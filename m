@@ -1,265 +1,76 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 19 Jun 2013 14:23:11 +0800
-Subject: [PATCH v4 0/6] mtd: atmel_nand: enable Nand Flash Controller (NFC)
- support
-Message-ID: <1371622997-26303-1-git-send-email-josh.wu@atmel.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 19 Jun 2013 16:24:49 +1000
+Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
+Message-ID: <20130619162449.5b0a64cc42e7cb9a744624e9@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enable NFC support for SAMA5 soc. It can send command,
-address cycles automaticly. Also when enable NFC sram, NFC will transfer
-data to sram. Which can save lots of cpu time.
+Hi Shawn,
 
-The mtd speed test results (non-NFC vs NFC), run in sama5d3x-ek with DMA
-enable, is in the end of this patch.
+Today's linux-next merge of the imx-mxs tree got a conflict in
+arch/arm/Kconfig.debug between commit 828989ad87af ("ARM: keystone: Add
+minimal TI Keystone platform support") from the arm-soc tree and commit
+34e8a16b944e ("ARM: imx: enable low-level debug support for imx6sl") from
+the imx-mxs tree.
 
-v3 --> v4:
- 1) refine the commit message for ofpart.c patch and also change the
-    description in partition.txt
- 2) remove len parameter for ofpart.c's change.
- 3) use devm_ioremap_resource instead of devm_requrest_and_ioremap.
- 4) add BIT_POS macro definition for magic number.
-
-v2 --> v3:
- 1) Change the dts usage for NFC. Now use a NFC child node of atmel nand
-    to enable NFC driver. In this way the atmel nand driver will include
-    a NFC driver, which will be probed if dts has NFC node.
- 2) can enable/disable NFC write by sram in dts.
- 3) merged J.C's patch(use devm_xxx to simple the code) in this series.
- 4) remove unused NFC register definitions. Change the definition names.
- 5) trival fix accroding to J.C's suggestion.
- 6) modify the ofpart.c for child node check. If the child node has compatible
-    property then this node is a device not a partition.
-
-v1 --> v2:
- 1) rebase it with latest l2-mtd git tree: 
-    - remove useless nand commands (NAND_CMD_DEPLETE1, NAND_CMD_STATUS_ERRORx).
-    - adopt to the new nand write function's parameters. Add error message when
-      handle subpage write via nfc sram.
- 2) rewrite pmecc_enable function. Now I use exist NAND_ECC_READ/WRITE const
-    instead of using a new enum definition.
-
-Jean-Christophe PLAGNIOL-VILLARD (1):
-  MTD: atmel_nand: use devm_xxx gpio kzalloc, gpio and ioremap
-
-Josh Wu (5):
-  mtd: atmel_nand: replace pmecc enable code with one function.
-  mtd: atmel_nand: add Nand Flash Controller (NFC) support
-  mtd: atmel_nand: enable Nand Flash Controller (NFC) read data via
-    sram
-  mtd: atmel_nand: enable Nand Flash Controller (NFC) write via sram
-  mtd: ofpart: add compatible check for child nodes
-
- .../devicetree/bindings/mtd/atmel-nand.txt         |   28 +
- .../devicetree/bindings/mtd/partition.txt          |    1 +
- drivers/mtd/nand/atmel_nand.c                      |  876 ++++++++++++++++----
- drivers/mtd/nand/atmel_nand_nfc.h                  |   98 +++
- drivers/mtd/ofpart.c                               |   13 +-
- 5 files changed, 853 insertions(+), 163 deletions(-)
- create mode 100644 drivers/mtd/nand/atmel_nand_nfc.h
-
-
-mtd_speedtest is run in 60M partition with DMA enabled for two cases:
- 1. Using NFC and sram read/write with DMA enabled.
- 2. Using Non-NFC with DMA enabled.
-
-Summary of the two test results:
- 1. With NFC and sram read/write enabled, the write speed will become %10 slower
-    and the cpu load also is reduce a lot (50% -> 20%):
-                          Non-NFC                  NFC
-      Page write Speed:   5536KiB : 46% ~ 64% --> 4989KiB : 13% ~ 22%
-      2 Page write speed: 5567KiB : 52% ~ 69% --> 5043KiB : 10% ~ 20%
-
- 2. With NFC and sram read/write enabled, the read speed is almost same and the
-    cpu load is reduced (30% -> 15%):
-                          Non-NFC                  NFC
-      Page read Speed:    9361KiB : %24 ~ 46% --> 9340KiB : 13% ~ 19%
-      2 Page read Speed:  9361KiB : %21 ~ 57% --> 9426KiB :  8% ~ 15%
-
-Following is the detail test log:
-
-case 1: Non-NFC with DMA:
-=================================================
-mtd_speedtest: MTD device: 2
-mtd_speedtest: MTD device size 62914560, eraseblock size 131072, page size 2048, count of eraseblocks 480, pages per eraseblock 64, OOB size 64
-mtd_speedtest: scanning for bad eraseblocks
-mtd_speedtest: scanned 480 eraseblocks, 0 are bad
-mtd_speedtest: testing eraseblock write speed
-top -n 130 -d 1 | grep speedtest
-  513   504 root     R     1164   0%  62% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     D     1164   0%  53% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  57% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  58% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  53% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  60% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  55% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  55% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  59% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  57% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  62% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: eraseblock write speed is 5594 KiB/s
-mtd_speedtest: testing eraseblock read speed
-  513   504 root     R     1164   0%  27% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%   5% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%   1% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%   2% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%   1% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: eraseblock read speed is 9442 KiB/s
-mtd_speedtest: testing page write speed
-  513   504 root     R     1164   0%  46% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  64% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  57% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  64% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  56% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  59% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  59% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  56% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  59% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  62% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  60% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: page write speed is 5536 KiB/s
-mtd_speedtest: testing page read speed
-  513   504 root     R     1164   0%  46% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  24% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  30% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  30% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  26% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  25% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: page read speed is 9361 KiB/s
-  513   504 root     R     1164   0%  24% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: testing 2 page write speed
-  513   504 root     R     1164   0%  69% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  56% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  57% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  61% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  55% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  61% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  55% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  52% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  55% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  58% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: 2 page write speed is 5567 KiB/s
-mtd_speedtest: testing 2 page read speed
-  513   504 root     D     1164   0%  57% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  26% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  21% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  23% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  24% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  25% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  23% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: 2 page read speed is 9361 KiB/s
-mtd_speedtest: Testing erase speed
-mtd_speedtest: erase speed is 167411 KiB/s
-mtd_speedtest: Testing 2x multi-block erase speed
-mtd_speedtest: 2x multi-block erase speed is 326808 KiB/s
-mtd_speedtest: Testing 4x multi-block erase speed
-  513   504 root     R     1164   0%  74% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: 4x multi-block erase speed is 301176 KiB/s
-mtd_speedtest: Testing 8x multi-block erase speed
-mtd_speedtest: 8x multi-block erase speed is 326808 KiB/s
-mtd_speedtest: Testing 16x multi-block erase speed
-mtd_speedtest: 16x multi-block erase speed is 328556 KiB/s
-mtd_speedtest: Testing 32x multi-block erase speed
-mtd_speedtest: 32x multi-block erase speed is 328556 KiB/s
-mtd_speedtest: Testing 64x multi-block erase speed
-mtd_speedtest: 64x multi-block erase speed is 325079 KiB/s
-mtd_speedtest: finished
-=================================================
-
-
-case 2: NFC with DMA:
-=================================================
-mtd_speedtest: MTD device: 2
-mtd_speedtest: MTD device size 62914560, eraseblock size 131072, page size 2048, count of eraseblocks 480, pages per eraseblock 64, OOB size 64
-mtd_speedtest: scanning for bad eraseblocks
-mtd_speedtest: scanned 480 eraseblocks, 0 are bad
-top -n 130 -d 1 | grep speedtest
-mtd_speedtest: testing eraseblock write speed
-  514   504 root     R     1164   0%   8% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  10% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  13% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     D     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     D     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  11% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%   9% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  11% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: eraseblock write speed is 5105 KiB/s
-mtd_speedtest: testing eraseblock read speed
-  514   504 root     R     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  20% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%   8% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%   6% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: eraseblock read speed is 9512 KiB/s
-  514   504 root     R     1164   0%   6% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: testing page write speed
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  20% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  13% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  11% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  22% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: page write speed is 4989 KiB/s
-mtd_speedtest: testing page read speed
-  514   504 root     R     1164   0%  16% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  13% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  16% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  18% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  19% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  16% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: page read speed is 9340 KiB/s
-mtd_speedtest: testing 2 page write speed
-  514   504 root     R     1164   0%  20% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  10% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  16% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  16% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  18% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  16% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  13% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: 2 page write speed is 5043 KiB/s
-mtd_speedtest: testing 2 page read speed
-  514   504 root     R     1164   0%   8% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%   9% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: 2 page read speed is 9426 KiB/s
-mtd_speedtest: Testing erase speed
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: erase speed is 157943 KiB/s
-mtd_speedtest: Testing 2x multi-block erase speed
-mtd_speedtest: 2x multi-block erase speed is 308743 KiB/s
-mtd_speedtest: Testing 4x multi-block erase speed
-mtd_speedtest: 4x multi-block erase speed is 313469 KiB/s
-mtd_speedtest: Testing 8x multi-block erase speed
-mtd_speedtest: 8x multi-block erase speed is 313469 KiB/s
-mtd_speedtest: Testing 16x multi-block erase speed
-mtd_speedtest: 16x multi-block erase speed is 315076 KiB/s
-mtd_speedtest: Testing 32x multi-block erase speed
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: 32x multi-block erase speed is 298252 KiB/s
-mtd_speedtest: Testing 64x multi-block erase speed
-mtd_speedtest: 64x multi-block erase speed is 311878 KiB/s
-mtd_speedtest: finished
-=================================================
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
 -- 
-1.7.9.5
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/Kconfig.debug
+index 4649bf5,29f7623..0000000
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@@ -251,20 -251,13 +251,27 @@@ choic
+  		  Say Y here if you want kernel low-level debugging support
+  		  on i.MX6Q/DL.
+  
++ 	config DEBUG_IMX6SL_UART
++ 		bool "i.MX6SL Debug UART"
++ 		depends on SOC_IMX6SL
++ 		help
++ 		  Say Y here if you want kernel low-level debugging support
++ 		  on i.MX6SL.
++ 
+ +	config DEBUG_KEYSTONE_UART0
+ +		bool "Kernel low-level debugging on KEYSTONE2 using UART0"
+ +		depends on ARCH_KEYSTONE
+ +		help
+ +		  Say Y here if you want the debug print routines to direct
+ +		  their output to UART0 serial port on KEYSTONE2 devices.
+ +
+ +	config DEBUG_KEYSTONE_UART1
+ +		bool "Kernel low-level debugging on KEYSTONE2 using UART1"
+ +		depends on ARCH_KEYSTONE
+ +		help
+ +		  Say Y here if you want the debug print routines to direct
+ +		  their output to UART1 serial port on KEYSTONE2 devices.
+ +
+  	config DEBUG_MMP_UART2
+  		bool "Kernel low-level debugging message via MMP UART2"
+  		depends on ARCH_MMP
+@@@ -677,11 -639,9 +685,12 @@@ config DEBUG_LL_INCLUD
+  				 DEBUG_IMX35_UART || \
+  				 DEBUG_IMX51_UART || \
+  				 DEBUG_IMX53_UART ||\
+- 				 DEBUG_IMX6Q_UART
++ 				 DEBUG_IMX6Q_UART || \
++ 				 DEBUG_IMX6SL_UART
+ -	default "debug/mvebu.S" if DEBUG_MVEBU_UART
+ +	default "debug/keystone.S" if DEBUG_KEYSTONE_UART0 || \
+ +				      DEBUG_KEYSTONE_UART1
+ +	default "debug/mvebu.S" if DEBUG_MVEBU_UART || \
+ +				   DEBUG_MVEBU_UART_ALTERNATE
+  	default "debug/mxs.S" if DEBUG_IMX23_UART || DEBUG_IMX28_UART
+  	default "debug/nomadik.S" if DEBUG_NOMADIK_UART
+  	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130619/d06cf0c2/attachment.sig>
