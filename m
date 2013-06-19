@@ -1,52 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Jun 2013 14:43:09 +0200
-Subject: [PATCH V5 1/3] pci: Add PCIe driver for Samsung Exynos
-In-Reply-To: <002401ce6c8a$2dd1e4a0$8975ade0$@samsung.com>
-References: <000b01ce6839$0f0455d0$2d0d0170$@samsung.com>
- <201306181556.47656.arnd@arndb.de>
- <002401ce6c8a$2dd1e4a0$8975ade0$@samsung.com>
-Message-ID: <201306191443.09598.arnd@arndb.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 19 Jun 2013 16:43:45 +0400
+Subject: [PATCH V3 05/11] USB: OHCI: Properly handle ohci-ep93xx suspend
+In-Reply-To: <1371643936-3314-6-git-send-email-manjunath.goudar@linaro.org>
+References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
+ <1371643936-3314-1-git-send-email-manjunath.goudar@linaro.org>
+ <1371643936-3314-6-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <51C1A781.2040603@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 June 2013, Jingoo Han wrote:
-> Then, do you mean the following?
-> 
-> static int __exit exynos_pcie_remove(struct platform_device *pdev)
-> {
->         struct pcie_port *pp = platform_get_drvdata(pdev);
-> 
->         clk_disable_unprepare(pp->bus_clk);
->         clk_disable_unprepare(pp->clk);
-> 
->         return 0;
-> }
-> 
-> static struct platform_driver exynos_pcie_driver = {
->         .remove = __exit_p(exynos_pcie_remove),
-> 
-> [.....]
-> 
-> /* Exynos PCIe driver does not allow module unload */
-> 
-> static int __init pcie_init(void)
-> {
->         hook_fault_code(16 + 6, exynos_pcie_abort, SIGBUS, 0,
->                         "imprecise external abort");
-> 
->         platform_driver_probe(&exynos_pcie_driver, exynos_pcie_probe);
-> 
->         return 0;
-> }
-> subsys_initcall(pcie_init);
-> 
-> MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
-> MODULE_DESCRIPTION("Samsung PCIe host controller driver");
-> MODULE_LICENSE("GPLv2");
-> 
+Hello.
 
-Yes, this looks good. I would probably use platform_driver_register
-rather than platform_driver_probe, but that is your choice. using
-platform_driver_probe() mean you cannot deal with deferred probing.
+On 19-06-2013 16:12, Manjunath Goudar wrote:
 
-	Arnd
+> Suspend scenario in case of ohci-ep93xx glue was not
+> properly handled as it was not suspending generic part
+> of ohci controller. Calling explicitly the ohci_suspend()
+> routine in ohci_hcd_ep93xx_drv_suspend() will ensure proper
+> handling of suspend scenario.
+
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg KH <greg@kroah.com>
+> Cc: linux-usb at vger.kernel.org
+
+> V2:
+>   -Incase ohci_suspend() fails, return right away without
+>    executing further.
+> V3:
+>   -Aligned variable "do_wakeup" and "ret".
+> ---
+>   drivers/usb/host/ohci-ep93xx.c |   10 +++++++++-
+>   1 file changed, 9 insertions(+), 1 deletion(-)
+
+> diff --git a/drivers/usb/host/ohci-ep93xx.c b/drivers/usb/host/ohci-ep93xx.c
+> index 8704e9f..f5f11d1 100644
+> --- a/drivers/usb/host/ohci-ep93xx.c
+> +++ b/drivers/usb/host/ohci-ep93xx.c
+> @@ -174,13 +174,21 @@ static int ohci_hcd_ep93xx_drv_suspend(struct platform_device *pdev, pm_message_
+>   {
+>   	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+>   	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+> +	bool	do_wakeup = device_may_wakeup(&pdev->dev);
+> +	int		ret;
+
+    There was no need to use tabs here, didn't you see that here the 
+variables aren't aligned?
+
+WBR, Sergei
