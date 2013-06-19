@@ -1,20 +1,28 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Wed, 19 Jun 2013 15:44:23 +0200
-Subject: [PATCH v2] ARM: map_init_section flushes incorrect pmd
-In-Reply-To: <1369914361-4237-1-git-send-email-ratbert.chuang@gmail.com>
-References: <CANutaR_ZHWdXQrZNBN91K==n3taMKBptmyU0+8DT1RzBStNCyA@mail.gmail.com>
- <1369914361-4237-1-git-send-email-ratbert.chuang@gmail.com>
-Message-ID: <CACmBeS3jtkdaREQ7hc2KHzsuR5OULXRMvMiO_fz0ggnYTHJvQA@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 19 Jun 2013 09:44:55 -0400
+Subject: How to use GDB on ARMv8 RTSM model
+In-Reply-To: <CAJXQGfKJHra0T57Fc6fRdWFJta40E1ok9gQu1Hv-rk0m697gZg@mail.gmail.com>
+References: <CAJXQGfKJHra0T57Fc6fRdWFJta40E1ok9gQu1Hv-rk0m697gZg@mail.gmail.com>
+Message-ID: <51C1B5D7.8020805@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 May 2013 13:46, Po-Yu Chuang <ratbert.chuang@gmail.com> wrote:
-> This bug was introduced in commit e651eab0.
-> Some v4/v5 platforms failed to boot due to this.
+Hi Naresh,
 
-Thanks!
+On 06/19/2013 07:38 AM, Naresh Bhat wrote:
+> Hi All,
+> 
+> How to debug kernel on ARMv8 RTSM model
+> http://www.linaro.org/engineering/armv8 ??
+> 
+> Is it possible to use GDB ??
 
-Confirming that this fixes boot on MOXA ART (FA526).
+Nobody has ported KGDB to arm64 yet, to my knowledge. I've been meaning to
+give it a go, but never seem to find the time.
 
-Best regards,
-Jonas
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
