@@ -1,73 +1,48 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 19 Jun 2013 21:33:14 +0400
-Subject: [PATCH V3 05/11] USB: OHCI: Properly handle ohci-ep93xx suspend
-In-Reply-To: <CAJFYCKGck29t211NTmXSKPtFdah3Pbe8T0UVZDsqWqqax3OL7g@mail.gmail.com>
-References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
- <1371643936-3314-1-git-send-email-manjunath.goudar@linaro.org>
- <1371643936-3314-6-git-send-email-manjunath.goudar@linaro.org>
- <51C1A781.2040603@cogentembedded.com>
- <CAJFYCKGck29t211NTmXSKPtFdah3Pbe8T0UVZDsqWqqax3OL7g@mail.gmail.com>
-Message-ID: <51C1EB5A.7090809@cogentembedded.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 19 Jun 2013 19:33:18 +0200
+Subject: [PATCH 02/10] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
+In-Reply-To: <1371645406-16873-3-git-send-email-ben.dooks@codethink.co.uk>
+References: <1371645406-16873-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1371645406-16873-3-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130619193318.70a9988a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Dear Ben Dooks,
 
-On 06/19/2013 06:42 PM, Manjunath Goudar wrote:
+On Wed, 19 Jun 2013 13:36:38 +0100, Ben Dooks wrote:
 
->         Suspend scenario in case of ohci-ep93xx glue was not
->         properly handled as it was not suspending generic part
->         of ohci controller. Calling explicitly the ohci_suspend()
->         routine in ohci_hcd_ep93xx_drv_suspend() will ensure proper
->         handling of suspend scenario.
->
->
->         Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org
->         <mailto:manjunath.goudar@linaro.org>>
->         Cc: Arnd Bergmann <arnd at arndb.de <mailto:arnd@arndb.de>>
->         Cc: Alan Stern <stern@rowland.harvard.edu
->         <mailto:stern@rowland.harvard.edu>>
->         Cc: Greg KH <greg at kroah.com <mailto:greg@kroah.com>>
->         Cc: linux-usb at vger.kernel.org <mailto:linux-usb@vger.kernel.org>
->
->
->         V2:
->            -Incase ohci_suspend() fails, return right away without
->             executing further.
->         V3:
->            -Aligned variable "do_wakeup" and "ret".
->         ---
->            drivers/usb/host/ohci-ep93xx.c |   10 +++++++++-
->            1 file changed, 9 insertions(+), 1 deletion(-)
->
->
->         diff --git a/drivers/usb/host/ohci-__ep93xx.c
->         b/drivers/usb/host/ohci-__ep93xx.c
->         index 8704e9f..f5f11d1 100644
->         --- a/drivers/usb/host/ohci-__ep93xx.c
->         +++ b/drivers/usb/host/ohci-__ep93xx.c
->         @@ -174,13 +174,21 @@ static int
->         ohci_hcd_ep93xx_drv_suspend(__struct platform_device *pdev,
->         pm_message_
->            {
->                  struct usb_hcd *hcd = platform_get_drvdata(pdev);
->                  struct ohci_hcd *ohci = hcd_to_ohci(hcd);
->         +       bool    do_wakeup = device_may_wakeup(&pdev->dev);
->         +       int             ret;
->
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +	@ in BE8, we load data in BE, but instructions still in LE
+> +	bic	ip, ip, #0xff000000
+> +	orr	ip, ip, r6, lsl#24
+> +#else
+>  	bic	ip, ip, #0x000000ff
+>  	orr	ip, ip, r6	@ mask in offset bits 31-24
+> +#endif
+>  	str	ip, [r7, r3]
+>  2:	cmp	r4, r5
+>  	ldrcc	r7, [r4], #4	@ use branch for delay slot
 
->         There was no need to use tabs here, didn't you see that here the
->     variables aren't aligned?
+As was suggested in
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/150782.html,
+you could put this patch later in the series and use the ARM_BE8()
+macro you introduce in the next patch.
 
->     WBR, Sergei
+Also in
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/150784.html,
+the same reviewer suggested to name the macro BE8() to make it fit like
+ARM() and THUMB() in the margin left by the indentation of assembly
+code. And also to add LE() to make the above code look like:
 
-> Instead of gmail you can use thunderbird mail there it is showing
->   proper alignment.
+BE8(	bic ip, ip, #0xff000000)
+BE8(	orr ip, ip, r6, lsl#24)
+LE(	bic ip, ip, #0x000000ff)
+LE(	orr ip, ip, r6)
 
-    Imagine, I'm using Thinderbird. :-D
-    And you're using HTML reply format, unwelcome on the Linux mailing 
-lists.
-
-> Manjunath Goudar
-
-WBR, Sergei
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
