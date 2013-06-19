@@ -1,30 +1,47 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 19 Jun 2013 11:34:02 +0200
-Subject: [PATCH v2] mfd: vexpress: Make the driver optional for arm and
- arm64
-In-Reply-To: <1370948162-18895-1-git-send-email-pawel.moll@arm.com>
-References: <20130610232249.GH18614@n2100.arm.linux.org.uk>
- <1370948162-18895-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20130619093402.GY7161@zurbaran>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 19 Jun 2013 04:34:32 -0500
+Subject: [PATCH 0/4] ARM: dts: OMAP3: Updates for Overo
+In-Reply-To: <51C179DC.9040605@epfl.ch>
+References: <1370962189-9689-1-git-send-email-florian.vaussard@epfl.ch>
+ <51C179DC.9040605@epfl.ch>
+Message-ID: <51C17B28.6060802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+On 06/19/2013 04:29 AM, Florian Vaussard wrote:
+> Hello Benoit,
+>
+> Any comments on this series?
 
-On Tue, Jun 11, 2013 at 11:56:02AM +0100, Pawel Moll wrote:
-> The driver can be used on either arm or arm64 platforms, but
-> the latter doesn't have any platform-specific configuration
-> options, so it must be possible to manually enable the driver.
-> 
-> As the gpiolib is optional for arm64 arch, the gpio/led code
-> must be compiled conditionally.
-The real solution would be to move the GPIO code away from the MFD
-driver, as we agreed on another thread.
-Based on this agreement, I'm taking this one for now, thanks.
+That series looks good to me. I've just applied it.
 
-Cheers,
-Samuel.
+Thanks,
+Benoit
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+>
+> Regards,
+> Florian
+>
+> On 06/11/2013 04:49 PM, Florian Vaussard wrote:
+>> Hello,
+>>
+>> This series performs several updates to omap3-overo and omap3-tobi.
+>> Patch 1 is necessary to patch 2 for the IRQ constant. The SMSC911X is
+>> largely taken from omap3-igep.
+>>
+>> Regards,
+>>
+>> Florian
+>>
+>> Florian Vaussard (4):
+>>    ARM: dts: OMAP3: Include IRQ header
+>>    ARM: dts: omap3-tobi: Add SMSC911X node
+>>    ARM: dts: omap3-tobi: Correct polarity for GPIO LED
+>>    ARM: dts: omap3-overo: Add default trigger for TWL4030 LED
+>>
+>>   arch/arm/boot/dts/omap3-overo.dtsi |    1 +
+>>   arch/arm/boot/dts/omap3-tobi.dts   |   50
+>> +++++++++++++++++++++++++++++++++++-
+>>   arch/arm/boot/dts/omap3.dtsi       |    1 +
+>>   3 files changed, 51 insertions(+), 1 deletions(-)
+>>
