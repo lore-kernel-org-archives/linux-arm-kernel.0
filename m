@@ -1,9 +1,9 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 19 Jun 2013 13:16:30 +0200
-Subject: [PATCH 3/8] mmc: atmel-mci: prepare clk before calling enable
+Date: Wed, 19 Jun 2013 13:17:30 +0200
+Subject: [PATCH 4/8] tty: atmel_serial: prepare clk before calling enable
 In-Reply-To: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
 References: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1371640590-9585-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1371640650-9625-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,105 +12,134 @@ avoid common clk framework warnings.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- drivers/mmc/host/atmel-mci.c |   29 ++++++++++++++++++++---------
- 1 file changed, 20 insertions(+), 9 deletions(-)
+ drivers/tty/serial/atmel_serial.c |   41 ++++++++++++++++++++++++++++---------
+ 1 file changed, 31 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index e75774f..e3058a5 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -380,6 +380,8 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 3467462..691265f 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1100,7 +1100,7 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
+ 		 * Enable the peripheral clock for this serial port.
+ 		 * This is called on uart_open() or a resume event.
+ 		 */
+-		clk_enable(atmel_port->clk);
++		clk_prepare_enable(atmel_port->clk);
+ 
+ 		/* re-enable interrupts if we disabled some on suspend */
+ 		UART_PUT_IER(port, atmel_port->backup_imr);
+@@ -1114,7 +1114,7 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
+ 		 * Disable the peripheral clock for this serial port.
+ 		 * This is called on uart_close() or a suspend event.
+ 		 */
+-		clk_disable(atmel_port->clk);
++		clk_disable_unprepare(atmel_port->clk);
+ 		break;
+ 	default:
+ 		printk(KERN_ERR "atmel_serial: unknown pm %d\n", state);
+@@ -1458,9 +1458,10 @@ static void atmel_of_init_port(struct atmel_uart_port *atmel_port,
+ /*
+  * Configure the port from the platform device resource info.
+  */
+-static void atmel_init_port(struct atmel_uart_port *atmel_port,
++static int atmel_init_port(struct atmel_uart_port *atmel_port,
+ 				      struct platform_device *pdev)
  {
- 	struct atmel_mci	*host = s->private;
- 	u32			*buf;
-+	int			ret = 0;
-+
++	int ret;
+ 	struct uart_port *port = &atmel_port->uart;
+ 	struct atmel_uart_data *pdata = pdev->dev.platform_data;
  
- 	buf = kmalloc(ATMCI_REGS_SIZE, GFP_KERNEL);
- 	if (!buf)
-@@ -391,9 +393,13 @@ static int atmci_regs_show(struct seq_file *s, void *v)
- 	 * consistent.
- 	 */
- 	spin_lock_bh(&host->lock);
--	clk_enable(host->mck);
-+	ret = clk_prepare_enable(host->mck);
-+	if (ret) {
-+		spin_unlock_bh(&host->lock);
-+		goto out;
-+	}
- 	memcpy_fromio(buf, host->regs, ATMCI_REGS_SIZE);
--	clk_disable(host->mck);
-+	clk_disable_unprepare(host->mck);
- 	spin_unlock_bh(&host->lock);
- 
- 	seq_printf(s, "MR:\t0x%08x%s%s ",
-@@ -444,9 +450,10 @@ static int atmci_regs_show(struct seq_file *s, void *v)
- 				val & ATMCI_CFG_LSYNC ? " LSYNC" : "");
+@@ -1496,9 +1497,19 @@ static void atmel_init_port(struct atmel_uart_port *atmel_port,
+ 	/* for console, the clock could already be configured */
+ 	if (!atmel_port->clk) {
+ 		atmel_port->clk = clk_get(&pdev->dev, "usart");
+-		clk_enable(atmel_port->clk);
++		if (IS_ERR(atmel_port->clk)) {
++			ret = PTR_ERR(atmel_port->clk);
++			atmel_port->clk = NULL;
++			return ret;
++		}
++		ret = clk_prepare_enable(atmel_port->clk);
++		if (ret) {
++			clk_put(atmel_port->clk);
++			atmel_port->clk = NULL;
++			return ret;
++		}
+ 		port->uartclk = clk_get_rate(atmel_port->clk);
+-		clk_disable(atmel_port->clk);
++		clk_disable_unprepare(atmel_port->clk);
+ 		/* only enable clock when USART is in use */
  	}
  
-+out:
- 	kfree(buf);
- 
--	return 0;
-+	return ret;
+@@ -1511,6 +1522,8 @@ static void atmel_init_port(struct atmel_uart_port *atmel_port,
+ 	} else {
+ 		atmel_port->tx_done_mask = ATMEL_US_TXRDY;
+ 	}
++
++	return 0;
  }
  
- static int atmci_regs_open(struct inode *inode, struct file *file)
-@@ -1281,7 +1288,7 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ struct platform_device *atmel_default_console_device;	/* the serial console device */
+@@ -1601,6 +1614,7 @@ static void __init atmel_console_get_options(struct uart_port *port, int *baud,
  
- 		spin_lock_bh(&host->lock);
- 		if (!host->mode_reg) {
--			clk_enable(host->mck);
-+			clk_prepare_enable(host->mck);
- 			atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
- 			atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIEN);
- 			if (host->caps.has_cfg_reg)
-@@ -1361,7 +1368,7 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 			atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
- 			if (host->mode_reg) {
- 				atmci_readl(host, ATMCI_MR);
--				clk_disable(host->mck);
-+				clk_disable_unprepare(host->mck);
- 			}
- 			host->mode_reg = 0;
- 		}
-@@ -2379,10 +2386,12 @@ static int __init atmci_probe(struct platform_device *pdev)
- 	if (!host->regs)
- 		goto err_ioremap;
- 
--	clk_enable(host->mck);
-+	ret = clk_prepare_enable(host->mck);
-+	if (ret)
-+		goto err_clk_prepare_enable;
- 	atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
- 	host->bus_hz = clk_get_rate(host->mck);
--	clk_disable(host->mck);
-+	clk_disable_unprepare(host->mck);
- 
- 	host->mapbase = regs->start;
- 
-@@ -2463,6 +2472,8 @@ err_init_slot:
- 		dma_release_channel(host->dma.chan);
- 	free_irq(irq, host);
- err_request_irq:
-+	clk_unprepare(host->mck);
-+err_clk_prepare_enable:
- 	iounmap(host->regs);
- err_ioremap:
- 	clk_put(host->mck);
-@@ -2487,11 +2498,11 @@ static int __exit atmci_remove(struct platform_device *pdev)
- 			atmci_cleanup_slot(host->slot[i], i);
+ static int __init atmel_console_setup(struct console *co, char *options)
+ {
++	int ret;
+ 	struct uart_port *port = &atmel_ports[co->index].uart;
+ 	int baud = 115200;
+ 	int bits = 8;
+@@ -1612,7 +1626,9 @@ static int __init atmel_console_setup(struct console *co, char *options)
+ 		return -ENODEV;
  	}
  
--	clk_enable(host->mck);
-+	clk_prepare_enable(host->mck);
- 	atmci_writel(host, ATMCI_IDR, ~0UL);
- 	atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
- 	atmci_readl(host, ATMCI_SR);
--	clk_disable(host->mck);
-+	clk_disable_unprepare(host->mck);
+-	clk_enable(atmel_ports[co->index].clk);
++	ret = clk_prepare_enable(atmel_ports[co->index].clk);
++	if (ret)
++		return ret;
  
- 	if (host->dma.chan)
- 		dma_release_channel(host->dma.chan);
+ 	UART_PUT_IDR(port, -1);
+ 	UART_PUT_CR(port, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
+@@ -1645,6 +1661,7 @@ static struct console atmel_console = {
+  */
+ static int __init atmel_console_init(void)
+ {
++	int ret;
+ 	if (atmel_default_console_device) {
+ 		struct atmel_uart_data *pdata =
+ 			atmel_default_console_device->dev.platform_data;
+@@ -1655,7 +1672,9 @@ static int __init atmel_console_init(void)
+ 		port->uart.line = id;
+ 
+ 		add_preferred_console(ATMEL_DEVICENAME, id, NULL);
+-		atmel_init_port(port, atmel_default_console_device);
++		ret = atmel_init_port(port, atmel_default_console_device);
++		if (ret)
++			return ret;
+ 		register_console(&atmel_console);
+ 	}
+ 
+@@ -1786,7 +1805,9 @@ static int atmel_serial_probe(struct platform_device *pdev)
+ 	port->backup_imr = 0;
+ 	port->uart.line = ret;
+ 
+-	atmel_init_port(port, pdev);
++	ret = atmel_init_port(port, pdev);
++	if (ret)
++		goto err;
+ 
+ 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+ 	if (IS_ERR(pinctrl)) {
+@@ -1812,9 +1833,9 @@ static int atmel_serial_probe(struct platform_device *pdev)
+ 			&& ATMEL_CONSOLE_DEVICE->flags & CON_ENABLED) {
+ 		/*
+ 		 * The serial core enabled the clock for us, so undo
+-		 * the clk_enable() in atmel_console_setup()
++		 * the clk_prepare_enable() in atmel_console_setup()
+ 		 */
+-		clk_disable(port->clk);
++		clk_disable_unprepare(port->clk);
+ 	}
+ #endif
+ 
 -- 
 1.7.9.5
