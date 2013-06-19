@@ -1,70 +1,117 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 18 Jun 2013 17:04:38 -0700
-Subject: [PATCH 08/11] iommu/msm: Move mach includes to iommu directory
+Date: Tue, 18 Jun 2013 17:04:35 -0700
+Subject: [PATCH 05/11] ARM: msm: Migrate msm_timer to CLOCKSOURCE_OF_DECLARE
 In-Reply-To: <1371600281-6118-1-git-send-email-sboyd@codeaurora.org>
 References: <1371600281-6118-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1371600281-6118-9-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1371600281-6118-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two header files exist in mach-msm's include/mach directory that
-are only used by the MSM iommu driver. Move these files to the
-iommu driver directory and prefix them with "msm_". This allows
-us to compile the MSM iommu driver on multi-platform kernels.
+This allows us to remove the init_time callback in the DT machine
+descriptors, shrinking the code.
 
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
 
-Joerg, please ack so this can go through the MSM tree.
+Unchanged from previous sends.
 
- drivers/iommu/msm_iommu.c                                             | 4 ++--
- arch/arm/mach-msm/include/mach/iommu.h => drivers/iommu/msm_iommu.h   | 0
- drivers/iommu/msm_iommu_dev.c                                         | 4 ++--
- .../include/mach/iommu_hw-8xxx.h => drivers/iommu/msm_iommu_hw-8xxx.h | 0
- 4 files changed, 4 insertions(+), 4 deletions(-)
- rename arch/arm/mach-msm/include/mach/iommu.h => drivers/iommu/msm_iommu.h (100%)
- rename arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h => drivers/iommu/msm_iommu_hw-8xxx.h (100%)
+ arch/arm/Kconfig                  |  1 +
+ arch/arm/mach-msm/board-dt-8660.c |  1 -
+ arch/arm/mach-msm/board-dt-8960.c |  1 -
+ arch/arm/mach-msm/common.h        |  1 -
+ arch/arm/mach-msm/timer.c         | 17 +++--------------
+ 5 files changed, 4 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
-index 8ab4f41..f5ff657 100644
---- a/drivers/iommu/msm_iommu.c
-+++ b/drivers/iommu/msm_iommu.c
-@@ -31,8 +31,8 @@
- #include <asm/cacheflush.h>
- #include <asm/sizes.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index af88c83..430c922 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -622,6 +622,7 @@ config ARCH_MSM
+ 	bool "Qualcomm MSM"
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKDEV_LOOKUP
++	select CLKSRC_OF if OF
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+ 	help
+diff --git a/arch/arm/mach-msm/board-dt-8660.c b/arch/arm/mach-msm/board-dt-8660.c
+index 40523da..f491b9b 100644
+--- a/arch/arm/mach-msm/board-dt-8660.c
++++ b/arch/arm/mach-msm/board-dt-8660.c
+@@ -46,6 +46,5 @@ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+ 	.map_io = debug_ll_io_init,
+ 	.init_machine = msm8x60_dt_init,
+ 	.init_late = msm8x60_init_late,
+-	.init_time	= msm_dt_timer_init,
+ 	.dt_compat = msm8x60_fluid_match,
+ MACHINE_END
+diff --git a/arch/arm/mach-msm/board-dt-8960.c b/arch/arm/mach-msm/board-dt-8960.c
+index 59b48e7..83be2b8 100644
+--- a/arch/arm/mach-msm/board-dt-8960.c
++++ b/arch/arm/mach-msm/board-dt-8960.c
+@@ -31,7 +31,6 @@ static const char * const msm8960_dt_match[] __initconst = {
+ DT_MACHINE_START(MSM8960_DT, "Qualcomm MSM (Flattened Device Tree)")
+ 	.smp = smp_ops(msm_smp_ops),
+ 	.map_io = debug_ll_io_init,
+-	.init_time	= msm_dt_timer_init,
+ 	.init_machine = msm_dt_init,
+ 	.dt_compat = msm8960_dt_match,
+ MACHINE_END
+diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
+index d8f3eac..3776268 100644
+--- a/arch/arm/mach-msm/common.h
++++ b/arch/arm/mach-msm/common.h
+@@ -14,7 +14,6 @@
  
--#include <mach/iommu_hw-8xxx.h>
--#include <mach/iommu.h>
-+#include "msm_iommu_hw-8xxx.h"
-+#include "msm_iommu.h"
+ extern void msm7x01_timer_init(void);
+ extern void msm7x30_timer_init(void);
+-extern void msm_dt_timer_init(void);
+ extern void qsd8x50_timer_init(void);
  
- #define MRC(reg, processor, op1, crn, crm, op2)				\
- __asm__ __volatile__ (							\
-diff --git a/arch/arm/mach-msm/include/mach/iommu.h b/drivers/iommu/msm_iommu.h
-similarity index 100%
-rename from arch/arm/mach-msm/include/mach/iommu.h
-rename to drivers/iommu/msm_iommu.h
-diff --git a/drivers/iommu/msm_iommu_dev.c b/drivers/iommu/msm_iommu_dev.c
-index 9144a6b..2ac1033 100644
---- a/drivers/iommu/msm_iommu_dev.c
-+++ b/drivers/iommu/msm_iommu_dev.c
-@@ -27,8 +27,8 @@
- #include <linux/err.h>
- #include <linux/slab.h>
+ extern void msm_map_common_io(void);
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 284313f..1167cf6 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -219,15 +219,8 @@ err:
+ }
  
--#include <mach/iommu_hw-8xxx.h>
--#include <mach/iommu.h>
-+#include "msm_iommu_hw-8xxx.h"
-+#include "msm_iommu.h"
+ #ifdef CONFIG_OF
+-static const struct of_device_id msm_timer_match[] __initconst = {
+-	{ .compatible = "qcom,kpss-timer" },
+-	{ .compatible = "qcom,scss-timer" },
+-	{ },
+-};
+-
+-void __init msm_dt_timer_init(void)
++static void __init msm_dt_timer_init(struct device_node *np)
+ {
+-	struct device_node *np;
+ 	u32 freq;
+ 	int irq;
+ 	struct resource res;
+@@ -235,12 +228,6 @@ void __init msm_dt_timer_init(void)
+ 	void __iomem *base;
+ 	void __iomem *cpu0_base;
  
- struct iommu_ctx_iter_data {
- 	/* input */
-diff --git a/arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h b/drivers/iommu/msm_iommu_hw-8xxx.h
-similarity index 100%
-rename from arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h
-rename to drivers/iommu/msm_iommu_hw-8xxx.h
+-	np = of_find_matching_node(NULL, msm_timer_match);
+-	if (!np) {
+-		pr_err("Can't find msm timer DT node\n");
+-		return;
+-	}
+-
+ 	base = of_iomap(np, 0);
+ 	if (!base) {
+ 		pr_err("Failed to map event base\n");
+@@ -283,6 +270,8 @@ void __init msm_dt_timer_init(void)
+ 
+ 	msm_timer_init(freq, 32, irq, !!percpu_offset);
+ }
++CLOCKSOURCE_OF_DECLARE(kpss_timer, "qcom,kpss-timer", msm_dt_timer_init);
++CLOCKSOURCE_OF_DECLARE(scss_timer, "qcom,scss-timer", msm_dt_timer_init);
+ #endif
+ 
+ static int __init msm_timer_map(phys_addr_t addr, u32 event, u32 source,
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
