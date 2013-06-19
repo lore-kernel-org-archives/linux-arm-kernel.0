@@ -1,67 +1,102 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Wed, 19 Jun 2013 17:42:16 +0530
-Subject: [PATCH V3 11/11] USB: OHCI: Properly handle ohci-spear suspend
-In-Reply-To: <1371643936-3314-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
- <1371643936-3314-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1371643936-3314-12-git-send-email-manjunath.goudar@linaro.org>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 19 Jun 2013 07:23:10 -0500
+Subject: [PATCH v2 1/4] ARM: dts: omap4-panda: Add USB Host support
+In-Reply-To: <51C19E6C.4040802@epfl.ch>
+References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
+ <1371571487-14389-2-git-send-email-rogerq@ti.com> <51C106A1.9030001@ti.com>
+ <51C15F7E.5020305@ti.com> <20130619074605.GW5523@atomide.com>
+ <51C183AC.8040801@ti.com> <51C19011.5050107@ti.com>
+ <51C19E6C.4040802@epfl.ch>
+Message-ID: <51C1A2AE.2020506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of ohci-spear glue was not
-properly handled as it was not suspending generic part
-of ohci controller. Calling explicitly the ohci_suspend()
-routine in spear_ohci_hcd_drv_suspend() will ensure proper
-handling of suspend scenario.
+On 06/19/2013 07:05 AM, Florian Vaussard wrote:
+> Hello,
+>
+> On 06/19/2013 01:03 PM, Roger Quadros wrote:
+>> On 06/19/2013 01:10 PM, Benoit Cousson wrote:
+>>> On 06/19/2013 02:46 AM, Tony Lindgren wrote:
+>>>> * Roger Quadros <rogerq@ti.com> [130619 00:42]:
+>>>>> Hi Benoit,
+>>>>>
+>>>>> On 06/19/2013 04:17 AM, Benoit Cousson wrote:
+>>>>>> Hi Roger,
+>>>>>>
+>>>>>> On 06/18/2013 11:04 AM, Roger Quadros wrote:
+>>>>>>> Provide the RESET and Power regulators for the USB PHY,
+>>>>>>> the USB Host port mode and the PHY device.
+>>>>>>>
+>>>>>>> Also provide pin multiplexer information for the USB host
+>>>>>>> pins.
+>>>>>>>
+>>>>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>>>>>> ---
+>>>>>>>     arch/arm/boot/dts/omap4-panda-common.dtsi |   62
+>>>>>>> +++++++++++++++++++++++++++++
+>>>>>>>     1 files changed, 62 insertions(+), 0 deletions(-)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>>>>>> b/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>>>>>> index 00cbaa5..7a21e8e 100644
+>>>>>>> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>>>>>> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>>>>>> @@ -59,6 +59,42 @@
+>>>>>>>                 "AFML", "Line In",
+>>>>>>>                 "AFMR", "Line In";
+>>>>>>>         };
+>>>>>>> +
+>>>>>>> +    /* HS USB Port 1 RESET */
+>>>>>>> +    hsusb1_reset: hsusb1_reset_reg {
+>>>>>>> +        compatible = "regulator-fixed";
+>>>>>>> +        regulator-name = "hsusb1_reset";
+>>>>>>> +        regulator-min-microvolt = <3300000>;
+>>>>>>> +        regulator-max-microvolt = <3300000>;
+>>>>>>> +        gpio = <&gpio2 30 0>;    /* gpio_62 */
+>>>>>>> +        startup-delay-us = <70000>;
+>>>>>>> +        enable-active-high;
+>>>>>>> +    };
+>>>>>>
+>>>>>> Is this really a regulator? Or just a GPIO line used to reset the
+>>>>>> USB PHY?
+>>>>>
+>>>>> It is in fact a GPIO line used as reset.
+>>>>>>
+>>>>>> If this is the case, I don't think it should be represented as a
+>>>>>> regulator.
+>>>>>
+>>>>> Why not? I think it fits very well in the regulator device model.
+>>>
+>>> I'm not sure fitting very well is the correct term.
+>>> It works, for sure, but it is no different than when we were trying
+>>> to abuse the regulator fmwk to enable the 32k clock in phoenix.
+>>> It is just a hack.
+>>>
+>>
+>> The only difference is there is a dedicated framework for clocks.
+>> Since there is nothing specific to
+>> handle reset lines it is left to the driver writer how he wants to
+>> manage it.
+>>
+>
+> There is a proposed binding for gpio-controlled reset lines, but it is
+> not yet merged [1].
+> I guess it can fit most usage patterns, and it can be an interesting
+> move in the future.
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg KH <greg@kroah.com>
-Cc: linux-usb at vger.kernel.org
+I'm glad to see that I was not the only one thinking that the regulator 
+was not the right fmwk to do that :-)
 
-V2:
- -Incase ohci_suspend() fails, return right away without
-  executing further.
-V3:
- -Aligned variable "do_wakeup" and "ret".
----
- drivers/usb/host/ohci-spear.c |   12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+Thanks for the pointer Florian.
 
-diff --git a/drivers/usb/host/ohci-spear.c b/drivers/usb/host/ohci-spear.c
-index 31ff3fc..a3b2696 100644
---- a/drivers/usb/host/ohci-spear.c
-+++ b/drivers/usb/host/ohci-spear.c
-@@ -130,20 +130,26 @@ static int spear_ohci_hcd_drv_remove(struct platform_device *pdev)
- }
- 
- #if defined(CONFIG_PM)
--static int spear_ohci_hcd_drv_suspend(struct platform_device *dev,
-+static int spear_ohci_hcd_drv_suspend(struct platform_device *pdev,
- 		pm_message_t message)
- {
--	struct usb_hcd *hcd = platform_get_drvdata(dev);
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
- 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
- 	struct spear_ohci *sohci_p = to_spear_ohci(hcd);
-+	bool		do_wakeup = device_may_wakeup(&pdev->dev);
-+	int		ret;
- 
- 	if (time_before(jiffies, ohci->next_statechange))
- 		msleep(5);
- 	ohci->next_statechange = jiffies;
- 
-+	ret = ohci_suspend(hcd, do_wakeup);
-+	if (ret)
-+		return ret;
-+
- 	clk_disable_unprepare(sohci_p->clk);
- 
--	return 0;
-+	return ret;
- }
- 
- static int spear_ohci_hcd_drv_resume(struct platform_device *dev)
--- 
-1.7.9.5
+I guess that series should be merged for 3.11? Based on the thread, it 
+should to through arm-soc.
+
+Roger,
+
+It might be tricky to have dependency on that series, but if this is 
+possible, you should try. Otherwise, just keep the existing one, adding 
+that a new solution will be available soon as a disclaimer.
+
+Regards,
+Benoit
