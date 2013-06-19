@@ -1,19 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jun 2013 01:47:26 +0200
-Subject: [PATCH] clocksource: kona: adapt to CLOCKSOURCE_OF_DECLARE change
-In-Reply-To: <51B770D7.6000000@broadcom.com>
-References: <3174210.ZivUajNGev@wuerfel> <51B770D7.6000000@broadcom.com>
-Message-ID: <201306200147.26772.arnd@arndb.de>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Thu, 20 Jun 2013 07:44:05 +0800
+Subject: [PATCH -next] arm: remove duplicated include from process.c
+Message-ID: <CAPgLHd9-sZkf8CboY9noao0GnSRRFsRCtnU0C0mtmKJRRFaC-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 June 2013, Christian Daudt wrote:
-> >
-> Acked-by: Christian Daudt <csd@broadcom.com>
-> 
-> Do you want this for 3.10 or should I add to my 3.11 tree ?
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-I've applied it to the next/fixes-non-critical branch with your ack now,
-scheduled for 3.11.
+Remove duplicated include.
 
-	Arnd
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ arch/arm/kernel/process.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 7591df5..f89ff80 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -32,7 +32,6 @@
+ #include <linux/hw_breakpoint.h>
+ #include <linux/cpuidle.h>
+ #include <linux/leds.h>
+-#include <linux/reboot.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/idmap.h>
