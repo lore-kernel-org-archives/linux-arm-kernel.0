@@ -1,52 +1,65 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 19 Jun 2013 21:32:18 +0200 (CEST)
-Subject: [PATCH] dmaengine: shdma: fix a build failure on platforms with
- no DMA support
-In-Reply-To: <CAGa+x8413povhYWx+BSj=TdzQDAuYFXmjF4A2kXvQt+=n+380w@mail.gmail.com>
-References: <Pine.LNX.4.64.1305301650290.29171@axis700.grange>
- <51A77CF1.7040105@ti.com> <20130531024438.GB32564@verge.net.au>
- <CAGa+x8413povhYWx+BSj=TdzQDAuYFXmjF4A2kXvQt+=n+380w@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1306192125480.12502@axis700.grange>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 19 Jun 2013 21:32:44 +0200
+Subject: [RFC PATCH 00/11] ARM: s3c64xx: Let amba-pl08x driver handle DMA
+In-Reply-To: <20130619192211.GH1403@sirena.org.uk>
+References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
+ <3697657.tZFV7pR81Q@flatron> <20130619192211.GH1403@sirena.org.uk>
+Message-ID: <5443580.A5iCQBtp1T@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod
-
-On Wed, 19 Jun 2013, Kevin Hilman wrote:
-
-> On Thu, May 30, 2013 at 7:44 PM, Simon Horman <horms@verge.net.au> wrote:
+On Wednesday 19 of June 2013 20:22:11 Mark Brown wrote:
+> On Wed, Jun 19, 2013 at 08:26:12PM +0200, Tomasz Figa wrote:
+> > On Wednesday 19 of June 2013 18:40:47 Mark Brown wrote:
+> > > -		ret = pd->get_signal(plchan->cd);
+> > > +		ret = (pd->get_signal)(plchan->cd);
+> > 
+> > Hmm, that's strange. The former is a completely valid piece of code...
 > 
-> [...]
+> I know, hence...
 > 
-> > thanks for this. I will wait for a refresh (as we discussed earlier today).
-> > Can I confirm that this is a fix for v3.10? If so, could ou note
-> > that when you post your revised patch?
+> > > to get it to build which makes me suspect the compiler a bit as
+> > > well...
 > 
-> Any progress on this patch?
+> ...my comment about suspecting the compiler.
 > 
-> The SH-mobile defconfigs are still all failing in linux-next.
+> > > I was applying this to -next, are there any other dependencies I
+> > > need or anything?
+> > 
+> > Hmm, I've been testing this on top of my common clock framework and
+> > device tree patches, but I don't think this had any effect. Did you
+> > add necessary clkdev lookups to the clock driver?
+> 
+> No, I didn't - that's most likely it, I didn't really investigate.  I
+> didn't test the watchdog stuff as the clocks didn't get sent to me.
 
-In
+I always try to keep you on Cc of my patches for s3c64xx, as you are the 
+most active user of this platform (if not the only one other than me) and 
+this was the case for clock patches as well, just checked that.
 
-https://patchwork.kernel.org/patch/2640061/
+Seems like I forgot to add you to watchdog patches, sorry. But you didn't 
+miss anything, since they were rather trivial ones.
 
-I proposed a simple immediate fix for this problem. Arnd at the same time 
-developed an alternative solution:
+> > In Samsung CCF alias notation it looks like this:
+> > 
+> > +       ALIAS(HCLK_DMA1, "dma-pl080s.1", "apb_pclk"),
+> > +       ALIAS(HCLK_DMA0, "dma-pl080s.0", "apb_pclk"),
+> > 
+> > Not sure how hard it will be to add such lookups to the old clock
+> > driver, though.
+> 
+> It's pretty much the same providing you know which clock needs to be
+> used.
+> 
+> > I will test this applied directly on top of current linux-next when I
+> > find some time, but for now you might check out my v3.11-devel branch
+> > on my github:
+> > 
+> > https://github.com/tom3q/linux.git
+> 
+> Will try to get round to it.
 
-https://patchwork.kernel.org/patch/2644121/
-https://patchwork.kernel.org/patch/2644111/
+OK.
 
-Which, I think, is a much larger change and isn't suitable as a bug-fix 
-this late in the release cycle. Instead those patches address other issues 
-with the shdma drivers, which might need to be carefully studied and 
-solutions have to be found, which, however, would require more work and 
-need a longer time. What is your opinion on this? Would you agree to apply 
-v2 of this patch, as referenced above or would you prefer a different 
-solution?
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Best regards,
+Tomasz
