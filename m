@@ -1,51 +1,87 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 19 Jun 2013 14:06:22 -0600
-Subject: [PATCH] pinctrl: document the pinctrl PM states
-In-Reply-To: <20130617180212.GU20992@atomide.com>
-References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
- <51BA1FE7.4000900@wwwdotorg.org>
- <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
- <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
- <CACRpkdYwGHMznjoJqf5bX_74pmeKSiWtTwpNF1_4GSEk+KwrZA@mail.gmail.com>
- <20130617180212.GU20992@atomide.com>
-Message-ID: <51C20F3E.5060302@wwwdotorg.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 19 Jun 2013 17:07:15 -0300
+Subject: [PATCH v4 01/12] bus: mvebu-mbus: Factor out initialization details
+In-Reply-To: <1371672446-21583-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1371672446-21583-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1371672446-21583-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2013 12:02 PM, Tony Lindgren wrote:
-> * Linus Walleij <linus.walleij@linaro.org> [130617 09:11]:
->> On Mon, Jun 17, 2013 at 9:20 AM, Tony Lindgren <tony@atomide.com> wrote:
->>
->>> First, I think the concept of remuxing (or even checking) _all_ the pins
->>> for a consumer device is wrong on most if not all hardware. For past 10
->>> years I have not seen a case where _all_ the pins for a device would need
->>> to be remuxed for any reason.
->>
->> We may be talking past each other here. On the ux500 we use a lot
->> of runtime pincontrol, but none of this is *remuxing*.
->>
->> We are only *reconfiguring*.
-> 
-> Hmm routing the signal to a different device is certainly
-> remuxing but yeah configuring pulls etc does not change the
-> mux.
->  
->> Now I know that Haojian only recently added pin config to the
->> pinctrl-single.c driver so maybe you have mostly seen muxing
->> in your driver so far, so you view of the world is a bit different.
->>
->> On the Nomadik pin controller we do mostly hogged muxing
->> at boot time, but a lot of runtime reconfiguration. So our
->> needs are very different.
->>
->> Bear in mind that struct pinctl * forks effects in two paths,
->> one is muxing the other is config, like pull-ups etc.
-> 
-> I also thought the plan was to merge pinmux and pinconf and
-> do things based the named modes?
+We introduce a common initialization function mvebu_mbus_common_init()
+that will be used by both legacy and device-tree initialization code.
+This patch is an intermediate step, which will allow to introduce the
+DT binding for this driver in a less intrusive way.
 
-Yes, pinctrl_select_state() simply applies a certain named state. A
-named state can include values for both mux settings and pin
-configuration values. So, everything is unified under this top-level
-API. There's certainly no need (nor allowance for really) drivers to be
-touching and pin_config API directly.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/bus/mvebu-mbus.c | 47 ++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 30 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index 33c6947..d0feee5 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -830,26 +830,14 @@ static __init int mvebu_mbus_debugfs_init(void)
+ }
+ fs_initcall(mvebu_mbus_debugfs_init);
+ 
+-int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+-			   size_t mbuswins_size,
+-			   phys_addr_t sdramwins_phys_base,
+-			   size_t sdramwins_size)
++static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
++					 phys_addr_t mbuswins_phys_base,
++					 size_t mbuswins_size,
++					 phys_addr_t sdramwins_phys_base,
++					 size_t sdramwins_size)
+ {
+-	struct mvebu_mbus_state *mbus = &mbus_state;
+-	const struct of_device_id *of_id;
+ 	int win;
+ 
+-	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
+-		if (!strcmp(of_id->compatible, soc))
+-			break;
+-
+-	if (!of_id->compatible) {
+-		pr_err("could not find a matching SoC family\n");
+-		return -ENODEV;
+-	}
+-
+-	mbus->soc = of_id->data;
+-
+ 	mbus->mbuswins_base = ioremap(mbuswins_phys_base, mbuswins_size);
+ 	if (!mbus->mbuswins_base)
+ 		return -ENOMEM;
+@@ -870,3 +858,28 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+ 
+ 	return 0;
+ }
++
++int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
++			   size_t mbuswins_size,
++			   phys_addr_t sdramwins_phys_base,
++			   size_t sdramwins_size)
++{
++	const struct of_device_id *of_id;
++
++	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
++		if (!strcmp(of_id->compatible, soc))
++			break;
++
++	if (!of_id->compatible) {
++		pr_err("could not find a matching SoC family\n");
++		return -ENODEV;
++	}
++
++	mbus_state.soc = of_id->data;
++
++	return mvebu_mbus_common_init(&mbus_state,
++			mbuswins_phys_base,
++			mbuswins_size,
++			sdramwins_phys_base,
++			sdramwins_size);
++}
+-- 
+1.8.1.5
