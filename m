@@ -1,66 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 19 Jun 2013 16:10:39 -0600
-Subject: [PATCH 2/5] pinctrl: clarify some dt pinconfig options
-In-Reply-To: <201306141742.49923.heiko@sntech.de>
-References: <201306141741.46077.heiko@sntech.de>
- <201306141742.49923.heiko@sntech.de>
-Message-ID: <51C22C5F.5020402@wwwdotorg.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 19 Jun 2013 15:16:11 -0700
+Subject: [PATCH v4 06/12] memory: mvebu-devbus: Remove address decoding
+ window workaround
+In-Reply-To: <20130619201805.GJ31667@titan.lakedaemon.net>
+References: <1371672446-21583-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1371672446-21583-7-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130619201805.GJ31667@titan.lakedaemon.net>
+Message-ID: <20130619221611.GC9518@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2013 09:42 AM, Heiko St?bner wrote:
-> The bias-pull-* options use values > 0 to indicate that the pull should
-> be activated and optionally also indicate the strength of the pull.
-> Therefore use an default value of 1 for these options.
+On Wed, Jun 19, 2013 at 04:18:05PM -0400, Jason Cooper wrote:
+> On Wed, Jun 19, 2013 at 05:07:20PM -0300, Ezequiel Garcia wrote:
+> > Now that mbus device tree binding has been introduced, remove the address
+> > decoding window management from this driver.
+> > A suitable 'ranges' entry should be added to the devbus-compatible node in
+> > the device tree, as described by the mbus binding documentation.
+> > 
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> > Greg,
+> > 
+> > I'm Ccing you, since you're carrying the mvebu-devbus driver in your trees.
+> > This patch should be applied only after the MBus DT binding is accepted
+> > and/or merged; although I doubt we will see that happening any time soon.
+> > 
+> >  drivers/memory/mvebu-devbus.c | 64 ++-----------------------------------------
+> >  1 file changed, 2 insertions(+), 62 deletions(-)
 > 
-> Split the low-power-mode option into low-power-enable and -disable.
-> 
-> Update the documentation to describe the param arguments better.
-> 
-> Wrong default options
-> Reported-by: James Hogan <james.hogan@imgtec.com>
-> 
+> Since this MBus series is most likely for v3.12, Greg's tree will be
+> merged by then.  At which time, we can decide if it's best to keep the
+> series together or continue to send devbus changes through him.  I'm
+> fine either way, and but I have a preference for keeping the series
+> together.
 
-That blank line should be before the Reported-by not after it.
+Ok, I'll ignore this then, as it shouldn't go into 3.11, and I don't
+have trees that go beyond that at this point in time.
 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+thanks,
 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-
-> -low-power-mode		- low power mode
-> +low-power-enable	- enable low power mode
-> +low-power-disable	- disable low power mode
-
-Hmmm. That's changing the binding definition. What if somebody already
-wrote their device tree according previous definition?
-
-It seems to be that tri-states are preferable for pinctrl DT:
-
-no entry: do nothing
-= 0: disable
-= 1: enable
-
-> +Arguments for parameters:
-> +
-> +- bias-pull-up, -down and -pin-default take as optional argument 0 to disable
-> +  the pull, on hardware supporting it the pull strength in Ohm. bias-disable
-> +  will also disable any active pull.
-
-Does this agree with the latest definition of the kernel-internal
-meaning of 0 for pull-up/down?
-
-> +- input-schmitt takes as argument the adjustable hysteresis in a
-> +  driver-specific format
-> +
-> +- input-debounce takes the debounce time as argument or 0 to disable debouncing
-> +
-> +- power-source argument is the custom value describing the source to select
-> +
-> +- slew-rate takes as argument the target rate in a driver-specific format
-
-If those things have driver-specific (note: should be
-DT-binding-specific, not driver-specific) values, then I'm not convinced
-that having a generic parameter name for them is a good idea; it makes
-things look the same when they aren't. By forcing each binding to
-include the vendor prefix on those properties and hence define a custom
-property name, you're making it clear that the semantics may be different.
+greg k-h
