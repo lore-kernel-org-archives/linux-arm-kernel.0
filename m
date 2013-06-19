@@ -1,39 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Jun 2013 09:52:02 +0100
-Subject: [PATCH 3/9] ARM: dma-mapping: convert DMA direction into IOMMU
- protection attributes
-In-Reply-To: <51C16DAF.1090205@samsung.com>
-References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
- <1370889285-22799-4-git-send-email-will.deacon@arm.com>
- <51C16DAF.1090205@samsung.com>
-Message-ID: <20130619085202.GC20351@mudshark.cambridge.arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 19 Jun 2013 14:22:28 +0530
+Subject: [PATCH 1/4] arm: omap: Add phy binding info for musb in plat data
+In-Reply-To: <1371631951-369-1-git-send-email-kishon@ti.com>
+References: <1371631951-369-1-git-send-email-kishon@ti.com>
+Message-ID: <1371631951-369-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 09:37:03AM +0100, Marek Szyprowski wrote:
-> Hello,
+In order for controllers to get PHY in case of non dt boot, the phy
+binding information (phy label) should be added in the platform
+data of the controller.
 
-Hi Marek,
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Tested-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/mach-omap2/usb-musb.c |    6 +++++-
+ include/linux/usb/musb.h       |    3 +++
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-> On 6/10/2013 8:34 PM, Will Deacon wrote:
-> > IOMMU mappings take a prot parameter, identifying the protection bits
-> > to enforce on the newly created mapping (READ or WRITE). The ARM
-> > dma-mapping framework currently just passes 0 as the prot argument,
-> > resulting in faulting mappings.
-> >
-> > This patch infers the protection attributes based on the direction of
-> > the DMA transfer.
-> >
-> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> Thanks for fixing this issue. Could I take this patch to my dma-mapping tree
-> with other dma-mapping changes I've collected recently or do you want my ack
-> and push it via other tree?
-
-Please, feel free to take it via the dma-mapping tree! That's probably the
-best route for it and there's nothing that really depends on it anyway.
-
-Cheers,
-
-Will
+diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
+index 3242a55..5ddbe39 100644
+--- a/arch/arm/mach-omap2/usb-musb.c
++++ b/arch/arm/mach-omap2/usb-musb.c
+@@ -85,8 +85,12 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
+ 	musb_plat.mode = board_data->mode;
+ 	musb_plat.extvbus = board_data->extvbus;
+ 
+-	if (cpu_is_omap44xx())
++	if (cpu_is_omap44xx()) {
+ 		musb_plat.has_mailbox = true;
++		musb_plat.phy_name = "omap-usb2";
++	} else if (cpu_is_omap34xx()) {
++		musb_plat.phy_name = "twl4030";
++	}
+ 
+ 	if (soc_is_am35xx()) {
+ 		oh_name = "am35x_otg_hs";
+diff --git a/include/linux/usb/musb.h b/include/linux/usb/musb.h
+index 053c268..c05d46d 100644
+--- a/include/linux/usb/musb.h
++++ b/include/linux/usb/musb.h
+@@ -104,6 +104,9 @@ struct musb_hdrc_platform_data {
+ 	/* for clk_get() */
+ 	const char	*clock;
+ 
++	/* phy device label */
++	const char	*phy_name;
++
+ 	/* (HOST or OTG) switch VBUS on/off */
+ 	int		(*set_vbus)(struct device *dev, int is_on);
+ 
+-- 
+1.7.10.4
