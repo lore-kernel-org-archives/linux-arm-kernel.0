@@ -1,86 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 19 Jun 2013 22:22:22 +0900
-Subject: [PATCH 4/5] ARM: shmobile: bockw: add MMCIF support
-In-Reply-To: <1371648143-18376-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371648143-18376-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371648143-18376-5-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 19 Jun 2013 22:22:31 +0900
+Subject: [GIT PULL 0/4] Renesas ARM based SoC pinmux and GPIO update for v3.11
+ #2
+Message-ID: <1371648155-18479-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Arnd,
 
-This patch enables CN26 MMCIF
+please consider these pinmux updates for v3.11.
 
-Signed-off-by: Yusuke Goda <yusuke.goda.sx@renesas.com>
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-bockw.c | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+This pull-request is based on renesas-pinmux-for-v3.11 which you
+have already pulled.
 
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index 7d42f12..7d48461 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -41,6 +41,23 @@
-  * SW41		SCIF	RCAN
-  */
- 
-+/*
-+ * MMC (CN26) pin
-+ *
-+ * SW6	(D2)	3 pin
-+ * SW7	(D5)	ON
-+ * SW8	(D3)	3 pin
-+ * SW10	(D4)	1 pin
-+ * SW12	(CLK)	1 pin
-+ * SW13	(D6)	3 pin
-+ * SW14	(CMD)	ON
-+ * SW15	(D6)	1 pin
-+ * SW16	(D0)	ON
-+ * SW17	(D1)	ON
-+ * SW18	(D7)	3 pin
-+ * SW19	(MMC)	1 pin
-+ */
-+
- /* Dummy supplies, where voltage doesn't matter */
- static struct regulator_consumer_supply dummy_supplies[] = {
- 	REGULATOR_SUPPLY("vddvario", "smsc911x"),
-@@ -114,6 +131,15 @@ static struct spi_board_info spi_board_info[] __initdata = {
- 	},
- };
- 
-+/* MMC */
-+static struct sh_mmcif_plat_data sh_mmcif_plat = {
-+	.sup_pclk	= 0,
-+	.ocr		= MMC_VDD_165_195 | MMC_VDD_32_33 | MMC_VDD_33_34,
-+	.caps		= MMC_CAP_4_BIT_DATA |
-+			  MMC_CAP_8_BIT_DATA |
-+			  MMC_CAP_NEEDS_POLL,
-+};
-+
- static const struct pinctrl_map bockw_pinctrl_map[] = {
- 	/* Ether */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7778",
-@@ -121,6 +147,11 @@ static const struct pinctrl_map bockw_pinctrl_map[] = {
- 	/* HSPI0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-hspi.0", "pfc-r8a7778",
- 				  "hspi0_a", "hspi0"),
-+	/* MMC */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif", "pfc-r8a7778",
-+				  "mmc_data8", "mmc"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif", "pfc-r8a7778",
-+				  "mmc_ctrl", "mmc"),
- 	/* SCIF0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
- 				  "scif0_data_a", "scif0"),
-@@ -145,6 +176,7 @@ static void __init bockw_init(void)
- 	r8a7778_add_ether_device(&ether_platform_data);
- 	r8a7778_add_i2c_device(0);
- 	r8a7778_add_hspi_device(0);
-+	r8a7778_add_mmc_device(&sh_mmcif_plat);
- 
- 	i2c_register_board_info(0, i2c0_devices,
- 				ARRAY_SIZE(i2c0_devices));
--- 
-1.8.2.1
+The following changes since commit 5fcf4a3c3a5bc08bf72a50ef1332501a3c1b96bb:
+
+  ARM: shmobile: marzen: Use RCAR_GP_PIN macro (2013-06-05 17:18:24 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pinmux2-for-v3.11
+
+for you to fetch changes up to cd622017eb3e0ab841502df88fb7fda3c3a58eb9:
+
+  sh-pfc: r8a7778: tidyup MMC_D1 pin (2013-06-18 16:13:28 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM based SoC pinmux and GPIO update for v3.11
+
+tidyup MMC_D1 pin for r8a7778 SoC
+fix two pin numbers and add HSCIF pin groups to r8a7790 SoC
+add pinmux data for MMCIF and SDHI interfaces for r8a73a4 SoC
+
+----------------------------------------------------------------
+Guennadi Liakhovetski (2):
+      pinctrl: r8a73a4: add pinmux data for MMCIF and SDHI interfaces
+      pinctrl: r8a7790: fix two pin numbers
+
+Kuninori Morimoto (1):
+      sh-pfc: r8a7778: tidyup MMC_D1 pin
+
+Ulrich Hecht (1):
+      sh-pfc: r8a7790: add HSCIF pin groups
+
+ drivers/pinctrl/sh-pfc/pfc-r8a73a4.c | 198 ++++++++++++++++++++++++++++++
+ drivers/pinctrl/sh-pfc/pfc-r8a7778.c |   4 +-
+ drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 227 +++++++++++++++++++++++++++++++----
+ 3 files changed, 403 insertions(+), 26 deletions(-)
