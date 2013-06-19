@@ -1,42 +1,114 @@
-From: mark.retallack@siemens.com (Retallack, Mark)
-Date: Wed, 19 Jun 2013 09:00:00 +0000
-Subject: Atmel Serial driver PDC buffer handling issue
-Message-ID: <3D029C603B477F4BAF0E9739E943D3FE087960@DEFTHW99EJ2MSX.ww902.siemens.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 19 Jun 2013 11:04:22 +0200
+Subject: [PATCH v1] ARM: DMA-mapping: mark all !DMA_TO_DEVICE pages in
+ unmapping as clean
+In-Reply-To: <1368590989-5433-1-git-send-email-ming.lei@canonical.com>
+References: <1368590989-5433-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <51C17416.60601@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-I hope this is the correct mailing list for this issue :)
+On 5/15/2013 6:09 AM, Ming Lei wrote:
+> It is common for one sg to include many pages, so mark all these
+> pages as clean to avoid unnecessary flushing on them in
+> set_pte_at() or update_mmu_cache().
+>
+> The patch might improve loading performance of applciation code a bit.
+>
+> On the below test code to read file(~1GByte size) from usb mass storage
+> disk to buffer created with mmap(PROT_READ | PROT_EXEC) on
+> Pandaboard, average ~1% improvement can be observed with the patch on
+> 10 times test.
+>
+> unsigned int sum = 0;
+>
+> static unsigned long tv_diff(struct timeval *tv1, struct timeval *tv2)
+> {
+> 	return (tv2->tv_sec - tv1->tv_sec) * 1000000 +
+> 		(tv2->tv_usec - tv1->tv_usec);
+> }
+>
+> int main(int argc, char *argv[])
+> {
+> 	char *mbuffer;
+> 	int fd;
+> 	int i;
+> 	unsigned long page_size, size;
+> 	struct stat stat;
+> 	struct timeval t1, t2;
+>
+> 	page_size = getpagesize();
+> 	fd = open(argv[1], O_RDONLY);
+> 	assert(fd >= 0);
+>
+> 	fstat(fd, &stat);
+> 	size = stat.st_size;
+> 	printf("%s: file %s, file size %lu, page size %lu\n", argv[0],
+> 		read_filename, size, page_size);
+>
+> 	gettimeofday(&t1, NULL);
+> 	mbuffer = mmap(NULL, size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
+> 	for (i = 0 ; i < size ; i += page_size)
+> 		sum += mbuffer[i];
+> 	munmap(mbuffer, page_size);
+> 	gettimeofday(&t2, NULL);
+> 	printf("\tread mmaped time: %luus\n", tv_diff(&t1, &t2));
+>
+> 	close(fd);
+> }
+>
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Ming Lei <ming.lei@canonical.com>
 
-We have found a small problem with the Atmel serial driver (drivers/tty/serial/atmel_serial.c) when using PDC. The problem showed itself on our system when it is heavily loaded and the softirq's are implemented as threads.
+Thanks for proving this patch. I'm really sorry for a late reply. I've 
+applied it to my dma-mapping tree.
 
-The DMA buffers (2 off) are dynamically allocated when the driver is initialized. The relative location of these buffers is down to the whims of the memory allocation software i.e. the buffers could be in contiguous memory or separated by a number of bytes.
-What if the buffers are contiguous and the PDC managed to fill both buffers before the handling tasklet could run, the tasklet would be unable to identify this condition.
+> ---
+> v1:
+> 	- fix one mistake on computing pfn, pointed out by Nicolas
+>
+>   arch/arm/mm/dma-mapping.c |   20 +++++++++++++++++---
+>   1 file changed, 17 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index ef3e0f3..c038ec0 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -880,10 +880,24 @@ static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+>   	dma_cache_maint_page(page, off, size, dir, dmac_unmap_area);
+>   
+>   	/*
+> -	 * Mark the D-cache clean for this page to avoid extra flushing.
+> +	 * Mark the D-cache clean for these pages to avoid extra flushing.
+>   	 */
+> -	if (dir != DMA_TO_DEVICE && off == 0 && size >= PAGE_SIZE)
+> -		set_bit(PG_dcache_clean, &page->flags);
+> +	if (dir != DMA_TO_DEVICE && size >= PAGE_SIZE) {
+> +		unsigned long pfn;
+> +		size_t left = size;
+> +
+> +		pfn = page_to_pfn(page) + off / PAGE_SIZE;
+> +		off %= PAGE_SIZE;
+> +		if (off) {
+> +			pfn++;
+> +			left -= PAGE_SIZE - off;
+> +		}
+> +		while (left >= PAGE_SIZE) {
+> +			page = pfn_to_page(pfn++);
+> +			set_bit(PG_dcache_clean, &page->flags);
+> +			left -= PAGE_SIZE;
+> +		}
+> +	}
+>   }
+>   
+>   /**
 
-For example:
-Assume DMA buffers A and B are both 0x200 bytes long and reside at addresses 0x100 and 0x300 respectively. Now also assume that the PDC has managed to fill both buffers starting with B then moving to A (at which point the PDC asserts the ENDRX and RXBUFF flags, resulting in the ENDRX interrupt). At this time the PDC has advanced the RPR to one byte beyond the end of buffer A i.e. address 0x200. 
-When the tasklet runs, as far as it is concerned it is still processing buffer B. The first thing it does is to work out whether the PDC has completely filled buffer B, which it does by subtracting buffer B address from the RPR i.e. 0x200 - 0x200 = 0. So the tasklet believes that the buffer is empty rather than actually being full. In this event, the tasklet does not update RNPR and RNCR to inform the PDC that buffer B can now be used (side effect of which is that the ENDRX and RXBUFF flags remain set). When the tasklet reenables the ENDRX interrupt (when it exits) the UART immediately generates an interrupt (based on the ENDRX flag being set). The whole process then repeats while no further data is received.
-
-I have attached a patch that fixes the issue. This is the first time I have submitted a patch, so please let me know if I did anything wrong. 
-
-
-Thanks
-Mark Retallack
-
-Siemens AG
-NWE RC-GB IC-MOL RCM ENG PD HWFW FW
-Sopers Lane
-BH17 7ER Poole, 
-Tel: +44 1202 782189
-Fax: +44 1202 782545
-mailto:mark.retallack at siemens.com
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: atmel_serial_dma.patch
-Type: application/octet-stream
-Size: 3811 bytes
-Desc: atmel_serial_dma.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130619/92952e79/attachment.obj>
+Best regards
+-- 
+Marek Szyprowski
+Samsung R&D Institute Poland
