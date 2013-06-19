@@ -1,53 +1,124 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 19 Jun 2013 07:34:38 -0500
-Subject: [PATCH v2 1/4] ARM: dts: omap4-panda: Add USB Host support
-In-Reply-To: <20130619122715.GA5523@atomide.com>
-References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
- <1371571487-14389-2-git-send-email-rogerq@ti.com> <51C106A1.9030001@ti.com>
- <51C15F7E.5020305@ti.com> <20130619074605.GW5523@atomide.com>
- <51C183AC.8040801@ti.com> <20130619122715.GA5523@atomide.com>
-Message-ID: <51C1A55E.9040500@ti.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 19 Jun 2013 14:34:07 +0200
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <00ae01ce6cd9$f4834630$dd89d290$%dae@samsung.com>
+References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
+ <1371467722-665-1-git-send-email-inki.dae@samsung.com>
+ <51BEF458.4090606@canonical.com>
+ <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
+ <20130617133109.GG2718@n2100.arm.linux.org.uk>
+ <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
+ <20130617154237.GJ2718@n2100.arm.linux.org.uk>
+ <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
+ <20130617182127.GM2718@n2100.arm.linux.org.uk>
+ <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
+ <20130618084308.GU2718@n2100.arm.linux.org.uk>
+ <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
+ <1371548849.4276.6.camel@weser.hi.pengutronix.de>
+ <008601ce6cb0$2c8cec40$85a6c4c0$%dae@samsung.com>
+ <1371637326.4230.24.camel@weser.hi.pengutronix.de>
+ <00ae01ce6cd9$f4834630$dd89d290$%dae@samsung.com>
+Message-ID: <1371645247.4230.41.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Am Mittwoch, den 19.06.2013, 19:44 +0900 schrieb Inki Dae:
+> 
+> > -----Original Message-----
+> > From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> > Sent: Wednesday, June 19, 2013 7:22 PM
+> > To: Inki Dae
+> > Cc: 'Russell King - ARM Linux'; 'linux-fbdev'; 'Kyungmin Park'; 'DRI
+> > mailing list'; 'myungjoo.ham'; 'YoungJun Cho'; linux-arm-
+> > kernel at lists.infradead.org; linux-media at vger.kernel.org
+> > Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+> > framework
+> > 
+> > Am Mittwoch, den 19.06.2013, 14:45 +0900 schrieb Inki Dae:
+> > >
+> > > > -----Original Message-----
+> > > > From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> > > > Sent: Tuesday, June 18, 2013 6:47 PM
+> > > > To: Inki Dae
+> > > > Cc: 'Russell King - ARM Linux'; 'linux-fbdev'; 'Kyungmin Park'; 'DRI
+> > > > mailing list'; 'myungjoo.ham'; 'YoungJun Cho'; linux-arm-
+> > > > kernel at lists.infradead.org; linux-media at vger.kernel.org
+> > > > Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer
+> > synchronization
+> > > > framework
+> > > >
+> > > > Am Dienstag, den 18.06.2013, 18:04 +0900 schrieb Inki Dae:
+> > > > [...]
+> > > > >
+> > > > > > a display device driver.  It shouldn't be used within a single
+> > driver
+> > > > > > as a means of passing buffers between userspace and kernel space.
+> > > > >
+> > > > > What I try to do is not really such ugly thing. What I try to do is
+> > to
+> > > > > notify that, when CPU tries to access a buffer , to kernel side
+> > through
+> > > > > dmabuf interface. So it's not really to send the buffer to kernel.
+> > > > >
+> > > > > Thanks,
+> > > > > Inki Dae
+> > > > >
+> > > > The most basic question about why you are trying to implement this
+> > sort
+> > > > of thing in the dma_buf framework still stands.
+> > > >
+> > > > Once you imported a dma_buf into your DRM driver it's a GEM object and
+> > > > you can and should use the native DRM ioctls to prepare/end a CPU
+> > access
+> > > > to this BO. Then internally to your driver you can use the dma_buf
+> > > > reservation/fence stuff to provide the necessary cross-device sync.
+> > > >
+> > >
+> > > I don't really want that is used only for DRM drivers. We really need
+> > > it for all other DMA devices; i.e., v4l2 based drivers. That is what I
+> > > try to do. And my approach uses reservation to use dma-buf resources
+> > > but not dma fence stuff anymore. However, I'm looking into Radeon DRM
+> > > driver for why we need dma fence stuff, and how we can use it if
+> > > needed.
+> > >
+> > 
+> > Still I don't see the point why you need syncpoints above dma-buf. In
+> > both the DRM and the V4L2 world we have defined points in the API where
+> > a buffer is allowed to change domain from device to CPU and vice versa.
+> > 
+> > In DRM if you want to access a buffer with the CPU you do a cpu_prepare.
+> > The buffer changes back to GPU domain once you do the execbuf
+> > validation, queue a pageflip to the buffer or similar things.
+> > 
+> > In V4L2 the syncpoints for cache operations are the queue/dequeue API
+> > entry points. Those are also the exact points to synchronize with other
+> > hardware thus using dma-buf reserve/fence.
+> 
+> 
+> If so, what if we want to access a buffer with the CPU _in V4L2_? We
+> should open a drm device node, and then do a cpu_prepare? 
+> 
+Not at all. As I said the syncpoints are the queue/dequeue operations.
+When dequeueing a buffer you are explicitly dragging the buffer domain
+back from device into userspace and thus CPU domain.
 
-On 06/19/2013 07:27 AM, Tony Lindgren wrote:
-> * Benoit Cousson <b-cousson@ti.com> [130619 03:17]:
->> On 06/19/2013 02:46 AM, Tony Lindgren wrote:
->>>
->>> We have a similar issue with the MMC1 PBIAS. I think in the long run we
->>> should expand regulator (and possibly pinctrl) framework(s) to handle
->>> comparators. We could just assume that a comparatator is a regulator,
->>> and have a comparator binding that just uses the regulator code.
->>
->> In the case of pbias, the pinctrl seems to be a much better fit for
->> my point of view. pinctrl can handle pin configuration and this is
->> what the pbias is in the case of MMC pins.
->
-> Well just recently Linus W specifically wanted us to use regulator
-> framework for the MMC1 PBIAS rather than pinctrl. That's because
-> from consumer driver point of view, it changes voltage and there's
-> a delay involved. So I guess no conclusion yet, and it's best to
-> do stand alone drivers to deal with those that use pinctrl for the
-> pinctrl specific parts and export it as a regulator for the consumer
-> devices.
-
-In the case of pbias, the boundary is not that clear, and it is true 
-that writing a complete pinctrl driver is really overkill.
-I've tried in the past, and gave up due to the complexity of fmwk and 
-the lack of time. I still think, it is a much better fmwk to handle pin 
-configuration than the regulator fmwk.
-
-> That's pretty much along the lines what Roger has done,
-> except the transceiver could use the pinctrl-single,bits for the
-> muxing and pinconf.
-
-Well, in that case, this is a reset line, so it does not have anything 
-to do with voltage :-)
-
-Anyway, thanks to Florian, we know that there is a real solution to that 
-problem. It is just not merged now :-(
+If you are operating on an mmap of a V4L2 processed buffer it's either
+before or after it got processed by the hardware and therefore all DMA
+operations on the buffer are bracketed by the V4L2 qbug/dqbuf ioctls.
+That is where cache operations and synchronization should happen. The
+V4L2 driver shouldn't allow you to dequeue a buffer and thus dragging it
+back into CPU domain while there is still DMA ongoing. Equally the queue
+ioctrl should make sure caches are properly written back to memory. The
+results of reading/writing to the mmap of a V4L2 buffer while it is
+enqueued to the hardware is simply undefined and there is nothing
+suggesting that this is a valid usecase.
 
 Regards,
-Benoit
+Lucas
+
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
