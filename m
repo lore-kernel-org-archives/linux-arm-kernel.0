@@ -1,59 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 18 Jun 2013 23:43:07 -0700
-Subject: OMAP4430 failure to boot
-In-Reply-To: <20130618183424.GD2718@n2100.arm.linux.org.uk>
-References: <20130618183424.GD2718@n2100.arm.linux.org.uk>
-Message-ID: <20130619064307.GV5523@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 19 Jun 2013 15:02:57 +0800
+Subject: [PATCH] irqchip: gic: call gic_cpu_init() as well in
+ CPU_STARTING_FROZEN case
+In-Reply-To: <20130614123357.GB4489@S2101-09.ap.freescale.net>
+References: <1371036627-13529-1-git-send-email-shawn.guo@linaro.org>
+ <20130612151748.GC31646@arm.com>
+ <20130614123357.GB4489@S2101-09.ap.freescale.net>
+Message-ID: <20130619070253.GA3405@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [130618 11:40]:
-> So... the boot and build system last night managed to build its kernels
-> after I dropped a couple of patches from my kernel, but we've gone from
-> having both the 3430LDP and 4430SDP booting to only the 3430LDP.
+On Fri, Jun 14, 2013 at 08:33:59PM +0800, Shawn Guo wrote:
+> On Wed, Jun 12, 2013 at 04:17:49PM +0100, Catalin Marinas wrote:
+> > On Wed, Jun 12, 2013 at 12:30:27PM +0100, Shawn Guo wrote:
+> > > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> > > index 1760ceb..19ceaa6 100644
+> > > --- a/drivers/irqchip/irq-gic.c
+> > > +++ b/drivers/irqchip/irq-gic.c
+> > > @@ -705,7 +705,7 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
+> > >  static int __cpuinit gic_secondary_init(struct notifier_block *nfb,
+> > >  					unsigned long action, void *hcpu)
+> > >  {
+> > > -	if (action == CPU_STARTING)
+> > > +	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
+> > >  		gic_cpu_init(&gic_data[0]);
+> > >  	return NOTIFY_OK;
+> > >  }
+> > 
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> Something has broken 4430SDP during the last week, and so far I've no
-> idea what.  The 4430 seems to be utterly immune to any kind of debugging.
-> It:
+> Thomas,
 > 
-> (a) doesn't produce any decompressor output because its part of the
-> multiplatform kernel.  This means I've no idea if the decompressor is
-> working or not.
-> 
-> (b) doesn't produce any output from the kernel via the use of printch()
-> in the early assembly, nor via adding printascii() into printk().
-> 
-> Will has tested v3.10-rc6, and that works.  Will tested v3.10-rc6 plus
-> arm-soc for-next, and got:
-> 
-> 	Error: unrecognized/unsupported machine ID (r1 = 0x00000ae7).
+> Can you please send the fix for 3.10?  Or are you fine with that I ask
+> arm-soc folks to send it?
 
-It's because it's DT only. I guess we could have some minimal generic
-file handling that machine ID to produce an error to avoid having
-to debug things?
+Arnd, Olof,
 
-If you have arm-soc for-next, omap4 is now DT only. So you have to
-have CONFIG_ARM_APPENDED_DTB=y, CONFIG_ARM_ATAG_DTB_COMPAT=y and
-CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y and append the .dtb to
-zImage to boot. Or you can also update u-boot to pass the .dtb.
-There are more accurate instructions in arm-soc commit b42b9181.
+Can you help send the fix for 3.10?
 
-Moving omap4 to be DT only has been about 5900 lines of reduced data
-and code so far, so that's a good reason for doing it. Most things
-should work as earlier, except for the pandaboard EHCI is still missing
-a fix for adding a clock alias for the auxclk. If there are things not
-working, they should be quite easy to fix.
-
-> I've just tested Linus' tip plus my tip, and that failed.  Tried Linus'
-> tip.  Failed.  Removed the printch()/printascii() hooks, that got Linus'
-> tip working.  I guess CONFIG_DEBUG_OMAP2UART1 is the wrong option.
-> 
-> And yes, Linus plus my tip also works without printascii.  So that leaves
-> the questionable case of Linus tip+my tip+arm-soc tip not being bootable
-> on OMAP4430 but is on OMAP3430.
-
-Sounds like it's because of needing to boot with DT now.
-
-Regards,
-
-Tony
+Shawn
