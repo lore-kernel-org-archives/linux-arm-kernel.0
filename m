@@ -1,33 +1,69 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Wed, 19 Jun 2013 09:00:02 +0800
-Subject: [PATCH v3 1/2] i2c: designware: use module_platform_driver
-In-Reply-To: <20130618162711.GG7718@katana>
-References: <1370918230-24793-1-git-send-email-zhangfei.gao@linaro.org>
- <1370918230-24793-2-git-send-email-zhangfei.gao@linaro.org>
- <20130618162711.GG7718@katana>
-Message-ID: <51C10292.9000906@linaro.org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 19 Jun 2013 10:13:16 +0900
+Subject: [PATCH V5 1/3] pci: Add PCIe driver for Samsung Exynos
+In-Reply-To: <201306181556.47656.arnd@arndb.de>
+References: <000b01ce6839$0f0455d0$2d0d0170$@samsung.com>
+ <7174350.I5qK0sQfHM@wuerfel> <000001ce6bd7$50146e60$f03d4b20$@samsung.com>
+ <201306181556.47656.arnd@arndb.de>
+Message-ID: <002401ce6c8a$2dd1e4a0$8975ade0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-06-19 12:27 AM, Wolfram Sang wrote:
-> On Tue, Jun 11, 2013 at 10:37:09AM +0800, Zhangfei Gao wrote:
->> Instead of use platform_driver_probe, use module_platform_driver
->> To support deferred probing
->> Also subsys_initcall may too early to auto set pinctl
->>
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> CC: Baruch Siach <baruch@tkos.co.il>
->
-> Basically OK, but please resend for 3.12, so we get enough testing
-> before entering mainline. I am a bit anxious of side
-> effects and 3.11 is too near.
->
+On Tuesday, June 18, 2013 10:57 PM, Arnd Bergmann wrote:
+> On Tuesday 18 June 2013, Jingoo Han wrote:
+> > On Monday, June 17, 2013 9:45 PM, Arnd Bergmann wrote:
+> > > On Monday 17 June 2013 18:45:52 Jingoo Han wrote:
+> > > > On Friday, June 14, 2013 9:54 PM, Arnd Bergmann wrote:
+> > > > >
 
-Dear Wolfram,
+[.....]
 
-Sorry for the silly question: How to be prepared for 3.12?
+> >
+> > I will remove a 'remove' callback. Is it OK?
+> > Or what should I do?
+> 
+> I think you should keep the remove function, but add a comment explaining that
+> you don't allow module unload and that in order to allow it, the remove function
+> will have to remove all pci buses and devices under the host bridge.
 
-Do you mean there is specific git & branch, which I should rebase on?
-linux-next.git is what I use now.
+Then, do you mean the following?
 
-Thanks
+static int __exit exynos_pcie_remove(struct platform_device *pdev)
+{
+	struct pcie_port *pp = platform_get_drvdata(pdev);
+
+	clk_disable_unprepare(pp->bus_clk);
+	clk_disable_unprepare(pp->clk);
+
+	return 0;
+}
+
+static struct platform_driver exynos_pcie_driver = {
+	.remove	= __exit_p(exynos_pcie_remove),
+
+[.....]
+
+/* Exynos PCIe driver does not allow module unload */
+
+static int __init pcie_init(void)
+{
+	hook_fault_code(16 + 6, exynos_pcie_abort, SIGBUS, 0,
+			"imprecise external abort");
+
+	platform_driver_probe(&exynos_pcie_driver, exynos_pcie_probe);
+
+	return 0;
+}
+subsys_initcall(pcie_init);
+
+MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
+MODULE_DESCRIPTION("Samsung PCIe host controller driver");
+MODULE_LICENSE("GPLv2");
+
+
+> 
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
