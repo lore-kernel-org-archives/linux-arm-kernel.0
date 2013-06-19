@@ -1,33 +1,52 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 19 Jun 2013 21:40:02 +0900
-Subject: [PATCH v2 0/2] R-Car GPIO fixes
-In-Reply-To: <1371551389-5493-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1371551389-5493-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20130619124002.GH32292@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Jun 2013 14:43:09 +0200
+Subject: [PATCH V5 1/3] pci: Add PCIe driver for Samsung Exynos
+In-Reply-To: <002401ce6c8a$2dd1e4a0$8975ade0$@samsung.com>
+References: <000b01ce6839$0f0455d0$2d0d0170$@samsung.com>
+ <201306181556.47656.arnd@arndb.de>
+ <002401ce6c8a$2dd1e4a0$8975ade0$@samsung.com>
+Message-ID: <201306191443.09598.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 12:29:47PM +0200, Laurent Pinchart wrote:
-> Hello,
+On Wednesday 19 June 2013, Jingoo Han wrote:
+> Then, do you mean the following?
 > 
-> Here are two small fixes for the gpio-rcar driver. I would push them through
-> the GPIO tree if it wasn't for the fact that they're based on gpio-rcar DT
-> support, scheduled for merge through the ARM SoC tree.
+> static int __exit exynos_pcie_remove(struct platform_device *pdev)
+> {
+>         struct pcie_port *pp = platform_get_drvdata(pdev);
 > 
-> Simon, as these patches are fixes, would it be possible to get them in v3.11
-> through your tree ?
+>         clk_disable_unprepare(pp->bus_clk);
+>         clk_disable_unprepare(pp->clk);
 > 
-> Changes since v1:
+>         return 0;
+> }
 > 
-> - Fixed 2/2 commit message to mention IS_ENABLED, not IS_CONFIG
+> static struct platform_driver exynos_pcie_driver = {
+>         .remove = __exit_p(exynos_pcie_remove),
 > 
-> Laurent Pinchart (2):
->   gpio-rcar: Reference core gpio documentation in the DT bindings
->   gpio-rcar: Remove #ifdef CONFIG_OF around OF-specific sections
+> [.....]
 > 
->  .../devicetree/bindings/gpio/renesas,gpio-rcar.txt     | 18 ++++++------------
->  drivers/gpio/gpio-rcar.c                               |  8 ++------
->  2 files changed, 8 insertions(+), 18 deletions(-)
+> /* Exynos PCIe driver does not allow module unload */
+> 
+> static int __init pcie_init(void)
+> {
+>         hook_fault_code(16 + 6, exynos_pcie_abort, SIGBUS, 0,
+>                         "imprecise external abort");
+> 
+>         platform_driver_probe(&exynos_pcie_driver, exynos_pcie_probe);
+> 
+>         return 0;
+> }
+> subsys_initcall(pcie_init);
+> 
+> MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
+> MODULE_DESCRIPTION("Samsung PCIe host controller driver");
+> MODULE_LICENSE("GPLv2");
+> 
 
-Thanks, I have queued these up in the gpio-rcar branch.
-I will submit them for inclusion in v3.11.
+Yes, this looks good. I would probably use platform_driver_register
+rather than platform_driver_probe, but that is your choice. using
+platform_driver_probe() mean you cannot deal with deferred probing.
+
+	Arnd
