@@ -1,38 +1,30 @@
-From: broonie@linaro.org (Mark Brown)
+From: broonie@kernel.org (Mark Brown)
 Date: Wed, 19 Jun 2013 19:21:21 +0100
-Subject: [PATCH] spi/s3c64xx: Make wait_for_timeout() function name less
- generic
-Message-ID: <1371666081-11699-1-git-send-email-broonie@linaro.org>
+Subject: [PATCH v1 1/3] spi: s3c64xx: added support for polling mode
+In-Reply-To: <1369032694-13183-2-git-send-email-ks.giri@samsung.com>
+References: <1369032694-13183-1-git-send-email-ks.giri@samsung.com>
+ <1369032694-13183-2-git-send-email-ks.giri@samsung.com>
+Message-ID: <20130619182121.GC1403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- drivers/spi/spi-s3c64xx.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+On Mon, May 20, 2013 at 12:21:32PM +0530, Girish K S wrote:
+> From: Girish K S <girishks2000@gmail.com>
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 0a80692..70b2213 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -583,7 +583,7 @@ static inline void enable_cs(struct s3c64xx_spi_driver_data *sdd,
- 	writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
- }
- 
--static u32 wait_for_timeout(struct s3c64xx_spi_driver_data *sdd,
-+static u32 s3c64xx_spi_wait_for_timeout(struct s3c64xx_spi_driver_data *sdd,
- 					int timeout_ms)
- {
- 	void __iomem *regs = sdd->regs;
-@@ -676,7 +676,8 @@ static int wait_for_xfer(struct s3c64xx_spi_driver_data *sdd,
- 		buf = xfer->rx_buf;
- 		do {
- 			/* wait for data to be received in the fifo */
--			cpy_len = wait_for_timeout(sdd, (loops ? ms : 0));
-+			cpy_len = s3c64xx_spi_wait_for_timeout(sdd,
-+						(loops ? ms : 0));
- 
- 			switch (sdd->cur_bpw) {
- 			case 32:
--- 
-1.8.3.1
+> The 64xx spi driver supports partial polling mode.
+> Only the last chunk of the transfer length is transferred
+> or recieved in polling mode.
+
+Applied, though I will send a followup since:
+
+> +static u32 wait_for_timeout(struct s3c64xx_spi_driver_data *sdd,
+> +					int timeout_ms)
+
+...this function name is way too generic.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130619/52cc8385/attachment.sig>
