@@ -1,165 +1,92 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 19 Jun 2013 12:11:32 +0100
-Subject: [PATCH v2 1/3] ARM: tegra: basic support for Trusted Foundations
-In-Reply-To: <CAAVeFuLc57pV=To5yaE5x9mrVy1yknH2e90QockCiNbEXRm0WQ@mail.gmail.com>
-References: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
- <1371114745-24710-2-git-send-email-acourbot@nvidia.com>
- <51BA1B41.6030002@wwwdotorg.org>
- <CAAVeFuLc57pV=To5yaE5x9mrVy1yknH2e90QockCiNbEXRm0WQ@mail.gmail.com>
-Message-ID: <20130619111126.GA3582@localhost.localdomain>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 19 Jun 2013 13:12:45 +0200
+Subject: [PATCH] atags_to_fdt: take into account root's #size and #cells
+In-Reply-To: <1371639471-14144-2-git-send-email-ben.dooks@codethink.co.uk>
+References: <1371639471-14144-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1371639471-14144-2-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <51C1922D.8040704@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 05:43:03PM +0900, Alexandre Courbot wrote:
-> On Thu, Jun 13, 2013 at 11:35 PM, Dave Martin <Dave.Martin@arm.com> wrote:
-> >> diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
-> >> index ed9c853..d59bc19 100644
-> >> --- a/Documentation/devicetree/bindings/arm/tegra.txt
-> >> +++ b/Documentation/devicetree/bindings/arm/tegra.txt
-> >> @@ -32,3 +32,14 @@ board-specific compatible values:
-> >>    nvidia,whistler
-> >>    toradex,colibri_t20-512
-> >>    toradex,iris
-> >> +
-> >> +Optional nodes
-> >> +-------------------------------------------
-> >> +
-> >> +Trusted Foundations:
-> >> +Boards using the Trusted Foundations secure monitor should signal its
-> >> +presence by declaring a node compatible with "tl,trusted-foundations":
-> >> +
-> >> +     firmware {
-> >
-> > You need to make a clear statement about whether the node name is
-> >
-> > I think it shouldn't required to be exactly equal to "firmware", because
-> > that would lead to problems if there were multiple independent firmware
-> > APIs present (which is certainly possible, whether or not it is true
-> > on Tegra).
+On 06/19/2013 12:57 PM, Ben Dooks wrote:
+> When creating entries for /memory, the root #size and #cells must be taken
+> into account otherwise the node will not be recongnized when the OF code
+> scans the nodes.
 > 
-> Yes, the name of the node is not fixed (doing so would make its lookup
-> faster, but the gain is not obvious). Will make it explicit in the
-> doc.
+> On some systems, the default is now to be 2 for each of #size and #cells
+> which means that appending a kernrel and having it update from ATAGS does
+> not work properly.
+Hi Ben,
+
+There is already a fix for it which is applied in Russell King's git tree, see
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7722/1
+
+Regards,
+> ---
+>  arch/arm/boot/compressed/atags_to_fdt.c |   22 +++++++++++++++++++++-
+>  1 file changed, 21 insertions(+), 1 deletion(-)
 > 
-> >> +             compatible = "tl,trusted-foundations";
-> >> +     };
-> >
-> > For now, it might make more sense to make this binding tegra-specific,
-> > and to interpret the node is only implying the presence of the low-
-> > level SoC functions you are using on Tegra, not TF as a whole.
+> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+> index 74e193e..da36840 100644
+> --- a/arch/arm/boot/compressed/atags_to_fdt.c
+> +++ b/arch/arm/boot/compressed/atags_to_fdt.c
+> @@ -1,5 +1,6 @@
+>  #include <asm/setup.h>
+>  #include <libfdt.h>
+> +#include <linux/of.h>
+>  
+>  #if defined(CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND)
+>  #define do_extend_cmdline 1
+> @@ -95,9 +96,12 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
+>  int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+>  {
+>  	struct tag *atag = atag_list;
+> -	uint32_t mem_reg_property[2 * NR_BANKS];
+> +	uint32_t mem_reg_property[2 * 2 * NR_BANKS];
+> +	const __be32 *prop;
+>  	int memcount = 0;
+>  	int ret;
+> +	u32 dt_root_size_cells;
+> +	u32 dt_root_addr_cells;
+>  
+>  	/* make sure we've got an aligned pointer */
+>  	if ((u32)atag_list & 0x3)
+> @@ -118,6 +122,17 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+>  	if (ret < 0)
+>  		return ret;
+>  
+> +	dt_root_size_cells = OF_ROOT_NODE_SIZE_CELLS_DEFAULT;
+> +	dt_root_addr_cells = OF_ROOT_NODE_ADDR_CELLS_DEFAULT;
+> +
+> +	prop = getprop(fdt, "/", "#size-cells", NULL);
+> +	if (prop)
+> +		dt_root_size_cells = be32_to_cpup(prop);
+> +
+> +	prop = getprop(fdt, "/", "#address-cells", NULL);
+> +	if (prop)
+> +		dt_root_addr_cells = be32_to_cpup(prop);
+> +
+>  	for_each_tag(atag, atag_list) {
+>  		if (atag->hdr.tag == cpu_to_atag32(ATAG_CMDLINE)) {
+>  			/* Append the ATAGS command line to the device tree
+> @@ -137,7 +152,12 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+>  				continue;
+>  			if (!atag32_to_cpu(atag->u.mem.size))
+>  				continue;
+> +
+> +			for (ret = 0; ret < dt_root_addr_cells - 1; ret++)
+> +				mem_reg_property[memcount++] = cpu_to_fdt32(0);
+>  			mem_reg_property[memcount++] = cpu_to_fdt32(atag32_to_cpu(atag->u.mem.start));
+> +			for (ret = 0; ret < dt_root_size_cells - 1; ret++)
+> +				mem_reg_property[memcount++] = cpu_to_fdt32(0);
+>  			mem_reg_property[memcount++] = cpu_to_fdt32(atag32_to_cpu(atag->u.mem.size));
+>  		} else if (atag->hdr.tag == cpu_to_atag32(ATAG_INITRD2)) {
+>  			uint32_t initrd_start, initrd_size;
 > 
-> Do you mean the vendor should be changed from "tl" to "nvidia" here?
 
-Since this is a Tegra-specific integration, I think that would be wise,
-unless you can confirm by looking at the API specs that the functionality
-you are trying to describe and use it truly intended to be generic across
-all deployments of TF (either always present, or at least as a well-
-specified optional feature).
 
-> > Otherwise, it feels too generic.  There is no description of exactly
-> > what functionality will be available if this node it present: if
-> > this is going to be a generic binding for TF, then it needs to work
-> > for all deployments of TF, not just your specific case.  For example,
-> > how to you find out what functionality is present?  Will there be
-> > a standard probing ABI for all versions and deployments of TF, or
-> > would extra information need to be described in the DT?
-> >
-> > Partly, this depends on whether the TF_SET_CPU_BOOT_ADDR_SMC call will
-> > be present, working, and with compatible ABI and semantics, on every SoC
-> > where an implementation of TF is present.  Someone from Trusted Logic, or
-> > someone with visibility of the relevant ABI/API specs would need to
-> > judge on that -- do you have that info?
-> 
-> I'm currently looking into that. This patch makes the assumption that
-> all TF implementations have the same features and the same interface -
-> if this is the case, do you agree this binding is ok as it is?
-
-It's a judgement call, but if the SMC you use is a mandatory part of
-TF after a certain version, and if it's guaranteed to have a fixed ABI
-(including function ID) and behaviour, then that binding works.
-
-If the function is an optional or SoC-specific feature, then it's not
-sufficient to say that TF firmware is present -- we need to describe
-something about the SoC-specific and optional features present, unless
-there's a well-defined generic way to probe for them.
-
-> If indeed TF's functionality and ABI is the same no matter whether we
-> are on Tegra on not, then its support should even be moved outside of
-> mach-tegra.
-
-Agreed, that's the ideal outcome.  I'm just not convinced we're ready
-for that just now (but I'm happy to be corrected).
-
-> >> --- /dev/null
-> >> +++ b/arch/arm/mach-tegra/firmware.c
-> >> @@ -0,0 +1,40 @@
-> >> +/*
-> >> + * SecureOS support for Tegra CPUs
-> >
-> > Should the name "SecureOS" change in these comment headers? (affects
-> > multiple files)
-> 
-> Yes, I missed these ones, thanks. Another missed opportunity to use git grep...
-> 
-> >> +     node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
-> >> +     if (node && !IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS))
-> >> +             pr_warn("Trusted Foundations detected but support missing!\n");
-> >
-> > Should this be more than just a warning?
-> >
-> > It looks to me like tegra_cpu_reset_handler_set() might either silently
-> > fail or trigger an external abort in this situation, depending on the
-> > hardware and on how TF sets things up.
-> 
-> What will happen (from 3.10) is that tegra_cpu_reset_handler_set()
-> will output a "CPUX: failed to come online" for each secondary CPU and
-> boot will continue (albeit on one CPU). The system's features are
-> degraded, but it is not fatal, so I think it is reasonable to continue
-> here.
-
-I don't think we should rely on ignoring in imprecise external abort,
-because such aborts indicate serious or potentially fatal system errors
-or bugs.
-
-If you're getting a precise abort (so that we know the faulted address)
-or no abort at all, that's less harmful, though it's hard to guarantee
-across all SoCs, because the ARM Architecture doesn't guarantee synchronous
-aborts for slave errors on writes.
-
-What was heppening differently on 3.9 compared with 3.10?
-
-> > There seems to be no way to signal an error when attempting to set a
-> > CPU's reset address.
-> 
-> Indeed. But even if that fails the system can still survive, at least on Tegra.
-> 
-> >> +#if IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS)
-> >> +     else if (node)
-> >> +             register_firmware_ops(&tegra_trusted_foundations_ops);
-> >> +#endif
-> >> +}
-> >
-> >
-> > IS_ENABLED() allows #ifdefs to be avoided -- maybe this would be clearer
-> > as:
-> >
-> >         node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
-> >         if (!node)
-> >                 return;
-> >
-> >         if (WARN_ON(!IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS))) {
-> >                 pr_warn("Trusted Foundations detected but support missing!\n");
-> >                 return;
-> >         }
-> >
-> >         register_firmware_ops(&tegra_trusted_foundations_ops);
-> 
-> But then you will get a link error when TF support is not compiled in
-> because tegra_trusted_foundations_ops will not be defined. That's why
-> I used a #ifdef here - I agree it is terribly inelegant though.
-
-Hmmm, fair point.  Dead code elimination in the compiler may solve that,
-but I've never been too keen on relying on that.
-
-Cheers
----Dave
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
