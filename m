@@ -1,81 +1,59 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 19 Jun 2013 14:23:17 +0800
-Subject: [PATCH 6/6] mtd: ofpart: add compatible check for child nodes
-In-Reply-To: <1371622997-26303-1-git-send-email-josh.wu@atmel.com>
-References: <1371622997-26303-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1371622997-26303-7-git-send-email-josh.wu@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 18 Jun 2013 23:43:07 -0700
+Subject: OMAP4430 failure to boot
+In-Reply-To: <20130618183424.GD2718@n2100.arm.linux.org.uk>
+References: <20130618183424.GD2718@n2100.arm.linux.org.uk>
+Message-ID: <20130619064307.GV5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case that the nand device will support some features like Nand Flash
-Controller, we want to make the sub feature as a sub node of nand device.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [130618 11:40]:
+> So... the boot and build system last night managed to build its kernels
+> after I dropped a couple of patches from my kernel, but we've gone from
+> having both the 3430LDP and 4430SDP booting to only the 3430LDP.
+> 
+> Something has broken 4430SDP during the last week, and so far I've no
+> idea what.  The 4430 seems to be utterly immune to any kind of debugging.
+> It:
+> 
+> (a) doesn't produce any decompressor output because its part of the
+> multiplatform kernel.  This means I've no idea if the decompressor is
+> working or not.
+> 
+> (b) doesn't produce any output from the kernel via the use of printch()
+> in the early assembly, nor via adding printascii() into printk().
+> 
+> Will has tested v3.10-rc6, and that works.  Will tested v3.10-rc6 plus
+> arm-soc for-next, and got:
+> 
+> 	Error: unrecognized/unsupported machine ID (r1 = 0x00000ae7).
 
-Use such organization it is easy to enable/disable feature, also it is back
-compatible and more readable.
+It's because it's DT only. I guess we could have some minimal generic
+file handling that machine ID to produce an error to avoid having
+to debug things?
 
-If the sub-node has a compatible property then it is a driver not partition.
+If you have arm-soc for-next, omap4 is now DT only. So you have to
+have CONFIG_ARM_APPENDED_DTB=y, CONFIG_ARM_ATAG_DTB_COMPAT=y and
+CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y and append the .dtb to
+zImage to boot. Or you can also update u-boot to pass the .dtb.
+There are more accurate instructions in arm-soc commit b42b9181.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
-v3 --> v4:
-  - remove the 'len' parameter, just use NULL.
-  - refine the commit message.
-  - also add a NOTE in devicetree/bindings/mtd/partition.txt.
+Moving omap4 to be DT only has been about 5900 lines of reduced data
+and code so far, so that's a good reason for doing it. Most things
+should work as earlier, except for the pandaboard EHCI is still missing
+a fix for adding a clock alias for the auxclk. If there are things not
+working, they should be quite easy to fix.
 
- .../devicetree/bindings/mtd/partition.txt          |    1 +
- drivers/mtd/ofpart.c                               |   13 ++++++++++++-
- 2 files changed, 13 insertions(+), 1 deletion(-)
+> I've just tested Linus' tip plus my tip, and that failed.  Tried Linus'
+> tip.  Failed.  Removed the printch()/printascii() hooks, that got Linus'
+> tip working.  I guess CONFIG_DEBUG_OMAP2UART1 is the wrong option.
+> 
+> And yes, Linus plus my tip also works without printascii.  So that leaves
+> the questionable case of Linus tip+my tip+arm-soc tip not being bootable
+> on OMAP4430 but is on OMAP3430.
 
-diff --git a/Documentation/devicetree/bindings/mtd/partition.txt b/Documentation/devicetree/bindings/mtd/partition.txt
-index 9315ac9..8e5557d 100644
---- a/Documentation/devicetree/bindings/mtd/partition.txt
-+++ b/Documentation/devicetree/bindings/mtd/partition.txt
-@@ -4,6 +4,7 @@ Partitions can be represented by sub-nodes of an mtd device. This can be used
- on platforms which have strong conventions about which portions of a flash are
- used for what purposes, but which don't use an on-flash partition table such
- as RedBoot.
-+NOTE: if the sub-node has a compatible string, then it is not a partition.
- 
- #address-cells & #size-cells must both be present in the mtd device. There are
- two valid values for both:
-diff --git a/drivers/mtd/ofpart.c b/drivers/mtd/ofpart.c
-index 553d6d6..30fcea1 100644
---- a/drivers/mtd/ofpart.c
-+++ b/drivers/mtd/ofpart.c
-@@ -20,6 +20,10 @@
- #include <linux/slab.h>
- #include <linux/mtd/partitions.h>
- 
-+static bool node_has_compatible(struct device_node *pp)
-+{
-+	return of_get_property(pp, "compatible", NULL);
-+}
- static int parse_ofpart_partitions(struct mtd_info *master,
- 				   struct mtd_partition **pparts,
- 				   struct mtd_part_parser_data *data)
-@@ -40,8 +44,12 @@ static int parse_ofpart_partitions(struct mtd_info *master,
- 	/* First count the subnodes */
- 	pp = NULL;
- 	nr_parts = 0;
--	while ((pp = of_get_next_child(node, pp)))
-+	while ((pp = of_get_next_child(node, pp))) {
-+		if (node_has_compatible(pp))
-+			continue;
-+
- 		nr_parts++;
-+	}
- 
- 	if (nr_parts == 0)
- 		return 0;
-@@ -57,6 +65,9 @@ static int parse_ofpart_partitions(struct mtd_info *master,
- 		int len;
- 		int a_cells, s_cells;
- 
-+		if (node_has_compatible(pp))
-+			continue;
-+
- 		reg = of_get_property(pp, "reg", &len);
- 		if (!reg) {
- 			nr_parts--;
--- 
-1.7.9.5
+Sounds like it's because of needing to boot with DT now.
+
+Regards,
+
+Tony
