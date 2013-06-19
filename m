@@ -1,124 +1,69 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 18 Jun 2013 20:17:21 -0500
-Subject: [PATCH v2 1/4] ARM: dts: omap4-panda: Add USB Host support
-In-Reply-To: <1371571487-14389-2-git-send-email-rogerq@ti.com>
-References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
- <1371571487-14389-2-git-send-email-rogerq@ti.com>
-Message-ID: <51C106A1.9030001@ti.com>
+Date: Tue, 18 Jun 2013 20:25:36 -0500
+Subject: [PATCH v3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ line
+In-Reply-To: <874nd4d8j8.fsf@linaro.org>
+References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
+ <1370629886-14170-1-git-send-email-khilman@linaro.org>
+ <20130607193130.GA13205@kahuna> <51B59AC3.2080900@ti.com>
+ <87fvwpex6k.fsf@linaro.org> <51B70B08.9030208@ti.com>
+ <51B70D57.4010208@ti.com> <874nd4d8j8.fsf@linaro.org>
+Message-ID: <51C10890.20802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
-
-On 06/18/2013 11:04 AM, Roger Quadros wrote:
-> Provide the RESET and Power regulators for the USB PHY,
-> the USB Host port mode and the PHY device.
+On 06/11/2013 09:30 AM, Kevin Hilman wrote:
+> Benoit Cousson <b-cousson@ti.com> writes:
 >
-> Also provide pin multiplexer information for the USB host
-> pins.
+>> On 06/11/2013 01:33 PM, Cousson, Benoit wrote:
+>>> On 6/10/2013 6:40 PM, Kevin Hilman wrote:
+>>>> Benoit Cousson <b-cousson@ti.com> writes:
+>>>>
+>>>>> Hi Kevin,
+>>>>>
+>>>>> On 06/07/2013 09:31 PM, Nishanth Menon wrote:
+>>>>>> On 11:31-20130607, Kevin Hilman wrote:
+>>>>>>> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
+>>>>>>> SYS_NIRQ line on OMAP.  Add another DTS include file
+>>>>>>> (twl4030_omap3.dtsi) for boards that hook up the twl4030 this way
+>>>>>>> to include.
+>>>>>>>
+>>>>>>> This allows RTC wake from off-mode to work again on OMAP3-based
+>>>>>>> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
+>>>>>>> 3530/Overo, 3730/Overo-STORM.
+>>>>>>>
+>>>>>>> Special thanks to Florian Vaussard for suggesting use of preprocessor
+>>>>>>> feature.
+>>>>>>>
+>>>>>>> Cc: Florian Vaussard <florian.vaussard@epfl.ch>
+>>>>>>> Cc: Benoit Cousson <b-cousson@ti.com>
+>>>>>>> Cc: Nishanth Menon <nm@ti.com>
+>>>>>>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>>>>>> Thanks,
+>>>>>> Reviewed-by: Nishanth Menon <nm@ti.com>
+>>>>>
+>>>>> Thanks, I've just applied it in for_3.11/dts.
+>>>>
+>>>> Thanks,
+>>>>
+>>>> Will you apply the first 2 from the series too?
+>>>>
+>>>>     ARM: DTS: OMAP3: beagle/overo: mux console UART, enable wakeup
+>>>>     ARM: DTS: OMAP3: beagle: enable user button via gpio_keys, enable
+>>>> wakeup
+>>>
+>>> Thanks for the reminder, I kind of forgot these ones :-)
+>>
+>> BTW, do you have any v2 for these ones? This version does not use the
+>> macros.
+>> Moreover I cannot apply them on top of Florian's series :-(
 >
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->   arch/arm/boot/dts/omap4-panda-common.dtsi |   62 +++++++++++++++++++++++++++++
->   1 files changed, 62 insertions(+), 0 deletions(-)
+> Oops,  I thought I reposted those too.   All three are here:
 >
-> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> index 00cbaa5..7a21e8e 100644
-> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> @@ -59,6 +59,42 @@
->   			"AFML", "Line In",
->   			"AFMR", "Line In";
->   	};
-> +
-> +	/* HS USB Port 1 RESET */
-> +	hsusb1_reset: hsusb1_reset_reg {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "hsusb1_reset";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&gpio2 30 0>;	/* gpio_62 */
-> +		startup-delay-us = <70000>;
-> +		enable-active-high;
-> +	};
+>    git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git  for_3.11/dt
+>
+> which is based on top of your for_3.11/dts branch.
 
-Is this really a regulator? Or just a GPIO line used to reset the USB PHY?
-
-If this is the case, I don't think it should be represented as a regulator.
+Thanks, I've just applied it.
 
 Regards,
 Benoit
-
-> +
-> +	/* HS USB Port 1 Power */
-> +	hsusb1_power: hsusb1_power_reg {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "hsusb1_vbus";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&gpio1 1 0>;	/* gpio_1 */
-> +		startup-delay-us = <70000>;
-> +		enable-active-high;
-> +	};
-> +
-> +	/* HS USB Host PHY on PORT 1 */
-> +	hsusb1_phy: hsusb1_phy {
-> +		compatible = "usb-nop-xceiv";
-> +		reset-supply = <&hsusb1_reset>;
-> +		vcc-supply = <&hsusb1_power>;
-> +	/**
-> +	 * FIXME:
-> +	 * put the right clock phandle here when available
-> +	 *	clocks = <&auxclk3>;
-> +	 *	clock-names = "main_clk";
-> +	 */
-> +		clock-frequency = <19200000>;
-> +	};
->   };
->
->   &omap4_pmx_wkup {
-> @@ -83,6 +119,7 @@
->   			&mcbsp1_pins
->   			&dss_hdmi_pins
->   			&tpd12s015_pins
-> +			&hsusbb1_pins
->   	>;
->
->   	twl6030_pins: pinmux_twl6030_pins {
-> @@ -133,6 +170,23 @@
->   		>;
->   	};
->
-> +	hsusbb1_pins: pinmux_hsusbb1_pins {
-> +		pinctrl-single,pins = <
-> +			0x82 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_clk.usbb1_ulpiphy_clk */
-> +			0x84 (PIN_OUTPUT | MUX_MODE4)		/* usbb1_ulpitll_stp.usbb1_ulpiphy_stp */
-> +			0x86 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dir.usbb1_ulpiphy_dir */
-> +			0x88 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_nxt.usbb1_ulpiphy_nxt */
-> +			0x8a (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat0.usbb1_ulpiphy_dat0 */
-> +			0x8c (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat1.usbb1_ulpiphy_dat1 */
-> +			0x8e (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat2.usbb1_ulpiphy_dat2 */
-> +			0x90 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat3.usbb1_ulpiphy_dat3 */
-> +			0x92 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat4.usbb1_ulpiphy_dat4 */
-> +			0x94 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat5.usbb1_ulpiphy_dat5 */
-> +			0x96 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat6.usbb1_ulpiphy_dat6 */
-> +			0x98 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat7.usbb1_ulpiphy_dat7 */
-> +		>;
-> +	};
-> +
->   	i2c1_pins: pinmux_i2c1_pins {
->   		pinctrl-single,pins = <
->   			0xe2 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_scl */
-> @@ -283,3 +337,11 @@
->   	mode = <3>;
->   	power = <50>;
->   };
-> +
-> +&usbhshost {
-> +	port1-mode = "ehci-phy";
-> +};
-> +
-> +&usbhsehci {
-> +	phys = <&hsusb1_phy>;
-> +};
->
