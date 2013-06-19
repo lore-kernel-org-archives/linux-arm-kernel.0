@@ -1,61 +1,72 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 19 Jun 2013 16:16:19 -0400 (EDT)
-Subject: [PATCH V2 5/6] USB: OHCI: make ohci-at91 a separate driver
-In-Reply-To: <1371052442-14541-6-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1306191609120.877-100000@iolanthe.rowland.org>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Thu, 20 Jun 2013 00:16:33 +0400
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCB2MiA2LzddIGRyaXZlcnM6IGJ1czogaW14LXdlaW06?=
+ =?UTF-8?B?IEFkZCBzdXBwb3J0IGZvciBpLk1YMS8yMS8yNS8yNy8zMS8zNS81MC81MS81?=
+ =?UTF-8?B?Mw==?=
+In-Reply-To: <20130619200757.GC14308@pengutronix.de>
+References: <1371671678-6345-1-git-send-email-shc_work@mail.ru>
+ <1371671678-6345-6-git-send-email-shc_work@mail.ru>
+ <20130619200757.GC14308@pengutronix.de>
+Message-ID: <1371672993.387718746@f288.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jun 2013, Manjunath Goudar wrote:
-
-> Separate the  TI OHCI Atmel host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> it would be nice to have in 3.11.
+> Hi Alexander,
 > 
-> V2:
->  -Set non-standard fields in ohci_at91_hc_driver manually, rather than
->   relying on an expanded struct ohci_driver_overrides.
->  -Save orig_ohci_hub_control and orig_ohci_hub_status_data rather than
->   relying on ohci_hub_control and hub_status_data being exported.
->  -ohci_setup() has been removed because it is called in .reset member
->   of the ohci_hc_driver structure.
+> Nice work!
+> 
+> On Wed, Jun 19, 2013 at 11:54:37PM +0400, Alexander Shiyan wrote:
+> > - - fsl,weim-cs-timing:	The timing array, contains 6 timing values for the
+> > + - fsl,weim-cs-timing:	The timing array, contains timing values for the
+> >  			child node. We can get the CS index from the child
+> > -			node's "reg" property. This property contains the values
+> > -			for the registers EIM_CSnGCR1, EIM_CSnGCR2, EIM_CSnRCR1,
+> > +			node's "reg" property. For example, if i.MX6Q CPU
+> > +			is used, this property contains the values for the
+> > +			registers EIM_CSnGCR1, EIM_CSnGCR2, EIM_CSnRCR1,
+> >  			EIM_CSnRCR2, EIM_CSnWCR1, EIM_CSnWCR2 in this order.
+> > +			For other i.MX CPUs count of register and register
+> > +			names may be different.
+> 
+> I think here we should have a more precise description for each SoC.
 
-> @@ -111,6 +125,8 @@ static void usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
->  static int usb_hcd_at91_probe(const struct hc_driver *driver,
->  			struct platform_device *pdev)
->  {
-> +	struct at91_usbh_data	*board;
-> +	struct ohci_hcd	*ohci;
+OK.
 
-Variables are supposed to be not aligned at all (in which case you 
-don't use tabs) or all aligned the same way.  In this case you put a 
-tab before the "*board"; therefore the "*ohci" should line up with it.
+> >  Example for an imx6q-sabreauto board, the NOR flash connected to the WEIM:
+> >  
+> > diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> > index 1f70e84..4faedc21 100644
+> > --- a/drivers/bus/Kconfig
+> > +++ b/drivers/bus/Kconfig
+> > @@ -8,10 +8,10 @@ config IMX_WEIM
+> >  	bool "Freescale EIM DRIVER"
+> >  	depends on ARCH_MXC
+> >  	help
+> > -	  Driver for i.MX6 WEIM controller.
+> > +	  Driver for i.MX WEIM controller.
+> >  	  The WEIM(Wireless External Interface Module) works like a bus.
+> >  	  You can attach many different devices on it, such as NOR, onenand.
+> > -	  But now, we only support the Parallel NOR.
+> > +	  But now, we only support the "of_physmap" driver.
+> 
+> This comment is wrong. In the early versions of this patch indeed only
+> parallel NOR was supported, but now there is no limitation on the device
+> type anymore.
 
-No, this isn't an artifact of my email program.  They really are not
-aligned.
+I am do not think so. But I will not insist on his opinion.
+I checked the operation only for physmap-flash and mtd-ram.
 
-> @@ -163,8 +179,11 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->  		goto err5;
->  	}
->  
-> +	board = hcd->self.controller->platform_data;
-> +	ohci = hcd_to_ohci(hcd);
-> +	ohci->num_ports = board->ports;
->  	at91_start_hc(pdev);
-> -	ohci_hcd_init(hcd_to_ohci(hcd));
-> +	ohci_setup(hcd);
+...
+> >  static const struct of_device_id weim_id_table[] = {
+> > +	/* i.MX1/21 */
+> > +	{ .compatible = "fsl,imx1-weim", .data = &imx1_weim_devtype, },
+> > +	/* i.MX25/27/31/35 */
+> > +	{ .compatible = "fsl,imx25-weim", .data = &imx25_weim_devtype, },
+> 
+> We usually name the compatible name after the oldest i.MX supporting
+> this IP, not after the lowest number. So this should be imx27, not
+> imx25.
 
-Didn't you say above that this version of the patch removes the call to 
-ohci_setup()?
+OK. Seems this fact also avoid [7/7] part. Is not it?
 
-> @@ -686,7 +631,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
->  	 * REVISIT: some boards will be able to turn VBUS off...
->  	 */
->  	if (at91_suspend_entering_slow_clock()) {
-> -		ohci_usb_reset (ohci);
-> +		ohci_restart(ohci);
-
-Why did you change this?  Did we discuss it earlier?
-
-Alan Stern
+---
