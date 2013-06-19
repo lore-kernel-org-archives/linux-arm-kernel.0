@@ -1,74 +1,59 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 19 Jun 2013 11:37:56 -0400 (EDT)
-Subject: [RFC PATCH v1 1/6] USB: HCD: support giveback of URB in tasklet
- context
-In-Reply-To: <CACVXFVNV=hSGGsY3oyuFR3SAzj4fTNa7Mf3aYEn35KvbqQ7Orw@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306191134170.2026-100000@iolanthe.rowland.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Jun 2013 17:42:26 +0200
+Subject: [PATCH 00/11] MSM DT based multi-platform support
+In-Reply-To: <1371600281-6118-1-git-send-email-sboyd@codeaurora.org>
+References: <1371600281-6118-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <201306191742.26491.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Jun 2013, Ming Lei wrote:
+On Wednesday 19 June 2013, Stephen Boyd wrote:
+> This patchset allows me to compile and run the DT based MSM
+> platforms in the multi-platform ARM kernel. This is built on
+> top of a couple patches I've sent out already (specifically
+> the debug_ll patch series and the clocksource_of conversion)
+> as well a patch from Rohit that didn't seem to make it into 
+> MSM's for-next branch.
 
-> >> @@ -835,9 +839,11 @@ static int usb_rh_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
-> >>                       hcd->status_urb = NULL;
-> >>                       usb_hcd_unlink_urb_from_ep(hcd, urb);
-> >>
-> >> -                     spin_unlock(&hcd_root_hub_lock);
-> >> +                     if (!hcd_giveback_urb_in_bh(hcd))
-> >> +                             spin_unlock(&hcd_root_hub_lock);
-> >>                       usb_hcd_giveback_urb(hcd, urb, status);
-> >> -                     spin_lock(&hcd_root_hub_lock);
-> >> +                     if (!hcd_giveback_urb_in_bh(hcd))
-> >> +                             spin_lock(&hcd_root_hub_lock);
-> >>               }
-> >>       }
-> >>   done:
-> >
-> > None of these tests are necessary.  Root hubs are different from normal
-> > devices; their URBs are handled mostly by usbcore.  The only part done
-> > by the HCD is always synchronous.  And we know that root-hub URBs
+Very nice!
+
+> There is one problem though, the last two patches cause compile
+> failures if you turn on MSM's sdcc or USB_OTG driver. It seems
+> that the sdcc driver depends on the clk_reset() API and the custom
+> DMA interface provided by mach layers. And the USB_OTG driver depends
+> on clk_reset.
 > 
-> Looks not always synchronous, control transfer is synchronous, and
-> interrupt transfer is still asynchronous. No drivers(hub, usbfs) depend
-> on that,  and IMO, treating root hub same as hub will simplify HCD core,
-> and finally we can remove all the above lock releasing & acquiring if
-> all HCDs set HCD_BH.
-> 
-> Also there is very less roothub transfers and always letting tasklet
-> handle URB giveback of roothub won't have performance problem, so
-> how about keeping the above tests?
-  
-If you want to use the tasklets for root-hub URBs, okay.  There's no
-reason to check the HCD_BH flag, though, because HCDs have only minimal
-involvement in root-hub URBs.  In particular, HCD's don't call
-usb_hcd_giveback_urb() for them.
-  
-So you can use the tasklets for _all_ root-hub URBs.  Then the tests   
-above aren't necessary, and neither are the spinlock operations.
+> The simplest solution is to make these two drivers depend on the
+> non-dt based MSM support so that they can't be compiled in the
+> multi-platform config. Otherwise, we'll need to replace the clk_reset()
+> calls with the new reset controller API, but doing that would
+> require us to convert all MSM platforms over to devicetree or
+> we'll need to add support to the reset controller API for non-DT based
+> controllers. Even with that, the sdcc driver uses custom DMA things
+> so we may need to put that all behind some #ifdef.
 
-> >> @@ -2573,6 +2687,16 @@ int usb_add_hcd(struct usb_hcd *hcd,
-> >>                       && device_can_wakeup(&hcd->self.root_hub->dev))
-> >>               dev_dbg(hcd->self.controller, "supports USB remote wakeup\n");
-> >>
-> >> +     if (usb_hcd_is_primary_hcd(hcd)) {
-> >> +             retval = init_giveback_urb_bh(hcd);
-> >> +             if (retval)
-> >> +                     goto err_init_giveback_bh;
-> >> +     } else {
-> >> +             /* share tasklet handling with primary hcd */
-> >> +             hcd->async_bh = hcd->primary_hcd->async_bh;
-> >> +             hcd->periodic_bh = hcd->primary_hcd->periodic_bh;
-> >> +     }
-> >
-> > Is there any reason why a secondary HCD can't have its own tasklets?
-> 
-> I didn't do that because both primary and secondary HCDs share one
-> hard interrupt handler, so basically there is no obvious advantage to
-> do that.
+The msm_serial_hs driver also seems to require the custom DMA
+interface.
 
-If the bh structures are embedded directly in the hcd structure, it 
-won't be possible for a secondary hcd to share its tasklets with the 
-primary hcd.  Not sharing seems simpler, and there's no obvious 
-disadvantage either.
+I think for the DMA stuff, the solution is clearly to move that
+driver to use the dmaengine API, wich I assume you are already
+planning to do anyway. Do you have a time line for that?
 
-Alan Stern
+For the clk_reset interface, maybe you can move those calls int
+platform_data callbacks for the non-DT machines to get them out
+of the way?
+
+You could have something like
+
+	if (pdata && pdata->reset)
+		pdata->reset(dev, clk);
+	else
+		reset_device(dev);
+
+That wouldn't be too ugly. For the time being, disabling the
+drivers on multiplatform sounds reasonable. I don't think you
+actually have to have the drivers conflict with DT support:
+you should be able to allow the DT based boards with non-multiplatform
+to enable the two or three drivers anyway.
+
+	Arnd
