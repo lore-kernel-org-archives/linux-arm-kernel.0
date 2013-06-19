@@ -1,79 +1,133 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 19 Jun 2013 13:44:52 +0100
-Subject: [PATCH 2/3] ARM: prevent risks of out-of-bound access in ASID
- allocator
+Date: Wed, 19 Jun 2013 13:44:53 +0100
+Subject: [PATCH 3/3] ARM: Cortex-A15: fix erratum 798181 implementation
 In-Reply-To: <1371645893-7630-1-git-send-email-marc.zyngier@arm.com>
 References: <1371645893-7630-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1371645893-7630-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1371645893-7630-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On a CPU that never ran anything, both the active and reserved ASID
-fields are set to zero. In this case the ASID_TO_IDX() macro will
-return -1, which is not a very useful value to index a bitmap.
+Looking into the active_asids array is not enough, as we also need
+to look into the reserved_asids array (they both represent processes
+that are currently running).
 
-Instead of trying to offset the ASID so that ASID #1 is actually
-bit 0 in the asid_map bitmap, just always ignore bit 0 and start
-the search from bit 1. This makes the code a bit more readable,
-and without risk of OoB access.
+Also, not holding the ASID allocator lock is racy, as another CPU
+could schedule that process and trigger a rollover, making the erratum
+workaround miss an IPI.
+
+Exposing this outside of context.c is a little ugly on the side, so
+let's define a new entry point that the erratum workaround can call
+to obtain the cpumask.
 
 Cc: <stable@vger.kernel.org> # 3.9
 Acked-by: Will Deacon <will.deacon@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Reported-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mm/context.c | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+ arch/arm/include/asm/mmu_context.h | 10 +++++++++-
+ arch/arm/kernel/smp_tlb.c          | 18 ++----------------
+ arch/arm/mm/context.c              | 29 ++++++++++++++++++++++++++++-
+ 3 files changed, 39 insertions(+), 18 deletions(-)
 
+diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
+index a7b85e0..dc90203 100644
+--- a/arch/arm/include/asm/mmu_context.h
++++ b/arch/arm/include/asm/mmu_context.h
+@@ -27,7 +27,15 @@ void __check_vmalloc_seq(struct mm_struct *mm);
+ void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk);
+ #define init_new_context(tsk,mm)	({ atomic64_set(&mm->context.id, 0); 0; })
+ 
+-DECLARE_PER_CPU(atomic64_t, active_asids);
++#ifdef CONFIG_ARM_ERRATA_798181
++void a15_erratum_get_cpumask(int this_cpu, struct mm_struct *mm,
++			     cpumask_t *mask);
++#else  /* !CONFIG_ARM_ERRATA_798181 */
++static inline void a15_erratum_get_cpumask(int this_cpu, struct mm_struct *mm,
++					   cpumask_t *mask)
++{
++}
++#endif /* CONFIG_ARM_ERRATA_798181 */
+ 
+ #else	/* !CONFIG_CPU_HAS_ASID */
+ 
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index 9a52a07..a98b62d 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -103,7 +103,7 @@ static void broadcast_tlb_a15_erratum(void)
+ 
+ static void broadcast_tlb_mm_a15_erratum(struct mm_struct *mm)
+ {
+-	int cpu, this_cpu;
++	int this_cpu;
+ 	cpumask_t mask = { CPU_BITS_NONE };
+ 
+ 	if (!erratum_a15_798181())
+@@ -111,21 +111,7 @@ static void broadcast_tlb_mm_a15_erratum(struct mm_struct *mm)
+ 
+ 	dummy_flush_tlb_a15_erratum();
+ 	this_cpu = get_cpu();
+-	for_each_online_cpu(cpu) {
+-		if (cpu == this_cpu)
+-			continue;
+-		/*
+-		 * We only need to send an IPI if the other CPUs are running
+-		 * the same ASID as the one being invalidated. There is no
+-		 * need for locking around the active_asids check since the
+-		 * switch_mm() function has at least one dmb() (as required by
+-		 * this workaround) in case a context switch happens on
+-		 * another CPU after the condition below.
+-		 */
+-		if (atomic64_read(&mm->context.id) ==
+-		    atomic64_read(&per_cpu(active_asids, cpu)))
+-			cpumask_set_cpu(cpu, &mask);
+-	}
++	a15_erratum_get_cpumask(this_cpu, mm, &mask);
+ 	smp_call_function_many(&mask, ipi_flush_tlb_a15_erratum, NULL, 1);
+ 	put_cpu();
+ }
 diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 8e12fcb..83e0905 100644
+index 83e0905..eeab06e 100644
 --- a/arch/arm/mm/context.c
 +++ b/arch/arm/mm/context.c
-@@ -39,10 +39,7 @@
-  * non 64-bit operations.
-  */
- #define ASID_FIRST_VERSION	(1ULL << ASID_BITS)
--#define NUM_USER_ASIDS		(ASID_FIRST_VERSION - 1)
--
--#define ASID_TO_IDX(asid)	((asid & ~ASID_MASK) - 1)
--#define IDX_TO_ASID(idx)	((idx + 1) & ~ASID_MASK)
-+#define NUM_USER_ASIDS		ASID_FIRST_VERSION
- 
- static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
+@@ -45,10 +45,37 @@ static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
  static atomic64_t asid_generation = ATOMIC64_INIT(ASID_FIRST_VERSION);
-@@ -137,7 +134,7 @@ static void flush_context(unsigned int cpu)
- 			 */
- 			if (asid == 0)
- 				asid = per_cpu(reserved_asids, i);
--			__set_bit(ASID_TO_IDX(asid), asid_map);
-+			__set_bit(asid & ~ASID_MASK, asid_map);
- 		}
- 		per_cpu(reserved_asids, i) = asid;
- 	}
-@@ -176,17 +173,19 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- 		/*
- 		 * Allocate a free ASID. If we can't find one, take a
- 		 * note of the currently active ASIDs and mark the TLBs
--		 * as requiring flushes.
-+		 * as requiring flushes. We always count from ASID #1,
-+		 * as we reserve ASID #0 to switch via TTBR0 and indicate
-+		 * rollover events.
- 		 */
--		asid = find_first_zero_bit(asid_map, NUM_USER_ASIDS);
-+		asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, 1);
- 		if (asid == NUM_USER_ASIDS) {
- 			generation = atomic64_add_return(ASID_FIRST_VERSION,
- 							 &asid_generation);
- 			flush_context(cpu);
--			asid = find_first_zero_bit(asid_map, NUM_USER_ASIDS);
-+			asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, 1);
- 		}
- 		__set_bit(asid, asid_map);
--		asid = generation | IDX_TO_ASID(asid);
-+		asid |= generation;
- 		cpumask_clear(mm_cpumask(mm));
- 	}
+ static DECLARE_BITMAP(asid_map, NUM_USER_ASIDS);
  
+-DEFINE_PER_CPU(atomic64_t, active_asids);
++static DEFINE_PER_CPU(atomic64_t, active_asids);
+ static DEFINE_PER_CPU(u64, reserved_asids);
+ static cpumask_t tlb_flush_pending;
+ 
++#ifdef CONFIG_ARM_ERRATA_798181
++void a15_erratum_get_cpumask(int this_cpu, struct mm_struct *mm,
++			     cpumask_t *mask)
++{
++	int cpu;
++	unsigned long flags;
++	u64 context_id, asid;
++
++	raw_spin_lock_irqsave(&cpu_asid_lock, flags);
++	context_id = mm->context.id.counter;
++	for_each_online_cpu(cpu) {
++		if (cpu == this_cpu)
++			continue;
++		/*
++		 * We only need to send an IPI if the other CPUs are
++		 * running the same ASID as the one being invalidated.
++		 */
++		asid = per_cpu(active_asids, cpu).counter;
++		if (asid == 0)
++			asid = per_cpu(reserved_asids, cpu);
++		if (context_id == asid)
++			cpumask_set_cpu(cpu, mask);
++	}
++	raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
++}
++#endif
++
+ #ifdef CONFIG_ARM_LPAE
+ static void cpu_set_reserved_ttbr0(void)
+ {
 -- 
 1.8.2.3
