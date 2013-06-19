@@ -1,23 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Jun 2013 16:51:30 +0800
-Subject: [PATCH v2 2/2] i2c: imx: Add Vybrid VF610 I2C controller support
-In-Reply-To: <1371545327-12481-1-git-send-email-b35083@freescale.com>
-References: <1371545327-12481-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130619085127.GB3405@S2101-09.ap.freescale.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Jun 2013 09:52:02 +0100
+Subject: [PATCH 3/9] ARM: dma-mapping: convert DMA direction into IOMMU
+ protection attributes
+In-Reply-To: <51C16DAF.1090205@samsung.com>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-4-git-send-email-will.deacon@arm.com>
+ <51C16DAF.1090205@samsung.com>
+Message-ID: <20130619085202.GC20351@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 04:48:47PM +0800, Jingchang Lu wrote:
->   Add Freescale Vybrid VF610 I2C controller support to
-> imx I2C driver framework.
->   Some operation is different from imx I2C controller.
-> The register offset, the i2c clock divider value table,
-> the module enabling(I2CR_IEN) which is just invert with imx,
-> and the interrupt flag(I2SR) clearing opcode is w1c on VF610
-> but w0c on imx.
-> 
-> Signed-off-by: Jason Jin <Jason.jin@freescale.com>
-> Signed-off-by: Xiaochun Li <b41219@freescale.com>
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+On Wed, Jun 19, 2013 at 09:37:03AM +0100, Marek Szyprowski wrote:
+> Hello,
 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
+Hi Marek,
+
+> On 6/10/2013 8:34 PM, Will Deacon wrote:
+> > IOMMU mappings take a prot parameter, identifying the protection bits
+> > to enforce on the newly created mapping (READ or WRITE). The ARM
+> > dma-mapping framework currently just passes 0 as the prot argument,
+> > resulting in faulting mappings.
+> >
+> > This patch infers the protection attributes based on the direction of
+> > the DMA transfer.
+> >
+> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> Thanks for fixing this issue. Could I take this patch to my dma-mapping tree
+> with other dma-mapping changes I've collected recently or do you want my ack
+> and push it via other tree?
+
+Please, feel free to take it via the dma-mapping tree! That's probably the
+best route for it and there's nothing that really depends on it anyway.
+
+Cheers,
+
+Will
