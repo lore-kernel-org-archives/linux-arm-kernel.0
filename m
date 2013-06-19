@@ -1,119 +1,122 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 19 Jun 2013 17:05:49 +0300
-Subject: [RFC PATCH 2/6] mfd: omap-usb-host: Put pins in IDLE state on suspend
+Date: Wed, 19 Jun 2013 17:05:50 +0300
+Subject: [RFC PATCH 3/6] USB: ehci: allow controller drivers to override irq &
+ bus_suspend/resume
 In-Reply-To: <1371650753-11452-1-git-send-email-rogerq@ti.com>
 References: <1371650753-11452-1-git-send-email-rogerq@ti.com>
-Message-ID: <1371650753-11452-3-git-send-email-rogerq@ti.com>
+Message-ID: <1371650753-11452-4-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support wake up from suspend use the pinctrl
-framework to put the USB host pins in IDLE state during suspend.
+Some drivers (e.g. ehci_omap) need to do additional work in
+bus suspend/resume and interrupt handler to support low power
+modes and remote wakeup.
+Allow drivers to override these functions through ehci_driver_overrides.
 
-CC: Samuel Ortiz <sameo@linux.intel.com>
+Also export the ehci_irq(), ehci_bus_suspend() and ehci_bus_resume()
+functions so they can be called from the controller drivers.
+
+CC: Alan Stern <stern@rowland.harvard.edu>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/mfd/omap-usb-host.c |   46 +++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 46 insertions(+), 0 deletions(-)
+ drivers/usb/host/ehci-hcd.c |    9 ++++++++-
+ drivers/usb/host/ehci-hub.c |    6 ++++--
+ drivers/usb/host/ehci.h     |    6 ++++++
+ 3 files changed, 18 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index 6601a49..171cc3b 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -31,6 +31,7 @@
- #include <linux/of.h>
- #include <linux/of_platform.h>
- #include <linux/err.h>
-+#include <linux/pinctrl/consumer.h>
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index 246e124..8d35dd4 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -681,7 +681,7 @@ EXPORT_SYMBOL_GPL(ehci_setup);
  
- #include "omap-usb.h"
- 
-@@ -111,6 +112,10 @@ struct usbhs_hcd_omap {
- 	struct usbhs_omap_platform_data	*pdata;
- 
- 	u32				usbhs_rev;
-+
-+	struct pinctrl *pinctrl;
-+	struct pinctrl_state *pins_default;
-+	struct pinctrl_state *pins_idle;
- };
  /*-------------------------------------------------------------------------*/
  
-@@ -325,6 +330,10 @@ static int usbhs_runtime_resume(struct device *dev)
+-static irqreturn_t ehci_irq (struct usb_hcd *hcd)
++irqreturn_t ehci_irq(struct usb_hcd *hcd)
+ {
+ 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
+ 	u32			status, masked_status, pcd_status = 0, cmd;
+@@ -828,6 +828,7 @@ dead:
+ 		usb_hcd_poll_rh_status(hcd);
+ 	return IRQ_HANDLED;
+ }
++EXPORT_SYMBOL_GPL(ehci_irq);
  
- 	dev_dbg(dev, "usbhs_runtime_resume\n");
+ /*-------------------------------------------------------------------------*/
  
-+	if (!IS_ERR(omap->pins_default))
-+		if (pinctrl_select_state(omap->pinctrl, omap->pins_default))
-+			dev_err(dev, "Could not select DEFAULT pin state\n");
-+
- 	omap_tll_enable(pdata);
- 
- 	if (!IS_ERR(omap->ehci_logic_fck))
-@@ -402,6 +411,10 @@ static int usbhs_runtime_suspend(struct device *dev)
- 
- 	omap_tll_disable(pdata);
- 
-+	if (!IS_ERR(omap->pins_idle))
-+		if (pinctrl_select_state(omap->pinctrl, omap->pins_idle))
-+			dev_err(dev, "Could not select IDLE pin state\n");
-+
- 	return 0;
+@@ -1211,6 +1212,12 @@ void ehci_init_driver(struct hc_driver *drv,
+ 		drv->hcd_priv_size += over->extra_priv_size;
+ 		if (over->reset)
+ 			drv->reset = over->reset;
++		if (over->bus_suspend)
++			drv->bus_suspend = over->bus_suspend;
++		if (over->bus_resume)
++			drv->bus_resume = over->bus_resume;
++		if (over->irq)
++			drv->irq = over->irq;
+ 	}
+ }
+ EXPORT_SYMBOL_GPL(ehci_init_driver);
+diff --git a/drivers/usb/host/ehci-hub.c b/drivers/usb/host/ehci-hub.c
+index 9ab4a4d..1fc03f9 100644
+--- a/drivers/usb/host/ehci-hub.c
++++ b/drivers/usb/host/ehci-hub.c
+@@ -218,7 +218,7 @@ static void ehci_adjust_port_wakeup_flags(struct ehci_hcd *ehci,
+ 	spin_unlock_irq(&ehci->lock);
  }
  
-@@ -608,6 +621,30 @@ static int usbhs_omap_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
-+	omap->pinctrl = devm_pinctrl_get(dev);
-+	if (!IS_ERR(omap->pinctrl)) {
-+		omap->pins_default = pinctrl_lookup_state(omap->pinctrl,
-+							 PINCTRL_STATE_DEFAULT);
-+		if (IS_ERR(omap->pins_default))
-+			dev_err(dev, "Could not get DEFAULT state pins\n");
-+
-+		omap->pins_idle = pinctrl_lookup_state(omap->pinctrl,
-+						      PINCTRL_STATE_IDLE);
-+		if (IS_ERR(omap->pins_idle))
-+			dev_err(dev, "Could not get IDLE state pins\n");
-+
-+	} else {
-+		dev_info(dev, "pinctrl_get error\n");
-+		if (PTR_ERR(omap->pinctrl) == -EPROBE_DEFER) {
-+			dev_info(dev, "defer\n");
-+			return -EPROBE_DEFER;
-+		}
-+
-+		omap->pins_default = omap->pins_idle = ERR_PTR(-EINVAL);
-+		dev_dbg(dev, "Proceeding without pinctrl: %ld\n",
-+						PTR_ERR(omap->pinctrl));
-+	}
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	omap->uhh_base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(omap->uhh_base))
-@@ -796,6 +833,10 @@ static int usbhs_omap_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	if (!IS_ERR(omap->pins_default))
-+		if (pinctrl_select_state(omap->pinctrl, omap->pins_default))
-+			dev_err(dev, "Could not select DEFAULT pin state\n");
-+
- 	return 0;
- 
- err_alloc:
-@@ -872,6 +913,11 @@ static int usbhs_omap_remove(struct platform_device *pdev)
- 
- 	/* remove children */
- 	device_for_each_child(&pdev->dev, NULL, usbhs_omap_remove_child);
-+
-+	if (!IS_ERR(omap->pins_idle))
-+		if (pinctrl_select_state(omap->pinctrl, omap->pins_idle))
-+			dev_err(&pdev->dev, "Could not select IDLE pin state\n");
-+
+-static int ehci_bus_suspend (struct usb_hcd *hcd)
++int ehci_bus_suspend(struct usb_hcd *hcd)
+ {
+ 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
+ 	int			port;
+@@ -348,10 +348,11 @@ static int ehci_bus_suspend (struct usb_hcd *hcd)
+ 	hrtimer_cancel(&ehci->hrtimer);
  	return 0;
  }
++EXPORT_SYMBOL_GPL(ehci_bus_suspend);
  
+ 
+ /* caller has locked the root hub, and should reset/reinit on error */
+-static int ehci_bus_resume (struct usb_hcd *hcd)
++int ehci_bus_resume(struct usb_hcd *hcd)
+ {
+ 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
+ 	u32			temp;
+@@ -489,6 +490,7 @@ static int ehci_bus_resume (struct usb_hcd *hcd)
+ 	spin_unlock_irq(&ehci->lock);
+ 	return -ESHUTDOWN;
+ }
++EXPORT_SYMBOL_GPL(ehci_bus_resume);
+ 
+ #else
+ 
+diff --git a/drivers/usb/host/ehci.h b/drivers/usb/host/ehci.h
+index 7c978b2..992d626 100644
+--- a/drivers/usb/host/ehci.h
++++ b/drivers/usb/host/ehci.h
+@@ -795,15 +795,21 @@ static inline u32 hc32_to_cpup (const struct ehci_hcd *ehci, const __hc32 *x)
+ struct ehci_driver_overrides {
+ 	size_t		extra_priv_size;
+ 	int		(*reset)(struct usb_hcd *hcd);
++	int		(*bus_suspend)(struct usb_hcd *hcd);
++	int		(*bus_resume)(struct usb_hcd *hcd);
++	irqreturn_t	(*irq) (struct usb_hcd *hcd);
+ };
+ 
+ extern void	ehci_init_driver(struct hc_driver *drv,
+ 				const struct ehci_driver_overrides *over);
+ extern int	ehci_setup(struct usb_hcd *hcd);
++extern irqreturn_t ehci_irq(struct usb_hcd *hcd);
+ 
+ #ifdef CONFIG_PM
+ extern int	ehci_suspend(struct usb_hcd *hcd, bool do_wakeup);
+ extern int	ehci_resume(struct usb_hcd *hcd, bool hibernated);
++extern int	ehci_bus_suspend(struct usb_hcd *hcd);
++extern int	ehci_bus_resume(struct usb_hcd *hcd);
+ #endif	/* CONFIG_PM */
+ 
+ #endif /* __LINUX_EHCI_HCD_H */
 -- 
 1.7.4.1
