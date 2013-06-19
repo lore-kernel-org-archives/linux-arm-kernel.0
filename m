@@ -1,49 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 19 Jun 2013 22:22:18 +0900
-Subject: [GIT PULL 0/5] Renesas ARM-based SoC board updates for v3.11 #2
-Message-ID: <1371648143-18376-1-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 19 Jun 2013 22:22:19 +0900
+Subject: [PATCH 1/5] ARM: shmobile: BOCK-W: add Ether support
+In-Reply-To: <1371648143-18376-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371648143-18376-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371648143-18376-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-please consider the following updates to the Bock-W board for v3.11.
+Register Ether device from bockw_init(), passing the platform data to it, adding
+only the RMII pin group to bockw_pinctrl_map[].  Although the LINK signal exists
+on the board, it's connected to the link/activity LED  output of the PHY, thus
+the link disappears and reappears after each packet. We'd be better off ignoring
+such signal and getting the link state from the PHY indirectly.
 
-This pull request is based on a merge of renesas-boards2-for-v3.11 and
-renesas-soc2-for-v3.11, both of which you have previously pulled, in order
-to satisfy dependencies.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+[horms+renesas at verge.net.au: manually applied]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-bockw.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-
-The following changes since commit 2e9a222e271b7fd16e62a0861ad5e42996d17815:
-
-  Merge branch 'soc2' into boards-base (2013-06-13 14:41:53 +0900)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards2-for-v3.11
-
-for you to fetch changes up to 2c83322ce820bcf2d5e8265de831489076ee211e:
-
-  ARM: shmobile: BOCK-W: change Ether device name (2013-06-18 16:22:45 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM-based SoC board updates for v3.11
-
-* Extended hardware coverage for the Bock-W board
-  by Goda-san and Morimoto-san
-* Correction to Ether device name for the Bock-W board
-  from Sergei Shtylyov
-
-----------------------------------------------------------------
-Kuninori Morimoto (3):
-      ARM: shmobile: bockw: add I2C device support
-      ARM: shmobile: bockw: add SPI FLASH support
-      ARM: shmobile: bockw: add MMCIF support
-
-Sergei Shtylyov (2):
-      ARM: shmobile: BOCK-W: add Ether support
-      ARM: shmobile: BOCK-W: change Ether device name
-
- arch/arm/mach-shmobile/board-bockw.c | 98 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 97 insertions(+), 1 deletion(-)
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+index 2b6103e..bfe8f67 100644
+--- a/arch/arm/mach-shmobile/board-bockw.c
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -63,7 +63,24 @@ static struct sh_mobile_sdhi_info sdhi0_info = {
+ 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
+ };
+ 
++static struct sh_eth_plat_data ether_platform_data __initdata = {
++	.phy		= 0x01,
++	.edmac_endian	= EDMAC_LITTLE_ENDIAN,
++	.register_type	= SH_ETH_REG_FAST_RCAR,
++	.phy_interface	= PHY_INTERFACE_MODE_RMII,
++	/*
++	 * Although the LINK signal is available on the board, it's connected to
++	 * the link/activity LED output of the PHY, thus the link disappears and
++	 * reappears after each packet.  We'd be better off ignoring such signal
++	 * and getting the link state from the PHY indirectly.
++	 */
++	.no_ether_link	= 1,
++};
++
+ static const struct pinctrl_map bockw_pinctrl_map[] = {
++	/* Ether */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7778",
++				  "ether_rmii", "ether"),
+ 	/* SCIF0 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
+ 				  "scif0_data_a", "scif0"),
+@@ -85,6 +102,7 @@ static void __init bockw_init(void)
+ 	r8a7778_clock_init();
+ 	r8a7778_init_irq_extpin(1);
+ 	r8a7778_add_standard_devices();
++	r8a7778_add_ether_device(&ether_platform_data);
+ 
+ 	pinctrl_register_mappings(bockw_pinctrl_map,
+ 				  ARRAY_SIZE(bockw_pinctrl_map));
+-- 
+1.8.2.1
