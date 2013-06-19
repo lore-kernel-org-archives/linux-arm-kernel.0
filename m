@@ -1,31 +1,217 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 19 Jun 2013 18:56:18 +0200
-Subject: [PATCHv3 10/11] arm: mvebu: indicate that this platform supports MSI
+Date: Wed, 19 Jun 2013 18:56:14 +0200
+Subject: [PATCHv3 06/11] irqchip: armada-370-xp: implement MSI support
 In-Reply-To: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1371660979-21588-11-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1371660979-21588-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all the pieces are in place, we can adjust the
-mach-mvebu/Kconfig file to indicate that this platform supports MSIs.
+This commit introduces the support for the MSI interrupts in the
+armada-370-xp interrupt controller driver. It registers an MSI chip to
+the MSI chip registry, which will be used by the Marvell PCIe host
+controller driver.
+
+The MSI interrupts use the 16 high doorbells, and are therefore
+notified using IRQ1 of the main interrupt controller.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/irqchip/irq-armada-370-xp.c | 135 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 134 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 9eb63d7..36951b1 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -15,6 +15,7 @@ config ARCH_MVEBU
- 	select ARCH_REQUIRE_GPIOLIB
- 	select MIGHT_HAVE_PCI
- 	select PCI_QUIRKS if PCI
-+	select ARCH_SUPPORTS_MSI if PCI
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index 26adc74..9e73547 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -21,7 +21,10 @@
+ #include <linux/io.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
++#include <linux/of_pci.h>
+ #include <linux/irqdomain.h>
++#include <linux/slab.h>
++#include <linux/msi.h>
+ #include <asm/mach/arch.h>
+ #include <asm/exception.h>
+ #include <asm/smp_plat.h>
+@@ -51,12 +54,20 @@
+ #define IPI_DOORBELL_START                      (0)
+ #define IPI_DOORBELL_END                        (8)
+ #define IPI_DOORBELL_MASK                       0xFF
++#define PCI_MSI_DOORBELL_START                  (16)
++#define PCI_MSI_DOORBELL_NR                     (16)
++#define PCI_MSI_DOORBELL_END                    (32)
++#define PCI_MSI_DOORBELL_MASK                   0xFFFF0000
  
- if ARCH_MVEBU
+ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
  
+ static void __iomem *per_cpu_int_base;
+ static void __iomem *main_int_base;
+ static struct irq_domain *armada_370_xp_mpic_domain;
++#ifdef CONFIG_PCI_MSI
++static struct irq_domain *armada_370_xp_msi_domain;
++static phys_addr_t msi_doorbell_addr;
++#endif
+ 
+ /*
+  * In SMP mode:
+@@ -87,6 +98,96 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
+ 				ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
+ }
+ 
++#ifdef CONFIG_PCI_MSI
++
++static int armada_370_xp_setup_msi_irq(struct msi_chip *chip,
++				       struct pci_dev *pdev,
++				       struct msi_desc *desc)
++{
++	struct msi_msg msg;
++	irq_hw_number_t hwirq;
++	int virq;
++
++	virq = irq_alloc_mapping(armada_370_xp_msi_domain, &hwirq);
++	if (!virq)
++		return -EINVAL;
++
++	irq_set_msi_desc(virq, desc);
++
++	msg.address_lo = msi_doorbell_addr;
++	msg.address_hi = 0;
++	msg.data = 0xf00 | (hwirq + 16);
++
++	write_msi_msg(virq, &msg);
++	return 0;
++}
++
++static void armada_370_xp_teardown_msi_irq(struct msi_chip *chip,
++					   unsigned int irq)
++{
++	irq_dispose_mapping(irq);
++}
++
++static struct irq_chip armada_370_xp_msi_irq_chip = {
++	.name = "armada_370_xp_msi_irq",
++	.irq_enable = unmask_msi_irq,
++	.irq_disable = mask_msi_irq,
++	.irq_mask = mask_msi_irq,
++	.irq_unmask = unmask_msi_irq,
++};
++
++static int armada_370_xp_msi_map(struct irq_domain *domain, unsigned int virq,
++				 irq_hw_number_t hw)
++{
++	irq_set_chip_and_handler(virq, &armada_370_xp_msi_irq_chip,
++				 handle_simple_irq);
++	set_irq_flags(virq, IRQF_VALID);
++
++	return 0;
++}
++
++static const struct irq_domain_ops armada_370_xp_msi_irq_ops = {
++	.map = armada_370_xp_msi_map,
++};
++
++static int armada_370_xp_msi_init(struct device_node *node)
++{
++	struct msi_chip *msi_chip;
++	u32 reg;
++
++	msi_chip = kzalloc(sizeof(*msi_chip), GFP_KERNEL);
++	if (!msi_chip)
++		return -ENOMEM;
++
++	armada_370_xp_msi_domain =
++		irq_domain_add_linear(NULL, PCI_MSI_DOORBELL_NR,
++				      &armada_370_xp_msi_irq_ops, NULL);
++	if (!armada_370_xp_msi_domain) {
++		kfree(msi_chip);
++		return -ENOMEM;
++	}
++
++	msi_chip->of_node = node;
++	msi_chip->setup_irq = armada_370_xp_setup_msi_irq;
++	msi_chip->teardown_irq = armada_370_xp_teardown_msi_irq;
++
++	of_msi_chip_add(msi_chip);
++
++	reg = readl(per_cpu_int_base + ARMADA_370_XP_IN_DRBEL_MSK_OFFS)
++		| PCI_MSI_DOORBELL_MASK;
++
++	writel(reg, per_cpu_int_base +
++	       ARMADA_370_XP_IN_DRBEL_MSK_OFFS);
++
++	/* Unmask IPI interrupt */
++	writel(1, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
++
++	return 0;
++}
++#else
++static inline int armada_370_xp_msi_init(struct device_node *node) { return 0; }
++#endif
++
+ #ifdef CONFIG_SMP
+ static int armada_xp_set_affinity(struct irq_data *d,
+ 				  const struct cpumask *mask_val, bool force)
+@@ -214,12 +315,39 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
+ 		if (irqnr > 1022)
+ 			break;
+ 
+-		if (irqnr > 0) {
++		if (irqnr > 1) {
+ 			irqnr =	irq_find_mapping(armada_370_xp_mpic_domain,
+ 					irqnr);
+ 			handle_IRQ(irqnr, regs);
+ 			continue;
+ 		}
++
++#ifdef CONFIG_PCI_MSI
++		/* MSI handling */
++		if (irqnr == 1) {
++			u32 msimask, msinr;
++
++			msimask = readl_relaxed(per_cpu_int_base +
++						ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
++				& PCI_MSI_DOORBELL_MASK;
++
++			writel(~PCI_MSI_DOORBELL_MASK, per_cpu_int_base +
++			       ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
++
++			for (msinr = PCI_MSI_DOORBELL_START;
++			     msinr < PCI_MSI_DOORBELL_END; msinr++) {
++				int irq;
++
++				if (!(msimask & BIT(msinr)))
++					continue;
++
++				irq = irq_find_mapping(armada_370_xp_msi_domain,
++						       msinr - 16);
++				handle_IRQ(irq, regs);
++			}
++		}
++#endif
++
+ #ifdef CONFIG_SMP
+ 		/* IPI Handling */
+ 		if (irqnr == 0) {
+@@ -269,6 +397,9 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 				   resource_size(&per_cpu_int_res));
+ 	BUG_ON(!per_cpu_int_base);
+ 
++	msi_doorbell_addr = main_int_res.start +
++		ARMADA_370_XP_SW_TRIG_INT_OFFS;
++
+ 	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
+ 
+ 	armada_370_xp_mpic_domain =
+@@ -292,6 +423,8 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 
+ #endif
+ 
++	armada_370_xp_msi_init(node);
++
+ 	set_handle_irq(armada_370_xp_handle_irq);
+ 
+ 	return 0;
 -- 
 1.8.1.2
