@@ -1,25 +1,29 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 19 Jun 2013 10:53:02 -0700
-Subject: [PATCH RFC 0/2] Extend multi_v7_defconfig
-Message-ID: <1371664384-24974-1-git-send-email-soren.brinkmann@xilinx.com>
+Date: Wed, 19 Jun 2013 10:53:03 -0700
+Subject: [PATCH RFC 1/2] arm: multi_v7_defconfig: Enable Zynq UART driver
+In-Reply-To: <1371664384-24974-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1371664384-24974-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1371664384-24974-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-I don't know how much a defconfig is supposed to provide, hence as RFC.
-This patches are needed for booting Zynq into a minimum ramfs based
-system with a serial console.
-
-	Thanks,
-	S?ren
-
-Soren Brinkmann (2):
-  arm: multi_v7_defconfig: Enable Zynq UART driver
-  arm: multi_v7_defconfig: Enable initrd/initramfs support
-
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
-
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 2e67a27..d5f0d76 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -42,6 +42,8 @@ CONFIG_KEYBOARD_SPEAR=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_SERIAL_XILINX_PS_UART=y
++CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
+ CONFIG_SERIAL_SIRFSOC=y
+ CONFIG_SERIAL_SIRFSOC_CONSOLE=y
+ CONFIG_SERIAL_VT8500=y
 -- 
 1.8.3.1
