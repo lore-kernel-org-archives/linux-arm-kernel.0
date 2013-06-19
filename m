@@ -1,9 +1,9 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 19 Jun 2013 13:18:41 +0200
-Subject: [PATCH 5/8] usb: gadget: at91_udc: prepare clk before calling enable
+Date: Wed, 19 Jun 2013 13:20:09 +0200
+Subject: [PATCH 6/8] ehci-atmel.c: prepare clk before calling enable
 In-Reply-To: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
 References: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1371640721-9661-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1371640809-9699-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,51 +12,32 @@ avoid common clk framework warnings.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- drivers/usb/gadget/at91_udc.c |   14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ drivers/usb/host/ehci-atmel.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-index 073b938..fce8e4e 100644
---- a/drivers/usb/gadget/at91_udc.c
-+++ b/drivers/usb/gadget/at91_udc.c
-@@ -870,8 +870,8 @@ static void clk_on(struct at91_udc *udc)
- 	if (udc->clocked)
- 		return;
- 	udc->clocked = 1;
--	clk_enable(udc->iclk);
--	clk_enable(udc->fclk);
-+	clk_prepare_enable(udc->iclk);
-+	clk_prepare_enable(udc->fclk);
+diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
+index 6642009..015ce6e 100644
+--- a/drivers/usb/host/ehci-atmel.c
++++ b/drivers/usb/host/ehci-atmel.c
+@@ -37,15 +37,15 @@ static int clocked;
+ 
+ static void atmel_start_clock(void)
+ {
+-	clk_enable(iclk);
+-	clk_enable(fclk);
++	clk_prepare_enable(iclk);
++	clk_prepare_enable(fclk);
+ 	clocked = 1;
  }
  
- static void clk_off(struct at91_udc *udc)
-@@ -880,8 +880,8 @@ static void clk_off(struct at91_udc *udc)
- 		return;
- 	udc->clocked = 0;
- 	udc->gadget.speed = USB_SPEED_UNKNOWN;
--	clk_disable(udc->fclk);
--	clk_disable(udc->iclk);
-+	clk_disable_unprepare(udc->fclk);
-+	clk_disable_unprepare(udc->iclk);
+ static void atmel_stop_clock(void)
+ {
+-	clk_disable(fclk);
+-	clk_disable(iclk);
++	clk_disable_unprepare(fclk);
++	clk_disable_unprepare(iclk);
+ 	clocked = 0;
  }
  
- /*
-@@ -1782,12 +1782,14 @@ static int at91udc_probe(struct platform_device *pdev)
- 	}
- 
- 	/* don't do anything until we have both gadget driver and VBUS */
--	clk_enable(udc->iclk);
-+	retval = clk_prepare_enable(udc->iclk);
-+	if (retval)
-+		goto fail1;
- 	at91_udp_write(udc, AT91_UDP_TXVC, AT91_UDP_TXVC_TXVDIS);
- 	at91_udp_write(udc, AT91_UDP_IDR, 0xffffffff);
- 	/* Clear all pending interrupts - UDP may be used by bootloader. */
- 	at91_udp_write(udc, AT91_UDP_ICR, 0xffffffff);
--	clk_disable(udc->iclk);
-+	clk_disable_unprepare(udc->iclk);
- 
- 	/* request UDC and maybe VBUS irqs */
- 	udc->udp_irq = platform_get_irq(pdev, 0);
 -- 
 1.7.9.5
