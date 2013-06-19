@@ -1,42 +1,103 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 19 Jun 2013 11:47:38 -0400 (EDT)
-Subject: [RFC PATCH v1 4/6] USB: EHCI: don't release ehci->lock if URB
- giveback in tasklet context
-In-Reply-To: <CACVXFVOc9GhZSX5vtgxN3u9+wMVv2SkXW6jyCtb1eYTzRXahWA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306191144230.2026-100000@iolanthe.rowland.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 19 Jun 2013 17:49:33 +0200
+Subject: [PATCH v7 1/9] drivers: phy: add generic PHY framework
+In-Reply-To: <1371113039-5784-2-git-send-email-kishon@ti.com>
+References: <1371113039-5784-1-git-send-email-kishon@ti.com>
+ <1371113039-5784-2-git-send-email-kishon@ti.com>
+Message-ID: <51C1D30D.1050907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Jun 2013, Ming Lei wrote:
+Hi,
 
-> On Wed, Jun 19, 2013 at 12:43 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> > On Tue, 18 Jun 2013, Ming Lei wrote:
-> >
-> >> If HCD_BH is set for HC driver's flags, URB giveback will be
-> >> done in tasklet context instead of interrupt context, so the
-> >> ehci->lock needn't to be released any more before calling
-> >> usb_hcd_giveback_urb().
-> >
-> > It is premature to do this now.  This should be part of the 6/6 patch,
-> 
-> It is fine since HCD_BH isn't enabled.
+On 06/13/2013 10:43 AM, Kishon Vijay Abraham I wrote:
+> +/**
+> + * phy_create() - create a new phy
+> + * @dev: device that is creating the new phy
+> + * @id: id of the phy
+> + * @ops: function pointers for performing phy operations
+> + * @label: label given to the phy
+> + * @priv: private data from phy driver
+> + *
+> + * Called to create a phy using phy framework.
+> + */
+> +struct phy *phy_create(struct device *dev, u8 id, const struct phy_ops *ops,
+> +	const char *label, void *priv)
+> +{
+> +	int ret;
+> +	struct phy *phy;
+> +
+> +	if (!dev) {
+> +		dev_WARN(dev, "no device provided for PHY\n");
+> +		ret = -EINVAL;
+> +		goto err0;
+> +	}
+> +
+> +	phy = kzalloc(sizeof(*phy), GFP_KERNEL);
+> +	if (!phy) {
+> +		ret = -ENOMEM;
+> +		goto err0;
+> +	}
+> +
+> +	device_initialize(&phy->dev);
+> +
+> +	phy->dev.class = phy_class;
+> +	phy->dev.parent = dev;
+> +	phy->dev.of_node = dev->of_node;
+> +	phy->id = id;
+> +	phy->ops = ops;
+> +	phy->label = label;
 
-It's not "fine".  It will work -- nothing will crash -- but that 
-doesn't mean it is good style.
+Perhaps we could make it:
 
-> > when it won't be necessary to test hcd_giveback_urb_in_bh().
-> 
-> Keeping it is easy to compare test results between running complete()
-> in tasklet and in hard irq handler.
+	phy->label = kstrdup(label, GFP_KERNEL);
 
-It's just as easy to do your tests by keeping two copies of ehci-hcd.ko 
-lying around; one with your changes and one without.  You can insmod 
-whichever one you want to test.
+and free the label in phy_destroy() ?
 
-> Also it might be helpful for out of tree drivers.
-> 
-> But it isn't a big deal, I can merge it to 6/6 if you care.
+That way the users would't need to keep the label around. It might
+be useful when PHY provider generates the labels dynamically. I guess
+it is OK for PHY providers to hard code the labels and having the PHY
+user drivers passed labels in platform data ?
 
-Yes, please.
+> +	dev_set_drvdata(&phy->dev, priv);
+> +
+> +	ret = dev_set_name(&phy->dev, "%s.%d", dev_name(dev), id);
+> +	if (ret)
+> +		goto err1;
+> +
+> +	ret = device_add(&phy->dev);
+> +	if (ret)
+> +		goto err1;
+> +
+> +	if (pm_runtime_enabled(dev))
+> +		pm_runtime_enable(&phy->dev);
+> +
+> +	return phy;
+> +
+> +err1:
+> +	put_device(&phy->dev);
+> +	kfree(phy);
+> +
+> +err0:
+> +	return ERR_PTR(ret);
+> +}
+> +EXPORT_SYMBOL_GPL(phy_create);
 
-Alan Stern
+> +/**
+> + * phy_destroy() - destroy the phy
+> + * @phy: the phy to be destroyed
+> + *
+> + * Called to destroy the phy.
+> + */
+> +void phy_destroy(struct phy *phy)
+> +{
+> +	pm_runtime_disable(&phy->dev);
+> +	device_unregister(&phy->dev);
+
+Isn't kfree(phy); missing here ?
+
+> +}
+> +EXPORT_SYMBOL_GPL(phy_destroy);
+
+Thanks,
+Sylwester
