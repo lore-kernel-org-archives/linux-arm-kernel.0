@@ -1,41 +1,73 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 19 Jun 2013 19:30:14 +0200
-Subject: [PATCH 01/10] ARM: fix ARCH_IXP4xx usage of
- ARCH_SUPPORTS_BIG_ENDIAN
-In-Reply-To: <1371645406-16873-2-git-send-email-ben.dooks@codethink.co.uk>
-References: <1371645406-16873-1-git-send-email-ben.dooks@codethink.co.uk>
- <1371645406-16873-2-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130619193014.51b5c796@skate>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 19 Jun 2013 21:33:14 +0400
+Subject: [PATCH V3 05/11] USB: OHCI: Properly handle ohci-ep93xx suspend
+In-Reply-To: <CAJFYCKGck29t211NTmXSKPtFdah3Pbe8T0UVZDsqWqqax3OL7g@mail.gmail.com>
+References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
+ <1371643936-3314-1-git-send-email-manjunath.goudar@linaro.org>
+ <1371643936-3314-6-git-send-email-manjunath.goudar@linaro.org>
+ <51C1A781.2040603@cogentembedded.com>
+ <CAJFYCKGck29t211NTmXSKPtFdah3Pbe8T0UVZDsqWqqax3OL7g@mail.gmail.com>
+Message-ID: <51C1EB5A.7090809@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ben Dooks,
+Hello.
 
-On Wed, 19 Jun 2013 13:36:37 +0100, Ben Dooks wrote:
-> The Kconfig for arch/arm/mach-ixp4xx has a local definition
-> of ARCH_SUPPORTS_BIG_ENDIAN which could be used elsewhere.
-> This means that if IXP4xx is selected and this symbol is
-> selected eleswhere then an warning is produced.
-> 
-> Clean the following error up by making the symbol be
-> selected by the main ARCH_IXP4XX definition and have a
-> common definition in arch/arm/mm/Kconfig
-> 
-> warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
-> warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
-> ---
->  arch/arm/Kconfig             |    1 +
->  arch/arm/mach-ixp4xx/Kconfig |    4 ----
->  arch/arm/mm/Kconfig          |    6 ++++++
->  3 files changed, 7 insertions(+), 4 deletions(-)
+On 06/19/2013 06:42 PM, Manjunath Goudar wrote:
 
-Patch lacks SoB.
+>         Suspend scenario in case of ohci-ep93xx glue was not
+>         properly handled as it was not suspending generic part
+>         of ohci controller. Calling explicitly the ohci_suspend()
+>         routine in ohci_hcd_ep93xx_drv_suspend() will ensure proper
+>         handling of suspend scenario.
+>
+>
+>         Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org
+>         <mailto:manjunath.goudar@linaro.org>>
+>         Cc: Arnd Bergmann <arnd at arndb.de <mailto:arnd@arndb.de>>
+>         Cc: Alan Stern <stern@rowland.harvard.edu
+>         <mailto:stern@rowland.harvard.edu>>
+>         Cc: Greg KH <greg at kroah.com <mailto:greg@kroah.com>>
+>         Cc: linux-usb at vger.kernel.org <mailto:linux-usb@vger.kernel.org>
+>
+>
+>         V2:
+>            -Incase ohci_suspend() fails, return right away without
+>             executing further.
+>         V3:
+>            -Aligned variable "do_wakeup" and "ret".
+>         ---
+>            drivers/usb/host/ohci-ep93xx.c |   10 +++++++++-
+>            1 file changed, 9 insertions(+), 1 deletion(-)
+>
+>
+>         diff --git a/drivers/usb/host/ohci-__ep93xx.c
+>         b/drivers/usb/host/ohci-__ep93xx.c
+>         index 8704e9f..f5f11d1 100644
+>         --- a/drivers/usb/host/ohci-__ep93xx.c
+>         +++ b/drivers/usb/host/ohci-__ep93xx.c
+>         @@ -174,13 +174,21 @@ static int
+>         ohci_hcd_ep93xx_drv_suspend(__struct platform_device *pdev,
+>         pm_message_
+>            {
+>                  struct usb_hcd *hcd = platform_get_drvdata(pdev);
+>                  struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+>         +       bool    do_wakeup = device_may_wakeup(&pdev->dev);
+>         +       int             ret;
+>
 
-Best regards,
+>         There was no need to use tabs here, didn't you see that here the
+>     variables aren't aligned?
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>     WBR, Sergei
+
+> Instead of gmail you can use thunderbird mail there it is showing
+>   proper alignment.
+
+    Imagine, I'm using Thinderbird. :-D
+    And you're using HTML reply format, unwelcome on the Linux mailing 
+lists.
+
+> Manjunath Goudar
+
+WBR, Sergei
