@@ -1,36 +1,30 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 19 Jun 2013 12:42:04 +0100
-Subject: [PATCH] atags_to_fdt: take into account root's #size and #cells
-In-Reply-To: <20130619131117.2eb2260c@skate>
-References: <1371639471-14144-1-git-send-email-ben.dooks@codethink.co.uk>
- <1371639471-14144-2-git-send-email-ben.dooks@codethink.co.uk>
- <20130619131117.2eb2260c@skate>
-Message-ID: <51C1990C.8090906@codethink.co.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 19 Jun 2013 13:42:40 +0200
+Subject: [PATCH v2 2/8] PCI: Add registry of MSI chips
+In-Reply-To: <20130618224844.GC16134@google.com>
+References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1370536888-8871-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130618224844.GC16134@google.com>
+Message-ID: <20130619134240.3ffa8f7c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/13 12:11, Thomas Petazzoni wrote:
-> Dear Ben Dooks,
->
-> On Wed, 19 Jun 2013 11:57:51 +0100, Ben Dooks wrote:
->> When creating entries for /memory, the root #size and #cells must be taken
->> into account otherwise the node will not be recongnized when the OF code
->> scans the nodes.
->>
->> On some systems, the default is now to be 2 for each of #size and #cells
->> which means that appending a kernrel and having it update from ATAGS does
->> not work properly.
->> ---
->>   arch/arm/boot/compressed/atags_to_fdt.c |   22 +++++++++++++++++++++-
->>   1 file changed, 21 insertions(+), 1 deletion(-)
->
-> Isn't this the same
-> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=faefd550c45d8d314e8f260f21565320355c947f
-> which is already in linux-next?
+Dear Bjorn Helgaas,
 
-Ah, it is almost the same although it only takes into
-account the #size-cells but not the number of them.
+On Tue, 18 Jun 2013 16:48:44 -0600, Bjorn Helgaas wrote:
 
+> I don't really understand why the msi_chip_list lives here, since
+> nothing in drivers/pci/msi.c uses it.  Seems like maybe something
+> that could be in the OF code somewhere?
+
+Ok, I'll move this to drivers/of/, we'll see what Grant says about
+this. Will be part of v3.
+
+Best regards,
+
+Thomas
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
