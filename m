@@ -1,291 +1,121 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 19 Jun 2013 17:07:24 -0300
-Subject: [PATCH v4 10/12] ARM: mvebu: Relocate Armada 370/XP DeviceBus device
- tree nodes
+Date: Wed, 19 Jun 2013 17:07:20 -0300
+Subject: [PATCH v4 06/12] memory: mvebu-devbus: Remove address decoding window
+ workaround
 In-Reply-To: <1371672446-21583-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1371672446-21583-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1371672446-21583-11-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1371672446-21583-7-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that mbus has been added to the device tree, it's possible to
-move the DeviceBus out of internal registers, placing it directly
-below the mbus. This is a more accurate representation of the hardware.
+Now that mbus device tree binding has been introduced, remove the address
+decoding window management from this driver.
+A suitable 'ranges' entry should be added to the devbus-compatible node in
+the device tree, as described by the mbus binding documentation.
 
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi             | 94 +++++++++++++-----------
- arch/arm/boot/dts/armada-xp-gp.dts               | 60 +++++++--------
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 60 +++++++--------
- 3 files changed, 110 insertions(+), 104 deletions(-)
+Greg,
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 70948ec..9a382ef 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -35,6 +35,56 @@
- 		#size-cells = <1>;
- 		interrupt-parent = <&mpic>;
+I'm Ccing you, since you're carrying the mvebu-devbus driver in your trees.
+This patch should be applied only after the MBus DT binding is accepted
+and/or merged; although I doubt we will see that happening any time soon.
+
+ drivers/memory/mvebu-devbus.c | 64 ++-----------------------------------------
+ 1 file changed, 2 insertions(+), 62 deletions(-)
+
+diff --git a/drivers/memory/mvebu-devbus.c b/drivers/memory/mvebu-devbus.c
+index 978e8e3..94c9248 100644
+--- a/drivers/memory/mvebu-devbus.c
++++ b/drivers/memory/mvebu-devbus.c
+@@ -208,16 +208,11 @@ static int mvebu_devbus_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *node = pdev->dev.of_node;
+-	struct device_node *parent;
+ 	struct devbus *devbus;
+ 	struct resource *res;
+ 	struct clk *clk;
+ 	unsigned long rate;
+-	const __be32 *ranges;
+-	int err, cs;
+-	int addr_cells, p_addr_cells, size_cells;
+-	int ranges_len, tuple_len;
+-	u32 base, size;
++	int err;
  
-+		devbus-bootcs {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10400 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
-+		devbus-cs0 {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10408 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x3e) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
-+		devbus-cs1 {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10410 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x3d) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
-+		devbus-cs2 {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10418 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x3b) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
-+		devbus-cs3 {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10420 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x37) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
- 		internal-regs {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -181,50 +231,6 @@
- 				status = "disabled";
- 			};
+ 	devbus = devm_kzalloc(&pdev->dev, sizeof(struct devbus), GFP_KERNEL);
+ 	if (!devbus)
+@@ -248,68 +243,13 @@ static int mvebu_devbus_probe(struct platform_device *pdev)
+ 		return err;
  
--			devbus-bootcs at 10400 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10400 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
+ 	/*
+-	 * Allocate an address window for this device.
+-	 * If the device probing fails, then we won't be able to
+-	 * remove the allocated address decoding window.
+-	 *
+-	 * FIXME: This is only a temporary hack! We need to do this here
+-	 * because we still don't have device tree bindings for mbus.
+-	 * Once that support is added, we will declare these address windows
+-	 * statically in the device tree, and remove the window configuration
+-	 * from here.
+-	 */
 -
--			devbus-cs0 at 10408 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10408 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
+-	/*
+-	 * Get the CS to choose the window string.
+-	 * This is a bit hacky, but it will be removed once the
+-	 * address windows are declared in the device tree.
+-	 */
+-	cs = (((unsigned long)devbus->base) % 0x400) / 8;
 -
--			devbus-cs1 at 10410 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10410 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
+-	/*
+-	 * Parse 'ranges' property to obtain a (base,size) window tuple.
+-	 * This will be removed once the address windows
+-	 * are declared in the device tree.
+-	 */
+-	parent = of_get_parent(node);
+-	if (!parent)
+-		return -EINVAL;
 -
--			devbus-cs2 at 10418 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10418 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
+-	p_addr_cells = of_n_addr_cells(parent);
+-	of_node_put(parent);
 -
--			devbus-cs3 at 10420 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10420 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
- 		};
- 	};
-  };
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index 946c695..30bf645 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -40,7 +40,36 @@
+-	addr_cells = of_n_addr_cells(node);
+-	size_cells = of_n_size_cells(node);
+-	tuple_len = (p_addr_cells + addr_cells + size_cells) * sizeof(__be32);
+-
+-	ranges = of_get_property(node, "ranges", &ranges_len);
+-	if (ranges == NULL || ranges_len != tuple_len)
+-		return -EINVAL;
+-
+-	base = of_translate_address(node, ranges + addr_cells);
+-	if (base == OF_BAD_ADDR)
+-		return -EINVAL;
+-	size = of_read_number(ranges + addr_cells + p_addr_cells, size_cells);
+-
+-	/*
+-	 * Create an mbus address windows.
+-	 * FIXME: Remove this, together with the above code, once the
+-	 * address windows are declared in the device tree.
+-	 */
+-	err = mvebu_mbus_add_window(devbus_wins[cs], base, size);
+-	if (err < 0)
+-		return err;
+-
+-	/*
+ 	 * We need to create a child device explicitly from here to
+ 	 * guarantee that the child will be probed after the timing
+ 	 * parameters for the bus are written.
+ 	 */
+ 	err = of_platform_populate(node, NULL, NULL, dev);
+-	if (err < 0) {
+-		mvebu_mbus_del_window(base, size);
++	if (err < 0)
+ 		return err;
+-	}
  
- 	soc {
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
--			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
-+
-+		devbus-bootcs {
-+			status = "okay";
-+
-+			/* Device Bus parameters are required */
-+
-+			/* Read parameters */
-+			devbus,bus-width    = <8>;
-+			devbus,turn-off-ps  = <60000>;
-+			devbus,badr-skew-ps = <0>;
-+			devbus,acc-first-ps = <124000>;
-+			devbus,acc-next-ps  = <248000>;
-+			devbus,rd-setup-ps  = <0>;
-+			devbus,rd-hold-ps   = <0>;
-+
-+			/* Write parameters */
-+			devbus,sync-enable = <0>;
-+			devbus,wr-high-ps  = <60000>;
-+			devbus,wr-low-ps   = <60000>;
-+			devbus,ale-wr-ps   = <60000>;
-+
-+			/* NOR 16 MiB */
-+			nor at 0 {
-+				compatible = "cfi-flash";
-+				reg = <0 0x1000000>;
-+				bank-width = <2>;
-+			};
-+		};
- 
- 		internal-regs {
- 			serial at 12000 {
-@@ -116,35 +145,6 @@
- 				};
- 			};
- 
--			devbus-bootcs at 10400 {
--				status = "okay";
--				ranges = <0 0xf0000000 0x1000000>; /* @addr 0xf000000, size 0x1000000 */
--
--				/* Device Bus parameters are required */
--
--				/* Read parameters */
--				devbus,bus-width    = <8>;
--				devbus,turn-off-ps  = <60000>;
--				devbus,badr-skew-ps = <0>;
--				devbus,acc-first-ps = <124000>;
--				devbus,acc-next-ps  = <248000>;
--				devbus,rd-setup-ps  = <0>;
--				devbus,rd-hold-ps   = <0>;
--
--				/* Write parameters */
--				devbus,sync-enable = <0>;
--				devbus,wr-high-ps  = <60000>;
--				devbus,wr-low-ps   = <60000>;
--				devbus,ale-wr-ps   = <60000>;
--
--				/* NOR 16 MiB */
--				nor at 0 {
--					compatible = "cfi-flash";
--					reg = <0 0x1000000>;
--					bank-width = <2>;
--				};
--			};
--
- 			pcie-controller {
- 				status = "okay";
- 
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index 889ca6ef..565765c 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -28,7 +28,36 @@
- 
- 	soc {
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
--			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
-+
-+		devbus-bootcs {
-+			status = "okay";
-+
-+			/* Device Bus parameters are required */
-+
-+			/* Read parameters */
-+			devbus,bus-width    = <8>;
-+			devbus,turn-off-ps  = <60000>;
-+			devbus,badr-skew-ps = <0>;
-+			devbus,acc-first-ps = <124000>;
-+			devbus,acc-next-ps  = <248000>;
-+			devbus,rd-setup-ps  = <0>;
-+			devbus,rd-hold-ps   = <0>;
-+
-+			/* Write parameters */
-+			devbus,sync-enable = <0>;
-+			devbus,wr-high-ps  = <60000>;
-+			devbus,wr-low-ps   = <60000>;
-+			devbus,ale-wr-ps   = <60000>;
-+
-+			/* NOR 128 MiB */
-+			nor at 0 {
-+				compatible = "cfi-flash";
-+				reg = <0 0x8000000>;
-+				bank-width = <2>;
-+			};
-+		};
- 
- 		internal-regs {
- 			serial at 12000 {
-@@ -144,35 +173,6 @@
- 				status = "okay";
- 			};
- 
--			devbus-bootcs at 10400 {
--				status = "okay";
--				ranges = <0 0xf0000000 0x8000000>; /* @addr 0xf000000, size 0x8000000 */
--
--				/* Device Bus parameters are required */
--
--				/* Read parameters */
--				devbus,bus-width    = <8>;
--				devbus,turn-off-ps  = <60000>;
--				devbus,badr-skew-ps = <0>;
--				devbus,acc-first-ps = <124000>;
--				devbus,acc-next-ps  = <248000>;
--				devbus,rd-setup-ps  = <0>;
--				devbus,rd-hold-ps   = <0>;
--
--				/* Write parameters */
--				devbus,sync-enable = <0>;
--				devbus,wr-high-ps  = <60000>;
--				devbus,wr-low-ps   = <60000>;
--				devbus,ale-wr-ps   = <60000>;
--
--				/* NOR 128 MiB */
--				nor at 0 {
--					compatible = "cfi-flash";
--					reg = <0 0x8000000>;
--					bank-width = <2>;
--				};
--			};
--
- 			pcie-controller {
- 				status = "okay";
- 				/* Internal mini-PCIe connector */
+ 	return 0;
+ }
 -- 
 1.8.1.5
