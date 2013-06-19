@@ -1,59 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Jun 2013 17:42:26 +0200
-Subject: [PATCH 00/11] MSM DT based multi-platform support
-In-Reply-To: <1371600281-6118-1-git-send-email-sboyd@codeaurora.org>
-References: <1371600281-6118-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <201306191742.26491.arnd@arndb.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 19 Jun 2013 11:44:08 -0400 (EDT)
+Subject: [RFC PATCH v1 5/6] USB: EHCI: improve interrupt qh unlink
+In-Reply-To: <CACVXFVOMDbWRWErkF5iDqtsJVBwD4B4fn22ZR1vupb78bKoDiQ@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306191138050.2026-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 June 2013, Stephen Boyd wrote:
-> This patchset allows me to compile and run the DT based MSM
-> platforms in the multi-platform ARM kernel. This is built on
-> top of a couple patches I've sent out already (specifically
-> the debug_ll patch series and the clocksource_of conversion)
-> as well a patch from Rohit that didn't seem to make it into 
-> MSM's for-next branch.
+On Wed, 19 Jun 2013, Ming Lei wrote:
 
-Very nice!
-
-> There is one problem though, the last two patches cause compile
-> failures if you turn on MSM's sdcc or USB_OTG driver. It seems
-> that the sdcc driver depends on the clk_reset() API and the custom
-> DMA interface provided by mach layers. And the USB_OTG driver depends
-> on clk_reset.
+> > The approach used in this patch is wrong.  You shouldn't start the
+> > unlink, then wait, then finish the unlink.  Consider what would happen
 > 
-> The simplest solution is to make these two drivers depend on the
-> non-dt based MSM support so that they can't be compiled in the
-> multi-platform config. Otherwise, we'll need to replace the clk_reset()
-> calls with the new reset controller API, but doing that would
-> require us to convert all MSM platforms over to devicetree or
-> we'll need to add support to the reset controller API for non-DT based
-> controllers. Even with that, the sdcc driver uses custom DMA things
-> so we may need to put that all behind some #ifdef.
+> What you mentioned above is just what the patch is doing, :-)
+> 
+> start_unlink_intr() only sets the qh as QH_STATE_UNLINK_WAIT, puts
+> the qh into one wait list and starts a timer, if it is expired the qh will be
+> started to unlink, otherwise the qh can be recovered to QH_STATE_LINKED
+> immediately if there is one URB submitted.
 
-The msm_serial_hs driver also seems to require the custom DMA
-interface.
+Okay, maybe I was fooled by your use of QH_STATE_UNLINK_WAIT.  Setting
+the state to that value means that the QH is going to be unlinked after
+a time delay.  However, that's not what you mean; you mean that after a
+time delay you will decide whether or not to unlink the QH.
 
-I think for the DMA stuff, the solution is clearly to move that
-driver to use the dmaengine API, wich I assume you are already
-planning to do anyway. Do you have a time line for that?
+I think you should copy the approach used for the async QHs.
 
-For the clk_reset interface, maybe you can move those calls int
-platform_data callbacks for the non-DT machines to get them out
-of the way?
+> So unlinking intr qh becomes a 3-stage process:
+> 
+>        - wait(qh return to linked state if URB is submitted during the period,
+>                   otherwise go to start unlink)
+>        - start unlink(do unlink, and wait for end of unlink)
+>        - end unlink
+> 
+> > if an URB were submitted during the delay: It would have to wait until
+> 
+> If an URB were submitted during the delay, the previous wait is canceled
+> immediately, and the qh state is recovered to linked state, please see
+> cancel_unlink_wait_intr() called in intr_submit().
 
-You could have something like
+Right.  But you're not allowed to do that after changing qh->state.  
+One of the invariants of the driver is that once qh->state takes on any
+value other than QH_STATE_LINKED (or, temporarily,
+QH_STATE_COMPLETING), the QH must be unlinked.  The state can't change
+back to QH_STATE_LINKED without first passing through QH_STATE_IDLE.
 
-	if (pdata && pdata->reset)
-		pdata->reset(dev, clk);
-	else
-		reset_device(dev);
+> > Also, it's silly to check whether or not giveback uses a tasklet.  We
+> > know that following the 6/6 patch it will.  Even if it doesn't, there's
+> > no harm in waiting a little while before unlinking an empty interrupt
+> > QH.
+> 
+> It is still for the test reason, since the patch may cause recursion if
+> HCD_BH isn't set.
 
-That wouldn't be too ugly. For the time being, disabling the
-drivers on multiplatform sounds reasonable. I don't think you
-actually have to have the drivers conflict with DT support:
-you should be able to allow the DT based boards with non-multiplatform
-to enable the two or three drivers anyway.
+How can it cause recursion?  The async unlink code doesn't.
 
-	Arnd
+Alan Stern
