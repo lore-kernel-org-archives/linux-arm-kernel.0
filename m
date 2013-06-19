@@ -1,70 +1,119 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 19 Jun 2013 17:05:47 +0300
-Subject: [RFC PATCH 0/6] Suspend USB Host controller on bus suspend
-Message-ID: <1371650753-11452-1-git-send-email-rogerq@ti.com>
+Date: Wed, 19 Jun 2013 17:05:49 +0300
+Subject: [RFC PATCH 2/6] mfd: omap-usb-host: Put pins in IDLE state on suspend
+In-Reply-To: <1371650753-11452-1-git-send-email-rogerq@ti.com>
+References: <1371650753-11452-1-git-send-email-rogerq@ti.com>
+Message-ID: <1371650753-11452-3-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In order to support wake up from suspend use the pinctrl
+framework to put the USB host pins in IDLE state during suspend.
 
-This series attempts to suspend the OMAP EHCI host controller on USB
-Bus suspend. This will cause its parent, the OMAP USB Host Module as well
-as the USB TLL Module to be put in suspend and hence allow the USB power domain
-to be put in a lower power state. Then we no longer prevent the rest of the OMAP
-SoC from entering lower power states like RETention or OFF mode when
-USB (or system) is suspended. This was one of the main reason why EHCI_OMAP
-is still not enabled in OMAP2 defconfig.
+CC: Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ drivers/mfd/omap-usb-host.c |   46 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 46 insertions(+), 0 deletions(-)
 
-In order for remote wakeup or hub events (connect/disconnect) to be detected
-while in suspend, we need to rely on the IO daisy chaining mechanism on OMAP.
-This is nothing but configuring a pin to be wakeup capable and triggering an
-interrupt on any pin activity while the hardware module or the entire SoC is
-in sleep state. For this to work, we rely on the wakeup feature added to the
-omap-pinctrl-single driver in [1]. This takes care of routing IO pad wakeup
-interrupt to the right driver's interrupt handler (i.e. ehci_irq in our case).
-
-The pin state information for DEFAULT and IDLE is specified for the omap3beagle-xm
-board in patch 5. So this is tested only on omap3beagle-xm board.
-
-As the omap-ehci controller driver needs to do some additional work to put
-itself into suspend/resume and make sure it is resumed to process an interrupt,
-we need to be able to override irq, bus_suspend, and bus_resume handlers. This
-provision is done in patch 3.
-
-Patch 2 uses pinctrl framework to toggle USB host pins from DEFAULT state
-when active to IDLE state with wakeups enabled while in suspend.
-
-Patch 5 implements the suspend feature in ehci-omap driver and ensures that
-we don't loose events while in suspend.
-
-Please let me know what you think about it. I'm not 100% confident about
-tackling interrupt when the device is runtime suspended in patch 5. Please
-let me know if a race condition is possible here.
-
-[1] - OMAP pinctrl wakeup support
-http://thread.gmane.org/gmane.linux.ports.arm.omap/99010/focus=99041
-
-cheers,
--roger
-
-Roger Quadros (6):
-  mfd: omap-usb-host: move initialization to module_init()
-  mfd: omap-usb-host: Put pins in IDLE state on suspend
-  USB: ehci: allow controller drivers to override irq &
-    bus_suspend/resume
-  USB: ehci-omap: Suspend the controller during bus suspend
-  ARM: dts: omap3beagle-xm: Add idle state pins for USB host
-  ARM: OMAP3: Enable Hardware Save and Restore for USB Host
-
- arch/arm/boot/dts/omap3-beagle-xm.dts       |   29 ++++++++--
- arch/arm/mach-omap2/powerdomains3xxx_data.c |    8 +--
- drivers/mfd/omap-usb-host.c                 |   56 +++++++++++++++---
- drivers/mfd/omap-usb-tll.c                  |    8 +--
- drivers/usb/host/ehci-hcd.c                 |    9 +++-
- drivers/usb/host/ehci-hub.c                 |    6 +-
- drivers/usb/host/ehci-omap.c                |   82 +++++++++++++++++++++++++++
- drivers/usb/host/ehci.h                     |    6 ++
- 8 files changed, 172 insertions(+), 32 deletions(-)
-
+diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+index 6601a49..171cc3b 100644
+--- a/drivers/mfd/omap-usb-host.c
++++ b/drivers/mfd/omap-usb-host.c
+@@ -31,6 +31,7 @@
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/err.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ #include "omap-usb.h"
+ 
+@@ -111,6 +112,10 @@ struct usbhs_hcd_omap {
+ 	struct usbhs_omap_platform_data	*pdata;
+ 
+ 	u32				usbhs_rev;
++
++	struct pinctrl *pinctrl;
++	struct pinctrl_state *pins_default;
++	struct pinctrl_state *pins_idle;
+ };
+ /*-------------------------------------------------------------------------*/
+ 
+@@ -325,6 +330,10 @@ static int usbhs_runtime_resume(struct device *dev)
+ 
+ 	dev_dbg(dev, "usbhs_runtime_resume\n");
+ 
++	if (!IS_ERR(omap->pins_default))
++		if (pinctrl_select_state(omap->pinctrl, omap->pins_default))
++			dev_err(dev, "Could not select DEFAULT pin state\n");
++
+ 	omap_tll_enable(pdata);
+ 
+ 	if (!IS_ERR(omap->ehci_logic_fck))
+@@ -402,6 +411,10 @@ static int usbhs_runtime_suspend(struct device *dev)
+ 
+ 	omap_tll_disable(pdata);
+ 
++	if (!IS_ERR(omap->pins_idle))
++		if (pinctrl_select_state(omap->pinctrl, omap->pins_idle))
++			dev_err(dev, "Could not select IDLE pin state\n");
++
+ 	return 0;
+ }
+ 
+@@ -608,6 +621,30 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	omap->pinctrl = devm_pinctrl_get(dev);
++	if (!IS_ERR(omap->pinctrl)) {
++		omap->pins_default = pinctrl_lookup_state(omap->pinctrl,
++							 PINCTRL_STATE_DEFAULT);
++		if (IS_ERR(omap->pins_default))
++			dev_err(dev, "Could not get DEFAULT state pins\n");
++
++		omap->pins_idle = pinctrl_lookup_state(omap->pinctrl,
++						      PINCTRL_STATE_IDLE);
++		if (IS_ERR(omap->pins_idle))
++			dev_err(dev, "Could not get IDLE state pins\n");
++
++	} else {
++		dev_info(dev, "pinctrl_get error\n");
++		if (PTR_ERR(omap->pinctrl) == -EPROBE_DEFER) {
++			dev_info(dev, "defer\n");
++			return -EPROBE_DEFER;
++		}
++
++		omap->pins_default = omap->pins_idle = ERR_PTR(-EINVAL);
++		dev_dbg(dev, "Proceeding without pinctrl: %ld\n",
++						PTR_ERR(omap->pinctrl));
++	}
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	omap->uhh_base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(omap->uhh_base))
+@@ -796,6 +833,10 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	if (!IS_ERR(omap->pins_default))
++		if (pinctrl_select_state(omap->pinctrl, omap->pins_default))
++			dev_err(dev, "Could not select DEFAULT pin state\n");
++
+ 	return 0;
+ 
+ err_alloc:
+@@ -872,6 +913,11 @@ static int usbhs_omap_remove(struct platform_device *pdev)
+ 
+ 	/* remove children */
+ 	device_for_each_child(&pdev->dev, NULL, usbhs_omap_remove_child);
++
++	if (!IS_ERR(omap->pins_idle))
++		if (pinctrl_select_state(omap->pinctrl, omap->pins_idle))
++			dev_err(&pdev->dev, "Could not select IDLE pin state\n");
++
+ 	return 0;
+ }
+ 
 -- 
 1.7.4.1
