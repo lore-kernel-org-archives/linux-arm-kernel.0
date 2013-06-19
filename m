@@ -1,110 +1,78 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 19 Jun 2013 10:51:21 +0300
-Subject: [PATCH V2] USB: initialize or shutdown PHY when add or remove
- host controller
-In-Reply-To: <1371609080-30595-1-git-send-email-chao.xie@marvell.com>
-References: <1371609080-30595-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <51C162F9.9020705@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 19 Jun 2013 09:56:03 +0200
+Subject: [PATCH V3 01/14]
+ =?UTF-8?Q?watchdog/mpcore=5Fwdt=3A=20Mark=20it=20as?=
+ =?UTF-8?Q?=20BROKEN?=
+In-Reply-To: <CAKohpom3S3NMhxbhbmyC6bceS51727CnWRWmWDGxwDcRJkHFyQ@mail.gmail.com>
+References: <cover.1371535241.git.viresh.kumar@linaro.org>
+ <22d22fe6eea294c5132e47b8901e094d60b0e99d.1371535242.git.viresh.kumar@linaro.org>
+ <20130618154236.GA9022@roeck-us.net> <51C086A8.3070601@arm.com>
+ <CAOesGMia0OZz5dcDooRHG9EAnaLimRL5_Gku2rm_fVDNxrxEEA@mail.gmail.com>
+ <CAKohpom3S3NMhxbhbmyC6bceS51727CnWRWmWDGxwDcRJkHFyQ@mail.gmail.com>
+Message-ID: <319bb53672a5fa97b7aa603392b6a2fa@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chao,
-
-On 06/19/2013 05:31 AM, Chao Xie wrote:
-> Some controller need software to initialize PHY before add
-> host controller, and shut down PHY after remove host controller.
-> Add the generic code for these controllers so they do not need
-> do it in its own host controller driver.
+On Wed, 19 Jun 2013 08:40:25 +0530, Viresh Kumar <viresh.kumar@linaro.org>
+wrote:
+> Wow!! So many replies, let me reply to everyone in this chain.
 > 
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> ---
->  drivers/usb/core/hcd.c |   24 +++++++++++++++++++++++-
->  1 files changed, 23 insertions(+), 1 deletions(-)
+> On 18 June 2013 22:05, Olof Johansson <olof@lixom.net> wrote:
+>> On Tue, Jun 18, 2013 at 9:11 AM, Marc Zyngier <marc.zyngier@arm.com>
+>> wrote:
+>>> On 18/06/13 16:42, Guenter Roeck wrote:
+>>>> On Tue, Jun 18, 2013 at 08:50:25PM +0530, Viresh Kumar wrote:
 > 
-> diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
-> index d53547d..301c639 100644
-> --- a/drivers/usb/core/hcd.c
-> +++ b/drivers/usb/core/hcd.c
-> @@ -40,9 +40,11 @@
->  #include <linux/platform_device.h>
->  #include <linux/workqueue.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/err.h>
->  
->  #include <linux/usb.h>
->  #include <linux/usb/hcd.h>
-> +#include <linux/usb/phy.h>
->  
->  #include "usb.h"
->  
-> @@ -2531,12 +2533,26 @@ int usb_add_hcd(struct usb_hcd *hcd,
->  	 */
->  	set_bit(HCD_FLAG_RH_RUNNING, &hcd->flags);
->  
-> +	/* In case hcd->phy contains the error code. */
-> +	if (IS_ERR(hcd->phy))
-> +		hcd->phy = NULL;
-> +
-> +	/* Initialize the PHY before other hardware operation. */
-> +	if (hcd->phy) {
-> +		retval = usb_phy_init(hcd->phy);
-> +		if (retval) {
-> +			dev_err(hcd->self.controller,
-> +				"can't initialize phy\n");
-> +			goto err_hcd_driver_setup;
-> +		}
-> +	}
-> +
->  	/* "reset" is misnamed; its role is now one-time init. the controller
->  	 * should already have been reset (and boot firmware kicked off etc).
->  	 */
->  	if (hcd->driver->reset && (retval = hcd->driver->reset(hcd)) < 0) {
->  		dev_err(hcd->self.controller, "can't setup\n");
-> -		goto err_hcd_driver_setup;
-> +		goto err_hcd_driver_init_phy;
->  	}
->  	hcd->rh_pollable = 1;
->  
-> @@ -2608,6 +2624,9 @@ err_hcd_driver_start:
->  	if (usb_hcd_is_primary_hcd(hcd) && hcd->irq > 0)
->  		free_irq(irqnum, hcd);
->  err_request_irq:
-> +err_hcd_driver_init_phy:
-> +	if (hcd->phy)
-> +		usb_phy_shutdown(hcd->phy);
->  err_hcd_driver_setup:
->  err_set_rh_speed:
->  	usb_put_dev(hcd->self.root_hub);
-> @@ -2674,6 +2693,9 @@ void usb_remove_hcd(struct usb_hcd *hcd)
->  			free_irq(hcd->irq, hcd);
->  	}
->  
-> +	if (hcd->phy)
-> +		usb_phy_shutdown(hcd->phy);
-> +
->  	usb_put_dev(hcd->self.root_hub);
->  	usb_deregister_bus(&hcd->self);
->  	hcd_buffer_destroy(hcd);
+>>>>> Lets mark it broken until somebody with this hardware gets up and
+>>>>> fixes it.
+>>>>>
+>>>> I must be missing something. What is the point of the remaining
+>>>> patches in this
+>>>> case ?
 > 
+> In case somebody wakes up and tries to fix this driver, he doesn't have
+to
+> write stuff which I already wrote. That's it. This stuff was pending in
+my
+> tree
+> for more than a year now and I wanted to get rid of it (without deleting
+> it) :)
+> 
+>>> Indeed. This looks like pointless churn to me, unless someone actually
+>>> picks up the driver and fixes it for good.
+>>>
+>>> If nobody cares enough about it, then maybe it should be moved into
+>>> staging and eventually retired...
+>>
+>>
+>> That was a year ago, and nobody has done anything to the driver. Just
+>> remove it -- if someone wants to do the work later on it's easy to
+>> revert the commit and start over.
+>>
+>> Keeping code in the kernel but marking it BROKEN is only useful if we
+>> think someone will fix it soon. It seems very unlikely in this case.
+> 
+> I believed that this is the driver which will be used by all cortex
+> family, i.e.
+> all ARM SMP platforms, isn't it? I am sure atleast the A9 family had
+this.
 
-I still think that we shouldn't do this because it adds more confusion and is not
-still a generic enough solution.
+ARM11, A5 and A9 in their MP configurations only.
 
-1) It is better for the piece of code that does usb_phy_get() to do usb_phy_init/shutdown,
-else there will be lot of confusion. (Felipe pointed this out earlier).
+> If no, then which ones are the real users of this driver/hardware?
+> If yes, Why isn't anybody using this?
 
-2) There is no standard way of getting phy for different controllers. It is mostly platform
-dependent and it is best to leave this to the controller drivers. (Pointed out by Alan).
+Because, as Russell mentioned, the piece of IP doesn't fit our watchdog
+model at all (per-CPU watchdog???), and most SoCs/boards have a separate
+watchdog anyway.
 
-3) Controllers can have multiple PHYs. e.g. ehci-omap has one PHY per port and it supports
-3 ports. This is also platform specific and difficult to handle generically.
+> I will send a patch that will delete this driver and will provide link
+to
+> my
+> patches, in case somebody wants it back in future.
 
-4) Controllers can have specific timing requirements as to when the PHY is initialized relative
-to the controller being initialized. I've pointed OMAP specific stuff in the earlier patch.
+Thanks.
 
-Considering all these points, I think we should leave things as they are. It isn't that hard
-for controllers to manage phy_init() and phy_shutdown(), and there is not much code space saved
-when compared to the complexity it creates if we move them to HCD layer.
-
-cheers,
--roger
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
