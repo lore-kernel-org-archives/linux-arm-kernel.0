@@ -1,33 +1,36 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 19 Jun 2013 11:30:32 -0400 (EDT)
-Subject: [RFC PATCH v1 2/6] USB: disable IRQs deliberately when calling
- complete()
-In-Reply-To: <CACVXFVOYrAW48YFLesJDtwwqLj9aNzd5wm_LPUSFm3BS8NC3sg@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306191126490.2026-100000@iolanthe.rowland.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Jun 2013 17:30:55 +0200
+Subject: [RFC/PATCH 11/11] ARM: msm: Move MSM's DT based hardware to
+ multi-platform support
+In-Reply-To: <1371600281-6118-12-git-send-email-sboyd@codeaurora.org>
+References: <1371600281-6118-1-git-send-email-sboyd@codeaurora.org>
+ <1371600281-6118-12-git-send-email-sboyd@codeaurora.org>
+Message-ID: <201306191730.55203.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Jun 2013, Ming Lei wrote:
+On Wednesday 19 June 2013, Stephen Boyd wrote:
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 430c922..22d4fff 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -618,8 +618,9 @@ config ARCH_PXA
+>         help
+>           Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
+>  
+> -config ARCH_MSM
+> +config ARCH_MSM_NODT
+>         bool "Qualcomm MSM"
+> +       select ARCH_MSM
+>         select ARCH_REQUIRE_GPIOLIB
+>         select CLKDEV_LOOKUP
+>         select CLKSRC_OF if OF
 
-> On Wed, Jun 19, 2013 at 12:36 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> > On Tue, 18 Jun 2013, Ming Lei wrote:
-> >
-> >> We disable local IRQs here in case of running complete() by
-> >> tasklet to avoid possible deadlock because drivers may call
-> >> spin_lock() to hold lock which might be acquired in one hard
-> >> interrupt handler.
-> >>
-> >> The local_irq_save()/local_irq_restore() around complete()
-> >> will be removed if current USB drivers have been cleaned up
-> >> and no one may trigger the above deadlock situation when
-> >> running complete() in tasklet.
-> >
-> > This should be part of the first patch, not added on separately.
-> 
-> Yes, but I want to highlight the change since that will be removed
-> after drivers have been cleaned up.
 
-I don't think it's necessary to highlight anything, and it seems silly 
-to add new code in one patch and then change it in the very next patch.
+I think you have to adapt your defconfig after this change.
 
-Alan Stern
+I'd suggest enabling all drivers for DT-based booting in
+multi_v7_defconfig, and changing msm_defconfig to select
+ARCH_MSM_NODT.
+
+	Arnd
