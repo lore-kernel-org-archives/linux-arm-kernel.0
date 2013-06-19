@@ -1,76 +1,125 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 19 Jun 2013 15:37:05 -0400
-Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation
- to the DT binding
-In-Reply-To: <20130619192915.GA8769@localhost>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306182345.26281.arnd@arndb.de>
- <20130619185224.GB5701@localhost>
- <201306192108.30998.arnd@arndb.de>
- <20130619192915.GA8769@localhost>
-Message-ID: <20130619193705.GH31667@titan.lakedaemon.net>
+From: broonie@linaro.org (Mark Brown)
+Date: Wed, 19 Jun 2013 20:38:28 +0100
+Subject: [PATCH] dmaengine: PL08x: Avoid collisions with get_signal() macro
+Message-ID: <1371670708-26161-1-git-send-email-broonie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 04:29:16PM -0300, Ezequiel Garcia wrote:
-> On Wed, Jun 19, 2013 at 09:08:30PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 19 June 2013, Ezequiel Garcia wrote:
-> > > > > What happens is that any decoding window that was setup by the bootloader,
-> > > > > is wiped and completely new windows are allocated using the translations
-> > > > > in the DT, as described by this binding.
-> > > > > 
-> > > > > This was the case from the start with the old MBus driver. FWIW, I think
-> > > > > it's actually the best choice that can be made: it makes the kernel
-> > > > > independent of the previous setting.
-> > > > > 
-> > > > > I know you've suggested differently in the past, but I'm not sure I
-> > > > > understand what's the benefit in keeping the bootloaders configuration.
-> > > > 
-> > > > The device tree normally describes things that are either wired up
-> > > > in hardware or set up by the boot loader. Describing things that the
-> > > > boot loader may or may not have set up and that the kernel should
-> > > > set up but may ignore if it wants to is a bit fishy, but it seems
-> > > > that you have decided to do it that way. You should definitely
-> > > > document the fact that all ranges except the "internal-regs" are just
-> > > > suggestions and cannot be relied on to be present at boot time.
-> > > > 
-> > > 
-> > > Hold on! I've just noticed this, and I want to clarify something, just
-> > > to avoid mis-interpretations. The binding is not saying "the windows
-> > > described through this ranges are present at boot time".
-> > > 
-> > > Rather, it is "this binding will guarantee that the windows described 
-> > > in it will be present after the mbus allocates them".
-> > > 
-> > > Does it sound too fishy?
-> > 
-> > I don't think it's a guarantee that the binding can make. The binding
-> > describes the interface between the hardware/firmware and the kernel,
-> > not an interface between one kernel driver and another.
-> > 
-> > You could instead write:
-> > 
-> > "The ranges property defines a set of mbus windows that are expected
-> > to be set by the operating system and that are guaranteed to be free
-> > of overlaps with one another or with the system memory ranges.
-> > Each entry in the property refers to exactly one window. If an
-> > operating system choses to use a different set of mbus windows,
-> > it must ensure that any address translations performed from downstream
-> > devices are adapted accordingly. The operating system may insert
-> > additional mbus windows that do not conflict with the ones listed
-> > in the ranges, e.g. for mapping PCIe devices. As a special case,
-> > the internal register window must be set up by the boot loader
-> > at the address listed in the ranges property, since the operating
+As pointed out by Arnd Bergmann there is a get_signal macro definied in
+linux/signal.h which can conflict with the platform data callback
+function of the same name leading to confusing errors from the compiler
+(especially if signal.h manages to get pulled into the driver itself due
+to header dependencies).  Avoid such errors by renaming get_signal and
+put_signal in the platform data to get_xfer_signal and put_xfer_signal.
 
-...system...
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm/mach-lpc32xx/phy3250.c | 4 ++--
+ arch/arm/mach-spear/spear3xx.c  | 4 ++--
+ arch/arm/mach-spear/spear6xx.c  | 4 ++--
+ drivers/dma/amba-pl08x.c        | 8 ++++----
+ include/linux/amba/pl08x.h      | 8 ++++----
+ 5 files changed, 14 insertions(+), 14 deletions(-)
 
-> > uses it to set up the other windows."
-> > 
-> 
-> Nice!
-> 
-> Shamelessly copy-pasted into the binding documentation.
-
-thx,
-
-Jason.
+diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
+index c1cd5a9..e54f87e 100644
+--- a/arch/arm/mach-lpc32xx/phy3250.c
++++ b/arch/arm/mach-lpc32xx/phy3250.c
+@@ -182,8 +182,8 @@ static void pl08x_put_signal(const struct pl08x_channel_data *cd, int ch)
+ static struct pl08x_platform_data pl08x_pd = {
+ 	.slave_channels = &pl08x_slave_channels[0],
+ 	.num_slave_channels = ARRAY_SIZE(pl08x_slave_channels),
+-	.get_signal = pl08x_get_signal,
+-	.put_signal = pl08x_put_signal,
++	.get_xfer_signal = pl08x_get_signal,
++	.put_xfer_signal = pl08x_put_signal,
+ 	.lli_buses = PL08X_AHB1,
+ 	.mem_buses = PL08X_AHB1,
+ };
+diff --git a/arch/arm/mach-spear/spear3xx.c b/arch/arm/mach-spear/spear3xx.c
+index 0227c97..bf3b1fd 100644
+--- a/arch/arm/mach-spear/spear3xx.c
++++ b/arch/arm/mach-spear/spear3xx.c
+@@ -56,8 +56,8 @@ struct pl08x_platform_data pl080_plat_data = {
+ 	},
+ 	.lli_buses = PL08X_AHB1,
+ 	.mem_buses = PL08X_AHB1,
+-	.get_signal = pl080_get_signal,
+-	.put_signal = pl080_put_signal,
++	.get_xfer_signal = pl080_get_signal,
++	.put_xfer_signal = pl080_put_signal,
+ };
+ 
+ /*
+diff --git a/arch/arm/mach-spear/spear6xx.c b/arch/arm/mach-spear/spear6xx.c
+index 8b0295a..da26fa5 100644
+--- a/arch/arm/mach-spear/spear6xx.c
++++ b/arch/arm/mach-spear/spear6xx.c
+@@ -334,8 +334,8 @@ static struct pl08x_platform_data spear6xx_pl080_plat_data = {
+ 	},
+ 	.lli_buses = PL08X_AHB1,
+ 	.mem_buses = PL08X_AHB1,
+-	.get_signal = pl080_get_signal,
+-	.put_signal = pl080_put_signal,
++	.get_xfer_signal = pl080_get_signal,
++	.put_xfer_signal = pl080_put_signal,
+ 	.slave_channels = spear600_dma_info,
+ 	.num_slave_channels = ARRAY_SIZE(spear600_dma_info),
+ };
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 8bad254..06fe45c 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -299,8 +299,8 @@ static int pl08x_request_mux(struct pl08x_dma_chan *plchan)
+ 	const struct pl08x_platform_data *pd = plchan->host->pd;
+ 	int ret;
+ 
+-	if (plchan->mux_use++ == 0 && pd->get_signal) {
+-		ret = pd->get_signal(plchan->cd);
++	if (plchan->mux_use++ == 0 && pd->get_xfer_signal) {
++		ret = pd->get_xfer_signal(plchan->cd);
+ 		if (ret < 0) {
+ 			plchan->mux_use = 0;
+ 			return ret;
+@@ -318,8 +318,8 @@ static void pl08x_release_mux(struct pl08x_dma_chan *plchan)
+ 	if (plchan->signal >= 0) {
+ 		WARN_ON(plchan->mux_use == 0);
+ 
+-		if (--plchan->mux_use == 0 && pd->put_signal) {
+-			pd->put_signal(plchan->cd, plchan->signal);
++		if (--plchan->mux_use == 0 && pd->put_xfer_signal) {
++			pd->put_xfer_signal(plchan->cd, plchan->signal);
+ 			plchan->signal = -1;
+ 		}
+ 	}
+diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
+index 2a5f64a..10fe2a2 100644
+--- a/include/linux/amba/pl08x.h
++++ b/include/linux/amba/pl08x.h
+@@ -76,11 +76,11 @@ struct pl08x_channel_data {
+  * platform, all inclusive, including multiplexed channels. The available
+  * physical channels will be multiplexed around these signals as they are
+  * requested, just enumerate all possible channels.
+- * @get_signal: request a physical signal to be used for a DMA transfer
++ * @get_xfer_signal: request a physical signal to be used for a DMA transfer
+  * immediately: if there is some multiplexing or similar blocking the use
+  * of the channel the transfer can be denied by returning less than zero,
+  * else it returns the allocated signal number
+- * @put_signal: indicate to the platform that this physical signal is not
++ * @put_xfer_signal: indicate to the platform that this physical signal is not
+  * running any DMA transfer and multiplexing can be recycled
+  * @lli_buses: buses which LLIs can be fetched from: PL08X_AHB1 | PL08X_AHB2
+  * @mem_buses: buses which memory can be accessed from: PL08X_AHB1 | PL08X_AHB2
+@@ -89,8 +89,8 @@ struct pl08x_platform_data {
+ 	const struct pl08x_channel_data *slave_channels;
+ 	unsigned int num_slave_channels;
+ 	struct pl08x_channel_data memcpy_channel;
+-	int (*get_signal)(const struct pl08x_channel_data *);
+-	void (*put_signal)(const struct pl08x_channel_data *, int);
++	int (*get_xfer_signal)(const struct pl08x_channel_data *);
++	void (*put_xfer_signal)(const struct pl08x_channel_data *, int);
+ 	u8 lli_buses;
+ 	u8 mem_buses;
+ };
+-- 
+1.8.3.1
