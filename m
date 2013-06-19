@@ -1,104 +1,143 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 19 Jun 2013 22:07:57 +0200
-Subject: [PATCH v2 6/7] drivers: bus: imx-weim: Add support for
- i.MX1/21/25/27/31/35/50/51/53
-In-Reply-To: <1371671678-6345-6-git-send-email-shc_work@mail.ru>
-References: <1371671678-6345-1-git-send-email-shc_work@mail.ru>
- <1371671678-6345-6-git-send-email-shc_work@mail.ru>
-Message-ID: <20130619200757.GC14308@pengutronix.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 19 Jun 2013 17:07:23 -0300
+Subject: [PATCH v4 09/12] ARM: mvebu: Add BootROM to Armada 370/XP device tree
+In-Reply-To: <1371672446-21583-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1371672446-21583-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1371672446-21583-10-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+In order to access the SoC BootROM, we need to declare a mapping
+(through a ranges property). The mbus driver will use this property
+to allocate a suitable address decoding window.
 
-Nice work!
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370-db.dts              | 3 ++-
+ arch/arm/boot/dts/armada-370-mirabox.dts         | 3 ++-
+ arch/arm/boot/dts/armada-370-rd.dts              | 3 ++-
+ arch/arm/boot/dts/armada-370.dtsi                | 5 +++++
+ arch/arm/boot/dts/armada-xp-db.dts               | 3 ++-
+ arch/arm/boot/dts/armada-xp-gp.dts               | 3 ++-
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 3 ++-
+ arch/arm/boot/dts/armada-xp.dtsi                 | 5 +++++
+ 8 files changed, 22 insertions(+), 6 deletions(-)
 
-On Wed, Jun 19, 2013 at 11:54:37PM +0400, Alexander Shiyan wrote:
-> - - fsl,weim-cs-timing:	The timing array, contains 6 timing values for the
-> + - fsl,weim-cs-timing:	The timing array, contains timing values for the
->  			child node. We can get the CS index from the child
-> -			node's "reg" property. This property contains the values
-> -			for the registers EIM_CSnGCR1, EIM_CSnGCR2, EIM_CSnRCR1,
-> +			node's "reg" property. For example, if i.MX6Q CPU
-> +			is used, this property contains the values for the
-> +			registers EIM_CSnGCR1, EIM_CSnGCR2, EIM_CSnRCR1,
->  			EIM_CSnRCR2, EIM_CSnWCR1, EIM_CSnWCR2 in this order.
-> +			For other i.MX CPUs count of register and register
-> +			names may be different.
-
-I think here we should have a more precise description for each SoC.
-
->  
->  Example for an imx6q-sabreauto board, the NOR flash connected to the WEIM:
->  
-> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-> index 1f70e84..4faedc21 100644
-> --- a/drivers/bus/Kconfig
-> +++ b/drivers/bus/Kconfig
-> @@ -8,10 +8,10 @@ config IMX_WEIM
->  	bool "Freescale EIM DRIVER"
->  	depends on ARCH_MXC
->  	help
-> -	  Driver for i.MX6 WEIM controller.
-> +	  Driver for i.MX WEIM controller.
->  	  The WEIM(Wireless External Interface Module) works like a bus.
->  	  You can attach many different devices on it, such as NOR, onenand.
-> -	  But now, we only support the Parallel NOR.
-> +	  But now, we only support the "of_physmap" driver.
-
-This comment is wrong. In the early versions of this patch indeed only
-parallel NOR was supported, but now there is no limitation on the device
-type anymore.
-
->  
->  config MVEBU_MBUS
->  	bool
-> diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-> index b6479fb..77fa1d4 100644
-> --- a/drivers/bus/imx-weim.c
-> +++ b/drivers/bus/imx-weim.c
-> @@ -17,6 +17,17 @@ struct imx_weim_devtype {
->  	unsigned int	cs_regs_count;
->  	unsigned int	cs_stride;
->  };
-> +static const struct imx_weim_devtype imx1_weim_devtype = {
-> +	.cs_count	= 6,
-> +	.cs_regs_count	= 2,
-> +	.cs_stride	= 0x08,
-> +};
-> +
-> +static const struct imx_weim_devtype imx25_weim_devtype = {
-> +	.cs_count	= 6,
-> +	.cs_regs_count	= 3,
-> +	.cs_stride	= 0x10,
-> +};
->  
->  static const struct imx_weim_devtype imx50_weim_devtype = {
->  	.cs_count	= 4,
-> @@ -24,9 +35,21 @@ static const struct imx_weim_devtype imx50_weim_devtype = {
->  	.cs_stride	= 0x18,
->  };
->  
-> +static const struct imx_weim_devtype imx51_weim_devtype = {
-> +	.cs_count	= 6,
-> +	.cs_regs_count	= 6,
-> +	.cs_stride	= 0x18,
-> +};
-> +
->  static const struct of_device_id weim_id_table[] = {
-> +	/* i.MX1/21 */
-> +	{ .compatible = "fsl,imx1-weim", .data = &imx1_weim_devtype, },
-> +	/* i.MX25/27/31/35 */
-> +	{ .compatible = "fsl,imx25-weim", .data = &imx25_weim_devtype, },
-
-We usually name the compatible name after the oldest i.MX supporting
-this IP, not after the lowest number. So this should be imx27, not
-imx25.
-
-Sascha
-
+diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+index 4f08b4d..519a24b 100644
+--- a/arch/arm/boot/dts/armada-370-db.dts
++++ b/arch/arm/boot/dts/armada-370-db.dts
+@@ -30,7 +30,8 @@
+ 	};
+ 
+ 	soc {
+-		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000>;
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
++			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
+ 
+ 		internal-regs {
+ 			serial at 12000 {
+diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+index df30065..69bb7aa 100644
+--- a/arch/arm/boot/dts/armada-370-mirabox.dts
++++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+@@ -25,7 +25,8 @@
+ 	};
+ 
+ 	soc {
+-		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000>;
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
++			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
+ 
+ 		internal-regs {
+ 			serial at 12000 {
+diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+index 7601b24..d0daa9e 100644
+--- a/arch/arm/boot/dts/armada-370-rd.dts
++++ b/arch/arm/boot/dts/armada-370-rd.dts
+@@ -28,7 +28,8 @@
+ 	};
+ 
+ 	soc {
+-		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000>;
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
++			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
+ 
+ 		internal-regs {
+ 			serial at 12000 {
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index c274b7b..2d0ec22 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -32,6 +32,11 @@
+ 		compatible = "marvell,armada370-mbus", "simple-bus";
+ 		reg = <0xd0020000 0x100>, <0xd0020180 0x20>;
+ 
++		bootrom {
++			compatible = "marvell,bootrom";
++			reg = <MBUS_ID(0x01, 0xe0) 0 0x100000>;
++		};
++
+ 		internal-regs {
+ 			system-controller at 18200 {
+ 				compatible = "marvell,armada-370-xp-system-controller";
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index 5bc9dcb..d157387 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -30,7 +30,8 @@
+ 	};
+ 
+ 	soc {
+-		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000>;
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
+ 
+ 		internal-regs {
+ 			serial at 12000 {
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 6c27a76..946c695 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -39,7 +39,8 @@
+ 	};
+ 
+ 	soc {
+-		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000>;
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
+ 
+ 		internal-regs {
+ 			serial at 12000 {
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index 61b17f4..889ca6ef 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -27,7 +27,8 @@
+ 	};
+ 
+ 	soc {
+-		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000>;
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
+ 
+ 		internal-regs {
+ 			serial at 12000 {
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index feec757..c2ff1d1 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -26,6 +26,11 @@
+ 		compatible = "marvell,armadaxp-mbus", "simple-bus";
+ 		reg = <0 0xd0020000 0 0x100>, <0 0xd0020180 0 0x20>;
+ 
++		bootrom {
++			compatible = "marvell,bootrom";
++			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
++		};
++
+ 		internal-regs {
+ 			L2: l2-cache {
+ 				compatible = "marvell,aurora-system-cache";
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.1.5
