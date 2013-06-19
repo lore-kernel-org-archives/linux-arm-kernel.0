@@ -1,36 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Jun 2013 11:25:26 +0200
-Subject: [PATCH V3 5/5] input: pxa27x-keypad: add device tree support
-In-Reply-To: <CADApbeiQWOi8SYEFf0bOsf1yn+TgXhwgDWaWFpGk7+nbC9bNDg@mail.gmail.com>
-References: <1371527778-5236-1-git-send-email-chao.xie@marvell.com>
- <201306191022.51630.marex@denx.de>
- <CADApbeiQWOi8SYEFf0bOsf1yn+TgXhwgDWaWFpGk7+nbC9bNDg@mail.gmail.com>
-Message-ID: <5961561.7UgodVjTLY@wuerfel>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Wed, 19 Jun 2013 11:29:00 +0200
+Subject: [PATCH 0/4] ARM: dts: OMAP3: Updates for Overo
+In-Reply-To: <1370962189-9689-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1370962189-9689-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <51C179DC.9040605@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 June 2013 16:38:38 Chao Xie wrote:
-> >> index 0000000..f8674f7
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/input/pxa27x-keypad.txt
-> >> @@ -0,0 +1,60 @@
-> >> +* Marvell PXA Keypad controller
-> >> +
-> >> +Required Properties
-> >> +- compatible : should be "marvell,pxa27x-keypad"
-> >> +- reg : Address and length of the register set for the device
-> >> +- interrupts : The interrupt for the keypad controller
-> >> +- marvell,debounce-interval : How long time the key will be
-> >
-> > Is there no generic prop name for this debounce interval?
-> >
-> I searched at drivers/input and Documents.
-> Two drivers use "debounce-interval", gpio-keys.c and stmpe-keypad.c.
-> They describe the meanings of "debounce-interval" at its own document file.
-> Some other drivers uses "xxx,debounce-delay-ms" or "debounce-delay-ms"
-> So it seems that there is no generic prop name for this debounce interval.
+Hello Benoit,
 
-I'd suggest using "debounce-interval" as in gpio-keys then, since that
-is the most generic driver.
+Any comments on this series?
 
-	Arnd
+Regards,
+Florian
+
+On 06/11/2013 04:49 PM, Florian Vaussard wrote:
+> Hello,
+>
+> This series performs several updates to omap3-overo and omap3-tobi.
+> Patch 1 is necessary to patch 2 for the IRQ constant. The SMSC911X is
+> largely taken from omap3-igep.
+>
+> Regards,
+>
+> Florian
+>
+> Florian Vaussard (4):
+>    ARM: dts: OMAP3: Include IRQ header
+>    ARM: dts: omap3-tobi: Add SMSC911X node
+>    ARM: dts: omap3-tobi: Correct polarity for GPIO LED
+>    ARM: dts: omap3-overo: Add default trigger for TWL4030 LED
+>
+>   arch/arm/boot/dts/omap3-overo.dtsi |    1 +
+>   arch/arm/boot/dts/omap3-tobi.dts   |   50 +++++++++++++++++++++++++++++++++++-
+>   arch/arm/boot/dts/omap3.dtsi       |    1 +
+>   3 files changed, 51 insertions(+), 1 deletions(-)
+>
