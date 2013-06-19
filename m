@@ -1,31 +1,73 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 19 Jun 2013 20:24:49 +0100
-Subject: [RFC PATCH 00/11] ARM: s3c64xx: Let amba-pl08x driver handle DMA
-In-Reply-To: <201306192101.34102.arnd@arndb.de>
-References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <20130619174047.GB1403@sirena.org.uk> <3697657.tZFV7pR81Q@flatron>
- <201306192101.34102.arnd@arndb.de>
-Message-ID: <20130619192449.GI1403@sirena.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 19 Jun 2013 16:29:16 -0300
+Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation
+ to the DT binding
+In-Reply-To: <201306192108.30998.arnd@arndb.de>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <201306182345.26281.arnd@arndb.de>
+ <20130619185224.GB5701@localhost>
+ <201306192108.30998.arnd@arndb.de>
+Message-ID: <20130619192915.GA8769@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 09:01:33PM +0200, Arnd Bergmann wrote:
-> On Wednesday 19 June 2013, Tomasz Figa wrote:
+On Wed, Jun 19, 2013 at 09:08:30PM +0200, Arnd Bergmann wrote:
+> On Wednesday 19 June 2013, Ezequiel Garcia wrote:
+> > > > What happens is that any decoding window that was setup by the bootloader,
+> > > > is wiped and completely new windows are allocated using the translations
+> > > > in the DT, as described by this binding.
+> > > > 
+> > > > This was the case from the start with the old MBus driver. FWIW, I think
+> > > > it's actually the best choice that can be made: it makes the kernel
+> > > > independent of the previous setting.
+> > > > 
+> > > > I know you've suggested differently in the past, but I'm not sure I
+> > > > understand what's the benefit in keeping the bootloaders configuration.
+> > > 
+> > > The device tree normally describes things that are either wired up
+> > > in hardware or set up by the boot loader. Describing things that the
+> > > boot loader may or may not have set up and that the kernel should
+> > > set up but may ignore if it wants to is a bit fishy, but it seems
+> > > that you have decided to do it that way. You should definitely
+> > > document the fact that all ranges except the "internal-regs" are just
+> > > suggestions and cannot be relied on to be present at boot time.
+> > > 
+> > 
+> > Hold on! I've just noticed this, and I want to clarify something, just
+> > to avoid mis-interpretations. The binding is not saying "the windows
+> > described through this ranges are present at boot time".
+> > 
+> > Rather, it is "this binding will guarantee that the windows described 
+> > in it will be present after the mbus allocates them".
+> > 
+> > Does it sound too fishy?
+> 
+> I don't think it's a guarantee that the binding can make. The binding
+> describes the interface between the hardware/firmware and the kernel,
+> not an interface between one kernel driver and another.
+> 
+> You could instead write:
+> 
+> "The ranges property defines a set of mbus windows that are expected
+> to be set by the operating system and that are guaranteed to be free
+> of overlaps with one another or with the system memory ranges.
+> Each entry in the property refers to exactly one window. If an
+> operating system choses to use a different set of mbus windows,
+> it must ensure that any address translations performed from downstream
+> devices are adapted accordingly. The operating system may insert
+> additional mbus windows that do not conflict with the ones listed
+> in the ranges, e.g. for mapping PCIe devices. As a special case,
+> the internal register window must be set up by the boot loader
+> at the address listed in the ranges property, since the operating
+> uses it to set up the other windows."
+> 
 
-> > >       if (plchan->mux_use++ == 0 && pd->get_signal) {
-> > > -             ret = pd->get_signal(plchan->cd);
-> > > +             ret = (pd->get_signal)(plchan->cd);
+Nice!
 
-> > Hmm, that's strange. The former is a completely valid piece of code...
+Shamelessly copy-pasted into the binding documentation.
 
-> get_signal is a macro defined in include/linux/signal.h. If that header
-> gets included, neither of the two is valid.
-
-Ah, that'll be it.  I'll post a patch to rename...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130619/23ffa763/attachment.sig>
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
