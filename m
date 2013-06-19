@@ -1,68 +1,34 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Wed, 19 Jun 2013 14:45:15 +0900
-Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
- framework
-In-Reply-To: <1371548849.4276.6.camel@weser.hi.pengutronix.de>
-References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
- <1371467722-665-1-git-send-email-inki.dae@samsung.com>
- <51BEF458.4090606@canonical.com>
- <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
- <20130617133109.GG2718@n2100.arm.linux.org.uk>
- <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
- <20130617154237.GJ2718@n2100.arm.linux.org.uk>
- <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
- <20130617182127.GM2718@n2100.arm.linux.org.uk>
- <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
- <20130618084308.GU2718@n2100.arm.linux.org.uk>
- <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
- <1371548849.4276.6.camel@weser.hi.pengutronix.de>
-Message-ID: <008601ce6cb0$2c8cec40$85a6c4c0$%dae@samsung.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Wed, 19 Jun 2013 11:23:54 +0530
+Subject: [PATCH 0/3] Add pinmux DT nodes to CPSW for AM335x
+In-Reply-To: <1370604775-21264-1-git-send-email-mugunthanvnm@ti.com>
+References: <1370604775-21264-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <51C14772.4090701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 6/7/2013 5:02 PM, Mugunthan V N wrote:
+> Add pinmux DT nodes to CPSW for the following AM335x boards
+> * AM335x Beaglebone
+> * AM335x EVM
+> * AM335x EVMsk
+> default state contains the pinmux required for active mode and
+> sleep mode contains pinmux reset values for energy saving.
+>
+> Mugunthan V N (3):
+>    ARM: dts: AM33XX: Add pinmux configuration for CPSW to beaglebone
+>    ARM: dts: AM33XX: Add pinmux configuration for CPSW to EVMsk
+>    ARM: dts: AM33XX: Add pinmux configuration for CPSW to am335x EVM
+>
+>   arch/arm/boot/dts/am335x-bone.dts  |   67 ++++++++++++++++++++++++++
+>   arch/arm/boot/dts/am335x-evm.dts   |   64 +++++++++++++++++++++++++
+>   arch/arm/boot/dts/am335x-evmsk.dts |   92 ++++++++++++++++++++++++++++++++++++
+>   3 files changed, 223 insertions(+)
+>
+Benoit
 
+Do you have any comments on this patch series,
+if not can you queue it for v3.11
 
-> -----Original Message-----
-> From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> Sent: Tuesday, June 18, 2013 6:47 PM
-> To: Inki Dae
-> Cc: 'Russell King - ARM Linux'; 'linux-fbdev'; 'Kyungmin Park'; 'DRI
-> mailing list'; 'myungjoo.ham'; 'YoungJun Cho'; linux-arm-
-> kernel at lists.infradead.org; linux-media at vger.kernel.org
-> Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
-> framework
-> 
-> Am Dienstag, den 18.06.2013, 18:04 +0900 schrieb Inki Dae:
-> [...]
-> >
-> > > a display device driver.  It shouldn't be used within a single driver
-> > > as a means of passing buffers between userspace and kernel space.
-> >
-> > What I try to do is not really such ugly thing. What I try to do is to
-> > notify that, when CPU tries to access a buffer , to kernel side through
-> > dmabuf interface. So it's not really to send the buffer to kernel.
-> >
-> > Thanks,
-> > Inki Dae
-> >
-> The most basic question about why you are trying to implement this sort
-> of thing in the dma_buf framework still stands.
-> 
-> Once you imported a dma_buf into your DRM driver it's a GEM object and
-> you can and should use the native DRM ioctls to prepare/end a CPU access
-> to this BO. Then internally to your driver you can use the dma_buf
-> reservation/fence stuff to provide the necessary cross-device sync.
-> 
-
-I don't really want that is used only for DRM drivers. We really need it for all other DMA devices; i.e., v4l2 based drivers. That is what I try to do. And my approach uses reservation to use dma-buf resources but not dma fence stuff anymore. However, I'm looking into Radeon DRM driver for why we need dma fence stuff, and how we can use it if needed.
-
-Thanks,
-Inki Dae
-
-> Regards,
-> Lucas
-> --
-> Pengutronix e.K.                           | Lucas Stach                 |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Mugunthan V N
