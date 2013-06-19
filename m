@@ -1,63 +1,62 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 19 Jun 2013 16:14:58 +0100
-Subject: [RFC PATCH v3 0/2] drivers: mfd: Versatile Express SPC support
-In-Reply-To: <201306191703.35182.arnd@arndb.de>
-References: <1370512763-32200-1-git-send-email-lorenzo.pieralisi@arm.com>
- <201306191437.20759.arnd@arndb.de> <1371646530.3867.12.camel@hornet>
- <201306191703.35182.arnd@arndb.de>
-Message-ID: <1371654898.3173.11.camel@hornet>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 19 Jun 2013 11:19:30 -0400 (EDT)
+Subject: [PATCH] ARM: EXYNOS: Fix incorrect usage of S5P_ARM_CORE1_*
+ registers
+In-Reply-To: <24503071.R7UT57fHdP@amdc1227>
+References: <1371569191-2364-1-git-send-email-t.figa@samsung.com>
+ <1933024.UCR4mQ7fzS@amdc1227>
+ <CANuQgHEXHgYm1-fzLfrsk66q4T-==ka0dnSKNuBVAq1kLWOOvg@mail.gmail.com>
+ <24503071.R7UT57fHdP@amdc1227>
+Message-ID: <alpine.LFD.2.03.1306191110130.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-06-19 at 16:03 +0100, Arnd Bergmann wrote:
-> On Wednesday 19 June 2013, Pawel Moll wrote:
-> > ... but sysreg does more than just that. In particular it provides a
-> > pseudo-gpio controller (I don't think you want to hide this behind the
-> > syscon) and it can act as a bridge to the configuration bus - see
-> > below. In short - no, I don't think sysreg driver can disappear. It can
-> > be reduced in size, yes.
-> 
-> As I said, the gpio part can be a separate driver that just handles
-> gpio, 
-
-I've already promised Samuel that.
-
-> and I think the configuration bridge can be part of the
-> vexpress-config driver, building on top of syscon. I'm not completely
-> sure about the latter part.
-
-I don't think so, no. I appreciate what you are trying to say, but I
-object to mixing ideas for the sake of reducing number of files. The
-config infrastructure is completely independent from the sysreg. Each of
-them can exist on its own. The only common thing is a (slightly baroque)
-communication interface between those two.
-
-> > > > > 3. Move vexpress-config into drivers/bus as it is (however I see no one
-> > > > > in MAINTAINERS for this directory)
-> > > > ISTR that Arnd originally created that directory, so he may help here.
-> > > > Arnd also had some concerns about implementing this code as a bus,
-> > > > mostly about it not being a discoverable bus. IMHO that's a valid
-> > > > concern, and this is why you ended up putting it under MFD which can be
-> > > > seen as some sort of platform devices bus. But I still believe the bus
-> > > > API would make this code look cleaner and easier to maintain.
-> > > 
-> > > Sorry, I don't see why it would be a bus. I assume that there is code
-> > > missing somewhere that is not yet merged, right?
+On Wed, 19 Jun 2013, Tomasz Figa wrote:
+> On Wednesday 19 of June 2013 20:26:50 Chander Kashyap wrote:
+> > On 19 June 2013 19:58, Tomasz Figa <t.figa@samsung.com> wrote:
+> > > I mean, calculate register offset based on two parameters - cluster ID
+> > > and> 
+> > > CPU ID, like:
+> > >         ...
+> > >         
+> > >         u32 mpidr = cpu_logical_map(cpu);
+> > >         u32 phys_cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> > >         
+> > >         if (soc_is_exynosXXXX()) {
+> > >         
+> > >                 u32 cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> > >                 
+> > >                 phys_cpu += EXYNOSXXXX_CPUS_PER_CLUSTER * cluster;
+> > >         
+> > >         }
+> > >         
+> > >         reg_base = S5P_ARM_CORE_CONFIGURATION(phys_cpu);
+> > >         __raw_writel(0, reg_base);
 > > 
-> > Well, different VE components (configuration microcontrollers on
-> > motherboard and daughterboards in particular) talk to each other over a
-> > bus (an SPI derivative, in case you were wondering). So there is a bus.
-> > A non-discoverable one, but it does 42 (approximately ;-) different
-> > things. We already have: clk, hwmon, regulator and reset drivers using
-> > it.
+> > This does not seems to viable solution, as eg. clusterID for
+> > exynos4210 is 0x9 and exynos 4412 is 0xa.
 > 
-> Ah, got it. In this case I think what you are looking for is a custom
-> 'regmap' interface that abstracts those devices. Regmap can already
-> cover i2c, spi and mmio based sets of registers (syscon is one example
-> for mmio), and IIRC there is a simple way of extending it to other
-> register-level interfaces like this one.
+> We don't need to consider cluster ID for any SoC that has just one cluster. 
+> That's why there is the if (soc_is_exynosXXXX()) clause, where exynosXXXX 
+> is the SoC that we support and has more clusters.
+> 
+> > But if we wass the cpu nodes
+> > thru DT, the we can comfortably rely on the logical cpu number. Also
+> > EXYNOSXXXX_CPUS_PER_CLUSTER can vary from cluster to cluster.
+> 
+> There is nothing that prevents you from specifying the CPUs in DT in 
+> different order. Moreover, even if you specify them in correct order, there 
+> is nothing that prevents you from using any of the listed CPUs as boot CPU, 
+> which will get the logical ID of 0.
 
-This is an interesting idea. The thing that worries me the most is its
-early (pre-slab) availability, but I will give it a try.
+Relying on the logical CPU number to index into hardware related 
+register space is wrong, please don't do that.
 
-Pawe?
+If the MPIDR allocation isn't linear then this cannot be used either.
+
+The best solution is probably to add this reg_base as a property of each 
+CPU node in DT, and extract it at boot time to stash it into an array 
+which can be indexed with the logical CPU number afterwards.
+
+
+Nicolas
