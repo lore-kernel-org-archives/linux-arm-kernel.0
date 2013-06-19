@@ -1,23 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Jun 2013 19:59:17 +0200
-Subject: [PATCH RESEND 01/15] ARM: clps711x: Remove
- NEED_MACH_MEMORY_H dependency
-In-Reply-To: <1371659133.475783558@f39.mail.ru>
-References: <1370411967-29451-1-git-send-email-shc_work@mail.ru>
- <201306191818.33756.arnd@arndb.de> <1371659133.475783558@f39.mail.ru>
-Message-ID: <201306191959.17633.arnd@arndb.de>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 19 Jun 2013 12:03:20 -0600
+Subject: [PATCH v3 05/12] ARM: mvebu: Remove the harcoded BootROM window
+ allocation
+In-Reply-To: <20130619175823.GB2324@localhost>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1371554737-25319-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130618173906.GC2204@obsidianresearch.com>
+ <20130619100159.GB16138@localhost>
+ <20130619165834.GB32155@obsidianresearch.com>
+ <20130619175823.GB2324@localhost>
+Message-ID: <20130619180320.GA25000@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 June 2013, Alexander Shiyan wrote:
-> > I'm having trouble applying these. Can you say which base you used
-> > and in which order to apply the two series?
-> 
-> Afaik this is already in the arm-soc by Olof.
+On Wed, Jun 19, 2013 at 02:58:24PM -0300, Ezequiel Garcia wrote:
 
-Yes, you are right. It's harder to track what has gone in for
-standaline patches, so I assumed these would be different.
+> I wasn't sure you wanted to panic(), to clip on available CPUs,
+> or to just do a pr_warn / WARN(), so here's a piece of code:
+> (disclaimer: non-tested, non-compiled, etc.)
 
-Thanks for the quick confirmation.
+Up to you, but you know it won't work if it isn't right so continuing
+on to try and startup the CPUs is not ideal. panic is probably
+reasonable?
+ 
+> 	node = of_find_compatible_node(NULL, NULL, "bootrom");
 
-	Arnd
+"marvell,bootrom" ?
+
+Jason
