@@ -1,40 +1,57 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 19 Jun 2013 17:21:58 +0530
-Subject: [PATCH v2 3/7] ARM: davinci: da8xx: creation of gpio platform
- device
-In-Reply-To: <1371202532-14628-4-git-send-email-avinashphilip@ti.com>
-References: <1371202532-14628-1-git-send-email-avinashphilip@ti.com>
- <1371202532-14628-4-git-send-email-avinashphilip@ti.com>
-Message-ID: <51C19B5E.6030907@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Jun 2013 14:03:20 +0200
+Subject: [PATCH v3 10/12] ARM: mvebu: Relocate Armada 370/XP DeviceBus
+ device tree nodes
+In-Reply-To: <20130618220929.GA24056@localhost>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <201306181816.26530.arnd@arndb.de> <20130618220929.GA24056@localhost>
+Message-ID: <201306191403.20569.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/14/2013 3:05 PM, Philip Avinash wrote:
-> From: KV Sujith <sujithkv@ti.com>
+On Wednesday 19 June 2013, Ezequiel Garcia wrote:
+> On Tue, Jun 18, 2013 at 06:16:26PM +0200, Arnd Bergmann wrote:
+> > On Tuesday 18 June 2013, Ezequiel Garcia wrote:
+> > > 
+> > > +               devbus-bootcs {
+> > > +                       compatible = "marvell,mvebu-devbus";
+> > > +                       reg = <0xffff0001 0x10400 0x8>;
+> > > +                       ranges = <0 MBUS_ID(0x01, 0x2f) 0 0xffffffff>;
+> > > +                       #address-cells = <1>;
+> > > +                       #size-cells = <1>;
+> > > +                       clocks = <&coreclk 0>;
+> > > +                       status = "disabled";
+> > > +               };
+> > 
+> > This is a violation of the binding as far as I can tell, since you don't specify ranges
+> > to access the 0xffff0001 0x10400 address. However, as I explained in my comment for
+> > the binding, I think you should clarify the binding and leave the implementation
+> > as you have it here.
+> > 
 > 
-> gpio controller resource information being associated with
-> davinci_soc_info structure and not created any device. Hence davinci
-> gpio didn't fall under proper device model. This patch creates gpio
-> davinci as a platform device for da8xx platforms.
+> Mmm... again I got lost here. Which 'ranges' you say I don't specify to
+> access the (formerly) 0xffff0001?
+> 
+> AFAIK, 'ranges' are only for children translation, which means I don't
+> need to specify a ranges for that in the devbus node, but in its parent,
+> right?
+> 
+> This ranges thing can be very tricky, so please correct me if I'm
+> mistaken.
 
-I didn't really find the description coherent. I simplified it to:
+You already clarified that the binding was wrong. This was about the
+part where you replied:
 
-    ARM: davinci: da8xx: support gpio platform device
+>> Do you really want to require the child to provide a "ranges" property?
+>> I think this makes it more complicated to specify devices that belong
+>> into the "internal-regs" category.
+>> 
+>
+>No, this text is actually a left-over from the previous patchset, in
+>current v3 patchset MBus children are not required to have any ranges.
+>On the otherside, although you will need one except in the most trivial
+>cases like for the BootROM.
 
-    DaVinci GPIO driver now uses platform device model.
-    Convert DA8XX SoC code to use the new model.
+With that change, everything above is ok.
 
-    - Add Memory and IRQ resources for da8xx
-    - Add da8xx_register_gpio API to create platform device for da8xx
-      platforms.
-
-    Signed-off-by: KV Sujith <sujithkv@ti.com>
-    Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-    Acked-by: Linus Walleij <linus.walleij@linaro.org>
-    [nsekhar at ti.com: simplify commit message]
-    Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-
-Before applying the patch.
-
-Thanks,
-Sekhar
+	Arnd
