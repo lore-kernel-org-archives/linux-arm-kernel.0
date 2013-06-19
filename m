@@ -1,73 +1,52 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 19 Jun 2013 16:29:16 -0300
-Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation
- to the DT binding
-In-Reply-To: <201306192108.30998.arnd@arndb.de>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306182345.26281.arnd@arndb.de>
- <20130619185224.GB5701@localhost>
- <201306192108.30998.arnd@arndb.de>
-Message-ID: <20130619192915.GA8769@localhost>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 19 Jun 2013 21:32:18 +0200 (CEST)
+Subject: [PATCH] dmaengine: shdma: fix a build failure on platforms with
+ no DMA support
+In-Reply-To: <CAGa+x8413povhYWx+BSj=TdzQDAuYFXmjF4A2kXvQt+=n+380w@mail.gmail.com>
+References: <Pine.LNX.4.64.1305301650290.29171@axis700.grange>
+ <51A77CF1.7040105@ti.com> <20130531024438.GB32564@verge.net.au>
+ <CAGa+x8413povhYWx+BSj=TdzQDAuYFXmjF4A2kXvQt+=n+380w@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1306192125480.12502@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 09:08:30PM +0200, Arnd Bergmann wrote:
-> On Wednesday 19 June 2013, Ezequiel Garcia wrote:
-> > > > What happens is that any decoding window that was setup by the bootloader,
-> > > > is wiped and completely new windows are allocated using the translations
-> > > > in the DT, as described by this binding.
-> > > > 
-> > > > This was the case from the start with the old MBus driver. FWIW, I think
-> > > > it's actually the best choice that can be made: it makes the kernel
-> > > > independent of the previous setting.
-> > > > 
-> > > > I know you've suggested differently in the past, but I'm not sure I
-> > > > understand what's the benefit in keeping the bootloaders configuration.
-> > > 
-> > > The device tree normally describes things that are either wired up
-> > > in hardware or set up by the boot loader. Describing things that the
-> > > boot loader may or may not have set up and that the kernel should
-> > > set up but may ignore if it wants to is a bit fishy, but it seems
-> > > that you have decided to do it that way. You should definitely
-> > > document the fact that all ranges except the "internal-regs" are just
-> > > suggestions and cannot be relied on to be present at boot time.
-> > > 
-> > 
-> > Hold on! I've just noticed this, and I want to clarify something, just
-> > to avoid mis-interpretations. The binding is not saying "the windows
-> > described through this ranges are present at boot time".
-> > 
-> > Rather, it is "this binding will guarantee that the windows described 
-> > in it will be present after the mbus allocates them".
-> > 
-> > Does it sound too fishy?
-> 
-> I don't think it's a guarantee that the binding can make. The binding
-> describes the interface between the hardware/firmware and the kernel,
-> not an interface between one kernel driver and another.
-> 
-> You could instead write:
-> 
-> "The ranges property defines a set of mbus windows that are expected
-> to be set by the operating system and that are guaranteed to be free
-> of overlaps with one another or with the system memory ranges.
-> Each entry in the property refers to exactly one window. If an
-> operating system choses to use a different set of mbus windows,
-> it must ensure that any address translations performed from downstream
-> devices are adapted accordingly. The operating system may insert
-> additional mbus windows that do not conflict with the ones listed
-> in the ranges, e.g. for mapping PCIe devices. As a special case,
-> the internal register window must be set up by the boot loader
-> at the address listed in the ranges property, since the operating
-> uses it to set up the other windows."
-> 
+Hi Vinod
 
-Nice!
+On Wed, 19 Jun 2013, Kevin Hilman wrote:
 
-Shamelessly copy-pasted into the binding documentation.
+> On Thu, May 30, 2013 at 7:44 PM, Simon Horman <horms@verge.net.au> wrote:
+> 
+> [...]
+> 
+> > thanks for this. I will wait for a refresh (as we discussed earlier today).
+> > Can I confirm that this is a fix for v3.10? If so, could ou note
+> > that when you post your revised patch?
+> 
+> Any progress on this patch?
+> 
+> The SH-mobile defconfigs are still all failing in linux-next.
 
-Thanks,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+In
+
+https://patchwork.kernel.org/patch/2640061/
+
+I proposed a simple immediate fix for this problem. Arnd at the same time 
+developed an alternative solution:
+
+https://patchwork.kernel.org/patch/2644121/
+https://patchwork.kernel.org/patch/2644111/
+
+Which, I think, is a much larger change and isn't suitable as a bug-fix 
+this late in the release cycle. Instead those patches address other issues 
+with the shdma drivers, which might need to be carefully studied and 
+solutions have to be found, which, however, would require more work and 
+need a longer time. What is your opinion on this? Would you agree to apply 
+v2 of this patch, as referenced above or would you prefer a different 
+solution?
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
