@@ -1,295 +1,242 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 19 Jun 2013 22:22:33 +0900
-Subject: [PATCH 2/4] sh-pfc: r8a7790: add HSCIF pin groups
-In-Reply-To: <1371648155-18479-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371648155-18479-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371648155-18479-3-git-send-email-horms+renesas@verge.net.au>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Wed, 19 Jun 2013 18:54:12 +0530
+Subject: [PATCH] ARM: EXYNOS: Fix incorrect usage of S5P_ARM_CORE1_*
+ registers
+In-Reply-To: <8974257.1Thh8U4Een@amdc1227>
+References: <1371569191-2364-1-git-send-email-t.figa@samsung.com>
+ <51C0A01E.5020206@samsung.com>
+ <CANuQgHEd3L=F20Nrp3zWh2+uXvRU9P_KVN=1xr3RXnoGBsaHLw@mail.gmail.com>
+ <8974257.1Thh8U4Een@amdc1227>
+Message-ID: <CANuQgHFNZ=gsWnydUYzAaEpgEbW7qwEEGdAsvbeqeY5H7G5uFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht@gmail.com>
+On 19 June 2013 18:20, Tomasz Figa <t.figa@samsung.com> wrote:
+> On Wednesday 19 of June 2013 17:39:21 Chander Kashyap wrote:
+>> On 18 June 2013 23:29, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > On 06/19/13 02:45, Tomasz Figa wrote:
+>> >> Ccing Arnd and Olof, because I forgot to add them to git send-email...
+>> >>
+>> >> Sorry for the noise.
+>> >>
+>> >> On Tuesday 18 of June 2013 17:26:31 Tomasz Figa wrote:
+>> >>> S5P_ARM_CORE1_* registers affect only core 1. To control further
+>> >>> cores
+>> >>> properly another registers must be used.
+>> >>>
+>> >>> This patch replaces S5P_ARM_CORE1_* register definitions with
+>> >>> S5P_ARM_CORE_*(x) macro which return addresses of registers for
+>> >>> specified core.
+>> >>>
+>> >>> This fixes CPU hotplug on quad core Exynos SoCs on which currently
+>> >>> offlining CPUs 2 or 3 caused CPU 1 to be turned off.
+>> >>
+>> >> Obviously this doesn't happen currently because of the if (cpu == 1),
+>> >> but>
+>> > Yes, not happened...and just note exynos5440 doesn't support hotplug :)
+>> > so this is available on exynos4412 and added 5420.
+>> >
+>> >> if logical cpu1 turned out not to be physical cpu1, then it would
+>> >> crash.
+>> >>
+>> >> Best regards,
+>> >> Tomasz
+>> >>
+>> >>> In addition,
+>> >>> bring-up of CPU 2 and 3 is fixed on boards where bootloader powers
+>> >>> off
+>> >>> secondary cores by default.
+>> >
+>> > I need to test on board about above...
+>> >
+>> >>> Cc: stable at vger.kernel.org
+>> >>> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+>> >>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+>> >>> ---
+>> >>>
+>> >>>   arch/arm/mach-exynos/hotplug.c               |  9 +++++----
+>> >>>   arch/arm/mach-exynos/include/mach/regs-pmu.h | 10 +++++++---
+>> >>>   arch/arm/mach-exynos/platsmp.c               |  9 +++++----
+>> >>>   3 files changed, 17 insertions(+), 11 deletions(-)
+>> >>>
+>> >>> diff --git a/arch/arm/mach-exynos/hotplug.c
+>> >>> b/arch/arm/mach-exynos/hotplug.c index af90cfa..c089943 100644
+>> >>> --- a/arch/arm/mach-exynos/hotplug.c
+>> >>> +++ b/arch/arm/mach-exynos/hotplug.c
+>> >>> @@ -93,10 +93,11 @@ static inline void cpu_leave_lowpower(void)
+>> >>>
+>> >>>   static inline void platform_do_lowpower(unsigned int cpu, int
+>> >>>
+>> >>> *spurious) {
+>> >>>
+>> >>>         for (;;) {
+>> >>>
+>> >>> +               void __iomem *reg_base;
+>> >>> +               unsigned int phys_cpu = cpu_logical_map(cpu);
+>> >>>
+>> >>> -               /* make cpu1 to be turned off at next WFI command */
+>> >>> -               if (cpu == 1)
+>> >>> -                       __raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
+>> >>> +               reg_base = S5P_ARM_CORE_CONFIGURATION(phys_cpu);
+>>
+>> Tomasz,
+>> This will break for non-zero, MPIDR value.  Say if MPIDR is 1 then for
+>> cpu0 phys_cpu value will be 0x100,
+>> and address calculation will be   (S5P_ARM_CORE0_CONFIGURATION +
+>> ((0x101) * 0x80)), which is wrong.
+>
+> Hmm, according to the code initializing __cpu_logical_map[] array this is
+> not true.
+>
+> Here's the code:
+>
+> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/kernel/setup.c?id=refs/tags/next-20130619#n468
+>
+> and for used macros and bitmasks:
+>
+> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/include/asm/cputype.h?id=refs/tags/next-20130619#n45
+>
+> Now the structure of the MPIDR register:
+>
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388e/CIHEBGFG.html
+>
+> As you can see, the value read from the register in
+> smp_setup_processor_id() is only the physical CPU ID, so I don't see any
+> problem here.
+Kindly look at implementation of "arm_dt_init_cpu_maps"  in
+"arch/arm/kernel/devtree.c". When you pass the cpu nodes thru DT, and
+cluster id is non zero, the phys_cpu will include clusterID. Say e.g
+exynos4210 has CLusterID=9, hence phys_cpu value for cpu0 will be
+0x901.
+>
+> If I'm wrong, feel free to correct me.
+>
+> Cc'ing people who should have more knowledge on this.
+>
+> Best regards,
+> Tomasz
+>
+>> >>> +               __raw_writel(0, reg_base);
+>> >>>
+>> >>>                 /*
+>> >>>
+>> >>>                  * here's the WFI
+>> >>>
+>> >>> @@ -106,7 +107,7 @@ static inline void platform_do_lowpower(unsigned
+>> >>> int
+>> >>> cpu, int *spurious)
+>> >>>
+>> >>>                     : "memory", "cc");
+>> >>>
+>> >>> -               if (pen_release == cpu_logical_map(cpu)) {
+>> >>> +               if (pen_release == phys_cpu) {
+>> >>>
+>> >>>                         /*
+>> >>>
+>> >>>                          * OK, proper wakeup, we're done
+>> >>>                          */
+>> >>>
+>> >>> diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h
+>> >>> b/arch/arm/mach-exynos/include/mach/regs-pmu.h index 57344b7..cf40b86
+>> >>> 100644
+>> >>> --- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
+>> >>> +++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+>> >>> @@ -125,10 +125,14 @@
+>> >>>
+>> >>>   #define S5P_GPS_ALIVE_LOWPWR                  S5P_PMUREG(0x13A0)
+>> >>>
+>> >>>   #define S5P_ARM_CORE0_CONFIGURATION           S5P_PMUREG(0x2000)
+>> >>>
+>> >>> +#define S5P_ARM_CORE0_STATUS                   S5P_PMUREG(0x2004)
+>> >>>
+>> >>>   #define S5P_ARM_CORE0_OPTION                  S5P_PMUREG(0x2008)
+>> >>>
+>> >>> -#define S5P_ARM_CORE1_CONFIGURATION            S5P_PMUREG(0x2080)
+>> >>> -#define S5P_ARM_CORE1_STATUS                   S5P_PMUREG(0x2084)
+>> >>> -#define S5P_ARM_CORE1_OPTION                   S5P_PMUREG(0x2088)
+>> >>> +#define S5P_ARM_CORE_CONFIGURATION(_nr)                \
+>> >>> +               (S5P_ARM_CORE0_CONFIGURATION + ((_nr) * 0x80))
+>> >>> +#define S5P_ARM_CORE_STATUS(_nr)               \
+>> >>> +               (S5P_ARM_CORE0_STATUS + ((_nr) * 0x80))
+>> >>> +#define S5P_ARM_CORE_OPTION(_nr)               \
+>> >>> +               (S5P_ARM_CORE0_OPTION + ((_nr) * 0x80))
+>> >>>
+>> >>>   #define S5P_ARM_COMMON_OPTION                 S5P_PMUREG(0x2408)
+>> >>>   #define S5P_TOP_PWR_OPTION                    S5P_PMUREG(0x2C48)
+>> >>>
+>> >>> diff --git a/arch/arm/mach-exynos/platsmp.c
+>> >>> b/arch/arm/mach-exynos/platsmp.c index d9c6d0a..2cbabc8 100644
+>> >>> --- a/arch/arm/mach-exynos/platsmp.c
+>> >>> +++ b/arch/arm/mach-exynos/platsmp.c
+>> >>> @@ -109,14 +109,15 @@ static int __cpuinit
+>> >>> exynos_boot_secondary(unsigned int cpu, struct task_struct */
+>> >>>
+>> >>>         write_pen_release(phys_cpu);
+>> >>>
+>> >>> -       if (!(__raw_readl(S5P_ARM_CORE1_STATUS)&
+>> >>> S5P_CORE_LOCAL_PWR_EN))>>
+>> >> {
+>> >>
+>> >>> +       if (!(__raw_readl(S5P_ARM_CORE_STATUS(phys_cpu))
+>> >>> +       &  S5P_CORE_LOCAL_PWR_EN)) {
+>> >>>
+>> >>>                 __raw_writel(S5P_CORE_LOCAL_PWR_EN,
+>> >>>
+>> >>> -                            S5P_ARM_CORE1_CONFIGURATION);
+>> >>> +                            S5P_ARM_CORE_CONFIGURATION(phys_cpu));
+>> >>>
+>> >>>                 timeout = 10;
+>> >>>
+>> >>>                 /* wait max 10 ms until cpu1 is on */
+>> >>>
+>> >>> -               while ((__raw_readl(S5P_ARM_CORE1_STATUS)
+>> >>> +               while ((__raw_readl(S5P_ARM_CORE_STATUS(phys_cpu))
+>>
+>> Ditto
+>>
+>> >>>                         &  S5P_CORE_LOCAL_PWR_EN) !=
+>> >>>
+>> >>> S5P_CORE_LOCAL_PWR_EN)
+>> >>
+>> >> {
+>> >>
+>> >>>                         if (timeout-- == 0)
+>> >>>
+>> >>>                                 break;
+>> >>>
+>> >>> @@ -125,7 +126,7 @@ static int __cpuinit
+>> >>> exynos_boot_secondary(unsigned
+>> >>> int cpu, struct task_struct }
+>> >>>
+>> >>>                 if (timeout == 0) {
+>> >>>
+>> >>> -                       printk(KERN_ERR "cpu1 power enable failed");
+>> >>> +                       printk(KERN_ERR "cpu%u power enable failed",
+>> >>> cpu);
+>> >>>
+>> >>>                         spin_unlock(&boot_lock);
+>> >>>                         return -ETIMEDOUT;
+>> >>>
+>> >>>                 }
+>> >>
+>> >> --
+>> >
+>> > --
+>> > To unsubscribe from this list: send the line "unsubscribe
+>> > linux-samsung-soc" in
+>> > the body of a message to majordomo at vger.kernel.org
+>> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>> --
+>> with warm regards,
+>> Chander Kashyap
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe
+>> linux-samsung-soc" in the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Adds HSCIF data/clk/ctrl groups to R8A7790 PFC driver.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 211 ++++++++++++++++++++++++++++++++---
- 1 file changed, 196 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-index 85d77a4..1e7a5eb 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-@@ -1979,6 +1979,141 @@ static const unsigned int scif1_clk_e_pins[] = {
- static const unsigned int scif1_clk_e_mux[] = {
- 	SCK1_E_MARK,
- };
-+/* - HSCIF0 ----------------------------------------------------------------- */
-+static const unsigned int hscif0_data_pins[] = {
-+	/* RX, TX */
-+	RCAR_GP_PIN(5, 8), RCAR_GP_PIN(5, 9),
-+};
-+static const unsigned int hscif0_data_mux[] = {
-+	HRX0_MARK, HTX0_MARK,
-+};
-+static const unsigned int hscif0_clk_pins[] = {
-+	/* SCK */
-+	RCAR_GP_PIN(5, 7),
-+};
-+static const unsigned int hscif0_clk_mux[] = {
-+	HSCK0_MARK,
-+};
-+static const unsigned int hscif0_ctrl_pins[] = {
-+	/* RTS, CTS */
-+	RCAR_GP_PIN(5, 11), RCAR_GP_PIN(5, 10),
-+};
-+static const unsigned int hscif0_ctrl_mux[] = {
-+	HRTS0_N_MARK, HCTS0_N_MARK,
-+};
-+static const unsigned int hscif0_data_b_pins[] = {
-+	/* RX, TX */
-+	RCAR_GP_PIN(1, 23), RCAR_GP_PIN(1, 12),
-+};
-+static const unsigned int hscif0_data_b_mux[] = {
-+	HRX0_B_MARK, HTX0_B_MARK,
-+};
-+static const unsigned int hscif0_ctrl_b_pins[] = {
-+	/* RTS, CTS */
-+	RCAR_GP_PIN(1, 29), RCAR_GP_PIN(1, 28),
-+};
-+static const unsigned int hscif0_ctrl_b_mux[] = {
-+	HRTS0_N_B_MARK, HCTS0_N_B_MARK,
-+};
-+static const unsigned int hscif0_data_c_pins[] = {
-+	/* RX, TX */
-+	RCAR_GP_PIN(5, 13), RCAR_GP_PIN(5, 16),
-+};
-+static const unsigned int hscif0_data_c_mux[] = {
-+	HRX0_C_MARK, HTX0_C_MARK,
-+};
-+static const unsigned int hscif0_ctrl_c_pins[] = {
-+	/* RTS, CTS */
-+	RCAR_GP_PIN(5, 3), RCAR_GP_PIN(5, 7),
-+};
-+static const unsigned int hscif0_ctrl_c_mux[] = {
-+	HRTS0_N_C_MARK, HCTS0_N_C_MARK,
-+};
-+static const unsigned int hscif0_data_d_pins[] = {
-+	/* RX, TX */
-+	RCAR_GP_PIN(3, 20), RCAR_GP_PIN(3, 21),
-+};
-+static const unsigned int hscif0_data_d_mux[] = {
-+	HRX0_D_MARK, HTX0_D_MARK,
-+};
-+static const unsigned int hscif0_ctrl_d_pins[] = {
-+	/* RTS, CTS */
-+	RCAR_GP_PIN(3, 23), RCAR_GP_PIN(3, 22),
-+};
-+static const unsigned int hscif0_ctrl_d_mux[] = {
-+	HRTS0_N_D_MARK, HCTS0_N_D_MARK,
-+};
-+static const unsigned int hscif0_data_e_pins[] = {
-+	/* RX, TX */
-+	RCAR_GP_PIN(2, 21), RCAR_GP_PIN(2, 22),
-+};
-+static const unsigned int hscif0_data_e_mux[] = {
-+	HRX0_E_MARK, HTX0_E_MARK,
-+};
-+static const unsigned int hscif0_ctrl_e_pins[] = {
-+	/* RTS, CTS */
-+	RCAR_GP_PIN(2, 24), RCAR_GP_PIN(2, 23),
-+};
-+static const unsigned int hscif0_ctrl_e_mux[] = {
-+	HRTS0_N_E_MARK, HCTS0_N_E_MARK,
-+};
-+static const unsigned int hscif0_data_f_pins[] = {
-+	/* RX, TX */
-+	RCAR_GP_PIN(2, 23), RCAR_GP_PIN(2, 25),
-+};
-+static const unsigned int hscif0_data_f_mux[] = {
-+	HRX0_F_MARK, HTX0_F_MARK,
-+};
-+static const unsigned int hscif0_ctrl_f_pins[] = {
-+	/* RTS, CTS */
-+	RCAR_GP_PIN(2, 26), RCAR_GP_PIN(2, 24),
-+};
-+static const unsigned int hscif0_ctrl_f_mux[] = {
-+	HRTS0_N_F_MARK, HCTS0_N_F_MARK,
-+};
-+/* - HSCIF1 ----------------------------------------------------------------- */
-+static const unsigned int hscif1_data_pins[] = {
-+	/* RX, TX */
-+	RCAR_GP_PIN(4, 28), RCAR_GP_PIN(4, 29),
-+};
-+static const unsigned int hscif1_data_mux[] = {
-+	HRX1_MARK, HTX1_MARK,
-+};
-+static const unsigned int hscif1_clk_pins[] = {
-+	/* SCK */
-+	RCAR_GP_PIN(4, 27),
-+};
-+static const unsigned int hscif1_clk_mux[] = {
-+	HSCK1_MARK,
-+};
-+static const unsigned int hscif1_ctrl_pins[] = {
-+	/* RTS, CTS */
-+	RCAR_GP_PIN(4, 31), RCAR_GP_PIN(4, 30),
-+};
-+static const unsigned int hscif1_ctrl_mux[] = {
-+	HRTS1_N_MARK, HCTS1_N_MARK,
-+};
-+static const unsigned int hscif1_data_b_pins[] = {
-+	/* RX, TX */
-+	RCAR_GP_PIN(1, 12), RCAR_GP_PIN(1, 18),
-+};
-+static const unsigned int hscif1_data_b_mux[] = {
-+	HRX1_B_MARK, HTX1_B_MARK,
-+};
-+static const unsigned int hscif1_clk_b_pins[] = {
-+	/* SCK */
-+	RCAR_GP_PIN(1, 28),
-+};
-+static const unsigned int hscif1_clk_b_mux[] = {
-+	HSCK1_B_MARK,
-+};
-+static const unsigned int hscif1_ctrl_b_pins[] = {
-+	/* RTS, CTS */
-+	RCAR_GP_PIN(1, 14), RCAR_GP_PIN(1, 13),
-+};
-+static const unsigned int hscif1_ctrl_b_mux[] = {
-+	HRTS1_N_B_MARK, HCTS1_N_B_MARK,
-+};
- /* - SCIFA0 ----------------------------------------------------------------- */
- static const unsigned int scifa0_data_pins[] = {
- 	/* RXD, TXD */
-@@ -2591,10 +2726,37 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(eth_magic),
- 	SH_PFC_PIN_GROUP(eth_mdio),
- 	SH_PFC_PIN_GROUP(eth_rmii),
-+	SH_PFC_PIN_GROUP(hscif0_data),
-+	SH_PFC_PIN_GROUP(hscif0_clk),
-+	SH_PFC_PIN_GROUP(hscif0_ctrl),
-+	SH_PFC_PIN_GROUP(hscif0_data_b),
-+	SH_PFC_PIN_GROUP(hscif0_ctrl_b),
-+	SH_PFC_PIN_GROUP(hscif0_data_c),
-+	SH_PFC_PIN_GROUP(hscif0_ctrl_c),
-+	SH_PFC_PIN_GROUP(hscif0_data_d),
-+	SH_PFC_PIN_GROUP(hscif0_ctrl_d),
-+	SH_PFC_PIN_GROUP(hscif0_data_e),
-+	SH_PFC_PIN_GROUP(hscif0_ctrl_e),
-+	SH_PFC_PIN_GROUP(hscif0_data_f),
-+	SH_PFC_PIN_GROUP(hscif0_ctrl_f),
-+	SH_PFC_PIN_GROUP(hscif1_data),
-+	SH_PFC_PIN_GROUP(hscif1_clk),
-+	SH_PFC_PIN_GROUP(hscif1_ctrl),
-+	SH_PFC_PIN_GROUP(hscif1_data_b),
-+	SH_PFC_PIN_GROUP(hscif1_clk_b),
-+	SH_PFC_PIN_GROUP(hscif1_ctrl_b),
- 	SH_PFC_PIN_GROUP(intc_irq0),
- 	SH_PFC_PIN_GROUP(intc_irq1),
- 	SH_PFC_PIN_GROUP(intc_irq2),
- 	SH_PFC_PIN_GROUP(intc_irq3),
-+	SH_PFC_PIN_GROUP(mmc0_data1),
-+	SH_PFC_PIN_GROUP(mmc0_data4),
-+	SH_PFC_PIN_GROUP(mmc0_data8),
-+	SH_PFC_PIN_GROUP(mmc0_ctrl),
-+	SH_PFC_PIN_GROUP(mmc1_data1),
-+	SH_PFC_PIN_GROUP(mmc1_data4),
-+	SH_PFC_PIN_GROUP(mmc1_data8),
-+	SH_PFC_PIN_GROUP(mmc1_ctrl),
- 	SH_PFC_PIN_GROUP(scif0_data),
- 	SH_PFC_PIN_GROUP(scif0_clk),
- 	SH_PFC_PIN_GROUP(scif0_ctrl),
-@@ -2659,18 +2821,6 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(scifb2_clk_b),
- 	SH_PFC_PIN_GROUP(scifb2_ctrl_b),
- 	SH_PFC_PIN_GROUP(scifb2_data_c),
--	SH_PFC_PIN_GROUP(tpu0_to0),
--	SH_PFC_PIN_GROUP(tpu0_to1),
--	SH_PFC_PIN_GROUP(tpu0_to2),
--	SH_PFC_PIN_GROUP(tpu0_to3),
--	SH_PFC_PIN_GROUP(mmc0_data1),
--	SH_PFC_PIN_GROUP(mmc0_data4),
--	SH_PFC_PIN_GROUP(mmc0_data8),
--	SH_PFC_PIN_GROUP(mmc0_ctrl),
--	SH_PFC_PIN_GROUP(mmc1_data1),
--	SH_PFC_PIN_GROUP(mmc1_data4),
--	SH_PFC_PIN_GROUP(mmc1_data8),
--	SH_PFC_PIN_GROUP(mmc1_ctrl),
- 	SH_PFC_PIN_GROUP(sdhi0_data1),
- 	SH_PFC_PIN_GROUP(sdhi0_data4),
- 	SH_PFC_PIN_GROUP(sdhi0_ctrl),
-@@ -2691,6 +2841,10 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(sdhi3_ctrl),
- 	SH_PFC_PIN_GROUP(sdhi3_cd),
- 	SH_PFC_PIN_GROUP(sdhi3_wp),
-+	SH_PFC_PIN_GROUP(tpu0_to0),
-+	SH_PFC_PIN_GROUP(tpu0_to1),
-+	SH_PFC_PIN_GROUP(tpu0_to2),
-+	SH_PFC_PIN_GROUP(tpu0_to3),
- };
- 
- static const char * const eth_groups[] = {
-@@ -2726,6 +2880,31 @@ static const char * const scif1_groups[] = {
- 	"scif1_clk_e",
- };
- 
-+static const char * const hscif0_groups[] = {
-+	"hscif0_data",
-+	"hscif0_clk",
-+	"hscif0_ctrl",
-+	"hscif0_data_b",
-+	"hscif0_ctrl_b",
-+	"hscif0_data_c",
-+	"hscif0_ctrl_c",
-+	"hscif0_data_d",
-+	"hscif0_ctrl_d",
-+	"hscif0_data_e",
-+	"hscif0_ctrl_e",
-+	"hscif0_data_f",
-+	"hscif0_ctrl_f",
-+};
-+
-+static const char * const hscif1_groups[] = {
-+	"hscif1_data",
-+	"hscif1_clk",
-+	"hscif1_ctrl",
-+	"hscif1_data_b",
-+	"hscif1_clk_b",
-+	"hscif1_ctrl_b",
-+};
-+
- static const char * const scifa0_groups[] = {
- 	"scifa0_data",
- 	"scifa0_clk",
-@@ -2850,7 +3029,11 @@ static const char * const sdhi3_groups[] = {
- 
- static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(eth),
-+	SH_PFC_FUNCTION(hscif0),
-+	SH_PFC_FUNCTION(hscif1),
- 	SH_PFC_FUNCTION(intc),
-+	SH_PFC_FUNCTION(mmc0),
-+	SH_PFC_FUNCTION(mmc1),
- 	SH_PFC_FUNCTION(scif0),
- 	SH_PFC_FUNCTION(scif1),
- 	SH_PFC_FUNCTION(scifa0),
-@@ -2859,13 +3042,11 @@ static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(scifb0),
- 	SH_PFC_FUNCTION(scifb1),
- 	SH_PFC_FUNCTION(scifb2),
--	SH_PFC_FUNCTION(tpu0),
--	SH_PFC_FUNCTION(mmc0),
--	SH_PFC_FUNCTION(mmc1),
- 	SH_PFC_FUNCTION(sdhi0),
- 	SH_PFC_FUNCTION(sdhi1),
- 	SH_PFC_FUNCTION(sdhi2),
- 	SH_PFC_FUNCTION(sdhi3),
-+	SH_PFC_FUNCTION(tpu0),
- };
- 
- static struct pinmux_cfg_reg pinmux_config_regs[] = {
--- 
-1.8.2.1
+--
+with warm regards,
+Chander Kashyap
