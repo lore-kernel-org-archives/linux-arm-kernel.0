@@ -1,47 +1,56 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 19 Jun 2013 04:34:32 -0500
-Subject: [PATCH 0/4] ARM: dts: OMAP3: Updates for Overo
-In-Reply-To: <51C179DC.9040605@epfl.ch>
-References: <1370962189-9689-1-git-send-email-florian.vaussard@epfl.ch>
- <51C179DC.9040605@epfl.ch>
-Message-ID: <51C17B28.6060802@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Jun 2013 11:40:32 +0200
+Subject: [GIT PULL] Allwinner sunXi additions for 3.11, take 2
+Message-ID: <20130619094032.GA7718@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2013 04:29 AM, Florian Vaussard wrote:
-> Hello Benoit,
->
-> Any comments on this series?
+Hi Arnd, Olof,
 
-That series looks good to me. I've just applied it.
+Here is the second batch of DT patches for Allwinner SoCs for the next
+merge window.
 
-Thanks,
-Benoit
+The following changes since commit 39138bc60f90560ac79e76fb0971be5619ae32d7:
 
->
-> Regards,
-> Florian
->
-> On 06/11/2013 04:49 PM, Florian Vaussard wrote:
->> Hello,
->>
->> This series performs several updates to omap3-overo and omap3-tobi.
->> Patch 1 is necessary to patch 2 for the IRQ constant. The SMSC911X is
->> largely taken from omap3-igep.
->>
->> Regards,
->>
->> Florian
->>
->> Florian Vaussard (4):
->>    ARM: dts: OMAP3: Include IRQ header
->>    ARM: dts: omap3-tobi: Add SMSC911X node
->>    ARM: dts: omap3-tobi: Correct polarity for GPIO LED
->>    ARM: dts: omap3-overo: Add default trigger for TWL4030 LED
->>
->>   arch/arm/boot/dts/omap3-overo.dtsi |    1 +
->>   arch/arm/boot/dts/omap3-tobi.dts   |   50
->> +++++++++++++++++++++++++++++++++++-
->>   arch/arm/boot/dts/omap3.dtsi       |    1 +
->>   3 files changed, 51 insertions(+), 1 deletions(-)
->>
+  ARM: sunxi: dt: Register the pio node as interrupt controller (2013-06-10 17:35:51 +0200)
+
+are available in the git repository at:
+
+  git://github.com/mripard/linux.git tags/sunxi-dt-for-3.11-2
+
+for you to fetch changes up to d0f2677be5b49a1c1de59fe94faa96b7808be95f:
+
+  ARM: sunxi: Add Olimex A10s-Olinuxino-micro device tree (2013-06-19 11:01:39 +0200)
+
+----------------------------------------------------------------
+Allwinner SoCs DT additions for 3.11, part 2
+
+Mostly adds support for the i2c controllers and the Allwinner A10S SoC.
+
+----------------------------------------------------------------
+Emilio L?pez (1):
+      ARM: sun4i: cubieboard: Enable the i2c controllers
+
+Maxime Ripard (6):
+      ARM: sunxi: dt: Add i2c controller nodes to the DTSI
+      ARM: sun4i: dt: Add i2c muxing options
+      ARM: sun5i: dt: Add i2c muxing options
+      ARM: sun5i: olinuxino: Enable the i2c controllers
+      ARM: sunxi: dt: Add Allwinner A10s DTSI
+      ARM: sunxi: Add Olimex A10s-Olinuxino-micro device tree
+
+ arch/arm/boot/dts/Makefile                       |   1 +
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts       |  12 +
+ arch/arm/boot/dts/sun4i-a10.dtsi                 |  48 ++++
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  76 ++++++
+ arch/arm/boot/dts/sun5i-a10s.dtsi                | 286 +++++++++++++++++++++++
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts        |  18 ++
+ arch/arm/boot/dts/sun5i-a13.dtsi                 |  48 ++++
+ 7 files changed, 489 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+ create mode 100644 arch/arm/boot/dts/sun5i-a10s.dtsi
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
