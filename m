@@ -1,48 +1,229 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 19 Jun 2013 16:50:53 +0400
-Subject: [PATCH V3 09/11] USB: OHCI: Properly handle ohci-pxa27x suspend
-In-Reply-To: <1371643936-3314-10-git-send-email-manjunath.goudar@linaro.org>
-References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
- <1371643936-3314-1-git-send-email-manjunath.goudar@linaro.org>
- <1371643936-3314-10-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <51C1A92D.4080404@cogentembedded.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 19 Jun 2013 14:50:57 +0200
+Subject: [PATCH] ARM: EXYNOS: Fix incorrect usage of S5P_ARM_CORE1_*
+ registers
+In-Reply-To: <CANuQgHEd3L=F20Nrp3zWh2+uXvRU9P_KVN=1xr3RXnoGBsaHLw@mail.gmail.com>
+References: <1371569191-2364-1-git-send-email-t.figa@samsung.com>
+ <51C0A01E.5020206@samsung.com>
+ <CANuQgHEd3L=F20Nrp3zWh2+uXvRU9P_KVN=1xr3RXnoGBsaHLw@mail.gmail.com>
+Message-ID: <8974257.1Thh8U4Een@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-06-2013 16:12, Manjunath Goudar wrote:
+On Wednesday 19 of June 2013 17:39:21 Chander Kashyap wrote:
+> On 18 June 2013 23:29, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > On 06/19/13 02:45, Tomasz Figa wrote:
+> >> Ccing Arnd and Olof, because I forgot to add them to git send-email...
+> >> 
+> >> Sorry for the noise.
+> >> 
+> >> On Tuesday 18 of June 2013 17:26:31 Tomasz Figa wrote:
+> >>> S5P_ARM_CORE1_* registers affect only core 1. To control further
+> >>> cores
+> >>> properly another registers must be used.
+> >>> 
+> >>> This patch replaces S5P_ARM_CORE1_* register definitions with
+> >>> S5P_ARM_CORE_*(x) macro which return addresses of registers for
+> >>> specified core.
+> >>> 
+> >>> This fixes CPU hotplug on quad core Exynos SoCs on which currently
+> >>> offlining CPUs 2 or 3 caused CPU 1 to be turned off.
+> >> 
+> >> Obviously this doesn't happen currently because of the if (cpu == 1),
+> >> but> 
+> > Yes, not happened...and just note exynos5440 doesn't support hotplug :)
+> > so this is available on exynos4412 and added 5420.
+> > 
+> >> if logical cpu1 turned out not to be physical cpu1, then it would
+> >> crash.
+> >> 
+> >> Best regards,
+> >> Tomasz
+> >> 
+> >>> In addition,
+> >>> bring-up of CPU 2 and 3 is fixed on boards where bootloader powers
+> >>> off
+> >>> secondary cores by default.
+> > 
+> > I need to test on board about above...
+> > 
+> >>> Cc: stable at vger.kernel.org
+> >>> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+> >>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+> >>> ---
+> >>> 
+> >>>   arch/arm/mach-exynos/hotplug.c               |  9 +++++----
+> >>>   arch/arm/mach-exynos/include/mach/regs-pmu.h | 10 +++++++---
+> >>>   arch/arm/mach-exynos/platsmp.c               |  9 +++++----
+> >>>   3 files changed, 17 insertions(+), 11 deletions(-)
+> >>> 
+> >>> diff --git a/arch/arm/mach-exynos/hotplug.c
+> >>> b/arch/arm/mach-exynos/hotplug.c index af90cfa..c089943 100644
+> >>> --- a/arch/arm/mach-exynos/hotplug.c
+> >>> +++ b/arch/arm/mach-exynos/hotplug.c
+> >>> @@ -93,10 +93,11 @@ static inline void cpu_leave_lowpower(void)
+> >>> 
+> >>>   static inline void platform_do_lowpower(unsigned int cpu, int
+> >>> 
+> >>> *spurious) {
+> >>> 
+> >>>         for (;;) {
+> >>> 
+> >>> +               void __iomem *reg_base;
+> >>> +               unsigned int phys_cpu = cpu_logical_map(cpu);
+> >>> 
+> >>> -               /* make cpu1 to be turned off at next WFI command */
+> >>> -               if (cpu == 1)
+> >>> -                       __raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
+> >>> +               reg_base = S5P_ARM_CORE_CONFIGURATION(phys_cpu);
+> 
+> Tomasz,
+> This will break for non-zero, MPIDR value.  Say if MPIDR is 1 then for
+> cpu0 phys_cpu value will be 0x100,
+> and address calculation will be   (S5P_ARM_CORE0_CONFIGURATION +
+> ((0x101) * 0x80)), which is wrong.
 
-> Suspend scenario in case of ohci-pxa27x glue was not
-> properly handled as it was not suspending generic part
-> of ohci controller. Calling explicitly the ohci_suspend()
-> routine in ohci_hcd_pxa27x_drv_suspend() will ensure proper
-> handling of suspend scenario.
+Hmm, according to the code initializing __cpu_logical_map[] array this is 
+not true.
 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: linux-usb at vger.kernel.org
+Here's the code:
 
-> V2:
->   -Incase ohci_suspend() fails, return right away without
->    executing further.
-> V3:
->   -Aligned variable "do_wakeup" and "ret".
-> ---
->   drivers/usb/host/ohci-pxa27x.c |    8 +++++++-
->   1 file changed, 7 insertions(+), 1 deletion(-)
+https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/kernel/setup.c?id=refs/tags/next-20130619#n468
 
-> diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
-> index 3a9c01d..1dc2a72 100644
-> --- a/drivers/usb/host/ohci-pxa27x.c
-> +++ b/drivers/usb/host/ohci-pxa27x.c
-> @@ -564,13 +564,19 @@ static int ohci_hcd_pxa27x_drv_suspend(struct device *dev)
->   {
->   	struct usb_hcd *hcd = dev_get_drvdata(dev);
->   	struct pxa27x_ohci *ohci = to_pxa27x_ohci(hcd);
-> +	bool		do_wakeup = device_may_wakeup(dev);
-> +	int		ret;
+and for used macros and bitmasks:
 
-    And again, no variable name alignment was needed.
+https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/include/asm/cputype.h?id=refs/tags/next-20130619#n45
 
-WBR, Sergei
+Now the structure of the MPIDR register:
+
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388e/CIHEBGFG.html
+
+As you can see, the value read from the register in 
+smp_setup_processor_id() is only the physical CPU ID, so I don't see any 
+problem here.
+
+If I'm wrong, feel free to correct me.
+
+Cc'ing people who should have more knowledge on this.
+
+Best regards,
+Tomasz
+
+> >>> +               __raw_writel(0, reg_base);
+> >>> 
+> >>>                 /*
+> >>>                 
+> >>>                  * here's the WFI
+> >>> 
+> >>> @@ -106,7 +107,7 @@ static inline void platform_do_lowpower(unsigned
+> >>> int
+> >>> cpu, int *spurious)
+> >>> 
+> >>>                     : "memory", "cc");
+> >>> 
+> >>> -               if (pen_release == cpu_logical_map(cpu)) {
+> >>> +               if (pen_release == phys_cpu) {
+> >>> 
+> >>>                         /*
+> >>>                         
+> >>>                          * OK, proper wakeup, we're done
+> >>>                          */
+> >>> 
+> >>> diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h
+> >>> b/arch/arm/mach-exynos/include/mach/regs-pmu.h index 57344b7..cf40b86
+> >>> 100644
+> >>> --- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
+> >>> +++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+> >>> @@ -125,10 +125,14 @@
+> >>> 
+> >>>   #define S5P_GPS_ALIVE_LOWPWR                  S5P_PMUREG(0x13A0)
+> >>>   
+> >>>   #define S5P_ARM_CORE0_CONFIGURATION           S5P_PMUREG(0x2000)
+> >>> 
+> >>> +#define S5P_ARM_CORE0_STATUS                   S5P_PMUREG(0x2004)
+> >>> 
+> >>>   #define S5P_ARM_CORE0_OPTION                  S5P_PMUREG(0x2008)
+> >>> 
+> >>> -#define S5P_ARM_CORE1_CONFIGURATION            S5P_PMUREG(0x2080)
+> >>> -#define S5P_ARM_CORE1_STATUS                   S5P_PMUREG(0x2084)
+> >>> -#define S5P_ARM_CORE1_OPTION                   S5P_PMUREG(0x2088)
+> >>> +#define S5P_ARM_CORE_CONFIGURATION(_nr)                \
+> >>> +               (S5P_ARM_CORE0_CONFIGURATION + ((_nr) * 0x80))
+> >>> +#define S5P_ARM_CORE_STATUS(_nr)               \
+> >>> +               (S5P_ARM_CORE0_STATUS + ((_nr) * 0x80))
+> >>> +#define S5P_ARM_CORE_OPTION(_nr)               \
+> >>> +               (S5P_ARM_CORE0_OPTION + ((_nr) * 0x80))
+> >>> 
+> >>>   #define S5P_ARM_COMMON_OPTION                 S5P_PMUREG(0x2408)
+> >>>   #define S5P_TOP_PWR_OPTION                    S5P_PMUREG(0x2C48)
+> >>> 
+> >>> diff --git a/arch/arm/mach-exynos/platsmp.c
+> >>> b/arch/arm/mach-exynos/platsmp.c index d9c6d0a..2cbabc8 100644
+> >>> --- a/arch/arm/mach-exynos/platsmp.c
+> >>> +++ b/arch/arm/mach-exynos/platsmp.c
+> >>> @@ -109,14 +109,15 @@ static int __cpuinit
+> >>> exynos_boot_secondary(unsigned int cpu, struct task_struct */
+> >>> 
+> >>>         write_pen_release(phys_cpu);
+> >>> 
+> >>> -       if (!(__raw_readl(S5P_ARM_CORE1_STATUS)& 
+> >>> S5P_CORE_LOCAL_PWR_EN))>> 
+> >> {
+> >> 
+> >>> +       if (!(__raw_readl(S5P_ARM_CORE_STATUS(phys_cpu))
+> >>> +       &  S5P_CORE_LOCAL_PWR_EN)) {
+> >>> 
+> >>>                 __raw_writel(S5P_CORE_LOCAL_PWR_EN,
+> >>> 
+> >>> -                            S5P_ARM_CORE1_CONFIGURATION);
+> >>> +                            S5P_ARM_CORE_CONFIGURATION(phys_cpu));
+> >>> 
+> >>>                 timeout = 10;
+> >>>                 
+> >>>                 /* wait max 10 ms until cpu1 is on */
+> >>> 
+> >>> -               while ((__raw_readl(S5P_ARM_CORE1_STATUS)
+> >>> +               while ((__raw_readl(S5P_ARM_CORE_STATUS(phys_cpu))
+> 
+> Ditto
+> 
+> >>>                         &  S5P_CORE_LOCAL_PWR_EN) !=
+> >>> 
+> >>> S5P_CORE_LOCAL_PWR_EN)
+> >> 
+> >> {
+> >> 
+> >>>                         if (timeout-- == 0)
+> >>>                         
+> >>>                                 break;
+> >>> 
+> >>> @@ -125,7 +126,7 @@ static int __cpuinit
+> >>> exynos_boot_secondary(unsigned
+> >>> int cpu, struct task_struct }
+> >>> 
+> >>>                 if (timeout == 0) {
+> >>> 
+> >>> -                       printk(KERN_ERR "cpu1 power enable failed");
+> >>> +                       printk(KERN_ERR "cpu%u power enable failed",
+> >>> cpu);
+> >>> 
+> >>>                         spin_unlock(&boot_lock);
+> >>>                         return -ETIMEDOUT;
+> >>>                 
+> >>>                 }
+> >> 
+> >> --
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe
+> > linux-samsung-soc" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> --
+> with warm regards,
+> Chander Kashyap
+> --
+> To unsubscribe from this list: send the line "unsubscribe
+> linux-samsung-soc" in the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
