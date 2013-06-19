@@ -1,36 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Jun 2013 17:30:55 +0200
-Subject: [RFC/PATCH 11/11] ARM: msm: Move MSM's DT based hardware to
- multi-platform support
-In-Reply-To: <1371600281-6118-12-git-send-email-sboyd@codeaurora.org>
-References: <1371600281-6118-1-git-send-email-sboyd@codeaurora.org>
- <1371600281-6118-12-git-send-email-sboyd@codeaurora.org>
-Message-ID: <201306191730.55203.arnd@arndb.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 19 Jun 2013 11:37:56 -0400 (EDT)
+Subject: [RFC PATCH v1 1/6] USB: HCD: support giveback of URB in tasklet
+ context
+In-Reply-To: <CACVXFVNV=hSGGsY3oyuFR3SAzj4fTNa7Mf3aYEn35KvbqQ7Orw@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306191134170.2026-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 June 2013, Stephen Boyd wrote:
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 430c922..22d4fff 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -618,8 +618,9 @@ config ARCH_PXA
->         help
->           Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
->  
-> -config ARCH_MSM
-> +config ARCH_MSM_NODT
->         bool "Qualcomm MSM"
-> +       select ARCH_MSM
->         select ARCH_REQUIRE_GPIOLIB
->         select CLKDEV_LOOKUP
->         select CLKSRC_OF if OF
+On Wed, 19 Jun 2013, Ming Lei wrote:
 
+> >> @@ -835,9 +839,11 @@ static int usb_rh_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
+> >>                       hcd->status_urb = NULL;
+> >>                       usb_hcd_unlink_urb_from_ep(hcd, urb);
+> >>
+> >> -                     spin_unlock(&hcd_root_hub_lock);
+> >> +                     if (!hcd_giveback_urb_in_bh(hcd))
+> >> +                             spin_unlock(&hcd_root_hub_lock);
+> >>                       usb_hcd_giveback_urb(hcd, urb, status);
+> >> -                     spin_lock(&hcd_root_hub_lock);
+> >> +                     if (!hcd_giveback_urb_in_bh(hcd))
+> >> +                             spin_lock(&hcd_root_hub_lock);
+> >>               }
+> >>       }
+> >>   done:
+> >
+> > None of these tests are necessary.  Root hubs are different from normal
+> > devices; their URBs are handled mostly by usbcore.  The only part done
+> > by the HCD is always synchronous.  And we know that root-hub URBs
+> 
+> Looks not always synchronous, control transfer is synchronous, and
+> interrupt transfer is still asynchronous. No drivers(hub, usbfs) depend
+> on that,  and IMO, treating root hub same as hub will simplify HCD core,
+> and finally we can remove all the above lock releasing & acquiring if
+> all HCDs set HCD_BH.
+> 
+> Also there is very less roothub transfers and always letting tasklet
+> handle URB giveback of roothub won't have performance problem, so
+> how about keeping the above tests?
+  
+If you want to use the tasklets for root-hub URBs, okay.  There's no
+reason to check the HCD_BH flag, though, because HCDs have only minimal
+involvement in root-hub URBs.  In particular, HCD's don't call
+usb_hcd_giveback_urb() for them.
+  
+So you can use the tasklets for _all_ root-hub URBs.  Then the tests   
+above aren't necessary, and neither are the spinlock operations.
 
-I think you have to adapt your defconfig after this change.
+> >> @@ -2573,6 +2687,16 @@ int usb_add_hcd(struct usb_hcd *hcd,
+> >>                       && device_can_wakeup(&hcd->self.root_hub->dev))
+> >>               dev_dbg(hcd->self.controller, "supports USB remote wakeup\n");
+> >>
+> >> +     if (usb_hcd_is_primary_hcd(hcd)) {
+> >> +             retval = init_giveback_urb_bh(hcd);
+> >> +             if (retval)
+> >> +                     goto err_init_giveback_bh;
+> >> +     } else {
+> >> +             /* share tasklet handling with primary hcd */
+> >> +             hcd->async_bh = hcd->primary_hcd->async_bh;
+> >> +             hcd->periodic_bh = hcd->primary_hcd->periodic_bh;
+> >> +     }
+> >
+> > Is there any reason why a secondary HCD can't have its own tasklets?
+> 
+> I didn't do that because both primary and secondary HCDs share one
+> hard interrupt handler, so basically there is no obvious advantage to
+> do that.
 
-I'd suggest enabling all drivers for DT-based booting in
-multi_v7_defconfig, and changing msm_defconfig to select
-ARCH_MSM_NODT.
+If the bh structures are embedded directly in the hcd structure, it 
+won't be possible for a secondary hcd to share its tasklets with the 
+primary hcd.  Not sharing seems simpler, and there's no obvious 
+disadvantage either.
 
-	Arnd
+Alan Stern
