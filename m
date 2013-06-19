@@ -1,133 +1,85 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 19 Jun 2013 13:44:53 +0100
-Subject: [PATCH 3/3] ARM: Cortex-A15: fix erratum 798181 implementation
+Date: Wed, 19 Jun 2013 13:44:51 +0100
+Subject: [PATCH 1/3] ARM: let the ASID allocator handle suspended animation
 In-Reply-To: <1371645893-7630-1-git-send-email-marc.zyngier@arm.com>
 References: <1371645893-7630-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1371645893-7630-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1371645893-7630-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looking into the active_asids array is not enough, as we also need
-to look into the reserved_asids array (they both represent processes
-that are currently running).
+When a CPU is running a process, the ASID for that process is
+held in a per-CPU variable (the "active ASIDs" array). When
+the ASID allocator handles a rollover, it copies the active
+ASIDs into a "reserved ASIDs" array to ensure that a process
+currently running on another CPU will continue to run unaffected.
+The active array is zero-ed to indicate that a rollover occurred.
 
-Also, not holding the ASID allocator lock is racy, as another CPU
-could schedule that process and trigger a rollover, making the erratum
-workaround miss an IPI.
+Because of this mechanism, a reserved ASID is only remembered for
+a single rollover. A subsequent rollover will completely refill
+the reserved ASIDs array.
 
-Exposing this outside of context.c is a little ugly on the side, so
-let's define a new entry point that the erratum workaround can call
-to obtain the cpumask.
+In a severely oversubscribed environment where a CPU can be
+prevented from running for extended periods of time (think virtual
+machines), the above has a horrible side effect:
+
+[P{a} denotes process P running with ASID a]
+
+	CPU-0		CPU-1
+
+	A{x}				[active = <x 0>]
+
+	[suspended]	runs B{y}	[active = <x y>]
+
+					[rollover:
+					 active = <0 0>
+					 reserved = <x y>]
+
+			runs B{y}	[active = <0 y>
+					 reserved = <x y>]
+
+					[rollover:
+					 active = <0 0>
+					 reserved = <0 y>]
+
+			runs C{x}	[active = <0 x>]
+
+	[resumes]
+
+	runs A{x}
+
+At that stage, both A and C have the same ASID, with deadly
+consequences.
+
+The fix is to preserve reserved ASIDs across rollovers if
+the CPU doesn't have an active ASID when the rollover occurs.
 
 Cc: <stable@vger.kernel.org> # 3.9
 Acked-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Catalin Carinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/mmu_context.h | 10 +++++++++-
- arch/arm/kernel/smp_tlb.c          | 18 ++----------------
- arch/arm/mm/context.c              | 29 ++++++++++++++++++++++++++++-
- 3 files changed, 39 insertions(+), 18 deletions(-)
+ arch/arm/mm/context.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
-index a7b85e0..dc90203 100644
---- a/arch/arm/include/asm/mmu_context.h
-+++ b/arch/arm/include/asm/mmu_context.h
-@@ -27,7 +27,15 @@ void __check_vmalloc_seq(struct mm_struct *mm);
- void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk);
- #define init_new_context(tsk,mm)	({ atomic64_set(&mm->context.id, 0); 0; })
- 
--DECLARE_PER_CPU(atomic64_t, active_asids);
-+#ifdef CONFIG_ARM_ERRATA_798181
-+void a15_erratum_get_cpumask(int this_cpu, struct mm_struct *mm,
-+			     cpumask_t *mask);
-+#else  /* !CONFIG_ARM_ERRATA_798181 */
-+static inline void a15_erratum_get_cpumask(int this_cpu, struct mm_struct *mm,
-+					   cpumask_t *mask)
-+{
-+}
-+#endif /* CONFIG_ARM_ERRATA_798181 */
- 
- #else	/* !CONFIG_CPU_HAS_ASID */
- 
-diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
-index 9a52a07..a98b62d 100644
---- a/arch/arm/kernel/smp_tlb.c
-+++ b/arch/arm/kernel/smp_tlb.c
-@@ -103,7 +103,7 @@ static void broadcast_tlb_a15_erratum(void)
- 
- static void broadcast_tlb_mm_a15_erratum(struct mm_struct *mm)
- {
--	int cpu, this_cpu;
-+	int this_cpu;
- 	cpumask_t mask = { CPU_BITS_NONE };
- 
- 	if (!erratum_a15_798181())
-@@ -111,21 +111,7 @@ static void broadcast_tlb_mm_a15_erratum(struct mm_struct *mm)
- 
- 	dummy_flush_tlb_a15_erratum();
- 	this_cpu = get_cpu();
--	for_each_online_cpu(cpu) {
--		if (cpu == this_cpu)
--			continue;
--		/*
--		 * We only need to send an IPI if the other CPUs are running
--		 * the same ASID as the one being invalidated. There is no
--		 * need for locking around the active_asids check since the
--		 * switch_mm() function has at least one dmb() (as required by
--		 * this workaround) in case a context switch happens on
--		 * another CPU after the condition below.
--		 */
--		if (atomic64_read(&mm->context.id) ==
--		    atomic64_read(&per_cpu(active_asids, cpu)))
--			cpumask_set_cpu(cpu, &mask);
--	}
-+	a15_erratum_get_cpumask(this_cpu, mm, &mask);
- 	smp_call_function_many(&mask, ipi_flush_tlb_a15_erratum, NULL, 1);
- 	put_cpu();
- }
 diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 83e0905..eeab06e 100644
+index 2ac3737..8e12fcb 100644
 --- a/arch/arm/mm/context.c
 +++ b/arch/arm/mm/context.c
-@@ -45,10 +45,37 @@ static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
- static atomic64_t asid_generation = ATOMIC64_INIT(ASID_FIRST_VERSION);
- static DECLARE_BITMAP(asid_map, NUM_USER_ASIDS);
- 
--DEFINE_PER_CPU(atomic64_t, active_asids);
-+static DEFINE_PER_CPU(atomic64_t, active_asids);
- static DEFINE_PER_CPU(u64, reserved_asids);
- static cpumask_t tlb_flush_pending;
- 
-+#ifdef CONFIG_ARM_ERRATA_798181
-+void a15_erratum_get_cpumask(int this_cpu, struct mm_struct *mm,
-+			     cpumask_t *mask)
-+{
-+	int cpu;
-+	unsigned long flags;
-+	u64 context_id, asid;
-+
-+	raw_spin_lock_irqsave(&cpu_asid_lock, flags);
-+	context_id = mm->context.id.counter;
-+	for_each_online_cpu(cpu) {
-+		if (cpu == this_cpu)
-+			continue;
-+		/*
-+		 * We only need to send an IPI if the other CPUs are
-+		 * running the same ASID as the one being invalidated.
-+		 */
-+		asid = per_cpu(active_asids, cpu).counter;
-+		if (asid == 0)
-+			asid = per_cpu(reserved_asids, cpu);
-+		if (context_id == asid)
-+			cpumask_set_cpu(cpu, mask);
-+	}
-+	raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
-+}
-+#endif
-+
- #ifdef CONFIG_ARM_LPAE
- static void cpu_set_reserved_ttbr0(void)
- {
+@@ -128,6 +128,15 @@ static void flush_context(unsigned int cpu)
+ 			asid = 0;
+ 		} else {
+ 			asid = atomic64_xchg(&per_cpu(active_asids, i), 0);
++			/*
++			 * If this CPU has already been through a
++			 * rollover, but hasn't run another task in
++			 * the meantime, we must preserve its reserved
++			 * ASID, as this is the only trace we have of
++			 * the process it is still running.
++			 */
++			if (asid == 0)
++				asid = per_cpu(reserved_asids, i);
+ 			__set_bit(ASID_TO_IDX(asid), asid_map);
+ 		}
+ 		per_cpu(reserved_asids, i) = asid;
 -- 
 1.8.2.3
