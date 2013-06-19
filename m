@@ -1,47 +1,49 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 19 Jun 2013 17:30:00 +0100
-Subject: [PATCH 3/6] ARM: add atag32_to_cpu() function
+Date: Wed, 19 Jun 2013 17:29:59 +0100
+Subject: [PATCH 2/6] ARM: fixup head for atag verification
 In-Reply-To: <1371659404-20167-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1371659404-20167-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1371659404-20167-4-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1371659404-20167-3-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add atag32_to_cpu() function to allow code manipulating ATAGs to deal
-with the case where the boot-loader was in little-endian and Linux is
-running big-endian.
+If we booted LE but running BE8, ensure we read ATAGs data from head code
+in the correct mode.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/include/uapi/asm/setup.h |   11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/kernel/head-common.S |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/include/uapi/asm/setup.h b/arch/arm/include/uapi/asm/setup.h
-index 979ff40..d3b3fa1 100644
---- a/arch/arm/include/uapi/asm/setup.h
-+++ b/arch/arm/include/uapi/asm/setup.h
-@@ -175,13 +175,20 @@ struct tagtable {
- 
- #define tag_member_present(tag,member)				\
- 	((unsigned long)(&((struct tag *)0L)->member + 1)	\
--		<= (tag)->hdr.size * 4)
-+		<= atag32_to_cpu((tag)->hdr.size) * 4)
- 
--#define tag_next(t)	((struct tag *)((__u32 *)(t) + (t)->hdr.size))
-+#define tag_next(t)	((struct tag *)((__u32 *)(t) + atag32_to_cpu((t)->hdr.size)))
- #define tag_size(type)	((sizeof(struct tag_header) + sizeof(struct type)) >> 2)
- 
- #define for_each_tag(t,base)		\
- 	for (t = base; t->hdr.size; t = tag_next(t))
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 5b391a6..ae73ffe 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -21,6 +21,12 @@
+ #define OF_DT_MAGIC 0xedfe0dd0 /* 0xd00dfeed in big-endian */
+ #endif
  
 +#ifdef CONFIG_CPU_BE8_BOOT_LE
-+#define atag32_to_cpu(x)	le32_to_cpu(x)
-+#define cpu_to_atag32(x)	cpu_to_le32(x)
++#define BE8_LE(x...)	x
 +#else
-+#define	cpu_to_atag32(x)	x
-+#define atag32_to_cpu(x)	x
++#define BE8_LE(x...)
 +#endif
- 
- #endif /* _UAPI__ASMARM_SETUP_H */
++
+ /*
+  * Exception handling.  Something went wrong and we can't proceed.  We
+  * ought to tell the user, but since we don't have any guarantee that
+@@ -53,10 +59,12 @@ __vet_atags:
+ 	cmp	r5, r6
+ 	beq	2f
+ #endif
++BE8_LE(	rev	r5, r5 )
+ 	cmp	r5, #ATAG_CORE_SIZE		@ is first tag ATAG_CORE?
+ 	cmpne	r5, #ATAG_CORE_SIZE_EMPTY
+ 	bne	1f
+ 	ldr	r5, [r2, #4]
++BE8_LE(	rev	r5, r5 )
+ 	ldr	r6, =ATAG_CORE
+ 	cmp	r5, r6
+ 	bne	1f
 -- 
 1.7.10.4
