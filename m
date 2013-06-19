@@ -1,17 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jun 2013 01:41:20 +0200
-Subject: [GIT PULL] arm-soc: Xilinx Zynq cleanups for v3.11
-In-Reply-To: <51BEA91F.2000305@monstr.eu>
-References: <51BEA91F.2000305@monstr.eu>
-Message-ID: <201306200141.20609.arnd@arndb.de>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Thu, 20 Jun 2013 07:43:29 +0800
+Subject: [PATCH -next] ARM: OMAP1: remove duplicated include from
+ board-voiceblue.c
+Message-ID: <CAPgLHd8t3h03XAzgge8aif-fkGBxqE21hDfThh6neF0WzKJK3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 June 2013, Michal Simek wrote:
-> please pull the following changes to your arm-soc tree.
-> There are just two cleanup patches.
-> 
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Pulled into next/cleanup, thanks!
+Remove duplicated include.
 
-	Arnd
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ arch/arm/mach-omap1/board-voiceblue.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap1/board-voiceblue.c b/arch/arm/mach-omap1/board-voiceblue.c
+index 4677a9c..4b382a0 100644
+--- a/arch/arm/mach-omap1/board-voiceblue.c
++++ b/arch/arm/mach-omap1/board-voiceblue.c
+@@ -26,7 +26,6 @@
+ #include <linux/serial_reg.h>
+ #include <linux/smc91x.h>
+ #include <linux/export.h>
+-#include <linux/reboot.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
