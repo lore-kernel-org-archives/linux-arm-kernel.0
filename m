@@ -1,28 +1,112 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 19 Jun 2013 11:27:50 +0100
-Subject: [PATCH] ARM: kernel: document ARM CPUs clock-frequency property
-In-Reply-To: <20130619100450.GA27181@e106331-lin.cambridge.arm.com>
-References: <1371635237-22860-1-git-send-email-f.fainelli@gmail.com>
- <20130619100450.GA27181@e106331-lin.cambridge.arm.com>
-Message-ID: <CAGVrzcY8oxZ7zUbThvXgsVyEGBCsxcvu4R0it_9s9wsKkJ3W0w@mail.gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 19 Jun 2013 05:36:00 -0500
+Subject: [PATCH 1/1] arm: add bandgap DT entry for OMAP5
+In-Reply-To: <1371609398-26454-1-git-send-email-eduardo.valentin@ti.com>
+References: <1371609398-26454-1-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <51C18990.8000109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+Hi Eduardo,
 
-2013/6/19 Mark Rutland <mark.rutland@arm.com>:
-> On Wed, Jun 19, 2013 at 10:47:17AM +0100, Florian Fainelli wrote:
->> ARM CPU device tree nodes may contain an optional clock-frequency
->> property, when set, this property must contain the CPU frequency in Hz,
->> which is then used by the topology parsing code in
->> arch/arm/kernel/topology.c to infer the CPU capacity.
+On 06/18/2013 09:36 PM, Eduardo Valentin wrote:
+> Add bandgap device DT entry for OMAP5 dtsi.
 >
-> I see that arch/arm/kernel/topology.c does a pr_err when clock-frequency isn't
-> present. If we're documenting it as optional, should we not downgrade that or
-> remove it entirely?
+> Cc: "Beno??t Cousson" <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-omap at vger.kernel.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+> Signed-off-by: J Keerthy <j-keerthy@ti.com>
+> ---
+>   arch/arm/boot/dts/omap5.dtsi | 8 ++++++++
+>   1 file changed, 8 insertions(+)
+> ---
+>
+> Benoit,
+>
+> Sorry for this very late request, but can you please consider
+> these patches for 3.11 still?
+>
+> I completely forgot to send these on my "Enable TI SoC thermal driver" series.
+>
+> All best,
+>
+> Eduardo
+>
+> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+> index 2ad63c4..5ede6e1 100644
+> --- a/arch/arm/boot/dts/omap5.dtsi
+> +++ b/arch/arm/boot/dts/omap5.dtsi
+> @@ -615,5 +615,13 @@
+>   			interrupts = <0 80 0x4>;
+>   			ti,hwmods = "wd_timer2";
+>   		};
 
-Good question. I think it might be good to just dowgrade the error to
-a simple warning, we should clearly be fixing the binding if we have a
-device_type = "cpu" property but no clock-frequency property.
---
-Florian
+missing blank line
+
+> +		bandgap {
+
+You must use the first address in that case. Otherwise DT will affect a random number and provide a non-standard device name. That does not really matter in theory, but it will looks ugly in the /sys/devices list.
+
+> +			reg = <0x4a0021e0 0xc
+> +				0x4a00232c 0xc
+> +				0x4a002380 0x2c
+> +				0x4a0023C0 0x3c>;
+> +				interrupts = <0 126 4>; /* talert */
+
+Not well aligned and should use the macros.
+
+> +			compatible = "ti,omap5430-bandgap";
+> +		};
+>   	};
+>   };
+>
+
+I did the update for you :-)
+
+Here is the version I've just applied.
+
+Benoit
+
+
+>From f0160bb93467e22f2f8bc77591dcd7e35cdee999 Mon Sep 17 00:00:00 2001
+From: Eduardo Valentin <eduardo.valentin@ti.com>
+Date: Tue, 18 Jun 2013 22:36:38 -0400
+Subject: [PATCH] ARM: dts: Add bandgap DT entry for OMAP5
+
+Add bandgap device DT entry for OMAP5 dtsi.
+
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+Signed-off-by: J Keerthy <j-keerthy@ti.com>
+Signed-off-by: Benoit Cousson <benoit.cousson@linaro.org>
+---
+ arch/arm/boot/dts/omap5.dtsi |    9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index accab62..47693c9 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -696,5 +696,14 @@
+ 				interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 		};
++
++		bandgap at 4a0021e0 {
++			reg = <0x4a0021e0 0xc
++			       0x4a00232c 0xc
++			       0x4a002380 0x2c
++			       0x4a0023C0 0x3c>;
++			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>;
++			compatible = "ti,omap5430-bandgap";
++		};
+ 	};
+ };
+-- 
+1.7.9.5
