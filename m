@@ -1,38 +1,69 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 19 Jun 2013 11:29:00 +0200
-Subject: [PATCH 0/4] ARM: dts: OMAP3: Updates for Overo
-In-Reply-To: <1370962189-9689-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1370962189-9689-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <51C179DC.9040605@epfl.ch>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 19 Jun 2013 11:29:18 +0200
+Subject: DMA mapping API(IOMMU) for ARM64?
+In-Reply-To: <20130618125054.GL9930@arm.com>
+References: <20130618.053955.305832937374936961.hdoyu@nvidia.com>
+ <20130618101914.GB3539@mudshark.cambridge.arm.com>
+ <5159282.rrJMaZuYMv@wuerfel>
+ <20130618.140137.1551430695673122122.hdoyu@nvidia.com>
+ <20130618125054.GL9930@arm.com>
+Message-ID: <51C179EE.5030609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Benoit,
+Hello,
 
-Any comments on this series?
+On 6/18/2013 2:50 PM, Catalin Marinas wrote:
+> On Tue, Jun 18, 2013 at 12:01:37PM +0100, Hiroshi Doyu wrote:
+> > Arnd Bergmann <arnd@arndb.de> wrote @ Tue, 18 Jun 2013 12:32:44 +0200:
+> > > On Tuesday 18 June 2013 11:19:14 Will Deacon wrote:
+> > > > I've spoken briefly with Catalin about this and it seems like there might be
+> > > > *some* scope for sharing common dma-mapping code between architectures.
+> > > > There doesn't really need to be any architecture-specific details in
+> > > > allocating iova space and the interface to the iommu drivers is
+> > > > well-defined. The arch-specific stuff is bogged down in the non-coherent
+> > > > buffer management, but that doesn't necessarily equate to lots of code.
+> > > >
+> > > > So, the best bet would be to figure out how to split up what we have under
+> > > > arch/arm/ so that it can be re-used by arm64 and potentially other
+> > > > architectures (powerpc has some simple stuff for coherent mappings and some
+> > > > less-simple stuff for non-coherent buffers).
+> > >
+> > > I'm sure that other architectures are interested in sharing the code.
+> > > Best move it into the global mm/ directory, at least the version for
+> > > coherent mappings.
+> >
+> > I'm guessing that this kind of unification usually takes some time
+> > since we need to factor out the common code from the different
+> > ${ARCH}/mm/dma-mapping.c. Also some of ${ARCH} has IOMMU support in
+> > it. So if we want to develop our 64-bit ARM with working DMA mapping
+> > API during this transition, the step to take would be:
+> >
+> > 1, Copy arch/arm/mm/dma-mapping.c arch/arm64/mm/dma-mapping.c(+swiotlb)
+> > 2, Adapt arch/arm64/mm/dma-mapping.c(+swiotlb) to 64bit compatible.
+> > 3, Factor out the common code from them into mm/dma-mapping.c
+>
+> Or add the relevant code to something like lib/iommu-helper.c, convert
+> arm64 to use that and we can work on converting arm and other
+> architectures afterwards.
 
-Regards,
-Florian
+I think that this would be the best way of providing iommu support for 
+dma mapping
+subsystem(s). I initially put it in arm/mm/dma-mapping.c because it was 
+the first
+approach of integrating generic IOMMU with DMA-mapping and it was simply 
+easier to
+have all the code in one place. Now, when second client of such approach 
+comes, it
+should be much easier to identify which part of the code is common and 
+which one is
+specific to particular implementation. Feel free to ask any questions if 
+you need
+help. I don't have access to any ARM64 machine or simulator, so I can 
+only review
+the code.
 
-On 06/11/2013 04:49 PM, Florian Vaussard wrote:
-> Hello,
->
-> This series performs several updates to omap3-overo and omap3-tobi.
-> Patch 1 is necessary to patch 2 for the IRQ constant. The SMSC911X is
-> largely taken from omap3-igep.
->
-> Regards,
->
-> Florian
->
-> Florian Vaussard (4):
->    ARM: dts: OMAP3: Include IRQ header
->    ARM: dts: omap3-tobi: Add SMSC911X node
->    ARM: dts: omap3-tobi: Correct polarity for GPIO LED
->    ARM: dts: omap3-overo: Add default trigger for TWL4030 LED
->
->   arch/arm/boot/dts/omap3-overo.dtsi |    1 +
->   arch/arm/boot/dts/omap3-tobi.dts   |   50 +++++++++++++++++++++++++++++++++++-
->   arch/arm/boot/dts/omap3.dtsi       |    1 +
->   3 files changed, 51 insertions(+), 1 deletions(-)
->
+Best regards
+-- 
+Marek Szyprowski
+Samsung R&D Institute Poland
