@@ -1,112 +1,65 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 19 Jun 2013 23:54:37 +0400
-Subject: [PATCH v2 6/7] drivers: bus: imx-weim: Add support for
- i.MX1/21/25/27/31/35/50/51/53
-In-Reply-To: <1371671678-6345-1-git-send-email-shc_work@mail.ru>
-References: <1371671678-6345-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1371671678-6345-6-git-send-email-shc_work@mail.ru>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 19 Jun 2013 14:02:02 -0600
+Subject: [PATCH] pinctrl: document the pinctrl PM states
+In-Reply-To: <20130617072021.GB4465@atomide.com>
+References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
+ <51BA1FE7.4000900@wwwdotorg.org>
+ <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
+ <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
+Message-ID: <51C20E3A.8090304@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06/17/2013 01:20 AM, Tony Lindgren wrote:
+...
+> First, I think the concept of remuxing (or even checking) _all_ the pins
+> for a consumer device is wrong on most if not all hardware. For past 10
+> years I have not seen a case where _all_ the pins for a device would need
+> to be remuxed for any reason.
+> 
+> This means the named states "default", "idle" and "sleep" cannot represent
+> the needs of hardware. So need to have a bit finer granularity for this.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- Documentation/devicetree/bindings/bus/imx-weim.txt | 11 +++++++----
- drivers/bus/Kconfig                                |  4 ++--
- drivers/bus/imx-weim.c                             | 23 ++++++++++++++++++++++
- 3 files changed, 32 insertions(+), 6 deletions(-)
+Well, I don't think that's quite true.
 
-diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
-index cedc2a9..99406e4 100644
---- a/Documentation/devicetree/bindings/bus/imx-weim.txt
-+++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
-@@ -8,7 +8,7 @@ The actual devices are instantiated from the child nodes of a WEIM node.
- 
- Required properties:
- 
-- - compatible:		Should be set to "fsl,imx6q-weim"
-+ - compatible:		Should be set to "fsl,<soc>-weim"
-  - reg:			A resource specifier for the register space
- 			(see the example below)
-  - clocks:		the clock, see the example below.
-@@ -21,11 +21,14 @@ Required properties:
- 
- Timing property for child nodes. It is mandatory, not optional.
- 
-- - fsl,weim-cs-timing:	The timing array, contains 6 timing values for the
-+ - fsl,weim-cs-timing:	The timing array, contains timing values for the
- 			child node. We can get the CS index from the child
--			node's "reg" property. This property contains the values
--			for the registers EIM_CSnGCR1, EIM_CSnGCR2, EIM_CSnRCR1,
-+			node's "reg" property. For example, if i.MX6Q CPU
-+			is used, this property contains the values for the
-+			registers EIM_CSnGCR1, EIM_CSnGCR2, EIM_CSnRCR1,
- 			EIM_CSnRCR2, EIM_CSnWCR1, EIM_CSnWCR2 in this order.
-+			For other i.MX CPUs count of register and register
-+			names may be different.
- 
- Example for an imx6q-sabreauto board, the NOR flash connected to the WEIM:
- 
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 1f70e84..4faedc21 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -8,10 +8,10 @@ config IMX_WEIM
- 	bool "Freescale EIM DRIVER"
- 	depends on ARCH_MXC
- 	help
--	  Driver for i.MX6 WEIM controller.
-+	  Driver for i.MX WEIM controller.
- 	  The WEIM(Wireless External Interface Module) works like a bus.
- 	  You can attach many different devices on it, such as NOR, onenand.
--	  But now, we only support the Parallel NOR.
-+	  But now, we only support the "of_physmap" driver.
- 
- config MVEBU_MBUS
- 	bool
-diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-index b6479fb..77fa1d4 100644
---- a/drivers/bus/imx-weim.c
-+++ b/drivers/bus/imx-weim.c
-@@ -17,6 +17,17 @@ struct imx_weim_devtype {
- 	unsigned int	cs_regs_count;
- 	unsigned int	cs_stride;
- };
-+static const struct imx_weim_devtype imx1_weim_devtype = {
-+	.cs_count	= 6,
-+	.cs_regs_count	= 2,
-+	.cs_stride	= 0x08,
-+};
-+
-+static const struct imx_weim_devtype imx25_weim_devtype = {
-+	.cs_count	= 6,
-+	.cs_regs_count	= 3,
-+	.cs_stride	= 0x10,
-+};
- 
- static const struct imx_weim_devtype imx50_weim_devtype = {
- 	.cs_count	= 4,
-@@ -24,9 +35,21 @@ static const struct imx_weim_devtype imx50_weim_devtype = {
- 	.cs_stride	= 0x18,
- };
- 
-+static const struct imx_weim_devtype imx51_weim_devtype = {
-+	.cs_count	= 6,
-+	.cs_regs_count	= 6,
-+	.cs_stride	= 0x18,
-+};
-+
- static const struct of_device_id weim_id_table[] = {
-+	/* i.MX1/21 */
-+	{ .compatible = "fsl,imx1-weim", .data = &imx1_weim_devtype, },
-+	/* i.MX25/27/31/35 */
-+	{ .compatible = "fsl,imx25-weim", .data = &imx25_weim_devtype, },
- 	/* i.MX50/53/6Q */
- 	{ .compatible = "fsl,imx6q-weim", .data = &imx50_weim_devtype, },
-+	/* i.MX51 */
-+	{ .compatible = "fsl,imx51-weim", .data = &imx51_weim_devtype, },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, weim_id_table);
--- 
-1.8.1.5
+We can certainly list configurations for all pins in each of those 3
+states without any issue.
+
+The only issue here is whether the data is normalized or not. By listing
+the entire configuration in each state, it's not really normalized.
+
+By separating the static and dynamic parts into separate states as you
+propose below, it is more normalized.
+
+However, the final configuration of HW is the same either way, and hence
+the overall configuration.
+
+> Below are the pin remuxing cases I'm aware of:
+...
+> Then for dealing with the above examples, I think we already have a
+> pretty good setup in pinctrl framework to deal with this with the
+> named modes. But I think that to do this properly with the named
+> modes we should have named modes like the following:
+> 
+> "static" && ("active" || "idle")
+> "static" && ("rx" || "tx")
+> 
+> Here the "static" pins would be set during driver probe and never
+> need to change until the driver is unloaded. This is close to what we
+> currently call "default". But we should probably make it clear that
+> these will not change to avoid confusion. See below for more info.
+> 
+> The the non-static states like "active"/"idle", or "rx"/"tx", can
+> be set in addition to "static", but they should not be subsets of
+> "static" to avoid the issues Stephen described earlier. This way we
+> allow the named modes to do the work for us while protecting the
+> claimed pins.
+
+Yes, I think this can certainly work conceptually. It's equivalent to
+pre-computing which parts of the overall state don't change between the
+currently-defined "global" active/idle states and then applying the
+diffs at runtime - rather like what I suggested before, but without the
+pinctrl code having to do the diff at runtime. I'm not sure if I have
+(yet) a strong opinion on whether allowing multiple states to be active
+at once (i.e. static plus active) is the correct way to go. Maybe once
+I've finished reading the thread...
