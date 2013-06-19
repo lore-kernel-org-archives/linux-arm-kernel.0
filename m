@@ -1,93 +1,113 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 19 Jun 2013 05:37:24 -0500
-Subject: [PATCH] ARM: dts: AM43x EPOS EVM support
-In-Reply-To: <1371218614-26311-1-git-send-email-afzal@ti.com>
-References: <1371218614-26311-1-git-send-email-afzal@ti.com>
-Message-ID: <51C189E4.3050608@ti.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Wed, 19 Jun 2013 19:44:20 +0900
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <1371637326.4230.24.camel@weser.hi.pengutronix.de>
+References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
+ <1371467722-665-1-git-send-email-inki.dae@samsung.com>
+ <51BEF458.4090606@canonical.com>
+ <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
+ <20130617133109.GG2718@n2100.arm.linux.org.uk>
+ <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
+ <20130617154237.GJ2718@n2100.arm.linux.org.uk>
+ <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
+ <20130617182127.GM2718@n2100.arm.linux.org.uk>
+ <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
+ <20130618084308.GU2718@n2100.arm.linux.org.uk>
+ <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
+ <1371548849.4276.6.camel@weser.hi.pengutronix.de>
+ <008601ce6cb0$2c8cec40$85a6c4c0$%dae@samsung.com>
+ <1371637326.4230.24.camel@weser.hi.pengutronix.de>
+Message-ID: <00ae01ce6cd9$f4834630$dd89d290$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
 
-On 06/14/2013 09:03 AM, Afzal Mohammed wrote:
-> Add AM43x ePOS EVM minimal DT source - this is a minimal one to get
-> it booting. Also include it in omap2plus dtbs and document bindings.
-> The hardware is under development.
->
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
->
-> Hi Benoit,
->
-> This is based on your for_3.11/dts branch.
->
-> Ideally I wanted to split this into 3 patches - first doc, second dts
-> and last adding build support. As changes in total is trivial, it was
-> made a single one.
 
-That's fine for me. I've just applied it.
+> -----Original Message-----
+> From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> Sent: Wednesday, June 19, 2013 7:22 PM
+> To: Inki Dae
+> Cc: 'Russell King - ARM Linux'; 'linux-fbdev'; 'Kyungmin Park'; 'DRI
+> mailing list'; 'myungjoo.ham'; 'YoungJun Cho'; linux-arm-
+> kernel at lists.infradead.org; linux-media at vger.kernel.org
+> Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+> framework
+> 
+> Am Mittwoch, den 19.06.2013, 14:45 +0900 schrieb Inki Dae:
+> >
+> > > -----Original Message-----
+> > > From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> > > Sent: Tuesday, June 18, 2013 6:47 PM
+> > > To: Inki Dae
+> > > Cc: 'Russell King - ARM Linux'; 'linux-fbdev'; 'Kyungmin Park'; 'DRI
+> > > mailing list'; 'myungjoo.ham'; 'YoungJun Cho'; linux-arm-
+> > > kernel at lists.infradead.org; linux-media at vger.kernel.org
+> > > Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer
+> synchronization
+> > > framework
+> > >
+> > > Am Dienstag, den 18.06.2013, 18:04 +0900 schrieb Inki Dae:
+> > > [...]
+> > > >
+> > > > > a display device driver.  It shouldn't be used within a single
+> driver
+> > > > > as a means of passing buffers between userspace and kernel space.
+> > > >
+> > > > What I try to do is not really such ugly thing. What I try to do is
+> to
+> > > > notify that, when CPU tries to access a buffer , to kernel side
+> through
+> > > > dmabuf interface. So it's not really to send the buffer to kernel.
+> > > >
+> > > > Thanks,
+> > > > Inki Dae
+> > > >
+> > > The most basic question about why you are trying to implement this
+> sort
+> > > of thing in the dma_buf framework still stands.
+> > >
+> > > Once you imported a dma_buf into your DRM driver it's a GEM object and
+> > > you can and should use the native DRM ioctls to prepare/end a CPU
+> access
+> > > to this BO. Then internally to your driver you can use the dma_buf
+> > > reservation/fence stuff to provide the necessary cross-device sync.
+> > >
+> >
+> > I don't really want that is used only for DRM drivers. We really need
+> > it for all other DMA devices; i.e., v4l2 based drivers. That is what I
+> > try to do. And my approach uses reservation to use dma-buf resources
+> > but not dma fence stuff anymore. However, I'm looking into Radeon DRM
+> > driver for why we need dma fence stuff, and how we can use it if
+> > needed.
+> >
+> 
+> Still I don't see the point why you need syncpoints above dma-buf. In
+> both the DRM and the V4L2 world we have defined points in the API where
+> a buffer is allowed to change domain from device to CPU and vice versa.
+> 
+> In DRM if you want to access a buffer with the CPU you do a cpu_prepare.
+> The buffer changes back to GPU domain once you do the execbuf
+> validation, queue a pageflip to the buffer or similar things.
+> 
+> In V4L2 the syncpoints for cache operations are the queue/dequeue API
+> entry points. Those are also the exact points to synchronize with other
+> hardware thus using dma-buf reserve/fence.
+
+
+If so, what if we want to access a buffer with the CPU _in V4L2_? We should open a drm device node, and then do a cpu_prepare? 
 
 Thanks,
-Benoit
+Inki Dae
 
->
-> Regards
-> Afzal
->
->
->   Documentation/devicetree/bindings/arm/omap/omap.txt |  3 +++
->   arch/arm/boot/dts/Makefile                          |  3 ++-
->   arch/arm/boot/dts/am43x-epos-evm.dts                | 18 ++++++++++++++++++
->   3 files changed, 23 insertions(+), 1 deletion(-)
->   create mode 100644 arch/arm/boot/dts/am43x-epos-evm.dts
->
-> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> index f8288ea..6d498c7 100644
-> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> @@ -56,3 +56,6 @@ Boards:
->
->   - OMAP5 EVM : Evaluation Module
->     compatible = "ti,omap5-evm", "ti,omap5"
-> +
-> +- AM43x EPOS EVM
-> +  compatible = "ti,am43x-epos-evm", "ti,am4372", "ti,am43"
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 8e50761..05da469 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -155,7 +155,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
->   	am335x-evmsk.dtb \
->   	am335x-bone.dtb \
->   	am3517-evm.dtb \
-> -	am3517_mt_ventoux.dtb
-> +	am3517_mt_ventoux.dtb \
-> +	am43x-epos-evm.dtb
->   dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
->   dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
->   dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
-> diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
-> new file mode 100644
-> index 0000000..74174d4
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/am43x-epos-evm.dts
-> @@ -0,0 +1,18 @@
-> +/*
-> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/* AM43x EPOS EVM */
-> +
-> +/dts-v1/;
-> +
-> +#include "am4372.dtsi"
-> +
-> +/ {
-> +	model = "TI AM43x EPOS EVM";
-> +	compatible = "ti,am43x-epos-evm","ti,am4372","ti,am43";
-> +};
->
+> 
+> In all this I can't see any need for a new syncpoint primitive slapped
+> on top of dma-buf.
+> 
+> Regards,
+> Lucas
+> --
+> Pengutronix e.K.                           | Lucas Stach                 |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
