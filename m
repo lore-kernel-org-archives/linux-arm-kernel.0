@@ -1,68 +1,124 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 18 Jun 2013 20:11:27 -0500
-Subject: [PATCHv3 4/6] arm: dts: add bandgap entry for OMAP4460 devices
-In-Reply-To: <51C0C014.2000402@ti.com>
-References: <1370637968-23299-1-git-send-email-eduardo.valentin@ti.com>
- <1370637968-23299-5-git-send-email-eduardo.valentin@ti.com>
- <51C0C014.2000402@ti.com>
-Message-ID: <51C1053F.7030607@ti.com>
+Date: Tue, 18 Jun 2013 20:17:21 -0500
+Subject: [PATCH v2 1/4] ARM: dts: omap4-panda: Add USB Host support
+In-Reply-To: <1371571487-14389-2-git-send-email-rogerq@ti.com>
+References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
+ <1371571487-14389-2-git-send-email-rogerq@ti.com>
+Message-ID: <51C106A1.9030001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+Hi Roger,
 
-On 06/18/2013 03:16 PM, Eduardo Valentin wrote:
-> Benoit
+On 06/18/2013 11:04 AM, Roger Quadros wrote:
+> Provide the RESET and Power regulators for the USB PHY,
+> the USB Host port mode and the PHY device.
 >
-> On 07-06-2013 16:46, Eduardo Valentin wrote:
->> Include bandgap devices for OMAP4460 devices.
->>
->> Cc: "Beno?t Cousson" <b-cousson@ti.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: linux-omap at vger.kernel.org
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
->> ---
+> Also provide pin multiplexer information for the USB host
+> pins.
 >
-> Could you please have a look on patch 3 and 4 of this series? I have
-> changed this one accordingly to your recommendation on v2. If nothing
-> else, please let me know if they can still be queued for 3.11.
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>   arch/arm/boot/dts/omap4-panda-common.dtsi |   62 +++++++++++++++++++++++++++++
+>   1 files changed, 62 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> index 00cbaa5..7a21e8e 100644
+> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> @@ -59,6 +59,42 @@
+>   			"AFML", "Line In",
+>   			"AFMR", "Line In";
+>   	};
+> +
+> +	/* HS USB Port 1 RESET */
+> +	hsusb1_reset: hsusb1_reset_reg {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "hsusb1_reset";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&gpio2 30 0>;	/* gpio_62 */
+> +		startup-delay-us = <70000>;
+> +		enable-active-high;
+> +	};
 
-I've just applied both of them in my tree for 3.11. I'll send the pull 
-request to Tony tomorrow.
+Is this really a regulator? Or just a GPIO line used to reset the USB PHY?
+
+If this is the case, I don't think it should be represented as a regulator.
 
 Regards,
 Benoit
 
+> +
+> +	/* HS USB Port 1 Power */
+> +	hsusb1_power: hsusb1_power_reg {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "hsusb1_vbus";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&gpio1 1 0>;	/* gpio_1 */
+> +		startup-delay-us = <70000>;
+> +		enable-active-high;
+> +	};
+> +
+> +	/* HS USB Host PHY on PORT 1 */
+> +	hsusb1_phy: hsusb1_phy {
+> +		compatible = "usb-nop-xceiv";
+> +		reset-supply = <&hsusb1_reset>;
+> +		vcc-supply = <&hsusb1_power>;
+> +	/**
+> +	 * FIXME:
+> +	 * put the right clock phandle here when available
+> +	 *	clocks = <&auxclk3>;
+> +	 *	clock-names = "main_clk";
+> +	 */
+> +		clock-frequency = <19200000>;
+> +	};
+>   };
 >
-> I would need to rebase patch 01 to refresh on top of the thermal tree.
+>   &omap4_pmx_wkup {
+> @@ -83,6 +119,7 @@
+>   			&mcbsp1_pins
+>   			&dss_hdmi_pins
+>   			&tpd12s015_pins
+> +			&hsusbb1_pins
+>   	>;
 >
-> Thanks.
+>   	twl6030_pins: pinmux_twl6030_pins {
+> @@ -133,6 +170,23 @@
+>   		>;
+>   	};
 >
->>   arch/arm/boot/dts/omap4460.dtsi | 9 +++++++++
->>   1 file changed, 9 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
->> index 2cf227c..ea97201 100644
->> --- a/arch/arm/boot/dts/omap4460.dtsi
->> +++ b/arch/arm/boot/dts/omap4460.dtsi
->> @@ -29,4 +29,13 @@
->>   			     <0 55 0x4>;
->>   		ti,hwmods = "debugss";
->>   	};
->> +
->> +	bandgap {
->> +		reg = <0x4a002260 0x4
->> +			0x4a00232C 0x4
->> +			0x4a002378 0x18>;
->> +		compatible = "ti,omap4460-bandgap";
->> +		interrupts = <0 126 4>; /* talert */
->> +		gpios = <&gpio3 22 0>; /* tshut */
->> +	};
->>   };
->>
->
+> +	hsusbb1_pins: pinmux_hsusbb1_pins {
+> +		pinctrl-single,pins = <
+> +			0x82 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_clk.usbb1_ulpiphy_clk */
+> +			0x84 (PIN_OUTPUT | MUX_MODE4)		/* usbb1_ulpitll_stp.usbb1_ulpiphy_stp */
+> +			0x86 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dir.usbb1_ulpiphy_dir */
+> +			0x88 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_nxt.usbb1_ulpiphy_nxt */
+> +			0x8a (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat0.usbb1_ulpiphy_dat0 */
+> +			0x8c (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat1.usbb1_ulpiphy_dat1 */
+> +			0x8e (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat2.usbb1_ulpiphy_dat2 */
+> +			0x90 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat3.usbb1_ulpiphy_dat3 */
+> +			0x92 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat4.usbb1_ulpiphy_dat4 */
+> +			0x94 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat5.usbb1_ulpiphy_dat5 */
+> +			0x96 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat6.usbb1_ulpiphy_dat6 */
+> +			0x98 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat7.usbb1_ulpiphy_dat7 */
+> +		>;
+> +	};
+> +
+>   	i2c1_pins: pinmux_i2c1_pins {
+>   		pinctrl-single,pins = <
+>   			0xe2 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_scl */
+> @@ -283,3 +337,11 @@
+>   	mode = <3>;
+>   	power = <50>;
+>   };
+> +
+> +&usbhshost {
+> +	port1-mode = "ehci-phy";
+> +};
+> +
+> +&usbhsehci {
+> +	phys = <&hsusb1_phy>;
+> +};
 >
