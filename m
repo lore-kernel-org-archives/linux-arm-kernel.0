@@ -1,39 +1,41 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 19 Jun 2013 22:22:23 +0900
-Subject: [PATCH 5/5] ARM: shmobile: BOCK-W: change Ether device name
-In-Reply-To: <1371648143-18376-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371648143-18376-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371648143-18376-6-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 19 Jun 2013 22:22:35 +0900
+Subject: [PATCH 4/4] sh-pfc: r8a7778: tidyup MMC_D1 pin
+In-Reply-To: <1371648155-18479-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371648155-18479-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371648155-18479-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-When changing the name of Ether platform device in the commit c02f846938fe (ARM:
-shmobile: r8a7778: fix Ether device name), I completely forgot that there's also
-platform  device name used in bockw_pinctrl_map[], so the commit "ARM: shmobile:
-BOCK-W: add Ether support" went in with the old "sh-eth" device name. Now change
-it to "r8a777x-ether" in accordance with the commits that are now in  the  'net-
-next.git' repository,  otherwise BOCK-W Ether support won't work in 3.11.
+MMC_D1 is RCAR_GP_PIN(1, 8), not RCAR_GP_PIN(2, 8)
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reported-by: Yusuke Goda <yusuke.goda.sx@renesas.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-bockw.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/sh-pfc/pfc-r8a7778.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index 7d48461..ce56381 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -142,7 +142,7 @@ static struct sh_mmcif_plat_data sh_mmcif_plat = {
- 
- static const struct pinctrl_map bockw_pinctrl_map[] = {
- 	/* Ether */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7778",
-+	PIN_MAP_MUX_GROUP_DEFAULT("r8a777x-ether", "pfc-r8a7778",
- 				  "ether_rmii", "ether"),
- 	/* HSPI0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-hspi.0", "pfc-r8a7778",
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7778.c b/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
+index 1dcbabc..f903910 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
+@@ -1447,11 +1447,11 @@ MMC_PFC_PINS(mmc_ctrl,		RCAR_GP_PIN(1, 5),	RCAR_GP_PIN(1, 6));
+ MMC_PFC_CTRL(mmc_ctrl,		MMC_CLK,		MMC_CMD);
+ MMC_PFC_PINS(mmc_data1,		RCAR_GP_PIN(1, 7));
+ MMC_PFC_DAT1(mmc_data1,		MMC_D0);
+-MMC_PFC_PINS(mmc_data4,		RCAR_GP_PIN(1, 7),	RCAR_GP_PIN(2, 8),
++MMC_PFC_PINS(mmc_data4,		RCAR_GP_PIN(1, 7),	RCAR_GP_PIN(1, 8),
+ 				RCAR_GP_PIN(0, 5),	RCAR_GP_PIN(0, 6));
+ MMC_PFC_DAT4(mmc_data4,		MMC_D0,			MMC_D1,
+ 				MMC_D2,			MMC_D3);
+-MMC_PFC_PINS(mmc_data8,		RCAR_GP_PIN(1, 7),	RCAR_GP_PIN(2, 8),
++MMC_PFC_PINS(mmc_data8,		RCAR_GP_PIN(1, 7),	RCAR_GP_PIN(1, 8),
+ 				RCAR_GP_PIN(0, 5),	RCAR_GP_PIN(0, 6),
+ 				RCAR_GP_PIN(1, 4),	RCAR_GP_PIN(1, 0),
+ 				RCAR_GP_PIN(0, 30),	RCAR_GP_PIN(0, 31));
 -- 
 1.8.2.1
