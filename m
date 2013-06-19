@@ -1,70 +1,76 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 19 Jun 2013 13:36:43 +0100
-Subject: [PATCH 07/10] ARM: smp_scu: data endian fixes
+Date: Wed, 19 Jun 2013 13:36:45 +0100
+Subject: [PATCH 09/10] mvebu: support running big-endian
 In-Reply-To: <1371645406-16873-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1371645406-16873-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1371645406-16873-8-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1371645406-16873-10-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The smp_scu driver needs to use the relaxed readl/write accessors
-to avoid any issues with the endian mode the processor core is in.
+Add indication we can run these cores in BE mode, and ensure that the
+secondary CPU is set to big-endian mode in the initialisation code as
+the initial code runs little-endian.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/kernel/smp_scu.c |   16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/mach-mvebu/Kconfig        |    1 +
+ arch/arm/mach-mvebu/coherency_ll.S |    3 +++
+ arch/arm/mach-mvebu/headsmp.S      |    4 ++++
+ 3 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-index 5bc1a63..0fcd0ce 100644
---- a/arch/arm/kernel/smp_scu.c
-+++ b/arch/arm/kernel/smp_scu.c
-@@ -28,7 +28,7 @@
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 80a8bca..317cdb8 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -1,5 +1,6 @@
+ config ARCH_MVEBU
+ 	bool "Marvell SOCs with Device Tree support" if ARCH_MULTI_V7
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select CLKSRC_MMIO
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+index 5476669..ee7598f 100644
+--- a/arch/arm/mach-mvebu/coherency_ll.S
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -20,6 +20,8 @@
+ #define ARMADA_XP_CFB_CTL_REG_OFFSET 0x0
+ #define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
+ 
++#include <asm/assembler.h>
++
+ 	.text
+ /*
+  * r0: Coherency fabric base register address
+@@ -29,6 +31,7 @@ ENTRY(ll_set_cpu_coherent)
+ 	/* Create bit by cpu index */
+ 	mov	r3, #(1 << 24)
+ 	lsl	r1, r3, r1
++ARM_BE8(rev	r1, r1)
+ 
+ 	/* Add CPU to SMP group - Atomic */
+ 	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
+diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
+index a06e0ed..a4f995d 100644
+--- a/arch/arm/mach-mvebu/headsmp.S
++++ b/arch/arm/mach-mvebu/headsmp.S
+@@ -21,6 +21,8 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ 
++#include <asm/assembler.h>
++
+ /*
+  * At this stage the secondary CPUs don't have acces yet to the MMU, so
+  * we have to provide physical addresses
+@@ -36,6 +38,8 @@
   */
- unsigned int __init scu_get_core_count(void __iomem *scu_base)
- {
--	unsigned int ncores = __raw_readl(scu_base + SCU_CONFIG);
-+	unsigned int ncores = readl_relaxed(scu_base + SCU_CONFIG);
- 	return (ncores & 0x03) + 1;
- }
+ ENTRY(armada_xp_secondary_startup)
  
-@@ -41,20 +41,20 @@ void scu_enable(void __iomem *scu_base)
- 
- #ifdef CONFIG_ARM_ERRATA_764369
- 	/* Cortex-A9 only */
--	if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090) {
--		scu_ctrl = __raw_readl(scu_base + 0x30);
-+	if ((read_cpuid(CPUID_ID) & 0xff0ffff0) == 0x410fc090) {
-+		scu_ctrl = readl_relaxed(scu_base + 0x30);
- 		if (!(scu_ctrl & 1))
--			__raw_writel(scu_ctrl | 0x1, scu_base + 0x30);
-+			writel_relaxed(scu_ctrl | 0x1, scu_base + 0x30);
- 	}
- #endif
- 
--	scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
-+	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
- 	/* already enabled? */
- 	if (scu_ctrl & 1)
- 		return;
- 
- 	scu_ctrl |= 1;
--	__raw_writel(scu_ctrl, scu_base + SCU_CTRL);
-+	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
- 
- 	/*
- 	 * Ensure that the data accessed by CPU0 before the SCU was
-@@ -80,9 +80,9 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
- 	if (mode > 3 || mode == 1 || cpu > 3)
- 		return -EINVAL;
- 
--	val = __raw_readb(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
-+	val = readb_relaxed(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
- 	val |= mode;
--	__raw_writeb(val, scu_base + SCU_CPU_STATUS + cpu);
-+	writeb_relaxed(val, scu_base + SCU_CPU_STATUS + cpu);
- 
- 	return 0;
- }
++ ARM_BE8(setend	be )			@ go BE8 if booted LE
++
+ 	/* Read CPU id */
+ 	mrc     p15, 0, r1, c0, c0, 5
+ 	and     r1, r1, #0xF
 -- 
 1.7.10.4
