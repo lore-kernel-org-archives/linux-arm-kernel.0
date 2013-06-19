@@ -1,27 +1,20 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 19 Jun 2013 11:39:59 +0800
-Subject: [RFC PATCH v1 6/6] USB: EHCI: support running URB giveback in
- tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306181252320.1157-100000@iolanthe.rowland.org>
-References: <1371567833-9077-7-git-send-email-ming.lei@canonical.com>
- <Pine.LNX.4.44L0.1306181252320.1157-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVMZ6V2gMJmORxTwq+qwbuN7FdKK4Q3VwJPq8Pj9PctOZQ@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 19 Jun 2013 08:19:13 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzRdIGRyaXZlcnM6IGJ1czogaW14LXdlaW06IFJlbW92?=
+ =?UTF-8?B?ZSBwcml2YXRlIGRyaXZlciBkYXRh?=
+In-Reply-To: <1371570410-12773-1-git-send-email-shc_work@mail.ru>
+References: <1371570410-12773-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1371615553.4921154@f394.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 12:55 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Tue, 18 Jun 2013, Ming Lei wrote:
->
->> Both 4 transfers can work well on EHCI HCD after switching to run
->
-> "Both 4 transfers"?  The word "both" applies when there are two items,
-> not more than two.  And what are the four transfers you are referring
-> to?  Do you mean all four transfer _types_?
+> Driver uses only probe function so no reason to keep variables
+> in private driver data.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Yes, I mean the four transfer types, and "Both 4 transfers" should have
-been "all four transfer types", will fix it in v2.
+Please review this series only. Later, I would send a second version
+with the addition of support for the entire i.MX series.
+Thanks.
 
-
-Thanks,
---
-Ming Lei
+---
