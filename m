@@ -1,61 +1,195 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 19 Jun 2013 16:23:45 +0200
-Subject: [PATCH 0/7] Common Clock Framework support for Samsung S3C64xx
-In-Reply-To: <51C1BD62.8050007@samsung.com>
-References: <1370476651-6743-1-git-send-email-tomasz.figa@gmail.com>
- <51C1BD62.8050007@samsung.com>
-Message-ID: <1617281.ftRel2CUbr@amdc1227>
+Date: Wed, 19 Jun 2013 16:28:30 +0200
+Subject: [PATCH] ARM: EXYNOS: Fix incorrect usage of S5P_ARM_CORE1_*
+ registers
+In-Reply-To: <CANuQgHHbDze0VthjnnKm8R3gny=4ubPUjr2jnkGnh7a-OK2siQ@mail.gmail.com>
+References: <1371569191-2364-1-git-send-email-t.figa@samsung.com>
+ <2791500.rs0iL4EgjJ@amdc1227>
+ <CANuQgHHbDze0VthjnnKm8R3gny=4ubPUjr2jnkGnh7a-OK2siQ@mail.gmail.com>
+Message-ID: <1933024.UCR4mQ7fzS@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 of June 2013 23:17:06 Kukjin Kim wrote:
-> On 06/06/13 08:57, Tomasz Figa wrote:
-> > This series is an attempt to move clock support on Samsung S3C64xx SoCs
-> > to Common Clock Framework.
-> 
-> Looks good :)
-
-Thanks.
-
-> > First, support for PLL types present on S3C64xx SoCs is added to
-> > Samsung
-> > Common Clock Framework driver. Then the main clock driver for mentioned
-> > SoCs is introduced. Further patches contain fixes for drivers to make
-> > them compliant with CCF semantics, migration of platform code to use
-> > the new clock driver and removal of old clock management code.
+On Wednesday 19 of June 2013 19:25:27 Chander Kashyap wrote:
+> On 19 June 2013 19:19, Tomasz Figa <t.figa@samsung.com> wrote:
+> > On Wednesday 19 of June 2013 14:24:17 Lorenzo Pieralisi wrote:
+> >> On Wed, Jun 19, 2013 at 01:50:57PM +0100, Tomasz Figa wrote:
+> >> > On Wednesday 19 of June 2013 17:39:21 Chander Kashyap wrote:
+> >> > > On 18 June 2013 23:29, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> >> > > > On 06/19/13 02:45, Tomasz Figa wrote:
+> >> > > >> Ccing Arnd and Olof, because I forgot to add them to git
+> >> > > >> send-email...
+> >> > > >> 
+> >> > > >> Sorry for the noise.
+> >> > > >> 
+> >> > > >> On Tuesday 18 of June 2013 17:26:31 Tomasz Figa wrote:
+> >> > > >>> S5P_ARM_CORE1_* registers affect only core 1. To control
+> >> > > >>> further
+> >> > > >>> cores
+> >> > > >>> properly another registers must be used.
+> >> > > >>> 
+> >> > > >>> This patch replaces S5P_ARM_CORE1_* register definitions with
+> >> > > >>> S5P_ARM_CORE_*(x) macro which return addresses of registers
+> >> > > >>> for
+> >> > > >>> specified core.
+> >> > > >>> 
+> >> > > >>> This fixes CPU hotplug on quad core Exynos SoCs on which
+> >> > > >>> currently
+> >> > > >>> offlining CPUs 2 or 3 caused CPU 1 to be turned off.
+> >> > > >> 
+> >> > > >> Obviously this doesn't happen currently because of the if (cpu
+> >> > > >> ==
+> >> > > >> 1),
+> >> > > >> but>
+> >> > > > 
+> >> > > > Yes, not happened...and just note exynos5440 doesn't support
+> >> > > > hotplug :)
+> >> > > > so this is available on exynos4412 and added 5420.
+> >> > > > 
+> >> > > >> if logical cpu1 turned out not to be physical cpu1, then it
+> >> > > >> would
+> >> > > >> crash.
+> >> > > >> 
+> >> > > >> Best regards,
+> >> > > >> Tomasz
+> >> > > >> 
+> >> > > >>> In addition,
+> >> > > >>> bring-up of CPU 2 and 3 is fixed on boards where bootloader
+> >> > > >>> powers
+> >> > > >>> off
+> >> > > >>> secondary cores by default.
+> >> > > > 
+> >> > > > I need to test on board about above...
+> >> > > > 
+> >> > > >>> Cc: stable at vger.kernel.org
+> >> > > >>> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+> >> > > >>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+> >> > > >>> ---
+> >> > > >>> 
+> >> > > >>>   arch/arm/mach-exynos/hotplug.c               |  9 +++++----
+> >> > > >>>   arch/arm/mach-exynos/include/mach/regs-pmu.h | 10 +++++++---
+> >> > > >>>   arch/arm/mach-exynos/platsmp.c               |  9 +++++----
+> >> > > >>>   3 files changed, 17 insertions(+), 11 deletions(-)
+> >> > > >>> 
+> >> > > >>> diff --git a/arch/arm/mach-exynos/hotplug.c
+> >> > > >>> b/arch/arm/mach-exynos/hotplug.c index af90cfa..c089943 100644
+> >> > > >>> --- a/arch/arm/mach-exynos/hotplug.c
+> >> > > >>> +++ b/arch/arm/mach-exynos/hotplug.c
+> >> > > >>> @@ -93,10 +93,11 @@ static inline void
+> >> > > >>> cpu_leave_lowpower(void)
+> >> > > >>> 
+> >> > > >>>   static inline void platform_do_lowpower(unsigned int cpu,
+> >> > > >>>   int
+> >> > > >>> 
+> >> > > >>> *spurious) {
+> >> > > >>> 
+> >> > > >>>         for (;;) {
+> >> > > >>> 
+> >> > > >>> +               void __iomem *reg_base;
+> >> > > >>> +               unsigned int phys_cpu = cpu_logical_map(cpu);
+> >> > > >>> 
+> >> > > >>> -               /* make cpu1 to be turned off at next WFI
+> >> > > >>> command
+> >> > > >>> */
+> >> > > >>> -               if (cpu == 1)
+> >> > > >>> -                       __raw_writel(0,
+> >> > > >>> S5P_ARM_CORE1_CONFIGURATION);
+> >> > > >>> +               reg_base =
+> >> > > >>> S5P_ARM_CORE_CONFIGURATION(phys_cpu);
+> >> > > 
+> >> > > Tomasz,
+> >> > > This will break for non-zero, MPIDR value.  Say if MPIDR is 1 then
+> >> > > for
+> >> > > cpu0 phys_cpu value will be 0x100,
+> >> > > and address calculation will be   (S5P_ARM_CORE0_CONFIGURATION +
+> >> > > ((0x101) * 0x80)), which is wrong.
+> >> 
+> >> Honestly, I did not understand the reasoning above, please clarify.
+> >> 
+> >> > Hmm, according to the code initializing __cpu_logical_map[] array
+> >> > this
+> >> > is not true.
+> >> > 
+> >> > Here's the code:
+> >> > 
+> >> > https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tre
+> >> > e/a
+> >> > rch/arm/kernel/setup.c?id=refs/tags/next-20130619#n468
+> >> > 
+> >> > and for used macros and bitmasks:
+> >> > 
+> >> > https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tre
+> >> > e/a
+> >> > rch/arm/include/asm/cputype.h?id=refs/tags/next-20130619#n45
+> >> > 
+> >> > Now the structure of the MPIDR register:
+> >> > 
+> >> > http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388e
+> >> > /CI
+> >> > HEBGFG.html
+> >> > 
+> >> > As you can see, the value read from the register in
+> >> > smp_setup_processor_id() is only the physical CPU ID, so I don't see
+> >> > any
+> >> > problem here.
+> >> 
+> >> Define "physical CPU ID" :-)
+> >> 
+> >> There is a problem here: the MPIDR is not an index, and the
+> >> cpu_logical_map is populated in arm_dt_init_cpu_maps in:
+> >> 
+> >> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/a
+> >> rch /arm/kernel/devtree.c?id=refs/tags/v3.10-rc6
+> >> 
+> >> with all affinity levels.
 > > 
-> > Depends on:
-> >   - [PATCH 0/6] Samsung watchdog support clean-up
-> >   
-> >     http://thread.gmane.org/gmane.linux.kernel.samsung-soc/18736/focus=
-> >     18989
-> >   
-> >   - [PATCH 00/15] Final Samsung PWM support cleanup
-> >   
-> >     http://www.spinics.net/lists/arm-kernel/msg248725.html
+> > OK. This is what I was missing. Thanks.
+> > 
+> >> You need to perform a mapping between logical cpus and registers
+> >> offset,
+> >> you can't use the cpu_logical_map directly for that.
+> > 
+> > Hmm, can't I just extract cluster ID and CPU ID from the MPIDR value
+> > and
+> > use them appropriately to calculate register offsets?
 > 
-> BTW, Tomasz, so how was going on above PWM patches?
-> 
+> That will create problem for multi-cluster systems. Say we have two
+> clusters then with clusterID 0 and 1. So phys-cpu will be 0x0/0x100,
+> 0x1/0x101 ans so on.
 
-I have them ready now, but the PWM maintainer has some objections, which 
-will hopefully be resolved soon.
+I mean, calculate register offset based on two parameters - cluster ID and 
+CPU ID, like:
+
+	...
+
+	u32 mpidr = cpu_logical_map(cpu);
+	u32 phys_cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+
+	if (soc_is_exynosXXXX()) {
+		u32 cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+
+		phys_cpu += EXYNOSXXXX_CPUS_PER_CLUSTER * cluster;
+	}
+
+	reg_base = S5P_ARM_CORE_CONFIGURATION(phys_cpu);
+	__raw_writel(0, reg_base);
+
+	...
 
 Best regards,
 Tomasz
 
-> > On S3C6410-based Tiny6410 board (Mini6410-compatible):
+> > Best regards,
+> > Tomasz
 > > 
-> > Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
-> > 
-> > Tomasz Figa (7):
-> >    clk: samsung: pll: Add support for PLL6552 and PLL6553
-> >    clk: samsung: Add clock driver for S3C64xx SoCs
-> >    ARM: SAMSUNG: Add soc_is_s3c6400/s3c6410 macros
-> >    ARM: s3c64xx: dma: Use clk_prepare_enable/clk_disable_unprepare
-> >    usb: host: ohci-s3c2410 Use clk_prepare_enable/clk_disable_unprepare
-> >    ARM: s3c64xx: Migrate clock handling to Common Clock Framework
-> >    ARM: s3c64xx: Remove old clock management code
+> >> Next accident waiting to happen is GIC code (CONFIG_GIC_NON_BANKED),
+> >> where cpu_logical_map is used erroneously as an index.
+> >> 
+> >> Lorenzo
 > 
+> --
+> with warm regards,
+> Chander Kashyap
 > --
 > To unsubscribe from this list: send the line "unsubscribe
 > linux-samsung-soc" in the body of a message to majordomo at vger.kernel.org
