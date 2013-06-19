@@ -1,57 +1,46 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 19 Jun 2013 07:02:00 -0300
-Subject: [PATCH v3 05/12] ARM: mvebu: Remove the harcoded BootROM window
- allocation
-In-Reply-To: <20130618173906.GC2204@obsidianresearch.com>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1371554737-25319-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130618173906.GC2204@obsidianresearch.com>
-Message-ID: <20130619100159.GB16138@localhost>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 19 Jun 2013 11:02:24 +0100
+Subject: [GIT PULL] picoxcell cleanups for 3.11
+In-Reply-To: <20130611122621.GA9967@page>
+References: <20130611122621.GA9967@page>
+Message-ID: <20130619100224.GB8641@page>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 11:39:06AM -0600, Jason Gunthorpe wrote:
-> On Tue, Jun 18, 2013 at 08:25:30AM -0300, Ezequiel Garcia wrote:
-> > The address decoding window to access the BootROM should not be
-> > allocated programatically, but instead declared in the device tree.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> >  arch/arm/mach-mvebu/platsmp.c | 1 -
-> >  1 file changed, 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-> > index 93f2f3a..d419fac 100644
-> > +++ b/arch/arm/mach-mvebu/platsmp.c
-> > @@ -118,7 +118,6 @@ void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
-> >  	set_secondary_cpus_clock();
-> >  	flush_cache_all();
-> >  	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
-> > -	mvebu_mbus_add_window("bootrom", 0xfff00000, SZ_1M);
-> >  }
+Fixing Arnd's mail address (sorry!).
+
+Jamie
+
+On Tue, Jun 11, 2013 at 01:26:21PM +0100, Jamie Iles wrote:
+> Hi Arnd, Olof,
 > 
-> I think some kind of test is needed here. As I understand it the SMP
-> startup uses a trampoline in the boot rom and the boot rom *must* be
-> mapped to 0xfff00000 ?
+> Please pull these small changes for 3.11 to cleanup the picoxcell machine
+> support.
 > 
-
-Indeed, setting up 0xfff00000 is a *must*.
-
-> Verifying the DT is setup this way and aborting if it is not seems
-> like a good idea..
+> Thanks,
 > 
-
-I agree it's a nice idea, but I'm not too sure how to accomplish this
-in a simple and generic way. There's nothing in the DT that allows you
-to know which of the ranges entries correspond to the BootROM, unless you go
-through each of the entries comparing against the known target ID and
-attribute.
-
-You could also do a 'of_find_node_by_name(NULL, "bootrom");' but the binding
-no longer requires to even have any children for the window.
-
-Any ideas?
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+> Jamie
+> 
+> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+> 
+>   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/jamieiles/linux-2.6-ji.git picoxcell-next
+> 
+> for you to fetch changes up to 4b83f75a7af388aaf5f79ccf72c37074bc9166da:
+> 
+>   ARM: picoxcell: Remove init_irq declaration in machine description (2013-05-14 17:19:12 +0100)
+> 
+> ----------------------------------------------------------------
+> Jamie Iles (1):
+>       picoxcell: remove redundant common.h
+> 
+> Maxime Ripard (1):
+>       ARM: picoxcell: Remove init_irq declaration in machine description
+> 
+>  arch/arm/mach-picoxcell/common.c |  7 -------
+>  arch/arm/mach-picoxcell/common.h | 17 -----------------
+>  2 files changed, 24 deletions(-)
+>  delete mode 100644 arch/arm/mach-picoxcell/common.h
