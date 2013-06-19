@@ -1,86 +1,31 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 19 Jun 2013 18:56:15 +0200
-Subject: [PATCHv3 07/11] arm: pci: add ->add_bus() and ->remove_bus() hooks to
- hw_pci
+Date: Wed, 19 Jun 2013 18:56:18 +0200
+Subject: [PATCHv3 10/11] arm: mvebu: indicate that this platform supports MSI
 In-Reply-To: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1371660979-21588-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1371660979-21588-11-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some PCI drivers may need to adjust the pci_bus structure after it has
-been allocated by the Linux PCI core. The PCI core allows
-architectures to implement the pcibios_add_bus() and
-pcibios_remove_bus() for this purpose. This commit therefore extends
-the hw_pci and pci_sys_data structures of the ARM PCI core to allow
-PCI drivers to register ->add_bus() and ->remove_bus() in hw_pci,
-which will get called when a bus is added or removed from the system.
-
-This will be used for example by the Marvell PCIe driver to connect a
-particular PCI bus with its corresponding MSI chip to handle Message
-Signaled Interrupts.
+Now that all the pieces are in place, we can adjust the
+mach-mvebu/Kconfig file to indicate that this platform supports MSIs.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/include/asm/mach/pci.h |  4 ++++
- arch/arm/kernel/bios32.c        | 16 ++++++++++++++++
- 2 files changed, 20 insertions(+)
+ arch/arm/mach-mvebu/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index 7d2c3c8..b71cc9d 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -35,6 +35,8 @@ struct hw_pci {
- 					  resource_size_t start,
- 					  resource_size_t size,
- 					  resource_size_t align);
-+	void            (*add_bus)(struct pci_bus *bus);
-+	void            (*remove_bus)(struct pci_bus *bus);
- };
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 9eb63d7..36951b1 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -15,6 +15,7 @@ config ARCH_MVEBU
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select MIGHT_HAVE_PCI
+ 	select PCI_QUIRKS if PCI
++	select ARCH_SUPPORTS_MSI if PCI
  
- /*
-@@ -62,6 +64,8 @@ struct pci_sys_data {
- 					  resource_size_t start,
- 					  resource_size_t size,
- 					  resource_size_t align);
-+	void            (*add_bus)(struct pci_bus *bus);
-+	void            (*remove_bus)(struct pci_bus *bus);
- 	void		*private_data;	/* platform controller private data	*/
- };
+ if ARCH_MVEBU
  
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index b2ed73c..0a441f8 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -363,6 +363,20 @@ void pcibios_fixup_bus(struct pci_bus *bus)
- }
- EXPORT_SYMBOL(pcibios_fixup_bus);
- 
-+void pcibios_add_bus(struct pci_bus *bus)
-+{
-+	struct pci_sys_data *sys = bus->sysdata;
-+	if (sys->add_bus)
-+		sys->add_bus(bus);
-+}
-+
-+void pcibios_remove_bus(struct pci_bus *bus)
-+{
-+	struct pci_sys_data *sys = bus->sysdata;
-+	if (sys->remove_bus)
-+		sys->remove_bus(bus);
-+}
-+
- /*
-  * Swizzle the device pin each time we cross a bridge.  If a platform does
-  * not provide a swizzle function, we perform the standard PCI swizzling.
-@@ -463,6 +477,8 @@ static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
- 		sys->swizzle = hw->swizzle;
- 		sys->map_irq = hw->map_irq;
- 		sys->align_resource = hw->align_resource;
-+		sys->add_bus        = hw->add_bus;
-+		sys->remove_bus     = hw->remove_bus;
- 		INIT_LIST_HEAD(&sys->resources);
- 
- 		if (hw->private_data)
 -- 
 1.8.1.2
