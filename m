@@ -1,96 +1,81 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Jun 2013 08:42:03 +0100
-Subject: [PATCH 21/33 v2] clk: ux500: Add Device Tree support for the
- PRCC Kernel clock
-In-Reply-To: <20130618211735.9136.25870@quantum>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-22-git-send-email-lee.jones@linaro.org>
- <20130611110923.GB3330@laptop> <201306121646.30279.arnd@arndb.de>
- <20130618211735.9136.25870@quantum>
-Message-ID: <20130619074203.GD31320@laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 19 Jun 2013 00:46:06 -0700
+Subject: [PATCH v2 1/4] ARM: dts: omap4-panda: Add USB Host support
+In-Reply-To: <51C15F7E.5020305@ti.com>
+References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
+ <1371571487-14389-2-git-send-email-rogerq@ti.com>
+ <51C106A1.9030001@ti.com> <51C15F7E.5020305@ti.com>
+Message-ID: <20130619074605.GW5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Quoting Arnd Bergmann (2013-06-12 07:46:30)
-> > On Tuesday 11 June 2013, Lee Jones wrote:
-> > > This patch enables clocks to be specified from Device Tree via phandles
-> > > to the "prcc-kernel-clock" node.
-> > > 
-> > > Cc: Mike Turquette <mturquette@linaro.org>
-> > > Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > 
-> > 
-> > I don't understand the design of the common clock subsystem here, but is it really
-> > necessary to hardcode all the clocks using clk_reg_prcc_kclk() here *and* register
-> > a clkdev *and* store the pointer in an array, when you can get all that information
-> > from the device tree?
-> > 
-> > Mike?
+* Roger Quadros <rogerq@ti.com> [130619 00:42]:
+> Hi Benoit,
 > 
-> I'm a bit confused by what is going on here too.  There are several
-> different ways to handle this.
+> On 06/19/2013 04:17 AM, Benoit Cousson wrote:
+> > Hi Roger,
+> > 
+> > On 06/18/2013 11:04 AM, Roger Quadros wrote:
+> >> Provide the RESET and Power regulators for the USB PHY,
+> >> the USB Host port mode and the PHY device.
+> >>
+> >> Also provide pin multiplexer information for the USB host
+> >> pins.
+> >>
+> >> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> >> ---
+> >>   arch/arm/boot/dts/omap4-panda-common.dtsi |   62 +++++++++++++++++++++++++++++
+> >>   1 files changed, 62 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> >> index 00cbaa5..7a21e8e 100644
+> >> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> >> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> >> @@ -59,6 +59,42 @@
+> >>               "AFML", "Line In",
+> >>               "AFMR", "Line In";
+> >>       };
+> >> +
+> >> +    /* HS USB Port 1 RESET */
+> >> +    hsusb1_reset: hsusb1_reset_reg {
+> >> +        compatible = "regulator-fixed";
+> >> +        regulator-name = "hsusb1_reset";
+> >> +        regulator-min-microvolt = <3300000>;
+> >> +        regulator-max-microvolt = <3300000>;
+> >> +        gpio = <&gpio2 30 0>;    /* gpio_62 */
+> >> +        startup-delay-us = <70000>;
+> >> +        enable-active-high;
+> >> +    };
+> > 
+> > Is this really a regulator? Or just a GPIO line used to reset the USB PHY?
 > 
-> 1) Since you have your own clock driver (e.g. not the basic clock types)
-> then you could expand the argument list of clk_reg_prcc_kclk to include
-> the clkdev dev_id string and toss the call to clk_register_clkdev inside
-> of clk_reg_prcc_kclk.
+> It is in fact a GPIO line used as reset.
+> > 
+> > If this is the case, I don't think it should be represented as a regulator.
+> 
+> Why not? I think it fits very well in the regulator device model. I couldn't find a better
+> way to represent this. It gives us a way to specify not only the GPIO line but also
+> the polarity. I know mostly reset is active low but still there is flexibility as you never
+> know for sure.
 
-Yes, that's actually a pretty good idea. It has nothing to do with
-this patchset, but I will add it to my TODO.
+I think it's really a mux + a comparator. But from Linux driver point of view
+a regulator fits well as we don't have anything better. After all, the pin
+voltage changes, and then something can be done based on the comparator
+value.
+ 
+> Do you have any better ideas?
 
-NB: I am away from tomorrow until after Connect, so I will continue
-with this after that.
+We have a similar issue with the MMC1 PBIAS. I think in the long run we
+should expand regulator (and possibly pinctrl) framework(s) to handle
+comparators. We could just assume that a comparatator is a regulator,
+and have a comparator binding that just uses the regulator code.
+ 
+> FYI. The USB PHY driver is already treating reset as a regulator and is into 3.10. Reworking that
+> will take some time. Not getting these in will prevent USB host/ethernet support on panda.
 
-> 2) Move your clock data into DT and teach the driver to use of_clk_get
-> to fetch the clk phandle directly instead of using the string-matching
-> clkdev mechanisms. Of course both your clock and device bits need to be
-> converted to DT first.
+Yes and we need to have some solution for v3.11 as we've dropped the
+legacy data for omap4. Otherwise things won't work properly.
 
-I'm sure this is the end-goal, but we still have to support the !DT
-case. At least until all of the ATAGs stuff has been completely
-removed from platform.
+Regards,
 
-> Can you explain what prcc_kclk[] and friends are doing? Is that a legacy
-> clock framework thing that is still hanging around? I'm curious to know
-> why your clock driver needs a list of the clocks it registers.
-
-Sure.
-
-1. So when we register a clock, we store a pointer to it in a 'struct
-clk *array[]' using known cell identifying read-ins. For peripheral
-(pclk) and kernel (kclk) clocks these are peripheral number (the
-kernel clocks have these too) and their associated 8bit register
-enable BIT(). The PRCMU clocks are read-in to the array only by their
-32bit register enable BIT().
-
-2. We then register with of_clk_add_provider() passing the array using
-the 'void *data' argument. So:
-
-  clk = clk_reg_prcc_[p|k]clk(blah, blah, blah);
-  array[(periph * PRCC_PERIPHS_PER_CLUSTER) + bit] = clk
-  of_clk_add_provider(child, ux500_twocell_get, array);
-
-3. In the DTS(I) files we request clocks using their known identifiers
-by way of tuplets for the kclks and pclks and by a 1 #cell variant for
-the PRCMU clocks. So:
-
-pclk & kclk:
-  /*        pclk/kclk       periph  BIT() */
-  clocks = <&prcc_[p|k]clk  1       9>;
-
-PRCMU:
-  /*        prcmu       BIT()             */
-  clocks = <&prcmu_clk  PRCMU_DMACLK>;
-
-The PRCMU can then use the clk framework supplied
-of_clk_src_onecell_get() call-back and the pclk and kclks use the 2
-#cell variant we provide. They both read into the aforementioned
-array[]s we populated earlier in the process to fetch the correct
-'struct clk*'.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Tony
