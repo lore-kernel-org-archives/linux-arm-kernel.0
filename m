@@ -1,87 +1,51 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 19 Jun 2013 11:06:29 +0800
-Subject: [RFC PATCH v1 3/6] USB: URB documentation: claim complete() may
- be run with IRQs enabled
-In-Reply-To: <Pine.LNX.4.44L0.1306181236470.1157-100000@iolanthe.rowland.org>
-References: <1371567833-9077-4-git-send-email-ming.lei@canonical.com>
- <Pine.LNX.4.44L0.1306181236470.1157-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVOPSxPvw5sN9-OWRDEB+v86gbaynTM2sSctiggj1JbsdA@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 19 Jun 2013 08:39:52 +0530
+Subject: [GIT PULL 00/10] Samsung 2nd pull-request for v3.11
+In-Reply-To: <51C0BC2D.80705@samsung.com>
+References: <51C0BC2D.80705@samsung.com>
+Message-ID: <CAK9yfHx--0dKDzdpBz3o_V_j+D+4f_N576rwuuVcJbMROtx=mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 12:42 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Tue, 18 Jun 2013, Ming Lei wrote:
->
->> There is no good reason to run complete() in hard interrupt
->> disabled context.
->>
->> After running complete() in tasklet, we will enable local IRQs
->> when calling complete() since we can do it now.
->>
->> Even though we still disable IRQs now when calling complete()
->> in tasklet, the URB documentation is updated to claim complete()
->> may be run in tasklet context and local IRQs may be enabled, so
->> that USB drivers can know the change and avoid one deadlock caused
->> by: assume IRQs disabled in complete() and call spin_lock() to
->> hold lock which might be acquired in interrupt context.
->>
->> Current spin_lock() usages in drivers' complete() will be cleaned
->> up at the same time, and when the cleanup is finished, local IRQs
->> will be enabled when calling complete() in tasklet.
->>
->> Also fix description about type of usb_complete_t.
->
->> @@ -210,12 +209,19 @@ have transferred successfully before the completion was called.
->>
->>
->>  NOTE:  ***** WARNING *****
->> -NEVER SLEEP IN A COMPLETION HANDLER.  These are normally called
->> -during hardware interrupt processing.  If you can, defer substantial
->> -work to a tasklet (bottom half) to keep system latencies low.  You'll
->> -probably need to use spinlocks to protect data structures you manipulate
->> -in completion handlers.
->> -
->> +NEVER SLEEP IN A COMPLETION HANDLER.  These are called during hardware
->> +interrupt processing if HCD_BH isn't set in hcd->driver->flags, otherwise
->> +called in tasklet context. If you can, defer substantial work to a tasklet
->> +(bottom half) to keep system latencies low.  You'll probably need to use
->> +spinlocks to protect data structures you manipulate in completion handlers.
->
-> You shouldn't go into so much detail here, partly because it doesn't
-> matter for driver authors and partly because it is subject to change.
-> Just say that completion handlers are usually called in an atomic
-> context, so they must not sleep.
+Hi Kukjin,
 
-Right.
-
+On 19 June 2013 01:29, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi Arnd, Olof
 >
-> Also, the advice about deferring work to a tasklet seems out of place
-> now, since many completion handlers will already be running in a
-> tasklet.
-
-Good catch.
-
+> This is 2nd pull-request for Samsung stuff for v3.11.
 >
->> +Driver can't assume that local IRQs are disabled any more when running
->> +complete(), for example, if drivers want to hold a lock which might be
->> +acquired in hard interrupt handler, they have to use spin_lock_irqsave()
->> +instead of spin_lock() to hold the lock.
+> This is including following branches.
+> v3.11-next/cleanup-samsung
+> v3.11-next/exynos-arch-2
+> v3.11-next/exynos-dt-2
+> v3.11-next/s3c24xx-dt-2
+> v3.11-next/dt-n-clk-audio
+> v3.11-next/remove-nondt-exynos-3
+> v3.11-next/s3c24xx-pinctrl-2
+> v3.11-next/soc-exynos5420
+> v3.11-next/samsung-defconfig
+> v3.11-next/non-critical-fixes
 >
-> Don't say so much.  Just mention that in the current kernel (3.10),
-> completion handlers always run with local interrupts disabled, but in
-> the future this is likely to change.  Therefore drivers should not make
-> any assumptions.
-
-OK.
-
+> Just note, for remove-nondt-exynos-3 branch, small merge conflict will be
+> happened. I added my resolution in the pull-request.
 >
->> +In the future, all HCD might set HCD_BH to run complete() in tasklet so
->> +that system latencies can be kept low.
+> If any problems, please kindly let me know.
 >
-> This does not need to be in the documentation.
+> Thanks,
+> - Kukjin
 
-Right, since drivers don't care HCD.
+[snip]
+>
+> Sachin Kamat (3):
+>       ARM: dts: Add PWM related pinctrl entries for exynos4210
+>       ARM: dts: Add LCD related pinctrl entries for exynos4210
+>       ARM: dts: Add FIMD node to Origen4210 board
 
-Thanks,
---
-Ming Lei
+I dont see my following patch in this pull request which you said you
+had applied.
+https://patchwork.kernel.org/patch/2469891/
+
+
+-- 
+With warm regards,
+Sachin
