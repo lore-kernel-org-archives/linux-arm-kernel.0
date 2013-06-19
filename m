@@ -1,39 +1,38 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 19 Jun 2013 04:52:00 -0500
-Subject: [PATCH 0/3] Add pinmux DT nodes to CPSW for AM335x
-In-Reply-To: <51C14772.4090701@ti.com>
-References: <1370604775-21264-1-git-send-email-mugunthanvnm@ti.com>
- <51C14772.4090701@ti.com>
-Message-ID: <51C17F40.8090607@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Jun 2013 11:52:29 +0200
+Subject: [GIT PULL] Allwinner sunXi defconfig additions for 3.11
+Message-ID: <20130619095229.GA7906@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2013 12:53 AM, Mugunthan V N wrote:
-> On 6/7/2013 5:02 PM, Mugunthan V N wrote:
->> Add pinmux DT nodes to CPSW for the following AM335x boards
->> * AM335x Beaglebone
->> * AM335x EVM
->> * AM335x EVMsk
->> default state contains the pinmux required for active mode and
->> sleep mode contains pinmux reset values for energy saving.
->>
->> Mugunthan V N (3):
->>    ARM: dts: AM33XX: Add pinmux configuration for CPSW to beaglebone
->>    ARM: dts: AM33XX: Add pinmux configuration for CPSW to EVMsk
->>    ARM: dts: AM33XX: Add pinmux configuration for CPSW to am335x EVM
->>
->>   arch/arm/boot/dts/am335x-bone.dts  |   67 ++++++++++++++++++++++++++
->>   arch/arm/boot/dts/am335x-evm.dts   |   64 +++++++++++++++++++++++++
->>   arch/arm/boot/dts/am335x-evmsk.dts |   92
->> ++++++++++++++++++++++++++++++++++++
->>   3 files changed, 223 insertions(+)
->>
-> Benoit
->
-> Do you have any comments on this patch series,
-> if not can you queue it for v3.11
+Hi Arnd, Olof,
 
-The series looks good to me. I've just applied it.
+Here is a rather small pull request for a change in the
+multi_v7_defconfig needed for the Allwinner SoCs.
 
-Thanks,
-Benoit
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+
+are available in the git repository at:
+
+  git://github.com/mripard/linux.git tags/sunxi-defconfig-for-3.11
+
+for you to fetch changes up to fb1c60288a886a28dc7c055449fd1936140fe891:
+
+  ARM: multi_v7: Enable Allwinner EMAC in multi_v7_defconfig (2013-06-19 11:07:50 +0200)
+
+----------------------------------------------------------------
+Allwinner defconfig changes for 3.11
+
+----------------------------------------------------------------
+Maxime Ripard (1):
+      ARM: multi_v7: Enable Allwinner EMAC in multi_v7_defconfig
+
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
