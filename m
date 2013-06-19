@@ -1,47 +1,68 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Wed, 19 Jun 2013 16:38:38 +0800
-Subject: [PATCH V3 5/5] input: pxa27x-keypad: add device tree support
-In-Reply-To: <201306191022.51630.marex@denx.de>
-References: <1371527778-5236-1-git-send-email-chao.xie@marvell.com>
- <1371527778-5236-6-git-send-email-chao.xie@marvell.com>
- <201306191022.51630.marex@denx.de>
-Message-ID: <CADApbeiQWOi8SYEFf0bOsf1yn+TgXhwgDWaWFpGk7+nbC9bNDg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 19 Jun 2013 01:42:10 -0700
+Subject: OMAP4430 failure to boot
+In-Reply-To: <20130619083630.GI2718@n2100.arm.linux.org.uk>
+References: <20130618183424.GD2718@n2100.arm.linux.org.uk>
+ <20130619064307.GV5523@atomide.com>
+ <20130619083630.GI2718@n2100.arm.linux.org.uk>
+Message-ID: <20130619084210.GX5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 4:22 PM, Marek Vasut <marex@denx.de> wrote:
-> Dear Chao Xie,
->
->> Signed-off-by: Chao Xie <chao.xie@marvell.com>
->> ---
->>  .../devicetree/bindings/input/pxa27x-keypad.txt    |   60 +++++
->>  drivers/input/keyboard/pxa27x_keypad.c             |  232
->> +++++++++++++++++++- 2 files changed, 288 insertions(+), 4 deletions(-)
->>  create mode 100644
->> Documentation/devicetree/bindings/input/pxa27x-keypad.txt
->>
->> diff --git a/Documentation/devicetree/bindings/input/pxa27x-keypad.txt
->> b/Documentation/devicetree/bindings/input/pxa27x-keypad.txt new file mode
->> 100644
->> index 0000000..f8674f7
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/input/pxa27x-keypad.txt
->> @@ -0,0 +1,60 @@
->> +* Marvell PXA Keypad controller
->> +
->> +Required Properties
->> +- compatible : should be "marvell,pxa27x-keypad"
->> +- reg : Address and length of the register set for the device
->> +- interrupts : The interrupt for the keypad controller
->> +- marvell,debounce-interval : How long time the key will be
->
-> Is there no generic prop name for this debounce interval?
->
-I searched at drivers/input and Documents.
-Two drivers use "debounce-interval", gpio-keys.c and stmpe-keypad.c.
-They describe the meanings of "debounce-interval" at its own document file.
-Some other drivers uses "xxx,debounce-delay-ms" or "debounce-delay-ms"
-So it seems that there is no generic prop name for this debounce interval.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [130619 01:42]:
+> On Tue, Jun 18, 2013 at 11:43:07PM -0700, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [130618 11:40]:
+> > > So... the boot and build system last night managed to build its kernels
+> > > after I dropped a couple of patches from my kernel, but we've gone from
+> > > having both the 3430LDP and 4430SDP booting to only the 3430LDP.
+> > > 
+> > > Something has broken 4430SDP during the last week, and so far I've no
+> > > idea what.  The 4430 seems to be utterly immune to any kind of debugging.
+> > > It:
+> > > 
+> > > (a) doesn't produce any decompressor output because its part of the
+> > > multiplatform kernel.  This means I've no idea if the decompressor is
+> > > working or not.
+> > > 
+> > > (b) doesn't produce any output from the kernel via the use of printch()
+> > > in the early assembly, nor via adding printascii() into printk().
+> > > 
+> > > Will has tested v3.10-rc6, and that works.  Will tested v3.10-rc6 plus
+> > > arm-soc for-next, and got:
+> > > 
+> > > 	Error: unrecognized/unsupported machine ID (r1 = 0x00000ae7).
+> > 
+> > It's because it's DT only. I guess we could have some minimal generic
+> > file handling that machine ID to produce an error to avoid having
+> > to debug things?
+> > 
+> > If you have arm-soc for-next, omap4 is now DT only. So you have to
+> > have CONFIG_ARM_APPENDED_DTB=y, CONFIG_ARM_ATAG_DTB_COMPAT=y and
+> > CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y and append the .dtb to
+> > zImage to boot. Or you can also update u-boot to pass the .dtb.
+> > There are more accurate instructions in arm-soc commit b42b9181.
+> > 
+> > Moving omap4 to be DT only has been about 5900 lines of reduced data
+> > and code so far, so that's a good reason for doing it. Most things
+> > should work as earlier, except for the pandaboard EHCI is still missing
+> > a fix for adding a clock alias for the auxclk. If there are things not
+> > working, they should be quite easy to fix.
+> 
+> Right, so as I said I'm taking OMAP4 out of the build/boot test system,
+> which can't currently cope with jumping through the hoops to get DT to
+> work.
 
-> Best regards,
-> Marek Vasut
+OK too bad, but hopefully it can get added back once your setup
+can deal with it.
+ 
+> And since no one tells me anything about where to get updated uboots from
+> for TI's boards, I'm not about to play boot loader roulette trying to
+> build my own.
+
+The mainline u-boot should work, I have not yet updated mine though as
+I want to be sure things work with older bootloaders too with appended
+DTB.
+
+Regards,
+
+Tony
