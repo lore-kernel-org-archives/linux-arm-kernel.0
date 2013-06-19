@@ -1,82 +1,44 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 19 Jun 2013 14:05:00 +0200
-Subject: [PATCH v2 1/4] ARM: dts: omap4-panda: Add USB Host support
-In-Reply-To: <51C19011.5050107@ti.com>
-References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
- <1371571487-14389-2-git-send-email-rogerq@ti.com> <51C106A1.9030001@ti.com>
- <51C15F7E.5020305@ti.com> <20130619074605.GW5523@atomide.com>
- <51C183AC.8040801@ti.com> <51C19011.5050107@ti.com>
-Message-ID: <51C19E6C.4040802@epfl.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 19 Jun 2013 14:05:16 +0200
+Subject: [GIT PULL] Integrator/AP PCI DT support
+In-Reply-To: <CACRpkdZaTDEu8vUx347k1Y5Pht5Pi_mPJXpDsVtAsSYVT60n_Q@mail.gmail.com>
+References: <CACRpkdb8J4+QH36SYavgGWbFWaBZDg5JSYyyJELzL=mSZfMnBw@mail.gmail.com>
+ <20130614230838.GA18124@quad.lixom.net>
+ <20130615000922.GG18124@quad.lixom.net>
+ <CACRpkdZaTDEu8vUx347k1Y5Pht5Pi_mPJXpDsVtAsSYVT60n_Q@mail.gmail.com>
+Message-ID: <CACRpkdYsmMLGF_u26Zxx3modFsFybk0KZe92c9D1rT2bd_XW=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sat, Jun 15, 2013 at 10:32 PM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
 
-On 06/19/2013 01:03 PM, Roger Quadros wrote:
-> On 06/19/2013 01:10 PM, Benoit Cousson wrote:
->> On 06/19/2013 02:46 AM, Tony Lindgren wrote:
->>> * Roger Quadros <rogerq@ti.com> [130619 00:42]:
->>>> Hi Benoit,
->>>>
->>>> On 06/19/2013 04:17 AM, Benoit Cousson wrote:
->>>>> Hi Roger,
->>>>>
->>>>> On 06/18/2013 11:04 AM, Roger Quadros wrote:
->>>>>> Provide the RESET and Power regulators for the USB PHY,
->>>>>> the USB Host port mode and the PHY device.
->>>>>>
->>>>>> Also provide pin multiplexer information for the USB host
->>>>>> pins.
->>>>>>
->>>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>>>>> ---
->>>>>>     arch/arm/boot/dts/omap4-panda-common.dtsi |   62 +++++++++++++++++++++++++++++
->>>>>>     1 files changed, 62 insertions(+), 0 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
->>>>>> index 00cbaa5..7a21e8e 100644
->>>>>> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
->>>>>> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
->>>>>> @@ -59,6 +59,42 @@
->>>>>>                 "AFML", "Line In",
->>>>>>                 "AFMR", "Line In";
->>>>>>         };
->>>>>> +
->>>>>> +    /* HS USB Port 1 RESET */
->>>>>> +    hsusb1_reset: hsusb1_reset_reg {
->>>>>> +        compatible = "regulator-fixed";
->>>>>> +        regulator-name = "hsusb1_reset";
->>>>>> +        regulator-min-microvolt = <3300000>;
->>>>>> +        regulator-max-microvolt = <3300000>;
->>>>>> +        gpio = <&gpio2 30 0>;    /* gpio_62 */
->>>>>> +        startup-delay-us = <70000>;
->>>>>> +        enable-active-high;
->>>>>> +    };
->>>>>
->>>>> Is this really a regulator? Or just a GPIO line used to reset the USB PHY?
->>>>
->>>> It is in fact a GPIO line used as reset.
->>>>>
->>>>> If this is the case, I don't think it should be represented as a regulator.
->>>>
->>>> Why not? I think it fits very well in the regulator device model.
->>
->> I'm not sure fitting very well is the correct term.
->> It works, for sure, but it is no different than when we were trying to abuse the regulator fmwk to enable the 32k clock in phoenix.
->> It is just a hack.
->>
+> OK here is the fixed branch, using the v3 patch of DT enablement just
+> posted to the list, please pull this instead (still the same base):
 >
-> The only difference is there is a dedicated framework for clocks. Since there is nothing specific to
-> handle reset lines it is left to the driver writer how he wants to manage it.
 >
+> The following changes since commit 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
+>
+>   of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+> tags/integrator-pci-for-arm-soc
+>
+> for you to fetch changes up to f55b2b56cd37fa8bcfcb75248c27094eaf09e04c:
+>
+>   ARM: integrator: basic PCIv3 device tree support (2013-06-15 22:18:39 +0200)
+>
+> ----------------------------------------------------------------
+> This is a patch series that:
+> - Pulls the Integrator/AP PCI bridge driver into one file
+> - Adds full device tree support for it
+> - Keeps ATAG support around for the time being
+>
+> ----------------------------------------------------------------
 
-There is a proposed binding for gpio-controlled reset lines, but it is 
-not yet merged [1].
-I guess it can fit most usage patterns, and it can be an interesting 
-move in the future.
+Ping on this...
 
-Regards,
-
-Florian
-
-[1] http://thread.gmane.org/gmane.linux.drivers.devicetree/36830
+Yours,
+Linus Walleij
