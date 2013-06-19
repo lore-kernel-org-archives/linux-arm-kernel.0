@@ -1,52 +1,42 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 19 Jun 2013 20:23:19 +0200
-Subject: [RFC PATCH 11/11] ARM: s3c64xx: Add support for DMA using generic
- amba-pl08x driver
-In-Reply-To: <CACRpkdbQ7+FDJh235vERbCcQcnW1Mzar9r5jgLaXAT5n6CiCFQ@mail.gmail.com>
-References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <1371416058-22047-12-git-send-email-tomasz.figa@gmail.com>
- <CACRpkdbQ7+FDJh235vERbCcQcnW1Mzar9r5jgLaXAT5n6CiCFQ@mail.gmail.com>
-Message-ID: <91444857.CpeBVZzDHZ@flatron>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 19 Jun 2013 19:23:54 +0100
+Subject: [PATCH v1 2/3] spi: s3c64xx: Added provision for dedicated cs pin
+In-Reply-To: <1369032694-13183-3-git-send-email-ks.giri@samsung.com>
+References: <1369032694-13183-1-git-send-email-ks.giri@samsung.com>
+ <1369032694-13183-3-git-send-email-ks.giri@samsung.com>
+Message-ID: <20130619182354.GD1403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 of June 2013 16:04:47 Linus Walleij wrote:
-> On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> 
-wrote:
-> > This patch adds all required platform-specific data and initialization
-> > code to support the generic amba-pl08x driver on S3C64xx SoCs.
-> > 
-> > Also some compatibility definitions are added to make the transition
-> > from legacy API to DMA engine easier. The biggest hack here is
-> > passing const char * pointers through DMA resource, casted to
-> > unsigned long, but this is how Samsung DMA wrappers (used to support
-> > both s3c-dma and DMA engine in drivers) is designed.
-> > 
-> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+On Mon, May 20, 2013 at 12:21:33PM +0530, Girish K S wrote:
+> From: Girish K S <girishks2000@gmail.com>
 > 
-> Patch looks like an OK stepping stone.
+> The existing driver supports gpio based /cs signal.
+> For controller's that have one device per controller,
+> the slave device's /cs signal might be internally controlled
+> by the chip select bit of slave select register. They are not
+> externally asserted/deasserted using gpio pin.
 > 
-> > +static AMBA_AHB_DEVICE(s3c64xx_dma0, "dma-pl080s.0", 0x0a141080,
-> > +                       0x75000000, {IRQ_DMA0},
-> > &s3c64xx_dma0_plat_data);
-> (...)
-> 
-> > +static AMBA_AHB_DEVICE(s3c64xx_dma1, "dma-pl080s.1", 0x0a141080,
-> > +                       0x75100000, {IRQ_DMA1},
-> > &s3c64xx_dma1_plat_data);
-> Ah, does this mean the device does not have any AMBA PrimeCell ID
-> contents?
+> This patch adds support for controllers with dedicated /cs pin.
+> if "cs-gpio" property doesnt exist in a spi dts node, the controller
+> would treat the /cs pin as dedicated.
 
-Hmm, not really. The ID here is what I copied from PrimeCell ID registers 
-and the method of registration is taken from S5PV210. If I remove the 
-override, it will read the same value from registers.
+This breaks SPI operation on my s3c64xx based system since...
 
-> Then use the ID 0x00053080 instead of 0x0a141080
-> 
-> 0x53 is "S" for Samsung. Variant 0.
+>  	if (pdev->dev.of_node) {
+> +		if (of_find_property(pdev->dev.of_node, "cs-gpio", NULL))
+> +			sdd->cs_gpio = true;
+> +
+>  		ret = of_alias_get_id(pdev->dev.of_node, "spi");
+>  		if (ret < 0) {
+>  			dev_err(&pdev->dev, "failed to get alias id, errno %d\n",
 
-Well, that's kind of solution to make sure that it won't conflict with any 
-future variant manufactured by ARM, I guess.
-
-Best regards,
-Tomasz
+sdd->cs_gpio is only set to true by this code so if you're using a board
+file then the GPIO will be ignored.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130619/c605248d/attachment.sig>
