@@ -1,51 +1,57 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 19 Jun 2013 13:11:03 +0200
-Subject: [PATCH 0/8] ARM: at91: prepare the move to common clk framework
-Message-ID: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 19 Jun 2013 12:11:38 +0100
+Subject: DMA mapping API(IOMMU) for ARM64?
+In-Reply-To: <51C0DA4F.1010405@redhat.com>
+References: <20130618.053955.305832937374936961.hdoyu@nvidia.com>
+ <20130618101914.GB3539@mudshark.cambridge.arm.com>
+ <5159282.rrJMaZuYMv@wuerfel>
+ <20130618.140137.1551430695673122122.hdoyu@nvidia.com>
+ <20130618125054.GL9930@arm.com> <51C0DA4F.1010405@redhat.com>
+Message-ID: <20130619111137.GJ9261@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Jun 18, 2013 at 11:08:15PM +0100, Don Dutile wrote:
+> On 06/18/2013 08:50 AM, Catalin Marinas wrote:
+> > On Tue, Jun 18, 2013 at 12:01:37PM +0100, Hiroshi Doyu wrote:
+> >> Arnd Bergmann<arnd@arndb.de>  wrote @ Tue, 18 Jun 2013 12:32:44 +0200:
+> >>> On Tuesday 18 June 2013 11:19:14 Will Deacon wrote:
+> >>>> I've spoken briefly with Catalin about this and it seems like there might be
+> >>>> *some* scope for sharing common dma-mapping code between architectures.
+> >>>> There doesn't really need to be any architecture-specific details in
+> >>>> allocating iova space and the interface to the iommu drivers is
+> >>>> well-defined. The arch-specific stuff is bogged down in the non-coherent
+> >>>> buffer management, but that doesn't necessarily equate to lots of code.
+> >>>>
+> >>>> So, the best bet would be to figure out how to split up what we have under
+> >>>> arch/arm/ so that it can be re-used by arm64 and potentially other
+> >>>> architectures (powerpc has some simple stuff for coherent mappings and some
+> >>>> less-simple stuff for non-coherent buffers).
+> >>>
+> >>> I'm sure that other architectures are interested in sharing the code.
+> >>> Best move it into the global mm/ directory, at least the version for
+> >>> coherent mappings.
+> >>
+> >> I'm guessing that this kind of unification usually takes some time
+> >> since we need to factor out the common code from the different
+> >> ${ARCH}/mm/dma-mapping.c. Also some of ${ARCH} has IOMMU support in
+> >> it. So if we want to develop our 64-bit ARM with working DMA mapping
+> >> API during this transition, the step to take would be:
+> >>
+> >> 1, Copy arch/arm/mm/dma-mapping.c arch/arm64/mm/dma-mapping.c(+swiotlb)
+> >> 2, Adapt arch/arm64/mm/dma-mapping.c(+swiotlb) to 64bit compatible.
+> >> 3, Factor out the common code from them into mm/dma-mapping.c
+> >
+> > Or add the relevant code to something like lib/iommu-helper.c, convert
+> > arm64 to use that and we can work on converting arm and other
+> > architectures afterwards.
+> >
+> why not in current drivers/iommu directory ?
 
-This patch series was formerly part of the at91 common clk patch series.
-It prepares the move to common clk framework by replacing all the
-clk_enable and clk_disable calls by clk_prepare_unable and
-clk_disable_unprepare to avoid common clock framework warnings.
-
-This patch series was taken out of the at91 common clk patch series
-beacuse it does not rely on any other patches and have a low impact
-on the drivers (can be merge faster).
-
-Please tell me if I missed drivers using at91 PMC clks.
-
-Best Regards,
-Boris
-
-Changes since v1:
- - add clk_prepare_enable return check
- - fix a deadlock in atmel-mci (missing spin_unlock)
- - remove already applied patches (atmel-ssc and pwm-atmel-tcb)
-
-Boris BREZILLON (8):
-  ARM: at91/tc/clocksource: replace clk_enable/disable with
-    clk_prepare_enable/disable_unprepare.
-  at_hdmac: prepare clk before calling enable
-  mmc: atmel-mci: prepare clk before calling enable
-  tty: atmel_serial: prepare clk before calling enable
-  usb: gadget: at91_udc: prepare clk before calling enable
-  ehci-atmel.c: prepare clk before calling enable
-  USB: ohci-at91: prepare clk before calling enable
-  at91/avr32/atmel_lcdfb: prepare clk before calling enable
-
- drivers/clocksource/tcb_clksrc.c  |   10 ++++-----
- drivers/dma/at_hdmac.c            |   17 +++++++++------
- drivers/mmc/host/atmel-mci.c      |   29 ++++++++++++++++++--------
- drivers/tty/serial/atmel_serial.c |   41 ++++++++++++++++++++++++++++---------
- drivers/usb/gadget/at91_udc.c     |   14 +++++++------
- drivers/usb/host/ehci-atmel.c     |    8 ++++----
- drivers/usb/host/ohci-at91.c      |   12 +++++------
- drivers/video/atmel_lcdfb.c       |    8 ++++----
- 8 files changed, 89 insertions(+), 50 deletions(-)
+That's not really specific to the iommu driver implementation, they have
+a clearly defined interface. For similarity with swiotlb and given that
+we already have iommu-helper.c, lib/ looks best to me. Anyway, let's
+first see how the code looks like, it can be moved later.
 
 -- 
-1.7.9.5
+Catalin
