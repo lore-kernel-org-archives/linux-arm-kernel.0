@@ -1,113 +1,46 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Wed, 19 Jun 2013 19:44:20 +0900
-Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
- framework
-In-Reply-To: <1371637326.4230.24.camel@weser.hi.pengutronix.de>
-References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
- <1371467722-665-1-git-send-email-inki.dae@samsung.com>
- <51BEF458.4090606@canonical.com>
- <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
- <20130617133109.GG2718@n2100.arm.linux.org.uk>
- <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
- <20130617154237.GJ2718@n2100.arm.linux.org.uk>
- <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
- <20130617182127.GM2718@n2100.arm.linux.org.uk>
- <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
- <20130618084308.GU2718@n2100.arm.linux.org.uk>
- <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
- <1371548849.4276.6.camel@weser.hi.pengutronix.de>
- <008601ce6cb0$2c8cec40$85a6c4c0$%dae@samsung.com>
- <1371637326.4230.24.camel@weser.hi.pengutronix.de>
-Message-ID: <00ae01ce6cd9$f4834630$dd89d290$%dae@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 19 Jun 2013 16:22:21 +0530
+Subject: [PATCH v2 1/7] gpio: davinci: coding style correction
+In-Reply-To: <1371202532-14628-2-git-send-email-avinashphilip@ti.com>
+References: <1371202532-14628-1-git-send-email-avinashphilip@ti.com>
+ <1371202532-14628-2-git-send-email-avinashphilip@ti.com>
+Message-ID: <51C18D65.6010009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 6/14/2013 3:05 PM, Philip Avinash wrote:
+> Make some minor coding style fixes. Use proper multi-line
+> commenting style, arrange include files alphabetically use
+> macros for bit definitions.
 
+Its a register offset, not bit definition.
 
-> -----Original Message-----
-> From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> Sent: Wednesday, June 19, 2013 7:22 PM
-> To: Inki Dae
-> Cc: 'Russell King - ARM Linux'; 'linux-fbdev'; 'Kyungmin Park'; 'DRI
-> mailing list'; 'myungjoo.ham'; 'YoungJun Cho'; linux-arm-
-> kernel at lists.infradead.org; linux-media at vger.kernel.org
-> Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
-> framework
 > 
-> Am Mittwoch, den 19.06.2013, 14:45 +0900 schrieb Inki Dae:
-> >
-> > > -----Original Message-----
-> > > From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> > > Sent: Tuesday, June 18, 2013 6:47 PM
-> > > To: Inki Dae
-> > > Cc: 'Russell King - ARM Linux'; 'linux-fbdev'; 'Kyungmin Park'; 'DRI
-> > > mailing list'; 'myungjoo.ham'; 'YoungJun Cho'; linux-arm-
-> > > kernel at lists.infradead.org; linux-media at vger.kernel.org
-> > > Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer
-> synchronization
-> > > framework
-> > >
-> > > Am Dienstag, den 18.06.2013, 18:04 +0900 schrieb Inki Dae:
-> > > [...]
-> > > >
-> > > > > a display device driver.  It shouldn't be used within a single
-> driver
-> > > > > as a means of passing buffers between userspace and kernel space.
-> > > >
-> > > > What I try to do is not really such ugly thing. What I try to do is
-> to
-> > > > notify that, when CPU tries to access a buffer , to kernel side
-> through
-> > > > dmabuf interface. So it's not really to send the buffer to kernel.
-> > > >
-> > > > Thanks,
-> > > > Inki Dae
-> > > >
-> > > The most basic question about why you are trying to implement this
-> sort
-> > > of thing in the dma_buf framework still stands.
-> > >
-> > > Once you imported a dma_buf into your DRM driver it's a GEM object and
-> > > you can and should use the native DRM ioctls to prepare/end a CPU
-> access
-> > > to this BO. Then internally to your driver you can use the dma_buf
-> > > reservation/fence stuff to provide the necessary cross-device sync.
-> > >
-> >
-> > I don't really want that is used only for DRM drivers. We really need
-> > it for all other DMA devices; i.e., v4l2 based drivers. That is what I
-> > try to do. And my approach uses reservation to use dma-buf resources
-> > but not dma fence stuff anymore. However, I'm looking into Radeon DRM
-> > driver for why we need dma fence stuff, and how we can use it if
-> > needed.
-> >
+> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+> Changes since v1:
+> 	- Remove variable name replacement
+> 	- Add line break after BINTEN macro definition
 > 
-> Still I don't see the point why you need syncpoints above dma-buf. In
-> both the DRM and the V4L2 world we have defined points in the API where
-> a buffer is allowed to change domain from device to CPU and vice versa.
+>  drivers/gpio/gpio-davinci.c |   21 +++++++++++++--------
+>  1 file changed, 13 insertions(+), 8 deletions(-)
 > 
-> In DRM if you want to access a buffer with the CPU you do a cpu_prepare.
-> The buffer changes back to GPU domain once you do the execbuf
-> validation, queue a pageflip to the buffer or similar things.
-> 
-> In V4L2 the syncpoints for cache operations are the queue/dequeue API
-> entry points. Those are also the exact points to synchronize with other
-> hardware thus using dma-buf reserve/fence.
+> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+> index 17df6db..e8d189c 100644
+> --- a/drivers/gpio/gpio-davinci.c
+> +++ b/drivers/gpio/gpio-davinci.c
+> @@ -9,12 +9,12 @@
+>   * the Free Software Foundation; either version 2 of the License, or
+>   * (at your option) any later version.
+>   */
+> -#include <linux/gpio.h>
+> -#include <linux/errno.h>
+> -#include <linux/kernel.h>
+> +
 
-
-If so, what if we want to access a buffer with the CPU _in V4L2_? We should open a drm device node, and then do a cpu_prepare? 
+This is unnecessary empty line. I made these fixes locally and added
+this to my v3.11/gpio branch.
 
 Thanks,
-Inki Dae
-
-> 
-> In all this I can't see any need for a new syncpoint primitive slapped
-> on top of dma-buf.
-> 
-> Regards,
-> Lucas
-> --
-> Pengutronix e.K.                           | Lucas Stach                 |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sekhar
