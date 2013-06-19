@@ -1,57 +1,34 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 19 Jun 2013 09:34:56 -0700
-Subject: [PATCH/RESEND 11/12] ARM: msm: Make proc_comm clock control
- into a platform driver
-In-Reply-To: <1371490999-15501-12-git-send-email-sboyd@codeaurora.org>
-References: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
- <1371490999-15501-12-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130619163456.GB6300@codeaurora.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 19 Jun 2013 17:43:38 +0100
+Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
+In-Reply-To: <20130612083619.GA13274@S2101-09.ap.freescale.net>
+References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
+ <20130612083619.GA13274@S2101-09.ap.freescale.net>
+Message-ID: <20130619164338.GE5276@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17, Stephen Boyd wrote:
-> diff --git a/arch/arm/mach-msm/devices.h b/arch/arm/mach-msm/devices.h
-> index da902cf..dccefad 100644
-> --- a/arch/arm/mach-msm/devices.h
-> +++ b/arch/arm/mach-msm/devices.h
-> @@ -16,10 +16,6 @@
->  #ifndef __ARCH_ARM_MACH_MSM_DEVICES_H
->  #define __ARCH_ARM_MACH_MSM_DEVICES_H
->  
-> -#include <linux/clkdev.h>
-> -
-> -#include "clock.h"
-> -
+On Wed, Jun 12, 2013 at 09:36:20AM +0100, Shawn Guo wrote:
+> On Tue, Jun 11, 2013 at 10:58:48AM +0100, Lorenzo Pieralisi wrote:
+> > Hi Russell, all,
+> > 
+> > even though I think this set is ready to get merged, it would be great
+> > if we can test it on as many platforms as possible since it touches core
+> > suspend/resume operations on ARM platforms relying on CONFIG_ARM_CPU_SUSPEND,
+> > and there are many.
+> > 
+> > I pushed out a branch:
+> > 
+> > git://linux-arm.org/linux-2.6-lp.git mpidr-linearization
+> > 
+> > if anyone has time to test the set that would be really great, thank you
+> > very much.
+> 
+> I tested the branch on imx6q, and system suspend/resume works fine with
+> it.
 
-This removal causes a build failure on 7x30/8x50. Please squash in
-this small fixup when applying.
+Can I add your tested-by please ?
 
----8<-----
-diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
-index be45136..d4db75a 100644
---- a/arch/arm/mach-msm/devices-msm7x30.c
-+++ b/arch/arm/mach-msm/devices-msm7x30.c
-@@ -28,6 +28,7 @@
- 
- #include <asm/mach/flash.h>
- 
-+#include "clock.h"
- #include "clock-pcom.h"
- 
- #include <linux/platform_data/mmc-msm_sdcc.h>
-diff --git a/arch/arm/mach-msm/devices-qsd8x50.c b/arch/arm/mach-msm/devices-qsd8x50.c
-index 3fd8f88..f551811 100644
---- a/arch/arm/mach-msm/devices-qsd8x50.c
-+++ b/arch/arm/mach-msm/devices-qsd8x50.c
-@@ -28,6 +28,7 @@
- #include <asm/mach/flash.h>
- 
- #include <linux/platform_data/mmc-msm_sdcc.h>
-+#include "clock.h"
- #include "clock-pcom.h"
- 
- static struct resource msm_gpio_resources[] = {
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thank you very much,
+Lorenzo
