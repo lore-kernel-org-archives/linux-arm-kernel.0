@@ -1,51 +1,30 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 19 Jun 2013 10:23:48 +0200
-Subject: [PATCH v2 0/5] mfd: twl4030-power: Start DT conversion and updates
-In-Reply-To: <1371561480-28325-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1371561480-28325-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <20130619082348.GQ7161@zurbaran>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Jun 2013 09:28:40 +0100
+Subject: [PATCH 1/2] ARM: mmu: fix the hang when we steal a section
+ unaligned size memory
+In-Reply-To: <51C11916.2030807@freescale.com>
+References: <1371113826-1231-1-git-send-email-b32955@freescale.com>
+ <20130618152905.GB8534@mudshark.cambridge.arm.com>
+ <20130618165246.GC2718@n2100.arm.linux.org.uk>
+ <51C11916.2030807@freescale.com>
+Message-ID: <20130619082840.GG2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On Wed, Jun 19, 2013 at 10:36:06AM +0800, Huang Shijie wrote:
+> ? 2013?06?19? 00:52, Russell King - ARM Linux ??:
+>> This is why I've always said - if you steal memory from memblock, it
+>> _must_  be aligned to 1MB (the section size) to avoid this.  Not only
+>
+> firstly, it's a little waste to _must_ steal 1M for some board with less  
+> memory such as 512M memory;
 
-On Tue, Jun 18, 2013 at 03:17:55PM +0200, Florian Vaussard wrote:
-> Hello,
-> 
-> This series enables a partial DT support for twl4030-power. The
-> missing part is the power management scripts, as the required
-> binding should be defined first. It however enables the complete
-> shutdown of the processor at poweroff when booting with DT,
-> dropping the power consumption from around 350 mA on Overo+Tobi
-> to about 40 mA.
-> 
-> The poweroff callback was tested with both DT and non-DT boots.
-> 
-> The last two patches simplify the error path in the probe function,
-> and fix registers relocking on error.
-> 
-> Best regards,
-> 
-> Florian
-> 
-> Since v1:
-> - use module_platform_driver()
-> - split the refactoring of the probe function into a dedicated patch
-> - new patch to fix registers relocking on error
-> - rebased on mfd-next
-> 
-> 
-> Florian Vaussard (5):
->   mfd: twl4030-power: Split from twl-core into a dedicated module
->   mfd: twl4030-power: Simplify probing of power scripts and resources
->   mfd: twl4030-power: Start transition to DT
->   mfd: twl4030-power: Simplify error path
->   mfd: twl4030-power: Fix relocking on error
-All 5 patches applied, thanks.
+You're complaining about 512M memory?  Christ.  Some of my machines
+which I run here have as little as 32M of memory!  1M is nothing in
+512M.
 
-Cheers,
-Samuel.
+> secondly, if we do not support the section unaligned mapping, we should  
+> remove the alloc_init_pte() in alloc_init_pmd(),
+> add a comment to tell that we do not support the section unaligned mapping.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+No, because that breaks a whole load of other non-memory mappings.
