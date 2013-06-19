@@ -1,20 +1,68 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 19 Jun 2013 08:19:13 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzRdIGRyaXZlcnM6IGJ1czogaW14LXdlaW06IFJlbW92?=
- =?UTF-8?B?ZSBwcml2YXRlIGRyaXZlciBkYXRh?=
-In-Reply-To: <1371570410-12773-1-git-send-email-shc_work@mail.ru>
-References: <1371570410-12773-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1371615553.4921154@f394.i.mail.ru>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Wed, 19 Jun 2013 14:45:15 +0900
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <1371548849.4276.6.camel@weser.hi.pengutronix.de>
+References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
+ <1371467722-665-1-git-send-email-inki.dae@samsung.com>
+ <51BEF458.4090606@canonical.com>
+ <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
+ <20130617133109.GG2718@n2100.arm.linux.org.uk>
+ <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
+ <20130617154237.GJ2718@n2100.arm.linux.org.uk>
+ <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
+ <20130617182127.GM2718@n2100.arm.linux.org.uk>
+ <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
+ <20130618084308.GU2718@n2100.arm.linux.org.uk>
+ <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
+ <1371548849.4276.6.camel@weser.hi.pengutronix.de>
+Message-ID: <008601ce6cb0$2c8cec40$85a6c4c0$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Driver uses only probe function so no reason to keep variables
-> in private driver data.
+
+
+> -----Original Message-----
+> From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> Sent: Tuesday, June 18, 2013 6:47 PM
+> To: Inki Dae
+> Cc: 'Russell King - ARM Linux'; 'linux-fbdev'; 'Kyungmin Park'; 'DRI
+> mailing list'; 'myungjoo.ham'; 'YoungJun Cho'; linux-arm-
+> kernel at lists.infradead.org; linux-media at vger.kernel.org
+> Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+> framework
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> Am Dienstag, den 18.06.2013, 18:04 +0900 schrieb Inki Dae:
+> [...]
+> >
+> > > a display device driver.  It shouldn't be used within a single driver
+> > > as a means of passing buffers between userspace and kernel space.
+> >
+> > What I try to do is not really such ugly thing. What I try to do is to
+> > notify that, when CPU tries to access a buffer , to kernel side through
+> > dmabuf interface. So it's not really to send the buffer to kernel.
+> >
+> > Thanks,
+> > Inki Dae
+> >
+> The most basic question about why you are trying to implement this sort
+> of thing in the dma_buf framework still stands.
+> 
+> Once you imported a dma_buf into your DRM driver it's a GEM object and
+> you can and should use the native DRM ioctls to prepare/end a CPU access
+> to this BO. Then internally to your driver you can use the dma_buf
+> reservation/fence stuff to provide the necessary cross-device sync.
+> 
 
-Please review this series only. Later, I would send a second version
-with the addition of support for the entire i.MX series.
-Thanks.
+I don't really want that is used only for DRM drivers. We really need it for all other DMA devices; i.e., v4l2 based drivers. That is what I try to do. And my approach uses reservation to use dma-buf resources but not dma fence stuff anymore. However, I'm looking into Radeon DRM driver for why we need dma fence stuff, and how we can use it if needed.
 
----
+Thanks,
+Inki Dae
+
+> Regards,
+> Lucas
+> --
+> Pengutronix e.K.                           | Lucas Stach                 |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
