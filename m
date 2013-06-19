@@ -1,40 +1,33 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 18 Jun 2013 19:49:06 -0500
-Subject: [PATCH 0/2] ARM: AM33XX: clock: Add debugSS data to clk and hwmod
- database
-In-Reply-To: <1371532080-27714-1-git-send-email-hvaibhav@ti.com>
-References: <1371532080-27714-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <51C10002.5040301@ti.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Wed, 19 Jun 2013 09:00:02 +0800
+Subject: [PATCH v3 1/2] i2c: designware: use module_platform_driver
+In-Reply-To: <20130618162711.GG7718@katana>
+References: <1370918230-24793-1-git-send-email-zhangfei.gao@linaro.org>
+ <1370918230-24793-2-git-send-email-zhangfei.gao@linaro.org>
+ <20130618162711.GG7718@katana>
+Message-ID: <51C10292.9000906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
-
-On 06/18/2013 12:07 AM, Vaibhav Hiremath wrote:
-> This patch adds DebugSS data to clock-tree and hwmod data files.
+On 13-06-19 12:27 AM, Wolfram Sang wrote:
+> On Tue, Jun 11, 2013 at 10:37:09AM +0800, Zhangfei Gao wrote:
+>> Instead of use platform_driver_probe, use module_platform_driver
+>> To support deferred probing
+>> Also subsys_initcall may too early to auto set pinctl
+>>
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> CC: Baruch Siach <baruch@tkos.co.il>
 >
-> Changes from RFC/V1 (No code change):
-> 	- Based on comments, we have to follow DT and loadable module
-> 	  approach for debugSS module as well, so separated out 2 patches
-> 	  of clock-tree and hwmod data addition from the RFC patch-series.
-> 	- Added Paul's Ack on clock-tree patch.
-> 	- Rebased on top of Benoit's for-3.11/dts branch.
+> Basically OK, but please resend for 3.12, so we get enough testing
+> before entering mainline. I am a bit anxious of side
+> effects and 3.11 is too near.
 >
-> Link to original RFC -
-> http://archive.arm.linux.org.uk/lurker/message/20130304.113554.53c9ec25.en.html
->
-> Vaibhav Hiremath (2):
->    ARM: AM33XX: clock: Add debugSS clock nodes
 
-I'll take that one, but the next one:
+Dear Wolfram,
 
->    ARM: AM33XX: hwmod: Add hwmod data for debugSS
+Sorry for the silly question: How to be prepared for 3.12?
 
-Still need to go through Paul's tree.
+Do you mean there is specific git & branch, which I should rebase on?
+linux-next.git is what I use now.
 
-Paul,
-
-Do you want to ack it, so I'll be able to take the whole series?
-
-Thanks,
-Benoit
+Thanks
