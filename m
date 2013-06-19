@@ -1,51 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 19 Jun 2013 22:22:20 +0900
-Subject: [PATCH 2/5] ARM: shmobile: bockw: add I2C device support
-In-Reply-To: <1371648143-18376-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371648143-18376-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371648143-18376-3-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 19 Jun 2013 22:22:18 +0900
+Subject: [GIT PULL 0/5] Renesas ARM-based SoC board updates for v3.11 #2
+Message-ID: <1371648143-18376-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Arnd,
 
-This patch enables rx8581 on I2C0
+please consider the following updates to the Bock-W board for v3.11.
 
-Signed-off-by: Yusuke Goda <yusuke.goda.sx@renesas.com>
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-bockw.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+This pull request is based on a merge of renesas-boards2-for-v3.11 and
+renesas-soc2-for-v3.11, both of which you have previously pulled, in order
+to satisfy dependencies.
 
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index bfe8f67..a4251cc 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -77,6 +77,13 @@ static struct sh_eth_plat_data ether_platform_data __initdata = {
- 	.no_ether_link	= 1,
- };
- 
-+/* I2C */
-+static struct i2c_board_info i2c0_devices[] = {
-+	{
-+		I2C_BOARD_INFO("rx8581", 0x51),
-+	},
-+};
-+
- static const struct pinctrl_map bockw_pinctrl_map[] = {
- 	/* Ether */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7778",
-@@ -103,7 +110,10 @@ static void __init bockw_init(void)
- 	r8a7778_init_irq_extpin(1);
- 	r8a7778_add_standard_devices();
- 	r8a7778_add_ether_device(&ether_platform_data);
-+	r8a7778_add_i2c_device(0);
- 
-+	i2c_register_board_info(0, i2c0_devices,
-+				ARRAY_SIZE(i2c0_devices));
- 	pinctrl_register_mappings(bockw_pinctrl_map,
- 				  ARRAY_SIZE(bockw_pinctrl_map));
- 	r8a7778_pinmux_init();
--- 
-1.8.2.1
+
+The following changes since commit 2e9a222e271b7fd16e62a0861ad5e42996d17815:
+
+  Merge branch 'soc2' into boards-base (2013-06-13 14:41:53 +0900)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards2-for-v3.11
+
+for you to fetch changes up to 2c83322ce820bcf2d5e8265de831489076ee211e:
+
+  ARM: shmobile: BOCK-W: change Ether device name (2013-06-18 16:22:45 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM-based SoC board updates for v3.11
+
+* Extended hardware coverage for the Bock-W board
+  by Goda-san and Morimoto-san
+* Correction to Ether device name for the Bock-W board
+  from Sergei Shtylyov
+
+----------------------------------------------------------------
+Kuninori Morimoto (3):
+      ARM: shmobile: bockw: add I2C device support
+      ARM: shmobile: bockw: add SPI FLASH support
+      ARM: shmobile: bockw: add MMCIF support
+
+Sergei Shtylyov (2):
+      ARM: shmobile: BOCK-W: add Ether support
+      ARM: shmobile: BOCK-W: change Ether device name
+
+ arch/arm/mach-shmobile/board-bockw.c | 98 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 97 insertions(+), 1 deletion(-)
