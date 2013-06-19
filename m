@@ -1,22 +1,24 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 19 Jun 2013 14:23:15 +0800
-Subject: [PATCH 4/6] mtd: atmel_nand: enable Nand Flash Controller (NFC) read
- data via sram
+Date: Wed, 19 Jun 2013 14:23:16 +0800
+Subject: [PATCH 5/6] mtd: atmel_nand: enable Nand Flash Controller (NFC) write
+ via sram
 In-Reply-To: <1371622997-26303-1-git-send-email-josh.wu@atmel.com>
 References: <1371622997-26303-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1371622997-26303-5-git-send-email-josh.wu@atmel.com>
+Message-ID: <1371622997-26303-6-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NFC has embedded sram which can use to transfer data. This patch enable reading
-nand flash via NFC SRAM. It will minimize the CPU overhead.
+This patch enable writing nand flash via NFC SRAM. It will minimize the CPU
+overhead. The SRAM write only support ECC_NONE and ECC_HW with PMECC.
+
+To enable this NFC write by SRAM feature, you can add a string in dts under
+NFC driver node.
 
 This driver has been tested on SAMA5D3X-EK with JFFS2, YAFFS2, UBIFS and
 mtd-utils.
 
-Here puts the part of mtd_speedtest (read test) result as following:
-Compare with non-NFC mtd_speedtest result, reading will reduce %45 cpu load
-with increase %80 speed.
+Here is part of mtd_speedtest (writing test) result, compare with non-NFC
+writing, it reduces %65 cpu load with loss %12 speed.
 
 - commands use to test:
   # insmod /mnt/mtd_speedtest.ko dev=2 &
@@ -26,313 +28,218 @@ with increase %80 speed.
 =================================================
 mtd_speedtest: MTD device: 2
 mtd_speedtest: MTD device size 41943040, eraseblock size 131072, page size 2048, count of eraseblocks 320, pages per eraseblock 64, OOB size 64
-mtd_speedtest: testing eraseblock read speed
-  509   495 root     D     1164   0%  28% insmod /mnt/mtd_speedtest.ko dev=2
+mtd_speedtest: testing eraseblock write speed
+  509   495 root     D     1164   0%   7% insmod /mnt/mtd_speedtest.ko dev=2
+  509   495 root     D     1164   0%   8% insmod /mnt/mtd_speedtest.ko dev=2
+  509   495 root     R     1164   0%   5% insmod /mnt/mtd_speedtest.ko dev=2
+mtd_speedtest: eraseblock write speed is 5194 KiB/s
+mtd_speedtest: testing page write speed
+  509   495 root     D     1164   0%  32% insmod /mnt/mtd_speedtest.ko dev=2
+  509   495 root     D     1164   0%  27% insmod /mnt/mtd_speedtest.ko dev=2
   509   495 root     D     1164   0%  25% insmod /mnt/mtd_speedtest.ko dev=2
-  509   495 root     D     1164   0%  26% insmod /mnt/mtd_speedtest.ko dev=2
-mtd_speedtest: eraseblock read speed is 9403 KiB/s
-mtd_speedtest: testing page read speed
-  509   495 root     R     1164   0%  31% insmod /mnt/mtd_speedtest.ko dev=2
-  509   495 root     D     1164   0%  57% insmod /mnt/mtd_speedtest.ko dev=2
-  509   495 root     D     1164   0%  53% insmod /mnt/mtd_speedtest.ko dev=2
-  509   495 root     D     1164   0%  71% insmod /mnt/mtd_speedtest.ko dev=2
-mtd_speedtest: page read speed is 9258 KiB/s
+  509   495 root     D     1164   0%  30% insmod /mnt/mtd_speedtest.ko dev=2
+mtd_speedtest: page write speed is 5024 KiB/s
 
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
 v3 --> v4:
-  - use BIT_POS definition not magical number.
+  - no blank line change.
 
 v2 --> v3:
-  - if NFC sram address and size is specified then enable NFC sram read.
-    Otherwise disable NFC sram read.
+  - use a property of NFC node to enable/disable NFC write via sram.
 
- drivers/mtd/nand/atmel_nand.c |  163 +++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 157 insertions(+), 6 deletions(-)
+ .../devicetree/bindings/mtd/atmel-nand.txt         |    2 +
+ drivers/mtd/nand/atmel_nand.c                      |  106 +++++++++++++++++++-
+ 2 files changed, 103 insertions(+), 5 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+index 6a267cb..da78e22 100644
+--- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+@@ -35,6 +35,8 @@ Optional properties:
+     - reg : should specify the address and size used for NFC command registers,
+             NFC registers and NFC Sram. NFC Sram address and size can be absent
+             if don't want to use it.
++  - Optional properties:
++    - atmel,write-by-sram: boolean to enable NFC write by sram.
+ 
+ Examples:
+ nand0: nand at 40000000,0 {
 diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 7c663cc..2e272a7 100644
+index 2e272a7..12c8a38 100644
 --- a/drivers/mtd/nand/atmel_nand.c
 +++ b/drivers/mtd/nand/atmel_nand.c
-@@ -96,9 +96,13 @@ struct atmel_nfc {
- 	void __iomem		*hsmc_regs;
+@@ -97,12 +97,14 @@ struct atmel_nfc {
  	void __iomem		*sram_bank0;
  	dma_addr_t		sram_bank0_phys;
-+	bool			use_nfc_sram;
+ 	bool			use_nfc_sram;
++	bool			write_by_sram;
  
  	bool			is_initialized;
  	struct completion	comp_nfc;
-+
-+	/* Point to the sram bank which include readed data via NFC */
-+	void __iomem		*data_in_sram;
+ 
+ 	/* Point to the sram bank which include readed data via NFC */
+ 	void __iomem		*data_in_sram;
++	bool			will_write_sram;
  };
  static struct atmel_nfc	nand_nfc;
  
-@@ -255,21 +259,43 @@ static int atmel_nand_set_enable_ready_pins(struct mtd_info *mtd)
- 	return res;
+@@ -269,6 +271,16 @@ static void memcpy32_fromio(void *trg, const void __iomem  *src, size_t size)
+ 		*t++ = readl_relaxed(s++);
  }
  
-+static void memcpy32_fromio(void *trg, const void __iomem  *src, size_t size)
++static void memcpy32_toio(void __iomem *trg, const void *src, int size)
 +{
 +	int i;
-+	u32 *t = trg;
-+	const __iomem u32 *s = src;
++	u32 __iomem *t = trg;
++	const u32 *s = src;
 +
 +	for (i = 0; i < (size >> 2); i++)
-+		*t++ = readl_relaxed(s++);
++		writel_relaxed(*s++, t++);
 +}
 +
  /*
   * Minimal-overhead PIO for data access.
   */
- static void atmel_read_buf8(struct mtd_info *mtd, u8 *buf, int len)
- {
- 	struct nand_chip	*nand_chip = mtd->priv;
-+	struct atmel_nand_host *host = nand_chip->priv;
- 
--	__raw_readsb(nand_chip->IO_ADDR_R, buf, len);
-+	if (host->nfc && host->nfc->use_nfc_sram && host->nfc->data_in_sram) {
-+		memcpy32_fromio(buf, host->nfc->data_in_sram, len);
-+		host->nfc->data_in_sram += len;
-+	} else {
-+		__raw_readsb(nand_chip->IO_ADDR_R, buf, len);
-+	}
- }
- 
- static void atmel_read_buf16(struct mtd_info *mtd, u8 *buf, int len)
- {
- 	struct nand_chip	*nand_chip = mtd->priv;
-+	struct atmel_nand_host *host = nand_chip->priv;
- 
--	__raw_readsw(nand_chip->IO_ADDR_R, buf, len / 2);
-+	if (host->nfc && host->nfc->use_nfc_sram && host->nfc->data_in_sram) {
-+		memcpy32_fromio(buf, host->nfc->data_in_sram, len);
-+		host->nfc->data_in_sram += len;
-+	} else {
-+		__raw_readsw(nand_chip->IO_ADDR_R, buf, len / 2);
-+	}
- }
- 
- static void atmel_write_buf8(struct mtd_info *mtd, const u8 *buf, int len)
-@@ -291,6 +317,40 @@ static void dma_complete_func(void *completion)
- 	complete(completion);
- }
- 
-+static int nfc_set_sram_bank(struct atmel_nand_host *host, unsigned int bank)
-+{
-+	/* NFC only has two banks. Must be 0 or 1 */
-+	if (bank > 1)
-+		return -EINVAL;
-+
-+	if (bank) {
-+		/* Only for a 2k-page or lower flash, NFC can handle 2 banks */
-+		if (host->mtd.writesize > 2048)
-+			return -EINVAL;
-+		nfc_writel(host->nfc->hsmc_regs, BANK, ATMEL_HSMC_NFC_BANK1);
-+	} else {
-+		nfc_writel(host->nfc->hsmc_regs, BANK, ATMEL_HSMC_NFC_BANK0);
-+	}
-+
-+	return 0;
-+}
-+
-+static uint nfc_get_sram_off(struct atmel_nand_host *host)
-+{
-+	if (nfc_readl(host->nfc->hsmc_regs, BANK) & ATMEL_HSMC_NFC_BANK1)
-+		return NFC_SRAM_BANK1_OFFSET;
-+	else
-+		return 0;
-+}
-+
-+static dma_addr_t nfc_sram_phys(struct atmel_nand_host *host)
-+{
-+	if (nfc_readl(host->nfc->hsmc_regs, BANK) & ATMEL_HSMC_NFC_BANK1)
-+		return host->nfc->sram_bank0_phys + NFC_SRAM_BANK1_OFFSET;
-+	else
-+		return host->nfc->sram_bank0_phys;
-+}
-+
- static int atmel_nand_dma_op(struct mtd_info *mtd, void *buf, int len,
- 			       int is_read)
- {
-@@ -304,6 +364,7 @@ static int atmel_nand_dma_op(struct mtd_info *mtd, void *buf, int len,
- 	void *p = buf;
- 	int err = -EIO;
- 	enum dma_data_direction dir = is_read ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
-+	struct atmel_nfc *nfc = host->nfc;
- 
- 	if (buf >= high_memory)
- 		goto err_buf;
-@@ -320,7 +381,12 @@ static int atmel_nand_dma_op(struct mtd_info *mtd, void *buf, int len,
- 	}
- 
- 	if (is_read) {
--		dma_src_addr = host->io_phys;
-+		if (nfc && nfc->data_in_sram)
-+			dma_src_addr = nfc_sram_phys(host) + (nfc->data_in_sram
-+				- (nfc->sram_bank0 + nfc_get_sram_off(host)));
-+		else
-+			dma_src_addr = host->io_phys;
-+
+@@ -390,7 +402,11 @@ static int atmel_nand_dma_op(struct mtd_info *mtd, void *buf, int len,
  		dma_dst_addr = phys_addr;
  	} else {
  		dma_src_addr = phys_addr;
-@@ -347,6 +413,10 @@ static int atmel_nand_dma_op(struct mtd_info *mtd, void *buf, int len,
- 	dma_async_issue_pending(host->dma_chan);
- 	wait_for_completion(&host->comp);
- 
-+	if (is_read && nfc && nfc->data_in_sram)
-+		/* After read data from SRAM, need to increase the position */
-+		nfc->data_in_sram += len;
+-		dma_dst_addr = host->io_phys;
 +
- 	err = 0;
++		if (nfc && nfc->write_by_sram)
++			dma_dst_addr = nfc_sram_phys(host);
++		else
++			dma_dst_addr = host->io_phys;
+ 	}
  
- err_dma:
-@@ -857,7 +927,8 @@ static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
+ 	tx = dma_dev->device_prep_dma_memcpy(host->dma_chan, dma_dst_addr,
+@@ -961,9 +977,10 @@ static int atmel_nand_pmecc_write_page(struct mtd_info *mtd,
+ 	int i, j;
  	unsigned long end_time;
- 	int bitflips = 0;
  
--	pmecc_enable(host, NAND_ECC_READ);
-+	if (!host->nfc || !host->nfc->use_nfc_sram)
-+		pmecc_enable(host, NAND_ECC_READ);
+-	pmecc_enable(host, NAND_ECC_WRITE);
+-
+-	chip->write_buf(mtd, (u8 *)buf, mtd->writesize);
++	if (!host->nfc || !host->nfc->write_by_sram) {
++		pmecc_enable(host, NAND_ECC_WRITE);
++		chip->write_buf(mtd, (u8 *)buf, mtd->writesize);
++	}
  
- 	chip->read_buf(mtd, buf, eccsize);
- 	chip->read_buf(mtd, oob, mtd->oobsize);
-@@ -1672,6 +1743,7 @@ static void nfc_nand_command(struct mtd_info *mtd, unsigned int command,
- 	unsigned int addr1234 = 0;
- 	unsigned int cycle0 = 0;
- 	bool do_addr = true;
-+	host->nfc->data_in_sram = NULL;
- 
- 	dev_dbg(host->dev, "%s: cmd = 0x%02x, col = 0x%08x, page = 0x%08x\n",
- 	     __func__, command, column, page_addr);
-@@ -1713,6 +1785,16 @@ static void nfc_nand_command(struct mtd_info *mtd, unsigned int command,
- 			command = NAND_CMD_READ0; /* only READ0 is valid */
- 			cmd1 = command << NFCADDR_CMD_CMD1_BIT_POS;
- 		}
-+		if (host->nfc->use_nfc_sram) {
-+			/* Enable Data transfer to sram */
+ 	end_time = jiffies + msecs_to_jiffies(PMECC_MAX_TIMEOUT_MS);
+ 	while ((pmecc_readl_relaxed(host->ecc, SR) & PMECC_SR_BUSY)) {
+@@ -1804,6 +1821,8 @@ static void nfc_nand_command(struct mtd_info *mtd, unsigned int command,
+ 	case NAND_CMD_SEQIN:
+ 	case NAND_CMD_RNDIN:
+ 		nfcwr = NFCADDR_CMD_NFCWR;
++		if (host->nfc->will_write_sram && command == NAND_CMD_SEQIN)
 +			dataen = NFCADDR_CMD_DATAEN;
-+
-+			/* Need enable PMECC now, since NFC will transfer
-+			 * data in bus after sending nfc read command.
-+			 */
-+			if (chip->ecc.mode == NAND_ECC_HW && host->has_pmecc)
-+				pmecc_enable(host, NAND_ECC_READ);
-+		}
- 
- 		cmd2 = NAND_CMD_READSTART << NFCADDR_CMD_CMD2_BIT_POS;
- 		vcmd2 = NFCADDR_CMD_VCMD2;
-@@ -1734,6 +1816,10 @@ static void nfc_nand_command(struct mtd_info *mtd, unsigned int command,
- 	nfc_addr_cmd = cmd1 | cmd2 | vcmd2 | acycle | csid | dataen | nfcwr;
- 	nfc_send_command(host, nfc_addr_cmd, addr1234, cycle0);
- 
-+	if (dataen == NFCADDR_CMD_DATAEN)
-+		if (nfc_wait_interrupt(host, NFC_SR_XFR_DONE))
-+			dev_err(host->dev, "something wrong, No XFR_DONE interrupt comes.\n");
-+
- 	/*
- 	 * Program and erase have their own busy handlers status, sequential
- 	 * in, and deplete1 need no delay.
-@@ -1751,12 +1837,66 @@ static void nfc_nand_command(struct mtd_info *mtd, unsigned int command,
- 		return;
- 
- 	case NAND_CMD_READ0:
-+		if (dataen == NFCADDR_CMD_DATAEN) {
-+			host->nfc->data_in_sram = host->nfc->sram_bank0 +
-+				nfc_get_sram_off(host);
-+			return;
-+		}
- 		/* fall through */
+ 		break;
  	default:
- 		nfc_wait_interrupt(host, NFC_SR_RB_EDGE);
+ 		break;
+@@ -1848,6 +1867,68 @@ static void nfc_nand_command(struct mtd_info *mtd, unsigned int command,
  	}
  }
  
-+static int nfc_sram_init(struct mtd_info *mtd)
++static int nfc_sram_write_page(struct mtd_info *mtd, struct nand_chip *chip,
++			uint32_t offset, int data_len, const uint8_t *buf,
++			int oob_required, int page, int cached, int raw)
 +{
-+	struct nand_chip *chip = mtd->priv;
++	int cfg, len;
++	int status = 0;
 +	struct atmel_nand_host *host = chip->priv;
-+	int res = 0;
++	void __iomem *sram = host->nfc->sram_bank0 + nfc_get_sram_off(host);
 +
-+	/* Initialize the NFC CFG register */
-+	unsigned int cfg_nfc = 0;
++	/* Subpage write is not supported */
++	if (offset || (data_len < mtd->writesize))
++		return -EINVAL;
 +
-+	/* set page size and oob layout */
-+	switch (mtd->writesize) {
-+	case 512:
-+		cfg_nfc = NFC_CFG_PAGESIZE_512;
-+		break;
-+	case 1024:
-+		cfg_nfc = NFC_CFG_PAGESIZE_1024;
-+		break;
-+	case 2048:
-+		cfg_nfc = NFC_CFG_PAGESIZE_2048;
-+		break;
-+	case 4096:
-+		cfg_nfc = NFC_CFG_PAGESIZE_4096;
-+		break;
-+	case 8192:
-+		cfg_nfc = NFC_CFG_PAGESIZE_8192;
-+		break;
-+	default:
-+		dev_err(host->dev, "Unsupported page size for NFC.\n");
-+		res = -ENXIO;
-+		return res;
++	cfg = nfc_readl(host->nfc->hsmc_regs, CFG);
++	len = mtd->writesize;
++
++	if (unlikely(raw)) {
++		len += mtd->oobsize;
++		nfc_writel(host->nfc->hsmc_regs, CFG, cfg | NFC_CFG_WSPARE);
++	} else
++		nfc_writel(host->nfc->hsmc_regs, CFG, cfg & ~NFC_CFG_WSPARE);
++
++	/* Copy page data to sram that will write to nand via NFC */
++	if (use_dma) {
++		if (atmel_nand_dma_op(mtd, (void *)buf, len, 0) != 0)
++			/* Fall back to use cpu copy */
++			memcpy32_toio(sram, buf, len);
++	} else {
++		memcpy32_toio(sram, buf, len);
 +	}
 +
-+	/* oob bytes size = (NFCSPARESIZE + 1) * 4
-+	 * Max support spare size is 512 bytes. */
-+	cfg_nfc |= (((mtd->oobsize / 4) - 1) << NFC_CFG_NFC_SPARESIZE_BIT_POS
-+		& NFC_CFG_NFC_SPARESIZE);
-+	/* default set a max timeout */
-+	cfg_nfc |= NFC_CFG_RSPARE |
-+			NFC_CFG_NFC_DTOCYC | NFC_CFG_NFC_DTOMUL;
++	if (chip->ecc.mode == NAND_ECC_HW && host->has_pmecc)
++		/*
++		 * When use NFC sram, need set up PMECC before send
++		 * NAND_CMD_SEQIN command. Since when the nand command
++		 * is sent, nfc will do transfer from sram and nand.
++		 */
++		pmecc_enable(host, NAND_ECC_WRITE);
 +
-+	nfc_writel(host->nfc->hsmc_regs, CFG, cfg_nfc);
++	host->nfc->will_write_sram = true;
++	chip->cmdfunc(mtd, NAND_CMD_SEQIN, 0x00, page);
++	host->nfc->will_write_sram = false;
 +
-+	nfc_set_sram_bank(host, 0);
++	if (likely(!raw))
++		/* Need to write ecc into oob */
++		status = chip->ecc.write_page(mtd, chip, buf, oob_required);
 +
-+	dev_info(host->dev, "Using NFC Sram read\n");
++	if (status < 0)
++		return status;
++
++	chip->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
++	status = chip->waitfunc(mtd, chip);
++
++	if ((status & NAND_STATUS_FAIL) && (chip->errstat))
++		status = chip->errstat(mtd, chip, FL_WRITING, status, page);
++
++	if (status & NAND_STATUS_FAIL)
++		return -EIO;
 +
 +	return 0;
 +}
 +
- static struct platform_driver atmel_nand_nfc_driver;
- /*
-  * Probe for the NAND device.
-@@ -1926,6 +2066,15 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
- 			goto err_hw_ecc;
- 	}
+ static int nfc_sram_init(struct mtd_info *mtd)
+ {
+ 	struct nand_chip *chip = mtd->priv;
+@@ -1890,10 +1971,20 @@ static int nfc_sram_init(struct mtd_info *mtd)
  
-+	/* initialize the nfc configuration register */
-+	if (host->nfc && host->nfc->use_nfc_sram) {
-+		res = nfc_sram_init(mtd);
-+		if (res) {
-+			host->nfc->use_nfc_sram = false;
-+			dev_err(host->dev, "Disable use nfc sram for data transfer.\n");
-+		}
+ 	nfc_writel(host->nfc->hsmc_regs, CFG, cfg_nfc);
+ 
++	host->nfc->will_write_sram = false;
+ 	nfc_set_sram_bank(host, 0);
+ 
+-	dev_info(host->dev, "Using NFC Sram read\n");
++	/* Use Write page with NFC SRAM only for PMECC or ECC NONE. */
++	if (host->nfc->write_by_sram) {
++		if ((chip->ecc.mode == NAND_ECC_HW && host->has_pmecc) ||
++				chip->ecc.mode == NAND_ECC_NONE)
++			chip->write_page = nfc_sram_write_page;
++		else
++			host->nfc->write_by_sram = false;
 +	}
-+
- 	/* second phase scan */
- 	if (nand_scan_tail(mtd)) {
- 		res = -ENXIO;
-@@ -2007,11 +2156,13 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
- 	nfc_sram = platform_get_resource(pdev, IORESOURCE_MEM, 2);
- 	if (nfc_sram) {
- 		nfc->sram_bank0 = devm_ioremap_resource(&pdev->dev, nfc_sram);
--		if (IS_ERR(nfc->sram_bank0))
-+		if (IS_ERR(nfc->sram_bank0)) {
- 			dev_warn(&pdev->dev, "Fail to ioremap the NFC sram with error: %ld. So disable NFC sram.\n",
- 					PTR_ERR(nfc->sram_bank0));
--		else
-+		} else {
-+			nfc->use_nfc_sram = true;
+ 
++	dev_info(host->dev, "Using NFC Sram read %s\n",
++			host->nfc->write_by_sram ? "and write" : "");
+ 	return 0;
+ }
+ 
+@@ -2162,6 +2253,11 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+ 		} else {
+ 			nfc->use_nfc_sram = true;
  			nfc->sram_bank0_phys = (dma_addr_t)nfc_sram->start;
-+		}
++
++			if (pdev->dev.of_node)
++				nfc->write_by_sram = of_property_read_bool(
++						pdev->dev.of_node,
++						"atmel,write-by-sram");
+ 		}
  	}
  
- 	nfc->is_initialized = true;
 -- 
 1.7.9.5
