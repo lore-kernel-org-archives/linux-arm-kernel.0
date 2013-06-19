@@ -1,89 +1,66 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Wed, 19 Jun 2013 09:20:19 +0000
-Subject: [PATCH v2 1/5] ARM: davinci: uart: move to devid based clk_get
-In-Reply-To: <51B06803.2020008@ti.com>
-References: <1369729686-6595-1-git-send-email-prakash.pm@ti.com>
- <1369729686-6595-2-git-send-email-prakash.pm@ti.com>
- <51B06547.8030709@ti.com> <51B06803.2020008@ti.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA82A60@DBDE04.ent.ti.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Wed, 19 Jun 2013 14:50:46 +0530
+Subject: OMAP4430 failure to boot
+In-Reply-To: <20130619083630.GI2718@n2100.arm.linux.org.uk>
+References: <20130618183424.GD2718@n2100.arm.linux.org.uk>
+ <20130619064307.GV5523@atomide.com>
+ <20130619083630.GI2718@n2100.arm.linux.org.uk>
+Message-ID: <51C177EE.3090805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+Hi Russell,
 
-Thanks for the review.
+On Wednesday 19 June 2013 02:06 PM, Russell King - ARM Linux wrote:
+> On Tue, Jun 18, 2013 at 11:43:07PM -0700, Tony Lindgren wrote:
+>> * Russell King - ARM Linux <linux@arm.linux.org.uk> [130618 11:40]:
+>>> So... the boot and build system last night managed to build its kernels
+>>> after I dropped a couple of patches from my kernel, but we've gone from
+>>> having both the 3430LDP and 4430SDP booting to only the 3430LDP.
+>>>
+>>> Something has broken 4430SDP during the last week, and so far I've no
+>>> idea what.  The 4430 seems to be utterly immune to any kind of debugging.
+>>> It:
+>>>
+>>> (a) doesn't produce any decompressor output because its part of the
+>>> multiplatform kernel.  This means I've no idea if the decompressor is
+>>> working or not.
+>>>
+>>> (b) doesn't produce any output from the kernel via the use of printch()
+>>> in the early assembly, nor via adding printascii() into printk().
+>>>
+>>> Will has tested v3.10-rc6, and that works.  Will tested v3.10-rc6 plus
+>>> arm-soc for-next, and got:
+>>>
+>>> 	Error: unrecognized/unsupported machine ID (r1 = 0x00000ae7).
+>> It's because it's DT only. I guess we could have some minimal generic
+>> file handling that machine ID to produce an error to avoid having
+>> to debug things?
+>>
+>> If you have arm-soc for-next, omap4 is now DT only. So you have to
+>> have CONFIG_ARM_APPENDED_DTB=y, CONFIG_ARM_ATAG_DTB_COMPAT=y and
+>> CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y and append the .dtb to
+>> zImage to boot. Or you can also update u-boot to pass the .dtb.
+>> There are more accurate instructions in arm-soc commit b42b9181.
+>>
+>> Moving omap4 to be DT only has been about 5900 lines of reduced data
+>> and code so far, so that's a good reason for doing it. Most things
+>> should work as earlier, except for the pandaboard EHCI is still missing
+>> a fix for adding a clock alias for the auxclk. If there are things not
+>> working, they should be quite easy to fix.
+> Right, so as I said I'm taking OMAP4 out of the build/boot test system,
+> which can't currently cope with jumping through the hoops to get DT to
+> work.
+>
+> And since no one tells me anything about where to get updated uboots from
+> for TI's boards, I'm not about to play boot loader roulette trying to
+> build my own.
+>
+ Regarding u-boot, the mainline[1] supports booting with DT.
 
-On Thu, Jun 06, 2013 at 16:14:19, Nori, Sekhar wrote:
-> 
-> 
-> On 6/6/2013 4:02 PM, Sekhar Nori wrote:
-> > Hi Prakash,
-> > 
-> > It appears that this patch was not tested thoroughly. See below:
-> > 
-> > On 5/28/2013 1:58 PM, Manjunathappa, Prakash wrote:
-> >> For modules having single clock, clk_get should be done with dev_id.
-> >> But current davinci implementation handles multiple instances
-> >> of the UART devices with single platform_device_register. Hence clk_get
-> >> is based on con_id rather than dev_id, this is not correct. Do
-> >> platform_device_register for each instance and clk_get on dev_id.
-> >>
-> >> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-> >> ---
-> > 
-> >> -static struct plat_serial8250_port da8xx_serial_pdata[] = {
-> >> +static struct plat_serial8250_port da8xx_serial0_pdata[] = {
-> >>  	{
-> >>  		.mapbase	= DA8XX_UART0_BASE,
-> >>  		.irq		= IRQ_DA8XX_UARTINT0,
-> >> @@ -75,7 +75,9 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
-> >>  					UPF_IOREMAP,
-> >>  		.iotype		= UPIO_MEM,
-> >>  		.regshift	= 2,
-> >> -	},
-> >> +	}
-> >> +};
-> >> +static struct plat_serial8250_port da8xx_serial1_pdata[] = {
-> >>  	{
-> >>  		.mapbase	= DA8XX_UART1_BASE,
-> >>  		.irq		= IRQ_DA8XX_UARTINT1,
-> >> @@ -83,7 +85,9 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
-> >>  					UPF_IOREMAP,
-> >>  		.iotype		= UPIO_MEM,
-> >>  		.regshift	= 2,
-> >> -	},
-> >> +	}
-> >> +};
-> >> +static struct plat_serial8250_port da8xx_serial2_pdata[] = {
-> >>  	{
-> >>  		.mapbase	= DA8XX_UART2_BASE,
-> >>  		.irq		= IRQ_DA8XX_UARTINT2,
-> >> @@ -91,18 +95,31 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
-> >>  					UPF_IOREMAP,
-> >>  		.iotype		= UPIO_MEM,
-> >>  		.regshift	= 2,
-> >> -	},
-> >> -	{
-> >> -		.flags	= 0,
-> >> -	},
-> >> +	}
-> > 
-> > 8250_core.c relies on sentinel value with p->flags = 0 to terminate
-> > looking for more ports. You don't have sentinel values in any of pdata
-> > the arrays you introduced so the code basically goes looking into areas
-> > of memory not its own. This caused bunch of "cannot register port"
-> > errors for me but I can easily imagine more serious errors.
+  bootm kernel_load_address - dt_blob_load_address
+ 
+ [1] git://git.denx.de/u-boot.git
 
-Will fix this.
-
-> 
-> Similarly, you check for platform_data being NULL to go over the list of
-> serial devices in the code in serial.c you introduced, but don't have a
-> sentinel when you define the serial device array.
-> 
-
-I have fixed this and above, posted patch here:
-http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-v3-0-5-ARM-davinci-fix-UART-clock-enabling-tt7583378.html
-
-Thanks,
-Prakash
+Regards,
+ Sricharan
