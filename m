@@ -1,68 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Jun 2013 01:42:10 -0700
-Subject: OMAP4430 failure to boot
-In-Reply-To: <20130619083630.GI2718@n2100.arm.linux.org.uk>
-References: <20130618183424.GD2718@n2100.arm.linux.org.uk>
- <20130619064307.GV5523@atomide.com>
- <20130619083630.GI2718@n2100.arm.linux.org.uk>
-Message-ID: <20130619084210.GX5523@atomide.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 19 Jun 2013 16:47:56 +0800
+Subject: [PATCH 1/2] ARM: mmu: fix the hang when we steal a
+ section	unaligned size memory
+In-Reply-To: <20130619082840.GG2718@n2100.arm.linux.org.uk>
+References: <1371113826-1231-1-git-send-email-b32955@freescale.com>
+ <20130618152905.GB8534@mudshark.cambridge.arm.com>
+ <20130618165246.GC2718@n2100.arm.linux.org.uk>
+ <51C11916.2030807@freescale.com>
+ <20130619082840.GG2718@n2100.arm.linux.org.uk>
+Message-ID: <51C1703C.6010003@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [130619 01:42]:
-> On Tue, Jun 18, 2013 at 11:43:07PM -0700, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [130618 11:40]:
-> > > So... the boot and build system last night managed to build its kernels
-> > > after I dropped a couple of patches from my kernel, but we've gone from
-> > > having both the 3430LDP and 4430SDP booting to only the 3430LDP.
-> > > 
-> > > Something has broken 4430SDP during the last week, and so far I've no
-> > > idea what.  The 4430 seems to be utterly immune to any kind of debugging.
-> > > It:
-> > > 
-> > > (a) doesn't produce any decompressor output because its part of the
-> > > multiplatform kernel.  This means I've no idea if the decompressor is
-> > > working or not.
-> > > 
-> > > (b) doesn't produce any output from the kernel via the use of printch()
-> > > in the early assembly, nor via adding printascii() into printk().
-> > > 
-> > > Will has tested v3.10-rc6, and that works.  Will tested v3.10-rc6 plus
-> > > arm-soc for-next, and got:
-> > > 
-> > > 	Error: unrecognized/unsupported machine ID (r1 = 0x00000ae7).
-> > 
-> > It's because it's DT only. I guess we could have some minimal generic
-> > file handling that machine ID to produce an error to avoid having
-> > to debug things?
-> > 
-> > If you have arm-soc for-next, omap4 is now DT only. So you have to
-> > have CONFIG_ARM_APPENDED_DTB=y, CONFIG_ARM_ATAG_DTB_COMPAT=y and
-> > CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y and append the .dtb to
-> > zImage to boot. Or you can also update u-boot to pass the .dtb.
-> > There are more accurate instructions in arm-soc commit b42b9181.
-> > 
-> > Moving omap4 to be DT only has been about 5900 lines of reduced data
-> > and code so far, so that's a good reason for doing it. Most things
-> > should work as earlier, except for the pandaboard EHCI is still missing
-> > a fix for adding a clock alias for the auxclk. If there are things not
-> > working, they should be quite easy to fix.
-> 
-> Right, so as I said I'm taking OMAP4 out of the build/boot test system,
-> which can't currently cope with jumping through the hoops to get DT to
-> work.
+? 2013?06?19? 16:28, Russell King - ARM Linux ??:
+> On Wed, Jun 19, 2013 at 10:36:06AM +0800, Huang Shijie wrote:
+>> ? 2013?06?19? 00:52, Russell King - ARM Linux ??:
+>>> This is why I've always said - if you steal memory from memblock, it
+>>> _must_  be aligned to 1MB (the section size) to avoid this.  Not only
+>> firstly, it's a little waste to _must_ steal 1M for some board with less
+>> memory such as 512M memory;
+> You're complaining about 512M memory?  Christ.  Some of my machines
+> which I run here have as little as 32M of memory!  1M is nothing in
+> 512M.
+>
+My meaning was : we only need 128K in some case, why we waste other 896K?
+IMHO, we should treasure the memory.
 
-OK too bad, but hopefully it can get added back once your setup
-can deal with it.
- 
-> And since no one tells me anything about where to get updated uboots from
-> for TI's boards, I'm not about to play boot loader roulette trying to
-> build my own.
+If you think there is no need to fix this issue, I am ok too.
 
-The mainline u-boot should work, I have not yet updated mine though as
-I want to be sure things work with older bootloaders too with appended
-DTB.
+>> secondly, if we do not support the section unaligned mapping, we should
+>> remove the alloc_init_pte() in alloc_init_pmd(),
+>> add a comment to tell that we do not support the section unaligned mapping.
+> No, because that breaks a whole load of other non-memory mappings.
+>
+yes. you are right. I forgot the other mappings besides the map_lowmem().
 
-Regards,
-
-Tony
+thanks
+Huang Shijie
