@@ -1,27 +1,36 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 19 Jun 2013 10:23:55 -0700
-Subject: [RFC PATCH 2/6] mfd: omap-usb-host: Put pins in IDLE state on
- suspend
-In-Reply-To: <1371650753-11452-3-git-send-email-rogerq@ti.com> (Roger
- Quadros's message of "Wed, 19 Jun 2013 17:05:49 +0300")
-References: <1371650753-11452-1-git-send-email-rogerq@ti.com>
- <1371650753-11452-3-git-send-email-rogerq@ti.com>
-Message-ID: <878v26815g.fsf@linaro.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 19 Jun 2013 19:24:44 +0200
+Subject: [RFC PATCH 5/5] ARM: Samsung: Remove MIPI PHY setup code
+In-Reply-To: <51BE25A0.6050202@samsung.com>
+References: <1371231951-1969-1-git-send-email-s.nawrocki@samsung.com>
+ <1371231951-1969-6-git-send-email-s.nawrocki@samsung.com>
+ <51BE25A0.6050202@samsung.com>
+Message-ID: <51C1E95C.5040607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
-
-Roger Quadros <rogerq@ti.com> writes:
-
-> In order to support wake up from suspend use the pinctrl
-> framework to put the USB host pins in IDLE state during suspend.
+On 06/16/2013 10:52 PM, Kukjin Kim wrote:
+> On 06/15/13 02:45, Sylwester Nawrocki wrote:
+>> > Generic PHY drivers are used to handle the MIPI CSIS and MIPI DSIM
+>> > DPHYs so we can remove now unused code at arch/arm/plat-samsung.
 >
-> CC: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> If so, sounds good :)
+> 
+>> > In case there is any board file for S5PV210 platforms using MIPI
+>> > CSIS/DSIM (not any upstream currently) it should use the generic
+>> > PHY API to bind the PHYs to respective PHY consumer drivers.
+>
+> To be honest, I didn't test this on boards but if the working is fine, 
+> please go ahead without RFC.
 
-You should use helpers for this now in the pinctrl core:
+Thanks for review. I've tested it on Exynos4412 based board, and will
+check also on Exynos4210 TRATS before posting the final version.
+It seems to work fine, I just won't be able to test on any non-dt
+platform (s5pv210), and there is currently no users of MIPI CSIS/DSIM
+on s5pv210. Moreover this series depends on the generic PHY API,
+perhaps it can be merged for 3.11.
 
-    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173514.html
+[1] http://www.spinics.net/lists/arm-kernel/msg251232.html
 
-Kevin
+Regards,
+Sylwester
