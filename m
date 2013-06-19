@@ -1,92 +1,79 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 19 Jun 2013 17:30:03 +0100
-Subject: [PATCH 6/6] ARM: ensure loader information in LE format for BE kernels
-In-Reply-To: <1371659404-20167-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1371659404-20167-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1371659404-20167-7-git-send-email-ben.dooks@codethink.co.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 19 Jun 2013 09:30:43 -0700
+Subject: [PATCHv7 01/11] clockevents: Prefer CPU local devices over
+ global devices
+In-Reply-To: <20130618102257.GH6809@e106331-lin.cambridge.arm.com>
+References: <1370291642-13259-2-git-send-email-sboyd@codeaurora.org>
+ <51B0A6E8.20909@linaro.org> <20130606180425.GQ599@codeaurora.org>
+ <51B10D85.1060507@linaro.org> <20130606223848.GR599@codeaurora.org>
+ <20130612214435.GE10823@codeaurora.org> <51B991EF.70800@linaro.org>
+ <alpine.LFD.2.02.1306131331430.22970@ionos>
+ <20130613183950.GA32061@codeaurora.org>
+ <20130618102257.GH6809@e106331-lin.cambridge.arm.com>
+Message-ID: <20130619163043.GA6300@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nico Pitre <nico@fluxnic.net>
+Thomas,
 
-If the loader for the system is assuming we are booting a BE kernel
-from a LE loading environment, then ensure that the magic number
-and image start/end values are in little endian format.
+On 06/18, Mark Rutland wrote:
+> On Thu, Jun 13, 2013 at 07:39:50PM +0100, Stephen Boyd wrote:
+> > On 06/13, Thomas Gleixner wrote:
+> > > On Thu, 13 Jun 2013, Daniel Lezcano wrote:
+> > > > I prefer Thomas to have a look at it and ack it. I changed Cc to To for
+> > > > Thomas.
+> > > 
+> > > The patch does not apply on tip timers/core. The code has been
+> > > reworked a month ago. Please work against tip timers/core. That's
+> > > where this stuff ends up.
+> > > 
+> > 
+> > Ah, I thought your patch series had stalled. Here is a refreshed
+> > patch. Every other patch in this series applies cleanly to tip
+> > timers/core so I don't want to resend them again unless
+> > absolutely necessary.
+> > 
+> > -----8<-----
+> > Subject: [PATCH v8] clockevents: Prefer CPU local devices over global devices
+> > 
+> > On an SMP system with only one global clockevent and a dummy
+> > clockevent per CPU we run into problems. We want the dummy
+> > clockevents to be registered as the per CPU tick devices, but
+> > we can only achieve that if we register the dummy clockevents
+> > before the global clockevent or if we artificially inflate the
+> > rating of the dummy clockevents to be higher than the rating
+> > of the global clockevent. Failure to do so leads to boot
+> > hangs when the dummy timers are registered on all other CPUs
+> > besides the CPU that accepted the global clockevent as its tick
+> > device and there is no broadcast timer to poke the dummy
+> > devices.
+> > 
+> > If we're registering multiple clockevents and one clockevent is
+> > global and the other is local to a particular CPU we should
+> > choose to use the local clockevent regardless of the rating of
+> > the device. This way, if the clockevent is a dummy it will take
+> > the tick device duty as long as there isn't a higher rated tick
+> > device and any global clockevent will be bumped out into
+> > broadcast mode, fixing the problem described above.
+> > 
+> > Reported-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: John Stultz <john.stultz@linaro.org>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> I've just tested this atop of tip/timers/core on a tc2, using only the
+> sp804. As previously, without the patch boot hangs, and with the patch
+> I'm able to reach userspace and do useful things.
+> 
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> Thanks for working on this, Stephen.
 
-[ben.dooks at codethink.co.uk: from nico's original email on this subject]
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
- arch/arm/boot/compressed/Makefile       |    5 ++++-
- arch/arm/boot/compressed/head.S         |    7 ++++---
- arch/arm/boot/compressed/vmlinux.lds.in |   14 ++++++++++++++
- 3 files changed, 22 insertions(+), 4 deletions(-)
+Can you pick up the first two patches in this series please? And
+preferably make a stable branch that can be pulled into arm-soc?
+Then I can send the rest through the arm-soc tree.
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 79e9bdb..633391c 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -194,8 +194,11 @@ CFLAGS_font.o := -Dstatic=
- $(obj)/font.c: $(FONTC)
- 	$(call cmd,shipped)
- 
--$(obj)/vmlinux.lds: $(obj)/vmlinux.lds.in arch/arm/boot/Makefile $(KCONFIG_CONFIG)
-+$(obj)/vmlinux.lds.S: $(obj)/vmlinux.lds.in arch/arm/boot/Makefile $(KCONFIG_CONFIG)
- 	@sed "$(SEDFLAGS)" < $< > $@
- 
-+$(obj)/vmlinux.lds: $(obj)/vmlinux.lds.S
-+	$(call if_changed,cpp_lds_S)
-+
- $(obj)/hyp-stub.S: $(srctree)/arch/$(SRCARCH)/kernel/hyp-stub.S
- 	$(call cmd,shipped)
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 032a8d9..1b9195c 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -130,9 +130,10 @@ start:
-  THUMB(		adr	r12, BSYM(1f)	)
-  THUMB(		bx	r12		)
- 
--		.word	0x016f2818		@ Magic numbers to help the loader
--		.word	start			@ absolute load/run zImage address
--		.word	_edata			@ zImage end address
-+		.word	_magic_sig	@ Magic numbers to help the loader
-+		.word	_magic_start	@ absolute load/run zImage address
-+		.word	_magic_end	@ zImage end address
-+
-  THUMB(		.thumb			)
- 1:
- 		mrs	r9, cpsr
-diff --git a/arch/arm/boot/compressed/vmlinux.lds.in b/arch/arm/boot/compressed/vmlinux.lds.in
-index 4919f2a..567250f 100644
---- a/arch/arm/boot/compressed/vmlinux.lds.in
-+++ b/arch/arm/boot/compressed/vmlinux.lds.in
-@@ -7,6 +7,16 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+
-+#ifdef CONFIG_CPU_BE8_BOOT_LE
-+#define ZIMAGE_MAGIC(x) ( (((x) >> 24) & 0x000000ff) | \
-+			  (((x) >>  8) & 0x0000ff00) | \
-+			  (((x) <<  8) & 0x00ff0000) | \
-+			  (((x) << 24) & 0xff000000) )
-+#else
-+#define ZIMAGE_MAGIC(x) (x)
-+#endif
-+
- OUTPUT_ARCH(arm)
- ENTRY(_start)
- SECTIONS
-@@ -57,6 +67,10 @@ SECTIONS
-   .pad			: { BYTE(0); . = ALIGN(8); }
-   _edata = .;
- 
-+  _magic_sig = ZIMAGE_MAGIC(0x016f2818);
-+  _magic_start = ZIMAGE_MAGIC(_start);
-+  _magic_end = ZIMAGE_MAGIC(_edata);
-+
-   . = BSS_START;
-   __bss_start = .;
-   .bss			: { *(.bss) }
 -- 
-1.7.10.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
