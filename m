@@ -1,33 +1,39 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 19 Jun 2013 13:45:12 +0530
-Subject: [PATCH V3 01/14] watchdog/mpcore_wdt: Mark it as BROKEN
-In-Reply-To: <319bb53672a5fa97b7aa603392b6a2fa@localhost>
-References: <cover.1371535241.git.viresh.kumar@linaro.org>
- <22d22fe6eea294c5132e47b8901e094d60b0e99d.1371535242.git.viresh.kumar@linaro.org>
- <20130618154236.GA9022@roeck-us.net> <51C086A8.3070601@arm.com>
- <CAOesGMia0OZz5dcDooRHG9EAnaLimRL5_Gku2rm_fVDNxrxEEA@mail.gmail.com>
- <CAKohpom3S3NMhxbhbmyC6bceS51727CnWRWmWDGxwDcRJkHFyQ@mail.gmail.com>
- <319bb53672a5fa97b7aa603392b6a2fa@localhost>
-Message-ID: <CAKohpokUJKt4dcqYpKLNVn2_f7OeZgiftZB3M+aa3-83o_XDcg@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 19 Jun 2013 10:22:51 +0200
+Subject: [PATCH V3 5/5] input: pxa27x-keypad: add device tree support
+In-Reply-To: <1371527778-5236-6-git-send-email-chao.xie@marvell.com>
+References: <1371527778-5236-1-git-send-email-chao.xie@marvell.com>
+ <1371527778-5236-6-git-send-email-chao.xie@marvell.com>
+Message-ID: <201306191022.51630.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 June 2013 13:26, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> ARM11, A5 and A9 in their MP configurations only.
->
->> If no, then which ones are the real users of this driver/hardware?
->> If yes, Why isn't anybody using this?
->
-> Because, as Russell mentioned, the piece of IP doesn't fit our watchdog
-> model at all (per-CPU watchdog???), and most SoCs/boards have a separate
-> watchdog anyway.
+Dear Chao Xie,
 
-I believe we should use mpcore watchdogs. Atleast on the platforms I have
-worked (SPEAr), they don't have an external watchdog.
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> ---
+>  .../devicetree/bindings/input/pxa27x-keypad.txt    |   60 +++++
+>  drivers/input/keyboard/pxa27x_keypad.c             |  232
+> +++++++++++++++++++- 2 files changed, 288 insertions(+), 4 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/input/pxa27x-keypad.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/input/pxa27x-keypad.txt
+> b/Documentation/devicetree/bindings/input/pxa27x-keypad.txt new file mode
+> 100644
+> index 0000000..f8674f7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/pxa27x-keypad.txt
+> @@ -0,0 +1,60 @@
+> +* Marvell PXA Keypad controller
+> +
+> +Required Properties
+> +- compatible : should be "marvell,pxa27x-keypad"
+> +- reg : Address and length of the register set for the device
+> +- interrupts : The interrupt for the keypad controller
+> +- marvell,debounce-interval : How long time the key will be
 
-But yes, this would require somebody, with a A5/9/ARM11 board, no
-separate watchdog and a customer requirement, to work on it :)
+Is there no generic prop name for this debounce interval?
 
-I will get rid of it.
-
-Thanks.
+Best regards,
+Marek Vasut
