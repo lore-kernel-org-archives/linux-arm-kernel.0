@@ -1,57 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Jun 2013 14:03:20 +0200
-Subject: [PATCH v3 10/12] ARM: mvebu: Relocate Armada 370/XP DeviceBus
- device tree nodes
-In-Reply-To: <20130618220929.GA24056@localhost>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306181816.26530.arnd@arndb.de> <20130618220929.GA24056@localhost>
-Message-ID: <201306191403.20569.arnd@arndb.de>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Wed, 19 Jun 2013 14:05:00 +0200
+Subject: [PATCH v2 1/4] ARM: dts: omap4-panda: Add USB Host support
+In-Reply-To: <51C19011.5050107@ti.com>
+References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
+ <1371571487-14389-2-git-send-email-rogerq@ti.com> <51C106A1.9030001@ti.com>
+ <51C15F7E.5020305@ti.com> <20130619074605.GW5523@atomide.com>
+ <51C183AC.8040801@ti.com> <51C19011.5050107@ti.com>
+Message-ID: <51C19E6C.4040802@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 June 2013, Ezequiel Garcia wrote:
-> On Tue, Jun 18, 2013 at 06:16:26PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 18 June 2013, Ezequiel Garcia wrote:
-> > > 
-> > > +               devbus-bootcs {
-> > > +                       compatible = "marvell,mvebu-devbus";
-> > > +                       reg = <0xffff0001 0x10400 0x8>;
-> > > +                       ranges = <0 MBUS_ID(0x01, 0x2f) 0 0xffffffff>;
-> > > +                       #address-cells = <1>;
-> > > +                       #size-cells = <1>;
-> > > +                       clocks = <&coreclk 0>;
-> > > +                       status = "disabled";
-> > > +               };
-> > 
-> > This is a violation of the binding as far as I can tell, since you don't specify ranges
-> > to access the 0xffff0001 0x10400 address. However, as I explained in my comment for
-> > the binding, I think you should clarify the binding and leave the implementation
-> > as you have it here.
-> > 
-> 
-> Mmm... again I got lost here. Which 'ranges' you say I don't specify to
-> access the (formerly) 0xffff0001?
-> 
-> AFAIK, 'ranges' are only for children translation, which means I don't
-> need to specify a ranges for that in the devbus node, but in its parent,
-> right?
-> 
-> This ranges thing can be very tricky, so please correct me if I'm
-> mistaken.
+Hello,
 
-You already clarified that the binding was wrong. This was about the
-part where you replied:
-
->> Do you really want to require the child to provide a "ranges" property?
->> I think this makes it more complicated to specify devices that belong
->> into the "internal-regs" category.
->> 
+On 06/19/2013 01:03 PM, Roger Quadros wrote:
+> On 06/19/2013 01:10 PM, Benoit Cousson wrote:
+>> On 06/19/2013 02:46 AM, Tony Lindgren wrote:
+>>> * Roger Quadros <rogerq@ti.com> [130619 00:42]:
+>>>> Hi Benoit,
+>>>>
+>>>> On 06/19/2013 04:17 AM, Benoit Cousson wrote:
+>>>>> Hi Roger,
+>>>>>
+>>>>> On 06/18/2013 11:04 AM, Roger Quadros wrote:
+>>>>>> Provide the RESET and Power regulators for the USB PHY,
+>>>>>> the USB Host port mode and the PHY device.
+>>>>>>
+>>>>>> Also provide pin multiplexer information for the USB host
+>>>>>> pins.
+>>>>>>
+>>>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>>>>> ---
+>>>>>>     arch/arm/boot/dts/omap4-panda-common.dtsi |   62 +++++++++++++++++++++++++++++
+>>>>>>     1 files changed, 62 insertions(+), 0 deletions(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>>>>> index 00cbaa5..7a21e8e 100644
+>>>>>> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>>>>> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>>>>> @@ -59,6 +59,42 @@
+>>>>>>                 "AFML", "Line In",
+>>>>>>                 "AFMR", "Line In";
+>>>>>>         };
+>>>>>> +
+>>>>>> +    /* HS USB Port 1 RESET */
+>>>>>> +    hsusb1_reset: hsusb1_reset_reg {
+>>>>>> +        compatible = "regulator-fixed";
+>>>>>> +        regulator-name = "hsusb1_reset";
+>>>>>> +        regulator-min-microvolt = <3300000>;
+>>>>>> +        regulator-max-microvolt = <3300000>;
+>>>>>> +        gpio = <&gpio2 30 0>;    /* gpio_62 */
+>>>>>> +        startup-delay-us = <70000>;
+>>>>>> +        enable-active-high;
+>>>>>> +    };
+>>>>>
+>>>>> Is this really a regulator? Or just a GPIO line used to reset the USB PHY?
+>>>>
+>>>> It is in fact a GPIO line used as reset.
+>>>>>
+>>>>> If this is the case, I don't think it should be represented as a regulator.
+>>>>
+>>>> Why not? I think it fits very well in the regulator device model.
+>>
+>> I'm not sure fitting very well is the correct term.
+>> It works, for sure, but it is no different than when we were trying to abuse the regulator fmwk to enable the 32k clock in phoenix.
+>> It is just a hack.
+>>
 >
->No, this text is actually a left-over from the previous patchset, in
->current v3 patchset MBus children are not required to have any ranges.
->On the otherside, although you will need one except in the most trivial
->cases like for the BootROM.
+> The only difference is there is a dedicated framework for clocks. Since there is nothing specific to
+> handle reset lines it is left to the driver writer how he wants to manage it.
+>
 
-With that change, everything above is ok.
+There is a proposed binding for gpio-controlled reset lines, but it is 
+not yet merged [1].
+I guess it can fit most usage patterns, and it can be an interesting 
+move in the future.
 
-	Arnd
+Regards,
+
+Florian
+
+[1] http://thread.gmane.org/gmane.linux.drivers.devicetree/36830
