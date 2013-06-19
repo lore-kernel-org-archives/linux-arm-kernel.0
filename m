@@ -1,54 +1,77 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Tue, 18 Jun 2013 22:36:38 -0400
-Subject: [PATCH 1/1] arm: add bandgap DT entry for OMAP5
-Message-ID: <1371609398-26454-1-git-send-email-eduardo.valentin@ti.com>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Wed, 19 Jun 2013 02:38:18 +0000
+Subject: [v1 3/3] imx: ahci: enable ahci sata on imx6q platforms
+In-Reply-To: <20130618055925.GA6723@S2101-09.ap.freescale.net>
+References: <1371462767-16630-1-git-send-email-r65037@freescale.com>
+ <1371462767-16630-4-git-send-email-r65037@freescale.com>
+ <20130618030310.GD28381@S2101-09.ap.freescale.net>
+ <0E83723C55F66F43A6041464FE31119D3057EF@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20130618055925.GA6723@S2101-09.ap.freescale.net>
+Message-ID: <0E83723C55F66F43A6041464FE31119D307B86@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bandgap device DT entry for OMAP5 dtsi.
+Hi Shawn:
+It's sounds right, platform is not right place to handle device/IP stuff.
+I would kick off to your option2. Thanks.
 
-Cc: "Beno?t Cousson" <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-omap at vger.kernel.org
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-Signed-off-by: J Keerthy <j-keerthy@ti.com>
----
- arch/arm/boot/dts/omap5.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
----
+Best Regards
+Richard Zhu
 
-Benoit,
+-----Original Message-----
+From: Shawn Guo [mailto:shawn.guo at linaro.org] 
+Sent: Tuesday, June 18, 2013 1:59 PM
+To: Zhu Richard-R65037
+Cc: Richard Zhu; linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; linux-ide at vger.kernel.org
+Subject: Re: [v1 3/3] imx: ahci: enable ahci sata on imx6q platforms
 
-Sorry for this very late request, but can you please consider
-these patches for 3.11 still?
+On Tue, Jun 18, 2013 at 05:00:09AM +0000, Zhu Richard-R65037 wrote:
+> > +enum {
+> > +     HOST_CAP = 0x00,
+> > +     HOST_CAP_SSS = (1 << 27), /* Staggered Spin-up */
+> > +     HOST_CTL = 0x04, /* global host control */
+> > +     HOST_RESET = (1 << 0),  /* reset controller; self-clear */
+> > +     HOST_PORTS_IMPL = 0x0c, /* bitmap of implemented ports */
+> > +     HOST_TIMER1MS = 0xe0, /* Timer 1-ms */
+> > +     HOST_VERSIONR = 0xf8, /* host version register*/
+> > +
+> > +     PORT_SATA_SR = 0x128, /* Port0 SATA Status */
+> > +     PORT_PHY_CTL = 0x178, /* Port0 PHY Control */
+> > +     PORT_PHY_CTL_PDDQ_LOC = 0x100000, /* PORT_PHY_CTL bits */ };
+> > +
+> 
+> This is all about IP stuff.  Some of them are just replication of 
+> definitions found in drivers/ata/ahci.h. I do not understand why we 
+> need them in platform.  It's a sign to me that we are doing something 
+> in platform code that should really be done in the device driver, no?
+> 
+> [Richard] Regarding to the AHCI SPEC, some bits of the ahci sata 
+> registers are  specified to be RO, but they are RW in the design of fsl ahci ata in actually.
+>  So the configurations of those bits are mandatory required in the  
+> platform sata initialization.
+> One HBA reset is better finished before start the configuration.
+> That's why those registers/bits are re-defined in the platform level.
+> 
+> For, e.x:
+> bit1 of the HOST_POSRTS_IMPL, HOST_CAP_SSS(bit27) of the HOST_CAP, are 
+> RO specified in the AHCI SPEC. But they should be configured in the sata platform initialization.
+> 
+> BTW, HOST_TIMER1MS is defined by FSL, can't be used in the common codes.
+> regarding to the AHCI SPEC.
+> " Registers at offset A0h to FFh are vendor specific"
 
-I completely forgot to send these on my "Enable TI SoC thermal driver" series.
+It sounds like to me that the generic ahci_platform driver does not perfectly fit imx6q sata device.  You're pushing all those bits that are not covered by the generic ahci_platform driver down to platform code.  This is not the right thing to do, and platform is not the right place to handle device/IP stuff.  I see two options you can go as below.
 
-All best,
+1. Create an imx6q sata specific compatible string and add code into
+   generic ahci_platform driver to implement programming model for imx6q
+   type of device.
 
-Eduardo
+2. The existing ahci_platform driver is not so useful for imx6q sata
+   considering you have so many imx6q custom bits to add.  It might be
+   more appropriate to create a custom ahci_platform driver for imx6q
+   sata device with forking the generic one, just like what
+   sata_highbank does.
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 2ad63c4..5ede6e1 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -615,5 +615,13 @@
- 			interrupts = <0 80 0x4>;
- 			ti,hwmods = "wd_timer2";
- 		};
-+		bandgap {
-+			reg = <0x4a0021e0 0xc
-+				0x4a00232c 0xc
-+				0x4a002380 0x2c
-+				0x4a0023C0 0x3c>;
-+				interrupts = <0 126 4>; /* talert */
-+			compatible = "ti,omap5430-bandgap";
-+		};
- 	};
- };
--- 
-1.8.2.1.342.gfa7285d
+I would go for option 2.
+
+Shawn
