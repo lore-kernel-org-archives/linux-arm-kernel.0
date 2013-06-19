@@ -1,28 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jun 2013 01:45:30 +0200
-Subject: [GIT PULL] arm-soc: Xilinx Zynq DT changes for v3.11
-In-Reply-To: <51BECCCD.5090104@monstr.eu>
-References: <51BECCCD.5090104@monstr.eu>
-Message-ID: <201306200145.30958.arnd@arndb.de>
+Date: Thu, 20 Jun 2013 01:47:26 +0200
+Subject: [PATCH] clocksource: kona: adapt to CLOCKSOURCE_OF_DECLARE change
+In-Reply-To: <51B770D7.6000000@broadcom.com>
+References: <3174210.ZivUajNGev@wuerfel> <51B770D7.6000000@broadcom.com>
+Message-ID: <201306200147.26772.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 June 2013, Michal Simek wrote:
-> please pull the following device-tree changes to your arm-soc tree.
-> This tag is based on zynq/clk branch you have already added to arm-soc tree.
+On Tuesday 11 June 2013, Christian Daudt wrote:
+> >
+> Acked-by: Christian Daudt <csd@broadcom.com>
 > 
-> Thanks,
-> Michal
-> 
-> The following changes since commit 97c4e87d45498fb4d18c995721bba72345a7d257:
-> 
->   clk: zynq: Remove deprecated clock code (2013-05-27 09:21:49 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-for-3.11
-> 
+> Do you want this for 3.10 or should I add to my 3.11 tree ?
 
-Pulled into next/dt, thanks!
+I've applied it to the next/fixes-non-critical branch with your ack now,
+scheduled for 3.11.
 
 	Arnd
