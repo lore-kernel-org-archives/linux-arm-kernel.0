@@ -1,29 +1,28 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Thu, 20 Jun 2013 07:43:29 +0800
-Subject: [PATCH -next] ARM: OMAP1: remove duplicated include from
- board-voiceblue.c
-Message-ID: <CAPgLHd8t3h03XAzgge8aif-fkGBxqE21hDfThh6neF0WzKJK3Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Jun 2013 01:45:30 +0200
+Subject: [GIT PULL] arm-soc: Xilinx Zynq DT changes for v3.11
+In-Reply-To: <51BECCCD.5090104@monstr.eu>
+References: <51BECCCD.5090104@monstr.eu>
+Message-ID: <201306200145.30958.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Monday 17 June 2013, Michal Simek wrote:
+> please pull the following device-tree changes to your arm-soc tree.
+> This tag is based on zynq/clk branch you have already added to arm-soc tree.
+> 
+> Thanks,
+> Michal
+> 
+> The following changes since commit 97c4e87d45498fb4d18c995721bba72345a7d257:
+> 
+>   clk: zynq: Remove deprecated clock code (2013-05-27 09:21:49 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-for-3.11
+> 
 
-Remove duplicated include.
+Pulled into next/dt, thanks!
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- arch/arm/mach-omap1/board-voiceblue.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap1/board-voiceblue.c b/arch/arm/mach-omap1/board-voiceblue.c
-index 4677a9c..4b382a0 100644
---- a/arch/arm/mach-omap1/board-voiceblue.c
-+++ b/arch/arm/mach-omap1/board-voiceblue.c
-@@ -26,7 +26,6 @@
- #include <linux/serial_reg.h>
- #include <linux/smc91x.h>
- #include <linux/export.h>
--#include <linux/reboot.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
+	Arnd
