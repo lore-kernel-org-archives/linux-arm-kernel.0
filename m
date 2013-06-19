@@ -1,103 +1,57 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 19 Jun 2013 13:36:42 +0100
-Subject: [PATCH 06/10] ARM: twd: data endian fix
-In-Reply-To: <1371645406-16873-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1371645406-16873-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1371645406-16873-7-git-send-email-ben.dooks@codethink.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Jun 2013 14:37:20 +0200
+Subject: [RFC PATCH v3 0/2] drivers: mfd: Versatile Express SPC support
+In-Reply-To: <20130619093014.GX7161@zurbaran>
+References: <1370512763-32200-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1371547782.16725.11.camel@hornet> <20130619093014.GX7161@zurbaran>
+Message-ID: <201306191437.20759.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure the twd driver uses the correct calls to access the hardware
-to ensure that we do not end up with data in the wrong endian format.
+On Wednesday 19 June 2013, Samuel Ortiz wrote:
+> > 2. Move the vexpress-sysreg "platform management" functions into misc
+> > (unless we get any better place for it)
+> This is for Arnd and Greg to decide I suppose.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
- arch/arm/kernel/smp_twd.c |   24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 90525d9..804d3f8 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -45,7 +45,7 @@ static void twd_set_mode(enum clock_event_mode mode,
- 	case CLOCK_EVT_MODE_PERIODIC:
- 		ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
- 			| TWD_TIMER_CONTROL_PERIODIC;
--		__raw_writel(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
-+		writel_relaxed(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
- 			twd_base + TWD_TIMER_LOAD);
- 		break;
- 	case CLOCK_EVT_MODE_ONESHOT:
-@@ -58,18 +58,18 @@ static void twd_set_mode(enum clock_event_mode mode,
- 		ctrl = 0;
- 	}
- 
--	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
-+	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
- }
- 
- static int twd_set_next_event(unsigned long evt,
- 			struct clock_event_device *unused)
- {
--	unsigned long ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
-+	unsigned long ctrl = readl_relaxed(twd_base + TWD_TIMER_CONTROL);
- 
- 	ctrl |= TWD_TIMER_CONTROL_ENABLE;
- 
--	__raw_writel(evt, twd_base + TWD_TIMER_COUNTER);
--	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
-+	writel_relaxed(evt, twd_base + TWD_TIMER_COUNTER);
-+	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
- 
- 	return 0;
- }
-@@ -82,8 +82,8 @@ static int twd_set_next_event(unsigned long evt,
-  */
- static int twd_timer_ack(void)
- {
--	if (__raw_readl(twd_base + TWD_TIMER_INTSTAT)) {
--		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
-+	if (readl_relaxed(twd_base + TWD_TIMER_INTSTAT)) {
-+		writel_relaxed(1, twd_base + TWD_TIMER_INTSTAT);
- 		return 1;
- 	}
- 
-@@ -209,15 +209,15 @@ static void __cpuinit twd_calibrate_rate(void)
- 		waitjiffies += 5;
- 
- 				 /* enable, no interrupt or reload */
--		__raw_writel(0x1, twd_base + TWD_TIMER_CONTROL);
-+		writel_relaxed(0x1, twd_base + TWD_TIMER_CONTROL);
- 
- 				 /* maximum value */
--		__raw_writel(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
-+		writel_relaxed(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
- 
- 		while (get_jiffies_64() < waitjiffies)
- 			udelay(10);
- 
--		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
-+		count = readl_relaxed(twd_base + TWD_TIMER_COUNTER);
- 
- 		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
- 
-@@ -275,7 +275,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	 * bother with the below.
- 	 */
- 	if (per_cpu(percpu_setup_called, cpu)) {
--		__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
-+		writel_relaxed(0, twd_base + TWD_TIMER_CONTROL);
- 		clockevents_register_device(*__this_cpu_ptr(twd_evt));
- 		enable_percpu_irq(clk->irq, 0);
- 		return 0;
-@@ -288,7 +288,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	 * The following is done once per CPU the first time .setup() is
- 	 * called.
- 	 */
--	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
-+	writel_relaxed(0, twd_base + TWD_TIMER_CONTROL);
- 
- 	clk->name = "local_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
--- 
-1.7.10.4
+I think when vexpress-sysreg was created, we didn't have the syscon driver
+yet, otherwise I think we should have used that, and put separate
+drivers on top.
+
+Not sure if it's too late for changing it to that now, given that
+we already have a binding.
+
+It seems we should use the same code for versatile and realview, or
+at least it will only need small modifications to apply to all of
+these platforms.
+
+What I think could be helpful here is:
+
+* export a "syscon" for the low-level registers
+
+* add a gpio driver based on the syscon interface, and move the gpiochip
+  implementation there
+
+* move the low-leve "config" code from the sysreg driver into the
+  vexpress-config driver and make it use the syscon.
+
+* move the other global functions from the driver into the callers
+  and use syscon there.
+
+That would end up eliminating the sysreg driver, aside from maybe
+a one-line change to the syscon driver to allow it to probe the
+right device.
+
+> > 3. Move vexpress-config into drivers/bus as it is (however I see no one
+> > in MAINTAINERS for this directory)
+> ISTR that Arnd originally created that directory, so he may help here.
+> Arnd also had some concerns about implementing this code as a bus,
+> mostly about it not being a discoverable bus. IMHO that's a valid
+> concern, and this is why you ended up putting it under MFD which can be
+> seen as some sort of platform devices bus. But I still believe the bus
+> API would make this code look cleaner and easier to maintain.
+
+Sorry, I don't see why it would be a bus. I assume that there is code
+missing somewhere that is not yet merged, right?
+
+	Arnd
