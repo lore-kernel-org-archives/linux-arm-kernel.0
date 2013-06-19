@@ -1,68 +1,41 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 19 Jun 2013 16:53:04 +0530
-Subject: [PATCH v2 2/7] gpio: davinci: move to platform device
-In-Reply-To: <1371202532-14628-3-git-send-email-avinashphilip@ti.com>
-References: <1371202532-14628-1-git-send-email-avinashphilip@ti.com>
- <1371202532-14628-3-git-send-email-avinashphilip@ti.com>
-Message-ID: <51C19498.8090807@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 19 Jun 2013 12:23:24 +0100
+Subject: [PATCH] ARM: kernel: document ARM CPUs clock-frequency property
+In-Reply-To: <CAGVrzcY8oxZ7zUbThvXgsVyEGBCsxcvu4R0it_9s9wsKkJ3W0w@mail.gmail.com>
+References: <1371635237-22860-1-git-send-email-f.fainelli@gmail.com>
+ <20130619100450.GA27181@e106331-lin.cambridge.arm.com>
+ <CAGVrzcY8oxZ7zUbThvXgsVyEGBCsxcvu4R0it_9s9wsKkJ3W0w@mail.gmail.com>
+Message-ID: <20130619112324.GA32207@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/14/2013 3:05 PM, Philip Avinash wrote:
-> From: KV Sujith <sujithkv@ti.com>
+On Wed, Jun 19, 2013 at 11:27:50AM +0100, Florian Fainelli wrote:
+> Hello Mark,
 > 
-> Modify GPIO Davinci driver to be compliant to standard platform drivers.
-> The driver did not have platform driver structure or a probe. Instead,
-> had a davinci_gpio_setup() function which is called in the pure_init
-> sequence. The function also had dependency on davinci_soc_info structure
-> of the corresponding platform. For Device Tree(DT) implementation, we
-> need to get rid of the dependency on the davinci_soc_info structure.
-> Hence as a first stage of DT conversion, we implement a probe. Future
-> commits shall modify the probe to read platform related data from DT.
+> 2013/6/19 Mark Rutland <mark.rutland@arm.com>:
+> > On Wed, Jun 19, 2013 at 10:47:17AM +0100, Florian Fainelli wrote:
+> >> ARM CPU device tree nodes may contain an optional clock-frequency
+> >> property, when set, this property must contain the CPU frequency in Hz,
+> >> which is then used by the topology parsing code in
+> >> arch/arm/kernel/topology.c to infer the CPU capacity.
+> >
+> > I see that arch/arm/kernel/topology.c does a pr_err when clock-frequency isn't
+> > present. If we're documenting it as optional, should we not downgrade that or
+> > remove it entirely?
 > 
-> - Add platform_driver structure and driver register function for davinci
->   GPIO driver. The driver registration is made to happen in
->   postcore_initcall. This is required since machine init functions like
->   da850_lcd_hw_init() make use of GPIO.
-> - Convert the davinci_gpio_setup() to davinci_gpio_probe().
-> - Remove access of members in soc_info structure. Instead, relevant data
->   are taken from davinci_gpio_platform_data structure pointed by
->   pdev->dev.platform_data.
-> - Change clk_get() to devm_clk_get() as devm_clk_get() is a device
->   managed function and makes error handling simpler.
-> - Change pr_err to dev_err for ngpio error reporting.
+> Good question. I think it might be good to just dowgrade the error to
+> a simple warning, we should clearly be fixing the binding if we have a
+> device_type = "cpu" property but no clock-frequency property.
 
-s/ngpio/gpio
+Well, this means that that pr_err will trigger as soon as the dts
+updates hit the mainline, now probably it is silent because cpu nodes
+for architectures with "arm,cortex-a15" as cpus miss device_type = "cpu".
+ePAPR defines "clock-frequency" as required.
 
-> - Arrange include files in alphabetical order
+So either we downgrade it to optional or we are in for another slew of dts
+updates, I am really looking forward to that. Certainly it has to be added
+to the bindings.
 
-Doesn't happen in this patch.
+Thoughts ?
 
-> - Add struct davinci_gpio_platform_data davinci for gpio module.
-> 
-> Signed-off-by: KV Sujith <sujithkv@ti.com>
-> [avinashphilip at ti.com: Move global definition for "struct
-> davinci_gpio_controller" variable to local in probe and set it as driver
-> data.]
-> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
-
-> diff --git a/arch/arm/mach-davinci/include/mach/gpio-davinci.h b/arch/arm/mach-davinci/include/mach/gpio-davinci.h
-> index 1fdd1fd..b325a1d 100644
-> --- a/arch/arm/mach-davinci/include/mach/gpio-davinci.h
-> +++ b/arch/arm/mach-davinci/include/mach/gpio-davinci.h
-> @@ -60,6 +60,8 @@ struct davinci_gpio_controller {
->  	void __iomem		*set_data;
->  	void __iomem		*clr_data;
->  	void __iomem		*in_data;
-> +	int			gpio_unbanked;
-
-You don't really use this member in this patch. You should add it in the
-patch you need it in.
-
-I fixed these issues locally and pushed this patch to my v3.11/gpio branch.
-
-Thanks,
-Sekhar
+Lorenzo
