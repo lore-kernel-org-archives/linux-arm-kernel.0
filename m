@@ -1,95 +1,36 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 19 Jun 2013 18:56:17 +0200
-Subject: [PATCHv3 09/11] pci: mvebu: add support for MSI
-In-Reply-To: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1371660979-21588-10-git-send-email-thomas.petazzoni@free-electrons.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 19 Jun 2013 10:58:34 -0600
+Subject: [PATCH v3 05/12] ARM: mvebu: Remove the harcoded BootROM window
+ allocation
+In-Reply-To: <20130619100159.GB16138@localhost>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1371554737-25319-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130618173906.GC2204@obsidianresearch.com>
+ <20130619100159.GB16138@localhost>
+Message-ID: <20130619165834.GB32155@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds support for Message Signaled Interrupts in the
-Marvell PCIe host controller. The work is very simple: it simply gets
-a reference to the msi_chip associated to the PCIe controller thanks
-to the msi-parent DT property, and stores this reference in the
-pci_bus structure. This is enough to let the Linux PCI core use the
-functions of msi_chip to setup and teardown MSIs.
+On Wed, Jun 19, 2013 at 07:02:00AM -0300, Ezequiel Garcia wrote:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/pci/host/pci-mvebu.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+> > Verifying the DT is setup this way and aborting if it is not seems
+> > like a good idea..
+> 
+> I agree it's a nice idea, but I'm not too sure how to accomplish this
+> in a simple and generic way. There's nothing in the DT that allows you
+> to know which of the ranges entries correspond to the BootROM, unless you go
+> through each of the entries comparing against the known target ID and
+> attribute.
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 13a633b..89638d1 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -11,6 +11,7 @@
- #include <linux/clk.h>
- #include <linux/module.h>
- #include <linux/mbus.h>
-+#include <linux/msi.h>
- #include <linux/slab.h>
- #include <linux/platform_device.h>
- #include <linux/of_address.h>
-@@ -107,6 +108,7 @@ struct mvebu_pcie_port;
- struct mvebu_pcie {
- 	struct platform_device *pdev;
- 	struct mvebu_pcie_port *ports;
-+	struct msi_chip *msi;
- 	struct resource io;
- 	struct resource realio;
- 	struct resource mem;
-@@ -695,6 +697,12 @@ static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
- 	return bus;
- }
- 
-+void mvebu_pcie_add_bus(struct pci_bus *bus)
-+{
-+	struct mvebu_pcie *pcie = sys_to_pcie(bus->sysdata);
-+	bus->msi = pcie->msi;
-+}
-+
- resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 					  const struct resource *res,
- 					  resource_size_t start,
-@@ -731,6 +739,7 @@ static void __init mvebu_pcie_enable(struct mvebu_pcie *pcie)
- 	hw.map_irq        = mvebu_pcie_map_irq;
- 	hw.ops            = &mvebu_pcie_ops;
- 	hw.align_resource = mvebu_pcie_align_resource;
-+	hw.add_bus        = mvebu_pcie_add_bus;
- 
- 	pci_common_init(&hw);
- }
-@@ -755,6 +764,21 @@ mvebu_pcie_map_registers(struct platform_device *pdev,
- 	return devm_request_and_ioremap(&pdev->dev, &regs);
- }
- 
-+static void __init mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
-+{
-+	struct device_node *msi_node;
-+
-+	msi_node = of_parse_phandle(pcie->pdev->dev.of_node,
-+				    "msi-parent", 0);
-+	if (!msi_node)
-+		return;
-+
-+	pcie->msi = of_msi_chip_find_by_node(msi_node);
-+
-+	if (pcie->msi)
-+		pcie->msi->dev = &pcie->pdev->dev;
-+}
-+
- static int __init mvebu_pcie_probe(struct platform_device *pdev)
- {
- 	struct mvebu_pcie *pcie;
-@@ -879,6 +903,8 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- 		i++;
- 	}
- 
-+	mvebu_pcie_msi_enable(pcie);
-+
- 	mvebu_pcie_enable(pcie);
- 
- 	return 0;
--- 
-1.8.1.2
+I think you need to have a defined compatible string for the bootrom,
+use one of the of_find.. functions to locate the node, then translate
+the regs to get a CPU address, ensure it is the right base and size..
+
+> You could also do a 'of_find_node_by_name(NULL, "bootrom");' but the
+> binding no longer requires to even have any children for the window.
+
+You'll need to define a bootrom binding. There is not a lot of sense
+in including things in the DT if the kernel can't find them and use
+them.
+
+Jason
