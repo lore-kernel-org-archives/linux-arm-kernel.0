@@ -1,30 +1,40 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 19 Jun 2013 11:45:42 +0300
-Subject: [PATCH 3/3] clk: tegra: T114: add DFLL DVCO reset control
-In-Reply-To: <20130607121901.21868.65416.stgit@dusk.lan>
-References: <20130607121505.21868.72360.stgit@dusk.lan>
- <20130607121901.21868.65416.stgit@dusk.lan>
-Message-ID: <20130619084542.GB3847@tbergstrom-lnx.Nvidia.com>
+From: ulrich.hecht@gmail.com (Ulrich Hecht)
+Date: Wed, 19 Jun 2013 10:46:51 +0200
+Subject: [PATCH 1/2] serial: sh-sci: HSCIF support
+In-Reply-To: <20130618011901.GB2588@verge.net.au>
+References: <1371440327-30512-1-git-send-email-horms+renesas@verge.net.au>
+ <1371440327-30512-2-git-send-email-horms+renesas@verge.net.au>
+ <201306171454.48936.arnd@arndb.de>
+ <20130618011901.GB2588@verge.net.au>
+Message-ID: <CAO3366zWrYFYNaXNWpUvc8KpxjwYVoHz2O5fV33QFSTN2-H7aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 02:19:09PM +0200, Paul Walmsley wrote:
-> Add DFLL DVCO reset line control functions to the CAR IP block driver.
-> 
-> The DVCO present in the DFLL IP block has a separate reset line,
-> exposed via the CAR IP block.  This reset line is asserted upon SoC
-> reset.  Unless something (such as the DFLL driver) deasserts this
-> line, the DVCO will not oscillate, although reads and writes to the
-> DFLL IP block will complete.
-> 
-> Thanks to Aleksandr Frid <afrid@nvidia.com> for identifying this and
-> saving hours of debugging time.
-> 
-> Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
-> Cc: Aleksandr Frid <afrid@nvidia.com>
-> Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
-Reviewed-by: <pdeschrijver@nvidia.com>
+On Tue, Jun 18, 2013 at 3:19 AM, Simon Horman <horms@verge.net.au> wrote:
+>> This hunk causes build warnings in linux-next now:
+>>
+>> /git/arm-soc/drivers/tty/serial/sh-sci.c: In function 'sci_set_termios':
+>> /git/arm-soc/drivers/tty/serial/sh-sci.c:1942:37: warning: 'srr' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>>     serial_port_out(port, HSSRR, srr | HSCIF_SRE);
+>>                                      ^
+>> /git/arm-soc/drivers/tty/serial/sh-sci.c:1892:15: note: 'srr' was declared here
+>>   unsigned int srr;
+>>                ^
+>> /git/arm-soc/drivers/tty/serial/sh-sci.c:1938:47: warning: 'cks' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>>    serial_port_out(port, SCSMR, (smr_val & ~3) | cks);
+>>                                                ^
+>> /git/arm-soc/drivers/tty/serial/sh-sci.c:1890:40: note: 'cks' was declared here
+>>   unsigned int baud, smr_val, max_baud, cks;
+>
+> Ulrich, could you please look into this?
 
-Cheers,
+Hmmm... I get this warning with gcc 4.5, 4.6, and 4.8. Apparently gcc
+4.7 is the only one that does not warn about this. Guess what I'm
+using... :(
 
-Peter.
+This is of course trivially fixed, but I have completely lost track of
+the transmogrifications this patch has been subjected to. What's the
+procedure?
+
+CU
+Uli
