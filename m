@@ -1,68 +1,57 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Wed, 19 Jun 2013 16:24:14 -0700
-Subject: [PATCH] ARM: bcm281xx: Adding bcm28155-ap.dts
-Message-ID: <1371684254-15189-1-git-send-email-markus.mayer@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Jun 2013 01:33:07 +0200
+Subject: [GIT PULL] Integrator/AP PCI DT support
+In-Reply-To: <CACRpkdZaTDEu8vUx347k1Y5Pht5Pi_mPJXpDsVtAsSYVT60n_Q@mail.gmail.com>
+References: <CACRpkdb8J4+QH36SYavgGWbFWaBZDg5JSYyyJELzL=mSZfMnBw@mail.gmail.com>
+ <20130615000922.GG18124@quad.lixom.net>
+ <CACRpkdZaTDEu8vUx347k1Y5Pht5Pi_mPJXpDsVtAsSYVT60n_Q@mail.gmail.com>
+Message-ID: <201306200133.07315.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the BCM28155 AP board.
+On Saturday 15 June 2013, Linus Walleij wrote:
+> The following changes since commit 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
+> 
+>   of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+> tags/integrator-pci-for-arm-soc
+> 
+> for you to fetch changes up to f55b2b56cd37fa8bcfcb75248c27094eaf09e04c:
+> 
+>   ARM: integrator: basic PCIv3 device tree support (2013-06-15 22:18:39 +0200)
+> 
 
-Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-Acked-by: Christian Daudt <csd@broadcom.com>
----
- arch/arm/boot/dts/Makefile        |    3 ++-
- arch/arm/boot/dts/bcm28155-ap.dts |   29 +++++++++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm28155-ap.dts
+Pulled into next/soc. Sorry for the delay doing the handover, I just started
+with this, and have a huge backlog.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f0895c5..187f336 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -40,7 +40,8 @@ dtb-$(CONFIG_ARCH_AT91)	+= sama5d34ek.dtb
- dtb-$(CONFIG_ARCH_AT91)	+= sama5d35ek.dtb
- 
- dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
--dtb-$(CONFIG_ARCH_BCM) += bcm11351-brt.dtb
-+dtb-$(CONFIG_ARCH_BCM) += bcm11351-brt.dtb \
-+	bcm28155-ap.dtb
- dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
- 	da850-evm.dtb
- dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
-diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
-new file mode 100644
-index 0000000..0d66db6
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm28155-ap.dts
-@@ -0,0 +1,29 @@
-+/*
-+ * Copyright (C) 2013 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm11351.dtsi"
-+
-+/ {
-+	model = "BCM28155 AP board";
-+	compatible = "bcm,bcm28155-ap", "bcm,bcm11351";
-+
-+	memory {
-+		reg = <0x80000000 0x40000000>; /* 1 GB */
-+	};
-+
-+	uart at 3e000000 {
-+		status = "okay";
-+	};
-+};
--- 
-1.7.9.5
+Please send a follow-on patch to fix the spaces window in the ranges
+property:
+
++               ranges = <0x00000000 0 0x61000000 /* config space */
++                       0x61000000 0 0x00100000 /* 16 MiB @ 61000000 */
++                       0x01000000 0 0x60000000 /* I/O space */
++                       0x60000000 0 0x00100000 /* 16 MiB @ 60000000 */
++                       0x02000000 0 0x40000000 /* non-prefectable memory */
++                       0x40000000 0 0x10000000 /* 256 MiB @ 40000000 */
++                       0x42000000 0 0x50000000 /* prefetchable memory */
++                       0x50000000 0 0x10000000>; /* 256 MiB @ 50000000 */
+
+This would not work, you need 0 as the local side address for I/O space
+(unlike memory space) instead of 0x60000000. Your code ignores the
+I/O space at the moment, but the ranges should be set up to let us
+handle it in the future.
+
+For the memory space, you seem to ignore the bus address in the ranges
+at the moment. Please fix that too, either by programming 0x40000000/
+0x50000000 into V3_LB_MAP0/V3_LB_MAP1, or by changing the ranges
+to have 0x00000000/0x10000000 as the local part for non-prefetch/prefetch
+memory. Either way is possible, but please make the DT consistent with
+the code, ideally by using the information from DT to set up the
+windows.
+
+Also, why not just map the I/O space by calling pci_ioremap_io?
+
+	Arnd
