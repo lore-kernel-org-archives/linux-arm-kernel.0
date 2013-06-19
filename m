@@ -1,30 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 19 Jun 2013 21:06:20 +0200
-Subject: [PATCH 0/2] Fix build breakage for tnetv107x platforms
-In-Reply-To: <1371203869-16308-1-git-send-email-avinashphilipk@gmail.com>
-References: <1371203869-16308-1-git-send-email-avinashphilipk@gmail.com>
-Message-ID: <CACRpkdaSTVgueBfvEt-C=f0tuem7BbuEdx-38HZPPJDGjtKELA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Jun 2013 21:08:30 +0200
+Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation to
+ the DT binding
+In-Reply-To: <20130619185224.GB5701@localhost>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <201306182345.26281.arnd@arndb.de> <20130619185224.GB5701@localhost>
+Message-ID: <201306192108.30998.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 11:57 AM, Philip Avinash
-<avinashphilipk@gmail.com> wrote:
+On Wednesday 19 June 2013, Ezequiel Garcia wrote:
+> > > What happens is that any decoding window that was setup by the bootloader,
+> > > is wiped and completely new windows are allocated using the translations
+> > > in the DT, as described by this binding.
+> > > 
+> > > This was the case from the start with the old MBus driver. FWIW, I think
+> > > it's actually the best choice that can be made: it makes the kernel
+> > > independent of the previous setting.
+> > > 
+> > > I know you've suggested differently in the past, but I'm not sure I
+> > > understand what's the benefit in keeping the bootloaders configuration.
+> > 
+> > The device tree normally describes things that are either wired up
+> > in hardware or set up by the boot loader. Describing things that the
+> > boot loader may or may not have set up and that the kernel should
+> > set up but may ignore if it wants to is a bit fishy, but it seems
+> > that you have decided to do it that way. You should definitely
+> > document the fact that all ranges except the "internal-regs" are just
+> > suggestions and cannot be relied on to be present at boot time.
+> > 
+> 
+> Hold on! I've just noticed this, and I want to clarify something, just
+> to avoid mis-interpretations. The binding is not saying "the windows
+> described through this ranges are present at boot time".
+> 
+> Rather, it is "this binding will guarantee that the windows described 
+> in it will be present after the mbus allocates them".
+> 
+> Does it sound too fishy?
 
-> tnetv107x_defconfig build failing on removal selection of NEED_MACH_GPIO_H
-> for ARCH_DAVINCI. This is due to header files inclusion from mach/gpio-davinci.h
-> So this patch series fixes the build breakage on removal of NEED_MACH_GPIO_H.
->
-> This patch series is based on Linux 3.10-rc4 and is availabel at [1] and dependency on 2.
->
-> 1. https://github.com/avinashphilip/am335x_linux/tree/linux_davinci_v3.10_soc_gpio_v310-rc4
-> 2. https://patchwork.kernel.org/patch/97853/
->
-> Philip Avinash (2):
->   ARM: davinci: fix for build breakage for tnetv107x platforms
->   gpio: gpio-tnetv107x: Fix bulid breakge
+I don't think it's a guarantee that the binding can make. The binding
+describes the interface between the hardware/firmware and the kernel,
+not an interface between one kernel driver and another.
 
-The series:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+You could instead write:
 
-Yours,
-Linus Walleij
+"The ranges property defines a set of mbus windows that are expected
+to be set by the operating system and that are guaranteed to be free
+of overlaps with one another or with the system memory ranges.
+Each entry in the property refers to exactly one window. If an
+operating system choses to use a different set of mbus windows,
+it must ensure that any address translations performed from downstream
+devices are adapted accordingly. The operating system may insert
+additional mbus windows that do not conflict with the ones listed
+in the ranges, e.g. for mapping PCIe devices. As a special case,
+the internal register window must be set up by the boot loader
+at the address listed in the ranges property, since the operating
+uses it to set up the other windows."
+
+	Arnd
