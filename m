@@ -1,43 +1,109 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 19 Jun 2013 15:16:11 -0700
-Subject: [PATCH v4 06/12] memory: mvebu-devbus: Remove address decoding
- window workaround
-In-Reply-To: <20130619201805.GJ31667@titan.lakedaemon.net>
-References: <1371672446-21583-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1371672446-21583-7-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130619201805.GJ31667@titan.lakedaemon.net>
-Message-ID: <20130619221611.GC9518@kroah.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 19 Jun 2013 17:40:44 -0500
+Subject: [PATCH v2 1/4] ARM: dts: omap4-panda: Add USB Host support
+In-Reply-To: <51C1BA8C.6000703@ti.com>
+References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
+ <1371571487-14389-2-git-send-email-rogerq@ti.com> <51C106A1.9030001@ti.com>
+ <51C15F7E.5020305@ti.com> <20130619074605.GW5523@atomide.com>
+ <51C183AC.8040801@ti.com> <51C19011.5050107@ti.com>
+ <51C19E6C.4040802@epfl.ch> <51C1A2AE.2020506@ti.com>
+ <51C1BA8C.6000703@ti.com>
+Message-ID: <51C2336C.7020504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 04:18:05PM -0400, Jason Cooper wrote:
-> On Wed, Jun 19, 2013 at 05:07:20PM -0300, Ezequiel Garcia wrote:
-> > Now that mbus device tree binding has been introduced, remove the address
-> > decoding window management from this driver.
-> > A suitable 'ranges' entry should be added to the devbus-compatible node in
-> > the device tree, as described by the mbus binding documentation.
-> > 
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> > Greg,
-> > 
-> > I'm Ccing you, since you're carrying the mvebu-devbus driver in your trees.
-> > This patch should be applied only after the MBus DT binding is accepted
-> > and/or merged; although I doubt we will see that happening any time soon.
-> > 
-> >  drivers/memory/mvebu-devbus.c | 64 ++-----------------------------------------
-> >  1 file changed, 2 insertions(+), 62 deletions(-)
-> 
-> Since this MBus series is most likely for v3.12, Greg's tree will be
-> merged by then.  At which time, we can decide if it's best to keep the
-> series together or continue to send devbus changes through him.  I'm
-> fine either way, and but I have a preference for keeping the series
-> together.
+On 06/19/2013 09:05 AM, Roger Quadros wrote:
+> On 06/19/2013 03:23 PM, Benoit Cousson wrote:
+>> On 06/19/2013 07:05 AM, Florian Vaussard wrote:
+>>> Hello,
+>>>
+>>> On 06/19/2013 01:03 PM, Roger Quadros wrote:
+>>>> On 06/19/2013 01:10 PM, Benoit Cousson wrote:
+>>>>> On 06/19/2013 02:46 AM, Tony Lindgren wrote:
+>>>>>> * Roger Quadros <rogerq@ti.com> [130619 00:42]:
+>>>>>>> Hi Benoit,
+>>>>>>>
+>>>>>>> On 06/19/2013 04:17 AM, Benoit Cousson wrote:
+>>>>>>>> Hi Roger,
+>>>>>>>>
+>>>>>>>> On 06/18/2013 11:04 AM, Roger Quadros wrote:
+>>>>>>>>> Provide the RESET and Power regulators for the USB PHY,
+>>>>>>>>> the USB Host port mode and the PHY device.
+>>>>>>>>>
+>>>>>>>>> Also provide pin multiplexer information for the USB host
+>>>>>>>>> pins.
+>>>>>>>>>
+>>>>>>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>>>>>>>> ---
+>>>>>>>>>      arch/arm/boot/dts/omap4-panda-common.dtsi |   62
+>>>>>>>>> +++++++++++++++++++++++++++++
+>>>>>>>>>      1 files changed, 62 insertions(+), 0 deletions(-)
+>>>>>>>>>
+>>>>>>>>> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>>>>>>>> b/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>>>>>>>> index 00cbaa5..7a21e8e 100644
+>>>>>>>>> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>>>>>>>> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>>>>>>>> @@ -59,6 +59,42 @@
+>>>>>>>>>                  "AFML", "Line In",
+>>>>>>>>>                  "AFMR", "Line In";
+>>>>>>>>>          };
+>>>>>>>>> +
+>>>>>>>>> +    /* HS USB Port 1 RESET */
+>>>>>>>>> +    hsusb1_reset: hsusb1_reset_reg {
+>>>>>>>>> +        compatible = "regulator-fixed";
+>>>>>>>>> +        regulator-name = "hsusb1_reset";
+>>>>>>>>> +        regulator-min-microvolt = <3300000>;
+>>>>>>>>> +        regulator-max-microvolt = <3300000>;
+>>>>>>>>> +        gpio = <&gpio2 30 0>;    /* gpio_62 */
+>>>>>>>>> +        startup-delay-us = <70000>;
+>>>>>>>>> +        enable-active-high;
+>>>>>>>>> +    };
+>>>>>>>>
+>>>>>>>> Is this really a regulator? Or just a GPIO line used to reset the
+>>>>>>>> USB PHY?
+>>>>>>>
+>>>>>>> It is in fact a GPIO line used as reset.
+>>>>>>>>
+>>>>>>>> If this is the case, I don't think it should be represented as a
+>>>>>>>> regulator.
+>>>>>>>
+>>>>>>> Why not? I think it fits very well in the regulator device model.
+>>>>>
+>>>>> I'm not sure fitting very well is the correct term.
+>>>>> It works, for sure, but it is no different than when we were trying
+>>>>> to abuse the regulator fmwk to enable the 32k clock in phoenix.
+>>>>> It is just a hack.
+>>>>>
+>>>>
+>>>> The only difference is there is a dedicated framework for clocks.
+>>>> Since there is nothing specific to
+>>>> handle reset lines it is left to the driver writer how he wants to
+>>>> manage it.
+>>>>
+>>>
+>>> There is a proposed binding for gpio-controlled reset lines, but it is
+>>> not yet merged [1].
+>>> I guess it can fit most usage patterns, and it can be an interesting
+>>> move in the future.
+>>
+>> I'm glad to see that I was not the only one thinking that the regulator was not the right fmwk to do that :-)
+>>
+>> Thanks for the pointer Florian.
+>
+> Thanks again Florian.
+>>
+>> I guess that series should be merged for 3.11? Based on the thread, it should to through arm-soc.
+>>
+>> Roger,
+>>
+>> It might be tricky to have dependency on that series, but if this is possible, you should try. Otherwise, just keep the existing one, adding that a new solution will be available soon as a disclaimer.
+>>
+>
+> I will rework the PHY driver to use the new gpio-reset driver. But for 3.11 let's proceed the way it is.
+> I'll resend this one with a disclaimer.
 
-Ok, I'll ignore this then, as it shouldn't go into 3.11, and I don't
-have trees that go beyond that at this point in time.
+OK, I've just done it myself while applying your series.
 
-thanks,
-
-greg k-h
+Regards,
+Benoit
