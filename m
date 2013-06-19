@@ -1,41 +1,25 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Thu, 20 Jun 2013 01:46:41 +0800
-Subject: [PATCH] ARM: OMAP2: reboot: Include common.h to fix build error
-Message-ID: <1371664001.9848.1.camel@phoenix>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Wed, 19 Jun 2013 10:53:02 -0700
+Subject: [PATCH RFC 0/2] Extend multi_v7_defconfig
+Message-ID: <1371664384-24974-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include common.h which will include linux/reboot.h to fix below build error.
+Hi all,
 
-  CC      arch/arm/mach-omap2/omap4-restart.o
-arch/arm/mach-omap2/omap4-restart.c:21:28: warning: 'enum reboot_mode' declared inside parameter list [enabled by default]
-arch/arm/mach-omap2/omap4-restart.c:21:28: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
-arch/arm/mach-omap2/omap4-restart.c:21:40: error: parameter 1 ('mode') has incomplete type
-arch/arm/mach-omap2/omap4-restart.c:21:6: warning: function declaration isn't a prototype [-Wstrict-prototypes]
-make[1]: *** [arch/arm/mach-omap2/omap4-restart.o] Error 1
-make: *** [arch/arm/mach-omap2] Error 2
+I don't know how much a defconfig is supposed to provide, hence as RFC.
+This patches are needed for booting Zynq into a minimum ramfs based
+system with a serial console.
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
-Seems this build error is introduced by commit 7507d035f3cf40c
-"reboot: arm: change reboot_mode to use enum reboot_mode"
+	Thanks,
+	S?ren
 
-This patch is against linux-next 20130619.
+Soren Brinkmann (2):
+  arm: multi_v7_defconfig: Enable Zynq UART driver
+  arm: multi_v7_defconfig: Enable initrd/initramfs support
 
- arch/arm/mach-omap2/omap4-restart.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/multi_v7_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap4-restart.c b/arch/arm/mach-omap2/omap4-restart.c
-index 652adde..7306d9b 100644
---- a/arch/arm/mach-omap2/omap4-restart.c
-+++ b/arch/arm/mach-omap2/omap4-restart.c
-@@ -9,6 +9,7 @@
- 
- #include <linux/types.h>
- #include "prminst44xx.h"
-+#include "common.h"
- 
- /**
-  * omap44xx_restart - trigger a software restart of the SoC
 -- 
-1.8.1.2
+1.8.3.1
