@@ -1,62 +1,62 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 19 Jun 2013 13:55:30 +0100
-Subject: [RFC PATCH v3 0/2] drivers: mfd: Versatile Express SPC support
-In-Reply-To: <201306191437.20759.arnd@arndb.de>
-References: <1370512763-32200-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1371547782.16725.11.camel@hornet> <20130619093014.GX7161@zurbaran>
- <201306191437.20759.arnd@arndb.de>
-Message-ID: <1371646530.3867.12.camel@hornet>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 19 Jun 2013 14:11:46 +0100
+Subject: [PATCH] ARM: kernel: document ARM CPUs clock-frequency property
+In-Reply-To: <20130619112324.GA32207@e102568-lin.cambridge.arm.com>
+References: <1371635237-22860-1-git-send-email-f.fainelli@gmail.com>
+ <20130619100450.GA27181@e106331-lin.cambridge.arm.com>
+ <CAGVrzcY8oxZ7zUbThvXgsVyEGBCsxcvu4R0it_9s9wsKkJ3W0w@mail.gmail.com>
+ <20130619112324.GA32207@e102568-lin.cambridge.arm.com>
+Message-ID: <CAGVrzcaFQacQeg4JSv2XRyCHoOpU3fcgThBzuP+k1+D7LrRtTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-06-19 at 13:37 +0100, Arnd Bergmann wrote:
-> I think when vexpress-sysreg was created, we didn't have the syscon driver
-> yet, otherwise I think we should have used that, and put separate
-> drivers on top.
-> 
-> Not sure if it's too late for changing it to that now, given that
-> we already have a binding.
+2013/6/19 Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>:
+> On Wed, Jun 19, 2013 at 11:27:50AM +0100, Florian Fainelli wrote:
+>> Hello Mark,
+>>
+>> 2013/6/19 Mark Rutland <mark.rutland@arm.com>:
+>> > On Wed, Jun 19, 2013 at 10:47:17AM +0100, Florian Fainelli wrote:
+>> >> ARM CPU device tree nodes may contain an optional clock-frequency
+>> >> property, when set, this property must contain the CPU frequency in Hz,
+>> >> which is then used by the topology parsing code in
+>> >> arch/arm/kernel/topology.c to infer the CPU capacity.
+>> >
+>> > I see that arch/arm/kernel/topology.c does a pr_err when clock-frequency isn't
+>> > present. If we're documenting it as optional, should we not downgrade that or
+>> > remove it entirely?
+>>
+>> Good question. I think it might be good to just dowgrade the error to
+>> a simple warning, we should clearly be fixing the binding if we have a
+>> device_type = "cpu" property but no clock-frequency property.
+>
+> Well, this means that that pr_err will trigger as soon as the dts
+> updates hit the mainline, now probably it is silent because cpu nodes
+> for architectures with "arm,cortex-a15" as cpus miss device_type = "cpu".
+> ePAPR defines "clock-frequency" as required.
 
-I will have a look try to use the syscon stuff for generic configuration
-bits and pieces...
+Correct. I am also fine with documenting this property as mandatory.
 
-> That would end up eliminating the sysreg driver, aside from maybe
-> a one-line change to the syscon driver to allow it to probe the
-> right device.
+>
+> So either we downgrade it to optional or we are in for another slew of dts
+> updates, I am really looking forward to that. Certainly it has to be added
+> to the bindings.
+>
+> Thoughts ?
 
-... but sysreg does more than just that. In particular it provides a
-pseudo-gpio controller (I don't think you want to hide this behind the
-syscon) *and* it can act as a bridge to the configuration bus - see
-below. In short - no, I don't think sysreg driver can disappear. It can
-be reduced in size, yes.
+Well, the fix would be twofold:
+- for platforms which already have an "arm,cortex-a15" CPU nodes but
+lack a clock phandle or a clock-frequency add it
+- update arch/arm/kernel/toplogy.c to fetch the clock phandle and rate
+if specified (e.g: ecx-2000)
 
-> > > 3. Move vexpress-config into drivers/bus as it is (however I see no one
-> > > in MAINTAINERS for this directory)
-> > ISTR that Arnd originally created that directory, so he may help here.
-> > Arnd also had some concerns about implementing this code as a bus,
-> > mostly about it not being a discoverable bus. IMHO that's a valid
-> > concern, and this is why you ended up putting it under MFD which can be
-> > seen as some sort of platform devices bus. But I still believe the bus
-> > API would make this code look cleaner and easier to maintain.
-> 
-> Sorry, I don't see why it would be a bus. I assume that there is code
-> missing somewhere that is not yet merged, right?
+Here is a list of platforms/DTS that would appear to need fixing:
+- exynos5440.dtsi
+- tegra114.dtsi
+- vexpress-v2p-ca15-tc1.dts
+- vexpress-v2p-ca15_a7.dts
+- xenvm-4.2.dts
 
-Well, different VE components (configuration microcontrollers on
-motherboard and daughterboards in particular) talk to each other over a
-bus (an SPI derivative, in case you were wondering). So there is a bus.
-A non-discoverable one, but it does 42 (approximately ;-) different
-things. We already have: clk, hwmon, regulator and reset drivers using
-it.
-
-And, to make things more complicated, the SPC in question, can act as a
-bridge to *some* of the functions as well. What's a difference? About
-190ms, in at least one case - accessing the energy monitor data (hwmon)
-can take up to 200ms going through sysreg and about 10ms going through
-SPC. And there are people interesting in getting this numbers as often
-as possible. But (obviously, to make things even more complex() only the
-daughterboard's components can be accessed through it. Eg. the
-motherboard clock generators must still be accessed through sysregs.
-Hope you see why the problem is not trivial.
-
-Pawe?
+As far as I am concerned, the DTB passed to my kernel is already okay,
+but certainly this needs fixing for in-tree DTS files.
+--
+Florian
