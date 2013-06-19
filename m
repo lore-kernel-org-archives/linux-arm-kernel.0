@@ -1,9 +1,9 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 19 Jun 2013 13:15:44 +0200
-Subject: [PATCH 2/8] at_hdmac: prepare clk before calling enable
+Date: Wed, 19 Jun 2013 13:16:30 +0200
+Subject: [PATCH 3/8] mmc: atmel-mci: prepare clk before calling enable
 In-Reply-To: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
 References: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1371640544-9515-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1371640590-9585-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,71 +12,105 @@ avoid common clk framework warnings.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- drivers/dma/at_hdmac.c |   17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+ drivers/mmc/host/atmel-mci.c |   29 ++++++++++++++++++++---------
+ 1 file changed, 20 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index e923cda..19a484a 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -1374,7 +1374,9 @@ static int __init at_dma_probe(struct platform_device *pdev)
- 		err = PTR_ERR(atdma->clk);
- 		goto err_clk;
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index e75774f..e3058a5 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -380,6 +380,8 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+ {
+ 	struct atmel_mci	*host = s->private;
+ 	u32			*buf;
++	int			ret = 0;
++
+ 
+ 	buf = kmalloc(ATMCI_REGS_SIZE, GFP_KERNEL);
+ 	if (!buf)
+@@ -391,9 +393,13 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+ 	 * consistent.
+ 	 */
+ 	spin_lock_bh(&host->lock);
+-	clk_enable(host->mck);
++	ret = clk_prepare_enable(host->mck);
++	if (ret) {
++		spin_unlock_bh(&host->lock);
++		goto out;
++	}
+ 	memcpy_fromio(buf, host->regs, ATMCI_REGS_SIZE);
+-	clk_disable(host->mck);
++	clk_disable_unprepare(host->mck);
+ 	spin_unlock_bh(&host->lock);
+ 
+ 	seq_printf(s, "MR:\t0x%08x%s%s ",
+@@ -444,9 +450,10 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+ 				val & ATMCI_CFG_LSYNC ? " LSYNC" : "");
  	}
--	clk_enable(atdma->clk);
-+	err = clk_prepare_enable(atdma->clk);
-+	if (err)
-+		goto err_clk_prepare;
  
- 	/* force dma off, just in case */
- 	at_dma_off(atdma);
-@@ -1475,7 +1477,8 @@ err_pool_create:
- 	platform_set_drvdata(pdev, NULL);
- 	free_irq(platform_get_irq(pdev, 0), atdma);
- err_irq:
--	clk_disable(atdma->clk);
-+	clk_disable_unprepare(atdma->clk);
-+err_clk_prepare:
- 	clk_put(atdma->clk);
- err_clk:
- 	iounmap(atdma->regs);
-@@ -1512,7 +1515,7 @@ static int at_dma_remove(struct platform_device *pdev)
- 		list_del(&chan->device_node);
- 	}
++out:
+ 	kfree(buf);
  
--	clk_disable(atdma->clk);
-+	clk_disable_unprepare(atdma->clk);
- 	clk_put(atdma->clk);
- 
- 	iounmap(atdma->regs);
-@@ -1531,7 +1534,7 @@ static void at_dma_shutdown(struct platform_device *pdev)
- 	struct at_dma	*atdma = platform_get_drvdata(pdev);
- 
- 	at_dma_off(platform_get_drvdata(pdev));
--	clk_disable(atdma->clk);
-+	clk_disable_unprepare(atdma->clk);
+-	return 0;
++	return ret;
  }
  
- static int at_dma_prepare(struct device *dev)
-@@ -1588,7 +1591,7 @@ static int at_dma_suspend_noirq(struct device *dev)
+ static int atmci_regs_open(struct inode *inode, struct file *file)
+@@ -1281,7 +1288,7 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
  
- 	/* disable DMA controller */
- 	at_dma_off(atdma);
--	clk_disable(atdma->clk);
-+	clk_disable_unprepare(atdma->clk);
- 	return 0;
- }
+ 		spin_lock_bh(&host->lock);
+ 		if (!host->mode_reg) {
+-			clk_enable(host->mck);
++			clk_prepare_enable(host->mck);
+ 			atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+ 			atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIEN);
+ 			if (host->caps.has_cfg_reg)
+@@ -1361,7 +1368,7 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 			atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
+ 			if (host->mode_reg) {
+ 				atmci_readl(host, ATMCI_MR);
+-				clk_disable(host->mck);
++				clk_disable_unprepare(host->mck);
+ 			}
+ 			host->mode_reg = 0;
+ 		}
+@@ -2379,10 +2386,12 @@ static int __init atmci_probe(struct platform_device *pdev)
+ 	if (!host->regs)
+ 		goto err_ioremap;
  
-@@ -1618,7 +1621,9 @@ static int at_dma_resume_noirq(struct device *dev)
- 	struct dma_chan *chan, *_chan;
+-	clk_enable(host->mck);
++	ret = clk_prepare_enable(host->mck);
++	if (ret)
++		goto err_clk_prepare_enable;
+ 	atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+ 	host->bus_hz = clk_get_rate(host->mck);
+-	clk_disable(host->mck);
++	clk_disable_unprepare(host->mck);
  
- 	/* bring back DMA controller */
--	clk_enable(atdma->clk);
-+	err = clk_prepare_enable(atdma->clk);
-+	if (err)
-+		return err;
- 	dma_writel(atdma, EN, AT_DMA_ENABLE);
+ 	host->mapbase = regs->start;
  
- 	/* clear any pending interrupt */
+@@ -2463,6 +2472,8 @@ err_init_slot:
+ 		dma_release_channel(host->dma.chan);
+ 	free_irq(irq, host);
+ err_request_irq:
++	clk_unprepare(host->mck);
++err_clk_prepare_enable:
+ 	iounmap(host->regs);
+ err_ioremap:
+ 	clk_put(host->mck);
+@@ -2487,11 +2498,11 @@ static int __exit atmci_remove(struct platform_device *pdev)
+ 			atmci_cleanup_slot(host->slot[i], i);
+ 	}
+ 
+-	clk_enable(host->mck);
++	clk_prepare_enable(host->mck);
+ 	atmci_writel(host, ATMCI_IDR, ~0UL);
+ 	atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
+ 	atmci_readl(host, ATMCI_SR);
+-	clk_disable(host->mck);
++	clk_disable_unprepare(host->mck);
+ 
+ 	if (host->dma.chan)
+ 		dma_release_channel(host->dma.chan);
 -- 
 1.7.9.5
