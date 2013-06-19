@@ -1,80 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Jun 2013 05:32:18 -0700
-Subject: [PATCH v2 1/4] ARM: dts: omap4-panda: Add USB Host support
-In-Reply-To: <51C1A2AE.2020506@ti.com>
-References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
- <1371571487-14389-2-git-send-email-rogerq@ti.com>
- <51C106A1.9030001@ti.com> <51C15F7E.5020305@ti.com>
- <20130619074605.GW5523@atomide.com> <51C183AC.8040801@ti.com>
- <51C19011.5050107@ti.com> <51C19E6C.4040802@epfl.ch>
- <51C1A2AE.2020506@ti.com>
-Message-ID: <20130619123217.GB5523@atomide.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 19 Jun 2013 21:33:24 +0900
+Subject: [PATCH 1/2] serial: sh-sci: HSCIF support
+In-Reply-To: <CAO3366zWrYFYNaXNWpUvc8KpxjwYVoHz2O5fV33QFSTN2-H7aQ@mail.gmail.com>
+References: <1371440327-30512-1-git-send-email-horms+renesas@verge.net.au>
+ <1371440327-30512-2-git-send-email-horms+renesas@verge.net.au>
+ <201306171454.48936.arnd@arndb.de>
+ <20130618011901.GB2588@verge.net.au>
+ <CAO3366zWrYFYNaXNWpUvc8KpxjwYVoHz2O5fV33QFSTN2-H7aQ@mail.gmail.com>
+Message-ID: <20130619123324.GG32292@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [130619 05:30]:
-> On 06/19/2013 07:05 AM, Florian Vaussard wrote:
-> >>>>>>>+
-> >>>>>>>+    /* HS USB Port 1 RESET */
-> >>>>>>>+    hsusb1_reset: hsusb1_reset_reg {
-> >>>>>>>+        compatible = "regulator-fixed";
-> >>>>>>>+        regulator-name = "hsusb1_reset";
-> >>>>>>>+        regulator-min-microvolt = <3300000>;
-> >>>>>>>+        regulator-max-microvolt = <3300000>;
-> >>>>>>>+        gpio = <&gpio2 30 0>;    /* gpio_62 */
-> >>>>>>>+        startup-delay-us = <70000>;
-> >>>>>>>+        enable-active-high;
-> >>>>>>>+    };
-> >>>>>>
-> >>>>>>Is this really a regulator? Or just a GPIO line used to reset the
-> >>>>>>USB PHY?
-> >>>>>
-> >>>>>It is in fact a GPIO line used as reset.
-> >>>>>>
-> >>>>>>If this is the case, I don't think it should be represented as a
-> >>>>>>regulator.
-> >>>>>
-> >>>>>Why not? I think it fits very well in the regulator device model.
-> >>>
-> >>>I'm not sure fitting very well is the correct term.
-> >>>It works, for sure, but it is no different than when we were trying
-> >>>to abuse the regulator fmwk to enable the 32k clock in phoenix.
-> >>>It is just a hack.
-
-If it's a reset, then yeah it's not a regulator. If the GPIO line is
-really used to control the regulator in the external device, then it
-makes sense to set it up as a regulator.
-
-> >>The only difference is there is a dedicated framework for clocks.
-> >>Since there is nothing specific to
-> >>handle reset lines it is left to the driver writer how he wants to
-> >>manage it.
+On Wed, Jun 19, 2013 at 10:46:51AM +0200, Ulrich Hecht wrote:
+> On Tue, Jun 18, 2013 at 3:19 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> This hunk causes build warnings in linux-next now:
 > >>
+> >> /git/arm-soc/drivers/tty/serial/sh-sci.c: In function 'sci_set_termios':
+> >> /git/arm-soc/drivers/tty/serial/sh-sci.c:1942:37: warning: 'srr' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> >>     serial_port_out(port, HSSRR, srr | HSCIF_SRE);
+> >>                                      ^
+> >> /git/arm-soc/drivers/tty/serial/sh-sci.c:1892:15: note: 'srr' was declared here
+> >>   unsigned int srr;
+> >>                ^
+> >> /git/arm-soc/drivers/tty/serial/sh-sci.c:1938:47: warning: 'cks' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> >>    serial_port_out(port, SCSMR, (smr_val & ~3) | cks);
+> >>                                                ^
+> >> /git/arm-soc/drivers/tty/serial/sh-sci.c:1890:40: note: 'cks' was declared here
+> >>   unsigned int baud, smr_val, max_baud, cks;
 > >
-> >There is a proposed binding for gpio-controlled reset lines, but it is
-> >not yet merged [1].
-> >I guess it can fit most usage patterns, and it can be an interesting
-> >move in the future.
+> > Ulrich, could you please look into this?
 > 
-> I'm glad to see that I was not the only one thinking that the
-> regulator was not the right fmwk to do that :-)
+> Hmmm... I get this warning with gcc 4.5, 4.6, and 4.8. Apparently gcc
+> 4.7 is the only one that does not warn about this. Guess what I'm
+> using... :(
 > 
-> Thanks for the pointer Florian.
+> This is of course trivially fixed, but I have completely lost track of
+> the transmogrifications this patch has been subjected to. What's the
+> procedure?
 
-Good to hear about the gpio-controlled reset lines :)
- 
-> I guess that series should be merged for 3.11? Based on the thread,
-> it should to through arm-soc.
-> 
-> Roger,
-> 
-> It might be tricky to have dependency on that series, but if this is
-> possible, you should try. Otherwise, just keep the existing one,
-> adding that a new solution will be available soon as a disclaimer.
+Hi Ulrich,
 
-We need some solution for v3.11 for omap4 USB on panda so people can
-use it with DT.
-
-Regards,
-
-Tony
+perhaps the best way forward would be for you to post an incremental patch
+on top of either the sh-sci branch or renesas-next-20130618 tag of
+my renesas tree on kernel.org.
