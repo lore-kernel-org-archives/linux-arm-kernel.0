@@ -1,38 +1,34 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 19 Jun 2013 15:52:12 -0400
-Subject: [PATCH] ARM: OMAP5: Enable Cortex A15 errata 798181
-Message-ID: <1371671532-27071-1-git-send-email-santosh.shilimkar@ti.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Wed, 19 Jun 2013 23:54:36 +0400
+Subject: [PATCH v2 5/7] drivers: bus: imx-weim: Add missing
+ platform_friver.owner field
+In-Reply-To: <1371671678-6345-1-git-send-email-shc_work@mail.ru>
+References: <1371671678-6345-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1371671678-6345-5-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM errata 798181 is applicable for OMAP5 based devices. So enable
-the same in the build. Errata extract and workaround information
-is as below.
 
-On Cortex-A15 (r0p0..r3p2) the TLBI*IS/DSB operations are not
-adequately shooting down all use of the old entries. The
-ARM_ERRATA_798181 option enables the Linux kernel workaround
-for this erratum which sends an IPI to the CPUs that are running
-the same ASID as the one being invalidated.
-
-Cc: Tony Lindgren <tony@atomide.com>
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-omap2/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/bus/imx-weim.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index f49cd51..fbd2b9f 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -112,6 +112,7 @@ config SOC_OMAP5
- 	select HAVE_SMP
- 	select COMMON_CLK
- 	select HAVE_ARM_ARCH_TIMER
-+	select ARM_ERRATA_798181
+diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+index b558aa3..b6479fb 100644
+--- a/drivers/bus/imx-weim.c
++++ b/drivers/bus/imx-weim.c
+@@ -120,8 +120,9 @@ static int __init weim_probe(struct platform_device *pdev)
  
- comment "OMAP Core Type"
- 	depends on ARCH_OMAP2
+ static struct platform_driver weim_driver = {
+ 	.driver = {
+-		.name = "imx-weim",
+-		.of_match_table = weim_id_table,
++		.name		= "imx-weim",
++		.owner		= THIS_MODULE,
++		.of_match_table	= weim_id_table,
+ 	},
+ };
+ module_platform_driver_probe(weim_driver, weim_probe);
 -- 
-1.7.9.5
+1.8.1.5
