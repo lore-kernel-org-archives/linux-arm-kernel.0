@@ -1,69 +1,108 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 19 Jun 2013 11:29:18 +0200
-Subject: DMA mapping API(IOMMU) for ARM64?
-In-Reply-To: <20130618125054.GL9930@arm.com>
-References: <20130618.053955.305832937374936961.hdoyu@nvidia.com>
- <20130618101914.GB3539@mudshark.cambridge.arm.com>
- <5159282.rrJMaZuYMv@wuerfel>
- <20130618.140137.1551430695673122122.hdoyu@nvidia.com>
- <20130618125054.GL9930@arm.com>
-Message-ID: <51C179EE.5030609@samsung.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Wed, 19 Jun 2013 11:30:14 +0200
+Subject: [RFC PATCH v3 0/2] drivers: mfd: Versatile Express SPC support
+In-Reply-To: <1371547782.16725.11.camel@hornet>
+References: <1370512763-32200-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130611090545.GC8164@e102568-lin.cambridge.arm.com>
+ <20130613001311.GC4567@zurbaran> <1371116757.3307.13.camel@hornet>
+ <20130618090941.GE7161@zurbaran> <1371547782.16725.11.camel@hornet>
+Message-ID: <20130619093014.GX7161@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Pawel,
 
-On 6/18/2013 2:50 PM, Catalin Marinas wrote:
-> On Tue, Jun 18, 2013 at 12:01:37PM +0100, Hiroshi Doyu wrote:
-> > Arnd Bergmann <arnd@arndb.de> wrote @ Tue, 18 Jun 2013 12:32:44 +0200:
-> > > On Tuesday 18 June 2013 11:19:14 Will Deacon wrote:
-> > > > I've spoken briefly with Catalin about this and it seems like there might be
-> > > > *some* scope for sharing common dma-mapping code between architectures.
-> > > > There doesn't really need to be any architecture-specific details in
-> > > > allocating iova space and the interface to the iommu drivers is
-> > > > well-defined. The arch-specific stuff is bogged down in the non-coherent
-> > > > buffer management, but that doesn't necessarily equate to lots of code.
-> > > >
-> > > > So, the best bet would be to figure out how to split up what we have under
-> > > > arch/arm/ so that it can be re-used by arm64 and potentially other
-> > > > architectures (powerpc has some simple stuff for coherent mappings and some
-> > > > less-simple stuff for non-coherent buffers).
-> > >
-> > > I'm sure that other architectures are interested in sharing the code.
-> > > Best move it into the global mm/ directory, at least the version for
-> > > coherent mappings.
-> >
-> > I'm guessing that this kind of unification usually takes some time
-> > since we need to factor out the common code from the different
-> > ${ARCH}/mm/dma-mapping.c. Also some of ${ARCH} has IOMMU support in
-> > it. So if we want to develop our 64-bit ARM with working DMA mapping
-> > API during this transition, the step to take would be:
-> >
-> > 1, Copy arch/arm/mm/dma-mapping.c arch/arm64/mm/dma-mapping.c(+swiotlb)
-> > 2, Adapt arch/arm64/mm/dma-mapping.c(+swiotlb) to 64bit compatible.
-> > 3, Factor out the common code from them into mm/dma-mapping.c
->
-> Or add the relevant code to something like lib/iommu-helper.c, convert
-> arm64 to use that and we can work on converting arm and other
-> architectures afterwards.
+On Tue, Jun 18, 2013 at 10:29:42AM +0100, Pawel Moll wrote:
+> On Tue, 2013-06-18 at 10:09 +0100, Samuel Ortiz wrote:
+> > Hi Pawell,
+> 
+> Double l in the wrong place ;-)
+Apologies...
 
-I think that this would be the best way of providing iommu support for 
-dma mapping
-subsystem(s). I initially put it in arm/mm/dma-mapping.c because it was 
-the first
-approach of integrating generic IOMMU with DMA-mapping and it was simply 
-easier to
-have all the code in one place. Now, when second client of such approach 
-comes, it
-should be much easier to identify which part of the code is common and 
-which one is
-specific to particular implementation. Feel free to ask any questions if 
-you need
-help. I don't have access to any ARM64 machine or simulator, so I can 
-only review
-the code.
+ 
+> > > If you feel strongly about it, I'm ready to split it into mfd_cells and
+> > > move the gpio and leds code into separate drivers, however I'm not
+> > > convinced that it's worth the effort.
+> > Well, after seeing your last patch for ifdef'ing the GPIO and LED code,
+> > I think it is worth the effort.
+> 
+> Good point. But as this - obviously - won't happen on time for 3.11, I
+> hope you would be kind enough to take the #ifdef patch in for now.
+I see that you guys are willing to improve this stuff, so I can take it,
+yes.
 
-Best regards
+
+> > > Now, as to the vexpress-config.c... The first time I've posted the
+> > > series, all parts lived in "driver/misc(/vexpress)", but (if I remember
+> > > correctly) Arnd had some feelings about "misc" existence at all... I was
+> > > thinking about a separate directory for random "system/platform/machine
+> > > configuration" drivers, but the idea didn't get any traction.
+> > drivers/misc would already have been a nicer option imo.
+> 
+> Ok. Quite conveniently Arnd is the driver/misc maintainer so I'll get
+> first-hand feedback on this.
+> 
+> > > > Not only that, but the whole vexpress-config code design is not the
+> > > > nicest piece of code I've ever seen. And I'm usually not picky. e.g. the
+> > > > whole vexpress-config ad-hoc API is awkward and I wonder if it could be
+> > > > implemented as a bus instead.
+> > > 
+> > > Funny you mention this :-) Again, the first version actually was a
+> > > vexpress-config bus. The feedback was - a whole bus_type is over the top
+> > > (I'm simplifying the letter slightly but this was the spirit).
+> > I think it would make sense to have it under drivers/bus/. It might be a
+> > little over the top, but when I look at the current code I'd be really
+> > happy to read an over-the-top bus driver instead. At least we'd know
+> > straight away what youre trying to achieve with this code and it would
+> > probably remove a fair chunk of the weird bridge API (the registering
+> > and the function reference stuff).
+> > Do you have a reference for the patch first version ?
+> 
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/185014/focus=185019
+
+
+ 
+> > > So to summarize - I'm open to any suggestions and ready to spend time on
+> > > this stuff.
+> > I'd say splitting the sysreg driver and leaving only the MFD bits in the
+> > MFD driver would be a first step.
+> > Also, re-considering the bus implementation for the config part would
+> > also be interesting. 
+> 
+> Ok, so what I'll do:
+> 
+> 1. Split vexpress-sysreg into
+> * gpio driver
+> * leds driver
+> * the rest (still in mfd though)
+Sounds good to me.
+
+
+> 2. Move the vexpress-sysreg "platform management" functions into misc
+> (unless we get any better place for it)
+This is for Arnd and Greg to decide I suppose.
+
+
+> 3. Move vexpress-config into drivers/bus as it is (however I see no one
+> in MAINTAINERS for this directory)
+ISTR that Arnd originally created that directory, so he may help here.
+Arnd also had some concerns about implementing this code as a bus,
+mostly about it not being a discoverable bus. IMHO that's a valid
+concern, and this is why you ended up putting it under MFD which can be
+seen as some sort of platform devices bus. But I still believe the bus
+API would make this code look cleaner and easier to maintain.
+
+> 4. *Try* to use more of the standard bus (aka bus_type) infrastructure,
+> however this will be the trickiest part of this all - as I've mentioned
+> the code must be functional before SLAB is up...
+> 
+> You shall see some patches before 3.11-rc1.
+Ok, we'll have plenty of time to have it ready for the 3.12 merge window
+then.
+
+Cheers,
+Samuel.
+
 -- 
-Marek Szyprowski
-Samsung R&D Institute Poland
+Intel Open Source Technology Centre
+http://oss.intel.com/
