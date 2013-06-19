@@ -1,64 +1,48 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 19 Jun 2013 20:26:12 +0200
-Subject: [RFC PATCH 00/11] ARM: s3c64xx: Let amba-pl08x driver handle DMA
-In-Reply-To: <20130619174047.GB1403@sirena.org.uk>
-References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <20130619174047.GB1403@sirena.org.uk>
-Message-ID: <3697657.tZFV7pR81Q@flatron>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Jun 2013 19:29:25 +0100
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <CAAQKjZNJD4HpnJQ7iE+Gez36066M6U0YQeUEdA0+UcSOKqeghg@mail.gmail.com>
+References: <20130617182127.GM2718@n2100.arm.linux.org.uk>
+ <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
+ <20130618084308.GU2718@n2100.arm.linux.org.uk>
+ <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
+ <1371548849.4276.6.camel@weser.hi.pengutronix.de>
+ <008601ce6cb0$2c8cec40$85a6c4c0$%dae@samsung.com>
+ <1371637326.4230.24.camel@weser.hi.pengutronix.de>
+ <00ae01ce6cd9$f4834630$dd89d290$%dae@samsung.com>
+ <1371645247.4230.41.camel@weser.hi.pengutronix.de>
+ <CAAQKjZNJD4HpnJQ7iE+Gez36066M6U0YQeUEdA0+UcSOKqeghg@mail.gmail.com>
+Message-ID: <20130619182925.GL2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 of June 2013 18:40:47 Mark Brown wrote:
-> On Sun, Jun 16, 2013 at 10:54:07PM +0200, Tomasz Figa wrote:
-> > One of the biggest roadblocks on the way of S3C64xx to DeviceTree
-> > support is its DMA driver, which is completely platform-specific and
-> > provides private API (s3c-dma), not even saying that its design is
-> > completely against multiplatform-awareness.
+On Thu, Jun 20, 2013 at 12:10:04AM +0900, Inki Dae wrote:
+> On the other hand, the below shows how we could enhance the conventional
+> way with my approach (just example):
 > 
-> I tried to test this on my s3c64xx based system but it gave me a kernel
-> that didn't boot far enough to give console output (there's some early
-> init stuff that uses SPI...).  That said, I needed:
+> CPU -> DMA,
+>         ioctl(qbuf command)              ioctl(streamon)
+>               |                                               |
+>               |                                               |
+>         qbuf  <- dma_buf_sync_get   start streaming <- syncpoint
 > 
-> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-> index 210a893..0f49707 100644
-> --- a/drivers/dma/amba-pl08x.c
-> +++ b/drivers/dma/amba-pl08x.c
-> @@ -313,7 +313,7 @@ static int pl08x_request_mux(struct pl08x_dma_chan
-> *plchan) int ret;
+> dma_buf_sync_get just registers a sync buffer(dmabuf) to sync object. And
+> the syncpoint is performed by calling dma_buf_sync_lock(), and then DMA
+> accesses the sync buffer.
 > 
->  	if (plchan->mux_use++ == 0 && pd->get_signal) {
-> -		ret = pd->get_signal(plchan->cd);
-> +		ret = (pd->get_signal)(plchan->cd);
-
-Hmm, that's strange. The former is a completely valid piece of code...
-
->  		if (ret < 0) {
->  			plchan->mux_use = 0;
->  			return ret;
+> And DMA -> CPU,
+>         ioctl(dqbuf command)
+>               |
+>               |
+>         dqbuf <- nothing to do
 > 
-> to get it to build which makes me suspect the compiler a bit as well...
-> the system has audio, SPI and MMC enabled.
-> 
-> I was applying this to -next, are there any other dependencies I need or
-> anything?
+> Actual syncpoint is when DMA operation is completed (in interrupt handler):
+> the syncpoint is performed by calling dma_buf_sync_unlock().
+> Hence,  my approach is to move the syncpoints into just before dma access
+> as long as possible.
 
-Hmm, I've been testing this on top of my common clock framework and device 
-tree patches, but I don't think this had any effect. Did you add necessary 
-clkdev lookups to the clock driver?
-
-In Samsung CCF alias notation it looks like this:
-
-+       ALIAS(HCLK_DMA1, "dma-pl080s.1", "apb_pclk"),
-+       ALIAS(HCLK_DMA0, "dma-pl080s.0", "apb_pclk"),
-
-Not sure how hard it will be to add such lookups to the old clock driver, 
-though.
-
-I will test this applied directly on top of current linux-next when I find 
-some time, but for now you might check out my v3.11-devel branch on my 
-github:
-
-https://github.com/tom3q/linux.git
-
-Best regards,
-Tomasz
+What you've just described does *not* work on architectures such as
+ARMv7 which do speculative cache fetches from memory at any time that
+that memory is mapped with a cacheable status, and will lead to data
+corruption.
