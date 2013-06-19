@@ -1,34 +1,30 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 19 Jun 2013 17:43:38 +0100
-Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
-In-Reply-To: <20130612083619.GA13274@S2101-09.ap.freescale.net>
-References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
- <20130612083619.GA13274@S2101-09.ap.freescale.net>
-Message-ID: <20130619164338.GE5276@e102568-lin.cambridge.arm.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 19 Jun 2013 10:53:48 -0600
+Subject: [PATCH v3 11/12] ARM: mvebu: Relocate Armada 370 PCIe device
+ tree nodes
+In-Reply-To: <201306191411.59010.arnd@arndb.de>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <201306182335.50722.arnd@arndb.de>
+ <20130619111257.GD16138@localhost>
+ <201306191411.59010.arnd@arndb.de>
+Message-ID: <20130619165348.GA32155@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 09:36:20AM +0100, Shawn Guo wrote:
-> On Tue, Jun 11, 2013 at 10:58:48AM +0100, Lorenzo Pieralisi wrote:
-> > Hi Russell, all,
-> > 
-> > even though I think this set is ready to get merged, it would be great
-> > if we can test it on as many platforms as possible since it touches core
-> > suspend/resume operations on ARM platforms relying on CONFIG_ARM_CPU_SUSPEND,
-> > and there are many.
-> > 
-> > I pushed out a branch:
-> > 
-> > git://linux-arm.org/linux-2.6-lp.git mpidr-linearization
-> > 
-> > if anyone has time to test the set that would be really great, thank you
-> > very much.
+On Wed, Jun 19, 2013 at 02:11:58PM +0200, Arnd Bergmann wrote:
+
+> > Mmm.. and why is this option acceptable?
 > 
-> I tested the branch on imx6q, and system suspend/resume works fine with
-> it.
+> As I explained on IRC, there is no requirement to pick a specific bus
+> aperture. The only two sensible choices are to make the bus address
+> the same as the CPU address, or to make the bus address start at 0,
+> which is what this does.
 
-Can I add your tested-by please ?
+PCI bus addresses must not alias other addresess in the system or
+you'll get weirdness. For instance DMA initiated from the PCI bus at
+address 0, intended to read from SDRAM at 0 must not be claimed by
+another device on the PCI bus. IMHO, a 1:1 mapping between PCI and CPU
+is strongly preferred. Any other configuration will need some
+additional techniques to avoid aliasing.
 
-Thank you very much,
-Lorenzo
+Jason
