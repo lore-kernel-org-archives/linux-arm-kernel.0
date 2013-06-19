@@ -1,57 +1,39 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 19 Jun 2013 12:19:40 +0200
-Subject: [PATCH v2 2/2] i2c-mv64xxx: Abort the mv64xxx_of_config if
- clock-frequency is not provided
-In-Reply-To: <1371570024-11613-3-git-send-email-gregory.clement@free-electrons.com>
+Date: Wed, 19 Jun 2013 12:24:17 +0200
+Subject: [PATCH v2 1/2] i2c-mv64xxx: Fix timing issue on Armada XP
+ (errata FE-8471889)
+In-Reply-To: <1371570024-11613-2-git-send-email-gregory.clement@free-electrons.com>
 References: <1371570024-11613-1-git-send-email-gregory.clement@free-electrons.com>
- <1371570024-11613-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130619101939.GG2950@katana>
+ <1371570024-11613-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130619102416.GH2950@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 05:40:24PM +0200, Gregory CLEMENT wrote:
+On Tue, Jun 18, 2013 at 05:40:23PM +0200, Gregory CLEMENT wrote:
 > From: Zbigniew Bodek <zbb@semihalf.com>
 > 
-> This commit adds checking whether clock-frequency property acquisition
-> has succeeded. Do not waste time to find baud factors if there is no
-> information about the desired bus frequency in dts.
+> All the Armada XP (mv78230, mv78260 and mv78460) have a silicon issue
+> in the I2C controller which violate the i2c repeated start
+> timing. The I2C standard requires a minimum of 4.7us for the repeated
+> start condition whereas the I2C controller of the Armada XP this time
+> is 2.9us.
 > 
-> [gregory.clement at free-electrons.com: Reword the commit log]
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Zbigniew Bodek <zbb@semihalf.com>
+> So this patch adds a 5us delay for the start case only if the
+> mv64xxx_i2c_errata_delay flag is set.
 
-What about setting it to 100kHz when not defined (and marking the
-property optional in the docs)? That's convenient and common I'd say.
+You are correct that this does not need a seperate property since this
+is a flaw of this specific controller. So, it needs a new compatible
+entry ('mv78230-i2c' for example) and this entry should then have the
+workaround enabled.
 
-> ---
->  drivers/i2c/busses/i2c-mv64xxx.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-> index 74f8fcb..de384a1 100644
-> --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> @@ -591,7 +591,11 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
->  		goto out;
->  	}
->  	tclk = clk_get_rate(drv_data->clk);
-> -	of_property_read_u32(np, "clock-frequency", &bus_freq);
-> +
-> +	rc = of_property_read_u32(np, "clock-frequency", &bus_freq);
-> +	if (rc)
-> +		goto out;
-> +
->  	if (!mv64xxx_find_baud_factors(bus_freq, tclk,
->  				       &drv_data->freq_n, &drv_data->freq_m)) {
->  		rc = -EINVAL;
-> -- 
-> 1.8.1.2
-> 
+Thanks,
+
+   Wolfram
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130619/c84df02f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130619/e92d3c7b/attachment.sig>
