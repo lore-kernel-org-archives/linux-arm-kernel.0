@@ -1,35 +1,38 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 19 Jun 2013 11:13:49 +0800
-Subject: [RFC PATCH v1 4/6] USB: EHCI: don't release ehci->lock if URB
- giveback in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306181242500.1157-100000@iolanthe.rowland.org>
-References: <1371567833-9077-5-git-send-email-ming.lei@canonical.com>
- <Pine.LNX.4.44L0.1306181242500.1157-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVOc9GhZSX5vtgxN3u9+wMVv2SkXW6jyCtb1eYTzRXahWA@mail.gmail.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Wed, 19 Jun 2013 11:23:00 +0800
+Subject: [PATCH V2] USB: initialize or shutdown PHY when add or remove
+ host controller
+In-Reply-To: <20130619024839.GA1987@kroah.com>
+References: <1371609080-30595-1-git-send-email-chao.xie@marvell.com>
+ <20130619024839.GA1987@kroah.com>
+Message-ID: <CADApbeikx1yrjVKOREHq45qZDmxF872FY2tN7WBkhPYY=Uxkcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 12:43 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Tue, 18 Jun 2013, Ming Lei wrote:
+On Wed, Jun 19, 2013 at 10:48 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Tue, Jun 18, 2013 at 10:31:20PM -0400, Chao Xie wrote:
+>> Some controller need software to initialize PHY before add
+>> host controller, and shut down PHY after remove host controller.
+>> Add the generic code for these controllers so they do not need
+>> do it in its own host controller driver.
 >
->> If HCD_BH is set for HC driver's flags, URB giveback will be
->> done in tasklet context instead of interrupt context, so the
->> ehci->lock needn't to be released any more before calling
->> usb_hcd_giveback_urb().
+> Why?  What breaks if we add this patch, and what gets fixed?  I'm
+> guessing you can then remove code?
 >
-> It is premature to do this now.  This should be part of the 6/6 patch,
+> What out-of-tree code now works properly?  Or gets broken?
+>
+> we need more info here please...
+>
+The patch does not fix any bug.
+Some echi-xxx driver will need initialize the phy before it do
+usb_add_hcd, and shut down phy after
+do usb_remove_hcd, and i did a patch for ehci-mv.c to do above thing.
+Alan and Felipe comments on my patch, and they think it is a peice of
+generic code, and it can be
+moved to hcd to handle it, so other ehci-xxx will not do the same thing again.
+So i add the patch to add the generic code in hcd to handle phy
+initialization and shut down.
 
-It is fine since HCD_BH isn't enabled.
-
-> when it won't be necessary to test hcd_giveback_urb_in_bh().
-
-Keeping it is easy to compare test results between running complete()
-in tasklet and in hard irq handler.
-
-Also it might be helpful for out of tree drivers.
-
-But it isn't a big deal, I can merge it to 6/6 if you care.
-
-Thanks,
---
-Ming Lei
+> thanks,
+>
+> greg k-h
