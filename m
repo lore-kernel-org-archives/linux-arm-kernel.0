@@ -1,60 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 19 Jun 2013 23:48:51 +0900
-Subject: [GIT PULL 2/2] Samsung CLK update for v3.11
-Message-ID: <51C1C4D3.5050206@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 19 Jun 2013 20:19:15 +0530
+Subject: [PATCH V3 05/11] USB: OHCI: Properly handle ohci-ep93xx suspend
+In-Reply-To: <CAJFYCKGck29t211NTmXSKPtFdah3Pbe8T0UVZDsqWqqax3OL7g@mail.gmail.com>
+References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
+ <1371643936-3314-1-git-send-email-manjunath.goudar@linaro.org>
+ <1371643936-3314-6-git-send-email-manjunath.goudar@linaro.org>
+ <51C1A781.2040603@cogentembedded.com>
+ <CAJFYCKGck29t211NTmXSKPtFdah3Pbe8T0UVZDsqWqqax3OL7g@mail.gmail.com>
+Message-ID: <CAKohpon4ZZWAvvGO+gM-=pq2nka5wOxsJAcQ74m-sS4J4LGVSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof
+On 19 June 2013 20:12, Manjunath Goudar <manjunath.goudar@linaro.org> wrote:
+> On 19 June 2013 18:13, Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> On 19-06-2013 16:12, Manjunath Goudar wrote:
 
-This is updates for Samsung clks but some of them didn't get Mike's ack 
-but I think, it should be fine and remained in mailing list long time.
+>>>         struct usb_hcd *hcd = platform_get_drvdata(pdev);
+>>>         struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+>>> +       bool    do_wakeup = device_may_wakeup(&pdev->dev);
+>>> +       int             ret;
+>>
+>>
+>>    There was no need to use tabs here, didn't you see that here the
+>> variables aren't aligned?
 
-Mike, if you have any objection on this branch, please let us know.
+> Instead of gmail you can use thunderbird mail there it is showing  proper
+> alignment.
 
-Just note, based on tags/exynos-dt-2 to avoid merge conflicts ;)
+First try to understand what the actual comment is. He isn't complaining
+about bad alignment but as hcd and ohci aren't aligned with tabs, you
+don't require to add tabs to do_wakeup and ret.
 
-Thanks,
-- Kukjin
-
-
-The following changes since commit 5f13269130d6798571ffbd9d84dbef0950984c5b:
-
-   ARM: dts: Set BUCK7 as always on for Origen board (2013-06-19 
-00:41:56 +0900)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-clk-1
-
-for you to fetch changes up to 765ab41132b24c9d40b11b2100ae7f01c19a64af:
-
-   clk: exynos5440: Staticize local symbols (2013-06-19 23:29:59 +0900)
-
-----------------------------------------------------------------
-clk updates
-- fix HDMI clock number for exynos5250
-- add G3D clocks for exynos5250
-- add TMU clocks for exynos4
-- use static for local symbols for exynos clk
-
-----------------------------------------------------------------
-Arun Kumar K (2):
-       Documentation: Fix HDMI clock number for exynos5250-clock
-       clk: exynos5250: Add clocks for G3D
-
-Sachin Kamat (4):
-       clk: exynos4: Add clock entries for TMU
-       clk: exynos4: Staticize local symbols
-       clk: exynos5250: Staticize local symbols
-       clk: exynos5440: Staticize local symbols
-
-  .../devicetree/bindings/clock/exynos4-clock.txt    |  1 +
-  .../devicetree/bindings/clock/exynos5250-clock.txt |  3 ++-
-  drivers/clk/samsung/clk-exynos4.c                  | 28 
-++++++++++++----------
-  drivers/clk/samsung/clk-exynos5250.c               | 26 
-+++++++++++++-------
-  drivers/clk/samsung/clk-exynos5440.c               | 14 +++++------
-  5 files changed, 43 insertions(+), 29 deletions(-)
+--
+viresh
