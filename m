@@ -1,15 +1,14 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 20 Jun 2013 09:33:03 +0200
-Subject: [PATCH 1/8] ARM: at91/tc/clocksource: replace clk_enable/disable
- with clk_prepare_enable/disable_unprepare.
-In-Reply-To: <1371640400-9399-1-git-send-email-b.brezillon@overkiz.com>
+Date: Thu, 20 Jun 2013 09:43:52 +0200
+Subject: [PATCH 2/8] at_hdmac: prepare clk before calling enable
+In-Reply-To: <1371640494-9472-1-git-send-email-b.brezillon@overkiz.com>
 References: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
- <1371640400-9399-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <51C2B02F.5080902@atmel.com>
+ <1371640494-9472-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <51C2B2B8.2040104@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/2013 13:13, Boris BREZILLON :
+On 19/06/2013 13:14, Boris BREZILLON :
 > Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
 > avoid common clk framework warnings.
 >
@@ -17,59 +16,78 @@ On 19/06/2013 13:13, Boris BREZILLON :
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
+BTW Vinod, it seems that we have several slave-dma patches pending: do 
+you want me to collect them and send you a pull-request for 3.11?
+
+Best regards,
+
 > ---
->   drivers/clocksource/tcb_clksrc.c |   10 +++++-----
->   1 file changed, 5 insertions(+), 5 deletions(-)
+>   drivers/dma/at_hdmac.c |   17 +++++++++++------
+>   1 file changed, 11 insertions(+), 6 deletions(-)
 >
-> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-> index 8a61872..229c019 100644
-> --- a/drivers/clocksource/tcb_clksrc.c
-> +++ b/drivers/clocksource/tcb_clksrc.c
-> @@ -100,7 +100,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
->   			|| tcd->clkevt.mode == CLOCK_EVT_MODE_ONESHOT) {
->   		__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
->   		__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
-> -		clk_disable(tcd->clk);
-> +		clk_disable_unprepare(tcd->clk);
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index e923cda..19a484a 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -1374,7 +1374,9 @@ static int __init at_dma_probe(struct platform_device *pdev)
+>   		err = PTR_ERR(atdma->clk);
+>   		goto err_clk;
+>   	}
+> -	clk_enable(atdma->clk);
+> +	err = clk_prepare_enable(atdma->clk);
+> +	if (err)
+> +		goto err_clk_prepare;
+>
+>   	/* force dma off, just in case */
+>   	at_dma_off(atdma);
+> @@ -1475,7 +1477,8 @@ err_pool_create:
+>   	platform_set_drvdata(pdev, NULL);
+>   	free_irq(platform_get_irq(pdev, 0), atdma);
+>   err_irq:
+> -	clk_disable(atdma->clk);
+> +	clk_disable_unprepare(atdma->clk);
+> +err_clk_prepare:
+>   	clk_put(atdma->clk);
+>   err_clk:
+>   	iounmap(atdma->regs);
+> @@ -1512,7 +1515,7 @@ static int at_dma_remove(struct platform_device *pdev)
+>   		list_del(&chan->device_node);
 >   	}
 >
->   	switch (m) {
-> @@ -109,7 +109,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
->   	 * of oneshot, we get lower overhead and improved accuracy.
->   	 */
->   	case CLOCK_EVT_MODE_PERIODIC:
-> -		clk_enable(tcd->clk);
-> +		clk_prepare_enable(tcd->clk);
+> -	clk_disable(atdma->clk);
+> +	clk_disable_unprepare(atdma->clk);
+>   	clk_put(atdma->clk);
 >
->   		/* slow clock, count up to RC, then irq and restart */
->   		__raw_writel(timer_clock
-> @@ -126,7 +126,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
->   		break;
+>   	iounmap(atdma->regs);
+> @@ -1531,7 +1534,7 @@ static void at_dma_shutdown(struct platform_device *pdev)
+>   	struct at_dma	*atdma = platform_get_drvdata(pdev);
 >
->   	case CLOCK_EVT_MODE_ONESHOT:
-> -		clk_enable(tcd->clk);
-> +		clk_prepare_enable(tcd->clk);
+>   	at_dma_off(platform_get_drvdata(pdev));
+> -	clk_disable(atdma->clk);
+> +	clk_disable_unprepare(atdma->clk);
+>   }
 >
->   		/* slow clock, count up to RC, then irq and stop */
->   		__raw_writel(timer_clock | ATMEL_TC_CPCSTOP
-> @@ -275,7 +275,7 @@ static int __init tcb_clksrc_init(void)
->   	pdev = tc->pdev;
+>   static int at_dma_prepare(struct device *dev)
+> @@ -1588,7 +1591,7 @@ static int at_dma_suspend_noirq(struct device *dev)
 >
->   	t0_clk = tc->clk[0];
-> -	clk_enable(t0_clk);
-> +	clk_prepare_enable(t0_clk);
+>   	/* disable DMA controller */
+>   	at_dma_off(atdma);
+> -	clk_disable(atdma->clk);
+> +	clk_disable_unprepare(atdma->clk);
+>   	return 0;
+>   }
 >
->   	/* How fast will we be counting?  Pick something over 5 MHz.  */
->   	rate = (u32) clk_get_rate(t0_clk);
-> @@ -313,7 +313,7 @@ static int __init tcb_clksrc_init(void)
->   		/* tclib will give us three clocks no matter what the
->   		 * underlying platform supports.
->   		 */
-> -		clk_enable(tc->clk[1]);
-> +		clk_prepare_enable(tc->clk[1]);
->   		/* setup both channel 0 & 1 */
->   		tcb_setup_dual_chan(tc, best_divisor_idx);
->   	}
+> @@ -1618,7 +1621,9 @@ static int at_dma_resume_noirq(struct device *dev)
+>   	struct dma_chan *chan, *_chan;
+>
+>   	/* bring back DMA controller */
+> -	clk_enable(atdma->clk);
+> +	err = clk_prepare_enable(atdma->clk);
+> +	if (err)
+> +		return err;
+>   	dma_writel(atdma, EN, AT_DMA_ENABLE);
+>
+>   	/* clear any pending interrupt */
 >
 
 
