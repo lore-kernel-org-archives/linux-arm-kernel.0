@@ -1,28 +1,99 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 20 Jun 2013 10:24:39 -0600
-Subject: [PATCH V1] ARM: dts: tegra: Modify pcie memory space size
-In-Reply-To: <1371712491-31070-1-git-send-email-jagarwal@nvidia.com>
-References: <1371712491-31070-1-git-send-email-jagarwal@nvidia.com>
-Message-ID: <51C32CC7.5010109@wwwdotorg.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 20 Jun 2013 09:40:51 -0700
+Subject: [PATCH/RESEND 05/12] msm: iommu: Convert to clk_prepare/unprepare
+In-Reply-To: <1371490999-15501-6-git-send-email-sboyd@codeaurora.org>
+References: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
+ <1371490999-15501-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130620164051.GC6300@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2013 01:14 AM, Jay Agarwal wrote:
-> - decrease non-prefetch memory size to 128 MB
-> - increase prefetch memory size to 384 MB
-> - above change is done because most pcie devices
->   prefetch memory size requirement is quite higher
->   compared to non-prefetch memory space.
+Sending to correct Joerg address.
 
-It's possible this change won't be suitable for all applications. People
-may simply need to adjust their DT based on what they want to connect.
-Still, this patch probably biases things in the correct way for now.
-Longer term, we might want to investigate dynamically sizing the windows
-in order to support arbitrary attached devices, in much the same way as
-the Marvell code does/will in order to conserve physical/bus address
-space for their multiple controllers.
+On 06/17, Stephen Boyd wrote:
+> Add calls to clk_prepare and unprepare so that MSM can migrate to
+> the common clock framework. We never unprepare the clocks until
+> driver remove because the clocks are enabled and disabled in irq
+> context. Finer grained power management is possible in the future
+> via runtime power management techniques.
+> 
+> Cc: Joerg Roedel <joerg.roedel@amd.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/iommu/msm_iommu_dev.c | 17 ++++++++++-------
+>  1 file changed, 10 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/iommu/msm_iommu_dev.c b/drivers/iommu/msm_iommu_dev.c
+> index 8e8fb07..d344f6a 100644
+> --- a/drivers/iommu/msm_iommu_dev.c
+> +++ b/drivers/iommu/msm_iommu_dev.c
+> @@ -160,7 +160,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
+>  		goto fail;
+>  	}
+>  
+> -	ret = clk_enable(iommu_pclk);
+> +	ret = clk_prepare_enable(iommu_pclk);
+>  	if (ret)
+>  		goto fail_enable;
+>  
+> @@ -170,7 +170,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
+>  		if (clk_get_rate(iommu_clk) == 0)
+>  			clk_set_min_rate(iommu_clk, 1);
+>  
+> -		ret = clk_enable(iommu_clk);
+> +		ret = clk_prepare_enable(iommu_clk);
+>  		if (ret) {
+>  			clk_put(iommu_clk);
+>  			goto fail_pclk;
+> @@ -261,7 +261,7 @@ fail_clk:
+>  		clk_put(iommu_clk);
+>  	}
+>  fail_pclk:
+> -	clk_disable(iommu_pclk);
+> +	clk_disable_unprepare(iommu_pclk);
+>  fail_enable:
+>  	clk_put(iommu_pclk);
+>  fail:
+> @@ -275,8 +275,11 @@ static int msm_iommu_remove(struct platform_device *pdev)
+>  
+>  	drv = platform_get_drvdata(pdev);
+>  	if (drv) {
+> -		if (drv->clk)
+> +		if (drv->clk) {
+> +			clk_unprepare(drv->clk);
+>  			clk_put(drv->clk);
+> +		}
+> +		clk_unprepare(drv->pclk);
+>  		clk_put(drv->pclk);
+>  		memset(drv, 0, sizeof(*drv));
+>  		kfree(drv);
+> @@ -314,14 +317,14 @@ static int msm_iommu_ctx_probe(struct platform_device *pdev)
+>  	INIT_LIST_HEAD(&ctx_drvdata->attached_elm);
+>  	platform_set_drvdata(pdev, ctx_drvdata);
+>  
+> -	ret = clk_enable(drvdata->pclk);
+> +	ret = clk_prepare_enable(drvdata->pclk);
+>  	if (ret)
+>  		goto fail;
+>  
+>  	if (drvdata->clk) {
+> -		ret = clk_enable(drvdata->clk);
+> +		ret = clk_prepare_enable(drvdata->clk);
+>  		if (ret) {
+> -			clk_disable(drvdata->pclk);
+> +			clk_disable_unprepare(drvdata->pclk);
+>  			goto fail;
+>  		}
+>  	}
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-However, this change allows me to correctly enumerate a particular GPU I
-have plugged into my Harmony board, and assign all the BARs, so:
-
-Tested-by: Stephen Warren <swarren@nvidia.com>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
