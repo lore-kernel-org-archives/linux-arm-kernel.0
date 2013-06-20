@@ -1,138 +1,52 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Thu, 20 Jun 2013 15:07:03 +0100
-Subject: [PATCH v3 10/10] ARM:stih41x: Add B2020 board support
-In-Reply-To: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1371737223-9650-1-git-send-email-srinivas.kandagatla@st.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 20 Jun 2013 14:11:04 +0000
+Subject: [PATCH v5 0/2] ARM: dts: Add USB host support for Beagle-xm
+In-Reply-To: <1371732374-27191-1-git-send-email-rogerq@ti.com>
+References: <1371732374-27191-1-git-send-email-rogerq@ti.com>
+Message-ID: <B7CE1C39EBFBA0428A012975D4B2FC830B72CECA@DNCE05.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-B2020 ADI board is reference board for STIH415/416 SOCs, it has 2 x
-UART, 4x USB, 1 x Ethernet, 1 x SATA, 1 x PCIe, and 2GB RAM  with
-standard set-top box IPs.
+Thanks Roger,
 
-This patch adds initial support to B2020 with STiH415/416 with SBC_UART1
-as console and a heard beat LED.
+I'll take them for 3.12. I was already late for my 3.11 pull request.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-CC: Stephen Gallimore <stephen.gallimore@st.com>
-CC: Stuart Menefy <stuart.menefy@st.com>
-CC: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/boot/dts/Makefile           |    4 ++-
- arch/arm/boot/dts/stih415-b2020.dts  |   15 ++++++++++++
- arch/arm/boot/dts/stih416-b2020.dts  |   16 +++++++++++++
- arch/arm/boot/dts/stih41x-b2020.dtsi |   42 ++++++++++++++++++++++++++++++++++
- 4 files changed, 76 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/boot/dts/stih415-b2020.dts
- create mode 100644 arch/arm/boot/dts/stih416-b2020.dts
- create mode 100644 arch/arm/boot/dts/stih41x-b2020.dtsi
+Regards,
+Benoit
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d4615fd..0d24c95 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -178,7 +178,9 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
- 	spear320-hmi.dtb
- dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
- dtb-$(CONFIG_ARCH_STIXXXX)+= stih415-b2000.dtb \
--	stih416-b2000.dtb
-+	stih416-b2000.dtb \
-+	stih415-b2020.dtb \
-+	stih416-b2020.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += \
- 	sun4i-a10-cubieboard.dtb \
- 	sun4i-a10-mini-xplus.dtb \
-diff --git a/arch/arm/boot/dts/stih415-b2020.dts b/arch/arm/boot/dts/stih415-b2020.dts
-new file mode 100644
-index 0000000..442b019
---- /dev/null
-+++ b/arch/arm/boot/dts/stih415-b2020.dts
-@@ -0,0 +1,15 @@
-+/*
-+ * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
-+ * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+#include "stih415.dtsi"
-+#include "stih41x-b2020.dtsi"
-+/ {
-+	model = "STiH415 B2020 Board";
-+	compatible = "st,stih415", "st,stih415-b2020";
-+};
-diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-new file mode 100644
-index 0000000..276f28d
---- /dev/null
-+++ b/arch/arm/boot/dts/stih416-b2020.dts
-@@ -0,0 +1,16 @@
-+/*
-+ * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
-+ * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+#include "stih416.dtsi"
-+#include "stih41x-b2020.dtsi"
-+/ {
-+	model = "STiH416 B2020";
-+	compatible = "st,stih416", "st,stih416-b2020";
-+
-+};
-diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
-new file mode 100644
-index 0000000..133e181
---- /dev/null
-+++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
-@@ -0,0 +1,42 @@
-+/*
-+ * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
-+ * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+/ {
-+	memory{
-+		device_type = "memory";
-+		reg = <0x40000000 0x80000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyAS0,115200";
-+		linux,stdout-path = &sbc_serial1;
-+	};
-+
-+	aliases {
-+		ttyAS0 = &sbc_serial1;
-+	};
-+	soc {
-+		sbc_serial1: serial at fe531000 {
-+			status = "okay";
-+		};
-+
-+		leds {
-+			compatible	= "gpio-leds";
-+			red {
-+				#gpio-cells = <1>;
-+				label	= "Front Panel LED";
-+				gpios	= <&PIO4 1>;
-+				linux,default-trigger	= "heartbeat";
-+			};
-+			green {
-+				gpios	= <&PIO4 7>;
-+				default-state = "off";
-+			};
-+		};
-+	};
-+};
--- 
-1.7.6.5
+>
+Texas Instruments France SA, 821 Avenue Jack Kilby, 06270 Villeneuve Loubet. 036 420 040 R.C.S Antibes. Capital de EUR 12.654.784
+
+-----Original Message-----
+>From: Quadros, Roger
+>Sent: Thursday, June 20, 2013 7:46 AM
+>To: Cousson, Benoit
+>Cc: tony at atomide.com; linux-omap at vger.kernel.org; devicetree-
+>discuss at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org; linux-
+>kernel at vger.kernel.org; Quadros, Roger
+>Subject: [PATCH v5 0/2] ARM: dts: Add USB host support for Beagle-xm
+>
+>Hi Benoit,
+>
+>Patch 1 adds USB host support for beagle-XM.
+>Patch 2 cleans up pin comments for USB host pins.
+>
+>Changes in v4:
+>- Rebased to todays for_3.11/dts branch
+>- added disclaimer about temporary usage of regulator framework for
+>GPIO RESET lines.
+>
+>cheers,
+>-roger
+>
+>Roger Quadros (2):
+>  ARM: dts: omap3-beagle-xm: Add USB Host support
+>  ARM: dts: omap3-beagle: Make USB host pin naming consistent
+>
+> arch/arm/boot/dts/omap3-beagle-xm.dts |   81
+>+++++++++++++++++++++++++++++----
+> arch/arm/boot/dts/omap3-beagle.dts    |   29 +++++++-----
+> 2 files changed, 89 insertions(+), 21 deletions(-)
+>
+>--
+>1.7.4.1
