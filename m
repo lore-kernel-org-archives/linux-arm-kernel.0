@@ -1,41 +1,45 @@
-From: rizhao@nvidia.com (Richard Zhao)
-Date: Thu, 20 Jun 2013 20:31:00 +0800
-Subject: [PATCH] ARM: dma: Drop __GFP_COMP for iommu dma memory allocations
-Message-ID: <1371731460-15316-1-git-send-email-rizhao@nvidia.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 20 Jun 2013 15:32:01 +0300
+Subject: [RFC PATCH 4/6] USB: ehci-omap: Suspend the controller during
+ bus suspend
+In-Reply-To: <87r4fy6lvm.fsf@linaro.org>
+References: <1371650753-11452-1-git-send-email-rogerq@ti.com>
+ <1371650753-11452-5-git-send-email-rogerq@ti.com> <87r4fy6lvm.fsf@linaro.org>
+Message-ID: <51C2F641.9000803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__iommu_alloc_buffer wants to split pages after allocation in order to
-reduce the memory footprint. This does not work well with __GFP_COMP
-pages, so drop this flag before allocation
+On 06/19/2013 08:39 PM, Kevin Hilman wrote:
+> Hi Roger,
+> 
+> Roger Quadros <rogerq@ti.com> writes:
+> 
+>> Runtime suspend the controller during bus suspend and resume it
+>> during bus resume. This will ensure that the USB Host power domain
+>> enters lower power state and does not prevent the SoC from
+>> endering deeper sleep states.
+>>
+>> Remote wakeup will come up as an interrupt while the controller
+>> is suspended, so tackle it carefully using a workqueue.
+> 
+> I don't think you need a special workqueue here.  The workqueue of the PM
+> core (pm_wq) will be used if you just use an asynchronous 'get' in the
+> ISR.  Then, the driver's own runtime PM callbacks can be used instead of
+> an additional workqueue.
+> 
+> Another thing to worry about here when using runtime PM to implement
+> suspend/resume is that runtime PM can be disabled from userspace (e.g.
+> echo disabled > /sys/devices/.../power/control.)  If that's the case,
+> all the pm_runtime_suspended() checks will always fail becuase that
+> call also checks if runtime PM is disabled.  You'll likely want to use
+> the pm_runtime_status_suspended() check instead, which checks only the
+> status, and doesn't matter if runtime PM is currently disabled.
+> 
+> Because of the corner issues here, please test system suspend/resume
+> when runtime PM has been disabled.
+> 
 
-One failure example is snd_malloc_dev_pages call dma_alloc_coherent with
-__GFP_COMP.
+Good points. Thanks. I'll need to think about it some more.
 
-Signed-off-by: Richard Zhao <rizhao@nvidia.com>
----
- arch/arm/mm/dma-mapping.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index ef3e0f3..f7efffd 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1314,6 +1314,15 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
- 	if (gfp & GFP_ATOMIC)
- 		return __iommu_alloc_atomic(dev, size, handle);
- 
-+	/*
-+	 * Following is a work-around (a.k.a. hack) to prevent pages
-+	 * with __GFP_COMP being passed to split_page() which cannot
-+	 * handle them.  The real problem is that this flag probably
-+	 * should be 0 on ARM as it is not supported on this
-+	 * platform; see CONFIG_HUGETLBFS.
-+	 */
-+	gfp &= ~(__GFP_COMP);
-+
- 	pages = __iommu_alloc_buffer(dev, size, gfp, attrs);
- 	if (!pages)
- 		return NULL;
--- 
-1.7.9.5
+cheers,
+-roger
