@@ -1,34 +1,54 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 20 Jun 2013 14:53:27 +0200
-Subject: [PATCH v8 00/11] ASoC: fsl-ssi: ac97-slave support
-In-Reply-To: <20130617023656.GE31687@S2101-09.ap.freescale.net>
-References: <1371389117-19729-1-git-send-email-mpa@pengutronix.de>
- <20130617023656.GE31687@S2101-09.ap.freescale.net>
-Message-ID: <20130620125327.GD3085@s25.your-server.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 20 Jun 2013 14:01:10 +0100
+Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
+ pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
+In-Reply-To: <51C2EBCD.4070206@pengutronix.de>
+References: <51C2C0B5.8020802@pengutronix.de> <20130620095705.GA18536@arm.com>
+ <51C2D5EF.3040803@pengutronix.de> <20130620102856.GC18536@arm.com>
+ <20130620111255.GD18536@arm.com> <51C2E917.9000708@pengutronix.de>
+ <51C2EA04.4060701@pengutronix.de> <51C2EBCD.4070206@pengutronix.de>
+Message-ID: <20130620130110.GE18536@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 10:36:57AM +0800, Shawn Guo wrote:
-> On Sun, Jun 16, 2013 at 03:25:06PM +0200, Markus Pargmann wrote:
-> > Markus Pargmann (11):
-> >       ASoC: imx-pcm-dma: DT support
-> >       ASoC: imx-pcm-fiq: Introduce pcm-fiq-params
-> >       ASoC: fsl: Move soc_ac97_ops from imx-ssi to fsl_ssi
-> >       ASoC: fsl-ssi: Add support for imx-pcm-fiq
-> >       ASoC: fsl-ssi: Use generic DMA bindings if possible
-> >       ASoC: fsl-ssi: imx ac97 support
-> >       ARM: imx: Export ac97 reset functions
-> >       ASoC: Add phycore-ac97-dt driver
-> >       ASoC: fsl: Kconfig: Use fsl-ssi for phycore-ac97
-> >       ASoC: fsl: Move fsl-ssi binding doc to sound/
-> >       ASoC: fsl: Update fsl-ssi binding doc
+On Thu, Jun 20, 2013 at 12:47:25PM +0100, Marc Kleine-Budde wrote:
+> On 06/20/2013 01:39 PM, Marc Kleine-Budde wrote:
+> > On 06/20/2013 01:35 PM, Marc Kleine-Budde wrote:
+> >> On 06/20/2013 01:12 PM, Catalin Marinas wrote:
+> >>> On Thu, Jun 20, 2013 at 11:28:56AM +0100, Catalin Marinas wrote:
+> >>>> We may need to place the preempt disable/enable at a higher level in the
+> >>>> scheduler. My theory is that we have a context switch from prev to next.
+> >>>> We get preempted just before finish_arch_post_lock_switch(), so the MMU
+> >>>> hasn't been switched yet. The new switch during preemption happens to a
+> >>>> thread with the same next mm, so the scheduler no longer switch_mm() and
+> >>>> the TIF_SWITCH_MM isn't set for the new thread.
+> >>>>
+> >>>> I'll come back with another patch shortly.
+> >>>
+> >>> Here's another attempt (as before, only compile-tested):
+> >>
+> >> booting kernel from /image
+> >> zImage: concatenated oftree detected
+> >> booting Linux kernel with devicetree
+> >>
+> >> ...dead...
+> >>
+> >> Does every process have a "mm"? Even Kernel threads?
 > 
-> Tested-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> 
+> I've added a check for "mm". Boots now and my test runs stable for 3
+> minutes now.
 
-Thank you for testing.
+Ah, good point.
 
-Regards,
+> I'm not sure if we have to check for "mm" in
+> check_and_switch_context(), too.
 
-Markus
+switch_mm() wouldn't be called with a NULL mm, hence we wouldn't call
+check_and_switch_context() either. finish_arch_post_lock_switch() is
+called all the time (and we set the TIF flag only if switch_mm() was
+called).
+
+Thanks.
+
+-- 
+Catalin
