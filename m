@@ -1,50 +1,190 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 20 Jun 2013 17:40:13 +0900
-Subject: [PATCH V6 3/3] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-In-Reply-To: <20130620100013.6000458f@skate>
-References: <00c201ce6d85$83b072a0$8b1157e0$@samsung.com>
- <20130620094835.3f1f34c2@skate> <00c301ce6d8b$d198b210$74ca1630$@samsung.com>
- <20130620100013.6000458f@skate>
-Message-ID: <00c901ce6d91$c8382010$58a86030$@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 20 Jun 2013 14:10:15 +0530
+Subject: [PATCH v2 5/7] ARM: davinci: da8xx: gpio device creation
+In-Reply-To: <1371202532-14628-6-git-send-email-avinashphilip@ti.com>
+References: <1371202532-14628-1-git-send-email-avinashphilip@ti.com>
+ <1371202532-14628-6-git-send-email-avinashphilip@ti.com>
+Message-ID: <51C2BFEF.1090205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 20, 2013 5:00 PM, Thomas Petazzoni wrote:
+On 6/14/2013 3:05 PM, Philip Avinash wrote:
+> Create davinci gpio device and remove references in davinci_soc_info
+> structure. Also rearrange header file inclusion in group basis.
 > 
-> Dear Jingoo Han,
+> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+>  arch/arm/mach-davinci/board-da830-evm.c     |   19 +++++++++++++++----
+>  arch/arm/mach-davinci/board-da850-evm.c     |   11 +++++++++++
+>  arch/arm/mach-davinci/board-omapl138-hawk.c |    2 ++
+>  arch/arm/mach-davinci/da830.c               |    4 ----
+>  arch/arm/mach-davinci/da850.c               |    4 ----
+>  5 files changed, 28 insertions(+), 12 deletions(-)
 > 
-> On Thu, 20 Jun 2013 16:57:32 +0900, Jingoo Han wrote:
-> 
-> > > > -	pinctrl {
-> > > > +	pin_ctrl: pinctrl {
-> > > >  		compatible = "samsung,exynos5440-pinctrl";
-> > >
-> > > I know I'm nitpicking, but isn't this change completely unrelated to
-> > > PCIe support?
-> >
-> > This change is related to PCIe support.
-> > Without this, I cannot use gpio binding.
-> >
-> > This change was guided by Thomas Abraham (Author of Samsung pinctrl).
-> > Also, it was confirmed by Kukjin Kim (Maintainer of Samsung SoC).
-> >
-> > Thank you for your caring. :)
-> 
-> I mean, the change is fine for sure, but it should maybe part of a
-> separate patch as it is more a fix than really the introduction of the
-> PCIe controller node, as the patch title suggests. This would also for
-> example allow this fix to be merged right now (for 3.11), regardless of
-> what happens for the rest of your PCIe patches.
-> 
-CC'ed Tomasz Figa
+> diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+> index 1332de8..4e8bcc1 100644
+> --- a/arch/arm/mach-davinci/board-da830-evm.c
+> +++ b/arch/arm/mach-davinci/board-da830-evm.c
+> @@ -22,17 +22,19 @@
+>  #include <linux/mtd/partitions.h>
+>  #include <linux/spi/spi.h>
+>  #include <linux/spi/flash.h>
+> +#include <linux/platform_data/mtd-davinci.h>
+> +#include <linux/platform_data/gpio-davinci.h>
+> +#include <linux/platform_data/usb-davinci.h>
+> +#include <linux/platform_data/mtd-davinci-aemif.h>
+> +#include <linux/platform_data/spi-davinci.h>
 
+While doing this, its better to keep the header files you are adding in
+sorted order.
 
-OK, I see.
-I will separate this patch to two patches, as Tomasz Figa mentioned.
-(http://www.spinics.net/lists/linux-samsung-soc/msg19639.html)
-Thank you.
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+>  
+>  #include <mach/cp_intc.h>
+>  #include <mach/mux.h>
+> -#include <linux/platform_data/mtd-davinci.h>
+> +#include <mach/common.h>
 
+You dont need to include this file here.
 
-Best regards,
-Jingoo Han
+>  #include <mach/da8xx.h>
+> -#include <linux/platform_data/usb-davinci.h>
+> -#include <linux/platform_data/mtd-davinci-aemif.h>
+> -#include <linux/platform_data/spi-davinci.h>
+>  
+>  #define DA830_EVM_PHY_ID		""
+>  /*
+> @@ -590,11 +592,20 @@ static struct spi_board_info da830evm_spi_info[] = {
+>  	},
+>  };
+>  
+> +static struct davinci_gpio_platform_data da830_gpio_platform_data = {
+> +	.ngpio = 128,
+> +	.intc_irq_num = DA830_N_CP_INTC_IRQ,
+> +};
+> +
+>  static __init void da830_evm_init(void)
+>  {
+>  	struct davinci_soc_info *soc_info = &davinci_soc_info;
+>  	int ret;
+>  
+> +	ret = da8xx_register_gpio(&da830_gpio_platform_data);
+> +	if (ret)
+> +		pr_warn("da830_evm_init: GPIO init failed: %d\n", ret);
+> +
+>  	ret = da830_register_edma(da830_edma_rsv);
+>  	if (ret)
+>  		pr_warning("da830_evm_init: edma registration failed: %d\n",
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 8a24b6c..d5dd010 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/mtd/partitions.h>
+>  #include <linux/mtd/physmap.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/platform_data/gpio-davinci.h>
+>  #include <linux/platform_data/mtd-davinci.h>
+>  #include <linux/platform_data/mtd-davinci-aemif.h>
+>  #include <linux/platform_data/spi-davinci.h>
+> @@ -42,6 +43,7 @@
+>  #include <mach/da8xx.h>
+>  #include <mach/mux.h>
+>  #include <mach/sram.h>
+> +#include <mach/common.h>
+
+No need of this file, as before.
+
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> @@ -1138,6 +1140,11 @@ static struct edma_rsv_info *da850_edma_rsv[2] = {
+>  	&da850_edma_cc1_rsv,
+>  };
+>  
+> +static struct davinci_gpio_platform_data da850_gpio_platform_data = {
+> +	.ngpio = 144,
+> +	.intc_irq_num = DA850_N_CP_INTC_IRQ,
+> +};
+> +
+>  #ifdef CONFIG_CPU_FREQ
+>  static __init int da850_evm_init_cpufreq(void)
+>  {
+> @@ -1444,6 +1451,10 @@ static __init void da850_evm_init(void)
+>  {
+>  	int ret;
+>  
+> +	ret = da8xx_register_gpio(&da850_gpio_platform_data);
+> +	if (ret)
+> +		pr_warn("da850_evm_init: GPIO init failed: %d\n", ret);
+> +
+>  	ret = pmic_tps65070_init();
+>  	if (ret)
+>  		pr_warn("%s: TPS65070 PMIC init failed: %d\n", __func__, ret);
+> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> index b8c20de..1f44a1b 100644
+> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
+> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/init.h>
+>  #include <linux/console.h>
+>  #include <linux/gpio.h>
+> +#include <linux/platform_data/gpio-davinci.h>
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> @@ -20,6 +21,7 @@
+>  #include <mach/cp_intc.h>
+>  #include <mach/da8xx.h>
+>  #include <mach/mux.h>
+> +#include <mach/common.h>
+
+No need of this again.
+
+>  
+>  #define HAWKBOARD_PHY_ID		"davinci_mdio-0:07"
+>  #define DA850_HAWK_MMCSD_CD_PIN		GPIO_TO_PIN(3, 12)
+
+You don't actually register GPIO for hawkboard?
+
+> diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+> index abbaf02..e7b79ee 100644
+> --- a/arch/arm/mach-davinci/da830.c
+> +++ b/arch/arm/mach-davinci/da830.c
+> @@ -1195,10 +1195,6 @@ static struct davinci_soc_info davinci_soc_info_da830 = {
+>  	.intc_irq_prios		= da830_default_priorities,
+>  	.intc_irq_num		= DA830_N_CP_INTC_IRQ,
+>  	.timer_info		= &da830_timer_info,
+> -	.gpio_type		= GPIO_TYPE_DAVINCI,
+> -	.gpio_base		= DA8XX_GPIO_BASE,
+> -	.gpio_num		= 128,
+> -	.gpio_irq		= IRQ_DA8XX_GPIO0,
+>  	.serial_dev		= &da8xx_serial_device,
+>  	.emac_pdata		= &da8xx_emac_pdata,
+>  };
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 93bcf06..de8753d 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -1298,10 +1298,6 @@ static struct davinci_soc_info davinci_soc_info_da850 = {
+>  	.intc_irq_prios		= da850_default_priorities,
+>  	.intc_irq_num		= DA850_N_CP_INTC_IRQ,
+>  	.timer_info		= &da850_timer_info,
+> -	.gpio_type		= GPIO_TYPE_DAVINCI,
+> -	.gpio_base		= DA8XX_GPIO_BASE,
+> -	.gpio_num		= 144,
+> -	.gpio_irq		= IRQ_DA8XX_GPIO0,
+>  	.serial_dev		= &da8xx_serial_device,
+>  	.emac_pdata		= &da8xx_emac_pdata,
+>  	.sram_dma		= DA8XX_SHARED_RAM_BASE,
+
+This the SoC changes can be done in 3/7 itself. I have done that in my
+v3.11/gpio branch. Can you fix the issues I pointed out and reply to
+this mail with an updated 5/7?
+
+Thanks,
+Sekhar
