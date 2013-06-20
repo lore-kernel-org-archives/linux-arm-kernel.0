@@ -1,55 +1,42 @@
-From: jamie@jamieiles.com (Jamie Iles)
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
 Date: Thu, 20 Jun 2013 15:57:44 +0100
-Subject: [GIT PULL] picoxcell cleanups for 3.11
-In-Reply-To: <201306201624.09841.arnd@arndb.de>
-References: <20130611122621.GA9967@page> <20130619100224.GB8641@page>
- <201306201624.09841.arnd@arndb.de>
-Message-ID: <20130620145744.GC8641@page>
+Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
+In-Reply-To: <20130620004302.GA19896@S2101-09.ap.freescale.net>
+References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
+ <20130612083619.GA13274@S2101-09.ap.freescale.net>
+ <20130619164338.GE5276@e102568-lin.cambridge.arm.com>
+ <20130620004302.GA19896@S2101-09.ap.freescale.net>
+Message-ID: <20130620145744.GC23833@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Thu, Jun 20, 2013 at 04:24:09PM +0200, Arnd Bergmann wrote:
-> On Wednesday 19 June 2013, Jamie Iles wrote:
-> > Fixing Arnd's mail address (sorry!).
-> 
-> you did forget to fix up Olof's address though.
-
-Gah, fat fingers!
-
-> > > ----------------------------------------------------------------
-> > > Jamie Iles (1):
-> > >       picoxcell: remove redundant common.h
+On Thu, Jun 20, 2013 at 01:43:04AM +0100, Shawn Guo wrote:
+> On Wed, Jun 19, 2013 at 05:43:38PM +0100, Lorenzo Pieralisi wrote:
+> > On Wed, Jun 12, 2013 at 09:36:20AM +0100, Shawn Guo wrote:
+> > > On Tue, Jun 11, 2013 at 10:58:48AM +0100, Lorenzo Pieralisi wrote:
+> > > > Hi Russell, all,
+> > > > 
+> > > > even though I think this set is ready to get merged, it would be great
+> > > > if we can test it on as many platforms as possible since it touches core
+> > > > suspend/resume operations on ARM platforms relying on CONFIG_ARM_CPU_SUSPEND,
+> > > > and there are many.
+> > > > 
+> > > > I pushed out a branch:
+> > > > 
+> > > > git://linux-arm.org/linux-2.6-lp.git mpidr-linearization
+> > > > 
+> > > > if anyone has time to test the set that would be really great, thank you
+> > > > very much.
 > > > 
-> > > Maxime Ripard (1):
-> > >       ARM: picoxcell: Remove init_irq declaration in machine description
+> > > I tested the branch on imx6q, and system suspend/resume works fine with
+> > > it.
+> > 
+> > Can I add your tested-by please ?
 > 
-> I got a regression since NR_IRQS_LEGACY is not defined with the headers
-> removed.
+> Sure.
 > 
-> I think we can just remove this line as well, since NR_IRQS_LEGACY is
-> the default anyway.
-> 
-> Does that work?
+> Tested-by: Shawn Guo <shawn.guo@linaro.org>
 
-I can't reproduce the failure here with my config, I guess it's getting 
-included through one of the other includes.  Either way, your fix looks 
-good to me.
-
-Thanks,
-
-Jamie
-
-> diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
-> index 8267c5d..b13f51b 100644
-> --- a/arch/arm/mach-picoxcell/common.c
-> +++ b/arch/arm/mach-picoxcell/common.c
-> @@ -79,7 +79,6 @@ static void picoxcell_wdt_restart(char mode, const char *cmd)
->  
->  DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
->  	.map_io		= picoxcell_map_io,
-> -	.nr_irqs	= NR_IRQS_LEGACY,
->  	.init_machine	= picoxcell_init_machine,
->  	.dt_compat	= picoxcell_dt_match,
->  	.restart	= picoxcell_wdt_restart,
+Thanks a lot,
+Lorenzo
