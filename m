@@ -1,59 +1,60 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 20 Jun 2013 15:02:24 +0300
-Subject: [RFC PATCH 5/6] ARM: dts: omap3beagle-xm: Add idle state pins
- for USB host
-In-Reply-To: <51C2EDB1.3080801@ti.com>
-References: <1371650753-11452-1-git-send-email-rogerq@ti.com>
- <1371650753-11452-6-git-send-email-rogerq@ti.com> <87obb26ixm.fsf@linaro.org>
- <51C2EDB1.3080801@ti.com>
-Message-ID: <51C2EF50.3070707@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 20 Jun 2013 14:06:13 +0200
+Subject: [PATCH v6] ARM: PJ4B: fix for 3.10-rc
+Message-ID: <1371729974-17950-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2013 02:55 PM, Roger Quadros wrote:
-> On 06/19/2013 09:42 PM, Kevin Hilman wrote:
->> Roger Quadros <rogerq@ti.com> writes:
->>
->>> Add the Idle state pins for USB host and enable WAKEUP on
->>> DIR, DAT0-3, so that the PHY can wakeup the OMAP SoC from
->>> sleep on any USB activity (e.g. remote wakeup or connect/disconnect).
->>>
->>> CC: Beno?t Cousson <b-cousson@ti.com>
->>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>
->> This one doesn't apply...
->>
->>> ---
->>>  arch/arm/boot/dts/omap3-beagle-xm.dts |   29 +++++++++++++++++++++++------
->>>  1 files changed, 23 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
->>> index d3808ed..f1d56c2 100644
->>> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
->>> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
->>> @@ -89,12 +89,7 @@
->>>  };
->>>  
->>>  &omap3_pmx_core {
->>> -	pinctrl-names = "default";
->>> -	pinctrl-0 = <
->>> -			&hsusbb2_pins
->>> -	>;
->>> -
->>> -	hsusbb2_pins: pinmux_hsusbb2_pins {
->>
->> This omap3_pmx_core section doesn't exist upstream in the xM DTS file
->> (but does in omap3-beagle.dts.)  
->>
->> Is there a dependency patch missing?
->>
-> 
-> Sorry for not mentioning it earlier. This is based on Benoit's tree [1]
-> and you need these patches
-> 
-> http://thread.gmane.org/gmane.linux.drivers.devicetree/38383
+Hello,
 
-Just noticed that this no longer applies today. I'll send a revision soon.
+This path allows to fix one errata for PJ4B CPUs.
 
-cheers,
--roger
+Without this the Armada 370 based board can't boot anymore since
+3.10-rc1. So this one really need to be applied on 3.10-rc.
+
+As the patch fixing PJ4B ID have been merged in Russell King's git
+tree. I only sent this one. I have tested a build with the
+vexpress_defconfig and it no more failed.
+
+I have also removed the acked-by from Nicolas Pitre and the
+Reviewed-by from Will Deacon as even the change are small it is still
+a new version.
+
+Nicolas, Will, would you agree to give your acked-by and reviewed-by
+on this new version?
+
+Thanks,
+
+Changelog:
+V1 -> V2;
+ - Fixed various coding style and typo issues
+ - Replaced the "mcr p15, 0, r0, c7, c10, 4" by  "dsb"
+
+V2 -> v3:
+ - As suggested by Russell, the first errata is now applied
+   dynamically according to the processor type
+
+v3 -> v4:
+ - Moved the glob_equ maco into proc-macro.S
+ - Split the patch in 2 parts, one for fixing the ID and mask of the
+   PJ4B and the second for fixing the errata itself
+
+v4 -> v5:
+- Added #ifdef all the places the new symbols conditionally defined
+  are used.
+
+v5 -> v6:
+- Selected the fix by default if MACH_ARMADA_370 is selected, as
+  without it there is no point to use Armada 370 base board.
+
+Gregory CLEMENT (1):
+  ARM PJ4B: Add support for errata 4742
+
+ arch/arm/Kconfig                 | 14 ++++++++++++++
+ arch/arm/include/asm/glue-proc.h |  9 +++++++++
+ arch/arm/mm/proc-macros.S        |  5 +++++
+ arch/arm/mm/proc-v7.S            | 34 +++++++++++++++++++++++++++++++---
+ 4 files changed, 59 insertions(+), 3 deletions(-)
+
+-- 
+1.8.1.2
