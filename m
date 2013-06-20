@@ -1,173 +1,72 @@
-From: nishanth.p@gmail.com (Nishanth Peethambaran)
-Date: Thu, 20 Jun 2013 13:37:00 +0530
-Subject: [Linaro-mm-sig] [RFC 2/3] ARM: dma-mapping: Pass DMA attrs as
- IOMMU prot
-In-Reply-To: <1371707384-30037-3-git-send-email-hdoyu@nvidia.com>
-References: <1371707384-30037-1-git-send-email-hdoyu@nvidia.com>
- <1371707384-30037-3-git-send-email-hdoyu@nvidia.com>
-Message-ID: <CAMcxFTRnnCnPnvMi89r7rUsN4xeYzZGqy9s5v5ukm_fJ_d_RGg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 20 Jun 2013 10:07:37 +0200
+Subject: [PATCH v2 7/7] drivers: bus: imx-weim: Change compatible string
+ for i.MX6Q
+In-Reply-To: <20130620070959.GE19896@S2101-09.ap.freescale.net>
+References: <1371671678-6345-1-git-send-email-shc_work@mail.ru>
+ <1371671678-6345-7-git-send-email-shc_work@mail.ru>
+ <20130620070959.GE19896@S2101-09.ap.freescale.net>
+Message-ID: <20130620080737.GO32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jun 20, 2013 at 03:10:01PM +0800, Shawn Guo wrote:
+> On Wed, Jun 19, 2013 at 11:54:38PM +0400, Alexander Shiyan wrote:
+> > This patch changes compatible string for i.MX6Q to "fsl,imx50-weim"
+> > since this is a lowest CPU type with same bus.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+> >  Documentation/devicetree/bindings/bus/imx-weim.txt | 2 +-
+> >  drivers/bus/imx-weim.c                             | 2 +-
+> >  2 files changed, 2 insertions(+), 2 deletions(-)
+> > 
+> I think patches #4, #6 and #7 can just be one patch.
+> 
+> > diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
+> > index 99406e4..b134811 100644
+> > --- a/Documentation/devicetree/bindings/bus/imx-weim.txt
+> > +++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
+> > @@ -33,7 +33,7 @@ Timing property for child nodes. It is mandatory, not optional.
+> >  Example for an imx6q-sabreauto board, the NOR flash connected to the WEIM:
+> >  
+> >  	weim: weim at 021b8000 {
+> > -		compatible = "fsl,imx6q-weim";
+> > +		compatible = "fsl,imx6q-weim", "fsl,imx50-weim";
+> >  		reg = <0x021b8000 0x4000>;
+> >  		clocks = <&clks 196>;
+> >  		#address-cells = <2>;
+> > diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+> > index 77fa1d4..3f665f8 100644
+> > --- a/drivers/bus/imx-weim.c
+> > +++ b/drivers/bus/imx-weim.c
+> > @@ -47,7 +47,7 @@ static const struct of_device_id weim_id_table[] = {
+> >  	/* i.MX25/27/31/35 */
+> >  	{ .compatible = "fsl,imx25-weim", .data = &imx25_weim_devtype, },
+> >  	/* i.MX50/53/6Q */
+> > -	{ .compatible = "fsl,imx6q-weim", .data = &imx50_weim_devtype, },
+> > +	{ .compatible = "fsl,imx50-weim", .data = &imx50_weim_devtype, },
+> 
+> The compatible "fsl,imx6q-weim" already has a user on the way to 3.11.
+> Changing the match table without updating the user will break it right
+> away.  Also, since the series will be 3.12 material, doing this will
+> result in an incompatible device tree between 3.11 and 3.12.  For this
+> reason, I suggest we keep using "fsl,imx6q-weim" for matching
+> imx6q/50/53 type of weim device.
 
-It would be better to define a prot flag bit in iommu API and convert
-the attrs to prot flag bit in dma-mapping aPI before calling the iommu
-API.
+How about:
 
-On Thu, Jun 20, 2013 at 11:19 AM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
->
-> Pass DMA attribute as IOMMU property, which can be proccessed in the
-> backend implementation of IOMMU. For example, DMA_ATTR_READ_ONLY can
-> be translated into each IOMMU H/W implementaion.
->
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
->  arch/arm/mm/dma-mapping.c | 34 +++++++++++++++++++++-------------
->  1 file changed, 21 insertions(+), 13 deletions(-)
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 4152ed6..cbc6768 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1254,7 +1254,8 @@ err:
->   */
->  static dma_addr_t
->  ____iommu_create_mapping(struct device *dev, dma_addr_t *req,
-> -                        struct page **pages, size_t size)
-> +                        struct page **pages, size_t size,
-> +                        struct dma_attrs *attrs)
->  {
->         struct dma_iommu_mapping *mapping = dev->archdata.mapping;
->         unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-> @@ -1280,7 +1281,7 @@ ____iommu_create_mapping(struct device *dev, dma_addr_t *req,
->                                 break;
->
->                 len = (j - i) << PAGE_SHIFT;
-> -               ret = iommu_map(mapping->domain, iova, phys, len, 0);
-> +               ret = iommu_map(mapping->domain, iova, phys, len, (int)attrs);
++	{ .compatible = "fsl,imx6q-weim", .data = &imx50_weim_devtype, },
++	{ .compatible = "fsl,imx50-weim", .data = &imx50_weim_devtype, },
 
-Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
-prot flag bit which needs to be defined in iommu.h
+We could then change the in-kernel devicetrees how we need it without
+breaking existing devicetrees.
 
->                 if (ret < 0)
->                         goto fail;
->                 iova += len;
-> @@ -1294,9 +1295,10 @@ fail:
->  }
->
->  static dma_addr_t
-> -__iommu_create_mapping(struct device *dev, struct page **pages, size_t size)
-> +__iommu_create_mapping(struct device *dev, struct page **pages, size_t size,
-> +                      struct dma_attrs *attrs)
->  {
-> -       return ____iommu_create_mapping(dev, NULL, pages, size);
-> +       return ____iommu_create_mapping(dev, NULL, pages, size, attrs);
->  }
->
->  static int __iommu_remove_mapping(struct device *dev, dma_addr_t iova, size_t size)
-> @@ -1332,7 +1334,7 @@ static struct page **__iommu_get_pages(void *cpu_addr, struct dma_attrs *attrs)
->  }
->
->  static void *__iommu_alloc_atomic(struct device *dev, size_t size,
-> -                                 dma_addr_t *handle)
-> +                                 dma_addr_t *handle, struct dma_attrs *attrs)
->  {
->         struct page *page;
->         void *addr;
-> @@ -1341,7 +1343,7 @@ static void *__iommu_alloc_atomic(struct device *dev, size_t size,
->         if (!addr)
->                 return NULL;
->
-> -       *handle = __iommu_create_mapping(dev, &page, size);
-> +       *handle = __iommu_create_mapping(dev, &page, size, attrs);
->         if (*handle == DMA_ERROR_CODE)
->                 goto err_mapping;
->
-> @@ -1378,17 +1380,20 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
->         size = PAGE_ALIGN(size);
->
->         if (gfp & GFP_ATOMIC)
-> -               return __iommu_alloc_atomic(dev, size, handle);
-> +
-> +               return __iommu_alloc_atomic(dev, size, handle, attrs);
->
->         pages = __iommu_alloc_buffer(dev, size, gfp);
->         if (!pages)
->                 return NULL;
->
->         if (*handle == DMA_ERROR_CODE)
-> -               *handle = __iommu_create_mapping(dev, pages, size);
-> +               *handle = __iommu_create_mapping(dev, pages, size, attrs);
->         else
-> -               *handle = ____iommu_create_mapping(dev, handle, pages, size);
-> +               *handle = ____iommu_create_mapping(dev, handle, pages, size,
-> +                                                  attrs);
->
-> +       *handle = __iommu_create_mapping(dev, pages, size, attrs);
->         if (*handle == DMA_ERROR_CODE)
->                 goto err_buffer;
->
-> @@ -1513,7 +1518,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
->
->  skip_cmaint:
->         count = size >> PAGE_SHIFT;
-> -       ret = iommu_map_sg(mapping->domain, iova_base, sg, count, 0);
-> +       ret = iommu_map_sg(mapping->domain, iova_base, sg, count, (int)attrs);
+Sascha
 
-Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
-prot flag bit which needs to be defined in iommu.h
 
->         if (WARN_ON(ret < 0))
->                 goto fail;
->
-> @@ -1716,7 +1721,8 @@ static dma_addr_t arm_coherent_iommu_map_page(struct device *dev, struct page *p
->         if (dma_addr == DMA_ERROR_CODE)
->                 return dma_addr;
->
-> -       ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len, 0);
-> +       ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len,
-> +                       (int)attrs);
-
-Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
-prot flag bit which needs to be defined in iommu.h
-
->         if (ret < 0)
->                 goto fail;
->
-> @@ -1756,7 +1762,8 @@ static dma_addr_t arm_iommu_map_page_at(struct device *dev, struct page *page,
->         if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
->                 __dma_page_cpu_to_dev(page, offset, size, dir);
->
-> -       ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len, 0);
-> +       ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len,
-> +                       (int)attrs);
-
-Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
-prot flag bit which needs to be defined in iommu.h
-
->         if (ret < 0)
->                 return DMA_ERROR_CODE;
->
-> @@ -1778,7 +1785,8 @@ static dma_addr_t arm_iommu_map_pages(struct device *dev, struct page **pages,
->                         __dma_page_cpu_to_dev(pages[i], 0, PAGE_SIZE, dir);
->         }
->
-> -       ret = iommu_map_pages(mapping->domain, dma_handle, pages, count, 0);
-> +       ret = iommu_map_pages(mapping->domain, dma_handle, pages, count,
-> +                             (int)attrs);
-
-Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
-prot flag bit which needs to be defined in iommu.h
-
->         if (ret < 0)
->                 return DMA_ERROR_CODE;
->
-> --
-> 1.8.1.5
->
->
-> _______________________________________________
-> Linaro-mm-sig mailing list
-> Linaro-mm-sig at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
