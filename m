@@ -1,51 +1,32 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 20 Jun 2013 11:50:36 -0700
-Subject: [PATCH 3/5] ARM: KVM: make sure maintainance operation complete
- before world switch
-In-Reply-To: <20130620183818.GD25734@mudshark.cambridge.arm.com>
-References: <1371648006-8036-1-git-send-email-marc.zyngier@arm.com>
- <1371648006-8036-4-git-send-email-marc.zyngier@arm.com>
- <20130620001820.GJ7870@lvm> <51C2B9A2.1020401@arm.com>
- <20130620171409.GB4563@lvm>
- <20130620181525.GC25734@mudshark.cambridge.arm.com>
- <20130620182847.GD4563@lvm>
- <20130620183818.GD25734@mudshark.cambridge.arm.com>
-Message-ID: <20130620185036.GH4563@lvm>
+From: nico@linaro.org (Nicolas Pitre)
+Date: Thu, 20 Jun 2013 14:54:21 -0400 (EDT)
+Subject: [PATCH v2 0/2] ARM: Remove any correlation between IPC and
+ BogoMips value
+In-Reply-To: <1371746612-23950-1-git-send-email-will.deacon@arm.com>
+References: <1371746612-23950-1-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.03.1306201452330.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 07:38:18PM +0100, Will Deacon wrote:
-> On Thu, Jun 20, 2013 at 07:28:47PM +0100, Christoffer Dall wrote:
-> > On Thu, Jun 20, 2013 at 07:15:25PM +0100, Will Deacon wrote:
-> > > On Thu, Jun 20, 2013 at 06:14:09PM +0100, Christoffer Dall wrote:
-> > > > ok, I was trying to think about how it would break, and if a guest needs
-> > > > a TLB invalidation to be visisble by other CPUs it would have to have a
-> > > > dsb/isb itself after the operation, and that would eventually be
-> > > > executed once the VCPU was rescheduled, but potentially on another CPU,
-> > > > but then I wonder if the PCPU migration on the host wouldn't take care
-> > > > of it?
-> > > 
-> > > Actually, it's worse than both of you think :)
-> > > 
-> > > The dsb *must* be executed on the same physical CPU as the TLB invalidation.
-> > > The same virtual CPU isn't enough, which is all that is guaranteed by the
-> > > guest. If you don't have a dsb on your vcpu migration path, then you need
-> > > something here.
-> > > 
-> > > The same thing applies to cache maintenance operations.
-> > > 
-> > But are we not sure that a dsb will happen anywhere in the kernel if a
-> > process is migrated to a different core?
-> 
-> Yes, we have a dsb when we unlock the runqueue for a CPU. That's why Linux
-> doesn't crash and burn usually. If vcpu migration always goes through the
-> usual scheduling paths, then you don't have a problem.
-> 
-Right, a vcpu is simply a thread, a process, so it gets migrated on the
-host as any other process.
+On Thu, 20 Jun 2013, Will Deacon wrote:
 
-I gather this means we don't need these, except maybe for the VMID
-rollover case, which I honestly didn't fully understand, but maybe it
-can be added for that specific case instead?
+> Hi all,
+> 
+> This is version two of the patches I originally posted here:
+> 
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/166728.html
+> 
+> Comments received there largely confirmed that it's not possible to choose
+> an `obviously bogus' value for BogoMIPs, so instead I've bitten the bullet
+> and removed the line altogether.
+> 
+> In the meantime, I've only had one complaint this month about BogoMIPs
+> being wrong, so perhaps the initial posting served some purpose without
+> even being merged!
+> 
+> Comments welcome,
 
--Christoffer
+Enthusiastic ACK for both patches.
+
+
+Nicolas
