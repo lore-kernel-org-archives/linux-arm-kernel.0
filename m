@@ -1,60 +1,53 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 19 Jun 2013 17:08:59 -0700
-Subject: [PATCH 2/5] ARM: KVM: add missing dsb before invalidating
- Stage-2 TLBs
-In-Reply-To: <20130620000522.GH7870@lvm>
+Date: Wed, 19 Jun 2013 17:18:20 -0700
+Subject: [PATCH 3/5] ARM: KVM: make sure maintainance operation complete
+ before world switch
+In-Reply-To: <1371648006-8036-4-git-send-email-marc.zyngier@arm.com>
 References: <1371648006-8036-1-git-send-email-marc.zyngier@arm.com>
- <1371648006-8036-3-git-send-email-marc.zyngier@arm.com>
- <20130620000522.GH7870@lvm>
-Message-ID: <20130620000859.GI7870@lvm>
+ <1371648006-8036-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130620001820.GJ7870@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 05:05:22PM -0700, Christoffer Dall wrote:
-> On Wed, Jun 19, 2013 at 02:20:03PM +0100, Marc Zyngier wrote:
-> > When performing a Stage-2 TLB invalidation, it is necessary to
-> > make sure the write to the page tables is observable by all CPUs.
-> > 
-> > For this purpose, add a dsb instruction to __kvm_tlb_flush_vmid_ipa
-> > before doing the TLB invalidation itself.
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm/kvm/interrupts.S | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> > index d0a8fa3..afa6c04 100644
-> > --- a/arch/arm/kvm/interrupts.S
-> > +++ b/arch/arm/kvm/interrupts.S
-> > @@ -49,6 +49,7 @@ __kvm_hyp_code_start:
-> >  ENTRY(__kvm_tlb_flush_vmid_ipa)
-> >  	push	{r2, r3}
-> >  
-> > +	dsb
+On Wed, Jun 19, 2013 at 02:20:04PM +0100, Marc Zyngier wrote:
+> We may have preempted the guest while it was performing a maintainance
+> operation (TLB invalidation, for example). Make sure it completes
+> before we do anything else by adding the necessary barriers.
 > 
-> shouldn't this be a dmb then?
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kvm/interrupts.S | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> thinking that a dsb only ensures completion between load/stores and not
-> between the preceeding store and the actual invalidate operation?
-> 
-> or are we relying on the fact that the store must complete before the
-> ldrd below, which must happen before the mcrr, which must happen before
-> the invalidate (?), and therefore it's all good?
-> 
+> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> index afa6c04..3124e0f 100644
+> --- a/arch/arm/kvm/interrupts.S
+> +++ b/arch/arm/kvm/interrupts.S
+> @@ -149,6 +149,15 @@ __kvm_vcpu_return:
+>  	 * r0: vcpu pointer
+>  	 * r1: exception code
+>  	 */
+> +
+> +	/*
+> +	 * We may have preempted the guest while it was performing a
+> +	 * maintainance operation (TLB invalidation, for example). Make
+> +	 * sure it completes before we do anything else.
+> +	 */
 
-bah, ignore my crazy rambling, I completely switched the two when I read
-the definitions.
+Can you explain what could go wrong here without these two instructions?
 
-> >  	add	r0, r0, #KVM_VTTBR
-> >  	ldrd	r2, r3, [r0]
-> >  	mcrr	p15, 6, r2, r3, c2	@ Write VTTBR
-> > -- 
-> > 1.8.2.3
-> > 
-> > 
-> > 
-> > _______________________________________________
-> > kvmarm mailing list
-> > kvmarm at lists.cs.columbia.edu
-> > https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+> +	dsb
+> +	isb
+> +
+>  	save_guest_regs
+>  
+>  	@ Set VMID == 0
+> -- 
+> 1.8.2.3
+> 
+> 
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
