@@ -1,17 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jun 2013 11:03:47 +0200
-Subject: [PATCH V6 3/3] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-In-Reply-To: <00c201ce6d85$83b072a0$8b1157e0$@samsung.com>
-References: <00c201ce6d85$83b072a0$8b1157e0$@samsung.com>
-Message-ID: <201306201103.47855.arnd@arndb.de>
+Date: Thu, 20 Jun 2013 11:05:14 +0200
+Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.11
+In-Reply-To: <20130620064541.GE5523@atomide.com>
+References: <51C23902.1080301@ti.com> <20130620064541.GE5523@atomide.com>
+Message-ID: <201306201105.14675.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 June 2013, Jingoo Han wrote:
-> Exynos5440 has two PCIe controllers which can be used as root complex
-> for PCIe interface.
+On Thursday 20 June 2013, Tony Lindgren wrote:
+> * Benoit Cousson <b-cousson@ti.com> [130619 16:10]:
+> > Hi Tony,
+> > 
+> > Please pull the following commits for OMAP Device Tree for v3.11.
+> > 
+> > It does contains as well 2 clock data patches, I hope it will not generate any conflict with Paul's tree. 
+> > 
+> > Special thanks to Florian for his nice cleanup using the C preprocessor.
 > 
-> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> It's best that Arnd and Olof take this pull request directly as we're
+> getting so close to the merge window. These patches should be pretty
+> much independent of the other branches I've sent, and are needed to
+> keep omap4 booting now that we've flipped the switch for omap4 to be  
+> DT only.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Ok, I've put it in my queue. About 60 pull requests to take care of
+at the moment, so it might take a few days.
+
+	Arnd
