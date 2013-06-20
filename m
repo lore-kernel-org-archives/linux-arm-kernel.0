@@ -1,32 +1,58 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 20 Jun 2013 10:21:37 +0200
-Subject: [PATCH 1/2] clk: nomadik: implement the Nomadik clocks properly
-In-Reply-To: <20130620063801.9136.80841@quantum>
-References: <1370775348-7440-1-git-send-email-linus.walleij@linaro.org>
- <20130620063801.9136.80841@quantum>
-Message-ID: <CACRpkdaxdFaj_gLjDCUXeN047uf-nfmLVfxmMioh9BL6B2JryQ@mail.gmail.com>
+Date: Thu, 20 Jun 2013 10:24:51 +0200
+Subject: [GIT PULL] Nomadik DT take 2 and Nomadik clocks
+Message-ID: <CACRpkdZNPOnhVRsd1AGEiOCmPQDBadcLhctP-OwsGP+DRLa9Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 8:38 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Linus Walleij (2013-06-09 03:55:47)
->> +static void pll_clk_disable(struct clk_hw *hw)
->> +{
->> +       struct clk_pll *pll = to_pll(hw);
->> +       u32 val;
->> +
->> +       return;
->
-> Is the early return intentional? Everything else looks good.
+Hi ARM SoC folks,
 
-Of course not :-)
+here is another batch of Nomadik patches. This should preferably
+be merged on top of your nomadik/dt branch (I've based it on top
+of that).
 
-At one time it had no proper children registered so would
-declock the entire system if I didn't have that in... fixed up.
-
-> Acked-by: Mike Turquette <mturquette@linaro.org>
-
-Thanks, sending this to ARM SoC now.
+Since the clock patches are totally devicetreeified, this needs to
+go in on top of the DT stuff.
 
 Yours,
 Linus Walleij
+
+
+The following changes since commit 49932f5ef13fa6a5a8bd71cf2f0b721d0e0b495d:
+
+  ARM: nomadik: move the pin configuration to DT (2013-05-26 22:25:36 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+tags/nomadik-dt-2
+
+for you to fetch changes up to c641d4dfef6d462c6d66a6fb57700086cd2f0106:
+
+  ARM: nomadik: add the new clocks to the device tree (2013-06-20
+10:15:48 +0200)
+
+----------------------------------------------------------------
+Nomadik DT and clock work:
+- Lee Jones' pinctrl compat ontology patches
+- A real clock driver for the Nomadik, 100% DT-based
+- Device tree changes for the Nomadik clocks
+
+----------------------------------------------------------------
+Lee Jones (2):
+      ARM: nomadik: Standardise Nomadik STN8815 based Pinctrl compat
+string in the DTS
+      pinctrl/nomadik: Standardise Pinctrl compat string for Nomadik
+based platforms
+
+Linus Walleij (2):
+      clk: nomadik: implement the Nomadik clocks properly
+      ARM: nomadik: add the new clocks to the device tree
+
+ .../devicetree/bindings/clock/st,nomadik.txt       | 104 ++++
+ arch/arm/boot/dts/ste-nomadik-s8815.dts            |   6 +
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         | 503 +++++++++++++++++--
+ drivers/clk/clk-nomadik.c                          | 551 ++++++++++++++++++++-
+ drivers/pinctrl/pinctrl-nomadik.c                  |   2 +-
+ 5 files changed, 1124 insertions(+), 42 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/st,nomadik.txt
