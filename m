@@ -1,50 +1,36 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 20 Jun 2013 16:50:14 +0200
-Subject: [PATCH 5/6] ARM: dts: imx27 cpufreq-cpu0 frequencies
+Date: Thu, 20 Jun 2013 16:50:12 +0200
+Subject: [PATCH 3/6] ARM: dts: imx27: Add imx framebuffer device
 In-Reply-To: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
 References: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1371739815-6666-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <1371739815-6666-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set operating-points for imx27. There is no regulator support, so the
-voltages are 0. The frequencies should be the same for all imx27 boards,
-so it is defined here and can be overwritten if necessary.
-
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm/boot/dts/imx27.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/imx27.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index e883e77..3ebd98a 100644
+index 4f76453..044004a 100644
 --- a/arch/arm/boot/dts/imx27.dtsi
 +++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -47,6 +47,25 @@
- 		};
- 	};
+@@ -354,6 +354,15 @@
+ 			reg = <0x10020000 0x20000>;
+ 			ranges;
  
-+	cpus {
-+		#size-cells = <0>;
-+		#address-cells = <1>;
++			imxfb: fb at 10021000 {
++				compatible = "fsl,imx27-fb", "fsl,imx21-fb";
++				interrupts = <61>;
++				reg = <0x10021000 0x1000>;
++				clocks = <&clks 36>, <&clks 65>, <&clks 59>;
++				clock-names = "ipg", "ahb", "per";
++				status = "disabled";
++			};
 +
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "fsl,imx27", "arm,arm926ejs";
-+			reg = <0>;
-+			operating-points = <
-+				/* kHz  uV (No regulator support) */
-+				133000  0
-+				399000  0
-+			>;
-+			clock-latency = <61036>; /* two CLK32 periods */
-+			clocks = <&clks 18>;
-+			clock-names = "cpu";
-+		};
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+ 			coda: coda at 10023000 {
+ 				compatible = "fsl,imx27-vpu";
+ 				reg = <0x10023000 0x0200>;
 -- 
 1.8.2.1
