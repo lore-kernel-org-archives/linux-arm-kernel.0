@@ -1,316 +1,161 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Wed, 19 Jun 2013 19:11:28 -0700
-Subject: [PATCH 2/3] mailbox/omap: add support for parsing dt devices
-In-Reply-To: <1371594892-37603-1-git-send-email-s-anna@ti.com>
-References: <1371594892-37603-1-git-send-email-s-anna@ti.com>
-Message-ID: <CA+Bv8XZtSyED3RdxTPPaZ1Y4_vx2JVyJ_-UVY06q2JhzAk5rpQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 20 Jun 2013 10:47:51 +0800
+Subject: [PATCH v2] thermal: add imx thermal driver support
+In-Reply-To: <51C1BA1A.5010704@ti.com>
+References: <1371280241-31699-1-git-send-email-shawn.guo@linaro.org>
+ <51C0C8D8.5090301@ti.com>
+ <20130619073739.GA3280@S2101-09.ap.freescale.net>
+ <51C1BA1A.5010704@ti.com>
+Message-ID: <20130620024749.GB19896@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 3:34 PM, Suman Anna <s-anna@ti.com> wrote:
-> Logic has been added to the OMAP2+ mailbox code to
-> parse the mailbox dt nodes and construct the different
-> mailboxes associated with the instance. The design is
-> based on gathering the same information that was being
-> passed previously through the platform data, except for
-> the interrupt type configuration information.
->
-> Signed-off-by: Suman Anna <s-anna@ti.com>
+On Wed, Jun 19, 2013 at 10:03:06AM -0400, Eduardo Valentin wrote:
+> >>> @@ -0,0 +1,14 @@
+> >>> +* Temperature Monitor (TEMPMON) on Freescale i.MX SoCs
+> >>
+> >> Any hw documentation reference?
+> >>
+> > http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf?fpsp=1&WT_TYPE=Reference%20Manuals&WT_VENDOR=FREESCALE&WT_FILE_FORMAT=pdf&WT_ASSET=Documentation
+> > 
+> 
+> OK. Tks.
+> 
+> Some ppl like to put hw doc reference on your driver documentation. But
+> for me is your call. I believe it is good to ask the kernel doc guys too.
+> 
+I'm not a fan of doing that, because I can not tell that the link will
+be still valid there in 5 years or so.
 
-Reviewed-by: Russ Dill <russ.dill@ti.com>
+> >>> +
+> >>> +Required properties:
+> >>> +- compatible : "fsl,imx6q-thermal"
+> >>> +- fsl,tempmon : phandle pointer to TEMPMON control registers
+> >>> +- fsl,tempmon-data : phandle pointer to TEMPMON calibration data
+> >>
+> >> what exactly is calibration data?
+> >>
+> > The temperature calibration values are fused individually for each part
+> > in the product testing process.  It consists of a pair of hardware
+> > monitor values at 25 C and a high temperature which is specified by
+> > calibration data itself, which will be used by software to translate
+> > hardware counter values to Celsius. The detailed description can be
+> > found in hardware reference manual.
+> 
+> That was what I expected. But it is not that clear what you meant by
+> "thermal cal data" your DT documenation. Maybe you need to describe how
+> to enter a fsl,tempmon-data.
+> 
+Ok, I will try to come up with something better.
 
-> ---
->  .../devicetree/bindings/mailbox/omap-mailbox.txt   |  46 +++++++
->  drivers/mailbox/mailbox-omap2.c                    | 141 ++++++++++++++++++---
->  2 files changed, 172 insertions(+), 15 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
->
-> diff --git a/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
-> new file mode 100644
-> index 0000000..913bc13
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
-> @@ -0,0 +1,46 @@
-> +OMAP2+ Mailbox Driver
-> +
-> +Required properties:
-> +- compatible:          Should be one of the following,
-> +                           "ti,omap2-mailbox" for
-> +                               OMAP2420, OMAP2430, OMAP3430, OMAP3630 SoCs
-> +                           "ti,omap4-mailbox" for
-> +                               OMAP44xx, OMAP54xx, AM33xx, AM43xx, DRA7xx SoCs
-> +- reg:                 Contains the mailbox register address range (base address
-> +                       and length)
-> +- interrupts:          Contains the interrupt information for the mailbox
-> +                       device. The format is dependent on which interrupt
-> +                       controller the OMAP device uses
-> +- ti,hwmods:           Name of the hwmod associated with the mailbox
-> +- ti,mbox-num-users:   Number of targets (processor devices) that the mailbox device
-> +                       can interrupt
-> +- ti,mbox-num-fifos:   Number of h/w fifos within the mailbox device
-> +- #ti,mbox-data-cells: Cell size for describing a mailbox
-> +                       (currently should be 4)
-> +- ti,mbox-names:       Array of the names of the mailboxes
-> +- ti,mbox-data:                Mailbox descriptor data private to each mailbox. The 4
-> +                       cells represent the following data,
-> +                         Cell #1 (tx_id) - mailbox fifo id used for
-> +                                               transmitting messages
-> +                         Cell #2 (rx_id) - mailbox fifo id on which messages
-> +                                               are received
-> +                         Cell #3 (irq_id) - irq identifier index number to use
-> +                                               from the interrupts data
-> +                         Cell #4 (usr_id) - mailbox user id for identifying the
-> +                                               interrupt into the MPU interrupt
-> +                                               controller.
-> +
-> +Example:
-> +
-> +/* OMAP4 */
-> +mailbox: mailbox at 4a0f4000 {
-> +       compatible = "ti,omap4-mailbox";
-> +       reg = <0x4a0f4000 0x200>;
-> +       interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
-> +       ti,hwmods = "mailbox";
-> +       ti,mbox-num-users = <3>;
-> +       ti,mbox-num-fifos = <8>;
-> +       #ti,mbox-data-cells = <4>
-> +       ti,mbox-names = "mbox-ipu", "mbox-dsp";
-> +       ti,mbox-data = <0 1 0 0>, <3 2 0 0>;
-> +};
-> diff --git a/drivers/mailbox/mailbox-omap2.c b/drivers/mailbox/mailbox-omap2.c
-> index 6c0687c..3fe08de 100644
-> --- a/drivers/mailbox/mailbox-omap2.c
-> +++ b/drivers/mailbox/mailbox-omap2.c
-> @@ -14,6 +14,7 @@
->  #include <linux/slab.h>
->  #include <linux/clk.h>
->  #include <linux/err.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/io.h>
->  #include <linux/pm_runtime.h>
-> @@ -222,6 +223,21 @@ static struct omap_mbox_ops omap2_mbox_ops = {
->         .restore_ctx    = omap2_mbox_restore_ctx,
->  };
->
-> +static const struct of_device_id omap_mailbox_of_match[] = {
-> +       {
-> +               .compatible     = "ti,omap2-mailbox",
-> +               .data           = (void *) MBOX_INTR_CFG_TYPE1,
-> +       },
-> +       {
-> +               .compatible     = "ti,omap4-mailbox",
-> +               .data           = (void *) MBOX_INTR_CFG_TYPE2,
-> +       },
-> +       {
-> +               /* end */
-> +       },
-> +};
-> +MODULE_DEVICE_TABLE(of, omap_mailbox_of_match);
-> +
->  static int omap2_mbox_probe(struct platform_device *pdev)
->  {
->         struct resource *mem;
-> @@ -229,47 +245,138 @@ static int omap2_mbox_probe(struct platform_device *pdev)
->         struct omap_mbox **list, *mbox, *mboxblk;
->         struct omap_mbox2_priv *priv, *privblk;
->         struct omap_mbox_pdata *pdata = pdev->dev.platform_data;
-> -       struct omap_mbox_dev_info *info;
->         struct omap_mbox_device *mdev;
-> -       int i;
-> -
-> -       if (!pdata || !pdata->info_cnt || !pdata->info) {
-> +       struct omap_mbox_dev_info *info, *of_info = NULL;
-> +       struct device_node *node = pdev->dev.of_node;
-> +       int i, j;
-> +       u32 info_count = 0, intr_type = 0;
-> +       u32 num_users = 0, num_fifos = 0;
-> +       u32 dlen, dsize;
-> +       u32 *tmp;
-> +       const __be32 *mbox_data;
-> +
-> +       if (!node && (!pdata || !pdata->info_cnt || !pdata->info)) {
->                 pr_err("%s: platform not supported\n", __func__);
->                 return -ENODEV;
->         }
->
-> +       if (node) {
-> +               intr_type = (u32)of_match_device(omap_mailbox_of_match,
-> +                                                       &pdev->dev)->data;
-> +               if (intr_type != 0 && intr_type != 1) {
-> +                       dev_err(&pdev->dev, "invalid match data value\n");
-> +                       return -EINVAL;
-> +               }
-> +
-> +               if (of_property_read_u32(node, "ti,mbox-num-users",
-> +                                                               &num_users)) {
-> +                       dev_err(&pdev->dev,
-> +                               "no ti,mbox-num-users configuration found\n");
-> +                       return -ENODEV;
-> +               }
-> +
-> +               if (of_property_read_u32(node, "ti,mbox-num-fifos",
-> +                                                               &num_fifos)) {
-> +                       dev_err(&pdev->dev,
-> +                               "no ti,mbox-num-fifos configuration found\n");
-> +                       return -ENODEV;
-> +               }
-> +
-> +               if (of_property_read_u32(node, "#ti,mbox-data-cells", &dsize)) {
-> +                       dev_err(&pdev->dev,
-> +                               "no #ti,mbox-data-cells configuration found\n");
-> +                       return -ENODEV;
-> +               }
-> +               if (dsize != 4) {
-> +                       dev_err(&pdev->dev,
-> +                               "invalid size for #ti,mbox-data-cells\n");
-> +                       return -EINVAL;
-> +               }
-> +
-> +               info_count = of_property_count_strings(node, "ti,mbox-names");
-> +               if (!info_count) {
-> +                       dev_err(&pdev->dev, "no mbox devices found\n");
-> +                       return -ENODEV;
-> +               }
-> +
-> +               mbox_data = of_get_property(node, "ti,mbox-data", &dlen);
-> +               if (!mbox_data) {
-> +                       dev_err(&pdev->dev, "no mbox device data found\n");
-> +                       return -ENODEV;
-> +               }
-> +               dlen /= sizeof(dsize);
-> +               if (dlen != dsize * info_count) {
-> +                       dev_err(&pdev->dev, "mbox device data is truncated\n");
-> +                       return -ENODEV;
-> +               }
-> +
-> +               of_info = kzalloc(info_count * sizeof(*of_info), GFP_KERNEL);
-> +               if (!of_info)
-> +                       return -ENOMEM;
-> +
-> +               i = 0;
-> +               while (i < info_count) {
-> +                       info = of_info + i;
-> +                       if (of_property_read_string_index(node,
-> +                                       "ti,mbox-names", i,  &info->name)) {
-> +                               dev_err(&pdev->dev,
-> +                                       "mbox_name [%d] read failed\n", i);
-> +                               ret = -ENODEV;
-> +                               goto free_of;
-> +                       }
-> +
-> +                       tmp = &info->tx_id;
-> +                       for (j = 0; j < dsize; j++) {
-> +                               tmp[j] = of_read_number(
-> +                                               mbox_data + j + (i * dsize), 1);
-> +                       }
-> +                       i++;
-> +               }
-> +       }
-> +
-> +       if (!node) { /* non-DT device creation */
-> +               info_count = pdata->info_cnt;
-> +               info = pdata->info;
-> +               intr_type = pdata->intr_type;
-> +               num_users = pdata->num_users;
-> +               num_fifos = pdata->num_fifos;
-> +       } else {
-> +               info = of_info;
-> +       }
-> +
->         mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
-> -       if (!mdev)
-> -               return -ENOMEM;
-> +       if (!mdev) {
-> +               ret = -ENOMEM;
-> +               goto free_of;
-> +       }
->
->         /* allocate one extra for marking end of list */
-> -       list = kzalloc((pdata->info_cnt + 1) * sizeof(*list), GFP_KERNEL);
-> +       list = kzalloc((info_count + 1) * sizeof(*list), GFP_KERNEL);
->         if (!list) {
->                 ret = -ENOMEM;
->                 goto free_mdev;
->         }
->
-> -       mboxblk = mbox = kzalloc(pdata->info_cnt * sizeof(*mbox), GFP_KERNEL);
-> +       mboxblk = mbox = kzalloc(info_count * sizeof(*mbox), GFP_KERNEL);
->         if (!mboxblk) {
->                 ret = -ENOMEM;
->                 goto free_list;
->         }
->
-> -       privblk = priv = kzalloc(pdata->info_cnt * sizeof(*priv), GFP_KERNEL);
-> +       privblk = priv = kzalloc(info_count * sizeof(*priv), GFP_KERNEL);
->         if (!privblk) {
->                 ret = -ENOMEM;
->                 goto free_mboxblk;
->         }
->
-> -       info = pdata->info;
-> -       for (i = 0; i < pdata->info_cnt; i++, info++, priv++) {
-> +       for (i = 0; i < info_count; i++, info++, priv++) {
->                 priv->tx_fifo.msg = MAILBOX_MESSAGE(info->tx_id);
->                 priv->tx_fifo.fifo_stat = MAILBOX_FIFOSTATUS(info->tx_id);
->                 priv->rx_fifo.msg =  MAILBOX_MESSAGE(info->rx_id);
->                 priv->rx_fifo.msg_stat =  MAILBOX_MSGSTATUS(info->rx_id);
->                 priv->notfull_bit = MAILBOX_IRQ_NOTFULL(info->tx_id);
->                 priv->newmsg_bit = MAILBOX_IRQ_NEWMSG(info->rx_id);
-> -               if (pdata->intr_type) {
-> +               if (intr_type) {
->                         priv->irqenable = OMAP4_MAILBOX_IRQENABLE(info->usr_id);
->                         priv->irqstatus = OMAP4_MAILBOX_IRQSTATUS(info->usr_id);
->                         priv->irqdisable =
-> @@ -279,7 +386,7 @@ static int omap2_mbox_probe(struct platform_device *pdev)
->                         priv->irqstatus = MAILBOX_IRQSTATUS(info->usr_id);
->                         priv->irqdisable = MAILBOX_IRQENABLE(info->usr_id);
->                 }
-> -               priv->intr_type = pdata->intr_type;
-> +               priv->intr_type = intr_type;
->
->                 mbox->priv = priv;
->                 mbox->parent = mdev;
-> @@ -307,8 +414,8 @@ static int omap2_mbox_probe(struct platform_device *pdev)
->
->         mutex_init(&mdev->cfg_lock);
->         mdev->dev = &pdev->dev;
-> -       mdev->num_users = pdata->num_users;
-> -       mdev->num_fifos = pdata->num_fifos;
-> +       mdev->num_users = num_users;
-> +       mdev->num_fifos = num_fifos;
->         mdev->mboxes = list;
->         ret = omap_mbox_register(&pdev->dev, list);
->         if (ret)
-> @@ -317,6 +424,7 @@ static int omap2_mbox_probe(struct platform_device *pdev)
->
->         pm_runtime_enable(mdev->dev);
->
-> +       kfree(of_info);
->         return 0;
->
->  unmap_mbox:
-> @@ -329,6 +437,8 @@ free_list:
->         kfree(list);
->  free_mdev:
->         kfree(mdev);
-> +free_of:
-> +       kfree(of_info);
->         return ret;
->  }
->
-> @@ -358,6 +468,7 @@ static struct platform_driver omap2_mbox_driver = {
->         .remove = omap2_mbox_remove,
->         .driver = {
->                 .name = "omap-mailbox",
-> +               .of_match_table = omap_mailbox_of_match,
->         },
->  };
->
-> --
-> 1.8.3.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+<snip>
+
+> >>> +#define IMX_POLLING_DELAY		5000 /* millisecond */
+> >>> +#define IMX_PASSIVE_DELAY		3000
+> >>
+> >> What is your maximum delta between CPU frequencies? Sure this polling
+> >> intervals can hold your maximum power burst?
+> >>
+> > I have to admit I'm not sure how to determine the optimal intervals
+> > here.  I initially have both intervals be 1000 ms, but I'm not sure if
+> > it's necessary.  I need some help on that.  The frequency table on the
+> > target consists of 396, 792, 996 and 1200 in MHz.
+> 
+> Here you can do simple calculation on your maximum delta Celsius over
+> delta time. Then check it against your maximum delta power (power at
+> 1.2GHz - power at 396MHz) with respect to your power vs. temp. curve.
+> That will give you a rough expectation on what you need to be sampling.
+> But you probably need help from some guy doing thermal modeling and
+> simulation on your chip.
+> 
+Ok, thanks for the input.  I just consulted the Freescale thermal
+expert.  Though I did not get the modeling and simulation data, I was
+told that one 1~2 seconds should be safer.  So I'm going to change the
+definitions as below.
+
+#define IMX_POLLING_DELAY	2000 /* millisecond */
+#define IMX_PASSIVE_DELAY	1000
+
+> > 
+> >>> +
+> >>> +struct imx_thermal_data {
+> >>> +	struct thermal_zone_device *tz;
+> >>> +	struct thermal_cooling_device *cdev;
+> >>> +	enum thermal_device_mode mode;
+> >>> +	struct regmap *tempmon;
+> >>> +	bool meas_suspended;
+> >>> +	int c1, c2; /* See forumla in imx_get_sensor_data() */
+> >>> +};
+> >>> +
+> >>> +static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
+> >>> +{
+> >>> +	struct imx_thermal_data *data = tz->devdata;
+> >>> +	struct regmap *map = data->tempmon;
+> >>> +	static unsigned long last_temp;
+> >>> +	unsigned int n_meas;
+> >>> +	u32 val;
+> >>> +
+> >>> +	/*
+> >>> +	 * Every time we measure the temperature, we will power on the
+> >>> +	 * temperature sensor, enable measurements, take a reading,
+> >>> +	 * disable measurements, power off the temperature sensor.
+> >>> +	 */
+> >>
+> >> Are these sensors used on any hw failsafe mechanism?
+> >>
+> > No, I do not think so.
+> 
+> OK. Then safe to turn it off right? Another good reason to have a fine
+> tuned sampling rate.
+> 
+Yes.
+
+> > 
+> >>> +	regmap_write(map, TEMPSENSE0 + REG_CLR, TEMPSENSE0_POWER_DOWN);
+> >>> +	regmap_write(map, TEMPSENSE0 + REG_SET, TEMPSENSE0_MEASURE_TEMP);
+> >>> +
+> >>> +	/*
+> >>> +	 * According to the temp sensor designers, it may require up to ~17us
+> >>> +	 * to complete a measurement.  But this timing isn't checked on every
+> >>> +	 * part nor is it specified in the datasheet, so sleeping at least 1ms
+> >>> +	 * should provide plenty of time.  Sleeping longer than 1ms is ok so no
+> >>> +	 * need for usleep_range.
+> >>> +	 */
+> >>> +	msleep(1);
+> >>
+> >> I know 1ms is usually too short time slice when talking about thermal
+> >> monitoring on nowadays processors even, but 17us to 1ms sounds like an
+> >> overkill.. Sure you are not hiding other issues?
+> >>
+> > At least none I'm ware of.  I will update the comment and simply use
+> > usleep_range in the next post to prove that I'm not hiding other
+> > issues :)
+> 
+> OK. It just looks strange that here you need 1ms, but after suspend you
+> can afford waiting only 50us. Anything special about the suspend path?
+> 
+Nothing special I think.  I'm changing the 1ms here to ~50 us.
+
+<snip>
+
+> >>> +	map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "fsl,tempmon");
+> >>
+> >> Is this MMIO? Sure you want to do regmapped access to something so
+> >> simple as io mem r/w?
+> >>
+> > Yes, MMIO.  But it's embedded in some kind of system controller block,
+> > call anatop on imx6q, which contains miscellaneous registers for various
+> > function blocks.  We do not want to have various device drivers iomap
+> > the same space multiple times.  syscon API which uses regmap was created
+> > exactly for such cases, so we use it here.
+> 
+> Then again, I was more on the overhead imposed by regmap. For buses like
+> i2c I understand its usage, but MMIO starts to be a stretch.
+> 
+The syscon regmap interface is widely used on Freescale platforms
+as well as others to access register bits embedded in this sort of
+system controllers.  I do not think there is much overhead since it's
+just a wrapper of MMIO accessors, and besides we do not have the
+register access on hot path anyway in the driver.
+
+Shawn
