@@ -1,170 +1,71 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 20 Jun 2013 10:26:11 +0200
-Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
- framework
-In-Reply-To: <20130620081733.GN2718@n2100.arm.linux.org.uk>
-References: <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
- <1371548849.4276.6.camel@weser.hi.pengutronix.de>
- <008601ce6cb0$2c8cec40$85a6c4c0$%dae@samsung.com>
- <1371637326.4230.24.camel@weser.hi.pengutronix.de>
- <00ae01ce6cd9$f4834630$dd89d290$%dae@samsung.com>
- <1371645247.4230.41.camel@weser.hi.pengutronix.de>
- <CAAQKjZNJD4HpnJQ7iE+Gez36066M6U0YQeUEdA0+UcSOKqeghg@mail.gmail.com>
- <20130619182925.GL2718@n2100.arm.linux.org.uk>
- <00da01ce6d81$76eb3d60$64c1b820$%dae@samsung.com>
- <1371714427.4230.64.camel@weser.hi.pengutronix.de>
- <20130620081733.GN2718@n2100.arm.linux.org.uk>
-Message-ID: <1371716771.4114.5.camel@weser.hi.pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Jun 2013 09:29:30 +0100
+Subject: [PATCH 4/5] ARM: KVM: clear exclusive monitor on all exception
+ returns
+In-Reply-To: <20130620002736.GK7870@lvm>
+References: <1371648006-8036-1-git-send-email-marc.zyngier@arm.com>
+ <1371648006-8036-5-git-send-email-marc.zyngier@arm.com>
+ <20130620002736.GK7870@lvm>
+Message-ID: <51C2BD6A.1080308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 20.06.2013, 09:17 +0100 schrieb Russell King - ARM
-Linux:
-> On Thu, Jun 20, 2013 at 09:47:07AM +0200, Lucas Stach wrote:
-> > Am Donnerstag, den 20.06.2013, 15:43 +0900 schrieb Inki Dae:
-> > > 
-> > > > -----Original Message-----
-> > > > From: dri-devel-bounces+inki.dae=samsung.com at lists.freedesktop.org
-> > > > [mailto:dri-devel-bounces+inki.dae=samsung.com at lists.freedesktop.org] On
-> > > > Behalf Of Russell King - ARM Linux
-> > > > Sent: Thursday, June 20, 2013 3:29 AM
-> > > > To: Inki Dae
-> > > > Cc: linux-fbdev; DRI mailing list; Kyungmin Park; myungjoo.ham; YoungJun
-> > > > Cho; linux-media at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > > > Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
-> > > > framework
-> > > > 
-> > > > On Thu, Jun 20, 2013 at 12:10:04AM +0900, Inki Dae wrote:
-> > > > > On the other hand, the below shows how we could enhance the conventional
-> > > > > way with my approach (just example):
-> > > > >
-> > > > > CPU -> DMA,
-> > > > >         ioctl(qbuf command)              ioctl(streamon)
-> > > > >               |                                               |
-> > > > >               |                                               |
-> > > > >         qbuf  <- dma_buf_sync_get   start streaming <- syncpoint
-> > > > >
-> > > > > dma_buf_sync_get just registers a sync buffer(dmabuf) to sync object.
-> > > > And
-> > > > > the syncpoint is performed by calling dma_buf_sync_lock(), and then DMA
-> > > > > accesses the sync buffer.
-> > > > >
-> > > > > And DMA -> CPU,
-> > > > >         ioctl(dqbuf command)
-> > > > >               |
-> > > > >               |
-> > > > >         dqbuf <- nothing to do
-> > > > >
-> > > > > Actual syncpoint is when DMA operation is completed (in interrupt
-> > > > handler):
-> > > > > the syncpoint is performed by calling dma_buf_sync_unlock().
-> > > > > Hence,  my approach is to move the syncpoints into just before dma
-> > > > access
-> > > > > as long as possible.
-> > > > 
-> > > > What you've just described does *not* work on architectures such as
-> > > > ARMv7 which do speculative cache fetches from memory at any time that
-> > > > that memory is mapped with a cacheable status, and will lead to data
-> > > > corruption.
-> > > 
-> > > I didn't explain that enough. Sorry about that. 'nothing to do' means that a
-> > > dmabuf sync interface isn't called but existing functions are called. So
-> > > this may be explained again:
-> > >         ioctl(dqbuf command)
-> > >             |
-> > >             |
-> > >         dqbuf <- 1. dma_unmap_sg
-> > >                     2. dma_buf_sync_unlock (syncpoint)
-> > > 
-> > > The syncpoint I mentioned means lock mechanism; not doing cache operation.
-> > > 
-> > > In addition, please see the below more detail examples.
-> > > 
-> > > The conventional way (without dmabuf-sync) is:
-> > > Task A                             
-> > > ----------------------------
-> > >  1. CPU accesses buf          
-> > >  2. Send the buf to Task B  
-> > >  3. Wait for the buf from Task B
-> > >  4. go to 1
-> > > 
-> > > Task B
-> > > ---------------------------
-> > > 1. Wait for the buf from Task A
-> > > 2. qbuf the buf                 
-> > >     2.1 insert the buf to incoming queue
-> > > 3. stream on
-> > >     3.1 dma_map_sg if ready, and move the buf to ready queue
-> > >     3.2 get the buf from ready queue, and dma start.
-> > > 4. dqbuf
-> > >     4.1 dma_unmap_sg after dma operation completion
-> > >     4.2 move the buf to outgoing queue
-> > > 5. back the buf to Task A
-> > > 6. go to 1
-> > > 
-> > > In case that two tasks share buffers, and data flow goes from Task A to Task
-> > > B, we would need IPC operation to send and receive buffers properly between
-> > > those two tasks every time CPU or DMA access to buffers is started or
-> > > completed.
-> > > 
-> > > 
-> > > With dmabuf-sync:
-> > > 
-> > > Task A                             
-> > > ----------------------------
-> > >  1. dma_buf_sync_lock <- synpoint (call by user side)
-> > >  2. CPU accesses buf          
-> > >  3. dma_buf_sync_unlock <- syncpoint (call by user side)
-> > >  4. Send the buf to Task B (just one time)
-> > >  5. go to 1
-> > > 
-> > > 
-> > > Task B
-> > > ---------------------------
-> > > 1. Wait for the buf from Task A (just one time)
-> > > 2. qbuf the buf                 
-> > >     1.1 insert the buf to incoming queue
-> > > 3. stream on
-> > >     3.1 dma_buf_sync_lock <- syncpoint (call by kernel side)
-> > >     3.2 dma_map_sg if ready, and move the buf to ready queue
-> > >     3.3 get the buf from ready queue, and dma start.
-> > > 4. dqbuf
-> > >     4.1 dma_buf_sync_unlock <- syncpoint (call by kernel side)
-> > >     4.2 dma_unmap_sg after dma operation completion
-> > >     4.3 move the buf to outgoing queue
-> > > 5. go to 1
-> > > 
-> > > On the other hand, in case of using dmabuf-sync, as you can see the above
-> > > example, we would need IPC operation just one time. That way, I think we
-> > > could not only reduce performance overhead but also make user application
-> > > simplified. Of course, this approach can be used for all DMA device drivers
-> > > such as DRM. I'm not a specialist in v4l2 world so there may be missing
-> > > point.
-> > > 
-> > 
-> > You already need some kind of IPC between the two tasks, as I suspect
-> > even in your example it wouldn't make much sense to queue the buffer
-> > over and over again in task B without task A writing anything to it. So
-> > task A has to signal task B there is new data in the buffer to be
-> > processed.
+On 20/06/13 01:27, Christoffer Dall wrote:
+> On Wed, Jun 19, 2013 at 02:20:05PM +0100, Marc Zyngier wrote:
+>> Make sure we clear the exclusive movitor on all exception returns,
+>> which otherwise could lead to lock corruptions.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/kvm/interrupts.S | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+>> index 3124e0f..750f051 100644
+>> --- a/arch/arm/kvm/interrupts.S
+>> +++ b/arch/arm/kvm/interrupts.S
+>> @@ -301,6 +301,7 @@ THUMB(	orr	r2, r2, #PSR_T_BIT	)
+>>  	ldr	r2, =BSYM(panic)
+>>  	msr	ELR_hyp, r2
+>>  	ldr	r0, =\panic_str
+>> +	clrex				@ Clear exclusive monitor
 > 
-> Hang on.  Since when did dma_buf become another inter-process IPC
-> mechanism?  That's *not* it's design goal, and there's other much
-> better mechanisms already provided.
+> on a panic? sure, why not ;)
+
+These days, you can have a lot of things going on after a panic: kexec,
+for example. You really want to return to the host with a clean state if
+at all possible.
+
+>>  	eret
+>>  .endm
+>>  
+>> @@ -450,6 +451,7 @@ guest_trap:
+>>  
+>>  4:	pop	{r0, r1}		@ Failed translation, return to guest
+>>  	mcrr	p15, 0, r0, r1, c7	@ PAR
+>> +	clrex
 > 
-That's why I said out-of-band completion signaling, particularly not
-bound to the dma-buf itself.
+> I gather this is because any store can potentially leave the system with
+> an exclusive monitor taken?
 
-My thinking was more along the lines of the wayland protocol, where one
-process tells the compositor to use a buf as the pixel data for the next
-frame and promises not to access it while the compositor uses it. When
-the compositor finishes it tells the client that it's now free to reuse
-the buffer. None of this is bound to the dma-buf.
+My scenario was the following:
+ldrex -> translation fault, page mapped in Stage-2, read-only
+strex -> permission fault
 
-Regards,
-Lucas
+On another vcpu, the page is unmapped (swapped out, for example).
+
+Translation then fails on the permission fault path, and we return to
+the guest. But we must make sure that the exclusive monitor is
+effectively cleared. Linux wouldn't be affected (me think), but that's
+always worth doing.
+
+That's probably one of the thing I like the most about ARMv8: eret
+always implies clrex. No questions asked.
+
+> patch looks fine.
+
+Thanks,
+
+	M.
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Jazz is not dead. It just smells funny...
