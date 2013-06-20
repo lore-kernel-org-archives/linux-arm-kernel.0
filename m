@@ -1,41 +1,22 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Thu, 20 Jun 2013 14:52:07 +0530
-Subject: [PATCH v1 2/3] spi: s3c64xx: Added provision for dedicated cs pin
-In-Reply-To: <20130619182354.GD1403@sirena.org.uk>
-References: <1369032694-13183-1-git-send-email-ks.giri@samsung.com>
- <1369032694-13183-3-git-send-email-ks.giri@samsung.com>
- <20130619182354.GD1403@sirena.org.uk>
-Message-ID: <CAKrE-KciiPe5Zx7ggxzh=x0xY0xGDhX+=Lt7aL-EgkxinO214w@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 20 Jun 2013 14:52:53 +0530
+Subject: [PATCH 0/2] Fix build breakage for tnetv107x platforms
+In-Reply-To: <1371203869-16308-1-git-send-email-avinashphilipk@gmail.com>
+References: <1371203869-16308-1-git-send-email-avinashphilipk@gmail.com>
+Message-ID: <51C2C9ED.7070409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 11:53 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, May 20, 2013 at 12:21:33PM +0530, Girish K S wrote:
->> From: Girish K S <girishks2000@gmail.com>
->>
->> The existing driver supports gpio based /cs signal.
->> For controller's that have one device per controller,
->> the slave device's /cs signal might be internally controlled
->> by the chip select bit of slave select register. They are not
->> externally asserted/deasserted using gpio pin.
->>
->> This patch adds support for controllers with dedicated /cs pin.
->> if "cs-gpio" property doesnt exist in a spi dts node, the controller
->> would treat the /cs pin as dedicated.
->
-> This breaks SPI operation on my s3c64xx based system since...
->
->>       if (pdev->dev.of_node) {
->> +             if (of_find_property(pdev->dev.of_node, "cs-gpio", NULL))
->> +                     sdd->cs_gpio = true;
->> +
->>               ret = of_alias_get_id(pdev->dev.of_node, "spi");
->>               if (ret < 0) {
->>                       dev_err(&pdev->dev, "failed to get alias id, errno %d\n",
->
-> sdd->cs_gpio is only set to true by this code so if you're using a board
-> file then the GPIO will be ignored.
+On 6/14/2013 3:27 PM, Philip Avinash wrote:
+> tnetv107x_defconfig build failing on removal selection of NEED_MACH_GPIO_H
+> for ARCH_DAVINCI. This is due to header files inclusion from mach/gpio-davinci.h
+> So this patch series fixes the build breakage on removal of NEED_MACH_GPIO_H.
 
-Reversing the default assignment for "sdd->cs_gpio" and the following
-"if condition" shall handle both dt and non-dt case. Will do it and
-resubmit only this patch in the series.
+So does this mean at the end of 7/7 of your "Convert GPIO Davinci to
+platform driver" series, the build is broken?
+
+If yes, then please include them when you repost that series before 7/7.
+Having a patch break build is bad.
+
+Thanks,
+Sekhar
