@@ -1,180 +1,173 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Thu, 20 Jun 2013 10:06:44 +0200
-Subject: [PATCH 4/8] tty: atmel_serial: prepare clk before calling enable
-In-Reply-To: <51C2B3D1.9060601@atmel.com>
-References: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
- <1371640650-9625-1-git-send-email-b.brezillon@overkiz.com>
- <51C2B3D1.9060601@atmel.com>
-Message-ID: <51C2B814.4050308@overkiz.com>
+From: nishanth.p@gmail.com (Nishanth Peethambaran)
+Date: Thu, 20 Jun 2013 13:37:00 +0530
+Subject: [Linaro-mm-sig] [RFC 2/3] ARM: dma-mapping: Pass DMA attrs as
+ IOMMU prot
+In-Reply-To: <1371707384-30037-3-git-send-email-hdoyu@nvidia.com>
+References: <1371707384-30037-1-git-send-email-hdoyu@nvidia.com>
+ <1371707384-30037-3-git-send-email-hdoyu@nvidia.com>
+Message-ID: <CAMcxFTRnnCnPnvMi89r7rUsN4xeYzZGqy9s5v5ukm_fJ_d_RGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/2013 09:48, Nicolas Ferre wrote:
-> On 19/06/2013 13:17, Boris BREZILLON :
->> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
->> avoid common clk framework warnings.
->>
->> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->
-> (one comment though)
->
->> ---
->>   drivers/tty/serial/atmel_serial.c |   41 
->> ++++++++++++++++++++++++++++---------
->>   1 file changed, 31 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/tty/serial/atmel_serial.c 
->> b/drivers/tty/serial/atmel_serial.c
->> index 3467462..691265f 100644
->> --- a/drivers/tty/serial/atmel_serial.c
->> +++ b/drivers/tty/serial/atmel_serial.c
->> @@ -1100,7 +1100,7 @@ static void atmel_serial_pm(struct uart_port 
->> *port, unsigned int state,
->>            * Enable the peripheral clock for this serial port.
->>            * This is called on uart_open() or a resume event.
->>            */
->> -        clk_enable(atmel_port->clk);
->> +        clk_prepare_enable(atmel_port->clk);
->
-> Do we need to check return code here?
-We could, but the pm function will not reflect the failure (void return).
-In addition, the clk_prepare_enable should not fail because it already 
-succeed in the probe
-function (no memory allocation, simple bit masking in clk-peripheral 
-implem).
+Hi,
 
-I can add it add this check (and avoid the interrrupt activation if it 
-fails) if you want.
+It would be better to define a prot flag bit in iommu API and convert
+the attrs to prot flag bit in dma-mapping aPI before calling the iommu
+API.
 
+On Thu, Jun 20, 2013 at 11:19 AM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
 >
->>
->>           /* re-enable interrupts if we disabled some on suspend */
->>           UART_PUT_IER(port, atmel_port->backup_imr);
->> @@ -1114,7 +1114,7 @@ static void atmel_serial_pm(struct uart_port 
->> *port, unsigned int state,
->>            * Disable the peripheral clock for this serial port.
->>            * This is called on uart_close() or a suspend event.
->>            */
->> -        clk_disable(atmel_port->clk);
->> +        clk_disable_unprepare(atmel_port->clk);
->>           break;
->>       default:
->>           printk(KERN_ERR "atmel_serial: unknown pm %d\n", state);
->> @@ -1458,9 +1458,10 @@ static void atmel_of_init_port(struct 
->> atmel_uart_port *atmel_port,
->>   /*
->>    * Configure the port from the platform device resource info.
->>    */
->> -static void atmel_init_port(struct atmel_uart_port *atmel_port,
->> +static int atmel_init_port(struct atmel_uart_port *atmel_port,
->>                         struct platform_device *pdev)
->>   {
->> +    int ret;
->>       struct uart_port *port = &atmel_port->uart;
->>       struct atmel_uart_data *pdata = pdev->dev.platform_data;
->>
->> @@ -1496,9 +1497,19 @@ static void atmel_init_port(struct 
->> atmel_uart_port *atmel_port,
->>       /* for console, the clock could already be configured */
->>       if (!atmel_port->clk) {
->>           atmel_port->clk = clk_get(&pdev->dev, "usart");
->> -        clk_enable(atmel_port->clk);
->> +        if (IS_ERR(atmel_port->clk)) {
->> +            ret = PTR_ERR(atmel_port->clk);
->> +            atmel_port->clk = NULL;
->> +            return ret;
->> +        }
->> +        ret = clk_prepare_enable(atmel_port->clk);
->> +        if (ret) {
->> +            clk_put(atmel_port->clk);
->> +            atmel_port->clk = NULL;
->> +            return ret;
->> +        }
->>           port->uartclk = clk_get_rate(atmel_port->clk);
->> -        clk_disable(atmel_port->clk);
->> +        clk_disable_unprepare(atmel_port->clk);
->>           /* only enable clock when USART is in use */
->>       }
->>
->> @@ -1511,6 +1522,8 @@ static void atmel_init_port(struct 
->> atmel_uart_port *atmel_port,
->>       } else {
->>           atmel_port->tx_done_mask = ATMEL_US_TXRDY;
->>       }
->> +
->> +    return 0;
->>   }
->>
->>   struct platform_device *atmel_default_console_device;    /* the 
->> serial console device */
->> @@ -1601,6 +1614,7 @@ static void __init 
->> atmel_console_get_options(struct uart_port *port, int *baud,
->>
->>   static int __init atmel_console_setup(struct console *co, char 
->> *options)
->>   {
->> +    int ret;
->>       struct uart_port *port = &atmel_ports[co->index].uart;
->>       int baud = 115200;
->>       int bits = 8;
->> @@ -1612,7 +1626,9 @@ static int __init atmel_console_setup(struct 
->> console *co, char *options)
->>           return -ENODEV;
->>       }
->>
->> -    clk_enable(atmel_ports[co->index].clk);
->> +    ret = clk_prepare_enable(atmel_ports[co->index].clk);
->> +    if (ret)
->> +        return ret;
->>
->>       UART_PUT_IDR(port, -1);
->>       UART_PUT_CR(port, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
->> @@ -1645,6 +1661,7 @@ static struct console atmel_console = {
->>    */
->>   static int __init atmel_console_init(void)
->>   {
->> +    int ret;
->>       if (atmel_default_console_device) {
->>           struct atmel_uart_data *pdata =
->> atmel_default_console_device->dev.platform_data;
->> @@ -1655,7 +1672,9 @@ static int __init atmel_console_init(void)
->>           port->uart.line = id;
->>
->>           add_preferred_console(ATMEL_DEVICENAME, id, NULL);
->> -        atmel_init_port(port, atmel_default_console_device);
->> +        ret = atmel_init_port(port, atmel_default_console_device);
->> +        if (ret)
->> +            return ret;
->>           register_console(&atmel_console);
->>       }
->>
->> @@ -1786,7 +1805,9 @@ static int atmel_serial_probe(struct 
->> platform_device *pdev)
->>       port->backup_imr = 0;
->>       port->uart.line = ret;
->>
->> -    atmel_init_port(port, pdev);
->> +    ret = atmel_init_port(port, pdev);
->> +    if (ret)
->> +        goto err;
->>
->>       pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
->>       if (IS_ERR(pinctrl)) {
->> @@ -1812,9 +1833,9 @@ static int atmel_serial_probe(struct 
->> platform_device *pdev)
->>               && ATMEL_CONSOLE_DEVICE->flags & CON_ENABLED) {
->>           /*
->>            * The serial core enabled the clock for us, so undo
->> -         * the clk_enable() in atmel_console_setup()
->> +         * the clk_prepare_enable() in atmel_console_setup()
->>            */
->> -        clk_disable(port->clk);
->> +        clk_disable_unprepare(port->clk);
->>       }
->>   #endif
->>
->>
+> Pass DMA attribute as IOMMU property, which can be proccessed in the
+> backend implementation of IOMMU. For example, DMA_ATTR_READ_ONLY can
+> be translated into each IOMMU H/W implementaion.
+>
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+>  arch/arm/mm/dma-mapping.c | 34 +++++++++++++++++++++-------------
+>  1 file changed, 21 insertions(+), 13 deletions(-)
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 4152ed6..cbc6768 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1254,7 +1254,8 @@ err:
+>   */
+>  static dma_addr_t
+>  ____iommu_create_mapping(struct device *dev, dma_addr_t *req,
+> -                        struct page **pages, size_t size)
+> +                        struct page **pages, size_t size,
+> +                        struct dma_attrs *attrs)
+>  {
+>         struct dma_iommu_mapping *mapping = dev->archdata.mapping;
+>         unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> @@ -1280,7 +1281,7 @@ ____iommu_create_mapping(struct device *dev, dma_addr_t *req,
+>                                 break;
+>
+>                 len = (j - i) << PAGE_SHIFT;
+> -               ret = iommu_map(mapping->domain, iova, phys, len, 0);
+> +               ret = iommu_map(mapping->domain, iova, phys, len, (int)attrs);
+
+Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
+prot flag bit which needs to be defined in iommu.h
+
+>                 if (ret < 0)
+>                         goto fail;
+>                 iova += len;
+> @@ -1294,9 +1295,10 @@ fail:
+>  }
+>
+>  static dma_addr_t
+> -__iommu_create_mapping(struct device *dev, struct page **pages, size_t size)
+> +__iommu_create_mapping(struct device *dev, struct page **pages, size_t size,
+> +                      struct dma_attrs *attrs)
+>  {
+> -       return ____iommu_create_mapping(dev, NULL, pages, size);
+> +       return ____iommu_create_mapping(dev, NULL, pages, size, attrs);
+>  }
+>
+>  static int __iommu_remove_mapping(struct device *dev, dma_addr_t iova, size_t size)
+> @@ -1332,7 +1334,7 @@ static struct page **__iommu_get_pages(void *cpu_addr, struct dma_attrs *attrs)
+>  }
+>
+>  static void *__iommu_alloc_atomic(struct device *dev, size_t size,
+> -                                 dma_addr_t *handle)
+> +                                 dma_addr_t *handle, struct dma_attrs *attrs)
+>  {
+>         struct page *page;
+>         void *addr;
+> @@ -1341,7 +1343,7 @@ static void *__iommu_alloc_atomic(struct device *dev, size_t size,
+>         if (!addr)
+>                 return NULL;
+>
+> -       *handle = __iommu_create_mapping(dev, &page, size);
+> +       *handle = __iommu_create_mapping(dev, &page, size, attrs);
+>         if (*handle == DMA_ERROR_CODE)
+>                 goto err_mapping;
+>
+> @@ -1378,17 +1380,20 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+>         size = PAGE_ALIGN(size);
+>
+>         if (gfp & GFP_ATOMIC)
+> -               return __iommu_alloc_atomic(dev, size, handle);
+> +
+> +               return __iommu_alloc_atomic(dev, size, handle, attrs);
+>
+>         pages = __iommu_alloc_buffer(dev, size, gfp);
+>         if (!pages)
+>                 return NULL;
+>
+>         if (*handle == DMA_ERROR_CODE)
+> -               *handle = __iommu_create_mapping(dev, pages, size);
+> +               *handle = __iommu_create_mapping(dev, pages, size, attrs);
+>         else
+> -               *handle = ____iommu_create_mapping(dev, handle, pages, size);
+> +               *handle = ____iommu_create_mapping(dev, handle, pages, size,
+> +                                                  attrs);
+>
+> +       *handle = __iommu_create_mapping(dev, pages, size, attrs);
+>         if (*handle == DMA_ERROR_CODE)
+>                 goto err_buffer;
+>
+> @@ -1513,7 +1518,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+>
+>  skip_cmaint:
+>         count = size >> PAGE_SHIFT;
+> -       ret = iommu_map_sg(mapping->domain, iova_base, sg, count, 0);
+> +       ret = iommu_map_sg(mapping->domain, iova_base, sg, count, (int)attrs);
+
+Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
+prot flag bit which needs to be defined in iommu.h
+
+>         if (WARN_ON(ret < 0))
+>                 goto fail;
+>
+> @@ -1716,7 +1721,8 @@ static dma_addr_t arm_coherent_iommu_map_page(struct device *dev, struct page *p
+>         if (dma_addr == DMA_ERROR_CODE)
+>                 return dma_addr;
+>
+> -       ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len, 0);
+> +       ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len,
+> +                       (int)attrs);
+
+Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
+prot flag bit which needs to be defined in iommu.h
+
+>         if (ret < 0)
+>                 goto fail;
+>
+> @@ -1756,7 +1762,8 @@ static dma_addr_t arm_iommu_map_page_at(struct device *dev, struct page *page,
+>         if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+>                 __dma_page_cpu_to_dev(page, offset, size, dir);
+>
+> -       ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len, 0);
+> +       ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len,
+> +                       (int)attrs);
+
+Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
+prot flag bit which needs to be defined in iommu.h
+
+>         if (ret < 0)
+>                 return DMA_ERROR_CODE;
+>
+> @@ -1778,7 +1785,8 @@ static dma_addr_t arm_iommu_map_pages(struct device *dev, struct page **pages,
+>                         __dma_page_cpu_to_dev(pages[i], 0, PAGE_SIZE, dir);
+>         }
+>
+> -       ret = iommu_map_pages(mapping->domain, dma_handle, pages, count, 0);
+> +       ret = iommu_map_pages(mapping->domain, dma_handle, pages, count,
+> +                             (int)attrs);
+
+Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
+prot flag bit which needs to be defined in iommu.h
+
+>         if (ret < 0)
+>                 return DMA_ERROR_CODE;
+>
+> --
+> 1.8.1.5
 >
 >
+> _______________________________________________
+> Linaro-mm-sig mailing list
+> Linaro-mm-sig at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
