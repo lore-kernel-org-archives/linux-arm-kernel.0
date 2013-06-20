@@ -1,18 +1,18 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Thu, 20 Jun 2013 15:05:59 +0530
-Subject: [PATCH V4 03/11] USB: OHCI: Properly handle ohci-s3c2410 suspend
+Date: Thu, 20 Jun 2013 15:06:00 +0530
+Subject: [PATCH V4 04/11] USB: OHCI: Properly handle ohci-da8xx suspend
 In-Reply-To: <1371720968-7533-1-git-send-email-manjunath.goudar@linaro.org>
 References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
  <1371720968-7533-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1371720968-7533-4-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1371720968-7533-5-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of ohci-s3c2410 glue was not
+Suspend scenario in case of ohci-da8xx glue was not
 properly handled as it was not suspending generic part
 of ohci controller. Calling explicitly the ohci_suspend()
-routine in ohci_hcd_s3c2410_drv_suspend() will ensure
-proper handling of suspend scenario.
+routine in ohci_da8xx_suspend() will ensure proper
+handling of suspend scenario.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
 Cc: Arnd Bergmann <arnd@arndb.de>
@@ -23,50 +23,51 @@ Cc: linux-usb at vger.kernel.org
 V2:
  -Incase ohci_suspend() fails, return right away without
   executing further.
+
 V3:
- -rid of unwanted code from ohci_hcd_s3c2410_drv_suspend()
-  which already ohci_suspend() does it.
+ -Aligned variable "do_wakeup" and "ret".
+ -pdev->dev.power.power_state stuff has been removed.
 
 V4:
- -The do_wakeup variable alignment is removed.
+ -Properly aligned "do_wakeup" and "ret" variable.
 ---
- drivers/usb/host/ohci-s3c2410.c |   19 ++++---------------
- 1 file changed, 4 insertions(+), 15 deletions(-)
+ drivers/usb/host/ohci-da8xx.c |   15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-s3c2410.c b/drivers/usb/host/ohci-s3c2410.c
-index 8018bb1..4ccf156 100644
---- a/drivers/usb/host/ohci-s3c2410.c
-+++ b/drivers/usb/host/ohci-s3c2410.c
-@@ -428,26 +428,15 @@ static int ohci_hcd_s3c2410_drv_suspend(struct device *dev)
- 	struct usb_hcd *hcd = dev_get_drvdata(dev);
- 	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
- 	struct platform_device *pdev = to_platform_device(dev);
-+	bool do_wakeup = device_may_wakeup(dev);
- 	unsigned long flags;
- 	int rc = 0;
- 
--	/*
--	 * Root hub was already suspended. Disable irq emission and
--	 * mark HW unaccessible, bail out if RH has been resumed. Use
--	 * the spinlock to properly synchronize with possible pending
--	 * RH suspend or resume activity.
--	 */
--	spin_lock_irqsave(&ohci->lock, flags);
--	if (ohci->rh_state != OHCI_RH_SUSPENDED) {
--		rc = -EINVAL;
--		goto bail;
--	}
--
--	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-+	rc = ohci_suspend(hcd, do_wakeup);
-+	if (rc)
-+		return rc;
- 
- 	s3c2410_stop_hc(pdev);
--bail:
--	spin_unlock_irqrestore(&ohci->lock, flags);
- 
- 	return rc;
+diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
+index 6aaa9c9..44893cf 100644
+--- a/drivers/usb/host/ohci-da8xx.c
++++ b/drivers/usb/host/ohci-da8xx.c
+@@ -406,19 +406,26 @@ static int ohci_hcd_da8xx_drv_remove(struct platform_device *dev)
  }
+ 
+ #ifdef CONFIG_PM
+-static int ohci_da8xx_suspend(struct platform_device *dev, pm_message_t message)
++static int ohci_da8xx_suspend(struct platform_device *pdev,
++		pm_message_t message)
+ {
+-	struct usb_hcd	*hcd	= platform_get_drvdata(dev);
++	struct usb_hcd	*hcd	= platform_get_drvdata(pdev);
+ 	struct ohci_hcd	*ohci	= hcd_to_ohci(hcd);
++	bool	do_wakeup	= device_may_wakeup(&pdev->dev);
++	int	ret;
+ 
+ 	if (time_before(jiffies, ohci->next_statechange))
+ 		msleep(5);
+ 	ohci->next_statechange = jiffies;
+ 
++	ret = ohci_suspend(hcd, do_wakeup);
++	if (ret)
++		return ret;
++
+ 	ohci_da8xx_clock(0);
+ 	hcd->state = HC_STATE_SUSPENDED;
+-	dev->dev.power.power_state = PMSG_SUSPEND;
+-	return 0;
++
++	return ret;
+ }
+ 
+ static int ohci_da8xx_resume(struct platform_device *dev)
 -- 
 1.7.9.5
