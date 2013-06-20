@@ -1,60 +1,50 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 20 Jun 2013 10:21:47 +0530
-Subject: [PATCH v2 2/4] gpio: davinci: DT changes for driver
-In-Reply-To: <CACRpkdbJJVKC539CAPNxxEbofVfw3Pr0gyCSZyY9YbkXneE-qQ@mail.gmail.com>
-References: <1371203020-15092-1-git-send-email-avinashphilip@ti.com>
- <1371205241-17205-3-git-send-email-avinashphilipk@gmail.com>
- <CACRpkdbJJVKC539CAPNxxEbofVfw3Pr0gyCSZyY9YbkXneE-qQ@mail.gmail.com>
-Message-ID: <51C28A63.6080905@ti.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 20 Jun 2013 07:23:28 +0200
+Subject: [PATCH RFC 0/2] Extend multi_v7_defconfig
+In-Reply-To: <201306192046.41005.arnd@arndb.de>
+References: <1371664384-24974-1-git-send-email-soren.brinkmann@xilinx.com>
+ <201306192046.41005.arnd@arndb.de>
+Message-ID: <51C291D0.6000401@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/20/2013 12:40 AM, Linus Walleij wrote:
-> On Fri, Jun 14, 2013 at 12:20 PM, Philip Avinash
-> <avinashphilipk@gmail.com> wrote:
+On 06/19/2013 08:46 PM, Arnd Bergmann wrote:
+> On Wednesday 19 June 2013, Soren Brinkmann wrote:
+>> I don't know how much a defconfig is supposed to provide, hence as RFC.
+>> This patches are needed for booting Zynq into a minimum ramfs based
+>> system with a serial console.
 > 
->> From: KV Sujith <sujithkv@ti.com>
->>
->> - Add of_device_id for Davinci GPIO driver.
->> - Add function to populate data from DT.
->> - Modify the probe to read from DT if DT match is found.
->> - Add DT binding documentation for Davinci GPIO properties in a new file
->>   gpio-davinci.txt located at Documentation/devicetree/bindings/gpio/.
->>
->> Signed-off-by: KV Sujith <sujithkv@ti.com>
->> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
->> ---
->> Changes since v1:
->>         - description for interrupts changed to reflecti
->>            interrupt array usage.
-> (...)
-> 
->> +static struct davinci_gpio_platform_data *davinci_gpio_set_pdata_of(
->> +                                               struct platform_device *pdev)
->> +{
->> +       struct device_node *dn = pdev->dev.of_node;
->> +       struct davinci_gpio_platform_data *pdata;
->> +       u32 val, ret;
->> +
->> +       pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
->> +       if (pdata) {
-> 
-> Instead of this arrow pattern:
-> 
-> if (!pdata) {
->   dev_err( ... "out of memory allocating platform data");
->   return NULL;
-> }
-> 
-> And de-indent the rest.
-> 
-> With that change:
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> I guess this may go through the DaVinci tree with the rest of the DaVinci
-> patches?
+> In my opinion we should provide enable all the platform specific drivers
+> in the defconfigs, as well as everything needed to boot the system,
+> to get proper compile coverage as well as the ability to test changes
+> easily. Your patches look good. Michal, would you apply them and
+> send another pull request or should I just take them directly?
 
-Linus, yes, I will pick these up with your acks.
+Soren asked me 2 days ago if make sense to create zynq defconfig or not.
+I just suggested him to better extend this multi_v7_defconfig.
+But still question is if we can/should create zynq specific defconfig?
+Or are you going to remove all of these platform specific defconfig?
+
+Definitely agree that multi_v7 defconfig should enable everything needed
+to boot the system.
+Does it also mean that we should also enable all zynq drivers
+to get better compile coverage?
 
 Thanks,
-Sekhar
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/dcdbdb1c/attachment.sig>
