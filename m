@@ -1,52 +1,50 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 20 Jun 2013 15:50:41 +0100
-Subject: [GIT PULL] ARM: MPIDR linearization
-Message-ID: <20130620145041.GA10110@e102568-lin.cambridge.arm.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 20 Jun 2013 16:50:11 +0200
+Subject: [PATCH 2/6] ARM: imx27: Use 'AITC' for the interrupt controller name
+In-Reply-To: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
+References: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1371739815-6666-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+From: Fabio Estevam <festevam@gmail.com>
 
-please pull this patch series that implements MPIDR linearization through a
-simple hashing algorithm and updates current cpu_{suspend}/{resume} code to
-use the newly created hash structures to retrieve context pointers.
-It represents a stepping stone for the implementation of power management code
-on forthcoming multi-cluster ARM systems.
+On the MX27 Reference Manual the interrupt controller is named AITC:
+ARM926EJ-S Interrupt Controller
 
-It has been tested on TC2 (dual cluster A15xA7 system), iMX6q, OMAP4 and
-Tegra, with processors hitting low-power states requiring warm-boot resume
-through the cpu_resume code path.
+So use the AITC term instead of AVIC.
 
-It is rebased against your devel-stable, I fixed conflicts with code already
-queued there.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Origin: id:1334193132-18944-2-git-send-email-festevam at gmail.com
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ arch/arm/boot/dts/imx27.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Please let me know if you have any objection.
-
-Thank you very much indeed,
-Lorenzo
-
-The following changes since commit fd8957a96d535a992067b2c206672323a885454a:
-
-  Merge branch 'for-rmk/arch-timer-cleanups' of git://linux-arm.org/linux-mr into devel-stable (2013-06-18 20:12:56 +0100)
-
-are available in the git repository at:
-
-
-  git://linux-arm.org/linux-2.6-lp.git mpidr-updates-for-rmk
-
-for you to fetch changes up to 7604537bbb5720376e8c9e6bc74a8e6305e3094d:
-
-  ARM: kernel: implement stack pointer save array through MPIDR hashing (2013-06-20 11:24:11 +0100)
-
-----------------------------------------------------------------
-Lorenzo Pieralisi (2):
-      ARM: kernel: build MPIDR hash function data structure
-      ARM: kernel: implement stack pointer save array through MPIDR hashing
-
- arch/arm/include/asm/smp_plat.h | 18 ++++++++
- arch/arm/include/asm/suspend.h  |  5 +++
- arch/arm/kernel/asm-offsets.c   |  6 +++
- arch/arm/kernel/setup.c         | 67 ++++++++++++++++++++++++++++
- arch/arm/kernel/sleep.S         | 97 +++++++++++++++++++++++++++++++++--------
- arch/arm/kernel/suspend.c       | 20 +++++++++
- 6 files changed, 195 insertions(+), 18 deletions(-)
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 48c263c..4f76453 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -30,8 +30,8 @@
+ 		spi2 = &cspi3;
+ 	};
+ 
+-	avic: avic-interrupt-controller at e0000000 {
+-		compatible = "fsl,imx27-avic", "fsl,avic";
++	aitc: aitc-interrupt-controller at e0000000 {
++		compatible = "fsl,imx27-aitc", "fsl,avic";
+ 		interrupt-controller;
+ 		#interrupt-cells = <1>;
+ 		reg = <0x10040000 0x1000>;
+@@ -51,7 +51,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "simple-bus";
+-		interrupt-parent = <&avic>;
++		interrupt-parent = <&aitc>;
+ 		ranges;
+ 
+ 		aipi at 10000000 { /* AIPI1 */
+-- 
+1.8.2.1
