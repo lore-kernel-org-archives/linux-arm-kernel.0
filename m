@@ -1,47 +1,35 @@
-From: joelagnel@ti.com (Joel A Fernandes)
-Date: Thu, 20 Jun 2013 16:06:40 -0500
-Subject: [PATCH v12 04/11] dmaengine: edma: enable build for AM33XX
-In-Reply-To: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
-References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
-Message-ID: <1371762407-24544-5-git-send-email-joelagnel@ti.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Thu, 20 Jun 2013 14:14:13 -0700
+Subject: [PATCH] ARM: dts: bcm281xx: change comment to C89 style
+In-Reply-To: <1370976358-18014-1-git-send-email-matt.porter@linaro.org>
+References: <1370976358-18014-1-git-send-email-matt.porter@linaro.org>
+Message-ID: <51C370A5.3020900@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matt Porter <mporter@ti.com>
-
-Enable TI EDMA option on OMAP and TI_PRIV_EDMA
-
-Signed-off-by: Matt Porter <mporter@ti.com>
-Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
----
- arch/arm/mach-omap2/Kconfig |    1 +
- drivers/dma/Kconfig         |    2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index f49cd51..f91b07f 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -17,6 +17,7 @@ config ARCH_OMAP2PLUS
- 	select PROC_DEVICETREE if PROC_FS
- 	select SOC_BUS
- 	select SPARSE_IRQ
-+	select TI_PRIV_EDMA
- 	select USE_OF
- 	help
- 	  Systems based on OMAP2, OMAP3, OMAP4 or OMAP5
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index e992489..3215a3c 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -213,7 +213,7 @@ config SIRF_DMA
- 
- config TI_EDMA
- 	tristate "TI EDMA support"
--	depends on ARCH_DAVINCI
-+	depends on ARCH_DAVINCI || ARCH_OMAP
- 	select DMA_ENGINE
- 	select DMA_VIRTUAL_CHANNELS
- 	default n
--- 
-1.7.9.5
+On 13-06-11 11:45 AM, Matt Porter wrote:
+> CodingStyle does not allow C99 style comments. Since the
+> dts files live in the kernel for now, make this compliant.
+>
+> Signed-off-by: Matt Porter <matt.porter@linaro.org>
+> Acked-by: Christian Daudt <csd@broadcom.com>
+> ---
+>   arch/arm/boot/dts/bcm11351.dtsi |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+> index 824bebe..0651a72 100644
+> --- a/arch/arm/boot/dts/bcm11351.dtsi
+> +++ b/arch/arm/boot/dts/bcm11351.dtsi
+> @@ -36,7 +36,7 @@
+>   
+>   	smc at 0x3404c000 {
+>   		compatible = "bcm,bcm11351-smc", "bcm,kona-smc";
+> -		reg = <0x3404c000 0x400>; //1 KiB in SRAM
+> +		reg = <0x3404c000 0x400>; /* 1 KiB in SRAM */
+>   	};
+>   
+>   	uart at 3e000000 {
+applied for for-3.11/dt
+  thanks,
+    csd
