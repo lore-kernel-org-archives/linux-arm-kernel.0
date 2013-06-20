@@ -1,446 +1,327 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Thu, 20 Jun 2013 14:26:37 -0700
-Subject: [PATCH V5 2/2] ARM: mmc: bcm281xx SDHCI driver
-In-Reply-To: <1371763597-12440-1-git-send-email-csd@broadcom.com>
-References: <1371763597-12440-1-git-send-email-csd@broadcom.com>
-Message-ID: <1371763597-12440-2-git-send-email-csd@broadcom.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 20 Jun 2013 16:45:38 -0500
+Subject: [PATCH 2/3] mailbox/omap: add support for parsing dt devices
+In-Reply-To: <1371594892-37603-1-git-send-email-s-anna@ti.com>
+References: <1371594892-37603-1-git-send-email-s-anna@ti.com>
+Message-ID: <51C37802.2010908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SDHCI driver for the Broadcom 281xx SoCs.
+Hi Suman,
 
-Still missing:
- - power managemement
+On 6/18/2013 5:34 PM, Suman Anna wrote:
+> Logic has been added to the OMAP2+ mailbox code to
+> parse the mailbox dt nodes and construct the different
+> mailboxes associated with the instance. The design is
+> based on gathering the same information that was being
+> passed previously through the platform data, except for
+> the interrupt type configuration information.
+>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+>   .../devicetree/bindings/mailbox/omap-mailbox.txt   |  46 +++++++
+>   drivers/mailbox/mailbox-omap2.c                    | 141 ++++++++++++++++++---
+>   2 files changed, 172 insertions(+), 15 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+> new file mode 100644
+> index 0000000..913bc13
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+> @@ -0,0 +1,46 @@
+> +OMAP2+ Mailbox Driver
+> +
+> +Required properties:
+> +- compatible:		Should be one of the following,
+> +			    "ti,omap2-mailbox" for
+> +				OMAP2420, OMAP2430, OMAP3430, OMAP3630 SoCs
+> +			    "ti,omap4-mailbox" for
+> +				OMAP44xx, OMAP54xx, AM33xx, AM43xx, DRA7xx SoCs
+> +- reg:			Contains the mailbox register address range (base address
+> +			and length)
+> +- interrupts: 		Contains the interrupt information for the mailbox
+> +			device. The format is dependent on which interrupt
+> +			controller the OMAP device uses
+> +- ti,hwmods:		Name of the hwmod associated with the mailbox
+> +- ti,mbox-num-users:	Number of targets (processor devices) that the mailbox device
+> +			can interrupt
+> +- ti,mbox-num-fifos:	Number of h/w fifos within the mailbox device
+> +- #ti,mbox-data-cells:	Cell size for describing a mailbox
+> +			(currently should be 4)
+> +- ti,mbox-names:	Array of the names of the mailboxes
+> +- ti,mbox-data:		Mailbox descriptor data private to each mailbox. The 4
+> +			cells represent the following data,
+> +			  Cell #1 (tx_id) - mailbox fifo id used for
+> +						transmitting messages
+> +			  Cell #2 (rx_id) - mailbox fifo id on which messages
+> +						are received
+> +			  Cell #3 (irq_id) - irq identifier index number to use
+> +						from the interrupts data
+> +			  Cell #4 (usr_id) - mailbox user id for identifying the
+> +						interrupt into the MPU interrupt
+> +						controller.
+> +
+> +Example:
+> +
+> +/* OMAP4 */
+> +mailbox: mailbox at 4a0f4000 {
+> +	compatible = "ti,omap4-mailbox";
+> +	reg = <0x4a0f4000 0x200>;
+> +	interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+> +	ti,hwmods = "mailbox";
+> +	ti,mbox-num-users = <3>;
+> +	ti,mbox-num-fifos = <8>;
+> +	#ti,mbox-data-cells = <4>
+> +	ti,mbox-names = "mbox-ipu", "mbox-dsp";
+> +	ti,mbox-data = <0 1 0 0>, <3 2 0 0>;
 
-Changes from V4:
- - replace driver dt parsing with mmc_of_parse call
- - replace driver cd, wp irq handler with mmc handler
- - adding callback to sdhci to toggle necessary bit on cd detect
+That seems to contain a bunch of low level IP internal information. 
+Cannot you figure out that from the MAILBOX_REVISION information?
 
-Changes from V3:
- - switch mdelay to usleep_range
+mbox-names belong here because it does describe the connection outside 
+the IP, but I'm not sure all the other data should be there.
 
-Changes from V2:
- - Structure cleanups
- - init space from sdhci_pltfm_init
- - replace spinlock_irqsave with mutex on sd_card_emulate
- - Reduce init_74_clocks delay and document it
+You should put in DT the minimal amount of data that are needed be the 
+driver to figure out the rest.
 
-Changes from V1:
- - split DT into separate patch
- - use gpio_is_valid instead of direct test
- - switch pr_debug calls to dev_dbg
- - use of_property_read_bool
+Please note that I did not check carefully every OMAP specs to see if 
+this is possible or not, but most of the time we can reduce the amount 
+of information thanks to some HW info already there.
 
-Signed-off-by: Christian Daudt <csd@broadcom.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Regards,
+Benoit
 
-diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
-index e3bf2d6..65edf6d 100644
---- a/arch/arm/configs/bcm_defconfig
-+++ b/arch/arm/configs/bcm_defconfig
-@@ -78,6 +78,13 @@ CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
- # CONFIG_USB_SUPPORT is not set
-+CONFIG_MMC=y
-+CONFIG_MMC_UNSAFE_RESUME=y
-+CONFIG_MMC_BLOCK_MINORS=32
-+CONFIG_MMC_TEST=y
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_BCM_KONA=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_TRIGGERS=y
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 9ab8f8d..2455a35 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -249,6 +249,17 @@ config MMC_SDHCI_S3C_DMA
- 
- 	  YMMV.
- 
-+config MMC_SDHCI_BCM_KONA
-+	tristate "SDHCI support on Broadcom KONA platform"
-+	depends on ARCH_BCM
-+	select MMC_SDHCI_PLTFM
-+	help
-+	  This selects the Broadcom Kona Secure Digital Host Controller
-+	  Interface(SDHCI) support.
-+	  This is used in Broadcom mobile SoCs.
-+
-+	  If you have a controller with this interface, say Y or M here.
-+
- config MMC_SDHCI_BCM2835
- 	tristate "SDHCI platform support for the BCM2835 SD/MMC Controller"
- 	depends on ARCH_BCM2835
-diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-index cd32280..cd4c845 100644
---- a/drivers/mmc/host/Makefile
-+++ b/drivers/mmc/host/Makefile
-@@ -60,6 +60,7 @@ obj-$(CONFIG_MMC_SDHCI_DOVE)		+= sdhci-dove.o
- obj-$(CONFIG_MMC_SDHCI_TEGRA)		+= sdhci-tegra.o
- obj-$(CONFIG_MMC_SDHCI_OF_ESDHC)	+= sdhci-of-esdhc.o
- obj-$(CONFIG_MMC_SDHCI_OF_HLWD)		+= sdhci-of-hlwd.o
-+obj-$(CONFIG_MMC_SDHCI_BCM_KONA)	+= sdhci-bcm-kona.o
- obj-$(CONFIG_MMC_SDHCI_BCM2835)		+= sdhci-bcm2835.o
- 
- ifeq ($(CONFIG_CB710_DEBUG),y)
-diff --git a/drivers/mmc/host/sdhci-bcm-kona.c b/drivers/mmc/host/sdhci-bcm-kona.c
-new file mode 100644
-index 0000000..1b3d8d0
---- /dev/null
-+++ b/drivers/mmc/host/sdhci-bcm-kona.c
-@@ -0,0 +1,349 @@
-+/*
-+ * Copyright (C) 2013 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/delay.h>
-+#include <linux/highmem.h>
-+#include <linux/platform_device.h>
-+#include <linux/mmc/host.h>
-+#include <linux/io.h>
-+#include <linux/gpio.h>
-+#include <linux/clk.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
-+#include <linux/version.h>
-+#include <linux/mmc/slot-gpio.h>
-+
-+#include "sdhci-pltfm.h"
-+#include "sdhci.h"
-+
-+#define SDHCI_SOFT_RESET			0x01000000
-+#define KONA_SDHOST_CORECTRL			0x8000
-+#define KONA_SDHOST_CD_PINCTRL			0x00000008
-+#define KONA_SDHOST_STOP_HCLK			0x00000004
-+#define KONA_SDHOST_RESET			0x00000002
-+#define KONA_SDHOST_EN				0x00000001
-+
-+#define KONA_SDHOST_CORESTAT			0x8004
-+#define KONA_SDHOST_WP				0x00000002
-+#define KONA_SDHOST_CD_SW			0x00000001
-+
-+#define KONA_SDHOST_COREIMR			0x8008
-+#define KONA_SDHOST_IP				0x00000001
-+
-+#define KONA_SDHOST_COREISR			0x800C
-+#define KONA_SDHOST_COREIMSR			0x8010
-+#define KONA_SDHOST_COREDBG1			0x8014
-+#define KONA_SDHOST_COREGPO_MASK		0x8018
-+
-+#define SD_DETECT_GPIO_DEBOUNCE_128MS		128
-+
-+#define KONA_MMC_AUTOSUSPEND_DELAY		(50)
-+
-+struct sdhci_bcm_kona_dev {
-+	struct mutex	write_lock; /* protect back to back writes */
-+};
-+
-+
-+static int sdhci_bcm_kona_sd_reset(struct sdhci_host *host)
-+{
-+	unsigned int val;
-+	unsigned long timeout;
-+
-+	/* This timeout should be sufficent for core to reset */
-+	timeout = jiffies + msecs_to_jiffies(100);
-+
-+	/* reset the host using the top level reset */
-+	val = sdhci_readl(host, KONA_SDHOST_CORECTRL);
-+	val |= KONA_SDHOST_RESET;
-+	sdhci_writel(host, val, KONA_SDHOST_CORECTRL);
-+
-+	while (!(sdhci_readl(host, KONA_SDHOST_CORECTRL) & KONA_SDHOST_RESET)) {
-+		if (time_is_before_jiffies(timeout)) {
-+			pr_err("Error: sd host is stuck in reset!!!\n");
-+			return -EFAULT;
-+		}
-+	}
-+
-+	/* bring the host out of reset */
-+	val = sdhci_readl(host, KONA_SDHOST_CORECTRL);
-+	val &= ~KONA_SDHOST_RESET;
-+
-+	/*
-+	 * Back-to-Back register write needs a delay of 1ms at bootup (min 10uS)
-+	 * Back-to-Back writes to same register needs delay when SD bus clock
-+	 * is very low w.r.t AHB clock, mainly during boot-time and during card
-+	 * insert-removal.
-+	 */
-+	usleep_range(1000, 5000);
-+	sdhci_writel(host, val, KONA_SDHOST_CORECTRL);
-+
-+	return 0;
-+}
-+
-+static void sdhci_bcm_kona_sd_init(struct sdhci_host *host)
-+{
-+	unsigned int val;
-+
-+	/* enable the interrupt from the IP core */
-+	val = sdhci_readl(host, KONA_SDHOST_COREIMR);
-+	val |= KONA_SDHOST_IP;
-+	sdhci_writel(host, val, KONA_SDHOST_COREIMR);
-+
-+	/* Enable the AHB clock gating module to the host */
-+	val = sdhci_readl(host, KONA_SDHOST_CORECTRL);
-+	val |= KONA_SDHOST_EN;
-+
-+	/*
-+	 * Back-to-Back register write needs a delay of 1ms at bootup (min 10uS)
-+	 * Back-to-Back writes to same register needs delay when SD bus clock
-+	 * is very low w.r.t AHB clock, mainly during boot-time and during card
-+	 * insert-removal.
-+	 */
-+	usleep_range(1000, 5000);
-+	sdhci_writel(host, val, KONA_SDHOST_CORECTRL);
-+}
-+
-+/*
-+ * Software emulation of the SD card insertion/removal. Set insert=1 for insert
-+ * and insert=0 for removal. The card detection is done by GPIO. For Broadcom
-+ * IP to function properly the bit 0 of CORESTAT register needs to be set/reset
-+ * to generate the CD IRQ handled in sdhci.c which schedules card_tasklet.
-+ */
-+static int sdhci_bcm_kona_sd_card_emulate(struct sdhci_host *host, int insert)
-+{
-+	struct sdhci_pltfm_host *pltfm_priv = sdhci_priv(host);
-+	struct sdhci_bcm_kona_dev *kona_dev = sdhci_pltfm_priv(pltfm_priv);
-+	u32 val;
-+
-+	/*
-+	 * Back-to-Back register write needs a delay of min 10uS.
-+	 * Back-to-Back writes to same register needs delay when SD bus clock
-+	 * is very low w.r.t AHB clock, mainly during boot-time and during card
-+	 * insert-removal.
-+	 * We keep 20uS
-+	 */
-+	mutex_lock(&kona_dev->write_lock);
-+	udelay(20);
-+	val = sdhci_readl(host, KONA_SDHOST_CORESTAT);
-+
-+	if (insert) {
-+		int ret;
-+
-+		ret = mmc_gpio_get_ro(host->mmc);
-+		if (ret >= 0)
-+			val = (val & ~KONA_SDHOST_WP) |
-+				((ret) ? KONA_SDHOST_WP : 0);
-+
-+		val |= KONA_SDHOST_CD_SW;
-+		sdhci_writel(host, val, KONA_SDHOST_CORESTAT);
-+	} else {
-+		val &= ~KONA_SDHOST_CD_SW;
-+		sdhci_writel(host, val, KONA_SDHOST_CORESTAT);
-+	}
-+	mutex_unlock(&kona_dev->write_lock);
-+
-+	return 0;
-+}
-+
-+/*
-+ * SD card interrupt event callback
-+ */
-+void sdhci_bcm_kona_card_event(struct sdhci_host *host)
-+{
-+	if (mmc_gpio_get_cd(host->mmc) > 0) {
-+		dev_dbg(mmc_dev(host->mmc),
-+			"card inserted\n");
-+		sdhci_bcm_kona_sd_card_emulate(host, 1);
-+	} else {
-+		dev_dbg(mmc_dev(host->mmc),
-+			"card removed\n");
-+		sdhci_bcm_kona_sd_card_emulate(host, 0);
-+	}
-+}
-+
-+/*
-+ * Get the base clock. Use central clock source for now. Not sure if different
-+ * clock speed to each dev is allowed
-+ */
-+static unsigned int sdhci_bcm_kona_get_max_clk(struct sdhci_host *host)
-+{
-+	struct sdhci_bcm_kona_dev *kona_dev;
-+	struct sdhci_pltfm_host *pltfm_priv = sdhci_priv(host);
-+	kona_dev = sdhci_pltfm_priv(pltfm_priv);
-+
-+	return host->mmc->f_max;
-+}
-+
-+static unsigned int sdhci_bcm_kona_get_timeout_clock(struct sdhci_host *host)
-+{
-+	return sdhci_bcm_kona_get_max_clk(host);
-+}
-+
-+static void sdhci_bcm_kona_init_74_clocks(struct sdhci_host *host,
-+				u8 power_mode)
-+{
-+	/*
-+	 *  JEDEC and SD spec specify supplying 74 continuous clocks to
-+	 * device after power up. With minimum bus (100KHz) that
-+	 * that translates to 740us
-+	 */
-+	if (power_mode != MMC_POWER_OFF)
-+		udelay(740);
-+}
-+
-+static struct sdhci_ops sdhci_bcm_kona_ops = {
-+	.get_max_clock = sdhci_bcm_kona_get_max_clk,
-+	.get_timeout_clock = sdhci_bcm_kona_get_timeout_clock,
-+	.platform_send_init_74_clocks = sdhci_bcm_kona_init_74_clocks,
-+	.card_event = sdhci_bcm_kona_card_event,
-+};
-+
-+static struct sdhci_pltfm_data sdhci_pltfm_data_kona = {
-+	.ops    = &sdhci_bcm_kona_ops,
-+	.quirks = SDHCI_QUIRK_NO_CARD_NO_RESET |
-+		SDHCI_QUIRK_BROKEN_TIMEOUT_VAL | SDHCI_QUIRK_32BIT_DMA_ADDR |
-+		SDHCI_QUIRK_32BIT_DMA_SIZE | SDHCI_QUIRK_32BIT_ADMA_SIZE |
-+		SDHCI_QUIRK_FORCE_BLK_SZ_2048 |
-+		SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
-+};
-+
-+static const struct of_device_id sdhci_bcm_kona_of_match[] __initdata = {
-+	{ .compatible = "bcm,kona-sdhci"},
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, sdhci_bcm_kona_of_match);
-+
-+static int __init sdhci_bcm_kona_probe(struct platform_device *pdev)
-+{
-+	struct sdhci_bcm_kona_dev *kona_dev = NULL;
-+	struct sdhci_pltfm_host *pltfm_priv;
-+	struct device *dev = &pdev->dev;
-+	struct sdhci_host *host;
-+	int ret;
-+
-+	ret = 0;
-+
-+	host = sdhci_pltfm_init(pdev, &sdhci_pltfm_data_kona,
-+			sizeof(*kona_dev));
-+	if (IS_ERR(host))
-+		return PTR_ERR(host);
-+
-+	dev_dbg(dev, "%s: inited. IOADDR=%p\n", __func__, host->ioaddr);
-+
-+	pltfm_priv = sdhci_priv(host);
-+
-+	kona_dev = sdhci_pltfm_priv(pltfm_priv);
-+	mutex_init(&kona_dev->write_lock);
-+
-+	mmc_of_parse(host->mmc);
-+
-+	if (!host->mmc->f_max) {
-+		dev_err(&pdev->dev, "Missing max-freq for SDHCI cfg\n");
-+		ret = -ENXIO;
-+		goto err_pltfm_free;
-+	}
-+
-+	dev_dbg(dev, "non-removable=%c\n",
-+		(host->mmc->caps & MMC_CAP_NONREMOVABLE) ? 'Y' : 'N');
-+	dev_dbg(dev, "cd_gpio %c, wp_gpio %c\n",
-+		(mmc_gpio_get_cd(host->mmc) != -ENOSYS) ? 'Y' : 'N',
-+		(mmc_gpio_get_ro(host->mmc) != -ENOSYS) ? 'Y' : 'N');
-+
-+	if (host->mmc->caps | MMC_CAP_NONREMOVABLE)
-+		host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
-+
-+	dev_dbg(dev, "is_8bit=%c\n",
-+		(host->mmc->caps | MMC_CAP_8_BIT_DATA) ? 'Y' : 'N');
-+
-+	ret = sdhci_bcm_kona_sd_reset(host);
-+	if (ret)
-+		goto err_pltfm_free;
-+
-+	sdhci_bcm_kona_sd_init(host);
-+
-+	ret = sdhci_add_host(host);
-+	if (ret) {
-+		dev_err(dev, "Failed sdhci_add_host\n");
-+		goto err_reset;
-+	}
-+
-+	/* if device is eMMC, emulate card insert right here */
-+	if (host->mmc->caps | MMC_CAP_NONREMOVABLE) {
-+		ret = sdhci_bcm_kona_sd_card_emulate(host, 1);
-+		if (ret) {
-+			dev_err(dev,
-+				"unable to emulate card insertion\n");
-+			goto err_remove_host;
-+		}
-+	}
-+	/*
-+	 * Since the card detection GPIO interrupt is configured to be
-+	 * edge sensitive, check the initial GPIO value here, emulate
-+	 * only if the card is present
-+	 */
-+	if (mmc_gpio_get_cd(host->mmc) > 0)
-+		sdhci_bcm_kona_sd_card_emulate(host, 1);
-+
-+	dev_dbg(dev, "initialized properly\n");
-+	return 0;
-+
-+err_remove_host:
-+	sdhci_remove_host(host, 0);
-+
-+err_reset:
-+	sdhci_bcm_kona_sd_reset(host);
-+
-+err_pltfm_free:
-+	sdhci_pltfm_free(pdev);
-+
-+	dev_err(dev, "Probing of sdhci-pltfm failed: %d\n", ret);
-+	return ret;
-+}
-+
-+static int __exit sdhci_bcm_kona_remove(struct platform_device *pdev)
-+{
-+	struct sdhci_host *host = platform_get_drvdata(pdev);
-+	int dead;
-+	u32 scratch;
-+
-+	dead = 0;
-+	scratch = readl(host->ioaddr + SDHCI_INT_STATUS);
-+	if (scratch == (u32)-1)
-+		dead = 1;
-+	sdhci_remove_host(host, dead);
-+
-+	sdhci_free_host(host);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver sdhci_bcm_kona_driver = {
-+	.driver		= {
-+		.name	= "sdhci-kona",
-+		.owner	= THIS_MODULE,
-+		.pm	= SDHCI_PLTFM_PMOPS,
-+		.of_match_table = of_match_ptr(sdhci_bcm_kona_of_match),
-+	},
-+	.probe		= sdhci_bcm_kona_probe,
-+	.remove		= __exit_p(sdhci_bcm_kona_remove),
-+};
-+module_platform_driver(sdhci_bcm_kona_driver);
-+
-+MODULE_DESCRIPTION("SDHCI driver for Broadcom Kona platform");
-+MODULE_AUTHOR("Broadcom");
-+MODULE_LICENSE("GPL v2");
-+
--- 
-1.7.10.4
+
+> +};
+> diff --git a/drivers/mailbox/mailbox-omap2.c b/drivers/mailbox/mailbox-omap2.c
+> index 6c0687c..3fe08de 100644
+> --- a/drivers/mailbox/mailbox-omap2.c
+> +++ b/drivers/mailbox/mailbox-omap2.c
+> @@ -14,6 +14,7 @@
+>   #include <linux/slab.h>
+>   #include <linux/clk.h>
+>   #include <linux/err.h>
+> +#include <linux/of_device.h>
+>   #include <linux/platform_device.h>
+>   #include <linux/io.h>
+>   #include <linux/pm_runtime.h>
+> @@ -222,6 +223,21 @@ static struct omap_mbox_ops omap2_mbox_ops = {
+>   	.restore_ctx	= omap2_mbox_restore_ctx,
+>   };
+>
+> +static const struct of_device_id omap_mailbox_of_match[] = {
+> +	{
+> +		.compatible	= "ti,omap2-mailbox",
+> +		.data		= (void *) MBOX_INTR_CFG_TYPE1,
+> +	},
+> +	{
+> +		.compatible	= "ti,omap4-mailbox",
+> +		.data		= (void *) MBOX_INTR_CFG_TYPE2,
+> +	},
+> +	{
+> +		/* end */
+> +	},
+> +};
+> +MODULE_DEVICE_TABLE(of, omap_mailbox_of_match);
+> +
+>   static int omap2_mbox_probe(struct platform_device *pdev)
+>   {
+>   	struct resource *mem;
+> @@ -229,47 +245,138 @@ static int omap2_mbox_probe(struct platform_device *pdev)
+>   	struct omap_mbox **list, *mbox, *mboxblk;
+>   	struct omap_mbox2_priv *priv, *privblk;
+>   	struct omap_mbox_pdata *pdata = pdev->dev.platform_data;
+> -	struct omap_mbox_dev_info *info;
+>   	struct omap_mbox_device *mdev;
+> -	int i;
+> -
+> -	if (!pdata || !pdata->info_cnt || !pdata->info) {
+> +	struct omap_mbox_dev_info *info, *of_info = NULL;
+> +	struct device_node *node = pdev->dev.of_node;
+> +	int i, j;
+> +	u32 info_count = 0, intr_type = 0;
+> +	u32 num_users = 0, num_fifos = 0;
+> +	u32 dlen, dsize;
+> +	u32 *tmp;
+> +	const __be32 *mbox_data;
+> +
+> +	if (!node && (!pdata || !pdata->info_cnt || !pdata->info)) {
+>   		pr_err("%s: platform not supported\n", __func__);
+>   		return -ENODEV;
+>   	}
+>
+> +	if (node) {
+> +		intr_type = (u32)of_match_device(omap_mailbox_of_match,
+> +							&pdev->dev)->data;
+> +		if (intr_type != 0 && intr_type != 1) {
+> +			dev_err(&pdev->dev, "invalid match data value\n");
+> +			return -EINVAL;
+> +		}
+> +
+> +		if (of_property_read_u32(node, "ti,mbox-num-users",
+> +								&num_users)) {
+> +			dev_err(&pdev->dev,
+> +				"no ti,mbox-num-users configuration found\n");
+> +			return -ENODEV;
+> +		}
+> +
+> +		if (of_property_read_u32(node, "ti,mbox-num-fifos",
+> +								&num_fifos)) {
+> +			dev_err(&pdev->dev,
+> +				"no ti,mbox-num-fifos configuration found\n");
+> +			return -ENODEV;
+> +		}
+> +
+> +		if (of_property_read_u32(node, "#ti,mbox-data-cells", &dsize)) {
+> +			dev_err(&pdev->dev,
+> +				"no #ti,mbox-data-cells configuration found\n");
+> +			return -ENODEV;
+> +		}
+> +		if (dsize != 4) {
+> +			dev_err(&pdev->dev,
+> +				"invalid size for #ti,mbox-data-cells\n");
+> +			return -EINVAL;
+> +		}
+> +
+> +		info_count = of_property_count_strings(node, "ti,mbox-names");
+> +		if (!info_count) {
+> +			dev_err(&pdev->dev, "no mbox devices found\n");
+> +			return -ENODEV;
+> +		}
+> +
+> +		mbox_data = of_get_property(node, "ti,mbox-data", &dlen);
+> +		if (!mbox_data) {
+> +			dev_err(&pdev->dev, "no mbox device data found\n");
+> +			return -ENODEV;
+> +		}
+> +		dlen /= sizeof(dsize);
+> +		if (dlen != dsize * info_count) {
+> +			dev_err(&pdev->dev, "mbox device data is truncated\n");
+> +			return -ENODEV;
+> +		}
+> +
+> +		of_info = kzalloc(info_count * sizeof(*of_info), GFP_KERNEL);
+> +		if (!of_info)
+> +			return -ENOMEM;
+> +
+> +		i = 0;
+> +		while (i < info_count) {
+> +			info = of_info + i;
+> +			if (of_property_read_string_index(node,
+> +					"ti,mbox-names", i,  &info->name)) {
+> +				dev_err(&pdev->dev,
+> +					"mbox_name [%d] read failed\n", i);
+> +				ret = -ENODEV;
+> +				goto free_of;
+> +			}
+> +
+> +			tmp = &info->tx_id;
+> +			for (j = 0; j < dsize; j++) {
+> +				tmp[j] = of_read_number(
+> +						mbox_data + j + (i * dsize), 1);
+> +			}
+> +			i++;
+> +		}
+> +	}
+> +
+> +	if (!node) { /* non-DT device creation */
+> +		info_count = pdata->info_cnt;
+> +		info = pdata->info;
+> +		intr_type = pdata->intr_type;
+> +		num_users = pdata->num_users;
+> +		num_fifos = pdata->num_fifos;
+> +	} else {
+> +		info = of_info;
+> +	}
+> +
+>   	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
+> -	if (!mdev)
+> -		return -ENOMEM;
+> +	if (!mdev) {
+> +		ret = -ENOMEM;
+> +		goto free_of;
+> +	}
+>
+>   	/* allocate one extra for marking end of list */
+> -	list = kzalloc((pdata->info_cnt + 1) * sizeof(*list), GFP_KERNEL);
+> +	list = kzalloc((info_count + 1) * sizeof(*list), GFP_KERNEL);
+>   	if (!list) {
+>   		ret = -ENOMEM;
+>   		goto free_mdev;
+>   	}
+>
+> -	mboxblk = mbox = kzalloc(pdata->info_cnt * sizeof(*mbox), GFP_KERNEL);
+> +	mboxblk = mbox = kzalloc(info_count * sizeof(*mbox), GFP_KERNEL);
+>   	if (!mboxblk) {
+>   		ret = -ENOMEM;
+>   		goto free_list;
+>   	}
+>
+> -	privblk = priv = kzalloc(pdata->info_cnt * sizeof(*priv), GFP_KERNEL);
+> +	privblk = priv = kzalloc(info_count * sizeof(*priv), GFP_KERNEL);
+>   	if (!privblk) {
+>   		ret = -ENOMEM;
+>   		goto free_mboxblk;
+>   	}
+>
+> -	info = pdata->info;
+> -	for (i = 0; i < pdata->info_cnt; i++, info++, priv++) {
+> +	for (i = 0; i < info_count; i++, info++, priv++) {
+>   		priv->tx_fifo.msg = MAILBOX_MESSAGE(info->tx_id);
+>   		priv->tx_fifo.fifo_stat = MAILBOX_FIFOSTATUS(info->tx_id);
+>   		priv->rx_fifo.msg =  MAILBOX_MESSAGE(info->rx_id);
+>   		priv->rx_fifo.msg_stat =  MAILBOX_MSGSTATUS(info->rx_id);
+>   		priv->notfull_bit = MAILBOX_IRQ_NOTFULL(info->tx_id);
+>   		priv->newmsg_bit = MAILBOX_IRQ_NEWMSG(info->rx_id);
+> -		if (pdata->intr_type) {
+> +		if (intr_type) {
+>   			priv->irqenable = OMAP4_MAILBOX_IRQENABLE(info->usr_id);
+>   			priv->irqstatus = OMAP4_MAILBOX_IRQSTATUS(info->usr_id);
+>   			priv->irqdisable =
+> @@ -279,7 +386,7 @@ static int omap2_mbox_probe(struct platform_device *pdev)
+>   			priv->irqstatus = MAILBOX_IRQSTATUS(info->usr_id);
+>   			priv->irqdisable = MAILBOX_IRQENABLE(info->usr_id);
+>   		}
+> -		priv->intr_type = pdata->intr_type;
+> +		priv->intr_type = intr_type;
+>
+>   		mbox->priv = priv;
+>   		mbox->parent = mdev;
+> @@ -307,8 +414,8 @@ static int omap2_mbox_probe(struct platform_device *pdev)
+>
+>   	mutex_init(&mdev->cfg_lock);
+>   	mdev->dev = &pdev->dev;
+> -	mdev->num_users = pdata->num_users;
+> -	mdev->num_fifos = pdata->num_fifos;
+> +	mdev->num_users = num_users;
+> +	mdev->num_fifos = num_fifos;
+>   	mdev->mboxes = list;
+>   	ret = omap_mbox_register(&pdev->dev, list);
+>   	if (ret)
+> @@ -317,6 +424,7 @@ static int omap2_mbox_probe(struct platform_device *pdev)
+>
+>   	pm_runtime_enable(mdev->dev);
+>
+> +	kfree(of_info);
+>   	return 0;
+>
+>   unmap_mbox:
+> @@ -329,6 +437,8 @@ free_list:
+>   	kfree(list);
+>   free_mdev:
+>   	kfree(mdev);
+> +free_of:
+> +	kfree(of_info);
+>   	return ret;
+>   }
+>
+> @@ -358,6 +468,7 @@ static struct platform_driver omap2_mbox_driver = {
+>   	.remove	= omap2_mbox_remove,
+>   	.driver	= {
+>   		.name = "omap-mailbox",
+> +		.of_match_table = omap_mailbox_of_match,
+>   	},
+>   };
+>
+>
