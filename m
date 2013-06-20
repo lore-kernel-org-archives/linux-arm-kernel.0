@@ -1,57 +1,68 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Jun 2013 07:45:30 +0900
-Subject: [GIT PULL 01/10] Samsung cleanup-1 for v3.11
-In-Reply-To: <201306201730.38049.arnd@arndb.de>
-References: <51C0BC37.7090604@samsung.com> <201306201730.38049.arnd@arndb.de>
-Message-ID: <25b701ce6e07$ddec4b40$99c4e1c0$%kim@samsung.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 20 Jun 2013 15:48:44 -0700
+Subject: [PATCH v2] ARM/KVM: save and restore generic timer registers
+In-Reply-To: <7BA55D0B-D754-4FD2-BD4C-6223AA063E27@suse.de>
+References: <1370963819-26165-1-git-send-email-andre.przywara@linaro.org>
+ <51C2D528.90805@arm.com> <20130620170923.GA4563@lvm>
+ <51C339BD.2080600@arm.com> <20130620183221.GE4563@lvm>
+ <CAFEAcA97WiCYnSSs3utfq5+3tgausn+fjEnWeN6zj9sgP9P9qA@mail.gmail.com>
+ <20130620203715.GI4563@lvm>
+ <52054112-99C9-44DD-921C-BA06854B29A5@suse.de>
+ <CAFEAcA8D+SXe8PPfd=sqPf8td4kk5TbdQgXgqUVnkXR7ZKXKpw@mail.gmail.com>
+ <7BA55D0B-D754-4FD2-BD4C-6223AA063E27@suse.de>
+Message-ID: <20130620224844.GM4563@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+On Fri, Jun 21, 2013 at 12:02:02AM +0200, Alexander Graf wrote:
+> 
+> On 20.06.2013, at 23:59, Peter Maydell wrote:
+> 
+> > On 20 June 2013 22:55, Alexander Graf <agraf@suse.de> wrote:
+> >> 
+> >> On 20.06.2013, at 22:37, Christoffer Dall wrote:
+> >> 
+> >>> On Thu, Jun 20, 2013 at 08:29:30PM +0100, Peter Maydell wrote:
+> >>>> On 20 June 2013 19:32, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> >>>>> Marc wrote:
+> >>>>>> So there is just one thing we absolutely need to make sure here: no vcpu
+> >>>>>> can run before they've all had their timer restored, and hence a stable
+> >>>>>> cntvoff. Otherwise two vcpus will have a different view of time.
+> >>>>>> 
+> >>>>>> Can we guarantee this?
+> >>>> 
+> >>>>> Do we need to?  User space is free to modify time and all sort of other
+> >>>>> registers at any point during VM execution - it will just break the
+> >>>>> guest that it's running.
+> >>>> 
+> >>>> Note that QEMU will stop all CPUs before doing a migration or
+> >>>> similar operation. However there is a monitor command to query
+> >>>> the current CPU registers etc which won't try to stop the VM
+> >>>> first. So we might try to read vcpu registers (though I hope we
+> >>>> don't allow writing them).
+> >>>> 
+> >>> Sounds like we need to add a -EBUSY return on SET_ONE_REG if the VM is
+> >>> running.
+> >> 
+> >> The ONE_REG API should already be protected here, as it does
+> >> vcpu_load() in kvm_vcpu_ioctl(). So a separate thread can't possibly
+> >> do ONE_REG accesses while another thread has the same vcpu running.
+> > 
+> > Doesn't protect you against confusion due to another thread running
+> > a different vcpu in the same vm, though.
+> 
+> Ah, different ONE_REG API. Can't you just notify all vcpus to exit and refresh their timers? That's what kvm_make_request() is there for, no?
+> 
+yes you can, but I don't think it's worth the trouble to add the code in
+the kernel to fix a case where user space does something completely
+broken, which does not muck with the hardware or host state, but can
+only break the guest.
 
-[...]
+I didn't realize that ONE_REG does vcpu_load() (or, I probably did once,
+and forgot) so that means we're good.
 
-> 
-> I've had to apply this patch on top to get s5p to build cleanly again.
-> It's part of next/cleanup now as well.
-> 
-> 	Arnd
-> 
-> From 854f1c88e6ab7c8a12a49913e8b1648f96af0701 Mon Sep 17 00:00:00 2001
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Thu, 20 Jun 2013 17:27:13 +0200
-> Subject: [PATCH] ARM: s5p64x0: avoid build warning for uncompress.h
-> 
-> Commit 5336539 "ARM: S5P64X0: Use common uncompress.h part
-> for plat-samsung" was missing a type cast, this brings
-> it in line with the other samsung platforms.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-Yes, thanks for fix it and if you want,
+Conclusion on this patch: address Marc's comment to move the user space
+interface handling out of arch_timer.c and we should be good.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-probably, you can't amend it though :)
-
-- Kukjin
-
-> diff --git a/arch/arm/mach-s5p64x0/include/mach/uncompress.h
-> b/arch/arm/mach-s5p64x0/include/mach/uncompress.h
-> index bc04bd5..bbcc3f6 100644
-> --- a/arch/arm/mach-s5p64x0/include/mach/uncompress.h
-> +++ b/arch/arm/mach-s5p64x0/include/mach/uncompress.h
-> @@ -23,9 +23,9 @@ static void arch_detect_cpu(void)
->  	chipid = *(const volatile unsigned int __force *) 0xE0100118;
-> 
->  	if ((chipid & 0xff000) == 0x50000)
-> -		uart_base = S5P6450_PA_UART(CONFIG_S3C_LOWLEVEL_UART_PORT);
-> +		uart_base = (volatile u8
-> *)S5P6450_PA_UART(CONFIG_S3C_LOWLEVEL_UART_PORT);
->  	else
-> -		uart_base = S5P6440_PA_UART(CONFIG_S3C_LOWLEVEL_UART_PORT);
-> +		uart_base = (volatile u8
-> *)S5P6440_PA_UART(CONFIG_S3C_LOWLEVEL_UART_PORT);
-> 
->  	fifo_mask = S3C2440_UFSTAT_TXMASK;
->  	fifo_max = 63 << S3C2440_UFSTAT_TXSHIFT;
+Thanks,
+-Christoffer
