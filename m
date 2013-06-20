@@ -1,56 +1,51 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 20 Jun 2013 17:42:51 +0200
-Subject: [PATCH 1/6] ARM: mx27: Replace clk_register_clkdev with clock DT
- lookup
-In-Reply-To: <CAOMZO5AaZSAsvNUCOqTuqx7UGCrGH6Cm-Uz9wN3nO1e1XU_usw@mail.gmail.com>
+Date: Thu, 20 Jun 2013 17:44:01 +0200
+Subject: [PATCH 4/6] ARM: dts: imx27: Add 1-wire
+In-Reply-To: <1371741454.488712140@f66.mail.ru>
 References: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
- <1371739815-6666-2-git-send-email-mpa@pengutronix.de>
- <1371742088.528552668@f66.mail.ru>
- <CAOMZO5AaZSAsvNUCOqTuqx7UGCrGH6Cm-Uz9wN3nO1e1XU_usw@mail.gmail.com>
-Message-ID: <20130620154251.GC8219@s25.your-server.de>
+ <1371739815-6666-5-git-send-email-mpa@pengutronix.de>
+ <1371741454.488712140@f66.mail.ru>
+Message-ID: <20130620154401.GD8219@s25.your-server.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 12:35:10PM -0300, Fabio Estevam wrote:
-> On Thu, Jun 20, 2013 at 12:28 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
-> >> From: Fabio Estevam <fabio.estevam@freescale.com>
-> >>
-> >> Similarly as it was done for mx6q, use a DT lookup in order to make maintainance
-> >> task for the clock devices easier.
-> >>
-> >> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> >> [Markus Pargmann: Add gpio clocks]
-> >> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> >> ---
-> >>  arch/arm/boot/dts/imx27.dtsi | 12 ++++++++++++
-> >>  1 file changed, 12 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> >> index 0695264..48c263c 100644
-> >> --- a/arch/arm/boot/dts/imx27.dtsi
-> >> +++ b/arch/arm/boot/dts/imx27.dtsi
-> >> @@ -208,6 +208,8 @@
-> >>                               #gpio-cells = <2>;
-> >>                               interrupt-controller;
-> >>                               #interrupt-cells = <2>;
-> >> +                             clocks = <&clks 47>;
-> >> +                             clock-names = "ipg";
-> >
-> > Clock is not used in the gpio driver, so I doubt the usefulness of this patch.
+On Thu, Jun 20, 2013 at 07:17:34PM +0400, Alexander Shiyan wrote:
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  arch/arm/boot/dts/imx27.dtsi | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> > index 044004a..e883e77 100644
+> > --- a/arch/arm/boot/dts/imx27.dtsi
+> > +++ b/arch/arm/boot/dts/imx27.dtsi
+> > @@ -110,6 +110,14 @@
+> >  				clock-names = "ipg", "per";
+> >  			};
+> >  
+> > +			owire: owire at 10009000 {
+> > +				compatible = "fsl,imx21-owire";
 > 
-> I think you meant "this hunk", right?
-> 
-> My original patch did not have this part. It was added by Markus as
-> mentioned in the commit log, and I agree we should go with the
-> original version that did not add the gpio clock.
+> I think you should use "fsl,imx27-owire", "fsl,imx21-owire" here.
 
-I somehow missed that your patch was applied in march. gpio clocks are
-not mentioned in the binding documentation, so I drop this one
-completely.
-
-Thanks,
+Fixed, thank you
 
 Markus
+
+> 
+> > +				reg = <0x10009000 0x1000>;
+> > +				clocks = <&clks 35>;
+> > +				clock-names = "ipg";
+> > +				status = "disabled";
+> > +			};
+> > +
+> >  			uart1: serial at 1000a000 {
+> >  				compatible = "fsl,imx27-uart", "fsl,imx21-uart";
+> >  				reg = <0x1000a000 0x1000>;
+> > -- 
+> 
+> 
+> ---
 
 -- 
 Pengutronix e.K.                           |                             |
