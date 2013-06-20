@@ -1,332 +1,132 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Fri, 21 Jun 2013 01:30:32 +0200
-Subject: [PATCH v6 1/3] arm: Add basic clocks for Rockchip rk3066a SoCs
+Date: Fri, 21 Jun 2013 01:31:10 +0200
+Subject: [PATCH v6 2/3] arm: add debug uarts for rockchip rk29xx and rk3xxx
+ series
 In-Reply-To: <201306210129.54629.heiko@sntech.de>
 References: <201306210129.54629.heiko@sntech.de>
-Message-ID: <201306210130.33033.heiko@sntech.de>
+Message-ID: <201306210131.11224.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a basic clock setup for rk3066a SoCs. Only the gates are
-set up currently, as the mux and dividers should use the upcoming
-generic devicetree bindings.
+Uarts on all recent Rockchip SoCs are Synopsis DesignWare 8250 types.
+Only their addresses vary very much.
 
-Clocks whose rates need to be known are supplied by fixed-rate
-"dummy"-clocks that provide the correct rate. This is uncritical insofar
-that the only bootloader currently in existence for Rockchip devices
-is the propietary Rockchip one that always setups the clocks in the
-necessary way.
+This patch adds the necessary definitions to use any of the uart ports
+for early debug purposes.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3066a-clocks.dtsi |  299 +++++++++++++++++++++++++++++++++
- 1 file changed, 299 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3066a-clocks.dtsi
+ arch/arm/Kconfig.debug            |   34 ++++++++++++++++++++++++++++++
+ arch/arm/include/debug/rockchip.S |   42 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 76 insertions(+)
+ create mode 100644 arch/arm/include/debug/rockchip.S
 
-diff --git a/arch/arm/boot/dts/rk3066a-clocks.dtsi b/arch/arm/boot/dts/rk3066a-clocks.dtsi
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 003f371..0e88bc8 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -399,6 +399,13 @@ choice
+ 		  their output to the standard serial port on the RealView
+ 		  PB1176 platform.
+ 
++	config DEBUG_ROCKCHIP_UART
++		bool "Kernel low-level debugging messages via Rockchip UART"
++		depends on ARCH_ROCKCHIP
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Rockchip based platforms.
++
+ 	config DEBUG_S3C_UART0
+ 		depends on PLAT_SAMSUNG
+ 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
+@@ -643,6 +650,32 @@ endchoice
+ 
+ choice
+ 	prompt "Low-level debug console UART"
++	depends on DEBUG_ROCKCHIP_UART
++
++	config DEBUG_RK29_UART0
++		bool "RK29 UART0"
++
++	config DEBUG_RK29_UART1
++		bool "RK29 UART1"
++
++	config DEBUG_RK29_UART2
++		bool "RK29 UART2"
++
++	config DEBUG_RK3X_UART0
++		bool "RK3X UART0"
++
++	config DEBUG_RK3X_UART1
++		bool "RK3X UART1"
++
++	config DEBUG_RK3X_UART2
++		bool "RK3X UART2"
++
++	config DEBUG_RK3X_UART3
++		bool "RK3X UART3"
++endchoice
++
++choice
++	prompt "Low-level debug console UART"
+ 	depends on DEBUG_LL && DEBUG_TEGRA_UART
+ 
+ 	config TEGRA_DEBUG_UART_AUTO_ODMDATA
+@@ -697,6 +730,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
+ 	default "debug/pxa.S" if DEBUG_PXA_UART1 || DEBUG_MMP_UART2 || \
+ 				 DEBUG_MMP_UART3
++	default "debug/rockchip.S" if DEBUG_ROCKCHIP_UART
+ 	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
+ 	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
+ 	default "debug/sunxi.S" if DEBUG_SUNXI_UART0 || DEBUG_SUNXI_UART1
+diff --git a/arch/arm/include/debug/rockchip.S b/arch/arm/include/debug/rockchip.S
 new file mode 100644
-index 0000000..6e307fc
+index 0000000..cfd883e
 --- /dev/null
-+++ b/arch/arm/boot/dts/rk3066a-clocks.dtsi
-@@ -0,0 +1,299 @@
++++ b/arch/arm/include/debug/rockchip.S
+@@ -0,0 +1,42 @@
 +/*
-+ * Copyright (c) 2013 MundoReader S.L.
-+ * Author: Heiko Stuebner <heiko@sntech.de>
++ * Early serial output macro for Rockchip SoCs
++ *
++ * Copyright (C) 2012 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+/ {
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
++#if defined(CONFIG_DEBUG_RK29_UART0)
++#define ROCKCHIP_UART_DEBUG_PHYS_BASE 0x20060000
++#define ROCKCHIP_UART_DEBUG_VIRT_BASE 0xfed60000
++#elif defined(CONFIG_DEBUG_RK29_UART1)
++#define ROCKCHIP_UART_DEBUG_PHYS_BASE 0x20064000
++#define ROCKCHIP_UART_DEBUG_VIRT_BASE 0xfed64000
++#elif defined(CONFIG_DEBUG_RK29_UART2)
++#define ROCKCHIP_UART_DEBUG_PHYS_BASE 0x20068000
++#define ROCKCHIP_UART_DEBUG_VIRT_BASE 0xfed68000
++#elif defined(CONFIG_DEBUG_RK3X_UART0)
++#define ROCKCHIP_UART_DEBUG_PHYS_BASE 0x10124000
++#define ROCKCHIP_UART_DEBUG_VIRT_BASE 0xfeb24000
++#elif defined(CONFIG_DEBUG_RK3X_UART1)
++#define ROCKCHIP_UART_DEBUG_PHYS_BASE 0x10126000
++#define ROCKCHIP_UART_DEBUG_VIRT_BASE 0xfeb26000
++#elif defined(CONFIG_DEBUG_RK3X_UART2)
++#define ROCKCHIP_UART_DEBUG_PHYS_BASE 0x20064000
++#define ROCKCHIP_UART_DEBUG_VIRT_BASE 0xfed64000
++#elif defined(CONFIG_DEBUG_RK3X_UART3)
++#define ROCKCHIP_UART_DEBUG_PHYS_BASE 0x20068000
++#define ROCKCHIP_UART_DEBUG_VIRT_BASE 0xfed68000
++#endif
 +
-+		/*
-+		 * This is a dummy clock, to be used as placeholder on
-+		 * other mux clocks when a specific parent clock is not
-+		 * yet implemented. It should be dropped when the driver
-+		 * is complete.
-+		 */
-+		dummy: dummy {
-+			compatible = "fixed-clock";
-+			clock-frequency = <0>;
-+			#clock-cells = <0>;
-+		};
++	.macro	addruart, rp, rv, tmp
++	ldr	\rp, =ROCKCHIP_UART_DEBUG_PHYS_BASE
++	ldr	\rv, =ROCKCHIP_UART_DEBUG_VIRT_BASE
++	.endm
 +
-+		xin24m: xin24m {
-+			compatible = "fixed-clock";
-+			clock-frequency = <24000000>;
-+			#clock-cells = <0>;
-+		};
-+
-+		dummy48m: dummy48m {
-+			compatible = "fixed-clock";
-+			clock-frequency = <48000000>;
-+			#clock-cells = <0>;
-+		};
-+
-+		dummy150m: dummy150m {
-+			compatible = "fixed-clock";
-+			clock-frequency = <150000000>;
-+			#clock-cells = <0>;
-+		};
-+
-+		clk_gates0: gate-clk at 200000d0 {
-+			compatible = "rockchip,rk2928-gate-clk";
-+			reg = <0x200000d0 0x4>;
-+			clocks = <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>;
-+
-+			clock-output-names =
-+				"gate_core_periph", "gate_cpu_gpll",
-+				"gate_ddrphy", "gate_aclk_cpu",
-+				"gate_hclk_cpu", "gate_pclk_cpu",
-+				"gate_atclk_cpu", "gate_i2s0",
-+				"gate_i2s0_frac", "gate_i2s1",
-+				"gate_i2s1_frac", "gate_i2s2",
-+				"gate_i2s2_frac", "gate_spdif",
-+				"gate_spdif_frac", "gate_testclk";
-+
-+			#clock-cells = <1>;
-+		};
-+
-+		clk_gates1: gate-clk at 200000d4 {
-+			compatible = "rockchip,rk2928-gate-clk";
-+			reg = <0x200000d4 0x4>;
-+			clocks = <&xin24m>, <&xin24m>,
-+				 <&xin24m>, <&dummy>,
-+				 <&dummy>, <&xin24m>,
-+				 <&xin24m>, <&dummy>,
-+				 <&xin24m>, <&dummy>,
-+				 <&xin24m>, <&dummy>,
-+				 <&xin24m>, <&dummy>,
-+				 <&xin24m>, <&dummy>;
-+
-+			clock-output-names =
-+				"gate_timer0", "gate_timer1",
-+				"gate_timer2", "gate_jtag",
-+				"gate_aclk_lcdc1_src", "gate_otgphy0",
-+				"gate_otgphy1", "gate_ddr_gpll",
-+				"gate_uart0", "gate_frac_uart0",
-+				"gate_uart1", "gate_frac_uart1",
-+				"gate_uart2", "gate_frac_uart2",
-+				"gate_uart3", "gate_frac_uart3";
-+
-+			#clock-cells = <1>;
-+		};
-+
-+		clk_gates2: gate-clk at 200000d8 {
-+			compatible = "rockchip,rk2928-gate-clk";
-+			reg = <0x200000d8 0x4>;
-+			clocks = <&clk_gates2 1>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&clk_gates2 3>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy48m>,
-+				 <&dummy>, <&dummy48m>,
-+				 <&dummy>, <&dummy>;
-+
-+			clock-output-names =
-+				"gate_periph_src", "gate_aclk_periph",
-+				"gate_hclk_periph", "gate_pclk_periph",
-+				"gate_smc", "gate_mac",
-+				"gate_hsadc", "gate_hsadc_frac",
-+				"gate_saradc", "gate_spi0",
-+				"gate_spi1", "gate_mmc0",
-+				"gate_mac_lbtest", "gate_mmc1",
-+				"gate_emmc", "gate_tsadc";
-+
-+			#clock-cells = <1>;
-+		};
-+
-+		clk_gates3: gate-clk at 200000dc {
-+			compatible = "rockchip,rk2928-gate-clk";
-+			reg = <0x200000dc 0x4>;
-+			clocks = <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&dummy>;
-+
-+			clock-output-names =
-+				"gate_aclk_lcdc0_src", "gate_dclk_lcdc0",
-+				"gate_dclk_lcdc1", "gate_pclkin_cif0",
-+				"gate_pclkin_cif1", "reserved",
-+				"reserved", "gate_cif0_out",
-+				"gate_cif1_out", "gate_aclk_vepu",
-+				"gate_hclk_vepu", "gate_aclk_vdpu",
-+				"gate_hclk_vdpu", "gate_gpu_src",
-+				"reserved", "gate_xin27m";
-+
-+			#clock-cells = <1>;
-+		};
-+
-+		clk_gates4: gate-clk at 200000e0 {
-+			compatible = "rockchip,rk2928-gate-clk";
-+			reg = <0x200000e0 0x4>;
-+			clocks = <&clk_gates2 2>, <&clk_gates2 3>,
-+				 <&clk_gates2 1>, <&clk_gates2 1>,
-+				 <&clk_gates2 1>, <&clk_gates2 2>,
-+				 <&clk_gates2 2>, <&clk_gates2 2>,
-+				 <&clk_gates0 4>, <&clk_gates0 4>,
-+				 <&clk_gates0 3>, <&clk_gates0 3>,
-+				 <&clk_gates0 3>, <&clk_gates2 3>,
-+				 <&clk_gates0 4>;
-+
-+			clock-output-names =
-+				"gate_hclk_peri_axi_matrix", "gate_pclk_peri_axi_matrix",
-+				"gate_aclk_cpu_peri", "gate_aclk_peri_axi_matrix",
-+				"gate_aclk_pei_niu", "gate_hclk_usb_peri",
-+				"gate_hclk_peri_ahb_arbi", "gate_hclk_emem_peri",
-+				"gate_hclk_cpubus", "gate_hclk_ahb2apb",
-+				"gate_aclk_strc_sys", "gate_aclk_l2mem_con",
-+				"gate_aclk_intmem", "gate_pclk_tsadc",
-+				"gate_hclk_hdmi";
-+
-+			#clock-cells = <1>;
-+		};
-+
-+		clk_gates5: gate-clk at 200000e4 {
-+			compatible = "rockchip,rk2928-gate-clk";
-+			reg = <0x200000e4 0x4>;
-+			clocks = <&clk_gates0 3>, <&clk_gates2 1>,
-+				 <&clk_gates0 5>, <&clk_gates0 5>,
-+				 <&clk_gates0 5>, <&clk_gates0 5>,
-+				 <&clk_gates0 4>, <&clk_gates0 5>,
-+				 <&clk_gates2 1>, <&clk_gates2 2>,
-+				 <&clk_gates2 2>, <&clk_gates2 2>,
-+				 <&clk_gates2 2>, <&clk_gates4 5>,
-+				 <&clk_gates4 5>, <&dummy>;
-+
-+			clock-output-names =
-+				"gate_aclk_dmac1", "gate_aclk_dmac2",
-+				"gate_pclk_efuse", "gate_pclk_tzpc",
-+				"gate_pclk_grf", "gate_pclk_pmu",
-+				"gate_hclk_rom", "gate_pclk_ddrupctl",
-+				"gate_aclk_smc", "gate_hclk_nandc",
-+				"gate_hclk_mmc0", "gate_hclk_mmc1",
-+				"gate_hclk_emmc", "gate_hclk_otg0",
-+				"gate_hclk_otg1", "gate_aclk_gpu";
-+
-+			#clock-cells = <1>;
-+		};
-+
-+		clk_gates6: gate-clk at 200000e8 {
-+			compatible = "rockchip,rk2928-gate-clk";
-+			reg = <0x200000e8 0x4>;
-+			clocks = <&clk_gates3 0>, <&clk_gates0 4>,
-+				 <&clk_gates0 4>, <&clk_gates1 4>,
-+				 <&clk_gates0 4>, <&clk_gates3 0>,
-+				 <&clk_gates0 4>, <&clk_gates1 4>,
-+				 <&clk_gates3 0>, <&clk_gates0 4>,
-+				 <&clk_gates0 4>, <&clk_gates1 4>,
-+				 <&clk_gates0 4>, <&clk_gates3 0>,
-+				 <&dummy>, <&dummy>;
-+
-+			clock-output-names =
-+				"gate_aclk_lcdc0", "gate_hclk_lcdc0",
-+				"gate_hclk_lcdc1", "gate_aclk_lcdc1",
-+				"gate_hclk_cif0", "gate_aclk_cif0",
-+				"gate_hclk_cif1", "gate_aclk_cif1",
-+				"gate_aclk_ipp", "gate_hclk_ipp",
-+				"gate_hclk_rga", "gate_aclk_rga",
-+				"gate_hclk_vio_bus", "gate_aclk_vio0",
-+				"gate_aclk_vcodec", "gate_shclk_vio_h2h";
-+
-+			#clock-cells = <1>;
-+		};
-+
-+		clk_gates7: gate-clk at 200000ec {
-+			compatible = "rockchip,rk2928-gate-clk";
-+			reg = <0x200000ec 0x4>;
-+			clocks = <&clk_gates2 2>, <&clk_gates0 4>,
-+				 <&clk_gates0 4>, <&clk_gates0 4>,
-+				 <&clk_gates0 4>, <&clk_gates2 2>,
-+				 <&clk_gates2 2>, <&clk_gates0 5>,
-+				 <&clk_gates0 5>, <&clk_gates0 5>,
-+				 <&clk_gates0 5>, <&clk_gates2 3>,
-+				 <&clk_gates2 3>, <&clk_gates2 3>,
-+				 <&clk_gates2 3>, <&clk_gates2 3>;
-+
-+			clock-output-names =
-+				"gate_hclk_emac", "gate_hclk_spdif",
-+				"gate_hclk_i2s0_2ch", "gate_hclk_i2s1_2ch",
-+				"gate_hclk_i2s_8ch", "gate_hclk_hsadc",
-+				"gate_hclk_pidf", "gate_pclk_timer0",
-+				"gate_pclk_timer1", "gate_pclk_timer2",
-+				"gate_pclk_pwm01", "gate_pclk_pwm23",
-+				"gate_pclk_spi0", "gate_pclk_spi1",
-+				"gate_pclk_saradc", "gate_pclk_wdt";
-+
-+			#clock-cells = <1>;
-+		};
-+
-+		clk_gates8: gate-clk at 200000f0 {
-+			compatible = "rockchip,rk2928-gate-clk";
-+			reg = <0x200000f0 0x4>;
-+			clocks = <&clk_gates0 5>, <&clk_gates0 5>,
-+				 <&clk_gates2 3>, <&clk_gates2 3>,
-+				 <&clk_gates0 5>, <&clk_gates0 5>,
-+				 <&clk_gates2 3>, <&clk_gates2 3>,
-+				 <&clk_gates2 3>, <&clk_gates0 5>,
-+				 <&clk_gates0 5>, <&clk_gates0 5>,
-+				 <&clk_gates2 3>, <&clk_gates2 3>,
-+				 <&dummy>, <&clk_gates0 5>;
-+
-+			clock-output-names =
-+				"gate_pclk_uart0", "gate_pclk_uart1",
-+				"gate_pclk_uart2", "gate_pclk_uart3",
-+				"gate_pclk_i2c0", "gate_pclk_i2c1",
-+				"gate_pclk_i2c2", "gate_pclk_i2c3",
-+				"gate_pclk_i2c4", "gate_pclk_gpio0",
-+				"gate_pclk_gpio1", "gate_pclk_gpio2",
-+				"gate_pclk_gpio3", "gate_pclk_gpio4",
-+				"reserved", "gate_pclk_gpio6";
-+
-+			#clock-cells = <1>;
-+		};
-+
-+		clk_gates9: gate-clk at 200000f4 {
-+			compatible = "rockchip,rk2928-gate-clk";
-+			reg = <0x200000f4 0x4>;
-+			clocks = <&dummy>, <&clk_gates0 5>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>, <&clk_gates1 4>,
-+				 <&clk_gates0 5>, <&dummy>,
-+				 <&dummy>, <&dummy>,
-+				 <&dummy>;
-+
-+			clock-output-names =
-+				"gate_clk_core_dbg", "gate_pclk_dbg",
-+				"gate_clk_trace", "gate_atclk",
-+				"gate_clk_l2c", "gate_aclk_vio1",
-+				"gate_pclk_publ", "gate_aclk_intmem0",
-+				"gate_aclk_intmem1", "gate_aclk_intmem2",
-+				"gate_aclk_intmem3";
-+
-+			#clock-cells = <1>;
-+		};
-+	};
-+
-+};
++#define UART_SHIFT	2
++#include <asm/hardware/debug-8250.S>
 -- 
 1.7.10.4
