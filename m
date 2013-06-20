@@ -1,64 +1,86 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 20 Jun 2013 10:43:33 +0200
-Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on pre-ARMv6
- CPUs" breaks armv5 with CONFIG_PREEMPT
-Message-ID: <51C2C0B5.8020802@pengutronix.de>
+From: nishanth.p@gmail.com (Nishanth Peethambaran)
+Date: Thu, 20 Jun 2013 14:25:32 +0530
+Subject: [Linaro-mm-sig] [RFC 2/3] ARM: dma-mapping: Pass DMA attrs as
+ IOMMU prot
+In-Reply-To: <20130620.112439.1330557591655135630.hdoyu@nvidia.com>
+References: <1371707384-30037-1-git-send-email-hdoyu@nvidia.com>
+ <1371707384-30037-3-git-send-email-hdoyu@nvidia.com>
+ <CAMcxFTRnnCnPnvMi89r7rUsN4xeYzZGqy9s5v5ukm_fJ_d_RGg@mail.gmail.com>
+ <20130620.112439.1330557591655135630.hdoyu@nvidia.com>
+Message-ID: <CAMcxFTS0dUUEfGj-=-cb_rdfy+qWvtsaoR6Tv+-x05XX0mZmmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Catalin,
+Hi Hiroshi,
 
-on current linus/master on armv5 we observed stack trashing[1] on high
-load. I bisected this problem down to commit:
+My preference would be to keep the iommu prot flags separate from
+dma-mapping attrs.
+dma-attrs have options which are not related to iommu - like having
+ARM kernel mapping.
+iommu.h is at a much lower level where we can define prot flags which
+are useful for iommu page-table management.
 
-> b9d4d42ad901cc848ac87f1cb8923fded3645568 is the first bad commit
-> commit b9d4d42ad901cc848ac87f1cb8923fded3645568
-> Author: Catalin Marinas <catalin.marinas@arm.com>
-> Date:   Mon Nov 28 21:57:24 2011 +0000
-> 
->     ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on pre-ARMv6 CPUs
-> 
->     This patch removes the __ARCH_WANT_INTERRUPTS_ON_CTXSW definition for
->     ARMv5 and earlier processors. On such processors, the context switch
->     requires a full cache flush. To avoid high interrupt latencies, this
->     patch defers the mm switching to the post-lock switch hook if the
->     interrupts are disabled.
-> 
->     Reviewed-by: Will Deacon <will.deacon@arm.com>
->     Tested-by: Will Deacon <will.deacon@arm.com>
->     Reviewed-by: Frank Rowand <frank.rowand@am.sony.com>
->     Tested-by: Marc Zyngier <Marc.Zyngier@arm.com>
->     Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> :040000 040000 034899bdcbc9aa59b5455a85a9d78b646b4cf784 ecc23e33a4ca807d4153f87fbea85a9437ff2928 M      arch
+Thinking again on it, I feel the translation of dma-attr should happen
+when dma-mapping code makes calls to " iommu mapping" API.
+"iommu mapping" API which does iova management and make iommu API
+calls could be taken out from dma-mapping.c, for which I see
+discussion already happening for arm64.
 
-The problem can be reproduced on several mx28 and an at91sam9263 and
-only occurs of CONFIG_PREEMPT (Preemptible Kernel (Low-Latency Desktop))
-is enabled.
+If devices allocate via dma-mapping API, physical mem allocation, iova
+allocation and iommu mapping happens internally.
+Devices may allocate physical memory using any allocator (say ION
+including carveout area), use "iommu mapping" API which will do iova
+allocation and iommu mapping. The prot flags could be useful in this
+case as well - not sure whether we would need dma-attrs here.
 
-I have the gut feeling that the "if (irqs_disabled())" check in the
-above patch is not correct for CONFIG_PREEMPT.
+ - Nishanth Peethambaran
 
-Marc
+- Nishanth Peethambaran
+  +91-9448074166
 
-[1] The test program creating 150 threads in a row crashes like this:
-> [8]+  Segmentation fault         ./thread_test_c
-> [5]   Illegal instruction        ./thread_test_c
-> [4]   Illegal instruction        ./thread_test_c
-> [2]   Segmentation fault         ./thread_test_c
-> [3]   Illegal instruction        ./thread_test_c
-> [1]   Segmentation fault         ./thread_test_c
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/11a01756/attachment-0001.sig>
+On Thu, Jun 20, 2013 at 1:54 PM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> Hi Nishanth,
+>
+> Nishanth Peethambaran <nishanth.p@gmail.com> wrote @ Thu, 20 Jun 2013 10:07:00 +0200:
+>
+>> It would be better to define a prot flag bit in iommu API and convert
+>> the attrs to prot flag bit in dma-mapping aPI before calling the iommu
+>> API.
+>
+> That's the 1st option.
+>
+>> On Thu, Jun 20, 2013 at 11:19 AM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> ....
+>> > @@ -1280,7 +1281,7 @@ ____iommu_create_mapping(struct device *dev, dma_addr_t *req,
+>> >                                 break;
+>> >
+>> >                 len = (j - i) << PAGE_SHIFT;
+>> > -               ret = iommu_map(mapping->domain, iova, phys, len, 0);
+>> > +               ret = iommu_map(mapping->domain, iova, phys, len, (int)attrs);
+>>
+>> Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
+>> prot flag bit which needs to be defined in iommu.h
+>
+> Both DMA_ATTR_READ_ONLY and IOMMU_READ are just logical bit in their
+> layers respectively and eventually it's converted to H/W dependent
+> bit.
+>
+> If IOMMU is considered as one of specific case of DMA, sharing
+> dma_attr between IOMMU and DMA may not be so bad. IIRC, ARM:
+> dma-mapping API was implemented based on this concept(?).
+>
+> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> index d8f98b1..161a1b0 100644
+> --- a/drivers/iommu/iommu.c
+> +++ b/drivers/iommu/iommu.c
+> @@ -755,7 +755,7 @@ int iommu_domain_has_cap(struct iommu_domain *domain,
+>  EXPORT_SYMBOL_GPL(iommu_domain_has_cap);
+>
+>  int iommu_map(struct iommu_domain *domain, unsigned long iova,
+> -             phys_addr_t paddr, size_t size, int prot)
+> +             phys_addr_t paddr, size_t size, struct dma_attr *attrs)
+>  {
+>         unsigned long orig_iova = iova;
+>         unsigned int min_pagesz;
