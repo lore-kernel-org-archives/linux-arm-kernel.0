@@ -1,57 +1,51 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 20 Jun 2013 09:48:56 +0200
-Subject: [PATCH] arm: mvebu: fix coherency_late_init() for multiplatform
-In-Reply-To: <1371714326-25971-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1371714326-25971-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130620074856.GA19959@lunn.ch>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 20 Jun 2013 09:49:26 +0200
+Subject: [PATCH 8/8] at91/avr32/atmel_lcdfb: prepare clk before calling
+ enable
+In-Reply-To: <1371640930-9771-1-git-send-email-b.brezillon@overkiz.com>
+References: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
+ <1371640930-9771-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <51C2B406.10604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 09:45:26AM +0200, Thomas Petazzoni wrote:
-> As noticed by Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>, commit
-> 865e0527d2d7 ('arm: mvebu: avoid hardcoded virtual address in
-> coherency code') added a postcore_initcall() to register the bus
-> notifier that the mvebu code needs to apply correct DMA operations on
-> its platform devices breaks the multiplatform boot on other platforms,
-> because the bus notifier registration is unconditional.
-> 
-> This commit fixes that by registering the bus notifier only if we have
-> the mvebu coherency unit described in the Device Tree. The conditional
-> used is exactly the same in which the bus_register_notifier() call was
-> originally enclosed before 865e0527d2d7 ('arm: mvebu: avoid hardcoded
-> virtual address in coherency code').
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Reported-by: Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>
-> ---
-> This fix has been reported by Arnaud to fix the boot on his OMAP4
-> PandaBoard, and it continues to work well on Marvell Armada XP GP.
-> 
-> This commit is based on jcooper/mvebu/regmap.
-> ---
->  arch/arm/mach-mvebu/coherency.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-> index 32fcf69..be11759 100644
-> --- a/arch/arm/mach-mvebu/coherency.c
-> +++ b/arch/arm/mach-mvebu/coherency.c
-> @@ -147,8 +147,9 @@ int __init coherency_init(void)
->  
->  static int __init coherency_late_init(void)
->  {
-> -	bus_register_notifier(&platform_bus_type,
-> -			      &mvebu_hwcc_platform_nb);
-> +	if (of_find_matching_node(NULL, of_coherency_table))
-> +		bus_register_notifier(&platform_bus_type,
-> +				      &mvebu_hwcc_platform_nb);
->  	return 0;
->  }
->  
-> -- 
-> 1.8.1.2
-> 
+On 19/06/2013 13:22, Boris BREZILLON :
+> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+> avoid common clk framework warnings.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-	  Andrew
+> ---
+>   drivers/video/atmel_lcdfb.c |    8 ++++----
+>   1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+> index 540909d..8525457 100644
+> --- a/drivers/video/atmel_lcdfb.c
+> +++ b/drivers/video/atmel_lcdfb.c
+> @@ -893,14 +893,14 @@ static int __init atmel_lcdfb_init_fbinfo(struct atmel_lcdfb_info *sinfo)
+>
+>   static void atmel_lcdfb_start_clock(struct atmel_lcdfb_info *sinfo)
+>   {
+> -	clk_enable(sinfo->bus_clk);
+> -	clk_enable(sinfo->lcdc_clk);
+> +	clk_prepare_enable(sinfo->bus_clk);
+> +	clk_prepare_enable(sinfo->lcdc_clk);
+>   }
+>
+>   static void atmel_lcdfb_stop_clock(struct atmel_lcdfb_info *sinfo)
+>   {
+> -	clk_disable(sinfo->bus_clk);
+> -	clk_disable(sinfo->lcdc_clk);
+> +	clk_disable_unprepare(sinfo->bus_clk);
+> +	clk_disable_unprepare(sinfo->lcdc_clk);
+>   }
+>
+>
+>
+
+
+-- 
+Nicolas Ferre
