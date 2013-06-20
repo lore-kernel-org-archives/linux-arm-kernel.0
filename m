@@ -1,58 +1,109 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 20 Jun 2013 22:08:14 +0900
-Subject: [PATCH 3/3] ARM: shmobile: irqpin: add a DT property to enable
- masking on parent
+Date: Thu, 20 Jun 2013 22:08:13 +0900
+Subject: [PATCH 2/3] ARM: shmobile: sh73a0: remove "0x" prefix from DT node
+ names
 In-Reply-To: <1371733694-27368-1-git-send-email-horms+renesas@verge.net.au>
 References: <1371733694-27368-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371733694-27368-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371733694-27368-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-To disable spurious interrupts, that get triggered on certain hardware, the
-irqpin driver masks them on the parent interrupt controller. To specify
-such broken devices a .control_parent parameter can be provided in the
-platform data. In the DT case we need a property, to do the same.
+The convention for Device Tree node names is <device>@<hex-address>, where
+the part after '@' shouldn't contain the "0x" prefix. Fix the sh73a0.dtsi
+DT names.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- .../bindings/interrupt-controller/renesas,intc-irqpin.txt          | 2 ++
- drivers/irqchip/irq-renesas-intc-irqpin.c                          | 7 +++++--
- 2 files changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sh73a0.dtsi | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-index 66fcaf5..1f8b0c5 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-@@ -12,3 +12,5 @@ Optional properties:
-   properties
- - sense-bitfield-width: width of a single sense bitfield in the SENSE register,
-   if different from the default 4 bits
-+- control-parent: disable and enable interrupts on the parent interrupt
-+  controller, needed for some broken implementations
-diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
-index 4aca1b2..82cec63 100644
---- a/drivers/irqchip/irq-renesas-intc-irqpin.c
-+++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
-@@ -348,11 +348,14 @@ static int intc_irqpin_probe(struct platform_device *pdev)
- 	}
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index ec40bf7..b977502 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -119,7 +119,7 @@
+ 			      0 32 0x4>;
+ 	};
  
- 	/* deal with driver instance configuration */
--	if (pdata)
-+	if (pdata) {
- 		memcpy(&p->config, pdata, sizeof(*pdata));
--	else
-+	} else {
- 		of_property_read_u32(pdev->dev.of_node, "sense-bitfield-width",
- 				     &p->config.sense_bitfield_width);
-+		p->config.control_parent = of_property_read_bool(pdev->dev.of_node,
-+								 "control-parent");
-+	}
- 	if (!p->config.sense_bitfield_width)
- 		p->config.sense_bitfield_width = 4; /* default to 4 bits */
+-	i2c0: i2c at 0xe6820000 {
++	i2c0: i2c at e6820000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+@@ -131,7 +131,7 @@
+ 			      0 170 0x4>;
+ 	};
  
+-	i2c1: i2c at 0xe6822000 {
++	i2c1: i2c at e6822000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+@@ -143,7 +143,7 @@
+ 			      0 54 0x4>;
+ 	};
+ 
+-	i2c2: i2c at 0xe6824000 {
++	i2c2: i2c at e6824000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+@@ -155,7 +155,7 @@
+ 			      0 174 0x4>;
+ 	};
+ 
+-	i2c3: i2c at 0xe6826000 {
++	i2c3: i2c at e6826000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+@@ -167,7 +167,7 @@
+ 			      0 186 0x4>;
+ 	};
+ 
+-	i2c4: i2c at 0xe6828000 {
++	i2c4: i2c at e6828000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+@@ -179,7 +179,7 @@
+ 			      0 190 0x4>;
+ 	};
+ 
+-	mmcif: mmcif at 0x10010000 {
++	mmcif: mmcif at e6bd0000 {
+ 		compatible = "renesas,sh-mmcif";
+ 		reg = <0xe6bd0000 0x100>;
+ 		interrupt-parent = <&gic>;
+@@ -189,7 +189,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	sdhi0: sdhi at 0xee100000 {
++	sdhi0: sdhi at ee100000 {
+ 		compatible = "renesas,r8a7740-sdhi";
+ 		reg = <0xee100000 0x100>;
+ 		interrupt-parent = <&gic>;
+@@ -201,7 +201,7 @@
+ 	};
+ 
+ 	/* SDHI1 and SDHI2 have no CD pins, no need for CD IRQ */
+-	sdhi1: sdhi at 0xee120000 {
++	sdhi1: sdhi at ee120000 {
+ 		compatible = "renesas,r8a7740-sdhi";
+ 		reg = <0xee120000 0x100>;
+ 		interrupt-parent = <&gic>;
+@@ -212,7 +212,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	sdhi2: sdhi at 0xee140000 {
++	sdhi2: sdhi at ee140000 {
+ 		compatible = "renesas,r8a7740-sdhi";
+ 		reg = <0xee140000 0x100>;
+ 		interrupt-parent = <&gic>;
 -- 
 1.8.2.1
