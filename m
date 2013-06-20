@@ -1,50 +1,33 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 20 Jun 2013 16:50:11 +0200
-Subject: [PATCH 2/6] ARM: imx27: Use 'AITC' for the interrupt controller name
-In-Reply-To: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
-References: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1371739815-6666-3-git-send-email-mpa@pengutronix.de>
+Date: Thu, 20 Jun 2013 16:50:09 +0200
+Subject: [PATCH 0/6] ARM: dts: imx27 Phytec PhyCARD-S
+Message-ID: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <festevam@gmail.com>
+Hi,
 
-On the MX27 Reference Manual the interrupt controller is named AITC:
-ARM926EJ-S Interrupt Controller
+This series adds some device nodes for imx27 and a board file for Phytec
+PhyCARD-S. It is based on shawn's branch "imx/dt".
 
-So use the AITC term instead of AVIC.
+Regards,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-Origin: id:1334193132-18944-2-git-send-email-festevam at gmail.com
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- arch/arm/boot/dts/imx27.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Markus
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 48c263c..4f76453 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -30,8 +30,8 @@
- 		spi2 = &cspi3;
- 	};
- 
--	avic: avic-interrupt-controller at e0000000 {
--		compatible = "fsl,imx27-avic", "fsl,avic";
-+	aitc: aitc-interrupt-controller at e0000000 {
-+		compatible = "fsl,imx27-aitc", "fsl,avic";
- 		interrupt-controller;
- 		#interrupt-cells = <1>;
- 		reg = <0x10040000 0x1000>;
-@@ -51,7 +51,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		compatible = "simple-bus";
--		interrupt-parent = <&avic>;
-+		interrupt-parent = <&aitc>;
- 		ranges;
- 
- 		aipi at 10000000 { /* AIPI1 */
--- 
-1.8.2.1
+
+Fabio Estevam (2):
+      ARM: mx27: Replace clk_register_clkdev with clock DT lookup
+      ARM: imx27: Use 'AITC' for the interrupt controller name
+
+Markus Pargmann (4):
+      ARM: dts: imx27: Add imx framebuffer device
+      ARM: dts: imx27: Add 1-wire
+      ARM: dts: imx27 cpufreq-cpu0 frequencies
+      ARM: dts: Add device tree support for phycard pca100
+
+ arch/arm/boot/dts/Makefile                   |   1 +
+ arch/arm/boot/dts/imx27-phytec-phycard-S.dts | 195 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx27.dtsi                 |  54 +++++++-
+ arch/arm/mach-imx/Kconfig                    |   1 +
+ 4 files changed, 248 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx27-phytec-phycard-S.dts
