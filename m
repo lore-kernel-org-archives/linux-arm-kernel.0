@@ -1,73 +1,36 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 20 Jun 2013 15:07:46 +0300
-Subject: [RFC PATCH 1/6] mfd: omap-usb-host: move initialization to
- module_init()
-In-Reply-To: <1371650753-11452-2-git-send-email-rogerq@ti.com>
-References: <1371650753-11452-1-git-send-email-rogerq@ti.com>
- <1371650753-11452-2-git-send-email-rogerq@ti.com>
-Message-ID: <20130620120746.GC9817@arwen.pp.htv.fi>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 20 Jun 2013 21:08:37 +0900
+Subject: [PATCH 1/2] serial: sh-sci: HSCIF support
+In-Reply-To: <201306191708.46525.arnd@arndb.de>
+References: <1371440327-30512-1-git-send-email-horms+renesas@verge.net.au>
+ <CAO3366zWrYFYNaXNWpUvc8KpxjwYVoHz2O5fV33QFSTN2-H7aQ@mail.gmail.com>
+ <20130619123324.GG32292@verge.net.au>
+ <201306191708.46525.arnd@arndb.de>
+Message-ID: <20130620120836.GB27177@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jun 19, 2013 at 05:05:48PM +0300, Roger Quadros wrote:
-> We no longer need to be initialized in any particular order
-> so move driver initialization to the standard place i.e. module_init()
+On Wed, Jun 19, 2013 at 05:08:46PM +0200, Arnd Bergmann wrote:
+> On Wednesday 19 June 2013, Simon Horman wrote:
+> > > This is of course trivially fixed, but I have completely lost track of
+> > > the transmogrifications this patch has been subjected to. What's the
+> > > procedure?
+> > 
+> > Hi Ulrich,
+> > 
+> > perhaps the best way forward would be for you to post an incremental patch
+> > on top of either the sh-sci branch or renesas-next-20130618 tag of
+> > my renesas tree on kernel.org.
 > 
-> CC: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->  drivers/mfd/omap-usb-host.c |   10 +---------
->  drivers/mfd/omap-usb-tll.c  |    8 +-------
->  2 files changed, 2 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-> index 759fae3..6601a49 100644
-> --- a/drivers/mfd/omap-usb-host.c
-> +++ b/drivers/mfd/omap-usb-host.c
-> @@ -908,15 +908,7 @@ static int __init omap_usbhs_drvinit(void)
->  {
->  	return platform_driver_probe(&usbhs_omap_driver, usbhs_omap_probe);
->  }
-> -
-> -/*
-> - * init before ehci and ohci drivers;
-> - * The usbhs core driver should be initialized much before
-> - * the omap ehci and ohci probe functions are called.
-> - * This usbhs core driver should be initialized after
-> - * usb tll driver
-> - */
-> -fs_initcall_sync(omap_usbhs_drvinit);
-> +module_init(omap_usbhs_drvinit);
->  
->  static void __exit omap_usbhs_drvexit(void)
->  {
-> diff --git a/drivers/mfd/omap-usb-tll.c b/drivers/mfd/omap-usb-tll.c
-> index e59ac4c..fb7c73e 100644
-> --- a/drivers/mfd/omap-usb-tll.c
-> +++ b/drivers/mfd/omap-usb-tll.c
-> @@ -482,13 +482,7 @@ static int __init omap_usbtll_drvinit(void)
->  {
->  	return platform_driver_register(&usbtll_omap_driver);
->  }
-> -
-> -/*
-> - * init before usbhs core driver;
-> - * The usbtll driver should be initialized before
-> - * the usbhs core driver probe function is called.
-> - */
-> -fs_initcall(omap_usbtll_drvinit);
-> +module_init(omap_usbtll_drvinit);
+> I'm not sure where we stand on this series at the moment. Should
+> I pull v3, has Olof already pulled it, or should I wait for an
+> update?
 
-since you're doing that, could just move to module_platform_driver.
+Hi Arnd,
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/545be6e8/attachment.sig>
+my preference is for you to wait for an update.
+
+In order to move things forwards I will post a proposed
+fix shortly. I believe that the warnings are for conditions
+that can never occur and thus in my patch I will propose initialising the
+variables that are flagged as being used uninitialised.
