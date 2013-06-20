@@ -1,63 +1,53 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 20 Jun 2013 20:57:55 +0200
-Subject: [PATCHv2 3/3] ARM: mxs: cfa10049: Add NAU7802 ADCs to the device tree
-In-Reply-To: <1371754675-12242-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1371754675-12242-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1371754675-12242-4-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Thu, 20 Jun 2013 20:57:52 +0200
+Subject: [PATCHv2 0/3] Add support for the Nuvoton NAU7802 ADC to the cfa10049
+Message-ID: <1371754675-12242-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi,
 
-Since these ADCs share the same non-configurable address on the I2C bus,
-they have to be put behind a muxer.
+Sorry for the delay, this is v2 of the patchset that adds support for the 3
+Nuvoton NAU7802 ADCs present on the CFA-10049 board from Crystalfontz. The first
+patch adds the driver, the next ones are adding them in the DT after switching
+the second i2c bus to bitbanging following a lot of timeout issues we have on
+that bus.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/imx28-cfa10049.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Since v1, I've taken into account the review from Jonathan Cameron, Lars-Peter
+Clausen and Maxime Ripard:
+ - channels are now statically allocated
+ - no wrappers around i2c functions
+ - sampling_freq is a shared attribute
+ - setting gain is done through scale
+ - cosmetics changes (s/idev/indio_dev/, blank lines before returns)
+ - use of sign_extend32 to extend the sign
+ - reading scale now returns IIO_VAL_FRACTIONAL_LOG2
+ - no dt lookup for interrupts, this is done in of_i2c.c but that was mask due
+ to a bug.
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index d3758c2..efc4213 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -356,18 +356,36 @@
- 			reg = <0>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+
-+			adc0: nau7802 at 2a {
-+				compatible = "nuvoton,nau7802";
-+				reg = <0x2a>;
-+				nuvoton,vldo = <3000>;
-+			};
- 		};
- 
- 		i2c at 1 {
- 			reg = <1>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+
-+			adc1: nau7802 at 2a {
-+				compatible = "nuvoton,nau7802";
-+				reg = <0x2a>;
-+				nuvoton,vldo = <3000>;
-+			};
- 		};
- 
- 		i2c at 2 {
- 			reg = <2>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+
-+			adc2: nau7802 at 2a {
-+				compatible = "nuvoton,nau7802";
-+				reg = <0x2a>;
-+				nuvoton,vldo = <3000>;
-+			};
- 		};
- 
- 		i2c at 3 {
+what I didn't address is setting the external reference voltage through a fixed
+regulator and I kept the vldo attribute to set the internal voltage reference in
+the DT as Jonathan seemed to be ok with that. If anybody is using a nau7802 with
+an external reference, it will still be time to add the fixed regulator. It
+shouldn't be difficult but I don't have any hardware to test.
+
+Regards,
+
+Alexandre Belloni (1):
+  iio: Add Nuvoton NAU7802 ADC driver
+
+Maxime Ripard (2):
+  ARM: mxs: cfa10049: Switch bus i2c1 to bitbanging
+  ARM: mxs: cfa10049: Add NAU7802 ADCs to the device tree
+
+ .../bindings/iio/adc/nuvoton-nau7802.txt           |  17 +
+ arch/arm/boot/dts/imx28-cfa10049.dts               | 126 +++--
+ drivers/iio/adc/Kconfig                            |   9 +
+ drivers/iio/adc/Makefile                           |   1 +
+ drivers/iio/adc/nau7802.c                          | 603 +++++++++++++++++++++
+ 5 files changed, 713 insertions(+), 43 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt
+ create mode 100644 drivers/iio/adc/nau7802.c
+
 -- 
 1.8.1.2
