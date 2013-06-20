@@ -1,51 +1,31 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Thu, 20 Jun 2013 15:54:49 +0200
-Subject: [PATCH 0/7] KVM: arm-vgic: Implement save/restore of VGIC state
-In-Reply-To: <1370926279-32532-1-git-send-email-christoffer.dall@linaro.org>
-References: <1370926279-32532-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <51C309A9.4070207@suse.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Jun 2013 15:08:02 +0100
+Subject: [PATCH v6] ARM: PJ4B: fix for 3.10-rc
+In-Reply-To: <1371729974-17950-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1371729974-17950-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130620140802.GO2842@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2013 06:51 AM, Christoffer Dall wrote:
-> This patch series adds support for user space save/restore of the VGIC
-> state.  Instead of expanding the ONE_REG interface, which works on
-> VCPUs, we first introduce support for the new KVM device control API and
-> the VGIC.  Now, instead of calling KVM_CREATE_IRQCHIP, user space can
-> call KVM_CREATE_DEVICE and perform operations on the device fd, such as
-> KVM_SET_DEVICE_ATTR to set a device attribute.
->
-> We leverage the KVM_{SET/GET}_DEVICE_ATTR API to export the state of the
-> VGIC to user space.  Instead of coming up with our own custom format for
-> exporting the VGIC state, we simply export all the state visible to an
-> emulated guest, which must contain the full GIC state to provide
-> save/restore of the GIC state for power management purposes.  This
-> further provides the benefit of being able to re-use the MMIO emulation
-> code for the distributor for save/restore.
->
-> However, the need to save/restore cpu-specific state demands that user
-> space can save/restore state accessible through the CPU interface, and
-> we therefore add an emulation interface for the CPU-specific interface.
->
-> This is considered a first attempt, and I am not married to the device
-> control API.  If there are good technical arguments to take another
-> approach, I am of course willing to discuss this.  However, my attempts
-> with the ONE_REG interface did not look very nice.
->
->    [ WARINING: The patch set core functionality is completely untested;
->    the basic KVM system has been briefly tested on TC2 and it doesn't
->    seem like I've broken existing functionality. ]
->
-> I wanted to get this out early to get feedback on the overall API and
-> idea, and I'm writing some user QEMU for the user space side to test
-> the new functionality meanwhile.
->
-> Patches are against kvm-arm-next and also available here:
-> git://git.linaro.org/people/cdall/linux-kvm-arm.git vgic-migrate
+On Thu, Jun 20, 2013 at 01:06:13PM +0100, Gregory CLEMENT wrote:
+> Hello,
+> 
+> This path allows to fix one errata for PJ4B CPUs.
+> 
+> Without this the Armada 370 based board can't boot anymore since
+> 3.10-rc1. So this one really need to be applied on 3.10-rc.
+> 
+> As the patch fixing PJ4B ID have been merged in Russell King's git
+> tree. I only sent this one. I have tested a build with the
+> vexpress_defconfig and it no more failed.
+> 
+> I have also removed the acked-by from Nicolas Pitre and the
+> Reviewed-by from Will Deacon as even the change are small it is still
+> a new version.
+> 
+> Nicolas, Will, would you agree to give your acked-by and reviewed-by
+> on this new version?
 
-I don't see major glitches :)
+Sure, it's not much different to the last one.
 
-Reviewed-by: Alexander Graf <agraf@suse.de>
-
-
-Alex
+Will
