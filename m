@@ -1,42 +1,57 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 20 Jun 2013 15:57:44 +0100
-Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
-In-Reply-To: <20130620004302.GA19896@S2101-09.ap.freescale.net>
-References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
- <20130612083619.GA13274@S2101-09.ap.freescale.net>
- <20130619164338.GE5276@e102568-lin.cambridge.arm.com>
- <20130620004302.GA19896@S2101-09.ap.freescale.net>
-Message-ID: <20130620145744.GC23833@e102568-lin.cambridge.arm.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 20 Jun 2013 10:59:28 -0400 (EDT)
+Subject: [RFC PATCH v1 1/6] USB: HCD: support giveback of URB in tasklet
+ context
+In-Reply-To: <CACVXFVOMYA9e2qiJoFCx+v7=fSWpjwpha5hKdcxX+4s5qAT83w@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306201046440.2063-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 01:43:04AM +0100, Shawn Guo wrote:
-> On Wed, Jun 19, 2013 at 05:43:38PM +0100, Lorenzo Pieralisi wrote:
-> > On Wed, Jun 12, 2013 at 09:36:20AM +0100, Shawn Guo wrote:
-> > > On Tue, Jun 11, 2013 at 10:58:48AM +0100, Lorenzo Pieralisi wrote:
-> > > > Hi Russell, all,
-> > > > 
-> > > > even though I think this set is ready to get merged, it would be great
-> > > > if we can test it on as many platforms as possible since it touches core
-> > > > suspend/resume operations on ARM platforms relying on CONFIG_ARM_CPU_SUSPEND,
-> > > > and there are many.
-> > > > 
-> > > > I pushed out a branch:
-> > > > 
-> > > > git://linux-arm.org/linux-2.6-lp.git mpidr-linearization
-> > > > 
-> > > > if anyone has time to test the set that would be really great, thank you
-> > > > very much.
-> > > 
-> > > I tested the branch on imx6q, and system suspend/resume works fine with
-> > > it.
-> > 
-> > Can I add your tested-by please ?
-> 
-> Sure.
-> 
-> Tested-by: Shawn Guo <shawn.guo@linaro.org>
+On Thu, 20 Jun 2013, Ming Lei wrote:
 
-Thanks a lot,
-Lorenzo
+> >> Looks not always synchronous, control transfer is synchronous, and
+> >> interrupt transfer is still asynchronous. No drivers(hub, usbfs) depend
+> >> on that,  and IMO, treating root hub same as hub will simplify HCD core,
+> >> and finally we can remove all the above lock releasing & acquiring if
+> >> all HCDs set HCD_BH.
+> >>
+> >> Also there is very less roothub transfers and always letting tasklet
+> >> handle URB giveback of roothub won't have performance problem, so
+> >> how about keeping the above tests?
+> >
+> > If you want to use the tasklets for root-hub URBs, okay.  There's no
+> > reason to check the HCD_BH flag, though, because HCDs have only minimal
+> > involvement in root-hub URBs.  In particular, HCD's don't call
+> > usb_hcd_giveback_urb() for them.
+> 
+> Looks both root hub's control and interrupt transfer call usb_hcd_giveback_urb()
+> to complete URBs, don't they?
+
+They do.  But those calls come from within usbcore, not from within the 
+HCD.  Which means it doesn't matter whether the HCD_BH flag is set.
+
+When working with URBs sent to a root hub, it many ways it's as though 
+usbcore acts as its own HCD.  It takes care of all the locking and 
+giving back the URBs.
+
+> > So you can use the tasklets for _all_ root-hub URBs.  Then the tests
+> > above aren't necessary, and neither are the spinlock operations.
+> 
+> Yes, that is what I am going to do.
+
+Okay.
+
+By the way, did you consider the race that Oliver pointed out?  When an
+HCD is removed, all the outstanding URBs for all devices on its bus get
+cancelled.  The core waits until the urb_list for each endpoint is
+empty.
+
+In the past this was good enough.  But now it looks like we will also
+need to wait until the tasklet lists are empty and the tasklets aren't
+running before they get killed.  Your __exit_giveback_urb_bh() routine 
+doesn't seem to do that.
+
+(Probably it's sufficient to wait until the tasklet lists are empty.  I 
+assume tasklet_kill() won't stop a tasklet that's currently running.)
+
+Alan Stern
