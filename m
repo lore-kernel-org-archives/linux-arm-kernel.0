@@ -1,30 +1,22 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 20 Jun 2013 21:00:04 +0900
-Subject: [PATCH] gpio: rcar: fix gpio_rcar_of_table
-In-Reply-To: <201306201219.25744.arnd@arndb.de>
-References: <201306191750.43755.arnd@arndb.de>
- <20130620005017.GA20643@verge.net.au>
- <201306201219.25744.arnd@arndb.de>
-Message-ID: <20130620120000.GA27177@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Jun 2013 13:00:11 +0100
+Subject: ARM Versatile A15_A7 boot with 3 & 4 Cores
+In-Reply-To: <CALicx6tx=QbsFzWpamGce50FFBjaB+ncdi0OzGuhFe=6DrZiPg@mail.gmail.com>
+References: <CALicx6s6E6qMmFPmvjikk+UCWaQCHipEdBN-eC33NPO7E9Gx4g@mail.gmail.com>
+ <51C02A0B.2000000@arm.com>
+ <CALicx6tx=QbsFzWpamGce50FFBjaB+ncdi0OzGuhFe=6DrZiPg@mail.gmail.com>
+Message-ID: <51C2EECB.1040007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 12:19:25PM +0200, Arnd Bergmann wrote:
-> On Thursday 20 June 2013, Simon Horman wrote:
-> > 
-> > On Wed, Jun 19, 2013 at 05:50:43PM +0200, Arnd Bergmann wrote:
-> > > The device table needs to be terminated with an empty element.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > > Cc: Simon Horman <horms+renesas@verge.net.au>
-> > > ---
-> > > I've just added this patch on top of the arm-soc next/drivers branch
-> > > that introduced the build warning.
-> > 
-> > Thanks, have you pushed it there or do I need to add it and
-> > send a pull-request?
-> 
-> I've applied this directly.
+On 20/06/13 12:26, Vijay Kilari wrote:
 
-Thanks.
+Hi Vijay,
+
+>  I have tested it on versatile TC2. It works
+
+Thanks for letting us know.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
