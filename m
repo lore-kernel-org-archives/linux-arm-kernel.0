@@ -1,147 +1,45 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 20 Jun 2013 16:02:19 +0300
-Subject: [RFC PATCH 5/6] ARM: dts: omap3beagle-xm: Add idle state pins
- for USB host
-In-Reply-To: <51C2EF50.3070707@ti.com>
-References: <1371650753-11452-1-git-send-email-rogerq@ti.com>
- <1371650753-11452-6-git-send-email-rogerq@ti.com> <87obb26ixm.fsf@linaro.org>
- <51C2EDB1.3080801@ti.com> <51C2EF50.3070707@ti.com>
-Message-ID: <51C2FD5B.1090508@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 20 Jun 2013 17:04:32 +0400
+Subject: [PATCH] ARM: dma: Drop __GFP_COMP for iommu dma memory allocations
+In-Reply-To: <1371731460-15316-1-git-send-email-rizhao@nvidia.com>
+References: <1371731460-15316-1-git-send-email-rizhao@nvidia.com>
+Message-ID: <51C2FDE0.4060206@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2013 03:02 PM, Roger Quadros wrote:
-> On 06/20/2013 02:55 PM, Roger Quadros wrote:
->> On 06/19/2013 09:42 PM, Kevin Hilman wrote:
->>> Roger Quadros <rogerq@ti.com> writes:
->>>
->>>> Add the Idle state pins for USB host and enable WAKEUP on
->>>> DIR, DAT0-3, so that the PHY can wakeup the OMAP SoC from
->>>> sleep on any USB activity (e.g. remote wakeup or connect/disconnect).
->>>>
->>>> CC: Beno?t Cousson <b-cousson@ti.com>
->>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>>
->>> This one doesn't apply...
->>>
->>>> ---
->>>>  arch/arm/boot/dts/omap3-beagle-xm.dts |   29 +++++++++++++++++++++++------
->>>>  1 files changed, 23 insertions(+), 6 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
->>>> index d3808ed..f1d56c2 100644
->>>> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
->>>> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
->>>> @@ -89,12 +89,7 @@
->>>>  };
->>>>  
->>>>  &omap3_pmx_core {
->>>> -	pinctrl-names = "default";
->>>> -	pinctrl-0 = <
->>>> -			&hsusbb2_pins
->>>> -	>;
->>>> -
->>>> -	hsusbb2_pins: pinmux_hsusbb2_pins {
->>>
->>> This omap3_pmx_core section doesn't exist upstream in the xM DTS file
->>> (but does in omap3-beagle.dts.)  
->>>
->>> Is there a dependency patch missing?
->>>
->>
->> Sorry for not mentioning it earlier. This is based on Benoit's tree [1]
->> and you need these patches
->>
->> http://thread.gmane.org/gmane.linux.drivers.devicetree/38383
-> 
-> Just noticed that this no longer applies today. I'll send a revision soon.
-> 
+Hello.
 
-OK. In case you are eager to test, please use the series [1] on l-o on top of Benoit's
-for_3.11/_dts branch and then the $subject series with the updated patch 5 below [2].
+On 20-06-2013 16:31, Richard Zhao wrote:
 
-[1] - [PATCH v5 0/2] ARM: dts: Add USB host support for Beagle-xm
+> __iommu_alloc_buffer wants to split pages after allocation in order to
+> reduce the memory footprint. This does not work well with __GFP_COMP
+> pages, so drop this flag before allocation
 
-[2] - Updated Patch 5
+> One failure example is snd_malloc_dev_pages call dma_alloc_coherent with
+> __GFP_COMP.
 
->From b712a1fb936f65fa05f21fcd2c62fff5628d0628 Mon Sep 17 00:00:00 2001
-From: Roger Quadros <rogerq@ti.com>
-Date: Wed, 19 Jun 2013 11:14:35 +0300
-Subject: [PATCH] ARM: dts: omap3beagle-xm: Add idle state pins for USB host
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
+> ---
+>   arch/arm/mm/dma-mapping.c |    9 +++++++++
+>   1 file changed, 9 insertions(+)
 
-Add the Idle state pins for USB host and enable WAKEUP on
-DIR, DAT0-3, so that the PHY can wakeup the OMAP SoC from
-sleep on any USB activity (e.g. remote wakeup or connect/disconnect).
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index ef3e0f3..f7efffd 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1314,6 +1314,15 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+>   	if (gfp & GFP_ATOMIC)
+>   		return __iommu_alloc_atomic(dev, size, handle);
+>
+> +	/*
+> +	 * Following is a work-around (a.k.a. hack) to prevent pages
+> +	 * with __GFP_COMP being passed to split_page() which cannot
+> +	 * handle them.  The real problem is that this flag probably
+> +	 * should be 0 on ARM as it is not supported on this
+> +	 * platform; see CONFIG_HUGETLBFS.
+> +	 */
+> +	gfp &= ~(__GFP_COMP);
 
-CC: Beno?t Cousson <b-cousson@ti.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/boot/dts/omap3-beagle-xm.dts |   29 +++++++++++++++++++++++------
- 1 files changed, 23 insertions(+), 6 deletions(-)
+    Hm, what exactly is the sense you meant in using ()?
 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index 371b1e2..91d19fa 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -113,11 +113,6 @@
- };
- 
- &omap3_pmx_core {
--	pinctrl-names = "default";
--	pinctrl-0 = <
--			&hsusbb2_pins
--	>;
--
- 	uart3_pins: pinmux_uart3_pins {
- 		pinctrl-single,pins = <
- 			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
-@@ -125,7 +120,7 @@
- 		>;
- 	};
- 
--	hsusbb2_pins: pinmux_hsusbb2_pins {
-+	hsusb2_pins: pinmux_hsusb2_pins {
- 		pinctrl-single,pins = <
- 			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
- 			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-@@ -141,6 +136,25 @@
- 			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
- 		>;
- 	};
-+
-+	/* WAKEUP enabled on DIR, DAT0-3 */
-+	hsusb2_idle_pins: pinmux_hsusb2_idle_pins {
-+		pinctrl-single,pins = <
-+			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-+			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-+			0x5c4 (PIN_INPUT_PULLDOWN | WAKEUP_EN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-+			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)			/* etk_d13.hsusb2_nxt */
-+			0x5c8 (PIN_INPUT_PULLDOWN | WAKEUP_EN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-+			0x5cA (PIN_INPUT_PULLDOWN | WAKEUP_EN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
-+			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
-+			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
-+			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
-+			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
-+			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
-+			0x1ae (PIN_INPUT_PULLDOWN | WAKEUP_EN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
-+		>;
-+		interrupts = <77>; /* route padconf wakeup to EHCI IRQ */
-+	};
- };
- 
- &i2c1 {
-@@ -223,6 +237,9 @@
- };
- 
- &usbhshost {
-+	pinctrl-names = "default", "idle";
-+	pinctrl-0 = <&hsusb2_pins>;
-+	pinctrl-1 = <&hsusb2_idle_pins>;
- 	port2-mode = "ehci-phy";
- };
- 
--- 
-1.7.4.1
+WBR, Sergei
