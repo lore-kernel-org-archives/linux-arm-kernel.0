@@ -1,25 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jun 2013 15:08:29 +0200
-Subject: [GIT PULL v2] DaVinci SoC updates for v3.11
-In-Reply-To: <51BFF3E8.4070806@ti.com>
-References: <1371193161-25224-1-git-send-email-nsekhar@ti.com>
- <51BEDA15.4090908@ti.com> <51BFF3E8.4070806@ti.com>
-Message-ID: <201306201508.29803.arnd@arndb.de>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 20 Jun 2013 22:09:11 +0900
+Subject: [PATCH 2/2] gpio-rcar: Remove #ifdef CONFIG_OF around OF-specific
+ sections
+In-Reply-To: <1371733751-27730-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371733751-27730-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371733751-27730-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Sekhar Nori wrote:
-> The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
-> 
->   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.11/soc-v2
-> 
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Pulled into next/soc
+All functions and data types used by OF-specific code paths are declared
+in <linux/of.h> regardless of CONFIG_OF. Replace the #ifdef CONFIG_OF
+guard with a if(IS_ENABLED(CONFIG_OF)) and let the compiler optimize
+the unused code away.
 
-Thanks,
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ drivers/gpio/gpio-rcar.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-	Arnd
+diff --git a/drivers/gpio/gpio-rcar.c b/drivers/gpio/gpio-rcar.c
+index 5a693dd..7fd09ef 100644
+--- a/drivers/gpio/gpio-rcar.c
++++ b/drivers/gpio/gpio-rcar.c
+@@ -279,16 +279,13 @@ static struct irq_domain_ops gpio_rcar_irq_domain_ops = {
+ static void gpio_rcar_parse_pdata(struct gpio_rcar_priv *p)
+ {
+ 	struct gpio_rcar_config *pdata = p->pdev->dev.platform_data;
+-#ifdef CONFIG_OF
+ 	struct device_node *np = p->pdev->dev.of_node;
+ 	struct of_phandle_args args;
+ 	int ret;
+-#endif
+ 
+-	if (pdata)
++	if (pdata) {
+ 		p->config = *pdata;
+-#ifdef CONFIG_OF
+-	else if (np) {
++	} else if (IS_ENABLED(CONFIG_OF) && np) {
+ 		ret = of_parse_phandle_with_args(np, "gpio-ranges",
+ 				"#gpio-range-cells", 0, &args);
+ 		p->config.number_of_pins = ret == 0 && args.args_count == 3
+@@ -296,7 +293,6 @@ static void gpio_rcar_parse_pdata(struct gpio_rcar_priv *p)
+ 					 : RCAR_MAX_GPIO_PER_BANK;
+ 		p->config.gpio_base = -1;
+ 	}
+-#endif
+ 
+ 	if (p->config.number_of_pins == 0 ||
+ 	    p->config.number_of_pins > RCAR_MAX_GPIO_PER_BANK) {
+-- 
+1.8.2.1
