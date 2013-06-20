@@ -1,126 +1,108 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 21 Jun 2013 00:12:57 +0200
-Subject: [PATCH v2 12/18] ARM: SAMSUNG: Rework private data handling in
- dev-backlight
+Date: Fri, 21 Jun 2013 00:13:02 +0200
+Subject: [PATCH v2 17/18] ARM: SAMSUNG: Remove remaining uses of
+ plat/regs-timer.h header
 In-Reply-To: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
 References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1371766383-29077-13-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1371766383-29077-18-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies dev-backlight helpers to get private data using
-container_of instead of abusing platform_data field of PWM device.
+This patch removes remaining inclusions of plat/regs-timer.h as
+a preparation to remove the header.
+
+As a part of this, things like save and restore of PWM registers are
+removed from SoC-specific code, because it is handled in appropriate
+drivers now.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/plat-samsung/dev-backlight.c | 51 ++++++++++++++++++++---------------
- 1 file changed, 29 insertions(+), 22 deletions(-)
+ arch/arm/mach-s3c64xx/irq-pm.c  |  2 --
+ arch/arm/mach-s5p64x0/pm.c      |  3 ---
+ arch/arm/mach-s5pv210/pm.c      | 10 ----------
+ arch/arm/plat-samsung/s5p-irq.c |  1 -
+ 4 files changed, 16 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/dev-backlight.c b/arch/arm/plat-samsung/dev-backlight.c
-index 5f197dc..e467a01 100644
---- a/arch/arm/plat-samsung/dev-backlight.c
-+++ b/arch/arm/plat-samsung/dev-backlight.c
-@@ -20,13 +20,18 @@
- #include <plat/gpio-cfg.h>
- #include <plat/backlight.h>
+diff --git a/arch/arm/mach-s3c64xx/irq-pm.c b/arch/arm/mach-s3c64xx/irq-pm.c
+index 0c7e1d9..c3da1b6 100644
+--- a/arch/arm/mach-s3c64xx/irq-pm.c
++++ b/arch/arm/mach-s3c64xx/irq-pm.c
+@@ -22,7 +22,6 @@
+ #include <mach/map.h>
  
-+struct samsung_bl_drvdata {
-+	struct platform_pwm_backlight_data plat_data;
-+	struct samsung_bl_gpio_info *gpio_info;
-+};
-+
- static int samsung_bl_init(struct device *dev)
- {
- 	int ret = 0;
--	struct platform_device *timer_dev =
--			container_of(dev->parent, struct platform_device, dev);
--	struct samsung_bl_gpio_info *bl_gpio_info =
--			timer_dev->dev.platform_data;
-+	struct platform_pwm_backlight_data *pdata = dev->platform_data;
-+	struct samsung_bl_drvdata *drvdata = container_of(pdata,
-+					struct samsung_bl_drvdata, plat_data);
-+	struct samsung_bl_gpio_info *bl_gpio_info = drvdata->gpio_info;
- 
- 	ret = gpio_request(bl_gpio_info->no, "Backlight");
- 	if (ret) {
-@@ -42,10 +47,10 @@ static int samsung_bl_init(struct device *dev)
- 
- static void samsung_bl_exit(struct device *dev)
- {
--	struct platform_device *timer_dev =
--			container_of(dev->parent, struct platform_device, dev);
--	struct samsung_bl_gpio_info *bl_gpio_info =
--			timer_dev->dev.platform_data;
-+	struct platform_pwm_backlight_data *pdata = dev->platform_data;
-+	struct samsung_bl_drvdata *drvdata = container_of(pdata,
-+					struct samsung_bl_drvdata, plat_data);
-+	struct samsung_bl_gpio_info *bl_gpio_info = drvdata->gpio_info;
- 
- 	s3c_gpio_cfgpin(bl_gpio_info->no, S3C_GPIO_OUTPUT);
- 	gpio_free(bl_gpio_info->no);
-@@ -60,12 +65,14 @@ static void samsung_bl_exit(struct device *dev)
-  * for their specific boards
-  */
- 
--static struct platform_pwm_backlight_data samsung_dfl_bl_data __initdata = {
--	.max_brightness = 255,
--	.dft_brightness = 255,
--	.pwm_period_ns  = 78770,
--	.init           = samsung_bl_init,
--	.exit           = samsung_bl_exit,
-+static struct samsung_bl_drvdata samsung_dfl_bl_data __initdata = {
-+	.plat_data = {
-+		.max_brightness = 255,
-+		.dft_brightness = 255,
-+		.pwm_period_ns  = 78770,
-+		.init           = samsung_bl_init,
-+		.exit           = samsung_bl_exit,
-+	},
+ #include <plat/regs-serial.h>
+-#include <plat/regs-timer.h>
+ #include <mach/regs-gpio.h>
+ #include <plat/cpu.h>
+ #include <plat/pm.h>
+@@ -43,7 +42,6 @@ static struct sleep_save irq_save[] = {
+ 	SAVE_ITEM(S3C64XX_EINT0FLTCON2),
+ 	SAVE_ITEM(S3C64XX_EINT0FLTCON3),
+ 	SAVE_ITEM(S3C64XX_EINT0MASK),
+-	SAVE_ITEM(S3C64XX_TINT_CSTAT),
  };
  
- static struct platform_device samsung_dfl_bl_device __initdata = {
-@@ -82,6 +89,7 @@ void __init samsung_bl_set(struct samsung_bl_gpio_info *gpio_info,
- {
- 	int ret = 0;
- 	struct platform_device *samsung_bl_device;
-+	struct samsung_bl_drvdata *samsung_bl_drvdata;
- 	struct platform_pwm_backlight_data *samsung_bl_data;
+ static struct irq_grp_save {
+diff --git a/arch/arm/mach-s5p64x0/pm.c b/arch/arm/mach-s5p64x0/pm.c
+index 97c2a08a..861e15c 100644
+--- a/arch/arm/mach-s5p64x0/pm.c
++++ b/arch/arm/mach-s5p64x0/pm.c
+@@ -18,7 +18,6 @@
  
- 	samsung_bl_device = kmemdup(&samsung_dfl_bl_device,
-@@ -91,17 +99,19 @@ void __init samsung_bl_set(struct samsung_bl_gpio_info *gpio_info,
- 		return;
- 	}
+ #include <plat/cpu.h>
+ #include <plat/pm.h>
+-#include <plat/regs-timer.h>
+ #include <plat/wakeup-mask.h>
  
--	samsung_bl_data = s3c_set_platdata(&samsung_dfl_bl_data,
--		sizeof(struct platform_pwm_backlight_data), samsung_bl_device);
--	if (!samsung_bl_data) {
-+	samsung_bl_drvdata = kmemdup(&samsung_dfl_bl_data,
-+				sizeof(samsung_dfl_bl_data), GFP_KERNEL);
-+	if (!samsung_bl_drvdata) {
- 		printk(KERN_ERR "%s: no memory for platform dev\n", __func__);
- 		goto err_data;
- 	}
-+	samsung_bl_device->dev.platform_data = &samsung_bl_drvdata->plat_data;
-+	samsung_bl_drvdata->gpio_info = gpio_info;
-+	samsung_bl_data = &samsung_bl_drvdata->plat_data;
- 
- 	/* Copy board specific data provided by user */
- 	samsung_bl_data->pwm_id = bl_data->pwm_id;
--	samsung_bl_device->dev.parent =
--			&s3c_device_timer[samsung_bl_data->pwm_id].dev;
-+	samsung_bl_device->dev.parent = &samsung_device_pwm.dev;
- 
- 	if (bl_data->max_brightness)
- 		samsung_bl_data->max_brightness = bl_data->max_brightness;
-@@ -122,9 +132,6 @@ void __init samsung_bl_set(struct samsung_bl_gpio_info *gpio_info,
- 	if (bl_data->check_fb)
- 		samsung_bl_data->check_fb = bl_data->check_fb;
- 
--	/* Keep the GPIO info for future use */
--	s3c_device_timer[samsung_bl_data->pwm_id].dev.platform_data = gpio_info;
+ #include <mach/regs-clock.h>
+@@ -48,8 +47,6 @@ static struct sleep_save s5p64x0_misc_save[] = {
+ 	SAVE_ITEM(S5P64X0_MEM0CONSLP1),
+ 	SAVE_ITEM(S5P64X0_MEM0DRVCON),
+ 	SAVE_ITEM(S5P64X0_MEM1DRVCON),
 -
- 	/* Register the specific PWM timer dev for Backlight control */
- 	ret = platform_device_register(
- 			&s3c_device_timer[samsung_bl_data->pwm_id]);
+-	SAVE_ITEM(S3C64XX_TINT_CSTAT),
+ };
+ 
+ /* DPLL is present only in S5P6450 */
+diff --git a/arch/arm/mach-s5pv210/pm.c b/arch/arm/mach-s5pv210/pm.c
+index 2b68a67..3cf3f9c 100644
+--- a/arch/arm/mach-s5pv210/pm.c
++++ b/arch/arm/mach-s5pv210/pm.c
+@@ -21,7 +21,6 @@
+ 
+ #include <plat/cpu.h>
+ #include <plat/pm.h>
+-#include <plat/regs-timer.h>
+ 
+ #include <mach/regs-irq.h>
+ #include <mach/regs-clock.h>
+@@ -77,15 +76,6 @@ static struct sleep_save s5pv210_core_save[] = {
+ 	/* Clock ETC */
+ 	SAVE_ITEM(S5P_CLK_OUT),
+ 	SAVE_ITEM(S5P_MDNIE_SEL),
+-
+-	/* PWM Register */
+-	SAVE_ITEM(S3C2410_TCFG0),
+-	SAVE_ITEM(S3C2410_TCFG1),
+-	SAVE_ITEM(S3C64XX_TINT_CSTAT),
+-	SAVE_ITEM(S3C2410_TCON),
+-	SAVE_ITEM(S3C2410_TCNTB(0)),
+-	SAVE_ITEM(S3C2410_TCMPB(0)),
+-	SAVE_ITEM(S3C2410_TCNTO(0)),
+ };
+ 
+ static int s5pv210_cpu_suspend(unsigned long arg)
+diff --git a/arch/arm/plat-samsung/s5p-irq.c b/arch/arm/plat-samsung/s5p-irq.c
+index 6729cb2..ddfaca9 100644
+--- a/arch/arm/plat-samsung/s5p-irq.c
++++ b/arch/arm/plat-samsung/s5p-irq.c
+@@ -17,7 +17,6 @@
+ 
+ #include <mach/irqs.h>
+ #include <mach/map.h>
+-#include <plat/regs-timer.h>
+ #include <plat/cpu.h>
+ 
+ void __init s5p_init_irq(u32 *vic, u32 num_vic)
 -- 
 1.8.2.1
