@@ -1,51 +1,61 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 20 Jun 2013 17:44:01 +0200
-Subject: [PATCH 4/6] ARM: dts: imx27: Add 1-wire
-In-Reply-To: <1371741454.488712140@f66.mail.ru>
+Date: Thu, 20 Jun 2013 17:45:14 +0200
+Subject: [PATCH 6/6] ARM: dts: Add device tree support for phycard pca100
+In-Reply-To: <1371741670.186508416@f66.mail.ru>
 References: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
- <1371739815-6666-5-git-send-email-mpa@pengutronix.de>
- <1371741454.488712140@f66.mail.ru>
-Message-ID: <20130620154401.GD8219@s25.your-server.de>
+ <1371739815-6666-7-git-send-email-mpa@pengutronix.de>
+ <1371741670.186508416@f66.mail.ru>
+Message-ID: <20130620154514.GE8219@s25.your-server.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 07:17:34PM +0400, Alexander Shiyan wrote:
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/imx27.dtsi | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
+On Thu, Jun 20, 2013 at 07:21:10PM +0400, Alexander Shiyan wrote:
+> > Based on patches from:
 > > 
-> > diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> > index 044004a..e883e77 100644
-> > --- a/arch/arm/boot/dts/imx27.dtsi
-> > +++ b/arch/arm/boot/dts/imx27.dtsi
-> > @@ -110,6 +110,14 @@
-> >  				clock-names = "ipg", "per";
-> >  			};
-> >  
-> > +			owire: owire at 10009000 {
-> > +				compatible = "fsl,imx21-owire";
-> 
-> I think you should use "fsl,imx27-owire", "fsl,imx21-owire" here.
-
-Fixed, thank you
-
-Markus
-
-> 
-> > +				reg = <0x10009000 0x1000>;
-> > +				clocks = <&clks 35>;
-> > +				clock-names = "ipg";
-> > +				status = "disabled";
+> > Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+> >  - Original patch
+> >  - ARM: dts: Set partition offsets for phycard
+> >  - ARM: dts: Use CSPI1 instead of CSPI2 on phycard pca100
+> >  - ARM: imx27-phytec-phycard-S.dts: resize nand partitions
+> > 
+> > Jan Luebbe <jlu@pengutronix.de>:
+> >  - ARM: dts: Enable bad block table in NAND
+> > 
+> > Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > Cc: Jan Luebbe <jlu@pengutronix.de>
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ...
+> > +			gpio at 10015000 {
+> > +				status = "okay";
 > > +			};
 > > +
-> >  			uart1: serial at 1000a000 {
-> >  				compatible = "fsl,imx27-uart", "fsl,imx21-uart";
-> >  				reg = <0x1000a000 0x1000>;
-> > -- 
+> > +			gpio at 10015100 {
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			gpio at 10015200 {
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			gpio at 10015300 {
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			gpio at 10015400 {
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			gpio at 10015500 {
+> > +				status = "okay";
+> > +			};
 > 
-> 
-> ---
+> No need setup status for devices which not disabled in imx27.dts
+
+Thanks, I removed all unnecessary nodes, gpio and wdog.
+
+Regards,
+
+Markus
 
 -- 
 Pengutronix e.K.                           |                             |
