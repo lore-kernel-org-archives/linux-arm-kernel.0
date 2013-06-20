@@ -1,241 +1,56 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 20 Jun 2013 11:36:20 +0200
-Subject: [PATCH V6 3/3] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-In-Reply-To: <00c501ce6d8f$af1bf900$0d53eb00$@samsung.com>
-References: <00c201ce6d85$83b072a0$8b1157e0$@samsung.com>
- <3250954.dVh4O1LchK@flatron> <00c501ce6d8f$af1bf900$0d53eb00$@samsung.com>
-Message-ID: <228629412.BqSshikCdN@amdc1227>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Thu, 20 Jun 2013 15:05:57 +0530
+Subject: [PATCH V4 01/11] USB: OHCI: Properly handle OHCI controller suspend
+In-Reply-To: <1371720968-7533-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
+ <1371720968-7533-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1371720968-7533-2-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 of June 2013 17:25:12 Jingoo Han wrote:
-> On Thursday, June 20, 2013 5:04 PM, Tomasz Figa wrote:
-> > Hi Jingoo,
-> > 
-> > On Thursday 20 of June 2013 16:12:24 Jingoo Han wrote:
-> > > Exynos5440 has two PCIe controllers which can be used as root complex
-> > > for PCIe interface.
-> > > 
-> > > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> > > ---
-> > > 
-> > >  arch/arm/boot/dts/exynos5440-ssdk5440.dts |    8 ++++++
-> > >  arch/arm/boot/dts/exynos5440.dtsi         |   40
-> > > 
-> > > ++++++++++++++++++++++++++++- 2 files changed, 47 insertions(+), 1
-> > > deletion(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> > > b/arch/arm/boot/dts/exynos5440-ssdk5440.dts index f32cd77..3d93804
-> > > 100644
-> > > --- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> > > +++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> > > @@ -65,4 +65,12 @@
-> > > 
-> > >  			clock-frequency = <50000000>;
-> > >  		
-> > >  		};
-> > >  	
-> > >  	};
-> > > 
-> > > +
-> > > +	pcie0 at 290000 {
-> > > +		reset-gpio = <&pin_ctrl 5 0>;
-> > > +	};
-> > > +
-> > > +	pcie1 at 2a0000 {
-> > > +		reset-gpio = <&pin_ctrl 22 0>;
-> > > +	};
-> > > 
-> > >  };
-> > > 
-> > > diff --git a/arch/arm/boot/dts/exynos5440.dtsi
-> > > b/arch/arm/boot/dts/exynos5440.dtsi index 03d40c0..6295eda 100644
-> > > --- a/arch/arm/boot/dts/exynos5440.dtsi
-> > > +++ b/arch/arm/boot/dts/exynos5440.dtsi
-> > > @@ -126,7 +126,7 @@
-> > > 
-> > >  		clock-names = "spi", "spi_busclk0";
-> > >  	
-> > >  	};
-> > > 
-> > > -	pinctrl {
-> > > +	pin_ctrl: pinctrl {
-> > > 
-> > >  		compatible = "samsung,exynos5440-pinctrl";
-> > >  		reg = <0xE0000 0x1000>;
-> > >  		interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>,
-> > > 
-> > > @@ -230,4 +230,42 @@
-> > > 
-> > >  		clocks = <&clock 24>;
-> > >  		clock-names = "usbhost";
-> > >  	
-> > >  	};
-> > 
-> > I think this patch should be split into two:
-> >  - patch adding just generlic PCIe nodes for Exynos5440,
-> >  - patch adding label to the pinctrl node (which is a prerequisite) and
-> > 
-> > board-specific properties of PCIe nodes.
-> 
-> Do you mean the following?
-> 
-> 1. patch adding just generlic PCIe nodes for Exynos5440
->     [PATCH] ARM: dts: Add pcie controller node for Samsung EXYNOS5440 SoC
-> 
-> arch/arm/boot/dts/exynos5440.dtsi
-> +
-> +	pcie at 290000 {
-> +		compatible = "samsung,exynos5440-pcie";
-> +		reg = <0x290000 0x1000
-> +			0x270000 0x1000
-> +			0x271000 0x40>;
-> +		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-> +		clocks = <&clock 28>, <&clock 27>;
-> +		clock-names = "pcie", "pcie_bus";
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		device_type = "pci";
-> +		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00001000   /*
-> configuration space */ +			  0x81000000 0 0	  0x40001000 0 0x00010000  
-> /* downstream I/O */ +			  0x82000000 0 0x40011000 0x40011000 0
-> 0x1ffef000>; /* non-prefetchable memory */ +		#interrupt-cells = <1>;
-> +		interrupt-map-mask = <0 0 0 0>;
-> +		interrupt-map = <0x0 0 &gic 53>;
-> +	};
-> +
-> +	pcie at 2a0000 {
-> +		compatible = "samsung,exynos5440-pcie";
-> +		reg = <0x2a0000 0x1000
-> +			0x272000 0x1000
-> +			0x271040 0x40>;
-> +		interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
-> +		clocks = <&clock 29>, <&clock 27>;
-> +		clock-names = "pcie", "pcie_bus";
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		device_type = "pci";
-> +		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00001000   /*
-> configuration space */ +			  0x81000000 0 0	  0x60001000 0 0x00010000  
-> /* downstream I/O */ +			  0x82000000 0 0x60011000 0x60011000 0
-> 0x1ffef000>; /* non-prefetchable memory */ +		#interrupt-cells = <1>;
-> +		interrupt-map-mask = <0 0 0 0>;
-> +		interrupt-map = <0x0 0 &gic 56>;
-> +	};
-> 
-> 
-> 
-> 2. patch adding label to the pinctrl node (which is a prerequisite) and
->     board-specific properties of PCIe nodes.
->    [PATCH] ARM: dts: Add pcie controller node for exynos5440-ssdk5440
-> 
-> arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> +
-> +	pcie0 at 290000 {
-> +		reset-gpio = <&pin_ctrl 5 0>;
-> +	};
-> +
-> +	pcie1 at 2a0000 {
-> +		reset-gpio = <&pin_ctrl 22 0>;
-> +	};
-> 
-> arch/arm/boot/dts/exynos5440.dtsi
-> -	pinctrl {
-> +	pin_ctrl: pinctrl {
-> 
+Suspend scenario in case of OHCI was not properly
+handled in ochi_suspend()routine. This does proper
+handling of suspend scenario.
 
-Exactly.
+Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg KH <greg@kroah.com>
+Cc: linux-usb at vger.kernel.org
 
-> > > +
-> > > +	pcie0 at 290000 {
-> > 
-> > Node naming looks incorrect here. The name should be as generic as
-> > possible, without any hardware-specific IDs, e.g. pcie, not pcie0. The
-> > @290000 suffix is enough to make the node unique.
-> 
-> I see. You are right.
-> I will fix it.
+V3: New patch.
 
-Thanks.
+V4: No change.
+---
+ drivers/usb/host/ohci-hcd.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-Best regards,
-Tomasz
-
-> Best regards,
-> Jingoo Han
-> 
-> > > +		compatible = "samsung,exynos5440-pcie";
-> > > +		reg = <0x290000 0x1000
-> > > +			0x270000 0x1000
-> > > +			0x271000 0x40>;
-> > > +		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-> > > +		clocks = <&clock 28>, <&clock 27>;
-> > > +		clock-names = "pcie", "pcie_bus";
-> > > +		#address-cells = <3>;
-> > > +		#size-cells = <2>;
-> > > +		device_type = "pci";
-> > > +		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00001000
-> > 
-> > /*
-> > 
-> > > configuration space */ +			  0x81000000 0 0
-> > 
-> > 0x40001000 0 0x00010000
-> > 
-> > > /* downstream I/O */ +			  0x82000000 0 0x40011000
-> > 
-> > 0x40011000 0
-> > 
-> > > 0x1ffef000>; /* non-prefetchable memory */ +		#interrupt-cells =
-> > 
-> > <1>;
-> > 
-> > > +		interrupt-map-mask = <0 0 0 0>;
-> > > +		interrupt-map = <0x0 0 &gic 53>;
-> > > +	};
-> > > +
-> > > +	pcie1 at 2a0000 {
-> > 
-> > Same here.
-> > 
-> > Best regards,
-> > Tomasz
-> > 
-> > > +		compatible = "samsung,exynos5440-pcie";
-> > > +		reg = <0x2a0000 0x1000
-> > > +			0x272000 0x1000
-> > > +			0x271040 0x40>;
-> > > +		interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
-> > > +		clocks = <&clock 29>, <&clock 27>;
-> > > +		clock-names = "pcie", "pcie_bus";
-> > > +		#address-cells = <3>;
-> > > +		#size-cells = <2>;
-> > > +		device_type = "pci";
-> > > +		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00001000
-> > 
-> > /*
-> > 
-> > > configuration space */ +			  0x81000000 0 0
-> > 
-> > 0x60001000 0 0x00010000
-> > 
-> > > /* downstream I/O */ +			  0x82000000 0 0x60011000
-> > 
-> > 0x60011000 0
-> > 
-> > > 0x1ffef000>; /* non-prefetchable memory */ +		#interrupt-cells =
-> > 
-> > <1>;
-> > 
-> > > +		interrupt-map-mask = <0 0 0 0>;
-> > > +		interrupt-map = <0x0 0 &gic 56>;
-> > > +	};
-> > > 
-> > >  };
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe
-> linux-samsung-soc" in the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+index b69a49e..f3dcaa2 100644
+--- a/drivers/usb/host/ohci-hcd.c
++++ b/drivers/usb/host/ohci-hcd.c
+@@ -1034,6 +1034,7 @@ int ohci_suspend(struct usb_hcd *hcd, bool do_wakeup)
+ {
+ 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
+ 	unsigned long	flags;
++	int		rc = 0;
+ 
+ 	/* Disable irq emission and mark HW unaccessible. Use
+ 	 * the spinlock to properly synchronize with possible pending
+@@ -1046,7 +1047,13 @@ int ohci_suspend(struct usb_hcd *hcd, bool do_wakeup)
+ 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+ 	spin_unlock_irqrestore (&ohci->lock, flags);
+ 
+-	return 0;
++	synchronize_irq(hcd->irq);
++
++	if (do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
++		ohci_resume(hcd, false);
++		rc = -EBUSY;
++	}
++	return rc;
+ }
+ EXPORT_SYMBOL_GPL(ohci_suspend);
+ 
+-- 
+1.7.9.5
