@@ -1,68 +1,61 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 20 Jun 2013 15:48:44 -0700
-Subject: [PATCH v2] ARM/KVM: save and restore generic timer registers
-In-Reply-To: <7BA55D0B-D754-4FD2-BD4C-6223AA063E27@suse.de>
-References: <1370963819-26165-1-git-send-email-andre.przywara@linaro.org>
- <51C2D528.90805@arm.com> <20130620170923.GA4563@lvm>
- <51C339BD.2080600@arm.com> <20130620183221.GE4563@lvm>
- <CAFEAcA97WiCYnSSs3utfq5+3tgausn+fjEnWeN6zj9sgP9P9qA@mail.gmail.com>
- <20130620203715.GI4563@lvm>
- <52054112-99C9-44DD-921C-BA06854B29A5@suse.de>
- <CAFEAcA8D+SXe8PPfd=sqPf8td4kk5TbdQgXgqUVnkXR7ZKXKpw@mail.gmail.com>
- <7BA55D0B-D754-4FD2-BD4C-6223AA063E27@suse.de>
-Message-ID: <20130620224844.GM4563@lvm>
+From: s-anna@ti.com (Anna, Suman)
+Date: Thu, 20 Jun 2013 22:56:49 +0000
+Subject: [GIT PULL 7/7] omap mailbox move to drivers for v3.11 merge window
+In-Reply-To: <201306202146.27093.arnd@arndb.de>
+References: <0MFrZm-1V3qHW1bmA-00EJsa@mx.kundenserver.de>
+ <201306202146.27093.arnd@arndb.de>
+Message-ID: <37C860A02101E749A747FA2D3C1E3C504CD3DD@DLEE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 12:02:02AM +0200, Alexander Graf wrote:
-> 
-> On 20.06.2013, at 23:59, Peter Maydell wrote:
-> 
-> > On 20 June 2013 22:55, Alexander Graf <agraf@suse.de> wrote:
-> >> 
-> >> On 20.06.2013, at 22:37, Christoffer Dall wrote:
-> >> 
-> >>> On Thu, Jun 20, 2013 at 08:29:30PM +0100, Peter Maydell wrote:
-> >>>> On 20 June 2013 19:32, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> >>>>> Marc wrote:
-> >>>>>> So there is just one thing we absolutely need to make sure here: no vcpu
-> >>>>>> can run before they've all had their timer restored, and hence a stable
-> >>>>>> cntvoff. Otherwise two vcpus will have a different view of time.
-> >>>>>> 
-> >>>>>> Can we guarantee this?
-> >>>> 
-> >>>>> Do we need to?  User space is free to modify time and all sort of other
-> >>>>> registers at any point during VM execution - it will just break the
-> >>>>> guest that it's running.
-> >>>> 
-> >>>> Note that QEMU will stop all CPUs before doing a migration or
-> >>>> similar operation. However there is a monitor command to query
-> >>>> the current CPU registers etc which won't try to stop the VM
-> >>>> first. So we might try to read vcpu registers (though I hope we
-> >>>> don't allow writing them).
-> >>>> 
-> >>> Sounds like we need to add a -EBUSY return on SET_ONE_REG if the VM is
-> >>> running.
-> >> 
-> >> The ONE_REG API should already be protected here, as it does
-> >> vcpu_load() in kvm_vcpu_ioctl(). So a separate thread can't possibly
-> >> do ONE_REG accesses while another thread has the same vcpu running.
-> > 
-> > Doesn't protect you against confusion due to another thread running
-> > a different vcpu in the same vm, though.
-> 
-> Ah, different ONE_REG API. Can't you just notify all vcpus to exit and refresh their timers? That's what kvm_make_request() is there for, no?
-> 
-yes you can, but I don't think it's worth the trouble to add the code in
-the kernel to fix a case where user space does something completely
-broken, which does not muck with the hardware or host state, but can
-only break the guest.
+Arnd,
 
-I didn't realize that ONE_REG does vcpu_load() (or, I probably did once,
-and forgot) so that means we're good.
+> On Tuesday 18 June 2013, Tony Lindgren wrote:
+> > The following changes since commit
+> 317ddd256b9c24b0d78fa8018f80f1e495481a10:
+> >
+> >   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-
+> for-v3.11/mailbox-signed
+> >
+> > for you to fetch changes up to d2e993289cc5f1780ce74188e3a8d2b404748397:
+> >
+> >   Merge tag 'omap-mailbox-for-v3.11' of git://github.com/sumananna/mailbox
+> into omap-for-v3.11/mailbox (2013-06-17 03:51:54 -0700)
+> >
+> > ----------------------------------------------------------------
+> >
+> > Move OMAP Mailbox framework to drivers via Suman Anna <s-anna@ti.com>
+> >
+> > The OMAP Mailbox driver framework is moved out of arch/arm folder
+> > into drivers/mailbox folder, to re-enable building it and also serve
+> > as a baseline for adapting to the new mailbox driver framework. The
+> > changes mainly contain:
+> >   - a minor bug fix and cleanup of mach-specific mailbox code
+> >   - remove any header dependencies from plat-omap for multi-platform
+> >     support
+> >   - represent mailbox device data through platform data/hwmod attrs
+> >   - move the omap mailbox code out of plat-omap/mach-omapX to
+> >     drivers/mailbox folder
+> >
+> 
+> I've pulled this into next/drivers as well, rather than a separate
+> branch that we had for 3.10 (and dropped). I am a bit puzzled about
+> this series though. Is it right that for 3.10 we had plans for a
+> generic subsystem, and now it's just the omap drivers?
 
-Conclusion on this patch: address Marc's comment to move the user space
-interface handling out of arch_timer.c and we should be good.
+Yes, we still have a plan for a generic subsystem, and these would form the
+the base patches of OMAP adaptation towards that. OMAP mailbox was disabled
+since couple of releases now because of the multi-platform enablement. There were
+couple of different work-items needed on OMAP mailbox like fixing the multi-platform,
+converting to DT and adapting to the new framework. The previous subsystem was
+derived of the OMAP mailbox, so the first and last items were kinda automatic. The
+newest one based on Jassi's work is not gonna reuse any OMAP stuff, so this series
+handles the first one to avoid a huge pending patchset for OMAP on the generic
+framework finalization.
 
-Thanks,
--Christoffer
+Regards
+Suman
