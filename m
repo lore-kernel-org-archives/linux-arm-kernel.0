@@ -1,48 +1,126 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 21 Jun 2013 00:13:00 +0200
-Subject: [PATCH v2 15/18] ARM: SAMSUNG: Remove old PWM timer platform devices
+Date: Fri, 21 Jun 2013 00:12:57 +0200
+Subject: [PATCH v2 12/18] ARM: SAMSUNG: Rework private data handling in
+ dev-backlight
 In-Reply-To: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
 References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1371766383-29077-16-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1371766383-29077-13-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes old Samsung PWM timer platform devices that are not
-used any more.
+This patch modifies dev-backlight helpers to get private data using
+container_of instead of abusing platform_data field of PWM device.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/plat-samsung/devs.c | 18 ------------------
- 1 file changed, 18 deletions(-)
+ arch/arm/plat-samsung/dev-backlight.c | 51 ++++++++++++++++++++---------------
+ 1 file changed, 29 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index 290f63a..8ce0ac0 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -1098,24 +1098,6 @@ arch_initcall(s5p_pmu_init);
- /* PWM Timer */
+diff --git a/arch/arm/plat-samsung/dev-backlight.c b/arch/arm/plat-samsung/dev-backlight.c
+index 5f197dc..e467a01 100644
+--- a/arch/arm/plat-samsung/dev-backlight.c
++++ b/arch/arm/plat-samsung/dev-backlight.c
+@@ -20,13 +20,18 @@
+ #include <plat/gpio-cfg.h>
+ #include <plat/backlight.h>
  
- #ifdef CONFIG_SAMSUNG_DEV_PWM
--
--#define DEFINE_S3C_TIMER(_tmr_no)			\
--	.name		= "s3c24xx-pwm",		\
--	.id		= _tmr_no,			\
--
--/*
-- * since we already have an static mapping for the timer,
-- * we do not bother setting any IO resource for the base.
-- */
--
--struct platform_device s3c_device_timer[] = {
--	[0] = { DEFINE_S3C_TIMER(0) },
--	[1] = { DEFINE_S3C_TIMER(1) },
--	[2] = { DEFINE_S3C_TIMER(2) },
--	[3] = { DEFINE_S3C_TIMER(3) },
--	[4] = { DEFINE_S3C_TIMER(4) },
--};
--
- static struct resource samsung_pwm_resource[] = {
- 	DEFINE_RES_MEM(SAMSUNG_PA_TIMER, SZ_4K),
++struct samsung_bl_drvdata {
++	struct platform_pwm_backlight_data plat_data;
++	struct samsung_bl_gpio_info *gpio_info;
++};
++
+ static int samsung_bl_init(struct device *dev)
+ {
+ 	int ret = 0;
+-	struct platform_device *timer_dev =
+-			container_of(dev->parent, struct platform_device, dev);
+-	struct samsung_bl_gpio_info *bl_gpio_info =
+-			timer_dev->dev.platform_data;
++	struct platform_pwm_backlight_data *pdata = dev->platform_data;
++	struct samsung_bl_drvdata *drvdata = container_of(pdata,
++					struct samsung_bl_drvdata, plat_data);
++	struct samsung_bl_gpio_info *bl_gpio_info = drvdata->gpio_info;
+ 
+ 	ret = gpio_request(bl_gpio_info->no, "Backlight");
+ 	if (ret) {
+@@ -42,10 +47,10 @@ static int samsung_bl_init(struct device *dev)
+ 
+ static void samsung_bl_exit(struct device *dev)
+ {
+-	struct platform_device *timer_dev =
+-			container_of(dev->parent, struct platform_device, dev);
+-	struct samsung_bl_gpio_info *bl_gpio_info =
+-			timer_dev->dev.platform_data;
++	struct platform_pwm_backlight_data *pdata = dev->platform_data;
++	struct samsung_bl_drvdata *drvdata = container_of(pdata,
++					struct samsung_bl_drvdata, plat_data);
++	struct samsung_bl_gpio_info *bl_gpio_info = drvdata->gpio_info;
+ 
+ 	s3c_gpio_cfgpin(bl_gpio_info->no, S3C_GPIO_OUTPUT);
+ 	gpio_free(bl_gpio_info->no);
+@@ -60,12 +65,14 @@ static void samsung_bl_exit(struct device *dev)
+  * for their specific boards
+  */
+ 
+-static struct platform_pwm_backlight_data samsung_dfl_bl_data __initdata = {
+-	.max_brightness = 255,
+-	.dft_brightness = 255,
+-	.pwm_period_ns  = 78770,
+-	.init           = samsung_bl_init,
+-	.exit           = samsung_bl_exit,
++static struct samsung_bl_drvdata samsung_dfl_bl_data __initdata = {
++	.plat_data = {
++		.max_brightness = 255,
++		.dft_brightness = 255,
++		.pwm_period_ns  = 78770,
++		.init           = samsung_bl_init,
++		.exit           = samsung_bl_exit,
++	},
  };
+ 
+ static struct platform_device samsung_dfl_bl_device __initdata = {
+@@ -82,6 +89,7 @@ void __init samsung_bl_set(struct samsung_bl_gpio_info *gpio_info,
+ {
+ 	int ret = 0;
+ 	struct platform_device *samsung_bl_device;
++	struct samsung_bl_drvdata *samsung_bl_drvdata;
+ 	struct platform_pwm_backlight_data *samsung_bl_data;
+ 
+ 	samsung_bl_device = kmemdup(&samsung_dfl_bl_device,
+@@ -91,17 +99,19 @@ void __init samsung_bl_set(struct samsung_bl_gpio_info *gpio_info,
+ 		return;
+ 	}
+ 
+-	samsung_bl_data = s3c_set_platdata(&samsung_dfl_bl_data,
+-		sizeof(struct platform_pwm_backlight_data), samsung_bl_device);
+-	if (!samsung_bl_data) {
++	samsung_bl_drvdata = kmemdup(&samsung_dfl_bl_data,
++				sizeof(samsung_dfl_bl_data), GFP_KERNEL);
++	if (!samsung_bl_drvdata) {
+ 		printk(KERN_ERR "%s: no memory for platform dev\n", __func__);
+ 		goto err_data;
+ 	}
++	samsung_bl_device->dev.platform_data = &samsung_bl_drvdata->plat_data;
++	samsung_bl_drvdata->gpio_info = gpio_info;
++	samsung_bl_data = &samsung_bl_drvdata->plat_data;
+ 
+ 	/* Copy board specific data provided by user */
+ 	samsung_bl_data->pwm_id = bl_data->pwm_id;
+-	samsung_bl_device->dev.parent =
+-			&s3c_device_timer[samsung_bl_data->pwm_id].dev;
++	samsung_bl_device->dev.parent = &samsung_device_pwm.dev;
+ 
+ 	if (bl_data->max_brightness)
+ 		samsung_bl_data->max_brightness = bl_data->max_brightness;
+@@ -122,9 +132,6 @@ void __init samsung_bl_set(struct samsung_bl_gpio_info *gpio_info,
+ 	if (bl_data->check_fb)
+ 		samsung_bl_data->check_fb = bl_data->check_fb;
+ 
+-	/* Keep the GPIO info for future use */
+-	s3c_device_timer[samsung_bl_data->pwm_id].dev.platform_data = gpio_info;
+-
+ 	/* Register the specific PWM timer dev for Backlight control */
+ 	ret = platform_device_register(
+ 			&s3c_device_timer[samsung_bl_data->pwm_id]);
 -- 
 1.8.2.1
