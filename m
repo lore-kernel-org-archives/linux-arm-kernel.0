@@ -1,31 +1,79 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 20 Jun 2013 22:08:45 +0200
-Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
- MMU binding
-In-Reply-To: <1370889285-22799-8-git-send-email-will.deacon@arm.com>
-References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
- <1370889285-22799-8-git-send-email-will.deacon@arm.com>
-Message-ID: <20130620200845.GF11309@8bytes.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Jun 2013 21:06:24 +0100
+Subject: [PATCH v4] drm/i2c: tda998x: fix sync generation and calculation
+In-Reply-To: <1371757563-27862-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1371757563-27862-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130620200624.GQ2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 07:34:43PM +0100, Will Deacon wrote:
-> This patch adds a description of the device tree binding for the ARM
-> System MMU architecture.
+On Thu, Jun 20, 2013 at 09:46:03PM +0200, Sebastian Hesselbarth wrote:
+> +	ref_pix      = 3 + mode->hsync_start - mode->hdisplay;
+> +	de_pix_s     = mode->htotal - mode->hdisplay;
+> +	de_pix_e     = de_pix_s + mode->hdisplay;
+> +	hs_pix_s     = mode->hsync_start - mode->hdisplay;
+> +	hs_pix_e     = hs_pix_s + mode->hsync_end - mode->hsync_start;
 
-Interesting, will this be a common driver to replace existing ARM IOMMU
-drivers or is it a common driver for ARM IOMMUs found in future chips?
+Correct, however, these can be simplified.
 
-> +- smmu-parent   : When multiple SMMUs are chained together, this
-> +                  property can be used to provide a phandle to the
-> +                  parent SMMU (that is the next SMMU on the path going
-> +                  from the mmu-masters towards memory) node for this
-> +                  SMMU.
+For de_pix_e:
 
-What happens when SMMUs are chained? Will the second SMMU seeing the DMA
-just pass it through or is it translated again?
+	de_pix_e = de_pix_s + mode->hdisplay;
+	de_pix_s = mode->htotal - mode->hdisplay;
 
+Putting de_pix_s into de_pix_e's equation, you get:
 
-Thanks,
+	de_pix_e = mode->htotal - mode->hdisplay + mode->hdisplay;
 
-	Joerg
+which ends up simply as:
+
+	de_pix_e = mode->htotal;
+
+Now, doing the same for hs_pix_e:
+
+	hs_pix_e = mode->hsync_start - mode->hdisplay + mode->hsync_end - mode->hsync_start;
+
+which ends up as:
+
+	hs_pix_e = mode->hsync_end - mode->hdisplay;
+
+So overall these come out as:
+
+	de_pix_e = mode->htotal;
+	de_pix_s = mode->htotal - mode->hdisplay;
+	hs_pix_e = mode->hsync_end - mode->hdisplay;
+	hs_pix_s = mode->hsync_start - mode->hdisplay;
+
+I've listed them in reverse order because it makes more sense to me when
+thinking about it.  What we're basically doing is rotating this by
+hdisplay pixel clocks to the left, so using abbreviations:
+
+ht=htotal
+hds=hdisplay start
+hde=hdisplay end
+hss=hsync_start
+hse=hsync_end
+
+0                                                ht
+hds                                hde  hss hse   |
+|-----------------------------------|----|---|----|
+
+becomes:
+0                                                ht
+0   hss hse  hds                                hde
+|----|---|----|-----------------------------------|
+
+and from that you can visualize taking hdisplay (being hde-hds) off each
+timing parameter modulo htotal gives you the above equations.
+
+These calculations are the same as what was originally in the driver:
+
++       de_start   = mode->htotal - mode->hdisplay;
++       de_end     = mode->htotal;
++       hs_start   = mode->hsync_start - mode->hdisplay;
++       hs_end     = mode->hsync_end - mode->hdisplay;
+
+when it was first committed.
+
+This is otherwise exactly what I came up with which gets my TV working
+again in HDMI mode.
