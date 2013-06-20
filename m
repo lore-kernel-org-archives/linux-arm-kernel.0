@@ -1,99 +1,61 @@
-From: yadi.brar@samsung.com (Yadwinder Singh Brar)
-Date: Tue, 11 Jun 2013 15:01:16 +0530
-Subject: [PATCH v7 11/11] clk: samsung: Add EPLL and VPLL freq table for
- exynos5250 SoC
-In-Reply-To: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
-References: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
-Message-ID: <1370943076-13461-12-git-send-email-yadi.brar@samsung.com>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Thu, 20 Jun 2013 15:06:05 +0530
+Subject: [PATCH V4 09/11] USB: OHCI: Properly handle ohci-pxa27x suspend
+In-Reply-To: <1371720968-7533-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
+ <1371720968-7533-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1371720968-7533-10-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vikas Sajjan <vikas.sajjan@linaro.org>
+Suspend scenario in case of ohci-pxa27x glue was not
+properly handled as it was not suspending generic part
+of ohci controller. Calling explicitly the ohci_suspend()
+routine in ohci_hcd_pxa27x_drv_suspend() will ensure proper
+handling of suspend scenario.
 
-Adds the EPLL and VPLL freq table for exynos5250 SoC.
+Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg KH <greg@kroah.com>
+Cc: linux-usb at vger.kernel.org
 
-Signed-off-by: Vikas Sajjan <vikas.sajjan@linaro.org>
-Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+V2:
+ -Incase ohci_suspend() fails, return right away without
+  executing further.
+V3:
+ -Aligned variable "do_wakeup" and "ret".
+
+V4:
+ -The do_wakeup and ret variable alignment is removed.
 ---
- drivers/clk/samsung/clk-exynos5250.c |   38 ++++++++++++++++++++++++++++++++++
- drivers/clk/samsung/clk.h            |    2 +
- 2 files changed, 40 insertions(+), 0 deletions(-)
+ drivers/usb/host/ohci-pxa27x.c |    8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index 492d119..2aabecb 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -498,6 +498,29 @@ static struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
- 	GATE(g3d, "g3d", "aclk_400_g3d", GATE_IP_G3D, 0, 0, 0),
- };
- 
-+static __initdata struct samsung_pll_rate_table vpll_24mhz_tbl[] = {
-+	/* sorted in descending order */
-+	/* PLL_36XX_RATE(rate, m, p, s, k) */
-+	PLL_36XX_RATE(266000000, 266, 3, 3, 0),
-+	/* Not in UM, but need for eDP on snow */
-+	PLL_36XX_RATE(70500000, 94, 2, 4, 0),
-+	{ },
-+};
-+
-+static __initdata struct samsung_pll_rate_table epll_24mhz_tbl[] = {
-+	/* sorted in descending order */
-+	/* PLL_36XX_RATE(rate, m, p, s, k) */
-+	PLL_36XX_RATE(192000000, 64, 2, 2, 0),
-+	PLL_36XX_RATE(180633600, 90, 3, 2, 20762),
-+	PLL_36XX_RATE(180000000, 90, 3, 2, 0),
-+	PLL_36XX_RATE(73728000, 98, 2, 4, 19923),
-+	PLL_36XX_RATE(67737600, 90, 2, 4, 20762),
-+	PLL_36XX_RATE(49152000, 98, 3, 4, 19923),
-+	PLL_36XX_RATE(45158400, 90, 3, 4, 20762),
-+	PLL_36XX_RATE(32768000, 131, 3, 5, 4719),
-+	{ },
-+};
-+
- struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
- 	[apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
- 		APLL_CON0, "fout_apll", NULL),
-@@ -524,6 +547,8 @@ static __initdata struct of_device_id ext_clk_match[] = {
- static void __init exynos5250_clk_init(struct device_node *np)
+diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
+index 3a9c01d..5fb91f1 100644
+--- a/drivers/usb/host/ohci-pxa27x.c
++++ b/drivers/usb/host/ohci-pxa27x.c
+@@ -564,13 +564,19 @@ static int ohci_hcd_pxa27x_drv_suspend(struct device *dev)
  {
- 	void __iomem *reg_base;
-+	struct clk *vpllsrc;
-+	unsigned long fin_pll_rate, mout_vpllsrc_rate = 0;
+ 	struct usb_hcd *hcd = dev_get_drvdata(dev);
+ 	struct pxa27x_ohci *ohci = to_pxa27x_ohci(hcd);
++	bool do_wakeup = device_may_wakeup(dev);
++	int ret;
  
- 	if (np) {
- 		reg_base = of_iomap(np, 0);
-@@ -541,6 +566,19 @@ static void __init exynos5250_clk_init(struct device_node *np)
- 			ext_clk_match);
- 	samsung_clk_register_mux(exynos5250_pll_pmux_clks,
- 				ARRAY_SIZE(exynos5250_pll_pmux_clks));
-+
-+	fin_pll_rate = _get_rate("fin_pll");
-+
-+	if (fin_pll_rate == 24 * MHZ)
-+		exynos5250_plls[epll].rate_table = epll_24mhz_tbl;
-+
-+	vpllsrc = __clk_lookup("mout_vpllsrc");
-+	if (vpllsrc)
-+		mout_vpllsrc_rate = clk_get_rate(vpllsrc);
-+
-+	if (mout_vpllsrc_rate == 24 * MHZ)
-+		exynos5250_plls[vpll].rate_table =  vpll_24mhz_tbl;
-+
- 	samsung_clk_register_pll(exynos5250_plls, ARRAY_SIZE(exynos5250_plls),
- 					reg_base);
- 	samsung_clk_register_fixed_rate(exynos5250_fixed_rate_clks,
-diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-index 4a003d7..d459ef7 100644
---- a/drivers/clk/samsung/clk.h
-+++ b/drivers/clk/samsung/clk.h
-@@ -40,6 +40,8 @@ struct samsung_clock_alias {
- 		.alias		= a,				\
- 	}
+ 	if (time_before(jiffies, ohci->ohci.next_statechange))
+ 		msleep(5);
+ 	ohci->ohci.next_statechange = jiffies;
  
-+#define MHZ (1000 * 1000)
++	ret = ohci_suspend(hcd, do_wakeup);
++	if (ret)
++		return ret;
 +
- /**
-  * struct samsung_fixed_rate_clock: information about fixed-rate clock
-  * @id: platform specific id of the clock.
+ 	pxa27x_stop_hc(ohci, dev);
+-	return 0;
++	return ret;
+ }
+ 
+ static int ohci_hcd_pxa27x_drv_resume(struct device *dev)
 -- 
-1.7.0.4
+1.7.9.5
