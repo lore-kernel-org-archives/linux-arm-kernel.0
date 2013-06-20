@@ -1,21 +1,40 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 20 Jun 2013 16:36:34 +0530
-Subject: [PATCH v2 1/4] ARM: davinci: da850: Use #include for all device
- trees
-In-Reply-To: <1371203156-15260-2-git-send-email-avinashphilip@ti.com>
-References: <1371203020-15092-1-git-send-email-avinashphilip@ti.com>
- <1371203156-15260-2-git-send-email-avinashphilip@ti.com>
-Message-ID: <51C2E23A.5070409@ti.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 20 Jun 2013 12:07:47 +0100
+Subject: [PATCH 01/10] ARM: fix ARCH_IXP4xx usage of
+ ARCH_SUPPORTS_BIG_ENDIAN
+In-Reply-To: <20130619193014.51b5c796@skate>
+References: <1371645406-16873-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1371645406-16873-2-git-send-email-ben.dooks@codethink.co.uk>
+ <20130619193014.51b5c796@skate>
+Message-ID: <51C2E283.8010000@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/14/2013 3:15 PM, Philip Avinash wrote:
-> Replace /include/ by #include for da850 device tree files, in order to
-> use the C pre-processor, making use of #define features possible.
-> 
-> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+On 19/06/13 18:30, Thomas Petazzoni wrote:
+> Dear Ben Dooks,
+>
+> On Wed, 19 Jun 2013 13:36:37 +0100, Ben Dooks wrote:
+>> The Kconfig for arch/arm/mach-ixp4xx has a local definition
+>> of ARCH_SUPPORTS_BIG_ENDIAN which could be used elsewhere.
+>> This means that if IXP4xx is selected and this symbol is
+>> selected eleswhere then an warning is produced.
+>>
+>> Clean the following error up by making the symbol be
+>> selected by the main ARCH_IXP4XX definition and have a
+>> common definition in arch/arm/mm/Kconfig
+>>
+>> warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
+>> warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
+>> ---
+>>   arch/arm/Kconfig             |    1 +
+>>   arch/arm/mach-ixp4xx/Kconfig |    4 ----
+>>   arch/arm/mm/Kconfig          |    6 ++++++
+>>   3 files changed, 7 insertions(+), 4 deletions(-)
+>
+> Patch lacks SoB.
 
-Added this to my v3.11/dt branch.
+Thanks, must have missed it.
 
-Thanks,
-Sekhar
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
