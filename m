@@ -1,36 +1,198 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 20 Jun 2013 21:08:37 +0900
-Subject: [PATCH 1/2] serial: sh-sci: HSCIF support
-In-Reply-To: <201306191708.46525.arnd@arndb.de>
-References: <1371440327-30512-1-git-send-email-horms+renesas@verge.net.au>
- <CAO3366zWrYFYNaXNWpUvc8KpxjwYVoHz2O5fV33QFSTN2-H7aQ@mail.gmail.com>
- <20130619123324.GG32292@verge.net.au>
- <201306191708.46525.arnd@arndb.de>
-Message-ID: <20130620120836.GB27177@verge.net.au>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Thu, 20 Jun 2013 08:10:19 -0400
+Subject: [PATCH v2] thermal: add imx thermal driver support
+In-Reply-To: <20130620024749.GB19896@S2101-09.ap.freescale.net>
+References: <1371280241-31699-1-git-send-email-shawn.guo@linaro.org>
+ <51C0C8D8.5090301@ti.com> <20130619073739.GA3280@S2101-09.ap.freescale.net>
+ <51C1BA1A.5010704@ti.com> <20130620024749.GB19896@S2101-09.ap.freescale.net>
+Message-ID: <51C2F12B.2090205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 05:08:46PM +0200, Arnd Bergmann wrote:
-> On Wednesday 19 June 2013, Simon Horman wrote:
-> > > This is of course trivially fixed, but I have completely lost track of
-> > > the transmogrifications this patch has been subjected to. What's the
-> > > procedure?
-> > 
-> > Hi Ulrich,
-> > 
-> > perhaps the best way forward would be for you to post an incremental patch
-> > on top of either the sh-sci branch or renesas-next-20130618 tag of
-> > my renesas tree on kernel.org.
+On 19-06-2013 22:47, Shawn Guo wrote:
+> On Wed, Jun 19, 2013 at 10:03:06AM -0400, Eduardo Valentin wrote:
+>>>>> @@ -0,0 +1,14 @@
+>>>>> +* Temperature Monitor (TEMPMON) on Freescale i.MX SoCs
+>>>>
+>>>> Any hw documentation reference?
+>>>>
+>>> http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf?fpsp=1&WT_TYPE=Reference%20Manuals&WT_VENDOR=FREESCALE&WT_FILE_FORMAT=pdf&WT_ASSET=Documentation
+>>>
+>>
+>> OK. Tks.
+>>
+>> Some ppl like to put hw doc reference on your driver documentation. But
+>> for me is your call. I believe it is good to ask the kernel doc guys too.
+>>
+> I'm not a fan of doing that, because I can not tell that the link will
+> be still valid there in 5 years or so.
+
+Well, I think just mentioning IMX6DQRM should be ok. I didnt really mean
+you need to put a link.
+
 > 
-> I'm not sure where we stand on this series at the moment. Should
-> I pull v3, has Olof already pulled it, or should I wait for an
-> update?
+>>>>> +
+>>>>> +Required properties:
+>>>>> +- compatible : "fsl,imx6q-thermal"
+>>>>> +- fsl,tempmon : phandle pointer to TEMPMON control registers
+>>>>> +- fsl,tempmon-data : phandle pointer to TEMPMON calibration data
+>>>>
+>>>> what exactly is calibration data?
+>>>>
+>>> The temperature calibration values are fused individually for each part
+>>> in the product testing process.  It consists of a pair of hardware
+>>> monitor values at 25 C and a high temperature which is specified by
+>>> calibration data itself, which will be used by software to translate
+>>> hardware counter values to Celsius. The detailed description can be
+>>> found in hardware reference manual.
+>>
+>> That was what I expected. But it is not that clear what you meant by
+>> "thermal cal data" your DT documenation. Maybe you need to describe how
+>> to enter a fsl,tempmon-data.
+>>
+> Ok, I will try to come up with something better.
+> 
+> <snip>
+> 
+>>>>> +#define IMX_POLLING_DELAY		5000 /* millisecond */
+>>>>> +#define IMX_PASSIVE_DELAY		3000
+>>>>
+>>>> What is your maximum delta between CPU frequencies? Sure this polling
+>>>> intervals can hold your maximum power burst?
+>>>>
+>>> I have to admit I'm not sure how to determine the optimal intervals
+>>> here.  I initially have both intervals be 1000 ms, but I'm not sure if
+>>> it's necessary.  I need some help on that.  The frequency table on the
+>>> target consists of 396, 792, 996 and 1200 in MHz.
+>>
+>> Here you can do simple calculation on your maximum delta Celsius over
+>> delta time. Then check it against your maximum delta power (power at
+>> 1.2GHz - power at 396MHz) with respect to your power vs. temp. curve.
+>> That will give you a rough expectation on what you need to be sampling.
+>> But you probably need help from some guy doing thermal modeling and
+>> simulation on your chip.
+>>
+> Ok, thanks for the input.  I just consulted the Freescale thermal
+> expert.  Though I did not get the modeling and simulation data, I was
+> told that one 1~2 seconds should be safer.  So I'm going to change the
+> definitions as below.
+> 
+> #define IMX_POLLING_DELAY	2000 /* millisecond */
+> #define IMX_PASSIVE_DELAY	1000
 
-Hi Arnd,
+cool.
 
-my preference is for you to wait for an update.
+> 
+>>>
+>>>>> +
+>>>>> +struct imx_thermal_data {
+>>>>> +	struct thermal_zone_device *tz;
+>>>>> +	struct thermal_cooling_device *cdev;
+>>>>> +	enum thermal_device_mode mode;
+>>>>> +	struct regmap *tempmon;
+>>>>> +	bool meas_suspended;
+>>>>> +	int c1, c2; /* See forumla in imx_get_sensor_data() */
+>>>>> +};
+>>>>> +
+>>>>> +static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
+>>>>> +{
+>>>>> +	struct imx_thermal_data *data = tz->devdata;
+>>>>> +	struct regmap *map = data->tempmon;
+>>>>> +	static unsigned long last_temp;
+>>>>> +	unsigned int n_meas;
+>>>>> +	u32 val;
+>>>>> +
+>>>>> +	/*
+>>>>> +	 * Every time we measure the temperature, we will power on the
+>>>>> +	 * temperature sensor, enable measurements, take a reading,
+>>>>> +	 * disable measurements, power off the temperature sensor.
+>>>>> +	 */
+>>>>
+>>>> Are these sensors used on any hw failsafe mechanism?
+>>>>
+>>> No, I do not think so.
+>>
+>> OK. Then safe to turn it off right? Another good reason to have a fine
+>> tuned sampling rate.
+>>
+> Yes.
 
-In order to move things forwards I will post a proposed
-fix shortly. I believe that the warnings are for conditions
-that can never occur and thus in my patch I will propose initialising the
-variables that are flagged as being used uninitialised.
+ok.
+
+> 
+>>>
+>>>>> +	regmap_write(map, TEMPSENSE0 + REG_CLR, TEMPSENSE0_POWER_DOWN);
+>>>>> +	regmap_write(map, TEMPSENSE0 + REG_SET, TEMPSENSE0_MEASURE_TEMP);
+>>>>> +
+>>>>> +	/*
+>>>>> +	 * According to the temp sensor designers, it may require up to ~17us
+>>>>> +	 * to complete a measurement.  But this timing isn't checked on every
+>>>>> +	 * part nor is it specified in the datasheet, so sleeping at least 1ms
+>>>>> +	 * should provide plenty of time.  Sleeping longer than 1ms is ok so no
+>>>>> +	 * need for usleep_range.
+>>>>> +	 */
+>>>>> +	msleep(1);
+>>>>
+>>>> I know 1ms is usually too short time slice when talking about thermal
+>>>> monitoring on nowadays processors even, but 17us to 1ms sounds like an
+>>>> overkill.. Sure you are not hiding other issues?
+>>>>
+>>> At least none I'm ware of.  I will update the comment and simply use
+>>> usleep_range in the next post to prove that I'm not hiding other
+>>> issues :)
+>>
+>> OK. It just looks strange that here you need 1ms, but after suspend you
+>> can afford waiting only 50us. Anything special about the suspend path?
+>>
+> Nothing special I think.  I'm changing the 1ms here to ~50 us.
+> 
+
+Ok.
+
+> <snip>
+> 
+>>>>> +	map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "fsl,tempmon");
+>>>>
+>>>> Is this MMIO? Sure you want to do regmapped access to something so
+>>>> simple as io mem r/w?
+>>>>
+>>> Yes, MMIO.  But it's embedded in some kind of system controller block,
+>>> call anatop on imx6q, which contains miscellaneous registers for various
+>>> function blocks.  We do not want to have various device drivers iomap
+>>> the same space multiple times.  syscon API which uses regmap was created
+>>> exactly for such cases, so we use it here.
+>>
+>> Then again, I was more on the overhead imposed by regmap. For buses like
+>> i2c I understand its usage, but MMIO starts to be a stretch.
+>>
+> The syscon regmap interface is widely used on Freescale platforms
+> as well as others to access register bits embedded in this sort of
+> system controllers.  I do not think there is much overhead since it's
+> just a wrapper of MMIO accessors, and besides we do not have the
+> register access on hot path anyway in the driver.
+
+Ok. If you dont care about the overhead, it is fine, as it is your call
+to design the driver accessors. FYI, this is a nice explanation of what
+is my concern:
+http://www.spinics.net/lists/linux-omap/msg92370.html
+
+
+> 
+> Shawn
+> 
+> 
+> 
+
+
+-- 
+You have got to be excited about what you are doing. (L. Lamport)
+
+Eduardo Valentin
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 295 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/76df2dd5/attachment.sig>
