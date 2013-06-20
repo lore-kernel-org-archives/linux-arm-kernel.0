@@ -1,42 +1,109 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jun 2013 12:57:58 +0200
-Subject: [Linaro-mm-sig] [RFC 2/3] ARM: dma-mapping: Pass DMA attrs as
- IOMMU prot
-In-Reply-To: <20130620.133407.798194318297047071.hdoyu@nvidia.com>
-References: <CAMcxFTS0dUUEfGj-=-cb_rdfy+qWvtsaoR6Tv+-x05XX0mZmmw@mail.gmail.com>
- <201306201213.13644.arnd@arndb.de>
- <20130620.133407.798194318297047071.hdoyu@nvidia.com>
-Message-ID: <201306201257.58419.arnd@arndb.de>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 20 Jun 2013 19:58:14 +0900
+Subject: [PATCH V4 1/3] pci: Add PCIe driver for Samsung Exynos
+In-Reply-To: <51C2D260.6000303@st.com>
+References: <003601ce6756$444e8cd0$cceba670$@samsung.com>
+ <2061566.hRLrhtBK6z@wuerfel> <000901ce6838$8b514720$a1f3d560$@samsung.com>
+ <28355406.ThqqvnG0Yj@wuerfel> <51C2D260.6000303@st.com>
+Message-ID: <00d701ce6da5$10216ae0$306440a0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 June 2013, Hiroshi Doyu wrote:
-> Arnd Bergmann <arnd@arndb.de> wrote @ Thu, 20 Jun 2013 12:13:13 +0200:
+On Thursday, June 20, 2013 6:59 PM, Pratyush Anand wrote:
+> On 6/13/2013 7:48 PM, Arnd Bergmann wrote:
+> > On Thursday 13 June 2013 22:18:50 Jingoo Han wrote:
+> >> >On Wednesday, June 12, 2013 8:23 PM, Arnd Bergmann wrote:
+> >>> > >On Wednesday 12 June 2013 19:19:05 Jingoo Han wrote:
+> >>>> > > >+
+> >>>> > > >+/* synopsis specific PCIE configuration registers*/
+> >>>> > > >+#define PCIE_PORT_LINK_CONTROL		0x710
+> >>>> > > >+#define PORT_LINK_MODE_MASK		(0x3f << 16)
+> >>>> > > >+#define PORT_LINK_MODE_4_LANES		(0x7 << 16)
+> >>> > >
+> >>> > >Do you mean this is a "Synopsys" designware part? In that case it
+> >>> > >should really not be called "exynos-pcie" but "designware-pcie"
+> >>> > >and you should make sure that the driver makes no assumptions about
+> >>> > >the platform. A lot of other platforms also use designware
+> >>> > >parts and should be able to reuse this driver.
+> >> >
+> >> >Sorry, I don't think so.
+> >> >Only core block is a "Synopsys" designware part IP block,
+> >> >other parts are Exynos-specific.
+> >> >So, it is hard to share with other PCIe IPs using synopsis core.
+> > Just call it synopsys anyway and put a comment in to explain this.
+> > That should be enough for the next person with a synopsys PCI core
+> > to reuse your code and split out the exynos specific parts into a
+> > separate file.
+> >
 > 
-> > On Thursday 20 June 2013, Hiroshi Doyu wrote:
-> > > > If devices allocate via dma-mapping API, physical mem allocation, iova
-> > > > allocation and iommu mapping happens internally.
-> > > > Devices may allocate physical memory using any allocator (say ION
-> > > > including carveout area), use "iommu mapping" API which will do iova
-> > > > allocation and iommu mapping. The prot flags could be useful in this
-> > > > case as well - not sure whether we would need dma-attrs here.
-> > > 
-> > > I haven't followed ION recently, but can't ION backed by DMA mapping
-> > > API instead of using IOMMU API directly?
-> > 
-> > For a GPU with an IOMMU, you typically want per-process IOMMU contexts,
-> > which are only available when using the IOMMU API directly, as the
-> > dma-mapping abstraction uses only one context for kernel space.
+> I agree to Arnd that this patch should be split. I had worked in past
+> with SPEAr PCIe which also had designware PCIe IP. I see some code which
+> will fit both in SPEAr as well as in exynos. Unfortunately, I was not
+> able to get SPEAr driver pushed to mainline, as I moved to some other
+> project and got heavily occupied.
+
+Oh, I see.
+
+How about this?
+At the next PATCH v7, I will change the file name from 'pci-exynos.c'
+to 'pci-designware.c', as Arnd mentioned.
+
+Then, when Spear or other platform using designware is submitted,
+this 'pci-designware.c' will be split to two separate files such as
+'pci-designware.c' and 'pci-exynos.c'.
+
+
+Best regards,
+Jingoo Han
+
 > 
-> Yes, we had some experiment for switching IOMMU context with DMA
-> mapping API. We needed to add some new DMA mapping API, and didn't
-> look so nice at that time. What do you think to introduce multiple
-> context or switching context in dma-mapping abstruction?
-
-My feeling is that drivers with the need for multiple contexts
-are better off using the iommu API, since that is what it was
-made for. The dma-mapping abstraction really tries to hide the
-bus address assignment, while users with multiple contexts typically
-also want to control the bus addresses.
-
-	Arnd
+> Last patch is here:
+> 
+> https://patchwork.kernel.org/patch/1661441/
+> 
+> Infact, these functions should be common to all arm platforms.
+> 
+> sys_to_pcie
+> cfg_read
+> cfg_write
+> 
+> Following functions should be common to all designware based driver (at
+> least they are same in SPEAr)
+> 
+> exynos_pcie_prog_viewport_cfg0
+> exynos_pcie_prog_viewport_cfg1
+> exynos_pcie_rd_other_conf
+> exynos_pcie_wr_other_conf
+> exynos_pcie_setup
+> exynos_pcie_valid_config
+> exynos_pcie_rd_conf
+> exynos_pcie_wd_conf
+> exynos_pcie_scan_bus
+> exynos_pcie_map_irq
+> add_pcie_port (after a bit of generalization)
+> exynos_pcie_probe
+> exynos_pcie_remove
+> 
+> 
+> 
+> Following should be specific to exynos:
+> 
+> exynos_pcie_rd_own_conf
+> exynos_pcie_wr_own_conf
+> exynos_pcie_link_up
+> exynos_pcie_setup_rc
+> exynos_pcie_assert_core_reset
+> exynos_pcie_deassert_core_reset
+> exynos_pcie_assert_phy_reset
+> exynos_pcie_deassert_phy_reset
+> exynos_pcie_init_phy
+> exynos_pcie_assert_reset
+> exynos_pcie_establish_link
+> exynos_pcie_host_init
+> 
+> 
+> 
+> struct pcie_port_info and struct pcie_port can also be standardized.
+> 
+> Regards
+> Pratyush
