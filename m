@@ -1,28 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jun 2013 16:56:48 +0200
-Subject: [GIT PULL 4/7] omap dma clean-up for v3.11 merge window
-In-Reply-To: <0LmtTQ-1UNOje0BA4-00hdOq@mx.kundenserver.de>
-References: <0LmtTQ-1UNOje0BA4-00hdOq@mx.kundenserver.de>
-Message-ID: <201306201656.49161.arnd@arndb.de>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 20 Jun 2013 15:57:44 +0100
+Subject: [GIT PULL] picoxcell cleanups for 3.11
+In-Reply-To: <201306201624.09841.arnd@arndb.de>
+References: <20130611122621.GA9967@page> <20130619100224.GB8641@page>
+ <201306201624.09841.arnd@arndb.de>
+Message-ID: <20130620145744.GC8641@page>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Tony Lindgren wrote:
-> The following changes since commit 7d132055814ef17a6c7b69f342244c410a5e000f:
-> 
->   Linux 3.10-rc6 (2013-06-15 11:51:07 -1000)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/dma-signed
-> 
-> for you to fetch changes up to e2081f96ba1be3aa22a44daec82af9b226a6d7d6:
-> 
->   ARM: OMAP1: Remove dma.h (2013-06-18 00:12:34 -0700)
-> 
-> ----------------------------------------------------------------
-> Non-critical omap DMA fixes and removal of unused legacy code.
+Hi Arnd,
 
-Pulled into next/cleanup, thanks!
+On Thu, Jun 20, 2013 at 04:24:09PM +0200, Arnd Bergmann wrote:
+> On Wednesday 19 June 2013, Jamie Iles wrote:
+> > Fixing Arnd's mail address (sorry!).
+> 
+> you did forget to fix up Olof's address though.
 
-	Arnd
+Gah, fat fingers!
+
+> > > ----------------------------------------------------------------
+> > > Jamie Iles (1):
+> > >       picoxcell: remove redundant common.h
+> > > 
+> > > Maxime Ripard (1):
+> > >       ARM: picoxcell: Remove init_irq declaration in machine description
+> 
+> I got a regression since NR_IRQS_LEGACY is not defined with the headers
+> removed.
+> 
+> I think we can just remove this line as well, since NR_IRQS_LEGACY is
+> the default anyway.
+> 
+> Does that work?
+
+I can't reproduce the failure here with my config, I guess it's getting 
+included through one of the other includes.  Either way, your fix looks 
+good to me.
+
+Thanks,
+
+Jamie
+
+> diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
+> index 8267c5d..b13f51b 100644
+> --- a/arch/arm/mach-picoxcell/common.c
+> +++ b/arch/arm/mach-picoxcell/common.c
+> @@ -79,7 +79,6 @@ static void picoxcell_wdt_restart(char mode, const char *cmd)
+>  
+>  DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
+>  	.map_io		= picoxcell_map_io,
+> -	.nr_irqs	= NR_IRQS_LEGACY,
+>  	.init_machine	= picoxcell_init_machine,
+>  	.dt_compat	= picoxcell_dt_match,
+>  	.restart	= picoxcell_wdt_restart,
