@@ -1,33 +1,60 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 20 Jun 2013 10:19:32 +0530
-Subject: [PATCH v11 3/8] ARM: edma: Add EDMA crossbar event mux support
-In-Reply-To: <CAD=GYpbVUu4H8vkLHYAGPUMqdzmbJncX4yOR+5k+5B8NJhfgAQ@mail.gmail.com>
-References: <1371537499-12970-1-git-send-email-joelagnel@ti.com>
- <1371537499-12970-4-git-send-email-joelagnel@ti.com>
- <51C0344F.6010709@ti.com>
- <CAD=GYpbVUu4H8vkLHYAGPUMqdzmbJncX4yOR+5k+5B8NJhfgAQ@mail.gmail.com>
-Message-ID: <51C289DC.1080604@ti.com>
+Date: Thu, 20 Jun 2013 10:21:47 +0530
+Subject: [PATCH v2 2/4] gpio: davinci: DT changes for driver
+In-Reply-To: <CACRpkdbJJVKC539CAPNxxEbofVfw3Pr0gyCSZyY9YbkXneE-qQ@mail.gmail.com>
+References: <1371203020-15092-1-git-send-email-avinashphilip@ti.com>
+ <1371205241-17205-3-git-send-email-avinashphilipk@gmail.com>
+ <CACRpkdbJJVKC539CAPNxxEbofVfw3Pr0gyCSZyY9YbkXneE-qQ@mail.gmail.com>
+Message-ID: <51C28A63.6080905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 6/20/2013 6:06 AM, Joel A Fernandes wrote:
-
->>> +             /* Clear the xbar mapped channels in unused list */
->>> +             xbar_chans = info[j]->xbar_chans;
->>> +             if (xbar_chans) {
->>> +                     for (i = 0; xbar_chans[i][1] != -1; i++) {
->>> +                             off = xbar_chans[i][1];
->>> +                             clear_bits(off, 1,
->>> +                                     edma_cc[j]->edma_unused);
->>
->> Please fix the alignment here.
+On 6/20/2013 12:40 AM, Linus Walleij wrote:
+> On Fri, Jun 14, 2013 at 12:20 PM, Philip Avinash
+> <avinashphilipk@gmail.com> wrote:
 > 
-> I noticed the alignment was off in a few other places in that driver.
-> Fixed those up too.
+>> From: KV Sujith <sujithkv@ti.com>
+>>
+>> - Add of_device_id for Davinci GPIO driver.
+>> - Add function to populate data from DT.
+>> - Modify the probe to read from DT if DT match is found.
+>> - Add DT binding documentation for Davinci GPIO properties in a new file
+>>   gpio-davinci.txt located at Documentation/devicetree/bindings/gpio/.
+>>
+>> Signed-off-by: KV Sujith <sujithkv@ti.com>
+>> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+>> ---
+>> Changes since v1:
+>>         - description for interrupts changed to reflecti
+>>            interrupt array usage.
+> (...)
+> 
+>> +static struct davinci_gpio_platform_data *davinci_gpio_set_pdata_of(
+>> +                                               struct platform_device *pdev)
+>> +{
+>> +       struct device_node *dn = pdev->dev.of_node;
+>> +       struct davinci_gpio_platform_data *pdata;
+>> +       u32 val, ret;
+>> +
+>> +       pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+>> +       if (pdata) {
+> 
+> Instead of this arrow pattern:
+> 
+> if (!pdata) {
+>   dev_err( ... "out of memory allocating platform data");
+>   return NULL;
+> }
+> 
+> And de-indent the rest.
+> 
+> With that change:
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> I guess this may go through the DaVinci tree with the rest of the DaVinci
+> patches?
 
-If you do, please make it a separate (pre)patch.
+Linus, yes, I will pick these up with your acks.
 
 Thanks,
 Sekhar
