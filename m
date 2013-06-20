@@ -1,48 +1,39 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 20 Jun 2013 22:28:16 +0200
-Subject: [PATCH v4] drm/i2c: tda998x: fix sync generation and calculation
-In-Reply-To: <20130620200624.GQ2718@n2100.arm.linux.org.uk>
-References: <1371757563-27862-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130620200624.GQ2718@n2100.arm.linux.org.uk>
-Message-ID: <51C365E0.1060000@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Jun 2013 22:28:42 +0200
+Subject: [GIT PULL 07/10] Samsung S3C24XX PINCTRL-2 for v3.11
+In-Reply-To: <51C0BC6B.2080507@samsung.com>
+References: <51C0BC6B.2080507@samsung.com>
+Message-ID: <201306202228.42435.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2013 10:06 PM, Russell King - ARM Linux wrote:
-> On Thu, Jun 20, 2013 at 09:46:03PM +0200, Sebastian Hesselbarth wrote:
->> +	ref_pix      = 3 + mode->hsync_start - mode->hdisplay;
->> +	de_pix_s     = mode->htotal - mode->hdisplay;
->> +	de_pix_e     = de_pix_s + mode->hdisplay;
->> +	hs_pix_s     = mode->hsync_start - mode->hdisplay;
->> +	hs_pix_e     = hs_pix_s + mode->hsync_end - mode->hsync_start;
->
-> Correct, however, these can be simplified.
-[...]
-> These calculations are the same as what was originally in the driver:
->
-> +       de_start   = mode->htotal - mode->hdisplay;
-> +       de_end     = mode->htotal;
-> +       hs_start   = mode->hsync_start - mode->hdisplay;
-> +       hs_end     = mode->hsync_end - mode->hdisplay;
->
-> when it was first committed.
->
-> This is otherwise exactly what I came up with which gets my TV working
-> again in HDMI mode.
+On Tuesday 18 June 2013, Kukjin Kim wrote:
+> The following changes since commit af99a7507469d4fa6dd4d8d633e093b1ff7aff6e:
+> 
+>    pinctrl: Add pinctrl-s3c24xx driver (2013-05-21 00:56:13 +0900)
+> 
+> are available in the git repository at:
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+> tags/s3c24xx-pinctrl-2
+> 
+> for you to fetch changes up to c2c70a7905dbf97472e9a5fa6919675462373994:
+> 
+>    pinctrl: s3c24xx: use correct header for chained_irq functions 
+> (2013-06-19 02:41:20 +0900)
+> 
+> ----------------------------------------------------------------
+> based on s3c24xx-pinctrl
+> - use correct header for chained_irq functions for s3c24xx-pinctrl
+> 
+> ----------------------------------------------------------------
+> Heiko Stuebner (1):
+>        pinctrl: s3c24xx: use correct header for chained_irq functions
+> 
+>   drivers/pinctrl/pinctrl-s3c24xx.c | 3 +--
+>   1 file changed, 1 insertion(+), 2 deletions(-)
+> 
 
-Russell,
+Pulled into next/drivers, thanks!
 
-I am fine with any way to describe de/hs but you should notice that
-I also modified refpix/refline and added interlaced sync. With the
-original sync calculation, on some modes there was source blanking
-captured by TDA998x which was also visible in the output image. I
-chose the above description to make it more readable.
-
-Also the patch takes care of input sync and output sync inversion
-while the original driver always expected positive HS/VS.
-
-I tested these sync settings on 4 DVI monitors and TV sets all
-accepted each mode perfectly. Especially, not-so-cheap TV sets
-are very picky about wrong sync.
-
-Sebastian
+	Arnd
