@@ -1,117 +1,83 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 20 Jun 2013 17:00:54 +0200
-Subject: RFC: [PATCH] clocksource: tcb: fix min_delta calculation
-In-Reply-To: <51794385.1030308@pengutronix.de>
-References: <517687AB.1040309@pengutronix.de>
- <1366722524-25991-1-git-send-email-mkl@pengutronix.de>
- <alpine.LFD.2.02.1304251618590.21884@ionos> <51794385.1030308@pengutronix.de>
-Message-ID: <51C31926.3060400@pengutronix.de>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 20 Jun 2013 18:03:21 +0300
+Subject: [RFC PATCH 2/2] clocksource: dw_apb: allow build for
+ architectures other than arm
+In-Reply-To: <20130620144432.GA22115@amd.pavel.ucw.cz>
+References: <1369570367-994-2-git-send-email-baruch@tkos.co.il>
+ <51A51271.2070506@linaro.org>
+ <20130530053233.GL25186@sapphire.tkos.co.il>
+ <20130620144432.GA22115@amd.pavel.ucw.cz>
+Message-ID: <20130620150321.GH10269@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas,
+Hi Pavel,
 
-On 04/25/2013 04:53 PM, Marc Kleine-Budde wrote:
-> On 04/25/2013 04:21 PM, Thomas Gleixner wrote:
->> On Tue, 23 Apr 2013, Marc Kleine-Budde wrote:
->>> The commit
->>>
->>>     77cc982 clocksource: use clockevents_config_and_register() where possible
->>>
->>> switches from manually calculating min_delta_ns (and others) and
->>> clockevents_register_device() to automatic calculation via
->>> clockevents_config_and_register(). During this conversation the "+ 1" in
->>>
->>>     min_delta_ns = clockevent_delta2ns(1, &clkevt.clkevt) + 1;
->>>
->>> was lost. This leads to problems with schedule_delayed_work() with a delay of
->>> "1". Resulting in the work not scheduled in time.
->>
->> Errm. How is schedule_delayed_work() related to this?
-
-Coming back to the this problem after some time.
-
-I'm on at91sam9263 (armv5) using latest linus/master (v3.10-rc6-84-gc069114).
-I can illustrate the problem running cyclictest.
-
-Here's the output of unpatched linus/master:
-
-> root at halo22:~ cyclictest -i 10000 -n -t 4
-> policy: other/other: loadavg: 0.10 0.19 0.10 2/31 133
+On Thu, Jun 20, 2013 at 04:44:33PM +0200, Pavel Machek wrote:
+> > > >@@ -73,6 +77,9 @@ static void add_clocksource(struct device_node 
+> > > >  *source_timer)
+> > > >  }
+> > > >  static void __iomem *sched_io_base;
+> > > >+#ifndef CONFIG_HAVE_SETUP_SCHED_CLOCK
+> > > >+static u64 sched_clock_mult __read_mostly;
+> > > >+#endif
+> > > >  static u32 read_sched_clock(void)
+> > > >  {
+> > > >@@ -97,7 +104,11 @@ static void init_sched_clock(void)
+> > > >  	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
+> > > >  	of_node_put(sched_timer);
+> > > >+#ifdef CONFIG_HAVE_SETUP_SCHED_CLOCK
+> > > >  	setup_sched_clock(read_sched_clock, 32, rate);
+> > > >+#else
+> > > >+	sched_clock_mult = NSEC_PER_SEC / rate;
+> > > >+#endif
+> > > >  }
+> > > 
+> > > Can you rework this to not use #ifdefs within the function? They
+> > > make it annoying to read the code.
+> > > 
+> > > Instead maybe have a local setup_sched_clock() function that sets
+> > > the mult value for the !CONFIG_HAVE_SETUP_SCHED_CLOCK case?
+> > > 
+> > > >  static const struct of_device_id osctimer_ids[] __initconst = {
+> > > >@@ -124,3 +135,10 @@ void __init dw_apb_timer_init(void)
+> > > >  	init_sched_clock();
+> > > >  }
+> > > >+
+> > > >+#ifndef CONFIG_HAVE_SETUP_SCHED_CLOCK
+> > > >+unsigned long long notrace sched_clock()
+> > > >+{
+> > > >+	return read_sched_clock() * sched_clock_mult;
+> > > >+}
+> > > >+#endif
+> > > 
+> > > Also, can you try to condense the number of #ifndef
+> > > CONFIG_HAVE_SETUP_SCHED_CLOCK checks to one, and consolidate the
+> > > needed functions all in that one conditional?
+> > 
+> > Thanks for your comments. I'll rework the patch and resubmit.
+> > 
+> > I've just noticed that I have a bigger problem. read_sched_clock() returns 
+> > u32, not u64. This means that in a rate of, say, 100MHz it will wrap around 
+> > after a little more than 40 seconds. Would it make sense to put ARM's 32 bin 
+> > sched_clock extension code (arch/arm/kernel/sched_clock.c) is a common place 
+> > (maybe drivers/clocksource), and use that? There seems to be nothing ARM 
+> > specific in this code, after all.
 > 
-> T: 0 (  130) P: 0 I:10000 C:  30767 Min:     57 Act:  165 Avg:909453 Max: 201897444
-> T: 1 (  131) P: 0 I:10500 C:  29302 Min:     68 Act:  144 Avg:906651 Max: 204005666
-> T: 2 (  132) P: 0 I:11000 C:  27970 Min:     79 Act:  188 Avg:905068 Max: 204008666
-> T: 3 (  133) P: 0 I:11500 C:  26754 Min:     52 Act:  132 Avg:904438 Max: 203665111
-
-Cyclictest runs for about two seconds, but then shows no output for
-about two seconds, then it runs again, then stops and so on...
-
-With my patch applied, the numbers are back to normal:
-
-> root at halo22:~ cyclictest -i 10000 -n -t 4
-> policy: other/other: loadavg: 0.34 0.15 0.06 2/32 109
+> Also note that there are two conflicting changes to this area
+> pending. It seems one in soc-next arm tree will prevail.
 > 
-> T: 0 (  106) P: 0 I:10000 C:    292 Min:    112 Act:  208 Avg:  189 Max:    1715
-> T: 1 (  107) P: 0 I:10500 C:    277 Min:    107 Act:  198 Avg:  201 Max:    1464
-> T: 2 (  108) P: 0 I:11000 C:    265 Min:    104 Act:  148 Avg:  195 Max:    1530
-> T: 3 (  109) P: 0 I:11500 C:    252 Min:    113 Act:  205 Avg:  167 Max:     269
+> Please take a look...
 
-Cyclictest keeps running without 2 second stops.
+Now that generic sched_clock implementation is available to all architectures 
+(38ff87f77 "sched_clock: Make ARM's sched_clock generic for all architectures" 
+in the timers/core branch of the tip tree) this patch is not needed anymore.
 
-Is my patch a valid solution to the problem? If so, I'll write more 
-specific commit message.
+Thanks for the head up.
 
-regards,
-Marc
-
----
-
-The commit
-
-    77cc982 clocksource: use clockevents_config_and_register() where possible
-
-switches from manually calculating min_delta_ns (and others) and
-clockevents_register_device() to automatic calculation via
-clockevents_config_and_register(). During this conversation the "+ 1" in
-
-    min_delta_ns = clockevent_delta2ns(1, &clkevt.clkevt) + 1;
-
-was lost. This leads to problems with schedule_delayed_work() with a delay of
-"1". Resulting in the work not scheduled in time.
-
-This patch fixes the problem by increasing the min_delta to "2" ticks.
-
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
- drivers/clocksource/tcb_clksrc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index 8a61872..7cf6dc7 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -197,7 +197,7 @@ static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
- 
- 	clkevt.clkevt.cpumask = cpumask_of(0);
- 
--	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
-+	clockevents_config_and_register(&clkevt.clkevt, 32768, 2, 0xffff);
- 
- 	setup_irq(irq, &tc_irqaction);
- }
--- 1.8.2.rc2
+baruch
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/f746e3df/attachment.sig>
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
