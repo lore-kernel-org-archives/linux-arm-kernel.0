@@ -1,69 +1,77 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 20 Jun 2013 09:29:51 +0200
-Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
-In-Reply-To: <20130619095837.GY5523@atomide.com> (Tony Lindgren's message of
- "Wed, 19 Jun 2013 02:58:37 -0700")
-References: <51B99B07.1050806@ti.com>
- <CACVXFVN3=hzWJEwHN5TXRoJ4mvVRVR+3=Tasw+gvLH3vsNHwUg@mail.gmail.com>
- <CACVXFVNzAMrkhrAMAmQ7ZdJdby2O4VdoD8BVHRF-O=rPKQMqbw@mail.gmail.com>
- <51BEBDCD.3060104@ti.com> <87ppvlqhyy.fsf@lebrac.rtp-net.org>
- <20130617082458.GH20992@atomide.com>
- <87li69qdcs.fsf@lebrac.rtp-net.org>
- <20130617102650.GK20992@atomide.com>
- <20130618112701.GO5523@atomide.com>
- <8761xaqvrn.fsf@lebrac.rtp-net.org>
- <20130619095837.GY5523@atomide.com>
-Message-ID: <87obb1b5ow.fsf@lebrac.rtp-net.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 20 Jun 2013 09:33:03 +0200
+Subject: [PATCH 1/8] ARM: at91/tc/clocksource: replace clk_enable/disable
+ with clk_prepare_enable/disable_unprepare.
+In-Reply-To: <1371640400-9399-1-git-send-email-b.brezillon@overkiz.com>
+References: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
+ <1371640400-9399-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <51C2B02F.5080902@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
-
-Hi,
-
-> * Arnaud Patard <arnaud.patard@rtp-net.org> [130619 02:52]:
->> Tony Lindgren <tony@atomide.com> writes:
->> 
->> Hi,
->> 
->> > * Tony Lindgren <tony@atomide.com> [130617 03:32]:
->> >> * Arnaud Patard <arnaud.patard@rtp-net.org> [130617 02:52]:
->> >> > Tony Lindgren <tony@atomide.com> writes:
->> >> > 
->> >> > I understand your concerns but, please, cope with reality: the clock
->> >> > work is not in -next so this tends to make me think it won't reach
->> >> > 3.11. We're at -rc6 after all. Telling users that their system doesn't
->> >> > have any network because it was easier to maintain, is not something
->> >> > they will understand imho.
->> >> 
->> >> Right, like I said: the idea is to have it usable with DT. And USB and
->> >> Ethernet certainly are part of what I call usable. So is MMC, WLAN and
->> >> DSS. I've certainly spent quite a bit of time on making sure panda works
->> >> with DT, and I can assure you that fixing the USB extclock is easier than
->> >> supporting the legacy boot with DT :)
->> >> 
->> >> This issue can also be fixed with a clock alias if we don't have DT
->> >> defined clocks ready for v3.11. It may take a few days for us to have
->> >> the solution. But get getting a clock to a driver certainly is not a
->> >> showstopper here. After all, that's what all drivers already do.
->> >
->> > Care to test the last patch just posted by Roger in thread
->> > " [PATCH 0/4] ARM: OMAP4: Panda USB Host support and DVI EDID fix"?
->> 
->> I tried to test them but they don't apply on linux-next due to some
->> pinctrl changes probably missing:
->> Error: arch/arm/boot/dts/omap4-panda-common.dtsi:177.14-15 syntax error
->> 
->> which corresponds to :
->> 0x82 (PIN_INPUT_PULLDOWN | MUX_MODE4)
+On 19/06/2013 13:13, Boris BREZILLON :
+> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+> avoid common clk framework warnings.
 >
-> Oops, right, that's in Benoit's branch too for the .dts preprocessing.
-> Until it is merged, maybe try with Roger's earlier version of that patch
-> that did not yet use the macros?
->  
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-Right. I've changed the missing macros with their values and now, it
-compiles and I can even ping the board, so works for me.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Thanks,
-Arnaud
+> ---
+>   drivers/clocksource/tcb_clksrc.c |   10 +++++-----
+>   1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> index 8a61872..229c019 100644
+> --- a/drivers/clocksource/tcb_clksrc.c
+> +++ b/drivers/clocksource/tcb_clksrc.c
+> @@ -100,7 +100,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+>   			|| tcd->clkevt.mode == CLOCK_EVT_MODE_ONESHOT) {
+>   		__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
+>   		__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
+> -		clk_disable(tcd->clk);
+> +		clk_disable_unprepare(tcd->clk);
+>   	}
+>
+>   	switch (m) {
+> @@ -109,7 +109,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+>   	 * of oneshot, we get lower overhead and improved accuracy.
+>   	 */
+>   	case CLOCK_EVT_MODE_PERIODIC:
+> -		clk_enable(tcd->clk);
+> +		clk_prepare_enable(tcd->clk);
+>
+>   		/* slow clock, count up to RC, then irq and restart */
+>   		__raw_writel(timer_clock
+> @@ -126,7 +126,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+>   		break;
+>
+>   	case CLOCK_EVT_MODE_ONESHOT:
+> -		clk_enable(tcd->clk);
+> +		clk_prepare_enable(tcd->clk);
+>
+>   		/* slow clock, count up to RC, then irq and stop */
+>   		__raw_writel(timer_clock | ATMEL_TC_CPCSTOP
+> @@ -275,7 +275,7 @@ static int __init tcb_clksrc_init(void)
+>   	pdev = tc->pdev;
+>
+>   	t0_clk = tc->clk[0];
+> -	clk_enable(t0_clk);
+> +	clk_prepare_enable(t0_clk);
+>
+>   	/* How fast will we be counting?  Pick something over 5 MHz.  */
+>   	rate = (u32) clk_get_rate(t0_clk);
+> @@ -313,7 +313,7 @@ static int __init tcb_clksrc_init(void)
+>   		/* tclib will give us three clocks no matter what the
+>   		 * underlying platform supports.
+>   		 */
+> -		clk_enable(tc->clk[1]);
+> +		clk_prepare_enable(tc->clk[1]);
+>   		/* setup both channel 0 & 1 */
+>   		tcb_setup_dual_chan(tc, best_divisor_idx);
+>   	}
+>
+
+
+-- 
+Nicolas Ferre
