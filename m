@@ -1,293 +1,488 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 21 Jun 2013 00:12:52 +0200
-Subject: [PATCH v2 07/18] ARM: SAMSUNG: Move all platforms to new clocksource
- driver
+Date: Fri, 21 Jun 2013 00:12:53 +0200
+Subject: [PATCH v2 08/18] ARM: SAMSUNG: Remove old samsung-time driver
 In-Reply-To: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
 References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1371766383-29077-8-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1371766383-29077-9-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves all Samsung platforms using PWM clocksource from legacy
-samsung-time to new samsung-pwm-timer driver.
+This patch removes the old samsung-time driver, since all its users have
+been migrated to the new samsung_pwm_timer clocksource driver.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/mach-s3c24xx/Kconfig  | 12 ++++++------
- arch/arm/mach-s3c24xx/common.c | 16 ++++++++++++++++
- arch/arm/mach-s3c64xx/Kconfig  |  4 ++--
- arch/arm/mach-s3c64xx/common.c | 17 +++++++++++++++++
- arch/arm/mach-s5p64x0/Kconfig  |  4 ++--
- arch/arm/mach-s5p64x0/common.c | 17 +++++++++++++++++
- arch/arm/mach-s5pc100/Kconfig  |  2 +-
- arch/arm/mach-s5pc100/common.c | 17 +++++++++++++++++
- arch/arm/mach-s5pv210/Kconfig  |  2 +-
- arch/arm/mach-s5pv210/common.c | 17 +++++++++++++++++
- 10 files changed, 96 insertions(+), 12 deletions(-)
+ arch/arm/plat-samsung/Kconfig                     |   8 -
+ arch/arm/plat-samsung/Makefile                    |   1 -
+ arch/arm/plat-samsung/include/plat/samsung-time.h |  23 --
+ arch/arm/plat-samsung/samsung-time.c              | 394 ----------------------
+ 4 files changed, 426 deletions(-)
+ delete mode 100644 arch/arm/plat-samsung/samsung-time.c
 
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index 6d9252e..46f9a9c 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -30,7 +30,7 @@ config CPU_S3C2410
- 	select S3C2410_CLOCK
- 	select ARM_S3C2410_CPUFREQ if ARM_S3C24XX_CPUFREQ
- 	select S3C2410_PM if PM
--	select SAMSUNG_HRT
-+	select CLKSRC_SAMSUNG_PWM
- 	select SAMSUNG_WDT_RESET
- 	help
- 	  Support for S3C2410 and S3C2410A family from the S3C24XX line
-@@ -42,7 +42,7 @@ config CPU_S3C2412
- 	select CPU_LLSERIAL_S3C2440
- 	select S3C2412_DMA if S3C24XX_DMA
- 	select S3C2412_PM if PM
--	select SAMSUNG_HRT
-+	select CLKSRC_SAMSUNG_PWM
- 	help
- 	  Support for the S3C2412 and S3C2413 SoCs from the S3C24XX line
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 3dc5cbe..3e880b7 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -72,14 +72,6 @@ config SAMSUNG_ATAGS
  
-@@ -54,7 +54,7 @@ config CPU_S3C2416
- 	select S3C2443_COMMON
- 	select S3C2443_DMA if S3C24XX_DMA
- 	select SAMSUNG_CLKSRC
--	select SAMSUNG_HRT
-+	select CLKSRC_SAMSUNG_PWM
- 	help
- 	  Support for the S3C2416 SoC from the S3C24XX line
+ if SAMSUNG_ATAGS
  
-@@ -65,7 +65,7 @@ config CPU_S3C2440
- 	select S3C2410_CLOCK
- 	select S3C2410_PM if PM
- 	select S3C2440_DMA if S3C24XX_DMA
--	select SAMSUNG_HRT
-+	select CLKSRC_SAMSUNG_PWM
- 	help
- 	  Support for S3C2440 Samsung Mobile CPU based systems.
+-# timer options
+-
+-config SAMSUNG_HRT
+-	bool
+-	select SAMSUNG_DEV_PWM
+-	help
+-	  Use the High Resolution timer support
+-
+ # clock options
  
-@@ -75,7 +75,7 @@ config CPU_S3C2442
- 	select CPU_LLSERIAL_S3C2440
- 	select S3C2410_CLOCK
- 	select S3C2410_PM if PM
--	select SAMSUNG_HRT
-+	select CLKSRC_SAMSUNG_PWM
- 	help
- 	  Support for S3C2442 Samsung Mobile CPU based systems.
+ config SAMSUNG_CLOCK
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index 98d07d8..cf41bf9 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -12,7 +12,6 @@ obj-				:=
+ # Objects we always build independent of SoC choice
  
-@@ -91,7 +91,7 @@ config CPU_S3C2443
- 	select S3C2443_COMMON
- 	select S3C2443_DMA if S3C24XX_DMA
- 	select SAMSUNG_CLKSRC
--	select SAMSUNG_HRT
-+	select CLKSRC_SAMSUNG_PWM
- 	help
- 	  Support for the S3C2443 SoC from the S3C24XX line
+ obj-y				+= init.o cpu.o
+-obj-$(CONFIG_SAMSUNG_HRT) 	+= samsung-time.o
  
-diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
-index e5e7d7d..457261c 100644
---- a/arch/arm/mach-s3c24xx/common.c
-+++ b/arch/arm/mach-s3c24xx/common.c
-@@ -245,6 +245,22 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
- 	samsung_pwm_set_platdata(&s3c24xx_pwm_variant);
- }
- 
-+void __init samsung_set_timer_source(unsigned int event, unsigned int source)
-+{
-+	s3c24xx_pwm_variant.output_mask = BIT(SAMSUNG_PWM_NUM) - 1;
-+	s3c24xx_pwm_variant.output_mask &= ~(BIT(event) | BIT(source));
-+}
-+
-+void __init samsung_timer_init(void)
-+{
-+	unsigned int timer_irqs[SAMSUNG_PWM_NUM] = {
-+		IRQ_TIMER0, IRQ_TIMER1, IRQ_TIMER2, IRQ_TIMER3, IRQ_TIMER4,
-+	};
-+
-+	samsung_pwm_clocksource_init(S3C_VA_TIMER,
-+					timer_irqs, &s3c24xx_pwm_variant);
-+}
-+
- /* Serial port registrations */
- 
- #define S3C2410_PA_UART0      (S3C24XX_PA_UART)
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 2057853..f78a6a0 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -17,13 +17,13 @@ config PLAT_S3C64XX
- # Configuration options for the S3C6410 CPU
- 
- config CPU_S3C6400
--	select SAMSUNG_HRT
-+	select CLKSRC_SAMSUNG_PWM
- 	bool
- 	help
- 	  Enable S3C6400 CPU support
- 
- config CPU_S3C6410
--	select SAMSUNG_HRT
-+	select CLKSRC_SAMSUNG_PWM
- 	bool
- 	help
- 	  Enable S3C6410 CPU support
-diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
-index 0ab97c3..91df45a 100644
---- a/arch/arm/mach-s3c64xx/common.c
-+++ b/arch/arm/mach-s3c64xx/common.c
-@@ -157,6 +157,23 @@ static struct samsung_pwm_variant s3c64xx_pwm_variant = {
- 	.tclk_mask	= (1 << 7) | (1 << 6) | (1 << 5),
+ obj-$(CONFIG_SAMSUNG_CLOCK)	+= clock.o
+ obj-$(CONFIG_SAMSUNG_CLOCK)	+= pwm-clock.o
+diff --git a/arch/arm/plat-samsung/include/plat/samsung-time.h b/arch/arm/plat-samsung/include/plat/samsung-time.h
+index 4cc99bb..209464a 100644
+--- a/arch/arm/plat-samsung/include/plat/samsung-time.h
++++ b/arch/arm/plat-samsung/include/plat/samsung-time.h
+@@ -22,29 +22,6 @@ enum samsung_timer_mode {
+ 	SAMSUNG_PWM4,
  };
  
-+void __init samsung_set_timer_source(unsigned int event, unsigned int source)
-+{
-+	s3c64xx_pwm_variant.output_mask = BIT(SAMSUNG_PWM_NUM) - 1;
-+	s3c64xx_pwm_variant.output_mask &= ~(BIT(event) | BIT(source));
-+}
-+
-+void __init samsung_timer_init(void)
-+{
-+	unsigned int timer_irqs[SAMSUNG_PWM_NUM] = {
-+		IRQ_TIMER0_VIC, IRQ_TIMER1_VIC, IRQ_TIMER2_VIC,
-+		IRQ_TIMER3_VIC, IRQ_TIMER4_VIC,
-+	};
-+
-+	samsung_pwm_clocksource_init(S3C_VA_TIMER,
-+					timer_irqs, &s3c64xx_pwm_variant);
-+}
-+
- /* read cpu identification code */
+-struct samsung_timer_source {
+-	unsigned int event_id;
+-	unsigned int source_id;
+-};
+-
+-/* Be able to sleep for atleast 4 seconds (usually more) */
+-#define SAMSUNG_TIMER_MIN_RANGE	4
+-
+-#if defined(CONFIG_ARCH_S3C24XX) || defined(CONFIG_ARCH_S5PC100)
+-#define TCNT_MAX		0xffff
+-#define TSCALER_DIV		25
+-#define TDIV			50
+-#define TSIZE			16
+-#else
+-#define TCNT_MAX		0xffffffff
+-#define TSCALER_DIV		2
+-#define TDIV			2
+-#define TSIZE			32
+-#endif
+-
+-#define NON_PERIODIC		0
+-#define PERIODIC		1
+-
+ extern void __init samsung_set_timer_source(enum samsung_timer_mode event,
+ 					enum samsung_timer_mode source);
  
- void __init s3c64xx_init_io(struct map_desc *mach_desc, int size)
-diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
-index 5a707bd..a39cd9e 100644
---- a/arch/arm/mach-s5p64x0/Kconfig
-+++ b/arch/arm/mach-s5p64x0/Kconfig
-@@ -11,14 +11,14 @@ config CPU_S5P6440
- 	bool
- 	select S5P_SLEEP if PM
- 	select SAMSUNG_DMADEV
--	select SAMSUNG_HRT
-+	select CLKSRC_SAMSUNG_PWM
- 	select SAMSUNG_WAKEMASK if PM
- 	help
- 	  Enable S5P6440 CPU support
- 
- config CPU_S5P6450
- 	bool
--	select SAMSUNG_HRT
-+	select CLKSRC_SAMSUNG_PWM
- 	select S5P_SLEEP if PM
- 	select SAMSUNG_DMADEV
- 	select SAMSUNG_WAKEMASK if PM
-diff --git a/arch/arm/mach-s5p64x0/common.c b/arch/arm/mach-s5p64x0/common.c
-index c14d719..6ee5638 100644
---- a/arch/arm/mach-s5p64x0/common.c
-+++ b/arch/arm/mach-s5p64x0/common.c
-@@ -165,6 +165,23 @@ static struct samsung_pwm_variant s5p64x0_pwm_variant = {
- 	.tclk_mask	= 0,
- };
- 
-+void __init samsung_set_timer_source(unsigned int event, unsigned int source)
-+{
-+	s5p64x0_pwm_variant.output_mask = BIT(SAMSUNG_PWM_NUM) - 1;
-+	s5p64x0_pwm_variant.output_mask &= ~(BIT(event) | BIT(source));
-+}
-+
-+void __init samsung_timer_init(void)
-+{
-+	unsigned int timer_irqs[SAMSUNG_PWM_NUM] = {
-+		IRQ_TIMER0_VIC, IRQ_TIMER1_VIC, IRQ_TIMER2_VIC,
-+		IRQ_TIMER3_VIC, IRQ_TIMER4_VIC,
-+	};
-+
-+	samsung_pwm_clocksource_init(S3C_VA_TIMER,
-+					timer_irqs, &s5p64x0_pwm_variant);
-+}
-+
- /*
-  * s5p64x0_map_io
-  *
-diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
-index 2f456a4..2094a9b 100644
---- a/arch/arm/mach-s5pc100/Kconfig
-+++ b/arch/arm/mach-s5pc100/Kconfig
-@@ -11,7 +11,7 @@ config CPU_S5PC100
- 	bool
- 	select S5P_EXT_INT
- 	select SAMSUNG_DMADEV
--	select SAMSUNG_HRT
-+	select CLKSRC_SAMSUNG_PWM
- 	help
- 	  Enable S5PC100 CPU support
- 
-diff --git a/arch/arm/mach-s5pc100/common.c b/arch/arm/mach-s5pc100/common.c
-index a62e8a4..544a9c6 100644
---- a/arch/arm/mach-s5pc100/common.c
-+++ b/arch/arm/mach-s5pc100/common.c
-@@ -140,6 +140,23 @@ static struct samsung_pwm_variant s5pc100_pwm_variant = {
- 	.tclk_mask	= (1 << 5),
- };
- 
-+void __init samsung_set_timer_source(unsigned int event, unsigned int source)
-+{
-+	s5pc100_pwm_variant.output_mask = BIT(SAMSUNG_PWM_NUM) - 1;
-+	s5pc100_pwm_variant.output_mask &= ~(BIT(event) | BIT(source));
-+}
-+
-+void __init samsung_timer_init(void)
-+{
-+	unsigned int timer_irqs[SAMSUNG_PWM_NUM] = {
-+		IRQ_TIMER0_VIC, IRQ_TIMER1_VIC, IRQ_TIMER2_VIC,
-+		IRQ_TIMER3_VIC, IRQ_TIMER4_VIC,
-+	};
-+
-+	samsung_pwm_clocksource_init(S3C_VA_TIMER,
-+					timer_irqs, &s5pc100_pwm_variant);
-+}
-+
- /*
-  * s5pc100_map_io
-  *
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 0963283..07cdff7 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -15,7 +15,7 @@ config CPU_S5PV210
- 	select S5P_PM if PM
- 	select S5P_SLEEP if PM
- 	select SAMSUNG_DMADEV
--	select SAMSUNG_HRT
-+	select CLKSRC_SAMSUNG_PWM
- 	help
- 	  Enable S5PV210 CPU support
- 
-diff --git a/arch/arm/mach-s5pv210/common.c b/arch/arm/mach-s5pv210/common.c
-index 4eba33d..d28affb 100644
---- a/arch/arm/mach-s5pv210/common.c
-+++ b/arch/arm/mach-s5pv210/common.c
-@@ -157,6 +157,23 @@ static struct samsung_pwm_variant s5pv210_pwm_variant = {
- 	.tclk_mask	= (1 << 5),
- };
- 
-+void __init samsung_set_timer_source(unsigned int event, unsigned int source)
-+{
-+	s5pv210_pwm_variant.output_mask = BIT(SAMSUNG_PWM_NUM) - 1;
-+	s5pv210_pwm_variant.output_mask &= ~(BIT(event) | BIT(source));
-+}
-+
-+void __init samsung_timer_init(void)
-+{
-+	unsigned int timer_irqs[SAMSUNG_PWM_NUM] = {
-+		IRQ_TIMER0_VIC, IRQ_TIMER1_VIC, IRQ_TIMER2_VIC,
-+		IRQ_TIMER3_VIC, IRQ_TIMER4_VIC,
-+	};
-+
-+	samsung_pwm_clocksource_init(S3C_VA_TIMER,
-+					timer_irqs, &s5pv210_pwm_variant);
-+}
-+
- /*
-  * s5pv210_map_io
-  *
+diff --git a/arch/arm/plat-samsung/samsung-time.c b/arch/arm/plat-samsung/samsung-time.c
+deleted file mode 100644
+index f899cbc..0000000
+--- a/arch/arm/plat-samsung/samsung-time.c
++++ /dev/null
+@@ -1,394 +0,0 @@
+-/*
+- * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com/
+- *
+- * samsung - Common hr-timer support (s3c and s5p)
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/err.h>
+-#include <linux/clk.h>
+-#include <linux/clockchips.h>
+-#include <linux/platform_device.h>
+-
+-#include <asm/smp_twd.h>
+-#include <asm/mach/time.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+-#include <asm/sched_clock.h>
+-
+-#include <mach/map.h>
+-#include <plat/devs.h>
+-#include <plat/regs-timer.h>
+-#include <plat/samsung-time.h>
+-
+-static struct clk *tin_event;
+-static struct clk *tin_source;
+-static struct clk *tdiv_event;
+-static struct clk *tdiv_source;
+-static struct clk *timerclk;
+-static struct samsung_timer_source timer_source;
+-static unsigned long clock_count_per_tick;
+-static void samsung_timer_resume(void);
+-
+-static void samsung_time_stop(enum samsung_timer_mode mode)
+-{
+-	unsigned long tcon;
+-
+-	tcon = __raw_readl(S3C2410_TCON);
+-
+-	switch (mode) {
+-	case SAMSUNG_PWM0:
+-		tcon &= ~S3C2410_TCON_T0START;
+-		break;
+-
+-	case SAMSUNG_PWM1:
+-		tcon &= ~S3C2410_TCON_T1START;
+-		break;
+-
+-	case SAMSUNG_PWM2:
+-		tcon &= ~S3C2410_TCON_T2START;
+-		break;
+-
+-	case SAMSUNG_PWM3:
+-		tcon &= ~S3C2410_TCON_T3START;
+-		break;
+-
+-	case SAMSUNG_PWM4:
+-		tcon &= ~S3C2410_TCON_T4START;
+-		break;
+-
+-	default:
+-		printk(KERN_ERR "Invalid Timer %d\n", mode);
+-		break;
+-	}
+-	__raw_writel(tcon, S3C2410_TCON);
+-}
+-
+-static void samsung_time_setup(enum samsung_timer_mode mode, unsigned long tcnt)
+-{
+-	unsigned long tcon;
+-
+-	tcon = __raw_readl(S3C2410_TCON);
+-
+-	tcnt--;
+-
+-	switch (mode) {
+-	case SAMSUNG_PWM0:
+-		tcon &= ~(0x0f << 0);
+-		tcon |= S3C2410_TCON_T0MANUALUPD;
+-		break;
+-
+-	case SAMSUNG_PWM1:
+-		tcon &= ~(0x0f << 8);
+-		tcon |= S3C2410_TCON_T1MANUALUPD;
+-		break;
+-
+-	case SAMSUNG_PWM2:
+-		tcon &= ~(0x0f << 12);
+-		tcon |= S3C2410_TCON_T2MANUALUPD;
+-		break;
+-
+-	case SAMSUNG_PWM3:
+-		tcon &= ~(0x0f << 16);
+-		tcon |= S3C2410_TCON_T3MANUALUPD;
+-		break;
+-
+-	case SAMSUNG_PWM4:
+-		tcon &= ~(0x07 << 20);
+-		tcon |= S3C2410_TCON_T4MANUALUPD;
+-		break;
+-
+-	default:
+-		printk(KERN_ERR "Invalid Timer %d\n", mode);
+-		break;
+-	}
+-
+-	__raw_writel(tcnt, S3C2410_TCNTB(mode));
+-	__raw_writel(tcnt, S3C2410_TCMPB(mode));
+-	__raw_writel(tcon, S3C2410_TCON);
+-}
+-
+-static void samsung_time_start(enum samsung_timer_mode mode, bool periodic)
+-{
+-	unsigned long tcon;
+-
+-	tcon  = __raw_readl(S3C2410_TCON);
+-
+-	switch (mode) {
+-	case SAMSUNG_PWM0:
+-		tcon |= S3C2410_TCON_T0START;
+-		tcon &= ~S3C2410_TCON_T0MANUALUPD;
+-
+-		if (periodic)
+-			tcon |= S3C2410_TCON_T0RELOAD;
+-		else
+-			tcon &= ~S3C2410_TCON_T0RELOAD;
+-		break;
+-
+-	case SAMSUNG_PWM1:
+-		tcon |= S3C2410_TCON_T1START;
+-		tcon &= ~S3C2410_TCON_T1MANUALUPD;
+-
+-		if (periodic)
+-			tcon |= S3C2410_TCON_T1RELOAD;
+-		else
+-			tcon &= ~S3C2410_TCON_T1RELOAD;
+-		break;
+-
+-	case SAMSUNG_PWM2:
+-		tcon |= S3C2410_TCON_T2START;
+-		tcon &= ~S3C2410_TCON_T2MANUALUPD;
+-
+-		if (periodic)
+-			tcon |= S3C2410_TCON_T2RELOAD;
+-		else
+-			tcon &= ~S3C2410_TCON_T2RELOAD;
+-		break;
+-
+-	case SAMSUNG_PWM3:
+-		tcon |= S3C2410_TCON_T3START;
+-		tcon &= ~S3C2410_TCON_T3MANUALUPD;
+-
+-		if (periodic)
+-			tcon |= S3C2410_TCON_T3RELOAD;
+-		else
+-			tcon &= ~S3C2410_TCON_T3RELOAD;
+-		break;
+-
+-	case SAMSUNG_PWM4:
+-		tcon |= S3C2410_TCON_T4START;
+-		tcon &= ~S3C2410_TCON_T4MANUALUPD;
+-
+-		if (periodic)
+-			tcon |= S3C2410_TCON_T4RELOAD;
+-		else
+-			tcon &= ~S3C2410_TCON_T4RELOAD;
+-		break;
+-
+-	default:
+-		printk(KERN_ERR "Invalid Timer %d\n", mode);
+-		break;
+-	}
+-	__raw_writel(tcon, S3C2410_TCON);
+-}
+-
+-static int samsung_set_next_event(unsigned long cycles,
+-				struct clock_event_device *evt)
+-{
+-	samsung_time_setup(timer_source.event_id, cycles);
+-	samsung_time_start(timer_source.event_id, NON_PERIODIC);
+-
+-	return 0;
+-}
+-
+-static void samsung_set_mode(enum clock_event_mode mode,
+-				struct clock_event_device *evt)
+-{
+-	samsung_time_stop(timer_source.event_id);
+-
+-	switch (mode) {
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		samsung_time_setup(timer_source.event_id, clock_count_per_tick);
+-		samsung_time_start(timer_source.event_id, PERIODIC);
+-		break;
+-
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		break;
+-
+-	case CLOCK_EVT_MODE_UNUSED:
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-		break;
+-
+-	case CLOCK_EVT_MODE_RESUME:
+-		samsung_timer_resume();
+-		break;
+-	}
+-}
+-
+-static void samsung_timer_resume(void)
+-{
+-	/* event timer restart */
+-	samsung_time_setup(timer_source.event_id, clock_count_per_tick);
+-	samsung_time_start(timer_source.event_id, PERIODIC);
+-
+-	/* source timer restart */
+-	samsung_time_setup(timer_source.source_id, TCNT_MAX);
+-	samsung_time_start(timer_source.source_id, PERIODIC);
+-}
+-
+-void __init samsung_set_timer_source(enum samsung_timer_mode event,
+-				 enum samsung_timer_mode source)
+-{
+-	s3c_device_timer[event].dev.bus = &platform_bus_type;
+-	s3c_device_timer[source].dev.bus = &platform_bus_type;
+-
+-	timer_source.event_id = event;
+-	timer_source.source_id = source;
+-}
+-
+-static struct clock_event_device time_event_device = {
+-	.name		= "samsung_event_timer",
+-	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.rating		= 200,
+-	.set_next_event	= samsung_set_next_event,
+-	.set_mode	= samsung_set_mode,
+-};
+-
+-static irqreturn_t samsung_clock_event_isr(int irq, void *dev_id)
+-{
+-	struct clock_event_device *evt = dev_id;
+-
+-	evt->event_handler(evt);
+-
+-	return IRQ_HANDLED;
+-}
+-
+-static struct irqaction samsung_clock_event_irq = {
+-	.name		= "samsung_time_irq",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+-	.handler	= samsung_clock_event_isr,
+-	.dev_id		= &time_event_device,
+-};
+-
+-static void __init samsung_clockevent_init(void)
+-{
+-	unsigned long pclk;
+-	unsigned long clock_rate;
+-	unsigned int irq_number;
+-	struct clk *tscaler;
+-
+-	pclk = clk_get_rate(timerclk);
+-
+-	tscaler = clk_get_parent(tdiv_event);
+-
+-	clk_set_rate(tscaler, pclk / TSCALER_DIV);
+-	clk_set_rate(tdiv_event, pclk / TDIV);
+-	clk_set_parent(tin_event, tdiv_event);
+-
+-	clock_rate = clk_get_rate(tin_event);
+-	clock_count_per_tick = clock_rate / HZ;
+-
+-	time_event_device.cpumask = cpumask_of(0);
+-	clockevents_config_and_register(&time_event_device, clock_rate, 1, -1);
+-
+-	irq_number = timer_source.event_id + IRQ_TIMER0;
+-	setup_irq(irq_number, &samsung_clock_event_irq);
+-}
+-
+-static void __iomem *samsung_timer_reg(void)
+-{
+-	unsigned long offset = 0;
+-
+-	switch (timer_source.source_id) {
+-	case SAMSUNG_PWM0:
+-	case SAMSUNG_PWM1:
+-	case SAMSUNG_PWM2:
+-	case SAMSUNG_PWM3:
+-		offset = (timer_source.source_id * 0x0c) + 0x14;
+-		break;
+-
+-	case SAMSUNG_PWM4:
+-		offset = 0x40;
+-		break;
+-
+-	default:
+-		printk(KERN_ERR "Invalid Timer %d\n", timer_source.source_id);
+-		return NULL;
+-	}
+-
+-	return S3C_TIMERREG(offset);
+-}
+-
+-/*
+- * Override the global weak sched_clock symbol with this
+- * local implementation which uses the clocksource to get some
+- * better resolution when scheduling the kernel. We accept that
+- * this wraps around for now, since it is just a relative time
+- * stamp. (Inspired by U300 implementation.)
+- */
+-static u32 notrace samsung_read_sched_clock(void)
+-{
+-	void __iomem *reg = samsung_timer_reg();
+-
+-	if (!reg)
+-		return 0;
+-
+-	return ~__raw_readl(reg);
+-}
+-
+-static void __init samsung_clocksource_init(void)
+-{
+-	unsigned long pclk;
+-	unsigned long clock_rate;
+-
+-	pclk = clk_get_rate(timerclk);
+-
+-	clk_set_rate(tdiv_source, pclk / TDIV);
+-	clk_set_parent(tin_source, tdiv_source);
+-
+-	clock_rate = clk_get_rate(tin_source);
+-
+-	samsung_time_setup(timer_source.source_id, TCNT_MAX);
+-	samsung_time_start(timer_source.source_id, PERIODIC);
+-
+-	setup_sched_clock(samsung_read_sched_clock, TSIZE, clock_rate);
+-
+-	if (clocksource_mmio_init(samsung_timer_reg(), "samsung_clocksource_timer",
+-			clock_rate, 250, TSIZE, clocksource_mmio_readl_down))
+-		panic("samsung_clocksource_timer: can't register clocksource\n");
+-}
+-
+-static void __init samsung_timer_resources(void)
+-{
+-
+-	unsigned long event_id = timer_source.event_id;
+-	unsigned long source_id = timer_source.source_id;
+-	char devname[15];
+-
+-	timerclk = clk_get(NULL, "timers");
+-	if (IS_ERR(timerclk))
+-		panic("failed to get timers clock for timer");
+-
+-	clk_enable(timerclk);
+-
+-	sprintf(devname, "s3c24xx-pwm.%lu", event_id);
+-	s3c_device_timer[event_id].id = event_id;
+-	s3c_device_timer[event_id].dev.init_name = devname;
+-
+-	tin_event = clk_get(&s3c_device_timer[event_id].dev, "pwm-tin");
+-	if (IS_ERR(tin_event))
+-		panic("failed to get pwm-tin clock for event timer");
+-
+-	tdiv_event = clk_get(&s3c_device_timer[event_id].dev, "pwm-tdiv");
+-	if (IS_ERR(tdiv_event))
+-		panic("failed to get pwm-tdiv clock for event timer");
+-
+-	clk_enable(tin_event);
+-
+-	sprintf(devname, "s3c24xx-pwm.%lu", source_id);
+-	s3c_device_timer[source_id].id = source_id;
+-	s3c_device_timer[source_id].dev.init_name = devname;
+-
+-	tin_source = clk_get(&s3c_device_timer[source_id].dev, "pwm-tin");
+-	if (IS_ERR(tin_source))
+-		panic("failed to get pwm-tin clock for source timer");
+-
+-	tdiv_source = clk_get(&s3c_device_timer[source_id].dev, "pwm-tdiv");
+-	if (IS_ERR(tdiv_source))
+-		panic("failed to get pwm-tdiv clock for source timer");
+-
+-	clk_enable(tin_source);
+-}
+-
+-void __init samsung_timer_init(void)
+-{
+-	samsung_timer_resources();
+-	samsung_clockevent_init();
+-	samsung_clocksource_init();
+-}
 -- 
 1.8.2.1
