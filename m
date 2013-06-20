@@ -1,66 +1,49 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 20 Jun 2013 15:41:42 +0900
-Subject: [PATCH V5 1/3] pci: Add PCIe driver for Samsung Exynos
-In-Reply-To: <201306191443.09598.arnd@arndb.de>
-References: <000b01ce6839$0f0455d0$2d0d0170$@samsung.com>
- <201306181556.47656.arnd@arndb.de>
- <002401ce6c8a$2dd1e4a0$8975ade0$@samsung.com>
- <201306191443.09598.arnd@arndb.de>
-Message-ID: <00be01ce6d81$39743950$ac5cabf0$@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 20 Jun 2013 08:42:23 +0200
+Subject: [PATCH v2 2/2] gpio-rcar: Remove #ifdef CONFIG_OF around
+ OF-specific sections
+In-Reply-To: <1667096.lqpXoD2UlE@avalon>
+References: <1371551389-5493-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1371551389-5493-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CACRpkda+rw802mrdXYvcQRO0qy8hLmid7pdQwg4z=YvH6EY+Aw@mail.gmail.com>
+ <1667096.lqpXoD2UlE@avalon>
+Message-ID: <CACRpkdZJ1Hg=4w1fySiMgy0-Qdph1pD0OZGLFecxHhTsMEKQog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 19, 2013 9:43 PM, Arnd Bergmann wrote:
-> On Wednesday 19 June 2013, Jingoo Han wrote:
-> > Then, do you mean the following?
-> >
-> > static int __exit exynos_pcie_remove(struct platform_device *pdev)
-> > {
-> >         struct pcie_port *pp = platform_get_drvdata(pdev);
-> >
-> >         clk_disable_unprepare(pp->bus_clk);
-> >         clk_disable_unprepare(pp->clk);
-> >
-> >         return 0;
-> > }
-> >
-> > static struct platform_driver exynos_pcie_driver = {
-> >         .remove = __exit_p(exynos_pcie_remove),
-> >
-> > [.....]
-> >
-> > /* Exynos PCIe driver does not allow module unload */
-> >
-> > static int __init pcie_init(void)
-> > {
-> >         hook_fault_code(16 + 6, exynos_pcie_abort, SIGBUS, 0,
-> >                         "imprecise external abort");
-> >
-> >         platform_driver_probe(&exynos_pcie_driver, exynos_pcie_probe);
-> >
-> >         return 0;
-> > }
-> > subsys_initcall(pcie_init);
-> >
-> > MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
-> > MODULE_DESCRIPTION("Samsung PCIe host controller driver");
-> > MODULE_LICENSE("GPLv2");
-> >
-> 
-> Yes, this looks good. I would probably use platform_driver_register
-> rather than platform_driver_probe, but that is your choice. using
-> platform_driver_probe() mean you cannot deal with deferred probing.
+On Wed, Jun 19, 2013 at 9:51 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Wednesday 19 June 2013 21:17:35 Linus Walleij wrote:
+>> On Tue, Jun 18, 2013 at 12:29 PM, Laurent Pinchart wrote:
+>> > All functions and data types used by OF-specific code paths are declared
+>> > in <linux/of.h> regardless of CONFIG_OF. Replace the #ifdef CONFIG_OF
+>> > guard with a if(IS_ENABLED(CONFIG_OF)) and let the compiler optimize
+>> > the unused code away.
+>> >
+>> > Signed-off-by: Laurent Pinchart
+>> > <laurent.pinchart+renesas@ideasonboard.com>
+>>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Thank you. Can you please take the patch in your tree ?
 
-Hi Arnd,
+No. It does not apply:
 
-Thank you for your reply. :)
-I will send PATCH v6, soon.
-I really appreciate your comments.
-
-Hi Thomas Abraham, Kukjin Kim,
-Thank you for your support.
-It is very helpful.
+]$ git am --signoff rcar-fix.patch
+Till?mpar: gpio-rcar: Remove #ifdef CONFIG_OF around OF-specific sections
+error: patch misslyckades: drivers/gpio/gpio-rcar.c:279
+error: drivers/gpio/gpio-rcar.c: patchen kan inte till?mpas
+Patchen misslyckades vid 0001 gpio-rcar: Remove #ifdef CONFIG_OF
+around OF-specific sections
+En kopia av patchen som misslyckades finns i:
+   /home/linus/src/linux-trees/linux-gpio/.git/rebase-apply/patch
+N?r du har l?st problemet k?r du "git am --resolved".
+Om du vill hoppa ?ver patchen k?r du ist?llet "git am --skip".
+F?r att ?terst?lla originalgrenen och avbryta k?r du "git am --abort".
 
 
-Best regards,
-Jingoo Han
+Isn't this RCAR stuff funneled through ARM SoC this merge window?
+Then you have to send it to the ARM SoC folks corresponding branch.
+
+Yours,
+Linus Walleij
