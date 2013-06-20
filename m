@@ -1,71 +1,43 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 20 Jun 2013 15:05:34 +0200
-Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
- pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
-In-Reply-To: <20130620130110.GE18536@arm.com>
-References: <51C2C0B5.8020802@pengutronix.de> <20130620095705.GA18536@arm.com>
- <51C2D5EF.3040803@pengutronix.de> <20130620102856.GC18536@arm.com>
- <20130620111255.GD18536@arm.com> <51C2E917.9000708@pengutronix.de>
- <51C2EA04.4060701@pengutronix.de> <51C2EBCD.4070206@pengutronix.de>
- <20130620130110.GE18536@arm.com>
-Message-ID: <51C2FE1E.5000008@pengutronix.de>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 20 Jun 2013 22:08:11 +0900
+Subject: [GIT PULL 0/3] Renesas ARM-based SoC DT updates for v3.11 #2
+Message-ID: <1371733694-27368-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2013 03:01 PM, Catalin Marinas wrote:
-> On Thu, Jun 20, 2013 at 12:47:25PM +0100, Marc Kleine-Budde wrote:
->> On 06/20/2013 01:39 PM, Marc Kleine-Budde wrote:
->>> On 06/20/2013 01:35 PM, Marc Kleine-Budde wrote:
->>>> On 06/20/2013 01:12 PM, Catalin Marinas wrote:
->>>>> On Thu, Jun 20, 2013 at 11:28:56AM +0100, Catalin Marinas wrote:
->>>>>> We may need to place the preempt disable/enable at a higher level in the
->>>>>> scheduler. My theory is that we have a context switch from prev to next.
->>>>>> We get preempted just before finish_arch_post_lock_switch(), so the MMU
->>>>>> hasn't been switched yet. The new switch during preemption happens to a
->>>>>> thread with the same next mm, so the scheduler no longer switch_mm() and
->>>>>> the TIF_SWITCH_MM isn't set for the new thread.
->>>>>>
->>>>>> I'll come back with another patch shortly.
->>>>>
->>>>> Here's another attempt (as before, only compile-tested):
->>>>
->>>> booting kernel from /image
->>>> zImage: concatenated oftree detected
->>>> booting Linux kernel with devicetree
->>>>
->>>> ...dead...
->>>>
->>>> Does every process have a "mm"? Even Kernel threads?
->>
->> I've added a check for "mm". Boots now and my test runs stable for 3
->> minutes now.
-> 
-> Ah, good point.
-> 
->> I'm not sure if we have to check for "mm" in
->> check_and_switch_context(), too.
-> 
-> switch_mm() wouldn't be called with a NULL mm, hence we wouldn't call
-> check_and_switch_context() either. finish_arch_post_lock_switch() is
-> called all the time (and we set the TIF flag only if switch_mm() was
-> called).
+Hi Olof, Hi Arnd,
 
-Thanks for the explanation. $CUSTOMER's mx28 runs stable with the
-minimal test program, I'll keep you informed if they have tested with
-the full blown program.
+This pull request is based on renesas-dt-for-v3.11 which you have
+previously pulled.
 
-Marc
+The following changes since commit 24603f3caf07f5f65aa17ed7851ad4741595cf6a:
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+  ARM: shmobile: marzen-reference: add irqpin support in DT (2013-06-04 18:05:59 +0900)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/0ddc9ae4/attachment.sig>
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v3.11
+
+for you to fetch changes up to c4fa4946f177ae214523586cd794ac18d34b1430:
+
+  ARM: shmobile: irqpin: add a DT property to enable masking on parent (2013-06-19 21:27:31 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM-based SoC DT updates for v3.11
+
+* Increased DT coverage for renesas-intc-irqpin
+  by Guennadi Liakhovetski
+* Clean up of address format used in sh73a0 dtsi file
+  by Guennadi Liakhovetski
+
+----------------------------------------------------------------
+Guennadi Liakhovetski (3):
+      irqchip: renesas-intc-irqpin: DT binding for sense bitfield width
+      ARM: shmobile: sh73a0: remove "0x" prefix from DT node names
+      ARM: shmobile: irqpin: add a DT property to enable masking on parent
+
+ .../interrupt-controller/renesas,intc-irqpin.txt       | 16 ++++++++++++++++
+ arch/arm/boot/dts/sh73a0.dtsi                          | 18 +++++++++---------
+ drivers/irqchip/irq-renesas-intc-irqpin.c              |  9 ++++++++-
+ 3 files changed, 33 insertions(+), 10 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
