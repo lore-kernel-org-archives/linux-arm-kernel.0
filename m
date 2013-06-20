@@ -1,35 +1,29 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 20 Jun 2013 01:00:07 -0700
-Subject: [PATCH 0/2] clk vexpress updates for 3.11
-In-Reply-To: <1370876707-25265-1-git-send-email-pawel.moll@arm.com>
-References: <1370876707-25265-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20130620080007.9136.12423@quantum>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 20 Jun 2013 10:01:20 +0200
+Subject: [GIT PULL] U300 multiplatform for v3.11
+In-Reply-To: <201306200227.31603.arnd@arndb.de>
+References: <CACRpkdY1EUbFK6Mk3nogjGGeSkmio2v6ZNFe1wh7sFcE3d51fg@mail.gmail.com>
+ <201306200227.31603.arnd@arndb.de>
+Message-ID: <CACRpkdb8WZi3FQuhKcZt4N7OZHAVpQsy45Dpcn+hYay42exqoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Pawel Moll (2013-06-10 08:05:05)
-> Hi Mike,
-> 
-> Could you please queue these two small updates of the vexpress clk
-> drivers?
+On Thu, Jun 20, 2013 at 2:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Taken into clk-next for 3.11.
+> I needed this patch on top.
+>
+> From e0a60445624107912e4684e20e5e9158b94b4c87 Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Thu, 20 Jun 2013 02:26:37 +0200
+> Subject: [PATCH] ARM: u300: only build for ARCH_MULTI_V5
+>
+> This avoids impossible platform combinations, as we cannot
+> build a combined V5 + V6/V7 kernel.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Regards,
-Mike
+Of course...
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> 
-> Thanks!
-> 
-> Pawel
-> 
-> Pawel Moll (2):
->   clk: vexpress: Use full node name to identify individual clocks
->   clk: vexpress: Make the clock drivers directly available for arm64
-> 
->  drivers/clk/Kconfig                      | 2 +-
->  drivers/clk/versatile/clk-vexpress-osc.c | 4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> -- 
-> 1.8.1.2
+Yours,
+Linus Walleij
