@@ -1,52 +1,111 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Jun 2013 15:21:17 +0100
-Subject: [PATCH v2 03/12] ARM: tlb: don't bother with barriers for branch
- predictor maintenance
+Date: Thu, 20 Jun 2013 15:21:19 +0100
+Subject: [PATCH v2 05/12] ARM: barrier: allow options to be passed to memory
+ barrier instructions
 In-Reply-To: <1371738086-6707-1-git-send-email-will.deacon@arm.com>
 References: <1371738086-6707-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1371738086-6707-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1371738086-6707-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Branch predictor maintenance is only required when we are either
-changing the kernel's view of memory (switching tables completely) or
-dealing with ASID rollover.
+On ARMv7, the memory barrier instructions take an optional `option'
+field which can be used to constrain the effects of a memory barrier
+based on shareability and access type.
 
-Both of these use-cases require subsequent TLB invalidation, which has
-the relevant barrier instructions to ensure completion and visibility
-of the maintenance, so this patch removes the instruction barrier from
-[local_]flush_bp_all.
+This patch allows the caller to pass these options if required, and
+updates the smp_*() barriers to request inner-shareable barriers,
+affecting only stores for the _wmb variant. wmb() is also changed to
+use the -st version of dsb.
 
+Reported-by: Albin Tonnerre <albin.tonnerre@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/tlbflush.h | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/assembler.h |  4 ++--
+ arch/arm/include/asm/barrier.h   | 32 ++++++++++++++++----------------
+ 2 files changed, 18 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index 91b2922..45e3aea 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -527,6 +527,10 @@ static inline void __flush_tlb_kernel_page(unsigned long kaddr)
- 	}
- }
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 05ee9ee..863b280 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -212,9 +212,9 @@
+ #ifdef CONFIG_SMP
+ #if __LINUX_ARM_ARCH__ >= 7
+ 	.ifeqs "\mode","arm"
+-	ALT_SMP(dmb)
++	ALT_SMP(dmb	ish)
+ 	.else
+-	ALT_SMP(W(dmb))
++	ALT_SMP(W(dmb)	ish)
+ 	.endif
+ #elif __LINUX_ARM_ARCH__ == 6
+ 	ALT_SMP(mcr	p15, 0, r0, c7, c10, 5)	@ dmb
+diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
+index 8dcd9c7..60f15e2 100644
+--- a/arch/arm/include/asm/barrier.h
++++ b/arch/arm/include/asm/barrier.h
+@@ -14,27 +14,27 @@
+ #endif
  
-+/*
-+ * Branch predictor maintenance is paired with full TLB invalidation, so
-+ * there is no need for any barriers here.
-+ */
- static inline void local_flush_bp_all(void)
- {
- 	const int zero = 0;
-@@ -536,9 +540,6 @@ static inline void local_flush_bp_all(void)
- 		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
- 	else if (tlb_flag(TLB_V6_BP))
- 		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
--
--	if (tlb_flag(TLB_BARRIER))
--		isb();
- }
+ #if __LINUX_ARM_ARCH__ >= 7
+-#define isb() __asm__ __volatile__ ("isb" : : : "memory")
+-#define dsb() __asm__ __volatile__ ("dsb" : : : "memory")
+-#define dmb() __asm__ __volatile__ ("dmb" : : : "memory")
++#define isb(option) __asm__ __volatile__ ("isb " #option : : : "memory")
++#define dsb(option) __asm__ __volatile__ ("dsb " #option : : : "memory")
++#define dmb(option) __asm__ __volatile__ ("dmb " #option : : : "memory")
+ #elif defined(CONFIG_CPU_XSC3) || __LINUX_ARM_ARCH__ == 6
+-#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
++#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
++#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dmb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
++#define dmb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
+ 				    : : "r" (0) : "memory")
+ #elif defined(CONFIG_CPU_FA526)
+-#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
++#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
++#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dmb() __asm__ __volatile__ ("" : : : "memory")
++#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
+ #else
+-#define isb() __asm__ __volatile__ ("" : : : "memory")
+-#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
++#define isb(x) __asm__ __volatile__ ("" : : : "memory")
++#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dmb() __asm__ __volatile__ ("" : : : "memory")
++#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
+ #endif
  
- #ifdef CONFIG_ARM_ERRATA_798181
+ #ifdef CONFIG_ARCH_HAS_BARRIERS
+@@ -42,7 +42,7 @@
+ #elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
+ #define mb()		do { dsb(); outer_sync(); } while (0)
+ #define rmb()		dsb()
+-#define wmb()		mb()
++#define wmb()		do { dsb(st); outer_sync(); } while (0)
+ #else
+ #define mb()		barrier()
+ #define rmb()		barrier()
+@@ -54,9 +54,9 @@
+ #define smp_rmb()	barrier()
+ #define smp_wmb()	barrier()
+ #else
+-#define smp_mb()	dmb()
+-#define smp_rmb()	dmb()
+-#define smp_wmb()	dmb()
++#define smp_mb()	dmb(ish)
++#define smp_rmb()	smp_mb()
++#define smp_wmb()	dmb(ishst)
+ #endif
+ 
+ #define read_barrier_depends()		do { } while(0)
 -- 
 1.8.2.2
