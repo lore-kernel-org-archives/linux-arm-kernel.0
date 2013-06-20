@@ -1,111 +1,77 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Jun 2013 15:21:19 +0100
-Subject: [PATCH v2 05/12] ARM: barrier: allow options to be passed to memory
- barrier instructions
+Date: Thu, 20 Jun 2013 15:21:18 +0100
+Subject: [PATCH v2 04/12] ARM: tlb: don't perform inner-shareable invalidation
+ for local BP ops
 In-Reply-To: <1371738086-6707-1-git-send-email-will.deacon@arm.com>
 References: <1371738086-6707-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1371738086-6707-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1371738086-6707-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARMv7, the memory barrier instructions take an optional `option'
-field which can be used to constrain the effects of a memory barrier
-based on shareability and access type.
+Now that the ASID allocator doesn't require inner-shareable maintenance,
+we can convert the local_bp_flush_all function to perform only
+non-shareable flushing, in a similar manner to the TLB invalidation
+routines.
 
-This patch allows the caller to pass these options if required, and
-updates the smp_*() barriers to request inner-shareable barriers,
-affecting only stores for the _wmb variant. wmb() is also changed to
-use the -st version of dsb.
-
-Reported-by: Albin Tonnerre <albin.tonnerre@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/assembler.h |  4 ++--
- arch/arm/include/asm/barrier.h   | 32 ++++++++++++++++----------------
- 2 files changed, 18 insertions(+), 18 deletions(-)
+ arch/arm/include/asm/tlbflush.h | 22 ++++++++++++++++++++--
+ arch/arm/kernel/smp_tlb.c       |  2 +-
+ 2 files changed, 21 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 05ee9ee..863b280 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -212,9 +212,9 @@
- #ifdef CONFIG_SMP
- #if __LINUX_ARM_ARCH__ >= 7
- 	.ifeqs "\mode","arm"
--	ALT_SMP(dmb)
-+	ALT_SMP(dmb	ish)
- 	.else
--	ALT_SMP(W(dmb))
-+	ALT_SMP(W(dmb)	ish)
- 	.endif
- #elif __LINUX_ARM_ARCH__ == 6
- 	ALT_SMP(mcr	p15, 0, r0, c7, c10, 5)	@ dmb
-diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
-index 8dcd9c7..60f15e2 100644
---- a/arch/arm/include/asm/barrier.h
-+++ b/arch/arm/include/asm/barrier.h
-@@ -14,27 +14,27 @@
- #endif
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index 45e3aea..b9c0811 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -531,17 +531,35 @@ static inline void __flush_tlb_kernel_page(unsigned long kaddr)
+  * Branch predictor maintenance is paired with full TLB invalidation, so
+  * there is no need for any barriers here.
+  */
++static inline void __local_flush_bp_all(void)
++{
++	const int zero = 0;
++	const unsigned int __tlb_flag = __cpu_tlb_flags;
++
++	if (tlb_flag(TLB_V6_BP))
++		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
++}
++
+ static inline void local_flush_bp_all(void)
+ {
+ 	const int zero = 0;
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
  
- #if __LINUX_ARM_ARCH__ >= 7
--#define isb() __asm__ __volatile__ ("isb" : : : "memory")
--#define dsb() __asm__ __volatile__ ("dsb" : : : "memory")
--#define dmb() __asm__ __volatile__ ("dmb" : : : "memory")
-+#define isb(option) __asm__ __volatile__ ("isb " #option : : : "memory")
-+#define dsb(option) __asm__ __volatile__ ("dsb " #option : : : "memory")
-+#define dmb(option) __asm__ __volatile__ ("dmb " #option : : : "memory")
- #elif defined(CONFIG_CPU_XSC3) || __LINUX_ARM_ARCH__ == 6
--#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
-+#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
- 				    : : "r" (0) : "memory")
--#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
-+#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
- 				    : : "r" (0) : "memory")
--#define dmb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
-+#define dmb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
- 				    : : "r" (0) : "memory")
- #elif defined(CONFIG_CPU_FA526)
--#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
-+#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
- 				    : : "r" (0) : "memory")
--#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
-+#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
- 				    : : "r" (0) : "memory")
--#define dmb() __asm__ __volatile__ ("" : : : "memory")
-+#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
- #else
--#define isb() __asm__ __volatile__ ("" : : : "memory")
--#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
-+#define isb(x) __asm__ __volatile__ ("" : : : "memory")
-+#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
- 				    : : "r" (0) : "memory")
--#define dmb() __asm__ __volatile__ ("" : : : "memory")
-+#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
- #endif
++	__local_flush_bp_all();
+ 	if (tlb_flag(TLB_V7_UIS_BP))
+-		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
+-	else if (tlb_flag(TLB_V6_BP))
+ 		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
+ }
  
- #ifdef CONFIG_ARCH_HAS_BARRIERS
-@@ -42,7 +42,7 @@
- #elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
- #define mb()		do { dsb(); outer_sync(); } while (0)
- #define rmb()		dsb()
--#define wmb()		mb()
-+#define wmb()		do { dsb(st); outer_sync(); } while (0)
- #else
- #define mb()		barrier()
- #define rmb()		barrier()
-@@ -54,9 +54,9 @@
- #define smp_rmb()	barrier()
- #define smp_wmb()	barrier()
- #else
--#define smp_mb()	dmb()
--#define smp_rmb()	dmb()
--#define smp_wmb()	dmb()
-+#define smp_mb()	dmb(ish)
-+#define smp_rmb()	smp_mb()
-+#define smp_wmb()	dmb(ishst)
- #endif
- 
- #define read_barrier_depends()		do { } while(0)
++static inline void __flush_bp_all(void)
++{
++	const int zero = 0;
++	const unsigned int __tlb_flag = __cpu_tlb_flags;
++
++	__local_flush_bp_all();
++	if (tlb_flag(TLB_V7_UIS_BP))
++		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
++}
++
+ #ifdef CONFIG_ARM_ERRATA_798181
+ static inline void dummy_flush_tlb_a15_erratum(void)
+ {
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index cc299b5..5cb5500 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -204,5 +204,5 @@ void flush_bp_all(void)
+ 	if (tlb_ops_need_broadcast())
+ 		on_each_cpu(ipi_flush_bp_all, NULL, 1);
+ 	else
+-		local_flush_bp_all();
++		__flush_bp_all();
+ }
 -- 
 1.8.2.2
