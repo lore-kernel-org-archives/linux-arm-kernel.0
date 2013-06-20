@@ -1,42 +1,28 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 20 Jun 2013 18:12:09 +0200
-Subject: Initial big-endian support series
-In-Reply-To: <1371645406-16873-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1371645406-16873-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130620181209.646db8db@skate>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 20 Jun 2013 10:24:39 -0600
+Subject: [PATCH V1] ARM: dts: tegra: Modify pcie memory space size
+In-Reply-To: <1371712491-31070-1-git-send-email-jagarwal@nvidia.com>
+References: <1371712491-31070-1-git-send-email-jagarwal@nvidia.com>
+Message-ID: <51C32CC7.5010109@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ben Dooks,
+On 06/20/2013 01:14 AM, Jay Agarwal wrote:
+> - decrease non-prefetch memory size to 128 MB
+> - increase prefetch memory size to 384 MB
+> - above change is done because most pcie devices
+>   prefetch memory size requirement is quite higher
+>   compared to non-prefetch memory space.
 
-On Wed, 19 Jun 2013 13:36:36 +0100, Ben Dooks wrote:
-> This updates the kernel support for building big-endian kernels
-> and updating the core drivers to deal with the endian swap as
-> needed.
-> 
-> This series does not include the fixups for ATAGs so it will require
-> being booted with fdt. As a note, we do not currently disable the
-> ATAGs options for the system (although we could) as there will be a
-> set of patches following on to deal with booting BE kernel on LE
-> systems.
+It's possible this change won't be suitable for all applications. People
+may simply need to adjust their DT based on what they want to connect.
+Still, this patch probably biases things in the correct way for now.
+Longer term, we might want to investigate dynamically sizing the windows
+in order to support arbitrary attached devices, in much the same way as
+the Marvell code does/will in order to conserve physical/bus address
+space for their multiple controllers.
 
-I have tested both series on an Armada XP based platform and I confirm
-that I'm able to boot successfully with a BE8 kernel and into a BE8
-userspace. Nice!
+However, this change allows me to correctly enumerate a particular GPU I
+have plugged into my Harmony board, and assign all the BARs, so:
 
-Would it be possible to get this merged?
-
-> I have not had time to test it on THUMB2 kernels. There is still
-> fixup work to be done for these which will require more time.
-
-I might have some time in the near future to look at that, if you don't
-do it in the mean time, of course.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tested-by: Stephen Warren <swarren@nvidia.com>
