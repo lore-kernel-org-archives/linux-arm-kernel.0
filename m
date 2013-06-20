@@ -1,109 +1,75 @@
-From: ithamar@upgrade-android.com (Ithamar R. Adema)
-Date: Thu, 20 Jun 2013 19:12:53 +0200
-Subject: [PATCH] pinctrl-sunxi: fix pin attribute handling.
-Message-ID: <1371748373-10519-1-git-send-email-ithamar@upgrade-android.com>
+From: mhei@heimpold.de (Michael Heimpold)
+Date: Thu, 20 Jun 2013 19:13:41 +0200
+Subject: [PATCH 2/3] ARM: i.MX6: add ethernet phy fixup for AR8031
+In-Reply-To: <1371742473-28026-3-git-send-email-s.hauer@pengutronix.de>
+References: <1371742473-28026-1-git-send-email-s.hauer@pengutronix.de>
+ <1371742473-28026-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4263249.CSIcTzoYtY@kerker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ithamar R. Adema" <ithamar@upgrade-android.com>
+Hi,
 
-The configuration of pull up/down on pins does not allow disabling
-of the pins. PIN_CONFIG_BIAS_PULL_UP and PIN_CONFIG_BIAS_PULL_DOWN
-take an argument of 1 or 0 to specify enabling or disabling of the
-pull up/down, but the code does not take this into account.
+Am Donnerstag, 20. Juni 2013, 17:34:32 schrieb Sascha Hauer:
+> The AR8031 is used on the i.MX6 based sabreSD, sabreauto and wandboard.
+> All need the same fixup, so add it for all i.MX6.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/mach-imx6q.c | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index e5f4a5b..69fae87 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -113,6 +113,29 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
+>  	return 0;
+>  }
+>  
+> +static int ar8031_phy_fixup(struct phy_device *dev)
+> +{
+> +	u16 val;
+> +
+> +	/* To enable AR8031 ouput a 125MHz clk from CLK_25M */
 
-Also, default the pullup/downs to disabled if not specified, so no old
-state from e.g. the bootloader is still active after reconfiguration
-by the kernel.
+Typo? "ouput" -> "output"
 
-Signed-off-by: Ithamar R. Adema <ithamar@upgrade-android.com>
----
- drivers/pinctrl/pinctrl-sunxi.c |   39 +++++++++++++++++----------------------
- 1 file changed, 17 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-index b7d8c89..a652061 100644
---- a/drivers/pinctrl/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/pinctrl-sunxi.c
-@@ -1466,7 +1466,7 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 	of_property_for_each_string(node, "allwinner,pins", prop, group) {
- 		struct sunxi_pinctrl_group *grp =
- 			sunxi_pinctrl_find_group_by_name(pctl, group);
--		int j = 0, configlen = 0;
-+		u16 strength;
- 
- 		if (!grp) {
- 			dev_err(pctl->dev, "unknown pin %s", group);
-@@ -1490,31 +1490,23 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 		(*map)[i].type = PIN_MAP_TYPE_CONFIGS_GROUP;
- 		(*map)[i].data.configs.group_or_pin = group;
- 
--		if (of_find_property(node, "allwinner,drive", NULL))
--			configlen++;
--		if (of_find_property(node, "allwinner,pull", NULL))
--			configlen++;
--
--		pinconfig = kzalloc(configlen * sizeof(*pinconfig), GFP_KERNEL);
-+		pinconfig = kzalloc(3 * sizeof(*pinconfig), GFP_KERNEL);
- 
-+		strength = 0;
- 		if (!of_property_read_u32(node, "allwinner,drive", &val)) {
--			u16 strength = (val + 1) * 10;
--			pinconfig[j++] =
--				pinconf_to_config_packed(PIN_CONFIG_DRIVE_STRENGTH,
--							 strength);
-+			strength = (val + 1) * 10;
- 		}
-+		pinconfig[0] =
-+			pinconf_to_config_packed(PIN_CONFIG_DRIVE_STRENGTH,
-+						 strength);
- 
--		if (!of_property_read_u32(node, "allwinner,pull", &val)) {
--			enum pin_config_param pull = PIN_CONFIG_END;
--			if (val == 1)
--				pull = PIN_CONFIG_BIAS_PULL_UP;
--			else if (val == 2)
--				pull = PIN_CONFIG_BIAS_PULL_DOWN;
--			pinconfig[j++] = pinconf_to_config_packed(pull, 0);
--		}
-+		val = 0;
-+		of_property_read_u32(node, "allwinner,pull", &val);
-+		pinconfig[1] = pinconf_to_config_packed(PIN_CONFIG_BIAS_PULL_UP, val == 1);
-+		pinconfig[2] = pinconf_to_config_packed(PIN_CONFIG_BIAS_PULL_DOWN, val == 2);
- 
- 		(*map)[i].data.configs.configs = pinconfig;
--		(*map)[i].data.configs.num_configs = configlen;
-+		(*map)[i].data.configs.num_configs = 3;
- 
- 		i++;
- 	}
-@@ -1563,6 +1555,7 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
- {
- 	struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
- 	struct sunxi_pinctrl_group *g = &pctl->groups[group];
-+	u32 arg = pinconf_to_config_argument(config);
- 	u32 val, mask;
- 	u16 strength;
- 	u8 dlevel;
-@@ -1586,15 +1579,17 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
- 			pctl->membase + sunxi_dlevel_reg(g->pin));
- 		break;
- 	case PIN_CONFIG_BIAS_PULL_UP:
-+		arg = !!arg;
- 		val = readl(pctl->membase + sunxi_pull_reg(g->pin));
- 		mask = PULL_PINS_MASK << sunxi_pull_offset(g->pin);
--		writel((val & ~mask) | 1 << sunxi_pull_offset(g->pin),
-+		writel((val & ~mask) | arg << sunxi_pull_offset(g->pin),
- 			pctl->membase + sunxi_pull_reg(g->pin));
- 		break;
- 	case PIN_CONFIG_BIAS_PULL_DOWN:
-+		arg = !!arg;
- 		val = readl(pctl->membase + sunxi_pull_reg(g->pin));
- 		mask = PULL_PINS_MASK << sunxi_pull_offset(g->pin);
--		writel((val & ~mask) | 2 << sunxi_pull_offset(g->pin),
-+		writel((val & ~mask) | (arg << 1) << sunxi_pull_offset(g->pin),
- 			pctl->membase + sunxi_pull_reg(g->pin));
- 		break;
- 	default:
--- 
-1.7.9.5
+> +	phy_write(dev, 0xd, 0x7);
+> +	phy_write(dev, 0xe, 0x8016);
+> +	phy_write(dev, 0xd, 0x4007);
+> +
+> +	val = phy_read(dev, 0xe);
+> +	val &= 0xffe3;
+> +	val |= 0x18;
+> +	phy_write(dev, 0xe, val);
+> +
+> +	/* introduce tx clock delay */
+> +	phy_write(dev, 0x1d, 0x5);
+> +	val = phy_read(dev, 0x1e);
+> +	val |= 0x0100;
+> +	phy_write(dev, 0x1e, val);
+> +
+> +	return 0;
+> +}
+> +
+>  static void __init imx6q_sabrelite_cko1_setup(void)
+>  {
+>  	struct clk *cko1_sel, *ahb, *cko1;
+> @@ -137,11 +160,15 @@ put_clk:
+>  		clk_put(cko1);
+>  }
+>  
+> +#define PHY_ID_AR8031	0x004dd074
+> +
+>  static void __init imx6q_enet_phy_init(void)
+>  {
+>  	if (IS_BUILTIN(CONFIG_PHYLIB)) {
+>  		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
+>  				ksz9021rn_phy_fixup);
+> +		phy_register_fixup_for_uid(PHY_ID_AR8031, 0xffffffff,
+> +				ar8031_phy_fixup);
+>  	}
+>  }
+>  
+> 
