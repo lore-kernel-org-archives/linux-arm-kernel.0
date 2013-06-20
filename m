@@ -1,41 +1,36 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 20 Jun 2013 11:59:29 +0200
-Subject: [RFC 0/3] How to pass IOMMU map attr via DMA API?
-In-Reply-To: <20130620093152.GE2842@mudshark.cambridge.arm.com>
-References: <1371707384-30037-1-git-send-email-hdoyu@nvidia.com><20130620093152.GE2842@mudshark.cambridge.arm.com>
-Message-ID: <20130620.125929.2250094502232662356.hdoyu@nvidia.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 20 Jun 2013 18:59:46 +0900
+Subject: [PATCH V7 1/4] pci: Add PCIe driver for Samsung Exynos
+In-Reply-To: <00cb01ce6d99$0e932030$2bb96090$@samsung.com>
+References: <00cb01ce6d99$0e932030$2bb96090$@samsung.com>
+Message-ID: <00cf01ce6d9c$e5870540$b0950fc0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-Will Deacon <will.deacon@arm.com> wrote @ Thu, 20 Jun 2013 11:31:52 +0200:
-
-> > Hiroshi Doyu (3):
-> >   common: DMA-mapping: add DMA_ATTR_READ_ONLY attribute
-> >   ARM: dma-mapping: Pass DMA attrs as IOMMU prot
-> >   iommu/tegra: smmu: Support read-only mapping
+On Thursday, June 20, 2013 6:32 PM, Jingoo Han wrote:
 > 
-> These patches don't seem to have made it to the linux-arm-kernel list
-> (either in my inbox or the list archive). Could you try and resend them please?
-
-I'm sorry but linux-arm-kernel list someitmes requires me moderators
-approval. I don't know why. I'll find a way to work around.
-
-Here are links for the original post:
-
-http://lists.linuxfoundation.org/pipermail/iommu/2013-June/005860.html
-http://lists.linuxfoundation.org/pipermail/iommu/2013-June/005861.html
-http://lists.linuxfoundation.org/pipermail/iommu/2013-June/005862.html
-http://lists.linuxfoundation.org/pipermail/iommu/2013-June/005863.html
-
-> Also: how do they interact with my patch here?:
+> Exynos5440 has a PCIe controller which can be used as Root Complex.
+> This driver supports a PCIe controller as Root Complex mode.
 > 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/175124.html
+> Signed-off-by: Surendranath Gurivireddy Balla <suren.reddy@samsung.com>
+> Signed-off-by: Siva Reddy Kallam <siva.kallam@samsung.com>
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> ---
+>  .../devicetree/bindings/pci/exynos-pcie.txt        |   71 ++
+>  drivers/pci/host/Kconfig                           |    5 +
+>  drivers/pci/host/Makefile                          |    1 +
+>  drivers/pci/host/pci-exynos.c                      | 1057 ++++++++++++++++++++
+>  4 files changed, 1134 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/exynos-pcie.txt
+>  create mode 100644 drivers/pci/host/pci-exynos.c
 
-This conversion looks reasonable enough, but some platform may need
-more attrs to pass IOMMU like OMAP.
+Dear Bjorn Helgass,
 
-  #define IOMMU_FLAG	(IOVMF_ENDIAN_LITTLE | IOVMF_ELSZ_8)
+Would you review this patch?
+I have posted the Exynos PCIe patch for about 4 months.
+But, I have not received your reply.
+I need your feedback. :)
+Thank you.
 
-How can we deal with those cases?
+Best regards,
+Jingoo Han
