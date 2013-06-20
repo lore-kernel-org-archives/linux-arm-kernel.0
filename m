@@ -1,264 +1,74 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 20 Jun 2013 10:09:23 -0700
-Subject: [PATCH v2] ARM/KVM: save and restore generic timer registers
-In-Reply-To: <51C2D528.90805@arm.com>
-References: <1370963819-26165-1-git-send-email-andre.przywara@linaro.org>
- <51C2D528.90805@arm.com>
-Message-ID: <20130620170923.GA4563@lvm>
+Date: Thu, 20 Jun 2013 10:14:09 -0700
+Subject: [PATCH 3/5] ARM: KVM: make sure maintainance operation complete
+ before world switch
+In-Reply-To: <51C2B9A2.1020401@arm.com>
+References: <1371648006-8036-1-git-send-email-marc.zyngier@arm.com>
+ <1371648006-8036-4-git-send-email-marc.zyngier@arm.com>
+ <20130620001820.GJ7870@lvm> <51C2B9A2.1020401@arm.com>
+Message-ID: <20130620171409.GB4563@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 11:10:48AM +0100, Marc Zyngier wrote:
-> On 11/06/13 16:16, Andre Przywara wrote:
-> > For migration to work we need to save (and later restore) the state of
-> > each core's virtual generic timer.
-> > Since this is per VCPU, we can use the [gs]et_one_reg ioctl and export
-> > the three needed registers (control, counter, compare value).
-> > Though they live in cp15 space, we don't use the existing list, since
-> > they need special accessor functions and also the arch timer is
-> > optional.
+On Thu, Jun 20, 2013 at 09:13:22AM +0100, Marc Zyngier wrote:
+> On 20/06/13 01:18, Christoffer Dall wrote:
+> > On Wed, Jun 19, 2013 at 02:20:04PM +0100, Marc Zyngier wrote:
+> >> We may have preempted the guest while it was performing a maintainance
+> >> operation (TLB invalidation, for example). Make sure it completes
+> >> before we do anything else by adding the necessary barriers.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm/kvm/interrupts.S | 9 +++++++++
+> >>  1 file changed, 9 insertions(+)
+> >>
+> >> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> >> index afa6c04..3124e0f 100644
+> >> --- a/arch/arm/kvm/interrupts.S
+> >> +++ b/arch/arm/kvm/interrupts.S
+> >> @@ -149,6 +149,15 @@ __kvm_vcpu_return:
+> >>  	 * r0: vcpu pointer
+> >>  	 * r1: exception code
+> >>  	 */
+> >> +
+> >> +	/*
+> >> +	 * We may have preempted the guest while it was performing a
+> >> +	 * maintainance operation (TLB invalidation, for example). Make
+> >> +	 * sure it completes before we do anything else.
+> >> +	 */
 > > 
-> > Changes from v1:
-> > - move code out of coproc.c and into guest.c and arch_timer.c
-> > - present the registers with their native CP15 addresses, but without
-> >   using space in the VCPU's cp15 array
-> > - do the user space copying in the accessor functions
-> > 
-> > Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
-> > ---
-> >  arch/arm/include/asm/kvm_host.h |  5 ++++
-> >  arch/arm/include/uapi/asm/kvm.h | 16 ++++++++++
-> >  arch/arm/kvm/arch_timer.c       | 65 +++++++++++++++++++++++++++++++++++++++++
-> >  arch/arm/kvm/guest.c            | 26 ++++++++++++++++-
-> >  4 files changed, 111 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> > index 57cb786..1096e33 100644
-> > --- a/arch/arm/include/asm/kvm_host.h
-> > +++ b/arch/arm/include/asm/kvm_host.h
-> > @@ -224,4 +224,9 @@ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
-> >  int kvm_perf_init(void);
-> >  int kvm_perf_teardown(void);
-> >  
-> > +int kvm_arm_num_timer_regs(void);
-> > +int kvm_arm_copy_timer_indices(struct kvm_vcpu *, u64 __user *);
-> > +int kvm_arm_timer_get_reg(struct kvm_vcpu *, const struct kvm_one_reg *);
-> > +int kvm_arm_timer_set_reg(struct kvm_vcpu *, const struct kvm_one_reg *);
-> > +
-> >  #endif /* __ARM_KVM_HOST_H__ */
-> > diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> > index c1ee007..e3b0115 100644
-> > --- a/arch/arm/include/uapi/asm/kvm.h
-> > +++ b/arch/arm/include/uapi/asm/kvm.h
-> > @@ -118,6 +118,22 @@ struct kvm_arch_memory_slot {
-> >  #define KVM_REG_ARM_32_CRN_MASK		0x0000000000007800
-> >  #define KVM_REG_ARM_32_CRN_SHIFT	11
-> >  
-> > +#define KVM_REG_ARM_32_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U32      | \
-> > +					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
-> > +#define KVM_REG_ARM_64_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U64      | \
-> > +					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
-> > +#define KVM_REG_ARM_TIMER_CTL		(KVM_REG_ARM_32_CP15                 | \
-> > +					( 3ULL << KVM_REG_ARM_CRM_SHIFT)     | \
-> > +					(14ULL << KVM_REG_ARM_32_CRN_SHIFT)  | \
-> > +					( 0ULL << KVM_REG_ARM_OPC1_SHIFT)    | \
-> > +					( 1ULL << KVM_REG_ARM_32_OPC2_SHIFT))
-> > +#define KVM_REG_ARM_TIMER_CNT		(KVM_REG_ARM_64_CP15 | \
-> > +					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
-> > +					( 1ULL << KVM_REG_ARM_OPC1_SHIFT))
-> > +#define KVM_REG_ARM_TIMER_CVAL		(KVM_REG_ARM_64_CP15 | \
-> > +					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
-> > +					( 3ULL << KVM_REG_ARM_OPC1_SHIFT))
-> > +
-> >  /* Normal registers are mapped as coprocessor 16. */
-> >  #define KVM_REG_ARM_CORE		(0x0010 << KVM_REG_ARM_COPROC_SHIFT)
-> >  #define KVM_REG_ARM_CORE_REG(name)	(offsetof(struct kvm_regs, name) / 4)
-> > diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
-> > index c55b608..8d709eb 100644
-> > --- a/arch/arm/kvm/arch_timer.c
-> > +++ b/arch/arm/kvm/arch_timer.c
-> > @@ -18,6 +18,7 @@
-> >  
-> >  #include <linux/cpu.h>
-> >  #include <linux/of_irq.h>
-> > +#include <linux/uaccess.h>
-> >  #include <linux/kvm.h>
-> >  #include <linux/kvm_host.h>
-> >  #include <linux/interrupt.h>
-> > @@ -171,6 +172,70 @@ static void kvm_timer_init_interrupt(void *info)
-> >  	enable_percpu_irq(timer_irq.irq, 0);
-> >  }
-> >  
-> > +int kvm_arm_num_timer_regs(void)
-> > +{
-> > +	return 3;
-> > +}
-> > +
-> > +int kvm_arm_copy_timer_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-> > +{
-> > +	if (put_user(KVM_REG_ARM_TIMER_CTL, uindices))
-> > +		return -EFAULT;
-> > +	uindices++;
-> > +	if (put_user(KVM_REG_ARM_TIMER_CNT, uindices))
-> > +		return -EFAULT;
-> > +	uindices++;
-> > +	if (put_user(KVM_REG_ARM_TIMER_CVAL, uindices))
-> > +		return -EFAULT;
+> > Can you explain what could go wrong here without these two instructions?
 > 
-> So these macros are going to break arm64. Any chance you could introduce
-> them at the same time on both platforms? The rest of the work can be
-> delayed, but you shouldn't break arm64 (you'd expect me to say that,
-> wouldn't you? ;-).
-> 
-> Also, I'd like to keep userspace access out of the timer code itself.
-> Low level code shouldn't have to know about that. Can you create proper
-> accessors instead, and move whole userspace access to coproc.c?
-> 
+> There would be no guarantee that the TLB invalidation has effectively
+> completed, and is visible by other CPUs. Not sure that would be a
+> massive issue in any decent guest OS, but I thought it was worth plugging.
 
-I'm fine with this, coproc.c or guest.c - either way.
+ok, I was trying to think about how it would break, and if a guest needs
+a TLB invalidation to be visisble by other CPUs it would have to have a
+dsb/isb itself after the operation, and that would eventually be
+executed once the VCPU was rescheduled, but potentially on another CPU,
+but then I wonder if the PCPU migration on the host wouldn't take care
+of it?
 
-> > +	return 0;
-> > +}
-> > +
-> > +int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> > +{
-> > +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> > +	void __user *uaddr = (void __user *)(long)reg->addr;
-> > +	u64 val;
-> > +	int ret;
-> > +
-> > +	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
-> > +	if (ret != 0)
-> > +		return ret;
-> > +
-> > +	switch (reg->id) {
-> > +	case KVM_REG_ARM_TIMER_CTL:
-> > +		timer->cntv_ctl = val;
-> > +		break;
-> > +	case KVM_REG_ARM_TIMER_CNT:
-> > +		vcpu->kvm->arch.timer.cntvoff = kvm_phys_timer_read() - val;
+It sounds like you're not 100% sure it actually breaks something (or am
+I reading it wrong?), but if the performance impact is minor, why not be
+on the safe side I guess.
+
 > 
-> I just realized what bothers me here: You're computing cntvoff on a per
-> vcpu basis, while this is a VM property. Which means that as you're
-> restoring vcpus, you'll be changing cntvoff - sounds like a bad idea to me.
+> Another (more serious) thing I had doubts about was that we're about to
+> switch VMID to restore the host context. The ARM ARM doesn't clearly
+> specify the interaction between pending TLB maintainance and VMID
+> switch, and I'm worried that you could end up performing the TLB
+> maintainance on the *host* TLBs rather than on the guest's.
 > 
-> The counter is really global. Do we have a way to handle VM-wide
-> registers? I think Christoffer was trying to some a similar thing with
-> the GIC...
+> Having this dsb/isb sequence before switching VMID gives us a strong
+> guarantee that such a mixup cannot occur.
 > 
+This is really hurting my brain.
 
-We do have a way, but it requires user space to create a device and keep
-track of the device fd just to set/get a single register, which seems
-like overkill to me.
+Again, it seems the argument is, why not, and maybe it's required.
+And indeed, if it gives us peace of mind, I'm ok with it.
 
-I suggest you do one of two things:
- 1. Whenever this value is written, make sure it's written across all
-    vcpus, so guests always have a consistent view of time (be careful
-    about synchronization here).
- 2. Move the cntvoff value to the vm struct instead, so there's only one
-    offset and a consistent view of time.  This may have an adverse
-    effect on the world-switch code performance, but I suspect it would
-    completely disappear in the noise.
-
-I dont' feel strongly about either approach.
+Sorry about this OCD.
 
 -Christoffer
-
-> > +		break;
-> > +	case KVM_REG_ARM_TIMER_CVAL:
-> > +		timer->cntv_cval = val;
-> > +		break;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +int kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> > +{
-> > +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> > +	void __user *uaddr = (void __user *)(long)reg->addr;
-> > +	u64 val;
-> > +
-> > +	switch (reg->id) {
-> > +	case KVM_REG_ARM_TIMER_CTL:
-> > +		val = timer->cntv_ctl;
-> > +		break;
-> > +	case KVM_REG_ARM_TIMER_CNT:
-> > +		val = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
-> > +		break;
-> > +	case KVM_REG_ARM_TIMER_CVAL:
-> > +		val = timer->cntv_cval;
-> > +		break;
-> > +	}
-> > +	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id));
-> > +}
-> >  
-> >  static int kvm_timer_cpu_notify(struct notifier_block *self,
-> >  				unsigned long action, void *cpu)
-> > diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-> > index 152d036..a50ffb6 100644
-> > --- a/arch/arm/kvm/guest.c
-> > +++ b/arch/arm/kvm/guest.c
-> > @@ -121,7 +121,8 @@ static unsigned long num_core_regs(void)
-> >   */
-> >  unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
-> >  {
-> > -	return num_core_regs() + kvm_arm_num_coproc_regs(vcpu);
-> > +	return num_core_regs() + kvm_arm_num_coproc_regs(vcpu)
-> > +		+ kvm_arm_num_timer_regs();
-> >  }
-> >  
-> >  /**
-> > @@ -133,6 +134,7 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-> >  {
-> >  	unsigned int i;
-> >  	const u64 core_reg = KVM_REG_ARM | KVM_REG_SIZE_U32 | KVM_REG_ARM_CORE;
-> > +	int ret;
-> >  
-> >  	for (i = 0; i < sizeof(struct kvm_regs)/sizeof(u32); i++) {
-> >  		if (put_user(core_reg | i, uindices))
-> > @@ -140,9 +142,25 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-> >  		uindices++;
-> >  	}
-> >  
-> > +	ret = kvm_arm_copy_timer_indices(vcpu, uindices);
-> > +	if (ret)
-> > +		return ret;
-> > +	uindices += kvm_arm_num_timer_regs();
-> > +
-> >  	return kvm_arm_copy_coproc_indices(vcpu, uindices);
-> >  }
-> >  
-> > +static bool is_timer_reg(u64 index)
-> > +{
-> > +	switch (index) {
-> > +	case KVM_REG_ARM_TIMER_CTL:
-> > +	case KVM_REG_ARM_TIMER_CNT:
-> > +	case KVM_REG_ARM_TIMER_CVAL:
-> > +		return true;
-> > +	}
-> > +	return false;
-> > +}
-> > +
-> >  int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> >  {
-> >  	/* We currently use nothing arch-specific in upper 32 bits */
-> > @@ -153,6 +171,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> >  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-> >  		return get_core_reg(vcpu, reg);
-> >  
-> > +	if (is_timer_reg(reg->id))
-> > +		return kvm_arm_timer_get_reg(vcpu, reg);
-> > +
-> >  	return kvm_arm_coproc_get_reg(vcpu, reg);
-> >  }
-> >  
-> > @@ -166,6 +187,9 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> >  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-> >  		return set_core_reg(vcpu, reg);
-> >  
-> > +	if (is_timer_reg(reg->id))
-> > +		return kvm_arm_timer_set_reg(vcpu, reg);
-> > +
-> >  	return kvm_arm_coproc_set_reg(vcpu, reg);
-> >  }
