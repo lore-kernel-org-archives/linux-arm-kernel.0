@@ -1,28 +1,33 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 20 Jun 2013 15:50:21 -0400 (EDT)
-Subject: [PATCH V4 00/11] USB: OHCI:Properly handle ohci_suspend()routine
- in bus glue
-In-Reply-To: <1371720968-7533-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1306201549470.879-100000@iolanthe.rowland.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Jun 2013 21:51:34 +0200
+Subject: [GIT PULL 02/10] Samsung EXYNOS arch for v3.11
+In-Reply-To: <51C0BC3F.2060002@samsung.com>
+References: <51C0BC3F.2060002@samsung.com>
+Message-ID: <201306202151.34934.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Jun 2013, Manjunath Goudar wrote:
-
-> Suspend scenario in case of ohci bus glue was not properly handled as
-> it was not suspending generic part of ohci controller. Calling
-> explicitly the ohci_suspend()routine will ensure proper handling
-> of suspend scenario.
+On Tuesday 18 June 2013, Kukjin Kim wrote:
+> The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
 > 
-> V2:
->  -Incase ohci_suspend() fails, return right away without executing further.
+>    Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
 > 
-> V3:
->  -New patch 1/11 added, for generic ohci-hcd suspend code.
->  
-> V4:
->  -Properly aligned "do_wakeup" and "ret" variables.
+> are available in the git repository at:
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+> tags/exynos-arch-2
+> 
+> for you to fetch changes up to b5f3c75a75d31039c6de3ab38d074b43c60462f7:
+> 
+>    ARM: EXYNOS: call scu_enable() only in case of cortex-A9 processor 
+> (2013-06-19 03:41:38 +0900)
+> 
+> ----------------------------------------------------------------
+> arch/arm/mach-exynos update
+> - enable XHCI on exynos5
+> - enable Pinctrl on exynos4 and exynos5
+> - calling scu_enable() is only available on Cortex-A9
 
-This whole series looks good now.  For all of the patches:
+Pulled into next/soc, thanks!
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+	ARnd
