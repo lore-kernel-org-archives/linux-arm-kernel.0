@@ -1,54 +1,45 @@
-From: nishanth.p@gmail.com (Nishanth Peethambaran)
-Date: Thu, 20 Jun 2013 18:19:09 +0530
-Subject: [Linaro-mm-sig] [RFC 2/3] ARM: dma-mapping: Pass DMA attrs as
- IOMMU prot
-In-Reply-To: <201306201257.58419.arnd@arndb.de>
-References: <CAMcxFTS0dUUEfGj-=-cb_rdfy+qWvtsaoR6Tv+-x05XX0mZmmw@mail.gmail.com>
- <201306201213.13644.arnd@arndb.de>
- <20130620.133407.798194318297047071.hdoyu@nvidia.com>
- <201306201257.58419.arnd@arndb.de>
-Message-ID: <CAMcxFTQPUMMMagFioyENGMhHFCiUUvPkjurT+oDGa3HdF_cOwg@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 20 Jun 2013 14:51:48 +0200
+Subject: [PATCH v8 00/11] ASoC: fsl-ssi: ac97-slave support
+In-Reply-To: <51BE8B21.8050605@tabi.org>
+References: <1371389117-19729-1-git-send-email-mpa@pengutronix.de>
+ <51BE8B21.8050605@tabi.org>
+Message-ID: <20130620125148.GC3085@s25.your-server.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 4:27 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 20 June 2013, Hiroshi Doyu wrote:
->> Arnd Bergmann <arnd@arndb.de> wrote @ Thu, 20 Jun 2013 12:13:13 +0200:
->>
->> > On Thursday 20 June 2013, Hiroshi Doyu wrote:
->> > > > If devices allocate via dma-mapping API, physical mem allocation, iova
->> > > > allocation and iommu mapping happens internally.
->> > > > Devices may allocate physical memory using any allocator (say ION
->> > > > including carveout area), use "iommu mapping" API which will do iova
->> > > > allocation and iommu mapping. The prot flags could be useful in this
->> > > > case as well - not sure whether we would need dma-attrs here.
->> > >
->> > > I haven't followed ION recently, but can't ION backed by DMA mapping
->> > > API instead of using IOMMU API directly?
->> >
->> > For a GPU with an IOMMU, you typically want per-process IOMMU contexts,
->> > which are only available when using the IOMMU API directly, as the
->> > dma-mapping abstraction uses only one context for kernel space.
->>
->> Yes, we had some experiment for switching IOMMU context with DMA
->> mapping API. We needed to add some new DMA mapping API, and didn't
->> look so nice at that time. What do you think to introduce multiple
->> context or switching context in dma-mapping abstruction?
->
-> My feeling is that drivers with the need for multiple contexts
-> are better off using the iommu API, since that is what it was
-> made for. The dma-mapping abstraction really tries to hide the
-> bus address assignment, while users with multiple contexts typically
-> also want to control the bus addresses.
->
->         Arnd
+On Sun, Jun 16, 2013 at 11:05:53PM -0500, Timur Tabi wrote:
+> Markus Pargmann wrote:
+> > Hi,
+> >
+> > This series adds DT support for phycore-ac97. Beside ac97 support, the series
+> > adds imx-pcm-fiq and generic DMA bindings to fsl-ssi.
+> >
+> > In version 8 I fixed the build issues by seperating the DT capable ac97 phycore
+> > driver from the old driver.
+> 
+> FYI, I get some warnings applying this patchset:
+> 
+> Applying: ASoC: Add phycore-ac97-dt driver
+> /home/b04825/git/linux.alsa2/.git/rebase-apply/patch:375: new blank line 
+> at EOF.
+> +
+> warning: 1 line adds whitespace errors.
+> Applying: ASoC: fsl: Kconfig: Use fsl-ssi for phycore-ac97
+> Applying: ASoC: fsl: Move fsl-ssi binding doc to sound/
+> Applying: ASoC: fsl: Update fsl-ssi binding doc
+> /home/b04825/git/linux.alsa2/.git/rebase-apply/patch:33: space before tab 
+> in indent.
+>    		    Only necessary for some boards with incompatible
+> warning: 1 line adds whitespace errors.
 
-ION is more of a physical memory allocator supporting buddy pages as
-well as memory reserved at boot-time. DMA type of heap is only one of
-the types
-of heap. For system heap, ION provides an sg_table which device will
-have to map it using iommu API to get dma_address for the device. Even
-for DMA type of heap, each device will have to map the pages to its
-own iommu as Arnd mentioned.
+Thanks, I fixed all whitespace errors and the compile error.
 
-- Nishanth Peethambaran
+Regards,
+
+Markus
+
+> 
+> -- 
+> Timur Tabi
+> 
