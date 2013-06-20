@@ -1,30 +1,70 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 20 Jun 2013 15:46:12 +0300
-Subject: [PATCH v5 0/2] ARM: dts: Add USB host support for Beagle-xm
-Message-ID: <1371732374-27191-1-git-send-email-rogerq@ti.com>
+Date: Thu, 20 Jun 2013 15:46:14 +0300
+Subject: [PATCH v5 2/2] ARM: dts: omap3-beagle: Make USB host pin naming
+ consistent
+In-Reply-To: <1371732374-27191-1-git-send-email-rogerq@ti.com>
+References: <1371732374-27191-1-git-send-email-rogerq@ti.com>
+Message-ID: <1371732374-27191-3-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+Use a common naming scheme "mode0name.modename flags" for the
+USB host pins to be consistent.
 
-Patch 1 adds USB host support for beagle-XM.
-Patch 2 cleans up pin comments for USB host pins.
+Also add a disclaimer stating that use of regulator framework
+for GPIO RESET line is temporary.
 
-Changes in v4:
-- Rebased to todays for_3.11/dts branch
-- added disclaimer about temporary usage of regulator framework for
-GPIO RESET lines.
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/boot/dts/omap3-beagle.dts |   29 +++++++++++++++++------------
+ 1 files changed, 17 insertions(+), 12 deletions(-)
 
-cheers,
--roger
-
-Roger Quadros (2):
-  ARM: dts: omap3-beagle-xm: Add USB Host support
-  ARM: dts: omap3-beagle: Make USB host pin naming consistent
-
- arch/arm/boot/dts/omap3-beagle-xm.dts |   81 +++++++++++++++++++++++++++++----
- arch/arm/boot/dts/omap3-beagle.dts    |   29 +++++++-----
- 2 files changed, 89 insertions(+), 21 deletions(-)
-
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index dfd8310..587781a 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -44,6 +44,11 @@
+ 		};
+ 	};
+ 
++	/*
++	 * Temp hack: Need to be replaced with the proper gpio-controlled
++	 * reset driver as soon it will be merged.
++	 * http://thread.gmane.org/gmane.linux.drivers.devicetree/36830
++	 */
+ 	/* HS USB Port 2 RESET */
+ 	hsusb2_reset: hsusb2_reset_reg {
+ 		compatible = "regulator-fixed";
+@@ -101,18 +106,18 @@
+ 
+ 	hsusbb2_pins: pinmux_hsusbb2_pins {
+ 		pinctrl-single,pins = <
+-			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* usbb2_ulpitll_clk.usbb1_ulpiphy_clk */
+-			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* usbb2_ulpitll_clk.usbb1_ulpiphy_stp */
+-			0x5c4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dir */
+-			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_nxt */
+-			0x5c8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat0 */
+-			0x5cA (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat1 */
+-			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat2 */
+-			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat3 */
+-			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat4 */
+-			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat5 */
+-			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat6 */
+-			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat7 */
++			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
++			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
++			0x5c4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
++			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
++			0x5c8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
++			0x5cA (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
++			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
++			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
++			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
++			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
++			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
++			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
+ 		>;
+ 	};
+ 
 -- 
 1.7.4.1
