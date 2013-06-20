@@ -1,109 +1,54 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 20 Jun 2013 19:58:14 +0900
-Subject: [PATCH V4 1/3] pci: Add PCIe driver for Samsung Exynos
-In-Reply-To: <51C2D260.6000303@st.com>
-References: <003601ce6756$444e8cd0$cceba670$@samsung.com>
- <2061566.hRLrhtBK6z@wuerfel> <000901ce6838$8b514720$a1f3d560$@samsung.com>
- <28355406.ThqqvnG0Yj@wuerfel> <51C2D260.6000303@st.com>
-Message-ID: <00d701ce6da5$10216ae0$306440a0$@samsung.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 20 Jun 2013 11:58:34 +0100
+Subject: [PATCH 1/6] ARM: add CPU_BE8_BOOT_LE configuration
+In-Reply-To: <20130619192904.0375c15c@skate>
+References: <1371659404-20167-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1371659404-20167-2-git-send-email-ben.dooks@codethink.co.uk>
+ <20130619192904.0375c15c@skate>
+Message-ID: <51C2E05A.7000101@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 20, 2013 6:59 PM, Pratyush Anand wrote:
-> On 6/13/2013 7:48 PM, Arnd Bergmann wrote:
-> > On Thursday 13 June 2013 22:18:50 Jingoo Han wrote:
-> >> >On Wednesday, June 12, 2013 8:23 PM, Arnd Bergmann wrote:
-> >>> > >On Wednesday 12 June 2013 19:19:05 Jingoo Han wrote:
-> >>>> > > >+
-> >>>> > > >+/* synopsis specific PCIE configuration registers*/
-> >>>> > > >+#define PCIE_PORT_LINK_CONTROL		0x710
-> >>>> > > >+#define PORT_LINK_MODE_MASK		(0x3f << 16)
-> >>>> > > >+#define PORT_LINK_MODE_4_LANES		(0x7 << 16)
-> >>> > >
-> >>> > >Do you mean this is a "Synopsys" designware part? In that case it
-> >>> > >should really not be called "exynos-pcie" but "designware-pcie"
-> >>> > >and you should make sure that the driver makes no assumptions about
-> >>> > >the platform. A lot of other platforms also use designware
-> >>> > >parts and should be able to reuse this driver.
-> >> >
-> >> >Sorry, I don't think so.
-> >> >Only core block is a "Synopsys" designware part IP block,
-> >> >other parts are Exynos-specific.
-> >> >So, it is hard to share with other PCIe IPs using synopsis core.
-> > Just call it synopsys anyway and put a comment in to explain this.
-> > That should be enough for the next person with a synopsys PCI core
-> > to reuse your code and split out the exynos specific parts into a
-> > separate file.
-> >
-> 
-> I agree to Arnd that this patch should be split. I had worked in past
-> with SPEAr PCIe which also had designware PCIe IP. I see some code which
-> will fit both in SPEAr as well as in exynos. Unfortunately, I was not
-> able to get SPEAr driver pushed to mainline, as I moved to some other
-> project and got heavily occupied.
+On 19/06/13 18:29, Thomas Petazzoni wrote:
+> Dear Ben Dooks,
+>
+> On Wed, 19 Jun 2013 17:29:58 +0100, Ben Dooks wrote:
+>
+>> +config CPU_BE8_BOOT_LE
+>> +	bool "Boot BE system from LE loader"
+>> +	depends on CPU_ENDIAN_BE8
+>> +	help
+>> +	  Support for running BE-8 (big-endian) from a boot environment that is
+>> +	  running in LE mode.
+>> +
+>
+> I'm not sure to understand how this option articulates with the
+> CPU_ENDIAN_BE8 option, because your other patch series ("Initial
+> big-endian support series") in its PATCH 4 ("ARM: set BE8 if LE in head
+> code") already switches the kernel into BE mode even if it's booted
+> from a Little Endian bootloader.
+>
+> Maybe what you wanted to achieve is:
+>
+>   * The first patch series "Initial big-endian support series" allows to
+>     run the kernel big-endian if the bootloader has booted it big-endian.
+>
+>   * The second patch series "ARM big-endian - atags and loader updates",
+>     allows to run the kernel big-endian even if the bootloader started
+>     it little-endian.
+>
+> In this case, then the PATCH 4 of your first patch series ("ARM: set
+> BE8 if LE in head code") should be in the second patch series, and
+> the code be conditional under CPU_BE8_BOOT_LE.
 
-Oh, I see.
+I suppose the second series should be to allow little endian ATAGS
+based loaders to boot the kernel. If the loader starts the kernel LE
+with OF then it is easy to swap to big endian in the head code.
 
-How about this?
-At the next PATCH v7, I will change the file name from 'pci-exynos.c'
-to 'pci-designware.c', as Arnd mentioned.
+The secondary boots will always require the LE->BE switching as there
+is no guarantee that if the primary processor started the kernel BE8
+that any of the secondary cpus will be started in the same way.
 
-Then, when Spear or other platform using designware is submitted,
-this 'pci-designware.c' will be split to two separate files such as
-'pci-designware.c' and 'pci-exynos.c'.
-
-
-Best regards,
-Jingoo Han
-
-> 
-> Last patch is here:
-> 
-> https://patchwork.kernel.org/patch/1661441/
-> 
-> Infact, these functions should be common to all arm platforms.
-> 
-> sys_to_pcie
-> cfg_read
-> cfg_write
-> 
-> Following functions should be common to all designware based driver (at
-> least they are same in SPEAr)
-> 
-> exynos_pcie_prog_viewport_cfg0
-> exynos_pcie_prog_viewport_cfg1
-> exynos_pcie_rd_other_conf
-> exynos_pcie_wr_other_conf
-> exynos_pcie_setup
-> exynos_pcie_valid_config
-> exynos_pcie_rd_conf
-> exynos_pcie_wd_conf
-> exynos_pcie_scan_bus
-> exynos_pcie_map_irq
-> add_pcie_port (after a bit of generalization)
-> exynos_pcie_probe
-> exynos_pcie_remove
-> 
-> 
-> 
-> Following should be specific to exynos:
-> 
-> exynos_pcie_rd_own_conf
-> exynos_pcie_wr_own_conf
-> exynos_pcie_link_up
-> exynos_pcie_setup_rc
-> exynos_pcie_assert_core_reset
-> exynos_pcie_deassert_core_reset
-> exynos_pcie_assert_phy_reset
-> exynos_pcie_deassert_phy_reset
-> exynos_pcie_init_phy
-> exynos_pcie_assert_reset
-> exynos_pcie_establish_link
-> exynos_pcie_host_init
-> 
-> 
-> 
-> struct pcie_port_info and struct pcie_port can also be standardized.
-> 
-> Regards
-> Pratyush
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
