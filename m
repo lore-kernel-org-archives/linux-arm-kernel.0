@@ -1,49 +1,80 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Thu, 20 Jun 2013 09:53:39 +0800
-Subject: [RFC PATCH v1 4/6] USB: EHCI: don't release ehci->lock if URB
- giveback in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306191144230.2026-100000@iolanthe.rowland.org>
-References: <CACVXFVOc9GhZSX5vtgxN3u9+wMVv2SkXW6jyCtb1eYTzRXahWA@mail.gmail.com>
- <Pine.LNX.4.44L0.1306191144230.2026-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVOLwGtBiU1bBJuO5YobJ-y4kCs19tptrvL5nC4k1uL+1A@mail.gmail.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Thu, 20 Jun 2013 10:01:24 +0800
+Subject: [PATCH V3 5/5] input: pxa27x-keypad: add device tree support
+In-Reply-To: <20130619111341.GH2426@book.gsilab.sittig.org>
+References: <1371527778-5236-1-git-send-email-chao.xie@marvell.com>
+ <1371527778-5236-6-git-send-email-chao.xie@marvell.com>
+ <201306191022.51630.marex@denx.de>
+ <CADApbeiQWOi8SYEFf0bOsf1yn+TgXhwgDWaWFpGk7+nbC9bNDg@mail.gmail.com>
+ <20130619111341.GH2426@book.gsilab.sittig.org>
+Message-ID: <CADApbehrJ=Jy_Z57serKuDm+-6_oy94QbrJUxL17HCKokDov8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 11:47 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Wed, 19 Jun 2013, Ming Lei wrote:
->
->> On Wed, Jun 19, 2013 at 12:43 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
->> > On Tue, 18 Jun 2013, Ming Lei wrote:
+On Wed, Jun 19, 2013 at 7:13 PM, Gerhard Sittig <gsi@denx.de> wrote:
+> On Wed, Jun 19, 2013 at 16:38 +0800, Chao Xie wrote:
+>>
+>> On Wed, Jun 19, 2013 at 4:22 PM, Marek Vasut <marex@denx.de> wrote:
 >> >
->> >> If HCD_BH is set for HC driver's flags, URB giveback will be
->> >> done in tasklet context instead of interrupt context, so the
->> >> ehci->lock needn't to be released any more before calling
->> >> usb_hcd_giveback_urb().
+>> >> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>> >> [ ... ]
+>> >> +++ b/Documentation/devicetree/bindings/input/pxa27x-keypad.txt
+>> >> @@ -0,0 +1,60 @@
+>> >> +* Marvell PXA Keypad controller
+>> >> +
+>> >> +Required Properties
+>> >> +- compatible : should be "marvell,pxa27x-keypad"
+>> >> +- reg : Address and length of the register set for the device
+>> >> +- interrupts : The interrupt for the keypad controller
+>> >> +- marvell,debounce-interval : How long time the key will be
 >> >
->> > It is premature to do this now.  This should be part of the 6/6 patch,
->>
->> It is fine since HCD_BH isn't enabled.
+>> > Is there no generic prop name for this debounce interval?
+>> >
+>> I searched at drivers/input and Documents.
+>> Two drivers use "debounce-interval", gpio-keys.c and stmpe-keypad.c.
+>> They describe the meanings of "debounce-interval" at its own document file.
+>> Some other drivers uses "xxx,debounce-delay-ms" or "debounce-delay-ms"
+>> So it seems that there is no generic prop name for this debounce interval.
 >
-> It's not "fine".  It will work -- nothing will crash -- but that
-> doesn't mean it is good style.
+> Actually there is, but under a different (more user friendly)
+> name:  See the 'debounce-delay-ms' property in
+> Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
+> which gets referenced in the matrix_keypad_parse_dt() routine in
+> the drivers/input/keyboard/matrix_keypad.c source file.  Ah, your
+> last sentence mentions that fact.
 >
->> > when it won't be necessary to test hcd_giveback_urb_in_bh().
->>
->> Keeping it is easy to compare test results between running complete()
->> in tasklet and in hard irq handler.
+> But when you introduce DT support into an existing driver which
+> previously used platform data, then there is no problem with
+> backwards compatibility in .dts files.  So I suggest to go with
+> the "debounce-delay-ms" name since it better reflects to the .dts
+> author (hardware engineer) which unit the number is supposed to
+> be specified in.
 >
-> It's just as easy to do your tests by keeping two copies of ehci-hcd.ko
-> lying around; one with your changes and one without.  You can insmod
-> whichever one you want to test.
->
->> Also it might be helpful for out of tree drivers.
->>
->> But it isn't a big deal, I can merge it to 6/6 if you care.
->
-> Yes, please.
+So Arnd
+What do you think? I am fine with either one.
 
-OK.
+>
+> Note that I've recently worked on extending the matrix keypad
+> input driver (doc improvements, software polling, binary encoded
+> column selection), but haven't submitted the patch series yet
+> since it's perfectly operational on the target which motivated
+> the extension but wasn't tested yet on any other platform or
+> matrix setup -- I currently lack access to an ARM based board
+> with either lots of accessible GPIOs to connect a matrix to, or
+> some matrix already built into the board, but more importantly
+> lack free resources for this very driver extension.
+>
+> Alternatively I might send an RFC series since the current state
+> isn't good enough for v1.  Just ask if you'd like to test or
+> review what I have come up with so far (it builds but wasn't
+> run-tested).
+>
+Sure, i can help you to test at PXA platform which is ARM based.
 
-Thanks,
---
-Ming Lei
+>
+> virtually yours
+> Gerhard Sittig
+> --
+> DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+> HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+> Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
