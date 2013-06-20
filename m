@@ -1,45 +1,35 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 20 Jun 2013 10:00:13 +0200
-Subject: [PATCH V6 3/3] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-In-Reply-To: <00c301ce6d8b$d198b210$74ca1630$@samsung.com>
-References: <00c201ce6d85$83b072a0$8b1157e0$@samsung.com>
- <20130620094835.3f1f34c2@skate>
- <00c301ce6d8b$d198b210$74ca1630$@samsung.com>
-Message-ID: <20130620100013.6000458f@skate>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 20 Jun 2013 01:00:07 -0700
+Subject: [PATCH 0/2] clk vexpress updates for 3.11
+In-Reply-To: <1370876707-25265-1-git-send-email-pawel.moll@arm.com>
+References: <1370876707-25265-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20130620080007.9136.12423@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jingoo Han,
-
-On Thu, 20 Jun 2013 16:57:32 +0900, Jingoo Han wrote:
-
-> > > -	pinctrl {
-> > > +	pin_ctrl: pinctrl {
-> > >  		compatible = "samsung,exynos5440-pinctrl";
-> > 
-> > I know I'm nitpicking, but isn't this change completely unrelated to
-> > PCIe support?
+Quoting Pawel Moll (2013-06-10 08:05:05)
+> Hi Mike,
 > 
-> This change is related to PCIe support.
-> Without this, I cannot use gpio binding.
+> Could you please queue these two small updates of the vexpress clk
+> drivers?
+
+Taken into clk-next for 3.11.
+
+Regards,
+Mike
+
 > 
-> This change was guided by Thomas Abraham (Author of Samsung pinctrl).
-> Also, it was confirmed by Kukjin Kim (Maintainer of Samsung SoC).
+> Thanks!
 > 
-> Thank you for your caring. :)
-
-I mean, the change is fine for sure, but it should maybe part of a
-separate patch as it is more a fix than really the introduction of the
-PCIe controller node, as the patch title suggests. This would also for
-example allow this fix to be merged right now (for 3.11), regardless of
-what happens for the rest of your PCIe patches.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> Pawel
+> 
+> Pawel Moll (2):
+>   clk: vexpress: Use full node name to identify individual clocks
+>   clk: vexpress: Make the clock drivers directly available for arm64
+> 
+>  drivers/clk/Kconfig                      | 2 +-
+>  drivers/clk/versatile/clk-vexpress-osc.c | 4 ++--
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> -- 
+> 1.8.1.2
