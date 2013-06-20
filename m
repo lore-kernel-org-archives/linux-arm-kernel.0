@@ -1,53 +1,37 @@
 From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 20 Jun 2013 19:21:10 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCA2LzZdIEFSTTogZHRzOiBBZGQgZGV2aWNlIHRyZWUgc3Vw?=
- =?UTF-8?B?cG9ydCBmb3IgcGh5Y2FyZCBwY2ExMDA=?=
-In-Reply-To: <1371739815-6666-7-git-send-email-mpa@pengutronix.de>
+Date: Thu, 20 Jun 2013 19:28:08 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzZdIEFSTTogbXgyNzogUmVwbGFjZSBjbGtfcmVnaXN0?=
+ =?UTF-8?B?ZXJfY2xrZGV2IHdpdGggY2xvY2sgRFQgbG9va3Vw?=
+In-Reply-To: <1371739815-6666-2-git-send-email-mpa@pengutronix.de>
 References: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
- <1371739815-6666-7-git-send-email-mpa@pengutronix.de>
-Message-ID: <1371741670.186508416@f66.mail.ru>
+ <1371739815-6666-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <1371742088.528552668@f66.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Based on patches from:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Steffen Trumtrar <s.trumtrar@pengutronix.de>:
->  - Original patch
->  - ARM: dts: Set partition offsets for phycard
->  - ARM: dts: Use CSPI1 instead of CSPI2 on phycard pca100
->  - ARM: imx27-phytec-phycard-S.dts: resize nand partitions
+> Similarly as it was done for mx6q, use a DT lookup in order to make maintainance
+> task for the clock devices easier.
 > 
-> Jan Luebbe <jlu@pengutronix.de>:
->  - ARM: dts: Enable bad block table in NAND
-> 
-> Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Cc: Jan Luebbe <jlu@pengutronix.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> [Markus Pargmann: Add gpio clocks]
 > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-...
-> +			gpio at 10015000 {
-> +				status = "okay";
-> +			};
-> +
-> +			gpio at 10015100 {
-> +				status = "okay";
-> +			};
-> +
-> +			gpio at 10015200 {
-> +				status = "okay";
-> +			};
-> +
-> +			gpio at 10015300 {
-> +				status = "okay";
-> +			};
-> +
-> +			gpio at 10015400 {
-> +				status = "okay";
-> +			};
-> +
-> +			gpio at 10015500 {
-> +				status = "okay";
-> +			};
+> ---
+>  arch/arm/boot/dts/imx27.dtsi | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> index 0695264..48c263c 100644
+> --- a/arch/arm/boot/dts/imx27.dtsi
+> +++ b/arch/arm/boot/dts/imx27.dtsi
+> @@ -208,6 +208,8 @@
+>  				#gpio-cells = <2>;
+>  				interrupt-controller;
+>  				#interrupt-cells = <2>;
+> +				clocks = <&clks 47>;
+> +				clock-names = "ipg";
 
-No need setup status for devices which not disabled in imx27.dts
+Clock is not used in the gpio driver, so I doubt the usefulness of this patch.
 
 ---
