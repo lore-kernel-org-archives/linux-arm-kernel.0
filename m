@@ -1,52 +1,27 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 20 Jun 2013 22:09:10 +0900
-Subject: [PATCH 1/2] gpio-rcar: Reference core gpio documentation in the DT
- bindings
-In-Reply-To: <1371733751-27730-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371733751-27730-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371733751-27730-2-git-send-email-horms+renesas@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Jun 2013 15:11:52 +0200
+Subject: [GIT PULL] at91: cleanup for 3.11 #2
+In-Reply-To: <1371545020-23186-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1371545020-23186-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <201306201511.52876.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+On Tuesday 18 June 2013, Nicolas Ferre wrote:
+> The patch that was remaining from my old "soc" pull-request. It is stacked on
+> top of the "cleanup" patches already send as recommended by Olof.
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
+> 
+>   ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-cleanup
+> 
 
-Replaced the detailed gpio-ranges documentation with a reference to the
-code gpio DT bindings, and mention the gpio flags symbolic names.
+Pulled into next/cleanup, thanks!
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- .../devicetree/bindings/gpio/renesas,gpio-rcar.txt     | 18 ++++++------------
- 1 file changed, 6 insertions(+), 12 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-index 46d76a0..cb3dc7b 100644
---- a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-+++ b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-@@ -16,18 +16,12 @@ Required Properties:
- 
-   - gpio-controller: Marks the device node as a gpio controller.
-   - #gpio-cells: Should be 2. The first cell is the GPIO number and the second
--    cell is used to specify optional parameters as bit flags. Only the GPIO
--    active low flag (bit 0) is currently supported.
--  - gpio-ranges: Range of pins managed by the GPIO controller as a 4-cells
--    tuple using the following syntax.
--
--    <[phandle of the pin controller node]
--     0
--     [index of the first pin]
--     [number of pins]>
--
--Please refer to gpio.txt in this directory for details of the common GPIO
--bindings used by client devices.
-+    cell specifies GPIO flags, as defined in <dt-bindings/gpio/gpio.h>. Only the
-+    GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW flags are supported.
-+  - gpio-ranges: Range of pins managed by the GPIO controller.
-+
-+Please refer to gpio.txt in this directory for details of gpio-ranges property
-+and the common GPIO bindings used by client devices.
- 
- Example: R8A7779 (R-Car H1) GPIO controller nodes
- 
--- 
-1.8.2.1
+	Arnd
