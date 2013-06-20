@@ -1,66 +1,34 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 19 Jun 2013 17:27:36 -0700
-Subject: [PATCH 4/5] ARM: KVM: clear exclusive monitor on all exception
- returns
-In-Reply-To: <1371648006-8036-5-git-send-email-marc.zyngier@arm.com>
-References: <1371648006-8036-1-git-send-email-marc.zyngier@arm.com>
- <1371648006-8036-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130620002736.GK7870@lvm>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Jun 2013 02:27:31 +0200
+Subject: [GIT PULL] U300 multiplatform for v3.11
+In-Reply-To: <CACRpkdY1EUbFK6Mk3nogjGGeSkmio2v6ZNFe1wh7sFcE3d51fg@mail.gmail.com>
+References: <CACRpkdY1EUbFK6Mk3nogjGGeSkmio2v6ZNFe1wh7sFcE3d51fg@mail.gmail.com>
+Message-ID: <201306200227.31603.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 02:20:05PM +0100, Marc Zyngier wrote:
-> Make sure we clear the exclusive movitor on all exception returns,
-> which otherwise could lead to lock corruptions.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/interrupts.S | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> index 3124e0f..750f051 100644
-> --- a/arch/arm/kvm/interrupts.S
-> +++ b/arch/arm/kvm/interrupts.S
-> @@ -301,6 +301,7 @@ THUMB(	orr	r2, r2, #PSR_T_BIT	)
->  	ldr	r2, =BSYM(panic)
->  	msr	ELR_hyp, r2
->  	ldr	r0, =\panic_str
-> +	clrex				@ Clear exclusive monitor
+I needed this patch on top.
 
-on a panic? sure, why not ;)
+>From e0a60445624107912e4684e20e5e9158b94b4c87 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Thu, 20 Jun 2013 02:26:37 +0200
+Subject: [PATCH] ARM: u300: only build for ARCH_MULTI_V5
 
->  	eret
->  .endm
->  
-> @@ -450,6 +451,7 @@ guest_trap:
->  
->  4:	pop	{r0, r1}		@ Failed translation, return to guest
->  	mcrr	p15, 0, r0, r1, c7	@ PAR
-> +	clrex
+This avoids impossible platform combinations, as we cannot
+build a combined V5 + V6/V7 kernel.
 
-I gather this is because any store can potentially leave the system with
-an exclusive monitor taken?
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-patch looks fine.
-
->  	pop	{r0, r1, r2}
->  	eret
->  
-> @@ -476,6 +478,7 @@ switch_to_guest_vfp:
->  
->  	pop	{r3-r7}
->  	pop	{r0-r2}
-> +	clrex
->  	eret
->  #endif
->  
-> -- 
-> 1.8.2.3
-> 
-> 
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+diff --git a/arch/arm/mach-u300/Kconfig b/arch/arm/mach-u300/Kconfig
+index 09f4dda..a85adcd 100644
+--- a/arch/arm/mach-u300/Kconfig
++++ b/arch/arm/mach-u300/Kconfig
+@@ -3,7 +3,7 @@ menu "ST-Ericsson AB U300/U335 Platform"
+ comment "ST-Ericsson Mobile Platform Products"
+ 
+ config ARCH_U300
+-	bool "ST-Ericsson U300 Series"
++	bool "ST-Ericsson U300 Series" if ARCH_MULTI_V5
+ 	depends on MMU
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
