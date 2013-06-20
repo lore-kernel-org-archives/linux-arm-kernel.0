@@ -1,93 +1,41 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Thu, 20 Jun 2013 15:28:56 +0530
-Subject: [PATCH V4 1/3] pci: Add PCIe driver for Samsung Exynos
-In-Reply-To: <28355406.ThqqvnG0Yj@wuerfel>
-References: <003601ce6756$444e8cd0$cceba670$@samsung.com>
- <2061566.hRLrhtBK6z@wuerfel> <000901ce6838$8b514720$a1f3d560$@samsung.com>
- <28355406.ThqqvnG0Yj@wuerfel>
-Message-ID: <51C2D260.6000303@st.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 20 Jun 2013 11:59:29 +0200
+Subject: [RFC 0/3] How to pass IOMMU map attr via DMA API?
+In-Reply-To: <20130620093152.GE2842@mudshark.cambridge.arm.com>
+References: <1371707384-30037-1-git-send-email-hdoyu@nvidia.com><20130620093152.GE2842@mudshark.cambridge.arm.com>
+Message-ID: <20130620.125929.2250094502232662356.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/13/2013 7:48 PM, Arnd Bergmann wrote:
-> On Thursday 13 June 2013 22:18:50 Jingoo Han wrote:
->> >On Wednesday, June 12, 2013 8:23 PM, Arnd Bergmann wrote:
->>> > >On Wednesday 12 June 2013 19:19:05 Jingoo Han wrote:
->>>> > > >+
->>>> > > >+/* synopsis specific PCIE configuration registers*/
->>>> > > >+#define PCIE_PORT_LINK_CONTROL		0x710
->>>> > > >+#define PORT_LINK_MODE_MASK		(0x3f << 16)
->>>> > > >+#define PORT_LINK_MODE_4_LANES		(0x7 << 16)
->>> > >
->>> > >Do you mean this is a "Synopsys" designware part? In that case it
->>> > >should really not be called "exynos-pcie" but "designware-pcie"
->>> > >and you should make sure that the driver makes no assumptions about
->>> > >the platform. A lot of other platforms also use designware
->>> > >parts and should be able to reuse this driver.
->> >
->> >Sorry, I don't think so.
->> >Only core block is a "Synopsys" designware part IP block,
->> >other parts are Exynos-specific.
->> >So, it is hard to share with other PCIe IPs using synopsis core.
-> Just call it synopsys anyway and put a comment in to explain this.
-> That should be enough for the next person with a synopsys PCI core
-> to reuse your code and split out the exynos specific parts into a
-> separate file.
->
+Hi Will,
 
-I agree to Arnd that this patch should be split. I had worked in past 
-with SPEAr PCIe which also had designware PCIe IP. I see some code which 
-will fit both in SPEAr as well as in exynos. Unfortunately, I was not 
-able to get SPEAr driver pushed to mainline, as I moved to some other 
-project and got heavily occupied.
+Will Deacon <will.deacon@arm.com> wrote @ Thu, 20 Jun 2013 11:31:52 +0200:
 
-Last patch is here:
+> > Hiroshi Doyu (3):
+> >   common: DMA-mapping: add DMA_ATTR_READ_ONLY attribute
+> >   ARM: dma-mapping: Pass DMA attrs as IOMMU prot
+> >   iommu/tegra: smmu: Support read-only mapping
+> 
+> These patches don't seem to have made it to the linux-arm-kernel list
+> (either in my inbox or the list archive). Could you try and resend them please?
 
-https://patchwork.kernel.org/patch/1661441/
+I'm sorry but linux-arm-kernel list someitmes requires me moderators
+approval. I don't know why. I'll find a way to work around.
 
-Infact, these functions should be common to all arm platforms.
+Here are links for the original post:
 
-sys_to_pcie
-cfg_read
-cfg_write
+http://lists.linuxfoundation.org/pipermail/iommu/2013-June/005860.html
+http://lists.linuxfoundation.org/pipermail/iommu/2013-June/005861.html
+http://lists.linuxfoundation.org/pipermail/iommu/2013-June/005862.html
+http://lists.linuxfoundation.org/pipermail/iommu/2013-June/005863.html
 
-Following functions should be common to all designware based driver (at 
-least they are same in SPEAr)
+> Also: how do they interact with my patch here?:
+> 
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/175124.html
 
-exynos_pcie_prog_viewport_cfg0
-exynos_pcie_prog_viewport_cfg1
-exynos_pcie_rd_other_conf
-exynos_pcie_wr_other_conf
-exynos_pcie_setup
-exynos_pcie_valid_config
-exynos_pcie_rd_conf
-exynos_pcie_wd_conf
-exynos_pcie_scan_bus
-exynos_pcie_map_irq
-add_pcie_port (after a bit of generalization)
-exynos_pcie_probe
-exynos_pcie_remove
+This conversion looks reasonable enough, but some platform may need
+more attrs to pass IOMMU like OMAP.
 
+  #define IOMMU_FLAG	(IOVMF_ENDIAN_LITTLE | IOVMF_ELSZ_8)
 
-
-Following should be specific to exynos:
-
-exynos_pcie_rd_own_conf
-exynos_pcie_wr_own_conf
-exynos_pcie_link_up
-exynos_pcie_setup_rc
-exynos_pcie_assert_core_reset
-exynos_pcie_deassert_core_reset
-exynos_pcie_assert_phy_reset
-exynos_pcie_deassert_phy_reset
-exynos_pcie_init_phy
-exynos_pcie_assert_reset
-exynos_pcie_establish_link
-exynos_pcie_host_init
-
-
-
-struct pcie_port_info and struct pcie_port can also be standardized.
-
-Regards
-Pratyush
+How can we deal with those cases?
