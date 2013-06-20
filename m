@@ -1,133 +1,249 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 20 Jun 2013 12:08:58 +0200
-Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
- pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
-In-Reply-To: <20130620095705.GA18536@arm.com>
-References: <51C2C0B5.8020802@pengutronix.de> <20130620095705.GA18536@arm.com>
-Message-ID: <51C2D4BA.8020406@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Jun 2013 11:10:48 +0100
+Subject: [PATCH v2] ARM/KVM: save and restore generic timer registers
+In-Reply-To: <1370963819-26165-1-git-send-email-andre.przywara@linaro.org>
+References: <1370963819-26165-1-git-send-email-andre.przywara@linaro.org>
+Message-ID: <51C2D528.90805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2013 11:57 AM, Catalin Marinas wrote:
-> Hi Marc,
+On 11/06/13 16:16, Andre Przywara wrote:
+> For migration to work we need to save (and later restore) the state of
+> each core's virtual generic timer.
+> Since this is per VCPU, we can use the [gs]et_one_reg ioctl and export
+> the three needed registers (control, counter, compare value).
+> Though they live in cp15 space, we don't use the existing list, since
+> they need special accessor functions and also the arch timer is
+> optional.
 > 
-> On Thu, Jun 20, 2013 at 09:43:33AM +0100, Marc Kleine-Budde wrote:
->> on current linus/master on armv5 we observed stack trashing[1] on high
->> load. I bisected this problem down to commit:
->>
->>> b9d4d42ad901cc848ac87f1cb8923fded3645568 is the first bad commit
->>> commit b9d4d42ad901cc848ac87f1cb8923fded3645568
->>> Author: Catalin Marinas <catalin.marinas@arm.com>
->>> Date:   Mon Nov 28 21:57:24 2011 +0000
->>>
->>>     ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on pre-ARMv6 CPUs
->>>
->>>     This patch removes the __ARCH_WANT_INTERRUPTS_ON_CTXSW definition for
->>>     ARMv5 and earlier processors. On such processors, the context switch
->>>     requires a full cache flush. To avoid high interrupt latencies, this
->>>     patch defers the mm switching to the post-lock switch hook if the
->>>     interrupts are disabled.
->>>
->>>     Reviewed-by: Will Deacon <will.deacon@arm.com>
->>>     Tested-by: Will Deacon <will.deacon@arm.com>
->>>     Reviewed-by: Frank Rowand <frank.rowand@am.sony.com>
->>>     Tested-by: Marc Zyngier <Marc.Zyngier@arm.com>
->>>     Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->>>
->>> :040000 040000 034899bdcbc9aa59b5455a85a9d78b646b4cf784 ecc23e33a4ca807d4153f87fbea85a9437ff2928 M      arch
->>
->> The problem can be reproduced on several mx28 and an at91sam9263 and
->> only occurs of CONFIG_PREEMPT (Preemptible Kernel (Low-Latency Desktop))
->> is enabled.
->>
->> I have the gut feeling that the "if (irqs_disabled())" check in the
->> above patch is not correct for CONFIG_PREEMPT.
+> Changes from v1:
+> - move code out of coproc.c and into guest.c and arch_timer.c
+> - present the registers with their native CP15 addresses, but without
+>   using space in the VCPU's cp15 array
+> - do the user space copying in the accessor functions
 > 
-> The check is there to avoid long interrupt latencies (flushing the whole
-> cache with interrupts disabled during context switch). You can drop the
-> check and always call cpu_switch_mm() to confirm that it fixes the
-> faults.
-
-I have disabled the check:
-
-diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
-index a7b85e0..7b3f67f 100644
---- a/arch/arm/include/asm/mmu_context.h
-+++ b/arch/arm/include/asm/mmu_context.h
-@@ -39,7 +39,7 @@ static inline void check_and_switch_context(struct mm_struct *mm,
-        if (unlikely(mm->context.vmalloc_seq != init_mm.context.vmalloc_seq))
-                __check_vmalloc_seq(mm);
-
--       if (irqs_disabled())
-+       if (0 && irqs_disabled())
-                /*
-                 * cpu_switch_mm() needs to flush the VIVT caches. To avoid
-                 * high interrupt latencies, defer the call and continue
-
-...and the test is running without problems, while I'm writing this
-email. No more segfaults so far.
-
-> finish_task_switch() calls finish_arch_post_lock_switch() after the
-> interrupts have been enabled so that the CPU can actually switch the mm.
-> I wonder whether we could actually be preempted after
-> finish_lock_switch() but before we actually switched the MMU.
+> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_host.h |  5 ++++
+>  arch/arm/include/uapi/asm/kvm.h | 16 ++++++++++
+>  arch/arm/kvm/arch_timer.c       | 65 +++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/kvm/guest.c            | 26 ++++++++++++++++-
+>  4 files changed, 111 insertions(+), 1 deletion(-)
 > 
-> Here's an untested patch (trying to keep it in the arch/arm code):
-> 
-> 
-> diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
-> index a7b85e0..ded85e9 100644
-> --- a/arch/arm/include/asm/mmu_context.h
-> +++ b/arch/arm/include/asm/mmu_context.h
-> @@ -39,17 +39,20 @@ static inline void check_and_switch_context(struct mm_struct *mm,
->  	if (unlikely(mm->context.vmalloc_seq != init_mm.context.vmalloc_seq))
->  		__check_vmalloc_seq(mm);
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 57cb786..1096e33 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -224,4 +224,9 @@ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+>  int kvm_perf_init(void);
+>  int kvm_perf_teardown(void);
 >  
-> -	if (irqs_disabled())
-> +	if (irqs_disabled()) {
->  		/*
->  		 * cpu_switch_mm() needs to flush the VIVT caches. To avoid
->  		 * high interrupt latencies, defer the call and continue
->  		 * running with the old mm. Since we only support UP systems
->  		 * on non-ASID CPUs, the old mm will remain valid until the
-> -		 * finish_arch_post_lock_switch() call.
-> +		 * finish_arch_post_lock_switch() call. Preemption needs to be
-> +		 * disabled until the MMU is switched.
->  		 */
->  		set_ti_thread_flag(task_thread_info(tsk), TIF_SWITCH_MM);
-> -	else
-> +		preempt_disable();
-> +	} else {
->  		cpu_switch_mm(mm->pgd, mm);
+> +int kvm_arm_num_timer_regs(void);
+> +int kvm_arm_copy_timer_indices(struct kvm_vcpu *, u64 __user *);
+> +int kvm_arm_timer_get_reg(struct kvm_vcpu *, const struct kvm_one_reg *);
+> +int kvm_arm_timer_set_reg(struct kvm_vcpu *, const struct kvm_one_reg *);
+> +
+>  #endif /* __ARM_KVM_HOST_H__ */
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index c1ee007..e3b0115 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -118,6 +118,22 @@ struct kvm_arch_memory_slot {
+>  #define KVM_REG_ARM_32_CRN_MASK		0x0000000000007800
+>  #define KVM_REG_ARM_32_CRN_SHIFT	11
+>  
+> +#define KVM_REG_ARM_32_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U32      | \
+> +					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
+> +#define KVM_REG_ARM_64_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U64      | \
+> +					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
+> +#define KVM_REG_ARM_TIMER_CTL		(KVM_REG_ARM_32_CP15                 | \
+> +					( 3ULL << KVM_REG_ARM_CRM_SHIFT)     | \
+> +					(14ULL << KVM_REG_ARM_32_CRN_SHIFT)  | \
+> +					( 0ULL << KVM_REG_ARM_OPC1_SHIFT)    | \
+> +					( 1ULL << KVM_REG_ARM_32_OPC2_SHIFT))
+> +#define KVM_REG_ARM_TIMER_CNT		(KVM_REG_ARM_64_CP15 | \
+> +					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
+> +					( 1ULL << KVM_REG_ARM_OPC1_SHIFT))
+> +#define KVM_REG_ARM_TIMER_CVAL		(KVM_REG_ARM_64_CP15 | \
+> +					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
+> +					( 3ULL << KVM_REG_ARM_OPC1_SHIFT))
+> +
+>  /* Normal registers are mapped as coprocessor 16. */
+>  #define KVM_REG_ARM_CORE		(0x0010 << KVM_REG_ARM_COPROC_SHIFT)
+>  #define KVM_REG_ARM_CORE_REG(name)	(offsetof(struct kvm_regs, name) / 4)
+> diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
+> index c55b608..8d709eb 100644
+> --- a/arch/arm/kvm/arch_timer.c
+> +++ b/arch/arm/kvm/arch_timer.c
+> @@ -18,6 +18,7 @@
+>  
+>  #include <linux/cpu.h>
+>  #include <linux/of_irq.h>
+> +#include <linux/uaccess.h>
+>  #include <linux/kvm.h>
+>  #include <linux/kvm_host.h>
+>  #include <linux/interrupt.h>
+> @@ -171,6 +172,70 @@ static void kvm_timer_init_interrupt(void *info)
+>  	enable_percpu_irq(timer_irq.irq, 0);
+>  }
+>  
+> +int kvm_arm_num_timer_regs(void)
+> +{
+> +	return 3;
+> +}
+> +
+> +int kvm_arm_copy_timer_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+> +{
+> +	if (put_user(KVM_REG_ARM_TIMER_CTL, uindices))
+> +		return -EFAULT;
+> +	uindices++;
+> +	if (put_user(KVM_REG_ARM_TIMER_CNT, uindices))
+> +		return -EFAULT;
+> +	uindices++;
+> +	if (put_user(KVM_REG_ARM_TIMER_CVAL, uindices))
+> +		return -EFAULT;
+
+So these macros are going to break arm64. Any chance you could introduce
+them at the same time on both platforms? The rest of the work can be
+delayed, but you shouldn't break arm64 (you'd expect me to say that,
+wouldn't you? ;-).
+
+Also, I'd like to keep userspace access out of the timer code itself.
+Low level code shouldn't have to know about that. Can you create proper
+accessors instead, and move whole userspace access to coproc.c?
+
+> +	return 0;
+> +}
+> +
+> +int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> +{
+> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +	void __user *uaddr = (void __user *)(long)reg->addr;
+> +	u64 val;
+> +	int ret;
+> +
+> +	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
+> +	if (ret != 0)
+> +		return ret;
+> +
+> +	switch (reg->id) {
+> +	case KVM_REG_ARM_TIMER_CTL:
+> +		timer->cntv_ctl = val;
+> +		break;
+> +	case KVM_REG_ARM_TIMER_CNT:
+> +		vcpu->kvm->arch.timer.cntvoff = kvm_phys_timer_read() - val;
+
+I just realized what bothers me here: You're computing cntvoff on a per
+vcpu basis, while this is a VM property. Which means that as you're
+restoring vcpus, you'll be changing cntvoff - sounds like a bad idea to me.
+
+The counter is really global. Do we have a way to handle VM-wide
+registers? I think Christoffer was trying to some a similar thing with
+the GIC...
+
+> +		break;
+> +	case KVM_REG_ARM_TIMER_CVAL:
+> +		timer->cntv_cval = val;
+> +		break;
 > +	}
+> +
+> +	return 0;
+> +}
+> +
+> +int kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> +{
+> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +	void __user *uaddr = (void __user *)(long)reg->addr;
+> +	u64 val;
+> +
+> +	switch (reg->id) {
+> +	case KVM_REG_ARM_TIMER_CTL:
+> +		val = timer->cntv_ctl;
+> +		break;
+> +	case KVM_REG_ARM_TIMER_CNT:
+> +		val = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+> +		break;
+> +	case KVM_REG_ARM_TIMER_CVAL:
+> +		val = timer->cntv_cval;
+> +		break;
+> +	}
+> +	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id));
+> +}
+>  
+>  static int kvm_timer_cpu_notify(struct notifier_block *self,
+>  				unsigned long action, void *cpu)
+> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+> index 152d036..a50ffb6 100644
+> --- a/arch/arm/kvm/guest.c
+> +++ b/arch/arm/kvm/guest.c
+> @@ -121,7 +121,8 @@ static unsigned long num_core_regs(void)
+>   */
+>  unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
+>  {
+> -	return num_core_regs() + kvm_arm_num_coproc_regs(vcpu);
+> +	return num_core_regs() + kvm_arm_num_coproc_regs(vcpu)
+> +		+ kvm_arm_num_timer_regs();
 >  }
 >  
->  #define finish_arch_post_lock_switch \
-> @@ -59,6 +62,10 @@ static inline void finish_arch_post_lock_switch(void)
->  	if (test_and_clear_thread_flag(TIF_SWITCH_MM)) {
->  		struct mm_struct *mm = current->mm;
->  		cpu_switch_mm(mm->pgd, mm);
-> +		/*
-> +		 * Preemption disabled in check_and_switch_context().
-> +		 */
-> +		preempt_enable();
+>  /**
+> @@ -133,6 +134,7 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+>  {
+>  	unsigned int i;
+>  	const u64 core_reg = KVM_REG_ARM | KVM_REG_SIZE_U32 | KVM_REG_ARM_CORE;
+> +	int ret;
+>  
+>  	for (i = 0; i < sizeof(struct kvm_regs)/sizeof(u32); i++) {
+>  		if (put_user(core_reg | i, uindices))
+> @@ -140,9 +142,25 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+>  		uindices++;
 >  	}
+>  
+> +	ret = kvm_arm_copy_timer_indices(vcpu, uindices);
+> +	if (ret)
+> +		return ret;
+> +	uindices += kvm_arm_num_timer_regs();
+> +
+>  	return kvm_arm_copy_coproc_indices(vcpu, uindices);
+>  }
+>  
+> +static bool is_timer_reg(u64 index)
+> +{
+> +	switch (index) {
+> +	case KVM_REG_ARM_TIMER_CTL:
+> +	case KVM_REG_ARM_TIMER_CNT:
+> +	case KVM_REG_ARM_TIMER_CVAL:
+> +		return true;
+> +	}
+> +	return false;
+> +}
+> +
+>  int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  {
+>  	/* We currently use nothing arch-specific in upper 32 bits */
+> @@ -153,6 +171,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+>  		return get_core_reg(vcpu, reg);
+>  
+> +	if (is_timer_reg(reg->id))
+> +		return kvm_arm_timer_get_reg(vcpu, reg);
+> +
+>  	return kvm_arm_coproc_get_reg(vcpu, reg);
+>  }
+>  
+> @@ -166,6 +187,9 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+>  		return set_core_reg(vcpu, reg);
+>  
+> +	if (is_timer_reg(reg->id))
+> +		return kvm_arm_timer_set_reg(vcpu, reg);
+> +
+>  	return kvm_arm_coproc_set_reg(vcpu, reg);
 >  }
 
-Will now reboot to test your patch.
+This is otherwise moving in the right direction.
 
-thanks,
-Marc
+Thanks,
+
+	M.
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/510c114b/attachment.sig>
+Jazz is not dead. It just smells funny...
