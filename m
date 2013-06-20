@@ -1,77 +1,74 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Jun 2013 15:21:18 +0100
-Subject: [PATCH v2 04/12] ARM: tlb: don't perform inner-shareable invalidation
- for local BP ops
+Date: Thu, 20 Jun 2013 15:21:22 +0100
+Subject: [PATCH v2 08/12] ARM: spinlock: use inner-shareable dsb variant prior
+ to sev instruction
 In-Reply-To: <1371738086-6707-1-git-send-email-will.deacon@arm.com>
 References: <1371738086-6707-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1371738086-6707-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1371738086-6707-9-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the ASID allocator doesn't require inner-shareable maintenance,
-we can convert the local_bp_flush_all function to perform only
-non-shareable flushing, in a similar manner to the TLB invalidation
-routines.
+When unlocking a spinlock, we use the sev instruction to signal other
+CPUs waiting on the lock. Since sev is not a memory access instruction,
+we require a dsb in order to ensure that the sev is not issued ahead
+of the store placing the lock in an unlocked state.
+
+However, as sev is only concerned with other processors in a
+multiprocessor system, we can restrict the scope of the preceding dsb
+to the inner-shareable domain. Furthermore, we can restrict the scope to
+consider only stores, since there are no independent loads on the unlock
+path.
+
+A side-effect of this change is that a spin_unlock operation no longer
+forces completion of pending TLB invalidation, something which we rely
+on when unlocking runqueues to ensure that CPU migration during TLB
+maintenance routines doesn't cause us to continue before the operation
+has completed.
+
+This patch adds the -ishst suffix to the ARMv7 definition of dsb_sev()
+and adds an inner-shareable dsb to the context-switch path when running
+a preemptible, SMP, v7 kernel.
 
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/tlbflush.h | 22 ++++++++++++++++++++--
- arch/arm/kernel/smp_tlb.c       |  2 +-
- 2 files changed, 21 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/spinlock.h  |  2 +-
+ arch/arm/include/asm/switch_to.h | 10 ++++++++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index 45e3aea..b9c0811 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -531,17 +531,35 @@ static inline void __flush_tlb_kernel_page(unsigned long kaddr)
-  * Branch predictor maintenance is paired with full TLB invalidation, so
-  * there is no need for any barriers here.
-  */
-+static inline void __local_flush_bp_all(void)
-+{
-+	const int zero = 0;
-+	const unsigned int __tlb_flag = __cpu_tlb_flags;
-+
-+	if (tlb_flag(TLB_V6_BP))
-+		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
-+}
-+
- static inline void local_flush_bp_all(void)
+diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+index 6220e9f..5a0261e 100644
+--- a/arch/arm/include/asm/spinlock.h
++++ b/arch/arm/include/asm/spinlock.h
+@@ -46,7 +46,7 @@ static inline void dsb_sev(void)
  {
- 	const int zero = 0;
- 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ #if __LINUX_ARM_ARCH__ >= 7
+ 	__asm__ __volatile__ (
+-		"dsb\n"
++		"dsb ishst\n"
+ 		SEV
+ 	);
+ #else
+diff --git a/arch/arm/include/asm/switch_to.h b/arch/arm/include/asm/switch_to.h
+index fa09e6b..c99e259 100644
+--- a/arch/arm/include/asm/switch_to.h
++++ b/arch/arm/include/asm/switch_to.h
+@@ -4,6 +4,16 @@
+ #include <linux/thread_info.h>
  
-+	__local_flush_bp_all();
- 	if (tlb_flag(TLB_V7_UIS_BP))
--		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
--	else if (tlb_flag(TLB_V6_BP))
- 		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
- }
- 
-+static inline void __flush_bp_all(void)
-+{
-+	const int zero = 0;
-+	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ /*
++ * For v7 SMP cores running a preemptible kernel we may be pre-empted
++ * during a TLB maintenance operation, so execute an inner-shareable dsb
++ * to ensure that the maintenance completes in case we migrate to another
++ * CPU.
++ */
++#if defined(CONFIG_PREEMPT) && defined(CONFIG_SMP) && defined(CONFIG_CPU_V7)
++#define finish_arch_switch(prev)	dsb(ish)
++#endif
 +
-+	__local_flush_bp_all();
-+	if (tlb_flag(TLB_V7_UIS_BP))
-+		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
-+}
-+
- #ifdef CONFIG_ARM_ERRATA_798181
- static inline void dummy_flush_tlb_a15_erratum(void)
- {
-diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
-index cc299b5..5cb5500 100644
---- a/arch/arm/kernel/smp_tlb.c
-+++ b/arch/arm/kernel/smp_tlb.c
-@@ -204,5 +204,5 @@ void flush_bp_all(void)
- 	if (tlb_ops_need_broadcast())
- 		on_each_cpu(ipi_flush_bp_all, NULL, 1);
- 	else
--		local_flush_bp_all();
-+		__flush_bp_all();
- }
++/*
+  * switch_to(prev, next) should switch from task `prev' to `next'
+  * `prev' will never be the same as `next'.  schedule() itself
+  * contains the memory barrier to tell GCC not to cache `current'.
 -- 
 1.8.2.2
