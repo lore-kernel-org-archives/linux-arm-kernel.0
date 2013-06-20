@@ -1,146 +1,245 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 21 Jun 2013 01:05:43 +0200
-Subject: [PATCH v2 00/18] Final Samsung PWM support cleanup
-In-Reply-To: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
-References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <37075296.9Zi1INZ4c4@flatron>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 20 Jun 2013 16:29:03 -0700
+Subject: [PATCH v4 1/4] clk: add support for Rockchip gate clocks
+In-Reply-To: <201306131659.40802.heiko@sntech.de>
+References: <201306131658.36584.heiko@sntech.de>
+ <201306131659.40802.heiko@sntech.de>
+Message-ID: <20130620232903.9136.70323@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Quoting Heiko St?bner (2013-06-13 07:59:40)
+> This adds basic support for gate-clocks on Rockchip SoCs.
+> There are 16 gates in each register and use the HIWORD_MASK
+> mechanism for changing gate settings.
+> 
+> The gate registers form a continuos block which makes the dt node
+> structure a matter of taste, as either all 160 gates can be put into
+> one gate clock spanning all registers or they can be divided into
+> the 10 individual gates containing 16 clocks each.
+> The code supports both approaches.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-On Friday 21 of June 2013 00:12:45 Tomasz Figa wrote:
-> Since we now have a proper Samsung PWM clocksource driver in place,
-> we can proceed with further cleanup of PWM timers support on Samsung
-> SoCs.
-> 
-> This series attempts to achieve this goal by:
->  1) moving remaining Samsung platforms to the new clocksource driver
->  2) removing old clocksource driver
->  3) adding new multiplatform- and DT-aware PWM driver
->  4) moving all Samsung platforms to use the new PWM driver
->  5) removing old PWM driver
->  6) removing all PWM-related code that is not used anymore
-> 
-> Cleaning up the PWM driver is a bit tricky, because the design of
-> current driver makes it completely unsuitable for DT and multiplatform
-> and would require a heavy rework to make it usable, breaking any
-> existing Samsung PWM users by the way. To avoid any breakage I decided
-> to keep the old driver, add new one, move all platforms to it and then
-> remove the old one.
-> 
-> See particular patches for more detailed descriptions.
-> 
-> On S3C6410-based Tiny6410 (Mini6410-compatible), after enabling
-> pwm-beeper and Exynos4210-based Origen board (with PWM0 attached to a
-> scope):
-> 
-> Tested-by: Tomasz Figa <tomasz.figa@gmail.com>
+I've taken this patch into clk-next for 3.11. Perhaps in the future the
+gate-clock binding can be enhanced to allow for this kind of clock
+globbing and this driver can disappear entirely.
 
-Just tested on SMDK6410 with PWM backlight and works fine.
+Regards,
+Mike
 
-Best regards,
-Tomasz
-
-> Changes since v1:
->  - made sure that suspend/resume is handled correctly in both
->    clocksource and PWM drivers,
->  - fixed incorrect definition of AUTORELOAD bit for channel 4,
->  - fixed order of registering PWM device and calling samsung_bl_set(),
->    which assumes that PWM device has been already registered,
->  - corrected commit messages of several patches,
->  - addressed all the valid comments from reviewers, including cleanup
->    of most code originally copied from previous PWM driver,
->  - rebased on top of current Kgene's for-next,
->  - tested on Exynos4210, verifying correct PWM output with a scope.
+> ---
+>  .../devicetree/bindings/clock/rockchip.txt         |   74 +++++++++++++++
+>  drivers/clk/Makefile                               |    1 +
+>  drivers/clk/rockchip/Makefile                      |    5 ++
+>  drivers/clk/rockchip/clk-rockchip.c                |   94 ++++++++++++++++++++
+>  4 files changed, 174 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/rockchip.txt
+>  create mode 100644 drivers/clk/rockchip/Makefile
+>  create mode 100644 drivers/clk/rockchip/clk-rockchip.c
 > 
-> Needs testing on other platforms as I could only compile test for them.
-> Tomasz Figa (18):
->   ARM: SAMSUNG: Unify base address definitions of timer block
->   ARM: SAMSUNG: Add new PWM platform device
->   ARM: SAMSUNG: Set PWM platform data
->   clocksource: samsung_pwm_timer: Cache clocksource register address
->   clocksource: samsung_pwm_timer: Do not use clocksource_mmio
->   clocksource: samsung_pwm_timer: Handle suspend/resume correctly
->   ARM: SAMSUNG: Move all platforms to new clocksource driver
->   ARM: SAMSUNG: Remove old samsung-time driver
->   ARM: SAMSUNG: Remove unused PWM timer IRQ chip code
->   pwm: samsung: Rename to pwm-samsung-legacy
->   pwm: Add new pwm-samsung driver
->   ARM: SAMSUNG: Rework private data handling in dev-backlight
->   ARM: SAMSUNG: Modify board files to use new PWM platform device
->   pwm: Remove superseded pwm-samsung-legacy driver
->   ARM: SAMSUNG: Remove old PWM timer platform devices
->   ARM: SAMSUNG: Remove pwm-clock infrastructure
->   ARM: SAMSUNG: Remove remaining uses of plat/regs-timer.h header
->   ARM: SAMSUNG: Remove plat/regs-timer.h header
-> 
->  arch/arm/Kconfig                                   |   1 -
->  arch/arm/mach-s3c24xx/Kconfig                      |  12 +-
->  arch/arm/mach-s3c24xx/clock-s3c2410.c              |   1 -
->  arch/arm/mach-s3c24xx/clock-s3c2412.c              |   1 -
->  arch/arm/mach-s3c24xx/clock-s3c2416.c              |   2 -
->  arch/arm/mach-s3c24xx/clock-s3c2443.c              |   2 -
->  arch/arm/mach-s3c24xx/common.c                     |  27 +
->  arch/arm/mach-s3c24xx/include/mach/map.h           |   2 +
->  arch/arm/mach-s3c24xx/mach-h1940.c                 |   4 +-
->  arch/arm/mach-s3c24xx/mach-rx1950.c                |   5 +-
->  arch/arm/mach-s3c64xx/Kconfig                      |   4 +-
->  arch/arm/mach-s3c64xx/clock.c                      |   2 -
->  arch/arm/mach-s3c64xx/common.c                     |  32 +-
->  arch/arm/mach-s3c64xx/include/mach/irqs.h          |   8 -
->  arch/arm/mach-s3c64xx/include/mach/map.h           |   1 +
->  arch/arm/mach-s3c64xx/irq-pm.c                     |   2 -
->  arch/arm/mach-s3c64xx/mach-crag6410.c              |   4 +-
->  arch/arm/mach-s3c64xx/mach-hmt.c                   |   4 +-
->  arch/arm/mach-s3c64xx/mach-smartq.c                |   4 +-
->  arch/arm/mach-s3c64xx/mach-smdk6410.c              |   5 +-
->  arch/arm/mach-s5p64x0/Kconfig                      |   4 +-
->  arch/arm/mach-s5p64x0/clock-s5p6440.c              |   2 -
->  arch/arm/mach-s5p64x0/clock-s5p6450.c              |   2 -
->  arch/arm/mach-s5p64x0/common.c                     |  27 +
->  arch/arm/mach-s5p64x0/include/mach/irqs.h          |   2 -
->  arch/arm/mach-s5p64x0/include/mach/map.h           |   1 +
->  arch/arm/mach-s5p64x0/mach-smdk6440.c              |   5 +-
->  arch/arm/mach-s5p64x0/mach-smdk6450.c              |   5 +-
->  arch/arm/mach-s5p64x0/pm.c                         |   3 -
->  arch/arm/mach-s5pc100/Kconfig                      |   2 +-
->  arch/arm/mach-s5pc100/clock.c                      |   2 -
->  arch/arm/mach-s5pc100/common.c                     |  28 +
->  arch/arm/mach-s5pc100/include/mach/irqs.h          |   2 -
->  arch/arm/mach-s5pc100/include/mach/map.h           |   1 +
->  arch/arm/mach-s5pc100/mach-smdkc100.c              |   5 +-
->  arch/arm/mach-s5pv210/Kconfig                      |   2 +-
->  arch/arm/mach-s5pv210/clock.c                      |   1 -
->  arch/arm/mach-s5pv210/common.c                     |  28 +
->  arch/arm/mach-s5pv210/include/mach/irqs.h          |   2 -
->  arch/arm/mach-s5pv210/include/mach/map.h           |   1 +
->  arch/arm/mach-s5pv210/mach-smdkv210.c              |   5 +-
->  arch/arm/mach-s5pv210/pm.c                         |  10 -
->  arch/arm/plat-samsung/Kconfig                      |  14 -
->  arch/arm/plat-samsung/Makefile                     |   3 -
->  arch/arm/plat-samsung/dev-backlight.c              |  61 +-
->  arch/arm/plat-samsung/devs.c                       |  42 +-
->  arch/arm/plat-samsung/include/plat/clock.h         |   4 -
->  arch/arm/plat-samsung/include/plat/devs.h          |   1 +
->  arch/arm/plat-samsung/include/plat/irq-vic-timer.h |  13 -
->  arch/arm/plat-samsung/include/plat/irqs.h          |   9 -
->  arch/arm/plat-samsung/include/plat/pwm-clock.h     |  81 ---
->  arch/arm/plat-samsung/include/plat/pwm-core.h      |  24 +
->  arch/arm/plat-samsung/include/plat/regs-timer.h    | 124 ----
->  arch/arm/plat-samsung/include/plat/samsung-time.h  |  23 -
->  arch/arm/plat-samsung/irq-vic-timer.c              |  98 ---
->  arch/arm/plat-samsung/pwm-clock.c                  | 474 --------------
-> arch/arm/plat-samsung/s5p-irq.c                    |   4 -
->  arch/arm/plat-samsung/samsung-time.c               | 394 ------------
->  drivers/clocksource/samsung_pwm_timer.c            |  84 +--
->  drivers/pwm/pwm-samsung.c                          | 694
-> ++++++++++++++------- 60 files changed, 766 insertions(+), 1644
-> deletions(-)
->  delete mode 100644 arch/arm/plat-samsung/include/plat/irq-vic-timer.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/pwm-clock.h
->  create mode 100644 arch/arm/plat-samsung/include/plat/pwm-core.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-timer.h
->  delete mode 100644 arch/arm/plat-samsung/irq-vic-timer.c
->  delete mode 100644 arch/arm/plat-samsung/pwm-clock.c
->  delete mode 100644 arch/arm/plat-samsung/samsung-time.c
+> diff --git a/Documentation/devicetree/bindings/clock/rockchip.txt b/Documentation/devicetree/bindings/clock/rockchip.txt
+> new file mode 100644
+> index 0000000..a891c82
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/rockchip.txt
+> @@ -0,0 +1,74 @@
+> +Device Tree Clock bindings for arch-rockchip
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +== Gate clocks ==
+> +
+> +The gate registers form a continuos block which makes the dt node
+> +structure a matter of taste, as either all gates can be put into
+> +one gate clock spanning all registers or they can be divided into
+> +the 10 individual gates containing 16 clocks each.
+> +The code supports both approaches.
+> +
+> +Required properties:
+> +- compatible : "rockchip,rk2928-gate-clk"
+> +- reg : shall be the control register address(es) for the clock.
+> +- #clock-cells : from common clock binding; shall be set to 1
+> +- clock-output-names : the corresponding gate names that the clock controls
+> +- clocks : should contain the parent clock for each individual gate,
+> +  therefore the number of clocks elements should match the number of
+> +  clock-output-names
+> +
+> +Example using multiple gate clocks:
+> +
+> +               clk_gates0: gate-clk at 200000d0 {
+> +                       compatible = "rockchip,rk2928-gate-clk";
+> +                       reg = <0x200000d0 0x4>;
+> +                       clocks = <&dummy>, <&dummy>,
+> +                                <&dummy>, <&dummy>,
+> +                                <&dummy>, <&dummy>,
+> +                                <&dummy>, <&dummy>,
+> +                                <&dummy>, <&dummy>,
+> +                                <&dummy>, <&dummy>,
+> +                                <&dummy>, <&dummy>,
+> +                                <&dummy>, <&dummy>;
+> +
+> +                       clock-output-names =
+> +                               "gate_core_periph", "gate_cpu_gpll",
+> +                               "gate_ddrphy", "gate_aclk_cpu",
+> +                               "gate_hclk_cpu", "gate_pclk_cpu",
+> +                               "gate_atclk_cpu", "gate_i2s0",
+> +                               "gate_i2s0_frac", "gate_i2s1",
+> +                               "gate_i2s1_frac", "gate_i2s2",
+> +                               "gate_i2s2_frac", "gate_spdif",
+> +                               "gate_spdif_frac", "gate_testclk";
+> +
+> +                       #clock-cells = <1>;
+> +               };
+> +
+> +               clk_gates1: gate-clk at 200000d4 {
+> +                       compatible = "rockchip,rk2928-gate-clk";
+> +                       reg = <0x200000d4 0x4>;
+> +                       clocks = <&xin24m>, <&xin24m>,
+> +                                <&xin24m>, <&dummy>,
+> +                                <&dummy>, <&xin24m>,
+> +                                <&xin24m>, <&dummy>,
+> +                                <&xin24m>, <&dummy>,
+> +                                <&xin24m>, <&dummy>,
+> +                                <&xin24m>, <&dummy>,
+> +                                <&xin24m>, <&dummy>;
+> +
+> +                       clock-output-names =
+> +                               "gate_timer0", "gate_timer1",
+> +                               "gate_timer2", "gate_jtag",
+> +                               "gate_aclk_lcdc1_src", "gate_otgphy0",
+> +                               "gate_otgphy1", "gate_ddr_gpll",
+> +                               "gate_uart0", "gate_frac_uart0",
+> +                               "gate_uart1", "gate_frac_uart1",
+> +                               "gate_uart2", "gate_frac_uart2",
+> +                               "gate_uart3", "gate_frac_uart3";
+> +
+> +                       #clock-cells = <1>;
+> +               };
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index f51b52b..2e2e957 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -25,6 +25,7 @@ ifeq ($(CONFIG_COMMON_CLK), y)
+>  obj-$(CONFIG_ARCH_MMP)         += mmp/
+>  endif
+>  obj-$(CONFIG_MACH_LOONGSON1)   += clk-ls1x.o
+> +obj-$(CONFIG_ARCH_ROCKCHIP)    += rockchip/
+>  obj-$(CONFIG_ARCH_SUNXI)       += sunxi/
+>  obj-$(CONFIG_ARCH_U8500)       += ux500/
+>  obj-$(CONFIG_ARCH_VT8500)      += clk-vt8500.o
+> diff --git a/drivers/clk/rockchip/Makefile b/drivers/clk/rockchip/Makefile
+> new file mode 100644
+> index 0000000..8d3aefa
+> --- /dev/null
+> +++ b/drivers/clk/rockchip/Makefile
+> @@ -0,0 +1,5 @@
+> +#
+> +# Rockchip Clock specific Makefile
+> +#
+> +
+> +obj-y  += clk-rockchip.o
+> diff --git a/drivers/clk/rockchip/clk-rockchip.c b/drivers/clk/rockchip/clk-rockchip.c
+> new file mode 100644
+> index 0000000..ff990c4
+> --- /dev/null
+> +++ b/drivers/clk/rockchip/clk-rockchip.c
+> @@ -0,0 +1,94 @@
+> +/*
+> + * Copyright (c) 2013 MundoReader S.L.
+> + * Author: Heiko Stuebner <heiko@sntech.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +
+> +static DEFINE_SPINLOCK(clk_lock);
+> +
+> +/*
+> + * Gate clocks
+> + */
+> +
+> +static void __init rk2928_gate_clk_init(struct device_node *node,
+> +                                        void *data)
+> +{
+> +       struct clk_onecell_data *clk_data;
+> +       const char *clk_parent;
+> +       const char *clk_name;
+> +       void __iomem *reg;
+> +       void __iomem *reg_idx;
+> +       int flags;
+> +       int qty;
+> +       int reg_bit;
+> +       int clkflags = CLK_SET_RATE_PARENT;
+> +       int i;
+> +
+> +       qty = of_property_count_strings(node, "clock-output-names");
+> +       if (qty < 0) {
+> +               pr_err("%s: error in clock-output-names %d\n", __func__, qty);
+> +               return;
+> +       }
+> +
+> +       if (qty == 0) {
+> +               pr_info("%s: nothing to do\n", __func__);
+> +               return;
+> +       }
+> +
+> +       reg = of_iomap(node, 0);
+> +
+> +       clk_data = kzalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
+> +       if (!clk_data)
+> +               return;
+> +
+> +       clk_data->clks = kzalloc(qty * sizeof(struct clk *), GFP_KERNEL);
+> +       if (!clk_data->clks) {
+> +               kfree(clk_data);
+> +               return;
+> +       }
+> +
+> +       flags = CLK_GATE_HIWORD_MASK | CLK_GATE_SET_TO_DISABLE;
+> +
+> +       for (i = 0; i < qty; i++) {
+> +               of_property_read_string_index(node, "clock-output-names",
+> +                                             i, &clk_name);
+> +
+> +               /* ignore empty slots */
+> +               if (!strcmp("reserved", clk_name))
+> +                       continue;
+> +
+> +               clk_parent = of_clk_get_parent_name(node, i);
+> +
+> +               /* keep all gates untouched for now */
+> +               clkflags |= CLK_IGNORE_UNUSED;
+> +
+> +               reg_idx = reg + (4 * (i / 16));
+> +               reg_bit = (i % 16);
+> +
+> +               clk_data->clks[i] = clk_register_gate(NULL, clk_name,
+> +                                                     clk_parent, clkflags,
+> +                                                     reg_idx, reg_bit,
+> +                                                     flags,
+> +                                                     &clk_lock);
+> +               WARN_ON(IS_ERR(clk_data->clks[i]));
+> +       }
+> +
+> +       clk_data->clk_num = qty;
+> +
+> +       of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> +}
+> +CLK_OF_DECLARE(rk2928_gate, "rockchip,rk2928-gate-clk", rk2928_gate_clk_init);
+> -- 
+> 1.7.10.4
