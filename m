@@ -1,48 +1,59 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Thu, 20 Jun 2013 21:10:22 +0200
-Subject: [PATCHv7 1/1] Add support for GMT G762/G763 PWM fan controllers
-In-Reply-To: <20130620013823.GC29521@roeck-us.net> (Guenter Roeck's message of
- "Wed, 19 Jun 2013 18:38:23 -0700")
-References: <87ip19sxmd.fsf@natisbad.org> <20130620013823.GC29521@roeck-us.net>
-Message-ID: <87ehbwvbs1.fsf@natisbad.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 20 Jun 2013 13:26:54 -0600
+Subject: [PATCH] pinctrl: document the pinctrl PM states
+In-Reply-To: <20130620063823.GD5523@atomide.com>
+References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
+ <51BA1FE7.4000900@wwwdotorg.org>
+ <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
+ <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
+ <51C20E3A.8090304@wwwdotorg.org> <20130620063823.GD5523@atomide.com>
+Message-ID: <51C3577E.6040709@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+On 06/20/2013 12:38 AM, Tony Lindgren wrote:
+> * Stephen Warren <swarren@wwwdotorg.org> [130619 13:08]:
+>> On 06/17/2013 01:20 AM, Tony Lindgren wrote:
+...
+>>> Below are the pin remuxing cases I'm aware of:
+>> ...
+>>> Then for dealing with the above examples, I think we already have a
+>>> pretty good setup in pinctrl framework to deal with this with the
+>>> named modes. But I think that to do this properly with the named
+>>> modes we should have named modes like the following:
+>>>
+>>> "static" && ("active" || "idle")
+>>> "static" && ("rx" || "tx")
+>>>
+>>> Here the "static" pins would be set during driver probe and never
+>>> need to change until the driver is unloaded. This is close to what we
+>>> currently call "default". But we should probably make it clear that
+>>> these will not change to avoid confusion. See below for more info.
+>>>
+>>> The the non-static states like "active"/"idle", or "rx"/"tx", can
+>>> be set in addition to "static", but they should not be subsets of
+>>> "static" to avoid the issues Stephen described earlier. This way we
+>>> allow the named modes to do the work for us while protecting the
+>>> claimed pins.
+>>
+>> Yes, I think this can certainly work conceptually. It's equivalent to
+>> pre-computing which parts of the overall state don't change between the
+>> currently-defined "global" active/idle states and then applying the
+>> diffs at runtime - rather like what I suggested before, but without the
+>> pinctrl code having to do the diff at runtime. I'm not sure if I have
+>> (yet) a strong opinion on whether allowing multiple states to be active
+>> at once (i.e. static plus active) is the correct way to go. Maybe once
+>> I've finished reading the thread...
+> 
+> I don't think there's any issue for having multiple sets active the same
+> is an issue, we're already doing it quite a bit although for different
+> device drivers so we have the framework ready for that already.
 
-Guenter Roeck <linux@roeck-us.net> writes:
+I assume you mean there shouldn't be any issue *modifying* the pinctrl
+API to allow multiple states to be active at once? And where you're
+talking about having multiple sets active at once already, you're
+talking about some other API?
 
-> On Wed, Jun 19, 2013 at 09:34:34PM +0200, Arnaud Ebalard wrote:
->> 
->> GMT G762/763 fan speed PWM controller is connected directly to a fan
->> and performs closed-loop or open-loop control of the fan speed. Two
->> modes - PWM or DC - are supported by the chip. Introduced driver
->> provides various knobs to control the operations of the chip (via
->> sysfs interface). Specific characteristics of the system can be passed
->> either using board init code or via DT. Documentation for both the
->> driver and DT bindings are also provided.
->> 
->> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
->
-> Couple of additional nitpicks plus a bug.
->
->> +static void g762_of_clock_disable(struct i2c_client *client)
->> +{
->> +	struct g762_data *data = i2c_get_clientdata(client);
->> +
->> +	if (data->clk)
->> +		return;
->
-> Guess this should be 
-> 	if (!data->clk)
-> 		return;
->
-> Small but significant difference ...
-
-I am going to find me a hole to hide in. Thanks for catching
-this. Resending a v8 after fixing it and the other points you
-pointed.
-
-Cheers,
-
-a+
+Right now, pinctrl_select_state() de-activates the old state while
+activating the new state, so it's not possible to have more than one
+active at once.
