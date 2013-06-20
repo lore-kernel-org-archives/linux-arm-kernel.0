@@ -1,86 +1,74 @@
-From: nishanth.p@gmail.com (Nishanth Peethambaran)
-Date: Thu, 20 Jun 2013 14:25:32 +0530
-Subject: [Linaro-mm-sig] [RFC 2/3] ARM: dma-mapping: Pass DMA attrs as
- IOMMU prot
-In-Reply-To: <20130620.112439.1330557591655135630.hdoyu@nvidia.com>
-References: <1371707384-30037-1-git-send-email-hdoyu@nvidia.com>
- <1371707384-30037-3-git-send-email-hdoyu@nvidia.com>
- <CAMcxFTRnnCnPnvMi89r7rUsN4xeYzZGqy9s5v5ukm_fJ_d_RGg@mail.gmail.com>
- <20130620.112439.1330557591655135630.hdoyu@nvidia.com>
-Message-ID: <CAMcxFTS0dUUEfGj-=-cb_rdfy+qWvtsaoR6Tv+-x05XX0mZmmw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 20 Jun 2013 14:25:44 +0530
+Subject: [PATCH v2 6/7] ARM: davinci: dmxxx: gpio device creation
+In-Reply-To: <1371202532-14628-7-git-send-email-avinashphilip@ti.com>
+References: <1371202532-14628-1-git-send-email-avinashphilip@ti.com>
+ <1371202532-14628-7-git-send-email-avinashphilip@ti.com>
+Message-ID: <51C2C390.7090301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hiroshi,
+On 6/14/2013 3:05 PM, Philip Avinash wrote:
+> Create davinci gpio device and remove gpio references in
+> davinci_soc_info structure for dmxxx platforms. Also add Memory and IRQ
+> resources for GPIO platform device.
+> 
+> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+> Changes since v1:
+> 	- Add commit message
+> 
+>  arch/arm/mach-davinci/board-dm355-evm.c     |   27 ++++++++++++++++++++++++++
+>  arch/arm/mach-davinci/board-dm355-leopard.c |    1 +
+>  arch/arm/mach-davinci/board-dm365-evm.c     |   28 +++++++++++++++++++++++++++
+>  arch/arm/mach-davinci/board-dm644x-evm.c    |   26 +++++++++++++++++++++++++
+>  arch/arm/mach-davinci/board-dm646x-evm.c    |   27 ++++++++++++++++++++++++++
+>  arch/arm/mach-davinci/board-neuros-osd2.c   |    1 +
+>  arch/arm/mach-davinci/dm355.c               |    4 ----
+>  arch/arm/mach-davinci/dm365.c               |    5 -----
+>  arch/arm/mach-davinci/dm644x.c              |    4 ----
+>  arch/arm/mach-davinci/dm646x.c              |    4 ----
+>  arch/arm/mach-davinci/include/mach/common.h |    2 ++
+>  11 files changed, 112 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+> index c2a0a67..05e6e86 100644
+> --- a/arch/arm/mach-davinci/board-dm355-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm355-evm.c
+> @@ -28,9 +28,11 @@
+>  
+>  #include <linux/platform_data/i2c-davinci.h>
+>  #include <mach/serial.h>
+> +#include <mach/common.h>
+>  #include <linux/platform_data/mtd-davinci.h>
+>  #include <linux/platform_data/mmc-davinci.h>
+>  #include <linux/platform_data/usb-davinci.h>
+> +#include <linux/platform_data/gpio-davinci.h>
+>  
+>  #include "davinci.h"
+>  
+> @@ -376,9 +378,34 @@ static struct spi_board_info dm355_evm_spi_info[] __initconst = {
+>  	},
+>  };
+>  
+> +static struct resource dm355_gpio_resources[] = {
+> +	{ /* registers */
+> +		.start	= DAVINCI_GPIO_BASE,
+> +		.end	= DAVINCI_GPIO_BASE + SZ_4K - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	{ /* interrupt */
+> +		.start	= IRQ_DM355_GPIOBNK0,
+> +		.end	= IRQ_DM355_GPIOBNK6,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
 
-My preference would be to keep the iommu prot flags separate from
-dma-mapping attrs.
-dma-attrs have options which are not related to iommu - like having
-ARM kernel mapping.
-iommu.h is at a much lower level where we can define prot flags which
-are useful for iommu page-table management.
+Don't add these resource in board files. Granted we are not going to add
+more board files, but that does not mean we add soc specific data into
+board files. You need to move this into the respective SoC files.
 
-Thinking again on it, I feel the translation of dma-attr should happen
-when dma-mapping code makes calls to " iommu mapping" API.
-"iommu mapping" API which does iova management and make iommu API
-calls could be taken out from dma-mapping.c, for which I see
-discussion already happening for arm64.
-
-If devices allocate via dma-mapping API, physical mem allocation, iova
-allocation and iommu mapping happens internally.
-Devices may allocate physical memory using any allocator (say ION
-including carveout area), use "iommu mapping" API which will do iova
-allocation and iommu mapping. The prot flags could be useful in this
-case as well - not sure whether we would need dma-attrs here.
-
- - Nishanth Peethambaran
-
-- Nishanth Peethambaran
-  +91-9448074166
-
-
-
-On Thu, Jun 20, 2013 at 1:54 PM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> Hi Nishanth,
->
-> Nishanth Peethambaran <nishanth.p@gmail.com> wrote @ Thu, 20 Jun 2013 10:07:00 +0200:
->
->> It would be better to define a prot flag bit in iommu API and convert
->> the attrs to prot flag bit in dma-mapping aPI before calling the iommu
->> API.
->
-> That's the 1st option.
->
->> On Thu, Jun 20, 2013 at 11:19 AM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> ....
->> > @@ -1280,7 +1281,7 @@ ____iommu_create_mapping(struct device *dev, dma_addr_t *req,
->> >                                 break;
->> >
->> >                 len = (j - i) << PAGE_SHIFT;
->> > -               ret = iommu_map(mapping->domain, iova, phys, len, 0);
->> > +               ret = iommu_map(mapping->domain, iova, phys, len, (int)attrs);
->>
->> Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
->> prot flag bit which needs to be defined in iommu.h
->
-> Both DMA_ATTR_READ_ONLY and IOMMU_READ are just logical bit in their
-> layers respectively and eventually it's converted to H/W dependent
-> bit.
->
-> If IOMMU is considered as one of specific case of DMA, sharing
-> dma_attr between IOMMU and DMA may not be so bad. IIRC, ARM:
-> dma-mapping API was implemented based on this concept(?).
->
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index d8f98b1..161a1b0 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -755,7 +755,7 @@ int iommu_domain_has_cap(struct iommu_domain *domain,
->  EXPORT_SYMBOL_GPL(iommu_domain_has_cap);
->
->  int iommu_map(struct iommu_domain *domain, unsigned long iova,
-> -             phys_addr_t paddr, size_t size, int prot)
-> +             phys_addr_t paddr, size_t size, struct dma_attr *attrs)
->  {
->         unsigned long orig_iova = iova;
->         unsigned int min_pagesz;
+Thanks,
+Sekhar
