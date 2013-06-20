@@ -1,33 +1,50 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 20 Jun 2013 16:50:09 +0200
-Subject: [PATCH 0/6] ARM: dts: imx27 Phytec PhyCARD-S
-Message-ID: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
+Date: Thu, 20 Jun 2013 16:50:14 +0200
+Subject: [PATCH 5/6] ARM: dts: imx27 cpufreq-cpu0 frequencies
+In-Reply-To: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
+References: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1371739815-6666-6-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Set operating-points for imx27. There is no regulator support, so the
+voltages are 0. The frequencies should be the same for all imx27 boards,
+so it is defined here and can be overwritten if necessary.
 
-This series adds some device nodes for imx27 and a board file for Phytec
-PhyCARD-S. It is based on shawn's branch "imx/dt".
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ arch/arm/boot/dts/imx27.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-Regards,
-
-Markus
-
-
-Fabio Estevam (2):
-      ARM: mx27: Replace clk_register_clkdev with clock DT lookup
-      ARM: imx27: Use 'AITC' for the interrupt controller name
-
-Markus Pargmann (4):
-      ARM: dts: imx27: Add imx framebuffer device
-      ARM: dts: imx27: Add 1-wire
-      ARM: dts: imx27 cpufreq-cpu0 frequencies
-      ARM: dts: Add device tree support for phycard pca100
-
- arch/arm/boot/dts/Makefile                   |   1 +
- arch/arm/boot/dts/imx27-phytec-phycard-S.dts | 195 +++++++++++++++++++++++++++
- arch/arm/boot/dts/imx27.dtsi                 |  54 +++++++-
- arch/arm/mach-imx/Kconfig                    |   1 +
- 4 files changed, 248 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx27-phytec-phycard-S.dts
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index e883e77..3ebd98a 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -47,6 +47,25 @@
+ 		};
+ 	};
+ 
++	cpus {
++		#size-cells = <0>;
++		#address-cells = <1>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "fsl,imx27", "arm,arm926ejs";
++			reg = <0>;
++			operating-points = <
++				/* kHz  uV (No regulator support) */
++				133000  0
++				399000  0
++			>;
++			clock-latency = <61036>; /* two CLK32 periods */
++			clocks = <&clks 18>;
++			clock-names = "cpu";
++		};
++	};
++
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-- 
+1.8.2.1
