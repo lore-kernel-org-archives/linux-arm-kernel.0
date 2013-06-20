@@ -1,89 +1,170 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 20 Jun 2013 10:27:44 +0200
-Subject: [PATCH RFC 0/2] Extend multi_v7_defconfig
-In-Reply-To: <201306201002.01702.arnd@arndb.de>
-References: <1371664384-24974-1-git-send-email-soren.brinkmann@xilinx.com>
- <201306192046.41005.arnd@arndb.de> <51C291D0.6000401@monstr.eu>
- <201306201002.01702.arnd@arndb.de>
-Message-ID: <51C2BD00.4000800@monstr.eu>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 20 Jun 2013 10:26:11 +0200
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <20130620081733.GN2718@n2100.arm.linux.org.uk>
+References: <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
+ <1371548849.4276.6.camel@weser.hi.pengutronix.de>
+ <008601ce6cb0$2c8cec40$85a6c4c0$%dae@samsung.com>
+ <1371637326.4230.24.camel@weser.hi.pengutronix.de>
+ <00ae01ce6cd9$f4834630$dd89d290$%dae@samsung.com>
+ <1371645247.4230.41.camel@weser.hi.pengutronix.de>
+ <CAAQKjZNJD4HpnJQ7iE+Gez36066M6U0YQeUEdA0+UcSOKqeghg@mail.gmail.com>
+ <20130619182925.GL2718@n2100.arm.linux.org.uk>
+ <00da01ce6d81$76eb3d60$64c1b820$%dae@samsung.com>
+ <1371714427.4230.64.camel@weser.hi.pengutronix.de>
+ <20130620081733.GN2718@n2100.arm.linux.org.uk>
+Message-ID: <1371716771.4114.5.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2013 10:02 AM, Arnd Bergmann wrote:
-> On Thursday 20 June 2013, Michal Simek wrote:
->> On 06/19/2013 08:46 PM, Arnd Bergmann wrote:
->>> On Wednesday 19 June 2013, Soren Brinkmann wrote:
->>>> I don't know how much a defconfig is supposed to provide, hence as RFC.
->>>> This patches are needed for booting Zynq into a minimum ramfs based
->>>> system with a serial console.
->>>
->>> In my opinion we should provide enable all the platform specific drivers
->>> in the defconfigs, as well as everything needed to boot the system,
->>> to get proper compile coverage as well as the ability to test changes
->>> easily. Your patches look good. Michal, would you apply them and
->>> send another pull request or should I just take them directly?
->>
->> Soren asked me 2 days ago if make sense to create zynq defconfig or not.
->> I just suggested him to better extend this multi_v7_defconfig.
->> But still question is if we can/should create zynq specific defconfig?
->> Or are you going to remove all of these platform specific defconfig?
+Am Donnerstag, den 20.06.2013, 09:17 +0100 schrieb Russell King - ARM
+Linux:
+> On Thu, Jun 20, 2013 at 09:47:07AM +0200, Lucas Stach wrote:
+> > Am Donnerstag, den 20.06.2013, 15:43 +0900 schrieb Inki Dae:
+> > > 
+> > > > -----Original Message-----
+> > > > From: dri-devel-bounces+inki.dae=samsung.com at lists.freedesktop.org
+> > > > [mailto:dri-devel-bounces+inki.dae=samsung.com at lists.freedesktop.org] On
+> > > > Behalf Of Russell King - ARM Linux
+> > > > Sent: Thursday, June 20, 2013 3:29 AM
+> > > > To: Inki Dae
+> > > > Cc: linux-fbdev; DRI mailing list; Kyungmin Park; myungjoo.ham; YoungJun
+> > > > Cho; linux-media at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > > > Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+> > > > framework
+> > > > 
+> > > > On Thu, Jun 20, 2013 at 12:10:04AM +0900, Inki Dae wrote:
+> > > > > On the other hand, the below shows how we could enhance the conventional
+> > > > > way with my approach (just example):
+> > > > >
+> > > > > CPU -> DMA,
+> > > > >         ioctl(qbuf command)              ioctl(streamon)
+> > > > >               |                                               |
+> > > > >               |                                               |
+> > > > >         qbuf  <- dma_buf_sync_get   start streaming <- syncpoint
+> > > > >
+> > > > > dma_buf_sync_get just registers a sync buffer(dmabuf) to sync object.
+> > > > And
+> > > > > the syncpoint is performed by calling dma_buf_sync_lock(), and then DMA
+> > > > > accesses the sync buffer.
+> > > > >
+> > > > > And DMA -> CPU,
+> > > > >         ioctl(dqbuf command)
+> > > > >               |
+> > > > >               |
+> > > > >         dqbuf <- nothing to do
+> > > > >
+> > > > > Actual syncpoint is when DMA operation is completed (in interrupt
+> > > > handler):
+> > > > > the syncpoint is performed by calling dma_buf_sync_unlock().
+> > > > > Hence,  my approach is to move the syncpoints into just before dma
+> > > > access
+> > > > > as long as possible.
+> > > > 
+> > > > What you've just described does *not* work on architectures such as
+> > > > ARMv7 which do speculative cache fetches from memory at any time that
+> > > > that memory is mapped with a cacheable status, and will lead to data
+> > > > corruption.
+> > > 
+> > > I didn't explain that enough. Sorry about that. 'nothing to do' means that a
+> > > dmabuf sync interface isn't called but existing functions are called. So
+> > > this may be explained again:
+> > >         ioctl(dqbuf command)
+> > >             |
+> > >             |
+> > >         dqbuf <- 1. dma_unmap_sg
+> > >                     2. dma_buf_sync_unlock (syncpoint)
+> > > 
+> > > The syncpoint I mentioned means lock mechanism; not doing cache operation.
+> > > 
+> > > In addition, please see the below more detail examples.
+> > > 
+> > > The conventional way (without dmabuf-sync) is:
+> > > Task A                             
+> > > ----------------------------
+> > >  1. CPU accesses buf          
+> > >  2. Send the buf to Task B  
+> > >  3. Wait for the buf from Task B
+> > >  4. go to 1
+> > > 
+> > > Task B
+> > > ---------------------------
+> > > 1. Wait for the buf from Task A
+> > > 2. qbuf the buf                 
+> > >     2.1 insert the buf to incoming queue
+> > > 3. stream on
+> > >     3.1 dma_map_sg if ready, and move the buf to ready queue
+> > >     3.2 get the buf from ready queue, and dma start.
+> > > 4. dqbuf
+> > >     4.1 dma_unmap_sg after dma operation completion
+> > >     4.2 move the buf to outgoing queue
+> > > 5. back the buf to Task A
+> > > 6. go to 1
+> > > 
+> > > In case that two tasks share buffers, and data flow goes from Task A to Task
+> > > B, we would need IPC operation to send and receive buffers properly between
+> > > those two tasks every time CPU or DMA access to buffers is started or
+> > > completed.
+> > > 
+> > > 
+> > > With dmabuf-sync:
+> > > 
+> > > Task A                             
+> > > ----------------------------
+> > >  1. dma_buf_sync_lock <- synpoint (call by user side)
+> > >  2. CPU accesses buf          
+> > >  3. dma_buf_sync_unlock <- syncpoint (call by user side)
+> > >  4. Send the buf to Task B (just one time)
+> > >  5. go to 1
+> > > 
+> > > 
+> > > Task B
+> > > ---------------------------
+> > > 1. Wait for the buf from Task A (just one time)
+> > > 2. qbuf the buf                 
+> > >     1.1 insert the buf to incoming queue
+> > > 3. stream on
+> > >     3.1 dma_buf_sync_lock <- syncpoint (call by kernel side)
+> > >     3.2 dma_map_sg if ready, and move the buf to ready queue
+> > >     3.3 get the buf from ready queue, and dma start.
+> > > 4. dqbuf
+> > >     4.1 dma_buf_sync_unlock <- syncpoint (call by kernel side)
+> > >     4.2 dma_unmap_sg after dma operation completion
+> > >     4.3 move the buf to outgoing queue
+> > > 5. go to 1
+> > > 
+> > > On the other hand, in case of using dmabuf-sync, as you can see the above
+> > > example, we would need IPC operation just one time. That way, I think we
+> > > could not only reduce performance overhead but also make user application
+> > > simplified. Of course, this approach can be used for all DMA device drivers
+> > > such as DRM. I'm not a specialist in v4l2 world so there may be missing
+> > > point.
+> > > 
+> > 
+> > You already need some kind of IPC between the two tasks, as I suspect
+> > even in your example it wouldn't make much sense to queue the buffer
+> > over and over again in task B without task A writing anything to it. So
+> > task A has to signal task B there is new data in the buffer to be
+> > processed.
 > 
-> We don't have a consistent policy across platforms at the moment.
-> Traditionally we had multiple defconfigs per platform, in some cases
-> one per board, but moving towards one defconfig per platform at
-> the moment.
-
-That's what I though but on the other hand in this process
-all these defconfigs should be removed.
-
-> I guess whether or not to have a separate defconfig for one platform
-> or to use only multi_*_defconfig is a question of how many people
-> would use a zynq_defconfig in practice.
-
-The point is if you look at zynq users than they will just use this zynq_defconfig
-because they know that it is for zynq and also they don't want to
-compile drivers for other platforms which zynq can't use.
->From distribution point of view they want to use only one image because it is just
-easier.
-
-Based on this if there is an option to also add just zynq defconfig, I would prefer
-to also add it.
-
->> Definitely agree that multi_v7 defconfig should enable everything needed
->> to boot the system.
->> Does it also mean that we should also enable all zynq drivers
->> to get better compile coverage?
+> Hang on.  Since when did dma_buf become another inter-process IPC
+> mechanism?  That's *not* it's design goal, and there's other much
+> better mechanisms already provided.
 > 
-> I would say yes.
-> 
-> My feeling is that multi_v7_defconfig should enable all hardware
-> support for the platforms in it, and that users would take it
-> as a starting point if they want to have a configuration for
-> an embedded system, disabling everything they don't need.
+That's why I said out-of-band completion signaling, particularly not
+bound to the dma-buf itself.
 
-I just wanted to be sure because you wrote just drivers for booting
-it means any "minimal" configuration to get it boot not all drivers.
+My thinking was more along the lines of the wayland protocol, where one
+process tells the compositor to use a buf as the pixel data for the next
+frame and promises not to access it while the compositor uses it. When
+the compositor finishes it tells the client that it's now free to reuse
+the buffer. None of this is bound to the dma-buf.
 
-If you are ok, Soren will prepare also specific zynq defconfig file
-and check if there are any missing drivers which are not enabled for zynq
-for multi_v7. I will collect them in one branch and will send pull request.
-
-Thanks,
-Michal
-
-
+Regards,
+Lucas
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/5f5596fd/attachment.sig>
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
