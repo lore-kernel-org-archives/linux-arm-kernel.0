@@ -1,444 +1,1053 @@
 From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Thu, 20 Jun 2013 15:05:21 +0100
-Subject: [PATCH v3 02/10] clocksource:arm_global_timer: Add ARM global timer
- support.
+Date: Thu, 20 Jun 2013 15:05:03 +0100
+Subject: [PATCH v3 01/10] serial:st-asc: Add ST ASC driver.
 In-Reply-To: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
 References: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1371737121-9295-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1371737103-8871-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stuart Menefy <stuart.menefy@st.com>
+This patch adds support to ASC (asynchronous serial controller)
+driver, which is basically a standard serial driver. This IP is common
+across all the ST parts for settop box platforms.
 
-This is a simple driver for the global timer module found in the Cortex
-A9-MP cores from revision r1p0 onwards. This should be able to perform
-the functions of the system timer and the local timer in an SMP system.
+ASC is embedded in ST COMMS IP block. It supports Rx & Tx functionality.
+It support all industry standard baud rates.
 
-The global timer has the following features:
-    The global timer is a 64-bit incrementing counter with an
-auto-incrementing feature. It continues incrementing after sending
-interrupts. The global timer is memory mapped in the private memory
-region.
-    The global timer is accessible to all Cortex-A9 processors in the
-cluster. Each Cortex-A9 processor has a private 64-bit comparator that
-is used to assert a private interrupt when the global timer has reached
-the comparator value. All the Cortex-A9 processors in a design use the
-banked ID, ID27, for this interrupt. ID27 is sent to the Interrupt
-Controller as a Private Peripheral Interrupt. The global timer is
-clocked by PERIPHCLK.
-
-Signed-off-by: Stuart Menefy <stuart.menefy@st.com>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+CC: Stephen Gallimore <stephen.gallimore@st.com>
+CC: Stuart Menefy <stuart.menefy@st.com>
 CC: Arnd Bergmann <arnd@arndb.de>
-CC: Rob Herring <robherring2@gmail.com>
-CC: Linus Walleij <linus.walleij@linaro.org>
-CC: Will Deacon <will.deacon@arm.com>
-CC: Thomas Gleixner <tglx@linutronix.de>
+CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- .../devicetree/bindings/arm/global_timer.txt       |   21 ++
- drivers/clocksource/Kconfig                        |   13 +
- drivers/clocksource/Makefile                       |    1 +
- drivers/clocksource/arm_global_timer.c             |  330 ++++++++++++++++++++
- 4 files changed, 365 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/global_timer.txt
- create mode 100644 drivers/clocksource/arm_global_timer.c
+ .../devicetree/bindings/tty/serial/st-asc.txt      |   18 +
+ drivers/tty/serial/Kconfig                         |   16 +
+ drivers/tty/serial/Makefile                        |    1 +
+ drivers/tty/serial/st-asc.c                        |  939 ++++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |    3 +
+ 5 files changed, 977 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/tty/serial/st-asc.txt
+ create mode 100644 drivers/tty/serial/st-asc.c
 
-diff --git a/Documentation/devicetree/bindings/arm/global_timer.txt b/Documentation/devicetree/bindings/arm/global_timer.txt
+diff --git a/Documentation/devicetree/bindings/tty/serial/st-asc.txt b/Documentation/devicetree/bindings/tty/serial/st-asc.txt
 new file mode 100644
-index 0000000..b64abac
+index 0000000..75d877f
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/global_timer.txt
-@@ -0,0 +1,21 @@
++++ b/Documentation/devicetree/bindings/tty/serial/st-asc.txt
+@@ -0,0 +1,18 @@
++*st-asc(Serial Port)
 +
-+* ARM Global Timer
-+	Cortex-A9 are often associated with a per-core Global timer.
++Required properties:
++- compatible : Should be "st,asc".
++- reg, reg-names, interrupts, interrupt-names	: Standard way to define device
++			resources with names. look in
++			Documentation/devicetree/bindings/resource-names.txt
 +
-+** Timer node required properties:
-+
-+- compatible : Should be "arm,cortex-a9-global-timer"
-+		Driver supports versions r2p0 and above.
-+
-+- interrupts : One interrupt to each core
-+
-+- reg : Specify the base address and the size of the GT timer
-+	register window.
-+
++Optional properties:
++- st,hw-flow-ctrl	bool flag to enable hardware flow control.
++- st,force-m1		bool flat to force asc to be in Mode-1 recommeded
++			for high bit rates (above 19.2K)
 +Example:
-+
-+	timer at 2c000600 {
-+		compatible = "arm,cortex-a9-global-timer";
-+		reg = <0x2c000600 0x20>;
-+		interrupts = <1 13 0xf01>;
-+	};
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index f151c6c..b0c4c42 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -67,6 +67,19 @@ config ARM_ARCH_TIMER
- 	bool
- 	select CLKSRC_OF if OF
++serial at fe440000{
++    compatible    = "st,asc";
++    reg         = <0xfe440000 0x2c>;
++    interrupts     =  <0 209 0>;
++};
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 7e7006f..0c6ddf6 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1484,6 +1484,22 @@ config SERIAL_RP2_NR_UARTS
+ 	  If multiple cards are present, the default limit of 32 ports may
+ 	  need to be increased.
  
-+config ARM_GLOBAL_TIMER
-+	bool
-+	select CLKSRC_OF if OF
++config SERIAL_ST_ASC
++	tristate "ST ASC serial port support"
++	select SERIAL_CORE
 +	help
-+	  This options enables support for the ARM global timer unit
++	  This driver is for the on-chip Asychronous Serial Controller on
++	  STMicroelectronics STixxxx SoCs.
++	  ASC is embedded in ST COMMS IP block. It supports Rx & Tx functionality.
++	  It support all industry standard baud rates.
 +
-+config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-+	bool
-+	depends on ARM_GLOBAL_TIMER
-+	default y
-+	help
-+	 Use ARM global timer clock source as sched_clock
++	  If unsure, say N.
 +
- config CLKSRC_METAG_GENERIC
- 	def_bool y if METAG
- 	help
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 8d979c7..b2363cb 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -28,4 +28,5 @@ obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
- obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
++config SERIAL_ST_ASC_CONSOLE
++	bool "Support for console on ST ASC"
++	depends on SERIAL_ST_ASC=y
++	select SERIAL_CORE_CONSOLE
++
+ endmenu
  
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
-+obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
- obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
-diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+ endif # TTY
+diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+index eedfec4..536ccc7 100644
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -65,6 +65,7 @@ obj-$(CONFIG_SERIAL_KGDB_NMI) += kgdb_nmi.o
+ obj-$(CONFIG_SERIAL_KS8695) += serial_ks8695.o
+ obj-$(CONFIG_SERIAL_OMAP) += omap-serial.o
+ obj-$(CONFIG_SERIAL_ALTERA_UART) += altera_uart.o
++obj-$(CONFIG_SERIAL_ST_ASC) += st-asc.o
+ obj-$(CONFIG_KGDB_SERIAL_CONSOLE) += kgdboc.o
+ obj-$(CONFIG_SERIAL_QE) += ucc_uart.o
+ obj-$(CONFIG_SERIAL_TIMBERDALE)	+= timbuart.o
+diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
 new file mode 100644
-index 0000000..43cd32a
+index 0000000..5edf82f
 --- /dev/null
-+++ b/drivers/clocksource/arm_global_timer.c
-@@ -0,0 +1,330 @@
++++ b/drivers/tty/serial/st-asc.c
+@@ -0,0 +1,939 @@
 +/*
-+ * drivers/clocksource/arm_global_timer.c
++ * st-asc.c: ST Asynchronous serial controller (ASC) driver
 + *
-+ * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
-+ * Author: Stuart Menefy <stuart.menefy@st.com>
++ * Copyright (C) 2003-2013 STMicroelectronics (R&D) Limited
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/clocksource.h>
-+#include <linux/clockchips.h>
-+#include <linux/clk.h>
-+#include <linux/clkdev.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
-+
-+#include <asm/sched_clock.h>
-+#include <asm/mach/irq.h>
-+#include <asm/cputype.h>
-+#include <asm/localtimer.h>
-+
-+#define GT_COUNTER0	0x00
-+#define GT_COUNTER1	0x04
-+
-+#define GT_CONTROL	0x08
-+#define GT_CONTROL_TIMER_ENABLE		BIT(0)  /* this bit is NOT banked */
-+#define GT_CONTROL_COMP_ENABLE		BIT(1)	/* banked */
-+#define GT_CONTROL_IRQ_ENABLE		BIT(2)	/* banked */
-+#define GT_CONTROL_AUTO_INC		BIT(3)	/* banked */
-+
-+#define GT_INT_STATUS	0x0c
-+#define GT_INT_STATUS_EVENT_FLAG	BIT(0)
-+
-+#define GT_COMP0	0x10
-+#define GT_COMP1	0x14
-+#define GT_AUTO_INC	0x18
-+
-+/*
-+ * We are expecting to be clocked by the ARM peripheral clock.
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
 + *
-+ * Note: it is assumed we are using a prescaler value of zero, so this is
-+ * the units for all operations.
 + */
-+static void __iomem *gt_base;
-+static unsigned long gt_clk_rate;
-+static int gt_ppi;
-+static struct clock_event_device __percpu **gt_evt;
-+static DEFINE_PER_CPU(bool, percpu_init_called);
-+static DEFINE_PER_CPU(struct clock_event_device, gt_clockevent);
++
++#if defined(CONFIG_SERIAL_ST_ASC_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
++#define SUPPORT_SYSRQ
++#endif
++
++#include <linux/module.h>
++#include <linux/serial.h>
++#include <linux/console.h>
++#include <linux/sysrq.h>
++#include <linux/platform_device.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/tty.h>
++#include <linux/tty_flip.h>
++#include <linux/delay.h>
++#include <linux/spinlock.h>
++#include <linux/pm_runtime.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/serial_core.h>
++#include <linux/clk.h>
++
++#define DRIVER_NAME "st-asc"
++#define ASC_SERIAL_NAME "ttyAS"
++#define ASC_FIFO_SIZE 16
++#define ASC_MAX_PORTS 8
++
++struct asc_port {
++	struct uart_port port;
++	struct clk *clk;
++	unsigned int hw_flow_control:1;
++	unsigned int force_m1:1;
++};
++
++static struct asc_port asc_ports[ASC_MAX_PORTS];
++static struct uart_driver asc_uart_driver;
++
++/*---- UART Register definitions ------------------------------*/
++
++/* Register offsets */
++
++#define ASC_BAUDRATE			0x00
++#define ASC_TXBUF			0x04
++#define ASC_RXBUF			0x08
++#define ASC_CTL				0x0C
++#define ASC_INTEN			0x10
++#define ASC_STA				0x14
++#define ASC_GUARDTIME			0x18
++#define ASC_TIMEOUT			0x1C
++#define ASC_TXRESET			0x20
++#define ASC_RXRESET			0x24
++#define ASC_RETRIES			0x28
++
++/* ASC_RXBUF */
++#define ASC_RXBUF_PE			0x100
++#define ASC_RXBUF_FE			0x200
++/**
++ * Some of status comes from higher bits of the character and some come from
++ * the status register. Combining both of them in to single status using dummy
++ * bits.
++ */
++#define ASC_RXBUF_DUMMY_RX		0x10000
++#define ASC_RXBUF_DUMMY_BE		0x20000
++#define ASC_RXBUF_DUMMY_OE		0x40000
++
++/* ASC_CTL */
++
++#define ASC_CTL_MODE_MSK		0x0007
++#define  ASC_CTL_MODE_8BIT		0x0001
++#define  ASC_CTL_MODE_7BIT_PAR		0x0003
++#define  ASC_CTL_MODE_9BIT		0x0004
++#define  ASC_CTL_MODE_8BIT_WKUP		0x0005
++#define  ASC_CTL_MODE_8BIT_PAR		0x0007
++#define ASC_CTL_STOP_MSK		0x0018
++#define  ASC_CTL_STOP_HALFBIT		0x0000
++#define  ASC_CTL_STOP_1BIT		0x0008
++#define  ASC_CTL_STOP_1_HALFBIT		0x0010
++#define  ASC_CTL_STOP_2BIT		0x0018
++#define ASC_CTL_PARITYODD		0x0020
++#define ASC_CTL_LOOPBACK		0x0040
++#define ASC_CTL_RUN			0x0080
++#define ASC_CTL_RXENABLE		0x0100
++#define ASC_CTL_SCENABLE		0x0200
++#define ASC_CTL_FIFOENABLE		0x0400
++#define ASC_CTL_CTSENABLE		0x0800
++#define ASC_CTL_BAUDMODE		0x1000
++
++/* ASC_GUARDTIME */
++
++#define ASC_GUARDTIME_MSK		0x00FF
++
++/* ASC_INTEN */
++
++#define ASC_INTEN_RBE			0x0001
++#define ASC_INTEN_TE			0x0002
++#define ASC_INTEN_THE			0x0004
++#define ASC_INTEN_PE			0x0008
++#define ASC_INTEN_FE			0x0010
++#define ASC_INTEN_OE			0x0020
++#define ASC_INTEN_TNE			0x0040
++#define ASC_INTEN_TOI			0x0080
++#define ASC_INTEN_RHF			0x0100
++
++/* ASC_RETRIES */
++
++#define ASC_RETRIES_MSK			0x00FF
++
++/* ASC_RXBUF */
++
++#define ASC_RXBUF_MSK			0x03FF
++
++/* ASC_STA */
++
++#define ASC_STA_RBF			0x0001
++#define ASC_STA_TE			0x0002
++#define ASC_STA_THE			0x0004
++#define ASC_STA_PE			0x0008
++#define ASC_STA_FE			0x0010
++#define ASC_STA_OE			0x0020
++#define ASC_STA_TNE			0x0040
++#define ASC_STA_TOI			0x0080
++#define ASC_STA_RHF			0x0100
++#define ASC_STA_TF			0x0200
++#define ASC_STA_NKD			0x0400
++
++/* ASC_TIMEOUT */
++
++#define ASC_TIMEOUT_MSK			0x00FF
++
++/* ASC_TXBUF */
++
++#define ASC_TXBUF_MSK			0x01FF
++
++/*---- Inline function definitions ---------------------------*/
++
++static inline struct asc_port *to_asc_port(struct uart_port *port)
++{
++	return container_of(port, struct asc_port, port);
++}
++
++static inline u32 asc_in(struct uart_port *port, u32 offset)
++{
++	return readl(port->membase + offset);
++}
++
++static inline void asc_out(struct uart_port *port, u32 offset, u32 value)
++{
++	writel(value, port->membase + offset);
++}
 +
 +/*
-+ * To get the value from the Global Timer Counter register proceed as follows:
-+ * 1. Read the upper 32-bit timer counter register
-+ * 2. Read the lower 32-bit timer counter register
-+ * 3. Read the upper 32-bit timer counter register again. If the value is
-+ *  different to the 32-bit upper value read previously, go back to step 2.
-+ *  Otherwise the 64-bit timer counter value is correct.
++ * Some simple utility functions to enable and disable interrupts.
++ * Note that these need to be called with interrupts disabled.
 + */
-+static u64 gt_counter_read(void)
++static inline void asc_disable_tx_interrupts(struct uart_port *port)
 +{
-+	u64 counter;
-+	u32 lower;
-+	u32 upper, old_upper;
-+
-+	upper = __raw_readl(gt_base + GT_COUNTER1);
-+	do {
-+		old_upper = upper;
-+		lower = __raw_readl(gt_base + GT_COUNTER0);
-+		upper = __raw_readl(gt_base + GT_COUNTER1);
-+	} while (upper != old_upper);
-+
-+	counter = upper;
-+	counter <<= 32;
-+	counter |= lower;
-+	return counter;
++	u32 intenable = asc_in(port, ASC_INTEN) & ~ASC_INTEN_THE;
++	asc_out(port, ASC_INTEN, intenable);
++	(void)asc_in(port, ASC_INTEN);	/* Defeat bus write posting */
 +}
 +
-+/**
-+ * To ensure that updates to comparator value register do not set the
-+ * Interrupt Status Register proceed as follows:
-+ * 1. Clear the Comp Enable bit in the Timer Control Register.
-+ * 2. Write the lower 32-bit Comparator Value Register.
-+ * 3. Write the upper 32-bit Comparator Value Register.
-+ * 4. Set the Comp Enable bit and, if necessary, the IRQ enable bit.
++static inline void asc_enable_tx_interrupts(struct uart_port *port)
++{
++	u32 intenable = asc_in(port, ASC_INTEN) | ASC_INTEN_THE;
++	asc_out(port, ASC_INTEN, intenable);
++}
++
++static inline void asc_disable_rx_interrupts(struct uart_port *port)
++{
++	u32 intenable = asc_in(port, ASC_INTEN) & ~ASC_INTEN_RBE;
++	asc_out(port, ASC_INTEN, intenable);
++	(void)asc_in(port, ASC_INTEN);	/* Defeat bus write posting */
++}
++
++static inline void asc_enable_rx_interrupts(struct uart_port *port)
++{
++	u32 intenable = asc_in(port, ASC_INTEN) | ASC_INTEN_RBE;
++	asc_out(port, ASC_INTEN, intenable);
++}
++
++static inline u32 asc_txfifo_is_empty(struct uart_port *port)
++{
++	return asc_in(port, ASC_STA) & ASC_STA_TE;
++}
++
++static inline int asc_txfifo_is_full(struct uart_port *port)
++{
++	return asc_in(port, ASC_STA) & ASC_STA_TF;
++}
++
++static inline const char *asc_port_name(struct uart_port *port)
++{
++	return to_platform_device(port->dev)->name;
++}
++
++/*----------------------------------------------------------------------*/
++
++/*
++ * This section contains code to support the use of the ASC as a
++ * generic serial port.
 + */
-+static void gt_compare_set(unsigned long delta, int periodic)
++
++static inline unsigned asc_hw_txroom(struct uart_port *port)
 +{
-+	u64 counter = gt_counter_read();
-+	unsigned long ctrl = __raw_readl(gt_base + GT_CONTROL);
++	u32 status = asc_in(port, ASC_STA);
 +
-+	counter += delta;
-+	ctrl &=  ~(GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE);
++	if (status & ASC_STA_THE)
++		return port->fifosize / 2;
++	else if (!(status & ASC_STA_TF))
++		return 1;
 +
-+	__raw_writel(ctrl, gt_base + GT_CONTROL);
-+	__raw_writel(lower_32_bits(counter), gt_base + GT_COMP0);
-+	__raw_writel(upper_32_bits(counter), gt_base + GT_COMP1);
-+
-+	if (periodic) {
-+		__raw_writel(delta, gt_base + GT_AUTO_INC);
-+		ctrl |= GT_CONTROL_AUTO_INC;
-+	}
-+
-+	ctrl |= GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE;
-+	__raw_writel(ctrl, gt_base + GT_CONTROL);
-+}
-+
-+static void gt_clockevent_set_mode(enum clock_event_mode mode,
-+				   struct clock_event_device *clk)
-+{
-+	unsigned long ctrl;
-+
-+	ctrl = __raw_readl(gt_base + GT_CONTROL);
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		gt_compare_set(DIV_ROUND_CLOSEST(gt_clk_rate, HZ), 1);
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		ctrl &= ~(GT_CONTROL_AUTO_INC);
-+		__raw_writel(ctrl, gt_base + GT_CONTROL);
-+		break;
-+	/* Can not shut down it as enable bit is not banked */
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+		ctrl &= ~(GT_CONTROL_COMP_ENABLE |
-+				GT_CONTROL_IRQ_ENABLE | GT_CONTROL_AUTO_INC);
-+		__raw_writel(ctrl, gt_base + GT_CONTROL);
-+		break;
-+	default:
-+		break;
-+	}
-+}
-+
-+static int gt_clockevent_set_next_event(unsigned long evt,
-+					struct clock_event_device *unused)
-+{
-+	gt_compare_set(evt, 0);
 +	return 0;
 +}
 +
-+static irqreturn_t gt_clockevent_interrupt(int irq, void *dev_id)
++/*
++ * Start transmitting chars.
++ * This is called from both interrupt and task level.
++ * Either way interrupts are disabled.
++ */
++static void asc_transmit_chars(struct uart_port *port)
 +{
-+	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
++	struct circ_buf *xmit = &port->state->xmit;
++	int txroom;
++	unsigned char c;
 +
-+	if (__raw_readl(gt_base + GT_INT_STATUS) & GT_INT_STATUS_EVENT_FLAG) {
-+		/**
-+		 * ERRATA 740657( Global Timer can send 2 interrupts for
-+		 * the same event in single-shot mode)
-+		 * Workaround:
-+		 *	Either disable single-shot mode.
-+		 *	Or
-+		 *	Modify the Interrupt Handler to avoid the
-+		 *	offending sequence. This is achieved by clearing
-+		 *	the Global Timer flag _after_ having incremented
-+		 *	the Comparator register	value to a higher value.
++	txroom = asc_hw_txroom(port);
++
++	if ((txroom != 0) && port->x_char) {
++		c = port->x_char;
++		port->x_char = 0;
++		asc_out(port, ASC_TXBUF, c);
++		port->icount.tx++;
++		txroom = asc_hw_txroom(port);
++	}
++
++	if (uart_tx_stopped(port)) {
++		/*
++		 * We should try and stop the hardware here, but I
++		 * don't think the ASC has any way to do that.
 +		 */
-+		if (!(__raw_readl(gt_base + GT_CONTROL) & GT_CONTROL_AUTO_INC))
-+			gt_compare_set(ULONG_MAX, 0);
-+
-+		__raw_writel(GT_INT_STATUS_EVENT_FLAG, gt_base + GT_INT_STATUS);
-+
-+		evt->event_handler(evt);
-+		return IRQ_HANDLED;
++		asc_disable_tx_interrupts(port);
++		return;
 +	}
 +
-+	return IRQ_NONE;
++	if (uart_circ_empty(xmit)) {
++		asc_disable_tx_interrupts(port);
++		return;
++	}
++
++	if (txroom == 0)
++		return;
++
++	do {
++		c = xmit->buf[xmit->tail];
++		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
++		asc_out(port, ASC_TXBUF, c);
++		port->icount.tx++;
++		txroom--;
++	} while ((txroom > 0) && (!uart_circ_empty(xmit)));
++
++	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
++		uart_write_wakeup(port);
++
++	if (uart_circ_empty(xmit))
++		asc_disable_tx_interrupts(port);
 +}
 +
-+static int __cpuinit gt_clockevents_init(struct clock_event_device *clk)
++static void asc_receive_chars(struct uart_port *port)
 +{
-+	struct clock_event_device **this_cpu_clk;
-+	int cpu = smp_processor_id();
++	struct tty_port *tport = &port->state->port;
++	unsigned long status;
++	unsigned long c = 0;
++	char flag;
 +
-+	clk->name = "ARM global timer clock event";
-+	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
-+	clk->set_mode = gt_clockevent_set_mode;
-+	clk->set_next_event = gt_clockevent_set_next_event;
-+	this_cpu_clk = __this_cpu_ptr(gt_evt);
-+	*this_cpu_clk = clk;
-+	clk->cpumask = cpumask_of(cpu);
-+	clk->irq = gt_ppi;
-+	clockevents_config_and_register(clk, gt_clk_rate,
-+					1, 0xffffffff);
-+	per_cpu(percpu_init_called, cpu) = true;
-+	enable_percpu_irq(clk->irq, IRQ_TYPE_NONE);
++	if (port->irq_wake)
++		pm_wakeup_event(tport->tty->dev, 0);
++
++	while ((status = asc_in(port, ASC_STA)) & ASC_STA_RBF) {
++		c = asc_in(port, ASC_RXBUF) | ASC_RXBUF_DUMMY_RX;
++		flag = TTY_NORMAL;
++		port->icount.rx++;
++
++		if ((c & (ASC_RXBUF_FE | ASC_RXBUF_PE)) ||
++			status & ASC_STA_OE) {
++
++			if (c & ASC_RXBUF_FE) {
++				if (c == ASC_RXBUF_FE) {
++					port->icount.brk++;
++					if (uart_handle_break(port))
++						continue;
++					c |= ASC_RXBUF_DUMMY_BE;
++				} else {
++					port->icount.frame++;
++				}
++			} else if (c & ASC_RXBUF_PE) {
++				port->icount.parity++;
++			}
++			/*
++			 * Reading any data from the RX FIFO clears the
++			 * overflow error condition.
++			 */
++			if (status & ASC_STA_OE) {
++				port->icount.overrun++;
++				c |= ASC_RXBUF_DUMMY_OE;
++			}
++
++			c &= port->read_status_mask;
++
++			if (c & ASC_RXBUF_DUMMY_BE)
++				flag = TTY_BREAK;
++			else if (c & ASC_RXBUF_PE)
++				flag = TTY_PARITY;
++			else if (c & ASC_RXBUF_FE)
++				flag = TTY_FRAME;
++		}
++
++		if (uart_handle_sysrq_char(port, c))
++			continue;
++
++		uart_insert_char(port, c, ASC_RXBUF_DUMMY_OE, c & 0xff, flag);
++	}
++
++	/* Tell the rest of the system the news. New characters! */
++	tty_flip_buffer_push(tport);
++}
++
++static irqreturn_t asc_interrupt(int irq, void *ptr)
++{
++	struct uart_port *port = ptr;
++	u32 status;
++
++	spin_lock(&port->lock);
++
++	status = asc_in(port, ASC_STA);
++
++	if (status & ASC_STA_RBF) {
++		/* Receive FIFO not empty */
++		asc_receive_chars(port);
++	}
++
++	if ((status & ASC_STA_THE) &&
++	    (asc_in(port, ASC_INTEN) & ASC_INTEN_THE)) {
++		/* Transmitter FIFO at least half empty */
++		asc_transmit_chars(port);
++	}
++
++	spin_unlock(&port->lock);
++
++	return IRQ_HANDLED;
++}
++
++/*----------------------------------------------------------------------*/
++
++/*
++ * UART Functions
++ */
++
++static unsigned int asc_tx_empty(struct uart_port *port)
++{
++	return asc_txfifo_is_empty(port) ? TIOCSER_TEMT : 0;
++}
++
++static void asc_set_mctrl(struct uart_port *port, unsigned int mctrl)
++{
++	/*
++	 * This routine is used for seting signals of: DTR, DCD, CTS/RTS
++	 * We use ASC's hardware for CTS/RTS, so don't need any for that.
++	 * Some boards have DTR and DCD implemented using PIO pins,
++	 * code to do this should be hooked in here.
++	 */
++}
++
++static unsigned int asc_get_mctrl(struct uart_port *port)
++{
++	/*
++	 * This routine is used for geting signals of: DTR, DCD, DSR, RI,
++	 * and CTS/RTS
++	 */
++	return TIOCM_CAR | TIOCM_DSR | TIOCM_CTS;
++}
++
++/* There are probably characters waiting to be transmitted. */
++static void asc_start_tx(struct uart_port *port)
++{
++	struct circ_buf *xmit = &port->state->xmit;
++
++	if (!uart_circ_empty(xmit))
++		asc_enable_tx_interrupts(port);
++}
++
++/* Transmit stop */
++static void asc_stop_tx(struct uart_port *port)
++{
++	asc_disable_tx_interrupts(port);
++}
++
++/* Receive stop */
++static void asc_stop_rx(struct uart_port *port)
++{
++	asc_disable_rx_interrupts(port);
++}
++
++/* Force modem status interrupts on */
++static void asc_enable_ms(struct uart_port *port)
++{
++	/* Nothing here yet .. */
++}
++
++/* Handle breaks - ignored by us */
++static void asc_break_ctl(struct uart_port *port, int break_state)
++{
++	/* Nothing here yet .. */
++}
++
++/*
++ * Enable port for reception.
++ */
++static int asc_startup(struct uart_port *port)
++{
++	if (request_irq(port->irq, asc_interrupt, IRQF_NO_SUSPEND,
++			asc_port_name(port), port)) {
++		dev_err(port->dev, "cannot allocate irq.\n");
++		return -ENODEV;
++	}
++
++	asc_transmit_chars(port);
++	asc_enable_rx_interrupts(port);
++
 +	return 0;
 +}
 +
-+static void gt_clockevents_stop(struct clock_event_device *clk)
++static void asc_shutdown(struct uart_port *port)
 +{
-+	gt_clockevent_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
-+	disable_percpu_irq(clk->irq);
++	asc_disable_tx_interrupts(port);
++	asc_disable_rx_interrupts(port);
++	free_irq(port->irq, port);
 +}
 +
-+static int __cpuinit gt_clockevents_setup(struct clock_event_device *clk)
++static void asc_pm(struct uart_port *port, unsigned int state,
++		unsigned int oldstate)
 +{
-+	/* Use existing clock_event for boot cpu */
-+	if (per_cpu(percpu_init_called, smp_processor_id()))
-+		return 0;
++	struct asc_port *ascport = to_asc_port(port);
++	unsigned long flags = 0;
++	u32 ctl;
 +
-+	/* already enabled in gt_clocksource_init. */
-+	return gt_clockevents_init(clk);
++	switch (state) {
++	case UART_PM_STATE_ON:
++		clk_prepare_enable(ascport->clk);
++		break;
++	case UART_PM_STATE_OFF:
++		/*
++		 * Disable the ASC baud rate generator, which is as close as
++		 * we can come to turning it off. Note this is not called with
++		 * the port spinlock held.
++		 */
++		spin_lock_irqsave(&port->lock, flags);
++		ctl = asc_in(port, ASC_CTL) & ~ASC_CTL_RUN;
++		asc_out(port, ASC_CTL, ctl);
++		spin_unlock_irqrestore(&port->lock, flags);
++		clk_disable_unprepare(ascport->clk);
++		break;
++	}
 +}
 +
-+static cycle_t gt_clocksource_read(struct clocksource *cs)
++static void asc_set_termios(struct uart_port *port, struct ktermios *termios,
++			    struct ktermios *old)
 +{
-+	return gt_counter_read();
-+}
++	struct asc_port *ascport = to_asc_port(port);
++	unsigned int baud;
++	u32 ctrl_val;
++	tcflag_t cflag;
++	unsigned long flags;
 +
-+static struct clocksource gt_clocksource = {
-+	.name	= "ARM global timer clock source",
-+	.rating	= 300,
-+	.read	= gt_clocksource_read,
-+	.mask	= CLOCKSOURCE_MASK(64),
-+	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
-+};
++	/* Update termios to reflect hardware capabilities */
++	termios->c_cflag &= ~(CMSPAR |
++			 (ascport->hw_flow_control ? 0 : CRTSCTS));
 +
-+#ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-+static u32 gt_sched_clock_read(void)
-+{
-+	if (!gt_base)
-+		return 0;
++	port->uartclk = clk_get_rate(ascport->clk);
 +
-+	return gt_counter_read();
-+}
-+#endif
++	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16);
++	cflag = termios->c_cflag;
 +
-+static void __init gt_clocksource_init(void)
-+{
-+	__raw_writel(0, gt_base + GT_CONTROL);
-+	__raw_writel(0, gt_base + GT_COUNTER0);
-+	__raw_writel(0, gt_base + GT_COUNTER1);
-+	/* enables timer on all the cores */
-+	__raw_writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
++	spin_lock_irqsave(&port->lock, flags);
 +
-+#ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-+	setup_sched_clock(gt_sched_clock_read, 32, gt_clk_rate);
-+#endif
-+	clocksource_register_hz(&gt_clocksource, gt_clk_rate);
-+}
++	/* read control register */
++	ctrl_val = asc_in(port, ASC_CTL);
 +
-+#ifdef CONFIG_LOCAL_TIMERS
-+static struct local_timer_ops gt_lt_ops __cpuinitdata = {
-+	.setup	= gt_clockevents_setup,
-+	.stop	= gt_clockevents_stop,
-+};
-+#endif
++	/* stop serial port and reset value */
++	asc_out(port, ASC_CTL, (ctrl_val & ~ASC_CTL_RUN));
++	ctrl_val = ASC_CTL_RXENABLE | ASC_CTL_FIFOENABLE;
 +
-+static void __init global_timer_of_register(struct device_node *np)
-+{
-+	unsigned int cpu = smp_processor_id();
-+	struct clock_event_device *evt = &per_cpu(gt_clockevent, cpu);
-+	struct clk *gt_clk;
-+	int err = 0;
++	/* reset fifo rx & tx */
++	asc_out(port, ASC_TXRESET, 1);
++	asc_out(port, ASC_RXRESET, 1);
++
++	/* set character length */
++	if ((cflag & CSIZE) == CS7) {
++		ctrl_val |= ASC_CTL_MODE_7BIT_PAR;
++	} else {
++		ctrl_val |= (cflag & PARENB) ?  ASC_CTL_MODE_8BIT_PAR :
++						ASC_CTL_MODE_8BIT;
++	}
++
++	/* set stop bit */
++	ctrl_val |= (cflag & CSTOPB) ? ASC_CTL_STOP_2BIT : ASC_CTL_STOP_1BIT;
++
++	/* odd parity */
++	if (cflag & PARODD)
++		ctrl_val |= ASC_CTL_PARITYODD;
++
++	/* hardware flow control */
++	if ((cflag & CRTSCTS))
++		ctrl_val |= ASC_CTL_CTSENABLE;
++
++	if ((baud < 19200) && !ascport->force_m1) {
++		asc_out(port, ASC_BAUDRATE, (port->uartclk / (16 * baud)));
++	} else {
++		/*
++		 * MODE 1: recommended for high bit rates (above 19.2K)
++		 *
++		 *                   baudrate * 16 * 2^16
++		 * ASCBaudRate =   ------------------------
++		 *                          inputclock
++		 *
++		 * However to keep the maths inside 32bits we divide top and
++		 * bottom by 64. The +1 is to avoid a divide by zero if the
++		 * input clock rate is something unexpected.
++		 */
++		u32 counter = (baud * 16384) / ((port->uartclk / 64) + 1);
++		asc_out(port, ASC_BAUDRATE, counter);
++		ctrl_val |= ASC_CTL_BAUDMODE;
++	}
++
++	uart_update_timeout(port, cflag, baud);
++
++	ascport->port.read_status_mask = ASC_RXBUF_DUMMY_OE;
++	if (termios->c_iflag & INPCK)
++		ascport->port.read_status_mask |= ASC_RXBUF_FE | ASC_RXBUF_PE;
++	if (termios->c_iflag & (BRKINT | PARMRK))
++		ascport->port.read_status_mask |= ASC_RXBUF_DUMMY_BE;
 +
 +	/*
-+	 * In r2p0 the comparators for each processor with the global timer
-+	 * fire when the timer value is greater than or equal to. In previous
-+	 * revisions the comparators fired when the timer value was equal to.
++	 * Characters to ignore
 +	 */
-+	if ((read_cpuid_id() & 0xf0000f) < 0x200000) {
-+		pr_warn("global-timer: non support for this cpu version.\n");
-+		return;
++	ascport->port.ignore_status_mask = 0;
++	if (termios->c_iflag & IGNPAR)
++		ascport->port.ignore_status_mask |= ASC_RXBUF_FE | ASC_RXBUF_PE;
++	if (termios->c_iflag & IGNBRK) {
++		ascport->port.ignore_status_mask |= ASC_RXBUF_DUMMY_BE;
++		/*
++		 * If we're ignoring parity and break indicators,
++		 * ignore overruns too (for real raw support).
++		 */
++		if (termios->c_iflag & IGNPAR)
++			ascport->port.ignore_status_mask |= ASC_RXBUF_DUMMY_OE;
 +	}
 +
-+	gt_ppi = irq_of_parse_and_map(np, 0);
-+	if (!gt_ppi) {
-+		pr_warn("global-timer: unable to parse irq\n");
-+		return;
-+	}
++	/*
++	 * Ignore all characters if CREAD is not set.
++	 */
++	if (!(termios->c_cflag & CREAD))
++		ascport->port.ignore_status_mask |= ASC_RXBUF_DUMMY_RX;
 +
-+	gt_base = of_iomap(np, 0);
-+	if (!gt_base) {
-+		pr_warn("global-timer: invalid base address\n");
-+		return;
-+	}
++	/* Set the timeout */
++	asc_out(port, ASC_TIMEOUT, 20);
 +
-+	gt_clk = of_clk_get(np, 0);
-+	if (!IS_ERR(gt_clk)) {
-+		err = clk_prepare_enable(gt_clk);
-+	} else {
-+		pr_warn("global-timer: clk not found\n");
-+		err = -EINVAL;
-+		goto out_unmap;
-+	}
++	/* write final value and enable port */
++	asc_out(port, ASC_CTL, (ctrl_val | ASC_CTL_RUN));
 +
-+	gt_evt = alloc_percpu(struct clock_event_device *);
-+	if (!gt_evt) {
-+		pr_warn("global-timer: can't allocate memory\n");
-+		err = -ENOMEM;
-+		goto out_unmap;
-+	}
-+
-+	err = request_percpu_irq(gt_ppi, gt_clockevent_interrupt,
-+				 "gt", gt_evt);
-+	if (err) {
-+		pr_warn("global-timer: can't register interrupt %d (%d)\n",
-+			gt_ppi, err);
-+		goto out_free;
-+	}
-+
-+	gt_clk_rate = clk_get_rate(gt_clk);
-+	gt_clocksource_init();
-+	gt_clockevents_init(evt);
-+#ifdef CONFIG_LOCAL_TIMERS
-+	err =  local_timer_register(&gt_lt_ops);
-+	if (err) {
-+		pr_warn("global-timer: unable to register local timer.\n");
-+		free_percpu_irq(gt_ppi, gt_evt);
-+		goto out_free;
-+	}
-+#endif
-+	return;
-+
-+out_free:
-+	free_percpu(gt_evt);
-+out_unmap:
-+	iounmap(gt_base);
-+	WARN(err, "ARM Global timer register failed (%d)\n", err);
++	spin_unlock_irqrestore(&port->lock, flags);
 +}
 +
-+/* Only tested on r2p2 and r3p0  */
-+CLOCKSOURCE_OF_DECLARE(arm_gt, "arm,cortex-a9-global-timer",
-+			global_timer_of_register);
++static const char *asc_type(struct uart_port *port)
++{
++	return (port->type == PORT_ASC) ? DRIVER_NAME : NULL;
++}
++
++static void asc_release_port(struct uart_port *port)
++{
++}
++
++static int asc_request_port(struct uart_port *port)
++{
++	return 0;
++}
++
++/*
++ * Called when the port is opened, and UPF_BOOT_AUTOCONF flag is set
++ * Set type field if successful
++ */
++static void asc_config_port(struct uart_port *port, int flags)
++{
++	if ((flags & UART_CONFIG_TYPE))
++		port->type = PORT_ASC;
++}
++
++static int
++asc_verify_port(struct uart_port *port, struct serial_struct *ser)
++{
++	/* No user changeable parameters */
++	return -EINVAL;
++}
++
++#ifdef CONFIG_CONSOLE_POLL
++/*
++ * Console polling routines for writing and reading from the uart while
++ * in an interrupt or debug context (i.e. kgdb).
++ */
++
++static int asc_get_poll_char(struct uart_port *port)
++{
++	if (!(asc_in(port, ASC_STA) & ASC_STA_RBF))
++		return NO_POLL_CHAR;
++
++	return asc_in(port, ASC_RXBUF);
++}
++
++static void asc_put_poll_char(struct uart_port *port, unsigned char c)
++{
++	while (asc_txfifo_is_full(port))
++		cpu_relax();
++	asc_out(port, ASC_TXBUF, c);
++}
++
++#endif /* CONFIG_CONSOLE_POLL */
++
++/*---------------------------------------------------------------------*/
++
++static struct uart_ops asc_uart_ops = {
++	.tx_empty	= asc_tx_empty,
++	.set_mctrl	= asc_set_mctrl,
++	.get_mctrl	= asc_get_mctrl,
++	.start_tx	= asc_start_tx,
++	.stop_tx	= asc_stop_tx,
++	.stop_rx	= asc_stop_rx,
++	.enable_ms	= asc_enable_ms,
++	.break_ctl	= asc_break_ctl,
++	.startup	= asc_startup,
++	.shutdown	= asc_shutdown,
++	.set_termios	= asc_set_termios,
++	.type		= asc_type,
++	.release_port	= asc_release_port,
++	.request_port	= asc_request_port,
++	.config_port	= asc_config_port,
++	.verify_port	= asc_verify_port,
++	.pm		= asc_pm,
++#ifdef CONFIG_CONSOLE_POLL
++	.poll_get_char = asc_get_poll_char,
++	.poll_put_char = asc_put_poll_char,
++#endif /* CONFIG_CONSOLE_POLL */
++};
++
++static int asc_init_port(struct asc_port *ascport,
++			  struct platform_device *pdev)
++{
++	struct uart_port *port = &ascport->port;
++	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++
++	if (!res) {
++		dev_err(&pdev->dev, "Unable to get io resource\n");
++		return -ENODEV;
++	}
++
++	port->iotype	= UPIO_MEM;
++	port->flags	= UPF_BOOT_AUTOCONF;
++	port->ops	= &asc_uart_ops;
++	port->fifosize	= ASC_FIFO_SIZE;
++	port->dev	= &pdev->dev;
++	port->mapbase	= res->start;
++	port->irq	= platform_get_irq(pdev, 0);
++
++	port->membase = devm_request_and_ioremap(&pdev->dev, res);
++	if (!port->membase) {
++		dev_err(&pdev->dev, "Unable to request io memory\n");
++		return -ENODEV;
++	}
++
++	spin_lock_init(&port->lock);
++
++	ascport->clk = devm_clk_get(&pdev->dev, NULL);
++
++	if (WARN_ON(IS_ERR(ascport->clk)))
++		return -EINVAL;
++	/* ensure that clk rate is correct by enabling the clk */
++	clk_prepare_enable(ascport->clk);
++	ascport->port.uartclk = clk_get_rate(ascport->clk);
++	WARN_ON(ascport->port.uartclk == 0);
++	clk_disable_unprepare(ascport->clk);
++
++	return 0;
++}
++
++static struct asc_port *asc_of_get_asc_port(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	int id;
++
++	if (!np)
++		return NULL;
++
++	id = of_alias_get_id(np, ASC_SERIAL_NAME);
++	if (WARN_ON(id >= ASC_MAX_PORTS))
++		return NULL;
++
++	asc_ports[id].hw_flow_control = of_property_read_bool(np,
++							"st,hw-flow-control");
++	asc_ports[id].force_m1 =  of_property_read_bool(np, "st,force_m1");
++	asc_ports[id].port.line = id;
++	return &asc_ports[id];
++}
++
++static struct of_device_id asc_match[] = {
++	{ .compatible = "st,asc", },
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, asc_match);
++
++static int asc_serial_probe(struct platform_device *pdev)
++{
++	int ret;
++	struct asc_port *ascport;
++
++	ascport = asc_of_get_asc_port(pdev);
++	if (!ascport)
++		return -ENODEV;
++
++	ret = asc_init_port(ascport, pdev);
++	if (ret)
++		return ret;
++
++	ret = uart_add_one_port(&asc_uart_driver, &ascport->port);
++	if (ret)
++		return ret;
++
++	platform_set_drvdata(pdev, &ascport->port);
++
++	return 0;
++}
++
++static int asc_serial_remove(struct platform_device *pdev)
++{
++	struct uart_port *port = platform_get_drvdata(pdev);
++
++	platform_set_drvdata(pdev, NULL);
++	return uart_remove_one_port(&asc_uart_driver, port);
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int asc_serial_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct uart_port *port = platform_get_drvdata(pdev);
++
++	return uart_suspend_port(&asc_uart_driver, port);
++}
++
++static int asc_serial_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct uart_port *port = platform_get_drvdata(pdev);
++
++	if (pdev->dev.pins->default_state) {
++		if (pinctrl_select_state(pdev->dev.pins->p,
++					 pdev->dev.pins->default_state) < 0)
++			return -EBUSY;
++	}
++
++	return uart_resume_port(&asc_uart_driver, port);
++}
++
++#endif /* CONFIG_PM_SLEEP */
++
++/*----------------------------------------------------------------------*/
++
++#ifdef CONFIG_SERIAL_ST_ASC_CONSOLE
++static void asc_console_putchar(struct uart_port *port, int ch)
++{
++	unsigned int timeout = 1000000;
++
++	/* Wait for upto 1 second in case flow control is stopping us. */
++	while (--timeout && asc_txfifo_is_full(port))
++		udelay(1);
++
++	asc_out(port, ASC_TXBUF, ch);
++}
++
++/*
++ *  Print a string to the serial port trying not to disturb
++ *  any possible real use of the port...
++ */
++
++static void asc_console_write(struct console *co, const char *s, unsigned count)
++{
++	struct uart_port *port = &asc_ports[co->index].port;
++	unsigned long flags;
++	unsigned long timeout = 1000000;
++	int locked = 1;
++	u32 intenable;
++
++	local_irq_save(flags);
++	if (port->sysrq)
++		locked = 0; /* asc_interrupt has already claimed the lock */
++	else if (oops_in_progress)
++		locked = spin_trylock(&port->lock);
++	else
++		spin_lock(&port->lock);
++
++	/*
++	 * Disable interrupts so we don't get the IRQ line bouncing
++	 * up and down while interrupts are disabled.
++	 */
++	intenable = asc_in(port, ASC_INTEN);
++	asc_out(port, ASC_INTEN, 0);
++	(void)asc_in(port, ASC_INTEN);	/* Defeat bus write posting */
++
++	uart_console_write(port, s, count, asc_console_putchar);
++
++	while (--timeout && !asc_txfifo_is_empty(port))
++		udelay(1);
++
++	asc_out(port, ASC_INTEN, intenable);
++
++	if (locked)
++		spin_unlock(&port->lock);
++	local_irq_restore(flags);
++}
++
++static int asc_console_setup(struct console *co, char *options)
++{
++	struct asc_port *ascport;
++	int baud = 9600;
++	int bits = 8;
++	int parity = 'n';
++	int flow = 'n';
++
++	if (co->index >= ASC_MAX_PORTS)
++		return -ENODEV;
++
++	ascport = &asc_ports[co->index];
++
++	/*
++	 * This driver does not support early console initialization
++	 * (use ARM early printk support instead), so we only expect
++	 * this to be called during the uart port registration when the
++	 * driver gets probed and the port should be mapped at that point.
++	 */
++	BUG_ON(ascport->port.mapbase == 0 || ascport->port.membase == NULL);
++
++	if (options)
++		uart_parse_options(options, &baud, &parity, &bits, &flow);
++
++	return uart_set_options(&ascport->port, co, baud, parity, bits, flow);
++}
++
++static struct console asc_console = {
++	.name		= ASC_SERIAL_NAME,
++	.device		= uart_console_device,
++	.write		= asc_console_write,
++	.setup		= asc_console_setup,
++	.flags		= CON_PRINTBUFFER,
++	.index		= -1,
++	.data		= &asc_uart_driver,
++};
++
++#define ASC_SERIAL_CONSOLE (&asc_console)
++
++#else
++#define ASC_SERIAL_CONSOLE NULL
++#endif /* CONFIG_SERIAL_ST_ASC_CONSOLE */
++
++static struct uart_driver asc_uart_driver = {
++	.owner		= THIS_MODULE,
++	.driver_name	= DRIVER_NAME,
++	.dev_name	= ASC_SERIAL_NAME,
++	.major		= 0,
++	.minor		= 0,
++	.nr		= ASC_MAX_PORTS,
++	.cons		= ASC_SERIAL_CONSOLE,
++};
++
++static const struct dev_pm_ops asc_serial_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(asc_serial_suspend, asc_serial_resume)
++};
++
++static struct platform_driver asc_serial_driver = {
++	.probe		= asc_serial_probe,
++	.remove		= asc_serial_remove,
++	.driver	= {
++		.name	= DRIVER_NAME,
++		.pm	= &asc_serial_pm_ops,
++		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(asc_match),
++	},
++};
++
++static int __init asc_init(void)
++{
++	int ret;
++	static char banner[] __initdata =
++		KERN_INFO "STMicroelectronics ASC driver initialized\n";
++
++	printk(banner);
++
++	ret = uart_register_driver(&asc_uart_driver);
++	if (ret)
++		return ret;
++
++	ret = platform_driver_register(&asc_serial_driver);
++	if (ret)
++		uart_unregister_driver(&asc_uart_driver);
++
++	return ret;
++}
++
++static void __exit asc_exit(void)
++{
++	platform_driver_unregister(&asc_serial_driver);
++	uart_unregister_driver(&asc_uart_driver);
++}
++
++module_init(asc_init);
++module_exit(asc_exit);
++
++MODULE_ALIAS("platform:" DRIVER_NAME);
++MODULE_AUTHOR("STMicroelectronics (R&D) Limited");
++MODULE_DESCRIPTION("STMicroelectronics ASC serial port driver");
++MODULE_LICENSE("GPL");
+diff --git a/include/uapi/linux/serial_core.h b/include/uapi/linux/serial_core.h
+index 74c2bf7..ec80e01 100644
+--- a/include/uapi/linux/serial_core.h
++++ b/include/uapi/linux/serial_core.h
+@@ -226,4 +226,7 @@
+ /* Rocketport EXPRESS/INFINITY */
+ #define PORT_RP2	102
+ 
++/* ST ASC type numbers */
++#define PORT_ASC       103
++
+ #endif /* _UAPILINUX_SERIAL_CORE_H */
 -- 
 1.7.6.5
