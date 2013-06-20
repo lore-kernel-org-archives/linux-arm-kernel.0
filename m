@@ -1,54 +1,147 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 20 Jun 2013 14:01:10 +0100
-Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
- pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
-In-Reply-To: <51C2EBCD.4070206@pengutronix.de>
-References: <51C2C0B5.8020802@pengutronix.de> <20130620095705.GA18536@arm.com>
- <51C2D5EF.3040803@pengutronix.de> <20130620102856.GC18536@arm.com>
- <20130620111255.GD18536@arm.com> <51C2E917.9000708@pengutronix.de>
- <51C2EA04.4060701@pengutronix.de> <51C2EBCD.4070206@pengutronix.de>
-Message-ID: <20130620130110.GE18536@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 20 Jun 2013 16:02:19 +0300
+Subject: [RFC PATCH 5/6] ARM: dts: omap3beagle-xm: Add idle state pins
+ for USB host
+In-Reply-To: <51C2EF50.3070707@ti.com>
+References: <1371650753-11452-1-git-send-email-rogerq@ti.com>
+ <1371650753-11452-6-git-send-email-rogerq@ti.com> <87obb26ixm.fsf@linaro.org>
+ <51C2EDB1.3080801@ti.com> <51C2EF50.3070707@ti.com>
+Message-ID: <51C2FD5B.1090508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 12:47:25PM +0100, Marc Kleine-Budde wrote:
-> On 06/20/2013 01:39 PM, Marc Kleine-Budde wrote:
-> > On 06/20/2013 01:35 PM, Marc Kleine-Budde wrote:
-> >> On 06/20/2013 01:12 PM, Catalin Marinas wrote:
-> >>> On Thu, Jun 20, 2013 at 11:28:56AM +0100, Catalin Marinas wrote:
-> >>>> We may need to place the preempt disable/enable at a higher level in the
-> >>>> scheduler. My theory is that we have a context switch from prev to next.
-> >>>> We get preempted just before finish_arch_post_lock_switch(), so the MMU
-> >>>> hasn't been switched yet. The new switch during preemption happens to a
-> >>>> thread with the same next mm, so the scheduler no longer switch_mm() and
-> >>>> the TIF_SWITCH_MM isn't set for the new thread.
-> >>>>
-> >>>> I'll come back with another patch shortly.
-> >>>
-> >>> Here's another attempt (as before, only compile-tested):
-> >>
-> >> booting kernel from /image
-> >> zImage: concatenated oftree detected
-> >> booting Linux kernel with devicetree
-> >>
-> >> ...dead...
-> >>
-> >> Does every process have a "mm"? Even Kernel threads?
+On 06/20/2013 03:02 PM, Roger Quadros wrote:
+> On 06/20/2013 02:55 PM, Roger Quadros wrote:
+>> On 06/19/2013 09:42 PM, Kevin Hilman wrote:
+>>> Roger Quadros <rogerq@ti.com> writes:
+>>>
+>>>> Add the Idle state pins for USB host and enable WAKEUP on
+>>>> DIR, DAT0-3, so that the PHY can wakeup the OMAP SoC from
+>>>> sleep on any USB activity (e.g. remote wakeup or connect/disconnect).
+>>>>
+>>>> CC: Beno?t Cousson <b-cousson@ti.com>
+>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>>
+>>> This one doesn't apply...
+>>>
+>>>> ---
+>>>>  arch/arm/boot/dts/omap3-beagle-xm.dts |   29 +++++++++++++++++++++++------
+>>>>  1 files changed, 23 insertions(+), 6 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+>>>> index d3808ed..f1d56c2 100644
+>>>> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
+>>>> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+>>>> @@ -89,12 +89,7 @@
+>>>>  };
+>>>>  
+>>>>  &omap3_pmx_core {
+>>>> -	pinctrl-names = "default";
+>>>> -	pinctrl-0 = <
+>>>> -			&hsusbb2_pins
+>>>> -	>;
+>>>> -
+>>>> -	hsusbb2_pins: pinmux_hsusbb2_pins {
+>>>
+>>> This omap3_pmx_core section doesn't exist upstream in the xM DTS file
+>>> (but does in omap3-beagle.dts.)  
+>>>
+>>> Is there a dependency patch missing?
+>>>
+>>
+>> Sorry for not mentioning it earlier. This is based on Benoit's tree [1]
+>> and you need these patches
+>>
+>> http://thread.gmane.org/gmane.linux.drivers.devicetree/38383
 > 
-> I've added a check for "mm". Boots now and my test runs stable for 3
-> minutes now.
+> Just noticed that this no longer applies today. I'll send a revision soon.
+> 
 
-Ah, good point.
+OK. In case you are eager to test, please use the series [1] on l-o on top of Benoit's
+for_3.11/_dts branch and then the $subject series with the updated patch 5 below [2].
 
-> I'm not sure if we have to check for "mm" in
-> check_and_switch_context(), too.
+[1] - [PATCH v5 0/2] ARM: dts: Add USB host support for Beagle-xm
 
-switch_mm() wouldn't be called with a NULL mm, hence we wouldn't call
-check_and_switch_context() either. finish_arch_post_lock_switch() is
-called all the time (and we set the TIF flag only if switch_mm() was
-called).
+[2] - Updated Patch 5
 
-Thanks.
+>From b712a1fb936f65fa05f21fcd2c62fff5628d0628 Mon Sep 17 00:00:00 2001
+From: Roger Quadros <rogerq@ti.com>
+Date: Wed, 19 Jun 2013 11:14:35 +0300
+Subject: [PATCH] ARM: dts: omap3beagle-xm: Add idle state pins for USB host
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
+Add the Idle state pins for USB host and enable WAKEUP on
+DIR, DAT0-3, so that the PHY can wakeup the OMAP SoC from
+sleep on any USB activity (e.g. remote wakeup or connect/disconnect).
+
+CC: Beno?t Cousson <b-cousson@ti.com>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/boot/dts/omap3-beagle-xm.dts |   29 +++++++++++++++++++++++------
+ 1 files changed, 23 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 371b1e2..91d19fa 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -113,11 +113,6 @@
+ };
+ 
+ &omap3_pmx_core {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <
+-			&hsusbb2_pins
+-	>;
+-
+ 	uart3_pins: pinmux_uart3_pins {
+ 		pinctrl-single,pins = <
+ 			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
+@@ -125,7 +120,7 @@
+ 		>;
+ 	};
+ 
+-	hsusbb2_pins: pinmux_hsusbb2_pins {
++	hsusb2_pins: pinmux_hsusb2_pins {
+ 		pinctrl-single,pins = <
+ 			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
+ 			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
+@@ -141,6 +136,25 @@
+ 			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
+ 		>;
+ 	};
++
++	/* WAKEUP enabled on DIR, DAT0-3 */
++	hsusb2_idle_pins: pinmux_hsusb2_idle_pins {
++		pinctrl-single,pins = <
++			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
++			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
++			0x5c4 (PIN_INPUT_PULLDOWN | WAKEUP_EN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
++			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)			/* etk_d13.hsusb2_nxt */
++			0x5c8 (PIN_INPUT_PULLDOWN | WAKEUP_EN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
++			0x5cA (PIN_INPUT_PULLDOWN | WAKEUP_EN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
++			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
++			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
++			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
++			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
++			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
++			0x1ae (PIN_INPUT_PULLDOWN | WAKEUP_EN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
++		>;
++		interrupts = <77>; /* route padconf wakeup to EHCI IRQ */
++	};
+ };
+ 
+ &i2c1 {
+@@ -223,6 +237,9 @@
+ };
+ 
+ &usbhshost {
++	pinctrl-names = "default", "idle";
++	pinctrl-0 = <&hsusb2_pins>;
++	pinctrl-1 = <&hsusb2_idle_pins>;
+ 	port2-mode = "ehci-phy";
+ };
+ 
 -- 
-Catalin
+1.7.4.1
