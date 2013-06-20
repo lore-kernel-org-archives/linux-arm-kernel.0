@@ -1,31 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Jun 2013 15:08:02 +0100
-Subject: [PATCH v6] ARM: PJ4B: fix for 3.10-rc
-In-Reply-To: <1371729974-17950-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1371729974-17950-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130620140802.GO2842@mudshark.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 20 Jun 2013 22:08:48 +0800
+Subject: [PATCH v2] thermal: add imx thermal driver support
+In-Reply-To: <51C2F12B.2090205@ti.com>
+References: <1371280241-31699-1-git-send-email-shawn.guo@linaro.org>
+ <51C0C8D8.5090301@ti.com>
+ <20130619073739.GA3280@S2101-09.ap.freescale.net>
+ <51C1BA1A.5010704@ti.com>
+ <20130620024749.GB19896@S2101-09.ap.freescale.net>
+ <51C2F12B.2090205@ti.com>
+Message-ID: <20130620140846.GH19896@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 01:06:13PM +0100, Gregory CLEMENT wrote:
-> Hello,
+On Thu, Jun 20, 2013 at 08:10:19AM -0400, Eduardo Valentin wrote:
+> Well, I think just mentioning IMX6DQRM should be ok. I didnt really mean
+> you need to put a link.
 > 
-> This path allows to fix one errata for PJ4B CPUs.
-> 
-> Without this the Armada 370 based board can't boot anymore since
-> 3.10-rc1. So this one really need to be applied on 3.10-rc.
-> 
-> As the patch fixing PJ4B ID have been merged in Russell King's git
-> tree. I only sent this one. I have tested a build with the
-> vexpress_defconfig and it no more failed.
-> 
-> I have also removed the acked-by from Nicolas Pitre and the
-> Reviewed-by from Will Deacon as even the change are small it is still
-> a new version.
-> 
-> Nicolas, Will, would you agree to give your acked-by and reviewed-by
-> on this new version?
+Ok, will mention SoC Reference Manual in there.
 
-Sure, it's not much different to the last one.
+<snip>
 
-Will
+> Ok. If you dont care about the overhead, it is fine, as it is your call
+> to design the driver accessors. FYI, this is a nice explanation of what
+> is my concern:
+> http://www.spinics.net/lists/linux-omap/msg92370.html
+> 
+Thanks for the pointer.  As the IO access here is not on the hot path
+and is only at second basis, I'm not so concerned by the overhead.
+
+Shawn
