@@ -1,58 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 20 Jun 2013 10:24:51 +0200
-Subject: [GIT PULL] Nomadik DT take 2 and Nomadik clocks
-Message-ID: <CACRpkdZNPOnhVRsd1AGEiOCmPQDBadcLhctP-OwsGP+DRLa9Nw@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 20 Jun 2013 10:24:39 +0200
+Subject: [Linaro-mm-sig] [RFC 2/3] ARM: dma-mapping: Pass DMA attrs as
+ IOMMU prot
+In-Reply-To: <CAMcxFTRnnCnPnvMi89r7rUsN4xeYzZGqy9s5v5ukm_fJ_d_RGg@mail.gmail.com>
+References: <1371707384-30037-1-git-send-email-hdoyu@nvidia.com><1371707384-30037-3-git-send-email-hdoyu@nvidia.com><CAMcxFTRnnCnPnvMi89r7rUsN4xeYzZGqy9s5v5ukm_fJ_d_RGg@mail.gmail.com>
+Message-ID: <20130620.112439.1330557591655135630.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+Hi Nishanth,
 
-here is another batch of Nomadik patches. This should preferably
-be merged on top of your nomadik/dt branch (I've based it on top
-of that).
+Nishanth Peethambaran <nishanth.p@gmail.com> wrote @ Thu, 20 Jun 2013 10:07:00 +0200:
 
-Since the clock patches are totally devicetreeified, this needs to
-go in on top of the DT stuff.
+> It would be better to define a prot flag bit in iommu API and convert
+> the attrs to prot flag bit in dma-mapping aPI before calling the iommu
+> API.
 
-Yours,
-Linus Walleij
+That's the 1st option.
 
+> On Thu, Jun 20, 2013 at 11:19 AM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+....
+> > @@ -1280,7 +1281,7 @@ ____iommu_create_mapping(struct device *dev, dma_addr_t *req,
+> >                                 break;
+> >
+> >                 len = (j - i) << PAGE_SHIFT;
+> > -               ret = iommu_map(mapping->domain, iova, phys, len, 0);
+> > +               ret = iommu_map(mapping->domain, iova, phys, len, (int)attrs);
+> 
+> Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
+> prot flag bit which needs to be defined in iommu.h
 
-The following changes since commit 49932f5ef13fa6a5a8bd71cf2f0b721d0e0b495d:
+Both DMA_ATTR_READ_ONLY and IOMMU_READ are just logical bit in their
+layers respectively and eventually it's converted to H/W dependent
+bit.
 
-  ARM: nomadik: move the pin configuration to DT (2013-05-26 22:25:36 +0200)
+If IOMMU is considered as one of specific case of DMA, sharing
+dma_attr between IOMMU and DMA may not be so bad. IIRC, ARM:
+dma-mapping API was implemented based on this concept(?).
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/nomadik-dt-2
-
-for you to fetch changes up to c641d4dfef6d462c6d66a6fb57700086cd2f0106:
-
-  ARM: nomadik: add the new clocks to the device tree (2013-06-20
-10:15:48 +0200)
-
-----------------------------------------------------------------
-Nomadik DT and clock work:
-- Lee Jones' pinctrl compat ontology patches
-- A real clock driver for the Nomadik, 100% DT-based
-- Device tree changes for the Nomadik clocks
-
-----------------------------------------------------------------
-Lee Jones (2):
-      ARM: nomadik: Standardise Nomadik STN8815 based Pinctrl compat
-string in the DTS
-      pinctrl/nomadik: Standardise Pinctrl compat string for Nomadik
-based platforms
-
-Linus Walleij (2):
-      clk: nomadik: implement the Nomadik clocks properly
-      ARM: nomadik: add the new clocks to the device tree
-
- .../devicetree/bindings/clock/st,nomadik.txt       | 104 ++++
- arch/arm/boot/dts/ste-nomadik-s8815.dts            |   6 +
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         | 503 +++++++++++++++++--
- drivers/clk/clk-nomadik.c                          | 551 ++++++++++++++++++++-
- drivers/pinctrl/pinctrl-nomadik.c                  |   2 +-
- 5 files changed, 1124 insertions(+), 42 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/st,nomadik.txt
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index d8f98b1..161a1b0 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -755,7 +755,7 @@ int iommu_domain_has_cap(struct iommu_domain *domain,
+ EXPORT_SYMBOL_GPL(iommu_domain_has_cap);
+ 
+ int iommu_map(struct iommu_domain *domain, unsigned long iova,
+-	      phys_addr_t paddr, size_t size, int prot)
++	      phys_addr_t paddr, size_t size, struct dma_attr *attrs)
+ {
+ 	unsigned long orig_iova = iova;
+ 	unsigned int min_pagesz;
