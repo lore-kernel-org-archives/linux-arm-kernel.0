@@ -1,35 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 20 Jun 2013 16:32:24 +0100
-Subject: [GIT PULL] arm64 perf fix for 3.10
-Message-ID: <20130620153212.GA8621@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 20 Jun 2013 17:34:30 +0200
+Subject: [PATCH] i.MX6 ethernet phy fixup
+Message-ID: <1371742473-28026-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+All i.MX6 boards with gigabit phy I'm aware of have the same fixup
+in U-Boot for adjusting the rx/tx delay lines. In the kernel we
+only have a fixup for the sabrelite board. Instead of adding individual
+board hooks for each new boards I think we should just do register
+the fixups unconditionally on i.MX for each known phy type.
 
-Could you please pull a simple fix for arm64/perf? Thanks.
+This makes ethernet work on the different boards even when the bootloader
+misses to do it (or Linux resets the phy during startup of the ethernet
+interface).
 
-The following changes since commit 7d132055814ef17a6c7b69f342244c410a5e000f:
+I suspect this series is only the tip of the iceberg as I also see other
+boards having to adjust the rx/tx delay lines. The proper fix would probably
+be some phy level callbacks to adjust these values.
 
-  Linux 3.10-rc6 (2013-06-15 11:51:07 -1000)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git tags/arm64-stable
-
-for you to fetch changes up to abc41254181e901ef5eda2c884ca6cd88a186b6d:
-
-  perf: arm64: Record the user-mode PC in the call chain. (2013-06-20 10:16:39 +0100)
-
-----------------------------------------------------------------
-Perf fix (user-mode PC recording).
+Sascha
 
 ----------------------------------------------------------------
-Jed Davis (1):
-      perf: arm64: Record the user-mode PC in the call chain.
+Sascha Hauer (3):
+      ARM: i.MX6: call ksz9021 phy fixup for all i.MX6 boards
+      ARM: i.MX6: add ethernet phy fixup for AR8031
+      ARM: i.MX6: add ethernet phy fixup for KSZ9031
 
- arch/arm64/kernel/perf_event.c | 1 +
- 1 file changed, 1 insertion(+)
-
--- 
-Catalin
+ arch/arm/mach-imx/mach-imx6q.c | 60 +++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 56 insertions(+), 4 deletions(-)
