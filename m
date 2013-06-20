@@ -1,51 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Jun 2013 10:11:37 +0100
-Subject: [PATCH] perf: arm64: Record the user-mode PC in the call chain.
-In-Reply-To: <20130620083327.GA5288@gmail.com>
-References: <20130620030713.GA27428@mozilla.com>
- <20130620083327.GA5288@gmail.com>
-Message-ID: <20130620091136.GC2842@mudshark.cambridge.arm.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Thu, 20 Jun 2013 11:17:39 +0200
+Subject: [PATCH] dmaengine: ste_dma40: Declare memcpy config as static
+Message-ID: <1371719859-4600-1-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 09:33:28AM +0100, Ingo Molnar wrote:
-> 
-> * Jed Davis <jld@mozilla.com> wrote:
-> 
-> > With this change, we no longer lose the innermost entry in the user-mode
-> > part of the call chain.  See also the x86 port, which includes the ip,
-> > and the corresponding change in arch/arm.
-> > 
-> > Signed-off-by: Jed Davis <jld@mozilla.com>
-> > ---
-> >  arch/arm64/kernel/perf_event.c |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> > index 1e49e5eb..9ba33c4 100644
-> > --- a/arch/arm64/kernel/perf_event.c
-> > +++ b/arch/arm64/kernel/perf_event.c
-> > @@ -1336,6 +1336,7 @@ void perf_callchain_user(struct perf_callchain_entry *entry,
-> >  		return;
-> >  	}
-> >  
-> > +	perf_callchain_store(entry, regs->pc);
-> >  	tail = (struct frame_tail __user *)regs->regs[29];
-> >  
-> >  	while (entry->nr < PERF_MAX_STACK_DEPTH &&
-> 
-> Acked-by: Ingo Molnar <mingo@kernel.org>
-> 
-> I suspect this goes to v3.10 via the ARM64 tree?
+Fix sparse warnings:
 
-Yup, we'll take this via the arm64 tree, thanks.
+drivers/dma/ste_dma40.c:81:26: warning: symbol 'dma40_memcpy_conf_phy' was not declared. Should it be static?
+drivers/dma/ste_dma40.c:95:26: warning: symbol 'dma40_memcpy_conf_log' was not declared. Should it be static?
 
-Catalin, you can add:
+Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+---
 
-	Acked-by: Will Deacon <will.deacon@arm.com>
+Hi Linus,
 
-to this.
+just a quick sparse error fixup on the dma driver.
 
-Cheers,
+Thanks,
+Fabio
 
-Will
+ drivers/dma/ste_dma40.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index fa4f9a3..8f72085 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -78,7 +78,7 @@ static int dma40_memcpy_channels[] = {
+ };
+ 
+ /* Default configuration for physcial memcpy */
+-struct stedma40_chan_cfg dma40_memcpy_conf_phy = {
++static struct stedma40_chan_cfg dma40_memcpy_conf_phy = {
+ 	.mode = STEDMA40_MODE_PHYSICAL,
+ 	.dir = DMA_MEM_TO_MEM,
+ 
+@@ -92,7 +92,7 @@ struct stedma40_chan_cfg dma40_memcpy_conf_phy = {
+ };
+ 
+ /* Default configuration for logical memcpy */
+-struct stedma40_chan_cfg dma40_memcpy_conf_log = {
++static struct stedma40_chan_cfg dma40_memcpy_conf_log = {
+ 	.mode = STEDMA40_MODE_LOGICAL,
+ 	.dir = DMA_MEM_TO_MEM,
+ 
+-- 
+1.8.2
