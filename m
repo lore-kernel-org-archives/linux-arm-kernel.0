@@ -1,53 +1,71 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Jun 2013 17:43:32 +0100
-Subject: [PATCH v2 2/2] init: calibrate: don't print out bogomips value on boot
+Date: Thu, 20 Jun 2013 17:43:31 +0100
+Subject: [PATCH v2 1/2] ARM: delay: don't bother reporting bogomips in
+ /proc/cpuinfo
 In-Reply-To: <1371746612-23950-1-git-send-email-will.deacon@arm.com>
 References: <1371746612-23950-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1371746612-23950-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1371746612-23950-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BogoMIPs is a confusing concept to the ill-informed, so allow
-architectures to print it only if they find it worthwhile. The delay
-calibration code should stick to lpj and avoid trying to draw any
-correlation with BogoMIPs, which may be a fixed value derived from a
-timer frequency independent of the CPU clock speed.
+Now that we support a timer-backed delay loop, I'm quickly getting sick
+and tired of people complaining that their beloved bogomips value has
+decreased. You know who you are!
 
+This patch removes the bogomips line from /proc/cpuinfo, based on the
+reasoning that any program parsing this is already broken and, as such,
+won't be further broken if the field is removed.
+
+Cc: Nicolas Pitre <nico@fluxnic.net>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- init/calibrate.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ arch/arm/kernel/setup.c |  9 ---------
+ arch/arm/kernel/smp.c   | 13 ++-----------
+ 2 files changed, 2 insertions(+), 20 deletions(-)
 
-diff --git a/init/calibrate.c b/init/calibrate.c
-index fda0a7b..cf48068 100644
---- a/init/calibrate.c
-+++ b/init/calibrate.c
-@@ -135,13 +135,13 @@ static unsigned long __cpuinit calibrate_delay_direct(void)
- 		if ((measured_times[max] - estimate) <
- 				(estimate - measured_times[min])) {
- 			printk(KERN_NOTICE "calibrate_delay_direct() dropping "
--					"min bogoMips estimate %d = %lu\n",
-+					"min delay estimate %d = %lu\n",
- 				min, measured_times[min]);
- 			measured_times[min] = 0;
- 			min = max;
- 		} else {
- 			printk(KERN_NOTICE "calibrate_delay_direct() dropping "
--					"max bogoMips estimate %d = %lu\n",
-+					"max delay estimate %d = %lu\n",
- 				max, measured_times[max]);
- 			measured_times[max] = 0;
- 			max = min;
-@@ -292,9 +292,7 @@ void __cpuinit calibrate_delay(void)
- 	}
- 	per_cpu(cpu_loops_per_jiffy, this_cpu) = lpj;
- 	if (!printed)
--		pr_cont("%lu.%02lu BogoMIPS (lpj=%lu)\n",
--			lpj/(500000/HZ),
--			(lpj/(5000/HZ)) % 100, lpj);
-+		pr_cont("lpj=%lu\n", lpj);
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 559b976..9d80aeb 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -902,15 +902,6 @@ static int c_show(struct seq_file *m, void *v)
+ 		seq_printf(m, "model name\t: %s rev %d (%s)\n",
+ 			   cpu_name, cpuid & 15, elf_platform);
  
- 	loops_per_jiffy = lpj;
- 	printed = true;
+-#if defined(CONFIG_SMP)
+-		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
+-			   per_cpu(cpu_data, i).loops_per_jiffy / (500000UL/HZ),
+-			   (per_cpu(cpu_data, i).loops_per_jiffy / (5000UL/HZ)) % 100);
+-#else
+-		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
+-			   loops_per_jiffy / (500000/HZ),
+-			   (loops_per_jiffy / (5000/HZ)) % 100);
+-#endif
+ 		/* dump out the processor features */
+ 		seq_puts(m, "Features\t: ");
+ 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 550d63c..bd23678 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -375,17 +375,8 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+ 
+ void __init smp_cpus_done(unsigned int max_cpus)
+ {
+-	int cpu;
+-	unsigned long bogosum = 0;
+-
+-	for_each_online_cpu(cpu)
+-		bogosum += per_cpu(cpu_data, cpu).loops_per_jiffy;
+-
+-	printk(KERN_INFO "SMP: Total of %d processors activated "
+-	       "(%lu.%02lu BogoMIPS).\n",
+-	       num_online_cpus(),
+-	       bogosum / (500000/HZ),
+-	       (bogosum / (5000/HZ)) % 100);
++	printk(KERN_INFO "SMP: Total of %d processors activated.\n",
++	       num_online_cpus());
+ 
+ 	hyp_mode_check();
+ }
 -- 
 1.8.2.2
