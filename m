@@ -1,95 +1,49 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 20 Jun 2013 09:43:52 +0200
-Subject: [PATCH 2/8] at_hdmac: prepare clk before calling enable
-In-Reply-To: <1371640494-9472-1-git-send-email-b.brezillon@overkiz.com>
-References: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
- <1371640494-9472-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <51C2B2B8.2040104@atmel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 20 Jun 2013 09:45:26 +0200
+Subject: [PATCH] arm: mvebu: fix coherency_late_init() for multiplatform
+Message-ID: <1371714326-25971-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/2013 13:14, Boris BREZILLON :
-> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
-> avoid common clk framework warnings.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+As noticed by Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>, commit
+865e0527d2d7 ('arm: mvebu: avoid hardcoded virtual address in
+coherency code') added a postcore_initcall() to register the bus
+notifier that the mvebu code needs to apply correct DMA operations on
+its platform devices breaks the multiplatform boot on other platforms,
+because the bus notifier registration is unconditional.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+This commit fixes that by registering the bus notifier only if we have
+the mvebu coherency unit described in the Device Tree. The conditional
+used is exactly the same in which the bus_register_notifier() call was
+originally enclosed before 865e0527d2d7 ('arm: mvebu: avoid hardcoded
+virtual address in coherency code').
 
-BTW Vinod, it seems that we have several slave-dma patches pending: do 
-you want me to collect them and send you a pull-request for 3.11?
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reported-by: Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>
+---
+This fix has been reported by Arnaud to fix the boot on his OMAP4
+PandaBoard, and it continues to work well on Marvell Armada XP GP.
 
-Best regards,
+This commit is based on jcooper/mvebu/regmap.
+---
+ arch/arm/mach-mvebu/coherency.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-> ---
->   drivers/dma/at_hdmac.c |   17 +++++++++++------
->   1 file changed, 11 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index e923cda..19a484a 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -1374,7 +1374,9 @@ static int __init at_dma_probe(struct platform_device *pdev)
->   		err = PTR_ERR(atdma->clk);
->   		goto err_clk;
->   	}
-> -	clk_enable(atdma->clk);
-> +	err = clk_prepare_enable(atdma->clk);
-> +	if (err)
-> +		goto err_clk_prepare;
->
->   	/* force dma off, just in case */
->   	at_dma_off(atdma);
-> @@ -1475,7 +1477,8 @@ err_pool_create:
->   	platform_set_drvdata(pdev, NULL);
->   	free_irq(platform_get_irq(pdev, 0), atdma);
->   err_irq:
-> -	clk_disable(atdma->clk);
-> +	clk_disable_unprepare(atdma->clk);
-> +err_clk_prepare:
->   	clk_put(atdma->clk);
->   err_clk:
->   	iounmap(atdma->regs);
-> @@ -1512,7 +1515,7 @@ static int at_dma_remove(struct platform_device *pdev)
->   		list_del(&chan->device_node);
->   	}
->
-> -	clk_disable(atdma->clk);
-> +	clk_disable_unprepare(atdma->clk);
->   	clk_put(atdma->clk);
->
->   	iounmap(atdma->regs);
-> @@ -1531,7 +1534,7 @@ static void at_dma_shutdown(struct platform_device *pdev)
->   	struct at_dma	*atdma = platform_get_drvdata(pdev);
->
->   	at_dma_off(platform_get_drvdata(pdev));
-> -	clk_disable(atdma->clk);
-> +	clk_disable_unprepare(atdma->clk);
->   }
->
->   static int at_dma_prepare(struct device *dev)
-> @@ -1588,7 +1591,7 @@ static int at_dma_suspend_noirq(struct device *dev)
->
->   	/* disable DMA controller */
->   	at_dma_off(atdma);
-> -	clk_disable(atdma->clk);
-> +	clk_disable_unprepare(atdma->clk);
->   	return 0;
->   }
->
-> @@ -1618,7 +1621,9 @@ static int at_dma_resume_noirq(struct device *dev)
->   	struct dma_chan *chan, *_chan;
->
->   	/* bring back DMA controller */
-> -	clk_enable(atdma->clk);
-> +	err = clk_prepare_enable(atdma->clk);
-> +	if (err)
-> +		return err;
->   	dma_writel(atdma, EN, AT_DMA_ENABLE);
->
->   	/* clear any pending interrupt */
->
-
-
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 32fcf69..be11759 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -147,8 +147,9 @@ int __init coherency_init(void)
+ 
+ static int __init coherency_late_init(void)
+ {
+-	bus_register_notifier(&platform_bus_type,
+-			      &mvebu_hwcc_platform_nb);
++	if (of_find_matching_node(NULL, of_coherency_table))
++		bus_register_notifier(&platform_bus_type,
++				      &mvebu_hwcc_platform_nb);
+ 	return 0;
+ }
+ 
 -- 
-Nicolas Ferre
+1.8.1.2
