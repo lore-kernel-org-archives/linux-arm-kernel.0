@@ -1,50 +1,52 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 20 Jun 2013 18:35:09 +0900
-Subject: [PATCH V7 4/4] ARM: dts: Add pcie controller node for
- exynos5440-ssdk5440
-Message-ID: <00ce01ce6d99$74e1ebf0$5ea5c3d0$@samsung.com>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Thu, 20 Jun 2013 15:05:56 +0530
+Subject: [PATCH V4 00/11] USB: OHCI:Properly handle ohci_suspend()routine in
+ bus glue
+In-Reply-To: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1371720968-7533-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pcie controller node for exynos5440-ssdk5440,
-and also adds a phandle for pin controller node.
+Suspend scenario in case of ohci bus glue was not properly handled as
+it was not suspending generic part of ohci controller. Calling
+explicitly the ohci_suspend()routine will ensure proper handling
+of suspend scenario.
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/boot/dts/exynos5440-ssdk5440.dts |    8 ++++++++
- arch/arm/boot/dts/exynos5440.dtsi         |    2 +-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+V2:
+ -Incase ohci_suspend() fails, return right away without executing further.
 
-diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-index f32cd77..ede7727 100644
---- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-+++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-@@ -65,4 +65,12 @@
- 			clock-frequency = <50000000>;
- 		};
- 	};
-+
-+	pcie at 290000 {
-+		reset-gpio = <&pin_ctrl 5 0>;
-+	};
-+
-+	pcie at 2a0000 {
-+		reset-gpio = <&pin_ctrl 22 0>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index 68d05e9..de31f0c 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -126,7 +126,7 @@
- 		clock-names = "spi", "spi_busclk0";
- 	};
+V3:
+ -New patch 1/11 added, for generic ohci-hcd suspend code.
  
--	pinctrl {
-+	pin_ctrl: pinctrl {
- 		compatible = "samsung,exynos5440-pinctrl";
- 		reg = <0xE0000 0x1000>;
- 		interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>,
+V4:
+ -Properly aligned "do_wakeup" and "ret" variables.
+
+Manjunath Goudar (11):
+  USB: OHCI: Properly handle OHCI controller suspend
+  USB: OHCI: Properly handle ohci-at91 suspend
+  USB: OHCI: Properly handle ohci-s3c2410 suspend
+  USB: OHCI: Properly handle ohci-da8xx suspend
+  USB: OHCI: Properly handle ohci-ep93xx suspend
+  USB: OHCI: Properly handle ohci-exynos suspend
+  USB: OHCI: Properly handle ohci-omap suspend
+  USB: OHCI: Properly handle ohci-platform suspend
+  USB: OHCI: Properly handle ohci-pxa27x suspend
+  USB: OHCI: Properly handle ohci-sm501 suspend
+  USB: OHCI: Properly handle ohci-spear suspend
+
+ drivers/usb/host/ohci-at91.c     |   10 ++++++++--
+ drivers/usb/host/ohci-da8xx.c    |   15 +++++++++++----
+ drivers/usb/host/ohci-ep93xx.c   |    9 ++++++++-
+ drivers/usb/host/ohci-exynos.c   |   20 +++++---------------
+ drivers/usb/host/ohci-hcd.c      |    9 ++++++++-
+ drivers/usb/host/ohci-omap.c     |   13 ++++++++++---
+ drivers/usb/host/ohci-platform.c |    9 ++++++++-
+ drivers/usb/host/ohci-pxa27x.c   |    8 +++++++-
+ drivers/usb/host/ohci-s3c2410.c  |   19 ++++---------------
+ drivers/usb/host/ohci-sm501.c    |   11 +++++++++--
+ drivers/usb/host/ohci-spear.c    |   12 +++++++++---
+ 11 files changed, 87 insertions(+), 48 deletions(-)
+
 -- 
-1.7.10.4
+1.7.9.5
