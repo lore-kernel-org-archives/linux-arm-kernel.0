@@ -1,37 +1,47 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 20 Jun 2013 08:49:41 +0300
-Subject: [RFC 0/3] How to pass IOMMU map attr via DMA API?
-Message-ID: <1371707384-30037-1-git-send-email-hdoyu@nvidia.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Thu, 20 Jun 2013 05:59:02 +0000
+Subject: [PATCH] ARM: OMAP2: reboot: Include common.h to fix build error
+In-Reply-To: <1371664001.9848.1.camel@phoenix>
+References: <1371664001.9848.1.camel@phoenix>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EB22C4C@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In Tegra SoC, IOMMU can set some mapping attribute for each page, for
-exmaple, READable, and WRITEable. We'd like to use this feature
-*newly* for robustness, where read-only pages can be protected from
-being overwritten by wrong operation. We have been using IOMMU via DMA
-mapping API(ARM). DMA mapping API currently doesn't use "prot"
-parameter when calling IOMMU API. So this series tries to pass "struct
-dma_attrs *attrs" via "int prot" in IOMMU API. I'm not so sure if this
-implementation is right or not because:
+Hi,
 
-- Casting (struct dma_attrs *) to (int) in DMA API doesn't look nice.
-- IOMMU layer needs to cast (int) back to (struct dma_attrs *) again,
-  which can be considered as violation of layers.
+On Wed, Jun 19, 2013 at 23:16:41, Axel Lin wrote:
 
-If you have any implementations/suggestions, it would be really helpful.
+> Include common.h which will include linux/reboot.h to fix below build error.
+> 
+>   CC      arch/arm/mach-omap2/omap4-restart.o
+> arch/arm/mach-omap2/omap4-restart.c:21:28: warning: 'enum reboot_mode' declared inside parameter list [enabled by default]
+> arch/arm/mach-omap2/omap4-restart.c:21:28: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+> arch/arm/mach-omap2/omap4-restart.c:21:40: error: parameter 1 ('mode') has incomplete type
+> arch/arm/mach-omap2/omap4-restart.c:21:6: warning: function declaration isn't a prototype [-Wstrict-prototypes]
+> make[1]: *** [arch/arm/mach-omap2/omap4-restart.o] Error 1
+> make: *** [arch/arm/mach-omap2] Error 2
+> 
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> ---
+> Seems this build error is introduced by commit 7507d035f3cf40c
+> "reboot: arm: change reboot_mode to use enum reboot_mode"
+> 
+> This patch is against linux-next 20130619.
 
-This series isn't applied cleanly but this is posted to request for
-comments.
+> diff --git a/arch/arm/mach-omap2/omap4-restart.c b/arch/arm/mach-omap2/omap4-restart.c
+> index 652adde..7306d9b 100644
+> --- a/arch/arm/mach-omap2/omap4-restart.c
+> +++ b/arch/arm/mach-omap2/omap4-restart.c
+> @@ -9,6 +9,7 @@
+>  
+>  #include <linux/types.h>
+>  #include "prminst44xx.h"
+> +#include "common.h"
 
-Hiroshi Doyu (3):
-  common: DMA-mapping: add DMA_ATTR_READ_ONLY attribute
-  ARM: dma-mapping: Pass DMA attrs as IOMMU prot
-  iommu/tegra: smmu: Support read-only mapping
+Arnd has posted a patch [1] that includes reboot.h directly for
+multiple platforms including this one.
 
- arch/arm/mm/dma-mapping.c  | 34 +++++++++++++++++++++-------------
- drivers/iommu/tegra-smmu.c | 41 +++++++++++++++++++++++++++++------------
- include/linux/dma-attrs.h  |  1 +
- 3 files changed, 51 insertions(+), 25 deletions(-)
+Regards
+Afzal
 
--- 
-1.8.1.5
+[1] https://lkml.org/lkml/2013/6/19/498
