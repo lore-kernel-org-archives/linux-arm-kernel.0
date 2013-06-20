@@ -1,48 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Jun 2013 00:24:23 -0700
-Subject: [PATCH 2/4] mmc: omap_hsmmc: Enable SDIO IRQ using a GPIO in
- idle mode
-In-Reply-To: <CAPDyKFq+==Bca+AaZwD=A5v6HzL8ShKatq+8U-S=atZUFh8=rQ@mail.gmail.com>
-References: <20130607214557.18581.75288.stgit@localhost>
- <20130607214952.18581.90049.stgit@localhost>
- <CAPDyKFq+==Bca+AaZwD=A5v6HzL8ShKatq+8U-S=atZUFh8=rQ@mail.gmail.com>
-Message-ID: <20130620072422.GG5523@atomide.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 20 Jun 2013 09:27:17 +0200
+Subject: [Linaro-mm-sig] [RFC 3/3] iommu/tegra: smmu: Support read-only
+ mapping
+In-Reply-To: <CAH9JG2VUCJErBNwT0_u_9niaSWUza5gJ-+q8OOJhrrdw5D-hUg@mail.gmail.com>
+References: <1371707384-30037-1-git-send-email-hdoyu@nvidia.com><1371707384-30037-4-git-send-email-hdoyu@nvidia.com><CAH9JG2VUCJErBNwT0_u_9niaSWUza5gJ-+q8OOJhrrdw5D-hUg@mail.gmail.com>
+Message-ID: <20130620.102717.424970523102380476.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ulf Hansson <ulf.hansson@linaro.org> [130614 04:55]:
-> On 7 June 2013 23:49, Tony Lindgren <tony@atomide.com> wrote:
-> > From: Andreas Fenkart <andreas.fenkart@streamunlimited.com>
-> > --- a/drivers/mmc/host/omap_hsmmc.c
-> > +++ b/drivers/mmc/host/omap_hsmmc.c
-> > +static void omap_hsmmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
-> > +{
-> > +       struct omap_hsmmc_host *host = mmc_priv(mmc);
-> > +       u32 irq_mask;
-> > +       unsigned long flags;
-> > +
-> > +       spin_lock_irqsave(&host->irq_lock, flags);
-> > +
-> > +       if (host->sdio_irq_en == enable) {
-> > +               dev_dbg(host->dev, "en/disable:%d already set", enable);
-> > +               spin_unlock_irqrestore(&host->irq_lock, flags);
-> > +               return;
-> > +       }
-> > +
-> 
-> Hi Tony/Andreas,
-> 
-> I belive a "pm_runtime_get_sync" would be needed here, outside the
-> spinlock ofcourse. Before returning from this function, obviusly
-> return the references by a pm_runtime_put* in some form.
-> 
-> Then you will be able to remove the "active_pinmux" variable entirely,
-> since you know the runtime callbacks is the only place were you need
-> to handle the gpio irq enable|disable.
+Hi Kyungmin,
 
-Thanks for the review, that's a good point. I'll check this as
-soon as I have a chance.
+Kyungmin Park <kmpark@infradead.org> wrote @ Thu, 20 Jun 2013 08:50:14 +0200:
 
-Regards,
+> On Thu, Jun 20, 2013 at 2:49 PM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> > Support read-only mapping via struct dma_attrs.
+> >
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > ---
+> >  drivers/iommu/tegra-smmu.c | 41 +++++++++++++++++++++++++++++------------
+> >  1 file changed, 29 insertions(+), 12 deletions(-)
+> >
+> > diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+> > index fab1f19..3aff4cd 100644
+> > --- a/drivers/iommu/tegra-smmu.c
+> > +++ b/drivers/iommu/tegra-smmu.c
+> > @@ -862,12 +862,13 @@ static size_t __smmu_iommu_unmap_largepage(struct smmu_as *as, dma_addr_t iova)
+> >  }
+> >
+> >  static int __smmu_iommu_map_pfn(struct smmu_as *as, dma_addr_t iova,
+> > -                                unsigned long pfn)
+> > +                               unsigned long pfn, int prot)
+> Can you find 'prot' is used at other arch? In previous patch, you cast
 
-Tony
+{amd,intel}_iommu_map() take the IOMMU standard flags below and
+translate it into each H/W dependent bits.
+
+#define IOMMU_READ	(1)
+#define IOMMU_WRITE	(2)
+#define IOMMU_CACHE	(4) /* DMA cache coherency */
+
+The others like OMAP/MSM pass their H/W dependent bits all the way. I
+think that they don't use IOMMU via DMA mapping API.
+
+> it as 'int' but below code cast it as 'struct dma_attr' again.
+> doesn't it better to use 'struct dma_attr' as parameter to avoid
+> double cast? Of course you have to modify existing APIs to use 'struct
+> dma_attr'.
+
+If DMA mapping API is considered as the standard frontend of
+IOMMU(API), that may be an option.
