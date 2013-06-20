@@ -1,39 +1,28 @@
 From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 20 Jun 2013 12:52:31 -0400 (EDT)
-Subject: [RFC PATCH v1 1/6] USB: HCD: support giveback of URB in tasklet
- context
-In-Reply-To: <CACVXFVPPF=DNp0dpypoZ=OifkfnCgWJKpQHMv4xE8PmBk8RiHQ@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306201242110.2063-100000@iolanthe.rowland.org>
+Date: Thu, 20 Jun 2013 12:53:32 -0400 (EDT)
+Subject: [PATCH V2 5/6] USB: OHCI: make ohci-at91 a separate driver
+In-Reply-To: <CAJFYCKGaq5cQFRkXpD0jCwbrLF5R5MtDLJiaZSG6GMuZLaX5AA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306201252400.2063-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Jun 2013, Ming Lei wrote:
+On Thu, 20 Jun 2013, Manjunath Goudar wrote:
 
-> On Thu, Jun 20, 2013 at 10:59 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> > > @@ -686,7 +631,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device
+> > *pdev, pm_message_t mesg)
+> > >        * REVISIT: some boards will be able to turn VBUS off...
+> > >        */
+> > >       if (at91_suspend_entering_slow_clock()) {
+> > > -             ohci_usb_reset (ohci);
+> > > +             ohci_restart(ohci);
 > >
-> > By the way, did you consider the race that Oliver pointed out?  When an
-> > HCD is removed, all the outstanding URBs for all devices on its bus get
-> > cancelled.  The core waits until the urb_list for each endpoint is
-> > empty.
+> > Why did you change this?  Did we discuss it earlier?
+> >
 > 
-> This should be enough since during remove path usbcore will wait for all
-> URBs' completion which is only triggered by tasklet, so once all URBs are
-> finished, the tasklet list has been empty already.
+> We are not discussed  regarding this,I think we need to call
+> use ohci_resume() instead of ohci_restart().
 
-No, usbcore only waits until the urb_list for each endpoint is empty.  
-It doesn't keep track of the individual URB completions.  Look at
-usb_hcd_flush_endpoint() and you'll see.
-
-> > (Probably it's sufficient to wait until the tasklet lists are empty.  I
-> > assume tasklet_kill() won't stop a tasklet that's currently running.)
-> 
-> From the implementation of tasklet_kill(), it will wait for the completion
-> of the tasklet.
-> 
-> Actually the tasklet_kill() should not be necessary, I think.
-
-You're probably right.  But we should wait until the tasklet's list is 
-empty; we don't want to deallocate an hcd structure until all the URBs 
-are taken off.
+Why?  Don't you think the current code has a good reason for calling 
+ohci_usb_reset()?
 
 Alan Stern
