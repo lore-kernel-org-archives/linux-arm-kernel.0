@@ -1,29 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jun 2013 22:54:35 +0200
-Subject: [GIT PULL 10/10] Samsung non-critical-fixes-1 for v3.11
-In-Reply-To: <51C0BC84.7040501@samsung.com>
-References: <51C0BC84.7040501@samsung.com>
-Message-ID: <201306202254.35907.arnd@arndb.de>
+Date: Thu, 20 Jun 2013 22:58:26 +0200
+Subject: [GIT PULL 08/10] Samsung SoC EXYNOS5420 for v3.11
+In-Reply-To: <51C0BC74.1060502@samsung.com>
+References: <51C0BC74.1060502@samsung.com>
+Message-ID: <201306202258.26968.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 18 June 2013, Kukjin Kim wrote:
+> ----------------------------------------------------------------
+> based on tags/common-clk-audio
+> - add support for exynos5420 SoC
 > 
-> The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
-> 
->    Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
-> 
-> are available in the git repository at:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-> tags/non-critical-fixes-1
-> 
-> for you to fetch changes up to 33d43cdddbaa6d0071618d0d233817c460714634:
-> 
->    MAINTAINERS: Add exynos filename match to ARM/S5P EXYNOS ARM 
-> ARCHITECTURES (2013-06-18 07:02:23 +0900)
-> 
+> ----------------------------------------------------------------
 
-Pulled into next/fixes-non-critical, thanks!
+This is causing me a little pain because of the deep dependency
+chain. I'll probably have to create a next/soc2 branch, but
+will first try to merge the Renesas pull requests, which may have
+similar problems.
+
+If it's possible to rebase this one not to have any dependencies
+other than the branches merged into next/cleanup and next/soc,
+I can pull it more easily, as long as I can figure out how
+to merge it with the common-clk-audio branch.
 
 	Arnd
