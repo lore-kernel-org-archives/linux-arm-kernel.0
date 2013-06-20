@@ -1,75 +1,122 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 20 Jun 2013 10:04:06 +0200
-Subject: [PATCH v2 2/2] i2c: imx: Add Vybrid VF610 I2C controller support
-In-Reply-To: <1371545327-12481-1-git-send-email-b35083@freescale.com>
-References: <1371545327-12481-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130620080406.GD14308@pengutronix.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 20 Jun 2013 10:04:22 +0200
+Subject: [PATCH V6 3/3] ARM: dts: Add pcie controller node for Samsung
+ EXYNOS5440 SoC
+In-Reply-To: <00c201ce6d85$83b072a0$8b1157e0$@samsung.com>
+References: <00c201ce6d85$83b072a0$8b1157e0$@samsung.com>
+Message-ID: <3250954.dVh4O1LchK@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 04:48:47PM +0800, Jingchang Lu wrote:
-> +static u16 imx_i2c_clk_div[50][2] = {
->  	{ 22,	0x20 }, { 24,	0x21 }, { 26,	0x22 }, { 28,	0x23 },
->  	{ 30,	0x00 },	{ 32,	0x24 }, { 36,	0x25 }, { 40,	0x26 },
->  	{ 42,	0x03 }, { 44,	0x27 },	{ 48,	0x28 }, { 52,	0x05 },
-> @@ -112,11 +107,67 @@ static u16 __initdata i2c_clk_div[50][2] = {
->  	{ 3072,	0x1E }, { 3840,	0x1F }
+Hi Jingoo,
+
+On Thursday 20 of June 2013 16:12:24 Jingoo Han wrote:
+> Exynos5440 has two PCIe controllers which can be used as root complex
+> for PCIe interface.
+> 
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5440-ssdk5440.dts |    8 ++++++
+>  arch/arm/boot/dts/exynos5440.dtsi         |   40
+> ++++++++++++++++++++++++++++- 2 files changed, 47 insertions(+), 1
+> deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+> b/arch/arm/boot/dts/exynos5440-ssdk5440.dts index f32cd77..3d93804
+> 100644
+> --- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+> +++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+> @@ -65,4 +65,12 @@
+>  			clock-frequency = <50000000>;
+>  		};
+>  	};
+> +
+> +	pcie0 at 290000 {
+> +		reset-gpio = <&pin_ctrl 5 0>;
+> +	};
+> +
+> +	pcie1 at 2a0000 {
+> +		reset-gpio = <&pin_ctrl 22 0>;
+> +	};
 >  };
->  
-> +/* Vybrid VF610 clock divider, register value pairs */
-> +static u16 vf610_i2c_clk_div[60][2] = {
-> +	{ 20,   0x00 }, { 22,   0x01 }, { 24,   0x02 }, { 26,   0x03 },
-> +	{ 28,   0x04 }, { 30,   0x05 }, { 32,   0x09 }, { 34,   0x06 },
-> +	{ 36,   0x0A }, { 40,   0x07 }, { 44,   0x0C }, { 48,   0x0D },
-> +	{ 52,   0x43 }, { 56,   0x0E }, { 60,   0x45 }, { 64,   0x12 },
-> +	{ 68,   0x0F }, { 72,   0x13 }, { 80,   0x14 }, { 88,   0x15 },
-> +	{ 96,   0x19 }, { 104,  0x16 }, { 112,  0x1A }, { 128,  0x17 },
-> +	{ 136,  0x4F }, { 144,  0x1C }, { 160,  0x1D }, { 176,  0x55 },
-> +	{ 192,  0x1E }, { 208,  0x56 }, { 224,  0x22 }, { 228,  0x24 },
-> +	{ 240,  0x1F }, { 256,  0x23 }, { 288,  0x5C }, { 320,  0x25 },
-> +	{ 384,  0x26 }, { 448,  0x2A }, { 480,  0x27 }, { 512,  0x2B },
-> +	{ 576,  0x2C }, { 640,  0x2D }, { 768,  0x31 }, { 896,  0x32 },
-> +	{ 960,  0x2F }, { 1024, 0x33 }, { 1152, 0x34 }, { 1280, 0x35 },
-> +	{ 1536, 0x36 }, { 1792, 0x3A }, { 1920, 0x37 }, { 2048, 0x3B },
-> +	{ 2304, 0x3C }, { 2560, 0x3D }, { 3072, 0x3E }, { 3584, 0x7A },
-> +	{ 3840, 0x3F }, { 4096, 0x7B }, { 5120, 0x7D }, { 6144, 0x7E },
-> +};
+> diff --git a/arch/arm/boot/dts/exynos5440.dtsi
+> b/arch/arm/boot/dts/exynos5440.dtsi index 03d40c0..6295eda 100644
+> --- a/arch/arm/boot/dts/exynos5440.dtsi
+> +++ b/arch/arm/boot/dts/exynos5440.dtsi
+> @@ -126,7 +126,7 @@
+>  		clock-names = "spi", "spi_busclk0";
+>  	};
+> 
+> -	pinctrl {
+> +	pin_ctrl: pinctrl {
+>  		compatible = "samsung,exynos5440-pinctrl";
+>  		reg = <0xE0000 0x1000>;
+>  		interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>,
+> @@ -230,4 +230,42 @@
+>  		clocks = <&clock 24>;
+>  		clock-names = "usbhost";
+>  	};
 
-...
+I think this patch should be split into two:
+ - patch adding just generlic PCIe nodes for Exynos5440,
+ - patch adding label to the pinctrl node (which is a prerequisite) and 
+board-specific properties of PCIe nodes.
 
-> +static struct imx_i2c_hwdata imx_i2c_hwdata = {
-> +	.addr_reg		= 0x00,
-> +	.freq_reg		= 0x04,
-> +	.ctrl_reg		= 0x08,
-> +	.status_reg		= 0x0c,
-> +	.data_reg		= 0x10,
-> +	.clk_div		= imx_i2c_clk_div,
-> +	.ndivs			= ARRAY_SIZE(imx_i2c_clk_div),
-> +	.i2sr_clr_opcode	= I2SR_CLR_OPCODE_W0C,
-> +	.i2cr_ien_opcode	= I2CR_IEN_OPCODE_1,
 > +
-> +};
+> +	pcie0 at 290000 {
+
+Node naming looks incorrect here. The name should be as generic as 
+possible, without any hardware-specific IDs, e.g. pcie, not pcie0. The 
+@290000 suffix is enough to make the node unique.
+
+> +		compatible = "samsung,exynos5440-pcie";
+> +		reg = <0x290000 0x1000
+> +			0x270000 0x1000
+> +			0x271000 0x40>;
+> +		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
+> +		clocks = <&clock 28>, <&clock 27>;
+> +		clock-names = "pcie", "pcie_bus";
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		device_type = "pci";
+> +		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00001000   
+/*
+> configuration space */ +			  0x81000000 0 0	  
+0x40001000 0 0x00010000  
+> /* downstream I/O */ +			  0x82000000 0 0x40011000 
+0x40011000 0
+> 0x1ffef000>; /* non-prefetchable memory */ +		#interrupt-cells = 
+<1>;
+> +		interrupt-map-mask = <0 0 0 0>;
+> +		interrupt-map = <0x0 0 &gic 53>;
+> +	};
 > +
-> +static struct imx_i2c_hwdata vf610_i2c_hwdata = {
-> +	.addr_reg		= 0x00,
-> +	.freq_reg		= 0x01,
-> +	.ctrl_reg		= 0x02,
-> +	.status_reg		= 0x03,
-> +	.data_reg		= 0x04,
-> +	.clk_div		= vf610_i2c_clk_div,
-> +	.ndivs			= ARRAY_SIZE(vf610_i2c_clk_div),
-> +	.i2sr_clr_opcode	= I2SR_CLR_OPCODE_W1C,
-> +	.i2cr_ien_opcode	= I2CR_IEN_OPCODE_0,
-> +
-> +};
+> +	pcie1 at 2a0000 {
 
-Wow. The i2c unit remained unchanged since the i.MX21 days. Shuffling
-some registers or divider values was long overdue...
+Same here.
 
-Sascha
+Best regards,
+Tomasz
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> +		compatible = "samsung,exynos5440-pcie";
+> +		reg = <0x2a0000 0x1000
+> +			0x272000 0x1000
+> +			0x271040 0x40>;
+> +		interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
+> +		clocks = <&clock 29>, <&clock 27>;
+> +		clock-names = "pcie", "pcie_bus";
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		device_type = "pci";
+> +		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00001000   
+/*
+> configuration space */ +			  0x81000000 0 0	  
+0x60001000 0 0x00010000  
+> /* downstream I/O */ +			  0x82000000 0 0x60011000 
+0x60011000 0
+> 0x1ffef000>; /* non-prefetchable memory */ +		#interrupt-cells = 
+<1>;
+> +		interrupt-map-mask = <0 0 0 0>;
+> +		interrupt-map = <0x0 0 &gic 56>;
+> +	};
+>  };
