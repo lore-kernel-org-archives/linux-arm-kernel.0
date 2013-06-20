@@ -1,44 +1,70 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 20 Jun 2013 21:25:02 +0900
-Subject: [PATCH] serial: sh-sci: Initialise variables before access in
- sci_set_termios()
-Message-ID: <1371731102-5125-1-git-send-email-horms+renesas@verge.net.au>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 20 Jun 2013 15:29:54 +0300
+Subject: [RFC PATCH 1/6] mfd: omap-usb-host: move initialization to
+ module_init()
+In-Reply-To: <20130620120746.GC9817@arwen.pp.htv.fi>
+References: <1371650753-11452-1-git-send-email-rogerq@ti.com>
+ <1371650753-11452-2-git-send-email-rogerq@ti.com>
+ <20130620120746.GC9817@arwen.pp.htv.fi>
+Message-ID: <51C2F5C2.5040004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change addresses two warnings that are flagged by gcc relating to
-potential access to the ssr and cks variables while they are uninitialised.
+On 06/20/2013 03:07 PM, Felipe Balbi wrote:
+> Hi,
+> 
+> On Wed, Jun 19, 2013 at 05:05:48PM +0300, Roger Quadros wrote:
+>> We no longer need to be initialized in any particular order
+>> so move driver initialization to the standard place i.e. module_init()
+>>
+>> CC: Samuel Ortiz <sameo@linux.intel.com>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>  drivers/mfd/omap-usb-host.c |   10 +---------
+>>  drivers/mfd/omap-usb-tll.c  |    8 +-------
+>>  2 files changed, 2 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+>> index 759fae3..6601a49 100644
+>> --- a/drivers/mfd/omap-usb-host.c
+>> +++ b/drivers/mfd/omap-usb-host.c
+>> @@ -908,15 +908,7 @@ static int __init omap_usbhs_drvinit(void)
+>>  {
+>>  	return platform_driver_probe(&usbhs_omap_driver, usbhs_omap_probe);
+>>  }
+>> -
+>> -/*
+>> - * init before ehci and ohci drivers;
+>> - * The usbhs core driver should be initialized much before
+>> - * the omap ehci and ohci probe functions are called.
+>> - * This usbhs core driver should be initialized after
+>> - * usb tll driver
+>> - */
+>> -fs_initcall_sync(omap_usbhs_drvinit);
+>> +module_init(omap_usbhs_drvinit);
+>>  
+>>  static void __exit omap_usbhs_drvexit(void)
+>>  {
+>> diff --git a/drivers/mfd/omap-usb-tll.c b/drivers/mfd/omap-usb-tll.c
+>> index e59ac4c..fb7c73e 100644
+>> --- a/drivers/mfd/omap-usb-tll.c
+>> +++ b/drivers/mfd/omap-usb-tll.c
+>> @@ -482,13 +482,7 @@ static int __init omap_usbtll_drvinit(void)
+>>  {
+>>  	return platform_driver_register(&usbtll_omap_driver);
+>>  }
+>> -
+>> -/*
+>> - * init before usbhs core driver;
+>> - * The usbtll driver should be initialized before
+>> - * the usbhs core driver probe function is called.
+>> - */
+>> -fs_initcall(omap_usbtll_drvinit);
+>> +module_init(omap_usbtll_drvinit);
+> 
+> since you're doing that, could just move to module_platform_driver.
+> 
+sounds good.
 
-I have addressed this by initialising the values to
-the defaults present in sci_baud_calc_hscif().
-
-It is my analysis that cks is always initialised if used
-but that without this change ssr may be accessed while uninitialised.
-
-The code altered by this patch was introduced by commit
-f303b364b41d3fc5bf879799128958400b7859aa ("serial: sh-sci: HSCIF support").
-
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/tty/serial/sh-sci.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index 931d6c3..7477e0e 100644
---- a/drivers/tty/serial/sh-sci.c
-+++ b/drivers/tty/serial/sh-sci.c
-@@ -1887,9 +1887,9 @@ static void sci_set_termios(struct uart_port *port, struct ktermios *termios,
- {
- 	struct sci_port *s = to_sci_port(port);
- 	struct plat_sci_reg *reg;
--	unsigned int baud, smr_val, max_baud, cks;
-+	unsigned int baud, smr_val, max_baud, cks = 0;
- 	int t = -1;
--	unsigned int srr;
-+	unsigned int srr = 15;
- 
- 	/*
- 	 * earlyprintk comes here early on with port->uartclk set to zero.
--- 
-1.8.2.1
+cheers,
+-roger
