@@ -1,33 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jun 2013 21:51:34 +0200
-Subject: [GIT PULL 02/10] Samsung EXYNOS arch for v3.11
-In-Reply-To: <51C0BC3F.2060002@samsung.com>
-References: <51C0BC3F.2060002@samsung.com>
-Message-ID: <201306202151.34934.arnd@arndb.de>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 20 Jun 2013 22:08:45 +0200
+Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
+ MMU binding
+In-Reply-To: <1370889285-22799-8-git-send-email-will.deacon@arm.com>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-8-git-send-email-will.deacon@arm.com>
+Message-ID: <20130620200845.GF11309@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Kukjin Kim wrote:
-> The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
-> 
->    Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
-> 
-> are available in the git repository at:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-> tags/exynos-arch-2
-> 
-> for you to fetch changes up to b5f3c75a75d31039c6de3ab38d074b43c60462f7:
-> 
->    ARM: EXYNOS: call scu_enable() only in case of cortex-A9 processor 
-> (2013-06-19 03:41:38 +0900)
-> 
-> ----------------------------------------------------------------
-> arch/arm/mach-exynos update
-> - enable XHCI on exynos5
-> - enable Pinctrl on exynos4 and exynos5
-> - calling scu_enable() is only available on Cortex-A9
+On Mon, Jun 10, 2013 at 07:34:43PM +0100, Will Deacon wrote:
+> This patch adds a description of the device tree binding for the ARM
+> System MMU architecture.
 
-Pulled into next/soc, thanks!
+Interesting, will this be a common driver to replace existing ARM IOMMU
+drivers or is it a common driver for ARM IOMMUs found in future chips?
 
-	ARnd
+> +- smmu-parent   : When multiple SMMUs are chained together, this
+> +                  property can be used to provide a phandle to the
+> +                  parent SMMU (that is the next SMMU on the path going
+> +                  from the mmu-masters towards memory) node for this
+> +                  SMMU.
+
+What happens when SMMUs are chained? Will the second SMMU seeing the DMA
+just pass it through or is it translated again?
+
+
+Thanks,
+
+	Joerg
