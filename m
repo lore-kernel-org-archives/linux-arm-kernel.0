@@ -1,83 +1,121 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jun 2013 12:00:57 +0200
-Subject: [PATCH V6 1/3] pci: Add PCIe driver for Samsung Exynos
-In-Reply-To: <00c001ce6d85$4613e530$d23baf90$@samsung.com>
-References: <00c001ce6d85$4613e530$d23baf90$@samsung.com>
-Message-ID: <201306201200.58057.arnd@arndb.de>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Thu, 20 Jun 2013 15:37:32 +0530
+Subject: [PATCH v7 00/11] Add generic set_rate clk_ops for PLL35xx and
+ PLL36xx for samsung SoCs
+In-Reply-To: <3788098.20c4sNn9AM@amdc1227>
+References: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
+ <3788098.20c4sNn9AM@amdc1227>
+Message-ID: <CAKew6eUOy4=D08v_iq7CTRY5gvt37VAN7Z7WOr2Yt25znDJb2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 June 2013, Jingoo Han wrote:
-> Exynos5440 has a PCIe controller which can be used as Root Complex.
-> This driver supports a PCIe controller as Root Complex mode.
-> 
-> Signed-off-by: Surendranath Gurivireddy Balla <suren.reddy@samsung.com>
-> Signed-off-by: Siva Reddy Kallam <siva.kallam@samsung.com>
-> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+Hi Tomasz,
 
-The code looks good now.
+On Thu, Jun 20, 2013 at 3:30 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Yadwinder, Vikas,
+>
+> On Tuesday 11 of June 2013 15:01:05 Yadwinder Singh Brar wrote:
+>> This patch series does the following:
+>>
+>>  1) Unifies the clk strutures  and registration function used for PLL35xx
+>> & PLL36xx, to factor out possible common code.
+>>
+>>  2) Defines a common rate_table which will contain recommended p, m, s
+>> and k values for supported rates that needs to be changed for changing
+>> corresponding PLL's rate
+>>
+>>  3) Adds set_rate() and round_rate() clk_ops for PLL35xx and PLL36xx
+>>
+>> changes since v6:
+>>       - Splited the patch adding samsung_clk_register_pll() into definition
+>>       addition, SoC specific migration and cleanup patches.
+>>       - Addressed some NIT comments.
+>
+> This version looks good to me. Thanks for your work on improving this
+> series again!
+>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Thanks for helping to improve this series.
 
->  .../devicetree/bindings/pci/exynos-pcie.txt        |   71 ++
->  drivers/pci/host/Kconfig                           |    5 +
->  drivers/pci/host/Makefile                          |    1 +
->  drivers/pci/host/pci-exynos.c                      | 1057 ++++++++++++++++++++
->  4 files changed, 1134 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/exynos-pcie.txt
->  create mode 100644 drivers/pci/host/pci-exynos.c
+Thanks,
+Yadwinder
 
-But please change the identifier to designware or synopsys as I
-asked you to.
-
-Have a look at http://permalink.gmane.org/gmane.linux.kernel.pci/18400
-
-This was an earlier submission for a PCIe host driver obviously
-based on the same IP block. I don't know why that driver never
-made it into the kernel, but if it gets submitted again, or another
-platform uses the same block, it should share most of your driver.
-
-Whatever is exynos specific then can be moved out to a separate
-file.
-
-> +Required properties:
-> +-compatible: should be "samsung,exynos5440-pcie"
-
-Please also add a generic string, e.g.
-
-- compatible: should contain "snps,dwc-pcie" to identify the
-  core, plus an identifier for the specific instance, such
-  as "samsung,exynos5440-pcie".
-
-> +
-> +static unsigned long global_io_offset;
-> +
-> +static int exynos_pcie_setup(int nr, struct pci_sys_data *sys)
-> +{
-> +	struct pcie_port *pp;
-> +
-> +	pp = sys_to_pcie(sys);
-> +
-> +	if (!pp)
-> +		return 0;
-> +
-> +	if (global_io_offset < SZ_1M && pp->config.io_size > 0) {
-> +		sys->io_offset = global_io_offset - pp->config.io_bus_addr;
-> +		pci_ioremap_io(sys->io_offset, pp->io.start);
-> +		global_io_offset += SZ_64K;
-> +	}
-> +
-> +	sys->mem_offset = pp->mem.start - pp->config.mem_bus_addr;
-> +
-> +	pci_add_resource_offset(&sys->resources, &pp->io, sys->io_offset);
-> +	pci_add_resource_offset(&sys->resources, &pp->mem, sys->mem_offset);
-> +
-> +	return 1;
-> +}
-
-Just noticed one detail here: the 'pci_add_resource_offset' for the
-I/O window should be inside of the 'if' clause, we must not annouce
-the I/O port range to the PCI core layer unless we have actually
-mapped it.
-
-	Arnd
+> Best regards,
+> Tomasz
+>
+>> changes since v5:
+>>       - Corrected to use rate table as specified in UM for exynos5250 epll.
+>>       - Took care of exynos5420 as well, as new exynos5420 clk driver came in
+>>       while rebasing on latest Kgene's for-next.
+>>
+>>       Since we spilted 1st patch into 2 different patches,
+>>       can we expect "reviewed-by" again for the same?
+>>
+>> changes since v4:
+>>       - Defined common samsung samsung_clk_register_pll() to register a list
+>>       of PLL and used a struct samsung_pll_clock for passing intialisation
+>>       data instead of passing as arguments. Now passing LOCK as well as CON0
+>>       offset as intialisation data.
+>>       - Calculated length of rate table while registering PLL instead of
+>>       getting it as intialisation data.
+>>
+>> changes since v3:
+>>       - Used __clk_lookup() instead of adding alias for mout_vpllsrc
+>>       - Added check for changing only M value in samsung_pll36xx_set_rate()
+>>       - Modified samsung_pll35xx_mp_change() & samsung_pll35xx_set_rate()
+>>       to improve readabilty.
+>>       - Made the input rate_table as __init_data which is to be provided
+> while
+>> registering PLL and made a copy of that table while registering, so that
+>> if multiple tables are their, they can be freed after getting the P, M,
+>> S, K setting values from required one.
+>>
+>> changes since v2:
+>>       - Added new patch to reorder the MUX registration for mout_vpllsrc MUX
+>>       before the PLL registrations. And to add the alias for the mout_vpllsrc
+>> MUX. - Added a check to confirm parent rate while registrating the PLL
+>> rate tables.
+>>
+>> changes since v1:
+>>       - removed sorting and bsearch
+>>       - modified the definition of struct "samsung_pll_rate_table"
+>>       - added generic round_rate()
+>>       - rectified the ops assignment for "rate table passed as NULL
+>>
+>> Is rebased on branch kgene's "for-next"
+>> https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/
+>> ?h=for-next
+>>
+>> Vikas Sajjan (3):
+>>   clk: samsung: Add set_rate() clk_ops for PLL36xx
+>>   clk: samsung: Reorder MUX registration for mout_vpllsrc
+>>   clk: samsung: Add EPLL and VPLL freq table for exynos5250 SoC
+>>
+>> Yadwinder Singh Brar (8):
+>>   clk: samsung: Introduce a common samsung_clk_pll struct
+>>   clk: samsung: Define a common samsung_clk_register_pll()
+>>   clk: samsung: Migrate exynos5250 to use common
+>>     samsung_clk_register_pll()
+>>   clk: samsung: Migrate exynos4 to use common
+>>     samsung_clk_register_pll()
+>>   clk: samsung: Migrate exynos5420 to use common
+>>     samsung_clk_register_pll()
+>>   clk: samsung: Remove unused pll registeration code for pll35xx and
+>>     pll36xx
+>>   clk: samsung: Add support to register rate_table for samsung plls
+>>   clk: samsung: Add set_rate() clk_ops for PLL35xx
+>>
+>>  drivers/clk/samsung/clk-exynos4.c    |   40 +++--
+>>  drivers/clk/samsung/clk-exynos5250.c |  101 +++++++++--
+>>  drivers/clk/samsung/clk-exynos5420.c |   86 ++++++---
+>>  drivers/clk/samsung/clk-pll.c        |  339
+>> ++++++++++++++++++++++++++-------- drivers/clk/samsung/clk-pll.h
+>> |   38 ++++-
+>>  drivers/clk/samsung/clk.h            |   53 ++++++
+>>  6 files changed, 519 insertions(+), 138 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
