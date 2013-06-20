@@ -1,68 +1,76 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Thu, 20 Jun 2013 08:55:11 +0800
-Subject: [PATCH v2] ARM: mmp: bring up pxa988 with device tree support
-In-Reply-To: <201306172334.05626.arnd@arndb.de>
-References: <1369969115-4279-1-git-send-email-zhangwm@marvell.com>
- <2766142.mFu63TyH69@wuerfel>
- <CADApbejV3v11jedq=q9Nz7wyVWVAJp-4vYmAifsPb7UsdVj5zg@mail.gmail.com>
- <201306172334.05626.arnd@arndb.de>
-Message-ID: <CADApbeiotgXqX2Y_w8C9zY3mf+MjJmsVS3VBKVdWxYHwNkV2SQ@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 19 Jun 2013 18:20:27 -0700
+Subject: [RESEND,PATCHv6 1/1] Add support for GMT G762/G763 PWM fan
+ controllers
+In-Reply-To: <20130619212633.GC7626@kw.sim.vm.gnt>
+References: <87sj0jhuhn.fsf@natisbad.org> <20130617101948.GY7626@kw.sim.vm.gnt>
+ <8761x9svpf.fsf@natisbad.org> <20130619205321.GA7625@roeck-us.net>
+ <20130619212633.GC7626@kw.sim.vm.gnt>
+Message-ID: <20130620012027.GB29521@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 5:34 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 17 June 2013, Chao Xie wrote:
->> On Fri, Jun 14, 2013 at 8:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Friday 14 June 2013 17:15:33 Chao Xie wrote:
->> >> On Mon, Jun 10, 2013 at 4:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >
->> >> > I guess that is a problem we have on other platforms as well, we should
->> >> > find a generic solution for that. It would be nice to reserve a page
->> >> > in "fixmap" and have common code map the SCU page into that.
->> >> >
->> >>
->> >> So you mean that reserve a page in arch/arm/asm/include/fixmap.h?
->> >
->> > Yes.
->> >
->> >> This reserve will depend on the cpu type beacuse only A9 will have SCU part.
->> >
->> > I think A5 and ARM11MPCore as well.
->> >
->> >> I do not know that in fixmap, the #ifdef is acceptable or not.
->> >
->> > Yes, it is. We don't really use fixmap on ARM for anything other than
->> > kmap_atomic at the moment. Please have a look at the powerpc and x86
->> > implementations.
->> >
->> >> For the common code to map the SCU page, where do you suggest to put it?
->> >
->> > arch/arm/kernel/smp_scu.c.
->> >
->> I think smp_scu.c may not be good place to put the mapping for SCU page.
->> As you know that the fix map will make use of the mapping that set up
->> by vector page.
->> It will make use of top_pmd, and some APIs only provided under arch/arm/mm/.
->> For example
->> get_mem_type: for the pgprot for MT_DEVICE
->> set_top_pte:
->> Is that possible to add a file fixmap.c under arch/arm/mm/? It can
->> including all the fix mapping
->> except highmem. So SCU is one of it.
->
-> It's up to Russell, and he probably has an idea where this should be
-> going.
->
-> Russell, do you think using a fixmap page for the SCU makes sense?
-> I'm looking for a method to consolidate the various methods of
-> doing early mappings of the SCU for device tree based platforms.
-> Where do you think that should be implemented?
->
-Hi, Russell
+On Wed, Jun 19, 2013 at 11:26:33PM +0200, Simon Guinot wrote:
+> On Wed, Jun 19, 2013 at 01:53:21PM -0700, Guenter Roeck wrote:
+> > On Wed, Jun 19, 2013 at 10:15:56PM +0200, Arnaud Ebalard wrote:
+> > > Hi Simon,
+> > > 
+> > > Simon Guinot <simon.guinot@sequanux.org> writes:
+> > > 
+> > > > I have tested this patch on my 2Big Network v2 board.
+> > > >
+> > > > Sometimes I get a weird "No such device" error while reading or writing
+> > > > the hwmon sysfs attributes. For example:
+> > > >
+> > > > # cat pwm1
+> > > > cat: read error: No such device
+> > > > # cat pwm1
+> > > > 0
+> > > 
+> > This is odd, since ENODEV should not be returned as error code from i2c read
+> > operations.
+> > 
+> > What is the i2c controller ?
+> 
+> The controller is the very same as for the ReadyNAS Duo v2. It is built
+> in the Marvell Kirkwood SoC and the driver is i2c-mv64xxx.
+> 
+> I will try an another board to see if I reproduce the error.
+> 
+Might be a flaky i2c connection or a problematic board. The i2c-mv64xxx driver
+does return ENODEV in error cases. I submitted a patch to change it to ENXIO;
+we'll see if it gets accepted.
 
-What do you think about above suggestion?
+Guenter
 
-Thanks.
-
-
->         Arnd
+> Regards,
+> 
+> Simon
+> 
+> > 
+> > Thanks,
+> > Guenter
+> > 
+> > > Weird, I cannot reproduce that at all on my ReadyNAS Duo v2.
+> > > 
+> > > > Note, that if the same command is executed again (just after the faulty
+> > > > one), then it will succeed most of the time. The errors seems to happen
+> > > > quite randomly and not very often. I'd say one time over ten tries.
+> > > > I suppose this error is now visible due to the enhanced error path in
+> > > > g762_update_client. It looks like we learn something by checking the
+> > > > return value for i2c_smbus_read_byte_data :)
+> > > >
+> > > > Except that, all is working as expected. This new version fixes
+> > > > effectively open-loop driving when the set_cnt register is set to 0xff.
+> > > >
+> > > > Also I am planning (hopefully this Wednesday) to test your patch on my
+> > > > 5Big Network v2 board. This last also embed a g762 controller but with a
+> > > > three wires fan instead. Then, I should be able to test the closed-loop
+> > > > mode behaviour.
+> > > 
+> > > Thanks for your tests, Simon.
+> > > 
+> > > Cheers,
+> > > 
+> > > a+ 
+> > > 
