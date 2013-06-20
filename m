@@ -1,90 +1,49 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 20 Jun 2013 09:40:51 -0700
-Subject: [PATCH/RESEND 05/12] msm: iommu: Convert to clk_prepare/unprepare
-In-Reply-To: <1371490999-15501-6-git-send-email-sboyd@codeaurora.org>
+Date: Thu, 20 Jun 2013 09:41:42 -0700
+Subject: [PATCH/RESEND 06/12] msm: iommu: Use clk_set_rate() instead of
+ clk_set_min_rate()
+In-Reply-To: <1371490999-15501-7-git-send-email-sboyd@codeaurora.org>
 References: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
- <1371490999-15501-6-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130620164051.GC6300@codeaurora.org>
+ <1371490999-15501-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130620164142.GD6300@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Sending to correct Joerg address.
 
 On 06/17, Stephen Boyd wrote:
-> Add calls to clk_prepare and unprepare so that MSM can migrate to
-> the common clock framework. We never unprepare the clocks until
-> driver remove because the clocks are enabled and disabled in irq
-> context. Finer grained power management is possible in the future
-> via runtime power management techniques.
+> Calling clk_set_min_rate() is no better than just calling
+> clk_set_rate() because MSM clock code already takes care of
+> calling the min_rate ops if the clock really needs
+> clk_set_min_rate() called on it.
 > 
 > Cc: Joerg Roedel <joerg.roedel@amd.com>
 > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  drivers/iommu/msm_iommu_dev.c | 17 ++++++++++-------
->  1 file changed, 10 insertions(+), 7 deletions(-)
+>  drivers/iommu/msm_iommu_dev.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 > 
 > diff --git a/drivers/iommu/msm_iommu_dev.c b/drivers/iommu/msm_iommu_dev.c
-> index 8e8fb07..d344f6a 100644
+> index d344f6a..9144a6b 100644
 > --- a/drivers/iommu/msm_iommu_dev.c
 > +++ b/drivers/iommu/msm_iommu_dev.c
-> @@ -160,7 +160,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
->  		goto fail;
->  	}
+> @@ -29,7 +29,6 @@
 >  
-> -	ret = clk_enable(iommu_pclk);
-> +	ret = clk_prepare_enable(iommu_pclk);
->  	if (ret)
->  		goto fail_enable;
+>  #include <mach/iommu_hw-8xxx.h>
+>  #include <mach/iommu.h>
+> -#include <mach/clk.h>
 >  
-> @@ -170,7 +170,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
+>  struct iommu_ctx_iter_data {
+>  	/* input */
+> @@ -168,7 +167,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
+>  
+>  	if (!IS_ERR(iommu_clk))	{
 >  		if (clk_get_rate(iommu_clk) == 0)
->  			clk_set_min_rate(iommu_clk, 1);
+> -			clk_set_min_rate(iommu_clk, 1);
+> +			clk_set_rate(iommu_clk, 1);
 >  
-> -		ret = clk_enable(iommu_clk);
-> +		ret = clk_prepare_enable(iommu_clk);
+>  		ret = clk_prepare_enable(iommu_clk);
 >  		if (ret) {
->  			clk_put(iommu_clk);
->  			goto fail_pclk;
-> @@ -261,7 +261,7 @@ fail_clk:
->  		clk_put(iommu_clk);
->  	}
->  fail_pclk:
-> -	clk_disable(iommu_pclk);
-> +	clk_disable_unprepare(iommu_pclk);
->  fail_enable:
->  	clk_put(iommu_pclk);
->  fail:
-> @@ -275,8 +275,11 @@ static int msm_iommu_remove(struct platform_device *pdev)
->  
->  	drv = platform_get_drvdata(pdev);
->  	if (drv) {
-> -		if (drv->clk)
-> +		if (drv->clk) {
-> +			clk_unprepare(drv->clk);
->  			clk_put(drv->clk);
-> +		}
-> +		clk_unprepare(drv->pclk);
->  		clk_put(drv->pclk);
->  		memset(drv, 0, sizeof(*drv));
->  		kfree(drv);
-> @@ -314,14 +317,14 @@ static int msm_iommu_ctx_probe(struct platform_device *pdev)
->  	INIT_LIST_HEAD(&ctx_drvdata->attached_elm);
->  	platform_set_drvdata(pdev, ctx_drvdata);
->  
-> -	ret = clk_enable(drvdata->pclk);
-> +	ret = clk_prepare_enable(drvdata->pclk);
->  	if (ret)
->  		goto fail;
->  
->  	if (drvdata->clk) {
-> -		ret = clk_enable(drvdata->clk);
-> +		ret = clk_prepare_enable(drvdata->clk);
->  		if (ret) {
-> -			clk_disable(drvdata->pclk);
-> +			clk_disable_unprepare(drvdata->pclk);
->  			goto fail;
->  		}
->  	}
 > -- 
 > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 > hosted by The Linux Foundation
