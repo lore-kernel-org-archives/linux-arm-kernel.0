@@ -1,32 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jun 2013 21:43:28 +0200
-Subject: [GIT PULL 6/7] omap gpmc reworked suspend patch for v3.11 merge
- window
-In-Reply-To: <0M3kR7-1TyPb31W1B-00qrci@mx.kundenserver.de>
-References: <0M3kR7-1TyPb31W1B-00qrci@mx.kundenserver.de>
-Message-ID: <201306202143.28976.arnd@arndb.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 20 Jun 2013 14:45:12 -0500
+Subject: Get machine type in user space
+In-Reply-To: <201306202130.55247.arnd@arndb.de>
+References: <CABp-a4cUbwXEGPUQBjGRnNR+X91j1qGQigS=KYTZ1fZ2ZGzQtA@mail.gmail.com>
+ <201306202130.55247.arnd@arndb.de>
+Message-ID: <20130620194512.GA7269@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Tony Lindgren wrote:
-> The following changes since commit b3f5525c55ce5cb67af06f04dbbf28358da23a2c:
+On 21:30-20130620, Arnd Bergmann wrote:
+> On Thursday 20 June 2013, Per Strandh wrote:
+> > I work for a company that develops our own arm-based embedded linux
+> > products. (both hardware and software)
+> > 
+> > My question is about the "machine type" parameter that is passed from
+> > the  bootloader to the kernel.
+> > 
+> > If the kernel supports more than one "machine type", the the one that
+> > are specified by the bootloader will be choosen.
+> > If the kernel only supports one "machine type" that will always be choosen.
+> > 
+> > Question:
+> > Is it possible from user-space to find out the "machine type" that was
+> > passed from the bootloader?
+> > I know that in /proc/cpuinfo it is possible to see that "name" of the
+> > choosen "machine type", but not if it was the correct one.
 > 
->   ARM: OMAP2+: gpmc: Converts GPMC driver to pm_runtime capable (2013-06-12 09:56:30 -0700)
+> You can look in the "compatible" property of the root node in /proc/device-tree
 > 
-> are available in the git repository at:
+> That will have the exact string used to match the platform.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/gpmc-part2-signed
-> 
-> for you to fetch changes up to b536dd412b4364df2f9495c6550ee38f6ad3b0fe:
-> 
->   ARM: OMAP2+: gpmc: Low power transition support (2013-06-18 03:46:39 -0700)
-> 
-> ----------------------------------------------------------------
-> GPMC suspend patch that was left out of the earlier
-> omap-for-v3.11/gpmc-signed branch because of a compile error
-> it caused. The compile error is fixed in this version.
-> 
-
-Pulled into next/drivers, thanks!
-
-	Arnd
+Documentation/ABI/testing/sysfs-devices-soc exposes
+/sys/devices/socX/machine if enabled might help as well?
+-- 
+Regards,
+Nishanth Menon
