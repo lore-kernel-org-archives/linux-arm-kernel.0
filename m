@@ -1,45 +1,71 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 20 Jun 2013 17:04:32 +0400
-Subject: [PATCH] ARM: dma: Drop __GFP_COMP for iommu dma memory allocations
-In-Reply-To: <1371731460-15316-1-git-send-email-rizhao@nvidia.com>
-References: <1371731460-15316-1-git-send-email-rizhao@nvidia.com>
-Message-ID: <51C2FDE0.4060206@cogentembedded.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 20 Jun 2013 15:05:34 +0200
+Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
+ pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
+In-Reply-To: <20130620130110.GE18536@arm.com>
+References: <51C2C0B5.8020802@pengutronix.de> <20130620095705.GA18536@arm.com>
+ <51C2D5EF.3040803@pengutronix.de> <20130620102856.GC18536@arm.com>
+ <20130620111255.GD18536@arm.com> <51C2E917.9000708@pengutronix.de>
+ <51C2EA04.4060701@pengutronix.de> <51C2EBCD.4070206@pengutronix.de>
+ <20130620130110.GE18536@arm.com>
+Message-ID: <51C2FE1E.5000008@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 06/20/2013 03:01 PM, Catalin Marinas wrote:
+> On Thu, Jun 20, 2013 at 12:47:25PM +0100, Marc Kleine-Budde wrote:
+>> On 06/20/2013 01:39 PM, Marc Kleine-Budde wrote:
+>>> On 06/20/2013 01:35 PM, Marc Kleine-Budde wrote:
+>>>> On 06/20/2013 01:12 PM, Catalin Marinas wrote:
+>>>>> On Thu, Jun 20, 2013 at 11:28:56AM +0100, Catalin Marinas wrote:
+>>>>>> We may need to place the preempt disable/enable at a higher level in the
+>>>>>> scheduler. My theory is that we have a context switch from prev to next.
+>>>>>> We get preempted just before finish_arch_post_lock_switch(), so the MMU
+>>>>>> hasn't been switched yet. The new switch during preemption happens to a
+>>>>>> thread with the same next mm, so the scheduler no longer switch_mm() and
+>>>>>> the TIF_SWITCH_MM isn't set for the new thread.
+>>>>>>
+>>>>>> I'll come back with another patch shortly.
+>>>>>
+>>>>> Here's another attempt (as before, only compile-tested):
+>>>>
+>>>> booting kernel from /image
+>>>> zImage: concatenated oftree detected
+>>>> booting Linux kernel with devicetree
+>>>>
+>>>> ...dead...
+>>>>
+>>>> Does every process have a "mm"? Even Kernel threads?
+>>
+>> I've added a check for "mm". Boots now and my test runs stable for 3
+>> minutes now.
+> 
+> Ah, good point.
+> 
+>> I'm not sure if we have to check for "mm" in
+>> check_and_switch_context(), too.
+> 
+> switch_mm() wouldn't be called with a NULL mm, hence we wouldn't call
+> check_and_switch_context() either. finish_arch_post_lock_switch() is
+> called all the time (and we set the TIF flag only if switch_mm() was
+> called).
 
-On 20-06-2013 16:31, Richard Zhao wrote:
+Thanks for the explanation. $CUSTOMER's mx28 runs stable with the
+minimal test program, I'll keep you informed if they have tested with
+the full blown program.
 
-> __iommu_alloc_buffer wants to split pages after allocation in order to
-> reduce the memory footprint. This does not work well with __GFP_COMP
-> pages, so drop this flag before allocation
+Marc
 
-> One failure example is snd_malloc_dev_pages call dma_alloc_coherent with
-> __GFP_COMP.
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
-> ---
->   arch/arm/mm/dma-mapping.c |    9 +++++++++
->   1 file changed, 9 insertions(+)
-
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index ef3e0f3..f7efffd 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1314,6 +1314,15 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
->   	if (gfp & GFP_ATOMIC)
->   		return __iommu_alloc_atomic(dev, size, handle);
->
-> +	/*
-> +	 * Following is a work-around (a.k.a. hack) to prevent pages
-> +	 * with __GFP_COMP being passed to split_page() which cannot
-> +	 * handle them.  The real problem is that this flag probably
-> +	 * should be 0 on ARM as it is not supported on this
-> +	 * platform; see CONFIG_HUGETLBFS.
-> +	 */
-> +	gfp &= ~(__GFP_COMP);
-
-    Hm, what exactly is the sense you meant in using ()?
-
-WBR, Sergei
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/0ddc9ae4/attachment.sig>
