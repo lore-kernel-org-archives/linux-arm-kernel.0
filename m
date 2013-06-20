@@ -1,121 +1,133 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Thu, 20 Jun 2013 15:37:32 +0530
-Subject: [PATCH v7 00/11] Add generic set_rate clk_ops for PLL35xx and
- PLL36xx for samsung SoCs
-In-Reply-To: <3788098.20c4sNn9AM@amdc1227>
-References: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
- <3788098.20c4sNn9AM@amdc1227>
-Message-ID: <CAKew6eUOy4=D08v_iq7CTRY5gvt37VAN7Z7WOr2Yt25znDJb2g@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 20 Jun 2013 12:08:58 +0200
+Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
+ pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
+In-Reply-To: <20130620095705.GA18536@arm.com>
+References: <51C2C0B5.8020802@pengutronix.de> <20130620095705.GA18536@arm.com>
+Message-ID: <51C2D4BA.8020406@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On 06/20/2013 11:57 AM, Catalin Marinas wrote:
+> Hi Marc,
+> 
+> On Thu, Jun 20, 2013 at 09:43:33AM +0100, Marc Kleine-Budde wrote:
+>> on current linus/master on armv5 we observed stack trashing[1] on high
+>> load. I bisected this problem down to commit:
+>>
+>>> b9d4d42ad901cc848ac87f1cb8923fded3645568 is the first bad commit
+>>> commit b9d4d42ad901cc848ac87f1cb8923fded3645568
+>>> Author: Catalin Marinas <catalin.marinas@arm.com>
+>>> Date:   Mon Nov 28 21:57:24 2011 +0000
+>>>
+>>>     ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on pre-ARMv6 CPUs
+>>>
+>>>     This patch removes the __ARCH_WANT_INTERRUPTS_ON_CTXSW definition for
+>>>     ARMv5 and earlier processors. On such processors, the context switch
+>>>     requires a full cache flush. To avoid high interrupt latencies, this
+>>>     patch defers the mm switching to the post-lock switch hook if the
+>>>     interrupts are disabled.
+>>>
+>>>     Reviewed-by: Will Deacon <will.deacon@arm.com>
+>>>     Tested-by: Will Deacon <will.deacon@arm.com>
+>>>     Reviewed-by: Frank Rowand <frank.rowand@am.sony.com>
+>>>     Tested-by: Marc Zyngier <Marc.Zyngier@arm.com>
+>>>     Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+>>>
+>>> :040000 040000 034899bdcbc9aa59b5455a85a9d78b646b4cf784 ecc23e33a4ca807d4153f87fbea85a9437ff2928 M      arch
+>>
+>> The problem can be reproduced on several mx28 and an at91sam9263 and
+>> only occurs of CONFIG_PREEMPT (Preemptible Kernel (Low-Latency Desktop))
+>> is enabled.
+>>
+>> I have the gut feeling that the "if (irqs_disabled())" check in the
+>> above patch is not correct for CONFIG_PREEMPT.
+> 
+> The check is there to avoid long interrupt latencies (flushing the whole
+> cache with interrupts disabled during context switch). You can drop the
+> check and always call cpu_switch_mm() to confirm that it fixes the
+> faults.
 
-On Thu, Jun 20, 2013 at 3:30 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Yadwinder, Vikas,
->
-> On Tuesday 11 of June 2013 15:01:05 Yadwinder Singh Brar wrote:
->> This patch series does the following:
->>
->>  1) Unifies the clk strutures  and registration function used for PLL35xx
->> & PLL36xx, to factor out possible common code.
->>
->>  2) Defines a common rate_table which will contain recommended p, m, s
->> and k values for supported rates that needs to be changed for changing
->> corresponding PLL's rate
->>
->>  3) Adds set_rate() and round_rate() clk_ops for PLL35xx and PLL36xx
->>
->> changes since v6:
->>       - Splited the patch adding samsung_clk_register_pll() into definition
->>       addition, SoC specific migration and cleanup patches.
->>       - Addressed some NIT comments.
->
-> This version looks good to me. Thanks for your work on improving this
-> series again!
->
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->
+I have disabled the check:
 
-Thanks for helping to improve this series.
+diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
+index a7b85e0..7b3f67f 100644
+--- a/arch/arm/include/asm/mmu_context.h
++++ b/arch/arm/include/asm/mmu_context.h
+@@ -39,7 +39,7 @@ static inline void check_and_switch_context(struct mm_struct *mm,
+        if (unlikely(mm->context.vmalloc_seq != init_mm.context.vmalloc_seq))
+                __check_vmalloc_seq(mm);
 
-Thanks,
-Yadwinder
+-       if (irqs_disabled())
++       if (0 && irqs_disabled())
+                /*
+                 * cpu_switch_mm() needs to flush the VIVT caches. To avoid
+                 * high interrupt latencies, defer the call and continue
 
-> Best regards,
-> Tomasz
->
->> changes since v5:
->>       - Corrected to use rate table as specified in UM for exynos5250 epll.
->>       - Took care of exynos5420 as well, as new exynos5420 clk driver came in
->>       while rebasing on latest Kgene's for-next.
->>
->>       Since we spilted 1st patch into 2 different patches,
->>       can we expect "reviewed-by" again for the same?
->>
->> changes since v4:
->>       - Defined common samsung samsung_clk_register_pll() to register a list
->>       of PLL and used a struct samsung_pll_clock for passing intialisation
->>       data instead of passing as arguments. Now passing LOCK as well as CON0
->>       offset as intialisation data.
->>       - Calculated length of rate table while registering PLL instead of
->>       getting it as intialisation data.
->>
->> changes since v3:
->>       - Used __clk_lookup() instead of adding alias for mout_vpllsrc
->>       - Added check for changing only M value in samsung_pll36xx_set_rate()
->>       - Modified samsung_pll35xx_mp_change() & samsung_pll35xx_set_rate()
->>       to improve readabilty.
->>       - Made the input rate_table as __init_data which is to be provided
-> while
->> registering PLL and made a copy of that table while registering, so that
->> if multiple tables are their, they can be freed after getting the P, M,
->> S, K setting values from required one.
->>
->> changes since v2:
->>       - Added new patch to reorder the MUX registration for mout_vpllsrc MUX
->>       before the PLL registrations. And to add the alias for the mout_vpllsrc
->> MUX. - Added a check to confirm parent rate while registrating the PLL
->> rate tables.
->>
->> changes since v1:
->>       - removed sorting and bsearch
->>       - modified the definition of struct "samsung_pll_rate_table"
->>       - added generic round_rate()
->>       - rectified the ops assignment for "rate table passed as NULL
->>
->> Is rebased on branch kgene's "for-next"
->> https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/
->> ?h=for-next
->>
->> Vikas Sajjan (3):
->>   clk: samsung: Add set_rate() clk_ops for PLL36xx
->>   clk: samsung: Reorder MUX registration for mout_vpllsrc
->>   clk: samsung: Add EPLL and VPLL freq table for exynos5250 SoC
->>
->> Yadwinder Singh Brar (8):
->>   clk: samsung: Introduce a common samsung_clk_pll struct
->>   clk: samsung: Define a common samsung_clk_register_pll()
->>   clk: samsung: Migrate exynos5250 to use common
->>     samsung_clk_register_pll()
->>   clk: samsung: Migrate exynos4 to use common
->>     samsung_clk_register_pll()
->>   clk: samsung: Migrate exynos5420 to use common
->>     samsung_clk_register_pll()
->>   clk: samsung: Remove unused pll registeration code for pll35xx and
->>     pll36xx
->>   clk: samsung: Add support to register rate_table for samsung plls
->>   clk: samsung: Add set_rate() clk_ops for PLL35xx
->>
->>  drivers/clk/samsung/clk-exynos4.c    |   40 +++--
->>  drivers/clk/samsung/clk-exynos5250.c |  101 +++++++++--
->>  drivers/clk/samsung/clk-exynos5420.c |   86 ++++++---
->>  drivers/clk/samsung/clk-pll.c        |  339
->> ++++++++++++++++++++++++++-------- drivers/clk/samsung/clk-pll.h
->> |   38 ++++-
->>  drivers/clk/samsung/clk.h            |   53 ++++++
->>  6 files changed, 519 insertions(+), 138 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+...and the test is running without problems, while I'm writing this
+email. No more segfaults so far.
+
+> finish_task_switch() calls finish_arch_post_lock_switch() after the
+> interrupts have been enabled so that the CPU can actually switch the mm.
+> I wonder whether we could actually be preempted after
+> finish_lock_switch() but before we actually switched the MMU.
+> 
+> Here's an untested patch (trying to keep it in the arch/arm code):
+> 
+> 
+> diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
+> index a7b85e0..ded85e9 100644
+> --- a/arch/arm/include/asm/mmu_context.h
+> +++ b/arch/arm/include/asm/mmu_context.h
+> @@ -39,17 +39,20 @@ static inline void check_and_switch_context(struct mm_struct *mm,
+>  	if (unlikely(mm->context.vmalloc_seq != init_mm.context.vmalloc_seq))
+>  		__check_vmalloc_seq(mm);
+>  
+> -	if (irqs_disabled())
+> +	if (irqs_disabled()) {
+>  		/*
+>  		 * cpu_switch_mm() needs to flush the VIVT caches. To avoid
+>  		 * high interrupt latencies, defer the call and continue
+>  		 * running with the old mm. Since we only support UP systems
+>  		 * on non-ASID CPUs, the old mm will remain valid until the
+> -		 * finish_arch_post_lock_switch() call.
+> +		 * finish_arch_post_lock_switch() call. Preemption needs to be
+> +		 * disabled until the MMU is switched.
+>  		 */
+>  		set_ti_thread_flag(task_thread_info(tsk), TIF_SWITCH_MM);
+> -	else
+> +		preempt_disable();
+> +	} else {
+>  		cpu_switch_mm(mm->pgd, mm);
+> +	}
+>  }
+>  
+>  #define finish_arch_post_lock_switch \
+> @@ -59,6 +62,10 @@ static inline void finish_arch_post_lock_switch(void)
+>  	if (test_and_clear_thread_flag(TIF_SWITCH_MM)) {
+>  		struct mm_struct *mm = current->mm;
+>  		cpu_switch_mm(mm->pgd, mm);
+> +		/*
+> +		 * Preemption disabled in check_and_switch_context().
+> +		 */
+> +		preempt_enable();
+>  	}
+>  }
+
+Will now reboot to test your patch.
+
+thanks,
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/510c114b/attachment.sig>
