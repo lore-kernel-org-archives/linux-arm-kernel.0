@@ -1,53 +1,20 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 19 Jun 2013 17:18:20 -0700
-Subject: [PATCH 3/5] ARM: KVM: make sure maintainance operation complete
- before world switch
-In-Reply-To: <1371648006-8036-4-git-send-email-marc.zyngier@arm.com>
-References: <1371648006-8036-1-git-send-email-marc.zyngier@arm.com>
- <1371648006-8036-4-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130620001820.GJ7870@lvm>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Jun 2013 02:17:44 +0200
+Subject: [GIT PULL] ARM: mxs: device tree changes for 3.11
+In-Reply-To: <20130617125159.GG31687@S2101-09.ap.freescale.net>
+References: <20130617125159.GG31687@S2101-09.ap.freescale.net>
+Message-ID: <201306200217.44623.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 02:20:04PM +0100, Marc Zyngier wrote:
-> We may have preempted the guest while it was performing a maintainance
-> operation (TLB invalidation, for example). Make sure it completes
-> before we do anything else by adding the necessary barriers.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/interrupts.S | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> index afa6c04..3124e0f 100644
-> --- a/arch/arm/kvm/interrupts.S
-> +++ b/arch/arm/kvm/interrupts.S
-> @@ -149,6 +149,15 @@ __kvm_vcpu_return:
->  	 * r0: vcpu pointer
->  	 * r1: exception code
->  	 */
-> +
-> +	/*
-> +	 * We may have preempted the guest while it was performing a
-> +	 * maintainance operation (TLB invalidation, for example). Make
-> +	 * sure it completes before we do anything else.
-> +	 */
+On Monday 17 June 2013, Shawn Guo wrote:
+> Here is the device tree changes for 3.11.  There are a couple of
+> patches which should be soc changes.  I collected them on mxs/dt branch
+> and sent them together with device tree pull request here, considering
+> the volume for soc changes in this cycle is not high.  Hope it's fine.
 
-Can you explain what could go wrong here without these two instructions?
+Pulled mxs/dt and imx/dt into next/dt, and imx/soc into next/soc.
 
-> +	dsb
-> +	isb
-> +
->  	save_guest_regs
->  
->  	@ Set VMID == 0
-> -- 
-> 1.8.2.3
-> 
-> 
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+Thanks!
+
+	Arnd
