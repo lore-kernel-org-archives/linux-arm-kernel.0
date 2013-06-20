@@ -1,66 +1,133 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 20 Jun 2013 15:31:42 +0400
-Subject: [PATCH V4 04/11] USB: OHCI: Properly handle ohci-da8xx suspend
-In-Reply-To: <1371720968-7533-5-git-send-email-manjunath.goudar@linaro.org>
-References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
- <1371720968-7533-1-git-send-email-manjunath.goudar@linaro.org>
- <1371720968-7533-5-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <51C2E81E.9080005@cogentembedded.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 20 Jun 2013 20:36:01 +0900
+Subject: [PATCH V4 1/3] pci: Add PCIe driver for Samsung Exynos
+In-Reply-To: <51C2E6E5.1050001@st.com>
+References: <003601ce6756$444e8cd0$cceba670$@samsung.com>
+ <2061566.hRLrhtBK6z@wuerfel> <000901ce6838$8b514720$a1f3d560$@samsung.com>
+ <28355406.ThqqvnG0Yj@wuerfel> <51C2D260.6000303@st.com>
+ <00d701ce6da5$10216ae0$306440a0$@samsung.com> <51C2E6E5.1050001@st.com>
+Message-ID: <00d901ce6daa$56ffb6b0$04ff2410$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thursday, June 20, 2013 8:26 PM, Pratyush Anand wrote:
+> On 6/20/2013 4:28 PM, Jingoo Han wrote:
+> > On Thursday, June 20, 2013 6:59 PM, Pratyush Anand wrote:
+> >> On 6/13/2013 7:48 PM, Arnd Bergmann wrote:
+> >>> On Thursday 13 June 2013 22:18:50 Jingoo Han wrote:
+> >>>>> On Wednesday, June 12, 2013 8:23 PM, Arnd Bergmann wrote:
+> >>>>>>> On Wednesday 12 June 2013 19:19:05 Jingoo Han wrote:
+> >>>>>>>>> +
+> >>>>>>>>> +/* synopsis specific PCIE configuration registers*/
+> >>>>>>>>> +#define PCIE_PORT_LINK_CONTROL		0x710
+> >>>>>>>>> +#define PORT_LINK_MODE_MASK		(0x3f << 16)
+> >>>>>>>>> +#define PORT_LINK_MODE_4_LANES		(0x7 << 16)
+> >>>>>>>
+> >>>>>>> Do you mean this is a "Synopsys" designware part? In that case it
+> >>>>>>> should really not be called "exynos-pcie" but "designware-pcie"
+> >>>>>>> and you should make sure that the driver makes no assumptions about
+> >>>>>>> the platform. A lot of other platforms also use designware
+> >>>>>>> parts and should be able to reuse this driver.
+> >>>>>
+> >>>>> Sorry, I don't think so.
+> >>>>> Only core block is a "Synopsys" designware part IP block,
+> >>>>> other parts are Exynos-specific.
+> >>>>> So, it is hard to share with other PCIe IPs using synopsis core.
+> >>> Just call it synopsys anyway and put a comment in to explain this.
+> >>> That should be enough for the next person with a synopsys PCI core
+> >>> to reuse your code and split out the exynos specific parts into a
+> >>> separate file.
+> >>>
+> >>
+> >> I agree to Arnd that this patch should be split. I had worked in past
+> >> with SPEAr PCIe which also had designware PCIe IP. I see some code which
+> >> will fit both in SPEAr as well as in exynos. Unfortunately, I was not
+> >> able to get SPEAr driver pushed to mainline, as I moved to some other
+> >> project and got heavily occupied.
+> >
+> > Oh, I see.
+> >
+> > How about this?
+> > At the next PATCH v7, I will change the file name from 'pci-exynos.c'
+> > to 'pci-designware.c', as Arnd mentioned.
+> >
+> > Then, when Spear or other platform using designware is submitted,
+> > this 'pci-designware.c' will be split to two separate files such as
+> > 'pci-designware.c' and 'pci-exynos.c'.
+> >
+> 
+> For me it's OK. Let it go to mainline as Arnd mentioned.
+> Please keep Mohit in mail chain, who might have some bandwidth to
+> further add and follow up for SPEAr on top of your patches.
 
-On 20-06-2013 13:36, Manjunath Goudar wrote:
+Dear Pratyush Anand,
 
-> Suspend scenario in case of ohci-da8xx glue was not
-> properly handled as it was not suspending generic part
-> of ohci controller. Calling explicitly the ohci_suspend()
-> routine in ohci_da8xx_suspend() will ensure proper
-> handling of suspend scenario.
+Thank you for accepting the suggestion. :)
+OK, I will keep Mohit in main chain.
 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: linux-usb at vger.kernel.org
 
-> V2:
->   -Incase ohci_suspend() fails, return right away without
->    executing further.
+Best regards,
+Jingoo Han
 
-> V3:
->   -Aligned variable "do_wakeup" and "ret".
->   -pdev->dev.power.power_state stuff has been removed.
-
-> V4:
->   -Properly aligned "do_wakeup" and "ret" variable.
-> ---
->   drivers/usb/host/ohci-da8xx.c |   15 +++++++++++----
->   1 file changed, 11 insertions(+), 4 deletions(-)
-
-> diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
-> index 6aaa9c9..44893cf 100644
-> --- a/drivers/usb/host/ohci-da8xx.c
-> +++ b/drivers/usb/host/ohci-da8xx.c
-> @@ -406,19 +406,26 @@ static int ohci_hcd_da8xx_drv_remove(struct platform_device *dev)
->   }
->
->   #ifdef CONFIG_PM
-> -static int ohci_da8xx_suspend(struct platform_device *dev, pm_message_t message)
-> +static int ohci_da8xx_suspend(struct platform_device *pdev,
-> +		pm_message_t message)
-
-    Could you align this line more, so that it starts under the 
-character after ( in the previous line.
-
->   {
-> -	struct usb_hcd	*hcd	= platform_get_drvdata(dev);
-> +	struct usb_hcd	*hcd	= platform_get_drvdata(pdev);
->   	struct ohci_hcd	*ohci	= hcd_to_ohci(hcd);
-> +	bool	do_wakeup	= device_may_wakeup(&pdev->dev);
-> +	int	ret;
-
-    I wouldn't call this "properly aligned". It need one more tab.
-
-WBR, Sergei
+> 
+> Regards
+> Pratyush
+> 
+> >
+> > Best regards,
+> > Jingoo Han
+> >
+> >>
+> >> Last patch is here:
+> >>
+> >> https://patchwork.kernel.org/patch/1661441/
+> >>
+> >> Infact, these functions should be common to all arm platforms.
+> >>
+> >> sys_to_pcie
+> >> cfg_read
+> >> cfg_write
+> >>
+> >> Following functions should be common to all designware based driver (at
+> >> least they are same in SPEAr)
+> >>
+> >> exynos_pcie_prog_viewport_cfg0
+> >> exynos_pcie_prog_viewport_cfg1
+> >> exynos_pcie_rd_other_conf
+> >> exynos_pcie_wr_other_conf
+> >> exynos_pcie_setup
+> >> exynos_pcie_valid_config
+> >> exynos_pcie_rd_conf
+> >> exynos_pcie_wd_conf
+> >> exynos_pcie_scan_bus
+> >> exynos_pcie_map_irq
+> >> add_pcie_port (after a bit of generalization)
+> >> exynos_pcie_probe
+> >> exynos_pcie_remove
+> >>
+> >>
+> >>
+> >> Following should be specific to exynos:
+> >>
+> >> exynos_pcie_rd_own_conf
+> >> exynos_pcie_wr_own_conf
+> >> exynos_pcie_link_up
+> >> exynos_pcie_setup_rc
+> >> exynos_pcie_assert_core_reset
+> >> exynos_pcie_deassert_core_reset
+> >> exynos_pcie_assert_phy_reset
+> >> exynos_pcie_deassert_phy_reset
+> >> exynos_pcie_init_phy
+> >> exynos_pcie_assert_reset
+> >> exynos_pcie_establish_link
+> >> exynos_pcie_host_init
+> >>
+> >>
+> >>
+> >> struct pcie_port_info and struct pcie_port can also be standardized.
+> >>
+> >> Regards
+> >> Pratyush
+> >
+> > .
+> >
