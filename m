@@ -1,28 +1,25 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 20 Jun 2013 12:53:32 -0400 (EDT)
-Subject: [PATCH V2 5/6] USB: OHCI: make ohci-at91 a separate driver
-In-Reply-To: <CAJFYCKGaq5cQFRkXpD0jCwbrLF5R5MtDLJiaZSG6GMuZLaX5AA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306201252400.2063-100000@iolanthe.rowland.org>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 20 Jun 2013 19:04:01 +0200
+Subject: [PATCH/RESEND 05/12] msm: iommu: Convert to clk_prepare/unprepare
+In-Reply-To: <20130620164051.GC6300@codeaurora.org>
+References: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
+ <1371490999-15501-6-git-send-email-sboyd@codeaurora.org>
+ <20130620164051.GC6300@codeaurora.org>
+Message-ID: <20130620170401.GA11309@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Jun 2013, Manjunath Goudar wrote:
-
-> > > @@ -686,7 +631,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device
-> > *pdev, pm_message_t mesg)
-> > >        * REVISIT: some boards will be able to turn VBUS off...
-> > >        */
-> > >       if (at91_suspend_entering_slow_clock()) {
-> > > -             ohci_usb_reset (ohci);
-> > > +             ohci_restart(ohci);
-> >
-> > Why did you change this?  Did we discuss it earlier?
-> >
+On Thu, Jun 20, 2013 at 09:40:51AM -0700, Stephen Boyd wrote:
+> Sending to correct Joerg address.
 > 
-> We are not discussed  regarding this,I think we need to call
-> use ohci_resume() instead of ohci_restart().
+> On 06/17, Stephen Boyd wrote:
+> > Add calls to clk_prepare and unprepare so that MSM can migrate to
+> > the common clock framework. We never unprepare the clocks until
+> > driver remove because the clocks are enabled and disabled in irq
+> > context. Finer grained power management is possible in the future
+> > via runtime power management techniques.
+> > 
+> > Cc: Joerg Roedel <joerg.roedel@amd.com>
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Why?  Don't you think the current code has a good reason for calling 
-ohci_usb_reset()?
-
-Alan Stern
+Acked-by: Joerg Roedel <joro@8bytes.org>
