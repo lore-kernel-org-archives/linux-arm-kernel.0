@@ -1,96 +1,93 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 20 Jun 2013 10:57:05 +0100
-Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
- pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
-In-Reply-To: <51C2C0B5.8020802@pengutronix.de>
-References: <51C2C0B5.8020802@pengutronix.de>
-Message-ID: <20130620095705.GA18536@arm.com>
+From: pratyush.anand@st.com (Pratyush Anand)
+Date: Thu, 20 Jun 2013 15:28:56 +0530
+Subject: [PATCH V4 1/3] pci: Add PCIe driver for Samsung Exynos
+In-Reply-To: <28355406.ThqqvnG0Yj@wuerfel>
+References: <003601ce6756$444e8cd0$cceba670$@samsung.com>
+ <2061566.hRLrhtBK6z@wuerfel> <000901ce6838$8b514720$a1f3d560$@samsung.com>
+ <28355406.ThqqvnG0Yj@wuerfel>
+Message-ID: <51C2D260.6000303@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On 6/13/2013 7:48 PM, Arnd Bergmann wrote:
+> On Thursday 13 June 2013 22:18:50 Jingoo Han wrote:
+>> >On Wednesday, June 12, 2013 8:23 PM, Arnd Bergmann wrote:
+>>> > >On Wednesday 12 June 2013 19:19:05 Jingoo Han wrote:
+>>>> > > >+
+>>>> > > >+/* synopsis specific PCIE configuration registers*/
+>>>> > > >+#define PCIE_PORT_LINK_CONTROL		0x710
+>>>> > > >+#define PORT_LINK_MODE_MASK		(0x3f << 16)
+>>>> > > >+#define PORT_LINK_MODE_4_LANES		(0x7 << 16)
+>>> > >
+>>> > >Do you mean this is a "Synopsys" designware part? In that case it
+>>> > >should really not be called "exynos-pcie" but "designware-pcie"
+>>> > >and you should make sure that the driver makes no assumptions about
+>>> > >the platform. A lot of other platforms also use designware
+>>> > >parts and should be able to reuse this driver.
+>> >
+>> >Sorry, I don't think so.
+>> >Only core block is a "Synopsys" designware part IP block,
+>> >other parts are Exynos-specific.
+>> >So, it is hard to share with other PCIe IPs using synopsis core.
+> Just call it synopsys anyway and put a comment in to explain this.
+> That should be enough for the next person with a synopsys PCI core
+> to reuse your code and split out the exynos specific parts into a
+> separate file.
+>
 
-On Thu, Jun 20, 2013 at 09:43:33AM +0100, Marc Kleine-Budde wrote:
-> on current linus/master on armv5 we observed stack trashing[1] on high
-> load. I bisected this problem down to commit:
-> 
-> > b9d4d42ad901cc848ac87f1cb8923fded3645568 is the first bad commit
-> > commit b9d4d42ad901cc848ac87f1cb8923fded3645568
-> > Author: Catalin Marinas <catalin.marinas@arm.com>
-> > Date:   Mon Nov 28 21:57:24 2011 +0000
-> > 
-> >     ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on pre-ARMv6 CPUs
-> > 
-> >     This patch removes the __ARCH_WANT_INTERRUPTS_ON_CTXSW definition for
-> >     ARMv5 and earlier processors. On such processors, the context switch
-> >     requires a full cache flush. To avoid high interrupt latencies, this
-> >     patch defers the mm switching to the post-lock switch hook if the
-> >     interrupts are disabled.
-> > 
-> >     Reviewed-by: Will Deacon <will.deacon@arm.com>
-> >     Tested-by: Will Deacon <will.deacon@arm.com>
-> >     Reviewed-by: Frank Rowand <frank.rowand@am.sony.com>
-> >     Tested-by: Marc Zyngier <Marc.Zyngier@arm.com>
-> >     Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > 
-> > :040000 040000 034899bdcbc9aa59b5455a85a9d78b646b4cf784 ecc23e33a4ca807d4153f87fbea85a9437ff2928 M      arch
-> 
-> The problem can be reproduced on several mx28 and an at91sam9263 and
-> only occurs of CONFIG_PREEMPT (Preemptible Kernel (Low-Latency Desktop))
-> is enabled.
-> 
-> I have the gut feeling that the "if (irqs_disabled())" check in the
-> above patch is not correct for CONFIG_PREEMPT.
+I agree to Arnd that this patch should be split. I had worked in past 
+with SPEAr PCIe which also had designware PCIe IP. I see some code which 
+will fit both in SPEAr as well as in exynos. Unfortunately, I was not 
+able to get SPEAr driver pushed to mainline, as I moved to some other 
+project and got heavily occupied.
 
-The check is there to avoid long interrupt latencies (flushing the whole
-cache with interrupts disabled during context switch). You can drop the
-check and always call cpu_switch_mm() to confirm that it fixes the
-faults.
+Last patch is here:
 
-finish_task_switch() calls finish_arch_post_lock_switch() after the
-interrupts have been enabled so that the CPU can actually switch the mm.
-I wonder whether we could actually be preempted after
-finish_lock_switch() but before we actually switched the MMU.
+https://patchwork.kernel.org/patch/1661441/
 
-Here's an untested patch (trying to keep it in the arch/arm code):
+Infact, these functions should be common to all arm platforms.
+
+sys_to_pcie
+cfg_read
+cfg_write
+
+Following functions should be common to all designware based driver (at 
+least they are same in SPEAr)
+
+exynos_pcie_prog_viewport_cfg0
+exynos_pcie_prog_viewport_cfg1
+exynos_pcie_rd_other_conf
+exynos_pcie_wr_other_conf
+exynos_pcie_setup
+exynos_pcie_valid_config
+exynos_pcie_rd_conf
+exynos_pcie_wd_conf
+exynos_pcie_scan_bus
+exynos_pcie_map_irq
+add_pcie_port (after a bit of generalization)
+exynos_pcie_probe
+exynos_pcie_remove
 
 
-diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
-index a7b85e0..ded85e9 100644
---- a/arch/arm/include/asm/mmu_context.h
-+++ b/arch/arm/include/asm/mmu_context.h
-@@ -39,17 +39,20 @@ static inline void check_and_switch_context(struct mm_struct *mm,
- 	if (unlikely(mm->context.vmalloc_seq != init_mm.context.vmalloc_seq))
- 		__check_vmalloc_seq(mm);
- 
--	if (irqs_disabled())
-+	if (irqs_disabled()) {
- 		/*
- 		 * cpu_switch_mm() needs to flush the VIVT caches. To avoid
- 		 * high interrupt latencies, defer the call and continue
- 		 * running with the old mm. Since we only support UP systems
- 		 * on non-ASID CPUs, the old mm will remain valid until the
--		 * finish_arch_post_lock_switch() call.
-+		 * finish_arch_post_lock_switch() call. Preemption needs to be
-+		 * disabled until the MMU is switched.
- 		 */
- 		set_ti_thread_flag(task_thread_info(tsk), TIF_SWITCH_MM);
--	else
-+		preempt_disable();
-+	} else {
- 		cpu_switch_mm(mm->pgd, mm);
-+	}
- }
- 
- #define finish_arch_post_lock_switch \
-@@ -59,6 +62,10 @@ static inline void finish_arch_post_lock_switch(void)
- 	if (test_and_clear_thread_flag(TIF_SWITCH_MM)) {
- 		struct mm_struct *mm = current->mm;
- 		cpu_switch_mm(mm->pgd, mm);
-+		/*
-+		 * Preemption disabled in check_and_switch_context().
-+		 */
-+		preempt_enable();
- 	}
- }
- 
+
+Following should be specific to exynos:
+
+exynos_pcie_rd_own_conf
+exynos_pcie_wr_own_conf
+exynos_pcie_link_up
+exynos_pcie_setup_rc
+exynos_pcie_assert_core_reset
+exynos_pcie_deassert_core_reset
+exynos_pcie_assert_phy_reset
+exynos_pcie_deassert_phy_reset
+exynos_pcie_init_phy
+exynos_pcie_assert_reset
+exynos_pcie_establish_link
+exynos_pcie_host_init
+
+
+
+struct pcie_port_info and struct pcie_port can also be standardized.
+
+Regards
+Pratyush
