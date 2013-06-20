@@ -1,28 +1,56 @@
-From: jld@mozilla.com (Jed Davis)
-Date: Wed, 19 Jun 2013 20:17:06 -0700
-Subject: [PATCH] perf: ARM: Record the user-mode PC in the call chain.
-In-Reply-To: <20130618131319.GC6801@mudshark.cambridge.arm.com>
-References: <20130613232111.GA12536@mozilla.com>
- <20130618131319.GC6801@mudshark.cambridge.arm.com>
-Message-ID: <20130620031706.GB27428@mozilla.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 20 Jun 2013 13:10:14 +0900
+Subject: [PATCH V2 1/6] USB: OHCI: make ohci-exynos a separate driver
+In-Reply-To: <1371052442-14541-2-git-send-email-manjunath.goudar@linaro.org>
+References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+ <1371052442-14541-1-git-send-email-manjunath.goudar@linaro.org>
+ <1371052442-14541-2-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <00ba01ce6d6c$10e8a260$32b9e720$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 02:13:19PM +0100, Will Deacon wrote:
-> On Fri, Jun 14, 2013 at 12:21:11AM +0100, Jed Davis wrote:
-> > With this change, we no longer lose the innermost entry in the user-mode
-> > part of the call chain.  See also the x86 port, which includes the ip.
-> > 
-> > It's possible to partially work around this problem by post-processing
-> > the data to use the PERF_SAMPLE_IP value, but this works only if the CPU
-> > wasn't in the kernel when the sample was taken.
+On Thursday, June 13, 2013 12:54 AM, Manjunath Goudar wrote:
 > 
-> Thanks. I guess we need something similar for arm64 too. Could you cook a
-> similar patch please?
+> Separate the  Samsung OHCI EXYNOS host controller driver from ohci-hcd
+> host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM;
+> it would be nice to have in 3.11.
+> 
+> V2:
+>  -exynos_ohci_hcd structure assignment error fixed.
+>  -Removed multiple usb_create_hcd() from prob funtion.
+>  -platform_set_drvdata() called before exynos_ohci_phy_enable().
+>  -ohci_setup() removed because it is called in .reset member
+>   of the ohci_hc_driver structure
+> 
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Greg KH <greg@kroah.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: linux-usb at vger.kernel.org
+> ---
+>  drivers/usb/host/Kconfig       |    2 +-
+>  drivers/usb/host/Makefile      |    1 +
+>  drivers/usb/host/ohci-exynos.c |  167 +++++++++++++++++-----------------------
+>  drivers/usb/host/ohci-hcd.c    |   18 -----
+>  4 files changed, 71 insertions(+), 117 deletions(-)
 
-Done (and tested, on the ARM V8 Foundation Model).
+CC'ed Vivek Gautam
 
-It looked as if the powerpc and sparc ports might have similar issues,
-but I haven't checked on them yet.
+Hi Manjunath Goudar,
 
---Jed
+It looks good.
+I tested this patch on Exynos4210. It works properly.
+I really appreciate your work.
+
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+
+
+Also, I agree on Alan's opinion.
+> +#define DRIVER_DESC "OHCI exynos driver"
+Please, replace 'exynos' with 'EXYNOS'.
+
+Best regards,
+Jingoo Han
