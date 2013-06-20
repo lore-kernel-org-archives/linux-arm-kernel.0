@@ -1,33 +1,32 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Jun 2013 19:39:59 +0100
-Subject: [PATCH v2] ARM/KVM: save and restore generic timer registers
-In-Reply-To: <20130620183221.GE4563@lvm>
-References: <1370963819-26165-1-git-send-email-andre.przywara@linaro.org>
- <51C2D528.90805@arm.com> <20130620170923.GA4563@lvm>
- <51C339BD.2080600@arm.com> <20130620183221.GE4563@lvm>
-Message-ID: <51C34C7F.6030309@arm.com>
+Date: Thu, 20 Jun 2013 19:41:28 +0100
+Subject: [PATCH 0/5] A handful of KVM/ARM fixes
+In-Reply-To: <20130620183328.GF4563@lvm>
+References: <1371648006-8036-1-git-send-email-marc.zyngier@arm.com>
+ <20130620183328.GF4563@lvm>
+Message-ID: <51C34CD8.4070609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/13 19:32, Christoffer Dall wrote:
-
->> So there is just one thing we absolutely need to make sure here: no vcpu
->> can run before they've all had their timer restored, and hence a stable
->> cntvoff. Otherwise two vcpus will have a different view of time.
+On 20/06/13 19:33, Christoffer Dall wrote:
+> On Wed, Jun 19, 2013 at 02:20:01PM +0100, Marc Zyngier wrote:
+>> This is a small patch series that I accumulated while tracking what
+>> turned out to be an unrelated issue.
 >>
->> Can we guarantee this?
+>> The first patch has already been posted a while ago and included here
+>> for completeness. The others are fairly simple missing barriers/clear
+>> exclusives that are actually required.
 >>
+>> This has been tested on TC2, and is also available in my tree:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm/fixes-3.10-rc6
+>>
+> Will you update the version with the specific options to the dsb's
+> pointed out by Will before I merge this?
 > 
-> Do we need to?  User space is free to modify time and all sort of other
-> registers at any point during VM execution - it will just break the
-> guest that it's running.
-> 
-> I think the key here is that we expect the VM to be stopped for all
-> save/restore operations (we can enforce it if we want to, which I am
-> going to for the VGIC state, because we don't want to interfere with
-> consistent state being written to the hardware).
+> I'd like to include it for the pull request to kvm/next, which I'm
+> planning on getting out tomorrow.
 
-If that's what we expect, then it's fine by me.
+I was planning to do that tomorrow morning (UK time). Is that OK for you?
 
 	M.
 -- 
