@@ -1,17 +1,17 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Thu, 20 Jun 2013 15:06:02 +0530
-Subject: [PATCH V4 06/11] USB: OHCI: Properly handle ohci-exynos suspend
+Date: Thu, 20 Jun 2013 15:06:03 +0530
+Subject: [PATCH V4 07/11] USB: OHCI: Properly handle ohci-omap suspend
 In-Reply-To: <1371720968-7533-1-git-send-email-manjunath.goudar@linaro.org>
 References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
  <1371720968-7533-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1371720968-7533-7-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1371720968-7533-8-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of ohci-exynos glue was not
+Suspend scenario in case of ohci-omap glue was not
 properly handled as it was not suspending generic part
 of ohci controller. Calling explicitly the ohci_suspend()
-routine in exynos_ohci_suspend() will ensure proper
+routine in ohci_omap_suspend() will ensure proper
 handling of suspend scenario.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
@@ -25,57 +25,44 @@ V2:
   executing further.
 
 V3:
- -rid of unwanted code from ohci_hcd_s3c2410_drv_suspend() which already
-  ohci_suspend() does it.
  -Aligned variable "do_wakeup" and "ret".
 
 V4:
- -The do_wakeup and rc variable alignment is removed.
+ -The do_wakeup and ret variable alignment is removed.
 ---
- drivers/usb/host/ohci-exynos.c |   20 +++++---------------
- 1 file changed, 5 insertions(+), 15 deletions(-)
+ drivers/usb/host/ohci-omap.c |   13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
-index ae6068d..17de3dd 100644
---- a/drivers/usb/host/ohci-exynos.c
-+++ b/drivers/usb/host/ohci-exynos.c
-@@ -203,24 +203,15 @@ static int exynos_ohci_suspend(struct device *dev)
- 	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
- 	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
- 	struct platform_device *pdev = to_platform_device(dev);
-+	bool do_wakeup = device_may_wakeup(dev);
- 	unsigned long flags;
- 	int rc = 0;
+diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
+index 10ba58d..baefc46 100644
+--- a/drivers/usb/host/ohci-omap.c
++++ b/drivers/usb/host/ohci-omap.c
+@@ -432,16 +432,23 @@ static int ohci_hcd_omap_drv_remove(struct platform_device *dev)
  
--	/*
--	 * Root hub was already suspended. Disable irq emission and
--	 * mark HW unaccessible, bail out if RH has been resumed. Use
--	 * the spinlock to properly synchronize with possible pending
--	 * RH suspend or resume activity.
--	 */
--	spin_lock_irqsave(&ohci->lock, flags);
--	if (ohci->rh_state != OHCI_RH_SUSPENDED &&
--			ohci->rh_state != OHCI_RH_HALTED) {
--		rc = -EINVAL;
--		goto fail;
--	}
--
--	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-+	rc = ohci_suspend(hcd, do_wakeup);
-+	if (rc)
-+		return rc;
+ #ifdef	CONFIG_PM
  
-+	spin_lock_irqsave(&ohci->lock, flags);
- 	if (exynos_ohci->otg)
- 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+-static int ohci_omap_suspend(struct platform_device *dev, pm_message_t message)
++static int ohci_omap_suspend(struct platform_device *pdev, pm_message_t message)
+ {
+-	struct ohci_hcd	*ohci = hcd_to_ohci(platform_get_drvdata(dev));
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
++	bool do_wakeup = device_may_wakeup(&pdev->dev);
++	int ret;
  
-@@ -228,7 +219,6 @@ static int exynos_ohci_suspend(struct device *dev)
+ 	if (time_before(jiffies, ohci->next_statechange))
+ 		msleep(5);
+ 	ohci->next_statechange = jiffies;
  
- 	clk_disable_unprepare(exynos_ohci->clk);
++	ret = ohci_suspend(hcd, do_wakeup);
++	if (ret)
++		return ret;
++
+ 	omap_ohci_clock_power(0);
+-	return 0;
++	return ret;
+ }
  
--fail:
- 	spin_unlock_irqrestore(&ohci->lock, flags);
- 
- 	return rc;
+ static int ohci_omap_resume(struct platform_device *dev)
 -- 
 1.7.9.5
