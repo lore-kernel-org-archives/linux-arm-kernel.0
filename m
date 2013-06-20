@@ -1,49 +1,158 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 20 Jun 2013 09:45:26 +0200
-Subject: [PATCH] arm: mvebu: fix coherency_late_init() for multiplatform
-Message-ID: <1371714326-25971-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 20 Jun 2013 09:48:33 +0200
+Subject: [PATCH 4/8] tty: atmel_serial: prepare clk before calling enable
+In-Reply-To: <1371640650-9625-1-git-send-email-b.brezillon@overkiz.com>
+References: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
+ <1371640650-9625-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <51C2B3D1.9060601@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As noticed by Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>, commit
-865e0527d2d7 ('arm: mvebu: avoid hardcoded virtual address in
-coherency code') added a postcore_initcall() to register the bus
-notifier that the mvebu code needs to apply correct DMA operations on
-its platform devices breaks the multiplatform boot on other platforms,
-because the bus notifier registration is unconditional.
+On 19/06/2013 13:17, Boris BREZILLON :
+> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+> avoid common clk framework warnings.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-This commit fixes that by registering the bus notifier only if we have
-the mvebu coherency unit described in the Device Tree. The conditional
-used is exactly the same in which the bus_register_notifier() call was
-originally enclosed before 865e0527d2d7 ('arm: mvebu: avoid hardcoded
-virtual address in coherency code').
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reported-by: Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>
----
-This fix has been reported by Arnaud to fix the boot on his OMAP4
-PandaBoard, and it continues to work well on Marvell Armada XP GP.
+(one comment though)
 
-This commit is based on jcooper/mvebu/regmap.
----
- arch/arm/mach-mvebu/coherency.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+> ---
+>   drivers/tty/serial/atmel_serial.c |   41 ++++++++++++++++++++++++++++---------
+>   1 file changed, 31 insertions(+), 10 deletions(-)
+>
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 3467462..691265f 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -1100,7 +1100,7 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
+>   		 * Enable the peripheral clock for this serial port.
+>   		 * This is called on uart_open() or a resume event.
+>   		 */
+> -		clk_enable(atmel_port->clk);
+> +		clk_prepare_enable(atmel_port->clk);
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 32fcf69..be11759 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -147,8 +147,9 @@ int __init coherency_init(void)
- 
- static int __init coherency_late_init(void)
- {
--	bus_register_notifier(&platform_bus_type,
--			      &mvebu_hwcc_platform_nb);
-+	if (of_find_matching_node(NULL, of_coherency_table))
-+		bus_register_notifier(&platform_bus_type,
-+				      &mvebu_hwcc_platform_nb);
- 	return 0;
- }
- 
+Do we need to check return code here?
+
+>
+>   		/* re-enable interrupts if we disabled some on suspend */
+>   		UART_PUT_IER(port, atmel_port->backup_imr);
+> @@ -1114,7 +1114,7 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
+>   		 * Disable the peripheral clock for this serial port.
+>   		 * This is called on uart_close() or a suspend event.
+>   		 */
+> -		clk_disable(atmel_port->clk);
+> +		clk_disable_unprepare(atmel_port->clk);
+>   		break;
+>   	default:
+>   		printk(KERN_ERR "atmel_serial: unknown pm %d\n", state);
+> @@ -1458,9 +1458,10 @@ static void atmel_of_init_port(struct atmel_uart_port *atmel_port,
+>   /*
+>    * Configure the port from the platform device resource info.
+>    */
+> -static void atmel_init_port(struct atmel_uart_port *atmel_port,
+> +static int atmel_init_port(struct atmel_uart_port *atmel_port,
+>   				      struct platform_device *pdev)
+>   {
+> +	int ret;
+>   	struct uart_port *port = &atmel_port->uart;
+>   	struct atmel_uart_data *pdata = pdev->dev.platform_data;
+>
+> @@ -1496,9 +1497,19 @@ static void atmel_init_port(struct atmel_uart_port *atmel_port,
+>   	/* for console, the clock could already be configured */
+>   	if (!atmel_port->clk) {
+>   		atmel_port->clk = clk_get(&pdev->dev, "usart");
+> -		clk_enable(atmel_port->clk);
+> +		if (IS_ERR(atmel_port->clk)) {
+> +			ret = PTR_ERR(atmel_port->clk);
+> +			atmel_port->clk = NULL;
+> +			return ret;
+> +		}
+> +		ret = clk_prepare_enable(atmel_port->clk);
+> +		if (ret) {
+> +			clk_put(atmel_port->clk);
+> +			atmel_port->clk = NULL;
+> +			return ret;
+> +		}
+>   		port->uartclk = clk_get_rate(atmel_port->clk);
+> -		clk_disable(atmel_port->clk);
+> +		clk_disable_unprepare(atmel_port->clk);
+>   		/* only enable clock when USART is in use */
+>   	}
+>
+> @@ -1511,6 +1522,8 @@ static void atmel_init_port(struct atmel_uart_port *atmel_port,
+>   	} else {
+>   		atmel_port->tx_done_mask = ATMEL_US_TXRDY;
+>   	}
+> +
+> +	return 0;
+>   }
+>
+>   struct platform_device *atmel_default_console_device;	/* the serial console device */
+> @@ -1601,6 +1614,7 @@ static void __init atmel_console_get_options(struct uart_port *port, int *baud,
+>
+>   static int __init atmel_console_setup(struct console *co, char *options)
+>   {
+> +	int ret;
+>   	struct uart_port *port = &atmel_ports[co->index].uart;
+>   	int baud = 115200;
+>   	int bits = 8;
+> @@ -1612,7 +1626,9 @@ static int __init atmel_console_setup(struct console *co, char *options)
+>   		return -ENODEV;
+>   	}
+>
+> -	clk_enable(atmel_ports[co->index].clk);
+> +	ret = clk_prepare_enable(atmel_ports[co->index].clk);
+> +	if (ret)
+> +		return ret;
+>
+>   	UART_PUT_IDR(port, -1);
+>   	UART_PUT_CR(port, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
+> @@ -1645,6 +1661,7 @@ static struct console atmel_console = {
+>    */
+>   static int __init atmel_console_init(void)
+>   {
+> +	int ret;
+>   	if (atmel_default_console_device) {
+>   		struct atmel_uart_data *pdata =
+>   			atmel_default_console_device->dev.platform_data;
+> @@ -1655,7 +1672,9 @@ static int __init atmel_console_init(void)
+>   		port->uart.line = id;
+>
+>   		add_preferred_console(ATMEL_DEVICENAME, id, NULL);
+> -		atmel_init_port(port, atmel_default_console_device);
+> +		ret = atmel_init_port(port, atmel_default_console_device);
+> +		if (ret)
+> +			return ret;
+>   		register_console(&atmel_console);
+>   	}
+>
+> @@ -1786,7 +1805,9 @@ static int atmel_serial_probe(struct platform_device *pdev)
+>   	port->backup_imr = 0;
+>   	port->uart.line = ret;
+>
+> -	atmel_init_port(port, pdev);
+> +	ret = atmel_init_port(port, pdev);
+> +	if (ret)
+> +		goto err;
+>
+>   	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+>   	if (IS_ERR(pinctrl)) {
+> @@ -1812,9 +1833,9 @@ static int atmel_serial_probe(struct platform_device *pdev)
+>   			&& ATMEL_CONSOLE_DEVICE->flags & CON_ENABLED) {
+>   		/*
+>   		 * The serial core enabled the clock for us, so undo
+> -		 * the clk_enable() in atmel_console_setup()
+> +		 * the clk_prepare_enable() in atmel_console_setup()
+>   		 */
+> -		clk_disable(port->clk);
+> +		clk_disable_unprepare(port->clk);
+>   	}
+>   #endif
+>
+>
+
+
 -- 
-1.8.1.2
+Nicolas Ferre
