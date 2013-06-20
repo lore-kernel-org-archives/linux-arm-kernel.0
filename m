@@ -1,53 +1,42 @@
-From: jagarwal@nvidia.com (Jay Agarwal)
-Date: Thu, 20 Jun 2013 12:44:51 +0530
-Subject: [PATCH V1] ARM: dts: tegra: Modify pcie memory space size
-Message-ID: <1371712491-31070-1-git-send-email-jagarwal@nvidia.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 20 Jun 2013 17:09:51 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the tip tree
+Message-ID: <20130620170951.248631b40c84c30a1a57ba7f@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- decrease non-prefetch memory size to 128 MB
-- increase prefetch memory size to 384 MB
-- above change is done because most pcie devices
-  prefetch memory size requirement is quite higher
-  compared to non-prefetch memory space.
+Hi all,
 
-Signed-off-by: Jay Agarwal <jagarwal@nvidia.com>
----
-Patch is based on remotes/gitorious_thierryreding_linux/tegra/next and should be applied on top of this
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-integrator/integrator_ap.c between commit 38ff87f77af0
+("sched_clock: Make ARM's sched_clock generic for all architectures")
+from the tip tree and commit 01ef31053ddd ("ARM: integrator: move VGA
+base assignment") from the arm-soc tree.
 
- arch/arm/boot/dts/tegra20.dtsi |    4 ++--
- arch/arm/boot/dts/tegra30.dtsi |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index fd2a7e1..e09e97f 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -483,8 +483,8 @@
- 		ranges = <0x82000000 0 0x80000000 0x80000000 0 0x00001000   /* port 0 registers */
- 			  0x82000000 0 0x80001000 0x80001000 0 0x00001000   /* port 1 registers */
- 			  0x81000000 0 0          0x82000000 0 0x00010000   /* downstream I/O */
--			  0x82000000 0 0xa0000000 0xa0000000 0 0x10000000   /* non-prefetchable memory */
--			  0xc2000000 0 0xb0000000 0xb0000000 0 0x10000000>; /* prefetchable memory */
-+			  0x82000000 0 0xa0000000 0xa0000000 0 0x08000000   /* non-prefetchable memory */
-+			  0xc2000000 0 0xa8000000 0xa8000000 0 0x18000000>; /* prefetchable memory */
- 
- 		clocks = <&tegra_car 70>, <&tegra_car 72>, <&tegra_car 74>,
- 			 <&tegra_car 118>;
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index e0b96bd..b02bbb4 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -35,8 +35,8 @@
- 			  0x82000000 0 0x00001000 0x00001000 0 0x00001000   /* port 1 configuration space */
- 			  0x82000000 0 0x00004000 0x00004000 0 0x00001000   /* port 2 configuration space */
- 			  0x81000000 0 0          0x02000000 0 0x00010000   /* downstream I/O */
--			  0x82000000 0 0x20000000 0x20000000 0 0x10000000   /* non-prefetchable memory */
--			  0xc2000000 0 0x30000000 0x30000000 0 0x10000000>; /* prefetchable memory */
-+			  0x82000000 0 0x20000000 0x20000000 0 0x08000000   /* non-prefetchable memory */
-+			  0xc2000000 0 0x28000000 0x28000000 0 0x18000000>; /* prefetchable memory */
- 
- 		clocks = <&tegra_car 70>, <&tegra_car 72>, <&tegra_car 74>,
- 			 <&tegra_car 118>, <&tegra_car 215>;
 -- 
-1.7.0.4
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-integrator/integrator_ap.c
+index aa43462,a5b15c4..0000000
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@@ -41,8 -41,6 +41,7 @@@
+  #include <linux/stat.h>
+  #include <linux/sys_soc.h>
+  #include <linux/termios.h>
+ +#include <linux/sched_clock.h>
+- #include <video/vga.h>
+  
+  #include <mach/hardware.h>
+  #include <mach/platform.h>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/4b052602/attachment.sig>
