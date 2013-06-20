@@ -1,31 +1,176 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Jun 2013 22:08:48 +0800
-Subject: [PATCH v2] thermal: add imx thermal driver support
-In-Reply-To: <51C2F12B.2090205@ti.com>
-References: <1371280241-31699-1-git-send-email-shawn.guo@linaro.org>
- <51C0C8D8.5090301@ti.com>
- <20130619073739.GA3280@S2101-09.ap.freescale.net>
- <51C1BA1A.5010704@ti.com>
- <20130620024749.GB19896@S2101-09.ap.freescale.net>
- <51C2F12B.2090205@ti.com>
-Message-ID: <20130620140846.GH19896@S2101-09.ap.freescale.net>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Thu, 20 Jun 2013 15:03:16 +0100
+Subject: [PATCH v3 00/10] ARM:STixxxx: Add STixxxx platform and board support
+Message-ID: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 08:10:19AM -0400, Eduardo Valentin wrote:
-> Well, I think just mentioning IMX6DQRM should be ok. I didnt really mean
-> you need to put a link.
-> 
-Ok, will mention SoC Reference Manual in there.
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-<snip>
+Thankyou all for reviewing the v2 patches.
+Here is patch-set incorporating all the review comments from v2.
 
-> Ok. If you dont care about the overhead, it is fine, as it is your call
-> to design the driver accessors. FYI, this is a nice explanation of what
-> is my concern:
-> http://www.spinics.net/lists/linux-omap/msg92370.html
-> 
-Thanks for the pointer.  As the IO access here is not on the hot path
-and is only at second basis, I'm not so concerned by the overhead.
+This patch-set adds basic support for STMicroelectronics STixxxx SOCs
+which includes STiH415 and STiH416 with B2000 and B2020 board support.
 
-Shawn
+STiH415 and STiH416 are dual-core ARM Cortex-A9 CPU, designed for use in
+Set-top-boxes. The SOC support is available in mach-stixxxx which contains
+support code for STiH415, STiH416 SOCs including the generic board support.
+
+Only device drivers included in this patch set are UART and pinctrl, other
+drivers will be added in future.
+
+The reason for adding two SOCs at this patch set is to show that no new
+C code is required for second SOC(STiH416) support.
+
+Thanks to Mark B for picking up the regmap_field apis.
+
+I would appreciate any feedback on these patches.
+
+Changes since v2:
+	- st-asc driver made POSIX compatible based on Russell K comment.
+	- cleaned up arm-global-timer code for non-dt as suggested by Linus W and
+	- fixed minmum clock tick setting pointed by Linus W.
+	- Moved to using syscon driver, as suggested by Arnd and Linus W.
+	- Fixed few plat-* specfic references in comments pointed by Michal S.
+	- Removed un-used variables in mach code as pointed by Michal S.
+	- Cleaned up pinctrl nodes not to use simple-bus as suggested by Arnd
+	and Linus W.
+	- In pinctrl driver moved lot of magic numbers in to proper defines or
+	constants as suggested by Linus W.
+	- Renamed pinctrl-stixxxx to pinctrl-st as discussed with Linus W.
+	- Split adding SOC to multi_v7_defconfig in to two patches as discussed
+	with Mark R.
+	
+
+Changes since RFC:
+ - st-asc Serial driver:
+	- modified kconfig to remove default y
+	- removed all the forward declaration.
+	- use dynamic major numbering.
+	- merge header-file in to driver.
+
+ - ARM Global timer:
+	- moved to drivers/clocksource.
+	- added revision check in driver.
+	- removed unused header file.
+	- moved to u64 from union gt_counter
+	- comments added in get_counter
+	- removed leftover debug code.
+	- moved code to use __raw_readl/writel.
+	- used DIV_ROUND_CLOSEST
+	- added check in interrupt handler.
+	- expanded CE and CS acronyms usage.
+	- Fixed minimum clock ticks value.
+	- move to use clocksource_register_hz
+	- added arch sched_clock support.
+	- added ERRATA 740657 workaround.
+
+ - ST-System Configuration Registers:
+	- moved from syscon usage to st specific driver.
+
+ - ST Pinctrl support:
+	- fixed few typos in the documentation.
+	- moved some of the retime offset information to driver.
+	
+ - STixxxx Support:
+	- all the SOC support code is moved to mach-stixxxx
+	- seperated DEBUG_LL code to new patch.
+	- removed unnecessary #interrupt-cells
+	- renamed uart to serial
+	- moved to multi_v7_defconfig
+	- used menuconfig in mach-stixxx/Kconfig
+	- removed of_platform_populate as generic code does it for you.
+	- scu address is ioremaped.
+
+Srinivas Kandagatla (9):
+  serial:st-asc: Add ST ASC driver.
+  pinctrl:st: Add pinctrl and pinconf support.
+  ARM:stixxxx: Add STiH415 SOC support
+  ARM:stixxxx: Add STiH416 SOC support
+  ARM:stixxxx: Add DEBUG_LL console support
+  ARM:multi_v7_defconfig: rerun savedefconfig
+  ARM:stixxxx: Add stixxxx options to  multi_v7_defconfig
+  ARM:stih41x: Add B2000 board support
+  ARM:stih41x: Add B2020 board support
+
+Stuart Menefy (1):
+  clocksource:arm_global_timer: Add ARM global timer support.
+
+ Documentation/arm/stixxxx/overview.txt             |   33 +
+ Documentation/arm/stixxxx/stih415-overview.txt     |   12 +
+ Documentation/arm/stixxxx/stih416-overview.txt     |   12 +
+ .../devicetree/bindings/arm/global_timer.txt       |   21 +
+ .../devicetree/bindings/pinctrl/pinctrl-st.txt     |  110 ++
+ .../devicetree/bindings/tty/serial/st-asc.txt      |   18 +
+ MAINTAINERS                                        |   11 +
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/Kconfig.debug                             |   38 +
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/Makefile                         |    4 +
+ arch/arm/boot/dts/st-pincfg.h                      |   71 +
+ arch/arm/boot/dts/stih415-b2000.dts                |   15 +
+ arch/arm/boot/dts/stih415-b2020.dts                |   15 +
+ arch/arm/boot/dts/stih415-clock.dtsi               |   38 +
+ arch/arm/boot/dts/stih415-pinctrl.dtsi             |  268 ++++
+ arch/arm/boot/dts/stih415.dtsi                     |   87 ++
+ arch/arm/boot/dts/stih416-b2000.dts                |   16 +
+ arch/arm/boot/dts/stih416-b2020.dts                |   16 +
+ arch/arm/boot/dts/stih416-clock.dtsi               |   41 +
+ arch/arm/boot/dts/stih416-pinctrl.dtsi             |  295 ++++
+ arch/arm/boot/dts/stih416.dtsi                     |   96 ++
+ arch/arm/boot/dts/stih41x-b2000.dtsi               |   41 +
+ arch/arm/boot/dts/stih41x-b2020.dtsi               |   42 +
+ arch/arm/boot/dts/stih41x.dtsi                     |   38 +
+ arch/arm/configs/multi_v7_defconfig                |   31 +-
+ arch/arm/include/debug/stixxxx.S                   |   61 +
+ arch/arm/mach-stixxxx/Kconfig                      |   45 +
+ arch/arm/mach-stixxxx/Makefile                     |    2 +
+ arch/arm/mach-stixxxx/board-dt.c                   |   50 +
+ arch/arm/mach-stixxxx/headsmp.S                    |   44 +
+ arch/arm/mach-stixxxx/platsmp.c                    |  117 ++
+ arch/arm/mach-stixxxx/smp.h                        |   17 +
+ drivers/clocksource/Kconfig                        |   13 +
+ drivers/clocksource/Makefile                       |    1 +
+ drivers/clocksource/arm_global_timer.c             |  330 +++++
+ drivers/pinctrl/Kconfig                            |    6 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/pinctrl-st.c                       | 1403 ++++++++++++++++++++
+ drivers/tty/serial/Kconfig                         |   16 +
+ drivers/tty/serial/Makefile                        |    1 +
+ drivers/tty/serial/st-asc.c                        |  939 +++++++++++++
+ include/uapi/linux/serial_core.h                   |    3 +
+ 43 files changed, 4404 insertions(+), 17 deletions(-)
+ create mode 100644 Documentation/arm/stixxxx/overview.txt
+ create mode 100644 Documentation/arm/stixxxx/stih415-overview.txt
+ create mode 100644 Documentation/arm/stixxxx/stih416-overview.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/global_timer.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-st.txt
+ create mode 100644 Documentation/devicetree/bindings/tty/serial/st-asc.txt
+ create mode 100644 arch/arm/boot/dts/st-pincfg.h
+ create mode 100644 arch/arm/boot/dts/stih415-b2000.dts
+ create mode 100644 arch/arm/boot/dts/stih415-b2020.dts
+ create mode 100644 arch/arm/boot/dts/stih415-clock.dtsi
+ create mode 100644 arch/arm/boot/dts/stih415-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/stih415.dtsi
+ create mode 100644 arch/arm/boot/dts/stih416-b2000.dts
+ create mode 100644 arch/arm/boot/dts/stih416-b2020.dts
+ create mode 100644 arch/arm/boot/dts/stih416-clock.dtsi
+ create mode 100644 arch/arm/boot/dts/stih416-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/stih416.dtsi
+ create mode 100644 arch/arm/boot/dts/stih41x-b2000.dtsi
+ create mode 100644 arch/arm/boot/dts/stih41x-b2020.dtsi
+ create mode 100644 arch/arm/boot/dts/stih41x.dtsi
+ create mode 100644 arch/arm/include/debug/stixxxx.S
+ create mode 100644 arch/arm/mach-stixxxx/Kconfig
+ create mode 100644 arch/arm/mach-stixxxx/Makefile
+ create mode 100644 arch/arm/mach-stixxxx/board-dt.c
+ create mode 100644 arch/arm/mach-stixxxx/headsmp.S
+ create mode 100644 arch/arm/mach-stixxxx/platsmp.c
+ create mode 100644 arch/arm/mach-stixxxx/smp.h
+ create mode 100644 drivers/clocksource/arm_global_timer.c
+ create mode 100644 drivers/pinctrl/pinctrl-st.c
+ create mode 100644 drivers/tty/serial/st-asc.c
+
+-- 
+1.7.6.5
