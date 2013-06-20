@@ -1,50 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jun 2013 10:02:01 +0200
-Subject: [PATCH RFC 0/2] Extend multi_v7_defconfig
-In-Reply-To: <51C291D0.6000401@monstr.eu>
-References: <1371664384-24974-1-git-send-email-soren.brinkmann@xilinx.com>
- <201306192046.41005.arnd@arndb.de> <51C291D0.6000401@monstr.eu>
-Message-ID: <201306201002.01702.arnd@arndb.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 20 Jun 2013 10:04:07 +0200
+Subject: [PATCH v2 2/2] gpio-rcar: Remove #ifdef CONFIG_OF around
+ OF-specific sections
+In-Reply-To: <CACRpkdZJ1Hg=4w1fySiMgy0-Qdph1pD0OZGLFecxHhTsMEKQog@mail.gmail.com>
+References: <1371551389-5493-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1667096.lqpXoD2UlE@avalon>
+ <CACRpkdZJ1Hg=4w1fySiMgy0-Qdph1pD0OZGLFecxHhTsMEKQog@mail.gmail.com>
+Message-ID: <1653091.GeQyMLF6L8@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 June 2013, Michal Simek wrote:
-> On 06/19/2013 08:46 PM, Arnd Bergmann wrote:
-> > On Wednesday 19 June 2013, Soren Brinkmann wrote:
-> >> I don't know how much a defconfig is supposed to provide, hence as RFC.
-> >> This patches are needed for booting Zynq into a minimum ramfs based
-> >> system with a serial console.
+Hi Linus,
+
+On Thursday 20 June 2013 08:42:23 Linus Walleij wrote:
+> On Wed, Jun 19, 2013 at 9:51 PM, Laurent Pinchart wrote:
+> > On Wednesday 19 June 2013 21:17:35 Linus Walleij wrote:
+> >> On Tue, Jun 18, 2013 at 12:29 PM, Laurent Pinchart wrote:
+> >> > All functions and data types used by OF-specific code paths are
+> >> > declared
+> >> > in <linux/of.h> regardless of CONFIG_OF. Replace the #ifdef CONFIG_OF
+> >> > guard with a if(IS_ENABLED(CONFIG_OF)) and let the compiler optimize
+> >> > the unused code away.
+> >> > 
+> >> > Signed-off-by: Laurent Pinchart
+> >> > <laurent.pinchart+renesas@ideasonboard.com>
+> >> 
+> >> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > > 
-> > In my opinion we should provide enable all the platform specific drivers
-> > in the defconfigs, as well as everything needed to boot the system,
-> > to get proper compile coverage as well as the ability to test changes
-> > easily. Your patches look good. Michal, would you apply them and
-> > send another pull request or should I just take them directly?
+> > Thank you. Can you please take the patch in your tree ?
 > 
-> Soren asked me 2 days ago if make sense to create zynq defconfig or not.
-> I just suggested him to better extend this multi_v7_defconfig.
-> But still question is if we can/should create zynq specific defconfig?
-> Or are you going to remove all of these platform specific defconfig?
+> No. It does not apply:
+> 
+> ]$ git am --signoff rcar-fix.patch
+> Till?mpar: gpio-rcar: Remove #ifdef CONFIG_OF around OF-specific sections
+> error: patch misslyckades: drivers/gpio/gpio-rcar.c:279
+> error: drivers/gpio/gpio-rcar.c: patchen kan inte till?mpas
+> Patchen misslyckades vid 0001 gpio-rcar: Remove #ifdef CONFIG_OF
+> around OF-specific sections
+> En kopia av patchen som misslyckades finns i:
+>    /home/linus/src/linux-trees/linux-gpio/.git/rebase-apply/patch
+> N?r du har l?st problemet k?r du "git am --resolved".
+> Om du vill hoppa ?ver patchen k?r du ist?llet "git am --skip".
+> F?r att ?terst?lla originalgrenen och avbryta k?r du "git am --abort".
+> 
+> 
+> Isn't this RCAR stuff funneled through ARM SoC this merge window?
+> Then you have to send it to the ARM SoC folks corresponding branch.
 
-We don't have a consistent policy across platforms at the moment.
-Traditionally we had multiple defconfigs per platform, in some cases
-one per board, but moving towards one defconfig per platform at
-the moment.
+Oops, my bad. I had mistaken it for one of the pinctrl patches.
 
-I guess whether or not to have a separate defconfig for one platform
-or to use only multi_*_defconfig is a question of how many people
-would use a zynq_defconfig in practice.
+/me needs to sleep more :-)
 
-> Definitely agree that multi_v7 defconfig should enable everything needed
-> to boot the system.
-> Does it also mean that we should also enable all zynq drivers
-> to get better compile coverage?
+-- 
+Regards,
 
-I would say yes.
-
-My feeling is that multi_v7_defconfig should enable all hardware
-support for the platforms in it, and that users would take it
-as a starting point if they want to have a configuration for
-an embedded system, disabling everything they don't need.
-
-	Arnd
+Laurent Pinchart
