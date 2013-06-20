@@ -1,201 +1,89 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 20 Jun 2013 17:25:12 +0900
-Subject: [PATCH V6 3/3] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-In-Reply-To: <3250954.dVh4O1LchK@flatron>
-References: <00c201ce6d85$83b072a0$8b1157e0$@samsung.com>
- <3250954.dVh4O1LchK@flatron>
-Message-ID: <00c501ce6d8f$af1bf900$0d53eb00$@samsung.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 20 Jun 2013 10:27:44 +0200
+Subject: [PATCH RFC 0/2] Extend multi_v7_defconfig
+In-Reply-To: <201306201002.01702.arnd@arndb.de>
+References: <1371664384-24974-1-git-send-email-soren.brinkmann@xilinx.com>
+ <201306192046.41005.arnd@arndb.de> <51C291D0.6000401@monstr.eu>
+ <201306201002.01702.arnd@arndb.de>
+Message-ID: <51C2BD00.4000800@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 20, 2013 5:04 PM, Tomasz Figa wrote:
+On 06/20/2013 10:02 AM, Arnd Bergmann wrote:
+> On Thursday 20 June 2013, Michal Simek wrote:
+>> On 06/19/2013 08:46 PM, Arnd Bergmann wrote:
+>>> On Wednesday 19 June 2013, Soren Brinkmann wrote:
+>>>> I don't know how much a defconfig is supposed to provide, hence as RFC.
+>>>> This patches are needed for booting Zynq into a minimum ramfs based
+>>>> system with a serial console.
+>>>
+>>> In my opinion we should provide enable all the platform specific drivers
+>>> in the defconfigs, as well as everything needed to boot the system,
+>>> to get proper compile coverage as well as the ability to test changes
+>>> easily. Your patches look good. Michal, would you apply them and
+>>> send another pull request or should I just take them directly?
+>>
+>> Soren asked me 2 days ago if make sense to create zynq defconfig or not.
+>> I just suggested him to better extend this multi_v7_defconfig.
+>> But still question is if we can/should create zynq specific defconfig?
+>> Or are you going to remove all of these platform specific defconfig?
 > 
-> Hi Jingoo,
+> We don't have a consistent policy across platforms at the moment.
+> Traditionally we had multiple defconfigs per platform, in some cases
+> one per board, but moving towards one defconfig per platform at
+> the moment.
+
+That's what I though but on the other hand in this process
+all these defconfigs should be removed.
+
+> I guess whether or not to have a separate defconfig for one platform
+> or to use only multi_*_defconfig is a question of how many people
+> would use a zynq_defconfig in practice.
+
+The point is if you look at zynq users than they will just use this zynq_defconfig
+because they know that it is for zynq and also they don't want to
+compile drivers for other platforms which zynq can't use.
+>From distribution point of view they want to use only one image because it is just
+easier.
+
+Based on this if there is an option to also add just zynq defconfig, I would prefer
+to also add it.
+
+>> Definitely agree that multi_v7 defconfig should enable everything needed
+>> to boot the system.
+>> Does it also mean that we should also enable all zynq drivers
+>> to get better compile coverage?
 > 
-> On Thursday 20 of June 2013 16:12:24 Jingoo Han wrote:
-> > Exynos5440 has two PCIe controllers which can be used as root complex
-> > for PCIe interface.
-> >
-> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos5440-ssdk5440.dts |    8 ++++++
-> >  arch/arm/boot/dts/exynos5440.dtsi         |   40
-> > ++++++++++++++++++++++++++++- 2 files changed, 47 insertions(+), 1
-> > deletion(-)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> > b/arch/arm/boot/dts/exynos5440-ssdk5440.dts index f32cd77..3d93804
-> > 100644
-> > --- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> > +++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> > @@ -65,4 +65,12 @@
-> >  			clock-frequency = <50000000>;
-> >  		};
-> >  	};
-> > +
-> > +	pcie0 at 290000 {
-> > +		reset-gpio = <&pin_ctrl 5 0>;
-> > +	};
-> > +
-> > +	pcie1 at 2a0000 {
-> > +		reset-gpio = <&pin_ctrl 22 0>;
-> > +	};
-> >  };
-> > diff --git a/arch/arm/boot/dts/exynos5440.dtsi
-> > b/arch/arm/boot/dts/exynos5440.dtsi index 03d40c0..6295eda 100644
-> > --- a/arch/arm/boot/dts/exynos5440.dtsi
-> > +++ b/arch/arm/boot/dts/exynos5440.dtsi
-> > @@ -126,7 +126,7 @@
-> >  		clock-names = "spi", "spi_busclk0";
-> >  	};
-> >
-> > -	pinctrl {
-> > +	pin_ctrl: pinctrl {
-> >  		compatible = "samsung,exynos5440-pinctrl";
-> >  		reg = <0xE0000 0x1000>;
-> >  		interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>,
-> > @@ -230,4 +230,42 @@
-> >  		clocks = <&clock 24>;
-> >  		clock-names = "usbhost";
-> >  	};
+> I would say yes.
 > 
-> I think this patch should be split into two:
->  - patch adding just generlic PCIe nodes for Exynos5440,
->  - patch adding label to the pinctrl node (which is a prerequisite) and
-> board-specific properties of PCIe nodes.
+> My feeling is that multi_v7_defconfig should enable all hardware
+> support for the platforms in it, and that users would take it
+> as a starting point if they want to have a configuration for
+> an embedded system, disabling everything they don't need.
 
-Do you mean the following?
+I just wanted to be sure because you wrote just drivers for booting
+it means any "minimal" configuration to get it boot not all drivers.
 
-1. patch adding just generlic PCIe nodes for Exynos5440
-    [PATCH] ARM: dts: Add pcie controller node for Samsung EXYNOS5440 SoC
+If you are ok, Soren will prepare also specific zynq defconfig file
+and check if there are any missing drivers which are not enabled for zynq
+for multi_v7. I will collect them in one branch and will send pull request.
 
-arch/arm/boot/dts/exynos5440.dtsi
-+
-+	pcie at 290000 {
-+		compatible = "samsung,exynos5440-pcie";
-+		reg = <0x290000 0x1000
-+			0x270000 0x1000
-+			0x271000 0x40>;
-+		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-+		clocks = <&clock 28>, <&clock 27>;
-+		clock-names = "pcie", "pcie_bus";
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00001000   /* configuration space */
-+			  0x81000000 0 0	  0x40001000 0 0x00010000   /* downstream I/O */
-+			  0x82000000 0 0x40011000 0x40011000 0 0x1ffef000>; /* non-prefetchable memory */
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0x0 0 &gic 53>;
-+	};
-+
-+	pcie at 2a0000 {
-+		compatible = "samsung,exynos5440-pcie";
-+		reg = <0x2a0000 0x1000
-+			0x272000 0x1000
-+			0x271040 0x40>;
-+		interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
-+		clocks = <&clock 29>, <&clock 27>;
-+		clock-names = "pcie", "pcie_bus";
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00001000   /* configuration space */
-+			  0x81000000 0 0	  0x60001000 0 0x00010000   /* downstream I/O */
-+			  0x82000000 0 0x60011000 0x60011000 0 0x1ffef000>; /* non-prefetchable memory */
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0x0 0 &gic 56>;
-+	};
+Thanks,
+Michal
 
 
-
-2. patch adding label to the pinctrl node (which is a prerequisite) and
-    board-specific properties of PCIe nodes.
-   [PATCH] ARM: dts: Add pcie controller node for exynos5440-ssdk5440
-
-arch/arm/boot/dts/exynos5440-ssdk5440.dts
-+
-+	pcie0 at 290000 {
-+		reset-gpio = <&pin_ctrl 5 0>;
-+	};
-+
-+	pcie1 at 2a0000 {
-+		reset-gpio = <&pin_ctrl 22 0>;
-+	};
-
-arch/arm/boot/dts/exynos5440.dtsi
--	pinctrl {
-+	pin_ctrl: pinctrl {
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
 
-
-> 
-> > +
-> > +	pcie0 at 290000 {
-> 
-> Node naming looks incorrect here. The name should be as generic as
-> possible, without any hardware-specific IDs, e.g. pcie, not pcie0. The
-> @290000 suffix is enough to make the node unique.
-
-I see. You are right.
-I will fix it.
-
-
-Best regards,
-Jingoo Han
-
-> 
-> > +		compatible = "samsung,exynos5440-pcie";
-> > +		reg = <0x290000 0x1000
-> > +			0x270000 0x1000
-> > +			0x271000 0x40>;
-> > +		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-> > +		clocks = <&clock 28>, <&clock 27>;
-> > +		clock-names = "pcie", "pcie_bus";
-> > +		#address-cells = <3>;
-> > +		#size-cells = <2>;
-> > +		device_type = "pci";
-> > +		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00001000
-> /*
-> > configuration space */ +			  0x81000000 0 0
-> 0x40001000 0 0x00010000
-> > /* downstream I/O */ +			  0x82000000 0 0x40011000
-> 0x40011000 0
-> > 0x1ffef000>; /* non-prefetchable memory */ +		#interrupt-cells =
-> <1>;
-> > +		interrupt-map-mask = <0 0 0 0>;
-> > +		interrupt-map = <0x0 0 &gic 53>;
-> > +	};
-> > +
-> > +	pcie1 at 2a0000 {
-> 
-> Same here.
-> 
-> Best regards,
-> Tomasz
-> 
-> > +		compatible = "samsung,exynos5440-pcie";
-> > +		reg = <0x2a0000 0x1000
-> > +			0x272000 0x1000
-> > +			0x271040 0x40>;
-> > +		interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
-> > +		clocks = <&clock 29>, <&clock 27>;
-> > +		clock-names = "pcie", "pcie_bus";
-> > +		#address-cells = <3>;
-> > +		#size-cells = <2>;
-> > +		device_type = "pci";
-> > +		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00001000
-> /*
-> > configuration space */ +			  0x81000000 0 0
-> 0x60001000 0 0x00010000
-> > /* downstream I/O */ +			  0x82000000 0 0x60011000
-> 0x60011000 0
-> > 0x1ffef000>; /* non-prefetchable memory */ +		#interrupt-cells =
-> <1>;
-> > +		interrupt-map-mask = <0 0 0 0>;
-> > +		interrupt-map = <0x0 0 &gic 56>;
-> > +	};
-> >  };
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/5f5596fd/attachment.sig>
