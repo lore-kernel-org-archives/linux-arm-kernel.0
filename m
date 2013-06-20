@@ -1,32 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jun 2013 21:48:41 +0200
-Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.11
-In-Reply-To: <20130620064541.GE5523@atomide.com>
-References: <51C23902.1080301@ti.com> <20130620064541.GE5523@atomide.com>
-Message-ID: <201306202148.41464.arnd@arndb.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 20 Jun 2013 15:50:21 -0400 (EDT)
+Subject: [PATCH V4 00/11] USB: OHCI:Properly handle ohci_suspend()routine
+ in bus glue
+In-Reply-To: <1371720968-7533-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1306201549470.879-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 June 2013, Tony Lindgren wrote:
-> * Benoit Cousson <b-cousson@ti.com> [130619 16:10]:
-> > Hi Tony,
-> > 
-> > Please pull the following commits for OMAP Device Tree for v3.11.
-> > 
-> > It does contains as well 2 clock data patches, I hope it will not generate any conflict with Paul's tree. 
-> > 
-> > Special thanks to Florian for his nice cleanup using the C preprocessor.
+On Thu, 20 Jun 2013, Manjunath Goudar wrote:
+
+> Suspend scenario in case of ohci bus glue was not properly handled as
+> it was not suspending generic part of ohci controller. Calling
+> explicitly the ohci_suspend()routine will ensure proper handling
+> of suspend scenario.
 > 
-> It's best that Arnd and Olof take this pull request directly as we're
-> getting so close to the merge window. These patches should be pretty
-> much independent of the other branches I've sent, and are needed to
-> keep omap4 booting now that we've flipped the switch for omap4 to be  
-> DT only.
+> V2:
+>  -Incase ohci_suspend() fails, return right away without executing further.
 > 
+> V3:
+>  -New patch 1/11 added, for generic ohci-hcd suspend code.
+>  
+> V4:
+>  -Properly aligned "do_wakeup" and "ret" variables.
 
-Would someone provide a merge description for this? I just noticed
-that it's not a signed tag, and there are lots of patches in it,
-so I'd rather not have to come up with something myself.
+This whole series looks good now.  For all of the patches:
 
-
-	Arnd
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
