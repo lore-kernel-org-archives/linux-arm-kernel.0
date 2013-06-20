@@ -1,41 +1,23 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 20 Jun 2013 10:33:28 +0200
-Subject: [PATCH] perf: arm64: Record the user-mode PC in the call chain.
-In-Reply-To: <20130620030713.GA27428@mozilla.com>
-References: <20130620030713.GA27428@mozilla.com>
-Message-ID: <20130620083327.GA5288@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 20 Jun 2013 10:39:34 +0200
+Subject: [PATCH] gpiolib: remove warnning of allocations with IRQs disabled
+In-Reply-To: <1370747312-25957-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1370747312-25957-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <CACRpkdY3FVkuWpSYe2XQjATVzUx7Wjn1rGgAjkKSwnW1G==AxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Jun 9, 2013 at 5:08 AM, Zhangfei Gao <zhangfei.gao@linaro.org> wrote:
 
-* Jed Davis <jld@mozilla.com> wrote:
+> Move of_gpiochip_add outof spin_lock, since kzalloc inside
+> of_gpiochip_add -> of_gpiochip_add_pin_range -> gpiochip_add_pin_range -> kzalloc
+>
+> WARNING: at kernel/lockdep.c:2740 lockdep_trace_alloc+0xf8/0xfc()
+> DEBUG_LOCKS_WARN_ON(irqs_disabled_flags(flags))
+>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 
-> With this change, we no longer lose the innermost entry in the user-mode
-> part of the call chain.  See also the x86 port, which includes the ip,
-> and the corresponding change in arch/arm.
-> 
-> Signed-off-by: Jed Davis <jld@mozilla.com>
-> ---
->  arch/arm64/kernel/perf_event.c |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 1e49e5eb..9ba33c4 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -1336,6 +1336,7 @@ void perf_callchain_user(struct perf_callchain_entry *entry,
->  		return;
->  	}
->  
-> +	perf_callchain_store(entry, regs->pc);
->  	tail = (struct frame_tail __user *)regs->regs[29];
->  
->  	while (entry->nr < PERF_MAX_STACK_DEPTH &&
+Patch applied, thanks.
 
-Acked-by: Ingo Molnar <mingo@kernel.org>
-
-I suspect this goes to v3.10 via the ARM64 tree?
-
-Thanks,
-
-	Ingo
+Yours,
+Linus Walleij
