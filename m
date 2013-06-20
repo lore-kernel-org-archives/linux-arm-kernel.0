@@ -1,47 +1,36 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 20 Jun 2013 17:14:52 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the tip tree
-Message-ID: <20130620171452.365bf173b71870c690d52e27@canb.auug.org.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Jun 2013 00:21:14 -0700
+Subject: [RFC PATCH 2/6] mfd: omap-usb-host: Put pins in IDLE state on
+ suspend
+In-Reply-To: <878v26815g.fsf@linaro.org>
+References: <1371650753-11452-1-git-send-email-rogerq@ti.com>
+ <1371650753-11452-3-git-send-email-rogerq@ti.com>
+ <878v26815g.fsf@linaro.org>
+Message-ID: <20130620072112.GF5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+* Kevin Hilman <khilman@linaro.org> [130619 10:30]:
+> Hi Roger,
+> 
+> Roger Quadros <rogerq@ti.com> writes:
+> 
+> > In order to support wake up from suspend use the pinctrl
+> > framework to put the USB host pins in IDLE state during suspend.
+> >
+> > CC: Samuel Ortiz <sameo@linux.intel.com>
+> > Signed-off-by: Roger Quadros <rogerq@ti.com>
+> 
+> You should use helpers for this now in the pinctrl core:
+> 
+>     http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173514.html
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-drivers/clocksource/dw_apb_timer_of.c between commits 0a0a7e66fa26
-("clocksource: dw_apb: Remove unused header") and 38ff87f77af0
-("sched_clock: Make ARM's sched_clock generic for all architectures")
-from the tip tree and commit a8b447f2bbbb ("clocksource: dw_apb_timer_of:
-add clock-handling") from the arm-soc tree.
+Also see the thread "[PATCH] pinctrl: document the pinctrl PM states"
+as we're still discussing how to deal with the various dynamic
+pinctrl needs in a generic way. Meanwile, just make sure the other
+patches work and don't break anything without this patch to
+remove the dependency.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Regards,
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc drivers/clocksource/dw_apb_timer_of.c
-index d9a1e8d,cef5544..0000000
---- a/drivers/clocksource/dw_apb_timer_of.c
-+++ b/drivers/clocksource/dw_apb_timer_of.c
-@@@ -20,8 -20,11 +20,9 @@@
-  #include <linux/of.h>
-  #include <linux/of_address.h>
-  #include <linux/of_irq.h>
- +#include <linux/sched_clock.h>
-+ #include <linux/clk.h>
-  
- -#include <asm/mach/time.h>
- -#include <asm/sched_clock.h>
- -
-  static void timer_get_base_and_rate(struct device_node *np,
-  				    void __iomem **base, u32 *rate)
-  {
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/b89191cf/attachment.sig>
+Tony
