@@ -1,53 +1,244 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 20 Jun 2013 10:24:39 +0200
-Subject: [Linaro-mm-sig] [RFC 2/3] ARM: dma-mapping: Pass DMA attrs as
- IOMMU prot
-In-Reply-To: <CAMcxFTRnnCnPnvMi89r7rUsN4xeYzZGqy9s5v5ukm_fJ_d_RGg@mail.gmail.com>
-References: <1371707384-30037-1-git-send-email-hdoyu@nvidia.com><1371707384-30037-3-git-send-email-hdoyu@nvidia.com><CAMcxFTRnnCnPnvMi89r7rUsN4xeYzZGqy9s5v5ukm_fJ_d_RGg@mail.gmail.com>
-Message-ID: <20130620.112439.1330557591655135630.hdoyu@nvidia.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Thu, 20 Jun 2013 17:24:53 +0900
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <1371714427.4230.64.camel@weser.hi.pengutronix.de>
+References: <20130617182127.GM2718@n2100.arm.linux.org.uk>
+ <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
+ <20130618084308.GU2718@n2100.arm.linux.org.uk>
+ <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
+ <1371548849.4276.6.camel@weser.hi.pengutronix.de>
+ <008601ce6cb0$2c8cec40$85a6c4c0$%dae@samsung.com>
+ <1371637326.4230.24.camel@weser.hi.pengutronix.de>
+ <00ae01ce6cd9$f4834630$dd89d290$%dae@samsung.com>
+ <1371645247.4230.41.camel@weser.hi.pengutronix.de>
+ <CAAQKjZNJD4HpnJQ7iE+Gez36066M6U0YQeUEdA0+UcSOKqeghg@mail.gmail.com>
+ <20130619182925.GL2718@n2100.arm.linux.org.uk>
+ <00da01ce6d81$76eb3d60$64c1b820$%dae@samsung.com>
+ <1371714427.4230.64.camel@weser.hi.pengutronix.de>
+Message-ID: <00db01ce6d8f$a3c23dd0$eb46b970$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
 
-Nishanth Peethambaran <nishanth.p@gmail.com> wrote @ Thu, 20 Jun 2013 10:07:00 +0200:
 
-> It would be better to define a prot flag bit in iommu API and convert
-> the attrs to prot flag bit in dma-mapping aPI before calling the iommu
-> API.
-
-That's the 1st option.
-
-> On Thu, Jun 20, 2013 at 11:19 AM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-....
-> > @@ -1280,7 +1281,7 @@ ____iommu_create_mapping(struct device *dev, dma_addr_t *req,
-> >                                 break;
-> >
-> >                 len = (j - i) << PAGE_SHIFT;
-> > -               ret = iommu_map(mapping->domain, iova, phys, len, 0);
-> > +               ret = iommu_map(mapping->domain, iova, phys, len, (int)attrs);
+> -----Original Message-----
+> From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> Sent: Thursday, June 20, 2013 4:47 PM
+> To: Inki Dae
+> Cc: 'Russell King - ARM Linux'; 'Inki Dae'; 'linux-fbdev'; 'YoungJun Cho';
+> 'Kyungmin Park'; 'myungjoo.ham'; 'DRI mailing list'; linux-arm-
+> kernel at lists.infradead.org; linux-media at vger.kernel.org
+> Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+> framework
 > 
-> Use dma_get_attr and translate the READ_ONLY attr to a new READ_ONLY
-> prot flag bit which needs to be defined in iommu.h
+> Am Donnerstag, den 20.06.2013, 15:43 +0900 schrieb Inki Dae:
+> >
+> > > -----Original Message-----
+> > > From: dri-devel-bounces+inki.dae=samsung.com at lists.freedesktop.org
+> > > [mailto:dri-devel-bounces+inki.dae=samsung.com at lists.freedesktop.org]
+> On
+> > > Behalf Of Russell King - ARM Linux
+> > > Sent: Thursday, June 20, 2013 3:29 AM
+> > > To: Inki Dae
+> > > Cc: linux-fbdev; DRI mailing list; Kyungmin Park; myungjoo.ham;
+> YoungJun
+> > > Cho; linux-media at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > > Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer
+> synchronization
+> > > framework
+> > >
+> > > On Thu, Jun 20, 2013 at 12:10:04AM +0900, Inki Dae wrote:
+> > > > On the other hand, the below shows how we could enhance the
+> conventional
+> > > > way with my approach (just example):
+> > > >
+> > > > CPU -> DMA,
+> > > >         ioctl(qbuf command)              ioctl(streamon)
+> > > >               |                                               |
+> > > >               |                                               |
+> > > >         qbuf  <- dma_buf_sync_get   start streaming <- syncpoint
+> > > >
+> > > > dma_buf_sync_get just registers a sync buffer(dmabuf) to sync object.
+> > > And
+> > > > the syncpoint is performed by calling dma_buf_sync_lock(), and then
+> DMA
+> > > > accesses the sync buffer.
+> > > >
+> > > > And DMA -> CPU,
+> > > >         ioctl(dqbuf command)
+> > > >               |
+> > > >               |
+> > > >         dqbuf <- nothing to do
+> > > >
+> > > > Actual syncpoint is when DMA operation is completed (in interrupt
+> > > handler):
+> > > > the syncpoint is performed by calling dma_buf_sync_unlock().
+> > > > Hence,  my approach is to move the syncpoints into just before dma
+> > > access
+> > > > as long as possible.
+> > >
+> > > What you've just described does *not* work on architectures such as
+> > > ARMv7 which do speculative cache fetches from memory at any time that
+> > > that memory is mapped with a cacheable status, and will lead to data
+> > > corruption.
+> >
+> > I didn't explain that enough. Sorry about that. 'nothing to do' means
+> that a
+> > dmabuf sync interface isn't called but existing functions are called. So
+> > this may be explained again:
+> >         ioctl(dqbuf command)
+> >             |
+> >             |
+> >         dqbuf <- 1. dma_unmap_sg
+> >                     2. dma_buf_sync_unlock (syncpoint)
+> >
+> > The syncpoint I mentioned means lock mechanism; not doing cache
+> operation.
+> >
+> > In addition, please see the below more detail examples.
+> >
+> > The conventional way (without dmabuf-sync) is:
+> > Task A
+> > ----------------------------
+> >  1. CPU accesses buf
+> >  2. Send the buf to Task B
+> >  3. Wait for the buf from Task B
+> >  4. go to 1
+> >
+> > Task B
+> > ---------------------------
+> > 1. Wait for the buf from Task A
+> > 2. qbuf the buf
+> >     2.1 insert the buf to incoming queue
+> > 3. stream on
+> >     3.1 dma_map_sg if ready, and move the buf to ready queue
+> >     3.2 get the buf from ready queue, and dma start.
+> > 4. dqbuf
+> >     4.1 dma_unmap_sg after dma operation completion
+> >     4.2 move the buf to outgoing queue
+> > 5. back the buf to Task A
+> > 6. go to 1
+> >
+> > In case that two tasks share buffers, and data flow goes from Task A to
+> Task
+> > B, we would need IPC operation to send and receive buffers properly
+> between
+> > those two tasks every time CPU or DMA access to buffers is started or
+> > completed.
+> >
+> >
+> > With dmabuf-sync:
+> >
+> > Task A
+> > ----------------------------
+> >  1. dma_buf_sync_lock <- synpoint (call by user side)
+> >  2. CPU accesses buf
+> >  3. dma_buf_sync_unlock <- syncpoint (call by user side)
+> >  4. Send the buf to Task B (just one time)
+> >  5. go to 1
+> >
+> >
+> > Task B
+> > ---------------------------
+> > 1. Wait for the buf from Task A (just one time)
+> > 2. qbuf the buf
+> >     1.1 insert the buf to incoming queue
+> > 3. stream on
+> >     3.1 dma_buf_sync_lock <- syncpoint (call by kernel side)
+> >     3.2 dma_map_sg if ready, and move the buf to ready queue
+> >     3.3 get the buf from ready queue, and dma start.
+> > 4. dqbuf
+> >     4.1 dma_buf_sync_unlock <- syncpoint (call by kernel side)
+> >     4.2 dma_unmap_sg after dma operation completion
+> >     4.3 move the buf to outgoing queue
+> > 5. go to 1
+> >
+> > On the other hand, in case of using dmabuf-sync, as you can see the
+> above
+> > example, we would need IPC operation just one time. That way, I think we
+> > could not only reduce performance overhead but also make user
+> application
+> > simplified. Of course, this approach can be used for all DMA device
+> drivers
+> > such as DRM. I'm not a specialist in v4l2 world so there may be missing
+> > point.
+> >
+> 
+> You already need some kind of IPC between the two tasks, as I suspect
+> even in your example it wouldn't make much sense to queue the buffer
+> over and over again in task B without task A writing anything to it. So
+> task A has to signal task B there is new data in the buffer to be
+> processed.
+> 
+> There is no need to share the buffer over and over again just to get the
+> two processes to work together on the same thing. Just share the fd
+> between both and then do out-of-band completion signaling, as you need
+> this anyway. Without this you'll end up with unpredictable behavior.
+> Just because sync allows you to access the buffer doesn't mean it's
+> valid for your use-case. Without completion signaling you could easily
+> end up overwriting your data from task A multiple times before task B
+> even tries to lock the buffer for processing.
+> 
+> So the valid flow is (and this already works with the current APIs):
+> Task A                                    Task B
+> ------                                    ------
+> CPU access buffer
+>          ----------completion signal--------->
+>                                           qbuf (dragging buffer into
+>                                           device domain, flush caches,
+>                                           reserve buffer etc.)
+>                                                     |
+>                                           wait for device operation to
+>                                           complete
+>                                                     |
+>                                           dqbuf (dragging buffer back
+>                                           into CPU domain, invalidate
+>                                           caches, unreserve)
+>         <---------completion signal------------
+> CPU access buffer
+> 
 
-Both DMA_ATTR_READ_ONLY and IOMMU_READ are just logical bit in their
-layers respectively and eventually it's converted to H/W dependent
-bit.
+Correct. In case that data flow goes from A to B, it needs some kind of IPC between the two tasks every time as you said. Then, without dmabuf-sync, how do think about the case that two tasks share the same buffer but these tasks access the buffer(buf1) as write, and data of the buffer(buf1) isn't needed to be shared?
 
-If IOMMU is considered as one of specific case of DMA, sharing
-dma_attr between IOMMU and DMA may not be so bad. IIRC, ARM:
-dma-mapping API was implemented based on this concept(?).
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index d8f98b1..161a1b0 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -755,7 +755,7 @@ int iommu_domain_has_cap(struct iommu_domain *domain,
- EXPORT_SYMBOL_GPL(iommu_domain_has_cap);
- 
- int iommu_map(struct iommu_domain *domain, unsigned long iova,
--	      phys_addr_t paddr, size_t size, int prot)
-+	      phys_addr_t paddr, size_t size, struct dma_attr *attrs)
- {
- 	unsigned long orig_iova = iova;
- 	unsigned int min_pagesz;
+With dmabuf-sync is:
+
+ Task A
+ ----------------------------
+ 1. dma_buf_sync_lock <- synpoint (call by user side)
+ 2. CPU writes something to buf1
+ 3. dma_buf_sync_unlock <- syncpoint (call by user side)
+ 4. copy buf1 to buf2
+ 5. go to 1
+
+
+ Task B
+ ---------------------------
+ 1. dma_buf_sync_lock
+ 2. CPU writes something to buf3
+ 3. dma_buf_sync_unlock
+ 4. qbuf the buf3(src) and buf1(dst)
+     4.1 insert buf3,1 to incoming queue
+     4.2 dma_buf_sync_lock <- syncpoint (call by kernel side)
+ 5. stream on
+     5.1 dma_map_sg if ready, and move the buf to ready queue
+     5.2 get the buf from ready queue, and dma start.
+ 6. dqbuf
+     6.1 dma_buf_sync_unlock <- syncpoint (call by kernel side)
+     6.2 dma_unmap_sg after dma operation completion
+     6.3 move the buf3,1 to outgoing queue
+7. go to 1
+
+
+Thanks,
+Inki Dae
+
+> 
+> Regards,
+> Lucas
+> --
+> Pengutronix e.K.                           | Lucas Stach                 |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
