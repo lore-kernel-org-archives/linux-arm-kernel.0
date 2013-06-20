@@ -1,92 +1,47 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 20 Jun 2013 16:12:24 +0900
-Subject: [PATCH V6 3/3] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-Message-ID: <00c201ce6d85$83b072a0$8b1157e0$@samsung.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 20 Jun 2013 17:14:52 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the tip tree
+Message-ID: <20130620171452.365bf173b71870c690d52e27@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5440 has two PCIe controllers which can be used as root complex
-for PCIe interface.
+Hi all,
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
----
- arch/arm/boot/dts/exynos5440-ssdk5440.dts |    8 ++++++
- arch/arm/boot/dts/exynos5440.dtsi         |   40 ++++++++++++++++++++++++++++-
- 2 files changed, 47 insertions(+), 1 deletion(-)
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/clocksource/dw_apb_timer_of.c between commits 0a0a7e66fa26
+("clocksource: dw_apb: Remove unused header") and 38ff87f77af0
+("sched_clock: Make ARM's sched_clock generic for all architectures")
+from the tip tree and commit a8b447f2bbbb ("clocksource: dw_apb_timer_of:
+add clock-handling") from the arm-soc tree.
 
-diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-index f32cd77..3d93804 100644
---- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-+++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-@@ -65,4 +65,12 @@
- 			clock-frequency = <50000000>;
- 		};
- 	};
-+
-+	pcie0 at 290000 {
-+		reset-gpio = <&pin_ctrl 5 0>;
-+	};
-+
-+	pcie1 at 2a0000 {
-+		reset-gpio = <&pin_ctrl 22 0>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index 03d40c0..6295eda 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -126,7 +126,7 @@
- 		clock-names = "spi", "spi_busclk0";
- 	};
- 
--	pinctrl {
-+	pin_ctrl: pinctrl {
- 		compatible = "samsung,exynos5440-pinctrl";
- 		reg = <0xE0000 0x1000>;
- 		interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>,
-@@ -230,4 +230,42 @@
- 		clocks = <&clock 24>;
- 		clock-names = "usbhost";
- 	};
-+
-+	pcie0 at 290000 {
-+		compatible = "samsung,exynos5440-pcie";
-+		reg = <0x290000 0x1000
-+			0x270000 0x1000
-+			0x271000 0x40>;
-+		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-+		clocks = <&clock 28>, <&clock 27>;
-+		clock-names = "pcie", "pcie_bus";
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00001000   /* configuration space */
-+			  0x81000000 0 0	  0x40001000 0 0x00010000   /* downstream I/O */
-+			  0x82000000 0 0x40011000 0x40011000 0 0x1ffef000>; /* non-prefetchable memory */
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0x0 0 &gic 53>;
-+	};
-+
-+	pcie1 at 2a0000 {
-+		compatible = "samsung,exynos5440-pcie";
-+		reg = <0x2a0000 0x1000
-+			0x272000 0x1000
-+			0x271040 0x40>;
-+		interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
-+		clocks = <&clock 29>, <&clock 27>;
-+		clock-names = "pcie", "pcie_bus";
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00001000   /* configuration space */
-+			  0x81000000 0 0	  0x60001000 0 0x00010000   /* downstream I/O */
-+			  0x82000000 0 0x60011000 0x60011000 0 0x1ffef000>; /* non-prefetchable memory */
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0x0 0 &gic 56>;
-+	};
- };
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
 -- 
-1.7.10.4
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/clocksource/dw_apb_timer_of.c
+index d9a1e8d,cef5544..0000000
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@@ -20,8 -20,11 +20,9 @@@
+  #include <linux/of.h>
+  #include <linux/of_address.h>
+  #include <linux/of_irq.h>
+ +#include <linux/sched_clock.h>
++ #include <linux/clk.h>
+  
+ -#include <asm/mach/time.h>
+ -#include <asm/sched_clock.h>
+ -
+  static void timer_get_base_and_rate(struct device_node *np,
+  				    void __iomem **base, u32 *rate)
+  {
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/b89191cf/attachment.sig>
