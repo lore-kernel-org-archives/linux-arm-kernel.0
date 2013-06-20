@@ -1,30 +1,31 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 20 Jun 2013 20:29:30 +0100
-Subject: [PATCH v2] ARM/KVM: save and restore generic timer registers
-In-Reply-To: <20130620183221.GE4563@lvm>
-References: <1370963819-26165-1-git-send-email-andre.przywara@linaro.org>
- <51C2D528.90805@arm.com> <20130620170923.GA4563@lvm>
- <51C339BD.2080600@arm.com> <20130620183221.GE4563@lvm>
-Message-ID: <CAFEAcA97WiCYnSSs3utfq5+3tgausn+fjEnWeN6zj9sgP9P9qA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Jun 2013 21:30:55 +0200
+Subject: Get machine type in user space
+In-Reply-To: <CABp-a4cUbwXEGPUQBjGRnNR+X91j1qGQigS=KYTZ1fZ2ZGzQtA@mail.gmail.com>
+References: <CABp-a4cUbwXEGPUQBjGRnNR+X91j1qGQigS=KYTZ1fZ2ZGzQtA@mail.gmail.com>
+Message-ID: <201306202130.55247.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 June 2013 19:32, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> Marc wrote:
->> So there is just one thing we absolutely need to make sure here: no vcpu
->> can run before they've all had their timer restored, and hence a stable
->> cntvoff. Otherwise two vcpus will have a different view of time.
->>
->> Can we guarantee this?
+On Thursday 20 June 2013, Per Strandh wrote:
+> I work for a company that develops our own arm-based embedded linux
+> products. (both hardware and software)
+> 
+> My question is about the "machine type" parameter that is passed from
+> the  bootloader to the kernel.
+> 
+> If the kernel supports more than one "machine type", the the one that
+> are specified by the bootloader will be choosen.
+> If the kernel only supports one "machine type" that will always be choosen.
+> 
+> Question:
+> Is it possible from user-space to find out the "machine type" that was
+> passed from the bootloader?
+> I know that in /proc/cpuinfo it is possible to see that "name" of the
+> choosen "machine type", but not if it was the correct one.
 
-> Do we need to?  User space is free to modify time and all sort of other
-> registers at any point during VM execution - it will just break the
-> guest that it's running.
+You can look in the "compatible" property of the root node in /proc/device-tree
 
-Note that QEMU will stop all CPUs before doing a migration or
-similar operation. However there is a monitor command to query
-the current CPU registers etc which won't try to stop the VM
-first. So we might try to read vcpu registers (though I hope we
-don't allow writing them).
+That will have the exact string used to match the platform.
 
--- PMM
+	Arnd
