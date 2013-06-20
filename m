@@ -1,115 +1,39 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 20 Jun 2013 15:11:51 +0300
-Subject: [RFC PATCH 4/6] USB: ehci-omap: Suspend the controller during
- bus suspend
-In-Reply-To: <1371650753-11452-5-git-send-email-rogerq@ti.com>
-References: <1371650753-11452-1-git-send-email-rogerq@ti.com>
- <1371650753-11452-5-git-send-email-rogerq@ti.com>
-Message-ID: <20130620121151.GD9817@arwen.pp.htv.fi>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 20 Jun 2013 08:16:44 -0400
+Subject: [PATCH] arm: mvebu: fix coherency_late_init() for multiplatform
+In-Reply-To: <1371714326-25971-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1371714326-25971-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130620121644.GM31667@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jun 19, 2013 at 05:05:51PM +0300, Roger Quadros wrote:
-> Runtime suspend the controller during bus suspend and resume it
-> during bus resume. This will ensure that the USB Host power domain
-> enters lower power state and does not prevent the SoC from
-> endering deeper sleep states.
+On Thu, Jun 20, 2013 at 09:45:26AM +0200, Thomas Petazzoni wrote:
+> As noticed by Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>, commit
+> 865e0527d2d7 ('arm: mvebu: avoid hardcoded virtual address in
+> coherency code') added a postcore_initcall() to register the bus
+> notifier that the mvebu code needs to apply correct DMA operations on
+> its platform devices breaks the multiplatform boot on other platforms,
+> because the bus notifier registration is unconditional.
 > 
-> Remote wakeup will come up as an interrupt while the controller
-> is suspended, so tackle it carefully using a workqueue.
+> This commit fixes that by registering the bus notifier only if we have
+> the mvebu coherency unit described in the Device Tree. The conditional
+> used is exactly the same in which the bus_register_notifier() call was
+> originally enclosed before 865e0527d2d7 ('arm: mvebu: avoid hardcoded
+> virtual address in coherency code').
 > 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Reported-by: Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>
 > ---
->  drivers/usb/host/ehci-omap.c |   82 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 82 insertions(+), 0 deletions(-)
+> This fix has been reported by Arnaud to fix the boot on his OMAP4
+> PandaBoard, and it continues to work well on Marvell Armada XP GP.
 > 
-> diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-> index 16d7150..91f14f1 100644
-> --- a/drivers/usb/host/ehci-omap.c
-> +++ b/drivers/usb/host/ehci-omap.c
-> @@ -44,6 +44,8 @@
->  #include <linux/usb/hcd.h>
->  #include <linux/of.h>
->  #include <linux/dma-mapping.h>
-> +#include <linux/workqueue.h>
-> +#include <linux/spinlock.h>
->  
->  #include "ehci.h"
->  
-> @@ -69,6 +71,7 @@ static const char hcd_name[] = "ehci-omap";
->  struct omap_hcd {
->  	struct usb_phy *phy[OMAP3_HS_USB_PORTS]; /* one PHY for each port */
->  	int nports;
-> +	struct work_struct work;
->  };
->  
->  static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
-> @@ -81,6 +84,76 @@ static inline u32 ehci_read(void __iomem *base, u32 reg)
->  	return __raw_readl(base + reg);
->  }
->  
-> +static void omap_ehci_work(struct work_struct *work)
-> +{
-> +	struct omap_hcd *omap = container_of(work, struct omap_hcd, work);
-> +	struct ehci_hcd *ehci = container_of((void *) omap,
-> +						struct ehci_hcd, priv);
-> +	struct usb_hcd *hcd = ehci_to_hcd(ehci);
-> +	struct device *dev = hcd->self.controller;
-> +
-> +	pm_runtime_get_sync(dev);
-> +	enable_irq(hcd->irq);
-> +	/*
-> +	 * enable_irq() should preempt us with a pending IRQ
-> +	 * so we can be sure that IRQ handler completes before
-> +	 * we call pm_runtime_put_sync()
-> +	 */
-> +	pm_runtime_put_sync(dev);
-> +}
-> +
-> +static irqreturn_t omap_ehci_irq(struct usb_hcd *hcd)
-> +{
-> +	struct omap_hcd *omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
-> +	struct device *dev = hcd->self.controller;
-> +	irqreturn_t ret;
-> +
-> +	if (pm_runtime_suspended(dev)) {
-> +		schedule_work(&omap->work);
-> +		disable_irq_nosync(hcd->irq);
-> +		ret = IRQ_HANDLED;
+> This commit is based on jcooper/mvebu/regmap.
+> ---
+>  arch/arm/mach-mvebu/coherency.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 
-looks like this could be done as:
+Applied to mvebu/regmap
 
-if (pm_runtime_suspended(dev)) {
-	pm_runtime_get(dev);
-	omap->flags |= OMAP_EHCI_IRQ_PENDING;
-	disable_irq_nosync(hcd->irq);
-	ret = IRQ_HANDLED;
-}
+thx,
 
-then on your ->runtime_resume():
-
-runtime_resume(dev)
-{
-	...
-
-	if (omap->flags & OMAP_EHCI_IRQ_PENDING) {
-		process_pending_irqs(omap);
-		omap->flags &= ~OMAP_EHCI_IRQ_PENDING;
-	}
-
-	return 0;
-}
-
-or something similar
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130620/bc4ca896/attachment-0001.sig>
+Jason.
