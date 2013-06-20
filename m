@@ -1,244 +1,201 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Thu, 20 Jun 2013 17:24:53 +0900
-Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
- framework
-In-Reply-To: <1371714427.4230.64.camel@weser.hi.pengutronix.de>
-References: <20130617182127.GM2718@n2100.arm.linux.org.uk>
- <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
- <20130618084308.GU2718@n2100.arm.linux.org.uk>
- <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
- <1371548849.4276.6.camel@weser.hi.pengutronix.de>
- <008601ce6cb0$2c8cec40$85a6c4c0$%dae@samsung.com>
- <1371637326.4230.24.camel@weser.hi.pengutronix.de>
- <00ae01ce6cd9$f4834630$dd89d290$%dae@samsung.com>
- <1371645247.4230.41.camel@weser.hi.pengutronix.de>
- <CAAQKjZNJD4HpnJQ7iE+Gez36066M6U0YQeUEdA0+UcSOKqeghg@mail.gmail.com>
- <20130619182925.GL2718@n2100.arm.linux.org.uk>
- <00da01ce6d81$76eb3d60$64c1b820$%dae@samsung.com>
- <1371714427.4230.64.camel@weser.hi.pengutronix.de>
-Message-ID: <00db01ce6d8f$a3c23dd0$eb46b970$%dae@samsung.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 20 Jun 2013 17:25:12 +0900
+Subject: [PATCH V6 3/3] ARM: dts: Add pcie controller node for Samsung
+ EXYNOS5440 SoC
+In-Reply-To: <3250954.dVh4O1LchK@flatron>
+References: <00c201ce6d85$83b072a0$8b1157e0$@samsung.com>
+ <3250954.dVh4O1LchK@flatron>
+Message-ID: <00c501ce6d8f$af1bf900$0d53eb00$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> Sent: Thursday, June 20, 2013 4:47 PM
-> To: Inki Dae
-> Cc: 'Russell King - ARM Linux'; 'Inki Dae'; 'linux-fbdev'; 'YoungJun Cho';
-> 'Kyungmin Park'; 'myungjoo.ham'; 'DRI mailing list'; linux-arm-
-> kernel at lists.infradead.org; linux-media at vger.kernel.org
-> Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
-> framework
+On Thursday, June 20, 2013 5:04 PM, Tomasz Figa wrote:
 > 
-> Am Donnerstag, den 20.06.2013, 15:43 +0900 schrieb Inki Dae:
-> >
-> > > -----Original Message-----
-> > > From: dri-devel-bounces+inki.dae=samsung.com at lists.freedesktop.org
-> > > [mailto:dri-devel-bounces+inki.dae=samsung.com at lists.freedesktop.org]
-> On
-> > > Behalf Of Russell King - ARM Linux
-> > > Sent: Thursday, June 20, 2013 3:29 AM
-> > > To: Inki Dae
-> > > Cc: linux-fbdev; DRI mailing list; Kyungmin Park; myungjoo.ham;
-> YoungJun
-> > > Cho; linux-media at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > > Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer
-> synchronization
-> > > framework
-> > >
-> > > On Thu, Jun 20, 2013 at 12:10:04AM +0900, Inki Dae wrote:
-> > > > On the other hand, the below shows how we could enhance the
-> conventional
-> > > > way with my approach (just example):
-> > > >
-> > > > CPU -> DMA,
-> > > >         ioctl(qbuf command)              ioctl(streamon)
-> > > >               |                                               |
-> > > >               |                                               |
-> > > >         qbuf  <- dma_buf_sync_get   start streaming <- syncpoint
-> > > >
-> > > > dma_buf_sync_get just registers a sync buffer(dmabuf) to sync object.
-> > > And
-> > > > the syncpoint is performed by calling dma_buf_sync_lock(), and then
-> DMA
-> > > > accesses the sync buffer.
-> > > >
-> > > > And DMA -> CPU,
-> > > >         ioctl(dqbuf command)
-> > > >               |
-> > > >               |
-> > > >         dqbuf <- nothing to do
-> > > >
-> > > > Actual syncpoint is when DMA operation is completed (in interrupt
-> > > handler):
-> > > > the syncpoint is performed by calling dma_buf_sync_unlock().
-> > > > Hence,  my approach is to move the syncpoints into just before dma
-> > > access
-> > > > as long as possible.
-> > >
-> > > What you've just described does *not* work on architectures such as
-> > > ARMv7 which do speculative cache fetches from memory at any time that
-> > > that memory is mapped with a cacheable status, and will lead to data
-> > > corruption.
-> >
-> > I didn't explain that enough. Sorry about that. 'nothing to do' means
-> that a
-> > dmabuf sync interface isn't called but existing functions are called. So
-> > this may be explained again:
-> >         ioctl(dqbuf command)
-> >             |
-> >             |
-> >         dqbuf <- 1. dma_unmap_sg
-> >                     2. dma_buf_sync_unlock (syncpoint)
-> >
-> > The syncpoint I mentioned means lock mechanism; not doing cache
-> operation.
-> >
-> > In addition, please see the below more detail examples.
-> >
-> > The conventional way (without dmabuf-sync) is:
-> > Task A
-> > ----------------------------
-> >  1. CPU accesses buf
-> >  2. Send the buf to Task B
-> >  3. Wait for the buf from Task B
-> >  4. go to 1
-> >
-> > Task B
-> > ---------------------------
-> > 1. Wait for the buf from Task A
-> > 2. qbuf the buf
-> >     2.1 insert the buf to incoming queue
-> > 3. stream on
-> >     3.1 dma_map_sg if ready, and move the buf to ready queue
-> >     3.2 get the buf from ready queue, and dma start.
-> > 4. dqbuf
-> >     4.1 dma_unmap_sg after dma operation completion
-> >     4.2 move the buf to outgoing queue
-> > 5. back the buf to Task A
-> > 6. go to 1
-> >
-> > In case that two tasks share buffers, and data flow goes from Task A to
-> Task
-> > B, we would need IPC operation to send and receive buffers properly
-> between
-> > those two tasks every time CPU or DMA access to buffers is started or
-> > completed.
-> >
-> >
-> > With dmabuf-sync:
-> >
-> > Task A
-> > ----------------------------
-> >  1. dma_buf_sync_lock <- synpoint (call by user side)
-> >  2. CPU accesses buf
-> >  3. dma_buf_sync_unlock <- syncpoint (call by user side)
-> >  4. Send the buf to Task B (just one time)
-> >  5. go to 1
-> >
-> >
-> > Task B
-> > ---------------------------
-> > 1. Wait for the buf from Task A (just one time)
-> > 2. qbuf the buf
-> >     1.1 insert the buf to incoming queue
-> > 3. stream on
-> >     3.1 dma_buf_sync_lock <- syncpoint (call by kernel side)
-> >     3.2 dma_map_sg if ready, and move the buf to ready queue
-> >     3.3 get the buf from ready queue, and dma start.
-> > 4. dqbuf
-> >     4.1 dma_buf_sync_unlock <- syncpoint (call by kernel side)
-> >     4.2 dma_unmap_sg after dma operation completion
-> >     4.3 move the buf to outgoing queue
-> > 5. go to 1
-> >
-> > On the other hand, in case of using dmabuf-sync, as you can see the
-> above
-> > example, we would need IPC operation just one time. That way, I think we
-> > could not only reduce performance overhead but also make user
-> application
-> > simplified. Of course, this approach can be used for all DMA device
-> drivers
-> > such as DRM. I'm not a specialist in v4l2 world so there may be missing
-> > point.
-> >
+> Hi Jingoo,
 > 
-> You already need some kind of IPC between the two tasks, as I suspect
-> even in your example it wouldn't make much sense to queue the buffer
-> over and over again in task B without task A writing anything to it. So
-> task A has to signal task B there is new data in the buffer to be
-> processed.
+> On Thursday 20 of June 2013 16:12:24 Jingoo Han wrote:
+> > Exynos5440 has two PCIe controllers which can be used as root complex
+> > for PCIe interface.
+> >
+> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> > ---
+> >  arch/arm/boot/dts/exynos5440-ssdk5440.dts |    8 ++++++
+> >  arch/arm/boot/dts/exynos5440.dtsi         |   40
+> > ++++++++++++++++++++++++++++- 2 files changed, 47 insertions(+), 1
+> > deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+> > b/arch/arm/boot/dts/exynos5440-ssdk5440.dts index f32cd77..3d93804
+> > 100644
+> > --- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+> > +++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+> > @@ -65,4 +65,12 @@
+> >  			clock-frequency = <50000000>;
+> >  		};
+> >  	};
+> > +
+> > +	pcie0 at 290000 {
+> > +		reset-gpio = <&pin_ctrl 5 0>;
+> > +	};
+> > +
+> > +	pcie1 at 2a0000 {
+> > +		reset-gpio = <&pin_ctrl 22 0>;
+> > +	};
+> >  };
+> > diff --git a/arch/arm/boot/dts/exynos5440.dtsi
+> > b/arch/arm/boot/dts/exynos5440.dtsi index 03d40c0..6295eda 100644
+> > --- a/arch/arm/boot/dts/exynos5440.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5440.dtsi
+> > @@ -126,7 +126,7 @@
+> >  		clock-names = "spi", "spi_busclk0";
+> >  	};
+> >
+> > -	pinctrl {
+> > +	pin_ctrl: pinctrl {
+> >  		compatible = "samsung,exynos5440-pinctrl";
+> >  		reg = <0xE0000 0x1000>;
+> >  		interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>,
+> > @@ -230,4 +230,42 @@
+> >  		clocks = <&clock 24>;
+> >  		clock-names = "usbhost";
+> >  	};
 > 
-> There is no need to share the buffer over and over again just to get the
-> two processes to work together on the same thing. Just share the fd
-> between both and then do out-of-band completion signaling, as you need
-> this anyway. Without this you'll end up with unpredictable behavior.
-> Just because sync allows you to access the buffer doesn't mean it's
-> valid for your use-case. Without completion signaling you could easily
-> end up overwriting your data from task A multiple times before task B
-> even tries to lock the buffer for processing.
-> 
-> So the valid flow is (and this already works with the current APIs):
-> Task A                                    Task B
-> ------                                    ------
-> CPU access buffer
->          ----------completion signal--------->
->                                           qbuf (dragging buffer into
->                                           device domain, flush caches,
->                                           reserve buffer etc.)
->                                                     |
->                                           wait for device operation to
->                                           complete
->                                                     |
->                                           dqbuf (dragging buffer back
->                                           into CPU domain, invalidate
->                                           caches, unreserve)
->         <---------completion signal------------
-> CPU access buffer
-> 
+> I think this patch should be split into two:
+>  - patch adding just generlic PCIe nodes for Exynos5440,
+>  - patch adding label to the pinctrl node (which is a prerequisite) and
+> board-specific properties of PCIe nodes.
 
-Correct. In case that data flow goes from A to B, it needs some kind of IPC between the two tasks every time as you said. Then, without dmabuf-sync, how do think about the case that two tasks share the same buffer but these tasks access the buffer(buf1) as write, and data of the buffer(buf1) isn't needed to be shared?
+Do you mean the following?
 
+1. patch adding just generlic PCIe nodes for Exynos5440
+    [PATCH] ARM: dts: Add pcie controller node for Samsung EXYNOS5440 SoC
 
-With dmabuf-sync is:
-
- Task A
- ----------------------------
- 1. dma_buf_sync_lock <- synpoint (call by user side)
- 2. CPU writes something to buf1
- 3. dma_buf_sync_unlock <- syncpoint (call by user side)
- 4. copy buf1 to buf2
- 5. go to 1
-
-
- Task B
- ---------------------------
- 1. dma_buf_sync_lock
- 2. CPU writes something to buf3
- 3. dma_buf_sync_unlock
- 4. qbuf the buf3(src) and buf1(dst)
-     4.1 insert buf3,1 to incoming queue
-     4.2 dma_buf_sync_lock <- syncpoint (call by kernel side)
- 5. stream on
-     5.1 dma_map_sg if ready, and move the buf to ready queue
-     5.2 get the buf from ready queue, and dma start.
- 6. dqbuf
-     6.1 dma_buf_sync_unlock <- syncpoint (call by kernel side)
-     6.2 dma_unmap_sg after dma operation completion
-     6.3 move the buf3,1 to outgoing queue
-7. go to 1
+arch/arm/boot/dts/exynos5440.dtsi
++
++	pcie at 290000 {
++		compatible = "samsung,exynos5440-pcie";
++		reg = <0x290000 0x1000
++			0x270000 0x1000
++			0x271000 0x40>;
++		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
++		clocks = <&clock 28>, <&clock 27>;
++		clock-names = "pcie", "pcie_bus";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00001000   /* configuration space */
++			  0x81000000 0 0	  0x40001000 0 0x00010000   /* downstream I/O */
++			  0x82000000 0 0x40011000 0x40011000 0 0x1ffef000>; /* non-prefetchable memory */
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 0>;
++		interrupt-map = <0x0 0 &gic 53>;
++	};
++
++	pcie at 2a0000 {
++		compatible = "samsung,exynos5440-pcie";
++		reg = <0x2a0000 0x1000
++			0x272000 0x1000
++			0x271040 0x40>;
++		interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
++		clocks = <&clock 29>, <&clock 27>;
++		clock-names = "pcie", "pcie_bus";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00001000   /* configuration space */
++			  0x81000000 0 0	  0x60001000 0 0x00010000   /* downstream I/O */
++			  0x82000000 0 0x60011000 0x60011000 0 0x1ffef000>; /* non-prefetchable memory */
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 0>;
++		interrupt-map = <0x0 0 &gic 56>;
++	};
 
 
-Thanks,
-Inki Dae
+
+2. patch adding label to the pinctrl node (which is a prerequisite) and
+    board-specific properties of PCIe nodes.
+   [PATCH] ARM: dts: Add pcie controller node for exynos5440-ssdk5440
+
+arch/arm/boot/dts/exynos5440-ssdk5440.dts
++
++	pcie0 at 290000 {
++		reset-gpio = <&pin_ctrl 5 0>;
++	};
++
++	pcie1 at 2a0000 {
++		reset-gpio = <&pin_ctrl 22 0>;
++	};
+
+arch/arm/boot/dts/exynos5440.dtsi
+-	pinctrl {
++	pin_ctrl: pinctrl {
+
+
 
 > 
-> Regards,
-> Lucas
-> --
-> Pengutronix e.K.                           | Lucas Stach                 |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> > +
+> > +	pcie0 at 290000 {
+> 
+> Node naming looks incorrect here. The name should be as generic as
+> possible, without any hardware-specific IDs, e.g. pcie, not pcie0. The
+> @290000 suffix is enough to make the node unique.
+
+I see. You are right.
+I will fix it.
+
+
+Best regards,
+Jingoo Han
+
+> 
+> > +		compatible = "samsung,exynos5440-pcie";
+> > +		reg = <0x290000 0x1000
+> > +			0x270000 0x1000
+> > +			0x271000 0x40>;
+> > +		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
+> > +		clocks = <&clock 28>, <&clock 27>;
+> > +		clock-names = "pcie", "pcie_bus";
+> > +		#address-cells = <3>;
+> > +		#size-cells = <2>;
+> > +		device_type = "pci";
+> > +		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00001000
+> /*
+> > configuration space */ +			  0x81000000 0 0
+> 0x40001000 0 0x00010000
+> > /* downstream I/O */ +			  0x82000000 0 0x40011000
+> 0x40011000 0
+> > 0x1ffef000>; /* non-prefetchable memory */ +		#interrupt-cells =
+> <1>;
+> > +		interrupt-map-mask = <0 0 0 0>;
+> > +		interrupt-map = <0x0 0 &gic 53>;
+> > +	};
+> > +
+> > +	pcie1 at 2a0000 {
+> 
+> Same here.
+> 
+> Best regards,
+> Tomasz
+> 
+> > +		compatible = "samsung,exynos5440-pcie";
+> > +		reg = <0x2a0000 0x1000
+> > +			0x272000 0x1000
+> > +			0x271040 0x40>;
+> > +		interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
+> > +		clocks = <&clock 29>, <&clock 27>;
+> > +		clock-names = "pcie", "pcie_bus";
+> > +		#address-cells = <3>;
+> > +		#size-cells = <2>;
+> > +		device_type = "pci";
+> > +		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00001000
+> /*
+> > configuration space */ +			  0x81000000 0 0
+> 0x60001000 0 0x00010000
+> > /* downstream I/O */ +			  0x82000000 0 0x60011000
+> 0x60011000 0
+> > 0x1ffef000>; /* non-prefetchable memory */ +		#interrupt-cells =
+> <1>;
+> > +		interrupt-map-mask = <0 0 0 0>;
+> > +		interrupt-map = <0x0 0 &gic 56>;
+> > +	};
+> >  };
