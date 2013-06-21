@@ -1,47 +1,41 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 21 Jun 2013 09:16:27 -0700
-Subject: [PATCH] clk: Handle CLK_GET_RATE_NOCACHE flag in clk_set_rate()
-In-Reply-To: <1371820055-14147-1-git-send-email-s.nawrocki@samsung.com>
-References: <1371820055-14147-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20130621161627.9136.84494@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Jun 2013 18:19:36 +0200
+Subject: [GIT PULL] Keystone SOC support for 3.11
+In-Reply-To: <1371255346-3000-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1371255346-3000-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <201306211819.36288.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2013-06-21 06:07:35)
-> If a clock has CLK_GET_RATE_NOCACHE flag set the rate needs to
-> be recalculated, rather than referencing the cached value.
+On Saturday 15 June 2013, Santosh Shilimkar wrote:
+> The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
 > 
-> Currently cached clk->rate is compared with new value to see if
-> anything needs to be done in clk_set_rate(). This may cause required
-> clock controller registers update to not happen when same clock
-> frequency value is being set subsequently.
+>   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc-for-arm-soc
+> 
+> for you to fetch changes up to cc92fc07c26c1bec1abb58f0cd356b13dc00a28c:
+> 
+>   ARM: dts: keystone: Add minimal Keystone SOC device tree data (2013-06-14 19:45:46 -0400)
+> 
+> ----------------------------------------------------------------
+> SOC support for Keystone II devices:
+> 
+> - Minimal machine and device-tree support with arch_timers and console UART
+> - Reboot hook using PLL reset
+> - Low level debug support using UART
+> - SMP boot support
 
-Peter already sent a patch for this:
-https://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=commitdiff;h=34e452a152efd25d654b7bc809df429337115b03
+I'm getting a build warning with keystone_defconfig that I have not 
+encountered before:
 
-Regards,
-Mike
+arch/arm/mm/fault.c:495:1: warning: 'do_sect_fault' defined but not used [-Wunused-function]
+ do_sect_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ ^
 
-> ---
->  drivers/clk/clk.c |    3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 1144e8c..ffa304e 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1215,6 +1215,9 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
->         /* prevent racing with updates to the clock topology */
->         clk_prepare_lock();
-> 
-> +       if (clk->flags & CLK_GET_RATE_NOCACHE)
-> +               __clk_recalc_rates(clk, 0);
-> +
->         /* bail early if nothing to do */
->         if (rate == clk->rate)
->                 goto out;
-> --
-> 1.7.9.5
+Any idea what is going on here and what the fix is? Should that function
+just be hidden in #ifndef CONFIG_ARM_LPAE?
+
+	Arnd
