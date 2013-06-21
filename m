@@ -1,105 +1,82 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 21 Jun 2013 11:20:49 -0700
-Subject: [PATCH 21/33 v2] clk: ux500: Add Device Tree support for the PRCC
- Kernel clock
-In-Reply-To: <20130619074203.GD31320@laptop>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-22-git-send-email-lee.jones@linaro.org>
- <20130611110923.GB3330@laptop> <201306121646.30279.arnd@arndb.de>
- <20130618211735.9136.25870@quantum> <20130619074203.GD31320@laptop>
-Message-ID: <20130621182049.20448.88353@quantum>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 21 Jun 2013 14:25:34 -0400
+Subject: [GIT PULL 1/2] ARM: mvebu: dt changes for v3.11 (round 6!)
+In-Reply-To: <201306211958.00637.arnd@arndb.de>
+References: <20130621164611.GT31667@titan.lakedaemon.net>
+ <201306211958.00637.arnd@arndb.de>
+Message-ID: <20130621182534.GV31667@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lee Jones (2013-06-19 00:42:03)
-> > Quoting Arnd Bergmann (2013-06-12 07:46:30)
-> > > On Tuesday 11 June 2013, Lee Jones wrote:
-> > > > This patch enables clocks to be specified from Device Tree via phandles
-> > > > to the "prcc-kernel-clock" node.
-> > > > 
-> > > > Cc: Mike Turquette <mturquette@linaro.org>
-> > > > Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > > 
-> > > 
-> > > I don't understand the design of the common clock subsystem here, but is it really
-> > > necessary to hardcode all the clocks using clk_reg_prcc_kclk() here *and* register
-> > > a clkdev *and* store the pointer in an array, when you can get all that information
-> > > from the device tree?
-> > > 
-> > > Mike?
+On Fri, Jun 21, 2013 at 07:58:00PM +0200, Arnd Bergmann wrote:
+> On Friday 21 June 2013, Jason Cooper wrote:
+> > Arnd, Olof,
 > > 
-> > I'm a bit confused by what is going on here too.  There are several
-> > different ways to handle this.
+> > Here's the last stragglers for v3.11.  Nothing too traumatic :)
 > > 
-> > 1) Since you have your own clock driver (e.g. not the basic clock types)
-> > then you could expand the argument list of clk_reg_prcc_kclk to include
-> > the clkdev dev_id string and toss the call to clk_register_clkdev inside
-> > of clk_reg_prcc_kclk.
+> > This does cause a merge conflict in kirkwood.dtsi with my
+> > mvebu/pcie_kirkwood branch.  The resolution is to keep the changes in
+> > this branch.
+> > 
+> > 
+> > The following changes since commit 918f8f309643978b9e761f39af8962a7388d332d:
+> > 
+> >   ARM: Kirkwood: ts219: Enable second PCIe port in DT. (2013-06-11 16:02:08 +0000)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.infradead.org/users/jcooper/linux.git tags/dt-3.11-6
+> > 
+> > for you to fetch changes up to 01db527e657d6cf646c6e6f059ad41e7023a25e7:
+> > 
+> >   ARM: Kirkwood: Fix the internal register ranges translation (2013-06-21 15:38:20 +0000)
+> > 
+> > ----------------------------------------------------------------
+> > mvebu dt changes for v3.11 (round 6)
+> > 
+> >  - mvebu
+> >     - mini-PCIe connectors on Armada 370 RD
+> > 
+> >  - kirkwood
+> >     - correct internal register ranges translation
+> > 
+> > ----------------------------------------------------------------
+> > Ezequiel Garcia (1):
+> >       ARM: Kirkwood: Fix the internal register ranges translation
+> > 
+> > Thomas Petazzoni (1):
+> >       arm: mvebu: enable mini-PCIe connectors on Armada 370 RD
+> > 
+> >  arch/arm/boot/dts/armada-370-rd.dts | 16 ++++++++++++++++
+> >  arch/arm/boot/dts/kirkwood.dtsi     |  5 +++--
+> >  2 files changed, 19 insertions(+), 2 deletions(-)
+> > 
 > 
-> Yes, that's actually a pretty good idea. It has nothing to do with
-> this patchset, but I will add it to my TODO.
+> Pulled into next/dt, thanks!
 > 
-> NB: I am away from tomorrow until after Connect, so I will continue
-> with this after that.
+> I got a non-obvious conflict that I resolved like this:
 > 
-> > 2) Move your clock data into DT and teach the driver to use of_clk_get
-> > to fetch the clk phandle directly instead of using the string-matching
-> > clkdev mechanisms. Of course both your clock and device bits need to be
-> > converted to DT first.
 > 
-> I'm sure this is the end-goal, but we still have to support the !DT
-> case. At least until all of the ATAGs stuff has been completely
-> removed from platform.
-> 
-> > Can you explain what prcc_kclk[] and friends are doing? Is that a legacy
-> > clock framework thing that is still hanging around? I'm curious to know
-> > why your clock driver needs a list of the clocks it registers.
-> 
-> Sure.
-> 
-> 1. So when we register a clock, we store a pointer to it in a 'struct
-> clk *array[]' using known cell identifying read-ins. For peripheral
-> (pclk) and kernel (kclk) clocks these are peripheral number (the
-> kernel clocks have these too) and their associated 8bit register
-> enable BIT(). The PRCMU clocks are read-in to the array only by their
-> 32bit register enable BIT().
-> 
-> 2. We then register with of_clk_add_provider() passing the array using
-> the 'void *data' argument. So:
-> 
->   clk = clk_reg_prcc_[p|k]clk(blah, blah, blah);
->   array[(periph * PRCC_PERIPHS_PER_CLUSTER) + bit] = clk
->   of_clk_add_provider(child, ux500_twocell_get, array);
-> 
-> 3. In the DTS(I) files we request clocks using their known identifiers
-> by way of tuplets for the kclks and pclks and by a 1 #cell variant for
-> the PRCMU clocks. So:
-> 
-> pclk & kclk:
->   /*        pclk/kclk       periph  BIT() */
->   clocks = <&prcc_[p|k]clk  1       9>;
-> 
-> PRCMU:
->   /*        prcmu       BIT()             */
->   clocks = <&prcmu_clk  PRCMU_DMACLK>;
-> 
-> The PRCMU can then use the clk framework supplied
-> of_clk_src_onecell_get() call-back and the pclk and kclks use the 2
-> #cell variant we provide. They both read into the aforementioned
-> array[]s we populated earlier in the process to fetch the correct
-> 'struct clk*'.
+> --- a/arch/arm/boot/dts/kirkwood.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> @@@ -30,8 -30,8 +30,9 @@@
+>   
+>         ocp at f1000000 {
+>                 compatible = "simple-bus";
+> -               ranges = <0x00000000 0xf1000000 0x4000000
+> +               ranges = <0x00000000 0xf1000000 0x0100000
 
-Ok, so I had to re-read that several times. It's probably not a win for
-readability but if that is the binding you want then go for it.
 
-For patches #17-23:
+>  +                        0xe0000000 0xe0000000 0x8100000 /* PCIE */
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+good catch!  Looks like I need to redo my resolution in mvebu/for-next
+:)
 
-> 
-> -- 
-> Lee Jones
-> Linaro ST-Ericsson Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+> +                         0xf4000000 0xf4000000 0x0000400
+>                           0xf5000000 0xf5000000 0x0000400>;
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+
+thx,
+
+Jason.
