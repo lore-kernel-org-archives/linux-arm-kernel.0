@@ -1,35 +1,36 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Jun 2013 13:08:47 +0100
-Subject: [PATCH v2 2/3] ARM: KVM: add missing dsb before invalidating Stage-2
- TLBs
-In-Reply-To: <1371816528-25078-1-git-send-email-marc.zyngier@arm.com>
-References: <1371816528-25078-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1371816528-25078-3-git-send-email-marc.zyngier@arm.com>
+Date: Fri, 21 Jun 2013 13:08:45 +0100
+Subject: [PATCH v2 0/3] A handful of KVM/ARM fixes
+Message-ID: <1371816528-25078-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When performing a Stage-2 TLB invalidation, it is necessary to
-make sure the write to the page tables is observable by all CPUs.
+This is a small patch series that I accumulated while tracking what
+turned out to be an unrelated issue.
 
-For this purpose, add a dsb instruction to __kvm_tlb_flush_vmid_ipa
-before doing the TLB invalidation itself.
+The first patch has already been posted a while ago and included here
+for completeness. The others are fairly simple missing barriers/clear
+exclusives that are actually required.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/interrupts.S | 1 +
- 1 file changed, 1 insertion(+)
+This has been tested on TC2, and is also available in my tree:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm/fixes-3.10-rc6
 
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index d0a8fa3..20e03d9 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -49,6 +49,7 @@ __kvm_hyp_code_start:
- ENTRY(__kvm_tlb_flush_vmid_ipa)
- 	push	{r2, r3}
- 
-+	dsb	ishst
- 	add	r0, r0, #KVM_VTTBR
- 	ldrd	r2, r3, [r0]
- 	mcrr	p15, 6, r2, r3, c2	@ Write VTTBR
+>From v1:
+- Dropped two barrier related patches after Will convinced me that they
+  were not required at all.
+- Changed dsb to "dsb ishst" in the second patch to reflect that we only
+  care about stores.
+
+Marc Zyngier (3):
+  ARM: KVM: perform save/restore of PAR
+  ARM: KVM: add missing dsb before invalidating Stage-2 TLBs
+  ARM: KVM: clear exclusive monitor on all exception returns
+
+ arch/arm/include/asm/kvm_asm.h | 22 ++++++++++++----------
+ arch/arm/kvm/coproc.c          |  4 ++++
+ arch/arm/kvm/interrupts.S      | 16 +++++++++++++++-
+ arch/arm/kvm/interrupts_head.S | 10 ++++++++--
+ 4 files changed, 39 insertions(+), 13 deletions(-)
+
 -- 
 1.8.2.3
