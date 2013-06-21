@@ -1,32 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Jun 2013 15:29:03 +0200
-Subject: [GIT PULL 0/3] Renesas ARM-based SoC DT updates for v3.11 #2
-In-Reply-To: <1371733694-27368-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371733694-27368-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <201306211529.03617.arnd@arndb.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 21 Jun 2013 15:32:05 +0200
+Subject: [PATCH v3 0/4] i2c-mv64xxx: Fixes and new feature for controlers
+ embedded in Aramda XP
+Message-ID: <1371821529-13791-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 June 2013, Simon Horman wrote:
-> This pull request is based on renesas-dt-for-v3.11 which you have
-> previously pulled.
-> 
-> The following changes since commit 24603f3caf07f5f65aa17ed7851ad4741595cf6a:
-> 
->   ARM: shmobile: marzen-reference: add irqpin support in DT (2013-06-04 18:05:59 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v3.11
-> 
-> for you to fetch changes up to c4fa4946f177ae214523586cd794ac18d34b1430:
-> 
->   ARM: shmobile: irqpin: add a DT property to enable masking on parent (2013-06-19 21:27:31 +0900)
-> 
+Hello,
 
-Pulled into next/dt, thanks!
+this patch set adds support for the I2C Transaction Generator which
+offloads CPU from managing I2C transfer step by step. This feature is
+currently only available on the I2C controller IP embedded in the
+Armada XP SoC.
 
-I think I have taken all your pull requests now, please let me know
-if I missed something.
+This series also contains a real fix for the I2C controller of the
+Armada XP SoC and a patch closer to an improvement than a fix.
 
-	Arnd
+The first three patches modify the driver itself and should go through
+i2c subsystem.
+
+The last patch updates the device tree to be able to use this new
+feature and should go through mvebu subsystem.
+
+Due to the recent changes in i2c-mv64xxx.c file, I based these patches
+on the for-next branch of the i2c git repository.
+
+Thanks,
+
+Change log:
+
+v2->v3:
+
+ - Introduces a new compatible string mv78230-i2c which will be used
+   for the fix and for the offload feature which are only present on
+   the Armada XP SoCs
+
+ - Removes the unneeded spin_lock_irqsave pointed by Russell King
+
+ - The offload mechanism is now port of the fsm and handle the
+   multiple messages.
+
+ - The flag bridge-enabled is renamed to offload_enabled, but the
+   register name stills contains the BRIDGE word to match the
+   datasheet.
+
+ - Uses writel_relaxed on the place pointed by Russell King
+
+ - Uses the bool type for the flag (pointed by Thomas Petazzoni)
+
+ - Removes useless code (pointed by Thomas Petazzoni)
+
+ - Updates the bindings documentation
+
+v1->v2:
+ - Move the flag for the timing issue from global scope to per device
+   scope
+ - Assignment is no more done in if condition
+
+
+Gregory CLEMENT (4):
+  i2c-mv64xxx: Set bus frequency to 100kHz if clock-frequency is not
+    provided
+  i2c-mv64xxx: Add I2C Transaction Generator support
+  i2c-mv64xxx: Fix timing issue on Armada XP (errata FE-8471889)
+  ARM: dts: mvebu: Introduce a new compatible string for mv64xxx-i2c
+
+ .../devicetree/bindings/i2c/i2c-mv64xxx.txt        |  19 +-
+ arch/arm/boot/dts/armada-370-xp.dtsi               |   2 -
+ arch/arm/boot/dts/armada-370.dtsi                  |   8 +
+ arch/arm/boot/dts/armada-xp.dtsi                   |  10 +
+ drivers/i2c/busses/i2c-mv64xxx.c                   | 222 ++++++++++++++++++++-
+ 5 files changed, 246 insertions(+), 15 deletions(-)
+
+-- 
+1.8.1.2
