@@ -1,62 +1,42 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 21 Jun 2013 10:57:19 +0200
-Subject: [PATCH 2/4] staging: drm/imx: ipu-dmfc: fix bandwidth allocation
+Date: Fri, 21 Jun 2013 10:57:20 +0200
+Subject: [PATCH 3/4] staging: drm/imx: ipuv3-crtc: immediately update crtc->fb
+ in ipu_page_flip
 In-Reply-To: <1371805041-9299-1-git-send-email-p.zabel@pengutronix.de>
 References: <1371805041-9299-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1371805041-9299-3-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1371805041-9299-4-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IPU can request up to four pixels per access, which gives four
-times the bandwidth compared to what the driver currently assumes.
-After correcting this, we have to increase safety margins for
-bandwidth requirement calculations.
+Since commit 8cf1e9811471f2910fa38dc1b28e1789080ba961
+("drm: Add consistency check for page-flipping") drm_mode_page_flip_ioctl
+contains a WARN_ON that triggers if the .page_flip callback didn't update
+the crtc->fb pointer to the new framebuffer immediately.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+ drivers/staging/imx-drm/ipuv3-crtc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c
-index 91821bc..1dc9817 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c
-@@ -292,7 +292,7 @@ int ipu_dmfc_alloc_bandwidth(struct dmfc_channel *dmfc,
- {
- 	struct ipu_dmfc_priv *priv = dmfc->priv;
- 	int slots = dmfc_bandwidth_to_slots(priv, bandwidth_pixel_per_second);
--	int segment = 0, ret = 0;
-+	int segment = -1, ret = 0;
+diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+index abcdaef..4a7eedf 100644
+--- a/drivers/staging/imx-drm/ipuv3-crtc.c
++++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+@@ -147,6 +147,7 @@ static int ipu_page_flip(struct drm_crtc *crtc,
  
- 	dev_dbg(priv->dev, "dmfc: trying to allocate %ldMpixel/s for IPU channel %d\n",
- 			bandwidth_pixel_per_second / 1000000,
-@@ -307,7 +307,17 @@ int ipu_dmfc_alloc_bandwidth(struct dmfc_channel *dmfc,
- 		goto out;
- 	}
+ 	ipu_crtc->newfb = fb;
+ 	ipu_crtc->page_flip_event = event;
++	crtc->fb = fb;
  
--	segment = dmfc_find_slots(priv, slots);
-+	/* Always allocate at least 128*4 bytes (2 slots) */
-+	if (slots < 2)
-+		slots = 2;
-+
-+	/* For the MEM_BG channel, first try to allocate twice the slots */
-+	if (dmfc->data->ipu_channel == IPUV3_CHANNEL_MEM_BG_SYNC)
-+		segment = dmfc_find_slots(priv, slots * 2);
-+	if (segment >= 0)
-+		slots *= 2;
-+	else
-+		segment = dmfc_find_slots(priv, slots);
- 	if (segment < 0) {
- 		ret = -EBUSY;
- 		goto out;
-@@ -391,7 +401,7 @@ int ipu_dmfc_init(struct ipu_soc *ipu, struct device *dev, unsigned long base,
- 	 * We have a total bandwidth of clkrate * 4pixel divided
- 	 * into 8 slots.
- 	 */
--	priv->bandwidth_per_slot = clk_get_rate(ipu_clk) / 8;
-+	priv->bandwidth_per_slot = clk_get_rate(ipu_clk) * 4 / 8;
+ 	return 0;
+ }
+@@ -329,7 +330,6 @@ static irqreturn_t ipu_irq_handler(int irq, void *dev_id)
+ 	imx_drm_handle_vblank(ipu_crtc->imx_crtc);
  
- 	dev_dbg(dev, "dmfc: 8 slots with %ldMpixel/s bandwidth each\n",
- 			priv->bandwidth_per_slot / 1000000);
+ 	if (ipu_crtc->newfb) {
+-		ipu_crtc->base.fb = ipu_crtc->newfb;
+ 		ipu_crtc->newfb = NULL;
+ 		ipu_drm_set_base(&ipu_crtc->base, 0, 0);
+ 		ipu_crtc_handle_pageflip(ipu_crtc);
 -- 
 1.8.3.1
