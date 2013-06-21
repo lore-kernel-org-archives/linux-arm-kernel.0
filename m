@@ -1,61 +1,77 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 21 Jun 2013 11:33:40 +0200
-Subject: [PATCH] ARM: dma: Drop __GFP_COMP for iommu dma memory allocations
-In-Reply-To: <51C2FDE0.4060206@cogentembedded.com>
-References: <1371731460-15316-1-git-send-email-rizhao@nvidia.com>
- <51C2FDE0.4060206@cogentembedded.com>
-Message-ID: <51C41DF4.4090802@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 21 Jun 2013 10:35:26 +0100
+Subject: [PATCH 1/3] ARM: kernel: get cpu clock rate from cpu clock node
+ first
+In-Reply-To: <1371739146-32639-2-git-send-email-f.fainelli@gmail.com>
+References: <1371739146-32639-1-git-send-email-f.fainelli@gmail.com>
+ <1371739146-32639-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20130621093526.GC14268@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Jun 20, 2013 at 03:39:04PM +0100, Florian Fainelli wrote:
+> The current topology code will only attempt to parse a "clock-frequency"
+> property for a given CPU node. Some platforms such as the ecx-2000
+> provide a clock node. Change the logic to first look for a clock node,
+> and if we fail, fallback to parsing a "clock-frequency" property. To
+> avoid unnecessary casting, change rate from u32 to unsigned long, and
+> introduce the "prop" variable to hold the contents of the
+> "clock-frequency" property.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm/kernel/topology.c | 23 ++++++++++++++++-------
+>  1 file changed, 16 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> index c5a5954..8f340a1 100644
+> --- a/arch/arm/kernel/topology.c
+> +++ b/arch/arm/kernel/topology.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/of.h>
+>  #include <linux/sched.h>
+>  #include <linux/slab.h>
+> +#include <linux/clk.h>
+>  
+>  #include <asm/cputype.h>
+>  #include <asm/topology.h>
+> @@ -104,7 +105,9 @@ static void __init parse_dt_topology(void)
+>  	cpu_capacity = kzalloc(alloc_size, GFP_NOWAIT);
+>  
+>  	while ((cn = of_find_node_by_type(cn, "cpu"))) {
+> -		const u32 *rate, *reg;
+> +		const u32 *prop, *reg;
+> +		unsigned long rate;
+> +		struct clk *cpu_clk;
+>  		int len;
+>  
+>  		if (cpu >= num_possible_cpus())
+> @@ -117,11 +120,17 @@ static void __init parse_dt_topology(void)
+>  		if (cpu_eff->compatible == NULL)
+>  			continue;
+>  
+> -		rate = of_get_property(cn, "clock-frequency", &len);
+> -		if (!rate || len != 4) {
+> -			pr_err("%s missing clock-frequency property\n",
+> -				cn->full_name);
+> -			continue;
+> +		cpu_clk = of_clk_get(cn, 0);
+> +		if (IS_ERR(cpu_clk)) {
+> +			prop = of_get_property(cn, "clock-frequency", &len);
+> +			if (!prop || len != 4) {
+> +				pr_err("%s missing clock-frequency property\n",
+> +					cn->full_name);
+> +				continue;
+> +			}
+> +			rate = be32_to_cpup(prop);
+> +		} else {
+> +			rate = clk_get_rate(cpu_clk);
 
-On 6/20/2013 3:04 PM, Sergei Shtylyov wrote:
-> Hello.
->
-> On 20-06-2013 16:31, Richard Zhao wrote:
->
->> __iommu_alloc_buffer wants to split pages after allocation in order to
->> reduce the memory footprint. This does not work well with __GFP_COMP
->> pages, so drop this flag before allocation
->
->> One failure example is snd_malloc_dev_pages call dma_alloc_coherent with
->> __GFP_COMP.
->
->> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
->> ---
->>   arch/arm/mm/dma-mapping.c |    9 +++++++++
->>   1 file changed, 9 insertions(+)
->
->> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->> index ef3e0f3..f7efffd 100644
->> --- a/arch/arm/mm/dma-mapping.c
->> +++ b/arch/arm/mm/dma-mapping.c
->> @@ -1314,6 +1314,15 @@ static void *arm_iommu_alloc_attrs(struct 
->> device *dev, size_t size,
->>       if (gfp & GFP_ATOMIC)
->>           return __iommu_alloc_atomic(dev, size, handle);
->>
->> +    /*
->> +     * Following is a work-around (a.k.a. hack) to prevent pages
->> +     * with __GFP_COMP being passed to split_page() which cannot
->> +     * handle them.  The real problem is that this flag probably
->> +     * should be 0 on ARM as it is not supported on this
->> +     * platform; see CONFIG_HUGETLBFS.
->> +     */
->> +    gfp &= ~(__GFP_COMP);
->
->    Hm, what exactly is the sense you meant in using ()?
+I am not questioning whether adding a "clocks" property is proper or
+not, but let me say cpu related info and parsing are already scattered
+all over the place and this is wrong. We are currently trying to
+consolidate CPU related info in a single structure in the kernel, and
+then this code can become a consumer of that data. As to the "clocks"
+property as I mentioned in another reply, that requires more thought.
 
-I think that those parentheses come from the first patch, which disabled 
-__GFP_COMP
-in dma-mapping allocations: 3611553ef98 ("[AVR32] Drop GFP_COMP for DMA 
-memory
-allocations"). I would like to take this patch to the dma-mapping tree 
-together with
-other changes related to iommu integration code.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung R&D Institute Poland
+Lorenzo
