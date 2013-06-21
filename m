@@ -1,89 +1,49 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 21 Jun 2013 13:12:38 -0400
-Subject: [PATCH] of: Specify initrd location using 64-bit
-In-Reply-To: <51C40D78.4040603@imgtec.com>
-References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
- <51C3D8E7.5030601@synopsys.com> <51C40D78.4040603@imgtec.com>
-Message-ID: <51C48986.6080602@ti.com>
+From: dsd@laptop.org (Daniel Drake)
+Date: Fri, 21 Jun 2013 11:15:37 -0600
+Subject: [V2 5/7] video: mmp: add pitch info in mmp_win structure
+In-Reply-To: <1370879574-11397-1-git-send-email-jtzhou@marvell.com>
+References: <1370879574-11397-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <CAMLZHHRxS-wqd4Tb=Af6VEnfRb9MJeNo5RC7qeTLBZ0rgU69pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vineet, James,
+On Mon, Jun 10, 2013 at 9:52 AM, Jett.Zhou <jtzhou@marvell.com> wrote:
+> From: Jing Xiang <jxiang@marvell.com>
+>
+> Add pitch length info of graphics/video layer for mmp_win, if it is
+> YUV format of video layer, u/v pitch will non-zero.
+>
+> Signed-off-by: Jing Xiang <jxiang@marvell.com>
+> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> ---
+>  include/video/mmp_disp.h |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
+>
+> diff --git a/include/video/mmp_disp.h b/include/video/mmp_disp.h
+> index b9dd1fb..462e3bd 100644
+> --- a/include/video/mmp_disp.h
+> +++ b/include/video/mmp_disp.h
+> @@ -91,6 +91,11 @@ struct mmp_win {
+>         u16     up_crop;
+>         u16     bottom_crop;
+>         int     pix_fmt;
+> +       /*
+> +        * pitch[0]: graphics/video layer line length or y pitch
+> +        * pitch[1]/pitch[2]: video u/v pitch if non-zero
+> +        */
+> +       u32     pitch[3];
+>  };
 
-On Friday 21 June 2013 04:23 AM, James Hogan wrote:
-> On 21/06/13 05:39, Vineet Gupta wrote:
->> Hi Santosh,
->>
->> On 06/21/2013 06:22 AM, Santosh Shilimkar wrote:
->>> Cc: Vineet Gupta <vgupta@synopsys.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Mark Salter <msalter@redhat.com>
->>> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
->>> Cc: James Hogan <james.hogan@imgtec.com>
->>> Cc: Michal Simek <monstr@monstr.eu>
->>> Cc: Ralf Baechle <ralf@linux-mips.org>
->>> Cc: Jonas Bonn <jonas@southpole.se>
->>> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
->>> Cc: Paul Mackerras <paulus@samba.org>
->>> Cc: x86 at kernel.org
->>> Cc: arm at kernel.org
->>> Cc: Chris Zankel <chris@zankel.net>
->>> Cc: Max Filippov <jcmvbkbc@gmail.com>
->>> Cc: Grant Likely <grant.likely@linaro.org>
->>> Cc: Rob Herring <rob.herring@calxeda.com>
->>> Cc: bigeasy at linutronix.de
->>> Cc: robherring2 at gmail.com
->>> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
->>>
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: linux-c6x-dev at linux-c6x.org
->>> Cc: linux-mips at linux-mips.org
->>> Cc: linuxppc-dev at lists.ozlabs.org
->>> Cc: linux-xtensa at linux-xtensa.org
->>> Cc: devicetree-discuss at lists.ozlabs.org
->>>
->>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> ---
->>>  arch/arc/mm/init.c            |    3 +--
->>>  arch/arm/mm/init.c            |    2 +-
->>>  arch/arm64/mm/init.c          |    3 +--
->>>  arch/c6x/kernel/devicetree.c  |    3 +--
->>>  arch/metag/mm/init.c          |    3 +--
->>>  arch/microblaze/kernel/prom.c |    3 +--
->>>  arch/mips/kernel/prom.c       |    3 +--
->>>  arch/openrisc/kernel/prom.c   |    3 +--
->>>  arch/powerpc/kernel/prom.c    |    3 +--
->>>  arch/x86/kernel/devicetree.c  |    3 +--
->>>  arch/xtensa/kernel/setup.c    |    3 +--
->>>  drivers/of/fdt.c              |   10 ++++++----
->>>  include/linux/of_fdt.h        |    3 +--
->>>  13 files changed, 18 insertions(+), 27 deletions(-)
->>>
->>> diff --git a/arch/arc/mm/init.c b/arch/arc/mm/init.c
->>> index 4a17736..3640c74 100644
->>> --- a/arch/arc/mm/init.c
->>> +++ b/arch/arc/mm/init.c
->>> @@ -157,8 +157,7 @@ void __init free_initrd_mem(unsigned long start, unsigned long end)
->>>  #endif
->>>  
->>>  #ifdef CONFIG_OF_FLATTREE
->>> -void __init early_init_dt_setup_initrd_arch(unsigned long start,
->>> -					    unsigned long end)
->>> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
->>>  {
->>>  	pr_err("%s(%lx, %lx)\n", __func__, start, end);
->>>  }
->>
->> To avoid gcc warnings, you need to fix the print format specifiers too.
-> 
-> The same thing goes for arch/metag too.
-> 
-Will update that in next version based on what we will end
-after the dicussion. i.e u64 or phys_addr_t
+Thanks for adding a comment here, but the meaning of this field is
+still not clear to me.
+In what case is pitch[0] line length, and in which case does it refer
+to y pitch?
 
-Thanks for comments.
+pitch[1] and pitch[2] refer to u/v pitch respectively, if their own
+values are non-zero? (or if not, what value does the "if non-zero"
+comment refer to?)
 
-Regards,
-Santosh
+I would recommend rolling this patch into the patch that actually
+makes use of this new field.
+
+Daniel
