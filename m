@@ -1,51 +1,39 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Fri, 21 Jun 2013 14:50:55 +0100
-Subject: [PATCH v3 01/10] serial:st-asc: Add ST ASC driver.
-In-Reply-To: <201306202101.11261.arnd@arndb.de>
-References: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
- <1371737103-8871-1-git-send-email-srinivas.kandagatla@st.com>
- <201306202101.11261.arnd@arndb.de>
-Message-ID: <51C45A3F.7000009@st.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 21 Jun 2013 15:55:08 +0200
+Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
+ MMU binding
+In-Reply-To: <20130621095729.GA7766@mudshark.cambridge.arm.com>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-8-git-send-email-will.deacon@arm.com>
+ <20130620200845.GF11309@8bytes.org>
+ <20130621095729.GA7766@mudshark.cambridge.arm.com>
+Message-ID: <20130621135507.GI11309@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-If its not too late can this patch be considered for 3.11 via tty tree?
-Arnd preferred to take the SOC patches in this series via arm-soc tree.
-Also, there is no build dependency for this patch.
+Hi Will,
 
-Thanks,
-srini
+On Fri, Jun 21, 2013 at 10:57:29AM +0100, Will Deacon wrote:
+> This is a common driver that will support any IOMMUs compatible with v1 or
+> v2 of the ARM SMMU architecture. Currently, that includes SMMUs known
+> informatively as MMU-400, MMU-401 and MMU-500. I had a look at the other
+> IOMMU drivers in the kernel and they seem to be driving incompatible IOMMUs,
+> so I don't see how this driver can replace those.
+> 
+> However, we'll hopefully see ARM SMMU-compatible devices turning up soon (I
+> know of many SoCs in development that are looking at them).
 
-On 20/06/13 20:01, Arnd Bergmann wrote:
-> On Thursday 20 June 2013, Srinivas KANDAGATLA wrote:
->> This patch adds support to ASC (asynchronous serial controller)
->> driver, which is basically a standard serial driver. This IP is common
->> across all the ST parts for settop box platforms.
->>
->> ASC is embedded in ST COMMS IP block. It supports Rx & Tx functionality.
->> It support all industry standard baud rates.
->>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->> CC: Stephen Gallimore <stephen.gallimore@st.com>
->> CC: Stuart Menefy <stuart.menefy@st.com>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> 
->>From my point of view the series is ready for merging in 3.11,
-> I only had a few final comments. I would prefer the first three
-> patches to go through the respective serial/clocksource/pinctrl
-> trees, since there are no direct build dependencies to the
-> platform parts.
-> 
-> If there is a reason to take those through arm-soc, I would
-> insist on getting Acked-by's from the subsystem maintainers.
-> 
-> 	Arnd
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+That sounds great. So in the future there will be a single driver for
+most future SOCs. This is a real improvement over the current situation.
+
+>From NVidia is another driver with 'smmu' in its name, is that one also
+incompatible?
+
+> Chaining is really horrible and exists as a hack to support virtualisation
+> using two separate SMMUs, where neither of them can support nested
+> translation.
+
+I see, thanks for the explanation.
+
+
+	Joerg
