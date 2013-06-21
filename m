@@ -1,59 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 21 Jun 2013 10:33:11 +0100
-Subject: [PATCH 0/5] Kernel mode NEON for XOR and RAID6
-In-Reply-To: <alpine.LFD.2.03.1306072214120.18597@syhkavp.arg>
-References: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
- <20130606151705.GG16794@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1306061156330.18597@syhkavp.arg>
- <20130607175007.GH8111@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1306072214120.18597@syhkavp.arg>
-Message-ID: <20130621093311.GD6983@mudshark.cambridge.arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 21 Jun 2013 11:33:40 +0200
+Subject: [PATCH] ARM: dma: Drop __GFP_COMP for iommu dma memory allocations
+In-Reply-To: <51C2FDE0.4060206@cogentembedded.com>
+References: <1371731460-15316-1-git-send-email-rizhao@nvidia.com>
+ <51C2FDE0.4060206@cogentembedded.com>
+Message-ID: <51C41DF4.4090802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+Hello,
 
-On Sat, Jun 08, 2013 at 04:09:56AM +0100, Nicolas Pitre wrote:
-> On Fri, 7 Jun 2013, Will Deacon wrote:
-> > > Note that the kernel performs runtime benchmarking of all the different 
-> > > implementations it has available at boot time and selects the best one.  
-> > > So if this would turn out to make things worse on some cores then the 
-> > > Neon code would simply not be used.
-> > 
-> > That will be all sorts of fun if we try to run this on big.LITTLE...
-> > Perhaps we don't care about that either.
-> 
-> Probably not at the present time.
+On 6/20/2013 3:04 PM, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 20-06-2013 16:31, Richard Zhao wrote:
+>
+>> __iommu_alloc_buffer wants to split pages after allocation in order to
+>> reduce the memory footprint. This does not work well with __GFP_COMP
+>> pages, so drop this flag before allocation
+>
+>> One failure example is snd_malloc_dev_pages call dma_alloc_coherent with
+>> __GFP_COMP.
+>
+>> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
+>> ---
+>>   arch/arm/mm/dma-mapping.c |    9 +++++++++
+>>   1 file changed, 9 insertions(+)
+>
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index ef3e0f3..f7efffd 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -1314,6 +1314,15 @@ static void *arm_iommu_alloc_attrs(struct 
+>> device *dev, size_t size,
+>>       if (gfp & GFP_ATOMIC)
+>>           return __iommu_alloc_atomic(dev, size, handle);
+>>
+>> +    /*
+>> +     * Following is a work-around (a.k.a. hack) to prevent pages
+>> +     * with __GFP_COMP being passed to split_page() which cannot
+>> +     * handle them.  The real problem is that this flag probably
+>> +     * should be 0 on ARM as it is not supported on this
+>> +     * platform; see CONFIG_HUGETLBFS.
+>> +     */
+>> +    gfp &= ~(__GFP_COMP);
+>
+>    Hm, what exactly is the sense you meant in using ()?
 
-[...]
+I think that those parentheses come from the first patch, which disabled 
+__GFP_COMP
+in dma-mapping allocations: 3611553ef98 ("[AVR32] Drop GFP_COMP for DMA 
+memory
+allocations"). I would like to take this patch to the dma-mapping tree 
+together with
+other changes related to iommu integration code.
 
-> > What's the earliest toolchain we claim to support nowadays? If that can't
-> > deal with the intrinsics then we either need to bump the requirement, or
-> > write this using hand-coded asm. In the case of the latter, I don't think
-> > the maintenance overhead of having two implementations is worth it.
-> 
-> We have many different minimum toolchain version requirements attached 
-> to different features being enabled already, ftrace being one of them if 
-> I remember correctly.  For these Neon optimizations the minimum gcc 
-> version is v4.6.
-> 
-> Given that this is going to be interesting mostly to server systems, and 
-> given that ARM server deployments are rather new, I don't see the point 
-> of compiling a new server environment using an older gcc version.
-
-I've mulled over this, had some discussions with our toolchain guys and
-have concluded the following:
-
-  - The intrinsics are actually ok. I was sceptical at first, but I've been
-    assured that they should do a reasonable job (echoing your performance
-    figures).
-
-  - The current approach is targetting servers and isn't (yet) suitable for
-    mobile.
-
-So, given that the patches do the right thing wrt GCC version, the only
-remaining point is that we need to keep an eye out for people trying to
-re-use this stuff for mobile (likely crypto, as I mentioned earlier). When
-that happens, we should consider revisiting the benchmark/power figures.
-
-Will
+Best regards
+-- 
+Marek Szyprowski
+Samsung R&D Institute Poland
