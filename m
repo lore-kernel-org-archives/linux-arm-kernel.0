@@ -1,47 +1,48 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 21 Jun 2013 17:33:26 +1000
-Subject: linux-next: manual merge of the akpm tree with the arm-soc tree
-Message-ID: <20130621173326.42120edc7f766a527cef7470@canb.auug.org.au>
+From: heiko.stuebner@bqreaders.com (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Fri, 21 Jun 2013 09:34:37 +0200
+Subject: [GIT PULL] basic Rockchip support
+Message-ID: <201306210934.51624.heiko.stuebner@bqreaders.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+If it's not to late, please consider the following. Done on top of the needed
+timer/dw_apb_timer_of branch of arm-soc.
 
-Today's linux-next merge of the akpm tree got a conflict in
-arch/arm/mach-picoxcell/common.c between commit 4b83f75a7af3 ("ARM:
-picoxcell: Remove init_irq declaration in machine description") from the
-arm-soc tree and commit "reboot: arm: change reboot_mode to use enum
-reboot_mode" from the akpm tree.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+The following changes since commit 10021488997317d1121505a7ac659124c058efed:
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+  clocksource: dw_apb_timer_of: use clocksource_of_init (2013-06-12 13:47:38 +0200)
 
-diff --cc arch/arm/mach-picoxcell/common.c
-index b13f51b,37add6d..0000000
---- a/arch/arm/mach-picoxcell/common.c
-+++ b/arch/arm/mach-picoxcell/common.c
-@@@ -8,8 -8,13 +8,9 @@@
-   * All enquiries to support at picochip.com
-   */
-  #include <linux/delay.h>
- -#include <linux/irq.h>
- -#include <linux/irqchip.h>
- -#include <linux/irqdomain.h>
-+ #include <linux/reboot.h>
-  #include <linux/of.h>
-  #include <linux/of_address.h>
- -#include <linux/of_irq.h>
-  #include <linux/of_platform.h>
-  
-  #include <asm/mach/arch.h>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/f0f0c458/attachment.sig>
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.11-rockchip-basics
+
+for you to fetch changes up to d63dc0514d56e108cc96e334ca26b538263e52a2:
+
+  arm: add basic support for Rockchip RK3066a boards (2013-06-21 09:21:02 +0200)
+
+----------------------------------------------------------------
+Adds basic support for Rockchip Cortex-A9 SoCs.
+
+----------------------------------------------------------------
+Heiko Stuebner (3):
+      arm: Add basic clocks for Rockchip rk3066a SoCs
+      arm: add debug uarts for rockchip rk29xx and rk3xxx series
+      arm: add basic support for Rockchip RK3066a boards
+
+ arch/arm/Kconfig                      |    2 +
+ arch/arm/Kconfig.debug                |   34 +++
+ arch/arm/Makefile                     |    1 +
+ arch/arm/boot/dts/rk3066a-clocks.dtsi |  299 +++++++++++++++++++++++++
+ arch/arm/boot/dts/rk3066a.dtsi        |  390 +++++++++++++++++++++++++++++++++
+ arch/arm/include/debug/rockchip.S     |   42 ++++
+ arch/arm/mach-rockchip/Kconfig        |   16 ++
+ arch/arm/mach-rockchip/Makefile       |    1 +
+ arch/arm/mach-rockchip/rockchip.c     |   52 +++++
+ 9 files changed, 837 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3066a-clocks.dtsi
+ create mode 100644 arch/arm/boot/dts/rk3066a.dtsi
+ create mode 100644 arch/arm/include/debug/rockchip.S
+ create mode 100644 arch/arm/mach-rockchip/Kconfig
+ create mode 100644 arch/arm/mach-rockchip/Makefile
+ create mode 100644 arch/arm/mach-rockchip/rockchip.c
