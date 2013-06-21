@@ -1,43 +1,44 @@
-From: s-anna@ti.com (Anna, Suman)
-Date: Fri, 21 Jun 2013 16:39:57 +0000
-Subject: linux-next: manual merge of the arm-soc tree with the mailbox tree
-In-Reply-To: <20130621064526.GJ5523@atomide.com>
-References: <20130621160800.64f9965229e5042a7b77e212@canb.auug.org.au>
- <20130621064526.GJ5523@atomide.com>
-Message-ID: <37C860A02101E749A747FA2D3C1E3C504CDAAE@DLEE11.ent.ti.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 21 Jun 2013 18:40:30 +0200
+Subject: [PATCH] at91: cpuidle: Fix target_residency
+In-Reply-To: <201306211830.21175.arnd@arndb.de>
+References: <1371818219-13060-1-git-send-email-daniel.lezcano@linaro.org>
+ <51C474E9.40908@linaro.org> <51C47B3F.1090508@atmel.com>
+ <201306211830.21175.arnd@arndb.de>
+Message-ID: <51C481FE.4080607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> * Stephen Rothwell <sfr@canb.auug.org.au> [130620 23:14]:
-> > Hi all,
-> >
-> > Today's linux-next merge of the arm-soc tree got a conflict in
-> > arch/arm/mach-omap2/devices.c between commit 4a1c0e83bb4e ("ARM:
-> OMAP2+:
-> > mbox: remove dependencies with soc.h") from the mailbox tree and commit
-> > 82c5cde1c4b0 ("ARM: OMAP2+: Remove omap4 ocp2scp pdata") from the arm-
-> soc
-> > tree.
-> >
-> > I fixed it up (removing the include of
-> > linux/platform_data/omap_ocp2scp.h) and can carry the fix as necessary
-> > (no action is required).
+On 06/21/2013 06:30 PM, Arnd Bergmann wrote:
+> On Friday 21 June 2013, Nicolas Ferre wrote:
+>>>
+>>> Yes, I think it should go for 3.10 as it is fix and also for 3.9.8
+>>> (stable). May be I should have Cc stable@ ...
+>>
+>> Well, so it doesn't sound like a regression if it was already present in 
+>> 3.9...
+>>
+>> Moreover, it does not seem to be taken into account for all 
+>> configuration (seems not triggered for !tickless kernels).
+>>
+>> So I suspect Arnd and Olof would not take it for 3.10-fixes...
+>>
+>> Guys, you thoughts?
+>>
 > 
-> Thanks, that's the right fix as that header won't be needed any longer
-> as we've made omap4 device tree only.
-> 
-> > That mailbox tree commit looks very similar to commit b8a7cf8e2b15 ("ARM:
-> > OMAP2+: mbox: remove dependencies with soc.h") from the arm-soc tree ...
-> 
-> The earlier mailbox branch was merged into arm-soc for a few weeks until
-> we decided to drop it as Jassi is working on a more generic API. That was
-> merged in commit 51b5f893, then reverted in commit b5c85186. The updated
-> mailbox branch accounts for the generic API coming up from Jassi.
-> 
-> Suman, can you please check if Linux next has mailbox related files merged
-> correctly?
+> Ah, I just sent out a pull request for fixes a minute before I saw
+> your mail. I can't tell how serious this bug is. We can certainly
+> mark it for stable, but unless this is a significant regression,
+> I'd apply it for 3.11 instead and wait for the backports to happen.
 
-Yes, they look good.
+Ok, this is not a critical bug. The regression makes the idle state1 to
+enter less often, thus consuming a bit more power with a tickless
+system, but nothing leading to a crash or an unstable system.
 
-Regards
-Suman
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
