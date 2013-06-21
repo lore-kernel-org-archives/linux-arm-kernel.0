@@ -1,95 +1,57 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 21 Jun 2013 16:25:47 -0500
-Subject: [RFC PATCH V2 6/8] ARM: dts: TWL6030/OMAP4: Add OMAP voltage path
- linkage
+Date: Fri, 21 Jun 2013 16:25:48 -0500
+Subject: [RFC PATCH V2 7/8] ARM: dts: omap4-panda-es: add TPS62361 supply for
+ vdd_mpu
 In-Reply-To: <1371849949-12649-1-git-send-email-nm@ti.com>
 References: <1371849949-12649-1-git-send-email-nm@ti.com>
-Message-ID: <1371849949-12649-7-git-send-email-nm@ti.com>
+Message-ID: <1371849949-12649-8-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP4430 and 4460 platforms use TWL6030 to power voltage rails.
-However, on 4460, we use twl6030 only for iva and core voltage rails.
-
-Introduce an twl6030_omap4.dtsi to be able to reuse the base definition
-for all OMAP4 platforms and the delta change only for panda-es platform
-which is based on 4460.
+Unlike other OMAP4 platforms including the the "vanilla" PandaBoard,
+PandaBoard-ES uses TPS62361 to supply vdd_mpu.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/boot/dts/omap4-panda-common.dtsi |    1 +
- arch/arm/boot/dts/omap4-panda-es.dts      |   13 +++++++++++
- arch/arm/boot/dts/omap4-sdp.dts           |    1 +
- arch/arm/boot/dts/omap4-var-som.dts       |    1 +
- arch/arm/boot/dts/twl6030_omap4.dtsi      |   35 +++++++++++++++++++++++++++++
- 5 files changed, 51 insertions(+)
- create mode 100644 arch/arm/boot/dts/twl6030_omap4.dtsi
+ arch/arm/boot/dts/omap4-panda-es.dts |   18 ++++++++++++++++++
+ arch/arm/boot/dts/tps62361_omap.dtsi |   18 ++++++++++++++++++
+ 2 files changed, 36 insertions(+)
+ create mode 100644 arch/arm/boot/dts/tps62361_omap.dtsi
 
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index 00cbaa5..2b15c2b 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -199,6 +199,7 @@
- };
- 
- #include "twl6030.dtsi"
-+#include "twl6030_omap4.dtsi"
- 
- &i2c2 {
- 	pinctrl-names = "default";
 diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-index 56c4354..49017c5 100644
+index 49017c5..325816c 100644
 --- a/arch/arm/boot/dts/omap4-panda-es.dts
 +++ b/arch/arm/boot/dts/omap4-panda-es.dts
-@@ -62,3 +62,16 @@
- 		gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
- 	};
+@@ -75,3 +75,21 @@
+ 	/* We use TPS62361 on this platform instead */
+ 	status = "disabled";
  };
 +
-+&omap_twl6030_vcore1 {
-+	ti,vp = <&vp_core>;
++#include "tps62361_omap.dtsi"
++
++&omap4_pmx_wkup {
++	tps62361_wkgpio_pins: pinmux_tps62361_wkpins {
++		pinctrl-single,pins = <
++			0x1a (PIN_OUTPUT | MUX_MODE3 | OFF_EN | OFFOUT_VAL) /* gpio_wk7 */
++		>;
++	};
 +};
 +
-+&omap_twl6030_vcore2 {
-+	ti,vp = <&vp_iva>;
++&omap_tps62361 {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++		&tps62361_wkgpio_pins
++	>;
++	gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
 +};
-+
-+&omap_twl6030_vcore3 {
-+	/* We use TPS62361 on this platform instead */
-+	status = "disabled";
-+};
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 7951b4e..2f81b4d5 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -337,6 +337,7 @@
- };
- 
- #include "twl6030.dtsi"
-+#include "twl6030_omap4.dtsi"
- 
- &i2c2 {
- 	pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/omap4-var-som.dts b/arch/arm/boot/dts/omap4-var-som.dts
-index b41269e..6f0b763 100644
---- a/arch/arm/boot/dts/omap4-var-som.dts
-+++ b/arch/arm/boot/dts/omap4-var-som.dts
-@@ -40,6 +40,7 @@
- };
- 
- #include "twl6030.dtsi"
-+#include "twl6030_omap4.dtsi"
- 
- &i2c2 {
- 	clock-frequency = <400000>;
-diff --git a/arch/arm/boot/dts/twl6030_omap4.dtsi b/arch/arm/boot/dts/twl6030_omap4.dtsi
+diff --git a/arch/arm/boot/dts/tps62361_omap.dtsi b/arch/arm/boot/dts/tps62361_omap.dtsi
 new file mode 100644
-index 0000000..7724039
+index 0000000..ee261ec
 --- /dev/null
-+++ b/arch/arm/boot/dts/twl6030_omap4.dtsi
-@@ -0,0 +1,35 @@
++++ b/arch/arm/boot/dts/tps62361_omap.dtsi
+@@ -0,0 +1,18 @@
 +/*
-+ * TWL6030 entries specific for OMAP
++ * TPS62361 entries specific for OMAP
 + *
 + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
 + *	Nishanth Menon
@@ -99,29 +61,12 @@ index 0000000..7724039
 + * published by the Free Software Foundation.
 + */
 +
-+&twl {
-+	omap_twl6030_vcore1: vcore1 {
-+		compatible = "ti,omap-twl6030-vcore1";
-+		ti,boot-voltage-micro-volts = <1200000>;
++/ {
++	omap_tps62361: tps62361 {
++		compatible = "ti,omap-tps62361";
++		ti,boot-voltage-micro-volts = <1203000>;
 +		ti,vp = <&vp_mpu>;
 +	};
-+
-+	omap_twl6030_vcore2: vcore2 {
-+		compatible = "ti,omap-twl6030-vcore2";
-+		ti,boot-voltage-micro-volts = <1200000>;
-+		ti,vp = <&vp_iva>;
-+	};
-+
-+	omap_twl6030_vcore3: vcore3 {
-+		compatible = "ti,omap-twl6030-vcore3";
-+		ti,boot-voltage-micro-volts = <1200000>;
-+		ti,vp = <&vp_core>;
-+	};
-+};
-+
-+&vc {
-+	ti,i2c-high-speed;
-+	ti,i2c-pad-load = <3>;
 +};
 -- 
 1.7.9.5
