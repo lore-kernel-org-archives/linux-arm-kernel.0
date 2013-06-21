@@ -1,54 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 21 Jun 2013 13:23:46 +0800
-Subject: [PATCH 5/6] ARM: dts: imx27 cpufreq-cpu0 frequencies
-In-Reply-To: <1371790493.32418815@f415.i.mail.ru>
-References: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
- <1371739815-6666-6-git-send-email-mpa@pengutronix.de>
- <20130621024406.GB24268@S2101-09.ap.freescale.net>
- <1371790493.32418815@f415.i.mail.ru>
-Message-ID: <20130621052344.GA25633@S2101-09.ap.freescale.net>
+From: jagarwal@nvidia.com (Jay Agarwal)
+Date: Fri, 21 Jun 2013 11:00:20 +0530
+Subject: [PATCH V1] ARM: dts: tegra: Modify pcie memory space size
+In-Reply-To: <51C32CC7.5010109@wwwdotorg.org>
+References: <1371712491-31070-1-git-send-email-jagarwal@nvidia.com>
+ <51C32CC7.5010109@wwwdotorg.org>
+Message-ID: <C79B248886DD134989C8FF6B096A91AB91CF1615EC@BGMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 08:54:53AM +0400, Alexander Shiyan wrote:
-> > On Thu, Jun 20, 2013 at 04:50:14PM +0200, Markus Pargmann wrote:
-> > > +	cpus {
-> > > +		#size-cells = <0>;
-> > > +		#address-cells = <1>;
-> > > +
-> > > +		cpu at 0 {
-> > > +			device_type = "cpu";
-> > > +			compatible = "fsl,imx27", "arm,arm926ejs";
-> > 
-> > From what Documentation/devicetree/bindings/arm/cpus.txt tells, it
-> > should be "arm,arm926".  Also, why do you put "fsl,imx27" there?
-> > "imx27" is a SoC name not cpu core.
+> On 06/20/2013 01:14 AM, Jay Agarwal wrote:
+> > - decrease non-prefetch memory size to 128 MB
+> > - increase prefetch memory size to 384 MB
+> > - above change is done because most pcie devices
+> >   prefetch memory size requirement is quite higher
+> >   compared to non-prefetch memory space.
 > 
-> I think Markus take this ARM property from one of existing DTS.
+> It's possible this change won't be suitable for all applications. People may
+> simply need to adjust their DT based on what they want to connect.
+> Still, this patch probably biases things in the correct way for now.
+> Longer term, we might want to investigate dynamically sizing the windows
+> in order to support arbitrary attached devices, in much the same way as the
+> Marvell code does/will in order to conserve physical/bus address space for
+> their multiple controllers.
 > 
-> shc at shc /home/git/linux-mx27/arch/arm/boot/dts $ grep arm926 *.dtsi
-> at91sam9260.dtsi:                       compatible = "arm,arm926ejs";
-> at91sam9263.dtsi:                       compatible = "arm,arm926ejs";
-> at91sam9g45.dtsi:                       compatible = "arm,arm926ejs";
-> at91sam9n12.dtsi:                       compatible = "arm,arm926ejs";
-> at91sam9x5.dtsi:                        compatible = "arm,arm926ejs";
-> imx23.dtsi:                     compatible = "arm,arm926ejs";
-> imx28.dtsi:                     compatible = "arm,arm926ejs";
-> lpc32xx.dtsi:                   compatible = "arm,arm926ejs";
-> s3c2416.dtsi:                   compatible = "arm,arm926ejs";
-> spear3xx.dtsi:                  compatible = "arm,arm926ejs";
-> spear600.dtsi:                  compatible = "arm,arm926ejs";
-> wm8505.dtsi:                    compatible = "arm,arm926ejs";
+> However, this change allows me to correctly enumerate a particular GPU I
+> have plugged into my Harmony board, and assign all the BARs, so:
 > 
-> So, documentation need to be updated or these values should be fixed.
-> Another solution  is specify compatible string as:
-> compatible = "arm,arm926ejs", "arm,arm926";
-> What you think about this?
-
-I assume that the compatible string in the binding doc has been reviewed
-and agreed by people, so we should fix the existing users before kernel
-starts using it to for matching something.
-
-Lorenzo, comment?
-
-Shawn
+> Tested-by: Stephen Warren <swarren@nvidia.com>
+> 
+Thierry,
+Could you please integrate this change also to your branch if review is done. Please let me know once it is done.
