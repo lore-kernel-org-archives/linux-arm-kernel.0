@@ -1,75 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Jun 2013 23:01:31 -0700
-Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
-In-Reply-To: <87obb1b5ow.fsf@lebrac.rtp-net.org>
-References: <CACVXFVNzAMrkhrAMAmQ7ZdJdby2O4VdoD8BVHRF-O=rPKQMqbw@mail.gmail.com>
- <51BEBDCD.3060104@ti.com> <87ppvlqhyy.fsf@lebrac.rtp-net.org>
- <20130617082458.GH20992@atomide.com>
- <87li69qdcs.fsf@lebrac.rtp-net.org>
- <20130617102650.GK20992@atomide.com>
- <20130618112701.GO5523@atomide.com>
- <8761xaqvrn.fsf@lebrac.rtp-net.org>
- <20130619095837.GY5523@atomide.com>
- <87obb1b5ow.fsf@lebrac.rtp-net.org>
-Message-ID: <20130621060131.GH5523@atomide.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 21 Jun 2013 16:08:00 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the mailbox tree
+Message-ID: <20130621160800.64f9965229e5042a7b77e212@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnaud Patard <arnaud.patard@rtp-net.org> [130620 00:36]:
-> Tony Lindgren <tony@atomide.com> writes:
-> 
-> Hi,
-> 
-> > * Arnaud Patard <arnaud.patard@rtp-net.org> [130619 02:52]:
-> >> Tony Lindgren <tony@atomide.com> writes:
-> >> 
-> >> Hi,
-> >> 
-> >> > * Tony Lindgren <tony@atomide.com> [130617 03:32]:
-> >> >> * Arnaud Patard <arnaud.patard@rtp-net.org> [130617 02:52]:
-> >> >> > Tony Lindgren <tony@atomide.com> writes:
-> >> >> > 
-> >> >> > I understand your concerns but, please, cope with reality: the clock
-> >> >> > work is not in -next so this tends to make me think it won't reach
-> >> >> > 3.11. We're at -rc6 after all. Telling users that their system doesn't
-> >> >> > have any network because it was easier to maintain, is not something
-> >> >> > they will understand imho.
-> >> >> 
-> >> >> Right, like I said: the idea is to have it usable with DT. And USB and
-> >> >> Ethernet certainly are part of what I call usable. So is MMC, WLAN and
-> >> >> DSS. I've certainly spent quite a bit of time on making sure panda works
-> >> >> with DT, and I can assure you that fixing the USB extclock is easier than
-> >> >> supporting the legacy boot with DT :)
-> >> >> 
-> >> >> This issue can also be fixed with a clock alias if we don't have DT
-> >> >> defined clocks ready for v3.11. It may take a few days for us to have
-> >> >> the solution. But get getting a clock to a driver certainly is not a
-> >> >> showstopper here. After all, that's what all drivers already do.
-> >> >
-> >> > Care to test the last patch just posted by Roger in thread
-> >> > " [PATCH 0/4] ARM: OMAP4: Panda USB Host support and DVI EDID fix"?
-> >> 
-> >> I tried to test them but they don't apply on linux-next due to some
-> >> pinctrl changes probably missing:
-> >> Error: arch/arm/boot/dts/omap4-panda-common.dtsi:177.14-15 syntax error
-> >> 
-> >> which corresponds to :
-> >> 0x82 (PIN_INPUT_PULLDOWN | MUX_MODE4)
-> >
-> > Oops, right, that's in Benoit's branch too for the .dts preprocessing.
-> > Until it is merged, maybe try with Roger's earlier version of that patch
-> > that did not yet use the macros?
-> >  
-> 
-> Right. I've changed the missing macros with their values and now, it
-> compiles and I can even ping the board, so works for me.
+Hi all,
 
-Good to hear thanks. Sounds like we should have things mostly working
-with DT in mainline kernel by v3.11-rc1. I'm sure some minor fixes
-will be needed as more people start using it, but they should be
-all fixable either by binding changes, or by initializing missing things
-using platform data.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-omap2/devices.c between commit 4a1c0e83bb4e ("ARM: OMAP2+:
+mbox: remove dependencies with soc.h") from the mailbox tree and commit
+82c5cde1c4b0 ("ARM: OMAP2+: Remove omap4 ocp2scp pdata") from the arm-soc
+tree.
 
-Regards,
+I fixed it up (removing the include of
+linux/platform_data/omap_ocp2scp.h) and can carry the fix as necessary
+(no action is required).
 
-Tony
+That mailbox tree commit looks very similar to commit b8a7cf8e2b15 ("ARM:
+OMAP2+: mbox: remove dependencies with soc.h") from the arm-soc tree ...
+
+As an aside, the include of linux/usb/omap_control_usb.h into this file
+was removed by commit 608d19380c67 ("ARM: OMAP2+: Remove omap4 pdata for
+USB") in the arm-soc tree, but reintroduced by commit 435f4c6d5242
+("Merge branch 'next/drivers' into for-next").
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/2d7de735/attachment.sig>
