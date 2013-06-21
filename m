@@ -1,537 +1,150 @@
 From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Fri, 21 Jun 2013 11:39:13 +0100
-Subject: [PATCH v4 2/7] ARM:stixxxx: Add STiH416 SOC support
+Date: Fri, 21 Jun 2013 11:39:21 +0100
+Subject: [PATCH v4 3/7] ARM:stixxxx: Add DEBUG_LL console support
 In-Reply-To: <1371811076-27168-1-git-send-email-srinivas.kandagatla@st.com>
 References: <1371811076-27168-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1371811153-27284-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1371811161-27326-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-The STiH416 is advanced HD AVC processor with 3D graphics acceleration
-and 1.2-GHz ARM Cortex-A9 SMP CPU.
+This patch adds low level debug uart support to stixxxx based SOCs.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-CC: Stephen Gallimore <stephen.gallimore@st.com>
-CC: Stuart Menefy <stuart.menefy@st.com>
 CC: Arnd Bergmann <arnd@arndb.de>
-CC: Linus Walleij <linus.walleij@linaro.org>
 ---
- Documentation/arm/stixxxx/stih416-overview.txt |   12 +
- arch/arm/boot/dts/stih416-clock.dtsi           |   41 ++++
- arch/arm/boot/dts/stih416-pinctrl.dtsi         |  295 ++++++++++++++++++++++++
- arch/arm/boot/dts/stih416.dtsi                 |   96 ++++++++
- arch/arm/mach-stixxxx/Kconfig                  |    9 +
- arch/arm/mach-stixxxx/board-dt.c               |    3 +-
- 6 files changed, 455 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/arm/stixxxx/stih416-overview.txt
- create mode 100644 arch/arm/boot/dts/stih416-clock.dtsi
- create mode 100644 arch/arm/boot/dts/stih416-pinctrl.dtsi
- create mode 100644 arch/arm/boot/dts/stih416.dtsi
+ arch/arm/Kconfig.debug           |   35 +++++++++++++++++++++
+ arch/arm/include/debug/stixxxx.S |   61 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 96 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/debug/stixxxx.S
 
-diff --git a/Documentation/arm/stixxxx/stih416-overview.txt b/Documentation/arm/stixxxx/stih416-overview.txt
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 1d41908..9e6d6c1 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -483,6 +483,16 @@ choice
+ 		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
+ 		  devices, including VT8500, WM8505, WM8650 and WM8850.
+ 
++	config DEBUG_STIXXXX_UART
++		depends on ARCH_STIXXXX
++		bool "Use StiH415/416 ASC for low-level debug"
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on StiH415/416 based platforms like B2000, B2020.
++		  It support UART2 and SBC_UART1.
++
++		  If unsure, say N.
++
+ 	config DEBUG_LL_UART_NONE
+ 		bool "No low-level debugging UART"
+ 		depends on !ARCH_MULTIPLATFORM
+@@ -617,6 +627,30 @@ choice
+ 
+ endchoice
+ 
++choice
++	prompt "Low-level debug console UART"
++	depends on DEBUG_LL && DEBUG_STIXXXX_UART
++
++	config STIH41X_DEBUG_ASC2
++		bool "ASC2 UART"
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on STiH415/416 based platforms like b2000, which has
++		  default UART wired up to ASC2.
++
++		  If unsure, say N.
++
++	config STIH41X_DEBUG_SBC_ASC1
++		bool "SBC ASC1 UART"
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on STiH415/416 based platforms like b2020. which has
++		  default UART wired up to SBC ASC1.
++
++		  If unsure, say N.
++
++endchoice
++
+ config DEBUG_LL_INCLUDE
+ 	string
+ 	default "debug/bcm2835.S" if DEBUG_BCM2835
+@@ -641,6 +675,7 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_MMP_UART3
+ 	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
+ 	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
++	default "debug/stixxxx.S" if DEBUG_STIXXXX_UART
+ 	default "debug/sunxi.S" if DEBUG_SUNXI_UART0 || DEBUG_SUNXI_UART1
+ 	default "debug/tegra.S" if DEBUG_TEGRA_UART
+ 	default "debug/ux500.S" if DEBUG_UX500_UART
+diff --git a/arch/arm/include/debug/stixxxx.S b/arch/arm/include/debug/stixxxx.S
 new file mode 100644
-index 0000000..558444c
+index 0000000..7bc02a7
 --- /dev/null
-+++ b/Documentation/arm/stixxxx/stih416-overview.txt
-@@ -0,0 +1,12 @@
-+			STiH416 Overview
-+			================
-+
-+Introduction
-+------------
-+
-+    The STiH416 is the next generation of HD, AVC set-top box processors
-+    for satellite, cable, terrestrial and IP-STB markets.
-+
-+    Features
-+    - ARM Cortex-A9 1.2 GHz dual core CPU
-+    - SATA2x2,USB 2.0x3, PCIe, Gbit Ethernet MACx2
-diff --git a/arch/arm/boot/dts/stih416-clock.dtsi b/arch/arm/boot/dts/stih416-clock.dtsi
-new file mode 100644
-index 0000000..7026bf1
---- /dev/null
-+++ b/arch/arm/boot/dts/stih416-clock.dtsi
-@@ -0,0 +1,41 @@
++++ b/arch/arm/include/debug/stixxxx.S
+@@ -0,0 +1,61 @@
 +/*
-+ * Copyright (C) 2013 STMicroelectronics R&D Limited
-+ * <stlinux-devel@stlinux.com>
++ * arch/arm/include/debug/stixxxx.S
++ *
++ * Debugging macro include header
++ * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
-+/ {
-+	clocks {
-+		/*
-+		 * Fixed 30MHz oscillator inputs to SoC
-+		 */
-+		CLK_SYSIN: CLK_SYSIN {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <30000000>;
-+			clock-output-names = "CLK_SYSIN";
-+		};
 +
-+		/*
-+		 * ARM Peripheral clock for timers
-+		 */
-+		arm_periph_clk: arm_periph_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <600000000>;
-+		};
++#define STIH41X_COMMS_BASE              0xfed00000
++#define STIH41X_ASC2_BASE               (STIH41X_COMMS_BASE+0x32000)
 +
-+		/*
-+		 * Bootloader initialized system infrastructure clock for
-+		 * serial devices.
-+		 */
-+		CLK_S_ICN_REG_0: clockgenA0 at 4 {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <100000000>;
-+			clock-output-names = "CLK_S_ICN_REG_0";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-new file mode 100644
-index 0000000..957b21a
---- /dev/null
-+++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-@@ -0,0 +1,295 @@
++#define STIH41X_SBC_LPM_BASE            0xfe400000
++#define STIH41X_SBC_COMMS_BASE          (STIH41X_SBC_LPM_BASE + 0x100000)
++#define STIH41X_SBC_ASC1_BASE           (STIH41X_SBC_COMMS_BASE + 0x31000)
 +
-+/*
-+ * Copyright (C) 2013 STMicroelectronics Limited.
-+ * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+#include "st-pincfg.h"
-+/ {
 +
-+	aliases {
-+		gpio0	= &PIO0;
-+		gpio1	= &PIO1;
-+		gpio2	= &PIO2;
-+		gpio3	= &PIO3;
-+		gpio4	= &PIO4;
-+		gpio5	= &PIO40;
-+		gpio6	= &PIO5;
-+		gpio7	= &PIO6;
-+		gpio8	= &PIO7;
-+		gpio9	= &PIO8;
-+		gpio10	= &PIO9;
-+		gpio11	= &PIO10;
-+		gpio12	= &PIO11;
-+		gpio13	= &PIO12;
-+		gpio14	= &PIO30;
-+		gpio15	= &PIO31;
-+		gpio16	= &PIO13;
-+		gpio17	= &PIO14;
-+		gpio18	= &PIO15;
-+		gpio19	= &PIO16;
-+		gpio20	= &PIO17;
-+		gpio21	= &PIO18;
-+		gpio22	= &PIO100;
-+		gpio23	= &PIO101;
-+		gpio24	= &PIO102;
-+		gpio25	= &PIO103;
-+		gpio26	= &PIO104;
-+		gpio27	= &PIO105;
-+		gpio28	= &PIO106;
-+		gpio29	= &PIO107;
-+	};
++#define VIRT_ADDRESS(x)		(x - 0x1000000)
 +
-+	soc {
-+		pin-controller-sbc {
-+			#address-cells	= <1>;
-+			#size-cells	= <1>;
-+			compatible	= "st,stih416-sbc-pinctrl";
-+			st,syscfg	= <&syscfg_sbc>;
-+			ranges		= <0 0xfe610000 0x6000>;
++#if IS_ENABLED(CONFIG_STIH41X_DEBUG_ASC2)
++#define DEBUG_LL_UART_BASE	STIH41X_ASC2_BASE
++#endif
 +
-+			PIO0: gpio at fe610000 {
-+				gpio-controller;
-+				#gpio-cells = <1>;
-+				reg		= <0 0x100>;
-+				st,bank-name	= "PIO0";
-+			};
-+			PIO1: gpio at fe611000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x1000 0x100>;
-+				st,bank-name	= "PIO1";
-+			};
-+			PIO2: gpio at fe612000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x2000 0x100>;
-+				st,bank-name	= "PIO2";
-+			};
-+			PIO3: gpio at fe613000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x3000 0x100>;
-+				st,bank-name	= "PIO3";
-+			};
-+			PIO4: gpio at fe614000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x4000 0x100>;
-+				st,bank-name	= "PIO4";
-+			};
-+			PIO40: gpio at fe615000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x5000 0x100>;
-+				st,bank-name	= "PIO40";
-+				st,retime-pin-mask = <0x7f>;
-+			};
++#if IS_ENABLED(CONFIG_STIH41X_DEBUG_SBC_ASC1)
++#define DEBUG_LL_UART_BASE	STIH41X_SBC_ASC1_BASE
++#endif
 +
-+			sbc_serial1 {
-+				pinctrl_sbc_serial1: sbc_serial1 {
-+					st,pins {
-+						tx	= <&PIO2 6 ALT3 OUT>;
-+						rx	= <&PIO2 7 ALT3 IN>;
-+					};
-+				};
-+			};
-+		};
++#ifndef DEBUG_LL_UART_BASE
++#error "DEBUG UART is not Configured"
++#endif
 +
-+		pin-controller-front {
-+			#address-cells	= <1>;
-+			#size-cells	= <1>;
-+			compatible	= "st,stih416-front-pinctrl";
-+			st,syscfg	= <&syscfg_front>;
-+			ranges		= <0 0xfee00000 0x10000>;
++#define ASC_TX_BUF_OFF  0x04
++#define ASC_CTRL_OFF    0x0c
++#define ASC_STA_OFF     0x14
 +
-+			PIO5: gpio at fee00000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0 0x100>;
-+				st,bank-name	= "PIO5";
-+			};
-+			PIO6: gpio at fee01000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x1000 0x100>;
-+				st,bank-name	= "PIO6";
-+			};
-+			PIO7: gpio at fee02000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x2000 0x100>;
-+				st,bank-name	= "PIO7";
-+			};
-+			PIO8: gpio at fee03000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x3000 0x100>;
-+				st,bank-name	= "PIO8";
-+			};
-+			PIO9: gpio at fee04000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x4000 0x100>;
-+				st,bank-name	= "PIO9";
-+			};
-+			PIO10: gpio at fee05000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x5000 0x100>;
-+				st,bank-name	= "PIO10";
-+			};
-+			PIO11: gpio at fee06000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x6000 0x100>;
-+				st,bank-name	= "PIO11";
-+			};
-+			PIO12: gpio at fee07000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x7000 0x100>;
-+				st,bank-name	= "PIO12";
-+			};
-+			PIO30: gpio at fee08000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x8000 0x100>;
-+				st,bank-name	= "PIO30";
-+			};
-+			PIO31: gpio at fee09000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x9000 0x100>;
-+				st,bank-name	= "PIO31";
-+			};
-+		};
++#define ASC_STA_TX_FULL         (1<<9)
++#define ASC_STA_TX_EMPTY        (1<<1)
 +
-+		pin-controller-rear {
-+			#address-cells	= <1>;
-+			#size-cells	= <1>;
-+			compatible	= "st,stih416-rear-pinctrl";
-+			st,syscfg	= <&syscfg_rear>;
-+			ranges 		= <0 0xfe820000 0x6000>;
 +
-+			PIO13: gpio at fe820000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0 0x100>;
-+				st,bank-name	= "PIO13";
-+			};
-+			PIO14: gpio at fe821000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x1000 0x100>;
-+				st,bank-name	= "PIO14";
-+			};
-+			PIO15: gpio at fe822000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x2000 0x100>;
-+				st,bank-name	= "PIO15";
-+			};
-+			PIO16: gpio at fe823000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x3000 0x100>;
-+				st,bank-name	= "PIO16";
-+			};
-+			PIO17: gpio at fe824000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x4000 0x100>;
-+				st,bank-name	= "PIO17";
-+			};
-+			PIO18: gpio at fe825000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x5000 0x100>;
-+				st,bank-name	= "PIO18";
-+				st,retime-pin-mask = <0xf>;
-+			};
++		.macro	addruart, rp, rv, tmp
++		ldr	\rp,      =DEBUG_LL_UART_BASE	@ physical base
++		ldr	\rv,      =VIRT_ADDRESS(DEBUG_LL_UART_BASE) @ virt base
++		.endm
 +
-+			serial2 {
-+				pinctrl_serial2: serial2-0 {
-+					st,pins {
-+						tx	= <&PIO17 4 ALT2 OUT>;
-+						rx	= <&PIO17 5 ALT2 IN>;
-+						output-enable	= <&PIO11 3 ALT2 OUT>;
-+					};
-+				};
-+			};
-+		};
++                .macro  senduart,rd,rx
++                strb    \rd, [\rx, #ASC_TX_BUF_OFF]
++                .endm
 +
-+		pin-controller-fvdp-fe {
-+			#address-cells	= <1>;
-+			#size-cells	= <1>;
-+			compatible	= "st,stih416-fvdp-fe-pinctrl";
-+			st,syscfg	= <&syscfg_fvdp_fe>;
-+			ranges		= <0 0xfd6b0000 0x3000>;
++                .macro  waituart,rd,rx
++1001:           ldr     \rd, [\rx, #ASC_STA_OFF]
++                tst     \rd, #ASC_STA_TX_FULL
++                bne     1001b
++                .endm
 +
-+			PIO100: gpio at fd6b0000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0 0x100>;
-+				st,bank-name	= "PIO100";
-+			};
-+			PIO101: gpio at fd6b1000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x1000 0x100>;
-+				st,bank-name	= "PIO101";
-+			};
-+			PIO102: gpio at fd6b2000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x2000 0x100>;
-+				st,bank-name	= "PIO102";
-+			};
-+		};
-+
-+		pin-controller-fvdp-lite {
-+			#address-cells	= <1>;
-+			#size-cells	= <1>;
-+			compatible	= "st,stih416-fvdp-lite-pinctrl";
-+			st,syscfg		= <&syscfg_fvdp_lite>;
-+			ranges			= <0 0xfd330000 0x5000>;
-+
-+			PIO103: gpio at fd330000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0 0x100>;
-+				st,bank-name	= "PIO103";
-+			};
-+			PIO104: gpio at fd331000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x1000 0x100>;
-+				st,bank-name	= "PIO104";
-+			};
-+			PIO105: gpio at fd332000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x2000 0x100>;
-+				st,bank-name	= "PIO105";
-+			};
-+			PIO106: gpio at fd333000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x3000 0x100>;
-+				st,bank-name	= "PIO106";
-+			};
-+
-+			PIO107: gpio at fd334000 {
-+				gpio-controller;
-+				#gpio-cells	= <1>;
-+				reg		= <0x4000 0x100>;
-+				st,bank-name	= "PIO107";
-+				st,retime-pin-mask = <0xf>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-new file mode 100644
-index 0000000..3cecd96
---- /dev/null
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -0,0 +1,96 @@
-+/*
-+ * Copyright (C) 2012 STMicroelectronics Limited.
-+ * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+#include "stih41x.dtsi"
-+#include "stih416-clock.dtsi"
-+#include "stih416-pinctrl.dtsi"
-+/ {
-+	L2: cache-controller {
-+		compatible = "arm,pl310-cache";
-+		reg = <0xfffe2000 0x1000>;
-+		arm,data-latency = <3 3 3>;
-+		arm,tag-latency = <2 2 2>;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		interrupt-parent = <&intc>;
-+		ranges;
-+		compatible	= "simple-bus";
-+
-+		syscfg_sbc:sbc-syscfg at fe600000{
-+			compatible	= "st,stih416-sbc-syscfg", "syscon";
-+			reg		= <0xfe600000 0x1000>;
-+		};
-+
-+		syscfg_front:front-syscfg at fee10000{
-+			compatible	= "st,stih416-front-syscfg", "syscon";
-+			reg		= <0xfee10000 0x1000>;
-+		};
-+
-+		syscfg_rear:rear-syscfg at fe830000{
-+			compatible	= "st,stih416-rear-syscfg", "syscon";
-+			reg		= <0xfe830000 0x1000>;
-+		};
-+
-+		/* MPE */
-+		syscfg_fvdp_fe:fvdp-fe-syscfg at fddf0000{
-+			compatible	= "st,stih416-fvdp-fe-syscfg", "syscon";
-+			reg		= <0xfddf0000 0x1000>;
-+		};
-+
-+		syscfg_fvdp_lite:fvdp-lite-syscfg at fd6a0000{
-+			compatible	= "st,stih416-fvdp-lite-syscfg", "syscon";
-+			reg		= <0xfd6a0000 0x1000>;
-+		};
-+
-+		syscfg_cpu:cpu-syscfg at fdde0000{
-+			compatible	= "st,stih416-cpu-syscfg", "syscon";
-+			reg		= <0xfdde0000 0x1000>;
-+		};
-+
-+		syscfg_compo:compo-syscfg at fd320000{
-+			compatible	= "st,stih416-compo-syscfg", "syscon";
-+			reg		= <0xfd320000 0x1000>;
-+		};
-+
-+		syscfg_transport:transport-syscfg at fd690000{
-+			compatible	= "st,stih416-transport-syscfg", "syscon";
-+			reg		= <0xfd690000 0x1000>;
-+		};
-+
-+		syscfg_lpm:lpm-syscfg at fe4b5100{
-+			compatible	= "st,stih416-lpm-syscfg", "syscon";
-+			reg		= <0xfe4b5100 0x8>;
-+		};
-+
-+		serial2: serial at fed32000{
-+			compatible	= "st,asc";
-+			status 		= "disabled";
-+			reg		= <0xfed32000 0x2c>;
-+			interrupts	= <0 197 0>;
-+			clocks          = <&CLK_S_ICN_REG_0>;
-+			pinctrl-names 	= "default";
-+			pinctrl-0 	= <&pinctrl_serial2>;
-+		};
-+
-+		/* SBC_UART1 */
-+		sbc_serial1: serial at fe531000 {
-+			compatible	= "st,asc";
-+			status 		= "disabled";
-+			reg		= <0xfe531000 0x2c>;
-+			interrupts	= <0 210 0>;
-+			pinctrl-names 	= "default";
-+			pinctrl-0 	= <&pinctrl_sbc_serial1>;
-+			clocks          = <&CLK_SYSIN>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-stixxxx/Kconfig b/arch/arm/mach-stixxxx/Kconfig
-index df0aff2..3e93711 100644
---- a/arch/arm/mach-stixxxx/Kconfig
-+++ b/arch/arm/mach-stixxxx/Kconfig
-@@ -33,4 +33,13 @@ config SOC_STIH415
- 	  and other digital audio/video applications using Flattned Device
- 	  Trees.
- 
-+config SOC_STIH416
-+	bool "STiH416 STMicroelectronics Consumer Electronics family"
-+	default y
-+	help
-+	  This enables support for STMicroelectronics Digital Consumer
-+	  Electronics family StiH416 parts, primarily targetted at set-top-box
-+	  and other digital audio/video applications using Flattened Device
-+	  Trees.
-+
- endif
-diff --git a/arch/arm/mach-stixxxx/board-dt.c b/arch/arm/mach-stixxxx/board-dt.c
-index 9c5addd..6487a12 100644
---- a/arch/arm/mach-stixxxx/board-dt.c
-+++ b/arch/arm/mach-stixxxx/board-dt.c
-@@ -37,10 +37,11 @@ static void __init stih41x_timer_init(void)
- 
- static const char *stih41x_dt_match[] __initdata = {
- 	"st,stih415",
-+	"st,stih416",
- 	NULL
- };
- 
--DT_MACHINE_START(STM, "STiH415 SoC with Flattened Device Tree")
-+DT_MACHINE_START(STM, "STiH415/416 SoC with Flattened Device Tree")
- 	.init_time	= stih41x_timer_init,
- 	.smp		= smp_ops(stixxxx_smp_ops),
- 	.dt_compat	= stih41x_dt_match,
++                .macro  busyuart,rd,rx
++1001:           ldr     \rd, [\rx, #ASC_STA_OFF]
++                tst     \rd, #ASC_STA_TX_EMPTY
++                beq     1001b
++                .endm
 -- 
 1.7.6.5
