@@ -1,39 +1,47 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 21 Jun 2013 15:55:08 +0200
-Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
- MMU binding
-In-Reply-To: <20130621095729.GA7766@mudshark.cambridge.arm.com>
-References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
- <1370889285-22799-8-git-send-email-will.deacon@arm.com>
- <20130620200845.GF11309@8bytes.org>
- <20130621095729.GA7766@mudshark.cambridge.arm.com>
-Message-ID: <20130621135507.GI11309@8bytes.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Jun 2013 16:00:04 +0200
+Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
+In-Reply-To: <CAD=GYpb54bitcg0gnfhzxbvig3etRPY6fs=FOQu5nYkio5NRZw@mail.gmail.com>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <51C427E1.2000800@ti.com>
+ <CAD=GYpb54bitcg0gnfhzxbvig3etRPY6fs=FOQu5nYkio5NRZw@mail.gmail.com>
+Message-ID: <201306211600.04986.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Fri, Jun 21, 2013 at 10:57:29AM +0100, Will Deacon wrote:
-> This is a common driver that will support any IOMMUs compatible with v1 or
-> v2 of the ARM SMMU architecture. Currently, that includes SMMUs known
-> informatively as MMU-400, MMU-401 and MMU-500. I had a look at the other
-> IOMMU drivers in the kernel and they seem to be driving incompatible IOMMUs,
-> so I don't see how this driver can replace those.
+On Friday 21 June 2013, Joel A Fernandes wrote:
+> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >> index b1c66a4..7d58cd9 100644
+> >> --- a/arch/arm/Kconfig
+> >> +++ b/arch/arm/Kconfig
+> >> @@ -841,6 +841,7 @@ config ARCH_DAVINCI
+> >>       select HAVE_IDE
+> >>       select NEED_MACH_GPIO_H
+> >>       select TI_PRIV_EDMA
+> >> +     select DMADEVICES
+> >
+> > It is generally a bad idea to force select on something that can be
+> > enabled using menuconfig. Unless used carefully, select causes "unmet
+> > direct dependency" warnings which folks are already fighting hard to
+> > fix. This leads to what Russell referred in the past as "select madness" [1]
 > 
-> However, we'll hopefully see ARM SMMU-compatible devices turning up soon (I
-> know of many SoCs in development that are looking at them).
+> Are you concerned with bloat issues? I know your point of view but the idea
+> was to build these options by default for these platforms even though
+> in some cases
+> it might not be used. I have seen folks including myself select the wrong
+> option. Having the build system automatically select the correct option for the
+> most common cases can be very useful I feel and not require manual
+> configuration.
 
-That sounds great. So in the future there will be a single driver for
-most future SOCs. This is a real improvement over the current situation.
+For defaults, you should use the defconfig, not 'select' in Kconfig.
 
->From NVidia is another driver with 'smmu' in its name, is that one also
-incompatible?
+A lot of the 'select' statements are actually wrong because they
+do not take dependencies into account where A selects B but not C,
+and B depends on C, which leads to broken builds when C is disabled
+by a user (or randconfig).
 
-> Chaining is really horrible and exists as a hack to support virtualisation
-> using two separate SMMUs, where neither of them can support nested
-> translation.
+You should only ever use 'select' from platforms on silent options
+that are not themselves user selectable like the above 'HAVE_IDE'
+and 'NEED_MACH_GPIO_H'.
 
-I see, thanks for the explanation.
-
-
-	Joerg
+	Arnd
