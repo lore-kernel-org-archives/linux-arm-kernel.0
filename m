@@ -1,24 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 21 Jun 2013 00:32:50 -0700
-Subject: [PATCHv2 06/11] CLK: omap: move part of the machine specific
- clock header contents to driver
-In-Reply-To: <1371647942-4811-7-git-send-email-t-kristo@ti.com>
-References: <1371647942-4811-1-git-send-email-t-kristo@ti.com>
- <1371647942-4811-7-git-send-email-t-kristo@ti.com>
-Message-ID: <20130621073250.GO5523@atomide.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Fri, 21 Jun 2013 09:33:01 +0200
+Subject: [PATCH] dmaengine: ste_dma40: Declare memcpy config as static
+In-Reply-To: <20130621031000.GB23141@intel.com>
+References: <1371719859-4600-1-git-send-email-fabio.baltieri@linaro.org>
+ <20130621031000.GB23141@intel.com>
+Message-ID: <20130621073301.GA19353@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [130619 06:25]:
-> Some of the clock.h contents are needed by the new OMAP clock driver,
-> including dpll_data and clk_hw_omap. Thus, move these to the generic
-> omap header file which can be accessed by the driver.
+On Fri, Jun 21, 2013 at 08:40:00AM +0530, Vinod Koul wrote:
+> On Thu, Jun 20, 2013 at 11:17:39AM +0200, Fabio Baltieri wrote:
+> > Fix sparse warnings:
+> > 
+> > drivers/dma/ste_dma40.c:81:26: warning: symbol 'dma40_memcpy_conf_phy' was not declared. Should it be static?
+> > drivers/dma/ste_dma40.c:95:26: warning: symbol 'dma40_memcpy_conf_log' was not declared. Should it be static?
+> > 
+> > Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> Acked-by: Vinod Koul <vinod.koul@intel.com>
+> 
+> I guess this would be dependent on recent ste_dma40 patches so best way is
+> Linus's tree, right?
 
-Do you mean "are only needed by the new OMAP clock driver"?
+Yes, but I'm not sure Linus is going to send a third pull request for
+dma40 so maybe I should just resend my last two dma40 patches for
+arm-soc directly.
 
-Otherwise it sounds like this will break things for other
-omaps that don't yet have clocks configured in DT..
+Thanks for the Ack.
 
-Regards,
+Fabio
 
-Tony
+-- 
+Fabio Baltieri
