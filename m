@@ -1,31 +1,127 @@
-From: oneukum@suse.de (Oliver Neukum)
-Date: Fri, 21 Jun 2013 10:33:46 +0200
-Subject: [RFC PATCH v1 1/6] USB: HCD: support giveback of URB in tasklet
- context
-In-Reply-To: <CACVXFVMdxtd2fcwNE_YrfwG0Ksq67ww_Ar9A6fCGSr442gWaag@mail.gmail.com>
-References: <CACVXFVPPF=DNp0dpypoZ=OifkfnCgWJKpQHMv4xE8PmBk8RiHQ@mail.gmail.com>
- <Pine.LNX.4.44L0.1306201242110.2063-100000@iolanthe.rowland.org>
- <CACVXFVMdxtd2fcwNE_YrfwG0Ksq67ww_Ar9A6fCGSr442gWaag@mail.gmail.com>
-Message-ID: <4558223.ViRy5S2mR9@linux-5eaq.site>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Fri, 21 Jun 2013 16:37:14 +0800
+Subject: [PATCH v2 05/12] ARM: barrier: allow options to be passed to
+ memory barrier instructions
+In-Reply-To: <1371738086-6707-6-git-send-email-will.deacon@arm.com>
+References: <1371738086-6707-1-git-send-email-will.deacon@arm.com>
+ <1371738086-6707-6-git-send-email-will.deacon@arm.com>
+Message-ID: <CACVXFVPrkc4YY25J9QzbKB9A6uerq9m9VQjTZTMN45DvKbx3SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 June 2013 09:12:38 Ming Lei wrote:
-> >> This should be enough since during remove path usbcore will wait for all
-> >> URBs' completion which is only triggered by tasklet, so once all URBs are
-> >> finished, the tasklet list has been empty already.
-> >
-> > No, usbcore only waits until the urb_list for each endpoint is empty.
-> > It doesn't keep track of the individual URB completions.  Look at
-> > usb_hcd_flush_endpoint() and you'll see.
-> 
-> But, if URBs still aren't completed after usb_disconnect(), it should be
-> bug of usbcore or driver, shouldn't it?
+On Thu, Jun 20, 2013 at 10:21 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On ARMv7, the memory barrier instructions take an optional `option'
+> field which can be used to constrain the effects of a memory barrier
+> based on shareability and access type.
+>
+> This patch allows the caller to pass these options if required, and
+> updates the smp_*() barriers to request inner-shareable barriers,
+> affecting only stores for the _wmb variant. wmb() is also changed to
+> use the -st version of dsb.
+>
+> Reported-by: Albin Tonnerre <albin.tonnerre@arm.com>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/assembler.h |  4 ++--
+>  arch/arm/include/asm/barrier.h   | 32 ++++++++++++++++----------------
+>  2 files changed, 18 insertions(+), 18 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index 05ee9ee..863b280 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -212,9 +212,9 @@
+>  #ifdef CONFIG_SMP
+>  #if __LINUX_ARM_ARCH__ >= 7
+>         .ifeqs "\mode","arm"
+> -       ALT_SMP(dmb)
+> +       ALT_SMP(dmb     ish)
+>         .else
+> -       ALT_SMP(W(dmb))
+> +       ALT_SMP(W(dmb)  ish)
+>         .endif
+>  #elif __LINUX_ARM_ARCH__ == 6
+>         ALT_SMP(mcr     p15, 0, r0, c7, c10, 5) @ dmb
+> diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
+> index 8dcd9c7..60f15e2 100644
+> --- a/arch/arm/include/asm/barrier.h
+> +++ b/arch/arm/include/asm/barrier.h
+> @@ -14,27 +14,27 @@
+>  #endif
+>
+>  #if __LINUX_ARM_ARCH__ >= 7
+> -#define isb() __asm__ __volatile__ ("isb" : : : "memory")
+> -#define dsb() __asm__ __volatile__ ("dsb" : : : "memory")
+> -#define dmb() __asm__ __volatile__ ("dmb" : : : "memory")
+> +#define isb(option) __asm__ __volatile__ ("isb " #option : : : "memory")
+> +#define dsb(option) __asm__ __volatile__ ("dsb " #option : : : "memory")
+> +#define dmb(option) __asm__ __volatile__ ("dmb " #option : : : "memory")
+>  #elif defined(CONFIG_CPU_XSC3) || __LINUX_ARM_ARCH__ == 6
+> -#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
+> +#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
+>                                     : : "r" (0) : "memory")
+> -#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+> +#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+>                                     : : "r" (0) : "memory")
+> -#define dmb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
+> +#define dmb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
+>                                     : : "r" (0) : "memory")
+>  #elif defined(CONFIG_CPU_FA526)
+> -#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
+> +#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
+>                                     : : "r" (0) : "memory")
+> -#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+> +#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+>                                     : : "r" (0) : "memory")
+> -#define dmb() __asm__ __volatile__ ("" : : : "memory")
+> +#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
+>  #else
+> -#define isb() __asm__ __volatile__ ("" : : : "memory")
+> -#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+> +#define isb(x) __asm__ __volatile__ ("" : : : "memory")
+> +#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+>                                     : : "r" (0) : "memory")
+> -#define dmb() __asm__ __volatile__ ("" : : : "memory")
+> +#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
+>  #endif
+>
+>  #ifdef CONFIG_ARCH_HAS_BARRIERS
+> @@ -42,7 +42,7 @@
+>  #elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
+>  #define mb()           do { dsb(); outer_sync(); } while (0)
+>  #define rmb()          dsb()
 
-A driver cannot know what caused the call to disconnect(). That includes
-driver unbind. Doing IO to a device that another driver may be bound to
-is certainly a bug.
-Nevertheless it usually works and it is desirable to keep that behavior.
+The above two dsb() are missed?
 
-	Regards
-		Oliver
+> -#define wmb()          mb()
+> +#define wmb()          do { dsb(st); outer_sync(); } while (0)
+>  #else
+>  #define mb()           barrier()
+>  #define rmb()          barrier()
+> @@ -54,9 +54,9 @@
+>  #define smp_rmb()      barrier()
+>  #define smp_wmb()      barrier()
+>  #else
+> -#define smp_mb()       dmb()
+> -#define smp_rmb()      dmb()
+> -#define smp_wmb()      dmb()
+> +#define smp_mb()       dmb(ish)
+> +#define smp_rmb()      smp_mb()
+> +#define smp_wmb()      dmb(ishst)
+>  #endif
+>
+>  #define read_barrier_depends()         do { } while(0)
+> --
+> 1.8.2.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+Thanks,
+-- 
+Ming Lei
