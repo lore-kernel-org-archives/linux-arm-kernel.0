@@ -1,73 +1,29 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Fri, 21 Jun 2013 09:27:45 +0800
-Subject: [PATCH V2] USB: initialize or shutdown PHY when add or remove
- host controller
-In-Reply-To: <CADApbejTBAv0+XxkGLXuMVrLatbNurR0XBkK2gt6eQnXr+5yEA@mail.gmail.com>
-References: <20130620121749.GF9817@arwen.pp.htv.fi>
- <Pine.LNX.4.44L0.1306201319580.2063-100000@iolanthe.rowland.org>
- <CADApbejTBAv0+XxkGLXuMVrLatbNurR0XBkK2gt6eQnXr+5yEA@mail.gmail.com>
-Message-ID: <CADApbehD7tvOEAt2Dj+54on4kg7Ut553ADx74EUzjAPV19kt0g@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 20 Jun 2013 18:29:52 -0700
+Subject: [PATCH/RESEND 00/12] Convert MSM to common clock framework
+In-Reply-To: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
+References: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130621012952.GE6300@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-correct for irq. irq number is get by gludriver, while irq is
-requested by EHCO HCD.
+On 06/17, Stephen Boyd wrote:
+> Resending to collect higher level maintainer acks per Olof's request. 
+> The plan is to push this patchset through MSM to the arm-soc tree.
+> 
+> This patchset moves the existing MSM clock code and affected drivers to the
+> common clock framework. A prerequisite of moving to the common clock
+> framework is to use clk_prepare() and clk_enable() so the first
+> few patches migrate drivers to that call (clk_prepare() is a no-op on MSM
+> right now). It also removes some custom clock APIs that MSM provides
+> and finally moves the proc_comm clock code to the common struct clk.
+> 
+> This patch series will be used as the foundation of the MSM 8660/8960
+> clock code that I plan to send out after this series.
+> 
 
-On Fri, Jun 21, 2013 at 9:07 AM, Chao Xie <xiechao.mail@gmail.com> wrote:
-> On Fri, Jun 21, 2013 at 1:25 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
->> On Thu, 20 Jun 2013, Felipe Balbi wrote:
->>
->>> > In fact, the PHY setting and handling is related to platform or SOC,
->>> > and for different SOC they can
->>> > have same EHCI HCD but they PHY handling can be different.
->>> > Omap'a case is the example, and i think some other vendors may have
->>> > silimar cases.
->>> > From above point, It is better to leave the PHY initialization and
->>> > shutdown to be done by each echi-xxx driver.
->>> >
->>> > So Alan and Felipe
->>> > What are your ideas about it?
->>>
->>> If we have so many exceptions, then sure. But eventually, the common
->>> case should be added generically with a flag so that non-generic cases
->>> (like OMAP) can request to handle the PHY by themselves.
->>>
->>> Alan ?
->>
->> I don't have very strong feelings about this; Felipe has much more
->> experience with these things.
->>
->> However, when the common case is added into the core, the simplest way
->> to indicate that the HCD wants to handle the PHY(s) by itself will be
->> to leave hcd->phy set to NULL or an ERR_PTR value.
->>
->> One important thing that hasn't been pointed out yet: When we move
->> these calls into the core, the same patch must also remove those calls
->> from the glue drivers that currently do set hcd->phy.  And it must make
->> sure that the glue drivers which handle the PHY by themselves do not
->> set hcd->phy.
->>
->
-> From device point of view, EHCI is a standlone component. It has the
-> standard sepcification, so each
-> SOC vendor has EHCI HCD need to follow the standards. Then we have
-> common EHCI HCD driver.
-> The PHY is outside of EHCI component, each SOC vendor may have
-> different PHY implementation. Then
-> we have PHY driver.
-> The EHCI glue driver ehci-xxx works like a SOC depended driver. It is
-> its duty to handle the'
-> relationship between the EHCI HCD driver and PHY driver.
-> It is same as clk, irq requested by ehci-xxx driver.
->
-> So i think add a flag and use usb_get_phy() is not very good.
-> It is bette to make ehci-xxx to do the phy getting and EHCI HCD
-> initialize it and shut down as the patch did, or let ehci-xxx to
-> handle the PHY as Roger said.
->
-> Based on the generic work is not too much, and does not look so
-> meaningful. I suggest that let to echi-xxx
-> do it.
->
->> Alan Stern
->>
+David, can you pick this up and send it off to arm-soc now?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
