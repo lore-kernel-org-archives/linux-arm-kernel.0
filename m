@@ -1,31 +1,26 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 21 Jun 2013 16:19:16 +0530
-Subject: [PATCH] dmaengine: Add hisilicon k3 DMA engine driver
-In-Reply-To: <3686094.n3OCaPGG8M@wuerfel>
-References: <1371444872-26994-1-git-send-email-zhangfei.gao@linaro.org>
- <201306181609.14966.arnd@arndb.de> <51C06D19.3020304@linaro.org>
- <3686094.n3OCaPGG8M@wuerfel>
-Message-ID: <20130621104916.GI23141@intel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 21 Jun 2013 12:28:32 +0100
+Subject: [PATCH v12 09/11] spi: omap2-mcspi: convert to
+ dma_request_slave_channel_compat()
+In-Reply-To: <51C42CFF.10002@ti.com>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <1371762407-24544-10-git-send-email-joelagnel@ti.com>
+ <51C42A71.1090403@ti.com> <51C42CFF.10002@ti.com>
+Message-ID: <20130621112832.GS27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 05:08:01PM +0200, Arnd Bergmann wrote:
-> On Tuesday 18 June 2013 22:22:17 zhangfei wrote:
-> > > With no need to have a filter function.
-> > 
-> > Cool, then I would like to wait for the patch.
-> 
-> Maybe you can try to add the dma_get_slave_channel() function I proposed here
-> as a first patch and add your driver on top. There may be issues I missed,
-> and Vinod needs to agree to the concept first, but that would probably
-> get his attention.
-You have it now :)
+On Fri, Jun 21, 2013 at 04:07:51PM +0530, Sekhar Nori wrote:
 
+> We can resend the patch if you don't have it from the mailing list.
 
-> 
-> Or you could send your the new interface as an add-on patch
-> and convert your driver along with adding it.
-patch is always welcome
-
---
-~Vinod
+I'll probably have it assuming it's been sent to some mailing list I
+read (the CC list here looks absurldy large...) but if you don't send me
+the patch and/or ignore bounces then it's going to take longer.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/b32a791d/attachment.sig>
