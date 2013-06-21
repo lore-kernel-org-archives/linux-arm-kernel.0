@@ -1,66 +1,75 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Fri, 21 Jun 2013 05:59:50 +0000
-Subject: linux-next: manual merge of the arm-soc tree with the mfd tree
-In-Reply-To: <20130621155408.7e4a4c891ff4d74627b57a45@canb.auug.org.au>
-References: <20130621155408.7e4a4c891ff4d74627b57a45@canb.auug.org.au>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73E9DF042@DBDE04.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Jun 2013 23:01:31 -0700
+Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
+In-Reply-To: <87obb1b5ow.fsf@lebrac.rtp-net.org>
+References: <CACVXFVNzAMrkhrAMAmQ7ZdJdby2O4VdoD8BVHRF-O=rPKQMqbw@mail.gmail.com>
+ <51BEBDCD.3060104@ti.com> <87ppvlqhyy.fsf@lebrac.rtp-net.org>
+ <20130617082458.GH20992@atomide.com>
+ <87li69qdcs.fsf@lebrac.rtp-net.org>
+ <20130617102650.GK20992@atomide.com>
+ <20130618112701.GO5523@atomide.com>
+ <8761xaqvrn.fsf@lebrac.rtp-net.org>
+ <20130619095837.GY5523@atomide.com>
+ <87obb1b5ow.fsf@lebrac.rtp-net.org>
+Message-ID: <20130621060131.GH5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi all,
+* Arnaud Patard <arnaud.patard@rtp-net.org> [130620 00:36]:
+> Tony Lindgren <tony@atomide.com> writes:
 > 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/boot/dts/am33xx.dtsi between commit a82279dd6d3e ("arm:
-> am33xx:
-> add TSC/ADC mfd device support") from the mfd tree and commit
-> 15e8246bd61b ("ARM: dts: AM33XX: Add ELM node") from the arm-soc tree.
+> Hi,
 > 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+> > * Arnaud Patard <arnaud.patard@rtp-net.org> [130619 02:52]:
+> >> Tony Lindgren <tony@atomide.com> writes:
+> >> 
+> >> Hi,
+> >> 
+> >> > * Tony Lindgren <tony@atomide.com> [130617 03:32]:
+> >> >> * Arnaud Patard <arnaud.patard@rtp-net.org> [130617 02:52]:
+> >> >> > Tony Lindgren <tony@atomide.com> writes:
+> >> >> > 
+> >> >> > I understand your concerns but, please, cope with reality: the clock
+> >> >> > work is not in -next so this tends to make me think it won't reach
+> >> >> > 3.11. We're at -rc6 after all. Telling users that their system doesn't
+> >> >> > have any network because it was easier to maintain, is not something
+> >> >> > they will understand imho.
+> >> >> 
+> >> >> Right, like I said: the idea is to have it usable with DT. And USB and
+> >> >> Ethernet certainly are part of what I call usable. So is MMC, WLAN and
+> >> >> DSS. I've certainly spent quite a bit of time on making sure panda works
+> >> >> with DT, and I can assure you that fixing the USB extclock is easier than
+> >> >> supporting the legacy boot with DT :)
+> >> >> 
+> >> >> This issue can also be fixed with a clock alias if we don't have DT
+> >> >> defined clocks ready for v3.11. It may take a few days for us to have
+> >> >> the solution. But get getting a clock to a driver certainly is not a
+> >> >> showstopper here. After all, that's what all drivers already do.
+> >> >
+> >> > Care to test the last patch just posted by Roger in thread
+> >> > " [PATCH 0/4] ARM: OMAP4: Panda USB Host support and DVI EDID fix"?
+> >> 
+> >> I tried to test them but they don't apply on linux-next due to some
+> >> pinctrl changes probably missing:
+> >> Error: arch/arm/boot/dts/omap4-panda-common.dtsi:177.14-15 syntax error
+> >> 
+> >> which corresponds to :
+> >> 0x82 (PIN_INPUT_PULLDOWN | MUX_MODE4)
+> >
+> > Oops, right, that's in Benoit's branch too for the .dts preprocessing.
+> > Until it is merged, maybe try with Roger's earlier version of that patch
+> > that did not yet use the macros?
+> >  
 > 
-> --
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc arch/arm/boot/dts/am33xx.dtsi
-> index 37ef320,0d4df90..0000000
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@@ -404,24 -494,14 +494,32 @@@
->   			ti,hwmods = "wkup_m3";
->   		};
-> 
->  +		tscadc: tscadc at 44e0d000 {
->  +			compatible = "ti,am3359-tscadc";
->  +			reg = <0x44e0d000 0x1000>;
->  +			interrupt-parent = <&intc>;
->  +			interrupts = <16>;
->  +			ti,hwmods = "adc_tsc";
->  +			status = "disabled";
->  +
->  +			tsc {
->  +				compatible = "ti,am3359-tsc";
->  +			};
->  +			am335x_adc: adc {
->  +				#io-channel-cells = <1>;
->  +				compatible = "ti,am3359-adc";
->  +			};
->  +
->  +		};
->  +
-> + 		elm: elm at 48080000 {
-> + 			compatible = "ti,am3352-elm";
-> + 			reg = <0x48080000 0x2000>;
-> + 			interrupts = <4>;
-> + 			ti,hwmods = "elm";
-> + 			status = "disabled";
-> + 		};
-> +
-[Pekon]: Thanks.. Yes this is ok based on commit "15e8246bd61b ("ARM: dts: AM33XX: Add ELM node")
+> Right. I've changed the missing macros with their values and now, it
+> compiles and I can even ping the board, so works for me.
 
+Good to hear thanks. Sounds like we should have things mostly working
+with DT in mainline kernel by v3.11-rc1. I'm sure some minor fixes
+will be needed as more people start using it, but they should be
+all fixable either by binding changes, or by initializing missing things
+using platform data.
 
->   		gpmc: gpmc at 50000000 {
->   			compatible = "ti,am3352-gpmc";
->   			ti,hwmods = "gpmc";
+Regards,
 
-with regards, pekon
+Tony
