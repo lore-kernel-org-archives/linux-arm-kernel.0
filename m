@@ -1,18 +1,89 @@
-From: dsd@laptop.org (Daniel Drake)
-Date: Fri, 21 Jun 2013 11:13:03 -0600
-Subject: [V2 4/7] video: mmp: fix memcpy wrong size for mmp_addr issue
-In-Reply-To: <1370879562-11342-1-git-send-email-jtzhou@marvell.com>
-References: <1370879562-11342-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <CAMLZHHQL+TmwA1pYOsHp8E=B4q3D65O=0F=pQWfmxBuQwDbS=w@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 21 Jun 2013 13:12:38 -0400
+Subject: [PATCH] of: Specify initrd location using 64-bit
+In-Reply-To: <51C40D78.4040603@imgtec.com>
+References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
+ <51C3D8E7.5030601@synopsys.com> <51C40D78.4040603@imgtec.com>
+Message-ID: <51C48986.6080602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 9:52 AM, Jett.Zhou <jtzhou@marvell.com> wrote:
-> From: Jing Xiang <jxiang@marvell.com>
->
-> Memcpy used wrong struct of mmp_win, fix it.
->
-> Signed-off-by: Jing Xiang <jxiang@marvell.com>
-> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+Vineet, James,
 
-Reviewed-by: Daniel Drake <dsd@laptop.org>
+On Friday 21 June 2013 04:23 AM, James Hogan wrote:
+> On 21/06/13 05:39, Vineet Gupta wrote:
+>> Hi Santosh,
+>>
+>> On 06/21/2013 06:22 AM, Santosh Shilimkar wrote:
+>>> Cc: Vineet Gupta <vgupta@synopsys.com>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Cc: Mark Salter <msalter@redhat.com>
+>>> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
+>>> Cc: James Hogan <james.hogan@imgtec.com>
+>>> Cc: Michal Simek <monstr@monstr.eu>
+>>> Cc: Ralf Baechle <ralf@linux-mips.org>
+>>> Cc: Jonas Bonn <jonas@southpole.se>
+>>> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+>>> Cc: Paul Mackerras <paulus@samba.org>
+>>> Cc: x86 at kernel.org
+>>> Cc: arm at kernel.org
+>>> Cc: Chris Zankel <chris@zankel.net>
+>>> Cc: Max Filippov <jcmvbkbc@gmail.com>
+>>> Cc: Grant Likely <grant.likely@linaro.org>
+>>> Cc: Rob Herring <rob.herring@calxeda.com>
+>>> Cc: bigeasy at linutronix.de
+>>> Cc: robherring2 at gmail.com
+>>> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+>>>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-c6x-dev at linux-c6x.org
+>>> Cc: linux-mips at linux-mips.org
+>>> Cc: linuxppc-dev at lists.ozlabs.org
+>>> Cc: linux-xtensa at linux-xtensa.org
+>>> Cc: devicetree-discuss at lists.ozlabs.org
+>>>
+>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> ---
+>>>  arch/arc/mm/init.c            |    3 +--
+>>>  arch/arm/mm/init.c            |    2 +-
+>>>  arch/arm64/mm/init.c          |    3 +--
+>>>  arch/c6x/kernel/devicetree.c  |    3 +--
+>>>  arch/metag/mm/init.c          |    3 +--
+>>>  arch/microblaze/kernel/prom.c |    3 +--
+>>>  arch/mips/kernel/prom.c       |    3 +--
+>>>  arch/openrisc/kernel/prom.c   |    3 +--
+>>>  arch/powerpc/kernel/prom.c    |    3 +--
+>>>  arch/x86/kernel/devicetree.c  |    3 +--
+>>>  arch/xtensa/kernel/setup.c    |    3 +--
+>>>  drivers/of/fdt.c              |   10 ++++++----
+>>>  include/linux/of_fdt.h        |    3 +--
+>>>  13 files changed, 18 insertions(+), 27 deletions(-)
+>>>
+>>> diff --git a/arch/arc/mm/init.c b/arch/arc/mm/init.c
+>>> index 4a17736..3640c74 100644
+>>> --- a/arch/arc/mm/init.c
+>>> +++ b/arch/arc/mm/init.c
+>>> @@ -157,8 +157,7 @@ void __init free_initrd_mem(unsigned long start, unsigned long end)
+>>>  #endif
+>>>  
+>>>  #ifdef CONFIG_OF_FLATTREE
+>>> -void __init early_init_dt_setup_initrd_arch(unsigned long start,
+>>> -					    unsigned long end)
+>>> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
+>>>  {
+>>>  	pr_err("%s(%lx, %lx)\n", __func__, start, end);
+>>>  }
+>>
+>> To avoid gcc warnings, you need to fix the print format specifiers too.
+> 
+> The same thing goes for arch/metag too.
+> 
+Will update that in next version based on what we will end
+after the dicussion. i.e u64 or phys_addr_t
+
+Thanks for comments.
+
+Regards,
+Santosh
