@@ -1,61 +1,92 @@
-From: agnel.joel@gmail.com (Joel A Fernandes)
-Date: Fri, 21 Jun 2013 09:20:01 -0500
-Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
-In-Reply-To: <201306211600.04986.arnd@arndb.de>
-References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
- <51C427E1.2000800@ti.com>
- <CAD=GYpb54bitcg0gnfhzxbvig3etRPY6fs=FOQu5nYkio5NRZw@mail.gmail.com>
- <201306211600.04986.arnd@arndb.de>
-Message-ID: <CAD=GYpZ_5Lp1La=f+2BQfmuj+sc3FgygZRD4gfj4JGGZ0Do=_Q@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 21 Jun 2013 16:23:04 +0200
+Subject: [PATCH v3 4/4] ARM: dts: mvebu: Introduce a new compatible string
+ for mv64xxx-i2c
+In-Reply-To: <51C46001.30500@gmail.com>
+References: <1371821529-13791-1-git-send-email-gregory.clement@free-electrons.com>
+ <1371821529-13791-5-git-send-email-gregory.clement@free-electrons.com>
+ <20130621140707.GO31667@titan.lakedaemon.net> <51C46001.30500@gmail.com>
+Message-ID: <51C461C8.9050904@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 9:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 21 June 2013, Joel A Fernandes wrote:
->> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> >> index b1c66a4..7d58cd9 100644
->> >> --- a/arch/arm/Kconfig
->> >> +++ b/arch/arm/Kconfig
->> >> @@ -841,6 +841,7 @@ config ARCH_DAVINCI
->> >>       select HAVE_IDE
->> >>       select NEED_MACH_GPIO_H
->> >>       select TI_PRIV_EDMA
->> >> +     select DMADEVICES
->> >
->> > It is generally a bad idea to force select on something that can be
->> > enabled using menuconfig. Unless used carefully, select causes "unmet
->> > direct dependency" warnings which folks are already fighting hard to
->> > fix. This leads to what Russell referred in the past as "select madness" [1]
+On 06/21/2013 04:15 PM, Sebastian Hesselbarth wrote:
+> On 06/21/13 16:07, Jason Cooper wrote:
+>> On Fri, Jun 21, 2013 at 03:32:09PM +0200, Gregory CLEMENT wrote:
+>>> The mv64xxx-i2c embedded in the Armada XP have a new feature to
+>>> offload i2c transaction. This new version of the IP come also with
+>>> some errata. This lead to the introduction to a another compatible
+>>> string.
+>>>
+>>> This commit split the i2c information into armada-370.dtsi and
+>>> armada-xp.dtsi. Most of the data remains the same and stay in the
+>>> common file Armada-370-xp.dtsi. With this new feature the size of the
+>>> registers are bigger for Armada XP and the new compatible string is
+>>> used.
+>>>
+>>> The Device Tree binding documentation is updated accordingly.
+>>>
+>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>> ---
+>>>   Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 13 ++++++++++++-
+>>>   arch/arm/boot/dts/armada-370-xp.dtsi                  |  2 --
+>>>   arch/arm/boot/dts/armada-370.dtsi                     |  8 ++++++++
+>>>   arch/arm/boot/dts/armada-xp.dtsi                      | 10 ++++++++++
+>>>   4 files changed, 30 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+>>> index a1ee681..ce7af6a 100644
+>>> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+>>> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+>>> @@ -4,7 +4,8 @@
+>>>   Required properties :
+>>>
+>>>    - reg             : Offset and length of the register set for the device
+>>> - - compatible      : Should be "marvell,mv64xxx-i2c"
+>>> + - compatible      : Should be "marvell,mv64xxx-i2c" and "marvell,mv7230-i2c"
+>>> +for controller which support the I2C Transaction Generator
+> 
+> Jason, Gregory,
+> 
+> Also, s/mv7230/mv78230/
+
+You are right, thanks for both of you to notice it.
+
+> 
+> from a quick check of the patch set (which you forgot to send to LKML)
+> I am wondering why you didn't update the of matches struct with the new
+> compatible for "marvell,mv78230-i2c"? This will save you from still
+> having "marvell,mv64xxx-i2c" as additional compatible to match device
+> and driver. With that the above should also be s/and/or/.
+
+>From my point of view it is more an extension than an other kind of controller like
+the one embedded in the AllWinner SoCs. So I thought it was more in the spirit of
+the way you describe hardware in the device tree, but I am far for being an expert
+so I maybe wrong.
+
+> 
+>>>    - interrupts      : The interrupt number
+>>>
+>>>   Optional properties :
+>>> @@ -20,3 +21,13 @@ Examples:
+>>>   		interrupts = <29>;
+>>>   		clock-frequency = <100000>;
+>>>   	};
+>>> +
+>>> +For a controller which support the I2C Transaction Generator:
+>>> +
+>>> +	i2c at 11000 {
+>>> +		compatible = "marvell,mv64xxx-i2c", "marvell,mv78230-i2c";
+>>> +		reg = <0x11000 0x100>;
+>>> +		compatible = "marvell,mv64xxx-i2c";
 >>
->> Are you concerned with bloat issues? I know your point of view but the idea
->> was to build these options by default for these platforms even though
->> in some cases
->> it might not be used. I have seen folks including myself select the wrong
->> option. Having the build system automatically select the correct option for the
->> most common cases can be very useful I feel and not require manual
->> configuration.
->
-> For defaults, you should use the defconfig, not 'select' in Kconfig.
->
-> A lot of the 'select' statements are actually wrong because they
-> do not take dependencies into account where A selects B but not C,
-> and B depends on C, which leads to broken builds when C is disabled
-> by a user (or randconfig).
+>> extra compatible line.  If there's nothing else, I'll fix this up when I
+>> pull it in.
+> 
 
-I haven't come across this problem but- are you saying there is a
-shortcoming in Kbuild/Kconfig that selects an option even if its
-dependency is not met?
 
-The problem with defconfig is also too many options I feel for a common case.
-CONFIG_DMADEVICES=y
-CONFIG_TI_EDMA=y
-
-Most if not all future OMAPs from will use EDMA. Why not we can be
-explicit about it and just built it in anyway. If ARCH_OMAP and
-DMADEVICES are selected, then we can just build EDMA in by default.
-
-I agree maybe the option can be dropped from Davinci but I suggest
-let's keep it for OMAP. Is that ok?
-
-Thanks,
-Joel
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
