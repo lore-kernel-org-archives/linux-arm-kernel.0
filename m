@@ -1,50 +1,58 @@
-From: agnel.joel@gmail.com (Joel A Fernandes)
-Date: Fri, 21 Jun 2013 16:53:57 -0500
-Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
-In-Reply-To: <201306212044.26677.arnd@arndb.de>
-References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
- <201306211632.12577.arnd@arndb.de>
- <CAD=GYpbhBAaSkMtcJaPtVpWar7AcW37QpAk3A0qgwX6G5PDoZg@mail.gmail.com>
- <201306212044.26677.arnd@arndb.de>
-Message-ID: <CAD=GYpY4koXd9f6_ijQfDHsiULD4d53cdu=9X421WXSAit_YQg@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 21 Jun 2013 15:58:14 -0600
+Subject: [PATCH v1 09/12] input: matrix-keypad: add binary column encoding
+In-Reply-To: <1371838198-7327-10-git-send-email-gsi@denx.de>
+References: <1371838198-7327-1-git-send-email-gsi@denx.de>
+ <1371838198-7327-10-git-send-email-gsi@denx.de>
+Message-ID: <51C4CC76.70501@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 06/21/2013 12:09 PM, Gerhard Sittig wrote:
+> introduce support to optionally run a binary column address bit pattern
+> on column GPIO pins in contrast to the formerly assumed one-out-of-N approach
 
-On Fri, Jun 21, 2013 at 1:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 21 June 2013, Joel A Fernandes wrote:
->> I think we are talking about different things, I agree the 'select
->> DMADEVICES' can be dropped but lets please keep the default y option
->> (not adding new select statements, just saying that if someone select
->> DMADEVICES in menuconfig and if they're ARCH_OMAP=1 , then default to
->> EDMA). This will simply allow people to have a default. Thanks.
->
-> Yes, that's ok.
+> diff --git a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
 
-Ok, thanks. I will follow up with a patch in my next submissions that builds it.
+> +The driver assumes that each row and column line of the keypad matrix is
 
-Perhaps a:
-default y if 'ARCH_OMAP2PLUS'
+Here, I would definitely:
 
-and leave the existing as it is...
-default n if  'ARCH_DAVINCI || ARCH_OMAP1 || ARCH_OMAP2'
+s/The driver/This binding/.
 
-would make most sense to me. Basically EDMA is seen on current and all
-new OMAP2PLUS.
+> +connected to a specific GPIO pin.  Alternatively column addresses can get
+> +encoded in binary form to reduce the number of GPIO pins involved, at the
+> +cost of adding an external decoder which translates the binary pattern of N
+> +GPIO coloumn pins into one of 2**N column lines of the matrix.  A mere
 
->
-> config TI_EDMA
->         tristate "TI EDMA support"
->         default m if 'ARCH_DAVINCI || ARCH_OMAP1 || ARCH_OMAP2
->         select DMA_ENGINE
->         select DMA_VIRTUAL_CHANNELS
+s/coloumn/column/
 
+> +circuit of two inverting open collector drivers in series connected to one
+> +output pin is a special case of this generic decoder approach.  Such a
+> +decoder may be desirable since it's cheap and protects the SoC from damage
+> +by unwanted interaction of signals when any combination of multiple keys
+> +gets pressed, regardless of the software's operating the column GPIO pins.
+> +The row GPIO pins won't interfere either since they all are inputs.
 
+I'm not sure it's worth mentioning that; it presumably makes no semantic
+difference to how SW interfaces to the HW this binding describes.
 
-MMC depends on EDMA specially on AM33xx there's no PIO mode AFAIK. The
-'m' option will require some initramfs to load the module when needing
-to MMC boot, I suggest lets leave it as y.
+> +- col-gpios-binary:	boolean, switches from the 'one GPIO pin for each
+> +			column' approach to the 'n GPIO pins to address
+> +			2**n columns' approach (binary encoding of column
+> +			addresses in contrast to a one-out-of-many pattern
+> +			for the column GPIO pins)
 
-Thanks,
-Joel
+Thinking about the keypad,num-rows/keypad,num-columns properties from
+the previous patch, "num" might not be enough to describe all HW. "num"
+assumes that the decoder outputs 0..num-1 are used and that num..N-1 are
+not. What if the unused decoder outputs are 0..(N-num-1)? Instead, it
+may be better to define a property col-values-mask, with one bit set for
+each valid/useful integer value to be output on the column GPIOs?
+
+BTW, I think some of the new properties in either/both these patches and
+the original matrix-keypad binding doc are prefixed with "keypad," and
+some not. It would be best to be consistent. Given these properties are
+specific to this one binding, rather than some kind of generic
+infra-structure, having the prefix on as many properties as possible
+seems correct to me.
