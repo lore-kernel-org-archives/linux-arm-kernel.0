@@ -1,264 +1,79 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 21 Jun 2013 17:17:36 +0200
-Subject: [PATCH] ARM: at91: fix at91_extern_irq usage for non-dt boards
-Message-ID: <1371827856-19898-1-git-send-email-nicolas.ferre@atmel.com>
+From: lho@apm.com (Loc Ho)
+Date: Fri, 21 Jun 2013 08:29:27 -0700
+Subject: [PATCH V3 1/4] arm64: Add Kconfig option for APM X-Gene SOC family
+In-Reply-To: <20130621140719.GA8384@darko.cambridge.arm.com>
+References: <1366794420-17849-1-git-send-email-vkale@apm.com>
+ <1366794420-17849-2-git-send-email-vkale@apm.com>
+ <20130621093656.GB4099@arm.com>
+ <CAPrCYkc-=-no+TpHb8XMQYFoyqCJoXe9RR1-jazxCCNeFQ12Yw@mail.gmail.com>
+ <20130621140719.GA8384@darko.cambridge.arm.com>
+Message-ID: <CAPw-ZT=RzEVRDbkhuHYD7GbRnxdSBvd+SpvZv=PK0sJSMu-uLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Hi,
 
-Since 4b68520dc0ec96153bc0d87bca5ffba508edfcf
-ARM: at91: add AIC5 support
+Yes... We will do the same if there is no concern with the growing
+number of drivers.
 
-we allocate the at91_extern_irq.
+-Loc
 
-This patch makes it static and stores the non-dt extern irq in the soc
-structure. It is then possible to use a at91_get_extern_irq() function
-to get the value for outside of the irq driver. It is useful for passing
-its value to at91_aic_init().
-
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-[nicolas.ferre at atmel.com: rework commit message]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/at91rm9200.c  | 8 ++++----
- arch/arm/mach-at91/at91sam9260.c | 4 ++--
- arch/arm/mach-at91/at91sam9261.c | 4 ++--
- arch/arm/mach-at91/at91sam9263.c | 2 +-
- arch/arm/mach-at91/at91sam9g45.c | 2 +-
- arch/arm/mach-at91/at91sam9rl.c  | 2 +-
- arch/arm/mach-at91/at91x40.c     | 7 +++----
- arch/arm/mach-at91/generic.h     | 2 +-
- arch/arm/mach-at91/irq.c         | 9 ++++++++-
- arch/arm/mach-at91/pm.c          | 2 +-
- arch/arm/mach-at91/setup.c       | 2 +-
- arch/arm/mach-at91/soc.h         | 1 +
- 12 files changed, 26 insertions(+), 19 deletions(-)
-
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index d193a40..9eb5743 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -332,10 +332,6 @@ static void __init at91rm9200_initialize(void)
- {
- 	arm_pm_idle = at91rm9200_idle;
- 	arm_pm_restart = at91rm9200_restart;
--	at91_extern_irq = (1 << AT91RM9200_ID_IRQ0) | (1 << AT91RM9200_ID_IRQ1)
--			| (1 << AT91RM9200_ID_IRQ2) | (1 << AT91RM9200_ID_IRQ3)
--			| (1 << AT91RM9200_ID_IRQ4) | (1 << AT91RM9200_ID_IRQ5)
--			| (1 << AT91RM9200_ID_IRQ6);
- 
- 	/* Initialize GPIO subsystem */
- 	at91_gpio_init(at91rm9200_gpio,
-@@ -388,6 +384,10 @@ static unsigned int at91rm9200_default_irq_priority[NR_AIC_IRQS] __initdata = {
- AT91_SOC_START(at91rm9200)
- 	.map_io = at91rm9200_map_io,
- 	.default_irq_priority = at91rm9200_default_irq_priority,
-+	.extern_irq = (1 << AT91RM9200_ID_IRQ0) | (1 << AT91RM9200_ID_IRQ1)
-+		    | (1 << AT91RM9200_ID_IRQ2) | (1 << AT91RM9200_ID_IRQ3)
-+		    | (1 << AT91RM9200_ID_IRQ4) | (1 << AT91RM9200_ID_IRQ5)
-+		    | (1 << AT91RM9200_ID_IRQ6),
- 	.ioremap_registers = at91rm9200_ioremap_registers,
- 	.register_clocks = at91rm9200_register_clocks,
- 	.init = at91rm9200_initialize,
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index a8ce245..5de6074 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -348,8 +348,6 @@ static void __init at91sam9260_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
--	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
--			| (1 << AT91SAM9260_ID_IRQ2);
- 
- 	/* Register GPIO subsystem */
- 	at91_gpio_init(at91sam9260_gpio, 3);
-@@ -400,6 +398,8 @@ static unsigned int at91sam9260_default_irq_priority[NR_AIC_IRQS] __initdata = {
- AT91_SOC_START(at91sam9260)
- 	.map_io = at91sam9260_map_io,
- 	.default_irq_priority = at91sam9260_default_irq_priority,
-+	.extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
-+		    | (1 << AT91SAM9260_ID_IRQ2),
- 	.ioremap_registers = at91sam9260_ioremap_registers,
- 	.register_clocks = at91sam9260_register_clocks,
- 	.init = at91sam9260_initialize,
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 25efb5a..0e07932 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -290,8 +290,6 @@ static void __init at91sam9261_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
--	at91_extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 << AT91SAM9261_ID_IRQ1)
--			| (1 << AT91SAM9261_ID_IRQ2);
- 
- 	/* Register GPIO subsystem */
- 	at91_gpio_init(at91sam9261_gpio, 3);
-@@ -342,6 +340,8 @@ static unsigned int at91sam9261_default_irq_priority[NR_AIC_IRQS] __initdata = {
- AT91_SOC_START(at91sam9261)
- 	.map_io = at91sam9261_map_io,
- 	.default_irq_priority = at91sam9261_default_irq_priority,
-+	.extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 << AT91SAM9261_ID_IRQ1)
-+		    | (1 << AT91SAM9261_ID_IRQ2),
- 	.ioremap_registers = at91sam9261_ioremap_registers,
- 	.register_clocks = at91sam9261_register_clocks,
- 	.init = at91sam9261_initialize,
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index f44ffd2..6ce7d18 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -327,7 +327,6 @@ static void __init at91sam9263_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
--	at91_extern_irq = (1 << AT91SAM9263_ID_IRQ0) | (1 << AT91SAM9263_ID_IRQ1);
- 
- 	/* Register GPIO subsystem */
- 	at91_gpio_init(at91sam9263_gpio, 5);
-@@ -378,6 +377,7 @@ static unsigned int at91sam9263_default_irq_priority[NR_AIC_IRQS] __initdata = {
- AT91_SOC_START(at91sam9263)
- 	.map_io = at91sam9263_map_io,
- 	.default_irq_priority = at91sam9263_default_irq_priority,
-+	.extern_irq = (1 << AT91SAM9263_ID_IRQ0) | (1 << AT91SAM9263_ID_IRQ1),
- 	.ioremap_registers = at91sam9263_ioremap_registers,
- 	.register_clocks = at91sam9263_register_clocks,
- 	.init = at91sam9263_initialize,
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 8b7fce0..fda5026 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -374,7 +374,6 @@ static void __init at91sam9g45_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9g45_restart;
--	at91_extern_irq = (1 << AT91SAM9G45_ID_IRQ0);
- 
- 	/* Register GPIO subsystem */
- 	at91_gpio_init(at91sam9g45_gpio, 5);
-@@ -425,6 +424,7 @@ static unsigned int at91sam9g45_default_irq_priority[NR_AIC_IRQS] __initdata = {
- AT91_SOC_START(at91sam9g45)
- 	.map_io = at91sam9g45_map_io,
- 	.default_irq_priority = at91sam9g45_default_irq_priority,
-+	.extern_irq = (1 << AT91SAM9G45_ID_IRQ0),
- 	.ioremap_registers = at91sam9g45_ioremap_registers,
- 	.register_clocks = at91sam9g45_register_clocks,
- 	.init = at91sam9g45_initialize,
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index f77fae5..d4ec0d9 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -293,7 +293,6 @@ static void __init at91sam9rl_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
--	at91_extern_irq = (1 << AT91SAM9RL_ID_IRQ0);
- 
- 	/* Register GPIO subsystem */
- 	at91_gpio_init(at91sam9rl_gpio, 4);
-@@ -344,6 +343,7 @@ static unsigned int at91sam9rl_default_irq_priority[NR_AIC_IRQS] __initdata = {
- AT91_SOC_START(at91sam9rl)
- 	.map_io = at91sam9rl_map_io,
- 	.default_irq_priority = at91sam9rl_default_irq_priority,
-+	.extern_irq = (1 << AT91SAM9RL_ID_IRQ0),
- 	.ioremap_registers = at91sam9rl_ioremap_registers,
- 	.register_clocks = at91sam9rl_register_clocks,
- 	.init = at91sam9rl_initialize,
-diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
-index 19ca793..bad94b8 100644
---- a/arch/arm/mach-at91/at91x40.c
-+++ b/arch/arm/mach-at91/at91x40.c
-@@ -55,8 +55,6 @@ static void at91x40_idle(void)
- void __init at91x40_initialize(unsigned long main_clock)
- {
- 	arm_pm_idle = at91x40_idle;
--	at91_extern_irq = (1 << AT91X40_ID_IRQ0) | (1 << AT91X40_ID_IRQ1)
--			| (1 << AT91X40_ID_IRQ2);
- }
- 
- /*
-@@ -86,9 +84,10 @@ static unsigned int at91x40_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 
- void __init at91x40_init_interrupts(unsigned int priority[NR_AIC_IRQS])
- {
-+	u32  extern_irq = (1 << AT91X40_ID_IRQ0) | (1 << AT91X40_ID_IRQ1)
-+			| (1 << AT91X40_ID_IRQ2);
- 	if (!priority)
- 		priority = at91x40_default_irq_priority;
- 
--	at91_aic_init(priority, at91_extern_irq);
-+	at91_aic_init(priority, extern_irq);
- }
--
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 78ab065..f6de36a 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -85,4 +85,4 @@ extern void __init at91_gpio_irq_setup(void);
- extern int  __init at91_gpio_of_irq_setup(struct device_node *node,
- 					  struct device_node *parent);
- 
--extern int at91_extern_irq;
-+extern u32 at91_get_extern_irq(void);
-diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
-index e0ca591..3d192c5 100644
---- a/arch/arm/mach-at91/irq.c
-+++ b/arch/arm/mach-at91/irq.c
-@@ -232,7 +232,14 @@ static void __maybe_unused at91_aic5_eoi(struct irq_data *d)
- 	at91_aic_write(AT91_AIC5_EOICR, 0);
- }
- 
--unsigned long *at91_extern_irq;
-+static unsigned long *at91_extern_irq;
-+
-+u32 at91_get_extern_irq(void)
-+{
-+	if (!at91_extern_irq)
-+		return 0;
-+	return *at91_extern_irq;
-+}
- 
- #define is_extern_irq(hwirq) test_bit(hwirq, at91_extern_irq)
- 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 530db30..15afb5d 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -212,7 +212,7 @@ static int at91_pm_enter(suspend_state_t state)
- 			(at91_pmc_read(AT91_PMC_PCSR)
- 					| (1 << AT91_ID_FIQ)
- 					| (1 << AT91_ID_SYS)
--					| (at91_extern_irq))
-+					| (at91_get_extern_irq()))
- 				& at91_aic_read(AT91_AIC_IMR),
- 			state);
- 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 942dc00..b17fbcf 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -48,7 +48,7 @@ void __init at91_init_irq_default(void)
- void __init at91_init_interrupts(unsigned int *priority)
- {
- 	/* Initialize the AIC interrupt controller */
--	at91_aic_init(priority, at91_extern_irq);
-+	at91_aic_init(priority, at91_boot_soc.extern_irq);
- 
- 	/* Enable GPIO interrupts */
- 	at91_gpio_irq_setup();
-diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-index 43a225f..a1e1482 100644
---- a/arch/arm/mach-at91/soc.h
-+++ b/arch/arm/mach-at91/soc.h
-@@ -6,6 +6,7 @@
- 
- struct at91_init_soc {
- 	int builtin;
-+	u32 extern_irq;
- 	unsigned int *default_irq_priority;
- 	void (*map_io)(void);
- 	void (*ioremap_registers)(void);
--- 
-1.8.2.2
+On Fri, Jun 21, 2013 at 7:07 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Fri, Jun 21, 2013 at 11:43:59AM +0100, Vinayak Kale wrote:
+>> On Fri, Jun 21, 2013 at 3:06 PM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>> > Hi Vinayak,
+>> >
+>> > On Wed, Apr 24, 2013 at 10:06:57AM +0100, Vinayak Kale wrote:
+>> >> This patch adds arm64/Kconfig option for APM X-Gene SOC family.
+>> >>
+>> >> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+>> >> Signed-off-by: Loc Ho <lho@apm.com>
+>> >> Signed-off-by: Feng Kan <fkan@apm.com>
+>> >> ---
+>> >>  arch/arm64/Kconfig |    7 +++++++
+>> >>  1 files changed, 7 insertions(+), 0 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> >> index 43b0e9f..16d0198 100644
+>> >> --- a/arch/arm64/Kconfig
+>> >> +++ b/arch/arm64/Kconfig
+>> >> @@ -114,6 +114,11 @@ config ARCH_VEXPRESS
+>> >>         This enables support for the ARMv8 software model (Versatile
+>> >>         Express).
+>> >>
+>> >> +config ARCH_XGENE
+>> >> +     bool "AppliedMicro X-Gene SOC Family"
+>> >> +     help
+>> >> +       This enables support for AppliedMicro X-Gene SOC Family
+>> >> +
+>> >>  endmenu
+>> >>
+>> >>  menu "Bus support"
+>> >> @@ -153,6 +158,8 @@ config NR_CPUS
+>> >>       int "Maximum number of CPUs (2-32)"
+>> >>       range 2 32
+>> >>       depends on SMP
+>> >> +     # These have to remain sorted largest to smallest
+>> >> +     default "8" if ARCH_XGENE
+>> >>       default "4"
+>> >
+>> > For ARCH_VEXPRESS I was planning to get rid of the Kconfig entry and
+>> > just select the drivers in the defconfig file (once some other patches
+>> > get merged). Do you have any dependencies on ARCH_XGENE apart from
+>> > what's here?
+>>
+>> Apart from here, we do have dependency on ARCH_XGENE:
+>> 1) To select XGENE SoC specific dtb compilation
+>
+> We can build all of them.
+>
+>> 2) Use this to forcefully select certain platform drivers such as Clock.
+>
+> The vexpress-related clocks etc. will simply depend on ARM64 (patches
+> going upstream) and we enable them in defconfig. Can you do the same for
+> X-Gene?
+>
+> --
+> Catalin
