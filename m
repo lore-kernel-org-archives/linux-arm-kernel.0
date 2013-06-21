@@ -1,48 +1,30 @@
-From: heiko.stuebner@bqreaders.com (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Fri, 21 Jun 2013 09:34:37 +0200
-Subject: [GIT PULL] basic Rockchip support
-Message-ID: <201306210934.51624.heiko.stuebner@bqreaders.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Jun 2013 09:36:09 +0200
+Subject: linux-next: manual merge of the arm-soc tree with the mailbox tree
+In-Reply-To: <20130621071239.GM5523@atomide.com>
+References: <20130621162656.bb94e0fa8b6813781b804a73@canb.auug.org.au>
+ <CAOesGMjszju75jo6Ej6C=0-rfdPLuEj0mwmU1zYvFvYw1dyQCA@mail.gmail.com>
+ <20130621071239.GM5523@atomide.com>
+Message-ID: <201306210936.09593.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If it's not to late, please consider the following. Done on top of the needed
-timer/dw_apb_timer_of branch of arm-soc.
+On Friday 21 June 2013, Tony Lindgren wrote:
+> > I wonder if this mess is caused by the fact that I did the revert
+> > instead of rebuilding our for-next and dropping the merge in the first
+> > place.
+> > 
+> > I'll rebuild our for-next (or maybe Arnd will beat me to it) before
+> > next linux-next build, i.e. Sunday night my time.
+> 
+> Could be, especially if some of the commits are the same in the reverted
+> branch and newly merged branch as git might think that some merges have
+> been already resolved the right way earlier.
 
+I already rebuilt the arm-soc tree before Stephen started with today's
+linux-next, so I think the conflict is elsewhere.
 
-The following changes since commit 10021488997317d1121505a7ac659124c058efed:
+It's probably best if Suman Anna rebases the mailbox tree on top of
+the omap mailbox branch that I took.
 
-  clocksource: dw_apb_timer_of: use clocksource_of_init (2013-06-12 13:47:38 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.11-rockchip-basics
-
-for you to fetch changes up to d63dc0514d56e108cc96e334ca26b538263e52a2:
-
-  arm: add basic support for Rockchip RK3066a boards (2013-06-21 09:21:02 +0200)
-
-----------------------------------------------------------------
-Adds basic support for Rockchip Cortex-A9 SoCs.
-
-----------------------------------------------------------------
-Heiko Stuebner (3):
-      arm: Add basic clocks for Rockchip rk3066a SoCs
-      arm: add debug uarts for rockchip rk29xx and rk3xxx series
-      arm: add basic support for Rockchip RK3066a boards
-
- arch/arm/Kconfig                      |    2 +
- arch/arm/Kconfig.debug                |   34 +++
- arch/arm/Makefile                     |    1 +
- arch/arm/boot/dts/rk3066a-clocks.dtsi |  299 +++++++++++++++++++++++++
- arch/arm/boot/dts/rk3066a.dtsi        |  390 +++++++++++++++++++++++++++++++++
- arch/arm/include/debug/rockchip.S     |   42 ++++
- arch/arm/mach-rockchip/Kconfig        |   16 ++
- arch/arm/mach-rockchip/Makefile       |    1 +
- arch/arm/mach-rockchip/rockchip.c     |   52 +++++
- 9 files changed, 837 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3066a-clocks.dtsi
- create mode 100644 arch/arm/boot/dts/rk3066a.dtsi
- create mode 100644 arch/arm/include/debug/rockchip.S
- create mode 100644 arch/arm/mach-rockchip/Kconfig
- create mode 100644 arch/arm/mach-rockchip/Makefile
- create mode 100644 arch/arm/mach-rockchip/rockchip.c
+	Arnd
