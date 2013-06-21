@@ -1,35 +1,73 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Fri, 21 Jun 2013 10:42:10 -0700
-Subject: [PATCHv2 3/6] sched_clock: Make ARM's sched_clock generic for
- all architectures
-In-Reply-To: <20130621170523.GA14575@codeaurora.org>
-References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
- <1370155183-31421-4-git-send-email-sboyd@codeaurora.org>
- <201306211745.57528.arnd@arndb.de> <20130621170523.GA14575@codeaurora.org>
-Message-ID: <51C49072.1060700@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Jun 2013 19:58:00 +0200
+Subject: [GIT PULL 1/2] ARM: mvebu: dt changes for v3.11 (round 6!)
+In-Reply-To: <20130621164611.GT31667@titan.lakedaemon.net>
+References: <20130621164611.GT31667@titan.lakedaemon.net>
+Message-ID: <201306211958.00637.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2013 10:05 AM, Stephen Boyd wrote:
-> On 06/21, Arnd Bergmann wrote:
->> This causes build failures when doing a simple merge with the arm-soc
->> tree:
->>
->> ==> build/clps711x_defconfig/faillog <==
->> /git/arm-soc/arch/arm/mach-clps711x/common.c:37:29: fatal error: asm/sched_clock.h: No such file or directory
->>   #include <asm/sched_clock.h>
->>                               ^
->> ==> build/imx_v6_v7_defconfig/faillog <==
->> /git/arm-soc/drivers/clocksource/vf_pit_timer.c:15:29: fatal error: asm/sched_clock.h: No such file or directory
->>   #include <asm/sched_clock.h>
->>
->> How about adding back a temporary arch/arm/include/asm/sched_clock.h
->> that only contains "#include <linux/sched_clock.h>" so we can change
->> those two files after the merge and still get a bisectible history?
->>
-> Sounds fine. John can you add this patch on top?
+On Friday 21 June 2013, Jason Cooper wrote:
+> Arnd, Olof,
+> 
+> Here's the last stragglers for v3.11.  Nothing too traumatic :)
+> 
+> This does cause a merge conflict in kirkwood.dtsi with my
+> mvebu/pcie_kirkwood branch.  The resolution is to keep the changes in
+> this branch.
+> 
+> 
+> The following changes since commit 918f8f309643978b9e761f39af8962a7388d332d:
+> 
+>   ARM: Kirkwood: ts219: Enable second PCIe port in DT. (2013-06-11 16:02:08 +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/jcooper/linux.git tags/dt-3.11-6
+> 
+> for you to fetch changes up to 01db527e657d6cf646c6e6f059ad41e7023a25e7:
+> 
+>   ARM: Kirkwood: Fix the internal register ranges translation (2013-06-21 15:38:20 +0000)
+> 
+> ----------------------------------------------------------------
+> mvebu dt changes for v3.11 (round 6)
+> 
+>  - mvebu
+>     - mini-PCIe connectors on Armada 370 RD
+> 
+>  - kirkwood
+>     - correct internal register ranges translation
+> 
+> ----------------------------------------------------------------
+> Ezequiel Garcia (1):
+>       ARM: Kirkwood: Fix the internal register ranges translation
+> 
+> Thomas Petazzoni (1):
+>       arm: mvebu: enable mini-PCIe connectors on Armada 370 RD
+> 
+>  arch/arm/boot/dts/armada-370-rd.dts | 16 ++++++++++++++++
+>  arch/arm/boot/dts/kirkwood.dtsi     |  5 +++--
+>  2 files changed, 19 insertions(+), 2 deletions(-)
+> 
 
-Thanks. I've queued this and will send it on to Thomas here shortly.
+Pulled into next/dt, thanks!
 
-thanks
--john
+I got a non-obvious conflict that I resolved like this:
+
+
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@@ -30,8 -30,8 +30,9 @@@
+  
+        ocp at f1000000 {
+                compatible = "simple-bus";
+-               ranges = <0x00000000 0xf1000000 0x4000000
++               ranges = <0x00000000 0xf1000000 0x0100000
+ +                        0xe0000000 0xe0000000 0x8100000 /* PCIE */
++                         0xf4000000 0xf4000000 0x0000400
+                          0xf5000000 0xf5000000 0x0000400>;
+                #address-cells = <1>;
+                #size-cells = <1>;
+
+
+	Arnd
