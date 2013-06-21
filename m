@@ -1,23 +1,24 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 21 Jun 2013 11:48:36 -0700
-Subject: [PATCH v2 3/3] ARM: KVM: clear exclusive monitor on all
- exception returns
-In-Reply-To: <51C45B35.7030508@cogentembedded.com>
+Date: Fri, 21 Jun 2013 11:49:07 -0700
+Subject: [PATCH v2 0/3] A handful of KVM/ARM fixes
+In-Reply-To: <1371816528-25078-1-git-send-email-marc.zyngier@arm.com>
 References: <1371816528-25078-1-git-send-email-marc.zyngier@arm.com>
- <1371816528-25078-4-git-send-email-marc.zyngier@arm.com>
- <51C45B35.7030508@cogentembedded.com>
-Message-ID: <20130621184836.GB2816@lvm>
+Message-ID: <20130621184907.GC2816@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 05:55:01PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Fri, Jun 21, 2013 at 01:08:45PM +0100, Marc Zyngier wrote:
+> This is a small patch series that I accumulated while tracking what
+> turned out to be an unrelated issue.
 > 
-> On 21-06-2013 16:08, Marc Zyngier wrote:
+> The first patch has already been posted a while ago and included here
+> for completeness. The others are fairly simple missing barriers/clear
+> exclusives that are actually required.
 > 
-> >Make sure we clear the exclusive movitor on all exception returns,
+> This has been tested on TC2, and is also available in my tree:
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm/fixes-3.10-rc6
 > 
->    Only "monitor". Perhaps a committer could fix...
-> 
-fixed,
+Applied with the minor fixes addressed on the individual patch mails.
+
+Thanks,
 -Christoffer
