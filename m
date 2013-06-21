@@ -1,96 +1,102 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Jun 2013 10:56:29 -0400
-Subject: [PATCH v3 4/4] ARM: dts: mvebu: Introduce a new compatible
- string for mv64xxx-i2c
-In-Reply-To: <51C46001.30500@gmail.com>
-References: <1371821529-13791-1-git-send-email-gregory.clement@free-electrons.com>
- <1371821529-13791-5-git-send-email-gregory.clement@free-electrons.com>
- <20130621140707.GO31667@titan.lakedaemon.net>
- <51C46001.30500@gmail.com>
-Message-ID: <20130621145629.GQ31667@titan.lakedaemon.net>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 21 Jun 2013 10:58:21 -0400
+Subject: [PATCH 0/5] Kernel mode NEON for XOR and RAID6
+In-Reply-To: <CAKv+Gu8FTXC9XSE4DJ2LQueJ3FKjdjv8=sjDjTETH7fq+ruNGQ@mail.gmail.com>
+References: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20130606151705.GG16794@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1306061156330.18597@syhkavp.arg>
+ <20130607175007.GH8111@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1306072214120.18597@syhkavp.arg>
+ <20130621093311.GD6983@mudshark.cambridge.arm.com>
+ <CAKv+Gu8FTXC9XSE4DJ2LQueJ3FKjdjv8=sjDjTETH7fq+ruNGQ@mail.gmail.com>
+Message-ID: <51C46A0D.8070505@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 04:15:29PM +0200, Sebastian Hesselbarth wrote:
-> On 06/21/13 16:07, Jason Cooper wrote:
-> >On Fri, Jun 21, 2013 at 03:32:09PM +0200, Gregory CLEMENT wrote:
-> >>The mv64xxx-i2c embedded in the Armada XP have a new feature to
-> >>offload i2c transaction. This new version of the IP come also with
-> >>some errata. This lead to the introduction to a another compatible
-> >>string.
-> >>
-> >>This commit split the i2c information into armada-370.dtsi and
-> >>armada-xp.dtsi. Most of the data remains the same and stay in the
-> >>common file Armada-370-xp.dtsi. With this new feature the size of the
-> >>registers are bigger for Armada XP and the new compatible string is
-> >>used.
-> >>
-> >>The Device Tree binding documentation is updated accordingly.
-> >>
-> >>Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >>---
-> >>  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 13 ++++++++++++-
-> >>  arch/arm/boot/dts/armada-370-xp.dtsi                  |  2 --
-> >>  arch/arm/boot/dts/armada-370.dtsi                     |  8 ++++++++
-> >>  arch/arm/boot/dts/armada-xp.dtsi                      | 10 ++++++++++
-> >>  4 files changed, 30 insertions(+), 3 deletions(-)
-> >>
-> >>diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> >>index a1ee681..ce7af6a 100644
-> >>--- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> >>+++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> >>@@ -4,7 +4,8 @@
-> >>  Required properties :
-> >>
-> >>   - reg             : Offset and length of the register set for the device
-> >>- - compatible      : Should be "marvell,mv64xxx-i2c"
-> >>+ - compatible      : Should be "marvell,mv64xxx-i2c" and "marvell,mv7230-i2c"
-> >>+for controller which support the I2C Transaction Generator
+Hi Ard,
+
+On 06/21/2013 06:08 AM, Ard Biesheuvel wrote:
+> On 21 June 2013 11:33, Will Deacon <will.deacon@arm.com> wrote:
+>> On Sat, Jun 08, 2013 at 04:09:56AM +0100, Nicolas Pitre wrote:
+>>> On Fri, 7 Jun 2013, Will Deacon wrote:
+>>>> What's the earliest toolchain we claim to support nowadays? If that can't
+>>>> deal with the intrinsics then we either need to bump the requirement, or
+>>>> write this using hand-coded asm. In the case of the latter, I don't think
+>>>> the maintenance overhead of having two implementations is worth it.
+>>>
+>>> We have many different minimum toolchain version requirements attached
+>>> to different features being enabled already, ftrace being one of them if
+>>> I remember correctly.  For these Neon optimizations the minimum gcc
+>>> version is v4.6.
+>>>
+>>> Given that this is going to be interesting mostly to server systems, and
+>>> given that ARM server deployments are rather new, I don't see the point
+>>> of compiling a new server environment using an older gcc version.
+>>
+>> I've mulled over this, had some discussions with our toolchain guys and
+>> have concluded the following:
+>>
+>>   - The intrinsics are actually ok. I was sceptical at first, but I've been
+>>     assured that they should do a reasonable job (echoing your performance
+>>     figures).
+>>
+>>   - The current approach is targetting servers and isn't (yet) suitable for
+>>     mobile.
+>>
+>> So, given that the patches do the right thing wrt GCC version, the only
+>> remaining point is that we need to keep an eye out for people trying to
+>> re-use this stuff for mobile (likely crypto, as I mentioned earlier). When
+>> that happens, we should consider revisiting the benchmark/power figures.
+>>
 > 
-> Jason, Gregory,
+> OK, so a number of points have been raised in this discussion, let me
+> address them one by one:
 > 
-> Also, s/mv7230/mv78230/
-
-noted.
-
-> from a quick check of the patch set (which you forgot to send to LKML)
-> I am wondering why you didn't update the of matches struct with the new
-> compatible for "marvell,mv78230-i2c"? This will save you from still
-> having "marvell,mv64xxx-i2c" as additional compatible to match device
-> and driver. With that the above should also be s/and/or/.
-
-agreed, good point.
-
-Gregory,
-
-I'm sending the last PRs for mvebu today.  I'll include this one with my
-suggestion and Sebastian's if you're ok with it.  That means you'll have
-to respin the series for the i2c folks.  Does that work for you?
-
-thx,
-
-Jason.
-
-> >>   - interrupts      : The interrupt number
-> >>
-> >>  Optional properties :
-> >>@@ -20,3 +21,13 @@ Examples:
-> >>  		interrupts = <29>;
-> >>  		clock-frequency = <100000>;
-> >>  	};
-> >>+
-> >>+For a controller which support the I2C Transaction Generator:
-> >>+
-> >>+	i2c at 11000 {
-> >>+		compatible = "marvell,mv64xxx-i2c", "marvell,mv78230-i2c";
-> >>+		reg = <0x11000 0x100>;
-> >>+		compatible = "marvell,mv64xxx-i2c";
-> >
-> >extra compatible line.  If there's nothing else, I'll fix this up when I
-> >pull it in.
+> Should we allow NEON to be used in the kernel?
+> 
+> The consensus is not to allow floating point. However, NEON is
+> different, as the performance gains are considerable and there is no
+> dependency on support code, which makes it not as hairy as
+> conventional (pre-v3) VFP. Also, managing the vfpstates is easily
+> doable if NEON is only used outside interrupt context and with
+> preemption disabled.
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Does my series implement it correctly?
+> 
+> I have addressed Russell's first round of comments. Happy to take
+> another round if necessary.
+> 
+> 
+> Should we allow NEON intrinsics in the kernel?
+> Should we allow GCC-generated NEON in the kernel?
+> 
+> Only if the implementation is clear on which minimum version of GCC it
+> requires. We could use my examples to set a precedent on what is a
+> suitable way to use NEON intrinsics or the vectorizer in kernel code
+> (which includes coding it such that it can be reused for arm64 with no
+> modifications)
+> 
+> 
+> Is kernel mode NEON suitable for mobile?
+> 
+> To me, it is unclear why kernel and userland are so different in this
+> respect. However, kernel mode NEON is separately configurable from
+> Kconfig so it can be disabled at will.
+> 
+> 
+> Is there a point to doing a boot time benchmark to select the optimal
+> implementation of an algorithm?
+> 
+> Perhaps not but unrelated to kernel mode NEON.
+
+If this is indeed the consensus (I don't disagree with any of it myself),
+perhaps committing the main points, guidelines, and examples to
+Documentation/arm/* would be useful.
+
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
