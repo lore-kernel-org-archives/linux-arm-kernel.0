@@ -1,37 +1,21 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 21 Jun 2013 16:08:00 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the mailbox tree
-Message-ID: <20130621160800.64f9965229e5042a7b77e212@canb.auug.org.au>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Fri, 21 Jun 2013 14:11:31 +0800
+Subject: SCU registers mapping for CA9/CA5 cores
+Message-ID: <CADApbei3QOCQRmo_oYZ_XiUVupq+4uUs7WNe6f7k_OG0LHB3=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+hi, Russell
+When i sbumited the patch for pxa988 which is CA9, Arnd gave me some
+suggestions of SCU mapping.
+I used static mapping in the platform file for SCU registers mapping,
+but Arnd think there should be a more general way to do it, and others
+can benefit from it. I agree with him.
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-omap2/devices.c between commit 4a1c0e83bb4e ("ARM: OMAP2+:
-mbox: remove dependencies with soc.h") from the mailbox tree and commit
-82c5cde1c4b0 ("ARM: OMAP2+: Remove omap4 ocp2scp pdata") from the arm-soc
-tree.
+The following is his question for you when reply to my patch.
+"Russell, do you think using a fixmap page for the SCU makes sense?
+I'm looking for a method to consolidate the various methods of
+doing early mappings of the SCU for device tree based platforms.
+Where do you think that should be implemented?"
 
-I fixed it up (removing the include of
-linux/platform_data/omap_ocp2scp.h) and can carry the fix as necessary
-(no action is required).
-
-That mailbox tree commit looks very similar to commit b8a7cf8e2b15 ("ARM:
-OMAP2+: mbox: remove dependencies with soc.h") from the arm-soc tree ...
-
-As an aside, the include of linux/usb/omap_control_usb.h into this file
-was removed by commit 608d19380c67 ("ARM: OMAP2+: Remove omap4 pdata for
-USB") in the arm-soc tree, but reintroduced by commit 435f4c6d5242
-("Merge branch 'next/drivers' into for-next").
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/2d7de735/attachment.sig>
+So can you give your idea and suggestion? Thanks.
