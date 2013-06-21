@@ -1,50 +1,119 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 21 Jun 2013 16:26:14 +0900
-Subject: [PATCH V10 4/4] ARM: dts: Add pcie controller node for
- exynos5440-ssdk5440
-Message-ID: <003d01ce6e50$9c925d80$d5b71880$@samsung.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri, 21 Jun 2013 09:29:26 +0200
+Subject: [PATCH v2 3/4] ARM: at91/dt: add sam9 watchdog default options to SoCs
+In-Reply-To: <1371799176-3408-1-git-send-email-b.brezillon@overkiz.com>
+References: <1371799176-3408-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1371799766-3774-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pcie controller node for exynos5440-ssdk5440,
-and also adds a phandle for pin controller node.
+Set default watchdog options in every SoC compatible with the sam9 watchdog.
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- arch/arm/boot/dts/exynos5440-ssdk5440.dts |    8 ++++++++
- arch/arm/boot/dts/exynos5440.dtsi         |    2 +-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/at91sam9260.dtsi |    5 +++++
+ arch/arm/boot/dts/at91sam9263.dtsi |    5 +++++
+ arch/arm/boot/dts/at91sam9g45.dtsi |    5 +++++
+ arch/arm/boot/dts/at91sam9n12.dtsi |    5 +++++
+ arch/arm/boot/dts/at91sam9x5.dtsi  |    5 +++++
+ arch/arm/boot/dts/sama5d3.dtsi     |    5 +++++
+ 6 files changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-index f32cd77..ede7727 100644
---- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-+++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-@@ -65,4 +65,12 @@
- 			clock-frequency = <50000000>;
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index 899a7cf..6c44c35 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -643,6 +643,11 @@
+ 			watchdog at fffffd40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffd40 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				atmel,watchdog-type = "hardware";
++				atmel,reset-type = "all";
++				atmel,dbg-halt;
++				atmel,idle-halt;
+ 				status = "disabled";
+ 			};
  		};
- 	};
-+
-+	pcie at 290000 {
-+		reset-gpio = <&pin_ctrl 5 0>;
-+	};
-+
-+	pcie at 2a0000 {
-+		reset-gpio = <&pin_ctrl 22 0>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index 1ac4f5b..ff7f5d8 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -126,7 +126,7 @@
- 		clock-names = "spi", "spi_busclk0";
- 	};
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index ff63811..6b31ee0 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -519,6 +519,11 @@
+ 			watchdog at fffffd40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffd40 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				atmel,watchdog-type = "hardware";
++				atmel,reset-type = "all";
++				atmel,dbg-halt;
++				atmel,idle-halt;
+ 				status = "disabled";
+ 			};
  
--	pinctrl {
-+	pin_ctrl: pinctrl {
- 		compatible = "samsung,exynos5440-pinctrl";
- 		reg = <0xE0000 0x1000>;
- 		interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>,
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index faec17d..ca1a643 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -634,6 +634,11 @@
+ 			watchdog at fffffd40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffd40 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				atmel,watchdog-type = "hardware";
++				atmel,reset-type = "all";
++				atmel,dbg-halt;
++				atmel,idle-halt;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index 3166e1d..7c8a5ea 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -505,6 +505,11 @@
+ 			watchdog at fffffe40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffe40 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				atmel,watchdog-type = "hardware";
++				atmel,reset-type = "all";
++				atmel,dbg-halt;
++				atmel,idle-halt;
+ 				status = "disabled";
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index e77106e..48eb1cc 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -742,6 +742,11 @@
+ 			watchdog at fffffe40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffe40 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				atmel,watchdog-type = "hardware";
++				atmel,reset-type = "all";
++				atmel,dbg-halt;
++				atmel,idle-halt;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index c00e158..7974723 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -885,6 +885,11 @@
+ 			watchdog at fffffe40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffe40 0x10>;
++				interrupts = <4 IRQ_TYPE_LEVEL_HIGH 7>;
++				atmel,watchdog-type = "hardware";
++				atmel,reset-type = "all";
++				atmel,dbg-halt;
++				atmel,idle-halt;
+ 				status = "disabled";
+ 			};
+ 
 -- 
-1.7.10.4
+1.7.9.5
