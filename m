@@ -1,27 +1,61 @@
-From: linux@rasmusvillemoes.dk (Rasmus Villemoes)
-Date: Fri, 21 Jun 2013 14:12:02 +0000
-Subject: [PATCH v2 1/3] mfd: Add irq domain support for max8998 interrupts
-In-Reply-To: <1371818017-5215-2-git-send-email-t.figa@samsung.com> (Tomasz
- Figa's message of "Fri, 21 Jun 2013 14:33:35 +0200")
-References: <1371818017-5215-1-git-send-email-t.figa@samsung.com>
- <1371818017-5215-2-git-send-email-t.figa@samsung.com>
-Message-ID: <u0l61x7a6z1.fsf@orc04.imf.au.dk>
+From: agnel.joel@gmail.com (Joel A Fernandes)
+Date: Fri, 21 Jun 2013 09:20:01 -0500
+Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
+In-Reply-To: <201306211600.04986.arnd@arndb.de>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <51C427E1.2000800@ti.com>
+ <CAD=GYpb54bitcg0gnfhzxbvig3etRPY6fs=FOQu5nYkio5NRZw@mail.gmail.com>
+ <201306211600.04986.arnd@arndb.de>
+Message-ID: <CAD=GYpZ_5Lp1La=f+2BQfmuj+sc3FgygZRD4gfj4JGGZ0Do=_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa <t.figa@samsung.com> writes:
-
-> All uses of irq_base in platform data and max8997 driver private data
-> are removed.
+On Fri, Jun 21, 2013 at 9:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 21 June 2013, Joel A Fernandes wrote:
+>> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> >> index b1c66a4..7d58cd9 100644
+>> >> --- a/arch/arm/Kconfig
+>> >> +++ b/arch/arm/Kconfig
+>> >> @@ -841,6 +841,7 @@ config ARCH_DAVINCI
+>> >>       select HAVE_IDE
+>> >>       select NEED_MACH_GPIO_H
+>> >>       select TI_PRIV_EDMA
+>> >> +     select DMADEVICES
+>> >
+>> > It is generally a bad idea to force select on something that can be
+>> > enabled using menuconfig. Unless used carefully, select causes "unmet
+>> > direct dependency" warnings which folks are already fighting hard to
+>> > fix. This leads to what Russell referred in the past as "select madness" [1]
+>>
+>> Are you concerned with bloat issues? I know your point of view but the idea
+>> was to build these options by default for these platforms even though
+>> in some cases
+>> it might not be used. I have seen folks including myself select the wrong
+>> option. Having the build system automatically select the correct option for the
+>> most common cases can be very useful I feel and not require manual
+>> configuration.
 >
-[...]
-> +static int max8998_irq_domain_map(struct irq_domain *d, unsigned int irq,
-> +					irq_hw_number_t hw)
-> +{
-> +	struct max8997_dev *max8998 = d->host_data;
+> For defaults, you should use the defconfig, not 'select' in Kconfig.
+>
+> A lot of the 'select' statements are actually wrong because they
+> do not take dependencies into account where A selects B but not C,
+> and B depends on C, which leads to broken builds when C is disabled
+> by a user (or randconfig).
 
-I may be wrong, but this sure looks like a typo (or copy-pasto).
+I haven't come across this problem but- are you saying there is a
+shortcoming in Kbuild/Kconfig that selects an option even if its
+dependency is not met?
 
--- 
-Rasmus Villemoes
-<http://rasmusvillemoes.dk/>
+The problem with defconfig is also too many options I feel for a common case.
+CONFIG_DMADEVICES=y
+CONFIG_TI_EDMA=y
+
+Most if not all future OMAPs from will use EDMA. Why not we can be
+explicit about it and just built it in anyway. If ARCH_OMAP and
+DMADEVICES are selected, then we can just build EDMA in by default.
+
+I agree maybe the option can be dropped from Davinci but I suggest
+let's keep it for OMAP. Is that ok?
+
+Thanks,
+Joel
