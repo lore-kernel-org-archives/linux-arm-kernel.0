@@ -1,75 +1,49 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 21 Jun 2013 16:15:10 +0530
-Subject: [PATCH] dmaengine: Add hisilicon k3 DMA engine driver
-In-Reply-To: <201306181609.14966.arnd@arndb.de>
-References: <1371444872-26994-1-git-send-email-zhangfei.gao@linaro.org>
- <201306172258.08185.arnd@arndb.de>
- <CAMj5Bkh8=zc=RYoS9T_9ORYFuJeswQP2hfZ5GH_vywa_qM2DRA@mail.gmail.com>
- <201306181609.14966.arnd@arndb.de>
-Message-ID: <20130621104510.GH23141@intel.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 21 Jun 2013 13:26:10 +0200
+Subject: Chipidea usb otg support for IMX/MXS (device functionality)
+In-Reply-To: <20130529101332.GC7356@pengutronix.de>
+References: <51A5A808.2070803@digi.com>
+ <F281D0F91ED19E4D8E63A7504E8A649803E8A4D0@039-SN2MPN1-021.039d.mgd.msft.net>
+ <20130529101332.GC7356@pengutronix.de>
+Message-ID: <201306211326.11175.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 04:09:14PM +0200, Arnd Bergmann wrote:
-> On Tuesday 18 June 2013, zhangfei gao wrote:
-> > On Tue, Jun 18, 2013 at 4:58 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > >
-> > >> +static struct of_dma_filter_info k3_dma_filter;
-> > >> +static bool k3_dma_filter_fn(struct dma_chan *chan, void *param)
-> > >> +{
-> > >> +     return  (*(int *)param == chan->chan_id);
-> > >> +}
-> > >
-> > > This filter function works only as long as there is no more than
-> > > one DMA engine in the system, which is something that needs to
-> > > be documented better. Unfortunately, providing a filter
-> > > function to be called by .xlate is currently the only way that
-> > > the dma-engine API supports, but we should really get over that.
-> > >
-> > > Vinod: I think we need to add a way for a dmaengine driver to
-> > > just return one of its channels to the xlate function. The
-> > > current method is getting very silly, and it adds run-time and
-> > > code complexity without any need.
-> > >
-> > > How about something like
-> > >
-> > > int dma_get_slave_channel(struct dma_chan *chan)
-> > > {
-> > >         /* lock against __dma_request_channel */
-> > >         mutex_lock(&dma_list_mutex);
-> > >
-> > >         if (chan->client_count == 0)
-> > >                 ret = dma_chan_get(chan);
-> > >         else
-> > >                 ret = -EBUSY;
-> > >
-> > >         mutex_unlock(&dma_list_mutex);
-> > >
-> > >         return ret;
-> > > }
-> > > EXPORT_SYMBOL_GPL(dma_get_slave_channel);
-> > 
-> > Want to double check here.
-> > Device need specific channel via request line, the requirement still
-> > can be met, right?
-> 
-> The driver can have a simple array of pointers that is indexed by
-> the request number, so you end up with something like
-> 
-> struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
->                                                 struct of_dma *ofdma)
-> {
->         struct k3_dma_dev *dev = ofdma->of_dma_data;
-> 	unsigned int vchan = dma_spec->args[0];
-> 
-> 	if (vchan > dev->nr_channels)
-> 		return NULL;
-> 
->         return dma_get_slave_channel(dev->vchan[vchan]);
-> }
-> 
-> With no need to have a filter function.
-for SW muxes this may work well IMO
+Hi,
 
---
-~Vinod
+> Hi,
+> 
+> On Wed, May 29, 2013 at 08:07:55AM +0000, Chen Peter-B29397 wrote:
+> > > Indeed, I've been using the patchset "Add tested id switch and vbus
+> > > connect detect support for Chipidea" from Peter for quite some time on
+> > > top of 3.9 and it works like a charm for the gadget mode on an MX28
+> > > platform.
+> > > 
+> > > BTW, Peter, I've seen that these patches are still not merged in 3.10,
+> > > is there a reason for that? do you plan on sending a version rebased on
+> > > top of 3.10 some time in the future? I tried to do the rebasing myself,
+> > > but the chipidea driver seems to have changed quite heavily, which
+> > > makes the process quite difficult when you don't know what you're
+> > > doing :)
+> 
+> we already have Peter's patches on v3.10-rc3 [1].
+> 
+> > I can spend few bandwidth on upstream work recently, I may have more
+> > bandwidth after June 15th.
+> > 
+> > Currently, we still have no conclusion for chipidea core driver's coming
+> > work, like Device tree support, how to identify if the controller is OTG
+> > supported.
+> 
+> Yes, the next important step is getting the of propertys "dr_mode" and
+> "phy_type" properly used in the chipidea core.
+> 
+> [1] http://git.pengutronix.de/?p=mgr/linux.git;a=summary ->
+> v3.10/topic/usb-peterchen
+
+Is anyone planning to work on this stuff and start pushing it mainline or is 
+this effort stalled completely? What is it that's missing before these can be 
+applied?
+
+Best regards,
+Marek Vasut
