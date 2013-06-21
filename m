@@ -1,14 +1,20 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 21 Jun 2013 19:43:26 -0300
-Subject: [PATCH] ARM: imx: select syscon for IMX6L
-In-Reply-To: <201306220039.43988.arnd@arndb.de>
-References: <201306220039.43988.arnd@arndb.de>
-Message-ID: <CAOMZO5A++=N4BE24DBqat71HTMgEHVG3zn_GZEjYbw5K+6VP7g@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 21 Jun 2013 16:44:44 -0600
+Subject: [PATCH 4/7] of: introduce of_parse_phandle_with_fixed_args
+In-Reply-To: <1371157199-7272-4-git-send-email-swarren@wwwdotorg.org>
+References: <1371157199-7272-1-git-send-email-swarren@wwwdotorg.org>
+ <1371157199-7272-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <51C4D75C.9060007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 7:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> This is required for building a kernel that enables only
-> IMX6L but not IMX6Q, which would get a build error when
+On 06/13/2013 02:59 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> This is identical to of_parse_phandle_with_args(), except that the
+> number of argument cells is fixed, rather than being parsed out of the
+> node referenced by each phandle.
 
-I think you mean IMX6SL.
+Rob, Grant, are you OK with these two DT patches? LinusW would like an
+ack so he can take the series, which implements gpio-ranges property
+parsing cleanup, through the GPIO tree. Thanks.
