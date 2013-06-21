@@ -1,35 +1,24 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri, 21 Jun 2013 09:32:29 +0200
-Subject: [PATCH v2 4/4] ARM: at91/dt: add watchdog properties to kizbox board
-In-Reply-To: <1371799176-3408-1-git-send-email-b.brezillon@overkiz.com>
-References: <1371799176-3408-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1371799949-3887-1-git-send-email-b.brezillon@overkiz.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 21 Jun 2013 00:32:50 -0700
+Subject: [PATCHv2 06/11] CLK: omap: move part of the machine specific
+ clock header contents to driver
+In-Reply-To: <1371647942-4811-7-git-send-email-t-kristo@ti.com>
+References: <1371647942-4811-1-git-send-email-t-kristo@ti.com>
+ <1371647942-4811-7-git-send-email-t-kristo@ti.com>
+Message-ID: <20130621073250.GO5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add watchdog specific config for kizbox board.
+* Tero Kristo <t-kristo@ti.com> [130619 06:25]:
+> Some of the clock.h contents are needed by the new OMAP clock driver,
+> including dpll_data and clk_hw_omap. Thus, move these to the generic
+> omap header file which can be accessed by the driver.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/boot/dts/kizbox.dts |    6 ++++++
- 1 file changed, 6 insertions(+)
+Do you mean "are only needed by the new OMAP clock driver"?
 
-diff --git a/arch/arm/boot/dts/kizbox.dts b/arch/arm/boot/dts/kizbox.dts
-index 02df191..928f6ee 100644
---- a/arch/arm/boot/dts/kizbox.dts
-+++ b/arch/arm/boot/dts/kizbox.dts
-@@ -53,6 +53,12 @@
- 				status = "okay";
- 			};
- 
-+			watchdog at fffffd40 {
-+				timeout-sec = <15>;
-+				atmel,max-heartbeat-sec = <16>;
-+				atmel,min-heartbeat-sec = <0>;
-+				status = "okay";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
--- 
-1.7.9.5
+Otherwise it sounds like this will break things for other
+omaps that don't yet have clocks configured in DT..
+
+Regards,
+
+Tony
