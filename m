@@ -1,31 +1,133 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 21 Jun 2013 12:25:27 +0200
-Subject: [PATCHv3 09/11] pci: mvebu: add support for MSI
-In-Reply-To: <1371660979-21588-10-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1371660979-21588-10-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130621102526.GG12441@manwe>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Fri, 21 Jun 2013 15:56:57 +0530
+Subject: [PATCH v12 09/11] spi: omap2-mcspi: convert to
+ dma_request_slave_channel_compat()
+In-Reply-To: <1371762407-24544-10-git-send-email-joelagnel@ti.com>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <1371762407-24544-10-git-send-email-joelagnel@ti.com>
+Message-ID: <51C42A71.1090403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 06:56:17PM +0200, Thomas Petazzoni wrote:
-> This commit adds support for Message Signaled Interrupts in the
-> Marvell PCIe host controller. The work is very simple: it simply gets
-> a reference to the msi_chip associated to the PCIe controller thanks
-> to the msi-parent DT property, and stores this reference in the
-> pci_bus structure. This is enough to let the Linux PCI core use the
-> functions of msi_chip to setup and teardown MSIs.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Hi Mark,
+On Friday 21 June 2013 02:36 AM, Joel A Fernandes wrote:
+> From: Matt Porter<mporter@ti.com>
+>
+> Convert dmaengine channel requests to use
+> dma_request_slave_channel_compat(). This supports the DT case of
+> platforms requiring channel selection from either the OMAP DMA or
+> the EDMA engine. AM33xx only boots from DT and is the only user
+> implementing EDMA so in the !DT case we can default to the OMAP DMA
+> filter.
+>
+> Signed-off-by: Matt Porter<mporter@ti.com>
+> Acked-by: Mark Brown<broonie@opensource.wolfsonmicro.com>
+> Signed-off-by: Joel A Fernandes<joelagnel@ti.com>
 > ---
->  drivers/pci/host/pci-mvebu.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
+>   drivers/spi/spi-omap2-mcspi.c |   64 ++++++++++++++++++++++++++++-------------
+>   1 file changed, 44 insertions(+), 20 deletions(-)
+>
+> diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
+> index 86d2158..ca4ab78 100644
+> --- a/drivers/spi/spi-omap2-mcspi.c
+> +++ b/drivers/spi/spi-omap2-mcspi.c
+> @@ -102,6 +102,9 @@ struct omap2_mcspi_dma {
+>
+>   	struct completion dma_tx_completion;
+>   	struct completion dma_rx_completion;
+> +
+> +	char dma_rx_ch_name[14];
+> +	char dma_tx_ch_name[14];
+>   };
+>
+>   /* use PIO for small transfers, avoiding DMA setup/teardown overhead and
+> @@ -830,12 +833,20 @@ static int omap2_mcspi_request_dma(struct spi_device *spi)
+>   	dma_cap_zero(mask);
+>   	dma_cap_set(DMA_SLAVE, mask);
+>   	sig = mcspi_dma->dma_rx_sync_dev;
+> -	mcspi_dma->dma_rx = dma_request_channel(mask, omap_dma_filter_fn,&sig);
+> +
+> +	mcspi_dma->dma_rx =
+> +		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
+> +						&sig,&master->dev,
+> +						 mcspi_dma->dma_rx_ch_name);
+>   	if (!mcspi_dma->dma_rx)
+>   		goto no_dma;
+>
+>   	sig = mcspi_dma->dma_tx_sync_dev;
+> -	mcspi_dma->dma_tx = dma_request_channel(mask, omap_dma_filter_fn,&sig);
+> +	mcspi_dma->dma_tx =
+> +		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
+> +						&sig,&master->dev,
+> +						 mcspi_dma->dma_tx_ch_name);
+> +
+>   	if (!mcspi_dma->dma_tx) {
+>   		dma_release_channel(mcspi_dma->dma_rx);
+>   		mcspi_dma->dma_rx = NULL;
+> @@ -1256,29 +1267,42 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
+>   		goto free_master;
+>
+>   	for (i = 0; i<  master->num_chipselect; i++) {
+> -		char dma_ch_name[14];
+> +		char *dma_rx_ch_name = mcspi->dma_channels[i].dma_rx_ch_name;
+> +		char *dma_tx_ch_name = mcspi->dma_channels[i].dma_tx_ch_name;
+>   		struct resource *dma_res;
+>
+> -		sprintf(dma_ch_name, "rx%d", i);
+> -		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
+> -				dma_ch_name);
+> -		if (!dma_res) {
+> -			dev_dbg(&pdev->dev, "cannot get DMA RX channel\n");
+> -			status = -ENODEV;
+> -			break;
+> -		}
+> +		sprintf(dma_rx_ch_name, "rx%d", i);
+> +		if (!pdev->dev.of_node) {
+> +			dma_res =
+> +				platform_get_resource_byname(pdev,
+> +							     IORESOURCE_DMA,
+> +							     dma_rx_ch_name);
+> +			if (!dma_res) {
+> +				dev_dbg(&pdev->dev,
+> +					"cannot get DMA RX channel\n");
+> +				status = -ENODEV;
+> +				break;
+> +			}
+>
+> -		mcspi->dma_channels[i].dma_rx_sync_dev = dma_res->start;
+> -		sprintf(dma_ch_name, "tx%d", i);
+> -		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
+> -				dma_ch_name);
+> -		if (!dma_res) {
+> -			dev_dbg(&pdev->dev, "cannot get DMA TX channel\n");
+> -			status = -ENODEV;
+> -			break;
+> +			mcspi->dma_channels[i].dma_rx_sync_dev =
+> +				dma_res->start;
+>   		}
+> +		sprintf(dma_tx_ch_name, "tx%d", i);
+> +		if (!pdev->dev.of_node) {
+> +			dma_res =
+> +				platform_get_resource_byname(pdev,
+> +							     IORESOURCE_DMA,
+> +							     dma_tx_ch_name);
+> +			if (!dma_res) {
+> +				dev_dbg(&pdev->dev,
+> +					"cannot get DMA TX channel\n");
+> +				status = -ENODEV;
+> +				break;
+> +			}
+>
+> -		mcspi->dma_channels[i].dma_tx_sync_dev = dma_res->start;
+> +			mcspi->dma_channels[i].dma_tx_sync_dev =
+> +				dma_res->start;
+> +		}
+>   	}
+>
+>   	if (status<  0)
+Acked-by: Sourav Poddar <sourav.poddar@ti.com>
+Tested-by: Sourav Poddar <sourav.poddar@ti.com>
 
-Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/c5330e02/attachment.sig>
+This patch can go independently and does not depend on the rest of the
+series.
+Can these patch be pulled?
