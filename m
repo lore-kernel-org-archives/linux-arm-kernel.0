@@ -1,132 +1,69 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Jun 2013 10:07:07 -0400
-Subject: [PATCH v3 4/4] ARM: dts: mvebu: Introduce a new compatible
- string for mv64xxx-i2c
-In-Reply-To: <1371821529-13791-5-git-send-email-gregory.clement@free-electrons.com>
-References: <1371821529-13791-1-git-send-email-gregory.clement@free-electrons.com>
- <1371821529-13791-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130621140707.GO31667@titan.lakedaemon.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Jun 2013 15:07:19 +0100
+Subject: [PATCH V3 1/4] arm64: Add Kconfig option for APM X-Gene SOC family
+In-Reply-To: <CAPrCYkc-=-no+TpHb8XMQYFoyqCJoXe9RR1-jazxCCNeFQ12Yw@mail.gmail.com>
+References: <1366794420-17849-1-git-send-email-vkale@apm.com>
+ <1366794420-17849-2-git-send-email-vkale@apm.com>
+ <20130621093656.GB4099@arm.com>
+ <CAPrCYkc-=-no+TpHb8XMQYFoyqCJoXe9RR1-jazxCCNeFQ12Yw@mail.gmail.com>
+Message-ID: <20130621140719.GA8384@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 03:32:09PM +0200, Gregory CLEMENT wrote:
-> The mv64xxx-i2c embedded in the Armada XP have a new feature to
-> offload i2c transaction. This new version of the IP come also with
-> some errata. This lead to the introduction to a another compatible
-> string.
+On Fri, Jun 21, 2013 at 11:43:59AM +0100, Vinayak Kale wrote:
+> On Fri, Jun 21, 2013 at 3:06 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > Hi Vinayak,
+> >
+> > On Wed, Apr 24, 2013 at 10:06:57AM +0100, Vinayak Kale wrote:
+> >> This patch adds arm64/Kconfig option for APM X-Gene SOC family.
+> >>
+> >> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+> >> Signed-off-by: Loc Ho <lho@apm.com>
+> >> Signed-off-by: Feng Kan <fkan@apm.com>
+> >> ---
+> >>  arch/arm64/Kconfig |    7 +++++++
+> >>  1 files changed, 7 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >> index 43b0e9f..16d0198 100644
+> >> --- a/arch/arm64/Kconfig
+> >> +++ b/arch/arm64/Kconfig
+> >> @@ -114,6 +114,11 @@ config ARCH_VEXPRESS
+> >>         This enables support for the ARMv8 software model (Versatile
+> >>         Express).
+> >>
+> >> +config ARCH_XGENE
+> >> +     bool "AppliedMicro X-Gene SOC Family"
+> >> +     help
+> >> +       This enables support for AppliedMicro X-Gene SOC Family
+> >> +
+> >>  endmenu
+> >>
+> >>  menu "Bus support"
+> >> @@ -153,6 +158,8 @@ config NR_CPUS
+> >>       int "Maximum number of CPUs (2-32)"
+> >>       range 2 32
+> >>       depends on SMP
+> >> +     # These have to remain sorted largest to smallest
+> >> +     default "8" if ARCH_XGENE
+> >>       default "4"
+> >
+> > For ARCH_VEXPRESS I was planning to get rid of the Kconfig entry and
+> > just select the drivers in the defconfig file (once some other patches
+> > get merged). Do you have any dependencies on ARCH_XGENE apart from
+> > what's here?
 > 
-> This commit split the i2c information into armada-370.dtsi and
-> armada-xp.dtsi. Most of the data remains the same and stay in the
-> common file Armada-370-xp.dtsi. With this new feature the size of the
-> registers are bigger for Armada XP and the new compatible string is
-> used.
-> 
-> The Device Tree binding documentation is updated accordingly.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 13 ++++++++++++-
->  arch/arm/boot/dts/armada-370-xp.dtsi                  |  2 --
->  arch/arm/boot/dts/armada-370.dtsi                     |  8 ++++++++
->  arch/arm/boot/dts/armada-xp.dtsi                      | 10 ++++++++++
->  4 files changed, 30 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> index a1ee681..ce7af6a 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> @@ -4,7 +4,8 @@
->  Required properties :
->  
->   - reg             : Offset and length of the register set for the device
-> - - compatible      : Should be "marvell,mv64xxx-i2c"
-> + - compatible      : Should be "marvell,mv64xxx-i2c" and "marvell,mv7230-i2c"
-> +for controller which support the I2C Transaction Generator
->   - interrupts      : The interrupt number
->  
->  Optional properties :
-> @@ -20,3 +21,13 @@ Examples:
->  		interrupts = <29>;
->  		clock-frequency = <100000>;
->  	};
-> +
-> +For a controller which support the I2C Transaction Generator:
-> +
-> +	i2c at 11000 {
-> +		compatible = "marvell,mv64xxx-i2c", "marvell,mv78230-i2c";
-> +		reg = <0x11000 0x100>;
-> +		compatible = "marvell,mv64xxx-i2c";
+> Apart from here, we do have dependency on ARCH_XGENE:
+> 1) To select XGENE SoC specific dtb compilation
 
-extra compatible line.  If there's nothing else, I'll fix this up when I
-pull it in.
+We can build all of them.
 
-thx,
+> 2) Use this to forcefully select certain platform drivers such as Clock.
 
-Jason.
+The vexpress-related clocks etc. will simply depend on ARM64 (patches
+going upstream) and we enable them in defconfig. Can you do the same for
+X-Gene?
 
-> +		interrupts = <29>;
-> +		clock-frequency = <100000>;
-> +	};
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 550eb77..b6f475c 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -112,7 +112,6 @@
->  
->  			i2c0: i2c at 11000 {
->  				compatible = "marvell,mv64xxx-i2c";
-> -				reg = <0x11000 0x20>;
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				interrupts = <31>;
-> @@ -123,7 +122,6 @@
->  
->  			i2c1: i2c at 11100 {
->  				compatible = "marvell,mv64xxx-i2c";
-> -				reg = <0x11100 0x20>;
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				interrupts = <32>;
-> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> index aee2b18..39b26d6 100644
-> --- a/arch/arm/boot/dts/armada-370.dtsi
-> +++ b/arch/arm/boot/dts/armada-370.dtsi
-> @@ -155,6 +155,14 @@
->  				};
->  			};
->  
-> +			i2c0: i2c at 11000 {
-> +				reg = <0x11000 0x20>;
-> +			};
-> +
-> +			i2c1: i2c at 11100 {
-> +				reg = <0x11100 0x20>;
-> +			};
-> +
->  			usb at 50000 {
->  				clocks = <&coreclk 0>;
->  			};
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index 5b902f9..c2c357e 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -134,6 +134,16 @@
->  				};
->  			};
->  
-> +			i2c0: i2c at 11000 {
-> +				compatible = "marvell,mv64xxx-i2c", "marvell,mv78230-i2c";
-> +				reg = <0x11000 0x100>;
-> +			};
-> +
-> +			i2c1: i2c at 11100 {
-> +				compatible = "marvell,mv64xxx-i2c", "marvell,mv78230-i2c";
-> +				reg = <0x11100 0x100>;
-> +			};
-> +
->  			usb at 50000 {
->  				clocks = <&gateclk 18>;
->  			};
-> -- 
-> 1.8.1.2
-> 
+-- 
+Catalin
