@@ -1,50 +1,40 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 21 Jun 2013 16:18:01 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the tip tree
-Message-ID: <20130621161801.34c4a75c217ca4c1b7d6529c@canb.auug.org.au>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 20 Jun 2013 23:19:29 -0700
+Subject: [PATCH v2] clk: tegra: Use common of_clk_init function
+In-Reply-To: <51B6CF60.9020600@nvidia.com>
+References: <1369640409-1981-1-git-send-email-pgaikwad@nvidia.com>
+ <51A4CA6A.8090103@wwwdotorg.org> <51B6CF60.9020600@nvidia.com>
+Message-ID: <20130621061929.9136.10202@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Quoting Prashant Gaikwad (2013-06-11 00:18:56)
+> On Tuesday 28 May 2013 08:46 PM, Stephen Warren wrote:
+> > On 05/27/2013 01:40 AM, Prashant Gaikwad wrote:
+> >> Use common of_clk_init() function for clocks initialization.
+> 
+> Mike,
+> 
+> Please merge this patch in your tree.
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-u300/timer.c between commit 38ff87f77af0 ("sched_clock:
-Make ARM's sched_clock generic for all architectures") from the tip tree
-and commit 3c96d8ea8101 ("ARM: u300: enable delaytimer on the U300") from
-the arm-soc tree.
+Hi Prashant. I merged this one a long time ago:
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Refs: v3.10-rc3-22-g061cec9
+Author:     Prashant Gaikwad <pgaikwad@nvidia.com>
+AuthorDate: Mon May 27 13:10:09 2013 +0530
+Commit:     Mike Turquette <mturquette@linaro.org>
+CommitDate: Fri May 31 12:57:25 2013 -0700
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Regards,
+Mike
 
-diff --cc arch/arm/mach-u300/timer.c
-index af771b7,390ae5f..0000000
---- a/arch/arm/mach-u300/timer.c
-+++ b/arch/arm/mach-u300/timer.c
-@@@ -18,12 -18,12 +18,12 @@@
-  #include <linux/clk.h>
-  #include <linux/err.h>
-  #include <linux/irq.h>
- +#include <linux/sched_clock.h>
-- 
-- #include <mach/hardware.h>
-- #include <mach/irqs.h>
-+ #include <linux/delay.h>
-+ #include <linux/of_address.h>
-+ #include <linux/of_irq.h>
-  
-  /* Generic stuff */
- -#include <asm/sched_clock.h>
-  #include <asm/mach/map.h>
-  #include <asm/mach/time.h>
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/4e90a67b/attachment.sig>
+> 
+> Thanks,
+> PrashantG
+> > Acked-by: Stephen Warren <swarren@nvidia.com>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
