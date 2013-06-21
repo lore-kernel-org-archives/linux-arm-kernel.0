@@ -1,122 +1,105 @@
-From: lho@apm.com (Loc Ho)
-Date: Fri, 21 Jun 2013 12:17:37 -0600
-Subject: [PATCH v2 3/3] Documentation: Add documentation for APM X-Gene clock
- binding.
-In-Reply-To: <1371838657-6018-3-git-send-email-lho@apm.com>
-References: <1371838657-6018-1-git-send-email-lho@apm.com>
- <1371838657-6018-2-git-send-email-lho@apm.com>
- <1371838657-6018-3-git-send-email-lho@apm.com>
-Message-ID: <1371838657-6018-4-git-send-email-lho@apm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 21 Jun 2013 11:20:49 -0700
+Subject: [PATCH 21/33 v2] clk: ux500: Add Device Tree support for the PRCC
+ Kernel clock
+In-Reply-To: <20130619074203.GD31320@laptop>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <1370521041-32318-22-git-send-email-lee.jones@linaro.org>
+ <20130611110923.GB3330@laptop> <201306121646.30279.arnd@arndb.de>
+ <20130618211735.9136.25870@quantum> <20130619074203.GD31320@laptop>
+Message-ID: <20130621182049.20448.88353@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation: Add documentation for APM X-Gene clock binding with PLL and
-device clocks.
+Quoting Lee Jones (2013-06-19 00:42:03)
+> > Quoting Arnd Bergmann (2013-06-12 07:46:30)
+> > > On Tuesday 11 June 2013, Lee Jones wrote:
+> > > > This patch enables clocks to be specified from Device Tree via phandles
+> > > > to the "prcc-kernel-clock" node.
+> > > > 
+> > > > Cc: Mike Turquette <mturquette@linaro.org>
+> > > > Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > > 
+> > > 
+> > > I don't understand the design of the common clock subsystem here, but is it really
+> > > necessary to hardcode all the clocks using clk_reg_prcc_kclk() here *and* register
+> > > a clkdev *and* store the pointer in an array, when you can get all that information
+> > > from the device tree?
+> > > 
+> > > Mike?
+> > 
+> > I'm a bit confused by what is going on here too.  There are several
+> > different ways to handle this.
+> > 
+> > 1) Since you have your own clock driver (e.g. not the basic clock types)
+> > then you could expand the argument list of clk_reg_prcc_kclk to include
+> > the clkdev dev_id string and toss the call to clk_register_clkdev inside
+> > of clk_reg_prcc_kclk.
+> 
+> Yes, that's actually a pretty good idea. It has nothing to do with
+> this patchset, but I will add it to my TODO.
+> 
+> NB: I am away from tomorrow until after Connect, so I will continue
+> with this after that.
+> 
+> > 2) Move your clock data into DT and teach the driver to use of_clk_get
+> > to fetch the clk phandle directly instead of using the string-matching
+> > clkdev mechanisms. Of course both your clock and device bits need to be
+> > converted to DT first.
+> 
+> I'm sure this is the end-goal, but we still have to support the !DT
+> case. At least until all of the ATAGs stuff has been completely
+> removed from platform.
+> 
+> > Can you explain what prcc_kclk[] and friends are doing? Is that a legacy
+> > clock framework thing that is still hanging around? I'm curious to know
+> > why your clock driver needs a list of the clocks it registers.
+> 
+> Sure.
+> 
+> 1. So when we register a clock, we store a pointer to it in a 'struct
+> clk *array[]' using known cell identifying read-ins. For peripheral
+> (pclk) and kernel (kclk) clocks these are peripheral number (the
+> kernel clocks have these too) and their associated 8bit register
+> enable BIT(). The PRCMU clocks are read-in to the array only by their
+> 32bit register enable BIT().
+> 
+> 2. We then register with of_clk_add_provider() passing the array using
+> the 'void *data' argument. So:
+> 
+>   clk = clk_reg_prcc_[p|k]clk(blah, blah, blah);
+>   array[(periph * PRCC_PERIPHS_PER_CLUSTER) + bit] = clk
+>   of_clk_add_provider(child, ux500_twocell_get, array);
+> 
+> 3. In the DTS(I) files we request clocks using their known identifiers
+> by way of tuplets for the kclks and pclks and by a 1 #cell variant for
+> the PRCMU clocks. So:
+> 
+> pclk & kclk:
+>   /*        pclk/kclk       periph  BIT() */
+>   clocks = <&prcc_[p|k]clk  1       9>;
+> 
+> PRCMU:
+>   /*        prcmu       BIT()             */
+>   clocks = <&prcmu_clk  PRCMU_DMACLK>;
+> 
+> The PRCMU can then use the clk framework supplied
+> of_clk_src_onecell_get() call-back and the pclk and kclks use the 2
+> #cell variant we provide. They both read into the aforementioned
+> array[]s we populated earlier in the process to fetch the correct
+> 'struct clk*'.
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
-Signed-off-by: Vinayak Kale <vkale@apm.com>
-Signed-off-by: Feng Kan <fkan@apm.com>
----
- Documentation/devicetree/bindings/clock/xgene.txt |   90 +++++++++++++++++++++
- 1 files changed, 90 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/xgene.txt
+Ok, so I had to re-read that several times. It's probably not a win for
+readability but if that is the binding you want then go for it.
 
-diff --git a/Documentation/devicetree/bindings/clock/xgene.txt b/Documentation/devicetree/bindings/clock/xgene.txt
-new file mode 100644
-index 0000000..fcdee79
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/xgene.txt
-@@ -0,0 +1,90 @@
-+Device Tree Clock bindings for APM X-Gene
-+
-+This binding uses the common clock binding[1].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Required properties:
-+- compatible : shall be one of the following:
-+	"apm,xgene-pll-clock" - for a X-Gene PLL clock
-+	"apm,xgene-device-clock" - for a X-Gene device clock
-+
-+Required properties for PLL clocks:
-+- reg : shall be the physical PLL register address for the pll clock.
-+- clocks : shall be the input parent clock phandle for the clock. This should
-+	be the reference clock.
-+- #clock-cells : shall be set to 1.
-+- clock-output-names : shall be the name of the PLL referenced by derive
-+  clock.
-+- type : shall be 1 for SoC PLL and 0 for PCP PLL.
-+Optional properties for PLL clocks:
-+- clock-names : shall be the name of the PLL. If missing, use the device name.
-+
-+Required properties for device clocks:
-+- reg : shall be the physical CSR reset address base and physical CSR divider
-+        address base. If one does not exist, specify 0 for address and 0 for 
-+        size.
-+- clocks : shall be the input parent clock phandle for the clock.
-+- #clock-cells : shall be set to 1.
-+- clock-output-names : shall be the name of the device referenced.
-+Optional properties for device clocks:
-+- clock-names : shall be the name of the device clock. If missing, use the
-+                device name.
-+- flags : Any clock flags. ie. use 0x8 to leave clock un-touch if not
-+          referenced. Default is 0.
-+- csr-offset : Offset to the CSR reset register from the reset address base.
-+               Default is 0.
-+- csr-mask : CSR reset mask bit. Default is 0xF.
-+- enable-offset : Offset to the enable register from the reset address base.
-+                  Default is 0x8.
-+- enable-mask : CSR enable mask bit. Default is 0xF.
-+- divider-offset : Offset to the divider CSR register from the divider base.
-+                   Default is 0x0.
-+- divider-width : Width of the divider register. Default is 0.
-+- divider-shift : Bit shift of the divider register. Default is 0.
-+
-+For example:
-+
-+	pcppll: pcppll at 17000100 {
-+		compatible = "apm,xgene-pll-clock";
-+		#clock-cells = <1>;
-+		clocks = <&refclk 0>;
-+		clock-names = "pcppll";
-+		reg = <0x0 0x17000100 0x0 0x1000>;
-+		clock-output-names = "pcppll";
-+		type = <0>;
-+	};
-+
-+	socpll: socpll at 17000120 {
-+		compatible = "apm,xgene-pll-clock";
-+		#clock-cells = <1>;
-+		clocks = <&refclk 0>;
-+		clock-names = "socpll";
-+		reg = <0x0 0x17000120 0x0 0x1000>;
-+		clock-output-names = "socpll";
-+		type = <1>;
-+	};
-+
-+	qmlclk: qmlclk {
-+		compatible = "apm,xgene-device-clock";
-+		#clock-cells = <1>;
-+		clocks = <&socplldiv2 0>;
-+		clock-names = "qmlclk";
-+		reg = <0x0 0x1703C000 0x0 0x1000
-+			0x0 0x00000000 0x0 0x0000>;
-+		clock-output-names = "qmlclk";
-+	};
-+
-+	ethclk: ethclk {
-+		compatible = "apm,xgene-device-clock";
-+		#clock-cells = <1>;
-+		clocks = <&socplldiv2 0>;
-+		clock-names = "ethclk";
-+		reg = <0x0 0x00000000 0x0 0x0000
-+			0x0 0x17000000 0x0 0x1000>;
-+			divider-offset = <0x238>;
-+		divider-width = <0x9>;
-+		divider-shift = <0x0>;
-+		clock-output-names = "ethclk";
-+	};
-+
--- 
-1.5.5
+For patches #17-23:
+
+Acked-by: Mike Turquette <mturquette@linaro.org>
+
+> 
+> -- 
+> Lee Jones
+> Linaro ST-Ericsson Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
