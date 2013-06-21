@@ -1,93 +1,49 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Fri, 21 Jun 2013 08:59:41 +0200
-Subject: [RFC PATCH 0/4] watchdog: at91sam9_wdt: handle already configured
- wdt
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641687DE078@penmbx01>
-References: <1370947890-954-1-git-send-email-b.brezillon@overkiz.com>
- <B256D81BAE5131468A838E5D7A243641687DE078@penmbx01>
-Message-ID: <51C3F9DD.5040709@overkiz.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 21 Jun 2013 00:01:43 -0700
+Subject: linux-next: manual merge of the arm-soc tree with the mailbox tree
+In-Reply-To: <20130621065310.GK5523@atomide.com>
+References: <20130621162656.bb94e0fa8b6813781b804a73@canb.auug.org.au>
+ <20130621164149.598b39bb78b6015057d03f6f@canb.auug.org.au>
+ <20130621065310.GK5523@atomide.com>
+Message-ID: <CAOesGMjszju75jo6Ej6C=0-rfdPLuEj0mwmU1zYvFvYw1dyQCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/06/2013 03:47, Yang, Wenyou wrote:
+On Thu, Jun 20, 2013 at 11:53 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Stephen Rothwell <sfr@canb.auug.org.au> [130620 23:48]:
+>> Hi all,
+>>
+>> On Fri, 21 Jun 2013 16:26:56 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>> >
+>> > Today's linux-next merge of the arm-soc tree got a conflict in
+>> > drivers/mailbox/Kconfig between commit a1824eaab70f ("mailbox: OMAP:
+>> > introduce mailbox framework") from the mailbox tree and commit
+>> > c869c75c16b3 ("mailbox/omap: move the OMAP mailbox framework to drivers")
+>> > from the arm-soc tree.
+>> >
+>> > I fixed it up (I suspect not properly - see below) and can carry the fix
+>> > as necessary (no action is required).
+>> >
+>> > It looks like we have two different versions of these changes in
+>> > linux-next now, so please clean it all up.  i.e. can I just drop the
+>> > mailbox tree now?
+>>
+>> OK, things went steeply downhill from here, so I went back and removed
+>> the mailbox tree ...
 >
->> -----Original Message-----
->> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
->> On Behalf Of Boris BREZILLON
->> Sent: 2013?6?11? 18:51
->> To: Wim Van Sebroeck; Jean-Christophe Plagniol-Villard; Ferre, Nicolas;
->> linux-watchdog at vger.kernel.org
->> Cc: devicetree-discuss at lists.ozlabs.org; linux-doc at vger.kernel.org;
->> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Boris
->> BREZILLON
->> Subject: [RFC PATCH 0/4] watchdog: at91sam9_wdt: handle already configured
->> wdt
->>
->> Hello,
->>
->> This patch series is a porposal to enhance the sam9 watchdog timer support.
->>
->> The at91sam9 watchdog timer cannot configured twice, and the current
->> implementation only tries to configure in a static way:
->> - 2 seconds timeout
->> - wdt restart every 500ms
->>
->> If the timer has already been configured with different values, it returns an
->> error and do not create any watchdog device.
->>
->> This is not critical if the watchdog is disabled, but if it has been enabled with
->> different timeout values it will lead to a SoC reset.
->>
->> This patch series tries to address this issue by adapting the heartbeat value
->> according the WDT timer config:
->> - it first tries to configure the timer as requested.
->> - if it fails it fallbacks to the current config, adapting its heartbeat timer
->> to the needs
->>
->> This patch series also move to a dynamically allocated at91wdt device instead
->> of the static instance. I'm not sure this is the best solution, so please tell
->> me if you prefer to keep static instance of watchdog.
->>
->> It adds a new at91 wdt type: software. This new type make use of the at91 wdt
->> interrupt to trigger a software watchdog.
->>
->> Finally it adds several properties to the device tree bindings.
->>
->> Best Regards,
->> Boris
->>
->> Boris BREZILLON (4):
->>   watchdog: at91sam9_wdt: better watchdog support
->>   watchdog: at91sam9_wdt: update device tree doc
->>   ARM: at91/dt: add sam9 watchdog default options to SoCs
->>   ARM: at91/dt: add watchdog properties to kizbox board
->>
->>  .../devicetree/bindings/watchdog/atmel-wdt.txt     |   30 +-
->>  arch/arm/boot/dts/at91sam9260.dtsi                 |    5 +
->>  arch/arm/boot/dts/at91sam9263.dtsi                 |    5 +
->>  arch/arm/boot/dts/at91sam9g45.dtsi                 |    5 +
->>  arch/arm/boot/dts/at91sam9n12.dtsi                 |    5 +
->>  arch/arm/boot/dts/at91sam9x5.dtsi                  |    5 +
->>  arch/arm/boot/dts/kizbox.dts                       |    6 +
->>  arch/arm/boot/dts/sama5d3.dtsi                     |    5 +
->>  drivers/watchdog/at91sam9_wdt.c                    |  319
->> +++++++++++++++-----
->>  9 files changed, 300 insertions(+), 85 deletions(-)
->>
->> --
->> 1.7.9.5
->>
->>
-> Tested on sama5d34ek, at91sam9g25ek, linux-next_20130620
->
-> Tested by Wenyou Yang <Wenyou.yang@atmel.com>
->
-Thanks for your tests and review.
+> I think Olof dropped the earlier version of the mailbox branch, and
+> remerged the updated mailbox branch. So if there was also yet another
+> mailbox branch being pulled into Linux next, then yes, dropping it is
+> the way to go.
 
-Best Regards,
+No, I only reverted -- I didn't pull in any new branch.
 
-Boris
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I wonder if this mess is caused by the fact that I did the revert
+instead of rebuilding our for-next and dropping the merge in the first
+place.
+
+I'll rebuild our for-next (or maybe Arnd will beat me to it) before
+next linux-next build, i.e. Sunday night my time.
+
+
+-Olof
