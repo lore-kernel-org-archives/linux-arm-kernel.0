@@ -1,31 +1,51 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Fri, 21 Jun 2013 22:27:16 +0100
-Subject: [PATCH v5 0/5] clk: implement remuxing during set_rate
-In-Reply-To: <20130621170407.20448.35605@quantum>
-References: <1371139562-305-1-git-send-email-james.hogan@imgtec.com>
- <20130621170407.20448.35605@quantum>
-Message-ID: <CAAG0J9-F0P67=oaE5UHhmgd3Wz4k4XjsRjWShxmKOqicAyrhfw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 21 Jun 2013 15:38:11 -0600
+Subject: [PATCH v1 07/12] input: keypad-matrix: introduce polling support
+In-Reply-To: <1371838198-7327-8-git-send-email-gsi@denx.de>
+References: <1371838198-7327-1-git-send-email-gsi@denx.de>
+ <1371838198-7327-8-git-send-email-gsi@denx.de>
+Message-ID: <51C4C7C3.1070905@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 June 2013 18:04, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting James Hogan (2013-06-13 09:05:57)
->> This patchset adds support for automatic selection of the best parent
->> for a clock mux, i.e. the one which can provide the closest clock rate
->> to that requested. It can be disabled by a new CLK_SET_RATE_NO_REPARENT
->> flag (which is set for all uses of clk_register_mux().
->>
->> This works by way of adding a new op, determine_rate, similar to
->> round_rate but with an extra parameter to allow the clock driver to
->> optionally select a different parent clock. This is used in
->> clk_calc_new_rates to decide whether to initiate a set_parent operation.
->
-> Hi James,
->
-> I'm going to hold off on this one for 3.11. I'll revisit it after the
-> next merge window.
+On 06/21/2013 12:09 PM, Gerhard Sittig wrote:
+> detecting changes in the key press status may not work reliably in
+> interrupt driven mode (see the documentation part of the change for
+> details)
+> 
+> add support to poll the matrix in software for reliable operation in the
+> presence of multi key press events, leave a comment on how sleep and
+> wakeup could be made to work appropriately in the polling case
 
-Okay, no worries.
+> diff --git a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
 
-Thanks
-James
+> +The approach to enable all columns at the same time and to determine
+> +that a key press status change has occured from row pin level changes
+> +only works reliably for single key presses.  Multi key presses where the
+> +keys share their position on a row line may get deferred or even could
+> +go unnoticed, pressing and holding one key will shadow events which
+> +another key on the same row would have generated.  When reliable
+> +detection of key press events is required even in the presence of multi
+> +key presses, interrupt mode isn't sufficient any longer, and polling
+> +needs to be used.  The polling approach to detecting changes in the key
+> +press status will periodically activate a single column line and check
+> +the signals of the row lines.  Polling may also be applicable to setups
+> +where the hardware doesn't support the activation of several columns at
+> +the same time.
+
+This feels a bit like encoding a driver implementation detail into the
+DT binding.
+
+Instead, couldn't the driver simply:
+
+* When no keys are pressed, perhaps after a certain delay/timeout while
+scanning, enable "interrupt mode".
+
+* As soon as an interrupt is seen, switch back to "scanning mode".
+
+* Once no keys are pressed again, go back to "interrupt mode".
+
+That way, interrupt mode is only used while no key is pressed, and hence
+there's no possibility of shadowing.
+
+This can all be done without any need for DT binding changes.
