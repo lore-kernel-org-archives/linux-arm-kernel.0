@@ -1,62 +1,49 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 20 Jun 2013 23:54:45 -0700
-Subject: [PATCH V6 6/6] clk: exynos5250: Add enum entries for divider
- clock of i2s1 and i2s2
-In-Reply-To: <19ac01ce6b43$96bfb4d0$c43f1e70$%kim@samsung.com>
-References: <1371024463-303-1-git-send-email-padma.v@samsung.com>
- <1371024463-303-7-git-send-email-padma.v@samsung.com>
- <20130612164553.26381.41398@quantum>
- <CAAgF-BfEvBcrm186t6U9Tp4r64wB3sEsy6hoXMQi=dHJgncvfw@mail.gmail.com>
- <CAAgF-Bf4BVfGVuFF8-CwPRi-em5VHA5HXYjkRDxPxvyAZPx7kw@mail.gmail.com>
- <19ac01ce6b43$96bfb4d0$c43f1e70$%kim@samsung.com>
-Message-ID: <20130621065445.9136.69447@quantum>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Fri, 21 Jun 2013 07:50:51 +0100
+Subject: [PATCH v3 06/10] ARM:stixxxx: Add DEBUG_LL console support
+In-Reply-To: <201306202055.43189.arnd@arndb.de>
+References: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
+ <1371737176-9473-1-git-send-email-srinivas.kandagatla@st.com>
+ <201306202055.43189.arnd@arndb.de>
+Message-ID: <51C3F7CB.70703@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kukjin Kim (2013-06-17 03:15:27)
-> Padma Venkat wrote:
-> > 
-> > Hi Mike,
-> > 
-> > On Thu, Jun 13, 2013 at 8:32 AM, Padma Venkat <padma.kvr@gmail.com> wrote:
-> > > Hi Mike,
-> > >
-> > > On Wed, Jun 12, 2013 at 10:15 PM, Mike Turquette <mturquette@linaro.org>
-> > wrote:
-> > >> Quoting Padmavathi Venna (2013-06-12 01:07:43)
-> > >>> This patch adds enum entries for div_i2s1 and div_i2s2 which are
-> > >>> required for i2s1 and i2s2 controllers.
-> > >>>
-> > >>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> > >>
-> > >> Looks good.  Did you want me to take the clk patches or just gathering
-> > >> Acks?
-> > >
-> > > Please take the patches :).
-> > >
-> > > Thanks
-> > > Padma
-> > 
-> > clk related patches in this set has some dependency on arch side
-> > patches because one of the patch replaces all '/include's with
-> > '#include's and adds a header file in
-> > arch/arm/boot/include/dt-bindings/. So all these patches required to
-> > go into one tree.
-> > 
-> > Hi Kukjin,
-> > 
-> > Can you please take all these patches into samsung-tree?
-> > 
-> Padma, sure, I will.
+On 20/06/13 19:55, Arnd Bergmann wrote:
+> On Thursday 20 June 2013, Srinivas KANDAGATLA wrote:
+>> --- a/arch/arm/mach-stixxxx/board-dt.c
+>> +++ b/arch/arm/mach-stixxxx/board-dt.c
+>> @@ -11,6 +11,7 @@
+>>  #include <linux/clocksource.h>
+>>  #include <linux/irq.h>
+>>  #include <asm/hardware/cache-l2x0.h>
+>> +#include <asm/mach/map.h>
+>>  #include <asm/mach/arch.h>
+>>  
+>>  #include "smp.h"
+>> @@ -42,6 +43,7 @@ static const char *stih41x_dt_match[] __initdata = {
+>>  };
+>>  
+>>  DT_MACHINE_START(STM, "STiH415/416 SoC with Flattened Device Tree")
+>> +       .map_io         = debug_ll_io_init,
+>>         .init_time      = stih41x_timer_init,
+>>         .smp            = smp_ops(stixxxx_smp_ops),
+>>         .dt_compat      = stih41x_dt_match,
 > 
-> BTW, Mike, according to your reply, I may get your ack on 2nd and 6th clk
-> patches...If any problems, please kindly let me know.
+> This part of the patch is no longer needed, we do the same when .map_io
+> is not set.
 
-Fine by me.
+I can see the commit bc37324e "ARM: mmu: Call debug_ll_io_init if no
+map_io function is specified" in arm-soc.git:for-next branch.
 
-Regards,
-Mike
+That makes sense to take care of this before this patch gets merged. I
+will remove this line in next spin hopefully very soon.
+
+Thanks,
+srini
+
 
 > 
-> Thanks,
-> - Kukjin
+> 	Arnd
+> 
+> 
