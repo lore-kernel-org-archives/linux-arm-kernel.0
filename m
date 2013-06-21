@@ -1,43 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Jun 2013 18:48:28 -0700
-Subject: [PATCH] gpio: msm-v1: Remove errant __devinit to fix compile
-In-Reply-To: <CACRpkdZ=VbMUBfHt-GruTzc5_7vF508XFAW50YZb4ouG1TrjZg@mail.gmail.com>
-References: <1370373600-31921-1-git-send-email-sboyd@codeaurora.org>
- <CACRpkdZ5x3q9tn3J5_mQj-nJ_wO3HWgX5DTMQdMzF3mUDrAieQ@mail.gmail.com>
- <51BF43F4.9000007@codeaurora.org>
- <CACRpkdZ=VbMUBfHt-GruTzc5_7vF508XFAW50YZb4ouG1TrjZg@mail.gmail.com>
-Message-ID: <20130621014828.GA859@quad.lixom.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 21 Jun 2013 10:01:02 +0800
+Subject: [PATCH 1/3] ARM: dts: imx6dl: add a new pinctrl for ecspi1
+In-Reply-To: <1371708010-22710-1-git-send-email-b32955@freescale.com>
+References: <1371708010-22710-1-git-send-email-b32955@freescale.com>
+Message-ID: <20130621020100.GA24268@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 11:16:17AM +0200, Linus Walleij wrote:
-> On Mon, Jun 17, 2013 at 7:14 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 06/16/13 22:54, Linus Walleij wrote:
-> >> On Tue, Jun 4, 2013 at 9:20 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >>
-> >>> Commit 7bce696 (gpio: Make gpio-msm-v1 into a platform driver,
-> >>> 2013-03-04) was based on an older kernel where __devinit still
-> >>> existed. Remove the erroneous __devinit marking.
-> >>>
-> >>> Cc: David Brown <davidb@codeaurora.org>
-> >>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> >> Patch applied.
-> >
-> > Thanks. It looks like David picked this up and sent it off to arm-soc
-> > last week. Cc'ing Olof for awareness of a possible duplicate.
+On Thu, Jun 20, 2013 at 02:00:08PM +0800, Huang Shijie wrote:
+> This new pinctrl is used in the imx6dl-sabresd board.
 > 
-> Did that get ack by some GPIO maintainer?
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6dl.dtsi |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
 > 
-> This needs to go through the GPIO tree, but I
-> guess GIT will survive if it ends up in two trees.
+> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+> index 2b3ecd6..b8f6fab 100644
+> --- a/arch/arm/boot/dts/imx6dl.dtsi
+> +++ b/arch/arm/boot/dts/imx6dl.dtsi
+> @@ -56,6 +56,13 @@
+>  							MX6DL_PAD_EIM_D16__ECSPI1_SCLK 0x100b1
+>  						>;
+>  					};
 
-Nope, and it slipped through the cracks. More and more patches that we see lack
-proper acks, and it's becoming a problem. I have to go search for them on the
-lists and see if they came in without being tagged on the patch, etc.
+Please have a blank line between nodes.
 
-Time to get more strict on that, obviously. :(
+> +					pinctrl_ecspi1_2: ecspi1cr-1 {
 
-But yeah, one duplicate trivial patch like this shouldn't be an issue.
+What does the "cr" in the node name mean?  Aren't we generally using
+"grp" there?
 
+Shawn
 
--Olof
+> +						fsl,pins = <
+> +							MX6DL_PAD_KEY_COL1__ECSPI1_MISO 0x100b1
+> +							MX6DL_PAD_KEY_ROW0__ECSPI1_MOSI 0x100b1
+> +							MX6DL_PAD_KEY_COL0__ECSPI1_SCLK 0x100b1
+> +						>;
+> +					};
+>  				};
+>  
+>  				enet {
+> -- 
+> 1.7.1
+> 
+> 
