@@ -1,78 +1,182 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 21 Jun 2013 19:48:18 -0400
-Subject: [PATCH 4/8] ARM: mm: Pass the constant as an argument to
- fixup_pv_table()
+Date: Fri, 21 Jun 2013 19:48:21 -0400
+Subject: [PATCH 7/8] ARM: mm: Recreate kernel mappings in early_paging_init()
 In-Reply-To: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1371858502-10083-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1371858502-10083-8-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current fixup_pv_table() API hardcoded the constant to be
-patched. Make that as an argument to fixup_pv_table() so that
-different type of instructions can be patched.
+This patch adds a step in the init sequence, in order to recreate
+the kernel code/data page table mappings prior to full paging
+initialization.  This is necessary on LPAE systems that run out of
+a physical address space outside the 4G limit.  On these systems,
+this implementation provides a machine descriptor hook that allows
+the PHYS_OFFSET to be overridden in a machine specific fashion.
 
-This is preparatory patch to add the subsequent 64 bit patching.
+Based on Cyril's initial patch. The pv_table needs to be patched
+again after switching to higher address space.
 
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+
+Signed-off-by: R Sricharan <r.sricharan@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/include/asm/memory.h |    2 ++
- arch/arm/kernel/head.S        |    3 +--
- arch/arm/kernel/module.c      |    4 ++--
- 3 files changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/mach/arch.h |    1 +
+ arch/arm/kernel/setup.c          |    3 ++
+ arch/arm/mm/mmu.c                |   99 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 103 insertions(+)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 5944092..3d4f79c 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -175,6 +175,8 @@
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index 308ad7d..e487b8e 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -43,6 +43,7 @@ struct machine_desc {
+ 	struct smp_operations	*smp;		/* SMP operations	*/
+ 	void			(*fixup)(struct tag *, char **,
+ 					 struct meminfo *);
++	void			(*init_meminfo)(void);
+ 	void			(*reserve)(void);/* reserve mem blocks	*/
+ 	void			(*map_io)(void);/* IO mapping function	*/
+ 	void			(*init_early)(void);
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index bdcd4dd..e2ebe6c 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -71,6 +71,7 @@ static int __init fpe_setup(char *line)
+ __setup("fpe=", fpe_setup);
+ #endif
  
- extern phys_addr_t (*arch_virt_to_idmap) (unsigned long x);
- extern unsigned long __pv_phys_offset;
-+extern unsigned long __pv_offset;
++extern void early_paging_init(struct machine_desc *, struct proc_info_list *);
+ extern void paging_init(struct machine_desc *desc);
+ extern void sanity_check_meminfo(void);
+ extern void reboot_setup(char *str);
+@@ -789,6 +790,8 @@ void __init setup_arch(char **cmdline_p)
+ 	parse_early_param();
+ 
+ 	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
 +
- #define PHYS_OFFSET __pv_phys_offset
++	early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
+ 	sanity_check_meminfo();
+ 	arm_memblock_init(&meminfo, mdesc);
  
- #define __pv_stub(from,to,instr,type)			\
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 45e8935..764e83b 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -604,11 +604,10 @@ ENDPROC(__fixup_a_pv_table)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 280f91d..f8ef29b 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -28,6 +28,7 @@
+ #include <asm/highmem.h>
+ #include <asm/system_info.h>
+ #include <asm/traps.h>
++#include <asm/procinfo.h>
  
- ENTRY(fixup_pv_table)
- 	stmfd	sp!, {r4 - r7, lr}
--	ldr	r2, 2f			@ get address of __pv_phys_offset
- 	mov	r3, #0			@ no offset
- 	mov	r4, r0			@ r0 = table start
- 	add	r5, r0, r1		@ r1 = table size
--	ldr	r6, [r2, #4]		@ get __pv_offset
-+	mov	r6, r2			@ get constant to be patched
- 	bl	__fixup_a_pv_table
- 	ldmfd	sp!, {r4 - r7, pc}
- ENDPROC(fixup_pv_table)
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 1e9be5d..1ac071b 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -265,7 +265,7 @@ static const Elf_Shdr *find_mod_section(const Elf32_Ehdr *hdr,
- 	return NULL;
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -1264,6 +1265,104 @@ static void __init map_lowmem(void)
+ 	}
  }
  
--extern void fixup_pv_table(const void *, unsigned long);
++#ifdef CONFIG_ARM_LPAE
 +extern void fixup_pv_table(const void *, unsigned long, unsigned long);
- extern void fixup_smp(const void *, unsigned long);
- 
- int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
-@@ -319,7 +319,7 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
- #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
- 	s = find_mod_section(hdr, sechdrs, ".pv_table");
- 	if (s)
--		fixup_pv_table((void *)s->sh_addr, s->sh_size);
-+		fixup_pv_table((void *)s->sh_addr, s->sh_size, __pv_offset);
- #endif
- 	s = find_mod_section(hdr, sechdrs, ".alt.smp.init");
- 	if (s && !is_smp())
++extern const void *__pv_table_begin, *__pv_table_end;
++extern const void *__pv_high_table_begin, *__pv_high_table_end;
++
++/*
++ * early_paging_init() recreates boot time page table setup, allowing machines
++ * to switch over to a high (>4G) address space on LPAE systems
++ */
++void __init early_paging_init(struct machine_desc *mdesc,
++			      struct proc_info_list *procinfo)
++{
++	pmdval_t pmdprot = procinfo->__cpu_mm_mmu_flags;
++	unsigned long map_start, map_end;
++	pgd_t *pgd0, *pgdk;
++	pud_t *pud0, *pudk;
++	pmd_t *pmd0, *pmdk;
++	phys_addr_t phys;
++	int i;
++	unsigned long __pv_phys_offset_low;
++
++	/* remap kernel code and data */
++	map_start = init_mm.start_code;
++	map_end   = init_mm.brk;
++
++	/* get a handle on things... */
++	pgd0 = pgd_offset_k(0);
++	pud0 = pud_offset(pgd0, 0);
++	pmd0 = pmd_offset(pud0, 0);
++
++	pgdk = pgd_offset_k(map_start);
++	pudk = pud_offset(pgdk, map_start);
++	pmdk = pmd_offset(pudk, map_start);
++
++	phys = PHYS_OFFSET;
++
++	if (mdesc->init_meminfo) {
++		mdesc->init_meminfo();
++		/* Run the patch stub to update the constants */
++		fixup_pv_table(&__pv_table_begin,
++			(&__pv_table_end - &__pv_table_begin) << 2,
++			__pv_offset);
++
++		fixup_pv_table(&__pv_high_table_begin,
++			(&__pv_high_table_end - &__pv_high_table_begin) << 2,
++			__pv_phys_offset >> PV_HIGH_SHIFT);
++
++		/*
++		 * Cache cleaning operations for self-modifying code
++		 * We should clean the entries by MVA but running a
++		 * for loop over every pv_table entry pointer would
++		 * just complicate the code.
++		 */
++		flush_cache_louis();
++		dsb();
++		isb();
++
++		/*
++		 * Set the flag to indicate whether __pv_offset is
++		 * real or 2's complement after high address switch
++		 */
++		__pv_phys_offset_low = __pv_phys_offset;
++		if (__pv_phys_offset_low < PAGE_OFFSET)
++			__pv_sign_flag = 1;
++		else
++			 __pv_sign_flag = 0;
++	}
++
++	/* remap level 1 table */
++	for (i = 0; i < PTRS_PER_PGD; i++) {
++		*pud0++ = __pud(__pa(pmd0) | PMD_TYPE_TABLE | L_PGD_SWAPPER);
++		pmd0 += PTRS_PER_PMD;
++	}
++
++	/* remap pmds for kernel mapping */
++	phys = __pa(map_start) & PMD_MASK;
++	do {
++		*pmdk++ = __pmd(phys | pmdprot);
++		phys += PMD_SIZE;
++	} while (phys < map_end);
++
++	flush_cache_all();
++	cpu_set_ttbr(0, __pa(pgd0));
++	cpu_set_ttbr(1, __pa(pgd0) + TTBR1_OFFSET);
++	local_flush_tlb_all();
++}
++
++#else
++
++void __init early_paging_init(struct machine_desc *mdesc,
++			      struct proc_info_list *procinfo)
++{
++	if (mdesc->init_meminfo)
++		mdesc->init_meminfo();
++}
++
++#endif
++
+ /*
+  * paging_init() sets up the page tables, initialises the zone memory
+  * maps, and sets up the zero page, bad page and bad page tables.
 -- 
 1.7.9.5
