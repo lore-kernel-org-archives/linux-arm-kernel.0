@@ -1,53 +1,55 @@
 From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 21 Jun 2013 09:10:37 +0200
-Subject: [PATCH 3/4] ARM: shmobile: ape6evm: add CPUFreq support
+Date: Fri, 21 Jun 2013 09:10:38 +0200
+Subject: [PATCH 4/4] ARM: shmobile: r8a73a4: add Z2 clock support
 In-Reply-To: <1371798638-10530-1-git-send-email-g.liakhovetski@gmx.de>
 References: <1371798638-10530-1-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <1371798638-10530-4-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <1371798638-10530-5-git-send-email-g.liakhovetski@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds OPPs to the CA15 DT node and a max8973 DT node to support
-clock and voltage scaling, using the cpufreq-cpu0 CPUFreq driver.
+The Z2 clock on r8a73a4 is used to clock the 4 Cortex A7 cores on the SoC.
+Add a definition for this clock to later use it from the arm_big_little
+CPUFreq driver.
 
 Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 ---
- arch/arm/boot/dts/r8a73a4-ape6evm.dts |   26 ++++++++++++++++++++++++++
- 1 files changed, 26 insertions(+), 0 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a73a4.c |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-index 4fb0102..af6bd40 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-@@ -52,3 +52,29 @@
- 		};
- 	};
+diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
+index 508cb1e..b717e98 100644
+--- a/arch/arm/mach-shmobile/clock-r8a73a4.c
++++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
+@@ -324,6 +324,21 @@ static struct clk z_clk = {
+ 	.ops = &zclk_ops,
  };
+ 
++/*
++ * It seems only 1/2 divider is usable in manual mode. 1/2 / 2/3
++ * switching is only available in auto-DVFS mode
++ */
++SH_FIXED_RATIO_CLK(pll0_div2_clk,	pll0_clk,		div2);
 +
-+&i2c5 {
-+	max8973 at 1b {
-+		compatible = "maxium,max8973";
-+		reg = <0x1b>;
-+
-+		regulators {
-+			vdd_dvfs: dcdc {
-+				regulator-min-microvolt = <935000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+		};
-+	};
++static struct clk z2_clk = {
++	.parent = &pll0_div2_clk,
++	.div_mask = 0x1f,
++	.enable_bit = 0,
++	/* We'll need to access FRQCRB and FRQCRC */
++	.enable_reg = (void __iomem *)FRQCRB,
++	.ops = &zclk_ops,
 +};
 +
-+&cpu0 {
-+	cpu0-supply = <&vdd_dvfs>;
-+	operating-points = <
-+		/* kHz  uV */
-+		1950000 1115000
-+		1462500  995000
-+	>;
-+	voltage-tolerance = <1>; /* 1% */
-+};
+ static struct clk *main_clks[] = {
+ 	&extalr_clk,
+ 	&extal1_clk,
+@@ -342,6 +357,8 @@ static struct clk *main_clks[] = {
+ 	&pll2s_clk,
+ 	&pll2h_clk,
+ 	&z_clk,
++	&pll0_div2_clk,
++	&z2_clk,
+ };
+ 
+ /* DIV4 */
 -- 
 1.7.2.5
