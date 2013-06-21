@@ -1,107 +1,179 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 21 Jun 2013 13:12:19 -0600
-Subject: [PATCH] pinctrl: document the pinctrl PM states
-In-Reply-To: <20130621062552.GI5523@atomide.com>
-References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
- <51BA1FE7.4000900@wwwdotorg.org>
- <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
- <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
- <51C20E3A.8090304@wwwdotorg.org> <20130620063823.GD5523@atomide.com>
- <51C3577E.6040709@wwwdotorg.org> <20130621062552.GI5523@atomide.com>
-Message-ID: <51C4A593.6000900@wwwdotorg.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 21 Jun 2013 16:16:41 -0400 (EDT)
+Subject: [RFC PATCH v1 5/6] USB: EHCI: improve interrupt qh unlink
+In-Reply-To: <CACVXFVOp_zPRA65QBwLdD7pPLR1efK1_HSg1CmHbYCpmY+JJqw@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306211516190.1020-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2013 12:25 AM, Tony Lindgren wrote:
-> * Stephen Warren <swarren@wwwdotorg.org> [130620 12:32]:
->> On 06/20/2013 12:38 AM, Tony Lindgren wrote:
->>> * Stephen Warren <swarren@wwwdotorg.org> [130619 13:08]:
->>>> On 06/17/2013 01:20 AM, Tony Lindgren wrote:
->> ...
->>>>> Below are the pin remuxing cases I'm aware of:
->>>> ...
->>>>> Then for dealing with the above examples, I think we already have a
->>>>> pretty good setup in pinctrl framework to deal with this with the
->>>>> named modes. But I think that to do this properly with the named
->>>>> modes we should have named modes like the following:
->>>>>
->>>>> "static" && ("active" || "idle")
->>>>> "static" && ("rx" || "tx")
->>>>>
->>>>> Here the "static" pins would be set during driver probe and never
->>>>> need to change until the driver is unloaded. This is close to what we
->>>>> currently call "default". But we should probably make it clear that
->>>>> these will not change to avoid confusion. See below for more info.
->>>>>
->>>>> The the non-static states like "active"/"idle", or "rx"/"tx", can
->>>>> be set in addition to "static", but they should not be subsets of
->>>>> "static" to avoid the issues Stephen described earlier. This way we
->>>>> allow the named modes to do the work for us while protecting the
->>>>> claimed pins.
->>>>
->>>> Yes, I think this can certainly work conceptually. It's equivalent to
->>>> pre-computing which parts of the overall state don't change between the
->>>> currently-defined "global" active/idle states and then applying the
->>>> diffs at runtime - rather like what I suggested before, but without the
->>>> pinctrl code having to do the diff at runtime. I'm not sure if I have
->>>> (yet) a strong opinion on whether allowing multiple states to be active
->>>> at once (i.e. static plus active) is the correct way to go. Maybe once
->>>> I've finished reading the thread...
->>>
->>> I don't think there's any issue for having multiple sets active the same
->>> is an issue, we're already doing it quite a bit although for different
->>> device drivers so we have the framework ready for that already.
->>
->> I assume you mean there shouldn't be any issue *modifying* the pinctrl
->> API to allow multiple states to be active at once? And where you're
->> talking about having multiple sets active at once already, you're
->> talking about some other API?
+On Thu, 20 Jun 2013, Ming Lei wrote:
+
+> IMO, there is no any side effect when we change the state to
+> QH_STATE_UNLINK_WAIT and later change back to QH_STATE_LINKED
+> later under this situation.
+
+I don't like the idea of changing an invariant.
+
+> The reason why I use QH_STATE_UNLINK_WAIT here is for avoiding
+> unnecessary CPU wakeup.  Without the state, the unlink wait timer
+> is still triggered to check if there are intr QHs to be unlinked, but in most of
+> situations, there aren't QHs to be unlinked since tasklet is surely run
+> before the wait timer is expired. So generally, without knowing the wait state,
+> CPU wakeup events may be introduced unnecessarily.
+
+Avoiding unnecessary timer events is a good thing, but I don't 
+understand how it is connected with QH_STATE_UNLINK_WAIT.  Doesn't this
+revised patch avoid the events without using this state?
+
+Besides, don't you already know the wait state by checking whether 
+qh->unlink_node is empty?
+
+> Considered that the interval of interrupt endpoint might be very
+> small(e.g. 125us,
+> 1ms) and some devices have very frequent intr event, I think we
+> need to pay attention to the problem.
+
+Yes, we do.  The hrtimer code in ehci-timer is written specifically to 
+handle that sort of situation.
+
+> Even on async QH situation, we might need to consider the problem too
+> since some application(eg. bulk only mass storage on xhci) may have
+> thousands of interrupts per seconds during data transfer, so CPU wakeup
+> events could be increased much by letting wait timer expire unnecessarily.
+
+I suspect it's the other way around.  Letting the timer expire
+_reduces_ the amount of work, because we don't have to start and stop
+the timer as often.
+
+It's a tradeoff.  One approach starts and cancels the timer N times
+(where N can be fairly large); the other approach starts the timer
+once and lets it expire, and then the handler routine does almost no
+work.  Which approach uses more CPU time?  I don't know; I haven't
+measured it.
+
+> Also the async QH unlink approach has another disadvantage:
 > 
-> Nope, the standard pinctrl API. At least I have not seen issues with
-> having multiple states active the same time in a single driver.
+> - if there are several QHs which are become empty during one wait period,
+> the hrtimer has to be scheduled several times for starting unlink one qh
+> each time.
 
-Please take a look at the implementation of pinctrl_select_state(). It
-very explicitly performs the following steps:
+That's because the driver unlinks only one async QH at a time.  It is
+unavoidable.  In earlier kernels the driver would unlink multiple async
+QHs simultaneously, and it needed to schedule the timer only once.  
+For some reason (I still don't understand why), this did not work on
+some systems.
 
-1) Find all pins(groups) that are used in the current state but not the
-new state, and execute pinctrl_disable_setting() on them. (For mux
-settings only, not pin config, since the core doesn't have any idea how
-to reverse config settings).
+>  And after introducing the unlink wait list like the patch, we only
+> need schedule the hrtimer one time for unlinking all these empty QHs.
 
-2) For all settings in the new state, apply those settings.
+The async code used to work that way, before I changed it to unlink
+only one async QH at a time.
 
-So, it very explicitly only allows a single state to be set at a time.
-Equally, p->state (the field which stores the currently selected state)
-is a single item, not a set/list/array.
+> Finally, unlink wait for intr qh is only needed when the qh is completed
+> right now, and other cases(eg. unlink) needn't the wait.
 
-So, this code needs rework if you want the core to support the concept
-of having multiple states active at once, since it needs separate
-pinctrl_activate_state() and pinctrl_deactivate_state() APIs, in order
-to avoid step (1) above. And of course, p->state would need to be a
-set/list/array.
+Right.
 
->> Right now, pinctrl_select_state() de-activates the old state while
->> activating the new state, so it's not possible to have more than one
->> active at once.
+> The attached patch removes the QH_STATE_UNLINK_WAIT, and can
+> avoid the above disadvantages of async QH unlink, could you comment
+> on the new patch?
+
+Okay...
+
+> diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+> index 246e124..35b4148 100644
+> --- a/drivers/usb/host/ehci-hcd.c
+> +++ b/drivers/usb/host/ehci-hcd.c
+> @@ -304,7 +304,8 @@ static void end_unlink_async(struct ehci_hcd *ehci);
+>  static void unlink_empty_async(struct ehci_hcd *ehci);
+>  static void unlink_empty_async_suspended(struct ehci_hcd *ehci);
+>  static void ehci_work(struct ehci_hcd *ehci);
+> -static void start_unlink_intr(struct ehci_hcd *ehci, struct ehci_qh *qh);
+> +static void start_unlink_intr(struct ehci_hcd *ehci, struct ehci_qh *qh,
+> +			      bool wait);
+
+Adding a "wait" argument is a bad approach.  You should create a new 
+function: start_unlink_intr_wait() or something like that.  After all, 
+it is used in only one place.
+
+> diff --git a/drivers/usb/host/ehci-sched.c b/drivers/usb/host/ehci-sched.c
+> index acff5b8..5dfda56 100644
+> --- a/drivers/usb/host/ehci-sched.c
+> +++ b/drivers/usb/host/ehci-sched.c
+> @@ -548,6 +548,9 @@ static void qh_link_periodic(struct ehci_hcd
+> *ehci, struct ehci_qh *qh)
 > 
-> That should be fine if the hardware needs it. The "static" (or "default")
-> state can stay active continuously, and "active" and "idle" states are
-> not subsets of "static".
+>  	list_add(&qh->intr_node, &ehci->intr_qh_list);
 > 
-> Then flipping between "active" and "idle" states is fine as they cover
-> the same pins, and only either "active" or "idle" state is selected at
-> a time.
+> +	/* unlink need this node to be initialized */
+> +	INIT_LIST_HEAD(&qh->unlink_node);
+
+This should be done only once, when the QH is created.  And the comment 
+is unnecessary.
+
+> @@ -98,6 +99,17 @@ static void ehci_enable_event(struct ehci_hcd
+> *ehci, unsigned event,
+>  	}
+>  }
 > 
-> If the hardware needs to de-activate the old state inbetween the change
-> from "active" to "idle", that should be just fine.
+> +/* Warning: don't call this function from hrtimer handler context */
+> +static void ehci_disable_event(struct ehci_hcd *ehci, unsigned event)
+> +{
+> +	if (!hcd_giveback_urb_in_bh(ehci_to_hcd(ehci)))
+> +		return;
 
-Well, I'm not saying the code couldn't be written to do that. It may
-even be the right thing to do. However, I'm just pointing out that it
-would need conceptual/semantic changes to the pinctrl API and
-implementation.
+This test looks really ugly, and it won't be needed after the driver
+switches over to tasklets.  Of course, there's a problem before we
+switch over: this routine will be called by an interrupt URB
+submission, which could occur during a giveback in the timer handler
+context.
 
-> If there are other issues with de-activating pins, then let me know.
-> I'm not be seeing the issue with de-activating states as pinctrl-single
-> does not de-activate anything for omap. The disable call gets called
-> between the state changes though, so hardware needing de-activating
-> can specify it.
+Perhaps the best approach is to leave this routine out until after the 
+driver switches over.
+
+> +
+> +	ehci->enabled_hrtimer_events &= ~(1 << event);
+> +	if (!ehci->enabled_hrtimer_events)
+
+Here you need to add:
+
+		ehci->next_hrtimer_event = EHCI_HRTIMER_NO_EVENT;
+
+> +		hrtimer_cancel(&ehci->hrtimer);
+> +}
+
+This could also be useful for the IAA watchdog timer in the STS_IAA
+code in ehci_irq().
+
+> @@ -215,6 +227,36 @@ static void ehci_handle_controller_death(struct
+> ehci_hcd *ehci)
+>  	/* Not in process context, so don't try to reset the controller */
+>  }
+> 
+> +/* start to unlink interrupt QHs  */
+> +static void ehci_handle_start_intr_unlinks(struct ehci_hcd *ehci)
+> +{
+> +	bool		stopped = (ehci->rh_state < EHCI_RH_RUNNING);
+> +
+> +	/*
+> +	 * Process all the QHs on the intr_unlink list that were added
+> +	 * before the current unlink cycle began.  The list is in
+> +	 * temporal order, so stop when we reach the first entry in the
+> +	 * current cycle.  But if the root hub isn't running then
+> +	 * process all the QHs on the list.
+> +	 */
+> +	while (!list_empty(&ehci->intr_unlink_wait)) {
+> +		struct ehci_qh	*qh;
+> +
+> +		qh = list_first_entry(&ehci->intr_unlink_wait,
+> +				      struct ehci_qh, unlink_node);
+> +		if (!stopped &&
+> +		    qh->unlink_cycle == ehci->intr_unlink_wait_cycle)
+> +			break;
+
+The style in this driver is to add two tab stops to continuation lines, 
+not to line them up with respect to the previous line.
+
+Otherwise this seems to be about right.
+
+Alan Stern
