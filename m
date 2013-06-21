@@ -1,47 +1,41 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Jun 2013 12:46:11 -0400
-Subject: [GIT PULL 1/2] ARM: mvebu: dt changes for v3.11 (round 6!)
-Message-ID: <20130621164611.GT31667@titan.lakedaemon.net>
+Date: Fri, 21 Jun 2013 12:48:50 -0400
+Subject: [GIT PULL 2/2] ARM: mvebu: regmap fix for multiplatform (round 2)
+Message-ID: <20130621164850.GU31667@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd, Olof,
 
-Here's the last stragglers for v3.11.  Nothing too traumatic :)
 
-This does cause a merge conflict in kirkwood.dtsi with my
-mvebu/pcie_kirkwood branch.  The resolution is to keep the changes in
-this branch.
+The following changes since commit 5fb2038d61ce94e7c9224db2aaff5633ca224953:
 
-
-The following changes since commit 918f8f309643978b9e761f39af8962a7388d332d:
-
-  ARM: Kirkwood: ts219: Enable second PCIe port in DT. (2013-06-11 16:02:08 +0000)
+  arm: mvebu: disable DEBUG_LL/EARLY_PRINTK in defconfig (2013-06-13 17:48:59 +0000)
 
 are available in the git repository at:
 
-  git://git.infradead.org/users/jcooper/linux.git tags/dt-3.11-6
+  git://git.infradead.org/users/jcooper/linux.git tags/regmap-3.11-2
 
-for you to fetch changes up to 01db527e657d6cf646c6e6f059ad41e7023a25e7:
+for you to fetch changes up to 1919bff0e25f5f7ce43474a3b972405f51023e99:
 
-  ARM: Kirkwood: Fix the internal register ranges translation (2013-06-21 15:38:20 +0000)
-
-----------------------------------------------------------------
-mvebu dt changes for v3.11 (round 6)
-
- - mvebu
-    - mini-PCIe connectors on Armada 370 RD
-
- - kirkwood
-    - correct internal register ranges translation
+  arm: mvebu: fix coherency_late_init() for multiplatform (2013-06-20 12:12:48 +0000)
 
 ----------------------------------------------------------------
-Ezequiel Garcia (1):
-      ARM: Kirkwood: Fix the internal register ranges translation
+mvebu register map changes for v3.11 (round 2)
 
+This series removes the hardcoded register base address for mvebu.
+
+For round 2:
+ - multiplatform
+    - fix booting on anything other than mvebu
+
+Depends (none new for round 2):
+ - mvebu/fixes-non-critical (up to tags/fixes-non-3.11-1)
+ - mvebu/cleanup (up to tags/cleanup-3.11-3)
+
+----------------------------------------------------------------
 Thomas Petazzoni (1):
-      arm: mvebu: enable mini-PCIe connectors on Armada 370 RD
+      arm: mvebu: fix coherency_late_init() for multiplatform
 
- arch/arm/boot/dts/armada-370-rd.dts | 16 ++++++++++++++++
- arch/arm/boot/dts/kirkwood.dtsi     |  5 +++--
- 2 files changed, 19 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/coherency.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
