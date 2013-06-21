@@ -1,77 +1,57 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 21 Jun 2013 10:54:45 +0100
-Subject: [PATCH 3/3] ARM: kernel: document ARM CPUs clocks and
- clock-frequency properties
-In-Reply-To: <20130621093011.GB14268@e102568-lin.cambridge.arm.com>
-References: <1371739146-32639-1-git-send-email-f.fainelli@gmail.com>
- <1371739146-32639-4-git-send-email-f.fainelli@gmail.com>
- <20130621093011.GB14268@e102568-lin.cambridge.arm.com>
-Message-ID: <CAGVrzcZib6qBpugJn9WQ6hLo1EVkZB3r2PjbYwfvXOL3W5tbow@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 21 Jun 2013 10:57:29 +0100
+Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
+ MMU binding
+In-Reply-To: <20130620200845.GF11309@8bytes.org>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-8-git-send-email-will.deacon@arm.com>
+ <20130620200845.GF11309@8bytes.org>
+Message-ID: <20130621095729.GA7766@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/6/21 Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>:
-> On Thu, Jun 20, 2013 at 03:39:06PM +0100, Florian Fainelli wrote:
->> ARM CPU device tree nodes may contain a "clock-frequency" property,
->> when set, this property must contain the CPU frequency in Hz,
->> which is then used by the topology parsing code in
->> arch/arm/kernel/topology.c to deduced the CPU capacity. The "clocks"
->> property, if present shall be a phandle to a valid clock node.
->>
->> Document thes properties to avoid any possible confusion on the
->> clock-frequency unit and also specify that "device_type" is also
->> used by the topology code.
->>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->>  Documentation/devicetree/bindings/arm/cpus.txt | 7 ++++++-
->>  1 file changed, 6 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
->> index f32494d..1ce1ace 100644
->> --- a/Documentation/devicetree/bindings/arm/cpus.txt
->> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
->> @@ -10,7 +10,7 @@ http://devicetree.org
->>
->>  For the ARM architecture every CPU node must contain the following properties:
->>
->> -- device_type:       must be "cpu"
->> +- device_type:       must be "cpu". Use by the topology code.
->
-> No. These are DT bindings, they are not related to kernel code and must
-> be defined independently.
+Hi Joerg,
 
-Ok.
+On Thu, Jun 20, 2013 at 09:08:45PM +0100, Joerg Roedel wrote:
+> On Mon, Jun 10, 2013 at 07:34:43PM +0100, Will Deacon wrote:
+> > This patch adds a description of the device tree binding for the ARM
+> > System MMU architecture.
+> 
+> Interesting, will this be a common driver to replace existing ARM IOMMU
+> drivers or is it a common driver for ARM IOMMUs found in future chips?
 
->
->>  - reg:               property matching the CPU MPIDR[23:0] register bits
->>               reg[31:24] bits must be set to 0
->>  - compatible:        should be one of:
->> @@ -45,6 +45,11 @@ For the ARM architecture every CPU node must contain the following properties:
->>               "marvell,xsc3"
->>               "marvell,xscale"
->>
->> +- clocks:    phandle and clock specifier for the CPU clock, used if
->> +             "device_type" is present.
->
-> "device_type" must be present, no "if" there (see latest bindings that are on
-> their way to the kernel)
->
-> git://linux-arm.org/linux-2.6-lp.git dt-cpus-bindings
->
-> Then we can see if a "clocks" property is suitable here, and try to understand
-> what needs to happen when a platform has DVFS capabilities. I need to think
-> more about this.
->
->> +- clock-frequency: the frequency of the CPU, in Hz. Mandatory if "device_type"
->> +                is also present, used as fallback is "clocks" is not present.
-> We should not define bindings to fix kernel code. Either "clock-frequency"
-> is required or it is not, it should not depend on "device_type" being
-> present and "device_type" is mandatory anyway. As I mentioned above, we
-> still have to check how to handle multiple frequencies, and how to do it.
->
-> I will give it more thought on my side.
+This is a common driver that will support any IOMMUs compatible with v1 or
+v2 of the ARM SMMU architecture. Currently, that includes SMMUs known
+informatively as MMU-400, MMU-401 and MMU-500. I had a look at the other
+IOMMU drivers in the kernel and they seem to be driving incompatible IOMMUs,
+so I don't see how this driver can replace those.
 
-Sure. On the short term, I think it would be wise to clarify that
-"clock-frequency" must be in Hz so that people that define their
-binding now get it correctly.
+However, we'll hopefully see ARM SMMU-compatible devices turning up soon (I
+know of many SoCs in development that are looking at them).
+
+> > +- smmu-parent   : When multiple SMMUs are chained together, this
+> > +                  property can be used to provide a phandle to the
+> > +                  parent SMMU (that is the next SMMU on the path going
+> > +                  from the mmu-masters towards memory) node for this
+> > +                  SMMU.
+> 
+> What happens when SMMUs are chained? Will the second SMMU seeing the DMA
+> just pass it through or is it translated again?
+
+Chaining is really horrible and exists as a hack to support virtualisation
+using two separate SMMUs, where neither of them can support nested
+translation.
+
+The current driver just programs the translation in the SMMU nearest the
+device, then sets the other SMMU into `bypass' mode (it was simple enough to
+generalise the chain to contain an arbitrary number of SMMUs, so the driver
+can actually deal with any number of the things). In theory (and if we
+extended the IOMMU API to distinguish between guest and host mappings --
+something which I plan to look at in the future), KVM could install mappings
+in the second SMMU, but I think we should draw a line in the sand and mandate
+support for nested translation for KVM.
+
+The only thing to take care of is that the SMMUs in the chain don't silently
+truncate addresses.
+
+Will
