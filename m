@@ -1,77 +1,48 @@
-From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
-Date: Fri, 21 Jun 2013 10:09:03 +0530
-Subject: [PATCH] of: Specify initrd location using 64-bit
-In-Reply-To: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <51C3D8E7.5030601@synopsys.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Fri, 21 Jun 2013 12:46:33 +0800
+Subject: [RFC PATCH v1 1/6] USB: HCD: support giveback of URB in tasklet
+ context
+In-Reply-To: <CACVXFVMdxtd2fcwNE_YrfwG0Ksq67ww_Ar9A6fCGSr442gWaag@mail.gmail.com>
+References: <CACVXFVPPF=DNp0dpypoZ=OifkfnCgWJKpQHMv4xE8PmBk8RiHQ@mail.gmail.com>
+ <Pine.LNX.4.44L0.1306201242110.2063-100000@iolanthe.rowland.org>
+ <CACVXFVMdxtd2fcwNE_YrfwG0Ksq67ww_Ar9A6fCGSr442gWaag@mail.gmail.com>
+Message-ID: <CACVXFVM1gUxZjwGLjFkog_8K=aKBx3vr9hcdKKX6qr9GoS0YNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
-
-On 06/21/2013 06:22 AM, Santosh Shilimkar wrote:
-> Cc: Vineet Gupta <vgupta@synopsys.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
-> Cc: James Hogan <james.hogan@imgtec.com>
-> Cc: Michal Simek <monstr@monstr.eu>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: Jonas Bonn <jonas@southpole.se>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: x86 at kernel.org
-> Cc: arm at kernel.org
-> Cc: Chris Zankel <chris@zankel.net>
-> Cc: Max Filippov <jcmvbkbc@gmail.com>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: bigeasy at linutronix.de
-> Cc: robherring2 at gmail.com
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+On Fri, Jun 21, 2013 at 9:12 AM, Ming Lei <ming.lei@canonical.com> wrote:
+> On Fri, Jun 21, 2013 at 12:52 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+>> On Thu, 20 Jun 2013, Ming Lei wrote:
+>>
+>>> On Thu, Jun 20, 2013 at 10:59 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+>>> >
+>>> > By the way, did you consider the race that Oliver pointed out?  When an
+>>> > HCD is removed, all the outstanding URBs for all devices on its bus get
+>>> > cancelled.  The core waits until the urb_list for each endpoint is
+>>> > empty.
+>>>
+>>> This should be enough since during remove path usbcore will wait for all
+>>> URBs' completion which is only triggered by tasklet, so once all URBs are
+>>> finished, the tasklet list has been empty already.
+>>
+>> No, usbcore only waits until the urb_list for each endpoint is empty.
+>> It doesn't keep track of the individual URB completions.  Look at
+>> usb_hcd_flush_endpoint() and you'll see.
 >
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-c6x-dev at linux-c6x.org
-> Cc: linux-mips at linux-mips.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-xtensa at linux-xtensa.org
-> Cc: devicetree-discuss at lists.ozlabs.org
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arc/mm/init.c            |    3 +--
->  arch/arm/mm/init.c            |    2 +-
->  arch/arm64/mm/init.c          |    3 +--
->  arch/c6x/kernel/devicetree.c  |    3 +--
->  arch/metag/mm/init.c          |    3 +--
->  arch/microblaze/kernel/prom.c |    3 +--
->  arch/mips/kernel/prom.c       |    3 +--
->  arch/openrisc/kernel/prom.c   |    3 +--
->  arch/powerpc/kernel/prom.c    |    3 +--
->  arch/x86/kernel/devicetree.c  |    3 +--
->  arch/xtensa/kernel/setup.c    |    3 +--
->  drivers/of/fdt.c              |   10 ++++++----
->  include/linux/of_fdt.h        |    3 +--
->  13 files changed, 18 insertions(+), 27 deletions(-)
->
-> diff --git a/arch/arc/mm/init.c b/arch/arc/mm/init.c
-> index 4a17736..3640c74 100644
-> --- a/arch/arc/mm/init.c
-> +++ b/arch/arc/mm/init.c
-> @@ -157,8 +157,7 @@ void __init free_initrd_mem(unsigned long start, unsigned long end)
->  #endif
->  
->  #ifdef CONFIG_OF_FLATTREE
-> -void __init early_init_dt_setup_initrd_arch(unsigned long start,
-> -					    unsigned long end)
-> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
->  {
->  	pr_err("%s(%lx, %lx)\n", __func__, start, end);
->  }
+> But, if URBs still aren't completed after usb_disconnect(), it should be
+> bug of usbcore or driver, shouldn't it?
 
-To avoid gcc warnings, you need to fix the print format specifiers too.
+Thought about the problem further, there should be one problem:
 
-Thx,
--Vineet
+- we can't let URBs survive from deleting the interface, otherwise
+the module in which the completion handler lives might have been
+removed
+
+- so tasklet_kill() should be added into usb_hcd_synchronize_unlinks()
+to make sure the above point, although it is a bit tricky since tasklet_kill()
+flushes global list, but it does work.
+
+
+Thanks,
+--
+Ming Lei
