@@ -1,45 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Jun 2013 13:41:53 +0200
-Subject: [PATCH] dmaengine: Add hisilicon k3 DMA engine driver
-In-Reply-To: <20130621104355.GG23141@intel.com>
-References: <1371444872-26994-1-git-send-email-zhangfei.gao@linaro.org>
- <201306172258.08185.arnd@arndb.de> <20130621104355.GG23141@intel.com>
-Message-ID: <201306211341.53928.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 21 Jun 2013 13:08:47 +0100
+Subject: [PATCH v2 2/3] ARM: KVM: add missing dsb before invalidating Stage-2
+ TLBs
+In-Reply-To: <1371816528-25078-1-git-send-email-marc.zyngier@arm.com>
+References: <1371816528-25078-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1371816528-25078-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 June 2013, Vinod Koul wrote:
-> On Mon, Jun 17, 2013 at 10:58:07PM +0200, Arnd Bergmann wrote:
-> > On Monday 17 June 2013, Zhangfei Gao wrote:
-> >
-> > int dma_get_slave_channel(struct dma_chan *chan)
-> > {
-> >       /* lock against __dma_request_channel */
-> >       mutex_lock(&dma_list_mutex);
-> > 
-> >       if (chan->client_count == 0)
-> >               ret = dma_chan_get(chan);
-> >       else    
-> >               ret = -EBUSY;
-> > 
-> >       mutex_unlock(&dma_list_mutex);
-> > 
-> >       return ret;
-> > }
-> > EXPORT_SYMBOL_GPL(dma_get_slave_channel);
-> and you add filter on top?
+When performing a Stage-2 TLB invalidation, it is necessary to
+make sure the write to the page tables is observable by all CPUs.
 
-No, the idea is to no longer require a filter function when
-we use dma_request_slave_channel with a DT specifier.
+For this purpose, add a dsb instruction to __kvm_tlb_flush_vmid_ipa
+before doing the TLB invalidation itself.
 
-> This is getting you any channel and maynot work where we need to do some
-> filtering. 
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/interrupts.S | 1 +
+ 1 file changed, 1 insertion(+)
 
-This function would be called only by the dmaengine driver's
-xlate function. That driver obviously has to ensure that the
-channel works for the specification from DT (or ACPI or
-something else), but that part is easy, since that is
-the same information that we currently pass into the filter
-function.
-
-	Arnd
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index d0a8fa3..20e03d9 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -49,6 +49,7 @@ __kvm_hyp_code_start:
+ ENTRY(__kvm_tlb_flush_vmid_ipa)
+ 	push	{r2, r3}
+ 
++	dsb	ishst
+ 	add	r0, r0, #KVM_VTTBR
+ 	ldrd	r2, r3, [r0]
+ 	mcrr	p15, 6, r2, r3, c2	@ Write VTTBR
+-- 
+1.8.2.3
