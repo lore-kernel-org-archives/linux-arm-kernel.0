@@ -1,258 +1,162 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Fri, 21 Jun 2013 20:09:53 +0200
-Subject: [PATCH v1 07/12] input: keypad-matrix: introduce polling support
+Date: Fri, 21 Jun 2013 20:09:56 +0200
+Subject: [PATCH v1 10/12] input: keypad_matrix: use usleep_range() for scan
+ delay
 In-Reply-To: <1371838198-7327-1-git-send-email-gsi@denx.de>
 References: <1371838198-7327-1-git-send-email-gsi@denx.de>
-Message-ID: <1371838198-7327-8-git-send-email-gsi@denx.de>
+Message-ID: <1371838198-7327-11-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-detecting changes in the key press status may not work reliably in
-interrupt driven mode (see the documentation part of the change for
-details)
+querying keyboards isn't a time critical task and does not depend on
+exact timing in the microseconds order -- the timeouts and delays are
+arbitrary choices or educated guesses at best anyway
 
-add support to poll the matrix in software for reliable operation in the
-presence of multi key press events, leave a comment on how sleep and
-wakeup could be made to work appropriately in the polling case
+so we can be nice and reduce stress on the timer management
+- use usleep_range() for the scan delay (a delay in microseconds between
+  activating a column and reading rows)
+- allow optional range specs in device tree nodes in addition to the
+  previous simple integer spec of an exact delay
+- allow for platform data to optionally specify a delay range
+
+this implementation assumes an exact delay with the first or only
+integer spec when no upper bound for the range was specified as well as
+when the range spec is invalid, as well as keeps up the scan delay's
+being optional -- this results in compatible behaviour to the previous
+implementation and an improvement on system load when the newly
+introduced feature gets used
+
+normalization of the range spec (enforcing a valid upper bound against
+the lower bound, and assuming the exact value when no range was
+specified) happens during probe in the devide tree case, but cannot be
+done for the non-DT case because the platform data is read-only during
+probe -- that's why the routine which enables the columns and optionally
+applies the delay will enforce the constraints on the range spec -- this
+is not a problem, and is perfectly acceptable given the low cost of the
+min/max check and the potential benefit of reduced timer management cost
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- .../bindings/input/gpio-matrix-keypad.txt          |   17 ++++
- drivers/input/keyboard/matrix_keypad.c             |   92 ++++++++++++++++++--
- include/linux/input/matrix_keypad.h                |    4 +-
- 3 files changed, 107 insertions(+), 6 deletions(-)
+ .../bindings/input/gpio-matrix-keypad.txt          |    7 +++--
+ drivers/input/keyboard/matrix_keypad.c             |   29 +++++++++++++++++---
+ include/linux/input/matrix_keypad.h                |    5 ++++
+ 3 files changed, 35 insertions(+), 6 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
-index e6a01eb..196935b 100644
+index 75e9e28..1562681 100644
 --- a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
 +++ b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
-@@ -17,6 +17,20 @@ selected (active) at the same time.  Which in turn assumes that all
- column lines can get activated at the same time, and no harm is done to
- the hardware when multiple keys are pressed simultaneously.
- 
-+The approach to enable all columns at the same time and to determine
-+that a key press status change has occured from row pin level changes
-+only works reliably for single key presses.  Multi key presses where the
-+keys share their position on a row line may get deferred or even could
-+go unnoticed, pressing and holding one key will shadow events which
-+another key on the same row would have generated.  When reliable
-+detection of key press events is required even in the presence of multi
-+key presses, interrupt mode isn't sufficient any longer, and polling
-+needs to be used.  The polling approach to detecting changes in the key
-+press status will periodically activate a single column line and check
-+the signals of the row lines.  Polling may also be applicable to setups
-+where the hardware doesn't support the activation of several columns at
-+the same time.
-+
- Simple keypad matrix layouts just connect GPIO lines to mechanical
- switches, with no other active components involved.  Although due to the
- driver's operation of activating all columns at the same time for most
-@@ -60,6 +74,9 @@ Optional Properties:
+@@ -93,7 +93,10 @@ Optional Properties:
+ 			a column line and reading back its row status,
  			such that pin levels can settle after
  			propagating through the matrix and its
- 			associated hardware components
-+- col-switch-delay-ms:	columns switch interval in milliseconds instead
-+			of using interrupts to detect key press changes,
-+			enables polling mode when specified
- - row-gpios-activelow:	row GPIO pins are active low
- - col-gpios-activelow:	column GPIO pins are active low
- - gpio-activelow:	row pins as well as column pins are active low
+-			associated hardware components
++			associated hardware components, can be specified
++			with either one value giving the exact delay, or
++			with two values giving a delay range (allowing
++			for reduced timer management overhead)
+ - col-switch-delay-ms:	columns switch interval in milliseconds instead
+ 			of using interrupts to detect key press changes,
+ 			enables polling mode when specified
+@@ -146,7 +149,7 @@ Examples:
+ 	matrix_keypad {
+ 		compatible = "gpio-matrix-keypad";
+ 		debounce-delay-ms = <5>;
+-		col-scan-delay-us = <1>;
++		col-scan-delay-us = <2 10>;
+ 		col-switch-delay-ms = <20>;
+ 
+ 		col-gpios-binary;
 diff --git a/drivers/input/keyboard/matrix_keypad.c b/drivers/input/keyboard/matrix_keypad.c
-index 0b2599d..c2221d1 100644
+index c015f0d..275b157 100644
 --- a/drivers/input/keyboard/matrix_keypad.c
 +++ b/drivers/input/keyboard/matrix_keypad.c
-@@ -36,10 +36,12 @@ struct matrix_keypad {
+@@ -100,6 +100,7 @@ static void activate_col(const struct matrix_keypad_platform_data *pdata,
+ 			 int col, bool on)
+ {
+ 	int bit, lvl;
++	u32 delay_min, delay_max;
  
- 	uint32_t last_key_state[MATRIX_MAX_COLS];
- 	struct delayed_work work_scan_matrix;
-+	struct delayed_work work_switch_column;
- 	spinlock_t lock;
- 	bool scan_pending;
- 	bool stopped;
- 	bool gpio_all_disabled;
-+	unsigned int col_to_poll;
- };
+ 	if (!pdata->col_gpios_binary_encoded) {
+ 		/* one-out-of-N approach, just setup the one pin */
+@@ -115,8 +116,19 @@ static void activate_col(const struct matrix_keypad_platform_data *pdata,
+ 		/* EMPTY */
+ 	}
+ 
+-	if (on && pdata->col_scan_delay_us)
+-		udelay(pdata->col_scan_delay_us);
++	if (on && pdata->col_scan_delay_us) {
++		/*
++		 * the platform data is 'const' aka 'read-only' here, so
++		 * we may not modify it, yet might not have had a chance
++		 * to normalize its data before (we did for the DT case,
++		 * but did not for non-DT cases), which is why we have
++		 * to use local variables here to enforce sane input
++		 * data for the usleep range spec
++		 */
++		delay_min = pdata->col_scan_delay_us;
++		delay_max = max(delay_min, pdata->col_scan_delay_us_max);
++		usleep_range(delay_min, delay_max);
++	}
+ }
  
  /*
-@@ -152,17 +154,26 @@ static uint32_t sample_rows_for_col(struct matrix_keypad *keypad, int col)
-  * to have any subsequent change in the key press status trigger the ISR
-  *
-  * a single IRQ line can be used if all involved GPIOs share that IRQ
-+ *
-+ * in contrast to interrupt driven detection of key press changes, for
-+ * polling detection a delayed work routine periodically will switch
-+ * columns and upon changes will arrange for the same postprocessing as
-+ * an ISR would have done
-  */
- static void enable_row_irqs(struct matrix_keypad *keypad)
- {
- 	const struct matrix_keypad_platform_data *pdata = keypad->pdata;
+@@ -609,6 +621,7 @@ matrix_keypad_parse_dt(struct device *dev)
+ 	unsigned int *gpios;
  	int i;
-+	unsigned long jiffies;
+ 	int err;
++	u32 us[2];
  
--	if (pdata->clustered_irq > 0)
-+	if (pdata->clustered_irq > 0) {
- 		enable_irq(pdata->clustered_irq);
--	else {
-+	} else if (!pdata->col_switch_delay_ms) {
- 		for (i = 0; i < pdata->num_row_gpios; i++)
- 			enable_irq(gpio_to_irq(pdata->row_gpios[i]));
-+	} else {
-+		jiffies = msecs_to_jiffies(pdata->col_switch_delay_ms);
-+		schedule_delayed_work(&keypad->work_switch_column, jiffies);
- 	}
- }
+ 	if (!np) {
+ 		dev_err(dev, "device lacks DT data for the keypad config\n");
+@@ -655,8 +668,15 @@ matrix_keypad_parse_dt(struct device *dev)
  
-@@ -178,11 +189,13 @@ static void disable_row_irqs(struct matrix_keypad *keypad)
- 	const struct matrix_keypad_platform_data *pdata = keypad->pdata;
- 	int i;
- 
--	if (pdata->clustered_irq > 0)
-+	if (pdata->clustered_irq > 0) {
- 		disable_irq_nosync(pdata->clustered_irq);
--	else {
-+	} else if (!pdata->col_switch_delay_ms) {
- 		for (i = 0; i < pdata->num_row_gpios; i++)
- 			disable_irq_nosync(gpio_to_irq(pdata->row_gpios[i]));
-+	} else {
-+		cancel_delayed_work(&keypad->work_switch_column);
- 	}
- }
- 
-@@ -291,6 +304,58 @@ out:
- 	return IRQ_HANDLED;
- }
- 
-+/*
-+ * delayed work routine, periodically switching columns and checking the
-+ * key press status, to detect changes without interrupt support
-+ *
-+ * this routine is the polling mode counterpart to the above interrupt handler
-+ */
-+static void matrix_keypad_switch(struct work_struct *work)
-+{
-+	struct matrix_keypad *keypad = container_of(work, struct matrix_keypad,
-+						    work_switch_column.work);
-+	const struct matrix_keypad_platform_data *pdata = keypad->pdata;
-+	int col;
-+	uint32_t curr_state, prev_state;
-+	unsigned long jiffies;
-+
-+	/* avoid multiple injection, and cope with shutdowns */
-+	if (unlikely(keypad->scan_pending || keypad->stopped))
-+		return;
-+
-+	/*
-+	 * advance to the next column (avoids modulo calculation
-+	 * since that might be too expensive in the absence of
-+	 * compile time constants)
-+	 */
-+	keypad->col_to_poll++;
-+	if (keypad->col_to_poll >= pdata->num_col_gpios)
-+		keypad->col_to_poll = 0;
-+	col = keypad->col_to_poll;
-+
-+	/*
-+	 * sample the row status for this specific column, schedule
-+	 * for the next column switch in the absence of changes
-+	 */
-+	curr_state = sample_rows_for_col(keypad, col);
-+	prev_state = keypad->last_key_state[col];
-+	if (curr_state == prev_state) {
-+		jiffies = msecs_to_jiffies(pdata->col_switch_delay_ms);
-+		schedule_delayed_work(&keypad->work_switch_column, jiffies);
-+		return;
-+	}
-+
-+	/*
-+	 * start the debounce interval when a change was detected,
-+	 * cease further polling until the matrix scan has completed
-+	 * (polling automatically gets re-started after the scan)
-+	 */
-+	disable_row_irqs(keypad);
-+	keypad->scan_pending = true;
-+	jiffies = msecs_to_jiffies(keypad->pdata->debounce_ms);
-+	schedule_delayed_work(&keypad->work_scan_matrix, jiffies);
-+}
-+
- static int matrix_keypad_start(struct input_dev *dev)
- {
- 	struct matrix_keypad *keypad = input_get_drvdata(dev);
-@@ -313,6 +378,7 @@ static void matrix_keypad_stop(struct input_dev *dev)
- 
- 	keypad->stopped = true;
- 	mb();
-+	flush_work(&keypad->work_switch_column.work);
- 	flush_work(&keypad->work_scan_matrix.work);
- 	/*
- 	 * matrix_keypad_scan() will leave IRQs enabled;
-@@ -322,6 +388,16 @@ static void matrix_keypad_stop(struct input_dev *dev)
- }
- 
- #ifdef CONFIG_PM_SLEEP
-+/*
-+ * note that software polling may not mix well with interrupt driven
-+ * wakeup from power management, since there is no concept of "enabling
-+ * all columns at the same time", and any random column may be active
-+ * when we get here
-+ *
-+ * an appropriate approach might be to have the user specify a column
-+ * that shall get activated before sleep, such that a specific and
-+ * well-known subset of the keypad matrix can wake up the device
-+ */
- static void matrix_keypad_enable_wakeup(struct matrix_keypad *keypad)
- {
- 	const struct matrix_keypad_platform_data *pdata = keypad->pdata;
-@@ -342,6 +418,8 @@ static void matrix_keypad_enable_wakeup(struct matrix_keypad *keypad)
- 			}
- 		}
- 	}
-+
-+	/* TODO activate a potentially user specified column */
- }
- 
- static void matrix_keypad_disable_wakeup(struct matrix_keypad *keypad)
-@@ -542,7 +620,9 @@ matrix_keypad_parse_dt(struct device *dev)
  	/* get delay and interval timing specs */
  	of_property_read_u32(np, "debounce-delay-ms", &pdata->debounce_ms);
- 	of_property_read_u32(np, "col-scan-delay-us",
--						&pdata->col_scan_delay_us);
-+			     &pdata->col_scan_delay_us);
-+	of_property_read_u32(np, "col-switch-delay-ms",
-+			     &pdata->col_switch_delay_ms);
- 
- 	/* get the individual row and column GPIO pins */
- 	gpios = devm_kzalloc(dev,
-@@ -609,6 +689,8 @@ static int matrix_keypad_probe(struct platform_device *pdev)
+-	of_property_read_u32(np, "col-scan-delay-us",
+-			     &pdata->col_scan_delay_us);
++	us[0] = us[1] = 0;
++	err = of_property_read_u32_array(np, "col-scan-delay-us", &us[0], 2);
++	if (err == -EOVERFLOW) {
++		err = of_property_read_u32(np, "col-scan-delay-us", &us[0]);
++		us[1] = us[0];
++	}
++	us[1] = max(us[1], us[0]);
++	pdata->col_scan_delay_us = us[0];
++	pdata->col_scan_delay_us_max = us[1];
+ 	of_property_read_u32(np, "col-switch-delay-ms",
+ 			     &pdata->col_switch_delay_ms);
+ 	if (pdata->col_gpios_binary_encoded && !pdata->col_switch_delay_ms) {
+@@ -744,6 +764,7 @@ static int matrix_keypad_probe(struct platform_device *pdev)
  	/* start in stopped state, open(2) will activate the scan */
  	keypad->stopped = true;
  	INIT_DELAYED_WORK(&keypad->work_scan_matrix, matrix_keypad_scan);
-+	INIT_DELAYED_WORK(&keypad->work_switch_column, matrix_keypad_switch);
-+	keypad->col_to_poll = pdata->num_col_gpios;
++	/* we cannot normalize pdata here for the non-DT case, it's read-only */
+ 	INIT_DELAYED_WORK(&keypad->work_switch_column, matrix_keypad_switch);
+ 	keypad->col_to_poll = pdata->num_matrix_cols;
  	spin_lock_init(&keypad->lock);
- 
- 	input_dev->name		= pdev->name;
 diff --git a/include/linux/input/matrix_keypad.h b/include/linux/input/matrix_keypad.h
-index 4bbe6b3..3c8dc39 100644
+index 82db84a..fa093b2 100644
 --- a/include/linux/input/matrix_keypad.h
 +++ b/include/linux/input/matrix_keypad.h
-@@ -41,6 +41,8 @@ struct matrix_keymap_data {
-  * @num_col_gpios: actual number of col gpios used by device
+@@ -43,6 +43,10 @@ struct matrix_keymap_data {
+  * @num_matrix_cols: number of logical column lines in the matrix
   * @col_scan_delay_us: delay in microseconds, the interval between
   *	activating a column and reading back row information
-+ * @col_switch_delay_ms: delay in milliseconds, the interval with which
-+ *	colums periodically get checked for changes in key press status
++ * @col_scan_delay_us_max: maximum delay in microseconds between
++ *	activating a column and reading back row information,
++ *	defaults to @col_scan_delay_us when not specified, allows
++ *	for reduced timer management overhead
+  * @col_switch_delay_ms: delay in milliseconds, the interval with which
+  *	colums periodically get checked for changes in key press status
   * @debounce_ms: debounce interval in milliseconds, the interval between
-  *	detecting a change in the key press status and determining the new
-  *	overall keypad matrix status
-@@ -70,7 +72,7 @@ struct matrix_keypad_platform_data {
+@@ -80,6 +84,7 @@ struct matrix_keypad_platform_data {
  
  	/* delays and intervals specs */
  	unsigned int	col_scan_delay_us;
--
-+	unsigned int	col_switch_delay_ms;
++	unsigned int	col_scan_delay_us_max;
+ 	unsigned int	col_switch_delay_ms;
  	unsigned int	debounce_ms;
  
- 	/* optionally reduce interrupt mgmt overhead */
 -- 
 1.7.10.4
