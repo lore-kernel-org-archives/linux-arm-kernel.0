@@ -1,20 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 22 Jun 2013 01:24:40 +0200
-Subject: [PATCH] ARM: imx: select syscon for IMX6L
-In-Reply-To: <CAOMZO5A++=N4BE24DBqat71HTMgEHVG3zn_GZEjYbw5K+6VP7g@mail.gmail.com>
-References: <201306220039.43988.arnd@arndb.de>
- <CAOMZO5A++=N4BE24DBqat71HTMgEHVG3zn_GZEjYbw5K+6VP7g@mail.gmail.com>
-Message-ID: <201306220124.40831.arnd@arndb.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 22 Jun 2013 03:26:45 +0400
+Subject: [PATCH v5 0/3] R8A7778/BOCK-W R-Car VIN driver support
+Message-ID: <201306220326.46176.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 22 June 2013, Fabio Estevam wrote:
-> On Fri, Jun 21, 2013 at 7:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > This is required for building a kernel that enables only
-> > IMX6L but not IMX6Q, which would get a build error when
-> 
-> I think you mean IMX6SL.
+Hello.
 
-Right. I fixed up my local copy of the patch now.
+   Here's the set of 3 patches against the Simon Horman's 'renesas.git' repo,
+'renesas-next-20130620' tag. Here we add the VIN platform code working on
+the R8A7778/BOCK-W with ML86V7667 video decoder.
 
-	Arnd
+[1/3] ARM: shmobile: r8a7778: add VIN support
+[2/3] ARM: shmobile: BOCK-W: add VIN and ML86V7667 support
+[3/3] ARM: shmobile: BOCK-W: enable VIN and ML86V7667 in defconfig
+
+   The patch containing OKI ML86V7667 video decoder driver has been removed
+from the series as it should be applied to the 'media_tree.git' repo. The patch
+containing the VIN PFC support has been also removed from the series and has
+now been merged.
+
+WBR, Sergei
