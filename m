@@ -1,23 +1,47 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 21 Jun 2013 07:02:11 -0700
-Subject: [PATCH v3 01/10] serial:st-asc: Add ST ASC driver.
-In-Reply-To: <51C45A3F.7000009@st.com>
-References: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
- <1371737103-8871-1-git-send-email-srinivas.kandagatla@st.com>
- <201306202101.11261.arnd@arndb.de> <51C45A3F.7000009@st.com>
-Message-ID: <20130621140211.GA995@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Jun 2013 16:04:38 +0200
+Subject: [PATCH v2 00/18] Final Samsung PWM support cleanup
+In-Reply-To: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
+References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <201306211604.38443.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 02:50:55PM +0100, Srinivas KANDAGATLA wrote:
-> Hi Greg,
-> If its not too late can this patch be considered for 3.11 via tty tree?
-> Arnd preferred to take the SOC patches in this series via arm-soc tree.
-> Also, there is no build dependency for this patch.
+On Friday 21 June 2013, Tomasz Figa wrote:
+> Since we now have a proper Samsung PWM clocksource driver in place,
+> we can proceed with further cleanup of PWM timers support on Samsung SoCs.
+> 
+> This series attempts to achieve this goal by:
+>  1) moving remaining Samsung platforms to the new clocksource driver
+>  2) removing old clocksource driver
+>  3) adding new multiplatform- and DT-aware PWM driver
+>  4) moving all Samsung platforms to use the new PWM driver
+>  5) removing old PWM driver
+>  6) removing all PWM-related code that is not used anymore
+> 
+> Cleaning up the PWM driver is a bit tricky, because the design of current
+> driver makes it completely unsuitable for DT and multiplatform and would
+> require a heavy rework to make it usable, breaking any existing Samsung PWM
+> users by the way. To avoid any breakage I decided to keep the old driver,
+> add new one, move all platforms to it and then remove the old one.
+> 
+> See particular patches for more detailed descriptions.
+> 
+> On S3C6410-based Tiny6410 (Mini6410-compatible), after enabling pwm-beeper
+> and Exynos4210-based Origen board (with PWM0 attached to a scope):
+> 
+> Tested-by: Tomasz Figa <tomasz.figa@gmail.com>
+> 
 
-Can you please resend it, I no longer seem to have it in my queue
-anywhere.
+Looks good to me,
 
-thanks,
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-greg k-h
+Two small comments:
+
+* always use 'git format-patch -M' to detect renames (patch 10)
+
+* for new code, don't use __raw_readl and similar functions but
+  use readl_relaxed or plain readl.
+
+	Arnd
