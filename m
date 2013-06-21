@@ -1,35 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 21 Jun 2013 12:36:53 +0100
-Subject: ARM : Kexec fails with kernel 3.10 on ARM Versatile TC2
-In-Reply-To: <CALicx6sYQ19Jx_HuwLeoXNiNFSNvCUc+XKMZsf6vAasPhxOVSg@mail.gmail.com>
-References: <CALicx6sYQ19Jx_HuwLeoXNiNFSNvCUc+XKMZsf6vAasPhxOVSg@mail.gmail.com>
-Message-ID: <20130621113653.GF7766@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Jun 2013 13:41:53 +0200
+Subject: [PATCH] dmaengine: Add hisilicon k3 DMA engine driver
+In-Reply-To: <20130621104355.GG23141@intel.com>
+References: <1371444872-26994-1-git-send-email-zhangfei.gao@linaro.org>
+ <201306172258.08185.arnd@arndb.de> <20130621104355.GG23141@intel.com>
+Message-ID: <201306211341.53928.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 12:32:34PM +0100, Vijay Kilari wrote:
-> Hi,
-> 
->   With Kernel 3.10 SMP kernel, on versatile TC2 board, Kexec hangs.
-> 
-> 
-> arm-cortex-a15 login: kexec -f /boot/uImage
-> --command-line="root=/dev/nfs rw ip=bootp console=ttyS0,38400n8"
-> Modified cmdline:root=/dev/nfs rw ip=bootp console=ttyS0,38400n8
-> Starting new kernel
-> Bye!
-> Uncompressing Linux... done, booting the kernel
-> 
-> Can you please provide your inputs?
+On Friday 21 June 2013, Vinod Koul wrote:
+> On Mon, Jun 17, 2013 at 10:58:07PM +0200, Arnd Bergmann wrote:
+> > On Monday 17 June 2013, Zhangfei Gao wrote:
+> >
+> > int dma_get_slave_channel(struct dma_chan *chan)
+> > {
+> >       /* lock against __dma_request_channel */
+> >       mutex_lock(&dma_list_mutex);
+> > 
+> >       if (chan->client_count == 0)
+> >               ret = dma_chan_get(chan);
+> >       else    
+> >               ret = -EBUSY;
+> > 
+> >       mutex_unlock(&dma_list_mutex);
+> > 
+> >       return ret;
+> > }
+> > EXPORT_SYMBOL_GPL(dma_get_slave_channel);
+> and you add filter on top?
 
-SMP kexec isn't possible on TC2 because there's no way to kill off the
-secondary CPUs with mainline Linux. You could take a look at the recent
-patches from Stephen Warren (19ab428f4b79 ["ARM: 7759/1: decouple CPU
-offlining from reboot/shutdown"], but you'd still need to implement the
-various hotplug parts (a software pen is not enough) to get SMP working
-safely.
+No, the idea is to no longer require a filter function when
+we use dma_request_slave_channel with a DT specifier.
 
-If you're just using this for something like a bootloader, then you could
-use a UP kernel as the first stage.
+> This is getting you any channel and maynot work where we need to do some
+> filtering. 
 
-Will
+This function would be called only by the dmaengine driver's
+xlate function. That driver obviously has to ensure that the
+channel works for the specification from DT (or ACPI or
+something else), but that part is easy, since that is
+the same information that we currently pass into the filter
+function.
+
+	Arnd
