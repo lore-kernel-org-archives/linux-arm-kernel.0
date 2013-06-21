@@ -1,26 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 22 Jun 2013 00:39:43 +0200
-Subject: [PATCH] ARM: imx: select syscon for IMX6L
-Message-ID: <201306220039.43988.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 21 Jun 2013 16:41:51 -0600
+Subject: [PATCH V2 1/2] kexec: return error of machine_kexec() fails
+In-Reply-To: <1371067281-655-1-git-send-email-swarren@wwwdotorg.org>
+References: <1371067281-655-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <51C4D6AF.9010105@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is required for building a kernel that enables only
-IMX6L but not IMX6Q, which would get a build error when
-syscon is not available.
+On 06/12/2013 02:01 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Prior to commit 3ab8352 "kexec jump", if machine_kexec() returned,
+> sys_reboot() would return -EINVAL. This patch restores this behaviour
+> for the non-KEXEC_JUMP case, where machine_kexec() is not expected to
+> return.
+> 
+> This situation can occur on ARM, where kexec requires disabling all but
+> one CPU using CPU hotplug. However, if hotplug isn't supported by the
+> particular HW the kernel is running on, then kexec cannot succeed.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index f25cf88..eef9590 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -823,6 +823,7 @@ config SOC_IMX6SL
- 	select HAVE_IMX_GPC
- 	select HAVE_IMX_MMDC
- 	select HAVE_IMX_SRC
-+	select MFD_SYSCON
- 	select PINCTRL
- 	select PINCTRL_IMX6SL
- 	select PL310_ERRATA_588369 if CACHE_PL310
+Eric, does this look reasonable to go into 3.11? Thanks.
