@@ -1,140 +1,65 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Fri, 21 Jun 2013 11:39:48 +0100
-Subject: [PATCH v4 7/7] ARM:stih41x: Add B2020 board support
-In-Reply-To: <1371811076-27168-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1371811076-27168-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1371811188-27496-1-git-send-email-srinivas.kandagatla@st.com>
+From: vkale@apm.com (Vinayak Kale)
+Date: Fri, 21 Jun 2013 16:13:59 +0530
+Subject: [PATCH V3 1/4] arm64: Add Kconfig option for APM X-Gene SOC family
+In-Reply-To: <20130621093656.GB4099@arm.com>
+References: <1366794420-17849-1-git-send-email-vkale@apm.com>
+ <1366794420-17849-2-git-send-email-vkale@apm.com>
+ <20130621093656.GB4099@arm.com>
+Message-ID: <CAPrCYkc-=-no+TpHb8XMQYFoyqCJoXe9RR1-jazxCCNeFQ12Yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Hi Catalin,
 
-B2020 ADI board is reference board for STIH415/416 SOCs, it has 2 x
-UART, 4x USB, 1 x Ethernet, 1 x SATA, 1 x PCIe, and 2GB RAM  with
-standard set-top box IPs.
+On Fri, Jun 21, 2013 at 3:06 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> Hi Vinayak,
+>
+> On Wed, Apr 24, 2013 at 10:06:57AM +0100, Vinayak Kale wrote:
+>> This patch adds arm64/Kconfig option for APM X-Gene SOC family.
+>>
+>> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+>> Signed-off-by: Loc Ho <lho@apm.com>
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> ---
+>>  arch/arm64/Kconfig |    7 +++++++
+>>  1 files changed, 7 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 43b0e9f..16d0198 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -114,6 +114,11 @@ config ARCH_VEXPRESS
+>>         This enables support for the ARMv8 software model (Versatile
+>>         Express).
+>>
+>> +config ARCH_XGENE
+>> +     bool "AppliedMicro X-Gene SOC Family"
+>> +     help
+>> +       This enables support for AppliedMicro X-Gene SOC Family
+>> +
+>>  endmenu
+>>
+>>  menu "Bus support"
+>> @@ -153,6 +158,8 @@ config NR_CPUS
+>>       int "Maximum number of CPUs (2-32)"
+>>       range 2 32
+>>       depends on SMP
+>> +     # These have to remain sorted largest to smallest
+>> +     default "8" if ARCH_XGENE
+>>       default "4"
+>
+> For ARCH_VEXPRESS I was planning to get rid of the Kconfig entry and
+> just select the drivers in the defconfig file (once some other patches
+> get merged). Do you have any dependencies on ARCH_XGENE apart from
+> what's here?
+>
 
-This patch adds initial support to B2020 with STiH415/416 with SBC_UART1
-as console and a heard beat LED.
+Apart from here, we do have dependency on ARCH_XGENE:
+1) To select XGENE SoC specific dtb compilation
+2) Use this to forcefully select certain platform drivers such as Clock.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-CC: Stephen Gallimore <stephen.gallimore@st.com>
-CC: Stuart Menefy <stuart.menefy@st.com>
-CC: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/boot/dts/Makefile           |    4 ++-
- arch/arm/boot/dts/stih415-b2020.dts  |   15 ++++++++++++
- arch/arm/boot/dts/stih416-b2020.dts  |   16 +++++++++++++
- arch/arm/boot/dts/stih41x-b2020.dtsi |   42 ++++++++++++++++++++++++++++++++++
- 4 files changed, 76 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/boot/dts/stih415-b2020.dts
- create mode 100644 arch/arm/boot/dts/stih416-b2020.dts
- create mode 100644 arch/arm/boot/dts/stih41x-b2020.dtsi
+> --
+> Catalin
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d4615fd..0d24c95 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -178,7 +178,9 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
- 	spear320-hmi.dtb
- dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
- dtb-$(CONFIG_ARCH_STIXXXX)+= stih415-b2000.dtb \
--	stih416-b2000.dtb
-+	stih416-b2000.dtb \
-+	stih415-b2020.dtb \
-+	stih416-b2020.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += \
- 	sun4i-a10-cubieboard.dtb \
- 	sun4i-a10-mini-xplus.dtb \
-diff --git a/arch/arm/boot/dts/stih415-b2020.dts b/arch/arm/boot/dts/stih415-b2020.dts
-new file mode 100644
-index 0000000..442b019
---- /dev/null
-+++ b/arch/arm/boot/dts/stih415-b2020.dts
-@@ -0,0 +1,15 @@
-+/*
-+ * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
-+ * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+#include "stih415.dtsi"
-+#include "stih41x-b2020.dtsi"
-+/ {
-+	model = "STiH415 B2020 Board";
-+	compatible = "st,stih415", "st,stih415-b2020";
-+};
-diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-new file mode 100644
-index 0000000..276f28d
---- /dev/null
-+++ b/arch/arm/boot/dts/stih416-b2020.dts
-@@ -0,0 +1,16 @@
-+/*
-+ * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
-+ * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+#include "stih416.dtsi"
-+#include "stih41x-b2020.dtsi"
-+/ {
-+	model = "STiH416 B2020";
-+	compatible = "st,stih416", "st,stih416-b2020";
-+
-+};
-diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
-new file mode 100644
-index 0000000..133e181
---- /dev/null
-+++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
-@@ -0,0 +1,42 @@
-+/*
-+ * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
-+ * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+/ {
-+	memory{
-+		device_type = "memory";
-+		reg = <0x40000000 0x80000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyAS0,115200";
-+		linux,stdout-path = &sbc_serial1;
-+	};
-+
-+	aliases {
-+		ttyAS0 = &sbc_serial1;
-+	};
-+	soc {
-+		sbc_serial1: serial at fe531000 {
-+			status = "okay";
-+		};
-+
-+		leds {
-+			compatible	= "gpio-leds";
-+			red {
-+				#gpio-cells = <1>;
-+				label	= "Front Panel LED";
-+				gpios	= <&PIO4 1>;
-+				linux,default-trigger	= "heartbeat";
-+			};
-+			green {
-+				gpios	= <&PIO4 7>;
-+				default-state = "off";
-+			};
-+		};
-+	};
-+};
--- 
-1.7.6.5
+-Vinayak
