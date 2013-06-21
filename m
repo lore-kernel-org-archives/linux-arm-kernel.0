@@ -1,45 +1,58 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 21 Jun 2013 13:48:51 +0800
-Subject: [PATCH v2 1/3] ARM: dts: imx6dl: add a new pinctrl for ecspi1
-In-Reply-To: <1371781151-20749-1-git-send-email-b32955@freescale.com>
-References: <1371781151-20749-1-git-send-email-b32955@freescale.com>
-Message-ID: <20130621054849.GC25633@S2101-09.ap.freescale.net>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 21 Jun 2013 15:49:25 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the net-next tree
+Message-ID: <20130621154925.13c957ee77c5c62e540d7cfc@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 10:19:09AM +0800, Huang Shijie wrote:
-> This new pinctrl is used in the imx6dl-sabresd board.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+Hi all,
 
-Applied all 3, thanks.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/boot/dts/am335x-evmsk.dts between commit f6655d697b85 ("ARM:
+dts: AM33XX: Add CPSW phy_id device tree data to am335x-evmsk") from the
+net-next tree and commit 94a924ca61f0 ("ARM: dts: AM33XX: Add pinmux
+configuration for CPSW to EVMsk") from the arm-soc tree.
 
-Shawn
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-> ---
->  arch/arm/boot/dts/imx6dl.dtsi |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-> index 2b3ecd6..d961365 100644
-> --- a/arch/arm/boot/dts/imx6dl.dtsi
-> +++ b/arch/arm/boot/dts/imx6dl.dtsi
-> @@ -56,6 +56,14 @@
->  							MX6DL_PAD_EIM_D16__ECSPI1_SCLK 0x100b1
->  						>;
->  					};
-> +
-> +					pinctrl_ecspi1_2: ecspi1grp-2 {
-> +						fsl,pins = <
-> +							MX6DL_PAD_KEY_COL1__ECSPI1_MISO 0x100b1
-> +							MX6DL_PAD_KEY_ROW0__ECSPI1_MOSI 0x100b1
-> +							MX6DL_PAD_KEY_COL0__ECSPI1_SCLK 0x100b1
-> +						>;
-> +					};
->  				};
->  
->  				enet {
-> -- 
-> 1.7.1
-> 
-> 
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/boot/dts/am335x-evmsk.dts
+index 4297899,9e00eef..0000000
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@@ -249,12 -381,14 +381,24 @@@
+  	};
+  };
+  
+ +&cpsw_emac0 {
+ +	phy_id = <&davinci_mdio>, <0>;
+ +	phy-mode = "rgmii-txid";
+ +};
+ +
+ +&cpsw_emac1 {
+ +	phy_id = <&davinci_mdio>, <1>;
+ +	phy-mode = "rgmii-txid";
+ +};
+++
++ &mac {
++ 	pinctrl-names = "default", "sleep";
++ 	pinctrl-0 = <&cpsw_default>;
++ 	pinctrl-1 = <&cpsw_sleep>;
++ };
++ 
++ &davinci_mdio {
++ 	pinctrl-names = "default", "sleep";
++ 	pinctrl-0 = <&davinci_mdio_default>;
++ 	pinctrl-1 = <&davinci_mdio_sleep>;
++ };
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/1de69559/attachment-0001.sig>
