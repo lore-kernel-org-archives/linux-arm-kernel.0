@@ -1,77 +1,53 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 21 Jun 2013 10:35:26 +0100
-Subject: [PATCH 1/3] ARM: kernel: get cpu clock rate from cpu clock node
- first
-In-Reply-To: <1371739146-32639-2-git-send-email-f.fainelli@gmail.com>
-References: <1371739146-32639-1-git-send-email-f.fainelli@gmail.com>
- <1371739146-32639-2-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20130621093526.GC14268@e102568-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Jun 2013 10:36:56 +0100
+Subject: [PATCH V3 1/4] arm64: Add Kconfig option for APM X-Gene SOC family
+In-Reply-To: <1366794420-17849-2-git-send-email-vkale@apm.com>
+References: <1366794420-17849-1-git-send-email-vkale@apm.com>
+ <1366794420-17849-2-git-send-email-vkale@apm.com>
+Message-ID: <20130621093656.GB4099@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 03:39:04PM +0100, Florian Fainelli wrote:
-> The current topology code will only attempt to parse a "clock-frequency"
-> property for a given CPU node. Some platforms such as the ecx-2000
-> provide a clock node. Change the logic to first look for a clock node,
-> and if we fail, fallback to parsing a "clock-frequency" property. To
-> avoid unnecessary casting, change rate from u32 to unsigned long, and
-> introduce the "prop" variable to hold the contents of the
-> "clock-frequency" property.
+Hi Vinayak,
+
+On Wed, Apr 24, 2013 at 10:06:57AM +0100, Vinayak Kale wrote:
+> This patch adds arm64/Kconfig option for APM X-Gene SOC family.
 > 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
 > ---
->  arch/arm/kernel/topology.c | 23 ++++++++++++++++-------
->  1 file changed, 16 insertions(+), 7 deletions(-)
+>  arch/arm64/Kconfig |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> index c5a5954..8f340a1 100644
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -21,6 +21,7 @@
->  #include <linux/of.h>
->  #include <linux/sched.h>
->  #include <linux/slab.h>
-> +#include <linux/clk.h>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 43b0e9f..16d0198 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -114,6 +114,11 @@ config ARCH_VEXPRESS
+>  	  This enables support for the ARMv8 software model (Versatile
+>  	  Express).
 >  
->  #include <asm/cputype.h>
->  #include <asm/topology.h>
-> @@ -104,7 +105,9 @@ static void __init parse_dt_topology(void)
->  	cpu_capacity = kzalloc(alloc_size, GFP_NOWAIT);
+> +config ARCH_XGENE
+> +	bool "AppliedMicro X-Gene SOC Family"
+> +	help
+> +	  This enables support for AppliedMicro X-Gene SOC Family
+> +
+>  endmenu
 >  
->  	while ((cn = of_find_node_by_type(cn, "cpu"))) {
-> -		const u32 *rate, *reg;
-> +		const u32 *prop, *reg;
-> +		unsigned long rate;
-> +		struct clk *cpu_clk;
->  		int len;
->  
->  		if (cpu >= num_possible_cpus())
-> @@ -117,11 +120,17 @@ static void __init parse_dt_topology(void)
->  		if (cpu_eff->compatible == NULL)
->  			continue;
->  
-> -		rate = of_get_property(cn, "clock-frequency", &len);
-> -		if (!rate || len != 4) {
-> -			pr_err("%s missing clock-frequency property\n",
-> -				cn->full_name);
-> -			continue;
-> +		cpu_clk = of_clk_get(cn, 0);
-> +		if (IS_ERR(cpu_clk)) {
-> +			prop = of_get_property(cn, "clock-frequency", &len);
-> +			if (!prop || len != 4) {
-> +				pr_err("%s missing clock-frequency property\n",
-> +					cn->full_name);
-> +				continue;
-> +			}
-> +			rate = be32_to_cpup(prop);
-> +		} else {
-> +			rate = clk_get_rate(cpu_clk);
+>  menu "Bus support"
+> @@ -153,6 +158,8 @@ config NR_CPUS
+>  	int "Maximum number of CPUs (2-32)"
+>  	range 2 32
+>  	depends on SMP
+> +	# These have to remain sorted largest to smallest
+> +	default "8" if ARCH_XGENE
+>  	default "4"
 
-I am not questioning whether adding a "clocks" property is proper or
-not, but let me say cpu related info and parsing are already scattered
-all over the place and this is wrong. We are currently trying to
-consolidate CPU related info in a single structure in the kernel, and
-then this code can become a consumer of that data. As to the "clocks"
-property as I mentioned in another reply, that requires more thought.
+For ARCH_VEXPRESS I was planning to get rid of the Kconfig entry and
+just select the drivers in the defconfig file (once some other patches
+get merged). Do you have any dependencies on ARCH_XGENE apart from
+what's here?
 
-Lorenzo
+-- 
+Catalin
