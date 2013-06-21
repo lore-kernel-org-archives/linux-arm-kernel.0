@@ -1,59 +1,80 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Fri, 21 Jun 2013 20:09:57 +0200
-Subject: [PATCH v1 11/12] input: keypad-matrix: AC14xx device tree update
+Date: Fri, 21 Jun 2013 20:09:47 +0200
+Subject: [PATCH v1 01/12] input: matrix-keypad: update devicetree binding doc
 In-Reply-To: <1371838198-7327-1-git-send-email-gsi@denx.de>
 References: <1371838198-7327-1-git-send-email-gsi@denx.de>
-Message-ID: <1371838198-7327-12-git-send-email-gsi@denx.de>
+Message-ID: <1371838198-7327-2-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- catchup in the 'ifm AC14xx' board's device tree with recently added
-  keypad-matrix driver features: individual pin polarity for rows and
-  columns, push/pull pin operation for columns
-- slight re-ordering of keypad-matrix related settings, and tuning of
-  timing specs for more reliable detection of short lived key presses
-  (including a range spec to reduce timer management overhead) as well
-  as a slightly increased overall matrix poll frequency
-- fix keymap comments, make the names match the codes
+update the device tree binding documentation for the GPIO matrix keypad
+driver: mention the driver's selecting all columns at once, reword the
+delay descriptions, add the missing active low GPIO pin level property
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/boot/dts/ac14xx.dts |   13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ .../bindings/input/gpio-matrix-keypad.txt          |   42 +++++++++++++++++---
+ 1 file changed, 36 insertions(+), 6 deletions(-)
 
-diff --git a/arch/powerpc/boot/dts/ac14xx.dts b/arch/powerpc/boot/dts/ac14xx.dts
-index a27a460..502cc37 100644
---- a/arch/powerpc/boot/dts/ac14xx.dts
-+++ b/arch/powerpc/boot/dts/ac14xx.dts
-@@ -350,13 +350,14 @@
- 		matrix_keypad at 0 {
- 			compatible = "gpio-matrix-keypad";
- 			debounce-delay-ms = <5>;
--			col-scan-delay-us = <1>;
--			gpio-activelow;
--			col-gpios-binary;
--			col-switch-delay-ms = <200>;
-+			col-scan-delay-us = <5 100>;
-+			col-switch-delay-ms = <15>;
+diff --git a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
+index ead641c..11d030e 100644
+--- a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
++++ b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
+@@ -2,9 +2,30 @@
  
-+			col-gpios-binary;
-+			col-gpios-pushpull;
- 			col-gpios = <&gpio_pic 1 0>;	/* pin1 */
+ GPIO driven matrix keypad is used to interface a SoC with a matrix keypad.
+ The matrix keypad supports multiple row and column lines, a key can be
+-placed at each intersection of a unique row and a unique column. The matrix
+-keypad can sense a key-press and key-release by means of GPIO lines and
+-report the event using GPIO interrupts to the cpu.
++placed at each intersection of a unique row and a unique column.
++
++Sampling the keypad status is done by individually activating column
++lines (which thus are outputs) and reading back row lines (which are
++inputs).  Each combination of row and column is checked separately to
++determine the status of a single key.
++
++To reduce load on the CPU, changes in the keys' status can get detected
++by means of GPIO interrupts, which get generated upon changes in the pin
++levels.  This approach assumes that any change in the key press status
++will result in a GPIO pin level change interrupt when all columns are
++selected (active) at the same time.  Which in turn assumes that all
++column lines can get activated at the same time, and no harm is done to
++the hardware when multiple keys are pressed simultaneously.
++
++Simple keypad matrix layouts just connect GPIO lines to mechanical
++switches, with no other active components involved.  Although due to the
++driver's operation of activating all columns at the same time for most
++of the time, the use of current limiting resistors may be desirable, or
++column GPIO lines shall operate in open collector mode.
++
++More involved matrix layouts may include externally connected line
++drivers and might influence signal polarity.  The driver supports low
++active signals, while high active line levels are assumed by default.
  
-+			row-gpios-activelow;
- 			row-gpios = <&gpio_pic 2 0	/* pin2 */
- 				     &gpio_pic 3 0	/* pin3 */
- 				     &gpio_pic 4 0>;	/* pin4 */
-@@ -365,8 +366,8 @@
- 					0x01000067	/* UP */
- 					0x02000066	/* FN RIGHT */
- 					0x00010069	/* LEFT */
--					0x0101006a	/* DOWN */
--					0x0201006c>;	/* RIGHT */
-+					0x0101006a	/* RIGHT */
-+					0x0201006c>;	/* DOWN */
- 		};
- 	};
+ Required Properties:
+ - compatible:		Should be "gpio-matrix-keypad"
+@@ -20,9 +41,18 @@ Required Properties:
+ Optional Properties:
+ - linux,no-autorepeat:	do no enable autorepeat feature.
+ - linux,wakeup:		use any event on keypad as wakeup event.
+-- debounce-delay-ms:	debounce interval in milliseconds
+-- col-scan-delay-us:	delay, measured in microseconds, that is needed
+-			before we can scan keypad after activating column gpio
++- debounce-delay-ms:	debounce interval in milliseconds, which needs
++			to pass between detecting a change in the key
++			press status and sampling the new status, e.g.
++			to support multi key presses without spurious
++			single key events, or to cope with bouncing
++			mechanical key switches
++- col-scan-delay-us:	delay interval in microseconds between selecting
++			a column line and reading back its row status,
++			such that pin levels can settle after
++			propagating through the matrix and its
++			associated hardware components
++- gpio-activelow:	row pins as well as column pins are active low
  
+ Example:
+ 	matrix-keypad {
 -- 
 1.7.10.4
