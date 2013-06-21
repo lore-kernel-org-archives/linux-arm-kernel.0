@@ -1,90 +1,53 @@
-From: agnel.joel@gmail.com (Joel A Fernandes)
-Date: Fri, 21 Jun 2013 08:52:12 -0500
-Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
-In-Reply-To: <51C427E1.2000800@ti.com>
-References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
- <1371762407-24544-6-git-send-email-joelagnel@ti.com>
- <51C427E1.2000800@ti.com>
-Message-ID: <CAD=GYpb54bitcg0gnfhzxbvig3etRPY6fs=FOQu5nYkio5NRZw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Jun 2013 14:52:19 +0100
+Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
+ pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
+In-Reply-To: <51C42AE0.9070506@pengutronix.de>
+References: <51C2C0B5.8020802@pengutronix.de> <20130620095705.GA18536@arm.com>
+ <51C2D5EF.3040803@pengutronix.de> <20130620102856.GC18536@arm.com>
+ <20130620111255.GD18536@arm.com> <51C2E917.9000708@pengutronix.de>
+ <51C2EA04.4060701@pengutronix.de> <51C2EBCD.4070206@pengutronix.de>
+ <51C42AE0.9070506@pengutronix.de>
+Message-ID: <20130621135219.GC4099@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 5:16 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On 6/21/2013 2:36 AM, Joel A Fernandes wrote:
->> From: Joel A Fernandes <agnel.joel@gmail.com>
->>
->> Build TI_EDMA by default for ARCH_DAVINCI and ARCH_OMAP2PLUS
->>
->> Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
->
-> You should sign-off with author e-mail address.
->
->> ---
->>  arch/arm/Kconfig            |    1 +
->>  arch/arm/mach-omap2/Kconfig |    1 +
->>  drivers/dma/Kconfig         |    2 +-
->>  3 files changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index b1c66a4..7d58cd9 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -841,6 +841,7 @@ config ARCH_DAVINCI
->>       select HAVE_IDE
->>       select NEED_MACH_GPIO_H
->>       select TI_PRIV_EDMA
->> +     select DMADEVICES
->
-> It is generally a bad idea to force select on something that can be
-> enabled using menuconfig. Unless used carefully, select causes "unmet
-> direct dependency" warnings which folks are already fighting hard to
-> fix. This leads to what Russell referred in the past as "select madness" [1]
+On Fri, Jun 21, 2013 at 11:28:48AM +0100, Marc Kleine-Budde wrote:
+> On 06/20/2013 01:47 PM, Marc Kleine-Budde wrote:
+> > From 306d84d5f0645a86e86d539be0546c4ac758d3d4 Mon Sep 17 00:00:00 2001
+> > From: Catalin Marinas <catalin.marinas@arm.com>
+> > Date: Thu, 20 Jun 2013 12:12:55 +0100
+> > Subject: [PATCH] arm: Fix deferred mm switch on VIVT processors
+> > 
+> > As of commit b9d4d42ad9 (ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
+> > pre-ARMv6 CPUs), the mm switching on VIVT processors is done in the
+> > finish_arch_post_lock_switch() function to avoid whole cache flushing
+> > with interrupts disabled. The need for deferred mm switch is stored as a
+> > thread flag (TIF_SWITCH_MM). However, with preemption enabled, we can
+> > have another thread switch before finish_arch_post_lock_switch(). If the
+> > new thread has the same mm as the previous 'next' thread, the scheduler
+> > will not call switch_mm() and the TIF_SWITCH_MM flag won't be set for
+> > the new thread.
+> > 
+> > This patch moves the switch pending flag to the mm_context_t structure
+> > since this is specific to the mm rather than thread.
+> > 
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Reported-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> > [mkl: add check for mm]
+> > Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> 
+> Works on $CUSTOMERS's hardware.
+> 
+> Tested-by: Marc Kleine-Budde <mkl@pengutronix.de>
 
-Are you concerned with bloat issues? I know your point of view but the idea
-was to build these options by default for these platforms even though
-in some cases
-it might not be used. I have seen folks including myself select the wrong
-option. Having the build system automatically select the correct option for the
-most common cases can be very useful I feel and not require manual
-configuration.
+Thanks.
 
-> In this particular case, it is perfectly okay to have a DaVinci platform
-> without DMA engine support. Drivers figure out they don't have DMA
-> support and switch to PIO mode.
+> Catalin, do you take care of the patch? Please add stable on Cc. The fix
+> is needed on kernels >= v3.5.
 
-Drivers can still use PIO mode if they wish even though DMA is built into the
-kernel right.
+I'll send it to Russell, if possible it should go in for 3.10. I already
+added CC stable in my copy (3.5+).
 
->>       select USE_OF
->>       select ZONE_DMA
->>       help
->> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
->> index f91b07f..c02f083 100644
->> --- a/arch/arm/mach-omap2/Kconfig
->> +++ b/arch/arm/mach-omap2/Kconfig
->> @@ -17,6 +17,7 @@ config ARCH_OMAP2PLUS
->>       select PROC_DEVICETREE if PROC_FS
->>       select SOC_BUS
->>       select SPARSE_IRQ
->> +     select DMADEVICES
->>       select TI_PRIV_EDMA
->>       select USE_OF
->>       help
->> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
->> index 3215a3c..b2d6f15 100644
->> --- a/drivers/dma/Kconfig
->> +++ b/drivers/dma/Kconfig
->> @@ -216,7 +216,7 @@ config TI_EDMA
->>       depends on ARCH_DAVINCI || ARCH_OMAP
->>       select DMA_ENGINE
->>       select DMA_VIRTUAL_CHANNELS
->> -     default n
->> +     default y
->
-> Can't see why DMA support should default to y.
->
-
-For same reason as above.
-
-Thanks,
-Joel
+-- 
+Catalin
