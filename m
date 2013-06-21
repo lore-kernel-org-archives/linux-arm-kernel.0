@@ -1,70 +1,59 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 21 Jun 2013 10:30:11 +0100
-Subject: [PATCH 3/3] ARM: kernel: document ARM CPUs clocks and
- clock-frequency properties
-In-Reply-To: <1371739146-32639-4-git-send-email-f.fainelli@gmail.com>
-References: <1371739146-32639-1-git-send-email-f.fainelli@gmail.com>
- <1371739146-32639-4-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20130621093011.GB14268@e102568-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 21 Jun 2013 10:33:11 +0100
+Subject: [PATCH 0/5] Kernel mode NEON for XOR and RAID6
+In-Reply-To: <alpine.LFD.2.03.1306072214120.18597@syhkavp.arg>
+References: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20130606151705.GG16794@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1306061156330.18597@syhkavp.arg>
+ <20130607175007.GH8111@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1306072214120.18597@syhkavp.arg>
+Message-ID: <20130621093311.GD6983@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 03:39:06PM +0100, Florian Fainelli wrote:
-> ARM CPU device tree nodes may contain a "clock-frequency" property,
-> when set, this property must contain the CPU frequency in Hz,
-> which is then used by the topology parsing code in
-> arch/arm/kernel/topology.c to deduced the CPU capacity. The "clocks"
-> property, if present shall be a phandle to a valid clock node.
+Hi guys,
+
+On Sat, Jun 08, 2013 at 04:09:56AM +0100, Nicolas Pitre wrote:
+> On Fri, 7 Jun 2013, Will Deacon wrote:
+> > > Note that the kernel performs runtime benchmarking of all the different 
+> > > implementations it has available at boot time and selects the best one.  
+> > > So if this would turn out to make things worse on some cores then the 
+> > > Neon code would simply not be used.
+> > 
+> > That will be all sorts of fun if we try to run this on big.LITTLE...
+> > Perhaps we don't care about that either.
 > 
-> Document thes properties to avoid any possible confusion on the
-> clock-frequency unit and also specify that "device_type" is also
-> used by the topology code.
+> Probably not at the present time.
+
+[...]
+
+> > What's the earliest toolchain we claim to support nowadays? If that can't
+> > deal with the intrinsics then we either need to bump the requirement, or
+> > write this using hand-coded asm. In the case of the latter, I don't think
+> > the maintenance overhead of having two implementations is worth it.
 > 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  Documentation/devicetree/bindings/arm/cpus.txt | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
+> We have many different minimum toolchain version requirements attached 
+> to different features being enabled already, ftrace being one of them if 
+> I remember correctly.  For these Neon optimizations the minimum gcc 
+> version is v4.6.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index f32494d..1ce1ace 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -10,7 +10,7 @@ http://devicetree.org
->  
->  For the ARM architecture every CPU node must contain the following properties:
->  
-> -- device_type:	must be "cpu"
-> +- device_type:	must be "cpu". Use by the topology code.
+> Given that this is going to be interesting mostly to server systems, and 
+> given that ARM server deployments are rather new, I don't see the point 
+> of compiling a new server environment using an older gcc version.
 
-No. These are DT bindings, they are not related to kernel code and must
-be defined independently.
+I've mulled over this, had some discussions with our toolchain guys and
+have concluded the following:
 
->  - reg:		property matching the CPU MPIDR[23:0] register bits
->  		reg[31:24] bits must be set to 0
->  - compatible:	should be one of:
-> @@ -45,6 +45,11 @@ For the ARM architecture every CPU node must contain the following properties:
->  		"marvell,xsc3"
->  		"marvell,xscale"
->  
-> +- clocks:	phandle and clock specifier for the CPU clock, used if
-> +		"device_type" is present.
+  - The intrinsics are actually ok. I was sceptical at first, but I've been
+    assured that they should do a reasonable job (echoing your performance
+    figures).
 
-"device_type" must be present, no "if" there (see latest bindings that are on
-their way to the kernel)
+  - The current approach is targetting servers and isn't (yet) suitable for
+    mobile.
 
-git://linux-arm.org/linux-2.6-lp.git dt-cpus-bindings
+So, given that the patches do the right thing wrt GCC version, the only
+remaining point is that we need to keep an eye out for people trying to
+re-use this stuff for mobile (likely crypto, as I mentioned earlier). When
+that happens, we should consider revisiting the benchmark/power figures.
 
-Then we can see if a "clocks" property is suitable here, and try to understand
-what needs to happen when a platform has DVFS capabilities. I need to think
-more about this.
-
-> +- clock-frequency: the frequency of the CPU, in Hz. Mandatory if "device_type"
-> +		   is also present, used as fallback is "clocks" is not present.
-We should not define bindings to fix kernel code. Either "clock-frequency"
-is required or it is not, it should not depend on "device_type" being
-present and "device_type" is mandatory anyway. As I mentioned above, we
-still have to check how to handle multiple frequencies, and how to do it.
-
-I will give it more thought on my side.
-
-Lorenzo
+Will
