@@ -1,42 +1,45 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 21 Jun 2013 13:40:08 +0800
-Subject: [PATCH 2/3] ARM: i.MX6: add ethernet phy fixup for AR8031
-In-Reply-To: <4263249.CSIcTzoYtY@kerker>
-References: <1371742473-28026-1-git-send-email-s.hauer@pengutronix.de>
- <1371742473-28026-3-git-send-email-s.hauer@pengutronix.de>
- <4263249.CSIcTzoYtY@kerker>
-Message-ID: <20130621054006.GB25633@S2101-09.ap.freescale.net>
+Date: Fri, 21 Jun 2013 13:48:51 +0800
+Subject: [PATCH v2 1/3] ARM: dts: imx6dl: add a new pinctrl for ecspi1
+In-Reply-To: <1371781151-20749-1-git-send-email-b32955@freescale.com>
+References: <1371781151-20749-1-git-send-email-b32955@freescale.com>
+Message-ID: <20130621054849.GC25633@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 07:13:41PM +0200, Michael Heimpold wrote:
-> Hi,
+On Fri, Jun 21, 2013 at 10:19:09AM +0800, Huang Shijie wrote:
+> This new pinctrl is used in the imx6dl-sabresd board.
 > 
-> Am Donnerstag, 20. Juni 2013, 17:34:32 schrieb Sascha Hauer:
-> > The AR8031 is used on the i.MX6 based sabreSD, sabreauto and wandboard.
-> > All need the same fixup, so add it for all i.MX6.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  arch/arm/mach-imx/mach-imx6q.c | 27 +++++++++++++++++++++++++++
-> >  1 file changed, 27 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> > index e5f4a5b..69fae87 100644
-> > --- a/arch/arm/mach-imx/mach-imx6q.c
-> > +++ b/arch/arm/mach-imx/mach-imx6q.c
-> > @@ -113,6 +113,29 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
-> >  	return 0;
-> >  }
-> >  
-> > +static int ar8031_phy_fixup(struct phy_device *dev)
-> > +{
-> > +	u16 val;
-> > +
-> > +	/* To enable AR8031 ouput a 125MHz clk from CLK_25M */
-> 
-> Typo? "ouput" -> "output"
-> 
-I fixed it up and applied the series.
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+
+Applied all 3, thanks.
 
 Shawn
+
+> ---
+>  arch/arm/boot/dts/imx6dl.dtsi |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+> index 2b3ecd6..d961365 100644
+> --- a/arch/arm/boot/dts/imx6dl.dtsi
+> +++ b/arch/arm/boot/dts/imx6dl.dtsi
+> @@ -56,6 +56,14 @@
+>  							MX6DL_PAD_EIM_D16__ECSPI1_SCLK 0x100b1
+>  						>;
+>  					};
+> +
+> +					pinctrl_ecspi1_2: ecspi1grp-2 {
+> +						fsl,pins = <
+> +							MX6DL_PAD_KEY_COL1__ECSPI1_MISO 0x100b1
+> +							MX6DL_PAD_KEY_ROW0__ECSPI1_MOSI 0x100b1
+> +							MX6DL_PAD_KEY_COL0__ECSPI1_SCLK 0x100b1
+> +						>;
+> +					};
+>  				};
+>  
+>  				enet {
+> -- 
+> 1.7.1
+> 
+> 
