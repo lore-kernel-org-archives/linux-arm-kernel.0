@@ -1,24 +1,36 @@
-From: dsd@laptop.org (Daniel Drake)
-Date: Fri, 21 Jun 2013 11:36:51 -0600
-Subject: [V2 7/7] video: mmp: add video layer set win/addr operations
- support
-In-Reply-To: <1370879593-11557-1-git-send-email-jtzhou@marvell.com>
-References: <1370879593-11557-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <CAMLZHHS8d3Uh=RWo3QJcamVxNrkzo8eBRWTaRACmAfz9e1NO3Q@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 21 Jun 2013 10:39:19 -0700
+Subject: [PATCHv3/RESEND 2/4] clocksource: arch_timer: Pass clock event to
+ set_mode callback
+In-Reply-To: <1371836361-20574-1-git-send-email-sboyd@codeaurora.org>
+References: <1371836361-20574-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1371836361-20574-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 9:53 AM, Jett.Zhou <jtzhou@marvell.com> wrote:
-> From: Jing Xiang <jxiang@marvell.com>
->
-> Since mmp display controller support graphic/video layer together, so
-> add  win/addr setting operations support when set win parameters.
+There isn't any reason why we don't pass the event here and we'll
+need it in the near future for memory mapped arch timers anyway.
 
-> Signed-off-by: Jing Xiang <jxiang@marvell.com>
-> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clocksource/arm_arch_timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Still confused by the implementation of overlay_is_vid(), but on the
-basis that overlays can be either video or graphics, the code changes
-here seem to fit with the device specs.
-
-Reviewed-by: Daniel Drake <dsd@laptop.org>
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 053d846..220da0c 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -140,7 +140,7 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
+ 
+ 	clk->cpumask = cpumask_of(smp_processor_id());
+ 
+-	clk->set_mode(CLOCK_EVT_MODE_SHUTDOWN, NULL);
++	clk->set_mode(CLOCK_EVT_MODE_SHUTDOWN, clk);
+ 
+ 	clockevents_config_and_register(clk, arch_timer_rate,
+ 					0xf, 0x7fffffff);
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
