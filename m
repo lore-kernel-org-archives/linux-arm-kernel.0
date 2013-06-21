@@ -1,23 +1,26 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 22 Jun 2013 03:26:45 +0400
-Subject: [PATCH v5 0/3] R8A7778/BOCK-W R-Car VIN driver support
-Message-ID: <201306220326.46176.sergei.shtylyov@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 22 Jun 2013 01:29:12 +0200
+Subject: [PATCH] ARM: imx: Synertronixx scb9328 needs to select SOC_IMX1
+Message-ID: <2223651.9m9to5aFxT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+This is required for building a kernel that enables only
+scb9328 and would not get the i.MX1 specific files
+otherwise.
 
-   Here's the set of 3 patches against the Simon Horman's 'renesas.git' repo,
-'renesas-next-20130620' tag. Here we add the VIN platform code working on
-the R8A7778/BOCK-W with ML86V7667 video decoder.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Sascha Hauer <kernel@pengutronix.de>
 
-[1/3] ARM: shmobile: r8a7778: add VIN support
-[2/3] ARM: shmobile: BOCK-W: add VIN and ML86V7667 support
-[3/3] ARM: shmobile: BOCK-W: enable VIN and ML86V7667 in defconfig
-
-   The patch containing OKI ML86V7667 video decoder driver has been removed
-from the series as it should be applied to the 'media_tree.git' repo. The patch
-containing the VIN PFC support has been also removed from the series and has
-now been merged.
-
-WBR, Sergei
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index eef9590..60661a4 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -173,6 +173,7 @@ config ARCH_MX1ADS
+ config MACH_SCB9328
+ 	bool "Synertronixx scb9328"
+ 	select IMX_HAVE_PLATFORM_IMX_UART
++	select SOC_IMX1
+ 	help
+ 	  Say Y here if you are using a Synertronixx scb9328 board
+ 
