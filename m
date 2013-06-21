@@ -1,236 +1,62 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 21 Jun 2013 02:35:18 +0200
-Subject: [PATCH v6 2/8] ARM: s3c64xx: Bypass legacy initialization when
- booting with DT
+Date: Fri, 21 Jun 2013 02:35:20 +0200
+Subject: [PATCH v6 4/8] ARM: Add .init_platform() callback to machine
+ descriptor
 In-Reply-To: <1371774924-9224-1-git-send-email-tomasz.figa@gmail.com>
 References: <1371774924-9224-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1371774924-9224-3-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1371774924-9224-5-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows bypassing most of legacy initialization when booting
-an S3C64xx-based board using device tree, by adding conditional checks
-for DT presence to initcalls which are no longer necessary when booting
-with DT..
+Most ARM platforms have parts that should be initialized as early as
+possible, which usually means as soon as memory management (kmalloc,
+ioremap) starts to work,
+
+However, currently there is no appropriate callback in machine_desc
+struct to use for such initialization and platforms tend to stuff things
+up .init_irq() and .init_time() callbacks.
+
+Since all the DT-based platforms are going towards generic IRQ and time
+initialization (using irqchip_init and clocksource_of_init) and current
+code assumes that if custom callbacks are not provided in machine_desc
+then generic ones should be used, this problem has become a bit more
+inconvenient.
+
+This patch tries to solve this issue by introducing new callback called
+.init_platform(), where any custom low level initialization of platform
+can be done safely.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/mach-s3c64xx/common.c  | 12 ++++++++++++
- arch/arm/mach-s3c64xx/dma.c     |  9 +++++++++
- arch/arm/mach-s3c64xx/irq-pm.c  |  9 +++++++++
- arch/arm/mach-s3c64xx/s3c6400.c |  9 +++++++++
- arch/arm/mach-s3c64xx/s3c6410.c |  9 +++++++++
- arch/arm/plat-samsung/init.c    | 12 +++++++++++-
- 6 files changed, 59 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/mach/arch.h | 1 +
+ arch/arm/kernel/irq.c            | 3 +++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
-index bf00e60..77a22c6 100644
---- a/arch/arm/mach-s3c64xx/common.c
-+++ b/arch/arm/mach-s3c64xx/common.c
-@@ -14,6 +14,10 @@
-  * published by the Free Software Foundation.
-  */
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index 308ad7d..b2f4d11 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -46,6 +46,7 @@ struct machine_desc {
+ 	void			(*reserve)(void);/* reserve mem blocks	*/
+ 	void			(*map_io)(void);/* IO mapping function	*/
+ 	void			(*init_early)(void);
++	void			(*init_platform)(void);
+ 	void			(*init_irq)(void);
+ 	void			(*init_time)(void);
+ 	void			(*init_machine)(void);
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 9723d17..61e2000 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -115,6 +115,9 @@ EXPORT_SYMBOL_GPL(set_irq_flags);
  
-+/*
-+ * NOTE: Code in this file is not used when booting with Device Tree support.
-+ */
-+
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/module.h>
-@@ -202,6 +206,10 @@ void __init s3c64xx_init_io(struct map_desc *mach_desc, int size)
- 
- static __init int s3c64xx_dev_init(void)
+ void __init init_IRQ(void)
  {
-+	/* Not applicable when using DT. */
-+	if (of_have_populated_dt())
-+		return 0;
++	if (machine_desc->init_platform)
++		machine_desc->init_platform();
 +
- 	subsys_system_register(&s3c64xx_subsys, NULL);
- 	return device_register(&s3c64xx_dev);
- }
-@@ -403,6 +411,10 @@ static int __init s3c64xx_init_irq_eint(void)
- {
- 	int irq;
- 
-+	/* On DT-enabled systems EINTs are handled by pinctrl-s3c64xx driver. */
-+	if (of_have_populated_dt())
-+		return -ENODEV;
-+
- 	for (irq = IRQ_EINT(0); irq <= IRQ_EINT(27); irq++) {
- 		irq_set_chip_and_handler(irq, &s3c_irq_eint, handle_level_irq);
- 		irq_set_chip_data(irq, (void *)eint_irq_to_bit(irq));
-diff --git a/arch/arm/mach-s3c64xx/dma.c b/arch/arm/mach-s3c64xx/dma.c
-index c511dfa..7e22c21 100644
---- a/arch/arm/mach-s3c64xx/dma.c
-+++ b/arch/arm/mach-s3c64xx/dma.c
-@@ -12,6 +12,10 @@
-  * published by the Free Software Foundation.
- */
- 
-+/*
-+ * NOTE: Code in this file is not used when booting with Device Tree support.
-+ */
-+
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/interrupt.h>
-@@ -24,6 +28,7 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/amba/pl080.h>
-+#include <linux/of.h>
- 
- #include <mach/dma.h>
- #include <mach/map.h>
-@@ -726,6 +731,10 @@ static int __init s3c64xx_dma_init(void)
- {
- 	int ret;
- 
-+	/* This driver is not supported when booting with device tree. */
-+	if (of_have_populated_dt())
-+		return -ENODEV;
-+
- 	printk(KERN_INFO "%s: Registering DMA channels\n", __func__);
- 
- 	dma_pool = dma_pool_create("DMA-LLI", NULL, sizeof(struct pl080s_lli), 16, 0);
-diff --git a/arch/arm/mach-s3c64xx/irq-pm.c b/arch/arm/mach-s3c64xx/irq-pm.c
-index c3da1b6..1649c0d 100644
---- a/arch/arm/mach-s3c64xx/irq-pm.c
-+++ b/arch/arm/mach-s3c64xx/irq-pm.c
-@@ -12,12 +12,17 @@
-  * published by the Free Software Foundation.
-  */
- 
-+/*
-+ * NOTE: Code in this file is not used when booting with Device Tree support.
-+ */
-+
- #include <linux/kernel.h>
- #include <linux/syscore_ops.h>
- #include <linux/interrupt.h>
- #include <linux/serial_core.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-+#include <linux/of.h>
- 
- #include <mach/map.h>
- 
-@@ -101,6 +106,10 @@ static struct syscore_ops s3c64xx_irq_syscore_ops = {
- 
- static __init int s3c64xx_syscore_init(void)
- {
-+	/* Appropriate drivers (pinctrl, uart) handle this when using DT. */
-+	if (of_have_populated_dt())
-+		return 0;
-+
- 	register_syscore_ops(&s3c64xx_irq_syscore_ops);
- 
- 	return 0;
-diff --git a/arch/arm/mach-s3c64xx/s3c6400.c b/arch/arm/mach-s3c64xx/s3c6400.c
-index 331fe8e..3db0c98 100644
---- a/arch/arm/mach-s3c64xx/s3c6400.c
-+++ b/arch/arm/mach-s3c64xx/s3c6400.c
-@@ -9,6 +9,10 @@
-  * published by the Free Software Foundation.
- */
- 
-+/*
-+ * NOTE: Code in this file is not used when booting with Device Tree support.
-+ */
-+
- #include <linux/kernel.h>
- #include <linux/types.h>
- #include <linux/interrupt.h>
-@@ -20,6 +24,7 @@
- #include <linux/device.h>
- #include <linux/serial_core.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -76,6 +81,10 @@ static struct device s3c6400_dev = {
- 
- static int __init s3c6400_core_init(void)
- {
-+	/* Not applicable when using DT. */
-+	if (of_have_populated_dt())
-+		return 0;
-+
- 	return subsys_system_register(&s3c6400_subsys, NULL);
- }
- 
-diff --git a/arch/arm/mach-s3c64xx/s3c6410.c b/arch/arm/mach-s3c64xx/s3c6410.c
-index 7e6fa12..72b2278 100644
---- a/arch/arm/mach-s3c64xx/s3c6410.c
-+++ b/arch/arm/mach-s3c64xx/s3c6410.c
-@@ -10,6 +10,10 @@
-  * published by the Free Software Foundation.
- */
- 
-+/*
-+ * NOTE: Code in this file is not used when booting with Device Tree support.
-+ */
-+
- #include <linux/kernel.h>
- #include <linux/types.h>
- #include <linux/interrupt.h>
-@@ -21,6 +25,7 @@
- #include <linux/device.h>
- #include <linux/serial_core.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -79,6 +84,10 @@ static struct device s3c6410_dev = {
- 
- static int __init s3c6410_core_init(void)
- {
-+	/* Not applicable when using DT. */
-+	if (of_have_populated_dt())
-+		return 0;
-+
- 	return subsys_system_register(&s3c6410_subsys, NULL);
- }
- 
-diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
-index 3e5c461..e92aee2 100644
---- a/arch/arm/plat-samsung/init.c
-+++ b/arch/arm/plat-samsung/init.c
-@@ -11,12 +11,18 @@
-  * published by the Free Software Foundation.
- */
- 
-+/*
-+ * NOTE: Code in this file is not used on S3C64xx when booting with
-+ * Device Tree support.
-+ */
-+
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/interrupt.h>
- #include <linux/ioport.h>
- #include <linux/serial_core.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
- 
- #include <mach/hardware.h>
- 
-@@ -147,8 +153,12 @@ static int __init s3c_arch_init(void)
- 
- 	// do the correct init for cpu
- 
--	if (cpu == NULL)
-+	if (cpu == NULL) {
-+		/* Not needed when booting with device tree. */
-+		if (of_have_populated_dt())
-+			return 0;
- 		panic("s3c_arch_init: NULL cpu\n");
-+	}
- 
- 	ret = (cpu->init)();
- 	if (ret != 0)
+ 	if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
+ 		irqchip_init();
+ 	else
 -- 
 1.8.2.1
