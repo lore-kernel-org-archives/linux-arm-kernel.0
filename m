@@ -1,182 +1,83 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 21 Jun 2013 19:48:21 -0400
-Subject: [PATCH 7/8] ARM: mm: Recreate kernel mappings in early_paging_init()
+Date: Fri, 21 Jun 2013 19:48:19 -0400
+Subject: [PATCH 5/8] ARM: mm: Add __pv_stub_mov to patch MOV instruction
 In-Reply-To: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1371858502-10083-8-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1371858502-10083-6-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a step in the init sequence, in order to recreate
-the kernel code/data page table mappings prior to full paging
-initialization.  This is necessary on LPAE systems that run out of
-a physical address space outside the 4G limit.  On these systems,
-this implementation provides a machine descriptor hook that allows
-the PHYS_OFFSET to be overridden in a machine specific fashion.
+From: Sricharan R <r.sricharan@ti.com>
 
-Based on Cyril's initial patch. The pv_table needs to be patched
-again after switching to higher address space.
+Patch adds stub for MOV instruction. This is preparatory patch to
+add the subsequent 64 bit patching which will use MOV stub.
 
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
+For review simplicity the patch is kept as a separate change
 
-Signed-off-by: R Sricharan <r.sricharan@ti.com>
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/include/asm/mach/arch.h |    1 +
- arch/arm/kernel/setup.c          |    3 ++
- arch/arm/mm/mmu.c                |   99 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 103 insertions(+)
+ arch/arm/include/asm/memory.h |   10 ++++++++++
+ arch/arm/kernel/head.S        |    2 ++
+ arch/arm/kernel/vmlinux.lds.S |    5 +++++
+ 3 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 308ad7d..e487b8e 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -43,6 +43,7 @@ struct machine_desc {
- 	struct smp_operations	*smp;		/* SMP operations	*/
- 	void			(*fixup)(struct tag *, char **,
- 					 struct meminfo *);
-+	void			(*init_meminfo)(void);
- 	void			(*reserve)(void);/* reserve mem blocks	*/
- 	void			(*map_io)(void);/* IO mapping function	*/
- 	void			(*init_early)(void);
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index bdcd4dd..e2ebe6c 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -71,6 +71,7 @@ static int __init fpe_setup(char *line)
- __setup("fpe=", fpe_setup);
- #endif
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 3d4f79c..d8a3ea6 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -172,6 +172,7 @@
+  * so that all we need to do is modify the 8-bit constant field.
+  */
+ #define __PV_BITS_31_24	0x81000000
++#define __PV_BITS_7_0	0x81
  
-+extern void early_paging_init(struct machine_desc *, struct proc_info_list *);
- extern void paging_init(struct machine_desc *desc);
- extern void sanity_check_meminfo(void);
- extern void reboot_setup(char *str);
-@@ -789,6 +790,8 @@ void __init setup_arch(char **cmdline_p)
- 	parse_early_param();
+ extern phys_addr_t (*arch_virt_to_idmap) (unsigned long x);
+ extern unsigned long __pv_phys_offset;
+@@ -188,6 +189,15 @@ extern unsigned long __pv_offset;
+ 	: "=r" (to)					\
+ 	: "r" (from), "I" (type))
  
- 	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
++#define __pv_stub_mov(to, instr, type)			\
++	__asm__ volatile("@ __pv_stub_mov\n"		\
++	"1:	" instr "	%R0, %1\n"		\
++	"	.pushsection .pv_high_table,\"a\"\n"	\
++	"	.long	1b\n"				\
++	"	.popsection\n"				\
++	: "=r" (to)					\
++	: "I" (type))
 +
-+	early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
- 	sanity_check_meminfo();
- 	arm_memblock_init(&meminfo, mdesc);
+ static inline phys_addr_t __virt_to_phys(unsigned long x)
+ {
+ 	unsigned long t;
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 764e83b..b1bdeb5 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -565,6 +565,8 @@ ENDPROC(__fixup_pv_table)
+ 	.long	__pv_table_begin
+ 	.long	__pv_table_end
+ 2:	.long	__pv_phys_offset
++3:	.long	__pv_high_table_begin
++	.long	__pv_high_table_end
  
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 280f91d..f8ef29b 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -28,6 +28,7 @@
- #include <asm/highmem.h>
- #include <asm/system_info.h>
- #include <asm/traps.h>
-+#include <asm/procinfo.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -1264,6 +1265,104 @@ static void __init map_lowmem(void)
+ 	.text
+ __fixup_a_pv_table:
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index a871b8e..cf17c7b 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -182,6 +182,11 @@ SECTIONS
+ 		*(.pv_table)
+ 		__pv_table_end = .;
  	}
- }
- 
-+#ifdef CONFIG_ARM_LPAE
-+extern void fixup_pv_table(const void *, unsigned long, unsigned long);
-+extern const void *__pv_table_begin, *__pv_table_end;
-+extern const void *__pv_high_table_begin, *__pv_high_table_end;
-+
-+/*
-+ * early_paging_init() recreates boot time page table setup, allowing machines
-+ * to switch over to a high (>4G) address space on LPAE systems
-+ */
-+void __init early_paging_init(struct machine_desc *mdesc,
-+			      struct proc_info_list *procinfo)
-+{
-+	pmdval_t pmdprot = procinfo->__cpu_mm_mmu_flags;
-+	unsigned long map_start, map_end;
-+	pgd_t *pgd0, *pgdk;
-+	pud_t *pud0, *pudk;
-+	pmd_t *pmd0, *pmdk;
-+	phys_addr_t phys;
-+	int i;
-+	unsigned long __pv_phys_offset_low;
-+
-+	/* remap kernel code and data */
-+	map_start = init_mm.start_code;
-+	map_end   = init_mm.brk;
-+
-+	/* get a handle on things... */
-+	pgd0 = pgd_offset_k(0);
-+	pud0 = pud_offset(pgd0, 0);
-+	pmd0 = pmd_offset(pud0, 0);
-+
-+	pgdk = pgd_offset_k(map_start);
-+	pudk = pud_offset(pgdk, map_start);
-+	pmdk = pmd_offset(pudk, map_start);
-+
-+	phys = PHYS_OFFSET;
-+
-+	if (mdesc->init_meminfo) {
-+		mdesc->init_meminfo();
-+		/* Run the patch stub to update the constants */
-+		fixup_pv_table(&__pv_table_begin,
-+			(&__pv_table_end - &__pv_table_begin) << 2,
-+			__pv_offset);
-+
-+		fixup_pv_table(&__pv_high_table_begin,
-+			(&__pv_high_table_end - &__pv_high_table_begin) << 2,
-+			__pv_phys_offset >> PV_HIGH_SHIFT);
-+
-+		/*
-+		 * Cache cleaning operations for self-modifying code
-+		 * We should clean the entries by MVA but running a
-+		 * for loop over every pv_table entry pointer would
-+		 * just complicate the code.
-+		 */
-+		flush_cache_louis();
-+		dsb();
-+		isb();
-+
-+		/*
-+		 * Set the flag to indicate whether __pv_offset is
-+		 * real or 2's complement after high address switch
-+		 */
-+		__pv_phys_offset_low = __pv_phys_offset;
-+		if (__pv_phys_offset_low < PAGE_OFFSET)
-+			__pv_sign_flag = 1;
-+		else
-+			 __pv_sign_flag = 0;
++	.init.pv_high_table : {
++		__pv_high_table_begin = .;
++		*(.pv_high_table)
++		__pv_high_table_end = .;
 +	}
-+
-+	/* remap level 1 table */
-+	for (i = 0; i < PTRS_PER_PGD; i++) {
-+		*pud0++ = __pud(__pa(pmd0) | PMD_TYPE_TABLE | L_PGD_SWAPPER);
-+		pmd0 += PTRS_PER_PMD;
-+	}
-+
-+	/* remap pmds for kernel mapping */
-+	phys = __pa(map_start) & PMD_MASK;
-+	do {
-+		*pmdk++ = __pmd(phys | pmdprot);
-+		phys += PMD_SIZE;
-+	} while (phys < map_end);
-+
-+	flush_cache_all();
-+	cpu_set_ttbr(0, __pa(pgd0));
-+	cpu_set_ttbr(1, __pa(pgd0) + TTBR1_OFFSET);
-+	local_flush_tlb_all();
-+}
-+
-+#else
-+
-+void __init early_paging_init(struct machine_desc *mdesc,
-+			      struct proc_info_list *procinfo)
-+{
-+	if (mdesc->init_meminfo)
-+		mdesc->init_meminfo();
-+}
-+
-+#endif
-+
- /*
-  * paging_init() sets up the page tables, initialises the zone memory
-  * maps, and sets up the zero page, bad page and bad page tables.
+ 	.init.data : {
+ #ifndef CONFIG_XIP_KERNEL
+ 		INIT_DATA
 -- 
 1.7.9.5
