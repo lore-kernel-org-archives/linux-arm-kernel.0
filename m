@@ -1,47 +1,132 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Jun 2013 16:04:38 +0200
-Subject: [PATCH v2 00/18] Final Samsung PWM support cleanup
-In-Reply-To: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
-References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <201306211604.38443.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 21 Jun 2013 10:07:07 -0400
+Subject: [PATCH v3 4/4] ARM: dts: mvebu: Introduce a new compatible
+ string for mv64xxx-i2c
+In-Reply-To: <1371821529-13791-5-git-send-email-gregory.clement@free-electrons.com>
+References: <1371821529-13791-1-git-send-email-gregory.clement@free-electrons.com>
+ <1371821529-13791-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130621140707.GO31667@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 June 2013, Tomasz Figa wrote:
-> Since we now have a proper Samsung PWM clocksource driver in place,
-> we can proceed with further cleanup of PWM timers support on Samsung SoCs.
+On Fri, Jun 21, 2013 at 03:32:09PM +0200, Gregory CLEMENT wrote:
+> The mv64xxx-i2c embedded in the Armada XP have a new feature to
+> offload i2c transaction. This new version of the IP come also with
+> some errata. This lead to the introduction to a another compatible
+> string.
 > 
-> This series attempts to achieve this goal by:
->  1) moving remaining Samsung platforms to the new clocksource driver
->  2) removing old clocksource driver
->  3) adding new multiplatform- and DT-aware PWM driver
->  4) moving all Samsung platforms to use the new PWM driver
->  5) removing old PWM driver
->  6) removing all PWM-related code that is not used anymore
+> This commit split the i2c information into armada-370.dtsi and
+> armada-xp.dtsi. Most of the data remains the same and stay in the
+> common file Armada-370-xp.dtsi. With this new feature the size of the
+> registers are bigger for Armada XP and the new compatible string is
+> used.
 > 
-> Cleaning up the PWM driver is a bit tricky, because the design of current
-> driver makes it completely unsuitable for DT and multiplatform and would
-> require a heavy rework to make it usable, breaking any existing Samsung PWM
-> users by the way. To avoid any breakage I decided to keep the old driver,
-> add new one, move all platforms to it and then remove the old one.
+> The Device Tree binding documentation is updated accordingly.
 > 
-> See particular patches for more detailed descriptions.
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 13 ++++++++++++-
+>  arch/arm/boot/dts/armada-370-xp.dtsi                  |  2 --
+>  arch/arm/boot/dts/armada-370.dtsi                     |  8 ++++++++
+>  arch/arm/boot/dts/armada-xp.dtsi                      | 10 ++++++++++
+>  4 files changed, 30 insertions(+), 3 deletions(-)
 > 
-> On S3C6410-based Tiny6410 (Mini6410-compatible), after enabling pwm-beeper
-> and Exynos4210-based Origen board (with PWM0 attached to a scope):
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> index a1ee681..ce7af6a 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> @@ -4,7 +4,8 @@
+>  Required properties :
+>  
+>   - reg             : Offset and length of the register set for the device
+> - - compatible      : Should be "marvell,mv64xxx-i2c"
+> + - compatible      : Should be "marvell,mv64xxx-i2c" and "marvell,mv7230-i2c"
+> +for controller which support the I2C Transaction Generator
+>   - interrupts      : The interrupt number
+>  
+>  Optional properties :
+> @@ -20,3 +21,13 @@ Examples:
+>  		interrupts = <29>;
+>  		clock-frequency = <100000>;
+>  	};
+> +
+> +For a controller which support the I2C Transaction Generator:
+> +
+> +	i2c at 11000 {
+> +		compatible = "marvell,mv64xxx-i2c", "marvell,mv78230-i2c";
+> +		reg = <0x11000 0x100>;
+> +		compatible = "marvell,mv64xxx-i2c";
+
+extra compatible line.  If there's nothing else, I'll fix this up when I
+pull it in.
+
+thx,
+
+Jason.
+
+> +		interrupts = <29>;
+> +		clock-frequency = <100000>;
+> +	};
+> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> index 550eb77..b6f475c 100644
+> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> @@ -112,7 +112,6 @@
+>  
+>  			i2c0: i2c at 11000 {
+>  				compatible = "marvell,mv64xxx-i2c";
+> -				reg = <0x11000 0x20>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				interrupts = <31>;
+> @@ -123,7 +122,6 @@
+>  
+>  			i2c1: i2c at 11100 {
+>  				compatible = "marvell,mv64xxx-i2c";
+> -				reg = <0x11100 0x20>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				interrupts = <32>;
+> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> index aee2b18..39b26d6 100644
+> --- a/arch/arm/boot/dts/armada-370.dtsi
+> +++ b/arch/arm/boot/dts/armada-370.dtsi
+> @@ -155,6 +155,14 @@
+>  				};
+>  			};
+>  
+> +			i2c0: i2c at 11000 {
+> +				reg = <0x11000 0x20>;
+> +			};
+> +
+> +			i2c1: i2c at 11100 {
+> +				reg = <0x11100 0x20>;
+> +			};
+> +
+>  			usb at 50000 {
+>  				clocks = <&coreclk 0>;
+>  			};
+> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> index 5b902f9..c2c357e 100644
+> --- a/arch/arm/boot/dts/armada-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> @@ -134,6 +134,16 @@
+>  				};
+>  			};
+>  
+> +			i2c0: i2c at 11000 {
+> +				compatible = "marvell,mv64xxx-i2c", "marvell,mv78230-i2c";
+> +				reg = <0x11000 0x100>;
+> +			};
+> +
+> +			i2c1: i2c at 11100 {
+> +				compatible = "marvell,mv64xxx-i2c", "marvell,mv78230-i2c";
+> +				reg = <0x11100 0x100>;
+> +			};
+> +
+>  			usb at 50000 {
+>  				clocks = <&gateclk 18>;
+>  			};
+> -- 
+> 1.8.1.2
 > 
-> Tested-by: Tomasz Figa <tomasz.figa@gmail.com>
-> 
-
-Looks good to me,
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-Two small comments:
-
-* always use 'git format-patch -M' to detect renames (patch 10)
-
-* for new code, don't use __raw_readl and similar functions but
-  use readl_relaxed or plain readl.
-
-	Arnd
