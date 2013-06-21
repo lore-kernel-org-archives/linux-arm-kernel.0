@@ -1,82 +1,51 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Jun 2013 14:25:34 -0400
-Subject: [GIT PULL 1/2] ARM: mvebu: dt changes for v3.11 (round 6!)
-In-Reply-To: <201306211958.00637.arnd@arndb.de>
-References: <20130621164611.GT31667@titan.lakedaemon.net>
- <201306211958.00637.arnd@arndb.de>
-Message-ID: <20130621182534.GV31667@titan.lakedaemon.net>
+From: agnel.joel@gmail.com (Joel A Fernandes)
+Date: Fri, 21 Jun 2013 13:40:48 -0500
+Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
+In-Reply-To: <201306211632.12577.arnd@arndb.de>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <201306211600.04986.arnd@arndb.de>
+ <CAD=GYpZ_5Lp1La=f+2BQfmuj+sc3FgygZRD4gfj4JGGZ0Do=_Q@mail.gmail.com>
+ <201306211632.12577.arnd@arndb.de>
+Message-ID: <CAD=GYpbhBAaSkMtcJaPtVpWar7AcW37QpAk3A0qgwX6G5PDoZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 07:58:00PM +0200, Arnd Bergmann wrote:
-> On Friday 21 June 2013, Jason Cooper wrote:
-> > Arnd, Olof,
-> > 
-> > Here's the last stragglers for v3.11.  Nothing too traumatic :)
-> > 
-> > This does cause a merge conflict in kirkwood.dtsi with my
-> > mvebu/pcie_kirkwood branch.  The resolution is to keep the changes in
-> > this branch.
-> > 
-> > 
-> > The following changes since commit 918f8f309643978b9e761f39af8962a7388d332d:
-> > 
-> >   ARM: Kirkwood: ts219: Enable second PCIe port in DT. (2013-06-11 16:02:08 +0000)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.infradead.org/users/jcooper/linux.git tags/dt-3.11-6
-> > 
-> > for you to fetch changes up to 01db527e657d6cf646c6e6f059ad41e7023a25e7:
-> > 
-> >   ARM: Kirkwood: Fix the internal register ranges translation (2013-06-21 15:38:20 +0000)
-> > 
-> > ----------------------------------------------------------------
-> > mvebu dt changes for v3.11 (round 6)
-> > 
-> >  - mvebu
-> >     - mini-PCIe connectors on Armada 370 RD
-> > 
-> >  - kirkwood
-> >     - correct internal register ranges translation
-> > 
-> > ----------------------------------------------------------------
-> > Ezequiel Garcia (1):
-> >       ARM: Kirkwood: Fix the internal register ranges translation
-> > 
-> > Thomas Petazzoni (1):
-> >       arm: mvebu: enable mini-PCIe connectors on Armada 370 RD
-> > 
-> >  arch/arm/boot/dts/armada-370-rd.dts | 16 ++++++++++++++++
-> >  arch/arm/boot/dts/kirkwood.dtsi     |  5 +++--
-> >  2 files changed, 19 insertions(+), 2 deletions(-)
-> > 
-> 
-> Pulled into next/dt, thanks!
-> 
-> I got a non-obvious conflict that I resolved like this:
-> 
-> 
-> --- a/arch/arm/boot/dts/kirkwood.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> @@@ -30,8 -30,8 +30,9 @@@
->   
->         ocp at f1000000 {
->                 compatible = "simple-bus";
-> -               ranges = <0x00000000 0xf1000000 0x4000000
-> +               ranges = <0x00000000 0xf1000000 0x0100000
+On Fri, Jun 21, 2013 at 9:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 21 June 2013, Joel A Fernandes wrote:
+>> I haven't come across this problem but- are you saying there is a
+>> shortcoming in Kbuild/Kconfig that selects an option even if its
+>> dependency is not met?
+>
+> Well, the shortcoming is that it lets you specify impossible
+> contraints. You get a warning from Kconfig when building
+> such a configuration, but then it continues.
+>
+>> The problem with defconfig is also too many options I feel for a common case.
+>> CONFIG_DMADEVICES=y
+>> CONFIG_TI_EDMA=y
+>>
+>> Most if not all future OMAPs from will use EDMA. Why not we can be
+>> explicit about it and just built it in anyway. If ARCH_OMAP and
+>> DMADEVICES are selected, then we can just build EDMA in by default.
+>
+> It's just not how we do things. Kconfig is a mess because we are
+> not consistent in the way this is done.
+>
+>> I agree maybe the option can be dropped from Davinci but I suggest
+>> let's keep it for OMAP. Is that ok?
+>
+> No, I would still like you to not add it to either one. I'm spending
+> a lot of my time tracking down incorrect 'select' statements and I'd
+> rather spend it in a different way. I've had to a number of 'select'
+> statements from OMAP in the past, please don't add any new ones
+> unless there is a strict build dependency (which normally should not
+> exist).
 
+I think we are talking about different things, I agree the 'select
+DMADEVICES' can be dropped but lets please keep the default y option
+(not adding new select statements, just saying that if someone select
+DMADEVICES in menuconfig and if they're ARCH_OMAP=1 , then default to
+EDMA). This will simply allow people to have a default. Thanks.
 
->  +                        0xe0000000 0xe0000000 0x8100000 /* PCIE */
-
-good catch!  Looks like I need to redo my resolution in mvebu/for-next
-:)
-
-> +                         0xf4000000 0xf4000000 0x0000400
->                           0xf5000000 0xf5000000 0x0000400>;
->                 #address-cells = <1>;
->                 #size-cells = <1>;
-
-thx,
-
-Jason.
+Thanks
+Joel
