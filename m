@@ -1,46 +1,60 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 21 Jun 2013 09:10:34 +0200
-Subject: [PATCH 0/4] Add DVFS support on APE6EVM
-Message-ID: <1371798638-10530-1-git-send-email-g.liakhovetski@gmx.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 21 Jun 2013 00:12:39 -0700
+Subject: linux-next: manual merge of the arm-soc tree with the mailbox tree
+In-Reply-To: <CAOesGMjszju75jo6Ej6C=0-rfdPLuEj0mwmU1zYvFvYw1dyQCA@mail.gmail.com>
+References: <20130621162656.bb94e0fa8b6813781b804a73@canb.auug.org.au>
+ <20130621164149.598b39bb78b6015057d03f6f@canb.auug.org.au>
+ <20130621065310.GK5523@atomide.com>
+ <CAOesGMjszju75jo6Ej6C=0-rfdPLuEj0mwmU1zYvFvYw1dyQCA@mail.gmail.com>
+Message-ID: <20130621071239.GM5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having added CPUFreq support to the Cortex A15 cores on APE6 (r8a73a4) and 
-DT support to the max8973 regulator driver it is now possible to implement 
-CA15 CPUFreq support on APE6EVM, using a max8972 PMU to adjust SoC's DVFS
-voltage. This series depends on earlier
+* Olof Johansson <olof@lixom.net> [130621 00:07]:
+> On Thu, Jun 20, 2013 at 11:53 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Stephen Rothwell <sfr@canb.auug.org.au> [130620 23:48]:
+> >> Hi all,
+> >>
+> >> On Fri, 21 Jun 2013 16:26:56 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> >> >
+> >> > Today's linux-next merge of the arm-soc tree got a conflict in
+> >> > drivers/mailbox/Kconfig between commit a1824eaab70f ("mailbox: OMAP:
+> >> > introduce mailbox framework") from the mailbox tree and commit
+> >> > c869c75c16b3 ("mailbox/omap: move the OMAP mailbox framework to drivers")
+> >> > from the arm-soc tree.
+> >> >
+> >> > I fixed it up (I suspect not properly - see below) and can carry the fix
+> >> > as necessary (no action is required).
+> >> >
+> >> > It looks like we have two different versions of these changes in
+> >> > linux-next now, so please clean it all up.  i.e. can I just drop the
+> >> > mailbox tree now?
+> >>
+> >> OK, things went steeply downhill from here, so I went back and removed
+> >> the mailbox tree ...
+> >
+> > I think Olof dropped the earlier version of the mailbox branch, and
+> > remerged the updated mailbox branch. So if there was also yet another
+> > mailbox branch being pulled into Linux next, then yes, dropping it is
+> > the way to go.
+> 
+> No, I only reverted -- I didn't pull in any new branch.
 
-"ARM: shmobile: r8a73a4: wait for completion when kicking the clock"
-https://patchwork.kernel.org/patch/2601071/
-"ARM: shmobile: r8a73a4: implement CPU clock scaling for CPUFreq"
-https://patchwork.kernel.org/patch/2601111/
+Arnd pulled in tags/omap-for-v3.11/mailbox-signed, which is the branch
+that should get merged to the mainline tree while we're waiting for
+the generic mailbox framework from Jassi.
+ 
+> I wonder if this mess is caused by the fact that I did the revert
+> instead of rebuilding our for-next and dropping the merge in the first
+> place.
+> 
+> I'll rebuild our for-next (or maybe Arnd will beat me to it) before
+> next linux-next build, i.e. Sunday night my time.
 
-and requires the following max8973 patches:
+Could be, especially if some of the commits are the same in the reverted
+branch and newly merged branch as git might think that some merges have
+been already resolved the right way earlier.
 
-"regulators: max8973: fix multiple instance support"
-http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg456101.html
-"regulators: max8973: initial DT support"
-http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg456102.html
+Regards,
 
-Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-
-Guennadi Liakhovetski (4):
-  ARM: shmobile: r8a73a4: safeguard against wrong clk_set_rate() uses
-  ARM: shmobile: r8a73a4: add I2C DT nodes and required clocks
-  ARM: shmobile: ape6evm: add CPUFreq support
-  ARM: shmobile: r8a73a4: add Z2 clock support
-
- arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   26 ++++++++++
- arch/arm/boot/dts/r8a73a4.dtsi         |   81 ++++++++++++++++++++++++++++++++
- arch/arm/mach-shmobile/clock-r8a73a4.c |   56 +++++++++++++++++++++-
- 3 files changed, 160 insertions(+), 3 deletions(-)
-
--- 
-1.7.2.5
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Tony
