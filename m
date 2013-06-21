@@ -1,252 +1,258 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Fri, 21 Jun 2013 20:09:50 +0200
-Subject: [PATCH v1 04/12] input: matrix-keypad: push/pull, separate polarity
+Date: Fri, 21 Jun 2013 20:09:53 +0200
+Subject: [PATCH v1 07/12] input: keypad-matrix: introduce polling support
 In-Reply-To: <1371838198-7327-1-git-send-email-gsi@denx.de>
 References: <1371838198-7327-1-git-send-email-gsi@denx.de>
-Message-ID: <1371838198-7327-5-git-send-email-gsi@denx.de>
+Message-ID: <1371838198-7327-8-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-extend the device tree adjustable hardware configuration:
-- allow for differing polarity of the row and column GPIO pins
-- optionally fully drive column output pins instead of the former
-  unconditional open collector emulation approach
+detecting changes in the key press status may not work reliably in
+interrupt driven mode (see the documentation part of the change for
+details)
 
-this change introduces individual polarity settings for the row
-pins as well as the column pins, to achieve this separate members
-in the platform data bundle get introduced, and all places which
-fill in the platform data receive an update -- the result is
-complete backwards compatibility with existing matrix drivers and
-an improvement for newly written code which needs the individual
-polarity settings
-
-this change allows optional support to fully drive the column
-selection pins, but by default sticks with the former behaviour
-of driving the active level and being passive for the inactive
-level, so
-- unadjusted configurations keep operating the hardware in an
-  identical manner
-- adjusted or newly configured hardware will be operated
-  according to the configuration, which now allows for either
-  setups with pull resistors or mere connections between logic
-
-so this change doesn't break existing behaviour, is neutral for
-unadjusted code or configurations, and is an improvement in those
-areas where the former implementations was restricted
+add support to poll the matrix in software for reliable operation in the
+presence of multi key press events, leave a comment on how sleep and
+wakeup could be made to work appropriately in the polling case
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- .../bindings/input/gpio-matrix-keypad.txt          |   18 +++++++++
- arch/arm/mach-davinci/board-tnetv107x-evm.c        |    3 +-
- arch/arm/mach-omap2/board-h4.c                     |    3 +-
- arch/arm/mach-pxa/palmtc.c                         |    3 +-
- arch/mips/jz4740/board-qi_lb60.c                   |    3 +-
- drivers/input/keyboard/matrix_keypad.c             |   39 +++++++++++++++++---
- include/linux/input/matrix_keypad.h                |    9 ++++-
- 7 files changed, 66 insertions(+), 12 deletions(-)
+ .../bindings/input/gpio-matrix-keypad.txt          |   17 ++++
+ drivers/input/keyboard/matrix_keypad.c             |   92 ++++++++++++++++++--
+ include/linux/input/matrix_keypad.h                |    4 +-
+ 3 files changed, 107 insertions(+), 6 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
-index 11d030e..e6a01eb 100644
+index e6a01eb..196935b 100644
 --- a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
 +++ b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
-@@ -27,6 +27,14 @@ More involved matrix layouts may include externally connected line
- drivers and might influence signal polarity.  The driver supports low
- active signals, while high active line levels are assumed by default.
+@@ -17,6 +17,20 @@ selected (active) at the same time.  Which in turn assumes that all
+ column lines can get activated at the same time, and no harm is done to
+ the hardware when multiple keys are pressed simultaneously.
  
-+Since output drivers and input drivers may exist independently from each
-+other and may or may not invert signals, polarity for row pins and for
-+column pins is adjustable individually.  The initial implementation of
-+the driver used to emulate some kind of an open collector behaviour in
-+software, which makes signals float in the absence of pull up resistors.
-+To fully drive output signals in either direction, enable push/pull mode
-+for column pins.  This option is off by default for compatibility.
++The approach to enable all columns at the same time and to determine
++that a key press status change has occured from row pin level changes
++only works reliably for single key presses.  Multi key presses where the
++keys share their position on a row line may get deferred or even could
++go unnoticed, pressing and holding one key will shadow events which
++another key on the same row would have generated.  When reliable
++detection of key press events is required even in the presence of multi
++key presses, interrupt mode isn't sufficient any longer, and polling
++needs to be used.  The polling approach to detecting changes in the key
++press status will periodically activate a single column line and check
++the signals of the row lines.  Polling may also be applicable to setups
++where the hardware doesn't support the activation of several columns at
++the same time.
 +
- Required Properties:
- - compatible:		Should be "gpio-matrix-keypad"
- - row-gpios:		List of gpios used as row lines. The gpio specifier
-@@ -52,7 +60,17 @@ Optional Properties:
+ Simple keypad matrix layouts just connect GPIO lines to mechanical
+ switches, with no other active components involved.  Although due to the
+ driver's operation of activating all columns at the same time for most
+@@ -60,6 +74,9 @@ Optional Properties:
  			such that pin levels can settle after
  			propagating through the matrix and its
  			associated hardware components
-+- row-gpios-activelow:	row GPIO pins are active low
-+- col-gpios-activelow:	column GPIO pins are active low
++- col-switch-delay-ms:	columns switch interval in milliseconds instead
++			of using interrupts to detect key press changes,
++			enables polling mode when specified
+ - row-gpios-activelow:	row GPIO pins are active low
+ - col-gpios-activelow:	column GPIO pins are active low
  - gpio-activelow:	row pins as well as column pins are active low
-+			(provided for backward compatibility, and useful
-+			for matrix layouts of identical polarity for
-+			rows and columns)
-+- col-gpios-pushpull:	fully drive the column selection pins in either
-+			direction (high and low signals), the default
-+			behaviour is to actively drive low signals and
-+			be passive otherwise (emulates an open collector
-+			output driver)
- 
- Example:
- 	matrix-keypad {
-diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-index ba79837..d41bd8a 100644
---- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
-+++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-@@ -199,7 +199,8 @@ static struct matrix_keypad_platform_data keypad_config = {
- 	.num_row_gpios	= 6,
- 	.num_col_gpios	= 5,
- 	.debounce_ms	= 0, /* minimum */
--	.active_low	= 0, /* pull up realization */
-+	.col_gpios_active_low	= 0, /* pull up realization */
-+	.row_gpios_active_low	= 0, /* pull up realization */
- 	.no_autorepeat	= 0,
- };
- 
-diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
-index 69c0acf..78c91cd 100644
---- a/arch/arm/mach-omap2/board-h4.c
-+++ b/arch/arm/mach-omap2/board-h4.c
-@@ -97,7 +97,8 @@ static struct matrix_keypad_platform_data board_keypad_platform_data = {
- 	.num_row_gpios	= ARRAY_SIZE(board_keypad_row_gpios),
- 	.col_gpios	= board_keypad_col_gpios,
- 	.num_col_gpios	= ARRAY_SIZE(board_keypad_col_gpios),
--	.active_low	= 1,
-+	.col_gpios_active_low	= 1,
-+	.row_gpios_active_low	= 1,
- 
- 	.debounce_ms		= 20,
- 	.col_scan_delay_us	= 5,
-diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
-index 100b176f..4767563 100644
---- a/arch/arm/mach-pxa/palmtc.c
-+++ b/arch/arm/mach-pxa/palmtc.c
-@@ -314,7 +314,8 @@ static struct matrix_keypad_platform_data palmtc_keypad_platform_data = {
- 	.num_row_gpios	= ARRAY_SIZE(palmtc_keypad_row_gpios),
- 	.col_gpios	= palmtc_keypad_col_gpios,
- 	.num_col_gpios	= ARRAY_SIZE(palmtc_keypad_col_gpios),
--	.active_low	= 1,
-+	.col_gpios_active_low	= 1,
-+	.row_gpios_active_low	= 1,
- 
- 	.debounce_ms		= 20,
- 	.col_scan_delay_us	= 5,
-diff --git a/arch/mips/jz4740/board-qi_lb60.c b/arch/mips/jz4740/board-qi_lb60.c
-index be2b3de..4235ca2 100644
---- a/arch/mips/jz4740/board-qi_lb60.c
-+++ b/arch/mips/jz4740/board-qi_lb60.c
-@@ -250,7 +250,8 @@ static struct matrix_keypad_platform_data qi_lb60_pdata = {
- 	.col_scan_delay_us	= 10,
- 	.debounce_ms		= 10,
- 	.wakeup			= 1,
--	.active_low		= 1,
-+	.col_gpios_active_low	= 1,
-+	.row_gpios_active_low	= 1,
- };
- 
- static struct platform_device qi_lb60_keypad = {
 diff --git a/drivers/input/keyboard/matrix_keypad.c b/drivers/input/keyboard/matrix_keypad.c
-index 5b5f86d..4f22149 100644
+index 0b2599d..c2221d1 100644
 --- a/drivers/input/keyboard/matrix_keypad.c
 +++ b/drivers/input/keyboard/matrix_keypad.c
-@@ -43,20 +43,37 @@ struct matrix_keypad {
+@@ -36,10 +36,12 @@ struct matrix_keypad {
+ 
+ 	uint32_t last_key_state[MATRIX_MAX_COLS];
+ 	struct delayed_work work_scan_matrix;
++	struct delayed_work work_switch_column;
+ 	spinlock_t lock;
+ 	bool scan_pending;
+ 	bool stopped;
+ 	bool gpio_all_disabled;
++	unsigned int col_to_poll;
  };
  
  /*
-+ * former comment before introduction of optional push/pull behaviour:
-+ * <cite>
-  * NOTE: normally the GPIO has to be put into HiZ when de-activated to cause
-  * minmal side effect when scanning other columns, here it is configured to
-  * be input, and it should work on most platforms.
-+ * </cite>
+@@ -152,17 +154,26 @@ static uint32_t sample_rows_for_col(struct matrix_keypad *keypad, int col)
+  * to have any subsequent change in the key press status trigger the ISR
+  *
+  * a single IRQ line can be used if all involved GPIOs share that IRQ
 + *
-+ * the above sounds a lot like emulating open collector (open drain)
-+ * behaviour in software, which should only be required if the GPIO pin
-+ * lacks such a mode, which should be rare and could be hidden by
-+ * transparent support in the GPIO chip driver, or could be handled by
-+ * attaching an external transistor to the pin, which is cheap and in
-+ * addition avoids damage in the hardware caused by running the wrong
-+ * software configuration
-+ *
-+ * applying the "turn to input" logic unconditionally breaks hardware
-+ * setups which have no pull resistors (i.e. where outputs are directly
-+ * connected to the matrix or to external matrix line drivers), and
-+ * could make input signals float and become unreliable
++ * in contrast to interrupt driven detection of key press changes, for
++ * polling detection a delayed work routine periodically will switch
++ * columns and upon changes will arrange for the same postprocessing as
++ * an ISR would have done
   */
- static void __activate_col_pin(const struct matrix_keypad_platform_data *pdata,
- 			       int col, bool on)
- {
--	bool level_on = !pdata->active_low;
-+	bool level_on = !pdata->col_gpios_active_low;
- 
- 	if (on) {
- 		gpio_direction_output(pdata->col_gpios[col], level_on);
- 	} else {
- 		gpio_set_value_cansleep(pdata->col_gpios[col], !level_on);
--		gpio_direction_input(pdata->col_gpios[col]);
-+		if (!pdata->col_gpios_push_pull)
-+			gpio_direction_input(pdata->col_gpios[col]);
- 	}
- }
- 
-@@ -82,7 +99,8 @@ static bool row_asserted(const struct matrix_keypad_platform_data *pdata,
- 			 int row)
- {
- 	return gpio_get_value_cansleep(pdata->row_gpios[row]) ?
--			!pdata->active_low : pdata->active_low;
-+			!pdata->row_gpios_active_low :
-+			pdata->row_gpios_active_low;
- }
- 
  static void enable_row_irqs(struct matrix_keypad *keypad)
-@@ -317,7 +335,8 @@ static int matrix_keypad_init_gpio(struct platform_device *pdev,
- 			goto err_free_cols;
- 		}
+ {
+ 	const struct matrix_keypad_platform_data *pdata = keypad->pdata;
+ 	int i;
++	unsigned long jiffies;
  
--		gpio_direction_output(pdata->col_gpios[i], !pdata->active_low);
-+		gpio_direction_output(pdata->col_gpios[i],
-+				      !pdata->col_gpios_active_low);
+-	if (pdata->clustered_irq > 0)
++	if (pdata->clustered_irq > 0) {
+ 		enable_irq(pdata->clustered_irq);
+-	else {
++	} else if (!pdata->col_switch_delay_ms) {
+ 		for (i = 0; i < pdata->num_row_gpios; i++)
+ 			enable_irq(gpio_to_irq(pdata->row_gpios[i]));
++	} else {
++		jiffies = msecs_to_jiffies(pdata->col_switch_delay_ms);
++		schedule_delayed_work(&keypad->work_switch_column, jiffies);
  	}
+ }
  
- 	for (i = 0; i < pdata->num_row_gpios; i++) {
-@@ -427,8 +446,16 @@ matrix_keypad_parse_dt(struct device *dev)
- 		pdata->no_autorepeat = true;
- 	if (of_get_property(np, "linux,wakeup", NULL))
- 		pdata->wakeup = true;
--	if (of_get_property(np, "gpio-activelow", NULL))
--		pdata->active_low = true;
-+	if (of_get_property(np, "col-gpios-activelow", NULL))
-+		pdata->col_gpios_active_low = true;
-+	if (of_get_property(np, "row-gpios-activelow", NULL))
-+		pdata->row_gpios_active_low = true;
-+	if (of_get_property(np, "gpio-activelow", NULL)) {
-+		pdata->row_gpios_active_low = true;
-+		pdata->col_gpios_active_low = true;
+@@ -178,11 +189,13 @@ static void disable_row_irqs(struct matrix_keypad *keypad)
+ 	const struct matrix_keypad_platform_data *pdata = keypad->pdata;
+ 	int i;
+ 
+-	if (pdata->clustered_irq > 0)
++	if (pdata->clustered_irq > 0) {
+ 		disable_irq_nosync(pdata->clustered_irq);
+-	else {
++	} else if (!pdata->col_switch_delay_ms) {
+ 		for (i = 0; i < pdata->num_row_gpios; i++)
+ 			disable_irq_nosync(gpio_to_irq(pdata->row_gpios[i]));
++	} else {
++		cancel_delayed_work(&keypad->work_switch_column);
+ 	}
+ }
+ 
+@@ -291,6 +304,58 @@ out:
+ 	return IRQ_HANDLED;
+ }
+ 
++/*
++ * delayed work routine, periodically switching columns and checking the
++ * key press status, to detect changes without interrupt support
++ *
++ * this routine is the polling mode counterpart to the above interrupt handler
++ */
++static void matrix_keypad_switch(struct work_struct *work)
++{
++	struct matrix_keypad *keypad = container_of(work, struct matrix_keypad,
++						    work_switch_column.work);
++	const struct matrix_keypad_platform_data *pdata = keypad->pdata;
++	int col;
++	uint32_t curr_state, prev_state;
++	unsigned long jiffies;
++
++	/* avoid multiple injection, and cope with shutdowns */
++	if (unlikely(keypad->scan_pending || keypad->stopped))
++		return;
++
++	/*
++	 * advance to the next column (avoids modulo calculation
++	 * since that might be too expensive in the absence of
++	 * compile time constants)
++	 */
++	keypad->col_to_poll++;
++	if (keypad->col_to_poll >= pdata->num_col_gpios)
++		keypad->col_to_poll = 0;
++	col = keypad->col_to_poll;
++
++	/*
++	 * sample the row status for this specific column, schedule
++	 * for the next column switch in the absence of changes
++	 */
++	curr_state = sample_rows_for_col(keypad, col);
++	prev_state = keypad->last_key_state[col];
++	if (curr_state == prev_state) {
++		jiffies = msecs_to_jiffies(pdata->col_switch_delay_ms);
++		schedule_delayed_work(&keypad->work_switch_column, jiffies);
++		return;
 +	}
-+	if (of_get_property(np, "col-gpios-pushpull", NULL))
-+		pdata->col_gpios_push_pull = true;
++
++	/*
++	 * start the debounce interval when a change was detected,
++	 * cease further polling until the matrix scan has completed
++	 * (polling automatically gets re-started after the scan)
++	 */
++	disable_row_irqs(keypad);
++	keypad->scan_pending = true;
++	jiffies = msecs_to_jiffies(keypad->pdata->debounce_ms);
++	schedule_delayed_work(&keypad->work_scan_matrix, jiffies);
++}
++
+ static int matrix_keypad_start(struct input_dev *dev)
+ {
+ 	struct matrix_keypad *keypad = input_get_drvdata(dev);
+@@ -313,6 +378,7 @@ static void matrix_keypad_stop(struct input_dev *dev)
  
+ 	keypad->stopped = true;
+ 	mb();
++	flush_work(&keypad->work_switch_column.work);
+ 	flush_work(&keypad->work_scan_matrix.work);
+ 	/*
+ 	 * matrix_keypad_scan() will leave IRQs enabled;
+@@ -322,6 +388,16 @@ static void matrix_keypad_stop(struct input_dev *dev)
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
++/*
++ * note that software polling may not mix well with interrupt driven
++ * wakeup from power management, since there is no concept of "enabling
++ * all columns at the same time", and any random column may be active
++ * when we get here
++ *
++ * an appropriate approach might be to have the user specify a column
++ * that shall get activated before sleep, such that a specific and
++ * well-known subset of the keypad matrix can wake up the device
++ */
+ static void matrix_keypad_enable_wakeup(struct matrix_keypad *keypad)
+ {
+ 	const struct matrix_keypad_platform_data *pdata = keypad->pdata;
+@@ -342,6 +418,8 @@ static void matrix_keypad_enable_wakeup(struct matrix_keypad *keypad)
+ 			}
+ 		}
+ 	}
++
++	/* TODO activate a potentially user specified column */
+ }
+ 
+ static void matrix_keypad_disable_wakeup(struct matrix_keypad *keypad)
+@@ -542,7 +620,9 @@ matrix_keypad_parse_dt(struct device *dev)
+ 	/* get delay and interval timing specs */
  	of_property_read_u32(np, "debounce-delay-ms", &pdata->debounce_ms);
  	of_property_read_u32(np, "col-scan-delay-us",
+-						&pdata->col_scan_delay_us);
++			     &pdata->col_scan_delay_us);
++	of_property_read_u32(np, "col-switch-delay-ms",
++			     &pdata->col_switch_delay_ms);
+ 
+ 	/* get the individual row and column GPIO pins */
+ 	gpios = devm_kzalloc(dev,
+@@ -609,6 +689,8 @@ static int matrix_keypad_probe(struct platform_device *pdev)
+ 	/* start in stopped state, open(2) will activate the scan */
+ 	keypad->stopped = true;
+ 	INIT_DELAYED_WORK(&keypad->work_scan_matrix, matrix_keypad_scan);
++	INIT_DELAYED_WORK(&keypad->work_switch_column, matrix_keypad_switch);
++	keypad->col_to_poll = pdata->num_col_gpios;
+ 	spin_lock_init(&keypad->lock);
+ 
+ 	input_dev->name		= pdev->name;
 diff --git a/include/linux/input/matrix_keypad.h b/include/linux/input/matrix_keypad.h
-index 27e06ac..5496a00 100644
+index 4bbe6b3..3c8dc39 100644
 --- a/include/linux/input/matrix_keypad.h
 +++ b/include/linux/input/matrix_keypad.h
-@@ -45,7 +45,10 @@ struct matrix_keymap_data {
-  * @clustered_irq: may be specified if interrupts of all row/column GPIOs
-  *	are bundled to one single irq
-  * @clustered_irq_flags: flags that are needed for the clustered irq
-- * @active_low: gpio polarity
-+ * @row_gpios_active_low: polarity of row gpio pins
-+ * @col_gpios_active_low: polarity of column gpio pins
-+ * @col_gpios_push_pull: whether column gpio pins emulate open drain
-+ *	behaviour or fully drive pin levels to either direction
-  * @wakeup: controls whether the device should be set up as wakeup
-  *	source
-  * @no_autorepeat: disable key autorepeat
-@@ -70,7 +73,9 @@ struct matrix_keypad_platform_data {
- 	unsigned int	clustered_irq;
- 	unsigned int	clustered_irq_flags;
+@@ -41,6 +41,8 @@ struct matrix_keymap_data {
+  * @num_col_gpios: actual number of col gpios used by device
+  * @col_scan_delay_us: delay in microseconds, the interval between
+  *	activating a column and reading back row information
++ * @col_switch_delay_ms: delay in milliseconds, the interval with which
++ *	colums periodically get checked for changes in key press status
+  * @debounce_ms: debounce interval in milliseconds, the interval between
+  *	detecting a change in the key press status and determining the new
+  *	overall keypad matrix status
+@@ -70,7 +72,7 @@ struct matrix_keypad_platform_data {
  
--	bool		active_low;
-+	bool		row_gpios_active_low;
-+	bool		col_gpios_active_low;
-+	bool		col_gpios_push_pull;
- 	bool		wakeup;
- 	bool		no_autorepeat;
- };
+ 	/* delays and intervals specs */
+ 	unsigned int	col_scan_delay_us;
+-
++	unsigned int	col_switch_delay_ms;
+ 	unsigned int	debounce_ms;
+ 
+ 	/* optionally reduce interrupt mgmt overhead */
 -- 
 1.7.10.4
