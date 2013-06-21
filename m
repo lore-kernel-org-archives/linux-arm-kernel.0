@@ -1,103 +1,81 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 21 Jun 2013 19:48:16 -0400
-Subject: [PATCH 2/8] ARM: mm: Introduce virt_to_idmap() with an arch hook
+Date: Fri, 21 Jun 2013 19:48:15 -0400
+Subject: [PATCH 1/8] ARM: mm: LPAE: use phys_addr_t appropriately in p2v and
+ v2p conversions
 In-Reply-To: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1371858502-10083-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1371858502-10083-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some PAE systems (e.g. TI Keystone), memory is above the
-32-bit addressable limit, and the interconnect provides an
-aliased view of parts of physical memory in the 32-bit addressable
-space.  This alias is strictly for boot time usage, and is not
-otherwise usable because of coherency limitations. On such systems,
-the idmap mechanism needs to take this aliased mapping into account.
+Fix remainder types used when converting back and forth between
+physical and virtual addresses.
 
-This patch introduces virt_to_idmap() and a arch function pointer which
-can be populated by platform which needs it. Also populate necessary
-idmap spots with now available virt_to_idmap(). Avoided #ifdef approach
-to be compatible with multi-platform builds.
-
-Most architecture won't touch it and in that case virt_to_idmap()
-fall-back to existing virt_to_phys() macro.
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/include/asm/memory.h |   16 ++++++++++++++++
- arch/arm/kernel/smp.c         |    2 +-
- arch/arm/mm/idmap.c           |    5 +++--
- 3 files changed, 20 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/memory.h |   22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 93376e4..5944092 100644
+index 584786f..93376e4 100644
 --- a/arch/arm/include/asm/memory.h
 +++ b/arch/arm/include/asm/memory.h
-@@ -173,6 +173,7 @@
+@@ -185,22 +185,32 @@ extern unsigned long __pv_phys_offset;
+ 	: "=r" (to)					\
+ 	: "r" (from), "I" (type))
+ 
+-static inline unsigned long __virt_to_phys(unsigned long x)
++static inline phys_addr_t __virt_to_phys(unsigned long x)
+ {
+ 	unsigned long t;
+ 	__pv_stub(x, t, "add", __PV_BITS_31_24);
+ 	return t;
+ }
+ 
+-static inline unsigned long __phys_to_virt(unsigned long x)
++static inline unsigned long __phys_to_virt(phys_addr_t x)
+ {
+ 	unsigned long t;
+ 	__pv_stub(x, t, "sub", __PV_BITS_31_24);
+ 	return t;
+ }
++
+ #else
+-#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
+-#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
++
++static inline phys_addr_t __virt_to_phys(unsigned long x)
++{
++	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
++}
++
++static inline unsigned long __phys_to_virt(phys_addr_t x)
++{
++	return x - PHYS_OFFSET + PAGE_OFFSET;
++}
++
+ #endif
+ #endif
+ #endif /* __ASSEMBLY__ */
+@@ -238,14 +248,14 @@ static inline phys_addr_t virt_to_phys(const volatile void *x)
+ 
+ static inline void *phys_to_virt(phys_addr_t x)
+ {
+-	return (void *)(__phys_to_virt((unsigned long)(x)));
++	return (void *)__phys_to_virt(x);
+ }
+ 
+ /*
+  * Drivers should NOT use these either.
   */
- #define __PV_BITS_31_24	0x81000000
- 
-+extern phys_addr_t (*arch_virt_to_idmap) (unsigned long x);
- extern unsigned long __pv_phys_offset;
- #define PHYS_OFFSET __pv_phys_offset
- 
-@@ -259,6 +260,21 @@ static inline void *phys_to_virt(phys_addr_t x)
+ #define __pa(x)			__virt_to_phys((unsigned long)(x))
+-#define __va(x)			((void *)__phys_to_virt((unsigned long)(x)))
++#define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
  #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
  
  /*
-+ * These are for systems that have a hardware interconnect supported alias of
-+ * physical memory for idmap purposes.  Most cases should leave these
-+ * untouched.
-+ */
-+static inline phys_addr_t __virt_to_idmap(unsigned long x)
-+{
-+	if (arch_virt_to_idmap)
-+		return arch_virt_to_idmap(x);
-+	else
-+		return __virt_to_phys(x);
-+}
-+
-+#define virt_to_idmap(x)	__virt_to_idmap((unsigned long)(x))
-+
-+/*
-  * Virtual <-> DMA view memory address translations
-  * Again, these are *only* valid on the kernel direct mapped RAM
-  * memory.  Use of these is *deprecated* (and that doesn't mean
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 217b755..e1a7b9a 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -80,7 +80,7 @@ void __init smp_set_ops(struct smp_operations *ops)
- 
- static unsigned long get_arch_pgd(pgd_t *pgd)
- {
--	phys_addr_t pgdir = virt_to_phys(pgd);
-+	phys_addr_t pgdir = virt_to_idmap(pgd);
- 	BUG_ON(pgdir & ARCH_PGD_MASK);
- 	return pgdir >> ARCH_PGD_SHIFT;
- }
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index 83cb3ac..c0a1e48 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -10,6 +10,7 @@
- #include <asm/system_info.h>
- 
- pgd_t *idmap_pgd;
-+phys_addr_t (*arch_virt_to_idmap) (unsigned long x);
- 
- #ifdef CONFIG_ARM_LPAE
- static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
-@@ -67,8 +68,8 @@ static void identity_mapping_add(pgd_t *pgd, const char *text_start,
- 	unsigned long addr, end;
- 	unsigned long next;
- 
--	addr = virt_to_phys(text_start);
--	end = virt_to_phys(text_end);
-+	addr = virt_to_idmap(text_start);
-+	end = virt_to_idmap(text_end);
- 
- 	prot |= PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
- 
 -- 
 1.7.9.5
