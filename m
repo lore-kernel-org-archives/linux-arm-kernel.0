@@ -1,80 +1,64 @@
-From: rizhao@nvidia.com (Richard Zhao)
-Date: Fri, 21 Jun 2013 12:52:40 +0800
-Subject: [PATCH] ARM: dma: Drop __GFP_COMP for iommu dma memory allocations
-In-Reply-To: <20130620.173511.831032817734076793.hdoyu@nvidia.com>
-References: <1371731460-15316-1-git-send-email-rizhao@nvidia.com>
- <51C2FDE0.4060206@cogentembedded.com>
- <CANg6MZg3A7-oXfdUSarQ8n0PRsS0_BLjqfQ914KUoSzDDtShFg@mail.gmail.com>
- <20130620.173511.831032817734076793.hdoyu@nvidia.com>
-Message-ID: <20130621045240.GH17331@rizhao-lap>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 21 Jun 2013 08:54:53 +0400
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCA1LzZdIEFSTTogZHRzOiBpbXgyNyBjcHVmcmVxLWNw?=
+ =?UTF-8?B?dTAgZnJlcXVlbmNpZXM=?=
+In-Reply-To: <20130621024406.GB24268@S2101-09.ap.freescale.net>
+References: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
+ <1371739815-6666-6-git-send-email-mpa@pengutronix.de>
+ <20130621024406.GB24268@S2101-09.ap.freescale.net>
+Message-ID: <1371790493.32418815@f415.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 10:35:11PM +0800, Hiroshi Doyu wrote:
-> Richard Zhao <linuxzsc@gmail.com> wrote @ Thu, 20 Jun 2013 15:40:50 +0200:
-> 
-> > >> +       /*
-> > >> +        * Following is a work-around (a.k.a. hack) to prevent pages
-> > >> +        * with __GFP_COMP being passed to split_page() which cannot
-> > >> +        * handle them.  The real problem is that this flag probably
-> > >> +        * should be 0 on ARM as it is not supported on this
-> > >> +        * platform; see CONFIG_HUGETLBFS.
-> > >> +        */
-> > >> +       gfp &= ~(__GFP_COMP);
-> > >
-> > >
-> > >    Hm, what exactly is the sense you meant in using ()?
+> On Thu, Jun 20, 2013 at 04:50:14PM +0200, Markus Pargmann wrote:
+> > Set operating-points for imx27. There is no regulator support, so the
+> > voltages are 0. The frequencies should be the same for all imx27 boards,
+> > so it is defined here and can be overwritten if necessary.
 > > 
-> > It's copy/paste from elsewhere in this file. At least it's consistent? :)
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  arch/arm/boot/dts/imx27.dtsi | 19 +++++++++++++++++++
+> >  1 file changed, 19 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> > index e883e77..3ebd98a 100644
+> > --- a/arch/arm/boot/dts/imx27.dtsi
+> > +++ b/arch/arm/boot/dts/imx27.dtsi
+> > @@ -47,6 +47,25 @@
+> >  		};
+> >  	};
+> >  
+> > +	cpus {
+> > +		#size-cells = <0>;
+> > +		#address-cells = <1>;
+> > +
+> > +		cpu at 0 {
+> > +			device_type = "cpu";
+> > +			compatible = "fsl,imx27", "arm,arm926ejs";
 > 
-> I almost sent the exact same one, actually it was under internal reivew;)
-Ah, sorry I didn't search internal mails but only arm mail list for related
-fix, since I thought it's not specific to tegra. Why not give it a
-Reviewed-by or Tested-by?
-> 
-> This patch is similar but is the iommu version of:
-Exactly.
+> From what Documentation/devicetree/bindings/arm/cpus.txt tells, it
+> should be "arm,arm926".  Also, why do you put "fsl,imx27" there?
+> "imx27" is a SoC name not cpu core.
 
-Thanks
-Richard
-> 
-> 
-> commit ea2e7057c0234cfb8b09467d8f137760d371fc72
-> Author: Sumit Bhattacharya <sumitb@nvidia.com>
-> Date:   Thu Nov 24 00:47:12 2011 +0100
-> 
->     ARM: 7172/1: dma: Drop GFP_COMP for DMA memory allocations
->     
->     dma_alloc_coherent wants to split pages after allocation in order to
->     reduce the memory footprint. This does not work well with GFP_COMP
->     pages, so drop this flag before allocation.
->     
->     This patch is ported from arch/avr32
->     (commit 3611553ef985ef7c5863c8a94641738addd04cff).
->     
->     [swarren: s/HUGETLB_PAGE/HUGETLBFS/ in comment, minor comment cleanup]
->     
->     Signed-off-by: Sumit Bhattacharya <sumitb@nvidia.com>
->     Tested-by: Varun Colbert <vcolbert@nvidia.com>
->     Signed-off-by: Stephen Warren <swarren@nvidia.com>
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index ab58456..1aa664a 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -332,6 +332,15 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
->         struct page *page;
->         void *addr;
->  
-> +       /*
-> +        * Following is a work-around (a.k.a. hack) to prevent pages
-> +        * with __GFP_COMP being passed to split_page() which cannot
-> +        * handle them.  The real problem is that this flag probably
-> +        * should be 0 on ARM as it is not supported on this
-> +        * platform; see CONFIG_HUGETLBFS.
-> +        */
-> +       gfp &= ~(__GFP_COMP);
-> +
->         *handle = ~0;
->         size = PAGE_ALIGN(size);
+I think Markus take this ARM property from one of existing DTS.
+
+shc at shc /home/git/linux-mx27/arch/arm/boot/dts $ grep arm926 *.dtsi
+at91sam9260.dtsi:                       compatible = "arm,arm926ejs";
+at91sam9263.dtsi:                       compatible = "arm,arm926ejs";
+at91sam9g45.dtsi:                       compatible = "arm,arm926ejs";
+at91sam9n12.dtsi:                       compatible = "arm,arm926ejs";
+at91sam9x5.dtsi:                        compatible = "arm,arm926ejs";
+imx23.dtsi:                     compatible = "arm,arm926ejs";
+imx28.dtsi:                     compatible = "arm,arm926ejs";
+lpc32xx.dtsi:                   compatible = "arm,arm926ejs";
+s3c2416.dtsi:                   compatible = "arm,arm926ejs";
+spear3xx.dtsi:                  compatible = "arm,arm926ejs";
+spear600.dtsi:                  compatible = "arm,arm926ejs";
+wm8505.dtsi:                    compatible = "arm,arm926ejs";
+
+So, documentation need to be updated or these values should be fixed.
+Another solution  is specify compatible string as:
+compatible = "arm,arm926ejs", "arm,arm926";
+What you think about this?
+
+---
