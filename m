@@ -1,20 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Jun 2013 23:41:08 +0200
-Subject: [PATCH] ARM: keystone: remove hand-coded smc instruction
-In-Reply-To: <51C4C3B4.2050508@ti.com>
-References: <201306212228.29717.arnd@arndb.de>
- <201306212313.16771.arnd@arndb.de> <51C4C3B4.2050508@ti.com>
-Message-ID: <201306212341.08579.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 21 Jun 2013 15:41:15 -0600
+Subject: [PATCH v1 08/12] input: keypad-matrix: tell GPIO pins from matrix
+ lines
+In-Reply-To: <1371838198-7327-9-git-send-email-gsi@denx.de>
+References: <1371838198-7327-1-git-send-email-gsi@denx.de>
+ <1371838198-7327-9-git-send-email-gsi@denx.de>
+Message-ID: <51C4C87B.3050300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 June 2013, Santosh Shilimkar wrote:
-> > 
-> I was curious how you will fix that for a c file.
-> Just to be clear, I was planning to do that in 3.11-rcx/3.12
-> time. Let me know if it needs to be done earlier than that.
+On 06/21/2013 12:09 PM, Gerhard Sittig wrote:
 
-It breaks randconfig builds on arm-soc at the moment, so I'd
-like the fix as early as possible for 3.11.
+> diff --git a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
 
-	Arnd
+> +The driver assumes that all interconnections of the matrix can potentially
+> +contain a button, and will submit scan and key code events to the input
+> +subsystem.  By default the keypad matrix dimenstions are automatically
+> +derived from the GPIO pin specifications.  Optionally device tree
+> +information can override the keypad matrix dimension data, e.g. when not
+> +all of the potentially available physical connections are used to create
+> +the logical keypad matrix.
+
+Ignoring the binary encoding in the next patch, why would someone ever
+define more row GPIOs that there are rows (or similarly for columns)?
+
+On its own, I don't think this patch is needed.
+
+Now, if you add binary encoding, I can see that you might have say 3 row
+GPIOs but only say 6 rows even though there are 8 combinations of row
+GPIO values. If that is the situation this patch is intended to cover,
+the changes here should be introduced as part of, and only applicable
+to, the binary encoding patch instead.
