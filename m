@@ -1,65 +1,271 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Fri, 21 Jun 2013 16:13:59 +0530
-Subject: [PATCH V3 1/4] arm64: Add Kconfig option for APM X-Gene SOC family
-In-Reply-To: <20130621093656.GB4099@arm.com>
-References: <1366794420-17849-1-git-send-email-vkale@apm.com>
- <1366794420-17849-2-git-send-email-vkale@apm.com>
- <20130621093656.GB4099@arm.com>
-Message-ID: <CAPrCYkc-=-no+TpHb8XMQYFoyqCJoXe9RR1-jazxCCNeFQ12Yw@mail.gmail.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Fri, 21 Jun 2013 13:48:27 +0300
+Subject: [PATCH] usb: phy: msm: Move mach depndend code to platform data
+Message-ID: <1371811707-24634-1-git-send-email-iivanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
 
-On Fri, Jun 21, 2013 at 3:06 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> Hi Vinayak,
->
-> On Wed, Apr 24, 2013 at 10:06:57AM +0100, Vinayak Kale wrote:
->> This patch adds arm64/Kconfig option for APM X-Gene SOC family.
->>
->> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
->> Signed-off-by: Loc Ho <lho@apm.com>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> ---
->>  arch/arm64/Kconfig |    7 +++++++
->>  1 files changed, 7 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 43b0e9f..16d0198 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -114,6 +114,11 @@ config ARCH_VEXPRESS
->>         This enables support for the ARMv8 software model (Versatile
->>         Express).
->>
->> +config ARCH_XGENE
->> +     bool "AppliedMicro X-Gene SOC Family"
->> +     help
->> +       This enables support for AppliedMicro X-Gene SOC Family
->> +
->>  endmenu
->>
->>  menu "Bus support"
->> @@ -153,6 +158,8 @@ config NR_CPUS
->>       int "Maximum number of CPUs (2-32)"
->>       range 2 32
->>       depends on SMP
->> +     # These have to remain sorted largest to smallest
->> +     default "8" if ARCH_XGENE
->>       default "4"
->
-> For ARCH_VEXPRESS I was planning to get rid of the Kconfig entry and
-> just select the drivers in the defconfig file (once some other patches
-> get merged). Do you have any dependencies on ARCH_XGENE apart from
-> what's here?
->
+This patch fix compilation error and is an intermediate step
+before the addition of DeviceTree support for newer targets.
+Fix suggested here: https://lkml.org/lkml/2013/6/19/381
 
-Apart from here, we do have dependency on ARCH_XGENE:
-1) To select XGENE SoC specific dtb compilation
-2) Use this to forcefully select certain platform drivers such as Clock.
+Cc: David Brown <davidb@codeaurora.org>
+Cc: Daniel Walker <dwalker@fifo99.com>
+Cc: Bryan Huntsman <bryanh@codeaurora.org>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-usb at vger.kernel.org
 
-> --
-> Catalin
+Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+---
+ arch/arm/mach-msm/board-msm7x30.c |   35 +++++++++++++++++++++++
+ arch/arm/mach-msm/board-qsd8x50.c |   34 +++++++++++++++++++++++
+ drivers/usb/phy/phy-msm-usb.c     |   55 ++++++++++---------------------------
+ include/linux/usb/msm_hsusb.h     |    2 ++
+ 4 files changed, 85 insertions(+), 41 deletions(-)
 
--Vinayak
+diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+index db3d8c0..4df7daa 100644
+--- a/arch/arm/mach-msm/board-msm7x30.c
++++ b/arch/arm/mach-msm/board-msm7x30.c
+@@ -31,6 +31,7 @@
+ #include <asm/setup.h>
+ 
+ #include <mach/board.h>
++#include <mach/clk.h>
+ #include <mach/msm_iomap.h>
+ #include <mach/dma.h>
+ 
+@@ -61,10 +62,44 @@ static int hsusb_phy_init_seq[] = {
+ 	-1
+ };
+ 
++static int hsusb_phy_link_clk_reset(struct clk *link_clk, bool assert)
++{
++	int ret;
++
++	if (assert) {
++		ret = clk_reset(link_clk, CLK_RESET_ASSERT);
++		if (ret)
++			pr_err("usb hs_clk assert failed\n");
++	} else {
++		ret = clk_reset(link_clk, CLK_RESET_DEASSERT);
++		if (ret)
++			pr_err("usb hs_clk deassert failed\n");
++	}
++	return ret;
++}
++
++static int hsusb_phy_clk_reset(struct clk *phy_clk)
++{
++	int ret;
++
++	ret = clk_reset(phy_clk, CLK_RESET_ASSERT);
++	if (ret) {
++		pr_err("usb phy clk assert failed\n");
++		return ret;
++	}
++	usleep_range(10000, 12000);
++	ret = clk_reset(phy_clk, CLK_RESET_DEASSERT);
++	if (ret)
++		pr_err("usb phy clk deassert failed\n");
++	return ret;
++}
++
+ static struct msm_otg_platform_data msm_otg_pdata = {
+ 	.phy_init_seq		= hsusb_phy_init_seq,
+ 	.mode                   = USB_PERIPHERAL,
+ 	.otg_control		= OTG_PHY_CONTROL,
++	.phy_link_clk_reset	= hsusb_phy_link_clk_reset,
++	.phy_phy_clk_reset	= hsusb_phy_clk_reset,
+ };
+ 
+ struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
+diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
+index f14a73d..d3d92ab 100644
+--- a/arch/arm/mach-msm/board-qsd8x50.c
++++ b/arch/arm/mach-msm/board-qsd8x50.c
+@@ -82,10 +82,44 @@ static int hsusb_phy_init_seq[] = {
+ 	-1
+ };
+ 
++static int hsusb_phy_link_clk_reset(struct clk *link_clk, bool assert)
++{
++	int ret;
++
++	if (assert) {
++		ret = clk_reset(link_clk, CLK_RESET_ASSERT);
++		if (ret)
++			pr_err("usb hs_clk assert failed\n");
++	} else {
++		ret = clk_reset(link_clk, CLK_RESET_DEASSERT);
++		if (ret)
++			pr_err("usb hs_clk deassert failed\n");
++	}
++	return ret;
++}
++
++static int hsusb_phy_clk_reset(struct clk *phy_clk)
++{
++	int ret;
++
++	ret = clk_reset(phy_clk, CLK_RESET_ASSERT);
++	if (ret) {
++		pr_err("usb phy clk assert failed\n");
++		return ret;
++	}
++	usleep_range(10000, 12000);
++	ret = clk_reset(phy_clk, CLK_RESET_DEASSERT);
++	if (ret)
++		pr_err("usb phy clk deassert failed\n");
++	return ret;
++}
++
+ static struct msm_otg_platform_data msm_otg_pdata = {
+ 	.phy_init_seq		= hsusb_phy_init_seq,
+ 	.mode                   = USB_PERIPHERAL,
+ 	.otg_control		= OTG_PHY_CONTROL,
++	.phy_link_clk_reset	= hsusb_phy_link_clk_reset,
++	.phy_phy_clk_reset	= hsusb_phy_clk_reset,
+ };
+ 
+ static struct platform_device *devices[] __initdata = {
+diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
+index d08f334..ab1b880 100644
+--- a/drivers/usb/phy/phy-msm-usb.c
++++ b/drivers/usb/phy/phy-msm-usb.c
+@@ -40,8 +40,6 @@
+ #include <linux/usb/msm_hsusb_hw.h>
+ #include <linux/regulator/consumer.h>
+ 
+-#include <mach/clk.h>
+-
+ #define MSM_USB_BASE	(motg->regs)
+ #define DRIVER_NAME	"msm_otg"
+ 
+@@ -306,51 +304,20 @@ static void ulpi_init(struct msm_otg *motg)
+ 	}
+ }
+ 
+-static int msm_otg_link_clk_reset(struct msm_otg *motg, bool assert)
+-{
+-	int ret;
+-
+-	if (assert) {
+-		ret = clk_reset(motg->clk, CLK_RESET_ASSERT);
+-		if (ret)
+-			dev_err(motg->phy.dev, "usb hs_clk assert failed\n");
+-	} else {
+-		ret = clk_reset(motg->clk, CLK_RESET_DEASSERT);
+-		if (ret)
+-			dev_err(motg->phy.dev, "usb hs_clk deassert failed\n");
+-	}
+-	return ret;
+-}
+-
+-static int msm_otg_phy_clk_reset(struct msm_otg *motg)
+-{
+-	int ret;
+-
+-	ret = clk_reset(motg->phy_reset_clk, CLK_RESET_ASSERT);
+-	if (ret) {
+-		dev_err(motg->phy.dev, "usb phy clk assert failed\n");
+-		return ret;
+-	}
+-	usleep_range(10000, 12000);
+-	ret = clk_reset(motg->phy_reset_clk, CLK_RESET_DEASSERT);
+-	if (ret)
+-		dev_err(motg->phy.dev, "usb phy clk deassert failed\n");
+-	return ret;
+-}
+-
+ static int msm_otg_phy_reset(struct msm_otg *motg)
+ {
++	struct msm_otg_platform_data *pdata = motg->pdata;
+ 	u32 val;
+ 	int ret;
+ 	int retries;
+ 
+-	ret = msm_otg_link_clk_reset(motg, 1);
++	ret = pdata->phy_link_clk_reset(motg->clk, true);
+ 	if (ret)
+ 		return ret;
+-	ret = msm_otg_phy_clk_reset(motg);
++	ret = pdata->phy_clk_reset(motg->phy_reset_clk);
+ 	if (ret)
+ 		return ret;
+-	ret = msm_otg_link_clk_reset(motg, 0);
++	ret = pdata->phy_link_clk_reset(motg->clk, false);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -362,7 +329,7 @@ static int msm_otg_phy_reset(struct msm_otg *motg)
+ 				ULPI_CLR(ULPI_FUNC_CTRL));
+ 		if (!ret)
+ 			break;
+-		ret = msm_otg_phy_clk_reset(motg);
++		ret = pdata->phy_clk_reset(motg->phy_reset_clk);
+ 		if (ret)
+ 			return ret;
+ 	}
+@@ -370,7 +337,7 @@ static int msm_otg_phy_reset(struct msm_otg *motg)
+ 		return -ETIMEDOUT;
+ 
+ 	/* This reset calibrates the phy, if the above write succeeded */
+-	ret = msm_otg_phy_clk_reset(motg);
++	ret = pdata->phy_clk_reset(motg->phy_reset_clk);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -378,7 +345,7 @@ static int msm_otg_phy_reset(struct msm_otg *motg)
+ 		ret = ulpi_read(&motg->phy, ULPI_DEBUG);
+ 		if (ret != -ETIMEDOUT)
+ 			break;
+-		ret = msm_otg_phy_clk_reset(motg);
++		ret = pdata->phy_clk_reset(motg->phy_reset_clk);
+ 		if (ret)
+ 			return ret;
+ 	}
+@@ -1414,16 +1381,22 @@ static void msm_otg_debugfs_cleanup(void)
+ static int __init msm_otg_probe(struct platform_device *pdev)
+ {
+ 	int ret = 0;
++	struct msm_otg_platform_data *pdata = pdev->dev.platform_data;
+ 	struct resource *res;
+ 	struct msm_otg *motg;
+ 	struct usb_phy *phy;
+ 
+ 	dev_info(&pdev->dev, "msm_otg probe\n");
+-	if (!pdev->dev.platform_data) {
++	if (!pdata) {
+ 		dev_err(&pdev->dev, "No platform data given. Bailing out\n");
+ 		return -ENODEV;
+ 	}
+ 
++	if (!pdata->phy_clk_reset || !pdata->phy_link_clk_reset) {
++		dev_err(&pdev->dev, "No phy or link clock reset methods\n");
++		return -ENODEV;
++	}
++
+ 	motg = kzalloc(sizeof(struct msm_otg), GFP_KERNEL);
+ 	if (!motg) {
+ 		dev_err(&pdev->dev, "unable to allocate msm_otg\n");
+diff --git a/include/linux/usb/msm_hsusb.h b/include/linux/usb/msm_hsusb.h
+index 22a396c..66081ed 100644
+--- a/include/linux/usb/msm_hsusb.h
++++ b/include/linux/usb/msm_hsusb.h
+@@ -135,6 +135,8 @@ struct msm_otg_platform_data {
+ 	enum msm_usb_phy_type phy_type;
+ 	void (*setup_gpio)(enum usb_otg_state state);
+ 	char *pclk_src_name;
++	int (*phy_link_clk_reset)(struct clk *link_clk, bool assert);
++	int (*phy_clk_reset)(struct clk *phy_clk);
+ };
+ 
+ /**
+-- 
+1.7.9.5
