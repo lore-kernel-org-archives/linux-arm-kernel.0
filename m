@@ -1,44 +1,81 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Jun 2013 09:23:18 +0200
-Subject: [PATCHv3 07/11] arm: pci: add ->add_bus() and ->remove_bus()
- hooks to hw_pci
-In-Reply-To: <1371660979-21588-8-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1371660979-21588-8-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130621092318.410465eb@skate>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 21 Jun 2013 00:24:32 -0700
+Subject: [RFC PATCH v4 2/2] drivers: mfd: vexpress: add Serial Power
+ Controller (SPC) support
+In-Reply-To: <20130618102213.GA1564@e102568-lin.cambridge.arm.com>
+References: <1371484269-11743-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1371484269-11743-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130617174451.GF28497@quad.lixom.net>
+ <20130618102213.GA1564@e102568-lin.cambridge.arm.com>
+Message-ID: <20130621072432.GB30076@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hi,
 
-On Wed, 19 Jun 2013 18:56:15 +0200, Thomas Petazzoni wrote:
-> Some PCI drivers may need to adjust the pci_bus structure after it has
-> been allocated by the Linux PCI core. The PCI core allows
-> architectures to implement the pcibios_add_bus() and
-> pcibios_remove_bus() for this purpose. This commit therefore extends
-> the hw_pci and pci_sys_data structures of the ARM PCI core to allow
-> PCI drivers to register ->add_bus() and ->remove_bus() in hw_pci,
-> which will get called when a bus is added or removed from the system.
+On Tue, Jun 18, 2013 at 11:22:13AM +0100, Lorenzo Pieralisi wrote:
+> Hi Olof,
 > 
-> This will be used for example by the Marvell PCIe driver to connect a
-> particular PCI bus with its corresponding MSI chip to handle Message
-> Signaled Interrupts.
+> thanks a lot.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/include/asm/mach/pci.h |  4 ++++
->  arch/arm/kernel/bios32.c        | 16 ++++++++++++++++
->  2 files changed, 20 insertions(+)
+> On Mon, Jun 17, 2013 at 06:44:51PM +0100, Olof Johansson wrote:
+> > 
+> > Sorry, I got to think of this over the weekend and should have replied
+> > before you had a chance to repost, but still:
+> > 
+> > Why is the operating point and frequency change code in this driver at all?
+> > Usually, the MFD driver contains a shared method to access register space on
+> > a multifunction device, but the actual operation of each subdevice is handled
+> > by individual drivers in the regular locations.
+> > 
+> > So, in the case of operating points and requencies, that should be in
+> > a cpufreq driver. And the clock setup should presumably be in a clk
+> > framework driver if needed.
+> 
+> Well, yes this can be done. I will probably move this code out of mfd
+> since this choice caused more issues than the current driver solves.
+> 
+> By moving the frequency changes into subsystems, we are certainly
+> trimming down the code, not sure we improve the maintainability though,
+> keep in mind that we already had to change the vexpress-config interface
+> to cope with SPC oddities, at least now these intricacies are self-contained.
 
-Do you have any comments ? Any chance to get this merged for 3.11 ? It
-is independent of the previous patches of the patch series, so it can
-be merged independently.
+Yes, I think it makes sense to split up the "mess", and not expose
+everybody to all of the quirks and complexities of the system design
+unless it makes sense to need to know about it at a particular layer of
+the driver stack.
 
-Thanks!
+> What you are suggesting makes sense though, I will do it.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Ok, cool. I think Sam will be happy to see a smaller driver (and hopefully be
+quick at merging it) once that's done too. But it looks like it'd be 3.12
+material given the current phase of 3.10 and the fact that it'll take a while
+to do the refactoring.
+
+> > Then all that would be left here is the functionality for submitting the two
+> > kinds of commands, and handling interrupts.
+> 
+> Not really. There are still a bunch of registers to set-up wake-up IRQs,
+> power down flags and warm-boot jump addresses that do not go through the
+> vexpress interface, they are ad-hoc. I could also split that stuff, but I
+> really do not think it is worth the effort.
+
+It _sounds_ like you could be fine with moving direct access to those pieces of
+hardware out to the drivers that need to touch them. MFD is mostly about
+allowing a arbitration point for when multiple drivers need to syncronize
+and/or share an interface such as a mapped register bank or i2c device.
+
+> > That'll trim down the driver to a point where I think you'll find it much
+> > easier to get merged. :-)
+> 
+> To start with I have to understand in which directory this code should
+> live. Moving the frequency settings in clk/CPUfreq drivers should be
+> feasible with extra DT complexity for their bindings.
+
+Yes, clock and cpufreq would go in their corresponding driver trees. I'll need
+to revisit the code a bit tomorrow to see what else would be left and where
+good homes for them would be.
+
+
+
+-Olof
