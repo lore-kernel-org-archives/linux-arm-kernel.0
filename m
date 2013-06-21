@@ -1,102 +1,81 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 21 Jun 2013 10:58:21 -0400
-Subject: [PATCH 0/5] Kernel mode NEON for XOR and RAID6
-In-Reply-To: <CAKv+Gu8FTXC9XSE4DJ2LQueJ3FKjdjv8=sjDjTETH7fq+ruNGQ@mail.gmail.com>
-References: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
- <20130606151705.GG16794@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1306061156330.18597@syhkavp.arg>
- <20130607175007.GH8111@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1306072214120.18597@syhkavp.arg>
- <20130621093311.GD6983@mudshark.cambridge.arm.com>
- <CAKv+Gu8FTXC9XSE4DJ2LQueJ3FKjdjv8=sjDjTETH7fq+ruNGQ@mail.gmail.com>
-Message-ID: <51C46A0D.8070505@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 21 Jun 2013 16:00:06 +0100
+Subject: [PATCH 8/9] iommu: add support for ARM Ltd. System MMU
+ architecture
+In-Reply-To: <20130621141306.GJ11309@8bytes.org>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-9-git-send-email-will.deacon@arm.com>
+ <20130620212646.GG11309@8bytes.org>
+ <20130621102318.GB7766@mudshark.cambridge.arm.com>
+ <20130621141306.GJ11309@8bytes.org>
+Message-ID: <20130621150006.GG7766@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Fri, Jun 21, 2013 at 03:13:07PM +0100, Joerg Roedel wrote:
+> On Fri, Jun 21, 2013 at 11:23:18AM +0100, Will Deacon wrote:
+> > The results were that the memory-to-memory DMA didn't show any corruption. I
+> > also managed to tickle access faults by messing around with the permissions,
+> > then remap the buffers and resume the transfers.
+> 
+> That sounds pretty conclusive. So when real hardware shows up it should
+> work reasonably well.
 
-On 06/21/2013 06:08 AM, Ard Biesheuvel wrote:
-> On 21 June 2013 11:33, Will Deacon <will.deacon@arm.com> wrote:
->> On Sat, Jun 08, 2013 at 04:09:56AM +0100, Nicolas Pitre wrote:
->>> On Fri, 7 Jun 2013, Will Deacon wrote:
->>>> What's the earliest toolchain we claim to support nowadays? If that can't
->>>> deal with the intrinsics then we either need to bump the requirement, or
->>>> write this using hand-coded asm. In the case of the latter, I don't think
->>>> the maintenance overhead of having two implementations is worth it.
->>>
->>> We have many different minimum toolchain version requirements attached
->>> to different features being enabled already, ftrace being one of them if
->>> I remember correctly.  For these Neon optimizations the minimum gcc
->>> version is v4.6.
->>>
->>> Given that this is going to be interesting mostly to server systems, and
->>> given that ARM server deployments are rather new, I don't see the point
->>> of compiling a new server environment using an older gcc version.
->>
->> I've mulled over this, had some discussions with our toolchain guys and
->> have concluded the following:
->>
->>   - The intrinsics are actually ok. I was sceptical at first, but I've been
->>     assured that they should do a reasonable job (echoing your performance
->>     figures).
->>
->>   - The current approach is targetting servers and isn't (yet) suitable for
->>     mobile.
->>
->> So, given that the patches do the right thing wrt GCC version, the only
->> remaining point is that we need to keep an eye out for people trying to
->> re-use this stuff for mobile (likely crypto, as I mentioned earlier). When
->> that happens, we should consider revisiting the benchmark/power figures.
->>
-> 
-> OK, so a number of points have been raised in this discussion, let me
-> address them one by one:
-> 
-> Should we allow NEON to be used in the kernel?
-> 
-> The consensus is not to allow floating point. However, NEON is
-> different, as the performance gains are considerable and there is no
-> dependency on support code, which makes it not as hairy as
-> conventional (pre-v3) VFP. Also, managing the vfpstates is easily
-> doable if NEON is only used outside interrupt context and with
-> preemption disabled.
-> 
-> 
-> Does my series implement it correctly?
-> 
-> I have addressed Russell's first round of comments. Happy to take
-> another round if necessary.
-> 
-> 
-> Should we allow NEON intrinsics in the kernel?
-> Should we allow GCC-generated NEON in the kernel?
-> 
-> Only if the implementation is clear on which minimum version of GCC it
-> requires. We could use my examples to set a precedent on what is a
-> suitable way to use NEON intrinsics or the vectorizer in kernel code
-> (which includes coding it such that it can be reused for arm64 with no
-> modifications)
-> 
-> 
-> Is kernel mode NEON suitable for mobile?
-> 
-> To me, it is unclear why kernel and userland are so different in this
-> respect. However, kernel mode NEON is separately configurable from
-> Kconfig so it can be disabled at will.
-> 
-> 
-> Is there a point to doing a boot time benchmark to select the optimal
-> implementation of an algorithm?
-> 
-> Perhaps not but unrelated to kernel mode NEON.
+Fingers crossed. Of course, as I get to run on real RTL I'll address any
+issues that might crop up.
 
-If this is indeed the consensus (I don't disagree with any of it myself),
-perhaps committing the main points, guidelines, and examples to
-Documentation/arm/* would be useful.
+> > > > +static struct arm_smmu_device *find_parent_smmu(struct arm_smmu_device *smmu)
+> > > > +{
+> > > > +	struct arm_smmu_device *parent, *tmp;
+> > > > +
+> > > > +	if (!smmu->parent_of_node)
+> > > > +		return NULL;
+> > > > +
+> > > > +	list_for_each_entry_safe(parent, tmp, &arm_smmu_devices, list)
+> > > > +		if (parent->dev->of_node == smmu->parent_of_node)
+> > > > +			return parent;
+> > > 
+> > > Why do you need the _safe variant here? You are not changing the list in
+> > > this loop so you should be fine with list_for_each_entry().
+> > 
+> > For a system with multiple SMMUs (regardless of chaining), couldn't this
+> > code run in parallel with probing of another SMMU (which has to add to the
+> > arm_smmu_devices list)? The same applies for device removal, which could
+> > perhaps be driven from some power-managment code.
+> 
+> Well, the '_safe' does not mean it is safe from concurrent list
+> manipulations. If you want to protect from that you still need a lock.
+> The '_safe' variant only allows to remove the current element from the
+> list while traversing it.
 
-Christopher
+Damn, I was hoping to avoid locking on the map path. In fact, this is a good
+argument to go with your suggestion below (otherwise I'd need to use
+reader/writer locks which seem to be frowned on).
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+> > > > +	do {
+> > > > +		phys_addr_t output_mask = (1ULL << smmu->s2_output_size) - 1;
+> > > > +		if ((phys_addr_t)iova & ~output_mask)
+> > > > +			return -ERANGE;
+> > > > +	} while ((smmu = find_parent_smmu(smmu)));
+> > > 
+> > > This looks a bit too expensive to have in the map path. How about saving
+> > > something like an effective_output_mask (or output_size) which contains
+> > > the logical OR of every mask up the path? This would make this check a
+> > > lot cheaper.
+> > 
+> > As mentioned in the DT binding thread, it's rare that this loop would
+> > execute more than once, and largely inconceivable that it would execute more
+> > than twice, so I don't know how much we need to worry about the cost.
+> 
+> But still, this code is a challenge for the branch-predictor, plus
+> the additional function calls to find_parent_smmu(). I still think it is
+> worth to optimize this away. The map function is supposed to be a
+> fast-path function.
+
+Yes, the locking I'd need to introduce in find_parent_smmu seals the deal.
+I'll have a go at constructing the mask statically for each SMMU (although I
+think I want to use logical AND rather than OR).
+
+Cheers,
+
+Will
