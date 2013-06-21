@@ -1,92 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 21 Jun 2013 16:23:04 +0200
-Subject: [PATCH v3 4/4] ARM: dts: mvebu: Introduce a new compatible string
- for mv64xxx-i2c
-In-Reply-To: <51C46001.30500@gmail.com>
-References: <1371821529-13791-1-git-send-email-gregory.clement@free-electrons.com>
- <1371821529-13791-5-git-send-email-gregory.clement@free-electrons.com>
- <20130621140707.GO31667@titan.lakedaemon.net> <51C46001.30500@gmail.com>
-Message-ID: <51C461C8.9050904@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Jun 2013 15:22:38 +0100
+Subject: [PATCH] arm64: Add support to pass earlyprintk argument via
+ device tree
+In-Reply-To: <CAAHg+HhhVOLn1DXizWAKOqZXczq9YR8dOXM+u=ywbEakw6A6ZQ@mail.gmail.com>
+References: <1370274671-23812-1-git-send-email-pranavkumar@linaro.org>
+ <20130612132820.992E73E0A56@localhost>
+ <CAAHg+HhhVOLn1DXizWAKOqZXczq9YR8dOXM+u=ywbEakw6A6ZQ@mail.gmail.com>
+Message-ID: <20130621142238.GB8384@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2013 04:15 PM, Sebastian Hesselbarth wrote:
-> On 06/21/13 16:07, Jason Cooper wrote:
->> On Fri, Jun 21, 2013 at 03:32:09PM +0200, Gregory CLEMENT wrote:
->>> The mv64xxx-i2c embedded in the Armada XP have a new feature to
->>> offload i2c transaction. This new version of the IP come also with
->>> some errata. This lead to the introduction to a another compatible
->>> string.
->>>
->>> This commit split the i2c information into armada-370.dtsi and
->>> armada-xp.dtsi. Most of the data remains the same and stay in the
->>> common file Armada-370-xp.dtsi. With this new feature the size of the
->>> registers are bigger for Armada XP and the new compatible string is
->>> used.
->>>
->>> The Device Tree binding documentation is updated accordingly.
->>>
->>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>> ---
->>>   Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 13 ++++++++++++-
->>>   arch/arm/boot/dts/armada-370-xp.dtsi                  |  2 --
->>>   arch/arm/boot/dts/armada-370.dtsi                     |  8 ++++++++
->>>   arch/arm/boot/dts/armada-xp.dtsi                      | 10 ++++++++++
->>>   4 files changed, 30 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
->>> index a1ee681..ce7af6a 100644
->>> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
->>> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
->>> @@ -4,7 +4,8 @@
->>>   Required properties :
->>>
->>>    - reg             : Offset and length of the register set for the device
->>> - - compatible      : Should be "marvell,mv64xxx-i2c"
->>> + - compatible      : Should be "marvell,mv64xxx-i2c" and "marvell,mv7230-i2c"
->>> +for controller which support the I2C Transaction Generator
+On Thu, Jun 13, 2013 at 07:25:20AM +0100, Pranavkumar Sawargaonkar wrote:
+> On 12 June 2013 18:58, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > On Mon,  3 Jun 2013 21:21:11 +0530, Pranavkumar Sawargaonkar
+> > <pranavkumar@linaro.org> wrote:
+> >> One can just append earlyprintk=device-type,address (same as we pass
+> >> through command line) in "/chosen" node to notify kernel which is the
+> >> earlyprintk device and what is its address.
+> >
+> > I'm not a big fan of this. It seems to be short-circuiting around
+> > existing properties. The kernel /should/ be able to use the
+> > linux,stdout-path property to determine what the earlyprintk device
+> > to use is.
 > 
-> Jason, Gregory,
+> For this there are two problems:
 > 
-> Also, s/mv7230/mv78230/
+> 1. Early printk code gets initialized before un-flattening of a device tree.
+> Hence trying to find out node from stdout-path is tricky as we do not have
+> of_find_node_by_path available.
 
-You are right, thanks for both of you to notice it.
+Looking at the existing uses of linux,stdout-path, it seems that it is
+pointed at an existing entry like &uart0, which cannot be parsed early
+enough. The base address is the main problem as it needs the DT to be
+unflattened (for example v2m_serial0 on arm64 would read as 0x90000
+which is just an offset). If you pass the full path,
+of_find_node_by_path() wouldn't work either this early.
 
-> 
-> from a quick check of the patch set (which you forgot to send to LKML)
-> I am wondering why you didn't update the of matches struct with the new
-> compatible for "marvell,mv78230-i2c"? This will save you from still
-> having "marvell,mv64xxx-i2c" as additional compatible to match device
-> and driver. With that the above should also be s/and/or/.
+Question for the DT guys - would it be feasible to pass a
+@<phys address> via the linux,stdout-path? Any other way to get the phys
+address of the device early during boot?
 
->From my point of view it is more an extension than an other kind of controller like
-the one embedded in the AllWinner SoCs. So I thought it was more in the spirit of
-the way you describe hardware in the device tree, but I am far for being an expert
-so I maybe wrong.
+> 2. Current compatible strings in arm64 early printk code are not in
+> synced (or different) from actual compatible strings used in drivers -
+> e.g. for PL011 In earlyprintk code match name is just pl011 but in dts
+> it is specified as "arm,pl011" Hence we will need multiple changes to
+> implement it.
 
-> 
->>>    - interrupts      : The interrupt number
->>>
->>>   Optional properties :
->>> @@ -20,3 +21,13 @@ Examples:
->>>   		interrupts = <29>;
->>>   		clock-frequency = <100000>;
->>>   	};
->>> +
->>> +For a controller which support the I2C Transaction Generator:
->>> +
->>> +	i2c at 11000 {
->>> +		compatible = "marvell,mv64xxx-i2c", "marvell,mv78230-i2c";
->>> +		reg = <0x11000 0x100>;
->>> +		compatible = "marvell,mv64xxx-i2c";
->>
->> extra compatible line.  If there's nothing else, I'll fix this up when I
->> pull it in.
-> 
-
+I think we can sort this out. The first point is more important.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Catalin
