@@ -1,40 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Jun 2013 14:57:24 +0200
-Subject: [GIT PULL 00/15 v2] Renesas ARM based SoC boot cleanup for v3.11
-In-Reply-To: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <201306211457.24492.arnd@arndb.de>
+Date: Fri, 21 Jun 2013 14:58:16 +0200
+Subject: [GIT PULL v2 0/1] Renesas ARM based SoC cleanups for v3.11
+In-Reply-To: <1371452045-21959-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371452045-21959-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <201306211458.16852.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Monday 17 June 2013, Simon Horman wrote:
-> Hi Arnd, Olof,
+> Hi Olof, Hi Arnd,
 > 
-> This pull request is based on renesas-pinmux-for-v3.11, which you have
-> already pulled, in order to provide pre-requisites.
+> This small pull request is based on a merge of
+> renesas-soc-for-v3.11 and renesas-pinmux-for-v3.11 both
+> of which you have previously pulled. The reason for this base is to provide
+> all the code that the one patch in this request adds annotations to.
 > 
-> The following changes since commit 5fcf4a3c3a5bc08bf72a50ef1332501a3c1b96bb:
-> 
->   ARM: shmobile: marzen: Use RCAR_GP_PIN macro (2013-06-05 17:18:24 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-boot-for-v3.11
-> 
-> for you to fetch changes up to 53332005bfde9d2e3c9a66030c0e8c2598eaa1d5:
-> 
->   ARM: shmobile: Remove Bonito board support (2013-06-17 16:07:31 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM based SoC boot cleanup for v3.11
-> 
-> Work by Magnus Damm and others to clean up the boot of and move
-> things closer to supporting multi-arch.
-> 
-> As a side effect of this work it was decided to remove support for
-> two boards, Bonito and AP4EVB. Those patches are included in this
-> series as they depend on earlier patches in the series.
+> The following changes since commit 12dd9752512449f0336b7d64df3871145a28a2fe:
 
-Pulled into next/soc, thanks!
+As discussed on IRC, I started a next/late branch now and pulled this
+into it, since the dependencies don't allow putting it into any
+other branch easily.
 
 	Arnd
