@@ -1,68 +1,50 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Fri, 21 Jun 2013 09:07:59 +0800
-Subject: [PATCH V2] USB: initialize or shutdown PHY when add or remove
- host controller
-In-Reply-To: <Pine.LNX.4.44L0.1306201319580.2063-100000@iolanthe.rowland.org>
-References: <20130620121749.GF9817@arwen.pp.htv.fi>
- <Pine.LNX.4.44L0.1306201319580.2063-100000@iolanthe.rowland.org>
-Message-ID: <CADApbejTBAv0+XxkGLXuMVrLatbNurR0XBkK2gt6eQnXr+5yEA@mail.gmail.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Fri, 21 Jun 2013 09:12:38 +0800
+Subject: [RFC PATCH v1 1/6] USB: HCD: support giveback of URB in tasklet
+ context
+In-Reply-To: <Pine.LNX.4.44L0.1306201242110.2063-100000@iolanthe.rowland.org>
+References: <CACVXFVPPF=DNp0dpypoZ=OifkfnCgWJKpQHMv4xE8PmBk8RiHQ@mail.gmail.com>
+ <Pine.LNX.4.44L0.1306201242110.2063-100000@iolanthe.rowland.org>
+Message-ID: <CACVXFVMdxtd2fcwNE_YrfwG0Ksq67ww_Ar9A6fCGSr442gWaag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 1:25 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Thu, 20 Jun 2013, Felipe Balbi wrote:
+On Fri, Jun 21, 2013 at 12:52 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Thu, 20 Jun 2013, Ming Lei wrote:
 >
->> > In fact, the PHY setting and handling is related to platform or SOC,
->> > and for different SOC they can
->> > have same EHCI HCD but they PHY handling can be different.
->> > Omap'a case is the example, and i think some other vendors may have
->> > silimar cases.
->> > From above point, It is better to leave the PHY initialization and
->> > shutdown to be done by each echi-xxx driver.
+>> On Thu, Jun 20, 2013 at 10:59 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
 >> >
->> > So Alan and Felipe
->> > What are your ideas about it?
+>> > By the way, did you consider the race that Oliver pointed out?  When an
+>> > HCD is removed, all the outstanding URBs for all devices on its bus get
+>> > cancelled.  The core waits until the urb_list for each endpoint is
+>> > empty.
 >>
->> If we have so many exceptions, then sure. But eventually, the common
->> case should be added generically with a flag so that non-generic cases
->> (like OMAP) can request to handle the PHY by themselves.
+>> This should be enough since during remove path usbcore will wait for all
+>> URBs' completion which is only triggered by tasklet, so once all URBs are
+>> finished, the tasklet list has been empty already.
+>
+> No, usbcore only waits until the urb_list for each endpoint is empty.
+> It doesn't keep track of the individual URB completions.  Look at
+> usb_hcd_flush_endpoint() and you'll see.
+
+But, if URBs still aren't completed after usb_disconnect(), it should be
+bug of usbcore or driver, shouldn't it?
+
+>
+>> > (Probably it's sufficient to wait until the tasklet lists are empty.  I
+>> > assume tasklet_kill() won't stop a tasklet that's currently running.)
 >>
->> Alan ?
+>> From the implementation of tasklet_kill(), it will wait for the completion
+>> of the tasklet.
+>>
+>> Actually the tasklet_kill() should not be necessary, I think.
 >
-> I don't have very strong feelings about this; Felipe has much more
-> experience with these things.
->
-> However, when the common case is added into the core, the simplest way
-> to indicate that the HCD wants to handle the PHY(s) by itself will be
-> to leave hcd->phy set to NULL or an ERR_PTR value.
->
-> One important thing that hasn't been pointed out yet: When we move
-> these calls into the core, the same patch must also remove those calls
-> from the glue drivers that currently do set hcd->phy.  And it must make
-> sure that the glue drivers which handle the PHY by themselves do not
-> set hcd->phy.
->
+> You're probably right.  But we should wait until the tasklet's list is
+> empty; we don't want to deallocate an hcd structure until all the URBs
+> are taken off.
 
->From device point of view, EHCI is a standlone component. It has the
-standard sepcification, so each
-SOC vendor has EHCI HCD need to follow the standards. Then we have
-common EHCI HCD driver.
-The PHY is outside of EHCI component, each SOC vendor may have
-different PHY implementation. Then
-we have PHY driver.
-The EHCI glue driver ehci-xxx works like a SOC depended driver. It is
-its duty to handle the'
-relationship between the EHCI HCD driver and PHY driver.
-It is same as clk, irq requested by ehci-xxx driver.
+I will keep the tasklet_kill() for safe reason.
 
-So i think add a flag and use usb_get_phy() is not very good.
-It is bette to make ehci-xxx to do the phy getting and EHCI HCD
-initialize it and shut down as the patch did, or let ehci-xxx to
-handle the PHY as Roger said.
-
-Based on the generic work is not too much, and does not look so
-meaningful. I suggest that let to echi-xxx
-do it.
-
-> Alan Stern
->
+Thanks,
+--
+Ming Lei
