@@ -1,42 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Jun 2013 22:35:42 +0200
-Subject: [PATCH] ARM: keystone: remove hand-coded smc instruction
-In-Reply-To: <201306212228.29717.arnd@arndb.de>
-References: <201306212228.29717.arnd@arndb.de>
-Message-ID: <201306212235.43125.arnd@arndb.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 21 Jun 2013 15:42:50 -0500
+Subject: [PATCH] ARM: omap5: build opp4xxx_data.c
+In-Reply-To: <201306212229.54238.arnd@arndb.de>
+References: <201306212229.54238.arnd@arndb.de>
+Message-ID: <20130621204250.GA16139@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 June 2013, Arnd Bergmann wrote:
-> This lets us build keystone with CONFIG_THUMB2_KERNEL enabled,
-> without the patch we get this error:
+On 22:29-20130621, Arnd Bergmann wrote:
+> Building OMAP5 support without this file currently results in this link error:
 > 
-> Error: cannot determine Thumb instruction size. Use .inst.n/.inst.w instead
-> 
-> This follows the same change for all other platforms done
-> earlier.
+> arch/arm/mach-omap2/built-in.o: In function `omap54xx_voltagedomains_init':
+> :(.init.text+0x6b80): undefined reference to `omap446x_vdd_core_volt_data'
+> :(.init.text+0x6b84): undefined reference to `omap446x_vdd_mpu_volt_data'
+> :(.init.text+0x6b88): undefined reference to `omap446x_vdd_iva_volt_data'
 > 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
 > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: linux-omap at vger.kernel.org
 > 
-> diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
-> index 630ab3bd..1800c33 100644
-> --- a/arch/arm/mach-keystone/platsmp.c
-> +++ b/arch/arm/mach-keystone/platsmp.c
-> @@ -34,7 +34,7 @@ static int __cpuinit keystone_smp_boot_secondary(unsigned int cpu,
->  		"mov    r0, #0\n"	/* power on cmd	*/
->  		"mov    r1, %1\n"	/* cpu		*/
->  		"mov    r2, %2\n"	/* start	*/
-> -		".inst  0xe1600070\n"	/* smc #0	*/
-> +		"smc	#0\n"		/* smc #0	*/
->  		"mov    %0, r0\n"
->  		: "=r" (error)
->  		: "r"(cpu), "r"(start)
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 0520dc4..f5038f5 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -77,6 +77,7 @@ ifeq ($(CONFIG_PM_OPP),y)
+>  obj-y					+= opp.o
+>  obj-$(CONFIG_ARCH_OMAP3)		+= opp3xxx_data.o
+>  obj-$(CONFIG_ARCH_OMAP4)		+= opp4xxx_data.o
+> +obj-$(CONFIG_SOC_OMAP5)			+= opp4xxx_data.o
+>  endif
+>  
 
-Ah, damm, now I get this error for building an ARMv6+ARMv7 combined kernel:
+	/*
+	 * XXX Will depend on the process, validation, and binning
+	 * for the currently-running IC. Use OMAP4 data for time being.
+	 */
+#ifdef CONFIG_PM_OPP
+	omap5_voltdm_mpu.volt_data = omap446x_vdd_mpu_volt_data;
+	omap5_voltdm_mm.volt_data = omap446x_vdd_iva_volt_data;
+	omap5_voltdm_core.volt_data = omap446x_vdd_core_volt_data;
+#endif
 
-/tmp/ccSWHCik.s:55: Error: selected processor does not support ARM mode `smc #0'
+Should we just remove this instead? these are obviously wrong.
 
-I'll add a -march=armv7-a gcc flag as well.
-
-	Arnd
+-- 
+Regards,
+Nishanth Menon
