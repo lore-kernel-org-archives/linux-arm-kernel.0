@@ -1,31 +1,38 @@
-From: tremyfr@yahoo.fr (Philippe Reynes)
-Date: Fri, 21 Jun 2013 18:24:13 +0200
-Subject: [PATCH] apf27dev: add rtc ds1374 to the device tree
-Message-ID: <1371831853-24754-1-git-send-email-tremyfr@yahoo.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Jun 2013 18:25:37 +0200
+Subject: ARM: SoC fixes for 3.10-rc
+Message-ID: <201306211825.37495.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following changes since commit 323226bbb3d865af12644d66df2b7f161adf51c7:
 
-Signed-off-by: Philippe Reynes <tremyfr@yahoo.fr>
----
- arch/arm/boot/dts/imx27-apf27dev.dts |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+  Merge tag 'fixes-3.10-4' of git://git.infradead.org/users/jcooper/linux into fixes (2013-06-11 17:05:56 -0700)
 
-diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
-index 66b8e1c..2a377ca 100644
---- a/arch/arm/boot/dts/imx27-apf27dev.dts
-+++ b/arch/arm/boot/dts/imx27-apf27dev.dts
-@@ -53,6 +53,11 @@
- &i2c1 {
- 	clock-frequency = <400000>;
- 	status = "okay";
-+
-+	rtc at 68 {
-+		compatible = "dallas,ds1374";
-+		reg = <0x68>;
-+	};
- };
- 
- &i2c2 {
--- 
-1.7.4.4
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to 8b6fd652641e5ab1892d092e73e83d49291ed638:
+
+  irqchip: gic: call gic_cpu_init() as well in CPU_STARTING_FROZEN case (2013-06-20 14:52:23 +0200)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 3.10-rc
+
+These are two fixes that came in this week, one for a regression we
+introduced in 3.10 in the GIC interrupt code, and the other one
+fixes a typo in newly introduced code.
+
+----------------------------------------------------------------
+Padmavathi Venna (1):
+      ARM: dts: Correct the base address of pinctrl_3 on Exynos5250
+
+Shawn Guo (1):
+      irqchip: gic: call gic_cpu_init() as well in CPU_STARTING_FROZEN case
+
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi | 2 +-
+ arch/arm/boot/dts/exynos5250.dtsi         | 4 ++--
+ drivers/irqchip/irq-gic.c                 | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
