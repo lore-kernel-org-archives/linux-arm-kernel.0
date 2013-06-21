@@ -1,43 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 22 Jun 2013 00:38:16 +0200
-Subject: [PATCH] drm: always provide debugfs function prototypes
-Message-ID: <201306220038.17115.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 21 Jun 2013 16:39:07 -0600
+Subject: [PATCH] ARM: tegra: fix section mismatch in tegra_pmc_parse_dt
+Message-ID: <1371854347-12091-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is generally considered bad style to enclose function prototypes
-in header files in #ifdef. This case illustrates why that is:
-The tegra host1x driver calls into the debugfs functions if
-CONFIG_DEBUG_FS is enabled, but that code is otherwise already
-discarded by the compiler, so leaving the prototype in place
-actually makes everything work.
+From: Stephen Warren <swarren@nvidia.com>
 
-drivers/gpu/host1x/drm/dc.c: In function 'tegra_dc_debugfs_init':
-drivers/gpu/host1x/drm/dc.c:1004:2: error: implicit declaration of function 'drm_debugfs_create_files' [-Werror=implicit-function-declaration]
-drivers/gpu/host1x/drm/dc.c: In function 'tegra_dc_debugfs_exit': drivers/gpu/host1x/drm/dc.c:1026:2: error: implicit declaration of function 'drm_debugfs_remove_files' [-Werror=implicit-function-declaration]
+tegra_pmc_parse_dt() references __initconst data. Fix it to be __init.
+This matches its only usage; a call from tegra_pmc_init() which is
+already __init. This fixes:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Ben Gamari <bgamari@gmail.com>
-Cc: Dave Airlie <airlied@redhat.com>
+WARNING: vmlinux.o(.text.unlikely+0x580): Section mismatch in reference
+from the function tegra_pmc_parse_dt() to the (unknown reference)
+.init.rodata:(unknown)
 
-diff --git a/include/drm/drmP.h b/include/drm/drmP.h
-index 63d17ee..8bc105e 100644
---- a/include/drm/drmP.h
-+++ b/include/drm/drmP.h
-@@ -1551,7 +1551,7 @@ extern int drm_proc_init(struct drm_minor *minor, struct proc_dir_entry *root);
- extern int drm_proc_cleanup(struct drm_minor *minor, struct proc_dir_entry *root);
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/pmc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+index 32360e5..eb3fa4a 100644
+--- a/arch/arm/mach-tegra/pmc.c
++++ b/arch/arm/mach-tegra/pmc.c
+@@ -234,7 +234,7 @@ static const struct of_device_id matches[] __initconst = {
+ 	{ }
+ };
  
- 				/* Debugfs support */
--#if defined(CONFIG_DEBUG_FS)
-+
- extern int drm_debugfs_init(struct drm_minor *minor, int minor_id,
- 			    struct dentry *root);
- extern int drm_debugfs_create_files(struct drm_info_list *files, int count,
-@@ -1559,7 +1559,6 @@ extern int drm_debugfs_create_files(struct drm_info_list *files, int count,
- extern int drm_debugfs_remove_files(struct drm_info_list *files, int count,
-                                     struct drm_minor *minor);
- extern int drm_debugfs_cleanup(struct drm_minor *minor);
--#endif
- 
- 				/* Info file support */
- extern int drm_name_info(struct seq_file *m, void *data);
+-static void tegra_pmc_parse_dt(void)
++static void __init tegra_pmc_parse_dt(void)
+ {
+ 	struct device_node *np;
+ 	u32 prop;
+-- 
+1.8.1.5
