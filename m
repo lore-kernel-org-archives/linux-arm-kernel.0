@@ -1,46 +1,54 @@
-From: oneukum@suse.de (Oliver Neukum)
-Date: Fri, 21 Jun 2013 11:20:14 +0200
-Subject: [RFC PATCH v1 1/6] USB: HCD: support giveback of URB in tasklet
- context
-In-Reply-To: <CACVXFVNNR-ZYsJpQXu0tUpCtEk-hhw0M8nmYMB4GcSkKyLopqw@mail.gmail.com>
-References: <CACVXFVPPF=DNp0dpypoZ=OifkfnCgWJKpQHMv4xE8PmBk8RiHQ@mail.gmail.com>
- <4558223.ViRy5S2mR9@linux-5eaq.site>
- <CACVXFVNNR-ZYsJpQXu0tUpCtEk-hhw0M8nmYMB4GcSkKyLopqw@mail.gmail.com>
-Message-ID: <4846131.y6OZcfhzIJ@linux-5eaq.site>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Fri, 21 Jun 2013 10:17:25 +0100
+Subject: [PATCH v3 01/10] serial:st-asc: Add ST ASC driver.
+In-Reply-To: <201306202101.11261.arnd@arndb.de>
+References: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
+ <1371737103-8871-1-git-send-email-srinivas.kandagatla@st.com>
+ <201306202101.11261.arnd@arndb.de>
+Message-ID: <51C41A25.20508@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 June 2013 17:13:48 Ming Lei wrote:
-> On Fri, Jun 21, 2013 at 4:33 PM, Oliver Neukum <oneukum@suse.de> wrote:
-> > On Friday 21 June 2013 09:12:38 Ming Lei wrote:
-> >> >> This should be enough since during remove path usbcore will wait for all
-> >> >> URBs' completion which is only triggered by tasklet, so once all URBs are
-> >> >> finished, the tasklet list has been empty already.
-> >> >
-> >> > No, usbcore only waits until the urb_list for each endpoint is empty.
-> >> > It doesn't keep track of the individual URB completions.  Look at
-> >> > usb_hcd_flush_endpoint() and you'll see.
-> >>
-> >> But, if URBs still aren't completed after usb_disconnect(), it should be
-> >> bug of usbcore or driver, shouldn't it?
-> >
-> > A driver cannot know what caused the call to disconnect(). That includes
-> > driver unbind. Doing IO to a device that another driver may be bound to
-> > is certainly a bug.
-> > Nevertheless it usually works and it is desirable to keep that behavior.
+On 20/06/13 20:01, Arnd Bergmann wrote:
+> On Thursday 20 June 2013, Srinivas KANDAGATLA wrote:
+>> This patch adds support to ASC (asynchronous serial controller)
+>> driver, which is basically a standard serial driver. This IP is common
+>> across all the ST parts for settop box platforms.
+>>
+>> ASC is embedded in ST COMMS IP block. It supports Rx & Tx functionality.
+>> It support all industry standard baud rates.
+>>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>> CC: Stephen Gallimore <stephen.gallimore@st.com>
+>> CC: Stuart Menefy <stuart.menefy@st.com>
+>> CC: Arnd Bergmann <arnd@arndb.de>
+>> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 > 
-> I mean once driver is unbound, URB's complete() in that driver shouldn't be
+>>From my point of view the series is ready for merging in 3.11,
+> I only had a few final comments. I would prefer the first three
+> patches to go through the respective serial/clocksource/pinctrl
+> trees, since there are no direct build dependencies to the
+> platform parts.
+> 
+Thankyou Arnd,
 
-This is highly problematic. It is bound to cause resource leaks.
+There are no build dependencies on serial/clocksource/pinctrl.
 
-> called.  The situation might happen when driver->remove() doesn't
-> kill the URBs with the patch applied.
+I will re-spin SOC support patches 4-10 for arm-soc inclusion and wait
+for comments on serial/clocksource/pinctrl driver v3 patches.
 
-Well, there is no good way to handle this. But we have a simple rule.
-If usb_submit_urb() succeeds, complete() will be called.
-Breaking this rule is a bad idea.
 
-The best way is really to make sure that no URB survive.
+Thanks,
+srini
 
-	Regards
-		Oliver
+> If there is a reason to take those through arm-soc, I would
+> insist on getting Acked-by's from the subsystem maintainers.
+> 
+> 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
