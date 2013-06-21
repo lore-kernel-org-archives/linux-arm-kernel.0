@@ -1,81 +1,107 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Fri, 21 Jun 2013 19:04:45 +0800
-Subject: [PATCH] ARM: dma: Drop __GFP_COMP for iommu dma memory allocations
-In-Reply-To: <51C41DF4.4090802@samsung.com>
-References: <1371731460-15316-1-git-send-email-rizhao@nvidia.com>
- <51C2FDE0.4060206@cogentembedded.com>
- <51C41DF4.4090802@samsung.com>
-Message-ID: <CANg6MZhymH6DVN8LkWVVwcwhB5ks3+OCkm_WuxkKBo805sNx-g@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 21 Jun 2013 13:14:34 +0200
+Subject: [PATCH v6 4/8] ARM: Add .init_platform() callback to machine
+ descriptor
+In-Reply-To: <51C429F4.60709@arm.com>
+References: <1371774924-9224-1-git-send-email-tomasz.figa@gmail.com>
+ <1371774924-9224-5-git-send-email-tomasz.figa@gmail.com>
+ <51C429F4.60709@arm.com>
+Message-ID: <72209947.cQvP4jsDBz@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 5:33 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:> Hello,
->
->
-> On 6/20/2013 3:04 PM, Sergei Shtylyov wrote:
->>
->> Hello.
->>
->> On 20-06-2013 16:31, Richard Zhao wrote:
->>
->>> __iommu_alloc_buffer wants to split pages after allocation in order to
->>> reduce the memory footprint. This does not work well with __GFP_COMP
->>> pages, so drop this flag before allocation
->>
->>
->>> One failure example is snd_malloc_dev_pages call dma_alloc_coherent with
->>> __GFP_COMP.
->>
->>
->>> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
->>> ---
->>>   arch/arm/mm/dma-mapping.c |    9 +++++++++
->>>   1 file changed, 9 insertions(+)
->>
->>
->>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->>> index ef3e0f3..f7efffd 100644
->>> --- a/arch/arm/mm/dma-mapping.c
->>> +++ b/arch/arm/mm/dma-mapping.c
->>> @@ -1314,6 +1314,15 @@ static void *arm_iommu_alloc_attrs(struct device
->>> *dev, size_t size,
->>>       if (gfp & GFP_ATOMIC)
->>>           return __iommu_alloc_atomic(dev, size, handle);
->>>
->>> +    /*
->>> +     * Following is a work-around (a.k.a. hack) to prevent pages
->>> +     * with __GFP_COMP being passed to split_page() which cannot
->>> +     * handle them.  The real problem is that this flag probably
->>> +     * should be 0 on ARM as it is not supported on this
->>> +     * platform; see CONFIG_HUGETLBFS.
->>> +     */
->>> +    gfp &= ~(__GFP_COMP);
->>
->>
->>    Hm, what exactly is the sense you meant in using ()?
->
->
-> I think that those parentheses come from the first patch, which disabled
-> __GFP_COMP
-> in dma-mapping allocations: 3611553ef98 ("[AVR32] Drop GFP_COMP for DMA
-> memory
-> allocations"). I would like to take this patch to the dma-mapping tree
-> together with
-> other changes related to iommu integration code.
-Thanks! I'm not sure. Do we still have time to have this fix on 3.10?
+Hi Marc,
 
-Richard
->
-> Best regards
-> --
-> Marek Szyprowski
-> Samsung R&D Institute Poland
->
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Friday 21 of June 2013 11:24:52 Marc Zyngier wrote:
+> On 21/06/13 01:35, Tomasz Figa wrote:
+> 
+> Hi Tomasz,
+> 
+> > Most ARM platforms have parts that should be initialized as early as
+> > possible, which usually means as soon as memory management (kmalloc,
+> > ioremap) starts to work,
+> > 
+> > However, currently there is no appropriate callback in machine_desc
+> > struct to use for such initialization and platforms tend to stuff
+> > things
+> > up .init_irq() and .init_time() callbacks.
+> > 
+> > Since all the DT-based platforms are going towards generic IRQ and time
+> > initialization (using irqchip_init and clocksource_of_init) and current
+> > code assumes that if custom callbacks are not provided in machine_desc
+> > then generic ones should be used, this problem has become a bit more
+> > inconvenient.
+> > 
+> > This patch tries to solve this issue by introducing new callback called
+> > .init_platform(), where any custom low level initialization of platform
+> > can be done safely.
+> > 
+> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> > ---
+> > 
+> >  arch/arm/include/asm/mach/arch.h | 1 +
+> >  arch/arm/kernel/irq.c            | 3 +++
+> >  2 files changed, 4 insertions(+)
+> > 
+> > diff --git a/arch/arm/include/asm/mach/arch.h
+> > b/arch/arm/include/asm/mach/arch.h index 308ad7d..b2f4d11 100644
+> > --- a/arch/arm/include/asm/mach/arch.h
+> > +++ b/arch/arm/include/asm/mach/arch.h
+> > @@ -46,6 +46,7 @@ struct machine_desc {
+> > 
+> >  	void			(*reserve)(void);/* reserve mem blocks	*/
+> >  	void			(*map_io)(void);/* IO mapping function	*/
+> >  	void			(*init_early)(void);
+> > 
+> > +	void			(*init_platform)(void);
+> > 
+> >  	void			(*init_irq)(void);
+> >  	void			(*init_time)(void);
+> >  	void			(*init_machine)(void);
+> > 
+> > diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+> > index 9723d17..61e2000 100644
+> > --- a/arch/arm/kernel/irq.c
+> > +++ b/arch/arm/kernel/irq.c
+> > @@ -115,6 +115,9 @@ EXPORT_SYMBOL_GPL(set_irq_flags);
+> > 
+> >  void __init init_IRQ(void)
+> >  {
+> > 
+> > +	if (machine_desc->init_platform)
+> > +		machine_desc->init_platform();
+> > +
+> > 
+> >  	if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
+> >  	
+> >  		irqchip_init();
+> >  	
+> >  	else
+> 
+> To me, this new hook is strictly equivalent to init_irq. What do we gain
+> exactly? I didn't think init_irq was going away...
+> 
+> I know init_irq is not pretty, and we tend to overload it with other
+> stuff, but I don't really see the point of adding a new callback that
+> has the exact same properties.
+
+Well, it doesn't really give us any functional benefits.
+
+However in my opinion it looks much saner in case of DT-only platforms that 
+don't need any specific IRQ initialization, but need to call some platform 
+specific initialization routines, after memory management, but before 
+anything else is initialized.
+
+This way irqchip_init() doesn't have to be explicitly called in platform 
+code.
+
+Anyway, I don't have any strong opinion on this. If it is perfectly fine to 
+abuse irqchip_init() for anything that must be done at this stage of boot, 
+then I'm fine with this either and will modify the board file from further 
+patch from this series to not rely on this change any more.
+
+Best regards,
+Tomasz
+
+> 
+> 	M.
