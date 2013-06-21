@@ -1,271 +1,268 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Fri, 21 Jun 2013 13:48:27 +0300
-Subject: [PATCH] usb: phy: msm: Move mach depndend code to platform data
-Message-ID: <1371811707-24634-1-git-send-email-iivanov@mm-sol.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 21 Jun 2013 12:51:26 +0200
+Subject: [RFC patch 2/2] ARM: at91: cpuidle: move the driver to
+ drivers/cpuidle directory
+In-Reply-To: <516DD310.6030006@linaro.org>
+References: <1366032598-23053-1-git-send-email-daniel.lezcano@linaro.org>
+ <1366032598-23053-3-git-send-email-daniel.lezcano@linaro.org>
+ <20130415142047.GE15139@game.jcrosoft.org> <516C10C5.4050107@linaro.org>
+ <20130415160041.GF15139@game.jcrosoft.org> <516DD310.6030006@linaro.org>
+Message-ID: <51C4302E.8010707@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+On 04/17/2013 12:39 AM, Daniel Lezcano wrote:
+> On 04/15/2013 06:00 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> On 16:37 Mon 15 Apr     , Daniel Lezcano wrote:
+>>> On 04/15/2013 04:20 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>> On 15:29 Mon 15 Apr     , Daniel Lezcano wrote:
+>>>>> We don't have any dependency with the SoC specific code.
+>>>>>
+>>>>> Move the driver to the drivers/cpuidle directory.
+>>>>>
+>>>>> Add Nicolas Ferre as author of the driver, so it will be in copy of the emails.
+>>>>>
+>>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>> please use -M when generating the patch
+>>>
+>>> Oh, right. Thanks for reminding me the option.
+>>>
+>>> [ ... ]
+>>>
+>>>>> +#include <linux/module.h>
+>>>>> +#include <linux/init.h>
+>>>>> +#include <linux/cpuidle.h>
+>>>>> +#include <asm/cpuidle.h>
+>>>>> +
+>>>>> +#define AT91_MAX_STATES	2
+>>>>> +
+>>>>> +extern void (*at91_standby_ops)(void);
+>>>> really don't like can we pass it via the pm?
+>>>
+>>> I agree, it is hackish. Can you elaborate when you say "pass it via the
+>>> pm" ?
+>>
+>> I was thinking about it
+>>
+>> I would even prefer to have a platfrom driver that pass it via platform data
+>> even in DT
+>>
+>> but not something that can touch globally
+>>
+>> and for drivers I prefer to do not use cpu_is only for the core
+> 
+> Is the following code what you had in mind ?
 
-This patch fix compilation error and is an intermediate step
-before the addition of DeviceTree support for newer targets.
-Fix suggested here: https://lkml.org/lkml/2013/6/19/381
+Hi Jean-Christophe,
 
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Daniel Walker <dwalker@fifo99.com>
-Cc: Bryan Huntsman <bryanh@codeaurora.org>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-usb at vger.kernel.org
+coming back to move the cpuidle driver to drivers/cpuidle.
 
-Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
----
- arch/arm/mach-msm/board-msm7x30.c |   35 +++++++++++++++++++++++
- arch/arm/mach-msm/board-qsd8x50.c |   34 +++++++++++++++++++++++
- drivers/usb/phy/phy-msm-usb.c     |   55 ++++++++++---------------------------
- include/linux/usb/msm_hsusb.h     |    2 ++
- 4 files changed, 85 insertions(+), 41 deletions(-)
+I was wondering if the code below would be ok for you ?
 
-diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
-index db3d8c0..4df7daa 100644
---- a/arch/arm/mach-msm/board-msm7x30.c
-+++ b/arch/arm/mach-msm/board-msm7x30.c
-@@ -31,6 +31,7 @@
- #include <asm/setup.h>
- 
- #include <mach/board.h>
-+#include <mach/clk.h>
- #include <mach/msm_iomap.h>
- #include <mach/dma.h>
- 
-@@ -61,10 +62,44 @@ static int hsusb_phy_init_seq[] = {
- 	-1
- };
- 
-+static int hsusb_phy_link_clk_reset(struct clk *link_clk, bool assert)
-+{
-+	int ret;
-+
-+	if (assert) {
-+		ret = clk_reset(link_clk, CLK_RESET_ASSERT);
-+		if (ret)
-+			pr_err("usb hs_clk assert failed\n");
-+	} else {
-+		ret = clk_reset(link_clk, CLK_RESET_DEASSERT);
-+		if (ret)
-+			pr_err("usb hs_clk deassert failed\n");
-+	}
-+	return ret;
-+}
-+
-+static int hsusb_phy_clk_reset(struct clk *phy_clk)
-+{
-+	int ret;
-+
-+	ret = clk_reset(phy_clk, CLK_RESET_ASSERT);
-+	if (ret) {
-+		pr_err("usb phy clk assert failed\n");
-+		return ret;
-+	}
-+	usleep_range(10000, 12000);
-+	ret = clk_reset(phy_clk, CLK_RESET_DEASSERT);
-+	if (ret)
-+		pr_err("usb phy clk deassert failed\n");
-+	return ret;
-+}
-+
- static struct msm_otg_platform_data msm_otg_pdata = {
- 	.phy_init_seq		= hsusb_phy_init_seq,
- 	.mode                   = USB_PERIPHERAL,
- 	.otg_control		= OTG_PHY_CONTROL,
-+	.phy_link_clk_reset	= hsusb_phy_link_clk_reset,
-+	.phy_phy_clk_reset	= hsusb_phy_clk_reset,
- };
- 
- struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
-diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
-index f14a73d..d3d92ab 100644
---- a/arch/arm/mach-msm/board-qsd8x50.c
-+++ b/arch/arm/mach-msm/board-qsd8x50.c
-@@ -82,10 +82,44 @@ static int hsusb_phy_init_seq[] = {
- 	-1
- };
- 
-+static int hsusb_phy_link_clk_reset(struct clk *link_clk, bool assert)
-+{
-+	int ret;
-+
-+	if (assert) {
-+		ret = clk_reset(link_clk, CLK_RESET_ASSERT);
-+		if (ret)
-+			pr_err("usb hs_clk assert failed\n");
-+	} else {
-+		ret = clk_reset(link_clk, CLK_RESET_DEASSERT);
-+		if (ret)
-+			pr_err("usb hs_clk deassert failed\n");
-+	}
-+	return ret;
-+}
-+
-+static int hsusb_phy_clk_reset(struct clk *phy_clk)
-+{
-+	int ret;
-+
-+	ret = clk_reset(phy_clk, CLK_RESET_ASSERT);
-+	if (ret) {
-+		pr_err("usb phy clk assert failed\n");
-+		return ret;
-+	}
-+	usleep_range(10000, 12000);
-+	ret = clk_reset(phy_clk, CLK_RESET_DEASSERT);
-+	if (ret)
-+		pr_err("usb phy clk deassert failed\n");
-+	return ret;
-+}
-+
- static struct msm_otg_platform_data msm_otg_pdata = {
- 	.phy_init_seq		= hsusb_phy_init_seq,
- 	.mode                   = USB_PERIPHERAL,
- 	.otg_control		= OTG_PHY_CONTROL,
-+	.phy_link_clk_reset	= hsusb_phy_link_clk_reset,
-+	.phy_phy_clk_reset	= hsusb_phy_clk_reset,
- };
- 
- static struct platform_device *devices[] __initdata = {
-diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
-index d08f334..ab1b880 100644
---- a/drivers/usb/phy/phy-msm-usb.c
-+++ b/drivers/usb/phy/phy-msm-usb.c
-@@ -40,8 +40,6 @@
- #include <linux/usb/msm_hsusb_hw.h>
- #include <linux/regulator/consumer.h>
- 
--#include <mach/clk.h>
--
- #define MSM_USB_BASE	(motg->regs)
- #define DRIVER_NAME	"msm_otg"
- 
-@@ -306,51 +304,20 @@ static void ulpi_init(struct msm_otg *motg)
- 	}
- }
- 
--static int msm_otg_link_clk_reset(struct msm_otg *motg, bool assert)
--{
--	int ret;
--
--	if (assert) {
--		ret = clk_reset(motg->clk, CLK_RESET_ASSERT);
--		if (ret)
--			dev_err(motg->phy.dev, "usb hs_clk assert failed\n");
--	} else {
--		ret = clk_reset(motg->clk, CLK_RESET_DEASSERT);
--		if (ret)
--			dev_err(motg->phy.dev, "usb hs_clk deassert failed\n");
--	}
--	return ret;
--}
--
--static int msm_otg_phy_clk_reset(struct msm_otg *motg)
--{
--	int ret;
--
--	ret = clk_reset(motg->phy_reset_clk, CLK_RESET_ASSERT);
--	if (ret) {
--		dev_err(motg->phy.dev, "usb phy clk assert failed\n");
--		return ret;
--	}
--	usleep_range(10000, 12000);
--	ret = clk_reset(motg->phy_reset_clk, CLK_RESET_DEASSERT);
--	if (ret)
--		dev_err(motg->phy.dev, "usb phy clk deassert failed\n");
--	return ret;
--}
--
- static int msm_otg_phy_reset(struct msm_otg *motg)
- {
-+	struct msm_otg_platform_data *pdata = motg->pdata;
- 	u32 val;
- 	int ret;
- 	int retries;
- 
--	ret = msm_otg_link_clk_reset(motg, 1);
-+	ret = pdata->phy_link_clk_reset(motg->clk, true);
- 	if (ret)
- 		return ret;
--	ret = msm_otg_phy_clk_reset(motg);
-+	ret = pdata->phy_clk_reset(motg->phy_reset_clk);
- 	if (ret)
- 		return ret;
--	ret = msm_otg_link_clk_reset(motg, 0);
-+	ret = pdata->phy_link_clk_reset(motg->clk, false);
- 	if (ret)
- 		return ret;
- 
-@@ -362,7 +329,7 @@ static int msm_otg_phy_reset(struct msm_otg *motg)
- 				ULPI_CLR(ULPI_FUNC_CTRL));
- 		if (!ret)
- 			break;
--		ret = msm_otg_phy_clk_reset(motg);
-+		ret = pdata->phy_clk_reset(motg->phy_reset_clk);
- 		if (ret)
- 			return ret;
- 	}
-@@ -370,7 +337,7 @@ static int msm_otg_phy_reset(struct msm_otg *motg)
- 		return -ETIMEDOUT;
- 
- 	/* This reset calibrates the phy, if the above write succeeded */
--	ret = msm_otg_phy_clk_reset(motg);
-+	ret = pdata->phy_clk_reset(motg->phy_reset_clk);
- 	if (ret)
- 		return ret;
- 
-@@ -378,7 +345,7 @@ static int msm_otg_phy_reset(struct msm_otg *motg)
- 		ret = ulpi_read(&motg->phy, ULPI_DEBUG);
- 		if (ret != -ETIMEDOUT)
- 			break;
--		ret = msm_otg_phy_clk_reset(motg);
-+		ret = pdata->phy_clk_reset(motg->phy_reset_clk);
- 		if (ret)
- 			return ret;
- 	}
-@@ -1414,16 +1381,22 @@ static void msm_otg_debugfs_cleanup(void)
- static int __init msm_otg_probe(struct platform_device *pdev)
- {
- 	int ret = 0;
-+	struct msm_otg_platform_data *pdata = pdev->dev.platform_data;
- 	struct resource *res;
- 	struct msm_otg *motg;
- 	struct usb_phy *phy;
- 
- 	dev_info(&pdev->dev, "msm_otg probe\n");
--	if (!pdev->dev.platform_data) {
-+	if (!pdata) {
- 		dev_err(&pdev->dev, "No platform data given. Bailing out\n");
- 		return -ENODEV;
- 	}
- 
-+	if (!pdata->phy_clk_reset || !pdata->phy_link_clk_reset) {
-+		dev_err(&pdev->dev, "No phy or link clock reset methods\n");
-+		return -ENODEV;
-+	}
-+
- 	motg = kzalloc(sizeof(struct msm_otg), GFP_KERNEL);
- 	if (!motg) {
- 		dev_err(&pdev->dev, "unable to allocate msm_otg\n");
-diff --git a/include/linux/usb/msm_hsusb.h b/include/linux/usb/msm_hsusb.h
-index 22a396c..66081ed 100644
---- a/include/linux/usb/msm_hsusb.h
-+++ b/include/linux/usb/msm_hsusb.h
-@@ -135,6 +135,8 @@ struct msm_otg_platform_data {
- 	enum msm_usb_phy_type phy_type;
- 	void (*setup_gpio)(enum usb_otg_state state);
- 	char *pclk_src_name;
-+	int (*phy_link_clk_reset)(struct clk *link_clk, bool assert);
-+	int (*phy_clk_reset)(struct clk *phy_clk);
- };
- 
- /**
+Thanks
+  -- Daniel
+
+
+> Please, be lenient, it is the first time I write something based on
+> 'platform' :)
+> 
+> 
+> Index: cpuidle-next/arch/arm/mach-at91/cpuidle.c
+> ===================================================================
+> --- cpuidle-next.orig/arch/arm/mach-at91/cpuidle.c      2013-04-16
+> 10:40:21.058315042 +0200
+> +++ cpuidle-next/arch/arm/mach-at91/cpuidle.c   2013-04-17
+> 00:35:42.836314931 +0200
+> @@ -13,32 +13,22 @@
+>   * #2 wait-for-interrupt and RAM self refresh
+>   */
+> 
+> -#include <linux/kernel.h>
+> +#include <linux/module.h>
+>  #include <linux/init.h>
+> -#include <linux/platform_device.h>
+>  #include <linux/cpuidle.h>
+> -#include <linux/io.h>
+> -#include <linux/export.h>
+> -#include <asm/proc-fns.h>
+> +#include <linux/platform_device.h>
+>  #include <asm/cpuidle.h>
+> -#include <mach/cpu.h>
+> -
+> -#include "pm.h"
+> 
+>  #define AT91_MAX_STATES        2
+> 
+> +static void (*at91_standby_ops)(void);
+> +
+>  /* Actual code that puts the SoC in different idle states */
+>  static int at91_enter_idle(struct cpuidle_device *dev,
+>                         struct cpuidle_driver *drv,
+>                                int index)
+>  {
+> -       if (cpu_is_at91rm9200())
+> -               at91rm9200_standby();
+> -       else if (cpu_is_at91sam9g45())
+> -               at91sam9g45_standby();
+> -       else
+> -               at91sam9_standby();
+> -
+> +       at91_standby_ops();
+>         return index;
+>  }
+> 
+> @@ -58,9 +48,16 @@ static struct cpuidle_driver at91_idle_d
+>  };
+> 
+>  /* Initialize CPU idle by registering the idle states */
+> -static int __init at91_init_cpuidle(void)
+> +int __init at91_init_cpuidle(struct platform_device *pdev)
+>  {
+> -       return cpuidle_register(&at91_idle_driver, NULL);
+> +       at91_standby_ops = pdata;
+> +       return 0;
+>  }
+> 
+> -device_initcall(at91_init_cpuidle);
+> +static int __init at91_cpuidle_init(void)
+> +{
+> +
+> +
+> +       return cpuidle_register(&at91_idle_driver, NULL);
+> +}
+> +device_initcall(at91_cpuidle_init);
+> Index: cpuidle-next/arch/arm/mach-at91/pm.c
+> ===================================================================
+> --- cpuidle-next.orig/arch/arm/mach-at91/pm.c   2013-04-16
+> 09:52:33.048426618 +0200
+> +++ cpuidle-next/arch/arm/mach-at91/pm.c        2013-04-16
+> 18:22:03.207420375 +0200
+> @@ -312,21 +312,40 @@ static const struct platform_suspend_ops
+>         .end    = at91_pm_end,
+>  };
+> 
+> -static int __init at91_pm_init(void)
+> +static int __init at91_pm_probe(struct platform_device *pdev)
+>  {
+> -#ifdef CONFIG_AT91_SLOW_CLOCK
+> -       slow_clock = (void *) (AT91_IO_VIRT_BASE - at91_slow_clock_sz);
+> -#endif
+> -
+> -       pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow
+> clock mode)" : ""));
+> -
+>         /* AT91RM9200 SDRAM low-power mode cannot be used with
+> self-refresh. */
+> -       if (cpu_is_at91rm9200())
+> +       if (of_machine_is_compatible("atmel,at91rm9200")) {
+>                 at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+> +               pdev->dev.platform_data = at91rm9200_standby;
+> +       } else if (of_machine_is_compatible("atmel,atmel,at91sam9g45")) {
+> +               pdev->dev.platform_data = at91sam9g45_standby;
+> +       } else {
+> +               pdev->dev.platform_data = at91sam9_standby;
+> +       }
+> 
+>         suspend_set_ops(&at91_pm_ops);
+> 
+>         show_reset_status();
+> +
+>         return 0;
+>  }
+> +
+> +static struct platform_driver at91_pm_driver = {
+> +       .driver = {
+> +               .name    = "pm-at91",
+> +               .owner   = THIS_MODULE,
+> +       },
+> +};
+> +
+> +static int __init at91_pm_init(void)
+> +{
+> +#ifdef CONFIG_AT91_SLOW_CLOCK
+> +       slow_clock = (void *) (AT91_IO_VIRT_BASE - at91_slow_clock_sz);
+> +#endif
+> +       pr_info("AT91: Power Management%s\n",
+> +               (slow_clock ? " (with slow clock mode)" : ""));
+> +
+> +       return platform_driver_probe(&at91_pm_driver, at91_pm_probe);
+> +}
+>  arch_initcall(at91_pm_init);
+> Index: cpuidle-next/arch/arm/mach-at91/board-usb-a926x.c
+> ===================================================================
+> --- cpuidle-next.orig/arch/arm/mach-at91/board-usb-a926x.c
+> 2013-04-15 10:31:45.503051053 +0200
+> +++ cpuidle-next/arch/arm/mach-at91/board-usb-a926x.c   2013-04-17
+> 00:35:38.480314758 +0200
+> @@ -49,7 +49,6 @@
+>  #include "sam9_smc.h"
+>  #include "generic.h"
+> 
+> -
+>  static void __init ek_init_early(void)
+>  {
+>         /* Initialize processor: 12.00 MHz crystal */
+> @@ -319,6 +318,19 @@ static void __init ek_add_device_leds(vo
+>         at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
+>  }
+> 
+> +#ifdef CONFIG_PM
+> +static struct platform_device at91_pm_device = {
+> +       .name = "pm-at91",
+> +       .id = -1,
+> +};
+> +#endif
+> +
+> +static struct platform_device *platform_devices[] __initdata = {
+> +#ifdef CONFIG_PM
+> +       &at91_pm_device,
+> +#endif
+> +}
+> +
+>  static void __init ek_board_init(void)
+>  {
+>         /* Serial */
+> @@ -351,6 +363,9 @@ static void __init ek_board_init(void)
+>                                 | AT91_SHDW_WKMODE0_LOW
+>                                 | AT91_SHDW_RTTWKEN);
+>         }
+> +
+> +       /* Platform devices */
+> +       platform_add_devices(&platform_devices,
+> ARRAY_SIZE(platform_devices));
+>  }
+> 
+>  MACHINE_START(USB_A9263, "CALAO USB_A9263")
+> 
+> 
+> if (of_machine_is_compatible("atmel,at91rm9200")) {
+> 	printk("at91rm9200\n");
+> } else if (of_machine_is_compatible("atmel,atmel,at91sam9g45")) {
+> 	printk(at91sam9g45\n");
+> } else {
+> 	printk(other at91 cpu\n");
+> }
+> 
+>>
+>> Best Regards,
+>> J.
+>>>
+>>>
+>>>
+>>> -- 
+>>>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>>>
+>>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+>>> <http://twitter.com/#!/linaroorg> Twitter |
+>>> <http://www.linaro.org/linaro-blog/> Blog
+>>>
+> 
+> 
+
+
 -- 
-1.7.9.5
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
