@@ -1,38 +1,40 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Jun 2013 09:22:20 +0200
-Subject: [PATCHv3 05/11] irqchip: armada-370-xp: properly request resources
-In-Reply-To: <1371660979-21588-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri, 21 Jun 2013 09:23:18 +0200
+Subject: [PATCHv3 07/11] arm: pci: add ->add_bus() and ->remove_bus()
+ hooks to hw_pci
+In-Reply-To: <1371660979-21588-8-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1371660979-21588-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130621092220.1b335f95@skate>
+ <1371660979-21588-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130621092318.410465eb@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Gleixner,
+Russell,
 
-On Wed, 19 Jun 2013 18:56:13 +0200, Thomas Petazzoni wrote:
-> Instead of using of_iomap(), we now use of_address_to_resource(),
-> request_mem_region() and ioremap(). This allows the corresponding I/O
-> regions to be properly requested and visible in /proc/iomem.
+On Wed, 19 Jun 2013 18:56:15 +0200, Thomas Petazzoni wrote:
+> Some PCI drivers may need to adjust the pci_bus structure after it has
+> been allocated by the Linux PCI core. The PCI core allows
+> architectures to implement the pcibios_add_bus() and
+> pcibios_remove_bus() for this purpose. This commit therefore extends
+> the hw_pci and pci_sys_data structures of the ARM PCI core to allow
+> PCI drivers to register ->add_bus() and ->remove_bus() in hw_pci,
+> which will get called when a bus is added or removed from the system.
 > 
-> The main motivation for this change is that the introduction of the
-> MSI support requires us to get the physical address of the main
-> interrupt controller registers, so we will need the corresponding
-> 'struct resource' anyway.
-> 
-> We also take this opportunity to change a panic() to BUG_ON(), in
-> order to be consistent with the rest of the driver.
+> This will be used for example by the Marvell PCIe driver to connect a
+> particular PCI bus with its corresponding MSI chip to handle Message
+> Signaled Interrupts.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  drivers/irqchip/irq-armada-370-xp.c | 20 ++++++++++++++++----
->  1 file changed, 16 insertions(+), 4 deletions(-)
+>  arch/arm/include/asm/mach/pci.h |  4 ++++
+>  arch/arm/kernel/bios32.c        | 16 ++++++++++++++++
+>  2 files changed, 20 insertions(+)
 
-Any chance you could take this one for 3.11 ? It's independent of the
-rest of the patch series, and it would reduce the amount of code
-remaining to merge for the entire MSI feature.
+Do you have any comments ? Any chance to get this merged for 3.11 ? It
+is independent of the previous patches of the patch series, so it can
+be merged independently.
 
-Thanks,
+Thanks!
 
 Thomas
 -- 
