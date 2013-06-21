@@ -1,112 +1,205 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 21 Jun 2013 12:16:41 +0200
-Subject: [PATCHv3 04/11] of: pci: add registry of MSI chips
-In-Reply-To: <1371660979-21588-5-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1371660979-21588-5-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130621101640.GD12441@manwe>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 21 Jun 2013 11:23:18 +0100
+Subject: [PATCH 8/9] iommu: add support for ARM Ltd. System MMU
+ architecture
+In-Reply-To: <20130620212646.GG11309@8bytes.org>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-9-git-send-email-will.deacon@arm.com>
+ <20130620212646.GG11309@8bytes.org>
+Message-ID: <20130621102318.GB7766@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 06:56:12PM +0200, Thomas Petazzoni wrote:
-> This commit adds a very basic registry of msi_chip structures, so that
-> an IRQ controller driver can register an msi_chip, and a PCIe host
-> controller can find it, based on a 'struct device_node'.
+On Thu, Jun 20, 2013 at 10:26:46PM +0100, Joerg Roedel wrote:
+> Hi Will,
+
+Hi Joerg,
+
+First, thanks for looking at this patch. I really appreciate it.
+
+> On Mon, Jun 10, 2013 at 07:34:44PM +0100, Will Deacon wrote:
+> > This patch adds support for SMMUs implementing the ARM System MMU
+> > architecture versions 1 or 2. Both arm and arm64 are supported, although
+> > the v7s descriptor format is not used.
+> > 
+> > Cc: Rob Herring <robherring2@gmail.com>
+> > Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> > Cc: Olav Haugan <ohaugan@codeaurora.org>
+> > Cc: Joerg Roedel <joro@8bytes.org>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/of/of_pci.c    | 22 ++++++++++++++++++++++
->  include/linux/msi.h    |  2 ++
->  include/linux/of_pci.h |  4 ++++
->  3 files changed, 28 insertions(+)
+> A few general questions:
 > 
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 42c687a..ca12db8 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -89,3 +89,25 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
->  	return 0;
->  }
->  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
-> +
-> +static LIST_HEAD(msi_chip_list);
-> +static DEFINE_MUTEX(msi_chip_mutex);
+> How have you tested this code? Has it been run on real hardware? What
+> were the results?
 
-Should all of this code perhaps be conditionalized by an #ifdef PCI_MSI?
+I've only tested it with software models, however they are fairly
+sophisticated and provide *lots* of tunables, so you can test different
+configurations which don't actually exist in hardware yet. You also get a
+tonne of trace output, so you can inspect things like page table walking and
+TLB filling to make sure the driver is setting things up as you planned.
 
-> +
-> +void of_msi_chip_add(struct msi_chip *chip)
-> +{
-> +	mutex_lock(&msi_chip_mutex);
-> +	list_add(&chip->link, &msi_chip_list);
-> +	mutex_unlock(&msi_chip_mutex);
-> +}
+I have also tested on MMU-400 (AArch32) and MMU-500 (both AArch32 and
+AArch64, with 4k and 64k pages in the latter case) models. The setup I used
+was 4 PL330 DMA controllers driven by dmatest.ko, which I hacked to call into
+the ARM dma-mapping API to create a separate domain for each controller.
 
-Since eventually we may want to use these functions from modules, maybe
-they should be exported?
+The results were that the memory-to-memory DMA didn't show any corruption. I
+also managed to tickle access faults by messing around with the permissions,
+then remap the buffers and resume the transfers.
 
-Also isn't this missing an of_msi_chip_remove() counterpart?
+> The code looks good and clean in general, minus a few places mentioned
+> below were I have questions and/or suggestions:
 
-> +struct msi_chip *of_msi_chip_find_by_node(struct device_node *of_node)
+Cheers, responses inline.
 
-Most other functions of this type are named of_find_*_by_node(), so for
-consistency it'd be better to call this of_find_msi_chip_by_node().
+> > +static struct arm_smmu_device *find_parent_smmu(struct arm_smmu_device *smmu)
+> > +{
+> > +	struct arm_smmu_device *parent, *tmp;
+> > +
+> > +	if (!smmu->parent_of_node)
+> > +		return NULL;
+> > +
+> > +	list_for_each_entry_safe(parent, tmp, &arm_smmu_devices, list)
+> > +		if (parent->dev->of_node == smmu->parent_of_node)
+> > +			return parent;
+> 
+> Why do you need the _safe variant here? You are not changing the list in
+> this loop so you should be fine with list_for_each_entry().
 
-> +{
-> +	struct msi_chip *c;
-> +	list_for_each_entry(c, &msi_chip_list, link) {
-> +		if (c->of_node == of_node &&
-> +		    of_property_read_bool(c->of_node, "msi-controller"))
+For a system with multiple SMMUs (regardless of chaining), couldn't this
+code run in parallel with probing of another SMMU (which has to add to the
+arm_smmu_devices list)? The same applies for device removal, which could
+perhaps be driven from some power-managment code.
 
-Perhaps it would be more efficient to put this check within the
-of_msi_chip_add() function?
+> > +
+> > +	dev_warn(smmu->dev,
+> > +		 "Failed to find SMMU parent despite parent in DT\n");
+> > +	return NULL;
+> > +}
+> 
+> > +/* Wait for any pending TLB invalidations to complete */
+> > +static void arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
+> > +{
+> > +	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+> > +
+> > +	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_sTLBGSYNC);
+> > +	while (readl_relaxed(gr0_base + ARM_SMMU_GR0_sTLBGSTATUS)
+> > +	       & sTLBGSTATUS_GSACTIVE)
+> > +		cpu_relax();
+> 
+> Other IOMMU drivers have a timeout for this loop and report an error
+> when the state does not change. I think this makes sense here too so
+> that the kernel will not just stop spinning in that loop if something
+> goes wrong but prints an error instead.
 
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index e3a137d..8b930c3 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -74,6 +74,8 @@ void default_restore_msi_irqs(struct pci_dev *dev, int irq);
->  struct msi_chip {
->  	struct module *owner;
->  	struct device *dev;
-> +	struct device_node *of_node;
+Good idea, I'll add that.
 
-I know there's no easier way to do this, but I think we need to find a
-way to clean this up at some point. There's no point in storing the OF
-node in two places.
+> > +}
+> > +static void arm_smmu_flush_pgtable(struct arm_smmu_device *smmu, void *addr,
+> > +				   size_t size)
+> > +{
+> > +	unsigned long offset = (unsigned long)addr & ~PAGE_MASK;
+> > +
+> > +	/*
+> > +	 * If the SMMU can't walk tables in the CPU caches, treat them
+> > +	 * like non-coherent DMA...
+> > +	 */
+> > +	if (!(smmu->features & ARM_SMMU_FEAT_COHERENT_WALK))
+> > +		dma_map_page(smmu->dev, virt_to_page(addr), offset, size,
+> > +			     DMA_TO_DEVICE);
+> 
+> Why can you call into DMA-API here? A DMA-API implementation may call
+> back into this IOMMU driver, no? So this looks a little bit like a
+> layering violation.
 
-> +	struct list_head link;
+So this is subtle, and the comment could probably do with more explanation.
 
-I'd prefer this to be named "list" for consistency.
+The problem is that the SMMU hardware page table walker might not be able to
+snoop the CPU caches. This means that after writing page table entries on
+the CPU, we have to flush them *all* the way out to main memory, so the SMMU
+can pick them up. There are only two other places I can think of where we
+have to do something like this in Linux:
 
-> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> index 7a04826..6e88189 100644
-> --- a/include/linux/of_pci.h
-> +++ b/include/linux/of_pci.h
-> @@ -2,6 +2,7 @@
->  #define __OF_PCI_H
->  
->  #include <linux/pci.h>
-> +#include <linux/msi.h>
->  
->  struct pci_dev;
->  struct of_irq;
-> @@ -13,4 +14,7 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
->  int of_pci_get_devfn(struct device_node *np);
->  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
->  
-> +void of_msi_chip_add(struct msi_chip *chip);
-> +struct msi_chip *of_msi_chip_find_by_node(struct device_node *of_node);
+  (1) In the bowels of CPU suspend, where we may need to clean all of our
+      caches prior to shutdown. This is all hidden away in low-level arch
+      code.
 
-Since these will be exported and conditionalized on PCI_MSI as suggested
-above, maybe they should get a dummy implementation if (!OF || !PCI_MSI)
-so that drivers don't have to conditionally call them?
+  (2) When dealing with non-coherent DMA, since we have to transfer buffer
+      ownership between the CPU and the device. There is an API for this.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/7f5bbf19/attachment.sig>
+so, in fact, non-coherent DMA is a perfect fit for what we're trying to
+achieve with the SMMU page tables! I admit it looks odd, but it can't
+possibly go recursive because the master in question is a page-table walker,
+rather than anything backed by a struct device.
+
+> > +}
+> 
+> > +static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+> > +			phys_addr_t paddr, size_t size, int flags)
+> > +{
+> > +	struct arm_smmu_domain *smmu_domain = domain->priv;
+> > +	struct arm_smmu_device *smmu = smmu_domain->leaf_smmu;
+> > +
+> > +	if (!smmu_domain || !smmu)
+> > +		return -ENODEV;
+> > +
+> > +	/*
+> > +	 * Check for silent address truncation up the SMMU chain.
+> > +	 */
+> > +	do {
+> > +		phys_addr_t output_mask = (1ULL << smmu->s2_output_size) - 1;
+> > +		if ((phys_addr_t)iova & ~output_mask)
+> > +			return -ERANGE;
+> > +	} while ((smmu = find_parent_smmu(smmu)));
+> 
+> This looks a bit too expensive to have in the map path. How about saving
+> something like an effective_output_mask (or output_size) which contains
+> the logical OR of every mask up the path? This would make this check a
+> lot cheaper.
+
+As mentioned in the DT binding thread, it's rare that this loop would
+execute more than once, and largely inconceivable that it would execute more
+than twice, so I don't know how much we need to worry about the cost.
+
+> > +
+> > +	return arm_smmu_create_mapping(smmu_domain, iova, paddr, size, flags);
+> > +}
+> > +
+> > +static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
+> > +			     size_t size)
+> > +{
+> > +	int ret;
+> > +	struct arm_smmu_domain *smmu_domain = domain->priv;
+> > +	struct arm_smmu_cfg *root_cfg = &smmu_domain->root_cfg;
+> > +	struct arm_smmu_device *smmu = root_cfg->smmu;
+> > +	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+> > +
+> > +	ret = arm_smmu_create_mapping(smmu_domain, iova, 0, size, 0);
+> 
+> Since this function does also unmapping, how about renaming it to
+> arm_smmu_handle_mapping(). The 'create' part in there is misleading.
+
+Yep, that's a hangover from when I originally had separate functions. Will
+fix,
+
+> > +	writel_relaxed(root_cfg->vmid, gr0_base + ARM_SMMU_GR0_TLBIVMID);
+> > +	arm_smmu_tlb_sync(smmu);
+> > +	return ret ? ret : size;
+> > +}
+> > +static int arm_smmu_add_device(struct device *dev)
+> > +{
+> > +	struct arm_smmu_device *child, *parent, *smmu;
+> > +	struct arm_smmu_device *tmp[2];
+> > +	struct arm_smmu_master *master = NULL;
+> > +
+> > +	list_for_each_entry_safe(parent, tmp[0], &arm_smmu_devices, list) {
+> 
+> Again, why do you use the _safe variant, you do not seem to change the
+> lists traversed here.
+
+Same reasoning as above. Happy to remove it if it's not actually required...
+
+Cheers again,
+
+Will
