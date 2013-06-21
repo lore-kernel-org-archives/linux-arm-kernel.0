@@ -1,49 +1,93 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Fri, 21 Jun 2013 07:50:51 +0100
-Subject: [PATCH v3 06/10] ARM:stixxxx: Add DEBUG_LL console support
-In-Reply-To: <201306202055.43189.arnd@arndb.de>
-References: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
- <1371737176-9473-1-git-send-email-srinivas.kandagatla@st.com>
- <201306202055.43189.arnd@arndb.de>
-Message-ID: <51C3F7CB.70703@st.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Fri, 21 Jun 2013 08:59:41 +0200
+Subject: [RFC PATCH 0/4] watchdog: at91sam9_wdt: handle already configured
+ wdt
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641687DE078@penmbx01>
+References: <1370947890-954-1-git-send-email-b.brezillon@overkiz.com>
+ <B256D81BAE5131468A838E5D7A243641687DE078@penmbx01>
+Message-ID: <51C3F9DD.5040709@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/13 19:55, Arnd Bergmann wrote:
-> On Thursday 20 June 2013, Srinivas KANDAGATLA wrote:
->> --- a/arch/arm/mach-stixxxx/board-dt.c
->> +++ b/arch/arm/mach-stixxxx/board-dt.c
->> @@ -11,6 +11,7 @@
->>  #include <linux/clocksource.h>
->>  #include <linux/irq.h>
->>  #include <asm/hardware/cache-l2x0.h>
->> +#include <asm/mach/map.h>
->>  #include <asm/mach/arch.h>
->>  
->>  #include "smp.h"
->> @@ -42,6 +43,7 @@ static const char *stih41x_dt_match[] __initdata = {
->>  };
->>  
->>  DT_MACHINE_START(STM, "STiH415/416 SoC with Flattened Device Tree")
->> +       .map_io         = debug_ll_io_init,
->>         .init_time      = stih41x_timer_init,
->>         .smp            = smp_ops(stixxxx_smp_ops),
->>         .dt_compat      = stih41x_dt_match,
-> 
-> This part of the patch is no longer needed, we do the same when .map_io
-> is not set.
+On 21/06/2013 03:47, Yang, Wenyou wrote:
+>
+>> -----Original Message-----
+>> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+>> On Behalf Of Boris BREZILLON
+>> Sent: 2013?6?11? 18:51
+>> To: Wim Van Sebroeck; Jean-Christophe Plagniol-Villard; Ferre, Nicolas;
+>> linux-watchdog at vger.kernel.org
+>> Cc: devicetree-discuss at lists.ozlabs.org; linux-doc at vger.kernel.org;
+>> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Boris
+>> BREZILLON
+>> Subject: [RFC PATCH 0/4] watchdog: at91sam9_wdt: handle already configured
+>> wdt
+>>
+>> Hello,
+>>
+>> This patch series is a porposal to enhance the sam9 watchdog timer support.
+>>
+>> The at91sam9 watchdog timer cannot configured twice, and the current
+>> implementation only tries to configure in a static way:
+>> - 2 seconds timeout
+>> - wdt restart every 500ms
+>>
+>> If the timer has already been configured with different values, it returns an
+>> error and do not create any watchdog device.
+>>
+>> This is not critical if the watchdog is disabled, but if it has been enabled with
+>> different timeout values it will lead to a SoC reset.
+>>
+>> This patch series tries to address this issue by adapting the heartbeat value
+>> according the WDT timer config:
+>> - it first tries to configure the timer as requested.
+>> - if it fails it fallbacks to the current config, adapting its heartbeat timer
+>> to the needs
+>>
+>> This patch series also move to a dynamically allocated at91wdt device instead
+>> of the static instance. I'm not sure this is the best solution, so please tell
+>> me if you prefer to keep static instance of watchdog.
+>>
+>> It adds a new at91 wdt type: software. This new type make use of the at91 wdt
+>> interrupt to trigger a software watchdog.
+>>
+>> Finally it adds several properties to the device tree bindings.
+>>
+>> Best Regards,
+>> Boris
+>>
+>> Boris BREZILLON (4):
+>>   watchdog: at91sam9_wdt: better watchdog support
+>>   watchdog: at91sam9_wdt: update device tree doc
+>>   ARM: at91/dt: add sam9 watchdog default options to SoCs
+>>   ARM: at91/dt: add watchdog properties to kizbox board
+>>
+>>  .../devicetree/bindings/watchdog/atmel-wdt.txt     |   30 +-
+>>  arch/arm/boot/dts/at91sam9260.dtsi                 |    5 +
+>>  arch/arm/boot/dts/at91sam9263.dtsi                 |    5 +
+>>  arch/arm/boot/dts/at91sam9g45.dtsi                 |    5 +
+>>  arch/arm/boot/dts/at91sam9n12.dtsi                 |    5 +
+>>  arch/arm/boot/dts/at91sam9x5.dtsi                  |    5 +
+>>  arch/arm/boot/dts/kizbox.dts                       |    6 +
+>>  arch/arm/boot/dts/sama5d3.dtsi                     |    5 +
+>>  drivers/watchdog/at91sam9_wdt.c                    |  319
+>> +++++++++++++++-----
+>>  9 files changed, 300 insertions(+), 85 deletions(-)
+>>
+>> --
+>> 1.7.9.5
+>>
+>>
+> Tested on sama5d34ek, at91sam9g25ek, linux-next_20130620
+>
+> Tested by Wenyou Yang <Wenyou.yang@atmel.com>
+>
+Thanks for your tests and review.
 
-I can see the commit bc37324e "ARM: mmu: Call debug_ll_io_init if no
-map_io function is specified" in arm-soc.git:for-next branch.
+Best Regards,
 
-That makes sense to take care of this before this patch gets merged. I
-will remove this line in next spin hopefully very soon.
-
-Thanks,
-srini
-
-
-> 
-> 	Arnd
-> 
-> 
+Boris
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
