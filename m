@@ -1,73 +1,66 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 21 Jun 2013 15:58:46 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the net-next tree
-Message-ID: <20130621155846.71c2d64923a1e505c08eca72@canb.auug.org.au>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Fri, 21 Jun 2013 05:59:50 +0000
+Subject: linux-next: manual merge of the arm-soc tree with the mfd tree
+In-Reply-To: <20130621155408.7e4a4c891ff4d74627b57a45@canb.auug.org.au>
+References: <20130621155408.7e4a4c891ff4d74627b57a45@canb.auug.org.au>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73E9DF042@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+> Hi all,
+> 
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/boot/dts/am33xx.dtsi between commit a82279dd6d3e ("arm:
+> am33xx:
+> add TSC/ADC mfd device support") from the mfd tree and commit
+> 15e8246bd61b ("ARM: dts: AM33XX: Add ELM node") from the arm-soc tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
+> 
+> --
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
+> 
+> diff --cc arch/arm/boot/dts/am33xx.dtsi
+> index 37ef320,0d4df90..0000000
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@@ -404,24 -494,14 +494,32 @@@
+>   			ti,hwmods = "wkup_m3";
+>   		};
+> 
+>  +		tscadc: tscadc at 44e0d000 {
+>  +			compatible = "ti,am3359-tscadc";
+>  +			reg = <0x44e0d000 0x1000>;
+>  +			interrupt-parent = <&intc>;
+>  +			interrupts = <16>;
+>  +			ti,hwmods = "adc_tsc";
+>  +			status = "disabled";
+>  +
+>  +			tsc {
+>  +				compatible = "ti,am3359-tsc";
+>  +			};
+>  +			am335x_adc: adc {
+>  +				#io-channel-cells = <1>;
+>  +				compatible = "ti,am3359-adc";
+>  +			};
+>  +
+>  +		};
+>  +
+> + 		elm: elm at 48080000 {
+> + 			compatible = "ti,am3352-elm";
+> + 			reg = <0x48080000 0x2000>;
+> + 			interrupts = <4>;
+> + 			ti,hwmods = "elm";
+> + 			status = "disabled";
+> + 		};
+> +
+[Pekon]: Thanks.. Yes this is ok based on commit "15e8246bd61b ("ARM: dts: AM33XX: Add ELM node")
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/boot/dts/sun4i-a10.dtsi between commit b21da664120b ("ARM:
-sun4i: Add muxing options for the ethernet controller") from the net-next
-tree and commit 27cce4ff34ec ("ARM: sun4i: dt: Add i2c muxing options")
-from the arm-soc tree.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+>   		gpmc: gpmc at 50000000 {
+>   			compatible = "ti,am3352-gpmc";
+>   			ti,hwmods = "gpmc";
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/boot/dts/sun4i-a10.dtsi
-index 983da33,82e03d2..0000000
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@@ -214,18 -204,28 +220,39 @@@
-  				allwinner,function = "uart1";
-  				allwinner,drive = <0>;
-  				allwinner,pull = <0>;
- +			};
- +
- +			emac_pins_a: emac0 at 0 {
- +				allwinner,pins = "PA0", "PA1", "PA2",
- +						"PA3", "PA4", "PA5", "PA6",
- +						"PA7", "PA8", "PA9", "PA10",
- +						"PA11", "PA12", "PA13", "PA14",
- +						"PA15", "PA16";
- +				allwinner,function = "emac";
- +				allwinner,drive = <0>;
- +				allwinner,pull = <0>;
-  			};
-+ 
-+ 			i2c0_pins_a: i2c0 at 0 {
-+ 				allwinner,pins = "PB0", "PB1";
-+ 				allwinner,function = "i2c0";
-+ 				allwinner,drive = <0>;
-+ 				allwinner,pull = <0>;
-+ 			};
-+ 
-+ 			i2c1_pins_a: i2c1 at 0 {
-+ 				allwinner,pins = "PB18", "PB19";
-+ 				allwinner,function = "i2c1";
-+ 				allwinner,drive = <0>;
-+ 				allwinner,pull = <0>;
-+ 			};
-+ 
-+ 			i2c2_pins_a: i2c2 at 0 {
-+ 				allwinner,pins = "PB20", "PB21";
-+ 				allwinner,function = "i2c2";
-+ 				allwinner,drive = <0>;
-+ 				allwinner,pull = <0>;
-+ 			};
-  		};
-  
-  		timer at 01c20c00 {
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/b83c7c1f/attachment.sig>
+with regards, pekon
