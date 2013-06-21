@@ -1,33 +1,119 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 21 Jun 2013 09:30:14 +0200
-Subject: [PATCH RESEND] media: coda: Fix DT-driver data pointer for i.MX27
-In-Reply-To: <1371746796-16123-1-git-send-email-shc_work@mail.ru>
-References: <1371746796-16123-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1371799814.4320.3.camel@pizza.hi.pengutronix.de>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri, 21 Jun 2013 09:31:29 +0200
+Subject: [PATCH v2 3/4] ARM: at91/dt: add sam9 watchdog default options to SoCs
+In-Reply-To: <1371799176-3408-1-git-send-email-b.brezillon@overkiz.com>
+References: <1371799176-3408-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1371799889-3812-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 20.06.2013, 20:46 +0400 schrieb Alexander Shiyan:
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  drivers/media/platform/coda.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/coda.c b/drivers/media/platform/coda.c
-> index 48b8d7a..1c77781 100644
-> --- a/drivers/media/platform/coda.c
-> +++ b/drivers/media/platform/coda.c
-> @@ -1924,7 +1924,7 @@ MODULE_DEVICE_TABLE(platform, coda_platform_ids);
->  
->  #ifdef CONFIG_OF
->  static const struct of_device_id coda_dt_ids[] = {
-> -	{ .compatible = "fsl,imx27-vpu", .data = &coda_platform_ids[CODA_IMX27] },
-> +	{ .compatible = "fsl,imx27-vpu", .data = &coda_devdata[CODA_IMX27] },
->  	{ .compatible = "fsl,imx53-vpu", .data = &coda_devdata[CODA_IMX53] },
->  	{ /* sentinel */ }
->  };
+Set default watchdog options in every SoC compatible with the sam9 watchdog.
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/boot/dts/at91sam9260.dtsi |    5 +++++
+ arch/arm/boot/dts/at91sam9263.dtsi |    5 +++++
+ arch/arm/boot/dts/at91sam9g45.dtsi |    5 +++++
+ arch/arm/boot/dts/at91sam9n12.dtsi |    5 +++++
+ arch/arm/boot/dts/at91sam9x5.dtsi  |    5 +++++
+ arch/arm/boot/dts/sama5d3.dtsi     |    5 +++++
+ 6 files changed, 30 insertions(+)
 
-thanks
-Philipp
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index 899a7cf..6c44c35 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -643,6 +643,11 @@
+ 			watchdog at fffffd40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffd40 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				atmel,watchdog-type = "hardware";
++				atmel,reset-type = "all";
++				atmel,dbg-halt;
++				atmel,idle-halt;
+ 				status = "disabled";
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index ff63811..6b31ee0 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -519,6 +519,11 @@
+ 			watchdog at fffffd40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffd40 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				atmel,watchdog-type = "hardware";
++				atmel,reset-type = "all";
++				atmel,dbg-halt;
++				atmel,idle-halt;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index faec17d..ca1a643 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -634,6 +634,11 @@
+ 			watchdog at fffffd40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffd40 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				atmel,watchdog-type = "hardware";
++				atmel,reset-type = "all";
++				atmel,dbg-halt;
++				atmel,idle-halt;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index 3166e1d..7c8a5ea 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -505,6 +505,11 @@
+ 			watchdog at fffffe40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffe40 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				atmel,watchdog-type = "hardware";
++				atmel,reset-type = "all";
++				atmel,dbg-halt;
++				atmel,idle-halt;
+ 				status = "disabled";
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index e77106e..48eb1cc 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -742,6 +742,11 @@
+ 			watchdog at fffffe40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffe40 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				atmel,watchdog-type = "hardware";
++				atmel,reset-type = "all";
++				atmel,dbg-halt;
++				atmel,idle-halt;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index c00e158..7974723 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -885,6 +885,11 @@
+ 			watchdog at fffffe40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffe40 0x10>;
++				interrupts = <4 IRQ_TYPE_LEVEL_HIGH 7>;
++				atmel,watchdog-type = "hardware";
++				atmel,reset-type = "all";
++				atmel,dbg-halt;
++				atmel,idle-halt;
+ 				status = "disabled";
+ 			};
+ 
+-- 
+1.7.9.5
