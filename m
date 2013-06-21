@@ -1,40 +1,115 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Sat, 22 Jun 2013 00:12:23 +0800
-Subject: [RFC PATCH v1 1/6] USB: HCD: support giveback of URB in tasklet
- context
-In-Reply-To: <Pine.LNX.4.44L0.1306211040420.1020-100000@iolanthe.rowland.org>
-References: <CACVXFVNQLSg_hQ_h7S8uCTjTuKV6Q5gPSYFP0SLXiqdHOKGfsw@mail.gmail.com>
- <Pine.LNX.4.44L0.1306211040420.1020-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVOKM_SvSmiktBoCHfmx-pMWjFkNOTDWc08m+MVkd=2-PA@mail.gmail.com>
+From: dsd@laptop.org (Daniel Drake)
+Date: Fri, 21 Jun 2013 10:14:19 -0600
+Subject: MMP display subsystem questions
+In-Reply-To: <51C3BD65.8070206@marvell.com>
+References: <CAMLZHHTmSzzcL-aqk6rMjuD8Ct2zno--p7tUGfVVsocWiyhf8A@mail.gmail.com>
+ <51C3BD65.8070206@marvell.com>
+Message-ID: <CAMLZHHQFtXWx0weG3uh14Nm3euqbSqyztBEQHEQFBzjFxWGTZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 10:48 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+On Thu, Jun 20, 2013 at 8:41 PM, Zhou Zhu <zzhu3@marvell.com> wrote:
+> I admit it's an issue of no documents. We would submit a patch to add
+> description under Documentation soon later.
+
+That would be much appreciated. Without the required background I am
+still having trouble fully understanding your reply and reviewing your
+patches.
+
+>> The overlay's address is written to a register that is specific to
+>> it's parent path. If we are dealing with two overlays, how does this
+>> work? We write both overlay addresses to the same register and the
+>> second one "wins"? I checked all of the other overlay-related
+>> functions and they all defer to the parent path as well.
+>>
+>> As an experiment I modified platform data to suggest that my path has
+>> 98 overlays and the framebuffer should run on overlay 33. Nonsense,
+>> but the framebuffer booted up as normal. It seems like there is
+>> something missing in this path/overlay relationship.
+>>
+>> What is the plan going forward for this overlay management? At the
+>> moment there is only one consumer of overlays in the kernel - the
+>> framebuffer driver. And the framebuffer will only ever use one. Who
+>> are the other intended in-kernel users of overlays?
 >
-> Come to think of it, this shouldn't be a problem.  Drivers _must_
-> insure that all their URBs have completed before their disconnect
-> routine returns; otherwise the completion handler could get called
-> after the driver has been unloaded from memory.
+> We have already pushed patches to fix this issue and support overlays.
+> Please see patches below:
+> [V2 7/7] video: mmp: add video layer set win/addr operations support
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/175071.html
+
+At a glance, I cannot see how this patch answers any of my questions.
+I will attempt to review the patches in that series and let you know
+my difficulties in understanding. Hopefully that will help us write
+good documentation.
+
+>> path_config: this value gets written to registers LCD_SCLK *and*
+>> IOPAD_CONTROL. The bit definitions in these registers are totally
+>> different. It seems like nonsense to share the same configuration
+>> value between two diversely different registers - what is going on
+>> here?
+>>
+>> link_config: Seems to have a dual meaning. Upper 4 bits can be used to
+>> specify dumb panel mode in registers like LCD_DUMB_CTRL. Bit 0 is
+>> totally unrelated and triggers "swap RB" i.e. use BGR instead of RGB,
+>> when dealing with totally different registers. Other bits are ignored.
+>> If "disorganised" bitfields are to be haphazardly invented in this way
+>> it would at least be nice to have documentation.
 >
-> Currently we have no way to enforce this in usbcore, although with the
-> tasklets we could enforce it.  But I don't think it is necessary.  It
+> Actually we are using mixed configs here and it is not so clear.
+> We may update these config to separated configs with more clearly meanings.
+> Currently 4 fields is here:
+> SCLK source: select source clock for sclk. We have plan to remove it and
+> move the source selection into common clock driver.
+> IOPAD CONTROL: for iopad control
+> DUMB CONTROL: for dumb panel mode
+> RB SWAP: for rb swaps in link. Actually it's do required as for some panels
+> would swap r/b links.
 
-One way of enforcing this I thought of is to wait for completions of all
-unlinking URBs at the end of usb_hcd_flush_endpoint().
+Yes, separating this makes sense. I look forward to the patch, with
+the kind of documentation written above.
 
-But as you said, it may not be necessary.
+> Actually in our usage mode, we'd rather prefer to make one fb connected to
+> one path.
+> In many usage mode, we may need 2 or more devices (panel, external tv...)
+> turned on together so 2 or more fb devices are required to connect to
+> separate path.
 
-> would be sufficient to log a warning if the tasklet's URB list isn't
-> empty when exit_giveback_urb_bh() runs.  It won't happen unless there's
-> a buggy driver.
+That makes sense.
+
+>> 4. Which overlay to use - according to my investigation above, this
+>> doesn't actually have any meaningful effect on the driver.
 >
-> Besides, even if you try to flush all the URBs on the tasklet's list at
-> the end of usb_hcd_flush_endpoint(), you'll still miss the URBs which
-> have been moved to the local_list in usb_giveback_urb_bh().  You'd have
-> to wait until the tasklet wasn't running, and it would most likely be a
-> waste of time.
+> As overlay enabled in patch above now, this config is required to make fb
+> show on some overlay and other interface(v4l2, private interface) to use
+> others.
 
+I don't understand this, but it might be easier to understand once you
+have documented what an overlay is and how it relates to a path. How
+is v4l2 going to interact with this driver? What private interfaces
+are you referring to?
 
-Thanks,
---
-Ming Lei
+> So according to comments above, fb buffer is still need to be configure in
+> dts for path/overlay configs.
+
+Or can we just auto-instantiate one framebuffer per path with good defaults?
+
+> Also there still might be some settings in fb for some further settings like
+> vsync usage or yres_virtual size in coming patches.
+
+Wouldn't such information be represented in the modes supported by the panel?
+
+A couple more questions:
+
+1. What is the invert_pixclock setting in the mmp_mode structure? This
+causes a currently unused bit to be set in fb_videomode->vmode to be
+set (seems dangerous). And then nothing acts upon this bit, as far as
+I can see.
+
+2. What about pix_fmt_out? Why is pixel format dumped into the mode
+specifier? If there is a supported panel that really can support
+different pixel formats, I would expect it to support all the pixel
+formats for all the resolution. This also seems unused within the
+driver.
+
+Thanks
+Daniel
