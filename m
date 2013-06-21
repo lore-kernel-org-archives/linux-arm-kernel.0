@@ -1,49 +1,57 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Jun 2013 15:03:43 +0200
-Subject: [GIT PULL 08/10] Samsung SoC EXYNOS5420 for v3.11
-In-Reply-To: <51C0BC74.1060502@samsung.com>
-References: <51C0BC74.1060502@samsung.com>
-Message-ID: <201306211503.44079.arnd@arndb.de>
+Date: Fri, 21 Jun 2013 15:05:01 +0200
+Subject: [GIT PULL 0/5] Renesas ARM-based SoC board updates for v3.11 #2
+In-Reply-To: <1371648143-18376-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371648143-18376-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <201306211505.01567.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Kukjin Kim wrote:
-> The following changes since commit 79d743c177f99d6854e152d9e7fac5bbbeb7c25e:
+On Wednesday 19 June 2013, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
->    clk: exynos5250: Add enum entries for divider clock of i2s1 and i2s2 
-> (2013-06-19 03:28:43 +0900)
+> please consider the following updates to the Bock-W board for v3.11.
+> 
+> This pull request is based on a merge of renesas-boards2-for-v3.11 and
+> renesas-soc2-for-v3.11, both of which you have previously pulled, in order
+> to satisfy dependencies.
+> 
+> 
+> The following changes since commit 2e9a222e271b7fd16e62a0861ad5e42996d17815:
+> 
+>   Merge branch 'soc2' into boards-base (2013-06-13 14:41:53 +0900)
 > 
 > are available in the git repository at:
 > 
->    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-> tags/soc-exynos5420-1
 > 
-> for you to fetch changes up to eff4e7c7f32a4e4be60b19b209ffab5cb430b385:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards2-for-v3.11
 > 
->    ARM: EXYNOS: extend soft-reset support for EXYNOS5420 (2013-06-19 
-> 04:09:37 +0900)
+> for you to fetch changes up to 2c83322ce820bcf2d5e8265de831489076ee211e:
 > 
-> ----------------------------------------------------------------
-> based on tags/common-clk-audio
-> - add support for exynos5420 SoC
+>   ARM: shmobile: BOCK-W: change Ether device name (2013-06-18 16:22:45 +0900)
 > 
 > ----------------------------------------------------------------
-> Chander Kashyap (10):
->        ARM: dts: fork out common EXYNOS5 nodes
->        ARM: dts: list the CPU nodes for EXYNOS5250
->        ARM: EXYNOS: Add support for EXYNOS5420 SoC
->        serial: samsung: select EXYNOS specific driver data if 
-> ARCH_EXYNOS is defined
->        ARM: EXYNOS: use four additional chipid bits to identify EXYNOS 
-> family
->        clk: exynos5420: register clocks using common clock framework
->        ARM: dts: Add initial device tree support for EXYNOS5420
->        clocksource: exynos_mct: use (request/free)_irq calls for local 
-> timer registration
->        ARM: EXYNOS: add secondary CPU boot base location for EXYNOS5420
->        ARM: EXYNOS: extend soft-reset support for EXYNOS5420
+> Second Round of Renesas ARM-based SoC board updates for v3.11
+> 
+> * Extended hardware coverage for the Bock-W board
+>   by Goda-san and Morimoto-san
+> * Correction to Ether device name for the Bock-W board
+>   from Sergei Shtylyov
+> 
+> ----------------------------------------------------------------
+> Kuninori Morimoto (3):
+>       ARM: shmobile: bockw: add I2C device support
+>       ARM: shmobile: bockw: add SPI FLASH support
+>       ARM: shmobile: bockw: add MMCIF support
+> 
+> Sergei Shtylyov (2):
+>       ARM: shmobile: BOCK-W: add Ether support
+>       ARM: shmobile: BOCK-W: change Ether device name
+> 
+>  arch/arm/mach-shmobile/board-bockw.c | 98 +++++++++++++++++++++++++++++++++++-
+>  1 file changed, 97 insertions(+), 1 deletion(-)
 > 
 
-Pulled into next/late now to avoid the dependencies.
+Pulled into next/boards, thanks!
 
 	Arnd
