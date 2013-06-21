@@ -1,43 +1,93 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 21 Jun 2013 12:28:54 +0200
-Subject: [PATCHv3 10/11] arm: mvebu: indicate that this platform supports
- MSI
-In-Reply-To: <1371660979-21588-11-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1371660979-21588-11-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130621102853.GH12441@manwe>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 21 Jun 2013 12:28:48 +0200
+Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
+ pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
+In-Reply-To: <51C2EBCD.4070206@pengutronix.de>
+References: <51C2C0B5.8020802@pengutronix.de> <20130620095705.GA18536@arm.com>
+ <51C2D5EF.3040803@pengutronix.de> <20130620102856.GC18536@arm.com>
+ <20130620111255.GD18536@arm.com> <51C2E917.9000708@pengutronix.de>
+ <51C2EA04.4060701@pengutronix.de> <51C2EBCD.4070206@pengutronix.de>
+Message-ID: <51C42AE0.9070506@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 06:56:18PM +0200, Thomas Petazzoni wrote:
-> Now that all the pieces are in place, we can adjust the
-> mach-mvebu/Kconfig file to indicate that this platform supports MSIs.
+On 06/20/2013 01:47 PM, Marc Kleine-Budde wrote:
+> On 06/20/2013 01:39 PM, Marc Kleine-Budde wrote:
+>> On 06/20/2013 01:35 PM, Marc Kleine-Budde wrote:
+>>> On 06/20/2013 01:12 PM, Catalin Marinas wrote:
+>>>> On Thu, Jun 20, 2013 at 11:28:56AM +0100, Catalin Marinas wrote:
+>>>>> We may need to place the preempt disable/enable at a higher level in the
+>>>>> scheduler. My theory is that we have a context switch from prev to next.
+>>>>> We get preempted just before finish_arch_post_lock_switch(), so the MMU
+>>>>> hasn't been switched yet. The new switch during preemption happens to a
+>>>>> thread with the same next mm, so the scheduler no longer switch_mm() and
+>>>>> the TIF_SWITCH_MM isn't set for the new thread.
+>>>>>
+>>>>> I'll come back with another patch shortly.
+>>>>
+>>>> Here's another attempt (as before, only compile-tested):
+>>>
+>>> booting kernel from /image
+>>> zImage: concatenated oftree detected
+>>> booting Linux kernel with devicetree
+>>>
+>>> ...dead...
+>>>
+>>> Does every process have a "mm"? Even Kernel threads?
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> I've added a check for "mm". Boots now and my test runs stable for 3
+> minutes now.
+> 
+> I'm not sure if we have to check for "mm" in
+> check_and_switch_context(), too.
+> 
+> Thanks,
+> Marc
 > ---
->  arch/arm/mach-mvebu/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> index 9eb63d7..36951b1 100644
-> --- a/arch/arm/mach-mvebu/Kconfig
-> +++ b/arch/arm/mach-mvebu/Kconfig
-> @@ -15,6 +15,7 @@ config ARCH_MVEBU
->  	select ARCH_REQUIRE_GPIOLIB
->  	select MIGHT_HAVE_PCI
->  	select PCI_QUIRKS if PCI
-> +	select ARCH_SUPPORTS_MSI if PCI
+> From 306d84d5f0645a86e86d539be0546c4ac758d3d4 Mon Sep 17 00:00:00 2001
+> From: Catalin Marinas <catalin.marinas@arm.com>
+> Date: Thu, 20 Jun 2013 12:12:55 +0100
+> Subject: [PATCH] arm: Fix deferred mm switch on VIVT processors
+> 
+> As of commit b9d4d42ad9 (ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
+> pre-ARMv6 CPUs), the mm switching on VIVT processors is done in the
+> finish_arch_post_lock_switch() function to avoid whole cache flushing
+> with interrupts disabled. The need for deferred mm switch is stored as a
+> thread flag (TIF_SWITCH_MM). However, with preemption enabled, we can
+> have another thread switch before finish_arch_post_lock_switch(). If the
+> new thread has the same mm as the previous 'next' thread, the scheduler
+> will not call switch_mm() and the TIF_SWITCH_MM flag won't be set for
+> the new thread.
+> 
+> This patch moves the switch pending flag to the mm_context_t structure
+> since this is specific to the mm rather than thread.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Reported-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> [mkl: add check for mm]
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 
-I think we can get rid of ARCH_SUPPORTS_MSI now. I actually wrote a
-patch once to do that but haven't posted it yet. The reason is that
-the new weak functions do the right thing if MSI isn't supported by
-some architecture or platform.
+Works on $CUSTOMERS's hardware.
 
-Thierry
+Tested-by: Marc Kleine-Budde <mkl@pengutronix.de>
+
+Catalin, do you take care of the patch? Please add stable on Cc. The fix
+is needed on kernels >= v3.5.
+
+regards,
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/4f32694f/attachment-0001.sig>
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/1f4e3652/attachment.sig>
