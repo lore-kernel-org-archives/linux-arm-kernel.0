@@ -1,36 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 21 Jun 2013 00:16:50 -0600
-Subject: [PATCH V1] ARM: dts: tegra: Modify pcie memory space size
-In-Reply-To: <C79B248886DD134989C8FF6B096A91AB91CF1615EC@BGMAIL01.nvidia.com>
-References: <1371712491-31070-1-git-send-email-jagarwal@nvidia.com>
- <51C32CC7.5010109@wwwdotorg.org>
- <C79B248886DD134989C8FF6B096A91AB91CF1615EC@BGMAIL01.nvidia.com>
-Message-ID: <51C3EFD2.7090803@wwwdotorg.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 21 Jun 2013 16:18:01 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the tip tree
+Message-ID: <20130621161801.34c4a75c217ca4c1b7d6529c@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2013 11:30 PM, Jay Agarwal wrote:
->> On 06/20/2013 01:14 AM, Jay Agarwal wrote:
->>> - decrease non-prefetch memory size to 128 MB
->>> - increase prefetch memory size to 384 MB
->>> - above change is done because most pcie devices
->>>   prefetch memory size requirement is quite higher
->>>   compared to non-prefetch memory space.
->>
->> It's possible this change won't be suitable for all applications. People may
->> simply need to adjust their DT based on what they want to connect.
->> Still, this patch probably biases things in the correct way for now.
->> Longer term, we might want to investigate dynamically sizing the windows
->> in order to support arbitrary attached devices, in much the same way as the
->> Marvell code does/will in order to conserve physical/bus address space for
->> their multiple controllers.
->>
->> However, this change allows me to correctly enumerate a particular GPU I
->> have plugged into my Harmony board, and assign all the BARs, so:
->>
->> Tested-by: Stephen Warren <swarren@nvidia.com>
->
-> Thierry,
-> Could you please integrate this change also to your branch if review is done. Please let me know once it is done.
+Hi all,
 
-I'm sure he will, but pinging after less than 24 hours is a little quick.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-u300/timer.c between commit 38ff87f77af0 ("sched_clock:
+Make ARM's sched_clock generic for all architectures") from the tip tree
+and commit 3c96d8ea8101 ("ARM: u300: enable delaytimer on the U300") from
+the arm-soc tree.
+
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-u300/timer.c
+index af771b7,390ae5f..0000000
+--- a/arch/arm/mach-u300/timer.c
++++ b/arch/arm/mach-u300/timer.c
+@@@ -18,12 -18,12 +18,12 @@@
+  #include <linux/clk.h>
+  #include <linux/err.h>
+  #include <linux/irq.h>
+ +#include <linux/sched_clock.h>
+- 
+- #include <mach/hardware.h>
+- #include <mach/irqs.h>
++ #include <linux/delay.h>
++ #include <linux/of_address.h>
++ #include <linux/of_irq.h>
+  
+  /* Generic stuff */
+ -#include <asm/sched_clock.h>
+  #include <asm/mach/map.h>
+  #include <asm/mach/time.h>
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/4e90a67b/attachment.sig>
