@@ -1,21 +1,44 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Fri, 21 Jun 2013 14:11:31 +0800
-Subject: SCU registers mapping for CA9/CA5 cores
-Message-ID: <CADApbei3QOCQRmo_oYZ_XiUVupq+4uUs7WNe6f7k_OG0LHB3=w@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 20 Jun 2013 23:14:11 -0700
+Subject: [PATCH v3 0/5] clk: dt: bindings for mux, divider & gate clocks
+Message-ID: <1371795256-16703-1-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi, Russell
-When i sbumited the patch for pxa988 which is CA9, Arnd gave me some
-suggestions of SCU mapping.
-I used static mapping in the platform file for SCU registers mapping,
-but Arnd think there should be a more general way to do it, and others
-can benefit from it. I agree with him.
+This series introduces binding definitions for common register-mapped
+clock multiplexer, divider and gate IP blocks along with the
+corresponding setup functions for matching DT data.  The bindings are
+similar to the struct definitions but please don't hold that against the
+binding: the struct definitions closely model the hardware register
+layout.
 
-The following is his question for you when reply to my patch.
-"Russell, do you think using a fixmap page for the SCU makes sense?
-I'm looking for a method to consolidate the various methods of
-doing early mappings of the SCU for device tree based platforms.
-Where do you think that should be implemented?"
+This version fixes bugs and incorporates support for the hiword-mask
+property needed on Hisilicon and Rockchip platforms.
 
-So can you give your idea and suggestion? Thanks.
+Tested on OMAP4460 Panda ES.
+
+Mike Turquette (5):
+  clk: divider: replace bitfield width with mask
+  clk: of: helper for determining number of parent clocks
+  clk: dt: binding for basic multiplexer clock
+  clk: dt: binding for basic divider clock
+  clk: dt: binding for basic gate clock
+
+ .../devicetree/bindings/clock/divider-clock.txt    |  90 +++++++++++++++
+ .../devicetree/bindings/clock/gate-clock.txt       |  36 ++++++
+ .../devicetree/bindings/clock/mux-clock.txt        |  79 +++++++++++++
+ arch/arm/mach-imx/clk-busy.c                       |   2 +-
+ drivers/clk/clk-divider.c                          | 127 ++++++++++++++++++---
+ drivers/clk/clk-gate.c                             |  43 +++++++
+ drivers/clk/clk-mux.c                              |  65 ++++++++++-
+ drivers/clk/clk.c                                  |   6 +
+ drivers/clk/mxs/clk-div.c                          |   2 +-
+ include/linux/clk-private.h                        |   2 +-
+ include/linux/clk-provider.h                       |  12 +-
+ 11 files changed, 441 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/divider-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/gate-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/mux-clock.txt
+
+-- 
+1.8.1.2
