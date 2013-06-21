@@ -1,62 +1,67 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 21 Jun 2013 08:40:00 +0530
-Subject: [PATCH] dmaengine: ste_dma40: Declare memcpy config as static
-In-Reply-To: <1371719859-4600-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1371719859-4600-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <20130621031000.GB23141@intel.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri, 21 Jun 2013 09:40:48 +0530
+Subject: [PATCH V9 1/4] pci: Add PCIe driver for Samsung Exynos
+In-Reply-To: <002001ce6e2e$623d7970$26b86c50$@samsung.com>
+References: <002001ce6e2e$623d7970$26b86c50$@samsung.com>
+Message-ID: <CAK9yfHxCy0JcvsFHo8gERefdiZhxi1J8MNALe5-g6ooTGR-QjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 11:17:39AM +0200, Fabio Baltieri wrote:
-> Fix sparse warnings:
-> 
-> drivers/dma/ste_dma40.c:81:26: warning: symbol 'dma40_memcpy_conf_phy' was not declared. Should it be static?
-> drivers/dma/ste_dma40.c:95:26: warning: symbol 'dma40_memcpy_conf_log' was not declared. Should it be static?
-> 
-> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+Hi Jingoo,
 
-I guess this would be dependent on recent ste_dma40 patches so best way is
-Linus's tree, right?
+Some small corrections inline.
 
---
-~Vinod
+On 21 June 2013 08:51, Jingoo Han <jg1.han@samsung.com> wrote:
+> Exynos5440 has a PCIe controller which can be used as Root Complex.
+> This driver supports a PCIe controller as Root Complex mode.
+>
+> Signed-off-by: Surendranath Gurivireddy Balla <suren.reddy@samsung.com>
+> Signed-off-by: Siva Reddy Kallam <siva.kallam@samsung.com>
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > ---
-> 
-> Hi Linus,
-> 
-> just a quick sparse error fixup on the dma driver.
-> 
-> Thanks,
-> Fabio
-> 
->  drivers/dma/ste_dma40.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-> index fa4f9a3..8f72085 100644
-> --- a/drivers/dma/ste_dma40.c
-> +++ b/drivers/dma/ste_dma40.c
-> @@ -78,7 +78,7 @@ static int dma40_memcpy_channels[] = {
->  };
->  
->  /* Default configuration for physcial memcpy */
-> -struct stedma40_chan_cfg dma40_memcpy_conf_phy = {
-> +static struct stedma40_chan_cfg dma40_memcpy_conf_phy = {
->  	.mode = STEDMA40_MODE_PHYSICAL,
->  	.dir = DMA_MEM_TO_MEM,
->  
-> @@ -92,7 +92,7 @@ struct stedma40_chan_cfg dma40_memcpy_conf_phy = {
->  };
->  
->  /* Default configuration for logical memcpy */
-> -struct stedma40_chan_cfg dma40_memcpy_conf_log = {
-> +static struct stedma40_chan_cfg dma40_memcpy_conf_log = {
->  	.mode = STEDMA40_MODE_LOGICAL,
->  	.dir = DMA_MEM_TO_MEM,
->  
-> -- 
-> 1.8.2
-> 
+>  .../devicetree/bindings/pci/designware-pcie.txt    |   73 ++
+>  drivers/pci/host/Kconfig                           |    9 +
+>  drivers/pci/host/Makefile                          |    1 +
+>  drivers/pci/host/pci-designware.c                  | 1057 ++++++++++++++++++++
+>  4 files changed, 1140 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/designware-pcie.txt
+>  create mode 100644 drivers/pci/host/pci-designware.c
+>
+> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> new file mode 100644
+> index 0000000..e4681e6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> @@ -0,0 +1,73 @@
+> +* Synopsis Designware PCIe interface
+> +
+> +Required properties:
+> +-compatible: should contain "snps,dw-pcie" to identify the
+> +       core, plus an identifier for the specific instance, such
+> +       as "samsung,exynos5440-pcie".
+> +-reg: base addresses and lengths of the pcie conteroller,
+
+s/conteroller/controller
+
+> +       the phy controller, additional register for the phy controller.
+> +- interrupts: interrupt values for level interrupt,
+> +       pulse interrupt, special interrupt.
+> +- clocks: from common clock binding: handle to pci clock.
+> +- clock-names: from common clock binding: Shall be "pcie", "pcie_bus".
+
+s/Shall be .../should be "pcie" and "pcie_bus".
+
+[snip]
+
+> +
+> +MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
+> +MODULE_DESCRIPTION("Samsung PCIe host controller driver");
+> +MODULE_LICENSE("GPLv2");
+
+I think this should be "GPL v2"  (with a space between GPL and v2).
+
 
 -- 
+With warm regards,
+Sachin
