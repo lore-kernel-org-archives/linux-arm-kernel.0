@@ -1,49 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 21 Jun 2013 13:26:10 +0200
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <20130529101332.GC7356@pengutronix.de>
-References: <51A5A808.2070803@digi.com>
- <F281D0F91ED19E4D8E63A7504E8A649803E8A4D0@039-SN2MPN1-021.039d.mgd.msft.net>
- <20130529101332.GC7356@pengutronix.de>
-Message-ID: <201306211326.11175.marex@denx.de>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 21 Jun 2013 16:19:16 +0530
+Subject: [PATCH] dmaengine: Add hisilicon k3 DMA engine driver
+In-Reply-To: <3686094.n3OCaPGG8M@wuerfel>
+References: <1371444872-26994-1-git-send-email-zhangfei.gao@linaro.org>
+ <201306181609.14966.arnd@arndb.de> <51C06D19.3020304@linaro.org>
+ <3686094.n3OCaPGG8M@wuerfel>
+Message-ID: <20130621104916.GI23141@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> Hi,
-> 
-> On Wed, May 29, 2013 at 08:07:55AM +0000, Chen Peter-B29397 wrote:
-> > > Indeed, I've been using the patchset "Add tested id switch and vbus
-> > > connect detect support for Chipidea" from Peter for quite some time on
-> > > top of 3.9 and it works like a charm for the gadget mode on an MX28
-> > > platform.
-> > > 
-> > > BTW, Peter, I've seen that these patches are still not merged in 3.10,
-> > > is there a reason for that? do you plan on sending a version rebased on
-> > > top of 3.10 some time in the future? I tried to do the rebasing myself,
-> > > but the chipidea driver seems to have changed quite heavily, which
-> > > makes the process quite difficult when you don't know what you're
-> > > doing :)
-> 
-> we already have Peter's patches on v3.10-rc3 [1].
-> 
-> > I can spend few bandwidth on upstream work recently, I may have more
-> > bandwidth after June 15th.
+On Tue, Jun 18, 2013 at 05:08:01PM +0200, Arnd Bergmann wrote:
+> On Tuesday 18 June 2013 22:22:17 zhangfei wrote:
+> > > With no need to have a filter function.
 > > 
-> > Currently, we still have no conclusion for chipidea core driver's coming
-> > work, like Device tree support, how to identify if the controller is OTG
-> > supported.
+> > Cool, then I would like to wait for the patch.
 > 
-> Yes, the next important step is getting the of propertys "dr_mode" and
-> "phy_type" properly used in the chipidea core.
+> Maybe you can try to add the dma_get_slave_channel() function I proposed here
+> as a first patch and add your driver on top. There may be issues I missed,
+> and Vinod needs to agree to the concept first, but that would probably
+> get his attention.
+You have it now :)
+
+
 > 
-> [1] http://git.pengutronix.de/?p=mgr/linux.git;a=summary ->
-> v3.10/topic/usb-peterchen
+> Or you could send your the new interface as an add-on patch
+> and convert your driver along with adding it.
+patch is always welcome
 
-Is anyone planning to work on this stuff and start pushing it mainline or is 
-this effort stalled completely? What is it that's missing before these can be 
-applied?
-
-Best regards,
-Marek Vasut
+--
+~Vinod
