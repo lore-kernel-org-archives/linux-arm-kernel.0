@@ -1,144 +1,238 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 21 Jun 2013 02:35:21 +0200
-Subject: [PATCH v6 5/8] ARM: s3c64xx: Add board file for boot using Device Tree
+Date: Fri, 21 Jun 2013 02:35:23 +0200
+Subject: [PATCH v6 7/8] ARM: dts: Add dts file for S3C6410-based Mini6410 board
 In-Reply-To: <1371774924-9224-1-git-send-email-tomasz.figa@gmail.com>
 References: <1371774924-9224-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1371774924-9224-6-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1371774924-9224-8-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds board file that will be used to boot S3C64xx-based boards
-using Device Tree.
+This patch adds basic device tree sources for FriendlyARM Mini6410 board
+based on Samsung S3C6410 SoC.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/mach-s3c64xx/Kconfig           | 16 +++++++
- arch/arm/mach-s3c64xx/Makefile          |  1 +
- arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c | 83 +++++++++++++++++++++++++++++++++
- 3 files changed, 100 insertions(+)
- create mode 100644 arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+ arch/arm/boot/dts/Makefile             |   1 +
+ arch/arm/boot/dts/s3c6410-mini6410.dts | 199 +++++++++++++++++++++++++++++++++
+ 2 files changed, 200 insertions(+)
+ create mode 100644 arch/arm/boot/dts/s3c6410-mini6410.dts
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index f78a6a0..fb4258c 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -308,3 +308,19 @@ config MACH_WLF_CRAGG_6410
- 	select SAMSUNG_GPIO_EXTRA128
- 	help
- 	  Machine support for the Wolfson Cragganmore S3C6410 variant.
-+
-+config MACH_S3C64XX_DT
-+	bool "Samsung S3C6400/S3C6410 machine using Device Tree"
-+	select CLKSRC_OF
-+	select CPU_S3C6400
-+	select CPU_S3C6410
-+	select PINCTRL
-+	select PINCTRL_S3C64XX
-+	select USE_OF
-+	help
-+	  Machine support for Samsung S3C6400/S3C6410 machines with Device Tree
-+	  enabled.
-+	  Select this if a fdt blob is available for your S3C64XX SoC based
-+	  board.
-+	  Note: This is under development and not all peripherals can be
-+	  supported with this machine file.
-diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-index 645a8fe..6faedcf 100644
---- a/arch/arm/mach-s3c64xx/Makefile
-+++ b/arch/arm/mach-s3c64xx/Makefile
-@@ -57,3 +57,4 @@ obj-$(CONFIG_MACH_SMARTQ7)		+= mach-smartq7.o
- obj-$(CONFIG_MACH_SMDK6400)		+= mach-smdk6400.o
- obj-$(CONFIG_MACH_SMDK6410)		+= mach-smdk6410.o
- obj-$(CONFIG_MACH_WLF_CRAGG_6410)	+= mach-crag6410.o mach-crag6410-module.o
-+obj-$(CONFIG_MACH_S3C64XX_DT)		+= mach-s3c64xx-dt.o
-diff --git a/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 1357510..acf41d7 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -161,6 +161,7 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
+ 	hrefv60plus.dtb \
+ 	ccu9540.dtb
+ dtb-$(CONFIG_ARCH_S3C24XX) += s3c2416-smdk2416.dtb
++dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	r8a7778-bockw.dtb \
+diff --git a/arch/arm/boot/dts/s3c6410-mini6410.dts b/arch/arm/boot/dts/s3c6410-mini6410.dts
 new file mode 100644
-index 0000000..b904c9b
+index 0000000..3f70671
 --- /dev/null
-+++ b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
-@@ -0,0 +1,83 @@
++++ b/arch/arm/boot/dts/s3c6410-mini6410.dts
+@@ -0,0 +1,199 @@
 +/*
-+ * Samsung's S3C64XX flattened device tree enabled machine
++ * Samsung's S3C6410 based Mini6410 board device tree source
 + *
 + * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
++ *
++ * Device tree source file for FriendlyARM Mini6410 board which is based on
++ * Samsung's S3C6410 SoC.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 +*/
 +
-+#include <linux/clk-provider.h>
-+#include <linux/of_platform.h>
++/dts-v1/;
 +
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/system_misc.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
 +
-+#include <plat/cpu.h>
-+#include <plat/watchdog-reset.h>
++#include "s3c6410.dtsi"
 +
-+#include <mach/map.h>
++/ {
++	model = "FriendlyARM Mini6410 board based on S3C6410";
++	compatible = "friendlyarm,mini6410", "samsung,s3c6410";
 +
-+#include "common.h"
++	memory {
++		reg = <0x50000000 0x10000000>;
++	};
 +
-+/*
-+ * IO mapping for shared system controller IP.
-+ *
-+ * FIXME: Make remaining drivers use dynamic mapping.
-+ */
-+static struct map_desc s3c64xx_dt_iodesc[] __initdata = {
-+	{
-+		.virtual	= (unsigned long)S3C_VA_SYS,
-+		.pfn		= __phys_to_pfn(S3C64XX_PA_SYSCON),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	},
++	chosen {
++		bootargs = "console=ttySAC0,115200n8 earlyprintk rootwait root=/dev/mmcblk0p1";
++	};
++
++	fixed-rate-clocks {
++		xxti {
++			compatible = "samsung,clock-fin-pll";
++			clock-frequency = <12000000>;
++		};
++
++		xusbxti {
++			compatible = "samsung,clock-xusbxti";
++			clock-frequency = <48000000>;
++		};
++	};
++
++	srom-cs1 at 18000000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x18000000 0x8000000>;
++		ranges;
++
++		ethernet at 18000000 {
++			compatible = "davicom,dm9000";
++			reg = <0x18000000 0x2 0x18000004 0x2>;
++			interrupt-parent = <&gpn>;
++			interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
++			davicom,no-eeprom;
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gpio_keys>;
++		autorepeat;
++
++		button-k1 {
++			label = "K1";
++			gpios = <&gpn 0 GPIO_ACTIVE_LOW>;
++			linux,code = <2>;
++			debounce-interval = <20>;
++		};
++
++		button-k2 {
++			label = "K2";
++			gpios = <&gpn 1 GPIO_ACTIVE_LOW>;
++			linux,code = <3>;
++			debounce-interval = <20>;
++		};
++
++		button-k3 {
++			label = "K3";
++			gpios = <&gpn 2 GPIO_ACTIVE_LOW>;
++			linux,code = <4>;
++			debounce-interval = <20>;
++		};
++
++		button-k4 {
++			label = "K4";
++			gpios = <&gpn 3 GPIO_ACTIVE_LOW>;
++			linux,code = <5>;
++			debounce-interval = <20>;
++		};
++
++		button-k5 {
++			label = "K5";
++			gpios = <&gpn 4 GPIO_ACTIVE_LOW>;
++			linux,code = <6>;
++			debounce-interval = <20>;
++		};
++
++		button-k6 {
++			label = "K6";
++			gpios = <&gpn 5 GPIO_ACTIVE_LOW>;
++			linux,code = <7>;
++			debounce-interval = <20>;
++		};
++
++		button-k7 {
++			label = "K7";
++			gpios = <&gpl 11 GPIO_ACTIVE_LOW>;
++			linux,code = <8>;
++			debounce-interval = <20>;
++		};
++
++		button-k8 {
++			label = "K8";
++			gpios = <&gpl 12 GPIO_ACTIVE_LOW>;
++			linux,code = <9>;
++			debounce-interval = <20>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gpio_leds>;
++
++		led-1 {
++			label = "LED1";
++			gpios = <&gpk 4 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "heartbeat";
++		};
++
++		led-2 {
++			label = "LED2";
++			gpios = <&gpk 5 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "mmc0";
++		};
++
++		led-3 {
++			label = "LED3";
++			gpios = <&gpk 6 GPIO_ACTIVE_LOW>;
++		};
++
++		led-4 {
++			label = "LED4";
++			gpios = <&gpk 7 GPIO_ACTIVE_LOW>;
++		};
++	};
 +};
 +
-+static void __init s3c64xx_dt_map_io(void)
-+{
-+	debug_ll_io_init();
-+	iotable_init(s3c64xx_dt_iodesc, ARRAY_SIZE(s3c64xx_dt_iodesc));
-+
-+	s3c64xx_init_cpu();
-+
-+	if (!soc_is_s3c64xx())
-+		panic("SoC is not S3C64xx!");
-+}
-+
-+static void __init s3c64xx_dt_init_platform(void)
-+{
-+	of_clk_init(NULL);
-+	samsung_wdt_reset_of_init();
++&sdhci0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&sd0_clk>, <&sd0_cmd>, <&sd0_cd>, <&sd0_bus4>;
++	bus-width = <4>;
++	status = "okay";
 +};
 +
-+static void __init s3c64xx_dt_init_machine(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+static void s3c64xx_dt_restart(char mode, const char *cmd)
-+{
-+	if (mode != 's')
-+		samsung_wdt_reset();
-+
-+	/* if all else fails, or mode was for soft, jump to 0 */
-+	soft_restart(0);
-+}
-+
-+static char const *s3c64xx_dt_compat[] __initdata = {
-+	"samsung,s3c6400",
-+	"samsung,s3c6410",
-+	NULL
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_data>;
++	status = "okay";
 +};
 +
-+DT_MACHINE_START(S3C6400_DT, "Samsung S3C64xx (Flattened Device Tree)")
-+	/* Maintainer: Tomasz Figa <tomasz.figa@gmail.com> */
-+	.dt_compat	= s3c64xx_dt_compat,
-+	.map_io		= s3c64xx_dt_map_io,
-+	.init_platform	= s3c64xx_dt_init_platform,
-+	.init_machine	= s3c64xx_dt_init_machine,
-+	.restart        = s3c64xx_dt_restart,
-+MACHINE_END
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_data>, <&uart1_fctl>;
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_data>;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart3_data>;
++	status = "okay";
++};
++
++&pwm {
++	status = "okay";
++};
++
++&pinctrl0 {
++	gpio_leds: gpio-leds {
++		samsung,pins = "gpk-4", "gpk-5", "gpk-6", "gpk-7";
++		samsung,pin-pud = <PIN_PULL_NONE>;
++	};
++
++	gpio_keys: gpio-keys {
++		samsung,pins = "gpn-0", "gpn-1", "gpn-2", "gpn-3",
++				"gpn-4", "gpn-5", "gpl-11", "gpl-12";
++		samsung,pin-pud = <PIN_PULL_NONE>;
++	};
++};
 -- 
 1.8.2.1
