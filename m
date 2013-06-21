@@ -1,56 +1,46 @@
 From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 21 Jun 2013 09:10:35 +0200
-Subject: [PATCH 1/4] ARM: shmobile: r8a73a4: safeguard against wrong
- clk_set_rate() uses
-In-Reply-To: <1371798638-10530-1-git-send-email-g.liakhovetski@gmx.de>
-References: <1371798638-10530-1-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <1371798638-10530-2-git-send-email-g.liakhovetski@gmx.de>
+Date: Fri, 21 Jun 2013 09:10:34 +0200
+Subject: [PATCH 0/4] Add DVFS support on APE6EVM
+Message-ID: <1371798638-10530-1-git-send-email-g.liakhovetski@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_set_rate() should only be called with exact rates, returned by
-clk_round_rate(). However, it is still good to verify, that the value,
-passed to clock's .set_rate() method is at least valid. This patch adds
-such a check for the Z-clock on r8a73a4.
+Having added CPUFreq support to the Cortex A15 cores on APE6 (r8a73a4) and 
+DT support to the max8973 regulator driver it is now possible to implement 
+CA15 CPUFreq support on APE6EVM, using a max8972 PMU to adjust SoC's DVFS
+voltage. This series depends on earlier
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
----
- arch/arm/mach-shmobile/clock-r8a73a4.c |   14 +++++++++++++-
- 1 files changed, 13 insertions(+), 1 deletions(-)
+"ARM: shmobile: r8a73a4: wait for completion when kicking the clock"
+https://patchwork.kernel.org/patch/2601071/
+"ARM: shmobile: r8a73a4: implement CPU clock scaling for CPUFreq"
+https://patchwork.kernel.org/patch/2601111/
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-index eb42740..cbf9852 100644
---- a/arch/arm/mach-shmobile/clock-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-@@ -225,16 +225,28 @@ static int zclk_set_rate(struct clk *clk, unsigned long rate)
- 		goto done;
- 	}
- 
--	frqcrc = clk->mapped_reg + (FRQCRC - (u32)clk->enable_reg);
-+	/*
-+	 * Users are supposed to first call clk_set_rate() only with
-+	 * clk_round_rate() results. So, we don't fix wrong rates here, but
-+	 * guard against them anyway
-+	 */
- 
- 	p_rate = clk_get_rate(clk->parent);
- 	if (rate == p_rate) {
- 		val = 0;
- 	} else {
- 		step = DIV_ROUND_CLOSEST(p_rate, 32);
-+
-+		if (rate > p_rate || rate < step) {
-+			ret = -EINVAL;
-+			goto done;
-+		}
-+
- 		val = 32 - rate / step;
- 	}
- 
-+	frqcrc = clk->mapped_reg + (FRQCRC - (u32)clk->enable_reg);
-+
- 	iowrite32((ioread32(frqcrc) & ~(clk->div_mask << clk->enable_bit)) |
- 		  (val << clk->enable_bit), frqcrc);
- 
+and requires the following max8973 patches:
+
+"regulators: max8973: fix multiple instance support"
+http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg456101.html
+"regulators: max8973: initial DT support"
+http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg456102.html
+
+Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+
+Guennadi Liakhovetski (4):
+  ARM: shmobile: r8a73a4: safeguard against wrong clk_set_rate() uses
+  ARM: shmobile: r8a73a4: add I2C DT nodes and required clocks
+  ARM: shmobile: ape6evm: add CPUFreq support
+  ARM: shmobile: r8a73a4: add Z2 clock support
+
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   26 ++++++++++
+ arch/arm/boot/dts/r8a73a4.dtsi         |   81 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/clock-r8a73a4.c |   56 +++++++++++++++++++++-
+ 3 files changed, 160 insertions(+), 3 deletions(-)
+
 -- 
 1.7.2.5
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
