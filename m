@@ -1,51 +1,36 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Fri, 21 Jun 2013 08:15:28 +0100
-Subject: [PATCH v3 02/10] clocksource:arm_global_timer: Add ARM global
- timer support.
-In-Reply-To: <201306202102.30478.arnd@arndb.de>
-References: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
- <1371737121-9295-1-git-send-email-srinivas.kandagatla@st.com>
- <201306202102.30478.arnd@arndb.de>
-Message-ID: <51C3FD90.8010505@st.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 21 Jun 2013 09:20:54 +0200
+Subject: [PATCHv3 04/11] of: pci: add registry of MSI chips
+In-Reply-To: <1371660979-21588-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1371660979-21588-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130621092054.4c3cb717@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/13 20:02, Arnd Bergmann wrote:
-> On Thursday 20 June 2013, Srinivas KANDAGATLA wrote:
->> +static u64 gt_counter_read(void)
->> +{
->> +       u64 counter;
->> +       u32 lower;
->> +       u32 upper, old_upper;
->> +
->> +       upper = __raw_readl(gt_base + GT_COUNTER1);
->> +       do {
->> +               old_upper = upper;
->> +               lower = __raw_readl(gt_base + GT_COUNTER0);
->> +               upper = __raw_readl(gt_base + GT_COUNTER1);
->> +       } while (upper != old_upper);
->> +
->> +       counter = upper;
->> +       counter <<= 32;
->> +       counter |= lower;
->> +       return counter;
->> +}
-> 
-> Please replace __raw_readl etc with the non-__raw variants
-> throughout the code.
-> 
-> The __raw accessors are not endian safe and are not meant
-> for device drivers. If you are worried about latency from
-> extra barriers, use readl_relaxed().
-Endian safe is good point. I will move to using readl/writel which does
-both ordering and byteswapping.
-And use relaxed versions in gt_counter_read to reduce the latency.
+Grant,
 
-looks like smp_twd.c too needs this type of change.
+On Wed, 19 Jun 2013 18:56:12 +0200, Thomas Petazzoni wrote:
+> This commit adds a very basic registry of msi_chip structures, so that
+> an IRQ controller driver can register an msi_chip, and a PCIe host
+> controller can find it, based on a 'struct device_node'.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/of/of_pci.c    | 22 ++++++++++++++++++++++
+>  include/linux/msi.h    |  2 ++
+>  include/linux/of_pci.h |  4 ++++
+>  3 files changed, 28 insertions(+)
+
+Any comments about this idea? It is quite fundamental for this patch,
+which requires a way of connecting PCI busses (handled by a PCI
+driver) and a msi_chip (handled by an IRQ controller driver).
 
 Thanks,
-srini
 
-> 
-> 	Arnd
-> 
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
