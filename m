@@ -1,86 +1,117 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Jun 2013 23:25:52 -0700
-Subject: [PATCH] pinctrl: document the pinctrl PM states
-In-Reply-To: <51C3577E.6040709@wwwdotorg.org>
-References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
- <51BA1FE7.4000900@wwwdotorg.org>
- <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
- <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
- <51C20E3A.8090304@wwwdotorg.org>
- <20130620063823.GD5523@atomide.com>
- <51C3577E.6040709@wwwdotorg.org>
-Message-ID: <20130621062552.GI5523@atomide.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 21 Jun 2013 16:26:56 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the mailbox tree
+Message-ID: <20130621162656.bb94e0fa8b6813781b804a73@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [130620 12:32]:
-> On 06/20/2013 12:38 AM, Tony Lindgren wrote:
-> > * Stephen Warren <swarren@wwwdotorg.org> [130619 13:08]:
-> >> On 06/17/2013 01:20 AM, Tony Lindgren wrote:
-> ...
-> >>> Below are the pin remuxing cases I'm aware of:
-> >> ...
-> >>> Then for dealing with the above examples, I think we already have a
-> >>> pretty good setup in pinctrl framework to deal with this with the
-> >>> named modes. But I think that to do this properly with the named
-> >>> modes we should have named modes like the following:
-> >>>
-> >>> "static" && ("active" || "idle")
-> >>> "static" && ("rx" || "tx")
-> >>>
-> >>> Here the "static" pins would be set during driver probe and never
-> >>> need to change until the driver is unloaded. This is close to what we
-> >>> currently call "default". But we should probably make it clear that
-> >>> these will not change to avoid confusion. See below for more info.
-> >>>
-> >>> The the non-static states like "active"/"idle", or "rx"/"tx", can
-> >>> be set in addition to "static", but they should not be subsets of
-> >>> "static" to avoid the issues Stephen described earlier. This way we
-> >>> allow the named modes to do the work for us while protecting the
-> >>> claimed pins.
-> >>
-> >> Yes, I think this can certainly work conceptually. It's equivalent to
-> >> pre-computing which parts of the overall state don't change between the
-> >> currently-defined "global" active/idle states and then applying the
-> >> diffs at runtime - rather like what I suggested before, but without the
-> >> pinctrl code having to do the diff at runtime. I'm not sure if I have
-> >> (yet) a strong opinion on whether allowing multiple states to be active
-> >> at once (i.e. static plus active) is the correct way to go. Maybe once
-> >> I've finished reading the thread...
-> > 
-> > I don't think there's any issue for having multiple sets active the same
-> > is an issue, we're already doing it quite a bit although for different
-> > device drivers so we have the framework ready for that already.
-> 
-> I assume you mean there shouldn't be any issue *modifying* the pinctrl
-> API to allow multiple states to be active at once? And where you're
-> talking about having multiple sets active at once already, you're
-> talking about some other API?
+Hi all,
 
-Nope, the standard pinctrl API. At least I have not seen issues with
-having multiple states active the same time in a single driver.
- 
-> Right now, pinctrl_select_state() de-activates the old state while
-> activating the new state, so it's not possible to have more than one
-> active at once.
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/mailbox/Kconfig between commit a1824eaab70f ("mailbox: OMAP:
+introduce mailbox framework") from the mailbox tree and commit
+c869c75c16b3 ("mailbox/omap: move the OMAP mailbox framework to drivers")
+from the arm-soc tree.
 
-That should be fine if the hardware needs it. The "static" (or "default")
-state can stay active continuously, and "active" and "idle" states are
-not subsets of "static".
+I fixed it up (I suspect not properly - see below) and can carry the fix
+as necessary (no action is required).
 
-Then flipping between "active" and "idle" states is fine as they cover
-the same pins, and only either "active" or "idle" state is selected at
-a time.
+It looks like we have two different versions of these changes in
+linux-next now, so please clean it all up.  i.e. can I just drop the
+mailbox tree now?
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-If the hardware needs to de-activate the old state inbetween the change
-from "active" to "idle", that should be just fine.
-
-If there are other issues with de-activating pins, then let me know.
-I'm not be seeing the issue with de-activating states as pinctrl-single
-does not de-activate anything for omap. The disable call gets called
-between the state changes though, so hardware needing de-activating
-can specify it.
-
-Regards,
-
-Tony
+diff --cc drivers/mailbox/Kconfig
+index 438ea21,c8b5c13..0000000
+--- a/drivers/mailbox/Kconfig
++++ b/drivers/mailbox/Kconfig
+@@@ -16,45 -16,38 +16,63 @@@ config PL320_MBO
+  	  Management Engine, primarily for cpufreq. Say Y here if you want
+  	  to use the PL320 IPCM support.
+  
+- config OMAP1_MBOX
+-        tristate "OMAP1 Mailbox framework support"
+-        depends on ARCH_OMAP1
+-        help
+-          Mailbox implementation for OMAP chips with hardware for
+-          interprocessor communication involving DSP in OMAP1. Say Y here
+-          if you want to use OMAP1 Mailbox framework support.
+- 
+- config OMAP2PLUS_MBOX
+-        tristate "OMAP2+ Mailbox framework support"
+-        depends on ARCH_OMAP2PLUS
+-        help
+-          Mailbox implementation for OMAP family chips with hardware for
+-          interprocessor communication involving DSP, IVA1.0 and IVA2 in
+-          OMAP2/3; or IPU, IVA HD and DSP in OMAP4. Say Y here if you want
+-          to use OMAP2+ Mailbox framework support.
+- 
+ +config DBX500_MBOX
+ +	tristate "DBx500 Mailbox driver support"
+ +	depends on ARCH_U8500
+ +	help
+ +	  Say Y here if you want to use DBx500 Mailbox driver support for
+ +	  power coprocessor access on Ux500 and Ux540 families
+ +
+ +config MBOX_KFIFO_SIZE
+ +       int "Mailbox kfifo default buffer size (bytes)"
+ +       default 256
+ +       help
+ +         Specify the default size of mailbox's kfifo buffers (bytes).
+ +         This can also be changed at runtime (via the mbox_kfifo_size
+ +         module parameter).
+ +
+ +config MBOX_DATA_SIZE
+ +	int "Mailbox associated data max size (bytes)"
+ +	default 64 if DBX500_MBOX
+ +	default 4
+ +	help
+ +	  Specify the default size of mailbox's associated data buffer
+ +	  (bytes)
+ +          This can also be changed at runtime (via the mbox_kfifo_size
+ +          module parameter).
+++
++ config OMAP_MBOX
++ 	tristate
++ 	help
++ 	  This option is selected by any OMAP architecture specific mailbox
++ 	  driver such as CONFIG_OMAP1_MBOX or CONFIG_OMAP2PLUS_MBOX. This
++ 	  enables the common OMAP mailbox framework code.
++ 
++ config OMAP1_MBOX
++ 	tristate "OMAP1 Mailbox framework support"
++ 	depends on ARCH_OMAP1
++ 	select OMAP_MBOX
++ 	help
++ 	  Mailbox implementation for OMAP chips with hardware for
++ 	  interprocessor communication involving DSP in OMAP1. Say Y here
++ 	  if you want to use OMAP1 Mailbox framework support.
++ 
++ config OMAP2PLUS_MBOX
++ 	tristate "OMAP2+ Mailbox framework support"
++ 	depends on ARCH_OMAP2PLUS
++ 	select OMAP_MBOX
++ 	help
++ 	  Mailbox implementation for OMAP family chips with hardware for
++ 	  interprocessor communication involving DSP, IVA1.0 and IVA2 in
++ 	  OMAP2/3; or IPU, IVA HD and DSP in OMAP4/5. Say Y here if you
++ 	  want to use OMAP2+ Mailbox framework support.
++ 
++ config OMAP_MBOX_KFIFO_SIZE
++ 	int "Mailbox kfifo default buffer size (bytes)"
++ 	depends on OMAP2PLUS_MBOX || OMAP1_MBOX
++ 	default 256
++ 	help
++ 	  Specify the default size of mailbox's kfifo buffers (bytes).
++ 	  This can also be changed at runtime (via the mbox_kfifo_size
++ 	  module parameter).
+  endif
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/54feb6c1/attachment-0001.sig>
