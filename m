@@ -1,88 +1,27 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 21 Jun 2013 16:01:24 -0700
-Subject: [PATCHv3/RESEND 4/4] clocksource: arch_timer: Add support for
- memory mapped timers
-In-Reply-To: <alpine.DEB.2.02.1306212304480.4013@ionos.tec.linutronix.de>
-References: <1371836361-20574-1-git-send-email-sboyd@codeaurora.org>
- <1371836361-20574-5-git-send-email-sboyd@codeaurora.org>
- <alpine.DEB.2.02.1306212304480.4013@ionos.tec.linutronix.de>
-Message-ID: <51C4DB44.7030909@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 22 Jun 2013 01:04:31 +0200
+Subject: [PATCH] ARM: keystone: select ARM_ERRATA_798181 only for SMP
+Message-ID: <201306220104.31656.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/13 14:18, Thomas Gleixner wrote:
-> On Fri, 21 Jun 2013, Stephen Boyd wrote:
->>  /*
->>   * Architected system timer support.
->> @@ -46,13 +73,69 @@ static bool arch_timer_use_virtual = true;
->>  static inline void arch_timer_reg_write(int access, int reg, u32 val,
->>  					struct clock_event_device *clk)
->>  {
->> -	arch_timer_reg_write_cp15(access, reg, val);
->> +	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
->> +		struct arch_timer *timer = to_arch_timer(clk);
->> +		switch (reg) {
->> +		case ARCH_TIMER_REG_CTRL:
->> +			writel_relaxed(val, timer->base + CNTP_CTL);
->> +			break;
->> +		case ARCH_TIMER_REG_TVAL:
->> +			writel_relaxed(val, timer->base + CNTP_TVAL);
->> +			break;
->> +		default:
->> +			BUILD_BUG();
-> So you are relying on the compiler cleverness to identify a caller
-> which calls that inline with a not supported reg value.
->
-> How does that work, when the compiler decides not to inline that?
->
-> enum without a default case emits at least a reliable warning.
+Selecting this symbol causes a build warning without SMP:
 
-Right now arm and arm64 don't allow inline to be anything besides
-always_inline so the compiler is forced to inline. But point taken, I'll
-remove the BUILD_BUG and make the register argument into an enum (which
-it isn't right now).
+warning: (ARCH_KEYSTONE) selects ARM_ERRATA_798181 which has unmet direct dependencies (CPU_V7 && SMP)
 
->
->> +		}
->> +	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
->> +		struct arch_timer *timer = to_arch_timer(clk);
->> +		switch (reg) {
->> +		case ARCH_TIMER_REG_CTRL:
->> +			writel_relaxed(val, timer->base + CNTV_CTL);
->> +			break;
->> +		case ARCH_TIMER_REG_TVAL:
->> +			writel_relaxed(val, timer->base + CNTV_TVAL);
->> +			break;
->> +		default:
->> +			BUILD_BUG();
->> +		}
->> +	} else {
->> +		arch_timer_reg_write_cp15(access, reg, val);
->> +	}
->>  }
-> Something in my little brain yells: function pointer
->
-> You can't be serious about hacking nested if/else/switch constructs
-> into a hot path.
->
-> Why not making your cpu data:
->
-> struct arch_timer {
->        struct clock_event_device evt;
->        ....
->        void (*write_ctrl)(val, timer);
->        void (*write_tval)(val, timer);
->        ....
-> }
->
-> and get rid of all that conditionals?
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-It sounds like that's undesirable according to the comment above
-arch_timer_reg_write(). It seems that all this code was written under
-the assumption that the compiler is good enough to optimize all the code
-paths and only generate the code that is necessary. So far this seems to
-be working and the hotpath is optimized for each type of access.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
+index 2dbd4ce..51a50e9 100644
+--- a/arch/arm/mach-keystone/Kconfig
++++ b/arch/arm/mach-keystone/Kconfig
+@@ -9,7 +9,7 @@ config ARCH_KEYSTONE
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_SCHED_CLOCK
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+-	select ARM_ERRATA_798181
++	select ARM_ERRATA_798181 if SMP
+ 	help
+ 	  Support for boards based on the Texas Instruments Keystone family of
+ 	  SoCs.
