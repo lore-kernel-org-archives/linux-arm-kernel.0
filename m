@@ -1,33 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 21 Jun 2013 15:41:15 -0600
-Subject: [PATCH v1 08/12] input: keypad-matrix: tell GPIO pins from matrix
- lines
-In-Reply-To: <1371838198-7327-9-git-send-email-gsi@denx.de>
-References: <1371838198-7327-1-git-send-email-gsi@denx.de>
- <1371838198-7327-9-git-send-email-gsi@denx.de>
-Message-ID: <51C4C87B.3050300@wwwdotorg.org>
+From: agnel.joel@gmail.com (Joel A Fernandes)
+Date: Fri, 21 Jun 2013 16:53:57 -0500
+Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
+In-Reply-To: <201306212044.26677.arnd@arndb.de>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <201306211632.12577.arnd@arndb.de>
+ <CAD=GYpbhBAaSkMtcJaPtVpWar7AcW37QpAk3A0qgwX6G5PDoZg@mail.gmail.com>
+ <201306212044.26677.arnd@arndb.de>
+Message-ID: <CAD=GYpY4koXd9f6_ijQfDHsiULD4d53cdu=9X421WXSAit_YQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2013 12:09 PM, Gerhard Sittig wrote:
+Hi Arnd,
 
-> diff --git a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
+On Fri, Jun 21, 2013 at 1:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 21 June 2013, Joel A Fernandes wrote:
+>> I think we are talking about different things, I agree the 'select
+>> DMADEVICES' can be dropped but lets please keep the default y option
+>> (not adding new select statements, just saying that if someone select
+>> DMADEVICES in menuconfig and if they're ARCH_OMAP=1 , then default to
+>> EDMA). This will simply allow people to have a default. Thanks.
+>
+> Yes, that's ok.
 
-> +The driver assumes that all interconnections of the matrix can potentially
-> +contain a button, and will submit scan and key code events to the input
-> +subsystem.  By default the keypad matrix dimenstions are automatically
-> +derived from the GPIO pin specifications.  Optionally device tree
-> +information can override the keypad matrix dimension data, e.g. when not
-> +all of the potentially available physical connections are used to create
-> +the logical keypad matrix.
+Ok, thanks. I will follow up with a patch in my next submissions that builds it.
 
-Ignoring the binary encoding in the next patch, why would someone ever
-define more row GPIOs that there are rows (or similarly for columns)?
+Perhaps a:
+default y if 'ARCH_OMAP2PLUS'
 
-On its own, I don't think this patch is needed.
+and leave the existing as it is...
+default n if  'ARCH_DAVINCI || ARCH_OMAP1 || ARCH_OMAP2'
 
-Now, if you add binary encoding, I can see that you might have say 3 row
-GPIOs but only say 6 rows even though there are 8 combinations of row
-GPIO values. If that is the situation this patch is intended to cover,
-the changes here should be introduced as part of, and only applicable
-to, the binary encoding patch instead.
+would make most sense to me. Basically EDMA is seen on current and all
+new OMAP2PLUS.
+
+>
+> config TI_EDMA
+>         tristate "TI EDMA support"
+>         default m if 'ARCH_DAVINCI || ARCH_OMAP1 || ARCH_OMAP2
+>         select DMA_ENGINE
+>         select DMA_VIRTUAL_CHANNELS
+
+
+
+MMC depends on EDMA specially on AM33xx there's no PIO mode AFAIK. The
+'m' option will require some initramfs to load the module when needing
+to MMC boot, I suggest lets leave it as y.
+
+Thanks,
+Joel
