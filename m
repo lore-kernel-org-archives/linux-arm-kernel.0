@@ -1,60 +1,74 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Thu, 20 Jun 2013 17:15:22 -0700
-Subject: clocksource with changing frequency?
-In-Reply-To: <f5e5d3d7-699d-4f89-80c8-849e432e8b26@VA3EHSMHS017.ehs.local>
-References: <f5e5d3d7-699d-4f89-80c8-849e432e8b26@VA3EHSMHS017.ehs.local>
-Message-ID: <51C39B1A.5070902@linaro.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 21 Jun 2013 02:35:17 +0200
+Subject: [PATCH v6 1/8] ARM: common: vic: Parse interrupt and resume masks
+ from device tree
+In-Reply-To: <1371774924-9224-1-git-send-email-tomasz.figa@gmail.com>
+References: <1371774924-9224-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1371774924-9224-2-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2013 05:01 PM, S?ren Brinkmann wrote:
-> Hi all,
->
-> I have a question/problem with a clocksource whose input frequency can
-> change.
+This patch extends vic_of_init to parse valid interrupt sources
+and resume sources masks from device tree.
 
-That behavior isn't supported by the clocksource core. We expect 
-frequency changing clocksources to be detected and disqualified (as we 
-do w/ freq changing TSCs on older laptops).
+If mask values are not specified in device tree, all sources
+are assumed to be valid, as before this patch.
 
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ Documentation/devicetree/bindings/arm/vic.txt | 6 ++++++
+ drivers/irqchip/irq-vic.c                     | 7 ++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-> On Zynq we use the cadece_ttc timer as clocksource. Its input clock is
-> tightly coupled to the CPU clock. I.e. it changes when cpufreq scales
-> the CPU clocks.
-> To compensate this, I added a clock notifier doing this on a frequency
-> change:
-> 	clocksource_unregister(&ttccs->cs);
-> 	clocksource_register_hz(&ttccs->cs, ndata->new_rate / PRESCALE);
-
-This will definitely have problems if this is the only high-res capable 
-clocksource.
-
-> This just seems not to be the most elegant way, a heavy weight operation
-> and results in a couple of locking errors in combination with
-> suspend/hotplug.
->
-> Is there a sane solution for such a case? E.g. for clockevent devices
-> there is a 'clockevents_update_freq()' to adjust to changing
-> frequencies.
-
-If you want to experiment with things, my suggestion would be to try to 
-fake a constant frequency clocksource in the clocksource driver(tracking 
-the change intervals and multiplying them up as needed). However, I 
-worry the quality of timekeeping won't be very good, as any latency in 
-the detection of the freq change will cause time error.
-
-
-> I assume the sanest solution is an external oscillator as clock input,
-> but I think our platforms don't provide that :(
-
-I suspect your best bet, if there really is no other consistent clocks, 
-would be to disable highres timers and use the jiffies clocksource for 
-timekeeping, allowing you to change cpufreq to save power or increase 
-performance as you need. This will result in coarse timekeeping and 
-larger timer latency. But the only other approach is to fix the cpu freq 
-so the clocksource freq doesn't change (at the cost of cpu performance 
-or battery life - both of which I suspect are bigger issues then coarse 
-time).
-
-thanks
--john
+diff --git a/Documentation/devicetree/bindings/arm/vic.txt b/Documentation/devicetree/bindings/arm/vic.txt
+index 266716b..bb7137c 100644
+--- a/Documentation/devicetree/bindings/arm/vic.txt
++++ b/Documentation/devicetree/bindings/arm/vic.txt
+@@ -18,6 +18,9 @@ Required properties:
+ Optional properties:
+ 
+ - interrupts : Interrupt source for parent controllers if the VIC is nested.
++- interrupt-mask : Bit mask of valid interrupt sources (defaults to all valid)
++- wakeup-mask : Bit mask of interrupt sources that can wake up the system
++  (defaults to all allowed)
+ 
+ Example:
+ 
+@@ -26,4 +29,7 @@ Example:
+ 		interrupt-controller;
+ 		#interrupt-cells = <1>;
+ 		reg = <0x60000 0x1000>;
++
++		interrupt-mask = <0xffffff7f>;
++		wakeup-mask = <0x0000ff7f>;
+ 	};
+diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
+index 2bbb004..d56750eb 100644
+--- a/drivers/irqchip/irq-vic.c
++++ b/drivers/irqchip/irq-vic.c
+@@ -469,6 +469,8 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
+ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+ {
+ 	void __iomem *regs;
++	u32 interrupt_mask = ~0;
++	u32 wakeup_mask = ~0;
+ 
+ 	if (WARN(parent, "non-root VICs are not supported"))
+ 		return -EINVAL;
+@@ -477,10 +479,13 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+ 	if (WARN_ON(!regs))
+ 		return -EIO;
+ 
++	of_property_read_u32(node, "interrupt-mask", &interrupt_mask);
++	of_property_read_u32(node, "wakeup-mask", &wakeup_mask);
++
+ 	/*
+ 	 * Passing 0 as first IRQ makes the simple domain allocate descriptors
+ 	 */
+-	__vic_init(regs, 0, ~0, ~0, node);
++	__vic_init(regs, 0, interrupt_mask, wakeup_mask, node);
+ 
+ 	return 0;
+ }
+-- 
+1.8.2.1
