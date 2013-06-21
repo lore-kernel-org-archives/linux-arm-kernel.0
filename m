@@ -1,67 +1,36 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 21 Jun 2013 16:13:07 +0200
-Subject: [PATCH 8/9] iommu: add support for ARM Ltd. System MMU
- architecture
-In-Reply-To: <20130621102318.GB7766@mudshark.cambridge.arm.com>
-References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
- <1370889285-22799-9-git-send-email-will.deacon@arm.com>
- <20130620212646.GG11309@8bytes.org>
- <20130621102318.GB7766@mudshark.cambridge.arm.com>
-Message-ID: <20130621141306.GJ11309@8bytes.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Jun 2013 16:14:49 +0200
+Subject: [PATCH V10 0/4] PCIe support for Samsung Exynos5440 SoC
+In-Reply-To: <20130621141144.GP31667@titan.lakedaemon.net>
+References: <003901ce6e50$03d039a0$0b70ace0$@samsung.com>
+ <201306211030.47440.arnd@arndb.de>
+ <20130621141144.GP31667@titan.lakedaemon.net>
+Message-ID: <201306211614.49434.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 11:23:18AM +0100, Will Deacon wrote:
-> The results were that the memory-to-memory DMA didn't show any corruption. I
-> also managed to tickle access faults by messing around with the permissions,
-> then remap the buffers and resume the transfers.
-
-That sounds pretty conclusive. So when real hardware shows up it should
-work reasonably well.
-
-> > > +static struct arm_smmu_device *find_parent_smmu(struct arm_smmu_device *smmu)
-> > > +{
-> > > +	struct arm_smmu_device *parent, *tmp;
-> > > +
-> > > +	if (!smmu->parent_of_node)
-> > > +		return NULL;
-> > > +
-> > > +	list_for_each_entry_safe(parent, tmp, &arm_smmu_devices, list)
-> > > +		if (parent->dev->of_node == smmu->parent_of_node)
-> > > +			return parent;
+On Friday 21 June 2013, Jason Cooper wrote:
+> On Fri, Jun 21, 2013 at 10:30:47AM +0200, Arnd Bergmann wrote:
+> > On Friday 21 June 2013, Thomas Petazzoni wrote:
+> > > I am by far not an expert on how to solve merge strategies and so on,
+> > > but to avoid conflicts at Linus's level while merging the arm-soc and
+> > > pci trees, it would be better if this Samsung PCIe driver could go
+> > > through arm-soc (with Bjorn ACK, of course), so that Arnd/Olof can
+> > > make sure the ordering is correct with regard to the of/pci changes and
+> > > the mvebu/pci driver.
 > > 
-> > Why do you need the _safe variant here? You are not changing the list in
-> > this loop so you should be fine with list_for_each_entry().
-> 
-> For a system with multiple SMMUs (regardless of chaining), couldn't this
-> code run in parallel with probing of another SMMU (which has to add to the
-> arm_smmu_devices list)? The same applies for device removal, which could
-> perhaps be driven from some power-managment code.
-
-Well, the '_safe' does not mean it is safe from concurrent list
-manipulations. If you want to protect from that you still need a lock.
-The '_safe' variant only allows to remove the current element from the
-list while traversing it.
-
-> > > +	do {
-> > > +		phys_addr_t output_mask = (1ULL << smmu->s2_output_size) - 1;
-> > > +		if ((phys_addr_t)iova & ~output_mask)
-> > > +			return -ERANGE;
-> > > +	} while ((smmu = find_parent_smmu(smmu)));
+> > Yes, good point.
 > > 
-> > This looks a bit too expensive to have in the map path. How about saving
-> > something like an effective_output_mask (or output_size) which contains
-> > the logical OR of every mask up the path? This would make this check a
-> > lot cheaper.
+> > The alternative would be that Bjorn also takes the PCI branch dependencies
+> > that are already in arm-soc into his tree. Either way works, but I agree
+> > that what you suggest would be simpler.
 > 
-> As mentioned in the DT binding thread, it's rare that this loop would
-> execute more than once, and largely inconceivable that it would execute more
-> than twice, so I don't know how much we need to worry about the cost.
+> Yes, that is why we did it this way.  It was my understanding based on
+> previous comments by yourself and LinusW that you both had patches
+> depending on (now called) mvebu/of_pci.  So we got it into arm-soc
+> early so those branches could depend on it.
 
-But still, this code is a challenge for the branch-predictor, plus
-the additional function calls to find_parent_smmu(). I still think it is
-worth to optimize this away. The map function is supposed to be a
-fast-path function.
+Right. I wasn't paying enough attention for the early merges that
+Olof did.
 
-
-	Joerg
+	Arnd
