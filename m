@@ -1,38 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 21 Jun 2013 15:34:01 -0600
-Subject: [PATCH v1 04/12] input: matrix-keypad: push/pull,
- separate polarity
-In-Reply-To: <1371838198-7327-5-git-send-email-gsi@denx.de>
-References: <1371838198-7327-1-git-send-email-gsi@denx.de>
- <1371838198-7327-5-git-send-email-gsi@denx.de>
-Message-ID: <51C4C6C9.6030000@wwwdotorg.org>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Fri, 21 Jun 2013 22:27:16 +0100
+Subject: [PATCH v5 0/5] clk: implement remuxing during set_rate
+In-Reply-To: <20130621170407.20448.35605@quantum>
+References: <1371139562-305-1-git-send-email-james.hogan@imgtec.com>
+ <20130621170407.20448.35605@quantum>
+Message-ID: <CAAG0J9-F0P67=oaE5UHhmgd3Wz4k4XjsRjWShxmKOqicAyrhfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2013 12:09 PM, Gerhard Sittig wrote:
-> extend the device tree adjustable hardware configuration:
-> - allow for differing polarity of the row and column GPIO pins
-> - optionally fully drive column output pins instead of the former
->   unconditional open collector emulation approach
+On 21 June 2013 18:04, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting James Hogan (2013-06-13 09:05:57)
+>> This patchset adds support for automatic selection of the best parent
+>> for a clock mux, i.e. the one which can provide the closest clock rate
+>> to that requested. It can be disabled by a new CLK_SET_RATE_NO_REPARENT
+>> flag (which is set for all uses of clk_register_mux().
+>>
+>> This works by way of adding a new op, determine_rate, similar to
+>> round_rate but with an extra parameter to allow the clock driver to
+>> optionally select a different parent clock. This is used in
+>> clk_calc_new_rates to decide whether to initiate a set_parent operation.
+>
+> Hi James,
+>
+> I'm going to hold off on this one for 3.11. I'll revisit it after the
+> next merge window.
 
-> diff --git a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
+Okay, no worries.
 
-> +- row-gpios-activelow:	row GPIO pins are active low
-> +- col-gpios-activelow:	column GPIO pins are active low
->  - gpio-activelow:	row pins as well as column pins are active low
-> +			(provided for backward compatibility, and useful
-> +			for matrix layouts of identical polarity for
-> +			rows and columns)
-
-Those should all come from the existing GPIO flags, and may even differ
-for each GPIO.
-
-> +- col-gpios-pushpull:	fully drive the column selection pins in either
-> +			direction (high and low signals), the default
-> +			behaviour is to actively drive low signals and
-> +			be passive otherwise (emulates an open collector
-> +			output driver)
-
-We don't actually have GPIO flags defined for pushpull-vs-open-collector
-etc. Perhaps we should do so. Then, we wouldn't need to invent custom
-properties to represent that in this binding.
+Thanks
+James
