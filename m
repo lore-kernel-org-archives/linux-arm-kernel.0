@@ -1,45 +1,46 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 21 Jun 2013 16:45:12 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the  tree
-Message-ID: <20130621164512.261ad1e1a0cb27f45e955601@canb.auug.org.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Jun 2013 23:45:26 -0700
+Subject: linux-next: manual merge of the arm-soc tree with the mailbox tree
+In-Reply-To: <20130621160800.64f9965229e5042a7b77e212@canb.auug.org.au>
+References: <20130621160800.64f9965229e5042a7b77e212@canb.auug.org.au>
+Message-ID: <20130621064526.GJ5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+* Stephen Rothwell <sfr@canb.auug.org.au> [130620 23:14]:
+> Hi all,
+> 
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/mach-omap2/devices.c between commit 4a1c0e83bb4e ("ARM: OMAP2+:
+> mbox: remove dependencies with soc.h") from the mailbox tree and commit
+> 82c5cde1c4b0 ("ARM: OMAP2+: Remove omap4 ocp2scp pdata") from the arm-soc
+> tree.
+> 
+> I fixed it up (removing the include of
+> linux/platform_data/omap_ocp2scp.h) and can carry the fix as necessary
+> (no action is required).
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-include/linux/mfd/davinci_voicecodec.h between commit 997174705458 ("mfd:
-davinci_voicecodec: Fix build breakage") from the mfd tree and commit
-3ad7a42d5a9c ("ARM: davinci: move private EDMA API to arm/common") from
-the arm-soc tree.
+Thanks, that's the right fix as that header won't be needed any longer
+as we've made omap4 device tree only.
+ 
+> That mailbox tree commit looks very similar to commit b8a7cf8e2b15 ("ARM:
+> OMAP2+: mbox: remove dependencies with soc.h") from the arm-soc tree ...
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+The earlier mailbox branch was merged into arm-soc for a few weeks until
+we decided to drop it as Jassi is working on a more generic API. That was
+merged in commit 51b5f893, then reverted in commit b5c85186. The updated
+mailbox branch accounts for the generic API coming up from Jassi.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Suman, can you please check if Linux next has mailbox related files merged
+correctly?
+ 
+> As an aside, the include of linux/usb/omap_control_usb.h into this file
+> was removed by commit 608d19380c67 ("ARM: OMAP2+: Remove omap4 pdata for
+> USB") in the arm-soc tree, but reintroduced by commit 435f4c6d5242
+> ("Merge branch 'next/drivers' into for-next").
 
-diff --cc include/linux/mfd/davinci_voicecodec.h
-index 810aee7,7dd6524..0000000
---- a/include/linux/mfd/davinci_voicecodec.h
-+++ b/include/linux/mfd/davinci_voicecodec.h
-@@@ -26,10 -26,8 +26,10 @@@
-  #include <linux/kernel.h>
-  #include <linux/platform_device.h>
-  #include <linux/mfd/core.h>
-+ #include <linux/platform_data/edma.h>
-  
-- #include <mach/edma.h>
- +#include <mach/hardware.h>
- +
-  /*
-   * Register values.
-   */
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/844a8ca6/attachment.sig>
+Yes omap_control_usb.h is no longer needed either.
+
+Thanks,
+
+Tony
