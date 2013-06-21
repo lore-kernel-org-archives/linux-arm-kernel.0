@@ -1,41 +1,39 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 21 Jun 2013 10:12:37 +0200 (CEST)
-Subject: clocksource with changing frequency?
-In-Reply-To: <51C39B1A.5070902@linaro.org>
-References: <f5e5d3d7-699d-4f89-80c8-849e432e8b26@VA3EHSMHS017.ehs.local>
- <51C39B1A.5070902@linaro.org>
-Message-ID: <alpine.DEB.2.02.1306211010000.4013@ionos.tec.linutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 Jun 2013 09:13:57 +0100
+Subject: SCU registers mapping for CA9/CA5 cores
+In-Reply-To: <CADApbei3QOCQRmo_oYZ_XiUVupq+4uUs7WNe6f7k_OG0LHB3=w@mail.gmail.com>
+References: <CADApbei3QOCQRmo_oYZ_XiUVupq+4uUs7WNe6f7k_OG0LHB3=w@mail.gmail.com>
+Message-ID: <20130621081356.GU2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Jun 2013, John Stultz wrote:
-
-> On 06/20/2013 05:01 PM, S?ren Brinkmann wrote:
-> > Hi all,
-> > 
-> > I have a question/problem with a clocksource whose input frequency can
-> > change.
+On Fri, Jun 21, 2013 at 02:11:31PM +0800, Chao Xie wrote:
+> hi, Russell
+> When i sbumited the patch for pxa988 which is CA9, Arnd gave me some
+> suggestions of SCU mapping.
+> I used static mapping in the platform file for SCU registers mapping,
+> but Arnd think there should be a more general way to do it, and others
+> can benefit from it. I agree with him.
 > 
-> That behavior isn't supported by the clocksource core. We expect frequency
-> changing clocksources to be detected and disqualified (as we do w/ freq
-> changing TSCs on older laptops).
+> The following is his question for you when reply to my patch.
+> "Russell, do you think using a fixmap page for the SCU makes sense?
+> I'm looking for a method to consolidate the various methods of
+> doing early mappings of the SCU for device tree based platforms.
+> Where do you think that should be implemented?"
 > 
-> 
-> > On Zynq we use the cadece_ttc timer as clocksource. Its input clock is
-> > tightly coupled to the CPU clock. I.e. it changes when cpufreq scales
-> > the CPU clocks.
-> > To compensate this, I added a clock notifier doing this on a frequency
-> > change:
-> > 	clocksource_unregister(&ttccs->cs);
-> > 	clocksource_register_hz(&ttccs->cs, ndata->new_rate / PRESCALE);
-> 
-> This will definitely have problems if this is the only high-res capable
-> clocksource.
+> So can you give your idea and suggestion? Thanks.
 
-And starting with 3.11 it will be not longer possible to unregister
-the only high-res capable clocksource exactly to prevent the wreckage
-you are talking about :)
+With our current fixmap region, we have 224 pages available, currently
+all dedicated to kmap.  kmap uses 16 pages per CPU at the moment, which
+we hope is enough (it's only checked when CONFIG_DEBUG_HIGHMEM is set.)
 
-Thanks,
+Assuming four CPUs, that makes it 64 pages, but then we have big.LITTLE
+with potentially 8 (I guess they map as separate smp_processor_id()'s)
+which makes that 128.  128 is over half of the available fixmap.
 
-	tglx
+If we ever saw 16 CPUs, we'd need to find a new home for fixmap.  If we
+needed to increase KM_TYPE_NR beyond 28, we'd be in the same situation.
+
+We do have the 0xffff1000 - 0xffff4000 range which is currently unused.
+We could put the SCU at 0xffff1000 for a single page.  IOW, not a fixmap
+page.
