@@ -1,28 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 21 Jun 2013 10:07:55 -0700
-Subject: [PATCHv7 01/11] clockevents: Prefer CPU local devices over
- global devices
-In-Reply-To: <20130619163043.GA6300@codeaurora.org>
-References: <51B0A6E8.20909@linaro.org> <20130606180425.GQ599@codeaurora.org>
- <51B10D85.1060507@linaro.org> <20130606223848.GR599@codeaurora.org>
- <20130612214435.GE10823@codeaurora.org> <51B991EF.70800@linaro.org>
- <alpine.LFD.2.02.1306131331430.22970@ionos>
- <20130613183950.GA32061@codeaurora.org>
- <20130618102257.GH6809@e106331-lin.cambridge.arm.com>
- <20130619163043.GA6300@codeaurora.org>
-Message-ID: <20130621170755.GB14575@codeaurora.org>
+From: dsd@laptop.org (Daniel Drake)
+Date: Fri, 21 Jun 2013 11:12:01 -0600
+Subject: [V2 3/7] video: mmp: fix graphics/video layer enable/mask swap
+ issue
+In-Reply-To: <1370879552-11290-1-git-send-email-jtzhou@marvell.com>
+References: <1370879552-11290-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <CAMLZHHSDUYZ8fpjjSKzDWKL3=RhOaxO8pq-ty5zM+KHzEu30QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19, Stephen Boyd wrote:
-> 
-> Can you pick up the first two patches in this series please? And
-> preferably make a stable branch that can be pulled into arm-soc?
-> Then I can send the rest through the arm-soc tree.
-> 
+On Mon, Jun 10, 2013 at 9:52 AM, Jett.Zhou <jtzhou@marvell.com> wrote:
+> From: Jing Xiang <jxiang@marvell.com>
+>
+> There is bug when switch dma of graphic layer and video layer, it
+> configured opposite bit, fix it.
 
-ping?
+So, overlays can be either graphics or video. overlay_is_vid() tells
+you which type.
+overlay_is_vid() makes its decision based on dmafetch_id which is
+undocumented and I don't understand it (and in another mail you said
+this is legacy configuration that is going to be removed).
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Ignoring my lack of understanding of the background: the patch here
+seems to make the code more correct. It will modify the path's
+underlying control register to enable graphics or video transfer
+depending on the overlay type. Turning a graphics overlay dmafetch ON
+will not stomp on the bits set by any video overlay dmafetch on the
+same path. Previously the logic was reversed.
+
+This codepath will not work correctly if there will ever be more than
+one overlay of the same type on the same path. For example, if we have
+two graphics overlays;
+1. dmafetch_onoff(overlay1, on) - graphics transfer is now enabled in
+the hardware
+2. dmafetch_onoff(overlay2, on) - graphics transfer was already
+enabled, no change
+3. dmafetch_onoff(overlay2, off) - graphics transfer is now disabled
+in the hardware
+
+At this point overlay1 is still active in theory, but the driver has
+disabled graphics transfer at the hardware level.
+
+Daniel
