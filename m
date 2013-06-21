@@ -1,69 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Jun 2013 15:07:19 +0100
-Subject: [PATCH V3 1/4] arm64: Add Kconfig option for APM X-Gene SOC family
-In-Reply-To: <CAPrCYkc-=-no+TpHb8XMQYFoyqCJoXe9RR1-jazxCCNeFQ12Yw@mail.gmail.com>
-References: <1366794420-17849-1-git-send-email-vkale@apm.com>
- <1366794420-17849-2-git-send-email-vkale@apm.com>
- <20130621093656.GB4099@arm.com>
- <CAPrCYkc-=-no+TpHb8XMQYFoyqCJoXe9RR1-jazxCCNeFQ12Yw@mail.gmail.com>
-Message-ID: <20130621140719.GA8384@darko.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 21 Jun 2013 10:11:44 -0400
+Subject: [PATCH V10 0/4] PCIe support for Samsung Exynos5440 SoC
+In-Reply-To: <201306211030.47440.arnd@arndb.de>
+References: <003901ce6e50$03d039a0$0b70ace0$@samsung.com>
+ <201306210931.58428.arnd@arndb.de> <20130621094723.312bc331@skate>
+ <201306211030.47440.arnd@arndb.de>
+Message-ID: <20130621141144.GP31667@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 11:43:59AM +0100, Vinayak Kale wrote:
-> On Fri, Jun 21, 2013 at 3:06 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > Hi Vinayak,
-> >
-> > On Wed, Apr 24, 2013 at 10:06:57AM +0100, Vinayak Kale wrote:
-> >> This patch adds arm64/Kconfig option for APM X-Gene SOC family.
-> >>
-> >> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
-> >> Signed-off-by: Loc Ho <lho@apm.com>
-> >> Signed-off-by: Feng Kan <fkan@apm.com>
-> >> ---
-> >>  arch/arm64/Kconfig |    7 +++++++
-> >>  1 files changed, 7 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> >> index 43b0e9f..16d0198 100644
-> >> --- a/arch/arm64/Kconfig
-> >> +++ b/arch/arm64/Kconfig
-> >> @@ -114,6 +114,11 @@ config ARCH_VEXPRESS
-> >>         This enables support for the ARMv8 software model (Versatile
-> >>         Express).
-> >>
-> >> +config ARCH_XGENE
-> >> +     bool "AppliedMicro X-Gene SOC Family"
-> >> +     help
-> >> +       This enables support for AppliedMicro X-Gene SOC Family
-> >> +
-> >>  endmenu
-> >>
-> >>  menu "Bus support"
-> >> @@ -153,6 +158,8 @@ config NR_CPUS
-> >>       int "Maximum number of CPUs (2-32)"
-> >>       range 2 32
-> >>       depends on SMP
-> >> +     # These have to remain sorted largest to smallest
-> >> +     default "8" if ARCH_XGENE
-> >>       default "4"
-> >
-> > For ARCH_VEXPRESS I was planning to get rid of the Kconfig entry and
-> > just select the drivers in the defconfig file (once some other patches
-> > get merged). Do you have any dependencies on ARCH_XGENE apart from
-> > what's here?
+On Fri, Jun 21, 2013 at 10:30:47AM +0200, Arnd Bergmann wrote:
+> On Friday 21 June 2013, Thomas Petazzoni wrote:
+> > I am by far not an expert on how to solve merge strategies and so on,
+> > but to avoid conflicts at Linus's level while merging the arm-soc and
+> > pci trees, it would be better if this Samsung PCIe driver could go
+> > through arm-soc (with Bjorn ACK, of course), so that Arnd/Olof can
+> > make sure the ordering is correct with regard to the of/pci changes and
+> > the mvebu/pci driver.
 > 
-> Apart from here, we do have dependency on ARCH_XGENE:
-> 1) To select XGENE SoC specific dtb compilation
+> Yes, good point.
+> 
+> The alternative would be that Bjorn also takes the PCI branch dependencies
+> that are already in arm-soc into his tree. Either way works, but I agree
+> that what you suggest would be simpler.
 
-We can build all of them.
+Yes, that is why we did it this way.  It was my understanding based on
+previous comments by yourself and LinusW that you both had patches
+depending on (now called) mvebu/of_pci.  So we got it into arm-soc
+early so those branches could depend on it.
 
-> 2) Use this to forcefully select certain platform drivers such as Clock.
+hth,
 
-The vexpress-related clocks etc. will simply depend on ARM64 (patches
-going upstream) and we enable them in defconfig. Can you do the same for
-X-Gene?
-
--- 
-Catalin
+Jason.
