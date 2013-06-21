@@ -1,123 +1,68 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 20 Jun 2013 17:57:55 -0700
-Subject: [PATCHv2 02/11] CLK: use of_property_read_u32 instead of read_u8
-In-Reply-To: <1371647942-4811-3-git-send-email-t-kristo@ti.com>
-References: <1371647942-4811-1-git-send-email-t-kristo@ti.com>
- <1371647942-4811-3-git-send-email-t-kristo@ti.com>
-Message-ID: <CAPtuhThmsucSZ8XxL9kcqdssi2N2JHwRzDnbkbaVy6okW_LSRA@mail.gmail.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Fri, 21 Jun 2013 09:07:59 +0800
+Subject: [PATCH V2] USB: initialize or shutdown PHY when add or remove
+ host controller
+In-Reply-To: <Pine.LNX.4.44L0.1306201319580.2063-100000@iolanthe.rowland.org>
+References: <20130620121749.GF9817@arwen.pp.htv.fi>
+ <Pine.LNX.4.44L0.1306201319580.2063-100000@iolanthe.rowland.org>
+Message-ID: <CADApbejTBAv0+XxkGLXuMVrLatbNurR0XBkK2gt6eQnXr+5yEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 6:18 AM, Tero Kristo <t-kristo@ti.com> wrote:
-> of_property_read_u8 does not work properly because of endianess problem
-> with its current implementation, and this causes it to always return
-> 0 with little endian architectures. Instead, use property_read_u32
-> until this is fixed.
+On Fri, Jun 21, 2013 at 1:25 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Thu, 20 Jun 2013, Felipe Balbi wrote:
+>
+>> > In fact, the PHY setting and handling is related to platform or SOC,
+>> > and for different SOC they can
+>> > have same EHCI HCD but they PHY handling can be different.
+>> > Omap'a case is the example, and i think some other vendors may have
+>> > silimar cases.
+>> > From above point, It is better to leave the PHY initialization and
+>> > shutdown to be done by each echi-xxx driver.
+>> >
+>> > So Alan and Felipe
+>> > What are your ideas about it?
+>>
+>> If we have so many exceptions, then sure. But eventually, the common
+>> case should be added generically with a flag so that non-generic cases
+>> (like OMAP) can request to handle the PHY by themselves.
+>>
+>> Alan ?
+>
+> I don't have very strong feelings about this; Felipe has much more
+> experience with these things.
+>
+> However, when the common case is added into the core, the simplest way
+> to indicate that the HCD wants to handle the PHY(s) by itself will be
+> to leave hcd->phy set to NULL or an ERR_PTR value.
+>
+> One important thing that hasn't been pointed out yet: When we move
+> these calls into the core, the same patch must also remove those calls
+> from the glue drivers that currently do set hcd->phy.  And it must make
+> sure that the glue drivers which handle the PHY by themselves do not
+> set hcd->phy.
+>
 
-Tero,
+>From device point of view, EHCI is a standlone component. It has the
+standard sepcification, so each
+SOC vendor has EHCI HCD need to follow the standards. Then we have
+common EHCI HCD driver.
+The PHY is outside of EHCI component, each SOC vendor may have
+different PHY implementation. Then
+we have PHY driver.
+The EHCI glue driver ehci-xxx works like a SOC depended driver. It is
+its duty to handle the'
+relationship between the EHCI HCD driver and PHY driver.
+It is same as clk, irq requested by ehci-xxx driver.
 
-Thanks for the fix. Heiko Stubner pointed out to me that in order to
-read a u8 value the DT node needs to specify "/bits/ 8" before the
-values. From the of_property_read_u8_array kerneldoc:
+So i think add a flag and use usb_get_phy() is not very good.
+It is bette to make ehci-xxx to do the phy getting and EHCI HCD
+initialize it and shut down as the patch did, or let ehci-xxx to
+handle the PHY as Roger said.
 
-"
-/**
-...
- * dts entry of array should be like:
- *      property = /bits/ 8 <0x50 0x60 0x70>;
- *
- * The out_value is modified only if a valid u8 value can be decoded.
- */
-"
+Based on the generic work is not too much, and does not look so
+meaningful. I suggest that let to echi-xxx
+do it.
 
-Still I think it is a bit silly to have to do this in all of the
-bindings, so I'm going to roll this patch into my next version of the
-series if only for the sake of readability. Not only that but it is
-slightly more future proof for the binding to use a u32 value. The
-fact that the implementation in Linux uses a u8 is of little
-consequence to the binding.  I'll also add a cast like the following
-to your patch:
-
-clk = clk_register_gate(NULL, clk_name, parent_name, 0, reg, (u8) bit_idx,
-                clk_gate_flags, NULL);
-
-Thanks,
-Mike
-
->
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  drivers/clk/clk-divider.c |    4 ++--
->  drivers/clk/clk-gate.c    |    4 ++--
->  drivers/clk/clk-mux.c     |    4 ++--
->  3 files changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index 17ea475..3413602 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -361,7 +361,7 @@ void of_divider_clk_setup(struct device_node *node)
->         const char *parent_name;
->         u8 clk_divider_flags = 0;
->         u32 mask = 0;
-> -       u8 shift = 0;
-> +       u32 shift = 0;
->         struct clk_div_table *table;
->
->         of_property_read_string(node, "clock-output-names", &clk_name);
-> @@ -375,7 +375,7 @@ void of_divider_clk_setup(struct device_node *node)
->                 return;
->         }
->
-> -       if (of_property_read_u8(node, "bit-shift", &shift)) {
-> +       if (of_property_read_u32(node, "bit-shift", &shift)) {
->                 shift = __ffs(mask);
->                 pr_debug("%s: bit-shift property defaults to 0x%x for %s\n",
->                                 __func__, shift, node->name);
-> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-> index 72cf99d..61b4dc1 100644
-> --- a/drivers/clk/clk-gate.c
-> +++ b/drivers/clk/clk-gate.c
-> @@ -162,7 +162,7 @@ void of_gate_clk_setup(struct device_node *node)
->         void __iomem *reg;
->         const char *parent_name;
->         u8 clk_gate_flags = 0;
-> -       u8 bit_idx = 0;
-> +       u32 bit_idx = 0;
->
->         of_property_read_string(node, "clock-output-names", &clk_name);
->
-> @@ -170,7 +170,7 @@ void of_gate_clk_setup(struct device_node *node)
->
->         reg = of_iomap(node, 0);
->
-> -       if (of_property_read_u8(node, "bit-shift", &bit_idx)) {
-> +       if (of_property_read_u32(node, "bit-shift", &bit_idx)) {
->                 pr_err("%s: missing bit-shift property for %s\n",
->                                 __func__, node->name);
->                 return;
-> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-> index c9f9f32..e63dd1b 100644
-> --- a/drivers/clk/clk-mux.c
-> +++ b/drivers/clk/clk-mux.c
-> @@ -170,7 +170,7 @@ void of_mux_clk_setup(struct device_node *node)
->         int i;
->         u8 clk_mux_flags = 0;
->         u32 mask = 0;
-> -       u8 shift = 0;
-> +       u32 shift = 0;
->
->         of_property_read_string(node, "clock-output-names", &clk_name);
->
-> @@ -194,7 +194,7 @@ void of_mux_clk_setup(struct device_node *node)
->                 return;
->         }
->
-> -       if (of_property_read_u8(node, "bit-shift", &shift)) {
-> +       if (of_property_read_u32(node, "bit-shift", &shift)) {
->                 shift = __ffs(mask);
->                 pr_debug("%s: bit-shift property defaults to 0x%x for %s\n",
->                                 __func__, shift, node->name);
-> --
-> 1.7.9.5
+> Alan Stern
 >
