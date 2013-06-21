@@ -1,127 +1,35 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Fri, 21 Jun 2013 16:37:14 +0800
-Subject: [PATCH v2 05/12] ARM: barrier: allow options to be passed to
- memory barrier instructions
-In-Reply-To: <1371738086-6707-6-git-send-email-will.deacon@arm.com>
-References: <1371738086-6707-1-git-send-email-will.deacon@arm.com>
- <1371738086-6707-6-git-send-email-will.deacon@arm.com>
-Message-ID: <CACVXFVPrkc4YY25J9QzbKB9A6uerq9m9VQjTZTMN45DvKbx3SA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 21 Jun 2013 09:40:19 +0100
+Subject: [PATCH v2 0/2] ARM: Remove any correlation between IPC and
+ BogoMips value
+In-Reply-To: <alpine.LFD.2.03.1306201452330.18597@syhkavp.arg>
+References: <1371746612-23950-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1306201452330.18597@syhkavp.arg>
+Message-ID: <20130621084018.GB6983@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 10:21 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On ARMv7, the memory barrier instructions take an optional `option'
-> field which can be used to constrain the effects of a memory barrier
-> based on shareability and access type.
->
-> This patch allows the caller to pass these options if required, and
-> updates the smp_*() barriers to request inner-shareable barriers,
-> affecting only stores for the _wmb variant. wmb() is also changed to
-> use the -st version of dsb.
->
-> Reported-by: Albin Tonnerre <albin.tonnerre@arm.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/assembler.h |  4 ++--
->  arch/arm/include/asm/barrier.h   | 32 ++++++++++++++++----------------
->  2 files changed, 18 insertions(+), 18 deletions(-)
->
-> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> index 05ee9ee..863b280 100644
-> --- a/arch/arm/include/asm/assembler.h
-> +++ b/arch/arm/include/asm/assembler.h
-> @@ -212,9 +212,9 @@
->  #ifdef CONFIG_SMP
->  #if __LINUX_ARM_ARCH__ >= 7
->         .ifeqs "\mode","arm"
-> -       ALT_SMP(dmb)
-> +       ALT_SMP(dmb     ish)
->         .else
-> -       ALT_SMP(W(dmb))
-> +       ALT_SMP(W(dmb)  ish)
->         .endif
->  #elif __LINUX_ARM_ARCH__ == 6
->         ALT_SMP(mcr     p15, 0, r0, c7, c10, 5) @ dmb
-> diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
-> index 8dcd9c7..60f15e2 100644
-> --- a/arch/arm/include/asm/barrier.h
-> +++ b/arch/arm/include/asm/barrier.h
-> @@ -14,27 +14,27 @@
->  #endif
->
->  #if __LINUX_ARM_ARCH__ >= 7
-> -#define isb() __asm__ __volatile__ ("isb" : : : "memory")
-> -#define dsb() __asm__ __volatile__ ("dsb" : : : "memory")
-> -#define dmb() __asm__ __volatile__ ("dmb" : : : "memory")
-> +#define isb(option) __asm__ __volatile__ ("isb " #option : : : "memory")
-> +#define dsb(option) __asm__ __volatile__ ("dsb " #option : : : "memory")
-> +#define dmb(option) __asm__ __volatile__ ("dmb " #option : : : "memory")
->  #elif defined(CONFIG_CPU_XSC3) || __LINUX_ARM_ARCH__ == 6
-> -#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
-> +#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
->                                     : : "r" (0) : "memory")
-> -#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
-> +#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
->                                     : : "r" (0) : "memory")
-> -#define dmb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
-> +#define dmb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
->                                     : : "r" (0) : "memory")
->  #elif defined(CONFIG_CPU_FA526)
-> -#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
-> +#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
->                                     : : "r" (0) : "memory")
-> -#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
-> +#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
->                                     : : "r" (0) : "memory")
-> -#define dmb() __asm__ __volatile__ ("" : : : "memory")
-> +#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
->  #else
-> -#define isb() __asm__ __volatile__ ("" : : : "memory")
-> -#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
-> +#define isb(x) __asm__ __volatile__ ("" : : : "memory")
-> +#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
->                                     : : "r" (0) : "memory")
-> -#define dmb() __asm__ __volatile__ ("" : : : "memory")
-> +#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
->  #endif
->
->  #ifdef CONFIG_ARCH_HAS_BARRIERS
-> @@ -42,7 +42,7 @@
->  #elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
->  #define mb()           do { dsb(); outer_sync(); } while (0)
->  #define rmb()          dsb()
+On Thu, Jun 20, 2013 at 07:54:21PM +0100, Nicolas Pitre wrote:
+> On Thu, 20 Jun 2013, Will Deacon wrote:
+> 
+> > Hi all,
+> > 
+> > This is version two of the patches I originally posted here:
+> > 
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/166728.html
+> > 
+> > Comments received there largely confirmed that it's not possible to choose
+> > an `obviously bogus' value for BogoMIPs, so instead I've bitten the bullet
+> > and removed the line altogether.
+> > 
+> > In the meantime, I've only had one complaint this month about BogoMIPs
+> > being wrong, so perhaps the initial posting served some purpose without
+> > even being merged!
+> > 
+> > Comments welcome,
+> 
+> Enthusiastic ACK for both patches.
 
-The above two dsb() are missed?
+Thanks Nicolas!
 
-> -#define wmb()          mb()
-> +#define wmb()          do { dsb(st); outer_sync(); } while (0)
->  #else
->  #define mb()           barrier()
->  #define rmb()          barrier()
-> @@ -54,9 +54,9 @@
->  #define smp_rmb()      barrier()
->  #define smp_wmb()      barrier()
->  #else
-> -#define smp_mb()       dmb()
-> -#define smp_rmb()      dmb()
-> -#define smp_wmb()      dmb()
-> +#define smp_mb()       dmb(ish)
-> +#define smp_rmb()      smp_mb()
-> +#define smp_wmb()      dmb(ishst)
->  #endif
->
->  #define read_barrier_depends()         do { } while(0)
-> --
-> 1.8.2.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-Thanks,
--- 
-Ming Lei
+Will
