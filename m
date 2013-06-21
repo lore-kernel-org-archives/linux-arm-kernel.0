@@ -1,156 +1,54 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 21 Jun 2013 18:22:00 -0300
-Subject: [PATCH 2/2] ARM: dts: mx28: Fix sgtl5000 codec probe
-In-Reply-To: <1371849720-14506-1-git-send-email-festevam@gmail.com>
-References: <1371849720-14506-1-git-send-email-festevam@gmail.com>
-Message-ID: <1371849720-14506-2-git-send-email-festevam@gmail.com>
+Date: Fri, 21 Jun 2013 18:21:59 -0300
+Subject: [PATCH 1/2] clk: mxs: clk-imx28: Provide a dummy clock
+Message-ID: <1371849720-14506-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Since commit 9e13f345887 (ASoC: sgtl5000: Let the codec acquire its clock)it is 
-necessary to pass a codec clock to the sgtl5000 driver.
+Sometimes it is useful to be able to pass a dummy clock for a driver.
 
-On some boards the sgtl5000 codec is driven via SAIF MCLK signal, so enable it
-early in machine code to allow the I2C codec access to succeed.
-
-Since the saif mclk cannot be passed as a real clock within the clock framework,
-let's pass a dummy one to the codec driver.
+Add support for a dummy clock.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
-Tested on a mx28evk board running linux-next 20130621
+ Documentation/devicetree/bindings/clock/imx28-clock.txt | 1 +
+ drivers/clk/mxs/clk-imx28.c                             | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
- arch/arm/boot/dts/imx28-apx4devkit.dts |  2 +-
- arch/arm/boot/dts/imx28-evk.dts        |  2 +-
- arch/arm/boot/dts/imx28-m28evk.dts     |  2 +-
- arch/arm/mach-mxs/mach-mxs.c           | 41 ++++++++++++++++++++++++++++++++++
- 4 files changed, 44 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx28-apx4devkit.dts b/arch/arm/boot/dts/imx28-apx4devkit.dts
-index 43bf3c7..f26bf2f 100644
---- a/arch/arm/boot/dts/imx28-apx4devkit.dts
-+++ b/arch/arm/boot/dts/imx28-apx4devkit.dts
-@@ -147,7 +147,7 @@
- 					reg = <0x0a>;
- 					VDDA-supply = <&reg_3p3v>;
- 					VDDIO-supply = <&reg_3p3v>;
--
-+					clocks = <&clks 65>;
- 				};
+diff --git a/Documentation/devicetree/bindings/clock/imx28-clock.txt b/Documentation/devicetree/bindings/clock/imx28-clock.txt
+index e6587af..5a153ef 100644
+--- a/Documentation/devicetree/bindings/clock/imx28-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx28-clock.txt
+@@ -76,6 +76,7 @@ clocks and IDs.
+ 	usb0_phy	62
+ 	usb1_phy	63
+ 	enet_out	64
++	dummy		65
  
- 				pcf8563: rtc at 51 {
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 3637bf3..28f20b6 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -193,7 +193,7 @@
- 					reg = <0x0a>;
- 					VDDA-supply = <&reg_3p3v>;
- 					VDDIO-supply = <&reg_3p3v>;
--
-+					clocks = <&clks 65>;
- 				};
+ Examples:
  
- 				at24 at 51 {
-diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
-index 880df2f..a09c5bf 100644
---- a/arch/arm/boot/dts/imx28-m28evk.dts
-+++ b/arch/arm/boot/dts/imx28-m28evk.dts
-@@ -184,7 +184,7 @@
- 					reg = <0x0a>;
- 					VDDA-supply = <&reg_3p3v>;
- 					VDDIO-supply = <&reg_3p3v>;
--
-+					clocks = <&clks 65>;
- 				};
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index 4faf0af..6b55211 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -143,7 +143,7 @@ enum imx28_clk {
+ 	emi_xtal, lcdif_div, etm_div, ptp, saif0_div, saif1_div,
+ 	clk32k_div, rtc, lradc, spdif_div, clk32k, pwm, uart, ssp0,
+ 	ssp1, ssp2, ssp3, gpmi, spdif, emi, saif0, saif1, lcdif, etm,
+-	fec, can0, can1, usb0, usb1, usb0_phy, usb1_phy, enet_out,
++	fec, can0, can1, usb0, usb1, usb0_phy, usb1_phy, enet_out, dummy,
+ 	clk_max
+ };
  
- 				eeprom: eeprom at 51 {
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 6298adb..57ab042 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -27,6 +27,7 @@
- #include <linux/phy.h>
- #include <linux/pinctrl/consumer.h>
- #include <linux/sys_soc.h>
-+#include <linux/stmp_device.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
-@@ -59,6 +60,8 @@
- #define MXS_CLR_ADDR		0x8
- #define MXS_TOG_ADDR		0xc
+@@ -234,6 +234,7 @@ int __init mx28_clocks_init(void)
+ 	clks[usb0_phy] = clk_register_gate(NULL, "usb0_phy", "pll0", 0, PLL0CTRL0, 18, 0, &mxs_lock);
+ 	clks[usb1_phy] = clk_register_gate(NULL, "usb1_phy", "pll1", 0, PLL1CTRL0, 18, 0, &mxs_lock);
+ 	clks[enet_out] = clk_register_gate(NULL, "enet_out", "pll2", 0, ENET, 18, 0, &mxs_lock);
++	clks[dummy] = mxs_clk_fixed("dummy", 0);
  
-+#define SAIF0			0x100
-+
- static u32 chipid;
- static u32 socid;
- 
-@@ -264,11 +267,46 @@ static inline void enable_clk_enet_out(void)
- 		clk_prepare_enable(clk);
- }
- 
-+static void __init mxs_enable_mclk(void)
-+{
-+	struct device_node *np;
-+	void __iomem *clkctrl_base, *saif_base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,clkctrl");
-+	clkctrl_base = of_iomap(np, 0);
-+
-+	if (!clkctrl_base)
-+		return;
-+
-+	/*
-+	 * DIV_FRAC_EN, MCLK frequency = 44.1KHz * 512 =  22.5792MHz
-+	 * This initial MCLK frequency is just to allow I2C access to the
-+	 * SGLT5000 codec to work
-+	 */
-+	writel(0x10c0b, clkctrl_base + SAIF0);
-+
-+	iounmap(clkctrl_base);
-+	of_node_put(np);
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx28-saif");
-+	saif_base = of_iomap(np, 0);
-+
-+	if (!saif_base)
-+		return;
-+
-+	stmp_reset_block(saif_base);
-+	writel(1, saif_base + STMP_OFFSET_REG_SET);
-+
-+	iounmap(saif_base);
-+	of_node_put(np);
-+}
-+
- static void __init imx28_evk_init(void)
- {
- 	update_fec_mac_prop(OUI_FSL);
- 
- 	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
-+	mxs_enable_mclk();
- }
- 
- static void __init imx28_evk_post_init(void)
-@@ -293,6 +331,7 @@ static void __init apx4devkit_init(void)
- 	if (IS_BUILTIN(CONFIG_PHYLIB))
- 		phy_register_fixup_for_uid(PHY_ID_KSZ8051, MICREL_PHY_ID_MASK,
- 					   apx4devkit_phy_fixup);
-+	mxs_enable_mclk();
- }
- 
- #define ENET0_MDC__GPIO_4_0	MXS_GPIO_NR(4, 0)
-@@ -483,6 +522,8 @@ static void __init mxs_machine_init(void)
- 		 of_machine_is_compatible("crystalfontz,cfa10055") ||
- 		 of_machine_is_compatible("crystalfontz,cfa10057"))
- 		crystalfontz_init();
-+	else if (of_machine_is_compatible("denx,m28evk"))
-+		mxs_enable_mclk();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 			     mxs_auxdata_lookup, parent);
+ 	for (i = 0; i < ARRAY_SIZE(clks); i++)
+ 		if (IS_ERR(clks[i])) {
 -- 
 1.8.1.2
