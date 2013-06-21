@@ -1,42 +1,20 @@
 From: dsd@laptop.org (Daniel Drake)
-Date: Fri, 21 Jun 2013 10:57:13 -0600
-Subject: [V2 1/7] video: mmp: rb swap setting update for new LCD driver
-In-Reply-To: <1370879533-11017-1-git-send-email-jtzhou@marvell.com>
-References: <1370879533-11017-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <CAMLZHHQ+97f=i3axaFBn9JoOu7Cqo73neqxKYNCfWqwjZ4DfnQ@mail.gmail.com>
+Date: Fri, 21 Jun 2013 11:00:37 -0600
+Subject: [V2 2/7] video: mmp: optimize some register setting code
+In-Reply-To: <1370879543-11152-1-git-send-email-jtzhou@marvell.com>
+References: <1370879543-11152-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <CAMLZHHQXDq6ZT0N85n1FWE9TkEbgkf6AKtZJZP+5db6k7NQT2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Jun 10, 2013 at 9:52 AM, Jett.Zhou <jtzhou@marvell.com> wrote:
 > From: Guoqing Li <ligq@marvell.com>
 >
-> We could set rb swap in two modules: DMA controler and interface
-> output after blending.
-> This patch move the panel rbswap requirement setting in later module.
+> There are dumplicate code of the smooth setting based on different
+> path, optimized the routine and use readl_relaxed instead.
+>
+> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> Signed-off-by: Jing Xiang <jxiang@marvell.com>
+> Signed-off-by: Guoqing Li <ligq@marvell.com>
 
-link_config originates from the platform's path config. link_config is
-undocumented and this patch also changes its meaning.
-
-Previously, bit 0 triggered rbswap, and this behaviour is relied upon
-by arch/arm/mach-mmp/ttc_dkb.c
-
-Now bits 27:24 of link_config are used to enable or disable rbswap,
-and link_config bit 0 is ignored. According to the specs for the panel
-path register, valid values for these new bits are 0 (no swap) and 1
-(swap). ttc_dkb has not been updated in this patch series for this new
-behaviour.
-
-I don't understand why rbswap is set to 1 in fmt_to_reg for certain
-RGB formats. The patch description suggests that the rb swapping can
-either be set in fmt_to_reg context (to be written into DMA
-controller) *or* in the interface output. If we are now relying on the
-interface output control to do RB swapping when appropriate, why are
-there still cases when we ask the DMA controller to do the same thing?
-
-I also do not fully understand the requirement for RB swapping. I do
-understand that it changes pixel format from RGB to BGR. What is the
-point? I can imagine that some panels may require such a pixel format,
-however in that case, this configuration should be part of the panel
-configuration, not part of the path configuration as it currently is.
-
-Daniel
+Reviewed-by: Daniel Drake <dsd@laptop.org>
