@@ -1,72 +1,81 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 21 Jun 2013 16:25:48 -0500
-Subject: [RFC PATCH V2 7/8] ARM: dts: omap4-panda-es: add TPS62361 supply for
- vdd_mpu
+Date: Fri, 21 Jun 2013 16:25:49 -0500
+Subject: [RFC PATCH V2 8/8] ARM: dts: OMAP4-panda-es: use tps regulator as
+ cpu0 supply
 In-Reply-To: <1371849949-12649-1-git-send-email-nm@ti.com>
 References: <1371849949-12649-1-git-send-email-nm@ti.com>
-Message-ID: <1371849949-12649-8-git-send-email-nm@ti.com>
+Message-ID: <1371849949-12649-9-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike other OMAP4 platforms including the the "vanilla" PandaBoard,
-PandaBoard-ES uses TPS62361 to supply vdd_mpu.
+TPS62361 is used for cpufreq regulation. As part of this change
+use labels that can be used to reference cpu0 to setup it's supply.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/boot/dts/omap4-panda-es.dts |   18 ++++++++++++++++++
- arch/arm/boot/dts/tps62361_omap.dtsi |   18 ++++++++++++++++++
- 2 files changed, 36 insertions(+)
- create mode 100644 arch/arm/boot/dts/tps62361_omap.dtsi
+ arch/arm/boot/dts/omap4-panda-es.dts |    4 ++++
+ arch/arm/boot/dts/omap4.dtsi         |    4 ++--
+ arch/arm/boot/dts/omap443x.dtsi      |    2 +-
+ arch/arm/boot/dts/omap4460.dtsi      |    2 +-
+ 4 files changed, 8 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-index 49017c5..325816c 100644
+index 325816c..d2ce518 100644
 --- a/arch/arm/boot/dts/omap4-panda-es.dts
 +++ b/arch/arm/boot/dts/omap4-panda-es.dts
-@@ -75,3 +75,21 @@
- 	/* We use TPS62361 on this platform instead */
- 	status = "disabled";
+@@ -93,3 +93,7 @@
+ 	>;
+ 	gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
  };
 +
-+#include "tps62361_omap.dtsi"
-+
-+&omap4_pmx_wkup {
-+	tps62361_wkgpio_pins: pinmux_tps62361_wkpins {
-+		pinctrl-single,pins = <
-+			0x1a (PIN_OUTPUT | MUX_MODE3 | OFF_EN | OFFOUT_VAL) /* gpio_wk7 */
-+		>;
-+	};
++&cpu0 {
++	cpu0-supply = <&omap_tps62361>;
 +};
-+
-+&omap_tps62361 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+		&tps62361_wkgpio_pins
-+	>;
-+	gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-+};
-diff --git a/arch/arm/boot/dts/tps62361_omap.dtsi b/arch/arm/boot/dts/tps62361_omap.dtsi
-new file mode 100644
-index 0000000..ee261ec
---- /dev/null
-+++ b/arch/arm/boot/dts/tps62361_omap.dtsi
-@@ -0,0 +1,18 @@
-+/*
-+ * TPS62361 entries specific for OMAP
-+ *
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ *	Nishanth Menon
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/ {
-+	omap_tps62361: tps62361 {
-+		compatible = "ti,omap-tps62361";
-+		ti,boot-voltage-micro-volts = <1203000>;
-+		ti,vp = <&vp_mpu>;
-+	};
-+};
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 3c75b23..127b974 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -24,13 +24,13 @@
+ 	};
+ 
+ 	cpus {
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			compatible = "arm,cortex-a9";
+ 			next-level-cache = <&L2>;
+ 			clocks = <&dpll_mpu>;
+ 			clock-names = "cpu";
+ 		};
+-		cpu at 1 {
++		cpu1: cpu at 1 {
+ 			compatible = "arm,cortex-a9";
+ 			next-level-cache = <&L2>;
+ 		};
+diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
+index e759937..91a5f70 100644
+--- a/arch/arm/boot/dts/omap443x.dtsi
++++ b/arch/arm/boot/dts/omap443x.dtsi
+@@ -12,7 +12,7 @@
+ 
+ / {
+ 	cpus {
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			/* OMAP443x variants OPP50-OPPNT */
+ 			operating-points = <
+ 				/* kHz    uV */
+diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+index 8320865..9827e35 100644
+--- a/arch/arm/boot/dts/omap4460.dtsi
++++ b/arch/arm/boot/dts/omap4460.dtsi
+@@ -12,7 +12,7 @@
+ / {
+ 	cpus {
+ 		/* OMAP446x 'standard device' variants OPP50 to OPPTurbo */
+-		cpu at 0 {
++		cpu0: cpu@0 {
+ 			operating-points = <
+ 				/* kHz    uV */
+ 				350000  1025000
 -- 
 1.7.9.5
