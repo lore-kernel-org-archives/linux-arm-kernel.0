@@ -1,93 +1,71 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 21 Jun 2013 12:28:48 +0200
-Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
- pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
-In-Reply-To: <51C2EBCD.4070206@pengutronix.de>
-References: <51C2C0B5.8020802@pengutronix.de> <20130620095705.GA18536@arm.com>
- <51C2D5EF.3040803@pengutronix.de> <20130620102856.GC18536@arm.com>
- <20130620111255.GD18536@arm.com> <51C2E917.9000708@pengutronix.de>
- <51C2EA04.4060701@pengutronix.de> <51C2EBCD.4070206@pengutronix.de>
-Message-ID: <51C42AE0.9070506@pengutronix.de>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Fri, 21 Jun 2013 16:05:35 +0530
+Subject: [PATCH v12 08/11] spi: omap2-mcspi: add generic DMA request
+ support to the DT binding
+In-Reply-To: <1371762407-24544-9-git-send-email-joelagnel@ti.com>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <1371762407-24544-9-git-send-email-joelagnel@ti.com>
+Message-ID: <51C42C77.90909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2013 01:47 PM, Marc Kleine-Budde wrote:
-> On 06/20/2013 01:39 PM, Marc Kleine-Budde wrote:
->> On 06/20/2013 01:35 PM, Marc Kleine-Budde wrote:
->>> On 06/20/2013 01:12 PM, Catalin Marinas wrote:
->>>> On Thu, Jun 20, 2013 at 11:28:56AM +0100, Catalin Marinas wrote:
->>>>> We may need to place the preempt disable/enable at a higher level in the
->>>>> scheduler. My theory is that we have a context switch from prev to next.
->>>>> We get preempted just before finish_arch_post_lock_switch(), so the MMU
->>>>> hasn't been switched yet. The new switch during preemption happens to a
->>>>> thread with the same next mm, so the scheduler no longer switch_mm() and
->>>>> the TIF_SWITCH_MM isn't set for the new thread.
->>>>>
->>>>> I'll come back with another patch shortly.
->>>>
->>>> Here's another attempt (as before, only compile-tested):
->>>
->>> booting kernel from /image
->>> zImage: concatenated oftree detected
->>> booting Linux kernel with devicetree
->>>
->>> ...dead...
->>>
->>> Does every process have a "mm"? Even Kernel threads?
-> 
-> I've added a check for "mm". Boots now and my test runs stable for 3
-> minutes now.
-> 
-> I'm not sure if we have to check for "mm" in
-> check_and_switch_context(), too.
-> 
-> Thanks,
-> Marc
+Hi Benoit,
+On Friday 21 June 2013 02:36 AM, Joel A Fernandes wrote:
+> From: Matt Porter<mporter@ti.com>
+>
+> The binding definition is based on the generic DMA request binding
+>
+> Signed-off-by: Matt Porter<mporter@ti.com>
+> Signed-off-by: Joel A Fernandes<joelagnel@ti.com>
 > ---
-> 
-> From 306d84d5f0645a86e86d539be0546c4ac758d3d4 Mon Sep 17 00:00:00 2001
-> From: Catalin Marinas <catalin.marinas@arm.com>
-> Date: Thu, 20 Jun 2013 12:12:55 +0100
-> Subject: [PATCH] arm: Fix deferred mm switch on VIVT processors
-> 
-> As of commit b9d4d42ad9 (ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
-> pre-ARMv6 CPUs), the mm switching on VIVT processors is done in the
-> finish_arch_post_lock_switch() function to avoid whole cache flushing
-> with interrupts disabled. The need for deferred mm switch is stored as a
-> thread flag (TIF_SWITCH_MM). However, with preemption enabled, we can
-> have another thread switch before finish_arch_post_lock_switch(). If the
-> new thread has the same mm as the previous 'next' thread, the scheduler
-> will not call switch_mm() and the TIF_SWITCH_MM flag won't be set for
-> the new thread.
-> 
-> This patch moves the switch pending flag to the mm_context_t structure
-> since this is specific to the mm rather than thread.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Reported-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> [mkl: add check for mm]
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>   Documentation/devicetree/bindings/spi/omap-spi.txt |   27 +++++++++++++++++++-
+>   1 file changed, 26 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/spi/omap-spi.txt b/Documentation/devicetree/bindings/spi/omap-spi.txt
+> index 938809c..4c85c4c 100644
+> --- a/Documentation/devicetree/bindings/spi/omap-spi.txt
+> +++ b/Documentation/devicetree/bindings/spi/omap-spi.txt
+> @@ -10,7 +10,18 @@ Required properties:
+>   			  input. The default is D0 as input and
+>   			  D1 as output.
+>
+> -Example:
+> +Optional properties:
+> +- dmas: List of DMA specifiers with the controller specific format
+> +	as described in the generic DMA client binding. A tx and rx
+> +	specifier is required for each chip select.
+> +- dma-names: List of DMA request names. These strings correspond
+> +	1:1 with the DMA specifiers listed in dmas. The string naming
+> +	is to be "rxN" and "txN" for RX and TX requests,
+> +	respectively, where N equals the chip select number.
+> +
+> +Examples:
+> +
+> +[hwmod populated DMA resources]
+>
+>   mcspi1: mcspi at 1 {
+>       #address-cells =<1>;
+> @@ -20,3 +31,17 @@ mcspi1: mcspi at 1 {
+>       ti,spi-num-cs =<4>;
+>   };
+>
+> +[generic DMA request binding]
+> +
+> +mcspi1: mcspi at 1 {
+> +    #address-cells =<1>;
+> +    #size-cells =<0>;
+> +    compatible = "ti,omap4-mcspi";
+> +    ti,hwmods = "mcspi1";
+> +    ti,spi-num-cs =<2>;
+> +    dmas =<&edma 42
+> +	&edma 43
+> +	&edma 44
+> +	&edma 45>;
+> +    dma-names = "tx0", "rx0", "tx1", "rx1";
+> +};
+If the patch looks good to you, these can go independently in your
+tree.
 
-Works on $CUSTOMERS's hardware.
+Reviewed-by: Sourav Poddar <sourav.poddar@ti.com>
 
-Tested-by: Marc Kleine-Budde <mkl@pengutronix.de>
-
-Catalin, do you take care of the patch? Please add stable on Cc. The fix
-is needed on kernels >= v3.5.
-
-regards,
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/1f4e3652/attachment.sig>
+~Sourav
