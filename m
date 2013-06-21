@@ -1,35 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 21 Jun 2013 17:41:40 +0100
-Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
- MMU binding
-In-Reply-To: <20130621135507.GI11309@8bytes.org>
-References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
- <1370889285-22799-8-git-send-email-will.deacon@arm.com>
- <20130620200845.GF11309@8bytes.org>
- <20130621095729.GA7766@mudshark.cambridge.arm.com>
- <20130621135507.GI11309@8bytes.org>
-Message-ID: <20130621164139.GK7766@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Jun 2013 17:42:57 +0100
+Subject: [PATCH 0/3] clk: Add APM X-Gene SoC clock driver
+In-Reply-To: <1371828605-18053-1-git-send-email-lho@apm.com>
+References: <1371828605-18053-1-git-send-email-lho@apm.com>
+Message-ID: <20130621164257.GB25228@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 02:55:08PM +0100, Joerg Roedel wrote:
-> On Fri, Jun 21, 2013 at 10:57:29AM +0100, Will Deacon wrote:
-> > This is a common driver that will support any IOMMUs compatible with v1 or
-> > v2 of the ARM SMMU architecture. Currently, that includes SMMUs known
-> > informatively as MMU-400, MMU-401 and MMU-500. I had a look at the other
-> > IOMMU drivers in the kernel and they seem to be driving incompatible IOMMUs,
-> > so I don't see how this driver can replace those.
-> > 
-> > However, we'll hopefully see ARM SMMU-compatible devices turning up soon (I
-> > know of many SoCs in development that are looking at them).
+On Fri, Jun 21, 2013 at 04:30:02PM +0100, Loc Ho wrote:
+> This patch adds APM X-Gene SoC clock driver support. Reference,
+> PCP PLL, SoC PCP, and Ethernet clocks are defined via the DTS.
 > 
-> That sounds great. So in the future there will be a single driver for
-> most future SOCs. This is a real improvement over the current situation.
+> Loc Ho (3):
+>   clk: Add APM X-Gene SoC clock driver with reference, PLL, and device
+>     clocks.
+>   clk: arm64: Add DTS clock entry for APM X-Gene Storm SoC.
+>   Documentation: Add documentation for APM X-Gene clock binding.
 > 
-> From NVidia is another driver with 'smmu' in its name, is that one also
-> incompatible?
+>  Documentation/devicetree/bindings/clock/xgene.txt |   90 ++++
+>  arch/arm64/boot/dts/apm-storm.dtsi                |   75 +++
+>  drivers/clk/Kconfig                               |    7 +
+>  drivers/clk/Makefile                              |    1 +
+>  drivers/clk/clk-xgene.c                           |  538 +++++++++++++++++++++
+>  5 files changed, 711 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/xgene.txt
+>  create mode 100644 drivers/clk/clk-xgene.c
 
-Yup. I even checked with Stephen Warren before I started my driver, just in
-case :)
+You'll have to send these patches to Mike Turquette (cc'ed), they are
+not being merged via the arm64 tree.
 
-Will
+Thanks.
+
+-- 
+Catalin
