@@ -1,54 +1,113 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 21 Jun 2013 18:21:59 -0300
-Subject: [PATCH 1/2] clk: mxs: clk-imx28: Provide a dummy clock
-Message-ID: <1371849720-14506-1-git-send-email-festevam@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 21 Jun 2013 16:25:45 -0500
+Subject: [RFC PATCH V2 4/8] ARM: dts: OMAP4: add voltage controller nodes
+In-Reply-To: <1371849949-12649-1-git-send-email-nm@ti.com>
+References: <1371849949-12649-1-git-send-email-nm@ti.com>
+Message-ID: <1371849949-12649-5-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+OMAP443x, OMAP446x SoC use same offsets for voltage controller,
+however their voltage characteristics differ a little.
 
-Sometimes it is useful to be able to pass a dummy clock for a driver.
+Introduce the voltage controller nodes for the same.
 
-Add support for a dummy clock.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- Documentation/devicetree/bindings/clock/imx28-clock.txt | 1 +
- drivers/clk/mxs/clk-imx28.c                             | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/omap4.dtsi    |   26 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap443x.dtsi |   15 +++++++++++++++
+ arch/arm/boot/dts/omap4460.dtsi |   16 ++++++++++++++++
+ 3 files changed, 57 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/imx28-clock.txt b/Documentation/devicetree/bindings/clock/imx28-clock.txt
-index e6587af..5a153ef 100644
---- a/Documentation/devicetree/bindings/clock/imx28-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/imx28-clock.txt
-@@ -76,6 +76,7 @@ clocks and IDs.
- 	usb0_phy	62
- 	usb1_phy	63
- 	enet_out	64
-+	dummy		65
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 3b44546..a153e8d 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -104,6 +104,11 @@
+ 			ti,hwmods = "counter_32k";
+ 		};
  
- Examples:
- 
-diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-index 4faf0af..6b55211 100644
---- a/drivers/clk/mxs/clk-imx28.c
-+++ b/drivers/clk/mxs/clk-imx28.c
-@@ -143,7 +143,7 @@ enum imx28_clk {
- 	emi_xtal, lcdif_div, etm_div, ptp, saif0_div, saif1_div,
- 	clk32k_div, rtc, lradc, spdif_div, clk32k, pwm, uart, ssp0,
- 	ssp1, ssp2, ssp3, gpmi, spdif, emi, saif0, saif1, lcdif, etm,
--	fec, can0, can1, usb0, usb1, usb0_phy, usb1_phy, enet_out,
-+	fec, can0, can1, usb0, usb1, usb0_phy, usb1_phy, enet_out, dummy,
- 	clk_max
++		sysclk_in: sys_clkin {
++			#clock-cells = <0>;
++			compatible = "ti,omap-clock";
++		};
++
+ 		dpll_mpu: dpll_mpu {
+ 			#clock-cells = <0>;
+ 			compatible = "ti,omap-clock";
+@@ -663,5 +668,26 @@
+ 			ram-bits = <12>;
+ 			ti,has-mailbox;
+ 		};
++
++		vc: vc at 0x4A307B88 {
++			compatible = "ti,omap4-vc";
++			clocks = <&sysclk_in>;
++			reg = <0x4A307B88 0x40>;
++			reg-names = "base-address";
++
++			ti,i2c-high-speed; /* belongs to board file */
++			vc_mpu: vc_mpu {
++				compatible = "ti,omap4-vc-channel-mpu";
++				ti,master-channel;
++			};
++
++			vc_iva: vc_iva {
++				compatible = "ti,omap4-vc-channel-iva";
++			};
++
++			vc_core: vc_core {
++				compatible = "ti,omap4-vc-channel-core";
++			};
++		};
+ 	};
  };
- 
-@@ -234,6 +234,7 @@ int __init mx28_clocks_init(void)
- 	clks[usb0_phy] = clk_register_gate(NULL, "usb0_phy", "pll0", 0, PLL0CTRL0, 18, 0, &mxs_lock);
- 	clks[usb1_phy] = clk_register_gate(NULL, "usb1_phy", "pll1", 0, PLL1CTRL0, 18, 0, &mxs_lock);
- 	clks[enet_out] = clk_register_gate(NULL, "enet_out", "pll2", 0, ENET, 18, 0, &mxs_lock);
-+	clks[dummy] = mxs_clk_fixed("dummy", 0);
- 
- 	for (i = 0; i < ARRAY_SIZE(clks); i++)
- 		if (IS_ERR(clks[i])) {
+diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
+index bcf455e..2b0deb5 100644
+--- a/arch/arm/boot/dts/omap443x.dtsi
++++ b/arch/arm/boot/dts/omap443x.dtsi
+@@ -31,3 +31,18 @@
+ 		compatible = "ti,omap4430-bandgap";
+ 	};
+ };
++
++&vc_mpu {
++	ti,retention-micro-volts = <750000>;
++	ti,off-micro-volts = <0>;
++};
++
++&vc_iva {
++	ti,retention-micro-volts = <750000>;
++	ti,off-micro-volts = <0>;
++};
++
++&vc_core {
++	ti,retention-micro-volts = <750000>;
++	ti,off-micro-volts = <0>;
++};
+diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+index c2f0f39..16210a1 100644
+--- a/arch/arm/boot/dts/omap4460.dtsi
++++ b/arch/arm/boot/dts/omap4460.dtsi
+@@ -39,3 +39,19 @@
+ 		gpios = <&gpio3 22 0>; /* tshut */
+ 	};
+ };
++
++&vc_mpu {
++	ti,retention-micro-volts = <750000>;
++	/* Erratum i738: Reliability impact work around */
++	ti,off-micro-volts = <750000>;
++};
++
++&vc_iva {
++	ti,retention-micro-volts = <750000>;
++	ti,off-micro-volts = <0>;
++};
++
++&vc_core {
++	ti,retention-micro-volts = <750000>;
++	ti,off-micro-volts = <0>;
++};
 -- 
-1.8.1.2
+1.7.9.5
