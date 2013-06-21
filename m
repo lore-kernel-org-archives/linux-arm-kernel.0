@@ -1,48 +1,27 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 21 Jun 2013 13:20:26 -0400
-Subject: [PATCH] of: Specify initrd location using 64-bit
-In-Reply-To: <51C4171C.9050908@linutronix.de>
-References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
- <51C4171C.9050908@linutronix.de>
-Message-ID: <51C48B5A.2040404@ti.com>
+From: dsd@laptop.org (Daniel Drake)
+Date: Fri, 21 Jun 2013 11:31:05 -0600
+Subject: [V2 6/7] video: mmp: calculate pitch value when fb set win
+In-Reply-To: <1370879585-11452-1-git-send-email-jtzhou@marvell.com>
+References: <1370879585-11452-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <CAMLZHHRLv+qZXVOkZSH2FDxanhy6xitYgCbF3DHXS-8FEWNfuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 June 2013 05:04 AM, Sebastian Andrzej Siewior wrote:
-> On 06/21/2013 02:52 AM, Santosh Shilimkar wrote:
->> diff --git a/arch/microblaze/kernel/prom.c b/arch/microblaze/kernel/prom.c
->> index 0a2c68f..62e2e8f 100644
->> --- a/arch/microblaze/kernel/prom.c
->> +++ b/arch/microblaze/kernel/prom.c
->> @@ -136,8 +136,7 @@ void __init early_init_devtree(void *params)
->>  }
->>  
->>  #ifdef CONFIG_BLK_DEV_INITRD
->> -void __init early_init_dt_setup_initrd_arch(unsigned long start,
->> -		unsigned long end)
->> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
->>  {
->>  	initrd_start = (unsigned long)__va(start);
->>  	initrd_end = (unsigned long)__va(end);
-> 
-> I think it would better to go here for phys_addr_t instead of u64. This
-> would force you in of_flat_dt_match() to check if the value passed from
-> DT specifies a memory address outside of 32bit address space and the
-> kernel can't deal with this because its phys_addr_t is 32bit only due
-> to a Kconfig switch.
-> 
-> For x86, the initrd has to remain in the 32bit address space so passing
-> the initrd in the upper range would violate the ABI. Not sure if this
-> is true for other archs as well (ARM obviously not).
-> 
-That pretty much means phys_addr_t. It will work for me as well but
-in last thread from consistency with memory and reserved node, Rob
-insisted to keep it as u64. So before I re-spin another version,
-would like to here what Rob has to say considering the x86 requirement.
+On Mon, Jun 10, 2013 at 9:53 AM, Jett.Zhou <jtzhou@marvell.com> wrote:
+> From: Jing Xiang <jxiang@marvell.com>
+>
+> Add new func mmpfb_set_win to make code clean, it will calculate pitch
+> value when fb set win in mmpfb_set_win.
 
-Rob,
-Are you ok with phys_addr_t since your concern was about rest
-of the memory specific bits of the device-tree code use u64 ?
+It looks like a good idea to create a function for setting window
+parameters from fb info, but this patch also starts to write into the
+pitch[] fields which are not used anywhere. You should rework these
+patches so that the pitch field is introduced, set, and consumed all
+in the same patch.
 
-Regards,
-Santosh
+The commit message for the patch that added pitch[] seems to suggest
+that pitch[1] and pitch[2] are used for YUV formats. But in the code
+posted here, they will not be used for PIXFMT_YUYV, PIXFMT_UYVY, etc.
+
+Thanks,
+Daniel
