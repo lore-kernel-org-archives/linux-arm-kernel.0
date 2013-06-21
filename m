@@ -1,205 +1,264 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 21 Jun 2013 18:03:10 +0300
-Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
-Message-ID: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 21 Jun 2013 17:17:36 +0200
+Subject: [PATCH] ARM: at91: fix at91_extern_irq usage for non-dt boards
+Message-ID: <1371827856-19898-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before switching to DT pinctrl states of OMAP IPs have been handled by hwmod
-framework. After switching to DT-boot the pinctrl handling was dropped from
-hwmod framework and, as it was recommended, OMAP IP's drivers have to be updated
-to handle pinctrl states by itself using pinctrl_pm_select_xx() helpers
-(see http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173514.html)
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-But this is not right for OMAP2+ SoC where real IPs state is controlled
-by omap_device core which enables/disables modules & clocks actually.
+Since 4b68520dc0ec96153bc0d87bca5ffba508edfcf
+ARM: at91: add AIC5 support
 
-For example, if OMAP I2C driver will handle pinctrl state during system wide
-suspend the following issue may occure:
-- suspend_noirq - I2C device can be still active because of PM auto-suspend
-  |-_od_suspend_noirq
-     |- omap_i2c_suspend_noirq
-        |- PINs state set to SLEEP
-  |- pm_generic_runtime_suspend
-     |- omap_i2c_runtime_suspend()
-        |- PINs state set to IDLE  <--- *oops* PINs state is IDLE and not SLEEP
-  |- omap_device_idle()
-     |- omap_hwmod_idle()
-        |- _idle()
-           |- disbale module (sysc&clocks)
+we allocate the at91_extern_irq.
 
-- resume_noirq - I2C was active before suspend
-  |-_od_resume_noirq
-     |- omap_hwmod_enable()
-        |- _enable()
-           |- enable module (sysc&clocks)
-     |- pm_generic_runtime_resume
-        |- omap_i2c_runtime_resume()
-           |- PINs state set to DEFAULT  <--- !!!!
-     |- omap_i2c_resume_noirq
-        |- PINs state set to DEFAULT
-        |- PINs state set to IDLE  <--- *big oops* we have active module and its
-                                         PINs state is IDLE
-(see https://patchwork.kernel.org/patch/2642101/)
+This patch makes it static and stores the non-dt extern irq in the soc
+structure. It is then possible to use a at91_get_extern_irq() function
+to get the value for outside of the irq driver. It is useful for passing
+its value to at91_aic_init().
 
-Of course, everything can be handled by adding a tons of code in ecah driver to
-check PM state of device and override default behavior of omap_device core, but
-this not good.
-
-Hence, add pinctrl handling in omap_device core:
-1) on PM runtime resume
-- switch pinctrl state to "default" (todo: "active")
-2) on PM runtime suspend
-- switch pinctrl state to "idle"
-3) during system wide suspend
-- switch pinctrl state to "sleep" or "idle" if omap_device core disables device
-- switch pinctrl state to "sleep" if device is disabled already
-4) during system wide resume
-- switch pinctrl state to "default" (todo: "active") if omap_device core has
-  disabled  device during suspend
-- switch pinctrl state to "idle" if device was already disabled before suspend
-
-This will enable pinctrl for all OMAP2+ IP's drivers by default -
-no changes in code is needed and only DT data will need to be updated
-(add "default", "active", "idle", "sleep" states).
-
-This will enable pinctrl handling for all OMAP2+ drivers by default -
-no changes in code is needed and only DT data will need to be updated
-(add "default", "active", "idle", "sleep" states).
-
-Related discussions:
-- [3/3] i2c: nomadik: use pinctrl PM helpers 
- https://patchwork.kernel.org/patch/2670291/
-- mmc: omap_hsmmc: Remux pins to support SDIO interrupt and PM runtime
- https://patchwork.kernel.org/patch/2690191/
-- [PATCH 00/11] drivers: Add Pinctrl PM support
- https://lkml.org/lkml/2013/5/31/210
-
-CC: Hebbar Gururaja <gururaja.hebbar@ti.com>
-CC: Linus Walleij  <linus.walleij@linaro.org>
-CC: linux-arm-kernel at lists.infradead.org
-CC: linux-omap at vger.kernel.org
-CC: linux-kernel at vger.kernel.org 
-
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+[nicolas.ferre at atmel.com: rework commit message]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
-Hi Kevin, Tony,
+ arch/arm/mach-at91/at91rm9200.c  | 8 ++++----
+ arch/arm/mach-at91/at91sam9260.c | 4 ++--
+ arch/arm/mach-at91/at91sam9261.c | 4 ++--
+ arch/arm/mach-at91/at91sam9263.c | 2 +-
+ arch/arm/mach-at91/at91sam9g45.c | 2 +-
+ arch/arm/mach-at91/at91sam9rl.c  | 2 +-
+ arch/arm/mach-at91/at91x40.c     | 7 +++----
+ arch/arm/mach-at91/generic.h     | 2 +-
+ arch/arm/mach-at91/irq.c         | 9 ++++++++-
+ arch/arm/mach-at91/pm.c          | 2 +-
+ arch/arm/mach-at91/setup.c       | 2 +-
+ arch/arm/mach-at91/soc.h         | 1 +
+ 12 files changed, 26 insertions(+), 19 deletions(-)
 
-I've verified this patch on OMAP4 SDP board:
-- PM runtime for I2C4, UART2, UART3
-- suspend/resume with I2C4, UART2, UART3
-
-seems it works and pinctrl states have been updated as expected.
-
-TODO:
-- need to be rebased when support for "active" state  will be added.
-- need to be rebased when "Omap serial cleanup" patch series will be merged
-  https://lkml.org/lkml/2013/4/26/503
-
-based on top of:
- git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
-849aa58 Add linux-next specific files for 20130620
-
-Best regards
-- grygorii
-
- arch/arm/mach-omap2/omap_device.c |   45 ++++++++++++++++++++++++++++++++-----
- 1 file changed, 39 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index e37feb2..d8cf17b 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -39,6 +39,7 @@
- #include "soc.h"
- #include "omap_device.h"
- #include "omap_hwmod.h"
-+#include "iomap.h"
- 
- /* Private functions */
- 
-@@ -585,8 +586,10 @@ static int _od_runtime_suspend(struct device *dev)
- 
- 	ret = pm_generic_runtime_suspend(dev);
- 
--	if (!ret)
-+	if (!ret) {
- 		omap_device_idle(pdev);
-+		pinctrl_pm_select_idle_state(dev);
-+	}
- 
- 	return ret;
- }
-@@ -595,12 +598,26 @@ static int _od_runtime_resume(struct device *dev)
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index d193a40..9eb5743 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -332,10 +332,6 @@ static void __init at91rm9200_initialize(void)
  {
- 	struct platform_device *pdev = to_platform_device(dev);
+ 	arm_pm_idle = at91rm9200_idle;
+ 	arm_pm_restart = at91rm9200_restart;
+-	at91_extern_irq = (1 << AT91RM9200_ID_IRQ0) | (1 << AT91RM9200_ID_IRQ1)
+-			| (1 << AT91RM9200_ID_IRQ2) | (1 << AT91RM9200_ID_IRQ3)
+-			| (1 << AT91RM9200_ID_IRQ4) | (1 << AT91RM9200_ID_IRQ5)
+-			| (1 << AT91RM9200_ID_IRQ6);
  
-+	/* TODO: should be replaced to pinctrl_pm_select_active_state() */
-+	pinctrl_pm_select_default_state(dev);
-+
- 	omap_device_enable(pdev);
+ 	/* Initialize GPIO subsystem */
+ 	at91_gpio_init(at91rm9200_gpio,
+@@ -388,6 +384,10 @@ static unsigned int at91rm9200_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ AT91_SOC_START(at91rm9200)
+ 	.map_io = at91rm9200_map_io,
+ 	.default_irq_priority = at91rm9200_default_irq_priority,
++	.extern_irq = (1 << AT91RM9200_ID_IRQ0) | (1 << AT91RM9200_ID_IRQ1)
++		    | (1 << AT91RM9200_ID_IRQ2) | (1 << AT91RM9200_ID_IRQ3)
++		    | (1 << AT91RM9200_ID_IRQ4) | (1 << AT91RM9200_ID_IRQ5)
++		    | (1 << AT91RM9200_ID_IRQ6),
+ 	.ioremap_registers = at91rm9200_ioremap_registers,
+ 	.register_clocks = at91rm9200_register_clocks,
+ 	.init = at91rm9200_initialize,
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index a8ce245..5de6074 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -348,8 +348,6 @@ static void __init at91sam9260_initialize(void)
+ {
+ 	arm_pm_idle = at91sam9_idle;
+ 	arm_pm_restart = at91sam9_alt_restart;
+-	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
+-			| (1 << AT91SAM9260_ID_IRQ2);
  
- 	return pm_generic_runtime_resume(dev);
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9260_gpio, 3);
+@@ -400,6 +398,8 @@ static unsigned int at91sam9260_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ AT91_SOC_START(at91sam9260)
+ 	.map_io = at91sam9260_map_io,
+ 	.default_irq_priority = at91sam9260_default_irq_priority,
++	.extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
++		    | (1 << AT91SAM9260_ID_IRQ2),
+ 	.ioremap_registers = at91sam9260_ioremap_registers,
+ 	.register_clocks = at91sam9260_register_clocks,
+ 	.init = at91sam9260_initialize,
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index 25efb5a..0e07932 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -290,8 +290,6 @@ static void __init at91sam9261_initialize(void)
+ {
+ 	arm_pm_idle = at91sam9_idle;
+ 	arm_pm_restart = at91sam9_alt_restart;
+-	at91_extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 << AT91SAM9261_ID_IRQ1)
+-			| (1 << AT91SAM9261_ID_IRQ2);
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9261_gpio, 3);
+@@ -342,6 +340,8 @@ static unsigned int at91sam9261_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ AT91_SOC_START(at91sam9261)
+ 	.map_io = at91sam9261_map_io,
+ 	.default_irq_priority = at91sam9261_default_irq_priority,
++	.extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 << AT91SAM9261_ID_IRQ1)
++		    | (1 << AT91SAM9261_ID_IRQ2),
+ 	.ioremap_registers = at91sam9261_ioremap_registers,
+ 	.register_clocks = at91sam9261_register_clocks,
+ 	.init = at91sam9261_initialize,
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index f44ffd2..6ce7d18 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -327,7 +327,6 @@ static void __init at91sam9263_initialize(void)
+ {
+ 	arm_pm_idle = at91sam9_idle;
+ 	arm_pm_restart = at91sam9_alt_restart;
+-	at91_extern_irq = (1 << AT91SAM9263_ID_IRQ0) | (1 << AT91SAM9263_ID_IRQ1);
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9263_gpio, 5);
+@@ -378,6 +377,7 @@ static unsigned int at91sam9263_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ AT91_SOC_START(at91sam9263)
+ 	.map_io = at91sam9263_map_io,
+ 	.default_irq_priority = at91sam9263_default_irq_priority,
++	.extern_irq = (1 << AT91SAM9263_ID_IRQ0) | (1 << AT91SAM9263_ID_IRQ1),
+ 	.ioremap_registers = at91sam9263_ioremap_registers,
+ 	.register_clocks = at91sam9263_register_clocks,
+ 	.init = at91sam9263_initialize,
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 8b7fce0..fda5026 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -374,7 +374,6 @@ static void __init at91sam9g45_initialize(void)
+ {
+ 	arm_pm_idle = at91sam9_idle;
+ 	arm_pm_restart = at91sam9g45_restart;
+-	at91_extern_irq = (1 << AT91SAM9G45_ID_IRQ0);
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9g45_gpio, 5);
+@@ -425,6 +424,7 @@ static unsigned int at91sam9g45_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ AT91_SOC_START(at91sam9g45)
+ 	.map_io = at91sam9g45_map_io,
+ 	.default_irq_priority = at91sam9g45_default_irq_priority,
++	.extern_irq = (1 << AT91SAM9G45_ID_IRQ0),
+ 	.ioremap_registers = at91sam9g45_ioremap_registers,
+ 	.register_clocks = at91sam9g45_register_clocks,
+ 	.init = at91sam9g45_initialize,
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index f77fae5..d4ec0d9 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -293,7 +293,6 @@ static void __init at91sam9rl_initialize(void)
+ {
+ 	arm_pm_idle = at91sam9_idle;
+ 	arm_pm_restart = at91sam9_alt_restart;
+-	at91_extern_irq = (1 << AT91SAM9RL_ID_IRQ0);
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9rl_gpio, 4);
+@@ -344,6 +343,7 @@ static unsigned int at91sam9rl_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ AT91_SOC_START(at91sam9rl)
+ 	.map_io = at91sam9rl_map_io,
+ 	.default_irq_priority = at91sam9rl_default_irq_priority,
++	.extern_irq = (1 << AT91SAM9RL_ID_IRQ0),
+ 	.ioremap_registers = at91sam9rl_ioremap_registers,
+ 	.register_clocks = at91sam9rl_register_clocks,
+ 	.init = at91sam9rl_initialize,
+diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
+index 19ca793..bad94b8 100644
+--- a/arch/arm/mach-at91/at91x40.c
++++ b/arch/arm/mach-at91/at91x40.c
+@@ -55,8 +55,6 @@ static void at91x40_idle(void)
+ void __init at91x40_initialize(unsigned long main_clock)
+ {
+ 	arm_pm_idle = at91x40_idle;
+-	at91_extern_irq = (1 << AT91X40_ID_IRQ0) | (1 << AT91X40_ID_IRQ1)
+-			| (1 << AT91X40_ID_IRQ2);
  }
- #endif
  
-+void _od_suspend_sel_pinctrl_state(struct device *dev)
+ /*
+@@ -86,9 +84,10 @@ static unsigned int at91x40_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ 
+ void __init at91x40_init_interrupts(unsigned int priority[NR_AIC_IRQS])
+ {
++	u32  extern_irq = (1 << AT91X40_ID_IRQ0) | (1 << AT91X40_ID_IRQ1)
++			| (1 << AT91X40_ID_IRQ2);
+ 	if (!priority)
+ 		priority = at91x40_default_irq_priority;
+ 
+-	at91_aic_init(priority, at91_extern_irq);
++	at91_aic_init(priority, extern_irq);
+ }
+-
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 78ab065..f6de36a 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -85,4 +85,4 @@ extern void __init at91_gpio_irq_setup(void);
+ extern int  __init at91_gpio_of_irq_setup(struct device_node *node,
+ 					  struct device_node *parent);
+ 
+-extern int at91_extern_irq;
++extern u32 at91_get_extern_irq(void);
+diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
+index e0ca591..3d192c5 100644
+--- a/arch/arm/mach-at91/irq.c
++++ b/arch/arm/mach-at91/irq.c
+@@ -232,7 +232,14 @@ static void __maybe_unused at91_aic5_eoi(struct irq_data *d)
+ 	at91_aic_write(AT91_AIC5_EOICR, 0);
+ }
+ 
+-unsigned long *at91_extern_irq;
++static unsigned long *at91_extern_irq;
++
++u32 at91_get_extern_irq(void)
 +{
-+	if (!dev->pins)
-+		return;
-+	/* try to select *deepest* pinctrl state */
-+	if (IS_ERR(dev->pins->sleep_state))
-+		pinctrl_pm_select_idle_state(dev);
-+	else
-+		pinctrl_pm_select_sleep_state(dev);
++	if (!at91_extern_irq)
++		return 0;
++	return *at91_extern_irq;
 +}
-+
- #ifdef CONFIG_SUSPEND
- static int _od_suspend_noirq(struct device *dev)
+ 
+ #define is_extern_irq(hwirq) test_bit(hwirq, at91_extern_irq)
+ 
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 530db30..15afb5d 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -212,7 +212,7 @@ static int at91_pm_enter(suspend_state_t state)
+ 			(at91_pmc_read(AT91_PMC_PCSR)
+ 					| (1 << AT91_ID_FIQ)
+ 					| (1 << AT91_ID_SYS)
+-					| (at91_extern_irq))
++					| (at91_get_extern_irq()))
+ 				& at91_aic_read(AT91_AIC_IMR),
+ 			state);
+ 
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 942dc00..b17fbcf 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -48,7 +48,7 @@ void __init at91_init_irq_default(void)
+ void __init at91_init_interrupts(unsigned int *priority)
  {
-@@ -613,12 +630,22 @@ static int _od_suspend_noirq(struct device *dev)
- 		return 0;
+ 	/* Initialize the AIC interrupt controller */
+-	at91_aic_init(priority, at91_extern_irq);
++	at91_aic_init(priority, at91_boot_soc.extern_irq);
  
- 	ret = pm_generic_suspend_noirq(dev);
-+	if (!ret) {
-+		if (!pm_runtime_status_suspended(dev)) {
-+			if (pm_generic_runtime_suspend(dev) == 0) {
-+				if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND)) {
-+					omap_device_idle(pdev);
-+					_od_suspend_sel_pinctrl_state(dev);
-+				}
-+			}
+ 	/* Enable GPIO interrupts */
+ 	at91_gpio_irq_setup();
+diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
+index 43a225f..a1e1482 100644
+--- a/arch/arm/mach-at91/soc.h
++++ b/arch/arm/mach-at91/soc.h
+@@ -6,6 +6,7 @@
  
--	if (!ret && !pm_runtime_status_suspended(dev)) {
--		if (pm_generic_runtime_suspend(dev) == 0) {
--			if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
--				omap_device_idle(pdev);
- 			od->flags |= OMAP_DEVICE_SUSPENDED;
-+		} else {
-+			/*
-+			 * "idle" pinctrl state already applied -
-+			 * try to set "sleep" state
-+			 */
-+			pinctrl_pm_select_sleep_state(dev);
- 		}
- 	}
- 
-@@ -633,9 +660,15 @@ static int _od_resume_noirq(struct device *dev)
- 	if ((od->flags & OMAP_DEVICE_SUSPENDED) &&
- 	    !pm_runtime_status_suspended(dev)) {
- 		od->flags &= ~OMAP_DEVICE_SUSPENDED;
--		if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
-+		if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND)) {
- 			omap_device_enable(pdev);
-+			/* TODO: should be replaced to pinctrl_pm_select_active_state() */
-+			pinctrl_pm_select_default_state(dev);
-+		}
- 		pm_generic_runtime_resume(dev);
-+	} else if (!pm_runtime_status_suspended(dev)) {
-+		/* switch back to "idle" pinctrl state */
-+		pinctrl_pm_select_idle_state(dev);
- 	}
- 
- 	return pm_generic_resume_noirq(dev);
+ struct at91_init_soc {
+ 	int builtin;
++	u32 extern_irq;
+ 	unsigned int *default_irq_priority;
+ 	void (*map_io)(void);
+ 	void (*ioremap_registers)(void);
 -- 
-1.7.9.5
+1.8.2.2
