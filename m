@@ -1,31 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Jun 2013 14:48:50 +0200
-Subject: [PATCH 0/3] ARM: ux500: mop500_snowball_ethernet_clock_enable()
- removal
-In-Reply-To: <CACRpkdbpTMm8FG6KSwvq_7BQRGZ0P=PHHb+WikfRE6JqHv8xpw@mail.gmail.com>
-References: <1371545519-27119-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdbpTMm8FG6KSwvq_7BQRGZ0P=PHHb+WikfRE6JqHv8xpw@mail.gmail.com>
-Message-ID: <201306211448.50709.arnd@arndb.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 21 Jun 2013 14:50:16 +0200
+Subject: [PATCH 0/8] ARM: dts: Add camera and barometer sensor support for
+ TRATS2 board
+Message-ID: <1371819024-12596-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Linus Walleij wrote:
-> On Tue, Jun 18, 2013 at 10:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > As requested by you, this gets rid of  mop500_snowball_ethernet_clock_enable()
-> > which is no longer in use. It also straightens out a bug which ensures the
-> > SMSC911x's regulator is turned on at start-up when using Device Tree.
-> >
-> > This is based on your test-merge-20130615 branch.
-> 
-> All are Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> I suggest the ARM SoC folks merge these three patches directly.
-> I've queued 1/3 and 2/3 on my devicetree branch so they won't
-> be lost, but 3/3 does not apply on any of my branches, it
-> needs to be applied directly on some ARM SoC baseline.
-> 
+This patch series includes some fixes and extensions to the Exynos
+dts files to add the camera and barometer sensor support for TRATS2
+board. It depends on a patch from Tomasz adding initial TRATS2
+board dts file [1].
 
-Applied to next/drivers, thanks!
+[1] http://www.spinics.net/lists/arm-kernel/msg253184.html
 
-	Arnd
+Jacek Anaszewski (1):
+  ARM: dts: Add AK8975 device node for Exynos4412 TRATS2 board
+
+Sylwester Nawrocki (7):
+  ARM: dts: Correct camera pinctrl nodes for Exynos4x12 SoCs
+  ARM: dts: Add pinctrl entries for Exynos4x12 FIMC-IS peripherals
+  ARM: dts: Add ISP power domain node for Exynos4x12
+  ARM: dts: Use generic DMA bindings for Exynos4 SPI devices
+  ARM: dts: Add camera nodes for Exynos4 SoCs
+  ARM: dts: Add camera subsystem nodes to exynos4x12.dtsi
+  ARM: dts: Add camera device nodes for Exynos4412 TRATS2 board
+
+ arch/arm/boot/dts/exynos4.dtsi            |   80 +++++++++++++++++--
+ arch/arm/boot/dts/exynos4412-trats2.dts   |  106 +++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4x12-pinctrl.dtsi |   61 ++++++++++++--
+ arch/arm/boot/dts/exynos4x12.dtsi         |  123 +++++++++++++++++++++++++++++
+ 4 files changed, 357 insertions(+), 13 deletions(-)
+
+--
+1.7.9.5
