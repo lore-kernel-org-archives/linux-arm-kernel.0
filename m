@@ -1,165 +1,79 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 21 Jun 2013 15:44:31 +0530
-Subject: [PATCH] ARM: edma: Add EDMA crossbar event mux support
-In-Reply-To: <51C42705.1060803@ti.com>
-References: <51C42705.1060803@ti.com>
-Message-ID: <1371809671-24037-1-git-send-email-nsekhar@ti.com>
+Date: Fri, 21 Jun 2013 15:46:01 +0530
+Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
+In-Reply-To: <1371762407-24544-6-git-send-email-joelagnel@ti.com>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <1371762407-24544-6-git-send-email-joelagnel@ti.com>
+Message-ID: <51C427E1.2000800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matt Porter <mporter@ti.com>
+On 6/21/2013 2:36 AM, Joel A Fernandes wrote:
+> From: Joel A Fernandes <agnel.joel@gmail.com>
+> 
+> Build TI_EDMA by default for ARCH_DAVINCI and ARCH_OMAP2PLUS
+> 
+> Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
 
-EDMA supports a cross bar which provides ability
-to mux additional events into physical channels
-present in the channel controller.
+You should sign-off with author e-mail address.
 
-This is required when the number of events present
-in the system are more than number of available
-physical channels.
+> ---
+>  arch/arm/Kconfig            |    1 +
+>  arch/arm/mach-omap2/Kconfig |    1 +
+>  drivers/dma/Kconfig         |    2 +-
+>  3 files changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index b1c66a4..7d58cd9 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -841,6 +841,7 @@ config ARCH_DAVINCI
+>  	select HAVE_IDE
+>  	select NEED_MACH_GPIO_H
+>  	select TI_PRIV_EDMA
+> +	select DMADEVICES
 
-Changes by Joel:
-* Split EDMA xbar support out of original EDMA DT parsing patch
-to keep it easier for review.
-* Rewrite shift and offset calculation.
+It is generally a bad idea to force select on something that can be
+enabled using menuconfig. Unless used carefully, select causes "unmet
+direct dependency" warnings which folks are already fighting hard to
+fix. This leads to what Russell referred in the past as "select madness" [1]
 
-Suggested-by: Sekhar Nori <nsekhar@ti.com>
-Suggested by: Andy Shevchenko <andy.shevchenko@gmail.com>
-Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-[nsekhar at ti.com: fix checkpatch errors and a minor coding improvement]
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/common/edma.c             |   78 ++++++++++++++++++++++++++++++++++++
- include/linux/platform_data/edma.h |    1 +
- 2 files changed, 79 insertions(+)
+In this particular case, it is perfectly okay to have a DaVinci platform
+without DMA engine support. Drivers figure out they don't have DMA
+support and switch to PIO mode.
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index b3770ab..2b591b1 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -1378,12 +1378,76 @@ EXPORT_SYMBOL(edma_clear_event);
- 
- #if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_DMADEVICES)
- 
-+static int edma_of_read_u32_to_s16_array(const struct device_node *np,
-+					 const char *propname, s16 *out_values,
-+					 size_t sz)
-+{
-+	int ret;
-+
-+	ret = of_property_read_u16_array(np, propname, out_values, sz);
-+	if (ret)
-+		return ret;
-+
-+	/* Terminate it */
-+	*out_values++ = -1;
-+	*out_values++ = -1;
-+
-+	return 0;
-+}
-+
-+static int edma_xbar_event_map(struct device *dev,
-+			       struct device_node *node,
-+			       struct edma_soc_info *pdata, int len)
-+{
-+	int ret, i;
-+	struct resource res;
-+	void __iomem *xbar;
-+	const s16 (*xbar_chans)[2];
-+	u32 shift, offset, mux;
-+
-+	xbar_chans = devm_kzalloc(dev,
-+				  len/sizeof(s16) + 2*sizeof(s16),
-+				  GFP_KERNEL);
-+	if (!xbar_chans)
-+		return -ENOMEM;
-+
-+	ret = of_address_to_resource(node, 1, &res);
-+	if (ret)
-+		return -EIO;
-+
-+	xbar = devm_ioremap(dev, res.start, resource_size(&res));
-+	if (!xbar)
-+		return -ENOMEM;
-+
-+	ret = edma_of_read_u32_to_s16_array(node,
-+					    "ti,edma-xbar-event-map",
-+					    (s16 *)xbar_chans,
-+					    len/sizeof(u32));
-+	if (ret)
-+		return -EIO;
-+
-+	for (i = 0; xbar_chans[i][0] != -1; i++) {
-+		shift = (xbar_chans[i][1] & 0x03) << 3;
-+		offset = xbar_chans[i][1] & 0xfffffffc;
-+		mux = readl(xbar + offset);
-+		mux &= ~(0xff << shift);
-+		mux |= xbar_chans[i][0] << shift;
-+		writel(mux, (xbar + offset));
-+	}
-+
-+	pdata->xbar_chans = xbar_chans;
-+
-+	return 0;
-+}
-+
- static int edma_of_parse_dt(struct device *dev,
- 			    struct device_node *node,
- 			    struct edma_soc_info *pdata)
- {
- 	int ret = 0, i;
- 	u32 value;
-+	struct property *prop;
-+	size_t sz;
- 	struct edma_rsv_info *rsv_info;
- 	s8 (*queue_tc_map)[2], (*queue_priority_map)[2];
- 
-@@ -1439,6 +1503,10 @@ static int edma_of_parse_dt(struct device *dev,
- 
- 	pdata->default_queue = 0;
- 
-+	prop = of_find_property(node, "ti,edma-xbar-event-map", &sz);
-+	if (prop)
-+		ret = edma_xbar_event_map(dev, node, pdata, sz);
-+
- 	return ret;
- }
- 
-@@ -1492,6 +1560,7 @@ static int edma_probe(struct platform_device *pdev)
- 	int			status = -1;
- 	const s16		(*rsv_chans)[2];
- 	const s16		(*rsv_slots)[2];
-+	const s16		(*xbar_chans)[2];
- 	int			irq[EDMA_MAX_CC] = {0, 0};
- 	int			err_irq[EDMA_MAX_CC] = {0, 0};
- 	struct resource		*r[EDMA_MAX_CC] = {NULL};
-@@ -1599,6 +1668,15 @@ static int edma_probe(struct platform_device *pdev)
- 			}
- 		}
- 
-+		/* Clear the xbar mapped channels in unused list */
-+		xbar_chans = info[j]->xbar_chans;
-+		if (xbar_chans) {
-+			for (i = 0; xbar_chans[i][1] != -1; i++) {
-+				off = xbar_chans[i][1];
-+				clear_bits(off, 1,
-+					   edma_cc[j]->edma_unused);
-+			}
-+		}
- 
- 		if (node) {
- 			irq[j] = irq_of_parse_and_map(node, 0);
-diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
-index 317f2be..57300fd 100644
---- a/include/linux/platform_data/edma.h
-+++ b/include/linux/platform_data/edma.h
-@@ -177,6 +177,7 @@ struct edma_soc_info {
- 
- 	s8	(*queue_tc_mapping)[2];
- 	s8	(*queue_priority_mapping)[2];
-+	const s16	(*xbar_chans)[2];
- };
- 
- #endif
--- 
-1.7.10.1
+Add this in defconfig if its useful for most folks using the platform,
+but don't force it for everyone through select.
+
+>  	select USE_OF
+>  	select ZONE_DMA
+>  	help
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index f91b07f..c02f083 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -17,6 +17,7 @@ config ARCH_OMAP2PLUS
+>  	select PROC_DEVICETREE if PROC_FS
+>  	select SOC_BUS
+>  	select SPARSE_IRQ
+> +	select DMADEVICES
+>  	select TI_PRIV_EDMA
+>  	select USE_OF
+>  	help
+> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> index 3215a3c..b2d6f15 100644
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -216,7 +216,7 @@ config TI_EDMA
+>  	depends on ARCH_DAVINCI || ARCH_OMAP
+>  	select DMA_ENGINE
+>  	select DMA_VIRTUAL_CHANNELS
+> -	default n
+> +	default y
+
+Can't see why DMA support should default to y.
+
+Thanks,
+Sekhar
+
+[1] http://lkml.org/lkml/2013/3/4/114
