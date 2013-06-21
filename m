@@ -1,48 +1,36 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 21 Jun 2013 17:36:18 +1000
-Subject: linux-next: manual merge of the akpm tree with the arm-soc tree
-Message-ID: <20130621173618.5e86932305b15b0fe4af6b8b@canb.auug.org.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Jun 2013 09:36:43 +0200
+Subject: [GIT PULL 08/10] Samsung SoC EXYNOS5420 for v3.11
+In-Reply-To: <25bc01ce6e09$b149fc20$13ddf460$%kim@samsung.com>
+References: <51C0BC74.1060502@samsung.com> <201306202258.26968.arnd@arndb.de>
+ <25bc01ce6e09$b149fc20$13ddf460$%kim@samsung.com>
+Message-ID: <201306210936.43780.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Friday 21 June 2013, Kukjin Kim wrote:
+> > I'll probably have to create a next/soc2 branch, but
+> > will first try to merge the Renesas pull requests, which may have
+> > similar problems.
+> > 
+> > If it's possible to rebase this one not to have any dependencies
+> > other than the branches merged into next/cleanup and next/soc,
+> > I can pull it more easily, as long as I can figure out how
+> > to merge it with the common-clk-audio branch.
+> > 
+> I see, BTW as you can see, the common-clk-audio touches all of samsung dt
+> files to use '#include' instead of '/include/' so I couldn't remove the
+> dependencies :( sorry about that.
+> 
+> If anything is required, please kindly let me know.
 
-Today's linux-next merge of the akpm tree got a conflict in
-arch/arm/mach-davinci/include/mach/tnetv107x.h between commit
-b464e3cb2945 ("ARM: davinci: remove __init atrribute from function
-declaration") from the arm-soc tree and commit "reboot: arm: change
-reboot_mode to use enum reboot_mode" from the akpm tree.
+No, we'll figure it out.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+I think a better solution would have been to do the change do the
+dts files in a separate "cleanup" branch and have everything else
+that touches those files build on that branch. That way you could
+have maintained the flat hierarchy.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+I'll just merge it as a 'late' branch for now.
 
-diff --cc arch/arm/mach-davinci/include/mach/tnetv107x.h
-index 366e975,bc9479d..0000000
---- a/arch/arm/mach-davinci/include/mach/tnetv107x.h
-+++ b/arch/arm/mach-davinci/include/mach/tnetv107x.h
-@@@ -51,10 -52,10 +52,10 @@@ struct tnetv107x_device_info 
-  extern struct platform_device tnetv107x_wdt_device;
-  extern struct platform_device tnetv107x_serial_device;
-  
- -extern void __init tnetv107x_init(void);
- -extern void __init tnetv107x_devices_init(struct tnetv107x_device_info *);
- -extern void __init tnetv107x_irq_init(void);
- +extern void tnetv107x_init(void);
- +extern void tnetv107x_devices_init(struct tnetv107x_device_info *);
- +extern void tnetv107x_irq_init(void);
-- void tnetv107x_restart(char mode, const char *cmd);
-+ void tnetv107x_restart(enum reboot_mode mode, const char *cmd);
-  
-  #endif
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130621/0840a9fa/attachment.sig>
+	Arnd
