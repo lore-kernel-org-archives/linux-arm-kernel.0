@@ -1,46 +1,36 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 21 Jun 2013 10:57:21 +0200
-Subject: [PATCH 4/4] staging: drm/imx: ipu-dmfc: use defines for ipu channel
- numbers
-In-Reply-To: <1371805041-9299-1-git-send-email-p.zabel@pengutronix.de>
-References: <1371805041-9299-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1371805041-9299-5-git-send-email-p.zabel@pengutronix.de>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 21 Jun 2013 11:04:28 +0200
+Subject: [PATCH] of: Specify initrd location using 64-bit
+In-Reply-To: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <51C4171C.9050908@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+On 06/21/2013 02:52 AM, Santosh Shilimkar wrote:
+> diff --git a/arch/microblaze/kernel/prom.c b/arch/microblaze/kernel/prom.c
+> index 0a2c68f..62e2e8f 100644
+> --- a/arch/microblaze/kernel/prom.c
+> +++ b/arch/microblaze/kernel/prom.c
+> @@ -136,8 +136,7 @@ void __init early_init_devtree(void *params)
+>  }
+>  
+>  #ifdef CONFIG_BLK_DEV_INITRD
+> -void __init early_init_dt_setup_initrd_arch(unsigned long start,
+> -		unsigned long end)
+> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
+>  {
+>  	initrd_start = (unsigned long)__va(start);
+>  	initrd_end = (unsigned long)__va(end);
 
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c
-index 1dc9817..2e97c33 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c
-@@ -61,7 +61,7 @@ struct dmfc_channel_data {
- 
- static const struct dmfc_channel_data dmfcdata[] = {
- 	{
--		.ipu_channel	= 23,
-+		.ipu_channel	= IPUV3_CHANNEL_MEM_BG_SYNC,
- 		.channel_reg	= DMFC_DP_CHAN,
- 		.shift		= DMFC_DP_CHAN_5B_23,
- 		.eot_shift	= 20,
-@@ -73,13 +73,13 @@ static const struct dmfc_channel_data dmfcdata[] = {
- 		.eot_shift	= 22,
- 		.max_fifo_lines	= 1,
- 	}, {
--		.ipu_channel	= 27,
-+		.ipu_channel	= IPUV3_CHANNEL_MEM_FG_SYNC,
- 		.channel_reg	= DMFC_DP_CHAN,
- 		.shift		= DMFC_DP_CHAN_5F_27,
- 		.eot_shift	= 21,
- 		.max_fifo_lines	= 2,
- 	}, {
--		.ipu_channel	= 28,
-+		.ipu_channel	= IPUV3_CHANNEL_MEM_DC_SYNC,
- 		.channel_reg	= DMFC_WR_CHAN,
- 		.shift		= DMFC_WR_CHAN_1_28,
- 		.eot_shift	= 16,
--- 
-1.8.3.1
+I think it would better to go here for phys_addr_t instead of u64. This
+would force you in of_flat_dt_match() to check if the value passed from
+DT specifies a memory address outside of 32bit address space and the
+kernel can't deal with this because its phys_addr_t is 32bit only due
+to a Kconfig switch.
+
+For x86, the initrd has to remain in the 32bit address space so passing
+the initrd in the upper range would violate the ABI. Not sure if this
+is true for other archs as well (ARM obviously not).
+
+Sebastian
