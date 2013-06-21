@@ -1,74 +1,27 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 21 Jun 2013 16:15:29 +0200
-Subject: [PATCH v3 4/4] ARM: dts: mvebu: Introduce a new compatible string
- for mv64xxx-i2c
-In-Reply-To: <20130621140707.GO31667@titan.lakedaemon.net>
-References: <1371821529-13791-1-git-send-email-gregory.clement@free-electrons.com>
- <1371821529-13791-5-git-send-email-gregory.clement@free-electrons.com>
- <20130621140707.GO31667@titan.lakedaemon.net>
-Message-ID: <51C46001.30500@gmail.com>
+From: linux@rasmusvillemoes.dk (Rasmus Villemoes)
+Date: Fri, 21 Jun 2013 14:12:02 +0000
+Subject: [PATCH v2 1/3] mfd: Add irq domain support for max8998 interrupts
+In-Reply-To: <1371818017-5215-2-git-send-email-t.figa@samsung.com> (Tomasz
+ Figa's message of "Fri, 21 Jun 2013 14:33:35 +0200")
+References: <1371818017-5215-1-git-send-email-t.figa@samsung.com>
+ <1371818017-5215-2-git-send-email-t.figa@samsung.com>
+Message-ID: <u0l61x7a6z1.fsf@orc04.imf.au.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/13 16:07, Jason Cooper wrote:
-> On Fri, Jun 21, 2013 at 03:32:09PM +0200, Gregory CLEMENT wrote:
->> The mv64xxx-i2c embedded in the Armada XP have a new feature to
->> offload i2c transaction. This new version of the IP come also with
->> some errata. This lead to the introduction to a another compatible
->> string.
->>
->> This commit split the i2c information into armada-370.dtsi and
->> armada-xp.dtsi. Most of the data remains the same and stay in the
->> common file Armada-370-xp.dtsi. With this new feature the size of the
->> registers are bigger for Armada XP and the new compatible string is
->> used.
->>
->> The Device Tree binding documentation is updated accordingly.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>   Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 13 ++++++++++++-
->>   arch/arm/boot/dts/armada-370-xp.dtsi                  |  2 --
->>   arch/arm/boot/dts/armada-370.dtsi                     |  8 ++++++++
->>   arch/arm/boot/dts/armada-xp.dtsi                      | 10 ++++++++++
->>   4 files changed, 30 insertions(+), 3 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
->> index a1ee681..ce7af6a 100644
->> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
->> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
->> @@ -4,7 +4,8 @@
->>   Required properties :
->>
->>    - reg             : Offset and length of the register set for the device
->> - - compatible      : Should be "marvell,mv64xxx-i2c"
->> + - compatible      : Should be "marvell,mv64xxx-i2c" and "marvell,mv7230-i2c"
->> +for controller which support the I2C Transaction Generator
+Tomasz Figa <t.figa@samsung.com> writes:
 
-Jason, Gregory,
-
-Also, s/mv7230/mv78230/
-
-from a quick check of the patch set (which you forgot to send to LKML)
-I am wondering why you didn't update the of matches struct with the new
-compatible for "marvell,mv78230-i2c"? This will save you from still
-having "marvell,mv64xxx-i2c" as additional compatible to match device
-and driver. With that the above should also be s/and/or/.
-
->>    - interrupts      : The interrupt number
->>
->>   Optional properties :
->> @@ -20,3 +21,13 @@ Examples:
->>   		interrupts = <29>;
->>   		clock-frequency = <100000>;
->>   	};
->> +
->> +For a controller which support the I2C Transaction Generator:
->> +
->> +	i2c at 11000 {
->> +		compatible = "marvell,mv64xxx-i2c", "marvell,mv78230-i2c";
->> +		reg = <0x11000 0x100>;
->> +		compatible = "marvell,mv64xxx-i2c";
+> All uses of irq_base in platform data and max8997 driver private data
+> are removed.
 >
-> extra compatible line.  If there's nothing else, I'll fix this up when I
-> pull it in.
+[...]
+> +static int max8998_irq_domain_map(struct irq_domain *d, unsigned int irq,
+> +					irq_hw_number_t hw)
+> +{
+> +	struct max8997_dev *max8998 = d->host_data;
+
+I may be wrong, but this sure looks like a typo (or copy-pasto).
+
+-- 
+Rasmus Villemoes
+<http://rasmusvillemoes.dk/>
