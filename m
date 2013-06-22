@@ -1,181 +1,68 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 21 Jun 2013 19:48:22 -0400
-Subject: [PATCH 8/8] ARM: keystone: Switch over to high physical address range
-In-Reply-To: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1371858502-10083-9-git-send-email-santosh.shilimkar@ti.com>
+From: joelagnel@ti.com (Joel A Fernandes)
+Date: Fri, 21 Jun 2013 19:02:48 -0500
+Subject: [PATCH] ARM: common: edma: Fix dangling pointer dereference
+Message-ID: <1371859368-16063-1-git-send-email-joelagnel@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keystone platforms have their physical memory mapped at an address outside the
-32-bit physical range.  A Keystone machine with 16G of RAM would find its
-memory at 0x0800000000 - 0x0bffffffff.
+Returning a pointer to a variable in the setup_from_dt function is
+causing dangling pointer dereferences. This causes boot to fail
+on AM33XX.
 
-For boot purposes, the interconnect supports a limited alias of some of this
-memory within the 32-bit addressable space (0x80000000 - 0xffffffff).  This
-aliasing is implemented in hardware, and is not intended to be used much
-beyond boot.  For instance, DMA coherence does not work when running out of
-this aliased address space.
+Add ninfo to the caller's stack and just return the kzalloc'ed ptr
+from the calling function.
 
-Therefore, a two pahsed boot approach is implemented.
-1) Boot out of the low physical address range
-2) Switch over to the high range once we're safely inside machine
- initialization.
+Seen on linux-davinci/soc-v2 branch.
 
-This patch implements this switch over mechanism, which involves rewiring
-the TTBRs and page tables to point to the new physical address space.
-Based on earlier patch version from Cyril.
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
 ---
- arch/arm/mach-keystone/keystone.c |   49 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-keystone/memory.h   |   24 ++++++++++++++++++
- arch/arm/mach-keystone/platsmp.c  |   16 +++++++++++-
- 3 files changed, 88 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-keystone/memory.h
+ arch/arm/common/edma.c |   10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
-index fe4d9ff..90442bb 100644
---- a/arch/arm/mach-keystone/keystone.c
-+++ b/arch/arm/mach-keystone/keystone.c
-@@ -20,6 +20,9 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <asm/smp_plat.h>
-+#include <asm/memory.h>
-+
-+#include "memory.h"
- 
- #include "keystone.h"
- 
-@@ -44,6 +47,51 @@ static void __init keystone_init(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-+static phys_addr_t keystone_virt_to_idmap(unsigned long x)
-+{
-+	return (phys_addr_t)(x) - CONFIG_PAGE_OFFSET + KEYSTONE_LOW_PHYS_START;
-+}
-+
-+static void __init keystone_init_meminfo(void)
-+{
-+	bool lpae = IS_ENABLED(CONFIG_ARM_LPAE);
-+	bool pvpatch = IS_ENABLED(CONFIG_ARM_PATCH_PHYS_VIRT);
-+	phys_addr_t offset = PHYS_OFFSET - KEYSTONE_LOW_PHYS_START;
-+	phys_addr_t mem_start, mem_end;
-+
-+	BUG_ON(meminfo.nr_banks < 1);
-+	mem_start = meminfo.bank[0].start;
-+	mem_end = mem_start + meminfo.bank[0].size - 1;
-+
-+	/* nothing to do if we are running out of the <32-bit space */
-+	if (mem_start >= KEYSTONE_LOW_PHYS_START &&
-+	    mem_end   <= KEYSTONE_LOW_PHYS_END)
-+		return;
-+
-+	if (!lpae || !pvpatch) {
-+		pr_crit("Enable %s%s%s to run outside 32-bit space\n",
-+		      !lpae ? __stringify(CONFIG_ARM_LPAE) : "",
-+		      (!lpae && !pvpatch) ? " and " : "",
-+		      !pvpatch ? __stringify(CONFIG_ARM_PATCH_PHYS_VIRT) : "");
-+	}
-+
-+	if (mem_start < KEYSTONE_HIGH_PHYS_START ||
-+	    mem_end   > KEYSTONE_HIGH_PHYS_END) {
-+		pr_crit("Invalid address space for memory (%08llx-%08llx)\n",
-+		      (u64)mem_start, (u64)mem_end);
-+	}
-+
-+	offset += KEYSTONE_HIGH_PHYS_START;
-+	__pv_phys_offset = offset;
-+	__pv_offset = (offset - PAGE_OFFSET);
-+	__pv_offset >>= PV_LOW_SHIFT;
-+
-+	/* Populate the arch idmap hook */
-+	arch_virt_to_idmap = keystone_virt_to_idmap;
-+
-+	pr_info("Switching to high address space at 0x%llx\n", (u64)offset);
-+}
-+
- static const char *keystone_match[] __initconst = {
- 	"ti,keystone-evm",
- 	NULL,
-@@ -72,4 +120,5 @@ DT_MACHINE_START(KEYSTONE, "Keystone")
- 	.init_machine	= keystone_init,
- 	.dt_compat	= keystone_match,
- 	.restart	= keystone_restart,
-+	.init_meminfo   = keystone_init_meminfo,
- MACHINE_END
-diff --git a/arch/arm/mach-keystone/memory.h b/arch/arm/mach-keystone/memory.h
-new file mode 100644
-index 0000000..83fc5a9
---- /dev/null
-+++ b/arch/arm/mach-keystone/memory.h
-@@ -0,0 +1,24 @@
-+/*
-+ * Copyright 2013 Texas Instruments, Inc.
-+ *	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
-+#ifndef __MACH_MEMORY_H
-+#define __MACH_MEMORY_H
-+
-+#define MAX_PHYSMEM_BITS	36
-+#define SECTION_SIZE_BITS	34
-+
-+#define KEYSTONE_LOW_PHYS_START		0x80000000ULL
-+#define KEYSTONE_LOW_PHYS_SIZE		0x80000000ULL /* 2G */
-+#define KEYSTONE_LOW_PHYS_END		(KEYSTONE_LOW_PHYS_START + \
-+					 KEYSTONE_LOW_PHYS_SIZE - 1)
-+
-+#define KEYSTONE_HIGH_PHYS_START	0x800000000ULL
-+#define KEYSTONE_HIGH_PHYS_SIZE		0x400000000ULL	/* 16G */
-+#define KEYSTONE_HIGH_PHYS_END		(KEYSTONE_HIGH_PHYS_START + \
-+					 KEYSTONE_HIGH_PHYS_SIZE - 1)
-+#endif /* _MACH_MEMORY_H */
-diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
-index 1d4181e..4be8ea2 100644
---- a/arch/arm/mach-keystone/platsmp.c
-+++ b/arch/arm/mach-keystone/platsmp.c
-@@ -18,13 +18,15 @@
- 
- #include <asm/smp_plat.h>
- #include <asm/prom.h>
-+#include <asm/tlbflush.h>
-+#include <asm/pgtable.h>
- 
- #include "keystone.h"
- 
- static int __cpuinit keystone_smp_boot_secondary(unsigned int cpu,
- 						struct task_struct *idle)
- {
--	unsigned long start = virt_to_phys(&secondary_startup);
-+	unsigned long start = virt_to_idmap(&secondary_startup);
- 	int error;
- 
- 	pr_debug("keystone-smp: booting cpu %d, vector %08lx\n",
-@@ -37,7 +39,19 @@ static int __cpuinit keystone_smp_boot_secondary(unsigned int cpu,
- 	return error;
- }
- 
-+static void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
-+{
-+	bool lpae = IS_ENABLED(CONFIG_ARM_LPAE);
-+
-+	if (lpae) {
-+		pgd_t *pgd0 = pgd_offset_k(0);
-+		cpu_set_ttbr(1, __pa(pgd0) + TTBR1_OFFSET);
-+		local_flush_tlb_all();
-+	}
-+}
-+
- struct smp_operations keystone_smp_ops __initdata = {
- 	.smp_init_cpus		= arm_dt_init_cpu_maps,
- 	.smp_boot_secondary	= keystone_smp_boot_secondary,
-+	.smp_secondary_init     = keystone_smp_secondary_initmem,
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 2b591b1..f913e82 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1514,10 +1514,9 @@ static struct of_dma_filter_info edma_filter_info = {
+ 	.filter_fn = edma_filter_fn,
  };
+ 
+-static struct edma_soc_info **edma_setup_info_from_dt(struct device *dev,
++static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev,
+ 						      struct device_node *node)
+ {
+-	static struct edma_soc_info **info;
+ 	struct edma_soc_info *ninfo;
+ 	int ret;
+ 
+@@ -1539,9 +1538,7 @@ static struct edma_soc_info **edma_setup_info_from_dt(struct device *dev,
+ 	of_dma_controller_register(dev->of_node, of_dma_simple_xlate,
+ 				   &edma_filter_info);
+ 
+-	info = &ninfo;
+-
+-	return info;
++	return ninfo;
+ }
+ #else
+ static struct edma_soc_info **edma_setup_info_from_dt(struct device *dev,
+@@ -1554,6 +1551,7 @@ static struct edma_soc_info **edma_setup_info_from_dt(struct device *dev,
+ static int edma_probe(struct platform_device *pdev)
+ {
+ 	struct edma_soc_info	**info = pdev->dev.platform_data;
++	struct edma_soc_info    *ninfo[EDMA_MAX_CC] = {NULL};
+ 	s8		(*queue_priority_mapping)[2];
+ 	s8		(*queue_tc_mapping)[2];
+ 	int			i, j, off, ln, found = 0;
+@@ -1572,7 +1570,7 @@ static int edma_probe(struct platform_device *pdev)
+ 	int			ret;
+ 
+ 	if (node) {
+-		info = edma_setup_info_from_dt(dev, node);
++		ninfo[0] = edma_setup_info_from_dt(dev, node);
+ 		if (IS_ERR(info)) {
+ 			dev_err(dev, "failed to get DT data\n");
+ 			return PTR_ERR(info);
 -- 
 1.7.9.5
