@@ -1,28 +1,29 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sat, 22 Jun 2013 15:23:15 +0200
-Subject: [PATCH v1 02/12] input: matrix-keymap: func call coding style nit
-In-Reply-To: <20130622082207.GC24305@book.gsilab.sittig.org>
-References: <1371838198-7327-1-git-send-email-gsi@denx.de>
- <201306220418.59722.marex@denx.de>
- <20130622082207.GC24305@book.gsilab.sittig.org>
-Message-ID: <201306221523.15431.marex@denx.de>
+Date: Sat, 22 Jun 2013 15:24:33 +0200
+Subject: [PATCH 2/2] ARM: dts: mx28: Fix sgtl5000 codec probe
+In-Reply-To: <CAOMZO5DUsGpffGOkEjZX3JaKcJxV6GsH_pOyX=dhHxq3vB9xQA@mail.gmail.com>
+References: <1371849720-14506-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5AN7+ZodLwxNbRKk4ixheFkL4T=OdphXXRRu_Qmv30JjQ@mail.gmail.com>
+ <CAOMZO5DUsGpffGOkEjZX3JaKcJxV6GsH_pOyX=dhHxq3vB9xQA@mail.gmail.com>
+Message-ID: <201306221524.33879.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gerhard Sittig,
+Dear Fabio Estevam,
 
-> On Sat, Jun 22, 2013 at 04:18 +0200, Marek Vasut wrote:
-> > ret = matrix_keypad_map_key(input_dev, rows, cols, row_shift, key);
-> > if (ret)
+> On Sat, Jun 22, 2013 at 12:47 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> > On Fri, Jun 21, 2013 at 11:31 PM, Marek Vasut <marex@denx.de> wrote:
+> >> Should the SAIF block reset not happen in the driver?
 > > 
-> > 	return ret;
-> > 
-> > Now that you return correct error codes from above, you should propagate
-> > them through.
+> > We need to clear SFTRST and CLKGATE here in order to get MCLK output.
 > 
-> Will do, queued for v2.  Thank you for reviewing this.
+> Just to clarify: the sgtl500 i2c probe happens prior to the mxs saif
+> probe, so that's why we can't wait for the mxs-saif to turn on the
+> clocks.
 
-Wait a little bit for some more feedback, esp. from the marvell guys ;-)
+Yuck, I see. This is really ugly :(
+
+Just an idea here, can we not maybe defer the SGTL5000 I2C probe?
 
 Best regards,
 Marek Vasut
