@@ -1,40 +1,37 @@
-From: agnel.joel@gmail.com (Joel A Fernandes)
-Date: Fri, 21 Jun 2013 19:07:07 -0500
-Subject: [PATCH v12 00/11] DMA Engine support for AM33XX
-In-Reply-To: <51C42A85.8090705@ti.com>
-References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
- <51C42A85.8090705@ti.com>
-Message-ID: <CAD=GYpbjZJeebxaJ=zNc9R=pkSoVsu_3D9deaOr7enuONNc0wQ@mail.gmail.com>
+From: anton@enomsg.org (Anton Vorontsov)
+Date: Fri, 21 Jun 2013 17:35:11 -0700
+Subject: [PATCH] power/reset: Make the vexpress driver optional on arm
+ and arm64
+In-Reply-To: <1370877121-26211-1-git-send-email-pawel.moll@arm.com>
+References: <1370877121-26211-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20130622003510.GA32416@lizard.mcd26095.sjc.wayport.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+On Mon, Jun 10, 2013 at 04:12:01PM +0100, Pawel Moll wrote:
+> The driver can be used on either arm or arm64 platforms, but
+> the latter doesn't have any platform-specific configuration
+> options, so it must be possible to manually enable the driver.
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
 
-On Fri, Jun 21, 2013 at 5:27 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> Joel,
->
-> On 6/21/2013 2:36 AM, Joel A Fernandes wrote:
->> From: Joel A Fernandes <agnel.joel@gmail.com>
->>
->> This series is remaining of Matt Porter's EDMA patches for AM33XX EDMA support
->> with changes for few pending review comments on v11 series.
->
-> I have posted a branch with fixes for patches accepted by me in this
-> series (also posted inline as replies to specific patches).
->
-> https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/log/?h=v3.11/soc-2
->
-> Can you please give it a good test - especially on AM335x? I will send a
-> pull request after you confirm. If you find bugs please send incremental
-> patches so I can merge into the original patch.
+Applied. Thanks a lot, Pawel!
 
-This breaks on AM33XX due to dangling pointer, I sent a follow up
-patch addressing it.
-
-However, with this branch I still get..
-mmc: unable to obtain RX DMA engine channel 25
-
-Is there anything obvious you might have changed that is causing this?
-
-Thanks,
-Joel
+> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> index 349e9ae..ee039dc 100644
+> --- a/drivers/power/reset/Kconfig
+> +++ b/drivers/power/reset/Kconfig
+> @@ -32,7 +32,8 @@ config POWER_RESET_RESTART
+>  	  user presses a key. u-boot then boots into Linux.
+>  
+>  config POWER_RESET_VEXPRESS
+> -	bool
+> +	bool "ARM Versatile Express power-off and reset driver"
+> +	depends on ARM || ARM64
+>  	depends on POWER_RESET
+>  	help
+>  	  Power off and reset support for the ARM Ltd. Versatile
+> -- 
+> 1.8.1.2
