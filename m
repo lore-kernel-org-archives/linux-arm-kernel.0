@@ -1,55 +1,75 @@
-From: agnel.joel@gmail.com (Joel A Fernandes)
-Date: Fri, 21 Jun 2013 21:53:18 -0500
-Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
-In-Reply-To: <201306220014.16427.arnd@arndb.de>
-References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
- <201306212044.26677.arnd@arndb.de>
- <CAD=GYpY4koXd9f6_ijQfDHsiULD4d53cdu=9X421WXSAit_YQg@mail.gmail.com>
- <201306220014.16427.arnd@arndb.de>
-Message-ID: <CAD=GYpabakChmN-TEJbLn6p=BwX2wsK5KWsc5gH9-cAA+yWcEA@mail.gmail.com>
+From: joelagnel@ti.com (Joel A Fernandes)
+Date: Fri, 21 Jun 2013 22:31:17 -0500
+Subject: [PATCH v2] ARM: common: edma: Fix dangling pointer dereference
+Message-ID: <1371871877-15269-1-git-send-email-joelagnel@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> > config TI_EDMA
->> >         tristate "TI EDMA support"
->> >         default m if 'ARCH_DAVINCI || ARCH_OMAP1 || ARCH_OMAP2
->> >         select DMA_ENGINE
->> >         select DMA_VIRTUAL_CHANNELS
->>
->>
->> MMC depends on EDMA specially on AM33xx there's no PIO mode AFAIK. The
->> 'm' option will require some initramfs to load the module when needing
->> to MMC boot, I suggest lets leave it as y.
->>
->
-> Ah, right: you still export a filter function from the edma driver
-> and use it in slave drivers:
->
-> drivers/mmc/host/davinci_mmc.c:         dma_request_slave_channel_compat(mask, edma_filter_fn,
-> drivers/mmc/host/davinci_mmc.c:         dma_request_slave_channel_compat(mask, edma_filter_fn,
-> drivers/spi/spi-davinci.c:      dspi->dma_rx = dma_request_channel(mask, edma_filter_fn,
-> drivers/spi/spi-davinci.c:      dspi->dma_tx = dma_request_channel(mask, edma_filter_fn,
->
-> As long as this is the case, you have to be careful with the dependencies
-> to make sure that davinci_mmc and spi-davinci either depend on TI_EDMA, or
-> edma_filter_fn gets defined to NULL when you are building for a DT-only platform.
+Fixup for linux-davinci/soc-v2 branch. Please ignore v1 and use this.
+Returning a pointer to a variable in the setup_from_dt function is
+causing dangling pointer dereferences. This causes boot to fail
+on AM33XX.
 
-Yes sure, right now they are defined  as follows in include/linux/edma.h:
+Add ninfo to the caller's stack and just return the kzalloc'ed ptr
+from the calling function.
 
-#if defined(CONFIG_TI_EDMA) || defined(CONFIG_TI_EDMA_MODULE)
-bool edma_filter_fn(struct dma_chan *, void *);
-#else
-static inline bool edma_filter_fn(struct dma_chan *chan, void *param)
-{
-return false;
-}
-#endif
+v2: Fixed last issue in davinci branch:
+    ninfo 2D array is used for DT platforms.
+    info is shared between DT and non-DT cases. So point info to ninfo.
 
-This also has the side effect of causing DMA requests to fail if
-TI_EDMA is not built, causing frustration for a lot of people some of
-whom don't want to deal with DMA so I think it is OK to build the
-driver in by default as it is (and will be) used by a lot of
-OMAP2PLUS.
+With this MMC is working (rootfs mount) on AM33XX.
 
-Thanks,
-Joel
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
+---
+ arch/arm/common/edma.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 2b591b1..3567ba1 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1514,10 +1514,9 @@ static struct of_dma_filter_info edma_filter_info = {
+ 	.filter_fn = edma_filter_fn,
+ };
+ 
+-static struct edma_soc_info **edma_setup_info_from_dt(struct device *dev,
++static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev,
+ 						      struct device_node *node)
+ {
+-	static struct edma_soc_info **info;
+ 	struct edma_soc_info *ninfo;
+ 	int ret;
+ 
+@@ -1539,9 +1538,7 @@ static struct edma_soc_info **edma_setup_info_from_dt(struct device *dev,
+ 	of_dma_controller_register(dev->of_node, of_dma_simple_xlate,
+ 				   &edma_filter_info);
+ 
+-	info = &ninfo;
+-
+-	return info;
++	return ninfo;
+ }
+ #else
+ static struct edma_soc_info **edma_setup_info_from_dt(struct device *dev,
+@@ -1554,6 +1551,7 @@ static struct edma_soc_info **edma_setup_info_from_dt(struct device *dev,
+ static int edma_probe(struct platform_device *pdev)
+ {
+ 	struct edma_soc_info	**info = pdev->dev.platform_data;
++	struct edma_soc_info    *ninfo[EDMA_MAX_CC] = {NULL};
+ 	s8		(*queue_priority_mapping)[2];
+ 	s8		(*queue_tc_mapping)[2];
+ 	int			i, j, off, ln, found = 0;
+@@ -1572,7 +1570,9 @@ static int edma_probe(struct platform_device *pdev)
+ 	int			ret;
+ 
+ 	if (node) {
+-		info = edma_setup_info_from_dt(dev, node);
++		/* For now, for DT we populate only first ninfo element */
++		ninfo[0] = edma_setup_info_from_dt(dev, node);
++		info = ninfo;
+ 		if (IS_ERR(info)) {
+ 			dev_err(dev, "failed to get DT data\n");
+ 			return PTR_ERR(info);
+-- 
+1.7.9.5
