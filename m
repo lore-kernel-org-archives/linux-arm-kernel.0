@@ -1,40 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 22 Jun 2013 07:09:12 +0200
-Subject: [PATCH] ARM: imx: Synertronixx scb9328 needs to select SOC_IMX1
-In-Reply-To: <2223651.9m9to5aFxT@wuerfel>
-References: <2223651.9m9to5aFxT@wuerfel>
-Message-ID: <20130622050912.GH32299@pengutronix.de>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Sat, 22 Jun 2013 13:54:14 +0800
+Subject: [PATCH] arch: arm64: kernel: add '#ifdef CONFIG_COMPAT' for
+ aarch32_break_handler()
+Message-ID: <51C53C06.7050205@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 22, 2013 at 01:29:12AM +0200, Arnd Bergmann wrote:
-> This is required for building a kernel that enables only
-> scb9328 and would not get the i.MX1 specific files
-> otherwise.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
 
-Acked-by: Sascha Hauer <kernel@pengutronix.de>
+If 'COMPAT' not defined, aarch32_break_handler() cannot pass compiling,
+so need add '#ifdef' for it just like the header file has done.
 
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index eef9590..60661a4 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -173,6 +173,7 @@ config ARCH_MX1ADS
->  config MACH_SCB9328
->  	bool "Synertronixx scb9328"
->  	select IMX_HAVE_PLATFORM_IMX_UART
-> +	select SOC_IMX1
->  	help
->  	  Say Y here if you are using a Synertronixx scb9328 board
->  
-> 
-> 
+The related make:
 
+  make ARCH=arm64 randconfig
+  make ARCH=arm64 menuconfig
+  make ARCH=arm64 V=1 EXTRA_CFLAGS=-W
+
+The related error:
+
+  arch/arm64/kernel/debug-monitors.c:249:5: error: redefinition of ?aarch32_break_handler?
+  In file included from arch/arm64/kernel/debug-monitors.c:29:0:
+  /root/linux-next/arch/arm64/include/asm/debug-monitors.h:89:12: note: previous definition of ?aarch32_break_handler? was here
+
+
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm64/kernel/debug-monitors.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index 08018e3..ceedcd7 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -246,6 +246,7 @@ static int brk_handler(unsigned long addr, unsigned int esr,
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_COMPAT
+ int aarch32_break_handler(struct pt_regs *regs)
+ {
+ 	siginfo_t info;
+@@ -285,6 +286,7 @@ int aarch32_break_handler(struct pt_regs *regs)
+ 	force_sig_info(SIGTRAP, &info, current);
+ 	return 0;
+ }
++#endif
+ 
+ static int __init debug_traps_init(void)
+ {
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.7.6
