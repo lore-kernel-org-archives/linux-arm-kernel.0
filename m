@@ -1,51 +1,72 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sat, 22 Jun 2013 15:08:45 -0400 (EDT)
-Subject: [PATCH V2 5/6] USB: OHCI: make ohci-at91 a separate driver
-In-Reply-To: <CAJFYCKEfyb+2BpTDLpVS3Qvdim2JTyuJNYFHweF8+3s9f28vvw@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306221500300.2162-100000@netrider.rowland.org>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sat, 22 Jun 2013 21:34:28 +0200
+Subject: [PATCH v2 00/18] Final Samsung PWM support cleanup
+In-Reply-To: <201306222001.49600.heiko@sntech.de>
+References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
+ <201306222001.49600.heiko@sntech.de>
+Message-ID: <51C5FC44.6000001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 23 Jun 2013, Manjunath Goudar wrote:
+Hi,
 
-> > As a general rule, you should never change code that you don't
-> > understand.  Do you _know_ that it will be safe to call ohci_setup() or
-> > ohci_restart() at this point?
-> >
-> >
-> From David Brownell comment I am understanding,instead of calling
-> ohci_setup()
-> or ohci_restart(),we can use directly below code.
-> 
->         ohci->hc_control &= OHCI_CTRL_RWC;
->         ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
->         ohci->rh_state = OHCI_RH_HALTED;
+W dniu 2013-06-22 20:01, Heiko St?bner pisze:
+> Am Freitag, 21. Juni 2013, 00:12:45 schrieb Tomasz Figa:
+>> Since we now have a proper Samsung PWM clocksource driver in place,
+>> we can proceed with further cleanup of PWM timers support on Samsung SoCs.
+>>
+>> This series attempts to achieve this goal by:
+>>   1) moving remaining Samsung platforms to the new clocksource driver
+>>   2) removing old clocksource driver
+>>   3) adding new multiplatform- and DT-aware PWM driver
+>>   4) moving all Samsung platforms to use the new PWM driver
+>>   5) removing old PWM driver
+>>   6) removing all PWM-related code that is not used anymore
+>>
+>> Cleaning up the PWM driver is a bit tricky, because the design of current
+>> driver makes it completely unsuitable for DT and multiplatform and would
+>> require a heavy rework to make it usable, breaking any existing Samsung PWM
+>> users by the way. To avoid any breakage I decided to keep the old driver,
+>> add new one, move all platforms to it and then remove the old one.
+>>
+>> See particular patches for more detailed descriptions.
+>>
+>> On S3C6410-based Tiny6410 (Mini6410-compatible), after enabling pwm-beeper
+>> and Exynos4210-based Origen board (with PWM0 attached to a scope):
+>>
+>> Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
+>
+> On a s3c2416 based machine (with the additional two v3 patches)
+>
+> Tested-by: Heiko Stuebner<heiko@sntech.de>
 
-Of course you can use that code; that's exactly what ohci_usb_reset() 
-does now.
+I have tested this series on Mini2440 board (all v2 patches).
+Only boot testing for now, however I'm going to inspect the PWM
+output signal and will report back if there are any issues.
+I think you could add my
 
-> the 3rd line code is written by you,I want to know what exactly it is doing.
-> Is it required here?
+Tested-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
 
-Yes, it is required.  ohci->rh_state stores the current state of the
-root hub.  When the controller is reset, the root hub goes into the 
-HALTED state; this line records that fact.
+I had to revert this patch (introduced between v3.10-rc4 and v3.10-rc5)
 
-> > It might be a good idea to get in touch with the person who wrote that
-> > routine originally and ask why they used ohci_usb_reset().
-> >
-> > yes I will.
-> 
-> Hi David,
-> 
-> As I understood ohci_usb_reset() is calling for to notice
-> disconnect,reconnect,
-> or wakeup without the 48 MHz clock active.
-> After fix power management hanging(869aa98c) issue by Patrice Vilchez,I
-> think
-> ohci_usb_reset() is not required to call. what is your opinion about this.
+commit 60e93575476f90a72146b51283f514da655410a7
+Author: Chander Kashyap <chander.kashyap@linaro.org>
+Date:   Tue May 28 18:32:07 2013 +0530
 
-Sadly, David Brownell died in 2011.  I can tell you, though, that
-commit 869aa98c does not eliminate the need to call ohci_usb_reset().
+     serial: samsung: enable clock before clearing pending interrupts 
+during init
 
-Alan Stern
+     Ensure that the uart controller clock is enabled prior to writing 
+to the
+     interrupt mask and pending registers in the s3c24xx_serial_init_port
+     function.
+
+     Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+
+to make serial console working again on Mini2440, but this is a
+different story.
+
+Thanks,
+Sylwester
