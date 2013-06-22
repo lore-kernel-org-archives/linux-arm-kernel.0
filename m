@@ -1,67 +1,55 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 22 Jun 2013 04:33:58 +0200
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <201306211456.31197.marex@denx.de>
-References: <51A5A808.2070803@digi.com> <20130621122231.GD3523@pengutronix.de>
- <201306211456.31197.marex@denx.de>
-Message-ID: <201306220433.58281.marex@denx.de>
+From: agnel.joel@gmail.com (Joel A Fernandes)
+Date: Fri, 21 Jun 2013 21:53:18 -0500
+Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
+In-Reply-To: <201306220014.16427.arnd@arndb.de>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <201306212044.26677.arnd@arndb.de>
+ <CAD=GYpY4koXd9f6_ijQfDHsiULD4d53cdu=9X421WXSAit_YQg@mail.gmail.com>
+ <201306220014.16427.arnd@arndb.de>
+Message-ID: <CAD=GYpabakChmN-TEJbLn6p=BwX2wsK5KWsc5gH9-cAA+yWcEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+>> > config TI_EDMA
+>> >         tristate "TI EDMA support"
+>> >         default m if 'ARCH_DAVINCI || ARCH_OMAP1 || ARCH_OMAP2
+>> >         select DMA_ENGINE
+>> >         select DMA_VIRTUAL_CHANNELS
+>>
+>>
+>> MMC depends on EDMA specially on AM33xx there's no PIO mode AFAIK. The
+>> 'm' option will require some initramfs to load the module when needing
+>> to MMC boot, I suggest lets leave it as y.
+>>
+>
+> Ah, right: you still export a filter function from the edma driver
+> and use it in slave drivers:
+>
+> drivers/mmc/host/davinci_mmc.c:         dma_request_slave_channel_compat(mask, edma_filter_fn,
+> drivers/mmc/host/davinci_mmc.c:         dma_request_slave_channel_compat(mask, edma_filter_fn,
+> drivers/spi/spi-davinci.c:      dspi->dma_rx = dma_request_channel(mask, edma_filter_fn,
+> drivers/spi/spi-davinci.c:      dspi->dma_tx = dma_request_channel(mask, edma_filter_fn,
+>
+> As long as this is the case, you have to be careful with the dependencies
+> to make sure that davinci_mmc and spi-davinci either depend on TI_EDMA, or
+> edma_filter_fn gets defined to NULL when you are building for a DT-only platform.
 
-> Dear Michael Grzeschik,
-> 
-> > Hi Marek,
-> > 
-> > On Fri, Jun 21, 2013 at 01:26:10PM +0200, Marek Vasut wrote:
-> > > Hi,
-> > > 
-> > > > Hi,
-> > > > 
-> > > > On Wed, May 29, 2013 at 08:07:55AM +0000, Chen Peter-B29397 wrote:
-> > > > > > Indeed, I've been using the patchset "Add tested id switch and
-> > > > > > vbus connect detect support for Chipidea" from Peter for quite
-> > > > > > some time on top of 3.9 and it works like a charm for the gadget
-> > > > > > mode on an MX28 platform.
-> > > > > > 
-> > > > > > BTW, Peter, I've seen that these patches are still not merged in
-> > > > > > 3.10, is there a reason for that? do you plan on sending a
-> > > > > > version rebased on top of 3.10 some time in the future? I tried
-> > > > > > to do the rebasing myself, but the chipidea driver seems to have
-> > > > > > changed quite heavily, which makes the process quite difficult
-> > > > > > when you don't know what you're doing :)
-> > > > 
-> > > > we already have Peter's patches on v3.10-rc3 [1].
-> > > > 
-> > > > > I can spend few bandwidth on upstream work recently, I may have
-> > > > > more bandwidth after June 15th.
-> > > > > 
-> > > > > Currently, we still have no conclusion for chipidea core driver's
-> > > > > coming work, like Device tree support, how to identify if the
-> > > > > controller is OTG supported.
-> > > > 
-> > > > Yes, the next important step is getting the of propertys "dr_mode"
-> > > > and "phy_type" properly used in the chipidea core.
-> > > > 
-> > > > [1] http://git.pengutronix.de/?p=mgr/linux.git;a=summary ->
-> > > > v3.10/topic/usb-peterchen
-> > > 
-> > > Is anyone planning to work on this stuff and start pushing it mainline
-> > > or is this effort stalled completely? What is it that's missing before
-> > > these can be applied?
-> > 
-> > AFAIK the latest commit to that work is:
-> > 
-> > http://permalink.gmane.org/gmane.linux.usb.general/88121
-> 
-> Cool, so it seems Peter is back at it. Thanks
+Yes sure, right now they are defined  as follows in include/linux/edma.h:
 
-Peter, I dunno if you are already aware of it, but the USB peripheral mode hangs 
-on MX233. It's easy to replicate for example if you try to run CDC ethernet over 
-the USB peripheral mode, then telnet into the board and run "dmesg" . This will 
-trigger a "larger" data transfer which will make the UDC driver hang. This 
-doesn't happen on MX28 so it must be some MX233-specific thing.
+#if defined(CONFIG_TI_EDMA) || defined(CONFIG_TI_EDMA_MODULE)
+bool edma_filter_fn(struct dma_chan *, void *);
+#else
+static inline bool edma_filter_fn(struct dma_chan *chan, void *param)
+{
+return false;
+}
+#endif
 
-Best regards,
-Marek Vasut
+This also has the side effect of causing DMA requests to fail if
+TI_EDMA is not built, causing frustration for a lot of people some of
+whom don't want to deal with DMA so I think it is OK to build the
+driver in by default as it is (and will be) used by a lot of
+OMAP2PLUS.
+
+Thanks,
+Joel
