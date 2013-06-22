@@ -1,44 +1,55 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 22 Jun 2013 15:09:02 +0200
-Subject: [PATCH v3 10/18] pwm: samsung: Rename to pwm-samsung-legacy
-In-Reply-To: <1371766383-29077-11-git-send-email-tomasz.figa@gmail.com>
+Date: Sat, 22 Jun 2013 15:10:47 +0200
+Subject: [PATCH v2 00/18] Final Samsung PWM support cleanup
+In-Reply-To: <201306211604.38443.arnd@arndb.de>
 References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
- <1371766383-29077-11-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <72206051.D6kXZYm5YD@flatron>
+ <201306211604.38443.arnd@arndb.de>
+Message-ID: <3161519.pXjTM5UxUs@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch renames the old pwm-samsung driver to pwm-samsung-legacy to
-create place for the new, rewritten, DT- and multiplatform- aware
-pwm-samsung driver that will be added in further patch.
+On Friday 21 of June 2013 16:04:38 Arnd Bergmann wrote:
+> On Friday 21 June 2013, Tomasz Figa wrote:
+> > Since we now have a proper Samsung PWM clocksource driver in place,
+> > we can proceed with further cleanup of PWM timers support on Samsung
+> > SoCs.> 
+> > This series attempts to achieve this goal by:
+> >  1) moving remaining Samsung platforms to the new clocksource driver
+> >  2) removing old clocksource driver
+> >  3) adding new multiplatform- and DT-aware PWM driver
+> >  4) moving all Samsung platforms to use the new PWM driver
+> >  5) removing old PWM driver
+> >  6) removing all PWM-related code that is not used anymore
+> > 
+> > Cleaning up the PWM driver is a bit tricky, because the design of
+> > current driver makes it completely unsuitable for DT and
+> > multiplatform and would require a heavy rework to make it usable,
+> > breaking any existing Samsung PWM users by the way. To avoid any
+> > breakage I decided to keep the old driver, add new one, move all
+> > platforms to it and then remove the old one.
+> > 
+> > See particular patches for more detailed descriptions.
+> > 
+> > On S3C6410-based Tiny6410 (Mini6410-compatible), after enabling
+> > pwm-beeper and Exynos4210-based Origen board (with PWM0 attached to a
+> > scope):
+> > 
+> > Tested-by: Tomasz Figa <tomasz.figa@gmail.com>
+> 
+> Looks good to me,
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- drivers/pwm/Makefile                                | 2 +-
- drivers/pwm/{pwm-samsung.c => pwm-samsung-legacy.c} | 0
- 2 files changed, 1 insertion(+), 1 deletion(-)
- rename drivers/pwm/{pwm-samsung.c => pwm-samsung-legacy.c} (100%)
+Thanks.
 
-Changes since v2:
- - Used git format-patch -M to detect rename.
- - Corrected commit message.
+> Two small comments:
+> 
+> * always use 'git format-patch -M' to detect renames (patch 10)
+> 
+> * for new code, don't use __raw_readl and similar functions but
+>   use readl_relaxed or plain readl.
 
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index 94ba21e..229a599 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -8,7 +8,7 @@ obj-$(CONFIG_PWM_LPC32XX)	+= pwm-lpc32xx.o
- obj-$(CONFIG_PWM_MXS)		+= pwm-mxs.o
- obj-$(CONFIG_PWM_PUV3)		+= pwm-puv3.o
- obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
--obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
-+obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung-legacy.o
- obj-$(CONFIG_PWM_SPEAR)		+= pwm-spear.o
- obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
- obj-$(CONFIG_PWM_TIECAP)	+= pwm-tiecap.o
-diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung-legacy.c
-similarity index 100%
-rename from drivers/pwm/pwm-samsung.c
-rename to drivers/pwm/pwm-samsung-legacy.c
--- 
-1.8.2.1
+Just posted v3 of patches 10 and 11 addressing these issues.
+
+Best regards,
+Tomasz
