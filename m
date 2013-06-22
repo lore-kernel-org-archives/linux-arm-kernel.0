@@ -1,46 +1,59 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 22 Jun 2013 18:14:15 +0200
-Subject: [PATCH v3 4/4] ARM: dts: mvebu: Introduce a new compatible string
- for mv64xxx-i2c
-In-Reply-To: <20130621171836.GC10905@obsidianresearch.com>
-References: <1371821529-13791-1-git-send-email-gregory.clement@free-electrons.com>
- <1371821529-13791-5-git-send-email-gregory.clement@free-electrons.com>
- <20130621140707.GO31667@titan.lakedaemon.net> <51C46001.30500@gmail.com>
- <20130621171836.GC10905@obsidianresearch.com>
-Message-ID: <51C5CD57.6040200@gmail.com>
+From: elezegarcia@gmail.com (Ezequiel Garcia)
+Date: Sat, 22 Jun 2013 13:52:27 -0300
+Subject: [PATCH for v3.11] ARM: mvebu: fix length of ethernet registers in
+ mv78260 dtsi
+Message-ID: <1371919947-28872-1-git-send-email-elezegarcia@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2013 07:18 PM, Jason Gunthorpe wrote:
-> On Fri, Jun 21, 2013 at 04:15:29PM +0200, Sebastian Hesselbarth wrote:
->> from a quick check of the patch set (which you forgot to send to LKML)
->> I am wondering why you didn't update the of matches struct with the new
->> compatible for "marvell,mv78230-i2c"? This will save you from still
->> having "marvell,mv64xxx-i2c" as additional compatible to match device
->> and driver. With that the above should also be s/and/or/.
->
-> Agree, I noticed the same things.
->
-> Alos, the compatible string should be:
->
->    compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
->
-> (note the order reversal, most specific is first)
+From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-Actually, I suggest to use "marvell,mv78230-i2c" alone. With a new
-entry in the match table it will be sufficient for matching driver and
-device. BTW, is mv78230 sufficient to match all SoC variants having
-this feature? Maybe mv78xx0 but that could interfere with Discovery
-Innovation or even better armada-xp-i2c (or armada-370-i2c)?
+The length of the registers area for the Marvell 370/XP Ethernet controller
+was incorrect in the .dtsi: 0x2500, while it should have been 0x4000.
+This problem wasn't noticed because there used to be a static mapping for
+all the MMIO register region set up by ->map_io().
 
-> and I think it is better to use the 'data' field of of_device_id than
-> a of_is_compatible call. The former is sensitive to order of the
-> compatible string, the latter is not.
+The register length was fixed in all the other device tree files,
+except from the armada-xp-mv78260.dtsi, in the following commit:
 
-IMHO as long as there is only one compatible and only a bool to set,
-using of_device_is_compatible without data pointer is fine here.
-IIRC sunxi i2c isn't using data pointer the different register offset
-struct, so we shouldn't for a simple bool. And casting a bool to
-(void *) looks awkward.
+  commit cf8088c5cac6ce20d914b9131533844b9291a054
+  Author: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+  Date:   Tue May 21 12:33:27 2013 +0200
 
-Sebastian
+    arm: mvebu: fix length of Ethernet registers area in .dtsi
+
+This commit fixes a kernel panic in mvneta_probe(), when the kernel
+tries to access the unmapped registers:
+
+[  163.639092] mvneta d0070000.ethernet eth0: mac: 6e:3c:4f:87:17:2e
+[  163.646962] mvneta d0074000.ethernet eth1: mac: 6a:04:4e:6f:f5:ef
+[  163.654853] mvneta d0030000.ethernet eth2: mac: 2a:99:19:19:fc:4c
+[  163.661258] Unable to handle kernel paging request at virtual address f011bcf0
+[  163.668523] pgd = c0004000
+[  163.671237] [f011bcf0] *pgd=2f006811, *pte=00000000, *ppte=00000000
+[  163.677565] Internal error: Oops: 807 [#1] SMP ARM
+[  163.682370] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-rc6-01850-gba0682e #11
+[  163.690046] task: ef04c000 ti: ef03e000 task.ti: ef03e000
+[  163.695467] PC is at mvneta_probe+0x34c/0xabc
+[...]
+
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index f4029f0..2d9335d 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -92,7 +92,7 @@
+ 
+ 			ethernet at 34000 {
+ 				compatible = "marvell,armada-370-neta";
+-				reg = <0x34000 0x2500>;
++				reg = <0x34000 0x4000>;
+ 				interrupts = <14>;
+ 				clocks = <&gateclk 1>;
+ 				status = "disabled";
+-- 
+1.8.1.5
