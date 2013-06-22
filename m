@@ -1,52 +1,29 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Sat, 22 Jun 2013 13:54:14 +0800
-Subject: [PATCH] arch: arm64: kernel: add '#ifdef CONFIG_COMPAT' for
- aarch32_break_handler()
-Message-ID: <51C53C06.7050205@asianux.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Sat, 22 Jun 2013 10:22:07 +0200
+Subject: [PATCH v1 02/12] input: matrix-keymap: func call coding style nit
+In-Reply-To: <201306220418.59722.marex@denx.de>
+References: <1371838198-7327-1-git-send-email-gsi@denx.de>
+ <1371838198-7327-3-git-send-email-gsi@denx.de>
+ <201306220418.59722.marex@denx.de>
+Message-ID: <20130622082207.GC24305@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Jun 22, 2013 at 04:18 +0200, Marek Vasut wrote:
+> 
+> ret = matrix_keypad_map_key(input_dev, rows, cols, row_shift, key);
+> if (ret)
+> 	return ret;
+> 
+> Now that you return correct error codes from above, you should propagate them 
+> through.
 
-If 'COMPAT' not defined, aarch32_break_handler() cannot pass compiling,
-so need add '#ifdef' for it just like the header file has done.
-
-The related make:
-
-  make ARCH=arm64 randconfig
-  make ARCH=arm64 menuconfig
-  make ARCH=arm64 V=1 EXTRA_CFLAGS=-W
-
-The related error:
-
-  arch/arm64/kernel/debug-monitors.c:249:5: error: redefinition of ?aarch32_break_handler?
-  In file included from arch/arm64/kernel/debug-monitors.c:29:0:
-  /root/linux-next/arch/arm64/include/asm/debug-monitors.h:89:12: note: previous definition of ?aarch32_break_handler? was here
+Will do, queued for v2.  Thank you for reviewing this.
 
 
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm64/kernel/debug-monitors.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index 08018e3..ceedcd7 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -246,6 +246,7 @@ static int brk_handler(unsigned long addr, unsigned int esr,
- 	return 0;
- }
- 
-+#ifdef CONFIG_COMPAT
- int aarch32_break_handler(struct pt_regs *regs)
- {
- 	siginfo_t info;
-@@ -285,6 +286,7 @@ int aarch32_break_handler(struct pt_regs *regs)
- 	force_sig_info(SIGTRAP, &info, current);
- 	return 0;
- }
-+#endif
- 
- static int __init debug_traps_init(void)
- {
+virtually yours
+Gerhard Sittig
 -- 
-1.7.7.6
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
