@@ -1,29 +1,53 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 22 Jun 2013 15:24:33 +0200
-Subject: [PATCH 2/2] ARM: dts: mx28: Fix sgtl5000 codec probe
-In-Reply-To: <CAOMZO5DUsGpffGOkEjZX3JaKcJxV6GsH_pOyX=dhHxq3vB9xQA@mail.gmail.com>
-References: <1371849720-14506-1-git-send-email-festevam@gmail.com>
- <CAOMZO5AN7+ZodLwxNbRKk4ixheFkL4T=OdphXXRRu_Qmv30JjQ@mail.gmail.com>
- <CAOMZO5DUsGpffGOkEjZX3JaKcJxV6GsH_pOyX=dhHxq3vB9xQA@mail.gmail.com>
-Message-ID: <201306221524.33879.marex@denx.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 22 Jun 2013 15:28:47 +0200
+Subject: [PATCHv2 1/3] iio: Add Nuvoton NAU7802 ADC driver
+In-Reply-To: <51C5A499.5050509@metafoo.de>
+References: <1371754675-12242-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1371754675-12242-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <51C590B5.2060308@kernel.org> <51C5923D.6030609@metafoo.de>
+ <51C5A1AF.3070404@free-electrons.com> <51C5A499.5050509@metafoo.de>
+Message-ID: <51C5A68F.3000300@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Fabio Estevam,
+On 22/06/2013 15:20, Lars-Peter Clausen wrote:
+> On 06/22/2013 03:07 PM, Alexandre Belloni wrote:
+>> On 22/06/2013 14:02, Lars-Peter Clausen wrote:
+>>> On 06/22/2013 01:55 PM, Jonathan Cameron wrote:
+>>>> On 06/20/2013 07:57 PM, Alexandre Belloni wrote:
+>>>>> The Nuvoton NAU7802 ADC is a 24-bit 2-channels I2C ADC, with adjustable
+>>>>> gain and sampling rates.
+>>>>>
+>>>> Sorry, somewhat low on time today so only a quick review.
+>>>>
+>>>> 1) Missing userspace ABI documentation.  Also, perhaps min_conversions is
+>>>>    a little vague?  Not that I have a better idea!
+>>> I really don't like the name min_conversions either. Isn't this effectively
+>>> a decimation filter?
+>> Yeah, it could be seen like that but it is only relevant and only
+>> happens when switching between channels. I'm open to any ideas.
+>>
+> I see. Is there anything about this in the datasheet on how many conversions
+> you usually need? Is this really something you need to change at runtime or
+> does moving this to platform data work?
+>
+>
 
-> On Sat, Jun 22, 2013 at 12:47 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> > On Fri, Jun 21, 2013 at 11:31 PM, Marek Vasut <marex@denx.de> wrote:
-> >> Should the SAIF block reset not happen in the driver?
-> > 
-> > We need to clear SFTRST and CLKGATE here in order to get MCLK output.
-> 
-> Just to clarify: the sgtl500 i2c probe happens prior to the mxs saif
-> probe, so that's why we can't wait for the mxs-saif to turn on the
-> clocks.
+There is actually nothing in the datasheet. The default value (6
+conversions) was found experimentally. What I did was saturating the ADC
+with the higher value on one channel and the lower value on the other
+one and I tried to find when reading both channel sequentially was
+resulting in a correct value.
 
-Yuck, I see. This is really ugly :(
+You may not need to change it at runtime. And that value mainly depend
+on the precision versus speed balance you want to achieve. If you know
+that the values on both channels will not be to far apart, then you may
+not need to wait at all.
 
-Just an idea here, can we not maybe defer the SGTL5000 I2C probe?
+Would you think that is something I should hide in the DT ? Or maybe I
+can drop that knob for now and see if it is needed in the future.
 
-Best regards,
-Marek Vasut
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
