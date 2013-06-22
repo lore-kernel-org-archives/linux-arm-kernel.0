@@ -1,86 +1,69 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 22 Jun 2013 12:14:44 +0200
-Subject: [PATCH v6 4/8] ARM: Add .init_platform() callback to machine
- descriptor
-In-Reply-To: <201306211612.15508.arnd@arndb.de>
-References: <1371774924-9224-1-git-send-email-tomasz.figa@gmail.com>
- <72209947.cQvP4jsDBz@amdc1227> <201306211612.15508.arnd@arndb.de>
-Message-ID: <6564540.EvIEu9dlOG@flatron>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Sat, 22 Jun 2013 12:17:39 +0200
+Subject: [PATCH v1 10/12] input: keypad_matrix: use usleep_range() for
+ scan delay
+In-Reply-To: <51C4CCF3.20603@wwwdotorg.org>
+References: <1371838198-7327-1-git-send-email-gsi@denx.de>
+ <1371838198-7327-11-git-send-email-gsi@denx.de>
+ <51C4CCF3.20603@wwwdotorg.org>
+Message-ID: <20130622101739.GI24305@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 of June 2013 16:12:15 Arnd Bergmann wrote:
-> On Friday 21 June 2013, Tomasz Figa wrote:
-> > > To me, this new hook is strictly equivalent to init_irq. What do we
-> > > gain exactly? I didn't think init_irq was going away...
-> > > 
-> > > I know init_irq is not pretty, and we tend to overload it with other
-> > > stuff, but I don't really see the point of adding a new callback
-> > > that
-> > > has the exact same properties.
-> > 
-> > Well, it doesn't really give us any functional benefits.
-> > 
-> > However in my opinion it looks much saner in case of DT-only platforms
-> > that don't need any specific IRQ initialization, but need to call
-> > some platform specific initialization routines, after memory
-> > management, but before anything else is initialized.
-> > 
-> > This way irqchip_init() doesn't have to be explicitly called in
-> > platform code.
-> > 
-> > Anyway, I don't have any strong opinion on this. If it is perfectly
-> > fine to abuse irqchip_init() for anything that must be done at this
-> > stage of boot, then I'm fine with this either and will modify the
-> > board file from further patch from this series to not rely on this
-> > change any more.
+On Fri, Jun 21, 2013 at 16:00 -0600, Stephen Warren wrote:
 > 
-> Your init_platform only has these two calls in it:
+> On 06/21/2013 12:09 PM, Gerhard Sittig wrote:
+> > querying keyboards isn't a time critical task and does not depend on
+> > exact timing in the microseconds order -- the timeouts and delays are
+> > arbitrary choices or educated guesses at best anyway
 > 
-> +       of_clk_init(NULL);
-> +       samsung_wdt_reset_of_init();
+> > diff --git a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
 > 
-> Presumably you need of_clk_init() for the watchdog to work.
+> > @@ -93,7 +93,10 @@ Optional Properties:
+> >  			a column line and reading back its row status,
+> >  			such that pin levels can settle after
+> >  			propagating through the matrix and its
+> > -			associated hardware components
+> > +			associated hardware components, can be specified
+> > +			with either one value giving the exact delay, or
+> > +			with two values giving a delay range (allowing
+> > +			for reduced timer management overhead)
+> >  - col-switch-delay-ms:	columns switch interval in milliseconds instead
+> >  			of using interrupts to detect key press changes,
+> >  			enables polling mode when specified
+> > @@ -146,7 +149,7 @@ Examples:
+> >  	matrix_keypad {
+> >  		compatible = "gpio-matrix-keypad";
+> >  		debounce-delay-ms = <5>;
+> > -		col-scan-delay-us = <1>;
+> > +		col-scan-delay-us = <2 10>;
+> 
+> Is it really useful to change the binding this way?
+> 
+> The values in DT presumably represent the minimum delays that the HW
+> will tolerate or that are useful. SW is always free to scan more slowly
+> than that. As such, if you're simply modifying the driver to allow more
+> flexibility in timing, then I don't think you have to modify the DT
+> binding to allow for this?
 
-Clock initialization is also required for timekeeping to work, so if we 
-had to defer it, it must happen before (or inside) init_time().
+Yes, this puts less burdon on the .dts author.  The "problem"
+would be to come up (programmatically, without the user's spec)
+with an appropriate upper bound.
 
-Putting this platform aside, there might be other platforms which require 
-clock initialization before IRQ initialization, e.g. to enable clock of an 
-interrupt controller.
+One might choose "half the col switch delay" when available (in
+the polling scenario).  Or "three times the lower bound".  Or an
+arbitrary upper bound in the 100us order.  Or actually with the
+minimum of all the above.  That should keep the absolute minimum
+(user specified) in the loop, and scan the keys fast enough, yet
+drastically reduce timer management overhead, and hide all of
+this from the .dts author.
 
-> But do you
-> actually need to initialize the reset logic this early? Why not turn
-> samsung_wdt_reset_of_init into a standalone driver, or call it from
-> init_machine?
+I will ponder this for a moment ...
 
-This is debatable. One might want to have reset support working as early 
-as possible to have panic timeout working, but I'm not sure if there is 
-any point of rebooting the machine if the kernel fails so early.
 
-Personally I'd prefer this to be a separate driver, in 
-drivers/power/reset/ or wherever appropriate, but I didn't want to change 
-existing behavior too much, which was the reset working already after 
-clock initialization.
-
-> I would actually like to call of_clk_init from common code at some point
-> between init_irq and init_time, although I'm not sure if some platforms
-> need it to be called before init_irq.
-
-Now as I think of it, some platforms might need it earlier, some later, so 
-my init_platform(), which is not flexible at all, would be useless for 
-some of them, that need such things done after init_irq().
-
-I'm going to drop this patch from this series (and simply abuse one of 
-existing callbacks instead), but we should think about a better solution 
-for this issue.
-
-Best regards,
-Tomasz
-
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe
-> linux-samsung-soc" in the body of a message to
-> majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
