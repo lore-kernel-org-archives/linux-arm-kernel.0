@@ -1,71 +1,27 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 21 Jun 2013 21:29:45 -0400 (EDT)
-Subject: [PATCH v7] ARM: PJ4B: fix for 3.10-rc
-In-Reply-To: <1371828664-3681-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1371828664-3681-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <alpine.LFD.2.03.1306212128370.18597@syhkavp.arg>
+Date: Fri, 21 Jun 2013 21:51:19 -0400 (EDT)
+Subject: [PATCH 0/8] ARM: mm: Extend the runtime patch stub for PAE systems
+In-Reply-To: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <alpine.LFD.2.03.1306212149130.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Jun 2013, Gregory CLEMENT wrote:
+On Fri, 21 Jun 2013, Santosh Shilimkar wrote:
 
-> Hello,
+> Based on discussion/debate on Cyril's generic code patching framework,
+> we cooked up this series which basically trying to extend the existing
+> v2p runtime patching for LPAE machines which can have physical memory
+> beyond 4 GB. Keystone is one such ARM machine.
 > 
-> This path allows to fix one errata for PJ4B CPUs.
-> 
-> Without this the Armada 370 based board can't boot anymore since
-> 3.10-rc1. So this one really need to be applied on 3.10-rc.
-> 
-> Willy Tarreau have reported that with the last version the kernel
-> crashed in !SMP. The problem was that all the pj4b cpu functions were
-> defined in the __CPU_INIT section and in !SMP the code was removed
-> from the memory once the kernel initialization done. In this version I
-> fixed this issue by moving the code outside this section, and the
-> kernel now boots in SMP and !SMP.
-> 
-> Nicolas, would you agree to give your acked-by on this new version
-> before I sumbit it to Russell King's patch system?
+> We think the 64 bit patching can be still made better than the proposed
+> patch in the series and hence seeking expert comments from RMK, Nico and
+> others. Last patch in the series added to just give perspective on how
+> machine code will make use of the available bits from the series.
 
-Yes, you may add my ACK.
+FYI I'm currently on vacation and only handling quick emails.
+
+I'll review your series in a week or so.
 
 
-> 
-> Thanks,
-> 
-> V1 -> V2;
->  - Fixed various coding style and typo issues
->  - Replaced the "mcr p15, 0, r0, c7, c10, 4" by  "dsb"
-> 
-> V2 -> v3:
->  - As suggested by Russell, the first errata is now applied
->    dynamically according to the processor type
-> 
-> v3 -> v4:
->  - Moved the glob_equ maco into proc-macro.S
->  - Split the patch in 2 parts, one for fixing the ID and mask of the
->    PJ4B and the second for fixing the errata itself
-> 
-> v4 -> v5:
-> - Added #ifdef all the places the new symbols conditionally defined
->   are used.
-> 
-> v5 -> v6:
-> - Selected the fix by default if MACH_ARMADA_370 is selected, as
->   without it there is no point to use Armada 370 base board.
-> 
-> v6 -> v7:
-> - Move the pj4b cpu functions outside the CPU_INIT section
-> 
-> 
-> Gregory CLEMENT (1):
->   ARM PJ4B: Add support for errata 4742
-> 
->  arch/arm/Kconfig                 | 14 ++++++++++++++
->  arch/arm/include/asm/glue-proc.h |  9 +++++++++
->  arch/arm/mm/proc-macros.S        |  5 +++++
->  arch/arm/mm/proc-v7.S            | 34 +++++++++++++++++++++++++++++++---
->  4 files changed, 59 insertions(+), 3 deletions(-)
-> 
-> -- 
-> 1.8.1.2
-> 
+Nicolas
