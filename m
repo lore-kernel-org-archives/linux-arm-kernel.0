@@ -1,39 +1,42 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Sat, 22 Jun 2013 08:26:54 -0700
-Subject: [PATCH V3 3/5] arm: pxa: use matrix_keymap for all boards
-In-Reply-To: <1371527778-5236-4-git-send-email-chao.xie@marvell.com>
-References: <1371527778-5236-1-git-send-email-chao.xie@marvell.com>
- <1371527778-5236-4-git-send-email-chao.xie@marvell.com>
-Message-ID: <51C5C23E.8070408@newsguy.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 22 Jun 2013 12:44:22 -0300
+Subject: [PATCH v7] ARM PJ4B: Add support for errata 4742
+In-Reply-To: <1371828664-3681-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1371828664-3681-1-git-send-email-gregory.clement@free-electrons.com>
+ <1371828664-3681-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130622154421.GA475@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2013 08:56 PM, Chao Xie wrote:
-> Compile passed for configurations
-> 
-> em_x270_defconfig
->   em_x270x.c(MACH_EM_X270, MACH_EXEDA)
-> 
-> ezx_defconfig
->   ezx.c(MACH_EZX_A780, MACH_EZX_E680, MACH_EZX_A1200,
->         MACH_EZX_A910, MACH_EZX_E6, MACH_EZX_E2)
-> 
-> palmz72_defconfig
->   palmld.c(MACH_PALMLD), palmtreo.c(PALM_TREO),
->   palmtx.c(MACH_PALMTX), palmz72.c(MACH_PALMZ72),
->   palmt5.c(MACH_PALMT5)
-> 
-> pxa3xx_defconfig
->   littleton.c(MACH_LITTLETON), tarvorevb.c(MACH_TAVOREVB),
->   zylonite.c(MACH_ZYLONITE320), mioa701.c(MACH_MIOA701),
->   z2.c(MACH_ZIPIT2)
-> 
-> mainstone_defconfig
->   maintone.c(MACH_MAINSTONE)
-> 
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+Hi Greg,
 
+On Fri, Jun 21, 2013 at 05:31:04PM +0200, Gregory CLEMENT wrote:
+> This commit fixes the regression on Armada 370 (the kernal hang during
+> boot) introduced by the commit: "ARM: 7691/1: mm: kill unused
+> TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead".
+> 
+> When coming out of either a Wait for Interrupt (WFI) or a Wait for
+> Event (WFE) IDLE states, a specific timing sensitivity exists between
+> the retiring WFI/WFE instructions and the newly issued subsequent
+> instructions. This sensitivity can result in a CPU hang scenario.  The
+> workaround is to insert either a Data Synchronization Barrier (DSB) or
+> Data Memory Barrier (DMB) command immediately after the WFI/WFE
+> instruction.
+> 
+> This commit was based on the work of Lior Amsalem, but heavily
+> modified to apply the errata fix dynamically according to the
+> processor type thanks to the suggestions of Russell King and Nicolas
+> Pitre.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
+> Cc: <stable@vger.kernel.org>
 
-Tested-by: Mike Dunn <mikedunn@newsguy.com>
+This patch doesn't seem to apply on any 3.10-rcX;
+maybe I'm doing something wrong, but could you double-check this?
 
-On a palm treo 680
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
