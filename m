@@ -1,42 +1,21 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 22 Jun 2013 15:46:41 +0200
-Subject: [PATCH v6 4/8] ARM: Add .init_platform() callback to machine
- descriptor
-In-Reply-To: <1371774924-9224-5-git-send-email-tomasz.figa@gmail.com>
-References: <1371774924-9224-1-git-send-email-tomasz.figa@gmail.com>
- <1371774924-9224-5-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <2503927.uZIubvXWLh@flatron>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 22 Jun 2013 11:04:41 -0300
+Subject: [PATCH 2/2] ARM: dts: mx28: Fix sgtl5000 codec probe
+In-Reply-To: <201306221524.33879.marex@denx.de>
+References: <1371849720-14506-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5AN7+ZodLwxNbRKk4ixheFkL4T=OdphXXRRu_Qmv30JjQ@mail.gmail.com>
+ <CAOMZO5DUsGpffGOkEjZX3JaKcJxV6GsH_pOyX=dhHxq3vB9xQA@mail.gmail.com>
+ <201306221524.33879.marex@denx.de>
+Message-ID: <CAOMZO5DYNmiasRREC8jXH===2HG1aNvpxpFVU2u+q5ZAT8Wd3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Sat, Jun 22, 2013 at 10:24 AM, Marek Vasut <marex@denx.de> wrote:
 
-On Friday 21 of June 2013 02:35:20 Tomasz Figa wrote:
-> Most ARM platforms have parts that should be initialized as early as
-> possible, which usually means as soon as memory management (kmalloc,
-> ioremap) starts to work,
-> 
-> However, currently there is no appropriate callback in machine_desc
-> struct to use for such initialization and platforms tend to stuff things
-> up .init_irq() and .init_time() callbacks.
-> 
-> Since all the DT-based platforms are going towards generic IRQ and time
-> initialization (using irqchip_init and clocksource_of_init) and current
-> code assumes that if custom callbacks are not provided in machine_desc
-> then generic ones should be used, this problem has become a bit more
-> inconvenient.
-> 
-> This patch tries to solve this issue by introducing new callback called
-> .init_platform(), where any custom low level initialization of platform
-> can be done safely.
-> 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  arch/arm/include/asm/mach/arch.h | 1 +
->  arch/arm/kernel/irq.c            | 3 +++
->  2 files changed, 4 insertions(+)
+> Yuck, I see. This is really ugly :(
+>
+> Just an idea here, can we not maybe defer the SGTL5000 I2C probe?
 
-Please disregard this patch when applying the series (if that happens).
-
-Best regards,
-Tomasz
+This was already discussed in the alsa-devel list, and the
+recommendation was that sgtl5000 should acquire its clock in i2c
+probe.
