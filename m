@@ -1,55 +1,35 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 22 Jun 2013 15:10:47 +0200
-Subject: [PATCH v2 00/18] Final Samsung PWM support cleanup
-In-Reply-To: <201306211604.38443.arnd@arndb.de>
-References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
- <201306211604.38443.arnd@arndb.de>
-Message-ID: <3161519.pXjTM5UxUs@flatron>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Sat, 22 Jun 2013 15:20:25 +0200
+Subject: [PATCHv2 1/3] iio: Add Nuvoton NAU7802 ADC driver
+In-Reply-To: <51C5A1AF.3070404@free-electrons.com>
+References: <1371754675-12242-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1371754675-12242-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <51C590B5.2060308@kernel.org> <51C5923D.6030609@metafoo.de>
+ <51C5A1AF.3070404@free-electrons.com>
+Message-ID: <51C5A499.5050509@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 of June 2013 16:04:38 Arnd Bergmann wrote:
-> On Friday 21 June 2013, Tomasz Figa wrote:
-> > Since we now have a proper Samsung PWM clocksource driver in place,
-> > we can proceed with further cleanup of PWM timers support on Samsung
-> > SoCs.> 
-> > This series attempts to achieve this goal by:
-> >  1) moving remaining Samsung platforms to the new clocksource driver
-> >  2) removing old clocksource driver
-> >  3) adding new multiplatform- and DT-aware PWM driver
-> >  4) moving all Samsung platforms to use the new PWM driver
-> >  5) removing old PWM driver
-> >  6) removing all PWM-related code that is not used anymore
-> > 
-> > Cleaning up the PWM driver is a bit tricky, because the design of
-> > current driver makes it completely unsuitable for DT and
-> > multiplatform and would require a heavy rework to make it usable,
-> > breaking any existing Samsung PWM users by the way. To avoid any
-> > breakage I decided to keep the old driver, add new one, move all
-> > platforms to it and then remove the old one.
-> > 
-> > See particular patches for more detailed descriptions.
-> > 
-> > On S3C6410-based Tiny6410 (Mini6410-compatible), after enabling
-> > pwm-beeper and Exynos4210-based Origen board (with PWM0 attached to a
-> > scope):
-> > 
-> > Tested-by: Tomasz Figa <tomasz.figa@gmail.com>
+On 06/22/2013 03:07 PM, Alexandre Belloni wrote:
+> On 22/06/2013 14:02, Lars-Peter Clausen wrote:
+>> On 06/22/2013 01:55 PM, Jonathan Cameron wrote:
+>>> On 06/20/2013 07:57 PM, Alexandre Belloni wrote:
+>>>> The Nuvoton NAU7802 ADC is a 24-bit 2-channels I2C ADC, with adjustable
+>>>> gain and sampling rates.
+>>>>
+>>> Sorry, somewhat low on time today so only a quick review.
+>>>
+>>> 1) Missing userspace ABI documentation.  Also, perhaps min_conversions is
+>>>    a little vague?  Not that I have a better idea!
+>> I really don't like the name min_conversions either. Isn't this effectively
+>> a decimation filter?
 > 
-> Looks good to me,
+> Yeah, it could be seen like that but it is only relevant and only
+> happens when switching between channels. I'm open to any ideas.
 > 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Thanks.
+I see. Is there anything about this in the datasheet on how many conversions
+you usually need? Is this really something you need to change at runtime or
+does moving this to platform data work?
 
-> Two small comments:
-> 
-> * always use 'git format-patch -M' to detect renames (patch 10)
-> 
-> * for new code, don't use __raw_readl and similar functions but
->   use readl_relaxed or plain readl.
-
-Just posted v3 of patches 10 and 11 addressing these issues.
-
-Best regards,
-Tomasz
+- Lars
