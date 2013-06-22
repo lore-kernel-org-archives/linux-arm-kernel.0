@@ -1,33 +1,80 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Sat, 22 Jun 2013 08:28:57 +0000
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <201306220433.58281.marex@denx.de>
-References: <51A5A808.2070803@digi.com>
- <20130621122231.GD3523@pengutronix.de> <201306211456.31197.marex@denx.de>
- <201306220433.58281.marex@denx.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803EFA9DC@039-SN2MPN1-023.039d.mgd.msft.net>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Sat, 22 Jun 2013 10:30:44 +0200
+Subject: [PATCH v1 12/12] input: matrix-keypad: add diagnostics in probe()
+In-Reply-To: <201306220428.44614.marex@denx.de>
+References: <1371838198-7327-1-git-send-email-gsi@denx.de>
+ <1371838198-7327-13-git-send-email-gsi@denx.de>
+ <201306220428.44614.marex@denx.de>
+Message-ID: <20130622083044.GD24305@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+On Sat, Jun 22, 2013 at 04:28 +0200, Marek Vasut wrote:
 > 
-> Peter, I dunno if you are already aware of it, but the USB peripheral
-> mode hangs
-> on MX233. It's easy to replicate for example if you try to run CDC
-> ethernet over
-> the USB peripheral mode, then telnet into the board and run "dmesg" .
-> This will
-> trigger a "larger" data transfer which will make the UDC driver hang.
-> This
-> doesn't happen on MX28 so it must be some MX233-specific thing.
+> Dear Gerhard Sittig,
 > 
+> > optionally dump relevant configuration of pins, matrix lines,
+> > and delay/interval times at the very end of the probe routine
+> > (development feature, silent by default)
+> > 
+> > Signed-off-by: Gerhard Sittig <gsi@denx.de>
+> > ---
+> >  drivers/input/keyboard/matrix_keypad.c |   18 ++++++++++++++++++
+> >  1 file changed, 18 insertions(+)
+> > 
+> > diff --git a/drivers/input/keyboard/matrix_keypad.c
+> > b/drivers/input/keyboard/matrix_keypad.c index 275b157..69b15720 100644
+> > --- a/drivers/input/keyboard/matrix_keypad.c
+> > +++ b/drivers/input/keyboard/matrix_keypad.c
+> > @@ -800,6 +800,24 @@ static int matrix_keypad_probe(struct platform_device
+> > *pdev) device_init_wakeup(&pdev->dev, pdata->wakeup);
+> >  	platform_set_drvdata(pdev, keypad);
+> > 
+> > +	dev_dbg(&pdev->dev, "gpios col num[%u] lvl[%s] drv[%s] enc[%s]\n",
+> > +		pdata->num_col_gpios,
+> > +		pdata->col_gpios_active_low ? "low" : "high",
+> > +		pdata->col_gpios_push_pull ? "pp" : "od",
+> > +		pdata->col_gpios_binary_encoded ? "bin" : "1-1");
+> > +	dev_dbg(&pdev->dev, "gpios row num[%u] lvl[%s]\n",
+> > +		pdata->num_row_gpios,
+> > +		pdata->row_gpios_active_low ? "low" : "high");
+> > +	dev_dbg(&pdev->dev, "matrix cols[%u] rows[%u] code shift[%u]\n",
+> > +		pdata->num_matrix_cols,
+> > +		pdata->num_matrix_rows,
+> > +		keypad->row_shift);
+> > +	dev_dbg(&pdev->dev, "times scan[%u-%u] bounce[%u] switch[%u]\n",
+> > +		pdata->col_scan_delay_us,
+> > +		pdata->col_scan_delay_us_max,
+> > +		pdata->debounce_ms,
+> > +		pdata->col_switch_delay_ms);
+> > +
+> 
+> It's a bit hard to understand this kind of debug output. Besides, we already 
+> have all the DT props in /proc/device-tree where you can check them , do we 
+> really need this patch then ?
 
-Marek, Have you tried below?
+This output shall reflect not only what was provided to the
+driver as input, but as well what the driver made of it (that is,
+some of the values get derived from others, some underwent
+normalization).
 
-http://marc.info/?l=linux-usb&m=136537318510847&w=2
+The terse format mostly is a consequence of the 80 columns line
+length limit, and the output being for debugging purposes
+exclusively.  But I understand that one needs to know the
+driver's internal working before one can read this output.  And I
+felt that this is the only situation where one would enable
+debugging for the driver.
 
-It may not the USB itself problem, the mx23's usb is almost
-the same with mx28's.
+That patch might as well get dropped, I have no strong feelings
+about it.  Actually I put it at the end of the series such that
+nothing else builds on top of it and that it doesn't change the
+context of anything else, so that dropping it doesn't matter
+anyway.
 
-Best regards,
-Peter 
+
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
