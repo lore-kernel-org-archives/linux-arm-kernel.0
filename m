@@ -1,59 +1,52 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Sat, 22 Jun 2013 13:52:27 -0300
-Subject: [PATCH for v3.11] ARM: mvebu: fix length of ethernet registers in
- mv78260 dtsi
-Message-ID: <1371919947-28872-1-git-send-email-elezegarcia@gmail.com>
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Sat, 22 Jun 2013 19:04:41 +0200
+Subject: [PATCH v3 0/5] clk: dt: bindings for mux, divider & gate clocks
+In-Reply-To: <1371795256-16703-1-git-send-email-mturquette@linaro.org>
+References: <1371795256-16703-1-git-send-email-mturquette@linaro.org>
+Message-ID: <201306221904.41833.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Am Freitag, 21. Juni 2013, 08:14:11 schrieb Mike Turquette:
+> This series introduces binding definitions for common register-mapped
+> clock multiplexer, divider and gate IP blocks along with the
+> corresponding setup functions for matching DT data.  The bindings are
+> similar to the struct definitions but please don't hold that against the
+> binding: the struct definitions closely model the hardware register
+> layout.
+> 
+> This version fixes bugs and incorporates support for the hiword-mask
+> property needed on Hisilicon and Rockchip platforms.
+> 
+> Tested on OMAP4460 Panda ES.
 
-The length of the registers area for the Marvell 370/XP Ethernet controller
-was incorrect in the .dtsi: 0x2500, while it should have been 0x4000.
-This problem wasn't noticed because there used to be a static mapping for
-all the MMIO register region set up by ->map_io().
+Now it works like a charm :-), so on a rk3066a based board
 
-The register length was fixed in all the other device tree files,
-except from the armada-xp-mv78260.dtsi, in the following commit:
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-  commit cf8088c5cac6ce20d914b9131533844b9291a054
-  Author: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-  Date:   Tue May 21 12:33:27 2013 +0200
 
-    arm: mvebu: fix length of Ethernet registers area in .dtsi
-
-This commit fixes a kernel panic in mvneta_probe(), when the kernel
-tries to access the unmapped registers:
-
-[  163.639092] mvneta d0070000.ethernet eth0: mac: 6e:3c:4f:87:17:2e
-[  163.646962] mvneta d0074000.ethernet eth1: mac: 6a:04:4e:6f:f5:ef
-[  163.654853] mvneta d0030000.ethernet eth2: mac: 2a:99:19:19:fc:4c
-[  163.661258] Unable to handle kernel paging request at virtual address f011bcf0
-[  163.668523] pgd = c0004000
-[  163.671237] [f011bcf0] *pgd=2f006811, *pte=00000000, *ppte=00000000
-[  163.677565] Internal error: Oops: 807 [#1] SMP ARM
-[  163.682370] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-rc6-01850-gba0682e #11
-[  163.690046] task: ef04c000 ti: ef03e000 task.ti: ef03e000
-[  163.695467] PC is at mvneta_probe+0x34c/0xabc
-[...]
-
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/boot/dts/armada-xp-mv78260.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index f4029f0..2d9335d 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -92,7 +92,7 @@
- 
- 			ethernet at 34000 {
- 				compatible = "marvell,armada-370-neta";
--				reg = <0x34000 0x2500>;
-+				reg = <0x34000 0x4000>;
- 				interrupts = <14>;
- 				clocks = <&gateclk 1>;
- 				status = "disabled";
--- 
-1.8.1.5
+> Mike Turquette (5):
+>   clk: divider: replace bitfield width with mask
+>   clk: of: helper for determining number of parent clocks
+>   clk: dt: binding for basic multiplexer clock
+>   clk: dt: binding for basic divider clock
+>   clk: dt: binding for basic gate clock
+> 
+>  .../devicetree/bindings/clock/divider-clock.txt    |  90 +++++++++++++++
+>  .../devicetree/bindings/clock/gate-clock.txt       |  36 ++++++
+>  .../devicetree/bindings/clock/mux-clock.txt        |  79 +++++++++++++
+>  arch/arm/mach-imx/clk-busy.c                       |   2 +-
+>  drivers/clk/clk-divider.c                          | 127
+> ++++++++++++++++++--- drivers/clk/clk-gate.c                             |
+>  43 +++++++
+>  drivers/clk/clk-mux.c                              |  65 ++++++++++-
+>  drivers/clk/clk.c                                  |   6 +
+>  drivers/clk/mxs/clk-div.c                          |   2 +-
+>  include/linux/clk-private.h                        |   2 +-
+>  include/linux/clk-provider.h                       |  12 +-
+>  11 files changed, 441 insertions(+), 23 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/divider-clock.txt create mode
+> 100644 Documentation/devicetree/bindings/clock/gate-clock.txt create mode
+> 100644 Documentation/devicetree/bindings/clock/mux-clock.txt
