@@ -1,48 +1,118 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sun, 23 Jun 2013 12:09:51 +0200
-Subject: [PATCH v7] ARM: PJ4B: fix for 3.10-rc
-In-Reply-To: <20130623082746.GV2718@n2100.arm.linux.org.uk>
-References: <1371828664-3681-1-git-send-email-gregory.clement@free-electrons.com>
- <20130623102036.66dd8b74@skate>
- <20130623082746.GV2718@n2100.arm.linux.org.uk>
-Message-ID: <51C6C96F.5010808@free-electrons.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 23 Jun 2013 12:12:42 +0200
+Subject: [PATCH 1/8] ARM: dts: Correct camera pinctrl nodes for Exynos4x12
+ SoCs
+In-Reply-To: <1371819024-12596-2-git-send-email-s.nawrocki@samsung.com>
+References: <1371819024-12596-1-git-send-email-s.nawrocki@samsung.com>
+ <1371819024-12596-2-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <7538808.XQjIcFgyeQ@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/23/2013 10:27 AM, Russell King - ARM Linux wrote:
-> On Sun, Jun 23, 2013 at 10:20:36AM +0200, Thomas Petazzoni wrote:
->> Hello,
->>
->> On Fri, 21 Jun 2013 17:31:03 +0200, Gregory CLEMENT wrote:
->>
->>> This path allows to fix one errata for PJ4B CPUs.
->>>
->>> Without this the Armada 370 based board can't boot anymore since
->>> 3.10-rc1. So this one really need to be applied on 3.10-rc.
->>
->> I'd like to point out that this patch is really needed for 3.10-rc,
->> *OR* ae8a8b9553 ("ARM: 7691/1: mm: kill unused
->> TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead") should be
->> reverted, as it introduces a regression compared to 3.9.
->>
->> Without one of those two solutions, 3.10 cannot boot on Armada 370
->> platforms, which is a clear regression compared to 3.9.
->>
->> Linus has just released 3.10-rc7 and said it would most likely be the
->> last rc.
-> 
-> The only thing I can say is that it would have been in -rc7 if the previous
-> revision hadn't contained a mistake.
-> 
-> And I also see no sign of this patch in the patch system yet.
-> 
+Hi Sylwester,
 
-It is now on the pacth system. I was waiting for at least a few hours,
-to let people give their feedback and test it.
+On Friday 21 of June 2013 14:50:17 Sylwester Nawrocki wrote:
+> Add separate nodes for the CAMCLK pin and turn off pull-up on camera
+> ports A, B. The video bus pins and the clock output (CAMCLK) pin need
+> separate nodes since full camera port is not used in some
+> configurations, e.g. for MIPI CSI-2 bus only CAMCLK is required and
+> data/clock signal use separate dedicated pins.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4x12-pinctrl.dtsi |   40
+> ++++++++++++++++++++++++----- 1 file changed, 33 insertions(+), 7
+> deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
+> b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi index 704290f..50eaa95
+> 100644
+> --- a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
+> @@ -401,13 +401,26 @@
+>  			samsung,pin-drv = <0>;
+>  		};
+> 
+> -		cam_port_a: cam-port-a {
+> +		cam_port_a_io: cam-port-a-io {
+>  			samsung,pins = "gpj0-0", "gpj0-1", "gpj0-2", 
+"gpj0-3",
+>  					"gpj0-4", "gpj0-5", "gpj0-6", 
+"gpj0-7",
+> -					"gpj1-0", "gpj1-1", "gpj1-2", 
+"gpj1-3",
+> -					"gpj1-4";
+> +					"gpj1-0", "gpj1-1", "gpj1-2", 
+"gpj1-4";
+>  			samsung,pin-function = <2>;
+> -			samsung,pin-pud = <3>;
+> +			samsung,pin-pud = <0>;
+> +			samsung,pin-drv = <0>;
+> +		};
+> +
+> +		cam_port_a_clk_active: cam-port-a-clk-active {
+> +			samsung,pins = "gpj1-3";
+> +			samsung,pin-function = <2>;
+> +			samsung,pin-pud = <0>;
+> +			samsung,pin-drv = <3>;
+> +		};
+> +
+> +		cam_port_a_clk_idle: cam-port-a-clk-idle {
+> +			samsung,pins = "gpj1-3";
+> +			samsung,pin-function = <0>;
+> +			samsung,pin-pud = <0>;
+>  			samsung,pin-drv = <0>;
 
+Who is driving the clock line in this configuration? Idle would suggest 
+that neither the camera nor the camif, so I think some pull should be 
+enabled to avoid floating pin. (Or is there an external pulling resistor 
+for this line in most common setups?)
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>  		};
+>  	};
+> @@ -778,16 +791,29 @@
+>  			samsung,pin-drv = <3>;
+>  		};
+> 
+> -		cam_port_b: cam-port-b {
+> +		cam_port_b_io: cam-port-b-io {
+>  			samsung,pins = "gpm0-0", "gpm0-1", "gpm0-2", 
+"gpm0-3",
+>  					"gpm0-4", "gpm0-5", "gpm0-6", 
+"gpm0-7",
+> -					"gpm1-0", "gpm1-1", "gpm2-0", 
+"gpm2-1",
+> -					"gpm2-2";
+> +					"gpm1-0", "gpm1-1", "gpm2-0", 
+"gpm2-1";
+>  			samsung,pin-function = <3>;
+>  			samsung,pin-pud = <3>;
+>  			samsung,pin-drv = <0>;
+>  		};
+> 
+> +		cam_port_b_clk_active: cam-port-b-clk-active {
+> +			samsung,pins = "gpm2-2";
+> +			samsung,pin-function = <3>;
+> +			samsung,pin-pud = <0>;
+> +			samsung,pin-drv = <3>;
+> +		};
+> +
+> +		cam_port_b_clk_idle: cam-port-b-clk-idle {
+> +			samsung,pins = "gpm2-2";
+> +			samsung,pin-function = <0>;
+> +			samsung,pin-pud = <0>;
+> +			samsung,pin-drv = <0>;
+> +		};
+
+Same here.
+
+Otherwise looks fine to me.
+
+Best regards,
+Tomasz
+
+> +
+>  		eint0: ext-int0 {
+>  			samsung,pins = "gpx0-0";
+>  			samsung,pin-function = <0xf>;
