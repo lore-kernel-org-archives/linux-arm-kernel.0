@@ -1,118 +1,88 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 23 Jun 2013 12:12:42 +0200
-Subject: [PATCH 1/8] ARM: dts: Correct camera pinctrl nodes for Exynos4x12
- SoCs
-In-Reply-To: <1371819024-12596-2-git-send-email-s.nawrocki@samsung.com>
-References: <1371819024-12596-1-git-send-email-s.nawrocki@samsung.com>
- <1371819024-12596-2-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <7538808.XQjIcFgyeQ@flatron>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 23 Jun 2013 12:20:57 +0200
+Subject: [PATCH] pinctrl-sunxi: fix pin attribute handling.
+In-Reply-To: <A06309D9-3340-4F5B-AFB5-4B3DC3997411@upgrade-android.com>
+References: <1371748373-10519-1-git-send-email-ithamar@upgrade-android.com>
+ <20130620204908.GG2987@lukather>
+ <A06309D9-3340-4F5B-AFB5-4B3DC3997411@upgrade-android.com>
+Message-ID: <20130623102057.GD26008@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Hi Ithamar,
 
-On Friday 21 of June 2013 14:50:17 Sylwester Nawrocki wrote:
-> Add separate nodes for the CAMCLK pin and turn off pull-up on camera
-> ports A, B. The video bus pins and the clock output (CAMCLK) pin need
-> separate nodes since full camera port is not used in some
-> configurations, e.g. for MIPI CSI-2 bus only CAMCLK is required and
-> data/clock signal use separate dedicated pins.
+On Fri, Jun 21, 2013 at 09:41:13AM +0200, Ithamar R. Adema wrote:
+> Dear Maxime,
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4x12-pinctrl.dtsi |   40
-> ++++++++++++++++++++++++----- 1 file changed, 33 insertions(+), 7
-> deletions(-)
+> On Jun 20, 2013, at 10:49 , Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > 
-> diff --git a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-> b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi index 704290f..50eaa95
-> 100644
-> --- a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-> @@ -401,13 +401,26 @@
->  			samsung,pin-drv = <0>;
->  		};
+> > Hi Ithamar,
+> > 
+> > You should probably put in the recipients Linus Walleij that will
+> > probably be the one that will merge this patch anyway.
 > 
-> -		cam_port_a: cam-port-a {
-> +		cam_port_a_io: cam-port-a-io {
->  			samsung,pins = "gpj0-0", "gpj0-1", "gpj0-2", 
-"gpj0-3",
->  					"gpj0-4", "gpj0-5", "gpj0-6", 
-"gpj0-7",
-> -					"gpj1-0", "gpj1-1", "gpj1-2", 
-"gpj1-3",
-> -					"gpj1-4";
-> +					"gpj1-0", "gpj1-1", "gpj1-2", 
-"gpj1-4";
->  			samsung,pin-function = <2>;
-> -			samsung,pin-pud = <3>;
-> +			samsung,pin-pud = <0>;
-> +			samsung,pin-drv = <0>;
-> +		};
-> +
-> +		cam_port_a_clk_active: cam-port-a-clk-active {
-> +			samsung,pins = "gpj1-3";
-> +			samsung,pin-function = <2>;
-> +			samsung,pin-pud = <0>;
-> +			samsung,pin-drv = <3>;
-> +		};
-> +
-> +		cam_port_a_clk_idle: cam-port-a-clk-idle {
-> +			samsung,pins = "gpj1-3";
-> +			samsung,pin-function = <0>;
-> +			samsung,pin-pud = <0>;
->  			samsung,pin-drv = <0>;
-
-Who is driving the clock line in this configuration? Idle would suggest 
-that neither the camera nor the camif, so I think some pull should be 
-enabled to avoid floating pin. (Or is there an external pulling resistor 
-for this line in most common setups?)
-
->  		};
->  	};
-> @@ -778,16 +791,29 @@
->  			samsung,pin-drv = <3>;
->  		};
+> Ah okay, thanks for the heads-up.
+> >> +		strength = 0;
+> >> 		if (!of_property_read_u32(node, "allwinner,drive", &val)) {
+> >> -			u16 strength = (val + 1) * 10;
+> >> -			pinconfig[j++] =
+> >> -				pinconf_to_config_packed(PIN_CONFIG_DRIVE_STRENGTH,
+> >> -							 strength);
+> >> +			strength = (val + 1) * 10;
+> >> 		}
+> >> +		pinconfig[0] =
+> >> +			pinconf_to_config_packed(PIN_CONFIG_DRIVE_STRENGTH,
+> >> +						 strength);
+> > 
+> > Why are you making the configuration of the strength in any cases? It's
+> > an optional property, it should be treated as such.
 > 
-> -		cam_port_b: cam-port-b {
-> +		cam_port_b_io: cam-port-b-io {
->  			samsung,pins = "gpm0-0", "gpm0-1", "gpm0-2", 
-"gpm0-3",
->  					"gpm0-4", "gpm0-5", "gpm0-6", 
-"gpm0-7",
-> -					"gpm1-0", "gpm1-1", "gpm2-0", 
-"gpm2-1",
-> -					"gpm2-2";
-> +					"gpm1-0", "gpm1-1", "gpm2-0", 
-"gpm2-1";
->  			samsung,pin-function = <3>;
->  			samsung,pin-pud = <3>;
->  			samsung,pin-drv = <0>;
->  		};
+> My reasoning, which I can see is very subjective, is that if those
+> properties (same for pull up/down) are not specified, you still want
+> them to be in a defined state. Setting the drive strength (and pull
+> up/down) to the default 0 value is just so that any configuration that
+> might have been done the kernel started is undone.
 > 
-> +		cam_port_b_clk_active: cam-port-b-clk-active {
-> +			samsung,pins = "gpm2-2";
-> +			samsung,pin-function = <3>;
-> +			samsung,pin-pud = <0>;
-> +			samsung,pin-drv = <3>;
-> +		};
-> +
-> +		cam_port_b_clk_idle: cam-port-b-clk-idle {
-> +			samsung,pins = "gpm2-2";
-> +			samsung,pin-function = <0>;
-> +			samsung,pin-pud = <0>;
-> +			samsung,pin-drv = <0>;
-> +		};
+> I can understand your reasoning here, but are you sure you would want
+> them left in undefined state?
 
-Same here.
+While your reasoning is correct here, the point is that the platform is
+still a little obscure, with not a lot of documentation and so on. So
+relying on the bootloader to do some muxing could still prove useful.
 
-Otherwise looks fine to me.
+> > 
+> >> 		val = readl(pctl->membase + sunxi_pull_reg(g->pin));
+> >> 		mask = PULL_PINS_MASK << sunxi_pull_offset(g->pin);
+> >> -		writel((val & ~mask) | 1 << sunxi_pull_offset(g->pin),
+> >> +		writel((val & ~mask) | arg << sunxi_pull_offset(g->pin),
+> > 
+> > I'd rather see an obvious assignment of 1 here. It's the value that is
+> > documented in the datasheet, it pops to the mind. You can always put
+> > this inside an if(arg) statement if you want to.
+> 
+> Just to make sure I understand, are you suggesting to stretch that
+> writel() onliner into an if (arg) writel() else writel() ?
 
-Best regards,
-Tomasz
+Yes, something like
 
-> +
->  		eint0: ext-int0 {
->  			samsung,pins = "gpx0-0";
->  			samsung,pin-function = <0xf>;
+case PULL_UP:
+    val = readl(pctl->membase + sunxi_pull_reg(g->pin));
+    mask = PULL_PINS_MASK << sunxi_pull_offset(g->pin);
+    if (arg)
+	writel((val & ~mask) | 1 << sunxi_pull_offset(g->pin), reg);
+    else
+	writel(val & ~mask, reg);
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130623/02b42f03/attachment.sig>
