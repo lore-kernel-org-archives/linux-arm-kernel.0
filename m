@@ -1,34 +1,28 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 23 Jun 2013 15:16:48 +0200
-Subject: [PATCH v5] ARM: sunxi: New watchdog driver for Allwinner A10/A13
-In-Reply-To: <1370547265-24854-1-git-send-email-carlo.caione@gmail.com>
-References: <1370547265-24854-1-git-send-email-carlo.caione@gmail.com>
-Message-ID: <20130623131647.GE26008@lukather>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun, 23 Jun 2013 17:40:35 +0400
+Subject: [PATCH] ARM: i.MX27: Typo fix
+Message-ID: <1371994835-3482-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wim,
 
-On Thu, Jun 06, 2013 at 09:34:25PM +0200, Carlo Caione wrote:
-> This patch adds the driver for the watchdog found in the Allwinner A10 and
-> A13 SoCs. It has DT-support and uses the new watchdog framework.
-> 
-> Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-imx/mx27.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-It would be great if we have this patch merged for 3.11, unless if you
-have additional comments of course.
-
-Thanks,
-Maxime
-
+diff --git a/arch/arm/mach-imx/mx27.h b/arch/arm/mach-imx/mx27.h
+index e074616..8a65f19 100644
+--- a/arch/arm/mach-imx/mx27.h
++++ b/arch/arm/mach-imx/mx27.h
+@@ -135,7 +135,7 @@
+ #define MX27_INT_GPT4		(NR_IRQS_LEGACY + 4)
+ #define MX27_INT_RTIC		(NR_IRQS_LEGACY + 5)
+ #define MX27_INT_CSPI3		(NR_IRQS_LEGACY + 6)
+-#define MX27_INT_SDHC		(NR_IRQS_LEGACY + 7)
++#define MX27_INT_MSHC		(NR_IRQS_LEGACY + 7)
+ #define MX27_INT_GPIO		(NR_IRQS_LEGACY + 8)
+ #define MX27_INT_SDHC3		(NR_IRQS_LEGACY + 9)
+ #define MX27_INT_SDHC2		(NR_IRQS_LEGACY + 10)
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130623/3c23eff4/attachment.sig>
+1.8.1.5
