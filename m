@@ -1,42 +1,48 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 23 Jun 2013 11:59:19 +0200
-Subject: [PATCH] clocksource: samsung_pwm: Correct definition of
- AUTORELOAD bit
-In-Reply-To: <1371577267-2860-1-git-send-email-tomasz.figa@gmail.com>
-References: <1371577267-2860-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <4314851.1Z5ihu2ZPz@flatron>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sun, 23 Jun 2013 12:09:51 +0200
+Subject: [PATCH v7] ARM: PJ4B: fix for 3.10-rc
+In-Reply-To: <20130623082746.GV2718@n2100.arm.linux.org.uk>
+References: <1371828664-3681-1-git-send-email-gregory.clement@free-electrons.com>
+ <20130623102036.66dd8b74@skate>
+ <20130623082746.GV2718@n2100.arm.linux.org.uk>
+Message-ID: <51C6C96F.5010808@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 of June 2013 19:41:07 Tomasz Figa wrote:
-> PWM channel 4 (logically channel 5 in TCON register) has its autoreload
-> bit located at different position. This patch fixes the driver to
-> account for this.
+On 06/23/2013 10:27 AM, Russell King - ARM Linux wrote:
+> On Sun, Jun 23, 2013 at 10:20:36AM +0200, Thomas Petazzoni wrote:
+>> Hello,
+>>
+>> On Fri, 21 Jun 2013 17:31:03 +0200, Gregory CLEMENT wrote:
+>>
+>>> This path allows to fix one errata for PJ4B CPUs.
+>>>
+>>> Without this the Armada 370 based board can't boot anymore since
+>>> 3.10-rc1. So this one really need to be applied on 3.10-rc.
+>>
+>> I'd like to point out that this patch is really needed for 3.10-rc,
+>> *OR* ae8a8b9553 ("ARM: 7691/1: mm: kill unused
+>> TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead") should be
+>> reverted, as it introduces a regression compared to 3.9.
+>>
+>> Without one of those two solutions, 3.10 cannot boot on Armada 370
+>> platforms, which is a clear regression compared to 3.9.
+>>
+>> Linus has just released 3.10-rc7 and said it would most likely be the
+>> last rc.
 > 
-> This fixes a problem with clocksource hanging after it overflows because
-> it is not reloaded any more.
+> The only thing I can say is that it would have been in -rc7 if the previous
+> revision hadn't contained a mistake.
 > 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  drivers/clocksource/samsung_pwm_timer.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> And I also see no sign of this patch in the patch system yet.
 > 
-> diff --git a/drivers/clocksource/samsung_pwm_timer.c
-> b/drivers/clocksource/samsung_pwm_timer.c index 2977043..6af178f 100644
-> --- a/drivers/clocksource/samsung_pwm_timer.c
-> +++ b/drivers/clocksource/samsung_pwm_timer.c
-> @@ -47,7 +47,8 @@
->  #define TCON_START(chan)		(1 << (4 * (chan) + 0))
->  #define TCON_MANUALUPDATE(chan)		(1 << (4 * (chan) + 1))
->  #define TCON_INVERT(chan)		(1 << (4 * (chan) + 2))
-> -#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
-> +#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) \
-> +						+ (((chan) < 5) ? 3 : 2)))
-> 
->  DEFINE_SPINLOCK(samsung_pwm_lock);
->  EXPORT_SYMBOL(samsung_pwm_lock);
 
-Ping.
+It is now on the pacth system. I was waiting for at least a few hours,
+to let people give their feedback and test it.
 
-Best regards,
-Tomasz
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
