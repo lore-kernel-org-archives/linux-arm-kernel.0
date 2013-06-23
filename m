@@ -1,38 +1,40 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sun, 23 Jun 2013 20:59:52 +0200
-Subject: [patch 1/1] imx53-qsb: enable usb power
-In-Reply-To: <20130620212939.018670789@rtp-net.org>
-References: <20130620212939.018670789@rtp-net.org>
-Message-ID: <20130623185952.GA26397@pengutronix.de>
+Date: Sun, 23 Jun 2013 21:04:48 +0200
+Subject: [PATCH 1/6] ARM: dts: imx27: Add SAHARA2 devicetree node
+In-Reply-To: <1371970490-10874-1-git-send-email-eagle.alexander923@gmail.com>
+References: <1371970490-10874-1-git-send-email-eagle.alexander923@gmail.com>
+Message-ID: <20130623190448.GB26397@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 11:29:30PM +0200, Arnaud Patard wrote:
-> Enable usb power pin by using a fixed regulator. With this and the usb clock
-> patch is making usb working on my loco.
+On Sun, Jun 23, 2013 at 10:54:45AM +0400, Alexander Shiyan wrote:
+> From: Alexander Shiyan <shc_work@mail.ru>
 > 
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Index: linux-next/arch/arm/boot/dts/imx53-qsb.dts
-> ===================================================================
-> --- linux-next.orig/arch/arm/boot/dts/imx53-qsb.dts	2013-06-20 23:25:46.049428530 +0200
-> +++ linux-next/arch/arm/boot/dts/imx53-qsb.dts	2013-06-20 23:26:34.293425920 +0200
-> @@ -93,6 +93,15 @@
->  			regulator-max-microvolt = <3200000>;
->  			regulator-always-on;
->  		};
-> +
-> +		reg_usbpwr: usbpwr {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "usbpwr";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio7 8 0>;
-> +			regulator-always-on;
-> +		};
+> This patch adds the missing (Symmetric/Asymmetric Hashing and Random
+> Accelerator) SAHARA2 devicetree node for i.MX27 CPUs.
+> 
+> Signed-off-by: Alexander Shiyan <eagle.alexander923@gmail.com>
+> ---
+>  arch/arm/boot/dts/imx27.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> index 0695264..04f9154 100644
+> --- a/arch/arm/boot/dts/imx27.dtsi
+> +++ b/arch/arm/boot/dts/imx27.dtsi
+> @@ -351,6 +351,14 @@
+>  				iram = <&iram>;
+>  			};
+>  
+> +			sahara2: sahara at 10025000 {
+> +				compatible = "fsl,imx27-sahara";
+> +				reg = <0x10025000 0x0800>;
 
-Shouldn't this be provided to the chipidea driver as vbus?
+I think we should use the whole register space here which would be
+0x1000.
 
 Sascha
+
 
 -- 
 Pengutronix e.K.                           |                             |
