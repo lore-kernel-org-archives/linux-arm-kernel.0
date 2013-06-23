@@ -1,36 +1,55 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 23 Jun 2013 10:44:18 +0200
-Subject: [PATCH v2 2/5] ARM: dts: imx27: Add imx framebuffer device
+Date: Sun, 23 Jun 2013 10:44:20 +0200
+Subject: [PATCH v2 4/5] ARM: dts: imx27 cpufreq-cpu0 frequencies
 In-Reply-To: <1371977061-9891-1-git-send-email-mpa@pengutronix.de>
 References: <1371977061-9891-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1371977061-9891-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <1371977061-9891-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Set operating-points for imx27. There is no regulator support, so the
+voltages are 0. The frequencies should be the same for all imx27 boards,
+so it is defined here and can be overwritten if necessary.
+
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm/boot/dts/imx27.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+
+Notes:
+    Changes in v2:
+     - Update compatibility list of cpu node
+     - Simplify cpu node
+
+ arch/arm/boot/dts/imx27.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 8603886..10dcbd3 100644
+index c6a78ba..377b026 100644
 --- a/arch/arm/boot/dts/imx27.dtsi
 +++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -342,6 +342,15 @@
- 			reg = <0x10020000 0x20000>;
- 			ranges;
+@@ -47,6 +47,24 @@
+ 		};
+ 	};
  
-+			imxfb: fb at 10021000 {
-+				compatible = "fsl,imx27-fb", "fsl,imx21-fb";
-+				interrupts = <61>;
-+				reg = <0x10021000 0x1000>;
-+				clocks = <&clks 36>, <&clks 65>, <&clks 59>;
-+				clock-names = "ipg", "ahb", "per";
-+				status = "disabled";
-+			};
++	cpus {
++		#size-cells = <0>;
++		#address-cells = <1>;
 +
- 			coda: coda at 10023000 {
- 				compatible = "fsl,imx27-vpu";
- 				reg = <0x10023000 0x0200>;
++		cpu {
++			device_type = "cpu";
++			compatible = "arm,arm926ej-s";
++			operating-points = <
++				/* kHz  uV (No regulator support) */
++				133000  0
++				399000  0
++			>;
++			clock-latency = <61036>; /* two CLK32 periods */
++			clocks = <&clks 18>;
++			clock-names = "cpu";
++		};
++	};
++
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 1.8.2.1
