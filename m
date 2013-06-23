@@ -1,56 +1,330 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 23 Jun 2013 10:16:14 +0200
-Subject: [PATCH for v3.11] ARM: mvebu: fix length of ethernet registers
- in mv78260 dtsi
-In-Reply-To: <1371919947-28872-1-git-send-email-elezegarcia@gmail.com>
-References: <1371919947-28872-1-git-send-email-elezegarcia@gmail.com>
-Message-ID: <20130623101614.112bc6e2@skate>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sun, 23 Jun 2013 10:17:50 +0200
+Subject: [PATCH 6/6] ARM: dts: Add device tree support for phycard pca100
+In-Reply-To: <20130621034604.GC24268@S2101-09.ap.freescale.net>
+References: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
+ <1371739815-6666-7-git-send-email-mpa@pengutronix.de>
+ <20130621034604.GC24268@S2101-09.ap.freescale.net>
+Message-ID: <20130623081701.GA13104@s25.your-server.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+On Fri, Jun 21, 2013 at 11:46:05AM +0800, Shawn Guo wrote:
+> On Thu, Jun 20, 2013 at 04:50:15PM +0200, Markus Pargmann wrote:
+> > Based on patches from:
+> > 
+> > Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+> >  - Original patch
+> >  - ARM: dts: Set partition offsets for phycard
+> >  - ARM: dts: Use CSPI1 instead of CSPI2 on phycard pca100
+> >  - ARM: imx27-phytec-phycard-S.dts: resize nand partitions
+> > 
+> > Jan Luebbe <jlu@pengutronix.de>:
+> >  - ARM: dts: Enable bad block table in NAND
+> > 
+> > Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > Cc: Jan Luebbe <jlu@pengutronix.de>
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  arch/arm/boot/dts/Makefile                   |   1 +
+> >  arch/arm/boot/dts/imx27-phytec-phycard-S.dts | 195 +++++++++++++++++++++++++++
+> >  arch/arm/mach-imx/Kconfig                    |   1 +
+> >  3 files changed, 197 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/imx27-phytec-phycard-S.dts
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index b3a8661..e8fb0bc 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -105,6 +105,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+> >  	imx27-pdk.dtb \
+> >  	imx27-phytec-phycore-som.dtb \
+> >  	imx27-phytec-phycore-rdk.dtb \
+> > +	imx27-phytec-phycard-S.dtb \
+> >  	imx31-bug.dtb \
+> >  	imx51-apf51.dtb \
+> >  	imx51-apf51dev.dtb \
+> > diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-S.dts b/arch/arm/boot/dts/imx27-phytec-phycard-S.dts
+> > new file mode 100644
+> > index 0000000..dc3a93b
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/imx27-phytec-phycard-S.dts
+> > @@ -0,0 +1,195 @@
+> > +/*
+> > + * Copyright 2012 Sascha Hauer, Uwe Kleine-K?nig and Steffen Trumtrar, Pengutronix
+> > + *
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "imx27.dtsi"
+> > +
+> > +/ {
+> > +	model = "Phytec pca100";
+> > +	compatible = "phytec,imx27-pca100", "fsl,imx27";
+> > +
+> > +	memory {
+> > +		device_type = "memory";
+> 
+> It's been covered by skeleton.dtsi.
+> 
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> 
+> They are only needed if there are child nodes with "reg" property.
 
-On Sat, 22 Jun 2013 13:52:27 -0300, Ezequiel Garcia wrote:
-> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> 
-> The length of the registers area for the Marvell 370/XP Ethernet controller
-> was incorrect in the .dtsi: 0x2500, while it should have been 0x4000.
-> This problem wasn't noticed because there used to be a static mapping for
-> all the MMIO register region set up by ->map_io().
-> 
-> The register length was fixed in all the other device tree files,
-> except from the armada-xp-mv78260.dtsi, in the following commit:
-> 
->   commit cf8088c5cac6ce20d914b9131533844b9291a054
->   Author: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->   Date:   Tue May 21 12:33:27 2013 +0200
-> 
->     arm: mvebu: fix length of Ethernet registers area in .dtsi
-> 
-> This commit fixes a kernel panic in mvneta_probe(), when the kernel
-> tries to access the unmapped registers:
-> 
-> [  163.639092] mvneta d0070000.ethernet eth0: mac: 6e:3c:4f:87:17:2e
-> [  163.646962] mvneta d0074000.ethernet eth1: mac: 6a:04:4e:6f:f5:ef
-> [  163.654853] mvneta d0030000.ethernet eth2: mac: 2a:99:19:19:fc:4c
-> [  163.661258] Unable to handle kernel paging request at virtual address f011bcf0
-> [  163.668523] pgd = c0004000
-> [  163.671237] [f011bcf0] *pgd=2f006811, *pte=00000000, *ppte=00000000
-> [  163.677565] Internal error: Oops: 807 [#1] SMP ARM
-> [  163.682370] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-rc6-01850-gba0682e #11
-> [  163.690046] task: ef04c000 ti: ef03e000 task.ti: ef03e000
-> [  163.695467] PC is at mvneta_probe+0x34c/0xabc
-> [...]
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Removed
 
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> 
+> > +		reg = <0x0 0x08000000>;   // 128MB
+> > +	};
+> > +
+> > +	soc {
+> > +		aipi at 10000000 { /* aipi */
+> > +			wdog at 10002000 {
+> > +				status = "okay";
+> > +			};
+> 
+> We now use node label in board dts files to refer to the nodes defined
+> in soc dts.
 
-Thanks for spotting the issue!
+I replaced all node identifiers with their labels.
 
-Thomas
+> 
+> > +
+> > +			owire at 10009000 {
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			serial at 1000a000 {
+> > +				fsl,uart-has-rtscts;
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			serial at 1000b000 {
+> > +				fsl,uart-has-rtscts;
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			serial at 1000c000 {
+> > +				fsl,uart-has-rtscts;
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			cspi at 1000e000 {
+> > +				fsl,spi-num-chipselects = <2>;
+> > +				cs-gpios = <&gpio4 28 0>,
+> > +					<&gpio4 27 0>;
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			i2c at 10012000 {
+> > +				status = "okay";
+> > +				ioexpander at 41 {
+> > +					compatible = "nxp,pca9536";
+> > +					reg = <0x41>;
+> > +				};
+> 
+> Please put blank line before and after node.
+
+Fixed
+
+> 
+> > +				rtc at 51 {
+> > +					compatible = "nxp,pcf8563";
+> > +					reg = <0x51>;
+> > +				};
+> > +				dimmer at 60 {
+> > +					compatible = "nxp,pca9530";
+> > +					reg = <0x60>;
+> 
+> > +					pwm = <1 1>;
+> > +					psc = <1 1>;
+> > +					leds = <&led0 &led1>;
+> 
+> Are these documented/accepted bindings?
+
+No, sorry, I forgot to remove them.
+
+> 
+> > +					led0: led0 {
+> > +						label = "pba-lcd_brightness";
+> > +						default-state = "off";
+> > +						type = "led";
+> 
+> What is this "type" property used for?  Is it documented?
+> 
+> > +					};
+> > +					led1: led1 {
+> > +						label = "pba-free_use";
+> > +						default-state = "off";
+> > +						type = "led";
+> > +					};
+> > +				};
+> > +			};
+> > +
+> > +			sdhci at 10014000 {
+> > +				cd-gpios = <&gpio3 29 0>;
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			gpio at 10015000 {
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			gpio at 10015100 {
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			gpio at 10015200 {
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			gpio at 10015300 {
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			gpio at 10015400 {
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			gpio at 10015500 {
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			i2c at 1001d000 {
+> > +				status = "okay";
+> > +
+> > +				lm75 at 4a {
+> > +					compatible = "national,lm75";
+> > +					reg = <0x4a>;
+> > +				};
+> > +
+> > +				rtc at 51 {
+> > +					compatible = "nxp,pcf8563";
+> > +					reg = <0x51>;
+> > +				};
+> > +
+> > +				at24 at 52 {
+> > +					compatible = "at,24c32";
+> > +					pagesize = <32>;
+> > +					reg = <0x52>;
+> > +				};
+> > +			};
+> > +		};
+> > +
+> > +		aipi at 10020000 { /* AIPI2 */
+> > +			fb at 10021000 {
+> > +				status = "okay";
+> 
+> Please let it be the last property in the node.
+
+Fixed.
+
+> 
+> > +				display = <&display0>;
+> > +			};
+> > +
+> > +			ethernet at 1002b000 {
+> > +				status = "okay";
+> > +			};
+> > +		}; /* AIPI */
+> > +
+> > +		nand at d8000000 {
+> > +			status = "okay";
+> 
+> Ditto
+> 
+> > +			nand-bus-width = <8>;
+> > +			nand-ecc-mode = "hw";
+> > +			nand-on-flash-bbt;
+> > +
+> > +			barebox at 0 {
+> > +				label = "barebox";
+> > +				reg = <0x0 0x80000>;
+> > +			};
+> > +
+> > +			bareboxenv at 80000 {
+> > +				label = "bareboxenv";
+> > +				reg = <0x80000 0x80000>;
+> > +			};
+> > +
+> > +			kernel at 100000 {
+> > +				label = "kernel";
+> > +				reg = <0x100000 0x500000>;
+> > +			};
+> > +
+> > +			rootfs at 500000 {
+> > +				label = "rootfs";
+> > +				reg = <0x500000 0x7b00000>;
+> > +			};
+> 
+> People are against the idea of putting partition layout in device tree.
+
+Removed.
+
+> 
+> > +		};
+> > +	};
+> > +
+> > +	display0: display0 {
+> > +		model = "Primeview-PD050VL1";
+> > +		native-mode = <&timing_disp0>;
+> > +		bits-per-pixel = <16>;		/* non-standard but required */
+> > +		fsl,pcr = <0xf0c88080>;	/* non-standard but required */
+> 
+> Has the code/document for these non-standard properties been accepted?
+
+Yes, it was accepted:
+https://patchwork.kernel.org/patch/2614951/
+
+Thank you,
+
+Markus
+
+> 
+> Shawn
+> 
+> > +		display-timings {
+> > +			timing_disp0: 640x480 {
+> > +				hactive = <640>;
+> > +				vactive = <480>;
+> > +				hback-porch = <112>;
+> > +				hfront-porch = <36>;
+> > +				hsync-len = <32>;
+> > +				vback-porch = <33>;
+> > +				vfront-porch = <33>;
+> > +				vsync-len = <2>;
+> > +				clock-frequency = <25000000>;
+> > +			};
+> > +		};
+> > +	};
+> > +};
+> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> > index f25cf88..5372337 100644
+> > --- a/arch/arm/mach-imx/Kconfig
+> > +++ b/arch/arm/mach-imx/Kconfig
+> > @@ -441,6 +441,7 @@ config MACH_IMX27IPCAM
+> >  config MACH_IMX27_DT
+> >  	bool "Support i.MX27 platforms from device tree"
+> >  	select SOC_IMX27
+> > +	select IMX_HAVE_PLATFORM_MXC_NAND
+> >  	help
+> >  	  Include support for Freescale i.MX27 based platforms
+> >  	  using the device tree for discovery
+> > -- 
+> > 1.8.2.1
+> > 
+> 
+> 
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
