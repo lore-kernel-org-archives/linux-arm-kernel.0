@@ -1,17 +1,52 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 23 Jun 2013 18:50:03 -0300
-Subject: [PATCH v3 1/5] drivers: bus: imx-weim: Remove private driver data
-In-Reply-To: <20130623192303.GO32299@pengutronix.de>
-References: <1371973698-16150-1-git-send-email-shc_work@mail.ru>
- <20130623192303.GO32299@pengutronix.de>
-Message-ID: <CAOMZO5CN2NybQJ27p18R5z0yOUsse5Y4OwRCFn+E9HTTHy2sOw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 23 Jun 2013 18:02:05 -0400
+Subject: [PATCH for v3.11] ARM: mvebu: fix length of ethernet registers
+ in mv78260 dtsi
+In-Reply-To: <1371919947-28872-1-git-send-email-elezegarcia@gmail.com>
+References: <1371919947-28872-1-git-send-email-elezegarcia@gmail.com>
+Message-ID: <20130623220205.GW31667@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 23, 2013 at 4:23 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On Sat, Jun 22, 2013 at 01:52:27PM -0300, Ezequiel Garcia wrote:
+> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> 
+> The length of the registers area for the Marvell 370/XP Ethernet controller
+> was incorrect in the .dtsi: 0x2500, while it should have been 0x4000.
+> This problem wasn't noticed because there used to be a static mapping for
+> all the MMIO register region set up by ->map_io().
+> 
+> The register length was fixed in all the other device tree files,
+> except from the armada-xp-mv78260.dtsi, in the following commit:
+> 
+>   commit cf8088c5cac6ce20d914b9131533844b9291a054
+>   Author: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>   Date:   Tue May 21 12:33:27 2013 +0200
+> 
+>     arm: mvebu: fix length of Ethernet registers area in .dtsi
+> 
+> This commit fixes a kernel panic in mvneta_probe(), when the kernel
+> tries to access the unmapped registers:
+> 
+> [  163.639092] mvneta d0070000.ethernet eth0: mac: 6e:3c:4f:87:17:2e
+> [  163.646962] mvneta d0074000.ethernet eth1: mac: 6a:04:4e:6f:f5:ef
+> [  163.654853] mvneta d0030000.ethernet eth2: mac: 2a:99:19:19:fc:4c
+> [  163.661258] Unable to handle kernel paging request at virtual address f011bcf0
+> [  163.668523] pgd = c0004000
+> [  163.671237] [f011bcf0] *pgd=2f006811, *pte=00000000, *ppte=00000000
+> [  163.677565] Internal error: Oops: 807 [#1] SMP ARM
+> [  163.682370] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-rc6-01850-gba0682e #11
+> [  163.690046] task: ef04c000 ti: ef03e000 task.ti: ef03e000
+> [  163.695467] PC is at mvneta_probe+0x34c/0xabc
+> [...]
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-> I don't know how others see it, but I would keep the private data now
-> that it's there already. We don't know what it's good for in the future
-> and it doesn't hurt.
+Applied to mvebu/fixes-non-critical
 
-I agree with you, Sascha.
+thx,
+
+Jason.
