@@ -1,66 +1,117 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 23 Jun 2013 11:48:15 +0400
-Subject: [PATCH v3 2/5] drivers: bus: imx-weim: Simplify error path
-In-Reply-To: <1371973698-16150-1-git-send-email-shc_work@mail.ru>
-References: <1371973698-16150-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1371973698-16150-2-git-send-email-shc_work@mail.ru>
+Date: Sun, 23 Jun 2013 11:48:14 +0400
+Subject: [PATCH v3 1/5] drivers: bus: imx-weim: Remove private driver data
+Message-ID: <1371973698-16150-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Driver uses only probe function so no reason to keep variables
+in private driver data.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- drivers/bus/imx-weim.c | 22 ++++++++--------------
- 1 file changed, 8 insertions(+), 14 deletions(-)
+ drivers/bus/imx-weim.c | 41 ++++++++++++++---------------------------
+ 1 file changed, 14 insertions(+), 27 deletions(-)
 
 diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-index 0c0e6fe..0f4b081 100644
+index 349f14e..0c0e6fe 100644
 --- a/drivers/bus/imx-weim.c
 +++ b/drivers/bus/imx-weim.c
-@@ -78,36 +78,30 @@ static int weim_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct clk *clk;
- 	void __iomem *base;
--	int ret = -EINVAL;
-+	int ret;
+@@ -12,11 +12,6 @@
+ #include <linux/io.h>
+ #include <linux/of_device.h>
  
+-struct imx_weim {
+-	void __iomem *base;
+-	struct clk *clk;
+-};
+-
+ static const struct of_device_id weim_id_table[] = {
+ 	{ .compatible = "fsl,imx6q-weim", },
+ 	{}
+@@ -27,10 +22,8 @@ MODULE_DEVICE_TABLE(of, weim_id_table);
+ #define CS_REG_RANGE  0x18
+ 
+ /* Parse and set the timing for this device. */
+-static int
+-weim_timing_setup(struct platform_device *pdev, struct device_node *np)
++static int weim_timing_setup(struct device_node *np, void __iomem *base)
+ {
+-	struct imx_weim *weim = platform_get_drvdata(pdev);
+ 	u32 value[CS_TIMING_LEN];
+ 	u32 cs_idx;
+ 	int ret;
+@@ -52,11 +45,11 @@ weim_timing_setup(struct platform_device *pdev, struct device_node *np)
+ 
+ 	/* set the timing for WEIM */
+ 	for (i = 0; i < CS_TIMING_LEN; i++)
+-		writel(value[i], weim->base + cs_idx * CS_REG_RANGE + i * 4);
++		writel(value[i], base + cs_idx * CS_REG_RANGE + i * 4);
+ 	return 0;
+ }
+ 
+-static int weim_parse_dt(struct platform_device *pdev)
++static int weim_parse_dt(struct platform_device *pdev, void __iomem *base)
+ {
+ 	struct device_node *child;
+ 	int ret;
+@@ -65,7 +58,7 @@ static int weim_parse_dt(struct platform_device *pdev)
+ 		if (!child->name)
+ 			continue;
+ 
+-		ret = weim_timing_setup(pdev, child);
++		ret = weim_timing_setup(child, base);
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "%s set timing failed.\n",
+ 				child->full_name);
+@@ -82,38 +75,32 @@ static int weim_parse_dt(struct platform_device *pdev)
+ 
+ static int weim_probe(struct platform_device *pdev)
+ {
+-	struct imx_weim *weim;
+ 	struct resource *res;
++	struct clk *clk;
++	void __iomem *base;
+ 	int ret = -EINVAL;
+ 
+-	weim = devm_kzalloc(&pdev->dev, sizeof(*weim), GFP_KERNEL);
+-	if (!weim) {
+-		ret = -ENOMEM;
+-		goto weim_err;
+-	}
+-	platform_set_drvdata(pdev, weim);
+-
  	/* get the resource */
  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(base)) {
--		ret = PTR_ERR(base);
--		goto weim_err;
--	}
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
+-	weim->base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(weim->base)) {
+-		ret = PTR_ERR(weim->base);
++	base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(base)) {
++		ret = PTR_ERR(base);
+ 		goto weim_err;
+ 	}
  
  	/* get the clock */
- 	clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(clk))
--		goto weim_err;
-+		return PTR_ERR(clk);
+-	weim->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(weim->clk))
++	clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(clk))
+ 		goto weim_err;
  
- 	ret = clk_prepare_enable(clk);
+-	ret = clk_prepare_enable(weim->clk);
++	ret = clk_prepare_enable(clk);
  	if (ret)
--		goto weim_err;
-+		return ret;
+ 		goto weim_err;
  
  	/* parse the device node */
- 	ret = weim_parse_dt(pdev, base);
--	if (ret) {
-+	if (ret)
- 		clk_disable_unprepare(clk);
--		goto weim_err;
--	}
--
--	dev_info(&pdev->dev, "WEIM driver registered.\n");
--	return 0;
-+	else
-+		dev_info(&pdev->dev, "Driver registered.\n");
- 
--weim_err:
- 	return ret;
- }
+-	ret = weim_parse_dt(pdev);
++	ret = weim_parse_dt(pdev, base);
+ 	if (ret) {
+-		clk_disable_unprepare(weim->clk);
++		clk_disable_unprepare(clk);
+ 		goto weim_err;
+ 	}
  
 -- 
 1.8.1.5
