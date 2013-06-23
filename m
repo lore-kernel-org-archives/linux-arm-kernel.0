@@ -1,42 +1,42 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 23 Jun 2013 11:07:06 +0200
-Subject: [PATCH v2 3/5] ARM: dts: imx27: Add 1-wire
-In-Reply-To: <1371977674.224117544@f196.mail.ru>
-References: <1371977061-9891-1-git-send-email-mpa@pengutronix.de>
- <1371977061-9891-4-git-send-email-mpa@pengutronix.de>
- <1371977674.224117544@f196.mail.ru>
-Message-ID: <20130623090706.GC13104@s25.your-server.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 23 Jun 2013 11:59:19 +0200
+Subject: [PATCH] clocksource: samsung_pwm: Correct definition of
+ AUTORELOAD bit
+In-Reply-To: <1371577267-2860-1-git-send-email-tomasz.figa@gmail.com>
+References: <1371577267-2860-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <4314851.1Z5ihu2ZPz@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 23, 2013 at 12:54:34PM +0400, Alexander Shiyan wrote:
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> ...
-> > +			owire: owire at 10009000 {
-> > +				compatible = "fsl,imx27-owire", "fsl,imx21-owire";
-> > +				reg = <0x10009000 0x1000>;
-> > +				clocks = <&clks 35>;
-> > +				clock-names = "ipg";
+On Tuesday 18 of June 2013 19:41:07 Tomasz Figa wrote:
+> PWM channel 4 (logically channel 5 in TCON register) has its autoreload
+> bit located at different position. This patch fixes the driver to
+> account for this.
 > 
-> Clock name can be discarded here.
-
-Thanks, I fixed both, owire and memory offset.
-
-Regards,
-
-Markus
-
+> This fixes a problem with clocksource hanging after it overflows because
+> it is not reloaded any more.
 > 
-> > +				status = "disabled";
-> > +			};
-> > +
-> 
-> 
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 > ---
+>  drivers/clocksource/samsung_pwm_timer.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/samsung_pwm_timer.c
+> b/drivers/clocksource/samsung_pwm_timer.c index 2977043..6af178f 100644
+> --- a/drivers/clocksource/samsung_pwm_timer.c
+> +++ b/drivers/clocksource/samsung_pwm_timer.c
+> @@ -47,7 +47,8 @@
+>  #define TCON_START(chan)		(1 << (4 * (chan) + 0))
+>  #define TCON_MANUALUPDATE(chan)		(1 << (4 * (chan) + 1))
+>  #define TCON_INVERT(chan)		(1 << (4 * (chan) + 2))
+> -#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
+> +#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) \
+> +						+ (((chan) < 5) ? 3 : 2)))
+> 
+>  DEFINE_SPINLOCK(samsung_pwm_lock);
+>  EXPORT_SYMBOL(samsung_pwm_lock);
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Ping.
+
+Best regards,
+Tomasz
