@@ -1,52 +1,37 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 23 Jun 2013 18:02:05 -0400
-Subject: [PATCH for v3.11] ARM: mvebu: fix length of ethernet registers
- in mv78260 dtsi
-In-Reply-To: <1371919947-28872-1-git-send-email-elezegarcia@gmail.com>
-References: <1371919947-28872-1-git-send-email-elezegarcia@gmail.com>
-Message-ID: <20130623220205.GW31667@titan.lakedaemon.net>
+Date: Sun, 23 Jun 2013 18:06:18 -0400
+Subject: [GIT PULL] ARM: mvebu: fixes-non-critical v3.11 (round 2)
+Message-ID: <20130623220618.GX31667@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 22, 2013 at 01:52:27PM -0300, Ezequiel Garcia wrote:
-> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> 
-> The length of the registers area for the Marvell 370/XP Ethernet controller
-> was incorrect in the .dtsi: 0x2500, while it should have been 0x4000.
-> This problem wasn't noticed because there used to be a static mapping for
-> all the MMIO register region set up by ->map_io().
-> 
-> The register length was fixed in all the other device tree files,
-> except from the armada-xp-mv78260.dtsi, in the following commit:
-> 
->   commit cf8088c5cac6ce20d914b9131533844b9291a054
->   Author: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->   Date:   Tue May 21 12:33:27 2013 +0200
-> 
->     arm: mvebu: fix length of Ethernet registers area in .dtsi
-> 
-> This commit fixes a kernel panic in mvneta_probe(), when the kernel
-> tries to access the unmapped registers:
-> 
-> [  163.639092] mvneta d0070000.ethernet eth0: mac: 6e:3c:4f:87:17:2e
-> [  163.646962] mvneta d0074000.ethernet eth1: mac: 6a:04:4e:6f:f5:ef
-> [  163.654853] mvneta d0030000.ethernet eth2: mac: 2a:99:19:19:fc:4c
-> [  163.661258] Unable to handle kernel paging request at virtual address f011bcf0
-> [  163.668523] pgd = c0004000
-> [  163.671237] [f011bcf0] *pgd=2f006811, *pte=00000000, *ppte=00000000
-> [  163.677565] Internal error: Oops: 807 [#1] SMP ARM
-> [  163.682370] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-rc6-01850-gba0682e #11
-> [  163.690046] task: ef04c000 ti: ef03e000 task.ti: ef03e000
-> [  163.695467] PC is at mvneta_probe+0x34c/0xabc
-> [...]
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Arnd, Olof,
 
-Applied to mvebu/fixes-non-critical
+Got a late bloomer this weekend.  Thanks to Ezequiel for spotting this
+and providing a fix.
 
-thx,
 
-Jason.
+The following changes since commit cf8088c5cac6ce20d914b9131533844b9291a054:
+
+  arm: mvebu: fix length of Ethernet registers area in .dtsi (2013-05-28 14:48:28 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/jcooper/linux.git tags/fixes-non-3.11-2
+
+for you to fetch changes up to cdd8e498c92abd63878a5c1380217fb870ab1872:
+
+  ARM: mvebu: fix length of ethernet registers in mv78260 dtsi (2013-06-23 21:46:12 +0000)
+
+----------------------------------------------------------------
+mvebu fixes non-critical for v3.11 (round 2)
+
+ - mvebu
+    - mv78260: catch missing fix for mvneta register length
+
+----------------------------------------------------------------
+Ezequiel Garcia (1):
+      ARM: mvebu: fix length of ethernet registers in mv78260 dtsi
+
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
