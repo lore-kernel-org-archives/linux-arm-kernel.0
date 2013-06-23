@@ -1,38 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 23 Jun 2013 20:13:16 +0200
-Subject: No stable driver/module api?
-In-Reply-To: <CABp-a4eHep=hx7HQ=Og0GC0t=CyE8u2sVt7BwyVMJb9zjA2ePw@mail.gmail.com>
-References: <CABp-a4eHep=hx7HQ=Og0GC0t=CyE8u2sVt7BwyVMJb9zjA2ePw@mail.gmail.com>
-Message-ID: <2105177.8kY1vWxy2t@wuerfel>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sun, 23 Jun 2013 20:59:52 +0200
+Subject: [patch 1/1] imx53-qsb: enable usb power
+In-Reply-To: <20130620212939.018670789@rtp-net.org>
+References: <20130620212939.018670789@rtp-net.org>
+Message-ID: <20130623185952.GA26397@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 23 June 2013 19:29:52 Per Strandh wrote:
+On Thu, Jun 20, 2013 at 11:29:30PM +0200, Arnaud Patard wrote:
+> Enable usb power pin by using a fixed regulator. With this and the usb clock
+> patch is making usb working on my loco.
 > 
-> I have now encountered one problem with this layout.
-> When upgrading the kernel, our driver in the root file system isn't
-> always compatible/loading.
-> 
-> When upgrading from 3.0.18 to 3.0.22 it worked out fine.
-> When upgrading from 3.0.22 to 3.0.23 the driver isn't loading.
-> When trying to load it if fails with the message:
-> - "disagrees about version of symbol module_layout"
-> 
-> We have configured the kernel with the option
->  CONFIG_MODULE_FORCE_LOAD=y
-> 
-> 
-> 
-> Isn't the driver/module api stable within the 3.0 track?
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> Index: linux-next/arch/arm/boot/dts/imx53-qsb.dts
+> ===================================================================
+> --- linux-next.orig/arch/arm/boot/dts/imx53-qsb.dts	2013-06-20 23:25:46.049428530 +0200
+> +++ linux-next/arch/arm/boot/dts/imx53-qsb.dts	2013-06-20 23:26:34.293425920 +0200
+> @@ -93,6 +93,15 @@
+>  			regulator-max-microvolt = <3200000>;
+>  			regulator-always-on;
+>  		};
+> +
+> +		reg_usbpwr: usbpwr {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "usbpwr";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio7 8 0>;
+> +			regulator-always-on;
+> +		};
 
-The API is generally stable, unless there is a serious bug,
-the ABI is not. If the API ever changes, you should get a build
-warning when recompiling your module.
+Shouldn't this be provided to the chipidea driver as vbus?
 
-The easiest way to deal with those changes is to keep your
-own code as a patch to the mainline kernel and build it all
-together. That also makes it easier for your to show that
-you are shipping the matching source code for all the
-binary kernel code.
+Sascha
 
-	Arnd
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
