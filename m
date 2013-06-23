@@ -1,32 +1,56 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Sun, 23 Jun 2013 10:09:52 +0200
-Subject: [PATCH] ARM: fix missing flush_kernel_dcache_page() for noMMU
-In-Reply-To: <871u7w6eht.fsf@linaro.org>
-References: <1371672910-9340-1-git-send-email-gmbnomis@gmail.com>
- <871u7w6eht.fsf@linaro.org>
-Message-ID: <20130623080951.GA29398@schnuecks.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 23 Jun 2013 10:16:14 +0200
+Subject: [PATCH for v3.11] ARM: mvebu: fix length of ethernet registers
+ in mv78260 dtsi
+In-Reply-To: <1371919947-28872-1-git-send-email-elezegarcia@gmail.com>
+References: <1371919947-28872-1-git-send-email-elezegarcia@gmail.com>
+Message-ID: <20130623101614.112bc6e2@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 07:30:54AM -0700, Kevin Hilman wrote:
-> Simon Baatz <gmbnomis@gmail.com> writes:
-> 
-> > Commit 1bc3974 moved the implementation of flush_kernel_dcache_page()
-> > into in mm/flush.c but did not implement it on noMMU ARM.
-> >
-> > Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
-> > Cc: <stable@vger.kernel.org> # 3.2+: 1bc3974: ARM: 7755/1
-> > Cc: <stable@vger.kernel.org> # 3.2+
-> > ---
-> >
-> > ARM 7755/1 "handle user space mapped pages in flush_kernel_dcache_page"
-> > unfortunately broke the no MMU case.  Compile tested with allnoconfig and
-> > at91x40_defconfig on v3.10-rc6/v3.9.6 + ARM 7755/1.  On older stable kernels
-> > (3.2.47 & 3.4.49) compiled with at91x40_defconfig.
-> 
-> Acked-by: Kevin Hilman <khilman@linaro.org>
+Dear Ezequiel Garcia,
 
-Thanks! Reworded according to Sergei's comment, added your Acked-by and
-submitted to Russell's patch tracking system (7772/1).
+On Sat, 22 Jun 2013 13:52:27 -0300, Ezequiel Garcia wrote:
+> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> 
+> The length of the registers area for the Marvell 370/XP Ethernet controller
+> was incorrect in the .dtsi: 0x2500, while it should have been 0x4000.
+> This problem wasn't noticed because there used to be a static mapping for
+> all the MMIO register region set up by ->map_io().
+> 
+> The register length was fixed in all the other device tree files,
+> except from the armada-xp-mv78260.dtsi, in the following commit:
+> 
+>   commit cf8088c5cac6ce20d914b9131533844b9291a054
+>   Author: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>   Date:   Tue May 21 12:33:27 2013 +0200
+> 
+>     arm: mvebu: fix length of Ethernet registers area in .dtsi
+> 
+> This commit fixes a kernel panic in mvneta_probe(), when the kernel
+> tries to access the unmapped registers:
+> 
+> [  163.639092] mvneta d0070000.ethernet eth0: mac: 6e:3c:4f:87:17:2e
+> [  163.646962] mvneta d0074000.ethernet eth1: mac: 6a:04:4e:6f:f5:ef
+> [  163.654853] mvneta d0030000.ethernet eth2: mac: 2a:99:19:19:fc:4c
+> [  163.661258] Unable to handle kernel paging request at virtual address f011bcf0
+> [  163.668523] pgd = c0004000
+> [  163.671237] [f011bcf0] *pgd=2f006811, *pte=00000000, *ppte=00000000
+> [  163.677565] Internal error: Oops: 807 [#1] SMP ARM
+> [  163.682370] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-rc6-01850-gba0682e #11
+> [  163.690046] task: ef04c000 ti: ef03e000 task.ti: ef03e000
+> [  163.695467] PC is at mvneta_probe+0x34c/0xabc
+> [...]
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-- Simon
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Thanks for spotting the issue!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
