@@ -1,34 +1,207 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Sun, 23 Jun 2013 10:41:33 +0200
-Subject: [PATCH v7] ARM PJ4B: Add support for errata 4742
-In-Reply-To: <20130623083055.GW2718@n2100.arm.linux.org.uk>
-References: <1371828664-3681-1-git-send-email-gregory.clement@free-electrons.com>
- <1371828664-3681-2-git-send-email-gregory.clement@free-electrons.com>
- <20130622154421.GA475@localhost> <20130622155103.GA11542@1wt.eu>
- <20130623072058.GD11542@1wt.eu>
- <20130623083055.GW2718@n2100.arm.linux.org.uk>
-Message-ID: <20130623084133.GF11542@1wt.eu>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sun, 23 Jun 2013 10:44:21 +0200
+Subject: [PATCH v2 5/5] ARM: dts: Add device tree support for phycard pca100
+In-Reply-To: <1371977061-9891-1-git-send-email-mpa@pengutronix.de>
+References: <1371977061-9891-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1371977061-9891-6-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 23, 2013 at 09:30:55AM +0100, Russell King - ARM Linux wrote:
-> On Sun, Jun 23, 2013 at 09:20:58AM +0200, Willy Tarreau wrote:
-> > On Sat, Jun 22, 2013 at 05:51:03PM +0200, Willy Tarreau wrote:
-> > > Interesting, I had the same issue and thought it was because of my
-> > > tree, though visually I couldn't spot the issue. It probably was a
-> > > space/tab issue only.
-> > 
-> > OK it was probably because of other pending changes since rc6, because
-> > it applied perfectly on top of 3.10-rc7.
-> 
-> It needs its counterpart patch:
-> 
-> 049be07053ebbf0ee8543caea23ae7bdf0765bb2
-> ARM: 7754/1: Fix the CPU ID and the mask associated to the PJ4B
-> 
-> which did made it into -rc7.
+Board files for Phytec PhyCARD-S "System on Module" and "Rapid
+Development Kit".
 
-Yes I had it, but maybe an earlier improperly formated version.
+Based on patches from:
 
-Thanks,
-Willy
+Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+ - Original patch
+ - ARM: dts: Set partition offsets for phycard
+ - ARM: dts: Use CSPI1 instead of CSPI2 on phycard pca100
+ - ARM: imx27-phytec-phycard-S.dts: resize nand partitions
+
+Jan Luebbe <jlu@pengutronix.de>:
+ - ARM: dts: Enable bad block table in NAND
+
+Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Cc: Jan Luebbe <jlu@pengutronix.de>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+
+Notes:
+    Changes in v2:
+     - Remove unnecessary Kconfig nand selection.
+     - Style fixes
+     - Replace node identifiers with node labels
+     - Fix compatibility of cpu node
+     - Remove device node for not mainlined dimmer driver
+     - Remove nand partition table
+     - Remove memory node
+     - Splitted board file into "system on module" and "rapid development kit"
+
+ arch/arm/boot/dts/Makefile                       |  2 +
+ arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts | 62 ++++++++++++++++++++
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts | 72 ++++++++++++++++++++++++
+ 3 files changed, 136 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
+ create mode 100644 arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b3a8661..707c192 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -105,6 +105,8 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx27-pdk.dtb \
+ 	imx27-phytec-phycore-som.dtb \
+ 	imx27-phytec-phycore-rdk.dtb \
++	imx27-phytec-phycard-s-som.dtb \
++	imx27-phytec-phycard-s-rdk.dtb \
+ 	imx31-bug.dtb \
+ 	imx51-apf51.dtb \
+ 	imx51-apf51dev.dtb \
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
+new file mode 100644
+index 0000000..bf11429
+--- /dev/null
++++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
+@@ -0,0 +1,62 @@
++/*
++ * Copyright 2012 Markus Pargmann, Pengutronix
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include "imx27-phytec-phycard-s-som.dts"
++
++/ {
++	model = "Phytec pca100 rapid development kit";
++	compatible = "phytec,imx27-pca100-rdk", "phytec,imx27-pca100", "fsl,imx27";
++
++	display: display {
++		model = "Primeview-PD050VL1";
++		native-mode = <&timing0>;
++		bits-per-pixel = <16>;  /* non-standard but required */
++		fsl,pcr = <0xf0c88080>;	/* non-standard but required */
++		display-timings {
++			timing0: 640x480 {
++				hactive = <640>;
++				vactive = <480>;
++				hback-porch = <112>;
++				hfront-porch = <36>;
++				hsync-len = <32>;
++				vback-porch = <33>;
++				vfront-porch = <33>;
++				vsync-len = <2>;
++				clock-frequency = <25000000>;
++			};
++		};
++	};
++};
++
++&imxfb {
++	display = <&display>;
++	status = "okay";
++};
++
++&sdhci2 {
++	cd-gpios = <&gpio3 29 0>;
++	status = "okay";
++};
++
++&uart1 {
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
++
++&uart2 {
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
++
++&uart3 {
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+new file mode 100644
+index 0000000..6b2b8ad4
+--- /dev/null
++++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+@@ -0,0 +1,72 @@
++/*
++ * Copyright 2012 Sascha Hauer, Uwe Kleine-K?nig, Steffen Trumtrar
++ * and Markus Pargmann, Pengutronix
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++#include "imx27.dtsi"
++
++/ {
++	model = "Phytec pca100";
++	compatible = "phytec,imx27-pca100", "fsl,imx27";
++
++	memory {
++		reg = <0x0 0x08000000>; /* 128MB */
++	};
++};
++
++&cspi1 {
++	fsl,spi-num-chipselects = <2>;
++	cs-gpios = <&gpio4 28 0>,
++		<&gpio4 27 0>;
++	status = "okay";
++};
++
++&fec {
++	status = "okay";
++};
++
++&i2c1 {
++	status = "okay";
++
++	ioexpander at 41 {
++		compatible = "nxp,pca9536";
++		reg = <0x41>;
++	};
++
++	rtc at 51 {
++		compatible = "nxp,pcf8563";
++		reg = <0x51>;
++	};
++};
++
++&i2c2 {
++	status = "okay";
++
++	lm75 at 4a {
++		compatible = "national,lm75";
++		reg = <0x4a>;
++	};
++
++	rtc at 51 {
++		compatible = "nxp,pcf8563";
++		reg = <0x51>;
++	};
++
++	at24 at 52 {
++		compatible = "at,24c32";
++		pagesize = <32>;
++		reg = <0x52>;
++	};
++};
++
++&owire {
++	status = "okay";
++};
+-- 
+1.8.2.1
