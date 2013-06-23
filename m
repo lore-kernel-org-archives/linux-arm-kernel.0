@@ -1,82 +1,74 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 23 Jun 2013 10:22:22 +0200
-Subject: [PATCH 5/6] ARM: dts: imx27 cpufreq-cpu0 frequencies
-In-Reply-To: <20130621084740.GA14268@e102568-lin.cambridge.arm.com>
-References: <1371739815-6666-1-git-send-email-mpa@pengutronix.de>
- <1371739815-6666-6-git-send-email-mpa@pengutronix.de>
- <20130621024406.GB24268@S2101-09.ap.freescale.net>
- <1371790493.32418815@f415.i.mail.ru>
- <20130621052344.GA25633@S2101-09.ap.freescale.net>
- <20130621084740.GA14268@e102568-lin.cambridge.arm.com>
-Message-ID: <20130623082222.GB13104@s25.your-server.de>
+From: naresh.kamboju@linaro.org (Naresh Kamboju)
+Date: Sun, 23 Jun 2013 13:53:10 +0530
+Subject: linux-next: panda build failed at arch/arm/mach-omap2/omap4-restart.c
+Message-ID: <CA+G9fYv_9EQUmpRNPUwioSwJVXnXJC5odEKiMd=vKHNWYRT8xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 09:47:40AM +0100, Lorenzo Pieralisi wrote:
-> On Fri, Jun 21, 2013 at 06:23:46AM +0100, Shawn Guo wrote:
-> > On Fri, Jun 21, 2013 at 08:54:53AM +0400, Alexander Shiyan wrote:
-> > > > On Thu, Jun 20, 2013 at 04:50:14PM +0200, Markus Pargmann wrote:
-> > > > > +	cpus {
-> > > > > +		#size-cells = <0>;
-> > > > > +		#address-cells = <1>;
-> > > > > +
-> > > > > +		cpu at 0 {
-> > > > > +			device_type = "cpu";
-> > > > > +			compatible = "fsl,imx27", "arm,arm926ejs";
-> > > > 
-> > > > From what Documentation/devicetree/bindings/arm/cpus.txt tells, it
-> > > > should be "arm,arm926".  Also, why do you put "fsl,imx27" there?
-> > > > "imx27" is a SoC name not cpu core.
-> > > 
-> > > I think Markus take this ARM property from one of existing DTS.
-> > > 
-> > > shc at shc /home/git/linux-mx27/arch/arm/boot/dts $ grep arm926 *.dtsi
-> > > at91sam9260.dtsi:                       compatible = "arm,arm926ejs";
-> > > at91sam9263.dtsi:                       compatible = "arm,arm926ejs";
-> > > at91sam9g45.dtsi:                       compatible = "arm,arm926ejs";
-> > > at91sam9n12.dtsi:                       compatible = "arm,arm926ejs";
-> > > at91sam9x5.dtsi:                        compatible = "arm,arm926ejs";
-> > > imx23.dtsi:                     compatible = "arm,arm926ejs";
-> > > imx28.dtsi:                     compatible = "arm,arm926ejs";
-> > > lpc32xx.dtsi:                   compatible = "arm,arm926ejs";
-> > > s3c2416.dtsi:                   compatible = "arm,arm926ejs";
-> > > spear3xx.dtsi:                  compatible = "arm,arm926ejs";
-> > > spear600.dtsi:                  compatible = "arm,arm926ejs";
-> > > wm8505.dtsi:                    compatible = "arm,arm926ejs";
-> > > 
-> > > So, documentation need to be updated or these values should be fixed.
-> > > Another solution  is specify compatible string as:
-> > > compatible = "arm,arm926ejs", "arm,arm926";
-> > > What you think about this?
-> > 
-> > I assume that the compatible string in the binding doc has been reviewed
-> > and agreed by people, so we should fix the existing users before kernel
-> > starts using it to for matching something.
-> > 
-> > Lorenzo, comment?
-> 
-> I patched them all and changes are queued through arm-soc, according to the
-> latest bindings that should get merged this cycle and are available here:
-> 
-> git://linux-arm.org/linux-2.6-lp.git dt-cpus-bindings
-> 
-> If you are queuing dts updates please follow rules in there, waiting for
-> that document to get merged.
-> 
-> Lorenzo
-> 
+Hi,
 
-Okay, I changed it to "arm,arm926ej-s" and removed "reg" as described in
-the dt-cpus-bindings branch documentation.
+panda build broken on linux-next branch
 
-Thanks,
+kernel_config=omap2plus_defconfig
+KERNEL_VERSION=3.10.0-rc6
+KERNEL_GIT=git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+KERNEL_COMMIT=e1a86578747376f08985627c84df088a5d0d1e92
 
-Markus
+Build error log :
+-------------------
+04:43:18   CC      arch/arm/mach-omap2/omap4-restart.o
+04:43:18 /mnt/ci_build/workspace/linux-next/hwpack/panda/label/kernel_cloud/arch/arm/mach-omap2/omap4-restart.c:21:28:
+warning: ?enum reboot_mode? declared inside parameter list [enabled by
+default]
+04:43:18  void omap44xx_restart(enum reboot_mode mode, const char *cmd)
+04:43:18                             ^
+04:43:18 /mnt/ci_build/workspace/linux-next/hwpack/panda/label/kernel_cloud/arch/arm/mach-omap2/omap4-restart.c:21:28:
+warning: its scope is only this definition or declaration, which is
+probably not what you want [enabled by default]
+04:43:18 /mnt/ci_build/workspace/linux-next/hwpack/panda/label/kernel_cloud/arch/arm/mach-omap2/omap4-restart.c:21:40:
+error: parameter 1 (?mode?) has incomplete type
+04:43:18  void omap44xx_restart(enum reboot_mode mode, const char *cmd)
+04:43:18                                         ^
+04:43:18 /mnt/ci_build/workspace/linux-next/hwpack/panda/label/kernel_cloud/arch/arm/mach-omap2/omap4-restart.c:21:6:
+warning: function declaration isn?t a prototype [-Wstrict-prototypes]
+04:43:18  void omap44xx_restart(enum reboot_mode mode, const char *cmd)
+04:43:18       ^
+04:43:18 make[2]: *** [arch/arm/mach-omap2/omap4-restart.o] Error 1
+04:43:18 make[1]: *** [arch/arm/mach-omap2] Error 2
 
-> 
+Full build log:
+------------------
+https://ci.linaro.org/jenkins/job/linux-next/hwpack=panda,label=kernel_cloud/lastBuild/console
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Suspecting patch which caused build failed:
+--------------------------------------------------------
+commit b61cdf2aebc5cd2f4efc4e0cbebeb8a91884a43e
+Author: Robin Holt <holt@sgi.com>
+Date:   Wed Jun 19 10:08:43 2013 +1000
+
+reboot: arm: change reboot_mode to use enum reboot_mode
+
+Preparing to move the parsing of reboot= to generic kernel code forces the
+change in reboot_mode handling to use the enum.
+
+Signed-off-by: Robin Holt <holt@sgi.com>
+
+...
+diff --git a/arch/arm/mach-omap2/omap4-restart.c
+b/arch/arm/mach-omap2/omap4-restart.c
+index f90e02e..652adde 100644
+--- a/arch/arm/mach-omap2/omap4-restart.c
++++ b/arch/arm/mach-omap2/omap4-restart.c
+@@ -18,7 +18,7 @@
+  * Resets the SoC.  For @cmd, see the 'reboot' syscall in
+  * kernel/sys.c.  No return value.
+  */
+-void omap44xx_restart(char mode, const char *cmd)
++void omap44xx_restart(enum reboot_mode mode, const char *cmd)
+ {
+        /* XXX Should save 'cmd' into scratchpad for use after reboot */
+        omap4_prminst_global_warm_sw_reset(); /* never returns */
+...
+
+Best regards
+Naresh Kamboju
