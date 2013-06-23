@@ -1,30 +1,73 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Sun, 23 Jun 2013 12:49:17 -0500
-Subject: [PATCH v9 01/10] ASoC: imx-pcm-dma: DT support
-In-Reply-To: <1371734429-6081-2-git-send-email-mpa@pengutronix.de>
-References: <1371734429-6081-1-git-send-email-mpa@pengutronix.de>
- <1371734429-6081-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <51C7351D.9080004@tabi.org>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sun, 23 Jun 2013 20:07:08 +0200
+Subject: [PATCHv8 1/1] Add support for GMT G762/G763 PWM fan controllers
+In-Reply-To: <20130623160659.GB17536@roeck-us.net> (Guenter Roeck's message of
+ "Sun, 23 Jun 2013 09:06:59 -0700")
+References: <87a9mkttxr.fsf@natisbad.org> <20130623153931.GD7626@kw.sim.vm.gnt>
+ <20130623160659.GB17536@roeck-us.net>
+Message-ID: <87r4fsem5v.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Markus Pargmann wrote:
-> This patch removes the NO_DT flag. The pdev pointer may have a proper
-> of_node with the dmas property, so we can use it to request DMA
-> channels.
->
-> Signed-off-by: Markus Pargmann<mpa@pengutronix.de>
-> Tested-by: Shawn Guo<shawn.guo@linaro.org>
-> ---
+Hi,
 
-I won't have access to functioning hardware for another month or two, so I 
-can't test to see if this patchset breaks PowerPC, but at least it does 
-compile.  I'm a little worried that the DMA changes won't actually run on 
-PowerPC, but I can't test that now.
+Guenter Roeck <linux@roeck-us.net> writes:
 
-So for the time being:
+> On Sun, Jun 23, 2013 at 05:39:32PM +0200, Simon Guinot wrote:
+>> On Thu, Jun 20, 2013 at 10:21:04PM +0200, Arnaud Ebalard wrote:
+>> > 
+>> > GMT G762/763 fan speed PWM controller is connected directly to a fan
+>> > and performs closed-loop or open-loop control of the fan speed. Two
+>> > modes - PWM or DC - are supported by the chip. Introduced driver
+>> > provides various knobs to control the operations of the chip (via
+>> > sysfs interface). Specific characteristics of the system can be passed
+>> > either using board init code or via DT. Documentation for both the
+>> > driver and DT bindings are also provided.
+>> > 
+>> > Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+>> > ---
+>> > Hi Guenter,
+>> > 
+>> > I guess we can wait for Simon's tests against its 5Big Network to check
+>> > everything is ok on another platform. Note that I also tested the patch
+>> > on my (Armada 370 based) ReadyNAS 102 and it works as expected.
+>> > 
+>> > To be very accurate, I had to revert eda6bee6c7 to get both an out of
+>> > tree driver for ISL 12057 chip and the g762 work *on the 102*, but this
+>> > is an unrelated story (Debian bug #622325 [1] has more on the topic) for
+>> > which I will create a separate thread. Simon, the symptom you reported
+>> > for your read failures are different from those I get so I don't think
+>> > the revert will fix your problem but it may be worth trying it.
+>> > 
+>> > [1] http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622325
+>> 
+>> Hi Arnaud and Guenter,
+>> 
+>> Actually, reverting the commit eda6bee6c7 seems to solve the -ENODEV
+>> issue...
+>> 
+> Did you let the i2c maintainers know ?
 
-Acked-by: Timur Tabi <timur@tabi.org>
+As I wrote, I will create a separate thread on the topic. It is good to
+have another unrelated example for which the problem is solved by
+reverting this commit. I will keep both of you in the CC: list if you
+want to follow the discussion.
 
--- 
-Timur Tabi
+
+>> Then, I have been able to test successfully the g762 driver against the
+>> following boards:
+>> 
+>> - 2Big NAS (open-loop mode)
+>> - 2Big Network v2 (open-loop mode)
+>> - 5Big Network v2 (closed-loop mode)
+>> 
+>> For the last, I have also been able to configure the clock frequency
+>> through the platform_data structure.
+>> 
+>> Tested-by: Simon Guinot <simon.guinot@sequanux.org>
+
+Thanks for your time and efforts, Simon.
+
+Cheers,
+
+a+
