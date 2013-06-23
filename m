@@ -1,74 +1,35 @@
-From: naresh.kamboju@linaro.org (Naresh Kamboju)
-Date: Sun, 23 Jun 2013 13:53:10 +0530
-Subject: linux-next: panda build failed at arch/arm/mach-omap2/omap4-restart.c
-Message-ID: <CA+G9fYv_9EQUmpRNPUwioSwJVXnXJC5odEKiMd=vKHNWYRT8xw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 23 Jun 2013 09:27:46 +0100
+Subject: [PATCH v7] ARM: PJ4B: fix for 3.10-rc
+In-Reply-To: <20130623102036.66dd8b74@skate>
+References: <1371828664-3681-1-git-send-email-gregory.clement@free-electrons.com>
+ <20130623102036.66dd8b74@skate>
+Message-ID: <20130623082746.GV2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Jun 23, 2013 at 10:20:36AM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> On Fri, 21 Jun 2013 17:31:03 +0200, Gregory CLEMENT wrote:
+> 
+> > This path allows to fix one errata for PJ4B CPUs.
+> > 
+> > Without this the Armada 370 based board can't boot anymore since
+> > 3.10-rc1. So this one really need to be applied on 3.10-rc.
+> 
+> I'd like to point out that this patch is really needed for 3.10-rc,
+> *OR* ae8a8b9553 ("ARM: 7691/1: mm: kill unused
+> TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead") should be
+> reverted, as it introduces a regression compared to 3.9.
+> 
+> Without one of those two solutions, 3.10 cannot boot on Armada 370
+> platforms, which is a clear regression compared to 3.9.
+> 
+> Linus has just released 3.10-rc7 and said it would most likely be the
+> last rc.
 
-panda build broken on linux-next branch
+The only thing I can say is that it would have been in -rc7 if the previous
+revision hadn't contained a mistake.
 
-kernel_config=omap2plus_defconfig
-KERNEL_VERSION=3.10.0-rc6
-KERNEL_GIT=git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
-KERNEL_COMMIT=e1a86578747376f08985627c84df088a5d0d1e92
-
-Build error log :
--------------------
-04:43:18   CC      arch/arm/mach-omap2/omap4-restart.o
-04:43:18 /mnt/ci_build/workspace/linux-next/hwpack/panda/label/kernel_cloud/arch/arm/mach-omap2/omap4-restart.c:21:28:
-warning: ?enum reboot_mode? declared inside parameter list [enabled by
-default]
-04:43:18  void omap44xx_restart(enum reboot_mode mode, const char *cmd)
-04:43:18                             ^
-04:43:18 /mnt/ci_build/workspace/linux-next/hwpack/panda/label/kernel_cloud/arch/arm/mach-omap2/omap4-restart.c:21:28:
-warning: its scope is only this definition or declaration, which is
-probably not what you want [enabled by default]
-04:43:18 /mnt/ci_build/workspace/linux-next/hwpack/panda/label/kernel_cloud/arch/arm/mach-omap2/omap4-restart.c:21:40:
-error: parameter 1 (?mode?) has incomplete type
-04:43:18  void omap44xx_restart(enum reboot_mode mode, const char *cmd)
-04:43:18                                         ^
-04:43:18 /mnt/ci_build/workspace/linux-next/hwpack/panda/label/kernel_cloud/arch/arm/mach-omap2/omap4-restart.c:21:6:
-warning: function declaration isn?t a prototype [-Wstrict-prototypes]
-04:43:18  void omap44xx_restart(enum reboot_mode mode, const char *cmd)
-04:43:18       ^
-04:43:18 make[2]: *** [arch/arm/mach-omap2/omap4-restart.o] Error 1
-04:43:18 make[1]: *** [arch/arm/mach-omap2] Error 2
-
-Full build log:
-------------------
-https://ci.linaro.org/jenkins/job/linux-next/hwpack=panda,label=kernel_cloud/lastBuild/console
-
-Suspecting patch which caused build failed:
---------------------------------------------------------
-commit b61cdf2aebc5cd2f4efc4e0cbebeb8a91884a43e
-Author: Robin Holt <holt@sgi.com>
-Date:   Wed Jun 19 10:08:43 2013 +1000
-
-reboot: arm: change reboot_mode to use enum reboot_mode
-
-Preparing to move the parsing of reboot= to generic kernel code forces the
-change in reboot_mode handling to use the enum.
-
-Signed-off-by: Robin Holt <holt@sgi.com>
-
-...
-diff --git a/arch/arm/mach-omap2/omap4-restart.c
-b/arch/arm/mach-omap2/omap4-restart.c
-index f90e02e..652adde 100644
---- a/arch/arm/mach-omap2/omap4-restart.c
-+++ b/arch/arm/mach-omap2/omap4-restart.c
-@@ -18,7 +18,7 @@
-  * Resets the SoC.  For @cmd, see the 'reboot' syscall in
-  * kernel/sys.c.  No return value.
-  */
--void omap44xx_restart(char mode, const char *cmd)
-+void omap44xx_restart(enum reboot_mode mode, const char *cmd)
- {
-        /* XXX Should save 'cmd' into scratchpad for use after reboot */
-        omap4_prminst_global_warm_sw_reset(); /* never returns */
-...
-
-Best regards
-Naresh Kamboju
+And I also see no sign of this patch in the patch system yet.
