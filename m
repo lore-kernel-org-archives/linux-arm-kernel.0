@@ -1,31 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Jun 2013 00:38:17 +0200
-Subject: [RFC PATCH v2 09/12] clk: samsung: s3c64xx: Add aliases for DMA
- clocks
-In-Reply-To: <1371933764-24875-10-git-send-email-tomasz.figa@gmail.com>
-References: <1371933764-24875-1-git-send-email-tomasz.figa@gmail.com>
- <1371933764-24875-10-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <CACRpkdZ0WZ03XsNNx_e1zNuu_Mqkh6cyi0cV3PrzD1LxD0s63g@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 24 Jun 2013 15:45:52 -0700
+Subject: [PATCHv2 3/6] sched_clock: Make ARM's sched_clock generic for
+ all architectures
+In-Reply-To: <51C49072.1060700@linaro.org>
+References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
+ <1370155183-31421-4-git-send-email-sboyd@codeaurora.org>
+ <201306211745.57528.arnd@arndb.de> <20130621170523.GA14575@codeaurora.org>
+ <51C49072.1060700@linaro.org>
+Message-ID: <51C8CC20.3010700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 22, 2013 at 10:42 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-
-> The new amba-pl08x driver requires another set of clock aliases, so this
-> patch adds them.
+On 06/21/13 10:42, John Stultz wrote:
+> On 06/21/2013 10:05 AM, Stephen Boyd wrote:
+>> On 06/21, Arnd Bergmann wrote:
+>>> This causes build failures when doing a simple merge with the arm-soc
+>>> tree:
+>>>
+>>> ==> build/clps711x_defconfig/faillog <==
+>>> /git/arm-soc/arch/arm/mach-clps711x/common.c:37:29: fatal error:
+>>> asm/sched_clock.h: No such file or directory
+>>>   #include <asm/sched_clock.h>
+>>>                               ^
+>>> ==> build/imx_v6_v7_defconfig/faillog <==
+>>> /git/arm-soc/drivers/clocksource/vf_pit_timer.c:15:29: fatal error:
+>>> asm/sched_clock.h: No such file or directory
+>>>   #include <asm/sched_clock.h>
+>>>
+>>> How about adding back a temporary arch/arm/include/asm/sched_clock.h
+>>> that only contains "#include <linux/sched_clock.h>" so we can change
+>>> those two files after the merge and still get a bisectible history?
+>>>
+>> Sounds fine. John can you add this patch on top?
 >
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  drivers/clk/samsung/clk-s3c64xx.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
-> index 253a972..9fb750c 100644
-> --- a/drivers/clk/samsung/clk-s3c64xx.c
-> +++ b/drivers/clk/samsung/clk-s3c64xx.c
+> Thanks. I've queued this and will send it on to Thomas here shortly.
 
-This driver is not in my kernel mainline tree or linux-next,
-is it pending in some review?
+Thanks John. Can you send this off to the tip tree? I think we'll need
+to merge tip/timers into arm-soc so I can send the rest of my "kill ARM
+local timer API" series through and this patch helps make that more
+palatable.
 
-Yours,
-Linus Walleij
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
