@@ -1,35 +1,32 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 24 Jun 2013 16:12:29 +0530
-Subject: [GIT PULL] ARM: CPUFreq updates for 3.11
-In-Reply-To: <1524748.bV9OZAOR0D@vostro.rjw.lan>
-References: <CAKohpo=v4qPDH32Y4ithr_p007nTn5AOUzkUCiHTGgQN6-=BEw@mail.gmail.com>
- <1524748.bV9OZAOR0D@vostro.rjw.lan>
-Message-ID: <CAKohpomThmZFKTufBzWpmokqqZJ8C6DtGTKTzBY=OxJPNT-BmA@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 24 Jun 2013 18:44:30 +0800
+Subject: [PATCH 2/3] ARM: at91/PMC: at91sam9n12 family have a PLLB
+In-Reply-To: <1a09cb9b88027ff0f5226d977786275f0463b930.1372064763.git.nicolas.ferre@atmel.com>
+References: <cover.1372064763.git.nicolas.ferre@atmel.com>
+ <1a09cb9b88027ff0f5226d977786275f0463b930.1372064763.git.nicolas.ferre@atmel.com>
+Message-ID: <51C8230E.20804@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 June 2013 16:19, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> On Monday, June 24, 2013 11:20:35 AM Viresh Kumar wrote:
->> Hi Rafael,
->>
->> This is part of my patchset "CPUFreq: Fix {PRE|POST}CHANGE notification
->> sequence". It contains changes specific to cpufreq core and ARM drivers.
->>
->> I have left changes to non-ARM cpufreq drivers from this pull request. See if
->> you can take them for 3.11.
->>
->> The following changes since commit 9e895ace5d82df8929b16f58e9f515f6d54ab82d:
->>
->>   Linux 3.10-rc7 (2013-06-22 09:47:31 -1000)
->>
->> are available in the git repository at:
->>
->>   git://git.linaro.org/people/vireshk/linux.git cpufreq-fix-notification-arm
->>
->> for you to fetch changes up to f2d65dd0d573e6961165f0be35bac84997b9e707:
->
-> Well, this contains changes that aren't specific to ARM as far as I can say.
+On 06/24/2013 05:08 PM, Nicolas Ferre wrote:
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Yeah, the first patch touches core. How do you want to proceed with this one
-then? You will apply them from mail? Or you will apply first patch (core cpufreq
-one) and I should send pull request without it?
+Acked-by: Bo Shen <voice.shen@atmel.com>
+
+> ---
+>   arch/arm/mach-at91/clock.c | 1 -
+>   1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+> index 085a79d..978de42 100644
+> --- a/arch/arm/mach-at91/clock.c
+> +++ b/arch/arm/mach-at91/clock.c
+> @@ -75,7 +75,6 @@ EXPORT_SYMBOL_GPL(at91_pmc_base);
+>   #define cpu_has_pllb()		(!(cpu_is_at91sam9rl() \
+>   				|| cpu_is_at91sam9g45() \
+>   				|| cpu_is_at91sam9x5() \
+> -				|| cpu_is_at91sam9n12() \
+>   				|| cpu_is_sama5d3()))
+>
+>   #define cpu_has_upll()		(cpu_is_at91sam9g45() \
+>
