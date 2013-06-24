@@ -1,194 +1,76 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 24 Jun 2013 17:49:01 +0200
-Subject: [PATCH v2 07/18] ARM: SAMSUNG: Move all platforms to new
- clocksource driver
-In-Reply-To: <51C869BE.3020800@samsung.com>
-References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
- <1446181.qPbsJvieFG@flatron> <51C869BE.3020800@samsung.com>
-Message-ID: <1526371.oK01FDVHb7@flatron>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 24 Jun 2013 16:53:50 +0100
+Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
+In-Reply-To: <20130624072112.GQ5523@atomide.com>
+References: <20130516180933.GG5600@atomide.com>
+ <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
+ <20130516214430.GN5600@atomide.com> <20130520174621.GI10378@atomide.com>
+ <20130605223355.EDC113E10E4@localhost> <20130606155341.GL3331@atomide.com>
+ <20130623221605.GA3150@blackmetal.musicnaut.iki.fi>
+ <CAAwP0s1DkMu8Vfka43hS4Wj-927q=O5u-coyFsPBgy3qtA_vjw@mail.gmail.com>
+ <20130623234326.GA20703@blackmetal.musicnaut.iki.fi>
+ <CAAwP0s00RwP7jCMF1O8j8Ndhu=VfD2dMA5fzr6jWvQ7PziXBCw@mail.gmail.com>
+ <20130624072112.GQ5523@atomide.com>
+Message-ID: <CACxGe6vRCjyJgX+dgKuJREvFf_btjhSkfqDnYekuDfkVW7pRQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 of June 2013 00:46:06 Kukjin Kim wrote:
-> On 06/25/13 00:38, Tomasz Figa wrote:
-> 
-> [...]
-> 
-> >>> -	select SAMSUNG_HRT
-> >>> +	select CLKSRC_SAMSUNG_PWM
-> >> 
-> >> Please put this in alphabetical ordering, this is just replacing
-> >> though.> 
-> > Argh, I always forget about this ordering, sorry.
-> 
-> no problem ;-)
-> 
-> [...]
-> 
-> >> Let me fix it...
-> 
-> like following :-)
-> 
-> 8<----------------------------------------------
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 49d993c..734d85b 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -694,6 +694,7 @@ config ARCH_S3C24XX
->   	select ARCH_REQUIRE_GPIOLIB
->   	select CLKDEV_LOOKUP
->   	select CLKSRC_MMIO
-> +	select CLKSRC_SAMSUNG_PWM
->   	select GENERIC_CLOCKEVENTS
->   	select HAVE_CLK
->   	select HAVE_S3C2410_I2C if I2C
-> @@ -715,6 +716,7 @@ config ARCH_S3C64XX
->   	select ARM_VIC
->   	select CLKDEV_LOOKUP
->   	select CLKSRC_MMIO
-> +	select CLKSRC_SAMSUNG_PWM
->   	select CPU_V6
->   	select GENERIC_CLOCKEVENTS
->   	select HAVE_CLK
-> @@ -737,6 +739,7 @@ config ARCH_S5P64X0
->   	bool "Samsung S5P6440 S5P6450"
->   	select CLKDEV_LOOKUP
->   	select CLKSRC_MMIO
-> +	select CLKSRC_SAMSUNG_PWM
->   	select CPU_V6
->   	select GENERIC_CLOCKEVENTS
->   	select HAVE_CLK
-> @@ -753,6 +756,7 @@ config ARCH_S5PC100
->   	select ARCH_REQUIRE_GPIOLIB
->   	select CLKDEV_LOOKUP
->   	select CLKSRC_MMIO
-> +	select CLKSRC_SAMSUNG_PWM
->   	select CPU_V7
->   	select GENERIC_CLOCKEVENTS
->   	select HAVE_CLK
-> @@ -770,6 +774,7 @@ config ARCH_S5PV210
->   	select ARCH_SPARSEMEM_ENABLE
->   	select CLKDEV_LOOKUP
->   	select CLKSRC_MMIO
-> +	select CLKSRC_SAMSUNG_PWM
->   	select CPU_V7
->   	select GENERIC_CLOCKEVENTS
->   	select HAVE_CLK
-> diff --git a/arch/arm/mach-s3c24xx/Kconfig
-> b/arch/arm/mach-s3c24xx/Kconfig index f2f7088..8124ec7 100644
-> --- a/arch/arm/mach-s3c24xx/Kconfig
-> +++ b/arch/arm/mach-s3c24xx/Kconfig
-> @@ -30,7 +30,6 @@ config CPU_S3C2410
->   	select S3C2410_CLOCK
->   	select S3C2410_CPUFREQ if CPU_FREQ_S3C24XX
->   	select S3C2410_PM if PM
-> -	select SAMSUNG_HRT
->   	help
->   	  Support for S3C2410 and S3C2410A family from the S3C24XX line
->   	  of Samsung Mobile CPUs.
-> @@ -41,7 +40,6 @@ config CPU_S3C2412
->   	select CPU_LLSERIAL_S3C2440
->   	select S3C2412_DMA if S3C24XX_DMA
->   	select S3C2412_PM if PM
-> -	select SAMSUNG_HRT
->   	help
->   	  Support for the S3C2412 and S3C2413 SoCs from the S3C24XX line
-> 
-> @@ -53,7 +51,6 @@ config CPU_S3C2416
->   	select S3C2443_COMMON
->   	select S3C2443_DMA if S3C24XX_DMA
->   	select SAMSUNG_CLKSRC
-> -	select SAMSUNG_HRT
->   	help
->   	  Support for the S3C2416 SoC from the S3C24XX line
-> 
-> @@ -64,7 +61,6 @@ config CPU_S3C2440
->   	select S3C2410_CLOCK
->   	select S3C2410_PM if PM
->   	select S3C2440_DMA if S3C24XX_DMA
-> -	select SAMSUNG_HRT
->   	help
->   	  Support for S3C2440 Samsung Mobile CPU based systems.
-> 
-> @@ -74,7 +70,6 @@ config CPU_S3C2442
->   	select CPU_LLSERIAL_S3C2440
->   	select S3C2410_CLOCK
->   	select S3C2410_PM if PM
-> -	select SAMSUNG_HRT
->   	help
->   	  Support for S3C2442 Samsung Mobile CPU based systems.
-> 
-> @@ -89,7 +84,6 @@ config CPU_S3C2443
->   	select S3C2443_COMMON
->   	select S3C2443_DMA if S3C24XX_DMA
->   	select SAMSUNG_CLKSRC
-> -	select SAMSUNG_HRT
->   	help
->   	  Support for the S3C2443 SoC from the S3C24XX line
-> 
-> diff --git a/arch/arm/mach-s3c64xx/Kconfig
-> b/arch/arm/mach-s3c64xx/Kconfig index 2057853..041da51 100644
-> --- a/arch/arm/mach-s3c64xx/Kconfig
-> +++ b/arch/arm/mach-s3c64xx/Kconfig
-> @@ -17,13 +17,11 @@ config PLAT_S3C64XX
->   # Configuration options for the S3C6410 CPU
-> 
->   config CPU_S3C6400
-> -	select SAMSUNG_HRT
->   	bool
->   	help
->   	  Enable S3C6400 CPU support
-> 
->   config CPU_S3C6410
-> -	select SAMSUNG_HRT
->   	bool
->   	help
->   	  Enable S3C6410 CPU support
-> diff --git a/arch/arm/mach-s5p64x0/Kconfig
-> b/arch/arm/mach-s5p64x0/Kconfig index 5a707bd..bb2111b 100644
-> --- a/arch/arm/mach-s5p64x0/Kconfig
-> +++ b/arch/arm/mach-s5p64x0/Kconfig
-> @@ -11,14 +11,12 @@ config CPU_S5P6440
->   	bool
->   	select S5P_SLEEP if PM
->   	select SAMSUNG_DMADEV
-> -	select SAMSUNG_HRT
->   	select SAMSUNG_WAKEMASK if PM
->   	help
->   	  Enable S5P6440 CPU support
-> 
->   config CPU_S5P6450
->   	bool
-> -	select SAMSUNG_HRT
->   	select S5P_SLEEP if PM
->   	select SAMSUNG_DMADEV
->   	select SAMSUNG_WAKEMASK if PM
-> diff --git a/arch/arm/mach-s5pc100/Kconfig
-> b/arch/arm/mach-s5pc100/Kconfig index 2f456a4..15170be 100644
-> --- a/arch/arm/mach-s5pc100/Kconfig
-> +++ b/arch/arm/mach-s5pc100/Kconfig
-> @@ -11,7 +11,6 @@ config CPU_S5PC100
->   	bool
->   	select S5P_EXT_INT
->   	select SAMSUNG_DMADEV
-> -	select SAMSUNG_HRT
->   	help
->   	  Enable S5PC100 CPU support
-> 
-> diff --git a/arch/arm/mach-s5pv210/Kconfig
-> b/arch/arm/mach-s5pv210/Kconfig index 0963283..caaedaf 100644
-> --- a/arch/arm/mach-s5pv210/Kconfig
-> +++ b/arch/arm/mach-s5pv210/Kconfig
-> @@ -15,7 +15,6 @@ config CPU_S5PV210
->   	select S5P_PM if PM
->   	select S5P_SLEEP if PM
->   	select SAMSUNG_DMADEV
-> -	select SAMSUNG_HRT
->   	help
->   	  Enable S5PV210 CPU support
+On Mon, Jun 24, 2013 at 8:21 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Javier Martinez Canillas <martinez.javier@gmail.com> [130623 18:08]:
+>> On Mon, Jun 24, 2013 at 1:43 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+>> > Hi,
+>> >
+>> > On Mon, Jun 24, 2013 at 01:06:37AM +0200, Javier Martinez Canillas wrote:
+>> >> On Mon, Jun 24, 2013 at 12:16 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+>> >> > What is the status of this patch? We're already at 3.10-rc7 and GPIO
+>> >> > IRQs are still broken on OMAP1.
+>> >
+>> > [...]
+>> >
+>> >> There is a problem with this patch.
+>> >
+>> > [...]
+>> >
+>> >> So I think that the correct solution is to add SPARSE_IRQ support to
+>> >> omap1 and not reverting Jon's patch. Of course this may not be
+>> >> possible since we are so close to 3.10 and most OMAP patches already
+>> >> merged for 3.11 but we should definitely try to have this at least for
+>> >> 3.12. Otherwise we won't be able to move to DT-only booting for
+>> >> OMAP2+.
+>> >
+>> > OMAP1 does not use DT. So we could put this code under #ifdef
+>> > CONFIG_ARCH_OMAP1 or similar. It's just a few lines of code. OMAP2+
+>> > work should not regress OMAP1.
+>> >
+>> > Demanding SPARSE_IRQ support for OMAP1 should have been discussed before
+>> > these changes were made. It's not reasonable to assume such things can
+>> > be made during rc-cycle. Also, now, I don't think it's reasonable to
+>> > wait for that to be done, as it would take until 3.12 or even later to
+>> > get OMAP1 functional again.
+>> >
+>> > A.
+>>
+>> Hi,
+>>
+>> Yes, since we are so late in the -rc cycle and OMAP1 is currently
+>> broken I agree that the only sensible solution is to revert the patch
+>> for now.
+>
+> Agreed.
+>
+>> I just wanted to point out the issue that keeping the OMAP GPIO driver
+>> using legacy mapping domain represents a blocker to have GPIO-IRQ
+>> working with Device Tree for OMAP2+
+>
+> Yes. We can do the ifdef Aaro suggested, and let's also plan on
+> converting omap1 to use SPARSE_IRQ. But with the ifdef we can cut
+> away the dependency between these two.
 
-Looks good, thanks.
+Alright. Sorry I dropped the ball on this one. I've lost track of
+which patch needs to get applied, but given that it is so late in the
+cycle, it would be better for someone else to apply the change, test
+and send a pull request to Linus. I'm okay with it going through the
+OMAP tree if that is the most expedient. Alternately, send me the pull
+request and I'll pass it on to Linus.
 
-Best regards,
-Tomasz
+g.
