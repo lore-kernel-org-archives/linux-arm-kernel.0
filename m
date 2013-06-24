@@ -1,37 +1,46 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 24 Jun 2013 12:07:18 +0530
-Subject: [PATCH v7 1/9] drivers: phy: add generic PHY framework
-In-Reply-To: <51C0CFAC.9080606@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 24 Jun 2013 09:37:52 +0300
+Subject: [PATCH v7 7/9] usb: musb: omap2430: use the new generic PHY
+ framework
+In-Reply-To: <51C7D9CC.8090901@ti.com>
 References: <1371113039-5784-1-git-send-email-kishon@ti.com>
- <1371113039-5784-2-git-send-email-kishon@ti.com> <51C0CFAC.9080606@gmail.com>
-Message-ID: <51C7E91E.3030303@ti.com>
+ <1371113039-5784-8-git-send-email-kishon@ti.com>
+ <20130618094703.GV5461@arwen.pp.htv.fi> <51C7D9CC.8090901@ti.com>
+Message-ID: <20130624063752.GA7145@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 June 2013 02:52 AM, Sylwester Nawrocki wrote:
-> Hi Kishon,
->
-> I've noticed there is a little inconsistency between the code and documentation.
->
-> On 06/13/2013 10:43 AM, Kishon Vijay Abraham I wrote:
->> +3. Creating the PHY
->> +
->> +The PHY driver should create the PHY in order for other peripheral controllers
->> +to make use of it. The PHY framework provides 2 APIs to create the PHY.
->> +
->> +struct phy *phy_create(struct device *dev, int id, const struct phy_ops *ops,
->> +    void *priv);
->> +struct phy *devm_phy_create(struct device *dev, int id,
->> +    const struct phy_ops *ops, void *priv);
->
-> The 'label' argument is missing in those function prototypes. It seems the
-> labels must be unique, I guess this needs to be documented. And do we allow
-> NULL labels ? If so, then there is probably a check for NULL label needed
-> in phy_lookup() and if not, then phy_create() should fail when NULL label
-> is passed ?
+Hi,
 
-Yeah. Label is used only for non-dt case so NULL should be allowed while 
-phy_create().
+On Mon, Jun 24, 2013 at 11:01:56AM +0530, Kishon Vijay Abraham I wrote:
+> >>@@ -397,9 +407,10 @@ static int omap2430_musb_init(struct musb *musb)
+> >>  	if (glue->status != OMAP_MUSB_UNKNOWN)
+> >>  		omap_musb_set_mailbox(glue);
+> >>
+> >>-	usb_phy_init(musb->xceiv);
+> >>+	phy_init(musb->phy);
+> >>
+> >>  	pm_runtime_put_noidle(musb->controller);
+> >>+	phy_pm_runtime_put(musb->phy);
+> >
+> >see, weird unbalanced calls :-)
+> >
+> >Make it all explicit:
+> >
+> >phy_pm_runtime_get_sync(phy);
+> >phy_init(phy);
+> >phy_pm_runtime_put(phy);
+> 
+> I think then it makes sense to drop get_sync from phy_init()?
 
-Thanks
-Kishon
+maybe not, you don't know if the phy has already autosuspended or not.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/8f85e599/attachment.sig>
