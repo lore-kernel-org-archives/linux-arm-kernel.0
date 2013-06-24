@@ -1,55 +1,21 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 24 Jun 2013 15:51:19 +0200
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803EFB072@039-SN2MPN1-023.039d.mgd.msft.net>
-References: <51A5A808.2070803@digi.com> <201306221529.53043.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803EFB072@039-SN2MPN1-023.039d.mgd.msft.net>
-Message-ID: <201306241551.19831.marex@denx.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 24 Jun 2013 10:54:11 -0300
+Subject: [PATCH 2/2] ARM: dts: mx28: Fix sgtl5000 codec probe
+In-Reply-To: <20130624072908.GH26254@S2101-09.ap.freescale.net>
+References: <1371849720-14506-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5AN7+ZodLwxNbRKk4ixheFkL4T=OdphXXRRu_Qmv30JjQ@mail.gmail.com>
+ <CAOMZO5DUsGpffGOkEjZX3JaKcJxV6GsH_pOyX=dhHxq3vB9xQA@mail.gmail.com>
+ <201306221524.33879.marex@denx.de>
+ <CAOMZO5DYNmiasRREC8jXH===2HG1aNvpxpFVU2u+q5ZAT8Wd3Q@mail.gmail.com>
+ <20130624072908.GH26254@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5Bfetjwinatj4W-nrEvg+3pLfjgF8Zpx_-=n52ZTGHeGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Peter,
+On Mon, Jun 24, 2013 at 4:29 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-> > Hi Peter,
-> > 
-> > > > Peter, I dunno if you are already aware of it, but the USB peripheral
-> > > > mode hangs
-> > > > on MX233. It's easy to replicate for example if you try to run CDC
-> > > > ethernet over
-> > > > the USB peripheral mode, then telnet into the board and run "dmesg" .
-> > > > This will
-> > > > trigger a "larger" data transfer which will make the UDC driver hang.
-> > > > This
-> > > > doesn't happen on MX28 so it must be some MX233-specific thing.
-> > > 
-> > > Marek, Have you tried below?
-> > > 
-> > > http://marc.info/?l=linux-usb&m=136537318510847&w=2
-> > > 
-> > > It may not the USB itself problem, the mx23's usb is almost
-> > > the same with mx28's.
-> > 
-> > This also happens on a different MX23-based board for me. This other
-> > board I
-> > tried has mDDR DRAM and the DRAM is operating correctly. The 96MHz thing
-> > people
-> > complained about in the Olimex forum is resolved now.
-> 
-> Add shawn.
-> 
-> Marek, have you tried mx23 evk?
+> Yes, we should have sgtl5000 acquire its clock, but when it fails to do
+> so, there is nothing wrong with deferring it to see if mxs-saif would
+> provide the clock later.
 
-No, I don't have this one available right now. I tried both MX23 Olinuxino maxi 
-(I just mutilated the board so that I cut traces to the USB devices on the board 
-and routed out USB gadget connector) and a custom MX23 board.
-
-Note that both have working USB peripheral mode in U-Boot too, but the driver in 
-U-Boot is very minimalistic.
-
-> Shawn, marek reported the udc function at mx23 works abnormal, but it works
-> good at mx28. Have you tried mx23 udc recently?
-
-Fabio, can you possibly test on MX23EVK please?
-
-Best regards,
-Marek Vasut
+I didn't manage to get mx28evk to probe audio correctly by using -EPROBE_DEFER.
