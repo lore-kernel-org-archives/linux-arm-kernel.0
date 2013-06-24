@@ -1,68 +1,61 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 24 Jun 2013 18:16:08 +0800
-Subject: [PATCH v2] arch: arm64: kernel: add '#ifdef CONFIG_COMPAT' for
- aarch32_break_handler()
-In-Reply-To: <20130624101429.GF23779@mudshark.cambridge.arm.com>
-References: <51C53C06.7050205@asianux.com> <51C81115.4070803@asianux.com>
- <20130624101429.GF23779@mudshark.cambridge.arm.com>
-Message-ID: <51C81C68.5080101@asianux.com>
+From: jett.zhou@gmail.com (jett zhou)
+Date: Mon, 24 Jun 2013 18:17:00 +0800
+Subject: [V2 3/7] video: mmp: fix graphics/video layer enable/mask swap
+ issue
+In-Reply-To: <CAMLZHHSDUYZ8fpjjSKzDWKL3=RhOaxO8pq-ty5zM+KHzEu30QA@mail.gmail.com>
+References: <1370879552-11290-1-git-send-email-jtzhou@marvell.com>
+ <CAMLZHHSDUYZ8fpjjSKzDWKL3=RhOaxO8pq-ty5zM+KHzEu30QA@mail.gmail.com>
+Message-ID: <CACDDiy-L152hYkthVziVYrtjsp0KnNK9o1b-BkCa-GWeoJMK0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2013 06:14 PM, Will Deacon wrote:
-> On Mon, Jun 24, 2013 at 10:27:49AM +0100, Chen Gang wrote:
->> > 
->> > If 'COMPAT' not defined, aarch32_break_handler() cannot pass compiling,
->> > and it can work independent with 'COMPAT', so remove dummy definition.
->> > 
->> > The related make:
->> > 
->> >   make ARCH=arm64 randconfig
->> >   make ARCH=arm64 menuconfig
->> >   make ARCH=arm64 V=1 EXTRA_CFLAGS=-W
-> This sequence isn't really very useful, so I wouldn't bother including it in
-> the commit message. You can trigger this issue just by disabling
-> CONFIG_COMPAT.
-> 
+2013/6/22 Daniel Drake <dsd@laptop.org>:
+> On Mon, Jun 10, 2013 at 9:52 AM, Jett.Zhou <jtzhou@marvell.com> wrote:
+>> From: Jing Xiang <jxiang@marvell.com>
+>>
+>> There is bug when switch dma of graphic layer and video layer, it
+>> configured opposite bit, fix it.
+>
+> So, overlays can be either graphics or video. overlay_is_vid() tells
+> you which type.
+> overlay_is_vid() makes its decision based on dmafetch_id which is
+> undocumented and I don't understand it (and in another mail you said
+> this is legacy configuration that is going to be removed).
+>
+> Ignoring my lack of understanding of the background: the patch here
+> seems to make the code more correct. It will modify the path's
+> underlying control register to enable graphics or video transfer
+> depending on the overlay type. Turning a graphics overlay dmafetch ON
+> will not stomp on the bits set by any video overlay dmafetch on the
+> same path. Previously the logic was reversed.
+>
+> This codepath will not work correctly if there will ever be more than
+> one overlay of the same type on the same path. For example, if we have
+> two graphics overlays;
+> 1. dmafetch_onoff(overlay1, on) - graphics transfer is now enabled in
+> the hardware
+> 2. dmafetch_onoff(overlay2, on) - graphics transfer was already
+> enabled, no change
+> 3. dmafetch_onoff(overlay2, off) - graphics transfer is now disabled
+> in the hardware
+>
+> At this point overlay1 is still active in theory, but the driver has
+> disabled graphics transfer at the hardware level.
+>
+> Daniel
+Hi Daniel
+     Now for our controller and usage, we have 2 over-lay of the path,
+they are graphic layer and video layer.
+     dmafetch_id =0 if it is graphic layer, dmafetch_id =1 if it is video layer.
+     The another mail mentioned is right, we plan to remove the
+dmafetch_id and detect overlay_is_vid by other method.
+     But this patch did not include it yet, it will be included by
+another patch later on.
+Thanks
 
-OK, thanks. Next time, I need notice about it.
 
->> > The related error:
->> > 
->> >   arch/arm64/kernel/debug-monitors.c:249:5: error: redefinition of ?aarch32_break_handler?
->> >   In file included from arch/arm64/kernel/debug-monitors.c:29:0:
->> >   /root/linux-next/arch/arm64/include/asm/debug-monitors.h:89:12: note: previous definition of ?aarch32_break_handler? was here
->> > 
->> > 
->> > 
->> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> > ---
->> >  arch/arm64/include/asm/debug-monitors.h |    7 -------
->> >  1 files changed, 0 insertions(+), 7 deletions(-)
->> > 
->> > diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
->> > index ef8235c..a2232d0 100644
->> > --- a/arch/arm64/include/asm/debug-monitors.h
->> > +++ b/arch/arm64/include/asm/debug-monitors.h
->> > @@ -83,14 +83,7 @@ static inline int reinstall_suspended_bps(struct pt_regs *regs)
->> >  }
->> >  #endif
->> >  
->> > -#ifdef CONFIG_COMPAT
->> >  int aarch32_break_handler(struct pt_regs *regs);
->> > -#else
->> > -static int aarch32_break_handler(struct pt_regs *regs)
->> > -{
->> > -	return -EFAULT;
->> > -}
->> > -#endif
-> Code looks fine to me:
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
+--
 
-Thanks.
-
--- 
-Chen Gang
-
-Asianux Corporation
+----------------------------------
+Best Regards
+Jett Zhou
