@@ -1,67 +1,39 @@
-From: agnel.joel@gmail.com (Joel A Fernandes)
-Date: Mon, 24 Jun 2013 15:10:15 -0500
-Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
-In-Reply-To: <51C82C3C.8040506@ti.com>
-References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
- <201306211632.12577.arnd@arndb.de>
- <CAD=GYpbhBAaSkMtcJaPtVpWar7AcW37QpAk3A0qgwX6G5PDoZg@mail.gmail.com>
- <201306212044.26677.arnd@arndb.de>
- <CAD=GYpY4koXd9f6_ijQfDHsiULD4d53cdu=9X421WXSAit_YQg@mail.gmail.com>
- <51C82C3C.8040506@ti.com>
-Message-ID: <CAD=GYparFQPMH801j9N2tRA6VnMidn23qUS9=yW8amOLSDLOzA@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 24 Jun 2013 13:10:35 -0700
+Subject: [PATCH/RESEND 00/12] Convert MSM to common clock framework
+In-Reply-To: <20130621012952.GE6300@codeaurora.org>
+References: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
+ <20130621012952.GE6300@codeaurora.org>
+Message-ID: <20130624201034.GA23147@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 6:23 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On 6/22/2013 3:23 AM, Joel A Fernandes wrote:
->> Hi Arnd,
+On Thu, Jun 20, 2013 at 06:29:52PM -0700, Stephen Boyd wrote:
+>On 06/17, Stephen Boyd wrote:
+>> Resending to collect higher level maintainer acks per Olof's request.
+>> The plan is to push this patchset through MSM to the arm-soc tree.
 >>
->> On Fri, Jun 21, 2013 at 1:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Friday 21 June 2013, Joel A Fernandes wrote:
->>>> I think we are talking about different things, I agree the 'select
->>>> DMADEVICES' can be dropped but lets please keep the default y option
->>>> (not adding new select statements, just saying that if someone select
->>>> DMADEVICES in menuconfig and if they're ARCH_OMAP=1 , then default to
->>>> EDMA). This will simply allow people to have a default. Thanks.
->>>
->>> Yes, that's ok.
+>> This patchset moves the existing MSM clock code and affected drivers to the
+>> common clock framework. A prerequisite of moving to the common clock
+>> framework is to use clk_prepare() and clk_enable() so the first
+>> few patches migrate drivers to that call (clk_prepare() is a no-op on MSM
+>> right now). It also removes some custom clock APIs that MSM provides
+>> and finally moves the proc_comm clock code to the common struct clk.
 >>
->> Ok, thanks. I will follow up with a patch in my next submissions that builds it.
+>> This patch series will be used as the foundation of the MSM 8660/8960
+>> clock code that I plan to send out after this series.
 >>
->> Perhaps a:
->> default y if 'ARCH_OMAP2PLUS'
->>
->> and leave the existing as it is...
->> default n if  'ARCH_DAVINCI || ARCH_OMAP1 || ARCH_OMAP2'
->>
->> would make most sense to me. Basically EDMA is seen on current and all
->> new OMAP2PLUS.
 >
-> OMAP2PLUS devices like OMAP3/4 do not have EDMA so this is not really true.
+>David, can you pick this up and send it off to arm-soc now?
 
-Sure. Right now though, and from what I've seen, all future SoCs are
-supporting EDMA.
+I'm still not seeing an Ack from
 
->>
->>>
->>> config TI_EDMA
->>>         tristate "TI EDMA support"
->>>         default m if 'ARCH_DAVINCI || ARCH_OMAP1 || ARCH_OMAP2
->>>         select DMA_ENGINE
->>>         select DMA_VIRTUAL_CHANNELS
->>
->>
->>
->> MMC depends on EDMA specially on AM33xx there's no PIO mode AFAIK. The
->> 'm' option will require some initramfs to load the module when needing
->> to MMC boot, I suggest lets leave it as y.
->
-> But there is no reason why it cannot work with PIO, right? Sounds like
-> the right fix is in driver.
-
-I am not sure about this. I agree no reason it cannot do PIO. I will check.
-But even if it did, loading EDMA as a module will require omap_hsmmc to switch
-to DMA mode which I am sure the driver doesn't support today.
+  msm_sdcc: Convert to clk_prepare/unprepare
 
 Thanks,
-Joel
+David
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
