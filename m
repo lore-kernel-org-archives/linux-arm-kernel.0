@@ -1,30 +1,37 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 24 Jun 2013 14:07:19 -0700
-Subject: [PATCH] clk: tegra: fix ifdef for tegra_periph_reset_assert inline
-In-Reply-To: <1372100756-10448-1-git-send-email-swarren@wwwdotorg.org>
-References: <1372100756-10448-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <51C8B507.8020301@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Jun 2013 23:07:35 +0200
+Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
+In-Reply-To: <CAD=GYpYwswOYGHRzZ6SeKD+sEfi-7s3HuqKr7G0OXQWFCA_EtQ@mail.gmail.com>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <201306242228.23297.arnd@arndb.de>
+ <CAD=GYpYwswOYGHRzZ6SeKD+sEfi-7s3HuqKr7G0OXQWFCA_EtQ@mail.gmail.com>
+Message-ID: <201306242307.35840.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 24 June 2013, Joel A Fernandes wrote:
+> >> Yes sure, right now they are defined  as follows in include/linux/edma.h:
+> >>
+> >> #if defined(CONFIG_TI_EDMA) || defined(CONFIG_TI_EDMA_MODULE)
+> >> bool edma_filter_fn(struct dma_chan *, void *);
+> >> #else
+> >> static inline bool edma_filter_fn(struct dma_chan *chan, void *param)
+> >> {
+> >> return false;
+> >> }
+> >> #endif
+> >
+> > It's best to just define the filter function in the platform
+> > code and pass a pointer to it through platform data. The way you do
+> > it above makes the slave drivers inherently nonportable.
+> 
+> But with DT-only platforms, can you really do that?
 
-On 06/24/2013 12:05 PM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
->
-> Commit 7064f6b "clk: tegra: provide tegra_periph_reset_assert
-> alternative" added ifdef'd static inline versions of some functions,
-> but tested ARCH_TEGRA rather than CONFIG_ARCH_TEGRA, thus disabling
-> these function in all cases. In some cases, this caused HW modules to
-> misbehave; for example, the Tegra I2C driver BUG()d during boot on
-> Seaboard.
->
-> Reported-by: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+The nice thing about this is that with a DT-only platform, the
+filter function will automatically go away: you have no
+platform_data, which means that if you are using
+dma_request_slave_channel_compat, you just pass NULL as the
+filter and the filter-data, same as just calling
+dma_request_slave_channel.
 
-Tested-by: Paul Walmsley <pwalmsley@nvidia.com> # for the Tegra30 Beaver
-board
-
-Stephen pointed me at this patch to fix the boot on Tegra30 Beaver boad
-with linux-next 20130624.  Thanks Stephen!
-
-- Paul
+	Arnd
