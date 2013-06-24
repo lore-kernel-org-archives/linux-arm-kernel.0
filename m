@@ -1,50 +1,68 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 24 Jun 2013 11:20:35 +0530
-Subject: [GIT PULL] ARM: CPUFreq updates for 3.11
-Message-ID: <CAKohpo=v4qPDH32Y4ithr_p007nTn5AOUzkUCiHTGgQN6-=BEw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 24 Jun 2013 14:22:00 +0800
+Subject: [PATCH v3] thermal: add imx thermal driver support
+In-Reply-To: <51C48342.2060303@ti.com>
+References: <1371816567-22821-1-git-send-email-shawn.guo@linaro.org>
+ <51C48342.2060303@ti.com>
+Message-ID: <20130624062158.GA26254@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On Fri, Jun 21, 2013 at 12:45:54PM -0400, Eduardo Valentin wrote:
+> > +struct imx_thermal_data {
+> > +	struct thermal_zone_device *tz;
+> > +	struct thermal_cooling_device *cdev;
+> > +	enum thermal_device_mode mode;
+> > +	struct regmap *tempmon;
+> > +	int c1, c2; /* See forumla in imx_get_sensor_data() */
+> 
+> s/forumla/formula/g (there are more occurrences of same typo)
+> 
+Thanks for spotting it.
 
-This is part of my patchset "CPUFreq: Fix {PRE|POST}CHANGE notification
-sequence". It contains changes specific to cpufreq core and ARM drivers.
+<snip>
 
-I have left changes to non-ARM cpufreq drivers from this pull request. See if
-you can take them for 3.11.
+> > +static int imx_bind(struct thermal_zone_device *tz,
+> > +		    struct thermal_cooling_device *cdev)
+> > +{
+> > +	int ret;
+> > +
+> > +	ret = thermal_zone_bind_cooling_device(tz, IMX_TRIP_PASSIVE, cdev,
+> > +					       THERMAL_NO_LIMIT,
+> > +					       THERMAL_NO_LIMIT);
+> 
+> Remember that if you ever add another cdev in your system, you will be
+> blindly bind it to your tz.
+> 
+Yes.  If someday we add another cooling device, we need a little surgery
+on the driver anyway.
 
-The following changes since commit 9e895ace5d82df8929b16f58e9f515f6d54ab82d:
+<snip>
 
-  Linux 3.10-rc7 (2013-06-22 09:47:31 -1000)
+> > +	/*
+> > +	 * Sensor data layout:
+> > +	 *   [31:20] - sensor value @ 25C
+> > +	 *    [19:8] - sensor value of hot
+> > +	 *     [7:0] - hot temperature value
+> > +	 */
+> > +	n1 = val >> 20;
+> > +	n2 = (val & 0xfff00) >> 8;
+> > +	t2 = val & 0xff;
+> > +	t1 = 25; /* t1 always 25C */
+> 
+> don't the above constants deserve #define macros?
+> 
+Hmm, with the constants being used only once here and the comment put
+right above the code, I think we're fine.
 
-are available in the git repository at:
+<snip>
 
-  git://git.linaro.org/people/vireshk/linux.git cpufreq-fix-notification-arm
+> > +MODULE_AUTHOR("Freescale Semiconductor, Inc.");
+> > +MODULE_DESCRIPTION("Thermal driver for Freescale i.MX SoCs");
+> > +MODULE_LICENSE("GPL");
+> 
+> GPLv2, accordingly to your header.
+> 
+Okay, will change it.
 
-for you to fetch changes up to f2d65dd0d573e6961165f0be35bac84997b9e707:
-
-  cpufreq: tegra: call CPUFREQ_POSTCHANGE notfier in error cases
-(2013-06-24 11:14:24 +0530)
-
-----------------------------------------------------------------
-Viresh Kumar (9):
-      cpufreq: make sure frequency transitions are serialized
-      cpufreq: arm-big-little: call CPUFREQ_POSTCHANGE notfier in error cases
-      cpufreq: davinci: call CPUFREQ_POSTCHANGE notfier in error cases
-      cpufreq: dbx500: call CPUFREQ_POSTCHANGE notfier in error cases
-      cpufreq: exynos: call CPUFREQ_POSTCHANGE notfier in error cases
-      cpufreq: imx6q: call CPUFREQ_POSTCHANGE notfier in error cases
-      cpufreq: omap: call CPUFREQ_POSTCHANGE notfier in error cases
-      cpufreq: s3c64xx: call CPUFREQ_POSTCHANGE notfier in error cases
-      cpufreq: tegra: call CPUFREQ_POSTCHANGE notfier in error cases
-
- drivers/cpufreq/arm_big_little.c  |  4 +---
- drivers/cpufreq/cpufreq.c         |  9 +++++++++
- drivers/cpufreq/davinci-cpufreq.c |  3 +++
- drivers/cpufreq/dbx500-cpufreq.c  |  4 ++--
- drivers/cpufreq/exynos-cpufreq.c  | 10 ++++++++--
- drivers/cpufreq/imx6q-cpufreq.c   | 17 +++++++++++------
- drivers/cpufreq/omap-cpufreq.c    |  6 +++---
- drivers/cpufreq/s3c64xx-cpufreq.c |  8 ++++++--
- drivers/cpufreq/tegra-cpufreq.c   |  4 ++--
- 9 files changed, 45 insertions(+), 20 deletions(-)
+Shawn
