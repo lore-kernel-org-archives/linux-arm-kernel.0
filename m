@@ -1,45 +1,70 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 24 Jun 2013 15:54:52 -0700
-Subject: [PATCHv2 3/6] sched_clock: Make ARM's sched_clock generic for
- all architectures
-In-Reply-To: <51C8CC20.3010700@codeaurora.org>
-References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
- <1370155183-31421-4-git-send-email-sboyd@codeaurora.org>
- <201306211745.57528.arnd@arndb.de> <20130621170523.GA14575@codeaurora.org>
- <51C49072.1060700@linaro.org> <51C8CC20.3010700@codeaurora.org>
-Message-ID: <51C8CE3C.2030406@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 24 Jun 2013 17:14:04 -0600
+Subject: [PATCH v1 04/12] input: matrix-keypad: push/pull,
+ separate polarity
+In-Reply-To: <20130622093649.GF24305@book.gsilab.sittig.org>
+References: <1371838198-7327-1-git-send-email-gsi@denx.de>
+ <1371838198-7327-5-git-send-email-gsi@denx.de>
+ <51C4C6C9.6030000@wwwdotorg.org>
+ <20130622093649.GF24305@book.gsilab.sittig.org>
+Message-ID: <51C8D2BC.9010507@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2013 03:45 PM, Stephen Boyd wrote:
-> On 06/21/13 10:42, John Stultz wrote:
->> On 06/21/2013 10:05 AM, Stephen Boyd wrote:
->>> On 06/21, Arnd Bergmann wrote:
->>>> This causes build failures when doing a simple merge with the arm-soc
->>>> tree:
->>>>
->>>> ==> build/clps711x_defconfig/faillog <==
->>>> /git/arm-soc/arch/arm/mach-clps711x/common.c:37:29: fatal error:
->>>> asm/sched_clock.h: No such file or directory
->>>>    #include <asm/sched_clock.h>
->>>>                                ^
->>>> ==> build/imx_v6_v7_defconfig/faillog <==
->>>> /git/arm-soc/drivers/clocksource/vf_pit_timer.c:15:29: fatal error:
->>>> asm/sched_clock.h: No such file or directory
->>>>    #include <asm/sched_clock.h>
->>>>
->>>> How about adding back a temporary arch/arm/include/asm/sched_clock.h
->>>> that only contains "#include <linux/sched_clock.h>" so we can change
->>>> those two files after the merge and still get a bisectible history?
->>>>
->>> Sounds fine. John can you add this patch on top?
->> Thanks. I've queued this and will send it on to Thomas here shortly.
-> Thanks John. Can you send this off to the tip tree? I think we'll need
-> to merge tip/timers into arm-soc so I can send the rest of my "kill ARM
-> local timer API" series through and this patch helps make that more
-> palatable.
+On 06/22/2013 03:36 AM, Gerhard Sittig wrote:
+> On Fri, Jun 21, 2013 at 15:34 -0600, Stephen Warren wrote:
+>>
+>> On 06/21/2013 12:09 PM, Gerhard Sittig wrote:
+>>> extend the device tree adjustable hardware configuration:
+>>> - allow for differing polarity of the row and column GPIO pins
+>>> - optionally fully drive column output pins instead of the former
+>>>   unconditional open collector emulation approach
+>>
+>>> diff --git a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
+>>
+>>> +- row-gpios-activelow:	row GPIO pins are active low
+>>> +- col-gpios-activelow:	column GPIO pins are active low
+>>>  - gpio-activelow:	row pins as well as column pins are active low
+>>> +			(provided for backward compatibility, and useful
+>>> +			for matrix layouts of identical polarity for
+>>> +			rows and columns)
+>>
+>> Those should all come from the existing GPIO flags, and may even differ
+>> for each GPIO.
+>>
+>>> +- col-gpios-pushpull:	fully drive the column selection pins in either
+>>> +			direction (high and low signals), the default
+>>> +			behaviour is to actively drive low signals and
+>>> +			be passive otherwise (emulates an open collector
+>>> +			output driver)
+>>
+>> We don't actually have GPIO flags defined for pushpull-vs-open-collector
+>> etc. Perhaps we should do so. Then, we wouldn't need to invent custom
+>> properties to represent that in this binding.
+> 
+> I see your concerns and understand, but chose the above way to
+> just extend the existing implementation in the least intrusive
+> way without changing its nature.  See the reply on the first
+> patch for more details on the motivation.
+> 
+> Of course I agree that pin properties belong to the GPIO layer
+> and that "application drivers" on top should not worry about
+> that.  Were I allowed to break backwards compatibility, then I
+> could have done more shuffling.  But lacking the capability to
+> test the affected setups puts more burdon on others, which I
+> wanted to avoid.
 
-Thanks for the reminder! Just sent the pull request.
+Can't you add this enhancement as follows:
 
-thanks
--john
+Update the driver to look at the per-pin GPIO flags in all cases.
+Presumably in any existing cases, those flags all say "active high"
+anyway, since specifying anything else was useless. In the very unlikely
+case this isn't true, one could always add a quirk based on the
+HW-specific compatible value.
+
+If gpio-activelow is set, mark all pins as active-low.
+
+This way, any future extensions (i.e. what this patch implements: just
+rows active low, just columns active low) can be implemented using
+purely the standard GPIO flags, but the existing behaviour of the
+existing gpio-activelow property is maintained.
