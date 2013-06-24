@@ -1,28 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 24 Jun 2013 22:07:56 +0800
-Subject: [PATCH 2/2] ARM: dts: mx28: Fix sgtl5000 codec probe
-In-Reply-To: <CAOMZO5Bfetjwinatj4W-nrEvg+3pLfjgF8Zpx_-=n52ZTGHeGA@mail.gmail.com>
-References: <1371849720-14506-1-git-send-email-festevam@gmail.com>
- <CAOMZO5AN7+ZodLwxNbRKk4ixheFkL4T=OdphXXRRu_Qmv30JjQ@mail.gmail.com>
- <CAOMZO5DUsGpffGOkEjZX3JaKcJxV6GsH_pOyX=dhHxq3vB9xQA@mail.gmail.com>
- <201306221524.33879.marex@denx.de>
- <CAOMZO5DYNmiasRREC8jXH===2HG1aNvpxpFVU2u+q5ZAT8Wd3Q@mail.gmail.com>
- <20130624072908.GH26254@S2101-09.ap.freescale.net>
- <CAOMZO5Bfetjwinatj4W-nrEvg+3pLfjgF8Zpx_-=n52ZTGHeGA@mail.gmail.com>
-Message-ID: <20130624140754.GF30747@S2101-09.ap.freescale.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 24 Jun 2013 15:12:57 +0100
+Subject: [PATCH v3 03/10] pinctrl:st: Add pinctrl and pinconf support.
+In-Reply-To: <CACRpkdb-H2=GdF54Fay+PQVdXLTs++L5+QYe_vFPuzpa+E4ZMg@mail.gmail.com>
+References: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
+ <1371737138-9340-1-git-send-email-srinivas.kandagatla@st.com>
+ <51C45816.5010207@st.com>
+ <CACRpkdb-H2=GdF54Fay+PQVdXLTs++L5+QYe_vFPuzpa+E4ZMg@mail.gmail.com>
+Message-ID: <20130624141257.GM27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 10:54:11AM -0300, Fabio Estevam wrote:
-> On Mon, Jun 24, 2013 at 4:29 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> 
-> > Yes, we should have sgtl5000 acquire its clock, but when it fails to do
-> > so, there is nothing wrong with deferring it to see if mxs-saif would
-> > provide the clock later.
-> 
-> I didn't manage to get mx28evk to probe audio correctly by using -EPROBE_DEFER.
+On Mon, Jun 24, 2013 at 01:57:56PM +0200, Linus Walleij wrote:
 
-When you was doing that, did you have the clock that sgtl5000 is
-requesting registered somewhere?
+> This seems fairly complete, but I cannot have such a basic dependency onto
+> the regmap tree this late in the merge window, i.e. I'm not ready to pull
+> all of regmap into the pinctrl tree. I'd consider this for merging
+> for the next kernel cycle so it's more orthogonal.
 
-Shawn
+I've got the patch on a topic branch in regmap to allow for this sort of
+stuff - I can readily provide a signed tag for you to get just that
+patch if that'd help?  Alternatively I'm happy to carry the pinctrl
+patch in regmap?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/f97ca77b/attachment.sig>
