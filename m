@@ -1,109 +1,107 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 24 Jun 2013 23:17:03 +0200
-Subject: [PATCH v3 11/18] pwm: Add new pwm-samsung driver
-In-Reply-To: <20130624205342.GE7163@mithrandir>
-References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
- <3059286.XLVAQe4lge@flatron> <20130624205342.GE7163@mithrandir>
-Message-ID: <1405696.in3RSSDWnX@flatron>
+From: oliver+list@schinagl.nl (Oliver Schinagl)
+Date: Mon, 24 Jun 2013 23:21:16 +0200
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <20130624181509.GA8847@kroah.com>
+References: <1371502778-15849-1-git-send-email-oliver+list@schinagl.nl>
+ <1371502778-15849-2-git-send-email-oliver+list@schinagl.nl>
+ <20130617225847.GA9494@kroah.com> <20130624092942.GG26008@lukather>
+ <20130624160440.GA15201@kroah.com> <51C87DC7.50005@schinagl.nl>
+ <20130624181509.GA8847@kroah.com>
+Message-ID: <51C8B84C.3020200@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 of June 2013 22:53:42 Thierry Reding wrote:
-> On Mon, Jun 24, 2013 at 10:32:55PM +0200, Tomasz Figa wrote:
-> > On Monday 24 of June 2013 22:13:27 Thierry Reding wrote:
-> > > On Mon, Jun 24, 2013 at 08:31:43PM +0200, Tomasz Figa wrote:
-> [...]
-> 
-> > > > Channel reservation between clocksource and PWM drivers is
-> > > > completely
-> > > > correct, relying on the fact that the former can only use channels
-> > > > _without_ outputs and the latter can only use channels _with_
-> > > > outputs.
-> > > > Do I have to add that there can't be a channel both with and
-> > > > without
-> > > > output?
-> > > 
-> > > The issue is that you can't really ensure that both the clocksource
-> > > and
-> > > PWM drivers use the same variant and therefore might be using
-> > > different
-> > > masks.
-> > 
-> > Output mask is _not_ a part of the constant variant data. It is stored
-> > in the same struct, which is to simplify passing SoC-specific
-> > parameters from platform code to both drivers, but it is not defined
-> > as a constant anywhere in drivers.
-> > 
-> > As I already explained in one of my previous replies, it is either
-> > parsed from DT (samsung,pwm-outputs property) or passed through the
-> > variant struct as platform_data from board files. It isn't possible
-> > for both drivers to get different mask values.
-> 
-> But samsung_pwm_set_platdata() and samsung_pwm_clocksource_init() can
-> still be called with different variants, can't they?
+On 06/24/13 20:15, Greg KH wrote:
+> On Mon, Jun 24, 2013 at 07:11:35PM +0200, Oliver Schinagl wrote:
+>> Hey Greg,
+>> On 06/24/13 18:04, Greg KH wrote:
+>>> On Mon, Jun 24, 2013 at 11:29:42AM +0200, Maxime Ripard wrote:
+>>>> Hi Greg,
+>>>>
+>>>> On Mon, Jun 17, 2013 at 03:58:47PM -0700, Greg KH wrote:
+>>>>> On Mon, Jun 17, 2013 at 10:59:37PM +0200, Oliver Schinagl wrote:
+>>>>
+>>>> [..]
+>>>>
+>>>>>> +static int __init sunxi_sid_probe(struct platform_device *pdev)
+>>>>>> +{
+>>>>>> +	u8 entropy[SID_SIZE];
+>>>>>> +	unsigned int i;
+>>>>>> +	struct resource *res;
+>>>>>> +	void __iomem *sid_reg_base;
+>>>>>> +	int ret;
+>>>>>> +
+>>>>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>>>>> +	sid_reg_base = devm_ioremap_resource(&pdev->dev, res);
+>>>>>> +	if (IS_ERR(sid_reg_base))
+>>>>>> +		return PTR_ERR(sid_reg_base);
+>>>>>> +	platform_set_drvdata(pdev, sid_reg_base);
+>>>>>> +
+>>>>>> +	ret = device_create_bin_file(&pdev->dev, &sid_bin_attr);
+>>>>>> +	if (ret)
+>>>>>> +		return ret;
+>>>>>
+>>>>> You just raced with userspace, having the file show up after the device
+>>>>> was announced to users that it was there.  Please use the proper device
+>>>>> file api to add default attributes to prevent this from happening.
+>>>>
+>>>> Sorry if the question looks dumb, but what kind of race can we generate
+>>>> here?
+>>>
+>>> Userspace gets told about the device from the driver core, udev runs and
+>>> reads all of the attributes, then your probe function comes along and
+>>> adds a new attribute.  Userspace will then not know about it at all.
+>>>
+>>>> The device_create_bin_file is the last call that we make (if we except
+>>>> the entropy stuff, but it doesn't really matter here), so after we
+>>>> created the file, we have everything properly initialised so that our
+>>>> functions can be called, right?
+>>>>
+>>>> And another dumb question for you, what is the "proper device file API"
+>>>> you are referring to ? :)
+>>>
+>>> Please read Documentation/driver_model/device.txt and see the section on
+>>> Attributes for what to do.  If you have specific questions after reading
+>>> that, please let me know.
+>> Since Maxime kinda asked for me, I hope you don't mind me following up.
+>>
+>> That doc doesn't mention the binary interface at all. Initially I
+>> had both devices up, the 'read' device as a textual representation
+>> and added the binary one later. Maxime and I decided the binary one
+>> made more sense, as the only textual user would be a human and they
+>> don't poke that entry that often.
+>>
+>> So what default way exists for binary files or how would that be solved?
+>
+> The same interface should work just fine for binary files, have you
+> tried it?
+I'll just take the plunge and make myself look stupid ;)
 
-Sure, they can be, but the question is who would even want to call them 
-this way? We are on kernel level, we have assumptions here and we don't 
-break those assumptions.
+I tried to change things around, used DEVICE_ATTR(eeprom, S_IRUGO, 
+sid_read, NULL); So far so good I'd hope.
 
-> Furthermore the
-> variants aren't read-only and therefore can be modified at any point in
-> time. So it is indeed possible for them to get different mask values.
+Of course now I'll have to change the function's parameters from
 
-Again, who would be willing to do something like this? We are not in 
-userspace.
+static ssize_t sid_read(struct file *fd, struct kobject *kobj,
+			struct bin_attribute *attr, char *buf,
+			loff_t pos, size_t size)
 
-> Granted, it may be unlikely that they will but it wouldn't be all that
-> difficult to write the driver in a way to make it really impossible and
-> at the same time make sure that both driver share the same variant
-> information.
+to
 
-Sure, it wouldn't. If I'm not mistaken, I already acomplished this in one 
-or two of the versions I posted long time ago, but was it really worth all 
-the added drawbacks?
+static ssize_t sid_read(struct device *dev,
+			struct device_attribute *attr, char *buf)
 
-Keep in mind that originally, when I started my work on this, I thought 
-exactly the same as you - let's design something scalable and sane. 
-However, sometimes it's necessary to ask the question if that's really 
-what is needed.
+But now, I'm missing things like 'pos' and 'size', both which determine 
+the requested bytes. True, in this specific driver we are talking about 
+'only' 16 bytes, but what if it weren't but a few MiB and in sysfs we 
+want to read some random byte, will we have to put the entire blok into 
+the buffer?
 
-> > > > So the only place for improvement here, without starting
-> > > > overengineering things, is a comment about the purpose of the
-> > > > spinlock and why it can be used in our case.
-> > > 
-> > > I disagree. You actually even had a version with a halfway decent
-> > > design at some point and it was discarded. I don't think I'm asking
-> > > for all that much here. I even gave you the option of admitting
-> > > that the driver was suboptimal. All I request in return is that you
-> > > mention that in the code so that either somebody else might go and
-> > > clean things up or at least that nobody will copy from a bad
-> > > example.
-> > 
-> > What about:
-> > 
-> > /*
-> > 
-> >  * PWM block is shared between pwm-samsung and samsung_pwm_timer
-> >  drivers
-> >  * and some registers need access synchronization. If both drivers are
-> >  * compiled in, the spinlock is defined in the clocksource driver,
-> >  * otherwise following definition is used.
-> >  *
-> >  * Currently we do not need any more complex synchronization method
-> >  * because all the supported SoCs contain only one instance of the PWM
-> >  * IP. Should this change, both drivers will need to be modified to
-> >  * properly synchronize accesses to particular instances.
-> >  */
-> 
-> I see that you can't be persuaded. And everybody else seems to be okay
-> with it so... have it your way. I'm probably going to regret this.
+So sorry for not understanding, but ... I don't understand :)
 
-This was just a proposal. Do you want anything else to be added to the 
-comment or anything to be changed?
-
-Sure, an alternative would be getting rid of the hacky shared spinlock, 
-but do we really need that? Do we really want to have something in the 
-kernel that we don't need? I'm just trying to avoid this.
-
-Best regards,
-Tomasz
+Oliver
+>
+> thanks,
+>
+> greg k-h
+>
