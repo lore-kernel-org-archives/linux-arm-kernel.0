@@ -1,48 +1,56 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 24 Jun 2013 16:36:08 +0200
-Subject: [PATCH v12 00/11] DMA Engine support for AM33XX
-In-Reply-To: <20130624101903.GV5523@atomide.com>
-References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
- <20130624101903.GV5523@atomide.com>
-Message-ID: <51C85958.9030502@ti.com>
+From: dsd@laptop.org (Daniel Drake)
+Date: Mon, 24 Jun 2013 08:38:36 -0600
+Subject: [V2 1/7] video: mmp: rb swap setting update for new LCD driver
+In-Reply-To: <CACDDiy8=WRmnGMFr55uVWUE6+NNy3pMCeBfV8E9urAeW6VVEMw@mail.gmail.com>
+References: <1370879533-11017-1-git-send-email-jtzhou@marvell.com>
+ <CAMLZHHQ+97f=i3axaFBn9JoOu7Cqo73neqxKYNCfWqwjZ4DfnQ@mail.gmail.com>
+ <CACDDiy8=WRmnGMFr55uVWUE6+NNy3pMCeBfV8E9urAeW6VVEMw@mail.gmail.com>
+Message-ID: <CAMLZHHQxMAM1Vhj9Jreq5rAN-nmBEbEyoKMwFnL0tVHsKv4U=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Mon, Jun 24, 2013 at 2:45 AM, jett zhou <jett.zhou@gmail.com> wrote:
+>        Sorry that the comments of the patch is not so clear.
+>        As you might know,We can set two rbswap setting, one is based on
+> pix_fmt to set into DMA input part, the other is to configured in the output
+> interface part.
+>        This patch include below change and enhancement:
+>        1) The input format which support rbswap is based RGB format, YUV
+> series did not support now. So you can see the patch will change the rbswap
+> value based on specific RGB format,eg. RGB will set rbswap = 1, BGR will not
+> set it.
 
-On 06/24/2013 12:19 PM, Tony Lindgren wrote:
-> Hi,
-> 
-> For merging this series, I suggest the following sets:
-> 
-> * Joel A Fernandes <joelagnel@ti.com> [130620 14:13]:
->>
->> Joel A Fernandes (3):
->>   edma: config: Enable config options for EDMA
->>   da8xx: config: Enable MMC and FS options
->>   ARM: davinci: Fix compiler warnings in devices-da8xx
->>
->> Matt Porter (8):
->>   dmaengine: edma: Add TI EDMA device tree binding
->>   ARM: edma: Add DT and runtime PM support to the private EDMA API
->>   ARM: edma: Add EDMA crossbar event mux support
->>   dmaengine: edma: enable build for AM33XX
-> 
-> Sekhar should queue the above patches, I've acked the
-> mach-omap2/Kconfig change.
-> 
->>   spi: omap2-mcspi: add generic DMA request support to the DT binding
->>   spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
-> 
-> 
-> The spi changes should get merged via the driver list.
-> 
->>   ARM: dts: add AM33XX EDMA support
->>   ARM: dts: add AM33XX SPI DMA support
-> 
-> Benoit should queue the .dts changes.
+What if I'm working with a display that doesn't need or want RB
+swapping? Lets say I am working with format PIXFMT_RGB565, and running
+your patch. dmafetch_set_fmt() gets called, and fmt_to_reg() sets
+rbswap to 1.
+This means that dmafetch_set_fmt() writes a '1' into the appropriate
+RB-swapping bit in the LCD_PN_CTRL0 register, and this triggers the
+"DMA input" swapping that you mentioned. But I never asked for RB
+swapping...
 
-I'll do that, but do you consider them for 3.11?
+>           This part setting is controlled in driver internally, will not
+> depend on platform configure(link_config) any more.
 
-Thanks,
-Benoit
+Your patch seems to depend very clearly on link_config.
+
+>        2) The output part of rbswap is depend on link_config which is
+> defined in specific platfrom.
+>            It will setting bit27:24 of 0x01DC register, eg. DSI output
+> interface can be controlled by this.
+
+I don't think you should add more disorganised/undocumented (ab)use of
+this magic link_config variable. You should create new, dedicated,
+documented fields.
+
+Your comment above suggests that this RB-swapping behaviour is
+something that is imposed by the output device. In which case, this
+should be a configuration parameter on the panel, not on the path
+structure.
+
+>            TTC_dkb does not support dsi, the link_config is no used anymore.
+
+Then you should fix up ttc_dkb before submitting this patch.
+
+Thanks
+Daniel
