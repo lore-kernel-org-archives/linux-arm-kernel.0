@@ -1,117 +1,93 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 24 Jun 2013 14:46:15 -0700
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
-In-Reply-To: <51C8B84C.3020200@schinagl.nl>
-References: <1371502778-15849-1-git-send-email-oliver+list@schinagl.nl>
- <1371502778-15849-2-git-send-email-oliver+list@schinagl.nl>
- <20130617225847.GA9494@kroah.com> <20130624092942.GG26008@lukather>
- <20130624160440.GA15201@kroah.com> <51C87DC7.50005@schinagl.nl>
- <20130624181509.GA8847@kroah.com> <51C8B84C.3020200@schinagl.nl>
-Message-ID: <20130624214615.GA17604@kroah.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 24 Jun 2013 16:00:26 -0600
+Subject: [PATCH v1 01/12] input: matrix-keypad: update devicetree binding
+ doc
+In-Reply-To: <20130622092319.GE24305@book.gsilab.sittig.org>
+References: <1371838198-7327-1-git-send-email-gsi@denx.de>
+ <1371838198-7327-2-git-send-email-gsi@denx.de>
+ <51C4C63B.3030300@wwwdotorg.org>
+ <20130622092319.GE24305@book.gsilab.sittig.org>
+Message-ID: <51C8C17A.1050700@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 11:21:16PM +0200, Oliver Schinagl wrote:
-> On 06/24/13 20:15, Greg KH wrote:
-> >On Mon, Jun 24, 2013 at 07:11:35PM +0200, Oliver Schinagl wrote:
-> >>Hey Greg,
-> >>On 06/24/13 18:04, Greg KH wrote:
-> >>>On Mon, Jun 24, 2013 at 11:29:42AM +0200, Maxime Ripard wrote:
-> >>>>Hi Greg,
-> >>>>
-> >>>>On Mon, Jun 17, 2013 at 03:58:47PM -0700, Greg KH wrote:
-> >>>>>On Mon, Jun 17, 2013 at 10:59:37PM +0200, Oliver Schinagl wrote:
-> >>>>
-> >>>>[..]
-> >>>>
-> >>>>>>+static int __init sunxi_sid_probe(struct platform_device *pdev)
-> >>>>>>+{
-> >>>>>>+	u8 entropy[SID_SIZE];
-> >>>>>>+	unsigned int i;
-> >>>>>>+	struct resource *res;
-> >>>>>>+	void __iomem *sid_reg_base;
-> >>>>>>+	int ret;
-> >>>>>>+
-> >>>>>>+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >>>>>>+	sid_reg_base = devm_ioremap_resource(&pdev->dev, res);
-> >>>>>>+	if (IS_ERR(sid_reg_base))
-> >>>>>>+		return PTR_ERR(sid_reg_base);
-> >>>>>>+	platform_set_drvdata(pdev, sid_reg_base);
-> >>>>>>+
-> >>>>>>+	ret = device_create_bin_file(&pdev->dev, &sid_bin_attr);
-> >>>>>>+	if (ret)
-> >>>>>>+		return ret;
-> >>>>>
-> >>>>>You just raced with userspace, having the file show up after the device
-> >>>>>was announced to users that it was there.  Please use the proper device
-> >>>>>file api to add default attributes to prevent this from happening.
-> >>>>
-> >>>>Sorry if the question looks dumb, but what kind of race can we generate
-> >>>>here?
-> >>>
-> >>>Userspace gets told about the device from the driver core, udev runs and
-> >>>reads all of the attributes, then your probe function comes along and
-> >>>adds a new attribute.  Userspace will then not know about it at all.
-> >>>
-> >>>>The device_create_bin_file is the last call that we make (if we except
-> >>>>the entropy stuff, but it doesn't really matter here), so after we
-> >>>>created the file, we have everything properly initialised so that our
-> >>>>functions can be called, right?
-> >>>>
-> >>>>And another dumb question for you, what is the "proper device file API"
-> >>>>you are referring to ? :)
-> >>>
-> >>>Please read Documentation/driver_model/device.txt and see the section on
-> >>>Attributes for what to do.  If you have specific questions after reading
-> >>>that, please let me know.
-> >>Since Maxime kinda asked for me, I hope you don't mind me following up.
-> >>
-> >>That doc doesn't mention the binary interface at all. Initially I
-> >>had both devices up, the 'read' device as a textual representation
-> >>and added the binary one later. Maxime and I decided the binary one
-> >>made more sense, as the only textual user would be a human and they
-> >>don't poke that entry that often.
-> >>
-> >>So what default way exists for binary files or how would that be solved?
-> >
-> >The same interface should work just fine for binary files, have you
-> >tried it?
-> I'll just take the plunge and make myself look stupid ;)
+On 06/22/2013 03:23 AM, Gerhard Sittig wrote:
+...
+> On Fri, Jun 21, 2013 at 15:31 -0600, Stephen Warren wrote:
+>> On 06/21/2013 12:09 PM, Gerhard Sittig wrote:
+>>> update the device tree binding documentation for the GPIO matrix keypad
+>>> driver: mention the driver's selecting all columns at once, reword the
+>>> delay descriptions, add the missing active low GPIO pin level property
+>>
+>>> diff --git a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
+...
+>>> +Simple keypad matrix layouts just connect GPIO lines to mechanical
+>>> +switches, with no other active components involved.  Although due to the
+>>
+>> I don't think that's always true. On some Tegra boards for example,
+>> multiple processes can "press" certain switches, so we actually have a
+>> wired-OR feed into a transistor which then connects a particular
+>> (column, row) combination. We do this e.g. for remote-control USB over
+>> the power button for example. I believe the effect is the same, but it
+>> does mean that statement above isn't quite true.
 > 
-> I tried to change things around, used DEVICE_ATTR(eeprom, S_IRUGO,
-> sid_read, NULL); So far so good I'd hope.
-
-Ick, no.
-
-> Of course now I'll have to change the function's parameters from
+> That's why I wrote about "simple ... layouts", but couldn't tell
+> exactly when it was appropriate to discuss the more advanced
+> setups as well, and in how much depth to do that in the device
+> tree binding.
 > 
-> static ssize_t sid_read(struct file *fd, struct kobject *kobj,
-> 			struct bin_attribute *attr, char *buf,
-> 			loff_t pos, size_t size)
+> So is there a better way of putting this?  Is the "simple" or the
+> "mechanical" the issue in the description?
+
+I think both "simple" and "mechanical" should be removed. My reasoning:
+
+At the level of connection between rows/columns, aren't all matrix
+keypads set up such that something connects a row to a column to signify
+a keypress, not just "simple layouts".
+
+Similarly, "mechanical" should be removed since it's not always true,
+and even if it were, it would be irrelevant to anything outside the
+keyboard, perhaps aside from the need to debounce.
+
+In fact, thinking about this more, I think all four paragraphs of text
+that this patch adds would be better in Documentation/input/, as you
+mentioned elsewhere. When introducing any extra properties, you could
+mention their potential use by a driver, as explanation for why they're
+useful, but there's probably no need to describe the complete operation
+of the driver in the DT binding.
+
+>>> +- gpio-activelow:	row pins as well as column pins are active low
+>>
+>> That one change is definitely wrong. Each entry in row-gpios and
+>> col-gpios should include GPIO flags (in a format defined by the binding
+>> for the DT node providing the GPIO). Those flags include an active-high
+>> vs. active-low bit. In Linux, you can use of_get_gpio_flags() to
+>> retrieve a standardized representation of the flags.
 > 
-> to
+> See my introduction above.  This isn't a "change", it's just
+> catching up in the documentation and adding what was omitted
+> before.
+
+Oh dear, that's quite unfortunate. I see that even though that property
+wasn't documented in the binding doc, arch/powerpc/boot/dts/ac14xx.dts
+has still already used it, so we probably can't fix it. I suppose we
+must simply document it, and ignore the shortcomings of that binding:-(
+
+> And I can see another issue here (maybe shadowed by the wording I
+> used, referring to "row pins"):  The fact that a pin may be
+> inverted (within the SoC), and the fact that an externally
+> connected component might require low active stimulus over
+> otherwise high active pins/connections, might need to get
+> reflected well.  Or am I too picky here?
 > 
-> static ssize_t sid_read(struct device *dev,
-> 			struct device_attribute *attr, char *buf)
+> Are there other cases to learn from, where non-inverted physical
+> pins get attached to components which require inverted logical
+> information?  Do we combine the overall polarity within the GPIO
+> pin's abstraction, or do logical drivers above GPIO handle the
+> inversion?
 
-Which is what do you do not want, as you find out:
-
-> But now, I'm missing things like 'pos' and 'size', both which
-> determine the requested bytes. True, in this specific driver we are
-> talking about 'only' 16 bytes, but what if it weren't but a few MiB
-> and in sysfs we want to read some random byte, will we have to put
-> the entire blok into the buffer?
-> 
-> So sorry for not understanding, but ... I don't understand :)
-
-Stick with a binary attribute, and attach that to the proper class
-structure and all should be fine.
-
-Ah crap, you're using a platform device.
-
-{sigh}
-
-Why?  Why not use a "real" device which has a "real" class, and then use
-the interfaces there?
-
-greg k-h
+In general, I would expect the binding to represent the overall
+effective polarity of the signal that must be programmed into the
+relevant GPIO controller. SW doesn't really care how/why the signal is
+inverted, simply that it needs to (or doesn't) invert the signal when it
+programs the GPIO controller.
