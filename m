@@ -1,61 +1,111 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Mon, 24 Jun 2013 03:01:41 +0200
-Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
-In-Reply-To: <20130623234326.GA20703@blackmetal.musicnaut.iki.fi>
-References: <20130513205302.GA3157@blackmetal.musicnaut.iki.fi>
- <20130516180933.GG5600@atomide.com>
- <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
- <20130516214430.GN5600@atomide.com> <20130520174621.GI10378@atomide.com>
- <20130605223355.EDC113E10E4@localhost> <20130606155341.GL3331@atomide.com>
- <20130623221605.GA3150@blackmetal.musicnaut.iki.fi>
- <CAAwP0s1DkMu8Vfka43hS4Wj-927q=O5u-coyFsPBgy3qtA_vjw@mail.gmail.com>
- <20130623234326.GA20703@blackmetal.musicnaut.iki.fi>
-Message-ID: <CAAwP0s00RwP7jCMF1O8j8Ndhu=VfD2dMA5fzr6jWvQ7PziXBCw@mail.gmail.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Mon, 24 Jun 2013 09:22:39 +0800
+Subject: SCU registers mapping for CA9/CA5 cores
+In-Reply-To: <201306211129.22625.arnd@arndb.de>
+References: <CADApbei3QOCQRmo_oYZ_XiUVupq+4uUs7WNe6f7k_OG0LHB3=w@mail.gmail.com>
+ <20130621081356.GU2718@n2100.arm.linux.org.uk>
+ <201306211129.22625.arnd@arndb.de>
+Message-ID: <CADApbeiv2_eo5EiHOH9-dX_oWdax_hDMbBdLWzDBg=vFMxwSjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 1:43 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> Hi,
+On Fri, Jun 21, 2013 at 5:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 21 June 2013, Russell King - ARM Linux wrote:
+>> On Fri, Jun 21, 2013 at 02:11:31PM +0800, Chao Xie wrote:
+>> > hi, Russell
+>> > When i sbumited the patch for pxa988 which is CA9, Arnd gave me some
+>> > suggestions of SCU mapping.
+>> > I used static mapping in the platform file for SCU registers mapping,
+>> > but Arnd think there should be a more general way to do it, and others
+>> > can benefit from it. I agree with him.
+>> >
+>> > The following is his question for you when reply to my patch.
+>> > "Russell, do you think using a fixmap page for the SCU makes sense?
+>> > I'm looking for a method to consolidate the various methods of
+>> > doing early mappings of the SCU for device tree based platforms.
+>> > Where do you think that should be implemented?"
+>> >
+>> > So can you give your idea and suggestion? Thanks.
+>>
+>> With our current fixmap region, we have 224 pages available, currently
+>> all dedicated to kmap.  kmap uses 16 pages per CPU at the moment, which
+>> we hope is enough (it's only checked when CONFIG_DEBUG_HIGHMEM is set.)
+>>
+>> Assuming four CPUs, that makes it 64 pages, but then we have big.LITTLE
+>> with potentially 8 (I guess they map as separate smp_processor_id()'s)
+>> which makes that 128.  128 is over half of the available fixmap.
+>>
+>> If we ever saw 16 CPUs, we'd need to find a new home for fixmap.  If we
+>> needed to increase KM_TYPE_NR beyond 28, we'd be in the same situation.
+>>
+>> We do have the 0xffff1000 - 0xffff4000 range which is currently unused.
+>> We could put the SCU at 0xffff1000 for a single page.  IOW, not a fixmap
+>> page.
 >
-> On Mon, Jun 24, 2013 at 01:06:37AM +0200, Javier Martinez Canillas wrote:
->> On Mon, Jun 24, 2013 at 12:16 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
->> > What is the status of this patch? We're already at 3.10-rc7 and GPIO
->> > IRQs are still broken on OMAP1.
+> I think we need to separate the specific discussion on the SCU page
+> from the question about how to use fixmap. Putting the SCU at 0xffff1000
+> sounds reasonable to me, so let's do that.
 >
-> [...]
->
->> There is a problem with this patch.
->
-> [...]
->
->> So I think that the correct solution is to add SPARSE_IRQ support to
->> omap1 and not reverting Jon's patch. Of course this may not be
->> possible since we are so close to 3.10 and most OMAP patches already
->> merged for 3.11 but we should definitely try to have this at least for
->> 3.12. Otherwise we won't be able to move to DT-only booting for
->> OMAP2+.
->
-> OMAP1 does not use DT. So we could put this code under #ifdef
-> CONFIG_ARCH_OMAP1 or similar. It's just a few lines of code. OMAP2+
-> work should not regress OMAP1.
->
-> Demanding SPARSE_IRQ support for OMAP1 should have been discussed before
-> these changes were made. It's not reasonable to assume such things can
-> be made during rc-cycle. Also, now, I don't think it's reasonable to
-> wait for that to be done, as it would take until 3.12 or even later to
-> get OMAP1 functional again.
->
-> A.
 
-Hi,
+Where can i put the mapping code for SCU registers?
+The mapping code will make use of some static APIs in
+arch/arm/mm/mm.h, for example
+set_top_pte(). These APIs can only be used by files under arch/arm/mm/
+It seems that all the mm related operations will be located at
+arch/arm/mm, and it is strange
+if i copied the code of the functions in mm.h to SCU driver located at
+arch/arm/kernel/ for the mapping.
 
-Yes, since we are so late in the -rc cycle and OMAP1 is currently
-broken I agree that the only sensible solution is to revert the patch
-for now.
+> On the matter of fixmap, I'm missing what the requirement is to have
+> fixmap be a single section. Right now as you say, we have a bit under
+> half of the fixmap unused in the worst-case (8 CPU) scenario, so we
+> could put other things in the remaining space. If we get to 16 CPUs
+> (which I think is specified already but not implemented anywhere so
+> far) or beyond, we need to grow fixmap, but then there would be
+> free space again.
+>
+> I think we could actually move everything between VMALLOC_END and
+> ffff0000 /into/ a larger fixmap. This would be a substantial change,
+> but it would give us more vmalloc space for most configurations
+> and more flexibility with what else we could put into fixmap.
+>
+> Something like:
+>
+> enum fixed_addresses {
+> #ifdef CONFIG_HIGHMEM
+>         FIX_KMAP_BEGIN,
+>         FIX_KMAP_END = FIX_KMAP_BEGIN + (KM_TYPE_NR*NR_CPUS)-1,
+> #endif
+> #ifdef CONFIG_CPU_XSCALE
+>         XSCALE_CLEAN_BEGIN,
+>         XSCALE_CLEAN_END = XSCALE_CLEAN_START + 15,
+> #endif
+> #ifdef CONFIG_HAVE_TCM
+>         ITCM_BEGIN,
+>         ITCM_END = ITCM_SIZE / PAGE_SIZE - 1,
+>         DTCM_BEGIN,
+>         DTCM_END = DTCM_SIZE / PAGE_SIZE - 1,
+> #endif
+> #ifdef CONFIG_PCI
+>         PCI_IO_BEGIN,
+>         PCI_IO_END = PCI_IO_BEGIN + SZ_1M / PAGE_SIZE -1,
+> #endif
+>         __end_of_fixed_addresses,
+> };
+>
+> Obviously we'd have to be careful to change all references to the
+> current well-known addresses to use the fixmap infrastructure
+> intead.
+>
+> Any opinion on this? I haven't found any downsides yet, other than
+> having to do the work. I suppose we could even move the DEBUG_LL
+> mapping in there, but that would require some more rework.
+>
+I think it is a good idea. Just need define the END_OF_FIXMAP address
+to be 0xffff0000, and
+all the fixmap can extend from high address to lower address.
+Now, the 2nd level table is mapped, and the table address is stored in
+top_pmd. If want to extend
+the fixmap range, top_pmd need to be changed.
 
-I just wanted to point out the issue that keeping the OMAP GPIO driver
-using legacy mapping domain represents a blocker to have GPIO-IRQ
-working with Device Tree for OMAP2+
-
-Thanks a lot and best regards,
-Javier
+>         Arnd
