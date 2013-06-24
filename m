@@ -1,41 +1,50 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 24 Jun 2013 22:34:03 +0300
-Subject: [PATCH v7 0/9] Generic PHY Framework
-In-Reply-To: <51C89D98.1070806@samsung.com>
-References: <1371113039-5784-1-git-send-email-kishon@ti.com>
- <51BEE203.6090103@samsung.com>
- <20130618094942.GY5461@arwen.pp.htv.fi>
- <51C89D98.1070806@samsung.com>
-Message-ID: <20130624193403.GB11815@arwen.pp.htv.fi>
+Date: Mon, 24 Jun 2013 22:36:43 +0300
+Subject: [PATCH V2] USB: initialize or shutdown PHY when add or remove
+ host controller
+In-Reply-To: <Pine.LNX.4.44L0.1306201319580.2063-100000@iolanthe.rowland.org>
+References: <20130620121749.GF9817@arwen.pp.htv.fi>
+ <Pine.LNX.4.44L0.1306201319580.2063-100000@iolanthe.rowland.org>
+Message-ID: <20130624193643.GC11815@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 09:27:20PM +0200, Sylwester Nawrocki wrote:
-> Hi,
+On Thu, Jun 20, 2013 at 01:25:31PM -0400, Alan Stern wrote:
+> On Thu, 20 Jun 2013, Felipe Balbi wrote:
 > 
-> On 06/18/2013 11:49 AM, Felipe Balbi wrote:
-> > On Mon, Jun 17, 2013 at 12:16:35PM +0200, Sylwester Nawrocki wrote:
-> >> I have already used this API for our MIPI CSI-2/DSIM DPHYs driver,
-> >> the RFC patch series can be found at [1].
-> >>
-> >> Thanks,
-> >> Sylwester
-> >>
-> >> [1] http://www.spinics.net/lists/arm-kernel/msg251666.html
+> > > In fact, the PHY setting and handling is related to platform or SOC,
+> > > and for different SOC they can
+> > > have same EHCI HCD but they PHY handling can be different.
+> > > Omap'a case is the example, and i think some other vendors may have
+> > > silimar cases.
+> > > From above point, It is better to leave the PHY initialization and
+> > > shutdown to be done by each echi-xxx driver.
+> > > 
+> > > So Alan and Felipe
+> > > What are your ideas about it?
 > > 
-> > one comment to that series:
+> > If we have so many exceptions, then sure. But eventually, the common
+> > case should be added generically with a flag so that non-generic cases
+> > (like OMAP) can request to handle the PHY by themselves.
 > > 
-> > let's make the phy names standardized, how about phy-exynos-video-mipi.c
-> > or phy-mipi-csi-dsim.c ?
+> > Alan ?
 > 
-> Yes, I have been thinking about that, wasn't sure exactly what pattern to
-> chose. I would make it phy-exynos-mipi-video.c, phy-exynos-dsim-csis.c feels
-> a bit odd. phy-mipi-csis-dsim.c might be to generic as MIPI CSIS stands for
-> MIPI CSI Slave and MIPI DSIM - MIPI DSI Master. And there might be (actually
-> are) IP blocks in an SoC that use the other MIPI Aliance standards.
-> For the HDMI PHY I guess just phy-exynos-hdmi.c could be used.
+> I don't have very strong feelings about this; Felipe has much more
+> experience with these things.
+> 
+> However, when the common case is added into the core, the simplest way
+> to indicate that the HCD wants to handle the PHY(s) by itself will be
+> to leave hcd->phy set to NULL or an ERR_PTR value.
+> 
+> One important thing that hasn't been pointed out yet: When we move
+> these calls into the core, the same patch must also remove those calls
+> from the glue drivers that currently do set hcd->phy.  And it must make
+> sure that the glue drivers which handle the PHY by themselves do not
+> set hcd->phy.
 
-sounds good to me :-)
+perfect summary. Perhaps Roger could already work on private PHY handle
+for ehci-omap.c and later we can start moving generic case to usbcore
+without having to touch ehci-omap.c at all. Roger, any commetns ?
 
 -- 
 balbi
@@ -45,4 +54,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/c4b283e8/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/7c037b2a/attachment.sig>
