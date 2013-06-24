@@ -1,32 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 24 Jun 2013 15:29:09 +0800
-Subject: [PATCH 2/2] ARM: dts: mx28: Fix sgtl5000 codec probe
-In-Reply-To: <CAOMZO5DYNmiasRREC8jXH===2HG1aNvpxpFVU2u+q5ZAT8Wd3Q@mail.gmail.com>
-References: <1371849720-14506-1-git-send-email-festevam@gmail.com>
- <CAOMZO5AN7+ZodLwxNbRKk4ixheFkL4T=OdphXXRRu_Qmv30JjQ@mail.gmail.com>
- <CAOMZO5DUsGpffGOkEjZX3JaKcJxV6GsH_pOyX=dhHxq3vB9xQA@mail.gmail.com>
- <201306221524.33879.marex@denx.de>
- <CAOMZO5DYNmiasRREC8jXH===2HG1aNvpxpFVU2u+q5ZAT8Wd3Q@mail.gmail.com>
-Message-ID: <20130624072908.GH26254@S2101-09.ap.freescale.net>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Mon, 24 Jun 2013 09:29:05 +0200
+Subject: [patch 1/1] imx53-qsb: enable usb power
+In-Reply-To: <20130623185952.GA26397@pengutronix.de> (Sascha Hauer's message
+ of "Sun, 23 Jun 2013 20:59:52 +0200")
+References: <20130620212939.018670789@rtp-net.org>
+ <20130623185952.GA26397@pengutronix.de>
+Message-ID: <8738s8arwe.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 22, 2013 at 11:04:41AM -0300, Fabio Estevam wrote:
-> On Sat, Jun 22, 2013 at 10:24 AM, Marek Vasut <marex@denx.de> wrote:
-> 
-> > Yuck, I see. This is really ugly :(
-> >
-> > Just an idea here, can we not maybe defer the SGTL5000 I2C probe?
-> 
-> This was already discussed in the alsa-devel list, and the
-> recommendation was that sgtl5000 should acquire its clock in i2c
-> probe.
+Sascha Hauer <s.hauer@pengutronix.de> writes:
 
-Yes, we should have sgtl5000 acquire its clock, but when it fails to do
-so, there is nothing wrong with deferring it to see if mxs-saif would
-provide the clock later.
+> On Thu, Jun 20, 2013 at 11:29:30PM +0200, Arnaud Patard wrote:
+>> Enable usb power pin by using a fixed regulator. With this and the usb clock
+>> patch is making usb working on my loco.
+>> 
+>> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+>> Index: linux-next/arch/arm/boot/dts/imx53-qsb.dts
+>> ===================================================================
+>> --- linux-next.orig/arch/arm/boot/dts/imx53-qsb.dts	2013-06-20 23:25:46.049428530 +0200
+>> +++ linux-next/arch/arm/boot/dts/imx53-qsb.dts	2013-06-20 23:26:34.293425920 +0200
+>> @@ -93,6 +93,15 @@
+>>  			regulator-max-microvolt = <3200000>;
+>>  			regulator-always-on;
+>>  		};
+>> +
+>> +		reg_usbpwr: usbpwr {
+>> +			compatible = "regulator-fixed";
+>> +			regulator-name = "usbpwr";
+>> +			regulator-min-microvolt = <5000000>;
+>> +			regulator-max-microvolt = <5000000>;
+>> +			gpio = <&gpio7 8 0>;
+>> +			regulator-always-on;
+>> +		};
+>
+> Shouldn't this be provided to the chipidea driver as vbus?
 
-That said, I do not like the patch, and we should try to have mxs-saif
-driver implement and register the clock.
+I'm not sure about that. This gpio is controlling the usb power for the
+2 usb ports while the vbus is more a port-basis thing.
 
-Shawn
+Arnaud
