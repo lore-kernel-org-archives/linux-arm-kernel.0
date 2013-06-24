@@ -1,40 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 24 Jun 2013 15:44:42 +0800
-Subject: [PATCH 1/6] ARM: dts: imx27: Add SAHARA2 devicetree node
-In-Reply-To: <20130623190448.GB26397@pengutronix.de>
-References: <1371970490-10874-1-git-send-email-eagle.alexander923@gmail.com>
- <20130623190448.GB26397@pengutronix.de>
-Message-ID: <20130624074440.GI26254@S2101-09.ap.freescale.net>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 24 Jun 2013 10:45:23 +0300
+Subject: [PATCHv2 11/11] ARM: OMAP4: register DT clocks and remove old data
+In-Reply-To: <20130621072518.GN5523@atomide.com>
+References: <1371647942-4811-1-git-send-email-t-kristo@ti.com>
+ <1371647942-4811-12-git-send-email-t-kristo@ti.com>
+ <20130621072518.GN5523@atomide.com>
+Message-ID: <51C7F913.7070104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 23, 2013 at 09:04:48PM +0200, Sascha Hauer wrote:
-> On Sun, Jun 23, 2013 at 10:54:45AM +0400, Alexander Shiyan wrote:
-> > From: Alexander Shiyan <shc_work@mail.ru>
-> > 
-> > This patch adds the missing (Symmetric/Asymmetric Hashing and Random
-> > Accelerator) SAHARA2 devicetree node for i.MX27 CPUs.
-> > 
-> > Signed-off-by: Alexander Shiyan <eagle.alexander923@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/imx27.dtsi | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> > index 0695264..04f9154 100644
-> > --- a/arch/arm/boot/dts/imx27.dtsi
-> > +++ b/arch/arm/boot/dts/imx27.dtsi
-> > @@ -351,6 +351,14 @@
-> >  				iram = <&iram>;
-> >  			};
-> >  
-> > +			sahara2: sahara at 10025000 {
-> > +				compatible = "fsl,imx27-sahara";
-> > +				reg = <0x10025000 0x0800>;
-> 
-> I think we should use the whole register space here which would be
-> 0x1000.
+On 06/21/2013 10:25 AM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [130619 06:25]:
+>> Now that the OMAP4 PRCM clock data has been converted to device tree
+>> representation, it is no longer needed as static clock data. OMAP4
+>> clock init routine is also changed to register DT clocks first.
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/cclock44xx_data.c | 1674 +--------------------------------
+>>   1 file changed, 38 insertions(+), 1636 deletions(-)
+>
+> This is nice, thanks for working on this. While at it, can
+> you also keep your eyes open for the register defines in the
+> header files we can also drop?
+>
+> Some of those headers are quite huge.. and should eventually
+> be private to the related drivers if needed at all with DT.
 
-I just fixed it up and applied the series.
+Yeah, I can take a look at this after this set is done. It seems like 
+large portion of the headers can be dropped completely once this 
+exercise is done.
 
-Shawn
+-Tero
