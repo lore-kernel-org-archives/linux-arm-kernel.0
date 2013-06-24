@@ -1,128 +1,62 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 24 Jun 2013 20:05:51 +0200
-Subject: [PATCH v2 8/8] ARM: dts: Add camera device nodes for Exynos4412 TRATS2
+Date: Mon, 24 Jun 2013 20:05:50 +0200
+Subject: [PATCH v2 7/8] ARM: dts: Add AK8975 device node for Exynos4412 TRATS2
  board
 In-Reply-To: <1372097151-18122-1-git-send-email-s.nawrocki@samsung.com>
 References: <1372097151-18122-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1372097151-18122-9-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1372097151-18122-8-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the front camera using the internal
-camera ISP (FIMC-IS).
+From: Jacek Anaszewski <j.anaszewski@samsung.com>
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+This patch adds AK8975 magnetometer node and corresponding
+i2c-gpio bus node for TRATS2 board.
+
+Signed-off-by: Jacek Anaszewski <j.anaszewski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- arch/arm/boot/dts/exynos4412-trats2.dts |   91 +++++++++++++++++++++++++++++++
- 1 file changed, 91 insertions(+)
+Changes since v1:
+ - added node alias for i2c-gpio at 0 I2C controller node.
+---
+ arch/arm/boot/dts/exynos4412-trats2.dts |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index b9de3b5..e9fb3de 100644
+index 056b835..b9de3b5 100644
 --- a/arch/arm/boot/dts/exynos4412-trats2.dts
 +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -62,6 +62,15 @@
- 			enable-active-high;
- 		};
- 
-+		cam_io_reg: voltage-regulator at 3 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "CAM_SENSOR_A";
-+			regulator-min-microvolt = <2800000>;
-+			regulator-max-microvolt = <2800000>;
-+			gpio = <&gpm0 2 0>;
-+			enable-active-high;
-+		};
+@@ -19,6 +19,10 @@
+ 	model = "Samsung Trats 2 based on Exynos4412";
+ 	compatible = "samsung,trats2", "samsung,exynos4412";
+
++	aliases {
++		i2c8 = &i2c_ak8975;
++	};
 +
- 		/* More to come */
+ 	memory {
+ 		reg =  <0x40000000 0x40000000>;
  	};
- 
-@@ -472,4 +481,86 @@
- 			gpios = <&gpj0 7 0>;
- 		};
+@@ -453,4 +457,19 @@
+ 	serial at 13830000 {
+ 		status = "okay";
  	};
 +
-+	camera {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&cam_port_b_clk_active>;
++	i2c_ak8975: i2c-gpio at 0 {
++		compatible = "i2c-gpio";
++		gpios = <&gpy2 4 0>, <&gpy2 5 0>;
++		i2c-gpio,delay-us = <2>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +		status = "okay";
 +
-+		fimc_0: fimc at 11800000 {
-+			clock-frequency = <160000000>;
-+			status = "okay";
-+		};
-+
-+		fimc_1: fimc at 11810000 {
-+			clock-frequency = <160000000>;
-+			status = "okay";
-+		};
-+
-+		fimc_2: fimc at 11820000 {
-+			clock-frequency = <160000000>;
-+			status = "okay";
-+		};
-+
-+		fimc_3: fimc at 11830000 {
-+			clock-frequency = <160000000>;
-+			status = "okay";
-+		};
-+
-+		csis_1: csis at 11890000 {
-+			vddcore-supply = <&ldo8_reg>;
-+			vddio-supply = <&ldo10_reg>;
-+			clock-frequency = <160000000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "okay";
-+
-+			/* Camera D (4) MIPI CSI-2 (CSIS1) */
-+			port at 4 {
-+				reg = <4>;
-+				csis1_ep: endpoint {
-+					remote-endpoint = <&is_s5k6a3_ep>;
-+					data-lanes = <1>;
-+					samsung,csis-hs-settle = <18>;
-+					samsung,csis-wclk;
-+				};
-+			};
-+		};
-+
-+		fimc_lite_0: fimc-lite at 12390000 {
-+			status = "okay";
-+		};
-+
-+		fimc_lite_1: fimc-lite at 123A0000 {
-+			status = "okay";
-+		};
-+
-+		fimc-is at 12000000 {
-+			pinctrl-0 = <&fimc_is_uart>;
-+			pinctrl-names = "default";
-+			status = "okay";
-+
-+			i2c1_isp: i2c-isp at 12140000 {
-+				pinctrl-0 = <&fimc_is_i2c1>;
-+				pinctrl-names = "default";
-+
-+				s5k6a3 at 10 {
-+					compatible = "samsung,s5k6a3";
-+					reg = <0x10>;
-+					svdda-supply = <&cam_io_reg>;
-+					svddio-supply = <&ldo19_reg>;
-+					clock-frequency = <24000000>;
-+					samsung,camclk-out = <1>;
-+					gpios = <&gpm1 6 0>;
-+
-+					port {
-+						is_s5k6a3_ep: endpoint {
-+							remote-endpoint = <&csis1_ep>;
-+							data-lanes = <1>;
-+						};
-+					};
-+				};
-+			};
++		ak8975 at 0c {
++			compatible = "asahi-kasei,ak8975";
++			reg = <0x0c>;
++			gpios = <&gpj0 7 0>;
 +		};
 +	};
  };
--- 
+--
 1.7.9.5
