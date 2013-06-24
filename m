@@ -1,144 +1,66 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Mon, 24 Jun 2013 17:35:18 +0200
-Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
-In-Reply-To: <20130624072112.GQ5523@atomide.com>
-References: <20130516180933.GG5600@atomide.com>
- <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
- <20130516214430.GN5600@atomide.com> <20130520174621.GI10378@atomide.com>
- <20130605223355.EDC113E10E4@localhost> <20130606155341.GL3331@atomide.com>
- <20130623221605.GA3150@blackmetal.musicnaut.iki.fi>
- <CAAwP0s1DkMu8Vfka43hS4Wj-927q=O5u-coyFsPBgy3qtA_vjw@mail.gmail.com>
- <20130623234326.GA20703@blackmetal.musicnaut.iki.fi>
- <CAAwP0s00RwP7jCMF1O8j8Ndhu=VfD2dMA5fzr6jWvQ7PziXBCw@mail.gmail.com>
- <20130624072112.GQ5523@atomide.com>
-Message-ID: <CAAwP0s1LTj1gu8o2mQd3arzH9-9Wfn2G+wsQ=4DpnMRXb7LADw@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 24 Jun 2013 17:37:14 +0200
+Subject: [PATCH v3 11/18] pwm: Add new pwm-samsung driver
+In-Reply-To: <51C86442.6090406@samsung.com>
+References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
+ <2925617.TjWXJcIKRC@flatron> <51C86442.6090406@samsung.com>
+Message-ID: <2127827.gZe35M7nEN@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 9:21 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Javier Martinez Canillas <martinez.javier@gmail.com> [130623 18:08]:
->> On Mon, Jun 24, 2013 at 1:43 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
->> > Hi,
->> >
->> > On Mon, Jun 24, 2013 at 01:06:37AM +0200, Javier Martinez Canillas wrote:
->> >> On Mon, Jun 24, 2013 at 12:16 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
->> >> > What is the status of this patch? We're already at 3.10-rc7 and GPIO
->> >> > IRQs are still broken on OMAP1.
->> >
->> > [...]
->> >
->> >> There is a problem with this patch.
->> >
->> > [...]
->> >
->> >> So I think that the correct solution is to add SPARSE_IRQ support to
->> >> omap1 and not reverting Jon's patch. Of course this may not be
->> >> possible since we are so close to 3.10 and most OMAP patches already
->> >> merged for 3.11 but we should definitely try to have this at least for
->> >> 3.12. Otherwise we won't be able to move to DT-only booting for
->> >> OMAP2+.
->> >
->> > OMAP1 does not use DT. So we could put this code under #ifdef
->> > CONFIG_ARCH_OMAP1 or similar. It's just a few lines of code. OMAP2+
->> > work should not regress OMAP1.
->> >
->> > Demanding SPARSE_IRQ support for OMAP1 should have been discussed before
->> > these changes were made. It's not reasonable to assume such things can
->> > be made during rc-cycle. Also, now, I don't think it's reasonable to
->> > wait for that to be done, as it would take until 3.12 or even later to
->> > get OMAP1 functional again.
->> >
->> > A.
->>
->> Hi,
->>
->> Yes, since we are so late in the -rc cycle and OMAP1 is currently
->> broken I agree that the only sensible solution is to revert the patch
->> for now.
->
-> Agreed.
->
->> I just wanted to point out the issue that keeping the OMAP GPIO driver
->> using legacy mapping domain represents a blocker to have GPIO-IRQ
->> working with Device Tree for OMAP2+
->
-> Yes. We can do the ifdef Aaro suggested, and let's also plan on
-> converting omap1 to use SPARSE_IRQ. But with the ifdef we can cut
-> away the dependency between these two.
->
-> Regards,
->
-> Tony
+On Tuesday 25 of June 2013 00:22:42 Kukjin Kim wrote:
+> On 06/22/13 22:06, Tomasz Figa wrote:
+> > This patch introduces new Samsung PWM driver, which is heavily
+> > cleaned,
+> > multiplatform aware and supports DeviceTree based instantiation.
+> > 
+> > Since on historical hardware PWM block can be shared with clocksource
+> > driver, a shared spinlock is used to protect access to shared
+> > registers, already exported from the clocksource driver.
+> > 
+> > Signed-off-by: Tomasz Figa<tomasz.figa@gmail.com>
+> > ---
+> > 
+> >   drivers/pwm/Makefile      |   1 +
+> >   drivers/pwm/pwm-samsung.c | 601
+> >   ++++++++++++++++++++++++++++++++++++++++++++++ 2 files changed, 602
+> >   insertions(+)
+> >   create mode 100644 drivers/pwm/pwm-samsung.c
+> > 
+> > Changes since v2:
+> >   - Replaced __raw_{readl,writel} with {readl,writel}.
+> >   - Corrected commit message.
+> 
+> [...]
+> 
+> > +	of_property_for_each_u32(np, "samsung,pwm-outputs", prop, cur, 
+val)
+> > {
+> > +		if (val>= SAMSUNG_PWM_NUM) {
+> > +			pr_warning("%s: invalid channel index in 
+samsung,pwm-outputs
+> > property\n",
+> Just note, checkpatch complains following, so fixed to use pr_warn()
+> when I applied.
+> 
+> WARNING: Prefer pr_warn(... to pr_warning(...
+> #471: FILE: drivers/pwm/pwm-samsung.c:432:
+> +			pr_warning("%s: invalid channel index in 
+samsung,pwm-outputs
+> property\n",
+> 
+> [...]
+> 
+> > +
+> > +static struct dev_pm_ops pwm_samsung_pm_ops = {
+> 
+> WARNING: struct dev_pm_ops should normally be const
+> #622: FILE: drivers/pwm/pwm-samsung.c:583:
+> +static struct dev_pm_ops pwm_samsung_pm_ops = {
+> 
+> fixed to add const when I applied.
 
-Ok, so something like the following patch should do it (tested on an
-OMAP3 board):
+Oops, I forgot to fix them, sorry. Thank you for fixing and applying.
 
->From b9e262c688fb7f3ad733f140b55dddbc8e4716e6 Mon Sep 17 00:00:00 2001
-From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Date: Mon, 24 Jun 2013 17:13:23 +0200
-Subject: [PATCH 1/1] gpio/omap: don't use linear domain mapping for OMAP1
-
-commit ede4d7a5 ("gpio/omap: convert gpio irq domain to linear mapping")
-converted the OMAP GPIO driver to use a linear mapping for the GPIO IRQ
-domain instead of using a legacy mapping. Not using a legacy mapping has
-a number of benefits but it requires the platform to support SPARSE_IRQ
-which currently is not supported on OMAP1.
-
-So this change caused a regression on OMAP1 platforms [1].
-
-Since this issue is not present on all OMAP2+ platforms, there is no need to
-revert the driver to use legacy domain mapping for all the platforms.
-
-[1]: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg89005.html
-
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- drivers/gpio/gpio-omap.c |   22 +++++++++++++++++++++-
- 1 files changed, 21 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index d3f7d2d..4a43036 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -1094,6 +1094,9 @@ static int omap_gpio_probe(struct platform_device *pdev)
- 	const struct omap_gpio_platform_data *pdata;
- 	struct resource *res;
- 	struct gpio_bank *bank;
-+#ifdef CONFIG_ARCH_OMAP1
-+	int irq_base;
-+#endif
-
- 	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
-
-@@ -1135,11 +1138,28 @@ static int omap_gpio_probe(struct platform_device *pdev)
- 				pdata->get_context_loss_count;
- 	}
-
-+#ifdef CONFIG_ARCH_OMAP1
-+	/*
-+	 * REVISIT: Once we have OMAP1 supporting SPARSE_IRQ, we can drop
-+	 * irq_alloc_descs() and irq_domain_add_legacy() and just use a
-+	 * linear IRQ domain mapping for all OMAP platforms.
-+	 */
-+	irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
-+	if (irq_base < 0) {
-+		dev_err(dev, "Couldn't allocate IRQ numbers\n");
-+		return -ENODEV;
-+	}
-
-+	bank->domain = irq_domain_add_legacy(node, bank->width, irq_base,
-+					     0, &irq_domain_simple_ops, NULL);
-+#else
- 	bank->domain = irq_domain_add_linear(node, bank->width,
- 					     &irq_domain_simple_ops, NULL);
--	if (!bank->domain)
-+#endif
-+	if (!bank->domain) {
-+		dev_err(dev, "Couldn't register an IRQ domain\n");
- 		return -ENODEV;
-+	}
-
- 	if (bank->regs->set_dataout && bank->regs->clr_dataout)
- 		bank->set_dataout = _set_gpio_dataout_reg;
--- 
-1.7.7.6
+Best regards,
+Tomasz
