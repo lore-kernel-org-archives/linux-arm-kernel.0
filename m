@@ -1,53 +1,194 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Jun 2013 16:43:57 +0100
-Subject: [Question] race between spin_lock and spin_unlock
-In-Reply-To: <CACVXFVMBL5E5SGwDatn_ay0sPOhqPKTwouCbzjwrhPuRKHNDcg@mail.gmail.com>
-References: <CACVXFVMBL5E5SGwDatn_ay0sPOhqPKTwouCbzjwrhPuRKHNDcg@mail.gmail.com>
-Message-ID: <20130624154357.GB25582@mudshark.cambridge.arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 25 Jun 2013 00:46:06 +0900
+Subject: [PATCH v2 07/18] ARM: SAMSUNG: Move all platforms to new
+ clocksource driver
+In-Reply-To: <1446181.qPbsJvieFG@flatron>
+References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
+ <1371766383-29077-8-git-send-email-tomasz.figa@gmail.com>
+ <51C866AD.6010406@samsung.com> <1446181.qPbsJvieFG@flatron>
+Message-ID: <51C869BE.3020800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 04:13:38PM +0100, Ming Lei wrote:
-> Hi,
+On 06/25/13 00:38, Tomasz Figa wrote:
 
-Hi Ming Lei,
+[...]
 
-> When reading the code of arch_spin_lock(), I think there might be
-> a race between arch_spin_lock() and arch_spin_unlock():
-> 
-> - arch_spin_unlock() happened just between StoreExcl(lock->next)
-> and comparing lockval.tickets.next with lockval.tickets.owner inside
-> arch_spin_lock()
-> 
-> - arch_spin_lock() can't notice the change on lock->owner, so call
-> wfe(), then just waiting for being waken up, but there isn't corresponding
-> unlock to send wake event any more.
-> 
-> Maybe the below change may make the race to happen difficultly,
-> but it still can't avoid it completely.
-> 
-> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
-> index 6220e9f..e1b239c 100644
-> --- a/arch/arm/include/asm/spinlock.h
-> +++ b/arch/arm/include/asm/spinlock.h
-> @@ -87,10 +87,8 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
->  	: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
->  	: "cc");
-> 
-> -	while (lockval.tickets.next != lockval.tickets.owner) {
-> +	while (lockval.tickets.next != ACCESS_ONCE(lock->tickets.owner))
->  		wfe();
-> -		lockval.tickets.owner = ACCESS_ONCE(lock->tickets.owner);
-> -	}
-> 
->  	smp_mb();
->  }
-> 
-> Any comments on the problem?
+>>> -	select SAMSUNG_HRT
+>>> +	select CLKSRC_SAMSUNG_PWM
+>>
+>> Please put this in alphabetical ordering, this is just replacing though.
+>
+> Argh, I always forget about this ordering, sorry.
+>
 
-Not sure I see the problem -- the sev guaranteed by the unlock is pended on
-the core doing the lock by setting the event register, so you can't miss it.
-The wfe will acknowledge the event (by clearing the event register) but it
-won't actually wait.
+no problem ;-)
 
-Will
+[...]
+
+>> Let me fix it...
+
+like following :-)
+
+8<----------------------------------------------
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 49d993c..734d85b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -694,6 +694,7 @@ config ARCH_S3C24XX
+  	select ARCH_REQUIRE_GPIOLIB
+  	select CLKDEV_LOOKUP
+  	select CLKSRC_MMIO
++	select CLKSRC_SAMSUNG_PWM
+  	select GENERIC_CLOCKEVENTS
+  	select HAVE_CLK
+  	select HAVE_S3C2410_I2C if I2C
+@@ -715,6 +716,7 @@ config ARCH_S3C64XX
+  	select ARM_VIC
+  	select CLKDEV_LOOKUP
+  	select CLKSRC_MMIO
++	select CLKSRC_SAMSUNG_PWM
+  	select CPU_V6
+  	select GENERIC_CLOCKEVENTS
+  	select HAVE_CLK
+@@ -737,6 +739,7 @@ config ARCH_S5P64X0
+  	bool "Samsung S5P6440 S5P6450"
+  	select CLKDEV_LOOKUP
+  	select CLKSRC_MMIO
++	select CLKSRC_SAMSUNG_PWM
+  	select CPU_V6
+  	select GENERIC_CLOCKEVENTS
+  	select HAVE_CLK
+@@ -753,6 +756,7 @@ config ARCH_S5PC100
+  	select ARCH_REQUIRE_GPIOLIB
+  	select CLKDEV_LOOKUP
+  	select CLKSRC_MMIO
++	select CLKSRC_SAMSUNG_PWM
+  	select CPU_V7
+  	select GENERIC_CLOCKEVENTS
+  	select HAVE_CLK
+@@ -770,6 +774,7 @@ config ARCH_S5PV210
+  	select ARCH_SPARSEMEM_ENABLE
+  	select CLKDEV_LOOKUP
+  	select CLKSRC_MMIO
++	select CLKSRC_SAMSUNG_PWM
+  	select CPU_V7
+  	select GENERIC_CLOCKEVENTS
+  	select HAVE_CLK
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index f2f7088..8124ec7 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -30,7 +30,6 @@ config CPU_S3C2410
+  	select S3C2410_CLOCK
+  	select S3C2410_CPUFREQ if CPU_FREQ_S3C24XX
+  	select S3C2410_PM if PM
+-	select SAMSUNG_HRT
+  	help
+  	  Support for S3C2410 and S3C2410A family from the S3C24XX line
+  	  of Samsung Mobile CPUs.
+@@ -41,7 +40,6 @@ config CPU_S3C2412
+  	select CPU_LLSERIAL_S3C2440
+  	select S3C2412_DMA if S3C24XX_DMA
+  	select S3C2412_PM if PM
+-	select SAMSUNG_HRT
+  	help
+  	  Support for the S3C2412 and S3C2413 SoCs from the S3C24XX line
+
+@@ -53,7 +51,6 @@ config CPU_S3C2416
+  	select S3C2443_COMMON
+  	select S3C2443_DMA if S3C24XX_DMA
+  	select SAMSUNG_CLKSRC
+-	select SAMSUNG_HRT
+  	help
+  	  Support for the S3C2416 SoC from the S3C24XX line
+
+@@ -64,7 +61,6 @@ config CPU_S3C2440
+  	select S3C2410_CLOCK
+  	select S3C2410_PM if PM
+  	select S3C2440_DMA if S3C24XX_DMA
+-	select SAMSUNG_HRT
+  	help
+  	  Support for S3C2440 Samsung Mobile CPU based systems.
+
+@@ -74,7 +70,6 @@ config CPU_S3C2442
+  	select CPU_LLSERIAL_S3C2440
+  	select S3C2410_CLOCK
+  	select S3C2410_PM if PM
+-	select SAMSUNG_HRT
+  	help
+  	  Support for S3C2442 Samsung Mobile CPU based systems.
+
+@@ -89,7 +84,6 @@ config CPU_S3C2443
+  	select S3C2443_COMMON
+  	select S3C2443_DMA if S3C24XX_DMA
+  	select SAMSUNG_CLKSRC
+-	select SAMSUNG_HRT
+  	help
+  	  Support for the S3C2443 SoC from the S3C24XX line
+
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 2057853..041da51 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -17,13 +17,11 @@ config PLAT_S3C64XX
+  # Configuration options for the S3C6410 CPU
+
+  config CPU_S3C6400
+-	select SAMSUNG_HRT
+  	bool
+  	help
+  	  Enable S3C6400 CPU support
+
+  config CPU_S3C6410
+-	select SAMSUNG_HRT
+  	bool
+  	help
+  	  Enable S3C6410 CPU support
+diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
+index 5a707bd..bb2111b 100644
+--- a/arch/arm/mach-s5p64x0/Kconfig
++++ b/arch/arm/mach-s5p64x0/Kconfig
+@@ -11,14 +11,12 @@ config CPU_S5P6440
+  	bool
+  	select S5P_SLEEP if PM
+  	select SAMSUNG_DMADEV
+-	select SAMSUNG_HRT
+  	select SAMSUNG_WAKEMASK if PM
+  	help
+  	  Enable S5P6440 CPU support
+
+  config CPU_S5P6450
+  	bool
+-	select SAMSUNG_HRT
+  	select S5P_SLEEP if PM
+  	select SAMSUNG_DMADEV
+  	select SAMSUNG_WAKEMASK if PM
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index 2f456a4..15170be 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -11,7 +11,6 @@ config CPU_S5PC100
+  	bool
+  	select S5P_EXT_INT
+  	select SAMSUNG_DMADEV
+-	select SAMSUNG_HRT
+  	help
+  	  Enable S5PC100 CPU support
+
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index 0963283..caaedaf 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -15,7 +15,6 @@ config CPU_S5PV210
+  	select S5P_PM if PM
+  	select S5P_SLEEP if PM
+  	select SAMSUNG_DMADEV
+-	select SAMSUNG_HRT
+  	help
+  	  Enable S5PV210 CPU support
+-- 
+
+Thanks.
+- Kukjin
