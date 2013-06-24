@@ -1,24 +1,23 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 24 Jun 2013 15:54:29 +0100
-Subject: [PATCH v3 2/3] regulator: max8998: Use arrays for specifying
- voltages in platform data
-In-Reply-To: <1372077594-17052-3-git-send-email-t.figa@samsung.com>
-References: <1372077594-17052-1-git-send-email-t.figa@samsung.com>
- <1372077594-17052-3-git-send-email-t.figa@samsung.com>
-Message-ID: <20130624145429.GP27646@sirena.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 25 Jun 2013 00:02:39 +0900
+Subject: [PATCH v7 00/11] Add generic set_rate clk_ops for PLL35xx and
+ PLL36xx for samsung SoCs
+In-Reply-To: <20130621163143.9136.28807@quantum>
+References: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
+ <CAKew6eUOy4=D08v_iq7CTRY5gvt37VAN7Z7WOr2Yt25znDJb2g@mail.gmail.com>
+ <CAGm_ybiVZOPBJJ0bYX33wafn1So6aqSAnk7myXZ+Z+RfLBeBQw@mail.gmail.com>
+ <1524664.UCV47tfIRU@flatron> <20130621163143.9136.28807@quantum>
+Message-ID: <51C85F8F.9050501@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 02:39:53PM +0200, Tomasz Figa wrote:
-> This patch modifies the platform data of max8998 to use arrays for
-> specifying predefined voltages of buck1 and buck2 instead of separate
-> field for each voltage.
+On 06/22/13 01:31, Mike Turquette wrote:
+>
+> Acked-by: Mike Turquette<mturquette@linaro.org>
+>
+> Or I can take this through the clk tree. Either way is fine.
+>
+Mike, please go ahead taking this series into the clk tree for 3.11.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/f0d2b972/attachment-0001.sig>
+Thanks,
+- Kukjin
