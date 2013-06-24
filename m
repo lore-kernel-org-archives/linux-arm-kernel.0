@@ -1,38 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 24 Jun 2013 19:40:14 +0200
-Subject: [PATCH 2/8] at_hdmac: prepare clk before calling enable
-In-Reply-To: <20130621024039.GA23141@intel.com>
-References: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
- <1371640494-9472-1-git-send-email-b.brezillon@overkiz.com>
- <51C2B2B8.2040104@atmel.com> <20130621024039.GA23141@intel.com>
-Message-ID: <51C8847E.5020101@atmel.com>
+From: lho@apm.com (Loc Ho)
+Date: Mon, 24 Jun 2013 10:48:56 -0700
+Subject: [PATCH 1/3] clk: Add APM X-Gene SoC clock driver for reference,
+ PLL, and device clocks.
+In-Reply-To: <20130624084820.GC19489@e106331-lin.cambridge.arm.com>
+References: <1371828605-18053-1-git-send-email-lho@apm.com>
+ <1371828605-18053-2-git-send-email-lho@apm.com>
+ <20130624084820.GC19489@e106331-lin.cambridge.arm.com>
+Message-ID: <CAPw-ZT=2fKtsnkygNmctWop+zRfQE05OgGSFTbjpZxdSD1wQSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/06/2013 04:40, Vinod Koul :
-> On Thu, Jun 20, 2013 at 09:43:52AM +0200, Nicolas Ferre wrote:
->> On 19/06/2013 13:14, Boris BREZILLON :
->>> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
->>> avoid common clk framework warnings.
->>>
->>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>
->> BTW Vinod, it seems that we have several slave-dma patches pending:
->> do you want me to collect them and send you a pull-request for 3.11?
-> I think those are the DT binding one, right? Sorry have been quite busy and
-> travelling. I could use the help right now...
+Hi,
 
-Vinod,
+I will fix them. With regard to continue where the CSR is NULL, it is
+possible to continue as long as both is NOT NULL.
 
-I have just sent the pull-request with all patches that you may take for 
-3.11 ([GIT PULL] dmaengine: at_hdmac: updates for 3.11). It is a signed 
-tag "at91-sdma" on our github space.
+> Use of_iomap(np, 0) here.
+>
+>> +       } else {
+>> +               parameters.csr_reg = NULL;
+>> +       }
+>
+> Are you able to continue if this is the case?
+>
+>> +
+>> +       rc = of_address_to_resource(np, 1, &res);
+>> +       if (rc != 0) {
+>> +               pr_err("no DTS DIV register for %s\n", np->full_name);
+>> +               return;
+>> +       }
+>> +       if (resource_size(&res)) {
+>> +               parameters.divider_reg = ioremap(res.start,
+>> +                                               resource_size(&res));
+>> +               if (parameters.divider_reg == NULL) {
+>> +                       pr_err("Unable to map DIV register for %s\n",
+>> +                               np->full_name);
+>> +                       if (parameters.csr_reg)
+>> +                               iounmap(parameters.csr_reg);
+>> +                       return;
+>> +               }
+>
+> Use of_iomap(np, 1) here.
+>
+>> +       } else {
+>> +               parameters.divider_reg = NULL;
+>> +       }
+>
+> Similarly, are you able to continue with this being the case?
 
-I hope that it will be easy for you to take it in your slave-dma git 
-tree. If you have any question, please let me know.
-
-Best regards,
--- 
-Nicolas Ferre
+-Loc
