@@ -1,46 +1,159 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 24 Jun 2013 09:37:52 +0300
-Subject: [PATCH v7 7/9] usb: musb: omap2430: use the new generic PHY
- framework
-In-Reply-To: <51C7D9CC.8090901@ti.com>
-References: <1371113039-5784-1-git-send-email-kishon@ti.com>
- <1371113039-5784-8-git-send-email-kishon@ti.com>
- <20130618094703.GV5461@arwen.pp.htv.fi> <51C7D9CC.8090901@ti.com>
-Message-ID: <20130624063752.GA7145@arwen.pp.htv.fi>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 24 Jun 2013 08:41:39 +0200
+Subject: [PATCHv2 1/3] iio: Add Nuvoton NAU7802 ADC driver
+In-Reply-To: <1371754675-12242-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1371754675-12242-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1371754675-12242-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <51C7EA23.1040707@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jun 24, 2013 at 11:01:56AM +0530, Kishon Vijay Abraham I wrote:
-> >>@@ -397,9 +407,10 @@ static int omap2430_musb_init(struct musb *musb)
-> >>  	if (glue->status != OMAP_MUSB_UNKNOWN)
-> >>  		omap_musb_set_mailbox(glue);
-> >>
-> >>-	usb_phy_init(musb->xceiv);
-> >>+	phy_init(musb->phy);
-> >>
-> >>  	pm_runtime_put_noidle(musb->controller);
-> >>+	phy_pm_runtime_put(musb->phy);
-> >
-> >see, weird unbalanced calls :-)
-> >
-> >Make it all explicit:
-> >
-> >phy_pm_runtime_get_sync(phy);
-> >phy_init(phy);
-> >phy_pm_runtime_put(phy);
+On 06/20/2013 08:57 PM, Alexandre Belloni wrote:
+> The Nuvoton NAU7802 ADC is a 24-bit 2-channels I2C ADC, with adjustable
+> gain and sampling rates.
 > 
-> I think then it makes sense to drop get_sync from phy_init()?
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  .../bindings/iio/adc/nuvoton-nau7802.txt           |  17 +
+>  drivers/iio/adc/Kconfig                            |   9 +
+>  drivers/iio/adc/Makefile                           |   1 +
+>  drivers/iio/adc/nau7802.c                          | 603 +++++++++++++++++++++
+>  4 files changed, 630 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt
+>  create mode 100644 drivers/iio/adc/nau7802.c
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt b/Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt
+> new file mode 100644
+> index 0000000..9bc4218
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt
+> @@ -0,0 +1,17 @@
+> +* Nuvoton NAU7802 Analog to Digital Converter (ADC)use
+> +
+> +Required properties:
+> +  - compatible: Should be "nuvoton,nau7802"
+> +  - reg: Should contain the ADC I2C address
+> +
+> +Optional properties:
+> +  - nuvoton,vldo: Reference voltage in millivolts (integer)
+> +  - interrupts: IRQ line for the ADC. If not used the driver will use
+> +    polling.
+> +
+> +Example:
+> +adc2: nau7802 at 2a {
+> +	compatible = "nuvoton,nau7802";
+> +	reg = <0x2a>;
+> +	nuvoton,vldo = <3000>;
 
-maybe not, you don't know if the phy has already autosuspended or not.
+We usually use the regulator framework for specifying the reference voltage.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/8f85e599/attachment.sig>
+> +};
+[...]
+> diff --git a/drivers/iio/adc/nau7802.c b/drivers/iio/adc/nau7802.c
+> new file mode 100644
+> index 0000000..e1b6981
+> --- /dev/null
+> +++ b/drivers/iio/adc/nau7802.c
+> @@ -0,0 +1,603 @@
+[...]
+> +static int nau7802_set_gain(struct nau7802_state *st, int gain)
+> +{
+> +	u8 data;
+> +	int ret;
+> +
+> +	mutex_lock(&st->lock);
+> +	st->conversion_count = 0;
+> +
+> +	data = i2c_smbus_read_byte_data(st->client, NAU7802_REG_CTRL1);
+> +	if (data < 0)
+> +		goto nau7802_sysfs_set_gain_out;
+
+ret will be uninitialized if the goto above is taken
+
+> +	ret = i2c_smbus_write_byte_data(st->client, NAU7802_REG_CTRL1,
+> +					(data & (~NAU7802_CTRL1_GAINS_BITS)) |
+> +					gain);
+> +
+> +nau7802_sysfs_set_gain_out:
+> +	mutex_unlock(&st->lock);
+> +
+> +	return ret ? ret : 0;
+> +}
+[...]
+> +static int nau7802_read_irq(struct iio_dev *indio_dev,
+> +			struct iio_chan_spec const *chan,
+> +			int *val)
+> +{
+> +	struct nau7802_state *st = iio_priv(indio_dev);
+> +	int ret;
+> +
+> +	INIT_COMPLETION(st->value_ok);
+> +	enable_irq(st->client->irq);
+
+Is it really necessary to enable/disable the IRQ or could you keep it
+enabled all the time?
+
+> +
+> +	nau7802_sync(st);
+> +
+> +	/* read registers to ensure we flush everything */
+> +	ret = nau7802_read_conversion(st);
+> +	if (ret < 0)
+> +		goto read_chan_info_failure;
+> +
+> +	/* Wait for a conversion to finish */
+> +	ret = wait_for_completion_interruptible_timeout(&st->value_ok,
+> +			msecs_to_jiffies(1000));
+> +	if (ret == 0)
+> +		ret = -ETIMEDOUT;
+> +
+> +	if (ret < 0)
+> +		goto read_chan_info_failure;
+> +
+> +	disable_irq(st->client->irq);
+> +
+> +	*val = st->last_value;
+> +
+> +	return IIO_VAL_INT;
+> +
+> +read_chan_info_failure:
+> +	disable_irq(st->client->irq);
+> +
+> +	return ret;
+> +}
+[...]
+
+[...]
+> +static int nau7802_probe(struct i2c_client *client,
+> +			const struct i2c_device_id *id)
+> +{
+> +	struct iio_dev *indio_dev;
+> +	struct nau7802_state *st;
+> +	struct device_node *np = client->dev.of_node;
+> +	int i, ret;
+> +	u8 data;
+> +	u32 tmp;
+> +
+> +	if (!client->dev.of_node) {
+> +		dev_err(&client->dev, "No device tree node available.\n");
+> +		return -EINVAL;
+> +	}
+
+Except for getting the vref the is no direct dependency on devicetree, if
+you switch to the regulator framework for the vref this check can be removed.
+
+[...]
+> +	/* Setup the ADC channels available on the board */
+> +	indio_dev->num_channels = 2;
+
+ARRAY_SIZE(nau7802_chan_array)
+
+> +	indio_dev->channels = nau7802_chan_array;
+> +
+> +	init_completion(&st->value_ok);
+
+You need to initialize the completion before requesting the IRQ handler.
+
+[...]
+> +}
