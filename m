@@ -1,454 +1,364 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 24 Jun 2013 16:00:21 -0400
-Subject: [PATCH-next 00/32] Delete support for __cpuinit
-In-Reply-To: <1372102237-8757-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1372102237-8757-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <51C8A555.8090006@windriver.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 24 Jun 2013 22:03:12 +0200
+Subject: [PATCH 08/15] pwm: Add new pwm-samsung driver
+In-Reply-To: <20130624195020.GA7163@mithrandir>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <24964129.e56nj79VjR@flatron> <20130624195020.GA7163@mithrandir>
+Message-ID: <8756440.8o3uDlCqg5@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Resending with only lists on Cc: -- previous mail header on the 00/32
- was too long; failed to get passed vger's crap filters.]
+On Monday 24 of June 2013 21:50:21 Thierry Reding wrote:
+> On Mon, Jun 24, 2013 at 07:52:11PM +0200, Tomasz Figa wrote:
+> > Hi Thierry,
+> > 
+> > On Wednesday 19 of June 2013 12:23:52 Tomasz Figa wrote:
+> > > On Wednesday 19 of June 2013 11:43:56 Thierry Reding wrote:
+> > > > On Wed, Jun 19, 2013 at 12:45:02AM +0200, Tomasz Figa wrote:
+> > > > > On Wednesday 19 of June 2013 00:17:06 Thierry Reding wrote:
+> > > > > > On Mon, Jun 17, 2013 at 10:50:40PM +0200, Tomasz Figa wrote:
+> > > > > > > On Monday 17 of June 2013 22:29:11 Thierry Reding wrote:
+> > > > > > > > On Wed, Jun 05, 2013 at 11:18:13PM +0200, Tomasz Figa 
+wrote:
+> > > > > > [...]
+> > > > > > 
+> > > > > > > > > +#ifndef CONFIG_CLKSRC_SAMSUNG_PWM
+> > > > > > > > > +static DEFINE_SPINLOCK(samsung_pwm_lock);
+> > > > > > > > > +#endif
+> > > > > > > > 
+> > > > > > > > Why is this lock global? Shouldn't it more correctly be
+> > > > > > > > part
+> > > > > > > > of
+> > > > > > > > samsung_pwm_chip?
+> > > > > > > 
+> > > > > > > There are few registers shared with samsung_pwm_timer
+> > > > > > > clocksource
+> > > > > > > driver and so normally the spinlock is exported from it.
+> > > > > > > However
+> > > > > > > on
+> > > > > > > on some platforms (namely Exynos >=4x12) kernel can be
+> > > > > > > compiled
+> > > > > > > without that driver, so the lock must be defined locally,
+> > > > > > > just
+> > > > > > > to
+> > > > > > > synchronize multiple PWM channels, as they share registers
+> > > > > > > as
+> > > > > > > well.
+> > > > > > 
+> > > > > > Okay, I think this needs further explanation. The clocksource
+> > > > > > driver
+> > > > > > is
+> > > > > > used for what exactly? From a quick look it seems to be very
+> > > > > > much
+> > > > > > PWM-
+> > > > > > specific. According to the device tree binding for the PWM
+> > > > > > driver,
+> > > > > > the
+> > > > > > timer blocks can also be used as clock sources and clock event
+> > > > > > timers.
+> > > > > > So if I understand correctly you have setups where you use one
+> > > > > > or
+> > > > > > more
+> > > > > > channels as clock source or clock event timer and one or more
+> > > > > > channels
+> > > > > > as PWM outputs.
+> > > > > > 
+> > > > > > In that case it's a very bad idea to use a global lock to
+> > > > > > synchronize
+> > > > > > accesses. You need to do much more than that. To properly
+> > > > > > split
+> > > > > > this
+> > > > > > across several drivers there needs to be a mechanism to
+> > > > > > allocate
+> > > > > > channels for use either as clock source/event timer or PWM.
+> > > > > > Otherwise,
+> > > > > > how do you know that drivers aren't stepping on each other's
+> > > > > > toes?
+> > > > > > 
+> > > > > > > > > +		ret = pwm_samsung_parse_dt(chip);
+> > > > > > > > > +		if (ret)
+> > > > > > > > > +			return ret;
+> > > > > > > > > +
+> > > > > > > > > +		chip->chip.of_xlate = 
+of_pwm_xlate_with_flags;
+> > > > > > > > > +		chip->chip.of_pwm_n_cells = 3;
+> > > > > > > > > +	} else {
+> > > > > > > > > +		if (!pdev->dev.platform_data) {
+> > > > > > > > > +			dev_err(&pdev->dev, "no platform 
+data
+> > > > > > > 
+> > > > > > > specified\n");
+> > > > > > > 
+> > > > > > > > > +			return -EINVAL;
+> > > > > > > > > +		}
+> > > > > > > > > +
+> > > > > > > > > +		memcpy(&chip->variant, pdev-
+>dev.platform_data,
+> > > > > > > > > +
+> > > > > 
+> > > > > sizeof(chip-
+> > > > > 
+> > > > > > > >variant));
+> > > > > > > >
+> > > > > > > > > +	}
+> > > > > > > > 
+> > > > > > > > Obviously this needs some modification in order for the
+> > > > > > > > variant
+> > > > > > > > to
+> > > > > > > > become constant. But I think you can easily do so by
+> > > > > > > > making
+> > > > > > > > the
+> > > > > > > > driver
+> > > > > > > > match using the platform_driver's id_table field, similar
+> > > > > > > > to
+> > > > > > > > how
+> > > > > > > > the
+> > > > > > > > matching is done for OF.
+> > > > > > > 
+> > > > > > > Generally output_mask is board-dependent and is passed
+> > > > > > > inside a
+> > > > > > > variant
+> > > > > > > struct using platform_data pointer.
+> > > > > > 
+> > > > > > That's okay. But output_mask is the only thing that's
+> > > > > > board-dependent.
+> > > > > > Everything else in the variant is SoC dependent judging by the
+> > > > > > OF
+> > > > > > device
+> > > > > > table. So really only the output_mask should be part of the
+> > > > > > platform
+> > > > > > data.
+> > > > > > 
+> > > > > > > Same platform data is used in samsung_pwm_timer clocksource
+> > > > > > > driver,
+> > > > > > > so
+> > > > > > > I just reused it here without adding the need to rename
+> > > > > > > platform
+> > > > > > > device at runtime (see arch/arm/plat-samsung/devs.c).
+> > > > > > 
+> > > > > > Looking a bit at git log for the clocksource driver, there's
+> > > > > > this
+> > > > > > 
+> > > > > > commit:
+> > > > > > 	a3ce54f clocksource: samsung_pwm_timer: Do not request PWM
+> > 
+> > mem
+> > 
+> > > > > region
+> > > > > 
+> > > > > > That's an ugly workaround for sharing registers between two
+> > > > > > drivers.
+> > > > > > There's a reason why drivers do request_mem_region(), and it
+> > > > > > is
+> > > > > > precisely to prevent them from accessing the same registers.
+> > > > > > As I
+> > > > > > already said above, I think you need to come up with some sort
+> > > > > > of
+> > > > > > API
+> > > > > > to
+> > > > > > share resources between the drivers.
+> > > > > > 
+> > > > > > There was a similar issue a few months back with the
+> > > > > > pwm-tiehrpwm
+> > > > > > and
+> > > > > > pwm-tiecap drivers, which use a shared block of registers.
+> > > > > > Initially
+> > > > > > something similar was done as you do here, but eventually we
+> > > > > > came
+> > > > > > up
+> > > > > > with a much better solution that involved introducing a new
+> > > > > > driver
+> > > > > > for
+> > > > > > the shared functionality and an exported API.
+> > > > > > 
+> > > > > > The situation seems to be somewhat different here since you
+> > > > > > actually
+> > > > > > share the same resources for different functionality instead
+> > > > > > of
+> > > > > > sharing
+> > > > > > one subset of register across multiple drivers, but I think a
+> > > > > > similar
+> > > > > > solution can be applied here.
+> > > > > 
+> > > > > Well, current design, or rather lack of thereof, has been
+> > > > > established
+> > > > > after a significant amount of discussion, mostly with ARM SoC
+> > > > > and
+> > > > > MFD
+> > > > > maintainers.
+> > > > > 
+> > > > > It started from a simple reorganization of the clocksource
+> > > > > driver to
+> > > > > be
+> > > > > multiplatform friendly, without any means of synchronizing both
+> > > > > drivers
+> > > > > other than local_irq_save() and _restore() that used to be there
+> > > > > originally, before I started my work on this. This was enough to
+> > > > > work
+> > > > > correctly, because both drivers at the same time are used only
+> > > > > on
+> > > > > uniprocessor systems.
+> > > > > 
+> > > > > Here's the thread with patches:
+> > > > > http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16664/foc
+> > > > > us=1
+> > > > > 726
+> > > > > 7
+> > > > > 
+> > > > > Then I opened a Pandora's Box by asking for opinion in this
+> > > > > thread:
+> > > > > http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16480/foc
+> > > > > us=1
+> > > > > 650
+> > > > > 0
+> > > > > 
+> > > > > After that I started working on a complex framework for sharing
+> > > > > this
+> > > > > IP
+> > > > > block that would solve all the problems with synchronization,
+> > > > > channel
+> > > > > allocation, device tree parsing, variant management, etc.
+> > > > > 
+> > > > > Here's an initial version, which started as an MFD master
+> > > > > driver,
+> > > > > which
+> > > > > would let 2 client drivers use the hardware (only the
+> > > > > clocksource
+> > > > > part
+> > > > > was implemented in that series):
+> > > > > http://thread.gmane.org/gmane.linux.kernel.samsung-soc/17464/foc
+> > > > > us=2
+> > > > > 292
+> > > > > 50
+> > > > > 
+> > > > > Still, that version didn't receive too good feedback, with
+> > > > > comments
+> > > > > pointing me to change the architecture to master-slave, with the
+> > > > > clocksource driver being the master and PWM driver being the
+> > > > > slave.
+> > > > > And
+> > > > > so v5 was made:
+> > > > > http://thread.gmane.org/gmane.linux.kernel.samsung-soc/17864
+> > > > 
+> > > > Yeah, this seemed to be going in the right direction.
+> > > > 
+> > > > > This version was generally accepted, but then we discussed on
+> > > > > IRC
+> > > > > (mostly me and Arnd) whether such complex infrastructure is
+> > > > > really
+> > > > > needed and concluded that for this platform a simple shared
+> > > > > spinlock
+> > > > > would be enough, based on following reasons:
+> > > > > - on all SoCs on which the clocksource driver is going to be
+> > > > > used
+> > > > > there
+> > > > > is only one instance of the PWM block, with 5 channels
+> > > > 
+> > > > You say that now. But then at some point somebody decides that it
+> > > > might
+> > > > be useful to have a second instance.
+> > > 
+> > > No, he won't.
+> > > 
+> > > Simply because no new SoC is going to be made which will use the
+> > > samsung_pwm_timer driver and all existing ones have only a single
+> > > instance of this IP.
+> > > 
+> > > > > - on all existing boards there are always at least two channels
+> > > > > that
+> > > > > don't have outputs
+> > > > 
+> > > > I don't see how that's relevant here.
+> > > 
+> > > This is the information passed through output_mask. Clocksource
+> > > driver
+> > > can use _only_ channels without output and PWM driver can use _only_
+> > > channels with output.
+> > > 
+> > > Both drivers receive the same output_mask value, either from the
+> > > same
+> > > variant structure or from device tree.
+> > > 
+> > > > > - operations on particular PWM channels must be synchronized
+> > > > > anyway,
+> > > > > because there are registers shared by all PWM channels (TCON
+> > > > > being
+> > > > > most
+> > > > > important where enable, autoreload and invert bits are located
+> > > > > for
+> > > > > all
+> > > > > channels).
+> > > > 
+> > > > And that's precisely why there should be a more explicit way of
+> > > > synchronizing than just acquiring a lock. Otherwise you have no
+> > > > possibility whatsoever to detect when a board tries to use both
+> > > > the
+> > > > clocksource and PWM drivers in incompatible ways. The lock may
+> > > > prevent
+> > > > concurrent accesses to the shared registers, but that won't help
+> > > > you
+> > > > if
+> > > > the PWM driver suddenly decides to use an output that was
+> > > > originally
+> > > > meant to be used as clock source.
+> > > 
+> > > See above.
+> > > 
+> > > > > And so we got to current design which is basically a shared
+> > > > > spinlock
+> > > > > and
+> > > > > per-board output_mask, which specifies which channels have
+> > > > > outputs
+> > > > > on
+> > > > > particular boards. If you look to the clocksource driver, you
+> > > > > can
+> > > > > see
+> > > > > that it tries to allocate two output-less channels for
+> > > > > timekeeping
+> > > > > purposes and if it fails to do so, it simply panics.
+> > > > > 
+> > > > > IMHO this solution is fine, because it's simple, has little
+> > > > > overhead
+> > > > > and
+> > > > > it just works in case of platforms for which it is needed.
+> > > > 
+> > > > Okay, I like simple. But I see too much potential for this to
+> > > > break
+> > > > in the future. There are just too many assumptions for my taste.
+> > > > It
+> > > > isn't anything that I'm looking forward to have to maintain.
+> > > 
+> > > Those are completely safe assumptions for existing platforms. Any
+> > > new
+> > > platform with the same PWM IP will use this driver exclusively,
+> > > without
+> > > the clocksource driver and so without the problems you mentioned.
+> > 
+> > Would you mind taking into account things I pointed in reply above?
+> 
+> I took those into account. But quite frankly they're no excuse for not
+> having at least a half-decent design. Even if you could guarantee that
+> the same IP wasn't used in a different combination than you expect,
+> keeping what you have now sets a very bad example and people will copy
+> because they don't know better and I'll have to explain this all over
+> again.
 
-On 13-06-24 03:30 PM, Paul Gortmaker wrote:
-> This is the whole patch queue for removal of __cpuinit support
-> against the latest linux-next tree (Jun24th).  Some of you may
-> have already seen chunks of it, or already read the logistics
-> of what is being done (and why) here:
-> 
->   https://lkml.org/lkml/2013/6/20/513
-> 
-> I won't repeat all that here again, other than to say this send
-> is to ensure arch/subsystem maintainers get a 2nd chance to know
-> what is going on and to look at what is being proposed for their
-> area of code.  That, and to ensure one complete continuous copy
-> of it gets mailed out.  You can also see the patch queue here:
-> 
->   http://git.kernel.org/cgit/linux/kernel/git/paulg/cpuinit-delete.git
-> 
-> If you've noticed that a chunk for MIPS isn't present here, that
-> is because it has already been queued in the linux-mips for-next
-> branch.
-> 
-> Thanks,
-> Paul.
-> 
-> ---
-> Cc: Len Brown <lenb@kernel.org>
-> Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
-> Cc: Richard Henderson <rth@twiddle.net>
-> Cc: Ivan Kokshaysky <ink@jurassic.park.msu.ru>
-> Cc: Matt Turner <mattst88@gmail.com>
-> Cc: Vineet Gupta <vgupta@synopsys.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mike Frysinger <vapier@gentoo.org>
-> Cc: Bob Liu <lliubbo@gmail.com>
-> Cc: Sonic Zhang <sonic.zhang@analog.com>
-> Cc: Jens Axboe <axboe@kernel.dk>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Mikael Starvik <starvik@axis.com>
-> Cc: Jesper Nilsson <jesper.nilsson@axis.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: David Howells <dhowells@redhat.com>
-> Cc: Richard Kuo <rkuo@codeaurora.org>
-> Cc: Fenghua Yu <fenghua.yu@intel.com>
-> Cc: Tony Luck <tony.luck@intel.com>
-> Cc: Fenghua Yu <fenghua.yu@intel.com>
-> Cc: Hirokazu Takata <takata@linux-m32r.org>
-> Cc: James Hogan <james.hogan@imgtec.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Rusty Russell <rusty@rustcorp.com.au>
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: Jonas Bonn <jonas@southpole.se>
-> Cc: Helge Deller <deller@gmx.de>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Josh Boyer <jwboyer@gmail.com>
-> Cc: Matt Porter <mporter@kernel.crashing.org>
-> Cc: Kumar Gala <galak@kernel.crashing.org>
-> Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-> Cc: Josh Triplett <josh@freedesktop.org>
-> Cc: Dipankar Sarma <dipankar@in.ibm.com>
-> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-> Cc: Chen Liqin <liqin.chen@sunplusct.com>
-> Cc: Lennox Wu <lennox.wu@gmail.com>
-> Cc: Paul Mundt <lethal@linux-sh.org>
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: Chris Metcalf <cmetcalf@tilera.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: "H. Peter Anvin" <hpa@zytor.com>
-> Cc: Chris Zankel <chris@zankel.net>
-> Cc: Max Filippov <jcmvbkbc@gmail.com>
-> Cc: linux-acpi at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: uclinux-dist-devel at blackfin.uclinux.org
-> Cc: cpufreq at vger.kernel.org
-> Cc: linux-pm at vger.kernel.org
-> Cc: linux-cris-kernel at axis.com
-> Cc: linux-hexagon at vger.kernel.org
-> Cc: lm-sensors at lm-sensors.org
-> Cc: linux-ia64 at vger.kernel.org
-> Cc: linux-m32r at ml.linux-m32r.org
-> Cc: linux-m32r-ja at ml.linux-m32r.org
-> Cc: netdev at vger.kernel.org
-> Cc: linux at lists.openrisc.net
-> Cc: linux-parisc at vger.kernel.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux390 at de.ibm.com
-> Cc: linux-s390 at vger.kernel.org
-> Cc: linux-sh at vger.kernel.org
-> Cc: sparclinux at vger.kernel.org
-> Cc: x86 at kernel.org
-> Cc: linux-xtensa at linux-xtensa.org
-> 
-> Paul Gortmaker (32):
->   init.h: remove __cpuinit sections from the kernel
->   modpost: remove all traces of cpuinit/cpuexit sections
->   alpha: delete __cpuinit usage from all users
->   powerpc: delete __cpuinit usage from all users
->   parisc: delete __cpuinit usage from all users
->   ia64: delete __cpuinit usage from all ia64 users
->   arm: delete __cpuinit/__CPUINIT usage from all ARM users
->   sparc: delete __cpuinit/__CPUINIT usage from all users
->   arm64: delete __cpuinit usage from all users
->   arc: delete __cpuinit usage from all arc files
->   blackfin: delete __cpuinit usage from all blackfin files
->   s390: delete __cpuinit usage from all s390 files
->   sh: delete __cpuinit usage from all sh files
->   tile: delete __cpuinit usage from all tile files
->   metag: delete __cpuinit usage from all metag files
->   cris: delete __cpuinit usage from all cris files
->   frv: delete __cpuinit usage from all frv files
->   hexagon: delete __cpuinit usage from all hexagon files
->   m32r: delete __cpuinit usage from all m32r files
->   openrisc: delete __cpuinit usage from all openrisc files
->   xtensa: delete __cpuinit usage from all xtensa files
->   score: delete __cpuinit usage from all score files
->   x86: delete __cpuinit usage from all x86 files
->   clocksource+irqchip: delete __cpuinit usage from all related files
->   cpufreq: delete __cpuinit usage from all cpufreq files
->   hwmon: delete __cpuinit usage from all hwmon files
->   acpi: delete __cpuinit usage from all acpi files
->   net: delete __cpuinit usage from all net files
->   rcu: delete __cpuinit usage from all rcu files
->   kernel: delete __cpuinit usage from all core kernel files
->   drivers: delete __cpuinit usage from all remaining drivers files
->   block: delete __cpuinit usage from all block files
-> 
->  Documentation/cpu-hotplug.txt                 |  6 +--
->  arch/alpha/kernel/smp.c                       | 10 ++---
->  arch/alpha/kernel/traps.c                     |  4 +-
->  arch/arc/include/asm/irq.h                    |  2 +-
->  arch/arc/kernel/irq.c                         |  2 +-
->  arch/arc/kernel/setup.c                       | 10 ++---
->  arch/arc/kernel/smp.c                         |  4 +-
->  arch/arc/kernel/time.c                        |  6 +--
->  arch/arc/mm/cache_arc700.c                    |  4 +-
->  arch/arc/mm/tlb.c                             |  4 +-
->  arch/arm/common/mcpm_platsmp.c                |  4 +-
->  arch/arm/include/asm/arch_timer.h             |  2 +-
->  arch/arm/kernel/head-common.S                 |  1 -
->  arch/arm/kernel/head.S                        |  1 -
->  arch/arm/kernel/hw_breakpoint.c               |  4 +-
->  arch/arm/kernel/perf_event_cpu.c              |  6 +--
->  arch/arm/kernel/psci_smp.c                    |  3 +-
->  arch/arm/kernel/smp.c                         | 18 ++++----
->  arch/arm/kernel/smp_twd.c                     |  6 +--
->  arch/arm/lib/delay.c                          |  2 +-
->  arch/arm/mach-exynos/headsmp.S                |  2 -
->  arch/arm/mach-exynos/platsmp.c                |  4 +-
->  arch/arm/mach-highbank/platsmp.c              |  2 +-
->  arch/arm/mach-imx/platsmp.c                   |  2 +-
->  arch/arm/mach-msm/headsmp.S                   |  2 -
->  arch/arm/mach-msm/platsmp.c                   |  6 +--
->  arch/arm/mach-msm/timer.c                     |  4 +-
->  arch/arm/mach-mvebu/coherency.c               |  2 +-
->  arch/arm/mach-mvebu/headsmp.S                 |  2 -
->  arch/arm/mach-mvebu/platsmp.c                 |  5 +--
->  arch/arm/mach-omap2/omap-headsmp.S            |  2 -
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c     |  2 +-
->  arch/arm/mach-omap2/omap-smp.c                |  4 +-
->  arch/arm/mach-omap2/omap-wakeupgen.c          |  4 +-
->  arch/arm/mach-prima2/headsmp.S                |  2 -
->  arch/arm/mach-prima2/platsmp.c                |  4 +-
->  arch/arm/mach-shmobile/headsmp-scu.S          |  1 -
->  arch/arm/mach-shmobile/headsmp.S              |  2 -
->  arch/arm/mach-shmobile/smp-emev2.c            |  2 +-
->  arch/arm/mach-shmobile/smp-r8a7779.c          |  2 +-
->  arch/arm/mach-shmobile/smp-sh73a0.c           |  2 +-
->  arch/arm/mach-socfpga/headsmp.S               |  1 -
->  arch/arm/mach-socfpga/platsmp.c               |  2 +-
->  arch/arm/mach-spear/generic.h                 |  2 +-
->  arch/arm/mach-spear/platsmp.c                 |  4 +-
->  arch/arm/mach-tegra/platsmp.c                 |  4 +-
->  arch/arm/mach-tegra/pm.c                      |  2 +-
->  arch/arm/mach-ux500/platsmp.c                 |  4 +-
->  arch/arm/mach-zynq/common.h                   |  2 +-
->  arch/arm/mach-zynq/headsmp.S                  |  2 -
->  arch/arm/mach-zynq/platsmp.c                  |  6 +--
->  arch/arm/mm/proc-arm1020.S                    |  2 -
->  arch/arm/mm/proc-arm1020e.S                   |  2 -
->  arch/arm/mm/proc-arm1022.S                    |  2 -
->  arch/arm/mm/proc-arm1026.S                    |  3 --
->  arch/arm/mm/proc-arm720.S                     |  2 -
->  arch/arm/mm/proc-arm740.S                     |  2 -
->  arch/arm/mm/proc-arm7tdmi.S                   |  2 -
->  arch/arm/mm/proc-arm920.S                     |  2 -
->  arch/arm/mm/proc-arm922.S                     |  2 -
->  arch/arm/mm/proc-arm925.S                     |  2 -
->  arch/arm/mm/proc-arm926.S                     |  2 -
->  arch/arm/mm/proc-arm940.S                     |  2 -
->  arch/arm/mm/proc-arm946.S                     |  2 -
->  arch/arm/mm/proc-arm9tdmi.S                   |  2 -
->  arch/arm/mm/proc-fa526.S                      |  2 -
->  arch/arm/mm/proc-feroceon.S                   |  2 -
->  arch/arm/mm/proc-mohawk.S                     |  2 -
->  arch/arm/mm/proc-sa110.S                      |  2 -
->  arch/arm/mm/proc-sa1100.S                     |  2 -
->  arch/arm/mm/proc-v6.S                         |  2 -
->  arch/arm/mm/proc-v7-2level.S                  |  4 --
->  arch/arm/mm/proc-v7-3level.S                  |  4 --
->  arch/arm/mm/proc-v7.S                         |  2 -
->  arch/arm/mm/proc-xsc3.S                       |  2 -
->  arch/arm/mm/proc-xscale.S                     |  2 -
->  arch/arm/plat-versatile/platsmp.c             |  6 +--
->  arch/arm64/include/asm/arch_timer.h           |  2 +-
->  arch/arm64/kernel/debug-monitors.c            |  6 +--
->  arch/arm64/kernel/hw_breakpoint.c             |  4 +-
->  arch/arm64/kernel/smp.c                       |  8 ++--
->  arch/blackfin/kernel/perf_event.c             |  2 +-
->  arch/blackfin/kernel/setup.c                  |  4 +-
->  arch/blackfin/mach-bf561/smp.c                |  6 +--
->  arch/blackfin/mach-common/cache-c.c           |  4 +-
->  arch/blackfin/mach-common/ints-priority.c     |  2 +-
->  arch/blackfin/mach-common/smp.c               |  8 ++--
->  arch/cris/arch-v32/kernel/smp.c               |  2 +-
->  arch/frv/kernel/setup.c                       |  2 +-
->  arch/hexagon/kernel/setup.c                   |  2 +-
->  arch/hexagon/kernel/smp.c                     |  4 +-
->  arch/ia64/kernel/acpi.c                       |  4 +-
->  arch/ia64/kernel/err_inject.c                 |  8 ++--
->  arch/ia64/kernel/mca.c                        | 12 ++---
->  arch/ia64/kernel/numa.c                       |  4 +-
->  arch/ia64/kernel/palinfo.c                    |  4 +-
->  arch/ia64/kernel/salinfo.c                    |  4 +-
->  arch/ia64/kernel/setup.c                      | 10 ++---
->  arch/ia64/kernel/smpboot.c                    |  8 ++--
->  arch/ia64/kernel/topology.c                   | 18 ++++----
->  arch/ia64/mm/contig.c                         |  3 +-
->  arch/ia64/mm/discontig.c                      |  2 +-
->  arch/ia64/mm/numa.c                           |  2 +-
->  arch/ia64/sn/kernel/setup.c                   |  8 ++--
->  arch/ia64/xen/hypervisor.c                    |  2 +-
->  arch/m32r/kernel/smpboot.c                    |  2 +-
->  arch/metag/kernel/perf/perf_event.c           |  6 +--
->  arch/metag/kernel/smp.c                       | 16 +++----
->  arch/metag/kernel/traps.c                     |  2 +-
->  arch/openrisc/kernel/setup.c                  |  2 +-
->  arch/parisc/kernel/firmware.c                 | 14 +++---
->  arch/parisc/kernel/hardware.c                 |  2 +-
->  arch/parisc/kernel/processor.c                |  6 +--
->  arch/parisc/kernel/smp.c                      |  8 ++--
->  arch/powerpc/include/asm/rtas.h               |  4 +-
->  arch/powerpc/include/asm/vdso.h               |  2 +-
->  arch/powerpc/kernel/cacheinfo.c               | 36 ++++++++-------
->  arch/powerpc/kernel/rtas.c                    |  4 +-
->  arch/powerpc/kernel/smp.c                     |  4 +-
->  arch/powerpc/kernel/sysfs.c                   |  6 +--
->  arch/powerpc/kernel/time.c                    |  1 -
->  arch/powerpc/kernel/vdso.c                    |  2 +-
->  arch/powerpc/mm/44x_mmu.c                     |  6 +--
->  arch/powerpc/mm/hash_utils_64.c               |  2 +-
->  arch/powerpc/mm/mmu_context_nohash.c          |  6 +--
->  arch/powerpc/mm/numa.c                        |  7 ++-
->  arch/powerpc/mm/tlb_nohash.c                  |  2 +-
->  arch/powerpc/perf/core-book3s.c               |  4 +-
->  arch/powerpc/platforms/44x/currituck.c        |  4 +-
->  arch/powerpc/platforms/44x/iss4xx.c           |  4 +-
->  arch/powerpc/platforms/85xx/smp.c             |  6 +--
->  arch/powerpc/platforms/powermac/smp.c         |  2 +-
->  arch/powerpc/platforms/powernv/smp.c          |  2 +-
->  arch/s390/kernel/cache.c                      | 15 +++----
->  arch/s390/kernel/perf_cpum_cf.c               |  4 +-
->  arch/s390/kernel/processor.c                  |  2 +-
->  arch/s390/kernel/smp.c                        | 17 ++++---
->  arch/s390/kernel/sysinfo.c                    |  2 +-
->  arch/s390/kernel/vtime.c                      |  6 +--
->  arch/s390/mm/fault.c                          |  4 +-
->  arch/score/mm/tlb-score.c                     |  2 +-
->  arch/sh/kernel/cpu/init.c                     | 18 ++++----
->  arch/sh/kernel/cpu/sh2/probe.c                |  2 +-
->  arch/sh/kernel/cpu/sh2a/probe.c               |  2 +-
->  arch/sh/kernel/cpu/sh3/probe.c                |  2 +-
->  arch/sh/kernel/cpu/sh4/probe.c                |  2 +-
->  arch/sh/kernel/cpu/sh4a/smp-shx3.c            |  6 +--
->  arch/sh/kernel/cpu/sh5/probe.c                |  2 +-
->  arch/sh/kernel/perf_event.c                   |  4 +-
->  arch/sh/kernel/process.c                      |  2 +-
->  arch/sh/kernel/setup.c                        |  2 +-
->  arch/sh/kernel/smp.c                          |  8 ++--
->  arch/sh/kernel/traps_32.c                     |  2 +-
->  arch/sh/kernel/traps_64.c                     |  2 +-
->  arch/sh/mm/tlb-sh5.c                          |  2 +-
->  arch/sparc/kernel/ds.c                        | 11 ++---
->  arch/sparc/kernel/entry.h                     |  2 +-
->  arch/sparc/kernel/hvtramp.S                   |  1 -
->  arch/sparc/kernel/irq_64.c                    |  5 ++-
->  arch/sparc/kernel/leon_smp.c                  | 10 ++---
->  arch/sparc/kernel/mdesc.c                     | 34 +++++++-------
->  arch/sparc/kernel/smp_32.c                    | 20 ++++-----
->  arch/sparc/kernel/smp_64.c                    |  9 ++--
->  arch/sparc/kernel/sun4d_smp.c                 |  6 +--
->  arch/sparc/kernel/sun4m_smp.c                 |  6 +--
->  arch/sparc/kernel/sysfs.c                     |  4 +-
->  arch/sparc/kernel/trampoline_32.S             |  3 --
->  arch/sparc/kernel/trampoline_64.S             |  2 -
->  arch/sparc/mm/init_64.c                       |  2 +-
->  arch/sparc/mm/srmmu.c                         | 12 ++---
->  arch/tile/kernel/irq.c                        |  2 +-
->  arch/tile/kernel/messaging.c                  |  2 +-
->  arch/tile/kernel/setup.c                      | 12 ++---
->  arch/tile/kernel/smpboot.c                    |  8 ++--
->  arch/tile/kernel/time.c                       |  2 +-
->  arch/x86/include/asm/cpu.h                    |  2 +-
->  arch/x86/include/asm/microcode.h              |  4 +-
->  arch/x86/include/asm/microcode_intel.h        |  4 +-
->  arch/x86/include/asm/mmconfig.h               |  4 +-
->  arch/x86/include/asm/mpspec.h                 |  2 +-
->  arch/x86/include/asm/numa.h                   |  6 +--
->  arch/x86/include/asm/prom.h                   |  2 +-
->  arch/x86/include/asm/smp.h                    |  2 +-
->  arch/x86/kernel/acpi/boot.c                   |  6 +--
->  arch/x86/kernel/apic/apic.c                   | 30 ++++++-------
->  arch/x86/kernel/apic/apic_numachip.c          |  2 +-
->  arch/x86/kernel/apic/es7000_32.c              |  2 +-
->  arch/x86/kernel/apic/numaq_32.c               |  2 +-
->  arch/x86/kernel/apic/x2apic_cluster.c         |  2 +-
->  arch/x86/kernel/apic/x2apic_uv_x.c            | 14 +++---
->  arch/x86/kernel/cpu/amd.c                     | 33 +++++++-------
->  arch/x86/kernel/cpu/centaur.c                 | 26 +++++------
->  arch/x86/kernel/cpu/common.c                  | 64 +++++++++++++--------------
->  arch/x86/kernel/cpu/cyrix.c                   | 40 ++++++++---------
->  arch/x86/kernel/cpu/hypervisor.c              |  2 +-
->  arch/x86/kernel/cpu/intel.c                   | 30 ++++++-------
->  arch/x86/kernel/cpu/intel_cacheinfo.c         | 55 +++++++++++------------
->  arch/x86/kernel/cpu/mcheck/mce.c              | 23 +++++-----
->  arch/x86/kernel/cpu/mcheck/mce_amd.c          | 14 +++---
->  arch/x86/kernel/cpu/mcheck/therm_throt.c      |  9 ++--
->  arch/x86/kernel/cpu/perf_event.c              |  2 +-
->  arch/x86/kernel/cpu/perf_event_amd_ibs.c      |  2 +-
->  arch/x86/kernel/cpu/perf_event_amd_uncore.c   | 31 +++++++------
->  arch/x86/kernel/cpu/perf_event_intel_uncore.c | 20 ++++-----
->  arch/x86/kernel/cpu/rdrand.c                  |  2 +-
->  arch/x86/kernel/cpu/scattered.c               |  4 +-
->  arch/x86/kernel/cpu/topology.c                |  2 +-
->  arch/x86/kernel/cpu/transmeta.c               |  6 +--
->  arch/x86/kernel/cpu/umc.c                     |  2 +-
->  arch/x86/kernel/cpu/vmware.c                  |  2 +-
->  arch/x86/kernel/cpuid.c                       |  7 ++-
->  arch/x86/kernel/devicetree.c                  |  2 +-
->  arch/x86/kernel/head_32.S                     |  1 -
->  arch/x86/kernel/i387.c                        |  8 ++--
->  arch/x86/kernel/irq_32.c                      |  2 +-
->  arch/x86/kernel/kvm.c                         | 10 ++---
->  arch/x86/kernel/kvmclock.c                    |  2 +-
->  arch/x86/kernel/microcode_core.c              |  2 +-
->  arch/x86/kernel/microcode_core_early.c        |  6 +--
->  arch/x86/kernel/microcode_intel_early.c       | 26 +++++------
->  arch/x86/kernel/mmconf-fam10h_64.c            | 12 ++---
->  arch/x86/kernel/msr.c                         |  6 +--
->  arch/x86/kernel/process.c                     |  2 +-
->  arch/x86/kernel/setup.c                       |  2 +-
->  arch/x86/kernel/smpboot.c                     | 28 ++++++------
->  arch/x86/kernel/tboot.c                       |  6 +--
->  arch/x86/kernel/tsc.c                         |  4 +-
->  arch/x86/kernel/tsc_sync.c                    | 18 ++++----
->  arch/x86/kernel/vsyscall_64.c                 |  6 +--
->  arch/x86/kernel/x86_init.c                    |  4 +-
->  arch/x86/kernel/xsave.c                       |  4 +-
->  arch/x86/mm/mmio-mod.c                        |  4 +-
->  arch/x86/mm/numa.c                            | 12 ++---
->  arch/x86/mm/numa_emulation.c                  | 12 ++---
->  arch/x86/mm/setup_nx.c                        |  4 +-
->  arch/x86/pci/amd_bus.c                        |  8 ++--
->  arch/x86/platform/ce4100/ce4100.c             |  2 +-
->  arch/x86/platform/mrst/mrst.c                 |  4 +-
->  arch/x86/xen/enlighten.c                      |  6 +--
->  arch/x86/xen/setup.c                          |  6 +--
->  arch/x86/xen/smp.c                            | 12 ++---
->  arch/x86/xen/spinlock.c                       |  2 +-
->  arch/x86/xen/xen-ops.h                        |  2 +-
->  arch/xtensa/kernel/time.c                     |  2 +-
->  block/blk-iopoll.c                            |  6 +--
->  block/blk-softirq.c                           |  6 +--
->  drivers/acpi/acpi_processor.c                 |  2 +-
->  drivers/acpi/processor_core.c                 |  8 ++--
->  drivers/acpi/processor_driver.c               |  8 ++--
->  drivers/acpi/processor_idle.c                 |  6 +--
->  drivers/base/cpu.c                            |  2 +-
->  drivers/base/topology.c                       | 10 ++---
->  drivers/clocksource/arm_arch_timer.c          |  8 ++--
->  drivers/clocksource/exynos_mct.c              |  4 +-
->  drivers/clocksource/metag_generic.c           |  6 +--
->  drivers/clocksource/time-armada-370-xp.c      |  4 +-
->  drivers/clocksource/timer-marco.c             |  4 +-
->  drivers/cpufreq/cpufreq.c                     |  4 +-
->  drivers/cpufreq/cpufreq_stats.c               |  4 +-
->  drivers/cpufreq/dbx500-cpufreq.c              |  2 +-
->  drivers/cpufreq/intel_pstate.c                |  4 +-
->  drivers/cpufreq/longhaul.c                    |  6 +--
->  drivers/cpufreq/longhaul.h                    | 26 +++++------
->  drivers/cpufreq/longrun.c                     |  8 ++--
->  drivers/cpufreq/omap-cpufreq.c                |  2 +-
->  drivers/cpufreq/powernow-k7.c                 |  8 ++--
->  drivers/cpufreq/powernow-k8.c                 |  6 +--
->  drivers/hwmon/coretemp.c                      | 39 ++++++++--------
->  drivers/hwmon/via-cputemp.c                   |  8 ++--
->  drivers/irqchip/irq-gic.c                     |  8 ++--
->  drivers/oprofile/timer_int.c                  |  4 +-
->  drivers/xen/xen-acpi-cpuhotplug.c             |  2 +-
->  include/asm-generic/vmlinux.lds.h             | 12 -----
->  include/linux/cpu.h                           |  2 +-
->  include/linux/init.h                          | 19 ++++----
->  include/linux/perf_event.h                    |  2 +-
->  init/calibrate.c                              | 13 +++---
->  kernel/cpu.c                                  |  6 +--
->  kernel/events/core.c                          |  4 +-
->  kernel/fork.c                                 |  2 +-
->  kernel/hrtimer.c                              |  6 +--
->  kernel/printk.c                               |  2 +-
->  kernel/profile.c                              |  2 +-
->  kernel/rcutorture.c                           |  6 +--
->  kernel/rcutree.c                              |  6 +--
->  kernel/rcutree.h                              |  4 +-
->  kernel/rcutree_plugin.h                       |  6 +--
->  kernel/relay.c                                |  2 +-
->  kernel/sched/core.c                           | 12 ++---
->  kernel/sched/fair.c                           |  2 +-
->  kernel/smp.c                                  |  2 +-
->  kernel/smpboot.c                              |  2 +-
->  kernel/softirq.c                              |  8 ++--
->  kernel/time/tick-sched.c                      |  2 +-
->  kernel/timer.c                                | 10 ++---
->  kernel/workqueue.c                            |  4 +-
->  lib/Kconfig.debug                             |  2 +-
->  lib/earlycpio.c                               |  2 +-
->  lib/percpu_counter.c                          |  2 +-
->  mm/memcontrol.c                               |  2 +-
->  mm/page-writeback.c                           |  4 +-
->  mm/slab.c                                     | 10 ++---
->  mm/slub.c                                     |  4 +-
->  mm/vmstat.c                                   |  6 +--
->  net/core/flow.c                               |  4 +-
->  net/iucv/iucv.c                               |  2 +-
->  scripts/mod/modpost.c                         | 52 ++++------------------
->  307 files changed, 896 insertions(+), 1037 deletions(-)
-> 
+OK. So we just need to prevent people from blindly copying this.
+
+Wouldn't adding a big comment about why this is enough for this platform 
+and why anything more sophisticated would be just overengineering in this 
+case be enough?
+
+As you could see in several versions of the series I linked in my previous 
+replies, anything that looked decently simply added a lot of glue code and 
+cross module dependencies without serving any useful purpose, other than 
+just looking good.
+
+This driver is already a lot better than previous one, because as opposed 
+to the old one, it gives synchronization that is technically correct. Not 
+even saying about a lot of other things fixed, like multiplatform-
+awareness, OF support, coding style, proper handling of dividers, etc., 
+etc. It would be really bad if all this was put to waste...
+
+Best regards,
+Tomasz
