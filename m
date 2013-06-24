@@ -1,53 +1,25 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 24 Jun 2013 13:05:16 +0200 (CEST)
-Subject: [PATCH v2 3/4] ARM: shmobile: ape6evm: add CPUFreq support
-Message-ID: <Pine.LNX.4.64.1306241257190.19735@axis700.grange>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 24 Jun 2013 16:40:27 +0530
+Subject: [GIT PULL] ARM: CPUFreq updates for 3.11
+In-Reply-To: <7195611.gCcafMWC85@vostro.rjw.lan>
+References: <CAKohpo=v4qPDH32Y4ithr_p007nTn5AOUzkUCiHTGgQN6-=BEw@mail.gmail.com>
+ <1524748.bV9OZAOR0D@vostro.rjw.lan>
+ <CAKohpomThmZFKTufBzWpmokqqZJ8C6DtGTKTzBY=OxJPNT-BmA@mail.gmail.com>
+ <7195611.gCcafMWC85@vostro.rjw.lan>
+Message-ID: <CAKohpomdnEgDcAExoyN1b4vohHNEg3NDH1mM8NWG8gQoPvff+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds OPPs to the CA15 DT node and a max8973 DT node to support
-clock and voltage scaling, using the cpufreq-cpu0 CPUFreq driver.
+On 24 June 2013 16:29, Rafael J. Wysocki <rjw@sisk.pl> wrote:
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
----
+> In your original series that patch was the last one.  What made you change your
+> mind and put it in front?
 
-v2: Subject to Mark acking v2 of my max8973 DT patch, this should be the 
-updated version of my original ape6evm CPUFreq patch. This version puts 
-all max8973 regulator bindings directly under the respective I2C device 
-node instead of creating 2 additional levels.
+I initially thought that this one would break git bisect (code would
+compile, but would fail) for platforms whose code I have fixed in
+this patchset.
 
- arch/arm/boot/dts/r8a73a4-ape6evm.dts |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
+But that is true only for failure cases, otherwise code would work as
+normal.
 
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-index 4fb0102..27c5e06 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-@@ -52,3 +52,25 @@
- 		};
- 	};
- };
-+
-+&i2c5 {
-+	vdd_dvfs: max8973 at 1b {
-+		compatible = "maxium,max8973";
-+		reg = <0x1b>;
-+
-+		regulator-min-microvolt = <935000>;
-+		regulator-max-microvolt = <1200000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+};
-+
-+&cpu0 {
-+	cpu0-supply = <&vdd_dvfs>;
-+	operating-points = <
-+		/* kHz  uV */
-+		1950000 1115000
-+		1462500  995000
-+	>;
-+	voltage-tolerance = <1>; /* 1% */
-+};
--- 
-1.7.2.5
+And hence kept this at the top this time.
