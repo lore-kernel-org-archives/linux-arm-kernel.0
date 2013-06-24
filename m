@@ -1,36 +1,50 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 24 Jun 2013 20:19:06 +0530
-Subject: [PATCH] ARM: multi_v7: Add OMAP with ramdisk config bits
-In-Reply-To: <51C858B4.2020106@ti.com>
-References: <1371071282-14750-1-git-send-email-santosh.shilimkar@ti.com>
- <20130618082422.GE5523@atomide.com> <51C07253.3040909@ti.com>
- <51C858B4.2020106@ti.com>
-Message-ID: <51C85C62.5030709@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Jun 2013 16:54:02 +0200
+Subject: [GIT PULL] DaVinci SoC updates for v3.11 (part 2)
+In-Reply-To: <51C85BBD.1080002@ti.com>
+References: <51C85ABE.6020505@ti.com> <51C85BBD.1080002@ti.com>
+Message-ID: <2995587.jVmYWMG6GW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 June 2013 08:03 PM, Sricharan R wrote:
-> Hi,
-> On Tuesday 18 June 2013 08:14 PM, Santosh Shilimkar wrote:
->> On Tuesday 18 June 2013 04:24 AM, Tony Lindgren wrote:
->>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130612 14:14]:
->>>> Add ramdisk fileystem related options which lets OMAP5 and Keystone
->>>> SOCs to boot till shell with multi_v7_config.
->>> Please add also other v7 omaps.
->>>
->> Should have done first place. Sorry.
->> Will update other machines and after testing, repost it.
->>
->> Regards,
->> Santosh
->>
->  Since CONFIG_ARCH_OMAP2PLUS=y is set in the patch,
->  OMAP3, OMAP4 are getting enabled by default.
->
->  I tested OMAP4 PANDA on mainline + multi_v7_config + above patch
->  and it booted up fine.
-  Also tested on OMAP3 beagle-xm and beagle-bone black (am335x-bone.dtb)
-  and booted up fine.
+On Monday 24 June 2013 20:16:21 Sekhar Nori wrote:
+> replying to own with address of DaVinci kernel list fixed.
+> 
+> On 6/24/2013 8:12 PM, Sekhar Nori wrote:
+> > Hi Arnd, Olof,
+> > 
+> > Can you please pull the following EDMA related updates for v3.11?
+> > There is a small change to drivers/dma/Kconfig that would have liked 
+> > Vinod's ack, but the change is pretty trivial and the patches have
+> > been out there for pretty long now.
+> > 
+> > Thanks,
+> > Sekhar
+> > 
+> > The following changes since commit 7bb5d75ce91ca3725256c0d502624ed697231cde:
+> > 
+> >   ARM: edma: remove unused transfer controller handlers (2013-06-18 10:53:13 +0530)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.11/soc-2
+> > 
+> > for you to fetch changes up to e65abbbc5279319ab679298f8740ddf53e022a5e:
+> > 
+> >   dmaengine: edma: enable build for AM33XX (2013-06-24 15:55:08 +0530)
+> > 
+> > ----------------------------------------------------------------
+> > DaVinci SoC updates for v3.11 - part 2
+> > --------------------------------------
+> > 
+> > This pull request adds DT and runtime PM to
+> > EDMA ARM private API so it can be used on
+> > DT enabled DaVinci and OMAP platforms.
+> > 
+> > Also adds DMA channel crossbar mapping
+> > support to be used by DT-enabled platforms
+> > which use it.
 
-Regards,
- Sricharan
+Pulled into next/soc, thanks!
+
+	Arnd
