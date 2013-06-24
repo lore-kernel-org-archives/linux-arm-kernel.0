@@ -1,36 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Jun 2013 13:49:54 +0200
-Subject: [PATCH] dmaengine: ste_dma40: Declare memcpy config as static
-In-Reply-To: <20130621073301.GA19353@balto.lan>
-References: <1371719859-4600-1-git-send-email-fabio.baltieri@linaro.org>
- <20130621031000.GB23141@intel.com>
- <20130621073301.GA19353@balto.lan>
-Message-ID: <CACRpkdYRqY9yRutfwgEaRAUGiwV38fs=EVpSP1As8OB0piERiQ@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 24 Jun 2013 15:49:53 +0400
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCB2MyA1LzVdIGRyaXZlcnM6IGJ1czogaW14LXdlaW06?=
+ =?UTF-8?B?IEFkZCBzdXBwb3J0IGZvciBpLk1YMS8yMS8yNS8yNy8zMS8zNS81MC81MS81?=
+ =?UTF-8?B?Mw==?=
+In-Reply-To: <20130624113544.GA30747@S2101-09.ap.freescale.net>
+References: <1371973698-16150-1-git-send-email-shc_work@mail.ru>
+ <1371973698-16150-5-git-send-email-shc_work@mail.ru>
+ <20130624113544.GA30747@S2101-09.ap.freescale.net>
+Message-ID: <1372074593.303395301@f394.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 9:33 AM, Fabio Baltieri
-<fabio.baltieri@linaro.org> wrote:
-> On Fri, Jun 21, 2013 at 08:40:00AM +0530, Vinod Koul wrote:
->> On Thu, Jun 20, 2013 at 11:17:39AM +0200, Fabio Baltieri wrote:
->> > Fix sparse warnings:
->> >
->> > drivers/dma/ste_dma40.c:81:26: warning: symbol 'dma40_memcpy_conf_phy' was not declared. Should it be static?
->> > drivers/dma/ste_dma40.c:95:26: warning: symbol 'dma40_memcpy_conf_log' was not declared. Should it be static?
->> >
->> > Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
->> Acked-by: Vinod Koul <vinod.koul@intel.com>
->>
->> I guess this would be dependent on recent ste_dma40 patches so best way is
->> Linus's tree, right?
->
-> Yes, but I'm not sure Linus is going to send a third pull request for
-> dma40 so maybe I should just resend my last two dma40 patches for
-> arm-soc directly.
 
-I've stacked it in my tree, I didn't plan to send another pull
-request but I guess I have to, or I'll send it as fixes, so I'm
-taking care of this.
+> On Sun, Jun 23, 2013 at 11:48:18AM +0400, Alexander Shiyan wrote:
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> 
+> Can you write up something for the commit log?  Leaving it empty for
+> such a patch with tens of LOC is not a nice thing.
 
-Yours,
-Linus Walleij
+OK.
+
+...
+> > @@ -81,6 +118,9 @@ static int __init weim_probe(struct platform_device *pdev)
+> >  	void __iomem *base;
+> >  	int ret;
+> >  
+> > +	if (!pdev->dev.of_node)
+> > +		return -ENOTSUPP;
+> > +
+> Is it really necessary?  Since we only support DT probe, we can not
+> reach here if the of_node is NULL.
+
+In fact, nothing prevents to add to the board file line like
+platform_device_register_simple ("imx-weim", 0, res, res_cnt);
+In this case, the core will crush. I make it impossible to use.
+Consider it unnecessary checks?
+Thanks!
+
+---
