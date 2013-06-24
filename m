@@ -1,28 +1,28 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 24 Jun 2013 20:22:54 +0530
-Subject: [PATCH 3/3] ARM: davinci: da850: adopt to pinctrl-single driver
- to configure multiple pins
-In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3EA911E0@DBDE04.ent.ti.com>
-References: <1369145282-14419-1-git-send-email-prakash.pm@ti.com>
- <1369145282-14419-5-git-send-email-prakash.pm@ti.com>
- <A73F36158E33644199EB82C5EC81C7BC3EA911E0@DBDE04.ent.ti.com>
-Message-ID: <51C85D46.3040209@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Jun 2013 15:53:03 +0100
+Subject: [PATCH] ARM: Add support for LPAE style CONTEXTIDR
+In-Reply-To: <51C85A0D.3070400@codeaurora.org>
+References: <1372080405-13365-1-git-send-email-cov@codeaurora.org>
+ <20130624140424.GA24861@mudshark.cambridge.arm.com>
+ <51C85A0D.3070400@codeaurora.org>
+Message-ID: <20130624145303.GA25582@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/24/2013 5:18 PM, Manjunathappa, Prakash wrote:
-> Hi Sekhar,
+On Mon, Jun 24, 2013 at 03:39:09PM +0100, Christopher Covington wrote:
+> Hi Will,
 > 
-> On Tue, May 21, 2013 at 19:38:02, Manjunathappa, Prakash wrote:
->> function-mask property is a mask for a pin at each pin configure offset
->> in a pincontrol register.
->>
+> On 06/24/2013 10:04 AM, Will Deacon wrote:
+> [...]
 > 
-> Got 1/3 and 2/3 accepted, I do not know if this gets merged via DaVinci tree or
-> pincontrol tree. Could you please takecare of this?
+> > What's the advantage of this approach, other than you get an extra byte's
+> > worth of PID?
+> 
+> In my view, the real advantage is that the the PID is located where people
+> reading ARM Architecture Reference Manual are told they can find it.
 
-I will send this via DaVinci tree. I had actually missed that there is a
-bit waiting for me here. So thanks for asking.
+Perhaps, but I'd usually expect a debugger or trace tools to do something
+with the PID, and they likely expect it to be shifted, so you can't really
+win.
 
-Regards,
-Sekhar
+Will
