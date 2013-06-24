@@ -1,68 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 24 Jun 2013 14:22:00 +0800
-Subject: [PATCH v3] thermal: add imx thermal driver support
-In-Reply-To: <51C48342.2060303@ti.com>
-References: <1371816567-22821-1-git-send-email-shawn.guo@linaro.org>
- <51C48342.2060303@ti.com>
-Message-ID: <20130624062158.GA26254@S2101-09.ap.freescale.net>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 24 Jun 2013 11:43:58 +0530
+Subject: [PATCH 1/1] ARM: EXYNOS: Update CONFIG_ARCH_NR_GPIO for Exynos
+Message-ID: <1372054438-15693-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 12:45:54PM -0400, Eduardo Valentin wrote:
-> > +struct imx_thermal_data {
-> > +	struct thermal_zone_device *tz;
-> > +	struct thermal_cooling_device *cdev;
-> > +	enum thermal_device_mode mode;
-> > +	struct regmap *tempmon;
-> > +	int c1, c2; /* See forumla in imx_get_sensor_data() */
-> 
-> s/forumla/formula/g (there are more occurrences of same typo)
-> 
-Thanks for spotting it.
+With the recent cleanup in Exynos platform code notably commits
+17859bec ("ARM: EXYNOS: Do not select legacy Kconfig symbols any
+more") and b9222210 ("ARM: EXYNOS: Remove mach/gpio.h"), the definition
+of ARCH_NR_GPIOS got removed. This started causing problems on SoCs like
+Exynos4412 which have more (285) than the default number of GPIOs (255).
+Thus define this number in Kconfig file. Without this patch we get the
+following errors during boot:
 
-<snip>
+gpiochip_add: gpios 251..258 (gpv0) failed to register
+samsung-pinctrl 106e0000.pinctrl: failed to register gpio_chip gpv0,
+error code: -22
+samsung-pinctrl: probe of 106e0000.pinctrl failed with error -22
 
-> > +static int imx_bind(struct thermal_zone_device *tz,
-> > +		    struct thermal_cooling_device *cdev)
-> > +{
-> > +	int ret;
-> > +
-> > +	ret = thermal_zone_bind_cooling_device(tz, IMX_TRIP_PASSIVE, cdev,
-> > +					       THERMAL_NO_LIMIT,
-> > +					       THERMAL_NO_LIMIT);
-> 
-> Remember that if you ever add another cdev in your system, you will be
-> blindly bind it to your tz.
-> 
-Yes.  If someday we add another cooling device, we need a little surgery
-on the driver anyway.
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+Cc: Tomasz Figa <t.figa@samsung.com>
+---
+Based on Kukjin's for-next tree.
+---
+ arch/arm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-<snip>
-
-> > +	/*
-> > +	 * Sensor data layout:
-> > +	 *   [31:20] - sensor value @ 25C
-> > +	 *    [19:8] - sensor value of hot
-> > +	 *     [7:0] - hot temperature value
-> > +	 */
-> > +	n1 = val >> 20;
-> > +	n2 = (val & 0xfff00) >> 8;
-> > +	t2 = val & 0xff;
-> > +	t1 = 25; /* t1 always 25C */
-> 
-> don't the above constants deserve #define macros?
-> 
-Hmm, with the constants being used only once here and the comment put
-right above the code, I think we're fine.
-
-<snip>
-
-> > +MODULE_AUTHOR("Freescale Semiconductor, Inc.");
-> > +MODULE_DESCRIPTION("Thermal driver for Freescale i.MX SoCs");
-> > +MODULE_LICENSE("GPL");
-> 
-> GPLv2, accordingly to your header.
-> 
-Okay, will change it.
-
-Shawn
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ddf2667..380a53b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1578,6 +1578,7 @@ config ARCH_NR_GPIO
+ 	default 512 if SOC_OMAP5
+ 	default 392 if ARCH_U8500
+ 	default 352 if ARCH_VT8500
++	default 288 if ARCH_EXYNOS
+ 	default 288 if ARCH_SUNXI
+ 	default 264 if MACH_H4700
+ 	default 0
+-- 
+1.7.9.5
