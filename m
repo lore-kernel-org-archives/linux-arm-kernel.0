@@ -1,69 +1,88 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 24 Jun 2013 11:54:51 +0200
-Subject: [PATCH v3 4/4] ARM: dts: mvebu: Introduce a new compatible string
- for mv64xxx-i2c
-In-Reply-To: <51C5CD57.6040200@gmail.com>
-References: <1371821529-13791-1-git-send-email-gregory.clement@free-electrons.com>
- <1371821529-13791-5-git-send-email-gregory.clement@free-electrons.com>
- <20130621140707.GO31667@titan.lakedaemon.net> <51C46001.30500@gmail.com>
- <20130621171836.GC10905@obsidianresearch.com> <51C5CD57.6040200@gmail.com>
-Message-ID: <51C8176B.4000807@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 24 Jun 2013 02:58:15 -0700
+Subject: [PATCH] ARM: omap: make am43xx build with SMP enabled
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EB2495F@DBDE04.ent.ti.com>
+References: <201306220122.47786.arnd@arndb.de>
+ <C8443D0743D26F4388EA172BF4E2A7A93EB2495F@DBDE04.ent.ti.com>
+Message-ID: <20130624095814.GS5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/22/2013 06:14 PM, Sebastian Hesselbarth wrote:
-> On 06/21/2013 07:18 PM, Jason Gunthorpe wrote:
->> On Fri, Jun 21, 2013 at 04:15:29PM +0200, Sebastian Hesselbarth wrote:
->>> from a quick check of the patch set (which you forgot to send to LKML)
->>> I am wondering why you didn't update the of matches struct with the new
->>> compatible for "marvell,mv78230-i2c"? This will save you from still
->>> having "marvell,mv64xxx-i2c" as additional compatible to match device
->>> and driver. With that the above should also be s/and/or/.
->>
->> Agree, I noticed the same things.
->>
->> Alos, the compatible string should be:
->>
->>    compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
->>
->> (note the order reversal, most specific is first)
+* Mohammed, Afzal <afzal@ti.com> [130624 01:19]:
+> Hi Arnd, Tony,
 > 
-> Actually, I suggest to use "marvell,mv78230-i2c" alone. With a new
-> entry in the match table it will be sufficient for matching driver and
-
-I would prefer using a specialization rather than a new entry, so I can just
-use the "marvell,mv64xxx-i2c" entry for the data pointer .
-
-> device. BTW, is mv78230 sufficient to match all SoC variants having
-> this feature? Maybe mv78xx0 but that could interfere with Discovery
-> Innovation or even better armada-xp-i2c (or armada-370-i2c)?
-
-I am pretty sure that the convention in the device tree is to always use
-specific product numbers, rather than wildcards. So, here, the choice of
-mv78230 was just that we can see the mv78260 and mv78460 as extension of
-the mv78230, so I chose the smallest common denominator.
-
+> On Sat, Jun 22, 2013 at 04:52:47, Arnd Bergmann wrote:
+> > With am43xx enabled, omap4 and omap5 disabled and SMP on, I get these
+> > build errors:
 > 
->> and I think it is better to use the 'data' field of of_device_id than
->> a of_is_compatible call. The former is sensitive to order of the
->> compatible string, the latter is not.
+> Getting AM43x only build with OMAP4/5 disabled was really difficult
+> with original series itself, I thought finally had got a right
+> Makefile change handling SMP combinations too, but still :(, my brain
+> was not big enough to think of multiplatform case :)
 > 
-> IMHO as long as there is only one compatible and only a bool to set,
-> using of_device_is_compatible without data pointer is fine here.
-> IIRC sunxi i2c isn't using data pointer the different register offset
-> struct, so we shouldn't for a simple bool. And casting a bool to
-> (void *) looks awkward.
+> Thanks Arnd for the patch.
 > 
-> Sebastian
+> > arch/arm/mach-omap2/built-in.o: In function `scu_gp_set':
+> > :(.text+0x7858): undefined reference to `omap4_get_scu_base'
+> > arch/arm/mach-omap2/built-in.o: In function `scu_gp_clear':
+> > :(.text+0x793c): undefined reference to `omap4_get_scu_base'
+> > arch/arm/mach-omap2/built-in.o: In function `omap4_cpu_die':
+> > :(.ref.text+0x44): undefined reference to `omap4_hotplug_cpu'
+> > 
+> > The easiest way to work around that is to turn on the missing
+> > functions, even though we know they won't be used on am43xx,
+> > which is single-CPU.
+> 
+> This change was giving errors mainly due to unavailable omap4 prcm
+> functions required by "omap-mpuss-lowpower.c"
+> 
+> How about the below patch - we don't need to include additional
+> files with it, or something wrong with it ?
+
+This too looks OK to me, sounds like you'll need a separate
+sleep code anyways. It's probably best that Arnd applies this
+directly:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+
+> ---8<------
+> 
+> From: Afzal Mohammed <afzal@ti.com>
+> Date: Mon, 24 Jun 2013 12:41:05 +0530
+> Subject: [PATCH] ARM: OMAP2+: AM43x: resolve SMP related build error
+> 
+> If AM43x and SMP is selected, OMAP4 & OMAP5 deselected, build error as
+> follows,
+> 
+> arch/arm/mach-omap2/built-in.o: In function `scu_gp_set':
+> arch/arm/mach-omap2/sleep44xx.S:131: undefined reference to `omap4_get_scu_base'
+> arch/arm/mach-omap2/sleep44xx.S:132: undefined reference to `scu_power_mode'
+> arch/arm/mach-omap2/built-in.o: In function `scu_gp_clear':
+> arch/arm/mach-omap2/sleep44xx.S:227: undefined reference to `omap4_get_scu_base'
+> arch/arm/mach-omap2/sleep44xx.S:229: undefined reference to `scu_power_mode'
+> 
+> Resolve it by building sleep44xx.S only for OMAP4 & OMAP5.
+> 
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/Makefile | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 0520dc4..a6c4187 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -35,8 +35,9 @@ obj-$(CONFIG_SOC_HAS_OMAP2_SDRC)      += sdrc.o
+> 
+>  smp-$(CONFIG_SMP)                      += omap-smp.o omap-headsmp.o
+>  smp-$(CONFIG_HOTPLUG_CPU)              += omap-hotplug.o
+> -omap-4-5-common                                =  omap4-common.o omap-wakeupgen.o \
+> -                                          sleep44xx.o
+> +omap-4-5-common                                =  omap4-common.o omap-wakeupgen.o
+> +obj-$(CONFIG_ARCH_OMAP4)               += sleep44xx.o
+> +obj-$(CONFIG_SOC_OMAP5)                        += sleep44xx.o
+>  obj-$(CONFIG_ARCH_OMAP4)               += $(omap-4-5-common) $(smp-y)
+>  obj-$(CONFIG_SOC_OMAP5)                        += $(omap-4-5-common) $(smp-y)
+>  obj-$(CONFIG_SOC_AM43XX)               += $(omap-4-5-common)
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
