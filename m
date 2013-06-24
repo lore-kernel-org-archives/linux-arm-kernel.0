@@ -1,70 +1,45 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 24 Jun 2013 17:14:04 -0600
-Subject: [PATCH v1 04/12] input: matrix-keypad: push/pull,
- separate polarity
-In-Reply-To: <20130622093649.GF24305@book.gsilab.sittig.org>
+Date: Mon, 24 Jun 2013 17:18:14 -0600
+Subject: [PATCH v1 07/12] input: keypad-matrix: introduce polling support
+In-Reply-To: <20130622095022.GG24305@book.gsilab.sittig.org>
 References: <1371838198-7327-1-git-send-email-gsi@denx.de>
- <1371838198-7327-5-git-send-email-gsi@denx.de>
- <51C4C6C9.6030000@wwwdotorg.org>
- <20130622093649.GF24305@book.gsilab.sittig.org>
-Message-ID: <51C8D2BC.9010507@wwwdotorg.org>
+ <1371838198-7327-8-git-send-email-gsi@denx.de>
+ <51C4C7C3.1070905@wwwdotorg.org>
+ <20130622095022.GG24305@book.gsilab.sittig.org>
+Message-ID: <51C8D3B6.3090108@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/22/2013 03:36 AM, Gerhard Sittig wrote:
-> On Fri, Jun 21, 2013 at 15:34 -0600, Stephen Warren wrote:
->>
->> On 06/21/2013 12:09 PM, Gerhard Sittig wrote:
->>> extend the device tree adjustable hardware configuration:
->>> - allow for differing polarity of the row and column GPIO pins
->>> - optionally fully drive column output pins instead of the former
->>>   unconditional open collector emulation approach
->>
->>> diff --git a/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt b/Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
->>
->>> +- row-gpios-activelow:	row GPIO pins are active low
->>> +- col-gpios-activelow:	column GPIO pins are active low
->>>  - gpio-activelow:	row pins as well as column pins are active low
->>> +			(provided for backward compatibility, and useful
->>> +			for matrix layouts of identical polarity for
->>> +			rows and columns)
->>
->> Those should all come from the existing GPIO flags, and may even differ
->> for each GPIO.
->>
->>> +- col-gpios-pushpull:	fully drive the column selection pins in either
->>> +			direction (high and low signals), the default
->>> +			behaviour is to actively drive low signals and
->>> +			be passive otherwise (emulates an open collector
->>> +			output driver)
->>
->> We don't actually have GPIO flags defined for pushpull-vs-open-collector
->> etc. Perhaps we should do so. Then, we wouldn't need to invent custom
->> properties to represent that in this binding.
+On 06/22/2013 03:50 AM, Gerhard Sittig wrote:
+
+...
+> The patch set doesn't introduce that behaviour, but merely
+> describes it in more detail.  It doesn't even introduce the
+> interrupt discussion into the binding document in a strict sense,
+> but expands on it in the hope for improved usability of the
+> binding after the motivation became more obvious.
 > 
-> I see your concerns and understand, but chose the above way to
-> just extend the existing implementation in the least intrusive
-> way without changing its nature.  See the reply on the first
-> patch for more details on the motivation.
 > 
-> Of course I agree that pin properties belong to the GPIO layer
-> and that "application drivers" on top should not worry about
-> that.  Were I allowed to break backwards compatibility, then I
-> could have done more shuffling.  But lacking the capability to
-> test the affected setups puts more burdon on others, which I
-> wanted to avoid.
+> What this part of the series does is to introduce polling mode as
+> an alternative to the interrupt driven detection of changes, to
+> improve reliability of change detection in the presence of multi
+> key presses.
 
-Can't you add this enhancement as follows:
+To me, this sounds more like something for Documentation/input/ rather
+than DT binding.
 
-Update the driver to look at the per-pin GPIO flags in all cases.
-Presumably in any existing cases, those flags all say "active high"
-anyway, since specifying anything else was useless. In the very unlikely
-case this isn't true, one could always add a quirk based on the
-HW-specific compatible value.
+...
+> I suggest to have the "meta-discussions" on which documentation
+> belongs where and on where to put the GPIO polarity and on
+> whether backward compatibility needs to be kept or may be broken,
+> in a single spot, to not have several parallel discussions in
+> multiple subthreads.
+> 
+> Is the cover letter or the first patch the most appropriate
+> message to respond to with this though in mind?  Or don't you
+> mind if several replies for different parts of the patch set
+> discuss similar "background" aspects of the same series?
 
-If gpio-activelow is set, mark all pins as active-low.
-
-This way, any future extensions (i.e. what this patch implements: just
-rows active low, just columns active low) can be implemented using
-purely the standard GPIO flags, but the existing behaviour of the
-existing gpio-activelow property is maintained.
+I don't really have a preference myself; feel free to pick whichever
+patch or response you want to continue discussing, and reply to that;
+I'll just reply to whatever sub-thread/... you choose:-)
