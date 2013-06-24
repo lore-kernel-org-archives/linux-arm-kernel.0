@@ -1,41 +1,35 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 24 Jun 2013 10:39:49 +0300
-Subject: [PATCHv2 10/11] ARM: dts: omap4 clock data
-In-Reply-To: <51C3AB46.4040609@codeaurora.org>
+Date: Mon, 24 Jun 2013 10:42:04 +0300
+Subject: [PATCHv2 06/11] CLK: omap: move part of the machine specific
+ clock header contents to driver
+In-Reply-To: <20130621073250.GO5523@atomide.com>
 References: <1371647942-4811-1-git-send-email-t-kristo@ti.com>
- <1371647942-4811-11-git-send-email-t-kristo@ti.com>
- <51C3AB46.4040609@codeaurora.org>
-Message-ID: <51C7F7C5.70201@ti.com>
+ <1371647942-4811-7-git-send-email-t-kristo@ti.com>
+ <20130621073250.GO5523@atomide.com>
+Message-ID: <51C7F84C.5080607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2013 04:24 AM, Stephen Boyd wrote:
-> On 06/19/13 06:19, Tero Kristo wrote:
->> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->> index 2a56428..70608db 100644
->> --- a/arch/arm/boot/dts/omap4.dtsi
->> +++ b/arch/arm/boot/dts/omap4.dtsi
->> @@ -106,6 +106,8 @@
->>   			ti,hwmods = "counter_32k";
->>   		};
->>
->> +		/include/ "omap4-clocks.dtsi"
->> +
+On 06/21/2013 10:32 AM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [130619 06:25]:
+>> Some of the clock.h contents are needed by the new OMAP clock driver,
+>> including dpll_data and clk_hw_omap. Thus, move these to the generic
+>> omap header file which can be accessed by the driver.
 >
-> Doesn't this cause one platform device to be allocated for each clock
-> node defined in omap4-clocks.dtsi? Are you concerned about wasting
-> memory on things that aren't really devices and that will never be probed?
+> Do you mean "are only needed by the new OMAP clock driver"?
 
-Hi Stephen,
+Not only, it is needed by both driver and mach-omap2.
 
-Sounds like a valid point to me, so should this include just go under 
-the root in omap4.dtsi? I am not quite familiar with DT specifics myself 
-as of yet.
+> Otherwise it sounds like this will break things for other
+> omaps that don't yet have clocks configured in DT..
+
+No it doesn't, as you can probably see, the new include/linux/clk/omap.h 
+is included from clock.h also.
 
 -Tero
 
 >
->>   		omap4_pmx_core: pinmux at 4a100040 {
->>   			compatible = "ti,omap4-padconf", "pinctrl-single";
->>   			reg = <0x4a100040 0x0196>;
+> Regards,
+>
+> Tony
 >
