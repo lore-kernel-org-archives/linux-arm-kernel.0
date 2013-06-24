@@ -1,49 +1,79 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 24 Jun 2013 20:10:19 +0200
-Subject: next-20130624 build fix for imx_v6_v7_defconfig
-Message-ID: <1421252.HsQN8mblgM@amdc1032>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 24 Jun 2013 11:15:09 -0700
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <51C87DC7.50005@schinagl.nl>
+References: <1371502778-15849-1-git-send-email-oliver+list@schinagl.nl>
+ <1371502778-15849-2-git-send-email-oliver+list@schinagl.nl>
+ <20130617225847.GA9494@kroah.com> <20130624092942.GG26008@lukather>
+ <20130624160440.GA15201@kroah.com> <51C87DC7.50005@schinagl.nl>
+Message-ID: <20130624181509.GA8847@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 24, 2013 at 07:11:35PM +0200, Oliver Schinagl wrote:
+> Hey Greg,
+> On 06/24/13 18:04, Greg KH wrote:
+> >On Mon, Jun 24, 2013 at 11:29:42AM +0200, Maxime Ripard wrote:
+> >>Hi Greg,
+> >>
+> >>On Mon, Jun 17, 2013 at 03:58:47PM -0700, Greg KH wrote:
+> >>>On Mon, Jun 17, 2013 at 10:59:37PM +0200, Oliver Schinagl wrote:
+> >>
+> >>[..]
+> >>
+> >>>>+static int __init sunxi_sid_probe(struct platform_device *pdev)
+> >>>>+{
+> >>>>+	u8 entropy[SID_SIZE];
+> >>>>+	unsigned int i;
+> >>>>+	struct resource *res;
+> >>>>+	void __iomem *sid_reg_base;
+> >>>>+	int ret;
+> >>>>+
+> >>>>+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >>>>+	sid_reg_base = devm_ioremap_resource(&pdev->dev, res);
+> >>>>+	if (IS_ERR(sid_reg_base))
+> >>>>+		return PTR_ERR(sid_reg_base);
+> >>>>+	platform_set_drvdata(pdev, sid_reg_base);
+> >>>>+
+> >>>>+	ret = device_create_bin_file(&pdev->dev, &sid_bin_attr);
+> >>>>+	if (ret)
+> >>>>+		return ret;
+> >>>
+> >>>You just raced with userspace, having the file show up after the device
+> >>>was announced to users that it was there.  Please use the proper device
+> >>>file api to add default attributes to prevent this from happening.
+> >>
+> >>Sorry if the question looks dumb, but what kind of race can we generate
+> >>here?
+> >
+> >Userspace gets told about the device from the driver core, udev runs and
+> >reads all of the attributes, then your probe function comes along and
+> >adds a new attribute.  Userspace will then not know about it at all.
+> >
+> >>The device_create_bin_file is the last call that we make (if we except
+> >>the entropy stuff, but it doesn't really matter here), so after we
+> >>created the file, we have everything properly initialised so that our
+> >>functions can be called, right?
+> >>
+> >>And another dumb question for you, what is the "proper device file API"
+> >>you are referring to ? :)
+> >
+> >Please read Documentation/driver_model/device.txt and see the section on
+> >Attributes for what to do.  If you have specific questions after reading
+> >that, please let me know.
+> Since Maxime kinda asked for me, I hope you don't mind me following up.
+> 
+> That doc doesn't mention the binary interface at all. Initially I
+> had both devices up, the 'read' device as a textual representation
+> and added the binary one later. Maxime and I decided the binary one
+> made more sense, as the only textual user would be a human and they
+> don't poke that entry that often.
+> 
+> So what default way exists for binary files or how would that be solved?
 
-Hi,
+The same interface should work just fine for binary files, have you
+tried it?
 
-The issue is probably caused by:
+thanks,
 
-commit 38ff87f77af0b5a93fc8581cff1d6e5692ab8970
-Author: Stephen Boyd <sboyd@codeaurora.org>
-Date:   Sat Jun 1 23:39:40 2013 -0700
-
-    sched_clock: Make ARM's sched_clock generic for all architectures
-...
-
-not taking into account following change:
-
-commit c19672492d233e0012b60fbfa460ffac1381ee26
-Author: Jingchang Lu <b35083@freescale.com>
-Date:   Wed May 29 10:12:17 2013 +0200
-
-    clocksource: Add Freescale Vybrid pit timer support
-...
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
----
-
-Index: b/drivers/clocksource/vf_pit_timer.c
-===================================================================
---- a/drivers/clocksource/vf_pit_timer.c	2013-06-24 19:41:07.022518558 +0200
-+++ b/drivers/clocksource/vf_pit_timer.c	2013-06-24 19:41:13.274518546 +0200
-@@ -12,7 +12,7 @@
- #include <linux/clk.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
--#include <asm/sched_clock.h>
-+#include <linux/sched_clock.h>
- 
- /*
-  * Each pit takes 0x10 Bytes register space
+greg k-h
