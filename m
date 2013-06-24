@@ -1,58 +1,109 @@
-From: agnel.joel@gmail.com (Joel A Fernandes)
-Date: Mon, 24 Jun 2013 15:32:11 -0500
-Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
-In-Reply-To: <201306242228.23297.arnd@arndb.de>
-References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
- <201306220014.16427.arnd@arndb.de>
- <CAD=GYpabakChmN-TEJbLn6p=BwX2wsK5KWsc5gH9-cAA+yWcEA@mail.gmail.com>
- <201306242228.23297.arnd@arndb.de>
-Message-ID: <CAD=GYpYwswOYGHRzZ6SeKD+sEfi-7s3HuqKr7G0OXQWFCA_EtQ@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 24 Jun 2013 22:32:55 +0200
+Subject: [PATCH v3 11/18] pwm: Add new pwm-samsung driver
+In-Reply-To: <20130624201326.GB7163@mithrandir>
+References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
+ <1888817.YsvuAKkSk2@flatron> <20130624201326.GB7163@mithrandir>
+Message-ID: <3059286.XLVAQe4lge@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 3:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 22 June 2013, Joel A Fernandes wrote:
->>
->> >> > config TI_EDMA
->> >> >         tristate "TI EDMA support"
->> >> >         default m if 'ARCH_DAVINCI || ARCH_OMAP1 || ARCH_OMAP2
->> >> >         select DMA_ENGINE
->> >> >         select DMA_VIRTUAL_CHANNELS
->> >>
->> >>
->> >> MMC depends on EDMA specially on AM33xx there's no PIO mode AFAIK. The
->> >> 'm' option will require some initramfs to load the module when needing
->> >> to MMC boot, I suggest lets leave it as y.
->> >>
->> >
->> > Ah, right: you still export a filter function from the edma driver
->> > and use it in slave drivers:
->> >
->> > drivers/mmc/host/davinci_mmc.c:         dma_request_slave_channel_compat(mask, edma_filter_fn,
->> > drivers/mmc/host/davinci_mmc.c:         dma_request_slave_channel_compat(mask, edma_filter_fn,
->> > drivers/spi/spi-davinci.c:      dspi->dma_rx = dma_request_channel(mask, edma_filter_fn,
->> > drivers/spi/spi-davinci.c:      dspi->dma_tx = dma_request_channel(mask, edma_filter_fn,
->> >
->> > As long as this is the case, you have to be careful with the dependencies
->> > to make sure that davinci_mmc and spi-davinci either depend on TI_EDMA, or
->> > edma_filter_fn gets defined to NULL when you are building for a DT-only platform.
->>
->> Yes sure, right now they are defined  as follows in include/linux/edma.h:
->>
->> #if defined(CONFIG_TI_EDMA) || defined(CONFIG_TI_EDMA_MODULE)
->> bool edma_filter_fn(struct dma_chan *, void *);
->> #else
->> static inline bool edma_filter_fn(struct dma_chan *chan, void *param)
->> {
->> return false;
->> }
->> #endif
->
-> It's best to just define the filter function in the platform
-> code and pass a pointer to it through platform data. The way you do
-> it above makes the slave drivers inherently nonportable.
+On Monday 24 of June 2013 22:13:27 Thierry Reding wrote:
+> On Mon, Jun 24, 2013 at 08:31:43PM +0200, Tomasz Figa wrote:
+> > On Monday 24 of June 2013 19:49:04 Thierry Reding wrote:
+> > > On Tue, Jun 25, 2013 at 12:22:42AM +0900, Kukjin Kim wrote:
+[snip]
+> > > > 
+> > > > Just note, checkpatch complains following, so fixed to use
+> > > > pr_warn()
+> > > > when I applied.
+> > > 
+> > > Note that you can't apply patches that touch the PWM tree without my
+> > > Ack and I already mentioned that the current way this driver is
+> > > written isn't acceptable.
+> > > 
+> > > So either you fix it properly, or if everybody except me thinks we
+> > > don't need a proper design for drivers anymore, then the only way
+> > > I'll accept this driver into the PWM tree is if you put a really
+> > > big comment at the top of the file saying that the driver is badly
+> > > designed on purpose and that people shouldn't be using it as a
+> > > reference.
+> > 
+> > Sorry, I don't understand what problem you have with this design. It
+> > completely meets all the requirements applicable on hardware platforms
+> > it is (and going to be) used on.
+> 
+> My main problem with it is that there is no design. And as such it sets
+> a bad example. If I accept this into the PWM tree as is then what am I
+> supposed to tell the next person that comes up with a similarly broken
+> driver?
 
-But with DT-only platforms, can you really do that?
+I wouldn't call it no design. It's a simple (trivial) design.
 
-Thanks,
-Joel
+Simple design is often better than a complex one. In this case it indeed 
+is, because it doesn't add code that serves no purpose, without any 
+functional drawbacks.
+
+> > The only thing it would do in a suboptimal way would be
+> > synchronization of register accesses for multiple instances of the
+> > driver - one spinlock would be used for all of them. This is
+> > insignificant because there is no time critical code in this driver
+> > and it is really unlikely that a SoC with multiple instances of this
+> > IP block shows up.
+> 
+> I've had people give me guarantees that this and that would *never*
+> happen only to change their minds 6 months down the road. And again,
+> even if it was actually true in this case, it isn't a valid excuse for
+> setting a bad example.
+
+Well, even if that happens, there is nothing on the way stopping from 
+extending this design with something that will work optimally for multiple 
+instances. For all currently supported platforms solution used in this 
+series is enough.
+
+> > Channel reservation between clocksource and PWM drivers is completely
+> > correct, relying on the fact that the former can only use channels
+> > _without_ outputs and the latter can only use channels _with_ outputs.
+> > Do I have to add that there can't be a channel both with and without
+> > output?
+> The issue is that you can't really ensure that both the clocksource and
+> PWM drivers use the same variant and therefore might be using different
+> masks.
+
+Output mask is _not_ a part of the constant variant data. It is stored in 
+the same struct, which is to simplify passing SoC-specific parameters from 
+platform code to both drivers, but it is not defined as a constant 
+anywhere in drivers.
+
+As I already explained in one of my previous replies, it is either parsed 
+from DT (samsung,pwm-outputs property) or passed through the variant 
+struct as platform_data from board files. It isn't possible for both 
+drivers to get different mask values.
+
+> > So the only place for improvement here, without starting
+> > overengineering things, is a comment about the purpose of the
+> > spinlock and why it can be used in our case.
+> 
+> I disagree. You actually even had a version with a halfway decent design
+> at some point and it was discarded. I don't think I'm asking for all
+> that much here. I even gave you the option of admitting that the driver
+> was suboptimal. All I request in return is that you mention that in the
+> code so that either somebody else might go and clean things up or at
+> least that nobody will copy from a bad example.
+
+What about:
+
+/*
+ * PWM block is shared between pwm-samsung and samsung_pwm_timer drivers
+ * and some registers need access synchronization. If both drivers are
+ * compiled in, the spinlock is defined in the clocksource driver,
+ * otherwise following definition is used.
+ *
+ * Currently we do not need any more complex synchronization method 
+ * because all the supported SoCs contain only one instance of the PWM 
+ * IP. Should this change, both drivers will need to be modified to
+ * properly synchronize accesses to particular instances.
+ */
+
+Best regards,
+Tomasz
