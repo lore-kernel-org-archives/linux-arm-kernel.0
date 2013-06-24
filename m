@@ -1,61 +1,57 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Jun 2013 03:17:56 -0700
-Subject: [PATCH v12 04/11] dmaengine: edma: enable build for AM33XX
-In-Reply-To: <51C427AA.6080601@ti.com>
+Date: Mon, 24 Jun 2013 03:19:04 -0700
+Subject: [PATCH v12 00/11] DMA Engine support for AM33XX
+In-Reply-To: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
 References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
- <1371762407-24544-5-git-send-email-joelagnel@ti.com>
- <51C427AA.6080601@ti.com>
-Message-ID: <20130624101756.GU5523@atomide.com>
+Message-ID: <20130624101903.GV5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sekhar Nori <nsekhar@ti.com> [130621 03:21]:
-> On 6/21/2013 2:36 AM, Joel A Fernandes wrote:
-> > From: Matt Porter <mporter@ti.com>
-> > 
-> > Enable TI EDMA option on OMAP and TI_PRIV_EDMA
-> > 
-> > Signed-off-by: Matt Porter <mporter@ti.com>
-> > Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
+Hi,
+
+For merging this series, I suggest the following sets:
+
+* Joel A Fernandes <joelagnel@ti.com> [130620 14:13]:
 > 
-> This will have to be taken by Tony.
+> Joel A Fernandes (3):
+>   edma: config: Enable config options for EDMA
+>   da8xx: config: Enable MMC and FS options
+>   ARM: davinci: Fix compiler warnings in devices-da8xx
+>
+> Matt Porter (8):
+>   dmaengine: edma: Add TI EDMA device tree binding
+>   ARM: edma: Add DT and runtime PM support to the private EDMA API
+>   ARM: edma: Add EDMA crossbar event mux support
+>   dmaengine: edma: enable build for AM33XX
 
-Sekhar, please go ahead and take this one. I'll reply
-to the header email of this series how it should be
-queued.
+Sekhar should queue the above patches, I've acked the
+mach-omap2/Kconfig change.
 
-For the mach-omap2/Kconfig change:
+>   spi: omap2-mcspi: add generic DMA request support to the DT binding
+>   spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+
+The spi changes should get merged via the driver list.
+
+>   ARM: dts: add AM33XX EDMA support
+>   ARM: dts: add AM33XX SPI DMA support
+
+Benoit should queue the .dts changes.
  
-> > ---
-> >  arch/arm/mach-omap2/Kconfig |    1 +
-> >  drivers/dma/Kconfig         |    2 +-
-> >  2 files changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> > index f49cd51..f91b07f 100644
-> > --- a/arch/arm/mach-omap2/Kconfig
-> > +++ b/arch/arm/mach-omap2/Kconfig
-> > @@ -17,6 +17,7 @@ config ARCH_OMAP2PLUS
-> >  	select PROC_DEVICETREE if PROC_FS
-> >  	select SOC_BUS
-> >  	select SPARSE_IRQ
-> > +	select TI_PRIV_EDMA
-> >  	select USE_OF
-> >  	help
-> >  	  Systems based on OMAP2, OMAP3, OMAP4 or OMAP5
-> > diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> > index e992489..3215a3c 100644
-> > --- a/drivers/dma/Kconfig
-> > +++ b/drivers/dma/Kconfig
-> > @@ -213,7 +213,7 @@ config SIRF_DMA
-> >  
-> >  config TI_EDMA
-> >  	tristate "TI EDMA support"
-> > -	depends on ARCH_DAVINCI
-> > +	depends on ARCH_DAVINCI || ARCH_OMAP
-> >  	select DMA_ENGINE
-> >  	select DMA_VIRTUAL_CHANNELS
-> >  	default n
-> > 
+>  Documentation/devicetree/bindings/dma/ti-edma.txt  |   34 +++
+>  Documentation/devicetree/bindings/spi/omap-spi.txt |   27 ++-
+>  arch/arm/Kconfig                                   |    1 +
+>  arch/arm/boot/dts/am33xx.dtsi                      |   22 ++
+>  arch/arm/common/edma.c                             |  242 ++++++++++++++++++--
+>  arch/arm/configs/da8xx_omapl_defconfig             |    3 +
+>  arch/arm/mach-davinci/devices-da8xx.c              |    8 +-
+>  arch/arm/mach-omap2/Kconfig                        |    2 +
+>  drivers/dma/Kconfig                                |    4 +-
+>  drivers/spi/spi-omap2-mcspi.c                      |   64 ++++--
+>  include/linux/platform_data/edma.h                 |    5 +-
+>  11 files changed, 369 insertions(+), 43 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
+
+Regards,
+
+Tony
