@@ -1,86 +1,117 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Mon, 24 Jun 2013 17:39:29 -0400
-Subject: [PATCHv3 5/6] arm: omap2plus_defconfig: enable TI bandgap driver
-In-Reply-To: <51C0C2A8.4020707@ti.com>
-References: <1370637968-23299-1-git-send-email-eduardo.valentin@ti.com>
- <1370637968-23299-6-git-send-email-eduardo.valentin@ti.com>
- <51C0C2A8.4020707@ti.com>
-Message-ID: <51C8BC91.6020707@ti.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 24 Jun 2013 14:46:15 -0700
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <51C8B84C.3020200@schinagl.nl>
+References: <1371502778-15849-1-git-send-email-oliver+list@schinagl.nl>
+ <1371502778-15849-2-git-send-email-oliver+list@schinagl.nl>
+ <20130617225847.GA9494@kroah.com> <20130624092942.GG26008@lukather>
+ <20130624160440.GA15201@kroah.com> <51C87DC7.50005@schinagl.nl>
+ <20130624181509.GA8847@kroah.com> <51C8B84C.3020200@schinagl.nl>
+Message-ID: <20130624214615.GA17604@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-
-On 18-06-2013 16:27, Eduardo Valentin wrote:
-> Tony,
+On Mon, Jun 24, 2013 at 11:21:16PM +0200, Oliver Schinagl wrote:
+> On 06/24/13 20:15, Greg KH wrote:
+> >On Mon, Jun 24, 2013 at 07:11:35PM +0200, Oliver Schinagl wrote:
+> >>Hey Greg,
+> >>On 06/24/13 18:04, Greg KH wrote:
+> >>>On Mon, Jun 24, 2013 at 11:29:42AM +0200, Maxime Ripard wrote:
+> >>>>Hi Greg,
+> >>>>
+> >>>>On Mon, Jun 17, 2013 at 03:58:47PM -0700, Greg KH wrote:
+> >>>>>On Mon, Jun 17, 2013 at 10:59:37PM +0200, Oliver Schinagl wrote:
+> >>>>
+> >>>>[..]
+> >>>>
+> >>>>>>+static int __init sunxi_sid_probe(struct platform_device *pdev)
+> >>>>>>+{
+> >>>>>>+	u8 entropy[SID_SIZE];
+> >>>>>>+	unsigned int i;
+> >>>>>>+	struct resource *res;
+> >>>>>>+	void __iomem *sid_reg_base;
+> >>>>>>+	int ret;
+> >>>>>>+
+> >>>>>>+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >>>>>>+	sid_reg_base = devm_ioremap_resource(&pdev->dev, res);
+> >>>>>>+	if (IS_ERR(sid_reg_base))
+> >>>>>>+		return PTR_ERR(sid_reg_base);
+> >>>>>>+	platform_set_drvdata(pdev, sid_reg_base);
+> >>>>>>+
+> >>>>>>+	ret = device_create_bin_file(&pdev->dev, &sid_bin_attr);
+> >>>>>>+	if (ret)
+> >>>>>>+		return ret;
+> >>>>>
+> >>>>>You just raced with userspace, having the file show up after the device
+> >>>>>was announced to users that it was there.  Please use the proper device
+> >>>>>file api to add default attributes to prevent this from happening.
+> >>>>
+> >>>>Sorry if the question looks dumb, but what kind of race can we generate
+> >>>>here?
+> >>>
+> >>>Userspace gets told about the device from the driver core, udev runs and
+> >>>reads all of the attributes, then your probe function comes along and
+> >>>adds a new attribute.  Userspace will then not know about it at all.
+> >>>
+> >>>>The device_create_bin_file is the last call that we make (if we except
+> >>>>the entropy stuff, but it doesn't really matter here), so after we
+> >>>>created the file, we have everything properly initialised so that our
+> >>>>functions can be called, right?
+> >>>>
+> >>>>And another dumb question for you, what is the "proper device file API"
+> >>>>you are referring to ? :)
+> >>>
+> >>>Please read Documentation/driver_model/device.txt and see the section on
+> >>>Attributes for what to do.  If you have specific questions after reading
+> >>>that, please let me know.
+> >>Since Maxime kinda asked for me, I hope you don't mind me following up.
+> >>
+> >>That doc doesn't mention the binary interface at all. Initially I
+> >>had both devices up, the 'read' device as a textual representation
+> >>and added the binary one later. Maxime and I decided the binary one
+> >>made more sense, as the only textual user would be a human and they
+> >>don't poke that entry that often.
+> >>
+> >>So what default way exists for binary files or how would that be solved?
+> >
+> >The same interface should work just fine for binary files, have you
+> >tried it?
+> I'll just take the plunge and make myself look stupid ;)
 > 
-> On 07-06-2013 16:46, Eduardo Valentin wrote:
->> Enable the bandgap driver for TI SoCs thermal support.
->>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Cc: AnilKumar Ch <anilkumar@ti.com>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+> I tried to change things around, used DEVICE_ATTR(eeprom, S_IRUGO,
+> sid_read, NULL); So far so good I'd hope.
+
+Ick, no.
+
+> Of course now I'll have to change the function's parameters from
 > 
-> Is it possible for you to queue this one and patch 6 for 3.11?
-
-Gentle reminder.
-
+> static ssize_t sid_read(struct file *fd, struct kobject *kobj,
+> 			struct bin_attribute *attr, char *buf,
+> 			loff_t pos, size_t size)
 > 
-> Cheers,
+> to
 > 
->> ---
->>  arch/arm/configs/omap2plus_defconfig | 11 +++++++++++
->>  1 file changed, 11 insertions(+)
->>
->> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
->> index c1ef64b..6e6c494 100644
->> --- a/arch/arm/configs/omap2plus_defconfig
->> +++ b/arch/arm/configs/omap2plus_defconfig
->> @@ -151,6 +151,13 @@ CONFIG_W1=y
->>  CONFIG_POWER_SUPPLY=y
->>  CONFIG_SENSORS_LM75=m
->>  CONFIG_WATCHDOG=y
->> +CONFIG_THERMAL=y
->> +CONFIG_THERMAL_HWMON=y
->> +CONFIG_THERMAL_DEFAULT_GOV_STEP_WISE=y
->> +CONFIG_THERMAL_GOV_FAIR_SHARE=y
->> +CONFIG_THERMAL_GOV_STEP_WISE=y
->> +CONFIG_THERMAL_GOV_USER_SPACE=y
->> +CONFIG_CPU_THERMAL=y
->>  CONFIG_OMAP_WATCHDOG=y
->>  CONFIG_TWL4030_WATCHDOG=y
->>  CONFIG_MFD_TPS65217=y
->> @@ -237,6 +244,10 @@ CONFIG_RTC_DRV_TWL4030=y
->>  CONFIG_RTC_DRV_OMAP=y
->>  CONFIG_DMADEVICES=y
->>  CONFIG_DMA_OMAP=y
->> +CONFIG_TI_SOC_THERMAL=y
->> +CONFIG_TI_THERMAL=y
->> +CONFIG_OMAP4_THERMAL=y
->> +CONFIG_OMAP5_THERMAL=y
->>  CONFIG_EXT2_FS=y
->>  CONFIG_EXT3_FS=y
->>  # CONFIG_EXT3_FS_XATTR is not set
->>
+> static ssize_t sid_read(struct device *dev,
+> 			struct device_attribute *attr, char *buf)
+
+Which is what do you do not want, as you find out:
+
+> But now, I'm missing things like 'pos' and 'size', both which
+> determine the requested bytes. True, in this specific driver we are
+> talking about 'only' 16 bytes, but what if it weren't but a few MiB
+> and in sysfs we want to read some random byte, will we have to put
+> the entire blok into the buffer?
 > 
-> 
+> So sorry for not understanding, but ... I don't understand :)
 
+Stick with a binary attribute, and attach that to the proper class
+structure and all should be fine.
 
--- 
-You have got to be excited about what you are doing. (L. Lamport)
+Ah crap, you're using a platform device.
 
-Eduardo Valentin
+{sigh}
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 295 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/66cf164b/attachment.sig>
+Why?  Why not use a "real" device which has a "real" class, and then use
+the interfaces there?
+
+greg k-h
