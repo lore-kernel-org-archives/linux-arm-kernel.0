@@ -1,51 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 24 Jun 2013 17:26:26 +0200
-Subject: [GIT PULL] support for kernel mode NEON
-Message-ID: <CAKv+Gu8Ms2oV_qQj6OLeP_FQ4kMhzJmjn0a+RDqsG2iRx97zOQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 24 Jun 2013 09:26:28 -0600
+Subject: [PATCH] pinctrl: rip out the direct pinconf API
+In-Reply-To: <1372079700-16580-1-git-send-email-linus.walleij@stericsson.com>
+References: <1372079700-16580-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <51C86524.8020708@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
+On 06/24/2013 07:15 AM, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> From the inception ot the pin config API there has been the
+> possibility to get a handle at a pin directly and configure
+> its electrical characteristics. For this reason we had:
+> 
+> int pin_config_get(const char *dev_name, const char *name,
+>                unsigned long *config);
+> int pin_config_set(const char *dev_name, const char *name,
+>                unsigned long config);
+> int pin_config_group_get(const char *dev_name,
+>                const char *pin_group,
+>                unsigned long *config);
+> int pin_config_group_set(const char *dev_name,
+>                const char *pin_group,
+>                unsigned long config);
+> 
+> After the intruction of the pin control states that will
+> control pins associated with devices, and its subsequent
+> introduction to the device core, as well as the
+> introduction of pin control hogs that can set up states on
+> boot and optionally also at sleep, this direct pin control
+> API is a thing of the past.
+> 
+> As could be expected, it has zero in-kernel users.
+> Let's delete this API and make our world simpler.
 
-  Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/ardbiesheuvel/linux-arm.git for-rmk
-
-for you to fetch changes up to 81de811871661eff2b97cd9abfed9952d6aeb68c:
-
-  lib/raid6: add ARM-NEON accelerated syndrome calculation (2013-06-24
-17:20:51 +0200)
-
-----------------------------------------------------------------
-Ard Biesheuvel (5):
-      ARM: add support for kernel mode NEON
-      ARM: move VFP init to an earlier boot stage
-      ARM: be strict about FP exceptions in kernel mode
-      ARM: crypto: add NEON accelerated XOR implementation
-      lib/raid6: add ARM-NEON accelerated syndrome calculation
-
- arch/arm/Kconfig            |  7 +++++++
- arch/arm/include/asm/neon.h | 36 ++++++++++++++++++++++++++++++++++++
- arch/arm/include/asm/xor.h  | 73
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/lib/Makefile       |  6 ++++++
- arch/arm/lib/xor-neon.c     | 42 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/vfp/vfphw.S        |  5 +++++
- arch/arm/vfp/vfpmodule.c    | 56
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- include/linux/raid/pq.h     |  5 +++++
- lib/raid6/.gitignore        |  1 +
- lib/raid6/Makefile          | 40 ++++++++++++++++++++++++++++++++++++++++
- lib/raid6/algos.c           |  6 ++++++
- lib/raid6/neon.c            | 58
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- lib/raid6/neon.uc           | 80
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- lib/raid6/test/Makefile     | 19 ++++++++++++++++++-
- 14 files changed, 432 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/include/asm/neon.h
- create mode 100644 arch/arm/lib/xor-neon.c
- create mode 100644 lib/raid6/neon.c
- create mode 100644 lib/raid6/neon.uc
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
