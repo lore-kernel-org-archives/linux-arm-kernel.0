@@ -1,49 +1,128 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 24 Jun 2013 15:29:30 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the mailbox tree
-In-Reply-To: <51C4703C.10206@ti.com>
-References: <20130621162656.bb94e0fa8b6813781b804a73@canb.auug.org.au>
- <CAOesGMjszju75jo6Ej6C=0-rfdPLuEj0mwmU1zYvFvYw1dyQCA@mail.gmail.com>
- <20130621071239.GM5523@atomide.com>
- <201306210936.09593.arnd@arndb.de> <51C4703C.10206@ti.com>
-Message-ID: <20130624152930.4c6cef3c5a272d8ca82d94c6@canb.auug.org.au>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 24 Jun 2013 11:01:56 +0530
+Subject: [PATCH v7 7/9] usb: musb: omap2430: use the new generic PHY
+ framework
+In-Reply-To: <20130618094703.GV5461@arwen.pp.htv.fi>
+References: <1371113039-5784-1-git-send-email-kishon@ti.com>
+ <1371113039-5784-8-git-send-email-kishon@ti.com>
+ <20130618094703.GV5461@arwen.pp.htv.fi>
+Message-ID: <51C7D9CC.8090901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, 21 Jun 2013 10:24:44 -0500 Suman Anna <s-anna@ti.com> wrote:
+On Tuesday 18 June 2013 03:17 PM, Felipe Balbi wrote:
+> Hi,
 >
-> On 06/21/2013 02:36 AM, Arnd Bergmann wrote:
-> > On Friday 21 June 2013, Tony Lindgren wrote:
-> >>> I wonder if this mess is caused by the fact that I did the revert
-> >>> instead of rebuilding our for-next and dropping the merge in the first
-> >>> place.
-> >>>
-> >>> I'll rebuild our for-next (or maybe Arnd will beat me to it) before
-> >>> next linux-next build, i.e. Sunday night my time.
-> >>
-> >> Could be, especially if some of the commits are the same in the reverted
-> >> branch and newly merged branch as git might think that some merges have
-> >> been already resolved the right way earlier.
-> 
-> Yes, please drop the particular mailbox branch that you were picking
-> into linux-next. It was the previous framework which was dropped at the
-> last minute during the 3.10 merge window in favor of new one still under
-> its final development steps, so we will not be using any commits from
-> that branch.  Sorry for the trouble on this one. The branch that Arnd
-> took has some of the OMAP patches reworked in preparation for the
-> newer one.
+> On Thu, Jun 13, 2013 at 02:13:57PM +0530, Kishon Vijay Abraham I wrote:
+>> Use the generic PHY framework API to get the PHY. The usb_phy_set_resume
+>> and usb_phy_set_suspend is replaced with power_on/get_sync and
+>> power_off/put_sync to align with the new PHY framework.
+>>
+>> musb->xceiv can't be removed as of now because musb core uses xceiv.state and
+>> xceiv.otg. Once there is a separate state machine to handle otg, these can be
+>> moved out of xceiv and then we can start using the generic PHY framework.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>   drivers/usb/musb/musb_core.c |    1 +
+>>   drivers/usb/musb/musb_core.h |    3 +++
+>>   drivers/usb/musb/omap2430.c  |   29 +++++++++++++++++++++--------
+>>   3 files changed, 25 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+>> index 37a261a..f732bcc 100644
+>> --- a/drivers/usb/musb/musb_core.c
+>> +++ b/drivers/usb/musb/musb_core.c
+>> @@ -1864,6 +1864,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
+>>   	musb->board_set_power = plat->set_power;
+>>   	musb->min_power = plat->min_power;
+>>   	musb->ops = plat->platform_ops;
+>> +	musb->phy_label = plat->phy_label;
+>>
+>>   	/* The musb_platform_init() call:
+>>   	 *   - adjusts musb->mregs
+>> diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+>> index 7fb4819..498ae21 100644
+>> --- a/drivers/usb/musb/musb_core.h
+>> +++ b/drivers/usb/musb/musb_core.h
+>> @@ -46,6 +46,7 @@
+>>   #include <linux/usb.h>
+>>   #include <linux/usb/otg.h>
+>>   #include <linux/usb/musb.h>
+>> +#include <linux/phy/phy.h>
+>>
+>>   struct musb;
+>>   struct musb_hw_ep;
+>> @@ -357,6 +358,7 @@ struct musb {
+>>   	u16			int_tx;
+>>
+>>   	struct usb_phy		*xceiv;
+>> +	struct phy		*phy;
+>>
+>>   	int nIrq;
+>>   	unsigned		irq_wake:1;
+>> @@ -434,6 +436,7 @@ struct musb {
+>>   	unsigned                double_buffer_not_ok:1;
+>>
+>>   	struct musb_hdrc_config	*config;
+>> +	const char		*phy_label;
+>>
+>>   #ifdef MUSB_CONFIG_PROC_FS
+>>   	struct proc_dir_entry *proc_entry;
+>> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+>> index 628b93f..c62a004 100644
+>> --- a/drivers/usb/musb/omap2430.c
+>> +++ b/drivers/usb/musb/omap2430.c
+>> @@ -348,14 +348,24 @@ static int omap2430_musb_init(struct musb *musb)
+>>   	 * up through ULPI.  TWL4030-family PMICs include one,
+>>   	 * which needs a driver, drivers aren't always needed.
+>>   	 */
+>> -	if (dev->parent->of_node)
+>> +	if (dev->parent->of_node) {
+>> +		musb->phy = devm_phy_get(dev->parent, "usb2-phy");
+>> +
+>> +		/* We can't totally remove musb->xceiv as of now because
+>> +		 * musb core uses xceiv.state and xceiv.otg. Once we have
+>> +		 * a separate state machine to handle otg, these can be moved
+>> +		 * out of xceiv and then we can start using the generic PHY
+>> +		 * framework
+>> +		 */
+>>   		musb->xceiv = devm_usb_get_phy_by_phandle(dev->parent,
+>>   		    "usb-phy", 0);
+>> -	else
+>> +	} else {
+>>   		musb->xceiv = devm_usb_get_phy_dev(dev, 0);
+>> +		musb->phy = devm_phy_get(dev, musb->phy_label);
+>> +	}
+>>
+>> -	if (IS_ERR(musb->xceiv)) {
+>> -		status = PTR_ERR(musb->xceiv);
+>> +	if (IS_ERR(musb->xceiv) || IS_ERR(musb->phy)) {
+>> +		status = PTR_ERR(musb->xceiv) | PTR_ERR(musb->phy);
+>>
+>>   		if (status == -ENXIO)
+>>   			return status;
+>> @@ -397,9 +407,10 @@ static int omap2430_musb_init(struct musb *musb)
+>>   	if (glue->status != OMAP_MUSB_UNKNOWN)
+>>   		omap_musb_set_mailbox(glue);
+>>
+>> -	usb_phy_init(musb->xceiv);
+>> +	phy_init(musb->phy);
+>>
+>>   	pm_runtime_put_noidle(musb->controller);
+>> +	phy_pm_runtime_put(musb->phy);
+>
+> see, weird unbalanced calls :-)
+>
+> Make it all explicit:
+>
+> phy_pm_runtime_get_sync(phy);
+> phy_init(phy);
+> phy_pm_runtime_put(phy);
 
-OK, I have removed the mailbox tree for now.  Let me know if you want it
-to be back in again.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/90808085/attachment-0001.sig>
+I think then it makes sense to drop get_sync from phy_init()?
+
+Thanks
+Kishon
