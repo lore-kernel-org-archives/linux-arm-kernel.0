@@ -1,71 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Jun 2013 11:51:32 +0200
-Subject: [PATCH 2/5] pinctrl: clarify some dt pinconfig options
-In-Reply-To: <51C22C5F.5020402@wwwdotorg.org>
-References: <201306141741.46077.heiko@sntech.de>
- <201306141742.49923.heiko@sntech.de>
- <51C22C5F.5020402@wwwdotorg.org>
-Message-ID: <CACRpkdbKOWEjnkzY2zGOqWPQ7okBjhK4=QR0tHhJYQa42nefXQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 24 Jun 2013 11:54:51 +0200
+Subject: [PATCH v3 4/4] ARM: dts: mvebu: Introduce a new compatible string
+ for mv64xxx-i2c
+In-Reply-To: <51C5CD57.6040200@gmail.com>
+References: <1371821529-13791-1-git-send-email-gregory.clement@free-electrons.com>
+ <1371821529-13791-5-git-send-email-gregory.clement@free-electrons.com>
+ <20130621140707.GO31667@titan.lakedaemon.net> <51C46001.30500@gmail.com>
+ <20130621171836.GC10905@obsidianresearch.com> <51C5CD57.6040200@gmail.com>
+Message-ID: <51C8176B.4000807@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 12:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/14/2013 09:42 AM, Heiko St?bner wrote:
+On 06/22/2013 06:14 PM, Sebastian Hesselbarth wrote:
+> On 06/21/2013 07:18 PM, Jason Gunthorpe wrote:
+>> On Fri, Jun 21, 2013 at 04:15:29PM +0200, Sebastian Hesselbarth wrote:
+>>> from a quick check of the patch set (which you forgot to send to LKML)
+>>> I am wondering why you didn't update the of matches struct with the new
+>>> compatible for "marvell,mv78230-i2c"? This will save you from still
+>>> having "marvell,mv64xxx-i2c" as additional compatible to match device
+>>> and driver. With that the above should also be s/and/or/.
+>>
+>> Agree, I noticed the same things.
+>>
+>> Alos, the compatible string should be:
+>>
+>>    compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+>>
+>> (note the order reversal, most specific is first)
+> 
+> Actually, I suggest to use "marvell,mv78230-i2c" alone. With a new
+> entry in the match table it will be sufficient for matching driver and
 
->> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->
->> -low-power-mode               - low power mode
->> +low-power-enable     - enable low power mode
->> +low-power-disable    - disable low power mode
->
-> Hmmm. That's changing the binding definition. What if somebody already
-> wrote their device tree according previous definition?
+I would prefer using a specialization rather than a new entry, so I can just
+use the "marvell,mv64xxx-i2c" entry for the data pointer .
 
-It's not merged so see it as alterations to a WIP in the
-turners workshop or something.
+> device. BTW, is mv78230 sufficient to match all SoC variants having
+> this feature? Maybe mv78xx0 but that could interfere with Discovery
+> Innovation or even better armada-xp-i2c (or armada-370-i2c)?
 
-> It seems to be that tri-states are preferable for pinctrl DT:
->
-> no entry: do nothing
-> = 0: disable
-> = 1: enable
+I am pretty sure that the convention in the device tree is to always use
+specific product numbers, rather than wildcards. So, here, the choice of
+mv78230 was just that we can see the mv78260 and mv78460 as extension of
+the mv78230, so I chose the smallest common denominator.
 
-Better with explict enable/disable strings instead of
-<0> or <1> I think, but the semantic effect would be the
-same I guess, the upside with *enable/*disable strings is
-that we do not have to handle cases like
-tristate = <2>; ...
+> 
+>> and I think it is better to use the 'data' field of of_device_id than
+>> a of_is_compatible call. The former is sensitive to order of the
+>> compatible string, the latter is not.
+> 
+> IMHO as long as there is only one compatible and only a bool to set,
+> using of_device_is_compatible without data pointer is fine here.
+> IIRC sunxi i2c isn't using data pointer the different register offset
+> struct, so we shouldn't for a simple bool. And casting a bool to
+> (void *) looks awkward.
+> 
+> Sebastian
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
->> +Arguments for parameters:
->> +
->> +- bias-pull-up, -down and -pin-default take as optional argument 0 to disable
->> +  the pull, on hardware supporting it the pull strength in Ohm. bias-disable
->> +  will also disable any active pull.
->
-> Does this agree with the latest definition of the kernel-internal
-> meaning of 0 for pull-up/down?
 
-No that is wrong. Heiko, care to fix this binding doc?
-
->> +- input-schmitt takes as argument the adjustable hysteresis in a
->> +  driver-specific format
->> +
->> +- input-debounce takes the debounce time as argument or 0 to disable debouncing
->> +
->> +- power-source argument is the custom value describing the source to select
->> +
->> +- slew-rate takes as argument the target rate in a driver-specific format
->
-> If those things have driver-specific (note: should be
-> DT-binding-specific, not driver-specific) values, then I'm not convinced
-> that having a generic parameter name for them is a good idea; it makes
-> things look the same when they aren't. By forcing each binding to
-> include the vendor prefix on those properties and hence define a custom
-> property name, you're making it clear that the semantics may be different.
-
-Hmmm I don't think they're used right now, let's deal with them when
-we have something to showcase them with. Patches to delete the
-unclear bindings will be considered...
-
-Yours,
-Linus Walleij
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
