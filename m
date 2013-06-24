@@ -1,159 +1,29 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 24 Jun 2013 08:41:39 +0200
-Subject: [PATCHv2 1/3] iio: Add Nuvoton NAU7802 ADC driver
-In-Reply-To: <1371754675-12242-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1371754675-12242-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1371754675-12242-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <51C7EA23.1040707@metafoo.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 24 Jun 2013 14:51:26 +0800
+Subject: [RFC PATCH] ARM i.MX53: Fix UART pad configuration
+In-Reply-To: <1371821771-23450-1-git-send-email-p.zabel@pengutronix.de>
+References: <1371821771-23450-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130624065125.GB26254@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2013 08:57 PM, Alexandre Belloni wrote:
-> The Nuvoton NAU7802 ADC is a 24-bit 2-channels I2C ADC, with adjustable
-> gain and sampling rates.
+On Fri, Jun 21, 2013 at 03:36:11PM +0200, Philipp Zabel wrote:
+> The current default pad configuration for UART RX and TX pads sets a 360k
+> pull-down and writes 1 to a reserved bit (1 << 0). It doesn't seem right to
+> me that in idle state, the UART has to keep the signal high against a
+> pull-down resistor.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> This patch instead sets a 100k pull-up, which incidentally corresponds to the
+> register reset value for all but one (MX53_PAD_KEY_ROW0__UART4_RXD_MUX) pad,
+> and removes the write to the reserved bit.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 > ---
->  .../bindings/iio/adc/nuvoton-nau7802.txt           |  17 +
->  drivers/iio/adc/Kconfig                            |   9 +
->  drivers/iio/adc/Makefile                           |   1 +
->  drivers/iio/adc/nau7802.c                          | 603 +++++++++++++++++++++
->  4 files changed, 630 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt
->  create mode 100644 drivers/iio/adc/nau7802.c
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt b/Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt
-> new file mode 100644
-> index 0000000..9bc4218
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt
-> @@ -0,0 +1,17 @@
-> +* Nuvoton NAU7802 Analog to Digital Converter (ADC)use
-> +
-> +Required properties:
-> +  - compatible: Should be "nuvoton,nau7802"
-> +  - reg: Should contain the ADC I2C address
-> +
-> +Optional properties:
-> +  - nuvoton,vldo: Reference voltage in millivolts (integer)
-> +  - interrupts: IRQ line for the ADC. If not used the driver will use
-> +    polling.
-> +
-> +Example:
-> +adc2: nau7802 at 2a {
-> +	compatible = "nuvoton,nau7802";
-> +	reg = <0x2a>;
-> +	nuvoton,vldo = <3000>;
+> Or is there a valid reason to set a pull-down on those pads and to write 1
+> to the reserved bit?
 
-We usually use the regulator framework for specifying the reference voltage.
+IIRC, the setting was inherited from non-DT kernel.
 
-> +};
-[...]
-> diff --git a/drivers/iio/adc/nau7802.c b/drivers/iio/adc/nau7802.c
-> new file mode 100644
-> index 0000000..e1b6981
-> --- /dev/null
-> +++ b/drivers/iio/adc/nau7802.c
-> @@ -0,0 +1,603 @@
-[...]
-> +static int nau7802_set_gain(struct nau7802_state *st, int gain)
-> +{
-> +	u8 data;
-> +	int ret;
-> +
-> +	mutex_lock(&st->lock);
-> +	st->conversion_count = 0;
-> +
-> +	data = i2c_smbus_read_byte_data(st->client, NAU7802_REG_CTRL1);
-> +	if (data < 0)
-> +		goto nau7802_sysfs_set_gain_out;
+Applied as a fix for 3.11.
 
-ret will be uninitialized if the goto above is taken
-
-> +	ret = i2c_smbus_write_byte_data(st->client, NAU7802_REG_CTRL1,
-> +					(data & (~NAU7802_CTRL1_GAINS_BITS)) |
-> +					gain);
-> +
-> +nau7802_sysfs_set_gain_out:
-> +	mutex_unlock(&st->lock);
-> +
-> +	return ret ? ret : 0;
-> +}
-[...]
-> +static int nau7802_read_irq(struct iio_dev *indio_dev,
-> +			struct iio_chan_spec const *chan,
-> +			int *val)
-> +{
-> +	struct nau7802_state *st = iio_priv(indio_dev);
-> +	int ret;
-> +
-> +	INIT_COMPLETION(st->value_ok);
-> +	enable_irq(st->client->irq);
-
-Is it really necessary to enable/disable the IRQ or could you keep it
-enabled all the time?
-
-> +
-> +	nau7802_sync(st);
-> +
-> +	/* read registers to ensure we flush everything */
-> +	ret = nau7802_read_conversion(st);
-> +	if (ret < 0)
-> +		goto read_chan_info_failure;
-> +
-> +	/* Wait for a conversion to finish */
-> +	ret = wait_for_completion_interruptible_timeout(&st->value_ok,
-> +			msecs_to_jiffies(1000));
-> +	if (ret == 0)
-> +		ret = -ETIMEDOUT;
-> +
-> +	if (ret < 0)
-> +		goto read_chan_info_failure;
-> +
-> +	disable_irq(st->client->irq);
-> +
-> +	*val = st->last_value;
-> +
-> +	return IIO_VAL_INT;
-> +
-> +read_chan_info_failure:
-> +	disable_irq(st->client->irq);
-> +
-> +	return ret;
-> +}
-[...]
-
-[...]
-> +static int nau7802_probe(struct i2c_client *client,
-> +			const struct i2c_device_id *id)
-> +{
-> +	struct iio_dev *indio_dev;
-> +	struct nau7802_state *st;
-> +	struct device_node *np = client->dev.of_node;
-> +	int i, ret;
-> +	u8 data;
-> +	u32 tmp;
-> +
-> +	if (!client->dev.of_node) {
-> +		dev_err(&client->dev, "No device tree node available.\n");
-> +		return -EINVAL;
-> +	}
-
-Except for getting the vref the is no direct dependency on devicetree, if
-you switch to the regulator framework for the vref this check can be removed.
-
-[...]
-> +	/* Setup the ADC channels available on the board */
-> +	indio_dev->num_channels = 2;
-
-ARRAY_SIZE(nau7802_chan_array)
-
-> +	indio_dev->channels = nau7802_chan_array;
-> +
-> +	init_completion(&st->value_ok);
-
-You need to initialize the completion before requesting the IRQ handler.
-
-[...]
-> +}
+Shawn
