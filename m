@@ -1,29 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Jun 2013 18:15:57 +0200
-Subject: [PATCH] dmaengine: Add hisilicon k3 DMA engine driver
-In-Reply-To: <CAMj5Bkg_4G9n9BaQjA-Xj2p8jGO8PZxNW7E7jOeWMMZa5sH6yQ@mail.gmail.com>
-References: <1371444872-26994-1-git-send-email-zhangfei.gao@linaro.org>
- <201306211341.53928.arnd@arndb.de>
- <CAMj5Bkg_4G9n9BaQjA-Xj2p8jGO8PZxNW7E7jOeWMMZa5sH6yQ@mail.gmail.com>
-Message-ID: <10541174.SUr9yD0veu@wuerfel>
+From: dsd@laptop.org (Daniel Drake)
+Date: Mon, 24 Jun 2013 10:17:41 -0600
+Subject: [V2 5/7] video: mmp: add pitch info in mmp_win structure
+In-Reply-To: <CACDDiy9CP2NyLAwCSr97yOAS50gz6HumY9cAHwO1DFRSCy9L-w@mail.gmail.com>
+References: <1370879574-11397-1-git-send-email-jtzhou@marvell.com>
+ <CAMLZHHRxS-wqd4Tb=Af6VEnfRb9MJeNo5RC7qeTLBZ0rgU69pw@mail.gmail.com>
+ <CACDDiy9CP2NyLAwCSr97yOAS50gz6HumY9cAHwO1DFRSCy9L-w@mail.gmail.com>
+Message-ID: <CAMLZHHTzR4WffVdw2nWVP6c0_jBb1vW=mOR3RrQudjUNu5Hupg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 June 2013 16:49:08 zhangfei gao wrote:
-> 
-> Dear Arnd & Vinod
-> 
-> The suggestion of using dma_get_slave_channel instead of filter works here.
-> Dma driver should modify accordingly.
+On Mon, Jun 24, 2013 at 4:34 AM, jett zhou <jett.zhou@gmail.com> wrote:
+>     pitch is used to represent line length in byte, the usage depends
+> on pix_fmt.
+>     If the fmt is YUV , the pitch[0] will be Y length, pitch[1] will
+> be U length, pitch[2] will be V lenth.
+>     If the fmt is RGB, the picth[0] will be line lenth, and
+> pitch[1]/pitch[2] will be 0 and not be used.
 
-The changes all look good to me, thanks a lot for following up!
+This description is clear, thanks - hopefully you can write it with
+such clarity in the comment :)
 
-However, you should really follow the procedure for posting patches even
-if it's just for the sake of discussion:
+>     For the patch rolling, do you mean combine the patch5 and patch6
+> by one patch?
 
-* always provide a signed-off-by and a patch description
-* use an email client that doesn't break whitespace
-* I would have split this up into two separate patches, one for the
-  subsystem and one for the new driver.
+I view patch 6 as a cleanup (consolidating and removing duplication of
+code), so I would leave that one separate. Patch 6 should not interact
+with any pitch[] stuff.
 
-	Arnd
+Then you can write a followup patch which adds the pitch[] header,
+*and* modifies mmpfb_set_par() to write to pitch[], *and* acts upon
+pitch[] in dmafetch_set_fmt (patch 7). This way, the pitch variable is
+defined, documented, written to, and acted upon all in the same patch,
+the meaning will then be very clear.
+
+Thanks
+Daniel
