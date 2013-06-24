@@ -1,122 +1,40 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon, 24 Jun 2013 13:01:27 -0600
-Subject: [PATCH v3 3/3] Documentation: Add documentation for APM X-Gene clock
- binding
-In-Reply-To: <1372100487-9367-3-git-send-email-lho@apm.com>
-References: <1372100487-9367-1-git-send-email-lho@apm.com>
- <1372100487-9367-2-git-send-email-lho@apm.com>
- <1372100487-9367-3-git-send-email-lho@apm.com>
-Message-ID: <1372100487-9367-4-git-send-email-lho@apm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 24 Jun 2013 12:02:27 -0700
+Subject: [PATCH v7 00/11] Add generic set_rate clk_ops for PLL35xx and
+ PLL36xx for samsung SoCs
+In-Reply-To: <51C85F8F.9050501@samsung.com>
+References: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
+ <CAKew6eUOy4=D08v_iq7CTRY5gvt37VAN7Z7WOr2Yt25znDJb2g@mail.gmail.com>
+ <CAGm_ybiVZOPBJJ0bYX33wafn1So6aqSAnk7myXZ+Z+RfLBeBQw@mail.gmail.com>
+ <1524664.UCV47tfIRU@flatron> <20130621163143.9136.28807@quantum>
+ <51C85F8F.9050501@samsung.com>
+Message-ID: <20130624190227.20448.68120@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation: Add documentation for APM X-Gene clock binding with PLL and
-device clocks.
+Quoting Kukjin Kim (2013-06-24 08:02:39)
+> On 06/22/13 01:31, Mike Turquette wrote:
+> >
+> > Acked-by: Mike Turquette<mturquette@linaro.org>
+> >
+> > Or I can take this through the clk tree. Either way is fine.
+> >
+> Mike, please go ahead taking this series into the clk tree for 3.11.
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
-Signed-off-by: Vinayak Kale <vkale@apm.com>
-Signed-off-by: Feng Kan <fkan@apm.com>
----
- Documentation/devicetree/bindings/clock/xgene.txt |   90 +++++++++++++++++++++
- 1 files changed, 90 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/xgene.txt
+Actually it might be better for you to take it. Patch #5 relies on
+drivers/clk/samsung/clk-exynos5420.c which only exists in the samsung
+tree.  It was introduced by commit 1609027f, "clk: exynos5420: register
+clocks using common clock framework".
 
-diff --git a/Documentation/devicetree/bindings/clock/xgene.txt b/Documentation/devicetree/bindings/clock/xgene.txt
-new file mode 100644
-index 0000000..4f864bd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/xgene.txt
-@@ -0,0 +1,90 @@
-+Device Tree Clock bindings for APM X-Gene
-+
-+This binding uses the common clock binding[1].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Required properties:
-+- compatible : shall be one of the following:
-+	"apm,xgene-socpll-clock" - for a X-Gene SoC PLL clock
-+	"apm,xgene-pcppll-clock" - for a X-Gene PCP PLL clock
-+	"apm,xgene-device-clock" - for a X-Gene device clock
-+
-+Required properties for SoC or PCP PLL clocks:
-+- reg : shall be the physical PLL register address for the pll clock.
-+- clocks : shall be the input parent clock phandle for the clock. This should
-+	be the reference clock.
-+- #clock-cells : shall be set to 1.
-+- clock-output-names : shall be the name of the PLL referenced by derive
-+  clock.
-+Optional properties for PLL clocks:
-+- clock-names : shall be the name of the PLL. If missing, use the device name.
-+
-+Required properties for device clocks:
-+- reg : shall be the physical CSR reset address base and physical CSR divider
-+        address base. If one does not exist, specify 0 for address and 0 for 
-+        size.
-+- clocks : shall be the input parent clock phandle for the clock.
-+- #clock-cells : shall be set to 1.
-+- clock-output-names : shall be the name of the device referenced.
-+Optional properties for device clocks:
-+- clock-names : shall be the name of the device clock. If missing, use the
-+                device name.
-+- flags : Any clock flags. ie. use 0x8 to leave clock un-touch if not
-+          referenced. Default is 0.
-+- csr-offset : Offset to the CSR reset register from the reset address base.
-+               Default is 0.
-+- csr-mask : CSR reset mask bit. Default is 0xF.
-+- enable-offset : Offset to the enable register from the reset address base.
-+                  Default is 0x8.
-+- enable-mask : CSR enable mask bit. Default is 0xF.
-+- divider-offset : Offset to the divider CSR register from the divider base.
-+                   Default is 0x0.
-+- divider-width : Width of the divider register. Default is 0.
-+- divider-shift : Bit shift of the divider register. Default is 0.
-+
-+For example:
-+
-+	pcppll: pcppll at 17000100 {
-+		compatible = "apm,xgene-pcppll-clock";
-+		#clock-cells = <1>;
-+		clocks = <&refclk 0>;
-+		clock-names = "pcppll";
-+		reg = <0x0 0x17000100 0x0 0x1000>;
-+		clock-output-names = "pcppll";
-+		type = <0>;
-+	};
-+
-+	socpll: socpll at 17000120 {
-+		compatible = "apm,xgene-socpll-clock";
-+		#clock-cells = <1>;
-+		clocks = <&refclk 0>;
-+		clock-names = "socpll";
-+		reg = <0x0 0x17000120 0x0 0x1000>;
-+		clock-output-names = "socpll";
-+		type = <1>;
-+	};
-+
-+	qmlclk: qmlclk {
-+		compatible = "apm,xgene-device-clock";
-+		#clock-cells = <1>;
-+		clocks = <&socplldiv2 0>;
-+		clock-names = "qmlclk";
-+		reg = <0x0 0x1703C000 0x0 0x1000
-+			0x0 0x00000000 0x0 0x0000>;
-+		clock-output-names = "qmlclk";
-+	};
-+
-+	ethclk: ethclk {
-+		compatible = "apm,xgene-device-clock";
-+		#clock-cells = <1>;
-+		clocks = <&socplldiv2 0>;
-+		clock-names = "ethclk";
-+		reg = <0x0 0x00000000 0x0 0x0000
-+			0x0 0x17000000 0x0 0x1000>;
-+			divider-offset = <0x238>;
-+		divider-width = <0x9>;
-+		divider-shift = <0x0>;
-+		clock-output-names = "ethclk";
-+	};
-+
--- 
-1.5.5
+And these patches need to be applied with some fuzz to the clk tree due
+to other changes which are not in my tree and only present in yours.
+
+The best two options are either for you to take this series or it can be
+rebased on top of clk-next, after which I'll apply it.
+
+Regards,
+Mike
+
+> 
+> Thanks,
+> - Kukjin
