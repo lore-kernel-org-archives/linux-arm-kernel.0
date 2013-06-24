@@ -1,48 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 24 Jun 2013 12:59:16 +0200
-Subject: [PATCH 3/3] ARM: at91/PMC: at91sam9n12 family has USB HS feature
-In-Reply-To: <51C82369.1080900@atmel.com>
-References: <cover.1372064763.git.nicolas.ferre@atmel.com>
- <a3b28f9041482ff60ed0b1b7a6f11d0b1beb5163.1372064763.git.nicolas.ferre@atmel.com>
- <51C82369.1080900@atmel.com>
-Message-ID: <51C82684.6090700@atmel.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 24 Jun 2013 13:05:16 +0200 (CEST)
+Subject: [PATCH v2 3/4] ARM: shmobile: ape6evm: add CPUFreq support
+Message-ID: <Pine.LNX.4.64.1306241257190.19735@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/06/2013 12:46, Bo Shen :
-> Hi Nicolas,
->
-> On 06/24/2013 05:08 PM, Nicolas Ferre wrote:
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>   arch/arm/mach-at91/clock.c | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
->> index 978de42..1b9bbba 100644
->> --- a/arch/arm/mach-at91/clock.c
->> +++ b/arch/arm/mach-at91/clock.c
->> @@ -88,6 +88,7 @@ EXPORT_SYMBOL_GPL(at91_pmc_base);
->>   #define cpu_has_udpfs()        (!(cpu_is_at91sam9rl() \
->>                   || cpu_is_at91sam9g45() \
->>                   || cpu_is_at91sam9x5() \
->> +                || cpu_is_at91sam9n12() \
->>                   || cpu_is_sama5d3()))
->
-> The at91sam9n12 don't have USB HS device port feature. It only has USB
-> FS device port feature.
+This patch adds OPPs to the CA15 DT node and a max8973 DT node to support
+clock and voltage scaling, using the cpufreq-cpu0 CPUFreq driver.
 
-OMG! sure ;-)
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+---
 
-So I remove this patch from my series (sorry for the noise ;-))
+v2: Subject to Mark acking v2 of my max8973 DT patch, this should be the 
+updated version of my original ape6evm CPUFreq patch. This version puts 
+all max8973 regulator bindings directly under the respective I2C device 
+node instead of creating 2 additional levels.
 
->
->>   #define cpu_has_plladiv2()    (cpu_is_at91sam9g45() \
->>
->
-> Best Regards,
-> Bo Shen
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
 
-Thanks! bye.
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+index 4fb0102..27c5e06 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+@@ -52,3 +52,25 @@
+ 		};
+ 	};
+ };
++
++&i2c5 {
++	vdd_dvfs: max8973 at 1b {
++		compatible = "maxium,max8973";
++		reg = <0x1b>;
++
++		regulator-min-microvolt = <935000>;
++		regulator-max-microvolt = <1200000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++};
++
++&cpu0 {
++	cpu0-supply = <&vdd_dvfs>;
++	operating-points = <
++		/* kHz  uV */
++		1950000 1115000
++		1462500  995000
++	>;
++	voltage-tolerance = <1>; /* 1% */
++};
 -- 
-Nicolas Ferre
+1.7.2.5
