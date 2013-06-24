@@ -1,59 +1,156 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 24 Jun 2013 19:24:56 +0200
-Subject: [PATCHv3 0/3] Add support for the Nuvoton NAU7802 ADC to the cfa10049
-Message-ID: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Mon, 24 Jun 2013 19:24:58 +0200
+Subject: [PATCHv3 2/3] ARM: mxs: cfa10049: Switch bus i2c1 to bitbanging
+In-Reply-To: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1372094699-3832-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-This is v3 of the patchset that adds support for the 3 Nuvoton NAU7802 ADCs
-present on the CFA-10049 board from Crystalfontz. The first patch adds the
-driver, the next ones are adding them in the DT after switching the second i2c
-bus to bitbanging following a lot of timeout issues we have on that bus.
+The ADCs connected to this bus have been experiencing some timeout
+issues when using the iMX28 i2c controller. Switching back to bitbanging
+solves this.
 
-Changes in v3:
- - removed the min_conversion knob in sysfs, it is now hardcoded to 6
- - added error checking in probe
- - corrected error checking
- - corrected possibly uninitialized vldo
- - used ARRAY_SIZE(nau7802_chan_array) instead of 2
- - added that vldo refers to the internal voltage regulator
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/imx28-cfa10049.dts | 108 +++++++++++++++++++++--------------
+ 1 file changed, 65 insertions(+), 43 deletions(-)
 
-Changes in v2:
- - channels are now statically allocated
- - no wrappers around i2c functions
- - sampling_freq is a shared attribute
- - setting gain is done through scale
- - cosmetics changes (s/idev/indio_dev/, blank lines before returns)
- - use of sign_extend32 to extend the sign
- - reading scale now returns IIO_VAL_FRACTIONAL_LOG2
- - no dt lookup for interrupts, this is done in of_i2c.c but that was mask due
- to a bug.
-
-what I didn't address is setting the external reference voltage through a fixed
-regulator and I kept the vldo attribute to set the internal voltage reference in
-the DT as Jonathan seemed to be ok with that. If anybody is using a nau7802 with
-an external reference, it will still be time to add the fixed regulator. It
-shouldn't be difficult but I don't have any hardware to test.
-
-Regards,
-
-Alexandre Belloni (1):
-  iio: Add Nuvoton NAU7802 ADC driver
-
-Maxime Ripard (2):
-  ARM: mxs: cfa10049: Switch bus i2c1 to bitbanging
-  ARM: mxs: cfa10049: Add NAU7802 ADCs to the device tree
-
- .../bindings/iio/adc/nuvoton-nau7802.txt           |  18 +
- arch/arm/boot/dts/imx28-cfa10049.dts               | 126 +++--
- drivers/iio/adc/Kconfig                            |   9 +
- drivers/iio/adc/Makefile                           |   1 +
- drivers/iio/adc/nau7802.c                          | 576 +++++++++++++++++++++
- 5 files changed, 687 insertions(+), 43 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt
- create mode 100644 drivers/iio/adc/nau7802.c
-
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index 05ae549..d3758c2 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -139,6 +139,17 @@
+ 					fsl,pull-up = <0>; /* 0 will enable the keeper */
+ 				};
+ 
++				i2c1_pins_cfa10049: i2c1 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x3103 /* MX28_PAD_PWM0__GPIO */
++						0x3113 /* MX28_PAD_PWM1__I2C1_SDA */
++					>;
++					fsl,drive-strength = <1>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
++
+ 				fiq_pins_cfa10049: fiq at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+@@ -199,49 +210,6 @@
+ 				status = "okay";
+ 			};
+ 
+-			i2c1: i2c@8005a000 {
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&i2c1_pins_a>;
+-				status = "okay";
+-			};
+-
+-			i2cmux {
+-				compatible = "i2c-mux-gpio";
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-				mux-gpios = <&gpio1 22 0 &gpio1 23 0>;
+-				i2c-parent = <&i2c1>;
+-
+-				i2c at 0 {
+-					reg = <0>;
+-				};
+-
+-				i2c at 1 {
+-					reg = <1>;
+-				};
+-
+-				i2c at 2 {
+-					reg = <2>;
+-				};
+-
+-				i2c at 3 {
+-					reg = <3>;
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-
+-					pca9555: pca9555 at 20 {
+-						compatible = "nxp,pca9555";
+-						interrupt-parent = <&gpio2>;
+-						interrupts = <19 0x2>;
+-						gpio-controller;
+-						#gpio-cells = <2>;
+-						interrupt-controller;
+-						#interrupt-cells = <2>;
+-						reg = <0x20>;
+-					};
+-				};
+-			};
+-
+ 			usbphy1: usbphy at 8007e000 {
+ 				status = "okay";
+ 			};
+@@ -366,6 +334,60 @@
+ 		rotary-encoder,relative-axis;
+ 	};
+ 
++	i2c1gpio: i2c at 0 {
++		compatible = "i2c-gpio";
++		pinctrl-0 = <&i2c1_pins_cfa10049>;
++		pinctrl-names = "default";
++		gpios = <
++			&gpio3 17 0 /* sda */
++			&gpio3 16 0 /* scl */
++			 >;
++		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
++	};
++
++	i2cmux {
++		compatible = "i2c-mux-gpio";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		mux-gpios = <&gpio1 22 0 &gpio1 23 0>;
++		i2c-parent = <&i2c1gpio>;
++
++		i2c at 0 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		i2c at 1 {
++			reg = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		i2c at 2 {
++			reg = <2>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		i2c at 3 {
++			reg = <3>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			pca9555: pca9555 at 20 {
++				compatible = "nxp,pca9555";
++				interrupt-parent = <&gpio2>;
++				interrupts = <19 0x2>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0x20>;
++			};
++		};
++	};
++
+ 	backlight {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm 3 5000000>;
 -- 
 1.8.1.2
