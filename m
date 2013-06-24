@@ -1,85 +1,48 @@
-From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Mon, 24 Jun 2013 09:30:23 -0300
-Subject: Fwd: mxs-lradc oops when unloading module
-In-Reply-To: <51C5847C.7030100@kernel.org>
-References: <CAP9ODKof+yv27-zHSO9MTLC9Wv6F6Ya-Ot-vW7OK7kwadYK8Xg@mail.gmail.com>
- <CAP9ODKq92LW-xQyiHkVe6AkwaaYV11nt92DxCEzUioEVARTZXw@mail.gmail.com>
- <51C5847C.7030100@kernel.org>
-Message-ID: <CAP9ODKohhQVTwj40K-h1LDAqjk6+nO1r=Fq404Xy1DUZWfwRxg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Jun 2013 14:37:16 +0200
+Subject: [PATCH] pinctrl: document the pinctrl PM states
+In-Reply-To: <20130617180212.GU20992@atomide.com>
+References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
+ <51BA1FE7.4000900@wwwdotorg.org>
+ <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
+ <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
+ <CACRpkdYwGHMznjoJqf5bX_74pmeKSiWtTwpNF1_4GSEk+KwrZA@mail.gmail.com>
+ <20130617180212.GU20992@atomide.com>
+Message-ID: <CACRpkdY7hF+9s0f64yc09DHLFQCjzzhPoS-ypBmgit=kFFD0Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 22, 2013 at 8:03 AM, Jonathan Cameron <jic23@kernel.org> wrote:
->> From what I could grasp, it might be related to the IIO subsystem but
->> I couldn't find the culprit.
->>
->> It seems "iio_device_unregister_trigger_consumer", as:
->>
->> void iio_device_unregister_trigger_consumer(struct iio_dev *indio_dev)
->> {
->> /* Clean up an associated but not attached trigger reference */
->> if (indio_dev->trig)
->> iio_trigger_put(indio_dev->trig);
->> }
->>
->> and , as:
->>
->> static inline void iio_trigger_put(struct iio_trigger *trig)
->> {
->> module_put(trig->ops->owner);
->> put_device(&trig->dev);
->> }
->>
->> so, somehow the trig->ops is NULL here.
->>
->> Do someone has a clue?
->>
-> I think the issue is more core to iio trigger handling than that, you
-> have just been unlucky enough to hit a bug that has been there a while.
->
-> In iio_trigger_unregister we call
-> iio_device_unregister which in turn calls device_del (as intended) and
-> device_put (as not!).  Then we get an additional device_put from
-> iio_trigger_free giving us one more than we should have an resulting
-> in a double attempt to free the device.
->
-> Could you try the following change and see if it solves the problem?
-> (the comment abov is 'interesting' and stupid given I've long ago
-> forgotten what it refers to, but it could be related to this issue...)
->
-> From 238faf76acaa9214b0eb607742dd14b134469328 Mon Sep 17 00:00:00 2001
-> From: Jonathan Cameron <jic23@kernel.org>
-> Date: Sat, 22 Jun 2013 12:00:04 +0100
-> Subject: [PATCH] iio:trigger: device_unregister->device_del to avoid double
->  free
->
-> iio_trigger unregistration and freeing has been separated in this
-> code for some time, but it looks like the calls to the device
-> handling were not appropriately updated.
->
-> Signed-off-by: Jonathan Cameron <jic23@kernel.org>
-> ---
->  drivers/iio/industrialio-trigger.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/iio/industrialio-trigger.c b/drivers/iio/industrialio-trigger.c
-> index 4d6c7d8..ea8a414 100644
-> --- a/drivers/iio/industrialio-trigger.c
-> +++ b/drivers/iio/industrialio-trigger.c
-> @@ -104,7 +104,7 @@ void iio_trigger_unregister(struct iio_trigger *trig_info)
->
->         ida_simple_remove(&iio_trigger_ida, trig_info->id);
->         /* Possible issue in here */
-> -       device_unregister(&trig_info->dev);
-> +       device_del(&trig_info->dev);
->  }
->  EXPORT_SYMBOL(iio_trigger_unregister);
+On Mon, Jun 17, 2013 at 8:02 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Linus Walleij <linus.walleij@linaro.org> [130617 09:11]:
 
-Tested-by: Otavio Salvador <otavio@ossystems.com.br>
+>> Bear in mind that struct pinctl * forks effects in two paths,
+>> one is muxing the other is config, like pull-ups etc.
+>
+> I also thought the plan was to merge pinmux and pinconf and
+> do things based the named modes?
 
-It does fix the Oops for me.
+That is done from a consumer point of view.
+Consumers only care about pinctrl * handles
+and pinctrl_state * switches.
 
---
-Otavio Salvador                             O.S. Systems
-http://www.ossystems.com.br        http://projetos.ossystems.com.br
-Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
+> The last time I tried using the pinconf functions it involved
+> knowing the name of the pin in the consumer driver. The name
+> may not be very descriptive in the device tree cases at least
+> for the pinctrl-single. So I did not pay much attention to
+> the pinconf functions.
+
+Consumers should not use that interface, i.e.:
+
+int pin_config_get(const char *dev_name, const char *name,
+                                unsigned long *config);
+int pin_config_set(const char *dev_name, const char *name,
+                                 unsigned long config)
+
+This needs to be deleted from <linux/pinctrl/consumer.h>
+I'll see if I can get rid of it pronto to avoid any more confusion
+and sorry for leaving that in place for too long.
+
+The proper way to use it is to use the states.
+
+Yours,
+Linus Walleij
