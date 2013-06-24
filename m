@@ -1,70 +1,68 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 24 Jun 2013 20:16:21 +0530
-Subject: [GIT PULL] DaVinci SoC updates for v3.11 (part 2)
-In-Reply-To: <51C85ABE.6020505@ti.com>
-References: <51C85ABE.6020505@ti.com>
-Message-ID: <51C85BBD.1080002@ti.com>
+From: dsd@laptop.org (Daniel Drake)
+Date: Mon, 24 Jun 2013 08:48:14 -0600
+Subject: MMP display subsystem questions
+In-Reply-To: <51C7F4C5.9040903@marvell.com>
+References: <CAMLZHHTmSzzcL-aqk6rMjuD8Ct2zno--p7tUGfVVsocWiyhf8A@mail.gmail.com>
+ <51C3BD65.8070206@marvell.com>
+ <CAMLZHHQFtXWx0weG3uh14Nm3euqbSqyztBEQHEQFBzjFxWGTZA@mail.gmail.com>
+ <51C7F4C5.9040903@marvell.com>
+Message-ID: <CAMLZHHTERYrkeb-m7Q7UDNF2kd-MoQ+2T3K1XyukjzG7RjKPxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-replying to own with address of DaVinci kernel list fixed.
+On Mon, Jun 24, 2013 at 1:27 AM, Zhou Zhu <zzhu3@marvell.com> wrote:
+> Actually besides fb, v4l2 and an IOCTL based interface to support what
+> fb/v4l2 not provided are also added. The v4l2 or private interface could
+> also directly use same interface defined in include/video/mmp_disp.h to get
+> path/overlay and manipulate the hardware.
+> Patches for these interfaces would be submitted later and documentation
+> would also be added.
 
-On 6/24/2013 8:12 PM, Sekhar Nori wrote:
-> Hi Arnd, Olof,
-> 
-> Can you please pull the following EDMA related updates for v3.11?
-> There is a small change to drivers/dma/Kconfig that would have liked 
-> Vinod's ack, but the change is pretty trivial and the patches have
-> been out there for pretty long now.
-> 
-> Thanks,
-> Sekhar
-> 
-> The following changes since commit 7bb5d75ce91ca3725256c0d502624ed697231cde:
-> 
->   ARM: edma: remove unused transfer controller handlers (2013-06-18 10:53:13 +0530)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.11/soc-2
-> 
-> for you to fetch changes up to e65abbbc5279319ab679298f8740ddf53e022a5e:
-> 
->   dmaengine: edma: enable build for AM33XX (2013-06-24 15:55:08 +0530)
-> 
-> ----------------------------------------------------------------
-> DaVinci SoC updates for v3.11 - part 2
-> --------------------------------------
-> 
-> This pull request adds DT and runtime PM to
-> EDMA ARM private API so it can be used on
-> DT enabled DaVinci and OMAP platforms.
-> 
-> Also adds DMA channel crossbar mapping
-> support to be used by DT-enabled platforms
-> which use it.
-> 
-> ----------------------------------------------------------------
-> Lad, Prabhakar (1):
->       ARM: edma: Convert to devm_* api
-> 
-> Matt Porter (4):
->       dmaengine: edma: Add TI EDMA device tree binding
->       ARM: edma: Add DT and runtime PM support to the private EDMA API
->       ARM: edma: Add EDMA crossbar event mux support
->       dmaengine: edma: enable build for AM33XX
-> 
->  Documentation/devicetree/bindings/dma/ti-edma.txt |   34 +++
->  arch/arm/common/edma.c                            |  329 +++++++++++++++++----
->  arch/arm/mach-davinci/devices-da8xx.c             |    8 +-
->  arch/arm/mach-davinci/devices-tnetv107x.c         |    4 +-
->  arch/arm/mach-davinci/dm355.c                     |    4 +-
->  arch/arm/mach-davinci/dm365.c                     |    4 +-
->  arch/arm/mach-davinci/dm644x.c                    |    4 +-
->  arch/arm/mach-davinci/dm646x.c                    |    4 +-
->  arch/arm/mach-omap2/Kconfig                       |    1 +
->  drivers/dma/Kconfig                               |    2 +-
->  include/linux/platform_data/edma.h                |    5 +-
->  11 files changed, 324 insertions(+), 75 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
-> 
+This kind of reasoning normally does not act as justification for
+adding private interfaces to the kernel. I doubt such patches would be
+accepted. Instead, you would be encouraged to help improve the
+standard interfaces that are missing the functionality you require.
+
+> These settings are software related rather than what hw supports.
+> Vsync settings include whether fb wait vsync interrupt to sync buffers when
+> pan display or whether send uevent in vsync (which is a mechanism for
+> Android).
+> For yres_virtual size which is related with pre-reserved fb buffer size and
+> some buffer sync mechanism.
+> As these settings are pure fb related so we just not place it in panel.
+
+Thanks, that is clear now.
+
+>> 2. What about pix_fmt_out? Why is pixel format dumped into the mode
+>> specifier? If there is a supported panel that really can support
+>> different pixel formats, I would expect it to support all the pixel
+>> formats for all the resolution. This also seems unused within the
+>> driver.
+>
+> We added it due to 2 reasons:
+> 1. It impacts output timing settings inside controller for dsi case (we have
+> already in-home patches and would be submitted later). So it's required to
+> indicate that timing need to be changed.
+> 2. It's still possible that for some panel that could support different
+> resolution and pixel formats, but it might not support all pixel formats for
+> all resolutions.
+>
+> Also this variable is not used for dumb panel as it's already covered in
+> dumb mode in link config - dumb mode includes not only 16bpp or 24bpp but
+> also whether low 16 bits or high 16 bits used in 24 bits' lines. For coming
+> DSI panel, it's required and would be used.
+
+It is a little irritating trying to work with this driver when a
+number of undocumented strange details are dependent on unsubmitted
+work.
+
+I would suggest keeping this simple and making the pixel format
+specific to the panel, not specific to the resolution. While maybe it
+is possible we will see a panel that supports certain pixel formats at
+only certain resolutions, that seems unlikely, and doesn't seem to be
+anything we are working with at the moment?
+Moving pixel format out of the mode definition will help with
+compatibility with standard devicetree display-timings bindings, which
+is the reason that I asked this question.
+
+Daniel
