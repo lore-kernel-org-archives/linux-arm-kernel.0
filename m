@@ -1,48 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Jun 2013 14:37:16 +0200
-Subject: [PATCH] pinctrl: document the pinctrl PM states
-In-Reply-To: <20130617180212.GU20992@atomide.com>
-References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
- <51BA1FE7.4000900@wwwdotorg.org>
- <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
- <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
- <CACRpkdYwGHMznjoJqf5bX_74pmeKSiWtTwpNF1_4GSEk+KwrZA@mail.gmail.com>
- <20130617180212.GU20992@atomide.com>
-Message-ID: <CACRpkdY7hF+9s0f64yc09DHLFQCjzzhPoS-ypBmgit=kFFD0Mg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 24 Jun 2013 20:38:19 +0800
+Subject: [PATCH v3 5/5] drivers: bus: imx-weim: Add support for
+ i.MX1/21/25/27/31/35/50/51/53
+In-Reply-To: <1372074593.303395301@f394.i.mail.ru>
+References: <1371973698-16150-1-git-send-email-shc_work@mail.ru>
+ <1371973698-16150-5-git-send-email-shc_work@mail.ru>
+ <20130624113544.GA30747@S2101-09.ap.freescale.net>
+ <1372074593.303395301@f394.i.mail.ru>
+Message-ID: <20130624123817.GB30747@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 8:02 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Linus Walleij <linus.walleij@linaro.org> [130617 09:11]:
+On Mon, Jun 24, 2013 at 03:49:53PM +0400, Alexander Shiyan wrote:
+> > > @@ -81,6 +118,9 @@ static int __init weim_probe(struct platform_device *pdev)
+> > >  	void __iomem *base;
+> > >  	int ret;
+> > >  
+> > > +	if (!pdev->dev.of_node)
+> > > +		return -ENOTSUPP;
+> > > +
+> > Is it really necessary?  Since we only support DT probe, we can not
+> > reach here if the of_node is NULL.
+> 
+> In fact, nothing prevents to add to the board file line like
+> platform_device_register_simple ("imx-weim", 0, res, res_cnt);
 
->> Bear in mind that struct pinctl * forks effects in two paths,
->> one is muxing the other is config, like pull-ups etc.
->
-> I also thought the plan was to merge pinmux and pinconf and
-> do things based the named modes?
+Reasonability prevents that:
 
-That is done from a consumer point of view.
-Consumers only care about pinctrl * handles
-and pinctrl_state * switches.
+1) We no longer accept any changes like that.
+2) The device driver does not work with platform probe anyway.  What's
+   the point of doing that?
 
-> The last time I tried using the pinconf functions it involved
-> knowing the name of the pin in the consumer driver. The name
-> may not be very descriptive in the device tree cases at least
-> for the pinctrl-single. So I did not pay much attention to
-> the pinconf functions.
+> In this case, the core will crush. I make it impossible to use.
+> Consider it unnecessary checks?
 
-Consumers should not use that interface, i.e.:
+Yes, unnecessary check for me.
 
-int pin_config_get(const char *dev_name, const char *name,
-                                unsigned long *config);
-int pin_config_set(const char *dev_name, const char *name,
-                                 unsigned long config)
-
-This needs to be deleted from <linux/pinctrl/consumer.h>
-I'll see if I can get rid of it pronto to avoid any more confusion
-and sorry for leaving that in place for too long.
-
-The proper way to use it is to use the states.
-
-Yours,
-Linus Walleij
+Shawn
