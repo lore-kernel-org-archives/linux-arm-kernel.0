@@ -1,42 +1,30 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Mon, 24 Jun 2013 12:59:07 +0200
-Subject: [GIT PULL] ARM: CPUFreq updates for 3.11
-In-Reply-To: <CAKohpomThmZFKTufBzWpmokqqZJ8C6DtGTKTzBY=OxJPNT-BmA@mail.gmail.com>
-References: <CAKohpo=v4qPDH32Y4ithr_p007nTn5AOUzkUCiHTGgQN6-=BEw@mail.gmail.com>
- <1524748.bV9OZAOR0D@vostro.rjw.lan>
- <CAKohpomThmZFKTufBzWpmokqqZJ8C6DtGTKTzBY=OxJPNT-BmA@mail.gmail.com>
-Message-ID: <7195611.gCcafMWC85@vostro.rjw.lan>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 24 Jun 2013 12:57:42 +0200
+Subject: [PATCH] ARM: at91/PMC: fix at91sam9n12 USB FS init
+Message-ID: <1372071462-29063-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 24, 2013 04:12:29 PM Viresh Kumar wrote:
-> On 24 June 2013 16:19, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> > On Monday, June 24, 2013 11:20:35 AM Viresh Kumar wrote:
-> >> Hi Rafael,
-> >>
-> >> This is part of my patchset "CPUFreq: Fix {PRE|POST}CHANGE notification
-> >> sequence". It contains changes specific to cpufreq core and ARM drivers.
-> >>
-> >> I have left changes to non-ARM cpufreq drivers from this pull request. See if
-> >> you can take them for 3.11.
-> >>
-> >> The following changes since commit 9e895ace5d82df8929b16f58e9f515f6d54ab82d:
-> >>
-> >>   Linux 3.10-rc7 (2013-06-22 09:47:31 -1000)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   git://git.linaro.org/people/vireshk/linux.git cpufreq-fix-notification-arm
-> >>
-> >> for you to fetch changes up to f2d65dd0d573e6961165f0be35bac84997b9e707:
-> >
-> > Well, this contains changes that aren't specific to ARM as far as I can say.
-> 
-> Yeah, the first patch touches core. How do you want to proceed with this one
-> then? You will apply them from mail? Or you will apply first patch (core cpufreq
-> one) and I should send pull request without it?
+at91sam9n12 has Full-speed only USB. So we should add
+it to the list in at91_pllb_usbfs_clock_init() function.
 
-In your original series that patch was the last one.  What made you change your
-mind and put it in front?
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/clock.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Rafael
+diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+index 978de42..2f732d9 100644
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -699,7 +699,7 @@ static void __init at91_pllb_usbfs_clock_init(unsigned long main_clock)
+ 		at91_pmc_write(AT91_PMC_SCER, AT91RM9200_PMC_MCKUDP);
+ 	} else if (cpu_is_at91sam9260() || cpu_is_at91sam9261() ||
+ 		   cpu_is_at91sam9263() || cpu_is_at91sam9g20() ||
+-		   cpu_is_at91sam9g10()) {
++		   cpu_is_at91sam9g10() || cpu_is_at91sam9n12()) {
+ 		uhpck.pmc_mask = AT91SAM926x_PMC_UHP;
+ 		udpck.pmc_mask = AT91SAM926x_PMC_UDP;
+ 	}
+-- 
+1.8.2.2
