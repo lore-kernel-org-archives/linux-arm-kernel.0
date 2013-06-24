@@ -1,310 +1,176 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 24 Jun 2013 15:15:00 +0200
-Subject: [PATCH] pinctrl: rip out the direct pinconf API
-Message-ID: <1372079700-16580-1-git-send-email-linus.walleij@stericsson.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 24 Jun 2013 14:18:33 +0100
+Subject: [PATCH v2] irqchip: add support for MOXA ART SoCs
+In-Reply-To: <1371718732-12680-1-git-send-email-jonas.jensen@gmail.com>
+References: <20130618154104.7f8115c7@skate>
+ <1371718732-12680-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <20130624131833.DA9D33E0A89@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, 20 Jun 2013 10:58:52 +0200, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+> This patch adds an irqchip driver for the main interrupt controller found
+> on MOXA ART SoCs.
+> 
+> v2:
+> * use irq_chip_generic
+> * remove macro duplicates
+> 
+> Applies to next-20130619
+> 
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> ---
+>  drivers/irqchip/Makefile     |    1 +
+>  drivers/irqchip/irq-moxart.c |  109 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 110 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/irqchip/irq-moxart.c
+> 
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index cda4cb5..956d129 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -16,3 +16,4 @@ obj-$(CONFIG_RENESAS_INTC_IRQPIN)	+= irq-renesas-intc-irqpin.o
+>  obj-$(CONFIG_RENESAS_IRQC)		+= irq-renesas-irqc.o
+>  obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
+>  obj-$(CONFIG_ARCH_VT8500)		+= irq-vt8500.o
+> +obj-$(CONFIG_ARCH_MOXART)		+= irq-moxart.o
+> diff --git a/drivers/irqchip/irq-moxart.c b/drivers/irqchip/irq-moxart.c
+> new file mode 100644
+> index 0000000..25c0ff7
+> --- /dev/null
+> +++ b/drivers/irqchip/irq-moxart.c
+> @@ -0,0 +1,109 @@
+> +/*
+> + * MOXA ART SoCs IRQ chip driver.
+> + *
+> + * Copyright (C) 2013 Jonas Jensen
+> + *
+> + * Jonas Jensen <jonas.jensen@gmail.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/irq.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/irqdomain.h>
+> +
+> +#include <asm/exception.h>
+> +
+> +#include "irqchip.h"
+> +
+> +#define IRQ_SOURCE_REG      0
+> +#define IRQ_MASK_REG        0x04
+> +#define IRQ_CLEAR_REG       0x08
+> +#define IRQ_MODE_REG        0x0c
+> +#define IRQ_LEVEL_REG       0x10
+> +#define IRQ_STATUS_REG      0x14
+> +
+> +#define FIQ_SOURCE_REG      0x20
+> +#define FIQ_MASK_REG        0x24
+> +#define FIQ_CLEAR_REG       0x28
+> +#define FIQ_MODE_REG        0x2c
+> +#define FIQ_LEVEL_REG       0x30
+> +#define FIQ_STATUS_REG      0x34
+> +
+> +static void __iomem *moxart_irq_base;
+> +static struct irq_domain *moxart_irq_domain;
+> +static unsigned int interrupt_mask;
+> +
+> +asmlinkage void __exception_irq_entry moxart_handle_irq(struct pt_regs *regs)
+> +{
+> +	u32 irqstat;
+> +	int hwirq;
+> +
+> +	irqstat = readl(moxart_irq_base + IRQ_STATUS_REG);
+> +
+> +	while (irqstat) {
+> +		hwirq = ffs(irqstat) - 1;
+> +		handle_IRQ(irq_find_mapping(moxart_irq_domain, hwirq), regs);
+> +		irqstat &= ~(1 << hwirq);
+> +	}
+> +}
+> +
+> +static __init void moxart_alloc_gc(void __iomem *base,
+> +	unsigned int irq_start, unsigned int num)
+> +{
+> +	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
+> +	int ret;
+> +	struct irq_chip_generic *gc;
+> +
+> +	ret = irq_alloc_domain_generic_chips(moxart_irq_domain, 32, 1,
+> +		"MOXARTINTC", handle_edge_irq, clr, 0, IRQ_GC_INIT_MASK_CACHE);
+> +
+> +	if (ret)
+> +		pr_err("%s: could not alloc generic chip\n", __func__);
 
->From the inception ot the pin config API there has been the
-possibility to get a handle at a pin directly and configure
-its electrical characteristics. For this reason we had:
+If this failure point is hit, the code following it will segfault. Need
+to bail at this point.
 
-int pin_config_get(const char *dev_name, const char *name,
-               unsigned long *config);
-int pin_config_set(const char *dev_name, const char *name,
-               unsigned long config);
-int pin_config_group_get(const char *dev_name,
-               const char *pin_group,
-               unsigned long *config);
-int pin_config_group_set(const char *dev_name,
-               const char *pin_group,
-               unsigned long config);
+> +
+> +	gc = irq_get_domain_generic_chip(moxart_irq_domain, 0);
+> +
+> +	gc->reg_base = base;
+> +	gc->chip_types[0].regs.mask = IRQ_MASK_REG;
+> +	gc->chip_types[0].regs.ack = IRQ_CLEAR_REG;
+> +	gc->chip_types[0].chip.irq_ack = irq_gc_ack_set_bit;
+> +	gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
+> +	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
+> +}
 
-After the intruction of the pin control states that will
-control pins associated with devices, and its subsequent
-introduction to the device core, as well as the
-introduction of pin control hogs that can set up states on
-boot and optionally also at sleep, this direct pin control
-API is a thing of the past.
+Why is this split into a separate function? There really isn't any need
+to.
 
-As could be expected, it has zero in-kernel users.
-Let's delete this API and make our world simpler.
+> +
+> +static int __init moxart_of_init(struct device_node *node,
+> +	struct device_node *parent)
+> +{
+> +	interrupt_mask = be32_to_cpup(of_get_property(node,
+> +		"interrupt-mask", NULL));
+> +	pr_debug("%s: interrupt-mask=%x\n", node->full_name, interrupt_mask);
+> +
+> +	moxart_irq_base = of_iomap(node, 0);
+> +	if (!moxart_irq_base)
+> +		panic("%s: unable to map INTC CPU registers\n",
+> +			node->full_name);
 
-Reported-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- Documentation/pinctrl.txt        |  11 +--
- drivers/pinctrl/pinconf.c        | 174 ---------------------------------------
- include/linux/pinctrl/consumer.h |  43 ----------
- 3 files changed, 2 insertions(+), 226 deletions(-)
+Is in necessary to panic here? Often even if the interrupt controller
+setup fails, it is valueable to print an error, exit gracefully and let
+the kernel try to continue. There is a greater chance of getting some
+form output useful for debug that way.
 
-diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-index 3ee2475..c5948c7 100644
---- a/Documentation/pinctrl.txt
-+++ b/Documentation/pinctrl.txt
-@@ -203,15 +203,8 @@ using a certain resistor value - pull up and pull down - so that the pin has a
- stable value when nothing is driving the rail it is connected to, or when it's
- unconnected.
- 
--Pin configuration can be programmed either using the explicit APIs described
--immediately below, or by adding configuration entries into the mapping table;
--see section "Board/machine configuration" below.
--
--For example, a platform may do the following to pull up a pin to VDD:
--
--#include <linux/pinctrl/consumer.h>
--
--ret = pin_config_set("foo-dev", "FOO_GPIO_PIN", PLATFORM_X_PULL_UP);
-+Pin configuration can be programmed by adding configuration entries into the
-+mapping table; see section "Board/machine configuration" below.
- 
- The format and meaning of the configuration parameter, PLATFORM_X_PULL_UP
- above, is entirely defined by the pin controller driver.
-diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
-index 694c3ac..e875f21 100644
---- a/drivers/pinctrl/pinconf.c
-+++ b/drivers/pinctrl/pinconf.c
-@@ -75,98 +75,6 @@ int pin_config_get_for_pin(struct pinctrl_dev *pctldev, unsigned pin,
- 	return ops->pin_config_get(pctldev, pin, config);
- }
- 
--/**
-- * pin_config_get() - get the configuration of a single pin parameter
-- * @dev_name: name of the pin controller device for this pin
-- * @name: name of the pin to get the config for
-- * @config: the config pointed to by this argument will be filled in with the
-- *	current pin state, it can be used directly by drivers as a numeral, or
-- *	it can be dereferenced to any struct.
-- */
--int pin_config_get(const char *dev_name, const char *name,
--			  unsigned long *config)
--{
--	struct pinctrl_dev *pctldev;
--	int pin;
--
--	pctldev = get_pinctrl_dev_from_devname(dev_name);
--	if (!pctldev) {
--		pin = -EINVAL;
--		return pin;
--	}
--
--	mutex_lock(&pctldev->mutex);
--
--	pin = pin_get_from_name(pctldev, name);
--	if (pin < 0)
--		goto unlock;
--
--	pin = pin_config_get_for_pin(pctldev, pin, config);
--
--unlock:
--	mutex_unlock(&pctldev->mutex);
--	return pin;
--}
--EXPORT_SYMBOL(pin_config_get);
--
--static int pin_config_set_for_pin(struct pinctrl_dev *pctldev, unsigned pin,
--			   unsigned long config)
--{
--	const struct pinconf_ops *ops = pctldev->desc->confops;
--	int ret;
--
--	if (!ops || !ops->pin_config_set) {
--		dev_err(pctldev->dev, "cannot configure pin, missing "
--			"config function in driver\n");
--		return -EINVAL;
--	}
--
--	ret = ops->pin_config_set(pctldev, pin, config);
--	if (ret) {
--		dev_err(pctldev->dev,
--			"unable to set pin configuration on pin %d\n", pin);
--		return ret;
--	}
--
--	return 0;
--}
--
--/**
-- * pin_config_set() - set the configuration of a single pin parameter
-- * @dev_name: name of pin controller device for this pin
-- * @name: name of the pin to set the config for
-- * @config: the config in this argument will contain the desired pin state, it
-- *	can be used directly by drivers as a numeral, or it can be dereferenced
-- *	to any struct.
-- */
--int pin_config_set(const char *dev_name, const char *name,
--		   unsigned long config)
--{
--	struct pinctrl_dev *pctldev;
--	int pin, ret;
--
--	pctldev = get_pinctrl_dev_from_devname(dev_name);
--	if (!pctldev) {
--		ret = -EINVAL;
--		return ret;
--	}
--
--	mutex_lock(&pctldev->mutex);
--
--	pin = pin_get_from_name(pctldev, name);
--	if (pin < 0) {
--		ret = pin;
--		goto unlock;
--	}
--
--	ret = pin_config_set_for_pin(pctldev, pin, config);
--
--unlock:
--	mutex_unlock(&pctldev->mutex);
--	return ret;
--}
--EXPORT_SYMBOL(pin_config_set);
--
- int pin_config_group_get(const char *dev_name, const char *pin_group,
- 			 unsigned long *config)
- {
-@@ -204,88 +112,6 @@ unlock:
- 	mutex_unlock(&pctldev->mutex);
- 	return ret;
- }
--EXPORT_SYMBOL(pin_config_group_get);
--
--int pin_config_group_set(const char *dev_name, const char *pin_group,
--			 unsigned long config)
--{
--	struct pinctrl_dev *pctldev;
--	const struct pinconf_ops *ops;
--	const struct pinctrl_ops *pctlops;
--	int selector;
--	const unsigned *pins;
--	unsigned num_pins;
--	int ret;
--	int i;
--
--	pctldev = get_pinctrl_dev_from_devname(dev_name);
--	if (!pctldev) {
--		ret = -EINVAL;
--		return ret;
--	}
--
--	mutex_lock(&pctldev->mutex);
--
--	ops = pctldev->desc->confops;
--	pctlops = pctldev->desc->pctlops;
--
--	if (!ops || (!ops->pin_config_group_set && !ops->pin_config_set)) {
--		dev_err(pctldev->dev, "cannot configure pin group, missing "
--			"config function in driver\n");
--		ret = -EINVAL;
--		goto unlock;
--	}
--
--	selector = pinctrl_get_group_selector(pctldev, pin_group);
--	if (selector < 0) {
--		ret = selector;
--		goto unlock;
--	}
--
--	ret = pctlops->get_group_pins(pctldev, selector, &pins, &num_pins);
--	if (ret) {
--		dev_err(pctldev->dev, "cannot configure pin group, error "
--			"getting pins\n");
--		goto unlock;
--	}
--
--	/*
--	 * If the pin controller supports handling entire groups we use that
--	 * capability.
--	 */
--	if (ops->pin_config_group_set) {
--		ret = ops->pin_config_group_set(pctldev, selector, config);
--		/*
--		 * If the pin controller prefer that a certain group be handled
--		 * pin-by-pin as well, it returns -EAGAIN.
--		 */
--		if (ret != -EAGAIN)
--			goto unlock;
--	}
--
--	/*
--	 * If the controller cannot handle entire groups, we configure each pin
--	 * individually.
--	 */
--	if (!ops->pin_config_set) {
--		ret = 0;
--		goto unlock;
--	}
--
--	for (i = 0; i < num_pins; i++) {
--		ret = ops->pin_config_set(pctldev, pins[i], config);
--		if (ret < 0)
--			goto unlock;
--	}
--
--	ret = 0;
--
--unlock:
--	mutex_unlock(&pctldev->mutex);
--
--	return ret;
--}
--EXPORT_SYMBOL(pin_config_group_set);
- 
- int pinconf_map_to_setting(struct pinctrl_map const *map,
- 			  struct pinctrl_setting *setting)
-diff --git a/include/linux/pinctrl/consumer.h b/include/linux/pinctrl/consumer.h
-index d071d85..18eccef 100644
---- a/include/linux/pinctrl/consumer.h
-+++ b/include/linux/pinctrl/consumer.h
-@@ -192,47 +192,4 @@ static inline struct pinctrl * __must_check devm_pinctrl_get_select_default(
- 	return devm_pinctrl_get_select(dev, PINCTRL_STATE_DEFAULT);
- }
- 
--#ifdef CONFIG_PINCONF
--
--extern int pin_config_get(const char *dev_name, const char *name,
--			  unsigned long *config);
--extern int pin_config_set(const char *dev_name, const char *name,
--			  unsigned long config);
--extern int pin_config_group_get(const char *dev_name,
--				const char *pin_group,
--				unsigned long *config);
--extern int pin_config_group_set(const char *dev_name,
--				const char *pin_group,
--				unsigned long config);
--
--#else
--
--static inline int pin_config_get(const char *dev_name, const char *name,
--				 unsigned long *config)
--{
--	return 0;
--}
--
--static inline int pin_config_set(const char *dev_name, const char *name,
--				 unsigned long config)
--{
--	return 0;
--}
--
--static inline int pin_config_group_get(const char *dev_name,
--				       const char *pin_group,
--				       unsigned long *config)
--{
--	return 0;
--}
--
--static inline int pin_config_group_set(const char *dev_name,
--				       const char *pin_group,
--				       unsigned long config)
--{
--	return 0;
--}
--
--#endif
--
- #endif /* __LINUX_PINCTRL_CONSUMER_H */
+> +
+> +	moxart_irq_domain = irq_domain_add_linear(node,
+> +		32, &irq_generic_chip_ops, moxart_irq_base);
+> +
+> +	moxart_alloc_gc(moxart_irq_base, 0, 32);
+> +
+> +	writel(0, moxart_irq_base + IRQ_MASK_REG);
+> +	writel(0xffffffff, moxart_irq_base + IRQ_CLEAR_REG);
+> +
+> +	writel(interrupt_mask, moxart_irq_base + IRQ_MODE_REG);
+> +	writel(interrupt_mask, moxart_irq_base + IRQ_LEVEL_REG);
+> +
+> +	set_handle_irq(moxart_handle_irq);
+> +
+> +	pr_info("%s: %s finished\n", node->full_name, __func__);
+> +
+> +	return 0;
+> +}
+> +IRQCHIP_DECLARE(moxa_moxart_ic, "moxa,moxart-interrupt-controller",
+> +	moxart_of_init);
+> -- 
+> 1.7.2.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
 -- 
-1.7.11.3
+email sent from notmuch.vim plugin
