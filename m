@@ -1,33 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Jun 2013 10:16:18 +0200
-Subject: [GIT PULL] Keystone SOC support for 3.11
-In-Reply-To: <20130624081057.GA11105@linaro.org>
-References: <1371255346-3000-1-git-send-email-santosh.shilimkar@ti.com>
- <201306211819.36288.arnd@arndb.de> <20130624081057.GA11105@linaro.org>
-Message-ID: <4545899.6e6jeG6NYZ@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Jun 2013 09:47:44 +0100
+Subject: [PATCH] arch: arm64: kernel: add '#ifdef CONFIG_COMPAT' for
+ aarch32_break_handler()
+In-Reply-To: <51C53C06.7050205@asianux.com>
+References: <51C53C06.7050205@asianux.com>
+Message-ID: <20130624084744.GA23779@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 June 2013 09:11:08 Steve Capper wrote:
+On Sat, Jun 22, 2013 at 06:54:14AM +0100, Chen Gang wrote:
 > 
-> Many apologies, I think this was introduced by my huge page patches. For
-> transparent hugepages to function correctly, access flag faults need to be
-> handled by do_page_fault rather than do_sect_fault. Even without THP enabled
-> the standard page fault handler is safe to use, so I removed the do_sect_fault
-> entry from fsr-3level.c.
+> If 'COMPAT' not defined, aarch32_break_handler() cannot pass compiling,
+> so need add '#ifdef' for it just like the header file has done.
 > 
-> Originally I had non-LPAE huge page code too in the series and one of those
-> patches re-wired fsr-2level.c and then completely removed do_sect_fault.
->
-> When I split the patch series I didn't spot that do_sect_fault was in limbo for
-> LPAE.
+> The related make:
+> 
+>   make ARCH=arm64 randconfig
+>   make ARCH=arm64 menuconfig
+>   make ARCH=arm64 V=1 EXTRA_CFLAGS=-W
+> 
+> The related error:
+> 
+>   arch/arm64/kernel/debug-monitors.c:249:5: error: redefinition of ?aarch32_break_handler?
+>   In file included from arch/arm64/kernel/debug-monitors.c:29:0:
+>   /root/linux-next/arch/arm64/include/asm/debug-monitors.h:89:12: note: previous definition of ?aarch32_break_handler? was here
 
-Ok, I see.
- 
-> I think the do_sect_fault can safely be surrounded by #ifndef CONFIG_ARM_LPAE.
-> Should I send a patch to do this?
+Actually, can we just kill the static definition in debug-monitors.h
+instead? I don't see anything in the full-blown aardch32_break_handler that
+won't play nicely if !COMPAT.
 
-Yes, that would be good. Please add it to Russell's patch tracker once
-you get an ack.
-
-	Arnd
+Will
