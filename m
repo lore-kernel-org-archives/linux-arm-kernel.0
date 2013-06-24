@@ -1,28 +1,39 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 24 Jun 2013 11:08:47 +0200
-Subject: [PATCH 3/3] ARM: at91/PMC: at91sam9n12 family has USB HS feature
-In-Reply-To: <cover.1372064763.git.nicolas.ferre@atmel.com>
-References: <cover.1372064763.git.nicolas.ferre@atmel.com>
-Message-ID: <a3b28f9041482ff60ed0b1b7a6f11d0b1beb5163.1372064763.git.nicolas.ferre@atmel.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 24 Jun 2013 17:19:46 +0800
+Subject: [PATCH] arch: arm64: kernel: add '#ifdef CONFIG_COMPAT' for
+ aarch32_break_handler()
+In-Reply-To: <20130624084744.GA23779@mudshark.cambridge.arm.com>
+References: <51C53C06.7050205@asianux.com>
+ <20130624084744.GA23779@mudshark.cambridge.arm.com>
+Message-ID: <51C80F32.4060500@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/clock.c | 1 +
- 1 file changed, 1 insertion(+)
+On 06/24/2013 04:47 PM, Will Deacon wrote:
+> On Sat, Jun 22, 2013 at 06:54:14AM +0100, Chen Gang wrote:
+>> > 
+>> > If 'COMPAT' not defined, aarch32_break_handler() cannot pass compiling,
+>> > so need add '#ifdef' for it just like the header file has done.
+>> > 
+>> > The related make:
+>> > 
+>> >   make ARCH=arm64 randconfig
+>> >   make ARCH=arm64 menuconfig
+>> >   make ARCH=arm64 V=1 EXTRA_CFLAGS=-W
+>> > 
+>> > The related error:
+>> > 
+>> >   arch/arm64/kernel/debug-monitors.c:249:5: error: redefinition of ?aarch32_break_handler?
+>> >   In file included from arch/arm64/kernel/debug-monitors.c:29:0:
+>> >   /root/linux-next/arch/arm64/include/asm/debug-monitors.h:89:12: note: previous definition of ?aarch32_break_handler? was here
+> Actually, can we just kill the static definition in debug-monitors.h
+> instead? I don't see anything in the full-blown aardch32_break_handler that
+> won't play nicely if !COMPAT.
 
-diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-index 978de42..1b9bbba 100644
---- a/arch/arm/mach-at91/clock.c
-+++ b/arch/arm/mach-at91/clock.c
-@@ -88,6 +88,7 @@ EXPORT_SYMBOL_GPL(at91_pmc_base);
- #define cpu_has_udpfs()		(!(cpu_is_at91sam9rl() \
- 				|| cpu_is_at91sam9g45() \
- 				|| cpu_is_at91sam9x5() \
-+				|| cpu_is_at91sam9n12() \
- 				|| cpu_is_sama5d3()))
- 
- #define cpu_has_plladiv2()	(cpu_is_at91sam9g45() \
+It sounds good, I will send patch v2.
+
+Thanks.
 -- 
-1.8.2.2
+Chen Gang
+
+Asianux Corporation
