@@ -1,59 +1,40 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Mon, 24 Jun 2013 15:20:23 +0200
-Subject: [GIT PULL] ARM: CPUFreq updates for 3.11
-In-Reply-To: <CAKohpo=3DHa0+3trrL7b1JVhxrXLtERX9kth5AjLGu7Tf6Adig@mail.gmail.com>
-References: <CAKohpo=v4qPDH32Y4ithr_p007nTn5AOUzkUCiHTGgQN6-=BEw@mail.gmail.com>
- <1662523.HdXbLYrd2q@vostro.rjw.lan>
- <CAKohpo=3DHa0+3trrL7b1JVhxrXLtERX9kth5AjLGu7Tf6Adig@mail.gmail.com>
-Message-ID: <2762325.xSxJKsi0Kg@vostro.rjw.lan>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 24 Jun 2013 21:11:32 +0800
+Subject: [PATCH] apf27dev: add rtc ds1374 to the device tree
+In-Reply-To: <1371831853-24754-1-git-send-email-tremyfr@yahoo.fr>
+References: <1371831853-24754-1-git-send-email-tremyfr@yahoo.fr>
+Message-ID: <20130624131130.GD30747@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 24, 2013 06:20:35 PM Viresh Kumar wrote:
-> On 24 June 2013 17:15, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> > Well, it should go last.  Also I'd prefer to apply it directly.
+On Fri, Jun 21, 2013 at 06:24:13PM +0200, Philippe Reynes wrote:
 > 
-> Okay.. Below is pull request for ARM patches alone.
+> Signed-off-by: Philippe Reynes <tremyfr@yahoo.fr>
 
-Pulled, thanks!
+Applied, thanks.
 
-> The following changes since commit 9e895ace5d82df8929b16f58e9f515f6d54ab82d:
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx27-apf27dev.dts |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
 > 
->   Linux 3.10-rc7 (2013-06-22 09:47:31 -1000)
+> diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
+> index 66b8e1c..2a377ca 100644
+> --- a/arch/arm/boot/dts/imx27-apf27dev.dts
+> +++ b/arch/arm/boot/dts/imx27-apf27dev.dts
+> @@ -53,6 +53,11 @@
+>  &i2c1 {
+>  	clock-frequency = <400000>;
+>  	status = "okay";
+> +
+> +	rtc at 68 {
+> +		compatible = "dallas,ds1374";
+> +		reg = <0x68>;
+> +	};
+>  };
+>  
+>  &i2c2 {
+> -- 
+> 1.7.4.4
 > 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/vireshk/linux.git cpufreq-fix-notification-arm
-> 
-> for you to fetch changes up to f56cc99e3f189ce214408e9c0fdda9e664d83dc1:
-> 
->   cpufreq: tegra: call CPUFREQ_POSTCHANGE notfier in error cases
-> (2013-06-24 18:19:01 +0530)
-> 
-> ----------------------------------------------------------------
-> Viresh Kumar (8):
->       cpufreq: arm-big-little: call CPUFREQ_POSTCHANGE notfier in error cases
->       cpufreq: davinci: call CPUFREQ_POSTCHANGE notfier in error cases
->       cpufreq: dbx500: call CPUFREQ_POSTCHANGE notfier in error cases
->       cpufreq: exynos: call CPUFREQ_POSTCHANGE notfier in error cases
->       cpufreq: imx6q: call CPUFREQ_POSTCHANGE notfier in error cases
->       cpufreq: omap: call CPUFREQ_POSTCHANGE notfier in error cases
->       cpufreq: s3c64xx: call CPUFREQ_POSTCHANGE notfier in error cases
->       cpufreq: tegra: call CPUFREQ_POSTCHANGE notfier in error cases
-> 
->  drivers/cpufreq/arm_big_little.c  |  4 +---
->  drivers/cpufreq/davinci-cpufreq.c |  3 +++
->  drivers/cpufreq/dbx500-cpufreq.c  |  4 ++--
->  drivers/cpufreq/exynos-cpufreq.c  | 10 ++++++++--
->  drivers/cpufreq/imx6q-cpufreq.c   | 17 +++++++++++------
->  drivers/cpufreq/omap-cpufreq.c    |  6 +++---
->  drivers/cpufreq/s3c64xx-cpufreq.c |  8 ++++++--
->  drivers/cpufreq/tegra-cpufreq.c   |  4 ++--
->  8 files changed, 36 insertions(+), 20 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe cpufreq" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
