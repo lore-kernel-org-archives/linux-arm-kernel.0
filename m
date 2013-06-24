@@ -1,37 +1,109 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 24 Jun 2013 10:54:15 -0700
-Subject: [PATCH v4 0/7] ARM:STixxxx: Add STixxxx platform and board support
-In-Reply-To: <1371811076-27168-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1371811076-27168-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <20130624175415.GA31429@quad.lixom.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 24 Jun 2013 10:55:43 -0700
+Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
+In-Reply-To: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
+ (Grygorii Strashko's message of "Fri, 21 Jun 2013 18:03:10 +0300")
+References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <87zjuftmu8.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 11:37:56AM +0100, Srinivas KANDAGATLA wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> 
-> Thankyou all for reviewing the v3 patches.
-> 
-> This patch-set adds basic support for STMicroelectronics STixxxx SOCs
-> which includes STiH415 and STiH416 with B2000 and B2020 board support.
-> 
-> STiH415 and STiH416 are dual-core ARM Cortex-A9 CPU, designed for use in
-> Set-top-boxes. The SOC support is available in mach-stixxxx which contains
-> support code for STiH415, STiH416 SOCs including the generic board support.
-> 
-> The reason for adding two SOCs at this patch set is to show that no new
-> C code is required for second SOC(STiH416) support.
-> 
-> This patch-set only contains the SOC support, all the driver support for
-> this platform are submitted to respective mailing lists.
+Hi Grygorii,
 
-Hi,
+Grygorii Strashko <grygorii.strashko@ti.com> writes:
 
-I think these are looking quite reasonable, and I am ready to apply them
-to 3.11.
+> Before switching to DT pinctrl states of OMAP IPs have been handled by hwmod
+> framework. After switching to DT-boot the pinctrl handling was dropped from
+> hwmod framework and, as it was recommended, OMAP IP's drivers have to be updated
+> to handle pinctrl states by itself using pinctrl_pm_select_xx() helpers
+> (see http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173514.html)
+>
+> But this is not right for OMAP2+ SoC where real IPs state is controlled
+> by omap_device core which enables/disables modules & clocks actually.
+>
+> For example, if OMAP I2C driver will handle pinctrl state during system wide
+> suspend the following issue may occure:
+> - suspend_noirq - I2C device can be still active because of PM auto-suspend
+>   |-_od_suspend_noirq
+>      |- omap_i2c_suspend_noirq
+>         |- PINs state set to SLEEP
+>   |- pm_generic_runtime_suspend
+>      |- omap_i2c_runtime_suspend()
+>         |- PINs state set to IDLE  <--- *oops* PINs state is IDLE and not SLEEP
+>   |- omap_device_idle()
+>      |- omap_hwmod_idle()
+>         |- _idle()
+>            |- disbale module (sysc&clocks)
+>
+> - resume_noirq - I2C was active before suspend
+>   |-_od_resume_noirq
+>      |- omap_hwmod_enable()
+>         |- _enable()
+>            |- enable module (sysc&clocks)
+>      |- pm_generic_runtime_resume
+>         |- omap_i2c_runtime_resume()
+>            |- PINs state set to DEFAULT  <--- !!!!
+>      |- omap_i2c_resume_noirq
+>         |- PINs state set to DEFAULT
+>         |- PINs state set to IDLE  <--- *big oops* we have active module and its
+>                                          PINs state is IDLE
+> (see https://patchwork.kernel.org/patch/2642101/)
+>
+> Of course, everything can be handled by adding a tons of code in ecah driver to
+> check PM state of device and override default behavior of omap_device core, but
+> this not good.
+>
+> Hence, add pinctrl handling in omap_device core:
+> 1) on PM runtime resume
+> - switch pinctrl state to "default" (todo: "active")
+> 2) on PM runtime suspend
+> - switch pinctrl state to "idle"
+> 3) during system wide suspend
+> - switch pinctrl state to "sleep" or "idle" if omap_device core disables device
+> - switch pinctrl state to "sleep" if device is disabled already
+> 4) during system wide resume
+> - switch pinctrl state to "default" (todo: "active") if omap_device core has
+>   disabled  device during suspend
+> - switch pinctrl state to "idle" if device was already disabled before suspend
+>
+> This will enable pinctrl for all OMAP2+ IP's drivers by default -
+> no changes in code is needed and only DT data will need to be updated
+> (add "default", "active", "idle", "sleep" states).
+>
+> This will enable pinctrl handling for all OMAP2+ drivers by default -
+> no changes in code is needed and only DT data will need to be updated
+> (add "default", "active", "idle", "sleep" states).
+>
+> Related discussions:
+> - [3/3] i2c: nomadik: use pinctrl PM helpers 
+>  https://patchwork.kernel.org/patch/2670291/
+> - mmc: omap_hsmmc: Remux pins to support SDIO interrupt and PM runtime
+>  https://patchwork.kernel.org/patch/2690191/
+> - [PATCH 00/11] drivers: Add Pinctrl PM support
+>  https://lkml.org/lkml/2013/5/31/210
+>
+> CC: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> CC: Linus Walleij  <linus.walleij@linaro.org>
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: linux-omap at vger.kernel.org
+> CC: linux-kernel at vger.kernel.org 
+>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+> Hi Kevin, Tony,
+>
+> I've verified this patch on OMAP4 SDP board:
+> - PM runtime for I2C4, UART2, UART3
+> - suspend/resume with I2C4, UART2, UART3
+>
+> seems it works and pinctrl states have been updated as expected.
 
-However, I have one bikeshed comment. I find the name of the platform to be
-awkward. Would you mind naming it mach-sti instead?
+Thanks for working on this.
 
+I agree with the approach, and much prefer this to boiler plate code
+throughout the drivers.
 
--Olof
+I suggest we wait until the dust settles on the active/default thread
+before taking this further, but have no objections to the approach.
+
+Kevin
