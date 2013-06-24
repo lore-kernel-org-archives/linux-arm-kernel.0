@@ -1,70 +1,61 @@
-From: jett.zhou@gmail.com (jett zhou)
-Date: Mon, 24 Jun 2013 18:08:32 +0800
-Subject: [V2 1/7] video: mmp: rb swap setting update for new LCD driver
-In-Reply-To: <CAMLZHHQ+97f=i3axaFBn9JoOu7Cqo73neqxKYNCfWqwjZ4DfnQ@mail.gmail.com>
-References: <1370879533-11017-1-git-send-email-jtzhou@marvell.com>
- <CAMLZHHQ+97f=i3axaFBn9JoOu7Cqo73neqxKYNCfWqwjZ4DfnQ@mail.gmail.com>
-Message-ID: <CACDDiy-pS-QWdmuc+N+0tijSF=_3YZNwR_PHdUBF_mbhzXY=2w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 24 Jun 2013 03:10:55 -0700
+Subject: [PATCH] pinctrl: document the pinctrl PM states
+In-Reply-To: <51C4A593.6000900@wwwdotorg.org>
+References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
+ <51BA1FE7.4000900@wwwdotorg.org>
+ <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
+ <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
+ <51C20E3A.8090304@wwwdotorg.org>
+ <20130620063823.GD5523@atomide.com>
+ <51C3577E.6040709@wwwdotorg.org>
+ <20130621062552.GI5523@atomide.com>
+ <51C4A593.6000900@wwwdotorg.org>
+Message-ID: <20130624101055.GT5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/6/22 Daniel Drake <dsd@laptop.org>:
-> On Mon, Jun 10, 2013 at 9:52 AM, Jett.Zhou <jtzhou@marvell.com> wrote:
->> From: Guoqing Li <ligq@marvell.com>
->>
->> We could set rb swap in two modules: DMA controler and interface
->> output after blending.
->> This patch move the panel rbswap requirement setting in later module.
+* Stephen Warren <swarren@wwwdotorg.org> [130621 12:18]:
+> On 06/21/2013 12:25 AM, Tony Lindgren wrote:
+> > * Stephen Warren <swarren@wwwdotorg.org> [130620 12:32]:
+> >>
+> >> I assume you mean there shouldn't be any issue *modifying* the pinctrl
+> >> API to allow multiple states to be active at once? And where you're
+> >> talking about having multiple sets active at once already, you're
+> >> talking about some other API?
+> > 
+> > Nope, the standard pinctrl API. At least I have not seen issues with
+> > having multiple states active the same time in a single driver.
+> 
+> Please take a look at the implementation of pinctrl_select_state(). It
+> very explicitly performs the following steps:
+> 
+> 1) Find all pins(groups) that are used in the current state but not the
+> new state, and execute pinctrl_disable_setting() on them. (For mux
+> settings only, not pin config, since the core doesn't have any idea how
+> to reverse config settings).
 >
-> link_config originates from the platform's path config. link_config is
-> undocumented and this patch also changes its meaning.
->
-> Previously, bit 0 triggered rbswap, and this behaviour is relied upon
-> by arch/arm/mach-mmp/ttc_dkb.c
->
-> Now bits 27:24 of link_config are used to enable or disable rbswap,
-> and link_config bit 0 is ignored. According to the specs for the panel
-> path register, valid values for these new bits are 0 (no swap) and 1
-> (swap). ttc_dkb has not been updated in this patch series for this new
-> behaviour.
->
-> I don't understand why rbswap is set to 1 in fmt_to_reg for certain
-> RGB formats. The patch description suggests that the rb swapping can
-> either be set in fmt_to_reg context (to be written into DMA
-> controller) *or* in the interface output. If we are now relying on the
-> interface output control to do RB swapping when appropriate, why are
-> there still cases when we ask the DMA controller to do the same thing?
->
-> I also do not fully understand the requirement for RB swapping. I do
-> understand that it changes pixel format from RGB to BGR. What is the
-> point? I can imagine that some panels may require such a pixel format,
-> however in that case, this configuration should be part of the panel
-> configuration, not part of the path configuration as it currently is.
->
-> Daniel
- Hi Daniel
-       Sorry that the comments of the patch is not so clear.
-       As you might know,We can set two rbswap setting, one is based
-on pix_fmt to set into DMA input part, the other is to configured in
-the output interface part.
-       This patch include below change and enhancement:
-       1) The input format which support rbswap is based RGB format,
-YUV series did not support now. So you can see the patch will change
-the rbswap value based on specific RGB format,eg. RGB will set rbswap
-= 1, BGR will not set it.
-          This part setting is controlled in driver internally, will
-not depend on platform configure(link_config) any more.
-       2) The output part of rbswap is depend on link_config which is
-defined in specific platfrom.
-           It will setting bit27:24 of 0x01DC register, eg. DSI output
-interface can be controlled by this.
-           TTC_dkb does not support dsi, the link_config is no used anymore.
-      I will add more this comments in the patch of V3.
-Thanks
+> 2) For all settings in the new state, apply those settings.
+> 
+> So, it very explicitly only allows a single state to be set at a time.
+> Equally, p->state (the field which stores the currently selected state)
+> is a single item, not a set/list/array.
 
+OK thanks I get now what you're saying. I did not see the p->state
+issue as the disable function won't do anything for the SoCs that I
+mostly deal with.
 
---
+> So, this code needs rework if you want the core to support the concept
+> of having multiple states active at once, since it needs separate
+> pinctrl_activate_state() and pinctrl_deactivate_state() APIs, in order
+> to avoid step (1) above. And of course, p->state would need to be a
+> set/list/array.
 
-----------------------------------
-Best Regards
-Jett Zhou
+I'll think about it a bit and do a patch to fix this. It seems that
+that we need just two entries in the p->state array: static (default),
+and dynamic. Then the dynamic would be typically one of: active, idle,
+rx, tx.
+
+Regards,
+
+Tony
