@@ -1,56 +1,28 @@
-From: dsd@laptop.org (Daniel Drake)
-Date: Mon, 24 Jun 2013 08:38:36 -0600
-Subject: [V2 1/7] video: mmp: rb swap setting update for new LCD driver
-In-Reply-To: <CACDDiy8=WRmnGMFr55uVWUE6+NNy3pMCeBfV8E9urAeW6VVEMw@mail.gmail.com>
-References: <1370879533-11017-1-git-send-email-jtzhou@marvell.com>
- <CAMLZHHQ+97f=i3axaFBn9JoOu7Cqo73neqxKYNCfWqwjZ4DfnQ@mail.gmail.com>
- <CACDDiy8=WRmnGMFr55uVWUE6+NNy3pMCeBfV8E9urAeW6VVEMw@mail.gmail.com>
-Message-ID: <CAMLZHHQxMAM1Vhj9Jreq5rAN-nmBEbEyoKMwFnL0tVHsKv4U=g@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 24 Jun 2013 10:39:09 -0400
+Subject: [PATCH] ARM: Add support for LPAE style CONTEXTIDR
+In-Reply-To: <20130624140424.GA24861@mudshark.cambridge.arm.com>
+References: <1372080405-13365-1-git-send-email-cov@codeaurora.org>
+ <20130624140424.GA24861@mudshark.cambridge.arm.com>
+Message-ID: <51C85A0D.3070400@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 2:45 AM, jett zhou <jett.zhou@gmail.com> wrote:
->        Sorry that the comments of the patch is not so clear.
->        As you might know,We can set two rbswap setting, one is based on
-> pix_fmt to set into DMA input part, the other is to configured in the output
-> interface part.
->        This patch include below change and enhancement:
->        1) The input format which support rbswap is based RGB format, YUV
-> series did not support now. So you can see the patch will change the rbswap
-> value based on specific RGB format,eg. RGB will set rbswap = 1, BGR will not
-> set it.
+Hi Will,
 
-What if I'm working with a display that doesn't need or want RB
-swapping? Lets say I am working with format PIXFMT_RGB565, and running
-your patch. dmafetch_set_fmt() gets called, and fmt_to_reg() sets
-rbswap to 1.
-This means that dmafetch_set_fmt() writes a '1' into the appropriate
-RB-swapping bit in the LCD_PN_CTRL0 register, and this triggers the
-"DMA input" swapping that you mentioned. But I never asked for RB
-swapping...
+On 06/24/2013 10:04 AM, Will Deacon wrote:
+[...]
 
->           This part setting is controlled in driver internally, will not
-> depend on platform configure(link_config) any more.
+> What's the advantage of this approach, other than you get an extra byte's
+> worth of PID?
 
-Your patch seems to depend very clearly on link_config.
+In my view, the real advantage is that the the PID is located where people
+reading ARM Architecture Reference Manual are told they can find it.
 
->        2) The output part of rbswap is depend on link_config which is
-> defined in specific platfrom.
->            It will setting bit27:24 of 0x01DC register, eg. DSI output
-> interface can be controlled by this.
+Regards,
+Christopher
 
-I don't think you should add more disorganised/undocumented (ab)use of
-this magic link_config variable. You should create new, dedicated,
-documented fields.
-
-Your comment above suggests that this RB-swapping behaviour is
-something that is imposed by the output device. In which case, this
-should be a configuration parameter on the panel, not on the path
-structure.
-
->            TTC_dkb does not support dsi, the link_config is no used anymore.
-
-Then you should fix up ttc_dkb before submitting this patch.
-
-Thanks
-Daniel
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
