@@ -1,40 +1,37 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 24 Jun 2013 12:02:27 -0700
-Subject: [PATCH v7 00/11] Add generic set_rate clk_ops for PLL35xx and
- PLL36xx for samsung SoCs
-In-Reply-To: <51C85F8F.9050501@samsung.com>
-References: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
- <CAKew6eUOy4=D08v_iq7CTRY5gvt37VAN7Z7WOr2Yt25znDJb2g@mail.gmail.com>
- <CAGm_ybiVZOPBJJ0bYX33wafn1So6aqSAnk7myXZ+Z+RfLBeBQw@mail.gmail.com>
- <1524664.UCV47tfIRU@flatron> <20130621163143.9136.28807@quantum>
- <51C85F8F.9050501@samsung.com>
-Message-ID: <20130624190227.20448.68120@quantum>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 24 Jun 2013 13:05:56 -0600
+Subject: [PATCH] clk: tegra: fix ifdef for tegra_periph_reset_assert inline
+Message-ID: <1372100756-10448-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kukjin Kim (2013-06-24 08:02:39)
-> On 06/22/13 01:31, Mike Turquette wrote:
-> >
-> > Acked-by: Mike Turquette<mturquette@linaro.org>
-> >
-> > Or I can take this through the clk tree. Either way is fine.
-> >
-> Mike, please go ahead taking this series into the clk tree for 3.11.
+From: Stephen Warren <swarren@nvidia.com>
 
-Actually it might be better for you to take it. Patch #5 relies on
-drivers/clk/samsung/clk-exynos5420.c which only exists in the samsung
-tree.  It was introduced by commit 1609027f, "clk: exynos5420: register
-clocks using common clock framework".
+Commit 7064f6b "clk: tegra: provide tegra_periph_reset_assert
+alternative" added ifdef'd static inline versions of some functions,
+but tested ARCH_TEGRA rather than CONFIG_ARCH_TEGRA, thus disabling
+these function in all cases. In some cases, this caused HW modules to
+misbehave; for example, the Tegra I2C driver BUG()d during boot on
+Seaboard.
 
-And these patches need to be applied with some fuzz to the clk tree due
-to other changes which are not in my tree and only present in yours.
+Reported-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ include/linux/clk/tegra.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The best two options are either for you to take this series or it can be
-rebased on top of clk-next, after which I'll apply it.
-
-Regards,
-Mike
-
-> 
-> Thanks,
-> - Kukjin
+diff --git a/include/linux/clk/tegra.h b/include/linux/clk/tegra.h
+index e3cc872..23a0cee 100644
+--- a/include/linux/clk/tegra.h
++++ b/include/linux/clk/tegra.h
+@@ -120,7 +120,7 @@ static inline void tegra_cpu_clock_resume(void)
+ }
+ #endif
+ 
+-#ifdef ARCH_TEGRA
++#ifdef CONFIG_ARCH_TEGRA
+ void tegra_periph_reset_deassert(struct clk *c);
+ void tegra_periph_reset_assert(struct clk *c);
+ #else
+-- 
+1.8.1.5
