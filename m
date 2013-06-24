@@ -1,217 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 24 Jun 2013 19:35:46 +0800
-Subject: [PATCH v3 5/5] drivers: bus: imx-weim: Add support for
- i.MX1/21/25/27/31/35/50/51/53
-In-Reply-To: <1371973698-16150-5-git-send-email-shc_work@mail.ru>
-References: <1371973698-16150-1-git-send-email-shc_work@mail.ru>
- <1371973698-16150-5-git-send-email-shc_work@mail.ru>
-Message-ID: <20130624113544.GA30747@S2101-09.ap.freescale.net>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 24 Jun 2013 13:45:15 +0200
+Subject: [GIT PULL] ARM: CPUFreq updates for 3.11
+In-Reply-To: <CAKohpomdnEgDcAExoyN1b4vohHNEg3NDH1mM8NWG8gQoPvff+Q@mail.gmail.com>
+References: <CAKohpo=v4qPDH32Y4ithr_p007nTn5AOUzkUCiHTGgQN6-=BEw@mail.gmail.com>
+ <7195611.gCcafMWC85@vostro.rjw.lan>
+ <CAKohpomdnEgDcAExoyN1b4vohHNEg3NDH1mM8NWG8gQoPvff+Q@mail.gmail.com>
+Message-ID: <1662523.HdXbLYrd2q@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 23, 2013 at 11:48:18AM +0400, Alexander Shiyan wrote:
+On Monday, June 24, 2013 04:40:27 PM Viresh Kumar wrote:
+> On 24 June 2013 16:29, Rafael J. Wysocki <rjw@sisk.pl> wrote:
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-
-Can you write up something for the commit log?  Leaving it empty for
-such a patch with tens of LOC is not a nice thing.
-
-> ---
->  Documentation/devicetree/bindings/bus/imx-weim.txt | 17 +++--
->  drivers/bus/Kconfig                                |  3 +-
->  drivers/bus/imx-weim.c                             | 72 +++++++++++++++++-----
->  3 files changed, 69 insertions(+), 23 deletions(-)
+> > In your original series that patch was the last one.  What made you change your
+> > mind and put it in front?
 > 
-> diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
-> index cedc2a9..0fd76c4 100644
-> --- a/Documentation/devicetree/bindings/bus/imx-weim.txt
-> +++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
-> @@ -8,7 +8,7 @@ The actual devices are instantiated from the child nodes of a WEIM node.
->  
->  Required properties:
->  
-> - - compatible:		Should be set to "fsl,imx6q-weim"
-> + - compatible:		Should be set to "fsl,<soc>-weim"
->   - reg:			A resource specifier for the register space
->  			(see the example below)
->   - clocks:		the clock, see the example below.
-> @@ -21,11 +21,18 @@ Required properties:
->  
->  Timing property for child nodes. It is mandatory, not optional.
->  
-> - - fsl,weim-cs-timing:	The timing array, contains 6 timing values for the
-> + - fsl,weim-cs-timing:	The timing array, contains timing values for the
->  			child node. We can get the CS index from the child
-> -			node's "reg" property. This property contains the values
-> -			for the registers EIM_CSnGCR1, EIM_CSnGCR2, EIM_CSnRCR1,
-> -			EIM_CSnRCR2, EIM_CSnWCR1, EIM_CSnWCR2 in this order.
-> +			node's "reg" property. The number of registers depends
-> +			on the selected chip.
-> +			For i.MX1, i.MX21 ("fsl,imx1-weim") there are two
-> +			registers: CSxU, CSxL.
-> +			For i.MX25, i.MX27, i.MX31 and i.MX35 ("fsl,imx27-weim")
-> +			there are three registers: CSCRxU, CSCRxL, CSCRxA.
-> +			For i.MX50, i.MX53 ("fsl,imx50-weim"),
-> +			i.MX51 ("fsl,imx51-weim") and i.MX6Q ("fsl,imx6q-weim")
-> +			there are six registers: CSxGCR1, CSxGCR2, CSxRCR1,
-> +			CSxRCR2, CSxWCR1, CSxWCR2.
->  
->  Example for an imx6q-sabreauto board, the NOR flash connected to the WEIM:
->  
-> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-> index 1f70e84..552373c 100644
-> --- a/drivers/bus/Kconfig
-> +++ b/drivers/bus/Kconfig
-> @@ -8,10 +8,9 @@ config IMX_WEIM
->  	bool "Freescale EIM DRIVER"
->  	depends on ARCH_MXC
->  	help
-> -	  Driver for i.MX6 WEIM controller.
-> +	  Driver for i.MX WEIM controller.
->  	  The WEIM(Wireless External Interface Module) works like a bus.
->  	  You can attach many different devices on it, such as NOR, onenand.
-> -	  But now, we only support the Parallel NOR.
->  
->  config MVEBU_MBUS
->  	bool
-> diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-> index dc860a4..541cf77 100644
-> --- a/drivers/bus/imx-weim.c
-> +++ b/drivers/bus/imx-weim.c
-> @@ -12,46 +12,83 @@
->  #include <linux/io.h>
->  #include <linux/of_device.h>
->  
-> +struct imx_weim_devtype {
-> +	unsigned int	cs_count;
-> +	unsigned int	cs_regs_count;
-> +	unsigned int	cs_stride;
-> +};
-
-Please have a blank line here.
-
-> +static const struct imx_weim_devtype imx1_weim_devtype = {
-> +	.cs_count	= 6,
-> +	.cs_regs_count	= 2,
-> +	.cs_stride	= 0x08,
-> +};
-> +
-> +static const struct imx_weim_devtype imx27_weim_devtype = {
-> +	.cs_count	= 6,
-> +	.cs_regs_count	= 3,
-> +	.cs_stride	= 0x10,
-> +};
-> +
-> +static const struct imx_weim_devtype imx50_weim_devtype = {
-> +	.cs_count	= 4,
-> +	.cs_regs_count	= 6,
-> +	.cs_stride	= 0x18,
-> +};
-> +
-> +static const struct imx_weim_devtype imx51_weim_devtype = {
-> +	.cs_count	= 6,
-> +	.cs_regs_count	= 6,
-> +	.cs_stride	= 0x18,
-> +};
-> +
->  static const struct of_device_id weim_id_table[] = {
-> -	{ .compatible = "fsl,imx6q-weim", },
-> -	{}
-> +	/* i.MX1/21 */
-> +	{ .compatible = "fsl,imx1-weim", .data = &imx1_weim_devtype, },
-> +	/* i.MX25/27/31/35 */
-> +	{ .compatible = "fsl,imx27-weim", .data = &imx27_weim_devtype, },
-> +	/* i.MX50/53 */
-> +	{ .compatible = "fsl,imx50-weim", .data = &imx50_weim_devtype, },
-> +	/* i.MX6Q */
-> +	{ .compatible = "fsl,imx6q-weim", .data = &imx50_weim_devtype, },
-
-I would suggest we have something like below to give it a hint that
-i.MX6Q WEIM is the same type as i.MX50/53 one.
-
-	/* i.MX50/53/6Q */
-	{ .compatible = "fsl,imx50-weim", .data = &imx50_weim_devtype, },
-	{ .compatible = "fsl,imx6q-weim", .data = &imx50_weim_devtype, },
-
-> +	/* i.MX51 */
-> +	{ .compatible = "fsl,imx51-weim", .data = &imx51_weim_devtype, },
-> +	{ }
->  };
->  MODULE_DEVICE_TABLE(of, weim_id_table);
->  
-> -#define CS_TIMING_LEN 6
-> -#define CS_REG_RANGE  0x18
-> -
->  /* Parse and set the timing for this device. */
-> -static int __init weim_timing_setup(struct device_node *np, void __iomem *base)
-> +static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
-> +				    const struct imx_weim_devtype *devtype)
->  {
-> -	u32 value[CS_TIMING_LEN];
-> -	u32 cs_idx;
-> -	int ret;
-> -	int i;
-> +	u32 cs_idx, value[devtype->cs_regs_count];
-> +	int i, ret;
->  
->  	/* get the CS index from this child node's "reg" property. */
->  	ret = of_property_read_u32(np, "reg", &cs_idx);
->  	if (ret)
->  		return ret;
->  
-> -	/* The weim has four chip selects. */
-> -	if (cs_idx > 3)
-> +	if (cs_idx >= devtype->cs_count)
->  		return -EINVAL;
->  
->  	ret = of_property_read_u32_array(np, "fsl,weim-cs-timing",
-> -					value, CS_TIMING_LEN);
-> +					 value, devtype->cs_regs_count);
->  	if (ret)
->  		return ret;
->  
->  	/* set the timing for WEIM */
-> -	for (i = 0; i < CS_TIMING_LEN; i++)
-> -		writel(value[i], base + cs_idx * CS_REG_RANGE + i * 4);
-> +	for (i = 0; i < devtype->cs_regs_count; i++)
-> +		writel(value[i], base + cs_idx * devtype->cs_stride + i * 4);
-> +
->  	return 0;
->  }
->  
->  static int __init weim_parse_dt(struct platform_device *pdev,
->  				void __iomem *base)
->  {
-> +	const struct of_device_id *of_id = of_match_device(weim_id_table,
-> +							   &pdev->dev);
-> +	const struct imx_weim_devtype *devtype = of_id->data;
->  	struct device_node *child;
->  	int ret;
->  
-> @@ -59,7 +96,7 @@ static int __init weim_parse_dt(struct platform_device *pdev,
->  		if (!child->name)
->  			continue;
->  
-> -		ret = weim_timing_setup(child, base);
-> +		ret = weim_timing_setup(child, base, devtype);
->  		if (ret) {
->  			dev_err(&pdev->dev, "%s set timing failed.\n",
->  				child->full_name);
-> @@ -81,6 +118,9 @@ static int __init weim_probe(struct platform_device *pdev)
->  	void __iomem *base;
->  	int ret;
->  
-> +	if (!pdev->dev.of_node)
-> +		return -ENOTSUPP;
-> +
-Is it really necessary?  Since we only support DT probe, we can not
-reach here if the of_node is NULL.
-
-Shawn
-
->  	/* get the resource */
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	base = devm_ioremap_resource(&pdev->dev, res);
-> -- 
-> 1.8.1.5
+> I initially thought that this one would break git bisect (code would
+> compile, but would fail) for platforms whose code I have fixed in
+> this patchset.
 > 
+> But that is true only for failure cases, otherwise code would work as
+> normal.
+> 
+> And hence kept this at the top this time.
+
+Well, it should go last.  Also I'd prefer to apply it directly.
+
+Please check my comment in there too.
+
+Thanks,
+Rafael
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
