@@ -1,24 +1,39 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon, 24 Jun 2013 13:41:32 -0700
-Subject: [PATCH v3 1/3] clk: Add APM X-Gene SoC clock driver for
- reference, PLL, and device clocks.
-In-Reply-To: <20130624195725.GA11289@e106331-lin.cambridge.arm.com>
-References: <1372100487-9367-1-git-send-email-lho@apm.com>
- <1372100487-9367-2-git-send-email-lho@apm.com>
- <20130624195725.GA11289@e106331-lin.cambridge.arm.com>
-Message-ID: <CAPw-ZTn4yf90Dj14FprdbpfFozQmjGTg5fTYD1d_CR3FctYd6w@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 24 Jun 2013 13:41:57 -0700
+Subject: [PATCH] ARM: Fix dtb dependency to use order-only prerequisites
+Message-ID: <1372106517-19105-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mar,
+The %.dtb dependency is specified to depend on the PHONY "scripts".
+That means that it'll build every time even if the underlying dtb file
+hasn't been touched.  Use an order-only prerequisites to fix this.
+Also mark "dtbs" as PHONY for correctness.
 
->> +       if (of_property_read_u32(np, "flags", &parameters.flags))
->> +               parameters.flags = 0;
->
-> As mentioned previously, I believe you could use the standard status
-> property instead of flags.
-[Loc Ho]
-Okay... As mentioned, this will enforce multiple DTS file or patching
-the DTS entry for clock as well as the driver DTS entry.
+This was broken in (70b0476 ARM: 7513/1: Make sure dtc is built before
+running it).
 
--Loc
+Reported-by: Mike Frysinger <vapier@gentoo.org>
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ arch/arm/Makefile | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 1ba358b..fe8144e 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -289,9 +289,10 @@ zImage Image xipImage bootpImage uImage: vmlinux
+ zinstall uinstall install: vmlinux
+ 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
+ 
+-%.dtb: scripts
++%.dtb: | scripts
+ 	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
+ 
++PHONY += dtbs
+ dtbs: scripts
+ 	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) dtbs
+ 
+-- 
+1.8.3
