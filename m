@@ -1,25 +1,16 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 24 Jun 2013 15:01:49 +0800
-Subject: [PATCH] ARM: mxs: don't select HAVE_PWM
-In-Reply-To: <201306212230.55179.arnd@arndb.de>
-References: <201306212230.55179.arnd@arndb.de>
-Message-ID: <20130624070148.GD26254@S2101-09.ap.freescale.net>
+Date: Mon, 24 Jun 2013 15:03:07 +0800
+Subject: [PATCH] ARM: imx: select syscon for IMX6L
+In-Reply-To: <201306220039.43988.arnd@arndb.de>
+References: <201306220039.43988.arnd@arndb.de>
+Message-ID: <20130624070306.GE26254@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 10:30:54PM +0200, Arnd Bergmann wrote:
-> The HAVE_PWM symbol is only for legacy platforms that provide
-> the PWM API without using the generic framework. MXS actually
-> uses that framework, and selecting the symbol anyway might
-> cause build errors like
-> 
-> drivers/built-in.o: In function `pwm_beeper_resume':
-> :(.text+0x1f4fc0): undefined reference to `pwm_config'
-> :(.text+0x1f4fc8): undefined reference to `pwm_enable'
-> drivers/built-in.o: In function `pwm_beeper_suspend':
-> :(.text+0x1f4ffc): undefined reference to `pwm_disable'
-> 
-> when CONFIG_PWM is disabled.
+On Sat, Jun 22, 2013 at 12:39:43AM +0200, Arnd Bergmann wrote:
+> This is required for building a kernel that enables only
+> IMX6L but not IMX6Q, which would get a build error when
+> syscon is not available.
 > 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > Cc: Shawn Guo <shawn.guo@linaro.org>
@@ -27,23 +18,15 @@ On Fri, Jun 21, 2013 at 10:30:54PM +0200, Arnd Bergmann wrote:
 Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
 > 
-> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> index 59c30ef..616fe02 100644
-> --- a/arch/arm/mach-mxs/Kconfig
-> +++ b/arch/arm/mach-mxs/Kconfig
-> @@ -3,7 +3,6 @@ config SOC_IMX23
->  	select ARM_AMBA
->  	select ARM_CPU_SUSPEND if PM
->  	select CPU_ARM926T
-> -	select HAVE_PWM
->  	select PINCTRL_IMX23
->  
->  config SOC_IMX28
-> @@ -12,7 +11,6 @@ config SOC_IMX28
->  	select ARM_CPU_SUSPEND if PM
->  	select CPU_ARM926T
->  	select HAVE_CAN_FLEXCAN if CAN
-> -	select HAVE_PWM
->  	select PINCTRL_IMX28
->  
->  config ARCH_MXS
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index f25cf88..eef9590 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -823,6 +823,7 @@ config SOC_IMX6SL
+>  	select HAVE_IMX_GPC
+>  	select HAVE_IMX_MMDC
+>  	select HAVE_IMX_SRC
+> +	select MFD_SYSCON
+>  	select PINCTRL
+>  	select PINCTRL_IMX6SL
+>  	select PL310_ERRATA_588369 if CACHE_PL310
