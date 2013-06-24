@@ -1,47 +1,234 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 24 Jun 2013 14:39:51 +0200
-Subject: [PATCH v3 0/3] regulator: max8998: Add support for Device Tree
-Message-ID: <1372077594-17052-1-git-send-email-t.figa@samsung.com>
+Date: Mon, 24 Jun 2013 14:39:52 +0200
+Subject: [PATCH v3 1/3] mfd: Add irq domain support for max8998 interrupts
+In-Reply-To: <1372077594-17052-1-git-send-email-t.figa@samsung.com>
+References: <1372077594-17052-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1372077594-17052-2-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds Device Tree support to max8998 MFD driver.
+This patch adds irq domain support for max8998 interrupts.
 
-First patch reworks max8998-irq driver to use IRQ domains. Second patch
-prepares platform data structure to ease generating it at runtime from
-data parsed from device tree. Third patch implements Device Tree
-binding and adds necessary documentation.
+To keep both non-DT and DT worlds happy, simple domain is used, which is
+linear when no explicit IRQ base is specified and legacy, with static
+mapping, otherwise.
 
-Tested on Universal C210 board.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ drivers/mfd/Kconfig                 |  1 +
+ drivers/mfd/max8998-irq.c           | 65 +++++++++++++++++++++++--------------
+ drivers/rtc/rtc-max8998.c           | 12 ++++++-
+ include/linux/mfd/max8998-private.h |  5 ++-
+ include/linux/mfd/max8998.h         |  2 +-
+ 5 files changed, 57 insertions(+), 28 deletions(-)
 
-Changes since v2:
- - switched to simple domains to retain compatibility with platforms
-   that do not support Device Tree
- - removed clocks from DT regulator bindings (will be moved to common
-   clock framework in further patch)
- - beautified the code a bit
-Changes since v1:
- - rebased to current for-next of regulator tree
-
-Tomasz Figa (3):
-  mfd: Add irq domain support for max8998 interrupts
-  regulator: max8998: Use arrays for specifying voltages in platform
-    data
-  mfd: max8998: Add support for Device Tree
-
- Documentation/devicetree/bindings/mfd/max8998.txt | 108 ++++++++++
- arch/arm/mach-exynos/mach-universal_c210.c        |   8 +-
- arch/arm/mach-s5pv210/mach-aquila.c               |   8 +-
- arch/arm/mach-s5pv210/mach-goni.c                 |   8 +-
- drivers/mfd/Kconfig                               |   1 +
- drivers/mfd/max8998-irq.c                         |  65 +++---
- drivers/mfd/max8998.c                             |  75 ++++++-
- drivers/regulator/max8998.c                       | 239 +++++++++++++++-------
- drivers/rtc/rtc-max8998.c                         |  14 +-
- include/linux/mfd/max8998-private.h               |   7 +-
- include/linux/mfd/max8998.h                       |  20 +-
- 11 files changed, 421 insertions(+), 132 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/max8998.txt
-
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index d54e985..360be92 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -1002,6 +1002,7 @@ config MFD_TC6393XB
+ config MFD_VX855
+ 	tristate "VIA VX855/VX875 integrated south bridge"
+ 	depends on PCI && GENERIC_HARDIRQS
++	select IRQ_DOMAIN
+ 	select MFD_CORE
+ 	help
+ 	  Say yes here to enable support for various functions of the
+diff --git a/drivers/mfd/max8998-irq.c b/drivers/mfd/max8998-irq.c
+index 5919710..c469477 100644
+--- a/drivers/mfd/max8998-irq.c
++++ b/drivers/mfd/max8998-irq.c
+@@ -14,6 +14,7 @@
+ #include <linux/device.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
++#include <linux/irqdomain.h>
+ #include <linux/mfd/max8998-private.h>
+ 
+ struct max8998_irq_data {
+@@ -99,7 +100,8 @@ static struct max8998_irq_data max8998_irqs[] = {
+ static inline struct max8998_irq_data *
+ irq_to_max8998_irq(struct max8998_dev *max8998, int irq)
+ {
+-	return &max8998_irqs[irq - max8998->irq_base];
++	struct irq_data *data = irq_get_irq_data(irq);
++	return &max8998_irqs[data->hwirq];
+ }
+ 
+ static void max8998_irq_lock(struct irq_data *data)
+@@ -176,8 +178,14 @@ static irqreturn_t max8998_irq_thread(int irq, void *data)
+ 
+ 	/* Report */
+ 	for (i = 0; i < MAX8998_IRQ_NR; i++) {
+-		if (irq_reg[max8998_irqs[i].reg - 1] & max8998_irqs[i].mask)
+-			handle_nested_irq(max8998->irq_base + i);
++		if (irq_reg[max8998_irqs[i].reg - 1] & max8998_irqs[i].mask) {
++			irq = irq_find_mapping(max8998->irq_domain, i);
++			if (WARN_ON(!irq)) {
++				disable_irq_nosync(max8998->irq);
++				return IRQ_NONE;
++			}
++			handle_nested_irq(irq);
++		}
+ 	}
+ 
+ 	return IRQ_HANDLED;
+@@ -185,27 +193,40 @@ static irqreturn_t max8998_irq_thread(int irq, void *data)
+ 
+ int max8998_irq_resume(struct max8998_dev *max8998)
+ {
+-	if (max8998->irq && max8998->irq_base)
+-		max8998_irq_thread(max8998->irq_base, max8998);
++	if (max8998->irq && max8998->irq_domain)
++		max8998_irq_thread(max8998->irq, max8998);
++	return 0;
++}
++
++static int max8998_irq_domain_map(struct irq_domain *d, unsigned int irq,
++					irq_hw_number_t hw)
++{
++	struct max8997_dev *max8998 = d->host_data;
++
++	irq_set_chip_data(irq, max8998);
++	irq_set_chip_and_handler(irq, &max8998_irq_chip, handle_edge_irq);
++	irq_set_nested_thread(irq, 1);
++#ifdef CONFIG_ARM
++	set_irq_flags(irq, IRQF_VALID);
++#else
++	irq_set_noprobe(irq);
++#endif
+ 	return 0;
+ }
+ 
++static struct irq_domain_ops max8998_irq_domain_ops = {
++	.map = max8998_irq_domain_map,
++};
++
+ int max8998_irq_init(struct max8998_dev *max8998)
+ {
+ 	int i;
+-	int cur_irq;
+ 	int ret;
++	struct irq_domain *domain;
+ 
+ 	if (!max8998->irq) {
+ 		dev_warn(max8998->dev,
+ 			 "No interrupt specified, no interrupts\n");
+-		max8998->irq_base = 0;
+-		return 0;
+-	}
+-
+-	if (!max8998->irq_base) {
+-		dev_err(max8998->dev,
+-			"No interrupt base specified, no interrupts\n");
+ 		return 0;
+ 	}
+ 
+@@ -221,19 +242,13 @@ int max8998_irq_init(struct max8998_dev *max8998)
+ 	max8998_write_reg(max8998->i2c, MAX8998_REG_STATUSM1, 0xff);
+ 	max8998_write_reg(max8998->i2c, MAX8998_REG_STATUSM2, 0xff);
+ 
+-	/* register with genirq */
+-	for (i = 0; i < MAX8998_IRQ_NR; i++) {
+-		cur_irq = i + max8998->irq_base;
+-		irq_set_chip_data(cur_irq, max8998);
+-		irq_set_chip_and_handler(cur_irq, &max8998_irq_chip,
+-					 handle_edge_irq);
+-		irq_set_nested_thread(cur_irq, 1);
+-#ifdef CONFIG_ARM
+-		set_irq_flags(cur_irq, IRQF_VALID);
+-#else
+-		irq_set_noprobe(cur_irq);
+-#endif
++	domain = irq_domain_add_simple(NULL, MAX8998_IRQ_NR,
++			max8998->irq_base, &max8998_irq_domain_ops, max8998);
++	if (!domain) {
++		dev_err(max8998->dev, "could not create irq domain\n");
++		return -ENODEV;
+ 	}
++	max8998->irq_domain = domain;
+ 
+ 	ret = request_threaded_irq(max8998->irq, NULL, max8998_irq_thread,
+ 				   IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+diff --git a/drivers/rtc/rtc-max8998.c b/drivers/rtc/rtc-max8998.c
+index d5af7ba..46f2301 100644
+--- a/drivers/rtc/rtc-max8998.c
++++ b/drivers/rtc/rtc-max8998.c
+@@ -16,6 +16,7 @@
+ #include <linux/i2c.h>
+ #include <linux/slab.h>
+ #include <linux/bcd.h>
++#include <linux/irqdomain.h>
+ #include <linux/rtc.h>
+ #include <linux/platform_device.h>
+ #include <linux/mfd/max8998.h>
+@@ -264,7 +265,6 @@ static int max8998_rtc_probe(struct platform_device *pdev)
+ 	info->dev = &pdev->dev;
+ 	info->max8998 = max8998;
+ 	info->rtc = max8998->rtc;
+-	info->irq = max8998->irq_base + MAX8998_IRQ_ALARM0;
+ 
+ 	platform_set_drvdata(pdev, info);
+ 
+@@ -277,6 +277,15 @@ static int max8998_rtc_probe(struct platform_device *pdev)
+ 		goto out_rtc;
+ 	}
+ 
++	if (!max8998->irq_domain)
++		goto no_irq;
++
++	info->irq = irq_create_mapping(max8998->irq_domain, MAX8998_IRQ_ALARM0);
++	if (!info->irq) {
++		dev_warn(&pdev->dev, "Failed to map alarm IRQ\n");
++		goto no_irq;
++	}
++
+ 	ret = devm_request_threaded_irq(&pdev->dev, info->irq, NULL,
+ 				max8998_rtc_alarm_irq, 0, "rtc-alarm0", info);
+ 
+@@ -284,6 +293,7 @@ static int max8998_rtc_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "Failed to request alarm IRQ: %d: %d\n",
+ 			info->irq, ret);
+ 
++no_irq:
+ 	dev_info(&pdev->dev, "RTC CHIP NAME: %s\n", pdev->id_entry->name);
+ 	if (pdata && pdata->rtc_delay) {
+ 		info->lp3974_bug_workaround = true;
+diff --git a/include/linux/mfd/max8998-private.h b/include/linux/mfd/max8998-private.h
+index effa5d3..bfb48b6 100644
+--- a/include/linux/mfd/max8998-private.h
++++ b/include/linux/mfd/max8998-private.h
+@@ -132,6 +132,8 @@ enum {
+ 
+ #define MAX8998_ENRAMP                  (1 << 4)
+ 
++struct irq_domain;
++
+ /**
+  * struct max8998_dev - max8998 master device for sub-drivers
+  * @dev: master device of the chip (can be used to access platform data)
+@@ -153,7 +155,8 @@ struct max8998_dev {
+ 	struct mutex iolock;
+ 	struct mutex irqlock;
+ 
+-	int irq_base;
++	unsigned int irq_base;
++	struct irq_domain *irq_domain;
+ 	int irq;
+ 	int ono;
+ 	u8 irq_masks_cur[MAX8998_NUM_IRQ_REGS];
+diff --git a/include/linux/mfd/max8998.h b/include/linux/mfd/max8998.h
+index 6823548..7547118 100644
+--- a/include/linux/mfd/max8998.h
++++ b/include/linux/mfd/max8998.h
+@@ -100,7 +100,7 @@ struct max8998_regulator_data {
+ struct max8998_platform_data {
+ 	struct max8998_regulator_data	*regulators;
+ 	int				num_regulators;
+-	int				irq_base;
++	unsigned int			irq_base;
+ 	int				ono;
+ 	bool				buck_voltage_lock;
+ 	int				buck1_voltage1;
 -- 
 1.8.2.1
