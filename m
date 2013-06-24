@@ -1,30 +1,48 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 24 Jun 2013 12:57:42 +0200
-Subject: [PATCH] ARM: at91/PMC: fix at91sam9n12 USB FS init
-Message-ID: <1372071462-29063-1-git-send-email-nicolas.ferre@atmel.com>
+Date: Mon, 24 Jun 2013 12:59:16 +0200
+Subject: [PATCH 3/3] ARM: at91/PMC: at91sam9n12 family has USB HS feature
+In-Reply-To: <51C82369.1080900@atmel.com>
+References: <cover.1372064763.git.nicolas.ferre@atmel.com>
+ <a3b28f9041482ff60ed0b1b7a6f11d0b1beb5163.1372064763.git.nicolas.ferre@atmel.com>
+ <51C82369.1080900@atmel.com>
+Message-ID: <51C82684.6090700@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91sam9n12 has Full-speed only USB. So we should add
-it to the list in at91_pllb_usbfs_clock_init() function.
+On 24/06/2013 12:46, Bo Shen :
+> Hi Nicolas,
+>
+> On 06/24/2013 05:08 PM, Nicolas Ferre wrote:
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>   arch/arm/mach-at91/clock.c | 1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+>> index 978de42..1b9bbba 100644
+>> --- a/arch/arm/mach-at91/clock.c
+>> +++ b/arch/arm/mach-at91/clock.c
+>> @@ -88,6 +88,7 @@ EXPORT_SYMBOL_GPL(at91_pmc_base);
+>>   #define cpu_has_udpfs()        (!(cpu_is_at91sam9rl() \
+>>                   || cpu_is_at91sam9g45() \
+>>                   || cpu_is_at91sam9x5() \
+>> +                || cpu_is_at91sam9n12() \
+>>                   || cpu_is_sama5d3()))
+>
+> The at91sam9n12 don't have USB HS device port feature. It only has USB
+> FS device port feature.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/clock.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+OMG! sure ;-)
 
-diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-index 978de42..2f732d9 100644
---- a/arch/arm/mach-at91/clock.c
-+++ b/arch/arm/mach-at91/clock.c
-@@ -699,7 +699,7 @@ static void __init at91_pllb_usbfs_clock_init(unsigned long main_clock)
- 		at91_pmc_write(AT91_PMC_SCER, AT91RM9200_PMC_MCKUDP);
- 	} else if (cpu_is_at91sam9260() || cpu_is_at91sam9261() ||
- 		   cpu_is_at91sam9263() || cpu_is_at91sam9g20() ||
--		   cpu_is_at91sam9g10()) {
-+		   cpu_is_at91sam9g10() || cpu_is_at91sam9n12()) {
- 		uhpck.pmc_mask = AT91SAM926x_PMC_UHP;
- 		udpck.pmc_mask = AT91SAM926x_PMC_UDP;
- 	}
+So I remove this patch from my series (sorry for the noise ;-))
+
+>
+>>   #define cpu_has_plladiv2()    (cpu_is_at91sam9g45() \
+>>
+>
+> Best Regards,
+> Bo Shen
+
+Thanks! bye.
 -- 
-1.8.2.2
+Nicolas Ferre
