@@ -1,42 +1,105 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Jun 2013 17:37:32 +0100
-Subject: [Question] race between spin_lock and spin_unlock
-In-Reply-To: <CACVXFVNgONa79n+7Bg4p4Fx568XaK6gy+L9tCrP=CmOGwKY7ig@mail.gmail.com>
-References: <CACVXFVMBL5E5SGwDatn_ay0sPOhqPKTwouCbzjwrhPuRKHNDcg@mail.gmail.com>
- <20130624154357.GB25582@mudshark.cambridge.arm.com>
- <CACVXFVNgONa79n+7Bg4p4Fx568XaK6gy+L9tCrP=CmOGwKY7ig@mail.gmail.com>
-Message-ID: <20130624163732.GC25582@mudshark.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 24 Jun 2013 18:37:59 +0200
+Subject: [PATCH 1/2] ARM: at91/PMC: fix at91sam9n12 USB FS init
+Message-ID: <1372091879-28459-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 05:04:37PM +0100, Ming Lei wrote:
-> On Mon, Jun 24, 2013 at 11:43 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >> Any comments on the problem?
-> >
-> > Not sure I see the problem -- the sev guaranteed by the unlock is pended on
-> > the core doing the lock by setting the event register, so you can't miss it.
-> > The wfe will acknowledge the event (by clearing the event register) but it
-> > won't actually wait.
-> 
-> If so, looks I am afraid too much, :-)
-> 
-> Also I have another question, if two sev() comes from two cores, then the
-> wfe() in one core will acknowledge both the two sev()? or one wfe() only
-> acks one sev()?
+at91sam9n12 has Full-speed only USB. So we should add
+it to the list in at91_pllb_usbfs_clock_init() function.
+Moreover, at91sam9n12 has an unusual PMC in the sense that it
+has a PLLB but also has a USB clock register.
 
-Events do not compose, so you can only have one event pending at a time,
-which the wfe will clear.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/clock.c                 | 25 +++++++++++++++++++++----
+ arch/arm/mach-at91/include/mach/at91_pmc.h |  3 +++
+ 2 files changed, 24 insertions(+), 4 deletions(-)
 
-> If the wfe() in one core may acknowledge two sev(), the above problem
-> might still exists.
-
-You mean, if you had two CPUs spinning on a lock held by a third CPU? In
-this case, the third CPU would have to release the lock, then one of the
-waiters would have to acquire it, complete its critical section and finally
-release it before the other waiter had executed its wfe (about three
-instructions)...
-
-I don't think we need to worry about that in practice, unless you have
-another example?
-
-Will
+diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+index 978de42..661111f 100644
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -489,7 +489,7 @@ static int at91_clk_show(struct seq_file *s, void *unused)
+ 		seq_printf(s, "UCKR = %8x\n", uckr);
+ 	}
+ 	seq_printf(s, "MCKR = %8x\n", at91_pmc_read(AT91_PMC_MCKR));
+-	if (cpu_has_upll())
++	if (cpu_has_upll() || cpu_is_at91sam9n12())
+ 		seq_printf(s, "USB  = %8x\n", at91_pmc_read(AT91_PMC_USB));
+ 	seq_printf(s, "SR   = %8x\n", sr);
+ 
+@@ -614,6 +614,8 @@ static u32 __init at91_usb_rate(struct clk *pll, u32 freq, u32 reg)
+ {
+ 	if (pll == &pllb && (reg & AT91_PMC_USB96M))
+ 		return freq / 2;
++	else if (pll == &utmi_clk || cpu_is_at91sam9n12())
++		return freq / (1 + ((reg & AT91_PMC_OHCIUSBDIV) >> 8));
+ 	else
+ 		return freq;
+ }
+@@ -683,6 +685,8 @@ static struct clk *const standard_pmc_clocks[] __initconst = {
+ /* PLLB generated USB full speed clock init */
+ static void __init at91_pllb_usbfs_clock_init(unsigned long main_clock)
+ {
++	unsigned int reg;
++
+ 	/*
+ 	 * USB clock init:  choose 48 MHz PLLB value,
+ 	 * disable 48MHz clock during usb peripheral suspend.
+@@ -691,22 +695,35 @@ static void __init at91_pllb_usbfs_clock_init(unsigned long main_clock)
+ 	 */
+ 	uhpck.parent = &pllb;
+ 
+-	at91_pllb_usb_init = at91_pll_calc(main_clock, 48000000 * 2) | AT91_PMC_USB96M;
++	reg = at91_pllb_usb_init = at91_pll_calc(main_clock, 48000000 * 2);
+ 	pllb.rate_hz = at91_pll_rate(&pllb, main_clock, at91_pllb_usb_init);
+ 	if (cpu_is_at91rm9200()) {
++		reg = at91_pllb_usb_init |= AT91_PMC_USB96M;
+ 		uhpck.pmc_mask = AT91RM9200_PMC_UHP;
+ 		udpck.pmc_mask = AT91RM9200_PMC_UDP;
+ 		at91_pmc_write(AT91_PMC_SCER, AT91RM9200_PMC_MCKUDP);
+ 	} else if (cpu_is_at91sam9260() || cpu_is_at91sam9261() ||
+ 		   cpu_is_at91sam9263() || cpu_is_at91sam9g20() ||
+ 		   cpu_is_at91sam9g10()) {
++		reg = at91_pllb_usb_init |= AT91_PMC_USB96M;
++		uhpck.pmc_mask = AT91SAM926x_PMC_UHP;
++		udpck.pmc_mask = AT91SAM926x_PMC_UDP;
++	} else if (cpu_is_at91sam9n12()) {
++		/* Divider for USB clock is in USB clock register for 9n12 */
++		reg = AT91_PMC_USBS_PLLB;
++
++		/* For PLLB output 96M, set usb divider 2 (USBDIV + 1) */
++		reg |= AT91_PMC_OHCIUSBDIV_2;
++		at91_pmc_write(AT91_PMC_USB, reg);
++
++		/* Still setup masks */
+ 		uhpck.pmc_mask = AT91SAM926x_PMC_UHP;
+ 		udpck.pmc_mask = AT91SAM926x_PMC_UDP;
+ 	}
+ 	at91_pmc_write(AT91_CKGR_PLLBR, 0);
+ 
+-	udpck.rate_hz = at91_usb_rate(&pllb, pllb.rate_hz, at91_pllb_usb_init);
+-	uhpck.rate_hz = at91_usb_rate(&pllb, pllb.rate_hz, at91_pllb_usb_init);
++	udpck.rate_hz = at91_usb_rate(&pllb, pllb.rate_hz, reg);
++	uhpck.rate_hz = at91_usb_rate(&pllb, pllb.rate_hz, reg);
+ }
+ 
+ /* UPLL generated USB full speed clock init */
+diff --git a/arch/arm/mach-at91/include/mach/at91_pmc.h b/arch/arm/mach-at91/include/mach/at91_pmc.h
+index 2bd7f51..c604cc6 100644
+--- a/arch/arm/mach-at91/include/mach/at91_pmc.h
++++ b/arch/arm/mach-at91/include/mach/at91_pmc.h
+@@ -130,7 +130,10 @@ extern void __iomem *at91_pmc_base;
+ #define		AT91_PMC_USBS		(0x1 <<  0)		/* USB OHCI Input clock selection */
+ #define			AT91_PMC_USBS_PLLA		(0 << 0)
+ #define			AT91_PMC_USBS_UPLL		(1 << 0)
++#define			AT91_PMC_USBS_PLLB		(1 << 0)	/* [AT91SAMN12 only] */
+ #define		AT91_PMC_OHCIUSBDIV	(0xF <<  8)		/* Divider for USB OHCI Clock */
++#define			AT91_PMC_OHCIUSBDIV_1	(0x0 <<  8)
++#define			AT91_PMC_OHCIUSBDIV_2	(0x1 <<  8)
+ 
+ #define	AT91_PMC_SMD		0x3c			/* Soft Modem Clock Register [some SAM9 only] */
+ #define		AT91_PMC_SMDS		(0x1  <<  0)		/* SMD input clock selection */
+-- 
+1.8.2.2
