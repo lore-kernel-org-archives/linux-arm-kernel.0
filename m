@@ -1,41 +1,62 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 24 Jun 2013 15:49:53 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCB2MyA1LzVdIGRyaXZlcnM6IGJ1czogaW14LXdlaW06?=
- =?UTF-8?B?IEFkZCBzdXBwb3J0IGZvciBpLk1YMS8yMS8yNS8yNy8zMS8zNS81MC81MS81?=
- =?UTF-8?B?Mw==?=
-In-Reply-To: <20130624113544.GA30747@S2101-09.ap.freescale.net>
-References: <1371973698-16150-1-git-send-email-shc_work@mail.ru>
- <1371973698-16150-5-git-send-email-shc_work@mail.ru>
- <20130624113544.GA30747@S2101-09.ap.freescale.net>
-Message-ID: <1372074593.303395301@f394.i.mail.ru>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 24 Jun 2013 17:23:44 +0530
+Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
+In-Reply-To: <CAD=GYpabakChmN-TEJbLn6p=BwX2wsK5KWsc5gH9-cAA+yWcEA@mail.gmail.com>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <201306212044.26677.arnd@arndb.de>
+ <CAD=GYpY4koXd9f6_ijQfDHsiULD4d53cdu=9X421WXSAit_YQg@mail.gmail.com>
+ <201306220014.16427.arnd@arndb.de>
+ <CAD=GYpabakChmN-TEJbLn6p=BwX2wsK5KWsc5gH9-cAA+yWcEA@mail.gmail.com>
+Message-ID: <51C83348.6040905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On Sun, Jun 23, 2013 at 11:48:18AM +0400, Alexander Shiyan wrote:
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+On 6/22/2013 8:23 AM, Joel A Fernandes wrote:
+>>>> config TI_EDMA
+>>>>         tristate "TI EDMA support"
+>>>>         default m if 'ARCH_DAVINCI || ARCH_OMAP1 || ARCH_OMAP2
+>>>>         select DMA_ENGINE
+>>>>         select DMA_VIRTUAL_CHANNELS
+>>>
+>>>
+>>> MMC depends on EDMA specially on AM33xx there's no PIO mode AFAIK. The
+>>> 'm' option will require some initramfs to load the module when needing
+>>> to MMC boot, I suggest lets leave it as y.
+>>>
+>>
+>> Ah, right: you still export a filter function from the edma driver
+>> and use it in slave drivers:
+>>
+>> drivers/mmc/host/davinci_mmc.c:         dma_request_slave_channel_compat(mask, edma_filter_fn,
+>> drivers/mmc/host/davinci_mmc.c:         dma_request_slave_channel_compat(mask, edma_filter_fn,
+>> drivers/spi/spi-davinci.c:      dspi->dma_rx = dma_request_channel(mask, edma_filter_fn,
+>> drivers/spi/spi-davinci.c:      dspi->dma_tx = dma_request_channel(mask, edma_filter_fn,
+>>
+>> As long as this is the case, you have to be careful with the dependencies
+>> to make sure that davinci_mmc and spi-davinci either depend on TI_EDMA, or
+>> edma_filter_fn gets defined to NULL when you are building for a DT-only platform.
 > 
-> Can you write up something for the commit log?  Leaving it empty for
-> such a patch with tens of LOC is not a nice thing.
+> Yes sure, right now they are defined  as follows in include/linux/edma.h:
+> 
+> #if defined(CONFIG_TI_EDMA) || defined(CONFIG_TI_EDMA_MODULE)
+> bool edma_filter_fn(struct dma_chan *, void *);
+> #else
+> static inline bool edma_filter_fn(struct dma_chan *chan, void *param)
+> {
+> return false;
+> }
+> #endif
+> 
+> This also has the side effect of causing DMA requests to fail if
+> TI_EDMA is not built, causing frustration for a lot of people some of
+> whom don't want to deal with DMA so I think it is OK to build the
+> driver in by default as it is (and will be) used by a lot of
+> OMAP2PLUS.
 
-OK.
+Solution for this is to enable TI_EDMA in relevant defconfigs. Most
+folks who would get frustrated by such issues would be using defconfigs
+and for those who are building their configuration from scratch this
+will be pretty low in their list of worries.
 
-...
-> > @@ -81,6 +118,9 @@ static int __init weim_probe(struct platform_device *pdev)
-> >  	void __iomem *base;
-> >  	int ret;
-> >  
-> > +	if (!pdev->dev.of_node)
-> > +		return -ENOTSUPP;
-> > +
-> Is it really necessary?  Since we only support DT probe, we can not
-> reach here if the of_node is NULL.
-
-In fact, nothing prevents to add to the board file line like
-platform_device_register_simple ("imx-weim", 0, res, res_cnt);
-In this case, the core will crush. I make it impossible to use.
-Consider it unnecessary checks?
-Thanks!
-
----
+Thanks,
+Sekhar
