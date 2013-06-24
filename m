@@ -1,26 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Jun 2013 17:04:20 +0200
-Subject: [PATCH] ASoC: Tegra and i.MX are mutually exclusive
-Message-ID: <5967649.DUvDfofhX4@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 24 Jun 2013 16:04:08 +0100
+Subject: [PATCH v3 3/3] mfd: max8998: Add support for Device Tree
+In-Reply-To: <1372077594-17052-4-git-send-email-t.figa@samsung.com>
+References: <1372077594-17052-1-git-send-email-t.figa@samsung.com>
+ <1372077594-17052-4-git-send-email-t.figa@samsung.com>
+Message-ID: <20130624150408.GQ27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both Tegra and i.MX provide ac97 operations, which can only
-exist once in the kernel. They can both be built as loadable
-modules (only one of them needs to be loaded anyway), but we
-have to disallow enabling them both as built-in.
+On Mon, Jun 24, 2013 at 02:39:54PM +0200, Tomasz Figa wrote:
+> This patch adds Device Tree support to max8998 driver.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Mark Brown <broonie@linaro.org>
 
-diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
-index 3843a18..5958948 100644
---- a/sound/soc/fsl/Kconfig
-+++ b/sound/soc/fsl/Kconfig
-@@ -99,6 +99,7 @@ endif # SND_POWERPC_SOC
- menuconfig SND_IMX_SOC
- 	tristate "SoC Audio for Freescale i.MX CPUs"
- 	depends on ARCH_MXC
-+	depends on SND_SOC_TEGRA=n || (SND_SOC_TEGRA=m && m)
- 	help
- 	  Say Y or M if you want to add support for codecs attached to
- 	  the i.MX CPUs.
+If applying please also apply the second patch, I'll drop it from the
+regulator tree.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/fe13902c/attachment.sig>
