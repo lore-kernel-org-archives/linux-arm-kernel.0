@@ -1,133 +1,289 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 24 Jun 2013 22:45:49 +0300
-Subject: [PATCH V2] USB: initialize or shutdown PHY when add or remove
- host controller
-In-Reply-To: <CADApbejTBAv0+XxkGLXuMVrLatbNurR0XBkK2gt6eQnXr+5yEA@mail.gmail.com>
-References: <20130620121749.GF9817@arwen.pp.htv.fi>
- <Pine.LNX.4.44L0.1306201319580.2063-100000@iolanthe.rowland.org>
- <CADApbejTBAv0+XxkGLXuMVrLatbNurR0XBkK2gt6eQnXr+5yEA@mail.gmail.com>
-Message-ID: <20130624194549.GD11815@arwen.pp.htv.fi>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 24 Jun 2013 21:50:21 +0200
+Subject: [PATCH 08/15] pwm: Add new pwm-samsung driver
+In-Reply-To: <24964129.e56nj79VjR@flatron>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <20130619094355.GB2911@mithrandir> <1991384.bDpcDUcax8@amdc1227>
+ <24964129.e56nj79VjR@flatron>
+Message-ID: <20130624195020.GA7163@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jun 21, 2013 at 09:07:59AM +0800, Chao Xie wrote:
-> On Fri, Jun 21, 2013 at 1:25 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> > On Thu, 20 Jun 2013, Felipe Balbi wrote:
-> >
-> >> > In fact, the PHY setting and handling is related to platform or SOC,
-> >> > and for different SOC they can
-> >> > have same EHCI HCD but they PHY handling can be different.
-> >> > Omap'a case is the example, and i think some other vendors may have
-> >> > silimar cases.
-> >> > From above point, It is better to leave the PHY initialization and
-> >> > shutdown to be done by each echi-xxx driver.
-> >> >
-> >> > So Alan and Felipe
-> >> > What are your ideas about it?
-> >>
-> >> If we have so many exceptions, then sure. But eventually, the common
-> >> case should be added generically with a flag so that non-generic cases
-> >> (like OMAP) can request to handle the PHY by themselves.
-> >>
-> >> Alan ?
-> >
-> > I don't have very strong feelings about this; Felipe has much more
-> > experience with these things.
-> >
-> > However, when the common case is added into the core, the simplest way
-> > to indicate that the HCD wants to handle the PHY(s) by itself will be
-> > to leave hcd->phy set to NULL or an ERR_PTR value.
-> >
-> > One important thing that hasn't been pointed out yet: When we move
-> > these calls into the core, the same patch must also remove those calls
-> > from the glue drivers that currently do set hcd->phy.  And it must make
-> > sure that the glue drivers which handle the PHY by themselves do not
-> > set hcd->phy.
-> >
+On Mon, Jun 24, 2013 at 07:52:11PM +0200, Tomasz Figa wrote:
+> Hi Thierry,
 > 
-> From device point of view, EHCI is a standlone component. It has the
-> standard sepcification, so each
-> SOC vendor has EHCI HCD need to follow the standards. Then we have
-> common EHCI HCD driver.
-> The PHY is outside of EHCI component, each SOC vendor may have
-> different PHY implementation. Then
-> we have PHY driver.
-> The EHCI glue driver ehci-xxx works like a SOC depended driver. It is
-> its duty to handle the'
-> relationship between the EHCI HCD driver and PHY driver.
+> On Wednesday 19 of June 2013 12:23:52 Tomasz Figa wrote:
+> > On Wednesday 19 of June 2013 11:43:56 Thierry Reding wrote:
+> > > On Wed, Jun 19, 2013 at 12:45:02AM +0200, Tomasz Figa wrote:
+> > > > On Wednesday 19 of June 2013 00:17:06 Thierry Reding wrote:
+> > > > > On Mon, Jun 17, 2013 at 10:50:40PM +0200, Tomasz Figa wrote:
+> > > > > > On Monday 17 of June 2013 22:29:11 Thierry Reding wrote:
+> > > > > > > On Wed, Jun 05, 2013 at 11:18:13PM +0200, Tomasz Figa wrote:
+> > > > > [...]
+> > > > > 
+> > > > > > > > +#ifndef CONFIG_CLKSRC_SAMSUNG_PWM
+> > > > > > > > +static DEFINE_SPINLOCK(samsung_pwm_lock);
+> > > > > > > > +#endif
+> > > > > > > 
+> > > > > > > Why is this lock global? Shouldn't it more correctly be part
+> > > > > > > of
+> > > > > > > samsung_pwm_chip?
+> > > > > > 
+> > > > > > There are few registers shared with samsung_pwm_timer
+> > > > > > clocksource
+> > > > > > driver and so normally the spinlock is exported from it. However
+> > > > > > on
+> > > > > > on some platforms (namely Exynos >=4x12) kernel can be compiled
+> > > > > > without that driver, so the lock must be defined locally, just
+> > > > > > to
+> > > > > > synchronize multiple PWM channels, as they share registers as
+> > > > > > well.
+> > > > > 
+> > > > > Okay, I think this needs further explanation. The clocksource
+> > > > > driver
+> > > > > is
+> > > > > used for what exactly? From a quick look it seems to be very much
+> > > > > PWM-
+> > > > > specific. According to the device tree binding for the PWM driver,
+> > > > > the
+> > > > > timer blocks can also be used as clock sources and clock event
+> > > > > timers.
+> > > > > So if I understand correctly you have setups where you use one or
+> > > > > more
+> > > > > channels as clock source or clock event timer and one or more
+> > > > > channels
+> > > > > as PWM outputs.
+> > > > > 
+> > > > > In that case it's a very bad idea to use a global lock to
+> > > > > synchronize
+> > > > > accesses. You need to do much more than that. To properly split
+> > > > > this
+> > > > > across several drivers there needs to be a mechanism to allocate
+> > > > > channels for use either as clock source/event timer or PWM.
+> > > > > Otherwise,
+> > > > > how do you know that drivers aren't stepping on each other's toes?
+> > > > > 
+> > > > > > > > +		ret = pwm_samsung_parse_dt(chip);
+> > > > > > > > +		if (ret)
+> > > > > > > > +			return ret;
+> > > > > > > > +
+> > > > > > > > +		chip->chip.of_xlate = of_pwm_xlate_with_flags;
+> > > > > > > > +		chip->chip.of_pwm_n_cells = 3;
+> > > > > > > > +	} else {
+> > > > > > > > +		if (!pdev->dev.platform_data) {
+> > > > > > > > +			dev_err(&pdev->dev, "no platform data
+> > > > > > 
+> > > > > > specified\n");
+> > > > > > 
+> > > > > > > > +			return -EINVAL;
+> > > > > > > > +		}
+> > > > > > > > +
+> > > > > > > > +		memcpy(&chip->variant, pdev->dev.platform_data,
+> > > > > > > > +
+> > > > 
+> > > > sizeof(chip-
+> > > > 
+> > > > > > >variant));
+> > > > > > >
+> > > > > > > > +	}
+> > > > > > > 
+> > > > > > > Obviously this needs some modification in order for the
+> > > > > > > variant
+> > > > > > > to
+> > > > > > > become constant. But I think you can easily do so by making
+> > > > > > > the
+> > > > > > > driver
+> > > > > > > match using the platform_driver's id_table field, similar to
+> > > > > > > how
+> > > > > > > the
+> > > > > > > matching is done for OF.
+> > > > > > 
+> > > > > > Generally output_mask is board-dependent and is passed inside a
+> > > > > > variant
+> > > > > > struct using platform_data pointer.
+> > > > > 
+> > > > > That's okay. But output_mask is the only thing that's
+> > > > > board-dependent.
+> > > > > Everything else in the variant is SoC dependent judging by the OF
+> > > > > device
+> > > > > table. So really only the output_mask should be part of the
+> > > > > platform
+> > > > > data.
+> > > > > 
+> > > > > > Same platform data is used in samsung_pwm_timer clocksource
+> > > > > > driver,
+> > > > > > so
+> > > > > > I just reused it here without adding the need to rename platform
+> > > > > > device at runtime (see arch/arm/plat-samsung/devs.c).
+> > > > > 
+> > > > > Looking a bit at git log for the clocksource driver, there's this
+> > > > > 
+> > > > > commit:
+> > > > > 	a3ce54f clocksource: samsung_pwm_timer: Do not request PWM 
+> mem
+> > > > 
+> > > > region
+> > > > 
+> > > > > That's an ugly workaround for sharing registers between two
+> > > > > drivers.
+> > > > > There's a reason why drivers do request_mem_region(), and it is
+> > > > > precisely to prevent them from accessing the same registers. As I
+> > > > > already said above, I think you need to come up with some sort of
+> > > > > API
+> > > > > to
+> > > > > share resources between the drivers.
+> > > > > 
+> > > > > There was a similar issue a few months back with the pwm-tiehrpwm
+> > > > > and
+> > > > > pwm-tiecap drivers, which use a shared block of registers.
+> > > > > Initially
+> > > > > something similar was done as you do here, but eventually we came
+> > > > > up
+> > > > > with a much better solution that involved introducing a new driver
+> > > > > for
+> > > > > the shared functionality and an exported API.
+> > > > > 
+> > > > > The situation seems to be somewhat different here since you
+> > > > > actually
+> > > > > share the same resources for different functionality instead of
+> > > > > sharing
+> > > > > one subset of register across multiple drivers, but I think a
+> > > > > similar
+> > > > > solution can be applied here.
+> > > > 
+> > > > Well, current design, or rather lack of thereof, has been
+> > > > established
+> > > > after a significant amount of discussion, mostly with ARM SoC and
+> > > > MFD
+> > > > maintainers.
+> > > > 
+> > > > It started from a simple reorganization of the clocksource driver to
+> > > > be
+> > > > multiplatform friendly, without any means of synchronizing both
+> > > > drivers
+> > > > other than local_irq_save() and _restore() that used to be there
+> > > > originally, before I started my work on this. This was enough to
+> > > > work
+> > > > correctly, because both drivers at the same time are used only on
+> > > > uniprocessor systems.
+> > > > 
+> > > > Here's the thread with patches:
+> > > > http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16664/focus=1
+> > > > 726
+> > > > 7
+> > > > 
+> > > > Then I opened a Pandora's Box by asking for opinion in this thread:
+> > > > http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16480/focus=1
+> > > > 650
+> > > > 0
+> > > > 
+> > > > After that I started working on a complex framework for sharing this
+> > > > IP
+> > > > block that would solve all the problems with synchronization,
+> > > > channel
+> > > > allocation, device tree parsing, variant management, etc.
+> > > > 
+> > > > Here's an initial version, which started as an MFD master driver,
+> > > > which
+> > > > would let 2 client drivers use the hardware (only the clocksource
+> > > > part
+> > > > was implemented in that series):
+> > > > http://thread.gmane.org/gmane.linux.kernel.samsung-soc/17464/focus=2
+> > > > 292
+> > > > 50
+> > > > 
+> > > > Still, that version didn't receive too good feedback, with comments
+> > > > pointing me to change the architecture to master-slave, with the
+> > > > clocksource driver being the master and PWM driver being the slave.
+> > > > And
+> > > > so v5 was made:
+> > > > http://thread.gmane.org/gmane.linux.kernel.samsung-soc/17864
+> > > 
+> > > Yeah, this seemed to be going in the right direction.
+> > > 
+> > > > This version was generally accepted, but then we discussed on IRC
+> > > > (mostly me and Arnd) whether such complex infrastructure is really
+> > > > needed and concluded that for this platform a simple shared spinlock
+> > > > would be enough, based on following reasons:
+> > > > - on all SoCs on which the clocksource driver is going to be used
+> > > > there
+> > > > is only one instance of the PWM block, with 5 channels
+> > > 
+> > > You say that now. But then at some point somebody decides that it
+> > > might
+> > > be useful to have a second instance.
+> > 
+> > No, he won't.
+> > 
+> > Simply because no new SoC is going to be made which will use the
+> > samsung_pwm_timer driver and all existing ones have only a single
+> > instance of this IP.
+> > 
+> > > > - on all existing boards there are always at least two channels that
+> > > > don't have outputs
+> > > 
+> > > I don't see how that's relevant here.
+> > 
+> > This is the information passed through output_mask. Clocksource driver
+> > can use _only_ channels without output and PWM driver can use _only_
+> > channels with output.
+> > 
+> > Both drivers receive the same output_mask value, either from the same
+> > variant structure or from device tree.
+> > 
+> > > > - operations on particular PWM channels must be synchronized anyway,
+> > > > because there are registers shared by all PWM channels (TCON being
+> > > > most
+> > > > important where enable, autoreload and invert bits are located for
+> > > > all
+> > > > channels).
+> > > 
+> > > And that's precisely why there should be a more explicit way of
+> > > synchronizing than just acquiring a lock. Otherwise you have no
+> > > possibility whatsoever to detect when a board tries to use both the
+> > > clocksource and PWM drivers in incompatible ways. The lock may prevent
+> > > concurrent accesses to the shared registers, but that won't help you
+> > > if
+> > > the PWM driver suddenly decides to use an output that was originally
+> > > meant to be used as clock source.
+> > 
+> > See above.
+> > 
+> > > > And so we got to current design which is basically a shared spinlock
+> > > > and
+> > > > per-board output_mask, which specifies which channels have outputs
+> > > > on
+> > > > particular boards. If you look to the clocksource driver, you can
+> > > > see
+> > > > that it tries to allocate two output-less channels for timekeeping
+> > > > purposes and if it fails to do so, it simply panics.
+> > > > 
+> > > > IMHO this solution is fine, because it's simple, has little overhead
+> > > > and
+> > > > it just works in case of platforms for which it is needed.
+> > > 
+> > > Okay, I like simple. But I see too much potential for this to break
+> > > in the future. There are just too many assumptions for my taste. It
+> > > isn't anything that I'm looking forward to have to maintain.
+> > 
+> > Those are completely safe assumptions for existing platforms. Any new
+> > platform with the same PWM IP will use this driver exclusively, without
+> > the clocksource driver and so without the problems you mentioned.
+> 
+> Would you mind taking into account things I pointed in reply above?
 
-that's not entirely true. We build abstractions layers so that the
-commonalities can be written generically. Just look at the amount of
-code I removed on v3.10 merge window by moving all other UDC drivers to
-use generic constructs I introduced earlier.
+I took those into account. But quite frankly they're no excuse for not
+having at least a half-decent design. Even if you could guarantee that
+the same IP wasn't used in a different combination than you expect,
+keeping what you have now sets a very bad example and people will copy
+because they don't know better and I'll have to explain this all over
+again.
 
-It just so happens that OMAP's EHCI has two different working modes
-which mandates different ways to handle the PHY, one is pretty much the
-generic way (power up EHCI, then power up PHY) the other is inverted
-(PHY, then EHCI), that's the only reason (as of today) we're having this
-thread.
-
-> It is same as clk, irq requested by ehci-xxx driver.
-
-clocks could be handled generically in some cases, we have pm_clk_add()
-for a reason ;-)
-
-Also, clock handling can be hidden under pm_runtime callbacks (say,
-clk_enable() on ->runtime_resume(), clk_disable() on
-->runtime_suspend()). IRQ is actually handled by usbcore, you just pass
-a handler which, in most cases, is the normal ehci_irq() handler.
-
-But we'll get to those later, let's focus on PHY for now.
-
-> So i think add a flag and use usb_get_phy() is not very good.
-
-Alan was talking about use hcd->phy as that flag, no flag would be
-added. But why isn't it very good ? you didn't mention your resoning.
-
-> It is bette to make ehci-xxx to do the phy getting and EHCI HCD
-> initialize it and shut down as the patch did, or let ehci-xxx to
-> handle the PHY as Roger said.
-
-right, so this is what Alan suggested:
-
-ehci-xxx.c does usb_get_phy() (or any of those variants) and sets the
-returned pointer to hcd->phy. From that point on, ehci-hcd will play
-with the phy, resuming and suspending at the proper locations, asking
-the phy to enable wakeup capabilities and the like.
-
-In fact, because of that, I was just considering if I should protect
-usb_phy* against NULL pointers, just to make EHCI's life easier, I mean:
-
-static inline int usb_phy_set_suspend(struct usb_phy *phy, int suspend)
-{
-	if (!phy)
-		return 0;
-
-	return phy->suspend(phy, suspend);
-}
-
-> Based on the generic work is not too much, and does not look so
-> meaningful. I suggest that let to echi-xxx
-> do it.
-
-we'll end up with a boilerplate code in every single ehci-xxx doing
-exactly the same thing. By building the common case in ehci-hcd, we can
-make sure to focus efforts wrt power consumption, proper use of the phy
-layer, etc in a single location which (almost) everybody shares.
-
-The other bits which are non-generic, can use ehci-hcd as a reference to
-build their own stuff.
-
-my 2 cents
-
--- 
-balbi
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/0af29905/attachment-0001.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/44e97f05/attachment.sig>
