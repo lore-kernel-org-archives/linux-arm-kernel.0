@@ -1,31 +1,42 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 24 Jun 2013 09:21:28 +0200
-Subject: [RFC 0/3] How to pass IOMMU map attr via DMA API?
-In-Reply-To: <20130624081759.76e66d42bbf7c2c54ed1975c@nvidia.com>
-References: <1371707384-30037-1-git-send-email-hdoyu@nvidia.com>
- <51C3FE27.5070702@samsung.com> <20130621160344.GM11309@8bytes.org>
- <20130624081759.76e66d42bbf7c2c54ed1975c@nvidia.com>
-Message-ID: <20130624072128.GP11309@8bytes.org>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 24 Jun 2013 07:25:50 +0000
+Subject: [PATCH] ARM: omap: make am43xx build with SMP enabled
+In-Reply-To: <20130624071742.GP5523@atomide.com>
+References: <201306220122.47786.arnd@arndb.de>
+ <20130624071742.GP5523@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EB248E5@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 08:17:59AM +0300, Hiroshi Doyu wrote:
-> Ok, thanks. One more question, IOMMU H/W sometimes supports more
-> platform specific attributes than READ/WRITE. For example, in OMAP,
+Hi,
+
+On Mon, Jun 24, 2013 at 12:47:42, Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [130621 16:28]:
+> > With am43xx enabled, omap4 and omap5 disabled and SMP on, I get these
+> > build errors:
+> > 
+> > arch/arm/mach-omap2/built-in.o: In function `scu_gp_set':
+> > :(.text+0x7858): undefined reference to `omap4_get_scu_base'
+> > arch/arm/mach-omap2/built-in.o: In function `scu_gp_clear':
+> > :(.text+0x793c): undefined reference to `omap4_get_scu_base'
+> > arch/arm/mach-omap2/built-in.o: In function `omap4_cpu_die':
+> > :(.ref.text+0x44): undefined reference to `omap4_hotplug_cpu'
+> > 
+> > The easiest way to work around that is to turn on the missing
+> > functions, even though we know they won't be used on am43xx,
+> > which is single-CPU.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Ankur Kishore <a-kishore@ti.com>
+> > Cc: Afzal Mohammed <afzal@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
 > 
->   #define IOMMU_FLAG	(IOVMF_ENDIAN_LITTLE | IOVMF_ELSZ_8)
+> Looks OK to me:
 > 
-> Is there any way to deal with those platform specific attrs from DMA
-> mapping API POV?
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-Depends on the kind of flag and whether you want to make it changeable
-from the DMA-API. The AMD IOMMU for example has a flag in the
-page-tables to force PCI DMA coherency. This is always set by the
-driver.
+Wait, seeing another build error after applying this patch,
+I will respond back soon.
 
-For other parameters that should be changeable and don't fit into the
-dma_direction parameter in some way the use of dma_attr would make
-sense.
-
-
-	Joerg
+Regards
+Afzal
