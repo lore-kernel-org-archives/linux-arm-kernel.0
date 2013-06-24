@@ -1,91 +1,55 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 24 Jun 2013 09:26:45 -0400
-Subject: [PATCH] ARM: Add support for LPAE style CONTEXTIDR
-Message-ID: <1372080405-13365-1-git-send-email-cov@codeaurora.org>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 24 Jun 2013 15:51:19 +0200
+Subject: Chipidea usb otg support for IMX/MXS (device functionality)
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803EFB072@039-SN2MPN1-023.039d.mgd.msft.net>
+References: <51A5A808.2070803@digi.com> <201306221529.53043.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803EFB072@039-SN2MPN1-023.039d.mgd.msft.net>
+Message-ID: <201306241551.19831.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the long-descriptor translation table format changes
-the layout of the CONTEXTIDR register.
+Hello Peter,
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
----
- arch/arm/mm/context.c | 37 +++++++++++++++++++++++++++----------
- 1 file changed, 27 insertions(+), 10 deletions(-)
+> > Hi Peter,
+> > 
+> > > > Peter, I dunno if you are already aware of it, but the USB peripheral
+> > > > mode hangs
+> > > > on MX233. It's easy to replicate for example if you try to run CDC
+> > > > ethernet over
+> > > > the USB peripheral mode, then telnet into the board and run "dmesg" .
+> > > > This will
+> > > > trigger a "larger" data transfer which will make the UDC driver hang.
+> > > > This
+> > > > doesn't happen on MX28 so it must be some MX233-specific thing.
+> > > 
+> > > Marek, Have you tried below?
+> > > 
+> > > http://marc.info/?l=linux-usb&m=136537318510847&w=2
+> > > 
+> > > It may not the USB itself problem, the mx23's usb is almost
+> > > the same with mx28's.
+> > 
+> > This also happens on a different MX23-based board for me. This other
+> > board I
+> > tried has mDDR DRAM and the DRAM is operating correctly. The 96MHz thing
+> > people
+> > complained about in the Olimex forum is resolved now.
+> 
+> Add shawn.
+> 
+> Marek, have you tried mx23 evk?
 
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 2ac3737..272c249 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -37,6 +37,11 @@
-  *
-  * In big endian operation, the two 32 bit words are swapped if accesed by
-  * non 64-bit operations.
-+ *
-+ * The above layout is also used by ARMv7 when the short-descriptor translation
-+ * table format is used, but when the long-descriptor translation table format
-+ * (LPAE) is used, all 32 bits are devoted to the process identifier. (The ASID
-+ * is in TTBRx.)
-  */
- #define ASID_FIRST_VERSION	(1ULL << ASID_BITS)
- #define NUM_USER_ASIDS		(ASID_FIRST_VERSION - 1)
-@@ -68,6 +73,13 @@ static void cpu_set_reserved_ttbr0(void)
- 	: "r" (ttbl), "r" (ttbh));
- 	isb();
- }
-+
-+static void write_contextidr(pid_t pid)
-+{
-+	asm volatile(
-+	"	mcr	p15, 0, %0, c13, c0, 1\n"
-+	: : "r" (pid));
-+}
- #else
- static void cpu_set_reserved_ttbr0(void)
- {
-@@ -79,20 +91,12 @@ static void cpu_set_reserved_ttbr0(void)
- 	: "=r" (ttb));
- 	isb();
- }
--#endif
- 
--#ifdef CONFIG_PID_IN_CONTEXTIDR
--static int contextidr_notifier(struct notifier_block *unused, unsigned long cmd,
--			       void *t)
-+static void write_contextidr(pid_t pid)
- {
- 	u32 contextidr;
--	pid_t pid;
--	struct thread_info *thread = t;
--
--	if (cmd != THREAD_NOTIFY_SWITCH)
--		return NOTIFY_DONE;
- 
--	pid = task_pid_nr(thread->task) << ASID_BITS;
-+	pid <<= ASID_BITS;
- 	asm volatile(
- 	"	mrc	p15, 0, %0, c13, c0, 1\n"
- 	"	and	%0, %0, %2\n"
-@@ -100,6 +104,19 @@ static int contextidr_notifier(struct notifier_block *unused, unsigned long cmd,
- 	"	mcr	p15, 0, %0, c13, c0, 1\n"
- 	: "=r" (contextidr), "+r" (pid)
- 	: "I" (~ASID_MASK));
-+}
-+#endif
-+
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+static int contextidr_notifier(struct notifier_block *unused, unsigned long cmd,
-+			       void *t)
-+{
-+	struct thread_info *thread = t;
-+
-+	if (cmd != THREAD_NOTIFY_SWITCH)
-+		return NOTIFY_DONE;
-+
-+	write_contextidr(task_pid_nr(thread->task));
- 	isb();
- 
- 	return NOTIFY_OK;
--- 
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by the Linux Foundation.
+No, I don't have this one available right now. I tried both MX23 Olinuxino maxi 
+(I just mutilated the board so that I cut traces to the USB devices on the board 
+and routed out USB gadget connector) and a custom MX23 board.
+
+Note that both have working USB peripheral mode in U-Boot too, but the driver in 
+U-Boot is very minimalistic.
+
+> Shawn, marek reported the udc function at mx23 works abnormal, but it works
+> good at mx28. Have you tried mx23 udc recently?
+
+Fabio, can you possibly test on MX23EVK please?
+
+Best regards,
+Marek Vasut
