@@ -1,109 +1,59 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 24 Jun 2013 10:55:43 -0700
-Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
-In-Reply-To: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
- (Grygorii Strashko's message of "Fri, 21 Jun 2013 18:03:10 +0300")
-References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <87zjuftmu8.fsf@linaro.org>
+From: lho@apm.com (Loc Ho)
+Date: Mon, 24 Jun 2013 10:57:14 -0700
+Subject: [PATCH 3/3] Documentation: Add documentation for APM X-Gene clock
+ binding.
+In-Reply-To: <20130624085423.GD19489@e106331-lin.cambridge.arm.com>
+References: <1371828605-18053-1-git-send-email-lho@apm.com>
+ <1371828605-18053-2-git-send-email-lho@apm.com>
+ <1371828605-18053-3-git-send-email-lho@apm.com>
+ <1371828605-18053-4-git-send-email-lho@apm.com>
+ <20130624085423.GD19489@e106331-lin.cambridge.arm.com>
+Message-ID: <CAPw-ZTmJVYU8tPqNGpDSENWKLVkMesDG7m0G_cZ8rCggN3H+gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
+HI,
 
-Grygorii Strashko <grygorii.strashko@ti.com> writes:
 
-> Before switching to DT pinctrl states of OMAP IPs have been handled by hwmod
-> framework. After switching to DT-boot the pinctrl handling was dropped from
-> hwmod framework and, as it was recommended, OMAP IP's drivers have to be updated
-> to handle pinctrl states by itself using pinctrl_pm_select_xx() helpers
-> (see http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173514.html)
+>> +Required properties for PLL clocks:
+>> +- reg : shall be the physical PLL register address for the pll clock.
+>> +- clocks : shall be the input parent clock phandle for the clock. This should
+>> +     be the reference clock.
+>> +- #clock-cells : shall be set to 1.
+>> +- clock-output-names : shall be the name of the PLL referenced by derive
+>> +  clock.
+>> +- type : shall be 1 for SoC PLL and 0 for PCP PLL.
 >
-> But this is not right for OMAP2+ SoC where real IPs state is controlled
-> by omap_device core which enables/disables modules & clocks actually.
->
-> For example, if OMAP I2C driver will handle pinctrl state during system wide
-> suspend the following issue may occure:
-> - suspend_noirq - I2C device can be still active because of PM auto-suspend
->   |-_od_suspend_noirq
->      |- omap_i2c_suspend_noirq
->         |- PINs state set to SLEEP
->   |- pm_generic_runtime_suspend
->      |- omap_i2c_runtime_suspend()
->         |- PINs state set to IDLE  <--- *oops* PINs state is IDLE and not SLEEP
->   |- omap_device_idle()
->      |- omap_hwmod_idle()
->         |- _idle()
->            |- disbale module (sysc&clocks)
->
-> - resume_noirq - I2C was active before suspend
->   |-_od_resume_noirq
->      |- omap_hwmod_enable()
->         |- _enable()
->            |- enable module (sysc&clocks)
->      |- pm_generic_runtime_resume
->         |- omap_i2c_runtime_resume()
->            |- PINs state set to DEFAULT  <--- !!!!
->      |- omap_i2c_resume_noirq
->         |- PINs state set to DEFAULT
->         |- PINs state set to IDLE  <--- *big oops* we have active module and its
->                                          PINs state is IDLE
-> (see https://patchwork.kernel.org/patch/2642101/)
->
-> Of course, everything can be handled by adding a tons of code in ecah driver to
-> check PM state of device and override default behavior of omap_device core, but
-> this not good.
->
-> Hence, add pinctrl handling in omap_device core:
-> 1) on PM runtime resume
-> - switch pinctrl state to "default" (todo: "active")
-> 2) on PM runtime suspend
-> - switch pinctrl state to "idle"
-> 3) during system wide suspend
-> - switch pinctrl state to "sleep" or "idle" if omap_device core disables device
-> - switch pinctrl state to "sleep" if device is disabled already
-> 4) during system wide resume
-> - switch pinctrl state to "default" (todo: "active") if omap_device core has
->   disabled  device during suspend
-> - switch pinctrl state to "idle" if device was already disabled before suspend
->
-> This will enable pinctrl for all OMAP2+ IP's drivers by default -
-> no changes in code is needed and only DT data will need to be updated
-> (add "default", "active", "idle", "sleep" states).
->
-> This will enable pinctrl handling for all OMAP2+ drivers by default -
-> no changes in code is needed and only DT data will need to be updated
-> (add "default", "active", "idle", "sleep" states).
->
-> Related discussions:
-> - [3/3] i2c: nomadik: use pinctrl PM helpers 
->  https://patchwork.kernel.org/patch/2670291/
-> - mmc: omap_hsmmc: Remux pins to support SDIO interrupt and PM runtime
->  https://patchwork.kernel.org/patch/2690191/
-> - [PATCH 00/11] drivers: Add Pinctrl PM support
->  https://lkml.org/lkml/2013/5/31/210
->
-> CC: Hebbar Gururaja <gururaja.hebbar@ti.com>
-> CC: Linus Walleij  <linus.walleij@linaro.org>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: linux-omap at vger.kernel.org
-> CC: linux-kernel at vger.kernel.org 
->
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
-> Hi Kevin, Tony,
->
-> I've verified this patch on OMAP4 SDP board:
-> - PM runtime for I2C4, UART2, UART3
-> - suspend/resume with I2C4, UART2, UART3
->
-> seems it works and pinctrl states have been updated as expected.
+> That makes the binding very difficult for a human to read, could this not be
+> part of the compatible string? e.g. "apm,xgene-pcp-pll-clock".
+[Loc Ho]
+I guess I could by they will only differ by one function in term of
+rate computation.
 
-Thanks for working on this.
+>
+>> +Optional properties for PLL clocks:
+>> +- clock-names : shall be the name of the PLL. If missing, use the device name.
+>> +
+>> +Required properties for device clocks:
+>> +- reg : shall be the physical CSR reset address base and physical CSR divider
+>> +        address base. If one does not exist, specify 0 for address and 0 for
+>> +        size.
+>> +- clocks : shall be the input parent clock phandle for the clock.
+>> +- #clock-cells : shall be set to 1.
+>> +- clock-output-names : shall be the name of the device referenced.
+>> +Optional properties for device clocks:
+>> +- clock-names : shall be the name of the device clock. If missing, use the
+>> +                device name.
+>> +- flags : Any clock flags. ie. use 0x8 to leave clock un-touch if not
+>> +          referenced. Default is 0.
+>
+> What flags are these? We should *not* be exporting Linux-internal flags as
+> devicetree bindings.
+[Loc Ho]
+I need the CLK ignore if un-used. This is needed in case an subsystem
+- such as PCIE is NOT powered on. With different board design, some IP
+may not have power. Accessing the clock registers will cause exception
+in the kernel. I guess I could just add the clock IGNORE by default
+and not require this.
 
-I agree with the approach, and much prefer this to boiler plate code
-throughout the drivers.
-
-I suggest we wait until the dust settles on the active/default thread
-before taking this further, but have no objections to the approach.
-
-Kevin
+-Loc
