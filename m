@@ -1,28 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Jun 2013 15:04:24 +0100
-Subject: [PATCH] ARM: Add support for LPAE style CONTEXTIDR
-In-Reply-To: <1372080405-13365-1-git-send-email-cov@codeaurora.org>
-References: <1372080405-13365-1-git-send-email-cov@codeaurora.org>
-Message-ID: <20130624140424.GA24861@mudshark.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 24 Jun 2013 22:07:56 +0800
+Subject: [PATCH 2/2] ARM: dts: mx28: Fix sgtl5000 codec probe
+In-Reply-To: <CAOMZO5Bfetjwinatj4W-nrEvg+3pLfjgF8Zpx_-=n52ZTGHeGA@mail.gmail.com>
+References: <1371849720-14506-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5AN7+ZodLwxNbRKk4ixheFkL4T=OdphXXRRu_Qmv30JjQ@mail.gmail.com>
+ <CAOMZO5DUsGpffGOkEjZX3JaKcJxV6GsH_pOyX=dhHxq3vB9xQA@mail.gmail.com>
+ <201306221524.33879.marex@denx.de>
+ <CAOMZO5DYNmiasRREC8jXH===2HG1aNvpxpFVU2u+q5ZAT8Wd3Q@mail.gmail.com>
+ <20130624072908.GH26254@S2101-09.ap.freescale.net>
+ <CAOMZO5Bfetjwinatj4W-nrEvg+3pLfjgF8Zpx_-=n52ZTGHeGA@mail.gmail.com>
+Message-ID: <20130624140754.GF30747@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christopher,
-
-On Mon, Jun 24, 2013 at 02:26:45PM +0100, Christopher Covington wrote:
-> Using the long-descriptor translation table format changes
-> the layout of the CONTEXTIDR register.
+On Mon, Jun 24, 2013 at 10:54:11AM -0300, Fabio Estevam wrote:
+> On Mon, Jun 24, 2013 at 4:29 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 > 
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> ---
->  arch/arm/mm/context.c | 37 +++++++++++++++++++++++++++----------
->  1 file changed, 27 insertions(+), 10 deletions(-)
+> > Yes, we should have sgtl5000 acquire its clock, but when it fails to do
+> > so, there is nothing wrong with deferring it to see if mxs-saif would
+> > provide the clock later.
+> 
+> I didn't manage to get mx28evk to probe audio correctly by using -EPROBE_DEFER.
 
-Hmm, I'd deliberately written the code as-is, so that debuggers wouldn't
-need context-sensitive parsing of the contextidr register depending on the
-type of page tables in use.
+When you was doing that, did you have the clock that sgtl5000 is
+requesting registered somewhere?
 
-What's the advantage of this approach, other than you get an extra byte's
-worth of PID?
-
-Will
+Shawn
