@@ -1,174 +1,144 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 25 Jun 2013 00:33:01 +0900
-Subject: [PATCH v2 07/18] ARM: SAMSUNG: Move all platforms to new
- clocksource driver
-In-Reply-To: <1371766383-29077-8-git-send-email-tomasz.figa@gmail.com>
-References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
- <1371766383-29077-8-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <51C866AD.6010406@samsung.com>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Mon, 24 Jun 2013 17:35:18 +0200
+Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
+In-Reply-To: <20130624072112.GQ5523@atomide.com>
+References: <20130516180933.GG5600@atomide.com>
+ <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
+ <20130516214430.GN5600@atomide.com> <20130520174621.GI10378@atomide.com>
+ <20130605223355.EDC113E10E4@localhost> <20130606155341.GL3331@atomide.com>
+ <20130623221605.GA3150@blackmetal.musicnaut.iki.fi>
+ <CAAwP0s1DkMu8Vfka43hS4Wj-927q=O5u-coyFsPBgy3qtA_vjw@mail.gmail.com>
+ <20130623234326.GA20703@blackmetal.musicnaut.iki.fi>
+ <CAAwP0s00RwP7jCMF1O8j8Ndhu=VfD2dMA5fzr6jWvQ7PziXBCw@mail.gmail.com>
+ <20130624072112.GQ5523@atomide.com>
+Message-ID: <CAAwP0s1LTj1gu8o2mQd3arzH9-9Wfn2G+wsQ=4DpnMRXb7LADw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/13 07:12, Tomasz Figa wrote:
-> This patch moves all Samsung platforms using PWM clocksource from legacy
-> samsung-time to new samsung-pwm-timer driver.
+On Mon, Jun 24, 2013 at 9:21 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Javier Martinez Canillas <martinez.javier@gmail.com> [130623 18:08]:
+>> On Mon, Jun 24, 2013 at 1:43 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+>> > Hi,
+>> >
+>> > On Mon, Jun 24, 2013 at 01:06:37AM +0200, Javier Martinez Canillas wrote:
+>> >> On Mon, Jun 24, 2013 at 12:16 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+>> >> > What is the status of this patch? We're already at 3.10-rc7 and GPIO
+>> >> > IRQs are still broken on OMAP1.
+>> >
+>> > [...]
+>> >
+>> >> There is a problem with this patch.
+>> >
+>> > [...]
+>> >
+>> >> So I think that the correct solution is to add SPARSE_IRQ support to
+>> >> omap1 and not reverting Jon's patch. Of course this may not be
+>> >> possible since we are so close to 3.10 and most OMAP patches already
+>> >> merged for 3.11 but we should definitely try to have this at least for
+>> >> 3.12. Otherwise we won't be able to move to DT-only booting for
+>> >> OMAP2+.
+>> >
+>> > OMAP1 does not use DT. So we could put this code under #ifdef
+>> > CONFIG_ARCH_OMAP1 or similar. It's just a few lines of code. OMAP2+
+>> > work should not regress OMAP1.
+>> >
+>> > Demanding SPARSE_IRQ support for OMAP1 should have been discussed before
+>> > these changes were made. It's not reasonable to assume such things can
+>> > be made during rc-cycle. Also, now, I don't think it's reasonable to
+>> > wait for that to be done, as it would take until 3.12 or even later to
+>> > get OMAP1 functional again.
+>> >
+>> > A.
+>>
+>> Hi,
+>>
+>> Yes, since we are so late in the -rc cycle and OMAP1 is currently
+>> broken I agree that the only sensible solution is to revert the patch
+>> for now.
 >
-> Signed-off-by: Tomasz Figa<tomasz.figa@gmail.com>
-> ---
->   arch/arm/mach-s3c24xx/Kconfig  | 12 ++++++------
->   arch/arm/mach-s3c24xx/common.c | 16 ++++++++++++++++
->   arch/arm/mach-s3c64xx/Kconfig  |  4 ++--
->   arch/arm/mach-s3c64xx/common.c | 17 +++++++++++++++++
->   arch/arm/mach-s5p64x0/Kconfig  |  4 ++--
->   arch/arm/mach-s5p64x0/common.c | 17 +++++++++++++++++
->   arch/arm/mach-s5pc100/Kconfig  |  2 +-
->   arch/arm/mach-s5pc100/common.c | 17 +++++++++++++++++
->   arch/arm/mach-s5pv210/Kconfig  |  2 +-
->   arch/arm/mach-s5pv210/common.c | 17 +++++++++++++++++
->   10 files changed, 96 insertions(+), 12 deletions(-)
+> Agreed.
 >
-> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-> index 6d9252e..46f9a9c 100644
-> --- a/arch/arm/mach-s3c24xx/Kconfig
-> +++ b/arch/arm/mach-s3c24xx/Kconfig
-> @@ -30,7 +30,7 @@ config CPU_S3C2410
->   	select S3C2410_CLOCK
->   	select ARM_S3C2410_CPUFREQ if ARM_S3C24XX_CPUFREQ
->   	select S3C2410_PM if PM
-> -	select SAMSUNG_HRT
-> +	select CLKSRC_SAMSUNG_PWM
-
-Please put this in alphabetical ordering, this is just replacing though.
-
->   	select SAMSUNG_WDT_RESET
->   	help
->   	  Support for S3C2410 and S3C2410A family from the S3C24XX line
-> @@ -42,7 +42,7 @@ config CPU_S3C2412
->   	select CPU_LLSERIAL_S3C2440
->   	select S3C2412_DMA if S3C24XX_DMA
->   	select S3C2412_PM if PM
-> -	select SAMSUNG_HRT
-> +	select CLKSRC_SAMSUNG_PWM
-
-Same as above.
-
->   	help
->   	  Support for the S3C2412 and S3C2413 SoCs from the S3C24XX line
+>> I just wanted to point out the issue that keeping the OMAP GPIO driver
+>> using legacy mapping domain represents a blocker to have GPIO-IRQ
+>> working with Device Tree for OMAP2+
 >
-> @@ -54,7 +54,7 @@ config CPU_S3C2416
->   	select S3C2443_COMMON
->   	select S3C2443_DMA if S3C24XX_DMA
->   	select SAMSUNG_CLKSRC
-> -	select SAMSUNG_HRT
-> +	select CLKSRC_SAMSUNG_PWM
-
-Same as above.
-
->   	help
->   	  Support for the S3C2416 SoC from the S3C24XX line
+> Yes. We can do the ifdef Aaro suggested, and let's also plan on
+> converting omap1 to use SPARSE_IRQ. But with the ifdef we can cut
+> away the dependency between these two.
 >
-> @@ -65,7 +65,7 @@ config CPU_S3C2440
->   	select S3C2410_CLOCK
->   	select S3C2410_PM if PM
->   	select S3C2440_DMA if S3C24XX_DMA
-> -	select SAMSUNG_HRT
-> +	select CLKSRC_SAMSUNG_PWM
-
-Same as above.
-
->   	help
->   	  Support for S3C2440 Samsung Mobile CPU based systems.
+> Regards,
 >
-> @@ -75,7 +75,7 @@ config CPU_S3C2442
->   	select CPU_LLSERIAL_S3C2440
->   	select S3C2410_CLOCK
->   	select S3C2410_PM if PM
-> -	select SAMSUNG_HRT
-> +	select CLKSRC_SAMSUNG_PWM
+> Tony
 
-Same.
+Ok, so something like the following patch should do it (tested on an
+OMAP3 board):
 
->   	help
->   	  Support for S3C2442 Samsung Mobile CPU based systems.
->
-> @@ -91,7 +91,7 @@ config CPU_S3C2443
->   	select S3C2443_COMMON
->   	select S3C2443_DMA if S3C24XX_DMA
->   	select SAMSUNG_CLKSRC
-> -	select SAMSUNG_HRT
-> +	select CLKSRC_SAMSUNG_PWM
+>From b9e262c688fb7f3ad733f140b55dddbc8e4716e6 Mon Sep 17 00:00:00 2001
+From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Date: Mon, 24 Jun 2013 17:13:23 +0200
+Subject: [PATCH 1/1] gpio/omap: don't use linear domain mapping for OMAP1
 
-Same.
+commit ede4d7a5 ("gpio/omap: convert gpio irq domain to linear mapping")
+converted the OMAP GPIO driver to use a linear mapping for the GPIO IRQ
+domain instead of using a legacy mapping. Not using a legacy mapping has
+a number of benefits but it requires the platform to support SPARSE_IRQ
+which currently is not supported on OMAP1.
 
-[...]
+So this change caused a regression on OMAP1 platforms [1].
 
->
->   config CPU_S3C6400
-> -	select SAMSUNG_HRT
-> +	select CLKSRC_SAMSUNG_PWM
+Since this issue is not present on all OMAP2+ platforms, there is no need to
+revert the driver to use legacy domain mapping for all the platforms.
 
-Same.
+[1]: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg89005.html
 
->   	bool
->   	help
->   	  Enable S3C6400 CPU support
->
->   config CPU_S3C6410
-> -	select SAMSUNG_HRT
-> +	select CLKSRC_SAMSUNG_PWM
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ drivers/gpio/gpio-omap.c |   22 +++++++++++++++++++++-
+ 1 files changed, 21 insertions(+), 1 deletions(-)
 
-Same.
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index d3f7d2d..4a43036 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -1094,6 +1094,9 @@ static int omap_gpio_probe(struct platform_device *pdev)
+ 	const struct omap_gpio_platform_data *pdata;
+ 	struct resource *res;
+ 	struct gpio_bank *bank;
++#ifdef CONFIG_ARCH_OMAP1
++	int irq_base;
++#endif
 
->   	bool
->   	help
->   	  Enable S3C6410 CPU support
+ 	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
 
-[...]
+@@ -1135,11 +1138,28 @@ static int omap_gpio_probe(struct platform_device *pdev)
+ 				pdata->get_context_loss_count;
+ 	}
 
-> @@ -11,14 +11,14 @@ config CPU_S5P6440
->   	bool
->   	select S5P_SLEEP if PM
->   	select SAMSUNG_DMADEV
-> -	select SAMSUNG_HRT
-> +	select CLKSRC_SAMSUNG_PWM
++#ifdef CONFIG_ARCH_OMAP1
++	/*
++	 * REVISIT: Once we have OMAP1 supporting SPARSE_IRQ, we can drop
++	 * irq_alloc_descs() and irq_domain_add_legacy() and just use a
++	 * linear IRQ domain mapping for all OMAP platforms.
++	 */
++	irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
++	if (irq_base < 0) {
++		dev_err(dev, "Couldn't allocate IRQ numbers\n");
++		return -ENODEV;
++	}
 
-Same.
++	bank->domain = irq_domain_add_legacy(node, bank->width, irq_base,
++					     0, &irq_domain_simple_ops, NULL);
++#else
+ 	bank->domain = irq_domain_add_linear(node, bank->width,
+ 					     &irq_domain_simple_ops, NULL);
+-	if (!bank->domain)
++#endif
++	if (!bank->domain) {
++		dev_err(dev, "Couldn't register an IRQ domain\n");
+ 		return -ENODEV;
++	}
 
->   	select SAMSUNG_WAKEMASK if PM
->   	help
->   	  Enable S5P6440 CPU support
->
->   config CPU_S5P6450
->   	bool
-> -	select SAMSUNG_HRT
-> +	select CLKSRC_SAMSUNG_PWM
-
-Same.
-
-[...]
-
-> @@ -11,7 +11,7 @@ config CPU_S5PC100
->   	bool
->   	select S5P_EXT_INT
->   	select SAMSUNG_DMADEV
-> -	select SAMSUNG_HRT
-> +	select CLKSRC_SAMSUNG_PWM
-
-Same.
-
-[...]
-
-> @@ -15,7 +15,7 @@ config CPU_S5PV210
->   	select S5P_PM if PM
->   	select S5P_SLEEP if PM
->   	select SAMSUNG_DMADEV
-> -	select SAMSUNG_HRT
-> +	select CLKSRC_SAMSUNG_PWM
-
-Same.
-
-[...]
-
-Let me fix it...
-
-- Kukjin
+ 	if (bank->regs->set_dataout && bank->regs->clr_dataout)
+ 		bank->set_dataout = _set_gpio_dataout_reg;
+-- 
+1.7.7.6
