@@ -1,39 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 24 Jun 2013 20:38:19 +0800
-Subject: [PATCH v3 5/5] drivers: bus: imx-weim: Add support for
- i.MX1/21/25/27/31/35/50/51/53
-In-Reply-To: <1372074593.303395301@f394.i.mail.ru>
-References: <1371973698-16150-1-git-send-email-shc_work@mail.ru>
- <1371973698-16150-5-git-send-email-shc_work@mail.ru>
- <20130624113544.GA30747@S2101-09.ap.freescale.net>
- <1372074593.303395301@f394.i.mail.ru>
-Message-ID: <20130624123817.GB30747@S2101-09.ap.freescale.net>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Mon, 24 Jun 2013 14:39:05 +0200
+Subject: [PATCH] pinctrl: establish pull-up/pull-down terminology
+In-Reply-To: <CACRpkdYMe+q2GUXooSeVVua3-AHDJFfWQu21bn45b_omsA7FAQ@mail.gmail.com>
+References: <1371379548-6482-1-git-send-email-linus.walleij@stericsson.com>
+ <201306220139.28794.heiko@sntech.de>
+ <CACRpkdYMe+q2GUXooSeVVua3-AHDJFfWQu21bn45b_omsA7FAQ@mail.gmail.com>
+Message-ID: <201306241439.05875.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 03:49:53PM +0400, Alexander Shiyan wrote:
-> > > @@ -81,6 +118,9 @@ static int __init weim_probe(struct platform_device *pdev)
-> > >  	void __iomem *base;
-> > >  	int ret;
-> > >  
-> > > +	if (!pdev->dev.of_node)
-> > > +		return -ENOTSUPP;
-> > > +
-> > Is it really necessary?  Since we only support DT probe, we can not
-> > reach here if the of_node is NULL.
+Am Montag, 24. Juni 2013, 14:24:12 schrieb Linus Walleij:
+> On Sat, Jun 22, 2013 at 1:39 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> > Am Samstag, 22. Juni 2013, 01:30:18 schrieb Laurent Pinchart:
+> >> [Stephen]
+> >> 
+> >> > IIRC the idea of the PULL_PIN_DEFAULT was to avoid having to specify
+> >> > UP/DOWN for each pin/group, but could just say "default", which would
+> >> > then reduce the number of pinctrl mapping table entries or pinctrl DT
+> >> > property entries.
+> >> 
+> >> I may be mistaken, but I've understood the PULL_PIN_DEFAULT option as a
+> >> way to select the default bias configuration when the default value is
+> >> hardware- controlled, not as a pure software option.
+> > 
+> > Yep that was the original intent ... to handle hardware that hides the
+> > complete logic from the software and you only get to turn it on or off,
+> > while the direction and other params are determined internally for
+> > example by the pin function.
 > 
-> In fact, nothing prevents to add to the board file line like
-> platform_device_register_simple ("imx-weim", 0, res, res_cnt);
+> Heiko, can you send a documentation patch to clarify this so we
+> don't get any misunderstandings?
+> 
+> Maybe it'd be useful for software purposes as well, but let's save
+> that for when it gets used like that.
 
-Reasonability prevents that:
+will try to get this (and the changes from the other mail) done today
 
-1) We no longer accept any changes like that.
-2) The device driver does not work with platform probe anyway.  What's
-   the point of doing that?
-
-> In this case, the core will crush. I make it impossible to use.
-> Consider it unnecessary checks?
-
-Yes, unnecessary check for me.
-
-Shawn
+Heiko
