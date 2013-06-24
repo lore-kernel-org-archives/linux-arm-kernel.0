@@ -1,42 +1,53 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 24 Jun 2013 16:43:05 +0100
-Subject: [Suggestion] arch: arm64: xen: "ln -s" the paravirt.h from
- arm.
-In-Reply-To: <51C81A39.5060909@asianux.com>
-References: <51C53C06.7050205@asianux.com> <51C81115.4070803@asianux.com>
- <51C81A39.5060909@asianux.com>
-Message-ID: <alpine.DEB.2.02.1306241639260.4782@kaball.uk.xensource.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Jun 2013 16:43:57 +0100
+Subject: [Question] race between spin_lock and spin_unlock
+In-Reply-To: <CACVXFVMBL5E5SGwDatn_ay0sPOhqPKTwouCbzjwrhPuRKHNDcg@mail.gmail.com>
+References: <CACVXFVMBL5E5SGwDatn_ay0sPOhqPKTwouCbzjwrhPuRKHNDcg@mail.gmail.com>
+Message-ID: <20130624154357.GB25582@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Jun 2013, Chen Gang wrote:
-> Hello Maintainers:
-> 
-> if 'CONFIG_XEN'
-> 
->   CC      arch/arm64/xen/../../arm/xen/enlighten.o
-> arch/arm64/xen/../../arm/xen/enlighten.c:19:26: fatal error: asm/paravirt.h: No such file or directory
-> 
-> The related .config file for next-20130624 is in attachment.
-> 
-> 
-> If "ln -s ../../../arm/include/asm/paravirt.h paravirt.h", it can pass
-> compiling, but I do not know how to make a patch for it ("ln -s ..."),
-> Do we have another more suitable ways for it (or another fixing ways) ?
-> 
-> Welcome any suggestions or completions.
+On Mon, Jun 24, 2013 at 04:13:38PM +0100, Ming Lei wrote:
+> Hi,
 
-The problem is caused by:
+Hi Ming Lei,
 
-commit 3a885582a366caf868b0782041c44854ff4c3568
-Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Date:   Wed May 29 10:56:34 2013 +0000
+> When reading the code of arch_spin_lock(), I think there might be
+> a race between arch_spin_lock() and arch_spin_unlock():
+> 
+> - arch_spin_unlock() happened just between StoreExcl(lock->next)
+> and comparing lockval.tickets.next with lockval.tickets.owner inside
+> arch_spin_lock()
+> 
+> - arch_spin_lock() can't notice the change on lock->owner, so call
+> wfe(), then just waiting for being waken up, but there isn't corresponding
+> unlock to send wake event any more.
+> 
+> Maybe the below change may make the race to happen difficultly,
+> but it still can't avoid it completely.
+> 
+> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+> index 6220e9f..e1b239c 100644
+> --- a/arch/arm/include/asm/spinlock.h
+> +++ b/arch/arm/include/asm/spinlock.h
+> @@ -87,10 +87,8 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
+>  	: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
+>  	: "cc");
+> 
+> -	while (lockval.tickets.next != lockval.tickets.owner) {
+> +	while (lockval.tickets.next != ACCESS_ONCE(lock->tickets.owner))
+>  		wfe();
+> -		lockval.tickets.owner = ACCESS_ONCE(lock->tickets.owner);
+> -	}
+> 
+>  	smp_mb();
+>  }
+> 
+> Any comments on the problem?
 
-    xen/arm: account for stolen ticks
+Not sure I see the problem -- the sev guaranteed by the unlock is pended on
+the core doing the lock by setting the event register, so you can't miss it.
+The wfe will acknowledge the event (by clearing the event register) but it
+won't actually wait.
 
-that is in my tree for linux-next (even though I have not received any
-replies from the ARM maintainers so I don't know when and if it is going
-to go upstream).
-
-I think that the best thing to do would be to add a couple of ifdef
-CONFIG_PARAVIRT in arch/arm/xen/enlighten.c. I'll add them to my tree.
+Will
