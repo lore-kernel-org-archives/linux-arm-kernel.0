@@ -1,24 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 24 Jun 2013 15:08:53 +0800
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803EFB072@039-SN2MPN1-023.039d.mgd.msft.net>
-References: <51A5A808.2070803@digi.com> <201306220433.58281.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803EFA9DC@039-SN2MPN1-023.039d.mgd.msft.net>
- <201306221529.53043.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803EFB072@039-SN2MPN1-023.039d.mgd.msft.net>
-Message-ID: <20130624070851.GG26254@S2101-09.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 24 Jun 2013 00:17:42 -0700
+Subject: [PATCH] ARM: omap: make am43xx build with SMP enabled
+In-Reply-To: <201306220122.47786.arnd@arndb.de>
+References: <201306220122.47786.arnd@arndb.de>
+Message-ID: <20130624071742.GP5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 01:37:59AM +0000, Chen Peter-B29397 wrote:
-> Add shawn.
+* Arnd Bergmann <arnd@arndb.de> [130621 16:28]:
+> With am43xx enabled, omap4 and omap5 disabled and SMP on, I get these
+> build errors:
 > 
-> Marek, have you tried mx23 evk?
+> arch/arm/mach-omap2/built-in.o: In function `scu_gp_set':
+> :(.text+0x7858): undefined reference to `omap4_get_scu_base'
+> arch/arm/mach-omap2/built-in.o: In function `scu_gp_clear':
+> :(.text+0x793c): undefined reference to `omap4_get_scu_base'
+> arch/arm/mach-omap2/built-in.o: In function `omap4_cpu_die':
+> :(.ref.text+0x44): undefined reference to `omap4_hotplug_cpu'
 > 
-> Shawn, marek reported the udc function at mx23 works abnormal, but it works
-> good at mx28. Have you tried mx23 udc recently?
+> The easiest way to work around that is to turn on the missing
+> functions, even though we know they won't be used on am43xx,
+> which is single-CPU.
 > 
-Sorry, I never tried usb on my imx23-evk due to some setup problem on
-the board.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Ankur Kishore <a-kishore@ti.com>
+> Cc: Afzal Mohammed <afzal@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
 
-Shawn
+Looks OK to me:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+ 
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index f5038f5..46d7c5f 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -39,7 +39,7 @@ omap-4-5-common				=  omap4-common.o omap-wakeupgen.o \
+>  					   sleep44xx.o
+>  obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common) $(smp-y)
+>  obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-common) $(smp-y)
+> -obj-$(CONFIG_SOC_AM43XX)		+= $(omap-4-5-common)
+> +obj-$(CONFIG_SOC_AM43XX)		+= $(omap-4-5-common) $(smp-y)
+>  
+>  plus_sec := $(call as-instr,.arch_extension sec,+sec)
+>  AFLAGS_omap-headsmp.o			:=-Wa,-march=armv7-a$(plus_sec)
+> @@ -89,6 +89,7 @@ obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
+>  obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
+>  obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o
+>  obj-$(CONFIG_SOC_OMAP5)			+= omap-mpuss-lowpower.o
+> +obj-$(CONFIG_SOC_AM43XX)		+= omap-mpuss-lowpower.o
+>  obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+>  
+>  obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
