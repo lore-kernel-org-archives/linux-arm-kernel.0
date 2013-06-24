@@ -1,42 +1,86 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Mon, 24 Jun 2013 07:25:50 +0000
-Subject: [PATCH] ARM: omap: make am43xx build with SMP enabled
-In-Reply-To: <20130624071742.GP5523@atomide.com>
-References: <201306220122.47786.arnd@arndb.de>
- <20130624071742.GP5523@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EB248E5@DBDE04.ent.ti.com>
+From: zzhu3@marvell.com (Zhou Zhu)
+Date: Mon, 24 Jun 2013 15:27:01 +0800
+Subject: MMP display subsystem questions
+In-Reply-To: <CAMLZHHQFtXWx0weG3uh14Nm3euqbSqyztBEQHEQFBzjFxWGTZA@mail.gmail.com>
+References: <CAMLZHHTmSzzcL-aqk6rMjuD8Ct2zno--p7tUGfVVsocWiyhf8A@mail.gmail.com>
+ <51C3BD65.8070206@marvell.com>
+ <CAMLZHHQFtXWx0weG3uh14Nm3euqbSqyztBEQHEQFBzjFxWGTZA@mail.gmail.com>
+Message-ID: <51C7F4C5.9040903@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Daniel,
 
-On Mon, Jun 24, 2013 at 12:47:42, Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [130621 16:28]:
-> > With am43xx enabled, omap4 and omap5 disabled and SMP on, I get these
-> > build errors:
-> > 
-> > arch/arm/mach-omap2/built-in.o: In function `scu_gp_set':
-> > :(.text+0x7858): undefined reference to `omap4_get_scu_base'
-> > arch/arm/mach-omap2/built-in.o: In function `scu_gp_clear':
-> > :(.text+0x793c): undefined reference to `omap4_get_scu_base'
-> > arch/arm/mach-omap2/built-in.o: In function `omap4_cpu_die':
-> > :(.ref.text+0x44): undefined reference to `omap4_hotplug_cpu'
-> > 
-> > The easiest way to work around that is to turn on the missing
-> > functions, even though we know they won't be used on am43xx,
-> > which is single-CPU.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Ankur Kishore <a-kishore@ti.com>
-> > Cc: Afzal Mohammed <afzal@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> 
-> Looks OK to me:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+Thank you for reviewing our patches.
+Please see my comments.
 
-Wait, seeing another build error after applying this patch,
-I will respond back soon.
+On 06/22/2013 12:14 AM, Daniel Drake wrote:
+>>> 4. Which overlay to use - according to my investigation above, this
+>>> doesn't actually have any meaningful effect on the driver.
+>>
+>> As overlay enabled in patch above now, this config is required to make fb
+>> show on some overlay and other interface(v4l2, private interface) to use
+>> others.
+>
+> I don't understand this, but it might be easier to understand once you
+> have documented what an overlay is and how it relates to a path. How
+> is v4l2 going to interact with this driver? What private interfaces
+> are you referring to?
+>
+> Or can we just auto-instantiate one framebuffer per path with good defaults?
+Actually besides fb, v4l2 and an IOCTL based interface to support what 
+fb/v4l2 not provided are also added. The v4l2 or private interface could 
+also directly use same interface defined in include/video/mmp_disp.h to 
+get path/overlay and manipulate the hardware.
+Patches for these interfaces would be submitted later and documentation 
+would also be added.
+>
+>> Also there still might be some settings in fb for some further settings like
+>> vsync usage or yres_virtual size in coming patches.
+>
+> Wouldn't such information be represented in the modes supported by the panel?
+These settings are software related rather than what hw supports.
+Vsync settings include whether fb wait vsync interrupt to sync buffers 
+when pan display or whether send uevent in vsync (which is a mechanism 
+for Android).
+For yres_virtual size which is related with pre-reserved fb buffer size 
+and some buffer sync mechanism.
+As these settings are pure fb related so we just not place it in panel.
+>
+> A couple more questions:
+>
+> 1. What is the invert_pixclock setting in the mmp_mode structure? This
+> causes a currently unused bit to be set in fb_videomode->vmode to be
+> set (seems dangerous). And then nothing acts upon this bit, as far as
+> I can see.
+This bit is a legacy settings that for some panels that require inverted 
+pixel clock. However, as panels we are using now don't require such 
+feature and even we forget it by mistake, we could make a patch to 
+remove it and related code soon later.
+Thank you for pointing out this:)
+>
+> 2. What about pix_fmt_out? Why is pixel format dumped into the mode
+> specifier? If there is a supported panel that really can support
+> different pixel formats, I would expect it to support all the pixel
+> formats for all the resolution. This also seems unused within the
+> driver.
+We added it due to 2 reasons:
+1. It impacts output timing settings inside controller for dsi case (we 
+have already in-home patches and would be submitted later). So it's 
+required to indicate that timing need to be changed.
+2. It's still possible that for some panel that could support different 
+resolution and pixel formats, but it might not support all pixel formats 
+for all resolutions.
 
-Regards
-Afzal
+Also this variable is not used for dumb panel as it's already covered in 
+dumb mode in link config - dumb mode includes not only 16bpp or 24bpp 
+but also whether low 16 bits or high 16 bits used in 24 bits' lines. For 
+coming DSI panel, it's required and would be used.
+>
+> Thanks
+> Daniel
+>
+
+
+-- 
+Thanks, -Zhou
