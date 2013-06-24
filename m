@@ -1,62 +1,26 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 24 Jun 2013 17:23:44 +0530
-Subject: [PATCH v12 05/11] edma: config: Enable config options for EDMA
-In-Reply-To: <CAD=GYpabakChmN-TEJbLn6p=BwX2wsK5KWsc5gH9-cAA+yWcEA@mail.gmail.com>
-References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
- <201306212044.26677.arnd@arndb.de>
- <CAD=GYpY4koXd9f6_ijQfDHsiULD4d53cdu=9X421WXSAit_YQg@mail.gmail.com>
- <201306220014.16427.arnd@arndb.de>
- <CAD=GYpabakChmN-TEJbLn6p=BwX2wsK5KWsc5gH9-cAA+yWcEA@mail.gmail.com>
-Message-ID: <51C83348.6040905@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Jun 2013 13:57:56 +0200
+Subject: [PATCH v3 03/10] pinctrl:st: Add pinctrl and pinconf support.
+In-Reply-To: <51C45816.5010207@st.com>
+References: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
+ <1371737138-9340-1-git-send-email-srinivas.kandagatla@st.com>
+ <51C45816.5010207@st.com>
+Message-ID: <CACRpkdb-H2=GdF54Fay+PQVdXLTs++L5+QYe_vFPuzpa+E4ZMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/22/2013 8:23 AM, Joel A Fernandes wrote:
->>>> config TI_EDMA
->>>>         tristate "TI EDMA support"
->>>>         default m if 'ARCH_DAVINCI || ARCH_OMAP1 || ARCH_OMAP2
->>>>         select DMA_ENGINE
->>>>         select DMA_VIRTUAL_CHANNELS
->>>
->>>
->>> MMC depends on EDMA specially on AM33xx there's no PIO mode AFAIK. The
->>> 'm' option will require some initramfs to load the module when needing
->>> to MMC boot, I suggest lets leave it as y.
->>>
->>
->> Ah, right: you still export a filter function from the edma driver
->> and use it in slave drivers:
->>
->> drivers/mmc/host/davinci_mmc.c:         dma_request_slave_channel_compat(mask, edma_filter_fn,
->> drivers/mmc/host/davinci_mmc.c:         dma_request_slave_channel_compat(mask, edma_filter_fn,
->> drivers/spi/spi-davinci.c:      dspi->dma_rx = dma_request_channel(mask, edma_filter_fn,
->> drivers/spi/spi-davinci.c:      dspi->dma_tx = dma_request_channel(mask, edma_filter_fn,
->>
->> As long as this is the case, you have to be careful with the dependencies
->> to make sure that davinci_mmc and spi-davinci either depend on TI_EDMA, or
->> edma_filter_fn gets defined to NULL when you are building for a DT-only platform.
-> 
-> Yes sure, right now they are defined  as follows in include/linux/edma.h:
-> 
-> #if defined(CONFIG_TI_EDMA) || defined(CONFIG_TI_EDMA_MODULE)
-> bool edma_filter_fn(struct dma_chan *, void *);
-> #else
-> static inline bool edma_filter_fn(struct dma_chan *chan, void *param)
-> {
-> return false;
-> }
-> #endif
-> 
-> This also has the side effect of causing DMA requests to fail if
-> TI_EDMA is not built, causing frustration for a lot of people some of
-> whom don't want to deal with DMA so I think it is OK to build the
-> driver in by default as it is (and will be) used by a lot of
-> OMAP2PLUS.
+On Fri, Jun 21, 2013 at 3:41 PM, Srinivas KANDAGATLA
+<srinivas.kandagatla@st.com> wrote:
 
-Solution for this is to enable TI_EDMA in relevant defconfigs. Most
-folks who would get frustrated by such issues would be using defconfigs
-and for those who are building their configuration from scratch this
-will be pretty low in their list of worries.
+> Hi Linus W,
+> If its not too late can this patch be considered for 3.11 via pinctrl tree?
+> There is a build dependecy with regmap_field apis pulled by Mark Brown
+> in regmap repository.
 
-Thanks,
-Sekhar
+This seems fairly complete, but I cannot have such a basic dependency onto
+the regmap tree this late in the merge window, i.e. I'm not ready to pull
+all of regmap into the pinctrl tree. I'd consider this for merging
+for the next kernel cycle so it's more orthogonal.
+
+Yours,
+Linus Walleij
