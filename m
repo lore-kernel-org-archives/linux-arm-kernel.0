@@ -1,81 +1,276 @@
 From: ming.lei@canonical.com (Ming Lei)
-Date: Mon, 24 Jun 2013 17:42:03 +0800
-Subject: [PATCH v2 2/4] USB: URB documentation: claim complete() will be run
- with IRQs enabled
+Date: Mon, 24 Jun 2013 17:42:04 +0800
+Subject: [PATCH v2 3/4] USB: EHCI: improve interrupt qh unlink
 In-Reply-To: <1372066925-23579-1-git-send-email-ming.lei@canonical.com>
 References: <1372066925-23579-1-git-send-email-ming.lei@canonical.com>
-Message-ID: <1372066925-23579-3-git-send-email-ming.lei@canonical.com>
+Message-ID: <1372066925-23579-4-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no good reason to run complete() in hard interrupt
-disabled context.
+Given interrupt URB will be resubmitted from tasklet context which
+is scheduled by ehci hardware interrupt handler, and commonly only
+one interrupt URB is scheduled on qh, so the qh may be unlinked
+immediately once qh_completions() returns from ehci_irq(), then
+the intr URB to be resubmitted in complete() can only be scheduled
+and linked to hardware until the qh unlink is completed.
 
-After switch to run complete() in tasklet, we will enable local IRQs
-when calling complete() since we can do it at that time.
+This patch improves this above situation, and the qh will wait for 5
+milliseconds before being unlinked from hardware, if one URB is submitted
+during the period, the qh is move out of unlink wait list and the
+interrupt transfer can be scheduled immediately, not like before: the
+transfer is only linked to hardware until previous unlink is completed.
 
-Even though we still disable IRQs now when calling complete()
-in tasklet, the URB documentation is updated to claim complete()
-will be run in tasklet context and local IRQs will be enabled, so
-that USB drivers can know the change and avoid one deadlock caused
-by: assume IRQs disabled in complete() and call spin_lock() to
-hold lock which might be acquired in interrupt context.
-
-Current spin_lock() usages in drivers' complete() will be cleaned
-up at the same time, and once the cleanup is finished, local IRQs
-will be enabled when calling complete() in tasklet.
-
-Also fix description about type of usb_complete_t, and remove the
-advice of running completion handler in tasklet for decreasing
-system latency.
-
-Cc: Oliver Neukum <oliver@neukum.org>
 Cc: Alan Stern <stern@rowland.harvard.edu>
 Signed-off-by: Ming Lei <ming.lei@canonical.com>
 ---
- Documentation/usb/URB.txt |   21 ++++++++++-----------
- 1 file changed, 10 insertions(+), 11 deletions(-)
+ drivers/usb/host/ehci-hcd.c   |    1 +
+ drivers/usb/host/ehci-hub.c   |    1 +
+ drivers/usb/host/ehci-mem.c   |    1 +
+ drivers/usb/host/ehci-sched.c |   62 ++++++++++++++++++++++++++++++++++++++---
+ drivers/usb/host/ehci-timer.c |   48 ++++++++++++++++++++++++++++++-
+ drivers/usb/host/ehci.h       |    3 ++
+ 6 files changed, 111 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/usb/URB.txt b/Documentation/usb/URB.txt
-index 00d2c64..50da0d4 100644
---- a/Documentation/usb/URB.txt
-+++ b/Documentation/usb/URB.txt
-@@ -195,13 +195,12 @@ by the completion handler.
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index 7abf1ce..35f1372 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -487,6 +487,7 @@ static int ehci_init(struct usb_hcd *hcd)
+ 	ehci->periodic_size = DEFAULT_I_TDPS;
+ 	INIT_LIST_HEAD(&ehci->async_unlink);
+ 	INIT_LIST_HEAD(&ehci->async_idle);
++	INIT_LIST_HEAD(&ehci->intr_unlink_wait);
+ 	INIT_LIST_HEAD(&ehci->intr_unlink);
+ 	INIT_LIST_HEAD(&ehci->intr_qh_list);
+ 	INIT_LIST_HEAD(&ehci->cached_itd_list);
+diff --git a/drivers/usb/host/ehci-hub.c b/drivers/usb/host/ehci-hub.c
+index 2b70277..6037f84 100644
+--- a/drivers/usb/host/ehci-hub.c
++++ b/drivers/usb/host/ehci-hub.c
+@@ -345,6 +345,7 @@ static int ehci_bus_suspend (struct usb_hcd *hcd)
  
- The handler is of the following type:
+ 	end_unlink_async(ehci);
+ 	unlink_empty_async_suspended(ehci);
++	ehci_handle_start_intr_unlinks(ehci);
+ 	ehci_handle_intr_unlinks(ehci);
+ 	end_free_itds(ehci);
  
--	typedef void (*usb_complete_t)(struct urb *, struct pt_regs *)
-+	typedef void (*usb_complete_t)(struct urb *)
+diff --git a/drivers/usb/host/ehci-mem.c b/drivers/usb/host/ehci-mem.c
+index ef2c3a1..52a7773 100644
+--- a/drivers/usb/host/ehci-mem.c
++++ b/drivers/usb/host/ehci-mem.c
+@@ -93,6 +93,7 @@ static struct ehci_qh *ehci_qh_alloc (struct ehci_hcd *ehci, gfp_t flags)
+ 	qh->qh_dma = dma;
+ 	// INIT_LIST_HEAD (&qh->qh_list);
+ 	INIT_LIST_HEAD (&qh->qtd_list);
++	INIT_LIST_HEAD(&qh->unlink_node);
  
--I.e., it gets the URB that caused the completion call, plus the
--register values at the time of the corresponding interrupt (if any).
--In the completion handler, you should have a look at urb->status to
--detect any USB errors. Since the context parameter is included in the URB,
--you can pass information to the completion handler. 
-+I.e., it gets the URB that caused the completion call. In the completion
-+handler, you should have a look at urb->status to detect any USB errors.
-+Since the context parameter is included in the URB, you can pass
-+information to the completion handler.
+ 	/* dummy td enables safe urb queuing */
+ 	qh->dummy = ehci_qtd_alloc (ehci, flags);
+diff --git a/drivers/usb/host/ehci-sched.c b/drivers/usb/host/ehci-sched.c
+index f80d033..5bf67e2 100644
+--- a/drivers/usb/host/ehci-sched.c
++++ b/drivers/usb/host/ehci-sched.c
+@@ -601,12 +601,24 @@ static void qh_unlink_periodic(struct ehci_hcd *ehci, struct ehci_qh *qh)
+ 	list_del(&qh->intr_node);
+ }
  
- Note that even when an error (or unlink) is reported, data may have been
- transferred.  That's because USB transfers are packetized; it might take
-@@ -210,12 +209,12 @@ have transferred successfully before the completion was called.
+-static void start_unlink_intr(struct ehci_hcd *ehci, struct ehci_qh *qh)
++/* must be called with holding ehci->lock */
++static void cancel_unlink_wait_intr(struct ehci_hcd *ehci, struct ehci_qh *qh)
+ {
+-	/* If the QH isn't linked then there's nothing we can do. */
+-	if (qh->qh_state != QH_STATE_LINKED)
++	if (qh->qh_state != QH_STATE_LINKED || list_empty(&qh->unlink_node))
+ 		return;
  
++	list_del_init(&qh->unlink_node);
++
++	/* avoid unnecessary CPU wakeup */
++	if (list_empty(&ehci->intr_unlink_wait))
++		ehci_disable_event(ehci, EHCI_HRTIMER_START_UNLINK_INTR);
++}
++
++static void start_do_unlink_intr(struct ehci_hcd *ehci, struct ehci_qh *qh)
++{
++	/* if the qh is waitting for unlink, cancel it now */
++	cancel_unlink_wait_intr(ehci, qh);
++
+ 	qh_unlink_periodic (ehci, qh);
  
- NOTE:  ***** WARNING *****
--NEVER SLEEP IN A COMPLETION HANDLER.  These are normally called
--during hardware interrupt processing.  If you can, defer substantial
--work to a tasklet (bottom half) to keep system latencies low.  You'll
--probably need to use spinlocks to protect data structures you manipulate
--in completion handlers.
-+NEVER SLEEP IN A COMPLETION HANDLER.  These are often called in atomic
-+context.
+ 	/* Make sure the unlinks are visible before starting the timer */
+@@ -632,6 +644,45 @@ static void start_unlink_intr(struct ehci_hcd *ehci, struct ehci_qh *qh)
+ 	}
+ }
  
-+In the current kernel, completion handlers run with local interrupts
-+disabled, but in the future this will be changed, so don't assume that
-+local IRQs are always disabled inside completion handlers.
++/*
++ * It is common only one intr URB is scheduled on one qh, and
++ * given complete() is run in tasklet context, introduce a bit
++ * delay to avoid unlink qh too early.
++ */
++static void __start_unlink_intr(struct ehci_hcd *ehci, struct ehci_qh *qh,
++				bool wait)
++{
++	/* If the QH isn't linked then there's nothing we can do. */
++	if (qh->qh_state != QH_STATE_LINKED)
++		return;
++
++	if (!wait)
++		return start_do_unlink_intr(ehci, qh);
++
++	qh->unlink_cycle = ehci->intr_unlink_wait_cycle;
++
++	/* New entries go at the end of the intr_unlink_wait list */
++	list_add_tail(&qh->unlink_node, &ehci->intr_unlink_wait);
++
++	if (ehci->rh_state < EHCI_RH_RUNNING)
++		ehci_handle_start_intr_unlinks(ehci);
++	else if (ehci->intr_unlink_wait.next == &qh->unlink_node) {
++		ehci_enable_event(ehci, EHCI_HRTIMER_START_UNLINK_INTR, true);
++		++ehci->intr_unlink_wait_cycle;
++	}
++}
++
++static void start_unlink_intr(struct ehci_hcd *ehci, struct ehci_qh *qh)
++{
++	__start_unlink_intr(ehci, qh, false);
++}
++
++static void start_unlink_intr_wait(struct ehci_hcd *ehci,
++				   struct ehci_qh *qh)
++{
++	__start_unlink_intr(ehci, qh, true);
++}
++
+ static void end_unlink_intr(struct ehci_hcd *ehci, struct ehci_qh *qh)
+ {
+ 	struct ehci_qh_hw	*hw = qh->hw;
+@@ -881,6 +932,9 @@ static int intr_submit (
+ 			goto done;
+ 	}
  
- 1.8. How to do isochronous (ISO) transfers?
++	/* put back qh from unlink wait list */
++	cancel_unlink_wait_intr(ehci, qh);
++
+ 	/* then queue the urb's tds to the qh */
+ 	qh = qh_append_tds(ehci, urb, qtd_list, epnum, &urb->ep->hcpriv);
+ 	BUG_ON (qh == NULL);
+@@ -926,7 +980,7 @@ static void scan_intr(struct ehci_hcd *ehci)
+ 			temp = qh_completions(ehci, qh);
+ 			if (unlikely(temp || (list_empty(&qh->qtd_list) &&
+ 					qh->qh_state == QH_STATE_LINKED)))
+-				start_unlink_intr(ehci, qh);
++				start_unlink_intr_wait(ehci, qh);
+ 		}
+ 	}
+ }
+diff --git a/drivers/usb/host/ehci-timer.c b/drivers/usb/host/ehci-timer.c
+index 11e5b32..9fef5d4 100644
+--- a/drivers/usb/host/ehci-timer.c
++++ b/drivers/usb/host/ehci-timer.c
+@@ -72,6 +72,7 @@ static unsigned event_delays_ns[] = {
+ 	1 * NSEC_PER_MSEC,	/* EHCI_HRTIMER_POLL_DEAD */
+ 	1125 * NSEC_PER_USEC,	/* EHCI_HRTIMER_UNLINK_INTR */
+ 	2 * NSEC_PER_MSEC,	/* EHCI_HRTIMER_FREE_ITDS */
++	5 * NSEC_PER_MSEC,	/* EHCI_HRTIMER_START_UNLINK_INTR */
+ 	6 * NSEC_PER_MSEC,	/* EHCI_HRTIMER_ASYNC_UNLINKS */
+ 	10 * NSEC_PER_MSEC,	/* EHCI_HRTIMER_IAA_WATCHDOG */
+ 	10 * NSEC_PER_MSEC,	/* EHCI_HRTIMER_DISABLE_PERIODIC */
+@@ -98,6 +99,19 @@ static void ehci_enable_event(struct ehci_hcd *ehci, unsigned event,
+ 	}
+ }
  
++/* Warning: don't call this function from hrtimer handler context */
++static void ehci_disable_event(struct ehci_hcd *ehci, unsigned event)
++{
++	if (!hcd_giveback_urb_in_bh(ehci_to_hcd(ehci)))
++		return;
++
++	ehci->enabled_hrtimer_events &= ~(1 << event);
++	if (!ehci->enabled_hrtimer_events) {
++		ehci->next_hrtimer_event = EHCI_HRTIMER_NO_EVENT;
++		hrtimer_cancel(&ehci->hrtimer);
++	}
++}
++
+ 
+ /* Poll the STS_ASS status bit; see when it agrees with CMD_ASE */
+ static void ehci_poll_ASS(struct ehci_hcd *ehci)
+@@ -215,6 +229,37 @@ static void ehci_handle_controller_death(struct ehci_hcd *ehci)
+ 	/* Not in process context, so don't try to reset the controller */
+ }
+ 
++/* start to unlink interrupt QHs  */
++static void ehci_handle_start_intr_unlinks(struct ehci_hcd *ehci)
++{
++	bool		stopped = (ehci->rh_state < EHCI_RH_RUNNING);
++
++	/*
++	 * Process all the QHs on the intr_unlink list that were added
++	 * before the current unlink cycle began.  The list is in
++	 * temporal order, so stop when we reach the first entry in the
++	 * current cycle.  But if the root hub isn't running then
++	 * process all the QHs on the list.
++	 */
++	while (!list_empty(&ehci->intr_unlink_wait)) {
++		struct ehci_qh	*qh;
++
++		qh = list_first_entry(&ehci->intr_unlink_wait,
++				      struct ehci_qh, unlink_node);
++		if (!stopped &&
++				(qh->unlink_cycle ==
++					ehci->intr_unlink_wait_cycle))
++			break;
++		list_del_init(&qh->unlink_node);
++		start_unlink_intr(ehci, qh);
++	}
++
++	/* Handle remaining entries later */
++	if (!list_empty(&ehci->intr_unlink_wait)) {
++		ehci_enable_event(ehci, EHCI_HRTIMER_START_UNLINK_INTR, true);
++		++ehci->intr_unlink_wait_cycle;
++	}
++}
+ 
+ /* Handle unlinked interrupt QHs once they are gone from the hardware */
+ static void ehci_handle_intr_unlinks(struct ehci_hcd *ehci)
+@@ -236,7 +281,7 @@ static void ehci_handle_intr_unlinks(struct ehci_hcd *ehci)
+ 				unlink_node);
+ 		if (!stopped && qh->unlink_cycle == ehci->intr_unlink_cycle)
+ 			break;
+-		list_del(&qh->unlink_node);
++		list_del_init(&qh->unlink_node);
+ 		end_unlink_intr(ehci, qh);
+ 	}
+ 
+@@ -363,6 +408,7 @@ static void (*event_handlers[])(struct ehci_hcd *) = {
+ 	ehci_handle_controller_death,	/* EHCI_HRTIMER_POLL_DEAD */
+ 	ehci_handle_intr_unlinks,	/* EHCI_HRTIMER_UNLINK_INTR */
+ 	end_free_itds,			/* EHCI_HRTIMER_FREE_ITDS */
++	ehci_handle_start_intr_unlinks,	/* EHCI_HRTIMER_START_UNLINK_INTR */
+ 	unlink_empty_async,		/* EHCI_HRTIMER_ASYNC_UNLINKS */
+ 	ehci_iaa_watchdog,		/* EHCI_HRTIMER_IAA_WATCHDOG */
+ 	ehci_disable_PSE,		/* EHCI_HRTIMER_DISABLE_PERIODIC */
+diff --git a/drivers/usb/host/ehci.h b/drivers/usb/host/ehci.h
+index 64f9a08..28dc8d2 100644
+--- a/drivers/usb/host/ehci.h
++++ b/drivers/usb/host/ehci.h
+@@ -88,6 +88,7 @@ enum ehci_hrtimer_event {
+ 	EHCI_HRTIMER_POLL_DEAD,		/* Wait for dead controller to stop */
+ 	EHCI_HRTIMER_UNLINK_INTR,	/* Wait for interrupt QH unlink */
+ 	EHCI_HRTIMER_FREE_ITDS,		/* Wait for unused iTDs and siTDs */
++	EHCI_HRTIMER_START_UNLINK_INTR, /* wait for new intr schedule */
+ 	EHCI_HRTIMER_ASYNC_UNLINKS,	/* Unlink empty async QHs */
+ 	EHCI_HRTIMER_IAA_WATCHDOG,	/* Handle lost IAA interrupts */
+ 	EHCI_HRTIMER_DISABLE_PERIODIC,	/* Wait to disable periodic sched */
+@@ -143,6 +144,8 @@ struct ehci_hcd {			/* one per controller */
+ 	unsigned		i_thresh;	/* uframes HC might cache */
+ 
+ 	union ehci_shadow	*pshadow;	/* mirror hw periodic table */
++	struct list_head	intr_unlink_wait;
++	unsigned		intr_unlink_wait_cycle;
+ 	struct list_head	intr_unlink;
+ 	unsigned		intr_unlink_cycle;
+ 	unsigned		now_frame;	/* frame from HC hardware */
 -- 
 1.7.9.5
