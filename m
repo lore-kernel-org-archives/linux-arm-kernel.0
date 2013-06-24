@@ -1,27 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Jun 2013 00:33:51 +0200
-Subject: [RFC PATCH v2 07/12] dmaengine: PL08x: Add cyclic transfer support
-In-Reply-To: <1371933764-24875-8-git-send-email-tomasz.figa@gmail.com>
-References: <1371933764-24875-1-git-send-email-tomasz.figa@gmail.com>
- <1371933764-24875-8-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <CACRpkdZrZFZ0MDP8=CWp9gv+1R6GfEktkgWaLDgEgzgfqGXucA@mail.gmail.com>
+From: lho@apm.com (Loc Ho)
+Date: Mon, 24 Jun 2013 16:34:20 -0600
+Subject: [PATCH v4 0/3] clk: Add APM X-Gene SoC clock driver
+Message-ID: <1372113263-18082-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 22, 2013 at 10:42 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+This patch adds APM X-Gene SoC clock driver support. Reference,
+PCP PLL, SoC PCP, and Ethernet clocks are defined via the DTS.
 
-> From: Alban Bedel <alban.bedel@avionic-design.de>
->
-> Many audio interface drivers require support of cyclic transfers to work
-> correctly, for example Samsung ASoC DMA driver. This patch adds support
-> for cyclic transfers to the amba-pl08x driver.
->
-> Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de>
-> [tfiga: Rebase and slightly beautify the original patch.]
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+-v4:
+ * Remove flags from DTS and check status instead
+ * Change DTS reg entry to be identified by reg-names property
 
-Looks good to me:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+-v3:
+ * Make DTS compatible type for SoC PLL and PCP PLL
+ * Make use of of_iomap instead direct ioremap call
+ * Make kzalloc with variable instead structure
+ * Remove DTS binding for fixed-clock and fixed_factor_clock
+ * Remove unnecessary arch_initcall
 
-Yours,
-Linus Walleij
+-v2:
+ * Make depends on ARM64
+ * Fix duplicate registration
+
+-v1 - Initial post
+
+Loc Ho (3):
+  clk: Add APM X-Gene SoC clock driver for reference, PLL, and device
+    clocks.
+  clk: arm64: Add DTS clock entry for APM X-Gene Storm SoC with
+    reference to
+  Documentation: Add documentation for APM X-Gene clock binding with
+    PLL and
+
+ Documentation/devicetree/bindings/clock/xgene.txt |  109 +++++
+ arch/arm64/boot/dts/apm-storm.dtsi                |   75 +++
+ drivers/clk/Kconfig                               |    7 +
+ drivers/clk/Makefile                              |    1 +
+ drivers/clk/clk-xgene.c                           |  538 +++++++++++++++++++++
+ 5 files changed, 730 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/xgene.txt
+ create mode 100644 drivers/clk/clk-xgene.c
