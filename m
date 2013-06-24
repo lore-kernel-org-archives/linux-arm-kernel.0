@@ -1,195 +1,130 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Mon, 24 Jun 2013 16:49:08 +0800
-Subject: [PATCH] dmaengine: Add hisilicon k3 DMA engine driver
-In-Reply-To: <201306211341.53928.arnd@arndb.de>
-References: <1371444872-26994-1-git-send-email-zhangfei.gao@linaro.org>
- <201306172258.08185.arnd@arndb.de>
- <20130621104355.GG23141@intel.com>
- <201306211341.53928.arnd@arndb.de>
-Message-ID: <CAMj5Bkg_4G9n9BaQjA-Xj2p8jGO8PZxNW7E7jOeWMMZa5sH6yQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 24 Jun 2013 09:54:23 +0100
+Subject: [PATCH 3/3] Documentation: Add documentation for APM X-Gene
+ clock binding.
+In-Reply-To: <1371828605-18053-4-git-send-email-lho@apm.com>
+References: <1371828605-18053-1-git-send-email-lho@apm.com>
+ <1371828605-18053-2-git-send-email-lho@apm.com>
+ <1371828605-18053-3-git-send-email-lho@apm.com>
+ <1371828605-18053-4-git-send-email-lho@apm.com>
+Message-ID: <20130624085423.GD19489@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 7:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 21 June 2013, Vinod Koul wrote:
->> On Mon, Jun 17, 2013 at 10:58:07PM +0200, Arnd Bergmann wrote:
->> > On Monday 17 June 2013, Zhangfei Gao wrote:
->> >
->> > int dma_get_slave_channel(struct dma_chan *chan)
->> > {
->> >       /* lock against __dma_request_channel */
->> >       mutex_lock(&dma_list_mutex);
->> >
->> >       if (chan->client_count == 0)
->> >               ret = dma_chan_get(chan);
->> >       else
->> >               ret = -EBUSY;
->> >
->> >       mutex_unlock(&dma_list_mutex);
->> >
->> >       return ret;
->> > }
->> > EXPORT_SYMBOL_GPL(dma_get_slave_channel);
->> and you add filter on top?
->
-> No, the idea is to no longer require a filter function when
-> we use dma_request_slave_channel with a DT specifier.
->
->> This is getting you any channel and maynot work where we need to do some
->> filtering.
->
-> This function would be called only by the dmaengine driver's
-> xlate function. That driver obviously has to ensure that the
-> channel works for the specification from DT (or ACPI or
-> something else), but that part is easy, since that is
-> the same information that we currently pass into the filter
-> function.
->
+On Fri, Jun 21, 2013 at 04:30:05PM +0100, Loc Ho wrote:
+> Documentation: Add documentation for APM X-Gene clock binding with PLL and 
+> device clocks.
+> 
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+>  Documentation/devicetree/bindings/clock/xgene.txt |   90 +++++++++++++++++++++
+>  1 files changed, 90 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/xgene.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/xgene.txt b/Documentation/devicetree/bindings/clock/xgene.txt
+> new file mode 100644
+> index 0000000..fcdee79
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/xgene.txt
+> @@ -0,0 +1,90 @@
+> +Device Tree Clock bindings for APM X-Gene
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +Required properties:
+> +- compatible : shall be one of the following:
+> +	"apm,xgene-pll-clock" - for a X-Gene PLL clock
+> +	"apm,xgene-device-clock" - for a X-Gene device clock
+> +
+> +Required properties for PLL clocks:
+> +- reg : shall be the physical PLL register address for the pll clock.
+> +- clocks : shall be the input parent clock phandle for the clock. This should
+> +	be the reference clock.
+> +- #clock-cells : shall be set to 1.
+> +- clock-output-names : shall be the name of the PLL referenced by derive
+> +  clock.
+> +- type : shall be 1 for SoC PLL and 0 for PCP PLL.
 
-Dear Arnd & Vinod
+That makes the binding very difficult for a human to read, could this not be
+part of the compatible string? e.g. "apm,xgene-pcp-pll-clock".
 
-The suggestion of using dma_get_slave_channel instead of filter works here.
-Dma driver should modify accordingly.
-Here is draft patch:
+> +Optional properties for PLL clocks:
+> +- clock-names : shall be the name of the PLL. If missing, use the device name.
+> +
+> +Required properties for device clocks:
+> +- reg : shall be the physical CSR reset address base and physical CSR divider
+> +        address base. If one does not exist, specify 0 for address and 0 for 
+> +        size.
+> +- clocks : shall be the input parent clock phandle for the clock.
+> +- #clock-cells : shall be set to 1.
+> +- clock-output-names : shall be the name of the device referenced.
+> +Optional properties for device clocks:
+> +- clock-names : shall be the name of the device clock. If missing, use the
+> +                device name.
+> +- flags : Any clock flags. ie. use 0x8 to leave clock un-touch if not
+> +          referenced. Default is 0.
 
-diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-index 93f7992..78dbbe0 100644
---- a/drivers/dma/dmaengine.c
-+++ b/drivers/dma/dmaengine.c
-@@ -504,6 +504,32 @@ static struct dma_chan *private_candidate(const
-dma_cap_mask_t *mask,
- }
+What flags are these? We should *not* be exporting Linux-internal flags as
+devicetree bindings.
 
- /**
-+ * dma_request_channel - try to get specific channel exclusively
-+ * @chan: target channel
-+ */
-+struct dma_chan *dma_get_slave_channel(struct dma_chan *chan)
-+{
-+ int err = -EBUSY;
-+
-+ /* lock against __dma_request_channel */
-+ mutex_lock(&dma_list_mutex);
-+
-+ if (chan->client_count == 0)
-+ err = dma_chan_get(chan);
-+ else
-+ chan = NULL;
-+
-+ mutex_unlock(&dma_list_mutex);
-+
-+ if (err)
-+ pr_debug("%s: failed to get %s: (%d)\n",
-+ __func__, dma_chan_name(chan), err);
-+
-+ return chan;
-+}
-+EXPORT_SYMBOL_GPL(dma_get_slave_channel);
-+
-+/**
-  * dma_request_channel - try to allocate an exclusive channel
-  * @mask: capabilities that the channel must satisfy
-  * @fn: optional callback to disposition available channels
-diff --git a/drivers/dma/k3dma.c b/drivers/dma/k3dma.c
-index afac13f..549247d 100644
---- a/drivers/dma/k3dma.c
-+++ b/drivers/dma/k3dma.c
-@@ -99,9 +99,11 @@ struct k3_dma_dev {
-  spinlock_t lock;
-  struct list_head chan_pending;
-  struct k3_dma_phy *phy;
-+ struct k3_dma_chan *chans;
-  struct dma_pool *pool;
-  struct clk *clk;
-  u32 dma_channels;
-+ u32 dma_requests;
- };
+> +- csr-offset : Offset to the CSR reset register from the reset address base.
+> +               Default is 0.
+> +- csr-mask : CSR reset mask bit. Default is 0xF.
+> +- enable-offset : Offset to the enable register from the reset address base.
+> +                  Default is 0x8.
+> +- enable-mask : CSR enable mask bit. Default is 0xF.
+> +- divider-offset : Offset to the divider CSR register from the divider base.
+> +                   Default is 0x0.
+> +- divider-width : Width of the divider register. Default is 0.
+> +- divider-shift : Bit shift of the divider register. Default is 0.
+> +
+> +For example:
+> +
+> +	pcppll: pcppll at 17000100 {
+> +		compatible = "apm,xgene-pll-clock";
+> +		#clock-cells = <1>;
+> +		clocks = <&refclk 0>;
+> +		clock-names = "pcppll";
+> +		reg = <0x0 0x17000100 0x0 0x1000>;
+> +		clock-output-names = "pcppll";
+> +		type = <0>;
+> +	};
+> +
+> +	socpll: socpll at 17000120 {
+> +		compatible = "apm,xgene-pll-clock";
+> +		#clock-cells = <1>;
+> +		clocks = <&refclk 0>;
+> +		clock-names = "socpll";
+> +		reg = <0x0 0x17000120 0x0 0x1000>;
+> +		clock-output-names = "socpll";
+> +		type = <1>;
+> +	};
+> +
+> +	qmlclk: qmlclk {
+> +		compatible = "apm,xgene-device-clock";
+> +		#clock-cells = <1>;
+> +		clocks = <&socplldiv2 0>;
+> +		clock-names = "qmlclk";
+> +		reg = <0x0 0x1703C000 0x0 0x1000
+> +			0x0 0x00000000 0x0 0x0000>;
+> +		clock-output-names = "qmlclk";
+> +	};
+> +
+> +	ethclk: ethclk {
+> +		compatible = "apm,xgene-device-clock";
+> +		#clock-cells = <1>;
+> +		clocks = <&socplldiv2 0>;
+> +		clock-names = "ethclk";
+> +		reg = <0x0 0x00000000 0x0 0x0000
+> +			0x0 0x17000000 0x0 0x1000>;
+> +			divider-offset = <0x238>;
 
- #define to_k3_dma(dmadev) container_of(dmadev, struct k3_dma_dev, slave)
-@@ -599,10 +601,17 @@ static struct of_device_id k3_pdma_dt_ids[] = {
- };
- MODULE_DEVICE_TABLE(of, k3_pdma_dt_ids);
+Extraneous tab here.
 
--static struct of_dma_filter_info k3_dma_filter;
--static bool k3_dma_filter_fn(struct dma_chan *chan, void *param)
-+static struct dma_chan *k3_of_dma_simple_xlate(struct of_phandle_args
-*dma_spec,
-+ struct of_dma *ofdma)
- {
-- return  (*(int *)param == chan->chan_id);
-+ struct k3_dma_dev *d = ofdma->of_dma_data;
-+ unsigned int request = dma_spec->args[0];
-+
-+ if (request > d->dma_requests)
-+ return NULL;
-+
-+ return dma_get_slave_channel(&(d->chans[request].vc.chan));
- }
-
- static int k3_dma_probe(struct platform_device *op)
-@@ -611,8 +620,6 @@ static int k3_dma_probe(struct platform_device *op)
-  const struct of_device_id *of_id;
-  struct resource *iores;
-  int i, ret, irq = 0;
-- int dma_requests = 0;
-- struct k3_dma_chan *chans;
-
-  iores = platform_get_resource(op, IORESOURCE_MEM, 0);
-  if (!iores)
-@@ -631,7 +638,7 @@ static int k3_dma_probe(struct platform_device *op)
-  of_property_read_u32((&op->dev)->of_node,
-  "dma-channels", &d->dma_channels);
-  of_property_read_u32((&op->dev)->of_node,
-- "dma-requests", &dma_requests);
-+ "dma-requests", &d->dma_requests);
-  }
-
-  d->clk = devm_clk_get(&op->dev, NULL);
-@@ -672,16 +679,16 @@ static int k3_dma_probe(struct platform_device *op)
-  d->slave.device_issue_pending = k3_dma_issue_pending;
-  d->slave.device_control = k3_dma_control;
-  d->slave.copy_align = DMA_ALIGN;
-- d->slave.chancnt = dma_requests;
-+ d->slave.chancnt = d->dma_requests;
-
-  /* init virtual channel */
-- chans = devm_kzalloc(&op->dev,
-- dma_requests * sizeof(struct k3_dma_chan), GFP_KERNEL);
-- if (chans == NULL)
-+ d->chans = devm_kzalloc(&op->dev,
-+ d->dma_requests * sizeof(struct k3_dma_chan), GFP_KERNEL);
-+ if (d->chans == NULL)
-  return -ENOMEM;
-
-- for (i = 0; i < dma_requests; i++) {
-- struct k3_dma_chan *c = &chans[i];
-+ for (i = 0; i < d->dma_requests; i++) {
-+ struct k3_dma_chan *c = &d->chans[i];
-
-  INIT_LIST_HEAD(&c->node);
-  c->vc.desc_free = k3_dma_free_desc;
-@@ -707,9 +714,8 @@ static int k3_dma_probe(struct platform_device *op)
-  if (ret)
-  goto of_dma_register_fail;
-
-- k3_dma_filter.dma_cap = d->slave.cap_mask;
-- k3_dma_filter.filter_fn = k3_dma_filter_fn;
-- ret = of_dma_controller_register((&op->dev)->of_node,
-of_dma_simple_xlate, &k3_dma_filter);
-+ ret = of_dma_controller_register((&op->dev)->of_node,
-+ k3_of_dma_simple_xlate, d);
-  if (ret)
-  goto dma_async_regitster_fail;
-
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index 96d3e4a..4e1c843 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -1000,6 +1000,7 @@ int dma_async_device_register(struct dma_device *device);
- void dma_async_device_unregister(struct dma_device *device);
- void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
- struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
-+struct dma_chan *dma_get_slave_channel(struct dma_chan *chan);
- struct dma_chan *net_dma_find_channel(void);
- #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
- #define dma_request_slave_channel_compat(mask, x, y, dev, name) \
+Thanks,
+Mark.
