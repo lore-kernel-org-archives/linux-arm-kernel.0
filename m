@@ -1,74 +1,69 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 24 Jun 2013 16:01:34 +0530
-Subject: [PATCH v12 04/11] dmaengine: edma: enable build for AM33XX
-In-Reply-To: <20130624101756.GU5523@atomide.com>
-References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
- <1371762407-24544-5-git-send-email-joelagnel@ti.com>
- <51C427AA.6080601@ti.com> <20130624101756.GU5523@atomide.com>
-Message-ID: <51C82006.6060008@ti.com>
+From: jett.zhou@gmail.com (jett zhou)
+Date: Mon, 24 Jun 2013 18:34:42 +0800
+Subject: [V2 5/7] video: mmp: add pitch info in mmp_win structure
+In-Reply-To: <CAMLZHHRxS-wqd4Tb=Af6VEnfRb9MJeNo5RC7qeTLBZ0rgU69pw@mail.gmail.com>
+References: <1370879574-11397-1-git-send-email-jtzhou@marvell.com>
+ <CAMLZHHRxS-wqd4Tb=Af6VEnfRb9MJeNo5RC7qeTLBZ0rgU69pw@mail.gmail.com>
+Message-ID: <CACDDiy9CP2NyLAwCSr97yOAS50gz6HumY9cAHwO1DFRSCy9L-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 6/24/2013 3:47 PM, Tony Lindgren wrote:
-> * Sekhar Nori <nsekhar@ti.com> [130621 03:21]:
->> On 6/21/2013 2:36 AM, Joel A Fernandes wrote:
->>> From: Matt Porter <mporter@ti.com>
->>>
->>> Enable TI EDMA option on OMAP and TI_PRIV_EDMA
->>>
->>> Signed-off-by: Matt Porter <mporter@ti.com>
->>> Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
+2013/6/22 Daniel Drake <dsd@laptop.org>:
+> On Mon, Jun 10, 2013 at 9:52 AM, Jett.Zhou <jtzhou@marvell.com> wrote:
+>> From: Jing Xiang <jxiang@marvell.com>
 >>
->> This will have to be taken by Tony.
-> 
-> Sekhar, please go ahead and take this one. I'll reply
-> to the header email of this series how it should be
-> queued.
-> 
-> For the mach-omap2/Kconfig change:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+>> Add pitch length info of graphics/video layer for mmp_win, if it is
+>> YUV format of video layer, u/v pitch will non-zero.
+>>
+>> Signed-off-by: Jing Xiang <jxiang@marvell.com>
+>> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+>> ---
+>>  include/video/mmp_disp.h |    5 +++++
+>>  1 files changed, 5 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/include/video/mmp_disp.h b/include/video/mmp_disp.h
+>> index b9dd1fb..462e3bd 100644
+>> --- a/include/video/mmp_disp.h
+>> +++ b/include/video/mmp_disp.h
+>> @@ -91,6 +91,11 @@ struct mmp_win {
+>>         u16     up_crop;
+>>         u16     bottom_crop;
+>>         int     pix_fmt;
+>> +       /*
+>> +        * pitch[0]: graphics/video layer line length or y pitch
+>> +        * pitch[1]/pitch[2]: video u/v pitch if non-zero
+>> +        */
+>> +       u32     pitch[3];
+>>  };
+>
+> Thanks for adding a comment here, but the meaning of this field is
+> still not clear to me.
+> In what case is pitch[0] line length, and in which case does it refer
+> to y pitch?
+>
+> pitch[1] and pitch[2] refer to u/v pitch respectively, if their own
+> values are non-zero? (or if not, what value does the "if non-zero"
+> comment refer to?)
+>
+> I would recommend rolling this patch into the patch that actually
+> makes use of this new field.
+>
+> Daniel
+Hi Daniel
+    pitch is used to represent line length in byte, the usage depends
+on pix_fmt.
+    If the fmt is YUV , the pitch[0] will be Y length, pitch[1] will
+be U length, pitch[2] will be V lenth.
+    If the fmt is RGB, the picth[0] will be line lenth, and
+pitch[1]/pitch[2] will be 0 and not be used.
+    You can refer to pixfmt_to_stride func implementation.
+    For the patch rolling, do you mean combine the patch5 and patch6
+by one patch?
+Thanks
 
-Thanks Tony. Added to v3.11/soc-2 branch with your and Arnd's acks included.
 
-Vinod, it will be nice to get your ack too for the drivers/dma/Kconfig
-change.
+--
 
-Regards,
-Sekhar
-
->  
->>> ---
->>>  arch/arm/mach-omap2/Kconfig |    1 +
->>>  drivers/dma/Kconfig         |    2 +-
->>>  2 files changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
->>> index f49cd51..f91b07f 100644
->>> --- a/arch/arm/mach-omap2/Kconfig
->>> +++ b/arch/arm/mach-omap2/Kconfig
->>> @@ -17,6 +17,7 @@ config ARCH_OMAP2PLUS
->>>  	select PROC_DEVICETREE if PROC_FS
->>>  	select SOC_BUS
->>>  	select SPARSE_IRQ
->>> +	select TI_PRIV_EDMA
->>>  	select USE_OF
->>>  	help
->>>  	  Systems based on OMAP2, OMAP3, OMAP4 or OMAP5
->>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
->>> index e992489..3215a3c 100644
->>> --- a/drivers/dma/Kconfig
->>> +++ b/drivers/dma/Kconfig
->>> @@ -213,7 +213,7 @@ config SIRF_DMA
->>>  
->>>  config TI_EDMA
->>>  	tristate "TI EDMA support"
->>> -	depends on ARCH_DAVINCI
->>> +	depends on ARCH_DAVINCI || ARCH_OMAP
->>>  	select DMA_ENGINE
->>>  	select DMA_VIRTUAL_CHANNELS
->>>  	default n
->>>
-> 
-> 
+----------------------------------
+Best Regards
+Jett Zhou
