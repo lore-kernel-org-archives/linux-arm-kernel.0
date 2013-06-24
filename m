@@ -1,61 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Jun 2013 03:10:55 -0700
-Subject: [PATCH] pinctrl: document the pinctrl PM states
-In-Reply-To: <51C4A593.6000900@wwwdotorg.org>
-References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
- <51BA1FE7.4000900@wwwdotorg.org>
- <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
- <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
- <51C20E3A.8090304@wwwdotorg.org>
- <20130620063823.GD5523@atomide.com>
- <51C3577E.6040709@wwwdotorg.org>
- <20130621062552.GI5523@atomide.com>
- <51C4A593.6000900@wwwdotorg.org>
-Message-ID: <20130624101055.GT5523@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Jun 2013 11:14:29 +0100
+Subject: [PATCH v2] arch: arm64: kernel: add '#ifdef CONFIG_COMPAT' for
+ aarch32_break_handler()
+In-Reply-To: <51C81115.4070803@asianux.com>
+References: <51C53C06.7050205@asianux.com>
+ <51C81115.4070803@asianux.com>
+Message-ID: <20130624101429.GF23779@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [130621 12:18]:
-> On 06/21/2013 12:25 AM, Tony Lindgren wrote:
-> > * Stephen Warren <swarren@wwwdotorg.org> [130620 12:32]:
-> >>
-> >> I assume you mean there shouldn't be any issue *modifying* the pinctrl
-> >> API to allow multiple states to be active at once? And where you're
-> >> talking about having multiple sets active at once already, you're
-> >> talking about some other API?
-> > 
-> > Nope, the standard pinctrl API. At least I have not seen issues with
-> > having multiple states active the same time in a single driver.
+On Mon, Jun 24, 2013 at 10:27:49AM +0100, Chen Gang wrote:
 > 
-> Please take a look at the implementation of pinctrl_select_state(). It
-> very explicitly performs the following steps:
+> If 'COMPAT' not defined, aarch32_break_handler() cannot pass compiling,
+> and it can work independent with 'COMPAT', so remove dummy definition.
 > 
-> 1) Find all pins(groups) that are used in the current state but not the
-> new state, and execute pinctrl_disable_setting() on them. (For mux
-> settings only, not pin config, since the core doesn't have any idea how
-> to reverse config settings).
->
-> 2) For all settings in the new state, apply those settings.
+> The related make:
 > 
-> So, it very explicitly only allows a single state to be set at a time.
-> Equally, p->state (the field which stores the currently selected state)
-> is a single item, not a set/list/array.
+>   make ARCH=arm64 randconfig
+>   make ARCH=arm64 menuconfig
+>   make ARCH=arm64 V=1 EXTRA_CFLAGS=-W
 
-OK thanks I get now what you're saying. I did not see the p->state
-issue as the disable function won't do anything for the SoCs that I
-mostly deal with.
+This sequence isn't really very useful, so I wouldn't bother including it in
+the commit message. You can trigger this issue just by disabling
+CONFIG_COMPAT.
 
-> So, this code needs rework if you want the core to support the concept
-> of having multiple states active at once, since it needs separate
-> pinctrl_activate_state() and pinctrl_deactivate_state() APIs, in order
-> to avoid step (1) above. And of course, p->state would need to be a
-> set/list/array.
+> The related error:
+> 
+>   arch/arm64/kernel/debug-monitors.c:249:5: error: redefinition of ?aarch32_break_handler?
+>   In file included from arch/arm64/kernel/debug-monitors.c:29:0:
+>   /root/linux-next/arch/arm64/include/asm/debug-monitors.h:89:12: note: previous definition of ?aarch32_break_handler? was here
+> 
+> 
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm64/include/asm/debug-monitors.h |    7 -------
+>  1 files changed, 0 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+> index ef8235c..a2232d0 100644
+> --- a/arch/arm64/include/asm/debug-monitors.h
+> +++ b/arch/arm64/include/asm/debug-monitors.h
+> @@ -83,14 +83,7 @@ static inline int reinstall_suspended_bps(struct pt_regs *regs)
+>  }
+>  #endif
+>  
+> -#ifdef CONFIG_COMPAT
+>  int aarch32_break_handler(struct pt_regs *regs);
+> -#else
+> -static int aarch32_break_handler(struct pt_regs *regs)
+> -{
+> -	return -EFAULT;
+> -}
+> -#endif
 
-I'll think about it a bit and do a patch to fix this. It seems that
-that we need just two entries in the p->state array: static (default),
-and dynamic. Then the dynamic would be typically one of: active, idle,
-rx, tx.
+Code looks fine to me:
 
-Regards,
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Tony
+Will
