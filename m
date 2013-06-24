@@ -1,130 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Jun 2013 09:54:23 +0100
-Subject: [PATCH 3/3] Documentation: Add documentation for APM X-Gene
- clock binding.
-In-Reply-To: <1371828605-18053-4-git-send-email-lho@apm.com>
-References: <1371828605-18053-1-git-send-email-lho@apm.com>
- <1371828605-18053-2-git-send-email-lho@apm.com>
- <1371828605-18053-3-git-send-email-lho@apm.com>
- <1371828605-18053-4-git-send-email-lho@apm.com>
-Message-ID: <20130624085423.GD19489@e106331-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Jun 2013 09:54:27 +0100
+Subject: [PATCH 0/5] Kernel mode NEON for XOR and RAID6
+In-Reply-To: <CAKv+Gu-jeHfJ1Ai63NVwY=x4PTfg+w_SnhzF4Sxs2+Xk+PpsoQ@mail.gmail.com>
+References: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20130606151705.GG16794@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1306061156330.18597@syhkavp.arg>
+ <20130607175007.GH8111@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1306072214120.18597@syhkavp.arg>
+ <20130621093311.GD6983@mudshark.cambridge.arm.com>
+ <CAKv+Gu8FTXC9XSE4DJ2LQueJ3FKjdjv8=sjDjTETH7fq+ruNGQ@mail.gmail.com>
+ <51C46A0D.8070505@codeaurora.org>
+ <CAKv+Gu-jeHfJ1Ai63NVwY=x4PTfg+w_SnhzF4Sxs2+Xk+PpsoQ@mail.gmail.com>
+Message-ID: <20130624085427.GY2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 04:30:05PM +0100, Loc Ho wrote:
-> Documentation: Add documentation for APM X-Gene clock binding with PLL and 
-> device clocks.
+On Mon, Jun 24, 2013 at 10:08:10AM +0200, Ard Biesheuvel wrote:
+> On 21 June 2013 16:58, Christopher Covington <cov@codeaurora.org> wrote:
+> > Hi Ard,
+> >
+> > If this is indeed the consensus (I don't disagree with any of it myself),
+> > perhaps committing the main points, guidelines, and examples to
+> > Documentation/arm/* would be useful.
+> >
 > 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
->  Documentation/devicetree/bindings/clock/xgene.txt |   90 +++++++++++++++++++++
->  1 files changed, 90 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/xgene.txt
+> Hello Chris,
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/xgene.txt b/Documentation/devicetree/bindings/clock/xgene.txt
-> new file mode 100644
-> index 0000000..fcdee79
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/xgene.txt
-> @@ -0,0 +1,90 @@
-> +Device Tree Clock bindings for APM X-Gene
-> +
-> +This binding uses the common clock binding[1].
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Required properties:
-> +- compatible : shall be one of the following:
-> +	"apm,xgene-pll-clock" - for a X-Gene PLL clock
-> +	"apm,xgene-device-clock" - for a X-Gene device clock
-> +
-> +Required properties for PLL clocks:
-> +- reg : shall be the physical PLL register address for the pll clock.
-> +- clocks : shall be the input parent clock phandle for the clock. This should
-> +	be the reference clock.
-> +- #clock-cells : shall be set to 1.
-> +- clock-output-names : shall be the name of the PLL referenced by derive
-> +  clock.
-> +- type : shall be 1 for SoC PLL and 0 for PCP PLL.
+> I agree that it makes sense to document any guidelines we set
+> regarding the use of NEON in kernel mode, and I will happily do so.
+> However, let's first try to wrap up this discussion, haven't heard
+> back from Russell yet on his current position in this matter.
 
-That makes the binding very difficult for a human to read, could this not be
-part of the compatible string? e.g. "apm,xgene-pcp-pll-clock".
+I think it's probably fine now - you have ample justification, and you
+seem to be ensuring that things are done safely.
 
-> +Optional properties for PLL clocks:
-> +- clock-names : shall be the name of the PLL. If missing, use the device name.
-> +
-> +Required properties for device clocks:
-> +- reg : shall be the physical CSR reset address base and physical CSR divider
-> +        address base. If one does not exist, specify 0 for address and 0 for 
-> +        size.
-> +- clocks : shall be the input parent clock phandle for the clock.
-> +- #clock-cells : shall be set to 1.
-> +- clock-output-names : shall be the name of the device referenced.
-> +Optional properties for device clocks:
-> +- clock-names : shall be the name of the device clock. If missing, use the
-> +                device name.
-> +- flags : Any clock flags. ie. use 0x8 to leave clock un-touch if not
-> +          referenced. Default is 0.
-
-What flags are these? We should *not* be exporting Linux-internal flags as
-devicetree bindings.
-
-> +- csr-offset : Offset to the CSR reset register from the reset address base.
-> +               Default is 0.
-> +- csr-mask : CSR reset mask bit. Default is 0xF.
-> +- enable-offset : Offset to the enable register from the reset address base.
-> +                  Default is 0x8.
-> +- enable-mask : CSR enable mask bit. Default is 0xF.
-> +- divider-offset : Offset to the divider CSR register from the divider base.
-> +                   Default is 0x0.
-> +- divider-width : Width of the divider register. Default is 0.
-> +- divider-shift : Bit shift of the divider register. Default is 0.
-> +
-> +For example:
-> +
-> +	pcppll: pcppll at 17000100 {
-> +		compatible = "apm,xgene-pll-clock";
-> +		#clock-cells = <1>;
-> +		clocks = <&refclk 0>;
-> +		clock-names = "pcppll";
-> +		reg = <0x0 0x17000100 0x0 0x1000>;
-> +		clock-output-names = "pcppll";
-> +		type = <0>;
-> +	};
-> +
-> +	socpll: socpll at 17000120 {
-> +		compatible = "apm,xgene-pll-clock";
-> +		#clock-cells = <1>;
-> +		clocks = <&refclk 0>;
-> +		clock-names = "socpll";
-> +		reg = <0x0 0x17000120 0x0 0x1000>;
-> +		clock-output-names = "socpll";
-> +		type = <1>;
-> +	};
-> +
-> +	qmlclk: qmlclk {
-> +		compatible = "apm,xgene-device-clock";
-> +		#clock-cells = <1>;
-> +		clocks = <&socplldiv2 0>;
-> +		clock-names = "qmlclk";
-> +		reg = <0x0 0x1703C000 0x0 0x1000
-> +			0x0 0x00000000 0x0 0x0000>;
-> +		clock-output-names = "qmlclk";
-> +	};
-> +
-> +	ethclk: ethclk {
-> +		compatible = "apm,xgene-device-clock";
-> +		#clock-cells = <1>;
-> +		clocks = <&socplldiv2 0>;
-> +		clock-names = "ethclk";
-> +		reg = <0x0 0x00000000 0x0 0x0000
-> +			0x0 0x17000000 0x0 0x1000>;
-> +			divider-offset = <0x238>;
-
-Extraneous tab here.
-
-Thanks,
-Mark.
+The only thing I'm left wondering about is whether the bits outside
+arch/arm should go to anyone else, but MAINTAINERS is being unhelpful
+on that - so I'm tempted to say that if someone should've been copied
+who hasn't, and they're not in MAINTAINERS that's their problem.
