@@ -1,22 +1,74 @@
-From: oliver@neukum.org (Oliver Neukum)
-Date: Mon, 24 Jun 2013 12:28:53 +0200
-Subject: [PATCH v2 3/4] USB: EHCI: improve interrupt qh unlink
-In-Reply-To: <1372066925-23579-4-git-send-email-ming.lei@canonical.com>
-References: <1372066925-23579-1-git-send-email-ming.lei@canonical.com>
- <1372066925-23579-4-git-send-email-ming.lei@canonical.com>
-Message-ID: <1708070.4u00OSumQU@linux-5eaq.site>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 24 Jun 2013 16:01:34 +0530
+Subject: [PATCH v12 04/11] dmaengine: edma: enable build for AM33XX
+In-Reply-To: <20130624101756.GU5523@atomide.com>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <1371762407-24544-5-git-send-email-joelagnel@ti.com>
+ <51C427AA.6080601@ti.com> <20130624101756.GU5523@atomide.com>
+Message-ID: <51C82006.6060008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 June 2013 17:42:04 Ming Lei wrote:
-> This patch improves this above situation, and the qh will wait for 5
-> milliseconds before being unlinked from hardware, if one URB is submitted
-> during the period, the qh is move out of unlink wait list and the
-> interrupt transfer can be scheduled immediately, not like before: the
-> transfer is only linked to hardware until previous unlink is completed.
 
-It seems to me that this logic should be used only if the URB completed
-without error.
-	
-	Regards
-		Oliver
+On 6/24/2013 3:47 PM, Tony Lindgren wrote:
+> * Sekhar Nori <nsekhar@ti.com> [130621 03:21]:
+>> On 6/21/2013 2:36 AM, Joel A Fernandes wrote:
+>>> From: Matt Porter <mporter@ti.com>
+>>>
+>>> Enable TI EDMA option on OMAP and TI_PRIV_EDMA
+>>>
+>>> Signed-off-by: Matt Porter <mporter@ti.com>
+>>> Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
+>>
+>> This will have to be taken by Tony.
+> 
+> Sekhar, please go ahead and take this one. I'll reply
+> to the header email of this series how it should be
+> queued.
+> 
+> For the mach-omap2/Kconfig change:
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
+
+Thanks Tony. Added to v3.11/soc-2 branch with your and Arnd's acks included.
+
+Vinod, it will be nice to get your ack too for the drivers/dma/Kconfig
+change.
+
+Regards,
+Sekhar
+
+>  
+>>> ---
+>>>  arch/arm/mach-omap2/Kconfig |    1 +
+>>>  drivers/dma/Kconfig         |    2 +-
+>>>  2 files changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+>>> index f49cd51..f91b07f 100644
+>>> --- a/arch/arm/mach-omap2/Kconfig
+>>> +++ b/arch/arm/mach-omap2/Kconfig
+>>> @@ -17,6 +17,7 @@ config ARCH_OMAP2PLUS
+>>>  	select PROC_DEVICETREE if PROC_FS
+>>>  	select SOC_BUS
+>>>  	select SPARSE_IRQ
+>>> +	select TI_PRIV_EDMA
+>>>  	select USE_OF
+>>>  	help
+>>>  	  Systems based on OMAP2, OMAP3, OMAP4 or OMAP5
+>>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>>> index e992489..3215a3c 100644
+>>> --- a/drivers/dma/Kconfig
+>>> +++ b/drivers/dma/Kconfig
+>>> @@ -213,7 +213,7 @@ config SIRF_DMA
+>>>  
+>>>  config TI_EDMA
+>>>  	tristate "TI EDMA support"
+>>> -	depends on ARCH_DAVINCI
+>>> +	depends on ARCH_DAVINCI || ARCH_OMAP
+>>>  	select DMA_ENGINE
+>>>  	select DMA_VIRTUAL_CHANNELS
+>>>  	default n
+>>>
+> 
+> 
