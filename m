@@ -1,89 +1,28 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 24 Jun 2013 14:00:28 -0700
+From: chris@printf.net (Chris Ball)
+Date: Mon, 24 Jun 2013 22:02:17 +0100
 Subject: [GIT PULL v2] msm clock for 3.11
-In-Reply-To: <20130614195238.GA2381@codeaurora.org>
-Message-ID: <1372107629-25862-1-git-send-email-davidb@codeaurora.org>
+In-Reply-To: <1372107629-25862-1-git-send-email-davidb@codeaurora.org> (David
+ Brown's message of "Mon, 24 Jun 2013 14:00:28 -0700")
+References: <1372107629-25862-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <86fvw76x46.fsf@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This pull request differs from the previous one for the clock code by:
+Hi,
 
-  - Gathered additional Acked-by lines.
-  - A small #include fixup found by Stephen Boyd
+On Mon, Jun 24 2013, David Brown wrote:
+> This pull request differs from the previous one for the clock code by:
+>
+>   - Gathered additional Acked-by lines.
+>   - A small #include fixup found by Stephen Boyd
+>
+> The only Ack not received was from Chris Ball, who is CC'd on this
+> request.
 
-The only Ack not received was from Chris Ball, who is CC'd on this
-request.
+Sorry about that.  For msm_sdcc.c:
 
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+Acked-by: Chris Ball <cjb@laptop.org>
 
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-clock-for-3.11b
-
-for you to fetch changes up to 8cc7f5338e729b79194e6c22e3c794faaef974b8:
-
-  ARM: msm: Migrate to common clock framework (2013-06-24 13:08:05 -0700)
-
-----------------------------------------------------------------
-MSM clock updates for 3.11.
-
-Per Stephen Boyd's coverletter:
-
-Resending to collect higher level maintainer acks per Olof's request.
-The plan is to push this patchset through MSM to the arm-soc tree.
-
-This patchset moves the existing MSM clock code and affected drivers
-to the common clock framework. A prerequisite of moving to the common
-clock framework is to use clk_prepare() and clk_enable() so the first
-few patches migrate drivers to that call (clk_prepare() is a no-op on
-MSM right now). It also removes some custom clock APIs that MSM
-provides and finally moves the proc_comm clock code to the common
-struct clk.
-
-This patch series will be used as the foundation of the MSM 8660/8960
-clock code that I plan to send out after this series.
-
-----------------------------------------------------------------
-Stephen Boyd (12):
-      msm_serial: Convert to clk_prepare/unprepare
-      msm_serial: Use devm_clk_get() and properly return errors
-      usb: otg: msm: Convert to clk_prepare/unprepare
-      msm_sdcc: Convert to clk_prepare/unprepare
-      msm: iommu: Convert to clk_prepare/unprepare
-      msm: iommu: Use clk_set_rate() instead of clk_set_min_rate()
-      ARM: msm: Remove custom clk_set_flags() API
-      ARM: msm: Remove custom clk_set_{max,min}_rate() API
-      ARM: msm: Remove clock-7x30.h include file
-      ARM: msm: Prepare clk_get() users in mach-msm for clock-pcom driver
-      ARM: msm: Make proc_comm clock control into a platform driver
-      ARM: msm: Migrate to common clock framework
-
- arch/arm/Kconfig                       |   2 +-
- arch/arm/mach-msm/Makefile             |  10 +-
- arch/arm/mach-msm/board-halibut.c      |   2 +-
- arch/arm/mach-msm/board-msm7x30.c      |   2 +-
- arch/arm/mach-msm/board-qsd8x50.c      |   2 +-
- arch/arm/mach-msm/board-trout-panel.c  |  19 ++--
- arch/arm/mach-msm/board-trout.c        |   3 +-
- arch/arm/mach-msm/clock-7x30.h         | 155 ------------------------------
- arch/arm/mach-msm/clock-debug.c        | 130 --------------------------
- arch/arm/mach-msm/clock-pcom.c         | 149 ++++++++++++++++++-----------
- arch/arm/mach-msm/clock-pcom.h         |  31 +++---
- arch/arm/mach-msm/clock.c              | 166 +--------------------------------
- arch/arm/mach-msm/clock.h              |  51 +++-------
- arch/arm/mach-msm/devices-msm7x00.c    |  12 ++-
- arch/arm/mach-msm/devices-msm7x30.c    |  15 ++-
- arch/arm/mach-msm/devices-qsd8x50.c    |  12 ++-
- arch/arm/mach-msm/devices.h            |  15 +--
- arch/arm/mach-msm/dma.c                |   5 +-
- arch/arm/mach-msm/include/mach/board.h |   5 -
- arch/arm/mach-msm/include/mach/clk.h   |   9 --
- drivers/iommu/msm_iommu_dev.c          |  20 ++--
- drivers/mmc/host/msm_sdcc.c            |  14 ++-
- drivers/tty/serial/msm_serial.c        |  35 +++----
- drivers/usb/phy/phy-msm-usb.c          |  38 ++++----
- 24 files changed, 243 insertions(+), 659 deletions(-)
- delete mode 100644 arch/arm/mach-msm/clock-7x30.h
- delete mode 100644 arch/arm/mach-msm/clock-debug.c
+- Chris.
+-- 
+Chris Ball   <chris@printf.net>   <http://printf.net/>
