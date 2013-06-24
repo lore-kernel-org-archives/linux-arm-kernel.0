@@ -1,57 +1,27 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 24 Jun 2013 22:36:43 +0300
-Subject: [PATCH V2] USB: initialize or shutdown PHY when add or remove
- host controller
-In-Reply-To: <Pine.LNX.4.44L0.1306201319580.2063-100000@iolanthe.rowland.org>
-References: <20130620121749.GF9817@arwen.pp.htv.fi>
- <Pine.LNX.4.44L0.1306201319580.2063-100000@iolanthe.rowland.org>
-Message-ID: <20130624193643.GC11815@arwen.pp.htv.fi>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 24 Jun 2013 21:42:00 +0200
+Subject: [PATCH 0/4] IPU DMFC bandwidth allocation fix and cleanups
+In-Reply-To: <1371805041-9299-1-git-send-email-p.zabel@pengutronix.de>
+References: <1371805041-9299-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130624194200.GV32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 01:25:31PM -0400, Alan Stern wrote:
-> On Thu, 20 Jun 2013, Felipe Balbi wrote:
+On Fri, Jun 21, 2013 at 10:57:17AM +0200, Philipp Zabel wrote:
+> Hi,
 > 
-> > > In fact, the PHY setting and handling is related to platform or SOC,
-> > > and for different SOC they can
-> > > have same EHCI HCD but they PHY handling can be different.
-> > > Omap'a case is the example, and i think some other vendors may have
-> > > silimar cases.
-> > > From above point, It is better to leave the PHY initialization and
-> > > shutdown to be done by each echi-xxx driver.
-> > > 
-> > > So Alan and Felipe
-> > > What are your ideas about it?
-> > 
-> > If we have so many exceptions, then sure. But eventually, the common
-> > case should be added generically with a flag so that non-generic cases
-> > (like OMAP) can request to handle the PHY by themselves.
-> > 
-> > Alan ?
-> 
-> I don't have very strong feelings about this; Felipe has much more
-> experience with these things.
-> 
-> However, when the common case is added into the core, the simplest way
-> to indicate that the HCD wants to handle the PHY(s) by itself will be
-> to leave hcd->phy set to NULL or an ERR_PTR value.
-> 
-> One important thing that hasn't been pointed out yet: When we move
-> these calls into the core, the same patch must also remove those calls
-> from the glue drivers that currently do set hcd->phy.  And it must make
-> sure that the glue drivers which handle the PHY by themselves do not
-> set hcd->phy.
+> the following patches remove some unused variables, replace some
+> hard-coded channel numbers with existing descriptive defines, fix
+> the DMFC bandwidth (or rather: FIFO space) allocation, and update
+> ipu_page_flip() to immediately set crtc->fb.    
 
-perfect summary. Perhaps Roger could already work on private PHY handle
-for ehci-omap.c and later we can start moving generic case to usbcore
-without having to touch ehci-omap.c at all. Roger, any commetns ?
+
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Sascha
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/7c037b2a/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
