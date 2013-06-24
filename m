@@ -1,45 +1,38 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Mon, 24 Jun 2013 23:13:38 +0800
-Subject: [Question] race between spin_lock and spin_unlock
-Message-ID: <CACVXFVMBL5E5SGwDatn_ay0sPOhqPKTwouCbzjwrhPuRKHNDcg@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 24 Jun 2013 11:15:06 -0400
+Subject: [PATCH] ARM: Add support for LPAE style CONTEXTIDR
+In-Reply-To: <20130624145303.GA25582@mudshark.cambridge.arm.com>
+References: <1372080405-13365-1-git-send-email-cov@codeaurora.org>
+ <20130624140424.GA24861@mudshark.cambridge.arm.com>
+ <51C85A0D.3070400@codeaurora.org>
+ <20130624145303.GA25582@mudshark.cambridge.arm.com>
+Message-ID: <51C8627A.5000106@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/24/2013 10:53 AM, Will Deacon wrote:
+> On Mon, Jun 24, 2013 at 03:39:09PM +0100, Christopher Covington wrote:
+>> Hi Will,
+>>
+>> On 06/24/2013 10:04 AM, Will Deacon wrote:
+>> [...]
+>>
+>>> What's the advantage of this approach, other than you get an extra byte's
+>>> worth of PID?
+>>
+>> In my view, the real advantage is that the the PID is located where people
+>> reading ARM Architecture Reference Manual are told they can find it.
+> 
+> Perhaps, but I'd usually expect a debugger or trace tools to do something
+> with the PID, and they likely expect it to be shifted, so you can't really
+> win.
 
-When reading the code of arch_spin_lock(), I think there might be
-a race between arch_spin_lock() and arch_spin_unlock():
+But reading and implementing the architecture *is* winning! LOL. I'll file a
+ticket with the architecture folks and see what they think.
 
-- arch_spin_unlock() happened just between StoreExcl(lock->next)
-and comparing lockval.tickets.next with lockval.tickets.owner inside
-arch_spin_lock()
+Christopher
 
-- arch_spin_lock() can't notice the change on lock->owner, so call
-wfe(), then just waiting for being waken up, but there isn't corresponding
-unlock to send wake event any more.
-
-Maybe the below change may make the race to happen difficultly,
-but it still can't avoid it completely.
-
-diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
-index 6220e9f..e1b239c 100644
---- a/arch/arm/include/asm/spinlock.h
-+++ b/arch/arm/include/asm/spinlock.h
-@@ -87,10 +87,8 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
- 	: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
- 	: "cc");
-
--	while (lockval.tickets.next != lockval.tickets.owner) {
-+	while (lockval.tickets.next != ACCESS_ONCE(lock->tickets.owner))
- 		wfe();
--		lockval.tickets.owner = ACCESS_ONCE(lock->tickets.owner);
--	}
-
- 	smp_mb();
- }
-
-Any comments on the problem?
-
-Thanks,
 -- 
-Ming Lei
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
