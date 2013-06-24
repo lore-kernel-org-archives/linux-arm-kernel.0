@@ -1,61 +1,61 @@
-From: jett.zhou@gmail.com (jett zhou)
-Date: Mon, 24 Jun 2013 18:17:00 +0800
-Subject: [V2 3/7] video: mmp: fix graphics/video layer enable/mask swap
- issue
-In-Reply-To: <CAMLZHHSDUYZ8fpjjSKzDWKL3=RhOaxO8pq-ty5zM+KHzEu30QA@mail.gmail.com>
-References: <1370879552-11290-1-git-send-email-jtzhou@marvell.com>
- <CAMLZHHSDUYZ8fpjjSKzDWKL3=RhOaxO8pq-ty5zM+KHzEu30QA@mail.gmail.com>
-Message-ID: <CACDDiy-L152hYkthVziVYrtjsp0KnNK9o1b-BkCa-GWeoJMK0Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 24 Jun 2013 03:17:56 -0700
+Subject: [PATCH v12 04/11] dmaengine: edma: enable build for AM33XX
+In-Reply-To: <51C427AA.6080601@ti.com>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <1371762407-24544-5-git-send-email-joelagnel@ti.com>
+ <51C427AA.6080601@ti.com>
+Message-ID: <20130624101756.GU5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/6/22 Daniel Drake <dsd@laptop.org>:
-> On Mon, Jun 10, 2013 at 9:52 AM, Jett.Zhou <jtzhou@marvell.com> wrote:
->> From: Jing Xiang <jxiang@marvell.com>
->>
->> There is bug when switch dma of graphic layer and video layer, it
->> configured opposite bit, fix it.
->
-> So, overlays can be either graphics or video. overlay_is_vid() tells
-> you which type.
-> overlay_is_vid() makes its decision based on dmafetch_id which is
-> undocumented and I don't understand it (and in another mail you said
-> this is legacy configuration that is going to be removed).
->
-> Ignoring my lack of understanding of the background: the patch here
-> seems to make the code more correct. It will modify the path's
-> underlying control register to enable graphics or video transfer
-> depending on the overlay type. Turning a graphics overlay dmafetch ON
-> will not stomp on the bits set by any video overlay dmafetch on the
-> same path. Previously the logic was reversed.
->
-> This codepath will not work correctly if there will ever be more than
-> one overlay of the same type on the same path. For example, if we have
-> two graphics overlays;
-> 1. dmafetch_onoff(overlay1, on) - graphics transfer is now enabled in
-> the hardware
-> 2. dmafetch_onoff(overlay2, on) - graphics transfer was already
-> enabled, no change
-> 3. dmafetch_onoff(overlay2, off) - graphics transfer is now disabled
-> in the hardware
->
-> At this point overlay1 is still active in theory, but the driver has
-> disabled graphics transfer at the hardware level.
->
-> Daniel
-Hi Daniel
-     Now for our controller and usage, we have 2 over-lay of the path,
-they are graphic layer and video layer.
-     dmafetch_id =0 if it is graphic layer, dmafetch_id =1 if it is video layer.
-     The another mail mentioned is right, we plan to remove the
-dmafetch_id and detect overlay_is_vid by other method.
-     But this patch did not include it yet, it will be included by
-another patch later on.
-Thanks
+* Sekhar Nori <nsekhar@ti.com> [130621 03:21]:
+> On 6/21/2013 2:36 AM, Joel A Fernandes wrote:
+> > From: Matt Porter <mporter@ti.com>
+> > 
+> > Enable TI EDMA option on OMAP and TI_PRIV_EDMA
+> > 
+> > Signed-off-by: Matt Porter <mporter@ti.com>
+> > Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
+> 
+> This will have to be taken by Tony.
 
+Sekhar, please go ahead and take this one. I'll reply
+to the header email of this series how it should be
+queued.
 
---
+For the mach-omap2/Kconfig change:
 
-----------------------------------
-Best Regards
-Jett Zhou
+Acked-by: Tony Lindgren <tony@atomide.com>
+ 
+> > ---
+> >  arch/arm/mach-omap2/Kconfig |    1 +
+> >  drivers/dma/Kconfig         |    2 +-
+> >  2 files changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> > index f49cd51..f91b07f 100644
+> > --- a/arch/arm/mach-omap2/Kconfig
+> > +++ b/arch/arm/mach-omap2/Kconfig
+> > @@ -17,6 +17,7 @@ config ARCH_OMAP2PLUS
+> >  	select PROC_DEVICETREE if PROC_FS
+> >  	select SOC_BUS
+> >  	select SPARSE_IRQ
+> > +	select TI_PRIV_EDMA
+> >  	select USE_OF
+> >  	help
+> >  	  Systems based on OMAP2, OMAP3, OMAP4 or OMAP5
+> > diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> > index e992489..3215a3c 100644
+> > --- a/drivers/dma/Kconfig
+> > +++ b/drivers/dma/Kconfig
+> > @@ -213,7 +213,7 @@ config SIRF_DMA
+> >  
+> >  config TI_EDMA
+> >  	tristate "TI EDMA support"
+> > -	depends on ARCH_DAVINCI
+> > +	depends on ARCH_DAVINCI || ARCH_OMAP
+> >  	select DMA_ENGINE
+> >  	select DMA_VIRTUAL_CHANNELS
+> >  	default n
+> > 
