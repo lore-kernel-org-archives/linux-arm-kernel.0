@@ -1,157 +1,81 @@
 From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 24 Jun 2013 11:17:36 -0400 (EDT)
-Subject: [PATCH v2 1/4] USB: HCD: support giveback of URB in tasklet
- context
-In-Reply-To: <1372066925-23579-2-git-send-email-ming.lei@canonical.com>
-Message-ID: <Pine.LNX.4.44L0.1306241102340.1406-100000@iolanthe.rowland.org>
+Date: Mon, 24 Jun 2013 11:18:45 -0400 (EDT)
+Subject: [PATCH v2 2/4] USB: URB documentation: claim complete() will be
+ run with IRQs enabled
+In-Reply-To: <1372066925-23579-3-git-send-email-ming.lei@canonical.com>
+Message-ID: <Pine.LNX.4.44L0.1306241118260.1406-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 24 Jun 2013, Ming Lei wrote:
 
-> This patch implements the mechanism of giveback of URB in
-> tasklet context, so that hardware interrupt handling time for
-> usb host controller can be saved much, and HCD interrupt handling
-> can be simplified.
-
-Changes from v1 to v2?
-
-
-> +static void usb_giveback_urb_bh(unsigned long param)
-> +{
-> +	struct giveback_urb_bh *bh = (struct giveback_urb_bh *)param;
-> +	unsigned long flags;
-> +	struct list_head local_list;
-> +
-> +	spin_lock_irqsave(&bh->lock, flags);
-> +	bh->running = 1;
-> + restart:
-> +	list_replace_init(&bh->head, &local_list);
-> +	spin_unlock_irqrestore(&bh->lock, flags);
-
-Tasklet routines are always called with interrupts enabled, right?  
-Therefore you don't need to use the "flags" argument here or below.
-
-> @@ -1667,25 +1721,40 @@ int usb_hcd_unlink_urb (struct urb *urb, int status)
->   */
->  void usb_hcd_giveback_urb(struct usb_hcd *hcd, struct urb *urb, int status)
->  {
-> -	urb->hcpriv = NULL;
-> -	if (unlikely(urb->unlinked))
-> -		status = urb->unlinked;
-> -	else if (unlikely((urb->transfer_flags & URB_SHORT_NOT_OK) &&
-> -			urb->actual_length < urb->transfer_buffer_length &&
-> -			!status))
-> -		status = -EREMOTEIO;
-> +	struct giveback_urb_bh *bh;
-> +	bool sched, high_prio_bh;
+> There is no good reason to run complete() in hard interrupt
+> disabled context.
+> 
+> After switch to run complete() in tasklet, we will enable local IRQs
+> when calling complete() since we can do it at that time.
+> 
+> Even though we still disable IRQs now when calling complete()
+> in tasklet, the URB documentation is updated to claim complete()
+> will be run in tasklet context and local IRQs will be enabled, so
+> that USB drivers can know the change and avoid one deadlock caused
+> by: assume IRQs disabled in complete() and call spin_lock() to
+> hold lock which might be acquired in interrupt context.
+> 
+> Current spin_lock() usages in drivers' complete() will be cleaned
+> up at the same time, and once the cleanup is finished, local IRQs
+> will be enabled when calling complete() in tasklet.
+> 
+> Also fix description about type of usb_complete_t, and remove the
+> advice of running completion handler in tasklet for decreasing
+> system latency.
+> 
+> Cc: Oliver Neukum <oliver@neukum.org>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Signed-off-by: Ming Lei <ming.lei@canonical.com>
+> ---
+>  Documentation/usb/URB.txt |   21 ++++++++++-----------
+>  1 file changed, 10 insertions(+), 11 deletions(-)
+> 
+> diff --git a/Documentation/usb/URB.txt b/Documentation/usb/URB.txt
+> index 00d2c64..50da0d4 100644
+> --- a/Documentation/usb/URB.txt
+> +++ b/Documentation/usb/URB.txt
+> @@ -195,13 +195,12 @@ by the completion handler.
 >  
-> -	unmap_urb_for_dma(hcd, urb);
-> -	usbmon_urb_complete(&hcd->self, urb, status);
-> -	usb_unanchor_urb(urb);
-> +	/* pass status to tasklet via unlinked */
-> +	if (likely(!urb->unlinked))
-> +		urb->unlinked = status;
+>  The handler is of the following type:
 >  
-> -	/* pass ownership to the completion handler */
-> -	urb->status = status;
-> -	urb->complete (urb);
-> -	atomic_dec (&urb->use_count);
-> -	if (unlikely(atomic_read(&urb->reject)))
-> -		wake_up (&usb_kill_urb_queue);
-> -	usb_put_urb (urb);
-> +	if (!hcd_giveback_urb_in_bh(hcd) && !is_root_hub(urb->dev)) {
-> +		__usb_hcd_giveback_urb(urb);
-> +		return;
-> +	}
-> +
-> +	if (usb_pipeisoc(urb->pipe) || usb_pipeint(urb->pipe)) {
-> +		bh = &hcd->high_prio_bh;
-> +		high_prio_bh = 1;
-> +	} else {
-> +		bh = &hcd->low_prio_bh;
-> +		high_prio_bh = 0;
-> +	}
-
-Bool values should be assigned "true" or "false", not "1" or "0".
-
-> +
-> +	spin_lock(&bh->lock);
-> +	list_add_tail(&urb->urb_list, &bh->head);
-> +	if (bh->running)
-> +		sched = 0;
-> +	else
-> +		sched = 1;
-> +	spin_unlock(&bh->lock);
-
-How about calling this variable "running" instead of "sched"?  Then you 
-could just say:
-
-	running = bh->running;
-
-with no "if" statement.
-
-> +
-> +	if (!sched)
-> +		;
-> +	else if (high_prio_bh)
-> +		tasklet_hi_schedule(&bh->bh);
-> +	else
-> +		tasklet_schedule(&bh->bh);
->  }
->  EXPORT_SYMBOL_GPL(usb_hcd_giveback_urb);
+> -	typedef void (*usb_complete_t)(struct urb *, struct pt_regs *)
+> +	typedef void (*usb_complete_t)(struct urb *)
 >  
-> @@ -2307,6 +2376,42 @@ EXPORT_SYMBOL_GPL (usb_hc_died);
+> -I.e., it gets the URB that caused the completion call, plus the
+> -register values at the time of the corresponding interrupt (if any).
+> -In the completion handler, you should have a look at urb->status to
+> -detect any USB errors. Since the context parameter is included in the URB,
+> -you can pass information to the completion handler. 
+> +I.e., it gets the URB that caused the completion call. In the completion
+> +handler, you should have a look at urb->status to detect any USB errors.
+> +Since the context parameter is included in the URB, you can pass
+> +information to the completion handler.
 >  
->  /*-------------------------------------------------------------------------*/
+>  Note that even when an error (or unlink) is reported, data may have been
+>  transferred.  That's because USB transfers are packetized; it might take
+> @@ -210,12 +209,12 @@ have transferred successfully before the completion was called.
 >  
-> +static void __init_giveback_urb_bh(struct giveback_urb_bh *bh)
-> +{
-> +
-> +	spin_lock_init(&bh->lock);
-> +	INIT_LIST_HEAD(&bh->head);
-> +	tasklet_init(&bh->bh, usb_giveback_urb_bh, (unsigned long)bh);
-> +}
-> +
-> +static void init_giveback_urb_bh(struct usb_hcd *hcd)
-> +{
-> +	if (!hcd_giveback_urb_in_bh(hcd))
-> +		return;
+>  
+>  NOTE:  ***** WARNING *****
+> -NEVER SLEEP IN A COMPLETION HANDLER.  These are normally called
+> -during hardware interrupt processing.  If you can, defer substantial
+> -work to a tasklet (bottom half) to keep system latencies low.  You'll
+> -probably need to use spinlocks to protect data structures you manipulate
+> -in completion handlers.
+> +NEVER SLEEP IN A COMPLETION HANDLER.  These are often called in atomic
+> +context.
+>  
+> +In the current kernel, completion handlers run with local interrupts
+> +disabled, but in the future this will be changed, so don't assume that
+> +local IRQs are always disabled inside completion handlers.
+>  
+>  1.8. How to do isochronous (ISO) transfers?
 
-As you mentioned, there's not much point in skipping this code when
-it's not needed.  In fact, you could just put the two lines below
-directly into usb_create_shared_hcd(), and get rid of the "__" from the
-beginning of the name.
-
-> +
-> +	__init_giveback_urb_bh(&hcd->high_prio_bh);
-> +	__init_giveback_urb_bh(&hcd->low_prio_bh);
-> +}
-> +
-> +static void exit_giveback_urb_bh(struct usb_hcd *hcd)
-> +{
-> +	if (!hcd_giveback_urb_in_bh(hcd))
-> +		return;
-> +
-> +	/*
-> +	 * tasklet_kill() isn't needed here because:
-> +	 * - driver's disconnec() called from usb_disconnect() should
-
-Misspelled "disconnect".
-
-> +	 *   make sure its URBs are completed during the disconnect()
-> +	 *   callback
-> +	 *
-> +	 * - it is too late to run complete() here since driver may have
-> +	 *   been removed already now
-> +	 *
-> +	 * Using tasklet to run URB's complete() doesn't change this
-> +	 * behavior of usbcore.
-> +	 */
-> +}
-
-Why have a separate subroutine for doing nothing?  Simply put this 
-comment directly into usb_remove_hcd().  (And you can remove the last 
-two lines of the comment; they don't make sense in this context.)
-
-Alan Stern
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
