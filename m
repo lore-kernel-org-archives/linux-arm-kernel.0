@@ -1,54 +1,65 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 24 Jun 2013 17:27:49 +0800
-Subject: [PATCH v2] arch: arm64: kernel: add '#ifdef CONFIG_COMPAT' for
- aarch32_break_handler()
-In-Reply-To: <51C53C06.7050205@asianux.com>
-References: <51C53C06.7050205@asianux.com>
-Message-ID: <51C81115.4070803@asianux.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Jun 2013 11:29:42 +0200
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <20130617225847.GA9494@kroah.com>
+References: <1371502778-15849-1-git-send-email-oliver+list@schinagl.nl>
+ <1371502778-15849-2-git-send-email-oliver+list@schinagl.nl>
+ <20130617225847.GA9494@kroah.com>
+Message-ID: <20130624092942.GG26008@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Greg,
 
-If 'COMPAT' not defined, aarch32_break_handler() cannot pass compiling,
-and it can work independent with 'COMPAT', so remove dummy definition.
+On Mon, Jun 17, 2013 at 03:58:47PM -0700, Greg KH wrote:
+> On Mon, Jun 17, 2013 at 10:59:37PM +0200, Oliver Schinagl wrote:
 
-The related make:
+[..]
 
-  make ARCH=arm64 randconfig
-  make ARCH=arm64 menuconfig
-  make ARCH=arm64 V=1 EXTRA_CFLAGS=-W
+> > +static int __init sunxi_sid_probe(struct platform_device *pdev)
+> > +{
+> > +	u8 entropy[SID_SIZE];
+> > +	unsigned int i;
+> > +	struct resource *res;
+> > +	void __iomem *sid_reg_base;
+> > +	int ret;
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	sid_reg_base = devm_ioremap_resource(&pdev->dev, res);
+> > +	if (IS_ERR(sid_reg_base))
+> > +		return PTR_ERR(sid_reg_base);
+> > +	platform_set_drvdata(pdev, sid_reg_base);
+> > +
+> > +	ret = device_create_bin_file(&pdev->dev, &sid_bin_attr);
+> > +	if (ret)
+> > +		return ret;
+> 
+> You just raced with userspace, having the file show up after the device
+> was announced to users that it was there.  Please use the proper device
+> file api to add default attributes to prevent this from happening.
 
-The related error:
+Sorry if the question looks dumb, but what kind of race can we generate
+here?
 
-  arch/arm64/kernel/debug-monitors.c:249:5: error: redefinition of ?aarch32_break_handler?
-  In file included from arch/arm64/kernel/debug-monitors.c:29:0:
-  /root/linux-next/arch/arm64/include/asm/debug-monitors.h:89:12: note: previous definition of ?aarch32_break_handler? was here
+The device_create_bin_file is the last call that we make (if we except
+the entropy stuff, but it doesn't really matter here), so after we
+created the file, we have everything properly initialised so that our
+functions can be called, right?
 
+And another dumb question for you, what is the "proper device file API"
+you are referring to ? :)
 
+Thanks!
+Maxime
 
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm64/include/asm/debug-monitors.h |    7 -------
- 1 files changed, 0 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index ef8235c..a2232d0 100644
---- a/arch/arm64/include/asm/debug-monitors.h
-+++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -83,14 +83,7 @@ static inline int reinstall_suspended_bps(struct pt_regs *regs)
- }
- #endif
- 
--#ifdef CONFIG_COMPAT
- int aarch32_break_handler(struct pt_regs *regs);
--#else
--static int aarch32_break_handler(struct pt_regs *regs)
--{
--	return -EFAULT;
--}
--#endif
- 
- #endif	/* __ASSEMBLY */
- #endif	/* __KERNEL__ */
 -- 
-1.7.7.6
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/2bb28f3d/attachment.sig>
