@@ -1,23 +1,26 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 25 Jun 2013 00:02:39 +0900
-Subject: [PATCH v7 00/11] Add generic set_rate clk_ops for PLL35xx and
- PLL36xx for samsung SoCs
-In-Reply-To: <20130621163143.9136.28807@quantum>
-References: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
- <CAKew6eUOy4=D08v_iq7CTRY5gvt37VAN7Z7WOr2Yt25znDJb2g@mail.gmail.com>
- <CAGm_ybiVZOPBJJ0bYX33wafn1So6aqSAnk7myXZ+Z+RfLBeBQw@mail.gmail.com>
- <1524664.UCV47tfIRU@flatron> <20130621163143.9136.28807@quantum>
-Message-ID: <51C85F8F.9050501@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Jun 2013 17:04:20 +0200
+Subject: [PATCH] ASoC: Tegra and i.MX are mutually exclusive
+Message-ID: <5967649.DUvDfofhX4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/22/13 01:31, Mike Turquette wrote:
->
-> Acked-by: Mike Turquette<mturquette@linaro.org>
->
-> Or I can take this through the clk tree. Either way is fine.
->
-Mike, please go ahead taking this series into the clk tree for 3.11.
+Both Tegra and i.MX provide ac97 operations, which can only
+exist once in the kernel. They can both be built as loadable
+modules (only one of them needs to be loaded anyway), but we
+have to disallow enabling them both as built-in.
 
-Thanks,
-- Kukjin
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
+index 3843a18..5958948 100644
+--- a/sound/soc/fsl/Kconfig
++++ b/sound/soc/fsl/Kconfig
+@@ -99,6 +99,7 @@ endif # SND_POWERPC_SOC
+ menuconfig SND_IMX_SOC
+ 	tristate "SoC Audio for Freescale i.MX CPUs"
+ 	depends on ARCH_MXC
++	depends on SND_SOC_TEGRA=n || (SND_SOC_TEGRA=m && m)
+ 	help
+ 	  Say Y or M if you want to add support for codecs attached to
+ 	  the i.MX CPUs.
