@@ -1,116 +1,68 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 24 Jun 2013 12:37:29 +0200
-Subject: [PATCHv2 1/3] iio: Add Nuvoton NAU7802 ADC driver
-In-Reply-To: <51C7EA23.1040707@metafoo.de>
-References: <1371754675-12242-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1371754675-12242-2-git-send-email-alexandre.belloni@free-electrons.com>
- <51C7EA23.1040707@metafoo.de>
-Message-ID: <51C82169.1010203@free-electrons.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 24 Jun 2013 12:49:26 +0200
+Subject: [GIT PULL] ARM: CPUFreq updates for 3.11
+In-Reply-To: <CAKohpo=v4qPDH32Y4ithr_p007nTn5AOUzkUCiHTGgQN6-=BEw@mail.gmail.com>
+References: <CAKohpo=v4qPDH32Y4ithr_p007nTn5AOUzkUCiHTGgQN6-=BEw@mail.gmail.com>
+Message-ID: <1524748.bV9OZAOR0D@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/06/2013 08:41, Lars-Peter Clausen wrote:
-> On 06/20/2013 08:57 PM, Alexandre Belloni wrote:
->> The Nuvoton NAU7802 ADC is a 24-bit 2-channels I2C ADC, with adjustable
->> gain and sampling rates.
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  .../bindings/iio/adc/nuvoton-nau7802.txt           |  17 +
->>  drivers/iio/adc/Kconfig                            |   9 +
->>  drivers/iio/adc/Makefile                           |   1 +
->>  drivers/iio/adc/nau7802.c                          | 603 +++++++++++++++++++++
->>  4 files changed, 630 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt
->>  create mode 100644 drivers/iio/adc/nau7802.c
->>
->> diff --git a/Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt b/Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt
->> new file mode 100644
->> index 0000000..9bc4218
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/iio/adc/nuvoton-nau7802.txt
->> @@ -0,0 +1,17 @@
->> +* Nuvoton NAU7802 Analog to Digital Converter (ADC)use
->> +
->> +Required properties:
->> +  - compatible: Should be "nuvoton,nau7802"
->> +  - reg: Should contain the ADC I2C address
->> +
->> +Optional properties:
->> +  - nuvoton,vldo: Reference voltage in millivolts (integer)
->> +  - interrupts: IRQ line for the ADC. If not used the driver will use
->> +    polling.
->> +
->> +Example:
->> +adc2: nau7802 at 2a {
->> +	compatible = "nuvoton,nau7802";
->> +	reg = <0x2a>;
->> +	nuvoton,vldo = <3000>;
-> We usually use the regulator framework for specifying the reference voltage.
+On Monday, June 24, 2013 11:20:35 AM Viresh Kumar wrote:
+> Hi Rafael,
+> 
+> This is part of my patchset "CPUFreq: Fix {PRE|POST}CHANGE notification
+> sequence". It contains changes specific to cpufreq core and ARM drivers.
+> 
+> I have left changes to non-ARM cpufreq drivers from this pull request. See if
+> you can take them for 3.11.
+> 
+> The following changes since commit 9e895ace5d82df8929b16f58e9f515f6d54ab82d:
+> 
+>   Linux 3.10-rc7 (2013-06-22 09:47:31 -1000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/vireshk/linux.git cpufreq-fix-notification-arm
+> 
+> for you to fetch changes up to f2d65dd0d573e6961165f0be35bac84997b9e707:
 
-I followed what Jonathan said in his review of my first patch. Do we
-want to use the regulator framework to set the internal reference
-voltage of the ADC ? I agree that if you supply an external voltage, it
-will be necessary to use the regulator framework. Unfortunately, I can't
-test that here.
+Well, this contains changes that aren't specific to ARM as far as I can say.
 
->> +};
-> [...]
->> diff --git a/drivers/iio/adc/nau7802.c b/drivers/iio/adc/nau7802.c
->> new file mode 100644
->> index 0000000..e1b6981
->> --- /dev/null
->> +++ b/drivers/iio/adc/nau7802.c
->> @@ -0,0 +1,603 @@
-> [...]
->> +static int nau7802_set_gain(struct nau7802_state *st, int gain)
->> +{
->> +	u8 data;
->> +	int ret;
->> +
->> +	mutex_lock(&st->lock);
->> +	st->conversion_count = 0;
->> +
->> +	data = i2c_smbus_read_byte_data(st->client, NAU7802_REG_CTRL1);
->> +	if (data < 0)
->> +		goto nau7802_sysfs_set_gain_out;
-> ret will be uninitialized if the goto above is taken
+Not pulled.
 
-Right, bigger issue, data is u8 so it will never be negative. I'm fixing
-that !
+Thanks,
+Rafael
 
 
->> +	ret = i2c_smbus_write_byte_data(st->client, NAU7802_REG_CTRL1,
->> +					(data & (~NAU7802_CTRL1_GAINS_BITS)) |
->> +					gain);
->> +
->> +nau7802_sysfs_set_gain_out:
->> +	mutex_unlock(&st->lock);
->> +
->> +	return ret ? ret : 0;
->> +}
-> [...]
->> +static int nau7802_read_irq(struct iio_dev *indio_dev,
->> +			struct iio_chan_spec const *chan,
->> +			int *val)
->> +{
->> +	struct nau7802_state *st = iio_priv(indio_dev);
->> +	int ret;
->> +
->> +	INIT_COMPLETION(st->value_ok);
->> +	enable_irq(st->client->irq);
-> Is it really necessary to enable/disable the IRQ or could you keep it
-> enabled all the time?
-
-Fact is that the ADC doesn't really care if you are reading data or not
-so you will probably endd up in a situation were you will get 320 IRQ
-per second but not caring about the result. We have 3 ADCs on the board.
-so that amounts to 960 IRQ per second when we are only reading like once
-par second !
-
-
+>   cpufreq: tegra: call CPUFREQ_POSTCHANGE notfier in error cases
+> (2013-06-24 11:14:24 +0530)
+> 
+> ----------------------------------------------------------------
+> Viresh Kumar (9):
+>       cpufreq: make sure frequency transitions are serialized
+>       cpufreq: arm-big-little: call CPUFREQ_POSTCHANGE notfier in error cases
+>       cpufreq: davinci: call CPUFREQ_POSTCHANGE notfier in error cases
+>       cpufreq: dbx500: call CPUFREQ_POSTCHANGE notfier in error cases
+>       cpufreq: exynos: call CPUFREQ_POSTCHANGE notfier in error cases
+>       cpufreq: imx6q: call CPUFREQ_POSTCHANGE notfier in error cases
+>       cpufreq: omap: call CPUFREQ_POSTCHANGE notfier in error cases
+>       cpufreq: s3c64xx: call CPUFREQ_POSTCHANGE notfier in error cases
+>       cpufreq: tegra: call CPUFREQ_POSTCHANGE notfier in error cases
+> 
+>  drivers/cpufreq/arm_big_little.c  |  4 +---
+>  drivers/cpufreq/cpufreq.c         |  9 +++++++++
+>  drivers/cpufreq/davinci-cpufreq.c |  3 +++
+>  drivers/cpufreq/dbx500-cpufreq.c  |  4 ++--
+>  drivers/cpufreq/exynos-cpufreq.c  | 10 ++++++++--
+>  drivers/cpufreq/imx6q-cpufreq.c   | 17 +++++++++++------
+>  drivers/cpufreq/omap-cpufreq.c    |  6 +++---
+>  drivers/cpufreq/s3c64xx-cpufreq.c |  8 ++++++--
+>  drivers/cpufreq/tegra-cpufreq.c   |  4 ++--
+>  9 files changed, 45 insertions(+), 20 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe cpufreq" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
