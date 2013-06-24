@@ -1,101 +1,46 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Jun 2013 18:31:24 +0100
-Subject: [PATCH v2 1/3] documentation: iommu: add description of ARM System
- MMU binding
-In-Reply-To: <1372095086-15681-1-git-send-email-will.deacon@arm.com>
-References: <1372095086-15681-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1372095086-15681-2-git-send-email-will.deacon@arm.com>
+Date: Mon, 24 Jun 2013 18:31:23 +0100
+Subject: [PATCH v2 0/3] Add support for ARM SMMU architectures 1 and 2
+Message-ID: <1372095086-15681-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a description of the device tree binding for the ARM
-System MMU architecture.
+Hello again,
 
-Cc: Rob Herring <robherring2@gmail.com>
-Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
-Cc: Joerg Roedel <joro@8bytes.org>
-Acked-by: Grant Likely <grant.likely@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- .../devicetree/bindings/iommu/arm,smmu.txt         | 70 ++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
+This is version 2 of the patches I originally posted here:
+
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/175128.html
+
+Changes since v1 include:
+  - Dropped the first six preparatory patches, since they've been picked
+    up by their respective trees.
+  - Fixed arm_smmu_devices list locking and removed unnecessary use of
+    _safe list iterators
+  - Added calculation of compound output mask to domain initialisation,
+    rather than iterate up the SMMU chain during the ->map fast path
+  - Added timeout to TLB invalidation loop
+  - Expanded comment about non-coherent table walking
+  - Renamed arm_smmu_create_mapping to arm_smmu_handle_mapping
+
+Thanks to everybody who was reviewed the patches so far!
+
+All comments welcome,
+
+Will
+
+Will Deacon (3):
+  documentation: iommu: add description of ARM System MMU binding
+  iommu: add support for ARM Ltd. System MMU architecture
+  MAINTAINERS: add entry for ARM system MMU driver
+
+ .../devicetree/bindings/iommu/arm,smmu.txt         |   70 +
+ MAINTAINERS                                        |    6 +
+ drivers/iommu/Kconfig                              |   13 +
+ drivers/iommu/Makefile                             |    1 +
+ drivers/iommu/arm-smmu.c                           | 1969 ++++++++++++++++++++
+ 5 files changed, 2059 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/iommu/arm,smmu.txt
+ create mode 100644 drivers/iommu/arm-smmu.c
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-new file mode 100644
-index 0000000..e34c6cd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -0,0 +1,70 @@
-+* ARM System MMU Architecture Implementation
-+
-+ARM SoCs may contain an implementation of the ARM System Memory
-+Management Unit Architecture, which can be used to provide 1 or 2 stages
-+of address translation to bus masters external to the CPU.
-+
-+The SMMU may also raise interrupts in response to various fault
-+conditions.
-+
-+** System MMU required properties:
-+
-+- compatible    : Should be one of:
-+
-+                        "arm,smmu-v1"
-+                        "arm,smmu-v2"
-+                        "arm,mmu-400"
-+                        "arm,mmu-500"
-+
-+                  depending on the particular implementation and/or the
-+                  version of the architecture implemented.
-+
-+- reg           : Base address and size of the SMMU.
-+
-+- #global-interrupts : The number of global interrupts exposed by the
-+                       device.
-+
-+- interrupts    : Interrupt list, with the first #global-irqs entries
-+                  corresponding to the global interrupts and any
-+                  following entries corresponding to context interrupts,
-+                  specified in order of their indexing by the SMMU.
-+
-+                  For SMMUv2 implementations, there must be exactly one
-+                  interrupt per context bank. In the case of a single,
-+                  combined interrupt, it must be listed multiple times.
-+
-+- mmu-masters   : A list of phandles to device nodes representing bus
-+                  masters for which the SMMU can provide a translation
-+                  and their corresponding StreamIDs (see example below).
-+                  Each device node linked from this list must have a
-+                  "#stream-id-cells" property, indicating the number of
-+                  StreamIDs associated with it.
-+
-+** System MMU optional properties:
-+
-+- smmu-parent   : When multiple SMMUs are chained together, this
-+                  property can be used to provide a phandle to the
-+                  parent SMMU (that is the next SMMU on the path going
-+                  from the mmu-masters towards memory) node for this
-+                  SMMU.
-+
-+Example:
-+
-+        smmu {
-+                compatible = "arm,smmu-v1";
-+                reg = <0xba5e0000 0x10000>;
-+                #global-interrupts = <2>;
-+                interrupts = <0 32 4>,
-+                             <0 33 4>,
-+                             <0 34 4>, /* This is the first context interrupt */
-+                             <0 35 4>,
-+                             <0 36 4>,
-+                             <0 37 4>;
-+
-+                /*
-+                 * Two DMA controllers, the first with two StreamIDs (0xd01d
-+                 * and 0xd01e) and the second with only one (0xd11c).
-+                 */
-+                mmu-masters = <&dma0 0xd01d 0xd01e>,
-+                              <&dma1 0xd11c>;
-+        };
 -- 
 1.8.2.2
