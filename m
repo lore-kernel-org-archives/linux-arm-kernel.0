@@ -1,51 +1,59 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon, 24 Jun 2013 10:48:56 -0700
-Subject: [PATCH 1/3] clk: Add APM X-Gene SoC clock driver for reference,
- PLL, and device clocks.
-In-Reply-To: <20130624084820.GC19489@e106331-lin.cambridge.arm.com>
-References: <1371828605-18053-1-git-send-email-lho@apm.com>
- <1371828605-18053-2-git-send-email-lho@apm.com>
- <20130624084820.GC19489@e106331-lin.cambridge.arm.com>
-Message-ID: <CAPw-ZT=2fKtsnkygNmctWop+zRfQE05OgGSFTbjpZxdSD1wQSQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 24 Jun 2013 19:49:04 +0200
+Subject: [PATCH v3 11/18] pwm: Add new pwm-samsung driver
+In-Reply-To: <51C86442.6090406@samsung.com>
+References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
+ <1371766383-29077-12-git-send-email-tomasz.figa@gmail.com>
+ <2925617.TjWXJcIKRC@flatron> <51C86442.6090406@samsung.com>
+Message-ID: <20130624174903.GA6795@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jun 25, 2013 at 12:22:42AM +0900, Kukjin Kim wrote:
+> On 06/22/13 22:06, Tomasz Figa wrote:
+> >This patch introduces new Samsung PWM driver, which is heavily cleaned,
+> >multiplatform aware and supports DeviceTree based instantiation.
+> >
+> >Since on historical hardware PWM block can be shared with clocksource
+> >driver, a shared spinlock is used to protect access to shared registers,
+> >already exported from the clocksource driver.
+> >
+> >Signed-off-by: Tomasz Figa<tomasz.figa@gmail.com>
+> >---
+> >  drivers/pwm/Makefile      |   1 +
+> >  drivers/pwm/pwm-samsung.c | 601 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 602 insertions(+)
+> >  create mode 100644 drivers/pwm/pwm-samsung.c
+> >
+> >Changes since v2:
+> >  - Replaced __raw_{readl,writel} with {readl,writel}.
+> >  - Corrected commit message.
+> >
+> 
+> [...]
+> 
+> >+	of_property_for_each_u32(np, "samsung,pwm-outputs", prop, cur, val) {
+> >+		if (val>= SAMSUNG_PWM_NUM) {
+> >+			pr_warning("%s: invalid channel index in samsung,pwm-outputs property\n",
+> 
+> Just note, checkpatch complains following, so fixed to use pr_warn()
+> when I applied.
 
-I will fix them. With regard to continue where the CSR is NULL, it is
-possible to continue as long as both is NOT NULL.
+Note that you can't apply patches that touch the PWM tree without my Ack
+and I already mentioned that the current way this driver is written
+isn't acceptable.
 
-> Use of_iomap(np, 0) here.
->
->> +       } else {
->> +               parameters.csr_reg = NULL;
->> +       }
->
-> Are you able to continue if this is the case?
->
->> +
->> +       rc = of_address_to_resource(np, 1, &res);
->> +       if (rc != 0) {
->> +               pr_err("no DTS DIV register for %s\n", np->full_name);
->> +               return;
->> +       }
->> +       if (resource_size(&res)) {
->> +               parameters.divider_reg = ioremap(res.start,
->> +                                               resource_size(&res));
->> +               if (parameters.divider_reg == NULL) {
->> +                       pr_err("Unable to map DIV register for %s\n",
->> +                               np->full_name);
->> +                       if (parameters.csr_reg)
->> +                               iounmap(parameters.csr_reg);
->> +                       return;
->> +               }
->
-> Use of_iomap(np, 1) here.
->
->> +       } else {
->> +               parameters.divider_reg = NULL;
->> +       }
->
-> Similarly, are you able to continue with this being the case?
+So either you fix it properly, or if everybody except me thinks we don't
+need a proper design for drivers anymore, then the only way I'll accept
+this driver into the PWM tree is if you put a really big comment at the
+top of the file saying that the driver is badly designed on purpose and
+that people shouldn't be using it as a reference.
 
--Loc
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130624/5ac9f4dc/attachment.sig>
