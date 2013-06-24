@@ -1,22 +1,36 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 24 Jun 2013 19:26:01 +0200
-Subject: [PATCHv2 1/3] iio: Add Nuvoton NAU7802 ADC driver
-In-Reply-To: <51C876B2.1050103@metafoo.de>
-References: <1371754675-12242-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1371754675-12242-2-git-send-email-alexandre.belloni@free-electrons.com>
- <51C7EA23.1040707@metafoo.de> <51C82169.1010203@free-electrons.com>
- <51C876B2.1050103@metafoo.de>
-Message-ID: <51C88129.30106@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Jun 2013 18:31:26 +0100
+Subject: [PATCH v2 3/3] MAINTAINERS: add entry for ARM system MMU driver
+In-Reply-To: <1372095086-15681-1-git-send-email-will.deacon@arm.com>
+References: <1372095086-15681-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1372095086-15681-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/06/2013 18:41, Lars-Peter Clausen wrote:
-> Ah, ok, makes sense.
->
+Add myself as maintainer for the ARM system MMU driver.
 
-I just sent v3, thanks for your reviews !
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 5be702c..1eb2a72 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1310,6 +1310,12 @@ T:	git git://git.xilinx.com/linux-xlnx.git
+ S:	Supported
+ F:	arch/arm/mach-zynq/
+ 
++ARM SMMU DRIVER
++M:	Will Deacon <will.deacon@arm.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	drivers/iommu/arm-smmu.c
++
+ ARM64 PORT (AARCH64 ARCHITECTURE)
+ M:	Catalin Marinas <catalin.marinas@arm.com>
+ M:	Will Deacon <will.deacon@arm.com>
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.2.2
