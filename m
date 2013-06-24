@@ -1,37 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Jun 2013 00:50:16 -0700
-Subject: [PATCHv2 11/11] ARM: OMAP4: register DT clocks and remove old data
-In-Reply-To: <51C7F913.7070104@ti.com>
-References: <1371647942-4811-1-git-send-email-t-kristo@ti.com>
- <1371647942-4811-12-git-send-email-t-kristo@ti.com>
- <20130621072518.GN5523@atomide.com> <51C7F913.7070104@ti.com>
-Message-ID: <20130624075015.GR5523@atomide.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 24 Jun 2013 10:08:10 +0200
+Subject: [PATCH 0/5] Kernel mode NEON for XOR and RAID6
+In-Reply-To: <51C46A0D.8070505@codeaurora.org>
+References: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20130606151705.GG16794@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1306061156330.18597@syhkavp.arg>
+ <20130607175007.GH8111@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1306072214120.18597@syhkavp.arg>
+ <20130621093311.GD6983@mudshark.cambridge.arm.com>
+ <CAKv+Gu8FTXC9XSE4DJ2LQueJ3FKjdjv8=sjDjTETH7fq+ruNGQ@mail.gmail.com>
+ <51C46A0D.8070505@codeaurora.org>
+Message-ID: <CAKv+Gu-jeHfJ1Ai63NVwY=x4PTfg+w_SnhzF4Sxs2+Xk+PpsoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [130624 00:51]:
-> On 06/21/2013 10:25 AM, Tony Lindgren wrote:
-> >* Tero Kristo <t-kristo@ti.com> [130619 06:25]:
-> >>Now that the OMAP4 PRCM clock data has been converted to device tree
-> >>representation, it is no longer needed as static clock data. OMAP4
-> >>clock init routine is also changed to register DT clocks first.
-> >>
-> >>Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> >>---
-> >>  arch/arm/mach-omap2/cclock44xx_data.c | 1674 +--------------------------------
-> >>  1 file changed, 38 insertions(+), 1636 deletions(-)
-> >
-> >This is nice, thanks for working on this. While at it, can
-> >you also keep your eyes open for the register defines in the
-> >header files we can also drop?
-> >
-> >Some of those headers are quite huge.. and should eventually
-> >be private to the related drivers if needed at all with DT.
-> 
-> Yeah, I can take a look at this after this set is done. It seems
-> like large portion of the headers can be dropped completely once
-> this exercise is done.
+On 21 June 2013 16:58, Christopher Covington <cov@codeaurora.org> wrote:
+> Hi Ard,
+>
+> If this is indeed the consensus (I don't disagree with any of it myself),
+> perhaps committing the main points, guidelines, and examples to
+> Documentation/arm/* would be useful.
+>
 
-OK great, thanks.
+Hello Chris,
 
-Tony
+I agree that it makes sense to document any guidelines we set
+regarding the use of NEON in kernel mode, and I will happily do so.
+However, let's first try to wrap up this discussion, haven't heard
+back from Russell yet on his current position in this matter.
+
+Regards,
+Ard.
