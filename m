@@ -1,53 +1,245 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 24 Jun 2013 11:18:52 -0300
-Subject: [PATCH 2/2] ARM: dts: mx28: Fix sgtl5000 codec probe
-In-Reply-To: <20130624140754.GF30747@S2101-09.ap.freescale.net>
-References: <1371849720-14506-1-git-send-email-festevam@gmail.com>
- <CAOMZO5AN7+ZodLwxNbRKk4ixheFkL4T=OdphXXRRu_Qmv30JjQ@mail.gmail.com>
- <CAOMZO5DUsGpffGOkEjZX3JaKcJxV6GsH_pOyX=dhHxq3vB9xQA@mail.gmail.com>
- <201306221524.33879.marex@denx.de>
- <CAOMZO5DYNmiasRREC8jXH===2HG1aNvpxpFVU2u+q5ZAT8Wd3Q@mail.gmail.com>
- <20130624072908.GH26254@S2101-09.ap.freescale.net>
- <CAOMZO5Bfetjwinatj4W-nrEvg+3pLfjgF8Zpx_-=n52ZTGHeGA@mail.gmail.com>
- <20130624140754.GF30747@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5Ds3ZBhunOh1BSjLz7g=-3mRz_CwpgsPVnabGr=XzMx4g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Jun 2013 16:20:43 +0200
+Subject: [PATCHv2] ARM: OMAP: build mach-omap code only if needed
+Message-ID: <3976244.L5dCjrM5gT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 11:07 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Mon, Jun 24, 2013 at 10:54:11AM -0300, Fabio Estevam wrote:
->> On Mon, Jun 24, 2013 at 4:29 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->>
->> > Yes, we should have sgtl5000 acquire its clock, but when it fails to do
->> > so, there is nothing wrong with deferring it to see if mxs-saif would
->> > provide the clock later.
->>
->> I didn't manage to get mx28evk to probe audio correctly by using -EPROBE_DEFER.
->
-> When you was doing that, did you have the clock that sgtl5000 is
-> requesting registered somewhere?
+If we build a kernel with CONFIG_ARCH_OMAP2PLUS enabled but all of the
+individual SoCs disabled, we run into a large number of link errors
+because if incorrect dependencies:
 
-I registered it as dummy one (same as done in this patch).
+arch/arm/mach-omap2/built-in.o: In function `_add_initiator_dep':
+arch/arm/mach-omap2/omap_hwmod.c:691: undefined reference to `clkdm_add_sleepdep' arch/arm/mach-omap2/built-in.o: In function `_del_initiator_dep':
+arch/arm/mach-omap2/omap_hwmod.c:720: undefined reference to `clkdm_del_sleepdep' arch/arm/mach-omap2/built-in.o: In function `_enable':
+arch/arm/mach-omap2/omap_hwmod.c:2145: undefined reference to `clkdm_in_hwsup'
+arch/arm/mach-omap2/omap_hwmod.c:2147: undefined reference to `clkdm_hwmod_enable'
+arch/arm/mach-omap2/omap_hwmod.c:2191: undefined reference to `clkdm_hwmod_disable'
+arch/arm/mach-omap2/omap_hwmod.c:2146: undefined reference to `clkdm_missing_idle_reporting' arch/arm/mach-omap2/built-in.o: In function `_idle':
+arch/arm/mach-omap2/omap_hwmod.c:2235: undefined reference to `clkdm_hwmod_disable' arch/arm/mach-omap2/built-in.o: In function `_shutdown':
+arch/arm/mach-omap2/omap_hwmod.c:2338: undefined reference to `clkdm_hwmod_disable' arch/arm/mach-omap2/built-in.o: In function `omap_hwmod_get_context_loss_count':
+arch/arm/mach-omap2/omap_hwmod.c:4071: undefined reference to `pwrdm_get_context_loss_count' arch/arm/mach-omap2/built-in.o: In function `omap_pm_clkdms_setup':
+arch/arm/mach-omap2/pm.c:114: undefined reference to `clkdm_allow_idle'
+arch/arm/mach-omap2/pm.c:117: undefined reference to `clkdm_sleep' arch/arm/mach-omap2/built-in.o: In function `omap2_common_pm_late_init':
+arch/arm/mach-omap2/pm.c:294: undefined reference to `omap_voltage_late_init' arch/arm/mach-omap2/built-in.o: In function `omap2_gpio_dev_init':
+arch/arm/mach-omap2/gpio.c:133: undefined reference to `pwrdm_can_ever_lose_context'
 
-Then regmap_read fails (from sgtl5000 driver), as it tries to read the
-codec revision via I2C and the clock is not available yet. Then I
-changed to return a -EDEFER_PROBE in case of failure:
+We can avoid this if we make CONFIG_ARCH_OMAP2PLUS a silent option that
+gets enabled any time that one of the SoC versions is enabled.
 
-[    1.754258] mxs-lradc 80050000.lradc: Touchscreen not enabled.
-[    1.783755] ******* reading I2C failed
-[    1.789748] i2c 0-000a: Driver sgtl5000 requests probe deferral
-[    1.801720] mxs-sgtl5000 sound.12: ASoC: CODEC (null) not registered
-[    1.809608] mxs-sgtl5000 sound.12: snd_soc_register_card failed (-517)
-[    1.816675] platform sound.12: Driver mxs-sgtl5000 requests probe deferral
-[    1.825852] TCP: cubic registered
-[    1.829375] NET: Registered protocol family 17
-[    1.835999] Key type dns_resolver registered
-[    1.844549] mmc0: new SDHC card at address f955
-[    1.852887] registered taskstats version 1
-[    1.860535] mmcblk0: mmc0:f955 SD04G 3.69 GiB
-[    1.878653] sgtl5000 0-000a: sgtl5000 revision 0x11
-[    1.887430]  mmcblk0: p1 p2 p3
-[    1.894824] mxs-sgtl5000 sound.12: ASoC: CODEC (null) not registered
-[    1.901468] mxs-sgtl5000 sound.12: snd_soc_register_card failed (-517)
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Tony Lindgren <tony@atomide.com>
 
-Then it succeeds in the following attemp, but snd_soc_register_card() fails.
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index abbe319..197a0bb 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -22,6 +22,10 @@ CONFIG_MODULE_SRCVERSION_ALL=y
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_ARCH_MULTI_V6=y
+ CONFIG_ARCH_OMAP2PLUS=y
++CONFIG_ARCH_OMAP2=y
++CONFIG_ARCH_OMAP3=y
++CONFIG_ARCH_OMAP4=y
++CONFIG_SOC_AM33XX=y
+ CONFIG_OMAP_RESET_CLOCKS=y
+ CONFIG_OMAP_MUX_DEBUG=y
+ CONFIG_ARCH_VEXPRESS_CA9X4=y
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 1bfe9ee..a07cdc9 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -1,61 +1,10 @@
+ config ARCH_OMAP
+ 	bool
+ 
+-config ARCH_OMAP2PLUS
+-	bool "TI OMAP2/3/4/5 SoCs with device tree support" if (ARCH_MULTI_V6 || ARCH_MULTI_V7)
+-	select ARCH_HAS_CPUFREQ
+-	select ARCH_HAS_HOLES_MEMORYMODEL
+-	select ARCH_OMAP
+-	select ARCH_REQUIRE_GPIOLIB
+-	select CLKDEV_LOOKUP
+-	select CLKSRC_MMIO
+-	select GENERIC_CLOCKEVENTS
+-	select GENERIC_IRQ_CHIP
+-	select HAVE_CLK
+-	select OMAP_DM_TIMER
+-	select PINCTRL
+-	select PROC_DEVICETREE if PROC_FS
+-	select SOC_BUS
+-	select SPARSE_IRQ
+-	select USE_OF
+-	help
+-	  Systems based on OMAP2, OMAP3, OMAP4 or OMAP5
+-
+-
+-if ARCH_OMAP2PLUS
+-
+-menu "TI OMAP2/3/4 Specific Features"
+-
+-config ARCH_OMAP2PLUS_TYPICAL
+-	bool "Typical OMAP configuration"
+-	default y
+-	select AEABI
+-	select HIGHMEM
+-	select I2C
+-	select I2C_OMAP
+-	select MENELAUS if ARCH_OMAP2
+-	select NEON if ARCH_OMAP3 || ARCH_OMAP4 || SOC_OMAP5
+-	select PM_RUNTIME
+-	select REGULATOR
+-	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
+-	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
+-	select VFP
+-	help
+-	  Compile a kernel suitable for booting most boards
+-
+-config SOC_HAS_OMAP2_SDRC
+-	bool "OMAP2 SDRAM Controller support"
+-
+-config SOC_HAS_REALTIME_COUNTER
+-	bool "Real time free running counter"
+-	depends on SOC_OMAP5
+-	default y
+-
+ config ARCH_OMAP2
+ 	bool "TI OMAP2"
+-	depends on ARCH_OMAP2PLUS
+ 	depends on ARCH_MULTI_V6
+-	default y
++	select ARCH_OMAP2PLUS
+ 	select CPU_V6
+ 	select MULTI_IRQ_HANDLER
+ 	select SOC_HAS_OMAP2_SDRC
+@@ -63,9 +12,8 @@ config ARCH_OMAP2
+ 
+ config ARCH_OMAP3
+ 	bool "TI OMAP3"
+-	depends on ARCH_OMAP2PLUS
+ 	depends on ARCH_MULTI_V7
+-	default y
++	select ARCH_OMAP2PLUS
+ 	select ARCH_HAS_OPP
+ 	select ARM_CPU_SUSPEND if PM
+ 	select CPU_V7
+@@ -79,9 +27,8 @@ config ARCH_OMAP3
+ 
+ config ARCH_OMAP4
+ 	bool "TI OMAP4"
+-	default y
+-	depends on ARCH_OMAP2PLUS
+ 	depends on ARCH_MULTI_V7
++	select ARCH_OMAP2PLUS
+ 	select ARCH_HAS_OPP
+ 	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
+ 	select ARM_CPU_SUSPEND if PM
+@@ -106,6 +53,7 @@ config ARCH_OMAP4
+ config SOC_OMAP5
+ 	bool "TI OMAP5"
+ 	depends on ARCH_MULTI_V7
++	select ARCH_OMAP2PLUS
+ 	select ARM_CPU_SUSPEND if PM
+ 	select ARM_GIC
+ 	select CPU_V7
+@@ -113,6 +61,76 @@ config SOC_OMAP5
+ 	select COMMON_CLK
+ 	select HAVE_ARM_ARCH_TIMER
+ 
++config SOC_AM33XX
++	bool "AM33XX support"
++	depends on ARCH_MULTI_V7
++	select ARCH_OMAP2PLUS
++	select ARM_CPU_SUSPEND if PM
++	select CPU_V7
++	select MULTI_IRQ_HANDLER
++	select COMMON_CLK
++
++config SOC_AM43XX
++	bool "TI AM43x"
++	depends on ARCH_MULTI_V7
++	select CPU_V7
++	select ARCH_OMAP2PLUS
++	select MULTI_IRQ_HANDLER
++	select ARM_GIC
++	select COMMON_CLK
++	select MACH_OMAP_GENERIC
++
++config ARCH_OMAP2PLUS
++	bool
++	select ARCH_HAS_BANDGAP
++	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_HOLES_MEMORYMODEL
++	select ARCH_OMAP
++	select ARCH_REQUIRE_GPIOLIB
++	select CLKDEV_LOOKUP
++	select CLKSRC_MMIO
++	select GENERIC_CLOCKEVENTS
++	select GENERIC_IRQ_CHIP
++	select HAVE_CLK
++	select OMAP_DM_TIMER
++	select PINCTRL
++	select PROC_DEVICETREE if PROC_FS
++	select SOC_BUS
++	select SPARSE_IRQ
++	select USE_OF
++	help
++	  Systems based on OMAP2, OMAP3, OMAP4 or OMAP5
++
++
++if ARCH_OMAP2PLUS
++
++menu "TI OMAP2/3/4 Specific Features"
++
++config ARCH_OMAP2PLUS_TYPICAL
++	bool "Typical OMAP configuration"
++	default y
++	select AEABI
++	select HIGHMEM
++	select I2C
++	select I2C_OMAP
++	select MENELAUS if ARCH_OMAP2
++	select NEON if ARCH_OMAP3 || ARCH_OMAP4 || SOC_OMAP5
++	select PM_RUNTIME
++	select REGULATOR
++	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
++	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
++	select VFP
++	help
++	  Compile a kernel suitable for booting most boards
++
++config SOC_HAS_OMAP2_SDRC
++	bool "OMAP2 SDRAM Controller support"
++
++config SOC_HAS_REALTIME_COUNTER
++	bool "Real time free running counter"
++	depends on SOC_OMAP5
++	default y
++
+ comment "OMAP Core Type"
+ 	depends on ARCH_OMAP2
+ 
+@@ -140,23 +158,6 @@ config SOC_TI81XX
+ 	depends on ARCH_OMAP3
+ 	default y
+ 
+-config SOC_AM33XX
+-	bool "AM33XX support"
+-	depends on ARCH_MULTI_V7
+-	default y
+-	select ARM_CPU_SUSPEND if PM
+-	select CPU_V7
+-	select MULTI_IRQ_HANDLER
+-	select COMMON_CLK
+-
+-config SOC_AM43XX
+-	bool "TI AM43x"
+-	select CPU_V7
+-	select MULTI_IRQ_HANDLER
+-	select ARM_GIC
+-	select COMMON_CLK
+-	select MACH_OMAP_GENERIC
+-
+ config OMAP_PACKAGE_ZAF
+        bool
+ 
