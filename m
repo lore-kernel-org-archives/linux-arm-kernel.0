@@ -1,26 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 25 Jun 2013 09:22:10 -0300
-Subject: [PATCH 2/2] ARM: dts: mx28: Fix sgtl5000 codec probe
-In-Reply-To: <20130625121941.GB12178@S2101-09.ap.freescale.net>
-References: <CAOMZO5AN7+ZodLwxNbRKk4ixheFkL4T=OdphXXRRu_Qmv30JjQ@mail.gmail.com>
- <CAOMZO5DUsGpffGOkEjZX3JaKcJxV6GsH_pOyX=dhHxq3vB9xQA@mail.gmail.com>
- <201306221524.33879.marex@denx.de>
- <CAOMZO5DYNmiasRREC8jXH===2HG1aNvpxpFVU2u+q5ZAT8Wd3Q@mail.gmail.com>
- <20130624072908.GH26254@S2101-09.ap.freescale.net>
- <CAOMZO5Bfetjwinatj4W-nrEvg+3pLfjgF8Zpx_-=n52ZTGHeGA@mail.gmail.com>
- <20130624140754.GF30747@S2101-09.ap.freescale.net>
- <CAOMZO5Ds3ZBhunOh1BSjLz7g=-3mRz_CwpgsPVnabGr=XzMx4g@mail.gmail.com>
- <20130625081227.GA12178@S2101-09.ap.freescale.net>
- <CAOMZO5Ch+kp4kzc_-aghZz3yMeXYYsKXiiaFrxVJnYF+BCFTbA@mail.gmail.com>
- <20130625121941.GB12178@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5Cy4v7JCNa9aMhKdHKvNTaXmKp_jvTP-Nau7T1SgB4P1g@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 25 Jun 2013 14:23:01 +0200 (CEST)
+Subject: [PATCH v4] irqchip: Add support for ARMv7-M's NVIC
+In-Reply-To: <CACxGe6vBCKCnXRtvT9N6cRPa7uHTJDMw7k-46eCj7fFPko+Raw@mail.gmail.com>
+References: <1371073835-10639-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130625103440.GR11232@pengutronix.de>
+ <CACxGe6vBCKCnXRtvT9N6cRPa7uHTJDMw7k-46eCj7fFPko+Raw@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1306251420330.4013@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 9:19 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Tue, 25 Jun 2013, Grant Likely wrote:
+> On Tue, Jun 25, 2013 at 11:34 AM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > Hello Thomas, hello Grant,
+> >
+> > On Wed, Jun 12, 2013 at 11:50:35PM +0200, Uwe Kleine-K?nig wrote:
+> >> This interrupt controller is found on Cortex-M3 and Cortex-M4 machines.
+> >>
+> >> Support for this controller appeared in Catalin's Cortex tree based on
+> >> 2.6.33 but was nearly completely rewritten.
+> >>
+> >> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> >> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> >> ---
+> >>
+> >> Notes:
+> >>     Changes since v3, sent with
+> >>     Message-Id: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>:
+> >>
+> >>      - use generic chip
+> >>      - rename nvic_do_IRQ to nvic_handle_irq
+> >>
+> >>     This depends on the stuff currently in tip/irq/for-arm
+> > I see that tip/irq/for-arm went into next via Grant's irqdomain tree. I
+> > assume that means the changes go in for 3.11?
+> 
+> Yes, the plan is to put that branch into v3.11. I don't know if Thomas
+> plans to send a separate pull request for the irq/for-arm branch, or
+> if he is going to let it go as part of my pull request. I'll work it
 
-> It seems to me that it fails at sgtl5000_fill_defaults().  Did you
-> test it on imx28 when your commit af8ee11 (ASoC: sgtl5000: Fix driver probe
-> after reset) goes in?
+irq/for-arm is in irq/core as well. So whoever sends first will merge
+it and the later pull request will just contain the same commits.
 
-I am running linux-next, which contains af8ee11.
+> out with him when the merge window opens. It would probably be best
+> for your patch to be applied on the irq/for-arm branch and pushed
+> separately from my irqdomain branch since I don't maintain any of the
+> irqchip drivers.
+
+I can take it via tip/irq/core.
+
+Thanks,
+
+	tglx
