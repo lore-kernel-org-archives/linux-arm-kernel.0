@@ -1,29 +1,116 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 25 Jun 2013 18:09:08 +0300
-Subject: [PATCH v2 4/5] exynos4-is: Use generic MIPI CSIS PHY driver
-In-Reply-To: <1372170110-12993-4-git-send-email-s.nawrocki@samsung.com>
-References: <1372170110-12993-1-git-send-email-s.nawrocki@samsung.com>
- <1372170110-12993-4-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20130625150908.GC21334@arwen.pp.htv.fi>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 25 Jun 2013 16:09:41 +0100
+Subject: scripts/kallsyms: Avoid ARM veneer symbols
+In-Reply-To: <2983817.Xe2505Drlj@wuerfel>
+References: <2983817.Xe2505Drlj@wuerfel>
+Message-ID: <20130625150941.GF2327@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 04:21:49PM +0200, Sylwester Nawrocki wrote:
-> Use the generic PHY API instead of the platform callback to control
-> the MIPI CSIS DPHY. The 'phy_label' field is added to the platform
-> data structure to allow PHY lookup on non-dt platforms
+On Mon, Jun 24, 2013 at 04:01:43PM +0200, Arnd Bergmann wrote:
+> When building ARM kernels that exceed a certain size, the linker
+> will add "veneers" that allow long branches. Unfortunately,
+> using a longer kallsyms section may lead to the extra veneers
+> being needed, which leads to inconsistent kallsyms data with the
+> message
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Inconsistent kallsyms data
+> Try make KALLSYMS_EXTRA_PASS=1 as a workaround
+> 
+> In some case, not just one but up to three extra passes were
+> needed before getting to a state that needed no extra veneers.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Do you understand why this was happening?  It sounds like there
+must have been branches crossing from one side of the kallsyms
+data to the other, triggering veneer insertion any time the
+kallsyms data grows.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/dea5d630/attachment.sig>
+Branches between .{init,exit}.text and .text (crossing .rodata) seem the
+likeliest culprits, but that's guesswork on my part.
+
+
+If that's whats going on, multiple kallsyms passes is actually a correct
+approach here: I think they should terminate after a number of steps
+roughly proportional to log(number of branches across .rodata). We
+could come up with a heuristic which allows us to choose the right
+limit with a high degree of reliability, since branch density in
+compiled C code is likely to be roughly.
+
+But including the veneer symbols in kallsyms is arguably not all
+that useful.
+
+The main potential effect is that profiling might occasionally
+sample the PC as being in a completely bogus function which it
+never passed through at all, because of the way kallsyms tracks
+only symbol locations and not sizes (if I remember right) --
+so a veneer will actually get accounted against some arbitrary
+adjacent function.
+
+I don't know how much this matters.
+
+> The easiest solution is to skip veneers in kallsyms in the
+> same way we already skip a couple of other symbols.
+
+The other symbols are not stripped for the purpose of making
+kallsyms terminate quickly.  The mapping symbols are rather
+different: masses of symbols with duplicate names which are
+not very interesting for most people.
+
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
+> index 487ac6f..53ec0bb 100644
+> --- a/scripts/kallsyms.c
+> +++ b/scripts/kallsyms.c
+> @@ -69,14 +69,32 @@ static void usage(void)
+>  	exit(1);
+>  }
+>  
+> -/*
+> - * This ignores the intensely annoying "mapping symbols" found
+> - * in ARM ELF files: $a, $t and $d.
+> - */
+>  static inline int is_arm_mapping_symbol(const char *str)
+
+The function's name is now wrong.  Should it be renamed or split up?
+
+Cheers
+---Dave
+
+>  {
+> -	return str[0] == '$' && strchr("atd", str[1])
+> -	       && (str[2] == '\0' || str[2] == '.');
+> +	size_t len;
+> +
+> +	/*
+> +	 * This ignores the intensely annoying "mapping symbols" found
+> +	 * in ARM ELF files: $a, $t and $d.
+> +	 */
+> +	if (str[0] == '$' && strchr("atd", str[1])
+> +	       && (str[2] == '\0' || str[2] == '.'))
+> +		return 1;
+> +
+> +	len = strlen(str);
+> +	if (len < 10)
+> +		return 0;
+> +
+> +	/*
+> +	 * This ignores any __.*_veneer symbol, which get
+> +	 * inserted for large kernels, in order to avoid
+> +	 * inconsistent data.
+> +	 */
+> +	if (str[0] == '_' && str[1] == '_' &&
+> +	    strcmp(str + len - 7, "_veneer") == 0)
+> +		return 1; 
+> +
+> +	return 0;
+>  }
+>  
+>  static int read_symbol_tr(const char *sym, unsigned long long addr)
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
