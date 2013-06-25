@@ -1,18 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 25 Jun 2013 09:12:42 -0600
-Subject: [PATCH] ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag
-In-Reply-To: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
-References: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
-Message-ID: <51C9B36A.3040808@wwwdotorg.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 25 Jun 2013 18:17:53 +0300
+Subject: [PATCH v8 1/8] drivers: phy: add generic PHY framework
+In-Reply-To: <1372139926-3719-2-git-send-email-kishon@ti.com>
+References: <1372139926-3719-1-git-send-email-kishon@ti.com>
+ <1372139926-3719-2-git-send-email-kishon@ti.com>
+Message-ID: <20130625151753.GF21334@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2013 03:23 AM, Joseph Lo wrote:
-> Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
-> to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
-> this state.
+Hi,
 
-I assume this patch is only needed to support the other two series you
-sent today; the Tegra114 cpuidle and system suspend series? In other
-words, there's no need to apply this to 3.11 to fix a bug; it can wait
-for 3.12 along with those other two series?
+On Tue, Jun 25, 2013 at 11:28:39AM +0530, Kishon Vijay Abraham I wrote:
+> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+> new file mode 100644
+> index 0000000..7abf573
+> --- /dev/null
+> +++ b/include/linux/phy/phy.h
+
+on this header, how about adding phy_set_drvdata() and phy_get_drvdata()
+helpers ?
+
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/be6c70be/attachment.sig>
