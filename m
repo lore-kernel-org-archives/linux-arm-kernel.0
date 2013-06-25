@@ -1,37 +1,67 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 26 Jun 2013 01:44:16 +0900
-Subject: [GIT PULL 0/2] Samsung 3rd pull-request for v3.11
-In-Reply-To: <201306242324.00039.arnd@arndb.de>
-References: <51C1C4BE.802@samsung.com> <51C87B3E.4000508@samsung.com>
- <201306242324.00039.arnd@arndb.de>
-Message-ID: <51C9C8E0.3090101@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 25 Jun 2013 18:48:48 +0200
+Subject: [GIT PULL] support for kernel mode NEON
+In-Reply-To: <CAKv+Gu8Ms2oV_qQj6OLeP_FQ4kMhzJmjn0a+RDqsG2iRx97zOQ@mail.gmail.com>
+References: <CAKv+Gu8Ms2oV_qQj6OLeP_FQ4kMhzJmjn0a+RDqsG2iRx97zOQ@mail.gmail.com>
+Message-ID: <CAKv+Gu8JdjEbSNfW_ZXgZqqR_F0ZmC_hJOz7+aZFuoRyzXKn3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/13 06:23, Arnd Bergmann wrote:
-> On Monday 24 June 2013, Kukjin Kim wrote:
->> On 06/19/13 23:48, Kukjin Kim wrote:
->>> Hi Arnd, Olof
->>>
->>> This is 3rd pull-request for v3.11.
->>>
->>> - pinctrl for exynos5420
->>> - update exynos clock
->>>
->>> Please see each tag in detail
->>>
->>> If any problems, please kindly let me know.
->>>
->>
->> Arnd, Olof
->>
->> Any concerns on this?
->>
->
-> Sorry, I made a mistake and marked these as done in my
-> email client without actually applying them. I suppose Olof
-> will handle them while I'm away for a day.
->
-OK, thanks.
+Hello Russell,
 
-- Kukjin
+Please ignore this request for now, I think there is still a thing I
+need to fix.
+Will send a v2 first, and another pull request later.
+
+Regards,
+Ard.
+
+
+
+
+
+On 24 June 2013 17:26, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
+>
+>   Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/people/ardbiesheuvel/linux-arm.git for-rmk
+>
+> for you to fetch changes up to 81de811871661eff2b97cd9abfed9952d6aeb68c:
+>
+>   lib/raid6: add ARM-NEON accelerated syndrome calculation (2013-06-24
+> 17:20:51 +0200)
+>
+> ----------------------------------------------------------------
+> Ard Biesheuvel (5):
+>       ARM: add support for kernel mode NEON
+>       ARM: move VFP init to an earlier boot stage
+>       ARM: be strict about FP exceptions in kernel mode
+>       ARM: crypto: add NEON accelerated XOR implementation
+>       lib/raid6: add ARM-NEON accelerated syndrome calculation
+>
+>  arch/arm/Kconfig            |  7 +++++++
+>  arch/arm/include/asm/neon.h | 36 ++++++++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/xor.h  | 73
+> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/lib/Makefile       |  6 ++++++
+>  arch/arm/lib/xor-neon.c     | 42 ++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/vfp/vfphw.S        |  5 +++++
+>  arch/arm/vfp/vfpmodule.c    | 56
+> +++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+>  include/linux/raid/pq.h     |  5 +++++
+>  lib/raid6/.gitignore        |  1 +
+>  lib/raid6/Makefile          | 40 ++++++++++++++++++++++++++++++++++++++++
+>  lib/raid6/algos.c           |  6 ++++++
+>  lib/raid6/neon.c            | 58
+> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  lib/raid6/neon.uc           | 80
+> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  lib/raid6/test/Makefile     | 19 ++++++++++++++++++-
+>  14 files changed, 432 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/include/asm/neon.h
+>  create mode 100644 arch/arm/lib/xor-neon.c
+>  create mode 100644 lib/raid6/neon.c
+>  create mode 100644 lib/raid6/neon.uc
