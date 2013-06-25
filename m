@@ -1,42 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 25 Jun 2013 00:41:03 -0700
-Subject: [PATCH] pinctrl: rip out the direct pinconf API
-In-Reply-To: <51C86524.8020708@wwwdotorg.org>
-References: <1372079700-16580-1-git-send-email-linus.walleij@stericsson.com>
- <51C86524.8020708@wwwdotorg.org>
-Message-ID: <20130625074102.GG5523@atomide.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 25 Jun 2013 17:41:52 +1000
+Subject: linux-next: manual merge of the msm tree with the arm-soc tree
+Message-ID: <20130625174152.d776ac051f6f19dfbf876634@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [130624 08:32]:
-> On 06/24/2013 07:15 AM, Linus Walleij wrote:
-> > From: Linus Walleij <linus.walleij@linaro.org>
-> > 
-> > From the inception ot the pin config API there has been the
-> > possibility to get a handle at a pin directly and configure
-> > its electrical characteristics. For this reason we had:
-> > 
-> > int pin_config_get(const char *dev_name, const char *name,
-> >                unsigned long *config);
-> > int pin_config_set(const char *dev_name, const char *name,
-> >                unsigned long config);
-> > int pin_config_group_get(const char *dev_name,
-> >                const char *pin_group,
-> >                unsigned long *config);
-> > int pin_config_group_set(const char *dev_name,
-> >                const char *pin_group,
-> >                unsigned long config);
-> > 
-> > After the intruction of the pin control states that will
-> > control pins associated with devices, and its subsequent
-> > introduction to the device core, as well as the
-> > introduction of pin control hogs that can set up states on
-> > boot and optionally also at sleep, this direct pin control
-> > API is a thing of the past.
-> > 
-> > As could be expected, it has zero in-kernel users.
-> > Let's delete this API and make our world simpler.
-> 
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+Hi David,
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Today's linux-next merge of the msm tree got a conflict in
+arch/arm/mach-msm/clock-debug.c between commit ad8c373c9aa3 ("arch: arm:
+mach-msm: using strlcpy instead of strncpy") from the arm-soc tree and
+commit 8cc7f5338e72 ("ARM: msm: Migrate to common clock framework") from
+the msm tree.
+
+The latter removed the file, so I did that, and can carry the fix as
+necessary (no action is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/ec526a4c/attachment.sig>
