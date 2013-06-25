@@ -1,95 +1,184 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 25 Jun 2013 12:30:08 +0100
-Subject: amba-pl08x and 'get_signal' namespace collision/build error
-Message-ID: <51C97F40.5030101@arm.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 25 Jun 2013 19:30:43 +0800
+Subject: [PATCH v2 1/4] USB: HCD: support giveback of URB in tasklet
+ context
+In-Reply-To: <Pine.LNX.4.44L0.1306241102340.1406-100000@iolanthe.rowland.org>
+References: <1372066925-23579-2-git-send-email-ming.lei@canonical.com>
+ <Pine.LNX.4.44L0.1306241102340.1406-100000@iolanthe.rowland.org>
+Message-ID: <CACVXFVNwwULYg_2==CLh=dJrKJekhWqcOKdKYd_koPNoLzFfgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, Jun 24, 2013 at 11:17 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Mon, 24 Jun 2013, Ming Lei wrote:
+>
+>> This patch implements the mechanism of giveback of URB in
+>> tasklet context, so that hardware interrupt handling time for
+>> usb host controller can be saved much, and HCD interrupt handling
+>> can be simplified.
+>
+> Changes from v1 to v2?
 
-There's a patch making its way to mainline via Russell's tree
-(8d96250700: ARM: mm: Transparent huge page support for LPAE systems)
-that breaks the build of the amba-pl08x driver (drivers/dma/amba-pl08x.c) 
-because the 'get_signal' macro from include/linux/signal.h is now in the
-driver's scope and it clobbers a (previously) valid function call.
+The change log is put in 0/4.
 
-The error:
-drivers/dma/amba-pl08x.c: In function ?pl08x_request_mux?:
-drivers/dma/amba-pl08x.c:303:13: error: expected identifier before ?(? token
+>
+>
+>> +static void usb_giveback_urb_bh(unsigned long param)
+>> +{
+>> +     struct giveback_urb_bh *bh = (struct giveback_urb_bh *)param;
+>> +     unsigned long flags;
+>> +     struct list_head local_list;
+>> +
+>> +     spin_lock_irqsave(&bh->lock, flags);
+>> +     bh->running = 1;
+>> + restart:
+>> +     list_replace_init(&bh->head, &local_list);
+>> +     spin_unlock_irqrestore(&bh->lock, flags);
+>
+> Tasklet routines are always called with interrupts enabled, right?
+> Therefore you don't need to use the "flags" argument here or below.
 
-Here's the problematic include:
-In file included from include/linux/sched.h:32:0,
---new include--> from /data/build/a32/linux/arch/arm/include/asm/tlbflush.h:204,
-                 from /data/build/a32/linux/arch/arm/include/asm/pgtable.h:28,
-                 from include/linux/mm.h:44,
-                 from include/linux/scatterlist.h:6,
-                 from include/linux/dmaengine.h:27,
-                 from include/linux/amba/pl08x.h:21,
-                 from drivers/dma/amba-pl08x.c:74:
-include/linux/signal.h:298:2: error: #error get_signal defined here
+Good catch.
 
-Below is a 'fix' that *doesn't* require any renaming of either the
-get_signal function or macro, but there's nothing to say that driver
-shouldn't be able to use the pl08x_platform_data struct *and* do
-scheduling so this doesn't seem like the best fix really.
+>
+>> @@ -1667,25 +1721,40 @@ int usb_hcd_unlink_urb (struct urb *urb, int status)
+>>   */
+>>  void usb_hcd_giveback_urb(struct usb_hcd *hcd, struct urb *urb, int status)
+>>  {
+>> -     urb->hcpriv = NULL;
+>> -     if (unlikely(urb->unlinked))
+>> -             status = urb->unlinked;
+>> -     else if (unlikely((urb->transfer_flags & URB_SHORT_NOT_OK) &&
+>> -                     urb->actual_length < urb->transfer_buffer_length &&
+>> -                     !status))
+>> -             status = -EREMOTEIO;
+>> +     struct giveback_urb_bh *bh;
+>> +     bool sched, high_prio_bh;
+>>
+>> -     unmap_urb_for_dma(hcd, urb);
+>> -     usbmon_urb_complete(&hcd->self, urb, status);
+>> -     usb_unanchor_urb(urb);
+>> +     /* pass status to tasklet via unlinked */
+>> +     if (likely(!urb->unlinked))
+>> +             urb->unlinked = status;
+>>
+>> -     /* pass ownership to the completion handler */
+>> -     urb->status = status;
+>> -     urb->complete (urb);
+>> -     atomic_dec (&urb->use_count);
+>> -     if (unlikely(atomic_read(&urb->reject)))
+>> -             wake_up (&usb_kill_urb_queue);
+>> -     usb_put_urb (urb);
+>> +     if (!hcd_giveback_urb_in_bh(hcd) && !is_root_hub(urb->dev)) {
+>> +             __usb_hcd_giveback_urb(urb);
+>> +             return;
+>> +     }
+>> +
+>> +     if (usb_pipeisoc(urb->pipe) || usb_pipeint(urb->pipe)) {
+>> +             bh = &hcd->high_prio_bh;
+>> +             high_prio_bh = 1;
+>> +     } else {
+>> +             bh = &hcd->low_prio_bh;
+>> +             high_prio_bh = 0;
+>> +     }
+>
+> Bool values should be assigned "true" or "false", not "1" or "0".
 
-So can we do something better?
+Right.
 
-Al: the commit where you add the get_signal() helper suggests you want
-to make it a function not a macro in the future - what needs to be done
-before that can happen? I think that would be the best/easiest fix.
+>
+>> +
+>> +     spin_lock(&bh->lock);
+>> +     list_add_tail(&urb->urb_list, &bh->head);
+>> +     if (bh->running)
+>> +             sched = 0;
+>> +     else
+>> +             sched = 1;
+>> +     spin_unlock(&bh->lock);
+>
+> How about calling this variable "running" instead of "sched"?  Then you
+> could just say:
+>
+>         running = bh->running;
+>
+> with no "if" statement.
 
+OK, even we can do this below without name change:
 
-Jonny
+           sched = !bh->running;
 
-----------8<-----------
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index c78efbc..ce1185c 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -201,7 +201,10 @@
- 
- #ifndef __ASSEMBLY__
- 
--#include <linux/sched.h>
-+#include <linux/smp.h>
-+#include <linux/mm_types.h>
-+
-+#include <asm/barrier.h>
- 
- struct cpu_tlb_fns {
-        void (*flush_user_range)(unsigned long, unsigned long, struct vm_area_struct *);
-diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-index 38a5067..3100983 100644
---- a/arch/arm/kernel/suspend.c
-+++ b/arch/arm/kernel/suspend.c
-@@ -1,4 +1,5 @@
- #include <linux/init.h>
-+#include <linux/sched.h>
- 
- #include <asm/idmap.h>
- #include <asm/pgalloc.h>
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index 83cb3ac..304e8ce 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -1,6 +1,7 @@
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/slab.h>
-+#include <linux/sched.h>
- 
- #include <asm/cputype.h>
- #include <asm/idmap.h>
-diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-index d5a4e9a..6eeaf3d 100644
---- a/arch/arm/mm/mm.h
-+++ b/arch/arm/mm/mm.h
-@@ -1,6 +1,7 @@
- #ifdef CONFIG_MMU
- #include <linux/list.h>
- #include <linux/vmalloc.h>
-+#include <linux/sched.h>
- 
- /* the upper-most page table pointer */
- extern pmd_t *top_pmd;
+>
+>> +
+>> +     if (!sched)
+>> +             ;
+>> +     else if (high_prio_bh)
+>> +             tasklet_hi_schedule(&bh->bh);
+>> +     else
+>> +             tasklet_schedule(&bh->bh);
+>>  }
+>>  EXPORT_SYMBOL_GPL(usb_hcd_giveback_urb);
+>>
+>> @@ -2307,6 +2376,42 @@ EXPORT_SYMBOL_GPL (usb_hc_died);
+>>
+>>  /*-------------------------------------------------------------------------*/
+>>
+>> +static void __init_giveback_urb_bh(struct giveback_urb_bh *bh)
+>> +{
+>> +
+>> +     spin_lock_init(&bh->lock);
+>> +     INIT_LIST_HEAD(&bh->head);
+>> +     tasklet_init(&bh->bh, usb_giveback_urb_bh, (unsigned long)bh);
+>> +}
+>> +
+>> +static void init_giveback_urb_bh(struct usb_hcd *hcd)
+>> +{
+>> +     if (!hcd_giveback_urb_in_bh(hcd))
+>> +             return;
+>
+> As you mentioned, there's not much point in skipping this code when
+> it's not needed.  In fact, you could just put the two lines below
+> directly into usb_create_shared_hcd(), and get rid of the "__" from the
+> beginning of the name.
+
+OK.
+
+>
+>> +
+>> +     __init_giveback_urb_bh(&hcd->high_prio_bh);
+>> +     __init_giveback_urb_bh(&hcd->low_prio_bh);
+>> +}
+>> +
+>> +static void exit_giveback_urb_bh(struct usb_hcd *hcd)
+>> +{
+>> +     if (!hcd_giveback_urb_in_bh(hcd))
+>> +             return;
+>> +
+>> +     /*
+>> +      * tasklet_kill() isn't needed here because:
+>> +      * - driver's disconnec() called from usb_disconnect() should
+>
+> Misspelled "disconnect".
+>
+>> +      *   make sure its URBs are completed during the disconnect()
+>> +      *   callback
+>> +      *
+>> +      * - it is too late to run complete() here since driver may have
+>> +      *   been removed already now
+>> +      *
+>> +      * Using tasklet to run URB's complete() doesn't change this
+>> +      * behavior of usbcore.
+>> +      */
+>> +}
+>
+> Why have a separate subroutine for doing nothing?  Simply put this
+> comment directly into usb_remove_hcd().  (And you can remove the last
+> two lines of the comment; they don't make sense in this context.)
+
+Looks it is a bit clean to put the comment in the function, but it is
+OK to add them in usb_remove_hcd() too.
+
+Thanks again for your review.
+
+Thanks,
+--
+Ming Lei
