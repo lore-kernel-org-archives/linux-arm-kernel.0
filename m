@@ -1,62 +1,149 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 25 Jun 2013 22:24:49 +0200
-Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
+Date: Tue, 25 Jun 2013 22:24:51 +0200
+Subject: [PATCH v2 5/5] lib/raid6: add ARM-NEON accelerated syndrome
+ calculation
 In-Reply-To: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1372191891-24574-6-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to safely support the use of NEON instructions in
-kernel mode, some precautions need to be taken:
-- the userland context that may be present in the registers (even
-  if the NEON/VFP is currently disabled) must be stored under the
-  correct task (which may not be 'current' in the UP case),
-- to avoid having to keep track of additional vfpstates for the
-  kernel side, disallow the use of NEON in interrupt context
-  and run with preemption disabled,
-- after use, re-enable preemption and re-enable the lazy restore
-  machinery by disabling the NEON/VFP unit.
-
-This patch adds the functions kernel_neon_begin() and
-kernel_neon_end() which take care of the above. It also adds
-the Kconfig symbol KERNEL_MODE_NEON to enable it.
+Rebased/reworked a patch contributed by Rob Herring that uses
+NEON intrinsics to perform the RAID-6 syndrome calculations.
+It uses the existing unroll.awk code to generate several
+unrolled versions of which the best performing one is selected
+at boot time.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Acked-by: Nicolas Pitre <nico@linaro.org>
+Cc: hpa at linux.intel.com
 ---
- arch/arm/Kconfig            |  7 ++++++
- arch/arm/include/asm/neon.h | 36 ++++++++++++++++++++++++++++++
- arch/arm/vfp/vfpmodule.c    | 54 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 97 insertions(+)
- create mode 100644 arch/arm/include/asm/neon.h
+ include/linux/raid/pq.h |  5 ++++
+ lib/raid6/.gitignore    |  1 +
+ lib/raid6/Makefile      | 40 +++++++++++++++++++++++++
+ lib/raid6/algos.c       |  6 ++++
+ lib/raid6/neon.c        | 58 +++++++++++++++++++++++++++++++++++
+ lib/raid6/neon.uc       | 80 +++++++++++++++++++++++++++++++++++++++++++++++++
+ lib/raid6/test/Makefile | 26 +++++++++++++++-
+ 7 files changed, 215 insertions(+), 1 deletion(-)
+ create mode 100644 lib/raid6/neon.c
+ create mode 100644 lib/raid6/neon.uc
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 2651b1d..1187e64 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2183,6 +2183,13 @@ config NEON
- 	  Say Y to include support code for NEON, the ARMv7 Advanced SIMD
- 	  Extension.
+diff --git a/include/linux/raid/pq.h b/include/linux/raid/pq.h
+index 8dfaa2c..0f42469 100644
+--- a/include/linux/raid/pq.h
++++ b/include/linux/raid/pq.h
+@@ -114,6 +114,11 @@ extern const struct raid6_recov_calls raid6_recov_intx1;
+ extern const struct raid6_recov_calls raid6_recov_ssse3;
+ extern const struct raid6_recov_calls raid6_recov_avx2;
  
-+config KERNEL_MODE_NEON
-+	bool "Support for NEON in kernel mode"
-+	default n
-+	depends on NEON
-+	help
-+	  Say Y to include support for NEON in kernel mode.
++extern const struct raid6_calls raid6_neonx1;
++extern const struct raid6_calls raid6_neonx2;
++extern const struct raid6_calls raid6_neonx4;
++extern const struct raid6_calls raid6_neonx8;
 +
- endmenu
+ /* Algorithm list */
+ extern const struct raid6_calls * const raid6_algos[];
+ extern const struct raid6_recov_calls *const raid6_recov_algos[];
+diff --git a/lib/raid6/.gitignore b/lib/raid6/.gitignore
+index 162beca..0a7e494 100644
+--- a/lib/raid6/.gitignore
++++ b/lib/raid6/.gitignore
+@@ -2,3 +2,4 @@ mktables
+ altivec*.c
+ int*.c
+ tables.c
++neon?.c
+diff --git a/lib/raid6/Makefile b/lib/raid6/Makefile
+index 9f7c184..b462578 100644
+--- a/lib/raid6/Makefile
++++ b/lib/raid6/Makefile
+@@ -5,6 +5,7 @@ raid6_pq-y	+= algos.o recov.o tables.o int1.o int2.o int4.o \
  
- menu "Userspace binary formats"
-diff --git a/arch/arm/include/asm/neon.h b/arch/arm/include/asm/neon.h
+ raid6_pq-$(CONFIG_X86) += recov_ssse3.o recov_avx2.o mmx.o sse1.o sse2.o avx2.o
+ raid6_pq-$(CONFIG_ALTIVEC) += altivec1.o altivec2.o altivec4.o altivec8.o
++raid6_pq-$(CONFIG_KERNEL_MODE_NEON) += neon.o neon1.o neon2.o neon4.o neon8.o
+ 
+ hostprogs-y	+= mktables
+ 
+@@ -16,6 +17,21 @@ ifeq ($(CONFIG_ALTIVEC),y)
+ altivec_flags := -maltivec -mabi=altivec
+ endif
+ 
++# The GCC option -ffreestanding is required in order to compile code containing
++# ARM/NEON intrinsics in a non C99-compliant environment (such as the kernel)
++ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
++NEON_FLAGS := -ffreestanding
++ifeq ($(ARCH),arm)
++NEON_FLAGS += -mfloat-abi=softfp -mfpu=neon
++endif
++ifeq ($(ARCH),arm64)
++CFLAGS_REMOVE_neon1.o += -mgeneral-regs-only
++CFLAGS_REMOVE_neon2.o += -mgeneral-regs-only
++CFLAGS_REMOVE_neon4.o += -mgeneral-regs-only
++CFLAGS_REMOVE_neon8.o += -mgeneral-regs-only
++endif
++endif
++
+ targets += int1.c
+ $(obj)/int1.c:   UNROLL := 1
+ $(obj)/int1.c:   $(src)/int.uc $(src)/unroll.awk FORCE
+@@ -70,6 +86,30 @@ $(obj)/altivec8.c:   UNROLL := 8
+ $(obj)/altivec8.c:   $(src)/altivec.uc $(src)/unroll.awk FORCE
+ 	$(call if_changed,unroll)
+ 
++CFLAGS_neon1.o += $(NEON_FLAGS)
++targets += neon1.c
++$(obj)/neon1.c:   UNROLL := 1
++$(obj)/neon1.c:   $(src)/neon.uc $(src)/unroll.awk FORCE
++	$(call if_changed,unroll)
++
++CFLAGS_neon2.o += $(NEON_FLAGS)
++targets += neon2.c
++$(obj)/neon2.c:   UNROLL := 2
++$(obj)/neon2.c:   $(src)/neon.uc $(src)/unroll.awk FORCE
++	$(call if_changed,unroll)
++
++CFLAGS_neon4.o += $(NEON_FLAGS)
++targets += neon4.c
++$(obj)/neon4.c:   UNROLL := 4
++$(obj)/neon4.c:   $(src)/neon.uc $(src)/unroll.awk FORCE
++	$(call if_changed,unroll)
++
++CFLAGS_neon8.o += $(NEON_FLAGS)
++targets += neon8.c
++$(obj)/neon8.c:   UNROLL := 8
++$(obj)/neon8.c:   $(src)/neon.uc $(src)/unroll.awk FORCE
++	$(call if_changed,unroll)
++
+ quiet_cmd_mktable = TABLE   $@
+       cmd_mktable = $(obj)/mktables > $@ || ( rm -f $@ && exit 1 )
+ 
+diff --git a/lib/raid6/algos.c b/lib/raid6/algos.c
+index 6d7316f..74e6f56 100644
+--- a/lib/raid6/algos.c
++++ b/lib/raid6/algos.c
+@@ -70,6 +70,12 @@ const struct raid6_calls * const raid6_algos[] = {
+ 	&raid6_intx2,
+ 	&raid6_intx4,
+ 	&raid6_intx8,
++#ifdef CONFIG_KERNEL_MODE_NEON
++	&raid6_neonx1,
++	&raid6_neonx2,
++	&raid6_neonx4,
++	&raid6_neonx8,
++#endif
+ 	NULL
+ };
+ 
+diff --git a/lib/raid6/neon.c b/lib/raid6/neon.c
 new file mode 100644
-index 0000000..8f730fe
+index 0000000..36ad470
 --- /dev/null
-+++ b/arch/arm/include/asm/neon.h
-@@ -0,0 +1,36 @@
++++ b/lib/raid6/neon.c
+@@ -0,0 +1,58 @@
 +/*
-+ * linux/arch/arm/include/asm/neon.h
++ * linux/lib/raid6/neon.c - RAID6 syndrome calculation using ARM NEON intrinsics
 + *
 + * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
 + *
@@ -65,103 +152,195 @@ index 0000000..8f730fe
 + * published by the Free Software Foundation.
 + */
 +
-+#include <asm/hwcap.h>
++#include <linux/raid/pq.h>
 +
-+#define cpu_has_neon()		(!!(elf_hwcap & HWCAP_NEON))
-+
-+#ifdef __ARM_NEON__
-+
-+/*
-+ * If you are affected by the BUILD_BUG below, it probably means that you are
-+ * using NEON code /and/ calling the kernel_neon_begin() function from the same
-+ * compilation unit. To prevent issues that may arise from GCC reordering or
-+ * generating(1) NEON instructions outside of these begin/end functions, the
-+ * only supported way of using NEON code in the kernel is by isolating it in a
-+ * separate compilation unit, and calling it from another unit from inside a
-+ * kernel_neon_begin/kernel_neon_end pair.
-+ *
-+ * (1) Current GCC (4.7) might generate NEON instructions at O3 level if
-+ *     -mpfu=neon is set.
-+ */
-+
-+#define kernel_neon_begin() \
-+	BUILD_BUG_ON_MSG(1, "kernel_neon_begin() called from NEON code")
-+
++#ifdef __KERNEL__
++#include <asm/neon.h>
 +#else
-+void kernel_neon_begin(void);
++#define kernel_neon_begin()
++#define kernel_neon_end()
++#define cpu_has_neon()		(1)
 +#endif
-+void kernel_neon_end(void);
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index fd1466c..b64ca77 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -20,6 +20,7 @@
- #include <linux/init.h>
- #include <linux/uaccess.h>
- #include <linux/user.h>
-+#include <linux/export.h>
- 
- #include <asm/cp15.h>
- #include <asm/cputype.h>
-@@ -659,6 +660,59 @@ void vfp_kmode_exception(void)
- 	BUG_ON(fmrx(FPEXC) & FPEXC_EN);
- }
- 
-+#ifdef CONFIG_KERNEL_MODE_NEON
 +
 +/*
-+ * Kernel-side NEON support functions
++ * There are 2 reasons these wrappers are kept in a separate compilation unit
++ * from the actual implementations in neonN.c (generated from neon.uc by
++ * unroll.awk):
++ * - the actual implementations use NEON intrinsics, and the GCC support header
++ *   (arm_neon.h) is not fully compatible (type wise) with the kernel;
++ * - the neonN.c files are compiled with -mfpu=neon and optimization enabled,
++ *   and we have to make sure that we never use *any* NEON/VFP instructions
++ *   outside a kernel_neon_begin()/kernel_neon_end() pair.
 + */
-+void kernel_neon_begin(void)
++
++#define RAID6_NEON_WRAPPER(_n)						\
++	static void raid6_neon ## _n ## _gen_syndrome(int disks,	\
++					size_t bytes, void **ptrs)	\
++	{								\
++		void raid6_neon ## _n  ## _gen_syndrome_real(int,	\
++						unsigned long, void**);	\
++		kernel_neon_begin();					\
++		raid6_neon ## _n ## _gen_syndrome_real(disks,		\
++					(unsigned long)bytes, ptrs);	\
++		kernel_neon_end();					\
++	}								\
++	struct raid6_calls const raid6_neonx ## _n = {			\
++		raid6_neon ## _n ## _gen_syndrome,			\
++		raid6_have_neon,					\
++		"neonx" #_n,						\
++		0							\
++	}
++
++static int raid6_have_neon(void)
 +{
-+	struct thread_info *thread = current_thread_info();
-+	unsigned int cpu;
-+	u32 fpexc;
-+
-+	/*
-+	 * Kernel mode NEON is only allowed outside of interrupt context
-+	 * with preemption disabled. This will make sure that the kernel
-+	 * mode NEON register contents never need to be preserved.
-+	 *
-+	 * Use inc_preempt_count() instead of preempt_disable() so sleeping
-+	 * complains noisily even on builds that have kernel preemption
-+	 * disabled.
-+	 */
-+	BUG_ON(in_interrupt());
-+	inc_preempt_count();
-+	barrier();
-+	cpu = smp_processor_id();
-+
-+	fpexc = fmrx(FPEXC) | FPEXC_EN;
-+	fmxr(FPEXC, fpexc);
-+
-+	/*
-+	 * Save the userland NEON/VFP state. Under UP,
-+	 * the owner could be a task other than 'current'
-+	 */
-+	if (vfp_state_in_hw(cpu, thread))
-+		vfp_save_state(&thread->vfpstate, fpexc);
-+#ifndef CONFIG_SMP
-+	else if (vfp_current_hw_state[cpu] != NULL)
-+		vfp_save_state(vfp_current_hw_state[cpu], fpexc);
-+#endif
-+	vfp_current_hw_state[cpu] = NULL;
++	return cpu_has_neon();
 +}
-+EXPORT_SYMBOL(kernel_neon_begin);
 +
-+void kernel_neon_end(void)
++RAID6_NEON_WRAPPER(1);
++RAID6_NEON_WRAPPER(2);
++RAID6_NEON_WRAPPER(4);
++RAID6_NEON_WRAPPER(8);
+diff --git a/lib/raid6/neon.uc b/lib/raid6/neon.uc
+new file mode 100644
+index 0000000..1b9ed79
+--- /dev/null
++++ b/lib/raid6/neon.uc
+@@ -0,0 +1,80 @@
++/* -----------------------------------------------------------------------
++ *
++ *   neon.uc - RAID-6 syndrome calculation using ARM NEON instructions
++ *
++ *   Copyright (C) 2012 Rob Herring
++ *
++ *   Based on altivec.uc:
++ *     Copyright 2002-2004 H. Peter Anvin - All Rights Reserved
++ *
++ *   This program is free software; you can redistribute it and/or modify
++ *   it under the terms of the GNU General Public License as published by
++ *   the Free Software Foundation, Inc., 53 Temple Place Ste 330,
++ *   Boston MA 02111-1307, USA; either version 2 of the License, or
++ *   (at your option) any later version; incorporated herein by reference.
++ *
++ * ----------------------------------------------------------------------- */
++
++/*
++ * neon$#.c
++ *
++ * $#-way unrolled NEON intrinsics math RAID-6 instruction set
++ *
++ * This file is postprocessed using unroll.awk
++ */
++
++#include <arm_neon.h>
++
++typedef uint8x16_t unative_t;
++
++#define NBYTES(x) ((unative_t){x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x})
++#define NSIZE	sizeof(unative_t)
++
++/*
++ * The SHLBYTE() operation shifts each byte left by 1, *not*
++ * rolling over into the next byte
++ */
++static inline unative_t SHLBYTE(unative_t v)
 +{
-+	/* Disable the NEON/VFP unit. */
-+	fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-+	barrier();
-+	dec_preempt_count();
++	return vshlq_n_u8(v, 1);
 +}
-+EXPORT_SYMBOL(kernel_neon_end);
 +
-+#endif /* CONFIG_KERNEL_MODE_NEON */
++/*
++ * The MASK() operation returns 0xFF in any byte for which the high
++ * bit is 1, 0x00 for any byte for which the high bit is 0.
++ */
++static inline unative_t MASK(unative_t v)
++{
++	const uint8x16_t temp = NBYTES(0);
++	return (unative_t)vcltq_s8((int8x16_t)v, (int8x16_t)temp);
++}
 +
- /*
-  * VFP support code initialisation.
-  */
++void raid6_neon$#_gen_syndrome_real(int disks, unsigned long bytes, void **ptrs)
++{
++	uint8_t **dptr = (uint8_t **)ptrs;
++	uint8_t *p, *q;
++	int d, z, z0;
++
++	register unative_t wd$$, wq$$, wp$$, w1$$, w2$$;
++	const unative_t x1d = NBYTES(0x1d);
++
++	z0 = disks - 3;		/* Highest data disk */
++	p = dptr[z0+1];		/* XOR parity */
++	q = dptr[z0+2];		/* RS syndrome */
++
++	for ( d = 0 ; d < bytes ; d += NSIZE*$# ) {
++		wq$$ = wp$$ = vld1q_u8(&dptr[z0][d+$$*NSIZE]);
++		for ( z = z0-1 ; z >= 0 ; z-- ) {
++			wd$$ = vld1q_u8(&dptr[z][d+$$*NSIZE]);
++			wp$$ = veorq_u8(wp$$, wd$$);
++			w2$$ = MASK(wq$$);
++			w1$$ = SHLBYTE(wq$$);
++
++			w2$$ = vandq_u8(w2$$, x1d);
++			w1$$ = veorq_u8(w1$$, w2$$);
++			wq$$ = veorq_u8(w1$$, wd$$);
++		}
++		vst1q_u8(&p[d+NSIZE*$$], wp$$);
++		vst1q_u8(&q[d+NSIZE*$$], wq$$);
++	}
++}
+diff --git a/lib/raid6/test/Makefile b/lib/raid6/test/Makefile
+index 087332d..28afa1a 100644
+--- a/lib/raid6/test/Makefile
++++ b/lib/raid6/test/Makefile
+@@ -22,11 +22,23 @@ ifeq ($(ARCH),x86_64)
+         IS_X86 = yes
+ endif
+ 
++ifeq ($(ARCH),arm)
++        CFLAGS += -I../../../arch/arm/include -mfpu=neon
++        HAS_NEON = yes
++endif
++ifeq ($(ARCH),arm64)
++        CFLAGS += -I../../../arch/arm64/include
++        HAS_NEON = yes
++endif
++
+ ifeq ($(IS_X86),yes)
+         OBJS   += mmx.o sse1.o sse2.o avx2.o recov_ssse3.o recov_avx2.o
+         CFLAGS += $(shell echo "vpbroadcastb %xmm0, %ymm1" |	\
+                     gcc -c -x assembler - >&/dev/null &&	\
+                     rm ./-.o && echo -DCONFIG_AS_AVX2=1)
++else ifeq ($(HAS_NEON),yes)
++        OBJS   += neon.o neon1.o neon2.o neon4.o neon8.o
++        CFLAGS += -DCONFIG_KERNEL_MODE_NEON=1
+ else
+         HAS_ALTIVEC := $(shell echo -e '\#include <altivec.h>\nvector int a;' |\
+                          gcc -c -x c - >&/dev/null && \
+@@ -55,6 +67,18 @@ raid6.a: $(OBJS)
+ raid6test: test.c raid6.a
+ 	$(CC) $(CFLAGS) -o raid6test $^
+ 
++neon1.c: neon.uc ../unroll.awk
++	$(AWK) ../unroll.awk -vN=1 < neon.uc > $@
++
++neon2.c: neon.uc ../unroll.awk
++	$(AWK) ../unroll.awk -vN=2 < neon.uc > $@
++
++neon4.c: neon.uc ../unroll.awk
++	$(AWK) ../unroll.awk -vN=4 < neon.uc > $@
++
++neon8.c: neon.uc ../unroll.awk
++	$(AWK) ../unroll.awk -vN=8 < neon.uc > $@
++
+ altivec1.c: altivec.uc ../unroll.awk
+ 	$(AWK) ../unroll.awk -vN=1 < altivec.uc > $@
+ 
+@@ -89,7 +113,7 @@ tables.c: mktables
+ 	./mktables > tables.c
+ 
+ clean:
+-	rm -f *.o *.a mktables mktables.c *.uc int*.c altivec*.c tables.c raid6test
++	rm -f *.o *.a mktables mktables.c *.uc int*.c altivec*.c neon*.c tables.c raid6test
+ 
+ spotless: clean
+ 	rm -f *~
 -- 
 1.8.1.2
