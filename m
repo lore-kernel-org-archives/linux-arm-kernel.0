@@ -1,249 +1,32 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Jun 2013 15:51:45 +0200
-Subject: [PATCH 01/16] ARM: dts: i.MX6: sync imx6q and imx6dl pinmux entries
+Date: Tue, 25 Jun 2013 15:51:47 +0200
+Subject: [PATCH 03/16] ARM: dts: i.MX6qdl: Add i.MX31 compatible to gpt node
 In-Reply-To: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
 References: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1372168320-22605-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1372168320-22605-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6Q and i.MX6DL are pin compatible, so the pinmux entries
-should be in sync. This patch systematically adds the pinmux entries
-missing from the imx6q to the imx6dl file.
-Some name inconsistencies and whitespace damage is fixed along the
-way.
+The i.MX6 gpt is handled by the i.MX31 gpt driver in the kernel,
+so add a corresponding compatible entry.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6dl.dtsi | 123 ++++++++++++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/imx6q.dtsi  |   3 +-
- 2 files changed, 121 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index d961365..5ec26ac 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -38,6 +38,15 @@
- 				reg = <0x020e0000 0x4000>;
- 
- 				audmux {
-+					pinctrl_audmux_1: audmux-1 {
-+						fsl,pins = <
-+							MX6DL_PAD_SD2_DAT0__AUD4_RXD  0x80000000
-+							MX6DL_PAD_SD2_DAT3__AUD4_TXC  0x80000000
-+							MX6DL_PAD_SD2_DAT2__AUD4_TXD  0x80000000
-+							MX6DL_PAD_SD2_DAT1__AUD4_TXFS 0x80000000
-+						>;
-+					};
-+
- 					pinctrl_audmux_2: audmux-2 {
- 						fsl,pins = <
- 							MX6DL_PAD_CSI0_DAT7__AUD3_RXD  0x80000000
-@@ -66,6 +75,16 @@
- 					};
- 				};
- 
-+				ecspi3 {
-+					pinctrl_ecspi3_1: ecspi3grp-1 {
-+						fsl,pins = <
-+							MX6DL_PAD_DISP0_DAT2__ECSPI3_MISO 0x100b1
-+							MX6DL_PAD_DISP0_DAT1__ECSPI3_MOSI 0x100b1
-+							MX6DL_PAD_DISP0_DAT0__ECSPI3_SCLK 0x100b1
-+						>;
-+					};
-+				};
-+
- 				enet {
- 					pinctrl_enet_1: enetgrp-1 {
- 						fsl,pins = <
-@@ -107,6 +126,27 @@
- 							MX6DL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
- 						>;
- 					};
-+
-+					pinctrl_enet_3: enetgrp-3 {
-+						fsl,pins = <
-+							MX6DL_PAD_ENET_MDIO__ENET_MDIO       0x1b0b0
-+							MX6DL_PAD_ENET_MDC__ENET_MDC         0x1b0b0
-+							MX6DL_PAD_RGMII_TXC__RGMII_TXC       0x1b0b0
-+							MX6DL_PAD_RGMII_TD0__RGMII_TD0       0x1b0b0
-+							MX6DL_PAD_RGMII_TD1__RGMII_TD1       0x1b0b0
-+							MX6DL_PAD_RGMII_TD2__RGMII_TD2       0x1b0b0
-+							MX6DL_PAD_RGMII_TD3__RGMII_TD3       0x1b0b0
-+							MX6DL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b0b0
-+							MX6DL_PAD_ENET_REF_CLK__ENET_TX_CLK  0x1b0b0
-+							MX6DL_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
-+							MX6DL_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
-+							MX6DL_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
-+							MX6DL_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
-+							MX6DL_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
-+							MX6DL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
-+							MX6DL_PAD_ENET_TX_EN__ENET_TX_EN     0x1b0b0
-+						>;
-+					};
- 				};
- 
- 				gpmi-nand {
-@@ -134,6 +174,13 @@
- 				};
- 
- 				i2c1 {
-+					pinctrl_i2c1_1: i2c1grp-1 {
-+						fsl,pins = <
-+							MX6DL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
-+							MX6DL_PAD_EIM_D28__I2C1_SDA 0x4001b8b1
-+						>;
-+					};
-+
- 					pinctrl_i2c1_2: i2c1grp-2 {
- 						fsl,pins = <
- 							MX6DL_PAD_CSI0_DAT8__I2C1_SDA 0x4001b8b1
-@@ -142,6 +189,24 @@
- 					};
- 				};
- 
-+				i2c2 {
-+					pinctrl_i2c2_1: i2c2grp-1 {
-+						fsl,pins = <
-+							MX6DL_PAD_EIM_EB2__I2C2_SCL 0x4001b8b1
-+							MX6DL_PAD_EIM_D16__I2C2_SDA 0x4001b8b1
-+						>;
-+					};
-+				};
-+
-+				i2c3 {
-+					pinctrl_i2c3_1: i2c3grp-1 {
-+						fsl,pins = <
-+							MX6DL_PAD_EIM_D17__I2C3_SCL 0x4001b8b1
-+							MX6DL_PAD_EIM_D18__I2C3_SDA 0x4001b8b1
-+						>;
-+					};
-+				};
-+
- 				uart1 {
- 					pinctrl_uart1_1: uart1grp-1 {
- 						fsl,pins = <
-@@ -151,6 +216,15 @@
- 					};
- 				};
- 
-+				uart2 {
-+					pinctrl_uart2_1: uart2grp-1 {
-+						fsl,pins = <
-+							MX6DL_PAD_EIM_D26__UART2_TX_DATA 0x1b0b1
-+							MX6DL_PAD_EIM_D27__UART2_RX_DATA 0x1b0b1
-+						>;
-+					};
-+				};
-+
- 				uart4 {
- 					pinctrl_uart4_1: uart4grp-1 {
- 						fsl,pins = <
-@@ -161,6 +235,12 @@
- 				};
- 
- 				usbotg {
-+					pinctrl_usbotg_1: usbotggrp-1 {
-+						fsl,pins = <
-+							MX6DL_PAD_GPIO_1__USB_OTG_ID 0x17059
-+						>;
-+					};
-+
- 					pinctrl_usbotg_2: usbotggrp-2 {
- 						fsl,pins = <
- 							MX6DL_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
-@@ -183,6 +263,17 @@
- 							MX6DL_PAD_NANDF_D7__SD2_DATA7 0x17059
- 						>;
- 					};
-+
-+					pinctrl_usdhc2_2: usdhc2grp-2 {
-+						fsl,pins = <
-+							MX6DL_PAD_SD2_CMD__SD2_CMD    0x17059
-+							MX6DL_PAD_SD2_CLK__SD2_CLK    0x10059
-+							MX6DL_PAD_SD2_DAT0__SD2_DATA0 0x17059
-+							MX6DL_PAD_SD2_DAT1__SD2_DATA1 0x17059
-+							MX6DL_PAD_SD2_DAT2__SD2_DATA2 0x17059
-+							MX6DL_PAD_SD2_DAT3__SD2_DATA3 0x17059
-+						>;
-+					};
- 				};
- 
- 				usdhc3 {
-@@ -201,7 +292,7 @@
- 						>;
- 					};
- 
--					pinctrl_usdhc3_2: usdhc3grp_2 {
-+					pinctrl_usdhc3_2: usdhc3grp-2 {
- 						fsl,pins = <
- 							MX6DL_PAD_SD3_CMD__SD3_CMD    0x17059
- 							MX6DL_PAD_SD3_CLK__SD3_CLK    0x10059
-@@ -213,6 +304,34 @@
- 					};
- 				};
- 
-+				usdhc4 {
-+					pinctrl_usdhc4_1: usdhc4grp-1 {
-+						fsl,pins = <
-+							MX6DL_PAD_SD4_CMD__SD4_CMD    0x17059
-+							MX6DL_PAD_SD4_CLK__SD4_CLK    0x10059
-+							MX6DL_PAD_SD4_DAT0__SD4_DATA0 0x17059
-+							MX6DL_PAD_SD4_DAT1__SD4_DATA1 0x17059
-+							MX6DL_PAD_SD4_DAT2__SD4_DATA2 0x17059
-+							MX6DL_PAD_SD4_DAT3__SD4_DATA3 0x17059
-+							MX6DL_PAD_SD4_DAT4__SD4_DATA4 0x17059
-+							MX6DL_PAD_SD4_DAT5__SD4_DATA5 0x17059
-+							MX6DL_PAD_SD4_DAT6__SD4_DATA6 0x17059
-+							MX6DL_PAD_SD4_DAT7__SD4_DATA7 0x17059
-+						>;
-+					};
-+
-+					pinctrl_usdhc4_2: usdhc4grp-2 {
-+						fsl,pins = <
-+							MX6DL_PAD_SD4_CMD__SD4_CMD    0x17059
-+							MX6DL_PAD_SD4_CLK__SD4_CLK    0x10059
-+							MX6DL_PAD_SD4_DAT0__SD4_DATA0 0x17059
-+							MX6DL_PAD_SD4_DAT1__SD4_DATA1 0x17059
-+							MX6DL_PAD_SD4_DAT2__SD4_DATA2 0x17059
-+							MX6DL_PAD_SD4_DAT3__SD4_DATA3 0x17059
-+						>;
-+					};
-+				};
-+
- 				weim {
- 					pinctrl_weim_cs0_1: weim_cs0grp-1 {
- 						fsl,pins = <
-@@ -269,9 +388,7 @@
- 							MX6DL_PAD_EIM_DA0__EIM_AD00   0xb0b1
- 						>;
- 					};
--
- 				};
--
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 9efaa56..7707f2e 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -294,7 +294,7 @@
  			};
  
- 			pxp: pxp at 020f0000 {
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 9a69891..6f4d6ab 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -382,7 +382,7 @@
- 						>;
- 					};
- 
--					pinctrl_weim_nor_1: weimnorgrp-1 {
-+					pinctrl_weim_nor_1: weim_norgrp-1 {
- 						fsl,pins = <
- 							MX6Q_PAD_EIM_OE__EIM_OE_B     0xb0b1
- 							MX6Q_PAD_EIM_RW__EIM_RW       0xb0b1
-@@ -431,7 +431,6 @@
- 							MX6Q_PAD_EIM_DA0__EIM_AD00   0xb0b1
- 						>;
- 					};
--
- 				};
- 			};
- 		};
+ 			gpt: gpt at 02098000 {
+-				compatible = "fsl,imx6q-gpt";
++				compatible = "fsl,imx6q-gpt", "fsl,imx31-gpt";
+ 				reg = <0x02098000 0x4000>;
+ 				interrupts = <0 55 0x04>;
+ 				clocks = <&clks 119>, <&clks 120>;
 -- 
 1.8.3.1
