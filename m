@@ -1,17 +1,17 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Tue, 25 Jun 2013 12:09:40 +0530
-Subject: [PATCH V4 05/11] USB: OHCI: Properly handle ohci-ep93xx suspend
+Date: Tue, 25 Jun 2013 12:09:42 +0530
+Subject: [PATCH V4 07/11] USB: OHCI: Properly handle ohci-omap suspend
 In-Reply-To: <1372142386-10691-1-git-send-email-manjunath.goudar@linaro.org>
 References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
  <1372142386-10691-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1372142386-10691-6-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1372142386-10691-8-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of ohci-ep93xx glue was not
+Suspend scenario in case of ohci-omap glue was not
 properly handled as it was not suspending generic part
 of ohci controller. Calling explicitly the ohci_suspend()
-routine in ohci_hcd_ep93xx_drv_suspend() will ensure proper
+routine in ohci_omap_suspend() will ensure proper
 handling of suspend scenario.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
@@ -23,22 +23,30 @@ Cc: linux-usb at vger.kernel.org
 V2:
  -Incase ohci_suspend() fails, return right away without
   executing further.
+
 V3:
  -Aligned variable "do_wakeup" and "ret".
+
 V4:
  -The do_wakeup and ret variable alignment is removed.
 ---
- drivers/usb/host/ohci-ep93xx.c |    9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/usb/host/ohci-omap.c |   13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-ep93xx.c b/drivers/usb/host/ohci-ep93xx.c
-index 8704e9f..f0aaa48 100644
---- a/drivers/usb/host/ohci-ep93xx.c
-+++ b/drivers/usb/host/ohci-ep93xx.c
-@@ -174,13 +174,20 @@ static int ohci_hcd_ep93xx_drv_suspend(struct platform_device *pdev, pm_message_
+diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
+index 10ba58d..baefc46 100644
+--- a/drivers/usb/host/ohci-omap.c
++++ b/drivers/usb/host/ohci-omap.c
+@@ -432,16 +432,23 @@ static int ohci_hcd_omap_drv_remove(struct platform_device *dev)
+ 
+ #ifdef	CONFIG_PM
+ 
+-static int ohci_omap_suspend(struct platform_device *dev, pm_message_t message)
++static int ohci_omap_suspend(struct platform_device *pdev, pm_message_t message)
  {
- 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
- 	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+-	struct ohci_hcd	*ohci = hcd_to_ohci(platform_get_drvdata(dev));
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
 +	bool do_wakeup = device_may_wakeup(&pdev->dev);
 +	int ret;
  
@@ -50,12 +58,11 @@ index 8704e9f..f0aaa48 100644
 +	if (ret)
 +		return ret;
 +
- 	ep93xx_stop_hc(&pdev->dev);
+ 	omap_ohci_clock_power(0);
 -	return 0;
-+
 +	return ret;
  }
  
- static int ohci_hcd_ep93xx_drv_resume(struct platform_device *pdev)
+ static int ohci_omap_resume(struct platform_device *dev)
 -- 
 1.7.9.5
