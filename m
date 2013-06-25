@@ -1,46 +1,46 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 25 Jun 2013 14:13:37 +0530
-Subject: [RFC 0/4] Cleanup PRM and CM regbit headers
-In-Reply-To: <20130625071428.GC5523@atomide.com>
-References: <1372076143-12955-1-git-send-email-rnayak@ti.com>
- <20130625071428.GC5523@atomide.com>
-Message-ID: <51C95839.6050307@ti.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 25 Jun 2013 10:46:04 +0200
+Subject: [PATCH v2 0/6] ARM: rockchip: add smp functionality
+Message-ID: <201306251046.04873.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 June 2013 12:44 PM, Tony Lindgren wrote:
->> Rajendra Nayak (4):
->> >   ARM: OMAP2: PRM/CM: Cleanup unused header contents
->> >   ARM: OMAP3: PRM/CM: Cleanup unused header contents
->> >   ARM: OMAP4: PRM/CM: Cleanup unused header contents
->> >   ARM: OMAP5: PRM/CM: Cleanup unused header contents
->> > 
->> >  arch/arm/mach-omap2/cm-regbits-24xx.h  |  317 ----
->> >  arch/arm/mach-omap2/cm-regbits-33xx.h  |  758 ---------
->> >  arch/arm/mach-omap2/cm-regbits-34xx.h  |  631 --------
->> >  arch/arm/mach-omap2/cm-regbits-44xx.h  | 1557 -------------------
->> >  arch/arm/mach-omap2/cm-regbits-54xx.h  | 1632 -------------------
->> >  arch/arm/mach-omap2/prm-regbits-24xx.h |  246 ---
->> >  arch/arm/mach-omap2/prm-regbits-33xx.h |  305 ----
->> >  arch/arm/mach-omap2/prm-regbits-34xx.h |  480 ------
->> >  arch/arm/mach-omap2/prm-regbits-44xx.h | 2225 --------------------------
->> >  arch/arm/mach-omap2/prm-regbits-54xx.h | 2677 --------------------------------
->> >  10 files changed, 10828 deletions(-)
-> If things build and work after applying this, I suggest we send them
-> as a clean-up branch right after -rc1.
+This series enables the use of the additional cores on Rockchip
+Cortex-A9 SoCs.
 
-They build fine, and I boot tested on the omap4/5 boards that I have too.
-(I had the out of tree clock data pulled in for omap5 before I did this
-cleanup).
+To achieve this, add the scu, the needed sram and power-management-unit.
 
-> 
-> It seems that build testing and then randconfig testing
-> should be enough for these if they are unused and only
-> removal.
+changes since v1:
+- add reserved block feature for mmio-sram, to not use two logical
+  sram nodes
+- the sram content is kept intact while the device is running, so
+  copying the trampoline is only needed once
 
-Right, I'll do more testing and even though they should just boot
-fine on the omap2/3 boards too since all thats removed is anyway
-unused, I will still do more sanity test before posting them on -rc1.
+Heiko Stuebner (6):
+  misc: sram: fix error path in sram_probe
+  misc: sram: add ability to mark sram sections as reserved
+  arm: rockchip: add snoop-control-unit
+  arm: rockchip: add sram dt nodes and documentation for the smp part
+  arm: rockchip: add power-management-unit dt node
+  arm: rockchip: add smp bringup code
 
-regards,
-Rajendra
+ .../devicetree/bindings/arm/rockchip/pmu.txt       |   16 ++
+ .../devicetree/bindings/arm/rockchip/smp-sram.txt  |   23 +++
+ Documentation/devicetree/bindings/misc/sram.txt    |    8 +
+ arch/arm/boot/dts/rk3066a.dtsi                     |   16 ++
+ arch/arm/mach-rockchip/Kconfig                     |    1 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/core.h                      |   22 +++
+ arch/arm/mach-rockchip/headsmp.S                   |   32 +++
+ arch/arm/mach-rockchip/platsmp.c                   |  203 ++++++++++++++++++++
+ arch/arm/mach-rockchip/rockchip.c                  |    2 +
+ drivers/misc/sram.c                                |   85 +++++++-
+ 11 files changed, 404 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
+ create mode 100644 arch/arm/mach-rockchip/core.h
+ create mode 100644 arch/arm/mach-rockchip/headsmp.S
+ create mode 100644 arch/arm/mach-rockchip/platsmp.c
+
+-- 
+1.7.10.4
