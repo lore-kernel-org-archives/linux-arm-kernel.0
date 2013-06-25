@@ -1,83 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 25 Jun 2013 00:04:32 -0700
-Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
-In-Reply-To: <CACxGe6vRCjyJgX+dgKuJREvFf_btjhSkfqDnYekuDfkVW7pRQg@mail.gmail.com>
-References: <20130516214430.GN5600@atomide.com>
- <20130520174621.GI10378@atomide.com>
- <20130605223355.EDC113E10E4@localhost>
- <20130606155341.GL3331@atomide.com>
- <20130623221605.GA3150@blackmetal.musicnaut.iki.fi>
- <CAAwP0s1DkMu8Vfka43hS4Wj-927q=O5u-coyFsPBgy3qtA_vjw@mail.gmail.com>
- <20130623234326.GA20703@blackmetal.musicnaut.iki.fi>
- <CAAwP0s00RwP7jCMF1O8j8Ndhu=VfD2dMA5fzr6jWvQ7PziXBCw@mail.gmail.com>
- <20130624072112.GQ5523@atomide.com>
- <CACxGe6vRCjyJgX+dgKuJREvFf_btjhSkfqDnYekuDfkVW7pRQg@mail.gmail.com>
-Message-ID: <20130625070432.GB5523@atomide.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 25 Jun 2013 09:11:37 +0200
+Subject: [PATCH 0/7] genirq: add irq_get_trigger_type() to get IRQ flags
+In-Reply-To: <CACxGe6smNZofiGdO=nBM88MiWyoDvCTiPGFG5enEUwP_zCn17A@mail.gmail.com>
+References: <1371228049-27080-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CACxGe6smNZofiGdO=nBM88MiWyoDvCTiPGFG5enEUwP_zCn17A@mail.gmail.com>
+Message-ID: <51C942A9.9070904@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grant Likely <grant.likely@secretlab.ca> [130624 09:00]:
-> On Mon, Jun 24, 2013 at 8:21 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Javier Martinez Canillas <martinez.javier@gmail.com> [130623 18:08]:
-> >> On Mon, Jun 24, 2013 at 1:43 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> >> > Hi,
-> >> >
-> >> > On Mon, Jun 24, 2013 at 01:06:37AM +0200, Javier Martinez Canillas wrote:
-> >> >> On Mon, Jun 24, 2013 at 12:16 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> >> >> > What is the status of this patch? We're already at 3.10-rc7 and GPIO
-> >> >> > IRQs are still broken on OMAP1.
-> >> >
-> >> > [...]
-> >> >
-> >> >> There is a problem with this patch.
-> >> >
-> >> > [...]
-> >> >
-> >> >> So I think that the correct solution is to add SPARSE_IRQ support to
-> >> >> omap1 and not reverting Jon's patch. Of course this may not be
-> >> >> possible since we are so close to 3.10 and most OMAP patches already
-> >> >> merged for 3.11 but we should definitely try to have this at least for
-> >> >> 3.12. Otherwise we won't be able to move to DT-only booting for
-> >> >> OMAP2+.
-> >> >
-> >> > OMAP1 does not use DT. So we could put this code under #ifdef
-> >> > CONFIG_ARCH_OMAP1 or similar. It's just a few lines of code. OMAP2+
-> >> > work should not regress OMAP1.
-> >> >
-> >> > Demanding SPARSE_IRQ support for OMAP1 should have been discussed before
-> >> > these changes were made. It's not reasonable to assume such things can
-> >> > be made during rc-cycle. Also, now, I don't think it's reasonable to
-> >> > wait for that to be done, as it would take until 3.12 or even later to
-> >> > get OMAP1 functional again.
-> >> >
-> >> > A.
-> >>
-> >> Hi,
-> >>
-> >> Yes, since we are so late in the -rc cycle and OMAP1 is currently
-> >> broken I agree that the only sensible solution is to revert the patch
-> >> for now.
-> >
-> > Agreed.
-> >
-> >> I just wanted to point out the issue that keeping the OMAP GPIO driver
-> >> using legacy mapping domain represents a blocker to have GPIO-IRQ
-> >> working with Device Tree for OMAP2+
-> >
-> > Yes. We can do the ifdef Aaro suggested, and let's also plan on
-> > converting omap1 to use SPARSE_IRQ. But with the ifdef we can cut
-> > away the dependency between these two.
+On 06/18/2013 12:29 AM, Grant Likely wrote:
+> On Fri, Jun 14, 2013 at 5:40 PM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> Drivers that want to get the trigger edge/level type flags for a
+>> given interrupt have to first call irq_get_irq_data(irq) to get
+>> the struct irq_data and then irqd_get_trigger_type(irq_data) to
+>> obtain the IRQ flags.
+>>
+>> This is not only error prone but also unnecessary exposes the
+>> struct irq_data to callers. This patch-set adds a new function
+>> irq_get_trigger_type() to obtain the edge/level flags for an IRQ
+>> and updates the places where irq_get_irq_data(irq) was called
+>> just to obtain the flags from the struct irq_data.
+>>
+>> The patch-set is composed of the following patches:
+>>
+>> [PATCH 1/7] genirq: add irq_get_trigger_type() to get IRQ flags
+>> [PATCH 2/7] gpio: mvebu: use irq_get_trigger_type() to get IRQ flags
+>> [PATCH 3/7] mfd: twl4030-irq: use irq_get_trigger_type() to get IRQ flags
+>> [PATCH 4/7] mfd: stmpe: use irq_get_trigger_type() to get IRQ flags
+>> [PATCH 5/7] arm: orion: use irq_get_trigger_type() to get IRQ flags
+>> [PATCH 6/7] MIPS: octeon: use irq_get_trigger_type() to get IRQ flags
+>> [PATCH 7/7] irqdomain: use irq_get_trigger_type() to get IRQ flags
 > 
-> Alright. Sorry I dropped the ball on this one. I've lost track of
-> which patch needs to get applied, but given that it is so late in the
-> cycle, it would be better for someone else to apply the change, test
-> and send a pull request to Linus. I'm okay with it going through the
-> OMAP tree if that is the most expedient. Alternately, send me the pull
-> request and I'll pass it on to Linus.
+> For the whole series:
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+> 
 
-OK, I'll wait for Aaro's ack on Javier's patch and then put it into a
-branch for you.
+Hello Thomas,
 
-Regards,
+Do you have any comments on this patch-set?
 
-Tony
+It has been ack'ed by a lot of people so I wonder if you could take it.
+
+Thanks a lot and best regards,
+Javier
