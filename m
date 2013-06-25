@@ -1,25 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Jun 2013 15:49:57 +0200
-Subject: amba-pl08x and 'get_signal' namespace collision/build error
-In-Reply-To: <51C97F40.5030101@arm.com>
-References: <51C97F40.5030101@arm.com>
-Message-ID: <CACRpkdb-Fhz3pjWm3xVguitv6h0-+ywyo3HFDVgqgHcZ-MjKKA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 25 Jun 2013 15:51:59 +0200
+Subject: [PATCH 15/16] ARM: dts: i.MX51 babbage: Add spi-cs-high property to
+ pmic
+In-Reply-To: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
+References: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1372168320-22605-16-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 1:30 PM, Jonathan Austin
-<jonathan.austin@arm.com> wrote:
+The mc13892 driver knows that it needs spi-cs-high, so the mc13892
+will work. The dataflash also connected to this bus though can only
+be probed when the mc13892 is inactive. Due to driver potential
+differences in the probe order we can only make sure the mc13892
+is inactive when we put the information into the devicetree.
 
-> There's a patch making its way to mainline via Russell's tree
-> (8d96250700: ARM: mm: Transparent huge page support for LPAE systems)
-> that breaks the build of the amba-pl08x driver (drivers/dma/amba-pl08x.c)
-> because the 'get_signal' macro from include/linux/signal.h is now in the
-> driver's scope and it clobbers a (previously) valid function call.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/boot/dts/imx51-babbage.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-This is already fixed by Mark Brown in the DMA tree.
-
-Commit subject:
-"dmaengine: PL08x: Avoid collisions with get_signal() macro"
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 6dd9486..9630b61 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -98,6 +98,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "fsl,mc13892";
+ 		spi-max-frequency = <6000000>;
++		spi-cs-high;
+ 		reg = <0>;
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <8 0x4>;
+-- 
+1.8.3.1
