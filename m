@@ -1,59 +1,43 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 25 Jun 2013 17:24:01 +0800
-Subject: [PATCH V3 2/3] ARM: tegra114: add low level support for CPU idle
- powered-down mode
-In-Reply-To: <1372152242-16373-1-git-send-email-josephl@nvidia.com>
-References: <1372152242-16373-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1372152242-16373-4-git-send-email-josephl@nvidia.com>
+Date: Tue, 25 Jun 2013 17:27:44 +0800
+Subject: [PATCH 00/11] ARM: tegra114: add support for system suspend
+Message-ID: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flow controller would take care the power sequence when CPU idle in
-powered-down mode. It powered gate the CPU when CPU runs into WFI
-instruction. And wake up the CPU when event be triggered.
+This series introduce system suspend function for Tegra114 and depend on
+the series of "ARM: tegra114: cpuidle: add power down state".
 
-The sequence is below.
-* setting wfi bitmap for the CPU as the halt event in the
-  FLOW_CTRL_CPU_HALT_REG to monitor the CPU running into WFI,then power
-  gate it
-* setting IRQ and FIQ as wake up event to wake up CPU when event triggered
+Verified on Seaboard, Cardhu and Dalmore and with THUMB2_KERNEL as well.
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
-V3:
-* no change
-V2:
-* no change
----
- arch/arm/mach-tegra/flowctrl.h      | 2 ++
- arch/arm/mach-tegra/sleep-tegra30.S | 2 ++
- 2 files changed, 4 insertions(+)
+Joseph Lo (11):
+  ARM: tegra: do v7_invalidate_l1 only when CPU is Cortex-A9 in
+    tegra_resume
+  ARM: tegra: add a flag for tegra_disable_clean_inv_dcache to do LoUIS
+    or ALL
+  ARM: tegra114: set up the correct L2 data RAM latency for Cortex-A15
+  ARM: tegra114: add low level support code for cluster power down
+  ARM: tegra114: shut off the CPU rail when the last CPU in suspend
+  ARM: tegra114: hook tegra_tear_down_cpu function
+  ARM: tegra114: flowctrl: add support for cpu_suspend_enter/exit
+  clk: tegra114: add suspend/resume function for tegar_cpu_car_ops
+  ARM: tegar: remove the limitation that Tegra114 can't support suspend
+  ARM: dts: tegra114: dalmore: add GPIO power key support
+  ARM: dts: tegra114: dalmore: add PM configurations for PMC
 
-diff --git a/arch/arm/mach-tegra/flowctrl.h b/arch/arm/mach-tegra/flowctrl.h
-index 7a29bae..e56a950 100644
---- a/arch/arm/mach-tegra/flowctrl.h
-+++ b/arch/arm/mach-tegra/flowctrl.h
-@@ -28,6 +28,8 @@
- #define FLOW_CTRL_SCLK_RESUME		(1 << 27)
- #define FLOW_CTRL_HALT_CPU_IRQ		(1 << 10)
- #define	FLOW_CTRL_HALT_CPU_FIQ		(1 << 8)
-+#define FLOW_CTRL_HALT_GIC_IRQ		(1 << 9)
-+#define FLOW_CTRL_HALT_GIC_FIQ		(1 << 8)
- #define FLOW_CTRL_CPU0_CSR		0x8
- #define	FLOW_CTRL_CSR_INTR_FLAG		(1 << 15)
- #define FLOW_CTRL_CSR_EVENT_FLAG	(1 << 14)
-diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
-index ada8821..5877f26 100644
---- a/arch/arm/mach-tegra/sleep-tegra30.S
-+++ b/arch/arm/mach-tegra/sleep-tegra30.S
-@@ -99,6 +99,8 @@ flow_ctrl_setting_for_lp2:
- 	cmp	r10, #TEGRA30
- 	moveq   r3, #FLOW_CTRL_WAIT_FOR_INTERRUPT	@ For LP2
- 	movne	r3, #FLOW_CTRL_WAITEVENT
-+	orrne	r3, r3, #FLOW_CTRL_HALT_GIC_IRQ
-+	orrne	r3, r3, #FLOW_CTRL_HALT_GIC_FIQ
- flow_ctrl_done:
- 	cmp	r10, #TEGRA30
- 	str	r3, [r2]
+ arch/arm/boot/dts/tegra114-dalmore.dts | 18 ++++++++++++++++++
+ arch/arm/mach-tegra/flowctrl.c         |  2 ++
+ arch/arm/mach-tegra/flowctrl.h         |  7 +++++++
+ arch/arm/mach-tegra/hotplug.c          |  2 +-
+ arch/arm/mach-tegra/pm.c               |  5 +----
+ arch/arm/mach-tegra/pmc.c              | 10 ++++++++++
+ arch/arm/mach-tegra/reset-handler.S    |  8 ++++++--
+ arch/arm/mach-tegra/sleep-tegra20.S    |  1 +
+ arch/arm/mach-tegra/sleep-tegra30.S    |  7 ++++++-
+ arch/arm/mach-tegra/sleep.S            | 29 ++++++++++++++++++++++++++++-
+ arch/arm/mach-tegra/sleep.h            |  6 +++++-
+ drivers/clk/tegra/clk-tegra114.c       | 26 ++++++++++++++++++++++++++
+ 12 files changed, 111 insertions(+), 10 deletions(-)
+
 -- 
 1.8.3.1
