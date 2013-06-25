@@ -1,87 +1,36 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Tue, 25 Jun 2013 22:37:04 +0300
-Subject: [PATCH] Documentation: dt: bindings: TI WiLink modules
-In-Reply-To: <1372149330-24335-1-git-send-email-coelho@ti.com>
-References: <1372149330-24335-1-git-send-email-coelho@ti.com>
-Message-ID: <1372189024.18889.19.camel@cumari.coelho.fi>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 25 Jun 2013 15:55:01 -0400
+Subject: [PATCH] ARM: omap5: build opp4xxx_data.c
+In-Reply-To: <alpine.DEB.2.02.1306251918590.14373@utopia.booyaka.com>
+References: <201306212229.54238.arnd@arndb.de> <20130621204250.GA16139@kahuna>
+ <alpine.DEB.2.02.1306251918590.14373@utopia.booyaka.com>
+Message-ID: <51C9F595.3060609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(oh crap, now *really* fixed the ARM mailing list address)
+On Tuesday 25 June 2013 03:20 PM, Paul Walmsley wrote:
+> Santosh,
+> 
+> On Fri, 21 Jun 2013, Nishanth Menon wrote:
+> 
+>> 	/*
+>> 	 * XXX Will depend on the process, validation, and binning
+>> 	 * for the currently-running IC. Use OMAP4 data for time being.
+>> 	 */
+>> #ifdef CONFIG_PM_OPP
+>> 	omap5_voltdm_mpu.volt_data = omap446x_vdd_mpu_volt_data;
+>> 	omap5_voltdm_mm.volt_data = omap446x_vdd_iva_volt_data;
+>> 	omap5_voltdm_core.volt_data = omap446x_vdd_core_volt_data;
+>> #endif
+>>
+>> Should we just remove this instead? these are obviously wrong.
+> 
+> Are the OMAP4460 values expected to work and be safe for OMAP5, or not?  
+> If the latter, please send a patch to remove them.
+> 
+The plan was to update the data along with and VC OPP update
+for OMAP5 which Keerthy is working on. As such without VC code,
+this data is not doing anything so it is safe.
 
-On Tue, 2013-06-25 at 11:35 +0300, Luciano Coelho wrote:
-> Add device tree bindings documentation for the TI WiLink modules.
-> Currently only the WLAN part of the WiLink6, WiLink7 and WiLink8
-> modules is supported.
-> 
-> Signed-off-by: Luciano Coelho <coelho@ti.com>
-> ---
-> 
-> I created a new directory under net to contain wireless bindings documentation.
-> 
-> The actual implementation in the driver will follow separately.
-> 
->  .../devicetree/bindings/net/wireless/ti-wilink.txt |   46 ++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt b/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
-> new file mode 100644
-> index 0000000..d8e8bfbb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
-> @@ -0,0 +1,46 @@
-> +TI WiLink Wireless Modules Device Tree Bindings
-> +===============================================
-> +
-> +The WiLink modules provide wireless connectivity, such as WLAN,
-> +Bluetooth, FM and NFC.
-> +
-> +There are several different modules available, which can be grouped by
-> +their generation: WiLink6, WiLink7 and WiLink8.  WiLink4 is not
-> +currently supported with device tree.
-> +
-> +Currently, only the WLAN portion of the modules is supported with
-> +device tree.
-> +
-> +Required properties:
-> +--------------------
-> +
-> +- compatible: should be "ti,wilink6", "ti,wilink7" or "ti,wilink8"
-> +- interrupt-parent: the interrupt controller
-> +- interrupts: out-of-band WLAN interrupt
-> +	See the interrupt controller's bindings documentation for
-> +	detailed definition.
-> +
-> +Optional properties:
-> +--------------------
-> +
-> +- refclock: the internal WLAN reference clock frequency (required for
-> +  WiLink6 and WiLink7; not used for WiLink8).  Must be one of the
-> +  following:
-> +	0 = 19.2 MHz
-> +	1 = 26.0 MHz
-> +	2 = 38.4 MHz
-> +	3 = 52.0 MHz
-> +	4 = 38.4 MHz, XTAL
-> +	5 = 26.0 MHz, XTAL
-> +
-> +- tcxoclock: the internal WLAN TCXO clock frequency (required for
-> +  WiLink7 not used for WiLink6 and WiLink8).  Must be one of the
-> +  following:
-> +	0 = 19.200 MHz
-> +	1 = 26.000 MHz
-> +	2 = 38.400 MHz
-> +	3 = 52.000 MHz
-> +	4 = 16.368 MHz
-> +	5 = 32.736 MHz
-> +	6 = 16.800 MHz
-> +	7 = 33.600 MHz
-
-If this is okay for everyone, can I push this via my tree (which goes to
-linux-wireless->net->linus)? I think it makes more sense to send the
-documentation together with the patch that actually implements the DT
-node parsing in the driver.
-
---
-Luca.
+Regards,
+Santosh
