@@ -1,27 +1,25 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 25 Jun 2013 11:17:28 -0700
-Subject: [PATCH] ARM: tegra: fix section mismatch in tegra_pmc_parse_dt
-In-Reply-To: <1371854347-12091-1-git-send-email-swarren@wwwdotorg.org>
-References: <1371854347-12091-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130625181728.GE10694@quad.lixom.net>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Tue, 25 Jun 2013 19:20:21 +0100
+Subject: [PATCH 3/4] arm: Add [U]EFI runtime services support
+In-Reply-To: <1372183863-11333-4-git-send-email-leif.lindholm@linaro.org>
+References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
+ <1372183863-11333-4-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <20130625182021.GA29955@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 04:39:07PM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Tue, Jun 25, 2013 at 07:11:02PM +0100, Leif Lindholm wrote:
+> This patch implements basic support for UEFI runtime services in the
+> ARM architecture - a requirement for using efibootmgr to read and update
+> the system boot configuration.
 > 
-> tegra_pmc_parse_dt() references __initconst data. Fix it to be __init.
-> This matches its only usage; a call from tegra_pmc_init() which is
-> already __init. This fixes:
-> 
-> WARNING: vmlinux.o(.text.unlikely+0x580): Section mismatch in reference
-> from the function tegra_pmc_parse_dt() to the (unknown reference)
-> .init.rodata:(unknown)
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
+> It also locates any presented SMBIOS configuration table and stores it
+> for potential later use by DMI.
 
-Applied to fixes-non-critical.
+This appears to duplicate code that's already duplicated between x86 and 
+ia64. We made a mistake there originally - let's not do it again. Having 
+this code in three places is inevitably going to lead to skew and missed 
+bugfixes.
 
-
--Olof
+-- 
+Matthew Garrett | mjg59 at srcf.ucam.org
