@@ -1,29 +1,45 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 25 Jun 2013 23:46:32 +0300
-Subject: [PATCH 1/4] usb: gadget: s3c-hsotg: Allow driver instantiation
- using device tree
-In-Reply-To: <1372174706-5459-2-git-send-email-t.figa@samsung.com>
-References: <1372174706-5459-1-git-send-email-t.figa@samsung.com>
- <1372174706-5459-2-git-send-email-t.figa@samsung.com>
-Message-ID: <20130625204632.GB9748@arwen.pp.htv.fi>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 25 Jun 2013 13:47:16 -0700
+Subject: [PATCH v5 0/7] ARM:sti: Add STiH415/STiH416 platform and board
+ support
+In-Reply-To: <20130625203002.GA15068@quad.lixom.net>
+References: <1372158822-19160-1-git-send-email-srinivas.kandagatla@st.com>
+ <20130625203002.GA15068@quad.lixom.net>
+Message-ID: <CAOesGMhsaGcpW80CjBRtwVjJLOaRj8yTa6xFz_gjG1WPqTAKLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 05:38:23PM +0200, Tomasz Figa wrote:
-> This patch adds OF match table to the driver to allow instantiating it
-> using device tree.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+On Tue, Jun 25, 2013 at 1:30 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Jun 25, 2013 at 12:13:42PM +0100, Srinivas KANDAGATLA wrote:
+>> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>>
+>> This patch-set adds basic support for STMicroelectronics STi series SOCs
+>> which includes STiH415 and STiH416 with B2000 and B2020 board support.
+>>
+>> STiH415 and STiH416 are dual-core ARM Cortex-A9 CPU, designed for use in
+>> Set-top-boxes. The SOC support is available in mach-sti which contains
+>> support code for STiH415, STiH416 SOCs including the generic board support.
+>>
+>> The reason for adding two SOCs at this patch set is to show that no new
+>> C code is required for second SOC(STiH416) support.
+>>
+>> This patch-set only contains the SOC support, all the driver support for
+>> this platform are submitted to respective mailing lists.
+>>
+>> Changes since v4:
+>>       - Renamed mach-stixxxx to mach-sti as suggested by Olof J.
+>
+> Thanks!
+>
+> I've merged this into next/late, and I'll drop the previous test merge by Arnd
+> of the last version of the patch set.
 
-when will this driver get merged into dwc2 ?
+I noticed that the defconfig update contained new drivers/options that
+won't make it into 3.11. So to avoid churn, I dropped those. We'll do
+a patch to enable all new platforms and drivers towards the end of the
+merge window and apply on top of next/late, I think, so it should be
+taken care of by that.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/79b37f7f/attachment-0001.sig>
+The rest of the code from the series is in though.
+
+-Olof
