@@ -1,33 +1,18 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 25 Jun 2013 18:09:58 +0300
-Subject: [PATCH v2 5/5] ARM: Samsung: Remove MIPI PHY setup code
-In-Reply-To: <1372170110-12993-5-git-send-email-s.nawrocki@samsung.com>
-References: <1372170110-12993-1-git-send-email-s.nawrocki@samsung.com>
- <1372170110-12993-5-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20130625150958.GD21334@arwen.pp.htv.fi>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 25 Jun 2013 09:12:42 -0600
+Subject: [PATCH] ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag
+In-Reply-To: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
+References: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
+Message-ID: <51C9B36A.3040808@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 04:21:50PM +0200, Sylwester Nawrocki wrote:
-> Generic PHY drivers are used to handle the MIPI CSIS and MIPI DSIM
-> DPHYs so we can remove now unused code at arch/arm/plat-samsung.
-> In case there is any board file for S5PV210 platforms using MIPI
-> CSIS/DSIM (not any upstream currently) it should use the generic
-> PHY API to bind the PHYs to respective PHY consumer drivers.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+On 06/25/2013 03:23 AM, Joseph Lo wrote:
+> Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
+> to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
+> this state.
 
-pretty cool stuff
-
-Acked-by: Felipe Balbi <balbi@ti.com>
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/7ecc4d9b/attachment-0001.sig>
+I assume this patch is only needed to support the other two series you
+sent today; the Tegra114 cpuidle and system suspend series? In other
+words, there's no need to apply this to 3.11 to fix a bug; it can wait
+for 3.12 along with those other two series?
