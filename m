@@ -1,48 +1,27 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 25 Jun 2013 13:56:09 -0700
-Subject: [PATCH] ARM: omap5: build opp4xxx_data.c
-In-Reply-To: <51C9FC97.1020502@ti.com> (Santosh Shilimkar's message of "Tue,
- 25 Jun 2013 16:24:55 -0400")
-References: <201306212229.54238.arnd@arndb.de> <20130621204250.GA16139@kahuna>
- <alpine.DEB.2.02.1306251918590.14373@utopia.booyaka.com>
- <51C9F595.3060609@ti.com> <20130625195751.GA6529@kahuna>
- <51C9F993.6050109@ti.com>
- <CAGo_u6rQG7h2aPSErwKR1H7PYE5QdxXU3Dd5z13-rPkbVtkcUw@mail.gmail.com>
- <51C9FC97.1020502@ti.com>
-Message-ID: <87a9mducye.fsf@linaro.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 25 Jun 2013 22:57:06 +0200
+Subject: [PATCH 1/4] usb: gadget: s3c-hsotg: Allow driver instantiation
+ using device tree
+In-Reply-To: <20130625204632.GB9748@arwen.pp.htv.fi>
+References: <1372174706-5459-1-git-send-email-t.figa@samsung.com>
+ <1372174706-5459-2-git-send-email-t.figa@samsung.com>
+ <20130625204632.GB9748@arwen.pp.htv.fi>
+Message-ID: <5782443.xpFZv1Saq0@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Tuesday 25 of June 2013 23:46:32 Felipe Balbi wrote:
+> On Tue, Jun 25, 2013 at 05:38:23PM +0200, Tomasz Figa wrote:
+> > This patch adds OF match table to the driver to allow instantiating it
+> > using device tree.
+> > 
+> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> when will this driver get merged into dwc2 ?
 
-> On Tuesday 25 June 2013 04:17 PM, Nishanth Menon wrote:
->> On Tue, Jun 25, 2013 at 3:12 PM, Santosh Shilimkar
->> <santosh.shilimkar@ti.com> wrote:
->>>
->>> Well having voltage data in voltage domain was not my decision ;-)
->>> Instead of creating another set of dummy data, I just used what
->>> is out there(OMAP4) with clear comment that data needs to be updated.
->>> I don't see any problem in this considering we have devices booting
->>> and working nicely for OMAP5
->> I really wish the OMAP5 devices(the latest ones from Fab) I have would
->> like to function at OMAP4 configurations! Unfortunately the devices
->> tend to follow the data manual for OMAP5.
->> *if* there is no need for it to boot, I suggest removing it.
->> 
-> I don't understand you. For OMAP5, that data without voltage
-> controller support doesn't do anything bad. Since there was some
-> dependency of voltage domain association whit PD's, I have to keep
-> that. I never claimed that OMAP4 settings would work for OMAP5
-> in absolute terms.
->
-> Feel free to post a patch with right data which you seems to have.
-> I don't mind you removing that data as long as the device
-> continues to boot. Patch welcome.
+What's dwc2? I can only see dwc3 in mainline kernel tree and it doesn't 
+seem to be compatible with s3c-hsotg.
 
-Thanks to Rajendra's cleanup, I don't think we need dummy data anymore:
-
-   http://marc.info/?l=linux-omap&m=137147503827947&w=2
-
-That series is queued for v3.11.
-
-Kevin
+Best regards,
+Tomasz
