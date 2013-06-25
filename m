@@ -1,45 +1,41 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 25 Jun 2013 23:05:06 +0200
-Subject: [PATCH 1/4] usb: gadget: s3c-hsotg: Allow driver instantiation
- using device tree
-In-Reply-To: <20130625210044.GD9748@arwen.pp.htv.fi>
-References: <1372174706-5459-1-git-send-email-t.figa@samsung.com>
- <5782443.xpFZv1Saq0@flatron> <20130625210044.GD9748@arwen.pp.htv.fi>
-Message-ID: <1543279.BFn8pxUra6@flatron>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 25 Jun 2013 23:09:26 +0200
+Subject: [BUG] mv64xxx i2c bus lock w/ commit eda6bee6c7
+References: <87a9mkttxr.fsf@natisbad.org> <20130623153931.GD7626@kw.sim.vm.gnt>
+ <20130623160659.GB17536@roeck-us.net> <87fvw8ehne.fsf@natisbad.org>
+ <20130624183006.GA3129@katana> <87wqpjkxfz.fsf@natisbad.org>
+Message-ID: <87mwqdnbi1.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 of June 2013 00:00:44 Felipe Balbi wrote:
-> On Tue, Jun 25, 2013 at 10:57:06PM +0200, Tomasz Figa wrote:
-> > On Tuesday 25 of June 2013 23:46:32 Felipe Balbi wrote:
-> > > On Tue, Jun 25, 2013 at 05:38:23PM +0200, Tomasz Figa wrote:
-> > > > This patch adds OF match table to the driver to allow
-> > > > instantiating it
-> > > > using device tree.
-> > > > 
-> > > > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > > 
-> > > when will this driver get merged into dwc2 ?
-> > 
-> > What's dwc2? I can only see dwc3 in mainline kernel tree and it
-> > doesn't
-> > seem to be compatible with s3c-hsotg.
-> 
-> drivers/staging/dwc2/
+Hi Wolfram,
 
-Oh right, staging, I forgot to check there.
+arno at natisbad.org (Arnaud Ebalard) writes:
 
-> That's the same IP you're using Paul Zimmerman (now in Cc) is working
-> towards getting that out of staging. It currently has only host mode, so
-> plugging your code in there shouldn't be too difficult.
-> 
-> OTOH, it might be better to make your code a device-only version of dwc2
-> (drivers/usb/dwc2) and have Paul move his host side to that instead.
+> Wolfram Sang <wsa@the-dreams.de> writes:
+>
+>>> does nothing fancy either. While debugging I ended up on Debian bug
+>>> #622325 (http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622325) which
+>>> made the driver a little less suspect when a revert of commit eda6bee6c7
+>>> fixed the issue for me.
+>>
+>> Either wait for 3.11 or pick 4243fa0bad551b8c8d4ff7104e8fd557ae848845
+>> "(I2C: mv64xxx: fix race between FSM/interrupt and process context")
+>> from my for-next branch. (Note the other patches from Russell, probably
+>> all worth to pick).
+>
+> Thanks for the tip. Will try it tomorrow.
 
-Hmm, I believe Lukasz Majewski and Marek Szyprowski (both on CC) should be 
-able to say something more on this topic as I'm not really into USB 
-drivers and just doing Device Tree enablement here.
+Done. It works as expected, i.e. no i2c lock at boot on my ReadynNAS
+102 once applied. Note that I had to also apply other patches from
+Russel on which this specific commit somewhat depends.
 
-Best regards,
-Tomasz
+>> Would be nice if you could pass the info to the Debian bug as well.
+
+Done as well. I put you in the Cc: list.
+
+Thanks for your work,
+
+Cheers,
+
+a+
