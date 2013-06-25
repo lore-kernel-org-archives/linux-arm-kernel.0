@@ -1,54 +1,67 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Jun 2013 15:51:57 +0200
-Subject: [PATCH 13/16] ARM: dts: i.MX6: Add i2c and spi aliases
+Date: Tue, 25 Jun 2013 15:52:00 +0200
+Subject: [PATCH 16/16] ARM: dts: i.MX51: Add USB host1/2 pinmux entries
 In-Reply-To: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
 References: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1372168320-22605-14-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1372168320-22605-17-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows to order the i2c and spi devices correctly.
-While at it reorder the aliases entries alphabetically.
+This adds pinmux entries for USBH1/2 in ULPI mode.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/imx51.dtsi | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 7707f2e..2d73f83 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -14,11 +14,6 @@
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 7eb026e..0ca62be 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -574,6 +574,44 @@
+ 						>;
+ 					};
+ 				};
++
++				usbh1 {
++					pinctrl_usbh1_1: usbh1grp-1 {
++						fsl,pins = <
++							MX51_PAD_USBH1_DATA0__USBH1_DATA0 0x1e5
++							MX51_PAD_USBH1_DATA1__USBH1_DATA1 0x1e5
++							MX51_PAD_USBH1_DATA2__USBH1_DATA2 0x1e5
++							MX51_PAD_USBH1_DATA3__USBH1_DATA3 0x1e5
++							MX51_PAD_USBH1_DATA4__USBH1_DATA4 0x1e5
++							MX51_PAD_USBH1_DATA5__USBH1_DATA5 0x1e5
++							MX51_PAD_USBH1_DATA6__USBH1_DATA6 0x1e5
++							MX51_PAD_USBH1_DATA7__USBH1_DATA7 0x1e5
++							MX51_PAD_USBH1_CLK__USBH1_CLK 0x1e5
++							MX51_PAD_USBH1_DIR__USBH1_DIR 0x1e5
++							MX51_PAD_USBH1_NXT__USBH1_NXT 0x1e5
++							MX51_PAD_USBH1_STP__USBH1_STP 0x1e5
++						>;
++					};
++				};
++
++				usbh2 {
++					pinctrl_usbh2_1: usbh2grp-1 {
++						fsl,pins = <
++							MX51_PAD_EIM_D16__USBH2_DATA0 0x1e5
++							MX51_PAD_EIM_D17__USBH2_DATA1 0x1e5
++							MX51_PAD_EIM_D18__USBH2_DATA2 0x1e5
++							MX51_PAD_EIM_D19__USBH2_DATA3 0x1e5
++							MX51_PAD_EIM_D20__USBH2_DATA4 0x1e5
++							MX51_PAD_EIM_D21__USBH2_DATA5 0x1e5
++							MX51_PAD_EIM_D22__USBH2_DATA6 0x1e5
++							MX51_PAD_EIM_D23__USBH2_DATA7 0x1e5
++							MX51_PAD_EIM_A24__USBH2_CLK 0x1e5
++							MX51_PAD_EIM_A25__USBH2_DIR 0x1e5
++							MX51_PAD_EIM_A27__USBH2_NXT 0x1e5
++							MX51_PAD_EIM_A26__USBH2_STP 0x1e5
++						>;
++					};
++				};
+ 			};
  
- / {
- 	aliases {
--		serial0 = &uart1;
--		serial1 = &uart2;
--		serial2 = &uart3;
--		serial3 = &uart4;
--		serial4 = &uart5;
- 		gpio0 = &gpio1;
- 		gpio1 = &gpio2;
- 		gpio2 = &gpio3;
-@@ -26,6 +21,18 @@
- 		gpio4 = &gpio5;
- 		gpio5 = &gpio6;
- 		gpio6 = &gpio7;
-+		i2c0 = &i2c1;
-+		i2c1 = &i2c2;
-+		i2c2 = &i2c3;
-+		serial0 = &uart1;
-+		serial1 = &uart2;
-+		serial2 = &uart3;
-+		serial3 = &uart4;
-+		serial4 = &uart5;
-+		spi0 = &ecspi1;
-+		spi1 = &ecspi2;
-+		spi2 = &ecspi3;
-+		spi3 = &ecspi4;
- 	};
- 
- 	intc: interrupt-controller at 00a01000 {
+ 			pwm1: pwm at 73fb4000 {
 -- 
 1.8.3.1
