@@ -1,49 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Jun 2013 23:58:11 -0700
-Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
-In-Reply-To: <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
-References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
- <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
-Message-ID: <20130625065811.GZ5523@atomide.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Tue, 25 Jun 2013 07:53:47 +0100
+Subject: [PATCH v4 0/7] ARM:STixxxx: Add STixxxx platform and board support
+In-Reply-To: <20130624175415.GA31429@quad.lixom.net>
+References: <1371811076-27168-1-git-send-email-srinivas.kandagatla@st.com>
+ <20130624175415.GA31429@quad.lixom.net>
+Message-ID: <51C93E7B.30709@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [130624 05:13]:
-> On Fri, Jun 21, 2013 at 5:03 PM, Grygorii Strashko
-> <grygorii.strashko@ti.com> wrote:
+On 24/06/13 18:54, Olof Johansson wrote:
+> On Fri, Jun 21, 2013 at 11:37:56AM +0100, Srinivas KANDAGATLA wrote:
+>> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>>
+>> Thankyou all for reviewing the v3 patches.
+>>
+>> This patch-set adds basic support for STMicroelectronics STixxxx SOCs
+>> which includes STiH415 and STiH416 with B2000 and B2020 board support.
+>>
+>> STiH415 and STiH416 are dual-core ARM Cortex-A9 CPU, designed for use in
+>> Set-top-boxes. The SOC support is available in mach-stixxxx which contains
+>> support code for STiH415, STiH416 SOCs including the generic board support.
+>>
+>> The reason for adding two SOCs at this patch set is to show that no new
+>> C code is required for second SOC(STiH416) support.
+>>
+>> This patch-set only contains the SOC support, all the driver support for
+>> this platform are submitted to respective mailing lists.
 > 
-> > Hence, add pinctrl handling in omap_device core:
-> > 1) on PM runtime resume
-> > - switch pinctrl state to "default" (todo: "active")
-> > 2) on PM runtime suspend
-> > - switch pinctrl state to "idle"
-> > 3) during system wide suspend
-> > - switch pinctrl state to "sleep" or "idle" if omap_device core disables device
-> > - switch pinctrl state to "sleep" if device is disabled already
-
-Do you need a separate setting for "idle" and "sleep", or are
-they the same?
-
-> > 4) during system wide resume
-> > - switch pinctrl state to "default" (todo: "active") if omap_device core has
-> >   disabled  device during suspend
-> > - switch pinctrl state to "idle" if device was already disabled before suspend
+> Hi,
 > 
-> I don't understand step 4.
+> I think these are looking quite reasonable, and I am ready to apply them
+> to 3.11.
 > 
-> I get the creeps about whether the system is runtime suspended
-> or runtime resumed when we come to resume proper, so I need
-> Kevin to have a look at this.
+> However, I have one bikeshed comment. I find the name of the platform to be
+> awkward. Would you mind naming it mach-sti instead?
+Am OK to rename them,
+But, I see the patches on arm-soc for-next branch.
+
+Thanks,
+srini
+
+
 > 
-> Apart from that it looks good.
 > 
-> Stephen and Tony are trying to figure out the details of whether "active"
-> is necessary or not in a related thread I think.
-
-Yes we should have that sorted out over next few weeks, so let's
-just wait a little while on all these dynamic remuxing patches
-to avoid churn.
-
-Regards,
-
-Tony
+> -Olof
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
