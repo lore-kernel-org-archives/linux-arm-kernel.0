@@ -1,29 +1,26 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 25 Jun 2013 10:12:31 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes-non-critical v3.11 (round 2)
-In-Reply-To: <20130623220618.GX31667@titan.lakedaemon.net>
-References: <20130623220618.GX31667@titan.lakedaemon.net>
-Message-ID: <20130625171231.GC10694@quad.lixom.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 25 Jun 2013 14:12:35 -0300
+Subject: [patch 1/1] imx53-qsb: enable usb power
+In-Reply-To: <878v1y9kyi.fsf@lebrac.rtp-net.org>
+References: <20130620212939.018670789@rtp-net.org>
+ <CAOMZO5Bk6hBtK1G_jGejAg2+2L+cJqTw-NebKUpVn-6XwBUWxw@mail.gmail.com>
+ <CAOMZO5DR6ChNwX8Kqb9mO66-M4xi1G3R8nQ=ENUwrp9k9S8vDg@mail.gmail.com>
+ <878v1y9kyi.fsf@lebrac.rtp-net.org>
+Message-ID: <CAOMZO5Ai7onT=qNtrW+Pj=mLhMt5svQxYo1TnY6wK=DVybfGSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 23, 2013 at 06:06:18PM -0400, Jason Cooper wrote:
-> Arnd, Olof,
-> 
-> Got a late bloomer this weekend.  Thanks to Ezequiel for spotting this
-> and providing a fix.
-> 
-> 
-> The following changes since commit cf8088c5cac6ce20d914b9131533844b9291a054:
-> 
->   arm: mvebu: fix length of Ethernet registers area in .dtsi (2013-05-28 14:48:28 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/fixes-non-3.11-2
+On Tue, Jun 25, 2013 at 2:08 PM, Arnaud Patard
+<arnaud.patard@rtp-net.org> wrote:
 
+> How do you want to proceed ? send a patch on top of mine or send a new
+> patch containing my patch and this change ? ( I guess that the later
+> would be easier)
 
-Pulled.
+It would be nice if you could send a v2 of your patch adding the
+vbus_supply node.
+>
+> btw, now that it seems that some more stuff has been merged in chipidea
+> are in next, what about enabling the second port ?
 
-
--Olof
+That would be nice as well, please send a patch for it if you have a chance.
