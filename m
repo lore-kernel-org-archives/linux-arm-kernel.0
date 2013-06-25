@@ -1,34 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Jun 2013 12:58:57 +0200
-Subject: [PATCH v3 03/10] pinctrl:st: Add pinctrl and pinconf support.
-In-Reply-To: <20130624141257.GM27646@sirena.org.uk>
-References: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
- <1371737138-9340-1-git-send-email-srinivas.kandagatla@st.com>
- <51C45816.5010207@st.com>
- <CACRpkdb-H2=GdF54Fay+PQVdXLTs++L5+QYe_vFPuzpa+E4ZMg@mail.gmail.com>
- <20130624141257.GM27646@sirena.org.uk>
-Message-ID: <CACRpkdaxqfdXz8bE0coF_mN2W5EUW1ENUJqwV8ne-ezUBpziCA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 25 Jun 2013 11:59:23 +0100
+Subject: [Question] race between spin_lock and spin_unlock
+In-Reply-To: <CACVXFVNq111U5OvVNXX-xm8RodQoXSjLUSFHzehRvtdk9jMCzA@mail.gmail.com>
+References: <CACVXFVMBL5E5SGwDatn_ay0sPOhqPKTwouCbzjwrhPuRKHNDcg@mail.gmail.com>
+ <20130624154357.GB25582@mudshark.cambridge.arm.com>
+ <CACVXFVNgONa79n+7Bg4p4Fx568XaK6gy+L9tCrP=CmOGwKY7ig@mail.gmail.com>
+ <20130624163732.GC25582@mudshark.cambridge.arm.com>
+ <CACVXFVMW39SD2YvW-+_A_kv0YgyOToB7xqhHgT7eZKxxWL0-mA@mail.gmail.com>
+ <20130625084805.GB31006@mudshark.cambridge.arm.com>
+ <CACVXFVNq111U5OvVNXX-xm8RodQoXSjLUSFHzehRvtdk9jMCzA@mail.gmail.com>
+Message-ID: <20130625105923.GE31838@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 4:12 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Jun 24, 2013 at 01:57:56PM +0200, Linus Walleij wrote:
->
->> This seems fairly complete, but I cannot have such a basic dependency onto
->> the regmap tree this late in the merge window, i.e. I'm not ready to pull
->> all of regmap into the pinctrl tree. I'd consider this for merging
->> for the next kernel cycle so it's more orthogonal.
->
-> I've got the patch on a topic branch in regmap to allow for this sort of
-> stuff - I can readily provide a signed tag for you to get just that
-> patch if that'd help?  Alternatively I'm happy to carry the pinctrl
-> patch in regmap?
+On Tue, Jun 25, 2013 at 11:54:23AM +0100, Ming Lei wrote:
+> On Tue, Jun 25, 2013 at 4:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Jun 25, 2013 at 05:31:44AM +0100, Ming Lei wrote:
+> >> On Tue, Jun 25, 2013 at 12:37 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> > You mean, if you had two CPUs spinning on a lock held by a third CPU? In
+> >> > this case, the third CPU would have to release the lock, then one of the
+> >> > waiters would have to acquire it, complete its critical section and finally
+> >> > release it before the other waiter had executed its wfe (about three
+> >> > instructions)...
+> >>
+> >> I mean the below situation:
+> >>
+> >> CPU0                                                                          CPU1
+> >>
+> >> spin_lock(&A)
+> >>       StoreExcl(lock->next)
+> >>                                                                                       spin_unlock(&A)
+> >>                                                                                               Store(&lock->owner)
+> >>                                                                                               dsb_sev()
+> >>       interrupt comes
+> >>               - wfe() called in the
+> >>               irq handler
+> >
+> > Is this just a vanilla wfe, or as part of a spin_lock? If it's part of a
+> > spin_lock, then we'll do a sev when we unlock it. An opencoded wfe in an
+> 
+> Suppose it is part of spin_lock(&B), and the sev in spin_unlock(&B) may happen
+> in CPU2 or CPU3, then two sev() will come in CPU0.
+> 
+> My question is that if the wfe in spin_lock(&B) called from irq
+> handler may clear
+> the two sev().
 
-I'm OK that you carry this in the regmap tree.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Yes, as I said before, the events don't accumulate.
 
-The clock retime weirdness convinced me that this cannot really
-use the generic pin config layout...
+> If yes, the wfe() in spin_lock(&A) may still wait for later sev, right?  If not,
+> it should be fine.
 
-Yours,
-Linus Walleij
+There's no problem, because spin_unlock(&B) in the interrupt handler on CPU0
+(which must happen before it returns from the interrupt) will send a further
+event and the wfe encountered when resuming spin_lock(&A) will not wait.
+
+Will
