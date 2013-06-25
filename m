@@ -1,80 +1,38 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 25 Jun 2013 14:16:06 +0530
-Subject: [GIT PULL v2] dmaengine: at_hdmac: updates for 3.11
-In-Reply-To: <1372149389-18544-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1372149389-18544-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20130625084606.GL23141@intel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 25 Jun 2013 10:26:12 +0100
+Subject: [alsa-devel] [PATCH] ASoC: Tegra and i.MX are mutually exclusive
+In-Reply-To: <51C93A62.1050702@metafoo.de>
+References: <5967649.DUvDfofhX4@wuerfel>
+ <51C93A62.1050702@metafoo.de>
+Message-ID: <20130625092612.GX27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 10:36:29AM +0200, Nicolas Ferre wrote:
-> Vinod,
-> 
-> As said previously, I have collected the patches that can reach sdma git tree
-> for 3.11.
-> 
-> This is the patch series that has already been sent by Ludovic and myself.
-> It is the part of the series that is dedicated to dmaengine. It is based on
-> slave-dma/next. 
-> This set of patches update the dt dma binding for at_hdmac since we need one
-> more parameter. In order to keep backward compatibility, an existing cell will
-> be used to add this parameter. Since the content of that cell will become a
-> magic value due to the concatenation of the two parameters, it is time to
-> use macros.
-> 
-> I have also stacked some cleanup and trivial patches that were arround for some
-> time plus the more recent conversion to the clock routines with
-> prepare/unprepare variants.
-> 
-> Thanks, best regards,
-> 
-> v2 of pull-request: update of patch (dmaengine: at_hdmac: prepare clk before
->                     calling enable): removal of failing return code handling.
-> 
-> The following changes since commit fdf3303434787a4ba00a37a6748eb68974c63b0d:
-> 
->   Merge branch 'for-linus' into next (2013-06-21 19:44:03 +0530)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-sdma
-Pulled thanks
+On Tue, Jun 25, 2013 at 08:36:18AM +0200, Lars-Peter Clausen wrote:
 
---
-~Vinod
+> It's just the ac97 drivers that are mutually exclusive. I'm not sure whether
+> it makes sense to make the whole platforms mutually exclusive for this.
 
-> 
-> for you to fetch changes up to ee92c15c3a6244e51faa520c4e2ef6daeca80792:
-> 
->   dmaengine: at_hdmac: prepare clk before calling enable (2013-06-25 10:27:18 +0200)
-> 
-> ----------------------------------------------------------------
-> dmaengine updates for Atmel AT91 driver: at_hdmac.c
-> - Device Tree binding update adding the use of header file for coding FIFO
->   configuration values
-> - a warning removal
-> - use of clk_prepare_enable/disable_unprepare in driver
-> 
-> ----------------------------------------------------------------
-> Boris BREZILLON (1):
->       dmaengine: at_hdmac: prepare clk before calling enable
-> 
-> Ludovic Desroches (2):
->       ARM: at91: dt: add header to define at_hdmac configuration
->       dmaengine: at_hdmac: add FIFO configuration parameter to DMA DT binding
-> 
-> Nicolas Ferre (2):
->       dmaengine: at_hdmac: remove unsuded atc_cleanup_descriptors()
->       dmaengine/trivial: at_hdmac: add curly brackets to if/else expressions
-> 
->  .../devicetree/bindings/dma/atmel-dma.txt          |  7 +-
->  drivers/dma/at_hdmac.c                             | 79 ++++++++++------------
->  include/dt-bindings/dma/at91.h                     | 27 ++++++++
->  3 files changed, 68 insertions(+), 45 deletions(-)
->  create mode 100644 include/dt-bindings/dma/at91.h
-> 
-> -- 
-> Nicolas Ferre
+I agree, this is excessive and seems to rather defeat the point of
+having multi-platform in the first place.  It makes it impossible to
+build the sound drivers multi-platform all for the sake of a bus which
+is used by approximately nothing these days (hence the lack of love the
+code has had).
 
--- 
+> Also this is not limited to tegra and imx. As more platforms are converted
+> to multiplatform ARM the same issue will pop up for other platforms as well.
+> I don't think your solution will scale really well for multiple platforms.
+> The best solution would of course be to make AC97 work properly with
+> multiple AC97 drivers. But maybe we can get away with a 'choice' Kconfig
+> entry which allows you to select which platforms AC97 driver you want to build.
+
+It should be easy enough to refactor so that we assign the ops pointer
+when the driver is loaded instead of at link time which isn't solving
+the issue but makes it better.  I'll send some patches.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/bfcd2a96/attachment.sig>
