@@ -1,70 +1,58 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Tue, 25 Jun 2013 12:09:46 +0530
-Subject: [PATCH V4 11/11] USB: OHCI: Properly handle ohci-spear suspend
-In-Reply-To: <1372142386-10691-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
- <1372142386-10691-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1372142386-10691-12-git-send-email-manjunath.goudar@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 24 Jun 2013 23:54:50 -0700
+Subject: [PATCH v12 00/11] DMA Engine support for AM33XX
+In-Reply-To: <51C85958.9030502@ti.com>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <20130624101903.GV5523@atomide.com> <51C85958.9030502@ti.com>
+Message-ID: <20130625065450.GY5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of ohci-spear glue was not
-properly handled as it was not suspending generic part
-of ohci controller. Calling explicitly the ohci_suspend()
-routine in spear_ohci_hcd_drv_suspend() will ensure proper
-handling of suspend scenario.
+* Benoit Cousson <b-cousson@ti.com> [130624 07:42]:
+> Hi Tony,
+> 
+> On 06/24/2013 12:19 PM, Tony Lindgren wrote:
+> > Hi,
+> > 
+> > For merging this series, I suggest the following sets:
+> > 
+> > * Joel A Fernandes <joelagnel@ti.com> [130620 14:13]:
+> >>
+> >> Joel A Fernandes (3):
+> >>   edma: config: Enable config options for EDMA
+> >>   da8xx: config: Enable MMC and FS options
+> >>   ARM: davinci: Fix compiler warnings in devices-da8xx
+> >>
+> >> Matt Porter (8):
+> >>   dmaengine: edma: Add TI EDMA device tree binding
+> >>   ARM: edma: Add DT and runtime PM support to the private EDMA API
+> >>   ARM: edma: Add EDMA crossbar event mux support
+> >>   dmaengine: edma: enable build for AM33XX
+> > 
+> > Sekhar should queue the above patches, I've acked the
+> > mach-omap2/Kconfig change.
+> > 
+> >>   spi: omap2-mcspi: add generic DMA request support to the DT binding
+> >>   spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
+> > 
+> > 
+> > The spi changes should get merged via the driver list.
+> > 
+> >>   ARM: dts: add AM33XX EDMA support
+> >>   ARM: dts: add AM33XX SPI DMA support
+> > 
+> > Benoit should queue the .dts changes.
+> 
+> I'll do that, but do you consider them for 3.11?
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg KH <greg@kroah.com>
-Cc: linux-usb at vger.kernel.org
+Yes right after -rc1 if it makes the DMA work. We almost
+certainly need to send few branches of fixes after -rc1 once
+we find out what might have broken by the removal of the
+hwmod data..
 
-V2:
- -Incase ohci_suspend() fails, return right away without
-  executing further.
-V3:
- -Aligned variable "do_wakeup" and "ret".
+But let's stick to minimal changes for the -rc series
+naturally.
 
-V4:
- -The do_wakeup and ret variable alignment is removed.
----
- drivers/usb/host/ohci-spear.c |   12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+Regards,
 
-diff --git a/drivers/usb/host/ohci-spear.c b/drivers/usb/host/ohci-spear.c
-index 31ff3fc..41148f8 100644
---- a/drivers/usb/host/ohci-spear.c
-+++ b/drivers/usb/host/ohci-spear.c
-@@ -130,20 +130,26 @@ static int spear_ohci_hcd_drv_remove(struct platform_device *pdev)
- }
- 
- #if defined(CONFIG_PM)
--static int spear_ohci_hcd_drv_suspend(struct platform_device *dev,
-+static int spear_ohci_hcd_drv_suspend(struct platform_device *pdev,
- 		pm_message_t message)
- {
--	struct usb_hcd *hcd = platform_get_drvdata(dev);
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
- 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
- 	struct spear_ohci *sohci_p = to_spear_ohci(hcd);
-+	bool do_wakeup = device_may_wakeup(&pdev->dev);
-+	int ret;
- 
- 	if (time_before(jiffies, ohci->next_statechange))
- 		msleep(5);
- 	ohci->next_statechange = jiffies;
- 
-+	ret = ohci_suspend(hcd, do_wakeup);
-+	if (ret)
-+		return ret;
-+
- 	clk_disable_unprepare(sohci_p->clk);
- 
--	return 0;
-+	return ret;
- }
- 
- static int spear_ohci_hcd_drv_resume(struct platform_device *dev)
--- 
-1.7.9.5
+Tony
