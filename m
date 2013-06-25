@@ -1,147 +1,181 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Tue, 25 Jun 2013 17:05:59 +0200
-Subject: [PATCH] ARM: dts: imx: fix clocks for cspi
-In-Reply-To: <1369369002.837105175@f322.mail.ru>
-References: <1369309085-31146-1-git-send-email-jonas@microbit.se>
- <1369319290.379285076@f398.i.mail.ru>
- <20130523173306.GT32299@pengutronix.de>
- <1369369002.837105175@f322.mail.ru>
-Message-ID: <20130625150559.GA3150@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 25 Jun 2013 18:06:50 +0300
+Subject: [PATCH v2 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+In-Reply-To: <1372170110-12993-1-git-send-email-s.nawrocki@samsung.com>
+References: <1372170110-12993-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <20130625150649.GA21334@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, May 24, 2013 at 08:16:42AM +0400, Alexander Shiyan wrote:
-> > > > On Thu, May 23, 2013 at 04:10:59PM +0400, Alexander Shiyan wrote:
-> > > > > > > The CSPI controller has only one clock, but the driver spi-imx.c needs clock "per" to calculate bitrate divisor.
-> > > > > > > 
-> > > > > > > Signed-off-by: Jonas Andersson <jonas@microbit.se>
-> > > > > > > ---
-> > > > > > >  arch/arm/boot/dts/imx25.dtsi | 12 ++++++------
-> > > > > > >  arch/arm/boot/dts/imx27.dtsi |  6 +++---
-> > > > > > >  arch/arm/boot/dts/imx51.dtsi |  2 +-
-> > > > > > >  arch/arm/boot/dts/imx53.dtsi |  2 +-
-> > > > > > >  4 files changed, 11 insertions(+), 11 deletions(-)
-> > > > > > > 
-> > > > > > > diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> > > > > > > index d2550e0..7011539 100644
-> > > > > > > --- a/arch/arm/boot/dts/imx25.dtsi
-> > > > > > > +++ b/arch/arm/boot/dts/imx25.dtsi
-> > > > > > > @@ -141,8 +141,8 @@
-> > > > > > >  				#size-cells = <0>;
-> > > > > > >  				compatible = "fsl,imx25-cspi", "fsl,imx35-cspi";
-> > > > > > >  				reg = <0x43fa4000 0x4000>;
-> > > > > > > -				clocks = <&clks 62>;
-> > > > > > > -				clock-names = "ipg";
-> > > > > > > +				clocks = <&clks 62>, <&clks 62>;
-> > > > > > > +				clock-names = "ipg", "per";
-> > > > > > >  				interrupts = <14>;
-> > > > > > >  				status = "disabled";
-> > > > > > >  			};
-> > > > > 
-> > > > > Sorry, typo.
-> > > > > 
-> > > > > > Why you do not use "dummy" clock for "per" here?
-> > > > > 
-> > > > > *for "ipg"
-> > > > 
-> > > > Because the same clock is used for the register clock and the baudrate
-> > > > clock. You have to enable the ipg clock to access registers.
-> > > 
-> > > I am not see any "ipg" clock usage in the spi driver.
-> > 
-> > It's the register clock. The driver enables it in order to access the
-> > registers.
-> > 
-> > > If "ipg" clock is
-> > > a dependency for "per" clock, it should be registered in ccm as parent.
-> > 
-> > Look, the eCSPI unit has two clock inputs, one for accessing the
-> > registers (ipg) and one for generating the SPI bit clock (per). Now the
-> > CSPI unit only has a single clock input, so the 100% correct way would
-> > be to specify only a single clock for this unit. However, since we
-> > handle both units with the same driver the simplest way to cope with
-> > it is to provide the very same clock twice, once for the register access
-> > and once for generating the SPI bit clock.
-> > And yes, we have to specify the real clock twice and can't replace one
-> > with a dummy clock, because if we specify a dummy clock for the ipg
-> > clock, then the driver couldn't access the registers even if it enabled
-> > the clock. If we would replace the SPI bit clock with a dummy clock then
-> > the device couldn't send data even if the driver enabled the bit clock.
-> > (That of course only becomes relevant when the driver actually
-> > en/disables the clocks during runtime and not only once during probe).
-> 
-> Well, I completely forgot about the clock for registers.
-> Everything looks right then.
-> However, it would be nice to add a few words about the clocks in the
-> Documentation/devicetree/bindings/spi/fsl-imx~spi.txt
-> Thanks for the clarification.
+On Tue, Jun 25, 2013 at 04:21:46PM +0200, Sylwester Nawrocki wrote:
+> +enum phy_id {
+> +	PHY_CSIS0,
+> +	PHY_DSIM0,
+> +	PHY_CSIS1,
+> +	PHY_DSIM1,
+> +	NUM_PHYS
 
-the spi device i got, only keeps working if having the per2_gate
-enabled.
+please prepend these with EXYNOS_PHY_ or EXYNOS_MIPI_PHY_
 
-It also seems that we lost that dependency, as the file
-arch/arm/mach-imx/clk-imx27.c contains this:
+> +struct exynos_video_phy {
+> +	spinlock_t slock;
+> +	struct phy *phys[NUM_PHYS];
 
-clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.0");
-clk_register_clkdev(clk[cspi1_ipg_gate], "ipg", "imx27-cspi.0");
-clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.1");
-clk_register_clkdev(clk[cspi2_ipg_gate], "ipg", "imx27-cspi.1");
-clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.2");
-clk_register_clkdev(clk[cspi3_ipg_gate], "ipg", "imx27-cspi.2");
+more than one phy ? This means you should instantiate driver multiple
+drivers. Each phy id should call probe again.
 
-So my suggestion is as follows:
+> +static int __set_phy_state(struct exynos_video_phy *state,
+> +				enum phy_id id, unsigned int on)
+> +{
+> +	void __iomem *addr;
+> +	unsigned long flags;
+> +	u32 reg, reset;
+> +
+> +	if (WARN_ON(id > NUM_PHYS))
+> +		return -EINVAL;
 
-From: Michael Grzeschik <m.grzeschik@pengutronix.de>
-Subject: [PATCH] ARM: dts: imx: fix clocks for cspi
+you don't want to do this, actually. It'll bug you everytime you want to
+add another phy ID :-)
 
-The CSPI controller needs the per2_gate clock to work.
+> +	addr = state->regs + EXYNOS_MIPI_PHY_CONTROL(id / 2);
+> +
+> +	if (id == PHY_DSIM0 || id == PHY_DSIM1)
+> +		reset = EXYNOS_MIPI_PHY_MRESETN;
+> +	else
+> +		reset = EXYNOS_MIPI_PHY_SRESETN;
+> +
+> +	spin_lock_irqsave(&state->slock, flags);
+> +	reg = readl(addr);
+> +	if (on)
+> +		reg |= reset;
+> +	else
+> +		reg &= ~reset;
+> +	writel(reg, addr);
+> +
+> +	/* Clear ENABLE bit only if MRESETN, SRESETN bits are not set. */
+> +	if (on)
+> +		reg |= EXYNOS_MIPI_PHY_ENABLE;
+> +	else if (!(reg & EXYNOS_MIPI_PHY_RESET_MASK))
+> +		reg &= ~EXYNOS_MIPI_PHY_ENABLE;
+> +
+> +	writel(reg, addr);
+> +	spin_unlock_irqrestore(&state->slock, flags);
+> +
+> +	pr_debug("%s(): id: %d, on: %d, addr: %#x, base: %#x\n",
+> +		 __func__, id, on, (u32)addr, (u32)state->regs);
 
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
----
- arch/arm/boot/dts/imx27.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+use dev_dbg() instead.
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 7f7d4a5..14683c3 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -169,7 +169,7 @@
- 				compatible = "fsl,imx27-cspi";
- 				reg = <0x1000e000 0x1000>;
- 				interrupts = <16>;
--				clocks = <&clks 53>, <&clks 53>;
-+				clocks = <&clks 53>, <&clks 60>;
- 				clock-names = "ipg", "per";
- 				status = "disabled";
- 			};
-@@ -180,7 +180,7 @@
- 				compatible = "fsl,imx27-cspi";
- 				reg = <0x1000f000 0x1000>;
- 				interrupts = <15>;
--				clocks = <&clks 52>, <&clks 52>;
-+				clocks = <&clks 52>, <&clks 60>;
- 				clock-names = "ipg", "per";
- 				status = "disabled";
- 			};
-@@ -345,7 +345,7 @@
- 				compatible = "fsl,imx27-cspi";
- 				reg = <0x10017000 0x1000>;
- 				interrupts = <6>;
--				clocks = <&clks 51>, <&clks 51>;
-+				clocks = <&clks 51>, <&clks 60>;
- 				clock-names = "ipg", "per";
- 				status = "disabled";
- 			};
+> +
+> +	return 0;
+> +}
+> +
+> +static int exynos_video_phy_power_on(struct phy *phy)
+> +{
+> +	struct exynos_video_phy *state = dev_get_drvdata(&phy->dev);
+
+looks like we should have phy_get_drvdata() helper :-) Kishon ?
+
+> +static struct phy *exynos_video_phy_xlate(struct device *dev,
+> +					struct of_phandle_args *args)
+> +{
+> +	struct exynos_video_phy *state = dev_get_drvdata(dev);
+> +
+> +	if (WARN_ON(args->args[0] > NUM_PHYS))
+> +		return NULL;
+
+please remove this check.
+
+> +	return state->phys[args->args[0]];
+
+and your xlate is 'wrong'.
+
+> +}
+> +
+> +static struct phy_ops exynos_video_phy_ops = {
+> +	.power_on	= exynos_video_phy_power_on,
+> +	.power_off	= exynos_video_phy_power_off,
+> +	.owner		= THIS_MODULE,
+> +};
+> +
+> +static int exynos_video_phy_probe(struct platform_device *pdev)
+> +{
+> +	struct exynos_video_phy *state;
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *res;
+> +	struct phy_provider *phy_provider;
+> +	int i;
+> +
+> +	state = devm_kzalloc(dev, sizeof(*state), GFP_KERNEL);
+> +	if (!state)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +
+> +	state->regs = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(state->regs))
+> +		return PTR_ERR(state->regs);
+> +
+> +	dev_set_drvdata(dev, state);
+
+you can use platform_set_drvdata(pdev, state);
+
+same thing though, no strong feelings.
+
+> +	phy_provider = devm_of_phy_provider_register(dev,
+> +					exynos_video_phy_xlate);
+> +	if (IS_ERR(phy_provider))
+> +		return PTR_ERR(phy_provider);
+> +
+> +	for (i = 0; i < NUM_PHYS; i++) {
+> +		char label[8];
+> +
+> +		snprintf(label, sizeof(label), "%s.%d",
+> +				i == PHY_DSIM0 || i == PHY_DSIM1 ?
+> +				"dsim" : "csis", i / 2);
+> +
+> +		state->phys[i] = devm_phy_create(dev, i, &exynos_video_phy_ops,
+> +								label, state);
+> +		if (IS_ERR(state->phys[i])) {
+> +			dev_err(dev, "failed to create PHY %s\n", label);
+> +			return PTR_ERR(state->phys[i]);
+> +		}
+> +	}
+
+this really doesn't look correct to me. It looks like you have multiple
+PHYs, one for each ID. So your probe should be called for each PHY ID
+and you have several phy_providers too.
+
+> +static const struct of_device_id exynos_video_phy_of_match[] = {
+> +	{ .compatible = "samsung,s5pv210-mipi-video-phy" },
+
+and this should contain all PHY IDs:
+
+	{ .compatible = "samsung,s5pv210-mipi-video-dsim0-phy",
+		.data = (const void *) DSIM0, },
+	{ .compatible = "samsung,s5pv210-mipi-video-dsim1-phy",
+		.data = (const void *) DSIM1, },
+	{ .compatible = "samsung,s5pv210-mipi-video-csi0-phy"
+		.data = (const void *) CSI0, },
+	{ .compatible = "samsung,s5pv210-mipi-video-csi1-phy"
+		.data = (const void *) CSI1, },
+
+then on your probe you can fetch that data field and use it as phy->id.
+
+> +static struct platform_driver exynos_video_phy_driver = {
+> +	.probe	= exynos_video_phy_probe,
+
+you *must* provide a remove method. drivers with NULL remove are
+non-removable :-)
+
 -- 
-1.8.3.1
-
-Thanks,
-Michael
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/ead349d6/attachment.sig>
