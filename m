@@ -1,57 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Jun 2013 23:54:50 -0700
-Subject: [PATCH v12 00/11] DMA Engine support for AM33XX
-In-Reply-To: <51C85958.9030502@ti.com>
-References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
- <20130624101903.GV5523@atomide.com> <51C85958.9030502@ti.com>
-Message-ID: <20130625065450.GY5523@atomide.com>
+Date: Mon, 24 Jun 2013 23:58:11 -0700
+Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
+In-Reply-To: <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
+References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
+ <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
+Message-ID: <20130625065811.GZ5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [130624 07:42]:
-> Hi Tony,
+* Linus Walleij <linus.walleij@linaro.org> [130624 05:13]:
+> On Fri, Jun 21, 2013 at 5:03 PM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
 > 
-> On 06/24/2013 12:19 PM, Tony Lindgren wrote:
-> > Hi,
-> > 
-> > For merging this series, I suggest the following sets:
-> > 
-> > * Joel A Fernandes <joelagnel@ti.com> [130620 14:13]:
-> >>
-> >> Joel A Fernandes (3):
-> >>   edma: config: Enable config options for EDMA
-> >>   da8xx: config: Enable MMC and FS options
-> >>   ARM: davinci: Fix compiler warnings in devices-da8xx
-> >>
-> >> Matt Porter (8):
-> >>   dmaengine: edma: Add TI EDMA device tree binding
-> >>   ARM: edma: Add DT and runtime PM support to the private EDMA API
-> >>   ARM: edma: Add EDMA crossbar event mux support
-> >>   dmaengine: edma: enable build for AM33XX
-> > 
-> > Sekhar should queue the above patches, I've acked the
-> > mach-omap2/Kconfig change.
-> > 
-> >>   spi: omap2-mcspi: add generic DMA request support to the DT binding
-> >>   spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
-> > 
-> > 
-> > The spi changes should get merged via the driver list.
-> > 
-> >>   ARM: dts: add AM33XX EDMA support
-> >>   ARM: dts: add AM33XX SPI DMA support
-> > 
-> > Benoit should queue the .dts changes.
+> > Hence, add pinctrl handling in omap_device core:
+> > 1) on PM runtime resume
+> > - switch pinctrl state to "default" (todo: "active")
+> > 2) on PM runtime suspend
+> > - switch pinctrl state to "idle"
+> > 3) during system wide suspend
+> > - switch pinctrl state to "sleep" or "idle" if omap_device core disables device
+> > - switch pinctrl state to "sleep" if device is disabled already
+
+Do you need a separate setting for "idle" and "sleep", or are
+they the same?
+
+> > 4) during system wide resume
+> > - switch pinctrl state to "default" (todo: "active") if omap_device core has
+> >   disabled  device during suspend
+> > - switch pinctrl state to "idle" if device was already disabled before suspend
 > 
-> I'll do that, but do you consider them for 3.11?
+> I don't understand step 4.
+> 
+> I get the creeps about whether the system is runtime suspended
+> or runtime resumed when we come to resume proper, so I need
+> Kevin to have a look at this.
+> 
+> Apart from that it looks good.
+> 
+> Stephen and Tony are trying to figure out the details of whether "active"
+> is necessary or not in a related thread I think.
 
-Yes right after -rc1 if it makes the DMA work. We almost
-certainly need to send few branches of fixes after -rc1 once
-we find out what might have broken by the removal of the
-hwmod data..
-
-But let's stick to minimal changes for the -rc series
-naturally.
+Yes we should have that sorted out over next few weeks, so let's
+just wait a little while on all these dynamic remuxing patches
+to avoid churn.
 
 Regards,
 
