@@ -1,66 +1,45 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Jun 2013 15:51:58 +0200
-Subject: [PATCH 14/16] ARM: dts: i.MX51: move kpp pinmux entry
+Date: Tue, 25 Jun 2013 15:51:55 +0200
+Subject: [PATCH 11/16] ARM: dts: i.MX51: Add i2c and spi aliases
 In-Reply-To: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
 References: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1372168320-22605-15-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1372168320-22605-12-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For keeping the alphabetical order in the pinmux nodes.
+This allows to order the i2c and spi devices correctly.
+While at it reorder the aliases entries alphabetically.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/imx51.dtsi | 30 +++++++++++++++---------------
- 1 file changed, 15 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/imx51.dtsi | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index f64c87e..7eb026e 100644
+index cb6e09b..f64c87e 100644
 --- a/arch/arm/boot/dts/imx51.dtsi
 +++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -486,6 +486,21 @@
- 					};
- 				};
+@@ -15,13 +15,18 @@
  
-+				kpp {
-+					pinctrl_kpp_1: kppgrp-1 {
-+						fsl,pins = <
-+							MX51_PAD_KEY_ROW0__KEY_ROW0 0xe0
-+							MX51_PAD_KEY_ROW1__KEY_ROW1 0xe0
-+							MX51_PAD_KEY_ROW2__KEY_ROW2 0xe0
-+							MX51_PAD_KEY_ROW3__KEY_ROW3 0xe0
-+							MX51_PAD_KEY_COL0__KEY_COL0 0xe8
-+							MX51_PAD_KEY_COL1__KEY_COL1 0xe8
-+							MX51_PAD_KEY_COL2__KEY_COL2 0xe8
-+							MX51_PAD_KEY_COL3__KEY_COL3 0xe8
-+						>;
-+					};
-+				};
-+
- 				pata {
- 					pinctrl_pata_1: patagrp-1 {
- 						fsl,pins = <
-@@ -559,21 +574,6 @@
- 						>;
- 					};
- 				};
--
--				kpp {
--					pinctrl_kpp_1: kppgrp-1 {
--						fsl,pins = <
--							MX51_PAD_KEY_ROW0__KEY_ROW0 0xe0
--							MX51_PAD_KEY_ROW1__KEY_ROW1 0xe0
--							MX51_PAD_KEY_ROW2__KEY_ROW2 0xe0
--							MX51_PAD_KEY_ROW3__KEY_ROW3 0xe0
--							MX51_PAD_KEY_COL0__KEY_COL0 0xe8
--							MX51_PAD_KEY_COL1__KEY_COL1 0xe8
--							MX51_PAD_KEY_COL2__KEY_COL2 0xe8
--							MX51_PAD_KEY_COL3__KEY_COL3 0xe8
--						>;
--					};
--				};
- 			};
+ / {
+ 	aliases {
+-		serial0 = &uart1;
+-		serial1 = &uart2;
+-		serial2 = &uart3;
+ 		gpio0 = &gpio1;
+ 		gpio1 = &gpio2;
+ 		gpio2 = &gpio3;
+ 		gpio3 = &gpio4;
++		i2c0 = &i2c1;
++		i2c1 = &i2c2;
++		serial0 = &uart1;
++		serial1 = &uart2;
++		serial2 = &uart3;
++		spi0 = &ecspi1;
++		spi1 = &ecspi2;
++		spi2 = &cspi;
+ 	};
  
- 			pwm1: pwm at 73fb4000 {
+ 	tzic: tz-interrupt-controller at e0000000 {
 -- 
 1.8.3.1
