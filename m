@@ -1,53 +1,78 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 25 Jun 2013 00:31:35 -0700
+Date: Tue, 25 Jun 2013 00:38:49 -0700
 Subject: [PATCH] pinctrl: document the pinctrl PM states
-In-Reply-To: <CACRpkdY7hF+9s0f64yc09DHLFQCjzzhPoS-ypBmgit=kFFD0Mg@mail.gmail.com>
-References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
- <51BA1FE7.4000900@wwwdotorg.org>
- <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
+In-Reply-To: <51C88B54.9000902@wwwdotorg.org>
+References: <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
  <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
- <CACRpkdYwGHMznjoJqf5bX_74pmeKSiWtTwpNF1_4GSEk+KwrZA@mail.gmail.com>
- <20130617180212.GU20992@atomide.com>
- <CACRpkdY7hF+9s0f64yc09DHLFQCjzzhPoS-ypBmgit=kFFD0Mg@mail.gmail.com>
-Message-ID: <20130625073134.GE5523@atomide.com>
+ <51C20E3A.8090304@wwwdotorg.org>
+ <20130620063823.GD5523@atomide.com>
+ <51C3577E.6040709@wwwdotorg.org>
+ <20130621062552.GI5523@atomide.com>
+ <51C4A593.6000900@wwwdotorg.org>
+ <20130624101055.GT5523@atomide.com>
+ <51C88B54.9000902@wwwdotorg.org>
+Message-ID: <20130625073849.GF5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [130624 05:43]:
-> On Mon, Jun 17, 2013 at 8:02 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Linus Walleij <linus.walleij@linaro.org> [130617 09:11]:
+* Stephen Warren <swarren@wwwdotorg.org> [130624 11:15]:
+> On 06/24/2013 04:10 AM, Tony Lindgren wrote:
+> > * Stephen Warren <swarren@wwwdotorg.org> [130621 12:18]:
+> >> On 06/21/2013 12:25 AM, Tony Lindgren wrote:
+> >>> * Stephen Warren <swarren@wwwdotorg.org> [130620 12:32]:
+> >>>>
+> >>>> I assume you mean there shouldn't be any issue *modifying* the pinctrl
+> >>>> API to allow multiple states to be active at once? And where you're
+> >>>> talking about having multiple sets active at once already, you're
+> >>>> talking about some other API?
+> >>>
+> >>> Nope, the standard pinctrl API. At least I have not seen issues with
+> >>> having multiple states active the same time in a single driver.
+> >>
+> >> Please take a look at the implementation of pinctrl_select_state(). It
+> >> very explicitly performs the following steps:
+> >>
+> >> 1) Find all pins(groups) that are used in the current state but not the
+> >> new state, and execute pinctrl_disable_setting() on them. (For mux
+> >> settings only, not pin config, since the core doesn't have any idea how
+> >> to reverse config settings).
+> >>
+> >> 2) For all settings in the new state, apply those settings.
+> >>
+> >> So, it very explicitly only allows a single state to be set at a time.
+> >> Equally, p->state (the field which stores the currently selected state)
+> >> is a single item, not a set/list/array.
+> > 
+> > OK thanks I get now what you're saying. I did not see the p->state
+> > issue as the disable function won't do anything for the SoCs that I
+> > mostly deal with.
+> > 
+> >> So, this code needs rework if you want the core to support the concept
+> >> of having multiple states active at once, since it needs separate
+> >> pinctrl_activate_state() and pinctrl_deactivate_state() APIs, in order
+> >> to avoid step (1) above. And of course, p->state would need to be a
+> >> set/list/array.
+> > 
+> > I'll think about it a bit and do a patch to fix this. It seems that
+> > that we need just two entries in the p->state array: static (default),
+> > and dynamic. Then the dynamic would be typically one of: active, idle,
+> > rx, tx.
 > 
-> >> Bear in mind that struct pinctl * forks effects in two paths,
-> >> one is muxing the other is config, like pull-ups etc.
-> >
-> > I also thought the plan was to merge pinmux and pinconf and
-> > do things based the named modes?
-> 
-> That is done from a consumer point of view.
-> Consumers only care about pinctrl * handles
-> and pinctrl_state * switches.
-> 
-> > The last time I tried using the pinconf functions it involved
-> > knowing the name of the pin in the consumer driver. The name
-> > may not be very descriptive in the device tree cases at least
-> > for the pinctrl-single. So I did not pay much attention to
-> > the pinconf functions.
-> 
-> Consumers should not use that interface, i.e.:
-> 
-> int pin_config_get(const char *dev_name, const char *name,
->                                 unsigned long *config);
-> int pin_config_set(const char *dev_name, const char *name,
->                                  unsigned long config)
-> 
-> This needs to be deleted from <linux/pinctrl/consumer.h>
-> I'll see if I can get rid of it pronto to avoid any more confusion
-> and sorry for leaving that in place for too long.
-> 
-> The proper way to use it is to use the states.
+> I'm not entirely convinced that "2" is the right number. If we start
+> allowing drivers to "piece together" multiple different state names, why
+> wouldn't you allow 3 (or n) different state names to be active at once?
+> Off-hand, I don't have specific use-cases in mind for more than 2 state
+> (or even 1 in my case I suspect) - it just seems like expecting to
+> arbitrarily restrict the number of co-active states is unlikely to last
+> for long, and it'll end up being a slippery slope.
 
-OK thanks for clarifying that. Yes I think the named states
-is a good way to handle the pins in a generic way.
+Yes let's set it up so we can expand it if needed.
+
+We probably don't want the consumer drivers to piece together various
+named states directly though as that will lead to custom code in every
+driver..
+
+I think we can make it happen automaticall for the cases we've discussed.
 
 Regards,
 
