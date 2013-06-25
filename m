@@ -1,57 +1,27 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 25 Jun 2013 16:12:03 -0400
-Subject: [PATCH] ARM: omap5: build opp4xxx_data.c
-In-Reply-To: <20130625195751.GA6529@kahuna>
-References: <201306212229.54238.arnd@arndb.de> <20130621204250.GA16139@kahuna>
- <alpine.DEB.2.02.1306251918590.14373@utopia.booyaka.com>
- <51C9F595.3060609@ti.com> <20130625195751.GA6529@kahuna>
-Message-ID: <51C9F993.6050109@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 25 Jun 2013 13:13:49 -0700
+Subject: [GIT PULL 1/2] Samsung cleanup PWM for v3.11
+In-Reply-To: <20130625200851.GA8663@mithrandir>
+References: <51C87D32.6050607@samsung.com> <51C9C6B3.4040003@samsung.com>
+ <20130625200851.GA8663@mithrandir>
+Message-ID: <CAOesGMhVsHP3Ld78MWfwwBkaKA=Z4tBmJi05OKMUgJrNp8s3dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 June 2013 03:57 PM, Nishanth Menon wrote:
-> On 15:55-20130625, Santosh Shilimkar wrote:
->> On Tuesday 25 June 2013 03:20 PM, Paul Walmsley wrote:
->>> Santosh,
->>>
->>> On Fri, 21 Jun 2013, Nishanth Menon wrote:
->>>
->>>> 	/*
->>>> 	 * XXX Will depend on the process, validation, and binning
->>>> 	 * for the currently-running IC. Use OMAP4 data for time being.
->>>> 	 */
->>>> #ifdef CONFIG_PM_OPP
->>>> 	omap5_voltdm_mpu.volt_data = omap446x_vdd_mpu_volt_data;
->>>> 	omap5_voltdm_mm.volt_data = omap446x_vdd_iva_volt_data;
->>>> 	omap5_voltdm_core.volt_data = omap446x_vdd_core_volt_data;
->>>> #endif
->>>>
->>>> Should we just remove this instead? these are obviously wrong.
->>>
->>> Are the OMAP4460 values expected to work and be safe for OMAP5, or not?  
->>> If the latter, please send a patch to remove them.
->>>
->> The plan was to update the data along with and VC OPP update
->> for OMAP5 which Keerthy is working on. As such without VC code,
->> this data is not doing anything so it is safe.
-> opp data in mach-omap2 is no longer used. everything is moving to dts
-> and OMAP5 is dts only. *IF* this is preventing boot, then we can hack
-> something in while we continue to debate on what we RFCs we have posted
-> so far.
->
-The boot is just fine as I said, the setting doesn't have any effect
-without the code which is going to use that data.
- 
-> Further, OPPs are NOT for Voltage Controller (VC). It is meant for
-> specific domains like MPU, SGX etc.. Having that data here, especially
-> wrong data is just plain wrong IMHO.
->
-Well having voltage data in voltage domain was not my decision ;-)
-Instead of creating another set of dummy data, I just used what
-is out there(OMAP4) with clear comment that data needs to be updated.
-I don't see any problem in this considering we have devices booting
-and working nicely for OMAP5
+On Tue, Jun 25, 2013 at 1:08 PM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Wed, Jun 26, 2013 at 01:34:59AM +0900, Kukjin Kim wrote:
 
-Regards,
-Santosh
- 
+>> Hi Arnd and Olof
+>>
+>> Please hold on pulling this one because Thierry Reding has objection
+>> on this. I think, this can be queued for next time.
+>
+> If it's really just my objection keeping this back, then I'm fine with
+> adding the comment in a follow-up patch.
+
+No, we're also out of time for 3.11. But let's get this queued for
+3.12 as soon as the merge window closes -- it's a very nice cleanup.
+
+
+-Olof
