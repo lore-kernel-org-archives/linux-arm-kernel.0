@@ -1,64 +1,47 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 25 Jun 2013 12:57:49 -0700
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <51C9F0A8.1050607@ti.com> (Tom Rini's message of "Tue, 25 Jun
- 2013 15:34:00 -0400")
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <51C9F0A8.1050607@ti.com>
-Message-ID: <87fvw6t136.fsf@linaro.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 25 Jun 2013 14:57:51 -0500
+Subject: [PATCH] ARM: omap5: build opp4xxx_data.c
+In-Reply-To: <51C9F595.3060609@ti.com>
+References: <201306212229.54238.arnd@arndb.de> <20130621204250.GA16139@kahuna>
+ <alpine.DEB.2.02.1306251918590.14373@utopia.booyaka.com>
+ <51C9F595.3060609@ti.com>
+Message-ID: <20130625195751.GA6529@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tom Rini <trini@ti.com> writes:
+On 15:55-20130625, Santosh Shilimkar wrote:
+> On Tuesday 25 June 2013 03:20 PM, Paul Walmsley wrote:
+> > Santosh,
+> > 
+> > On Fri, 21 Jun 2013, Nishanth Menon wrote:
+> > 
+> >> 	/*
+> >> 	 * XXX Will depend on the process, validation, and binning
+> >> 	 * for the currently-running IC. Use OMAP4 data for time being.
+> >> 	 */
+> >> #ifdef CONFIG_PM_OPP
+> >> 	omap5_voltdm_mpu.volt_data = omap446x_vdd_mpu_volt_data;
+> >> 	omap5_voltdm_mm.volt_data = omap446x_vdd_iva_volt_data;
+> >> 	omap5_voltdm_core.volt_data = omap446x_vdd_core_volt_data;
+> >> #endif
+> >>
+> >> Should we just remove this instead? these are obviously wrong.
+> > 
+> > Are the OMAP4460 values expected to work and be safe for OMAP5, or not?  
+> > If the latter, please send a patch to remove them.
+> > 
+> The plan was to update the data along with and VC OPP update
+> for OMAP5 which Keerthy is working on. As such without VC code,
+> this data is not doing anything so it is safe.
+opp data in mach-omap2 is no longer used. everything is moving to dts
+and OMAP5 is dts only. *IF* this is preventing boot, then we can hack
+something in while we continue to debate on what we RFCs we have posted
+so far.
 
-> On 06/25/2013 02:20 PM, Paul Walmsley wrote:
->> + Vaibhav and Kevin
->> 
->> Hi,
->> 
->> On Tue, 25 Jun 2013, Felipe Balbi wrote:
->> 
->>> On Mon, Jun 17, 2013 at 05:23:17AM +0000, Paul Walmsley wrote:
->>>> Boot to userspace:
->>>>     FAIL ( 3/12): 37xxevm, am335xbone, am335xbonelt
->>>
->>> Paul, we have at least 2 different folks who can't reproduce your bone
->>> and bone black boot to userspace failures. I wonder how you're trying to
->>> boot them.
->>>
->>> Care to share your test scripts ?
->> 
->> Sure... the methodology is completely open and has been posted in the 
->> online logs since the first test cycle.  (For some reason, almost no one 
->> clicks through the test directory trees that I post online.  Is this a 
->> documentation issue?  What can we do to make it easier for people to 
->> explore this?)
->
-> Well, another link never hurts the search results :)
->
-> [snip]
->> Am certainly open to the idea that there's something wrong with the way 
->> that I'm booting either of these.  But AFAIK no one's been able to 
->> identify exactly what it could be.  I haven't had the time recently to 
->> spend hours going through the various permutations, given all the other 
->> breakage :-(  BeagleBone-white has the additional complication that it is 
->> not easy to automate, due to the way that power is delivered to the board, 
->> so there is an extra dimension of difficulty there.
->
-> Ah-ha, I reproduced your failure.  If I make up a concat uImage + DTB,
-> rather than pass them separately, it fails to boot.  If you switch to
-> mainline U-Boot (v2012.10 or later) you get support for separate image +
-> dtb (v2013.04 gives you bootz and zImage support).  v2013.04 will also
-> work out of the box for BeagleBone-Black.
+Further, OPPs are NOT for Voltage Controller (VC). It is meant for
+specific domains like MPU, SGX etc.. Having that data here, especially
+wrong data is just plain wrong IMHO.
 
-Just to confirm, my problems with mainline were with appended DTB also.
-Separate DTB and zImage work fine (at least using u-boot v2013.04.)
-
-That being said, appended DTB should still work, so there's a bug hiding
-someplace that needs to be found fixed.
-
-Can you guys update your tests to test appended DTB also?
-
-Kevin
+-- 
+Regards,
+Nishanth Menon
