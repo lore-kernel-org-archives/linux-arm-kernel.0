@@ -1,205 +1,70 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 25 Jun 2013 16:27:58 +0800
-Subject: [PATCH v3 3/5] clk: dt: binding for basic multiplexer clock
-In-Reply-To: <1371795256-16703-4-git-send-email-mturquette@linaro.org>
-References: <1371795256-16703-1-git-send-email-mturquette@linaro.org>
- <1371795256-16703-4-git-send-email-mturquette@linaro.org>
-Message-ID: <CAD6h2NS=AOQ4B6V=TtA120ga9ucF7eBxEguqFK0y4cfpa-F50Q@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 25 Jun 2013 10:36:29 +0200
+Subject: [GIT PULL v2] dmaengine: at_hdmac: updates for 3.11
+Message-ID: <1372149389-18544-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 June 2013 14:14, Mike Turquette <mturquette@linaro.org> wrote:
-> Device Tree binding for the basic clock multiplexer, plus the setup
-> function to register the clock.  Based on the existing fixed-clock
-> binding.
->
-> Includes minor beautification of clk-provider.h where some whitespace is
-> added and of_fixed_factor_clock_setup is relocated to maintain a
-> consistent style.
->
-> Tero Kristo contributed helpful bug fixes to this patch.
->
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> ---
-> Changes since v2:
-> * added hiword-mask property to the binding
-> * changed bit-shift property from u8 to u32 in the dt binding
->
-> Changes since v1:
-> * pass shift value into clk_register_mux_table
-> * s/multiplexor/multiplexer/
-> * removed debug prints
-> * mask is u32, shift is u8
-> * DT property names use dashes instead of underscores
-> * DT property names are more verbose
-> * shift property is optional in binding and can be auto-generated from a
->   full 32-bit mask
->
->  .../devicetree/bindings/clock/mux-clock.txt        | 79 ++++++++++++++++++++++
->  drivers/clk/clk-mux.c                              | 65 +++++++++++++++++-
->  include/linux/clk-provider.h                       |  5 +-
->  3 files changed, 147 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/mux-clock.txt
->
-> diff --git a/Documentation/devicetree/bindings/clock/mux-clock.txt b/Documentation/devicetree/bindings/clock/mux-clock.txt
-> new file mode 100644
-> index 0000000..54cb8d1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/mux-clock.txt
-> @@ -0,0 +1,79 @@
-> +Binding for simple mux clock.
-> +
-> +This binding uses the common clock binding[1].  It assumes a
-> +register-mapped multiplexer with multiple input clock signals or
-> +parents, one of which can be selected as output.  This clock does not
-> +gate or adjust the parent rate via a divider or multiplier.
-> +
-> +By default the "clocks" property lists the parents in the same order
-> +as they are programmed into the regster.  E.g:
-> +
-> +       clocks = <&foo_clock>, <&bar_clock>, <&baz_clock>;
-> +
-> +results in programming the register as follows:
-> +
-> +register value         selected parent clock
-> +0                      foo_clock
-> +1                      bar_clock
-> +2                      baz_clock
-> +
-> +Some clock controller IPs do not allow a value of zero to be programmed
-> +into the register, instead indexing begins at 1.  The optional property
-> +"index_one" modified the scheme as follows:
-> +
-> +register value         selected clock parent
-> +1                      foo_clock
-> +2                      bar_clock
-> +3                      baz_clock
-> +
-> +Additionally an optional table of bit and parent pairs may be supplied
-> +like so:
-> +
-> +       table = <&foo_clock 0x0>, <&bar_clock, 0x2>, <&baz_clock, 0x4>;
-> +
-> +where the first value in the pair is the parent clock and the second
-> +value is the bitfield to be programmed into the register.
-> +
-> +The binding must provide the register to control the mux and the mask
-> +for the corresponding control bits.  Optionally the number of bits to
-> +shift that mask if necessary.  If the shift value is missing it is the
-> +same as supplying a zero shift.
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Required properties:
-> +- compatible : shall be "mux-clock".
-> +- #clock-cells : from common clock binding; shall be set to 0.
-> +- clocks : link phandles of parent clocks
-> +- reg : base address for register controlling adjustable mux
-> +- bit-mask : arbitrary bitmask for programming the adjustable mux
-> +
-> +Optional properties:
-> +- clock-output-names : From common clock binding.
-> +- table : array of integer pairs defining parents & bitfield values
-> +- bit-shift : number of bits to shift the bit-mask, defaults to
-> +  (ffs(mask) - 1) if not present
-> +- index-starts-at-one : valid input select programming starts at 1, not
-> +  zero
-> +- hiword-mask : lower half of the register programs the mux, upper half
-> +  of the register indicates bits that were updated in the lower half
-> +
-> +Examples:
-> +       clock: clock at 4a008100 {
-> +               compatible = "mux-clock";
-> +               #clock-cells = <0>;
-> +               clocks = <&clock_foo>, <&clock_bar>, <&clock_baz>;
-> +               reg = <0x4a008100 0x4>
-> +               mask = <0x3>;
-> +               index_one;
-> +       };
-> +
-> +       clock: clock at 4a008100 {
-> +               #clock-cells = <0>;
-> +               compatible = "mux-clock";
-> +               clocks = <&clock_foo>, <&clock_bar>, <&clock_baz>;
-> +               reg = <0x4a008100 0x4>;
-> +               mask = <0x3>;
-> +               shift = <0>;
-> +               table = <&clock_foo 1>, <&clock_bar 2>, <&clock_baz 3>;
-> +       };
-> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-> index 614444c..4751bce 100644
-> --- a/drivers/clk/clk-mux.c
-> +++ b/drivers/clk/clk-mux.c
-> @@ -1,7 +1,7 @@
->  /*
->   * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
->   * Copyright (C) 2011 Richard Zhao, Linaro <richard.zhao@linaro.org>
-> - * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
-> + * Copyright (C) 2011-2013 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
-> @@ -16,6 +16,8 @@
->  #include <linux/slab.h>
->  #include <linux/io.h>
->  #include <linux/err.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
->
->  /*
->   * DOC: basic adjustable multiplexer clock that cannot gate
-> @@ -166,3 +168,64 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
->                                       flags, reg, shift, mask, clk_mux_flags,
->                                       NULL, lock);
->  }
-> +
-> +#ifdef CONFIG_OF
-> +/**
-> + * of_mux_clk_setup() - Setup function for simple mux rate clock
-> + */
-> +void of_mux_clk_setup(struct device_node *node)
-> +{
-> +       struct clk *clk;
-> +       const char *clk_name = node->name;
-> +       void __iomem *reg;
-> +       int num_parents;
-> +       const char **parent_names;
-> +       int i;
-> +       u8 clk_mux_flags = 0;
-> +       u32 mask = 0;
-> +       u32 shift = 0;
-> +
-> +       of_property_read_string(node, "clock-output-names", &clk_name);
-> +
-> +       num_parents = of_clk_get_parent_count(node);
-> +       if (num_parents < 1) {
-> +               pr_err("%s: mux-clock %s must have parent(s)\n",
-> +                               __func__, node->name);
-> +               return;
-> +       }
-> +
-> +       parent_names = kzalloc((sizeof(char*) * num_parents),
-> +                       GFP_KERNEL);
-> +
-> +       for (i = 0; i < num_parents; i++)
-> +               parent_names[i] = of_clk_get_parent_name(node, i);
-> +
-> +       reg = of_iomap(node, 0);
+Vinod,
 
-As you mentioned above,  reg : base address for register controlling
-adjustable mux.
+As said previously, I have collected the patches that can reach sdma git tree
+for 3.11.
 
-Each clock node has the reg property. It means that we have to
-allocate one page memory
-for each register since of_iomap() is used at here. We always have
-lots of registers with
-continuous address in SoC, like 0x40a00040, 0x40a00044, .... Then
-we'll waste too much
-memory in system.
+This is the patch series that has already been sent by Ludovic and myself.
+It is the part of the series that is dedicated to dmaengine. It is based on
+slave-dma/next. 
+This set of patches update the dt dma binding for at_hdmac since we need one
+more parameter. In order to keep backward compatibility, an existing cell will
+be used to add this parameter. Since the content of that cell will become a
+magic value due to the concatenation of the two parameters, it is time to
+use macros.
 
-How about only define common function to parse property? Make register
-mapping handled
-by vendor's clock driver.
+I have also stacked some cleanup and trivial patches that were arround for some
+time plus the more recent conversion to the clock routines with
+prepare/unprepare variants.
 
-Regards
-Haojian
+Thanks, best regards,
+
+v2 of pull-request: update of patch (dmaengine: at_hdmac: prepare clk before
+                    calling enable): removal of failing return code handling.
+
+The following changes since commit fdf3303434787a4ba00a37a6748eb68974c63b0d:
+
+  Merge branch 'for-linus' into next (2013-06-21 19:44:03 +0530)
+
+are available in the git repository at:
+
+
+  git://github.com/at91linux/linux-at91.git tags/at91-sdma
+
+for you to fetch changes up to ee92c15c3a6244e51faa520c4e2ef6daeca80792:
+
+  dmaengine: at_hdmac: prepare clk before calling enable (2013-06-25 10:27:18 +0200)
+
+----------------------------------------------------------------
+dmaengine updates for Atmel AT91 driver: at_hdmac.c
+- Device Tree binding update adding the use of header file for coding FIFO
+  configuration values
+- a warning removal
+- use of clk_prepare_enable/disable_unprepare in driver
+
+----------------------------------------------------------------
+Boris BREZILLON (1):
+      dmaengine: at_hdmac: prepare clk before calling enable
+
+Ludovic Desroches (2):
+      ARM: at91: dt: add header to define at_hdmac configuration
+      dmaengine: at_hdmac: add FIFO configuration parameter to DMA DT binding
+
+Nicolas Ferre (2):
+      dmaengine: at_hdmac: remove unsuded atc_cleanup_descriptors()
+      dmaengine/trivial: at_hdmac: add curly brackets to if/else expressions
+
+ .../devicetree/bindings/dma/atmel-dma.txt          |  7 +-
+ drivers/dma/at_hdmac.c                             | 79 ++++++++++------------
+ include/dt-bindings/dma/at91.h                     | 27 ++++++++
+ 3 files changed, 68 insertions(+), 45 deletions(-)
+ create mode 100644 include/dt-bindings/dma/at91.h
+
+-- 
+Nicolas Ferre
