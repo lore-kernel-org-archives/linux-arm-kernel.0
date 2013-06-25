@@ -1,44 +1,67 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 25 Jun 2013 16:14:13 +0200
-Subject: [PATCH 0/5] Kernel mode NEON for XOR and RAID6
-In-Reply-To: <20130625135648.GA2327@linaro.org>
-References: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
- <20130606151705.GG16794@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1306061156330.18597@syhkavp.arg>
- <20130607175007.GH8111@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1306072214120.18597@syhkavp.arg>
- <20130621093311.GD6983@mudshark.cambridge.arm.com>
- <CAKv+Gu8FTXC9XSE4DJ2LQueJ3FKjdjv8=sjDjTETH7fq+ruNGQ@mail.gmail.com>
- <51C46A0D.8070505@codeaurora.org>
- <20130625135648.GA2327@linaro.org>
-Message-ID: <CAKv+Gu8psQZhPHrzPVTniO+W4qPnc6jwMboz3VRdVC4ezxv4MA@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 25 Jun 2013 16:15:30 +0200
+Subject: [PATCH v2 0/5] Generic PHY driver for the Exynos SoC MIPI CSI-2/DSI
+ DPHYs
+Message-ID: <1372169735-12501-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 June 2013 15:56, Dave Martin <dave.martin@linaro.org> wrote:
-> Significant benchmarks on the boot path would be unacceptable, unless they
-> are *fast* (and by fast, I mean fast on all platforms, not just fast on
-> the fast platforms).  If one second gets added onto the boot path for each
-> optimised algorithm, that sounds like a fail.  If all the benchmarks
-> combined take one second in total, that's no quite as bad.
->
-> Maybe benchmarks could be time-bounded (i.e., see how much data we can
-> chug though in X milliseconds) instead of size-bounded.  This would avoid
-> unreasonable slowdown on slow platforms, while avoiding trivially small
-> benchmark payloads on faster platforms which may typically have a more
-> complex architecture, bigger caches etc. which would cause them to take
-> longer to reach saturated performance when running a particular algorithm.
->
+This patch series adds a simple driver for the Samsung S5P/Exynos SoC
+series MIPI CSI-2 receiver (MIPI DSIM) and MIPI DSI transmitter (MIPI
+DSIM) DPHYs, using the generic PHY framework [1]. Previously the MIPI
+CSIS and MIPI DSIM used a platform callback to control the PHY power
+enable and reset bits. The platform callback can be dropped now and
+those drivers don't depend any more on any platform code.
 
-Benchmarks are already time bounded, at least the instances I am aware
-of (xor and raid6) are. They each measure, for each available
-implementation, the amount of work performed during a fixed time. For
-RAID6, this is 16 jiffies, for XOR it's only 1 jiffy but each test is
-repeated 5 times.
+Changes since v1:
+ - enabled build as module and with CONFIG_OF disabled,
+ - added phy_id enum,
+ - of_address_to_resource() replaced with platform_get_resource(),
+ - adapted to changes in the PHY API v7, v8 - added phy labels,
+ - added MODULE_DEVICE_TABLE() entry,
+ - the driver file renamed to phy-exynos-mipi-video.c,
+ - changed DT compatible string to "samsung,s5pv210-mipi-video-phy",
+ - corrected the compatible property's description.
+ - patch 3/5 "video: exynos_dsi: Use generic PHY driver" replaced
+   with a patch modifying the MIPI DSIM driver which is currently
+   in mainline.
 
-So I think this should not be a problem, especially as it is unlikely
-that newly added implementations (such as NEON) will be able to
-execute on older/slower platforms in the first place.
+This series depends on the generic PHY framework [1]. It can be browsed
+at: http://git.linuxtv.org/snawrocki/samsung.git/exynos-mipi-phy
+This branch is based on the 'for-next' branch from
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+and the patch series:
+http://www.spinics.net/lists/arm-kernel/msg254667.html
 
-Regards,
-Ard.
+Thank you for all the review comments.
+
+[1] https://lkml.org/lkml/2013/6/25/22
+
+Sylwester Nawrocki (5):
+  phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+  ARM: dts: Add MIPI PHY node to exynos4.dtsi
+  video: exynos_mipi_dsim: Use generic PHY driver
+  exynos4-is: Use generic MIPI CSIS PHY driver
+  ARM: Samsung: Remove MIPI PHY setup code
+
+ .../phy/samsung,s5pv210-mipi-video-phy.txt         |   14 ++
+ arch/arm/boot/dts/exynos4.dtsi                     |   10 ++
+ arch/arm/mach-exynos/include/mach/regs-pmu.h       |    5 -
+ arch/arm/mach-s5pv210/include/mach/regs-clock.h    |    4 -
+ arch/arm/plat-samsung/Kconfig                      |    5 -
+ arch/arm/plat-samsung/Makefile                     |    1 -
+ arch/arm/plat-samsung/setup-mipiphy.c              |   60 -------
+ drivers/media/platform/exynos4-is/mipi-csis.c      |   16 +-
+ drivers/phy/Kconfig                                |    9 +
+ drivers/phy/Makefile                               |    3 +-
+ drivers/phy/phy-exynos-mipi-video.c                |  173 ++++++++++++++++++++
+ drivers/video/exynos/exynos_mipi_dsi.c             |   18 +-
+ include/linux/platform_data/mipi-csis.h            |   11 +-
+ include/video/exynos_mipi_dsim.h                   |    6 +-
+ 14 files changed, 236 insertions(+), 99 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/samsung,s5pv210-mipi-video-phy.txt
+ delete mode 100644 arch/arm/plat-samsung/setup-mipiphy.c
+ create mode 100644 drivers/phy/phy-exynos-mipi-video.c
+
+--
+1.7.9.5
