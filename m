@@ -1,29 +1,32 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Tue, 25 Jun 2013 01:48:02 +0000
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <201306241551.19831.marex@denx.de>
-References: <51A5A808.2070803@digi.com> <201306221529.53043.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803EFB072@039-SN2MPN1-023.039d.mgd.msft.net>
- <201306241551.19831.marex@denx.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803EFBC6C@039-SN2MPN1-023.039d.mgd.msft.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 24 Jun 2013 22:50:17 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_NOP_USB_XCEIV by
+ default
+Message-ID: <1372125017-16294-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
- 
-> 
-> No, I don't have this one available right now. I tried both MX23
-> Olinuxino maxi
-> (I just mutilated the board so that I cut traces to the USB devices on
-> the board
-> and routed out USB gadget connector) and a custom MX23 board.
-> 
-> Note that both have working USB peripheral mode in U-Boot too, but the
-> driver in
-> U-Boot is very minimalistic.
- 
-You mean, the larger data transfer with USB peripheral mode is ok at u-boot?
-but it can't work at Linux Kernel?
+In order to get USB functionality on mx5 boards, we need to select
+CONFIG_NOP_USB_XCEIV option, so let's enable it by default.
 
-Best regards,
-Peter
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 06686e7..0837aae 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -195,6 +195,7 @@ CONFIG_USB_EHCI_MXC=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+ CONFIG_USB_PHY=y
++CONFIG_NOP_USB_XCEIV=y
+ CONFIG_USB_MXS_PHY=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_MMC=y
+-- 
+1.8.1.2
