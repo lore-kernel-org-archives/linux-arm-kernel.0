@@ -1,41 +1,54 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Jun 2013 15:51:46 +0200
-Subject: [PATCH 02/16] ARM: dts: i.MX6qdl: Add compatible and clock to flexcan
- nodes
+Date: Tue, 25 Jun 2013 15:51:57 +0200
+Subject: [PATCH 13/16] ARM: dts: i.MX6: Add i2c and spi aliases
 In-Reply-To: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
 References: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1372168320-22605-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1372168320-22605-14-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This allows to order the i2c and spi devices correctly.
+While at it reorder the aliases entries alphabetically.
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/imx6qdl.dtsi | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index f21d259..9efaa56 100644
+index 7707f2e..2d73f83 100644
 --- a/arch/arm/boot/dts/imx6qdl.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -278,13 +278,19 @@
- 			};
+@@ -14,11 +14,6 @@
  
- 			can1: flexcan at 02090000 {
-+				compatible = "fsl,imx6q-flexcan";
- 				reg = <0x02090000 0x4000>;
- 				interrupts = <0 110 0x04>;
-+				clocks = <&clks 108>, <&clks 109>;
-+				clock-names = "ipg", "per";
- 			};
+ / {
+ 	aliases {
+-		serial0 = &uart1;
+-		serial1 = &uart2;
+-		serial2 = &uart3;
+-		serial3 = &uart4;
+-		serial4 = &uart5;
+ 		gpio0 = &gpio1;
+ 		gpio1 = &gpio2;
+ 		gpio2 = &gpio3;
+@@ -26,6 +21,18 @@
+ 		gpio4 = &gpio5;
+ 		gpio5 = &gpio6;
+ 		gpio6 = &gpio7;
++		i2c0 = &i2c1;
++		i2c1 = &i2c2;
++		i2c2 = &i2c3;
++		serial0 = &uart1;
++		serial1 = &uart2;
++		serial2 = &uart3;
++		serial3 = &uart4;
++		serial4 = &uart5;
++		spi0 = &ecspi1;
++		spi1 = &ecspi2;
++		spi2 = &ecspi3;
++		spi3 = &ecspi4;
+ 	};
  
- 			can2: flexcan at 02094000 {
-+				compatible = "fsl,imx6q-flexcan";
- 				reg = <0x02094000 0x4000>;
- 				interrupts = <0 111 0x04>;
-+				clocks = <&clks 110>, <&clks 111>;
-+				clock-names = "ipg", "per";
- 			};
- 
- 			gpt: gpt at 02098000 {
+ 	intc: interrupt-controller at 00a01000 {
 -- 
 1.8.3.1
