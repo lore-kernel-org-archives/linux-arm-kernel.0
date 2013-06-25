@@ -1,34 +1,48 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Jun 2013 15:51:52 +0200
-Subject: [PATCH 08/16] ARM: dts: i.MX53: Add iim node
-In-Reply-To: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
-References: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1372168320-22605-9-git-send-email-s.hauer@pengutronix.de>
+Date: Tue, 25 Jun 2013 15:51:44 +0200
+Subject: [PATCH] i.MX dts updates
+Message-ID: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/boot/dts/imx53.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+This series contains several dts updates to i.MX SoCs.
 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 569aa9f..42f4456 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -957,6 +957,13 @@
- 			reg = <0x60000000 0x10000000>;
- 			ranges;
- 
-+			iim: iim at 63f98000 {
-+				compatible = "fsl,imx53-iim", "fsl,imx27-iim";
-+				reg = <0x63f98000 0x4000>;
-+				interrupts = <69>;
-+				clocks = <&clks 107>;
-+			};
-+
- 			uart5: serial at 63f90000 {
- 				compatible = "fsl,imx53-uart", "fsl,imx21-uart";
- 				reg = <0x63f90000 0x4000>;
--- 
-1.8.3.1
+- Add iim nodes to the dts files. We do not have a driver for the
+  iim in Linux, but barebox needs these
+- add aliases for i2c/spi consitently. We have started it, so let's
+  complete it.
+- sync pinmux between i.MX6Q and i.MX6DL. These really should be kept
+  in sync
+- some minor cleanup stuff and additions
+
+Sascha
+
+----------------------------------------------------------------
+Sascha Hauer (16):
+      ARM: dts: i.MX6: sync imx6q and imx6dl pinmux entries
+      ARM: dts: i.MX6qdl: Add compatible and clock to flexcan nodes
+      ARM: dts: i.MX6qdl: Add i.MX31 compatible to gpt node
+      ARM: dts: i.MX27: Add iim node
+      ARM: dts: i.MX31: Add iim node
+      ARM: dts: i.MX25: Add iim node
+      ARM: dts: i.MX51: Add iim node
+      ARM: dts: i.MX53: Add iim node
+      ARM: dts: i.MX25: Add i2c and spi aliases
+      ARM: dts: i.MX27: Add i2c aliases
+      ARM: dts: i.MX51: Add i2c and spi aliases
+      ARM: dts: i.MX53: Add i2c and spi aliases
+      ARM: dts: i.MX6: Add i2c and spi aliases
+      ARM: dts: i.MX51: move kpp pinmux entry
+      ARM: dts: i.MX51 babbage: Add spi-cs-high property to pmic
+      ARM: dts: i.MX51: Add USB host1/2 pinmux entries
+
+ arch/arm/boot/dts/imx25.dtsi        |  21 ++++--
+ arch/arm/boot/dts/imx27.dtsi        |  21 ++++--
+ arch/arm/boot/dts/imx31.dtsi        |   7 ++
+ arch/arm/boot/dts/imx51-babbage.dts |   1 +
+ arch/arm/boot/dts/imx51.dtsi        |  76 ++++++++++++++++++----
+ arch/arm/boot/dts/imx53.dtsi        |  20 ++++--
+ arch/arm/boot/dts/imx6dl.dtsi       | 123 +++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/imx6q.dtsi        |   3 +-
+ arch/arm/boot/dts/imx6qdl.dtsi      |  25 ++++++--
+ 9 files changed, 258 insertions(+), 39 deletions(-)
