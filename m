@@ -1,32 +1,64 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 24 Jun 2013 22:50:17 -0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_NOP_USB_XCEIV by
- default
-Message-ID: <1372125017-16294-1-git-send-email-festevam@gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 24 Jun 2013 19:52:45 -0600
+Subject: [PATCHv3 02/11] pci: use weak functions for MSI arch-specific
+ functions
+In-Reply-To: <20130620185707.GA8888@mithrandir>
+References: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1371660979-21588-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130620185707.GA8888@mithrandir>
+Message-ID: <CAErSpo6Mm6kYZKN_n-fMRD2T1-F0sf9GStmOTA8tT0wVLedCgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Thu, Jun 20, 2013 at 12:57 PM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Wed, Jun 19, 2013 at 06:56:10PM +0200, Thomas Petazzoni wrote:
+> [...]
+>> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+>> index 2c10752..4bc0c8f 100644
+>> --- a/drivers/pci/msi.c
+>> +++ b/drivers/pci/msi.c
+>> @@ -30,19 +30,35 @@ static int pci_msi_enable = 1;
+>>
+>>  /* Arch hooks */
+>>
+>> -#ifndef arch_msi_check_device
+>> -int arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
+>> +int default_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+>> +{
+>> +     return -EINVAL;
+>> +}
+>> +
+>> +int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+>> +{
+>> +     return default_setup_msi_irq(dev, desc);
+>> +}
+>> +
+>> +void default_teardown_msi_irq(unsigned int irq)
+>> +{
+>> +}
+>> +
+>> +void __weak arch_teardown_msi_irq(unsigned int irq)
+>> +{
+>> +     return default_teardown_msi_irq(irq);
+>> +}
+>> +
+>> +int default_msi_check_device(struct pci_dev *dev, int nvec, int type)
+>>  {
+>>       return 0;
+>>  }
+>> -#endif
+>
+> I don't think keeping the default_*() for these three is necessary,
+> given that they don't do anything and therefore no architecture is
+> likely to call them when overriding.
 
-In order to get USB functionality on mx5 boards, we need to select
-CONFIG_NOP_USB_XCEIV option, so let's enable it by default.
+I agree; the whole point of __weak is to provide a "default"
+implementation, so I hope you can just remove any empty default_*()
+functions and fold the others into the arch_*() functions directly.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+If there actually are callbacks from arch-specific strong functions
+back to the stuff in the default_*() functions, that suggests that we
+should refactor and rename that bit of functionality.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 06686e7..0837aae 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -195,6 +195,7 @@ CONFIG_USB_EHCI_MXC=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_HOST=y
- CONFIG_USB_PHY=y
-+CONFIG_NOP_USB_XCEIV=y
- CONFIG_USB_MXS_PHY=y
- CONFIG_USB_STORAGE=y
- CONFIG_MMC=y
--- 
-1.8.1.2
+Bjorn
