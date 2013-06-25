@@ -1,184 +1,59 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 25 Jun 2013 19:30:43 +0800
-Subject: [PATCH v2 1/4] USB: HCD: support giveback of URB in tasklet
- context
-In-Reply-To: <Pine.LNX.4.44L0.1306241102340.1406-100000@iolanthe.rowland.org>
-References: <1372066925-23579-2-git-send-email-ming.lei@canonical.com>
- <Pine.LNX.4.44L0.1306241102340.1406-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVNwwULYg_2==CLh=dJrKJekhWqcOKdKYd_koPNoLzFfgQ@mail.gmail.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Tue, 25 Jun 2013 07:32:03 -0400
+Subject: [RFC PATCH] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <CAAQKjZNnJRddACHzD+VF=A8vJpt9SEy2ttnS3Kw0y3hexu8dnw@mail.gmail.com>
+References: <20130617182127.GM2718@n2100.arm.linux.org.uk>
+ <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
+ <20130618084308.GU2718@n2100.arm.linux.org.uk>
+ <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
+ <1371548849.4276.6.camel@weser.hi.pengutronix.de>
+ <008601ce6cb0$2c8cec40$85a6c4c0$%dae@samsung.com>
+ <1371637326.4230.24.camel@weser.hi.pengutronix.de>
+ <00ae01ce6cd9$f4834630$dd89d290$%dae@samsung.com>
+ <1371645247.4230.41.camel@weser.hi.pengutronix.de>
+ <CAAQKjZNJD4HpnJQ7iE+Gez36066M6U0YQeUEdA0+UcSOKqeghg@mail.gmail.com>
+ <20130619182925.GL2718@n2100.arm.linux.org.uk>
+ <00da01ce6d81$76eb3d60$64c1b820$%dae@samsung.com>
+ <1371714427.4230.64.camel@weser.hi.pengutronix.de>
+ <00db01ce6d8f$a3c23dd0$eb46b970$%dae@samsung.com>
+ <1371723063.4114.12.camel@weser.hi.pengutronix.de>
+ <010801ce6da7$896affe0$9c40ffa0$%dae@samsung.com>
+ <1371804843.4114.49.camel@weser.hi.pengutronix.de>
+ <CAAQKjZOxOMuL3zh_yV7tU2LBcZ7oVryiKa+LgjTM5HLY+va8zQ@mail.gmail.com>
+ <1371817628.5882.13.camel@weser.hi.pengutronix.de>
+ <CAAQKjZOeskLB7n6FM+bnB8n7ecuQM5k6uANXJXo=xk979f9s9Q@mail.gmail.com>
+ <CAH3drwZVhs=odjFdB_Mf+K0JLT5NSSbz5mP9aOS=5fx-PVdzSg@mail.gmail.com>
+ <CAAQKjZNnJRddACHzD+VF=A8vJpt9SEy2ttnS3Kw0y3hexu8dnw@mail.gmail.com>
+Message-ID: <CAF6AEGsBvZbcWDbX3FFtyDxFO1NqYNRLqHEUyP4qUD9wK+ARbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 11:17 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Mon, 24 Jun 2013, Ming Lei wrote:
->
->> This patch implements the mechanism of giveback of URB in
->> tasklet context, so that hardware interrupt handling time for
->> usb host controller can be saved much, and HCD interrupt handling
->> can be simplified.
->
-> Changes from v1 to v2?
-
-The change log is put in 0/4.
-
->
->
->> +static void usb_giveback_urb_bh(unsigned long param)
->> +{
->> +     struct giveback_urb_bh *bh = (struct giveback_urb_bh *)param;
->> +     unsigned long flags;
->> +     struct list_head local_list;
->> +
->> +     spin_lock_irqsave(&bh->lock, flags);
->> +     bh->running = 1;
->> + restart:
->> +     list_replace_init(&bh->head, &local_list);
->> +     spin_unlock_irqrestore(&bh->lock, flags);
->
-> Tasklet routines are always called with interrupts enabled, right?
-> Therefore you don't need to use the "flags" argument here or below.
-
-Good catch.
-
->
->> @@ -1667,25 +1721,40 @@ int usb_hcd_unlink_urb (struct urb *urb, int status)
->>   */
->>  void usb_hcd_giveback_urb(struct usb_hcd *hcd, struct urb *urb, int status)
->>  {
->> -     urb->hcpriv = NULL;
->> -     if (unlikely(urb->unlinked))
->> -             status = urb->unlinked;
->> -     else if (unlikely((urb->transfer_flags & URB_SHORT_NOT_OK) &&
->> -                     urb->actual_length < urb->transfer_buffer_length &&
->> -                     !status))
->> -             status = -EREMOTEIO;
->> +     struct giveback_urb_bh *bh;
->> +     bool sched, high_prio_bh;
+On Tue, Jun 25, 2013 at 5:09 AM, Inki Dae <daeinki@gmail.com> wrote:
+>> that
+>> should be the role of kernel memory management which of course needs
+>> synchronization btw A and B. But in no case this should be done using
+>> dma-buf. dma-buf is for sharing content btw different devices not
+>> sharing resources.
 >>
->> -     unmap_urb_for_dma(hcd, urb);
->> -     usbmon_urb_complete(&hcd->self, urb, status);
->> -     usb_unanchor_urb(urb);
->> +     /* pass status to tasklet via unlinked */
->> +     if (likely(!urb->unlinked))
->> +             urb->unlinked = status;
->>
->> -     /* pass ownership to the completion handler */
->> -     urb->status = status;
->> -     urb->complete (urb);
->> -     atomic_dec (&urb->use_count);
->> -     if (unlikely(atomic_read(&urb->reject)))
->> -             wake_up (&usb_kill_urb_queue);
->> -     usb_put_urb (urb);
->> +     if (!hcd_giveback_urb_in_bh(hcd) && !is_root_hub(urb->dev)) {
->> +             __usb_hcd_giveback_urb(urb);
->> +             return;
->> +     }
->> +
->> +     if (usb_pipeisoc(urb->pipe) || usb_pipeint(urb->pipe)) {
->> +             bh = &hcd->high_prio_bh;
->> +             high_prio_bh = 1;
->> +     } else {
->> +             bh = &hcd->low_prio_bh;
->> +             high_prio_bh = 0;
->> +     }
 >
-> Bool values should be assigned "true" or "false", not "1" or "0".
+> hmm, is that true? And are you sure? Then how do you think about
+> reservation? the reservation also uses dma-buf with same reason as long as I
+> know: actually, we use reservation to use dma-buf. As you may know, a
+> reservation object is allocated and initialized when a buffer object is
+> exported to a dma buf.
 
-Right.
+no, this is why the reservation object can be passed in when you
+construction the dmabuf.  The fallback is for dmabuf to create it's
+own, for compatibility and to make life easier for simple devices with
+few buffers... but I think pretty much all drm drivers would embed the
+reservation object in the gem buffer and pass it in when the dmabuf is
+created.
 
->
->> +
->> +     spin_lock(&bh->lock);
->> +     list_add_tail(&urb->urb_list, &bh->head);
->> +     if (bh->running)
->> +             sched = 0;
->> +     else
->> +             sched = 1;
->> +     spin_unlock(&bh->lock);
->
-> How about calling this variable "running" instead of "sched"?  Then you
-> could just say:
->
->         running = bh->running;
->
-> with no "if" statement.
+It is pretty much imperative that synchronization works independently
+of dmabuf, you really don't want to have two different cases to deal
+with in your driver, one for synchronizing non-exported objects, and
+one for synchronizing dmabuf objects.
 
-OK, even we can do this below without name change:
-
-           sched = !bh->running;
-
->
->> +
->> +     if (!sched)
->> +             ;
->> +     else if (high_prio_bh)
->> +             tasklet_hi_schedule(&bh->bh);
->> +     else
->> +             tasklet_schedule(&bh->bh);
->>  }
->>  EXPORT_SYMBOL_GPL(usb_hcd_giveback_urb);
->>
->> @@ -2307,6 +2376,42 @@ EXPORT_SYMBOL_GPL (usb_hc_died);
->>
->>  /*-------------------------------------------------------------------------*/
->>
->> +static void __init_giveback_urb_bh(struct giveback_urb_bh *bh)
->> +{
->> +
->> +     spin_lock_init(&bh->lock);
->> +     INIT_LIST_HEAD(&bh->head);
->> +     tasklet_init(&bh->bh, usb_giveback_urb_bh, (unsigned long)bh);
->> +}
->> +
->> +static void init_giveback_urb_bh(struct usb_hcd *hcd)
->> +{
->> +     if (!hcd_giveback_urb_in_bh(hcd))
->> +             return;
->
-> As you mentioned, there's not much point in skipping this code when
-> it's not needed.  In fact, you could just put the two lines below
-> directly into usb_create_shared_hcd(), and get rid of the "__" from the
-> beginning of the name.
-
-OK.
-
->
->> +
->> +     __init_giveback_urb_bh(&hcd->high_prio_bh);
->> +     __init_giveback_urb_bh(&hcd->low_prio_bh);
->> +}
->> +
->> +static void exit_giveback_urb_bh(struct usb_hcd *hcd)
->> +{
->> +     if (!hcd_giveback_urb_in_bh(hcd))
->> +             return;
->> +
->> +     /*
->> +      * tasklet_kill() isn't needed here because:
->> +      * - driver's disconnec() called from usb_disconnect() should
->
-> Misspelled "disconnect".
->
->> +      *   make sure its URBs are completed during the disconnect()
->> +      *   callback
->> +      *
->> +      * - it is too late to run complete() here since driver may have
->> +      *   been removed already now
->> +      *
->> +      * Using tasklet to run URB's complete() doesn't change this
->> +      * behavior of usbcore.
->> +      */
->> +}
->
-> Why have a separate subroutine for doing nothing?  Simply put this
-> comment directly into usb_remove_hcd().  (And you can remove the last
-> two lines of the comment; they don't make sense in this context.)
-
-Looks it is a bit clean to put the comment in the function, but it is
-OK to add them in usb_remove_hcd() too.
-
-Thanks again for your review.
-
-Thanks,
---
-Ming Lei
+BR,
+-R
