@@ -1,53 +1,36 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Tue, 25 Jun 2013 07:53:47 +0100
-Subject: [PATCH v4 0/7] ARM:STixxxx: Add STixxxx platform and board support
-In-Reply-To: <20130624175415.GA31429@quad.lixom.net>
-References: <1371811076-27168-1-git-send-email-srinivas.kandagatla@st.com>
- <20130624175415.GA31429@quad.lixom.net>
-Message-ID: <51C93E7B.30709@st.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 25 Jun 2013 00:02:04 -0700
+Subject: [PATCH] ARM: multi_v7: Add OMAP with ramdisk config bits
+In-Reply-To: <51C858B4.2020106@ti.com>
+References: <1371071282-14750-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130618082422.GE5523@atomide.com> <51C07253.3040909@ti.com>
+ <51C858B4.2020106@ti.com>
+Message-ID: <20130625070203.GA5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/06/13 18:54, Olof Johansson wrote:
-> On Fri, Jun 21, 2013 at 11:37:56AM +0100, Srinivas KANDAGATLA wrote:
->> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->>
->> Thankyou all for reviewing the v3 patches.
->>
->> This patch-set adds basic support for STMicroelectronics STixxxx SOCs
->> which includes STiH415 and STiH416 with B2000 and B2020 board support.
->>
->> STiH415 and STiH416 are dual-core ARM Cortex-A9 CPU, designed for use in
->> Set-top-boxes. The SOC support is available in mach-stixxxx which contains
->> support code for STiH415, STiH416 SOCs including the generic board support.
->>
->> The reason for adding two SOCs at this patch set is to show that no new
->> C code is required for second SOC(STiH416) support.
->>
->> This patch-set only contains the SOC support, all the driver support for
->> this platform are submitted to respective mailing lists.
-> 
+* Sricharan R <r.sricharan@ti.com> [130624 07:39]:
 > Hi,
+> On Tuesday 18 June 2013 08:14 PM, Santosh Shilimkar wrote:
+> > On Tuesday 18 June 2013 04:24 AM, Tony Lindgren wrote:
+> >> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130612 14:14]:
+> >>> Add ramdisk fileystem related options which lets OMAP5 and Keystone
+> >>> SOCs to boot till shell with multi_v7_config.
+> >> Please add also other v7 omaps.
+> >>
+> > Should have done first place. Sorry.
+> > Will update other machines and after testing, repost it.
+> >
+> > Regards,
+> > Santosh
+> >
+>  Since CONFIG_ARCH_OMAP2PLUS=y is set in the patch,
+>  OMAP3, OMAP4 are getting enabled by default.
 > 
-> I think these are looking quite reasonable, and I am ready to apply them
-> to 3.11.
-> 
-> However, I have one bikeshed comment. I find the name of the platform to be
-> awkward. Would you mind naming it mach-sti instead?
-Am OK to rename them,
-But, I see the patches on arm-soc for-next branch.
+>  I tested OMAP4 PANDA on mainline + multi_v7_config + above patch
+>  and it booted up fine.
 
-Thanks,
-srini
+OK thanks for testing. Those default y things will be going
+away, but we can update both defconfigs after that.
 
-
-> 
-> 
-> -Olof
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Acked-by: Tony Lindgren <tony@atomide.com>
