@@ -1,48 +1,41 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 25 Jun 2013 12:26:47 +0200
-Subject: [PATCH v3 11/18] pwm: Add new pwm-samsung driver
-In-Reply-To: <1405696.in3RSSDWnX@flatron>
-References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
- <3059286.XLVAQe4lge@flatron> <20130624205342.GE7163@mithrandir>
- <1405696.in3RSSDWnX@flatron>
-Message-ID: <20130625102646.GC21137@manwe>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 25 Jun 2013 12:34:40 +0200
+Subject: [PATCH v4] irqchip: Add support for ARMv7-M's NVIC
+In-Reply-To: <1371073835-10639-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1371073835-10639-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20130625103440.GR11232@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 11:17:03PM +0200, Tomasz Figa wrote:
-> On Monday 24 of June 2013 22:53:42 Thierry Reding wrote:
-> > On Mon, Jun 24, 2013 at 10:32:55PM +0200, Tomasz Figa wrote:
-[...]
-> > > What about:
-> > > 
-> > > /*
-> > > 
-> > >  * PWM block is shared between pwm-samsung and samsung_pwm_timer
-> > >  drivers
-> > >  * and some registers need access synchronization. If both drivers are
-> > >  * compiled in, the spinlock is defined in the clocksource driver,
-> > >  * otherwise following definition is used.
-> > >  *
-> > >  * Currently we do not need any more complex synchronization method
-> > >  * because all the supported SoCs contain only one instance of the PWM
-> > >  * IP. Should this change, both drivers will need to be modified to
-> > >  * properly synchronize accesses to particular instances.
-> > >  */
-> > 
-> > I see that you can't be persuaded. And everybody else seems to be okay
-> > with it so... have it your way. I'm probably going to regret this.
+Hello Thomas, hello Grant,
+
+On Wed, Jun 12, 2013 at 11:50:35PM +0200, Uwe Kleine-K?nig wrote:
+> This interrupt controller is found on Cortex-M3 and Cortex-M4 machines.
 > 
-> This was just a proposal. Do you want anything else to be added to the 
-> comment or anything to be changed?
+> Support for this controller appeared in Catalin's Cortex tree based on
+> 2.6.33 but was nearly completely rewritten.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> 
+> Notes:
+>     Changes since v3, sent with
+>     Message-Id: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>:
+>     
+>      - use generic chip
+>      - rename nvic_do_IRQ to nvic_handle_irq
+>     
+>     This depends on the stuff currently in tip/irq/for-arm
+I see that tip/irq/for-arm went into next via Grant's irqdomain tree. I
+assume that means the changes go in for 3.11?
 
-For reference, I still don't like this but since I'm the only one
-complaining, go ahead. With that comment added to the driver:
+Are you OK with my patch? I can resend with the accumulated Acks and the
+arch/arm hunk dropped if it helps you. Just tell me what you want.
 
-Acked-by: Thierry Reding <thierry.reding@gmail.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/f20e3970/attachment.sig>
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
