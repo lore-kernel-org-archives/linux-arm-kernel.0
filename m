@@ -1,36 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 25 Jun 2013 13:30:02 -0700
-Subject: [PATCH v5 0/7] ARM:sti: Add STiH415/STiH416 platform and board
- support
-In-Reply-To: <1372158822-19160-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1372158822-19160-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <20130625203002.GA15068@quad.lixom.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 25 Jun 2013 23:39:01 +0300
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+Message-ID: <20130625203840.GA9748@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 12:13:42PM +0100, Srinivas KANDAGATLA wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> 
-> This patch-set adds basic support for STMicroelectronics STi series SOCs
-> which includes STiH415 and STiH416 with B2000 and B2020 board support.
-> 
-> STiH415 and STiH416 are dual-core ARM Cortex-A9 CPU, designed for use in
-> Set-top-boxes. The SOC support is available in mach-sti which contains
-> support code for STiH415, STiH416 SOCs including the generic board support.
-> 
-> The reason for adding two SOCs at this patch set is to show that no new
-> C code is required for second SOC(STiH416) support.
-> 
-> This patch-set only contains the SOC support, all the driver support for
-> this platform are submitted to respective mailing lists.
-> 
-> Changes since v4:
-> 	- Renamed mach-stixxxx to mach-sti as suggested by Olof J.
+Hi,
 
-Thanks!
+On Tue, Jun 25, 2013 at 06:20:51PM +0000, Paul Walmsley wrote:
+> Am certainly open to the idea that there's something wrong with the way 
+> that I'm booting either of these.  But AFAIK no one's been able to 
+> identify exactly what it could be.  I haven't had the time recently to 
+> spend hours going through the various permutations, given all the other 
+> breakage :-(  BeagleBone-white has the additional complication that it is 
+> not easy to automate, due to the way that power is delivered to the board, 
+> so there is an extra dimension of difficulty there.
 
-I've merged this into next/late, and I'll drop the previous test merge by Arnd
-of the last version of the patch set.
+oh yeah, you can use something like [1] for that
 
+[1] http://www.cleware-shop.de/epages/63698188.sf/en_US/?ObjectPath=/Shops/63698188/Products/01
 
--Olof
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/8c904e0e/attachment.sig>
