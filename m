@@ -1,143 +1,66 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 25 Jun 2013 11:28:46 +0530
-Subject: [PATCH v8 8/8] usb: phy: twl4030-usb: remove *set_suspend* and
- *phy_init* ops
-In-Reply-To: <1372139926-3719-1-git-send-email-kishon@ti.com>
-References: <1372139926-3719-1-git-send-email-kishon@ti.com>
-Message-ID: <1372139926-3719-9-git-send-email-kishon@ti.com>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Tue, 25 Jun 2013 11:53:22 +0530
+Subject: [PATCH V3 0/6]  USB: OHCI: more bus glues as separate modules 
+In-Reply-To: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1372141408-9894-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that twl4030-usb is adapted to the new generic PHY framework,
-*set_suspend* and *phy_init* ops can be removed from twl4030-usb driver.
+These patches are for separating the SOC On-Chip ohci host controller
+from ohci-hcd host code into its own driver module.
+This work is part of enabling multi-platform kernels on ARM;
+it would be nice to have in 3.11.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- drivers/usb/phy/phy-twl4030-usb.c |   57 +++++++++----------------------------
- 1 file changed, 13 insertions(+), 44 deletions(-)
+V2:
+  In patch 5/6 and 6/6:
+  -Set non-standard fields in hc_driver manually, rather than
+   relying on an expanded struct ohci_driver_overrides.
+  -Save orig_ohci_hub_control and orig_ohci_hub_status_data rather than
+   relying on ohci_hub_control and hub_status_data being exported.
 
-diff --git a/drivers/usb/phy/phy-twl4030-usb.c b/drivers/usb/phy/phy-twl4030-usb.c
-index 3f09b7b..f32e503 100644
---- a/drivers/usb/phy/phy-twl4030-usb.c
-+++ b/drivers/usb/phy/phy-twl4030-usb.c
-@@ -422,25 +422,20 @@ static void twl4030_phy_power(struct twl4030_usb *twl, int on)
- 	}
- }
+  In patch 1/6 to 4/6
+  -ohci_setup() has been removed because it is called in .reset member
+   of the ohci_hc_driver structure.
+
+V3:
+ In patch 5/6 and 6/6:
+ -ohci_setup() has been removed because it is called in .reset member
+  of the ohci_hc_driver structure.
  
--static void twl4030_phy_suspend(struct twl4030_usb *twl, int controller_off)
-+static int twl4030_phy_power_off(struct phy *phy)
- {
-+	struct twl4030_usb *twl = dev_get_drvdata(&phy->dev);
-+
- 	if (twl->asleep)
--		return;
-+		return 0;
+ In patch 5/6:
+ -The ohci_restart() function is not required in  current scenario,
+  only discarding connection state of integrated transceivers is sufficient,
+  for this directly handling ohci->hc_control.
  
- 	twl4030_phy_power(twl, 0);
- 	twl->asleep = 1;
- 	dev_dbg(twl->dev, "%s\n", __func__);
--}
--
--static int twl4030_phy_power_off(struct phy *phy)
--{
--	struct twl4030_usb *twl = dev_get_drvdata(&phy->dev);
--
--	twl4030_phy_suspend(twl, 0);
- 	return 0;
- }
- 
--static void __twl4030_phy_resume(struct twl4030_usb *twl)
-+static void __twl4030_phy_power_on(struct twl4030_usb *twl)
- {
- 	twl4030_phy_power(twl, 1);
- 	twl4030_i2c_access(twl, 1);
-@@ -449,11 +444,13 @@ static void __twl4030_phy_resume(struct twl4030_usb *twl)
- 		twl4030_i2c_access(twl, 0);
- }
- 
--static void twl4030_phy_resume(struct twl4030_usb *twl)
-+static int twl4030_phy_power_on(struct phy *phy)
- {
-+	struct twl4030_usb *twl = dev_get_drvdata(&phy->dev);
-+
- 	if (!twl->asleep)
--		return;
--	__twl4030_phy_resume(twl);
-+		return 0;
-+	__twl4030_phy_power_on(twl);
- 	twl->asleep = 0;
- 	dev_dbg(twl->dev, "%s\n", __func__);
- 
-@@ -466,13 +463,6 @@ static void twl4030_phy_resume(struct twl4030_usb *twl)
- 		cancel_delayed_work(&twl->id_workaround_work);
- 		schedule_delayed_work(&twl->id_workaround_work, HZ);
- 	}
--}
--
--static int twl4030_phy_power_on(struct phy *phy)
--{
--	struct twl4030_usb *twl = dev_get_drvdata(&phy->dev);
--
--	twl4030_phy_resume(twl);
- 	return 0;
- }
- 
-@@ -604,9 +594,9 @@ static void twl4030_id_workaround_work(struct work_struct *work)
- 	}
- }
- 
--static int twl4030_usb_phy_init(struct usb_phy *phy)
-+static int twl4030_phy_init(struct phy *phy)
- {
--	struct twl4030_usb *twl = phy_to_twl(phy);
-+	struct twl4030_usb *twl = dev_get_drvdata(&phy->dev);
- 	enum omap_musb_vbus_id_status status;
- 
- 	/*
-@@ -621,32 +611,13 @@ static int twl4030_usb_phy_init(struct usb_phy *phy)
- 
- 	if (status == OMAP_MUSB_ID_GROUND || status == OMAP_MUSB_VBUS_VALID) {
- 		omap_musb_mailbox(twl->linkstat);
--		twl4030_phy_resume(twl);
-+		twl4030_phy_power_on(phy);
- 	}
- 
- 	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
- 	return 0;
- }
- 
--static int twl4030_phy_init(struct phy *phy)
--{
--	struct twl4030_usb *twl = dev_get_drvdata(&phy->dev);
--
--	return twl4030_usb_phy_init(&twl->phy);
--}
--
--static int twl4030_set_suspend(struct usb_phy *x, int suspend)
--{
--	struct twl4030_usb *twl = phy_to_twl(x);
--
--	if (suspend)
--		twl4030_phy_suspend(twl, 1);
--	else
--		twl4030_phy_resume(twl);
--
--	return 0;
--}
--
- static int twl4030_set_peripheral(struct usb_otg *otg,
- 					struct usb_gadget *gadget)
- {
-@@ -717,8 +688,6 @@ static int twl4030_usb_probe(struct platform_device *pdev)
- 	twl->phy.label		= "twl4030";
- 	twl->phy.otg		= otg;
- 	twl->phy.type		= USB_PHY_TYPE_USB2;
--	twl->phy.set_suspend	= twl4030_set_suspend;
--	twl->phy.init		= twl4030_usb_phy_init;
- 
- 	otg->phy		= &twl->phy;
- 	otg->set_host		= twl4030_set_host;
+ In patch 2/6 :
+ -rewritten if (config->otg || config->rwc) block statements into
+  two separate 'if blocks' to handle below scenarios
+  1. config->otg set scenario.
+  2. if any of these (config->otg, config->rwc) are set, this
+     scenario should be handled only after ohci_setup()
+
+ In patch 1/6 and 4/6:
+  No change. 
+
+Manjunath Goudar (6):
+  USB: OHCI: make ohci-exynos a separate driver
+  USB: OHCI: make ohci-omap a separate driver
+  USB: OHCI: make ohci-omap3 a separate driver
+  USB: OHCI: make ohci-spear a separate driver
+  USB: OHCI: make ohci-at91 a separate driver
+  USB: OHCI: make ohci-s3c2410 a separate driver
+
+ drivers/usb/host/Kconfig        |   30 ++++++-
+ drivers/usb/host/Makefile       |    6 ++
+ drivers/usb/host/ohci-at91.c    |  151 ++++++++++++++++-------------------
+ drivers/usb/host/ohci-exynos.c  |  167 ++++++++++++++++-----------------------
+ drivers/usb/host/ohci-hcd.c     |  108 -------------------------
+ drivers/usb/host/ohci-omap.c    |  157 +++++++++++++-----------------------
+ drivers/usb/host/ohci-omap3.c   |  113 ++++++++------------------
+ drivers/usb/host/ohci-s3c2410.c |  128 +++++++++++++-----------------
+ drivers/usb/host/ohci-spear.c   |  140 +++++++++++++-------------------
+ 9 files changed, 369 insertions(+), 631 deletions(-)
+
 -- 
-1.7.10.4
+1.7.9.5
