@@ -1,28 +1,32 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 25 Jun 2013 17:41:52 +1000
-Subject: linux-next: manual merge of the msm tree with the arm-soc tree
-Message-ID: <20130625174152.d776ac051f6f19dfbf876634@canb.auug.org.au>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 25 Jun 2013 08:47:59 +0100
+Subject: [PATCH] ARM: mm: Remove do_sect_fault from LPAE code
+In-Reply-To: <201306242258.29470.arnd@arndb.de>
+References: <1372067284-13389-1-git-send-email-steve.capper@linaro.org>
+ <201306242258.29470.arnd@arndb.de>
+Message-ID: <20130625074758.GA23259@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Mon, Jun 24, 2013 at 10:58:29PM +0200, Arnd Bergmann wrote:
+> On Monday 24 June 2013, Steve Capper wrote:
+> > For LPAE, do_sect_fault used to be invoked as the second level access
+> > flag handler. When transparent huge pages were introduced for LPAE,
+> > do_page_fault was used instead.
+> > 
+> > Unfortunately, do_sect_fault remains defined but not used for LPAE code
+> > resulting in a compile warning.
+> > 
+> > This patch surrounds do_sect_fault with #ifndef CONFIG_ARM_LPAE to fix
+> > this warning.
+> > 
+> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Today's linux-next merge of the msm tree got a conflict in
-arch/arm/mach-msm/clock-debug.c between commit ad8c373c9aa3 ("arch: arm:
-mach-msm: using strlcpy instead of strncpy") from the arm-soc tree and
-commit 8cc7f5338e72 ("ARM: msm: Migrate to common clock framework") from
-the msm tree.
+Thanks Arnd,
+This is in Russell's system as 7775/1.
 
-The latter removed the file, so I did that, and can carry the fix as
-necessary (no action is required).
-
--- 
 Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/ec526a4c/attachment.sig>
+-- 
+Steve
