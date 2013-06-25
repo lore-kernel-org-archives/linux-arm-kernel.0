@@ -1,81 +1,33 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 25 Jun 2013 20:46:12 +0530
-Subject: [RFC PATCH v2 01/12] dmaengine: PL08x: Refactor
- pl08x_getbytes_chan() to lower indentation
-In-Reply-To: <1371933764-24875-2-git-send-email-tomasz.figa@gmail.com>
-References: <1371933764-24875-1-git-send-email-tomasz.figa@gmail.com>
- <1371933764-24875-2-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <20130625151612.GO23141@intel.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 25 Jun 2013 19:02:43 +0300
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+Message-ID: <20130625160243.GE22312@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 22, 2013 at 10:42:33PM +0200, Tomasz Figa wrote:
-> Further patch will introduce support for PL080S, which requires some
-> things to be done conditionally, thus increasing indentation level of
-> some functions even more.
-> 
-> This patch reduces indentation level of pl08x_getbytes_chan() function
-> by inverting several conditions and returning from function wherever
-> possible.
-> 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  drivers/dma/amba-pl08x.c | 53 ++++++++++++++++++++++++++----------------------
->  1 file changed, 29 insertions(+), 24 deletions(-)
-> 
-> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-> index 06fe45c..6a12392 100644
-> --- a/drivers/dma/amba-pl08x.c
-> +++ b/drivers/dma/amba-pl08x.c
-> @@ -469,47 +469,52 @@ static inline u32 get_bytes_in_cctl(u32 cctl)
->  /* The channel should be paused when calling this */
->  static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
->  {
-> +	struct pl08x_lli *llis_va;
->  	struct pl08x_phy_chan *ch;
-> +	dma_addr_t llis_bus;
->  	struct pl08x_txd *txd;
-> -	size_t bytes = 0;
-> +	size_t bytes;
-> +	int index;
-> +	u32 clli;
->  
->  	ch = plchan->phychan;
->  	txd = plchan->at;
->  
-> +	if (!ch || !txd)
-> +		return 0;
-shouldnt this be err return
+Hi,
 
-> +
->  	/*
->  	 * Follow the LLIs to get the number of remaining
->  	 * bytes in the currently active transaction.
->  	 */
-> -	if (ch && txd) {
-> -		u32 clli = readl(ch->base + PL080_CH_LLI) & ~PL080_LLI_LM_AHB2;
-> +	clli = readl(ch->base + PL080_CH_LLI) & ~PL080_LLI_LM_AHB2;
->  
-> -		/* First get the remaining bytes in the active transfer */
-> -		bytes = get_bytes_in_cctl(readl(ch->base + PL080_CH_CONTROL));
-> +	/* First get the remaining bytes in the active transfer */
-> +	bytes = get_bytes_in_cctl(readl(ch->base + PL080_CH_CONTROL));
->  
-> -		if (clli) {
-> -			struct pl08x_lli *llis_va = txd->llis_va;
-> -			dma_addr_t llis_bus = txd->llis_bus;
-> -			int index;
-> +	if (!clli)
-> +		return bytes;
->  
-> -			BUG_ON(clli < llis_bus || clli >= llis_bus +
-> +	llis_va = txd->llis_va;
-> +	llis_bus = txd->llis_bus;
-> +
-> +	BUG_ON(clli < llis_bus || clli >= llis_bus +
->  				sizeof(struct pl08x_lli) * MAX_NUM_TSFR_LLIS);
-IMO BUG_ON is too much for this. Perhaps returning error and logging error would
-be okay
+On Mon, Jun 17, 2013 at 05:23:17AM +0000, Paul Walmsley wrote:
+> Boot to userspace:
+>     FAIL ( 3/12): 37xxevm, am335xbone, am335xbonelt
 
---
-~Vinod
+Paul, we have at least 2 different folks who can't reproduce your bone
+and bone black boot to userspace failures. I wonder how you're trying to
+boot them.
+
+Care to share your test scripts ?
+
+Also, if you could share the entire thing, we will add your scripts to
+our nightly tests as to try and avoid future regressions.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/f6887588/attachment.sig>
