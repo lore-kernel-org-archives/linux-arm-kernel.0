@@ -1,119 +1,76 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 25 Jun 2013 16:39:29 +0100
-Subject: [PATCH] ARM: keystone: remove hand-coded smc instruction
-In-Reply-To: <51C9ABF9.1010902@ti.com>
-References: <201306212228.29717.arnd@arndb.de>
- <201306212313.16771.arnd@arndb.de> <51C4C3B4.2050508@ti.com>
- <201306212341.08579.arnd@arndb.de> <51C4D9B7.5010109@ti.com>
- <20130625141332.GC2327@linaro.org> <51C9A8BF.9040602@ti.com>
- <20130625143211.GE2327@linaro.org> <51C9ABF9.1010902@ti.com>
-Message-ID: <20130625153929.GG2327@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 25 Jun 2013 12:39:36 -0300
+Subject: Chipidea usb otg support for IMX/MXS (device functionality)
+In-Reply-To: <CAOMZO5DN6u32Udz9SxgnmpH8gtM0FzbL1fPCZ96EchSUzbBzMQ@mail.gmail.com>
+References: <51A5A808.2070803@digi.com> <201306221529.53043.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803EFB072@039-SN2MPN1-023.039d.mgd.msft.net>
+ <201306241551.19831.marex@denx.de>
+ <CAOMZO5DN6u32Udz9SxgnmpH8gtM0FzbL1fPCZ96EchSUzbBzMQ@mail.gmail.com>
+Message-ID: <CAOMZO5DFdUNm3e6+VLioFLEORYXaN2X331jOYBm7o-pE_6MYvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 10:40:57AM -0400, Santosh Shilimkar wrote:
-> On Tuesday 25 June 2013 10:32 AM, Dave Martin wrote:
-> > On Tue, Jun 25, 2013 at 10:27:11AM -0400, Santosh Shilimkar wrote:
-> >> On Tuesday 25 June 2013 10:13 AM, Dave Martin wrote:
-> >>> On Fri, Jun 21, 2013 at 06:54:47PM -0400, Santosh Shilimkar wrote:
-> >>>> On Friday 21 June 2013 05:41 PM, Arnd Bergmann wrote:
-> >>>>> On Friday 21 June 2013, Santosh Shilimkar wrote:
-> >>>>>>>
-> >>>>>> I was curious how you will fix that for a c file.
-> >>>>>> Just to be clear, I was planning to do that in 3.11-rcx/3.12
-> >>>>>> time. Let me know if it needs to be done earlier than that.
-> >>>>>
-> >>>>> It breaks randconfig builds on arm-soc at the moment, so I'd
-> >>>>> like the fix as early as possible for 3.11.
-> >>>>>
-> >>>> Ok, fix is at end of the email. Let me know if it makes
-> >>>> to pass both the builds now. I have build and boot tested
-> >>>> both ARM and THUMB2 builds on Keystone board.
-> >>>>
-> >>>> Regards,
-> >>>> Santosh
-> >>>>
-> >>>> From 05d6a5b6cad624fb3791e8c1f8eb7c774f0790d9 Mon Sep 17 00:00:00 2001
-> >>>> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>>> Date: Fri, 21 Jun 2013 18:35:32 -0400
-> >>>> Subject: [PATCH] ARM: keystone: Move CPU bringup code to dedicated asm file
-> >>>>
-> >>>> Because of inline asm usage in platsmp.c, smc instruction
-> >>>> creates build failure for ARM V6+V7 build where as using instruction
-> >>>> encoding for smc breaks the thumb2 build.
-> >>>>
-> >>>> So move the code snippet to separate asm file and mark
-> >>>> it with 'armv7-a$(plus_sec)' to avoid any build issues.
-> >>>>
-> >>>> Cc: Arnd Bergmann <arnd@arndb.de>
-> >>>>
-> >>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>>> ---
-> >>
-> >> [..]
-> >>
-> >>>> diff --git a/arch/arm/mach-keystone/smc.S b/arch/arm/mach-keystone/smc.S
-> >>>> new file mode 100644
-> >>>> index 0000000..9b9e4f7
-> >>>> --- /dev/null
-> >>>> +++ b/arch/arm/mach-keystone/smc.S
-> >>>> @@ -0,0 +1,29 @@
-> >>>> +/*
-> >>>> + * Keystone Secure APIs
-> >>>> + *
-> >>>> + * Copyright (C) 2013 Texas Instruments, Inc.
-> >>>> + * 	Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>>> + *
-> >>>> + * This program is free software,you can redistribute it and/or modify
-> >>>> + * it under the terms of the GNU General Public License version 2 as
-> >>>> + * published by the Free Software Foundation.
-> >>>> + */
-> >>>> +
-> >>>> +#include <linux/linkage.h>
-> >>>> +
-> >>>> +/**
-> >>>> + * u32 keystone_cpu_smc(u32 command, u32 cpu, u32 addr)
-> >>>> + *
-> >>>> + * Low level CPU monitor API
-> >>>> + * @command:	Monitor command.
-> >>>> + * @cpu:	CPU Number
-> >>>> + * @addr:	Kernel jump address for boot CPU
-> >>>> + *
-> >>>> + * Return: Non zero value on failure
-> >>>> + */
-> >>>
-> >>> Oops, looks like I missed the final mail on this thread.  Ignore my
-> >>> previous mail.
-> >>>
-> >>> I still think it would be a good idea to try to consolidate all these
-> >>> trivial SMC wrappers, but this remains debatable.
-> >>>
-> >>>
-> >>>
-> >>> Anyway, this looks like it should work, except:
-> >>>
-> >>>> +ENTRY(keystone_cpu_smc)
-> >>>> +	stmfd   sp!, {r4-r12, lr}
-> >>>> +	smc	#0
-> >>>> +	dsb
-> >>>
-> >>> What's this DSB for?  (You didn't have it in the inline asm version)
-> >>>
-> >> Just to drain the write buffer before resuming on non-secure side.
-> > 
-> > Why do you need to do that?
-> > 
-> To commit any secure side pending writes. I don't remember exactly the
-> issues but I remember facing issues in power management sequencing with
-> SMC calls in between. That time a dsb did the trick. In fact I use to
-> keep 1 before SMC and 1 after. 
+On Tue, Jun 25, 2013 at 11:23 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Mon, Jun 24, 2013 at 10:51 AM, Marek Vasut <marex@denx.de> wrote:
+>
+>> Fabio, can you possibly test on MX23EVK please?
+>
+> I never used USB gadget with chipidea driver.
+>
+> Could you please explain what are the changes I need to do in the dts
+> file (I want to try on mx28evk first) and defconfig in order to be
+> able to test gadget? I am running today's linux-next.
 
-Can we at least have a comment (as recommended in
-Documentation/development-process/4.Coding)?
+I tried the following:
 
-We don't want other people reading this and concluding that SMC always
-needs barriers -- in general, this shouldn't be necessary and could
-indicate bugs lurking somewhere.
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -239,7 +239,7 @@
 
-Cheers
----Dave
+        ahb at 80080000 {
+                usb0: usb at 80080000 {
+-                       vbus-supply = <&reg_usb0_vbus>;
++                       dr_mode = "peripheral";
+                        status = "okay";
+                };
+
+,but I get:
+
+[    1.495725] usbcore: registered new interface driver asix
+[    1.501516] usbcore: registered new interface driver ax88179_178a
+[    1.508139] usbcore: registered new interface driver cdc_ether
+[    1.514463] usbcore: registered new interface driver smsc95xx
+[    1.520743] usbcore: registered new interface driver net1080
+[    1.526920] usbcore: registered new interface driver cdc_subset
+[    1.533254] usbcore: registered new interface driver zaurus
+[    1.539587] usbcore: registered new interface driver cdc_ncm
+[    1.545432] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+[    1.552494] usbcore: registered new interface driver usb-storage
+[    1.565640] ci_hdrc ci_hdrc.0: can't start gadget role
+[    1.577682] ci_hdrc ci_hdrc.1: can't start gadget role
+[    1.588304] ci_hdrc ci_hdrc.2: can't start gadget role
+[    1.598888] ci_hdrc ci_hdrc.3: can't start gadget role
+[    1.609508] ci_hdrc ci_hdrc.4: can't start gadget role
+[    1.620144] ci_hdrc ci_hdrc.5: can't start gadget role
+[    1.631028] ci_hdrc ci_hdrc.6: can't start gadget role
+[    1.642563] ci_hdrc ci_hdrc.7: can't start gadget role
+[    1.653530] ci_hdrc ci_hdrc.8: can't start gadget role
+[    1.664744] ci_hdrc ci_hdrc.9: can't start gadget role
+[    1.676085] ci_hdrc ci_hdrc.10: can't start gadget role
+[    1.687121] ci_hdrc ci_hdrc.11: can't start gadget role
+[    1.698309] ci_hdrc ci_hdrc.12: can't start gadget role
+[    1.709442] ci_hdrc ci_hdrc.13: can't start gadget role
+[    1.720879] ci_hdrc ci_hdrc.14: can't start gadget role
+[    1.732216] ci_hdrc ci_hdrc.15: can't start gadget role
+[    1.743660] ci_hdrc ci_hdrc.16: can't start gadget role
+[    1.755289] ci_hdrc ci_hdrc.17: can't start gadget role
+[    1.766821] ci_hdrc ci_hdrc.18: can't start gadget role
+[    1.778642] ci_hdrc ci_hdrc.19: can't start gadget role
+[    1.790227] ci_hdrc ci_hdrc.20: can't start gadget role
+[    1.802036] ci_hdrc ci_hdrc.21: can't start gadget role
+[    1.813879] ci_hdrc ci_hdrc.22: can't start gadget role
+[    1.825921] ci_hdrc ci_hdrc.23: can't start gadget role
+
+... and system hangs here.
+
+Any suggestions as to how to get gadget working?
