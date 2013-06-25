@@ -1,34 +1,50 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Jun 2013 15:51:51 +0200
-Subject: [PATCH 07/16] ARM: dts: i.MX51: Add iim node
+Date: Tue, 25 Jun 2013 15:51:54 +0200
+Subject: [PATCH 10/16] ARM: dts: i.MX27: Add i2c aliases
 In-Reply-To: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
 References: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1372168320-22605-8-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1372168320-22605-11-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This allows to order the i2c devices correctly.
+While at it reorder the aliases entries alphabetically.
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/imx51.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/imx27.dtsi | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 25764b50..cb6e09b 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -628,6 +628,13 @@
- 			reg = <0x80000000 0x10000000>;
- 			ranges;
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index db139bf..86b6f5f 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -13,18 +13,20 @@
  
-+			iim: iim at 83f98000 {
-+				compatible = "fsl,imx51-iim", "fsl,imx27-iim";
-+				reg = <0x83f98000 0x4000>;
-+				interrupts = <69>;
-+				clocks = <&clks 107>;
-+			};
-+
- 			ecspi2: ecspi at 83fac000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
+ / {
+ 	aliases {
+-		serial0 = &uart1;
+-		serial1 = &uart2;
+-		serial2 = &uart3;
+-		serial3 = &uart4;
+-		serial4 = &uart5;
+-		serial5 = &uart6;
+ 		gpio0 = &gpio1;
+ 		gpio1 = &gpio2;
+ 		gpio2 = &gpio3;
+ 		gpio3 = &gpio4;
+ 		gpio4 = &gpio5;
+ 		gpio5 = &gpio6;
++		i2c0 = &i2c1;
++		i2c1 = &i2c2;
++		serial0 = &uart1;
++		serial1 = &uart2;
++		serial2 = &uart3;
++		serial3 = &uart4;
++		serial4 = &uart5;
++		serial5 = &uart6;
+ 		spi0 = &cspi1;
+ 		spi1 = &cspi2;
+ 		spi2 = &cspi3;
 -- 
 1.8.3.1
