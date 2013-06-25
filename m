@@ -1,105 +1,95 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 25 Jun 2013 17:23:48 +0800
-Subject: [PATCH] ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag
-Message-ID: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
+Date: Tue, 25 Jun 2013 17:24:02 +0800
+Subject: [PATCH V3 3/3] ARM: tegra114: cpuidle: add powered-down state
+In-Reply-To: <1372152242-16373-1-git-send-email-josephl@nvidia.com>
+References: <1372152242-16373-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1372152242-16373-5-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
-to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
-this state.
+This supports CPU core power down on each CPU when CPU idle. When CPU go
+into this state, it saves it's context and needs a proper configuration
+in flow controller to power gate the CPU when CPU runs into WFI
+instruction. And the CPU also needs to set the IRQ as CPU power down idle
+wake up event in flow controller.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
-This patch depends on the patch "tick:  Fix tick_broadcast_pending_mask not cleared".
+V3:
+* use CPUIDLE_FLAG_TIMER_STOP flag
+V2:
+* remove some redundant code of memory barrier
+* remove the function declaration by rearranging the coding sequence 
 ---
- arch/arm/mach-tegra/cpuidle-tegra20.c | 11 ++---------
- arch/arm/mach-tegra/cpuidle-tegra30.c | 13 ++-----------
- 2 files changed, 4 insertions(+), 20 deletions(-)
+ arch/arm/mach-tegra/cpuidle-tegra114.c | 48 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 47 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-index 706aa42..c7598fb 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra20.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-@@ -60,7 +60,8 @@ static struct cpuidle_driver tegra_idle_driver = {
- 			.target_residency = 10000,
- 			.power_usage      = 0,
- 			.flags            = CPUIDLE_FLAG_TIME_VALID |
--			CPUIDLE_FLAG_COUPLED,
-+					    CPUIDLE_FLAG_COUPLED |
-+					    CPUIDLE_FLAG_TIMER_STOP,
- 			.name             = "powered-down",
- 			.desc             = "CPU power gated",
- 		},
-@@ -137,12 +138,8 @@ static bool tegra20_cpu_cluster_power_down(struct cpuidle_device *dev,
- 	if (tegra20_reset_cpu_1() || !tegra_cpu_rail_off_ready())
- 		return false;
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+index 1d1c602..658b205 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra114.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+@@ -17,15 +17,61 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/cpuidle.h>
++#include <linux/cpu_pm.h>
++#include <linux/clockchips.h>
  
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
--
- 	tegra_idle_lp2_last();
+ #include <asm/cpuidle.h>
++#include <asm/suspend.h>
++#include <asm/smp_plat.h>
++
++#include "pm.h"
++#include "sleep.h"
++
++#ifdef CONFIG_PM_SLEEP
++#define TEGRA114_MAX_STATES 2
++#else
++#define TEGRA114_MAX_STATES 1
++#endif
++
++#ifdef CONFIG_PM_SLEEP
++static int tegra114_idle_power_down(struct cpuidle_device *dev,
++				    struct cpuidle_driver *drv,
++				    int index)
++{
++	local_fiq_disable();
++
++	tegra_set_cpu_in_lp2();
++	cpu_pm_enter();
++
++	cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
++
++	cpu_pm_exit();
++	tegra_clear_cpu_in_lp2();
++
++	local_fiq_enable();
++
++	return index;
++}
++#endif
  
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
--
- 	if (cpu_online(1))
- 		tegra20_wake_cpu1_from_reset();
- 
-@@ -154,14 +151,10 @@ static bool tegra20_idle_enter_lp2_cpu_1(struct cpuidle_device *dev,
- 					 struct cpuidle_driver *drv,
- 					 int index)
- {
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
--
- 	cpu_suspend(0, tegra20_sleep_cpu_secondary_finish);
- 
- 	tegra20_cpu_clear_resettable();
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
--
- 	return true;
- }
- #else
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-index ed2a2a7..8ffd8d9 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra30.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-@@ -56,7 +56,8 @@ static struct cpuidle_driver tegra_idle_driver = {
- 			.exit_latency		= 2000,
- 			.target_residency	= 2200,
- 			.power_usage		= 0,
--			.flags			= CPUIDLE_FLAG_TIME_VALID,
+ static struct cpuidle_driver tegra_idle_driver = {
+ 	.name = "tegra_idle",
+ 	.owner = THIS_MODULE,
+-	.state_count = 1,
++	.state_count = TEGRA114_MAX_STATES,
+ 	.states = {
+ 		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
++#ifdef CONFIG_PM_SLEEP
++		[1] = {
++			.enter			= tegra114_idle_power_down,
++			.exit_latency		= 500,
++			.target_residency	= 1000,
++			.power_usage		= 0,
 +			.flags			= CPUIDLE_FLAG_TIME_VALID |
 +						  CPUIDLE_FLAG_TIMER_STOP,
- 			.name			= "powered-down",
- 			.desc			= "CPU power gated",
- 		},
-@@ -77,12 +78,8 @@ static bool tegra30_cpu_cluster_power_down(struct cpuidle_device *dev,
- 		return false;
- 	}
++			.name			= "powered-down",
++			.desc			= "CPU power gated",
++		},
++#endif
+ 	},
+ };
  
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
--
- 	tegra_idle_lp2_last();
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
--
- 	return true;
- }
- 
-@@ -91,14 +88,8 @@ static bool tegra30_cpu_core_power_down(struct cpuidle_device *dev,
- 					struct cpuidle_driver *drv,
- 					int index)
- {
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
--
--	smp_wmb();
--
- 	cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
--
- 	return true;
- }
- #else
 -- 
 1.8.3.1
