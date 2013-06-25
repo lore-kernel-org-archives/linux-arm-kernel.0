@@ -1,48 +1,109 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Jun 2013 15:51:44 +0200
-Subject: [PATCH] i.MX dts updates
-Message-ID: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 25 Jun 2013 14:56:48 +0100
+Subject: [PATCH 0/5] Kernel mode NEON for XOR and RAID6
+In-Reply-To: <51C46A0D.8070505@codeaurora.org>
+References: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20130606151705.GG16794@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1306061156330.18597@syhkavp.arg>
+ <20130607175007.GH8111@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1306072214120.18597@syhkavp.arg>
+ <20130621093311.GD6983@mudshark.cambridge.arm.com>
+ <CAKv+Gu8FTXC9XSE4DJ2LQueJ3FKjdjv8=sjDjTETH7fq+ruNGQ@mail.gmail.com>
+ <51C46A0D.8070505@codeaurora.org>
+Message-ID: <20130625135648.GA2327@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contains several dts updates to i.MX SoCs.
+On Fri, Jun 21, 2013 at 10:58:21AM -0400, Christopher Covington wrote:
+> Hi Ard,
+> 
+> On 06/21/2013 06:08 AM, Ard Biesheuvel wrote:
+> > On 21 June 2013 11:33, Will Deacon <will.deacon@arm.com> wrote:
+> >> On Sat, Jun 08, 2013 at 04:09:56AM +0100, Nicolas Pitre wrote:
+> >>> On Fri, 7 Jun 2013, Will Deacon wrote:
+> >>>> What's the earliest toolchain we claim to support nowadays? If that can't
+> >>>> deal with the intrinsics then we either need to bump the requirement, or
+> >>>> write this using hand-coded asm. In the case of the latter, I don't think
+> >>>> the maintenance overhead of having two implementations is worth it.
+> >>>
+> >>> We have many different minimum toolchain version requirements attached
+> >>> to different features being enabled already, ftrace being one of them if
+> >>> I remember correctly.  For these Neon optimizations the minimum gcc
+> >>> version is v4.6.
+> >>>
+> >>> Given that this is going to be interesting mostly to server systems, and
+> >>> given that ARM server deployments are rather new, I don't see the point
+> >>> of compiling a new server environment using an older gcc version.
+> >>
+> >> I've mulled over this, had some discussions with our toolchain guys and
+> >> have concluded the following:
+> >>
+> >>   - The intrinsics are actually ok. I was sceptical at first, but I've been
+> >>     assured that they should do a reasonable job (echoing your performance
+> >>     figures).
+> >>
+> >>   - The current approach is targetting servers and isn't (yet) suitable for
+> >>     mobile.
+> >>
+> >> So, given that the patches do the right thing wrt GCC version, the only
+> >> remaining point is that we need to keep an eye out for people trying to
+> >> re-use this stuff for mobile (likely crypto, as I mentioned earlier). When
+> >> that happens, we should consider revisiting the benchmark/power figures.
+> >>
+> > 
+> > OK, so a number of points have been raised in this discussion, let me
+> > address them one by one:
+> > 
+> > Should we allow NEON to be used in the kernel?
+> > 
+> > The consensus is not to allow floating point. However, NEON is
+> > different, as the performance gains are considerable and there is no
+> > dependency on support code, which makes it not as hairy as
+> > conventional (pre-v3) VFP. Also, managing the vfpstates is easily
+> > doable if NEON is only used outside interrupt context and with
+> > preemption disabled.
+> > 
+> > 
+> > Does my series implement it correctly?
+> > 
+> > I have addressed Russell's first round of comments. Happy to take
+> > another round if necessary.
+> > 
+> > 
+> > Should we allow NEON intrinsics in the kernel?
+> > Should we allow GCC-generated NEON in the kernel?
+> > 
+> > Only if the implementation is clear on which minimum version of GCC it
+> > requires. We could use my examples to set a precedent on what is a
+> > suitable way to use NEON intrinsics or the vectorizer in kernel code
+> > (which includes coding it such that it can be reused for arm64 with no
+> > modifications)
+> > 
+> > 
+> > Is kernel mode NEON suitable for mobile?
+> > 
+> > To me, it is unclear why kernel and userland are so different in this
+> > respect. However, kernel mode NEON is separately configurable from
+> > Kconfig so it can be disabled at will.
+> > 
+> > 
+> > Is there a point to doing a boot time benchmark to select the optimal
+> > implementation of an algorithm?
+> > 
+> > Perhaps not but unrelated to kernel mode NEON.
 
-- Add iim nodes to the dts files. We do not have a driver for the
-  iim in Linux, but barebox needs these
-- add aliases for i2c/spi consitently. We have started it, so let's
-  complete it.
-- sync pinmux between i.MX6Q and i.MX6DL. These really should be kept
-  in sync
-- some minor cleanup stuff and additions
+Significant benchmarks on the boot path would be unacceptable, unless they
+are *fast* (and by fast, I mean fast on all platforms, not just fast on
+the fast platforms).  If one second gets added onto the boot path for each
+optimised algorithm, that sounds like a fail.  If all the benchmarks
+combined take one second in total, that's no quite as bad.
 
-Sascha
+Maybe benchmarks could be time-bounded (i.e., see how much data we can
+chug though in X milliseconds) instead of size-bounded.  This would avoid
+unreasonable slowdown on slow platforms, while avoiding trivially small
+benchmark payloads on faster platforms which may typically have a more
+complex architecture, bigger caches etc. which would cause them to take
+longer to reach saturated performance when running a particular algorithm.
 
-----------------------------------------------------------------
-Sascha Hauer (16):
-      ARM: dts: i.MX6: sync imx6q and imx6dl pinmux entries
-      ARM: dts: i.MX6qdl: Add compatible and clock to flexcan nodes
-      ARM: dts: i.MX6qdl: Add i.MX31 compatible to gpt node
-      ARM: dts: i.MX27: Add iim node
-      ARM: dts: i.MX31: Add iim node
-      ARM: dts: i.MX25: Add iim node
-      ARM: dts: i.MX51: Add iim node
-      ARM: dts: i.MX53: Add iim node
-      ARM: dts: i.MX25: Add i2c and spi aliases
-      ARM: dts: i.MX27: Add i2c aliases
-      ARM: dts: i.MX51: Add i2c and spi aliases
-      ARM: dts: i.MX53: Add i2c and spi aliases
-      ARM: dts: i.MX6: Add i2c and spi aliases
-      ARM: dts: i.MX51: move kpp pinmux entry
-      ARM: dts: i.MX51 babbage: Add spi-cs-high property to pmic
-      ARM: dts: i.MX51: Add USB host1/2 pinmux entries
-
- arch/arm/boot/dts/imx25.dtsi        |  21 ++++--
- arch/arm/boot/dts/imx27.dtsi        |  21 ++++--
- arch/arm/boot/dts/imx31.dtsi        |   7 ++
- arch/arm/boot/dts/imx51-babbage.dts |   1 +
- arch/arm/boot/dts/imx51.dtsi        |  76 ++++++++++++++++++----
- arch/arm/boot/dts/imx53.dtsi        |  20 ++++--
- arch/arm/boot/dts/imx6dl.dtsi       | 123 +++++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/imx6q.dtsi        |   3 +-
- arch/arm/boot/dts/imx6qdl.dtsi      |  25 ++++++--
- 9 files changed, 258 insertions(+), 39 deletions(-)
+Cheers
+---Dave
