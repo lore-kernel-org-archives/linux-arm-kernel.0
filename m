@@ -1,60 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 25 Jun 2013 12:39:02 +0200
-Subject: [PATCH 1/5] ARM: at91: at91_dt_defconfig: enable rm9200 support
-In-Reply-To: <1371472710-18535-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20130617123645.GA21034@game.jcrosoft.org>
- <1371472710-18535-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <51C97346.40209@atmel.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Tue, 25 Jun 2013 18:54:23 +0800
+Subject: [Question] race between spin_lock and spin_unlock
+In-Reply-To: <20130625084805.GB31006@mudshark.cambridge.arm.com>
+References: <CACVXFVMBL5E5SGwDatn_ay0sPOhqPKTwouCbzjwrhPuRKHNDcg@mail.gmail.com>
+ <20130624154357.GB25582@mudshark.cambridge.arm.com>
+ <CACVXFVNgONa79n+7Bg4p4Fx568XaK6gy+L9tCrP=CmOGwKY7ig@mail.gmail.com>
+ <20130624163732.GC25582@mudshark.cambridge.arm.com>
+ <CACVXFVMW39SD2YvW-+_A_kv0YgyOToB7xqhHgT7eZKxxWL0-mA@mail.gmail.com>
+ <20130625084805.GB31006@mudshark.cambridge.arm.com>
+Message-ID: <CACVXFVNq111U5OvVNXX-xm8RodQoXSjLUSFHzehRvtdk9jMCzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/2013 14:38, Jean-Christophe PLAGNIOL-VILLARD :
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->   arch/arm/configs/at91_dt_defconfig |    4 +++-
->   1 file changed, 3 insertions(+), 1 deletion(-)
+On Tue, Jun 25, 2013 at 4:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jun 25, 2013 at 05:31:44AM +0100, Ming Lei wrote:
+>> On Tue, Jun 25, 2013 at 12:37 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > You mean, if you had two CPUs spinning on a lock held by a third CPU? In
+>> > this case, the third CPU would have to release the lock, then one of the
+>> > waiters would have to acquire it, complete its critical section and finally
+>> > release it before the other waiter had executed its wfe (about three
+>> > instructions)...
+>>
+>> I mean the below situation:
+>>
+>> CPU0                                                                          CPU1
+>>
+>> spin_lock(&A)
+>>       StoreExcl(lock->next)
+>>                                                                                       spin_unlock(&A)
+>>                                                                                               Store(&lock->owner)
+>>                                                                                               dsb_sev()
+>>       interrupt comes
+>>               - wfe() called in the
+>>               irq handler
 >
-> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-> index 75fd842..690e892 100644
-> --- a/arch/arm/configs/at91_dt_defconfig
-> +++ b/arch/arm/configs/at91_dt_defconfig
-> @@ -14,11 +14,13 @@ CONFIG_MODULE_UNLOAD=y
->   # CONFIG_IOSCHED_DEADLINE is not set
->   # CONFIG_IOSCHED_CFQ is not set
->   CONFIG_ARCH_AT91=y
-> +CONFIG_SOC_AT91RM9200=y
->   CONFIG_SOC_AT91SAM9260=y
->   CONFIG_SOC_AT91SAM9263=y
->   CONFIG_SOC_AT91SAM9G45=y
->   CONFIG_SOC_AT91SAM9X5=y
->   CONFIG_SOC_AT91SAM9N12=y
-> +CONFIG_MACH_AT91RM9200_DT=y
->   CONFIG_MACH_AT91SAM9_DT=y
->   CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
->   CONFIG_AT91_TIMER_HZ=128
-> @@ -62,6 +64,7 @@ CONFIG_MTD=y
->   CONFIG_MTD_CMDLINE_PARTS=y
->   CONFIG_MTD_CHAR=y
->   CONFIG_MTD_BLOCK=y
-> +CONFIG_MTD_DATAFLASH=y
->   CONFIG_MTD_NAND=y
->   CONFIG_MTD_NAND_ATMEL=y
->   CONFIG_MTD_UBI=y
-> @@ -78,7 +81,6 @@ CONFIG_BLK_DEV_SD=y
->   CONFIG_SCSI_MULTI_LUN=y
->   # CONFIG_SCSI_LOWLEVEL is not set
->   CONFIG_NETDEVICES=y
-> -CONFIG_MII=y
+> Is this just a vanilla wfe, or as part of a spin_lock? If it's part of a
+> spin_lock, then we'll do a sev when we unlock it. An opencoded wfe in an
 
-What is the reason for this change? It is really related with rm9200 DT 
-suppot?
+Suppose it is part of spin_lock(&B), and the sev in spin_unlock(&B) may happen
+in CPU2 or CPU3, then two sev() will come in CPU0.
 
->   CONFIG_MACB=y
->   # CONFIG_NET_VENDOR_BROADCOM is not set
->   # CONFIG_NET_VENDOR_FARADAY is not set
->
+My question is that if the wfe in spin_lock(&B) called from irq
+handler may clear
+the two sev().
 
+If yes, the wfe() in spin_lock(&A) may still wait for later sev, right?  If not,
+it should be fine.
 
+Thanks,
 -- 
-Nicolas Ferre
+Ming Lei
