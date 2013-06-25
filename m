@@ -1,92 +1,81 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 25 Jun 2013 16:54:53 +0100
-Subject: [Suggestion] arch: arm64: xen: "ln -s" the paravirt.h from
- arm.
-In-Reply-To: <20130625132519.GA7222@arm.com>
-References: <51C53C06.7050205@asianux.com> <51C81115.4070803@asianux.com>
- <51C81A39.5060909@asianux.com>
- <alpine.DEB.2.02.1306241639260.4782@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1306241747360.4782@kaball.uk.xensource.com>
- <20130625132519.GA7222@arm.com>
-Message-ID: <alpine.DEB.2.02.1306251645260.4782@kaball.uk.xensource.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 25 Jun 2013 20:46:12 +0530
+Subject: [RFC PATCH v2 01/12] dmaengine: PL08x: Refactor
+ pl08x_getbytes_chan() to lower indentation
+In-Reply-To: <1371933764-24875-2-git-send-email-tomasz.figa@gmail.com>
+References: <1371933764-24875-1-git-send-email-tomasz.figa@gmail.com>
+ <1371933764-24875-2-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <20130625151612.GO23141@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Jun 2013, Catalin Marinas wrote:
-> On Mon, Jun 24, 2013 at 05:50:46PM +0100, Stefano Stabellini wrote:
-> > On Mon, 24 Jun 2013, Stefano Stabellini wrote:
-> > > On Mon, 24 Jun 2013, Chen Gang wrote:
-> > > > Hello Maintainers:
-> > > > 
-> > > > if 'CONFIG_XEN'
-> > > > 
-> > > >   CC      arch/arm64/xen/../../arm/xen/enlighten.o
-> > > > arch/arm64/xen/../../arm/xen/enlighten.c:19:26: fatal error: asm/paravirt.h: No such file or directory
-> > > > 
-> > > > The related .config file for next-20130624 is in attachment.
-> > > > 
-> > > > 
-> > > > If "ln -s ../../../arm/include/asm/paravirt.h paravirt.h", it can pass
-> > > > compiling, but I do not know how to make a patch for it ("ln -s ..."),
-> > > > Do we have another more suitable ways for it (or another fixing ways) ?
-> > > > 
-> > > > Welcome any suggestions or completions.
-> > > 
-> > > The problem is caused by:
-> > > 
-> > > commit 3a885582a366caf868b0782041c44854ff4c3568
-> > > Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > Date:   Wed May 29 10:56:34 2013 +0000
-> > > 
-> > >     xen/arm: account for stolen ticks
-> > > 
-> > > that is in my tree for linux-next (even though I have not received any
-> > > replies from the ARM maintainers so I don't know when and if it is going
-> > > to go upstream).
-> > > 
-> > > I think that the best thing to do would be to add a couple of ifdef
-> > > CONFIG_PARAVIRT in arch/arm/xen/enlighten.c. I'll add them to my tree.
-> > 
-> > Actually now that we have XEN support under arm64, we can just introduce the
-> > same pv_time_op struct and paravirt header that this patch
-> > 
-> > http://marc.info/?l=linux-arm-kernel&m=136992435301890&w=2
-> > 
-> > is introducing under arm.
+On Sat, Jun 22, 2013 at 10:42:33PM +0200, Tomasz Figa wrote:
+> Further patch will introduce support for PL080S, which requires some
+> things to be done conditionally, thus increasing indentation level of
+> some functions even more.
 > 
-> I'm not sure whether I replied to your Xen pull request but the patches
-> have been merged into my 'upstream' branch on git.kernel.org and they'll
-> be going in for 3.11-rc1.
-
-Great, thanks!
-
-
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index 19c1cde..47bd26b 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -207,6 +207,25 @@ config FORCE_MAX_ZONEORDER
-> >  	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
-> >  	default "11"
-> >  
-> > +config PARAVIRT
-> > +	bool "Enable paravirtualization code"
-> > +	---help---
-> > +	  This changes the kernel so it can modify itself when it is run
-> > +	  under a hypervisor, potentially improving performance significantly
-> > +	  over full virtualization.
-> > +
-> > +config PARAVIRT_TIME_ACCOUNTING
-> > +	bool "Paravirtual steal time accounting"
-> > +	select PARAVIRT
-> > +	default n
+> This patch reduces indentation level of pl08x_getbytes_chan() function
+> by inverting several conditions and returning from function wherever
+> possible.
 > 
-> No need for "default n".
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> ---
+>  drivers/dma/amba-pl08x.c | 53 ++++++++++++++++++++++++++----------------------
+>  1 file changed, 29 insertions(+), 24 deletions(-)
 > 
-> If you want, I can apply this patch on top (or send me another pull
-> request but don't rebase your original Xen branch which I merged).
+> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+> index 06fe45c..6a12392 100644
+> --- a/drivers/dma/amba-pl08x.c
+> +++ b/drivers/dma/amba-pl08x.c
+> @@ -469,47 +469,52 @@ static inline u32 get_bytes_in_cctl(u32 cctl)
+>  /* The channel should be paused when calling this */
+>  static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
+>  {
+> +	struct pl08x_lli *llis_va;
+>  	struct pl08x_phy_chan *ch;
+> +	dma_addr_t llis_bus;
+>  	struct pl08x_txd *txd;
+> -	size_t bytes = 0;
+> +	size_t bytes;
+> +	int index;
+> +	u32 clli;
+>  
+>  	ch = plchan->phychan;
+>  	txd = plchan->at;
+>  
+> +	if (!ch || !txd)
+> +		return 0;
+shouldnt this be err return
 
-Thanks, but unfortunately the corresponding arm part of this patch
-(linked above) didn't manage to get enough reviews and acks.
-I might as well send another iteration of "CONFIG_PARAVIRT and stolen
-ticks accounting" with this change in it.
+> +
+>  	/*
+>  	 * Follow the LLIs to get the number of remaining
+>  	 * bytes in the currently active transaction.
+>  	 */
+> -	if (ch && txd) {
+> -		u32 clli = readl(ch->base + PL080_CH_LLI) & ~PL080_LLI_LM_AHB2;
+> +	clli = readl(ch->base + PL080_CH_LLI) & ~PL080_LLI_LM_AHB2;
+>  
+> -		/* First get the remaining bytes in the active transfer */
+> -		bytes = get_bytes_in_cctl(readl(ch->base + PL080_CH_CONTROL));
+> +	/* First get the remaining bytes in the active transfer */
+> +	bytes = get_bytes_in_cctl(readl(ch->base + PL080_CH_CONTROL));
+>  
+> -		if (clli) {
+> -			struct pl08x_lli *llis_va = txd->llis_va;
+> -			dma_addr_t llis_bus = txd->llis_bus;
+> -			int index;
+> +	if (!clli)
+> +		return bytes;
+>  
+> -			BUG_ON(clli < llis_bus || clli >= llis_bus +
+> +	llis_va = txd->llis_va;
+> +	llis_bus = txd->llis_bus;
+> +
+> +	BUG_ON(clli < llis_bus || clli >= llis_bus +
+>  				sizeof(struct pl08x_lli) * MAX_NUM_TSFR_LLIS);
+IMO BUG_ON is too much for this. Perhaps returning error and logging error would
+be okay
+
+--
+~Vinod
