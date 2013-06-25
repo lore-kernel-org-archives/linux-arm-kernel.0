@@ -1,26 +1,40 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 25 Jun 2013 12:00:47 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2Ml0gYXJtOiBlcDkzeHg6IHVzZSBzb2MgYnVz?=
-In-Reply-To: <201306241753.21929.hartleys@visionengravers.com>
-References: <201306241753.21929.hartleys@visionengravers.com>
-Message-ID: <1372147247.546760685@f94.mail.ru>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue, 25 Jun 2013 10:08:22 +0200
+Subject: [PATCH v2 0/4] ARM: at91: prepare transition to common clk framework
+Message-ID: <1372147702-4074-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Use the soc bus to report the silicon revidion and Maverick Key. Both
-> are not currently exposed to the user. In addition, fill in the SoC
-> family and machine for completeness.
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-...
-> +	soc_dev_attr->machine = ep93xx_get_machine_name();
-> +	soc_dev_attr->family = "Cirrus EP93xx";
+Hello,
 
-Probably, use full name here is better?
-"Cirrus Logic EP93xx"
+This patch series prepares the transition to common clk framework by
+replacing all the clk_enable and clk_disable calls by clk_prepare_unable and
+clk_disable_unprepare to avoid common clock framework warnings.
 
-> +	soc_dev_attr->revision = ep93xx_get_soc_rev();
-> +	soc_dev_attr->soc_id = ep93xx_get_soc_id();
-...
----
+Best Regards,
+Boris
+
+Changes since v1:
+ - remove unneeded clk_unprepare in mci driver
+ - remove already applied patches (ehci, ohci, dma and serial)
+
+Changes since common clk patch series:
+ - add clk_prepare_enable return check
+ - fix a deadlock in atmel-mci (missing spin_unlock)
+ - remove already applied patches (atmel-ssc and pwm-atmel-tcb)
+
+Boris BREZILLON (4):
+  ARM: at91/tc/clocksource: replace clk_enable/disable with
+    clk_prepare_enable/disable_unprepare.
+  mmc: atmel-mci: prepare clk before calling enable
+  usb: gadget: at91_udc: prepare clk before calling enable
+  at91/avr32/atmel_lcdfb: prepare clk before calling enable
+
+ drivers/clocksource/tcb_clksrc.c |   10 +++++-----
+ drivers/mmc/host/atmel-mci.c     |   27 ++++++++++++++++++---------
+ drivers/usb/gadget/at91_udc.c    |   14 ++++++++------
+ drivers/video/atmel_lcdfb.c      |    8 ++++----
+ 4 files changed, 35 insertions(+), 24 deletions(-)
+
+-- 
+1.7.9.5
