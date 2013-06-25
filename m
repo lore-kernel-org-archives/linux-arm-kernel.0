@@ -1,68 +1,116 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 25 Jun 2013 17:27:47 +0800
-Subject: [PATCH 03/11] ARM: tegra114: set up the correct L2 data RAM latency
- for Cortex-A15
+Date: Tue, 25 Jun 2013 17:27:46 +0800
+Subject: [PATCH 02/11] ARM: tegra: add a flag for
+ tegra_disable_clean_inv_dcache to do LoUIS or ALL
 In-Reply-To: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
 References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1372152475-18617-4-git-send-email-josephl@nvidia.com>
+Message-ID: <1372152475-18617-3-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When there is a cluster power down cycle in suspend, we need to set up
-the correct L2 RAM data RAM latency to make L2 cache work correctly. This
-is only needed for cluster 0 and needs to be done in tegra_resume before
-the cache is enabled.
+Adding a flag for tegra_disable_clean_inv_dcache to flush cache as LoUIS
+or ALL. After this patch, the v7_flush_dcache_louis is used for CPU hotplug
+and CPU suspend in CPU power down (e.g. CPU idle power-down mode) case. And
+the v7_flush_dcache_all is used for CPU cluster power down (e.g. suspend to
+LP2 mode).
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- arch/arm/mach-tegra/reset-handler.S |  1 +
- arch/arm/mach-tegra/sleep.S         | 22 ++++++++++++++++++++++
- 2 files changed, 23 insertions(+)
+ arch/arm/mach-tegra/hotplug.c       | 2 +-
+ arch/arm/mach-tegra/sleep-tegra20.S | 1 +
+ arch/arm/mach-tegra/sleep-tegra30.S | 1 +
+ arch/arm/mach-tegra/sleep.S         | 7 ++++++-
+ arch/arm/mach-tegra/sleep.h         | 6 +++++-
+ 5 files changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index 75285a3..34614bd 100644
---- a/arch/arm/mach-tegra/reset-handler.S
-+++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -45,6 +45,7 @@
- ENTRY(tegra_resume)
- 	check_cpu_part_num 0xc09, r8, r9
- 	bleq	v7_invalidate_l1
-+	blne	tegra_init_l2_for_a15
+diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+index a52c10e..4687ec0 100644
+--- a/arch/arm/mach-tegra/hotplug.c
++++ b/arch/arm/mach-tegra/hotplug.c
+@@ -37,7 +37,7 @@ int tegra_cpu_kill(unsigned cpu)
+ void __ref tegra_cpu_die(unsigned int cpu)
+ {
+ 	/* Clean L1 data cache */
+-	tegra_disable_clean_inv_dcache();
++	tegra_disable_clean_inv_dcache(TEGRA_FLUSH_CACHE_LOUIS);
  
- 	cpu_id	r0
- 	tegra_get_soc_id TEGRA_APB_MISC_BASE, r6
+ 	/* Shut down the current CPU. */
+ 	tegra_hotplug_shutdown();
+diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
+index e3f2417..f87721d 100644
+--- a/arch/arm/mach-tegra/sleep-tegra20.S
++++ b/arch/arm/mach-tegra/sleep-tegra20.S
+@@ -191,6 +191,7 @@ ENTRY(tegra20_sleep_cpu_secondary_finish)
+ 	mrc	p15, 0, r11, c1, c0, 1  @ save actlr before exiting coherency
+ 
+ 	/* Flush and disable the L1 data cache */
++	mov	r0, #TEGRA_FLUSH_CACHE_LOUIS
+ 	bl	tegra_disable_clean_inv_dcache
+ 
+ 	mov32	r0, TEGRA_PMC_VIRT + PMC_SCRATCH41
+diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+index 5877f26..6744161 100644
+--- a/arch/arm/mach-tegra/sleep-tegra30.S
++++ b/arch/arm/mach-tegra/sleep-tegra30.S
+@@ -137,6 +137,7 @@ ENTRY(tegra30_sleep_cpu_secondary_finish)
+ 	mov	r7, lr
+ 
+ 	/* Flush and disable the L1 data cache */
++	mov 	r0, #TEGRA_FLUSH_CACHE_LOUIS
+ 	bl	tegra_disable_clean_inv_dcache
+ 
+ 	/* Powergate this CPU. */
 diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
-index 6d6600d..8388113 100644
+index 9daaef2..6d6600d 100644
 --- a/arch/arm/mach-tegra/sleep.S
 +++ b/arch/arm/mach-tegra/sleep.S
-@@ -69,6 +69,28 @@ ENDPROC(tegra_disable_clean_inv_dcache)
+@@ -56,7 +56,9 @@ ENTRY(tegra_disable_clean_inv_dcache)
+ 	isb
  
- #ifdef CONFIG_PM_SLEEP
- /*
-+ * tegra_init_l2_for_a15
-+ *
-+ * set up the correct L2 cache data RAM latency
-+ */
-+ENTRY(tegra_init_l2_for_a15)
-+	mrc	p15, 0, r0, c0, c0, 5
-+	ubfx	r0, r0, #8, #4
-+	tst	r0, #1				@ only need for cluster 0
-+	bne	_exit_init_l2_a15
+ 	/* Flush the D-cache */
+-	bl	v7_flush_dcache_louis
++	cmp	r0, #TEGRA_FLUSH_CACHE_ALL
++	blne	v7_flush_dcache_louis
++	bleq	v7_flush_dcache_all
+ 
+ 	/* Trun off coherency */
+ 	exit_smp r4, r5
+@@ -73,9 +75,12 @@ ENDPROC(tegra_disable_clean_inv_dcache)
+  * tegra?_tear_down_cpu
+  */
+ ENTRY(tegra_sleep_cpu_finish)
++	mov	r4, r0
+ 	/* Flush and disable the L1 data cache */
++	mov	r0, #TEGRA_FLUSH_CACHE_ALL
+ 	bl	tegra_disable_clean_inv_dcache
+ 
++	mov	r0, r4
+ 	mov32	r6, tegra_tear_down_cpu
+ 	ldr	r1, [r6]
+ 	add	r1, r1, r0
+diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+index 98b7da6..f0df3a4 100644
+--- a/arch/arm/mach-tegra/sleep.h
++++ b/arch/arm/mach-tegra/sleep.h
+@@ -41,6 +41,10 @@
+ #define CPU_NOT_RESETTABLE	0
+ #endif
+ 
++/* flag of tegra_disable_clean_inv_dcache to do LoUIS or all */
++#define TEGRA_FLUSH_CACHE_LOUIS	0x10
++#define TEGRA_FLUSH_CACHE_ALL	0x20
 +
-+	mrc	p15, 0x1, r0, c9, c0, 2
-+	and	r0, r0, #7
-+	cmp	r0, #2
-+	bicne	r0, r0, #7
-+	orrne	r0, r0, #2
-+	mcrne	p15, 0x1, r0, c9, c0, 2
-+_exit_init_l2_a15:
-+
-+	mov	pc, lr
-+ENDPROC(tegra_init_l2_for_a15)
-+
-+/*
-  * tegra_sleep_cpu_finish(unsigned long v2p)
-  *
-  * enters suspend in LP2 by turning off the mmu and jumping to
+ #ifdef __ASSEMBLY__
+ /* returns the offset of the flow controller halt register for a cpu */
+ .macro cpu_to_halt_reg rd, rcpu
+@@ -144,7 +148,7 @@ void tegra_pen_lock(void);
+ void tegra_pen_unlock(void);
+ void tegra_resume(void);
+ int tegra_sleep_cpu_finish(unsigned long);
+-void tegra_disable_clean_inv_dcache(void);
++void tegra_disable_clean_inv_dcache(u32 flag);
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+ void tegra20_hotplug_shutdown(void);
 -- 
 1.8.3.1
