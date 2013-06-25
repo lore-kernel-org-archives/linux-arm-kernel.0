@@ -1,45 +1,45 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Tue, 25 Jun 2013 10:54:49 +0200
-Subject: [PATCH 6/6] crypto: ux500: use dmaengine_submit API
-In-Reply-To: <1372150489-25594-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1372150489-25594-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <1372150489-25594-7-git-send-email-fabio.baltieri@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 25 Jun 2013 11:04:34 +0200
+Subject: [PATCH v2 1/6] misc: sram: fix error path in sram_probe
+In-Reply-To: <201306251046.38993.heiko@sntech.de>
+References: <201306251046.04873.heiko@sntech.de>
+ <201306251046.38993.heiko@sntech.de>
+Message-ID: <1372151074.3981.21.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dmaengine_submit instead of calling desc->tx_submit manually.
+Hi Heiko,
 
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
- drivers/crypto/ux500/cryp/cryp_core.c | 2 +-
- drivers/crypto/ux500/hash/hash_core.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Am Dienstag, den 25.06.2013, 10:46 +0200 schrieb Heiko St?bner:
+> The pool is created thru devm_gen_pool_create, so the call to
+> gen_pool_destroy is not necessary.
+> Instead the sram-clock must be turned off again if it exists.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/misc/sram.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+> index d87cc91..afe66571 100644
+> --- a/drivers/misc/sram.c
+> +++ b/drivers/misc/sram.c
+> @@ -68,7 +68,8 @@ static int sram_probe(struct platform_device *pdev)
+>  	ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
+>  				res->start, size, -1);
+>  	if (ret < 0) {
+> -		gen_pool_destroy(sram->pool);
 
-diff --git a/drivers/crypto/ux500/cryp/cryp_core.c b/drivers/crypto/ux500/cryp/cryp_core.c
-index 0cd89df..a999f53 100644
---- a/drivers/crypto/ux500/cryp/cryp_core.c
-+++ b/drivers/crypto/ux500/cryp/cryp_core.c
-@@ -594,7 +594,7 @@ static int cryp_set_dma_transfer(struct cryp_ctx *ctx,
- 		return -EFAULT;
- 	}
- 
--	cookie = desc->tx_submit(desc);
-+	cookie = dmaengine_submit(desc);
- 	dma_async_issue_pending(channel);
- 
- 	return 0;
-diff --git a/drivers/crypto/ux500/hash/hash_core.c b/drivers/crypto/ux500/hash/hash_core.c
-index 3527777..496ae6a 100644
---- a/drivers/crypto/ux500/hash/hash_core.c
-+++ b/drivers/crypto/ux500/hash/hash_core.c
-@@ -192,7 +192,7 @@ static int hash_set_dma_transfer(struct hash_ctx *ctx, struct scatterlist *sg,
- 	desc->callback = hash_dma_callback;
- 	desc->callback_param = ctx;
- 
--	cookie = desc->tx_submit(desc);
-+	cookie = dmaengine_submit(desc);
- 	dma_async_issue_pending(channel);
- 
- 	return 0;
--- 
-1.8.2
+Right, thanks.
+
+> +		if (sram->clk)
+> +			clk_disable_unprepare(sram->clk);
+>  		return ret;
+>  	}
+>  
+
+In light of the following patch, I'd rather move the
+clk_prepare_enable() call after gen_pool_add_virt() and its error path.
+
+regards
+Philipp
