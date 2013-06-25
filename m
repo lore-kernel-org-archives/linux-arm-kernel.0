@@ -1,34 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 25 Jun 2013 18:18:34 +0300
-Subject: [PATCH v8 2/8] usb: phy: omap-usb2: use the new generic PHY
- framework
-In-Reply-To: <1372139926-3719-3-git-send-email-kishon@ti.com>
-References: <1372139926-3719-1-git-send-email-kishon@ti.com>
- <1372139926-3719-3-git-send-email-kishon@ti.com>
-Message-ID: <20130625151834.GG21334@arwen.pp.htv.fi>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 25 Jun 2013 16:18:52 +0100
+Subject: [PATCH v3 11/18] pwm: Add new pwm-samsung driver
+In-Reply-To: <1688471.WOi6pAAcEq@amdc1227>
+References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
+ <1405696.in3RSSDWnX@flatron> <20130625102646.GC21137@manwe>
+ <1688471.WOi6pAAcEq@amdc1227>
+Message-ID: <20130625151852.GD27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 11:28:40AM +0530, Kishon Vijay Abraham I wrote:
-> Used the generic PHY framework API to create the PHY. Now the power off and
-> power on are done in omap_usb_power_off and omap_usb_power_on respectively.
-> 
-> However using the old USB PHY library cannot be completely removed
-> because OTG is intertwined with PHY and moving to the new framework
-> will break OTG. Once we have a separate OTG state machine, we
-> can get rid of the USB PHY library.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+On Tue, Jun 25, 2013 at 01:19:54PM +0200, Tomasz Figa wrote:
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+> Kukjin, can you amend the comment I mentioned to this patch above the line 
+> with DEFINE_SPINLOCK or I should send fixed version?
 
--- 
-balbi
+If you're amending stuff please feel free to also add
+
+Tested-by: Mark Brown <broonie@linaro.org>
+
+(for the whole series)
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/b91d82b3/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/41d26348/attachment.sig>
