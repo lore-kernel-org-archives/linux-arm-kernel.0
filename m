@@ -1,16 +1,17 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Tue, 25 Jun 2013 12:09:36 +0530
-Subject: [PATCH V4 01/11] USB: OHCI: Properly handle OHCI controller suspend
+Date: Tue, 25 Jun 2013 12:09:37 +0530
+Subject: [PATCH V4 02/11] USB: OHCI: Properly handle ohci-at91 suspend
 In-Reply-To: <1372142386-10691-1-git-send-email-manjunath.goudar@linaro.org>
 References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
  <1372142386-10691-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1372142386-10691-2-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1372142386-10691-3-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of OHCI was not properly
-handled in ochi_suspend()routine. This does proper
-handling of suspend scenario.
+Suspend scenario in case of ohci-at91 glue was not properly
+handled as it was not suspending generic part of ohci controller.
+Calling explicitly the ohci_suspend() routine in ohci_hcd_at91_drv_suspend()
+will ensure proper handling of suspend scenario.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
 Acked-by: Alan Stern <stern@rowland.harvard.edu>
@@ -18,39 +19,46 @@ Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Greg KH <greg@kroah.com>
 Cc: linux-usb at vger.kernel.org
 
-V3: New patch.
+V2:
+  -Incase ohci_suspend() fails, return right away without executing further.
 
-V4: No change.
+V3:
+  -Aligned variable "do_wakeup" and "ret".
+
+V4:
+  - No change.
 ---
- drivers/usb/host/ohci-hcd.c |    9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/usb/host/ohci-at91.c |   10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index b69a49e..f3dcaa2 100644
---- a/drivers/usb/host/ohci-hcd.c
-+++ b/drivers/usb/host/ohci-hcd.c
-@@ -1034,6 +1034,7 @@ int ohci_suspend(struct usb_hcd *hcd, bool do_wakeup)
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 4c01759..09f17d1 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -618,8 +618,14 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
  {
- 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
- 	unsigned long	flags;
-+	int		rc = 0;
+ 	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
+ 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
++	bool		do_wakeup = device_may_wakeup(&pdev->dev);
++	int		ret;
  
- 	/* Disable irq emission and mark HW unaccessible. Use
- 	 * the spinlock to properly synchronize with possible pending
-@@ -1046,7 +1047,13 @@ int ohci_suspend(struct usb_hcd *hcd, bool do_wakeup)
- 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
- 	spin_unlock_irqrestore (&ohci->lock, flags);
+-	if (device_may_wakeup(&pdev->dev))
++	ret = ohci_suspend(hcd, do_wakeup);
++	if (ret)
++		return ret;
++
++	if (do_wakeup)
+ 		enable_irq_wake(hcd->irq);
+ 
+ 	/*
+@@ -640,7 +646,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
+ 		at91_stop_clock();
+ 	}
  
 -	return 0;
-+	synchronize_irq(hcd->irq);
-+
-+	if (do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
-+		ohci_resume(hcd, false);
-+		rc = -EBUSY;
-+	}
-+	return rc;
++	return ret;
  }
- EXPORT_SYMBOL_GPL(ohci_suspend);
  
+ static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
 -- 
 1.7.9.5
