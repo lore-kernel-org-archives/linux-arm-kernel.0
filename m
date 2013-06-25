@@ -1,67 +1,61 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 25 Jun 2013 16:15:30 +0200
-Subject: [PATCH v2 0/5] Generic PHY driver for the Exynos SoC MIPI CSI-2/DSI
- DPHYs
-Message-ID: <1372169735-12501-1-git-send-email-s.nawrocki@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 25 Jun 2013 19:46:20 +0530
+Subject: [PATCH v12 00/11] DMA Engine support for AM33XX
+In-Reply-To: <20130625065450.GY5523@atomide.com>
+References: <1371762407-24544-1-git-send-email-joelagnel@ti.com>
+ <20130624101903.GV5523@atomide.com> <51C85958.9030502@ti.com>
+ <20130625065450.GY5523@atomide.com>
+Message-ID: <51C9A634.6030605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds a simple driver for the Samsung S5P/Exynos SoC
-series MIPI CSI-2 receiver (MIPI DSIM) and MIPI DSI transmitter (MIPI
-DSIM) DPHYs, using the generic PHY framework [1]. Previously the MIPI
-CSIS and MIPI DSIM used a platform callback to control the PHY power
-enable and reset bits. The platform callback can be dropped now and
-those drivers don't depend any more on any platform code.
+On 6/25/2013 12:24 PM, Tony Lindgren wrote:
+> * Benoit Cousson <b-cousson@ti.com> [130624 07:42]:
+>> Hi Tony,
+>>
+>> On 06/24/2013 12:19 PM, Tony Lindgren wrote:
+>>> Hi,
+>>>
+>>> For merging this series, I suggest the following sets:
+>>>
+>>> * Joel A Fernandes <joelagnel@ti.com> [130620 14:13]:
+>>>>
+>>>> Joel A Fernandes (3):
+>>>>   edma: config: Enable config options for EDMA
+>>>>   da8xx: config: Enable MMC and FS options
+>>>>   ARM: davinci: Fix compiler warnings in devices-da8xx
+>>>>
+>>>> Matt Porter (8):
+>>>>   dmaengine: edma: Add TI EDMA device tree binding
+>>>>   ARM: edma: Add DT and runtime PM support to the private EDMA API
+>>>>   ARM: edma: Add EDMA crossbar event mux support
+>>>>   dmaengine: edma: enable build for AM33XX
+>>>
+>>> Sekhar should queue the above patches, I've acked the
+>>> mach-omap2/Kconfig change.
+>>>
+>>>>   spi: omap2-mcspi: add generic DMA request support to the DT binding
+>>>>   spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
+>>>
+>>>
+>>> The spi changes should get merged via the driver list.
+>>>
+>>>>   ARM: dts: add AM33XX EDMA support
+>>>>   ARM: dts: add AM33XX SPI DMA support
+>>>
+>>> Benoit should queue the .dts changes.
+>>
+>> I'll do that, but do you consider them for 3.11?
+> 
+> Yes right after -rc1 if it makes the DMA work. We almost
+> certainly need to send few branches of fixes after -rc1 once
+> we find out what might have broken by the removal of the
+> hwmod data..
 
-Changes since v1:
- - enabled build as module and with CONFIG_OF disabled,
- - added phy_id enum,
- - of_address_to_resource() replaced with platform_get_resource(),
- - adapted to changes in the PHY API v7, v8 - added phy labels,
- - added MODULE_DEVICE_TABLE() entry,
- - the driver file renamed to phy-exynos-mipi-video.c,
- - changed DT compatible string to "samsung,s5pv210-mipi-video-phy",
- - corrected the compatible property's description.
- - patch 3/5 "video: exynos_dsi: Use generic PHY driver" replaced
-   with a patch modifying the MIPI DSIM driver which is currently
-   in mainline.
+The DMA related changes went into arm-soc yesterday. So it should be
+safe to send the DT patches in before the merge window opens. If Tony is
+done with sending his pull requests may be Benoit can send to arm-soc
+directly?
 
-This series depends on the generic PHY framework [1]. It can be browsed
-at: http://git.linuxtv.org/snawrocki/samsung.git/exynos-mipi-phy
-This branch is based on the 'for-next' branch from
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-and the patch series:
-http://www.spinics.net/lists/arm-kernel/msg254667.html
-
-Thank you for all the review comments.
-
-[1] https://lkml.org/lkml/2013/6/25/22
-
-Sylwester Nawrocki (5):
-  phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
-  ARM: dts: Add MIPI PHY node to exynos4.dtsi
-  video: exynos_mipi_dsim: Use generic PHY driver
-  exynos4-is: Use generic MIPI CSIS PHY driver
-  ARM: Samsung: Remove MIPI PHY setup code
-
- .../phy/samsung,s5pv210-mipi-video-phy.txt         |   14 ++
- arch/arm/boot/dts/exynos4.dtsi                     |   10 ++
- arch/arm/mach-exynos/include/mach/regs-pmu.h       |    5 -
- arch/arm/mach-s5pv210/include/mach/regs-clock.h    |    4 -
- arch/arm/plat-samsung/Kconfig                      |    5 -
- arch/arm/plat-samsung/Makefile                     |    1 -
- arch/arm/plat-samsung/setup-mipiphy.c              |   60 -------
- drivers/media/platform/exynos4-is/mipi-csis.c      |   16 +-
- drivers/phy/Kconfig                                |    9 +
- drivers/phy/Makefile                               |    3 +-
- drivers/phy/phy-exynos-mipi-video.c                |  173 ++++++++++++++++++++
- drivers/video/exynos/exynos_mipi_dsi.c             |   18 +-
- include/linux/platform_data/mipi-csis.h            |   11 +-
- include/video/exynos_mipi_dsim.h                   |    6 +-
- 14 files changed, 236 insertions(+), 99 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/samsung,s5pv210-mipi-video-phy.txt
- delete mode 100644 arch/arm/plat-samsung/setup-mipiphy.c
- create mode 100644 drivers/phy/phy-exynos-mipi-video.c
-
---
-1.7.9.5
+Thanks,
+Sekhar
