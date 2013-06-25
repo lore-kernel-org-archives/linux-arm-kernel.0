@@ -1,43 +1,48 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 25 Jun 2013 17:27:44 +0800
-Subject: [PATCH 00/11] ARM: tegra114: add support for system suspend
-Message-ID: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
+Date: Tue, 25 Jun 2013 17:27:45 +0800
+Subject: [PATCH 01/11] ARM: tegra: do v7_invalidate_l1 only when CPU is
+ Cortex-A9 in tegra_resume
+In-Reply-To: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
+References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1372152475-18617-2-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series introduce system suspend function for Tegra114 and depend on
-the series of "ARM: tegra114: cpuidle: add power down state".
+The v7_invalidate_l1 was used for the L1 cache that come out from reset
+in a undefined state. This is no need for Cortex-A15. We do it for A9
+only.
 
-Verified on Seaboard, Cardhu and Dalmore and with THUMB2_KERNEL as well.
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+ arch/arm/mach-tegra/reset-handler.S | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-Joseph Lo (11):
-  ARM: tegra: do v7_invalidate_l1 only when CPU is Cortex-A9 in
-    tegra_resume
-  ARM: tegra: add a flag for tegra_disable_clean_inv_dcache to do LoUIS
-    or ALL
-  ARM: tegra114: set up the correct L2 data RAM latency for Cortex-A15
-  ARM: tegra114: add low level support code for cluster power down
-  ARM: tegra114: shut off the CPU rail when the last CPU in suspend
-  ARM: tegra114: hook tegra_tear_down_cpu function
-  ARM: tegra114: flowctrl: add support for cpu_suspend_enter/exit
-  clk: tegra114: add suspend/resume function for tegar_cpu_car_ops
-  ARM: tegar: remove the limitation that Tegra114 can't support suspend
-  ARM: dts: tegra114: dalmore: add GPIO power key support
-  ARM: dts: tegra114: dalmore: add PM configurations for PMC
-
- arch/arm/boot/dts/tegra114-dalmore.dts | 18 ++++++++++++++++++
- arch/arm/mach-tegra/flowctrl.c         |  2 ++
- arch/arm/mach-tegra/flowctrl.h         |  7 +++++++
- arch/arm/mach-tegra/hotplug.c          |  2 +-
- arch/arm/mach-tegra/pm.c               |  5 +----
- arch/arm/mach-tegra/pmc.c              | 10 ++++++++++
- arch/arm/mach-tegra/reset-handler.S    |  8 ++++++--
- arch/arm/mach-tegra/sleep-tegra20.S    |  1 +
- arch/arm/mach-tegra/sleep-tegra30.S    |  7 ++++++-
- arch/arm/mach-tegra/sleep.S            | 29 ++++++++++++++++++++++++++++-
- arch/arm/mach-tegra/sleep.h            |  6 +++++-
- drivers/clk/tegra/clk-tegra114.c       | 26 ++++++++++++++++++++++++++
- 12 files changed, 111 insertions(+), 10 deletions(-)
-
+diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+index 39dc9e7..75285a3 100644
+--- a/arch/arm/mach-tegra/reset-handler.S
++++ b/arch/arm/mach-tegra/reset-handler.S
+@@ -40,9 +40,11 @@
+  *	  re-enabling sdram.
+  *
+  *	r6: SoC ID
++ *	r8: CPU part number
+  */
+ ENTRY(tegra_resume)
+-	bl	v7_invalidate_l1
++	check_cpu_part_num 0xc09, r8, r9
++	bleq	v7_invalidate_l1
+ 
+ 	cpu_id	r0
+ 	tegra_get_soc_id TEGRA_APB_MISC_BASE, r6
+@@ -70,7 +72,8 @@ no_cpu0_chk:
+ 	str	r1, [r2]
+ 1:
+ 
+-	check_cpu_part_num 0xc09, r8, r9
++	mov32	r9, 0xc09
++	cmp	r8, r9
+ 	bne	not_ca9
+ #ifdef CONFIG_HAVE_ARM_SCU
+ 	/* enable SCU */
 -- 
 1.8.3.1
