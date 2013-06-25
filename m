@@ -1,47 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Jun 2013 09:48:06 +0100
-Subject: [Question] race between spin_lock and spin_unlock
-In-Reply-To: <CACVXFVMW39SD2YvW-+_A_kv0YgyOToB7xqhHgT7eZKxxWL0-mA@mail.gmail.com>
-References: <CACVXFVMBL5E5SGwDatn_ay0sPOhqPKTwouCbzjwrhPuRKHNDcg@mail.gmail.com>
- <20130624154357.GB25582@mudshark.cambridge.arm.com>
- <CACVXFVNgONa79n+7Bg4p4Fx568XaK6gy+L9tCrP=CmOGwKY7ig@mail.gmail.com>
- <20130624163732.GC25582@mudshark.cambridge.arm.com>
- <CACVXFVMW39SD2YvW-+_A_kv0YgyOToB7xqhHgT7eZKxxWL0-mA@mail.gmail.com>
-Message-ID: <20130625084805.GB31006@mudshark.cambridge.arm.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 25 Jun 2013 10:48:34 +0200
+Subject: [PATCH v2 5/6] ARM: rockchip: add power-management-unit dt node
+In-Reply-To: <201306251046.04873.heiko@sntech.de>
+References: <201306251046.04873.heiko@sntech.de>
+Message-ID: <201306251048.34668.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 05:31:44AM +0100, Ming Lei wrote:
-> On Tue, Jun 25, 2013 at 12:37 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > You mean, if you had two CPUs spinning on a lock held by a third CPU? In
-> > this case, the third CPU would have to release the lock, then one of the
-> > waiters would have to acquire it, complete its critical section and finally
-> > release it before the other waiter had executed its wfe (about three
-> > instructions)...
-> 
-> I mean the below situation:
-> 
-> CPU0										CPU1
-> 
-> spin_lock(&A)
-> 	StoreExcl(lock->next)
-> 											spin_unlock(&A)
-> 												Store(&lock->owner)
-> 												dsb_sev()
-> 	interrupt comes
-> 		- wfe() called in the
-> 		irq handler
+The pmu is needed to bring up the cores during smp operations.
+Therefore add a node and documentation for it.
 
-Is this just a vanilla wfe, or as part of a spin_lock? If it's part of a
-spin_lock, then we'll do a sev when we unlock it. An opencoded wfe in an
-interrupt handler sounds like a really bad idea anyway!
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ Documentation/devicetree/bindings/arm/rockchip/pmu.txt |   16 ++++++++++++++++
+ arch/arm/boot/dts/rk3066a.dtsi                         |    5 +++++
+ 2 files changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
 
-> 		- the sev() from CPU1
-> 		is acked
-> 	
-> 	while(tickets.next != tickets.owner) {
-> 		wfe();
-> 		...
-> 	}
-
-Will
+diff --git a/Documentation/devicetree/bindings/arm/rockchip/pmu.txt b/Documentation/devicetree/bindings/arm/rockchip/pmu.txt
+new file mode 100644
+index 0000000..3ee9b42
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/rockchip/pmu.txt
+@@ -0,0 +1,16 @@
++Rockchip power-management-unit:
++-------------------------------
++
++The pmu is used to turn off and on different power domains of the SoCs
++This includes the power to the CPU cores.
++
++Required node properties:
++- compatible value : = "rockchip,rk3066-pmu";
++- reg : physical base address and the size of the registers window
++
++Example:
++
++	pmu at 20004000 {
++		compatible = "rockchip,rk3066-pmu";
++		reg = <0x20004000 0x100>;
++	};
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index 24d1941..43ac7c8 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -59,6 +59,11 @@
+ 			mmio-sram-reserved = <0x0 0x50>;
+ 		};
+ 
++		pmu at 20004000 {
++			compatible = "rockchip,rk3066-pmu";
++			reg = <0x20004000 0x100>;
++		};
++
+ 		gic: interrupt-controller at 1013d000 {
+ 			compatible = "arm,cortex-a9-gic";
+ 			interrupt-controller;
+-- 
+1.7.10.4
