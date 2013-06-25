@@ -1,31 +1,51 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 25 Jun 2013 23:44:47 +0200
-Subject: [PATCH v3 1/4] i2c-mv64xxx: Set bus frequency to 100kHz if
- clock-frequency is not provided
-In-Reply-To: <1371821529-13791-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1371821529-13791-1-git-send-email-gregory.clement@free-electrons.com>
- <1371821529-13791-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130625214446.GA2951@katana>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Tue, 25 Jun 2013 23:47:13 +0200
+Subject: [PATCH v2 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+In-Reply-To: <20130625205452.GC9748@arwen.pp.htv.fi>
+References: <1372170110-12993-1-git-send-email-s.nawrocki@samsung.com>
+ <20130625150649.GA21334@arwen.pp.htv.fi> <51C9D714.4000703@samsung.com>
+ <20130625205452.GC9748@arwen.pp.htv.fi>
+Message-ID: <51CA0FE1.9090107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 03:32:06PM +0200, Gregory CLEMENT wrote:
-> This commit adds checking whether clock-frequency property acquisition
-> has succeeded. If not, the frequency is set to 100kHz by default.
-> 
-> The Device Tree binding documentation is updated accordingly.
-> 
-> Based on the intials patches from Zbigniew Bodek
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Zbigniew Bodek <zbb@semihalf.com>
+Hi,
 
-Applied to for-next, thanks! Rest of the series is 3.12 material.
+On 06/25/2013 10:54 PM, Felipe Balbi wrote:
+>>>> +static int exynos_video_phy_probe(struct platform_device *pdev)
+>>>> >  >>  +{
+>>>> >  >>  +	struct exynos_video_phy *state;
+>>>> >  >>  +	struct device *dev =&pdev->dev;
+>>>> >  >>  +	struct resource *res;
+>>>> >  >>  +	struct phy_provider *phy_provider;
+>>>> >  >>  +	int i;
+>>>> >  >>  +
+>>>> >  >>  +	state = devm_kzalloc(dev, sizeof(*state), GFP_KERNEL);
+>>>> >  >>  +	if (!state)
+>>>> >  >>  +		return -ENOMEM;
+>>>> >  >>  +
+>>>> >  >>  +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>>> >  >>  +
+>>>> >  >>  +	state->regs = devm_ioremap_resource(dev, res);
+>>>> >  >>  +	if (IS_ERR(state->regs))
+>>>> >  >>  +		return PTR_ERR(state->regs);
+>>>> >  >>  +
+>>>> >  >>  +	dev_set_drvdata(dev, state);
+>>> >  >
+>>> >  >  you can use platform_set_drvdata(pdev, state);
+>> >
+>> >  I had it in the previous version, but changed for symmetry with
+>> >  dev_set_drvdata(). I guess those could be replaced with
+>> >  phy_{get, set}_drvdata as you suggested.
+>
+> hmm, you do need to set the drvdata() to the phy object, but also to the
+> pdev object (should you need it on a suspend/resume callback, for
+> instance). Those are separate struct device instances.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/707c68b3/attachment.sig>
+Indeed, I somehow confused phy->dev with with phy->dev.parent. I'm going
+to just drop the above call, since the pdev drvdata is currently not
+referenced anywhere.
+
+
+Thanks,
+Sylwester
