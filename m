@@ -1,36 +1,28 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 25 Jun 2013 19:17:18 +0800
-Subject: [PATCH 0/6] Various ux500 crypto updates
-In-Reply-To: <CACRpkdYgZ5ZSwDBfV8FRRqGcv09JiFyNq18vqO_dbxbhJ6_x4w@mail.gmail.com>
-References: <1372150489-25594-1-git-send-email-fabio.baltieri@linaro.org>
- <CACRpkdYgZ5ZSwDBfV8FRRqGcv09JiFyNq18vqO_dbxbhJ6_x4w@mail.gmail.com>
-Message-ID: <20130625111718.GA18551@gondor.apana.org.au>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Tue, 25 Jun 2013 19:19:02 +0800
+Subject: [Question] race between spin_lock and spin_unlock
+In-Reply-To: <20130625105923.GE31838@mudshark.cambridge.arm.com>
+References: <CACVXFVMBL5E5SGwDatn_ay0sPOhqPKTwouCbzjwrhPuRKHNDcg@mail.gmail.com>
+ <20130624154357.GB25582@mudshark.cambridge.arm.com>
+ <CACVXFVNgONa79n+7Bg4p4Fx568XaK6gy+L9tCrP=CmOGwKY7ig@mail.gmail.com>
+ <20130624163732.GC25582@mudshark.cambridge.arm.com>
+ <CACVXFVMW39SD2YvW-+_A_kv0YgyOToB7xqhHgT7eZKxxWL0-mA@mail.gmail.com>
+ <20130625084805.GB31006@mudshark.cambridge.arm.com>
+ <CACVXFVNq111U5OvVNXX-xm8RodQoXSjLUSFHzehRvtdk9jMCzA@mail.gmail.com>
+ <20130625105923.GE31838@mudshark.cambridge.arm.com>
+Message-ID: <CACVXFVMGMUFJztaaypAQnDKxCc=invjzxXuebGyVtoaMsxGz0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 11:20:50AM +0200, Linus Walleij wrote:
-> On Tue, Jun 25, 2013 at 10:54 AM, Fabio Baltieri
-> <fabio.baltieri@linaro.org> wrote:
-> 
-> > these are some fixes to issue pointed out by sparse and dmaengine API
-> > udpates on the recently enabled ux500 hw crypto drivers.
-> 
-> The series:
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> > These are based on recent linux-next, and can probably be applied on an
-> > architecture specific branch with your ack, or just skip to the next
-> > merge window.
-> 
-> I think these depend on the DMA40 fixes that reside in the ARM SoC
-> tree. If I get Herbert's ACK I can queue them.
+On Tue, Jun 25, 2013 at 6:59 PM, Will Deacon <will.deacon@arm.com> wrote:
+>
+> There's no problem, because spin_unlock(&B) in the interrupt handler on CPU0
+> (which must happen before it returns from the interrupt) will send a further
+> event and the wfe encountered when resuming spin_lock(&A) will not wait.
 
-Sure,
+Got it, thanks for your explanation.
 
-Acked-by: Herbert Xu <herbert@gondor.apana.org.au>
 
 Thanks,
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Ming Lei
