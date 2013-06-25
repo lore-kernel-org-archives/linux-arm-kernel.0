@@ -1,39 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 25 Jun 2013 11:22:55 -0700
-Subject: [GIT PULL] ux500 DMA40 fixes for next/drivers
-In-Reply-To: <CACRpkdY_RyTW1kEUpUKbP9hpt-9pvG=e00mCMDvr5fyYuQFU7g@mail.gmail.com>
-References: <CACRpkdY_RyTW1kEUpUKbP9hpt-9pvG=e00mCMDvr5fyYuQFU7g@mail.gmail.com>
-Message-ID: <20130625182255.GF10694@quad.lixom.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Jun 2013 19:30:51 +0100
+Subject: [RFC PATCH v2 01/12] dmaengine: PL08x: Refactor
+ pl08x_getbytes_chan() to lower indentation
+In-Reply-To: <20130625151612.GO23141@intel.com>
+References: <1371933764-24875-1-git-send-email-tomasz.figa@gmail.com>
+ <1371933764-24875-2-git-send-email-tomasz.figa@gmail.com>
+ <20130625151612.GO23141@intel.com>
+Message-ID: <20130625183050.GA2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 03:11:55PM +0200, Linus Walleij wrote:
-> Hi ARM SoC folks,
-> 
-> here are some fixes for the DMA40 patch stack that is currently
-> boiling in next/drivers. They are of such type that they can go in
-> per immediately or at -rc1.
-> 
-> I tested to merge this into next/drivers and it seems to go in
-> smoothly.
-> 
-> Please pull it in at your convenience.
-> 
-> Yours,
-> Linus Walleij
-> 
-> The following changes since commit 499c2bc3cc89dcbbf08aa526cd4a984b92a4d2a8:
-> 
->   dmaengine: ste_dma40: Fetch disabled channels from DT (2013-06-04
-> 11:12:12 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-dma40-for-arm-soc-3
+On Tue, Jun 25, 2013 at 08:46:12PM +0530, Vinod Koul wrote:
+> On Sat, Jun 22, 2013 at 10:42:33PM +0200, Tomasz Figa wrote:
+> > -			BUG_ON(clli < llis_bus || clli >= llis_bus +
+> > +	llis_va = txd->llis_va;
+> > +	llis_bus = txd->llis_bus;
+> > +
+> > +	BUG_ON(clli < llis_bus || clli >= llis_bus +
+> >  				sizeof(struct pl08x_lli) * MAX_NUM_TSFR_LLIS);
+> IMO BUG_ON is too much for this. Perhaps returning error and logging error would
+> be okay
 
+That should be a separate patch, because that's an unrelated change
+to this patch.  As this part is just reformatting this part of the
+code, it should contain no actual changes.
 
-Merged into next/drivers on top of the other branches.
-
-
--Olof
+There's lots that this driver "should" do differently...
