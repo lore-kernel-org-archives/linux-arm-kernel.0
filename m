@@ -1,34 +1,54 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 25 Jun 2013 17:27:53 +0800
-Subject: [PATCH 09/11] ARM: tegar: remove the limitation that Tegra114 can't
- support suspend
+Date: Tue, 25 Jun 2013 17:27:48 +0800
+Subject: [PATCH 04/11] ARM: tegra114: add low level support code for cluster
+ power down
 In-Reply-To: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
 References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1372152475-18617-10-git-send-email-josephl@nvidia.com>
+Message-ID: <1372152475-18617-5-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra114 can support suspend function now, removing the limitation.
+When the CPU cluster power down, the vGIC is powered down too. The
+flow controller needs to monitor the legacy interrupt controller to
+wake up CPU. So setting up the appropriate wake up event in flow
+controller.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- arch/arm/mach-tegra/pm.c | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/mach-tegra/flowctrl.h      | 2 ++
+ arch/arm/mach-tegra/sleep-tegra30.S | 6 +++++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-index a0668a2..94b1ee9 100644
---- a/arch/arm/mach-tegra/pm.c
-+++ b/arch/arm/mach-tegra/pm.c
-@@ -172,10 +172,6 @@ void tegra_idle_lp2_last(void)
- enum tegra_suspend_mode tegra_pm_validate_suspend_mode(
- 				enum tegra_suspend_mode mode)
- {
--	/* Tegra114 didn't support any suspending mode yet. */
--	if (tegra_chip_id == TEGRA114)
--		return TEGRA_SUSPEND_NONE;
--
- 	/*
- 	 * The Tegra devices only support suspending to LP2 currently.
- 	 */
+diff --git a/arch/arm/mach-tegra/flowctrl.h b/arch/arm/mach-tegra/flowctrl.h
+index e56a950..de0acb9 100644
+--- a/arch/arm/mach-tegra/flowctrl.h
++++ b/arch/arm/mach-tegra/flowctrl.h
+@@ -28,6 +28,8 @@
+ #define FLOW_CTRL_SCLK_RESUME		(1 << 27)
+ #define FLOW_CTRL_HALT_CPU_IRQ		(1 << 10)
+ #define	FLOW_CTRL_HALT_CPU_FIQ		(1 << 8)
++#define FLOW_CTRL_HALT_LIC_IRQ		(1 << 11)
++#define FLOW_CTRL_HALT_LIC_FIQ		(1 << 10)
+ #define FLOW_CTRL_HALT_GIC_IRQ		(1 << 9)
+ #define FLOW_CTRL_HALT_GIC_FIQ		(1 << 8)
+ #define FLOW_CTRL_CPU0_CSR		0x8
+diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+index 6744161..ecad4ea 100644
+--- a/arch/arm/mach-tegra/sleep-tegra30.S
++++ b/arch/arm/mach-tegra/sleep-tegra30.S
+@@ -175,8 +175,12 @@ tegra30_enter_sleep:
+ 	orr	r0, r0, #FLOW_CTRL_CSR_ENABLE
+ 	str	r0, [r6, r2]
+ 
++	tegra_get_soc_id TEGRA_APB_MISC_BASE, r10
++	cmp	r10, #TEGRA30
+ 	mov	r0, #FLOW_CTRL_WAIT_FOR_INTERRUPT
+-	orr	r0, r0, #FLOW_CTRL_HALT_CPU_IRQ | FLOW_CTRL_HALT_CPU_FIQ
++	orreq	r0, r0, #FLOW_CTRL_HALT_CPU_IRQ | FLOW_CTRL_HALT_CPU_FIQ
++	orrne   r0, r0, #FLOW_CTRL_HALT_LIC_IRQ | FLOW_CTRL_HALT_LIC_FIQ
++
+ 	cpu_to_halt_reg r2, r1
+ 	str	r0, [r6, r2]
+ 	dsb
 -- 
 1.8.3.1
