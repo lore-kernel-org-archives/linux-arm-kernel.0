@@ -1,29 +1,25 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 25 Jun 2013 18:21:05 +0300
-Subject: [PATCH v8 8/8] usb: phy: twl4030-usb: remove *set_suspend* and
- *phy_init* ops
-In-Reply-To: <1372139926-3719-9-git-send-email-kishon@ti.com>
-References: <1372139926-3719-1-git-send-email-kishon@ti.com>
- <1372139926-3719-9-git-send-email-kishon@ti.com>
-Message-ID: <20130625152105.GM21334@arwen.pp.htv.fi>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 25 Jun 2013 16:35:31 +0100
+Subject: [PATCH v3 03/10] pinctrl:st: Add pinctrl and pinconf support.
+In-Reply-To: <1371737138-9340-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1371736996-8770-1-git-send-email-srinivas.kandagatla@st.com>
+ <1371737138-9340-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <20130625153531.GE27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 11:28:46AM +0530, Kishon Vijay Abraham I wrote:
-> Now that twl4030-usb is adapted to the new generic PHY framework,
-> *set_suspend* and *phy_init* ops can be removed from twl4030-usb driver.
+On Thu, Jun 20, 2013 at 03:05:38PM +0100, Srinivas KANDAGATLA wrote:
+> This patch add pinctrl support to ST SoCs.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> About hardware:
+> ST Set-Top-Box parts have two blocks called PIO and PIO-mux which handle
+> pin configurations.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
-
--- 
-balbi
+Applied, thanks.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/61f539ef/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/5752b4b3/attachment.sig>
