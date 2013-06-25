@@ -1,58 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Jun 2013 11:59:23 +0100
-Subject: [Question] race between spin_lock and spin_unlock
-In-Reply-To: <CACVXFVNq111U5OvVNXX-xm8RodQoXSjLUSFHzehRvtdk9jMCzA@mail.gmail.com>
-References: <CACVXFVMBL5E5SGwDatn_ay0sPOhqPKTwouCbzjwrhPuRKHNDcg@mail.gmail.com>
- <20130624154357.GB25582@mudshark.cambridge.arm.com>
- <CACVXFVNgONa79n+7Bg4p4Fx568XaK6gy+L9tCrP=CmOGwKY7ig@mail.gmail.com>
- <20130624163732.GC25582@mudshark.cambridge.arm.com>
- <CACVXFVMW39SD2YvW-+_A_kv0YgyOToB7xqhHgT7eZKxxWL0-mA@mail.gmail.com>
- <20130625084805.GB31006@mudshark.cambridge.arm.com>
- <CACVXFVNq111U5OvVNXX-xm8RodQoXSjLUSFHzehRvtdk9jMCzA@mail.gmail.com>
-Message-ID: <20130625105923.GE31838@mudshark.cambridge.arm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 25 Jun 2013 12:04:44 +0100
+Subject: [PATCH v4] irqchip: Add support for ARMv7-M's NVIC
+In-Reply-To: <20130625103440.GR11232@pengutronix.de>
+References: <1371073835-10639-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130625103440.GR11232@pengutronix.de>
+Message-ID: <CACxGe6vBCKCnXRtvT9N6cRPa7uHTJDMw7k-46eCj7fFPko+Raw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 11:54:23AM +0100, Ming Lei wrote:
-> On Tue, Jun 25, 2013 at 4:48 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Jun 25, 2013 at 05:31:44AM +0100, Ming Lei wrote:
-> >> On Tue, Jun 25, 2013 at 12:37 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >> > You mean, if you had two CPUs spinning on a lock held by a third CPU? In
-> >> > this case, the third CPU would have to release the lock, then one of the
-> >> > waiters would have to acquire it, complete its critical section and finally
-> >> > release it before the other waiter had executed its wfe (about three
-> >> > instructions)...
-> >>
-> >> I mean the below situation:
-> >>
-> >> CPU0                                                                          CPU1
-> >>
-> >> spin_lock(&A)
-> >>       StoreExcl(lock->next)
-> >>                                                                                       spin_unlock(&A)
-> >>                                                                                               Store(&lock->owner)
-> >>                                                                                               dsb_sev()
-> >>       interrupt comes
-> >>               - wfe() called in the
-> >>               irq handler
-> >
-> > Is this just a vanilla wfe, or as part of a spin_lock? If it's part of a
-> > spin_lock, then we'll do a sev when we unlock it. An opencoded wfe in an
-> 
-> Suppose it is part of spin_lock(&B), and the sev in spin_unlock(&B) may happen
-> in CPU2 or CPU3, then two sev() will come in CPU0.
-> 
-> My question is that if the wfe in spin_lock(&B) called from irq
-> handler may clear
-> the two sev().
+On Tue, Jun 25, 2013 at 11:34 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello Thomas, hello Grant,
+>
+> On Wed, Jun 12, 2013 at 11:50:35PM +0200, Uwe Kleine-K?nig wrote:
+>> This interrupt controller is found on Cortex-M3 and Cortex-M4 machines.
+>>
+>> Support for this controller appeared in Catalin's Cortex tree based on
+>> 2.6.33 but was nearly completely rewritten.
+>>
+>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> ---
+>>
+>> Notes:
+>>     Changes since v3, sent with
+>>     Message-Id: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>:
+>>
+>>      - use generic chip
+>>      - rename nvic_do_IRQ to nvic_handle_irq
+>>
+>>     This depends on the stuff currently in tip/irq/for-arm
+> I see that tip/irq/for-arm went into next via Grant's irqdomain tree. I
+> assume that means the changes go in for 3.11?
 
-Yes, as I said before, the events don't accumulate.
+Yes, the plan is to put that branch into v3.11. I don't know if Thomas
+plans to send a separate pull request for the irq/for-arm branch, or
+if he is going to let it go as part of my pull request. I'll work it
+out with him when the merge window opens. It would probably be best
+for your patch to be applied on the irq/for-arm branch and pushed
+separately from my irqdomain branch since I don't maintain any of the
+irqchip drivers.
 
-> If yes, the wfe() in spin_lock(&A) may still wait for later sev, right?  If not,
-> it should be fine.
-
-There's no problem, because spin_unlock(&B) in the interrupt handler on CPU0
-(which must happen before it returns from the interrupt) will send a further
-event and the wfe encountered when resuming spin_lock(&A) will not wait.
-
-Will
+g.
