@@ -1,38 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 25 Jun 2013 10:26:12 +0100
-Subject: [alsa-devel] [PATCH] ASoC: Tegra and i.MX are mutually exclusive
-In-Reply-To: <51C93A62.1050702@metafoo.de>
-References: <5967649.DUvDfofhX4@wuerfel>
- <51C93A62.1050702@metafoo.de>
-Message-ID: <20130625092612.GX27646@sirena.org.uk>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 25 Jun 2013 17:23:58 +0800
+Subject: [PATCH V3 0/3] ARM: tegra114: cpuidle: add power down state
+Message-ID: <1372152242-16373-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 08:36:18AM +0200, Lars-Peter Clausen wrote:
+This series introduce CPU core power down state for CPU idle. When CPU go
+into this state, it saves it's context and needs a proper configuration
+in flow controller to power gate the CPU when CPU runs into WFI
+instruction. And the CPU also needs to set the IRQ as CPU power down idle
+wake up event in flow controller.
 
-> It's just the ac97 drivers that are mutually exclusive. I'm not sure whether
-> it makes sense to make the whole platforms mutually exclusive for this.
+To prevent race conditions and ensure proper interrupt routing on
+Cortex-A15 CPUs when they are power-gated, add a CPU PM notifier
+call-back to reprogram the GIC CPU interface on PM entry. The
+GIC CPU interface will be reset back to its normal state by
+the common GIC CPU PM exit callback when the CPU wakes up.
 
-I agree, this is excessive and seems to rather defeat the point of
-having multi-platform in the first place.  It makes it impossible to
-build the sound drivers multi-platform all for the sake of a bus which
-is used by approximately nothing these days (hence the lack of love the
-code has had).
+This series depends on the patch of "tick:  Fix
+tick_broadcast_pending_mask not cleared".
 
-> Also this is not limited to tegra and imx. As more platforms are converted
-> to multiplatform ARM the same issue will pop up for other platforms as well.
-> I don't think your solution will scale really well for multiple platforms.
-> The best solution would of course be to make AC97 work properly with
-> multiple AC97 drivers. But maybe we can get away with a 'choice' Kconfig
-> entry which allows you to select which platforms AC97 driver you want to build.
+V3:
+* use CPUIDLE_FLAG_TIMER_STOP flag
+V2:
+* clean up the CPUidle driver to make it more generic
 
-It should be easy enough to refactor so that we assign the ops pointer
-when the driver is loaded instead of at link time which isn't solving
-the issue but makes it better.  I'll send some patches.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130625/bfcd2a96/attachment.sig>
+Joseph Lo (3):
+  ARM: tegra114: Reprogram GIC CPU interface to bypass IRQ on CPU PM
+    entry
+  ARM: tegra114: add low level support for CPU idle powered-down mode
+  ARM: tegra114: cpuidle: add powered-down state
+
+ arch/arm/mach-tegra/cpuidle-tegra114.c | 48 +++++++++++++++++++++++++++++++++-
+ arch/arm/mach-tegra/flowctrl.h         |  2 ++
+ arch/arm/mach-tegra/irq.c              | 40 ++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/sleep-tegra30.S    |  2 ++
+ 4 files changed, 91 insertions(+), 1 deletion(-)
+
+-- 
+1.8.3.1
