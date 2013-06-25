@@ -1,41 +1,49 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 25 Jun 2013 16:24:55 -0400
-Subject: [PATCH] ARM: omap5: build opp4xxx_data.c
-In-Reply-To: <CAGo_u6rQG7h2aPSErwKR1H7PYE5QdxXU3Dd5z13-rPkbVtkcUw@mail.gmail.com>
-References: <201306212229.54238.arnd@arndb.de> <20130621204250.GA16139@kahuna>
- <alpine.DEB.2.02.1306251918590.14373@utopia.booyaka.com>
- <51C9F595.3060609@ti.com> <20130625195751.GA6529@kahuna>
- <51C9F993.6050109@ti.com>
- <CAGo_u6rQG7h2aPSErwKR1H7PYE5QdxXU3Dd5z13-rPkbVtkcUw@mail.gmail.com>
-Message-ID: <51C9FC97.1020502@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 25 Jun 2013 22:24:46 +0200
+Subject: [PATCH v2 0/5] kernel mode NEON support
+Message-ID: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 June 2013 04:17 PM, Nishanth Menon wrote:
-> On Tue, Jun 25, 2013 at 3:12 PM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->>
->> Well having voltage data in voltage domain was not my decision ;-)
->> Instead of creating another set of dummy data, I just used what
->> is out there(OMAP4) with clear comment that data needs to be updated.
->> I don't see any problem in this considering we have devices booting
->> and working nicely for OMAP5
-> I really wish the OMAP5 devices(the latest ones from Fab) I have would
-> like to function at OMAP4 configurations! Unfortunately the devices
-> tend to follow the data manual for OMAP5.
-> *if* there is no need for it to boot, I suggest removing it.
-> 
-I don't understand you. For OMAP5, that data without voltage
-controller support doesn't do anything bad. Since there was some
-dependency of voltage domain association whit PD's, I have to keep
-that. I never claimed that OMAP4 settings would work for OMAP5
-in absolute terms.
+This is version 2 of the kernel mode NEON patch set.
 
-Feel free to post a patch with right data which you seems to have.
-I don't mind you removing that data as long as the device
-continues to boot. Patch welcome.
+Changes since v1:
+- changed the order of the patches, so kernel_neon_begin() does not
+  appear before the required fixes are in place
+- don't use might_sleep() to enforce that kernel_neon_begin() should
+  not be called from interrupt context, as it also prevents it from
+  being called with preemption disabled, which is perfectly acceptable
+- prefer inc_preempt_count() over preempt_disable() so sleeping after
+  calling kernel_neon_begin() gets flagged even with kernel preemption 
+  disabled in Kconfig
+- made the RAID6 patch suitable for both arm and arm64
 
-Thanks !!
+Ard Biesheuvel (5):
+  ARM: move VFP init to an earlier boot stage
+  ARM: be strict about FP exceptions in kernel mode
+  ARM: add support for kernel mode NEON
+  ARM: crypto: add NEON accelerated XOR implementation
+  lib/raid6: add ARM-NEON accelerated syndrome calculation
 
-Regards,
-Santosh
+ arch/arm/Kconfig            |  7 ++++
+ arch/arm/include/asm/neon.h | 36 ++++++++++++++++++++
+ arch/arm/include/asm/xor.h  | 73 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/lib/Makefile       |  6 ++++
+ arch/arm/lib/xor-neon.c     | 42 ++++++++++++++++++++++++
+ arch/arm/vfp/vfphw.S        |  5 +++
+ arch/arm/vfp/vfpmodule.c    | 67 ++++++++++++++++++++++++++++++++++++-
+ include/linux/raid/pq.h     |  5 +++
+ lib/raid6/.gitignore        |  1 +
+ lib/raid6/Makefile          | 40 +++++++++++++++++++++++
+ lib/raid6/algos.c           |  6 ++++
+ lib/raid6/neon.c            | 58 ++++++++++++++++++++++++++++++++
+ lib/raid6/neon.uc           | 80 +++++++++++++++++++++++++++++++++++++++++++++
+ lib/raid6/test/Makefile     | 26 ++++++++++++++-
+ 14 files changed, 450 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/include/asm/neon.h
+ create mode 100644 arch/arm/lib/xor-neon.c
+ create mode 100644 lib/raid6/neon.c
+ create mode 100644 lib/raid6/neon.uc
+
+-- 
+1.8.1.2
