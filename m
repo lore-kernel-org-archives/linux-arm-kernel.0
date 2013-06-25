@@ -1,45 +1,26 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Tue, 25 Jun 2013 13:22:37 +0530
-Subject: ARM : Kexec fails with kernel 3.10 on ARM Versatile TC2
-In-Reply-To: <20130621113653.GF7766@mudshark.cambridge.arm.com>
-References: <CALicx6sYQ19Jx_HuwLeoXNiNFSNvCUc+XKMZsf6vAasPhxOVSg@mail.gmail.com>
- <20130621113653.GF7766@mudshark.cambridge.arm.com>
-Message-ID: <CALicx6uQiJedZCx-G+_C50x8tEwToB=M7uEb07cny_9Wb+=AZA@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 25 Jun 2013 12:00:47 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2Ml0gYXJtOiBlcDkzeHg6IHVzZSBzb2MgYnVz?=
+In-Reply-To: <201306241753.21929.hartleys@visionengravers.com>
+References: <201306241753.21929.hartleys@visionengravers.com>
+Message-ID: <1372147247.546760685@f94.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 5:06 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Jun 21, 2013 at 12:32:34PM +0100, Vijay Kilari wrote:
->> Hi,
->>
->>   With Kernel 3.10 SMP kernel, on versatile TC2 board, Kexec hangs.
->>
->>
->> arm-cortex-a15 login: kexec -f /boot/uImage
->> --command-line="root=/dev/nfs rw ip=bootp console=ttyS0,38400n8"
->> Modified cmdline:root=/dev/nfs rw ip=bootp console=ttyS0,38400n8
->> Starting new kernel
->> Bye!
->> Uncompressing Linux... done, booting the kernel
->>
->> Can you please provide your inputs?
->
-> SMP kexec isn't possible on TC2 because there's no way to kill off the
-> secondary CPUs with mainline Linux. You could take a look at the recent
-> patches from Stephen Warren (19ab428f4b79 ["ARM: 7759/1: decouple CPU
-> offlining from reboot/shutdown"], but you'd still need to implement the
-> various hotplug parts (a software pen is not enough) to get SMP working
-> safely.
->
+> Use the soc bus to report the silicon revidion and Maverick Key. Both
+> are not currently exposed to the user. In addition, fill in the SoC
+> family and machine for completeness.
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+...
+> +	soc_dev_attr->machine = ep93xx_get_machine_name();
+> +	soc_dev_attr->family = "Cirrus EP93xx";
 
-   In the mainline linux, I see for versatile, on hotplugging the CPU,
-it is kept in WFI unlike in other
-platforms where CPU is power down and clocked off. Does it mean for
-Versatile platform there is no support
-in HW for hotplugging the CPU completely? and hence kexec is not
-possible at all?
+Probably, use full name here is better?
+"Cirrus Logic EP93xx"
 
-> If you're just using this for something like a bootloader, then you could
-> use a UP kernel as the first stage.
->
-> Will
+> +	soc_dev_attr->revision = ep93xx_get_soc_rev();
+> +	soc_dev_attr->soc_id = ep93xx_get_soc_id();
+...
+---
