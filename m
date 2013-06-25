@@ -1,85 +1,92 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 25 Jun 2013 11:51:13 -0400
-Subject: [PATCH] ARM: keystone: remove hand-coded smc instruction
-In-Reply-To: <20130625153929.GG2327@linaro.org>
-References: <201306212228.29717.arnd@arndb.de>
- <201306212313.16771.arnd@arndb.de> <51C4C3B4.2050508@ti.com>
- <201306212341.08579.arnd@arndb.de> <51C4D9B7.5010109@ti.com>
- <20130625141332.GC2327@linaro.org> <51C9A8BF.9040602@ti.com>
- <20130625143211.GE2327@linaro.org> <51C9ABF9.1010902@ti.com>
- <20130625153929.GG2327@linaro.org>
-Message-ID: <51C9BC71.1000503@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 25 Jun 2013 16:54:53 +0100
+Subject: [Suggestion] arch: arm64: xen: "ln -s" the paravirt.h from
+ arm.
+In-Reply-To: <20130625132519.GA7222@arm.com>
+References: <51C53C06.7050205@asianux.com> <51C81115.4070803@asianux.com>
+ <51C81A39.5060909@asianux.com>
+ <alpine.DEB.2.02.1306241639260.4782@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1306241747360.4782@kaball.uk.xensource.com>
+ <20130625132519.GA7222@arm.com>
+Message-ID: <alpine.DEB.2.02.1306251645260.4782@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 June 2013 11:39 AM, Dave Martin wrote:
-> On Tue, Jun 25, 2013 at 10:40:57AM -0400, Santosh Shilimkar wrote:
->> On Tuesday 25 June 2013 10:32 AM, Dave Martin wrote:
->>> On Tue, Jun 25, 2013 at 10:27:11AM -0400, Santosh Shilimkar wrote:
->>>> On Tuesday 25 June 2013 10:13 AM, Dave Martin wrote:
->>>>> On Fri, Jun 21, 2013 at 06:54:47PM -0400, Santosh Shilimkar wrote:
->>>>>> On Friday 21 June 2013 05:41 PM, Arnd Bergmann wrote:
->>>>>>> On Friday 21 June 2013, Santosh Shilimkar wrote:
->>>>>>>>>
->>>>>>>> I was curious how you will fix that for a c file.
->>>>>>>> Just to be clear, I was planning to do that in 3.11-rcx/3.12
->>>>>>>> time. Let me know if it needs to be done earlier than that.
->>>>>>>
->>>>>>> It breaks randconfig builds on arm-soc at the moment, so I'd
->>>>>>> like the fix as early as possible for 3.11.
->>>>>>>
->>>>>> Ok, fix is at end of the email. Let me know if it makes
->>>>>> to pass both the builds now. I have build and boot tested
->>>>>> both ARM and THUMB2 builds on Keystone board.
->>>>>>
->>>>>> Regards,
->>>>>> Santosh
->>>>>>
->>>>>> From 05d6a5b6cad624fb3791e8c1f8eb7c774f0790d9 Mon Sep 17 00:00:00 2001
->>>>>> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>>> Date: Fri, 21 Jun 2013 18:35:32 -0400
->>>>>> Subject: [PATCH] ARM: keystone: Move CPU bringup code to dedicated asm file
->>>>>>
->>>>>> Because of inline asm usage in platsmp.c, smc instruction
->>>>>> creates build failure for ARM V6+V7 build where as using instruction
->>>>>> encoding for smc breaks the thumb2 build.
->>>>>>
->>>>>> So move the code snippet to separate asm file and mark
->>>>>> it with 'armv7-a$(plus_sec)' to avoid any build issues.
->>>>>>
->>>>>> Cc: Arnd Bergmann <arnd@arndb.de>
->>>>>>
->>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>>> ---
-
-[..]
-
->>>>> Anyway, this looks like it should work, except:
->>>>>
->>>>>> +ENTRY(keystone_cpu_smc)
->>>>>> +	stmfd   sp!, {r4-r12, lr}
->>>>>> +	smc	#0
->>>>>> +	dsb
->>>>>
->>>>> What's this DSB for?  (You didn't have it in the inline asm version)
->>>>>
->>>> Just to drain the write buffer before resuming on non-secure side.
->>>
->>> Why do you need to do that?
->>>
->> To commit any secure side pending writes. I don't remember exactly the
->> issues but I remember facing issues in power management sequencing with
->> SMC calls in between. That time a dsb did the trick. In fact I use to
->> keep 1 before SMC and 1 after. 
+On Tue, 25 Jun 2013, Catalin Marinas wrote:
+> On Mon, Jun 24, 2013 at 05:50:46PM +0100, Stefano Stabellini wrote:
+> > On Mon, 24 Jun 2013, Stefano Stabellini wrote:
+> > > On Mon, 24 Jun 2013, Chen Gang wrote:
+> > > > Hello Maintainers:
+> > > > 
+> > > > if 'CONFIG_XEN'
+> > > > 
+> > > >   CC      arch/arm64/xen/../../arm/xen/enlighten.o
+> > > > arch/arm64/xen/../../arm/xen/enlighten.c:19:26: fatal error: asm/paravirt.h: No such file or directory
+> > > > 
+> > > > The related .config file for next-20130624 is in attachment.
+> > > > 
+> > > > 
+> > > > If "ln -s ../../../arm/include/asm/paravirt.h paravirt.h", it can pass
+> > > > compiling, but I do not know how to make a patch for it ("ln -s ..."),
+> > > > Do we have another more suitable ways for it (or another fixing ways) ?
+> > > > 
+> > > > Welcome any suggestions or completions.
+> > > 
+> > > The problem is caused by:
+> > > 
+> > > commit 3a885582a366caf868b0782041c44854ff4c3568
+> > > Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > Date:   Wed May 29 10:56:34 2013 +0000
+> > > 
+> > >     xen/arm: account for stolen ticks
+> > > 
+> > > that is in my tree for linux-next (even though I have not received any
+> > > replies from the ARM maintainers so I don't know when and if it is going
+> > > to go upstream).
+> > > 
+> > > I think that the best thing to do would be to add a couple of ifdef
+> > > CONFIG_PARAVIRT in arch/arm/xen/enlighten.c. I'll add them to my tree.
+> > 
+> > Actually now that we have XEN support under arm64, we can just introduce the
+> > same pv_time_op struct and paravirt header that this patch
+> > 
+> > http://marc.info/?l=linux-arm-kernel&m=136992435301890&w=2
+> > 
+> > is introducing under arm.
 > 
-> Can we at least have a comment (as recommended in
-> Documentation/development-process/4.Coding)?
-> 
-> We don't want other people reading this and concluding that SMC always
-> needs barriers -- in general, this shouldn't be necessary and could
-> indicate bugs lurking somewhere.
-> 
-Agree. Comment should have been there to avoid confusion. Will do.
+> I'm not sure whether I replied to your Xen pull request but the patches
+> have been merged into my 'upstream' branch on git.kernel.org and they'll
+> be going in for 3.11-rc1.
 
-Regards,
-Santosh
+Great, thanks!
+
+
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index 19c1cde..47bd26b 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -207,6 +207,25 @@ config FORCE_MAX_ZONEORDER
+> >  	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
+> >  	default "11"
+> >  
+> > +config PARAVIRT
+> > +	bool "Enable paravirtualization code"
+> > +	---help---
+> > +	  This changes the kernel so it can modify itself when it is run
+> > +	  under a hypervisor, potentially improving performance significantly
+> > +	  over full virtualization.
+> > +
+> > +config PARAVIRT_TIME_ACCOUNTING
+> > +	bool "Paravirtual steal time accounting"
+> > +	select PARAVIRT
+> > +	default n
+> 
+> No need for "default n".
+> 
+> If you want, I can apply this patch on top (or send me another pull
+> request but don't rebase your original Xen branch which I merged).
+
+Thanks, but unfortunately the corresponding arm part of this patch
+(linked above) didn't manage to get enough reviews and acks.
+I might as well send another iteration of "CONFIG_PARAVIRT and stolen
+ticks accounting" with this change in it.
