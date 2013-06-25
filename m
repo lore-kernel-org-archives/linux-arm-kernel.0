@@ -1,81 +1,48 @@
 From: jett.zhou@gmail.com (jett zhou)
-Date: Tue, 25 Jun 2013 10:23:26 +0800
-Subject: [V2 1/7] video: mmp: rb swap setting update for new LCD driver
-In-Reply-To: <CAMLZHHQxMAM1Vhj9Jreq5rAN-nmBEbEyoKMwFnL0tVHsKv4U=g@mail.gmail.com>
-References: <1370879533-11017-1-git-send-email-jtzhou@marvell.com>
- <CAMLZHHQ+97f=i3axaFBn9JoOu7Cqo73neqxKYNCfWqwjZ4DfnQ@mail.gmail.com>
- <CACDDiy8=WRmnGMFr55uVWUE6+NNy3pMCeBfV8E9urAeW6VVEMw@mail.gmail.com>
- <CAMLZHHQxMAM1Vhj9Jreq5rAN-nmBEbEyoKMwFnL0tVHsKv4U=g@mail.gmail.com>
-Message-ID: <CACDDiy_CpKuZkevm4jQud1DKBEDa-ZhtrWb+rFpTXvK3zm6aHw@mail.gmail.com>
+Date: Tue, 25 Jun 2013 11:10:20 +0800
+Subject: [V2 5/7] video: mmp: add pitch info in mmp_win structure
+In-Reply-To: <CAMLZHHTzR4WffVdw2nWVP6c0_jBb1vW=mOR3RrQudjUNu5Hupg@mail.gmail.com>
+References: <1370879574-11397-1-git-send-email-jtzhou@marvell.com>
+ <CAMLZHHRxS-wqd4Tb=Af6VEnfRb9MJeNo5RC7qeTLBZ0rgU69pw@mail.gmail.com>
+ <CACDDiy9CP2NyLAwCSr97yOAS50gz6HumY9cAHwO1DFRSCy9L-w@mail.gmail.com>
+ <CAMLZHHTzR4WffVdw2nWVP6c0_jBb1vW=mOR3RrQudjUNu5Hupg@mail.gmail.com>
+Message-ID: <CACDDiy9C8Becu2HCWVLUSYQtz7Zv5pPrk3QyJHZNiM3JpwRC0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/6/24 Daniel Drake <dsd@laptop.org>:
-> On Mon, Jun 24, 2013 at 2:45 AM, jett zhou <jett.zhou@gmail.com> wrote:
->>        Sorry that the comments of the patch is not so clear.
->>        As you might know,We can set two rbswap setting, one is based on
->> pix_fmt to set into DMA input part, the other is to configured in the output
->> interface part.
->>        This patch include below change and enhancement:
->>        1) The input format which support rbswap is based RGB format, YUV
->> series did not support now. So you can see the patch will change the rbswap
->> value based on specific RGB format,eg. RGB will set rbswap = 1, BGR will not
->> set it.
+2013/6/25 Daniel Drake <dsd@laptop.org>:
+> On Mon, Jun 24, 2013 at 4:34 AM, jett zhou <jett.zhou@gmail.com> wrote:
+>>     pitch is used to represent line length in byte, the usage depends
+>> on pix_fmt.
+>>     If the fmt is YUV , the pitch[0] will be Y length, pitch[1] will
+>> be U length, pitch[2] will be V lenth.
+>>     If the fmt is RGB, the picth[0] will be line lenth, and
+>> pitch[1]/pitch[2] will be 0 and not be used.
 >
-> What if I'm working with a display that doesn't need or want RB
-> swapping? Lets say I am working with format PIXFMT_RGB565, and running
-> your patch. dmafetch_set_fmt() gets called, and fmt_to_reg() sets
-> rbswap to 1.
-> This means that dmafetch_set_fmt() writes a '1' into the appropriate
-> RB-swapping bit in the LCD_PN_CTRL0 register, and this triggers the
-> "DMA input" swapping that you mentioned. But I never asked for RB
-> swapping...
-
-Yes, if you configure it as PIXFMT_RGB565, it will set rbswap in "DMA
-input" part.
-So, for your case, you need to use PIXFMT_BGR565 instead of PIXFMT_RGB565.
-
+> This description is clear, thanks - hopefully you can write it with
+> such clarity in the comment :)
 >
->>           This part setting is controlled in driver internally, will not
->> depend on platform configure(link_config) any more.
+>>     For the patch rolling, do you mean combine the patch5 and patch6
+>> by one patch?
 >
-> Your patch seems to depend very clearly on link_config.
-
-Based on the patch, it does not depend on link_config for the "DMA
-input" swapping, it depend on the configured pix_format.
-
+> I view patch 6 as a cleanup (consolidating and removing duplication of
+> code), so I would leave that one separate. Patch 6 should not interact
+> with any pitch[] stuff.
 >
->>        2) The output part of rbswap is depend on link_config which is
->> defined in specific platfrom.
->>            It will setting bit27:24 of 0x01DC register, eg. DSI output
->> interface can be controlled by this.
+> Then you can write a followup patch which adds the pitch[] header,
+> *and* modifies mmpfb_set_par() to write to pitch[], *and* acts upon
+> pitch[] in dmafetch_set_fmt (patch 7). This way, the pitch variable is
+> defined, documented, written to, and acted upon all in the same patch,
+> the meaning will then be very clear.
 >
-> I don't think you should add more disorganised/undocumented (ab)use of
-> this magic link_config variable. You should create new, dedicated,
-> documented fields.
-Agree with you, create new,dedicated field for this usage is better, I
-will amend the patch and send out for review again.:)
->
-> Your comment above suggests that this RB-swapping behaviour is
-> something that is imposed by the output device. In which case, this
-> should be a configuration parameter on the panel, not on the path
-> structure.
->
->>            TTC_dkb does not support dsi, the link_config is no used anymore.
->
-> Then you should fix up ttc_dkb before submitting this patch.
-
-After we add one new field for this output rbswap setting based on dsi
-interface, it can be used by new stepping of mmp display controller,
-ttc_dkb platform just leave and not touch it, it will be tranparent
-for ttc_dkb, does not need to nothing for platform configuration for
-ttc_dkb usage.
-It means , ttc_dkb can only configure rbswap in "dma input" part, not
-support rbswap in dsi interface part.
-What do you think?
-
+HI Daniel
+    Thanks for your comments.
+    I will add more detail description on the comments.
+    For patch6, I will seperated it. For another patch, I will combine
+pitch header and mmpfb_set_par and dmafetch_set_fmt (patch 7) as one
+new patch based on patch6.
+    Will send for your review later.
 Thanks
-
 
 
 
