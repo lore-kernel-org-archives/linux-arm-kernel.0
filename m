@@ -1,156 +1,177 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Tue, 25 Jun 2013 09:25:30 +0800
-Subject: [PATCH V2] USB: initialize or shutdown PHY when add or remove
- host controller
-In-Reply-To: <20130624194549.GD11815@arwen.pp.htv.fi>
-References: <20130620121749.GF9817@arwen.pp.htv.fi>
- <Pine.LNX.4.44L0.1306201319580.2063-100000@iolanthe.rowland.org>
- <CADApbejTBAv0+XxkGLXuMVrLatbNurR0XBkK2gt6eQnXr+5yEA@mail.gmail.com>
- <20130624194549.GD11815@arwen.pp.htv.fi>
-Message-ID: <CADApbej4QRQBdZC9gGNy2_CfZjwM5wVhg89R0XA4Jp3vYivQsg@mail.gmail.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 25 Jun 2013 09:31:17 +0800
+Subject: [Suggestion] arch: arm64: xen: "ln -s" the paravirt.h from arm.
+In-Reply-To: <alpine.DEB.2.02.1306241747360.4782@kaball.uk.xensource.com>
+References: <51C53C06.7050205@asianux.com> <51C81115.4070803@asianux.com>
+ <51C81A39.5060909@asianux.com>
+ <alpine.DEB.2.02.1306241639260.4782@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1306241747360.4782@kaball.uk.xensource.com>
+Message-ID: <51C8F2E5.60607@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 3:45 AM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Fri, Jun 21, 2013 at 09:07:59AM +0800, Chao Xie wrote:
->> On Fri, Jun 21, 2013 at 1:25 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
->> > On Thu, 20 Jun 2013, Felipe Balbi wrote:
->> >
->> >> > In fact, the PHY setting and handling is related to platform or SOC,
->> >> > and for different SOC they can
->> >> > have same EHCI HCD but they PHY handling can be different.
->> >> > Omap'a case is the example, and i think some other vendors may have
->> >> > silimar cases.
->> >> > From above point, It is better to leave the PHY initialization and
->> >> > shutdown to be done by each echi-xxx driver.
->> >> >
->> >> > So Alan and Felipe
->> >> > What are your ideas about it?
->> >>
->> >> If we have so many exceptions, then sure. But eventually, the common
->> >> case should be added generically with a flag so that non-generic cases
->> >> (like OMAP) can request to handle the PHY by themselves.
->> >>
->> >> Alan ?
->> >
->> > I don't have very strong feelings about this; Felipe has much more
->> > experience with these things.
->> >
->> > However, when the common case is added into the core, the simplest way
->> > to indicate that the HCD wants to handle the PHY(s) by itself will be
->> > to leave hcd->phy set to NULL or an ERR_PTR value.
->> >
->> > One important thing that hasn't been pointed out yet: When we move
->> > these calls into the core, the same patch must also remove those calls
->> > from the glue drivers that currently do set hcd->phy.  And it must make
->> > sure that the glue drivers which handle the PHY by themselves do not
->> > set hcd->phy.
->> >
->>
->> From device point of view, EHCI is a standlone component. It has the
->> standard sepcification, so each
->> SOC vendor has EHCI HCD need to follow the standards. Then we have
->> common EHCI HCD driver.
->> The PHY is outside of EHCI component, each SOC vendor may have
->> different PHY implementation. Then
->> we have PHY driver.
->> The EHCI glue driver ehci-xxx works like a SOC depended driver. It is
->> its duty to handle the'
->> relationship between the EHCI HCD driver and PHY driver.
->
-> that's not entirely true. We build abstractions layers so that the
-> commonalities can be written generically. Just look at the amount of
-> code I removed on v3.10 merge window by moving all other UDC drivers to
-> use generic constructs I introduced earlier.
->
-> It just so happens that OMAP's EHCI has two different working modes
-> which mandates different ways to handle the PHY, one is pretty much the
-> generic way (power up EHCI, then power up PHY) the other is inverted
-> (PHY, then EHCI), that's the only reason (as of today) we're having this
-> thread.
->
->> It is same as clk, irq requested by ehci-xxx driver.
->
-> clocks could be handled generically in some cases, we have pm_clk_add()
-> for a reason ;-)
->
-> Also, clock handling can be hidden under pm_runtime callbacks (say,
-> clk_enable() on ->runtime_resume(), clk_disable() on
-> ->runtime_suspend()). IRQ is actually handled by usbcore, you just pass
-> a handler which, in most cases, is the normal ehci_irq() handler.
->
-> But we'll get to those later, let's focus on PHY for now.
->
-clock is another story, and i know that OMAP has full system to handle
-the clock with PM runtime,
-i would like to discuss it when one day you want to do it.
+On 06/25/2013 12:50 AM, Stefano Stabellini wrote:
+> On Mon, 24 Jun 2013, Stefano Stabellini wrote:
+>> > On Mon, 24 Jun 2013, Chen Gang wrote:
+>>> > > Hello Maintainers:
+>>> > > 
+>>> > > if 'CONFIG_XEN'
+>>> > > 
+>>> > >   CC      arch/arm64/xen/../../arm/xen/enlighten.o
+>>> > > arch/arm64/xen/../../arm/xen/enlighten.c:19:26: fatal error: asm/paravirt.h: No such file or directory
+>>> > > 
+>>> > > The related .config file for next-20130624 is in attachment.
+>>> > > 
+>>> > > 
+>>> > > If "ln -s ../../../arm/include/asm/paravirt.h paravirt.h", it can pass
+>>> > > compiling, but I do not know how to make a patch for it ("ln -s ..."),
+>>> > > Do we have another more suitable ways for it (or another fixing ways) ?
+>>> > > 
+>>> > > Welcome any suggestions or completions.
+>> > 
+>> > The problem is caused by:
+>> > 
+>> > commit 3a885582a366caf868b0782041c44854ff4c3568
+>> > Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>> > Date:   Wed May 29 10:56:34 2013 +0000
+>> > 
+>> >     xen/arm: account for stolen ticks
+>> > 
+>> > that is in my tree for linux-next (even though I have not received any
+>> > replies from the ARM maintainers so I don't know when and if it is going
+>> > to go upstream).
+>> > 
+>> > I think that the best thing to do would be to add a couple of ifdef
+>> > CONFIG_PARAVIRT in arch/arm/xen/enlighten.c. I'll add them to my tree.
+> Actually now that we have XEN support under arm64, we can just introduce the
+> same pv_time_op struct and paravirt header that this patch
+> 
+> http://marc.info/?l=linux-arm-kernel&m=136992435301890&w=2
+> 
+> is introducing under arm.
+> Any opinions?
+> 
 
->> So i think add a flag and use usb_get_phy() is not very good.
->
-> Alan was talking about use hcd->phy as that flag, no flag would be
-> added. But why isn't it very good ? you didn't mention your resoning.
->
-I maybe understand something wrong.
-Using hcd->phy as a flag to indicates whether the gule driver need
-EHCI HCD to help
-phy operation, such as initialization and shutdown, i think it is fine.
-If add another member as a flag in EHCI HCD to indicates the PHY
-differences of each echi-xxx.c driver,
-and handle them in EHCI HCD, i think that is not very good. Because as
-you said that make
-common part into EHCI HCD is the target, but this member will import
-all the differences to EHCI HCD.
-It is better to let the ehci-xxx.c driver to handle the differences if
-it does not fit EHCI HCD's requirment
-for common PHY handling just as this patch did.
+OK, thanks, and excuse me, I can not open the link above (the reason
+maybe it can not be accessed from China).
+
+But at least, the patch below is better than "ln -s" (which I provided).
+
+Thanks.
+
+> ---
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 19c1cde..47bd26b 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -207,6 +207,25 @@ config FORCE_MAX_ZONEORDER
+>  	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
+>  	default "11"
+>  
+> +config PARAVIRT
+> +	bool "Enable paravirtualization code"
+> +	---help---
+> +	  This changes the kernel so it can modify itself when it is run
+> +	  under a hypervisor, potentially improving performance significantly
+> +	  over full virtualization.
+> +
+> +config PARAVIRT_TIME_ACCOUNTING
+> +	bool "Paravirtual steal time accounting"
+> +	select PARAVIRT
+> +	default n
+> +	---help---
+> +	  Select this option to enable fine granularity task steal time
+> +	  accounting. Time spent executing other tasks in parallel with
+> +	  the current vCPU is discounted from the vCPU power. To account for
+> +	  that, there can be a small performance impact.
+> +
+> +	  If in doubt, say N here.
+> +
+>  config XEN_DOM0
+>  	def_bool y
+>  	depends on XEN
+> @@ -214,6 +233,7 @@ config XEN_DOM0
+>  config XEN
+>  	bool "Xen guest support on ARM64 (EXPERIMENTAL)"
+>  	depends on ARM64 && OF
+> +	select PARAVIRT
+>  	help
+>  	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM64.
+>  
+> diff --git a/arch/arm64/include/asm/paravirt.h b/arch/arm64/include/asm/paravirt.h
+> new file mode 100644
+> index 0000000..54e895b
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/paravirt.h
+> @@ -0,0 +1,19 @@
+> +#ifndef _ASM_ARM64_PARAVIRT_H
+> +#define _ASM_ARM64_PARAVIRT_H
+> +
+> +struct static_key;
+> +extern struct static_key paravirt_steal_enabled;
+> +extern struct static_key paravirt_steal_rq_enabled;
+> +
+> +struct pv_time_ops {
+> +	unsigned long long (*steal_clock)(int cpu);
+> +};
+> +extern struct pv_time_ops pv_time_ops;
+> +
+> +static inline u64 paravirt_steal_clock(int cpu)
+> +{
+> +	return pv_time_ops.steal_clock(cpu);
+> +}
+> +
+> +
+> +#endif
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 7b4b564..17613ad 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o smp_psci.o
+>  arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+>  arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
+>  arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+> +arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
+>  
+>  obj-y					+= $(arm64-obj-y) vdso/
+>  obj-m					+= $(arm64-obj-m)
+> diff --git a/arch/arm64/kernel/paravirt.c b/arch/arm64/kernel/paravirt.c
+> new file mode 100644
+> index 0000000..53f371e
+> --- /dev/null
+> +++ b/arch/arm64/kernel/paravirt.c
+> @@ -0,0 +1,25 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * Copyright (C) 2013 Citrix Systems
+> + *
+> + * Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> + */
+> +
+> +#include <linux/export.h>
+> +#include <linux/jump_label.h>
+> +#include <linux/types.h>
+> +#include <asm/paravirt.h>
+> +
+> +struct static_key paravirt_steal_enabled;
+> +struct static_key paravirt_steal_rq_enabled;
+> +
+> +struct pv_time_ops pv_time_ops;
+> +EXPORT_SYMBOL_GPL(pv_time_ops);
+> 
+> 
 
 
->> It is bette to make ehci-xxx to do the phy getting and EHCI HCD
->> initialize it and shut down as the patch did, or let ehci-xxx to
->> handle the PHY as Roger said.
->
-> right, so this is what Alan suggested:
->
-> ehci-xxx.c does usb_get_phy() (or any of those variants) and sets the
-> returned pointer to hcd->phy. From that point on, ehci-hcd will play
-> with the phy, resuming and suspending at the proper locations, asking
-> the phy to enable wakeup capabilities and the like.
->
-> In fact, because of that, I was just considering if I should protect
-> usb_phy* against NULL pointers, just to make EHCI's life easier, I mean:
->
-> static inline int usb_phy_set_suspend(struct usb_phy *phy, int suspend)
-> {
->         if (!phy)
->                 return 0;
->
->         return phy->suspend(phy, suspend);
-> }
->
-This patch does not include the suspending/resumeing. It is great that you are
-woking at it.
+-- 
+Chen Gang
 
->> Based on the generic work is not too much, and does not look so
->> meaningful. I suggest that let to echi-xxx
->> do it.
->
-> we'll end up with a boilerplate code in every single ehci-xxx doing
-> exactly the same thing. By building the common case in ehci-hcd, we can
-> make sure to focus efforts wrt power consumption, proper use of the phy
-> layer, etc in a single location which (almost) everybody shares.
->
-> The other bits which are non-generic, can use ehci-hcd as a reference to
-> build their own stuff.
->
-> my 2 cents
->
-OK. I understand. I am not very fimilar with PHY suspending/resuming.
-I hope that i can see the patch move all PHY handling to EHCI HCD
-including suspending/resuming, so
-i can change our ehci driver to fit it and continuing to push the USB
-patches ;-)
-
-> --
-> balbi
+Asianux Corporation
