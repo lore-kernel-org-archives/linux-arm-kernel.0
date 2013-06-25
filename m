@@ -1,80 +1,42 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 25 Jun 2013 18:43:32 -0400
-Subject: [PATCH] ARM: omap5: build opp4xxx_data.c
-In-Reply-To: <20130625223636.GA4455@kahuna>
-References: <201306212229.54238.arnd@arndb.de> <20130621204250.GA16139@kahuna>
- <alpine.DEB.2.02.1306251918590.14373@utopia.booyaka.com>
- <51C9F595.3060609@ti.com> <20130625195751.GA6529@kahuna>
- <51C9F993.6050109@ti.com>
- <CAGo_u6rQG7h2aPSErwKR1H7PYE5QdxXU3Dd5z13-rPkbVtkcUw@mail.gmail.com>
- <51C9FC97.1020502@ti.com> <87a9mducye.fsf@linaro.org>
- <51CA0498.9010506@ti.com> <20130625223636.GA4455@kahuna>
-Message-ID: <51CA1D14.4070600@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 25 Jun 2013 17:02:11 -0600
+Subject: [PATCH V3 1/3] ARM: tegra114: Reprogram GIC CPU interface to
+ bypass IRQ on CPU PM entry
+In-Reply-To: <1372152242-16373-2-git-send-email-josephl@nvidia.com>
+References: <1372152242-16373-1-git-send-email-josephl@nvidia.com>
+ <1372152242-16373-2-git-send-email-josephl@nvidia.com>
+Message-ID: <51CA2173.7060407@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 June 2013 06:36 PM, Nishanth Menon wrote:
-> On 16:59-20130625, Santosh Shilimkar wrote:
->> On Tuesday 25 June 2013 04:56 PM, Kevin Hilman wrote:
->>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>>
->>>> On Tuesday 25 June 2013 04:17 PM, Nishanth Menon wrote:
->>>>> On Tue, Jun 25, 2013 at 3:12 PM, Santosh Shilimkar
->>>>> <santosh.shilimkar@ti.com> wrote:
->>>>>>
->>>>>> Well having voltage data in voltage domain was not my decision ;-)
->>>>>> Instead of creating another set of dummy data, I just used what
->>>>>> is out there(OMAP4) with clear comment that data needs to be updated.
->>>>>> I don't see any problem in this considering we have devices booting
->>>>>> and working nicely for OMAP5
->>>>> I really wish the OMAP5 devices(the latest ones from Fab) I have would
->>>>> like to function at OMAP4 configurations! Unfortunately the devices
->>>>> tend to follow the data manual for OMAP5.
->>>>> *if* there is no need for it to boot, I suggest removing it.
->>>>>
->>>> I don't understand you. For OMAP5, that data without voltage
->>>> controller support doesn't do anything bad. Since there was some
->>>> dependency of voltage domain association whit PD's, I have to keep
->>>> that. I never claimed that OMAP4 settings would work for OMAP5
->>>> in absolute terms.
->>>>
->>>> Feel free to post a patch with right data which you seems to have.
->>>> I don't mind you removing that data as long as the device
->>>> continues to boot. Patch welcome.
->>>
->>> Thanks to Rajendra's cleanup, I don't think we need dummy data anymore:
->>>
->>>    http://marc.info/?l=linux-omap&m=137147503827947&w=2
->>>
->>> That series is queued for v3.11.
->>>
->> I knew the series but wasn't sure about it getting queued up
->> for 3.11. Nice to see the dependency is getting removed.
+On 06/25/2013 03:23 AM, Joseph Lo wrote:
+> There is a difference between GICv1 and v2 when CPU in power management
+> mode (aka CPU power down on Tegra). For GICv1, IRQ/FIQ interrupt lines
+> going to CPU are same lines which are also used for wake-interrupt.
+> Therefore, we cannot disable the GIC CPU interface if we need to use same
+> interrupts for CPU wake purpose. This creates a race condition for CPU
+> power off entry. Also, in GICv1, disabling GICv1 CPU interface puts GICv1
+> into bypass mode such that incoming legacy IRQ/FIQ are sent to CPU, which
+> means disabling GIC CPU interface doesn't really disable IRQ/FIQ to CPU.
 > 
-> Anyways, I tried booting up a kernel built on linux-next-20130625
-> with omap2plus_defconfig and [1] on OMAP5uEVM and all I see is:
-> Importing environment from mmc0 ...
-> reading //zImage
-> 4030024 bytes read in 198 ms (19.4 MiB/s)
-> reading //omap5-uevm.dtb
-> 17729 bytes read in 16 ms (1.1 MiB/s)
-> [..]
-> ## Flattened Device Tree blob at 80f80000
-> Booting using the fdt blob at 0x80f80000
-> Using Device Tree in place at 80f80000, end 80f87540
+> GICv2 provides a wake IRQ/FIQ (for wake-event purpose), which are not
+> disabled by GIC CPU interface. This is done by adding a bypass override
+> capability when the interrupts are disabled at the CPU interface. To
+> support this, there are four bits about IRQ/FIQ BypassDisable in CPU
+> interface Control Register. When the IRQ/FIQ not being driver by the
+> CPU interface, each interrupt output signal can be deasserted rather
+> than being driven by the legacy interrupt input.
 > 
-> Starting kernel ...
-> 
-> If someone can point me to a functional base, it'd be nice, or if there
-> is a known pending fix, it'd be better..
-> Taking http://marc.info/?l=linux-omap&m=136984555408516&w=2 and rebasing
-> on linux next tag resulted practically in NOP. 
-> 
-As mentioned in the cover-letter, you are probably missing the clock data.
-------------
-That means for the boot, one clock data patch needs to be applied.
-It is available on my git tree in 'out_of_tree/omap5_clk_data' branch.
----------------------------------------
+...
+> diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
 
-Regards,
-Santosh
+> +static int tegra_gic_notifier(struct notifier_block *self,
+> +			      unsigned long cmd, void *v)
+> +{
+> +	switch (cmd) {
+> +	case CPU_PM_ENTER:
+> +		writel_relaxed(0x1E0, tegra_gic_cpu_base + GIC_CPU_CTRL);
+
+I assume that 0x1e0 is the "four bits" for IRQ/FIQ bypass disable that
+are mentioned in the commit description. are there #defines that can be
+used instead of literal 0x1e0 here?
