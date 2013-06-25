@@ -1,41 +1,72 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 25 Jun 2013 23:09:26 +0200
-Subject: [BUG] mv64xxx i2c bus lock w/ commit eda6bee6c7
-References: <87a9mkttxr.fsf@natisbad.org> <20130623153931.GD7626@kw.sim.vm.gnt>
- <20130623160659.GB17536@roeck-us.net> <87fvw8ehne.fsf@natisbad.org>
- <20130624183006.GA3129@katana> <87wqpjkxfz.fsf@natisbad.org>
-Message-ID: <87mwqdnbi1.fsf@natisbad.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 25 Jun 2013 15:16:18 -0600
+Subject: [PATCH] pinctrl: elaborate a bit on arrangements in doc
+In-Reply-To: <1372169952-22439-1-git-send-email-linus.walleij@stericsson.com>
+References: <1372169952-22439-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <51CA08A2.4030204@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On 06/25/2013 08:19 AM, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This elaborates a bit on the pinctrl vs GPIO arangements
+> in the hardware.
+> 
+> Inspired by some drawings in a mail from Christian
+> Ruppert.
 
-arno at natisbad.org (Arnaud Ebalard) writes:
+> diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
 
-> Wolfram Sang <wsa@the-dreams.de> writes:
->
->>> does nothing fancy either. While debugging I ended up on Debian bug
->>> #622325 (http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622325) which
->>> made the driver a little less suspect when a revert of commit eda6bee6c7
->>> fixed the issue for me.
->>
->> Either wait for 3.11 or pick 4243fa0bad551b8c8d4ff7104e8fd557ae848845
->> "(I2C: mv64xxx: fix race between FSM/interrupt and process context")
->> from my for-next branch. (Note the other patches from Russell, probably
->> all worth to pick).
->
-> Thanks for the tip. Will try it tomorrow.
+> +The GPIO portions of a pin and its relation to a certain pin controller
+> +logic can be constructed in several ways. Here are three examples:
+> +
+> +(A)
+> +
+> +                                         +- SPI
+> +     Physical pins --- GPIO --- pinctrl -+- I2C
+> +                                         +- mmc
+> +
+> +(B)
+> +                    +- GPIO
+> +     Physical pins -+           +- SPI
+> +                    +- pinctrl -+- I2C
+> +                                +- mmc
+> +
+> +(C)
+> +                                +- SPI
+> +     Physical pins --- pinctrl -+- I2C
+> +                                +- mmc
+> +                                +- GPIO
 
-Done. It works as expected, i.e. no i2c lock at boot on my ReadynNAS
-102 once applied. Note that I had to also apply other patches from
-Russel on which this specific commit somewhat depends.
+I'm not really sure quite what these diagrams are attempting to convey
+within the context of this document.
 
->> Would be nice if you could pass the info to the Debian bug as well.
+> +In (A) the GPIO-like functionality of the pin is *always* available.
 
-Done as well. I put you in the Cc: list.
+Well, that can't really be true.
 
-Thanks for your work,
+It may be possible that you can always read the physical pin's value via
+a GPIO input register.
 
-Cheers,
+However, you obviously can't always write to a GPIO output register to
+set the pin's value. If you could, the pin would simply be a GPIO, and
+never serve any other function.
 
-a+
+If you're saying that it's always possible to put the pin into a mode
+where you can use the GPIO output register to driver the pin value, well
+then that's just regular pin-muxing, so I'm not sure why it's worth
+mentioning.
+
+In (a) there are really two levels of pinmux configuration, one in the
+GPIO HW block (GPIO-vs-whatever-pinctrl-selects).
+
+In (b) there is another level of pinmux configuration; some block has to
+exist between the physical pins and both GPIO/pinctrl HW modules; it
+simply isn't drawn in the diagram
+
+Diagram (c) appears complete.
+
+In all cases though, this is just attempting to enumerate different HW
+designs for pin-muxing I think. Isn't it better to just let each SoC's
+datasheet specify exactly how things are hooked up?
