@@ -1,45 +1,30 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 25 Jun 2013 11:04:34 +0200
-Subject: [PATCH v2 1/6] misc: sram: fix error path in sram_probe
-In-Reply-To: <201306251046.38993.heiko@sntech.de>
-References: <201306251046.04873.heiko@sntech.de>
- <201306251046.38993.heiko@sntech.de>
-Message-ID: <1372151074.3981.21.camel@pizza.hi.pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 25 Jun 2013 11:20:50 +0200
+Subject: [PATCH 0/6] Various ux500 crypto updates
+In-Reply-To: <1372150489-25594-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1372150489-25594-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <CACRpkdYgZ5ZSwDBfV8FRRqGcv09JiFyNq18vqO_dbxbhJ6_x4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Tue, Jun 25, 2013 at 10:54 AM, Fabio Baltieri
+<fabio.baltieri@linaro.org> wrote:
 
-Am Dienstag, den 25.06.2013, 10:46 +0200 schrieb Heiko St?bner:
-> The pool is created thru devm_gen_pool_create, so the call to
-> gen_pool_destroy is not necessary.
-> Instead the sram-clock must be turned off again if it exists.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/misc/sram.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-> index d87cc91..afe66571 100644
-> --- a/drivers/misc/sram.c
-> +++ b/drivers/misc/sram.c
-> @@ -68,7 +68,8 @@ static int sram_probe(struct platform_device *pdev)
->  	ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
->  				res->start, size, -1);
->  	if (ret < 0) {
-> -		gen_pool_destroy(sram->pool);
+> these are some fixes to issue pointed out by sparse and dmaengine API
+> udpates on the recently enabled ux500 hw crypto drivers.
 
-Right, thanks.
+The series:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> +		if (sram->clk)
-> +			clk_disable_unprepare(sram->clk);
->  		return ret;
->  	}
->  
+> These are based on recent linux-next, and can probably be applied on an
+> architecture specific branch with your ack, or just skip to the next
+> merge window.
 
-In light of the following patch, I'd rather move the
-clk_prepare_enable() call after gen_pool_add_virt() and its error path.
+I think these depend on the DMA40 fixes that reside in the ARM SoC
+tree. If I get Herbert's ACK I can queue them.
 
-regards
-Philipp
+They will have to go through that tree or wait for the next merge
+window, I think they are not regressions so no hurry.
+
+Yours,
+Linus Walleij
