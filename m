@@ -1,33 +1,107 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 25 Jun 2013 15:20:23 -0600
-Subject: [PATCHv3 09/11] pci: mvebu: add support for MSI
-In-Reply-To: <20130621102526.GG12441@manwe>
-References: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1371660979-21588-10-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130621102526.GG12441@manwe>
-Message-ID: <CAErSpo69OCYMA8ub8rZ8FfPimmpjHzE3WZ5RFt=HrototyHRSA@mail.gmail.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Tue, 25 Jun 2013 23:24:46 +0200
+Subject: [PATCH v2 1/3] documentation: iommu: add description of ARM
+ System MMU binding
+In-Reply-To: <1372095086-15681-2-git-send-email-will.deacon@arm.com>
+References: <1372095086-15681-1-git-send-email-will.deacon@arm.com>
+ <1372095086-15681-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20130625212446.GO2743@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 4:25 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Wed, Jun 19, 2013 at 06:56:17PM +0200, Thomas Petazzoni wrote:
->> This commit adds support for Message Signaled Interrupts in the
->> Marvell PCIe host controller. The work is very simple: it simply gets
->> a reference to the msi_chip associated to the PCIe controller thanks
->> to the msi-parent DT property, and stores this reference in the
->> pci_bus structure. This is enough to let the Linux PCI core use the
->> functions of msi_chip to setup and teardown MSIs.
->>
->> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> ---
->>  drivers/pci/host/pci-mvebu.c | 26 ++++++++++++++++++++++++++
->>  1 file changed, 26 insertions(+)
->
-> Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
+On Mon, Jun 24, 2013 at 01:31:24PM -0400, Will Deacon wrote:
+> This patch adds a description of the device tree binding for the ARM
+> System MMU architecture.
+> 
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Acked-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
 
-I assume you'll merge this through arm-soc or some other non-PCI tree.
-
-Bjorn
+> ---
+>  .../devicetree/bindings/iommu/arm,smmu.txt         | 70 ++++++++++++++++++++++
+>  1 file changed, 70 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> new file mode 100644
+> index 0000000..e34c6cd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> @@ -0,0 +1,70 @@
+> +* ARM System MMU Architecture Implementation
+> +
+> +ARM SoCs may contain an implementation of the ARM System Memory
+> +Management Unit Architecture, which can be used to provide 1 or 2 stages
+> +of address translation to bus masters external to the CPU.
+> +
+> +The SMMU may also raise interrupts in response to various fault
+> +conditions.
+> +
+> +** System MMU required properties:
+> +
+> +- compatible    : Should be one of:
+> +
+> +                        "arm,smmu-v1"
+> +                        "arm,smmu-v2"
+> +                        "arm,mmu-400"
+> +                        "arm,mmu-500"
+> +
+> +                  depending on the particular implementation and/or the
+> +                  version of the architecture implemented.
+> +
+> +- reg           : Base address and size of the SMMU.
+> +
+> +- #global-interrupts : The number of global interrupts exposed by the
+> +                       device.
+> +
+> +- interrupts    : Interrupt list, with the first #global-irqs entries
+> +                  corresponding to the global interrupts and any
+> +                  following entries corresponding to context interrupts,
+> +                  specified in order of their indexing by the SMMU.
+> +
+> +                  For SMMUv2 implementations, there must be exactly one
+> +                  interrupt per context bank. In the case of a single,
+> +                  combined interrupt, it must be listed multiple times.
+> +
+> +- mmu-masters   : A list of phandles to device nodes representing bus
+> +                  masters for which the SMMU can provide a translation
+> +                  and their corresponding StreamIDs (see example below).
+> +                  Each device node linked from this list must have a
+> +                  "#stream-id-cells" property, indicating the number of
+> +                  StreamIDs associated with it.
+> +
+> +** System MMU optional properties:
+> +
+> +- smmu-parent   : When multiple SMMUs are chained together, this
+> +                  property can be used to provide a phandle to the
+> +                  parent SMMU (that is the next SMMU on the path going
+> +                  from the mmu-masters towards memory) node for this
+> +                  SMMU.
+> +
+> +Example:
+> +
+> +        smmu {
+> +                compatible = "arm,smmu-v1";
+> +                reg = <0xba5e0000 0x10000>;
+> +                #global-interrupts = <2>;
+> +                interrupts = <0 32 4>,
+> +                             <0 33 4>,
+> +                             <0 34 4>, /* This is the first context interrupt */
+> +                             <0 35 4>,
+> +                             <0 36 4>,
+> +                             <0 37 4>;
+> +
+> +                /*
+> +                 * Two DMA controllers, the first with two StreamIDs (0xd01d
+> +                 * and 0xd01e) and the second with only one (0xd11c).
+> +                 */
+> +                mmu-masters = <&dma0 0xd01d 0xd01e>,
+> +                              <&dma1 0xd11c>;
+> +        };
+> -- 
+> 1.8.2.2
+> 
