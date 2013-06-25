@@ -1,59 +1,84 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Jun 2013 15:11:55 +0200
-Subject: [GIT PULL] ux500 DMA40 fixes for next/drivers
-Message-ID: <CACRpkdY_RyTW1kEUpUKbP9hpt-9pvG=e00mCMDvr5fyYuQFU7g@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 25 Jun 2013 14:25:19 +0100
+Subject: [Suggestion] arch: arm64: xen: "ln -s" the paravirt.h from arm.
+In-Reply-To: <alpine.DEB.2.02.1306241747360.4782@kaball.uk.xensource.com>
+References: <51C53C06.7050205@asianux.com> <51C81115.4070803@asianux.com>
+ <51C81A39.5060909@asianux.com>
+ <alpine.DEB.2.02.1306241639260.4782@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1306241747360.4782@kaball.uk.xensource.com>
+Message-ID: <20130625132519.GA7222@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On Mon, Jun 24, 2013 at 05:50:46PM +0100, Stefano Stabellini wrote:
+> On Mon, 24 Jun 2013, Stefano Stabellini wrote:
+> > On Mon, 24 Jun 2013, Chen Gang wrote:
+> > > Hello Maintainers:
+> > > 
+> > > if 'CONFIG_XEN'
+> > > 
+> > >   CC      arch/arm64/xen/../../arm/xen/enlighten.o
+> > > arch/arm64/xen/../../arm/xen/enlighten.c:19:26: fatal error: asm/paravirt.h: No such file or directory
+> > > 
+> > > The related .config file for next-20130624 is in attachment.
+> > > 
+> > > 
+> > > If "ln -s ../../../arm/include/asm/paravirt.h paravirt.h", it can pass
+> > > compiling, but I do not know how to make a patch for it ("ln -s ..."),
+> > > Do we have another more suitable ways for it (or another fixing ways) ?
+> > > 
+> > > Welcome any suggestions or completions.
+> > 
+> > The problem is caused by:
+> > 
+> > commit 3a885582a366caf868b0782041c44854ff4c3568
+> > Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > Date:   Wed May 29 10:56:34 2013 +0000
+> > 
+> >     xen/arm: account for stolen ticks
+> > 
+> > that is in my tree for linux-next (even though I have not received any
+> > replies from the ARM maintainers so I don't know when and if it is going
+> > to go upstream).
+> > 
+> > I think that the best thing to do would be to add a couple of ifdef
+> > CONFIG_PARAVIRT in arch/arm/xen/enlighten.c. I'll add them to my tree.
+> 
+> Actually now that we have XEN support under arm64, we can just introduce the
+> same pv_time_op struct and paravirt header that this patch
+> 
+> http://marc.info/?l=linux-arm-kernel&m=136992435301890&w=2
+> 
+> is introducing under arm.
 
-here are some fixes for the DMA40 patch stack that is currently
-boiling in next/drivers. They are of such type that they can go in
-per immediately or at -rc1.
+I'm not sure whether I replied to your Xen pull request but the patches
+have been merged into my 'upstream' branch on git.kernel.org and they'll
+be going in for 3.11-rc1.
 
-I tested to merge this into next/drivers and it seems to go in
-smoothly.
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 19c1cde..47bd26b 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -207,6 +207,25 @@ config FORCE_MAX_ZONEORDER
+>  	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
+>  	default "11"
+>  
+> +config PARAVIRT
+> +	bool "Enable paravirtualization code"
+> +	---help---
+> +	  This changes the kernel so it can modify itself when it is run
+> +	  under a hypervisor, potentially improving performance significantly
+> +	  over full virtualization.
+> +
+> +config PARAVIRT_TIME_ACCOUNTING
+> +	bool "Paravirtual steal time accounting"
+> +	select PARAVIRT
+> +	default n
 
-Please pull it in at your convenience.
+No need for "default n".
 
-Yours,
-Linus Walleij
+If you want, I can apply this patch on top (or send me another pull
+request but don't rebase your original Xen branch which I merged).
 
-The following changes since commit 499c2bc3cc89dcbbf08aa526cd4a984b92a4d2a8:
-
-  dmaengine: ste_dma40: Fetch disabled channels from DT (2013-06-04
-11:12:12 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-dma40-for-arm-soc-3
-
-for you to fetch changes up to 06568483297739f6ce8f2d25983f88dd8b563a9d:
-
-  crypto: ux500: use dmaengine_submit API (2013-06-25 14:51:34 +0200)
-
-----------------------------------------------------------------
-DMA40 fixes for earlier submitted driver patches:
-- Fix various error path and sparse bugs in the DMA40 driver
-- Fix various compile errors in the ux500 crypto driver
-  (dependent on the DMA40 changes).
-
-----------------------------------------------------------------
-Fabio Baltieri (7):
-      dmaengine: ste_dma40: Declare memcpy config as static
-      crypto: ux500/hash: use readl on iomem addresses
-      crypto: ux500/hash: add missing static qualifiers
-      crypto: ux500/crypt: add missing __iomem qualifiers
-      crypto: ux500: use dmaengine_device_control API
-      crypto: ux500: use dmaengine_prep_slave_sg API
-      crypto: ux500: use dmaengine_submit API
-
-Wei Yongjun (1):
-      dmaengine: ste_dma40: fix error return code in d40_probe()
-
- drivers/crypto/ux500/cryp/cryp.c      |  4 ++--
- drivers/crypto/ux500/cryp/cryp_core.c | 26 +++++++++++++-------------
- drivers/crypto/ux500/hash/hash_core.c | 33 ++++++++++++++++-----------------
- drivers/dma/ste_dma40.c               | 18 +++++++++---------
- 4 files changed, 40 insertions(+), 41 deletions(-)
+-- 
+Catalin
