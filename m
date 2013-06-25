@@ -1,37 +1,59 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 25 Jun 2013 21:04:18 +0800
-Subject: [PATCH 2/2] ARM: dts: mx28: Fix sgtl5000 codec probe
-In-Reply-To: <20130625125240.GC12178@S2101-09.ap.freescale.net>
-References: <CAOMZO5DYNmiasRREC8jXH===2HG1aNvpxpFVU2u+q5ZAT8Wd3Q@mail.gmail.com>
- <20130624072908.GH26254@S2101-09.ap.freescale.net>
- <CAOMZO5Bfetjwinatj4W-nrEvg+3pLfjgF8Zpx_-=n52ZTGHeGA@mail.gmail.com>
- <20130624140754.GF30747@S2101-09.ap.freescale.net>
- <CAOMZO5Ds3ZBhunOh1BSjLz7g=-3mRz_CwpgsPVnabGr=XzMx4g@mail.gmail.com>
- <20130625081227.GA12178@S2101-09.ap.freescale.net>
- <CAOMZO5Ch+kp4kzc_-aghZz3yMeXYYsKXiiaFrxVJnYF+BCFTbA@mail.gmail.com>
- <20130625121941.GB12178@S2101-09.ap.freescale.net>
- <CAOMZO5Cy4v7JCNa9aMhKdHKvNTaXmKp_jvTP-Nau7T1SgB4P1g@mail.gmail.com>
- <20130625125240.GC12178@S2101-09.ap.freescale.net>
-Message-ID: <20130625130416.GA31488@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 25 Jun 2013 15:11:55 +0200
+Subject: [GIT PULL] ux500 DMA40 fixes for next/drivers
+Message-ID: <CACRpkdY_RyTW1kEUpUKbP9hpt-9pvG=e00mCMDvr5fyYuQFU7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 08:52:42PM +0800, Shawn Guo wrote:
-> On Tue, Jun 25, 2013 at 09:22:10AM -0300, Fabio Estevam wrote:
-> > On Tue, Jun 25, 2013 at 9:19 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > 
-> > > It seems to me that it fails at sgtl5000_fill_defaults().  Did you
-> > > test it on imx28 when your commit af8ee11 (ASoC: sgtl5000: Fix driver probe
-> > > after reset) goes in?
-> > 
-> > I am running linux-next, which contains af8ee11.
-> 
-> What I'm saying is why you are seeing error "snd_soc_register_card
-> failed (-517)" on the second attempt is just because of commit af8ee11.
-> IOW, I doubt you did not test commit af8ee11 on imx28 when you was
+Hi ARM SoC folks,
 
-s/doubt/guess
+here are some fixes for the DMA40 patch stack that is currently
+boiling in next/drivers. They are of such type that they can go in
+per immediately or at -rc1.
 
-Shawn
+I tested to merge this into next/drivers and it seems to go in
+smoothly.
 
-> submitting the patch.
+Please pull it in at your convenience.
+
+Yours,
+Linus Walleij
+
+The following changes since commit 499c2bc3cc89dcbbf08aa526cd4a984b92a4d2a8:
+
+  dmaengine: ste_dma40: Fetch disabled channels from DT (2013-06-04
+11:12:12 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-dma40-for-arm-soc-3
+
+for you to fetch changes up to 06568483297739f6ce8f2d25983f88dd8b563a9d:
+
+  crypto: ux500: use dmaengine_submit API (2013-06-25 14:51:34 +0200)
+
+----------------------------------------------------------------
+DMA40 fixes for earlier submitted driver patches:
+- Fix various error path and sparse bugs in the DMA40 driver
+- Fix various compile errors in the ux500 crypto driver
+  (dependent on the DMA40 changes).
+
+----------------------------------------------------------------
+Fabio Baltieri (7):
+      dmaengine: ste_dma40: Declare memcpy config as static
+      crypto: ux500/hash: use readl on iomem addresses
+      crypto: ux500/hash: add missing static qualifiers
+      crypto: ux500/crypt: add missing __iomem qualifiers
+      crypto: ux500: use dmaengine_device_control API
+      crypto: ux500: use dmaengine_prep_slave_sg API
+      crypto: ux500: use dmaengine_submit API
+
+Wei Yongjun (1):
+      dmaengine: ste_dma40: fix error return code in d40_probe()
+
+ drivers/crypto/ux500/cryp/cryp.c      |  4 ++--
+ drivers/crypto/ux500/cryp/cryp_core.c | 26 +++++++++++++-------------
+ drivers/crypto/ux500/hash/hash_core.c | 33 ++++++++++++++++-----------------
+ drivers/dma/ste_dma40.c               | 18 +++++++++---------
+ 4 files changed, 40 insertions(+), 41 deletions(-)
