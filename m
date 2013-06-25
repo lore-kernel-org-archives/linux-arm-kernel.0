@@ -1,32 +1,34 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Jun 2013 15:51:47 +0200
-Subject: [PATCH 03/16] ARM: dts: i.MX6qdl: Add i.MX31 compatible to gpt node
+Date: Tue, 25 Jun 2013 15:51:49 +0200
+Subject: [PATCH 05/16] ARM: dts: i.MX31: Add iim node
 In-Reply-To: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
 References: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1372168320-22605-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1372168320-22605-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6 gpt is handled by the i.MX31 gpt driver in the kernel,
-so add a corresponding compatible entry.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx31.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 9efaa56..7707f2e 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -294,7 +294,7 @@
+diff --git a/arch/arm/boot/dts/imx31.dtsi b/arch/arm/boot/dts/imx31.dtsi
+index c544925..8116778 100644
+--- a/arch/arm/boot/dts/imx31.dtsi
++++ b/arch/arm/boot/dts/imx31.dtsi
+@@ -94,6 +94,13 @@
+ 				status = "disabled";
  			};
  
- 			gpt: gpt at 02098000 {
--				compatible = "fsl,imx6q-gpt";
-+				compatible = "fsl,imx6q-gpt", "fsl,imx31-gpt";
- 				reg = <0x02098000 0x4000>;
- 				interrupts = <0 55 0x04>;
- 				clocks = <&clks 119>, <&clks 120>;
++			iim: iim at 5001c000 {
++				compatible = "fsl,imx31-iim", "fsl,imx27-iim";
++				reg = <0x5001c000 0x1000>;
++				interrupts = <19>;
++				clocks = <&clks 25>;
++			};
++
+ 			clks: ccm at 53f80000{
+ 				compatible = "fsl,imx31-ccm";
+ 				reg = <0x53f80000 0x4000>;
 -- 
 1.8.3.1
