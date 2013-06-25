@@ -1,72 +1,164 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 25 Jun 2013 22:24:48 +0200
-Subject: [PATCH v2 2/5] ARM: be strict about FP exceptions in kernel mode
+Date: Tue, 25 Jun 2013 22:24:49 +0200
+Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
 In-Reply-To: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1372191891-24574-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The support code in vfp_support_entry does not care whether the
-exception that caused it to be invoked occurred in kernel mode or
-in user mode. However, neither condition that could trigger this
-exception (lazy restore and VFP bounce to support code) is
-currently allowable in kernel mode.
+In order to safely support the use of NEON instructions in
+kernel mode, some precautions need to be taken:
+- the userland context that may be present in the registers (even
+  if the NEON/VFP is currently disabled) must be stored under the
+  correct task (which may not be 'current' in the UP case),
+- to avoid having to keep track of additional vfpstates for the
+  kernel side, disallow the use of NEON in interrupt context
+  and run with preemption disabled,
+- after use, re-enable preemption and re-enable the lazy restore
+  machinery by disabling the NEON/VFP unit.
 
-In the former case, we can just handle it as an undefined instruction.
-In the latter case, we should flag it as a bug, as it implies that
-the FP unit has been enabled and an attempt has been made to
-execute FP instructions that are dependent on the support code, and
-this is not supported in kernel mode.
+This patch adds the functions kernel_neon_begin() and
+kernel_neon_end() which take care of the above. It also adds
+the Kconfig symbol KERNEL_MODE_NEON to enable it.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/vfp/vfphw.S     |  5 +++++
- arch/arm/vfp/vfpmodule.c | 11 +++++++++++
- 2 files changed, 16 insertions(+)
+ arch/arm/Kconfig            |  7 ++++++
+ arch/arm/include/asm/neon.h | 36 ++++++++++++++++++++++++++++++
+ arch/arm/vfp/vfpmodule.c    | 54 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 97 insertions(+)
+ create mode 100644 arch/arm/include/asm/neon.h
 
-diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
-index 8d10dc8..3e5d311 100644
---- a/arch/arm/vfp/vfphw.S
-+++ b/arch/arm/vfp/vfphw.S
-@@ -78,6 +78,11 @@
- ENTRY(vfp_support_entry)
- 	DBGSTR3	"instr %08x pc %08x state %p", r0, r2, r10
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2651b1d..1187e64 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2183,6 +2183,13 @@ config NEON
+ 	  Say Y to include support code for NEON, the ARMv7 Advanced SIMD
+ 	  Extension.
  
-+	ldr	r3, [sp, #S_PSR]	@ Neither lazy restore nor FP exceptions
-+	and	r3, r3, #MODE_MASK	@ are supported in kernel mode
-+	teq	r3, #USR_MODE
-+	bne	vfp_kmode_exception	@ Returns through lr
++config KERNEL_MODE_NEON
++	bool "Support for NEON in kernel mode"
++	default n
++	depends on NEON
++	help
++	  Say Y to include support for NEON in kernel mode.
 +
- 	VFPFMRX	r1, FPEXC		@ Is the VFP enabled?
- 	DBGSTR1	"fpexc %08x", r1
- 	tst	r1, #FPEXC_EN
+ endmenu
+ 
+ menu "Userspace binary formats"
+diff --git a/arch/arm/include/asm/neon.h b/arch/arm/include/asm/neon.h
+new file mode 100644
+index 0000000..8f730fe
+--- /dev/null
++++ b/arch/arm/include/asm/neon.h
+@@ -0,0 +1,36 @@
++/*
++ * linux/arch/arm/include/asm/neon.h
++ *
++ * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <asm/hwcap.h>
++
++#define cpu_has_neon()		(!!(elf_hwcap & HWCAP_NEON))
++
++#ifdef __ARM_NEON__
++
++/*
++ * If you are affected by the BUILD_BUG below, it probably means that you are
++ * using NEON code /and/ calling the kernel_neon_begin() function from the same
++ * compilation unit. To prevent issues that may arise from GCC reordering or
++ * generating(1) NEON instructions outside of these begin/end functions, the
++ * only supported way of using NEON code in the kernel is by isolating it in a
++ * separate compilation unit, and calling it from another unit from inside a
++ * kernel_neon_begin/kernel_neon_end pair.
++ *
++ * (1) Current GCC (4.7) might generate NEON instructions at O3 level if
++ *     -mpfu=neon is set.
++ */
++
++#define kernel_neon_begin() \
++	BUILD_BUG_ON_MSG(1, "kernel_neon_begin() called from NEON code")
++
++#else
++void kernel_neon_begin(void);
++#endif
++void kernel_neon_end(void);
 diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 791993a..fd1466c 100644
+index fd1466c..b64ca77 100644
 --- a/arch/arm/vfp/vfpmodule.c
 +++ b/arch/arm/vfp/vfpmodule.c
-@@ -26,6 +26,7 @@
- #include <asm/system_info.h>
- #include <asm/thread_notify.h>
- #include <asm/vfp.h>
-+#include <asm/bug.h>
+@@ -20,6 +20,7 @@
+ #include <linux/init.h>
+ #include <linux/uaccess.h>
+ #include <linux/user.h>
++#include <linux/export.h>
  
- #include "vfpinstr.h"
- #include "vfp.h"
-@@ -648,6 +649,16 @@ static int vfp_hotplug(struct notifier_block *b, unsigned long action,
- 	return NOTIFY_OK;
+ #include <asm/cp15.h>
+ #include <asm/cputype.h>
+@@ -659,6 +660,59 @@ void vfp_kmode_exception(void)
+ 	BUG_ON(fmrx(FPEXC) & FPEXC_EN);
  }
  
-+void vfp_kmode_exception(void)
++#ifdef CONFIG_KERNEL_MODE_NEON
++
++/*
++ * Kernel-side NEON support functions
++ */
++void kernel_neon_begin(void)
 +{
++	struct thread_info *thread = current_thread_info();
++	unsigned int cpu;
++	u32 fpexc;
++
 +	/*
-+	 * Taking an FP exception in kernel mode is always a bug, because
-+	 * none of the FP instructions currently supported in kernel mode
-+	 * (i.e., NEON) should ever be bounced back to the support code.
++	 * Kernel mode NEON is only allowed outside of interrupt context
++	 * with preemption disabled. This will make sure that the kernel
++	 * mode NEON register contents never need to be preserved.
++	 *
++	 * Use inc_preempt_count() instead of preempt_disable() so sleeping
++	 * complains noisily even on builds that have kernel preemption
++	 * disabled.
 +	 */
-+	BUG_ON(fmrx(FPEXC) & FPEXC_EN);
++	BUG_ON(in_interrupt());
++	inc_preempt_count();
++	barrier();
++	cpu = smp_processor_id();
++
++	fpexc = fmrx(FPEXC) | FPEXC_EN;
++	fmxr(FPEXC, fpexc);
++
++	/*
++	 * Save the userland NEON/VFP state. Under UP,
++	 * the owner could be a task other than 'current'
++	 */
++	if (vfp_state_in_hw(cpu, thread))
++		vfp_save_state(&thread->vfpstate, fpexc);
++#ifndef CONFIG_SMP
++	else if (vfp_current_hw_state[cpu] != NULL)
++		vfp_save_state(vfp_current_hw_state[cpu], fpexc);
++#endif
++	vfp_current_hw_state[cpu] = NULL;
 +}
++EXPORT_SYMBOL(kernel_neon_begin);
++
++void kernel_neon_end(void)
++{
++	/* Disable the NEON/VFP unit. */
++	fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
++	barrier();
++	dec_preempt_count();
++}
++EXPORT_SYMBOL(kernel_neon_end);
++
++#endif /* CONFIG_KERNEL_MODE_NEON */
 +
  /*
   * VFP support code initialisation.
