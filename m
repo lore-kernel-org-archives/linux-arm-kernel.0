@@ -1,43 +1,45 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 25 Jun 2013 11:55:52 +0200
-Subject: [PATCHv3 02/11] pci: use weak functions for MSI arch-specific
- functions
-In-Reply-To: <CAErSpo6Mm6kYZKN_n-fMRD2T1-F0sf9GStmOTA8tT0wVLedCgw@mail.gmail.com>
-References: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1371660979-21588-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130620185707.GA8888@mithrandir>
- <CAErSpo6Mm6kYZKN_n-fMRD2T1-F0sf9GStmOTA8tT0wVLedCgw@mail.gmail.com>
-Message-ID: <20130625115552.7ebdad17@skate>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 25 Jun 2013 13:12:15 +0300
+Subject: [PATCH 3/9] ARM: dma-mapping: convert DMA direction into IOMMU
+ protection attributes
+In-Reply-To: <1370889285-22799-4-git-send-email-will.deacon@arm.com>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-4-git-send-email-will.deacon@arm.com>
+Message-ID: <20130625131215.d3cea2a5668a3d41dbbeb064@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn Helgaas,
+Hi Will,
 
-On Mon, 24 Jun 2013 19:52:45 -0600, Bjorn Helgaas wrote:
+On Mon, 10 Jun 2013 20:34:39 +0200
+Will Deacon <will.deacon@arm.com> wrote:
+...
+> @@ -1636,13 +1636,27 @@ static dma_addr_t arm_coherent_iommu_map_page(struct device *dev, struct page *p
+>  {
+>  	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
+>  	dma_addr_t dma_addr;
+> -	int ret, len = PAGE_ALIGN(size + offset);
+> +	int ret, prot, len = PAGE_ALIGN(size + offset);
+>  
+>  	dma_addr = __alloc_iova(mapping, len);
+>  	if (dma_addr == DMA_ERROR_CODE)
+>  		return dma_addr;
+>  
+> -	ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len, 0);
+> +	switch (dir) {
+> +	case DMA_BIDIRECTIONAL:
+> +		prot = IOMMU_READ | IOMMU_WRITE;
+> +		break;
+> +	case DMA_TO_DEVICE:
+> +		prot = IOMMU_READ;
+> +		break;
+> +	case DMA_FROM_DEVICE:
+> +		prot = IOMMU_WRITE;
+> +		break;
+> +	default:
+> +		prot = 0;
+> +	}
+> +
+> +	ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len, prot);
 
-> I agree; the whole point of __weak is to provide a "default"
-> implementation, so I hope you can just remove any empty default_*()
-> functions and fold the others into the arch_*() functions directly.
-> 
-> If there actually are callbacks from arch-specific strong functions
-> back to the stuff in the default_*() functions, that suggests that we
-> should refactor and rename that bit of functionality.
-
-There is one such case, as highlighted in the commit log of this patch:
-
-"""
-This is needed because the x86 Xen implementation of
-teardown_msi_irqs() needs to do some work, and then call the default
-implementation of this hook.
-"""
-
-Any suggestion on how to solve this particular case?
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Do we need similar changes for map_sg case as well? They still passes '0' as prot.
