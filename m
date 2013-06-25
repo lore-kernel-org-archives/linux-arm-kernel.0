@@ -1,115 +1,36 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 25 Jun 2013 19:11:01 +0100
-Subject: [PATCH 2/4] x86: efi: break efi_lookup_mapped_addr out to generic code
+Date: Tue, 25 Jun 2013 19:11:03 +0100
+Subject: [PATCH 4/4] init: efi: arm: enable (U)EFI runtime services on arm
 In-Reply-To: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
 References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1372183863-11333-3-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1372183863-11333-5-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-efi_lookup_mapped_addr is a handy helper function for translating
-a physical address to the corresponding virtual one by scanning
-through memmap.map.
-
-This patch breaks it out into a new file for use elsewhere.
+Since the efi_set_virtual_address_map call has strict init ordering
+requirements, add an explicit hook in the required place.
 
 Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
 ---
- arch/x86/platform/efi/efi.c       |   28 ----------------------------
- drivers/firmware/efi/Makefile     |    2 +-
- drivers/firmware/efi/efi-helper.c |   33 +++++++++++++++++++++++++++++++++
- 3 files changed, 34 insertions(+), 29 deletions(-)
- create mode 100644 drivers/firmware/efi/efi-helper.c
+ init/main.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/x86/platform/efi/efi.c b/arch/x86/platform/efi/efi.c
-index 5ae2eb0..d1a1b6b 100644
---- a/arch/x86/platform/efi/efi.c
-+++ b/arch/x86/platform/efi/efi.c
-@@ -814,34 +814,6 @@ static void __init runtime_code_page_mkexec(void)
- 	}
- }
+diff --git a/init/main.c b/init/main.c
+index 9484f4b..c61706e 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -872,6 +872,12 @@ static noinline void __init kernel_init_freeable(void)
+ 	smp_prepare_cpus(setup_max_cpus);
  
--/*
-- * We can't ioremap data in EFI boot services RAM, because we've already mapped
-- * it as RAM.  So, look it up in the existing EFI memory map instead.  Only
-- * callable after efi_enter_virtual_mode and before efi_free_boot_services.
-- */
--void __iomem *efi_lookup_mapped_addr(u64 phys_addr)
--{
--	void *p;
--	if (WARN_ON(!memmap.map))
--		return NULL;
--	for (p = memmap.map; p < memmap.map_end; p += memmap.desc_size) {
--		efi_memory_desc_t *md = p;
--		u64 size = md->num_pages << EFI_PAGE_SHIFT;
--		u64 end = md->phys_addr + size;
--		if (!(md->attribute & EFI_MEMORY_RUNTIME) &&
--		    md->type != EFI_BOOT_SERVICES_CODE &&
--		    md->type != EFI_BOOT_SERVICES_DATA)
--			continue;
--		if (!md->virt_addr)
--			continue;
--		if (phys_addr >= md->phys_addr && phys_addr < end) {
--			phys_addr += md->virt_addr - md->phys_addr;
--			return (__force void __iomem *)(unsigned long)phys_addr;
--		}
--	}
--	return NULL;
--}
--
- void efi_memory_uc(u64 addr, unsigned long size)
- {
- 	unsigned long page_shift = 1UL << EFI_PAGE_SHIFT;
-diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
-index 99245ab..629a513 100644
---- a/drivers/firmware/efi/Makefile
-+++ b/drivers/firmware/efi/Makefile
-@@ -1,6 +1,6 @@
- #
- # Makefile for linux kernel
- #
--obj-y					+= efi.o vars.o
-+obj-y					+= efi.o vars.o efi-helper.o
- obj-$(CONFIG_EFI_VARS)			+= efivars.o
- obj-$(CONFIG_EFI_VARS_PSTORE)		+= efi-pstore.o
-diff --git a/drivers/firmware/efi/efi-helper.c b/drivers/firmware/efi/efi-helper.c
-new file mode 100644
-index 0000000..c5c2c72
---- /dev/null
-+++ b/drivers/firmware/efi/efi-helper.c
-@@ -0,0 +1,33 @@
-+/*
-+ * Common [U]EFI support helper functions across architectures.
-+ */
+ 	do_pre_smp_initcalls();
 +
-+#include <linux/efi.h>
++#ifdef CONFIG_ARM
++	if (efi_enabled(EFI_RUNTIME_SERVICES))
++		efi_enter_virtual_mode();
++#endif
 +
-+/*
-+ * We can't ioremap data in EFI boot services RAM, because we've already mapped
-+ * it as RAM.  So, look it up in the existing EFI memory map instead.  Only
-+ * callable after efi_enter_virtual_mode and before efi_free_boot_services.
-+ */
-+void __iomem *efi_lookup_mapped_addr(u64 phys_addr)
-+{
-+	void *p;
-+	if (WARN_ON(!memmap.map))
-+		return NULL;
-+	for (p = memmap.map; p < memmap.map_end; p += memmap.desc_size) {
-+		efi_memory_desc_t *md = p;
-+		u64 size = md->num_pages << EFI_PAGE_SHIFT;
-+		u64 end = md->phys_addr + size;
-+		if (!(md->attribute & EFI_MEMORY_RUNTIME) &&
-+		    md->type != EFI_BOOT_SERVICES_CODE &&
-+		    md->type != EFI_BOOT_SERVICES_DATA)
-+			continue;
-+		if (!md->virt_addr)
-+			continue;
-+		if (phys_addr >= md->phys_addr && phys_addr < end) {
-+			phys_addr += md->virt_addr - md->phys_addr;
-+			return (__force void __iomem *)(unsigned long)phys_addr;
-+		}
-+	}
-+	return NULL;
-+}
+ 	lockup_detector_init();
+ 
+ 	smp_init();
 -- 
 1.7.10.4
