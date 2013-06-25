@@ -1,19 +1,20 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Tue, 25 Jun 2013 11:53:24 +0530
-Subject: [PATCH V3 2/6] USB: OHCI: make ohci-omap a separate driver
+Date: Tue, 25 Jun 2013 11:53:25 +0530
+Subject: [PATCH V3 3/6] USB: OHCI: make ohci-omap3 a separate driver
 In-Reply-To: <1372141408-9894-1-git-send-email-manjunath.goudar@linaro.org>
 References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
  <1372141408-9894-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1372141408-9894-3-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1372141408-9894-4-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the  TI OHCI OMAP1/2 host controller driver from ohci-hcd
+Separate the  TI OHCI OMAP3 host controller driver from ohci-hcd
 host code so that it can be built as a separate driver module.
 This work is part of enabling multi-platform kernels on ARM;
 it would be nice to have in 3.11.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+Cc: Anand Gadiyar <gadiyar@ti.com>
 Cc: Felipe Balbi <balbi@ti.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Greg KH <greg@kroah.com>
@@ -21,280 +22,151 @@ Cc: Alan Stern <stern@rowland.harvard.edu>
 Cc: linux-usb at vger.kernel.org
 
 V2:
- -omap_ohci_clock_power(0) called in usb_hcd_omap_remove().
- -Removed ohci_setup() call from usb_hcd_omap_probe().
- -host_enabled and host_initialized variables aren't used for anything
-  thats what removed.
+ -ohci_setup() removed because it is called in .reset member
+  of the ohci_hc_driver structure.
+ -The improper multi-line commenting style written in proper way.
+  ('*' characters aligned in vertically).
 
 V3:
- -rewritten if (config->otg || config->rwc) block statements into
-  two separate 'if blocks' to handle below scenarios
-  1. config->otg set scenario.
-  2. if any of these (config->otg, config->rwc) are set, this
-     scenario should be handled only after ohci_setup()
+ -RemoteWakeupConnected setting has been removed.
 ---
- drivers/usb/host/Kconfig     |    2 +-
- drivers/usb/host/Makefile    |    1 +
- drivers/usb/host/ohci-hcd.c  |   18 -----
- drivers/usb/host/ohci-omap.c |  157 +++++++++++++++---------------------------
- 4 files changed, 56 insertions(+), 122 deletions(-)
+ drivers/usb/host/Kconfig      |    2 +-
+ drivers/usb/host/Makefile     |    1 +
+ drivers/usb/host/ohci-hcd.c   |   18 -------
+ drivers/usb/host/ohci-omap3.c |  113 ++++++++++++-----------------------------
+ 4 files changed, 34 insertions(+), 100 deletions(-)
 
 diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 75456f2..7a87c72 100644
+index 7a87c72..db20e43 100644
 --- a/drivers/usb/host/Kconfig
 +++ b/drivers/usb/host/Kconfig
-@@ -376,7 +376,7 @@ config USB_OHCI_HCD
- if USB_OHCI_HCD
+@@ -383,7 +383,7 @@ config USB_OHCI_HCD_OMAP1
+ 	  Enables support for the OHCI controller on OMAP1/2 chips.
  
- config USB_OHCI_HCD_OMAP1
--	bool "OHCI support for OMAP1/2 chips"
-+	tristate "OHCI support for OMAP1/2 chips"
- 	depends on ARCH_OMAP1
+ config USB_OHCI_HCD_OMAP3
+-	bool "OHCI support for OMAP3 and later chips"
++	tristate "OHCI support for OMAP3 and later chips"
+ 	depends on (ARCH_OMAP3 || ARCH_OMAP4)
  	default y
  	---help---
 diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index bf4a4b2..52f2c44 100644
+index 52f2c44..9f2f5f3 100644
 --- a/drivers/usb/host/Makefile
 +++ b/drivers/usb/host/Makefile
-@@ -46,6 +46,7 @@ obj-$(CONFIG_USB_OHCI_HCD)	+= ohci-hcd.o
- obj-$(CONFIG_USB_OHCI_HCD_PCI)	+= ohci-pci.o
+@@ -47,6 +47,7 @@ obj-$(CONFIG_USB_OHCI_HCD_PCI)	+= ohci-pci.o
  obj-$(CONFIG_USB_OHCI_HCD_PLATFORM)	+= ohci-platform.o
  obj-$(CONFIG_USB_OHCI_EXYNOS)	+= ohci-exynos.o
-+obj-$(CONFIG_USB_OHCI_HCD_OMAP1)	+= ohci-omap.o
+ obj-$(CONFIG_USB_OHCI_HCD_OMAP1)	+= ohci-omap.o
++obj-$(CONFIG_USB_OHCI_HCD_OMAP3)	+= ohci-omap3.o
  
  obj-$(CONFIG_USB_UHCI_HCD)	+= uhci-hcd.o
  obj-$(CONFIG_USB_FHCI_HCD)	+= fhci.o
 diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index 2980bb6..1abc1e7 100644
+index 1abc1e7..cad51d2 100644
 --- a/drivers/usb/host/ohci-hcd.c
 +++ b/drivers/usb/host/ohci-hcd.c
 @@ -1182,11 +1182,6 @@ MODULE_LICENSE ("GPL");
  #define S3C2410_PLATFORM_DRIVER	ohci_hcd_s3c2410_driver
  #endif
  
--#ifdef CONFIG_USB_OHCI_HCD_OMAP1
--#include "ohci-omap.c"
--#define OMAP1_PLATFORM_DRIVER	ohci_hcd_omap_driver
+-#ifdef CONFIG_USB_OHCI_HCD_OMAP3
+-#include "ohci-omap3.c"
+-#define OMAP3_PLATFORM_DRIVER	ohci_hcd_omap3_driver
 -#endif
 -
- #ifdef CONFIG_USB_OHCI_HCD_OMAP3
- #include "ohci-omap3.c"
- #define OMAP3_PLATFORM_DRIVER	ohci_hcd_omap3_driver
-@@ -1289,12 +1284,6 @@ static int __init ohci_hcd_mod_init(void)
+ #if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
+ #include "ohci-pxa27x.c"
+ #define PLATFORM_DRIVER		ohci_hcd_pxa27x_driver
+@@ -1284,12 +1279,6 @@ static int __init ohci_hcd_mod_init(void)
  		goto error_platform;
  #endif
  
--#ifdef OMAP1_PLATFORM_DRIVER
--	retval = platform_driver_register(&OMAP1_PLATFORM_DRIVER);
+-#ifdef OMAP3_PLATFORM_DRIVER
+-	retval = platform_driver_register(&OMAP3_PLATFORM_DRIVER);
 -	if (retval < 0)
--		goto error_omap1_platform;
+-		goto error_omap3_platform;
 -#endif
 -
- #ifdef OMAP3_PLATFORM_DRIVER
- 	retval = platform_driver_register(&OMAP3_PLATFORM_DRIVER);
+ #ifdef OF_PLATFORM_DRIVER
+ 	retval = platform_driver_register(&OF_PLATFORM_DRIVER);
  	if (retval < 0)
-@@ -1408,10 +1397,6 @@ static int __init ohci_hcd_mod_init(void)
- 	platform_driver_unregister(&OMAP3_PLATFORM_DRIVER);
-  error_omap3_platform:
+@@ -1393,10 +1382,6 @@ static int __init ohci_hcd_mod_init(void)
+ 	platform_driver_unregister(&OF_PLATFORM_DRIVER);
+  error_of_platform:
  #endif
--#ifdef OMAP1_PLATFORM_DRIVER
--	platform_driver_unregister(&OMAP1_PLATFORM_DRIVER);
-- error_omap1_platform:
+-#ifdef OMAP3_PLATFORM_DRIVER
+-	platform_driver_unregister(&OMAP3_PLATFORM_DRIVER);
+- error_omap3_platform:
 -#endif
  #ifdef PLATFORM_DRIVER
  	platform_driver_unregister(&PLATFORM_DRIVER);
   error_platform:
-@@ -1466,9 +1451,6 @@ static void __exit ohci_hcd_mod_exit(void)
- #ifdef OMAP3_PLATFORM_DRIVER
- 	platform_driver_unregister(&OMAP3_PLATFORM_DRIVER);
+@@ -1448,9 +1433,6 @@ static void __exit ohci_hcd_mod_exit(void)
+ #ifdef OF_PLATFORM_DRIVER
+ 	platform_driver_unregister(&OF_PLATFORM_DRIVER);
  #endif
--#ifdef OMAP1_PLATFORM_DRIVER
--	platform_driver_unregister(&OMAP1_PLATFORM_DRIVER);
+-#ifdef OMAP3_PLATFORM_DRIVER
+-	platform_driver_unregister(&OMAP3_PLATFORM_DRIVER);
 -#endif
  #ifdef PLATFORM_DRIVER
  	platform_driver_unregister(&PLATFORM_DRIVER);
  #endif
-diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
-index 8747fa6..10ba58d 100644
---- a/drivers/usb/host/ohci-omap.c
-+++ b/drivers/usb/host/ohci-omap.c
-@@ -14,12 +14,21 @@
-  * This file is licenced under the GPL.
+diff --git a/drivers/usb/host/ohci-omap3.c b/drivers/usb/host/ohci-omap3.c
+index 8f71357..f2de21b 100644
+--- a/drivers/usb/host/ohci-omap3.c
++++ b/drivers/usb/host/ohci-omap3.c
+@@ -29,90 +29,22 @@
+  *	- add kernel-doc
   */
  
--#include <linux/signal.h>
--#include <linux/jiffies.h>
--#include <linux/platform_device.h>
- #include <linux/clk.h>
 +#include <linux/dma-mapping.h>
- #include <linux/err.h>
- #include <linux/gpio.h>
-+#include <linux/io.h>
-+#include <linux/jiffies.h>
 +#include <linux/kernel.h>
 +#include <linux/module.h>
++#include <linux/of.h>
 +#include <linux/usb/otg.h>
-+#include <linux/platform_device.h>
-+#include <linux/signal.h>
-+#include <linux/usb.h>
-+#include <linux/usb/hcd.h>
-+
-+#include "ohci.h"
- 
- #include <asm/io.h>
- #include <asm/mach-types.h>
-@@ -42,10 +51,7 @@
- #define OMAP1510_LB_MMU_RAM_H	0xfffec234
- #define OMAP1510_LB_MMU_RAM_L	0xfffec238
- 
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+-#include <linux/of.h>
+-#include <linux/dma-mapping.h>
 -
--#ifndef CONFIG_ARCH_OMAP
--#error "This file is OMAP bus glue.  CONFIG_OMAP must be defined."
--#endif
-+#define DRIVER_DESC "OHCI OMAP driver"
- 
- #ifdef CONFIG_TPS65010
- #include <linux/i2c/tps65010.h>
-@@ -68,8 +74,9 @@ extern int ocpi_enable(void);
- 
- static struct clk *usb_host_ck;
- static struct clk *usb_dc_ck;
--static int host_enabled;
--static int host_initialized;
-+
-+static const char hcd_name[] = "ohci-omap";
-+static struct hc_driver __read_mostly ohci_omap_hc_driver;
- 
- static void omap_ohci_clock_power(int on)
- {
-@@ -188,7 +195,7 @@ static void start_hnp(struct ohci_hcd *ohci)
- 
- /*-------------------------------------------------------------------------*/
- 
--static int ohci_omap_init(struct usb_hcd *hcd)
-+static int ohci_omap_reset(struct usb_hcd *hcd)
- {
- 	struct ohci_hcd		*ohci = hcd_to_ohci(hcd);
- 	struct omap_usb_config	*config = hcd->self.controller->platform_data;
-@@ -198,9 +205,9 @@ static int ohci_omap_init(struct usb_hcd *hcd)
- 	dev_dbg(hcd->self.controller, "starting USB Controller\n");
- 
- 	if (config->otg) {
--		ohci_to_hcd(ohci)->self.otg_port = config->otg;
-+		hcd->self.otg_port = config->otg;
- 		/* default/minimum OTG power budget:  8 mA */
--		ohci_to_hcd(ohci)->power_budget = 8;
-+		hcd->power_budget = 8;
- 	}
- 
- 	/* boards can use OTG transceivers in non-OTG modes */
-@@ -238,9 +245,15 @@ static int ohci_omap_init(struct usb_hcd *hcd)
- 		omap_1510_local_bus_init();
- 	}
- 
--	if ((ret = ohci_init(ohci)) < 0)
-+	ret = ohci_setup(hcd);
-+	if (ret < 0)
- 		return ret;
- 
-+	if (config->otg || config->rwc) {
-+		ohci->hc_control = OHCI_CTRL_RWC;
-+		writel(OHCI_CTRL_RWC, &ohci->regs->control);
-+	}
-+
- 	/* board-specific power switching and overcurrent support */
- 	if (machine_is_omap_osk() || machine_is_omap_innovator()) {
- 		u32	rh = roothub_a (ohci);
-@@ -281,14 +294,6 @@ static int ohci_omap_init(struct usb_hcd *hcd)
- 	return 0;
- }
- 
--static void ohci_omap_stop(struct usb_hcd *hcd)
+-/*-------------------------------------------------------------------------*/
+-
+-static int ohci_omap3_init(struct usb_hcd *hcd)
 -{
--	dev_dbg(hcd->self.controller, "stopping USB Controller\n");
--	ohci_stop(hcd);
--	omap_ohci_clock_power(0);
--}
+-	dev_dbg(hcd->self.controller, "starting OHCI controller\n");
 -
--
- /*-------------------------------------------------------------------------*/
- 
- /**
-@@ -304,7 +309,6 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
- {
- 	int retval, irq;
- 	struct usb_hcd *hcd = 0;
--	struct ohci_hcd *ohci;
- 
- 	if (pdev->num_resources != 2) {
- 		printk(KERN_ERR "hcd probe: invalid num_resources: %i\n",
-@@ -354,12 +358,6 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
- 		goto err2;
- 	}
- 
--	ohci = hcd_to_ohci(hcd);
--	ohci_hcd_init(ohci);
--
--	host_initialized = 0;
--	host_enabled = 1;
--
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
- 		retval = -ENXIO;
-@@ -369,11 +367,7 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
- 	if (retval)
- 		goto err3;
- 
--	host_initialized = 1;
--
--	if (!host_enabled)
--		omap_ohci_clock_power(0);
--
-+	omap_ohci_clock_power(0);
- 	return 0;
- err3:
- 	iounmap(hcd->regs);
-@@ -402,6 +396,8 @@ err0:
- static inline void
- usb_hcd_omap_remove (struct usb_hcd *hcd, struct platform_device *pdev)
- {
-+	dev_dbg(hcd->self.controller, "stopping USB Controller\n");
-+	omap_ohci_clock_power(0);
- 	usb_remove_hcd(hcd);
- 	if (!IS_ERR_OR_NULL(hcd->phy)) {
- 		(void) otg_set_host(hcd->phy->otg, 0);
-@@ -418,76 +414,6 @@ usb_hcd_omap_remove (struct usb_hcd *hcd, struct platform_device *pdev)
- 
- /*-------------------------------------------------------------------------*/
- 
--static int
--ohci_omap_start (struct usb_hcd *hcd)
--{
--	struct omap_usb_config *config;
--	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
--	int		ret;
--
--	if (!host_enabled)
--		return 0;
--	config = hcd->self.controller->platform_data;
--	if (config->otg || config->rwc) {
--		ohci->hc_control = OHCI_CTRL_RWC;
--		writel(OHCI_CTRL_RWC, &ohci->regs->control);
--	}
--
--	if ((ret = ohci_run (ohci)) < 0) {
--		dev_err(hcd->self.controller, "can't start\n");
--		ohci_stop (hcd);
--		return ret;
--	}
--	return 0;
+-	return ohci_init(hcd_to_ohci(hcd));
 -}
 -
 -/*-------------------------------------------------------------------------*/
 -
--static const struct hc_driver ohci_omap_hc_driver = {
+-static int ohci_omap3_start(struct usb_hcd *hcd)
+-{
+-	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+-	int ret;
+-
+-	/*
+-	 * RemoteWakeupConnected has to be set explicitly before
+-	 * calling ohci_run. The reset value of RWC is 0.
+-	 */
+-	ohci->hc_control = OHCI_CTRL_RWC;
+-	writel(OHCI_CTRL_RWC, &ohci->regs->control);
+-
+-	ret = ohci_run(ohci);
+-
+-	if (ret < 0) {
+-		dev_err(hcd->self.controller, "can't start\n");
+-		ohci_stop(hcd);
+-	}
+-
+-	return ret;
+-}
+-
+-/*-------------------------------------------------------------------------*/
+-
+-static const struct hc_driver ohci_omap3_hc_driver = {
 -	.description =		hcd_name,
--	.product_desc =		"OMAP OHCI",
+-	.product_desc =		"OMAP3 OHCI Host Controller",
 -	.hcd_priv_size =	sizeof(struct ohci_hcd),
 -
 -	/*
@@ -306,9 +178,9 @@ index 8747fa6..10ba58d 100644
 -	/*
 -	 * basic lifecycle operations
 -	 */
--	.reset =		ohci_omap_init,
--	.start =		ohci_omap_start,
--	.stop =			ohci_omap_stop,
+-	.reset =		ohci_omap3_init,
+-	.start =		ohci_omap3_start,
+-	.stop =			ohci_stop,
 -	.shutdown =		ohci_shutdown,
 -
 -	/*
@@ -317,12 +189,15 @@ index 8747fa6..10ba58d 100644
 -	.urb_enqueue =		ohci_urb_enqueue,
 -	.urb_dequeue =		ohci_urb_dequeue,
 -	.endpoint_disable =	ohci_endpoint_disable,
--
++#include <linux/usb.h>
++#include <linux/usb/hcd.h>
+ 
 -	/*
 -	 * scheduling support
 -	 */
 -	.get_frame_number =	ohci_get_frame,
--
++#include "ohci.h"
+ 
 -	/*
 -	 * root hub support
 -	 */
@@ -334,41 +209,56 @@ index 8747fa6..10ba58d 100644
 -#endif
 -	.start_port_reset =	ohci_start_port_reset,
 -};
--
++#define DRIVER_DESC "OHCI OMAP3 driver"
+ 
 -/*-------------------------------------------------------------------------*/
--
- static int ohci_hcd_omap_drv_probe(struct platform_device *dev)
++static const char hcd_name[] = "ohci-omap3";
++static struct hc_driver __read_mostly ohci_omap3_hc_driver;
+ 
+ /*
+  * configure so an HC device and id are always provided
+@@ -129,6 +61,7 @@ static const struct hc_driver ohci_omap3_hc_driver = {
+ static int ohci_hcd_omap3_probe(struct platform_device *pdev)
  {
- 	return usb_hcd_omap_probe(&ohci_omap_hc_driver, dev);
-@@ -553,4 +479,29 @@ static struct platform_driver ohci_hcd_omap_driver = {
+ 	struct device		*dev = &pdev->dev;
++	struct ohci_hcd		*ohci;
+ 	struct usb_hcd		*hcd = NULL;
+ 	void __iomem		*regs = NULL;
+ 	struct resource		*res;
+@@ -185,8 +118,6 @@ static int ohci_hcd_omap3_probe(struct platform_device *pdev)
+ 	pm_runtime_enable(dev);
+ 	pm_runtime_get_sync(dev);
+ 
+-	ohci_hcd_init(hcd_to_ohci(hcd));
+-
+ 	ret = usb_add_hcd(hcd, irq, 0);
+ 	if (ret) {
+ 		dev_dbg(dev, "failed to add hcd with err %d\n", ret);
+@@ -256,5 +187,25 @@ static struct platform_driver ohci_hcd_omap3_driver = {
  	},
  };
  
-+static const struct ohci_driver_overrides omap_overrides __initconst = {
-+	.product_desc	= "OMAP OHCI",
-+	.reset		= ohci_omap_reset
-+};
-+
-+static int __init ohci_omap_init(void)
++static int __init ohci_omap3_init(void)
 +{
 +	if (usb_disabled())
 +		return -ENODEV;
 +
 +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
 +
-+	ohci_init_driver(&ohci_omap_hc_driver, &omap_overrides);
-+	return platform_driver_register(&ohci_hcd_omap_driver);
++	ohci_init_driver(&ohci_omap3_hc_driver, NULL);
++	return platform_driver_register(&ohci_hcd_omap3_driver);
 +}
-+module_init(ohci_omap_init);
++module_init(ohci_omap3_init);
 +
-+static void __exit ohci_omap_cleanup(void)
++static void __exit ohci_omap3_cleanup(void)
 +{
-+	platform_driver_unregister(&ohci_hcd_omap_driver);
++	platform_driver_unregister(&ohci_hcd_omap3_driver);
 +}
-+module_exit(ohci_omap_cleanup);
++module_exit(ohci_omap3_cleanup);
 +
 +MODULE_DESCRIPTION(DRIVER_DESC);
- MODULE_ALIAS("platform:ohci");
+ MODULE_ALIAS("platform:ohci-omap3");
+ MODULE_AUTHOR("Anand Gadiyar <gadiyar@ti.com>");
 +MODULE_LICENSE("GPL");
 -- 
 1.7.9.5
