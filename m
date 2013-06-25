@@ -1,10 +1,10 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue, 25 Jun 2013 10:12:56 +0200
-Subject: [PATCH v2 3/4] usb: gadget: at91_udc: prepare clk before calling
+Date: Tue, 25 Jun 2013 10:14:13 +0200
+Subject: [PATCH v2 4/4] at91/avr32/atmel_lcdfb: prepare clk before calling
  enable
 In-Reply-To: <1372147702-4074-1-git-send-email-b.brezillon@overkiz.com>
 References: <1372147702-4074-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1372147976-4405-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1372148053-4477-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,51 +13,31 @@ avoid common clk framework warnings.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- drivers/usb/gadget/at91_udc.c |   14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ drivers/video/atmel_lcdfb.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-index 073b938..fce8e4e 100644
---- a/drivers/usb/gadget/at91_udc.c
-+++ b/drivers/usb/gadget/at91_udc.c
-@@ -870,8 +870,8 @@ static void clk_on(struct at91_udc *udc)
- 	if (udc->clocked)
- 		return;
- 	udc->clocked = 1;
--	clk_enable(udc->iclk);
--	clk_enable(udc->fclk);
-+	clk_prepare_enable(udc->iclk);
-+	clk_prepare_enable(udc->fclk);
+diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+index 540909d..8525457 100644
+--- a/drivers/video/atmel_lcdfb.c
++++ b/drivers/video/atmel_lcdfb.c
+@@ -893,14 +893,14 @@ static int __init atmel_lcdfb_init_fbinfo(struct atmel_lcdfb_info *sinfo)
+ 
+ static void atmel_lcdfb_start_clock(struct atmel_lcdfb_info *sinfo)
+ {
+-	clk_enable(sinfo->bus_clk);
+-	clk_enable(sinfo->lcdc_clk);
++	clk_prepare_enable(sinfo->bus_clk);
++	clk_prepare_enable(sinfo->lcdc_clk);
  }
  
- static void clk_off(struct at91_udc *udc)
-@@ -880,8 +880,8 @@ static void clk_off(struct at91_udc *udc)
- 		return;
- 	udc->clocked = 0;
- 	udc->gadget.speed = USB_SPEED_UNKNOWN;
--	clk_disable(udc->fclk);
--	clk_disable(udc->iclk);
-+	clk_disable_unprepare(udc->fclk);
-+	clk_disable_unprepare(udc->iclk);
+ static void atmel_lcdfb_stop_clock(struct atmel_lcdfb_info *sinfo)
+ {
+-	clk_disable(sinfo->bus_clk);
+-	clk_disable(sinfo->lcdc_clk);
++	clk_disable_unprepare(sinfo->bus_clk);
++	clk_disable_unprepare(sinfo->lcdc_clk);
  }
  
- /*
-@@ -1782,12 +1782,14 @@ static int at91udc_probe(struct platform_device *pdev)
- 	}
  
- 	/* don't do anything until we have both gadget driver and VBUS */
--	clk_enable(udc->iclk);
-+	retval = clk_prepare_enable(udc->iclk);
-+	if (retval)
-+		goto fail1;
- 	at91_udp_write(udc, AT91_UDP_TXVC, AT91_UDP_TXVC_TXVDIS);
- 	at91_udp_write(udc, AT91_UDP_IDR, 0xffffffff);
- 	/* Clear all pending interrupts - UDP may be used by bootloader. */
- 	at91_udp_write(udc, AT91_UDP_ICR, 0xffffffff);
--	clk_disable(udc->iclk);
-+	clk_disable_unprepare(udc->iclk);
- 
- 	/* request UDC and maybe VBUS irqs */
- 	udc->udp_irq = platform_get_irq(pdev, 0);
 -- 
 1.7.9.5
