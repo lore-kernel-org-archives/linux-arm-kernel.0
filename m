@@ -1,88 +1,87 @@
-From: j.glisse@gmail.com (Jerome Glisse)
-Date: Tue, 25 Jun 2013 10:49:43 -0400
-Subject: [RFC PATCH] dmabuf-sync: Introduce buffer synchronization
- framework
-In-Reply-To: <CAAQKjZNjjgG3hoKU2RLsG7w+B-2v7CpTT5hfnnTTJ2DgTEk0vA@mail.gmail.com>
-References: <20130617182127.GM2718@n2100.arm.linux.org.uk>
- <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
- <20130618084308.GU2718@n2100.arm.linux.org.uk>
- <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
- <1371548849.4276.6.camel@weser.hi.pengutronix.de>
- <008601ce6cb0$2c8cec40$85a6c4c0$%dae@samsung.com>
- <1371637326.4230.24.camel@weser.hi.pengutronix.de>
- <00ae01ce6cd9$f4834630$dd89d290$%dae@samsung.com>
- <1371645247.4230.41.camel@weser.hi.pengutronix.de>
- <CAAQKjZNJD4HpnJQ7iE+Gez36066M6U0YQeUEdA0+UcSOKqeghg@mail.gmail.com>
- <20130619182925.GL2718@n2100.arm.linux.org.uk>
- <00da01ce6d81$76eb3d60$64c1b820$%dae@samsung.com>
- <1371714427.4230.64.camel@weser.hi.pengutronix.de>
- <00db01ce6d8f$a3c23dd0$eb46b970$%dae@samsung.com>
- <1371723063.4114.12.camel@weser.hi.pengutronix.de>
- <010801ce6da7$896affe0$9c40ffa0$%dae@samsung.com>
- <1371804843.4114.49.camel@weser.hi.pengutronix.de>
- <CAAQKjZOxOMuL3zh_yV7tU2LBcZ7oVryiKa+LgjTM5HLY+va8zQ@mail.gmail.com>
- <1371817628.5882.13.camel@weser.hi.pengutronix.de>
- <CAAQKjZOeskLB7n6FM+bnB8n7ecuQM5k6uANXJXo=xk979f9s9Q@mail.gmail.com>
- <CAH3drwZVhs=odjFdB_Mf+K0JLT5NSSbz5mP9aOS=5fx-PVdzSg@mail.gmail.com>
- <CAAQKjZNnJRddACHzD+VF=A8vJpt9SEy2ttnS3Kw0y3hexu8dnw@mail.gmail.com>
- <CAF6AEGsBvZbcWDbX3FFtyDxFO1NqYNRLqHEUyP4qUD9wK+ARbA@mail.gmail.com>
- <CAAQKjZNjjgG3hoKU2RLsG7w+B-2v7CpTT5hfnnTTJ2DgTEk0vA@mail.gmail.com>
-Message-ID: <CAH3drwYqwddVuFRjDbYyvs+2hVWxsQDC1X8OCXMJURRty2087Q@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 25 Jun 2013 10:54:05 -0400 (EDT)
+Subject: [PATCH v2 3/4] USB: EHCI: improve interrupt qh unlink
+In-Reply-To: <CACVXFVMjTYAdTyihQV82QmJWJuDw_Ok1naecrSRZ46MhGuM-Ag@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306251048380.1340-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 10:17 AM, Inki Dae <daeinki@gmail.com> wrote:
-> 2013/6/25 Rob Clark <robdclark@gmail.com>:
->> On Tue, Jun 25, 2013 at 5:09 AM, Inki Dae <daeinki@gmail.com> wrote:
->>>> that
->>>> should be the role of kernel memory management which of course needs
->>>> synchronization btw A and B. But in no case this should be done using
->>>> dma-buf. dma-buf is for sharing content btw different devices not
->>>> sharing resources.
->>>>
->>>
->>> hmm, is that true? And are you sure? Then how do you think about
->>> reservation? the reservation also uses dma-buf with same reason as long as I
->>> know: actually, we use reservation to use dma-buf. As you may know, a
->>> reservation object is allocated and initialized when a buffer object is
->>> exported to a dma buf.
->>
->> no, this is why the reservation object can be passed in when you
->> construction the dmabuf.
->
-> Right, that way, we could use dma buf for buffer synchronization. I
-> just wanted to ask for why Jerome said that "dma-buf is for sharing
-> content btw different devices not sharing resources".
+On Tue, 25 Jun 2013, Ming Lei wrote:
 
->From memory, the motivation of dma-buf was to done for few use case,
-among them webcam capturing frame into a buffer and having gpu using
-it directly without memcpy, or one big gpu rendering a scene into a
-buffer that is then use by low power gpu for display ie it was done to
-allow different device to operate on same data using same backing
-memory.
+> On Tue, Jun 25, 2013 at 2:53 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> > On Mon, 24 Jun 2013, Ming Lei wrote:
+> >
+> >> Given interrupt URB will be resubmitted from tasklet context which
+> >> is scheduled by ehci hardware interrupt handler, and commonly only
+> >> one interrupt URB is scheduled on qh, so the qh may be unlinked
+> >> immediately once qh_completions() returns from ehci_irq(), then
+> >> the intr URB to be resubmitted in complete() can only be scheduled
+> >> and linked to hardware until the qh unlink is completed.
+> >>
+> >> This patch improves this above situation, and the qh will wait for 5
+> >> milliseconds before being unlinked from hardware, if one URB is submitted
+> >> during the period, the qh is move out of unlink wait list and the
+> >> interrupt transfer can be scheduled immediately, not like before: the
+> >> transfer is only linked to hardware until previous unlink is completed.
+> >
+> > This description is very hard to understand.  I suggest rewriting it,
+> > something like this:
+> >
+> > ehci-hcd currently unlinks an interrupt QH when it becomes empty, that
+> > is, after its last URB completes.  This works well because in almost
+> > all cases, the completion handler for an interrupt URB resubmits the
+> > URB; therefore the QH doesn't become empty and doesn't get unlinked.
+> >
+> > When we start using tasklets for URB completion, this scheme won't work
+> > as well.  The resubmission won't occur until the tasklet runs, which
+> > will be some time after the completion is queued with the tasklet.
+> > During that delay, the QH will be empty and so will be unlinked
+> > unnecessarily.
+> >
+> > To prevent this problem, this patch adds a 5-ms time delay before empty
+> > interrupt QHs are unlinked.  Most often, during that time the interrupt
+> > URB will be resubmitted and thus we can avoid unlinking the QH.
+> 
+> Excellent description about the change, and I will add it in V3,
+> also care to add your signed-off in the patch for the change log part?
 
-AFAICT you seem to want to use dma-buf to create scratch buffer, ie a
-process needs to use X amount of memory for an operation, it can
-release|free this memory once its done and a process B can the use
-this X memory for its own operation discarding content of process A. I
-presume that next frame would have the sequence repeat, process A do
-something, then process B does its thing. So to me it sounds like you
-want to implement global scratch buffer using the dmabuf API and that
-sounds bad to me.
+You have my permission to add it.
 
-I know most closed driver have several pool of memory, long lived
-object, short lived object and scratch space, then user space allocate
-from one of this pool and there is synchronization done by driver
-using driver specific API to reclaim memory. Of course this work
-nicely if you only talking about one logic block or at very least hw
-that have one memory controller.
+> >> +static void start_unlink_intr(struct ehci_hcd *ehci, struct ehci_qh *qh)
+> >> +{
+> >> +     __start_unlink_intr(ehci, qh, false);
+> >> +}
+> >> +
+> >> +static void start_unlink_intr_wait(struct ehci_hcd *ehci,
+> >> +                                struct ehci_qh *qh)
+> >> +{
+> >> +     __start_unlink_intr(ehci, qh, true);
+> >> +}
+> >
+> > This is not what I had in mind.
+> >
+> > Instead, copy the qh->qh_state test into the beginning of
+> > start_unlink_intr() and move the rest of start_do_unlink_intr() there.
+> > Then you can rename __start_unlink_intr() to start_unlink_intr_wait()
+> > and get rid of the "wait" parameter.
+> 
+> The current code can do the check centrally, but it isn't big deal, and I
+> will follow your suggestion.
 
-Now if you are thinking of doing scratch buffer for several different
-device and share the memory among then you need to be aware of
-security implication, most obvious being that you don't want process B
-being able to read process A scratch memory. I know the argument about
-it being graphic but one day this might become gpu code and it might
-be able to insert jump to malicious gpu code.
+Copying the check adds two lines of code (plus a comment and a blank 
+line).  Your two extra function headers, extra parameter, and extra 
+test add more than that.
 
-Cheers,
-Jerome
+> OK.
+> 
+> BTW, indenting two tab might cause more lines, and looks many subsystems
+> don't do that. But, anyway, I am fine with two tab, :-)
+
+I admit, it isn't a perfect system and sometimes I don't use it.  But
+it does have the advantage that changes to the first line don't require
+the continuation line to be changed as well, just to keep the desired
+alignment.  Furthermore, aligning the continuation with the first
+parameter of a function call can often require _more_ than two extra
+tab stops of indentation.
+
+Alan Stern
