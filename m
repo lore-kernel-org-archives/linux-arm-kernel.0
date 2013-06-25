@@ -1,42 +1,52 @@
 From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Tue, 25 Jun 2013 10:54:46 +0200
-Subject: [PATCH 3/6] crypto: ux500/crypt: add missing __iomem qualifiers
+Date: Tue, 25 Jun 2013 10:54:47 +0200
+Subject: [PATCH 4/6] crypto: ux500: use dmaengine_device_control API
 In-Reply-To: <1372150489-25594-1-git-send-email-fabio.baltieri@linaro.org>
 References: <1372150489-25594-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <1372150489-25594-4-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <1372150489-25594-5-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing __iomem to struct cryp_register pointers, this solve some
-"incorrect type in initializer (different address spaces)" sparse
-warnings.
+Use dmaengine_device_control inline function instead of going through the
+structures manually.
 
 Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 ---
- drivers/crypto/ux500/cryp/cryp.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/crypto/ux500/cryp/cryp_core.c | 4 ++--
+ drivers/crypto/ux500/hash/hash_core.c | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/crypto/ux500/cryp/cryp.c b/drivers/crypto/ux500/cryp/cryp.c
-index 3eafa90..43a0c8a 100644
---- a/drivers/crypto/ux500/cryp/cryp.c
-+++ b/drivers/crypto/ux500/cryp/cryp.c
-@@ -291,7 +291,7 @@ void cryp_save_device_context(struct cryp_device_data *device_data,
- 			      int cryp_mode)
- {
- 	enum cryp_algo_mode algomode;
--	struct cryp_register *src_reg = device_data->base;
-+	struct cryp_register __iomem *src_reg = device_data->base;
- 	struct cryp_config *config =
- 		(struct cryp_config *)device_data->current_ctx;
+diff --git a/drivers/crypto/ux500/cryp/cryp_core.c b/drivers/crypto/ux500/cryp/cryp_core.c
+index b675bbd..1957c18 100644
+--- a/drivers/crypto/ux500/cryp/cryp_core.c
++++ b/drivers/crypto/ux500/cryp/cryp_core.c
+@@ -607,12 +607,12 @@ static void cryp_dma_done(struct cryp_ctx *ctx)
+ 	dev_dbg(ctx->device->dev, "[%s]: ", __func__);
  
-@@ -349,7 +349,7 @@ void cryp_save_device_context(struct cryp_device_data *device_data,
- void cryp_restore_device_context(struct cryp_device_data *device_data,
- 				 struct cryp_device_context *ctx)
- {
--	struct cryp_register *reg = device_data->base;
-+	struct cryp_register __iomem *reg = device_data->base;
- 	struct cryp_config *config =
- 		(struct cryp_config *)device_data->current_ctx;
+ 	chan = ctx->device->dma.chan_mem2cryp;
+-	chan->device->device_control(chan, DMA_TERMINATE_ALL, 0);
++	dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
+ 	dma_unmap_sg(chan->device->dev, ctx->device->dma.sg_src,
+ 		     ctx->device->dma.sg_src_len, DMA_TO_DEVICE);
+ 
+ 	chan = ctx->device->dma.chan_cryp2mem;
+-	chan->device->device_control(chan, DMA_TERMINATE_ALL, 0);
++	dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
+ 	dma_unmap_sg(chan->device->dev, ctx->device->dma.sg_dst,
+ 		     ctx->device->dma.sg_dst_len, DMA_FROM_DEVICE);
+ }
+diff --git a/drivers/crypto/ux500/hash/hash_core.c b/drivers/crypto/ux500/hash/hash_core.c
+index dbf7b63..8c2817804 100644
+--- a/drivers/crypto/ux500/hash/hash_core.c
++++ b/drivers/crypto/ux500/hash/hash_core.c
+@@ -203,7 +203,7 @@ static void hash_dma_done(struct hash_ctx *ctx)
+ 	struct dma_chan *chan;
+ 
+ 	chan = ctx->device->dma.chan_mem2hash;
+-	chan->device->device_control(chan, DMA_TERMINATE_ALL, 0);
++	dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
+ 	dma_unmap_sg(chan->device->dev, ctx->device->dma.sg,
+ 			ctx->device->dma.sg_len, DMA_TO_DEVICE);
  
 -- 
 1.8.2
