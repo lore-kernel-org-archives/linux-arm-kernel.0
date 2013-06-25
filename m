@@ -1,84 +1,73 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 25 Jun 2013 12:49:44 +0100
-Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
-In-Reply-To: <20130625070432.GB5523@atomide.com>
-References: <20130516214430.GN5600@atomide.com>
- <20130520174621.GI10378@atomide.com>
- <20130605223355.EDC113E10E4@localhost> <20130606155341.GL3331@atomide.com>
- <20130623221605.GA3150@blackmetal.musicnaut.iki.fi>
- <CAAwP0s1DkMu8Vfka43hS4Wj-927q=O5u-coyFsPBgy3qtA_vjw@mail.gmail.com>
- <20130623234326.GA20703@blackmetal.musicnaut.iki.fi>
- <CAAwP0s00RwP7jCMF1O8j8Ndhu=VfD2dMA5fzr6jWvQ7PziXBCw@mail.gmail.com>
- <20130624072112.GQ5523@atomide.com>
- <CACxGe6vRCjyJgX+dgKuJREvFf_btjhSkfqDnYekuDfkVW7pRQg@mail.gmail.com>
- <20130625070432.GB5523@atomide.com>
-Message-ID: <CACxGe6sQfosyUPTxFCORugJuLSKz4ZToLW2_ZVTftDrL+xwX3w@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 25 Jun 2013 13:52:26 +0200
+Subject: [PATCH 3/9] ARM: dma-mapping: convert DMA direction into IOMMU
+ protection attributes
+In-Reply-To: <20130625113714.GF31838@mudshark.cambridge.arm.com>
+References: <1370889285-22799-4-git-send-email-will.deacon@arm.com><20130625131215.d3cea2a5668a3d41dbbeb064@nvidia.com><20130625113714.GF31838@mudshark.cambridge.arm.com>
+Message-ID: <20130625.145226.1632119404634300971.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 8:04 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Grant Likely <grant.likely@secretlab.ca> [130624 09:00]:
->> On Mon, Jun 24, 2013 at 8:21 AM, Tony Lindgren <tony@atomide.com> wrote:
->> > * Javier Martinez Canillas <martinez.javier@gmail.com> [130623 18:08]:
->> >> On Mon, Jun 24, 2013 at 1:43 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
->> >> > Hi,
->> >> >
->> >> > On Mon, Jun 24, 2013 at 01:06:37AM +0200, Javier Martinez Canillas wrote:
->> >> >> On Mon, Jun 24, 2013 at 12:16 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
->> >> >> > What is the status of this patch? We're already at 3.10-rc7 and GPIO
->> >> >> > IRQs are still broken on OMAP1.
->> >> >
->> >> > [...]
->> >> >
->> >> >> There is a problem with this patch.
->> >> >
->> >> > [...]
->> >> >
->> >> >> So I think that the correct solution is to add SPARSE_IRQ support to
->> >> >> omap1 and not reverting Jon's patch. Of course this may not be
->> >> >> possible since we are so close to 3.10 and most OMAP patches already
->> >> >> merged for 3.11 but we should definitely try to have this at least for
->> >> >> 3.12. Otherwise we won't be able to move to DT-only booting for
->> >> >> OMAP2+.
->> >> >
->> >> > OMAP1 does not use DT. So we could put this code under #ifdef
->> >> > CONFIG_ARCH_OMAP1 or similar. It's just a few lines of code. OMAP2+
->> >> > work should not regress OMAP1.
->> >> >
->> >> > Demanding SPARSE_IRQ support for OMAP1 should have been discussed before
->> >> > these changes were made. It's not reasonable to assume such things can
->> >> > be made during rc-cycle. Also, now, I don't think it's reasonable to
->> >> > wait for that to be done, as it would take until 3.12 or even later to
->> >> > get OMAP1 functional again.
->> >> >
->> >> > A.
->> >>
->> >> Hi,
->> >>
->> >> Yes, since we are so late in the -rc cycle and OMAP1 is currently
->> >> broken I agree that the only sensible solution is to revert the patch
->> >> for now.
->> >
->> > Agreed.
->> >
->> >> I just wanted to point out the issue that keeping the OMAP GPIO driver
->> >> using legacy mapping domain represents a blocker to have GPIO-IRQ
->> >> working with Device Tree for OMAP2+
->> >
->> > Yes. We can do the ifdef Aaro suggested, and let's also plan on
->> > converting omap1 to use SPARSE_IRQ. But with the ifdef we can cut
->> > away the dependency between these two.
->>
->> Alright. Sorry I dropped the ball on this one. I've lost track of
->> which patch needs to get applied, but given that it is so late in the
->> cycle, it would be better for someone else to apply the change, test
->> and send a pull request to Linus. I'm okay with it going through the
->> OMAP tree if that is the most expedient. Alternately, send me the pull
->> request and I'll pass it on to Linus.
->
-> OK, I'll wait for Aaro's ack on Javier's patch and then put it into a
-> branch for you.
+Will Deacon <will.deacon@arm.com> wrote @ Tue, 25 Jun 2013 13:37:14 +0200:
+...
+> > Do we need similar changes for map_sg case as well? They still passes '0' as prot.
+> 
+> Yes, we could use the same trick there (probably worth moving the logic into
+> a helper function for translating dma_data_direction into IOMMU_* values).
+> 
+> There are also iommu_map calls when allocating DMA buffers, but I think 0 is
+> the right thing to pass there (i.e. no permission until pages have been
+> explicitly mapped). Although, to be honest, I don't see why we need to map
+> the buffer at all when we allocate it.
 
-Thanks Tony.
+Yes, I thought too. I have a patch for that as below. If you like,
+I'll rebase and send for merge with the one which changes
+dma-mapping.c.
 
-g.
+>From 699e6bd4fef86383d197775486b47bcbdc594f4a Mon Sep 17 00:00:00 2001
+From: Hiroshi Doyu <hdoyu@nvidia.com>
+Date: Tue, 25 Jun 2013 13:43:29 +0300
+Subject: [PATCH 1/2] iommu/core: convert DMA direction into IOMMU protection
+ attributes
+
+Introduce a new function to convert DMA direction into IOMMU
+protection attributes.
+
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ include/linux/iommu.h | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 00af00f..ce3be78 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -21,11 +21,26 @@
+ 
+ #include <linux/errno.h>
+ #include <linux/types.h>
++#include <linux/dma-direction.h>
+ 
+ #define IOMMU_READ	(1)
+ #define IOMMU_WRITE	(2)
+ #define IOMMU_CACHE	(4) /* DMA cache coherency */
+ 
++static inline int to_iommu_prot(enum dma_data_direction dir)
++{
++	switch (dir) {
++	case DMA_BIDIRECTIONAL:
++		return IOMMU_READ | IOMMU_WRITE;
++	case DMA_TO_DEVICE:
++		return IOMMU_READ;
++	case DMA_FROM_DEVICE:
++		return IOMMU_WRITE;
++	default:
++		return 0;
++	}
++}
++
+ struct iommu_ops;
+ struct iommu_group;
+ struct bus_type;
+-- 
+1.8.1.5
