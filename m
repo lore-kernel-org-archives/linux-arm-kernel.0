@@ -1,49 +1,119 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 25 Jun 2013 17:38:26 +0200
-Subject: [PATCH 4/4] ARM: dts: exynos4210-trats: Enable USB gadget
- functionality
-In-Reply-To: <1372174706-5459-1-git-send-email-t.figa@samsung.com>
-References: <1372174706-5459-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1372174706-5459-5-git-send-email-t.figa@samsung.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 25 Jun 2013 16:39:29 +0100
+Subject: [PATCH] ARM: keystone: remove hand-coded smc instruction
+In-Reply-To: <51C9ABF9.1010902@ti.com>
+References: <201306212228.29717.arnd@arndb.de>
+ <201306212313.16771.arnd@arndb.de> <51C4C3B4.2050508@ti.com>
+ <201306212341.08579.arnd@arndb.de> <51C4D9B7.5010109@ti.com>
+ <20130625141332.GC2327@linaro.org> <51C9A8BF.9040602@ti.com>
+ <20130625143211.GE2327@linaro.org> <51C9ABF9.1010902@ti.com>
+Message-ID: <20130625153929.GG2327@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree nodes necessary to enable USB gadget
-functionality on Exynos4210-based Trats board.
+On Tue, Jun 25, 2013 at 10:40:57AM -0400, Santosh Shilimkar wrote:
+> On Tuesday 25 June 2013 10:32 AM, Dave Martin wrote:
+> > On Tue, Jun 25, 2013 at 10:27:11AM -0400, Santosh Shilimkar wrote:
+> >> On Tuesday 25 June 2013 10:13 AM, Dave Martin wrote:
+> >>> On Fri, Jun 21, 2013 at 06:54:47PM -0400, Santosh Shilimkar wrote:
+> >>>> On Friday 21 June 2013 05:41 PM, Arnd Bergmann wrote:
+> >>>>> On Friday 21 June 2013, Santosh Shilimkar wrote:
+> >>>>>>>
+> >>>>>> I was curious how you will fix that for a c file.
+> >>>>>> Just to be clear, I was planning to do that in 3.11-rcx/3.12
+> >>>>>> time. Let me know if it needs to be done earlier than that.
+> >>>>>
+> >>>>> It breaks randconfig builds on arm-soc at the moment, so I'd
+> >>>>> like the fix as early as possible for 3.11.
+> >>>>>
+> >>>> Ok, fix is at end of the email. Let me know if it makes
+> >>>> to pass both the builds now. I have build and boot tested
+> >>>> both ARM and THUMB2 builds on Keystone board.
+> >>>>
+> >>>> Regards,
+> >>>> Santosh
+> >>>>
+> >>>> From 05d6a5b6cad624fb3791e8c1f8eb7c774f0790d9 Mon Sep 17 00:00:00 2001
+> >>>> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>>> Date: Fri, 21 Jun 2013 18:35:32 -0400
+> >>>> Subject: [PATCH] ARM: keystone: Move CPU bringup code to dedicated asm file
+> >>>>
+> >>>> Because of inline asm usage in platsmp.c, smc instruction
+> >>>> creates build failure for ARM V6+V7 build where as using instruction
+> >>>> encoding for smc breaks the thumb2 build.
+> >>>>
+> >>>> So move the code snippet to separate asm file and mark
+> >>>> it with 'armv7-a$(plus_sec)' to avoid any build issues.
+> >>>>
+> >>>> Cc: Arnd Bergmann <arnd@arndb.de>
+> >>>>
+> >>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>>> ---
+> >>
+> >> [..]
+> >>
+> >>>> diff --git a/arch/arm/mach-keystone/smc.S b/arch/arm/mach-keystone/smc.S
+> >>>> new file mode 100644
+> >>>> index 0000000..9b9e4f7
+> >>>> --- /dev/null
+> >>>> +++ b/arch/arm/mach-keystone/smc.S
+> >>>> @@ -0,0 +1,29 @@
+> >>>> +/*
+> >>>> + * Keystone Secure APIs
+> >>>> + *
+> >>>> + * Copyright (C) 2013 Texas Instruments, Inc.
+> >>>> + * 	Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>>> + *
+> >>>> + * This program is free software,you can redistribute it and/or modify
+> >>>> + * it under the terms of the GNU General Public License version 2 as
+> >>>> + * published by the Free Software Foundation.
+> >>>> + */
+> >>>> +
+> >>>> +#include <linux/linkage.h>
+> >>>> +
+> >>>> +/**
+> >>>> + * u32 keystone_cpu_smc(u32 command, u32 cpu, u32 addr)
+> >>>> + *
+> >>>> + * Low level CPU monitor API
+> >>>> + * @command:	Monitor command.
+> >>>> + * @cpu:	CPU Number
+> >>>> + * @addr:	Kernel jump address for boot CPU
+> >>>> + *
+> >>>> + * Return: Non zero value on failure
+> >>>> + */
+> >>>
+> >>> Oops, looks like I missed the final mail on this thread.  Ignore my
+> >>> previous mail.
+> >>>
+> >>> I still think it would be a good idea to try to consolidate all these
+> >>> trivial SMC wrappers, but this remains debatable.
+> >>>
+> >>>
+> >>>
+> >>> Anyway, this looks like it should work, except:
+> >>>
+> >>>> +ENTRY(keystone_cpu_smc)
+> >>>> +	stmfd   sp!, {r4-r12, lr}
+> >>>> +	smc	#0
+> >>>> +	dsb
+> >>>
+> >>> What's this DSB for?  (You didn't have it in the inline asm version)
+> >>>
+> >> Just to drain the write buffer before resuming on non-secure side.
+> > 
+> > Why do you need to do that?
+> > 
+> To commit any secure side pending writes. I don't remember exactly the
+> issues but I remember facing issues in power management sequencing with
+> SMC calls in between. That time a dsb did the trick. In fact I use to
+> keep 1 before SMC and 1 after. 
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos4210-trats.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Can we at least have a comment (as recommended in
+Documentation/development-process/4.Coding)?
 
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index 9a14484..d2ce1cf 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -39,6 +39,12 @@
- 		enable-active-high;
- 	};
- 
-+	hsotg at 12480000 {
-+		vusb_d-supply = <&vusb_reg>;
-+		vusb_a-supply = <&vusbdac_reg>;
-+		status = "okay";
-+	};
-+
- 	sdhci_emmc: sdhci at 12510000 {
- 		bus-width = <8>;
- 		non-removable;
-@@ -48,6 +54,10 @@
- 		status = "okay";
- 	};
- 
-+	usbphy at 125B0000 {
-+		status = "okay";
-+	};
-+
- 	serial at 13800000 {
- 		status = "okay";
- 	};
--- 
-1.8.2.1
+We don't want other people reading this and concluding that SMC always
+needs barriers -- in general, this shouldn't be necessary and could
+indicate bugs lurking somewhere.
+
+Cheers
+---Dave
