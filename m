@@ -1,44 +1,69 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 25 Jun 2013 17:27:51 +0800
-Subject: [PATCH 07/11] ARM: tegra114: flowctrl: add support for
- cpu_suspend_enter/exit
+Date: Tue, 25 Jun 2013 17:27:52 +0800
+Subject: [PATCH 08/11] clk: tegra114: add suspend/resume function for
+ tegar_cpu_car_ops
 In-Reply-To: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
 References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1372152475-18617-8-git-send-email-josephl@nvidia.com>
+Message-ID: <1372152475-18617-9-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flow controller can help CPU to go into suspend mode (powered-down
-state). When CPU goes into powered-down state, it needs some careful
-settings before getting into and after leaving. The enter and exit
-functions do that by configuring appropriate mode for flow controller.
+Adding suspend/resume function for tegra_cpu_car_ops. We only save and
+restore the setting of the clock of CoreSight. Other clocks still need
+to be taken care by clock driver.
 
-For Tegra114, the setting is compatible with Tegra30.
-
+Cc: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- arch/arm/mach-tegra/flowctrl.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/clk/tegra/clk-tegra114.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm/mach-tegra/flowctrl.c b/arch/arm/mach-tegra/flowctrl.c
-index b477ef3..5348543 100644
---- a/arch/arm/mach-tegra/flowctrl.c
-+++ b/arch/arm/mach-tegra/flowctrl.c
-@@ -86,6 +86,7 @@ void flowctrl_cpu_suspend_enter(unsigned int cpuid)
- 		reg |= TEGRA20_FLOW_CTRL_CSR_WFE_CPU0 << cpuid;
- 		break;
- 	case TEGRA30:
-+	case TEGRA114:
- 		/* clear wfe bitmap */
- 		reg &= ~TEGRA30_FLOW_CTRL_CSR_WFE_BITMAP;
- 		/* clear wfi bitmap */
-@@ -123,6 +124,7 @@ void flowctrl_cpu_suspend_exit(unsigned int cpuid)
- 		reg &= ~TEGRA20_FLOW_CTRL_CSR_WFI_BITMAP;
- 		break;
- 	case TEGRA30:
-+	case TEGRA114:
- 		/* clear wfe bitmap */
- 		reg &= ~TEGRA30_FLOW_CTRL_CSR_WFE_BITMAP;
- 		/* clear wfi bitmap */
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index dbd0428..cd51d75 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -258,6 +258,12 @@
+ #define PMC_PLLM_WB0_OVERRIDE 0x1dc
+ #define PMC_PLLM_WB0_OVERRIDE_2 0x2b0
+ 
++#ifdef CONFIG_PM_SLEEP
++static struct cpu_clk_suspend_context {
++	u32 clk_csite_src;
++} tegra114_cpu_clk_sctx;
++#endif
++
+ static int periph_clk_enb_refcnt[CLK_OUT_ENB_NUM * 32];
+ 
+ static void __iomem *clk_base;
+@@ -2107,9 +2113,29 @@ static void tegra114_disable_cpu_clock(u32 cpu)
+ 	/* flow controller would take care in the power sequence. */
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static void tegra114_cpu_clock_suspend(void)
++{
++	/* switch coresite to clk_m, save off original source */
++	tegra114_cpu_clk_sctx.clk_csite_src =
++				readl(clk_base + CLK_SOURCE_CSITE);
++	writel(3<<30, clk_base + CLK_SOURCE_CSITE);
++}
++
++static void tegra114_cpu_clock_resume(void)
++{
++	writel(tegra114_cpu_clk_sctx.clk_csite_src,
++					clk_base + CLK_SOURCE_CSITE);
++}
++#endif
++
+ static struct tegra_cpu_car_ops tegra114_cpu_car_ops = {
+ 	.wait_for_reset	= tegra114_wait_cpu_in_reset,
+ 	.disable_clock	= tegra114_disable_cpu_clock,
++#ifdef CONFIG_PM_SLEEP
++	.suspend	= tegra114_cpu_clock_suspend,
++	.resume		= tegra114_cpu_clock_resume,
++#endif
+ };
+ 
+ static const struct of_device_id pmc_match[] __initconst = {
 -- 
 1.8.3.1
