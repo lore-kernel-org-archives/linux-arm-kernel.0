@@ -1,68 +1,87 @@
-From: trini@ti.com (Tom Rini)
-Date: Tue, 25 Jun 2013 15:34:00 -0400
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
-Message-ID: <51C9F0A8.1050607@ti.com>
+From: coelho@ti.com (Luciano Coelho)
+Date: Tue, 25 Jun 2013 22:37:04 +0300
+Subject: [PATCH] Documentation: dt: bindings: TI WiLink modules
+In-Reply-To: <1372149330-24335-1-git-send-email-coelho@ti.com>
+References: <1372149330-24335-1-git-send-email-coelho@ti.com>
+Message-ID: <1372189024.18889.19.camel@cumari.coelho.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2013 02:20 PM, Paul Walmsley wrote:
-> + Vaibhav and Kevin
+(oh crap, now *really* fixed the ARM mailing list address)
+
+On Tue, 2013-06-25 at 11:35 +0300, Luciano Coelho wrote:
+> Add device tree bindings documentation for the TI WiLink modules.
+> Currently only the WLAN part of the WiLink6, WiLink7 and WiLink8
+> modules is supported.
 > 
-> Hi,
+> Signed-off-by: Luciano Coelho <coelho@ti.com>
+> ---
 > 
-> On Tue, 25 Jun 2013, Felipe Balbi wrote:
+> I created a new directory under net to contain wireless bindings documentation.
 > 
->> On Mon, Jun 17, 2013 at 05:23:17AM +0000, Paul Walmsley wrote:
->>> Boot to userspace:
->>>     FAIL ( 3/12): 37xxevm, am335xbone, am335xbonelt
->>
->> Paul, we have at least 2 different folks who can't reproduce your bone
->> and bone black boot to userspace failures. I wonder how you're trying to
->> boot them.
->>
->> Care to share your test scripts ?
+> The actual implementation in the driver will follow separately.
 > 
-> Sure... the methodology is completely open and has been posted in the 
-> online logs since the first test cycle.  (For some reason, almost no one 
-> clicks through the test directory trees that I post online.  Is this a 
-> documentation issue?  What can we do to make it easier for people to 
-> explore this?)
-
-Well, another link never hurts the search results :)
-
-[snip]
-> Am certainly open to the idea that there's something wrong with the way 
-> that I'm booting either of these.  But AFAIK no one's been able to 
-> identify exactly what it could be.  I haven't had the time recently to 
-> spend hours going through the various permutations, given all the other 
-> breakage :-(  BeagleBone-white has the additional complication that it is 
-> not easy to automate, due to the way that power is delivered to the board, 
-> so there is an extra dimension of difficulty there.
-
-Ah-ha, I reproduced your failure.  If I make up a concat uImage + DTB,
-rather than pass them separately, it fails to boot.  If you switch to
-mainline U-Boot (v2012.10 or later) you get support for separate image +
-dtb (v2013.04 gives you bootz and zImage support).  v2013.04 will also
-work out of the box for BeagleBone-Black.
-
-And yeah, I feel your pain about power cycling BeagleBone-White.  The QA
-folks here sent me one of the relay controllers they use, and I think
-Felipe is partial to one from phidgets.
-
->> Also, if you could share the entire thing, we will add your scripts to
->> our nightly tests as to try and avoid future regressions.
+>  .../devicetree/bindings/net/wireless/ti-wilink.txt |   46 ++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
 > 
-> It would be great to have TI folks running those tests, or something 
-> similar to them!  An early version of the test system has been shared with 
-> a handful of folks, but it needs to be cleaned up further before broader 
-> release.
+> diff --git a/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt b/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
+> new file mode 100644
+> index 0000000..d8e8bfbb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
+> @@ -0,0 +1,46 @@
+> +TI WiLink Wireless Modules Device Tree Bindings
+> +===============================================
+> +
+> +The WiLink modules provide wireless connectivity, such as WLAN,
+> +Bluetooth, FM and NFC.
+> +
+> +There are several different modules available, which can be grouped by
+> +their generation: WiLink6, WiLink7 and WiLink8.  WiLink4 is not
+> +currently supported with device tree.
+> +
+> +Currently, only the WLAN portion of the modules is supported with
+> +device tree.
+> +
+> +Required properties:
+> +--------------------
+> +
+> +- compatible: should be "ti,wilink6", "ti,wilink7" or "ti,wilink8"
+> +- interrupt-parent: the interrupt controller
+> +- interrupts: out-of-band WLAN interrupt
+> +	See the interrupt controller's bindings documentation for
+> +	detailed definition.
+> +
+> +Optional properties:
+> +--------------------
+> +
+> +- refclock: the internal WLAN reference clock frequency (required for
+> +  WiLink6 and WiLink7; not used for WiLink8).  Must be one of the
+> +  following:
+> +	0 = 19.2 MHz
+> +	1 = 26.0 MHz
+> +	2 = 38.4 MHz
+> +	3 = 52.0 MHz
+> +	4 = 38.4 MHz, XTAL
+> +	5 = 26.0 MHz, XTAL
+> +
+> +- tcxoclock: the internal WLAN TCXO clock frequency (required for
+> +  WiLink7 not used for WiLink6 and WiLink8).  Must be one of the
+> +  following:
+> +	0 = 19.200 MHz
+> +	1 = 26.000 MHz
+> +	2 = 38.400 MHz
+> +	3 = 52.000 MHz
+> +	4 = 16.368 MHz
+> +	5 = 32.736 MHz
+> +	6 = 16.800 MHz
+> +	7 = 33.600 MHz
 
-We've got "something similar", at least wrt boot tests.  But since we
-use separate kernel + DT, we hadn't seen this problem.
+If this is okay for everyone, can I push this via my tree (which goes to
+linux-wireless->net->linus)? I think it makes more sense to send the
+documentation together with the patch that actually implements the DT
+node parsing in the driver.
 
--- 
-Tom
+--
+Luca.
