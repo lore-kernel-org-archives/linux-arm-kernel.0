@@ -1,67 +1,34 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Jun 2013 15:52:00 +0200
-Subject: [PATCH 16/16] ARM: dts: i.MX51: Add USB host1/2 pinmux entries
+Date: Tue, 25 Jun 2013 15:51:48 +0200
+Subject: [PATCH 04/16] ARM: dts: i.MX27: Add iim node
 In-Reply-To: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
 References: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1372168320-22605-17-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1372168320-22605-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds pinmux entries for USBH1/2 in ULPI mode.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/imx51.dtsi | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ arch/arm/boot/dts/imx27.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 7eb026e..0ca62be 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -574,6 +574,44 @@
- 						>;
- 					};
- 				};
-+
-+				usbh1 {
-+					pinctrl_usbh1_1: usbh1grp-1 {
-+						fsl,pins = <
-+							MX51_PAD_USBH1_DATA0__USBH1_DATA0 0x1e5
-+							MX51_PAD_USBH1_DATA1__USBH1_DATA1 0x1e5
-+							MX51_PAD_USBH1_DATA2__USBH1_DATA2 0x1e5
-+							MX51_PAD_USBH1_DATA3__USBH1_DATA3 0x1e5
-+							MX51_PAD_USBH1_DATA4__USBH1_DATA4 0x1e5
-+							MX51_PAD_USBH1_DATA5__USBH1_DATA5 0x1e5
-+							MX51_PAD_USBH1_DATA6__USBH1_DATA6 0x1e5
-+							MX51_PAD_USBH1_DATA7__USBH1_DATA7 0x1e5
-+							MX51_PAD_USBH1_CLK__USBH1_CLK 0x1e5
-+							MX51_PAD_USBH1_DIR__USBH1_DIR 0x1e5
-+							MX51_PAD_USBH1_NXT__USBH1_NXT 0x1e5
-+							MX51_PAD_USBH1_STP__USBH1_STP 0x1e5
-+						>;
-+					};
-+				};
-+
-+				usbh2 {
-+					pinctrl_usbh2_1: usbh2grp-1 {
-+						fsl,pins = <
-+							MX51_PAD_EIM_D16__USBH2_DATA0 0x1e5
-+							MX51_PAD_EIM_D17__USBH2_DATA1 0x1e5
-+							MX51_PAD_EIM_D18__USBH2_DATA2 0x1e5
-+							MX51_PAD_EIM_D19__USBH2_DATA3 0x1e5
-+							MX51_PAD_EIM_D20__USBH2_DATA4 0x1e5
-+							MX51_PAD_EIM_D21__USBH2_DATA5 0x1e5
-+							MX51_PAD_EIM_D22__USBH2_DATA6 0x1e5
-+							MX51_PAD_EIM_D23__USBH2_DATA7 0x1e5
-+							MX51_PAD_EIM_A24__USBH2_CLK 0x1e5
-+							MX51_PAD_EIM_A25__USBH2_DIR 0x1e5
-+							MX51_PAD_EIM_A27__USBH2_NXT 0x1e5
-+							MX51_PAD_EIM_A26__USBH2_STP 0x1e5
-+						>;
-+					};
-+				};
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index df425a7..db139bf 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -348,6 +348,13 @@
+ 				clocks = <&clks 41>, <&clks 61>;
+ 				clock-names = "ipg", "per";
  			};
++
++			iim: iim at 10028000 {
++				compatible = "fsl,imx27-iim";
++				reg = <0x10028000 0x1000>;
++				interrupts = <62>;
++				clocks = <&clks 38>;
++			};
+ 		};
  
- 			pwm1: pwm at 73fb4000 {
+ 		aipi at 10020000 { /* AIPI2 */
 -- 
 1.8.3.1
