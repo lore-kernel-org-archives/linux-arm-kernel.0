@@ -1,71 +1,49 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 25 Jun 2013 17:38:25 +0200
-Subject: [PATCH 3/4] ARM: dts: exynos4: Add nodes for USB PHY block
+Date: Tue, 25 Jun 2013 17:38:26 +0200
+Subject: [PATCH 4/4] ARM: dts: exynos4210-trats: Enable USB gadget
+ functionality
 In-Reply-To: <1372174706-5459-1-git-send-email-t.figa@samsung.com>
 References: <1372174706-5459-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1372174706-5459-4-git-send-email-t.figa@samsung.com>
+Message-ID: <1372174706-5459-5-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree nodes for USB OTG PHYs of Exynos4210 and
-Exynos4x12 SoCs.
+This patch adds device tree nodes necessary to enable USB gadget
+functionality on Exynos4210-based Trats board.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/boot/dts/exynos4210.dtsi | 15 +++++++++++++++
- arch/arm/boot/dts/exynos4x12.dtsi | 15 +++++++++++++++
- 2 files changed, 30 insertions(+)
+ arch/arm/boot/dts/exynos4210-trats.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index 54710de..3c71ea5 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -114,6 +114,21 @@
- 		interrupts = <2 4>;
+diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+index 9a14484..d2ce1cf 100644
+--- a/arch/arm/boot/dts/exynos4210-trats.dts
++++ b/arch/arm/boot/dts/exynos4210-trats.dts
+@@ -39,6 +39,12 @@
+ 		enable-active-high;
+ 	};
+ 
++	hsotg at 12480000 {
++		vusb_d-supply = <&vusb_reg>;
++		vusb_a-supply = <&vusbdac_reg>;
++		status = "okay";
++	};
++
+ 	sdhci_emmc: sdhci at 12510000 {
+ 		bus-width = <8>;
+ 		non-removable;
+@@ -48,6 +54,10 @@
+ 		status = "okay";
  	};
  
 +	usbphy at 125B0000 {
-+		compatible = "samsung,exynos4210-usb2phy";
-+		reg = <0x125B0000 0x100>;
-+		clocks = <&clock 305>;
-+		clock-names = "otg";
-+		status = "disabled";
-+		ranges;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		usbphy-sys {
-+			reg = <0x10020704 0x8>;
-+		};
++		status = "okay";
 +	};
 +
- 	g2d at 12800000 {
- 		compatible = "samsung,s5pv210-g2d";
- 		reg = <0x12800000 0x1000>;
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index e3380a7..267ed95 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -79,4 +79,19 @@
- 		interrupts = <0 89 0>;
- 		status = "disabled";
+ 	serial at 13800000 {
+ 		status = "okay";
  	};
-+
-+	usbphy at 125B0000 {
-+		compatible = "samsung,exynos4x12-usb2phy";
-+		reg = <0x125B0000 0x100>;
-+		clocks = <&clock 305>;
-+		clock-names = "otg";
-+		status = "disabled";
-+		ranges;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		usbphy-sys {
-+			reg = <0x10020704 0x8>;
-+		};
-+	};
- };
 -- 
 1.8.2.1
