@@ -1,40 +1,37 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 25 Jun 2013 17:27:54 +0800
-Subject: [PATCH 10/11] ARM: dts: tegra114: dalmore: add GPIO power key support
+Date: Tue, 25 Jun 2013 17:27:55 +0800
+Subject: [PATCH 11/11] ARM: dts: tegra114: dalmore: add PM configurations for
+ PMC
 In-Reply-To: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
 References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1372152475-18617-11-git-send-email-josephl@nvidia.com>
+Message-ID: <1372152475-18617-12-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the GPIO power key and enabling the wake up function.
+Adding the PM configurations for PMC to support platform suspend.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- arch/arm/boot/dts/tegra114-dalmore.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/tegra114-dalmore.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-index cb640eb..b97a8cc 100644
+index b97a8cc..625bf3a 100644
 --- a/arch/arm/boot/dts/tegra114-dalmore.dts
 +++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-@@ -883,6 +883,17 @@
- 		};
+@@ -850,6 +850,13 @@
+ 
+ 	pmc {
+ 		nvidia,invert-interrupt;
++		nvidia,suspend-mode = <2>;
++		nvidia,cpu-pwr-good-time = <500>;
++		nvidia,cpu-pwr-off-time = <300>;
++		nvidia,core-pwr-good-time = <641 3845>;
++		nvidia,core-pwr-off-time = <61036>;
++		nvidia,core-power-req-active-high;
++		nvidia,sys-clock-req-active-high;
  	};
  
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		power {
-+			label = "Power";
-+			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
-+			linux,code = <116>; /* KEY_POWER */
-+			gpio-key,wakeup;
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
+ 	ahub {
 -- 
 1.8.3.1
