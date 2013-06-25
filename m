@@ -1,41 +1,39 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 25 Jun 2013 12:34:40 +0200
-Subject: [PATCH v4] irqchip: Add support for ARMv7-M's NVIC
-In-Reply-To: <1371073835-10639-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1371073835-10639-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20130625103440.GR11232@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 25 Jun 2013 12:35:48 +0200
+Subject: [PATCH 5/5] ARM: at91: at91rm9200: set default mmc0 pinctrl-names
+In-Reply-To: <1371472710-18535-5-git-send-email-plagnioj@jcrosoft.com>
+References: <20130617123645.GA21034@game.jcrosoft.org>
+ <1371472710-18535-1-git-send-email-plagnioj@jcrosoft.com>
+ <1371472710-18535-5-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <51C97284.40300@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas, hello Grant,
-
-On Wed, Jun 12, 2013 at 11:50:35PM +0200, Uwe Kleine-K?nig wrote:
-> This interrupt controller is found on Cortex-M3 and Cortex-M4 machines.
-> 
-> Support for this controller appeared in Catalin's Cortex tree based on
-> 2.6.33 but was nearly completely rewritten.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On 17/06/2013 14:38, Jean-Christophe PLAGNIOL-VILLARD :
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 > ---
-> 
-> Notes:
->     Changes since v3, sent with
->     Message-Id: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>:
->     
->      - use generic chip
->      - rename nvic_do_IRQ to nvic_handle_irq
->     
->     This depends on the stuff currently in tip/irq/for-arm
-I see that tip/irq/for-arm went into next via Grant's irqdomain tree. I
-assume that means the changes go in for 3.11?
+>   arch/arm/boot/dts/at91rm9200.dtsi |    1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+> index 1fc645e..8bc87e5 100644
+> --- a/arch/arm/boot/dts/at91rm9200.dtsi
+> +++ b/arch/arm/boot/dts/at91rm9200.dtsi
+> @@ -116,6 +116,7 @@
+>   				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 0>;
+>   				#address-cells = <1>;
+>   				#size-cells = <0>;
+> +				pinctrl-names = "default";
 
-Are you OK with my patch? I can resend with the accumulated Acks and the
-arch/arm hunk dropped if it helps you. Just tell me what you want.
+You do not add a pinctrl cell: is it normal? Which pinctrl definition 
+does it take then?
 
-Best regards
-Uwe
+>   				status = "disabled";
+>   			};
+>
+>
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Nicolas Ferre
