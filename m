@@ -1,34 +1,50 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Jun 2013 15:51:48 +0200
-Subject: [PATCH 04/16] ARM: dts: i.MX27: Add iim node
+Date: Tue, 25 Jun 2013 15:51:56 +0200
+Subject: [PATCH 12/16] ARM: dts: i.MX53: Add i2c and spi aliases
 In-Reply-To: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
 References: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1372168320-22605-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1372168320-22605-13-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This allows to order the i2c and spi devices correctly.
+While at it reorder the aliases entries alphabetically.
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/imx27.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/imx53.dtsi | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index df425a7..db139bf 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -348,6 +348,13 @@
- 				clocks = <&clks 41>, <&clks 61>;
- 				clock-names = "ipg", "per";
- 			};
-+
-+			iim: iim at 10028000 {
-+				compatible = "fsl,imx27-iim";
-+				reg = <0x10028000 0x1000>;
-+				interrupts = <62>;
-+				clocks = <&clks 38>;
-+			};
- 		};
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 42f4456..d437bfb 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -15,11 +15,6 @@
  
- 		aipi at 10020000 { /* AIPI2 */
+ / {
+ 	aliases {
+-		serial0 = &uart1;
+-		serial1 = &uart2;
+-		serial2 = &uart3;
+-		serial3 = &uart4;
+-		serial4 = &uart5;
+ 		gpio0 = &gpio1;
+ 		gpio1 = &gpio2;
+ 		gpio2 = &gpio3;
+@@ -30,6 +25,14 @@
+ 		i2c0 = &i2c1;
+ 		i2c1 = &i2c2;
+ 		i2c2 = &i2c3;
++		serial0 = &uart1;
++		serial1 = &uart2;
++		serial2 = &uart3;
++		serial3 = &uart4;
++		serial4 = &uart5;
++		spi0 = &ecspi1;
++		spi1 = &ecspi2;
++		spi2 = &cspi;
+ 	};
+ 
+ 	tzic: tz-interrupt-controller at 0fffc000 {
 -- 
 1.8.3.1
