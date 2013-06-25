@@ -1,27 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 25 Jun 2013 13:13:49 -0700
-Subject: [GIT PULL 1/2] Samsung cleanup PWM for v3.11
-In-Reply-To: <20130625200851.GA8663@mithrandir>
-References: <51C87D32.6050607@samsung.com> <51C9C6B3.4040003@samsung.com>
- <20130625200851.GA8663@mithrandir>
-Message-ID: <CAOesGMhVsHP3Ld78MWfwwBkaKA=Z4tBmJi05OKMUgJrNp8s3dw@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 25 Jun 2013 15:17:55 -0500
+Subject: [PATCH] ARM: omap5: build opp4xxx_data.c
+In-Reply-To: <51C9F993.6050109@ti.com>
+References: <201306212229.54238.arnd@arndb.de> <20130621204250.GA16139@kahuna>
+ <alpine.DEB.2.02.1306251918590.14373@utopia.booyaka.com>
+ <51C9F595.3060609@ti.com> <20130625195751.GA6529@kahuna>
+ <51C9F993.6050109@ti.com>
+Message-ID: <CAGo_u6rQG7h2aPSErwKR1H7PYE5QdxXU3Dd5z13-rPkbVtkcUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 1:08 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Wed, Jun 26, 2013 at 01:34:59AM +0900, Kukjin Kim wrote:
-
->> Hi Arnd and Olof
->>
->> Please hold on pulling this one because Thierry Reding has objection
->> on this. I think, this can be queued for next time.
+On Tue, Jun 25, 2013 at 3:12 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
 >
-> If it's really just my objection keeping this back, then I'm fine with
-> adding the comment in a follow-up patch.
+> Well having voltage data in voltage domain was not my decision ;-)
+> Instead of creating another set of dummy data, I just used what
+> is out there(OMAP4) with clear comment that data needs to be updated.
+> I don't see any problem in this considering we have devices booting
+> and working nicely for OMAP5
+I really wish the OMAP5 devices(the latest ones from Fab) I have would
+like to function at OMAP4 configurations! Unfortunately the devices
+tend to follow the data manual for OMAP5.
+*if* there is no need for it to boot, I suggest removing it.
 
-No, we're also out of time for 3.11. But let's get this queued for
-3.12 as soon as the merge window closes -- it's a very nice cleanup.
-
-
--Olof
+Regards,
+Nishanth Menon
