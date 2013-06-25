@@ -1,53 +1,539 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 25 Jun 2013 13:19:54 +0200
-Subject: [PATCH v3 11/18] pwm: Add new pwm-samsung driver
-In-Reply-To: <20130625102646.GC21137@manwe>
-References: <1371766383-29077-1-git-send-email-tomasz.figa@gmail.com>
- <1405696.in3RSSDWnX@flatron> <20130625102646.GC21137@manwe>
-Message-ID: <1688471.WOi6pAAcEq@amdc1227>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Tue, 25 Jun 2013 12:15:23 +0100
+Subject: [PATCH v5 2/7] ARM:sti: Add STiH416 SOC support
+In-Reply-To: <1372158822-19160-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1372158822-19160-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1372158923-19681-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 of June 2013 12:26:47 Thierry Reding wrote:
-> On Mon, Jun 24, 2013 at 11:17:03PM +0200, Tomasz Figa wrote:
-> > On Monday 24 of June 2013 22:53:42 Thierry Reding wrote:
-> > > On Mon, Jun 24, 2013 at 10:32:55PM +0200, Tomasz Figa wrote:
-> [...]
-> 
-> > > > What about:
-> > > > 
-> > > > /*
-> > > > 
-> > > >  * PWM block is shared between pwm-samsung and samsung_pwm_timer
-> > > >  drivers
-> > > >  * and some registers need access synchronization. If both drivers
-> > > >  are
-> > > >  * compiled in, the spinlock is defined in the clocksource driver,
-> > > >  * otherwise following definition is used.
-> > > >  *
-> > > >  * Currently we do not need any more complex synchronization method
-> > > >  * because all the supported SoCs contain only one instance of the
-> > > >  PWM
-> > > >  * IP. Should this change, both drivers will need to be modified to
-> > > >  * properly synchronize accesses to particular instances.
-> > > >  */
-> > > 
-> > > I see that you can't be persuaded. And everybody else seems to be
-> > > okay
-> > > with it so... have it your way. I'm probably going to regret this.
-> > 
-> > This was just a proposal. Do you want anything else to be added to the
-> > comment or anything to be changed?
-> 
-> For reference, I still don't like this but since I'm the only one
-> complaining, go ahead. With that comment added to the driver:
-> 
-> Acked-by: Thierry Reding <thierry.reding@gmail.com>
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-OK. Thank you.
+The STiH416 is advanced HD AVC processor with 3D graphics acceleration
+and 1.2-GHz ARM Cortex-A9 SMP CPU.
 
-Kukjin, can you amend the comment I mentioned to this patch above the line 
-with DEFINE_SPINLOCK or I should send fixed version?
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+CC: Stephen Gallimore <stephen.gallimore@st.com>
+CC: Stuart Menefy <stuart.menefy@st.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Linus Walleij <linus.walleij@linaro.org>
 
-Best regards,
-Tomasz
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+---
+ Documentation/arm/sti/stih416-overview.txt |   12 ++
+ arch/arm/boot/dts/stih416-clock.dtsi       |   41 ++++
+ arch/arm/boot/dts/stih416-pinctrl.dtsi     |  295 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stih416.dtsi             |   96 +++++++++
+ arch/arm/mach-sti/Kconfig                  |    9 +
+ arch/arm/mach-sti/board-dt.c               |    3 +-
+ 6 files changed, 455 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/arm/sti/stih416-overview.txt
+ create mode 100644 arch/arm/boot/dts/stih416-clock.dtsi
+ create mode 100644 arch/arm/boot/dts/stih416-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/stih416.dtsi
+
+diff --git a/Documentation/arm/sti/stih416-overview.txt b/Documentation/arm/sti/stih416-overview.txt
+new file mode 100644
+index 0000000..558444c
+--- /dev/null
++++ b/Documentation/arm/sti/stih416-overview.txt
+@@ -0,0 +1,12 @@
++			STiH416 Overview
++			================
++
++Introduction
++------------
++
++    The STiH416 is the next generation of HD, AVC set-top box processors
++    for satellite, cable, terrestrial and IP-STB markets.
++
++    Features
++    - ARM Cortex-A9 1.2 GHz dual core CPU
++    - SATA2x2,USB 2.0x3, PCIe, Gbit Ethernet MACx2
+diff --git a/arch/arm/boot/dts/stih416-clock.dtsi b/arch/arm/boot/dts/stih416-clock.dtsi
+new file mode 100644
+index 0000000..7026bf1
+--- /dev/null
++++ b/arch/arm/boot/dts/stih416-clock.dtsi
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (C) 2013 STMicroelectronics R&D Limited
++ * <stlinux-devel@stlinux.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/ {
++	clocks {
++		/*
++		 * Fixed 30MHz oscillator inputs to SoC
++		 */
++		CLK_SYSIN: CLK_SYSIN {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <30000000>;
++			clock-output-names = "CLK_SYSIN";
++		};
++
++		/*
++		 * ARM Peripheral clock for timers
++		 */
++		arm_periph_clk: arm_periph_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <600000000>;
++		};
++
++		/*
++		 * Bootloader initialized system infrastructure clock for
++		 * serial devices.
++		 */
++		CLK_S_ICN_REG_0: clockgenA0 at 4 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <100000000>;
++			clock-output-names = "CLK_S_ICN_REG_0";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+new file mode 100644
+index 0000000..957b21a
+--- /dev/null
++++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+@@ -0,0 +1,295 @@
++
++/*
++ * Copyright (C) 2013 STMicroelectronics Limited.
++ * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * publishhed by the Free Software Foundation.
++ */
++#include "st-pincfg.h"
++/ {
++
++	aliases {
++		gpio0	= &PIO0;
++		gpio1	= &PIO1;
++		gpio2	= &PIO2;
++		gpio3	= &PIO3;
++		gpio4	= &PIO4;
++		gpio5	= &PIO40;
++		gpio6	= &PIO5;
++		gpio7	= &PIO6;
++		gpio8	= &PIO7;
++		gpio9	= &PIO8;
++		gpio10	= &PIO9;
++		gpio11	= &PIO10;
++		gpio12	= &PIO11;
++		gpio13	= &PIO12;
++		gpio14	= &PIO30;
++		gpio15	= &PIO31;
++		gpio16	= &PIO13;
++		gpio17	= &PIO14;
++		gpio18	= &PIO15;
++		gpio19	= &PIO16;
++		gpio20	= &PIO17;
++		gpio21	= &PIO18;
++		gpio22	= &PIO100;
++		gpio23	= &PIO101;
++		gpio24	= &PIO102;
++		gpio25	= &PIO103;
++		gpio26	= &PIO104;
++		gpio27	= &PIO105;
++		gpio28	= &PIO106;
++		gpio29	= &PIO107;
++	};
++
++	soc {
++		pin-controller-sbc {
++			#address-cells	= <1>;
++			#size-cells	= <1>;
++			compatible	= "st,stih416-sbc-pinctrl";
++			st,syscfg	= <&syscfg_sbc>;
++			ranges		= <0 0xfe610000 0x6000>;
++
++			PIO0: gpio at fe610000 {
++				gpio-controller;
++				#gpio-cells = <1>;
++				reg		= <0 0x100>;
++				st,bank-name	= "PIO0";
++			};
++			PIO1: gpio at fe611000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x1000 0x100>;
++				st,bank-name	= "PIO1";
++			};
++			PIO2: gpio at fe612000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x2000 0x100>;
++				st,bank-name	= "PIO2";
++			};
++			PIO3: gpio at fe613000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x3000 0x100>;
++				st,bank-name	= "PIO3";
++			};
++			PIO4: gpio at fe614000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x4000 0x100>;
++				st,bank-name	= "PIO4";
++			};
++			PIO40: gpio at fe615000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x5000 0x100>;
++				st,bank-name	= "PIO40";
++				st,retime-pin-mask = <0x7f>;
++			};
++
++			sbc_serial1 {
++				pinctrl_sbc_serial1: sbc_serial1 {
++					st,pins {
++						tx	= <&PIO2 6 ALT3 OUT>;
++						rx	= <&PIO2 7 ALT3 IN>;
++					};
++				};
++			};
++		};
++
++		pin-controller-front {
++			#address-cells	= <1>;
++			#size-cells	= <1>;
++			compatible	= "st,stih416-front-pinctrl";
++			st,syscfg	= <&syscfg_front>;
++			ranges		= <0 0xfee00000 0x10000>;
++
++			PIO5: gpio at fee00000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0 0x100>;
++				st,bank-name	= "PIO5";
++			};
++			PIO6: gpio at fee01000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x1000 0x100>;
++				st,bank-name	= "PIO6";
++			};
++			PIO7: gpio at fee02000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x2000 0x100>;
++				st,bank-name	= "PIO7";
++			};
++			PIO8: gpio at fee03000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x3000 0x100>;
++				st,bank-name	= "PIO8";
++			};
++			PIO9: gpio at fee04000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x4000 0x100>;
++				st,bank-name	= "PIO9";
++			};
++			PIO10: gpio at fee05000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x5000 0x100>;
++				st,bank-name	= "PIO10";
++			};
++			PIO11: gpio at fee06000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x6000 0x100>;
++				st,bank-name	= "PIO11";
++			};
++			PIO12: gpio at fee07000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x7000 0x100>;
++				st,bank-name	= "PIO12";
++			};
++			PIO30: gpio at fee08000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x8000 0x100>;
++				st,bank-name	= "PIO30";
++			};
++			PIO31: gpio at fee09000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x9000 0x100>;
++				st,bank-name	= "PIO31";
++			};
++		};
++
++		pin-controller-rear {
++			#address-cells	= <1>;
++			#size-cells	= <1>;
++			compatible	= "st,stih416-rear-pinctrl";
++			st,syscfg	= <&syscfg_rear>;
++			ranges 		= <0 0xfe820000 0x6000>;
++
++			PIO13: gpio at fe820000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0 0x100>;
++				st,bank-name	= "PIO13";
++			};
++			PIO14: gpio at fe821000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x1000 0x100>;
++				st,bank-name	= "PIO14";
++			};
++			PIO15: gpio at fe822000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x2000 0x100>;
++				st,bank-name	= "PIO15";
++			};
++			PIO16: gpio at fe823000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x3000 0x100>;
++				st,bank-name	= "PIO16";
++			};
++			PIO17: gpio at fe824000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x4000 0x100>;
++				st,bank-name	= "PIO17";
++			};
++			PIO18: gpio at fe825000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x5000 0x100>;
++				st,bank-name	= "PIO18";
++				st,retime-pin-mask = <0xf>;
++			};
++
++			serial2 {
++				pinctrl_serial2: serial2-0 {
++					st,pins {
++						tx	= <&PIO17 4 ALT2 OUT>;
++						rx	= <&PIO17 5 ALT2 IN>;
++						output-enable	= <&PIO11 3 ALT2 OUT>;
++					};
++				};
++			};
++		};
++
++		pin-controller-fvdp-fe {
++			#address-cells	= <1>;
++			#size-cells	= <1>;
++			compatible	= "st,stih416-fvdp-fe-pinctrl";
++			st,syscfg	= <&syscfg_fvdp_fe>;
++			ranges		= <0 0xfd6b0000 0x3000>;
++
++			PIO100: gpio at fd6b0000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0 0x100>;
++				st,bank-name	= "PIO100";
++			};
++			PIO101: gpio at fd6b1000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x1000 0x100>;
++				st,bank-name	= "PIO101";
++			};
++			PIO102: gpio at fd6b2000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x2000 0x100>;
++				st,bank-name	= "PIO102";
++			};
++		};
++
++		pin-controller-fvdp-lite {
++			#address-cells	= <1>;
++			#size-cells	= <1>;
++			compatible	= "st,stih416-fvdp-lite-pinctrl";
++			st,syscfg		= <&syscfg_fvdp_lite>;
++			ranges			= <0 0xfd330000 0x5000>;
++
++			PIO103: gpio at fd330000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0 0x100>;
++				st,bank-name	= "PIO103";
++			};
++			PIO104: gpio at fd331000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x1000 0x100>;
++				st,bank-name	= "PIO104";
++			};
++			PIO105: gpio at fd332000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x2000 0x100>;
++				st,bank-name	= "PIO105";
++			};
++			PIO106: gpio at fd333000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x3000 0x100>;
++				st,bank-name	= "PIO106";
++			};
++
++			PIO107: gpio at fd334000 {
++				gpio-controller;
++				#gpio-cells	= <1>;
++				reg		= <0x4000 0x100>;
++				st,bank-name	= "PIO107";
++				st,retime-pin-mask = <0xf>;
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+new file mode 100644
+index 0000000..3cecd96
+--- /dev/null
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -0,0 +1,96 @@
++/*
++ * Copyright (C) 2012 STMicroelectronics Limited.
++ * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * publishhed by the Free Software Foundation.
++ */
++#include "stih41x.dtsi"
++#include "stih416-clock.dtsi"
++#include "stih416-pinctrl.dtsi"
++/ {
++	L2: cache-controller {
++		compatible = "arm,pl310-cache";
++		reg = <0xfffe2000 0x1000>;
++		arm,data-latency = <3 3 3>;
++		arm,tag-latency = <2 2 2>;
++		cache-unified;
++		cache-level = <2>;
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		interrupt-parent = <&intc>;
++		ranges;
++		compatible	= "simple-bus";
++
++		syscfg_sbc:sbc-syscfg at fe600000{
++			compatible	= "st,stih416-sbc-syscfg", "syscon";
++			reg		= <0xfe600000 0x1000>;
++		};
++
++		syscfg_front:front-syscfg at fee10000{
++			compatible	= "st,stih416-front-syscfg", "syscon";
++			reg		= <0xfee10000 0x1000>;
++		};
++
++		syscfg_rear:rear-syscfg at fe830000{
++			compatible	= "st,stih416-rear-syscfg", "syscon";
++			reg		= <0xfe830000 0x1000>;
++		};
++
++		/* MPE */
++		syscfg_fvdp_fe:fvdp-fe-syscfg at fddf0000{
++			compatible	= "st,stih416-fvdp-fe-syscfg", "syscon";
++			reg		= <0xfddf0000 0x1000>;
++		};
++
++		syscfg_fvdp_lite:fvdp-lite-syscfg at fd6a0000{
++			compatible	= "st,stih416-fvdp-lite-syscfg", "syscon";
++			reg		= <0xfd6a0000 0x1000>;
++		};
++
++		syscfg_cpu:cpu-syscfg at fdde0000{
++			compatible	= "st,stih416-cpu-syscfg", "syscon";
++			reg		= <0xfdde0000 0x1000>;
++		};
++
++		syscfg_compo:compo-syscfg at fd320000{
++			compatible	= "st,stih416-compo-syscfg", "syscon";
++			reg		= <0xfd320000 0x1000>;
++		};
++
++		syscfg_transport:transport-syscfg at fd690000{
++			compatible	= "st,stih416-transport-syscfg", "syscon";
++			reg		= <0xfd690000 0x1000>;
++		};
++
++		syscfg_lpm:lpm-syscfg at fe4b5100{
++			compatible	= "st,stih416-lpm-syscfg", "syscon";
++			reg		= <0xfe4b5100 0x8>;
++		};
++
++		serial2: serial at fed32000{
++			compatible	= "st,asc";
++			status 		= "disabled";
++			reg		= <0xfed32000 0x2c>;
++			interrupts	= <0 197 0>;
++			clocks          = <&CLK_S_ICN_REG_0>;
++			pinctrl-names 	= "default";
++			pinctrl-0 	= <&pinctrl_serial2>;
++		};
++
++		/* SBC_UART1 */
++		sbc_serial1: serial at fe531000 {
++			compatible	= "st,asc";
++			status 		= "disabled";
++			reg		= <0xfe531000 0x2c>;
++			interrupts	= <0 210 0>;
++			pinctrl-names 	= "default";
++			pinctrl-0 	= <&pinctrl_sbc_serial1>;
++			clocks          = <&CLK_SYSIN>;
++		};
++	};
++};
+diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
+index 23405b5..d04e3bf 100644
+--- a/arch/arm/mach-sti/Kconfig
++++ b/arch/arm/mach-sti/Kconfig
+@@ -33,4 +33,13 @@ config SOC_STIH415
+ 	  and other digital audio/video applications using Flattned Device
+ 	  Trees.
+ 
++config SOC_STIH416
++	bool "STiH416 STMicroelectronics Consumer Electronics family"
++	default y
++	help
++	  This enables support for STMicroelectronics Digital Consumer
++	  Electronics family StiH416 parts, primarily targetted at set-top-box
++	  and other digital audio/video applications using Flattened Device
++	  Trees.
++
+ endif
+diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+index 3faf642..8fe6f0c 100644
+--- a/arch/arm/mach-sti/board-dt.c
++++ b/arch/arm/mach-sti/board-dt.c
+@@ -37,10 +37,11 @@ static void __init stih41x_timer_init(void)
+ 
+ static const char *stih41x_dt_match[] __initdata = {
+ 	"st,stih415",
++	"st,stih416",
+ 	NULL
+ };
+ 
+-DT_MACHINE_START(STM, "STiH415 SoC with Flattened Device Tree")
++DT_MACHINE_START(STM, "STiH415/416 SoC with Flattened Device Tree")
+ 	.init_time	= stih41x_timer_init,
+ 	.smp		= smp_ops(sti_smp_ops),
+ 	.dt_compat	= stih41x_dt_match,
+-- 
+1.7.6.5
