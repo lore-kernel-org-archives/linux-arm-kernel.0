@@ -1,225 +1,93 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 26 Jun 2013 18:57:19 +0200
-Subject: [PATCH 0/8] ARM: move cpuidle drivers to drivers/cpuidle/
-In-Reply-To: <1673802.AM7kgUZk9G@amdc1032>
-References: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
- <5859839.2xKkDrLODE@amdc1032> <51CAE713.5070700@linaro.org>
- <1673802.AM7kgUZk9G@amdc1032>
-Message-ID: <51CB1D6F.8020101@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 26 Jun 2013 10:02:59 -0700
+Subject: [PATCH v2 1/2] ARM: mmu: Add debug_ll_io_init() mappings to early
+ mappings
+In-Reply-To: <1371241978-6224-1-git-send-email-sboyd@codeaurora.org>
+References: <1371241978-6224-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <51CB1EC3.8010103@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2013 04:40 PM, Bartlomiej Zolnierkiewicz wrote:
-> On Wednesday, June 26, 2013 03:05:23 PM Daniel Lezcano wrote:
->> On 06/26/2013 02:22 PM, Bartlomiej Zolnierkiewicz wrote:
->>>
->>> Hi,
->>>
->>> On Wednesday, June 26, 2013 12:59:53 PM Daniel Lezcano wrote:
->>>> On 06/26/2013 12:15 PM, Bartlomiej Zolnierkiewicz wrote:
->>>>> Hi,
->>>>>
->>>>> This patchset moves ARM cpuidle drivers to drivers/cpuidle/ to make
->>>>> code match new driver placement rules (per commit a8e39c3 "cpuidle: add
->>>>> maintainer entry").
->>>>
->>>> I second this initiative but as stated in a previous email, a bit of
->>>> code cleanup, consolidation and encapsulation should be done before.
->>>>
->>>> Again, from my POV, it is worth to do that but we have to split the pm
->>>> code from the driver.
->>>
->>> OK, I'll look into separating the pm code from the drivers.  However it
->>> seems that patch #2 (for davinci) can be applied as it is.
->>
->> No it can't. It still has #include <mach/...>
->>
->> Please have a look at the thread:
->>
->> http://comments.gmane.org/gmane.linux.ports.arm.kernel/146651
-> 
-> OK, I see.
-> 
-> On davinci:
-> 
-> * <mach/cpuidle.h> contains only struct davinci_cpuidle_config
->   declaration (pointer to this structure instance is passed as
->   platform data to davinci cpuidle driver) so it seems that
->   moving it to <linux/platform_data/cpuidle-davinci.h> would be
->   sufficient?
-> 
-> * <mach/ddr2.h> contains only few definitions used by davinci
->   cpuidle driver and arch/arm/mach-davinci/sleep.S so wouldn't
->   it be OK to just move the header to <linux/davinci_ddr2.h>?
-> 
-> If agreed I'll prepare appropriate patches later.
+Russell,
 
-Let me handle this driver with at91. I am consolidating the code around
-the RAM self refresh.
+Shall I put these two patches in the patch tracker for 3.11?
 
->>>> Please review some patches I sent recently to split this code and
->>>> comment them. Otherwise, we will collide on this work.
->>>>
->>>> All the patches sent [1] was to unify the code to make the drivers as
->>>> unified as possible to converge to the same code pattern and to
->>>> facilitate the factoring out.
->>>
->>> I've looked at the patches ([1] and at91 ones) and they look fine to me.
->>> I don't think that there is currently a risk of colliding on this work
->>> (except at91 case) as your patches (except at91 ones) are already merged
->>> in upstream or linux-next branch of linux-pm tree (which is included in
->>> linux-next tree which I based my patches on). I'm subscribed to linux-pm
->>> mailing list now but please cc: me on your future ARM cpuidle changes
->>> (thanks!).
->>
->> We are working on cleaning up the different drivers to have a *common
->> code pattern* in order to factor it out, split the code into pm code and
->> driver code, move the drivers to the drivers/cpuidle directory and
->> finally create a single arm driver [1][2][3].
-> 
-> Interesting, I wasn't aware of the single arm driver goal..
-> 
->> You are sending patches to move the drivers directly to the
->> drivers/cpuidle directory. I did that 1,5 years ago and I was told it is
->> not the way to go [4].
->>
->> As you can see this is a WIP.
->>
->> So I am insisting: that would be better if you sync up with us and check
->> what is the WIP and, if you are willing to, give us a hand instead of
->> doing your way.
-> 
-> OK.
-> 
->> May I suggest you fix up the exynos cpuidle driver first ? :)
-> 
-> Sure.
-> 
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
-> 
->> Thanks
->>   -- Daniel
->>
->> [1]
->> https://blueprints.launchpad.net/linaro-power-kernel/+spec/cpuidle-consolidate-arm-drivers
->>
->> [2]
->> http://summit.linuxplumbersconf.org/lpc-2012/meeting/31/lpc2012-ref-cpu-idle-cluster-management/
->>
->> [3] https://e.lca-13.zerista.com/event/member/72362
->>
->> [4] http://comments.gmane.org/gmane.linux.ports.arm.kernel/146651
->>
->>
->>> Best regards,
->>> --
->>> Bartlomiej Zolnierkiewicz
->>> Samsung R&D Institute Poland
->>> Samsung Electronics
->>>
->>>> Thanks
->>>>   -- Daniel
->>>>
->>>> [1]
->>>> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/log/?h=linux-next&qt=author&q=daniel.lezcano%40linaro.org
->>>>
->>>>> [ Please note that movement of Samsung EXYNOS cpuidle driver is handled
->>>>>   in separate patchset since it needs some other changes applied first. ]
->>>>>
->>>>> Patches are based on linux-next (next-20130624) and are compile tested
->>>>> only.  If agreed they all should probably go together through one tree
->>>>> (linux-pm or arm-soc) since they all modify drivers/cpuidle/Makefile.
->>>>>
->>>>> PS It seems that majority of cpuidle drivers is not used by default
->>>>> (CONFIG_CPU_IDLE is not turned on in corresponding defconfigs). The only
->>>>> exceptions are shmobile (kota2_defconfig) and tegra (tegra_defconfig).
->>>>> This is probably also something that needs updating.
->>>>>
->>>>> Best regards,
->>>>> --
->>>>> Bartlomiej Zolnierkiewicz
->>>>> Samsung R&D Institute Poland
->>>>> Samsung Electronics
->>>>>
->>>>>
->>>>> Bartlomiej Zolnierkiewicz (8):
->>>>>   ARM: at91: move cpuidle driver to drivers/cpuidle/
->>>>>   ARM: davinci: move cpuidle driver to drivers/cpuidle/
->>>>>   ARM: imx: move cpuidle drivers to drivers/cpuidle/
->>>>>   ARM: OMAP: move cpuidle drivers to drivers/cpuidle/
->>>>>   ARM: S3C64XX: move cpuidle driver to drivers/cpuidle/
->>>>>   ARM: shmobile: move cpuidle driver to drivers/cpuidle/
->>>>>   ARM: tegra: move cpuidle drivers to drivers/cpuidle/
->>>>>   ARM: ux500: move cpuidle drivers to drivers/cpuidle/
->>>>>
->>>>>  arch/arm/mach-at91/Makefile            |   1 -
->>>>>  arch/arm/mach-at91/cpuidle.c           |  68 -------
->>>>>  arch/arm/mach-davinci/Makefile         |   1 -
->>>>>  arch/arm/mach-davinci/cpuidle.c        | 105 ----------
->>>>>  arch/arm/mach-imx/Makefile             |   5 -
->>>>>  arch/arm/mach-imx/cpuidle-imx5.c       |  37 ----
->>>>>  arch/arm/mach-imx/cpuidle-imx6q.c      |  75 -------
->>>>>  arch/arm/mach-omap2/Makefile           |   5 -
->>>>>  arch/arm/mach-omap2/cpuidle34xx.c      | 344 ---------------------------------
->>>>>  arch/arm/mach-omap2/cpuidle44xx.c      | 217 ---------------------
->>>>>  arch/arm/mach-s3c64xx/Makefile         |   1 -
->>>>>  arch/arm/mach-s3c64xx/cpuidle.c        |  63 ------
->>>>>  arch/arm/mach-shmobile/Makefile        |   1 -
->>>>>  arch/arm/mach-shmobile/cpuidle.c       |  37 ----
->>>>>  arch/arm/mach-tegra/Makefile           |   9 -
->>>>>  arch/arm/mach-tegra/cpuidle-tegra114.c |  35 ----
->>>>>  arch/arm/mach-tegra/cpuidle-tegra20.c  | 217 ---------------------
->>>>>  arch/arm/mach-tegra/cpuidle-tegra30.c  | 149 --------------
->>>>>  arch/arm/mach-ux500/Makefile           |   1 -
->>>>>  arch/arm/mach-ux500/cpuidle.c          | 128 ------------
->>>>>  drivers/cpuidle/Makefile               |  42 ++++
->>>>>  drivers/cpuidle/cpuidle-at91.c         |  68 +++++++
->>>>>  drivers/cpuidle/cpuidle-davinci.c      | 104 ++++++++++
->>>>>  drivers/cpuidle/cpuidle-imx5.c         |  37 ++++
->>>>>  drivers/cpuidle/cpuidle-imx6q.c        |  74 +++++++
->>>>>  drivers/cpuidle/cpuidle-omap34xx.c     | 342 ++++++++++++++++++++++++++++++++
->>>>>  drivers/cpuidle/cpuidle-omap44xx.c     | 216 +++++++++++++++++++++
->>>>>  drivers/cpuidle/cpuidle-s3c64xx.c      |  62 ++++++
->>>>>  drivers/cpuidle/cpuidle-shmobile.c     |  37 ++++
->>>>>  drivers/cpuidle/cpuidle-tegra114.c     |  35 ++++
->>>>>  drivers/cpuidle/cpuidle-tegra20.c      | 217 +++++++++++++++++++++
->>>>>  drivers/cpuidle/cpuidle-tegra30.c      | 149 ++++++++++++++
->>>>>  drivers/cpuidle/cpuidle-ux500.c        | 128 ++++++++++++
->>>>>  33 files changed, 1511 insertions(+), 1499 deletions(-)
->>>>>  delete mode 100644 arch/arm/mach-at91/cpuidle.c
->>>>>  delete mode 100644 arch/arm/mach-davinci/cpuidle.c
->>>>>  delete mode 100644 arch/arm/mach-imx/cpuidle-imx5.c
->>>>>  delete mode 100644 arch/arm/mach-imx/cpuidle-imx6q.c
->>>>>  delete mode 100644 arch/arm/mach-omap2/cpuidle34xx.c
->>>>>  delete mode 100644 arch/arm/mach-omap2/cpuidle44xx.c
->>>>>  delete mode 100644 arch/arm/mach-s3c64xx/cpuidle.c
->>>>>  delete mode 100644 arch/arm/mach-shmobile/cpuidle.c
->>>>>  delete mode 100644 arch/arm/mach-tegra/cpuidle-tegra114.c
->>>>>  delete mode 100644 arch/arm/mach-tegra/cpuidle-tegra20.c
->>>>>  delete mode 100644 arch/arm/mach-tegra/cpuidle-tegra30.c
->>>>>  delete mode 100644 arch/arm/mach-ux500/cpuidle.c
->>>>>  create mode 100644 drivers/cpuidle/cpuidle-at91.c
->>>>>  create mode 100644 drivers/cpuidle/cpuidle-davinci.c
->>>>>  create mode 100644 drivers/cpuidle/cpuidle-imx5.c
->>>>>  create mode 100644 drivers/cpuidle/cpuidle-imx6q.c
->>>>>  create mode 100644 drivers/cpuidle/cpuidle-omap34xx.c
->>>>>  create mode 100644 drivers/cpuidle/cpuidle-omap44xx.c
->>>>>  create mode 100644 drivers/cpuidle/cpuidle-s3c64xx.c
->>>>>  create mode 100644 drivers/cpuidle/cpuidle-shmobile.c
->>>>>  create mode 100644 drivers/cpuidle/cpuidle-tegra114.c
->>>>>  create mode 100644 drivers/cpuidle/cpuidle-tegra20.c
->>>>>  create mode 100644 drivers/cpuidle/cpuidle-tegra30.c
->>>>>  create mode 100644 drivers/cpuidle/cpuidle-ux500.c
-> 
+On 06/14/13 13:32, Stephen Boyd wrote:
+> Failure to add the mapping created in debug_ll_io_init() can lead
+> to the BUG_ON() triggering in lib/ioremap.c:27 if the static
+> virtual address decided for the debug_ll mapping overlaps with
+> another mapping that is created later. This happens because the
+> generic ioremap code has no idea there is a mapping there and it
+> tries to place a mapping in the same location and blows up when
+> it sees that there is a pte already present.
+>
+> kernel BUG at lib/ioremap.c:27!
+> Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-rc2-00042-g2af0c67-dirty #316
+> task: ef088000 ti: ef082000 task.ti: ef082000
+> PC is at ioremap_page_range+0x16c/0x198
+> LR is at ioremap_page_range+0xf0/0x198
+> pc : [<c04cb874>]    lr : [<c04cb7f8>]    psr: 20000113
+> sp : ef083e78  ip : af140000  fp : ef083ebc
+> r10: ef7fc100  r9 : ef7fc104  r8 : 000af174
+> r7 : 00000647  r6 : beffffff  r5 : f004c000  r4 : f0040000
+> r3 : af173417  r2 : 16440653  r1 : af173e07  r0 : ef7fc8fc
+> Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+> Control: 10c5787d  Table: 8020406a  DAC: 00000015
+> Process swapper/0 (pid: 1, stack limit = 0xef082238)
+> Stack: (0xef083e78 to 0xef084000)
+> 3e60:                                                       00040000 ef083eec
+> 3e80: bf134000 f004bfff c0207c00 f004c000 c02fc120 f000c000 c15e7800 00040000
+> 3ea0: ef083eec 00000647 c098ba9c c0953544 ef083edc ef083ec0 c021b82c c04cb714
+> 3ec0: c09cdc50 00000040 ef0f1e00 ef1003c0 ef083f14 ef083ee0 c09535bc c021b7bc
+> 3ee0: c0953544 c04d0c6c c094e2cc c1600be4 c07440c4 c09a6888 00000002 c0a15f00
+> 3f00: ef082000 00000000 ef083f54 ef083f18 c0208728 c0953550 00000002 c1600bfc
+> 3f20: c08e3fac c0839918 ef083f54 c1600b80 c09a6888 c0a15f00 0000008b c094e2cc
+> 3f40: c098ba9c c098bab8 ef083f94 ef083f58 c094ea0c c020865c 00000002 00000002
+> 3f60: c094e2cc 00000000 c025b674 00000000 c06ff860 00000000 00000000 00000000
+> 3f80: 00000000 00000000 ef083fac ef083f98 c06ff878 c094e910 00000000 00000000
+> 3fa0: 00000000 ef083fb0 c020efe8 c06ff86c 00000000 00000000 00000000 00000000
+> 3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> 3fe0: 00000000 00000000 00000000 00000000 00000013 00000000 00000000 c0595108
+> [<c04cb874>] (ioremap_page_range+0x16c/0x198) from [<c021b82c>] (__alloc_remap_buffer.isra.18+0x7c/0xc4)
+> [<c021b82c>] (__alloc_remap_buffer.isra.18+0x7c/0xc4) from [<c09535bc>] (atomic_pool_init+0x78/0x128)
+> [<c09535bc>] (atomic_pool_init+0x78/0x128) from [<c0208728>] (do_one_initcall+0xd8/0x198)
+> [<c0208728>] (do_one_initcall+0xd8/0x198) from [<c094ea0c>] (kernel_init_freeable+0x108/0x1d0)
+> [<c094ea0c>] (kernel_init_freeable+0x108/0x1d0) from [<c06ff878>] (kernel_init+0x18/0xf4)
+> [<c06ff878>] (kernel_init+0x18/0xf4) from [<c020efe8>] (ret_from_fork+0x14/0x20)
+> Code: e50b0040 ebf54b2f e51b0040 eaffffee (e7f001f2)
+>
+> Fix it by telling generic layers about the static mapping via
+> iotable_init().  This also has the nice side effect of letting
+> you see the mapping in procfs' vmallocinfo file.
+>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>
+> Changes since v1:
+>  * Use iotable_init() instead of open coding it
+>
+>  arch/arm/mm/mmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index e0d8565..18b8aeb 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -947,7 +947,7 @@ void __init debug_ll_io_init(void)
+>  	map.virtual &= PAGE_MASK;
+>  	map.length = PAGE_SIZE;
+>  	map.type = MT_DEVICE;
+> -	create_mapping(&map);
+> +	iotable_init(&map, 1);
+>  }
+>  #endif
+>  
 
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
