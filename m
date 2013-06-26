@@ -1,50 +1,161 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 26 Jun 2013 19:19:27 +0800
-Subject: [PATCH V3 1/3] ARM: tegra114: Reprogram GIC CPU interface to
- bypass IRQ on CPU PM entry
-In-Reply-To: <51CA2173.7060407@wwwdotorg.org>
-References: <1372152242-16373-1-git-send-email-josephl@nvidia.com>
- <1372152242-16373-2-git-send-email-josephl@nvidia.com>
- <51CA2173.7060407@wwwdotorg.org>
-Message-ID: <1372245567.2986.27.camel@jlo-ubuntu-64.nvidia.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 26 Jun 2013 17:17:33 +0530
+Subject: [PATCH v9 5/8] ARM: dts: omap: update usb_otg_hs data
+In-Reply-To: <1372247257-30186-1-git-send-email-kishon@ti.com>
+References: <1372247257-30186-1-git-send-email-kishon@ti.com>
+Message-ID: <1372247257-30186-6-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-06-26 at 07:02 +0800, Stephen Warren wrote:
-> On 06/25/2013 03:23 AM, Joseph Lo wrote:
-> > There is a difference between GICv1 and v2 when CPU in power management
-> > mode (aka CPU power down on Tegra). For GICv1, IRQ/FIQ interrupt lines
-> > going to CPU are same lines which are also used for wake-interrupt.
-> > Therefore, we cannot disable the GIC CPU interface if we need to use same
-> > interrupts for CPU wake purpose. This creates a race condition for CPU
-> > power off entry. Also, in GICv1, disabling GICv1 CPU interface puts GICv1
-> > into bypass mode such that incoming legacy IRQ/FIQ are sent to CPU, which
-> > means disabling GIC CPU interface doesn't really disable IRQ/FIQ to CPU.
-> > 
-> > GICv2 provides a wake IRQ/FIQ (for wake-event purpose), which are not
-> > disabled by GIC CPU interface. This is done by adding a bypass override
-> > capability when the interrupts are disabled at the CPU interface. To
-> > support this, there are four bits about IRQ/FIQ BypassDisable in CPU
-> > interface Control Register. When the IRQ/FIQ not being driver by the
-> > CPU interface, each interrupt output signal can be deasserted rather
-> > than being driven by the legacy interrupt input.
-> > 
-> ...
-> > diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-> 
-> > +static int tegra_gic_notifier(struct notifier_block *self,
-> > +			      unsigned long cmd, void *v)
-> > +{
-> > +	switch (cmd) {
-> > +	case CPU_PM_ENTER:
-> > +		writel_relaxed(0x1E0, tegra_gic_cpu_base + GIC_CPU_CTRL);
-> 
-> I assume that 0x1e0 is the "four bits" for IRQ/FIQ bypass disable that
-> are mentioned in the commit description. are there #defines that can be
-> used instead of literal 0x1e0 here?
+Updated the usb_otg_hs dt data to include the *phy* and *phy-names*
+binding in order for the driver to use the new generic PHY framework.
+Also updated the Documentation to include the binding information.
+The PHY binding information can be found at
+Documentation/devicetree/bindings/phy/phy-bindings.txt
 
-The common "arm-gic.h" didn't have the new define for GICv2 yet. So I
-didn't define something like GIC_CPU_{FIQ,IRQ}BypDisGrp{0,1} for Tegra.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ Documentation/devicetree/bindings/usb/omap-usb.txt |    5 +++++
+ Documentation/devicetree/bindings/usb/usb-phy.txt  |    6 ++++++
+ arch/arm/boot/dts/omap3-beagle-xm.dts              |    2 ++
+ arch/arm/boot/dts/omap3-evm.dts                    |    2 ++
+ arch/arm/boot/dts/omap3-overo.dtsi                 |    2 ++
+ arch/arm/boot/dts/omap4.dtsi                       |    3 +++
+ arch/arm/boot/dts/twl4030.dtsi                     |    1 +
+ 7 files changed, 21 insertions(+)
 
-Thanks,
-Joseph
+diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
+index d4769f3..c0871a7 100644
+--- a/Documentation/devicetree/bindings/usb/omap-usb.txt
++++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
+@@ -19,6 +19,9 @@ OMAP MUSB GLUE
+  - power : Should be "50". This signifies the controller can supply upto
+    100mA when operating in host mode.
+  - usb-phy : the phandle for the PHY device
++ - phys : the phandle for the PHY device (used by generic PHY framework)
++ - phy-names : the names of the PHY corresponding to the PHYs present in the
++   *phy* phandle.
+ 
+ Optional properties:
+  - ctrl-module : phandle of the control module this glue uses to write to
+@@ -33,6 +36,8 @@ usb_otg_hs: usb_otg_hs at 4a0ab000 {
+ 	num-eps = <16>;
+ 	ram-bits = <12>;
+ 	ctrl-module = <&omap_control_usb>;
++	phys = <&usb2_phy>;
++	phy-names = "usb2-phy";
+ };
+ 
+ Board specific device node entry
+diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
+index 61496f5..c0245c8 100644
+--- a/Documentation/devicetree/bindings/usb/usb-phy.txt
++++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
+@@ -5,6 +5,8 @@ OMAP USB2 PHY
+ Required properties:
+  - compatible: Should be "ti,omap-usb2"
+  - reg : Address and length of the register set for the device.
++ - #phy-cells: determine the number of cells that should be given in the
++   phandle while referencing this phy.
+ 
+ Optional properties:
+  - ctrl-module : phandle of the control module used by PHY driver to power on
+@@ -16,6 +18,7 @@ usb2phy at 4a0ad080 {
+ 	compatible = "ti,omap-usb2";
+ 	reg = <0x4a0ad080 0x58>;
+ 	ctrl-module = <&omap_control_usb>;
++	#phy-cells = <0>;
+ };
+ 
+ OMAP USB3 PHY
+@@ -25,6 +28,8 @@ Required properties:
+  - reg : Address and length of the register set for the device.
+  - reg-names: The names of the register addresses corresponding to the registers
+    filled in "reg".
++ - #phy-cells: determine the number of cells that should be given in the
++   phandle while referencing this phy.
+ 
+ Optional properties:
+  - ctrl-module : phandle of the control module used by PHY driver to power on
+@@ -39,4 +44,5 @@ usb3phy at 4a084400 {
+ 	      <0x4a084c00 0x40>;
+ 	reg-names = "phy_rx", "phy_tx", "pll_ctrl";
+ 	ctrl-module = <&omap_control_usb>;
++	#phy-cells = <0>;
+ };
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 3046d1f..023596e 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -123,6 +123,8 @@
+ &usb_otg_hs {
+ 	interface-type = <0>;
+ 	usb-phy = <&usb2_phy>;
++	phys = <&usb2_phy>;
++	phy-names = "usb2-phy";
+ 	mode = <3>;
+ 	power = <50>;
+ };
+diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
+index 96d1c20..f2b8314 100644
+--- a/arch/arm/boot/dts/omap3-evm.dts
++++ b/arch/arm/boot/dts/omap3-evm.dts
+@@ -69,6 +69,8 @@
+ &usb_otg_hs {
+ 	interface-type = <0>;
+ 	usb-phy = <&usb2_phy>;
++	phys = <&usb2_phy>;
++	phy-names = "usb2-phy";
+ 	mode = <3>;
+ 	power = <50>;
+ };
+diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+index a626c50..b65916e 100644
+--- a/arch/arm/boot/dts/omap3-overo.dtsi
++++ b/arch/arm/boot/dts/omap3-overo.dtsi
+@@ -74,6 +74,8 @@
+ &usb_otg_hs {
+ 	interface-type = <0>;
+ 	usb-phy = <&usb2_phy>;
++	phys = <&usb2_phy>;
++	phy-names = "usb2-phy";
+ 	mode = <3>;
+ 	power = <50>;
+ };
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 2a56428..dae620b 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -517,6 +517,7 @@
+ 				compatible = "ti,omap-usb2";
+ 				reg = <0x4a0ad080 0x58>;
+ 				ctrl-module = <&omap_control_usb>;
++				#phy-cells = <0>;
+ 			};
+ 		};
+ 
+@@ -655,6 +656,8 @@
+ 			interrupt-names = "mc", "dma";
+ 			ti,hwmods = "usb_otg_hs";
+ 			usb-phy = <&usb2_phy>;
++			phys = <&usb2_phy>;
++			phy-names = "usb2-phy";
+ 			multipoint = <1>;
+ 			num-eps = <16>;
+ 			ram-bits = <12>;
+diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+index b3034da..ce4cd6f 100644
+--- a/arch/arm/boot/dts/twl4030.dtsi
++++ b/arch/arm/boot/dts/twl4030.dtsi
+@@ -80,6 +80,7 @@
+ 		usb1v8-supply = <&vusb1v8>;
+ 		usb3v1-supply = <&vusb3v1>;
+ 		usb_mode = <1>;
++		#phy-cells = <0>;
+ 	};
+ 
+ 	twl_pwm: pwm {
+-- 
+1.7.10.4
