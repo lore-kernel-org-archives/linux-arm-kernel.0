@@ -1,79 +1,34 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 26 Jun 2013 13:12:21 +0200
-Subject: [PATCH 21/23] iommu/tegra: smmu: Get swgroup ID from DT
-In-Reply-To: <1372238906-9346-22-git-send-email-hdoyu@nvidia.com>
-References: <1372238906-9346-22-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20130626111220.GQ27083@manwe>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 26 Jun 2013 13:06:23 +0200
+Subject: [PATCH 04/23] ARM: dt: tegra30: Register AHB/IOMMU device first
+In-Reply-To: <20130626104514.GJ27083@manwe>
+References: <1372238906-9346-5-git-send-email-hdoyu@nvidia.com><20130626104514.GJ27083@manwe>
+Message-ID: <20130626.140623.313229910934807681.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 12:28:24PM +0300, Hiroshi Doyu wrote:
-> Get swgroup ID from DT. "nvidia,swgroups" indicates which swgroup IDs
-> a device belongs to.
-> 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
->  arch/arm/boot/dts/tegra30.dtsi |  1 -
->  drivers/iommu/tegra-smmu.c     | 20 +++++++++++++++++++-
->  2 files changed, 19 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-> index 7c480f2..a116737 100644
-> --- a/arch/arm/boot/dts/tegra30.dtsi
-> +++ b/arch/arm/boot/dts/tegra30.dtsi
-> @@ -1,6 +1,5 @@
->  #include <dt-bindings/clock/tegra30-car.h>
->  #include <dt-bindings/gpio/tegra-gpio.h>
-> -#include <dt-bindings/iommu/tegra-swgid.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  
->  #include "skeleton.dtsi"
-> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-> index 50eb843..96dbef3 100644
-> --- a/drivers/iommu/tegra-smmu.c
-> +++ b/drivers/iommu/tegra-smmu.c
-> @@ -314,6 +314,24 @@ static inline void smmu_write(struct smmu_device *smmu, u32 val, size_t offs)
->  
->  #define smmu_client_hwgrp(c)	(c->as->smmu->swgroups)
->  
-> +static u64 tegra_smmu_of_get_swgids(struct device *dev)
-> +{
-> +	size_t bytes;
-> +	const char *propname = "nvidia,memory-clients";
-> +	const __be32 *prop;
-> +	int i;
-> +	u64 swgids = 0;
-> +
-> +	prop = of_get_property(dev->of_node, propname, &bytes);
-> +	if (!prop || !bytes)
-> +		return 0;
-> +
-> +	for (i = 0; i < bytes / sizeof(u32); i++, prop++)
-> +		swgids |= 1ULL << be32_to_cpup(prop);
-> +
-> +	return swgids;
-> +}
-> +
->  static int __smmu_client_set_hwgrp(struct smmu_client *c,
->  				   u64 map, int on)
->  {
-> @@ -725,7 +743,7 @@ static int smmu_iommu_attach_dev(struct iommu_domain *domain,
->  		return -ENOMEM;
->  	client->dev = dev;
->  	client->as = as;
-> -	map = smmu->swgroups;
-> +	map = tegra_smmu_of_get_swgids(dev);
->  	if (!map)
->  		return -EINVAL;
+Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 26 Jun 2013 12:45:14 +0200:
 
-Shouldn't this be part of an earlier patch ("[PATCH 17/23] iommu/tegra:
-smmu: Use swgroups instead of pdata")? What's the reason for the split?
+> * PGP Signed by an unknown key
+> 
+> On Wed, Jun 26, 2013 at 12:28:07PM +0300, Hiroshi Doyu wrote:
+> > Move up AHB/IOMMU to register them earlier than others. IOMMU needs
+> > AHB, and IOMMU needs to register all platform devices as
+> > IOMMU'able. So AHB/IOMMU needs to be instanciated at very beginning.
+> > 
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > ---
+> >  arch/arm/boot/dts/tegra30.dtsi | 33 +++++++++++++++++----------------
+> >  1 file changed, 17 insertions(+), 16 deletions(-)
+> 
+> This just happens to work because DTC keeps the order from the DTS in
+> the DTB and the Linux implementation sequentially instantiates devices
+> from DT nodes. Neither should be assumed though when writing DTS files.
+> Other implementations (DTC or OS) could do things differently.
+> 
+> But if I understand correctly there is another solution which should
+> solve this issue properly.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/14bb2b2a/attachment-0001.sig>
+As you've noticed:
+
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/036746.html
