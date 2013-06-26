@@ -1,52 +1,31 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 26 Jun 2013 15:13:27 +0200
-Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
-In-Reply-To: <CAKv+Gu9_V75jGSq675H+Gi7jkDWBkVDLXvewMuv8dWxx7-VxEw@mail.gmail.com>
-References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
- <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
- <20130626111430.GH26142@mudshark.cambridge.arm.com>
- <CAKv+Gu_R7=Euaa87kQqR5TfGQLyF6Ad51dBm2CroYHcKMRs_dA@mail.gmail.com>
- <20130626124009.GL26142@mudshark.cambridge.arm.com>
- <CAKv+Gu9_V75jGSq675H+Gi7jkDWBkVDLXvewMuv8dWxx7-VxEw@mail.gmail.com>
-Message-ID: <CAKv+Gu-5SsvJCvXkJoqPm-TZx6tr+49pUXfpkSoBo-s+Z8_YmQ@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 26 Jun 2013 15:08:49 +0200
+Subject: [PATCH 2/2] ARM i.MX6Q: Use ENET_CLK_SEL defines in imx6q_1588_init
+In-Reply-To: <1372252129-18898-1-git-send-email-p.zabel@pengutronix.de>
+References: <1372252129-18898-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1372252129-18898-2-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 June 2013 14:52, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 26 June 2013 14:40, Will Deacon <will.deacon@arm.com> wrote:
->> On Wed, Jun 26, 2013 at 12:28:49PM +0100, Ard Biesheuvel wrote:
->>> So can you suggest a better way of making sure schedule_debug() shoots
->>> us down if calling schedule() between kernel_neon_begin and
->>> kernel_neon_end, even on non-preempt builds?
->>
->> With what we currently have in the kernel, no, I can't think of a better
->> way. However, I also don't think that smuggling in a back-end hack is a good
->> idea either. How about we follow x86's lead on this and rely on the caller
->> not to sleep for the timebeing? Then, separately to this patch series, you
->> could look at augmenting the scheduler so that schedule_debug can complain
->> if it encounters a task that is not expected to sleep? That seems like the
->> right place to fix this problem, and will benefit other architectures too.
->>
->
-> Good point. As preempt_enable/disable already have this side effect on
-> PREEMPT builds, perhaps it wouldn't be such a bad idea to modify them
-> in the non-PREEMPT case to at least complain if schedule() is invoked
-> during such a section.
->
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/mach-imx/mach-imx6q.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-It appears we have this already, but in the non-PREEMPT case, it needs
-CONFIG_DEBUG_ATOMIC_SLEEP to be defined.
-Let's just rely on preempt_disable() to do the right thing...
-
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index db1db78..adabe2b 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -242,7 +242,9 @@ static void __init imx6q_1588_init(void)
+ 
+ 	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+ 	if (!IS_ERR(gpr))
+-		regmap_update_bits(gpr, 0x4, 1 << 21, 1 << 21);
++		regmap_update_bits(gpr, IOMUXC_GPR1,
++				IMX6Q_GPR1_ENET_CLK_SEL_MASK,
++				IMX6Q_GPR1_ENET_CLK_SEL_ANATOP);
+ 	else
+ 		pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
+ 
 -- 
-Ard.
-
-
-> @Russell: you mentioned spinlocks at some point to prevent sleeping.
-> Are you ok with Will's suggestion instead, i.e., to rely on
-> preempt_disable() to do the right thing, and fix it later because
-> currently, it doesn't on non-PREEMPT?
->
-> --
-> Ard.
+1.8.3.1
