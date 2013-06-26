@@ -1,65 +1,92 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 26 Jun 2013 15:45:07 +0200
-Subject: [GIT PULL] at91: non critical fixes (for early 3.11) #2
-Message-ID: <1372254307-2063-1-git-send-email-nicolas.ferre@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 26 Jun 2013 14:39:41 +0100
+Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
+ MMU binding
+In-Reply-To: <CALRxmdBxFWoRKv+bUu8VEwNNcAJUej9jM2V8N0rrqrr_Vpe8fQ@mail.gmail.com>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-8-git-send-email-will.deacon@arm.com>
+ <CALRxmdBxFWoRKv+bUu8VEwNNcAJUej9jM2V8N0rrqrr_Vpe8fQ@mail.gmail.com>
+Message-ID: <20130626133941.GD7417@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Hi Stuart,
 
-Another fixes-non-critical pull-request for early 3.11. It is of course based
-on the patches that you already have in arm-soc/at91/fixes.
+On Tue, Jun 25, 2013 at 08:18:19PM +0100, Stuart Yoder wrote:
+> On Mon, Jun 10, 2013 at 1:34 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > new file mode 100644
+> > index 0000000..e34c6cd
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > @@ -0,0 +1,70 @@
+> > +* ARM System MMU Architecture Implementation
+> > +
+> > +ARM SoCs may contain an implementation of the ARM System Memory
+> > +Management Unit Architecture, which can be used to provide 1 or 2 stages
+> > +of address translation to bus masters external to the CPU.
+> > +
+> > +The SMMU may also raise interrupts in response to various fault
+> > +conditions.
+> > +
+> > +** System MMU required properties:
+> > +
+> > +- compatible    : Should be one of:
+> > +
+> > +                        "arm,smmu-v1"
+> > +                        "arm,smmu-v2"
+> > +                        "arm,mmu-400"
+> > +                        "arm,mmu-500"
+> > +
+> > +                  depending on the particular implementation and/or the
+> > +                  version of the architecture implemented.
+> > +
+> > +- reg           : Base address and size of the SMMU.
+> > +
+> > +- #global-interrupts : The number of global interrupts exposed by the
+> > +                       device.
+> > +
+> > +- interrupts    : Interrupt list, with the first #global-irqs entries
+> > +                  corresponding to the global interrupts
+> 
+> It seems like we don't have enough information here.   It's not enough
+> for the OS to know that there are 2, 4, etc global interrupts, no?  It needs
+> to know which hardware interrupt each corresponds to.   That kind of
+> stuff is normally defined in the device binding.
+> 
+> What is it that determines the number of global interrupts?
 
-Thanks, best regards,
+I'd suggest looking at the driver I posted to get a gist of how the parsing
+code works, but suffice to say that we describe both the number of
+interrupts and the actual interrupt numbers here.
 
-The following changes since commit 133e00116b5bc76110bcc41ded369489209b641f:
+> > +- mmu-masters   : A list of phandles to device nodes representing bus
+> > +                  masters for which the SMMU can provide a translation
+> > +                  and their corresponding StreamIDs (see example below).
+> > +                  Each device node linked from this list must have a
+> > +                  "#stream-id-cells" property, indicating the number of
+> > +                  StreamIDs associated with it.
+> 
+> So to find a the SMMU for a given device, I walk up the bus hierarchy
+> until I find an SMMU?
 
-  ARM: at91: Change the internal SRAM memory type MT_MEMORY_NONCACHED (2013-06-18 10:20:30 +0200)
+Again, the code is better than any explanation I can give here, but we
+basically construct a tree of masters for each SMMU in the system based on
+the mmu-masters property, which we can later search.
 
-are available in the git repository at:
+> > +** System MMU optional properties:
+> > +
+> > +- smmu-parent   : When multiple SMMUs are chained together, this
+> > +                  property can be used to provide a phandle to the
+> > +                  parent SMMU (that is the next SMMU on the path going
+> > +                  from the mmu-masters towards memory) node for this
+> > +                  SMMU.
+> 
+> Why is an explicit phandle link needed here when you don't need a
+> smmu-parent phandle in each mmu-master?    Won't walking the bus
+> hierarchy identify the parent SMMU if things are chained?
 
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
+What bus hierarchy? If I have two SMMU device nodes, how do I infer any
+topological information without an explicit linkage?
 
-for you to fetch changes up to bd2da9ca138e446824a7542b381aed442fef4caa:
-
-  ARM: at91/PMC: use at91_usb_rate() for UTMI PLL (2013-06-26 15:24:11 +0200)
-
-----------------------------------------------------------------
-Several fixes for:
-- external irq on non-DT boards
-- cpuidle code in some circumstances
-- PMC code in relation with PLLB/PLL_UTMI/USB:
-  mainly for SAMA5D3 and AT91SAM9N12
-
-----------------------------------------------------------------
-Daniel Lezcano (1):
-      ARM: at91: cpuidle: Fix target_residency
-
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      ARM: at91: fix at91_extern_irq usage for non-dt boards
-
-Nicolas Ferre (4):
-      ARM: at91/PMC: sama5d3 family doesn't have a PLLB
-      ARM: at91/PMC: at91sam9n12 family has a PLLB
-      ARM: at91/PMC: fix at91sam9n12 USB FS init
-      ARM: at91/PMC: use at91_usb_rate() for UTMI PLL
-
- arch/arm/mach-at91/at91rm9200.c            |  8 ++++----
- arch/arm/mach-at91/at91sam9260.c           |  4 ++--
- arch/arm/mach-at91/at91sam9261.c           |  4 ++--
- arch/arm/mach-at91/at91sam9263.c           |  2 +-
- arch/arm/mach-at91/at91sam9g45.c           |  2 +-
- arch/arm/mach-at91/at91sam9rl.c            |  2 +-
- arch/arm/mach-at91/at91x40.c               |  7 +++----
- arch/arm/mach-at91/clock.c                 | 30 +++++++++++++++++++++++-------
- arch/arm/mach-at91/cpuidle.c               |  2 +-
- arch/arm/mach-at91/generic.h               |  2 +-
- arch/arm/mach-at91/include/mach/at91_pmc.h |  3 +++
- arch/arm/mach-at91/irq.c                   |  9 ++++++++-
- arch/arm/mach-at91/pm.c                    |  2 +-
- arch/arm/mach-at91/setup.c                 |  2 +-
- arch/arm/mach-at91/soc.h                   |  1 +
- 15 files changed, 53 insertions(+), 27 deletions(-)
-
--- 
-Nicolas Ferre
+Will
