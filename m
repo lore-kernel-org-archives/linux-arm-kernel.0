@@ -1,203 +1,28 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 26 Jun 2013 12:15:40 +0200
-Subject: [PATCH 1/8] ARM: at91: move cpuidle driver to drivers/cpuidle/
-In-Reply-To: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1372241747-21083-2-git-send-email-b.zolnierkie@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 26 Jun 2013 16:13:08 +0200
+Subject: [PATCH 03/16] ARM: dts: i.MX6qdl: Add i.MX31 compatible to gpt
+ node
+In-Reply-To: <20130626135920.GB21845@S2101-09.ap.freescale.net>
+References: <1372168320-22605-1-git-send-email-s.hauer@pengutronix.de>
+ <1372168320-22605-4-git-send-email-s.hauer@pengutronix.de>
+ <20130626135920.GB21845@S2101-09.ap.freescale.net>
+Message-ID: <20130626141308.GA516@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compile tested only.
+On Wed, Jun 26, 2013 at 09:59:21PM +0800, Shawn Guo wrote:
+> On Tue, Jun 25, 2013 at 03:51:47PM +0200, Sascha Hauer wrote:
+> > The i.MX6 gpt is handled by the i.MX31 gpt driver in the kernel,
+> 
+> Just out of curiosity, where is the gpt driver you are talking about?
 
-Cc: Andrew Victor <linux@maxim.org.za>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- arch/arm/mach-at91/Makefile    |  1 -
- arch/arm/mach-at91/cpuidle.c   | 68 ------------------------------------------
- drivers/cpuidle/Makefile       |  3 ++
- drivers/cpuidle/cpuidle-at91.c | 68 ++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 71 insertions(+), 69 deletions(-)
- delete mode 100644 arch/arm/mach-at91/cpuidle.c
- create mode 100644 drivers/cpuidle/cpuidle-at91.c
+In barebox. In the kernel we have mxc_timer_init() which I called
+'driver', but the i.MX6 uses the same codepath as i.MX31.
 
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 3b0a953..c1b7370 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -98,7 +98,6 @@ obj-y				+= leds.o
- # Power Management
- obj-$(CONFIG_PM)		+= pm.o
- obj-$(CONFIG_AT91_SLOW_CLOCK)	+= pm_slowclock.o
--obj-$(CONFIG_CPU_IDLE)	+= cpuidle.o
- 
- ifeq ($(CONFIG_PM_DEBUG),y)
- CFLAGS_pm.o += -DDEBUG
-diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
-deleted file mode 100644
-index 69f9e3b..0000000
---- a/arch/arm/mach-at91/cpuidle.c
-+++ /dev/null
-@@ -1,68 +0,0 @@
--/*
-- * based on arch/arm/mach-kirkwood/cpuidle.c
-- *
-- * CPU idle support for AT91 SoC
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- *
-- * The cpu idle uses wait-for-interrupt and RAM self refresh in order
-- * to implement two idle states -
-- * #1 wait-for-interrupt
-- * #2 wait-for-interrupt and RAM self refresh
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/cpuidle.h>
--#include <linux/io.h>
--#include <linux/export.h>
--#include <asm/proc-fns.h>
--#include <asm/cpuidle.h>
--#include <mach/cpu.h>
--
--#include "pm.h"
--
--#define AT91_MAX_STATES	2
--
--/* Actual code that puts the SoC in different idle states */
--static int at91_enter_idle(struct cpuidle_device *dev,
--			struct cpuidle_driver *drv,
--			       int index)
--{
--	if (cpu_is_at91rm9200())
--		at91rm9200_standby();
--	else if (cpu_is_at91sam9g45())
--		at91sam9g45_standby();
--	else if (cpu_is_at91sam9263())
--		at91sam9263_standby();
--	else
--		at91sam9_standby();
--
--	return index;
--}
--
--static struct cpuidle_driver at91_idle_driver = {
--	.name			= "at91_idle",
--	.owner			= THIS_MODULE,
--	.states[0]		= ARM_CPUIDLE_WFI_STATE,
--	.states[1]		= {
--		.enter			= at91_enter_idle,
--		.exit_latency		= 10,
--		.target_residency	= 100000,
--		.flags			= CPUIDLE_FLAG_TIME_VALID,
--		.name			= "RAM_SR",
--		.desc			= "WFI and DDR Self Refresh",
--	},
--	.state_count = AT91_MAX_STATES,
--};
--
--/* Initialize CPU idle by registering the idle states */
--static int __init at91_init_cpuidle(void)
--{
--	return cpuidle_register(&at91_idle_driver, NULL);
--}
--
--device_initcall(at91_init_cpuidle);
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index 8767a7b..9dd4091 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -5,6 +5,9 @@
- obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
- obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
- 
-+ifeq ($(CONFIG_ARCH_AT91),y)
-+	obj-y += cpuidle-at91.o
-+endif
- obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
- obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
- obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
-diff --git a/drivers/cpuidle/cpuidle-at91.c b/drivers/cpuidle/cpuidle-at91.c
-new file mode 100644
-index 0000000..2545218
---- /dev/null
-+++ b/drivers/cpuidle/cpuidle-at91.c
-@@ -0,0 +1,68 @@
-+/*
-+ * based on arch/arm/mach-kirkwood/cpuidle.c
-+ *
-+ * CPU idle support for AT91 SoC
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * The cpu idle uses wait-for-interrupt and RAM self refresh in order
-+ * to implement two idle states -
-+ * #1 wait-for-interrupt
-+ * #2 wait-for-interrupt and RAM self refresh
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/cpuidle.h>
-+#include <linux/io.h>
-+#include <linux/export.h>
-+#include <asm/proc-fns.h>
-+#include <asm/cpuidle.h>
-+#include <mach/cpu.h>
-+
-+#include "../../arch/arm/mach-at91/pm.h"
-+
-+#define AT91_MAX_STATES	2
-+
-+/* Actual code that puts the SoC in different idle states */
-+static int at91_enter_idle(struct cpuidle_device *dev,
-+			struct cpuidle_driver *drv,
-+			       int index)
-+{
-+	if (cpu_is_at91rm9200())
-+		at91rm9200_standby();
-+	else if (cpu_is_at91sam9g45())
-+		at91sam9g45_standby();
-+	else if (cpu_is_at91sam9263())
-+		at91sam9263_standby();
-+	else
-+		at91sam9_standby();
-+
-+	return index;
-+}
-+
-+static struct cpuidle_driver at91_idle_driver = {
-+	.name			= "at91_idle",
-+	.owner			= THIS_MODULE,
-+	.states[0]		= ARM_CPUIDLE_WFI_STATE,
-+	.states[1]		= {
-+		.enter			= at91_enter_idle,
-+		.exit_latency		= 10,
-+		.target_residency	= 100000,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID,
-+		.name			= "RAM_SR",
-+		.desc			= "WFI and DDR Self Refresh",
-+	},
-+	.state_count = AT91_MAX_STATES,
-+};
-+
-+/* Initialize CPU idle by registering the idle states */
-+static int __init at91_init_cpuidle(void)
-+{
-+	return cpuidle_register(&at91_idle_driver, NULL);
-+}
-+
-+device_initcall(at91_init_cpuidle);
+Sascha
+
 -- 
-1.8.2.3
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
