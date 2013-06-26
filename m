@@ -1,39 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Jun 2013 23:23:50 +0200
-Subject: [PATCH 0/2] arm: add early_ioremap() support
-In-Reply-To: <20130626192352.GE9078@rocoto.smurfnet.nu>
-References: <1372182401-11029-1-git-send-email-leif.lindholm@linaro.org>
- <201306262052.09640.arnd@arndb.de> <20130626192352.GE9078@rocoto.smurfnet.nu>
-Message-ID: <201306262323.50691.arnd@arndb.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 26 Jun 2013 23:27:35 +0200
+Subject: [PATCH 2/8] clocksource: sun4i: Add clocksource and sched clock
+ drivers
+In-Reply-To: <1372281421-2099-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1372281421-2099-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <51CB5CC7.7000308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 June 2013, Leif Lindholm wrote:
-> On Wed, Jun 26, 2013 at 08:52:09PM +0200, Arnd Bergmann wrote:
-> > I made a similar suggestion to extending the use of fixmap recently, see
-> > "Re: SCU registers mapping for CA9/CA5 cores". Russell pointed out that
-> > fixmap is intentionally limited to just kmap_atomic uses at the moment
-> > and changing that would potentially have a significant impact when we
-> > run out of pages in the fixmap area.
->  
-> Is this an issue here, since (unlike x86) this early_ioremap only works
-> before paging_init()?
-
-The main problem is that the total fixmap size is only around 900kb,
-and we want to reserve at least 64kb per cpu for kmap_atomic.
-If you want to fit multiple 128kb mappings in there, you run out of
-space really fast.
-
-
-> > Extending the iotable mechanism on ARM would be the convenient
-> > solution for us I think.
+On 06/26/2013 11:16 PM, Maxime Ripard wrote:
+> The A10 and the A13 has a 64 bits free running counter that we can use
+> as a clocksource and a sched clock, that were both not used yet on these
+> platforms.
 > 
-> Could that easily be extended to give similar semantics sufficiently
-> that we can progress with merging more of the UEFI and ACPI support 
-> together as common code with x86/ia64?
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/clocksource/sun4i_timer.c | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+> 
+> diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
+> index bdf34d9..1d2eaa0 100644
+> --- a/drivers/clocksource/sun4i_timer.c
+> +++ b/drivers/clocksource/sun4i_timer.c
+> @@ -23,6 +23,8 @@
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+>  
+> +#include <asm/sched_clock.h>
+> +
+>  #define TIMER_IRQ_EN_REG	0x00
+>  #define TIMER_IRQ_EN(val)		BIT(val)
+>  #define TIMER_IRQ_ST_REG	0x04
+> @@ -34,6 +36,11 @@
+>  #define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
+>  
+>  #define TIMER_SCAL		16
+> +#define TIMER_CNT64_CTL_REG	0xa0
+> +#define TIMER_CNT64_CTL_CLR		BIT(0)
+> +#define TIMER_CNT64_CTL_RL		BIT(1)
+> +#define TIMER_CNT64_LOW_REG	0xa4
+> +#define TIMER_CNT64_HIGH_REG	0xa8
+>  
+>  static void __iomem *timer_base;
+>  
+> @@ -96,6 +103,20 @@ static struct irqaction sun4i_timer_irq = {
+>  	.dev_id = &sun4i_clockevent,
+>  };
+>  
+> +static u32 sun4i_timer_sched_read(void)
+> +{
+> +	u32 reg = readl(timer_base + TIMER_CNT64_CTL_REG);
+> +	writel(reg | TIMER_CNT64_CTL_RL, timer_base + TIMER_CNT64_CTL_REG);
+> +	while (readl(timer_base + TIMER_CNT64_CTL_REG) & TIMER_CNT64_CTL_REG);
 
-I don't know what the requirements are, but the idea with iotable
-is that the mappings stay around at run time, while it seems you want
-to discard them at some point.
+Isn't a cpu_relax missing here ?
 
-	Arnd
+> +
+> +	return readl(timer_base + TIMER_CNT64_LOW_REG);
+> +}
+> +
+> +static cycle_t sun4i_timer_clksrc_read(struct clocksource *c)
+> +{
+> +	return sun4i_timer_sched_read();
+> +}
+> +
+>  static void __init sun4i_timer_init(struct device_node *node)
+>  {
+>  	unsigned long rate = 0;
+> @@ -117,6 +138,12 @@ static void __init sun4i_timer_init(struct device_node *node)
+>  
+>  	rate = clk_get_rate(clk);
+>  
+> +	writel(TIMER_CNT64_CTL_CLR, timer_base + TIMER_CNT64_CTL_REG);
+> +	setup_sched_clock(sun4i_timer_sched_read, 32, clk_get_rate(clk));
+> +	clocksource_mmio_init(timer_base + TIMER_CNT64_LOW_REG, node->name,
+> +			      clk_get_rate(clk), 300, 32,
+> +			      sun4i_timer_clksrc_read);
+> +
+>  	writel(rate / (TIMER_SCAL * HZ),
+
+DIV_ROUND_CLOSEST(rate, (TIMER_SCAL * HZ)), ?
+
+>  	       timer_base + TIMER_INTVAL_REG(0));
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
