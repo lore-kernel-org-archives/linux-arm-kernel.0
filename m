@@ -1,49 +1,16 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 26 Jun 2013 01:15:32 -0700 (PDT)
-Subject: [RFC] ARM: shmobile: r8a7790: add thermal driver support
-In-Reply-To: <1372232164-31285-1-git-send-email-horms+renesas@verge.net.au>
-References: <1372232164-31285-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <87haglnv8j.wl%kuninori.morimoto.gx@renesas.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Jun 2013 09:14:09 +0100
+Subject: [PATCH 3/3] ARM: integrator: pciv3: do not remap IO so early
+In-Reply-To: <1372201560-26015-1-git-send-email-linus.walleij@linaro.org>
+References: <1372201560-26015-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20130626081409.GC2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jun 26, 2013 at 01:06:00AM +0200, Linus Walleij wrote:
+> Instead of remapping the IO memory very early with
+> pci_map_io_early(), use pci_ioremap_io() when setting
+> up resources as most PCI bridges do. Also request this
+> resource properly.
 
-Hi Simon
-
-> You can get current thermal by
-> > cat /sys/class/thermal/thermal_zone?/temp
-> 
-> Based on similar work for the r8a73a4 by Kuninori Morimoto.
-> 
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/mach-shmobile/setup-r8a7790.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> This patch is based on renesas-next-20130620
-> 
-> 
-> Hi Morimoto-san,
-> 
-> with this patch applied I see that the thermal driver is initialised,
-> but there seems to be some problem:
-> 
-> # dmesg | grep thermal
-> rcar_thermal rcar_thermal: thermal sensor was broken
-> rcar_thermal rcar_thermal: 1 sensor proved
-> 
-> Furthermore I see a negative temperature reading.
-> 
-> # cat /sys/devices/virtual/thermal/thermal_zone0/temp  
-> -65000
-> 
-> I am wondering if you have any insight into this.
-
-Hmm...
-Does your clock-r8a7790 has MSTP522 for thermal driver ?
-
-
-Best regards
----
-Kuninori Morimoto
+What impact does this have with a VGA card plugged in?
