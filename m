@@ -1,80 +1,35 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 26 Jun 2013 12:28:17 +0300
-Subject: [PATCH 14/23] iommu/tegra: smmu: Register platform_device to IOMMU
- dynamically
-Message-ID: <1372238906-9346-15-git-send-email-hdoyu@nvidia.com>
+Date: Wed, 26 Jun 2013 13:02:27 +0200
+Subject: [PATCH 03/23] ARM: dt: tegra30: iommu: Add "nvidia,memory-clients"
+In-Reply-To: <20130626101816.GE27083@manwe>
+References: <1372238906-9346-4-git-send-email-hdoyu@nvidia.com><20130626101816.GE27083@manwe>
+Message-ID: <20130626.140227.471410226520470110.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register platform_devices to IOMMU dynamically via
-ops->{add,remove}_device().
+Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 26 Jun 2013 12:18:17 +0200:
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- drivers/iommu/tegra-smmu.c | 37 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+> > diff --git a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
+> [...]
+> > @@ -23,3 +24,13 @@ Example:
+> >  		nvidia,swgroups = <0x00000000 0x000779ff>;
+> >  		nvidia,ahb = <&ahb>;
+> >  	};
+> > +
+> > +	host1x {
+> > +		compatible = "nvidia,tegra30-host1x", "simple-bus";
+> > +		nvidia,memory-clients = <SWGID_HC>;
+> 
+> And this could use the SWGID(HC) to match up with how GPIOs are
+> referenced in the DTS files. Though I see that the clocks don't use a
+> parameterized version either, so things are inconsistent anyway. But if
+> SWGID() isn't used then maybe it shouldn't be provided by the header
+> file in the first place.
 
-diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-index 1617c90..35f4a16 100644
---- a/drivers/iommu/tegra-smmu.c
-+++ b/drivers/iommu/tegra-smmu.c
-@@ -39,6 +39,7 @@
- 
- #include <asm/page.h>
- #include <asm/cacheflush.h>
-+#include <asm/dma-iommu.h>
- 
- enum smmu_hwgrp {
- 	HWGRP_AFI,
-@@ -949,6 +950,40 @@ static void smmu_iommu_domain_destroy(struct iommu_domain *domain)
- 	dev_dbg(smmu->dev, "smmu_as@%p\n", as);
- }
- 
-+/*
-+ * ASID[0] for the system default
-+ * ASID[1] for PPCS, which has SDMMC
-+ * ASID[2][3].. open for drivers, first come, first served.
-+ */
-+enum {
-+	SYSTEM_DEFAULT,
-+	SYSTEM_PROTECTED,
-+};
-+
-+static int smmu_iommu_add_device(struct device *dev)
-+{
-+	int err;
-+	struct dma_iommu_mapping *map = smmu_handle->map[SYSTEM_DEFAULT];
-+
-+	if (!map)
-+		goto out;
-+
-+	err = arm_iommu_attach_device(dev, map);
-+	if (err) {
-+		dev_err(dev, "Failed to attach to map %p\n", map);
-+		return err;
-+	}
-+out:
-+	dev_dbg(dev, "Attached to map %p\n", map);
-+	return 0;
-+}
-+
-+static void smmu_iommu_remove_device(struct device *dev)
-+{
-+	dev_dbg(dev, "Detaching from map %p\n", to_dma_iommu_mapping(dev));
-+	arm_iommu_detach_device(dev);
-+}
-+
- static struct iommu_ops smmu_iommu_ops = {
- 	.domain_init	= smmu_iommu_domain_init,
- 	.domain_destroy	= smmu_iommu_domain_destroy,
-@@ -958,6 +993,8 @@ static struct iommu_ops smmu_iommu_ops = {
- 	.unmap		= smmu_iommu_unmap,
- 	.iova_to_phys	= smmu_iommu_iova_to_phys,
- 	.domain_has_cap	= smmu_iommu_domain_has_cap,
-+	.add_device	= smmu_iommu_add_device,
-+	.remove_device	= smmu_iommu_remove_device,
- 	.pgsize_bitmap	= SMMU_IOMMU_PGSIZES,
- };
- 
--- 
-1.8.1.5
+I think that the above SWGID_* is still easier to understand which
+swgroup a device belongs to rather than raw number intuitively.
+
+> Oh, one other thing: both GPIO and CAR use the TEGRA_ prefix, perhaps
+> this should use it as well?
+
+Sounds quite reasonable to me.
