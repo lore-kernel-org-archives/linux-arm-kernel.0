@@ -1,102 +1,49 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 27 Jun 2013 08:48:07 +0900
-Subject: [PATCH] ARM: shmobile: Update romImage to relocate appended DTB
-Message-ID: <20130626234807.11425.24645.sendpatchset@w520>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Thu, 27 Jun 2013 01:25:06 +0200
+Subject: [PATCH 0/2] arm: add early_ioremap() support
+In-Reply-To: <201306270013.55333.arnd@arndb.de>
+References: <1372182401-11029-1-git-send-email-leif.lindholm@linaro.org>
+ <201306262323.50691.arnd@arndb.de>
+ <20130626213409.GA18151@rocoto.smurfnet.nu>
+ <201306270013.55333.arnd@arndb.de>
+Message-ID: <20130626232504.GB18151@rocoto.smurfnet.nu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
-
-Instead of relying of MACH_TYPE for board identification,
-update the romImage code to relocate an appended DTB to
-the beginning of RAM. This implementation is independent
-of ARM_APPENDED_DTB, this because it is necessary to copy
-the DTB to memory so the kernel can access it.
-
-Without this patch Mackerel does not boot via the Mask ROM
-over USB (r_usb_boot) - this since non-DT boot was broken
-ages ago in commit:
-
-0ce53cd ARM: mach-shmobile: Use DT_MACHINE for mackerel
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- Written against renesas-next-20130620
-
- arch/arm/boot/compressed/head-shmobile.S    |   43 ++++++++++++++++++++++++---
- arch/arm/mach-shmobile/include/mach/zboot.h |    2 -
- 2 files changed, 39 insertions(+), 6 deletions(-)
-
---- 0001/arch/arm/boot/compressed/head-shmobile.S
-+++ work/arch/arm/boot/compressed/head-shmobile.S	2013-06-26 13:27:39.000000000 +0900
-@@ -55,12 +55,47 @@ __tmp_stack:
- __continue:
- #endif /* CONFIG_ZBOOT_ROM_MMC || CONFIG_ZBOOT_ROM_SH_MOBILE_SDHI */
+On Thu, Jun 27, 2013 at 12:13:55AM +0200, Arnd Bergmann wrote:
+> > Sorry, I still don't get it. Are you saying that kmap_atomic is
+> > available before kmap_init() (in paging_init())?
+> > 
+> > If not, all of my mappings are discarded (well, abandoned to be more
+> > correct), so I don't see how it affects kmap.
+> 
+> Sorry, I was under the assumption that the mappings are meant to
+> stay around.
  
--	/* Set board ID necessary for boot */
--	ldr	r7, 1f				@ Set machine type register
--	mov	r8, #0				@ pass null pointer as atag
-+	adr	r0, dtb_info
-+	ldmia	r0, {r1, r3, r4, r5, r7}
-+
-+	sub	r0, r0, r1		@ calculate the delta offset
-+	add	r5, r5, r0		@ _edata
-+
-+	ldr	lr, [r5, #0]		@ check if valid DTB is present
-+	cmp	lr, r3
-+	bne	0f
-+
-+	add	r9, r7, #31		@ rounded up to a multiple
-+	bic	r9, r9, #31		@ ... of 32 bytes
-+
-+	add	r6, r9, r5		@ copy from _edata
-+	add	r9, r9, r4		@ to MEMORY_START
-+
-+1:	ldmdb	r6!, {r0 - r3, r10 - r12, lr}
-+	cmp	r6, r5
-+	stmdb	r9!, {r0 - r3, r10 - r12, lr}
-+	bhi	1b
-+
-+	/* Success: Zero board ID, pointer to start of memory for atag/dtb */
-+	mov	r7, #0
-+	mov	r8, r4
- 	b	2f
- 
--1 :	.long MACH_TYPE
-+	.align	2
-+dtb_info:
-+	.word	dtb_info
-+#ifndef __ARMEB__
-+	.word	0xedfe0dd0		@ sig is 0xd00dfeed big endian
-+#else
-+	.word	0xd00dfeed
-+#endif
-+	.word	MEMORY_START
-+	.word	_edata
-+	.word	0x4000			@ maximum DTB size
-+0:
-+	/* Failure: Zero board ID, NULL atag/dtb */
-+	mov 	r7, #0
-+	mov	r8, #0			@ pass null pointer as atag
- 2 :
- 
- #endif /* CONFIG_ZBOOT_ROM */
---- 0001/arch/arm/mach-shmobile/include/mach/zboot.h
-+++ work/arch/arm/mach-shmobile/include/mach/zboot.h	2013-06-26 13:23:03.000000000 +0900
-@@ -1,7 +1,6 @@
- #ifndef ZBOOT_H
- #define ZBOOT_H
- 
--#include <asm/mach-types.h>
- #include <mach/zboot_macros.h>
- 
- /**************************************************
-@@ -11,7 +10,6 @@
-  **************************************************/
- 
- #ifdef CONFIG_MACH_MACKEREL
--#define MACH_TYPE	MACH_TYPE_MACKEREL
- #define MEMORY_START	0x40000000
- #include "mach/head-mackerel.txt"
- #else
+Ok, just so I'm not completely lost :)
+
+No, the purpose is just like for x86 - do early parsing of things like
+the UEFI system and configuration tables, DMI and ACPI, in order to
+populate global structs and stuff.
+
+> > Indeed - almost immediately.
+> > 
+> > x86 early_ioremap can coexist with kmap; the intent of my
+> > implementation is to use the kmap region only before kmap is available.
+> 
+> So if you never plan to use fixmap and early_ioremap at the same time,
+> why even bother using the fixmap code? Wouldn't it be easier to just
+> use the same memory area and ensure we never use fixmap before 
+> we're done with early_ioremap?
+
+Well, I did have a crazy idea that much/most of the early_ioremap code
+could be made generic and shared between x86 and arm (and any other
+32-bit architecture). Using the fixmap macros would make that possible
+with a minimum of ifdefs.
+
+If we ever wanted early_ioremap() to work like on x86, beyond kmap_init()
+(but not beyond the "booting" system state), using the same macros would
+help there too. I had no need for that for my EFI patches.
+
+/
+    Leif
