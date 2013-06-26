@@ -1,61 +1,37 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 26 Jun 2013 12:18:17 +0200
-Subject: [PATCH 03/23] ARM: dt: tegra30: iommu: Add "nvidia,memory-clients"
-In-Reply-To: <1372238906-9346-4-git-send-email-hdoyu@nvidia.com>
-References: <1372238906-9346-4-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20130626101816.GE27083@manwe>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 26 Jun 2013 16:11:30 +0200
+Subject: [PATCH 2/4] x86: efi: break efi_lookup_mapped_addr out to
+ generic code
+In-Reply-To: <20130626133217.GO22026@console-pimps.org>
+References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
+ <1372183863-11333-3-git-send-email-leif.lindholm@linaro.org>
+ <20130626133217.GO22026@console-pimps.org>
+Message-ID: <20130626141130.GC9078@rocoto.smurfnet.nu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 12:28:06PM +0300, Hiroshi Doyu wrote:
-[...]
-> diff --git a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
-[...]
-> @@ -23,3 +24,13 @@ Example:
->  		nvidia,swgroups = <0x00000000 0x000779ff>;
->  		nvidia,ahb = <&ahb>;
->  	};
-> +
-> +	host1x {
-> +		compatible = "nvidia,tegra30-host1x", "simple-bus";
-> +		nvidia,memory-clients = <SWGID_HC>;
+On Wed, Jun 26, 2013 at 02:32:17PM +0100, Matt Fleming wrote:
+> On Tue, 25 Jun, at 07:11:01PM, Leif Lindholm wrote:
+> > efi_lookup_mapped_addr is a handy helper function for translating
+> > a physical address to the corresponding virtual one by scanning
+> > through memmap.map.
+> > 
+> > This patch breaks it out into a new file for use elsewhere.
+> > 
+> > Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> > ---
+> >  arch/x86/platform/efi/efi.c       |   28 ----------------------------
+> >  drivers/firmware/efi/Makefile     |    2 +-
+> >  drivers/firmware/efi/efi-helper.c |   33 +++++++++++++++++++++++++++++++++
+> >  3 files changed, 34 insertions(+), 29 deletions(-)
+> >  create mode 100644 drivers/firmware/efi/efi-helper.c
+> 
+> I'm not sure this function needs its own file. drivers/firmware/efi/efi.c
+> is a suitable place for this.
 
-And this could use the SWGID(HC) to match up with how GPIOs are
-referenced in the DTS files. Though I see that the clocks don't use a
-parameterized version either, so things are inconsistent anyway. But if
-SWGID() isn't used then maybe it shouldn't be provided by the header
-file in the first place.
+Sure.
+Would you be happy for me to start moving the other things mentioned
+(config table parsing, common debug printout, global structs) in there too?
 
-Oh, one other thing: both GPIO and CAR use the TEGRA_ prefix, perhaps
-this should use it as well?
-
-> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-[...]
-> index 14ec3f9..3fcee3f 100644
-> --- a/arch/arm/boot/dts/tegra30.dtsi
-> +++ b/arch/arm/boot/dts/tegra30.dtsi
-> @@ -1,5 +1,6 @@
->  #include <dt-bindings/clock/tegra30-car.h>
->  #include <dt-bindings/gpio/tegra-gpio.h>
-> +#include <dt-bindings/iommu/tegra-swgid.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-
-Nit: these includes seem to be ordered alphabetically; if so then iommu
-should go below interrupt-controller.
-
-> @@ -286,6 +300,7 @@
->  		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
->  		nvidia,dma-request-selector = <&apbdma 20>;
->  		clocks = <&tegra_car TEGRA30_CLK_UARTE>;
-> +		nvidia,memory-clients = <14>;
-
-SWGID_PPCS?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/d449a65f/attachment-0001.sig>
+/
+    Leif
