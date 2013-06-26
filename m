@@ -1,68 +1,129 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 26 Jun 2013 12:05:54 -0700
-Subject: [GIT PULL] KVM/ARM queue for 3.11
-Message-ID: <20130626190554.GB41132@lvm>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 26 Jun 2013 21:15:54 +0200
+Subject: [PATCH v2] ARM: clocksource: add support for MOXA ART SoCs
+In-Reply-To: <1372258383-24524-1-git-send-email-jonas.jensen@gmail.com>
+References: <1371549604-7201-1-git-send-email-jonas.jensen@gmail.com>
+ <1372258383-24524-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <CACRpkdZdmC=ur0FFxoDXAMzieutp2w4HXBDbgbeoSeVXeCgp9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gleb and Paolo,
+On Wed, Jun 26, 2013 at 4:53 PM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
 
-The following changes since commit 87d41fb4da6467622b7a87fd6afe8071abab6dae:
+> This patch adds an clocksource driver for the main timer(s)
+> found on MOXA ART SoCs.
+>
+> Changes since v2:
+>
+> 1. use clocksource/clockevents infrastructures
+> 2. clock frequency read from system clock
+>
+> Applies to next-20130619
+>
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 
-  KVM: s390: Fixed priority of execution in STSI (2013-06-20 23:33:01 +0200)
+This is starting to look good :-)
 
-are available in the git repository at:
+> +/* TIMER_CR flags:
+> +   TIMEREG_CR_1_CLOCK  0: PCLK, 1: EXT1CLK
+> +   TIMEREG_CR_1_INT    over flow interrupt enable bit */
 
-  git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-3.11
+/*
+ * Usually we use this comment style, one star at the beginning
+ * of every comment line and a closing star-slash sitting lonley
+ * on a single line to close it.
+ */
 
-for you to fetch changes up to 8bd4ffd6b3a98f00267051dc095076ea2ff06ea8:
+> +       case CLOCK_EVT_MODE_RESUME:
+> +       case CLOCK_EVT_MODE_ONESHOT:
+> +               u |= TIMEREG_CR_1_ENABLE;
+> +               writel(u, timer_base + TIMER_CR);
+> +               writel(~0, timer_base + TIMER1_LOAD);
 
-  ARM: kvm: don't include drivers/virtio/Kconfig (2013-06-26 10:50:06 -0700)
+Should you not write the load value *before* enabling the timer?
+
+> +               pr_debug("%s: CLOCK_EVT_MODE_ONESHOT\n", __func__);
+> +               break;
+
+This looks like you're enabling a tick far ahead in the future.
+For oneshot you should just trigger new events in .next_event(),
+I would just disable the timer for oneshot and enable it
+for each new event in .next_event() instead.
+
+> +       case CLOCK_EVT_MODE_PERIODIC:
+> +               u |= TIMEREG_CR_1_ENABLE;
+> +               writel(u, timer_base + TIMER_CR);
+> +               writel(clock_frequency / HZ, timer_base + TIMER1_LOAD);
+
+Use DIV_ROUND_CLOSEST(clock_frequency, HZ)
+
+> +               pr_debug("%s: CLOCK_EVT_MODE_PERIODIC\n", __func__);
+> +               break;
+> +       case CLOCK_EVT_MODE_UNUSED:
+> +       case CLOCK_EVT_MODE_SHUTDOWN:
+> +       default:
+> +               u &= ~TIMEREG_CR_1_ENABLE;
+
+I would do this also for Oneshot. Then enable it in
+.next_event().
+
+> +               writel(u, timer_base + TIMER_CR);
+> +               break;
 
 
-Thanks,
--Christoffer
+> +static int moxart_clkevt_next_event(unsigned long cycles,
+> +       struct clock_event_device *unused)
+> +{
+> +       u32 alarm = readl(timer_base + TIMER1_COUNT) - cycles;
+> +       writel(alarm, timer_base + TIMER1_MATCH1);
 
-----------------------------------------------------------------
-Anup Patel (1):
-      ARM: KVM: Allow host virt timer irq to be different from guest timer virt irq
+I would write TIMEREG_CR_1_ENABLE *here*. This way the
+timer is only strictly triggered when an event is queued.
 
-Arnd Bergmann (1):
-      ARM: kvm: don't include drivers/virtio/Kconfig
+> +static struct irqaction moxart_timer_irq = {
+> +       .name = "moxart-timer",
+> +       .flags = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
 
-Christoffer Dall (1):
-      Update MAINTAINERS: KVM/ARM work now funded by Linaro
+IRQF_DISABLED is pointless, remove it. Nowadays all IRQ handlers
+are called with interrupts disabled.
 
-Dave P Martin (1):
-      ARM: KVM: Don't handle PSCI calls via SMC
+Why do you need IRQF_IRQPOLL? That seems like more
+copy/paste luggade.
 
-Geoff Levand (1):
-      arm/kvm: Cleanup KVM_ARM_MAX_VCPUS logic
+> +       clock_frequency = APB_CLK;
+> +       /* it might be a good idea to have a default other than 0 for
+> +          clock_frequency, should any attempt at getting a valid
+> +          frequency fail, not that i see how it could, it probably could..
+> +          having it APB_CLK can certainly be wrong on some hardware,
+> +          why it is set again with the DT specific property: */
 
-Marc Zyngier (7):
-      ARM: KVM: remove dead prototype for __kvm_tlb_flush_vmid
-      ARM: KVM: use phys_addr_t instead of unsigned long long for HYP PGDs
-      ARM: KVM: don't special case PC when doing an MMIO
-      ARM: KVM: get rid of S2_PGD_SIZE
-      ARM: KVM: perform save/restore of PAR
-      ARM: KVM: add missing dsb before invalidating Stage-2 TLBs
-      ARM: KVM: clear exclusive monitor on all exception returns
+Seems overkill.
 
- MAINTAINERS                        |  4 ++--
- arch/arm/include/asm/kvm_arm.h     |  1 -
- arch/arm/include/asm/kvm_asm.h     | 24 ++++++++++++------------
- arch/arm/include/asm/kvm_emulate.h |  5 -----
- arch/arm/include/asm/kvm_host.h    |  9 +++++++--
- arch/arm/kvm/Kconfig               |  8 +++-----
- arch/arm/kvm/arm.c                 |  8 ++++----
- arch/arm/kvm/coproc.c              |  4 ++++
- arch/arm/kvm/handle_exit.c         |  3 ---
- arch/arm/kvm/interrupts.S          | 16 +++++++++++++++-
- arch/arm/kvm/interrupts_head.S     | 10 ++++++++--
- arch/arm/kvm/mmio.c                |  6 ------
- arch/arm/kvm/mmu.c                 |  3 ---
- arch/arm/kvm/psci.c                |  2 +-
- arch/arm/kvm/reset.c               | 12 ++++++++++++
- include/kvm/arm_arch_timer.h       |  4 ++++
- virt/kvm/arm/arch_timer.c          | 29 ++++++++++++++++++++---------
- 17 files changed, 92 insertions(+), 56 deletions(-)
+> +       ret = of_property_read_u32(node, "clock-frequency", &clock_frequency);
+> +       if (ret)
+> +               pr_err("%s: can't read clock-frequency DT property\n",
+> +                       node->full_name);
+
+I don't think it's apropriate to put clock frequencies into the device
+tree node as u32:s. Please use the clock framework exclusively.
+Now it's like three ways to get this frequency... what if all three
+are different :-P
+
+> +       clk = of_clk_get(node, 0);
+> +       if (IS_ERR(clk))
+> +               pr_err("%s: of_clk_get failed\n", __func__);
+
+bail out here?
+
+> +       else {
+> +               clock_frequency = clk_get_rate(clk);
+> +               pr_debug("%s: clk_get_rate=%u success\n", __func__,
+> +                       clock_frequency);
+> +       }
+
+Then you can  remove the else clause and de-indent this.
+
+The rest looks OK...
+
+Yours,
+Linus Walleij
