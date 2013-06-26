@@ -1,51 +1,40 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 26 Jun 2013 10:51:55 +0200
-Subject: [PATCH 3/5] ARM: at91: dt: rm9200ek: add spi support
-In-Reply-To: <1371472710-18535-3-git-send-email-plagnioj@jcrosoft.com>
-References: <20130617123645.GA21034@game.jcrosoft.org>
- <1371472710-18535-1-git-send-email-plagnioj@jcrosoft.com>
- <1371472710-18535-3-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <51CAABAB.5070408@atmel.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 26 Jun 2013 10:51:13 +0200
+Subject: [PATCH 4/4] arm: mxs: Add mxs internal temp sensor to cfa-10036
+In-Reply-To: <1372236673-20725-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1372236673-20725-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1372236673-20725-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/2013 14:38, Jean-Christophe PLAGNIOL-VILLARD :
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/imx28-cfa10036.dts | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-stacked on at91-3.11-dt
-
-Thanks
-
-> ---
->   arch/arm/boot/dts/at91rm9200ek.dts |   10 ++++++++++
->   1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
-> index 1405812..d2d72c3 100644
-> --- a/arch/arm/boot/dts/at91rm9200ek.dts
-> +++ b/arch/arm/boot/dts/at91rm9200ek.dts
-> @@ -53,6 +53,16 @@
->   				atmel,vbus-gpio = <&pioD 4 GPIO_ACTIVE_HIGH>;
->   				status = "okay";
->   			};
-> +
-> +			spi0: spi at fffe0000 {
-> +				status = "okay";
-> +				cs-gpios = <&pioA 3 0>, <0>, <0>, <0>;
-> +				mtd_dataflash at 0 {
-> +					compatible = "atmel,at45", "atmel,dataflash";
-> +					spi-max-frequency = <15000000>;
-> +					reg = <0>;
-> +				};
-> +			};
->   		};
->
->   		usb0: ohci at 00300000 {
->
-
-
+diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
+index 802e0e9..5afb945 100644
+--- a/arch/arm/boot/dts/imx28-cfa10036.dts
++++ b/arch/arm/boot/dts/imx28-cfa10036.dts
+@@ -95,7 +95,7 @@
+ 				status = "okay";
+ 			};
+ 
+-			lradc at 80050000 {
++			lradc: lradc at 80050000 {
+ 				status = "okay";
+ 			};
+ 		};
+@@ -121,4 +121,10 @@
+ 			default-state = "on";
+ 		};
+ 	};
++
++	temp {
++		compatible = "fsl,mxs-internal-temp";
++		io-channels = <&lradc 8>, <&lradc 9>;
++		io-channel-names = "min", "max";
++	};
+ };
 -- 
-Nicolas Ferre
+1.8.1.2
