@@ -1,240 +1,316 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 26 Jun 2013 17:57:08 +0200
-Subject: [PATCHv2 2/3] ARM: mxs: dt: Add Crystalfontz CFA-10056 device tree
-In-Reply-To: <1372261232-21051-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1372261232-21051-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1372261232-21051-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20130626155708.GG5803@lukather>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 26 Jun 2013 12:15:42 +0200
+Subject: [PATCH 3/8] ARM: imx: move cpuidle drivers to drivers/cpuidle/
+In-Reply-To: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1372241747-21083-4-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 05:40:31PM +0200, Alexandre Belloni wrote:
-> From: Brian Lilly <brian@crystalfontz.com>
-> 
-> The CFA-10056 is a breakout board for the CFA-10036, and is
-> basically a CFA-10037, with a 4.3" screen.
-> 
-> Signed-off-by: Brian Lilly <brian@crystalfontz.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/Makefile           |   1 +
->  arch/arm/boot/dts/imx28-cfa10056.dts | 171 +++++++++++++++++++++++++++++++++++
->  2 files changed, 172 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx28-cfa10056.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 225d939..d494f37 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -131,6 +131,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
->  	imx28-cfa10037.dtb \
->  	imx28-cfa10049.dtb \
->  	imx28-cfa10055.dtb \
-> +	imx28-cfa10056.dtb \
->  	imx28-cfa10057.dtb \
->  	imx28-evk.dtb \
->  	imx28-m28evk.dtb \
-> diff --git a/arch/arm/boot/dts/imx28-cfa10056.dts b/arch/arm/boot/dts/imx28-cfa10056.dts
-> new file mode 100644
-> index 0000000..dd6d217
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx28-cfa10056.dts
-> @@ -0,0 +1,171 @@
-> +/*
-> + * Copyright 2013 Free Electrons
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/*
-> + * The CFA-10056 is an expansion board for the CFA-10036 module, thus we
-> + * need to include the CFA-10036 DTS.
-> + */
-> +/include/ "imx28-cfa10036.dts"
-> +
-> +/ {
-> +	model = "Crystalfontz CFA-10056 Board";
-> +	compatible = "crystalfontz,cfa10056", "crystalfontz,cfa10036", "fsl,imx28";
-> +
-> +	apb at 80000000 {
-> +		apbh at 80000000 {
-> +			pinctrl at 80018000 {
-> +				pinctrl-names = "default", "default";
-> +				pinctrl-1 = <&hog_pins_cfa10056
-> +					&hog_pins_cfa10056_pullup>;
-> +
-> +				hog_pins_cfa10056: hog-10056 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						0x0073 /* MX28_PAD_GPMI_D7__GPIO_0_7 */
-> +						0x2153 /* MX28_PAD_SSP2_D5__GPIO_2_21 */
-> +						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
-> +					>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
+While at it:
+- remove needless "cpuidle.h" include from cpuidle-imx6q.c
+- fix whitespace issue in cpuidle-imx6q.c
 
-These hogs pins don't have much sense anymore.
+Compile tested only.
 
-Maybe you should split out the three pins in:
-  - usb_pins_cfa10056
-  - mac0_pins_cfa10056
-  - move the last one in spi2_pins_cfa10056
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/mach-imx/Makefile        |  5 ---
+ arch/arm/mach-imx/cpuidle-imx5.c  | 37 -------------------
+ arch/arm/mach-imx/cpuidle-imx6q.c | 75 ---------------------------------------
+ drivers/cpuidle/Makefile          |  8 +++++
+ drivers/cpuidle/cpuidle-imx5.c    | 37 +++++++++++++++++++
+ drivers/cpuidle/cpuidle-imx6q.c   | 74 ++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 119 insertions(+), 117 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/cpuidle-imx5.c
+ delete mode 100644 arch/arm/mach-imx/cpuidle-imx6q.c
+ create mode 100644 drivers/cpuidle/cpuidle-imx5.c
+ create mode 100644 drivers/cpuidle/cpuidle-imx6q.c
 
-> +
-> +				hog_pins_cfa10056_pullup: hog-10056-pullup at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						0x31e3 /* MX28_PAD_LCD_RESET__GPIO_3_30 */
-> +					>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <1>;
-> +				};
-
-You could probably rename it to lcdif_pins_cfa10056_pullups or something
-then, and make the lcdif driver grab these pins.
-
-> +
-> +				spi2_pins_cfa10056: spi2-cfa10056 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						0x2103 /* MX28_PAD_SSP2_SCK__GPIO_2_16 */
-> +						0x2113 /* MX28_PAD_SSP2_CMD__GPIO_2_17 */
-> +						0x2123 /* MX28_PAD_SSP2_D0__GPIO_2_18 */
-> +					>;
-> +					fsl,drive-strength = <1>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <1>;
-> +				};
-> +
-> +				lcdif_pins_cfa10056: lcdif-evk at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						0x1181 /* MX28_PAD_LCD_RD_E__LCD_VSYNC */
-> +						0x1191 /* MX28_PAD_LCD_WR_RWN__LCD_HSYNC */
-> +						0x11a1 /* MX28_PAD_LCD_RS__LCD_DOTCLK */
-> +						0x11b1 /* MX28_PAD_LCD_CS__LCD_ENABLE */
-> +					>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +			};
-> +
-> +			lcdif at 80030000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&lcdif_24bit_pins_a
-> +						 &lcdif_pins_cfa10056>;
-> +				display = <&display>;
-> +				status = "okay";
-> +
-> +				display: display {
-> +					bits-per-pixel = <32>;
-> +					bus-width = <24>;
-> +
-> +					display-timings {
-> +						native-mode = <&timing0>;
-> +						timing0: timing0 {
-> +							clock-frequency = <32000000>;
-> +							hactive = <480>;
-> +							vactive = <800>;
-> +							hback-porch = <2>;
-> +							hfront-porch = <2>;
-> +							vback-porch = <2>;
-> +							vfront-porch = <2>;
-> +							hsync-len = <5>;
-> +							vsync-len = <5>;
-> +							hsync-active = <0>;
-> +							vsync-active = <0>;
-> +							de-active = <1>;
-> +							pixelclk-active = <1>;
-> +						};
-> +					};
-> +				};
-> +			};
-> +		};
-> +
-> +		apbx at 80040000 {
-> +			usbphy1: usbphy at 8007e000 {
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +
-> +	ahb at 80080000 {
-> +		usb1: usb at 80090000 {
-> +			vbus-supply = <&reg_usb1_vbus>;
-> +			pinctrl-0 = <&usbphy1_pins_a>;
-> +			pinctrl-names = "default";
-> +			status = "okay";
-> +		};
-> +	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +
-> +		reg_usb1_vbus: usb1_vbus {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "usb1_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio0 7 1>;
-> +		};
-> +	};
-> +
-> +	ahb at 80080000 {
-> +		mac0: ethernet at 800f0000 {
-> +			phy-mode = "rmii";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&mac0_pins_a>;
-> +			phy-reset-gpios = <&gpio2 21 0>;
-> +			phy-reset-duration = <100>;
-> +			status = "okay";
-> +		};
-> +	};
-> +
-> +	spi2 {
-> +		compatible = "spi-gpio";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&spi2_pins_cfa10056>;
-> +		status = "okay";
-> +		gpio-sck = <&gpio2 16 0>;
-> +		gpio-mosi = <&gpio2 17 0>;
-> +		gpio-miso = <&gpio2 18 0>;
-> +		cs-gpios = <&gpio3 5 0>;
-> +		num-chipselects = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		hx8369: hx8369 at 0 {
-> +			compatible = "himax,hx8369a", "himax,hx8369";
-> +			reg = <0>;
-> +			spi-max-frequency = <100000>;
-> +			spi-cpol;
-> +			spi-cpha;
-> +			gpios-reset = <&gpio3 30 0>;
-> +		};
-> +	};
-> +};
-> -- 
-> 1.8.1.2
-> 
-
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index e20f22d..4affcbb 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -26,11 +26,6 @@ obj-$(CONFIG_MXC_AVIC) += avic.o
+ obj-$(CONFIG_MXC_USE_EPIT) += epit.o
+ obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+ 
+-ifeq ($(CONFIG_CPU_IDLE),y)
+-obj-$(CONFIG_SOC_IMX5) += cpuidle-imx5.o
+-obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
+-endif
+-
+ ifdef CONFIG_SND_IMX_SOC
+ obj-y += ssi-fiq.o
+ obj-y += ssi-fiq-ksym.o
+diff --git a/arch/arm/mach-imx/cpuidle-imx5.c b/arch/arm/mach-imx/cpuidle-imx5.c
+deleted file mode 100644
+index 5a47e3c..0000000
+--- a/arch/arm/mach-imx/cpuidle-imx5.c
++++ /dev/null
+@@ -1,37 +0,0 @@
+-/*
+- * Copyright (C) 2012 Freescale Semiconductor, Inc.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/cpuidle.h>
+-#include <linux/module.h>
+-#include <asm/system_misc.h>
+-
+-static int imx5_cpuidle_enter(struct cpuidle_device *dev,
+-			      struct cpuidle_driver *drv, int index)
+-{
+-	arm_pm_idle();
+-	return index;
+-}
+-
+-static struct cpuidle_driver imx5_cpuidle_driver = {
+-	.name             = "imx5_cpuidle",
+-	.owner            = THIS_MODULE,
+-	.states[0] = {
+-		.enter            = imx5_cpuidle_enter,
+-		.exit_latency     = 2,
+-		.target_residency = 1,
+-		.flags            = CPUIDLE_FLAG_TIME_VALID,
+-		.name             = "IMX5 SRPG",
+-		.desc             = "CPU state retained,powered off",
+-	},
+-	.state_count = 1,
+-};
+-
+-int __init imx5_cpuidle_init(void)
+-{
+-	return cpuidle_register(&imx5_cpuidle_driver, NULL);
+-}
+diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
+deleted file mode 100644
+index 23ddfb6..0000000
+--- a/arch/arm/mach-imx/cpuidle-imx6q.c
++++ /dev/null
+@@ -1,75 +0,0 @@
+-/*
+- * Copyright (C) 2012 Freescale Semiconductor, Inc.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/cpuidle.h>
+-#include <linux/module.h>
+-#include <asm/cpuidle.h>
+-#include <asm/proc-fns.h>
+-
+-#include "common.h"
+-#include "cpuidle.h"
+-
+-static atomic_t master = ATOMIC_INIT(0);
+-static DEFINE_SPINLOCK(master_lock);
+-
+-static int imx6q_enter_wait(struct cpuidle_device *dev,
+-			    struct cpuidle_driver *drv, int index)
+-{
+-	if (atomic_inc_return(&master) == num_online_cpus()) {
+-		/*
+-		 * With this lock, we prevent other cpu to exit and enter
+-		 * this function again and become the master.
+-		 */
+-		if (!spin_trylock(&master_lock))
+-			goto idle;
+-		imx6q_set_lpm(WAIT_UNCLOCKED);
+-		cpu_do_idle();
+-		imx6q_set_lpm(WAIT_CLOCKED);
+-		spin_unlock(&master_lock);
+-		goto done;
+-	}
+-
+-idle:
+-	cpu_do_idle();
+-done:
+-	atomic_dec(&master);
+-
+-	return index;
+-}
+-
+-static struct cpuidle_driver imx6q_cpuidle_driver = {
+-	.name = "imx6q_cpuidle",
+-	.owner = THIS_MODULE,
+-	.states = {
+-		/* WFI */
+-		ARM_CPUIDLE_WFI_STATE,
+-		/* WAIT */
+-		{
+-			.exit_latency = 50,
+-			.target_residency = 75,
+-			.flags = CPUIDLE_FLAG_TIME_VALID |
+-			         CPUIDLE_FLAG_TIMER_STOP,
+-			.enter = imx6q_enter_wait,
+-			.name = "WAIT",
+-			.desc = "Clock off",
+-		},
+-	},
+-	.state_count = 2,
+-	.safe_state_index = 0,
+-};
+-
+-int __init imx6q_cpuidle_init(void)
+-{
+-	/* Need to enable SCU standby for entering WAIT modes */
+-	imx_scu_standby_enable();
+-
+-	/* Set chicken bit to get a reliable WAIT mode support */
+-	imx6q_set_chicken_bit();
+-
+-	return cpuidle_register(&imx6q_cpuidle_driver, NULL);
+-}
+diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+index 3bbb828..9bacf85 100644
+--- a/drivers/cpuidle/Makefile
++++ b/drivers/cpuidle/Makefile
+@@ -13,4 +13,12 @@ ifeq ($(CONFIG_ARCH_DAVINCI),y)
+ 	obj-y += cpuidle-davinci.o
+ endif
+ obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
++ifeq ($(CONFIG_ARCH_MXC),y)
++	ifeq ($(CONFIG_SOC_IMX5),y)
++		obj-y += cpuidle-imx5.o
++	endif
++	ifeq ($(CONFIG_SOC_IMX6Q),y)
++		obj-y += cpuidle-imx6q.o
++	endif
++endif
+ obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
+diff --git a/drivers/cpuidle/cpuidle-imx5.c b/drivers/cpuidle/cpuidle-imx5.c
+new file mode 100644
+index 0000000..5a47e3c
+--- /dev/null
++++ b/drivers/cpuidle/cpuidle-imx5.c
+@@ -0,0 +1,37 @@
++/*
++ * Copyright (C) 2012 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/cpuidle.h>
++#include <linux/module.h>
++#include <asm/system_misc.h>
++
++static int imx5_cpuidle_enter(struct cpuidle_device *dev,
++			      struct cpuidle_driver *drv, int index)
++{
++	arm_pm_idle();
++	return index;
++}
++
++static struct cpuidle_driver imx5_cpuidle_driver = {
++	.name             = "imx5_cpuidle",
++	.owner            = THIS_MODULE,
++	.states[0] = {
++		.enter            = imx5_cpuidle_enter,
++		.exit_latency     = 2,
++		.target_residency = 1,
++		.flags            = CPUIDLE_FLAG_TIME_VALID,
++		.name             = "IMX5 SRPG",
++		.desc             = "CPU state retained,powered off",
++	},
++	.state_count = 1,
++};
++
++int __init imx5_cpuidle_init(void)
++{
++	return cpuidle_register(&imx5_cpuidle_driver, NULL);
++}
+diff --git a/drivers/cpuidle/cpuidle-imx6q.c b/drivers/cpuidle/cpuidle-imx6q.c
+new file mode 100644
+index 0000000..01b8622
+--- /dev/null
++++ b/drivers/cpuidle/cpuidle-imx6q.c
+@@ -0,0 +1,74 @@
++/*
++ * Copyright (C) 2012 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/cpuidle.h>
++#include <linux/module.h>
++#include <asm/cpuidle.h>
++#include <asm/proc-fns.h>
++
++#include "../../arch/arm/mach-imx/common.h"
++
++static atomic_t master = ATOMIC_INIT(0);
++static DEFINE_SPINLOCK(master_lock);
++
++static int imx6q_enter_wait(struct cpuidle_device *dev,
++			    struct cpuidle_driver *drv, int index)
++{
++	if (atomic_inc_return(&master) == num_online_cpus()) {
++		/*
++		 * With this lock, we prevent other cpu to exit and enter
++		 * this function again and become the master.
++		 */
++		if (!spin_trylock(&master_lock))
++			goto idle;
++		imx6q_set_lpm(WAIT_UNCLOCKED);
++		cpu_do_idle();
++		imx6q_set_lpm(WAIT_CLOCKED);
++		spin_unlock(&master_lock);
++		goto done;
++	}
++
++idle:
++	cpu_do_idle();
++done:
++	atomic_dec(&master);
++
++	return index;
++}
++
++static struct cpuidle_driver imx6q_cpuidle_driver = {
++	.name = "imx6q_cpuidle",
++	.owner = THIS_MODULE,
++	.states = {
++		/* WFI */
++		ARM_CPUIDLE_WFI_STATE,
++		/* WAIT */
++		{
++			.exit_latency = 50,
++			.target_residency = 75,
++			.flags = CPUIDLE_FLAG_TIME_VALID |
++				 CPUIDLE_FLAG_TIMER_STOP,
++			.enter = imx6q_enter_wait,
++			.name = "WAIT",
++			.desc = "Clock off",
++		},
++	},
++	.state_count = 2,
++	.safe_state_index = 0,
++};
++
++int __init imx6q_cpuidle_init(void)
++{
++	/* Need to enable SCU standby for entering WAIT modes */
++	imx_scu_standby_enable();
++
++	/* Set chicken bit to get a reliable WAIT mode support */
++	imx6q_set_chicken_bit();
++
++	return cpuidle_register(&imx6q_cpuidle_driver, NULL);
++}
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/f0def45b/attachment-0001.sig>
+1.8.2.3
