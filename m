@@ -1,65 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Jun 2013 18:54:30 +0100
-Subject: ARM pagetable setting in Linux
-In-Reply-To: <20130626171649.GG10333@mudshark.cambridge.arm.com>
-References: <35FD53F367049845BC99AC72306C23D19441BF5863@CNBJMBX05.corpusers.net>
- <20130626171649.GG10333@mudshark.cambridge.arm.com>
-Message-ID: <20130626175430.GH2718@n2100.arm.linux.org.uk>
+From: lho@apm.com (Loc Ho)
+Date: Wed, 26 Jun 2013 11:56:08 -0600
+Subject: [PATCH v5 0/3] clk: Add APM X-Gene SoC clock driver
+Message-ID: <1372269371-22992-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As I don't have the original mail (because it wasn't copied to the right
-list) I can't reply to the original author, so I'll do it like this
-instead.
+This patch adds APM X-Gene SoC clock driver support. Reference,
+PCP PLL, SoC PCP, and Ethernet clocks are defined via the DTS.
 
-On Wed, Jun 26, 2013 at 06:16:49PM +0100, Will Deacon wrote:
-> [adding the ARM list -- please try and remember to do that in future]
-> 
-> On Wed, Jun 26, 2013 at 03:41:40AM +0100, Wang, Yalin wrote:
-> > Hi  Will,
-> 
-> Hello,
-> 
-> > I have a question about  arm pagetable setting in Linux .
-> > 
-> > From armV6,  there is TTBR0 and TTBR1  translation base address registers  in mmu .
-> > But I  found linux only use TTBR0 for translation base address ,
-> > Could we use TTBR0 and TTBR1 to split user task and kernel pagetables (swapper_pg_dir)? 
+-v5:
+ * Remove duplicate code for soc/pcp clk init function
+ * Remove un-used flags field from structure
+ * Merge error handler code for device clock init function
+ * Update binding documentation
 
-We don't use TTBR1 because the configurable page table splits between
-TTBR0 and TTBR1 are not appropriate for Linux kernels.  The common
-configuration is to have 3GB of userspace and 1GB of kernel space.
+-v4:
+ * Remove flags from DTS and check status instead
+ * Change DTS reg entry to be identified by reg-names property
 
-However, the TTBR splits supported are 2GB, 1GB, 512MB etc.  As I had
-prior knowledge of ARMv6 before it was released, I raised this point
-with ARM Ltd because I knew that it would not be appropriate for Linux.
-Unfortunately, the response was basically that they didn't want to know.
-So, as the hardware provided support mismatches what we want, we don't
-use the feature.
+-v3:
+ * Make DTS compatible type for SoC PLL and PCP PLL
+ * Make use of of_iomap instead direct ioremap call
+ * Make kzalloc with variable instead structure
+ * Remove DTS binding for fixed-clock and fixed_factor_clock
+ * Remove unnecessary arch_initcall
 
-It's as simple as that; had we been listened to and the architecture
-altered to do what we required, then we'd be using it...
+-v2:
+ * Make depends on ARM64
+ * Fix duplicate registration
 
-> > 1. Because we don?t need copy kernel first ?level pagetables into every 
-> > User task?s pagetables and flush tlb (for example fork() a new process).
-> 
-> Well, you still need the TLB maintenance for setting up CoW, so this win is
-> probably not very big.
-> 
-> > 2. And don?t need handle kernel page fault because that user task?s kernel 
-> > Pagetable when it is not set up , need copy again( for example vmalloc()  ioremap()  kmap()  will change 
-> > Kernel pagetables and need update to every task pagetables ) .
-> 
-> Is that really a fastpath?
+-v1 - Initial post 
 
-No it isn't, because for all of the above cases we're talking about copying
-L1 page table entries, not the individual L2 page table entries between
-threads.
+Loc Ho (3):
+  clk: Add APM X-Gene SoC clock driver for reference, PLL, and device
+    clocks.
+  clk: arm64: Add DTS clock entry for APM X-Gene Storm SoC with
+    reference to
+  Documentation: Add documentation for APM X-Gene clock binding with
+    PLL and
 
-Every page table above TASK_SIZE gets shared between processes, and once
-it's been shared to a process, any new process forked from that gets its
-own pointer to that 2nd level page table immediately.
-
-So, during the initial boot there will be a number of the L1 copies, but
-the system will stabilize and there will be no further L1 faulted copies
-needed.
+ Documentation/devicetree/bindings/clock/xgene.txt |  111 +++++
+ arch/arm64/boot/dts/apm-storm.dtsi                |   75 +++
+ drivers/clk/Kconfig                               |    7 +
+ drivers/clk/Makefile                              |    1 +
+ drivers/clk/clk-xgene.c                           |  521 +++++++++++++++++++++
+ 5 files changed, 715 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/xgene.txt
+ create mode 100644 drivers/clk/clk-xgene.c
