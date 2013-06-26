@@ -1,31 +1,72 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 26 Jun 2013 17:06:36 +0530
-Subject: [PATCH 1/2] ARM: EXYNOS: Remove combiner_init declaration
-Message-ID: <1372246597-32323-1-git-send-email-sachin.kamat@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 26 Jun 2013 17:17:35 +0530
+Subject: [PATCH v9 7/8] usb: phy: omap-usb2: remove *set_suspend* callback
+ from omap-usb2
+In-Reply-To: <1372247257-30186-1-git-send-email-kishon@ti.com>
+References: <1372247257-30186-1-git-send-email-kishon@ti.com>
+Message-ID: <1372247257-30186-8-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit d243997f ("ARM: EXYNOS: Remove legacy interrupt initialization
-code") removed the call to combiner_init(). Since there are no more
-users in the machine code, remove the declaration as well.
+Now that omap-usb2 is adapted to the new generic PHY framework,
+*set_suspend* ops can be removed from omap-usb2 driver.
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- arch/arm/mach-exynos/common.h |    2 --
- 1 file changed, 2 deletions(-)
+ drivers/usb/phy/phy-omap-usb2.c |   25 -------------------------
+ 1 file changed, 25 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 3e156bc..c4abde2 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -72,8 +72,6 @@ void exynos4212_register_clocks(void);
- #endif
+diff --git a/drivers/usb/phy/phy-omap-usb2.c b/drivers/usb/phy/phy-omap-usb2.c
+index 751b30f..3f2b125 100644
+--- a/drivers/usb/phy/phy-omap-usb2.c
++++ b/drivers/usb/phy/phy-omap-usb2.c
+@@ -97,29 +97,6 @@ static int omap_usb_set_peripheral(struct usb_otg *otg,
+ 	return 0;
+ }
  
- struct device_node;
--void combiner_init(void __iomem *combiner_base, struct device_node *np,
--			unsigned int max_nr, int irq_base);
+-static int omap_usb2_suspend(struct usb_phy *x, int suspend)
+-{
+-	u32 ret;
+-	struct omap_usb *phy = phy_to_omapusb(x);
+-
+-	if (suspend && !phy->is_suspended) {
+-		omap_control_usb_phy_power(phy->control_dev, 0);
+-		pm_runtime_put_sync(phy->dev);
+-		phy->is_suspended = 1;
+-	} else if (!suspend && phy->is_suspended) {
+-		ret = pm_runtime_get_sync(phy->dev);
+-		if (ret < 0) {
+-			dev_err(phy->dev, "get_sync failed with err %d\n",
+-									ret);
+-			return ret;
+-		}
+-		omap_control_usb_phy_power(phy->control_dev, 1);
+-		phy->is_suspended = 0;
+-	}
+-
+-	return 0;
+-}
+-
+ static int omap_usb_power_off(struct phy *x)
+ {
+ 	struct omap_usb *phy = phy_get_drvdata(x);
+@@ -167,7 +144,6 @@ static int omap_usb2_probe(struct platform_device *pdev)
  
- extern struct smp_operations exynos_smp_ops;
+ 	phy->phy.dev		= phy->dev;
+ 	phy->phy.label		= "omap-usb2";
+-	phy->phy.set_suspend	= omap_usb2_suspend;
+ 	phy->phy.otg		= otg;
+ 	phy->phy.type		= USB_PHY_TYPE_USB2;
  
+@@ -182,7 +158,6 @@ static int omap_usb2_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
+-	phy->is_suspended	= 1;
+ 	omap_control_usb_phy_power(phy->control_dev, 0);
+ 
+ 	otg->set_host		= omap_usb_set_host;
 -- 
-1.7.9.5
+1.7.10.4
