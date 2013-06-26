@@ -1,51 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 26 Jun 2013 23:16:57 +0200
-Subject: [PATCH 4/8] clocksource: sun4i: Fix the next event code
-In-Reply-To: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1372281421-2099-5-git-send-email-maxime.ripard@free-electrons.com>
+Date: Wed, 26 Jun 2013 23:16:53 +0200
+Subject: [PATCH 0/8] clocksource: sunxi: Timer fixes and cleanup
+Message-ID: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The next_event logic was setting the next interval to fire in the
-current timer value instead of the interval value register, which is
-obviously wrong. Plus the logic to set the actual value was wrong as
-well, so this code has always been broken.
+Hi everyone,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clocksource/sun4i_timer.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+The first timer code we merged when adding support for the A13 some time back
+was mostly a clean up from the source drop we had, without any documentation.
+This happened to work, but the code merged in turned out to be far from
+perfect, and had several flaws.
 
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 8bd66df..032e504 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -16,6 +16,7 @@
+This patchset hopefully fixes these flaws, and cleanup most of the driver as
+well, to end up in an almost complete rewrite of it (even though it's not that
+long).
+
+It also finally adds a clocksource from the free running counter found in the
+A10/A13 SoCs.
+
+These flaws have all been spotted when trying to add the A31 support, work that
+is still ongoing, but will hopefully benefit from this patchset as well.
+
+Thanks,
+Maxime
  
- #include <linux/clk.h>
- #include <linux/clockchips.h>
-+#include <linux/delay.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/irqreturn.h>
-@@ -69,9 +70,14 @@ static void sun4i_clkevt_mode(enum clock_event_mode mode,
- static int sun4i_clkevt_next_event(unsigned long evt,
- 				   struct clock_event_device *unused)
- {
--	u32 u = readl(timer_base + TIMER_CTL_REG(0));
--	writel(evt, timer_base + TIMER_CNTVAL_REG(0));
--	writel(u | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
-+	u32 val = readl(timer_base + TIMER_CTL_REG(0));
-+	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
-+	udelay(1);
-+
-+	writel(evt, timer_base + TIMER_INTVAL_REG(0));
-+
-+	val = readl(timer_base + TIMER_CTL_REG(0));
-+	writel(val | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
- 	       timer_base + TIMER_CTL_REG(0));
- 
- 	return 0;
+Maxime Ripard (8):
+  clocksource: sun4i: Use the BIT macros where possible
+  clocksource: sun4i: Add clocksource and sched clock drivers
+  clocksource: sun4i: Don't forget to enable the clock we use
+  clocksource: sun4i: Fix the next event code
+  clocksource: sun4i: Factor out some timer code
+  clocksource: sun4i: Remove TIMER_SCAL variable
+  clocksource: sun4i: Cleanup parent clock setup
+  clocksource: sun4i: Fix bug when switching from periodic to oneshot
+    modes
+
+ drivers/clocksource/sun4i_timer.c | 107 ++++++++++++++++++++++++++------------
+ 1 file changed, 75 insertions(+), 32 deletions(-)
+
 -- 
 1.8.3.1
