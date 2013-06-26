@@ -1,22 +1,61 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Wed, 26 Jun 2013 15:40:42 +0100
-Subject: [PATCH 2/4] x86: efi: break efi_lookup_mapped_addr out to
- generic code
-In-Reply-To: <20130626141130.GC9078@rocoto.smurfnet.nu>
-References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
- <1372183863-11333-3-git-send-email-leif.lindholm@linaro.org>
- <20130626133217.GO22026@console-pimps.org>
- <20130626141130.GC9078@rocoto.smurfnet.nu>
-Message-ID: <20130626144042.GS22026@console-pimps.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 26 Jun 2013 09:39:47 -0500
+Subject: [-next PATCH 2/2] ARM: scu: provide inline dummy functions when SCU
+ is not present
+In-Reply-To: <1372257587-21720-1-git-send-email-nm@ti.com>
+References: <1372257587-21720-1-git-send-email-nm@ti.com>
+Message-ID: <1372257587-21720-3-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jun, at 04:11:30PM, Leif Lindholm wrote:
-> Sure.
-> Would you be happy for me to start moving the other things mentioned
-> (config table parsing, common debug printout, global structs) in there too?
+On platforms such as Cortex-A15 based OMAP5, SCU is not used, however
+since much code is shared between Cortex-A9 based OMAP4 (which uses
+SCU) and OMAP5, It does help to have inline functions returning error
+values when SCU is not present on the platform.
 
-Super, super happy.
+arch/arm/mach-omap2/omap-smp.c which is common between OMAP4 and 5
+handles the SCU usage only for OMAP4.
 
+This fixes the following build failure with OMAP5 only build:
+arch/arm/mach-omap2/built-in.o: In function `omap4_smp_init_cpus':
+arch/arm/mach-omap2/omap-smp.c:185: undefined reference to `scu_get_core_count'
+arch/arm/mach-omap2/built-in.o: In function `omap4_smp_prepare_cpus':
+arch/arm/mach-omap2/omap-smp.c:211: undefined reference to `scu_enable'
+
+Reported-by: Pekon Gupta <pekon@ti.com>
+Reported-by: Vincent Stehl? <v-stehle@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/include/asm/smp_scu.h |   13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+index 18d1693..433f9d9 100644
+--- a/arch/arm/include/asm/smp_scu.h
++++ b/arch/arm/include/asm/smp_scu.h
+@@ -23,10 +23,21 @@ static inline unsigned long scu_a9_get_base(void)
+ 	return pa;
+ }
+ 
++#ifdef CONFIG_HAVE_ARM_SCU
+ unsigned int scu_get_core_count(void __iomem *);
+ int scu_power_mode(void __iomem *, unsigned int);
++#else
++static inline unsigned int scu_get_core_count(void __iomem *scu_base)
++{
++	return 0;
++}
++static inline int scu_power_mode(void __iomem *scu_base, unsigned int mode)
++{
++	return -EINVAL;
++}
++#endif
+ 
+-#ifdef CONFIG_SMP
++#if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
+ void scu_enable(void __iomem *scu_base);
+ #else
+ static inline void scu_enable(void __iomem *scu_base) {}
 -- 
-Matt Fleming, Intel Open Source Technology Center
+1.7.9.5
