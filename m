@@ -1,46 +1,41 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 27 Jun 2013 00:21:20 +0530
-Subject: [GIT PULL] DaVinci DT updates for v3.11
-Message-ID: <51CB3828.6060407@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Jun 2013 20:52:09 +0200
+Subject: [PATCH 0/2] arm: add early_ioremap() support
+In-Reply-To: <1372182401-11029-1-git-send-email-leif.lindholm@linaro.org>
+References: <1372182401-11029-1-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <201306262052.09640.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Tuesday 25 June 2013, Leif Lindholm wrote:
+> x86 and ia64 have the early_ioremap()/early_iounmap() functions, which are
+> useful for supporting things like UEFI, ACPI and SMBIOS, where configuration
+> tables need to be parsed before proper memory management is available,
+> regardless of highmem status.
+> 
+> This patchset implements a restricted form of early_ioremap(), available
+> before paging_init() only. Like the x86 code on which it is based, it
+> (p)re-uses the fixmap regions for its virtual mapping range. Up to 7
+> simultaneous mappings of up to 128KB can be accommodated in the available
+> fixmap space.
 
-Can you please pull the following DT updates for v3.11?
++rmk
 
-Thanks,
-Sekhar
+I made a similar suggestion to extending the use of fixmap recently, see
+"Re: SCU registers mapping for CA9/CA5 cores". Russell pointed out that
+fixmap is intentionally limited to just kmap_atomic uses at the moment
+and changing that would potentially have a significant impact when we
+run out of pages in the fixmap area.
 
-The following changes since commit 7d132055814ef17a6c7b69f342244c410a5e000f:
+The method we use on ARM normally is the iotable_init() function, which
+requires hardcoding a virtual address at the moment.
 
-  Linux 3.10-rc6 (2013-06-15 11:51:07 -1000)
+It might be nicer to change that code than to put early_ioremap into
+fixmap. Note that early_ioremap in fixmap is a bit of a kludge on x86
+as well because it is very much /not/ a fixed mapping like the rest
+of fixmap, they just use it because it's convenient.
 
-are available in the git repository at:
+Extending the iotable mechanism on ARM would be the convenient
+solution for us I think.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.11/dt
-
-for you to fetch changes up to 055cb2a9e065c3a606f57fbcf8de1689f7c1fedf:
-
-  ARM: davinci: da850: adopt to pinctrl-single change for configuring multiple pins (2013-06-26 23:56:31 +0530)
-
-----------------------------------------------------------------
-Device Tree updates for DaVinci
-
-This patch set updates da850 DTS files to enable use of
-C pre-processor. Also updates pinctrl-single DT data
-to go with changes done in that module to enable a
-single register to service configuration of multiple
-pins.
-
-----------------------------------------------------------------
-Manjunathappa, Prakash (1):
-      ARM: davinci: da850: adopt to pinctrl-single change for configuring multiple pins
-
-Philip Avinash (1):
-      ARM: davinci: da850: Use #include for all device trees
-
- arch/arm/boot/dts/da850-enbw-cmc.dts |    2 +-
- arch/arm/boot/dts/da850-evm.dts      |    2 +-
- arch/arm/boot/dts/da850.dtsi         |    4 ++--
- 3 files changed, 4 insertions(+), 4 deletions(-)
+	Arnd
