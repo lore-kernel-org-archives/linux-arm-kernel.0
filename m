@@ -1,35 +1,65 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 26 Jun 2013 14:46:22 +0100
-Subject: [PATCH 3/4] arm: Add [U]EFI runtime services support
-In-Reply-To: <20130625182021.GA29955@srcf.ucam.org>
-References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
- <1372183863-11333-4-git-send-email-leif.lindholm@linaro.org>
- <20130625182021.GA29955@srcf.ucam.org>
-Message-ID: <CACxGe6tjZT4TjWhYt+eA8RAwBrgJqW+Dto8t3rFgs8C_PbE9rQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 26 Jun 2013 15:45:07 +0200
+Subject: [GIT PULL] at91: non critical fixes (for early 3.11) #2
+Message-ID: <1372254307-2063-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 7:20 PM, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
-> On Tue, Jun 25, 2013 at 07:11:02PM +0100, Leif Lindholm wrote:
->> This patch implements basic support for UEFI runtime services in the
->> ARM architecture - a requirement for using efibootmgr to read and update
->> the system boot configuration.
->>
->> It also locates any presented SMBIOS configuration table and stores it
->> for potential later use by DMI.
->
-> This appears to duplicate code that's already duplicated between x86 and
-> ia64. We made a mistake there originally - let's not do it again. Having
-> this code in three places is inevitably going to lead to skew and missed
-> bugfixes.
+Arnd, Olof,
 
-+1
+Another fixes-non-critical pull-request for early 3.11. It is of course based
+on the patches that you already have in arm-soc/at91/fixes.
 
->
-> --
-> Matthew Garrett | mjg59 at srcf.ucam.org
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Thanks, best regards,
+
+The following changes since commit 133e00116b5bc76110bcc41ded369489209b641f:
+
+  ARM: at91: Change the internal SRAM memory type MT_MEMORY_NONCACHED (2013-06-18 10:20:30 +0200)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-fixes
+
+for you to fetch changes up to bd2da9ca138e446824a7542b381aed442fef4caa:
+
+  ARM: at91/PMC: use at91_usb_rate() for UTMI PLL (2013-06-26 15:24:11 +0200)
+
+----------------------------------------------------------------
+Several fixes for:
+- external irq on non-DT boards
+- cpuidle code in some circumstances
+- PMC code in relation with PLLB/PLL_UTMI/USB:
+  mainly for SAMA5D3 and AT91SAM9N12
+
+----------------------------------------------------------------
+Daniel Lezcano (1):
+      ARM: at91: cpuidle: Fix target_residency
+
+Jean-Christophe PLAGNIOL-VILLARD (1):
+      ARM: at91: fix at91_extern_irq usage for non-dt boards
+
+Nicolas Ferre (4):
+      ARM: at91/PMC: sama5d3 family doesn't have a PLLB
+      ARM: at91/PMC: at91sam9n12 family has a PLLB
+      ARM: at91/PMC: fix at91sam9n12 USB FS init
+      ARM: at91/PMC: use at91_usb_rate() for UTMI PLL
+
+ arch/arm/mach-at91/at91rm9200.c            |  8 ++++----
+ arch/arm/mach-at91/at91sam9260.c           |  4 ++--
+ arch/arm/mach-at91/at91sam9261.c           |  4 ++--
+ arch/arm/mach-at91/at91sam9263.c           |  2 +-
+ arch/arm/mach-at91/at91sam9g45.c           |  2 +-
+ arch/arm/mach-at91/at91sam9rl.c            |  2 +-
+ arch/arm/mach-at91/at91x40.c               |  7 +++----
+ arch/arm/mach-at91/clock.c                 | 30 +++++++++++++++++++++++-------
+ arch/arm/mach-at91/cpuidle.c               |  2 +-
+ arch/arm/mach-at91/generic.h               |  2 +-
+ arch/arm/mach-at91/include/mach/at91_pmc.h |  3 +++
+ arch/arm/mach-at91/irq.c                   |  9 ++++++++-
+ arch/arm/mach-at91/pm.c                    |  2 +-
+ arch/arm/mach-at91/setup.c                 |  2 +-
+ arch/arm/mach-at91/soc.h                   |  1 +
+ 15 files changed, 53 insertions(+), 27 deletions(-)
+
+-- 
+Nicolas Ferre
