@@ -1,41 +1,56 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 26 Jun 2013 17:58:01 +0000 (UTC)
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <51CB28BD.2020105@ti.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
- <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
- <51CAEB33.5010101@ti.com> <51CAEBF3.1010507@ti.com>
- <alpine.DEB.2.02.1306261726280.6135@utopia.booyaka.com>
- <51CB28BD.2020105@ti.com>
-Message-ID: <alpine.DEB.2.02.1306261750210.6135@utopia.booyaka.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 26 Jun 2013 14:02:12 -0400
+Subject: [PATCH] ARM: Add support for LPAE style CONTEXTIDR
+In-Reply-To: <20130626171138.GF10333@mudshark.cambridge.arm.com>
+References: <1372080405-13365-1-git-send-email-cov@codeaurora.org>
+ <20130624140424.GA24861@mudshark.cambridge.arm.com>
+ <51C85A0D.3070400@codeaurora.org>
+ <20130624145303.GA25582@mudshark.cambridge.arm.com>
+ <51C8627A.5000106@codeaurora.org>
+ <20130626171138.GF10333@mudshark.cambridge.arm.com>
+Message-ID: <51CB2CA4.20701@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jun 2013, Tom Rini wrote:
+On 06/26/2013 01:11 PM, Will Deacon wrote:
+> On Mon, Jun 24, 2013 at 04:15:06PM +0100, Christopher Covington wrote:
+>> On 06/24/2013 10:53 AM, Will Deacon wrote:
+>>> On Mon, Jun 24, 2013 at 03:39:09PM +0100, Christopher Covington wrote:
+>>>> Hi Will,
+>>>>
+>>>> On 06/24/2013 10:04 AM, Will Deacon wrote:
+>>>> [...]
+>>>>
+>>>>> What's the advantage of this approach, other than you get an extra byte's
+>>>>> worth of PID?
+>>>>
+>>>> In my view, the real advantage is that the the PID is located where people
+>>>> reading ARM Architecture Reference Manual are told they can find it.
+>>>
+>>> Perhaps, but I'd usually expect a debugger or trace tools to do something
+>>> with the PID, and they likely expect it to be shifted, so you can't really
+>>> win.
+>>
+>> But reading and implementing the architecture *is* winning! LOL. I'll file a
+>> ticket with the architecture folks and see what they think.
+> 
+> ...aaand that came full circle :)
+> 
+> I think the conclusion is that Linux PID != CONTEXTIDR.PROCID.
 
-> OK, is there a reason to not be using omap2plus_defconfig?  My pass/fail
-> here is based on that config and enabling, or not, dtb append.  Seems
-> like it would be one less thing to maintain on your end and it would be
-> on TIs end (roughly speaking) to make sure our platforms that ought to
-> be working upstream have what they need enabled in the defconfig(s) in
-> question.
+Fair enough. What would you think then of configuration options to write other
+identifiers like the process group ID to the PROCID field?
 
-That would be convenient for me, but part of the goal is to verify that a 
-Kconfig that deselects all OMAPs other than AM33xx continues to work.
+> I'm just trying to keep it easy for the tools.
 
-So the build process for am33xx_only here goes something like:
+What tools exactly? The ones I've been working with are software model plugins
+supporting AArch32 and AArch64, which may be very different from the ones
+you're concerned about.
 
-1. Start with omap2plus_defconfig
+Thanks,
+Christopher
 
-2. Turn off support for everything other than AM33xx in the SoC target 
-selection menus
-
-3. Turn on the appended DTB and compat ATAGs options
-
-You might consider adding something like this to your pass/fail tests.
-
-
-- Paul
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
