@@ -1,66 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Jun 2013 21:46:08 +0200
-Subject: [PATCH] ARM: ux500: check platform in ux500_l2x0_init
-In-Reply-To: <1372210231-22900-1-git-send-email-olof@lixom.net>
-References: <1372210231-22900-1-git-send-email-olof@lixom.net>
-Message-ID: <CACRpkdaiKYCzb1t-eTEUSa5e5LupL3sqtE4GmFtWmaEOnRvhKQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Jun 2013 22:04:22 +0200
+Subject: [PATCH 3/3] ARM: integrator: pciv3: do not remap IO so early
+In-Reply-To: <CACRpkdaSwgPws=G+PcmT6DsQqD-EAQkvKO1PMEVOs9KniJ6xrA@mail.gmail.com>
+References: <1372201560-26015-1-git-send-email-linus.walleij@linaro.org>
+ <201306261712.28981.arnd@arndb.de>
+ <CACRpkdaSwgPws=G+PcmT6DsQqD-EAQkvKO1PMEVOs9KniJ6xrA@mail.gmail.com>
+Message-ID: <201306262204.22653.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 3:30 AM, Olof Johansson <olof@lixom.net> wrote:
+On Wednesday 26 June 2013, Linus Walleij wrote:
+> On Wed, Jun 26, 2013 at 5:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 26 June 2013, Russell King - ARM Linux wrote:
+> >> On Wed, Jun 26, 2013 at 01:06:00AM +0200, Linus Walleij wrote:
+> >> > Instead of remapping the IO memory very early with
+> >> > pci_map_io_early(), use pci_ioremap_io() when setting
+> >> > up resources as most PCI bridges do. Also request this
+> >> > resource properly.
+> >>
+> >> What impact does this have with a VGA card plugged in?
+> >
+> > It probably won't work. It's my fault for misreading the driver:
+> > I saw it didn't do the pci_ioremap_io, but didn't remember the
+> > *_early call being present in the platform.
+> 
+> I haven't got the VGA working (hacking on the biosemu in
+> U-boot from time to time, will get there I hope). So keep this
+> patch out for now.
+> 
+> However I don't see how the VGA console is using iospace?
+> We set vga_base to the start of non-prefetched memory, and
+> assume the first slot is the VGA card, then it goes poking into
+> the screen memory or something... but maybe it's poking the
+> ioports in some runpath I can't see :-P
+> 
 
-> Add compatible checks for ux500. This should probably be moved to generic
-> DT-based probing whenever DT is populated instead, but until then at
-> least don't panic all non-ux500 multiplatform machines.
->
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+I think you are looking for vga_io_w()/vga_io_r() in case of
+vga16fb. vgacon uses inb_p/outb_p directly.
 
-> +       /* Ick. I wish there was a single compatible value to compare for,
-> +        * but there isn't.
-> +        */
-> +       if (!of_machine_is_compatible("st-ericsson,u8500") &&
-> +           !of_machine_is_compatible("st-ericsson,u8540") &&
-> +           !of_machine_is_compatible("st-ericsson,u9500") &&
-> +           !of_machine_is_compatible("st-ericsson,u8540"))
-> +               return -ENODEV;
-
-This is checking u8540 twice and does not account for snowball.
-
-With new platforms coming we cannot just line up all possible
-compat strings like this, we need to rely on the cpu_is* macro
-to be reporting something sane, and I think it does.
-
-What about just doing this:
-
->From da838c71fb32d63d7e28c14697702ff48088a09b Mon Sep 17 00:00:00 2001
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Wed, 26 Jun 2013 21:44:57 +0200
-Subject: [PATCH] ARM: ux500: bail out on alien cpus
-
-This makes the l2x0 initialization fail gracefully on non-ux500
-systems.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/cache-l2x0.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-index f58615b..82ccf1d 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -42,7 +42,8 @@ static int __init ux500_l2x0_init(void)
-     if (cpu_is_u8500_family() || cpu_is_ux540_family())
-         l2x0_base = __io_address(U8500_L2CC_BASE);
-     else
--        ux500_unknown_soc();
-+        /* Non-Ux500 platform */
-+        return -ENODEV;
-
-     /* Unlock before init */
-     ux500_l2x0_unlock();
---
-1.8.1.4
-
-Yours,
-Linus Walleij
+	Arnd
