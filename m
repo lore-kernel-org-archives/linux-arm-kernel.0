@@ -1,40 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Jun 2013 11:05:12 +0200
-Subject: [RFC] ARM: Allow use debug_ll_io_init as .map_io in machine
- description
-In-Reply-To: <1372221227-20091-1-git-send-email-shc_work@mail.ru>
-References: <1372221227-20091-1-git-send-email-shc_work@mail.ru>
-Message-ID: <5856677.qmH9YB8W5A@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Jun 2013 10:10:33 +0100
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <20130624214615.GA17604@kroah.com>
+References: <1371502778-15849-1-git-send-email-oliver+list@schinagl.nl>
+ <1371502778-15849-2-git-send-email-oliver+list@schinagl.nl>
+ <20130617225847.GA9494@kroah.com> <20130624092942.GG26008@lukather>
+ <20130624160440.GA15201@kroah.com> <51C87DC7.50005@schinagl.nl>
+ <20130624181509.GA8847@kroah.com> <51C8B84C.3020200@schinagl.nl>
+ <20130624214615.GA17604@kroah.com>
+Message-ID: <20130626091032.GE2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 June 2013 08:33:47 Alexander Shiyan wrote:
+On Mon, Jun 24, 2013 at 02:46:15PM -0700, Greg KH wrote:
+> Stick with a binary attribute, and attach that to the proper class
+> structure and all should be fine.
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/include/asm/mach/map.h | 4 +---
->  arch/arm/mm/mmu.c               | 4 ++++
->  2 files changed, 5 insertions(+), 3 deletions(-)
+> Ah crap, you're using a platform device.
 > 
-> diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
-> index 2fe141f..c1fafc5 100644
-> --- a/arch/arm/include/asm/mach/map.h
-> +++ b/arch/arm/include/asm/mach/map.h
-> @@ -42,10 +42,8 @@ extern void vm_reserve_area_early(unsigned long addr, unsigned long size,
->  
->  #ifdef CONFIG_DEBUG_LL
->  extern void debug_ll_addr(unsigned long *paddr, unsigned long *vaddr);
-> -extern void debug_ll_io_init(void);
-> -#else
-> -static inline void debug_ll_io_init(void) {}
->  #endif
-> +extern void debug_ll_io_init(void);
->  
->  struct mem_type;
+> {sigh}
+> 
+> Why?  Why not use a "real" device which has a "real" class, and then use
+> the interfaces there?
 
-Hi Alexander,
+And why aren't platform devices "real" devices?  If platform devices are
+second class devices then that's pretty crap because virtually all
+devices on ARM are platform devices, not something like "first class"
+PCI devices.
 
-I don't think you need this, since having a NULL .map_io callback means
-the same thing. Just remove the reference in your platform code.
+We could make them PCI devices if you want us to totally fsck with the
+PCI code to bend it in ways it was never meant to, but I suspect that'll
+upset the PCI guys.
 
-	Arnd
+No, platform devices must be first class devices just like any other.
