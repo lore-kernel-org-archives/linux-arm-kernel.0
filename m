@@ -1,31 +1,31 @@
 From: joelagnel@ti.com (Joel A Fernandes)
-Date: Tue, 25 Jun 2013 20:32:00 -0500
-Subject: [PATCH 1/2] ARM: configs: Enable TI_EDMA in omap2plus_defconfig
-Message-ID: <1372210320-7148-1-git-send-email-joelagnel@ti.com>
+Date: Tue, 25 Jun 2013 20:31:54 -0500
+Subject: [PATCH 0/2] EDMA config and comments
+Message-ID: <1372210314-7115-1-git-send-email-joelagnel@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Joel A Fernandes <agnel.joel@gmail.com>
 
-Build EDMA in my default to avoid fewer people stepping on their toes
-with broken DMA on drivers needing EDMA.
+Minor patches remaining after EDMA series has been merged:
 
-Signed-off-by: Joel A Fernandes <agnel.joel@gmail.com>
----
+First patch adds the TI_EDMA option which people can forget to add and
+can result in failure without any informative errors of why DMA is not
+working.
+
+Second patch adds comments to the EDMA code for the calculations in the
+A-sync case. From my experience, this code is not-so-obvious. Hopefully
+this makes the life of readers of the code a little better.
+
+Joel A Fernandes (2):
+  ARM: configs: Enable TI_EDMA in omap2plus_defconfig
+  DMA: EDMA: Add comments for A-sync case calculations
+
  arch/arm/configs/omap2plus_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/dma/edma.c                   |   22 ++++++++++++++++++++++
+ 2 files changed, 23 insertions(+)
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index abbe319..7e00deb 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -236,6 +236,7 @@ CONFIG_RTC_DRV_TWL92330=y
- CONFIG_RTC_DRV_TWL4030=y
- CONFIG_RTC_DRV_OMAP=y
- CONFIG_DMADEVICES=y
-+CONFIG_TI_EDMA=y
- CONFIG_DMA_OMAP=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
 -- 
+Resending as first attempt didn't work.
+
 1.7.9.5
