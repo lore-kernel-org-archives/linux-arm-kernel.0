@@ -1,31 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Jun 2013 12:32:02 +0100
-Subject: [PATCH v2 0/3] Add support for ARM SMMU architectures 1 and 2
-In-Reply-To: <20130626094805.GS11309@8bytes.org>
-References: <1372095086-15681-1-git-send-email-will.deacon@arm.com>
- <20130626094805.GS11309@8bytes.org>
-Message-ID: <20130626113202.GJ26142@mudshark.cambridge.arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 26 Jun 2013 16:51:34 +0530
+Subject: [PATCH v2 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+In-Reply-To: <20130625205452.GC9748@arwen.pp.htv.fi>
+References: <1372170110-12993-1-git-send-email-s.nawrocki@samsung.com>
+ <20130625150649.GA21334@arwen.pp.htv.fi> <51C9D714.4000703@samsung.com>
+ <20130625205452.GC9748@arwen.pp.htv.fi>
+Message-ID: <51CACEBE.9000505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 10:48:05AM +0100, Joerg Roedel wrote:
-> On Mon, Jun 24, 2013 at 06:31:23PM +0100, Will Deacon wrote:
-> > Will Deacon (3):
-> >   documentation: iommu: add description of ARM System MMU binding
-> >   iommu: add support for ARM Ltd. System MMU architecture
-> >   MAINTAINERS: add entry for ARM system MMU driver
-> > 
-> >  .../devicetree/bindings/iommu/arm,smmu.txt         |   70 +
-> >  MAINTAINERS                                        |    6 +
-> >  drivers/iommu/Kconfig                              |   13 +
-> >  drivers/iommu/Makefile                             |    1 +
-> >  drivers/iommu/arm-smmu.c                           | 1969 ++++++++++++++++++++
-> >  5 files changed, 2059 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> >  create mode 100644 drivers/iommu/arm-smmu.c
-> 
-> Applied this series to the new arm/smmu branch, thanks Will.
+Hi,
 
-Cheers Joerg! Just shout if you see any fireworks.
+On Wednesday 26 June 2013 02:24 AM, Felipe Balbi wrote:
+> Hi,
+>
+> On Tue, Jun 25, 2013 at 07:44:52PM +0200, Sylwester Nawrocki wrote:
+>>>> +struct exynos_video_phy {
+>>>> +	spinlock_t slock;
+>>>> +	struct phy *phys[NUM_PHYS];
+>>>
+>>> more than one phy ? This means you should instantiate driver multiple
+>>> drivers. Each phy id should call probe again.
+>>
+>> Why ? This single PHY _provider_ can well handle multiple PHYs.
+>> I don't see a good reason to further complicate this driver like
+>> this. Please note that MIPI-CSIS 0 and MIPI DSIM 0 share MMIO
+>> register, so does MIPI CSIS 1 and MIPI DSIM 1. There are only 2
+>> registers for those 4 PHYs. I could have the involved object
+>> multiplied, but it would have been just a waste of resources
+>> with no difference to the PHY consumers.
+>
+> alright, I misunderstood your code then. When I looked over your id
+> usage I missed the "/2" part and assumed that you would have separate
+> EXYNOS_MIPI_PHY_CONTROL() register for each ;-)
+>
+> My bad, you can disregard the other comments.
+>
+>>>> +static int exynos_video_phy_probe(struct platform_device *pdev)
+>>>> +{
+>>>> +	struct exynos_video_phy *state;
+>>>> +	struct device *dev = &pdev->dev;
+>>>> +	struct resource *res;
+>>>> +	struct phy_provider *phy_provider;
+>>>> +	int i;
+>>>> +
+>>>> +	state = devm_kzalloc(dev, sizeof(*state), GFP_KERNEL);
+>>>> +	if (!state)
+>>>> +		return -ENOMEM;
+>>>> +
+>>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>>> +
+>>>> +	state->regs = devm_ioremap_resource(dev, res);
+>>>> +	if (IS_ERR(state->regs))
+>>>> +		return PTR_ERR(state->regs);
+>>>> +
+>>>> +	dev_set_drvdata(dev, state);
+>>>
+>>> you can use platform_set_drvdata(pdev, state);
+>>
+>> I had it in the previous version, but changed for symmetry with
+>> dev_set_drvdata(). I guess those could be replaced with
+>> phy_{get, set}_drvdata as you suggested.
 
-Will
+right. currently I was setting dev_set_drvdata of phy (core) device
+in phy-core.c and the corresponding dev_get_drvdata in phy provider driver
+which is little confusing.
+So I'll add phy_set_drvdata and phy_get_drvdata in phy.h (as suggested by
+Felipe) to be used by phy provider drivers. So after creating the PHY, the
+phy provider should use phy_set_drvdata and in phy_ops, it can use
+phy_get_drvdata. (I'll remove the dev_set_drvdata in phy_create).
+
+This also means _void *priv_ in phy_create is useless. So I'll be removing
+_priv_ from phy_create.
+
+Thanks
+Kishon
+
+>
+> hmm, you do need to set the drvdata() to the phy object, but also to the
+> pdev object (should you need it on a suspend/resume callback, for
+> instance). Those are separate struct device instances.
