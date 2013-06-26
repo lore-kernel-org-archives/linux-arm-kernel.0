@@ -1,123 +1,63 @@
-From: oliver+list@schinagl.nl (Oliver Schinagl)
-Date: Wed, 26 Jun 2013 10:32:09 +0200
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
-In-Reply-To: <20130624214615.GA17604@kroah.com>
-References: <1371502778-15849-1-git-send-email-oliver+list@schinagl.nl>
- <1371502778-15849-2-git-send-email-oliver+list@schinagl.nl>
- <20130617225847.GA9494@kroah.com> <20130624092942.GG26008@lukather>
- <20130624160440.GA15201@kroah.com> <51C87DC7.50005@schinagl.nl>
- <20130624181509.GA8847@kroah.com> <51C8B84C.3020200@schinagl.nl>
- <20130624214615.GA17604@kroah.com>
-Message-ID: <51CAA709.4060801@schinagl.nl>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 26 Jun 2013 17:53:05 +0900
+Subject: [PATCH 2/4] ARM: shmobile: r8a7790: HSCIF support
+In-Reply-To: <1372236787-23342-1-git-send-email-horms+renesas@verge.net.au>
+References: <1372236787-23342-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1372236787-23342-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24-06-13 23:46, Greg KH wrote:
-> On Mon, Jun 24, 2013 at 11:21:16PM +0200, Oliver Schinagl wrote:
->> On 06/24/13 20:15, Greg KH wrote:
->>> On Mon, Jun 24, 2013 at 07:11:35PM +0200, Oliver Schinagl wrote:
->>>> Hey Greg,
->>>> On 06/24/13 18:04, Greg KH wrote:
->>>>> On Mon, Jun 24, 2013 at 11:29:42AM +0200, Maxime Ripard wrote:
->>>>>> Hi Greg,
->>>>>>
->>>>>> On Mon, Jun 17, 2013 at 03:58:47PM -0700, Greg KH wrote:
->>>>>>> On Mon, Jun 17, 2013 at 10:59:37PM +0200, Oliver Schinagl wrote:
->>>>>>
->>>>>> [..]
->>>>>>
->>>>>>>> +static int __init sunxi_sid_probe(struct platform_device *pdev)
->>>>>>>> +{
->>>>>>>> +	u8 entropy[SID_SIZE];
->>>>>>>> +	unsigned int i;
->>>>>>>> +	struct resource *res;
->>>>>>>> +	void __iomem *sid_reg_base;
->>>>>>>> +	int ret;
->>>>>>>> +
->>>>>>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>>>>>>> +	sid_reg_base = devm_ioremap_resource(&pdev->dev, res);
->>>>>>>> +	if (IS_ERR(sid_reg_base))
->>>>>>>> +		return PTR_ERR(sid_reg_base);
->>>>>>>> +	platform_set_drvdata(pdev, sid_reg_base);
->>>>>>>> +
->>>>>>>> +	ret = device_create_bin_file(&pdev->dev, &sid_bin_attr);
->>>>>>>> +	if (ret)
->>>>>>>> +		return ret;
->>>>>>>
->>>>>>> You just raced with userspace, having the file show up after the device
->>>>>>> was announced to users that it was there.  Please use the proper device
->>>>>>> file api to add default attributes to prevent this from happening.
->>>>>>
->>>>>> Sorry if the question looks dumb, but what kind of race can we generate
->>>>>> here?
->>>>>
->>>>> Userspace gets told about the device from the driver core, udev runs and
->>>>> reads all of the attributes, then your probe function comes along and
->>>>> adds a new attribute.  Userspace will then not know about it at all.
->>>>>
->>>>>> The device_create_bin_file is the last call that we make (if we except
->>>>>> the entropy stuff, but it doesn't really matter here), so after we
->>>>>> created the file, we have everything properly initialised so that our
->>>>>> functions can be called, right?
->>>>>>
->>>>>> And another dumb question for you, what is the "proper device file API"
->>>>>> you are referring to ? :)
->>>>>
->>>>> Please read Documentation/driver_model/device.txt and see the section on
->>>>> Attributes for what to do.  If you have specific questions after reading
->>>>> that, please let me know.
->>>> Since Maxime kinda asked for me, I hope you don't mind me following up.
->>>>
->>>> That doc doesn't mention the binary interface at all. Initially I
->>>> had both devices up, the 'read' device as a textual representation
->>>> and added the binary one later. Maxime and I decided the binary one
->>>> made more sense, as the only textual user would be a human and they
->>>> don't poke that entry that often.
->>>>
->>>> So what default way exists for binary files or how would that be solved?
->>>
->>> The same interface should work just fine for binary files, have you
->>> tried it?
->> I'll just take the plunge and make myself look stupid ;)
->>
->> I tried to change things around, used DEVICE_ATTR(eeprom, S_IRUGO,
->> sid_read, NULL); So far so good I'd hope.
->
-> Ick, no.
->
->> Of course now I'll have to change the function's parameters from
->>
->> static ssize_t sid_read(struct file *fd, struct kobject *kobj,
->> 			struct bin_attribute *attr, char *buf,
->> 			loff_t pos, size_t size)
->>
->> to
->>
->> static ssize_t sid_read(struct device *dev,
->> 			struct device_attribute *attr, char *buf)
->
-> Which is what do you do not want, as you find out:
->
->> But now, I'm missing things like 'pos' and 'size', both which
->> determine the requested bytes. True, in this specific driver we are
->> talking about 'only' 16 bytes, but what if it weren't but a few MiB
->> and in sysfs we want to read some random byte, will we have to put
->> the entire blok into the buffer?
->>
->> So sorry for not understanding, but ... I don't understand :)
->
-> Stick with a binary attribute, and attach that to the proper class
-> structure and all should be fine.
->
-> Ah crap, you're using a platform device.
->
-> {sigh}
->
-> Why?  Why not use a "real" device which has a "real" class, and then use
-> the interfaces there?
-Because, as I was told, this really is a platform device. If you have 
-some example code I can look at and learn from that would be awesome. 
-I'm still learning after all, and apparently I'm doing it wrong now :)
->
-> greg k-h
->
+From: Ulrich Hecht <ulrich.hecht@gmail.com>
+
+Adds support for HSCIF0 and HSCIF1 on the r8a7790.
+
+Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
+[ horms+renesas at verge.net.au this is the setup-r8a7790.c
+  which I somehow miss-applied as part of another patch.
+  The clock-r8a7790.c portion of this patch has already been merged. ]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a7790.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 49de2d5..896d374 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -67,7 +67,15 @@ void __init r8a7790_pinmux_init(void)
+ 	.scscr = SCSCR_RE | SCSCR_TE | SCSCR_CKE1,	\
+ }
+ 
+-enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFA2, SCIF0, SCIF1 };
++#define HSCIF_DATA(index, baseaddr, irq)		\
++[index] = {						\
++	SCIF_COMMON(PORT_HSCIF, baseaddr, irq),		\
++	.scbrr_algo_id	= SCBRR_ALGO_6,			\
++	.scscr = SCSCR_RE | SCSCR_TE,	\
++}
++
++enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFA2, SCIF0, SCIF1,
++       HSCIF0, HSCIF1 };
+ 
+ static const struct plat_sci_port scif[] = {
+ 	SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
+@@ -78,6 +86,8 @@ static const struct plat_sci_port scif[] = {
+ 	SCIFA_DATA(SCIFA2, 0xe6c60000, gic_spi(151)), /* SCIFA2 */
+ 	SCIF_DATA(SCIF0, 0xe6e60000, gic_spi(152)), /* SCIF0 */
+ 	SCIF_DATA(SCIF1, 0xe6e68000, gic_spi(153)), /* SCIF1 */
++	HSCIF_DATA(HSCIF0, 0xe62c0000, gic_spi(154)), /* HSCIF0 */
++	HSCIF_DATA(HSCIF1, 0xe62c8000, gic_spi(155)), /* HSCIF1 */
+ };
+ 
+ static inline void r8a7790_register_scif(int idx)
+@@ -115,6 +125,8 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_scif(SCIFA2);
+ 	r8a7790_register_scif(SCIF0);
+ 	r8a7790_register_scif(SCIF1);
++	r8a7790_register_scif(HSCIF0);
++	r8a7790_register_scif(HSCIF1);
+ 	r8a7790_register_irqc(0);
+ }
+ 
+-- 
+1.8.2.1
