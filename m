@@ -1,39 +1,24 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 26 Jun 2013 08:10:45 -0700
-Subject: [GIT PULL] OMAP5: fix voltage domains, remove wrong data
-Message-ID: <87fvw4sya2.fsf@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Jun 2013 17:12:28 +0200
+Subject: [PATCH 3/3] ARM: integrator: pciv3: do not remap IO so early
+In-Reply-To: <20130626081409.GC2718@n2100.arm.linux.org.uk>
+References: <1372201560-26015-1-git-send-email-linus.walleij@linaro.org>
+ <20130626081409.GC2718@n2100.arm.linux.org.uk>
+Message-ID: <201306261712.28981.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+On Wednesday 26 June 2013, Russell King - ARM Linux wrote:
+> On Wed, Jun 26, 2013 at 01:06:00AM +0200, Linus Walleij wrote:
+> > Instead of remapping the IO memory very early with
+> > pci_map_io_early(), use pci_ioremap_io() when setting
+> > up resources as most PCI bridges do. Also request this
+> > resource properly.
+> 
+> What impact does this have with a VGA card plugged in?
 
-Below is a pull request with a patch that fixes the build breakage you reported
-related to voltage domains on OMAP5-only builds: https://patchwork.kernel.org/patch/2764191/
+It probably won't work. It's my fault for misreading the driver:
+I saw it didn't do the pci_ioremap_io, but didn't remember the
+*_early call being present in the platform.
 
-This applies on top of arm-soc/omap/omap5
-
-Kevin
-
-
-
-The following changes since commit 6503a8e109a639760408f874c1251060d563942e:
-
-  ARM: OMAP5: Remove unused include for ocp2scp (2013-06-09 21:17:15 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.11/fixes/omap5-voltdm
-
-for you to fetch changes up to 2ac524f151dbecb862c95b8f433267772caa800e:
-
-  ARM: OMAP5: voltagedomain data: remove temporary OMAP4 voltage data (2013-06-25 17:11:06 -0700)
-
-----------------------------------------------------------------
-OMAP5: PM: fix boot by removing unneeded dummy voltage domain data
-
-----------------------------------------------------------------
-Nishanth Menon (1):
-      ARM: OMAP5: voltagedomain data: remove temporary OMAP4 voltage data
-
- arch/arm/mach-omap2/voltagedomains54xx_data.c | 10 ----------
- 1 file changed, 10 deletions(-)
+	Arnd
