@@ -1,35 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Jun 2013 10:10:33 +0100
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
-In-Reply-To: <20130624214615.GA17604@kroah.com>
-References: <1371502778-15849-1-git-send-email-oliver+list@schinagl.nl>
- <1371502778-15849-2-git-send-email-oliver+list@schinagl.nl>
- <20130617225847.GA9494@kroah.com> <20130624092942.GG26008@lukather>
- <20130624160440.GA15201@kroah.com> <51C87DC7.50005@schinagl.nl>
- <20130624181509.GA8847@kroah.com> <51C8B84C.3020200@schinagl.nl>
- <20130624214615.GA17604@kroah.com>
-Message-ID: <20130626091032.GE2718@n2100.arm.linux.org.uk>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 26 Jun 2013 17:40:39 +0900
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7790: add thermal driver support
+In-Reply-To: <1372236040-16737-1-git-send-email-horms+renesas@verge.net.au>
+References: <1372236040-16737-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1372236040-16737-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 02:46:15PM -0700, Greg KH wrote:
-> Stick with a binary attribute, and attach that to the proper class
-> structure and all should be fine.
-> 
-> Ah crap, you're using a platform device.
-> 
-> {sigh}
-> 
-> Why?  Why not use a "real" device which has a "real" class, and then use
-> the interfaces there?
+You can get current thermal by
+> cat /sys/class/thermal/thermal_zone?/temp
 
-And why aren't platform devices "real" devices?  If platform devices are
-second class devices then that's pretty crap because virtually all
-devices on ARM are platform devices, not something like "first class"
-PCI devices.
+Based on similar work for the r8a73a4 by Kuninori Morimoto.
 
-We could make them PCI devices if you want us to totally fsck with the
-PCI code to bend it in ways it was never meant to, but I suspect that'll
-upset the PCI guys.
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a7790.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-No, platform devices must be first class devices just like any other.
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 28f9475..06c720f 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -149,6 +149,17 @@ static struct resource irqc0_resources[] __initdata = {
+ 					  &irqc##idx##_data,		\
+ 					  sizeof(struct renesas_irqc_config))
+ 
++static struct resource thermal_resources[] __initdata = {
++	DEFINE_RES_MEM(0xe61f0000, 0x14),
++	DEFINE_RES_MEM(0xe61f0100, 0x38),
++	DEFINE_RES_IRQ(gic_spi(69)),
++};
++
++#define r8a7790_register_thermal()					\
++	platform_device_register_simple("rcar_thermal", -1,		\
++					thermal_resources,		\
++					ARRAY_SIZE(thermal_resources))
++
+ void __init r8a7790_add_standard_devices(void)
+ {
+ 	r8a7790_register_scif(SCIFA0);
+@@ -162,6 +173,7 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_scif(HSCIF0);
+ 	r8a7790_register_scif(HSCIF1);
+ 	r8a7790_register_irqc(0);
++	r8a7790_register_thermal();
+ }
+ 
+ void __init r8a7790_timer_init(void)
+-- 
+1.8.2.1
