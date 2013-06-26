@@ -1,192 +1,203 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 26 Jun 2013 12:15:44 +0200
-Subject: [PATCH 5/8] ARM: S3C64XX: move cpuidle driver to drivers/cpuidle/
+Date: Wed, 26 Jun 2013 12:15:40 +0200
+Subject: [PATCH 1/8] ARM: at91: move cpuidle driver to drivers/cpuidle/
 In-Reply-To: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1372241747-21083-6-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1372241747-21083-2-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While at it:
-- remove file path from comment
-
 Compile tested only.
 
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Andrew Victor <linux@maxim.org.za>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
 Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/mach-s3c64xx/Makefile    |  1 -
- arch/arm/mach-s3c64xx/cpuidle.c   | 63 ---------------------------------------
- drivers/cpuidle/Makefile          |  3 ++
- drivers/cpuidle/cpuidle-s3c64xx.c | 62 ++++++++++++++++++++++++++++++++++++++
- 4 files changed, 65 insertions(+), 64 deletions(-)
- delete mode 100644 arch/arm/mach-s3c64xx/cpuidle.c
- create mode 100644 drivers/cpuidle/cpuidle-s3c64xx.c
+ arch/arm/mach-at91/Makefile    |  1 -
+ arch/arm/mach-at91/cpuidle.c   | 68 ------------------------------------------
+ drivers/cpuidle/Makefile       |  3 ++
+ drivers/cpuidle/cpuidle-at91.c | 68 ++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 71 insertions(+), 69 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/cpuidle.c
+ create mode 100644 drivers/cpuidle/cpuidle-at91.c
 
-diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-index 31d0c91..e7a3ee7 100644
---- a/arch/arm/mach-s3c64xx/Makefile
-+++ b/arch/arm/mach-s3c64xx/Makefile
-@@ -22,7 +22,6 @@ obj-$(CONFIG_CPU_S3C6410)	+= s3c6410.o
- # PM
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 3b0a953..c1b7370 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -98,7 +98,6 @@ obj-y				+= leds.o
+ # Power Management
+ obj-$(CONFIG_PM)		+= pm.o
+ obj-$(CONFIG_AT91_SLOW_CLOCK)	+= pm_slowclock.o
+-obj-$(CONFIG_CPU_IDLE)	+= cpuidle.o
  
- obj-$(CONFIG_PM)		+= pm.o irq-pm.o sleep.o
--obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- 
- # DMA support
- 
-diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-s3c64xx/cpuidle.c
+ ifeq ($(CONFIG_PM_DEBUG),y)
+ CFLAGS_pm.o += -DDEBUG
+diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
 deleted file mode 100644
-index 3c8ab07..0000000
---- a/arch/arm/mach-s3c64xx/cpuidle.c
+index 69f9e3b..0000000
+--- a/arch/arm/mach-at91/cpuidle.c
 +++ /dev/null
-@@ -1,63 +0,0 @@
--/* linux/arch/arm/mach-s3c64xx/cpuidle.c
+@@ -1,68 +0,0 @@
+-/*
+- * based on arch/arm/mach-kirkwood/cpuidle.c
 - *
-- * Copyright (c) 2011 Wolfson Microelectronics, plc
-- * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
+- * CPU idle support for AT91 SoC
 - *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- *
+- * The cpu idle uses wait-for-interrupt and RAM self refresh in order
+- * to implement two idle states -
+- * #1 wait-for-interrupt
+- * #2 wait-for-interrupt and RAM self refresh
+- */
 -
 -#include <linux/kernel.h>
 -#include <linux/init.h>
+-#include <linux/platform_device.h>
 -#include <linux/cpuidle.h>
 -#include <linux/io.h>
 -#include <linux/export.h>
--#include <linux/time.h>
--
 -#include <asm/proc-fns.h>
+-#include <asm/cpuidle.h>
+-#include <mach/cpu.h>
 -
--#include <mach/map.h>
+-#include "pm.h"
 -
--#include "regs-sys.h"
--#include "regs-syscon-power.h"
+-#define AT91_MAX_STATES	2
 -
--static int s3c64xx_enter_idle(struct cpuidle_device *dev,
--			      struct cpuidle_driver *drv,
--			      int index)
+-/* Actual code that puts the SoC in different idle states */
+-static int at91_enter_idle(struct cpuidle_device *dev,
+-			struct cpuidle_driver *drv,
+-			       int index)
 -{
--	unsigned long tmp;
--
--	/* Setup PWRCFG to enter idle mode */
--	tmp = __raw_readl(S3C64XX_PWR_CFG);
--	tmp &= ~S3C64XX_PWRCFG_CFG_WFI_MASK;
--	tmp |= S3C64XX_PWRCFG_CFG_WFI_IDLE;
--	__raw_writel(tmp, S3C64XX_PWR_CFG);
--
--	cpu_do_idle();
+-	if (cpu_is_at91rm9200())
+-		at91rm9200_standby();
+-	else if (cpu_is_at91sam9g45())
+-		at91sam9g45_standby();
+-	else if (cpu_is_at91sam9263())
+-		at91sam9263_standby();
+-	else
+-		at91sam9_standby();
 -
 -	return index;
 -}
 -
--static struct cpuidle_driver s3c64xx_cpuidle_driver = {
--	.name	= "s3c64xx_cpuidle",
--	.owner  = THIS_MODULE,
--	.states = {
--		{
--			.enter            = s3c64xx_enter_idle,
--			.exit_latency     = 1,
--			.target_residency = 1,
--			.flags            = CPUIDLE_FLAG_TIME_VALID,
--			.name             = "IDLE",
--			.desc             = "System active, ARM gated",
--		},
+-static struct cpuidle_driver at91_idle_driver = {
+-	.name			= "at91_idle",
+-	.owner			= THIS_MODULE,
+-	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+-	.states[1]		= {
+-		.enter			= at91_enter_idle,
+-		.exit_latency		= 10,
+-		.target_residency	= 100000,
+-		.flags			= CPUIDLE_FLAG_TIME_VALID,
+-		.name			= "RAM_SR",
+-		.desc			= "WFI and DDR Self Refresh",
 -	},
--	.state_count = 1,
+-	.state_count = AT91_MAX_STATES,
 -};
 -
--static int __init s3c64xx_init_cpuidle(void)
+-/* Initialize CPU idle by registering the idle states */
+-static int __init at91_init_cpuidle(void)
 -{
--	return cpuidle_register(&s3c64xx_cpuidle_driver, NULL);
+-	return cpuidle_register(&at91_idle_driver, NULL);
 -}
--device_initcall(s3c64xx_init_cpuidle);
+-
+-device_initcall(at91_init_cpuidle);
 diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index 6436c67..eed221e 100644
+index 8767a7b..9dd4091 100644
 --- a/drivers/cpuidle/Makefile
 +++ b/drivers/cpuidle/Makefile
-@@ -31,4 +31,7 @@ ifeq ($(CONFIG_ARCH_OMAP4),y)
- 	ccflags-y += -I$(srctree)/arch/arm/mach-omap2/include
- 	obj-y += cpuidle-omap44xx.o
- endif
-+ifeq ($(CONFIG_ARCH_S3C64XX),y)
-+	obj-y += cpuidle-s3c64xx.o
+@@ -5,6 +5,9 @@
+ obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
+ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+ 
++ifeq ($(CONFIG_ARCH_AT91),y)
++	obj-y += cpuidle-at91.o
 +endif
+ obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
+ obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
  obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
-diff --git a/drivers/cpuidle/cpuidle-s3c64xx.c b/drivers/cpuidle/cpuidle-s3c64xx.c
+diff --git a/drivers/cpuidle/cpuidle-at91.c b/drivers/cpuidle/cpuidle-at91.c
 new file mode 100644
-index 0000000..c18d075
+index 0000000..2545218
 --- /dev/null
-+++ b/drivers/cpuidle/cpuidle-s3c64xx.c
-@@ -0,0 +1,62 @@
++++ b/drivers/cpuidle/cpuidle-at91.c
+@@ -0,0 +1,68 @@
 +/*
-+ * Copyright (c) 2011 Wolfson Microelectronics, plc
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
++ * based on arch/arm/mach-kirkwood/cpuidle.c
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++ * CPU idle support for AT91 SoC
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * The cpu idle uses wait-for-interrupt and RAM self refresh in order
++ * to implement two idle states -
++ * #1 wait-for-interrupt
++ * #2 wait-for-interrupt and RAM self refresh
++ */
 +
 +#include <linux/kernel.h>
 +#include <linux/init.h>
++#include <linux/platform_device.h>
 +#include <linux/cpuidle.h>
 +#include <linux/io.h>
 +#include <linux/export.h>
-+#include <linux/time.h>
-+
 +#include <asm/proc-fns.h>
++#include <asm/cpuidle.h>
++#include <mach/cpu.h>
 +
-+#include <mach/map.h>
++#include "../../arch/arm/mach-at91/pm.h"
 +
-+#include "../../arch/arm/mach-s3c64xx/regs-sys.h"
-+#include "../../arch/arm/mach-s3c64xx/regs-syscon-power.h"
++#define AT91_MAX_STATES	2
 +
-+static int s3c64xx_enter_idle(struct cpuidle_device *dev,
-+			      struct cpuidle_driver *drv,
-+			      int index)
++/* Actual code that puts the SoC in different idle states */
++static int at91_enter_idle(struct cpuidle_device *dev,
++			struct cpuidle_driver *drv,
++			       int index)
 +{
-+	unsigned long tmp;
-+
-+	/* Setup PWRCFG to enter idle mode */
-+	tmp = __raw_readl(S3C64XX_PWR_CFG);
-+	tmp &= ~S3C64XX_PWRCFG_CFG_WFI_MASK;
-+	tmp |= S3C64XX_PWRCFG_CFG_WFI_IDLE;
-+	__raw_writel(tmp, S3C64XX_PWR_CFG);
-+
-+	cpu_do_idle();
++	if (cpu_is_at91rm9200())
++		at91rm9200_standby();
++	else if (cpu_is_at91sam9g45())
++		at91sam9g45_standby();
++	else if (cpu_is_at91sam9263())
++		at91sam9263_standby();
++	else
++		at91sam9_standby();
 +
 +	return index;
 +}
 +
-+static struct cpuidle_driver s3c64xx_cpuidle_driver = {
-+	.name	= "s3c64xx_cpuidle",
-+	.owner  = THIS_MODULE,
-+	.states = {
-+		{
-+			.enter            = s3c64xx_enter_idle,
-+			.exit_latency     = 1,
-+			.target_residency = 1,
-+			.flags            = CPUIDLE_FLAG_TIME_VALID,
-+			.name             = "IDLE",
-+			.desc             = "System active, ARM gated",
-+		},
++static struct cpuidle_driver at91_idle_driver = {
++	.name			= "at91_idle",
++	.owner			= THIS_MODULE,
++	.states[0]		= ARM_CPUIDLE_WFI_STATE,
++	.states[1]		= {
++		.enter			= at91_enter_idle,
++		.exit_latency		= 10,
++		.target_residency	= 100000,
++		.flags			= CPUIDLE_FLAG_TIME_VALID,
++		.name			= "RAM_SR",
++		.desc			= "WFI and DDR Self Refresh",
 +	},
-+	.state_count = 1,
++	.state_count = AT91_MAX_STATES,
 +};
 +
-+static int __init s3c64xx_init_cpuidle(void)
++/* Initialize CPU idle by registering the idle states */
++static int __init at91_init_cpuidle(void)
 +{
-+	return cpuidle_register(&s3c64xx_cpuidle_driver, NULL);
++	return cpuidle_register(&at91_idle_driver, NULL);
 +}
-+device_initcall(s3c64xx_init_cpuidle);
++
++device_initcall(at91_init_cpuidle);
 -- 
 1.8.2.3
