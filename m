@@ -1,56 +1,83 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Jun 2013 13:40:09 +0100
-Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
-In-Reply-To: <CAKv+Gu_R7=Euaa87kQqR5TfGQLyF6Ad51dBm2CroYHcKMRs_dA@mail.gmail.com>
-References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
- <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
- <20130626111430.GH26142@mudshark.cambridge.arm.com>
- <CAKv+Gu_R7=Euaa87kQqR5TfGQLyF6Ad51dBm2CroYHcKMRs_dA@mail.gmail.com>
-Message-ID: <20130626124009.GL26142@mudshark.cambridge.arm.com>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Wed, 26 Jun 2013 20:22:50 +0800
+Subject: [PATCH] dmaengine: add interface of dma_get_slave_channel
+Message-ID: <1372249370-10658-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Suggested by Arnd, add dma_get_slave_channel interface
+Dma host driver could get specific channel specificied by request line, rather than filter.
 
-On Wed, Jun 26, 2013 at 12:28:49PM +0100, Ard Biesheuvel wrote:
-> On 26 June 2013 13:14, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Jun 26, 2013 at 11:55:33AM +0100, Ard Biesheuvel wrote:
-> >> Propose to replace it with
-> >>
-> >>     preempt_enable();
-> >> #ifndef CONFIG_PREEMPT_COUNT
-> >>     /* in this case, the preempt_enable() right above is just a barrier() */
-> >>     dec_preempt_count();
-> >> #endif
-> >>
-> >> (and the converse in kernel_neon_begin())
-> >
-> > Yuck, that's ugly as sin! How does x86 deal with this? Looking at
-> > kernel_fpu_{begin,end}, they just disable preemption so I guess that they
-> > assume the caller is non-blocking? There's an aside about the use of
-> > preempt-notifiers for KVM, so it does sound like the onus is on the caller
-> > not to shoot themselves in the face.
-> >
-> 
-> Even if x86 doesn't care about this, do you really think we should
-> take the risk of silently clobbering the NEON registers if the caller
-> does something that may end up sleeping? Anyway, I don't remember
-> exactly who suggested using inc_preempt_count() directly, but doing so
-> brings about the responsibility of calling preempt_schedule() when
-> leaving the critical section, and just using both (without the #ifdef)
-> is also not an option.
-> 
-> So can you suggest a better way of making sure schedule_debug() shoots
-> us down if calling schedule() between kernel_neon_begin and
-> kernel_neon_end, even on non-preempt builds?
+host example:
+static struct dma_chan *xx_of_dma_simple_xlate(struct of_phandle_args *dma_spec,
+		struct of_dma *ofdma)
+{
+	struct xx_dma_dev *d = ofdma->of_dma_data;
+	unsigned int request = dma_spec->args[0];
 
-With what we currently have in the kernel, no, I can't think of a better
-way. However, I also don't think that smuggling in a back-end hack is a good
-idea either. How about we follow x86's lead on this and rely on the caller
-not to sleep for the timebeing? Then, separately to this patch series, you
-could look at augmenting the scheduler so that schedule_debug can complain
-if it encounters a task that is not expected to sleep? That seems like the
-right place to fix this problem, and will benefit other architectures too.
+	if (request > d->dma_requests)
+		return NULL;
 
-Will
+	return dma_get_slave_channel(&(d->chans[request].vc.chan));
+}
+
+probe:
+of_dma_controller_register((&op->dev)->of_node, xx_of_dma_simple_xlate, d);
+
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+---
+ drivers/dma/dmaengine.c   |   26 ++++++++++++++++++++++++++
+ include/linux/dmaengine.h |    1 +
+ 2 files changed, 27 insertions(+)
+
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 93f7992..78dbbe0 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -504,6 +504,32 @@ static struct dma_chan *private_candidate(const dma_cap_mask_t *mask,
+ }
+ 
+ /**
++ * dma_request_channel - try to get specific channel exclusively
++ * @chan: target channel
++ */
++struct dma_chan *dma_get_slave_channel(struct dma_chan *chan)
++{
++	int err = -EBUSY;
++
++	/* lock against __dma_request_channel */
++	mutex_lock(&dma_list_mutex);
++
++	if (chan->client_count == 0)
++		err = dma_chan_get(chan);
++	else
++		chan = NULL;
++
++	mutex_unlock(&dma_list_mutex);
++
++	if (err)
++		pr_debug("%s: failed to get %s: (%d)\n",
++			__func__, dma_chan_name(chan), err);
++
++	return chan;
++}
++EXPORT_SYMBOL_GPL(dma_get_slave_channel);
++
++/**
+  * dma_request_channel - try to allocate an exclusive channel
+  * @mask: capabilities that the channel must satisfy
+  * @fn: optional callback to disposition available channels
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 96d3e4a..4e1c843 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -1000,6 +1000,7 @@ int dma_async_device_register(struct dma_device *device);
+ void dma_async_device_unregister(struct dma_device *device);
+ void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
+ struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
++struct dma_chan *dma_get_slave_channel(struct dma_chan *chan);
+ struct dma_chan *net_dma_find_channel(void);
+ #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
+ #define dma_request_slave_channel_compat(mask, x, y, dev, name) \
+-- 
+1.7.9.5
