@@ -1,38 +1,127 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 26 Jun 2013 09:33:08 +0100
-Subject: [PATCH 3/3] ASoC: sgtl5000: Defer probe in case of I2C error
-In-Reply-To: <1372168801-4221-3-git-send-email-fabio.estevam@freescale.com>
-References: <1372168801-4221-1-git-send-email-fabio.estevam@freescale.com>
- <1372168801-4221-3-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20130626083308.GL27646@sirena.org.uk>
+From: b08248@gmail.com (Stuart Yoder)
+Date: Wed, 26 Jun 2013 11:19:48 -0500
+Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
+ MMU binding
+In-Reply-To: <20130626133941.GD7417@mudshark.cambridge.arm.com>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-8-git-send-email-will.deacon@arm.com>
+ <CALRxmdBxFWoRKv+bUu8VEwNNcAJUej9jM2V8N0rrqrr_Vpe8fQ@mail.gmail.com>
+ <20130626133941.GD7417@mudshark.cambridge.arm.com>
+Message-ID: <CALRxmdCycFK2wW=C4aU79mudSaT+2vU8nzXxepdstubg+YSdQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 11:00:01AM -0300, Fabio Estevam wrote:
-> In case of I2C error, let's defer the probe.
-> 
-> On mx28, for example, the first read of the codec revision register fails 
-> because there is no codec clock provided at this point. The codec clock will be 
-> enabled later in the mxs-saif driver, so return -EPROBE_DEFER in case of I2C 
-> read error, so that the codec driver can do another attempt at a later stage 
-> when the codec clock is available.
+On Wed, Jun 26, 2013 at 8:39 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Stuart,
+>
+> On Tue, Jun 25, 2013 at 08:18:19PM +0100, Stuart Yoder wrote:
+>> On Mon, Jun 10, 2013 at 1:34 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> > new file mode 100644
+>> > index 0000000..e34c6cd
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> > @@ -0,0 +1,70 @@
+>> > +* ARM System MMU Architecture Implementation
+>> > +
+>> > +ARM SoCs may contain an implementation of the ARM System Memory
+>> > +Management Unit Architecture, which can be used to provide 1 or 2 stages
+>> > +of address translation to bus masters external to the CPU.
+>> > +
+>> > +The SMMU may also raise interrupts in response to various fault
+>> > +conditions.
+>> > +
+>> > +** System MMU required properties:
+>> > +
+>> > +- compatible    : Should be one of:
+>> > +
+>> > +                        "arm,smmu-v1"
+>> > +                        "arm,smmu-v2"
+>> > +                        "arm,mmu-400"
+>> > +                        "arm,mmu-500"
+>> > +
+>> > +                  depending on the particular implementation and/or the
+>> > +                  version of the architecture implemented.
+>> > +
+>> > +- reg           : Base address and size of the SMMU.
+>> > +
+>> > +- #global-interrupts : The number of global interrupts exposed by the
+>> > +                       device.
+>> > +
+>> > +- interrupts    : Interrupt list, with the first #global-irqs entries
+>> > +                  corresponding to the global interrupts
+>>
+>> It seems like we don't have enough information here.   It's not enough
+>> for the OS to know that there are 2, 4, etc global interrupts, no?  It needs
+>> to know which hardware interrupt each corresponds to.   That kind of
+>> stuff is normally defined in the device binding.
+>>
+>> What is it that determines the number of global interrupts?
+>
+> I'd suggest looking at the driver I posted to get a gist of how the parsing
+> code works, but suffice to say that we describe both the number of
+> interrupts and the actual interrupt numbers here.
 
-This doesn't seem to match up with the code:
+I understand that the number of interrupts and actual interrupt numbers
+are described here, but was referring to the _meaning_ of the interrupt
+numbers.   A binding for a device with 2 interrupts, a TX and RX would
+normally identify which interrupt specifier is for TX and which is for RX.
 
->  	ret = regmap_read(sgtl5000->regmap, SGTL5000_CHIP_ID, &reg);
-> -	if (ret)
-> +	if (ret) {
-> +		ret = -EPROBE_DEFER; /* If I2C read failed, try again later */
->  		goto disable_clk;
->  
-> +	}
+Based on your code, the 2 global interrupts seem to be the secure
+and non-secure fault interrupts...which your driver does not differentiate.
+However, the device tree is describing hardware and  you can't assume
+that all drivers don't care which is which.
 
-Looking at the label we jump to here it seems like the clock really
-should be enabled at the point where the register read is attempted...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/aa9024db/attachment.sig>
+So, I would suggest that the binding identify which interrupt specifier
+is secure and which is non-secure.
+
+If there are other interrupts added in the future like the performance interrupt
+the definition could be expanded to add that.
+
+But a question.... why do you need the #global-interrupts property
+at all?   Is the number of "global" interrupts really implementation dependent?
+Does't a specific compatible string imply the number of interrupts that there
+actually are?
+
+>> > +- mmu-masters   : A list of phandles to device nodes representing bus
+>> > +                  masters for which the SMMU can provide a translation
+>> > +                  and their corresponding StreamIDs (see example below).
+>> > +                  Each device node linked from this list must have a
+>> > +                  "#stream-id-cells" property, indicating the number of
+>> > +                  StreamIDs associated with it.
+>>
+>> So to find a the SMMU for a given device, I walk up the bus hierarchy
+>> until I find an SMMU?
+>
+> Again, the code is better than any explanation I can give here, but we
+> basically construct a tree of masters for each SMMU in the system based on
+> the mmu-masters property, which we can later search.
+
+I see.
+
+>> > +** System MMU optional properties:
+>> > +
+>> > +- smmu-parent   : When multiple SMMUs are chained together, this
+>> > +                  property can be used to provide a phandle to the
+>> > +                  parent SMMU (that is the next SMMU on the path going
+>> > +                  from the mmu-masters towards memory) node for this
+>> > +                  SMMU.
+>>
+>> Why is an explicit phandle link needed here when you don't need a
+>> smmu-parent phandle in each mmu-master?    Won't walking the bus
+>> hierarchy identify the parent SMMU if things are chained?
+>
+> What bus hierarchy? If I have two SMMU device nodes, how do I infer any
+> topological information without an explicit linkage?
+
+I really don't know anything about SMMU chaining, but am inferring what
+this might look like.   Does the "child" SMMU look just like another
+mmu-master to the parent?   If so, why not just use the mmu-masters
+property to establish the relationship.
+
+I just found it a bit strange that the relationship between I/O mmu-masters
+is defined from parent SMMU node pointing to the device, and the
+relationship between a 'child' SMMU and a parent is established
+in the other direction.   Not a big deal.
+
+Stuart
