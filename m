@@ -1,28 +1,30 @@
-From: wangyuhang2014@gmail.com (=?GB2312?B?zfXT7rq9?=)
-Date: Wed, 26 Jun 2013 18:33:17 +0800
-Subject: DUAL/QUAD SPI SUPPORT
-Message-ID: <CAHSAbzO2+wAmxyafDgfN-a-Q+6iWjP_Ho7-kW3g-_mC=qXp-vA@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 26 Jun 2013 12:31:41 +0200
+Subject: [PATCH 01/23] ARM: tegra: Create a DT header defining swgroups ID
+In-Reply-To: <20130626100648.GC27083@manwe>
+References: <1372238906-9346-2-git-send-email-hdoyu@nvidia.com><20130626100648.GC27083@manwe>
+Message-ID: <20130626.133141.857713230994773030.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI
+Hi Thierry,
 
-I met some troubles in development and I really hope that you can give
-me a hand, Thanks a lot.
+Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 26 Jun 2013 12:06:49 +0200:
+...
+> I'm not entirely sure where to find these mappings in the TRM. I see
+> that there's a list of the groups in 15.10.11, but where do the numbers
+> come from?
 
-Question:
-Now I am in developing SPI Controller Driver. But our SPI Controller
-supports DUAL and QUAD modes and the slave device is a flash
-chip(which also support DUAL and QUAD). Linux kernel version I am
-working with is 3.0.39 and I also have checked the latest version 3.9.4,
-but there is no members in the SPI related struction to support DUAL and
-QUAD. In that situation I have to add members in "struct spi_transfer"
-which provide the flash transfer mode(DUAL/QUAD) to spi driver.
-1:So I want to know the reason that why linux SPI do not support DUAL
-and QUAD modes.
-2:What I expect is to add members in "struct spi_transfer" so that
-slave can provide the information. Is that any problems exist?
-If you think that is possible, I can provide the patch and some details
+To convert swgroup ID bit to register address,
 
+#define HWGRP_ASID_REG(x) ((x) * sizeof(u32) + SMMU_AFI_ASID)
 
-  Thank you
+in "[PATCH 15/23] iommu/tegra: smmu: Calculate ASID register offset by ID"
+
+> And why are some of the names aliased? If it's for
+> readability only maybe we could add some more for SWGID_HC ->
+> SWGID_HOST1X and perhaps SWGID_NV -> SWGID_GR3D.
+
+I used the exact same name from TRM register definition. I thought
+that same naming in TRM may be better since this bit is converted to
+register, but I'm quite open to rename if needed.
