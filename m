@@ -1,282 +1,35 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 26 Jun 2013 12:46:42 +0200
-Subject: [PATCH 3/3] ARM: EXYNOS: move cpuidle driver to drivers/cpuidle/
-In-Reply-To: <1372241627-22695-4-git-send-email-b.zolnierkie@samsung.com>
-References: <1372241627-22695-1-git-send-email-b.zolnierkie@samsung.com>
- <1372241627-22695-4-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <51CAC692.4080902@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 26 Jun 2013 12:45:14 +0200
+Subject: [PATCH 04/23] ARM: dt: tegra30: Register AHB/IOMMU device first
+In-Reply-To: <1372238906-9346-5-git-send-email-hdoyu@nvidia.com>
+References: <1372238906-9346-5-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20130626104514.GJ27083@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2013 12:13 PM, Bartlomiej Zolnierkiewicz wrote:
-> While at it:
-> - remove "common.h" include
-> - remove wrong comment about file path
+On Wed, Jun 26, 2013 at 12:28:07PM +0300, Hiroshi Doyu wrote:
+> Move up AHB/IOMMU to register them earlier than others. IOMMU needs
+> AHB, and IOMMU needs to register all platform devices as
+> IOMMU'able. So AHB/IOMMU needs to be instanciated at very beginning.
 > 
-> Tested on Exynos4210 (Universal C210 board).
-
-I agree to move the driver to the drivers/cpuidle, but the header
-#include <mach/regs-clock.h> shouldn't appear in this file.
-
-There were several attempts to move the cpuidle drivers to this
-directory [1]  and we agree to separate the pm code from the driver
-code. A bit of code encapsulation should be done here before.
-
-Thanks
-  -- Daniel
-
-ps : "use -M to generate the patch" when moving files from one directory
-to another one.
-
-[1] https://patchwork.kernel.org/patch/2445191/
-
-> Cc: Jaecheol Lee <jc.lee@samsung.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Amit Daniel Kachhap <amit.kachhap@linaro.org>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 > ---
->  arch/arm/mach-exynos/Makefile    |  1 -
->  arch/arm/mach-exynos/cpuidle.c   | 95 ----------------------------------------
->  drivers/cpuidle/Makefile         |  3 ++
->  drivers/cpuidle/cpuidle-exynos.c | 92 ++++++++++++++++++++++++++++++++++++++
->  4 files changed, 95 insertions(+), 96 deletions(-)
->  delete mode 100644 arch/arm/mach-exynos/cpuidle.c
->  create mode 100644 drivers/cpuidle/cpuidle-exynos.c
-> 
-> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-> index b09b027..0f91c7a 100644
-> --- a/arch/arm/mach-exynos/Makefile
-> +++ b/arch/arm/mach-exynos/Makefile
-> @@ -16,7 +16,6 @@ obj-$(CONFIG_ARCH_EXYNOS)	+= common.o
->  
->  obj-$(CONFIG_PM)		+= pm.o
->  obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
-> -obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
->  
->  obj-$(CONFIG_ARCH_EXYNOS)	+= pmu.o
->  
-> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-> deleted file mode 100644
-> index d6e5115..0000000
-> --- a/arch/arm/mach-exynos/cpuidle.c
-> +++ /dev/null
-> @@ -1,95 +0,0 @@
-> -/* linux/arch/arm/mach-exynos4/cpuidle.c
-> - *
-> - * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-> - *		http://www.samsung.com
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> -*/
-> -
-> -#include <linux/kernel.h>
-> -#include <linux/init.h>
-> -#include <linux/cpuidle.h>
-> -#include <linux/cpu_pm.h>
-> -#include <linux/io.h>
-> -#include <linux/export.h>
-> -#include <linux/time.h>
-> -
-> -#include <asm/proc-fns.h>
-> -#include <asm/cpuidle.h>
-> -#include <mach/regs-clock.h>
-> -
-> -#include "common.h"
-> -
-> -static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
-> -
-> -static struct cpuidle_driver exynos4_idle_driver = {
-> -	.name			= "exynos4_idle",
-> -	.owner			= THIS_MODULE,
-> -	.states = {
-> -		[0] = ARM_CPUIDLE_WFI_STATE,
-> -	},
-> -	.state_count = 1,
-> -	.safe_state_index = 0,
-> -};
-> -
-> -static void __init exynos5_core_down_clk(void)
-> -{
-> -	unsigned int tmp;
-> -
-> -	/*
-> -	 * Enable arm clock down (in idle) and set arm divider
-> -	 * ratios in WFI/WFE state.
-> -	 */
-> -	tmp = PWR_CTRL1_CORE2_DOWN_RATIO | \
-> -	      PWR_CTRL1_CORE1_DOWN_RATIO | \
-> -	      PWR_CTRL1_DIV2_DOWN_EN	 | \
-> -	      PWR_CTRL1_DIV1_DOWN_EN	 | \
-> -	      PWR_CTRL1_USE_CORE1_WFE	 | \
-> -	      PWR_CTRL1_USE_CORE0_WFE	 | \
-> -	      PWR_CTRL1_USE_CORE1_WFI	 | \
-> -	      PWR_CTRL1_USE_CORE0_WFI;
-> -	__raw_writel(tmp, EXYNOS5_PWR_CTRL1);
-> -
-> -	/*
-> -	 * Enable arm clock up (on exiting idle). Set arm divider
-> -	 * ratios when not in idle along with the standby duration
-> -	 * ratios.
-> -	 */
-> -	tmp = PWR_CTRL2_DIV2_UP_EN	 | \
-> -	      PWR_CTRL2_DIV1_UP_EN	 | \
-> -	      PWR_CTRL2_DUR_STANDBY2_VAL | \
-> -	      PWR_CTRL2_DUR_STANDBY1_VAL | \
-> -	      PWR_CTRL2_CORE2_UP_RATIO	 | \
-> -	      PWR_CTRL2_CORE1_UP_RATIO;
-> -	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
-> -}
-> -
-> -int __init exynos4_init_cpuidle(void)
-> -{
-> -	int cpu_id, ret;
-> -	struct cpuidle_device *device;
-> -
-> -	if (soc_is_exynos5250())
-> -		exynos5_core_down_clk();
-> -
-> -	ret = cpuidle_register_driver(&exynos4_idle_driver);
-> -	if (ret) {
-> -		printk(KERN_ERR "CPUidle failed to register driver\n");
-> -		return ret;
-> -	}
-> -
-> -	for_each_online_cpu(cpu_id) {
-> -		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
-> -		device->cpu = cpu_id;
-> -
-> -		ret = cpuidle_register_device(device);
-> -		if (ret) {
-> -			printk(KERN_ERR "CPUidle register device failed\n");
-> -			return ret;
-> -		}
-> -	}
-> -
-> -	return 0;
-> -}
-> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-> index 0d8bd55..37c6178 100644
-> --- a/drivers/cpuidle/Makefile
-> +++ b/drivers/cpuidle/Makefile
-> @@ -6,4 +6,7 @@ obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
->  obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
->  
->  obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
-> +ifeq ($(CONFIG_ARCH_EXYNOS),y)
-> +	obj-y += cpuidle-exynos.o
-> +endif
->  obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
-> diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
-> new file mode 100644
-> index 0000000..1c592d2
-> --- /dev/null
-> +++ b/drivers/cpuidle/cpuidle-exynos.c
-> @@ -0,0 +1,92 @@
-> +/*
-> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/cpu_pm.h>
-> +#include <linux/io.h>
-> +#include <linux/export.h>
-> +#include <linux/time.h>
-> +
-> +#include <asm/proc-fns.h>
-> +#include <asm/cpuidle.h>
-> +#include <mach/regs-clock.h>
-> +
-> +static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
-> +
-> +static struct cpuidle_driver exynos4_idle_driver = {
-> +	.name			= "exynos4_idle",
-> +	.owner			= THIS_MODULE,
-> +	.states = {
-> +		[0] = ARM_CPUIDLE_WFI_STATE,
-> +	},
-> +	.state_count = 1,
-> +	.safe_state_index = 0,
-> +};
-> +
-> +static void __init exynos5_core_down_clk(void)
-> +{
-> +	unsigned int tmp;
-> +
-> +	/*
-> +	 * Enable arm clock down (in idle) and set arm divider
-> +	 * ratios in WFI/WFE state.
-> +	 */
-> +	tmp = PWR_CTRL1_CORE2_DOWN_RATIO | \
-> +	      PWR_CTRL1_CORE1_DOWN_RATIO | \
-> +	      PWR_CTRL1_DIV2_DOWN_EN	 | \
-> +	      PWR_CTRL1_DIV1_DOWN_EN	 | \
-> +	      PWR_CTRL1_USE_CORE1_WFE	 | \
-> +	      PWR_CTRL1_USE_CORE0_WFE	 | \
-> +	      PWR_CTRL1_USE_CORE1_WFI	 | \
-> +	      PWR_CTRL1_USE_CORE0_WFI;
-> +	__raw_writel(tmp, EXYNOS5_PWR_CTRL1);
-> +
-> +	/*
-> +	 * Enable arm clock up (on exiting idle). Set arm divider
-> +	 * ratios when not in idle along with the standby duration
-> +	 * ratios.
-> +	 */
-> +	tmp = PWR_CTRL2_DIV2_UP_EN	 | \
-> +	      PWR_CTRL2_DIV1_UP_EN	 | \
-> +	      PWR_CTRL2_DUR_STANDBY2_VAL | \
-> +	      PWR_CTRL2_DUR_STANDBY1_VAL | \
-> +	      PWR_CTRL2_CORE2_UP_RATIO	 | \
-> +	      PWR_CTRL2_CORE1_UP_RATIO;
-> +	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
-> +}
-> +
-> +int __init exynos4_init_cpuidle(void)
-> +{
-> +	int cpu_id, ret;
-> +	struct cpuidle_device *device;
-> +
-> +	if (soc_is_exynos5250())
-> +		exynos5_core_down_clk();
-> +
-> +	ret = cpuidle_register_driver(&exynos4_idle_driver);
-> +	if (ret) {
-> +		printk(KERN_ERR "CPUidle failed to register driver\n");
-> +		return ret;
-> +	}
-> +
-> +	for_each_online_cpu(cpu_id) {
-> +		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
-> +		device->cpu = cpu_id;
-> +
-> +		ret = cpuidle_register_device(device);
-> +		if (ret) {
-> +			printk(KERN_ERR "CPUidle register device failed\n");
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> 
+>  arch/arm/boot/dts/tegra30.dtsi | 33 +++++++++++++++++----------------
+>  1 file changed, 17 insertions(+), 16 deletions(-)
 
+This just happens to work because DTC keeps the order from the DTS in
+the DTB and the Linux implementation sequentially instantiates devices
+from DT nodes. Neither should be assumed though when writing DTS files.
+Other implementations (DTC or OS) could do things differently.
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+But if I understand correctly there is another solution which should
+solve this issue properly.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/93649077/attachment-0001.sig>
