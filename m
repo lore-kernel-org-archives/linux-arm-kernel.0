@@ -1,67 +1,64 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 26 Jun 2013 12:28:24 +0300
-Subject: [PATCH 21/23] iommu/tegra: smmu: Get swgroup ID from DT
-Message-ID: <1372238906-9346-22-git-send-email-hdoyu@nvidia.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 26 Jun 2013 12:06:49 +0200
+Subject: [PATCH 01/23] ARM: tegra: Create a DT header defining swgroups ID
+In-Reply-To: <1372238906-9346-2-git-send-email-hdoyu@nvidia.com>
+References: <1372238906-9346-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20130626100648.GC27083@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get swgroup ID from DT. "nvidia,swgroups" indicates which swgroup IDs
-a device belongs to.
+On Wed, Jun 26, 2013 at 12:28:04PM +0300, Hiroshi Doyu wrote:
+[...]
+> +#define SWGID_AFI 0
+> +#define SWGID_AVPC 1
+> +#define SWGID_DC 2
+> +#define SWGID_DCB 3
+> +#define SWGID_EPP 4
+> +#define SWGID_G2 5
+> +#define SWGID_HC 6
+> +#define SWGID_HDA 7
+> +#define SWGID_ISP 8
+> +#define SWGID_ISP2 SWGID_ISP
+> +/* UNUSED: 9 */
+> +/* UNUSED: 10 */
+> +#define SWGID_MPE 11
+> +#define SWGID_MSENC SWGID_MPE
+> +#define SWGID_NV 12
+> +#define SWGID_NV2 13
+> +#define SWGID_PPCS 14
+> +#define SWGID_SATA2 15
+> +#define SWGID_SATA 16
+> +#define SWGID_VDE 17
+> +#define SWGID_VI 18
+> +#define SWGID_VIC 19
+> +#define SWGID_XUSB_HOST 20
+> +#define SWGID_XUSB_DEV 21
+> +#define SWGID_A9AVP 22
+> +#define SWGID_TSEC 23
+> +#define SWGID_PPCS1 24
+> +/* UNUSED: 25 */
+> +/* UNUSED: 26 */
+> +/* UNUSED: 27 */
+> +/* UNUSED: 28 */
+> +/* UNUSED: 29 */
+> +/* UNUSED: 30 */
+> +/* UNUSED: 31 */
+> +
+> +/* Reserved: 32-63 */
+> +
+> +#define SWGID(x)	(1ULL << SWGID_##x)
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- arch/arm/boot/dts/tegra30.dtsi |  1 -
- drivers/iommu/tegra-smmu.c     | 20 +++++++++++++++++++-
- 2 files changed, 19 insertions(+), 2 deletions(-)
+I'm not entirely sure where to find these mappings in the TRM. I see
+that there's a list of the groups in 15.10.11, but where do the numbers
+come from? And why are some of the names aliased? If it's for
+readability only maybe we could add some more for SWGID_HC ->
+SWGID_HOST1X and perhaps SWGID_NV -> SWGID_GR3D.
 
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 7c480f2..a116737 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -1,6 +1,5 @@
- #include <dt-bindings/clock/tegra30-car.h>
- #include <dt-bindings/gpio/tegra-gpio.h>
--#include <dt-bindings/iommu/tegra-swgid.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- #include "skeleton.dtsi"
-diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-index 50eb843..96dbef3 100644
---- a/drivers/iommu/tegra-smmu.c
-+++ b/drivers/iommu/tegra-smmu.c
-@@ -314,6 +314,24 @@ static inline void smmu_write(struct smmu_device *smmu, u32 val, size_t offs)
- 
- #define smmu_client_hwgrp(c)	(c->as->smmu->swgroups)
- 
-+static u64 tegra_smmu_of_get_swgids(struct device *dev)
-+{
-+	size_t bytes;
-+	const char *propname = "nvidia,memory-clients";
-+	const __be32 *prop;
-+	int i;
-+	u64 swgids = 0;
-+
-+	prop = of_get_property(dev->of_node, propname, &bytes);
-+	if (!prop || !bytes)
-+		return 0;
-+
-+	for (i = 0; i < bytes / sizeof(u32); i++, prop++)
-+		swgids |= 1ULL << be32_to_cpup(prop);
-+
-+	return swgids;
-+}
-+
- static int __smmu_client_set_hwgrp(struct smmu_client *c,
- 				   u64 map, int on)
- {
-@@ -725,7 +743,7 @@ static int smmu_iommu_attach_dev(struct iommu_domain *domain,
- 		return -ENOMEM;
- 	client->dev = dev;
- 	client->as = as;
--	map = smmu->swgroups;
-+	map = tegra_smmu_of_get_swgids(dev);
- 	if (!map)
- 		return -EINVAL;
- 
--- 
-1.8.1.5
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/3a0229ff/attachment-0001.sig>
