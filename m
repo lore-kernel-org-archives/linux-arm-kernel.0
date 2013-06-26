@@ -1,104 +1,56 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Wed, 26 Jun 2013 11:13:04 +0300
-Subject: [PATCH] Documentation: dt: bindings: TI WiLink modules
-In-Reply-To: <20130626062409.GK5523@atomide.com>
-References: <1372149330-24335-1-git-send-email-coelho@ti.com>
- <1372189024.18889.19.camel@cumari.coelho.fi>
- <20130626062409.GK5523@atomide.com>
-Message-ID: <1372234384.18889.37.camel@cumari.coelho.fi>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Wed, 26 Jun 2013 10:15:07 +0100
+Subject: [PATCH v5 0/7] ARM:sti: Add STiH415/STiH416 platform and board
+ support
+In-Reply-To: <CAOesGMhsaGcpW80CjBRtwVjJLOaRj8yTa6xFz_gjG1WPqTAKLQ@mail.gmail.com>
+References: <1372158822-19160-1-git-send-email-srinivas.kandagatla@st.com>
+ <20130625203002.GA15068@quad.lixom.net>
+ <CAOesGMhsaGcpW80CjBRtwVjJLOaRj8yTa6xFz_gjG1WPqTAKLQ@mail.gmail.com>
+Message-ID: <51CAB11B.1070209@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Tue, 2013-06-25 at 23:24 -0700, Tony Lindgren wrote:
-> * Luciano Coelho <coelho@ti.com> [130625 12:43]:
-> > On Tue, 2013-06-25 at 11:35 +0300, Luciano Coelho wrote:
-> > > Add device tree bindings documentation for the TI WiLink modules.
-> > > Currently only the WLAN part of the WiLink6, WiLink7 and WiLink8
-> > > modules is supported.
-> > > 
-> > > Signed-off-by: Luciano Coelho <coelho@ti.com>
-> > > ---
-
-[...]
-
-> > > +Optional properties:
-> > > +--------------------
-> > > +
-> > > +- refclock: the internal WLAN reference clock frequency (required for
-> > > +  WiLink6 and WiLink7; not used for WiLink8).  Must be one of the
-> > > +  following:
-> > > +	0 = 19.2 MHz
-> > > +	1 = 26.0 MHz
-> > > +	2 = 38.4 MHz
-> > > +	3 = 52.0 MHz
-> > > +	4 = 38.4 MHz, XTAL
-> > > +	5 = 26.0 MHz, XTAL
+On 25/06/13 21:47, Olof Johansson wrote:
+> On Tue, Jun 25, 2013 at 1:30 PM, Olof Johansson <olof@lixom.net> wrote:
+>> On Tue, Jun 25, 2013 at 12:13:42PM +0100, Srinivas KANDAGATLA wrote:
+>>> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>>>
+>>> This patch-set adds basic support for STMicroelectronics STi series SOCs
+>>> which includes STiH415 and STiH416 with B2000 and B2020 board support.
+>>>
+>>> STiH415 and STiH416 are dual-core ARM Cortex-A9 CPU, designed for use in
+>>> Set-top-boxes. The SOC support is available in mach-sti which contains
+>>> support code for STiH415, STiH416 SOCs including the generic board support.
+>>>
+>>> The reason for adding two SOCs at this patch set is to show that no new
+>>> C code is required for second SOC(STiH416) support.
+>>>
+>>> This patch-set only contains the SOC support, all the driver support for
+>>> this platform are submitted to respective mailing lists.
+>>>
+>>> Changes since v4:
+>>>       - Renamed mach-stixxxx to mach-sti as suggested by Olof J.
+>>
+>> Thanks!
+>>
+>> I've merged this into next/late, and I'll drop the previous test merge by Arnd
+>> of the last version of the patch set.
 > 
-> This is just the omap refclock, right? If so, you can just pass the
-> standard clock phandle. I know we don't yet have the DT clocks merged,
-> but Tero just posted another revision of those.
-
-This is an internal clock.  This clock is part of the module that
-contains the WiLink chip.  It is not associated with the clocks in the
-main board (OMAP).
-
-
-> > > +- tcxoclock: the internal WLAN TCXO clock frequency (required for
-> > > +  WiLink7 not used for WiLink6 and WiLink8).  Must be one of the
-> > > +  following:
-> > > +	0 = 19.200 MHz
-> > > +	1 = 26.000 MHz
-> > > +	2 = 38.400 MHz
-> > > +	3 = 52.000 MHz
-> > > +	4 = 16.368 MHz
-> > > +	5 = 32.736 MHz
-> > > +	6 = 16.800 MHz
-> > > +	7 = 33.600 MHz
+Thanks Olof.
+> I noticed that the defconfig update contained new drivers/options that
+> won't make it into 3.11. So to avoid churn, I dropped those. We'll do
+> a patch to enable all new platforms and drivers towards the end of the
+> merge window and apply on top of next/late, I think, so it should be
+> taken care of by that.
+Ok..
 > 
-> Where does this clock come from? Maybe this can be set based on the
-> compatible value if it's completely internal?
-
-This is also a completely internal clock.  My "compatible" values are
-based on the WiLink chip itself, not in the module that contains the
-chip.  There are several modules and they are the ones that specify the
-clock frequencies.  This data I'm passing here is just to tell the
-WiLink chip which frequencies the module uses.
-
-My driver is for the WiLink chip itself, not to the module (in theory).
-So I think having the WiLink values as bindings would be more generic
-than having to specify values for each available module (eg.
-"lsr-research,tiwi-ble") and mapping those values to specific
-frequencies in the driver.
-
- 
-> > If this is okay for everyone, can I push this via my tree (which goes to
-> > linux-wireless->net->linus)? I think it makes more sense to send the
-> > documentation together with the patch that actually implements the DT
-> > node parsing in the driver.
+> The rest of the code from the series is in though.
 > 
-> If we can use the standard bindings, it might be worth waiting until
-> we have the DT clocks available as we have the pdata workaround merged
-> anyways. That's because then we don't need to support the custom
-> binding later on ;)
-
-I looked into Tero's patches and I considered using the generic clock
-bindings, but I think it doesn't make sense in this case.  The thing is
-that the module is not providing the clocks to the main board.  Neither
-is the WiLink chip consuming clocks from the main board.
-
-I thought about specifying clock providers and consumers to be used only
-by the module and WiLink chip, but I think it's overkill.  And we would
-also have to find a way to prevent the main clock framework from trying
-to handle them.
-
-So, my conclusion was that, even though these *are* clocks, from the
-main board's perspective they're just specifications of what the module
-looks like.
-
-Does this make sense?
-
---
-Cheers,
-Luca.
+> -Olof
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
