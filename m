@@ -1,51 +1,104 @@
-From: trini@ti.com (Tom Rini)
-Date: Wed, 26 Jun 2013 09:26:11 -0400
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <51CAEB33.5010101@ti.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
- <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
- <51CAEB33.5010101@ti.com>
-Message-ID: <51CAEBF3.1010507@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 26 Jun 2013 14:20:23 +0100
+Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
+In-Reply-To: <51CA2B03.4080106@wwwdotorg.org>
+References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
+ <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
+ <51CA2B03.4080106@wwwdotorg.org>
+Message-ID: <CACxGe6vsBKnbipR-Zd1T9Ox1J2ugFmShrGXGUzPa_=D9TJvFQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2013 09:22 AM, Rajendra Nayak wrote:
->>>
->>> Just to confirm, my problems with mainline were with appended DTB also.
->>> Separate DTB and zImage work fine (at least using u-boot v2013.04.)
->>>
->>> That being said, appended DTB should still work, so there's a bug
->>> hiding
->>> someplace that needs to be found fixed.
->>>
->>> Can you guys update your tests to test appended DTB also?
->>>
->>
->> What is missing here is, 
->>
->> CONFIG_ARM_APPENDED_DTB = y
->> CONFIG_ARM_ATAG_DTB_COMPAT = y
->>
->>
->> And for the code which is required in case of appended DTB, please refer to the code
->> "arch/arm/boot/compressed/head.S"
->>
->>
->> Please __NOTE__ that these options are not enabled in default omap2plus_defconfig.
-> 
-> Paul/Kevin,
-> 
-> Apart from confirming if you are manually enabling these options, can you also give some
-> details on how you append the dtb to the kernel image?
+On Wed, Jun 26, 2013 at 12:42 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 06/25/2013 12:11 PM, Leif Lindholm wrote:
+>> This patch provides documentation of the [U]EFI runtime services and
+>> configuration features.
+>
+>
+>> diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
+>
+>> +The implementation depends on receiving pointers to the UEFI memory map
+>> +and System Table in a Flattened Device Tree - so is only available with
+>> +CONFIG_OF.
+>> +
+>> +It (early) parses the FDT for the following parameters:
+>
+> Part of this document (the raw requirements for DT content, rather than
+> the discussion of OS implementation/behaviour in parsing/interpreting
+> the properties) should be part of a file in
+> Documentation/devicetree/bindings/ (arm/uefi.txt?).
+>
+> What node are these properties expected to be contained within?
+>
+> Shouldn't that node be required to contain a compatible value, which
+> would define the schema for the other properties?
 
-Yes, please confirm that they're being set.  I've managed to reproduce
-the failure, with them off, and enabling them brings things back to life.
+Typically, a compatible property isn't only used for nodes that
+represent a device or a so-called 'virtual' device (ie. such as to
+describe how all the sound complex is wired together) since that
+should be the clue to an OS that a device driver will bind against the
+node. I think these properties can be dropped into /chosen without
+defining a new compatible value.
 
-Pending rmk's reply in another part of the thread, I'll submit a patch
-to enable the above in omap2plus_defconfig.
+>> +- 'efi-system-table':
+>> +  Physical address of the system table. (required)
+>> +- 'efi-runtime-mmap':
+>> +  Physical address of an EFI memory map, containing at least
+>> +  the regions to be preserved. (required)
+>> +- 'efi-runtime-mmap-size':
+>> +  Size in bytes of the provided memory map. (required)
+>> +- 'efi-mmap-desc-size':
+>> +  Size of each descriptor in the memory map. (override default)
+>> +- 'efi-mmap-desc-ver':
+>> +  Memory descriptor format version. (override default)
+>> +
+>> +Since UEFI firmware on ARM systems are required to use a 1:1 memory map
+>> +even on LPAE-capable systems, the above fields are 32-bit regardless.
+>
+> What about ARMv8? Is the intention to have a separate definition for the
+> UEFI bindings on ARMv8, so that compatibility isn't an issue? What if a
+> future version of UEFI allows LPAE usage?
 
--- 
-Tom
+It is unlikely that will happen on v7 since newer versions of UEFI are
+expected to remain backwards compatible with the current spec.
+
+> It may be better to explicitly state that the size of those properties
+> is either #address-cells from the parent node (presumably the top-level
+> of the DT), and/or introduce some property to explicitly state the size
+> of the properties. Those mechanisms would allow forward-compatibility to
+> LPAE usage or ARMv8 without requiring the text of the binding definition
+> to change.
+>
+> Also, it seems legal to state the physical addresses using 64-bits even
+> if the actual values themselves are restricted to 32-bit range by the
+> UEFI spec. Illegal values would presumably cause SW that interprets them
+> to fail error-checks, and be rejected.
+>
+>> +After the kernel has mapped the required regions into its address space,
+>> +a SetVirtualAddressMap() call is made into UEFI in order to update
+>> +relocations. This call must be performed with all the code in a 1:1
+>
+> Presumably "all the code" also includes "all .data and .bss", or
+> whatever the UEFI-equivalent may be? I'm not familiar with UEFI at all;
+> does the "EFI memory map" mentioned above describe all the memory
+> regions that must be mapped to use UEFI?
+
+yes. Actually, there is an API for retrieving the memory map from UEFI
+at runtime, but it is difficult to call from within the kernel.
+Actually, my preference would be to not require GRUB or the Linux
+Loader to add the above properties at all and instead have the kernel
+proper retrieve the memory map directly. That would reduce the
+dependency on GRUB/LinuxLoader doing things correctly, but Leif knows
+better how feasible that would be.
+
+>
+>> +mapping. This implementation achieves this by temporarily disabling the
+>> +MMU for the duration of this call. This can only be done safely:
+>> +- before secondary CPUs are brought online.
+>> +- after early_initcalls have completed, sinze it uses setup_mm_for_reboot().
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
