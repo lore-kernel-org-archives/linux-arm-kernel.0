@@ -1,56 +1,48 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 26 Jun 2013 09:39:46 -0500
-Subject: [-next PATCH 1/2] ARM: OMAP4: sleep: build OMAP4 specific functions
- only for OMAP4
-In-Reply-To: <1372257587-21720-1-git-send-email-nm@ti.com>
-References: <1372257587-21720-1-git-send-email-nm@ti.com>
-Message-ID: <1372257587-21720-2-git-send-email-nm@ti.com>
+Date: Wed, 26 Jun 2013 09:39:45 -0500
+Subject: [-next PATCH 0/2] ARM: OMAP5: fix build breakage due to SCU usage
+Message-ID: <1372257587-21720-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU sleep and resume functions for Cortex-A9 based OMAP4 and
-Cortex-A15 based OMAP5 are different. Hence, even though we reuse
-most of the remaining file as part of OMAP4/5 consolidation, build
-OMAP4 specific sleep/resume operations only for OMAP4. SCU is not used
-OMAP5.
+Hi,
 
-This fixes the following build failure with OMAP5 only build:
+Cortex-A15 based OMAP5 does not use Snoop Control Unit(SCU)[1].
+However, there is lot of code that is shared between Cortex-A9 based
+OMAP4 and OMAP5, hence functionality code is shared with runtime usage
+of SCU based on SoC worked on. However on building with OMAP5 only
+generates the following errors:
 arch/arm/mach-omap2/built-in.o: In function `scu_gp_set':
 arch/arm/mach-omap2/sleep44xx.S:132: undefined reference to `scu_power_mode'
 arch/arm/mach-omap2/built-in.o: In function `scu_gp_clear':
 arch/arm/mach-omap2/sleep44xx.S:229: undefined reference to `scu_power_mode'
+arch/arm/mach-omap2/built-in.o: In function `omap4_smp_init_cpus':
+arch/arm/mach-omap2/omap-smp.c:185: undefined reference to `scu_get_core_count'
+arch/arm/mach-omap2/built-in.o: In function `omap4_smp_prepare_cpus':
+arch/arm/mach-omap2/omap-smp.c:211: undefined reference to `scu_enable'
 
-Reported-by: Pekon Gupta <pekon@ti.com>
-Reported-by: Vincent Stehl? <v-stehle@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
+This was attempted to be "fixed" in various attempts in the past [2] [3].
+
+This series applies on top of the other fixes in discussion for linux-next [4] [5].
+
+Based on:
+git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git  next-20130626
+
+Nishanth Menon (2):
+  ARM: OMAP4: sleep: build OMAP4 specific functions only for OMAP4
+  ARM: scu: provide inline dummy functions when SCU is not present
+
+ arch/arm/include/asm/smp_scu.h  |   13 ++++++++++++-
  arch/arm/mach-omap2/sleep44xx.S |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ 2 files changed, 17 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep44xx.S
-index 88ff83a..9086ce0 100644
---- a/arch/arm/mach-omap2/sleep44xx.S
-+++ b/arch/arm/mach-omap2/sleep44xx.S
-@@ -34,6 +34,8 @@ ppa_zero_params:
- ppa_por_params:
- 	.word		1, 0
- 
-+#ifdef CONFIG_ARCH_OMAP4
-+
- /*
-  * =============================
-  * == CPU suspend finisher ==
-@@ -326,7 +328,9 @@ skip_l2en:
- 
- 	b	cpu_resume			@ Jump to generic resume
- ENDPROC(omap4_cpu_resume)
--#endif
-+#endif	/* CONFIG_ARCH_OMAP4 */
-+
-+#endif	/* defined(CONFIG_SMP) && defined(CONFIG_PM) */
- 
- #ifndef CONFIG_OMAP4_ERRATA_I688
- ENTRY(omap_bus_sync)
+[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407e/CHDFJICC.html
+[2] https://patchwork.kernel.org/patch/2568091/
+[3] http://marc.info/?t=137120115400001&r=1&w=2
+[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/178209.html
+[5] https://patchwork.kernel.org/patch/2781471/
+
+Regards,
+Nishanth Menon
 -- 
 1.7.9.5
