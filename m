@@ -1,76 +1,35 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 26 Jun 2013 12:28:04 +0300
-Subject: [PATCH 01/23] ARM: tegra: Create a DT header defining swgroups ID
-Message-ID: <1372238906-9346-2-git-send-email-hdoyu@nvidia.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 26 Jun 2013 17:53:06 +0900
+Subject: [PATCH 3/4] ARM: shmobile: r8a7790: don't use external clock for SCIFs
+In-Reply-To: <1372236787-23342-1-git-send-email-horms+renesas@verge.net.au>
+References: <1372236787-23342-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1372236787-23342-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a header file to define the swgroup IDs used by the IOMMU(SMMU)
-binding. "swgroup" is a group of H/W clients in Tegra SoC from S/W POV.
+From: Ulrich Hecht <ulrich.hecht@gmail.com>
 
-This will allow the same header to be used by both device tree files,
-and drivers implementing this binding, which guarantees that the two
-stay in sync. This also makes device trees more readable by using names
-instead of magic numbers.
+This is an external component and may or may not be there, while the
+internal clock always works.
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- include/dt-bindings/iommu/tegra-swgid.h | 47 +++++++++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
- create mode 100644 include/dt-bindings/iommu/tegra-swgid.h
+ arch/arm/mach-shmobile/setup-r8a7790.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/dt-bindings/iommu/tegra-swgid.h b/include/dt-bindings/iommu/tegra-swgid.h
-new file mode 100644
-index 0000000..b429ce1
---- /dev/null
-+++ b/include/dt-bindings/iommu/tegra-swgid.h
-@@ -0,0 +1,47 @@
-+/*
-+ * This header provides constants for binding nvidia,swgroup ID
-+ */
-+
-+#ifndef _DT_BINDINGS_IOMMU_TEGRA_SWGID_H
-+#define _DT_BINDINGS_IOMMU_TEGRA_SWGID_H
-+
-+#define SWGID_AFI 0
-+#define SWGID_AVPC 1
-+#define SWGID_DC 2
-+#define SWGID_DCB 3
-+#define SWGID_EPP 4
-+#define SWGID_G2 5
-+#define SWGID_HC 6
-+#define SWGID_HDA 7
-+#define SWGID_ISP 8
-+#define SWGID_ISP2 SWGID_ISP
-+/* UNUSED: 9 */
-+/* UNUSED: 10 */
-+#define SWGID_MPE 11
-+#define SWGID_MSENC SWGID_MPE
-+#define SWGID_NV 12
-+#define SWGID_NV2 13
-+#define SWGID_PPCS 14
-+#define SWGID_SATA2 15
-+#define SWGID_SATA 16
-+#define SWGID_VDE 17
-+#define SWGID_VI 18
-+#define SWGID_VIC 19
-+#define SWGID_XUSB_HOST 20
-+#define SWGID_XUSB_DEV 21
-+#define SWGID_A9AVP 22
-+#define SWGID_TSEC 23
-+#define SWGID_PPCS1 24
-+/* UNUSED: 25 */
-+/* UNUSED: 26 */
-+/* UNUSED: 27 */
-+/* UNUSED: 28 */
-+/* UNUSED: 29 */
-+/* UNUSED: 30 */
-+/* UNUSED: 31 */
-+
-+/* Reserved: 32-63 */
-+
-+#define SWGID(x)	(1ULL << SWGID_##x)
-+
-+#endif /* _DT_BINDINGS_IOMMU_TEGRA_SWGID_H */
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 896d374..6531f3d 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -64,7 +64,7 @@ void __init r8a7790_pinmux_init(void)
+ [index] = {						\
+ 	SCIF_COMMON(PORT_SCIF, baseaddr, irq),		\
+ 	.scbrr_algo_id	= SCBRR_ALGO_2,			\
+-	.scscr = SCSCR_RE | SCSCR_TE | SCSCR_CKE1,	\
++	.scscr = SCSCR_RE | SCSCR_TE,	\
+ }
+ 
+ #define HSCIF_DATA(index, baseaddr, irq)		\
 -- 
-1.8.1.5
+1.8.2.1
