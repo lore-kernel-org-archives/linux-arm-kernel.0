@@ -1,21 +1,43 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 26 Jun 2013 12:33:14 +0200
-Subject: [PATCH 03/23] ARM: dt: tegra30: iommu: Add "nvidia,memory-clients"
-In-Reply-To: <20130626101028.GD27083@manwe>
-References: <1372238906-9346-4-git-send-email-hdoyu@nvidia.com><20130626101028.GD27083@manwe>
-Message-ID: <20130626.133314.1520719774895092173.hdoyu@nvidia.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 26 Jun 2013 17:35:59 +0800
+Subject: [PATCH 2/2] serial: imx: check the return value when enabling the
+ clocks
+In-Reply-To: <1372239359-4054-1-git-send-email-b32955@freescale.com>
+References: <1372239359-4054-1-git-send-email-b32955@freescale.com>
+Message-ID: <1372239359-4054-2-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 26 Jun 2013 12:10:30 +0200:
+In the probe function, we do not check the return value of the
+clk_prepare_enable(). But in actually, the clk_prepare_enable() may fails,
+so check the return value when we enable the clocks.
 
-> * PGP Signed by an unknown key
-> 
-> On Wed, Jun 26, 2013 at 12:28:06PM +0300, Hiroshi Doyu wrote:
-> > Add "nvidia,memory-clients" to identify which swgroup ID a device
-> > belongs to.
-> 
-> Why not call the property "nvidia,swgid" instead? That seems a lot more
-> intuitive.
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ drivers/tty/serial/imx.c |   11 +++++++++--
+ 1 files changed, 9 insertions(+), 2 deletions(-)
 
-Tegra powerdomain also needs this info. Joseph?
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index bfdf764..2aec568 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -1593,8 +1593,15 @@ static int serial_imx_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	clk_prepare_enable(sport->clk_per);
+-	clk_prepare_enable(sport->clk_ipg);
++	ret = clk_prepare_enable(sport->clk_per);
++	if (ret)
++		return ret;
++
++	ret = clk_prepare_enable(sport->clk_ipg);
++	if (ret) {
++		clk_disable_unprepare(sport->clk_per);
++		return ret;
++	}
+ 
+ 	sport->port.uartclk = clk_get_rate(sport->clk_per);
+ 
+-- 
+1.7.1
