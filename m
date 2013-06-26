@@ -1,52 +1,52 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 26 Jun 2013 12:55:33 +0200
+Date: Wed, 26 Jun 2013 15:13:27 +0200
 Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
-In-Reply-To: <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
+In-Reply-To: <CAKv+Gu9_V75jGSq675H+Gi7jkDWBkVDLXvewMuv8dWxx7-VxEw@mail.gmail.com>
 References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
  <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
+ <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
+ <20130626111430.GH26142@mudshark.cambridge.arm.com>
+ <CAKv+Gu_R7=Euaa87kQqR5TfGQLyF6Ad51dBm2CroYHcKMRs_dA@mail.gmail.com>
+ <20130626124009.GL26142@mudshark.cambridge.arm.com>
+ <CAKv+Gu9_V75jGSq675H+Gi7jkDWBkVDLXvewMuv8dWxx7-VxEw@mail.gmail.com>
+Message-ID: <CAKv+Gu-5SsvJCvXkJoqPm-TZx6tr+49pUXfpkSoBo-s+Z8_YmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replying to self:
+On 26 June 2013 14:52, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 26 June 2013 14:40, Will Deacon <will.deacon@arm.com> wrote:
+>> On Wed, Jun 26, 2013 at 12:28:49PM +0100, Ard Biesheuvel wrote:
+>>> So can you suggest a better way of making sure schedule_debug() shoots
+>>> us down if calling schedule() between kernel_neon_begin and
+>>> kernel_neon_end, even on non-preempt builds?
+>>
+>> With what we currently have in the kernel, no, I can't think of a better
+>> way. However, I also don't think that smuggling in a back-end hack is a good
+>> idea either. How about we follow x86's lead on this and rely on the caller
+>> not to sleep for the timebeing? Then, separately to this patch series, you
+>> could look at augmenting the scheduler so that schedule_debug can complain
+>> if it encounters a task that is not expected to sleep? That seems like the
+>> right place to fix this problem, and will benefit other architectures too.
+>>
+>
+> Good point. As preempt_enable/disable already have this side effect on
+> PREEMPT builds, perhaps it wouldn't be such a bad idea to modify them
+> in the non-PREEMPT case to at least complain if schedule() is invoked
+> during such a section.
+>
 
-On 25 June 2013 22:24, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> +void kernel_neon_end(void)
-> +{
-> +       /* Disable the NEON/VFP unit. */
-> +       fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-> +       barrier();
-> +       dec_preempt_count();
-> +}
-> +EXPORT_SYMBOL(kernel_neon_end);
-
-Meh. This is not going to please the RT crowd, as preempt_schedule()
-will not be called on PREEMPT builds in this case.
-
-Propose to replace it with
-
-    preempt_enable();
-#ifndef CONFIG_PREEMPT_COUNT
-    /* in this case, the preempt_enable() right above is just a barrier() */
-    dec_preempt_count();
-#endif
-
-(and the converse in kernel_neon_begin())
-
-In that case, preempt_disable will either be just a barrier(), or it
-will re-enable preemption, and potentially reschedule if the preempt
-count has dropped to zero.
+It appears we have this already, but in the non-PREEMPT case, it needs
+CONFIG_DEBUG_ATOMIC_SLEEP to be defined.
+Let's just rely on preempt_disable() to do the right thing...
 
 -- 
 Ard.
 
 
-> +
-> +#endif /* CONFIG_KERNEL_MODE_NEON */
-> +
->  /*
->   * VFP support code initialisation.
->   */
-> --
-> 1.8.1.2
+> @Russell: you mentioned spinlocks at some point to prevent sleeping.
+> Are you ok with Will's suggestion instead, i.e., to rely on
+> preempt_disable() to do the right thing, and fix it later because
+> currently, it doesn't on non-PREEMPT?
 >
+> --
+> Ard.
