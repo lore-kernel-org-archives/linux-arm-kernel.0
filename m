@@ -1,41 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Jun 2013 20:52:09 +0200
-Subject: [PATCH 0/2] arm: add early_ioremap() support
-In-Reply-To: <1372182401-11029-1-git-send-email-leif.lindholm@linaro.org>
-References: <1372182401-11029-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <201306262052.09640.arnd@arndb.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 26 Jun 2013 12:05:54 -0700
+Subject: [GIT PULL] KVM/ARM queue for 3.11
+Message-ID: <20130626190554.GB41132@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 June 2013, Leif Lindholm wrote:
-> x86 and ia64 have the early_ioremap()/early_iounmap() functions, which are
-> useful for supporting things like UEFI, ACPI and SMBIOS, where configuration
-> tables need to be parsed before proper memory management is available,
-> regardless of highmem status.
-> 
-> This patchset implements a restricted form of early_ioremap(), available
-> before paging_init() only. Like the x86 code on which it is based, it
-> (p)re-uses the fixmap regions for its virtual mapping range. Up to 7
-> simultaneous mappings of up to 128KB can be accommodated in the available
-> fixmap space.
+Hi Gleb and Paolo,
 
-+rmk
+The following changes since commit 87d41fb4da6467622b7a87fd6afe8071abab6dae:
 
-I made a similar suggestion to extending the use of fixmap recently, see
-"Re: SCU registers mapping for CA9/CA5 cores". Russell pointed out that
-fixmap is intentionally limited to just kmap_atomic uses at the moment
-and changing that would potentially have a significant impact when we
-run out of pages in the fixmap area.
+  KVM: s390: Fixed priority of execution in STSI (2013-06-20 23:33:01 +0200)
 
-The method we use on ARM normally is the iotable_init() function, which
-requires hardcoding a virtual address at the moment.
+are available in the git repository at:
 
-It might be nicer to change that code than to put early_ioremap into
-fixmap. Note that early_ioremap in fixmap is a bit of a kludge on x86
-as well because it is very much /not/ a fixed mapping like the rest
-of fixmap, they just use it because it's convenient.
+  git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-3.11
 
-Extending the iotable mechanism on ARM would be the convenient
-solution for us I think.
+for you to fetch changes up to 8bd4ffd6b3a98f00267051dc095076ea2ff06ea8:
 
-	Arnd
+  ARM: kvm: don't include drivers/virtio/Kconfig (2013-06-26 10:50:06 -0700)
+
+
+Thanks,
+-Christoffer
+
+----------------------------------------------------------------
+Anup Patel (1):
+      ARM: KVM: Allow host virt timer irq to be different from guest timer virt irq
+
+Arnd Bergmann (1):
+      ARM: kvm: don't include drivers/virtio/Kconfig
+
+Christoffer Dall (1):
+      Update MAINTAINERS: KVM/ARM work now funded by Linaro
+
+Dave P Martin (1):
+      ARM: KVM: Don't handle PSCI calls via SMC
+
+Geoff Levand (1):
+      arm/kvm: Cleanup KVM_ARM_MAX_VCPUS logic
+
+Marc Zyngier (7):
+      ARM: KVM: remove dead prototype for __kvm_tlb_flush_vmid
+      ARM: KVM: use phys_addr_t instead of unsigned long long for HYP PGDs
+      ARM: KVM: don't special case PC when doing an MMIO
+      ARM: KVM: get rid of S2_PGD_SIZE
+      ARM: KVM: perform save/restore of PAR
+      ARM: KVM: add missing dsb before invalidating Stage-2 TLBs
+      ARM: KVM: clear exclusive monitor on all exception returns
+
+ MAINTAINERS                        |  4 ++--
+ arch/arm/include/asm/kvm_arm.h     |  1 -
+ arch/arm/include/asm/kvm_asm.h     | 24 ++++++++++++------------
+ arch/arm/include/asm/kvm_emulate.h |  5 -----
+ arch/arm/include/asm/kvm_host.h    |  9 +++++++--
+ arch/arm/kvm/Kconfig               |  8 +++-----
+ arch/arm/kvm/arm.c                 |  8 ++++----
+ arch/arm/kvm/coproc.c              |  4 ++++
+ arch/arm/kvm/handle_exit.c         |  3 ---
+ arch/arm/kvm/interrupts.S          | 16 +++++++++++++++-
+ arch/arm/kvm/interrupts_head.S     | 10 ++++++++--
+ arch/arm/kvm/mmio.c                |  6 ------
+ arch/arm/kvm/mmu.c                 |  3 ---
+ arch/arm/kvm/psci.c                |  2 +-
+ arch/arm/kvm/reset.c               | 12 ++++++++++++
+ include/kvm/arm_arch_timer.h       |  4 ++++
+ virt/kvm/arm/arch_timer.c          | 29 ++++++++++++++++++++---------
+ 17 files changed, 92 insertions(+), 56 deletions(-)
