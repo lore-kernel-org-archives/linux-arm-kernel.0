@@ -1,49 +1,110 @@
 From: lho@apm.com (Loc Ho)
-Date: Wed, 26 Jun 2013 11:56:08 -0600
-Subject: [PATCH v5 0/3] clk: Add APM X-Gene SoC clock driver
-Message-ID: <1372269371-22992-1-git-send-email-lho@apm.com>
+Date: Wed, 26 Jun 2013 11:56:10 -0600
+Subject: [PATCH v5 2/3] clk: arm64: Add DTS clock entry for APM X-Gene Storm
+ SoC
+In-Reply-To: <1372269371-22992-2-git-send-email-lho@apm.com>
+References: <1372269371-22992-1-git-send-email-lho@apm.com>
+ <1372269371-22992-2-git-send-email-lho@apm.com>
+Message-ID: <1372269371-22992-3-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds APM X-Gene SoC clock driver support. Reference,
-PCP PLL, SoC PCP, and Ethernet clocks are defined via the DTS.
+clk: arm64: Add DTS clock entry for APM X-Gene Storm SoC with reference to
+reference, PCP PLL, SoC PLL, and Ethernet clocks.
 
--v5:
- * Remove duplicate code for soc/pcp clk init function
- * Remove un-used flags field from structure
- * Merge error handler code for device clock init function
- * Update binding documentation
+Signed-off-by: Loc Ho <lho@apm.com>
+Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+Signed-off-by: Vinayak Kale <vkale@apm.com>
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ arch/arm64/boot/dts/apm-storm.dtsi |   75 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 75 insertions(+), 0 deletions(-)
 
--v4:
- * Remove flags from DTS and check status instead
- * Change DTS reg entry to be identified by reg-names property
-
--v3:
- * Make DTS compatible type for SoC PLL and PCP PLL
- * Make use of of_iomap instead direct ioremap call
- * Make kzalloc with variable instead structure
- * Remove DTS binding for fixed-clock and fixed_factor_clock
- * Remove unnecessary arch_initcall
-
--v2:
- * Make depends on ARM64
- * Fix duplicate registration
-
--v1 - Initial post 
-
-Loc Ho (3):
-  clk: Add APM X-Gene SoC clock driver for reference, PLL, and device
-    clocks.
-  clk: arm64: Add DTS clock entry for APM X-Gene Storm SoC with
-    reference to
-  Documentation: Add documentation for APM X-Gene clock binding with
-    PLL and
-
- Documentation/devicetree/bindings/clock/xgene.txt |  111 +++++
- arch/arm64/boot/dts/apm-storm.dtsi                |   75 +++
- drivers/clk/Kconfig                               |    7 +
- drivers/clk/Makefile                              |    1 +
- drivers/clk/clk-xgene.c                           |  521 +++++++++++++++++++++
- 5 files changed, 715 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/xgene.txt
- create mode 100644 drivers/clk/clk-xgene.c
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index bfdc578..d37d736 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -103,6 +103,81 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 
++		clocks {
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges;
++			refclk: refclk {
++				compatible = "fixed-clock";
++				#clock-cells = <1>;
++				clock-frequency = <100000000>;
++				clock-output-names = "refclk";
++			};
++
++			pcppll: pcppll at 17000100 {
++				compatible = "apm,xgene-pcppll-clock";
++				#clock-cells = <1>;
++				clocks = <&refclk 0>;
++				clock-names = "pcppll";
++				reg = <0x0 0x17000100 0x0 0x1000>;
++				clock-output-names = "pcppll";
++				type = <0>;
++			};
++
++			socpll: socpll at 17000120 {
++				compatible = "apm,xgene-socpll-clock";
++				#clock-cells = <1>;
++				clocks = <&refclk 0>;
++				clock-names = "socpll";
++				reg = <0x0 0x17000120 0x0 0x1000>;
++				clock-output-names = "socpll";
++				type = <1>;
++			};
++
++			socplldiv2: socplldiv2  {
++				compatible = "fixed-factor-clock";
++				#clock-cells = <1>;
++				clocks = <&socpll 0>;
++				clock-names = "socplldiv2";
++				clock-mult = <1>;
++				clock-div = <2>;
++				clock-output-names = "socplldiv2";
++			};
++
++			qmlclk: qmlclk {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "qmlclk";
++				reg = <0x0 0x1703C000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "qmlclk";
++			};
++
++			ethclk: ethclk {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "ethclk";
++				reg = <0x0 0x17000000 0x0 0x1000>;
++				reg-names = "div-reg";
++				divider-offset = <0x238>;
++				divider-width = <0x9>;
++				divider-shift = <0x0>;
++				clock-output-names = "ethclk";
++			};
++
++			eth8clk: eth8clk {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&ethclk 0>;
++				clock-names = "eth8clk";
++				reg = <0x0 0x1702C000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "eth8clk";
++			};
++		};
++
+ 		serial0: serial at 1c020000 {
+ 			device_type = "serial";
+ 			compatible = "ns16550";
+-- 
+1.5.5
