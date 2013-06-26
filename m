@@ -1,27 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 26 Jun 2013 11:07:25 -0600
-Subject: [PATCH] ARM: Make multi_v7_defconfig usable on hardware
-In-Reply-To: <1372210565-22962-1-git-send-email-olof@lixom.net>
-References: <1372210565-22962-1-git-send-email-olof@lixom.net>
-Message-ID: <51CB1FCD.5020008@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 26 Jun 2013 18:11:38 +0100
+Subject: [PATCH] ARM: Add support for LPAE style CONTEXTIDR
+In-Reply-To: <51C8627A.5000106@codeaurora.org>
+References: <1372080405-13365-1-git-send-email-cov@codeaurora.org>
+ <20130624140424.GA24861@mudshark.cambridge.arm.com>
+ <51C85A0D.3070400@codeaurora.org>
+ <20130624145303.GA25582@mudshark.cambridge.arm.com>
+ <51C8627A.5000106@codeaurora.org>
+Message-ID: <20130626171138.GF10333@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2013 07:36 PM, Olof Johansson wrote:
-> This updates multi_v7_defconfig to boot on at least Tegra2 Seaboard and
-> Panda ES. I lack working hardware for most of the platforms that were
-> enabled to compare with, so I could only verify those two for now. Still,
-> I enabled all of the available ones for build coverage purposes.
+On Mon, Jun 24, 2013 at 04:15:06PM +0100, Christopher Covington wrote:
+> On 06/24/2013 10:53 AM, Will Deacon wrote:
+> > On Mon, Jun 24, 2013 at 03:39:09PM +0100, Christopher Covington wrote:
+> >> Hi Will,
+> >>
+> >> On 06/24/2013 10:04 AM, Will Deacon wrote:
+> >> [...]
+> >>
+> >>> What's the advantage of this approach, other than you get an extra byte's
+> >>> worth of PID?
+> >>
+> >> In my view, the real advantage is that the the PID is located where people
+> >> reading ARM Architecture Reference Manual are told they can find it.
+> > 
+> > Perhaps, but I'd usually expect a debugger or trace tools to do something
+> > with the PID, and they likely expect it to be shifted, so you can't really
+> > win.
 > 
-> Beyond base platforms, things like PRINTK_TIME, filesystems, MMC, USB,
-> INET and UNIX networking was enabled. I'm sure we'll keep adding more
-> over time, but this gets us off the ground for semi-regular boot testing.
+> But reading and implementing the architecture *is* winning! LOL. I'll file a
+> ticket with the architecture folks and see what they think.
 
-This looks like a good first step for Tegra,so,
+...aaand that came full circle :)
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+I think the conclusion is that Linux PID != CONTEXTIDR.PROCID, so there's no
+architectural issue here. I'm just trying to keep it easy for the tools.
 
-There are quite a few drivers enabled in tegra_defconfig that aren't in
-this file. They're probably not required for basic boot testing (I think
-e.g. all the PMICs were there), but would be for full functionality.
-Should we port all those in too sometime?
+Will
