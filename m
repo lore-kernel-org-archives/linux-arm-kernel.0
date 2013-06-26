@@ -1,48 +1,69 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 26 Jun 2013 17:27:45 +0900
-Subject: [RFC] ARM: shmobile: r8a7790: add thermal driver support
-In-Reply-To: <87haglnv8j.wl%kuninori.morimoto.gx@renesas.com>
-References: <1372232164-31285-1-git-send-email-horms+renesas@verge.net.au>
- <87haglnv8j.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20130626082743.GB1229@verge.net.au>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 26 Jun 2013 12:28:03 +0300
+Subject: [PATCH 00/23] Unified SMMU driver among Tegra SoCs
+Message-ID: <1372238906-9346-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 01:15:32AM -0700, Kuninori Morimoto wrote:
-> 
-> Hi Simon
-> 
-> > You can get current thermal by
-> > > cat /sys/class/thermal/thermal_zone?/temp
-> > 
-> > Based on similar work for the r8a73a4 by Kuninori Morimoto.
-> > 
-> > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >  arch/arm/mach-shmobile/setup-r8a7790.c | 12 ++++++++++++
-> >  1 file changed, 12 insertions(+)
-> > 
-> > This patch is based on renesas-next-20130620
-> > 
-> > 
-> > Hi Morimoto-san,
-> > 
-> > with this patch applied I see that the thermal driver is initialised,
-> > but there seems to be some problem:
-> > 
-> > # dmesg | grep thermal
-> > rcar_thermal rcar_thermal: thermal sensor was broken
-> > rcar_thermal rcar_thermal: 1 sensor proved
-> > 
-> > Furthermore I see a negative temperature reading.
-> > 
-> > # cat /sys/devices/virtual/thermal/thermal_zone0/temp  
-> > -65000
-> > 
-> > I am wondering if you have any insight into this.
-> 
-> Hmm...
-> Does your clock-r8a7790 has MSTP522 for thermal driver ?
+Hi,
 
-No, thanks. I will fix that.
+This series provides:
+
+(1) Unified SMMU driver among Tegra SoCs
+(2) Multiple Address Space support(MASID) in IOMMU(SMMMU)
+(3) Tegra IOMMU'able devices, most of platform devices are IOMMU'able.
+
+There's some discussion[1] about device population order, which can
+solve the following patches.
+
+  ARM: dt: tegra114: Register AHB/IOMMU device first
+  amba: Move AHB to core_initcall
+  iommu/tegra: smmu: Move IOMMU to core_initcall
+
+Also "ARM: dma-mapping: Drop GFP_COMP for DMA memory allocations" may
+not be necessary by [2]
+
+Tested IOMMU functionality with T30 SD/MMC. Any further testing with
+T114 and/or other devices would be really appreciated.
+
+[1] https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/thread.html#36542
+[2] http://marc.info/?l=linux-tegra&m=137173895620957&w=1
+
+Hiroshi Doyu (23):
+  ARM: tegra: Create a DT header defining swgroups ID
+  ARM: dt: tegra30: iommu: Add "nvidia,swgroups"
+  ARM: dt: tegra30: iommu: Add "nvidia,memory-clients"
+  ARM: dt: tegra30: Register AHB/IOMMU device first
+  ARM: dt: tegra114: iommu: Fix IOMMU register address
+  ARM: dt: tegra114: iommu: Add "nvidia,swgroups"
+  ARM: dt: tegra114: Add "nvidia,memory-clients"
+  ARM: dt: tegra114: Register AHB/IOMMU device first
+  amba: Move AHB to core_initcall
+  iommu/tegra: smmu: Move IOMMU to core_initcall
+  iommu/tegra: smmu: Add of_mach_id for T114
+  iommu/tegra: smmu: Select ARM_DMA_USE_IOMMU in Kconfig
+  iommu/tegra: smmu: Create default IOVA maps
+  iommu/tegra: smmu: Register platform_device to IOMMU dynamically
+  iommu/tegra: smmu: Calculate ASID register offset by ID
+  iommu/tegra: smmu: Get "nvidia,swgroups" from DT
+  iommu/tegra: smmu: Use swgroups instead of pdata
+  iommu/tegra: smmu: Workaround PCIe IOMMU'able
+  iommu/tegra: smmu: Unfied driver for Tegra SoCs
+  iommu/tegra: smmu: Use dt-bindings MACRO
+  iommu/tegra: smmu: Get swgroup ID from DT
+  iommu/tegra: smmu: Support Multiple ASID
+  ARM: dma-mapping: Drop GFP_COMP for DMA memory allocations
+
+ .../bindings/iommu/nvidia,tegra30-smmu.txt         |  17 +-
+ arch/arm/boot/dts/tegra114.dtsi                    |  37 ++--
+ arch/arm/boot/dts/tegra30.dtsi                     |  50 +++--
+ arch/arm/mm/dma-mapping.c                          |   7 +
+ drivers/amba/tegra-ahb.c                           |   7 +-
+ drivers/iommu/Kconfig                              |   1 +
+ drivers/iommu/tegra-smmu.c                         | 215 +++++++++++----------
+ include/dt-bindings/iommu/tegra-swgid.h            |  47 +++++
+ 8 files changed, 250 insertions(+), 131 deletions(-)
+ create mode 100644 include/dt-bindings/iommu/tegra-swgid.h
+
+-- 
+1.8.1.5
