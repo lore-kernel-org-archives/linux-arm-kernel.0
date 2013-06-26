@@ -1,45 +1,38 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 26 Jun 2013 10:51:09 +0200
-Subject: [PATCH 0/4] Add an hwmon driver for the mxs soc internal sensor
-Message-ID: <1372236673-20725-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 26 Jun 2013 09:33:08 +0100
+Subject: [PATCH 3/3] ASoC: sgtl5000: Defer probe in case of I2C error
+In-Reply-To: <1372168801-4221-3-git-send-email-fabio.estevam@freescale.com>
+References: <1372168801-4221-1-git-send-email-fabio.estevam@freescale.com>
+ <1372168801-4221-3-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130626083308.GL27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is ading a simple driver for the i.mx28 internal die temperature
-sensor.
+On Tue, Jun 25, 2013 at 11:00:01AM -0300, Fabio Estevam wrote:
+> In case of I2C error, let's defer the probe.
+> 
+> On mx28, for example, the first read of the codec revision register fails 
+> because there is no codec clock provided at this point. The codec clock will be 
+> enabled later in the mxs-saif driver, so return -EPROBE_DEFER in case of I2C 
+> read error, so that the codec driver can do another attempt at a later stage 
+> when the codec clock is available.
 
-The first two patches are preparation patches an can be applied now.
+This doesn't seem to match up with the code:
 
-The first patch is adding the #io-channel-cells to the lrdac on i.mx28 so that
-it becomes an inkernel iio provider.
+>  	ret = regmap_read(sgtl5000->regmap, SGTL5000_CHIP_ID, &reg);
+> -	if (ret)
+> +	if (ret) {
+> +		ret = -EPROBE_DEFER; /* If I2C read failed, try again later */
+>  		goto disable_clk;
+>  
+> +	}
 
-The second patch defines the lradc as present on the cfa-10036 and thus removes
-it from i.mx28-cfa10049.dts and imx28-cfa10055.dts as they both include
-imx28-cfa10036.dts
-
-The third patch adds the driver itself.
-
-And the final patch adds the driver bindings to the cfa-10036.
-
-Alexandre Belloni (4):
-  arm: mxs: Add #io-channel-cells property to lradc
-  arm: mxs: add lradc to cfa10036
-  hwmon: Add a simple driver to read the MXS SoC temperature
-  arm: mxs: Add mxs internal temp sensor to cfa-10036
-
- .../devicetree/bindings/hwmon/mxs-cputemp.txt      |  18 +++
- Documentation/hwmon/mxs-cputemp                    |  29 +++++
- arch/arm/boot/dts/imx28-cfa10036.dts               |  10 ++
- arch/arm/boot/dts/imx28-cfa10049.dts               |   1 -
- arch/arm/boot/dts/imx28-cfa10055.dts               |   1 -
- arch/arm/boot/dts/imx28.dtsi                       |   1 +
- drivers/hwmon/Kconfig                              |  10 ++
- drivers/hwmon/Makefile                             |   1 +
- drivers/hwmon/mxs-cputemp.c                        | 132 +++++++++++++++++++++
- 9 files changed, 201 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/hwmon/mxs-cputemp.txt
- create mode 100644 Documentation/hwmon/mxs-cputemp
- create mode 100644 drivers/hwmon/mxs-cputemp.c
-
--- 
-1.8.1.2
+Looking at the label we jump to here it seems like the clock really
+should be enabled at the point where the register read is attempted...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/aa9024db/attachment.sig>
