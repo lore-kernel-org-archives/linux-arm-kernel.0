@@ -1,117 +1,61 @@
-From: jett.zhou@gmail.com (jett zhou)
-Date: Wed, 26 Jun 2013 18:31:14 +0800
-Subject: [V2 1/7] video: mmp: rb swap setting update for new LCD driver
-In-Reply-To: <CAMLZHHTdgU2-BAsUn-QoUP5JL--pPVjsT4AW0Yv+bPL__EbHCw@mail.gmail.com>
-References: <1370879533-11017-1-git-send-email-jtzhou@marvell.com>
- <CAMLZHHQ+97f=i3axaFBn9JoOu7Cqo73neqxKYNCfWqwjZ4DfnQ@mail.gmail.com>
- <CACDDiy8=WRmnGMFr55uVWUE6+NNy3pMCeBfV8E9urAeW6VVEMw@mail.gmail.com>
- <CAMLZHHQxMAM1Vhj9Jreq5rAN-nmBEbEyoKMwFnL0tVHsKv4U=g@mail.gmail.com>
- <CACDDiy_CpKuZkevm4jQud1DKBEDa-ZhtrWb+rFpTXvK3zm6aHw@mail.gmail.com>
- <CAMLZHHTdgU2-BAsUn-QoUP5JL--pPVjsT4AW0Yv+bPL__EbHCw@mail.gmail.com>
-Message-ID: <CACDDiy-bCSBVLnSJq+jEP+zunwp8pTHkJaOq-zdzgiiL4ZH8Fw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 26 Jun 2013 12:24:29 +0200
+Subject: [PATCH 02/23] ARM: dt: tegra30: iommu: Add "nvidia,swgroups"
+In-Reply-To: <1372238906-9346-3-git-send-email-hdoyu@nvidia.com>
+References: <1372238906-9346-3-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20130626102428.GF27083@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/6/25 Daniel Drake <dsd@laptop.org>:
-> On Mon, Jun 24, 2013 at 8:23 PM, jett zhou <jett.zhou@gmail.com> wrote:
->>> What if I'm working with a display that doesn't need or want RB
->>> swapping? Lets say I am working with format PIXFMT_RGB565, and running
->>> your patch. dmafetch_set_fmt() gets called, and fmt_to_reg() sets
->>> rbswap to 1.
->>> This means that dmafetch_set_fmt() writes a '1' into the appropriate
->>> RB-swapping bit in the LCD_PN_CTRL0 register, and this triggers the
->>> "DMA input" swapping that you mentioned. But I never asked for RB
->>> swapping...
->>
->> Yes, if you configure it as PIXFMT_RGB565, it will set rbswap in "DMA
->> input" part.
->> So, for your case, you need to use PIXFMT_BGR565 instead of PIXFMT_RGB565.
->
-> So let me get this straight. I have a display that wants RGB565
-> format, no RB swapping. I don't do anything special in link_config to
-> affect any swapping.
->
-> After your patch, I must request BGR565 format in order to get RGB565?
-> That sounds backwards to me.
+On Wed, Jun 26, 2013 at 12:28:05PM +0300, Hiroshi Doyu wrote:
+> This is a bitmap that indicates which HardWare Accelerators(HWA) are
+> supported on Tegra30 SoC.
+> 
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+>  Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt | 6 +++++-
+>  arch/arm/boot/dts/tegra30.dtsi                                  | 1 +
+>  2 files changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
+> index 89fb543..6be51f6 100644
+> --- a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
+> +++ b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
+> @@ -8,14 +8,18 @@ Required properties:
+>  - nvidia,#asids : # of ASIDs
+>  - dma-window : IOVA start address and length.
+>  - nvidia,ahb : phandle to the ahb bus connected to SMMU.
+> +- nvidia,swgroups: A bit map of supported HardWare Accelerators(HWA).
 
-HI Daniel
-     My above explanation may be not so precise and correct, actually
-you can RGB565 directly and does not need BGR565, mmp display
-controller handle it accordingly in driver.
-     Take RGB565 and BGR565 as example:
-          RGB565 indicates the source data in memory is that Red is
-[15~11] , Green is [10~5], Blue is [4:0], Red is MSB, Blue is LSB, but
-for the display dma input default setting(rbswap = 0), it only support
-Blue is [15~11] , Green is [10~5], Red is [4:0], Red is LSB, Blue is
-MSB, so for this format(RGB565), display controller need to set rbswap
-= 1 and it can support the MSB/LSB correctly.
-          In conclusion, no matter you use RGB565 or BGR565, mmp
-display driver did the rbswap setiing based on the format and what is
-MSB/LSB, so platform does not need handle it by link_config based on
-this patch.
-Thanks
+Nit: you use the spelling "bitmap" in the subject but "bit map" here.
+Both are correct but perhaps we should stick to one.
 
->
->>> Your comment above suggests that this RB-swapping behaviour is
->>> something that is imposed by the output device. In which case, this
->>> should be a configuration parameter on the panel, not on the path
->>> structure.
->>>
->>>>            TTC_dkb does not support dsi, the link_config is no used anymore.
->>>
->>> Then you should fix up ttc_dkb before submitting this patch.
->>
->> After we add one new field for this output rbswap setting based on dsi
->> interface, it can be used by new stepping of mmp display controller,
->> ttc_dkb platform just leave and not touch it, it will be tranparent
->> for ttc_dkb, does not need to nothing for platform configuration for
->> ttc_dkb usage.
->> It means , ttc_dkb can only configure rbswap in "dma input" part, not
->> support rbswap in dsi interface part.
->> What do you think?
->
-> The point I am trying to make is that your patch is changing behaviour
-> for ttc_dkb, so you need to address that at the same time.
->
-> Right now ttc_dkb does this:
->
-> #define CFG_GRA_SWAPRB(x)      (x << 0) /* 1: rbswap enabled */
-> .link_config = CFG_DUMBMODE(0x2) | CFG_GRA_SWAPRB(0x1),
->
-> i.e. SWAPRB requested through bit 0 in link_config
->
-> And this is obeyed by the existing code in fmt_to_reg:
->
->    u32 link_config = path_to_path_plat(overlay->path)->link_config;
->    rbswap = link_config & 0x1;
->
-> Your patch removes the handling of link_config bit 0, without fixing
-> up its only user (even if that user was incorrect). That is not good
-> practice.
->
-> Another question: why is this change needed?
-> We can request rb swapping either in DMA input or in the output
-> interface. I can understand the driver maybe supporting one option or
-> the other. But after your patch, it seems like both are supported: RB
-> swapping could be enabled either through choice of input format, or
-> through configuration of output parameters.
-For TTC dkb,  you are right, I need to fix the rbswap in the platform
-part, I will add one fix patch for ttc_dkb based on new rbswap patch.
-For output dsi interface, it has this feature to do rbswap again if it
-needs specifc byte sequence of RGB byte of DSI panel.
-eg. If display content is set RGB565 in memory and DMA input part set
-rbswap in driver to support Red as MSB , Blue LSB, but dsi panel only
-support Red as LSB, Blue as MSB, then it can use this feature.
-If there is no this requirement of panel, this dsi output part is not needed.
+> +  Each bit represents one sgroup. The assignments may be found in header
 
-Thanks
->
+Nit: "swgroup"
 
+> -	smmu {
+> +	iommu {
 
+This change isn't really related, but given that the tegra30.dtsi
+already uses it I guess we can keep it as part of this patch.
 
+>  		compatible = "nvidia,tegra30-smmu";
+>  		reg = <0x7000f010 0x02c
+>  		       0x7000f1f0 0x010
+>  		       0x7000f228 0x05c>;
+>  		nvidia,#asids = <4>;		/* # of ASIDs */
+>  		dma-window = <0 0x40000000>;	/* IOVA start & length */
+> +		nvidia,swgroups = <0x00000000 0x000779ff>;
 
---
+Perhaps this should be a symbolic name too? Perhaps something like
+TEGRA30_SWGID_ALL?
 
-----------------------------------
-Best Regards
-Jett Zhou
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/09d59650/attachment-0001.sig>
