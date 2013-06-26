@@ -1,52 +1,106 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Jun 2013 17:40:39 +0900
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7790: add thermal driver support
-In-Reply-To: <1372236040-16737-1-git-send-email-horms+renesas@verge.net.au>
-References: <1372236040-16737-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1372236040-16737-2-git-send-email-horms+renesas@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 26 Jun 2013 01:22:57 -0700
+Subject: [PATCH] Documentation: dt: bindings: TI WiLink modules
+In-Reply-To: <1372234384.18889.37.camel@cumari.coelho.fi>
+References: <1372149330-24335-1-git-send-email-coelho@ti.com>
+ <1372189024.18889.19.camel@cumari.coelho.fi>
+ <20130626062409.GK5523@atomide.com>
+ <1372234384.18889.37.camel@cumari.coelho.fi>
+Message-ID: <20130626082257.GT5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You can get current thermal by
-> cat /sys/class/thermal/thermal_zone?/temp
+* Luciano Coelho <coelho@ti.com> [130626 01:19]:
+> Hi Tony,
+> 
+> On Tue, 2013-06-25 at 23:24 -0700, Tony Lindgren wrote:
+> > * Luciano Coelho <coelho@ti.com> [130625 12:43]:
+> > > On Tue, 2013-06-25 at 11:35 +0300, Luciano Coelho wrote:
+> > > > Add device tree bindings documentation for the TI WiLink modules.
+> > > > Currently only the WLAN part of the WiLink6, WiLink7 and WiLink8
+> > > > modules is supported.
+> > > > 
+> > > > Signed-off-by: Luciano Coelho <coelho@ti.com>
+> > > > ---
+> 
+> [...]
+> 
+> > > > +Optional properties:
+> > > > +--------------------
+> > > > +
+> > > > +- refclock: the internal WLAN reference clock frequency (required for
+> > > > +  WiLink6 and WiLink7; not used for WiLink8).  Must be one of the
+> > > > +  following:
+> > > > +	0 = 19.2 MHz
+> > > > +	1 = 26.0 MHz
+> > > > +	2 = 38.4 MHz
+> > > > +	3 = 52.0 MHz
+> > > > +	4 = 38.4 MHz, XTAL
+> > > > +	5 = 26.0 MHz, XTAL
+> > 
+> > This is just the omap refclock, right? If so, you can just pass the
+> > standard clock phandle. I know we don't yet have the DT clocks merged,
+> > but Tero just posted another revision of those.
+> 
+> This is an internal clock.  This clock is part of the module that
+> contains the WiLink chip.  It is not associated with the clocks in the
+> main board (OMAP).
+> 
+> 
+> > > > +- tcxoclock: the internal WLAN TCXO clock frequency (required for
+> > > > +  WiLink7 not used for WiLink6 and WiLink8).  Must be one of the
+> > > > +  following:
+> > > > +	0 = 19.200 MHz
+> > > > +	1 = 26.000 MHz
+> > > > +	2 = 38.400 MHz
+> > > > +	3 = 52.000 MHz
+> > > > +	4 = 16.368 MHz
+> > > > +	5 = 32.736 MHz
+> > > > +	6 = 16.800 MHz
+> > > > +	7 = 33.600 MHz
+> > 
+> > Where does this clock come from? Maybe this can be set based on the
+> > compatible value if it's completely internal?
+> 
+> This is also a completely internal clock.  My "compatible" values are
+> based on the WiLink chip itself, not in the module that contains the
+> chip.  There are several modules and they are the ones that specify the
+> clock frequencies.  This data I'm passing here is just to tell the
+> WiLink chip which frequencies the module uses.
+> 
+> My driver is for the WiLink chip itself, not to the module (in theory).
+> So I think having the WiLink values as bindings would be more generic
+> than having to specify values for each available module (eg.
+> "lsr-research,tiwi-ble") and mapping those values to specific
+> frequencies in the driver.
+> 
+>  
+> > > If this is okay for everyone, can I push this via my tree (which goes to
+> > > linux-wireless->net->linus)? I think it makes more sense to send the
+> > > documentation together with the patch that actually implements the DT
+> > > node parsing in the driver.
+> > 
+> > If we can use the standard bindings, it might be worth waiting until
+> > we have the DT clocks available as we have the pdata workaround merged
+> > anyways. That's because then we don't need to support the custom
+> > binding later on ;)
+> 
+> I looked into Tero's patches and I considered using the generic clock
+> bindings, but I think it doesn't make sense in this case.  The thing is
+> that the module is not providing the clocks to the main board.  Neither
+> is the WiLink chip consuming clocks from the main board.
+> 
+> I thought about specifying clock providers and consumers to be used only
+> by the module and WiLink chip, but I think it's overkill.  And we would
+> also have to find a way to prevent the main clock framework from trying
+> to handle them.
+> 
+> So, my conclusion was that, even though these *are* clocks, from the
+> main board's perspective they're just specifications of what the module
+> looks like.
+> 
+> Does this make sense?
 
-Based on similar work for the r8a73a4 by Kuninori Morimoto.
+OK yes, in that case looks fine to me:
 
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-r8a7790.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index 28f9475..06c720f 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -149,6 +149,17 @@ static struct resource irqc0_resources[] __initdata = {
- 					  &irqc##idx##_data,		\
- 					  sizeof(struct renesas_irqc_config))
- 
-+static struct resource thermal_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xe61f0000, 0x14),
-+	DEFINE_RES_MEM(0xe61f0100, 0x38),
-+	DEFINE_RES_IRQ(gic_spi(69)),
-+};
-+
-+#define r8a7790_register_thermal()					\
-+	platform_device_register_simple("rcar_thermal", -1,		\
-+					thermal_resources,		\
-+					ARRAY_SIZE(thermal_resources))
-+
- void __init r8a7790_add_standard_devices(void)
- {
- 	r8a7790_register_scif(SCIFA0);
-@@ -162,6 +173,7 @@ void __init r8a7790_add_standard_devices(void)
- 	r8a7790_register_scif(HSCIF0);
- 	r8a7790_register_scif(HSCIF1);
- 	r8a7790_register_irqc(0);
-+	r8a7790_register_thermal();
- }
- 
- void __init r8a7790_timer_init(void)
--- 
-1.8.2.1
+Acked-by: Tony Lindgren <tony@atomide.com>
