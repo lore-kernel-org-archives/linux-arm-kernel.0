@@ -1,41 +1,102 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 26 Jun 2013 11:26:41 +0800
-Subject: [PATCH] arch: arm64: include: asm: add pci.h to pass compiling
-Message-ID: <51CA5F71.207@asianux.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 25 Jun 2013 23:24:09 -0700
+Subject: [PATCH] Documentation: dt: bindings: TI WiLink modules
+In-Reply-To: <1372189024.18889.19.camel@cumari.coelho.fi>
+References: <1372149330-24335-1-git-send-email-coelho@ti.com>
+ <1372189024.18889.19.camel@cumari.coelho.fi>
+Message-ID: <20130626062409.GK5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Need add pci.h for compiling, the related error (with allmodconfig):
+* Luciano Coelho <coelho@ti.com> [130625 12:43]:
+> (oh crap, now *really* fixed the ARM mailing list address)
+> 
+> On Tue, 2013-06-25 at 11:35 +0300, Luciano Coelho wrote:
+> > Add device tree bindings documentation for the TI WiLink modules.
+> > Currently only the WLAN part of the WiLink6, WiLink7 and WiLink8
+> > modules is supported.
+> > 
+> > Signed-off-by: Luciano Coelho <coelho@ti.com>
+> > ---
+> > 
+> > I created a new directory under net to contain wireless bindings documentation.
+> > 
+> > The actual implementation in the driver will follow separately.
+> > 
+> >  .../devicetree/bindings/net/wireless/ti-wilink.txt |   46 ++++++++++++++++++++
+> >  1 file changed, 46 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt b/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
+> > new file mode 100644
+> > index 0000000..d8e8bfbb
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
+> > @@ -0,0 +1,46 @@
+> > +TI WiLink Wireless Modules Device Tree Bindings
+> > +===============================================
+> > +
+> > +The WiLink modules provide wireless connectivity, such as WLAN,
+> > +Bluetooth, FM and NFC.
+> > +
+> > +There are several different modules available, which can be grouped by
+> > +their generation: WiLink6, WiLink7 and WiLink8.  WiLink4 is not
+> > +currently supported with device tree.
+> > +
+> > +Currently, only the WLAN portion of the modules is supported with
+> > +device tree.
+> > +
+> > +Required properties:
+> > +--------------------
+> > +
+> > +- compatible: should be "ti,wilink6", "ti,wilink7" or "ti,wilink8"
+> > +- interrupt-parent: the interrupt controller
+> > +- interrupts: out-of-band WLAN interrupt
+> > +	See the interrupt controller's bindings documentation for
+> > +	detailed definition.
+> > +
+> > +Optional properties:
+> > +--------------------
+> > +
+> > +- refclock: the internal WLAN reference clock frequency (required for
+> > +  WiLink6 and WiLink7; not used for WiLink8).  Must be one of the
+> > +  following:
+> > +	0 = 19.2 MHz
+> > +	1 = 26.0 MHz
+> > +	2 = 38.4 MHz
+> > +	3 = 52.0 MHz
+> > +	4 = 38.4 MHz, XTAL
+> > +	5 = 26.0 MHz, XTAL
 
-  drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_exit?:
-  drivers/media/usb/b2c2/flexcop-usb.c:393:3: error: implicit declaration of function ?pci_free_consistent? [-Werror=implicit-function-declaration]
-  drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_init?:
-  drivers/media/usb/b2c2/flexcop-usb.c:410:2: error: implicit declaration of function ?pci_alloc_consistent? [-Werror=implicit-function-declaration]
-  drivers/media/usb/b2c2/flexcop-usb.c:410:21: warning: assignment makes pointer from integer without a cast [enabled by default]
-  cc1: some warnings being treated as errors
+This is just the omap refclock, right? If so, you can just pass the
+standard clock phandle. I know we don't yet have the DT clocks merged,
+but Tero just posted another revision of those.
 
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm64/include/asm/pci.h |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/pci.h
+> > +- tcxoclock: the internal WLAN TCXO clock frequency (required for
+> > +  WiLink7 not used for WiLink6 and WiLink8).  Must be one of the
+> > +  following:
+> > +	0 = 19.200 MHz
+> > +	1 = 26.000 MHz
+> > +	2 = 38.400 MHz
+> > +	3 = 52.000 MHz
+> > +	4 = 16.368 MHz
+> > +	5 = 32.736 MHz
+> > +	6 = 16.800 MHz
+> > +	7 = 33.600 MHz
 
-diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-new file mode 100644
-index 0000000..2ed467f
---- /dev/null
-+++ b/arch/arm64/include/asm/pci.h
-@@ -0,0 +1,11 @@
-+#ifndef ASMARM64_PCI_H
-+#define ASMARM64_PCI_H
-+
-+#ifdef __KERNEL__
-+
-+#include <asm-generic/pci-dma-compat.h>
-+#include <asm-generic/pci.h>
-+
-+#endif /* __KERNEL__ */
-+
-+#endif
--- 
-1.7.7.6
+Where does this clock come from? Maybe this can be set based on the
+compatible value if it's completely internal?
+ 
+> If this is okay for everyone, can I push this via my tree (which goes to
+> linux-wireless->net->linus)? I think it makes more sense to send the
+> documentation together with the patch that actually implements the DT
+> node parsing in the driver.
+
+If we can use the standard bindings, it might be worth waiting until
+we have the DT clocks available as we have the pdata workaround merged
+anyways. That's because then we don't need to support the custom
+binding later on ;)
+
+Regards,
+
+Tony
