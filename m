@@ -1,44 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Jun 2013 12:14:30 +0100
-Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
-In-Reply-To: <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
-References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
- <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
-Message-ID: <20130626111430.GH26142@mudshark.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 26 Jun 2013 13:15:37 +0200
+Subject: [PATCH 18/23] iommu/tegra: smmu: Workaround PCIe IOMMU'able
+In-Reply-To: <20130626.140906.1216615781918366349.hdoyu@nvidia.com>
+References: <1372238906-9346-19-git-send-email-hdoyu@nvidia.com>
+ <20130626110626.GO27083@manwe>
+ <20130626.140906.1216615781918366349.hdoyu@nvidia.com>
+Message-ID: <20130626111537.GR27083@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 11:55:33AM +0100, Ard Biesheuvel wrote:
-> Replying to self:
+On Wed, Jun 26, 2013 at 01:09:06PM +0200, Hiroshi Doyu wrote:
+> Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 26 Jun 2013 13:06:27 +0200:
 > 
-> On 25 June 2013 22:24, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > +void kernel_neon_end(void)
-> > +{
-> > +       /* Disable the NEON/VFP unit. */
-> > +       fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-> > +       barrier();
-> > +       dec_preempt_count();
-> > +}
-> > +EXPORT_SYMBOL(kernel_neon_end);
+> > * PGP Signed by an unknown key
+> > 
+> > On Wed, Jun 26, 2013 at 12:28:21PM +0300, Hiroshi Doyu wrote:
+> > > Make PCIe work as it is. IOMMU support can be implemented later.
+> > > 
+> > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > > ---
+> > >  drivers/iommu/tegra-smmu.c | 3 +++
+> > >  1 file changed, 3 insertions(+)
+> > 
+> > Can you provide more information about what the problem is here? Why is
+> > PCIe not working when mapped through the IOMMU?
 > 
-> Meh. This is not going to please the RT crowd, as preempt_schedule()
-> will not be called on PREEMPT builds in this case.
-> 
-> Propose to replace it with
-> 
->     preempt_enable();
-> #ifndef CONFIG_PREEMPT_COUNT
->     /* in this case, the preempt_enable() right above is just a barrier() */
->     dec_preempt_count();
-> #endif
-> 
-> (and the converse in kernel_neon_begin())
+> I haven't had a code to register PCI device as IOMMU'able as
+> ops->add_device() does for platform_devices. I'll add this comment.
 
-Yuck, that's ugly as sin! How does x86 deal with this? Looking at
-kernel_fpu_{begin,end}, they just disable preemption so I guess that they
-assume the caller is non-blocking? There's an aside about the use of
-preempt-notifiers for KVM, so it does sound like the onus is on the caller
-not to shoot themselves in the face.
+Okay, that should be solved then when we merge the PCIe driver. I hope
+that can happen soon.
 
-Will
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/f5318ac3/attachment-0001.sig>
