@@ -1,43 +1,33 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 26 Jun 2013 13:07:47 +0200
-Subject: [PATCH 19/23] iommu/tegra: smmu: Unfied driver for Tegra SoCs
-In-Reply-To: <1372238906-9346-20-git-send-email-hdoyu@nvidia.com>
-References: <1372238906-9346-20-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20130626110747.GP27083@manwe>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 26 Jun 2013 19:04:06 +0800
+Subject: [PATCH 03/23] ARM: dt: tegra30: iommu: Add "nvidia,memory-clients"
+In-Reply-To: <20130626.133314.1520719774895092173.hdoyu@nvidia.com>
+References: <1372238906-9346-4-git-send-email-hdoyu@nvidia.com>
+ <20130626101028.GD27083@manwe>
+ <20130626.133314.1520719774895092173.hdoyu@nvidia.com>
+Message-ID: <1372244646.2986.17.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 12:28:22PM +0300, Hiroshi Doyu wrote:
-> Support multiple generation of Tegra SoCs with this unified
-> SMMU driver. Necessary info is expected to be passed from DT.
+On Wed, 2013-06-26 at 18:33 +0800, Hiroshi Doyu wrote:
+> Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 26 Jun 2013 12:10:30 +0200:
 > 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
->  drivers/iommu/tegra-smmu.c | 80 ++--------------------------------------------
->  1 file changed, 3 insertions(+), 77 deletions(-)
+> > * PGP Signed by an unknown key
+> > 
+> > On Wed, Jun 26, 2013 at 12:28:06PM +0300, Hiroshi Doyu wrote:
+> > > Add "nvidia,memory-clients" to identify which swgroup ID a device
+> > > belongs to.
+> > 
+> > Why not call the property "nvidia,swgid" instead? That seems a lot more
+> > intuitive.
 > 
-> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-> index 6e82df3..ae71721 100644
-> --- a/drivers/iommu/tegra-smmu.c
-> +++ b/drivers/iommu/tegra-smmu.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * IOMMU API for SMMU in Tegra30
-> + * IOMMU API for SMMU in Tegra SoC
+> Tegra powerdomain also needs this info. Joseph?
 
-Maybe "Tegra30 and later SoCs" given that Tegra20 has no compatible
-IOMMU?
+Ah, yes. We need some kind of this information to know the relation in
+the power domain when we wants to power down it.  But it didn't upstream
+yet and still in very early stage of the design. I believe you can
+ignore that and do the good design here for your usage. We can re-use
+the binding if it point to the same HW behind that.
 
-> -MODULE_DESCRIPTION("IOMMU API for SMMU in Tegra30");
-> +MODULE_DESCRIPTION("IOMMU API for SMMU in Tegra SoC");
-
-Same here.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/7a189b9e/attachment.sig>
+Thanks,
+Joseph
