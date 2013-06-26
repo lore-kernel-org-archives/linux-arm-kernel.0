@@ -1,47 +1,48 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 26 Jun 2013 04:10:57 +0000
-Subject: [PATCH 1/2] ARM: configs: Enable TI_EDMA in omap2plus_defconfig
-In-Reply-To: <1372210320-7148-1-git-send-email-joelagnel@ti.com>
-References: <1372210320-7148-1-git-send-email-joelagnel@ti.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EC43DE5@DBDE04.ent.ti.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Wed, 26 Jun 2013 08:33:47 +0400
+Subject: [RFC] ARM: Allow use debug_ll_io_init as .map_io in machine
+ description
+Message-ID: <1372221227-20091-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 07:02:00, Fernandes, Joel wrote:
-> From: Joel A Fernandes <agnel.joel@gmail.com>
-> 
-> Build EDMA in my default to avoid fewer people stepping on their toes
 
-"my default" --> which default. I believe it should be omap2plus defconfig
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/include/asm/mach/map.h | 4 +---
+ arch/arm/mm/mmu.c               | 4 ++++
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-> with broken DMA on drivers needing EDMA.
-> 
-> Signed-off-by: Joel A Fernandes <agnel.joel@gmail.com>
-> ---
->  arch/arm/configs/omap2plus_defconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index abbe319..7e00deb 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -236,6 +236,7 @@ CONFIG_RTC_DRV_TWL92330=y
->  CONFIG_RTC_DRV_TWL4030=y
->  CONFIG_RTC_DRV_OMAP=y
->  CONFIG_DMADEVICES=y
-> +CONFIG_TI_EDMA=y
->  CONFIG_DMA_OMAP=y
->  CONFIG_EXT2_FS=y
->  CONFIG_EXT3_FS=y
-> -- 
-> 1.7.9.5
-> 
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
-> 
-
-
-Regards, 
-Gururaja
+diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+index 2fe141f..c1fafc5 100644
+--- a/arch/arm/include/asm/mach/map.h
++++ b/arch/arm/include/asm/mach/map.h
+@@ -42,10 +42,8 @@ extern void vm_reserve_area_early(unsigned long addr, unsigned long size,
+ 
+ #ifdef CONFIG_DEBUG_LL
+ extern void debug_ll_addr(unsigned long *paddr, unsigned long *vaddr);
+-extern void debug_ll_io_init(void);
+-#else
+-static inline void debug_ll_io_init(void) {}
+ #endif
++extern void debug_ll_io_init(void);
+ 
+ struct mem_type;
+ extern const struct mem_type *get_mem_type(unsigned int type);
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index d7229d2..557831b 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -952,6 +952,10 @@ void __init debug_ll_io_init(void)
+ 	map.type = MT_DEVICE;
+ 	create_mapping(&map);
+ }
++#else
++void __init debug_ll_io_init(void)
++{
++}
+ #endif
+ 
+ static void * __initdata vmalloc_min =
+-- 
+1.8.1.5
