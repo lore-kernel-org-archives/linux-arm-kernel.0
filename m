@@ -1,127 +1,22 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 26 Jun 2013 17:36:44 +0300
-Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
-In-Reply-To: <51CAEA90.90200@ti.com>
-References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
- <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
- <20130625065811.GZ5523@atomide.com> <51CAEA90.90200@ti.com>
-Message-ID: <51CAFC7C.2020504@ti.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Wed, 26 Jun 2013 15:40:42 +0100
+Subject: [PATCH 2/4] x86: efi: break efi_lookup_mapped_addr out to
+ generic code
+In-Reply-To: <20130626141130.GC9078@rocoto.smurfnet.nu>
+References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
+ <1372183863-11333-3-git-send-email-leif.lindholm@linaro.org>
+ <20130626133217.GO22026@console-pimps.org>
+ <20130626141130.GC9078@rocoto.smurfnet.nu>
+Message-ID: <20130626144042.GS22026@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Picture format fixed. Sorry for that.
+On Wed, 26 Jun, at 04:11:30PM, Leif Lindholm wrote:
+> Sure.
+> Would you be happy for me to start moving the other things mentioned
+> (config table parsing, common debug printout, global structs) in there too?
 
-On 06/26/2013 04:20 PM, Grygorii Strashko wrote:
-> Hi All,
->
-> On 06/25/2013 09:58 AM, Tony Lindgren wrote:
->> * Linus Walleij <linus.walleij@linaro.org> [130624 05:13]:
->>> On Fri, Jun 21, 2013 at 5:03 PM, Grygorii Strashko
->>> <grygorii.strashko@ti.com> wrote:
->>>
->>>> Hence, add pinctrl handling in omap_device core:
->>>> 1) on PM runtime resume
->>>> - switch pinctrl state to "default" (todo: "active")
->>>> 2) on PM runtime suspend
->>>> - switch pinctrl state to "idle"
->>>> 3) during system wide suspend
->>>> - switch pinctrl state to "sleep" or "idle" if omap_device core
->>>> disables device
->>>> - switch pinctrl state to "sleep" if device is disabled already
->> Do you need a separate setting for "idle" and "sleep", or are
->> they the same?
->>
->>>> 4) during system wide resume
->>>> - switch pinctrl state to "default" (todo: "active") if omap_device
->>>> core has
->>>>    disabled  device during suspend
->>>> - switch pinctrl state to "idle" if device was already disabled
->>>> before suspend
->>> I don't understand step 4.
->>>
->>> I get the creeps about whether the system is runtime suspended
->>> or runtime resumed when we come to resume proper, so I need
->>> Kevin to have a look at this.
->>>
->>> Apart from that it looks good.
->>>
->>> Stephen and Tony are trying to figure out the details of whether
->>> "active"
->>> is necessary or not in a related thread I think.
-> Thanks for your comments.
->
-> I've prepared diagram to illustrate how does this work:
->                                          +
->                                          |
->                                          |  .probe()
->                                          |
->                                    +-----v--------+
->                                    |              |
->                                    |  default     |
->                                    |              |
->                                    +----+--+------+
->                                         |  |
->                         pm_runtime_get()|  | pm_runtime_put()
->                        +----------------+  +------------+
->                        |                                |
->                 +------v------+ pm_runtime_put()+-------v-----+
->                 |             +----------------->             |
->     +----------->  Active     |pm_runtime_get() |   Idle      <----------+
->     |           |             <-----------------+             |          |
->     |           +-------+-----+                 +-------+-----+          |
->     |                   |.suspend_noirq()               |.suspend_noirq()|
->     |                   |                               |                |
->     |                   |                               |                |
->     |                   |                               |                |
->     |                   |                               |                |
->     |           +-------v-----+                 +-------v-----+          |
->     |           |             |                 |             |          |
->     +-----------+  Sleep      ------+           |  Sleep      +----------+
-> .resume_noirq() |             |     |           |             |.resume_noirq()
->                 +-------|-----+     |           +-------------+
->                         |  Idle     |
->                         +-----------+
->
-> The "Sleep" pinctrl state is optional - if "sleep" state isn't defined
-> then "Idle" pinctrl state will be used during suspend.
->
-> As per above pinctrl state transition diagram - I think, that:
-> - if "idle" or "sleep" states are defined then "active" state have to be
-> defined too.
-> So, pinctrl core should detect such situation and generate a warning.
->
->  From my point of view, we should have "active" state - it would allow
-> to avoid additional
-> runtime overhead and handle properly the case when drivers are used as
-> loadable modules.
-> In this case, after boot, device's pinctrl registers can have HW default
-> values (after reset) or
-> can be configured to some safe (off) state from board file (board's
-> "default" configuration).
-> Driver module will activate its PINs when loaded and need to restore
-> safe (off) PINs state when
-> unloaded.
-> As result, it seems, we should have "off" state which can be used when
-> driver's module is removed.
->
-> So, final list of default pnctrl states may be defined as "default",
-> "active", "idle", "sleep", "off":
-> - "active", "idle", "sleep": will be handled by omap_device core
-> - "default", "off": will be handled by driver itself (or Device core).
->
->
->
->> Yes we should have that sorted out over next few weeks, so let's
->> just wait a little while on all these dynamic remuxing patches
->> to avoid churn.
->>
->> Regards,
->>
->> Tony
->
-> Regards,
-> - grygorii
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Super, super happy.
+
+-- 
+Matt Fleming, Intel Open Source Technology Center
