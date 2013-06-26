@@ -1,83 +1,57 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Wed, 26 Jun 2013 20:22:50 +0800
-Subject: [PATCH] dmaengine: add interface of dma_get_slave_channel
-Message-ID: <1372249370-10658-1-git-send-email-zhangfei.gao@linaro.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 26 Jun 2013 14:03:42 +0200
+Subject: [PATCH v2 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+In-Reply-To: <51CACEBE.9000505@ti.com>
+References: <1372170110-12993-1-git-send-email-s.nawrocki@samsung.com>
+ <20130625150649.GA21334@arwen.pp.htv.fi> <51C9D714.4000703@samsung.com>
+ <20130625205452.GC9748@arwen.pp.htv.fi> <51CACEBE.9000505@ti.com>
+Message-ID: <51CAD89E.3060800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suggested by Arnd, add dma_get_slave_channel interface
-Dma host driver could get specific channel specificied by request line, rather than filter.
+On 06/26/2013 01:21 PM, Kishon Vijay Abraham I wrote:
+>>>>> +static int exynos_video_phy_probe(struct platform_device *pdev)
+>>>>> >>>> +{
+>>>>> >>>> +	struct exynos_video_phy *state;
+>>>>> >>>> +	struct device *dev = &pdev->dev;
+>>>>> >>>> +	struct resource *res;
+>>>>> >>>> +	struct phy_provider *phy_provider;
+>>>>> >>>> +	int i;
+>>>>> >>>> +
+>>>>> >>>> +	state = devm_kzalloc(dev, sizeof(*state), GFP_KERNEL);
+>>>>> >>>> +	if (!state)
+>>>>> >>>> +		return -ENOMEM;
+>>>>> >>>> +
+>>>>> >>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>>>> >>>> +
+>>>>> >>>> +	state->regs = devm_ioremap_resource(dev, res);
+>>>>> >>>> +	if (IS_ERR(state->regs))
+>>>>> >>>> +		return PTR_ERR(state->regs);
+>>>>> >>>> +
+>>>>> >>>> +	dev_set_drvdata(dev, state);
+>>>> >>>
+>>>> >>> you can use platform_set_drvdata(pdev, state);
+>>> >>
+>>> >> I had it in the previous version, but changed for symmetry with
+>>> >> dev_set_drvdata(). I guess those could be replaced with
+>>> >> phy_{get, set}_drvdata as you suggested.
+>
+> right. currently I was setting dev_set_drvdata of phy (core) device
+> in phy-core.c and the corresponding dev_get_drvdata in phy provider driver
+> which is little confusing.
+> So I'll add phy_set_drvdata and phy_get_drvdata in phy.h (as suggested by
+> Felipe) to be used by phy provider drivers. So after creating the PHY, the
+> phy provider should use phy_set_drvdata and in phy_ops, it can use
+> phy_get_drvdata. (I'll remove the dev_set_drvdata in phy_create).
+> 
+> This also means _void *priv_ in phy_create is useless. So I'll be removing
+> _priv_ from phy_create.
 
-host example:
-static struct dma_chan *xx_of_dma_simple_xlate(struct of_phandle_args *dma_spec,
-		struct of_dma *ofdma)
-{
-	struct xx_dma_dev *d = ofdma->of_dma_data;
-	unsigned int request = dma_spec->args[0];
+Yeah, sounds good. Then in the phy ops phy_get_drvdata(&phy->dev) would
+be used and in a custom of_xlate dev_get_drvdata(dev) (assuming the phy
+provider sets drvdata on its device beforehand).
 
-	if (request > d->dma_requests)
-		return NULL;
+I can't see any races from runtime PM with this approach.
 
-	return dma_get_slave_channel(&(d->chans[request].vc.chan));
-}
-
-probe:
-of_dma_controller_register((&op->dev)->of_node, xx_of_dma_simple_xlate, d);
-
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- drivers/dma/dmaengine.c   |   26 ++++++++++++++++++++++++++
- include/linux/dmaengine.h |    1 +
- 2 files changed, 27 insertions(+)
-
-diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-index 93f7992..78dbbe0 100644
---- a/drivers/dma/dmaengine.c
-+++ b/drivers/dma/dmaengine.c
-@@ -504,6 +504,32 @@ static struct dma_chan *private_candidate(const dma_cap_mask_t *mask,
- }
- 
- /**
-+ * dma_request_channel - try to get specific channel exclusively
-+ * @chan: target channel
-+ */
-+struct dma_chan *dma_get_slave_channel(struct dma_chan *chan)
-+{
-+	int err = -EBUSY;
-+
-+	/* lock against __dma_request_channel */
-+	mutex_lock(&dma_list_mutex);
-+
-+	if (chan->client_count == 0)
-+		err = dma_chan_get(chan);
-+	else
-+		chan = NULL;
-+
-+	mutex_unlock(&dma_list_mutex);
-+
-+	if (err)
-+		pr_debug("%s: failed to get %s: (%d)\n",
-+			__func__, dma_chan_name(chan), err);
-+
-+	return chan;
-+}
-+EXPORT_SYMBOL_GPL(dma_get_slave_channel);
-+
-+/**
-  * dma_request_channel - try to allocate an exclusive channel
-  * @mask: capabilities that the channel must satisfy
-  * @fn: optional callback to disposition available channels
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index 96d3e4a..4e1c843 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -1000,6 +1000,7 @@ int dma_async_device_register(struct dma_device *device);
- void dma_async_device_unregister(struct dma_device *device);
- void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
- struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
-+struct dma_chan *dma_get_slave_channel(struct dma_chan *chan);
- struct dma_chan *net_dma_find_channel(void);
- #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
- #define dma_request_slave_channel_compat(mask, x, y, dev, name) \
--- 
-1.7.9.5
+Regards,
+Sylwester
