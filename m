@@ -1,40 +1,68 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Jun 2013 18:11:38 +0100
-Subject: [PATCH] ARM: Add support for LPAE style CONTEXTIDR
-In-Reply-To: <51C8627A.5000106@codeaurora.org>
-References: <1372080405-13365-1-git-send-email-cov@codeaurora.org>
- <20130624140424.GA24861@mudshark.cambridge.arm.com>
- <51C85A0D.3070400@codeaurora.org>
- <20130624145303.GA25582@mudshark.cambridge.arm.com>
- <51C8627A.5000106@codeaurora.org>
-Message-ID: <20130626171138.GF10333@mudshark.cambridge.arm.com>
+Date: Wed, 26 Jun 2013 18:16:49 +0100
+Subject: ARM pagetable setting in Linux
+In-Reply-To: <35FD53F367049845BC99AC72306C23D19441BF5863@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D19441BF5863@CNBJMBX05.corpusers.net>
+Message-ID: <20130626171649.GG10333@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 04:15:06PM +0100, Christopher Covington wrote:
-> On 06/24/2013 10:53 AM, Will Deacon wrote:
-> > On Mon, Jun 24, 2013 at 03:39:09PM +0100, Christopher Covington wrote:
-> >> Hi Will,
-> >>
-> >> On 06/24/2013 10:04 AM, Will Deacon wrote:
-> >> [...]
-> >>
-> >>> What's the advantage of this approach, other than you get an extra byte's
-> >>> worth of PID?
-> >>
-> >> In my view, the real advantage is that the the PID is located where people
-> >> reading ARM Architecture Reference Manual are told they can find it.
-> > 
-> > Perhaps, but I'd usually expect a debugger or trace tools to do something
-> > with the PID, and they likely expect it to be shifted, so you can't really
-> > win.
+[adding the ARM list -- please try and remember to do that in future]
+
+On Wed, Jun 26, 2013 at 03:41:40AM +0100, Wang, Yalin wrote:
+> Hi  Will,
+
+Hello,
+
+> I have a question about  arm pagetable setting in Linux .
 > 
-> But reading and implementing the architecture *is* winning! LOL. I'll file a
-> ticket with the architecture folks and see what they think.
+> From armV6,  there is TTBR0 and TTBR1  translation base address registers  in mmu .
+> But I  found linux only use TTBR0 for translation base address ,
+> Could we use TTBR0 and TTBR1 to split user task and kernel pagetables (swapper_pg_dir)? 
+> 
+> But I found this need set TTBCR.N   ,
+> If PAGE_OFFSET==0xc0000000  ,   set TTBCR.N=0x2 ,
+> Will not work , because   only ensure 0--0x00FFFFFF  MVA use TTBCR0 
+> And other  MVA?will use TTBCR1 ,
+> But if we set PAGE_OFFSET==0x80000000  (2GB split )  ,
+> And set  TTBCR.N=0x1 ,
+> This will make sure user task MVA use TTBCR0 and kernel  MVA 
+> Use TTBCR1 , this  will make some improvement for the system .
+> 
+> 1. Because we don?t need copy kernel first ?level pagetables into every 
+> User task?s pagetables and flush tlb (for example fork() a new process).
 
-...aaand that came full circle :)
+Well, you still need the TLB maintenance for setting up CoW, so this win is
+probably not very big.
 
-I think the conclusion is that Linux PID != CONTEXTIDR.PROCID, so there's no
-architectural issue here. I'm just trying to keep it easy for the tools.
+> 2. And don?t need handle kernel page fault because that user task?s kernel 
+> Pagetable when it is not set up , need copy again( for example vmalloc()  ioremap()  kmap()  will change 
+> Kernel pagetables and need update to every task pagetables ) .
+
+Is that really a fastpath?
+
+> 3. We  even can only allocate 8KB first level pagetables for user task to save 
+> Memorys .
+
+That would be a nice gain, but there are a number of factors here:
+
+	1. Pre-ARMv6 only have one ttbr, so you'd end up needing to support
+	   both configurations in the same kernel source.
+
+	2. The module area lives below PAGE_OFFSET, so you still have to
+	   deal with that correctly (mitigating some of your earlier points)
+
+	3. PAGE_OFFSET is not fixed at 2GB, so you constrain your use-case
+	   even further.
+
+	4. We do actually use TTBR1 to hold an identity mapping at the
+	   moment. This could probably be fixed, but would require some
+	   thought.
+
+There's undoubtedly other problems that haven't immediately come to me but,
+all in all, I don't think this is a significant enough win to justify the
+effort and maintenance headache.
+
+Cheers,
 
 Will
