@@ -1,67 +1,34 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 26 Jun 2013 15:22:38 +0300
-Subject: [PATCH v2 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
-In-Reply-To: <51CAD89E.3060800@samsung.com>
-References: <1372170110-12993-1-git-send-email-s.nawrocki@samsung.com>
- <20130625150649.GA21334@arwen.pp.htv.fi>
- <51C9D714.4000703@samsung.com>
- <20130625205452.GC9748@arwen.pp.htv.fi> <51CACEBE.9000505@ti.com>
- <51CAD89E.3060800@samsung.com>
-Message-ID: <20130626122238.GD12640@arwen.pp.htv.fi>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 26 Jun 2013 09:55:14 +0200
+Subject: [PATCH v3 1/4] i2c-mv64xxx: Set bus frequency to 100kHz if
+ clock-frequency is not provided
+In-Reply-To: <20130625214446.GA2951@katana>
+References: <1371821529-13791-1-git-send-email-gregory.clement@free-electrons.com>
+ <1371821529-13791-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130625214446.GA2951@katana>
+Message-ID: <51CA9E62.6090203@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 02:03:42PM +0200, Sylwester Nawrocki wrote:
-> On 06/26/2013 01:21 PM, Kishon Vijay Abraham I wrote:
-> >>>>> +static int exynos_video_phy_probe(struct platform_device *pdev)
-> >>>>> >>>> +{
-> >>>>> >>>> +	struct exynos_video_phy *state;
-> >>>>> >>>> +	struct device *dev = &pdev->dev;
-> >>>>> >>>> +	struct resource *res;
-> >>>>> >>>> +	struct phy_provider *phy_provider;
-> >>>>> >>>> +	int i;
-> >>>>> >>>> +
-> >>>>> >>>> +	state = devm_kzalloc(dev, sizeof(*state), GFP_KERNEL);
-> >>>>> >>>> +	if (!state)
-> >>>>> >>>> +		return -ENOMEM;
-> >>>>> >>>> +
-> >>>>> >>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >>>>> >>>> +
-> >>>>> >>>> +	state->regs = devm_ioremap_resource(dev, res);
-> >>>>> >>>> +	if (IS_ERR(state->regs))
-> >>>>> >>>> +		return PTR_ERR(state->regs);
-> >>>>> >>>> +
-> >>>>> >>>> +	dev_set_drvdata(dev, state);
-> >>>> >>>
-> >>>> >>> you can use platform_set_drvdata(pdev, state);
-> >>> >>
-> >>> >> I had it in the previous version, but changed for symmetry with
-> >>> >> dev_set_drvdata(). I guess those could be replaced with
-> >>> >> phy_{get, set}_drvdata as you suggested.
-> >
-> > right. currently I was setting dev_set_drvdata of phy (core) device
-> > in phy-core.c and the corresponding dev_get_drvdata in phy provider driver
-> > which is little confusing.
-> > So I'll add phy_set_drvdata and phy_get_drvdata in phy.h (as suggested by
-> > Felipe) to be used by phy provider drivers. So after creating the PHY, the
-> > phy provider should use phy_set_drvdata and in phy_ops, it can use
-> > phy_get_drvdata. (I'll remove the dev_set_drvdata in phy_create).
-> > 
-> > This also means _void *priv_ in phy_create is useless. So I'll be removing
-> > _priv_ from phy_create.
+On 06/25/2013 11:44 PM, Wolfram Sang wrote:
+> On Fri, Jun 21, 2013 at 03:32:06PM +0200, Gregory CLEMENT wrote:
+>> This commit adds checking whether clock-frequency property acquisition has succeeded. If not, the frequency is set to 100kHz by default.
+>> 
+>> The Device Tree binding documentation is updated accordingly.
+>> 
+>> Based on the intials patches from Zbigniew Bodek
+>> 
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com> Signed-off-by: Zbigniew Bodek <zbb@semihalf.com>
 > 
-> Yeah, sounds good. Then in the phy ops phy_get_drvdata(&phy->dev) would
+> Applied to for-next, thanks! Rest of the series is 3.12 material.
+> 
+Thanks!
 
-phy_get_drvdata(phy);
-
-accessing the dev pointer will be done inside the helper :-)
+For the rest of the series, does it mean that you agree with it, or
+that you didn't review it yet?
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/ea45cd95/attachment.sig>
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
