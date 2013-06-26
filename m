@@ -1,85 +1,50 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 26 Jun 2013 18:42:50 +0200
-Subject: Armada DRM driver on OLPC XO
-In-Reply-To: <20130625204726.BF65C12647A@dev.laptop.org>
-References: <20130625204726.BF65C12647A@dev.laptop.org>
-Message-ID: <20130626184250.43f36e47@armhf>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 26 Jun 2013 11:02:57 +0200
+Subject: [GIT PULL] at91: Device Tree updates for 3.11 #3
+Message-ID: <1372237377-20315-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Jun 2013 16:47:26 -0400 (EDT)
-Daniel Drake <dsd@laptop.org> wrote:
+Arnd, Olof,
 
-> Hi Russell,
-> 
-> Thanks a lot for writing the Armada DRM driver.
-> 
-> I have tested it on OLPC XO-1.75 (MMP2 aka Armada610) and OLPC XO-4 (MMP3
-> aka PXA2128). After a bit of fighting, I have it running. Could you share your
-> X driver, or your methodology for testing hardware cursors? I'd like to test
-> your work there too.
-> 
-> It's probably easiest to get your cubox driver merged before adding MMP2/MMP3
-> complications into the mix. At that point, I will hopefully have time to
-> follow up developing MMP2/MMP3 support, which will involve the points
-> mentioned below.
-> 
-> A hacky patch is also included below, which makes the driver run on this
-> platform. I'm prepared to do the heavy lifting in implementing these changes
-> properly, but any high level guidance would be appreciated, especially as I
-> am new to the world of graphics.
-> 
-> Ordered roughly from highest to lowest importance:
-> 
-> 
-> 1. Device tree support
-	[snip]
-> 
-> 2. Panel support.
-	[snip]
-> 
-> 3. Register space conflicts
-	[snip]
-> 
-> 4. Video memory
-	[snip]
-> 
-> 5. Output paths
-	[snip]
-> 
-> I will work on getting you an XO in case you are interested in testing the
-> driver there from time to time or even helping to develop support. But first I
-> need to get it bootable on mainline kernels (patches posted, waiting for
-> review).
-> 
-> Thanks!
-> Daniel
+One more pull-request for AT91 DT patches.
+It is focused on SPI on several SoCs and it particular the SPI+DMA addition on newer
+SAMA5D3 and AT91SAM9N12.
 
-Hi Daniel,
+Thanks, best regards,
 
-Do you know that there are 2 drm drivers for the Cubox? I posted mine
-(http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/168732.html)
-before Russell, but I got no return about it yet.
+The following changes since commit 24ce10e142e7b063c4ae4437dd3b290fbfafe052:
 
-As it uses the CMA helper (no handling of the Cubox GPU/VPU), my
-driver is simpler and does not need any specific memory reservation.
+  ARM: at91: sam9m10g45ek add udc DT support (2013-06-15 00:15:22 +0200)
 
-It has full DT support. The Cubox specific drivers are build as
-loadable modules (dove-drm driver, tda998x hdmi slave encoder, si5351
-clock driver and kirkwood i2s/spdif audio driver). The synchronization
-of module loading at startup time is done by EPROBE_DEFER. The DT
-permits each CRTC to use any of up to 4 clocks.
+are available in the git repository at:
 
-It is designed to handle 2 CTRCs and 2 couples of encoder/connector
-only. LCD panel description (modeline / dimension) is done in the DT.
+  git://github.com/at91linux/linux-at91.git tags/at91-dt
 
-If you are interested or simply curious, I put my whole Cubox work in
-http://moinejf.free.fr/cubox/ (I have some fixes that I will upload as
-soon as I have a running 3.10.0-rc7 kernel compiled with gcc 4.8.1!).
-The big kernel patch contains the dove-drm driver (in
-drivers/gpu/drm/dove/) and the Cubox DT (arch/arm/boot/dts/dove.dtsi
-and dove-cubox.dts).
+for you to fetch changes up to 26e3326cc04bc3fc890a95ad6cb36359372acba5:
+
+  ARM: at91: dt: rm9200ek: add spi support (2013-06-26 10:13:39 +0200)
+
+----------------------------------------------------------------
+- more SPI DT activation for rm9200
+- SPI DMA for at91sam9n12/sama5d3
+And one little fix for SPI compatibility string
+
+----------------------------------------------------------------
+Jean-Christophe PLAGNIOL-VILLARD (2):
+      ARM: at91: dt: rm9200: add spi support
+      ARM: at91: dt: rm9200ek: add spi support
+
+Nicolas Ferre (3):
+      ARM: at91/DT: fix SPI compatibility string
+      ARM: at91/DT: sama5d3: add SPI DMA client infos
+      ARM: at91/DT: at91sam9n12: add SPI DMA client infos
+
+ arch/arm/boot/dts/at91rm9200.dtsi  | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/at91rm9200ek.dts | 10 ++++++++++
+ arch/arm/boot/dts/at91sam9n12.dtsi |  6 ++++++
+ arch/arm/boot/dts/sama5d3.dtsi     | 10 ++++++++--
+ 4 files changed, 44 insertions(+), 2 deletions(-)
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Nicolas Ferre
