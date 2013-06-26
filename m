@@ -1,62 +1,214 @@
-From: joelagnel@ti.com (Joel A Fernandes)
-Date: Tue, 25 Jun 2013 20:32:04 -0500
-Subject: [PATCH 2/2] DMA: EDMA: Add comments for A-sync case calculations
-Message-ID: <1372210324-7181-1-git-send-email-joelagnel@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 25 Jun 2013 18:36:05 -0700
+Subject: [PATCH] ARM: Make multi_v7_defconfig usable on hardware
+Message-ID: <1372210565-22962-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joel A Fernandes <agnel.joel@gmail.com>
+This updates multi_v7_defconfig to boot on at least Tegra2 Seaboard and
+Panda ES. I lack working hardware for most of the platforms that were
+enabled to compare with, so I could only verify those two for now. Still,
+I enabled all of the available ones for build coverage purposes.
 
-A-sync case in EDMA driver is tricky and not so obvious.
-Document the reasons for the calculations and the scenarious
-they are used.
+Beyond base platforms, things like PRINTK_TIME, filesystems, MMC, USB,
+INET and UNIX networking was enabled. I'm sure we'll keep adding more
+over time, but this gets us off the ground for semi-regular boot testing.
 
-Signed-off-by: Joel A Fernandes <agnel.joel@gmail.com>
+
+Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- drivers/dma/edma.c |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 125 ++++++++++++++++++++++++++++--------
+ 1 file changed, 97 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index e008ed2..a1d9f3785 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -284,8 +284,24 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
- 		 */
- 		if (burst == 1) {
- 			edesc->absync = false;
-+			/*
-+			 * For the A-sync case, bcnt and ccnt are the remainder
-+			 * and quotient respectively of the division of:
-+			 * (sg_dma_len(sg) / acnt) by (SZ_64K -1). This is so
-+			 * that in case bcnt over flows, we have ccnt to use.
-+			 * Note: In A-sync tranfer only, bcntrld is used, but it
-+			 * only applies for sg_dma_len(sg) >= SZ_64K.
-+			 * In this case, the best way adopted is- bccnt for the
-+			 * first frame will be the remainder below. Then for
-+			 * every successive frame, bcnt will be SZ_64K-1. This
-+			 * is assured as bcntrld = 0xffff in end of function.
-+			 */
- 			ccnt = sg_dma_len(sg) / acnt / (SZ_64K - 1);
- 			bcnt = sg_dma_len(sg) / acnt - ccnt * (SZ_64K - 1);
-+			/*
-+			 * If bcnt is non-zero, we have a remainder and hence an
-+			 * extra frame to transfer, so increment ccnt.
-+			 */
- 			if (bcnt)
- 				ccnt++;
- 			else
-@@ -343,6 +359,12 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
- 
- 		edesc->pset[i].a_b_cnt = bcnt << 16 | acnt;
- 		edesc->pset[i].ccnt = ccnt;
-+		/*
-+		 * Only time when (bcntrld) auto reload is required is for
-+		 * A-sync case, and in this case, a requirement of reload value
-+		 * of SZ_64K-1 only is assured. 'link' is initially set to NULL
-+		 * and then later will be populated by edma_execute.
-+		 */
- 		edesc->pset[i].link_bcntrld = 0xffffffff;
- 
- 	}
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 340d550..9dd7bc8 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -1,88 +1,157 @@
+-CONFIG_EXPERIMENTAL=y
++CONFIG_IRQ_DOMAIN_DEBUG=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+-CONFIG_ARCH_SIRF=y
+ CONFIG_MACH_ARMADA_XP=y
++CONFIG_ARCH_BCM=y
++CONFIG_GPIO_PCA953X=y
+ CONFIG_ARCH_HIGHBANK=y
++CONFIG_ARCH_KEYSTONE=y
++CONFIG_ARCH_MXC=y
++CONFIG_MACH_IMX51_DT=y
++CONFIG_SOC_IMX53=y
++CONFIG_SOC_IMX6Q=y
++CONFIG_SOC_IMX6SL=y
++CONFIG_SOC_VF610=y
++CONFIG_ARCH_OMAP2PLUS=y
++CONFIG_SOC_OMAP5=y
++CONFIG_SOC_AM43XX=y
++CONFIG_ARCH_ROCKCHIP=y
+ CONFIG_ARCH_SOCFPGA=y
+-CONFIG_ARCH_SUNXI=y
+-CONFIG_ARCH_WM8850=y
+-# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
+-CONFIG_ARCH_ZYNQ=y
+-CONFIG_ARM_ERRATA_754322=y
+ CONFIG_PLAT_SPEAR=y
+ CONFIG_ARCH_SPEAR13XX=y
+ CONFIG_MACH_SPEAR1310=y
+ CONFIG_MACH_SPEAR1340=y
++CONFIG_ARCH_STI=y
++CONFIG_ARCH_SUNXI=y
++CONFIG_ARCH_SIRF=y
++CONFIG_ARCH_TEGRA=y
++CONFIG_ARCH_TEGRA_2x_SOC=y
++CONFIG_ARCH_TEGRA_3x_SOC=y
++CONFIG_ARCH_TEGRA_114_SOC=y
++CONFIG_TEGRA_PCI=y
++CONFIG_TEGRA_EMC_SCALING_ENABLE=y
++CONFIG_ARCH_U8500=y
++CONFIG_MACH_SNOWBALL=y
++CONFIG_MACH_UX500_DT=y
++CONFIG_ARCH_VEXPRESS=y
++CONFIG_ARCH_VEXPRESS_CA9X4=y
++CONFIG_ARCH_VIRT=y
++CONFIG_ARCH_WM8850=y
++CONFIG_ARCH_ZYNQ=y
+ CONFIG_SMP=y
+-CONFIG_ARM_ARCH_TIMER=y
+-CONFIG_AEABI=y
+-CONFIG_HIGHMEM=y
+ CONFIG_HIGHPTE=y
+ CONFIG_ARM_APPENDED_DTB=y
+-CONFIG_VFP=y
+-CONFIG_NEON=y
+ CONFIG_NET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_ATA=y
++CONFIG_SATA_AHCI_PLATFORM=y
+ CONFIG_SATA_HIGHBANK=y
+ CONFIG_SATA_MV=y
+-CONFIG_SATA_AHCI_PLATFORM=y
+ CONFIG_NETDEVICES=y
+-CONFIG_SUN4I_EMAC=y
+ CONFIG_NET_CALXEDA_XGMAC=y
+ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=y
++CONFIG_KEYBOARD_SPEAR=y
+ CONFIG_SERIO_AMBAKMI=y
+-CONFIG_MDIO_SUN4I=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_DW=y
+-CONFIG_KEYBOARD_SPEAR=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+-CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_SERIAL_SIRFSOC=y
+ CONFIG_SERIAL_SIRFSOC_CONSOLE=y
++CONFIG_SERIAL_TEGRA=y
+ CONFIG_SERIAL_VT8500=y
+ CONFIG_SERIAL_VT8500_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_SERIAL_OMAP=y
++CONFIG_SERIAL_OMAP_CONSOLE=y
+ CONFIG_SERIAL_XILINX_PS_UART=y
+ CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
+-CONFIG_IPMI_HANDLER=y
+-CONFIG_IPMI_SI=y
+-CONFIG_I2C=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_I2C_SIRF=y
++CONFIG_I2C_TEGRA=y
+ CONFIG_SPI=y
+ CONFIG_SPI_PL022=y
+ CONFIG_SPI_SIRF=y
+-CONFIG_GPIO_PL061=y
+-CONFIG_FB=y
++CONFIG_SPI_TEGRA114=y
++CONFIG_SPI_TEGRA20_SLINK=y
++CONFIG_PINCTRL_SINGLE=y
++CONFIG_GPIO_GENERIC_PLATFORM=y
++CONFIG_GPIO_TWL4030=y
++CONFIG_REGULATOR_GPIO=y
++CONFIG_REGULATOR_AB8500=y
++CONFIG_REGULATOR_TPS51632=y
++CONFIG_REGULATOR_TPS62360=y
++CONFIG_REGULATOR_TWL4030=y
++CONFIG_REGULATOR_VEXPRESS=y
++CONFIG_DRM=y
++CONFIG_TEGRA_HOST1X=y
++CONFIG_DRM_TEGRA=y
+ CONFIG_FB_ARMCLCD=y
+ CONFIG_FB_WM8505=y
+-CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_FB_SIMPLE=y
+ CONFIG_USB=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_MXC=y
++CONFIG_USB_EHCI_TEGRA=y
++CONFIG_USB_EHCI_HCD_PLATFORM=y
+ CONFIG_USB_ISP1760_HCD=y
+ CONFIG_USB_STORAGE=y
++CONFIG_AB8500_USB=y
++CONFIG_NOP_USB_XCEIV=y
++CONFIG_OMAP_USB2=y
++CONFIG_OMAP_USB3=y
++CONFIG_SAMSUNG_USB2PHY=y
++CONFIG_SAMSUNG_USB3PHY=y
++CONFIG_USB_GPIO_VBUS=y
++CONFIG_USB_ISP1301=y
++CONFIG_USB_MXS_PHY=y
+ CONFIG_MMC=y
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_TEGRA=y
+ CONFIG_MMC_SDHCI_SPEAR=y
+-CONFIG_MMC_WMT=y
++CONFIG_MMC_OMAP=y
++CONFIG_MMC_OMAP_HS=y
+ CONFIG_EDAC=y
+ CONFIG_EDAC_MM_EDAC=y
+ CONFIG_EDAC_HIGHBANK_MC=y
+ CONFIG_EDAC_HIGHBANK_L2=y
+ CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_TWL4030=y
+ CONFIG_RTC_DRV_PL031=y
+ CONFIG_RTC_DRV_VT8500=y
+-CONFIG_PWM=y
+-CONFIG_PWM_VT8500=y
++CONFIG_RTC_DRV_TEGRA=y
+ CONFIG_DMADEVICES=y
+-CONFIG_PL330_DMA=y
+-CONFIG_SIRF_DMA=y
+ CONFIG_DW_DMAC=y
++CONFIG_TEGRA20_APB_DMA=y
++CONFIG_STE_DMA40=y
++CONFIG_SIRF_DMA=y
++CONFIG_TI_EDMA=y
++CONFIG_PL330_DMA=y
++CONFIG_IMX_SDMA=y
++CONFIG_IMX_DMA=y
++CONFIG_MXS_DMA=y
++CONFIG_DMA_OMAP=y
++CONFIG_PWM=y
++CONFIG_PWM_VT8500=y
++CONFIG_EXT4_FS=y
++CONFIG_TMPFS=y
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_LOCKUP_DETECTOR=y
++CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_OMAP2PLUS_UART=y
++CONFIG_DEBUG_OMAP4UART3=y
++CONFIG_EARLY_PRINTK=y
 -- 
-1.7.9.5
+1.8.1.192.gc4361b8
