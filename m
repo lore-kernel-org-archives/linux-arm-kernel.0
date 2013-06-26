@@ -1,104 +1,52 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 26 Jun 2013 18:52:59 +0530
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
- <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
-Message-ID: <51CAEB33.5010101@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Jun 2013 12:55:33 +0200
+Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
+In-Reply-To: <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>
->> Just to confirm, my problems with mainline were with appended DTB also.
->> Separate DTB and zImage work fine (at least using u-boot v2013.04.)
->>
->> That being said, appended DTB should still work, so there's a bug
->> hiding
->> someplace that needs to be found fixed.
->>
->> Can you guys update your tests to test appended DTB also?
->>
-> 
-> What is missing here is, 
-> 
-> CONFIG_ARM_APPENDED_DTB = y
-> CONFIG_ARM_ATAG_DTB_COMPAT = y
-> 
-> 
-> And for the code which is required in case of appended DTB, please refer to the code
-> "arch/arm/boot/compressed/head.S"
-> 
-> 
-> Please __NOTE__ that these options are not enabled in default omap2plus_defconfig.
+Replying to self:
 
-Paul/Kevin,
+On 25 June 2013 22:24, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> +void kernel_neon_end(void)
+> +{
+> +       /* Disable the NEON/VFP unit. */
+> +       fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+> +       barrier();
+> +       dec_preempt_count();
+> +}
+> +EXPORT_SYMBOL(kernel_neon_end);
 
-Apart from confirming if you are manually enabling these options, can you also give some
-details on how you append the dtb to the kernel image?
+Meh. This is not going to please the RT crowd, as preempt_schedule()
+will not be called on PREEMPT builds in this case.
 
-Most of us use an out-of-tree patch from Grant to do this, which I have shared below [2]
+Propose to replace it with
 
-Even without the patch with the below commands [1] to append the dtb, it still works, so it
-would be good to know what steps you follow to append the dtb to the kernel image.
+    preempt_enable();
+#ifndef CONFIG_PREEMPT_COUNT
+    /* in this case, the preempt_enable() right above is just a barrier() */
+    dec_preempt_count();
+#endif
 
-regards,
-Rajendra
+(and the converse in kernel_neon_begin())
 
-[1]
-cat arch/arm/boot/zImage arch/arm/boot/dts/am335x-bone.dtb > zImage
-mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 -n "Linux" -d zImage uImage 
+In that case, preempt_disable will either be just a barrier(), or it
+will re-enable preemption, and potentially reschedule if the preempt
+count has dropped to zero.
 
-[2]
-From: Grant Likely <grant.likely@secretlab.ca>
-Date: Tue, 24 Apr 2012 16:19:29 +0530
-Subject: Makefile: Build a uImage with dtb already appended
+-- 
+Ard.
 
-Do not commit to mainline; this is a useful hack only for now.
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
----
- arch/arm/Makefile      |    2 ++
- arch/arm/boot/Makefile |    7 +++++++
- 2 files changed, 9 insertions(+)
-
-Index: linux-2.6/arch/arm/Makefile
-===================================================================
---- linux-2.6.orig/arch/arm/Makefile    2013-04-24 12:25:22.547990009 +0530
-+++ linux-2.6/arch/arm/Makefile 2013-04-26 14:30:57.143150733 +0530
-@@ -295,6 +295,8 @@
-
- %.dtb: scripts
-        $(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
-+uImage.%: uImage
-+       $(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-
- dtbs: scripts
-        $(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) dtbs
-Index: linux-2.6/arch/arm/boot/Makefile
-===================================================================
---- linux-2.6.orig/arch/arm/boot/Makefile       2013-04-24 12:25:22.547990009 +0530
-+++ linux-2.6/arch/arm/boot/Makefile    2013-04-26 14:30:57.151150508 +0530
-@@ -55,6 +55,9 @@
-        $(call if_changed,objcopy)
-        @$(kecho) '  Kernel: $@ is ready'
-
-+$(obj)/zImage-dtb.%:   $(obj)/dts/%.dtb $(obj)/zImage
-+       cat $(obj)/zImage $< > $@
-+
- endif
-
- ifneq ($(LOADADDR),)
-@@ -80,6 +83,10 @@
-        $(call if_changed,uimage)
-        @$(kecho) '  Image $@ is ready'
-
-+$(obj)/uImage.%:       $(obj)/zImage-dtb.% FORCE
-+       $(call if_changed,uimage)
-+       @echo '  Image $@ is ready'
-+
- $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
-        $(Q)$(MAKE) $(build)=$(obj)/bootp $@
-        @:
+> +
+> +#endif /* CONFIG_KERNEL_MODE_NEON */
+> +
+>  /*
+>   * VFP support code initialisation.
+>   */
+> --
+> 1.8.1.2
+>
