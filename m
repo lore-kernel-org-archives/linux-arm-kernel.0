@@ -1,75 +1,44 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Wed, 26 Jun 2013 22:03:54 +0530
-Subject: [PATCH 3/5] ARM: dts: am33xx: Add interrupts and memory resources
- for MMC
-In-Reply-To: <1372209888-6649-1-git-send-email-joelagnel@ti.com>
-References: <1372209888-6649-1-git-send-email-joelagnel@ti.com>
-Message-ID: <51CB17F2.5060504@ti.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 26 Jun 2013 18:39:49 +0200
+Subject: [linux-next PATCH] samsung_pwm: fix build for
+ CONFIG_CLKSRC_SAMSUNG_PWM=n
+Message-ID: <1913259.iCGtCKZW7f@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joel,
+From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Subject: [linux-next PATCH] samsung_pwm: fix build for CONFIG_CLKSRC_SAMSUNG_PWM=n
 
-On Wednesday 26 June 2013 06:54 AM, Joel A Fernandes wrote:
-> From: Joel A Fernandes <agnel.joel@gmail.com>
->
-> HWMOD irq entries for MMC were removed. We provide the same from DT for MMC.
->
-> This fixes issue where memory resource could not be found during probe.
-> Also, added the reg-offset property to account for the offset from start.
->
-> Signed-off-by: Joel A Fernandes <agnel.joel@gmail.com>
-> ---
->   arch/arm/boot/dts/am33xx.dtsi |   12 ++++++++++++
->   1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 119f8a9..e0a5741 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -237,6 +237,10 @@
->   			dmas = <&edma 24
->   				&edma 25>;
->   			dma-names = "tx", "rx";
-> +			interrupts = <64>;
-> +			interrupt-parent = <&intc>;
-> +			reg = <0x48060000 0x1000>;
-> +			reg-offset = <0x100>;
->   			status = "disabled";
->   		};
->
-> @@ -247,6 +251,10 @@
->   			dmas = <&edma 2
->   				&edma 3>;
->   			dma-names = "tx", "rx";
-> +			interrupts = <24>;
+If CONFIG_PWM_SAMSUNG=y and CONFIG_CLKSRC_SAMSUNG_PWM=n next-20130626
+build fails with the following error:
 
-s/24/28
+drivers/pwm/pwm-samsung.c:89:19: error: static declaration of ?samsung_pwm_lock? follows non-static declaration
+include/clocksource/samsung_pwm.h:23:19: note: previous declaration of ?samsung_pwm_lock? was here
 
-> +			interrupt-parent = <&intc>;
-> +			reg = <0x481d8000 0x1000>;
-> +			reg-offset = <0x100>;
->   			status = "disabled";
->   		};
->
-> @@ -254,6 +262,10 @@
->   			compatible = "ti,omap3-hsmmc";
+It is caused by commit 9ebe293 ("pwm: Add new pwm-samsung driver").
 
-compatible should be ti,omap4-hsmmc since omap4 hsmmc IP is re-used in am33xx
-and reg-offset property is not needed.
-combine this patch with 2/5 ARM: dts: add AM33XX MMC support and please add
-your signed-off to that patch.
+Fix it by adding missing ifdef.
 
->   			ti,hwmods = "mmc3";
->   			ti,needs-special-reset;
-> +			interrupts = <25>;
+Cc: Stephen Rothwell <sfr@canb.auug.org.au>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ include/clocksource/samsung_pwm.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-s/25/29
-
-> +			interrupt-parent = <&intc>;
-> +			reg = <0x47810000 0x1000>;
-> +			reg-offset = <0x100>;
->   			status = "disabled";
->   		};
->
->
+Index: b/include/clocksource/samsung_pwm.h
+===================================================================
+--- a/include/clocksource/samsung_pwm.h	2013-06-21 12:05:51.329680497 +0200
++++ b/include/clocksource/samsung_pwm.h	2013-06-26 17:48:02.574187287 +0200
+@@ -20,7 +20,9 @@
+ 
+ #define SAMSUNG_PWM_NUM		5
+ 
++#ifdef CONFIG_CLKSRC_SAMSUNG_PWM
+ extern spinlock_t samsung_pwm_lock;
++#endif
+ 
+ struct samsung_pwm_variant {
+ 	u8 bits;
