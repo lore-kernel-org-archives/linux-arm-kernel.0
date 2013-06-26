@@ -1,125 +1,105 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 26 Jun 2013 16:20:16 +0300
-Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
-In-Reply-To: <20130625065811.GZ5523@atomide.com>
-References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
- <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
- <20130625065811.GZ5523@atomide.com>
-Message-ID: <51CAEA90.90200@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 26 Jun 2013 14:13:39 +0100
+Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
+In-Reply-To: <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
+References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
+ <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <CACxGe6tUpo31p6N0BZt_jdonuPP8ijvLBygC76wQ044EFsqOwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
-
-On 06/25/2013 09:58 AM, Tony Lindgren wrote:
-> * Linus Walleij <linus.walleij@linaro.org> [130624 05:13]:
->> On Fri, Jun 21, 2013 at 5:03 PM, Grygorii Strashko
->> <grygorii.strashko@ti.com> wrote:
->>
->>> Hence, add pinctrl handling in omap_device core:
->>> 1) on PM runtime resume
->>> - switch pinctrl state to "default" (todo: "active")
->>> 2) on PM runtime suspend
->>> - switch pinctrl state to "idle"
->>> 3) during system wide suspend
->>> - switch pinctrl state to "sleep" or "idle" if omap_device core disables device
->>> - switch pinctrl state to "sleep" if device is disabled already
-> Do you need a separate setting for "idle" and "sleep", or are
-> they the same?
+On Tue, Jun 25, 2013 at 7:11 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> This patch provides documentation of the [U]EFI runtime services and
+> configuration features.
 >
->>> 4) during system wide resume
->>> - switch pinctrl state to "default" (todo: "active") if omap_device core has
->>>    disabled  device during suspend
->>> - switch pinctrl state to "idle" if device was already disabled before suspend
->> I don't understand step 4.
->>
->> I get the creeps about whether the system is runtime suspended
->> or runtime resumed when we come to resume proper, so I need
->> Kevin to have a look at this.
->>
->> Apart from that it looks good.
->>
->> Stephen and Tony are trying to figure out the details of whether "active"
->> is necessary or not in a related thread I think.
-Thanks for your comments.
-
-I've prepared diagram to illustrate how does this work:
-                                                  +
-                                                  |
-                                                  |  .probe()
-                                                  |
-                                            +-----v--------+
-                                            |              |
-                                            |  default     |
-                                            |              |
-                                            +----+--+------+
-                                                 |  |
-                               pm_runtime_get()  |  | pm_runtime_put()
-                              +------------------+ +------------------+
-|                                        |
-                       +------v--------+ pm_runtime_put() +-------v-------+
-                       | +----------------------->               |
-           +----------->  Active       |      pm_runtime_get() | 
-Idle        <--------------+
-           |           | <-----------------------+               
-|              |
-           |           +-------+-------+ +-------+-------+              |
-           | |.suspend_noirq()                       
-|.suspend_noirq()      |
-           | |                                       
-|                      |
-           | |                                       
-|                      |
-           | |                                       
-|                      |
-           | |                                       
-|                      |
-           |           +-------v-------+ +-------v--------+             |
-           |           |               | |                |             |
-           +-----------+  Sleep        ------+                 | 
-Sleep         +-------------+
-       .resume_noirq() |               |     | |                
-|.resume_noirq()
-                       +-------|-------+     | +----------------+
-                               |   Idle      |
-                               +-------------+
-
-The "Sleep" pinctrl state is optional - if "sleep" state isn't defined
-then "Idle" pinctrl state will be used during suspend.
-
-As per above pinctrl state transition diagram - I think, that:
-- if "idle" or "sleep" states are defined then "active" state have to be 
-defined too.
-So, pinctrl core should detect such situation and generate a warning.
-
- From my point of view, we should have "active" state - it would allow 
-to avoid additional
-runtime overhead and handle properly the case when drivers are used as 
-loadable modules.
-In this case, after boot, device's pinctrl registers can have HW default 
-values (after reset) or
-can be configured to some safe (off) state from board file (board's 
-"default" configuration).
-Driver module will activate its PINs when loaded and need to restore 
-safe (off) PINs state when
-unloaded.
-As result, it seems, we should have "off" state which can be used when 
-driver's module is removed.
-
-So, final list of default pnctrl states may be defined as "default", 
-"active", "idle", "sleep", "off":
-- "active", "idle", "sleep": will be handled by omap_device core
-- "default", "off": will be handled by driver itself (or Device core).
-
-
-
-> Yes we should have that sorted out over next few weeks, so let's
-> just wait a little while on all these dynamic remuxing patches
-> to avoid churn.
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> ---
+>  Documentation/arm/00-INDEX |    3 +++
+>  Documentation/arm/uefi.txt |   39 +++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 42 insertions(+)
+>  create mode 100644 Documentation/arm/uefi.txt
 >
-> Regards,
->
-> Tony
+> diff --git a/Documentation/arm/00-INDEX b/Documentation/arm/00-INDEX
+> index 4978456..87e01d1 100644
+> --- a/Documentation/arm/00-INDEX
+> +++ b/Documentation/arm/00-INDEX
+> @@ -36,3 +36,6 @@ nwfpe/
+>         - NWFPE floating point emulator documentation
+>  swp_emulation
+>         - SWP/SWPB emulation handler/logging description
+> +
+> +uefi.txt
+> +       - [U]EFI configuration and runtime services documentation
+> diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
+> new file mode 100644
+> index 0000000..5c48271
+> --- /dev/null
+> +++ b/Documentation/arm/uefi.txt
+> @@ -0,0 +1,39 @@
+> +The nomenclature EFI and UEFI are used interchangeably in this document.
+> +
+> +The implementation depends on receiving pointers to the UEFI memory map
+> +and System Table in a Flattened Device Tree - so is only available with
+> +CONFIG_OF.
+> +
+> +It (early) parses the FDT for the following parameters:
 
-Regards,
-- grygorii
+Need to state which node these properties can be found in. I recommend /chosen
+
+I would also prefix all of the following properties with "linux,"
+since they are very much about what the Linux kernel needs for
+booting. EFI stub will be creating these properties specifically for
+Linux, and the LinuxLoader should do the same (until we eventually
+kill it).
+
+> +- 'efi-system-table':
+> +  Physical address of the system table. (required)
+
+Need to mention the size of this address. Is it 64 bit or 32 bit? I
+would follow the lead of 'linux,initrd-start' here and make the size
+of property the size of the address. ie. If it is 8 bytes long, then
+it is a 64 bit address.
+
+> +- 'efi-runtime-mmap':
+> +  Physical address of an EFI memory map, containing at least
+> +  the regions to be preserved. (required)
+> +- 'efi-runtime-mmap-size':
+> +  Size in bytes of the provided memory map. (required)
+
+I would collapse the above two properties into a single property that
+actually contains the memory map instead of pointing to it. You will
+also need to specify the exact format of the data in this property.
+
+> +- 'efi-mmap-desc-size':
+> +  Size of each descriptor in the memory map. (override default)
+> +- 'efi-mmap-desc-ver':
+> +  Memory descriptor format version. (override default)
+
+I don't understand how these properties will actually work. What
+changes in the parsing if these properties are set?
+
+> +
+> +Since UEFI firmware on ARM systems are required to use a 1:1 memory map
+> +even on LPAE-capable systems, the above fields are 32-bit regardless.
+> +
+> +It also depends on early_ioremap to parse the memory map and preserve
+> +the regions required for runtime services.
+> +
+> +For actually enabling [U]EFI support, enable:
+> +- CONFIG_EFI=y
+> +- CONFIG_EFI_VARS=y or m
+> +
+> +After the kernel has mapped the required regions into its address space,
+> +a SetVirtualAddressMap() call is made into UEFI in order to update
+> +relocations. This call must be performed with all the code in a 1:1
+> +mapping. This implementation achieves this by temporarily disabling the
+> +MMU for the duration of this call. This can only be done safely:
+> +- before secondary CPUs are brought online.
+> +- after early_initcalls have completed, sinze it uses setup_mm_for_reboot().
+> +
+> +For verbose debug messages, specify 'uefi_debug' on the kernel command
+> +line.
+
+Looks good otherwise, Thanks!
+
+g.
