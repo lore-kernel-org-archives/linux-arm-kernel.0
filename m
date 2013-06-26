@@ -1,43 +1,34 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 26 Jun 2013 17:19:20 +0000 (UTC)
+Date: Wed, 26 Jun 2013 17:26:19 +0000 (UTC)
 Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <51C9F0A8.1050607@ti.com>
+In-Reply-To: <51CAEB33.5010101@ti.com>
 References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
  <20130625160243.GE22312@arwen.pp.htv.fi>
  <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <51C9F0A8.1050607@ti.com>
-Message-ID: <alpine.DEB.2.02.1306261713260.6135@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+ <51CAEB33.5010101@ti.com>
+Message-ID: <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Jun 2013, Tom Rini wrote:
+On Wed, 26 Jun 2013, Rajendra Nayak wrote:
 
-> On 06/25/2013 02:20 PM, Paul Walmsley wrote:
+> Apart from confirming if you are manually enabling these options, can you also give some
+> details on how you append the dtb to the kernel image?
 > 
-> > BeagleBone-white has the additional complication that it is not easy 
-> > to automate, due to the way that power is delivered to the board, so 
-> > there is an extra dimension of difficulty there.
+> Most of us use an out-of-tree patch from Grant to do this, which I have shared below [2]
 > 
-> Ah-ha, I reproduced your failure.  If I make up a concat uImage + DTB,
-> rather than pass them separately, it fails to boot.  If you switch to
-> mainline U-Boot (v2012.10 or later) you get support for separate image +
-> dtb (v2013.04 gives you bootz and zImage support).
+> Even without the patch with the below commands [1] to append the dtb, it still works, so it
+> would be good to know what steps you follow to append the dtb to the kernel image.
 
-Yeah, I've tried to keep the original bootloader that came on the first SD 
-card image that was used on that device.  But am starting to think that 
-it's time to stop my bootloader independence jihad, since appended DTB 
-booting is so broken - have seen similar problems on SoCs from other 
-vendors as well :-(
+Here's how I do it:
 
-> And yeah, I feel your pain about power cycling BeagleBone-White.  The QA
-> folks here sent me one of the relay controllers they use, and I think
-> Felipe is partial to one from phidgets.
+ARCH=arm CROSS_COMPILE=${TOOLCHAIN_PATH}/bin/${TOOLCHAIN_PREFIX} nice make -j$CORES zImage am335x-bone.dtb
 
-Thanks yeah, I should have been more specific in my whining.  Here I use a 
-USB cable with VBUS sliced and then connected to an Ethernet-controlled DC 
-relay.  But there's a power delivery issue where, under some conditions, 
-supplemental power has to be supplied through the DC jack also, requiring 
-two separate contacts to be switched :-(
+cat arch/arm/boot/zImage arch/arm/boot/am335x-bone.dtb > arch/arm/boot/zImage-dtb.am335x-bone
+
+scripts/mkuboot.sh -A arm -O linux -C none  -T kernel -a 0x80008000 -e 0x80008000 -n 'Linux-' -d arch/arm/boot/zImage-dtb.am335x-bone arch/arm/boot/uImage-dtb.am335x-bone
 
 
 - Paul
