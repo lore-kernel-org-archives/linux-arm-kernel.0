@@ -1,82 +1,39 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 26 Jun 2013 16:51:34 +0530
-Subject: [PATCH v2 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
-In-Reply-To: <20130625205452.GC9748@arwen.pp.htv.fi>
-References: <1372170110-12993-1-git-send-email-s.nawrocki@samsung.com>
- <20130625150649.GA21334@arwen.pp.htv.fi> <51C9D714.4000703@samsung.com>
- <20130625205452.GC9748@arwen.pp.htv.fi>
-Message-ID: <51CACEBE.9000505@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 26 Jun 2013 15:10:00 +0300
+Subject: [PATCH v9 1/8] drivers: phy: add generic PHY framework
+In-Reply-To: <1372247257-30186-2-git-send-email-kishon@ti.com>
+References: <1372247257-30186-1-git-send-email-kishon@ti.com>
+ <1372247257-30186-2-git-send-email-kishon@ti.com>
+Message-ID: <20130626121000.GZ12640@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 26, 2013 at 05:17:29PM +0530, Kishon Vijay Abraham I wrote:
+> The PHY framework provides a set of APIs for the PHY drivers to
+> create/destroy a PHY and APIs for the PHY users to obtain a reference to the
+> PHY with or without using phandle. For dt-boot, the PHY drivers should
+> also register *PHY provider* with the framework.
+> 
+> PHY drivers should create the PHY by passing id and ops like init, exit,
+> power_on and power_off. This framework is also pm runtime enabled.
+> 
+> The documentation for the generic PHY framework is added in
+> Documentation/phy.txt and the documentation for dt binding can be found at
+> Documentation/devicetree/bindings/phy/phy-bindings.txt
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-On Wednesday 26 June 2013 02:24 AM, Felipe Balbi wrote:
-> Hi,
->
-> On Tue, Jun 25, 2013 at 07:44:52PM +0200, Sylwester Nawrocki wrote:
->>>> +struct exynos_video_phy {
->>>> +	spinlock_t slock;
->>>> +	struct phy *phys[NUM_PHYS];
->>>
->>> more than one phy ? This means you should instantiate driver multiple
->>> drivers. Each phy id should call probe again.
->>
->> Why ? This single PHY _provider_ can well handle multiple PHYs.
->> I don't see a good reason to further complicate this driver like
->> this. Please note that MIPI-CSIS 0 and MIPI DSIM 0 share MMIO
->> register, so does MIPI CSIS 1 and MIPI DSIM 1. There are only 2
->> registers for those 4 PHYs. I could have the involved object
->> multiplied, but it would have been just a waste of resources
->> with no difference to the PHY consumers.
->
-> alright, I misunderstood your code then. When I looked over your id
-> usage I missed the "/2" part and assumed that you would have separate
-> EXYNOS_MIPI_PHY_CONTROL() register for each ;-)
->
-> My bad, you can disregard the other comments.
->
->>>> +static int exynos_video_phy_probe(struct platform_device *pdev)
->>>> +{
->>>> +	struct exynos_video_phy *state;
->>>> +	struct device *dev = &pdev->dev;
->>>> +	struct resource *res;
->>>> +	struct phy_provider *phy_provider;
->>>> +	int i;
->>>> +
->>>> +	state = devm_kzalloc(dev, sizeof(*state), GFP_KERNEL);
->>>> +	if (!state)
->>>> +		return -ENOMEM;
->>>> +
->>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>>> +
->>>> +	state->regs = devm_ioremap_resource(dev, res);
->>>> +	if (IS_ERR(state->regs))
->>>> +		return PTR_ERR(state->regs);
->>>> +
->>>> +	dev_set_drvdata(dev, state);
->>>
->>> you can use platform_set_drvdata(pdev, state);
->>
->> I had it in the previous version, but changed for symmetry with
->> dev_set_drvdata(). I guess those could be replaced with
->> phy_{get, set}_drvdata as you suggested.
+looks great to my eyes
 
-right. currently I was setting dev_set_drvdata of phy (core) device
-in phy-core.c and the corresponding dev_get_drvdata in phy provider driver
-which is little confusing.
-So I'll add phy_set_drvdata and phy_get_drvdata in phy.h (as suggested by
-Felipe) to be used by phy provider drivers. So after creating the PHY, the
-phy provider should use phy_set_drvdata and in phy_ops, it can use
-phy_get_drvdata. (I'll remove the dev_set_drvdata in phy_create).
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-This also means _void *priv_ in phy_create is useless. So I'll be removing
-_priv_ from phy_create.
-
-Thanks
-Kishon
-
->
-> hmm, you do need to set the drvdata() to the phy object, but also to the
-> pdev object (should you need it on a suspend/resume callback, for
-> instance). Those are separate struct device instances.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/47aed22b/attachment.sig>
