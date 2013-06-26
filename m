@@ -1,54 +1,125 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 26 Jun 2013 14:30:34 +0100
-Subject: [PATCH 2/4] x86: efi: break efi_lookup_mapped_addr out to generic
- code
-In-Reply-To: <1372183863-11333-3-git-send-email-leif.lindholm@linaro.org>
-References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
- <1372183863-11333-3-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <CACxGe6u+8ac2a2EzAvTvo53xOHNU=14ve+8oMYe3_a4vO38VEQ@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 26 Jun 2013 16:20:16 +0300
+Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
+In-Reply-To: <20130625065811.GZ5523@atomide.com>
+References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
+ <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
+ <20130625065811.GZ5523@atomide.com>
+Message-ID: <51CAEA90.90200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 7:11 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> efi_lookup_mapped_addr is a handy helper function for translating
-> a physical address to the corresponding virtual one by scanning
-> through memmap.map.
+Hi All,
+
+On 06/25/2013 09:58 AM, Tony Lindgren wrote:
+> * Linus Walleij <linus.walleij@linaro.org> [130624 05:13]:
+>> On Fri, Jun 21, 2013 at 5:03 PM, Grygorii Strashko
+>> <grygorii.strashko@ti.com> wrote:
+>>
+>>> Hence, add pinctrl handling in omap_device core:
+>>> 1) on PM runtime resume
+>>> - switch pinctrl state to "default" (todo: "active")
+>>> 2) on PM runtime suspend
+>>> - switch pinctrl state to "idle"
+>>> 3) during system wide suspend
+>>> - switch pinctrl state to "sleep" or "idle" if omap_device core disables device
+>>> - switch pinctrl state to "sleep" if device is disabled already
+> Do you need a separate setting for "idle" and "sleep", or are
+> they the same?
 >
-> This patch breaks it out into a new file for use elsewhere.
+>>> 4) during system wide resume
+>>> - switch pinctrl state to "default" (todo: "active") if omap_device core has
+>>>    disabled  device during suspend
+>>> - switch pinctrl state to "idle" if device was already disabled before suspend
+>> I don't understand step 4.
+>>
+>> I get the creeps about whether the system is runtime suspended
+>> or runtime resumed when we come to resume proper, so I need
+>> Kevin to have a look at this.
+>>
+>> Apart from that it looks good.
+>>
+>> Stephen and Tony are trying to figure out the details of whether "active"
+>> is necessary or not in a related thread I think.
+Thanks for your comments.
+
+I've prepared diagram to illustrate how does this work:
+                                                  +
+                                                  |
+                                                  |  .probe()
+                                                  |
+                                            +-----v--------+
+                                            |              |
+                                            |  default     |
+                                            |              |
+                                            +----+--+------+
+                                                 |  |
+                               pm_runtime_get()  |  | pm_runtime_put()
+                              +------------------+ +------------------+
+|                                        |
+                       +------v--------+ pm_runtime_put() +-------v-------+
+                       | +----------------------->               |
+           +----------->  Active       |      pm_runtime_get() | 
+Idle        <--------------+
+           |           | <-----------------------+               
+|              |
+           |           +-------+-------+ +-------+-------+              |
+           | |.suspend_noirq()                       
+|.suspend_noirq()      |
+           | |                                       
+|                      |
+           | |                                       
+|                      |
+           | |                                       
+|                      |
+           | |                                       
+|                      |
+           |           +-------v-------+ +-------v--------+             |
+           |           |               | |                |             |
+           +-----------+  Sleep        ------+                 | 
+Sleep         +-------------+
+       .resume_noirq() |               |     | |                
+|.resume_noirq()
+                       +-------|-------+     | +----------------+
+                               |   Idle      |
+                               +-------------+
+
+The "Sleep" pinctrl state is optional - if "sleep" state isn't defined
+then "Idle" pinctrl state will be used during suspend.
+
+As per above pinctrl state transition diagram - I think, that:
+- if "idle" or "sleep" states are defined then "active" state have to be 
+defined too.
+So, pinctrl core should detect such situation and generate a warning.
+
+ From my point of view, we should have "active" state - it would allow 
+to avoid additional
+runtime overhead and handle properly the case when drivers are used as 
+loadable modules.
+In this case, after boot, device's pinctrl registers can have HW default 
+values (after reset) or
+can be configured to some safe (off) state from board file (board's 
+"default" configuration).
+Driver module will activate its PINs when loaded and need to restore 
+safe (off) PINs state when
+unloaded.
+As result, it seems, we should have "off" state which can be used when 
+driver's module is removed.
+
+So, final list of default pnctrl states may be defined as "default", 
+"active", "idle", "sleep", "off":
+- "active", "idle", "sleep": will be handled by omap_device core
+- "default", "off": will be handled by driver itself (or Device core).
+
+
+
+> Yes we should have that sorted out over next few weeks, so let's
+> just wait a little while on all these dynamic remuxing patches
+> to avoid churn.
 >
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> ---
->  arch/x86/platform/efi/efi.c       |   28 ----------------------------
->  drivers/firmware/efi/Makefile     |    2 +-
->  drivers/firmware/efi/efi-helper.c |   33 +++++++++++++++++++++++++++++++++
->  3 files changed, 34 insertions(+), 29 deletions(-)
->  create mode 100644 drivers/firmware/efi/efi-helper.c
+> Regards,
+>
+> Tony
 
-I /think/ you should be able to put this directly into
-drivers/firmware/efi/efi.c
-
-> diff --git a/drivers/firmware/efi/efi-helper.c b/drivers/firmware/efi/efi-helper.c
-> new file mode 100644
-> index 0000000..c5c2c72
-> --- /dev/null
-> +++ b/drivers/firmware/efi/efi-helper.c
-> @@ -0,0 +1,33 @@
-> +/*
-> + * Common [U]EFI support helper functions across architectures.
-> + */
-> +
-> +#include <linux/efi.h>
-> +
-> +/*
-> + * We can't ioremap data in EFI boot services RAM, because we've already mapped
-> + * it as RAM.  So, look it up in the existing EFI memory map instead.  Only
-> + * callable after efi_enter_virtual_mode and before efi_free_boot_services.
-> + */
-> +void __iomem *efi_lookup_mapped_addr(u64 phys_addr)
-
-Can be __init annotated. Although it's a good idea to do that in a
-separate patch.
-
-Otherwise looks good to me.
-
-Reviewed-by: Grant Likely <grant.likely@linaro.org>
+Regards,
+- grygorii
