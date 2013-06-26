@@ -1,22 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 25 Jun 2013 18:38:21 -0700
-Subject: [PATCH] ARM: Make multi_v7_defconfig usable on hardware
-In-Reply-To: <1372210565-22962-1-git-send-email-olof@lixom.net>
-References: <1372210565-22962-1-git-send-email-olof@lixom.net>
-Message-ID: <CAOesGMg2du8PsOGy1kdePT4vMsWie1N8hmjCxRqr-LS6RAC07g@mail.gmail.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Wed, 26 Jun 2013 09:58:16 +0800
+Subject: [PATCH -next] ARM: edma: remove duplicated include from edma.c
+Message-ID: <CAPgLHd_j_JmDOsGSwLO_eBZnWteMzLVKJa93fY2iaSe31Ozo_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 6:36 PM, Olof Johansson <olof@lixom.net> wrote:
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-> +CONFIG_DEBUG_LL=y
-> +CONFIG_DEBUG_OMAP2PLUS_UART=y
-> +CONFIG_DEBUG_OMAP4UART3=y
+Remove duplicated include.
 
-Clearly not supposed to be there for the posted version, my bad --
-will take those out before committing.
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ arch/arm/common/edma.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-(this will go on top of next/late, btw).
-
-
--Olof
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index a432e6c..39ad030 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -26,7 +26,6 @@
+ #include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/edma.h>
+-#include <linux/err.h>
+ #include <linux/of_address.h>
+ #include <linux/of_device.h>
+ #include <linux/of_dma.h>
