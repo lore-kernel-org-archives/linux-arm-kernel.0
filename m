@@ -1,45 +1,43 @@
-From: trini@ti.com (Tom Rini)
-Date: Wed, 26 Jun 2013 07:27:28 -0400
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <20130626091522.GT21614@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
- <51C9FC05.4070700@ti.com> <20130626091522.GT21614@n2100.arm.linux.org.uk>
-Message-ID: <51CAD020.5090704@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 26 Jun 2013 13:07:47 +0200
+Subject: [PATCH 19/23] iommu/tegra: smmu: Unfied driver for Tegra SoCs
+In-Reply-To: <1372238906-9346-20-git-send-email-hdoyu@nvidia.com>
+References: <1372238906-9346-20-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20130626110747.GP27083@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2013 05:15 AM, Russell King - ARM Linux wrote:
-> On Tue, Jun 25, 2013 at 04:22:29PM -0400, Tom Rini wrote:
->> On 06/25/2013 03:57 PM, Kevin Hilman wrote:
->>> Just to confirm, my problems with mainline were with appended DTB also.
->>> Separate DTB and zImage work fine (at least using u-boot v2013.04.)
->>>
->>> That being said, appended DTB should still work, so there's a bug hiding
->>> someplace that needs to be found fixed.
->>
->> Since we've narrowed down what the problem is, someone can bisect it
->> now, yeah.
->>
->>> Can you guys update your tests to test appended DTB also?
->>
->> What is the official position on appending DTBs?
+On Wed, Jun 26, 2013 at 12:28:22PM +0300, Hiroshi Doyu wrote:
+> Support multiple generation of Tegra SoCs with this unified
+> SMMU driver. Necessary info is expected to be passed from DT.
 > 
-> If a platform goes from being able to boot without a DTB to requiring
-> a DTB, we must continue to support booting on that platform in some
-> manner otherwise it is a regression.
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+>  drivers/iommu/tegra-smmu.c | 80 ++--------------------------------------------
+>  1 file changed, 3 insertions(+), 77 deletions(-)
 > 
-> And no, I don't term upgrading uboot as an acceptable regression fix.
-> So if appended DTB doesn't work, that needs fixing before the non-DTB
-> support for a platform is removed, otherwise we _will_ have a regression.
+> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+> index 6e82df3..ae71721 100644
+> --- a/drivers/iommu/tegra-smmu.c
+> +++ b/drivers/iommu/tegra-smmu.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * IOMMU API for SMMU in Tegra30
+> + * IOMMU API for SMMU in Tegra SoC
 
-am335x never had a board file in mainline, so it's always required a DTB.
+Maybe "Tegra30 and later SoCs" given that Tegra20 has no compatible
+IOMMU?
 
-Now, I assume you're still saying that whatever software, except for the
-kernel of course, shipped on the SD card, has to be supported for
-forever by the kernel, right?
+> -MODULE_DESCRIPTION("IOMMU API for SMMU in Tegra30");
+> +MODULE_DESCRIPTION("IOMMU API for SMMU in Tegra SoC");
 
--- 
-Tom
+Same here.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/7a189b9e/attachment.sig>
