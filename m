@@ -1,29 +1,37 @@
 From: joelagnel@ti.com (Joel A Fernandes)
-Date: Tue, 25 Jun 2013 20:06:44 -0500
-Subject: [PATCH 0/2] EDMA config and comments
-Message-ID: <1372208804-6319-1-git-send-email-joelagnel@ti.com>
+Date: Tue, 25 Jun 2013 20:23:28 -0500
+Subject: [PATCH 0/5] AM33xx: MMC resources from DT without HWMOD data
+Message-ID: <1372209808-6532-1-git-send-email-joelagnel@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Joel A Fernandes <agnel.joel@gmail.com>
 
-Minor patches remaining after EDMA series has been merged:
+This series is fixes to get MMC working on AM33XX without HWMOD data.
+On removal of HWMOD data, interrupt and register properties need to be provided
+for the driver to function correctly.
 
-First patch adds the TI_EDMA option which people can forget to add and
-can result in failure without any informative errors of why DMA is not
-working.
+Also instead of specifying offset in match->data, I've added bindings for the
+same and specify it directly from DT as this is a hardware description.
 
-Second patch adds comments to the EDMA code for the calculations in the
-A-sync case. From my experience, this code is not-so-obvious. Hopefully
-this makes the life of readers of the code a little better.
+Reposting Matt's remaining 2 patches on the bindings and dts.
 
-Joel A Fernandes (2):
-  ARM: configs: Enable TI_EDMA in omap2plus_defconfig
-  DMA: EDMA: Add comments for A-sync case calculations
+Joel A Fernandes (3):
+  MMC: omap_hsmmc: Add reg_offset to DT bindings
+  ARM: dts: am33xx: Add interrupts and memory resources for MMC
+  mmc: omap_hsmmc: Add reg-offset to bindings documentation
 
- arch/arm/configs/omap2plus_defconfig |    1 +
- drivers/dma/edma.c                   |   22 ++++++++++++++++++++++
- 2 files changed, 23 insertions(+)
+Matt Porter (2):
+  ARM: dts: add AM33XX MMC support
+  mmc: omap_hsmmc: add generic DMA request support to the DT binding
+
+ .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   29 +++++++++++++-
+ arch/arm/boot/dts/am335x-bone.dts                  |    7 ++++
+ arch/arm/boot/dts/am335x-evm.dts                   |    7 ++++
+ arch/arm/boot/dts/am335x-evmsk.dts                 |    7 ++++
+ arch/arm/boot/dts/am33xx.dtsi                      |   40 ++++++++++++++++++++
+ drivers/mmc/host/omap_hsmmc.c                      |    7 +++-
+ 6 files changed, 95 insertions(+), 2 deletions(-)
 
 -- 
 1.7.9.5
