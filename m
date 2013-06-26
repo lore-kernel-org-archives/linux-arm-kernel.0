@@ -1,28 +1,31 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 26 Jun 2013 13:06:27 +0200
-Subject: [PATCH 18/23] iommu/tegra: smmu: Workaround PCIe IOMMU'able
-In-Reply-To: <1372238906-9346-19-git-send-email-hdoyu@nvidia.com>
-References: <1372238906-9346-19-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20130626110626.GO27083@manwe>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 26 Jun 2013 12:32:02 +0100
+Subject: [PATCH v2 0/3] Add support for ARM SMMU architectures 1 and 2
+In-Reply-To: <20130626094805.GS11309@8bytes.org>
+References: <1372095086-15681-1-git-send-email-will.deacon@arm.com>
+ <20130626094805.GS11309@8bytes.org>
+Message-ID: <20130626113202.GJ26142@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 12:28:21PM +0300, Hiroshi Doyu wrote:
-> Make PCIe work as it is. IOMMU support can be implemented later.
+On Wed, Jun 26, 2013 at 10:48:05AM +0100, Joerg Roedel wrote:
+> On Mon, Jun 24, 2013 at 06:31:23PM +0100, Will Deacon wrote:
+> > Will Deacon (3):
+> >   documentation: iommu: add description of ARM System MMU binding
+> >   iommu: add support for ARM Ltd. System MMU architecture
+> >   MAINTAINERS: add entry for ARM system MMU driver
+> > 
+> >  .../devicetree/bindings/iommu/arm,smmu.txt         |   70 +
+> >  MAINTAINERS                                        |    6 +
+> >  drivers/iommu/Kconfig                              |   13 +
+> >  drivers/iommu/Makefile                             |    1 +
+> >  drivers/iommu/arm-smmu.c                           | 1969 ++++++++++++++++++++
+> >  5 files changed, 2059 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> >  create mode 100644 drivers/iommu/arm-smmu.c
 > 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
->  drivers/iommu/tegra-smmu.c | 3 +++
->  1 file changed, 3 insertions(+)
+> Applied this series to the new arm/smmu branch, thanks Will.
 
-Can you provide more information about what the problem is here? Why is
-PCIe not working when mapped through the IOMMU?
+Cheers Joerg! Just shout if you see any fireworks.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/308f25c8/attachment-0001.sig>
+Will
