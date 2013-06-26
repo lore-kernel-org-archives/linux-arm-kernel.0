@@ -1,38 +1,24 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Wed, 26 Jun 2013 01:59:22 +0000
-Subject: [PATCH 0/3] ARM: at91/DT: enable SPI for more SoCs
-In-Reply-To: <cover.1372069834.git.nicolas.ferre@atmel.com>
-References: <cover.1372069834.git.nicolas.ferre@atmel.com>
-Message-ID: <B256D81BAE5131468A838E5D7A243641687DF77C@penmbx01>
+From: agnel.joel@gmail.com (Joel A Fernandes)
+Date: Tue, 25 Jun 2013 22:28:14 -0500
+Subject: [PATCH 0/5] AM33xx: MMC resources from DT without HWMOD data
+In-Reply-To: <1372209808-6532-1-git-send-email-joelagnel@ti.com>
+References: <1372209808-6532-1-git-send-email-joelagnel@ti.com>
+Message-ID: <CAD=GYpbdVVrh-tiqOcbHi3mkWRJUBdx0EsEZEFVVbgFgcCWgsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jun 25, 2013 at 8:23 PM, Joel A Fernandes <joelagnel@ti.com> wrote:
+> From: Joel A Fernandes <agnel.joel@gmail.com>
+>
+> This series is fixes to get MMC working on AM33XX without HWMOD data.
+> On removal of HWMOD data, interrupt and register properties need to be provided
+> for the driver to function correctly.
 
+Please don't pull patches authored by me in this series. I have posted
+them with my wrong email address by mistake. I will correct my email
+during the next repost, after a round of review. Matt's patches in the
+series are still good though.
 
-> -----Original Message-----
-> From: Nicolas Ferre [mailto:nicolas.ferre at atmel.com]
-> Sent: 2013?6?24? 18:35
-> To: Jean-Christophe PLAGNIOL-VILLARD; Desroches, Ludovic; Yang, Wenyou;
-> Shen, Voice; Wu, Josh
-> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Ferre,
-> Nicolas
-> Subject: [PATCH 0/3] ARM: at91/DT: enable SPI for more SoCs
-> 
-> This little series is for enabling the support of SPI on at91sam9n12 and
-> sama5d3 families.
-> 
-> Nicolas Ferre (3):
->   ARM: at91/DT: fix SPI compatibility string
->   ARM: at91/DT: sama5d3: add SPI DMA client infos
->   ARM: at91/DT: at91sam9n12: add SPI DMA client infos
-> 
->  arch/arm/boot/dts/at91sam9n12.dtsi |  6 ++++++
->  arch/arm/boot/dts/sama5d3.dtsi     | 10 ++++++++--
->  2 files changed, 14 insertions(+), 2 deletions(-)
-> 
-> --
-> 1.8.2.2
+Thanks,
 
-Tested on sama5d34ek, Linux-next: next-20130624
-
-Tested by Wenyou Yang <wenyou.yang@atmel.com>
+-Joel
