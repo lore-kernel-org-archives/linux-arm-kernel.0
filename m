@@ -1,50 +1,28 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 26 Jun 2013 11:02:57 +0200
-Subject: [GIT PULL] at91: Device Tree updates for 3.11 #3
-Message-ID: <1372237377-20315-1-git-send-email-nicolas.ferre@atmel.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 26 Jun 2013 12:28:14 +0300
+Subject: [PATCH 11/23] iommu/tegra: smmu: Add of_mach_id for T114
+Message-ID: <1372238906-9346-12-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Add of_mach_id for T114
 
-One more pull-request for AT91 DT patches.
-It is focused on SPI on several SoCs and it particular the SPI+DMA addition on newer
-SAMA5D3 and AT91SAM9N12.
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ drivers/iommu/tegra-smmu.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks, best regards,
-
-The following changes since commit 24ce10e142e7b063c4ae4437dd3b290fbfafe052:
-
-  ARM: at91: sam9m10g45ek add udc DT support (2013-06-15 00:15:22 +0200)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-dt
-
-for you to fetch changes up to 26e3326cc04bc3fc890a95ad6cb36359372acba5:
-
-  ARM: at91: dt: rm9200ek: add spi support (2013-06-26 10:13:39 +0200)
-
-----------------------------------------------------------------
-- more SPI DT activation for rm9200
-- SPI DMA for at91sam9n12/sama5d3
-And one little fix for SPI compatibility string
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (2):
-      ARM: at91: dt: rm9200: add spi support
-      ARM: at91: dt: rm9200ek: add spi support
-
-Nicolas Ferre (3):
-      ARM: at91/DT: fix SPI compatibility string
-      ARM: at91/DT: sama5d3: add SPI DMA client infos
-      ARM: at91/DT: at91sam9n12: add SPI DMA client infos
-
- arch/arm/boot/dts/at91rm9200.dtsi  | 20 ++++++++++++++++++++
- arch/arm/boot/dts/at91rm9200ek.dts | 10 ++++++++++
- arch/arm/boot/dts/at91sam9n12.dtsi |  6 ++++++
- arch/arm/boot/dts/sama5d3.dtsi     | 10 ++++++++--
- 4 files changed, 44 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+index 4c16c90..3e03c69 100644
+--- a/drivers/iommu/tegra-smmu.c
++++ b/drivers/iommu/tegra-smmu.c
+@@ -1262,6 +1262,7 @@ const struct dev_pm_ops tegra_smmu_pm_ops = {
+ };
+ 
+ static struct of_device_id tegra_smmu_of_match[] = {
++	{ .compatible = "nvidia,tegra114-smmu", },
+ 	{ .compatible = "nvidia,tegra30-smmu", },
+ 	{ },
+ };
 -- 
-Nicolas Ferre
+1.8.1.5
