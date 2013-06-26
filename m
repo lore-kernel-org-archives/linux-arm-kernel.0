@@ -1,96 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 26 Jun 2013 23:16:58 +0200
-Subject: [PATCH 5/8] clocksource: sun4i: Factor out some timer code
-In-Reply-To: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1372281421-2099-6-git-send-email-maxime.ripard@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Jun 2013 23:23:50 +0200
+Subject: [PATCH 0/2] arm: add early_ioremap() support
+In-Reply-To: <20130626192352.GE9078@rocoto.smurfnet.nu>
+References: <1372182401-11029-1-git-send-email-leif.lindholm@linaro.org>
+ <201306262052.09640.arnd@arndb.de> <20130626192352.GE9078@rocoto.smurfnet.nu>
+Message-ID: <201306262323.50691.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The set_next_event and set_mode callbacks share a lot of common code we
-can easily factor to avoid duplication and mistakes.
+On Wednesday 26 June 2013, Leif Lindholm wrote:
+> On Wed, Jun 26, 2013 at 08:52:09PM +0200, Arnd Bergmann wrote:
+> > I made a similar suggestion to extending the use of fixmap recently, see
+> > "Re: SCU registers mapping for CA9/CA5 cores". Russell pointed out that
+> > fixmap is intentionally limited to just kmap_atomic uses at the moment
+> > and changing that would potentially have a significant impact when we
+> > run out of pages in the fixmap area.
+>  
+> Is this an issue here, since (unlike x86) this early_ioremap only works
+> before paging_init()?
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clocksource/sun4i_timer.c | 48 ++++++++++++++++++++++++++-------------
- 1 file changed, 32 insertions(+), 16 deletions(-)
+The main problem is that the total fixmap size is only around 900kb,
+and we want to reserve at least 64kb per cpu for kmap_atomic.
+If you want to fit multiple 128kb mappings in there, you run out of
+space really fast.
 
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 032e504..7f3b248 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -45,24 +45,46 @@
- 
- static void __iomem *timer_base;
- 
-+static void sun4i_clkevt_time_stop(void)
-+{
-+	u32 val = readl(timer_base + TIMER_CTL_REG(0));
-+	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
-+	udelay(1);
-+}
-+
-+static void sun4i_clkevt_time_setup(unsigned long delay)
-+{
-+	writel(delay, timer_base + TIMER_INTVAL_REG(0));
-+}
-+
-+static void sun4i_clkevt_time_start(bool periodic)
-+{
-+	u32 val = readl(timer_base + TIMER_CTL_REG(0));
-+
-+	if (periodic)
-+		val &= ~TIMER_CTL_ONESHOT;
-+	else
-+		val |= TIMER_CTL_ONESHOT;
-+
-+	writel(val | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
-+}
-+
- static void sun4i_clkevt_mode(enum clock_event_mode mode,
- 			      struct clock_event_device *clk)
- {
--	u32 u = readl(timer_base + TIMER_CTL_REG(0));
--
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
--		u &= ~(TIMER_CTL_ONESHOT);
--		writel(u | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
-+		sun4i_clkevt_time_stop();
-+		sun4i_clkevt_time_start(true);
- 		break;
--
- 	case CLOCK_EVT_MODE_ONESHOT:
--		writel(u | TIMER_CTL_ONESHOT, timer_base + TIMER_CTL_REG(0));
-+		sun4i_clkevt_time_stop();
-+		sun4i_clkevt_time_start(false);
- 		break;
- 	case CLOCK_EVT_MODE_UNUSED:
- 	case CLOCK_EVT_MODE_SHUTDOWN:
- 	default:
--		writel(u & ~(TIMER_CTL_ENABLE), timer_base + TIMER_CTL_REG(0));
-+		sun4i_clkevt_time_stop();
- 		break;
- 	}
- }
-@@ -70,15 +92,9 @@ static void sun4i_clkevt_mode(enum clock_event_mode mode,
- static int sun4i_clkevt_next_event(unsigned long evt,
- 				   struct clock_event_device *unused)
- {
--	u32 val = readl(timer_base + TIMER_CTL_REG(0));
--	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
--	udelay(1);
--
--	writel(evt, timer_base + TIMER_INTVAL_REG(0));
--
--	val = readl(timer_base + TIMER_CTL_REG(0));
--	writel(val | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
--	       timer_base + TIMER_CTL_REG(0));
-+	sun4i_clkevt_time_stop();
-+	sun4i_clkevt_time_setup(evt);
-+	sun4i_clkevt_time_start(false);
- 
- 	return 0;
- }
--- 
-1.8.3.1
+
+> > Extending the iotable mechanism on ARM would be the convenient
+> > solution for us I think.
+> 
+> Could that easily be extended to give similar semantics sufficiently
+> that we can progress with merging more of the UEFI and ACPI support 
+> together as common code with x86/ia64?
+
+I don't know what the requirements are, but the idea with iotable
+is that the mappings stay around at run time, while it seems you want
+to discard them at some point.
+
+	Arnd
