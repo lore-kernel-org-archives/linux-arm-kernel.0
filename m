@@ -1,100 +1,137 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 26 Jun 2013 15:40:07 +0200
-Subject: [PATCH v3 0/2] Device Tree support for CMA (Contiguous Memory
- Allocator)
-Message-ID: <1372254009-25307-1-git-send-email-m.szyprowski@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 26 Jun 2013 17:17:31 +0530
+Subject: [PATCH v9 3/8] usb: phy: twl4030: use the new generic PHY framework
+In-Reply-To: <1372247257-30186-1-git-send-email-kishon@ti.com>
+References: <1372247257-30186-1-git-send-email-kishon@ti.com>
+Message-ID: <1372247257-30186-4-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Used the generic PHY framework API to create the PHY. For powering on
+and powering off the PHY, power_on and power_off ops are used. Once the
+MUSB OMAP glue is adapted to the new framework, the suspend and resume
+ops of usb phy library will be removed.
 
-This is a third version of my proposal for device tree integration for
-Contiguous Memory Allocator. Over 2 month has passed from the time I've
-posted the second version, but now some things about using /chosen
-device tree node has been clarified, so I expect to get this code merged
-soon this time.
+However using the old usb phy library cannot be completely removed
+because otg is intertwined with phy and moving to the new
+framework completely will break otg. Once we have a separate otg state machine,
+we can get rid of the usb phy library.
 
-Just a few words for those who see this code for the first time:
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ drivers/usb/phy/phy-twl4030-usb.c |   50 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 49 insertions(+), 1 deletion(-)
 
-The proposed bindings allows to define contiguous memory regions of
-specified base address and size. Then, the defined regions can be
-assigned to the given device(s) by adding a property with a phanle to
-the defined contiguous memory region. From the device tree perspective
-that's all. Once the bindings are added, all the memory allocations from
-dma-mapping subsystem will be served from the defined contiguous memory
-regions.
-
-Contiguous Memory Allocator is a framework, which lets to provide a
-large contiguous memory buffers for (usually a multimedia) devices. The
-contiguous memory is reserved during early boot and then shared with
-kernel, which is allowed to allocate it for movable pages. Then, when
-device driver requests a contigouous buffer, the framework migrates
-movable pages out of contiguous region and gives it to the driver. When
-device driver frees the buffer, it is added to kernel memory pool again.
-For more information, please refer to commit c64be2bb1c6eb43c838b2c6d57
-("drivers: add Contiguous Memory Allocator") and d484864dd96e1830e76895
-(CMA merge commit).
-
-Why we need device tree bindings for CMA at all?
-
-Older ARM kernels used so called board-based initialization. Those board
-files contained a definition of all hardware blocks available on the
-target system and particular kernel and driver software configuration
-selected by the board maintainer. 
-
-In the new approach the board files will be removed completely and
-Device Tree approach is used to describe all hardware blocks available
-on the target system. By definition, the bindings should be software
-independent, so at least in theory it should be possible to use those
-bindings with other operating systems than Linux kernel. 
-
-However we also need to pass somehow the information about kernel and
-device driver software-only configuration data, which were earlier
-encoded in the board file. For such data I decided to use /chosen node,
-where kernel command line has been already stored. Future bootloaders
-will allow to modify or replace particular nodes and one will be able to
-use custom /chosen node to configure his system. The proposed patches
-introduce /chosen/contiguous-memory node and related bindings, to avoid
-complicated encoding of CMA related configuration to kernel command
-line.
-
-Some rationale for using /chosen/ node for kernel configuration entities
-has been already suggested by Grant Likely in the following thread:
-http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/155296/focus=34363
-
-Best regards
-Marek Szyprowski
-Samsung R&D Institute Poland
-
-Changelog:
-
-v3:
-- fixed issues pointed by Laura and updated documentation
-
-v2: http://thread.gmane.org/gmane.linux.drivers.devicetree/34075
-- moved contiguous-memory bindings from /memory to /chosen/contiguous-memory/
-  node to avoid spreading Linux specific parameters over the whole device
-  tree definitions
-- added support for autoconfigured regions (use zero base)
-- fixes minor bugs
-
-v1: http://thread.gmane.org/gmane.linux.drivers.devicetree/30111/
-- initial proposal
-
-Patch summary:
-
-Marek Szyprowski (2):
-  drivers: dma-contiguous: clean source code and prepare for device
-    tree
-  drivers: dma-contiguous: add initialization from device tree
-
- .../devicetree/bindings/contiguous-memory.txt      |   94 ++++++
- arch/arm/boot/dts/skeleton.dtsi                    |    7 +-
- drivers/base/dma-contiguous.c                      |  325 +++++++++++++-------
- include/asm-generic/dma-contiguous.h               |    2 -
- include/linux/dma-contiguous.h                     |   32 +-
- 5 files changed, 352 insertions(+), 108 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/contiguous-memory.txt
-
+diff --git a/drivers/usb/phy/phy-twl4030-usb.c b/drivers/usb/phy/phy-twl4030-usb.c
+index 8fbe2d9..437ba30 100644
+--- a/drivers/usb/phy/phy-twl4030-usb.c
++++ b/drivers/usb/phy/phy-twl4030-usb.c
+@@ -33,6 +33,7 @@
+ #include <linux/io.h>
+ #include <linux/delay.h>
+ #include <linux/usb/otg.h>
++#include <linux/phy/phy.h>
+ #include <linux/usb/musb-omap.h>
+ #include <linux/usb/ulpi.h>
+ #include <linux/i2c/twl.h>
+@@ -431,6 +432,14 @@ static void twl4030_phy_suspend(struct twl4030_usb *twl, int controller_off)
+ 	dev_dbg(twl->dev, "%s\n", __func__);
+ }
+ 
++static int twl4030_phy_power_off(struct phy *phy)
++{
++	struct twl4030_usb *twl = phy_get_drvdata(phy);
++
++	twl4030_phy_suspend(twl, 0);
++	return 0;
++}
++
+ static void __twl4030_phy_resume(struct twl4030_usb *twl)
+ {
+ 	twl4030_phy_power(twl, 1);
+@@ -459,6 +468,14 @@ static void twl4030_phy_resume(struct twl4030_usb *twl)
+ 	}
+ }
+ 
++static int twl4030_phy_power_on(struct phy *phy)
++{
++	struct twl4030_usb *twl = phy_get_drvdata(phy);
++
++	twl4030_phy_resume(twl);
++	return 0;
++}
++
+ static int twl4030_usb_ldo_init(struct twl4030_usb *twl)
+ {
+ 	/* Enable writing to power configuration registers */
+@@ -602,13 +619,22 @@ static int twl4030_usb_phy_init(struct usb_phy *phy)
+ 	status = twl4030_usb_linkstat(twl);
+ 	twl->linkstat = status;
+ 
+-	if (status == OMAP_MUSB_ID_GROUND || status == OMAP_MUSB_VBUS_VALID)
++	if (status == OMAP_MUSB_ID_GROUND || status == OMAP_MUSB_VBUS_VALID) {
+ 		omap_musb_mailbox(twl->linkstat);
++		twl4030_phy_resume(twl);
++	}
+ 
+ 	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
+ 	return 0;
+ }
+ 
++static int twl4030_phy_init(struct phy *phy)
++{
++	struct twl4030_usb *twl = phy_get_drvdata(phy);
++
++	return twl4030_usb_phy_init(&twl->phy);
++}
++
+ static int twl4030_set_suspend(struct usb_phy *x, int suspend)
+ {
+ 	struct twl4030_usb *twl = phy_to_twl(x);
+@@ -646,13 +672,22 @@ static int twl4030_set_host(struct usb_otg *otg, struct usb_bus *host)
+ 	return 0;
+ }
+ 
++static const struct phy_ops ops = {
++	.init		= twl4030_phy_init,
++	.power_on	= twl4030_phy_power_on,
++	.power_off	= twl4030_phy_power_off,
++	.owner		= THIS_MODULE,
++};
++
+ static int twl4030_usb_probe(struct platform_device *pdev)
+ {
+ 	struct twl4030_usb_data *pdata = pdev->dev.platform_data;
+ 	struct twl4030_usb	*twl;
++	struct phy		*phy;
+ 	int			status, err;
+ 	struct usb_otg		*otg;
+ 	struct device_node	*np = pdev->dev.of_node;
++	struct phy_provider	*phy_provider;
+ 
+ 	twl = devm_kzalloc(&pdev->dev, sizeof *twl, GFP_KERNEL);
+ 	if (!twl)
+@@ -689,6 +724,19 @@ static int twl4030_usb_probe(struct platform_device *pdev)
+ 	otg->set_host		= twl4030_set_host;
+ 	otg->set_peripheral	= twl4030_set_peripheral;
+ 
++	phy_provider = devm_of_phy_provider_register(twl->dev,
++		of_phy_simple_xlate);
++	if (IS_ERR(phy_provider))
++		return PTR_ERR(phy_provider);
++
++	phy = devm_phy_create(twl->dev, 0, &ops, "twl4030");
++	if (IS_ERR(phy)) {
++		dev_dbg(&pdev->dev, "Failed to create PHY\n");
++		return PTR_ERR(phy);
++	}
++
++	phy_set_drvdata(phy, twl);
++
+ 	/* init spinlock for workqueue */
+ 	spin_lock_init(&twl->lock);
+ 
 -- 
-1.7.9.5
+1.7.10.4
