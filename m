@@ -1,60 +1,41 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 26 Jun 2013 14:05:04 +0100
-Subject: [GIT PULL] GPIO regression fix for omap1 for v3.10-rc
-Message-ID: <CACxGe6t8KvnUfm7bt3-8+9d9KXwz1W4dQB+y+m0D75DRkMCGGA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Jun 2013 14:52:36 +0200
+Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
+In-Reply-To: <20130626124009.GL26142@mudshark.cambridge.arm.com>
+References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
+ <20130626111430.GH26142@mudshark.cambridge.arm.com>
+ <CAKv+Gu_R7=Euaa87kQqR5TfGQLyF6Ad51dBm2CroYHcKMRs_dA@mail.gmail.com>
+ <20130626124009.GL26142@mudshark.cambridge.arm.com>
+Message-ID: <CAKv+Gu9_V75jGSq675H+Gi7jkDWBkVDLXvewMuv8dWxx7-VxEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-It took a while to work out the correct solution to this regression.
-It is sorted now. This branch was constructed and tested by Tony. I've
-verified that it builds and signed the tag. Please pull into v3.10.
-
-g.
-
-The following changes since commit 9e895ace5d82df8929b16f58e9f515f6d54ab82d:
-
-  Linux 3.10-rc7 (2013-06-22 09:47:31 -1000)
-
-are available in the git repository at:
-
-  git://git.secretlab.ca/git/linux tags/gpio-for-linus
-
-for you to fetch changes up to 397eada946712b90e0620c378b366bcc6c98c9f6:
-
-  gpio/omap: don't use linear domain mapping for OMAP1 (2013-06-25
-23:13:40 -0700)
-
-----------------------------------------------------------------
-Fix for omap1 GPIO breaking regression
-
-----------------------------------------------------------------
-Javier Martinez Canillas (1):
-      gpio/omap: don't use linear domain mapping for OMAP1
-
- drivers/gpio/gpio-omap.c | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
-
-On Wed, Jun 26, 2013 at 8:05 AM, Tony Lindgren <tony@atomide.com> wrote:
-> The following changes since commit 9e895ace5d82df8929b16f58e9f515f6d54ab82d:
+On 26 June 2013 14:40, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Jun 26, 2013 at 12:28:49PM +0100, Ard Biesheuvel wrote:
+>> So can you suggest a better way of making sure schedule_debug() shoots
+>> us down if calling schedule() between kernel_neon_begin and
+>> kernel_neon_end, even on non-preempt builds?
 >
->   Linux 3.10-rc7 (2013-06-22 09:47:31 -1000)
+> With what we currently have in the kernel, no, I can't think of a better
+> way. However, I also don't think that smuggling in a back-end hack is a good
+> idea either. How about we follow x86's lead on this and rely on the caller
+> not to sleep for the timebeing? Then, separately to this patch series, you
+> could look at augmenting the scheduler so that schedule_debug can complain
+> if it encounters a task that is not expected to sleep? That seems like the
+> right place to fix this problem, and will benefit other architectures too.
 >
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/gpio-signed
->
-> for you to fetch changes up to 397eada946712b90e0620c378b366bcc6c98c9f6:
->
->   gpio/omap: don't use linear domain mapping for OMAP1 (2013-06-25 23:13:40 -0700)
->
-> ----------------------------------------------------------------
-> Fix for omap1 GPIO breaking regression.
->
-> ----------------------------------------------------------------
-> Javier Martinez Canillas (1):
->       gpio/omap: don't use linear domain mapping for OMAP1
->
->  drivers/gpio/gpio-omap.c | 22 +++++++++++++++++++++-
->  1 file changed, 21 insertions(+), 1 deletion(-)
+
+Good point. As preempt_enable/disable already have this side effect on
+PREEMPT builds, perhaps it wouldn't be such a bad idea to modify them
+in the non-PREEMPT case to at least complain if schedule() is invoked
+during such a section.
+
+@Russell: you mentioned spinlocks at some point to prevent sleeping.
+Are you ok with Will's suggestion instead, i.e., to rely on
+preempt_disable() to do the right thing, and fix it later because
+currently, it doesn't on non-PREEMPT?
+
+-- 
+Ard.
