@@ -1,60 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 26 Jun 2013 13:28:49 +0200
-Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
-In-Reply-To: <20130626111430.GH26142@mudshark.cambridge.arm.com>
-References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
- <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
- <20130626111430.GH26142@mudshark.cambridge.arm.com>
-Message-ID: <CAKv+Gu_R7=Euaa87kQqR5TfGQLyF6Ad51dBm2CroYHcKMRs_dA@mail.gmail.com>
+From: trini@ti.com (Tom Rini)
+Date: Wed, 26 Jun 2013 07:27:28 -0400
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <20130626091522.GT21614@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <51C9FC05.4070700@ti.com> <20130626091522.GT21614@n2100.arm.linux.org.uk>
+Message-ID: <51CAD020.5090704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 June 2013 13:14, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Jun 26, 2013 at 11:55:33AM +0100, Ard Biesheuvel wrote:
->> Replying to self:
+On 06/26/2013 05:15 AM, Russell King - ARM Linux wrote:
+> On Tue, Jun 25, 2013 at 04:22:29PM -0400, Tom Rini wrote:
+>> On 06/25/2013 03:57 PM, Kevin Hilman wrote:
+>>> Just to confirm, my problems with mainline were with appended DTB also.
+>>> Separate DTB and zImage work fine (at least using u-boot v2013.04.)
+>>>
+>>> That being said, appended DTB should still work, so there's a bug hiding
+>>> someplace that needs to be found fixed.
 >>
->> On 25 June 2013 22:24, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > +void kernel_neon_end(void)
->> > +{
->> > +       /* Disable the NEON/VFP unit. */
->> > +       fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
->> > +       barrier();
->> > +       dec_preempt_count();
->> > +}
->> > +EXPORT_SYMBOL(kernel_neon_end);
+>> Since we've narrowed down what the problem is, someone can bisect it
+>> now, yeah.
 >>
->> Meh. This is not going to please the RT crowd, as preempt_schedule()
->> will not be called on PREEMPT builds in this case.
+>>> Can you guys update your tests to test appended DTB also?
 >>
->> Propose to replace it with
->>
->>     preempt_enable();
->> #ifndef CONFIG_PREEMPT_COUNT
->>     /* in this case, the preempt_enable() right above is just a barrier() */
->>     dec_preempt_count();
->> #endif
->>
->> (and the converse in kernel_neon_begin())
->
-> Yuck, that's ugly as sin! How does x86 deal with this? Looking at
-> kernel_fpu_{begin,end}, they just disable preemption so I guess that they
-> assume the caller is non-blocking? There's an aside about the use of
-> preempt-notifiers for KVM, so it does sound like the onus is on the caller
-> not to shoot themselves in the face.
->
+>> What is the official position on appending DTBs?
+> 
+> If a platform goes from being able to boot without a DTB to requiring
+> a DTB, we must continue to support booting on that platform in some
+> manner otherwise it is a regression.
+> 
+> And no, I don't term upgrading uboot as an acceptable regression fix.
+> So if appended DTB doesn't work, that needs fixing before the non-DTB
+> support for a platform is removed, otherwise we _will_ have a regression.
 
-Even if x86 doesn't care about this, do you really think we should
-take the risk of silently clobbering the NEON registers if the caller
-does something that may end up sleeping? Anyway, I don't remember
-exactly who suggested using inc_preempt_count() directly, but doing so
-brings about the responsibility of calling preempt_schedule() when
-leaving the critical section, and just using both (without the #ifdef)
-is also not an option.
+am335x never had a board file in mainline, so it's always required a DTB.
 
-So can you suggest a better way of making sure schedule_debug() shoots
-us down if calling schedule() between kernel_neon_begin and
-kernel_neon_end, even on non-preempt builds?
+Now, I assume you're still saying that whatever software, except for the
+kernel of course, shipped on the SD card, has to be supported for
+forever by the kernel, right?
 
 -- 
-Ard.
+Tom
