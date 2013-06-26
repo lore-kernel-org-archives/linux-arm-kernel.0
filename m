@@ -1,73 +1,54 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 26 Jun 2013 17:03:57 +0200
-Subject: [GIT PULL] at91: Device Tree updates for 3.11 #3
-In-Reply-To: <201306261657.05191.arnd@arndb.de>
-References: <1372237377-20315-1-git-send-email-nicolas.ferre@atmel.com>
- <201306261657.05191.arnd@arndb.de>
-Message-ID: <51CB02DD.4080409@atmel.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 26 Jun 2013 17:02:23 +0200
+Subject: [PATCH v3 2/5] ARM: dts: Add MIPI PHY node to exynos4.dtsi
+In-Reply-To: <1372258946-15607-1-git-send-email-s.nawrocki@samsung.com>
+References: <1372258946-15607-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1372258946-15607-3-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/06/2013 16:57, Arnd Bergmann :
-> On Wednesday 26 June 2013, Nicolas Ferre wrote:
->> Arnd, Olof,
->>
->> One more pull-request for AT91 DT patches.
->> It is focused on SPI on several SoCs and it particular the SPI+DMA addition on newer
->> SAMA5D3 and AT91SAM9N12.
->
-> Pulled into next/dt, thanks! I've performed the simple merge below.
+Add PHY provider node for the MIPI CSIS and MIPI DSIM PHYs.
 
-Your merge is correct. Thanks a lot Arnd.
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/boot/dts/exynos4.dtsi |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Bye,
-
-> diff --cc arch/arm/boot/dts/sama5d3.dtsi
-> index bbf88d7,5956f9b..a1d5e25
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@@ -80,9 -76,17 +80,12 @@@
->    			spi0: spi at f0004000 {
->    				#address-cells = <1>;
->    				#size-cells = <0>;
-> - 				compatible = "atmel,at91sam9x5-spi";
-> + 				compatible = "atmel,at91rm9200-spi";
->    				reg = <0xf0004000 0x100>;
->    				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 3>;
->   -				cs-gpios = <&pioD 13 0
->   -					    &pioD 14 0 /* conflicts with SCK0 and CANRX0 */
->   -					    &pioD 15 0 /* conflicts with CTS0 and CANTX0 */
->   -					    &pioD 16 0 /* conflicts with RTS0 and PWMFI3 */
->   -					   >;
-> + 				dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(1)>,
-> + 				       <&dma0 2 AT91_DMA_CFG_PER_ID(2)>;
-> + 				dma-names = "tx", "rx";
->    				pinctrl-names = "default";
->    				pinctrl-0 = <&pinctrl_spi0>;
->    				status = "disabled";
-> @@@ -203,9 -207,17 +206,12 @@@
->    			spi1: spi at f8008000 {
->    				#address-cells = <1>;
->    				#size-cells = <0>;
-> - 				compatible = "atmel,at91sam9x5-spi";
-> + 				compatible = "atmel,at91rm9200-spi";
->    				reg = <0xf8008000 0x100>;
->    				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 3>;
->   -				cs-gpios = <&pioC 25 0
->   -					    &pioC 26 0 /* conflitcs with TWD1 and ISI_D11 */
->   -					    &pioC 27 0 /* conflitcs with TWCK1 and ISI_D10 */
->   -					    &pioC 28 0 /* conflitcs with PWMFI0 and ISI_D9 */
->   -					   >;
-> + 				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(15)>,
-> + 				       <&dma1 2 AT91_DMA_CFG_PER_ID(16)>;
-> + 				dma-names = "tx", "rx";
->    				pinctrl-names = "default";
->    				pinctrl-0 = <&pinctrl_spi1>;
->    				status = "disabled";
->
->
->
-
-
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 4d61120..9542088 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -98,6 +98,12 @@
+ 		reg = <0x10010000 0x400>;
+ 	};
+ 
++	mipi_phy: video-phy at 10020710 {
++		compatible = "samsung,s5pv210-mipi-video-phy";
++		reg = <0x10020710 8>;
++		#phy-cells = <1>;
++	};
++
+ 	camera {
+ 		compatible = "samsung,fimc", "simple-bus";
+ 		status = "disabled";
+@@ -147,6 +153,8 @@
+ 			interrupts = <0 78 0>;
+ 			bus-width = <4>;
+ 			samsung,power-domain = <&pd_cam>;
++			phys = <&mipi_phy 0>;
++			phy-names = "csis";
+ 			status = "disabled";
+ 		};
+ 
+@@ -156,6 +164,8 @@
+ 			interrupts = <0 80 0>;
+ 			bus-width = <2>;
+ 			samsung,power-domain = <&pd_cam>;
++			phys = <&mipi_phy 2>;
++			phy-names = "csis";
+ 			status = "disabled";
+ 		};
+ 	};
 -- 
-Nicolas Ferre
+1.7.9.5
