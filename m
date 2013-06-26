@@ -1,26 +1,41 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 26 Jun 2013 15:41:08 +0200
-Subject: [PATCH v3 1/4] i2c-mv64xxx: Set bus frequency to 100kHz if
- clock-frequency is not provided
-In-Reply-To: <51CA9E62.6090203@free-electrons.com>
-References: <1371821529-13791-1-git-send-email-gregory.clement@free-electrons.com>
- <1371821529-13791-2-git-send-email-gregory.clement@free-electrons.com>
- <20130625214446.GA2951@katana>
- <51CA9E62.6090203@free-electrons.com>
-Message-ID: <20130626134107.GA3119@katana>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 26 Jun 2013 21:40:17 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_NOP_USB_XCEIV by
+ default
+In-Reply-To: <1372125017-16294-1-git-send-email-festevam@gmail.com>
+References: <1372125017-16294-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130626134015.GA21845@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 24, 2013 at 10:50:17PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> In order to get USB functionality on mx5 boards, we need to select
+> CONFIG_NOP_USB_XCEIV option, so let's enable it by default.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-> For the rest of the series, does it mean that you agree with it, or
-> that you didn't review it yet?
+Applied, thanks.
 
-Didn't review. So, other people can still join in ;)
+Shawn
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/19840cf2/attachment-0001.sig>
+> ---
+>  arch/arm/configs/imx_v6_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> index 06686e7..0837aae 100644
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -195,6 +195,7 @@ CONFIG_USB_EHCI_MXC=y
+>  CONFIG_USB_CHIPIDEA=y
+>  CONFIG_USB_CHIPIDEA_HOST=y
+>  CONFIG_USB_PHY=y
+> +CONFIG_NOP_USB_XCEIV=y
+>  CONFIG_USB_MXS_PHY=y
+>  CONFIG_USB_STORAGE=y
+>  CONFIG_MMC=y
+> -- 
+> 1.8.1.2
+> 
