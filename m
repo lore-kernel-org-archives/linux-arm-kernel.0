@@ -1,64 +1,59 @@
 From: joelagnel@ti.com (Joel A Fernandes)
-Date: Tue, 25 Jun 2013 20:24:54 -0500
-Subject: [PATCH 4/5] mmc: omap_hsmmc: add generic DMA request support to the
- DT binding
-Message-ID: <1372209894-6682-1-git-send-email-joelagnel@ti.com>
+Date: Tue, 25 Jun 2013 20:24:48 -0500
+Subject: [PATCH 3/5] ARM: dts: am33xx: Add interrupts and memory resources for
+ MMC
+Message-ID: <1372209888-6649-1-git-send-email-joelagnel@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matt Porter <mporter@ti.com>
+From: Joel A Fernandes <agnel.joel@gmail.com>
 
-The binding definition is based on the generic DMA request binding.
+HWMOD irq entries for MMC were removed. We provide the same from DT for MMC.
 
-Signed-off-by: Matt Porter <mporter@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+This fixes issue where memory resource could not be found during probe.
+Also, added the reg-offset property to account for the offset from start.
+
+Signed-off-by: Joel A Fernandes <agnel.joel@gmail.com>
 ---
- .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   26 +++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/am33xx.dtsi |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-index ed271fc..8c8908a 100644
---- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-@@ -20,8 +20,29 @@ ti,dual-volt: boolean, supports dual voltage cards
- ti,non-removable: non-removable slot (like eMMC)
- ti,needs-special-reset: Requires a special softreset sequence
- ti,needs-special-hs-handling: HSMMC IP needs special setting for handling High Speed
-+dmas: List of DMA specifiers with the controller specific format
-+as described in the generic DMA client binding. A tx and rx
-+specifier is required.
-+dma-names: List of DMA request names. These strings correspond
-+1:1 with the DMA specifiers listed in dmas. The string naming is
-+to be "rx" and "tx" for RX and TX DMA requests, respectively.
-+
-+Examples:
-+
-+[hwmod populated DMA resources]
-+
-+	mmc1: mmc at 0x4809c000 {
-+		compatible = "ti,omap4-hsmmc";
-+		reg = <0x4809c000 0x400>;
-+		ti,hwmods = "mmc1";
-+		ti,dual-volt;
-+		bus-width = <4>;
-+		vmmc-supply = <&vmmc>; /* phandle to regulator node */
-+		ti,non-removable;
-+	};
-+
-+[generic DMA request binding]
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 119f8a9..e0a5741 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -237,6 +237,10 @@
+ 			dmas = <&edma 24
+ 				&edma 25>;
+ 			dma-names = "tx", "rx";
++			interrupts = <64>;
++			interrupt-parent = <&intc>;
++			reg = <0x48060000 0x1000>;
++			reg-offset = <0x100>;
+ 			status = "disabled";
+ 		};
  
--Example:
- 	mmc1: mmc at 0x4809c000 {
- 		compatible = "ti,omap4-hsmmc";
- 		reg = <0x4809c000 0x400>;
-@@ -30,4 +51,7 @@ Example:
- 		bus-width = <4>;
- 		vmmc-supply = <&vmmc>; /* phandle to regulator node */
- 		ti,non-removable;
-+		dmas = <&edma 24
-+			&edma 25>;
-+		dma-names = "tx", "rx";
- 	};
+@@ -247,6 +251,10 @@
+ 			dmas = <&edma 2
+ 				&edma 3>;
+ 			dma-names = "tx", "rx";
++			interrupts = <24>;
++			interrupt-parent = <&intc>;
++			reg = <0x481d8000 0x1000>;
++			reg-offset = <0x100>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -254,6 +262,10 @@
+ 			compatible = "ti,omap3-hsmmc";
+ 			ti,hwmods = "mmc3";
+ 			ti,needs-special-reset;
++			interrupts = <25>;
++			interrupt-parent = <&intc>;
++			reg = <0x47810000 0x1000>;
++			reg-offset = <0x100>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
 1.7.9.5
