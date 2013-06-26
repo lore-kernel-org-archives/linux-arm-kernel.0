@@ -1,48 +1,76 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 26 Jun 2013 09:39:45 -0500
-Subject: [-next PATCH 0/2] ARM: OMAP5: fix build breakage due to SCU usage
-Message-ID: <1372257587-21720-1-git-send-email-nm@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Jun 2013 16:35:45 +0200
+Subject: DMA channels (was Re: [PATCH 2/2] ARM: shmobile: sdhi: remove DMA
+ hardware dependencies)
+In-Reply-To: <Pine.LNX.4.64.1306261024280.8856@axis700.grange>
+References: <1370008605-3745603-1-git-send-email-arnd@arndb.de>
+ <201306192351.50804.arnd@arndb.de>
+ <Pine.LNX.4.64.1306261024280.8856@axis700.grange>
+Message-ID: <201306261635.45579.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday 26 June 2013, Guennadi Liakhovetski wrote:
+> > The problem with this is that on a lot of dma engines you have one channel
+> > per slave (in particular with virt-dma.c), so the slave-id has to be
+> > part of the filter data. Since the slave driver cannot know what kind
+> > of DMA engine it is connected to, it has to assume that the slave-id
+> > is inherent to the channel an cannot change.
+> > Also, the DT binding is built around the idea that you identify the
+> > channel or request line with the specifier in whichever form the
+> > dma engine requires, and there is no general way for the slave driver
+> > to find out a slave id. Setting it with dma_slave_config is inherently
+> > nonportable, and we should stop doing that.
+> 
+> Don't you think, that this situation, where without DT a filter function 
+> has to be used, which has to be provided by the platform and is just a 
+> kind of a platform callback; and with DT channels are selected and 
+> configured by a reference to suitable DMAC instances and a hardware- 
+> specific data set is suboptimal? Wouldn't it be better to unify it?
+> 
+> If yes, the unification would go in the direction of DT compatibility, 
+> i.e. dropping filter functions and just directly referencing required 
+> DMACs and using DMAC-specific configuration?
 
-Cortex-A15 based OMAP5 does not use Snoop Control Unit(SCU)[1].
-However, there is lot of code that is shared between Cortex-A9 based
-OMAP4 and OMAP5, hence functionality code is shared with runtime usage
-of SCU based on SoC worked on. However on building with OMAP5 only
-generates the following errors:
-arch/arm/mach-omap2/built-in.o: In function `scu_gp_set':
-arch/arm/mach-omap2/sleep44xx.S:132: undefined reference to `scu_power_mode'
-arch/arm/mach-omap2/built-in.o: In function `scu_gp_clear':
-arch/arm/mach-omap2/sleep44xx.S:229: undefined reference to `scu_power_mode'
-arch/arm/mach-omap2/built-in.o: In function `omap4_smp_init_cpus':
-arch/arm/mach-omap2/omap-smp.c:185: undefined reference to `scu_get_core_count'
-arch/arm/mach-omap2/built-in.o: In function `omap4_smp_prepare_cpus':
-arch/arm/mach-omap2/omap-smp.c:211: undefined reference to `scu_enable'
+With the introduction of dma_request_slave_channel() we tried to
+only change the cases going forward with DT, SFI and ACPI but
+without changing the interface for the existing drivers, which
+are highly inconsistent at the moment (filter function being defined
+in the slave driver /or/ the platform /or/ the dmaengine driver).
 
-This was attempted to be "fixed" in various attempts in the past [2] [3].
+> Wouldn't a channel requesting 
+> API, similar to that for requesting clocks, pinmux settings be a better 
+> option, than the current filtering procedure? Something like
+> 
+>         dma_request_slave_channel(dev, "tx", "dmac0", config);
+> 
+> in a simple case of just one suitable DMAC, or a NULL if DMACs should be 
+> able to figure out themselves, whether they can serve this slave, or 
+> something like "dmamux0" if there is a multiplexer, for which a driver has 
+> to be available, and in which case "config" would be that multiplexer 
+> driver's configuration?
 
-This series applies on top of the other fixes in discussion for linux-next [4] [5].
+I think what you suggest here is very similar to the existing
+dma_request_slave_channel_compat() function, except that you
+pass a string ("dmac0") instead of the filter function pointer,
+and that string presumably also has to come from the platform,
+since there is no other way for the driver to know it, right?
 
-Based on:
-git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git  next-20130626
+One idea that Vinod suggested was that the platform could register
+a table of DMA configurations with the dmaengine core to do the
+lookup by device and string. That would actually help unify the
+API to the current dma_request_slave_channel(dev, name) form
+for all the possible cases (DT, ACPI, SFI, platform_data).
 
-Nishanth Menon (2):
-  ARM: OMAP4: sleep: build OMAP4 specific functions only for OMAP4
-  ARM: scu: provide inline dummy functions when SCU is not present
+In essence, the platform would have a table like clk_lookup
+but also containing the config:
 
- arch/arm/include/asm/smp_scu.h  |   13 ++++++++++++-
- arch/arm/mach-omap2/sleep44xx.S |    6 +++++-
- 2 files changed, 17 insertions(+), 2 deletions(-)
+struct dma_lookup {
+	struct list_head node;
+	const char *dev_id;	/* the slave device */
+	const char *con_id;	/* request line of the slave, e.g. "rx" */
+	const char *dmadev_id;	/* master device name */
+	void *slave_id;		/* data passed to the master */
+};
 
-[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407e/CHDFJICC.html
-[2] https://patchwork.kernel.org/patch/2568091/
-[3] http://marc.info/?t=137120115400001&r=1&w=2
-[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/178209.html
-[5] https://patchwork.kernel.org/patch/2781471/
-
-Regards,
-Nishanth Menon
--- 
-1.7.9.5
+	Arnd
