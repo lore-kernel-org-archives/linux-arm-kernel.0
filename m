@@ -1,166 +1,200 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Wed, 26 Jun 2013 18:29:01 +0300
-Subject: [RFC/PATCH 11/11] ARM: msm: Move MSM's DT based hardware to
- multi-platform support
-In-Reply-To: <1371600281-6118-12-git-send-email-sboyd@codeaurora.org>
-References: <1371600281-6118-1-git-send-email-sboyd@codeaurora.org>
- <1371600281-6118-12-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1372260541.6211.12.camel@iivanov-dev.int.mm-sol.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 26 Jun 2013 15:33:36 +0200
+Subject: [RFC PATCH] ARM: at91: cpuidle: encapsulate the standby code
+Message-ID: <1372253616-28086-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen, 
+In order to split the pm code from the cpuidle driver, add an ops for the
+standby function which will be initialized by the platform data depending of
+the SoC.
 
-On Tue, 2013-06-18 at 17:04 -0700, Stephen Boyd wrote:
-> The DT based MSM platforms can join the multi-platform builds, so
-> introduce a DT based ARCH_MSM option. This option allows DT based
-> MSM platforms to be built into the multi-platform kernel. Also
-> introduce a hidden ARCH_MSM config that both the DT and non-DT
-> platform support code select to avoid churn in places that depend
-> on CONFIG_ARCH_MSM.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> 
-> RFC because this has problems with msm_sdcc and usb_otg using
-> mach specific APIs. See the cover letter for more details.
-> 
+Cleanup also the headers included in this file as they are no longer needed.
 
-You probably already know, but this patch causes compile error:
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/mach-at91/board-usb-a926x.c |   17 +++++++++++++++-
+ arch/arm/mach-at91/cpuidle.c         |   33 ++++++++++++++----------------
+ arch/arm/mach-at91/pm.c              |   37 +++++++++++++++++++++++++---------
+ arch/arm/mach-at91/pm.h              |    9 +++++++++
+ 4 files changed, 68 insertions(+), 28 deletions(-)
 
-arch/arm/mach-msm/board-dt-8660.c:20:24: fatal error: mach/board.h: No such file or directory
-
-I have fixed it locally like this:
-
---- a/arch/arm/mach-msm/board-dt-8660.c
-+++ b/arch/arm/mach-msm/board-dt-8660.c
-@@ -17,14 +17,8 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
+diff --git a/arch/arm/mach-at91/board-usb-a926x.c b/arch/arm/mach-at91/board-usb-a926x.c
+index 2487d94..b35f8fd 100644
+--- a/arch/arm/mach-at91/board-usb-a926x.c
++++ b/arch/arm/mach-at91/board-usb-a926x.c
+@@ -49,7 +49,6 @@
+ #include "sam9_smc.h"
+ #include "generic.h"
  
--#include <mach/board.h>
- #include "common.h"
- 
--static void __init msm8x60_init_late(void)
--{
--	smd_debugfs_init();
--}
 -
- static struct of_dev_auxdata msm_auxdata_lookup[] __initdata = {
- 	{}
+ static void __init ek_init_early(void)
+ {
+ 	/* Initialize processor: 12.00 MHz crystal */
+@@ -319,6 +318,19 @@ static void __init ek_add_device_leds(void)
+ 	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
+ }
+ 
++#ifdef CONFIG_PM
++static struct platform_device at91_pm_device = {
++	.name = "pm-at91",
++	.id = -1,
++};
++#endif
++
++static struct platform_device *platform_devices[] __initdata = {
++#ifdef CONFIG_PM
++	&at91_pm_device,
++#endif
++};
++
+ static void __init ek_board_init(void)
+ {
+ 	/* Serial */
+@@ -351,6 +363,9 @@ static void __init ek_board_init(void)
+ 				| AT91_SHDW_WKMODE0_LOW
+ 				| AT91_SHDW_RTTWKEN);
+ 	}
++
++	/* Platform devices */
++	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+ }
+ 
+ MACHINE_START(USB_A9263, "CALAO USB_A9263")
+diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
+index 4ec6a6d..8bfaad0 100644
+--- a/arch/arm/mach-at91/cpuidle.c
++++ b/arch/arm/mach-at91/cpuidle.c
+@@ -13,33 +13,21 @@
+  * #2 wait-for-interrupt and RAM self refresh
+  */
+ 
+-#include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/cpuidle.h>
+-#include <linux/io.h>
+-#include <linux/export.h>
+-#include <asm/proc-fns.h>
+ #include <asm/cpuidle.h>
+-#include <mach/cpu.h>
+-
+-#include "pm.h"
+ 
+ #define AT91_MAX_STATES	2
+ 
++static void (*at91_standby_ops)(void);
++
+ /* Actual code that puts the SoC in different idle states */
+ static int at91_enter_idle(struct cpuidle_device *dev,
+ 			struct cpuidle_driver *drv,
+ 			       int index)
+ {
+-	if (cpu_is_at91rm9200())
+-		at91rm9200_standby();
+-	else if (cpu_is_at91sam9g45())
+-		at91sam9g45_standby();
+-	else if (cpu_is_at91sam9263())
+-		at91sam9263_standby();
+-	else
+-		at91sam9_standby();
++	at91_standby_ops();
+ 
+ 	return index;
+ }
+@@ -60,9 +48,18 @@ static struct cpuidle_driver at91_idle_driver = {
  };
-@@ -45,6 +39,5 @@ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
- 	.smp = smp_ops(msm_smp_ops),
- 	.map_io = debug_ll_io_init,
- 	.init_machine = msm8x60_dt_init,
--	.init_late = msm8x60_init_late,
- 	.dt_compat = msm8x60_fluid_match,
- MACHINE_END
-
-
-Regards, 
-Ivan
-
->  arch/arm/Kconfig          |  3 ++-
->  arch/arm/mach-msm/Kconfig | 55 +++++++++++++++++++++++++++++------------------
->  2 files changed, 36 insertions(+), 22 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 430c922..22d4fff 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -618,8 +618,9 @@ config ARCH_PXA
->  	help
->  	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
->  
-> -config ARCH_MSM
-> +config ARCH_MSM_NODT
->  	bool "Qualcomm MSM"
-> +	select ARCH_MSM
->  	select ARCH_REQUIRE_GPIOLIB
->  	select CLKDEV_LOOKUP
->  	select CLKSRC_OF if OF
-> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-> index 614e41e..09f996a 100644
-> --- a/arch/arm/mach-msm/Kconfig
-> +++ b/arch/arm/mach-msm/Kconfig
-> @@ -1,12 +1,42 @@
-> +config ARCH_MSM
-> +	bool
-> +
-> +config ARCH_MSM_DT
-> +	bool "Qualcomm MSM DT support" if ARCH_MULTI_V7
-> +	select ARCH_MSM
-> +	select ARCH_REQUIRE_GPIOLIB
-> +	select CLKSRC_OF if OF
-> +	select GENERIC_CLOCKEVENTS
-> +	help
-> +	  Support for Qualcomm's DT-based MSM systems.
-> +
->  if ARCH_MSM
->  
-> -comment "Qualcomm MSM SoC Type"
-> -	depends on (ARCH_MSM8X60 || ARCH_MSM8960)
-> +menu "MSM options"
-> +	depends on ARCH_MSM_DT
-> +
-> +config ARCH_MSM8X60
-> +	bool "Enable support for MSM8X60"
-> +	select ARM_GIC
-> +	select CPU_V7
-> +	select GPIO_MSM_V2
-> +	select HAVE_SMP
-> +	select MSM_SCM if SMP
-> +
-> +config ARCH_MSM8960
-> +	bool "Enable support for MSM8960"
-> +	select ARM_GIC
-> +	select CPU_V7
-> +	select HAVE_SMP
-> +	select GPIO_MSM_V2
-> +	select MSM_SCM if SMP
-> +
-> +endmenu
->  
->  choice
->  	prompt "Qualcomm MSM SoC Type"
->  	default ARCH_MSM7X00A
-> -	depends on !(ARCH_MSM8X60 || ARCH_MSM8960)
-> +	depends on ARCH_MSM_NODT
->  
->  config ARCH_MSM7X00A
->  	bool "MSM7x00A / MSM7x01A"
-> @@ -42,24 +72,6 @@ config ARCH_QSD8X50
->  
->  endchoice
->  
-> -config ARCH_MSM8X60
-> -	bool "MSM8X60"
-> -	select ARM_GIC
-> -	select CPU_V7
-> -	select GPIO_MSM_V2
-> -	select HAVE_SMP
-> -	select MSM_SCM if SMP
-> -	select USE_OF
-> -
-> -config ARCH_MSM8960
-> -	bool "MSM8960"
-> -	select ARM_GIC
-> -	select CPU_V7
-> -	select HAVE_SMP
-> -	select GPIO_MSM_V2
-> -	select MSM_SCM if SMP
-> -	select USE_OF
-> -
->  config MSM_HAS_DEBUG_UART_HS
->  	bool
->  
-> @@ -75,6 +87,7 @@ config  MSM_VIC
->  	bool
->  
->  menu "Qualcomm MSM Board Type"
-> +	depends on ARCH_MSM_NODT
->  
->  config MACH_HALIBUT
->  	depends on ARCH_MSM
+ 
+ /* Initialize CPU idle by registering the idle states */
+-static int __init at91_init_cpuidle(void)
++int __init at91_init_cpuidle(struct platform_device *pdev)
+ {
+-	return cpuidle_register(&at91_idle_driver, NULL);
++	if (!pdev->dev.platform_data)
++		BUG();
++
++	at91_standby_ops = pdev->dev.platform_data;
++
++	return 0;
+ }
+ 
+-device_initcall(at91_init_cpuidle);
++static int __init at91_cpuidle_init(void)
++{
++	return cpuidle_register(&at91_idle_driver, NULL);
++}
++device_initcall(at91_cpuidle_init);
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 530db30..c5f4654 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -314,21 +314,40 @@ static const struct platform_suspend_ops at91_pm_ops = {
+ 	.end	= at91_pm_end,
+ };
+ 
+-static int __init at91_pm_init(void)
++static int __init at91_pm_probe(struct platform_device *pdev)
+ {
+-#ifdef CONFIG_AT91_SLOW_CLOCK
+-	slow_clock = (void *) (AT91_IO_VIRT_BASE - at91_slow_clock_sz);
+-#endif
+-
+-	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
+-
+ 	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
+-	if (cpu_is_at91rm9200())
++	if (of_machine_is_compatible("atmel,at91rm9200")) {
+ 		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
++		pdev->dev.platform_data = at91rm9200_standby;
++	} else if (of_machine_is_compatible("atmel,atmel,at91sam9g45")) {
++		pdev->dev.platform_data = at91sam9g45_standby;
++	} else {
++		pdev->dev.platform_data = at91sam9_standby;
++	}
+ 
+ 	suspend_set_ops(&at91_pm_ops);
+ 
+ 	show_reset_status();
+-	return 0;
++
++	return at91_init_cpuidle(pdev);
++}
++
++static struct platform_driver at91_pm_driver = {
++	.driver = {
++		.name	 = "pm-at91",
++		.owner	 = THIS_MODULE,
++	},
++};
++
++static int __init at91_pm_init(void)
++{
++#ifdef CONFIG_AT91_SLOW_CLOCK
++	slow_clock = (void *) (AT91_IO_VIRT_BASE - at91_slow_clock_sz);
++#endif
++	pr_info("AT91: Power Management%s\n",
++		(slow_clock ? " (with slow clock mode)" : ""));
++
++	return platform_driver_probe(&at91_pm_driver, at91_pm_probe);
+ }
+ arch_initcall(at91_pm_init);
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index 2f5908f..897bed5 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -111,4 +111,13 @@ static inline void at91sam9_standby(void)
+ 	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr);
+ }
+ 
++#ifdef CONFIG_CPU_IDLE
++extern int at91_init_cpuidle(struct platform_device *pdev);
++#else
++static inline int at91_init_cpuidle(struct platform_device *pdev)
++{
++	return 0;
++}
++#endif
++
+ #endif
+-- 
+1.7.9.5
