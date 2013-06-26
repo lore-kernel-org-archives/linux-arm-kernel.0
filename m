@@ -1,22 +1,20 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Jun 2013 17:40:38 +0900
-Subject: [PATCH v2 0/2] ARM: shmobile: r8a7790: add thermal driver support
-Message-ID: <1372236040-16737-1-git-send-email-horms+renesas@verge.net.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Jun 2013 09:19:09 +0100
+Subject: amba-pl08x and 'get_signal' namespace collision/build error
+In-Reply-To: <20130626044842.GR23141@intel.com>
+References: <51C97F40.5030101@arm.com>
+ <20130625184539.GB2718@n2100.arm.linux.org.uk>
+ <20130626044842.GR23141@intel.com>
+Message-ID: <20130626081909.GD2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This short series enables the thermal driver on the r8a7790 SoC
-and thus the lager board.
+On Wed, Jun 26, 2013 at 10:18:42AM +0530, Vinod Koul wrote:
+> Yup. This is fixed in slave-dma tree by a patch from mark by renaming it.
+> 
+> This should not show in the -next tree
 
-It is based on renesas-next-20130620
+Except, that change probably is probably responsible for this new error:
 
-Simon Horman (2):
-  ARM: shmobile: r8a7790: add thermal driver support
-  ARM: shmobile: r8a73a4: add clocks for thermal
-
- arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
- arch/arm/mach-shmobile/setup-r8a7790.c | 12 ++++++++++++
- 2 files changed, 16 insertions(+)
-
--- 
-1.8.2.1
+drivers/dma/amba-pl08x.c: In function 'pl08x_request_mux':
+drivers/dma/amba-pl08x.c:304:13: error: expected identifier before '(' token
