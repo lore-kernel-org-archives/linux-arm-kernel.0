@@ -1,65 +1,52 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 26 Jun 2013 10:55:04 +0100
-Subject: [GIT PULL] ARM DT cpus/cpu bindings documentation updates
-In-Reply-To: <20130523103315.GA2866@e102568-lin.cambridge.arm.com>
-References: <20130523103315.GA2866@e102568-lin.cambridge.arm.com>
-Message-ID: <20130626095504.GC22333@e102568-lin.cambridge.arm.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 26 Jun 2013 12:28:10 +0300
+Subject: [PATCH 07/23] ARM: dt: tegra114: Add "nvidia,memory-clients"
+Message-ID: <1372238906-9346-8-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant, Rob,
+Add "nvidia,memory-clients" to identify which swgroup ID a device
+belongs to.
 
-On Thu, May 23, 2013 at 11:33:15AM +0100, Lorenzo Pieralisi wrote:
-> Hi Grant, Rob,
-> 
-> please pull the cpus/cpu nodes bindings updates for ARM. This pull
-> request completes my previous pull request:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/169110.html
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ arch/arm/boot/dts/tegra114.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Please let me know if you have any objection to these two pull requests
-(the one I am replying to and the one provided in the link above). I
-sent them quite early so I am just reminding you lest you missed them.
-
-These bindings are quite important and without them all in-kernel dts files,
-cpu map parsing code and topology updates are meaningless, I really hope you
-can queue them for this upcoming merge window.
-
-They are based against early kernel versions (3.10-rc1 and 3.10-rc2), but
-they fast-forward cleanly to -rc7, please let me know if you want me to
-send pull requests with branches updated to -rc7, I do not think it is
-necessary.
-
-Thank you very much indeed,
-Lorenzo
-
-> 
-> with the required changes for cpus/cpu nodes.
-> 
-> Thanks a lot,
-> Lorenzo
-> 
-> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
-> 
->   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://linux-arm.org/linux-2.6-lp.git dt-cpus-bindings
-> 
-> for you to fetch changes up to 8e11f862d6a5491bb5f8ef73e13cfd66562e7be3:
-> 
->   Documentation: devicetree: arm: cpus/cpu nodes bindings updates (2013-05-23 10:46:46 +0100)
-> 
-> ----------------------------------------------------------------
-> Lorenzo Pieralisi (1):
->       Documentation: devicetree: arm: cpus/cpu nodes bindings updates
-> 
->  Documentation/devicetree/bindings/arm/cpus.txt | 459 ++++++++++++++++++++++---
->  1 file changed, 412 insertions(+), 47 deletions(-)
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 715b5d6..980a3b1 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -1,5 +1,6 @@
+ #include <dt-bindings/clock/tegra114-car.h>
+ #include <dt-bindings/gpio/tegra-gpio.h>
++#include <dt-bindings/iommu/tegra-swgid.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ 
+ #include "skeleton.dtsi"
+@@ -411,6 +412,7 @@
+ 		reg = <0x78000200 0x200>;
+ 		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&tegra_car TEGRA114_CLK_SDMMC2>;
++		nvidia,memory-clients = <SWGID_PPCS>;
+ 		status = "disable";
+ 	};
+ 
+@@ -419,6 +421,7 @@
+ 		reg = <0x78000400 0x200>;
+ 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&tegra_car TEGRA114_CLK_SDMMC3>;
++		nvidia,memory-clients = <SWGID_PPCS>;
+ 		status = "disable";
+ 	};
+ 
+@@ -427,6 +430,7 @@
+ 		reg = <0x78000600 0x200>;
+ 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&tegra_car TEGRA114_CLK_SDMMC4>;
++		nvidia,memory-clients = <SWGID_PPCS>;
+ 		status = "disable";
+ 	};
+ 
+-- 
+1.8.1.5
