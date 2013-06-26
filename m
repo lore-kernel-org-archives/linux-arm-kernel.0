@@ -1,88 +1,69 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 26 Jun 2013 16:29:27 +0900
-Subject: [PATCH 3/4] ARM: dts: exynos4: Add nodes for USB PHY block
-In-Reply-To: <1372174706-5459-4-git-send-email-t.figa@samsung.com>
-References: <1372174706-5459-1-git-send-email-t.figa@samsung.com>
- <1372174706-5459-4-git-send-email-t.figa@samsung.com>
-Message-ID: <001601ce723e$e3f20170$abd60450$@samsung.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 26 Jun 2013 16:36:04 +0900
+Subject: [RFC] ARM: shmobile: r8a7790: add thermal driver support
+Message-ID: <1372232164-31285-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 26, 2013 12:38 AM, Tomasz Figa wrote:
-> 
-> This patch adds device tree nodes for USB OTG PHYs of Exynos4210 and
-> Exynos4x12 SoCs.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+You can get current thermal by
+> cat /sys/class/thermal/thermal_zone?/temp
 
-It looks good.
+Based on similar work for the r8a73a4 by Kuninori Morimoto.
 
-Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a7790.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Best regards,
-Jingoo Han
+This patch is based on renesas-next-20130620
 
 
-> ---
->  arch/arm/boot/dts/exynos4210.dtsi | 15 +++++++++++++++
->  arch/arm/boot/dts/exynos4x12.dtsi | 15 +++++++++++++++
->  2 files changed, 30 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> index 54710de..3c71ea5 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -114,6 +114,21 @@
->  		interrupts = <2 4>;
->  	};
-> 
-> +	usbphy at 125B0000 {
-> +		compatible = "samsung,exynos4210-usb2phy";
-> +		reg = <0x125B0000 0x100>;
-> +		clocks = <&clock 305>;
-> +		clock-names = "otg";
-> +		status = "disabled";
-> +		ranges;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		usbphy-sys {
-> +			reg = <0x10020704 0x8>;
-> +		};
-> +	};
-> +
->  	g2d at 12800000 {
->  		compatible = "samsung,s5pv210-g2d";
->  		reg = <0x12800000 0x1000>;
-> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-> index e3380a7..267ed95 100644
-> --- a/arch/arm/boot/dts/exynos4x12.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-> @@ -79,4 +79,19 @@
->  		interrupts = <0 89 0>;
->  		status = "disabled";
->  	};
-> +
-> +	usbphy at 125B0000 {
-> +		compatible = "samsung,exynos4x12-usb2phy";
-> +		reg = <0x125B0000 0x100>;
-> +		clocks = <&clock 305>;
-> +		clock-names = "otg";
-> +		status = "disabled";
-> +		ranges;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		usbphy-sys {
-> +			reg = <0x10020704 0x8>;
-> +		};
-> +	};
->  };
-> --
-> 1.8.2.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Hi Morimoto-san,
+
+with this patch applied I see that the thermal driver is initialised,
+but there seems to be some problem:
+
+# dmesg | grep thermal
+rcar_thermal rcar_thermal: thermal sensor was broken
+rcar_thermal rcar_thermal: 1 sensor proved
+
+Furthermore I see a negative temperature reading.
+
+# cat /sys/devices/virtual/thermal/thermal_zone0/temp  
+-65000
+
+I am wondering if you have any insight into this.
+
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 28f9475..06c720f 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -149,6 +149,17 @@ static struct resource irqc0_resources[] __initdata = {
+ 					  &irqc##idx##_data,		\
+ 					  sizeof(struct renesas_irqc_config))
+ 
++static struct resource thermal_resources[] __initdata = {
++	DEFINE_RES_MEM(0xe61f0000, 0x14),
++	DEFINE_RES_MEM(0xe61f0100, 0x38),
++	DEFINE_RES_IRQ(gic_spi(69)),
++};
++
++#define r8a7790_register_thermal()					\
++	platform_device_register_simple("rcar_thermal", -1,		\
++					thermal_resources,		\
++					ARRAY_SIZE(thermal_resources))
++
+ void __init r8a7790_add_standard_devices(void)
+ {
+ 	r8a7790_register_scif(SCIFA0);
+@@ -162,6 +173,7 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_scif(HSCIF0);
+ 	r8a7790_register_scif(HSCIF1);
+ 	r8a7790_register_irqc(0);
++	r8a7790_register_thermal();
+ }
+ 
+ void __init r8a7790_timer_init(void)
+-- 
+1.8.2.1
