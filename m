@@ -1,44 +1,273 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 26 Jun 2013 11:53:09 +0200
-Subject: [linux-next PATCH] ARM: OMAP: fix build for omap4-restart.c
-Message-ID: <3975063.P6ddal97NH@amdc1032>
+Date: Wed, 26 Jun 2013 12:15:41 +0200
+Subject: [PATCH 2/8] ARM: davinci: move cpuidle driver to drivers/cpuidle/
+In-Reply-To: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1372241747-21083-3-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Subject: [linux-next PATCH] ARM: OMAP: fix build for omap4-restart.c
+Compile tested only.
 
-Building omap2plus_defconfig for next-20130626 results in the following
-build error:
-
-arch/arm/mach-omap2/omap4-restart.c:21:28: warning: ?enum reboot_mode? declared inside parameter list [enabled by default]
-arch/arm/mach-omap2/omap4-restart.c:21:28: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
-arch/arm/mach-omap2/omap4-restart.c:21:40: error: parameter 1 (?mode?) has incomplete type
-arch/arm/mach-omap2/omap4-restart.c:21:6: warning: function declaration isn?t a prototype [-Wstrict-prototypes]
-
-It is caused by commit 7eb135b ("reboot: arm: change reboot_mode to use
-enum reboot_mode").
-
-Fix it by adding missing include.
-
-Cc: Stephen Rothwell <sfr@canb.auug.org.au>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Robin Holt <holt@sgi.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/mach-omap2/omap4-restart.c |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-davinci/Makefile    |   1 -
+ arch/arm/mach-davinci/cpuidle.c   | 105 --------------------------------------
+ drivers/cpuidle/Makefile          |   3 ++
+ drivers/cpuidle/cpuidle-davinci.c | 104 +++++++++++++++++++++++++++++++++++++
+ 4 files changed, 107 insertions(+), 106 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/cpuidle.c
+ create mode 100644 drivers/cpuidle/cpuidle-davinci.c
 
-Index: b/arch/arm/mach-omap2/omap4-restart.c
-===================================================================
---- a/arch/arm/mach-omap2/omap4-restart.c	2013-06-25 14:41:05.842382072 +0200
-+++ b/arch/arm/mach-omap2/omap4-restart.c	2013-06-25 14:44:16.062381692 +0200
-@@ -8,6 +8,7 @@
-  */
+diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
+index 63997a1..76712e2 100644
+--- a/arch/arm/mach-davinci/Makefile
++++ b/arch/arm/mach-davinci/Makefile
+@@ -37,6 +37,5 @@ obj-$(CONFIG_MACH_MITYOMAPL138)		+= board-mityomapl138.o
+ obj-$(CONFIG_MACH_OMAPL138_HAWKBOARD)	+= board-omapl138-hawk.o
  
- #include <linux/types.h>
-+#include <linux/reboot.h>
- #include "prminst44xx.h"
- 
- /**
+ # Power Management
+-obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+ obj-$(CONFIG_SUSPEND)			+= pm.o sleep.o
+ obj-$(CONFIG_HAVE_CLK)			+= pm_domain.o
+diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
+deleted file mode 100644
+index 36aef3a..0000000
+--- a/arch/arm/mach-davinci/cpuidle.c
++++ /dev/null
+@@ -1,105 +0,0 @@
+-/*
+- * CPU idle for DaVinci SoCs
+- *
+- * Copyright (C) 2009 Texas Instruments Incorporated. http://www.ti.com/
+- *
+- * Derived from Marvell Kirkwood CPU idle code
+- * (arch/arm/mach-kirkwood/cpuidle.c)
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/cpuidle.h>
+-#include <linux/io.h>
+-#include <linux/export.h>
+-#include <asm/proc-fns.h>
+-#include <asm/cpuidle.h>
+-
+-#include <mach/cpuidle.h>
+-#include <mach/ddr2.h>
+-
+-#define DAVINCI_CPUIDLE_MAX_STATES	2
+-
+-static void __iomem *ddr2_reg_base;
+-static bool ddr2_pdown;
+-
+-static void davinci_save_ddr_power(int enter, bool pdown)
+-{
+-	u32 val;
+-
+-	val = __raw_readl(ddr2_reg_base + DDR2_SDRCR_OFFSET);
+-
+-	if (enter) {
+-		if (pdown)
+-			val |= DDR2_SRPD_BIT;
+-		else
+-			val &= ~DDR2_SRPD_BIT;
+-		val |= DDR2_LPMODEN_BIT;
+-	} else {
+-		val &= ~(DDR2_SRPD_BIT | DDR2_LPMODEN_BIT);
+-	}
+-
+-	__raw_writel(val, ddr2_reg_base + DDR2_SDRCR_OFFSET);
+-}
+-
+-/* Actual code that puts the SoC in different idle states */
+-static int davinci_enter_idle(struct cpuidle_device *dev,
+-			      struct cpuidle_driver *drv, int index)
+-{
+-	davinci_save_ddr_power(1, ddr2_pdown);
+-	cpu_do_idle();
+-	davinci_save_ddr_power(0, ddr2_pdown);
+-
+-	return index;
+-}
+-
+-static struct cpuidle_driver davinci_idle_driver = {
+-	.name			= "cpuidle-davinci",
+-	.owner			= THIS_MODULE,
+-	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+-	.states[1]		= {
+-		.enter			= davinci_enter_idle,
+-		.exit_latency		= 10,
+-		.target_residency	= 100000,
+-		.flags			= CPUIDLE_FLAG_TIME_VALID,
+-		.name			= "DDR SR",
+-		.desc			= "WFI and DDR Self Refresh",
+-	},
+-	.state_count = DAVINCI_CPUIDLE_MAX_STATES,
+-};
+-
+-static int __init davinci_cpuidle_probe(struct platform_device *pdev)
+-{
+-	struct davinci_cpuidle_config *pdata = pdev->dev.platform_data;
+-
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "cannot get platform data\n");
+-		return -ENOENT;
+-	}
+-
+-	ddr2_reg_base = pdata->ddr2_ctlr_base;
+-
+-	ddr2_pdown = pdata->ddr2_pdown;
+-
+-	return cpuidle_register(&davinci_idle_driver, NULL);
+-}
+-
+-static struct platform_driver davinci_cpuidle_driver = {
+-	.driver = {
+-		.name	= "cpuidle-davinci",
+-		.owner	= THIS_MODULE,
+-	},
+-};
+-
+-static int __init davinci_cpuidle_init(void)
+-{
+-	return platform_driver_probe(&davinci_cpuidle_driver,
+-						davinci_cpuidle_probe);
+-}
+-device_initcall(davinci_cpuidle_init);
+-
+diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+index 9dd4091..3bbb828 100644
+--- a/drivers/cpuidle/Makefile
++++ b/drivers/cpuidle/Makefile
+@@ -9,5 +9,8 @@ ifeq ($(CONFIG_ARCH_AT91),y)
+ 	obj-y += cpuidle-at91.o
+ endif
+ obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
++ifeq ($(CONFIG_ARCH_DAVINCI),y)
++	obj-y += cpuidle-davinci.o
++endif
+ obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
+ obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
+diff --git a/drivers/cpuidle/cpuidle-davinci.c b/drivers/cpuidle/cpuidle-davinci.c
+new file mode 100644
+index 0000000..b5a6476
+--- /dev/null
++++ b/drivers/cpuidle/cpuidle-davinci.c
+@@ -0,0 +1,104 @@
++/*
++ * CPU idle for DaVinci SoCs
++ *
++ * Copyright (C) 2009 Texas Instruments Incorporated. http://www.ti.com/
++ *
++ * Derived from Marvell Kirkwood CPU idle code
++ * (arch/arm/mach-kirkwood/cpuidle.c)
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/cpuidle.h>
++#include <linux/io.h>
++#include <linux/export.h>
++#include <asm/proc-fns.h>
++#include <asm/cpuidle.h>
++
++#include <mach/cpuidle.h>
++#include <mach/ddr2.h>
++
++#define DAVINCI_CPUIDLE_MAX_STATES	2
++
++static void __iomem *ddr2_reg_base;
++static bool ddr2_pdown;
++
++static void davinci_save_ddr_power(int enter, bool pdown)
++{
++	u32 val;
++
++	val = __raw_readl(ddr2_reg_base + DDR2_SDRCR_OFFSET);
++
++	if (enter) {
++		if (pdown)
++			val |= DDR2_SRPD_BIT;
++		else
++			val &= ~DDR2_SRPD_BIT;
++		val |= DDR2_LPMODEN_BIT;
++	} else {
++		val &= ~(DDR2_SRPD_BIT | DDR2_LPMODEN_BIT);
++	}
++
++	__raw_writel(val, ddr2_reg_base + DDR2_SDRCR_OFFSET);
++}
++
++/* Actual code that puts the SoC in different idle states */
++static int davinci_enter_idle(struct cpuidle_device *dev,
++			      struct cpuidle_driver *drv, int index)
++{
++	davinci_save_ddr_power(1, ddr2_pdown);
++	cpu_do_idle();
++	davinci_save_ddr_power(0, ddr2_pdown);
++
++	return index;
++}
++
++static struct cpuidle_driver davinci_idle_driver = {
++	.name			= "cpuidle-davinci",
++	.owner			= THIS_MODULE,
++	.states[0]		= ARM_CPUIDLE_WFI_STATE,
++	.states[1]		= {
++		.enter			= davinci_enter_idle,
++		.exit_latency		= 10,
++		.target_residency	= 100000,
++		.flags			= CPUIDLE_FLAG_TIME_VALID,
++		.name			= "DDR SR",
++		.desc			= "WFI and DDR Self Refresh",
++	},
++	.state_count = DAVINCI_CPUIDLE_MAX_STATES,
++};
++
++static int __init davinci_cpuidle_probe(struct platform_device *pdev)
++{
++	struct davinci_cpuidle_config *pdata = pdev->dev.platform_data;
++
++	if (!pdata) {
++		dev_err(&pdev->dev, "cannot get platform data\n");
++		return -ENOENT;
++	}
++
++	ddr2_reg_base = pdata->ddr2_ctlr_base;
++
++	ddr2_pdown = pdata->ddr2_pdown;
++
++	return cpuidle_register(&davinci_idle_driver, NULL);
++}
++
++static struct platform_driver davinci_cpuidle_driver = {
++	.driver = {
++		.name	= "cpuidle-davinci",
++		.owner	= THIS_MODULE,
++	},
++};
++
++static int __init davinci_cpuidle_init(void)
++{
++	return platform_driver_probe(&davinci_cpuidle_driver,
++						davinci_cpuidle_probe);
++}
++device_initcall(davinci_cpuidle_init);
+-- 
+1.8.2.3
