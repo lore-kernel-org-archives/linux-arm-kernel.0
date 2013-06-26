@@ -1,50 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 26 Jun 2013 13:00:31 +0100
-Subject: amba-pl08x and 'get_signal' namespace collision/build error
-In-Reply-To: <20130626103930.GS23141@intel.com>
-References: <51C97F40.5030101@arm.com>
- <20130625184539.GB2718@n2100.arm.linux.org.uk>
- <20130626044842.GR23141@intel.com>
- <20130626081909.GD2718@n2100.arm.linux.org.uk>
- <20130626103930.GS23141@intel.com>
-Message-ID: <20130626120031.GN27646@sirena.org.uk>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 26 Jun 2013 13:09:06 +0200
+Subject: [PATCH 18/23] iommu/tegra: smmu: Workaround PCIe IOMMU'able
+In-Reply-To: <20130626110626.GO27083@manwe>
+References: <1372238906-9346-19-git-send-email-hdoyu@nvidia.com><20130626110626.GO27083@manwe>
+Message-ID: <20130626.140906.1216615781918366349.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 04:09:30PM +0530, Vinod Koul wrote:
-> On Wed, Jun 26, 2013 at 09:19:09AM +0100, Russell King - ARM Linux wrote:
+Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 26 Jun 2013 13:06:27 +0200:
 
-> > Except, that change probably is probably responsible for this new error:
+> * PGP Signed by an unknown key
+> 
+> On Wed, Jun 26, 2013 at 12:28:21PM +0300, Hiroshi Doyu wrote:
+> > Make PCIe work as it is. IOMMU support can be implemented later.
+> > 
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > ---
+> >  drivers/iommu/tegra-smmu.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> 
+> Can you provide more information about what the problem is here? Why is
+> PCIe not working when mapped through the IOMMU?
 
-> > drivers/dma/amba-pl08x.c: In function 'pl08x_request_mux':
-> > drivers/dma/amba-pl08x.c:304:13: error: expected identifier before '(' token
-
-> This was pushed four days ago and havent seen any error report expect this.
-
-> Anyway I rebuild my -next and looks fine for me
-
->   CC      drivers/dma/dmaengine.o
->   CC      drivers/dma/virt-dma.o
->   CC      drivers/dma/iovlock.o
->   CC [M]  drivers/dma/dmatest.o
->   CC      drivers/dma/amba-pl08x.o
->   LD      drivers/dma/built-in.o
-
-> Can you share your config which failed for you?
-
-> Mark, I believe you are testing for this, have you seen above error?
-
-No, that looks like the original error that was being fixed.  The driver
-build tested OK for me at the time and currently in -next, though a tree
-which has the additional include but not the rename away from get_signal
-will obviously still have the issue.
-
-BTW for build coverage it'd be handy if AMBA could be enabled without
-having to be explicitly selected.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/1ef851cb/attachment.sig>
+I haven't had a code to register PCI device as IOMMU'able as
+ops->add_device() does for platform_devices. I'll add this comment.
