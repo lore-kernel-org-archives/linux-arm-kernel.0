@@ -1,27 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 26 Jun 2013 13:31:00 -0600
-Subject: [PATCH 02/11] ARM: tegra: add a flag for
- tegra_disable_clean_inv_dcache to do LoUIS or ALL
-In-Reply-To: <1372152475-18617-3-git-send-email-josephl@nvidia.com>
-References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
- <1372152475-18617-3-git-send-email-josephl@nvidia.com>
-Message-ID: <51CB4174.1050700@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 26 Jun 2013 21:31:22 +0200
+Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
+In-Reply-To: <51CAEA90.90200@ti.com>
+References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
+ <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
+ <20130625065811.GZ5523@atomide.com> <51CAEA90.90200@ti.com>
+Message-ID: <CACRpkdbKgEcfF67oO9HrczvDp4Po3Xt1hFajJ1vO8kEvsZH4jA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2013 03:27 AM, Joseph Lo wrote:
-> Adding a flag for tegra_disable_clean_inv_dcache to flush cache as LoUIS
-> or ALL. After this patch, the v7_flush_dcache_louis is used for CPU hotplug
-> and CPU suspend in CPU power down (e.g. CPU idle power-down mode) case. And
-> the v7_flush_dcache_all is used for CPU cluster power down (e.g. suspend to
-> LP2 mode).
+On Wed, Jun 26, 2013 at 3:20 PM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
 
-> diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+> The "Sleep" pinctrl state is optional - if "sleep" state isn't defined
+> then "Idle" pinctrl state will be used during suspend.
 
-> +/* flag of tegra_disable_clean_inv_dcache to do LoUIS or all */
-> +#define TEGRA_FLUSH_CACHE_LOUIS	0x10
-> +#define TEGRA_FLUSH_CACHE_ALL	0x20
+Why? If we have a clear cut semantic that "idle" is for runtime
+suspend, why should it be a fallback for suspend?
 
-Is there a reason those two values aren't just 0 and 1; they only seem
-to be used internally to switch between two function calls, and not
-passed to those calls or written to HW.
+You do realize that can just be turned around (as common suspend
+is more widely implemented than runtime suspend) so that we
+could say that if "idle" does not exist, we go to "sleep" in
+runtime suspend.
+
+> So, final list of default pnctrl states may be defined as "default",
+> "active", "idle", "sleep", "off":
+> - "active", "idle", "sleep": will be handled by omap_device core
+> - "default", "off": will be handled by driver itself (or Device core).
+
+Currently the pinctrl system combines what is called "default"
+and "active" into one, assuming that all devices shall come up
+in the active state.
+
+Also we haven't seen a device that need some "off" state that
+is different from "sleep".
+
+If you want to drive this state list home you have to give a
+*real world example*.
+
+I want to see a *real* example, for a device and it's pins,
+that define totally different things for these states, as a
+rationale.
+
+Else we are just defining states to make nice figures or mental
+maps and that is not helpful for drivers writers.
+
+Yours,
+Linus Walleij
