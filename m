@@ -1,98 +1,108 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 26 Jun 2013 17:58:46 +0200
-Subject: [PATCHv2 3/3] ARM: mxs: dt: Add Crystalfontz CFA-10058 device tree
-In-Reply-To: <1372261232-21051-4-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1372261232-21051-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1372261232-21051-4-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20130626155846.GH5803@lukather>
+From: daeinki@gmail.com (Inki Dae)
+Date: Thu, 27 Jun 2013 01:06:37 +0900
+Subject: [RFC PATCH] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <CAH3drwYqwddVuFRjDbYyvs+2hVWxsQDC1X8OCXMJURRty2087Q@mail.gmail.com>
+References: <20130617182127.GM2718@n2100.arm.linux.org.uk>
+ <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
+ <20130618084308.GU2718@n2100.arm.linux.org.uk>
+ <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
+ <1371548849.4276.6.camel@weser.hi.pengutronix.de>
+ <008601ce6cb0$2c8cec40$85a6c4c0$%dae@samsung.com>
+ <1371637326.4230.24.camel@weser.hi.pengutronix.de>
+ <00ae01ce6cd9$f4834630$dd89d290$%dae@samsung.com>
+ <1371645247.4230.41.camel@weser.hi.pengutronix.de>
+ <CAAQKjZNJD4HpnJQ7iE+Gez36066M6U0YQeUEdA0+UcSOKqeghg@mail.gmail.com>
+ <20130619182925.GL2718@n2100.arm.linux.org.uk>
+ <00da01ce6d81$76eb3d60$64c1b820$%dae@samsung.com>
+ <1371714427.4230.64.camel@weser.hi.pengutronix.de>
+ <00db01ce6d8f$a3c23dd0$eb46b970$%dae@samsung.com>
+ <1371723063.4114.12.camel@weser.hi.pengutronix.de>
+ <010801ce6da7$896affe0$9c40ffa0$%dae@samsung.com>
+ <1371804843.4114.49.camel@weser.hi.pengutronix.de>
+ <CAAQKjZOxOMuL3zh_yV7tU2LBcZ7oVryiKa+LgjTM5HLY+va8zQ@mail.gmail.com>
+ <1371817628.5882.13.camel@weser.hi.pengutronix.de>
+ <CAAQKjZOeskLB7n6FM+bnB8n7ecuQM5k6uANXJXo=xk979f9s9Q@mail.gmail.com>
+ <CAH3drwZVhs=odjFdB_Mf+K0JLT5NSSbz5mP9aOS=5fx-PVdzSg@mail.gmail.com>
+ <CAAQKjZNnJRddACHzD+VF=A8vJpt9SEy2ttnS3Kw0y3hexu8dnw@mail.gmail.com>
+ <CAF6AEGsBvZbcWDbX3FFtyDxFO1NqYNRLqHEUyP4qUD9wK+ARbA@mail.gmail.com>
+ <CAAQKjZNjjgG3hoKU2RLsG7w+B-2v7CpTT5hfnnTTJ2DgTEk0vA@mail.gmail.com>
+ <CAH3drwYqwddVuFRjDbYyvs+2hVWxsQDC1X8OCXMJURRty2087Q@mail.gmail.com>
+Message-ID: <CAAQKjZOWi1Fj4dJMp5aS3Fv24huRqvhobnjPC8wm9GwJ09oLQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+2013/6/25 Jerome Glisse <j.glisse@gmail.com>:
+> On Tue, Jun 25, 2013 at 10:17 AM, Inki Dae <daeinki@gmail.com> wrote:
+>> 2013/6/25 Rob Clark <robdclark@gmail.com>:
+>>> On Tue, Jun 25, 2013 at 5:09 AM, Inki Dae <daeinki@gmail.com> wrote:
+>>>>> that
+>>>>> should be the role of kernel memory management which of course needs
+>>>>> synchronization btw A and B. But in no case this should be done using
+>>>>> dma-buf. dma-buf is for sharing content btw different devices not
+>>>>> sharing resources.
+>>>>>
+>>>>
+>>>> hmm, is that true? And are you sure? Then how do you think about
+>>>> reservation? the reservation also uses dma-buf with same reason as long
+>>>> as I
+>>>> know: actually, we use reservation to use dma-buf. As you may know, a
+>>>> reservation object is allocated and initialized when a buffer object is
+>>>> exported to a dma buf.
+>>>
+>>> no, this is why the reservation object can be passed in when you
+>>> construction the dmabuf.
+>>
+>> Right, that way, we could use dma buf for buffer synchronization. I
+>> just wanted to ask for why Jerome said that "dma-buf is for sharing
+>> content btw different devices not sharing resources".
+>
+> From memory, the motivation of dma-buf was to done for few use case,
+> among them webcam capturing frame into a buffer and having gpu using
+> it directly without memcpy, or one big gpu rendering a scene into a
+> buffer that is then use by low power gpu for display ie it was done to
+> allow different device to operate on same data using same backing
+> memory.
+>
+> AFAICT you seem to want to use dma-buf to create scratch buffer, ie a
+> process needs to use X amount of memory for an operation, it can
+> release|free this memory once its done
+> and a process B can the use
+> this X memory for its own operation discarding content of process A.
+> presume that next frame would have the sequence repeat, process A do
+> something, then process B does its thing.
+> So to me it sounds like you
+> want to implement global scratch buffer using the dmabuf API and that
+> sounds bad to me.
+>
+> I know most closed driver have several pool of memory, long lived
+> object, short lived object and scratch space, then user space allocate
+> from one of this pool and there is synchronization done by driver
+> using driver specific API to reclaim memory.
+> Of course this work
+> nicely if you only talking about one logic block or at very least hw
+> that have one memory controller.
+>
+> Now if you are thinking of doing scratch buffer for several different
+> device and share the memory among then you need to be aware of
+> security implication, most obvious being that you don't want process B
+> being able to read process A scratch memory.
+> I know the argument about
+> it being graphic but one day this might become gpu code and it might
+> be able to insert jump to malicious gpu code.
+>
 
-On Wed, Jun 26, 2013 at 05:40:32PM +0200, Alexandre Belloni wrote:
-> From: Brian Lilly <brian@crystalfontz.com>
-> 
-> The CFA-10057 is a breakout board for the CFA-10036 that has Ethernet, USB and a
-> 5" LCD screen on it.
-> 
-> Signed-off-by: Brian Lilly <brian@crystalfontz.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/Makefile           |   1 +
->  arch/arm/boot/dts/imx28-cfa10058.dts | 158 +++++++++++++++++++++++++++++++++++
->  2 files changed, 159 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx28-cfa10058.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index d494f37..ddd6f32 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -133,6 +133,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
->  	imx28-cfa10055.dtb \
->  	imx28-cfa10056.dtb \
->  	imx28-cfa10057.dtb \
-> +	imx28-cfa10058.dtb \
->  	imx28-evk.dtb \
->  	imx28-m28evk.dtb \
->  	imx28-sps1.dtb \
-> diff --git a/arch/arm/boot/dts/imx28-cfa10058.dts b/arch/arm/boot/dts/imx28-cfa10058.dts
-> new file mode 100644
-> index 0000000..99a21ac
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx28-cfa10058.dts
-> @@ -0,0 +1,158 @@
-> +/*
-> + * Copyright 2013 Crystalfontz America, Inc.
-> + * Copyright 2013 Free Electrons
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/*
-> + * The CFA-10058 is an expansion board for the CFA-10036 module, thus we
-> + * need to include the CFA-10036 DTS.
-> + */
-> +/include/ "imx28-cfa10036.dts"
-> +
-> +/ {
-> +	model = "Crystalfontz CFA-10058 Board";
-> +	compatible = "crystalfontz,cfa10058", "crystalfontz,cfa10036", "fsl,imx28";
-> +
-> +	apb at 80000000 {
-> +		apbh at 80000000 {
-> +			pinctrl at 80018000 {
-> +				pinctrl-names = "default", "default";
-> +				pinctrl-1 = <&hog_pins_cfa10058
-> +					&hog_pins_cfa10058_pullup>;
-
-It doesn't compile, this node doesn't exist anymore.
-
-> +				hog_pins_cfa10058: hog-10058 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						0x0073 /* MX28_PAD_GPMI_D7__GPIO_0_7 */
-> +						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
-
-Again, we should probably split out these two pins into two different
-nodes that would be grabed by their respective drivers.
+If you think so, it seems like that there is *definitely* your
+misunderstanding. My approach is similar to dma fence: it guarantees
+that a DMA cannot access a buffer while other DMA is accessing the
+buffer. I guess now some gpu drivers in mainline have been using
+specific mechanism for it. And when it comes to the portion you
+commented, please know that I just introduced user side mechanism for
+buffer sychronization between CPU and CPU, and CPU and DMA in
+addition; not implemented but just planned.
 
 Thanks,
-Maxime
+Inki Dae
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/6defb639/attachment-0001.sig>
+> Cheers,
+> Jerome
