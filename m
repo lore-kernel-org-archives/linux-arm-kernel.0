@@ -1,33 +1,63 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 26 Jun 2013 17:41:38 +0000 (UTC)
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <alpine.DEB.2.02.1306261641040.6135@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83ECC9548@DBDE04.ent.ti.com>
- <alpine.DEB.2.02.1306261641040.6135@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1306261741010.6135@utopia.booyaka.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 26 Jun 2013 18:42:31 +0100
+Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
+ MMU binding
+In-Reply-To: <CALRxmdCycFK2wW=C4aU79mudSaT+2vU8nzXxepdstubg+YSdQg@mail.gmail.com>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-8-git-send-email-will.deacon@arm.com>
+ <CALRxmdBxFWoRKv+bUu8VEwNNcAJUej9jM2V8N0rrqrr_Vpe8fQ@mail.gmail.com>
+ <20130626133941.GD7417@mudshark.cambridge.arm.com>
+ <CALRxmdCycFK2wW=C4aU79mudSaT+2vU8nzXxepdstubg+YSdQg@mail.gmail.com>
+Message-ID: <20130626174231.GH10333@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jun 2013, Paul Walmsley wrote:
-
-> On Wed, 26 Jun 2013, Hiremath, Vaibhav wrote:
+On Wed, Jun 26, 2013 at 05:19:48PM +0100, Stuart Yoder wrote:
+> On Wed, Jun 26, 2013 at 8:39 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > I'd suggest looking at the driver I posted to get a gist of how the parsing
+> > code works, but suffice to say that we describe both the number of
+> > interrupts and the actual interrupt numbers here.
 > 
-> > That?s not quite true, I remember going through your log in detail multiple
-> > Times.
-> > 
-> > The issue is, for appended DTB you must enable 2 config options,
-> > 
-> > CONFIG_ARM_APPENDED_DTB = y
-> > CONFIG_ARM_ATAG_DTB_COMPAT = y
+> I understand that the number of interrupts and actual interrupt numbers
+> are described here, but was referring to the _meaning_ of the interrupt
+> numbers.   A binding for a device with 2 interrupts, a TX and RX would
+> normally identify which interrupt specifier is for TX and which is for RX.
 > 
-> Maybe you should look again.  Both of these options are set in the 
-> am33xx_only Kconfig which is used here for the Beaglebone-White boot.
+> Based on your code, the 2 global interrupts seem to be the secure
+> and non-secure fault interrupts...which your driver does not differentiate.
+> However, the device tree is describing hardware and  you can't assume
+> that all drivers don't care which is which.
 
-(and I do appreciate the attention you brought to looking into this issue 
-a few months ago)
+Currently, the driver only works when Linux is running as non-secure, which is
+becoming more and more common since it is required to be able to make use of
+hyp mode.
 
+There are actually two global interrupts for SMMUv1 and SMMUv2, which
+correspond to configuration faults and `other' global faults.
 
-- Paul
+> If there are other interrupts added in the future like the performance interrupt
+> the definition could be expanded to add that.
+
+PMU interrupts would like have a separate property, since the PMU would be
+driven by a largely independent piece of code.
+
+> But a question.... why do you need the #global-interrupts property
+> at all?   Is the number of "global" interrupts really implementation dependent?
+> Does't a specific compatible string imply the number of interrupts that there
+> actually are?
+
+Integrators have a nasty habit of ORing interrupts together or not wiring
+them at all and I don't want to be caught out by that.
+
+> > What bus hierarchy? If I have two SMMU device nodes, how do I infer any
+> > topological information without an explicit linkage?
+> 
+> I really don't know anything about SMMU chaining, but am inferring what
+> this might look like.   Does the "child" SMMU look just like another
+> mmu-master to the parent?   If so, why not just use the mmu-masters
+> property to establish the relationship.
+
+No, the child SMMU does not look like a master. It can remaster upstream
+StreamIDs, for example.
+
+Will
