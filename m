@@ -1,60 +1,81 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 26 Jun 2013 12:10:29 +0200 (CEST)
-Subject: DMA channels (was Re: [PATCH 2/2] ARM: shmobile: sdhi: remove DMA
- hardware dependencies)
-In-Reply-To: <201306192351.50804.arnd@arndb.de>
-References: <1370008605-3745603-1-git-send-email-arnd@arndb.de>
- <201306071806.16031.arnd@arndb.de>
- <Pine.LNX.4.64.1306192132290.12502@axis700.grange>
- <201306192351.50804.arnd@arndb.de>
-Message-ID: <Pine.LNX.4.64.1306261024280.8856@axis700.grange>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 26 Jun 2013 11:06:47 +0100
+Subject: [PATCH v4 3/3] Documentation: Add documentation for APM X-Gene
+ clock binding
+In-Reply-To: <1372113263-18082-4-git-send-email-lho@apm.com>
+References: <1372113263-18082-1-git-send-email-lho@apm.com>
+ <1372113263-18082-2-git-send-email-lho@apm.com>
+ <1372113263-18082-3-git-send-email-lho@apm.com>
+ <1372113263-18082-4-git-send-email-lho@apm.com>
+Message-ID: <20130626100647.GB10833@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+Hi,
 
-I think it would be good to come to a certain conclusion regarding the 
-current dmaengine channel selection and configuration API and its possibly 
-desired amendments.
+I'd recommend on your next posting that you Cc devicetree-discuss
+(devicetree-discuss at lists.ozlabs.org), as bindings should go there for
+review.
 
-On Wed, 19 Jun 2013, Arnd Bergmann wrote:
+On Mon, Jun 24, 2013 at 11:34:23PM +0100, Loc Ho wrote:
+> Documentation: Add documentation for APM X-Gene clock binding with PLL and
+> device clocks.
+> 
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+>  Documentation/devicetree/bindings/clock/xgene.txt |  109 +++++++++++++++++++++
+>  1 files changed, 109 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/xgene.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/xgene.txt b/Documentation/devicetree/bindings/clock/xgene.txt
+> new file mode 100644
+> index 0000000..cda90f1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/xgene.txt
+> @@ -0,0 +1,109 @@
+> +Device Tree Clock bindings for APM X-Gene
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +Required properties:
+> +- compatible : shall be one of the following:
+> +	"apm,xgene-socpll-clock" - for a X-Gene SoC PLL clock
+> +	"apm,xgene-pcppll-clock" - for a X-Gene PCP PLL clock
+> +	"apm,xgene-device-clock" - for a X-Gene device clock
+> +
+> +Required properties for SoC or PCP PLL clocks:
+> +- reg : shall be the physical PLL register address for the pll clock.
+> +- clocks : shall be the input parent clock phandle for the clock. This should
+> +	be the reference clock.
+> +- #clock-cells : shall be set to 1.
+> +- clock-output-names : shall be the name of the PLL referenced by derive
+> +  clock.
+> +Optional properties for PLL clocks:
+> +- clock-names : shall be the name of the PLL. If missing, use the device name.
+> +
+> +Required properties for device clocks:
+> +- reg : shall be the physical CSR reset address base and/or physical CSR 
+> +        divider address base if one existed.
+> +- reg-names : shall be string describing the reg resource. Supported
+> +              register names are "csr-reg" and "div-reg" which default
+> +              to "csr-reg" if not specified.
 
-[snip]
+This is somewhat difficult to read. How about:
 
-> The problem with this is that on a lot of dma engines you have one channel
-> per slave (in particular with virt-dma.c), so the slave-id has to be
-> part of the filter data. Since the slave driver cannot know what kind
-> of DMA engine it is connected to, it has to assume that the slave-id
-> is inherent to the channel an cannot change.
-> Also, the DT binding is built around the idea that you identify the
-> channel or request line with the specifier in whichever form the
-> dma engine requires, and there is no general way for the slave driver
-> to find out a slave id. Setting it with dma_slave_config is inherently
-> nonportable, and we should stop doing that.
+- reg : shall be a list of address and length pairs describing the CSR
+	reset and/or the divider. Either may be omitted, but at least
+	one must be present.
+- reg-names : shall be a string list describing the reg resource. This
+              may include "csr-reg" and/or "div-reg". If this property
+	      is not present, the reg property is assumed to describe
+	      only "csr-reg".
 
-Don't you think, that this situation, where without DT a filter function 
-has to be used, which has to be provided by the platform and is just a 
-kind of a platform callback; and with DT channels are selected and 
-configured by a reference to suitable DMAC instances and a hardware- 
-specific data set is suboptimal? Wouldn't it be better to unify it?
+Otherwise, the binding looks good to me.
 
-If yes, the unification would go in the direction of DT compatibility, 
-i.e. dropping filter functions and just directly referencing required 
-DMACs and using DMAC-specific configuration? Wouldn't a channel requesting 
-API, similar to that for requesting clocks, pinmux settings be a better 
-option, than the current filtering procedure? Something like
-
-	dma_request_slave_channel(dev, "tx", "dmac0", config);
-
-in a simple case of just one suitable DMAC, or a NULL if DMACs should be 
-able to figure out themselves, whether they can serve this slave, or 
-something like "dmamux0" if there is a multiplexer, for which a driver has 
-to be available, and in which case "config" would be that multiplexer 
-driver's configuration?
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Thanks,
+Mark.
