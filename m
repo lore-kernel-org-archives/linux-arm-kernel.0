@@ -1,31 +1,102 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 26 Jun 2013 15:57:14 -0700
-Subject: [PATCH] ARM: Make multi_v7_defconfig usable on hardware
-In-Reply-To: <CAOesGMg2du8PsOGy1kdePT4vMsWie1N8hmjCxRqr-LS6RAC07g@mail.gmail.com>
-References: <1372210565-22962-1-git-send-email-olof@lixom.net>
- <CAOesGMg2du8PsOGy1kdePT4vMsWie1N8hmjCxRqr-LS6RAC07g@mail.gmail.com>
-Message-ID: <20130626225714.GB911@quad.lixom.net>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 27 Jun 2013 08:48:07 +0900
+Subject: [PATCH] ARM: shmobile: Update romImage to relocate appended DTB
+Message-ID: <20130626234807.11425.24645.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 06:38:21PM -0700, Olof Johansson wrote:
-> On Tue, Jun 25, 2013 at 6:36 PM, Olof Johansson <olof@lixom.net> wrote:
-> 
-> > +CONFIG_DEBUG_LL=y
-> > +CONFIG_DEBUG_OMAP2PLUS_UART=y
-> > +CONFIG_DEBUG_OMAP4UART3=y
-> 
-> Clearly not supposed to be there for the posted version, my bad --
-> will take those out before committing.
-> 
-> (this will go on top of next/late, btw).
+From: Magnus Damm <damm@opensource.se>
 
-Actually, this doesn't go nicely on top of any branch right now since
-multi_v7_defconfig is modified in several of the branches.
+Instead of relying of MACH_TYPE for board identification,
+update the romImage code to relocate an appended DTB to
+the beginning of RAM. This implementation is independent
+of ARM_APPENDED_DTB, this because it is necessary to copy
+the DTB to memory so the kernel can access it.
 
-So, I've applied this on top of for-next (which is unorthodox and unusual), and
-we'll move it over to what will likely be the first, pre-rc1 fixes pull request
-that we send up, once all the other contents has been merged.
+Without this patch Mackerel does not boot via the Mask ROM
+over USB (r_usb_boot) - this since non-DT boot was broken
+ages ago in commit:
 
+0ce53cd ARM: mach-shmobile: Use DT_MACHINE for mackerel
 
--Olof
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Written against renesas-next-20130620
+
+ arch/arm/boot/compressed/head-shmobile.S    |   43 ++++++++++++++++++++++++---
+ arch/arm/mach-shmobile/include/mach/zboot.h |    2 -
+ 2 files changed, 39 insertions(+), 6 deletions(-)
+
+--- 0001/arch/arm/boot/compressed/head-shmobile.S
++++ work/arch/arm/boot/compressed/head-shmobile.S	2013-06-26 13:27:39.000000000 +0900
+@@ -55,12 +55,47 @@ __tmp_stack:
+ __continue:
+ #endif /* CONFIG_ZBOOT_ROM_MMC || CONFIG_ZBOOT_ROM_SH_MOBILE_SDHI */
+ 
+-	/* Set board ID necessary for boot */
+-	ldr	r7, 1f				@ Set machine type register
+-	mov	r8, #0				@ pass null pointer as atag
++	adr	r0, dtb_info
++	ldmia	r0, {r1, r3, r4, r5, r7}
++
++	sub	r0, r0, r1		@ calculate the delta offset
++	add	r5, r5, r0		@ _edata
++
++	ldr	lr, [r5, #0]		@ check if valid DTB is present
++	cmp	lr, r3
++	bne	0f
++
++	add	r9, r7, #31		@ rounded up to a multiple
++	bic	r9, r9, #31		@ ... of 32 bytes
++
++	add	r6, r9, r5		@ copy from _edata
++	add	r9, r9, r4		@ to MEMORY_START
++
++1:	ldmdb	r6!, {r0 - r3, r10 - r12, lr}
++	cmp	r6, r5
++	stmdb	r9!, {r0 - r3, r10 - r12, lr}
++	bhi	1b
++
++	/* Success: Zero board ID, pointer to start of memory for atag/dtb */
++	mov	r7, #0
++	mov	r8, r4
+ 	b	2f
+ 
+-1 :	.long MACH_TYPE
++	.align	2
++dtb_info:
++	.word	dtb_info
++#ifndef __ARMEB__
++	.word	0xedfe0dd0		@ sig is 0xd00dfeed big endian
++#else
++	.word	0xd00dfeed
++#endif
++	.word	MEMORY_START
++	.word	_edata
++	.word	0x4000			@ maximum DTB size
++0:
++	/* Failure: Zero board ID, NULL atag/dtb */
++	mov 	r7, #0
++	mov	r8, #0			@ pass null pointer as atag
+ 2 :
+ 
+ #endif /* CONFIG_ZBOOT_ROM */
+--- 0001/arch/arm/mach-shmobile/include/mach/zboot.h
++++ work/arch/arm/mach-shmobile/include/mach/zboot.h	2013-06-26 13:23:03.000000000 +0900
+@@ -1,7 +1,6 @@
+ #ifndef ZBOOT_H
+ #define ZBOOT_H
+ 
+-#include <asm/mach-types.h>
+ #include <mach/zboot_macros.h>
+ 
+ /**************************************************
+@@ -11,7 +10,6 @@
+  **************************************************/
+ 
+ #ifdef CONFIG_MACH_MACKEREL
+-#define MACH_TYPE	MACH_TYPE_MACKEREL
+ #define MEMORY_START	0x40000000
+ #include "mach/head-mackerel.txt"
+ #else
