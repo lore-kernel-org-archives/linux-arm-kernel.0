@@ -1,68 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Jun 2013 18:16:49 +0100
-Subject: ARM pagetable setting in Linux
-In-Reply-To: <35FD53F367049845BC99AC72306C23D19441BF5863@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D19441BF5863@CNBJMBX05.corpusers.net>
-Message-ID: <20130626171649.GG10333@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Jun 2013 18:18:49 +0100
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <CAKMK7uEbkKWFcxu6zs+0P26S9aJrE5v2+b6Jzg7AhORsAg4+9w@mail.gmail.com>
+References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
+ <1371467722-665-1-git-send-email-inki.dae@samsung.com>
+ <51BEF458.4090606@canonical.com>
+ <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
+ <20130617133109.GG2718@n2100.arm.linux.org.uk>
+ <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
+ <20130617154237.GJ2718@n2100.arm.linux.org.uk>
+ <CAKMK7uECS=eqNB-Ud6s=NvdYMPfxgJaGPbUx9hANfP6kb02j_w@mail.gmail.com>
+ <20130618104613.GX2718@n2100.arm.linux.org.uk>
+ <CAKMK7uEbkKWFcxu6zs+0P26S9aJrE5v2+b6Jzg7AhORsAg4+9w@mail.gmail.com>
+Message-ID: <20130626171849.GG2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding the ARM list -- please try and remember to do that in future]
+On Tue, Jun 25, 2013 at 11:23:21AM +0200, Daniel Vetter wrote:
+> Just a quick question on your assertion that we need all four
+> functions: Since we already have begin/end_cpu_access functions
+> (intention here was to allow the dma_buf exporter to ensure the memory
+> is pinned, e.g. for swapable gem objects, but also allow cpu cache
+> flushing if required) do we still need the sync_sg_for_cpu?
 
-On Wed, Jun 26, 2013 at 03:41:40AM +0100, Wang, Yalin wrote:
-> Hi  Will,
+Possibly not, but let's first look at that kind of scenario:
 
-Hello,
+- It attaches to a dma_buf using dma_buf_attach()
+- it maps the DMA buffer using dma_buf_map_attachment().  This does
+  dma_map_sg().  This possibly incurs a cache flush depending on the
+  coherence properties of the architecture.
+- it then calls dma_buf_begin_cpu_access().  This presumably does a
+  dma_sync_sg_for_cpu().  This possibly incurs another cache flush
+  depending on the coherence properties of the architecture.
+- then, presumably, it calls dma_buf_kmap_atomic() or dma_buf_kmap()
+  to gain a pointer to the buffer.
+- at some point, dma_buf_kunmap_atomic() or dma_buf_kunmap() gets
+  called.  On certain cache architectures, kunmap_atomic() results in
+  a cache flush.
+- dma_buf_end_cpu_access() gets called, calling through presumably to
+  dma_sync_sg_for_device().  Possibly incurs a cache flush.
+- dma_buf_unmap_attachment()... another cache flush.
 
-> I have a question about  arm pagetable setting in Linux .
-> 
-> From armV6,  there is TTBR0 and TTBR1  translation base address registers  in mmu .
-> But I  found linux only use TTBR0 for translation base address ,
-> Could we use TTBR0 and TTBR1 to split user task and kernel pagetables (swapper_pg_dir)? 
-> 
-> But I found this need set TTBCR.N   ,
-> If PAGE_OFFSET==0xc0000000  ,   set TTBCR.N=0x2 ,
-> Will not work , because   only ensure 0--0x00FFFFFF  MVA use TTBCR0 
-> And other  MVA?will use TTBCR1 ,
-> But if we set PAGE_OFFSET==0x80000000  (2GB split )  ,
-> And set  TTBCR.N=0x1 ,
-> This will make sure user task MVA use TTBCR0 and kernel  MVA 
-> Use TTBCR1 , this  will make some improvement for the system .
-> 
-> 1. Because we don?t need copy kernel first ?level pagetables into every 
-> User task?s pagetables and flush tlb (for example fork() a new process).
+Out of those all of those five cache flushes, the only cache flush which is
+really necessary out of all those would be the one in kunmap_atomic().  The
+rest of them are completely irrelevant to the CPU access provided that there
+is no DMA access by the device.  What's more is that you can't say "well,
+the architecture should optimize them!" to which I'd respond "how does the
+architecture know at dma_map_sg() time that there isn't going to be a
+DMA access?"
 
-Well, you still need the TLB maintenance for setting up CoW, so this win is
-probably not very big.
+Now, if we say that it's not necessary to call dma_buf_map_attachment()..
+dma_buf_unmap_attachment() around the calls to dma_buf_begin_cpu_access()..
+dma_buf_end_cpu_access(), then how does dma_buf_begin_cpu_access() know
+whether the DMA buffer has been dma_map_sg()'d?  It's invalid to call
+dma_sync_sg_for_cpu() on a buffer which has not been dma_map_sg()'d.
+Bear in mind that dma_buf_begin_cpu_access() is passed only the
+struct dma_buf and not the struct dma_buf_attachment *attach, there's
+no hope for the begin_cpu_access() method to know which user of the
+dma_buf is asking for this call, so you can't track any state there.
 
-> 2. And don?t need handle kernel page fault because that user task?s kernel 
-> Pagetable when it is not set up , need copy again( for example vmalloc()  ioremap()  kmap()  will change 
-> Kernel pagetables and need update to every task pagetables ) .
-
-Is that really a fastpath?
-
-> 3. We  even can only allocate 8KB first level pagetables for user task to save 
-> Memorys .
-
-That would be a nice gain, but there are a number of factors here:
-
-	1. Pre-ARMv6 only have one ttbr, so you'd end up needing to support
-	   both configurations in the same kernel source.
-
-	2. The module area lives below PAGE_OFFSET, so you still have to
-	   deal with that correctly (mitigating some of your earlier points)
-
-	3. PAGE_OFFSET is not fixed at 2GB, so you constrain your use-case
-	   even further.
-
-	4. We do actually use TTBR1 to hold an identity mapping at the
-	   moment. This could probably be fixed, but would require some
-	   thought.
-
-There's undoubtedly other problems that haven't immediately come to me but,
-all in all, I don't think this is a significant enough win to justify the
-effort and maintenance headache.
-
-Cheers,
-
-Will
+Thank you for pointing this out, I'm less impressed with this dma_buf
+API now that I've looked deeper at those two interfaces, and even more
+convinced it needs to be redesigned! :P
