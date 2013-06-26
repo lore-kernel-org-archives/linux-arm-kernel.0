@@ -1,43 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Jun 2013 20:22:10 +0200
-Subject: SCU registers mapping for CA9/CA5 cores
-In-Reply-To: <20130624090640.GZ2718@n2100.arm.linux.org.uk>
-References: <CADApbei3QOCQRmo_oYZ_XiUVupq+4uUs7WNe6f7k_OG0LHB3=w@mail.gmail.com>
- <201306211129.22625.arnd@arndb.de>
- <20130624090640.GZ2718@n2100.arm.linux.org.uk>
-Message-ID: <201306262022.11103.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 26 Jun 2013 12:24:09 -0600
+Subject: [PATCH 7/8] ARM: tegra: move cpuidle drivers to drivers/cpuidle/
+In-Reply-To: <1372241747-21083-8-git-send-email-b.zolnierkie@samsung.com>
+References: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
+ <1372241747-21083-8-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <51CB31C9.7050505@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 June 2013, Russell King - ARM Linux wrote:
-> On Fri, Jun 21, 2013 at 11:29:22AM +0200, Arnd Bergmann wrote:
-> > I think we could actually move everything between VMALLOC_END and
-> > ffff0000 into a larger fixmap. This would be a substantial change,
-> > but it would give us more vmalloc space for most configurations
-> > and more flexibility with what else we could put into fixmap.
-> 
-> ... at the expense of:
-> (a) having to look up the PTE table pointer every time we want to add or
-> remove a mapping,
+On 06/26/2013 04:15 AM, Bartlomiej Zolnierkiewicz wrote:
+> Compile tested only.
 
-Is that a frequent operation? I guess it's not important given the
-argument below.
+That's not a good patch description; it's more something that should be
+below the --- line.
 
-> (b) wasting the top 15 pages from being used.
-> 
-> Also, the placement of some of these pages matters especially for the
-> VIPT aliasing caches, where cache colouring becomes important.  So an
-> enum in fixmap isn't going to work for those.
+This would be a lot easier to review if "-M" had been passed to "git
+format-patch" so that the move was actually represented as a move in the
+patch.
 
-x86 deals with alignment through some extra tricks, it's certainly doable
-but I agree it's not improving readability if you do that.
+This patch would need to move at least part of
+arch/arm/mach-tegra/cpuidle.h to some common location, since core code
+that's left in arch/arm/mach-tegra ends up calling functions in the
+moved files to initialize the cpuidle driver.
 
-> Really, the value to such a change is very low and is really just churn
-> for churn's sake.  "Oh we can do something different!"  No.
+You should probably move arch/arm/mach-tegra/cpuidle.c too.
 
-Ok, fair enough.
-
-I also saw the patch for early_ioremap, which would basically require
-doing something like this. I'll comment on that email separately.
-
-	Arnd
+Does it make sense to introduce a new Kconfig option into
+drivers/cpuidle/Kconfig, so that cpuidle-tegra*.c isn't compiled if
+ARCH_TEGRA is enabled, but rather if something more like CPU_IDLE_TEGRA
+is enabled?
