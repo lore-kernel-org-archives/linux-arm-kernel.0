@@ -1,52 +1,48 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 26 Jun 2013 12:28:10 +0300
-Subject: [PATCH 07/23] ARM: dt: tegra114: Add "nvidia,memory-clients"
-Message-ID: <1372238906-9346-8-git-send-email-hdoyu@nvidia.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 26 Jun 2013 11:27:35 +0200
+Subject: [PATCH] ARM: ARMv7-M: Fix name of NVIC handler function
+Message-ID: <1372238855-26112-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "nvidia,memory-clients" to identify which swgroup ID a device
-belongs to.
+The name changed in response to review comments for the nvic irqchip
+driver when the original name was already accepted into Russell King's
+tree.
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/boot/dts/tegra114.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+Hello,
 
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 715b5d6..980a3b1 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -1,5 +1,6 @@
- #include <dt-bindings/clock/tegra114-car.h>
- #include <dt-bindings/gpio/tegra-gpio.h>
-+#include <dt-bindings/iommu/tegra-swgid.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
+this patch was part of the irqchip patch v4, but I split it out for
+being easier to merge in v5. It applies on top of Russell's devel-stable
+branch.
+
+Russell: I put it on top of my for-next branch (
+
+	git://git.pengutronix.de/git/ukl/linux.git for-next
+
+) that you merged into your devel-stable some time ago. So assuming
+you're fine with the patch, you can just repull or I can put it into
+your patch tracker if you prefer it. In the latter case please tell me.
+
+Best regards
+Uwe
+
+ arch/arm/kernel/entry-v7m.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
+index e00621f..52b2643 100644
+--- a/arch/arm/kernel/entry-v7m.S
++++ b/arch/arm/kernel/entry-v7m.S
+@@ -49,7 +49,7 @@ __irq_entry:
+ 	mov	r1, sp
+ 	stmdb	sp!, {lr}
+ 	@ routine called with r0 = irq number, r1 = struct pt_regs *
+-	bl	nvic_do_IRQ
++	bl	nvic_handle_irq
  
- #include "skeleton.dtsi"
-@@ -411,6 +412,7 @@
- 		reg = <0x78000200 0x200>;
- 		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car TEGRA114_CLK_SDMMC2>;
-+		nvidia,memory-clients = <SWGID_PPCS>;
- 		status = "disable";
- 	};
- 
-@@ -419,6 +421,7 @@
- 		reg = <0x78000400 0x200>;
- 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car TEGRA114_CLK_SDMMC3>;
-+		nvidia,memory-clients = <SWGID_PPCS>;
- 		status = "disable";
- 	};
- 
-@@ -427,6 +430,7 @@
- 		reg = <0x78000600 0x200>;
- 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car TEGRA114_CLK_SDMMC4>;
-+		nvidia,memory-clients = <SWGID_PPCS>;
- 		status = "disable";
- 	};
- 
+ 	pop	{lr}
+ 	@
 -- 
-1.8.1.5
+1.8.3.1
