@@ -1,55 +1,55 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 26 Jun 2013 12:24:29 +0200
-Subject: [PATCH 02/23] ARM: dt: tegra30: iommu: Add "nvidia,swgroups"
-In-Reply-To: <1372238906-9346-3-git-send-email-hdoyu@nvidia.com>
-References: <1372238906-9346-3-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20130626102428.GF27083@manwe>
+Date: Wed, 26 Jun 2013 12:18:17 +0200
+Subject: [PATCH 03/23] ARM: dt: tegra30: iommu: Add "nvidia,memory-clients"
+In-Reply-To: <1372238906-9346-4-git-send-email-hdoyu@nvidia.com>
+References: <1372238906-9346-4-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20130626101816.GE27083@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 12:28:05PM +0300, Hiroshi Doyu wrote:
-> This is a bitmap that indicates which HardWare Accelerators(HWA) are
-> supported on Tegra30 SoC.
-> 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
->  Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt | 6 +++++-
->  arch/arm/boot/dts/tegra30.dtsi                                  | 1 +
->  2 files changed, 6 insertions(+), 1 deletion(-)
-> 
+On Wed, Jun 26, 2013 at 12:28:06PM +0300, Hiroshi Doyu wrote:
+[...]
 > diff --git a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
-> index 89fb543..6be51f6 100644
-> --- a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
-> +++ b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
-> @@ -8,14 +8,18 @@ Required properties:
->  - nvidia,#asids : # of ASIDs
->  - dma-window : IOVA start address and length.
->  - nvidia,ahb : phandle to the ahb bus connected to SMMU.
-> +- nvidia,swgroups: A bit map of supported HardWare Accelerators(HWA).
+[...]
+> @@ -23,3 +24,13 @@ Example:
+>  		nvidia,swgroups = <0x00000000 0x000779ff>;
+>  		nvidia,ahb = <&ahb>;
+>  	};
+> +
+> +	host1x {
+> +		compatible = "nvidia,tegra30-host1x", "simple-bus";
+> +		nvidia,memory-clients = <SWGID_HC>;
 
-Nit: you use the spelling "bitmap" in the subject but "bit map" here.
-Both are correct but perhaps we should stick to one.
+And this could use the SWGID(HC) to match up with how GPIOs are
+referenced in the DTS files. Though I see that the clocks don't use a
+parameterized version either, so things are inconsistent anyway. But if
+SWGID() isn't used then maybe it shouldn't be provided by the header
+file in the first place.
 
-> +  Each bit represents one sgroup. The assignments may be found in header
+Oh, one other thing: both GPIO and CAR use the TEGRA_ prefix, perhaps
+this should use it as well?
 
-Nit: "swgroup"
+> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+[...]
+> index 14ec3f9..3fcee3f 100644
+> --- a/arch/arm/boot/dts/tegra30.dtsi
+> +++ b/arch/arm/boot/dts/tegra30.dtsi
+> @@ -1,5 +1,6 @@
+>  #include <dt-bindings/clock/tegra30-car.h>
+>  #include <dt-bindings/gpio/tegra-gpio.h>
+> +#include <dt-bindings/iommu/tegra-swgid.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
 
-> -	smmu {
-> +	iommu {
+Nit: these includes seem to be ordered alphabetically; if so then iommu
+should go below interrupt-controller.
 
-This change isn't really related, but given that the tegra30.dtsi
-already uses it I guess we can keep it as part of this patch.
+> @@ -286,6 +300,7 @@
+>  		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+>  		nvidia,dma-request-selector = <&apbdma 20>;
+>  		clocks = <&tegra_car TEGRA30_CLK_UARTE>;
+> +		nvidia,memory-clients = <14>;
 
->  		compatible = "nvidia,tegra30-smmu";
->  		reg = <0x7000f010 0x02c
->  		       0x7000f1f0 0x010
->  		       0x7000f228 0x05c>;
->  		nvidia,#asids = <4>;		/* # of ASIDs */
->  		dma-window = <0 0x40000000>;	/* IOVA start & length */
-> +		nvidia,swgroups = <0x00000000 0x000779ff>;
-
-Perhaps this should be a symbolic name too? Perhaps something like
-TEGRA30_SWGID_ALL?
+SWGID_PPCS?
 
 Thierry
 -------------- next part --------------
@@ -58,4 +58,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/09d59650/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/d449a65f/attachment-0001.sig>
