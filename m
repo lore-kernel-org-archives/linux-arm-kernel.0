@@ -1,41 +1,51 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 26 Jun 2013 14:24:11 +0100
-Subject: [PATCH 4/4] init: efi: arm: enable (U)EFI runtime services on arm
-In-Reply-To: <1372183863-11333-5-git-send-email-leif.lindholm@linaro.org>
-References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
- <1372183863-11333-5-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <CACxGe6tRBQdxN=5SrO7ES0N3R+nPeVpJDkBx5WHtKQSxPHb01Q@mail.gmail.com>
+From: trini@ti.com (Tom Rini)
+Date: Wed, 26 Jun 2013 09:26:11 -0400
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <51CAEB33.5010101@ti.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+ <51CAEB33.5010101@ti.com>
+Message-ID: <51CAEBF3.1010507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 7:11 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> Since the efi_set_virtual_address_map call has strict init ordering
-> requirements, add an explicit hook in the required place.
->
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> ---
->  init/main.c |    6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/init/main.c b/init/main.c
-> index 9484f4b..c61706e 100644
-> --- a/init/main.c
-> +++ b/init/main.c
-> @@ -872,6 +872,12 @@ static noinline void __init kernel_init_freeable(void)
->         smp_prepare_cpus(setup_max_cpus);
->
->         do_pre_smp_initcalls();
-> +
-> +#ifdef CONFIG_ARM
-> +       if (efi_enabled(EFI_RUNTIME_SERVICES))
-> +               efi_enter_virtual_mode();
-> +#endif
+On 06/26/2013 09:22 AM, Rajendra Nayak wrote:
+>>>
+>>> Just to confirm, my problems with mainline were with appended DTB also.
+>>> Separate DTB and zImage work fine (at least using u-boot v2013.04.)
+>>>
+>>> That being said, appended DTB should still work, so there's a bug
+>>> hiding
+>>> someplace that needs to be found fixed.
+>>>
+>>> Can you guys update your tests to test appended DTB also?
+>>>
+>>
+>> What is missing here is, 
+>>
+>> CONFIG_ARM_APPENDED_DTB = y
+>> CONFIG_ARM_ATAG_DTB_COMPAT = y
+>>
+>>
+>> And for the code which is required in case of appended DTB, please refer to the code
+>> "arch/arm/boot/compressed/head.S"
+>>
+>>
+>> Please __NOTE__ that these options are not enabled in default omap2plus_defconfig.
+> 
+> Paul/Kevin,
+> 
+> Apart from confirming if you are manually enabling these options, can you also give some
+> details on how you append the dtb to the kernel image?
 
-Nitpick:  Alternately you could use:
+Yes, please confirm that they're being set.  I've managed to reproduce
+the failure, with them off, and enabling them brings things back to life.
 
-        if (IS_ENABLED(CONFIG_ARM) && efi_enabled(EFI_RUNTIME_SERVICES))
-                efi_enter_virtual_mode();
+Pending rmk's reply in another part of the thread, I'll submit a patch
+to enable the above in omap2plus_defconfig.
 
-That would get away from the #ifdef
-
-g.
+-- 
+Tom
