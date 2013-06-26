@@ -1,35 +1,55 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Jun 2013 17:53:06 +0900
-Subject: [PATCH 3/4] ARM: shmobile: r8a7790: don't use external clock for SCIFs
-In-Reply-To: <1372236787-23342-1-git-send-email-horms+renesas@verge.net.au>
-References: <1372236787-23342-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1372236787-23342-4-git-send-email-horms+renesas@verge.net.au>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 26 Jun 2013 09:55:54 +0200
+Subject: [PATCH 4/5] ARM: AT91: dt: add at91rm9200 PQFP package version
+In-Reply-To: <1371472710-18535-4-git-send-email-plagnioj@jcrosoft.com>
+References: <20130617123645.GA21034@game.jcrosoft.org>
+ <1371472710-18535-1-git-send-email-plagnioj@jcrosoft.com>
+ <1371472710-18535-4-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <51CA9E8A.3080708@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht@gmail.com>
+On 17/06/2013 14:38, Jean-Christophe PLAGNIOL-VILLARD :
+> the PQFP version have only 3 gpio banks (A, B & C)
+>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-This is an external component and may or may not be there, while the
-internal clock always works.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-r8a7790.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> ---
+>   arch/arm/boot/dts/at91rm9200_pqfp.dtsi |   17 +++++++++++++++++
+>   1 file changed, 17 insertions(+)
+>   create mode 100644 arch/arm/boot/dts/at91rm9200_pqfp.dtsi
+>
+> diff --git a/arch/arm/boot/dts/at91rm9200_pqfp.dtsi b/arch/arm/boot/dts/at91rm9200_pqfp.dtsi
+> new file mode 100644
+> index 0000000..8e3d43f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91rm9200_pqfp.dtsi
+> @@ -0,0 +1,17 @@
+> +/*
+> + * at91rm9200_pqfp.dtsi - Device Tree Include file for AT91RM9200 PQFP family SoC
+> + *
+> + * Copyright (C) 2013 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +#include "at91rm9200.dtsi"
+> +
+> +/ {
+> +	compatible = "atmel,at91rm9200-pqfp", "atmel,at91rm9200";
+> +};
+> +
+> +&pioD {
+> +	status = "disable";
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index 896d374..6531f3d 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -64,7 +64,7 @@ void __init r8a7790_pinmux_init(void)
- [index] = {						\
- 	SCIF_COMMON(PORT_SCIF, baseaddr, irq),		\
- 	.scbrr_algo_id	= SCBRR_ALGO_2,			\
--	.scscr = SCSCR_RE | SCSCR_TE | SCSCR_CKE1,	\
-+	.scscr = SCSCR_RE | SCSCR_TE,	\
- }
- 
- #define HSCIF_DATA(index, baseaddr, irq)		\
+Typo: s/disable/disabled/
+
+> +};
+>
+
+
 -- 
-1.8.2.1
+Nicolas Ferre
