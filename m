@@ -1,27 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 26 Jun 2013 09:08:19 +0100
-Subject: [PATCH] spi: sirf: add missed spi mode_bits that SiRFSoC
- hardware supports
-In-Reply-To: <CAGsJ_4zztqXECjKJVQA955Dw=Qp3n4iFrbvQH-kd7s_4wpvvhA@mail.gmail.com>
-References: <1372160729-12796-1-git-send-email-Baohua.Song@csr.com>
- <20130625154020.GG27646@sirena.org.uk>
- <CAGsJ_4zztqXECjKJVQA955Dw=Qp3n4iFrbvQH-kd7s_4wpvvhA@mail.gmail.com>
-Message-ID: <20130626080819.GI27646@sirena.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 26 Jun 2013 17:27:45 +0900
+Subject: [RFC] ARM: shmobile: r8a7790: add thermal driver support
+In-Reply-To: <87haglnv8j.wl%kuninori.morimoto.gx@renesas.com>
+References: <1372232164-31285-1-git-send-email-horms+renesas@verge.net.au>
+ <87haglnv8j.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20130626082743.GB1229@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 12:17:24AM +0800, Barry Song wrote:
+On Wed, Jun 26, 2013 at 01:15:32AM -0700, Kuninori Morimoto wrote:
+> 
+> Hi Simon
+> 
+> > You can get current thermal by
+> > > cat /sys/class/thermal/thermal_zone?/temp
+> > 
+> > Based on similar work for the r8a73a4 by Kuninori Morimoto.
+> > 
+> > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  arch/arm/mach-shmobile/setup-r8a7790.c | 12 ++++++++++++
+> >  1 file changed, 12 insertions(+)
+> > 
+> > This patch is based on renesas-next-20130620
+> > 
+> > 
+> > Hi Morimoto-san,
+> > 
+> > with this patch applied I see that the thermal driver is initialised,
+> > but there seems to be some problem:
+> > 
+> > # dmesg | grep thermal
+> > rcar_thermal rcar_thermal: thermal sensor was broken
+> > rcar_thermal rcar_thermal: 1 sensor proved
+> > 
+> > Furthermore I see a negative temperature reading.
+> > 
+> > # cat /sys/devices/virtual/thermal/thermal_zone0/temp  
+> > -65000
+> > 
+> > I am wondering if you have any insight into this.
+> 
+> Hmm...
+> Does your clock-r8a7790 has MSTP522 for thermal driver ?
 
-> this was againest your for-next branch of spi as i guessed it will be
-> in the coming version. you want one againest mainline?
-
-I'm looking for things against topic/sirf.  Just checked again and it's
-due to a dependency on topic/bpw.  I've merged that in and applied,
-thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/4e17af80/attachment-0001.sig>
+No, thanks. I will fix that.
