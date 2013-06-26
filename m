@@ -1,97 +1,44 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 26 Jun 2013 16:51:44 +0000 (UTC)
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83ECC9548@DBDE04.ent.ti.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83ECC9548@DBDE04.ent.ti.com>
-Message-ID: <alpine.DEB.2.02.1306261641040.6135@utopia.booyaka.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 26 Jun 2013 11:53:09 +0200
+Subject: [linux-next PATCH] ARM: OMAP: fix build for omap4-restart.c
+Message-ID: <3975063.P6ddal97NH@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jun 2013, Hiremath, Vaibhav wrote:
+From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Subject: [linux-next PATCH] ARM: OMAP: fix build for omap4-restart.c
 
-> That?s not quite true, I remember going through your log in detail multiple
-> Times.
-> 
-> The issue is, for appended DTB you must enable 2 config options,
-> 
-> CONFIG_ARM_APPENDED_DTB = y
-> CONFIG_ARM_ATAG_DTB_COMPAT = y
+Building omap2plus_defconfig for next-20130626 results in the following
+build error:
 
-Maybe you should look again.  Both of these options are set in the 
-am33xx_only Kconfig which is used here for the Beaglebone-White boot.
+arch/arm/mach-omap2/omap4-restart.c:21:28: warning: ?enum reboot_mode? declared inside parameter list [enabled by default]
+arch/arm/mach-omap2/omap4-restart.c:21:28: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+arch/arm/mach-omap2/omap4-restart.c:21:40: error: parameter 1 (?mode?) has incomplete type
+arch/arm/mach-omap2/omap4-restart.c:21:6: warning: function declaration isn?t a prototype [-Wstrict-prototypes]
 
+It is caused by commit 7eb135b ("reboot: arm: change reboot_mode to use
+enum reboot_mode").
 
-- Paul
+Fix it by adding missing include.
 
+Cc: Stephen Rothwell <sfr@canb.auug.org.au>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Robin Holt <holt@sgi.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/mach-omap2/omap4-restart.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-$ find . -type f -name "am33xx_only" -exec fgrep -q CONFIG_ARM_APPENDED_DTB=y '{}' ';' -print   |fgrep test_v3. | sort -t. -k3,3 -n
-./test_v3.7/20121211094536/build/am33xx_only/am33xx_only
-./test_v3.7-rc1/20121017205513/build/am33xx_only/am33xx_only
-./test_v3.7-rc2/20121020134755/build/am33xx_only/am33xx_only
-./test_v3.7-rc3/20121028162003/build/am33xx_only/am33xx_only
-./test_v3.7-rc4/20121104142910/build/am33xx_only/am33xx_only
-./test_v3.7-rc5/20121111081034/build/am33xx_only/am33xx_only
-./test_v3.7-rc6/20121117093152/build/am33xx_only/am33xx_only
-./test_v3.7-rc7/20121127152704/build/am33xx_only/am33xx_only
-./test_v3.7-rc8/20121204220128/build/am33xx_only/am33xx_only
-./test_v3.8/20130218214403/build/am33xx_only/am33xx_only
-./test_v3.8-rc1/20121228031713/build/am33xx_only/am33xx_only
-./test_v3.8-rc2/20130103093341/build/am33xx_only/am33xx_only
-./test_v3.8-rc3/20130109222058/build/am33xx_only/am33xx_only
-./test_v3.8-rc4/20130120122039/build/am33xx_only/am33xx_only
-./test_v3.8-rc5/20130126003323/build/am33xx_only/am33xx_only
-./test_v3.8-rc6/20130206155004/build/am33xx_only/am33xx_only
-./test_v3.8-rc7/20130210080644/build/am33xx_only/am33xx_only
-./test_v3.9/20130429104339/build/am33xx_only/am33xx_only
-./test_v3.9-rc1/20130312100243/build/am33xx_only/am33xx_only
-./test_v3.9-rc2/20130314094808/build/am33xx_only/am33xx_only
-./test_v3.9-rc3/20130317194234/build/am33xx_only/am33xx_only
-./test_v3.9-rc4/20130324120244/build/am33xx_only/am33xx_only
-./test_v3.9-rc5/20130331205513/build/am33xx_only/am33xx_only
-./test_v3.9-rc6/20130410123059/build/am33xx_only/am33xx_only
-./test_v3.9-rc7/20130414220303/build/am33xx_only/am33xx_only
-./test_v3.9-rc8/20130422154921/build/am33xx_only/am33xx_only
-./test_v3.10-rc1/20130518212204/build/am33xx_only/am33xx_only
-./test_v3.10-rc2/20130527225935/build/am33xx_only/am33xx_only
-./test_v3.10-rc3/20130527220737/build/am33xx_only/am33xx_only
-./test_v3.10-rc3/20130603032237/build/am33xx_only/am33xx_only
-./test_v3.10-rc4/20130603034317/build/am33xx_only/am33xx_only
-./test_v3.10-rc5/20130609031534/build/am33xx_only/am33xx_only
-./test_v3.10-rc6/20130616211951/build/am33xx_only/am33xx_only
-$ find . -type f -name "am33xx_only" -exec fgrep -q CONFIG_ARM_ATAG_DTB_COMPAT=y '{}' ';' -print   |fgrep test_v3. | sort -t. -k3,3 -n
-./test_v3.7/20121211094536/build/am33xx_only/am33xx_only
-./test_v3.7-rc1/20121017205513/build/am33xx_only/am33xx_only
-./test_v3.7-rc2/20121020134755/build/am33xx_only/am33xx_only
-./test_v3.7-rc3/20121028162003/build/am33xx_only/am33xx_only
-./test_v3.7-rc4/20121104142910/build/am33xx_only/am33xx_only
-./test_v3.7-rc5/20121111081034/build/am33xx_only/am33xx_only
-./test_v3.7-rc6/20121117093152/build/am33xx_only/am33xx_only
-./test_v3.7-rc7/20121127152704/build/am33xx_only/am33xx_only
-./test_v3.7-rc8/20121204220128/build/am33xx_only/am33xx_only
-./test_v3.8/20130218214403/build/am33xx_only/am33xx_only
-./test_v3.8-rc1/20121228031713/build/am33xx_only/am33xx_only
-./test_v3.8-rc2/20130103093341/build/am33xx_only/am33xx_only
-./test_v3.8-rc3/20130109222058/build/am33xx_only/am33xx_only
-./test_v3.8-rc4/20130120122039/build/am33xx_only/am33xx_only
-./test_v3.8-rc5/20130126003323/build/am33xx_only/am33xx_only
-./test_v3.8-rc6/20130206155004/build/am33xx_only/am33xx_only
-./test_v3.8-rc7/20130210080644/build/am33xx_only/am33xx_only
-./test_v3.9/20130429104339/build/am33xx_only/am33xx_only
-./test_v3.9-rc1/20130312100243/build/am33xx_only/am33xx_only
-./test_v3.9-rc2/20130314094808/build/am33xx_only/am33xx_only
-./test_v3.9-rc3/20130317194234/build/am33xx_only/am33xx_only
-./test_v3.9-rc4/20130324120244/build/am33xx_only/am33xx_only
-./test_v3.9-rc5/20130331205513/build/am33xx_only/am33xx_only
-./test_v3.9-rc6/20130410123059/build/am33xx_only/am33xx_only
-./test_v3.9-rc7/20130414220303/build/am33xx_only/am33xx_only
-./test_v3.9-rc8/20130422154921/build/am33xx_only/am33xx_only
-./test_v3.10-rc1/20130518212204/build/am33xx_only/am33xx_only
-./test_v3.10-rc2/20130527225935/build/am33xx_only/am33xx_only
-./test_v3.10-rc3/20130527220737/build/am33xx_only/am33xx_only
-./test_v3.10-rc3/20130603032237/build/am33xx_only/am33xx_only
-./test_v3.10-rc4/20130603034317/build/am33xx_only/am33xx_only
-./test_v3.10-rc5/20130609031534/build/am33xx_only/am33xx_only
-./test_v3.10-rc6/20130616211951/build/am33xx_only/am33xx_only
+Index: b/arch/arm/mach-omap2/omap4-restart.c
+===================================================================
+--- a/arch/arm/mach-omap2/omap4-restart.c	2013-06-25 14:41:05.842382072 +0200
++++ b/arch/arm/mach-omap2/omap4-restart.c	2013-06-25 14:44:16.062381692 +0200
+@@ -8,6 +8,7 @@
+  */
+ 
+ #include <linux/types.h>
++#include <linux/reboot.h>
+ #include "prminst44xx.h"
+ 
+ /**
