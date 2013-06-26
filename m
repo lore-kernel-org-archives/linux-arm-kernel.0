@@ -1,66 +1,62 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 26 Jun 2013 04:57:01 +0000
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83ECC9548@DBDE04.ent.ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 26 Jun 2013 08:23:54 +0300
+Subject: [PATCH v2 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+In-Reply-To: <51CA0FE1.9090107@gmail.com>
+References: <1372170110-12993-1-git-send-email-s.nawrocki@samsung.com>
+ <20130625150649.GA21334@arwen.pp.htv.fi>
+ <51C9D714.4000703@samsung.com>
+ <20130625205452.GC9748@arwen.pp.htv.fi>
+ <51CA0FE1.9090107@gmail.com>
+Message-ID: <20130626052353.GA12640@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Paul Walmsley
-> Sent: Tuesday, June 25, 2013 11:51 PM
-> To: Balbi, Felipe
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> Rini, Tom; Hiremath, Vaibhav; khilman at ti.com
-> Subject: Re: OMAP baseline test results for v3.10-rc6
-> 
-> + Vaibhav and Kevin
-> 
+On Tue, Jun 25, 2013 at 11:47:13PM +0200, Sylwester Nawrocki wrote:
 > Hi,
 > 
-> On Tue, 25 Jun 2013, Felipe Balbi wrote:
-> 
-> > On Mon, Jun 17, 2013 at 05:23:17AM +0000, Paul Walmsley wrote:
-> > > Boot to userspace:
-> > >     FAIL ( 3/12): 37xxevm, am335xbone, am335xbonelt
+> On 06/25/2013 10:54 PM, Felipe Balbi wrote:
+> >>>>+static int exynos_video_phy_probe(struct platform_device *pdev)
+> >>>>>  >>  +{
+> >>>>>  >>  +	struct exynos_video_phy *state;
+> >>>>>  >>  +	struct device *dev =&pdev->dev;
+> >>>>>  >>  +	struct resource *res;
+> >>>>>  >>  +	struct phy_provider *phy_provider;
+> >>>>>  >>  +	int i;
+> >>>>>  >>  +
+> >>>>>  >>  +	state = devm_kzalloc(dev, sizeof(*state), GFP_KERNEL);
+> >>>>>  >>  +	if (!state)
+> >>>>>  >>  +		return -ENOMEM;
+> >>>>>  >>  +
+> >>>>>  >>  +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >>>>>  >>  +
+> >>>>>  >>  +	state->regs = devm_ioremap_resource(dev, res);
+> >>>>>  >>  +	if (IS_ERR(state->regs))
+> >>>>>  >>  +		return PTR_ERR(state->regs);
+> >>>>>  >>  +
+> >>>>>  >>  +	dev_set_drvdata(dev, state);
+> >>>>  >
+> >>>>  >  you can use platform_set_drvdata(pdev, state);
+> >>>
+> >>>  I had it in the previous version, but changed for symmetry with
+> >>>  dev_set_drvdata(). I guess those could be replaced with
+> >>>  phy_{get, set}_drvdata as you suggested.
 > >
-> > Paul, we have at least 2 different folks who can't reproduce your
-> bone
-> > and bone black boot to userspace failures. I wonder how you're trying
-> to
-> > boot them.
-> >
-> > Care to share your test scripts ?
+> >hmm, you do need to set the drvdata() to the phy object, but also to the
+> >pdev object (should you need it on a suspend/resume callback, for
+> >instance). Those are separate struct device instances.
 > 
-> Sure... the methodology is completely open and has been posted in the
-> online logs since the first test cycle.  (For some reason, almost no
-> one
-> clicks through the test directory trees that I post online.  Is this a
-> documentation issue?  What can we do to make it easier for people to
-> explore this?)
-> 
+> Indeed, I somehow confused phy->dev with with phy->dev.parent. I'm going
+> to just drop the above call, since the pdev drvdata is currently not
+> referenced anywhere.
 
+ok cool :-)
 
-That?s not quite true, I remember going through your log in detail multiple
-Times.
-
-The issue is, for appended DTB you must enable 2 config options,
-
-CONFIG_ARM_APPENDED_DTB = y
-CONFIG_ARM_ATAG_DTB_COMPAT = y
-
-OR
-
-If you don?t want to change/modify default config (omap2plus_defconfig), 
-Use separate DTB and zImage, which is standard way of booting kernel.
-
-Same applies to BeagleBone Black. Infact same DTB and zImage boots up fine
-On both boards without any issues.
-
-Thanks,
-Vaibhav
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/dc970476/attachment.sig>
