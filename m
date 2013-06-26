@@ -1,60 +1,40 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 26 Jun 2013 18:18:15 +0530
-Subject: [PATCH v2 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
-In-Reply-To: <51CAD89E.3060800@samsung.com>
-References: <1372170110-12993-1-git-send-email-s.nawrocki@samsung.com>
- <20130625150649.GA21334@arwen.pp.htv.fi> <51C9D714.4000703@samsung.com>
- <20130625205452.GC9748@arwen.pp.htv.fi> <51CACEBE.9000505@ti.com>
- <51CAD89E.3060800@samsung.com>
-Message-ID: <51CAE30F.9070700@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 26 Jun 2013 16:33:54 +0400
+Subject: [PATCH 3/4] ARM: shmobile: r8a7790: don't use external clock
+ for SCIFs
+In-Reply-To: <1372236787-23342-4-git-send-email-horms+renesas@verge.net.au>
+References: <1372236787-23342-1-git-send-email-horms+renesas@verge.net.au>
+ <1372236787-23342-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <51CADFB2.8040800@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 June 2013 05:33 PM, Sylwester Nawrocki wrote:
-> On 06/26/2013 01:21 PM, Kishon Vijay Abraham I wrote:
->>>>>> +static int exynos_video_phy_probe(struct platform_device *pdev)
->>>>>>>>>> +{
->>>>>>>>>> +	struct exynos_video_phy *state;
->>>>>>>>>> +	struct device *dev = &pdev->dev;
->>>>>>>>>> +	struct resource *res;
->>>>>>>>>> +	struct phy_provider *phy_provider;
->>>>>>>>>> +	int i;
->>>>>>>>>> +
->>>>>>>>>> +	state = devm_kzalloc(dev, sizeof(*state), GFP_KERNEL);
->>>>>>>>>> +	if (!state)
->>>>>>>>>> +		return -ENOMEM;
->>>>>>>>>> +
->>>>>>>>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>>>>>>>>> +
->>>>>>>>>> +	state->regs = devm_ioremap_resource(dev, res);
->>>>>>>>>> +	if (IS_ERR(state->regs))
->>>>>>>>>> +		return PTR_ERR(state->regs);
->>>>>>>>>> +
->>>>>>>>>> +	dev_set_drvdata(dev, state);
->>>>>>>>
->>>>>>>> you can use platform_set_drvdata(pdev, state);
->>>>>>
->>>>>> I had it in the previous version, but changed for symmetry with
->>>>>> dev_set_drvdata(). I guess those could be replaced with
->>>>>> phy_{get, set}_drvdata as you suggested.
->>
->> right. currently I was setting dev_set_drvdata of phy (core) device
->> in phy-core.c and the corresponding dev_get_drvdata in phy provider driver
->> which is little confusing.
->> So I'll add phy_set_drvdata and phy_get_drvdata in phy.h (as suggested by
->> Felipe) to be used by phy provider drivers. So after creating the PHY, the
->> phy provider should use phy_set_drvdata and in phy_ops, it can use
->> phy_get_drvdata. (I'll remove the dev_set_drvdata in phy_create).
->>
->> This also means _void *priv_ in phy_create is useless. So I'll be removing
->> _priv_ from phy_create.
->
-> Yeah, sounds good. Then in the phy ops phy_get_drvdata(&phy->dev) would
-> be used and in a custom of_xlate dev_get_drvdata(dev) (assuming the phy
-> provider sets drvdata on its device beforehand).
+Hello.
 
-thats correct. btw when you send the next version just have MODULE_LICENSE set
-to GPL v2. Apart from that this patch looks good to me.
+On 26-06-2013 12:53, Simon Horman wrote:
 
-Thanks
-Kishon
+> From: Ulrich Hecht <ulrich.hecht@gmail.com>
+
+> This is an external component and may or may not be there, while the
+> internal clock always works.
+
+> Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>   arch/arm/mach-shmobile/setup-r8a7790.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+
+> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+> index 896d374..6531f3d 100644
+> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
+> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+> @@ -64,7 +64,7 @@ void __init r8a7790_pinmux_init(void)
+>   [index] = {						\
+>   	SCIF_COMMON(PORT_SCIF, baseaddr, irq),		\
+>   	.scbrr_algo_id	= SCBRR_ALGO_2,			\
+> -	.scscr = SCSCR_RE | SCSCR_TE | SCSCR_CKE1,	\
+> +	.scscr = SCSCR_RE | SCSCR_TE,	\
+
+    Backslash should have been aligned with the others above...
+
+WBR, Sergei
