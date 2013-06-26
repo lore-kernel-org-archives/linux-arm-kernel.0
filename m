@@ -1,39 +1,44 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 26 Jun 2013 16:09:30 +0530
-Subject: amba-pl08x and 'get_signal' namespace collision/build error
-In-Reply-To: <20130626081909.GD2718@n2100.arm.linux.org.uk>
-References: <51C97F40.5030101@arm.com>
- <20130625184539.GB2718@n2100.arm.linux.org.uk>
- <20130626044842.GR23141@intel.com>
- <20130626081909.GD2718@n2100.arm.linux.org.uk>
-Message-ID: <20130626103930.GS23141@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 26 Jun 2013 12:14:30 +0100
+Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
+In-Reply-To: <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
+References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
+Message-ID: <20130626111430.GH26142@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 09:19:09AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 26, 2013 at 10:18:42AM +0530, Vinod Koul wrote:
-> > Yup. This is fixed in slave-dma tree by a patch from mark by renaming it.
-> > 
-> > This should not show in the -next tree
+On Wed, Jun 26, 2013 at 11:55:33AM +0100, Ard Biesheuvel wrote:
+> Replying to self:
 > 
-> Except, that change probably is probably responsible for this new error:
+> On 25 June 2013 22:24, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > +void kernel_neon_end(void)
+> > +{
+> > +       /* Disable the NEON/VFP unit. */
+> > +       fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+> > +       barrier();
+> > +       dec_preempt_count();
+> > +}
+> > +EXPORT_SYMBOL(kernel_neon_end);
 > 
-> drivers/dma/amba-pl08x.c: In function 'pl08x_request_mux':
-> drivers/dma/amba-pl08x.c:304:13: error: expected identifier before '(' token
-This was pushed four days ago and havent seen any error report expect this.
+> Meh. This is not going to please the RT crowd, as preempt_schedule()
+> will not be called on PREEMPT builds in this case.
+> 
+> Propose to replace it with
+> 
+>     preempt_enable();
+> #ifndef CONFIG_PREEMPT_COUNT
+>     /* in this case, the preempt_enable() right above is just a barrier() */
+>     dec_preempt_count();
+> #endif
+> 
+> (and the converse in kernel_neon_begin())
 
-Anyway I rebuild my -next and looks fine for me
+Yuck, that's ugly as sin! How does x86 deal with this? Looking at
+kernel_fpu_{begin,end}, they just disable preemption so I guess that they
+assume the caller is non-blocking? There's an aside about the use of
+preempt-notifiers for KVM, so it does sound like the onus is on the caller
+not to shoot themselves in the face.
 
-  CC      drivers/dma/dmaengine.o
-  CC      drivers/dma/virt-dma.o
-  CC      drivers/dma/iovlock.o
-  CC [M]  drivers/dma/dmatest.o
-  CC      drivers/dma/amba-pl08x.o
-  LD      drivers/dma/built-in.o
-
-Can you share your config which failed for you?
-
-Mark, I believe you are testing for this, have you seen above error?
-
---
-~Vinod
+Will
