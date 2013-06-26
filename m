@@ -1,49 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 26 Jun 2013 15:07:30 +0100
-Subject: [PATCH] arch: arm64: include: asm: add pci.h to pass compiling
-In-Reply-To: <51CA5F71.207@asianux.com>
-References: <51CA5F71.207@asianux.com>
-Message-ID: <20130626140730.GB23309@arm.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 26 Jun 2013 16:04:59 +0200
+Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
+In-Reply-To: <CACxGe6tUpo31p6N0BZt_jdonuPP8ijvLBygC76wQ044EFsqOwA@mail.gmail.com>
+References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
+ <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
+ <CACxGe6tUpo31p6N0BZt_jdonuPP8ijvLBygC76wQ044EFsqOwA@mail.gmail.com>
+Message-ID: <20130626140459.GB9078@rocoto.smurfnet.nu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 04:26:41AM +0100, Chen Gang wrote:
-> Need add pci.h for compiling, the related error (with allmodconfig):
+On Wed, Jun 26, 2013 at 02:13:39PM +0100, Grant Likely wrote:
+> > diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
+> > +It (early) parses the FDT for the following parameters:
 > 
->   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_exit?:
->   drivers/media/usb/b2c2/flexcop-usb.c:393:3: error: implicit declaration of function ?pci_free_consistent? [-Werror=implicit-function-declaration]
->   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_init?:
->   drivers/media/usb/b2c2/flexcop-usb.c:410:2: error: implicit declaration of function ?pci_alloc_consistent? [-Werror=implicit-function-declaration]
->   drivers/media/usb/b2c2/flexcop-usb.c:410:21: warning: assignment makes pointer from integer without a cast [enabled by default]
->   cc1: some warnings being treated as errors
-> 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm64/include/asm/pci.h |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm64/include/asm/pci.h
-> 
-> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-> new file mode 100644
-> index 0000000..2ed467f
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/pci.h
-> @@ -0,0 +1,11 @@
-> +#ifndef ASMARM64_PCI_H
-> +#define ASMARM64_PCI_H
-> +
-> +#ifdef __KERNEL__
-> +
-> +#include <asm-generic/pci-dma-compat.h>
-> +#include <asm-generic/pci.h>
-> +
-> +#endif /* __KERNEL__ */
-> +
-> +#endif
+> Need to state which node these properties can be found in. I recommend /chosen
 
-I wonder whether it makes sense to include pci-dma-compat.h in
-asm-generic/pci.h, I don't see why one would want the generic pci.h but
-not the generic pci-dma-compat.h (cc'ing Arnd).
+Will do.
+ 
+> I would also prefix all of the following properties with "linux,"
+> since they are very much about what the Linux kernel needs for
+> booting. EFI stub will be creating these properties specifically for
+> Linux, and the LinuxLoader should do the same (until we eventually
+> kill it).
+ 
+And that.
 
--- 
-Catalin
+> > +- 'efi-system-table':
+> > +  Physical address of the system table. (required)
+> 
+> Need to mention the size of this address. Is it 64 bit or 32 bit? I
+> would follow the lead of 'linux,initrd-start' here and make the size
+> of property the size of the address. ie. If it is 8 bytes long, then
+> it is a 64 bit address.
+ 
+Currently, it's a 4-byte address.
+Although technically possible to be >32-bit in an LPAE system, the 1:1
+mappign requirement of the UEFI spec forces it to reside in the lower
+4GB on a 32-bit system.
+
+> > +- 'efi-runtime-mmap':
+> > +  Physical address of an EFI memory map, containing at least
+> > +  the regions to be preserved. (required)
+> > +- 'efi-runtime-mmap-size':
+> > +  Size in bytes of the provided memory map. (required)
+> 
+> I would collapse the above two properties into a single property that
+> actually contains the memory map instead of pointing to it. You will
+> also need to specify the exact format of the data in this property.
+ 
+Ok, that makes sense.
+
+Hmm. The data is an array of struct EFI_MEMORY_DESCRIPTOR entries,
+known in Linux as efi_memory_desc_t. Is that a good enough description?
+
+> > +- 'efi-mmap-desc-size':
+> > +  Size of each descriptor in the memory map. (override default)
+> > +- 'efi-mmap-desc-ver':
+> > +  Memory descriptor format version. (override default)
+> 
+> I don't understand how these properties will actually work. What
+> changes in the parsing if these properties are set?
+ 
+I guess the intended use is that these options would permit you to
+append new fields to the struct and have old code correctly parse the
+array anyway.
+
+/
+    Leif
