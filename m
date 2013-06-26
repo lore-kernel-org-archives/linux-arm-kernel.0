@@ -1,21 +1,101 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 26 Jun 2013 12:48:57 +0200
-Subject: [PATCH 09/11] ARM: tegar: remove the limitation that Tegra114
- can't support suspend
-In-Reply-To: <1372152475-18617-10-git-send-email-josephl@nvidia.com>
-References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
- <1372152475-18617-10-git-send-email-josephl@nvidia.com>
-Message-ID: <20130626104856.GK27083@manwe>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 26 Jun 2013 12:48:37 +0200
+Subject: [PATCH 2/3] ARM: EXYNOS: init cpuidle driver in exynos_init_late()
+In-Reply-To: <1372241627-22695-3-git-send-email-b.zolnierkie@samsung.com>
+References: <1372241627-22695-1-git-send-email-b.zolnierkie@samsung.com>
+ <1372241627-22695-3-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <51CAC705.7000500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's a typo in the subject, it should be prefixed with "ARM: tegra:".
+On 06/26/2013 12:13 PM, Bartlomiej Zolnierkiewicz wrote:
+> Init cpuidle driver in exynos_init_late() instead of using
+> device_initcall().  This is needed for multiplatform support.
+> 
+> Tested on Exynos4210 (Universal C210 board).
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/99025078/attachment-0001.sig>
+Please, find a way to have the same level of initialization than
+device_init_call. In the work of consolidating the drivers, there are
+all at the device_init_call level.
+
+
+
+> Cc: Jaecheol Lee <jc.lee@samsung.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Amit Daniel Kachhap <amit.kachhap@linaro.org>
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  arch/arm/mach-exynos/common.c  | 8 ++++----
+>  arch/arm/mach-exynos/common.h  | 6 ++++++
+>  arch/arm/mach-exynos/cpuidle.c | 3 +--
+>  3 files changed, 11 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index f7e504b..1c78a16 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -346,11 +346,11 @@ void exynos5_restart(char mode, const char *cmd)
+>  
+>  void __init exynos_init_late(void)
+>  {
+> -	if (of_machine_is_compatible("samsung,exynos5440"))
+> -		/* to be supported later */
+> -		return;
+> +	/* exynos5440 to be supported later */
+> +	if (!of_machine_is_compatible("samsung,exynos5440"))
+> +		exynos_pm_late_initcall();
+>  
+> -	exynos_pm_late_initcall();
+> +	exynos4_init_cpuidle();
+>  }
+>  
+>  #ifdef CONFIG_OF
+> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> index 11fc1e2..a3b95a6 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -40,6 +40,12 @@ int exynos_pm_late_initcall(void);
+>  static inline int exynos_pm_late_initcall(void) { return 0; }
+>  #endif
+>  
+> +#ifdef CONFIG_CPU_IDLE
+> +int exynos4_init_cpuidle(void);
+> +#else
+> +static inline int exynos4_init_cpuidle(void) { return 0; }
+> +#endif
+> +
+>  #ifdef CONFIG_ARCH_EXYNOS4
+>  void exynos4_register_clocks(void);
+>  void exynos4_setup_clocks(void);
+> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+> index 0a657ac..d6e5115 100644
+> --- a/arch/arm/mach-exynos/cpuidle.c
+> +++ b/arch/arm/mach-exynos/cpuidle.c
+> @@ -66,7 +66,7 @@ static void __init exynos5_core_down_clk(void)
+>  	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+>  }
+>  
+> -static int __init exynos4_init_cpuidle(void)
+> +int __init exynos4_init_cpuidle(void)
+>  {
+>  	int cpu_id, ret;
+>  	struct cpuidle_device *device;
+> @@ -93,4 +93,3 @@ static int __init exynos4_init_cpuidle(void)
+>  
+>  	return 0;
+>  }
+> -device_initcall(exynos4_init_cpuidle);
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
