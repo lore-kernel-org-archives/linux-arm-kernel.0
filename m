@@ -1,49 +1,69 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 27 Jun 2013 01:25:06 +0200
-Subject: [PATCH 0/2] arm: add early_ioremap() support
-In-Reply-To: <201306270013.55333.arnd@arndb.de>
-References: <1372182401-11029-1-git-send-email-leif.lindholm@linaro.org>
- <201306262323.50691.arnd@arndb.de>
- <20130626213409.GA18151@rocoto.smurfnet.nu>
- <201306270013.55333.arnd@arndb.de>
-Message-ID: <20130626232504.GB18151@rocoto.smurfnet.nu>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 26 Jun 2013 16:57:38 -0700
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <51CB48BA.7020401@ti.com> (Tom Rini's message of "Wed, 26 Jun
+ 2013 16:02:02 -0400")
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+ <51CAEB33.5010101@ti.com> <51CAEBF3.1010507@ti.com>
+ <alpine.DEB.2.02.1306261726280.6135@utopia.booyaka.com>
+ <51CB28BD.2020105@ti.com>
+ <alpine.DEB.2.02.1306261750210.6135@utopia.booyaka.com>
+ <51CB48BA.7020401@ti.com>
+Message-ID: <87ehboqvbh.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 12:13:55AM +0200, Arnd Bergmann wrote:
-> > Sorry, I still don't get it. Are you saying that kmap_atomic is
-> > available before kmap_init() (in paging_init())?
-> > 
-> > If not, all of my mappings are discarded (well, abandoned to be more
-> > correct), so I don't see how it affects kmap.
-> 
-> Sorry, I was under the assumption that the mappings are meant to
-> stay around.
- 
-Ok, just so I'm not completely lost :)
+Tom Rini <trini@ti.com> writes:
 
-No, the purpose is just like for x86 - do early parsing of things like
-the UEFI system and configuration tables, DMI and ACPI, in order to
-populate global structs and stuff.
+> On 06/26/2013 01:58 PM, Paul Walmsley wrote:
+>> On Wed, 26 Jun 2013, Tom Rini wrote:
+>> 
+>>> OK, is there a reason to not be using omap2plus_defconfig?  My pass/fail
+>>> here is based on that config and enabling, or not, dtb append.  Seems
+>>> like it would be one less thing to maintain on your end and it would be
+>>> on TIs end (roughly speaking) to make sure our platforms that ought to
+>>> be working upstream have what they need enabled in the defconfig(s) in
+>>> question.
+>> 
+>> That would be convenient for me, but part of the goal is to verify that a 
+>> Kconfig that deselects all OMAPs other than AM33xx continues to work.
+>> 
+>> So the build process for am33xx_only here goes something like:
+>> 
+>> 1. Start with omap2plus_defconfig
+>> 
+>> 2. Turn off support for everything other than AM33xx in the SoC target 
+>> selection menus
+>> 
+>> 3. Turn on the appended DTB and compat ATAGs options
+>> 
+>> You might consider adding something like this to your pass/fail tests.
+>
+> Adding more and different build+boot tests is on the list.  I guess you
+> could automate this with a fraagment of everything am33xx must have to
+> boot+root and alldefconfig for the rest?
 
-> > Indeed - almost immediately.
-> > 
-> > x86 early_ioremap can coexist with kmap; the intent of my
-> > implementation is to use the kmap region only before kmap is available.
-> 
-> So if you never plan to use fixmap and early_ioremap at the same time,
-> why even bother using the fixmap code? Wouldn't it be easier to just
-> use the same memory area and ensure we never use fixmap before 
-> we're done with early_ioremap?
+Since I recently discovered scripts/kconfig/merge_config.sh, I thought
+I'd share a very convenient way of automating the variations on a
+kconfig theme, just in case I'm not the last one to discover this useful
+tool.
 
-Well, I did have a crazy idea that much/most of the early_ioremap code
-could be made generic and shared between x86 and arm (and any other
-32-bit architecture). Using the fixmap macros would make that possible
-with a minimum of ifdefs.
+For example, I have the following in am335x_only.config:
 
-If we ever wanted early_ioremap() to work like on x86, beyond kmap_init()
-(but not beyond the "booting" system state), using the same macros would
-help there too. I had no need for that for my EFI patches.
+  CONFIG_ARCH_OMAP2=n
+  CONFIG_ARCH_OMAP3=n
+  CONFIG_ARCH_OMAP4=n
+  CONFIG_SOC_OMAP5=n
+  CONFIG_SOC_AM33XX=y
 
-/
-    Leif
+Then I run:
+
+  scripts/kconfig/merge_config.sh arch/arm/configs/omap2plus_defconfig /path/to/am335x_only.config
+
+This gives me omap2plus_defconfig with overrides from my fragment.
+
+Kevin
