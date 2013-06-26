@@ -1,211 +1,32 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 26 Jun 2013 16:40:29 +0200
-Subject: [PATCH 0/8] ARM: move cpuidle drivers to drivers/cpuidle/
-In-Reply-To: <51CAE713.5070700@linaro.org>
-References: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
- <5859839.2xKkDrLODE@amdc1032> <51CAE713.5070700@linaro.org>
-Message-ID: <1673802.AM7kgUZk9G@amdc1032>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Wed, 26 Jun 2013 07:38:19 -0700
+Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
+In-Reply-To: <20130626135933.GQ22026@console-pimps.org>
+References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
+ <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
+ <51CA2B03.4080106@wwwdotorg.org>
+ <CACxGe6vsBKnbipR-Zd1T9Ox1J2ugFmShrGXGUzPa_=D9TJvFQw@mail.gmail.com>
+ <20130626135311.GA9078@rocoto.smurfnet.nu>
+ <20130626135933.GQ22026@console-pimps.org>
+Message-ID: <1372257499.2168.5.camel@dabdike>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 26, 2013 03:05:23 PM Daniel Lezcano wrote:
-> On 06/26/2013 02:22 PM, Bartlomiej Zolnierkiewicz wrote:
-> > 
-> > Hi,
-> > 
-> > On Wednesday, June 26, 2013 12:59:53 PM Daniel Lezcano wrote:
-> >> On 06/26/2013 12:15 PM, Bartlomiej Zolnierkiewicz wrote:
-> >>> Hi,
-> >>>
-> >>> This patchset moves ARM cpuidle drivers to drivers/cpuidle/ to make
-> >>> code match new driver placement rules (per commit a8e39c3 "cpuidle: add
-> >>> maintainer entry").
-> >>
-> >> I second this initiative but as stated in a previous email, a bit of
-> >> code cleanup, consolidation and encapsulation should be done before.
-> >>
-> >> Again, from my POV, it is worth to do that but we have to split the pm
-> >> code from the driver.
-> > 
-> > OK, I'll look into separating the pm code from the drivers.  However it
-> > seems that patch #2 (for davinci) can be applied as it is.
+On Wed, 2013-06-26 at 14:59 +0100, Matt Fleming wrote:
+> On Wed, 26 Jun, at 03:53:11PM, Leif Lindholm wrote:
+> > It's completely feasible, but we'd need to use a different method to do
+> > the boot services call with a 1:1 mapping (idmap support is not available
+> > until much later in the boot process).
 > 
-> No it can't. It still has #include <mach/...>
-> 
-> Please have a look at the thread:
-> 
-> http://comments.gmane.org/gmane.linux.ports.arm.kernel/146651
+> At least if you no longer relied upon the idmap we could potentially
+> have a single efi_enter_virtual_mode() call-site in init/main.c, which
+> would be nice.
 
-OK, I see.
+The fixed virtual address scheme currently being looked at for x86_64 to
+make SetVirtualAddressMap() kexec invariant doesn't work on 32 bit
+because the address space isn't big enough.  For ARM, given that we've
+much more opportunity to work with the vendors, can we just avoid
+transitioning to a virtual address map and always just install a
+physical mapping before doing efi calls?
 
-On davinci:
-
-* <mach/cpuidle.h> contains only struct davinci_cpuidle_config
-  declaration (pointer to this structure instance is passed as
-  platform data to davinci cpuidle driver) so it seems that
-  moving it to <linux/platform_data/cpuidle-davinci.h> would be
-  sufficient?
-
-* <mach/ddr2.h> contains only few definitions used by davinci
-  cpuidle driver and arch/arm/mach-davinci/sleep.S so wouldn't
-  it be OK to just move the header to <linux/davinci_ddr2.h>?
-
-If agreed I'll prepare appropriate patches later.
-
-> >> Please review some patches I sent recently to split this code and
-> >> comment them. Otherwise, we will collide on this work.
-> >>
-> >> All the patches sent [1] was to unify the code to make the drivers as
-> >> unified as possible to converge to the same code pattern and to
-> >> facilitate the factoring out.
-> > 
-> > I've looked at the patches ([1] and at91 ones) and they look fine to me.
-> > I don't think that there is currently a risk of colliding on this work
-> > (except at91 case) as your patches (except at91 ones) are already merged
-> > in upstream or linux-next branch of linux-pm tree (which is included in
-> > linux-next tree which I based my patches on). I'm subscribed to linux-pm
-> > mailing list now but please cc: me on your future ARM cpuidle changes
-> > (thanks!).
-> 
-> We are working on cleaning up the different drivers to have a *common
-> code pattern* in order to factor it out, split the code into pm code and
-> driver code, move the drivers to the drivers/cpuidle directory and
-> finally create a single arm driver [1][2][3].
-
-Interesting, I wasn't aware of the single arm driver goal..
-
-> You are sending patches to move the drivers directly to the
-> drivers/cpuidle directory. I did that 1,5 years ago and I was told it is
-> not the way to go [4].
-> 
-> As you can see this is a WIP.
-> 
-> So I am insisting: that would be better if you sync up with us and check
-> what is the WIP and, if you are willing to, give us a hand instead of
-> doing your way.
-
-OK.
-
-> May I suggest you fix up the exynos cpuidle driver first ? :)
-
-Sure.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> Thanks
->   -- Daniel
-> 
-> [1]
-> https://blueprints.launchpad.net/linaro-power-kernel/+spec/cpuidle-consolidate-arm-drivers
-> 
-> [2]
-> http://summit.linuxplumbersconf.org/lpc-2012/meeting/31/lpc2012-ref-cpu-idle-cluster-management/
-> 
-> [3] https://e.lca-13.zerista.com/event/member/72362
-> 
-> [4] http://comments.gmane.org/gmane.linux.ports.arm.kernel/146651
-> 
-> 
-> > Best regards,
-> > --
-> > Bartlomiej Zolnierkiewicz
-> > Samsung R&D Institute Poland
-> > Samsung Electronics
-> > 
-> >> Thanks
-> >>   -- Daniel
-> >>
-> >> [1]
-> >> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/log/?h=linux-next&qt=author&q=daniel.lezcano%40linaro.org
-> >>
-> >>> [ Please note that movement of Samsung EXYNOS cpuidle driver is handled
-> >>>   in separate patchset since it needs some other changes applied first. ]
-> >>>
-> >>> Patches are based on linux-next (next-20130624) and are compile tested
-> >>> only.  If agreed they all should probably go together through one tree
-> >>> (linux-pm or arm-soc) since they all modify drivers/cpuidle/Makefile.
-> >>>
-> >>> PS It seems that majority of cpuidle drivers is not used by default
-> >>> (CONFIG_CPU_IDLE is not turned on in corresponding defconfigs). The only
-> >>> exceptions are shmobile (kota2_defconfig) and tegra (tegra_defconfig).
-> >>> This is probably also something that needs updating.
-> >>>
-> >>> Best regards,
-> >>> --
-> >>> Bartlomiej Zolnierkiewicz
-> >>> Samsung R&D Institute Poland
-> >>> Samsung Electronics
-> >>>
-> >>>
-> >>> Bartlomiej Zolnierkiewicz (8):
-> >>>   ARM: at91: move cpuidle driver to drivers/cpuidle/
-> >>>   ARM: davinci: move cpuidle driver to drivers/cpuidle/
-> >>>   ARM: imx: move cpuidle drivers to drivers/cpuidle/
-> >>>   ARM: OMAP: move cpuidle drivers to drivers/cpuidle/
-> >>>   ARM: S3C64XX: move cpuidle driver to drivers/cpuidle/
-> >>>   ARM: shmobile: move cpuidle driver to drivers/cpuidle/
-> >>>   ARM: tegra: move cpuidle drivers to drivers/cpuidle/
-> >>>   ARM: ux500: move cpuidle drivers to drivers/cpuidle/
-> >>>
-> >>>  arch/arm/mach-at91/Makefile            |   1 -
-> >>>  arch/arm/mach-at91/cpuidle.c           |  68 -------
-> >>>  arch/arm/mach-davinci/Makefile         |   1 -
-> >>>  arch/arm/mach-davinci/cpuidle.c        | 105 ----------
-> >>>  arch/arm/mach-imx/Makefile             |   5 -
-> >>>  arch/arm/mach-imx/cpuidle-imx5.c       |  37 ----
-> >>>  arch/arm/mach-imx/cpuidle-imx6q.c      |  75 -------
-> >>>  arch/arm/mach-omap2/Makefile           |   5 -
-> >>>  arch/arm/mach-omap2/cpuidle34xx.c      | 344 ---------------------------------
-> >>>  arch/arm/mach-omap2/cpuidle44xx.c      | 217 ---------------------
-> >>>  arch/arm/mach-s3c64xx/Makefile         |   1 -
-> >>>  arch/arm/mach-s3c64xx/cpuidle.c        |  63 ------
-> >>>  arch/arm/mach-shmobile/Makefile        |   1 -
-> >>>  arch/arm/mach-shmobile/cpuidle.c       |  37 ----
-> >>>  arch/arm/mach-tegra/Makefile           |   9 -
-> >>>  arch/arm/mach-tegra/cpuidle-tegra114.c |  35 ----
-> >>>  arch/arm/mach-tegra/cpuidle-tegra20.c  | 217 ---------------------
-> >>>  arch/arm/mach-tegra/cpuidle-tegra30.c  | 149 --------------
-> >>>  arch/arm/mach-ux500/Makefile           |   1 -
-> >>>  arch/arm/mach-ux500/cpuidle.c          | 128 ------------
-> >>>  drivers/cpuidle/Makefile               |  42 ++++
-> >>>  drivers/cpuidle/cpuidle-at91.c         |  68 +++++++
-> >>>  drivers/cpuidle/cpuidle-davinci.c      | 104 ++++++++++
-> >>>  drivers/cpuidle/cpuidle-imx5.c         |  37 ++++
-> >>>  drivers/cpuidle/cpuidle-imx6q.c        |  74 +++++++
-> >>>  drivers/cpuidle/cpuidle-omap34xx.c     | 342 ++++++++++++++++++++++++++++++++
-> >>>  drivers/cpuidle/cpuidle-omap44xx.c     | 216 +++++++++++++++++++++
-> >>>  drivers/cpuidle/cpuidle-s3c64xx.c      |  62 ++++++
-> >>>  drivers/cpuidle/cpuidle-shmobile.c     |  37 ++++
-> >>>  drivers/cpuidle/cpuidle-tegra114.c     |  35 ++++
-> >>>  drivers/cpuidle/cpuidle-tegra20.c      | 217 +++++++++++++++++++++
-> >>>  drivers/cpuidle/cpuidle-tegra30.c      | 149 ++++++++++++++
-> >>>  drivers/cpuidle/cpuidle-ux500.c        | 128 ++++++++++++
-> >>>  33 files changed, 1511 insertions(+), 1499 deletions(-)
-> >>>  delete mode 100644 arch/arm/mach-at91/cpuidle.c
-> >>>  delete mode 100644 arch/arm/mach-davinci/cpuidle.c
-> >>>  delete mode 100644 arch/arm/mach-imx/cpuidle-imx5.c
-> >>>  delete mode 100644 arch/arm/mach-imx/cpuidle-imx6q.c
-> >>>  delete mode 100644 arch/arm/mach-omap2/cpuidle34xx.c
-> >>>  delete mode 100644 arch/arm/mach-omap2/cpuidle44xx.c
-> >>>  delete mode 100644 arch/arm/mach-s3c64xx/cpuidle.c
-> >>>  delete mode 100644 arch/arm/mach-shmobile/cpuidle.c
-> >>>  delete mode 100644 arch/arm/mach-tegra/cpuidle-tegra114.c
-> >>>  delete mode 100644 arch/arm/mach-tegra/cpuidle-tegra20.c
-> >>>  delete mode 100644 arch/arm/mach-tegra/cpuidle-tegra30.c
-> >>>  delete mode 100644 arch/arm/mach-ux500/cpuidle.c
-> >>>  create mode 100644 drivers/cpuidle/cpuidle-at91.c
-> >>>  create mode 100644 drivers/cpuidle/cpuidle-davinci.c
-> >>>  create mode 100644 drivers/cpuidle/cpuidle-imx5.c
-> >>>  create mode 100644 drivers/cpuidle/cpuidle-imx6q.c
-> >>>  create mode 100644 drivers/cpuidle/cpuidle-omap34xx.c
-> >>>  create mode 100644 drivers/cpuidle/cpuidle-omap44xx.c
-> >>>  create mode 100644 drivers/cpuidle/cpuidle-s3c64xx.c
-> >>>  create mode 100644 drivers/cpuidle/cpuidle-shmobile.c
-> >>>  create mode 100644 drivers/cpuidle/cpuidle-tegra114.c
-> >>>  create mode 100644 drivers/cpuidle/cpuidle-tegra20.c
-> >>>  create mode 100644 drivers/cpuidle/cpuidle-tegra30.c
-> >>>  create mode 100644 drivers/cpuidle/cpuidle-ux500.c
+James
