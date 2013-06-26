@@ -1,69 +1,220 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 26 Jun 2013 16:04:59 +0200
-Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
-In-Reply-To: <CACxGe6tUpo31p6N0BZt_jdonuPP8ijvLBygC76wQ044EFsqOwA@mail.gmail.com>
-References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
- <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
- <CACxGe6tUpo31p6N0BZt_jdonuPP8ijvLBygC76wQ044EFsqOwA@mail.gmail.com>
-Message-ID: <20130626140459.GB9078@rocoto.smurfnet.nu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Jun 2013 16:02:26 +0200
+Subject: [PATCH 1/2] ARM: EXYNOS: Remove combiner_init declaration
+In-Reply-To: <1372246597-32323-1-git-send-email-sachin.kamat@linaro.org>
+References: <1372246597-32323-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <201306261602.26800.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 02:13:39PM +0100, Grant Likely wrote:
-> > diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
-> > +It (early) parses the FDT for the following parameters:
+On Wednesday 26 June 2013, Sachin Kamat wrote:
+> Commit d243997f ("ARM: EXYNOS: Remove legacy interrupt initialization
+> code") removed the call to combiner_init(). Since there are no more
+> users in the machine code, remove the declaration as well.
 > 
-> Need to state which node these properties can be found in. I recommend /chosen
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 
-Will do.
+Hi,
+
+Your two patches look good to me, but I think there is more that
+can be cleaned up now. See below for my experimental patch.
+I have not gotten around to test or submit that, but feel
+free to take any contents for your own patches.
+
+	Arnd
+
+commit 3ee3acd595728d20b1a23fccc9684479749833e6
+Author: Arnd Bergmann <arnd@arndb.de>
+Date:   Fri Jun 14 15:47:26 2013 +0200
+
+    irqchip: exynos: remove ATAGS code
+    
+    With 3.11, the exynos platform will only support DT based booting,
+    so we can kill off a lot of code from this driver.
+    
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 3e156bc..a659ace 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -71,10 +71,6 @@ void exynos4212_register_clocks(void);
+ #define exynos4212_register_clocks()
+ #endif
  
-> I would also prefix all of the following properties with "linux,"
-> since they are very much about what the Linux kernel needs for
-> booting. EFI stub will be creating these properties specifically for
-> Linux, and the LinuxLoader should do the same (until we eventually
-> kill it).
+-struct device_node;
+-void combiner_init(void __iomem *combiner_base, struct device_node *np,
+-			unsigned int max_nr, int irq_base);
+-
+ extern struct smp_operations exynos_smp_ops;
  
-And that.
-
-> > +- 'efi-system-table':
-> > +  Physical address of the system table. (required)
-> 
-> Need to mention the size of this address. Is it 64 bit or 32 bit? I
-> would follow the lead of 'linux,initrd-start' here and make the size
-> of property the size of the address. ie. If it is 8 bytes long, then
-> it is a 64 bit address.
+ extern void exynos_cpu_die(unsigned int cpu);
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 55df3bd..e6b9137 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -1,7 +1,7 @@
+ obj-$(CONFIG_IRQCHIP)			+= irqchip.o
  
-Currently, it's a 4-byte address.
-Although technically possible to be >32-bit in an LPAE system, the 1:1
-mappign requirement of the UEFI spec forces it to reside in the lower
-4GB on a 32-bit system.
-
-> > +- 'efi-runtime-mmap':
-> > +  Physical address of an EFI memory map, containing at least
-> > +  the regions to be preserved. (required)
-> > +- 'efi-runtime-mmap-size':
-> > +  Size in bytes of the provided memory map. (required)
-> 
-> I would collapse the above two properties into a single property that
-> actually contains the memory map instead of pointing to it. You will
-> also need to specify the exact format of the data in this property.
+ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
+-obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
++obj-$(CONFIG_ARCH_EXYNOS_COMMON)	+= exynos-combiner.o
+ obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
+ obj-$(CONFIG_ARCH_MXS)			+= irq-mxs.o
+ obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
+diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+index a9d2b2f..d6ba2f7 100644
+--- a/drivers/irqchip/exynos-combiner.c
++++ b/drivers/irqchip/exynos-combiner.c
+@@ -19,10 +19,6 @@
+ #include <linux/of_irq.h>
+ #include <asm/mach/irq.h>
  
-Ok, that makes sense.
-
-Hmm. The data is an array of struct EFI_MEMORY_DESCRIPTOR entries,
-known in Linux as efi_memory_desc_t. Is that a good enough description?
-
-> > +- 'efi-mmap-desc-size':
-> > +  Size of each descriptor in the memory map. (override default)
-> > +- 'efi-mmap-desc-ver':
-> > +  Memory descriptor format version. (override default)
-> 
-> I don't understand how these properties will actually work. What
-> changes in the parsing if these properties are set?
+-#ifdef CONFIG_EXYNOS_ATAGS
+-#include <plat/cpu.h>
+-#endif
+-
+ #include "irqchip.h"
  
-I guess the intended use is that these options would permit you to
-append new fields to the struct and have old code correctly parse the
-array anyway.
-
-/
-    Leif
+ #define COMBINER_ENABLE_SET	0x0
+@@ -138,7 +134,6 @@ static void __init combiner_init_one(struct combiner_chip_data *combiner_data,
+ 	__raw_writel(combiner_data->irq_mask, base + COMBINER_ENABLE_CLEAR);
+ }
+ 
+-#ifdef CONFIG_OF
+ static int combiner_irq_domain_xlate(struct irq_domain *d,
+ 				     struct device_node *controller,
+ 				     const u32 *intspec, unsigned int intsize,
+@@ -156,16 +151,6 @@ static int combiner_irq_domain_xlate(struct irq_domain *d,
+ 
+ 	return 0;
+ }
+-#else
+-static int combiner_irq_domain_xlate(struct irq_domain *d,
+-				     struct device_node *controller,
+-				     const u32 *intspec, unsigned int intsize,
+-				     unsigned long *out_hwirq,
+-				     unsigned int *out_type)
+-{
+-	return -EINVAL;
+-}
+-#endif
+ 
+ static int combiner_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 				   irq_hw_number_t hw)
+@@ -184,95 +169,48 @@ static struct irq_domain_ops combiner_irq_domain_ops = {
+ 	.map	= combiner_irq_domain_map,
+ };
+ 
+-static unsigned int combiner_lookup_irq(int group)
+-{
+-#ifdef CONFIG_EXYNOS_ATAGS
+-	if (group < EXYNOS4210_MAX_COMBINER_NR || soc_is_exynos5250())
+-		return IRQ_SPI(group);
+-
+-	switch (group) {
+-	case 16:
+-		return IRQ_SPI(107);
+-	case 17:
+-		return IRQ_SPI(108);
+-	case 18:
+-		return IRQ_SPI(48);
+-	case 19:
+-		return IRQ_SPI(42);
+-	}
+-#endif
+-	return 0;
+-}
+-
+-void __init combiner_init(void __iomem *combiner_base,
+-			  struct device_node *np,
+-			  unsigned int max_nr,
+-			  int irq_base)
++static int __init combiner_init(struct device_node *np)
+ {
+ 	int i, irq;
++	unsigned int max_nr = 20;
+ 	unsigned int nr_irq;
++	void __iomem *combiner_base;
+ 	struct combiner_chip_data *combiner_data;
+ 
++	combiner_base = of_iomap(np, 0);
++	if (!combiner_base) {
++		pr_err("%s: failed to map combiner registers\n", __func__);
++		return -ENXIO;
++	}
++
++	if (of_property_read_u32(np, "samsung,combiner-nr", &max_nr)) {
++		pr_info("%s: number of combiners not specified, "
++			"setting default as %d.\n",
++			__func__, max_nr);
++	}
++
+ 	nr_irq = max_nr * IRQ_IN_COMBINER;
+ 
+ 	combiner_data = kcalloc(max_nr, sizeof (*combiner_data), GFP_KERNEL);
+ 	if (!combiner_data) {
+ 		pr_warning("%s: could not allocate combiner data\n", __func__);
+-		return;
++		return -ENOMEM;
+ 	}
+ 
+-	combiner_irq_domain = irq_domain_add_simple(np, nr_irq, irq_base,
++	combiner_irq_domain = irq_domain_add_simple(np, nr_irq, -1,
+ 				&combiner_irq_domain_ops, combiner_data);
+ 	if (WARN_ON(!combiner_irq_domain)) {
+ 		pr_warning("%s: irq domain init failed\n", __func__);
+-		return;
++		return -EINVAL;
+ 	}
+ 
+ 	for (i = 0; i < max_nr; i++) {
+-#ifdef CONFIG_OF
+-		if (np)
+-			irq = irq_of_parse_and_map(np, i);
+-		else
+-#endif
+-			irq = combiner_lookup_irq(i);
+-
++		irq = irq_of_parse_and_map(np, i);
+ 		combiner_init_one(&combiner_data[i], i,
+ 				  combiner_base + (i >> 2) * 0x10, irq);
+ 		combiner_cascade_irq(&combiner_data[i], irq);
+ 	}
+-}
+-
+-#ifdef CONFIG_OF
+-static int __init combiner_of_init(struct device_node *np,
+-				   struct device_node *parent)
+-{
+-	void __iomem *combiner_base;
+-	unsigned int max_nr = 20;
+-	int irq_base = -1;
+-
+-	combiner_base = of_iomap(np, 0);
+-	if (!combiner_base) {
+-		pr_err("%s: failed to map combiner registers\n", __func__);
+-		return -ENXIO;
+-	}
+-
+-	if (of_property_read_u32(np, "samsung,combiner-nr", &max_nr)) {
+-		pr_info("%s: number of combiners not specified, "
+-			"setting default as %d.\n",
+-			__func__, max_nr);
+-	}
+-
+-	/* 
+-	 * FIXME: This is a hardwired COMBINER_IRQ(0,0). Once all devices
+-	 * get their IRQ from DT, remove this in order to get dynamic
+-	 * allocation.
+-	 */
+-	irq_base = 160;
+-
+-	combiner_init(combiner_base, np, max_nr, irq_base);
+ 
+ 	return 0;
+ }
+-IRQCHIP_DECLARE(exynos4210_combiner, "samsung,exynos4210-combiner",
+-		combiner_of_init);
+-#endif
++IRQCHIP_DECLARE(exynos_combiner, "samsung,exynos4210-combiner", combiner_init);
