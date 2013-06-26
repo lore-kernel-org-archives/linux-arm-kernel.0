@@ -1,104 +1,104 @@
-From: christian.ruppert@abilis.com (Christian Ruppert)
-Date: Wed, 26 Jun 2013 15:15:43 +0200
-Subject: [PATCH] pinctrl: elaborate a bit on arrangements in doc
-In-Reply-To: <1372169952-22439-1-git-send-email-linus.walleij@stericsson.com>
-References: <1372169952-22439-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130626131543.GD7095@ab42.lan>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 26 Jun 2013 18:52:59 +0530
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+Message-ID: <51CAEB33.5010101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 04:19:12PM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> Just to confirm, my problems with mainline were with appended DTB also.
+>> Separate DTB and zImage work fine (at least using u-boot v2013.04.)
+>>
+>> That being said, appended DTB should still work, so there's a bug
+>> hiding
+>> someplace that needs to be found fixed.
+>>
+>> Can you guys update your tests to test appended DTB also?
+>>
 > 
-> This elaborates a bit on the pinctrl vs GPIO arangements
-> in the hardware.
+> What is missing here is, 
 > 
-> Inspired by some drawings in a mail from Christian
-> Ruppert.
+> CONFIG_ARM_APPENDED_DTB = y
+> CONFIG_ARM_ATAG_DTB_COMPAT = y
 > 
-> Cc: Rob Landley <rob@landley.net>
-> Cc: Christian Ruppert <christian.ruppert@abilis.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  Documentation/pinctrl.txt | 37 ++++++++++++++++++++++++++++++++-----
->  1 file changed, 32 insertions(+), 5 deletions(-)
 > 
-> diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-> index 447fd4c..41ecad0 100644
-> --- a/Documentation/pinctrl.txt
-> +++ b/Documentation/pinctrl.txt
-> @@ -784,11 +784,38 @@ special GPIO-handler is registered.
->  GPIO mode pitfalls
->  ==================
->  
-> -Sometime the developer may be confused by a datasheet talking about a pin
-> -being possible to set into "GPIO mode". It appears that what hardware
-> -engineers mean with "GPIO mode" is not necessarily the use case that is
-> -implied in the kernel interface <linux/gpio.h>: a pin that you grab from
-> -kernel code and then either listen for input or drive high/low to
-> +The GPIO portions of a pin and its relation to a certain pin controller
-> +logic can be constructed in several ways. Here are three examples:
-> +
-> +(A)
-> +
-> +                                         +- SPI
-> +     Physical pins --- GPIO --- pinctrl -+- I2C
-> +                                         +- mmc
-> +
-> +(B)
-> +                    +- GPIO
-> +     Physical pins -+           +- SPI
-> +                    +- pinctrl -+- I2C
-> +                                +- mmc
-> +
-> +(C)
-> +                                +- SPI
-> +     Physical pins --- pinctrl -+- I2C
-> +                                +- mmc
-> +                                +- GPIO
-> +
-> +In (A) the GPIO-like functionality of the pin is *always* available.
-> +For example it is possible to read the GPIO input register to "spy" on
-> +the SPI, I2C or MMC line while it is being used by the peripheral.
-> +In (B) the GPIO functionality is orthogonal to any device using the
-> +pin, and in (C) the GPIO case is the same as "some peripheral".
-> +
-> +For this reason the developer may be confused by a datasheet talking
-> +about a pin being possible to set into "GPIO mode". It appears that what
-> +hardware engineers mean with "GPIO mode" is not necessarily the use case
-> +that is implied in the kernel interface <linux/gpio.h>: a pin that you
-> +grab from kernel code and then either listen for input or drive high/low to
->  assert/deassert some external line.
->  
->  Rather hardware engineers think that "GPIO mode" means that you can
-> -- 
-> 1.7.11.3
+> And for the code which is required in case of appended DTB, please refer to the code
+> "arch/arm/boot/compressed/head.S"
+> 
+> 
+> Please __NOTE__ that these options are not enabled in default omap2plus_defconfig.
 
-In my experience, in hardware engineering terminology, GPIO/General
-Purpose I/O just means a physical pad macro cell which can be
-dynamically configured in different modes, e.g. as an input or as an
-output, as an open drain driver etc. This configuration is done through
-hardware signals and controlled by digital logic. This logic might
-either be a GPIO controller or some other hardware block, e.g. an I2C
-controller block.
+Paul/Kevin,
 
-Hardware GPIOs have nothing to do with the concept of GPIOs from the
-Linux kernel point of view where a GPIO is a swoftware controllable pin
-with a similar configuration space as "hardware GPIOs". To put it
-simple, a software GPIO is a hardware GPIO plus some digital logic which
-implements a register interface to drive all the hardware GPIO's control
-lines from software.
+Apart from confirming if you are manually enabling these options, can you also give some
+details on how you append the dtb to the kernel image?
 
-In some cases, both modes are combined, e.g. one can imagine an SPI
-interface where the output levels are driven from an SPI controller
-hardware block and other parameters such as the drive strength or
-integrated pull-up/pull-down resistors are controlled through some
-independent mechanism. The parameters controlled through that
-independent mechanism are sometimes referred to as the GPIO mode of the
-pin.
+Most of us use an out-of-tree patch from Grant to do this, which I have shared below [2]
 
--- 
-  Christian Ruppert              ,          <christian.ruppert@abilis.com>
-                                /|
-  Tel: +41/(0)22 816 19-42     //|                 3, Chemin du Pr?-Fleuri
-                             _// | bilis Systems   CH-1228 Plan-les-Ouates
+Even without the patch with the below commands [1] to append the dtb, it still works, so it
+would be good to know what steps you follow to append the dtb to the kernel image.
+
+regards,
+Rajendra
+
+[1]
+cat arch/arm/boot/zImage arch/arm/boot/dts/am335x-bone.dtb > zImage
+mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 -n "Linux" -d zImage uImage 
+
+[2]
+From: Grant Likely <grant.likely@secretlab.ca>
+Date: Tue, 24 Apr 2012 16:19:29 +0530
+Subject: Makefile: Build a uImage with dtb already appended
+
+Do not commit to mainline; this is a useful hack only for now.
+
+Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+---
+ arch/arm/Makefile      |    2 ++
+ arch/arm/boot/Makefile |    7 +++++++
+ 2 files changed, 9 insertions(+)
+
+Index: linux-2.6/arch/arm/Makefile
+===================================================================
+--- linux-2.6.orig/arch/arm/Makefile    2013-04-24 12:25:22.547990009 +0530
++++ linux-2.6/arch/arm/Makefile 2013-04-26 14:30:57.143150733 +0530
+@@ -295,6 +295,8 @@
+
+ %.dtb: scripts
+        $(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
++uImage.%: uImage
++       $(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+
+ dtbs: scripts
+        $(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) dtbs
+Index: linux-2.6/arch/arm/boot/Makefile
+===================================================================
+--- linux-2.6.orig/arch/arm/boot/Makefile       2013-04-24 12:25:22.547990009 +0530
++++ linux-2.6/arch/arm/boot/Makefile    2013-04-26 14:30:57.151150508 +0530
+@@ -55,6 +55,9 @@
+        $(call if_changed,objcopy)
+        @$(kecho) '  Kernel: $@ is ready'
+
++$(obj)/zImage-dtb.%:   $(obj)/dts/%.dtb $(obj)/zImage
++       cat $(obj)/zImage $< > $@
++
+ endif
+
+ ifneq ($(LOADADDR),)
+@@ -80,6 +83,10 @@
+        $(call if_changed,uimage)
+        @$(kecho) '  Image $@ is ready'
+
++$(obj)/uImage.%:       $(obj)/zImage-dtb.% FORCE
++       $(call if_changed,uimage)
++       @echo '  Image $@ is ready'
++
+ $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
+        $(Q)$(MAKE) $(build)=$(obj)/bootp $@
+        @:
