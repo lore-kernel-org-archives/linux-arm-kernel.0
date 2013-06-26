@@ -1,68 +1,96 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 26 Jun 2013 23:16:59 +0200
-Subject: [PATCH 6/8] clocksource: sun4i: Remove TIMER_SCAL variable
+Date: Wed, 26 Jun 2013 23:16:58 +0200
+Subject: [PATCH 5/8] clocksource: sun4i: Factor out some timer code
 In-Reply-To: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1372281421-2099-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1372281421-2099-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The prescaler is only used when using the internal low frequency
-oscillator (at 32kHz). Since we're using the higher frequency oscillator
-at 24MHz, we can just remove it.
+The set_next_event and set_mode callbacks share a lot of common code we
+can easily factor to avoid duplication and mistakes.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clocksource/sun4i_timer.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ drivers/clocksource/sun4i_timer.c | 48 ++++++++++++++++++++++++++-------------
+ 1 file changed, 32 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 7f3b248..912d3e0 100644
+index 032e504..7f3b248 100644
 --- a/drivers/clocksource/sun4i_timer.c
 +++ b/drivers/clocksource/sun4i_timer.c
-@@ -36,7 +36,6 @@
- #define TIMER_INTVAL_REG(val)	(0x10 * val + 0x14)
- #define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
+@@ -45,24 +45,46 @@
  
--#define TIMER_SCAL		16
- #define TIMER_CNT64_CTL_REG	0xa0
- #define TIMER_CNT64_CTL_CLR		BIT(0)
- #define TIMER_CNT64_CTL_RL		BIT(1)
-@@ -141,7 +140,6 @@ static cycle_t sun4i_timer_clksrc_read(struct clocksource *c)
+ static void __iomem *timer_base;
  
- static void __init sun4i_timer_init(struct device_node *node)
++static void sun4i_clkevt_time_stop(void)
++{
++	u32 val = readl(timer_base + TIMER_CTL_REG(0));
++	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
++	udelay(1);
++}
++
++static void sun4i_clkevt_time_setup(unsigned long delay)
++{
++	writel(delay, timer_base + TIMER_INTVAL_REG(0));
++}
++
++static void sun4i_clkevt_time_start(bool periodic)
++{
++	u32 val = readl(timer_base + TIMER_CTL_REG(0));
++
++	if (periodic)
++		val &= ~TIMER_CTL_ONESHOT;
++	else
++		val |= TIMER_CTL_ONESHOT;
++
++	writel(val | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
++}
++
+ static void sun4i_clkevt_mode(enum clock_event_mode mode,
+ 			      struct clock_event_device *clk)
  {
--	unsigned long rate = 0;
- 	struct clk *clk;
- 	int ret, irq;
- 	u32 val;
-@@ -159,15 +157,13 @@ static void __init sun4i_timer_init(struct device_node *node)
- 		panic("Can't get timer clock");
- 	clk_prepare_enable(clk);
- 
--	rate = clk_get_rate(clk);
+-	u32 u = readl(timer_base + TIMER_CTL_REG(0));
 -
- 	writel(TIMER_CNT64_CTL_CLR, timer_base + TIMER_CNT64_CTL_REG);
- 	setup_sched_clock(sun4i_timer_sched_read, 32, clk_get_rate(clk));
- 	clocksource_mmio_init(timer_base + TIMER_CNT64_LOW_REG, node->name,
- 			      clk_get_rate(clk), 300, 32,
- 			      sun4i_timer_clksrc_read);
- 
--	writel(rate / (TIMER_SCAL * HZ),
-+	writel(clk_get_rate(clk) / HZ,
- 	       timer_base + TIMER_INTVAL_REG(0));
- 
- 	/* set clock source to HOSC, 16 pre-division */
-@@ -191,8 +187,8 @@ static void __init sun4i_timer_init(struct device_node *node)
- 
- 	sun4i_clockevent.cpumask = cpumask_of(0);
- 
--	clockevents_config_and_register(&sun4i_clockevent, rate / TIMER_SCAL,
--					0x1, 0xff);
-+	clockevents_config_and_register(&sun4i_clockevent, clk_get_rate(clk),
-+					0x1, 0xffffffff);
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_PERIODIC:
+-		u &= ~(TIMER_CTL_ONESHOT);
+-		writel(u | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
++		sun4i_clkevt_time_stop();
++		sun4i_clkevt_time_start(true);
+ 		break;
+-
+ 	case CLOCK_EVT_MODE_ONESHOT:
+-		writel(u | TIMER_CTL_ONESHOT, timer_base + TIMER_CTL_REG(0));
++		sun4i_clkevt_time_stop();
++		sun4i_clkevt_time_start(false);
+ 		break;
+ 	case CLOCK_EVT_MODE_UNUSED:
+ 	case CLOCK_EVT_MODE_SHUTDOWN:
+ 	default:
+-		writel(u & ~(TIMER_CTL_ENABLE), timer_base + TIMER_CTL_REG(0));
++		sun4i_clkevt_time_stop();
+ 		break;
+ 	}
  }
- CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-timer",
- 		       sun4i_timer_init);
+@@ -70,15 +92,9 @@ static void sun4i_clkevt_mode(enum clock_event_mode mode,
+ static int sun4i_clkevt_next_event(unsigned long evt,
+ 				   struct clock_event_device *unused)
+ {
+-	u32 val = readl(timer_base + TIMER_CTL_REG(0));
+-	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
+-	udelay(1);
+-
+-	writel(evt, timer_base + TIMER_INTVAL_REG(0));
+-
+-	val = readl(timer_base + TIMER_CTL_REG(0));
+-	writel(val | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
+-	       timer_base + TIMER_CTL_REG(0));
++	sun4i_clkevt_time_stop();
++	sun4i_clkevt_time_setup(evt);
++	sun4i_clkevt_time_start(false);
+ 
+ 	return 0;
+ }
 -- 
 1.8.3.1
