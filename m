@@ -1,41 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Jun 2013 22:04:22 +0200
-Subject: [PATCH 3/3] ARM: integrator: pciv3: do not remap IO so early
-In-Reply-To: <CACRpkdaSwgPws=G+PcmT6DsQqD-EAQkvKO1PMEVOs9KniJ6xrA@mail.gmail.com>
-References: <1372201560-26015-1-git-send-email-linus.walleij@linaro.org>
- <201306261712.28981.arnd@arndb.de>
- <CACRpkdaSwgPws=G+PcmT6DsQqD-EAQkvKO1PMEVOs9KniJ6xrA@mail.gmail.com>
-Message-ID: <201306262204.22653.arnd@arndb.de>
+From: trini@ti.com (Tom Rini)
+Date: Wed, 26 Jun 2013 16:02:02 -0400
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <alpine.DEB.2.02.1306261750210.6135@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+ <51CAEB33.5010101@ti.com> <51CAEBF3.1010507@ti.com>
+ <alpine.DEB.2.02.1306261726280.6135@utopia.booyaka.com>
+ <51CB28BD.2020105@ti.com>
+ <alpine.DEB.2.02.1306261750210.6135@utopia.booyaka.com>
+Message-ID: <51CB48BA.7020401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 June 2013, Linus Walleij wrote:
-> On Wed, Jun 26, 2013 at 5:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 26 June 2013, Russell King - ARM Linux wrote:
-> >> On Wed, Jun 26, 2013 at 01:06:00AM +0200, Linus Walleij wrote:
-> >> > Instead of remapping the IO memory very early with
-> >> > pci_map_io_early(), use pci_ioremap_io() when setting
-> >> > up resources as most PCI bridges do. Also request this
-> >> > resource properly.
-> >>
-> >> What impact does this have with a VGA card plugged in?
-> >
-> > It probably won't work. It's my fault for misreading the driver:
-> > I saw it didn't do the pci_ioremap_io, but didn't remember the
-> > *_early call being present in the platform.
+On 06/26/2013 01:58 PM, Paul Walmsley wrote:
+> On Wed, 26 Jun 2013, Tom Rini wrote:
 > 
-> I haven't got the VGA working (hacking on the biosemu in
-> U-boot from time to time, will get there I hope). So keep this
-> patch out for now.
+>> OK, is there a reason to not be using omap2plus_defconfig?  My pass/fail
+>> here is based on that config and enabling, or not, dtb append.  Seems
+>> like it would be one less thing to maintain on your end and it would be
+>> on TIs end (roughly speaking) to make sure our platforms that ought to
+>> be working upstream have what they need enabled in the defconfig(s) in
+>> question.
 > 
-> However I don't see how the VGA console is using iospace?
-> We set vga_base to the start of non-prefetched memory, and
-> assume the first slot is the VGA card, then it goes poking into
-> the screen memory or something... but maybe it's poking the
-> ioports in some runpath I can't see :-P
+> That would be convenient for me, but part of the goal is to verify that a 
+> Kconfig that deselects all OMAPs other than AM33xx continues to work.
 > 
+> So the build process for am33xx_only here goes something like:
+> 
+> 1. Start with omap2plus_defconfig
+> 
+> 2. Turn off support for everything other than AM33xx in the SoC target 
+> selection menus
+> 
+> 3. Turn on the appended DTB and compat ATAGs options
+> 
+> You might consider adding something like this to your pass/fail tests.
 
-I think you are looking for vga_io_w()/vga_io_r() in case of
-vga16fb. vgacon uses inb_p/outb_p directly.
+Adding more and different build+boot tests is on the list.  I guess you
+could automate this with a fraagment of everything am33xx must have to
+boot+root and alldefconfig for the rest?
 
-	Arnd
+-- 
+Tom
