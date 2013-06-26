@@ -1,69 +1,97 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 26 Jun 2013 12:28:03 +0300
-Subject: [PATCH 00/23] Unified SMMU driver among Tegra SoCs
-Message-ID: <1372238906-9346-1-git-send-email-hdoyu@nvidia.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 26 Jun 2013 16:51:44 +0000 (UTC)
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83ECC9548@DBDE04.ent.ti.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83ECC9548@DBDE04.ent.ti.com>
+Message-ID: <alpine.DEB.2.02.1306261641040.6135@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 26 Jun 2013, Hiremath, Vaibhav wrote:
 
-This series provides:
+> That?s not quite true, I remember going through your log in detail multiple
+> Times.
+> 
+> The issue is, for appended DTB you must enable 2 config options,
+> 
+> CONFIG_ARM_APPENDED_DTB = y
+> CONFIG_ARM_ATAG_DTB_COMPAT = y
 
-(1) Unified SMMU driver among Tegra SoCs
-(2) Multiple Address Space support(MASID) in IOMMU(SMMMU)
-(3) Tegra IOMMU'able devices, most of platform devices are IOMMU'able.
+Maybe you should look again.  Both of these options are set in the 
+am33xx_only Kconfig which is used here for the Beaglebone-White boot.
 
-There's some discussion[1] about device population order, which can
-solve the following patches.
 
-  ARM: dt: tegra114: Register AHB/IOMMU device first
-  amba: Move AHB to core_initcall
-  iommu/tegra: smmu: Move IOMMU to core_initcall
+- Paul
 
-Also "ARM: dma-mapping: Drop GFP_COMP for DMA memory allocations" may
-not be necessary by [2]
 
-Tested IOMMU functionality with T30 SD/MMC. Any further testing with
-T114 and/or other devices would be really appreciated.
-
-[1] https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/thread.html#36542
-[2] http://marc.info/?l=linux-tegra&m=137173895620957&w=1
-
-Hiroshi Doyu (23):
-  ARM: tegra: Create a DT header defining swgroups ID
-  ARM: dt: tegra30: iommu: Add "nvidia,swgroups"
-  ARM: dt: tegra30: iommu: Add "nvidia,memory-clients"
-  ARM: dt: tegra30: Register AHB/IOMMU device first
-  ARM: dt: tegra114: iommu: Fix IOMMU register address
-  ARM: dt: tegra114: iommu: Add "nvidia,swgroups"
-  ARM: dt: tegra114: Add "nvidia,memory-clients"
-  ARM: dt: tegra114: Register AHB/IOMMU device first
-  amba: Move AHB to core_initcall
-  iommu/tegra: smmu: Move IOMMU to core_initcall
-  iommu/tegra: smmu: Add of_mach_id for T114
-  iommu/tegra: smmu: Select ARM_DMA_USE_IOMMU in Kconfig
-  iommu/tegra: smmu: Create default IOVA maps
-  iommu/tegra: smmu: Register platform_device to IOMMU dynamically
-  iommu/tegra: smmu: Calculate ASID register offset by ID
-  iommu/tegra: smmu: Get "nvidia,swgroups" from DT
-  iommu/tegra: smmu: Use swgroups instead of pdata
-  iommu/tegra: smmu: Workaround PCIe IOMMU'able
-  iommu/tegra: smmu: Unfied driver for Tegra SoCs
-  iommu/tegra: smmu: Use dt-bindings MACRO
-  iommu/tegra: smmu: Get swgroup ID from DT
-  iommu/tegra: smmu: Support Multiple ASID
-  ARM: dma-mapping: Drop GFP_COMP for DMA memory allocations
-
- .../bindings/iommu/nvidia,tegra30-smmu.txt         |  17 +-
- arch/arm/boot/dts/tegra114.dtsi                    |  37 ++--
- arch/arm/boot/dts/tegra30.dtsi                     |  50 +++--
- arch/arm/mm/dma-mapping.c                          |   7 +
- drivers/amba/tegra-ahb.c                           |   7 +-
- drivers/iommu/Kconfig                              |   1 +
- drivers/iommu/tegra-smmu.c                         | 215 +++++++++++----------
- include/dt-bindings/iommu/tegra-swgid.h            |  47 +++++
- 8 files changed, 250 insertions(+), 131 deletions(-)
- create mode 100644 include/dt-bindings/iommu/tegra-swgid.h
-
--- 
-1.8.1.5
+$ find . -type f -name "am33xx_only" -exec fgrep -q CONFIG_ARM_APPENDED_DTB=y '{}' ';' -print   |fgrep test_v3. | sort -t. -k3,3 -n
+./test_v3.7/20121211094536/build/am33xx_only/am33xx_only
+./test_v3.7-rc1/20121017205513/build/am33xx_only/am33xx_only
+./test_v3.7-rc2/20121020134755/build/am33xx_only/am33xx_only
+./test_v3.7-rc3/20121028162003/build/am33xx_only/am33xx_only
+./test_v3.7-rc4/20121104142910/build/am33xx_only/am33xx_only
+./test_v3.7-rc5/20121111081034/build/am33xx_only/am33xx_only
+./test_v3.7-rc6/20121117093152/build/am33xx_only/am33xx_only
+./test_v3.7-rc7/20121127152704/build/am33xx_only/am33xx_only
+./test_v3.7-rc8/20121204220128/build/am33xx_only/am33xx_only
+./test_v3.8/20130218214403/build/am33xx_only/am33xx_only
+./test_v3.8-rc1/20121228031713/build/am33xx_only/am33xx_only
+./test_v3.8-rc2/20130103093341/build/am33xx_only/am33xx_only
+./test_v3.8-rc3/20130109222058/build/am33xx_only/am33xx_only
+./test_v3.8-rc4/20130120122039/build/am33xx_only/am33xx_only
+./test_v3.8-rc5/20130126003323/build/am33xx_only/am33xx_only
+./test_v3.8-rc6/20130206155004/build/am33xx_only/am33xx_only
+./test_v3.8-rc7/20130210080644/build/am33xx_only/am33xx_only
+./test_v3.9/20130429104339/build/am33xx_only/am33xx_only
+./test_v3.9-rc1/20130312100243/build/am33xx_only/am33xx_only
+./test_v3.9-rc2/20130314094808/build/am33xx_only/am33xx_only
+./test_v3.9-rc3/20130317194234/build/am33xx_only/am33xx_only
+./test_v3.9-rc4/20130324120244/build/am33xx_only/am33xx_only
+./test_v3.9-rc5/20130331205513/build/am33xx_only/am33xx_only
+./test_v3.9-rc6/20130410123059/build/am33xx_only/am33xx_only
+./test_v3.9-rc7/20130414220303/build/am33xx_only/am33xx_only
+./test_v3.9-rc8/20130422154921/build/am33xx_only/am33xx_only
+./test_v3.10-rc1/20130518212204/build/am33xx_only/am33xx_only
+./test_v3.10-rc2/20130527225935/build/am33xx_only/am33xx_only
+./test_v3.10-rc3/20130527220737/build/am33xx_only/am33xx_only
+./test_v3.10-rc3/20130603032237/build/am33xx_only/am33xx_only
+./test_v3.10-rc4/20130603034317/build/am33xx_only/am33xx_only
+./test_v3.10-rc5/20130609031534/build/am33xx_only/am33xx_only
+./test_v3.10-rc6/20130616211951/build/am33xx_only/am33xx_only
+$ find . -type f -name "am33xx_only" -exec fgrep -q CONFIG_ARM_ATAG_DTB_COMPAT=y '{}' ';' -print   |fgrep test_v3. | sort -t. -k3,3 -n
+./test_v3.7/20121211094536/build/am33xx_only/am33xx_only
+./test_v3.7-rc1/20121017205513/build/am33xx_only/am33xx_only
+./test_v3.7-rc2/20121020134755/build/am33xx_only/am33xx_only
+./test_v3.7-rc3/20121028162003/build/am33xx_only/am33xx_only
+./test_v3.7-rc4/20121104142910/build/am33xx_only/am33xx_only
+./test_v3.7-rc5/20121111081034/build/am33xx_only/am33xx_only
+./test_v3.7-rc6/20121117093152/build/am33xx_only/am33xx_only
+./test_v3.7-rc7/20121127152704/build/am33xx_only/am33xx_only
+./test_v3.7-rc8/20121204220128/build/am33xx_only/am33xx_only
+./test_v3.8/20130218214403/build/am33xx_only/am33xx_only
+./test_v3.8-rc1/20121228031713/build/am33xx_only/am33xx_only
+./test_v3.8-rc2/20130103093341/build/am33xx_only/am33xx_only
+./test_v3.8-rc3/20130109222058/build/am33xx_only/am33xx_only
+./test_v3.8-rc4/20130120122039/build/am33xx_only/am33xx_only
+./test_v3.8-rc5/20130126003323/build/am33xx_only/am33xx_only
+./test_v3.8-rc6/20130206155004/build/am33xx_only/am33xx_only
+./test_v3.8-rc7/20130210080644/build/am33xx_only/am33xx_only
+./test_v3.9/20130429104339/build/am33xx_only/am33xx_only
+./test_v3.9-rc1/20130312100243/build/am33xx_only/am33xx_only
+./test_v3.9-rc2/20130314094808/build/am33xx_only/am33xx_only
+./test_v3.9-rc3/20130317194234/build/am33xx_only/am33xx_only
+./test_v3.9-rc4/20130324120244/build/am33xx_only/am33xx_only
+./test_v3.9-rc5/20130331205513/build/am33xx_only/am33xx_only
+./test_v3.9-rc6/20130410123059/build/am33xx_only/am33xx_only
+./test_v3.9-rc7/20130414220303/build/am33xx_only/am33xx_only
+./test_v3.9-rc8/20130422154921/build/am33xx_only/am33xx_only
+./test_v3.10-rc1/20130518212204/build/am33xx_only/am33xx_only
+./test_v3.10-rc2/20130527225935/build/am33xx_only/am33xx_only
+./test_v3.10-rc3/20130527220737/build/am33xx_only/am33xx_only
+./test_v3.10-rc3/20130603032237/build/am33xx_only/am33xx_only
+./test_v3.10-rc4/20130603034317/build/am33xx_only/am33xx_only
+./test_v3.10-rc5/20130609031534/build/am33xx_only/am33xx_only
+./test_v3.10-rc6/20130616211951/build/am33xx_only/am33xx_only
