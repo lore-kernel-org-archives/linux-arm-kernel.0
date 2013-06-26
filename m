@@ -1,74 +1,75 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 26 Jun 2013 17:01:36 +0200 (CEST)
-Subject: [linux-next PATCH] ARM: shmobile: marzen: defconfig: enable DMA
- engine support
-In-Reply-To: <20130626145252.GA4748@verge.net.au>
-References: <1642514.quKgForQrD@amdc1032> <20130626145252.GA4748@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1306261700130.8856@axis700.grange>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 26 Jun 2013 17:02:21 +0200
+Subject: [PATCH v3 0/5] Generic PHY driver for the Exynos SoC MIPI CSI-2/DSI
+ DPHYs
+Message-ID: <1372258946-15607-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+This patch series adds a simple driver for the Samsung S5P/Exynos SoC
+series MIPI CSI-2 receiver (MIPI CSIS) and MIPI DSI transmitter (MIPI
+DSIM) DPHYs, using the generic PHY framework [1]. Previously the MIPI
+CSIS and MIPI DSIM used a platform callback to control the PHY power
+enable and reset bits. The platform callback can now be dropped and
+those drivers don't need any calls back to the platform code, which
+makes migration to the device tree complete for MIPI CSIS.
 
-On Wed, 26 Jun 2013, Simon Horman wrote:
+Changes since v2:
+ - adapted to the generic PHY API v9: use phy_set/get_drvdata(),
+ - fixed of_xlate callback to return ERR_PTR() instead of NULL,
+ - namespace cleanup, put "GPL v2" as MODULE_LICENSE, removed pr_debug,
+ - removed phy id check in __set_phy_state().
 
-> [ Cc linux-sh and Guennadi ]
-> 
-> I have not looked into this closely but it seems to me that
-> it would be more robust to resolve this problem using Kconfig.
+Patches 2...3/5 are unchanged, description of patch 5/5 has been
+updated.
 
-I still think this
+Changes since v1:
+ - enabled build as module and with CONFIG_OF disabled,
+ - added phy_id enum,
+ - of_address_to_resource() replaced with platform_get_resource(),
+ - adapted to changes in the PHY API v7, v8 - added phy labels,
+ - added MODULE_DEVICE_TABLE() entry,
+ - the driver file renamed to phy-exynos-mipi-video.c,
+ - changed DT compatible string to "samsung,s5pv210-mipi-video-phy",
+ - corrected the compatible property's description.
+ - patch 3/5 "video: exynos_dsi: Use generic PHY driver" replaced
+   with a patch modifying the MIPI DSIM driver which is currently
+   in mainline.
 
-https://patchwork.kernel.org/patch/2640051/
+This series depends on the generic PHY framework [1]. It can be browsed at:
+ http://git.linuxtv.org/snawrocki/samsung.git/exynos-mipi-phy
+This branch is based on the 'for-next' branch from:
+ git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+and the patch series:
+ http://www.spinics.net/lists/arm-kernel/msg254667.html
 
-is a proper fix. We cannot and do not want to force building shdma on all 
-platforms, where SDHI or any other potential shdma client is built. It is 
-perfectly valid to build SDHI with no DMA support, which is exactly what 
-that patch makes possible.
+[1] https://lkml.org/lkml/2013/6/26/259
 
-Thanks
-Guennadi
+Sylwester Nawrocki (5):
+  phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+  ARM: dts: Add MIPI PHY node to exynos4.dtsi
+  video: exynos_mipi_dsim: Use the generic PHY driver
+  exynos4-is: Use the generic MIPI CSIS PHY driver
+  ARM: Samsung: Remove the MIPI PHY setup code
 
-> 
-> On Wed, Jun 26, 2013 at 12:02:55PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> > From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > Subject: [linux-next PATCH] ARM: shmobile: marzen: defconfig: enable DMA engine support
-> > 
-> > Building marzen_defconfig for next-20130626 results in the following
-> > build error:
-> > 
-> > drivers/built-in.o: In function `sh_mobile_sdhi_probe':
-> > /home/bzolnier/sam/linux-sprc/drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to `shdma_chan_filter'
-> > 
-> > Fix it by adding CONFIG_DMADEVICES=y line to marzen_defconfig. This
-> > will result in CONFIG_SH_DMAE_BASE being enabled by default and the
-> > needed code being build.
-> > 
-> > Cc: Stephen Rothwell <sfr@canb.auug.org.au>
-> > Cc: Simon Horman <horms@verge.net.au>
-> > Cc: Magnus Damm <magnus.damm@gmail.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > ---
-> >  arch/arm/configs/marzen_defconfig |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > Index: b/arch/arm/configs/marzen_defconfig
-> > ===================================================================
-> > --- a/arch/arm/configs/marzen_defconfig	2013-06-21 12:04:24.813681807 +0200
-> > +++ b/arch/arm/configs/marzen_defconfig	2013-06-25 16:43:40.730367398 +0200
-> > @@ -96,6 +96,7 @@ CONFIG_USB_STORAGE=y
-> >  CONFIG_NEW_LEDS=y
-> >  CONFIG_LEDS_CLASS=y
-> >  CONFIG_LEDS_GPIO=y
-> > +CONFIG_DMADEVICES=y
-> >  CONFIG_UIO=y
-> >  CONFIG_UIO_PDRV_GENIRQ=y
-> >  # CONFIG_IOMMU_SUPPORT is not set
-> > 
-> 
+ .../phy/samsung,s5pv210-mipi-video-phy.txt         |   14 ++
+ arch/arm/boot/dts/exynos4.dtsi                     |   10 ++
+ arch/arm/mach-exynos/include/mach/regs-pmu.h       |    5 -
+ arch/arm/mach-s5pv210/include/mach/regs-clock.h    |    4 -
+ arch/arm/plat-samsung/Kconfig                      |    5 -
+ arch/arm/plat-samsung/Makefile                     |    1 -
+ arch/arm/plat-samsung/setup-mipiphy.c              |   60 -------
+ drivers/media/platform/exynos4-is/mipi-csis.c      |   16 +-
+ drivers/phy/Kconfig                                |    9 ++
+ drivers/phy/Makefile                               |    3 +-
+ drivers/phy/phy-exynos-mipi-video.c                |  170 ++++++++++++++++++++
+ drivers/video/exynos/exynos_mipi_dsi.c             |   18 +--
+ include/linux/platform_data/mipi-csis.h            |   11 +-
+ include/video/exynos_mipi_dsim.h                   |    6 +-
+ 14 files changed, 233 insertions(+), 99 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/samsung,s5pv210-mipi-video-phy.txt
+ delete mode 100644 arch/arm/plat-samsung/setup-mipiphy.c
+ create mode 100644 drivers/phy/phy-exynos-mipi-video.c
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+--
+1.7.9.5
