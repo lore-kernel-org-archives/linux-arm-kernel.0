@@ -1,46 +1,29 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 26 Jun 2013 11:05:34 +0200
-Subject: [PATCH 0/3] ARM: at91/DT: enable SPI for more SoCs
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641687DF77C@penmbx01>
-References: <cover.1372069834.git.nicolas.ferre@atmel.com>
- <B256D81BAE5131468A838E5D7A243641687DF77C@penmbx01>
-Message-ID: <51CAAEDE.7050906@atmel.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 26 Jun 2013 12:28:15 +0300
+Subject: [PATCH 12/23] iommu/tegra: smmu: Select ARM_DMA_USE_IOMMU in Kconfig
+Message-ID: <1372238906-9346-13-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/06/2013 03:59, Yang, Wenyou :
-> 
-> 
->> -----Original Message-----
->> From: Nicolas Ferre [mailto:nicolas.ferre at atmel.com]
->> Sent: 2013?6?24? 18:35
->> To: Jean-Christophe PLAGNIOL-VILLARD; Desroches, Ludovic; Yang, Wenyou;
->> Shen, Voice; Wu, Josh
->> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Ferre,
->> Nicolas
->> Subject: [PATCH 0/3] ARM: at91/DT: enable SPI for more SoCs
->>
->> This little series is for enabling the support of SPI on at91sam9n12 and
->> sama5d3 families.
->>
->> Nicolas Ferre (3):
->>    ARM: at91/DT: fix SPI compatibility string
->>    ARM: at91/DT: sama5d3: add SPI DMA client infos
->>    ARM: at91/DT: at91sam9n12: add SPI DMA client infos
->>
->>   arch/arm/boot/dts/at91sam9n12.dtsi |  6 ++++++
->>   arch/arm/boot/dts/sama5d3.dtsi     | 10 ++++++++--
->>   2 files changed, 14 insertions(+), 2 deletions(-)
->>
->> --
->> 1.8.2.2
-> 
-> Tested on sama5d34ek, Linux-next: next-20130624
-> 
-> Tested by Wenyou Yang <wenyou.yang@atmel.com>
+SMMU expects ARM_DMA_USE_IOMMU to be enabled to use DMA mapping API by
+default.
 
-Thanks for having testing: series is stacked on at91-3.11-dt now.
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ drivers/iommu/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Bye,
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index 01730b2..09daeea3 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -160,6 +160,7 @@ config TEGRA_IOMMU_SMMU
+ 	bool "Tegra SMMU IOMMU Support"
+ 	depends on ARCH_TEGRA && TEGRA_AHB
+ 	select IOMMU_API
++	select ARM_DMA_USE_IOMMU
+ 	help
+ 	  Enables support for remapping discontiguous physical memory
+ 	  shared with the operating system into contiguous I/O virtual
 -- 
-Nicolas Ferre
+1.8.1.5
