@@ -1,33 +1,44 @@
-From: joelagnel@ti.com (Joel A Fernandes)
-Date: Tue, 25 Jun 2013 20:25:01 -0500
-Subject: [PATCH 5/5] mmc: omap_hsmmc: Add reg-offset to bindings documentation
-Message-ID: <1372209901-6715-1-git-send-email-joelagnel@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 25 Jun 2013 18:30:31 -0700
+Subject: [PATCH] ARM: ux500: check platform in ux500_l2x0_init
+Message-ID: <1372210231-22900-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joel A Fernandes <agnel.joel@gmail.com>
+Add compatible checks for ux500. This should probably be moved to generic
+DT-based probing whenever DT is populated instead, but until then at
+least don't panic all non-ux500 multiplatform machines.
 
-A new reg-offset property was added to account for register offsets
-in some omap-hsmmc's. Document the new property.
-
-Signed-off-by: Joel A Fernandes <agnel.joel@gmail.com>
+Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |    3 +++
- 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-index 8c8908a..33f4b1e 100644
---- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-@@ -20,6 +20,9 @@ ti,dual-volt: boolean, supports dual voltage cards
- ti,non-removable: non-removable slot (like eMMC)
- ti,needs-special-reset: Requires a special softreset sequence
- ti,needs-special-hs-handling: HSMMC IP needs special setting for handling High Speed
-+reg-offset: Supplementing the common reg property (described in bindings/mmc/mmc.txt),
-+some omap-hsmmc's can start an offset from reg but are otherwise identical to others.
-+The registers between start to offset are considered reserved.
- dmas: List of DMA specifiers with the controller specific format
- as described in the generic DMA client binding. A tx and rx
- specifier is required.
+Linus, I'll apply this directly if you ack it, let me know.
+
+
+-Olof
+
+ arch/arm/mach-ux500/cache-l2x0.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
+index f58615b..3facc1e 100644
+--- a/arch/arm/mach-ux500/cache-l2x0.c
++++ b/arch/arm/mach-ux500/cache-l2x0.c
+@@ -39,6 +39,15 @@ static int __init ux500_l2x0_init(void)
+ {
+ 	u32 aux_val = 0x3e000000;
+ 
++	/* Ick. I wish there was a single compatible value to compare for,
++	 * but there isn't.
++	 */
++	if (!of_machine_is_compatible("st-ericsson,u8500") &&
++	    !of_machine_is_compatible("st-ericsson,u8540") &&
++	    !of_machine_is_compatible("st-ericsson,u9500") &&
++	    !of_machine_is_compatible("st-ericsson,u8540"))
++		return -ENODEV;
++
+ 	if (cpu_is_u8500_family() || cpu_is_ux540_family())
+ 		l2x0_base = __io_address(U8500_L2CC_BASE);
+ 	else
 -- 
-1.7.9.5
+1.8.1.192.gc4361b8
