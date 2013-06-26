@@ -1,127 +1,79 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 26 Jun 2013 13:12:46 +0200
-Subject: [PATCH] arm64: add support for kernel mode NEON
-Message-ID: <1372245166-31924-1-git-send-email-ard.biesheuvel@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 26 Jun 2013 13:12:21 +0200
+Subject: [PATCH 21/23] iommu/tegra: smmu: Get swgroup ID from DT
+In-Reply-To: <1372238906-9346-22-git-send-email-hdoyu@nvidia.com>
+References: <1372238906-9346-22-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20130626111220.GQ27083@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add <asm/neon.h> containing kernel_neon_begin/kernel_neon_end function
-declarations and corresponding definitions in fpsimd.c
+On Wed, Jun 26, 2013 at 12:28:24PM +0300, Hiroshi Doyu wrote:
+> Get swgroup ID from DT. "nvidia,swgroups" indicates which swgroup IDs
+> a device belongs to.
+> 
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+>  arch/arm/boot/dts/tegra30.dtsi |  1 -
+>  drivers/iommu/tegra-smmu.c     | 20 +++++++++++++++++++-
+>  2 files changed, 19 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+> index 7c480f2..a116737 100644
+> --- a/arch/arm/boot/dts/tegra30.dtsi
+> +++ b/arch/arm/boot/dts/tegra30.dtsi
+> @@ -1,6 +1,5 @@
+>  #include <dt-bindings/clock/tegra30-car.h>
+>  #include <dt-bindings/gpio/tegra-gpio.h>
+> -#include <dt-bindings/iommu/tegra-swgid.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  
+>  #include "skeleton.dtsi"
+> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+> index 50eb843..96dbef3 100644
+> --- a/drivers/iommu/tegra-smmu.c
+> +++ b/drivers/iommu/tegra-smmu.c
+> @@ -314,6 +314,24 @@ static inline void smmu_write(struct smmu_device *smmu, u32 val, size_t offs)
+>  
+>  #define smmu_client_hwgrp(c)	(c->as->smmu->swgroups)
+>  
+> +static u64 tegra_smmu_of_get_swgids(struct device *dev)
+> +{
+> +	size_t bytes;
+> +	const char *propname = "nvidia,memory-clients";
+> +	const __be32 *prop;
+> +	int i;
+> +	u64 swgids = 0;
+> +
+> +	prop = of_get_property(dev->of_node, propname, &bytes);
+> +	if (!prop || !bytes)
+> +		return 0;
+> +
+> +	for (i = 0; i < bytes / sizeof(u32); i++, prop++)
+> +		swgids |= 1ULL << be32_to_cpup(prop);
+> +
+> +	return swgids;
+> +}
+> +
+>  static int __smmu_client_set_hwgrp(struct smmu_client *c,
+>  				   u64 map, int on)
+>  {
+> @@ -725,7 +743,7 @@ static int smmu_iommu_attach_dev(struct iommu_domain *domain,
+>  		return -ENOMEM;
+>  	client->dev = dev;
+>  	client->as = as;
+> -	map = smmu->swgroups;
+> +	map = tegra_smmu_of_get_swgids(dev);
+>  	if (!map)
+>  		return -EINVAL;
 
-These are needed to wrap uses of NEON in kernel mode. The names are
-identical to the ones used in arm/ so code using intrinsics or
-vectorized by GCC can be shared between arm and arm64.
+Shouldn't this be part of an earlier patch ("[PATCH 17/23] iommu/tegra:
+smmu: Use swgroups instead of pdata")? What's the reason for the split?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-Catalin,
-
-You were right about the might_sleep(), it prevents kernel_neon_begin() from
-being called if preemption is already disabled, which is a perfectly acceptable
-use case. I used BUG_ON(in_interrupt()) instead.
-
--- 
-Ard.
-
- 
- arch/arm64/Kconfig            |  3 +++
- arch/arm64/include/asm/neon.h | 14 ++++++++++++++
- arch/arm64/kernel/fpsimd.c    | 41 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 58 insertions(+)
- create mode 100644 arch/arm64/include/asm/neon.h
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 56b3f6d..46ba680 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -95,6 +95,9 @@ config SWIOTLB
- config IOMMU_HELPER
- 	def_bool SWIOTLB
- 
-+config KERNEL_MODE_NEON
-+	def_bool y
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
-new file mode 100644
-index 0000000..b0cc58a9
---- /dev/null
-+++ b/arch/arm64/include/asm/neon.h
-@@ -0,0 +1,14 @@
-+/*
-+ * linux/arch/arm64/include/asm/neon.h
-+ *
-+ * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#define cpu_has_neon()		(1)
-+
-+void kernel_neon_begin(void);
-+void kernel_neon_end(void);
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index e8b8357..040aec2 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -19,6 +19,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/preempt.h>
- #include <linux/sched.h>
- #include <linux/signal.h>
- 
-@@ -83,6 +84,46 @@ void fpsimd_flush_thread(void)
- 	fpsimd_load_state(&current->thread.fpsimd_state);
- }
- 
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+
-+/*
-+ * Kernel-side NEON support functions
-+ */
-+void kernel_neon_begin(void)
-+{
-+	/*
-+	 * Kernel mode NEON is only allowed outside of interrupt context
-+	 * with preemption disabled. This will make sure that the kernel
-+	 * mode NEON register contents never need to be preserved.
-+	 *
-+	 * Use inc_preempt_count() directly on builds that have kernel
-+	 * preemption disabled so sleeping complains noisily even on those.
-+	 */
-+	BUG_ON(in_interrupt());
-+#ifndef CONFIG_PREEMPT_COUNT
-+	inc_preempt_count();
-+#endif
-+	preempt_disable();
-+
-+	if (current->mm)
-+		fpsimd_save_state(&current->thread.fpsimd_state);
-+}
-+EXPORT_SYMBOL(kernel_neon_begin);
-+
-+void kernel_neon_end(void)
-+{
-+	if (current->mm)
-+		fpsimd_load_state(&current->thread.fpsimd_state);
-+
-+	preempt_enable();
-+#ifndef CONFIG_PREEMPT_COUNT
-+	dec_preempt_count();
-+#endif
-+}
-+EXPORT_SYMBOL(kernel_neon_end);
-+
-+#endif /* CONFIG_KERNEL_MODE_NEON */
-+
- /*
-  * FP/SIMD support code initialisation.
-  */
--- 
-1.8.1.2
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/14bb2b2a/attachment-0001.sig>
