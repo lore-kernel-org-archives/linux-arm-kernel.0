@@ -1,30 +1,143 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 26 Jun 2013 12:28:09 +0300
-Subject: [PATCH 06/23] ARM: dt: tegra114: iommu: Add "nvidia,swgroups"
-Message-ID: <1372238906-9346-7-git-send-email-hdoyu@nvidia.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 26 Jun 2013 17:35:58 +0800
+Subject: [PATCH 1/2] serial: imx: remove the uart_console() check
+Message-ID: <1372239359-4054-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a bitmap that indicates which HardWare Accelerators(HWA) are
-supported on Tegra114 SoC.
+The uart_console() check makes the clocks(clk_per and clk_ipg) opened
+even when we close the console uart.
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+This patch enable/disable the clocks in imx_console_write(),
+so we can keep the clocks closed when the console uart is closed.
+
+Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- arch/arm/boot/dts/tegra114.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/tty/serial/imx.c |   63 ++++++++++++++++++++++++++++++++-------------
+ 1 files changed, 45 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 1f45cf5..715b5d6 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -323,7 +323,7 @@
- 		       0x70019228 0x074>;
- 		nvidia,#asids = <4>;
- 		dma-window = <0 0x40000000>;
--		nvidia,swgroups = <0x18659fe>;
-+		nvidia,swgroups = <0x00000000 0x01b659fe>;
- 		nvidia,ahb = <&ahb>;
- 	};
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 415cec6..bfdf764 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -702,15 +702,13 @@ static int imx_startup(struct uart_port *port)
+ 	int retval;
+ 	unsigned long flags, temp;
  
+-	if (!uart_console(port)) {
+-		retval = clk_prepare_enable(sport->clk_per);
+-		if (retval)
+-			goto error_out1;
+-		retval = clk_prepare_enable(sport->clk_ipg);
+-		if (retval) {
+-			clk_disable_unprepare(sport->clk_per);
+-			goto error_out1;
+-		}
++	retval = clk_prepare_enable(sport->clk_per);
++	if (retval)
++		goto error_out1;
++	retval = clk_prepare_enable(sport->clk_ipg);
++	if (retval) {
++		clk_disable_unprepare(sport->clk_per);
++		goto error_out1;
+ 	}
+ 
+ 	imx_setup_ufcr(sport, 0);
+@@ -901,10 +899,8 @@ static void imx_shutdown(struct uart_port *port)
+ 	writel(temp, sport->port.membase + UCR1);
+ 	spin_unlock_irqrestore(&sport->port.lock, flags);
+ 
+-	if (!uart_console(&sport->port)) {
+-		clk_disable_unprepare(sport->clk_per);
+-		clk_disable_unprepare(sport->clk_ipg);
+-	}
++	clk_disable_unprepare(sport->clk_per);
++	clk_disable_unprepare(sport->clk_ipg);
+ }
+ 
+ static void
+@@ -1251,6 +1247,16 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
+ 	unsigned int ucr1;
+ 	unsigned long flags = 0;
+ 	int locked = 1;
++	int retval;
++
++	retval = clk_enable(sport->clk_per);
++	if (retval)
++		return;
++	retval = clk_enable(sport->clk_ipg);
++	if (retval) {
++		clk_disable(sport->clk_per);
++		return;
++	}
+ 
+ 	if (sport->port.sysrq)
+ 		locked = 0;
+@@ -1286,6 +1292,9 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
+ 
+ 	if (locked)
+ 		spin_unlock_irqrestore(&sport->port.lock, flags);
++
++	clk_disable(sport->clk_ipg);
++	clk_disable(sport->clk_per);
+ }
+ 
+ /*
+@@ -1359,6 +1368,7 @@ imx_console_setup(struct console *co, char *options)
+ 	int bits = 8;
+ 	int parity = 'n';
+ 	int flow = 'n';
++	int retval;
+ 
+ 	/*
+ 	 * Check whether an invalid uart number has been specified, and
+@@ -1371,6 +1381,15 @@ imx_console_setup(struct console *co, char *options)
+ 	if (sport == NULL)
+ 		return -ENODEV;
+ 
++	retval = clk_prepare_enable(sport->clk_per);
++	if (retval)
++		goto error_console;
++	retval = clk_prepare_enable(sport->clk_ipg);
++	if (retval) {
++		clk_disable_unprepare(sport->clk_per);
++		goto error_console;
++	}
++
+ 	if (options)
+ 		uart_parse_options(options, &baud, &parity, &bits, &flow);
+ 	else
+@@ -1378,7 +1397,17 @@ imx_console_setup(struct console *co, char *options)
+ 
+ 	imx_setup_ufcr(sport, 0);
+ 
+-	return uart_set_options(&sport->port, co, baud, parity, bits, flow);
++	retval = uart_set_options(&sport->port, co, baud, parity, bits, flow);
++
++	clk_disable(sport->clk_per);
++	clk_disable(sport->clk_ipg);
++	if (retval) {
++		clk_unprepare(sport->clk_per);
++		clk_unprepare(sport->clk_ipg);
++	}
++
++error_console:
++	return retval;
+ }
+ 
+ static struct uart_driver imx_reg;
+@@ -1583,10 +1612,8 @@ static int serial_imx_probe(struct platform_device *pdev)
+ 		goto deinit;
+ 	platform_set_drvdata(pdev, sport);
+ 
+-	if (!uart_console(&sport->port)) {
+-		clk_disable_unprepare(sport->clk_per);
+-		clk_disable_unprepare(sport->clk_ipg);
+-	}
++	clk_disable_unprepare(sport->clk_per);
++	clk_disable_unprepare(sport->clk_ipg);
+ 
+ 	return 0;
+ deinit:
 -- 
-1.8.1.5
+1.7.1
