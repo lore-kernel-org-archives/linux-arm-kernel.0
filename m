@@ -1,63 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Jun 2013 18:42:31 +0100
-Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
- MMU binding
-In-Reply-To: <CALRxmdCycFK2wW=C4aU79mudSaT+2vU8nzXxepdstubg+YSdQg@mail.gmail.com>
-References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
- <1370889285-22799-8-git-send-email-will.deacon@arm.com>
- <CALRxmdBxFWoRKv+bUu8VEwNNcAJUej9jM2V8N0rrqrr_Vpe8fQ@mail.gmail.com>
- <20130626133941.GD7417@mudshark.cambridge.arm.com>
- <CALRxmdCycFK2wW=C4aU79mudSaT+2vU8nzXxepdstubg+YSdQg@mail.gmail.com>
-Message-ID: <20130626174231.GH10333@mudshark.cambridge.arm.com>
+From: trini@ti.com (Tom Rini)
+Date: Wed, 26 Jun 2013 13:45:33 -0400
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <alpine.DEB.2.02.1306261726280.6135@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+ <51CAEB33.5010101@ti.com> <51CAEBF3.1010507@ti.com>
+ <alpine.DEB.2.02.1306261726280.6135@utopia.booyaka.com>
+Message-ID: <51CB28BD.2020105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 05:19:48PM +0100, Stuart Yoder wrote:
-> On Wed, Jun 26, 2013 at 8:39 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > I'd suggest looking at the driver I posted to get a gist of how the parsing
-> > code works, but suffice to say that we describe both the number of
-> > interrupts and the actual interrupt numbers here.
+On 06/26/2013 01:28 PM, Paul Walmsley wrote:
+> On Wed, 26 Jun 2013, Tom Rini wrote:
 > 
-> I understand that the number of interrupts and actual interrupt numbers
-> are described here, but was referring to the _meaning_ of the interrupt
-> numbers.   A binding for a device with 2 interrupts, a TX and RX would
-> normally identify which interrupt specifier is for TX and which is for RX.
+>> Yes, please confirm that they're being set.
 > 
-> Based on your code, the 2 global interrupts seem to be the secure
-> and non-secure fault interrupts...which your driver does not differentiate.
-> However, the device tree is describing hardware and  you can't assume
-> that all drivers don't care which is which.
-
-Currently, the driver only works when Linux is running as non-secure, which is
-becoming more and more common since it is required to be able to make use of
-hyp mode.
-
-There are actually two global interrupts for SMMUv1 and SMMUv2, which
-correspond to configuration faults and `other' global faults.
-
-> If there are other interrupts added in the future like the performance interrupt
-> the definition could be expanded to add that.
-
-PMU interrupts would like have a separate property, since the PMU would be
-driven by a largely independent piece of code.
-
-> But a question.... why do you need the #global-interrupts property
-> at all?   Is the number of "global" interrupts really implementation dependent?
-> Does't a specific compatible string imply the number of interrupts that there
-> actually are?
-
-Integrators have a nasty habit of ORing interrupts together or not wiring
-them at all and I don't want to be caught out by that.
-
-> > What bus hierarchy? If I have two SMMU device nodes, how do I infer any
-> > topological information without an explicit linkage?
+> For the Kconfig that I use to boot the BeagleBone-white, which is called 
+> "am33xx_only", yes, both of those are set.  
 > 
-> I really don't know anything about SMMU chaining, but am inferring what
-> this might look like.   Does the "child" SMMU look just like another
-> mmu-master to the parent?   If so, why not just use the mmu-masters
-> property to establish the relationship.
+> Here's the v3.8-rc1 version of this Kconfig as an example:
+> 
+> http://www.pwsan.com/omap/testlogs/test_v3.8-rc1/20121228031713/build/am33xx_only/am33xx_only
 
-No, the child SMMU does not look like a master. It can remaster upstream
-StreamIDs, for example.
+OK, is there a reason to not be using omap2plus_defconfig?  My pass/fail
+here is based on that config and enabling, or not, dtb append.  Seems
+like it would be one less thing to maintain on your end and it would be
+on TIs end (roughly speaking) to make sure our platforms that ought to
+be working upstream have what they need enabled in the defconfig(s) in
+question.
 
-Will
+-- 
+Tom
