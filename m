@@ -1,39 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Jun 2013 20:17:04 +0200
-Subject: [PATCH V10 1/4] pci: Add PCIe driver for Samsung Exynos
-In-Reply-To: <007e01ce7153$4d4b0730$e7e11590$%kim@samsung.com>
-References: <003a01ce6e50$6d5418b0$47fc4a10$@samsung.com>
- <20130625021102.GA13310@google.com>
- <007e01ce7153$4d4b0730$e7e11590$%kim@samsung.com>
-Message-ID: <201306262017.04689.arnd@arndb.de>
+Date: Wed, 26 Jun 2013 20:22:10 +0200
+Subject: SCU registers mapping for CA9/CA5 cores
+In-Reply-To: <20130624090640.GZ2718@n2100.arm.linux.org.uk>
+References: <CADApbei3QOCQRmo_oYZ_XiUVupq+4uUs7WNe6f7k_OG0LHB3=w@mail.gmail.com>
+ <201306211129.22625.arnd@arndb.de>
+ <20130624090640.GZ2718@n2100.arm.linux.org.uk>
+Message-ID: <201306262022.11103.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 June 2013, Kukjin Kim wrote:
-> Bjorn Helgaas wrote:
-> > 
-> > On Fri, Jun 21, 2013 at 04:24:54PM +0900, Jingoo Han wrote:
-> > > Exynos5440 has a PCIe controller which can be used as Root Complex.
-> > > This driver supports a PCIe controller as Root Complex mode.
-> > >
-> > > Signed-off-by: Surendranath Gurivireddy Balla <suren.reddy@samsung.com>
-> > > Signed-off-by: Siva Reddy Kallam <siva.kallam@samsung.com>
-> > > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> > 
-> > Please merge this through arm-soc as you discussed.
-> > 
-> Sounds great.
+On Monday 24 June 2013, Russell King - ARM Linux wrote:
+> On Fri, Jun 21, 2013 at 11:29:22AM +0200, Arnd Bergmann wrote:
+> > I think we could actually move everything between VMALLOC_END and
+> > ffff0000 into a larger fixmap. This would be a substantial change,
+> > but it would give us more vmalloc space for most configurations
+> > and more flexibility with what else we could put into fixmap.
 > 
-> Arnd, please take this series into arm-soc tree directly by yourself with my
-> ack on arch/exynos stuff if you want ;)
+> ... at the expense of:
+> (a) having to look up the PTE table pointer every time we want to add or
+> remove a mapping,
+
+Is that a frequent operation? I guess it's not important given the
+argument below.
+
+> (b) wasting the top 15 pages from being used.
 > 
+> Also, the placement of some of these pages matters especially for the
+> VIPT aliasing caches, where cache colouring becomes important.  So an
+> enum in fixmap isn't going to work for those.
 
-Ok, done.
+x86 deals with alignment through some extra tricks, it's certainly doable
+but I agree it's not improving readability if you do that.
 
-I've put this on top of the next/soc tree, which already contains the
-other PCI host controller support.
+> Really, the value to such a change is very low and is really just churn
+> for churn's sake.  "Oh we can do something different!"  No.
+
+Ok, fair enough.
+
+I also saw the patch for early_ioremap, which would basically require
+doing something like this. I'll comment on that email separately.
 
 	Arnd
