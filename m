@@ -1,38 +1,240 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 26 Jun 2013 12:33:54 +0200
-Subject: [PATCH 03/23] ARM: dt: tegra30: iommu: Add "nvidia,memory-clients"
-In-Reply-To: <20130626101816.GE27083@manwe>
-References: <1372238906-9346-4-git-send-email-hdoyu@nvidia.com>
- <20130626101816.GE27083@manwe>
-Message-ID: <20130626103354.GH27083@manwe>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 26 Jun 2013 17:57:08 +0200
+Subject: [PATCHv2 2/3] ARM: mxs: dt: Add Crystalfontz CFA-10056 device tree
+In-Reply-To: <1372261232-21051-3-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1372261232-21051-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1372261232-21051-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20130626155708.GG5803@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 12:18:17PM +0200, Thierry Reding wrote:
-> On Wed, Jun 26, 2013 at 12:28:06PM +0300, Hiroshi Doyu wrote:
-> [...]
-> > diff --git a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
-> [...]
-> > @@ -23,3 +24,13 @@ Example:
-> >  		nvidia,swgroups = <0x00000000 0x000779ff>;
-> >  		nvidia,ahb = <&ahb>;
-> >  	};
-> > +
-> > +	host1x {
-> > +		compatible = "nvidia,tegra30-host1x", "simple-bus";
-> > +		nvidia,memory-clients = <SWGID_HC>;
+On Wed, Jun 26, 2013 at 05:40:31PM +0200, Alexandre Belloni wrote:
+> From: Brian Lilly <brian@crystalfontz.com>
 > 
-> And this could use the SWGID(HC) to match up with how GPIOs are
-> referenced in the DTS files.
+> The CFA-10056 is a breakout board for the CFA-10036, and is
+> basically a CFA-10037, with a 4.3" screen.
+> 
+> Signed-off-by: Brian Lilly <brian@crystalfontz.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/Makefile           |   1 +
+>  arch/arm/boot/dts/imx28-cfa10056.dts | 171 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 172 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx28-cfa10056.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 225d939..d494f37 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -131,6 +131,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+>  	imx28-cfa10037.dtb \
+>  	imx28-cfa10049.dtb \
+>  	imx28-cfa10055.dtb \
+> +	imx28-cfa10056.dtb \
+>  	imx28-cfa10057.dtb \
+>  	imx28-evk.dtb \
+>  	imx28-m28evk.dtb \
+> diff --git a/arch/arm/boot/dts/imx28-cfa10056.dts b/arch/arm/boot/dts/imx28-cfa10056.dts
+> new file mode 100644
+> index 0000000..dd6d217
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx28-cfa10056.dts
+> @@ -0,0 +1,171 @@
+> +/*
+> + * Copyright 2013 Free Electrons
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/*
+> + * The CFA-10056 is an expansion board for the CFA-10036 module, thus we
+> + * need to include the CFA-10036 DTS.
+> + */
+> +/include/ "imx28-cfa10036.dts"
+> +
+> +/ {
+> +	model = "Crystalfontz CFA-10056 Board";
+> +	compatible = "crystalfontz,cfa10056", "crystalfontz,cfa10036", "fsl,imx28";
+> +
+> +	apb at 80000000 {
+> +		apbh at 80000000 {
+> +			pinctrl at 80018000 {
+> +				pinctrl-names = "default", "default";
+> +				pinctrl-1 = <&hog_pins_cfa10056
+> +					&hog_pins_cfa10056_pullup>;
+> +
+> +				hog_pins_cfa10056: hog-10056 at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <
+> +						0x0073 /* MX28_PAD_GPMI_D7__GPIO_0_7 */
+> +						0x2153 /* MX28_PAD_SSP2_D5__GPIO_2_21 */
+> +						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
+> +					>;
+> +					fsl,drive-strength = <0>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <0>;
+> +				};
 
-Scratch that. SWGID() yields a mask for the corresponding swgroup so
-it's not the same thing.
+These hogs pins don't have much sense anymore.
 
-Thierry
+Maybe you should split out the three pins in:
+  - usb_pins_cfa10056
+  - mac0_pins_cfa10056
+  - move the last one in spi2_pins_cfa10056
+
+> +
+> +				hog_pins_cfa10056_pullup: hog-10056-pullup at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <
+> +						0x31e3 /* MX28_PAD_LCD_RESET__GPIO_3_30 */
+> +					>;
+> +					fsl,drive-strength = <0>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <1>;
+> +				};
+
+You could probably rename it to lcdif_pins_cfa10056_pullups or something
+then, and make the lcdif driver grab these pins.
+
+> +
+> +				spi2_pins_cfa10056: spi2-cfa10056 at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <
+> +						0x2103 /* MX28_PAD_SSP2_SCK__GPIO_2_16 */
+> +						0x2113 /* MX28_PAD_SSP2_CMD__GPIO_2_17 */
+> +						0x2123 /* MX28_PAD_SSP2_D0__GPIO_2_18 */
+> +					>;
+> +					fsl,drive-strength = <1>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <1>;
+> +				};
+> +
+> +				lcdif_pins_cfa10056: lcdif-evk at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <
+> +						0x1181 /* MX28_PAD_LCD_RD_E__LCD_VSYNC */
+> +						0x1191 /* MX28_PAD_LCD_WR_RWN__LCD_HSYNC */
+> +						0x11a1 /* MX28_PAD_LCD_RS__LCD_DOTCLK */
+> +						0x11b1 /* MX28_PAD_LCD_CS__LCD_ENABLE */
+> +					>;
+> +					fsl,drive-strength = <0>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <0>;
+> +				};
+> +			};
+> +
+> +			lcdif at 80030000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&lcdif_24bit_pins_a
+> +						 &lcdif_pins_cfa10056>;
+> +				display = <&display>;
+> +				status = "okay";
+> +
+> +				display: display {
+> +					bits-per-pixel = <32>;
+> +					bus-width = <24>;
+> +
+> +					display-timings {
+> +						native-mode = <&timing0>;
+> +						timing0: timing0 {
+> +							clock-frequency = <32000000>;
+> +							hactive = <480>;
+> +							vactive = <800>;
+> +							hback-porch = <2>;
+> +							hfront-porch = <2>;
+> +							vback-porch = <2>;
+> +							vfront-porch = <2>;
+> +							hsync-len = <5>;
+> +							vsync-len = <5>;
+> +							hsync-active = <0>;
+> +							vsync-active = <0>;
+> +							de-active = <1>;
+> +							pixelclk-active = <1>;
+> +						};
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		apbx at 80040000 {
+> +			usbphy1: usbphy at 8007e000 {
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +
+> +	ahb at 80080000 {
+> +		usb1: usb at 80090000 {
+> +			vbus-supply = <&reg_usb1_vbus>;
+> +			pinctrl-0 = <&usbphy1_pins_a>;
+> +			pinctrl-names = "default";
+> +			status = "okay";
+> +		};
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +
+> +		reg_usb1_vbus: usb1_vbus {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "usb1_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio0 7 1>;
+> +		};
+> +	};
+> +
+> +	ahb at 80080000 {
+> +		mac0: ethernet at 800f0000 {
+> +			phy-mode = "rmii";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&mac0_pins_a>;
+> +			phy-reset-gpios = <&gpio2 21 0>;
+> +			phy-reset-duration = <100>;
+> +			status = "okay";
+> +		};
+> +	};
+> +
+> +	spi2 {
+> +		compatible = "spi-gpio";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&spi2_pins_cfa10056>;
+> +		status = "okay";
+> +		gpio-sck = <&gpio2 16 0>;
+> +		gpio-mosi = <&gpio2 17 0>;
+> +		gpio-miso = <&gpio2 18 0>;
+> +		cs-gpios = <&gpio3 5 0>;
+> +		num-chipselects = <1>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		hx8369: hx8369 at 0 {
+> +			compatible = "himax,hx8369a", "himax,hx8369";
+> +			reg = <0>;
+> +			spi-max-frequency = <100000>;
+> +			spi-cpol;
+> +			spi-cpha;
+> +			gpios-reset = <&gpio3 30 0>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.8.1.2
+> 
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/529d53c6/attachment-0001.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130626/f0def45b/attachment-0001.sig>
