@@ -1,70 +1,47 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 27 Jun 2013 10:25:14 -0700
-Subject: [PATCH 4/8] ARM: OMAP: move cpuidle drivers to drivers/cpuidle/
-In-Reply-To: <20130627080653.GH5523@atomide.com> (Tony Lindgren's message of
- "Thu, 27 Jun 2013 01:06:54 -0700")
-References: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
- <1372241747-21083-5-git-send-email-b.zolnierkie@samsung.com>
- <20130627080653.GH5523@atomide.com>
-Message-ID: <878v1vqxdx.fsf@linaro.org>
+From: dserrg@gmail.com (Sergey Dyasly)
+Date: Thu, 27 Jun 2013 21:24:35 +0400
+Subject: [PATCH] ARM: LPAE: don't reject mapping /dev/mem above 4GB
+Message-ID: <1372353875-3262-1-git-send-email-dserrg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+With LPAE enabled, physical address space is larger than 4GB. Allow mapping any
+part of it via /dev/mem by utilizing the same check as in arm64.
 
-> * Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> [130626 12:25]:
->> While at it:
->> - remove file path from comment
->> - fix whitespace issues
->> 
->> Compile tested only.
-> ...
->
->> --- /dev/null
->> +++ b/drivers/cpuidle/cpuidle-omap34xx.c
->> @@ -0,0 +1,342 @@
->> +/*
->> + * OMAP3 CPU IDLE Routines
->> + *
->> + * Copyright (C) 2008 Texas Instruments, Inc.
->> + * Rajendra Nayak <rnayak@ti.com>
->> + *
->> + * Copyright (C) 2007 Texas Instruments, Inc.
->> + * Karthik Dasu <karthik-dp@ti.com>
->> + *
->> + * Copyright (C) 2006 Nokia Corporation
->> + * Tony Lindgren <tony@atomide.com>
->> + *
->> + * Copyright (C) 2005 Texas Instruments, Inc.
->> + * Richard Woodruff <r-woodruff2@ti.com>
->> + *
->> + * Based on pm.c for omap2
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/sched.h>
->> +#include <linux/cpuidle.h>
->> +#include <linux/export.h>
->> +#include <linux/cpu_pm.h>
->> +#include <asm/cpuidle.h>
->> +
->> +#include "../../arch/arm/mach-omap2/powerdomain.h"
->> +#include "../../arch/arm/mach-omap2/clockdomain.h"
->> +
->> +#include "../../arch/arm/mach-omap2/pm.h"
->> +#include "../../arch/arm/mach-omap2/control.h"
->> +#include "../../arch/arm/mach-omap2/common.h"
->
-> Do we really want to do includes like this from drivers?
-> Presumably these will go away with DT, but still.
->
-> Kevin, any comments?
+Reported-by: Vassili Karpov <av1474@comtv.ru>
+Tested-by: Vassili Karpov <av1474@comtv.ru>
+Signed-off-by: Sergey Dyasly <dserrg@gmail.com>
+---
+ arch/arm/mm/mmap.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-NACK
-
-We need proper interfaces to platform-specific code before moving.
-
-Kevin
+diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
+index 10062ce..8f1bbbc 100644
+--- a/arch/arm/mm/mmap.c
++++ b/arch/arm/mm/mmap.c
+@@ -203,6 +203,15 @@ int valid_phys_addr_range(phys_addr_t addr, size_t size)
+ 	return 1;
+ }
+ 
++#ifdef CONFIG_ARM_LPAE
++/*
++ * Do not allow /dev/mem mappings beyond the supported physical range.
++ */
++int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
++{
++	return !(((pfn << PAGE_SHIFT) + size) & ~PHYS_MASK);
++}
++#else
+ /*
+  * We don't use supersection mappings for mmap() on /dev/mem, which
+  * means that we can't map the memory area above the 4G barrier into
+@@ -212,6 +221,7 @@ int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
+ {
+ 	return !(pfn + (size >> PAGE_SHIFT) > 0x00100000);
+ }
++#endif
+ 
+ #ifdef CONFIG_STRICT_DEVMEM
+ 
+-- 
+1.8.1.2
