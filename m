@@ -1,48 +1,58 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 27 Jun 2013 15:49:00 +0200
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803EFBC6C@039-SN2MPN1-023.039d.mgd.msft.net>
-References: <51A5A808.2070803@digi.com> <201306241551.19831.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803EFBC6C@039-SN2MPN1-023.039d.mgd.msft.net>
-Message-ID: <201306271549.01136.marex@denx.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 27 Jun 2013 22:49:20 +0900
+Subject: [PATCH v2] dmaengine: shdma: fix a build failure on platforms
+ with no DMA support
+In-Reply-To: <3410825.gK3KBC8v80@wuerfel>
+References: <Pine.LNX.4.64.1305310423360.1470@axis700.grange>
+ <3410825.gK3KBC8v80@wuerfel>
+Message-ID: <20130627134920.GD28902@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-> > No, I don't have this one available right now. I tried both MX23
-> > Olinuxino maxi
-> > (I just mutilated the board so that I cut traces to the USB devices on
-> > the board
-> > and routed out USB gadget connector) and a custom MX23 board.
+On Fri, May 31, 2013 at 04:51:52PM +0200, Arnd Bergmann wrote:
+> On Friday 31 May 2013 05:01:31 Guennadi Liakhovetski wrote:
+> > On platforms with no support for the shdma dmaengine driver build is
+> > currently failing with
 > > 
-> > Note that both have working USB peripheral mode in U-Boot too, but the
-> > driver in
-> > U-Boot is very minimalistic.
+> > drivers/built-in.o: In function `sh_mobile_sdhi_probe':
+> > drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
+> > 
+> > Fix the breakage by defining shdma_chan_filter to NULL in such
+> > configurations.
+> > 
+> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 > 
-> You mean, the larger data transfer with USB peripheral mode is ok at
-> u-boot? but it can't work at Linux Kernel?
+> Sorry, I saw your patch too late and already spent some time doing a different one.
+> 
+> > diff --git a/include/linux/sh_dma.h b/include/linux/sh_dma.h
+> > index b64d6be..1fd8a20 100644
+> > --- a/include/linux/sh_dma.h
+> > +++ b/include/linux/sh_dma.h
+> > @@ -99,6 +99,10 @@ struct sh_dmae_pdata {
+> >  #define CHCR_TE        0x00000002
+> >  #define CHCR_IE        0x00000004
+> >  
+> > +#if IS_ENABLED(CONFIG_SH_DMAE_BASE)
+> >  bool shdma_chan_filter(struct dma_chan *chan, void *arg);
+> > +#else
+> > +#define shdma_chan_filter NULL
+> > +#endif
+> 
+> I still think that this is not the right solution, or at least not
+> complete: No slave driver should care about which dma-engine it is
+> connected to. You have already done most of the necessary conversion,
+> so it would be straightforward to also pass the filter function
+> pointer to the sdhi driver along with the data that gets passed into
+> it.
 
-I stumbled across one more problem with the patches:
+Hi Arnd, Hi Guennadi,
 
-- I use OTG on MX28
-- I configured the USB ID pin
-- I set the dr_mode to "otg"
-(so far so good)
-- I use the port in HOST mode by plugging in a USB pendrive over the OTG-capable 
-reduction ; this works OK
-- I disconnect the reduction and connect it to the computer ; here I get 
-"timeout waiting for 00000800 in 11".
+It seems to me that the solution above, though not particularly generic,
+is sufficient as according to Guennadi SHDMA users cannot use other DMA
+drivers[1]. The change above also has the merit of being rather small.
 
-This means the BSV bit in OTGSC register wasn't unset.
+[1] https://patchwork.kernel.org/patch/2644101/
 
-Interestingly enough, transition the other way around (first use in gadget mode 
-then in host mode) works fine, but if I do host mode -> gadget mode, I get the 
-timeout. Do you have any hint for me?
+With that reasoning I would like to provide:
 
-btw. what is the plan about cleaning up and upstreaming all these patches we 
-have here? Is anyone working on it? I'd hate to stomp on anyones' efforts,but 
-I'd also like to see this mess sorted out.
-
-Best regards,
-Marek Vasut
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
