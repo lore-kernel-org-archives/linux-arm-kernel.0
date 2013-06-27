@@ -1,25 +1,66 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 27 Jun 2013 16:41:29 +0900
-Subject: [PATCH v4 0/3] R8A7779/Marzen R-Car VIN driver support
-In-Reply-To: <201305160153.29827.sergei.shtylyov@cogentembedded.com>
-References: <201305160153.29827.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130627074129.GB13927@verge.net.au>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 27 Jun 2013 09:47:47 +0200
+Subject: [PATCH v2 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+In-Reply-To: <20130627061713.GF15455@arwen.pp.htv.fi>
+References: <1372170110-12993-1-git-send-email-s.nawrocki@samsung.com>
+ <20130625150649.GA21334@arwen.pp.htv.fi> <51CB0212.3050103@samsung.com>
+ <20130627061713.GF15455@arwen.pp.htv.fi>
+Message-ID: <51CBEE23.4010402@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 01:53:29AM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
->    Here's the set of 3 patches against the Simon Horman's 'renesas.git' repo,
-> 'renesas-next-20130515v2' tag and my recent yet unapplied USB/I2C patches.
-> Here we add the VIN driver platform code for the R8A7779/Marzen with ADV7180
-> I2C video decoder.
-> 
-> [1/3] ARM: shmobile: r8a7779: add VIN support
-> [2/3] ARM: shmobile: Marzen: add VIN and ADV7180 support
-> [3/3] ARM: shmobile: Marzen: enable VIN and ADV7180 in defconfig
-> 
->    The VIN driver itself has been excluded from the series as it will be developed
-> against Mauro's 'media_tree.git' plus some yet unapplied patches in the future...
+Hi Felipe,
 
-Sergei, is this patch-set still needing review?
+On 06/27/2013 08:17 AM, Felipe Balbi wrote:
+> On Wed, Jun 26, 2013 at 05:00:34PM +0200, Sylwester Nawrocki wrote:
+>> Hi,
+>>
+>> On 06/25/2013 05:06 PM, Felipe Balbi wrote:
+>>>> +static struct platform_driver exynos_video_phy_driver = {
+>>>>> +	.probe	= exynos_video_phy_probe,
+>>>
+>>> you *must* provide a remove method. drivers with NULL remove are
+>>> non-removable :-)
+>>
+>> Actually the remove() callback can be NULL, it's just missing module_exit
+>> function that makes a module not unloadable.
+> 
+> look at the implementation of platform_drv_remove():
+> 
+>  499 static int platform_drv_remove(struct device *_dev)
+>  500 {
+>  501         struct platform_driver *drv = to_platform_driver(_dev->driver);
+>  502         struct platform_device *dev = to_platform_device(_dev);
+>  503         int ret;
+>  504 
+>  505         ret = drv->remove(dev);
+>  506         if (ACPI_HANDLE(_dev))
+>  507                 acpi_dev_pm_detach(_dev, true);
+>  508 
+>  509         return ret;
+>  510 }
+> 
+> that's not a conditional call right :-)
+
+It is conditional, just condition check is in different place:
+
+int platform_driver_register(struct platform_driver *drv)
+{
+	(...)
+	if (drv->remove)
+		drv->driver.remove = platform_drv_remove;
+	(...)
+}
+
+
+Regards
+Andrzej
+
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
