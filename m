@@ -1,44 +1,50 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Thu, 27 Jun 2013 23:26:08 +0300
-Subject: [linux-sunxi] [PATCH 0/8] clocksource: sunxi: Timer fixes and
- cleanup
-In-Reply-To: <20130627165436.GB4319@lukather>
-References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
- <51CC0566.8010302@redhat.com> <20130627094307.GC8437@lukather>
- <51CC0BC3.5090309@redhat.com> <20130627165436.GB4319@lukather>
-Message-ID: <20130627232608.1174558b@i7>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 27 Jun 2013 15:54:20 -0500
+Subject: [PATCH] of: Specify initrd location using 64-bit
+In-Reply-To: <51C48B5A.2040404@ti.com>
+References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
+ <51C4171C.9050908@linutronix.de> <51C48B5A.2040404@ti.com>
+Message-ID: <51CCA67C.2010803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Jun 2013 18:54:36 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> On Thu, Jun 27, 2013 at 11:54:11AM +0200, Hans de Goede wrote:
-> > I notice that unlike the sunxi-3.4 code you don't do any locking,
-> > so how do you stop 2 clocksource calls from racing (and thus
-> > getting a possible wrong value because of things not
-> > being properly latched) ?
+On 06/21/2013 12:20 PM, Santosh Shilimkar wrote:
+> On Friday 21 June 2013 05:04 AM, Sebastian Andrzej Siewior wrote:
+>> On 06/21/2013 02:52 AM, Santosh Shilimkar wrote:
+>>> diff --git a/arch/microblaze/kernel/prom.c b/arch/microblaze/kernel/prom.c
+>>> index 0a2c68f..62e2e8f 100644
+>>> --- a/arch/microblaze/kernel/prom.c
+>>> +++ b/arch/microblaze/kernel/prom.c
+>>> @@ -136,8 +136,7 @@ void __init early_init_devtree(void *params)
+>>>  }
+>>>  
+>>>  #ifdef CONFIG_BLK_DEV_INITRD
+>>> -void __init early_init_dt_setup_initrd_arch(unsigned long start,
+>>> -		unsigned long end)
+>>> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
+>>>  {
+>>>  	initrd_start = (unsigned long)__va(start);
+>>>  	initrd_end = (unsigned long)__va(end);
+>>
+>> I think it would better to go here for phys_addr_t instead of u64. This
+>> would force you in of_flat_dt_match() to check if the value passed from
+>> DT specifies a memory address outside of 32bit address space and the
+>> kernel can't deal with this because its phys_addr_t is 32bit only due
+>> to a Kconfig switch.
+>>
+>> For x86, the initrd has to remain in the 32bit address space so passing
+>> the initrd in the upper range would violate the ABI. Not sure if this
+>> is true for other archs as well (ARM obviously not).
+>>
+> That pretty much means phys_addr_t. It will work for me as well but
+> in last thread from consistency with memory and reserved node, Rob
+> insisted to keep it as u64. So before I re-spin another version,
+> would like to here what Rob has to say considering the x86 requirement.
 > 
-> Hmm, right. I'll add a spinlock.
+> Rob,
+> Are you ok with phys_addr_t since your concern was about rest
+> of the memory specific bits of the device-tree code use u64 ?
 
-I think the best would be to ask the Allwinner people (it's good to
-have them in CC, right?) whether anything wrong can happen because of
-"things not being properly latched".
+No. I still think it should be u64 for same reasons I said originally.
 
-The A10 manual from http://free-electrons.com/~maxime/pub/datasheet/
-does not seem to contain any details about what bad things may happen
-if we try to read CNT64_LO_REG while latching is still in progress and
-CNT64_RL_EN bit in CNT64_CTRL_REG has not changed to zero yet.
-I can imagine the following possible scenarios:
-  1. We read either the old stale CNT64_LO_REG value or the new
-     correct value.
-  2. We read either the old stale CNT64_LO_REG value or the new
-     correct value, or some random garbage.
-  3. The processor may deadlock, eat your dog, or do some other
-     nasty thing.
-
-In the case of 1, we probably can get away without using any spinlocks?
-
--- 
-Best regards,
-Siarhei Siamashka
+Rob
