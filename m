@@ -1,41 +1,33 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 27 Jun 2013 11:40:04 +0300
-Subject: [PATCH v3 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
-In-Reply-To: <51CBF9B8.70103@samsung.com>
-References: <1372258946-15607-1-git-send-email-s.nawrocki@samsung.com>
- <1372258946-15607-2-git-send-email-s.nawrocki@samsung.com>
- <20130627075223.GQ15455@arwen.pp.htv.fi>
- <51CBF9B8.70103@samsung.com>
-Message-ID: <20130627084004.GS15455@arwen.pp.htv.fi>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 27 Jun 2013 10:41:10 +0200
+Subject: [PATCH 1/3] ARM: imx: prepare for removal of flexcan_platform_data
+In-Reply-To: <1372317731-24966-2-git-send-email-mkl@pengutronix.de>
+References: <1372317731-24966-1-git-send-email-mkl@pengutronix.de>
+ <1372317731-24966-2-git-send-email-mkl@pengutronix.de>
+Message-ID: <20130627084110.GE516@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 10:37:12AM +0200, Sylwester Nawrocki wrote:
-> On 06/27/2013 09:52 AM, Felipe Balbi wrote:
-> > On Wed, Jun 26, 2013 at 05:02:22PM +0200, Sylwester Nawrocki wrote:
-> >> Add a PHY provider driver for the Samsung S5P/Exynos SoC MIPI CSI-2
-> >> receiver and MIPI DSI transmitter DPHYs.
-> >>
-> >> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > 
-> > Acked-by: Felipe Balbi <balbi@ti.com>
+On Thu, Jun 27, 2013 at 09:22:09AM +0200, Marc Kleine-Budde wrote:
+> As there are no imx in-tree users of flexcan_platform_data, this patch removes
+> the possibility to register a flexcan device with platform data.
 > 
-> Thank you for your review and ack!
+> The functionality to swith on/off CAN transceivers is added to DT via
+> regulators on a later patch.
 > 
-> Just for the record, I have tested this driver as a loadable
-> module on Exynos4412 TRATS2 board and it all worked fine for
-> both the camera and display side.
+> Compile time tested with imx_v4_v5_defconfig and imx_v6_v7_defconfig.
+> 
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
 
-Awesome dude :-) very cool, let's hope more users convert to Kishon's
-generic phy layer :-)
+I like to see platform stuff go away ;)
+
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Sascha
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130627/a1037fd2/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
