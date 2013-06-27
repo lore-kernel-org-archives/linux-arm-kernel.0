@@ -1,83 +1,44 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Thu, 27 Jun 2013 11:39:17 +0200
-Subject: [PATCH v2] mm: module_alloc: check if size is 0
-In-Reply-To: <1331125768-25454-1-git-send-email-veli-pekka.peltola@bluegiga.com>
-References: <1330631119-10059-1-git-send-email-veli-pekka.peltola@bluegiga.com>
- <1331125768-25454-1-git-send-email-veli-pekka.peltola@bluegiga.com>
-Message-ID: <20130627093917.GQ7171@linux-mips.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 27 Jun 2013 11:43:07 +0200
+Subject: [linux-sunxi] [PATCH 0/8] clocksource: sunxi: Timer fixes and
+ cleanup
+In-Reply-To: <51CC0566.8010302@redhat.com>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+ <51CC0566.8010302@redhat.com>
+Message-ID: <20130627094307.GC8437@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Warming up an ancient thread because the discussion seems to have just
-stalled at some point and I still have this patch bitrotting in patchwork.
-
-The original thread can be found at:
-
-  http://www.linux-mips.org/archives/linux-mips/2012-03/msg00006.html
-  http://www.linux-mips.org/archives/linux-mips/2012-03/msg00028.html
-
-On Wed, Mar 07, 2012 at 03:09:28PM +0200, Veli-Pekka Peltola wrote:
-
-> After commit de7d2b567d040e3b67fe7121945982f14343213d (mm/vmalloc.c: report
-> more vmalloc failures) users will get a warning if vmalloc_node_range() is
-> called with size 0. This happens if module's init size equals to 0. This
-> patch changes ARM, MIPS and x86 module_alloc() to return NULL before calling
-> vmalloc_node_range() that would also return NULL and print a warning.
+On Thu, Jun 27, 2013 at 11:27:02AM +0200, Hans de Goede wrote:
+> Hi,
 > 
-> Signed-off-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: "H. Peter Anvin" <hpa@zytor.com>
-> Cc: x86 at kernel.org
-> ---
-> I found this with ARM but after checking out various implementations of
-> module_alloc() I thought it would be better to fix all at once.
+> On 06/26/2013 11:16 PM, Maxime Ripard wrote:
+> >Hi everyone,
+> >
 > 
-> One way to replicate the warning:
-> compile kernel with CONFIG_KALLSYMS=n
-> insmod a module without init, I used usb-common.ko
+> <snip>
+> 
+> >It also finally adds a clocksource from the free running counter found in the
+> >A10/A13 SoCs.
+> 
+> Hmm, have you benchmarked this? There have been reports from linux-sunxi kernel
+> users (xbmc project) that the waiting for the latch is quite slow. Note we
+> don't have anything better yet in the linux-sunxi kernel.
 
-I didn't try to reproduce the issue but the code in question doesn't seem
-to have changed so the issue should still persist.
+No. I didn't.
 
-Imho de7d2b567d040e3b67fe7121945982f14343213d [mm/vmalloc.c: report more
-vmalloc failures] is overly strict in that it also reports zero-sized
-allocations.  I consider such allocations stupid but legitimiate and often
-better preferrable over having to scatter checks for zero size all over
-place.  So maybe something like below patch?
+Do you have any pointers to these discussions?
 
-Thanks,
+Maxime
 
-  Ralf
----
-
-Signed-off-by: Ralf Baechle <ralf@linux-mips.org>
-
- mm/vmalloc.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-index d365724..e58ca10 100644
---- a/mm/vmalloc.c
-+++ b/mm/vmalloc.c
-@@ -1679,7 +1679,10 @@ void *__vmalloc_node_range(unsigned long size, unsigned long align,
- 	unsigned long real_size = size;
- 
- 	size = PAGE_ALIGN(size);
--	if (!size || (size >> PAGE_SHIFT) > totalram_pages)
-+	if (unlikely(!size))
-+		return NULL;
-+
-+	if ((size >> PAGE_SHIFT) > totalram_pages)
- 		goto fail;
- 
- 	area = __get_vm_area_node(size, align, VM_ALLOC | VM_UNLIST,
-@@ -1711,6 +1714,7 @@ fail:
- 	warn_alloc_failed(gfp_mask, 0,
- 			  "vmalloc: allocation failure: %lu bytes\n",
- 			  real_size);
-+
- 	return NULL;
- }
- 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130627/01305c94/attachment.sig>
