@@ -1,24 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 27 Jun 2013 21:11:19 +0800
-Subject: [PATCH 0/3] ARM: imx: flexcan: convert transceiver switching to DT
-In-Reply-To: <1372317731-24966-1-git-send-email-mkl@pengutronix.de>
-References: <1372317731-24966-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <20130627131117.GB2695@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Jun 2013 15:13:32 +0200
+Subject: [GIT PULL] DaVinci DT updates for v3.11
+In-Reply-To: <51CB3828.6060407@ti.com>
+References: <51CB3828.6060407@ti.com>
+Message-ID: <201306271513.32395.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 09:22:08AM +0200, Marc Kleine-Budde wrote:
-> Hello,
+On Wednesday 26 June 2013, Sekhar Nori wrote:
+> Device Tree updates for DaVinci
 > 
-> this series converts the flexcan driver from using a callback function
-> (configured via platform data), to switch the transceiver on and off, to a
-> standard regulator. As there are no in-tree users of the platform data, it's
-> finally removed.
+> This patch set updates da850 DTS files to enable use of
+> C pre-processor. Also updates pinctrl-single DT data
+> to go with changes done in that module to enable a
+> single register to service configuration of multiple
+> pins.
 > 
-> If there are no objections I'd like to upstream this via can-next and David
-> Miller's net-next. As these patches are touching arch/arm/mach-imx, I don't
-> want to continue without some Acked-bys.
- 
-For the series,
+> ----------------------------------------------------------------
+> Manjunathappa, Prakash (1):
+>       ARM: davinci: da850: adopt to pinctrl-single change for configuring multiple pins
+> 
+> Philip Avinash (1):
+>       ARM: davinci: da850: Use #include for all device trees
+> 
+>  arch/arm/boot/dts/da850-enbw-cmc.dts |    2 +-
+>  arch/arm/boot/dts/da850-evm.dts      |    2 +-
+>  arch/arm/boot/dts/da850.dtsi         |    4 ++--
+>  3 files changed, 4 insertions(+), 4 deletions(-)
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Looks simple enough, I've put it into next/late, thanks!
+
+	Arnd
