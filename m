@@ -1,98 +1,119 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 27 Jun 2013 09:02:34 +0300
-Subject: [PATCH 2/8] clocksource: sun4i: Add clocksource and sched clock
- drivers
-In-Reply-To: <1372281421-2099-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
- <1372281421-2099-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130627060234.GD4824@tarshish>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 27 Jun 2013 08:09:33 +0200
+Subject: [PATCH v2] arm64: add support for kernel mode NEON
+Message-ID: <1372313373-30718-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Add <asm/neon.h> containing kernel_neon_begin/kernel_neon_end function
+declarations and corresponding definitions in fpsimd.c
 
-On Wed, Jun 26, 2013 at 11:16:55PM +0200, Maxime Ripard wrote:
-> The A10 and the A13 has a 64 bits free running counter that we can use
-> as a clocksource and a sched clock, that were both not used yet on these
-> platforms.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clocksource/sun4i_timer.c | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-> index bdf34d9..1d2eaa0 100644
-> --- a/drivers/clocksource/sun4i_timer.c
-> +++ b/drivers/clocksource/sun4i_timer.c
-> @@ -23,6 +23,8 @@
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
->  
-> +#include <asm/sched_clock.h>
+These are needed to wrap uses of NEON in kernel mode. The names are
+identical to the ones used in arm/ so code using intrinsics or
+vectorized by GCC can be shared between arm and arm64.
 
-In the tip.git tree (and -next) this header is moved to <linux/sched_clock.h> 
-in  38ff87f77a (sched_clock: Make ARM's sched_clock generic for all 
-architectures).
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+Catalin,
 
-> +
->  #define TIMER_IRQ_EN_REG	0x00
->  #define TIMER_IRQ_EN(val)		BIT(val)
->  #define TIMER_IRQ_ST_REG	0x04
-> @@ -34,6 +36,11 @@
->  #define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
->  
->  #define TIMER_SCAL		16
-> +#define TIMER_CNT64_CTL_REG	0xa0
-> +#define TIMER_CNT64_CTL_CLR		BIT(0)
-> +#define TIMER_CNT64_CTL_RL		BIT(1)
-> +#define TIMER_CNT64_LOW_REG	0xa4
-> +#define TIMER_CNT64_HIGH_REG	0xa8
->  
->  static void __iomem *timer_base;
->  
-> @@ -96,6 +103,20 @@ static struct irqaction sun4i_timer_irq = {
->  	.dev_id = &sun4i_clockevent,
->  };
->  
-> +static u32 sun4i_timer_sched_read(void)
-
-You commit message mentions "64 bits free running counter", but this one only 
-returns 32 bit.
-
-baruch
-
-> +{
-> +	u32 reg = readl(timer_base + TIMER_CNT64_CTL_REG);
-> +	writel(reg | TIMER_CNT64_CTL_RL, timer_base + TIMER_CNT64_CTL_REG);
-> +	while (readl(timer_base + TIMER_CNT64_CTL_REG) & TIMER_CNT64_CTL_REG);
-> +
-> +	return readl(timer_base + TIMER_CNT64_LOW_REG);
-> +}
-> +
-> +static cycle_t sun4i_timer_clksrc_read(struct clocksource *c)
-> +{
-> +	return sun4i_timer_sched_read();
-> +}
-> +
->  static void __init sun4i_timer_init(struct device_node *node)
->  {
->  	unsigned long rate = 0;
-> @@ -117,6 +138,12 @@ static void __init sun4i_timer_init(struct device_node *node)
->  
->  	rate = clk_get_rate(clk);
->  
-> +	writel(TIMER_CNT64_CTL_CLR, timer_base + TIMER_CNT64_CTL_REG);
-> +	setup_sched_clock(sun4i_timer_sched_read, 32, clk_get_rate(clk));
-> +	clocksource_mmio_init(timer_base + TIMER_CNT64_LOW_REG, node->name,
-> +			      clk_get_rate(clk), 300, 32,
-> +			      sun4i_timer_clksrc_read);
-> +
->  	writel(rate / (TIMER_SCAL * HZ),
->  	       timer_base + TIMER_INTVAL_REG(0));
->  
+Following a discussion with Will Deacon, I have switched back to just using
+preempt_disable, which should spot any violations of the no-sleep rule in a
+kernel_neon section in all configurations except non-PREEMPT combined with
+!CONFIG_DEBUG_ATOMIC_SLEEP (which probably accounts for all production servers,
+unfortunately)
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Ard.
+
+ arch/arm64/Kconfig            |  3 +++
+ arch/arm64/include/asm/neon.h | 14 ++++++++++++++
+ arch/arm64/kernel/fpsimd.c    | 32 ++++++++++++++++++++++++++++++++
+ 3 files changed, 49 insertions(+)
+ create mode 100644 arch/arm64/include/asm/neon.h
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 56b3f6d..46ba680 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -95,6 +95,9 @@ config SWIOTLB
+ config IOMMU_HELPER
+ 	def_bool SWIOTLB
+ 
++config KERNEL_MODE_NEON
++	def_bool y
++
+ source "init/Kconfig"
+ 
+ source "kernel/Kconfig.freezer"
+diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
+new file mode 100644
+index 0000000..b0cc58a9
+--- /dev/null
++++ b/arch/arm64/include/asm/neon.h
+@@ -0,0 +1,14 @@
++/*
++ * linux/arch/arm64/include/asm/neon.h
++ *
++ * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#define cpu_has_neon()		(1)
++
++void kernel_neon_begin(void);
++void kernel_neon_end(void);
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index e8b8357..07641c8 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -19,6 +19,7 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/preempt.h>
+ #include <linux/sched.h>
+ #include <linux/signal.h>
+ 
+@@ -83,6 +84,37 @@ void fpsimd_flush_thread(void)
+ 	fpsimd_load_state(&current->thread.fpsimd_state);
+ }
+ 
++#ifdef CONFIG_KERNEL_MODE_NEON
++
++/*
++ * Kernel-side NEON support functions
++ */
++void kernel_neon_begin(void)
++{
++	/*
++	 * Kernel mode NEON is only allowed outside of interrupt context
++	 * with preemption disabled. This will make sure that the kernel
++	 * mode NEON register contents never need to be preserved.
++	 */
++	BUG_ON(in_interrupt());
++	preempt_disable();
++
++	if (current->mm)
++		fpsimd_save_state(&current->thread.fpsimd_state);
++}
++EXPORT_SYMBOL(kernel_neon_begin);
++
++void kernel_neon_end(void)
++{
++	if (current->mm)
++		fpsimd_load_state(&current->thread.fpsimd_state);
++
++	preempt_enable();
++}
++EXPORT_SYMBOL(kernel_neon_end);
++
++#endif /* CONFIG_KERNEL_MODE_NEON */
++
+ /*
+  * FP/SIMD support code initialisation.
+  */
+-- 
+1.8.1.2
