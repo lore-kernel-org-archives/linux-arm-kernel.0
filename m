@@ -1,33 +1,53 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Thu, 27 Jun 2013 11:27:06 -0400
-Subject: [PATCH] mmc: atmel-mci: remove include <mach/cpu.h>
-In-Reply-To: <20130606083300.GJ23653@game.jcrosoft.org> (Jean-Christophe
- PLAGNIOL-VILLARD's message of "Thu, 6 Jun 2013 10:33:00 +0200")
-References: <1365511500-13778-1-git-send-email-nicolas.ferre@atmel.com>
- <20130605094225.GC2805@ludovic.desroches@atmel.com>
- <20130606083300.GJ23653@game.jcrosoft.org>
-Message-ID: <878v1vpoad.fsf@octavius.laptop.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 27 Jun 2013 17:30:53 +0200
+Subject: [RFC PATCH] ARM: ux500: cpuidle: use of_compatible instead of cpu_id
+Message-ID: <1372347053-27739-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Remove the dependency on the id.h header by replacing the cpu_is_
+functions by of_machine_is_compatible.
 
-On Thu, Jun 06 2013, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 11:42 Wed 05 Jun     , Ludovic Desroches wrote:
->> On Tue, Apr 09, 2013 at 02:45:00PM +0200, Nicolas Ferre wrote:
->> > Header file not needed anymore as we have removed
->> > the calls to cpu_is_xxx() macro.
->> > 
->> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> 
->> Late but of course:
->> 
->> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+In order to have cpuidle working on these SoC, the device tree must be
+enabled.
 
-Thanks, pushed to mmc-next for 3.11.
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/mach-ux500/cpuidle.c |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-- Chris.
+diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
+index a45dd09..872c6e9 100644
+--- a/arch/arm/mach-ux500/cpuidle.c
++++ b/arch/arm/mach-ux500/cpuidle.c
+@@ -14,6 +14,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/atomic.h>
+ #include <linux/smp.h>
++#include <linux/of.h>
+ #include <linux/mfd/dbx500-prcmu.h>
+ #include <linux/platform_data/arm-ux500-pm.h>
+ 
+@@ -21,7 +22,6 @@
+ #include <asm/proc-fns.h>
+ 
+ #include "db8500-regs.h"
+-#include "id.h"
+ 
+ static atomic_t master = ATOMIC_INIT(0);
+ static DEFINE_SPINLOCK(master_lock);
+@@ -115,7 +115,11 @@ static struct cpuidle_driver ux500_idle_driver = {
+ 
+ int __init ux500_idle_init(void)
+ {
+-	if (!(cpu_is_u8500_family() || cpu_is_ux540_family()))
++	if (!of_machine_is_compatible("st-ericsson,u8500") &&
++	    !of_machine_is_compatible("st-ericsson,u9540") &&
++	    !of_machine_is_compatible("calaosystems,snowball-a9500") &&
++	    !of_machine_is_compatible("st-ericsson,u9500") &&
++	    !of_machine_is_compatible("st-ericsson,mop500"))
+ 		return -ENODEV;
+ 
+ 	/* Configure wake up reasons */
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.9.5
