@@ -1,31 +1,67 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 27 Jun 2013 18:07:45 +0800
-Subject: [PATCH 02/11] ARM: tegra: add a flag for
- tegra_disable_clean_inv_dcache to do LoUIS or ALL
-In-Reply-To: <51CB4174.1050700@wwwdotorg.org>
-References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
- <1372152475-18617-3-git-send-email-josephl@nvidia.com>
- <51CB4174.1050700@wwwdotorg.org>
-Message-ID: <1372327665.9389.29.camel@jlo-ubuntu-64.nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 27 Jun 2013 12:08:40 +0200
+Subject: [PATCH] pinctrl: elaborate a bit on arrangements in doc
+In-Reply-To: <51CA08A2.4030204@wwwdotorg.org>
+References: <1372169952-22439-1-git-send-email-linus.walleij@stericsson.com>
+ <51CA08A2.4030204@wwwdotorg.org>
+Message-ID: <CACRpkdZJ3oP9ARDhwZ1h8CkFXpDTznPChLiSgivTYKGDkWbOZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-06-27 at 03:31 +0800, Stephen Warren wrote:
-> On 06/25/2013 03:27 AM, Joseph Lo wrote:
-> > Adding a flag for tegra_disable_clean_inv_dcache to flush cache as LoUIS
-> > or ALL. After this patch, the v7_flush_dcache_louis is used for CPU hotplug
-> > and CPU suspend in CPU power down (e.g. CPU idle power-down mode) case. And
-> > the v7_flush_dcache_all is used for CPU cluster power down (e.g. suspend to
-> > LP2 mode).
-> 
-> > diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
-> 
-> > +/* flag of tegra_disable_clean_inv_dcache to do LoUIS or all */
-> > +#define TEGRA_FLUSH_CACHE_LOUIS	0x10
-> > +#define TEGRA_FLUSH_CACHE_ALL	0x20
-> 
-> Is there a reason those two values aren't just 0 and 1; they only seem
-> to be used internally to switch between two function calls, and not
-> passed to those calls or written to HW.
+On Tue, Jun 25, 2013 at 11:16 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 06/25/2013 08:19 AM, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> This elaborates a bit on the pinctrl vs GPIO arangements
+>> in the hardware.
+>>
+>> Inspired by some drawings in a mail from Christian
+>> Ruppert.
+(...)
+> I'm not really sure quite what these diagrams are attempting to convey
+> within the context of this document.
 
-No. Will fix.
+I am trying to help pinctrl kernel developers understand hardware
+terminology.
+
+>> +In (A) the GPIO-like functionality of the pin is *always* available.
+>
+> Well, that can't really be true.
+>
+> It may be possible that you can always read the physical pin's value via
+> a GPIO input register.
+>
+> However, you obviously can't always write to a GPIO output register to
+> set the pin's value. If you could, the pin would simply be a GPIO, and
+> never serve any other function.
+
+This is possible on the U300. What happens in practice is
+that what you send out on the output from e.g. the I2C block is
+OR:ed with the GPIO output, so if that is not zero, you jam it to 1.
+
+> If you're saying that it's always possible to put the pin into a mode
+> where you can use the GPIO output register to driver the pin value, well
+> then that's just regular pin-muxing, so I'm not sure why it's worth
+> mentioning.
+
+That's not really the case. It can drive the pin at the same time.
+
+> In (a) there are really two levels of pinmux configuration, one in the
+> GPIO HW block (GPIO-vs-whatever-pinctrl-selects).
+>
+> In (b) there is another level of pinmux configuration; some block has to
+> exist between the physical pins and both GPIO/pinctrl HW modules; it
+> simply isn't drawn in the diagram
+
+I've redrawn these a bit to reflect the cases I know exist.
+Check the v2 patch.
+
+> In all cases though, this is just attempting to enumerate different HW
+> designs for pin-muxing I think. Isn't it better to just let each SoC's
+> datasheet specify exactly how things are hooked up?
+
+The intention of this is to understand the datasheet from a kernel
+point of view.
+
+Yours,
+Linus Walleij
