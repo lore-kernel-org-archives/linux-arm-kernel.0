@@ -1,62 +1,25 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 27 Jun 2013 00:30:58 -0700
-Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
-In-Reply-To: <CACRpkdbKgEcfF67oO9HrczvDp4Po3Xt1hFajJ1vO8kEvsZH4jA@mail.gmail.com>
-References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
- <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
- <20130625065811.GZ5523@atomide.com> <51CAEA90.90200@ti.com>
- <CACRpkdbKgEcfF67oO9HrczvDp4Po3Xt1hFajJ1vO8kEvsZH4jA@mail.gmail.com>
-Message-ID: <20130627073058.GF5523@atomide.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 27 Jun 2013 16:41:29 +0900
+Subject: [PATCH v4 0/3] R8A7779/Marzen R-Car VIN driver support
+In-Reply-To: <201305160153.29827.sergei.shtylyov@cogentembedded.com>
+References: <201305160153.29827.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130627074129.GB13927@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [130626 12:37]:
-> On Wed, Jun 26, 2013 at 3:20 PM, Grygorii Strashko
-> <grygorii.strashko@ti.com> wrote:
+On Thu, May 16, 2013 at 01:53:29AM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> > The "Sleep" pinctrl state is optional - if "sleep" state isn't defined
-> > then "Idle" pinctrl state will be used during suspend.
+>    Here's the set of 3 patches against the Simon Horman's 'renesas.git' repo,
+> 'renesas-next-20130515v2' tag and my recent yet unapplied USB/I2C patches.
+> Here we add the VIN driver platform code for the R8A7779/Marzen with ADV7180
+> I2C video decoder.
 > 
-> Why? If we have a clear cut semantic that "idle" is for runtime
-> suspend, why should it be a fallback for suspend?
+> [1/3] ARM: shmobile: r8a7779: add VIN support
+> [2/3] ARM: shmobile: Marzen: add VIN and ADV7180 support
+> [3/3] ARM: shmobile: Marzen: enable VIN and ADV7180 in defconfig
 > 
-> You do realize that can just be turned around (as common suspend
-> is more widely implemented than runtime suspend) so that we
-> could say that if "idle" does not exist, we go to "sleep" in
-> runtime suspend.
-> 
-> > So, final list of default pnctrl states may be defined as "default",
-> > "active", "idle", "sleep", "off":
-> > - "active", "idle", "sleep": will be handled by omap_device core
-> > - "default", "off": will be handled by driver itself (or Device core).
-> 
-> Currently the pinctrl system combines what is called "default"
-> and "active" into one, assuming that all devices shall come up
-> in the active state.
-> 
-> Also we haven't seen a device that need some "off" state that
-> is different from "sleep".
+>    The VIN driver itself has been excluded from the series as it will be developed
+> against Mauro's 'media_tree.git' plus some yet unapplied patches in the future...
 
-Right, this is what I've been wondering too.
-
-Do we really need "idle", "sleep", "off"? Or is "idle" enough?
-Or "idle" and "sleep"?
-
-Only one of the should be set at a time, but it would be nice
-to handle most cases in a generic way in drivers/base/pinctrl.c.
- 
-> If you want to drive this state list home you have to give a
-> *real world example*.
-> 
-> I want to see a *real* example, for a device and it's pins,
-> that define totally different things for these states, as a
-> rationale.
-
-Yeah me too :)
- 
-> Else we are just defining states to make nice figures or mental
-> maps and that is not helpful for drivers writers.
-
-Regards,
-
-Tony
+Sergei, is this patch-set still needing review?
