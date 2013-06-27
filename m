@@ -1,57 +1,116 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 27 Jun 2013 14:39:48 -0700
-Subject: [PATCH -v11 resend 10/11] arm,
- change reboot_mode to use enum reboot_mode
-In-Reply-To: <CAGa+x85UP6_3n-m76w_NHMF5Ld-rEu+ufSbRbAE4RhdU7GuKnw@mail.gmail.com>
-References: <1370519244-49918-1-git-send-email-holt@sgi.com>
- <12642293.RmlRtOVM54@wuerfel>
- <20130619102141.411c8e39.akpm@linux-foundation.org>
- <201306192016.00659.arnd@arndb.de>
- <CAGa+x87SZyOU3SWcBEUGKzke8whbHhudRzsj0VjgGU_VkhnJZA@mail.gmail.com>
- <CAGa+x85UP6_3n-m76w_NHMF5Ld-rEu+ufSbRbAE4RhdU7GuKnw@mail.gmail.com>
-Message-ID: <CAGa+x85zxXEEYBC6569+48xjfO4VoDB0q4NSbVaj2JbWuEJRCQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 27 Jun 2013 16:00:49 -0600
+Subject: [PATCH v2] pinctrl: elaborate a bit on arrangements in doc
+In-Reply-To: <1372326887-6497-1-git-send-email-linus.walleij@stericsson.com>
+References: <1372326887-6497-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <51CCB611.6010709@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 2:28 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> On Tue, Jun 25, 2013 at 2:41 PM, Kevin Hilman <khilman@linaro.org> wrote:
->> On Wed, Jun 19, 2013 at 11:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Wednesday 19 June 2013, Andrew Morton wrote:
->>>> This patchset gets a lot of rejects which I keep on fixing up.  Please
->>>> merge up early in the merge window and compile-test (and review) the
->>>> linux-next changes to make sure I didn't muck up the reject-fixing,
->>>> then we should be fine.
->>>
->>> Ok, good. The patch below is what I used locally to get everything to
->>> build. Please fold that into the larger patch.
->>
->> I'm still seeing build breaks in linux-next due to the original patch.
->>
->> Will the fix below from Arnd be folded into the original?
->
-> Actually, there's even more ARM build fallout from this patch not
-> covered by Arnd's fix.  For example, building the ixp4xx_defconfig now
-> has an include nesting mess[1] that is not a trivial fixup (at least
-> that I have found yet).
->
-> IMO, this patch needs to be dropped from -next until it gets better
-> build coverage testing on ARM.
+On 06/27/2013 03:54 AM, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This elaborates a bit on the pin control and pin muxing
+> logic vs GPIO arangements in the hardware.
+> 
+> Inspired by some drawings in a mail from Christian Ruppert.
+> Both arrangements are confirmed to exist in practice.
 
-OK, the change below also needs to be folded in to fix ixp4xxx_defconfig on ARM.
+> diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
 
-Kevin
+> +The GPIO portions of a pin and its relation to a certain pin controller
+> +configuration and muxing logic can be constructed in several ways. Here
+> +are three examples:
 
+s/three/two/ now:-)
 
-diff --git a/arch/arm/mach-ixp4xx/include/mach/platform.h
-b/arch/arm/mach-ixp4xx/include/mach/platform.h
-index 4c4c6a6..8f81a5b 100644
---- a/arch/arm/mach-ixp4xx/include/mach/platform.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/platform.h
-@@ -13,7 +13,7 @@
+> +(A)
+...
+> +Here some electrical properties of the pin can be configured no matter if the
+> +pin is used for GPIO or not. After multiplexing GPIO onto the pin, you can
+> +also drive it high/low from a certain bitset named "GPIO". Or the line can be
+> +controlled by a certain peripheral, while still applying desired pin config
+> +properties. GPIO functionality is thus orthogonal to any other device using the
+> +pad/pin.
 
- #ifndef __ASSEMBLY__
+I'd make a few minor tweaks to that:
 
--#include <linux/reboot.h>
-+extern enum reboot_mode reboot_mode;
+-----
+Here some electrical properties of the pin can be configured no matter
+whether the pin is used for GPIO or not. If you multiplex a GPIO onto a
+pin, you can also drive it high/low from "GPIO" registers.
+Alternatively, the pin can be controlled by a certain peripheral, while
+still applying desired pin config properties. GPIO functionality is thus
+orthogonal to any other device using the pin.
+-----
 
- #include <asm/types.h>
+> +In this arrangement the registers for the GPIO portions of the pin controller
+
+That slightly assumes that GPIO is part of the pin controller HW module,
+and then this paragraph is simply saying that the registers are likely
+to be segmented within that HW module. To more explicitly allow for
+entirely separate GPIO and pin controller HW modules, I would add the
+following immediately after that line:
+
+, or the registers for the GPIO HW module,
+
+> +are likely to reside in a separate memory range only intended for GPIO
+> +driving, and the register range dealing with pin config and pin multiplexing
+> +get placed into a different memory range and a separate section of the data
+> +sheet.
+
+> +(B)
+...
+> +In this arrangement, the GPIO functionality can always be enabled, such that
+> +e.g. a GPIO input can be used to "spy" on the SPI/I2C/MMC signal while it is
+> +pulsed out. It is likely possible to disrupt the traffic on the pin by doing
+> +wrong things on the GPIO block, as it is never really disconnected.
+(added a line break here)
+> +It is
+> +likely that the GPIO, pin config and pin multiplex registers are placed into
+> +the same memory range and the same section of the data sheet.
+
+Well, I guess the one example we have of this HW structure is that way,
+but I don't see any HW reason that has to be true. I would vote to
+either remove that last sentence, or perhaps re-write it as:
+
+-----
+It is possible that the GPIO, pin config and pin multiplex registers are
+placed into the same memory range and the same section of the data
+sheet, although that need not be the case.
+-----
+
+> +From a kernel point of view, however, these are different aspects of the
+> +hardware and shall be put into different subsystems.
+> +
+> +Electrical properties of the pin such as biasing and drive strength
+> +may be placed at some pin-specific register in all cases or as part
+> +of the GPIO register in case (B) especially. This doesn't mean that such
+> +properties necessarily pertain to what the Linux kernel calls "GPIO".
+
+Is it worth explaining which Linux subsystem each of the three aspects
+are controlled by. Something like:
+
+-----
+Registers (or fields within registers) that control electrical
+properties of the pin such as biasing and drive strength should be
+exposed through the pinctrl subsystem, as "pin configuration" settings.
+
+Registers (or fields within registers) that control muxing of signals
+from various other HW blocks (e.g. I2C, MMC, or GPIO) onto pins should
+be exposed through the pinctrl subssytem, as mux functions.
+
+Registers (or fields within registers) that control GPIO functionality
+such as setting a GPIO's output value, reading a GPIO's input value, or
+setting GPIO pin direction should be exposed through the GPIO subsystem.
+
+Depending on the exact HW register design, some functions exposed by the
+GPIO subsystem may call into the pinctrl subsystem in order to
+co-ordinate register settings across HW modules. In particular, this may
+be needed for HW with separate GPIO and pin controller HW modules, where
+e.g. GPIO direction is determined by a register in the pin controller HW
+module rather than the GPIO HW module.
+-----
+
+Otherwise, this patch seems good. Reading this version, it's much more
+obvious to me what the intent of the patch is, for some reason:-)
