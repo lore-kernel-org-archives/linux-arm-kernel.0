@@ -1,58 +1,61 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 27 Jun 2013 22:49:20 +0900
-Subject: [PATCH v2] dmaengine: shdma: fix a build failure on platforms
- with no DMA support
-In-Reply-To: <3410825.gK3KBC8v80@wuerfel>
-References: <Pine.LNX.4.64.1305310423360.1470@axis700.grange>
- <3410825.gK3KBC8v80@wuerfel>
-Message-ID: <20130627134920.GD28902@verge.net.au>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 27 Jun 2013 14:53:37 +0100
+Subject: [PATCH v6 0/5] xen/arm/arm64: CONFIG_PARAVIRT and stolen ticks
+ accounting
+Message-ID: <alpine.DEB.2.02.1306271446570.4782@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 04:51:52PM +0200, Arnd Bergmann wrote:
-> On Friday 31 May 2013 05:01:31 Guennadi Liakhovetski wrote:
-> > On platforms with no support for the shdma dmaengine driver build is
-> > currently failing with
-> > 
-> > drivers/built-in.o: In function `sh_mobile_sdhi_probe':
-> > drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
-> > 
-> > Fix the breakage by defining shdma_chan_filter to NULL in such
-> > configurations.
-> > 
-> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> 
-> Sorry, I saw your patch too late and already spent some time doing a different one.
-> 
-> > diff --git a/include/linux/sh_dma.h b/include/linux/sh_dma.h
-> > index b64d6be..1fd8a20 100644
-> > --- a/include/linux/sh_dma.h
-> > +++ b/include/linux/sh_dma.h
-> > @@ -99,6 +99,10 @@ struct sh_dmae_pdata {
-> >  #define CHCR_TE        0x00000002
-> >  #define CHCR_IE        0x00000004
-> >  
-> > +#if IS_ENABLED(CONFIG_SH_DMAE_BASE)
-> >  bool shdma_chan_filter(struct dma_chan *chan, void *arg);
-> > +#else
-> > +#define shdma_chan_filter NULL
-> > +#endif
-> 
-> I still think that this is not the right solution, or at least not
-> complete: No slave driver should care about which dma-engine it is
-> connected to. You have already done most of the necessary conversion,
-> so it would be straightforward to also pass the filter function
-> pointer to the sdhi driver along with the data that gets passed into
-> it.
+Hi all,
+this patch series introduces stolen ticks accounting for Xen on ARM and
+ARM64.
+Stolen ticks are clocksource ticks that have been "stolen" from the cpu,
+typically because Linux is running in a virtual machine and the vcpu has
+been descheduled.
+To account for these ticks we introduce CONFIG_PARAVIRT and pv_time_ops
+so that we can make use of:
 
-Hi Arnd, Hi Guennadi,
+kernel/sched/cputime.c:steal_account_process_tick
 
-It seems to me that the solution above, though not particularly generic,
-is sufficient as according to Guennadi SHDMA users cannot use other DMA
-drivers[1]. The change above also has the merit of being rather small.
 
-[1] https://patchwork.kernel.org/patch/2644101/
+In this last iteration I have added support for stolen ticks to arm64
+and rebased on Catalin's upstream branch (that contains support for Xen
+on arm64).
 
-With that reasoning I would like to provide:
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
+Stefano Stabellini (5):
+      xen: move xen_setup_runstate_info and get_runstate_snapshot to drivers/xen/time.c
+      kernel: missing include in cputime.c
+      arm: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+      arm64: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+      xen/arm: account for stolen ticks
+
+ arch/arm/Kconfig                  |   20 ++++++++
+ arch/arm/include/asm/paravirt.h   |   19 ++++++++
+ arch/arm/kernel/Makefile          |    1 +
+ arch/arm/kernel/paravirt.c        |   25 ++++++++++
+ arch/arm/xen/enlighten.c          |   21 +++++++++
+ arch/arm64/Kconfig                |   20 ++++++++
+ arch/arm64/include/asm/paravirt.h |   19 ++++++++
+ arch/arm64/kernel/Makefile        |    1 +
+ arch/arm64/kernel/paravirt.c      |   25 ++++++++++
+ arch/ia64/xen/time.c              |   48 +++-----------------
+ arch/x86/xen/time.c               |   76 +------------------------------
+ drivers/xen/Makefile              |    2 +-
+ drivers/xen/time.c                |   91 +++++++++++++++++++++++++++++++++++++
+ include/xen/xen-ops.h             |    5 ++
+ kernel/sched/cputime.c            |    4 +-
+ 15 files changed, 258 insertions(+), 119 deletions(-)
+ create mode 100644 arch/arm/include/asm/paravirt.h
+ create mode 100644 arch/arm/kernel/paravirt.c
+ create mode 100644 arch/arm64/include/asm/paravirt.h
+ create mode 100644 arch/arm64/kernel/paravirt.c
+ create mode 100644 drivers/xen/time.c
+
+
+git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git lost_ticks_6
+
+Cheers,
+
+Stefano
