@@ -1,70 +1,28 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 27 Jun 2013 10:05:12 +0800
-Subject: [PATCH] arch: arm64: include: asm: add pci.h to pass compiling
-In-Reply-To: <51CB87B0.8030805@asianux.com>
-References: <51CA5F71.207@asianux.com> <20130626140730.GB23309@arm.com>
- <51CB87B0.8030805@asianux.com>
-Message-ID: <51CB9DD8.6040905@asianux.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 27 Jun 2013 09:15:31 +0800
+Subject: [PATCH v4] thermal: add imx thermal driver support
+In-Reply-To: <1372055444-5286-1-git-send-email-shawn.guo@linaro.org>
+References: <1372055444-5286-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130627011529.GA3942@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2013 08:30 AM, Chen Gang wrote:
-> On 06/26/2013 10:07 PM, Catalin Marinas wrote:
->> On Wed, Jun 26, 2013 at 04:26:41AM +0100, Chen Gang wrote:
->>>> Need add pci.h for compiling, the related error (with allmodconfig):
->>>>
->>>>   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_exit?:
->>>>   drivers/media/usb/b2c2/flexcop-usb.c:393:3: error: implicit declaration of function ?pci_free_consistent? [-Werror=implicit-function-declaration]
->>>>   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_init?:
->>>>   drivers/media/usb/b2c2/flexcop-usb.c:410:2: error: implicit declaration of function ?pci_alloc_consistent? [-Werror=implicit-function-declaration]
->>>>   drivers/media/usb/b2c2/flexcop-usb.c:410:21: warning: assignment makes pointer from integer without a cast [enabled by default]
->>>>   cc1: some warnings being treated as errors
->>>>
->>>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->>>> ---
->>>>  arch/arm64/include/asm/pci.h |   11 +++++++++++
->>>>  1 files changed, 11 insertions(+), 0 deletions(-)
->>>>  create mode 100644 arch/arm64/include/asm/pci.h
->>>>
->>>> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
->>>> new file mode 100644
->>>> index 0000000..2ed467f
->>>> --- /dev/null
->>>> +++ b/arch/arm64/include/asm/pci.h
->>>> @@ -0,0 +1,11 @@
->>>> +#ifndef ASMARM64_PCI_H
->>>> +#define ASMARM64_PCI_H
->>>> +
->>>> +#ifdef __KERNEL__
->>>> +
->>>> +#include <asm-generic/pci-dma-compat.h>
->>>> +#include <asm-generic/pci.h>
->>>> +
->>>> +#endif /* __KERNEL__ */
->>>> +
->>>> +#endif
->> I wonder whether it makes sense to include pci-dma-compat.h in
->> asm-generic/pci.h, I don't see why one would want the generic pci.h but
->> not the generic pci-dma-compat.h (cc'ing Arnd).
+On Mon, Jun 24, 2013 at 02:30:44PM +0800, Shawn Guo wrote:
+> This is based on the initial imx thermal work done by
+> Rob Lee <rob.lee@linaro.org> (Not sure if the email address is still
+> valid).  Since he is no longer interested in the work and I have
+> rewritten a significant amount of the code, I just took the authorship
+> over from him.
 > 
-
-For m32r, it needs generic pci.h but not the generic pci-dma-compat.h.
-
-I am just compiling it with allmodconfig to see whether it will can
-cause issue too, if so I will send the patch for asm-generic. :-)
-
-And, sorry for the original reply below is incorrect.
-
-> I think, it will let architecture guys easier to add their own
-> pci-dma-compat.h (although they still need generic pci_dma_compat.h, and
-> generic pci.h, too).
+> It adds the imx thermal support using Temperature Monitor (TEMPMON)
+> block found on some Freescale i.MX SoCs.  The driver uses syscon regmap
+> interface to access TEMPMON control registers and calibration data, and
+> supports cpufreq as the cooling device.
 > 
-> e.g. one architecture want include generic pci-dma-compat.h firstly,
-> then define its own features in its own pci-dma-compat.h.
-> 
-> Thanks.
-> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
+Rui,
 
--- 
-Chen Gang
+Can this patch be applied for 3.11?
+
+Shawn
