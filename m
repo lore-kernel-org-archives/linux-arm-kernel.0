@@ -1,29 +1,60 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 26 Jun 2013 22:42:03 -0500
-Subject: [PATCH v2 1/2] ARM: configs: Enable TI_EDMA in omap2plus_defconfig
-Message-ID: <1372304523-30742-1-git-send-email-joelf@ti.com>
+Date: Wed, 26 Jun 2013 22:42:28 -0500
+Subject: [PATCH v2 2/2] DMA: EDMA: Add comments for A-sync case calculations
+Message-ID: <1372304548-30777-1-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Build EDMA in by default to avoid fewer people stepping on their toes
-with broken DMA on drivers needing EDMA.
+A-sync case in EDMA driver is tricky and not so obvious.
+Document the reasons for the calculations and the scenarious
+they are used.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/configs/omap2plus_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/dma/edma.c |   22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index abbe319..7e00deb 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -236,6 +236,7 @@ CONFIG_RTC_DRV_TWL92330=y
- CONFIG_RTC_DRV_TWL4030=y
- CONFIG_RTC_DRV_OMAP=y
- CONFIG_DMADEVICES=y
-+CONFIG_TI_EDMA=y
- CONFIG_DMA_OMAP=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index e008ed2..a1d9f3785 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -284,8 +284,24 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 		 */
+ 		if (burst == 1) {
+ 			edesc->absync = false;
++			/*
++			 * For the A-sync case, bcnt and ccnt are the remainder
++			 * and quotient respectively of the division of:
++			 * (sg_dma_len(sg) / acnt) by (SZ_64K -1). This is so
++			 * that in case bcnt over flows, we have ccnt to use.
++			 * Note: In A-sync tranfer only, bcntrld is used, but it
++			 * only applies for sg_dma_len(sg) >= SZ_64K.
++			 * In this case, the best way adopted is- bccnt for the
++			 * first frame will be the remainder below. Then for
++			 * every successive frame, bcnt will be SZ_64K-1. This
++			 * is assured as bcntrld = 0xffff in end of function.
++			 */
+ 			ccnt = sg_dma_len(sg) / acnt / (SZ_64K - 1);
+ 			bcnt = sg_dma_len(sg) / acnt - ccnt * (SZ_64K - 1);
++			/*
++			 * If bcnt is non-zero, we have a remainder and hence an
++			 * extra frame to transfer, so increment ccnt.
++			 */
+ 			if (bcnt)
+ 				ccnt++;
+ 			else
+@@ -343,6 +359,12 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 
+ 		edesc->pset[i].a_b_cnt = bcnt << 16 | acnt;
+ 		edesc->pset[i].ccnt = ccnt;
++		/*
++		 * Only time when (bcntrld) auto reload is required is for
++		 * A-sync case, and in this case, a requirement of reload value
++		 * of SZ_64K-1 only is assured. 'link' is initially set to NULL
++		 * and then later will be populated by edma_execute.
++		 */
+ 		edesc->pset[i].link_bcntrld = 0xffffffff;
+ 
+ 	}
 -- 
 1.7.9.5
