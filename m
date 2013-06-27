@@ -1,34 +1,30 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 27 Jun 2013 11:56:52 +0200
-Subject: [PATCH] ARM: cpuidle: davinci: Fix target residency
-Message-ID: <1372327012-13528-1-git-send-email-daniel.lezcano@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 27 Jun 2013 10:59:49 +0100
+Subject: Armada DRM driver on OLPC XO
+In-Reply-To: <20130625204726.BF65C12647A@dev.laptop.org>
+References: <20130625204726.BF65C12647A@dev.laptop.org>
+Message-ID: <20130627095949.GD4283@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 19976c2a88d125aec16b9255c7197c297bbdd637 changed the target
-residency to 100000, assuming this is a careless mistake.
+On Tue, Jun 25, 2013 at 04:47:26PM -0400, Daniel Drake wrote:
+> Hi Russell,
+> 
+> Thanks a lot for writing the Armada DRM driver.
+> 
+> I have tested it on OLPC XO-1.75 (MMP2 aka Armada610) and OLPC XO-4 (MMP3
+> aka PXA2128). After a bit of fighting, I have it running. Could you share your
+> X driver, or your methodology for testing hardware cursors? I'd like to test
+> your work there too.
+> 
+> It's probably easiest to get your cubox driver merged before adding MMP2/MMP3
+> complications into the mix. At that point, I will hopefully have time to
+> follow up developing MMP2/MMP3 support, which will involve the points
+> mentioned below.
 
-The same happened to the at91's cpuidle driver.
+As a side note, you've looked at a previous generation of the patches -
+in that same thread, there are two versions of these patches.  The original
+set was an older version that I mis-posted.
 
-Fix it by putting the initial value to 10000.
-
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/mach-davinci/cpuidle.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
-index 36aef3a..f1ac1c9 100644
---- a/arch/arm/mach-davinci/cpuidle.c
-+++ b/arch/arm/mach-davinci/cpuidle.c
-@@ -65,7 +65,7 @@ static struct cpuidle_driver davinci_idle_driver = {
- 	.states[1]		= {
- 		.enter			= davinci_enter_idle,
- 		.exit_latency		= 10,
--		.target_residency	= 100000,
-+		.target_residency	= 10000,
- 		.flags			= CPUIDLE_FLAG_TIME_VALID,
- 		.name			= "DDR SR",
- 		.desc			= "WFI and DDR Self Refresh",
--- 
-1.7.9.5
+The later version removes the clock handling for the LCDs out of
+armada_crtc.c into armada_drv.c.
