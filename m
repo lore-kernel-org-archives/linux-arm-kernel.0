@@ -1,57 +1,32 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 27 Jun 2013 08:30:40 +0800
-Subject: [PATCH] arch: arm64: include: asm: add pci.h to pass compiling
-In-Reply-To: <20130626140730.GB23309@arm.com>
-References: <51CA5F71.207@asianux.com> <20130626140730.GB23309@arm.com>
-Message-ID: <51CB87B0.8030805@asianux.com>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Thu, 27 Jun 2013 02:32:19 +0100
+Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
+In-Reply-To: <1372257499.2168.5.camel@dabdike>
+References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
+ <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
+ <51CA2B03.4080106@wwwdotorg.org>
+ <CACxGe6vsBKnbipR-Zd1T9Ox1J2ugFmShrGXGUzPa_=D9TJvFQw@mail.gmail.com>
+ <20130626135311.GA9078@rocoto.smurfnet.nu>
+ <20130626135933.GQ22026@console-pimps.org>
+ <1372257499.2168.5.camel@dabdike>
+Message-ID: <20130627013219.GA346@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2013 10:07 PM, Catalin Marinas wrote:
-> On Wed, Jun 26, 2013 at 04:26:41AM +0100, Chen Gang wrote:
->> > Need add pci.h for compiling, the related error (with allmodconfig):
->> > 
->> >   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_exit?:
->> >   drivers/media/usb/b2c2/flexcop-usb.c:393:3: error: implicit declaration of function ?pci_free_consistent? [-Werror=implicit-function-declaration]
->> >   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_init?:
->> >   drivers/media/usb/b2c2/flexcop-usb.c:410:2: error: implicit declaration of function ?pci_alloc_consistent? [-Werror=implicit-function-declaration]
->> >   drivers/media/usb/b2c2/flexcop-usb.c:410:21: warning: assignment makes pointer from integer without a cast [enabled by default]
->> >   cc1: some warnings being treated as errors
->> > 
->> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> > ---
->> >  arch/arm64/include/asm/pci.h |   11 +++++++++++
->> >  1 files changed, 11 insertions(+), 0 deletions(-)
->> >  create mode 100644 arch/arm64/include/asm/pci.h
->> > 
->> > diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
->> > new file mode 100644
->> > index 0000000..2ed467f
->> > --- /dev/null
->> > +++ b/arch/arm64/include/asm/pci.h
->> > @@ -0,0 +1,11 @@
->> > +#ifndef ASMARM64_PCI_H
->> > +#define ASMARM64_PCI_H
->> > +
->> > +#ifdef __KERNEL__
->> > +
->> > +#include <asm-generic/pci-dma-compat.h>
->> > +#include <asm-generic/pci.h>
->> > +
->> > +#endif /* __KERNEL__ */
->> > +
->> > +#endif
-> I wonder whether it makes sense to include pci-dma-compat.h in
-> asm-generic/pci.h, I don't see why one would want the generic pci.h but
-> not the generic pci-dma-compat.h (cc'ing Arnd).
+On Wed, Jun 26, 2013 at 07:38:19AM -0700, James Bottomley wrote:
+> The fixed virtual address scheme currently being looked at for x86_64 to
+> make SetVirtualAddressMap() kexec invariant doesn't work on 32 bit
+> because the address space isn't big enough.  For ARM, given that we've
+> much more opportunity to work with the vendors, can we just avoid
+> transitioning to a virtual address map and always just install a
+> physical mapping before doing efi calls?
 
-I think, it will let architecture guys easier to add their own
-pci-dma-compat.h (although they still need generic pci_dma_compat.h, and
-generic pci.h, too).
+We can probably get away with that now, but it does risk us ending up 
+with some firmware that expects to run in physical mode (boards designed 
+for Linux) and some firmware that expects to run in virtual mode (boards 
+designed for Windows). The degree of lockdown in the Windows ecosystem 
+at present means it's not a real problem at the moment, but if that ever 
+changes we're going to risk incompatibility.
 
-e.g. one architecture want include generic pci-dma-compat.h firstly,
-then define its own features in its own pci-dma-compat.h.
-
-Thanks.
 -- 
-Chen Gang
+Matthew Garrett | mjg59 at srcf.ucam.org
