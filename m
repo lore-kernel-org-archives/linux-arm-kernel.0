@@ -1,80 +1,63 @@
-From: joelf@ti.com (Fernandes, Joel)
-Date: Thu, 27 Jun 2013 18:08:55 +0000
-Subject: [PATCH 0/5] AM33xx: MMC resources from DT without HWMOD data
-In-Reply-To: <51CC67CA.2070805@ti.com>
-References: <1372209808-6532-1-git-send-email-joelagnel@ti.com>
- <CAD=GYpbdVVrh-tiqOcbHi3mkWRJUBdx0EsEZEFVVbgFgcCWgsw@mail.gmail.com>
- <51CC2A1E.2040003@ti.com>
- <CAD=GYpa9LQ1fV6=O9B65sJURVAigsgXCPLWav8cHXTuGQXPc9A@mail.gmail.com>
- <51CC67CA.2070805@ti.com>
-Message-ID: <083BC63EECB6FD41B8E81CF7FD87CC0F2E4F0F95@DLEE08.ent.ti.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 27 Jun 2013 14:09:27 -0400 (EDT)
+Subject: [PATCH] USB: EHCI: make ehci-w90X900 a separate driver
+In-Reply-To: <1372347109-5563-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1306271405030.1167-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Balaji,
+On Thu, 27 Jun 2013, Manjunath Goudar wrote:
 
-> -----Original Message-----
-> From: Krishnamoorthy, Balaji T
-> Sent: Thursday, June 27, 2013 11:27 AM
-> To: Cousson, Benoit; Fernandes, Joel
-> Cc: lars at metafoo.de; Tony Lindgren; Nori, Sekhar; Matt Porter; Grant Likely;
-> Rob Herring; Vinod Koul; Mark Brown; Russell King; Rob Landley; Andrew
-> Morton; Jason Kridner; Koen Kooi; Chris Ball; Devicetree Discuss; Linux OMAP
-> List; Linux ARM Kernel List; Linux DaVinci Kernel List; Linux Kernel Mailing List;
-> Linux MMC List; Arnd Bergmann
-> Subject: Re: [PATCH 0/5] AM33xx: MMC resources from DT without HWMOD
-> data
+> Separate the W90X900(W90P910) on-chip host controller driver from
+> ehci-hcd host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM;
+> however, note that other changes are still needed before W90X900(W90P910)
+> can be booted with a multi-platform kernel
 > 
-> On Thursday 27 June 2013 07:56 PM, Joel A Fernandes wrote:
-> > Hi Benoit,
-> >
-> > On Thu, Jun 27, 2013 at 7:03 AM, Benoit Cousson <b-cousson@ti.com> wrote:
-> >> Hi Joel,
-> >>
-> >> On 06/26/2013 05:28 AM, Joel A Fernandes wrote:
-> >>> On Tue, Jun 25, 2013 at 8:23 PM, Joel A Fernandes <joelagnel@ti.com>
-> wrote:
-> >>>> From: Joel A Fernandes <agnel.joel@gmail.com>
-> >>>>
-> >>>> This series is fixes to get MMC working on AM33XX without HWMOD
-> data.
-> >>>> On removal of HWMOD data, interrupt and register properties need to
-> >>>> be provided for the driver to function correctly.
-> >>>
-> >>> Please don't pull patches authored by me in this series. I have
-> >>> posted them with my wrong email address by mistake. I will correct
-> >>> my email during the next repost, after a round of review. Matt's
-> >>> patches in the series are still good though.
-> >>
-> >> In that case, please repost these in two series to avoid pulling the
-> >> DTS files in the MMC tree.
-> >
-> > The series has been replaced with the single patch:
-> > "[PATCH v2] ARM: dts: add AM33XX MMC support"
-> > http://marc.info/?l=linux-omap&m=137230403815943&w=2
-> >
-> > Some patches were squashed and others dropped in the series resulting
-> > in the single patch above. This patch should be good to apply
-> Hi Joel,
+> and an ehci driver that only works on one of them.
 > 
-> Before pushing mmc dts support for am335x, Can you please let me
-> know if below 2 patches [1] are merged/accepted,
-> IIRC these patches are needed for MMC to work properly.
-> 
-> I suggest to hold the dts patch until slave_sg_limit gets merged
-> otherwise it will cause regression in am335x mmc.
-> 
-> [PATCH v4 1/3] dmaengine: add dma_get_slave_sg_limits()
-> [PATCH v4 2/3] dma: edma: add device_slave_sg_limits() support
+> With the infrastructure added by Alan Stern in patch 3e0232039
+> "USB: EHCI: prepare to make ehci-hcd a library module", we can
+> avoid this problem by turning a bus glue into a separate
+> module, as we do here for the w90X900 bus glue.
 
-Actually this is an independent regression and is currently worked on by Lars-Peter Clausen [1].
 
-Currently not having the MMC DTS merged is also a regression, so I suggest lets take it one
-step at a time and get the DTS merged in first. Also there will be overhead of reposting this
-DTS patch later again which will not change. What do you say?
+> diff --git a/drivers/usb/host/ehci-w90x900.c b/drivers/usb/host/ehci-w90x900.c
+> index 59e0e24..d9ecd79 100644
+> --- a/drivers/usb/host/ehci-w90x900.c
+> +++ b/drivers/usb/host/ehci-w90x900.c
+> @@ -11,13 +11,28 @@
+>   *
+>   */
+>  
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/usb.h>
+> +#include <linux/usb/hcd.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/of.h>
 
-Thanks,
+Alphabetical order, please.
 
--Joel
+>  #include <linux/platform_device.h>
+>  
+> +#include "ehci.h"
+> +
+>  /* enable phy0 and phy1 for w90p910 */
+>  #define	ENPHY		(0x01<<8)
+>  #define PHY0_CTR	(0xA4)
+>  #define PHY1_CTR	(0xA8)
+>  
+> +#define DRIVER_DESC "w90p910 usb ehci driver!"
 
-[1] https://patchwork.kernel.org/patch/2228041/
+I know this is what it said originally, but let's make it look more 
+like the other drivers.  It doesn't need to say "usb", and it doesn't 
+need the '!' character at the end.  Also, 'ehci' should be in capital 
+letters.
+
+Finally, shouldn't it say "w90x900" instead of "w90p910"?
+
+The rest of the patch is okay.
+
+Alan Stern
