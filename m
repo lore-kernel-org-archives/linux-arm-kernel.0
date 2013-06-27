@@ -1,34 +1,50 @@
 From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 27 Jun 2013 11:47:55 +0200
-Subject: [PATCH v2 0/3] ARM: shmobile: r8a73a4: add I2C devices and CPUFreq
- support
-Message-ID: <1372326479-15028-1-git-send-email-g.liakhovetski@gmx.de>
+Date: Thu, 27 Jun 2013 11:47:58 +0200
+Subject: [PATCH 3/3] ARM: shmobile: ape6evm: add CPUFreq support
+In-Reply-To: <1372326479-15028-1-git-send-email-g.liakhovetski@gmx.de>
+References: <1372326479-15028-1-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <1372326479-15028-4-git-send-email-g.liakhovetski@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPUFreq voltage scaling support for APE6EVM uses an I2C PMIC. This patch 
-series adds support for I2C on r8a73a4 and adds required hooks to APE6EVM. 
-This patch series is identical to v1 with the only difference, that a 
-patch from it has been split into two upon maintainer's request.
+This patch adds OPPs to the CA15 DT node and a max8973 DT node to support
+clock and voltage scaling, using the cpufreq-cpu0 CPUFreq driver.
 
-Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+---
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
 
-Guennadi Liakhovetski (3):
-  ARM: shmobile: r8a73a4: add clocks for I2C controllers
-  ARM: shmobile: r8a73a4: add I2C controller DT nodes
-  ARM: shmobile: ape6evm: add CPUFreq support
-
- arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   22 +++++++++
- arch/arm/boot/dts/r8a73a4.dtsi         |   81 ++++++++++++++++++++++++++++++++
- arch/arm/mach-shmobile/clock-r8a73a4.c |   25 +++++++++-
- 3 files changed, 126 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+index 4fb0102..5c56f23 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+@@ -52,3 +52,25 @@
+ 		};
+ 	};
+ };
++
++&i2c5 {
++	vdd_dvfs: max8973 at 1b {
++		compatible = "maxim,max8973";
++		reg = <0x1b>;
++
++		regulator-min-microvolt = <935000>;
++		regulator-max-microvolt = <1200000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++};
++
++&cpu0 {
++	cpu0-supply = <&vdd_dvfs>;
++	operating-points = <
++		/* kHz  uV */
++		1950000 1115000
++		1462500  995000
++	>;
++	voltage-tolerance = <1>; /* 1% */
++};
 -- 
 1.7.2.5
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
