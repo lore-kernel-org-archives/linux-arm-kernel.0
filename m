@@ -1,40 +1,43 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 27 Jun 2013 11:00:50 +0200
-Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
-In-Reply-To: <20130627013219.GA346@srcf.ucam.org>
-References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
- <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
- <51CA2B03.4080106@wwwdotorg.org>
- <CACxGe6vsBKnbipR-Zd1T9Ox1J2ugFmShrGXGUzPa_=D9TJvFQw@mail.gmail.com>
- <20130626135311.GA9078@rocoto.smurfnet.nu>
- <20130626135933.GQ22026@console-pimps.org>
- <1372257499.2168.5.camel@dabdike>
- <20130627013219.GA346@srcf.ucam.org>
-Message-ID: <20130627090050.GC18151@rocoto.smurfnet.nu>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 27 Jun 2013 11:05:06 +0200 (CEST)
+Subject: [linux-next PATCH] ARM: shmobile: marzen: defconfig: enable DMA
+ engine support
+In-Reply-To: <20130627050007.GF28229@verge.net.au>
+References: <1642514.quKgForQrD@amdc1032> <20130626145252.GA4748@verge.net.au>
+ <Pine.LNX.4.64.1306261700130.8856@axis700.grange>
+ <20130627050007.GF28229@verge.net.au>
+Message-ID: <Pine.LNX.4.64.1306271103470.19503@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 02:32:19AM +0100, Matthew Garrett wrote:
-> On Wed, Jun 26, 2013 at 07:38:19AM -0700, James Bottomley wrote:
-> > The fixed virtual address scheme currently being looked at for x86_64 to
-> > make SetVirtualAddressMap() kexec invariant doesn't work on 32 bit
-> > because the address space isn't big enough.  For ARM, given that we've
-> > much more opportunity to work with the vendors, can we just avoid
-> > transitioning to a virtual address map and always just install a
-> > physical mapping before doing efi calls?
+On Thu, 27 Jun 2013, Simon Horman wrote:
+
+> On Wed, Jun 26, 2013 at 05:01:36PM +0200, Guennadi Liakhovetski wrote:
+> > Hi
+> > 
+> > On Wed, 26 Jun 2013, Simon Horman wrote:
+> > 
+> > > [ Cc linux-sh and Guennadi ]
+> > > 
+> > > I have not looked into this closely but it seems to me that
+> > > it would be more robust to resolve this problem using Kconfig.
+> > 
+> > I still think this
+> > 
+> > https://patchwork.kernel.org/patch/2640051/
+> > 
+> > is a proper fix. We cannot and do not want to force building shdma on all
+> > platforms, where SDHI or any other potential shdma client is built. It is
+> > perfectly valid to build SDHI with no DMA support, which is exactly what
+> > that patch makes possible.
 > 
-> We can probably get away with that now, but it does risk us ending up 
-> with some firmware that expects to run in physical mode (boards designed 
-> for Linux) and some firmware that expects to run in virtual mode (boards 
-> designed for Windows). The degree of lockdown in the Windows ecosystem 
-> at present means it's not a real problem at the moment, but if that ever 
-> changes we're going to risk incompatibility.
+> That is fine by me. Is there anything I can do to help move it forward?
 
-Is there anything preventing calling SetVirtualAddressMap() with a
-1:1 map?
+Well, you could reply to that thread with your ack or something...
 
-Or do you simply mean that some platforms might cruise along with
-undetected bugs in their relocation hooks?
-
-/
-    Leif
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
