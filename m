@@ -1,88 +1,77 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Jun 2013 13:55:08 +0200
-Subject: [PATCH 0/2] arm: add early_ioremap() support
-In-Reply-To: <20130627092934.GD18151@rocoto.smurfnet.nu>
-References: <1372182401-11029-1-git-send-email-leif.lindholm@linaro.org>
- <3503040.vhYAL5xGgS@wuerfel> <20130627092934.GD18151@rocoto.smurfnet.nu>
-Message-ID: <201306271355.08379.arnd@arndb.de>
+Date: Thu, 27 Jun 2013 14:01:13 +0200
+Subject: [PATCH] ARM: shmobile: r8a7790 SMP prototype v2
+In-Reply-To: <20130626235837.11576.86389.sendpatchset@w520>
+References: <20130626235837.11576.86389.sendpatchset@w520>
+Message-ID: <201306271401.13198.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 June 2013, Leif Lindholm wrote:
-> On Thu, Jun 27, 2013 at 10:47:21AM +0200, Arnd Bergmann wrote:
-> > > No, the purpose is just like for x86 - do early parsing of things like
-> > > the UEFI system and configuration tables, DMI and ACPI, in order to
-> > > populate global structs and stuff.
-> > 
-> > But are those tables actually in MMIO registers? I thought they
-> > are just memory, and in that case using any form of ioremap is
-> > wrong on ARM. Why do you even have to map them? Can't the boot
-> > loader pass those tables in regular addressable memory?
->  
-> Don't get too stuck on the name - x86 frequently uses *ioremap() in
-> many places when just accessing memory, and that has carried into EFI,
-> ACPI and DMI subsystems, which we now want to use on ARM. In fact, they
-> have early_memremap(), but don't use it for either EFI or ACPI.
+On Thursday 27 June 2013, Magnus Damm wrote:
 
-The difference of course is that x86 doesn't use page table flags
-to tell the difference between MMIO and memory. It is not harmful
-on x86 to access memory through ioremap, but it is on most
-other architectures. You get either unspecified behavior due to
-conflicting cache flags or you get a hard checkstop based on how
-the CPU treats this. If you want to make the EFI code architecture
-independent, I think you should change the EFI code.
+> +#include <asm/cacheflush.h>
+> +#include <asm/cp15.h>
+> +#include <asm/smp_plat.h>
+> +
+> +#define SYSC	0xe6180000
+> +#define SYSCSR  0x0000
+> +
+> +#define RST	0xe6160000
+> +#define CA15BAR	0x6020
+> +#define CA15RESCNT 0x0040
+> +#define CA7BAR	0x4030
+> +#define CA7RESCNT 0x0044
+> +#define RESCNT	0x0050
+> +
+> +#define APMU	0xe6150000
+> +#define CA15WUPCR 0x2010
+> +#define CA7WUPCR 0x1010
+> +
+> +#define MERAM	0xe8080000
 
-> The ia64 implementation actually performs a lookup in the EFI memmap
-> to decide whether early_ioremap() returns cacheable memory or not
-> (and falls back to noncacheable before memory map is available).
-> 
-> That said, I had somehow managed to get into my mind that the kernel
-> used -fno-unaligned-access, so thought MT_DEV_NONSHARED was safe.
-> Clearly it isn't, so that will need to change, making the semantic
-> match even worse...
-> 
-> As for the need of mapping - some of these descriptors are needed very
-> early in the boot process. Also, depending on platform, they may reside
-> at any offset from start of RAM (<2^32 physical address), rendering
-> __va()/__phys_to_virt()/... unusable.
+Please get the base addresses from device tree if you can,
+using of_iomap().
 
-Can you explain why they are needed this early?
+> +#define r8a7790_clst_id(cpu) (cpu_logical_map((cpu)) >> 8)
+> +#define r8a7790_cpu_id(cpu) (cpu_logical_map((cpu)) & 0xff)
+> +
+> +static void r8a7790_deassert_reset(unsigned int cpu)
+> +{
+> +	void __iomem *p, *carescnt;
+> +	u32 bar, mask, magic;
+> +	unsigned int clst_id = r8a7790_clst_id(cpu);
+> +
+> +	/* setup reset vectors */
+> +	p = ioremap_nocache(RST, 0x7000);
+> +	bar = (MERAM >> 8) & 0xfffffc00;
+> +	__raw_writel(bar, p + r8a7790_clst[clst_id].cabar);
+> +	__raw_writel(bar | 0x10, p + r8a7790_clst[clst_id].cabar);
+> +
+> +	/* enable clocks for cluster */
+> +	if (r8a7790_clst[clst_id].use_count++ == 0) {
+> +		mask = 1 << r8a7790_clst[clst_id].rescnt_bit;
+> +		__raw_writel(__raw_readl(p + RESCNT) & ~mask, p + RESCNT);
+> +	}
 
-Also, can't we define the boot protocol to require these tables
-within the first GB of RAM?
+If you cannot use writel_relaxed() here, add a comment. Otherwise
+change it to writel or writel_relaxed.
 
-> > > Well, I did have a crazy idea that much/most of the early_ioremap code
-> > > could be made generic and shared between x86 and arm (and any other
-> > > 32-bit architecture). Using the fixmap macros would make that possible
-> > > with a minimum of ifdefs.
-> > > 
-> > > If we ever wanted early_ioremap() to work like on x86, beyond kmap_init()
-> > > (but not beyond the "booting" system state), using the same macros would
-> > > help there too. I had no need for that for my EFI patches.
-> > 
-> > I guess I need to look at the EFI patches first. It sounds to me
-> > like you shouldn't actually be using early_ioremap here or on another
-> > architecture.
-> 
-> No, but I had been kind of hoping not having to rework the early memory
-> initialisation for three subsystems on two other platforms in order to
-> be able to merge common code between them. And it would have felt silly
-> to invent a new mechanism just for ARM, preventing that option.
+> +static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
+> +{
+> +	void __iomem *p;
+> +	unsigned int k;
+> +
+> +	shmobile_boot_fn = virt_to_phys(shmobile_invalidate_start);
+> +
+> +	/* MERAM for jump stub, because BAR requires 256KB aligned address */
+> +	p = ioremap_nocache(MERAM, 16);
+> +	memcpy(p, shmobile_boot_vector, 16);
+> +	iounmap(p);
 
-Well, if you can get around the "early" requirement, things can become
-much easier, you can basically 
+On the other hand here you have to use __raw_writel() or
+memcpy_toio() because memcpy cannot operate on __iomem tokens.
 
-#define early_ioremap(addr, size) ioremap(addr, size)
-#define early_memremap(addr, size) ioremap_cached(addr, size)
-
-and just need to fix the places where the common code mistakenly calls
-early_ioremap instead of early_memremap.
-
-Chances are that even if you can't avoid the requirement for early
-maps entirely that you only really have to worry about a small number
-of callers, for which you can then introduce architecture specific
-functions that do one thing in an appropriate way. On ARM, this may
-end up being __va(), kmap_atomic() or iotable_init() depending on
-the requirements.
+Also, if this is actually memory, you probably want to use ioremap_cached
+or ioremap_writecombine.
 
 	Arnd
