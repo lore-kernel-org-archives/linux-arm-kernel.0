@@ -1,47 +1,57 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 27 Jun 2013 17:43:44 +0200
-Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
-In-Reply-To: <20130627151318.GB1360@darko.cambridge.arm.com>
-References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
- <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
- <20130626111430.GH26142@mudshark.cambridge.arm.com>
- <CAKv+Gu_R7=Euaa87kQqR5TfGQLyF6Ad51dBm2CroYHcKMRs_dA@mail.gmail.com>
- <20130626124009.GL26142@mudshark.cambridge.arm.com>
- <CAKv+Gu9_V75jGSq675H+Gi7jkDWBkVDLXvewMuv8dWxx7-VxEw@mail.gmail.com>
- <CAKv+Gu-5SsvJCvXkJoqPm-TZx6tr+49pUXfpkSoBo-s+Z8_YmQ@mail.gmail.com>
- <CAKv+Gu_=Ctg8+KVMp9amq+2nOgj8DiUKidNDwas8qy2=y3TX-A@mail.gmail.com>
- <20130627151318.GB1360@darko.cambridge.arm.com>
-Message-ID: <CAKv+Gu-uZoHppWGy1RQ56BjwA6rDGHGcEbFATmQb70qfr_hRGw@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 27 Jun 2013 16:37:16 +0100
+Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
+In-Reply-To: <1372345790.2522.26.camel@dabdike>
+References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
+ <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
+ <51CA2B03.4080106@wwwdotorg.org>
+ <CACxGe6vsBKnbipR-Zd1T9Ox1J2ugFmShrGXGUzPa_=D9TJvFQw@mail.gmail.com>
+ <20130626135311.GA9078@rocoto.smurfnet.nu>
+ <20130626135933.GQ22026@console-pimps.org>
+ <1372257499.2168.5.camel@dabdike> <20130627013219.GA346@srcf.ucam.org>
+ <CACxGe6uFkbuJ3BxM=A0Lu=jZQ79Ba8SmNsdBdTOO13szTfTZ=Q@mail.gmail.com>
+ <1372314821.557.33.camel@dabdike> <20130627143714.GA12900@srcf.ucam.org>
+ <1372345790.2522.26.camel@dabdike>
+Message-ID: <CACxGe6u2xU=+MzYLUbDLFB-9kA23TT2=otzM59zrbGWYt8x7Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 June 2013 17:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Jun 27, 2013 at 02:11:27PM +0100, Ard Biesheuvel wrote:
->> OK, just one more question before I respin the next (hopefully final) version:
->> if a caller does sleep after calling kernel_neon_begin() (and thus
->> receives no warning if he runs a non-PREEMPT build with
->> CONFIG_DEBUG_ATOMIC_SLEEP disabled), he will most likely find the
->> NEON/VFP unit disabled after waking up (as we disable it on a context
->> switch), so any subsequent NEON instructions will trigger the undef
->> handler.
+On Thu, Jun 27, 2013 at 4:09 PM, James Bottomley
+<James.Bottomley@hansenpartnership.com> wrote:
+> On Thu, 2013-06-27 at 15:37 +0100, Matthew Garrett wrote:
+>> On Wed, Jun 26, 2013 at 11:33:41PM -0700, James Bottomley wrote:
+>> > On Thu, 2013-06-27 at 07:23 +0100, Grant Likely wrote:
+>> > > What is the problem trying to be avoided by not using the virtual map?
+>> > > Is it passing the virtual mapping data from one kernel to the next
+>> > > when kexecing? Or something else?
+>> >
+>> > Where to begin ... SetVirtualAddressMap() is one massive hack job ...
+>> > just look at the tiano core implementation.   Basically it has a fixed
+>> > idea of where all the pointers are and it tries to convert them all to
+>> > the new address space.  The problem we see in x86 is that this
+>> > conversion process isn't exhaustive due to implementation cockups, so
+>> > the post virtual address map image occasionally tries to access
+>> > unconverted pointers via the old physical address and oopses the kernel.
+>>
+>> And yet it's the only mode in which the firmrware is actually tested
+>> against an OS, so we don't have any real choice in the matter.
 >
-> Can you check on the VFP context switch path whether kernel_neon_begin()
-> has been called and we are moving away from the task? You could even
-> store the LR in kernel_neon_begin() to give better error information.
->
+> Agree for x86 ... we just have to cope with the implementations we see
+> in the field.  However, ARM has much more scope to have the UEFI
+> implementation developed collaboratively with Linux as the reference
+> platform.  If we can convince the ARM implementors that
+> SetVirtualAddressMap is an accident waiting to happen, they might be
+> more flexible.
 
-I guess it should be quite doable to add the LR of the most recent
-kernel_neon_begin() call to the vfpstate (and clear it in
-kernel_neon_end), so we can check it when vfp_notifier() is called.
-We'll still hit the vfp undef handler on swapping the task back in, so
-it may be a bit redundant.
+We may not have any success convincing them of that; but given the
+larger scope for Linux on ARM UEFI implementations, it will actually
+get tested. If Linux chooses to use a 1:1 mapping, then the hardware
+vendors will make sure a 1:1 mapping will actually work.
 
-What I could do is use this LR field in vfpstate when hitting the
-undef handler to distinguish between (a) kernel_neon_begin()
-erroneously not having called at all and (b) kernel_neon_begin()
-having been called before sleeping (and print a stacktrace in the
-latter case)
+I must say that I'm a whole lot more comfortable with this approach.
+I've never been comfortable with calling out to UEFI functions while
+leaving the entirety of kernel space accessable. Sure UEFI can still
+do nasty things if it really wants to and important devices get
+mapped, but at least it will protect against accidental accesses.
 
--- 
-Ard.
+g.
