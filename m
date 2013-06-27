@@ -1,38 +1,28 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 27 Jun 2013 12:24:25 +0300
-Subject: [PATCH 2/4] ARM: OMAP5: clockdomain data: add init file for
- omap54xx
-In-Reply-To: <20130627084434.GT15455@arwen.pp.htv.fi>
-References: <1372322299-25046-1-git-send-email-t-kristo@ti.com>
- <1372322299-25046-3-git-send-email-t-kristo@ti.com>
- <20130627084434.GT15455@arwen.pp.htv.fi>
-Message-ID: <51CC04C9.3050801@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 27 Jun 2013 11:27:02 +0200
+Subject: [linux-sunxi] [PATCH 0/8] clocksource: sunxi: Timer fixes and
+ cleanup
+In-Reply-To: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <51CC0566.8010302@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2013 11:44 AM, Felipe Balbi wrote:
-> Hi,
->
-> On Thu, Jun 27, 2013 at 11:38:17AM +0300, Tero Kristo wrote:
->> +	rc = clk_set_parent(abe_dpll_ref, sys_32k_ck);
->> +	abe_dpll = clk_get_sys(NULL, "dpll_abe_ck");
->
-> should these two lines be swaped ?
+Hi,
 
-No, its a different clock. clk_set_parent is done for a clock that is a 
-parent of dpll_abe_ck.
-
+On 06/26/2013 11:16 PM, Maxime Ripard wrote:
+> Hi everyone,
 >
->> +	if (!rc)
->> +		rc = clk_set_rate(abe_dpll, OMAP5_DPLL_ABE_DEFFREQ);
->> +	if (rc)
->> +		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
->> +
->> +	return 0;
->
-> so even if (rc) you still return 0 ? Shouldn't you return rc instead ?
 
-Hmm yea, this could be improved. :) Same should be done for O4 / DRA7 
-also. Seems like a long lasting feature actually.
+<snip>
 
--Tero
+> It also finally adds a clocksource from the free running counter found in the
+> A10/A13 SoCs.
+
+Hmm, have you benchmarked this? There have been reports from linux-sunxi kernel
+users (xbmc project) that the waiting for the latch is quite slow. Note we
+don't have anything better yet in the linux-sunxi kernel.
+
+Regards,
+
+Hans
