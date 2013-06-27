@@ -1,144 +1,39 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 27 Jun 2013 14:54:31 +0100
-Subject: [PATCH v6 4/5] arm64: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <alpine.DEB.2.02.1306271446570.4782@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1306271446570.4782@kaball.uk.xensource.com>
-Message-ID: <1372341272-12512-4-git-send-email-stefano.stabellini@eu.citrix.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 27 Jun 2013 22:57:24 +0900
+Subject: [PATCH v4 0/4] Renesas sh-sci updates for v3.11
+In-Reply-To: <201306271501.18968.arnd@arndb.de>
+References: <1372236787-23342-1-git-send-email-horms+renesas@verge.net.au>
+ <201306271501.18968.arnd@arndb.de>
+Message-ID: <20130627135724.GE28902@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
-Necessary duplication of paravirt.h and paravirt.c with ARM.
+On Thu, Jun 27, 2013 at 03:01:18PM +0200, Arnd Bergmann wrote:
+> On Wednesday 26 June 2013, Simon Horman wrote:
+> > This revised pull-request includes a build-warning fix by myself.
+> > The build-warning was reported by Arnd and has been acked by Greg
+> > Kroah-Hartman.
+> > 
+> > I apologise that this is now coming very late in the cycle, this is
+> > mostly due to the time it took to address the build-warning.
+> 
+> Ok. I've also had a simple merge conflict here, better make sure
+> it's ok now.
 
-The only paravirt interface supported is pv_time_ops.steal_clock, so no
-runtime pvops patching needed.
+Thanks. Your resolution appears to be the same as mine.
 
-This allows us to make use of steal_account_process_tick for stolen
-ticks accounting.
-
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-CC: will.deacon at arm.com
-CC: nico at linaro.org
-CC: marc.zyngier at arm.com
-CC: cov at codeaurora.org
-CC: arnd at arndb.de
-CC: olof at lixom.net
-CC: Catalin.Marinas at arm.com
----
- arch/arm64/Kconfig                |   20 ++++++++++++++++++++
- arch/arm64/include/asm/paravirt.h |   19 +++++++++++++++++++
- arch/arm64/kernel/Makefile        |    1 +
- arch/arm64/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
- 4 files changed, 65 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/paravirt.h
- create mode 100644 arch/arm64/kernel/paravirt.c
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 1fac4e5..4c4f213 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -190,6 +190,25 @@ config HW_PERF_EVENTS
- 
- source "mm/Kconfig"
- 
-+config PARAVIRT
-+	bool "Enable paravirtualization code"
-+	---help---
-+	  This changes the kernel so it can modify itself when it is run
-+	  under a hypervisor, potentially improving performance significantly
-+	  over full virtualization.
-+
-+config PARAVIRT_TIME_ACCOUNTING
-+	bool "Paravirtual steal time accounting"
-+	select PARAVIRT
-+	default n
-+	---help---
-+	  Select this option to enable fine granularity task steal time
-+	  accounting. Time spent executing other tasks in parallel with
-+	  the current vCPU is discounted from the vCPU power. To account for
-+	  that, there can be a small performance impact.
-+
-+	  If in doubt, say N here.
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-@@ -197,6 +216,7 @@ config XEN_DOM0
- config XEN
- 	bool "Xen guest support on ARM64 (EXPERIMENTAL)"
- 	depends on ARM64 && OF
-+	select PARAVIRT
- 	help
- 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM64.
- 
-diff --git a/arch/arm64/include/asm/paravirt.h b/arch/arm64/include/asm/paravirt.h
-new file mode 100644
-index 0000000..54e895b
---- /dev/null
-+++ b/arch/arm64/include/asm/paravirt.h
-@@ -0,0 +1,19 @@
-+#ifndef _ASM_ARM64_PARAVIRT_H
-+#define _ASM_ARM64_PARAVIRT_H
-+
-+struct static_key;
-+extern struct static_key paravirt_steal_enabled;
-+extern struct static_key paravirt_steal_rq_enabled;
-+
-+struct pv_time_ops {
-+	unsigned long long (*steal_clock)(int cpu);
-+};
-+extern struct pv_time_ops pv_time_ops;
-+
-+static inline u64 paravirt_steal_clock(int cpu)
-+{
-+	return pv_time_ops.steal_clock(cpu);
-+}
-+
-+
-+#endif
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 7b4b564..17613ad 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o smp_psci.o
- arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
- arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
-+arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/paravirt.c b/arch/arm64/kernel/paravirt.c
-new file mode 100644
-index 0000000..53f371e
---- /dev/null
-+++ b/arch/arm64/kernel/paravirt.c
-@@ -0,0 +1,25 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copyright (C) 2013 Citrix Systems
-+ *
-+ * Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-+ */
-+
-+#include <linux/export.h>
-+#include <linux/jump_label.h>
-+#include <linux/types.h>
-+#include <asm/paravirt.h>
-+
-+struct static_key paravirt_steal_enabled;
-+struct static_key paravirt_steal_rq_enabled;
-+
-+struct pv_time_ops pv_time_ops;
-+EXPORT_SYMBOL_GPL(pv_time_ops);
--- 
-1.7.2.5
+> Pulled into next/late.
+> 
+> > I also apologise that I have not yet addressed your request to
+> > drop your addresses from the CC list of the patch emails
+> > that follow this one. I will do so before I start sending patches
+> > for v3.12.
+> 
+> No worries.
+> 
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
