@@ -1,40 +1,98 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 26 Jun 2013 22:41:43 -0700 (PDT)
-Subject: [PATCH v3 0/2] ARM: shmobile: r8a7790: add thermal driver support
-In-Reply-To: <1372297984-9315-1-git-send-email-horms+renesas@verge.net.au>
-References: <1372297984-9315-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <871u7o2jqk.wl%kuninori.morimoto.gx@renesas.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 27 Jun 2013 09:02:34 +0300
+Subject: [PATCH 2/8] clocksource: sun4i: Add clocksource and sched clock
+ drivers
+In-Reply-To: <1372281421-2099-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1372281421-2099-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130627060234.GD4824@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Maxime,
 
-Hi Simon
-
-> This short series enables the thermal driver on the r8a7790 SoC
-> and thus the lager board.
+On Wed, Jun 26, 2013 at 11:16:55PM +0200, Maxime Ripard wrote:
+> The A10 and the A13 has a 64 bits free running counter that we can use
+> as a clocksource and a sched clock, that were both not used yet on these
+> platforms.
 > 
-> It is based on renesas-next-20130620
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/clocksource/sun4i_timer.c | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
 > 
-> v3
-> * Correct title of clocks patch to refer to r8a7790
-> 
-> v2
-> * Add clocks patch
-> 
-> Simon Horman (2):
->   ARM: shmobile: r8a7790: add clocks for thermal
->   ARM: shmobile: r8a7790: add thermal driver support
-> 
->  arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
->  arch/arm/mach-shmobile/setup-r8a7790.c | 12 ++++++++++++
->  2 files changed, 16 insertions(+)
+> diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
+> index bdf34d9..1d2eaa0 100644
+> --- a/drivers/clocksource/sun4i_timer.c
+> +++ b/drivers/clocksource/sun4i_timer.c
+> @@ -23,6 +23,8 @@
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+>  
+> +#include <asm/sched_clock.h>
 
-For all patches
+In the tip.git tree (and -next) this header is moved to <linux/sched_clock.h> 
+in  38ff87f77a (sched_clock: Make ARM's sched_clock generic for all 
+architectures).
 
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> +
+>  #define TIMER_IRQ_EN_REG	0x00
+>  #define TIMER_IRQ_EN(val)		BIT(val)
+>  #define TIMER_IRQ_ST_REG	0x04
+> @@ -34,6 +36,11 @@
+>  #define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
+>  
+>  #define TIMER_SCAL		16
+> +#define TIMER_CNT64_CTL_REG	0xa0
+> +#define TIMER_CNT64_CTL_CLR		BIT(0)
+> +#define TIMER_CNT64_CTL_RL		BIT(1)
+> +#define TIMER_CNT64_LOW_REG	0xa4
+> +#define TIMER_CNT64_HIGH_REG	0xa8
+>  
+>  static void __iomem *timer_base;
+>  
+> @@ -96,6 +103,20 @@ static struct irqaction sun4i_timer_irq = {
+>  	.dev_id = &sun4i_clockevent,
+>  };
+>  
+> +static u32 sun4i_timer_sched_read(void)
 
+You commit message mentions "64 bits free running counter", but this one only 
+returns 32 bit.
 
+baruch
 
-Best regards
----
-Kuninori Morimoto
+> +{
+> +	u32 reg = readl(timer_base + TIMER_CNT64_CTL_REG);
+> +	writel(reg | TIMER_CNT64_CTL_RL, timer_base + TIMER_CNT64_CTL_REG);
+> +	while (readl(timer_base + TIMER_CNT64_CTL_REG) & TIMER_CNT64_CTL_REG);
+> +
+> +	return readl(timer_base + TIMER_CNT64_LOW_REG);
+> +}
+> +
+> +static cycle_t sun4i_timer_clksrc_read(struct clocksource *c)
+> +{
+> +	return sun4i_timer_sched_read();
+> +}
+> +
+>  static void __init sun4i_timer_init(struct device_node *node)
+>  {
+>  	unsigned long rate = 0;
+> @@ -117,6 +138,12 @@ static void __init sun4i_timer_init(struct device_node *node)
+>  
+>  	rate = clk_get_rate(clk);
+>  
+> +	writel(TIMER_CNT64_CTL_CLR, timer_base + TIMER_CNT64_CTL_REG);
+> +	setup_sched_clock(sun4i_timer_sched_read, 32, clk_get_rate(clk));
+> +	clocksource_mmio_init(timer_base + TIMER_CNT64_LOW_REG, node->name,
+> +			      clk_get_rate(clk), 300, 32,
+> +			      sun4i_timer_clksrc_read);
+> +
+>  	writel(rate / (TIMER_SCAL * HZ),
+>  	       timer_base + TIMER_INTVAL_REG(0));
+>  
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
