@@ -1,30 +1,39 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 26 Jun 2013 22:39:30 -0700 (PDT)
-Subject: [PATCH v5 1/3] ARM: shmobile: r8a7778: add VIN support
-In-Reply-To: <20130627053037.GI28229@verge.net.au>
-References: <201306220326.46176.sergei.shtylyov@cogentembedded.com>
- <201306220328.47110.sergei.shtylyov@cogentembedded.com>
- <877ghg2krp.wl%kuninori.morimoto.gx@renesas.com>
- <20130627053037.GI28229@verge.net.au>
-Message-ID: <8738s42ju9.wl%kuninori.morimoto.gx@renesas.com>
+Date: Wed, 26 Jun 2013 22:41:43 -0700 (PDT)
+Subject: [PATCH v3 0/2] ARM: shmobile: r8a7790: add thermal driver support
+In-Reply-To: <1372297984-9315-1-git-send-email-horms+renesas@verge.net.au>
+References: <1372297984-9315-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <871u7o2jqk.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Hi Simon
 
-> > >  arch/arm/mach-shmobile/clock-r8a7778.c        |    5 +++
-> > >  arch/arm/mach-shmobile/include/mach/r8a7778.h |    3 ++
-> > >  arch/arm/mach-shmobile/setup-r8a7778.c        |   33 ++++++++++++++++++++++++++
-> > >  3 files changed, 41 insertions(+)
-> > 
-> > Simon (or ARM Maintainer ?) will be happy if clock was separated ?
+> This short series enables the thermal driver on the r8a7790 SoC
+> and thus the lager board.
 > 
-> Actually, I made a mistake with regards to that.
-> I now think it is ok to have them together.
-> Sorry for causing you some extra work earlier this month.
+> It is based on renesas-next-20130620
+> 
+> v3
+> * Correct title of clocks patch to refer to r8a7790
+> 
+> v2
+> * Add clocks patch
+> 
+> Simon Horman (2):
+>   ARM: shmobile: r8a7790: add clocks for thermal
+>   ARM: shmobile: r8a7790: add thermal driver support
+> 
+>  arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
+>  arch/arm/mach-shmobile/setup-r8a7790.c | 12 ++++++++++++
+>  2 files changed, 16 insertions(+)
 
-OK, thank you :)
+For all patches
+
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+
 
 Best regards
 ---
