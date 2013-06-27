@@ -1,32 +1,26 @@
-From: naresh.bhat@linaro.org (Naresh Bhat)
-Date: Thu, 27 Jun 2013 20:14:42 +0530
-Subject: [PATCH 3/3] smc91x: Fix cast from pointer to integer
-Message-ID: <1372344282-6608-1-git-send-email-naresh.bhat@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 27 Jun 2013 18:47:56 +0400
+Subject: [PATCH] ARM: cpuidle: davinci: Fix target residency
+In-Reply-To: <1372327012-13528-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1372327012-13528-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <51CC509C.6040804@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch fix the following warning which is occured
-while compiling the kernel for aarch64 bit architecture
+Hello.
 
-  CC      drivers/net/ethernet/smsc/smc91x.o
-drivers/net/ethernet/smsc/smc91x.c: In function ?smc_probe?:
-drivers/net/ethernet/smsc/smc91x.c:1901:7: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
----
- drivers/net/ethernet/smsc/smc91x.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 27-06-2013 13:56, Daniel Lezcano wrote:
 
-diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
-index 591650a..1011ecc 100644
---- a/drivers/net/ethernet/smsc/smc91x.c
-+++ b/drivers/net/ethernet/smsc/smc91x.c
-@@ -1898,7 +1898,7 @@ static int smc_probe(struct net_device *dev, void __iomem *ioaddr,
- 	SMC_SELECT_BANK(lp, 1);
- 	val = SMC_GET_BASE(lp);
- 	val = ((val & 0x1F00) >> 3) << SMC_IO_SHIFT;
--	if (((unsigned int)ioaddr & (0x3e0 << SMC_IO_SHIFT)) != val) {
-+	if (((unsigned long)ioaddr & (0x3e0 << SMC_IO_SHIFT)) != val) {
- 		printk("%s: IOADDR %p doesn't match configuration (%x).\n",
- 			CARDNAME, ioaddr, val);
- 	}
--- 
-1.7.9.5
+> The commit 19976c2a88d125aec16b9255c7197c297bbdd637 changed the target
+
+    Please also specify the summary line of that commit in parens.
+
+> residency to 100000, assuming this is a careless mistake.
+
+> The same happened to the at91's cpuidle driver.
+
+> Fix it by putting the initial value to 10000.
+
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+
+WBR, Sergei
