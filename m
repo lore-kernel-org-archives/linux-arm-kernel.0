@@ -1,21 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Jun 2013 14:18:05 +0200
-Subject: [PATCH 1/3] ARM: integrator: set local side PCI addresses right
-In-Reply-To: <1372201538-25946-1-git-send-email-linus.walleij@linaro.org>
-References: <1372201538-25946-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201306271418.05950.arnd@arndb.de>
+From: christian.ruppert@abilis.com (Christian Ruppert)
+Date: Thu, 27 Jun 2013 14:18:18 +0200
+Subject: [PATCH v2] pinctrl: elaborate a bit on arrangements in doc
+In-Reply-To: <1372326887-6497-1-git-send-email-linus.walleij@stericsson.com>
+References: <1372326887-6497-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130627121817.GB25445@ab42.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 June 2013, Linus Walleij wrote:
-> This alters the local side address of the iospace to zero,
-> non prefetchable memory local side address to 0x00000000 and
-> prefetchable memory local side address to 0x10000000,
-> so as to match the values actually poked in by the driver.
+On Thu, Jun 27, 2013 at 11:54:47AM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> This elaborates a bit on the pin control and pin muxing
+> logic vs GPIO arangements in the hardware.
+> 
+> Inspired by some drawings in a mail from Christian Ruppert.
+> Both arrangements are confirmed to exist in practice.
+> 
+> Cc: Rob Landley <rob@landley.net>
+> Cc: Christian Ruppert <christian.ruppert@abilis.com>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Applied, thanks!
+To me this sounds very clear.
 
-	Arnd
+Reviewed-by: Christian Ruppert <christian.ruppert@abilis.com>
+
+> ---
+> ChangeLog v1->v2:
+> - Cut down to two arrangements that I *know* exist in reality.
+> - Reword, rehash, rinse, repeat...
+
+-- 
+  Christian Ruppert              ,          <christian.ruppert@abilis.com>
+                                /|
+  Tel: +41/(0)22 816 19-42     //|                 3, Chemin du Pr?-Fleuri
+                             _// | bilis Systems   CH-1228 Plan-les-Ouates
