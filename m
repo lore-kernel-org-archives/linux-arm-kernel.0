@@ -1,73 +1,83 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 26 Jun 2013 22:29:20 -0700 (PDT)
-Subject: [PATCH 0/4] Add DVFS support on APE6EVM
-In-Reply-To: <1371798638-10530-1-git-send-email-g.liakhovetski@gmx.de>
-References: <1371798638-10530-1-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <874nck2kb7.wl%kuninori.morimoto.gx@renesas.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 27 Jun 2013 14:30:38 +0900
+Subject: [PATCH v5 1/3] ARM: shmobile: r8a7778: add VIN support
+In-Reply-To: <877ghg2krp.wl%kuninori.morimoto.gx@renesas.com>
+References: <201306220326.46176.sergei.shtylyov@cogentembedded.com>
+ <201306220328.47110.sergei.shtylyov@cogentembedded.com>
+ <877ghg2krp.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20130627053037.GI28229@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jun 26, 2013 at 10:19:27PM -0700, Kuninori Morimoto wrote:
+> 
+> Hi
+> 
+> I have 2 small comments
+> 
+> But, basically, I have no objection to this patch.
+> 
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> 
+> > From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> > 
+> > Add VIN clocks and platform devices on R8A7778 SoC; add function to register
+> > the VIN platform devices.
+> > 
+> > Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> > [Sergei: added 'id' parameter check to r8a7779_add_vin_device(), used '*pdata'
+> > in *sizeof* operator there, renamed some variables, annotated 'vin[01]_info' and
+> > vin[01]_resources[] as '__initdata'.]
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > 
+> > ---
+> > Changes since version 4:
+> > - resolved reject, refreshed the patch.
+> > 
+> > Changes since version 3:
+> > - changed the VIN platform device names to be R8A7778 specific; 
+> > - resolved reject in <mach/r8a7778.h>  due to USB patch rework.
+> > 
+> > Changes from version 2:
+> > - annotated 'vin[01]_info' and vin[01]_resources[] as '__initdata' since they're
+> >   kmemdup()'ed while registering the platform devices anyway;
+> > - refreshed the patch.
+> > 
+> >  arch/arm/mach-shmobile/clock-r8a7778.c        |    5 +++
+> >  arch/arm/mach-shmobile/include/mach/r8a7778.h |    3 ++
+> >  arch/arm/mach-shmobile/setup-r8a7778.c        |   33 ++++++++++++++++++++++++++
+> >  3 files changed, 41 insertions(+)
+> 
+> Simon (or ARM Maintainer ?) will be happy if clock was separated ?
 
-Hi
+Actually, I made a mistake with regards to that.
+I now think it is ok to have them together.
+Sorry for causing you some extra work earlier this month.
 
-I have no objection.
-For all patches
-
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-
-Guennadi wrote:
 > 
-> Having added CPUFreq support to the Cortex A15 cores on APE6 (r8a73a4) and 
-> DT support to the max8973 regulator driver it is now possible to implement 
-> CA15 CPUFreq support on APE6EVM, using a max8972 PMU to adjust SoC's DVFS
-> voltage. This series depends on earlier
+> > Index: renesas/arch/arm/mach-shmobile/clock-r8a7778.c
+> > ===================================================================
+> > --- renesas.orig/arch/arm/mach-shmobile/clock-r8a7778.c
+> > +++ renesas/arch/arm/mach-shmobile/clock-r8a7778.c
+> > @@ -106,6 +106,7 @@ enum {
+> >  	MSTP331,
+> >  	MSTP323, MSTP322, MSTP321,
+> >  	MSTP114,
+> > +	MSTP110, MSTP109,
+> >  	MSTP100,
+> >  	MSTP030,
 > 
-> "ARM: shmobile: r8a73a4: wait for completion when kicking the clock"
-> https://patchwork.kernel.org/patch/2601071/
-> "ARM: shmobile: r8a73a4: implement CPU clock scaling for CPUFreq"
-> https://patchwork.kernel.org/patch/2601111/
+> MSTP114, MSTP110
+> MSTP109, MSTP100
 > 
-> and requires the following max8973 patches:
+> is better
 > 
-> "regulators: max8973: fix multiple instance support"
-> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg456101.html
-> "regulators: max8973: initial DT support"
-> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg456102.html
 > 
-> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> 
-> Guennadi Liakhovetski (4):
->   ARM: shmobile: r8a73a4: safeguard against wrong clk_set_rate() uses
->   ARM: shmobile: r8a73a4: add I2C DT nodes and required clocks
->   ARM: shmobile: ape6evm: add CPUFreq support
->   ARM: shmobile: r8a73a4: add Z2 clock support
-> 
->  arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   26 ++++++++++
->  arch/arm/boot/dts/r8a73a4.dtsi         |   81 ++++++++++++++++++++++++++++++++
->  arch/arm/mach-shmobile/clock-r8a73a4.c |   56 +++++++++++++++++++++-
->  3 files changed, 160 insertions(+), 3 deletions(-)
-> 
-> -- 
-> 1.7.2.5
-> 
-> Thanks
-> Guennadi
+> Best regards
 > ---
-> Guennadi Liakhovetski, Ph.D.
-> Freelance Open-Source Software Developer
-> http://www.open-technology.de/
+> Kuninori Morimoto
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-sh" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
----
-Kuninori Morimoto
-
-??????????????
-??????????????????????
-                  ????????????????
-
-Best regards
----
-Kuninori Morimoto
+> 
