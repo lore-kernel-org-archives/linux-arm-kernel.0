@@ -1,24 +1,30 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 27 Jun 2013 15:46:28 -0700
-Subject: [PATCH v2] mm: module_alloc: check if size is 0
-In-Reply-To: <20130627152335.c3a4c9f4c647cf4a2b263479@linux-foundation.org>
-References: <1330631119-10059-1-git-send-email-veli-pekka.peltola@bluegiga.com>
- <1331125768-25454-1-git-send-email-veli-pekka.peltola@bluegiga.com>
- <20130627093917.GQ7171@linux-mips.org>
- <20130627152335.c3a4c9f4c647cf4a2b263479@linux-foundation.org>
-Message-ID: <1372373188.2060.32.camel@joe-AO722>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 27 Jun 2013 16:59:04 -0600
+Subject: [PATCH] clk: tegra: fix ifdef for tegra_periph_reset_assert inline
+In-Reply-To: <20130624210333.23972.95491@quantum>
+References: <1372100756-10448-1-git-send-email-swarren@wwwdotorg.org>
+ <20130624210333.23972.95491@quantum>
+Message-ID: <51CCC3B8.80909@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-06-27 at 15:23 -0700, Andrew Morton wrote:
-> On Thu, 27 Jun 2013 11:39:17 +0200 Ralf Baechle <ralf@linux-mips.org> wrote:
-[]
-> Veli-Pekka's original patch would be neater if we were to add a new
+On 06/24/2013 03:03 PM, Mike Turquette wrote:
+> Quoting Stephen Warren (2013-06-24 12:05:56)
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> Commit 7064f6b "clk: tegra: provide tegra_periph_reset_assert
+>> alternative" added ifdef'd static inline versions of some functions,
+>> but tested ARCH_TEGRA rather than CONFIG_ARCH_TEGRA, thus disabling
+>> these function in all cases. In some cases, this caused HW modules to
+>> misbehave; for example, the Tegra I2C driver BUG()d during boot on
+>> Seaboard.
+>>
+>> Reported-by: Olof Johansson <olof@lixom.net>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > 
-> void *__vmalloc_node_range_zero_size_ok(<args>)
-> {
-> 	if (size == 0)
-> 		return NULL;
+> Thanks for the fixup. I had already published the offending commit and
+> can't rebase it, so I just applied this patch on top.
+> 
+> Pulled into clk-next for 3.11.
 
-I believe you mean
-		return ZERO_SIZE_PTR;
+Did that get pushed out to the git server? The patch isn't in next-20130627.
