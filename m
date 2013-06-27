@@ -1,63 +1,61 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 27 Jun 2013 14:09:27 -0400 (EDT)
-Subject: [PATCH] USB: EHCI: make ehci-w90X900 a separate driver
-In-Reply-To: <1372347109-5563-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1306271405030.1167-100000@iolanthe.rowland.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 27 Jun 2013 12:04:17 -0600
+Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
+In-Reply-To: <20130626193158.GF9078@rocoto.smurfnet.nu>
+References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
+ <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
+ <51CA2B03.4080106@wwwdotorg.org>
+ <CACxGe6vsBKnbipR-Zd1T9Ox1J2ugFmShrGXGUzPa_=D9TJvFQw@mail.gmail.com>
+ <51CB33BE.2020601@wwwdotorg.org> <20130626193158.GF9078@rocoto.smurfnet.nu>
+Message-ID: <51CC7EA1.1040509@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Jun 2013, Manjunath Goudar wrote:
-
-> Separate the W90X900(W90P910) on-chip host controller driver from
-> ehci-hcd host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> however, note that other changes are still needed before W90X900(W90P910)
-> can be booted with a multi-platform kernel
+On 06/26/2013 01:31 PM, Leif Lindholm wrote:
+> On Wed, Jun 26, 2013 at 12:32:30PM -0600, Stephen Warren wrote:
+>>>> What about ARMv8? Is the intention to have a separate definition for the
+>>>> UEFI bindings on ARMv8, so that compatibility isn't an issue? What if a
+>>>> future version of UEFI allows LPAE usage?
+>>>
+>>> It is unlikely that will happen on v7 since newer versions of UEFI are
+>>> expected to remain backwards compatible with the current spec.
+>>
+>> The expectation of backwards-compatibility sounds nice, but it seems a
+>> little dangerous to outright rely on it.
+>>
+>> Even if not a regular compatible property, can we define a property that
+>> indicates the UEFI revision or revision of this DT binding, so that if
+>> we ever have to change it, there is some way of explicitly indicating
+>> which exact schema the DT corresponds to, rather than having to
+>> reverse-engineer it from the set of properties that "just happen" to be
+>> present in DT?
+>>
+>> This is rather like the firmware node discussion that happened recently,
+>> where we were expecting to represent a firmware (secure mode) interface
+>> by a DT node, which would have a compatible value, which in turn would
+>> convey information about which "OS" the secure firmware was running, and
+>> well as any potential SoC-/OEM-/board-specific interface provided by it.
+>>
+>> And who knows, what if UEFI gets replaced someday; presumably we'd want
+>> some way of explicitly stating "running under UEFI" vs. "running under
+>> something else"?
 > 
-> and an ehci driver that only works on one of them.
-> 
-> With the infrastructure added by Alan Stern in patch 3e0232039
-> "USB: EHCI: prepare to make ehci-hcd a library module", we can
-> avoid this problem by turning a bus glue into a separate
-> module, as we do here for the w90X900 bus glue.
+> To me, these concerns are all covered by the existence of the
+> efi-system-table node, and the version number that you can extract
+> from the table (mandatory in any UEFI implementation) located at that
+> address. There is no reverse-engineering involved.
 
+So, what you're saying is that the existence (or lack thereof) of the
+efi-system-table property is the indicator whether EFI is present? I
+guess if we assume that EFI will always evolve at least compatibly
+enough that the system table will always exist and be formatted
+identically at least to the extent of allowing the EFI version number to
+be parsed then that's workable. If that guarantee is broken, then we can
+always define a different property that points at the new format of the
+table.
 
-> diff --git a/drivers/usb/host/ehci-w90x900.c b/drivers/usb/host/ehci-w90x900.c
-> index 59e0e24..d9ecd79 100644
-> --- a/drivers/usb/host/ehci-w90x900.c
-> +++ b/drivers/usb/host/ehci-w90x900.c
-> @@ -11,13 +11,28 @@
->   *
->   */
->  
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/usb.h>
-> +#include <linux/usb/hcd.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/of.h>
+This still seems a little implicit to me; having an explicit node with
+an explicit compatible value is much more in line with what's been
+discussed for other firmware interfaces.
 
-Alphabetical order, please.
-
->  #include <linux/platform_device.h>
->  
-> +#include "ehci.h"
-> +
->  /* enable phy0 and phy1 for w90p910 */
->  #define	ENPHY		(0x01<<8)
->  #define PHY0_CTR	(0xA4)
->  #define PHY1_CTR	(0xA8)
->  
-> +#define DRIVER_DESC "w90p910 usb ehci driver!"
-
-I know this is what it said originally, but let's make it look more 
-like the other drivers.  It doesn't need to say "usb", and it doesn't 
-need the '!' character at the end.  Also, 'ehci' should be in capital 
-letters.
-
-Finally, shouldn't it say "w90x900" instead of "w90p910"?
-
-The rest of the patch is okay.
-
-Alan Stern
+However, I suppose it will work fine.
