@@ -1,39 +1,164 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 27 Jun 2013 16:12:09 +0200
-Subject: [PATCH v6 2/5] kernel: missing include in cputime.c
-In-Reply-To: <1372341272-12512-2-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1306271446570.4782@kaball.uk.xensource.com>
- <1372341272-12512-2-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130627141209.GB29209@dyad.programming.kicks-ass.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 27 Jun 2013 22:15:37 +0800
+Subject: [PATCH 1/2] serial: imx: remove the uart_console() check
+In-Reply-To: <1372239359-4054-1-git-send-email-b32955@freescale.com>
+References: <1372239359-4054-1-git-send-email-b32955@freescale.com>
+Message-ID: <20130627141535.GD2695@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 02:54:29PM +0100, Stefano Stabellini wrote:
-> steal_account_process_tick calls paravirt_steal_clock, but paravirt.h is
-> currently missing amoung the included header files.
-> Add include asm/paravirt.h ifdef CONFIG_PARAVIRT.
+On Wed, Jun 26, 2013 at 05:35:58PM +0800, Huang Shijie wrote:
+> The uart_console() check makes the clocks(clk_per and clk_ipg) opened
+> even when we close the console uart.
 > 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: mingo at redhat.com
-> CC: peterz at infradead.org
+> This patch enable/disable the clocks in imx_console_write(),
+> so we can keep the clocks closed when the console uart is closed.
 > 
-> Changes in v5:
-> - add ifdef CONFIG_PARAVIRT.
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
 > ---
->  kernel/sched/cputime.c |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
+>  drivers/tty/serial/imx.c |   63 ++++++++++++++++++++++++++++++++-------------
+>  1 files changed, 45 insertions(+), 18 deletions(-)
 > 
-> diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
-> index cc2dc3ee..317a578 100644
-> --- a/kernel/sched/cputime.c
-> +++ b/kernel/sched/cputime.c
-> @@ -5,7 +5,9 @@
->  #include <linux/static_key.h>
->  #include <linux/context_tracking.h>
->  #include "sched.h"
-> -
-> +#ifdef CONFIG_PARAVIRT
-> +#include <asm/paravirt.h>
-> +#endif
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 415cec6..bfdf764 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -702,15 +702,13 @@ static int imx_startup(struct uart_port *port)
+>  	int retval;
+>  	unsigned long flags, temp;
+>  
+> -	if (!uart_console(port)) {
+> -		retval = clk_prepare_enable(sport->clk_per);
+> -		if (retval)
+> -			goto error_out1;
+> -		retval = clk_prepare_enable(sport->clk_ipg);
+> -		if (retval) {
+> -			clk_disable_unprepare(sport->clk_per);
+> -			goto error_out1;
+> -		}
+> +	retval = clk_prepare_enable(sport->clk_per);
+> +	if (retval)
+> +		goto error_out1;
+> +	retval = clk_prepare_enable(sport->clk_ipg);
+> +	if (retval) {
+> +		clk_disable_unprepare(sport->clk_per);
+> +		goto error_out1;
+>  	}
+>  
+>  	imx_setup_ufcr(sport, 0);
+> @@ -901,10 +899,8 @@ static void imx_shutdown(struct uart_port *port)
+>  	writel(temp, sport->port.membase + UCR1);
+>  	spin_unlock_irqrestore(&sport->port.lock, flags);
+>  
+> -	if (!uart_console(&sport->port)) {
+> -		clk_disable_unprepare(sport->clk_per);
+> -		clk_disable_unprepare(sport->clk_ipg);
+> -	}
+> +	clk_disable_unprepare(sport->clk_per);
+> +	clk_disable_unprepare(sport->clk_ipg);
+>  }
+>  
+>  static void
+> @@ -1251,6 +1247,16 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
+>  	unsigned int ucr1;
+>  	unsigned long flags = 0;
+>  	int locked = 1;
+> +	int retval;
+> +
+> +	retval = clk_enable(sport->clk_per);
+> +	if (retval)
+> +		return;
+> +	retval = clk_enable(sport->clk_ipg);
+> +	if (retval) {
+> +		clk_disable(sport->clk_per);
+> +		return;
+> +	}
+>  
+>  	if (sport->port.sysrq)
+>  		locked = 0;
+> @@ -1286,6 +1292,9 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
+>  
+>  	if (locked)
+>  		spin_unlock_irqrestore(&sport->port.lock, flags);
+> +
+> +	clk_disable(sport->clk_ipg);
+> +	clk_disable(sport->clk_per);
+>  }
+>  
+>  /*
+> @@ -1359,6 +1368,7 @@ imx_console_setup(struct console *co, char *options)
+>  	int bits = 8;
+>  	int parity = 'n';
+>  	int flow = 'n';
+> +	int retval;
+>  
+>  	/*
+>  	 * Check whether an invalid uart number has been specified, and
+> @@ -1371,6 +1381,15 @@ imx_console_setup(struct console *co, char *options)
+>  	if (sport == NULL)
+>  		return -ENODEV;
+>  
+> +	retval = clk_prepare_enable(sport->clk_per);
+> +	if (retval)
+> +		goto error_console;
+> +	retval = clk_prepare_enable(sport->clk_ipg);
+> +	if (retval) {
+> +		clk_disable_unprepare(sport->clk_per);
+> +		goto error_console;
+> +	}
+> +
 
-Why isn't that CONFIG stuff inside the header instead of around it?
+Why do we need clk_enable() here at all?  The amba-pl011 driver only
+calls clk_prepare() in console .setup().
+
+>  	if (options)
+>  		uart_parse_options(options, &baud, &parity, &bits, &flow);
+>  	else
+> @@ -1378,7 +1397,17 @@ imx_console_setup(struct console *co, char *options)
+>  
+>  	imx_setup_ufcr(sport, 0);
+>  
+> -	return uart_set_options(&sport->port, co, baud, parity, bits, flow);
+> +	retval = uart_set_options(&sport->port, co, baud, parity, bits, flow);
+> +
+> +	clk_disable(sport->clk_per);
+> +	clk_disable(sport->clk_ipg);
+> +	if (retval) {
+> +		clk_unprepare(sport->clk_per);
+> +		clk_unprepare(sport->clk_ipg);
+> +	}
+> +
+> +error_console:
+> +	return retval;
+>  }
+>  
+>  static struct uart_driver imx_reg;
+> @@ -1583,10 +1612,8 @@ static int serial_imx_probe(struct platform_device *pdev)
+>  		goto deinit;
+>  	platform_set_drvdata(pdev, sport);
+>  
+> -	if (!uart_console(&sport->port)) {
+> -		clk_disable_unprepare(sport->clk_per);
+> -		clk_disable_unprepare(sport->clk_ipg);
+> -	}
+> +	clk_disable_unprepare(sport->clk_per);
+> +	clk_disable_unprepare(sport->clk_ipg);
+
+I also had a hard time to understand why we need to turn on the clocks
+in .probe() for a while and then turn them off.
+
+It just reminds me a thing.  Did you test CONFIG_CONSOLE_POLL support
+when your commit 28eb427 (serial: imx: enable the clocks only when the
+uart is used) went in?  The commit turns off the clocks at the
+end of .probe(), but who will enable the clocks for .poll_get_char()
+and .poll_put_char()?  The amba-pl011 driver does that in .poll_init().
+
+Shawn
+
+>  
+>  	return 0;
+>  deinit:
+> -- 
+> 1.7.1
+> 
+> 
