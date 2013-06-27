@@ -1,76 +1,49 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 27 Jun 2013 20:13:56 +0200
-Subject: [linux-sunxi] [PATCH 0/8] clocksource: sunxi: Timer fixes and
- cleanup
-In-Reply-To: <20130627165436.GB4319@lukather>
-References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
- <51CC0566.8010302@redhat.com> <20130627094307.GC8437@lukather>
- <51CC0BC3.5090309@redhat.com> <20130627165436.GB4319@lukather>
-Message-ID: <51CC80E4.8060801@redhat.com>
+From: b08248@gmail.com (Stuart Yoder)
+Date: Thu, 27 Jun 2013 13:22:30 -0500
+Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
+ MMU binding
+In-Reply-To: <20130626174231.GH10333@mudshark.cambridge.arm.com>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-8-git-send-email-will.deacon@arm.com>
+ <CALRxmdBxFWoRKv+bUu8VEwNNcAJUej9jM2V8N0rrqrr_Vpe8fQ@mail.gmail.com>
+ <20130626133941.GD7417@mudshark.cambridge.arm.com>
+ <CALRxmdCycFK2wW=C4aU79mudSaT+2vU8nzXxepdstubg+YSdQg@mail.gmail.com>
+ <20130626174231.GH10333@mudshark.cambridge.arm.com>
+Message-ID: <CALRxmdD5fyp06xW+z=rWagJc_bcJmpr1H9Zbdf=xbg9cCzvVfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 26, 2013 at 12:42 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Jun 26, 2013 at 05:19:48PM +0100, Stuart Yoder wrote:
+>> On Wed, Jun 26, 2013 at 8:39 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > I'd suggest looking at the driver I posted to get a gist of how the parsing
+>> > code works, but suffice to say that we describe both the number of
+>> > interrupts and the actual interrupt numbers here.
+>>
+>> I understand that the number of interrupts and actual interrupt numbers
+>> are described here, but was referring to the _meaning_ of the interrupt
+>> numbers.   A binding for a device with 2 interrupts, a TX and RX would
+>> normally identify which interrupt specifier is for TX and which is for RX.
+>>
+>> Based on your code, the 2 global interrupts seem to be the secure
+>> and non-secure fault interrupts...which your driver does not differentiate.
+>> However, the device tree is describing hardware and  you can't assume
+>> that all drivers don't care which is which.
+>
+> Currently, the driver only works when Linux is running as non-secure, which is
+> becoming more and more common since it is required to be able to make use of
+> hyp mode.
+>
+> There are actually two global interrupts for SMMUv1 and SMMUv2, which
+> correspond to configuration faults and `other' global faults.
 
-On 06/27/2013 06:54 PM, Maxime Ripard wrote:
-> On Thu, Jun 27, 2013 at 11:54:11AM +0200, Hans de Goede wrote:
->> Hi,
->>
->> On 06/27/2013 11:43 AM, Maxime Ripard wrote:
->>> On Thu, Jun 27, 2013 at 11:27:02AM +0200, Hans de Goede wrote:
->>>> Hi,
->>>>
->>>> On 06/26/2013 11:16 PM, Maxime Ripard wrote:
->>>>> Hi everyone,
->>>>>
->>>>
->>>> <snip>
->>>>
->>>>> It also finally adds a clocksource from the free running counter found in the
->>>>> A10/A13 SoCs.
->>>>
->>>> Hmm, have you benchmarked this? There have been reports from linux-sunxi kernel
->>>> users (xbmc project) that the waiting for the latch is quite slow. Note we
->>>> don't have anything better yet in the linux-sunxi kernel.
->>>
->>> No. I didn't.
->>>
->>> Do you have any pointers to these discussions?
->>>
->>
->> The original discussion should be somewhere here:
->> https://groups.google.com/forum/#!forum/linux-sunxi
->>
->> But I could not find it (it is probably hidden under
->> an unlogical subject).
->
-> I searched a bit and it seems to be that discussion:
-> https://groups.google.com/d/msg/linux-sunxi/gaTDngPT7Is/oeLtWb1N1wIJ
->
->> Looking at my own notes (a small TODO file), I've
->> written down that the reporter reports:
->>
->>   -current clocksource can cause us to run with interrupts disabled for 17%
->>    of the time, see "perf top" output
->>
->> This is with a workload which does a lot of gettimeofday
->> calls.
->
-> Siarhei however notes that even higher-end SoCs like the exynos5 have
-> similar performances with that regard. So I'm not sure we can do
-> something about it, except what is suggested in the above mail, which
-> looks rather unsafe.
->
-> Anyway, like you said, we have no easy other solution, and we lacked
-> such support until now.
->
-> So why not merge this code for now, and try to optimise it later if we
-> find it's needed.
+So, why don't we define which interrupt is which in this binding?
+...e.g. "The first
+interrupt specifier is for the configuration access fault interrupt, the second
+interrupt specifier is for other global faults."
 
-That is fine with me, I just wanted to share that this has shown as
-a bottleneck in some benchmarks in case anyone has a clever idea to
-fix it ...
+How else is software supposed to know which interrupt corresponds to what
+event.
 
-Regards,
-
-Hans
+Thanks,
+Stuart
