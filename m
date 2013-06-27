@@ -1,57 +1,29 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 27 Jun 2013 16:37:16 +0100
-Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
-In-Reply-To: <1372345790.2522.26.camel@dabdike>
-References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
- <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
- <51CA2B03.4080106@wwwdotorg.org>
- <CACxGe6vsBKnbipR-Zd1T9Ox1J2ugFmShrGXGUzPa_=D9TJvFQw@mail.gmail.com>
- <20130626135311.GA9078@rocoto.smurfnet.nu>
- <20130626135933.GQ22026@console-pimps.org>
- <1372257499.2168.5.camel@dabdike> <20130627013219.GA346@srcf.ucam.org>
- <CACxGe6uFkbuJ3BxM=A0Lu=jZQ79Ba8SmNsdBdTOO13szTfTZ=Q@mail.gmail.com>
- <1372314821.557.33.camel@dabdike> <20130627143714.GA12900@srcf.ucam.org>
- <1372345790.2522.26.camel@dabdike>
-Message-ID: <CACxGe6u2xU=+MzYLUbDLFB-9kA23TT2=otzM59zrbGWYt8x7Uw@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 27 Jun 2013 11:56:06 -0400
+Subject: [PATCH v4 0/3] mmc: dw_mmc: Add support for Rockchip variant
+In-Reply-To: <201306131055.49595.heiko@sntech.de> ("Heiko \=\?utf-8\?Q\?St\?\=
+ \=\?utf-8\?Q\?\=C3\=BCbner\=22's\?\= message
+ of "Thu, 13 Jun 2013 10:55:48 +0200")
+References: <201306131055.49595.heiko@sntech.de>
+Message-ID: <87ppv7mtt5.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 4:09 PM, James Bottomley
-<James.Bottomley@hansenpartnership.com> wrote:
-> On Thu, 2013-06-27 at 15:37 +0100, Matthew Garrett wrote:
->> On Wed, Jun 26, 2013 at 11:33:41PM -0700, James Bottomley wrote:
->> > On Thu, 2013-06-27 at 07:23 +0100, Grant Likely wrote:
->> > > What is the problem trying to be avoided by not using the virtual map?
->> > > Is it passing the virtual mapping data from one kernel to the next
->> > > when kexecing? Or something else?
->> >
->> > Where to begin ... SetVirtualAddressMap() is one massive hack job ...
->> > just look at the tiano core implementation.   Basically it has a fixed
->> > idea of where all the pointers are and it tries to convert them all to
->> > the new address space.  The problem we see in x86 is that this
->> > conversion process isn't exhaustive due to implementation cockups, so
->> > the post virtual address map image occasionally tries to access
->> > unconverted pointers via the old physical address and oopses the kernel.
->>
->> And yet it's the only mode in which the firmrware is actually tested
->> against an OS, so we don't have any real choice in the matter.
+Hi Heiko,
+
+On Thu, Jun 13 2013, Heiko St?bner wrote:
+> The driver support for the mmc host is not needed for the core SoC support
+> and in the same way the mmc support does not need the SoC code to function.
+> Therefore it can be submitted (and hopefully merged) on its own.
 >
-> Agree for x86 ... we just have to cope with the implementations we see
-> in the field.  However, ARM has much more scope to have the UEFI
-> implementation developed collaboratively with Linux as the reference
-> platform.  If we can convince the ARM implementors that
-> SetVirtualAddressMap is an accident waiting to happen, they might be
-> more flexible.
+>
+> Changes since v3:
+> - submit mmc driver standalone
+> - add dt binding documentation
 
-We may not have any success convincing them of that; but given the
-larger scope for Linux on ARM UEFI implementations, it will actually
-get tested. If Linux chooses to use a 1:1 mapping, then the hardware
-vendors will make sure a 1:1 mapping will actually work.
+Thanks, all three patches pushed to mmc-next for 3.11.
 
-I must say that I'm a whole lot more comfortable with this approach.
-I've never been comfortable with calling out to UEFI functions while
-leaving the entirety of kernel space accessable. Sure UEFI can still
-do nasty things if it really wants to and important devices get
-mapped, but at least it will protect against accidental accesses.
-
-g.
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
