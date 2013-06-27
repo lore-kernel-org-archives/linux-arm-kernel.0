@@ -1,64 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 27 Jun 2013 01:06:54 -0700
-Subject: [PATCH 4/8] ARM: OMAP: move cpuidle drivers to drivers/cpuidle/
-In-Reply-To: <1372241747-21083-5-git-send-email-b.zolnierkie@samsung.com>
-References: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
- <1372241747-21083-5-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <20130627080653.GH5523@atomide.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 27 Jun 2013 17:09:01 +0900
+Subject: [PATCH v2] ARM: shmobile: sh73a0 pinmux platform device cleanup
+Message-ID: <1372320541-32698-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> [130626 12:25]:
-> While at it:
-> - remove file path from comment
-> - fix whitespace issues
-> 
-> Compile tested only.
-...
+From: Magnus Damm <damm@opensource.se>
 
-> --- /dev/null
-> +++ b/drivers/cpuidle/cpuidle-omap34xx.c
-> @@ -0,0 +1,342 @@
-> +/*
-> + * OMAP3 CPU IDLE Routines
-> + *
-> + * Copyright (C) 2008 Texas Instruments, Inc.
-> + * Rajendra Nayak <rnayak@ti.com>
-> + *
-> + * Copyright (C) 2007 Texas Instruments, Inc.
-> + * Karthik Dasu <karthik-dp@ti.com>
-> + *
-> + * Copyright (C) 2006 Nokia Corporation
-> + * Tony Lindgren <tony@atomide.com>
-> + *
-> + * Copyright (C) 2005 Texas Instruments, Inc.
-> + * Richard Woodruff <r-woodruff2@ti.com>
-> + *
-> + * Based on pm.c for omap2
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/sched.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/export.h>
-> +#include <linux/cpu_pm.h>
-> +#include <asm/cpuidle.h>
-> +
-> +#include "../../arch/arm/mach-omap2/powerdomain.h"
-> +#include "../../arch/arm/mach-omap2/clockdomain.h"
-> +
-> +#include "../../arch/arm/mach-omap2/pm.h"
-> +#include "../../arch/arm/mach-omap2/control.h"
-> +#include "../../arch/arm/mach-omap2/common.h"
+Use DEFINE_RES_MEM() and platform_device_register_simple()
+to save a couple of lines of code.
 
-Do we really want to do includes like this from drivers?
-Presumably these will go away with DT, but still.
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+[ remove const from resource pfc_resources to avoid section miss-match
+  reported by 4.4.5 ]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-sh73a0.c | 25 ++++++-------------------
+ 1 file changed, 6 insertions(+), 19 deletions(-)
 
-Kevin, any comments?
-
-Regards,
-
-Tony
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 96e7ca1..79a6040 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -61,29 +61,16 @@ void __init sh73a0_map_io(void)
+ 	iotable_init(sh73a0_io_desc, ARRAY_SIZE(sh73a0_io_desc));
+ }
+ 
+-static struct resource sh73a0_pfc_resources[] = {
+-	[0] = {
+-		.start	= 0xe6050000,
+-		.end	= 0xe6057fff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= 0xe605801c,
+-		.end	= 0xe6058027,
+-		.flags	= IORESOURCE_MEM,
+-	}
+-};
+-
+-static struct platform_device sh73a0_pfc_device = {
+-	.name		= "pfc-sh73a0",
+-	.id		= -1,
+-	.resource	= sh73a0_pfc_resources,
+-	.num_resources	= ARRAY_SIZE(sh73a0_pfc_resources),
++/* PFC */
++static struct resource pfc_resources[] __initdata = {
++	DEFINE_RES_MEM(0xe6050000, 0x8000),
++	DEFINE_RES_MEM(0xe605801c, 0x000c),
+ };
+ 
+ void __init sh73a0_pinmux_init(void)
+ {
+-	platform_device_register(&sh73a0_pfc_device);
++	platform_device_register_simple("pfc-sh73a0", -1, pfc_resources,
++					ARRAY_SIZE(pfc_resources));
+ }
+ 
+ static struct plat_sci_port scif0_platform_data = {
+-- 
+1.8.2.1
