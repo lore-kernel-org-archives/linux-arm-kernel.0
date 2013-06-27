@@ -1,49 +1,41 @@
-From: b08248@gmail.com (Stuart Yoder)
-Date: Thu, 27 Jun 2013 13:22:30 -0500
-Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
- MMU binding
-In-Reply-To: <20130626174231.GH10333@mudshark.cambridge.arm.com>
-References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
- <1370889285-22799-8-git-send-email-will.deacon@arm.com>
- <CALRxmdBxFWoRKv+bUu8VEwNNcAJUej9jM2V8N0rrqrr_Vpe8fQ@mail.gmail.com>
- <20130626133941.GD7417@mudshark.cambridge.arm.com>
- <CALRxmdCycFK2wW=C4aU79mudSaT+2vU8nzXxepdstubg+YSdQg@mail.gmail.com>
- <20130626174231.GH10333@mudshark.cambridge.arm.com>
-Message-ID: <CALRxmdD5fyp06xW+z=rWagJc_bcJmpr1H9Zbdf=xbg9cCzvVfw@mail.gmail.com>
+From: hpa@linux.intel.com (H. Peter Anvin)
+Date: Thu, 27 Jun 2013 11:32:49 -0700
+Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
+In-Reply-To: <1372257499.2168.5.camel@dabdike>
+References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
+ <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
+ <51CA2B03.4080106@wwwdotorg.org>
+ <CACxGe6vsBKnbipR-Zd1T9Ox1J2ugFmShrGXGUzPa_=D9TJvFQw@mail.gmail.com>
+ <20130626135311.GA9078@rocoto.smurfnet.nu>
+ <20130626135933.GQ22026@console-pimps.org> <1372257499.2168.5.camel@dabdike>
+Message-ID: <51CC8551.1090202@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 12:42 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Jun 26, 2013 at 05:19:48PM +0100, Stuart Yoder wrote:
->> On Wed, Jun 26, 2013 at 8:39 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > I'd suggest looking at the driver I posted to get a gist of how the parsing
->> > code works, but suffice to say that we describe both the number of
->> > interrupts and the actual interrupt numbers here.
+On 06/26/2013 07:38 AM, James Bottomley wrote:
+> On Wed, 2013-06-26 at 14:59 +0100, Matt Fleming wrote:
+>> On Wed, 26 Jun, at 03:53:11PM, Leif Lindholm wrote:
+>>> It's completely feasible, but we'd need to use a different method to do
+>>> the boot services call with a 1:1 mapping (idmap support is not available
+>>> until much later in the boot process).
 >>
->> I understand that the number of interrupts and actual interrupt numbers
->> are described here, but was referring to the _meaning_ of the interrupt
->> numbers.   A binding for a device with 2 interrupts, a TX and RX would
->> normally identify which interrupt specifier is for TX and which is for RX.
->>
->> Based on your code, the 2 global interrupts seem to be the secure
->> and non-secure fault interrupts...which your driver does not differentiate.
->> However, the device tree is describing hardware and  you can't assume
->> that all drivers don't care which is which.
->
-> Currently, the driver only works when Linux is running as non-secure, which is
-> becoming more and more common since it is required to be able to make use of
-> hyp mode.
->
-> There are actually two global interrupts for SMMUv1 and SMMUv2, which
-> correspond to configuration faults and `other' global faults.
+>> At least if you no longer relied upon the idmap we could potentially
+>> have a single efi_enter_virtual_mode() call-site in init/main.c, which
+>> would be nice.
+> 
+> The fixed virtual address scheme currently being looked at for x86_64 to
+> make SetVirtualAddressMap() kexec invariant doesn't work on 32 bit
+> because the address space isn't big enough.  For ARM, given that we've
+> much more opportunity to work with the vendors, can we just avoid
+> transitioning to a virtual address map and always just install a
+> physical mapping before doing efi calls?
+> 
 
-So, why don't we define which interrupt is which in this binding?
-...e.g. "The first
-interrupt specifier is for the configuration access fault interrupt, the second
-interrupt specifier is for other global faults."
+What we could do on x86-32 is to map from 0xc0000000 downwards.  It
+wouldn't be invariant across kernel builds with different user/kernel
+split... but I'm not sure we can win that one.
 
-How else is software supposed to know which interrupt corresponds to what
-event.
+The other option is to say sod it and just use straight 1:1 mapping on
+32 bits...
 
-Thanks,
-Stuart
+	-hpa
