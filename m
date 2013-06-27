@@ -1,53 +1,76 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Wed, 26 Jun 2013 23:33:41 -0700
-Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
-In-Reply-To: <CACxGe6uFkbuJ3BxM=A0Lu=jZQ79Ba8SmNsdBdTOO13szTfTZ=Q@mail.gmail.com>
-References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
- <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
- <51CA2B03.4080106@wwwdotorg.org>
- <CACxGe6vsBKnbipR-Zd1T9Ox1J2ugFmShrGXGUzPa_=D9TJvFQw@mail.gmail.com>
- <20130626135311.GA9078@rocoto.smurfnet.nu>
- <20130626135933.GQ22026@console-pimps.org>
- <1372257499.2168.5.camel@dabdike> <20130627013219.GA346@srcf.ucam.org>
- <CACxGe6uFkbuJ3BxM=A0Lu=jZQ79Ba8SmNsdBdTOO13szTfTZ=Q@mail.gmail.com>
-Message-ID: <1372314821.557.33.camel@dabdike>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Thu, 27 Jun 2013 09:39:05 +0300
+Subject: [GIT PULL] KVM/ARM queue for 3.11
+In-Reply-To: <20130626190554.GB41132@lvm>
+References: <20130626190554.GB41132@lvm>
+Message-ID: <20130627063905.GA18508@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-06-27 at 07:23 +0100, Grant Likely wrote:
-> On Thu, Jun 27, 2013 at 2:32 AM, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
-> > On Wed, Jun 26, 2013 at 07:38:19AM -0700, James Bottomley wrote:
-> >> The fixed virtual address scheme currently being looked at for x86_64 to
-> >> make SetVirtualAddressMap() kexec invariant doesn't work on 32 bit
-> >> because the address space isn't big enough.  For ARM, given that we've
-> >> much more opportunity to work with the vendors, can we just avoid
-> >> transitioning to a virtual address map and always just install a
-> >> physical mapping before doing efi calls?
-> >
-> > We can probably get away with that now, but it does risk us ending up
-> > with some firmware that expects to run in physical mode (boards designed
-> > for Linux) and some firmware that expects to run in virtual mode (boards
-> > designed for Windows). The degree of lockdown in the Windows ecosystem
-> > at present means it's not a real problem at the moment, but if that ever
-> > changes we're going to risk incompatibility.
+On Wed, Jun 26, 2013 at 12:05:54PM -0700, Christoffer Dall wrote:
+> Hi Gleb and Paolo,
 > 
-> What is the problem trying to be avoided by not using the virtual map?
-> Is it passing the virtual mapping data from one kernel to the next
-> when kexecing? Or something else?
+> The following changes since commit 87d41fb4da6467622b7a87fd6afe8071abab6dae:
+> 
+>   KVM: s390: Fixed priority of execution in STSI (2013-06-20 23:33:01 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-3.11
+> 
+> for you to fetch changes up to 8bd4ffd6b3a98f00267051dc095076ea2ff06ea8:
+> 
+>   ARM: kvm: don't include drivers/virtio/Kconfig (2013-06-26 10:50:06 -0700)
+> 
+> 
+Pulled, thanks.
 
-Where to begin ... SetVirtualAddressMap() is one massive hack job ...
-just look at the tiano core implementation.   Basically it has a fixed
-idea of where all the pointers are and it tries to convert them all to
-the new address space.  The problem we see in x86 is that this
-conversion process isn't exhaustive due to implementation cockups, so
-the post virtual address map image occasionally tries to access
-unconverted pointers via the old physical address and oopses the kernel.
+> Thanks,
+> -Christoffer
+> 
+> ----------------------------------------------------------------
+> Anup Patel (1):
+>       ARM: KVM: Allow host virt timer irq to be different from guest timer virt irq
+> 
+> Arnd Bergmann (1):
+>       ARM: kvm: don't include drivers/virtio/Kconfig
+> 
+> Christoffer Dall (1):
+>       Update MAINTAINERS: KVM/ARM work now funded by Linaro
+> 
+> Dave P Martin (1):
+>       ARM: KVM: Don't handle PSCI calls via SMC
+> 
+> Geoff Levand (1):
+>       arm/kvm: Cleanup KVM_ARM_MAX_VCPUS logic
+> 
+> Marc Zyngier (7):
+>       ARM: KVM: remove dead prototype for __kvm_tlb_flush_vmid
+>       ARM: KVM: use phys_addr_t instead of unsigned long long for HYP PGDs
+>       ARM: KVM: don't special case PC when doing an MMIO
+>       ARM: KVM: get rid of S2_PGD_SIZE
+>       ARM: KVM: perform save/restore of PAR
+>       ARM: KVM: add missing dsb before invalidating Stage-2 TLBs
+>       ARM: KVM: clear exclusive monitor on all exception returns
+> 
+>  MAINTAINERS                        |  4 ++--
+>  arch/arm/include/asm/kvm_arm.h     |  1 -
+>  arch/arm/include/asm/kvm_asm.h     | 24 ++++++++++++------------
+>  arch/arm/include/asm/kvm_emulate.h |  5 -----
+>  arch/arm/include/asm/kvm_host.h    |  9 +++++++--
+>  arch/arm/kvm/Kconfig               |  8 +++-----
+>  arch/arm/kvm/arm.c                 |  8 ++++----
+>  arch/arm/kvm/coproc.c              |  4 ++++
+>  arch/arm/kvm/handle_exit.c         |  3 ---
+>  arch/arm/kvm/interrupts.S          | 16 +++++++++++++++-
+>  arch/arm/kvm/interrupts_head.S     | 10 ++++++++--
+>  arch/arm/kvm/mmio.c                |  6 ------
+>  arch/arm/kvm/mmu.c                 |  3 ---
+>  arch/arm/kvm/psci.c                |  2 +-
+>  arch/arm/kvm/reset.c               | 12 ++++++++++++
+>  include/kvm/arm_arch_timer.h       |  4 ++++
+>  virt/kvm/arm/arch_timer.c          | 29 ++++++++++++++++++++---------
+>  17 files changed, 92 insertions(+), 56 deletions(-)
 
-The problem for kexec is that SetVirtualAddressMap isn't idempotent.  In
-fact by API fiat it can only ever be called once for the entire lifetime
-of the UEFI bios, which could be many kernels in a kexec situation.  So,
-somehow the subsequent kernels have to know not to call it, plus,
-obviously, the virtual address map of the previous kernel has to work in
-the next because it can't set up a new one.
-
-James
+--
+			Gleb.
