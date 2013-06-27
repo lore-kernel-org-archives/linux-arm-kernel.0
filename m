@@ -1,39 +1,80 @@
-From: dsd@laptop.org (Daniel Drake)
-Date: Thu, 27 Jun 2013 13:51:18 -0400 (EDT)
-Subject: [PATCH] mmp: irq: Don't clear unused interrupt enable bits
-Message-ID: <20130627175118.8A9FEFAACF@dev.laptop.org>
+From: joelf@ti.com (Fernandes, Joel)
+Date: Thu, 27 Jun 2013 18:08:55 +0000
+Subject: [PATCH 0/5] AM33xx: MMC resources from DT without HWMOD data
+In-Reply-To: <51CC67CA.2070805@ti.com>
+References: <1372209808-6532-1-git-send-email-joelagnel@ti.com>
+ <CAD=GYpbdVVrh-tiqOcbHi3mkWRJUBdx0EsEZEFVVbgFgcCWgsw@mail.gmail.com>
+ <51CC2A1E.2040003@ti.com>
+ <CAD=GYpa9LQ1fV6=O9B65sJURVAigsgXCPLWav8cHXTuGQXPc9A@mail.gmail.com>
+ <51CC67CA.2070805@ti.com>
+Message-ID: <083BC63EECB6FD41B8E81CF7FD87CC0F2E4F0F95@DLEE08.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When enabling/masking interrupts, the existing MMP2 code clears
-a mask of 0x7f in the interrupt enable register.
-The lower 5 bits here are not directly used by Linux:
- 0:3 is interrupt priority
- 4 determines whether the interrupt gets delivered to the Security Processor
+Hi Balaji,
 
-In the OLPC case, a special firmware is running on the SP, and we do not
-want to mask it from receiving the interrupts it has already unmasked.
+> -----Original Message-----
+> From: Krishnamoorthy, Balaji T
+> Sent: Thursday, June 27, 2013 11:27 AM
+> To: Cousson, Benoit; Fernandes, Joel
+> Cc: lars at metafoo.de; Tony Lindgren; Nori, Sekhar; Matt Porter; Grant Likely;
+> Rob Herring; Vinod Koul; Mark Brown; Russell King; Rob Landley; Andrew
+> Morton; Jason Kridner; Koen Kooi; Chris Ball; Devicetree Discuss; Linux OMAP
+> List; Linux ARM Kernel List; Linux DaVinci Kernel List; Linux Kernel Mailing List;
+> Linux MMC List; Arnd Bergmann
+> Subject: Re: [PATCH 0/5] AM33xx: MMC resources from DT without HWMOD
+> data
+> 
+> On Thursday 27 June 2013 07:56 PM, Joel A Fernandes wrote:
+> > Hi Benoit,
+> >
+> > On Thu, Jun 27, 2013 at 7:03 AM, Benoit Cousson <b-cousson@ti.com> wrote:
+> >> Hi Joel,
+> >>
+> >> On 06/26/2013 05:28 AM, Joel A Fernandes wrote:
+> >>> On Tue, Jun 25, 2013 at 8:23 PM, Joel A Fernandes <joelagnel@ti.com>
+> wrote:
+> >>>> From: Joel A Fernandes <agnel.joel@gmail.com>
+> >>>>
+> >>>> This series is fixes to get MMC working on AM33XX without HWMOD
+> data.
+> >>>> On removal of HWMOD data, interrupt and register properties need to
+> >>>> be provided for the driver to function correctly.
+> >>>
+> >>> Please don't pull patches authored by me in this series. I have
+> >>> posted them with my wrong email address by mistake. I will correct
+> >>> my email during the next repost, after a round of review. Matt's
+> >>> patches in the series are still good though.
+> >>
+> >> In that case, please repost these in two series to avoid pulling the
+> >> DTS files in the MMC tree.
+> >
+> > The series has been replaced with the single patch:
+> > "[PATCH v2] ARM: dts: add AM33XX MMC support"
+> > http://marc.info/?l=linux-omap&m=137230403815943&w=2
+> >
+> > Some patches were squashed and others dropped in the series resulting
+> > in the single patch above. This patch should be good to apply
+> Hi Joel,
+> 
+> Before pushing mmc dts support for am335x, Can you please let me
+> know if below 2 patches [1] are merged/accepted,
+> IIRC these patches are needed for MMC to work properly.
+> 
+> I suggest to hold the dts patch until slave_sg_limit gets merged
+> otherwise it will cause regression in am335x mmc.
+> 
+> [PATCH v4 1/3] dmaengine: add dma_get_slave_sg_limits()
+> [PATCH v4 2/3] dma: edma: add device_slave_sg_limits() support
 
-Refine the mask to only deal with the bits that are of specific interest
-to Linux running on the main CPU.
+Actually this is an independent regression and is currently worked on by Lars-Peter Clausen [1].
 
-Signed-off-by: Daniel Drake <dsd@laptop.org>
----
- arch/arm/mach-mmp/irq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Currently not having the MMC DTS merged is also a regression, so I suggest lets take it one
+step at a time and get the DTS merged in first. Also there will be overhead of reposting this
+DTS patch later again which will not change. What do you say?
 
-diff --git a/arch/arm/mach-mmp/irq.c b/arch/arm/mach-mmp/irq.c
-index ac92433..21cc0b5 100644
---- a/arch/arm/mach-mmp/irq.c
-+++ b/arch/arm/mach-mmp/irq.c
-@@ -190,7 +190,7 @@ static struct mmp_intc_conf mmp_conf = {
- static struct mmp_intc_conf mmp2_conf = {
- 	.conf_enable	= 0x20,
- 	.conf_disable	= 0x0,
--	.conf_mask	= 0x7f,
-+	.conf_mask	= 0x60,
- };
- 
- /* MMP (ARMv5) */
--- 
-1.8.1.4
+Thanks,
+
+-Joel
+
+[1] https://patchwork.kernel.org/patch/2228041/
