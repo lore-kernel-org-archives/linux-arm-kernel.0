@@ -1,30 +1,55 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 27 Jun 2013 18:16:21 +0100
-Subject: Initial big-endian support series
-In-Reply-To: <1371645406-16873-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1371645406-16873-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <51CC7365.9000506@codethink.co.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 27 Jun 2013 19:21:44 +0200
+Subject: [PATCH 2/8] clocksource: sun4i: Add clocksource and sched clock
+ drivers
+In-Reply-To: <20130627094649.GM4824@tarshish>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1372281421-2099-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20130627060234.GD4824@tarshish> <20130627093558.GB8437@lukather>
+ <20130627094649.GM4824@tarshish>
+Message-ID: <20130627172144.GD4319@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/13 13:36, Ben Dooks wrote:
-> This updates the kernel support for building big-endian kernels
-> and updating the core drivers to deal with the endian swap as
-> needed.
->
-> This series does not include the fixups for ATAGs so it will require
-> being booted with fdt. As a note, we do not currently disable the
-> ATAGs options for the system (although we could) as there will be a
-> set of patches following on to deal with booting BE kernel on LE
-> systems.
->
-> I have not had time to test it on THUMB2 kernels. There is still
-> fixup work to be done for these which will require more time.
->
-> It is on git://git.baserock.org:/delta/linux on branch baserock/311/be/core
+Hi Baruch,
 
-Russell, any objections to taking this patch series?
+On Thu, Jun 27, 2013 at 12:46:49PM +0300, Baruch Siach wrote:
+> On Thu, Jun 27, 2013 at 11:35:58AM +0200, Maxime Ripard wrote:
+> > On Thu, Jun 27, 2013 at 09:02:34AM +0300, Baruch Siach wrote:
+> > > On Wed, Jun 26, 2013 at 11:16:55PM +0200, Maxime Ripard wrote:
+> > > > +static u32 sun4i_timer_sched_read(void)
+> > > 
+> > > You commit message mentions "64 bits free running counter", but this one only 
+> > > returns 32 bit.
+> > 
+> > Yeah, the callback setup by setup_sched_clock is supposed to be
+> > returning a u32, and clocksource_mmio_init only accepts up to 32 bits as
+> > well, so I'm only using the lower 32bits of this 64 bits counter.
+> > 
+> > I'll amend the commit log to state this.
+> 
+> But using 64 bit counter for sched_clock is much easier that using 32 bit one. 
+
+Easier in what aspect? Both API looks similar.
+
+> You can either wait for the rest of Stephen's patch set 
+> (http://thread.gmane.org/gmane.linux.ports.arm.msm/4092) before adding 64 bit, 
+> or you can just make the trivial change to the now generic sched_clock code.
+
+I'll wait for the Stephen's patches to be merged then, and add support
+for 64bits counters to clocksource_mmio_init.
+
+Thanks!
+Maxime
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130627/7719f97c/attachment.sig>
