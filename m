@@ -1,61 +1,86 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Thu, 27 Jun 2013 21:56:50 +0530
-Subject: [PATCH 0/5] AM33xx: MMC resources from DT without HWMOD data
-In-Reply-To: <CAD=GYpa9LQ1fV6=O9B65sJURVAigsgXCPLWav8cHXTuGQXPc9A@mail.gmail.com>
-References: <1372209808-6532-1-git-send-email-joelagnel@ti.com>
- <CAD=GYpbdVVrh-tiqOcbHi3mkWRJUBdx0EsEZEFVVbgFgcCWgsw@mail.gmail.com>
- <51CC2A1E.2040003@ti.com>
- <CAD=GYpa9LQ1fV6=O9B65sJURVAigsgXCPLWav8cHXTuGQXPc9A@mail.gmail.com>
-Message-ID: <51CC67CA.2070805@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 27 Jun 2013 18:54:36 +0200
+Subject: [linux-sunxi] [PATCH 0/8] clocksource: sunxi: Timer fixes and
+ cleanup
+In-Reply-To: <51CC0BC3.5090309@redhat.com>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+ <51CC0566.8010302@redhat.com> <20130627094307.GC8437@lukather>
+ <51CC0BC3.5090309@redhat.com>
+Message-ID: <20130627165436.GB4319@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 June 2013 07:56 PM, Joel A Fernandes wrote:
-> Hi Benoit,
->
-> On Thu, Jun 27, 2013 at 7:03 AM, Benoit Cousson <b-cousson@ti.com> wrote:
->> Hi Joel,
->>
->> On 06/26/2013 05:28 AM, Joel A Fernandes wrote:
->>> On Tue, Jun 25, 2013 at 8:23 PM, Joel A Fernandes <joelagnel@ti.com> wrote:
->>>> From: Joel A Fernandes <agnel.joel@gmail.com>
->>>>
->>>> This series is fixes to get MMC working on AM33XX without HWMOD data.
->>>> On removal of HWMOD data, interrupt and register properties need to be provided
->>>> for the driver to function correctly.
->>>
->>> Please don't pull patches authored by me in this series. I have posted
->>> them with my wrong email address by mistake. I will correct my email
->>> during the next repost, after a round of review. Matt's patches in the
->>> series are still good though.
->>
->> In that case, please repost these in two series to avoid pulling the DTS
->> files in the MMC tree.
->
-> The series has been replaced with the single patch:
-> "[PATCH v2] ARM: dts: add AM33XX MMC support"
-> http://marc.info/?l=linux-omap&m=137230403815943&w=2
->
-> Some patches were squashed and others dropped in the series resulting
-> in the single
-> patch above. This patch should be good to apply
-Hi Joel,
+On Thu, Jun 27, 2013 at 11:54:11AM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 06/27/2013 11:43 AM, Maxime Ripard wrote:
+> >On Thu, Jun 27, 2013 at 11:27:02AM +0200, Hans de Goede wrote:
+> >>Hi,
+> >>
+> >>On 06/26/2013 11:16 PM, Maxime Ripard wrote:
+> >>>Hi everyone,
+> >>>
+> >>
+> >><snip>
+> >>
+> >>>It also finally adds a clocksource from the free running counter found in the
+> >>>A10/A13 SoCs.
+> >>
+> >>Hmm, have you benchmarked this? There have been reports from linux-sunxi kernel
+> >>users (xbmc project) that the waiting for the latch is quite slow. Note we
+> >>don't have anything better yet in the linux-sunxi kernel.
+> >
+> >No. I didn't.
+> >
+> >Do you have any pointers to these discussions?
+> >
+> 
+> The original discussion should be somewhere here:
+> https://groups.google.com/forum/#!forum/linux-sunxi
+> 
+> But I could not find it (it is probably hidden under
+> an unlogical subject).
 
-Before pushing mmc dts support for am335x, Can you please let me
-know if below 2 patches [1] are merged/accepted,
-IIRC these patches are needed for MMC to work properly.
+I searched a bit and it seems to be that discussion:
+https://groups.google.com/d/msg/linux-sunxi/gaTDngPT7Is/oeLtWb1N1wIJ
 
-I suggest to hold the dts patch until slave_sg_limit gets merged
-otherwise it will cause regression in am335x mmc.
+> Looking at my own notes (a small TODO file), I've
+> written down that the reporter reports:
+> 
+>  -current clocksource can cause us to run with interrupts disabled for 17%
+>   of the time, see "perf top" output
+> 
+> This is with a workload which does a lot of gettimeofday
+> calls.
 
-[PATCH v4 1/3] dmaengine: add dma_get_slave_sg_limits()
-[PATCH v4 2/3] dma: edma: add device_slave_sg_limits() support
+Siarhei however notes that even higher-end SoCs like the exynos5 have
+similar performances with that regard. So I'm not sure we can do
+something about it, except what is suggested in the above mail, which
+looks rather unsafe.
 
-[1]
-https://groups.google.com/forum/#!topic/linux.kernel/khTTcPtQpag
+Anyway, like you said, we have no easy other solution, and we lacked
+such support until now.
 
->
-> Thanks,
->
-> -Joel
->
+So why not merge this code for now, and try to optimise it later if we
+find it's needed.
+
+> I notice that unlike the sunxi-3.4 code you don't do any locking,
+> so how do you stop 2 clocksource calls from racing (and thus
+> getting a possible wrong value because of things not
+> being properly latched) ?
+
+Hmm, right. I'll add a spinlock.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130627/9055044f/attachment.sig>
