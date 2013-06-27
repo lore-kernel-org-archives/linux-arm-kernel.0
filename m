@@ -1,52 +1,36 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 27 Jun 2013 16:17:19 +0200
-Subject: [PATCH v6 2/5] kernel: missing include in cputime.c
-In-Reply-To: <20130627141209.GB29209@dyad.programming.kicks-ass.net>
-References: <alpine.DEB.2.02.1306271446570.4782@kaball.uk.xensource.com>
- <1372341272-12512-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130627141209.GB29209@dyad.programming.kicks-ass.net>
-Message-ID: <20130627141718.GA10056@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Jun 2013 16:22:26 +0200
+Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
+In-Reply-To: <CACxGe6tUpo31p6N0BZt_jdonuPP8ijvLBygC76wQ044EFsqOwA@mail.gmail.com>
+References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
+ <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
+ <CACxGe6tUpo31p6N0BZt_jdonuPP8ijvLBygC76wQ044EFsqOwA@mail.gmail.com>
+Message-ID: <201306271622.26494.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-* Peter Zijlstra <peterz@infradead.org> wrote:
-
-> On Thu, Jun 27, 2013 at 02:54:29PM +0100, Stefano Stabellini wrote:
-> > steal_account_process_tick calls paravirt_steal_clock, but paravirt.h is
-> > currently missing amoung the included header files.
-> > Add include asm/paravirt.h ifdef CONFIG_PARAVIRT.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > CC: mingo at redhat.com
-> > CC: peterz at infradead.org
-> > 
-> > Changes in v5:
-> > - add ifdef CONFIG_PARAVIRT.
-> > ---
-> >  kernel/sched/cputime.c |    4 +++-
-> >  1 files changed, 3 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
-> > index cc2dc3ee..317a578 100644
-> > --- a/kernel/sched/cputime.c
-> > +++ b/kernel/sched/cputime.c
-> > @@ -5,7 +5,9 @@
-> >  #include <linux/static_key.h>
-> >  #include <linux/context_tracking.h>
-> >  #include "sched.h"
-> > -
-> > +#ifdef CONFIG_PARAVIRT
-> > +#include <asm/paravirt.h>
-> > +#endif
+On Wednesday 26 June 2013, Grant Likely wrote:
+> > index 0000000..5c48271
+> > --- /dev/null
+> > +++ b/Documentation/arm/uefi.txt
+> > @@ -0,0 +1,39 @@
+> > +The nomenclature EFI and UEFI are used interchangeably in this document.
+> > +
+> > +The implementation depends on receiving pointers to the UEFI memory map
+> > +and System Table in a Flattened Device Tree - so is only available with
+> > +CONFIG_OF.
+> > +
+> > +It (early) parses the FDT for the following parameters:
 > 
-> Why isn't that CONFIG stuff inside the header instead of around it?
+> Need to state which node these properties can be found in. I recommend /chosen
+> 
+> I would also prefix all of the following properties with "linux,"
+> since they are very much about what the Linux kernel needs for
+> booting. EFI stub will be creating these properties specifically for
+> Linux, and the LinuxLoader should do the same (until we eventually
+> kill it).
 
-Indeed.
+Why not make it a separate /efi node instead, mirroring what we
+have for hypervisor specific information and things like rtas?
 
-Once that is fixed then the #ifdef around asm/paravirt.h in 
-kernel/sched/core.c could be removed as well.
-
-Thanks,
-
-	Ingo
+	Arnd
