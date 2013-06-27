@@ -1,49 +1,72 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 26 Jun 2013 22:25:37 -0700 (PDT)
-Subject: [PATCH v5 2/3] ARM: shmobile: BOCK-W: add VIN and ML86V7667
- support
-In-Reply-To: <201306220330.13845.sergei.shtylyov@cogentembedded.com>
-References: <201306220326.46176.sergei.shtylyov@cogentembedded.com>
- <201306220330.13845.sergei.shtylyov@cogentembedded.com>
-Message-ID: <8761x02khf.wl%kuninori.morimoto.gx@renesas.com>
+Date: Wed, 26 Jun 2013 22:29:20 -0700 (PDT)
+Subject: [PATCH 0/4] Add DVFS support on APE6EVM
+In-Reply-To: <1371798638-10530-1-git-send-email-g.liakhovetski@gmx.de>
+References: <1371798638-10530-1-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <874nck2kb7.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Hi
 
-> @@ -166,6 +187,16 @@ static const struct pinctrl_map bockw_pi
->  				  "usb0", "usb0"),
->  	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform", "pfc-r8a7778",
->  				  "usb1", "usb1"),
-> +	/* VIN0 */
-> +	PIN_MAP_MUX_GROUP_DEFAULT("r8a7778-vin.0", "pfc-r8a7778",
-> +				  "vin0_clk", "vin0"),
-> +	PIN_MAP_MUX_GROUP_DEFAULT("r8a7778-vin.0", "pfc-r8a7778",
-> +				  "vin0_data8", "vin0"),
-> +	/* VIN1 */
-> +	PIN_MAP_MUX_GROUP_DEFAULT("r8a7778-vin.1", "pfc-r8a7778",
-> +				  "vin1_clk", "vin1"),
-> +	PIN_MAP_MUX_GROUP_DEFAULT("r8a7778-vin.1", "pfc-r8a7778",
-> +				  "vin1_data8", "vin1"),
->  };
+I have no objection.
+For all patches
 
-Here, it includes VIN1 pin, but
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
->  #define FPGA	0x18200000
-> @@ -184,6 +215,16 @@ static void __init bockw_init(void)
->  	r8a7778_add_hspi_device(0);
->  	r8a7778_add_mmc_device(&sh_mmcif_plat);
->  	r8a7778_add_usb_phy_device(&usb_phy_platform_data);
-> +	r8a7778_add_vin_device(0, &vin_platform_data);
-> +	/* VIN1 has a pin conflict with Ether */
-> +	if (!IS_ENABLED(CONFIG_SH_ETH))
-> +		r8a7778_add_vin_device(1, &vin_platform_data);
+Guennadi wrote:
+> 
+> Having added CPUFreq support to the Cortex A15 cores on APE6 (r8a73a4) and 
+> DT support to the max8973 regulator driver it is now possible to implement 
+> CA15 CPUFreq support on APE6EVM, using a max8972 PMU to adjust SoC's DVFS
+> voltage. This series depends on earlier
+> 
+> "ARM: shmobile: r8a73a4: wait for completion when kicking the clock"
+> https://patchwork.kernel.org/patch/2601071/
+> "ARM: shmobile: r8a73a4: implement CPU clock scaling for CPUFreq"
+> https://patchwork.kernel.org/patch/2601111/
+> 
+> and requires the following max8973 patches:
+> 
+> "regulators: max8973: fix multiple instance support"
+> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg456101.html
+> "regulators: max8973: initial DT support"
+> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg456102.html
+> 
+> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> 
+> Guennadi Liakhovetski (4):
+>   ARM: shmobile: r8a73a4: safeguard against wrong clk_set_rate() uses
+>   ARM: shmobile: r8a73a4: add I2C DT nodes and required clocks
+>   ARM: shmobile: ape6evm: add CPUFreq support
+>   ARM: shmobile: r8a73a4: add Z2 clock support
+> 
+>  arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   26 ++++++++++
+>  arch/arm/boot/dts/r8a73a4.dtsi         |   81 ++++++++++++++++++++++++++++++++
+>  arch/arm/mach-shmobile/clock-r8a73a4.c |   56 +++++++++++++++++++++-
+>  3 files changed, 160 insertions(+), 3 deletions(-)
+> 
+> -- 
+> 1.7.2.5
+> 
+> Thanks
+> Guennadi
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-what happen if SH_ETH was enabled here ?
-r8a7778_add_vin_device(1, xxx) is not called,
-but bockw_pinctrl_map was called with VIN1 setting ?
+---
+Kuninori Morimoto
 
+??????????????
+??????????????????????
+                  ????????????????
 
 Best regards
 ---
