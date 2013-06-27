@@ -1,30 +1,27 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 27 Jun 2013 19:50:37 +0530
-Subject: [PATCH 1/2] ARM: EXYNOS: Remove combiner_init declaration
-In-Reply-To: <201306261602.26800.arnd@arndb.de>
-References: <1372246597-32323-1-git-send-email-sachin.kamat@linaro.org>
- <201306261602.26800.arnd@arndb.de>
-Message-ID: <CAK9yfHx2sQ38xHDM0CyS_+0HP_gLq+XnaJf5PNyLbOFM_LbR+g@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 27 Jun 2013 10:32:08 -0400
+Subject: [PATCH v2] mmc: sdhci-sirf: let device core setup the default pin
+ configuration
+In-Reply-To: <1368522511-26491-1-git-send-email-Baohua.Song@csr.com> (Barry
+ Song's message of "Tue, 14 May 2013 17:08:31 +0800")
+References: <1368522511-26491-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <87obarsjyv.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 June 2013 19:32, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 26 June 2013, Sachin Kamat wrote:
->> Commit d243997f ("ARM: EXYNOS: Remove legacy interrupt initialization
->> code") removed the call to combiner_init(). Since there are no more
->> users in the machine code, remove the declaration as well.
->>
->> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->
-> Hi,
->
-> Your two patches look good to me, but I think there is more that
-> can be cleaned up now. See below for my experimental patch.
-> I have not gotten around to test or submit that, but feel
-> free to take any contents for your own patches.
+Hi,
 
-Thanks Arnd. Let me look into it.
+On Tue, May 14 2013, Barry Song wrote:
+> With device core now able to setup the default pin configuration, the call
+> to devm_pinctrl_get_select_default can be removed. And the pin configuration
+> code based on the deprecated Samsung specific gpio bindings is also removed.
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
+Thanks, pushed to mmc-next for 3.11.
+
+- Chris.
 -- 
-With warm regards,
-Sachin
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
