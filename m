@@ -1,39 +1,44 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 27 Jun 2013 13:12:20 -0700
-Subject: [PATCH] ARM: zImage: fix path to fonts which moved to lib/fonts
-Message-ID: <1372363940-13023-1-git-send-email-khilman@linaro.org>
+From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
+Date: Thu, 27 Jun 2013 23:26:08 +0300
+Subject: [linux-sunxi] [PATCH 0/8] clocksource: sunxi: Timer fixes and
+ cleanup
+In-Reply-To: <20130627165436.GB4319@lukather>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+ <51CC0566.8010302@redhat.com> <20130627094307.GC8437@lukather>
+ <51CC0BC3.5090309@redhat.com> <20130627165436.GB4319@lukather>
+Message-ID: <20130627232608.1174558b@i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 1affee67 (lib: Move fonts from drivers/video/console/ to lib/fonts/)
-moved fonts from drivers/video/console/ to lib/fonts, but the ARM zImage
-build still references the old location.
+On Thu, 27 Jun 2013 18:54:36 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
-Found due to build failures on ARM in next-20130627.
+> On Thu, Jun 27, 2013 at 11:54:11AM +0200, Hans de Goede wrote:
+> > I notice that unlike the sunxi-3.4 code you don't do any locking,
+> > so how do you stop 2 clocksource calls from racing (and thus
+> > getting a possible wrong value because of things not
+> > being properly latched) ?
+> 
+> Hmm, right. I'll add a spinlock.
 
-Rather than go through the ARM tree, this should probably be included
-with the original series from Geert.
+I think the best would be to ask the Allwinner people (it's good to
+have them in CC, right?) whether anything wrong can happen because of
+"things not being properly latched".
 
- arch/arm/boot/compressed/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The A10 manual from http://free-electrons.com/~maxime/pub/datasheet/
+does not seem to contain any details about what bad things may happen
+if we try to read CNT64_LO_REG while latching is still in progress and
+CNT64_RL_EN bit in CNT64_CTRL_REG has not changed to zero yet.
+I can imagine the following possible scenarios:
+  1. We read either the old stale CNT64_LO_REG value or the new
+     correct value.
+  2. We read either the old stale CNT64_LO_REG value or the new
+     correct value, or some random garbage.
+  3. The processor may deadlock, eat your dog, or do some other
+     nasty thing.
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 13499a8..7ac1610 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -27,7 +27,7 @@ OBJS	+= misc.o decompress.o
- ifeq ($(CONFIG_DEBUG_UNCOMPRESS),y)
- OBJS	+= debug.o
- endif
--FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
-+FONTC	= $(srctree)/lib/fonts/font_acorn_8x8.c
- 
- # string library code (-Os is enforced to keep it much smaller)
- OBJS		+= string.o
+In the case of 1, we probably can get away without using any spinlocks?
+
 -- 
-1.8.3
+Best regards,
+Siarhei Siamashka
