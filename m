@@ -1,15 +1,32 @@
-From: info@resplaw.com (info at resplaw.com)
-Date: Wed, 26 Jun 2013 20:19:02 +0200
-Subject: =?iso-8859-5?Q?=DE=D1=E3=E7=D0=EF=E1=EC_=D2=E1=D5=D3=DE-?=
- =?iso-8859-5?Q?=DD=D0=D2=E1=D5=D3=DE_10-15_=DC=D8=DD=E3?=
- =?iso-8859-5?Q?=E2=DE=DA_=D2_=D4=D5=DD=EC=2C_=B2=EB_=D2?=
- =?iso-8859-5?Q?=DE=E0=DE=E2=D8=E2=D5_=E1=D5=D1=D5_100-=DF?=
- =?iso-8859-5?Q?=E0=DE=E6=D5=DD=E2=DD=DE=D5_=D7=E0=D5=DD?=
- =?iso-8859-5?Q?=D8=D5?=
-Message-ID: <192125244.20130626211146@resplaw.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 27 Jun 2013 13:45:16 +0900
+Subject: [PATCH 0/4] Add DVFS support on APE6EVM
+In-Reply-To: <1371798638-10530-1-git-send-email-g.liakhovetski@gmx.de>
+References: <1371798638-10530-1-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <20130627044516.GA28229@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?????????? ???????? ?????????????? ?????? http://goo.gl/e7shx?/DvMftw
+On Fri, Jun 21, 2013 at 09:10:34AM +0200, Guennadi Liakhovetski wrote:
+> Having added CPUFreq support to the Cortex A15 cores on APE6 (r8a73a4) and 
+> DT support to the max8973 regulator driver it is now possible to implement 
+> CA15 CPUFreq support on APE6EVM, using a max8972 PMU to adjust SoC's DVFS
+> voltage. This series depends on earlier
+> 
+> "ARM: shmobile: r8a73a4: wait for completion when kicking the clock"
+> https://patchwork.kernel.org/patch/2601071/
+> "ARM: shmobile: r8a73a4: implement CPU clock scaling for CPUFreq"
+> https://patchwork.kernel.org/patch/2601111/
+> 
+> and requires the following max8973 patches:
+> 
+> "regulators: max8973: fix multiple instance support"
+> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg456101.html
+> "regulators: max8973: initial DT support"
+> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg456102.html
+> 
+> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 
-??????? ????? - ????, ????? - ??? ??????.
+Magnus, Morimoto-san,
+
+could you take some time to review this?
