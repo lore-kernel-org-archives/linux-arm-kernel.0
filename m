@@ -1,61 +1,67 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 27 Jun 2013 16:16:40 +0900
-Subject: [PATCH 4/4] ARM: shmobile: r8a73a4: add Z2 clock support
-In-Reply-To: <1371798638-10530-5-git-send-email-g.liakhovetski@gmx.de>
+Date: Thu, 27 Jun 2013 16:16:52 +0900
+Subject: [PATCH 1/4] ARM: shmobile: r8a73a4: safeguard against wrong
+ clk_set_rate() uses
+In-Reply-To: <1371798638-10530-2-git-send-email-g.liakhovetski@gmx.de>
 References: <1371798638-10530-1-git-send-email-g.liakhovetski@gmx.de>
- <1371798638-10530-5-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <20130627071640.GB25014@verge.net.au>
+ <1371798638-10530-2-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <20130627071652.GC25014@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 21, 2013 at 09:10:38AM +0200, Guennadi Liakhovetski wrote:
-> The Z2 clock on r8a73a4 is used to clock the 4 Cortex A7 cores on the SoC.
-> Add a definition for this clock to later use it from the arm_big_little
-> CPUFreq driver.
+On Fri, Jun 21, 2013 at 09:10:35AM +0200, Guennadi Liakhovetski wrote:
+> clk_set_rate() should only be called with exact rates, returned by
+> clk_round_rate(). However, it is still good to verify, that the value,
+> passed to clock's .set_rate() method is at least valid. This patch adds
+> such a check for the Z-clock on r8a73a4.
 > 
 > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 
 Thanks, I have queued this up for v3.12 in the soc branch.
 
 > ---
->  arch/arm/mach-shmobile/clock-r8a73a4.c |   17 +++++++++++++++++
->  1 files changed, 17 insertions(+), 0 deletions(-)
+>  arch/arm/mach-shmobile/clock-r8a73a4.c |   14 +++++++++++++-
+>  1 files changed, 13 insertions(+), 1 deletions(-)
 > 
 > diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-> index 508cb1e..b717e98 100644
+> index eb42740..cbf9852 100644
 > --- a/arch/arm/mach-shmobile/clock-r8a73a4.c
 > +++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-> @@ -324,6 +324,21 @@ static struct clk z_clk = {
->  	.ops = &zclk_ops,
->  };
+> @@ -225,16 +225,28 @@ static int zclk_set_rate(struct clk *clk, unsigned long rate)
+>  		goto done;
+>  	}
 >  
-> +/*
-> + * It seems only 1/2 divider is usable in manual mode. 1/2 / 2/3
-> + * switching is only available in auto-DVFS mode
-> + */
-> +SH_FIXED_RATIO_CLK(pll0_div2_clk,	pll0_clk,		div2);
-> +
-> +static struct clk z2_clk = {
-> +	.parent = &pll0_div2_clk,
-> +	.div_mask = 0x1f,
-> +	.enable_bit = 0,
-> +	/* We'll need to access FRQCRB and FRQCRC */
-> +	.enable_reg = (void __iomem *)FRQCRB,
-> +	.ops = &zclk_ops,
-> +};
-> +
->  static struct clk *main_clks[] = {
->  	&extalr_clk,
->  	&extal1_clk,
-> @@ -342,6 +357,8 @@ static struct clk *main_clks[] = {
->  	&pll2s_clk,
->  	&pll2h_clk,
->  	&z_clk,
-> +	&pll0_div2_clk,
-> +	&z2_clk,
->  };
+> -	frqcrc = clk->mapped_reg + (FRQCRC - (u32)clk->enable_reg);
+> +	/*
+> +	 * Users are supposed to first call clk_set_rate() only with
+> +	 * clk_round_rate() results. So, we don't fix wrong rates here, but
+> +	 * guard against them anyway
+> +	 */
 >  
->  /* DIV4 */
+>  	p_rate = clk_get_rate(clk->parent);
+>  	if (rate == p_rate) {
+>  		val = 0;
+>  	} else {
+>  		step = DIV_ROUND_CLOSEST(p_rate, 32);
+> +
+> +		if (rate > p_rate || rate < step) {
+> +			ret = -EINVAL;
+> +			goto done;
+> +		}
+> +
+>  		val = 32 - rate / step;
+>  	}
+>  
+> +	frqcrc = clk->mapped_reg + (FRQCRC - (u32)clk->enable_reg);
+> +
+>  	iowrite32((ioread32(frqcrc) & ~(clk->div_mask << clk->enable_bit)) |
+>  		  (val << clk->enable_bit), frqcrc);
+>  
 > -- 
 > 1.7.2.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
