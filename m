@@ -1,42 +1,53 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 27 Jun 2013 12:03:25 +0800
-Subject: [PATCH] include/asm-generic/pci.h: include generic "pci-dma-compat.h"
-Message-ID: <51CBB98D.3040304@asianux.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Thu, 27 Jun 2013 09:47:28 +0530
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+ <51CAEB33.5010101@ti.com>
+ <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
+Message-ID: <51CBBCD8.5030600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If an architecture need "generic pci.h", it also need generic "pci-dma-
-compat.h",  so recommend to include it in asm-generic directly.
+Hi Paul,
+On Wednesday 26 June 2013 10:56 PM, Paul Walmsley wrote:
+> On Wed, 26 Jun 2013, Rajendra Nayak wrote:
+>
+>> Apart from confirming if you are manually enabling these options, can you also give some
+>> details on how you append the dtb to the kernel image?
+>>
+>> Most of us use an out-of-tree patch from Grant to do this, which I have shared below [2]
+>>
+>> Even without the patch with the below commands [1] to append the dtb, it still works, so it
+>> would be good to know what steps you follow to append the dtb to the kernel image.
+>
+> Here's how I do it:
+>
+> ARCH=arm CROSS_COMPILE=${TOOLCHAIN_PATH}/bin/${TOOLCHAIN_PREFIX} nice make -j$CORES zImage am335x-bone.dtb
+>
+> cat arch/arm/boot/zImage arch/arm/boot/am335x-bone.dtb > arch/arm/boot/zImage-dtb.am335x-bone
+Here is the catch..
+Your dtb is generated in arch/arm/boot/dts/ folder(before V3.8 dtb was 
+generated in arch/arm/boot).
+You are using very old dtb file. Please delete all your dtb files in 
+arch/arm/boot/ folder and check once.
+Here is the patch from Grant Likely which does that.
+https://patchwork.kernel.org/patch/1813321/
+Can you please give a try updating this ..:)
 
-And now, for arm64 and m32r, may cause compiling error about it.
-
-The related error (with allmodconfig):
-
-  drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_exit?:
-  drivers/media/usb/b2c2/flexcop-usb.c:393:3: error: implicit declaration of function ?pci_free_consistent? [-Werror=implicit-function-declaration]
-  drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_init?:
-  drivers/media/usb/b2c2/flexcop-usb.c:410:2: error: implicit declaration of function ?pci_alloc_consistent? [-Werror=implicit-function-declaration]
-  drivers/media/usb/b2c2/flexcop-usb.c:410:21: warning: assignment makes pointer from integer without a cast [enabled by default]
-  cc1: some warnings being treated as errors
-
-
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- include/asm-generic/pci.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/include/asm-generic/pci.h b/include/asm-generic/pci.h
-index e80a049..64e2a15 100644
---- a/include/asm-generic/pci.h
-+++ b/include/asm-generic/pci.h
-@@ -6,6 +6,8 @@
- #ifndef _ASM_GENERIC_PCI_H
- #define _ASM_GENERIC_PCI_H
- 
-+#include <asm-generic/pci-dma-compat.h>
-+
- static inline struct resource *
- pcibios_select_root(struct pci_dev *pdev, struct resource *res)
- {
--- 
-1.7.7.6
+Thanks and regards,
+Lokesh
+>
+> scripts/mkuboot.sh -A arm -O linux -C none  -T kernel -a 0x80008000 -e 0x80008000 -n 'Linux-' -d arch/arm/boot/zImage-dtb.am335x-bone arch/arm/boot/uImage-dtb.am335x-bone
+>
+>
+> - Paul
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
