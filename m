@@ -1,79 +1,88 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 27 Jun 2013 15:49:30 +0400
-Subject: [PATCH v5 1/3] ARM: shmobile: r8a7778: add VIN support
-In-Reply-To: <877ghg2krp.wl%kuninori.morimoto.gx@renesas.com>
-References: <201306220326.46176.sergei.shtylyov@cogentembedded.com>
- <201306220328.47110.sergei.shtylyov@cogentembedded.com>
- <877ghg2krp.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <51CC26CA.1080207@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Jun 2013 13:55:08 +0200
+Subject: [PATCH 0/2] arm: add early_ioremap() support
+In-Reply-To: <20130627092934.GD18151@rocoto.smurfnet.nu>
+References: <1372182401-11029-1-git-send-email-leif.lindholm@linaro.org>
+ <3503040.vhYAL5xGgS@wuerfel> <20130627092934.GD18151@rocoto.smurfnet.nu>
+Message-ID: <201306271355.08379.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thursday 27 June 2013, Leif Lindholm wrote:
+> On Thu, Jun 27, 2013 at 10:47:21AM +0200, Arnd Bergmann wrote:
+> > > No, the purpose is just like for x86 - do early parsing of things like
+> > > the UEFI system and configuration tables, DMI and ACPI, in order to
+> > > populate global structs and stuff.
+> > 
+> > But are those tables actually in MMIO registers? I thought they
+> > are just memory, and in that case using any form of ioremap is
+> > wrong on ARM. Why do you even have to map them? Can't the boot
+> > loader pass those tables in regular addressable memory?
+>  
+> Don't get too stuck on the name - x86 frequently uses *ioremap() in
+> many places when just accessing memory, and that has carried into EFI,
+> ACPI and DMI subsystems, which we now want to use on ARM. In fact, they
+> have early_memremap(), but don't use it for either EFI or ACPI.
 
-On 27-06-2013 9:19, Kuninori Morimoto wrote:
+The difference of course is that x86 doesn't use page table flags
+to tell the difference between MMIO and memory. It is not harmful
+on x86 to access memory through ioremap, but it is on most
+other architectures. You get either unspecified behavior due to
+conflicting cache flags or you get a hard checkstop based on how
+the CPU treats this. If you want to make the EFI code architecture
+independent, I think you should change the EFI code.
 
-> I have 2 small comments
+> The ia64 implementation actually performs a lookup in the EFI memmap
+> to decide whether early_ioremap() returns cacheable memory or not
+> (and falls back to noncacheable before memory map is available).
+> 
+> That said, I had somehow managed to get into my mind that the kernel
+> used -fno-unaligned-access, so thought MT_DEV_NONSHARED was safe.
+> Clearly it isn't, so that will need to change, making the semantic
+> match even worse...
+> 
+> As for the need of mapping - some of these descriptors are needed very
+> early in the boot process. Also, depending on platform, they may reside
+> at any offset from start of RAM (<2^32 physical address), rendering
+> __va()/__phys_to_virt()/... unusable.
 
-> But, basically, I have no objection to this patch.
+Can you explain why they are needed this early?
 
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Also, can't we define the boot protocol to require these tables
+within the first GB of RAM?
 
->> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> > > Well, I did have a crazy idea that much/most of the early_ioremap code
+> > > could be made generic and shared between x86 and arm (and any other
+> > > 32-bit architecture). Using the fixmap macros would make that possible
+> > > with a minimum of ifdefs.
+> > > 
+> > > If we ever wanted early_ioremap() to work like on x86, beyond kmap_init()
+> > > (but not beyond the "booting" system state), using the same macros would
+> > > help there too. I had no need for that for my EFI patches.
+> > 
+> > I guess I need to look at the EFI patches first. It sounds to me
+> > like you shouldn't actually be using early_ioremap here or on another
+> > architecture.
+> 
+> No, but I had been kind of hoping not having to rework the early memory
+> initialisation for three subsystems on two other platforms in order to
+> be able to merge common code between them. And it would have felt silly
+> to invent a new mechanism just for ARM, preventing that option.
 
->> Add VIN clocks and platform devices on R8A7778 SoC; add function to register
->> the VIN platform devices.
+Well, if you can get around the "early" requirement, things can become
+much easier, you can basically 
 
->> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> [Sergei: added 'id' parameter check to r8a7779_add_vin_device(), used '*pdata'
->> in *sizeof* operator there, renamed some variables, annotated 'vin[01]_info' and
->> vin[01]_resources[] as '__initdata'.]
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+#define early_ioremap(addr, size) ioremap(addr, size)
+#define early_memremap(addr, size) ioremap_cached(addr, size)
 
->> ---
->> Changes since version 4:
->> - resolved reject, refreshed the patch.
+and just need to fix the places where the common code mistakenly calls
+early_ioremap instead of early_memremap.
 
->> Changes since version 3:
->> - changed the VIN platform device names to be R8A7778 specific;
->> - resolved reject in <mach/r8a7778.h>  due to USB patch rework.
+Chances are that even if you can't avoid the requirement for early
+maps entirely that you only really have to worry about a small number
+of callers, for which you can then introduce architecture specific
+functions that do one thing in an appropriate way. On ARM, this may
+end up being __va(), kmap_atomic() or iotable_init() depending on
+the requirements.
 
->> Changes from version 2:
->> - annotated 'vin[01]_info' and vin[01]_resources[] as '__initdata' since they're
->>    kmemdup()'ed while registering the platform devices anyway;
->> - refreshed the patch.
-
->>   arch/arm/mach-shmobile/clock-r8a7778.c        |    5 +++
->>   arch/arm/mach-shmobile/include/mach/r8a7778.h |    3 ++
->>   arch/arm/mach-shmobile/setup-r8a7778.c        |   33 ++++++++++++++++++++++++++
->>   3 files changed, 41 insertions(+)
-
-> Simon (or ARM Maintainer ?) will be happy if clock was separated ?
-
-    Neither I guess. Simon wrote to you "scratch that" after his request 
-to separate device and clock changes.
-
->> Index: renesas/arch/arm/mach-shmobile/clock-r8a7778.c
->> ===================================================================
->> --- renesas.orig/arch/arm/mach-shmobile/clock-r8a7778.c
->> +++ renesas/arch/arm/mach-shmobile/clock-r8a7778.c
->> @@ -106,6 +106,7 @@ enum {
->>   	MSTP331,
->>   	MSTP323, MSTP322, MSTP321,
->>   	MSTP114,
->> +	MSTP110, MSTP109,
->>   	MSTP100,
->>   	MSTP030,
-
-> MSTP114, MSTP110
-> MSTP109, MSTP100
-
-> is better
-
-    Somewhat doubt it.
-
-> Best regards
-> ---
-> Kuninori Morimoto
-
-WBR, Sergei
+	Arnd
