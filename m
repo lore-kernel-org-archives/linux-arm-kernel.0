@@ -1,58 +1,157 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 27 Jun 2013 08:18:06 -0500
-Subject: [PATCH linux-next] ARM: OMAP2+: fix omap4-restart compilation
-In-Reply-To: <1372335961-31401-1-git-send-email-vincent.stehle@freescale.com>
-References: <1372335961-31401-1-git-send-email-vincent.stehle@freescale.com>
-Message-ID: <51CC3B8E.8070702@ti.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Thu, 27 Jun 2013 15:29:33 +0200
+Subject: [PATCH v3] ARM: irqchip: add support for MOXA ART SoCs
+In-Reply-To: <1371718732-12680-1-git-send-email-jonas.jensen@gmail.com>
+References: <1371718732-12680-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1372339773-4974-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2013 07:26 AM, Vincent Stehl? wrote:
-> Fix following compilation error due to missing include file:
->
->    arch/arm/mach-omap2/omap4-restart.c:21:28: warning: ?enum reboot_mode? declared inside parameter list [enabled by default]
->    arch/arm/mach-omap2/omap4-restart.c:21:28: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
->    arch/arm/mach-omap2/omap4-restart.c:21:40: error: parameter 1 (?mode?) has incomplete type
->    arch/arm/mach-omap2/omap4-restart.c:21:6: warning: function declaration isn?t a prototype [-Wstrict-prototypes]
->    make[1]: *** [arch/arm/mach-omap2/omap4-restart.o] Error 1
->
-> Signed-off-by: Vincent Stehl? <vincent.stehle@freescale.com>
-> Cc: Robin Holt <holt@sgi.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: trivial at kernel.org
-> ---
->
->
-> Hi,
->
-> This fixes the build of linux-next for arch ARM, config multi_v7_defconfig, tag
-> next-20130627.
->
-> Best regards,
->
-> V.
->
->
->   arch/arm/mach-omap2/omap4-restart.c |    1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/mach-omap2/omap4-restart.c b/arch/arm/mach-omap2/omap4-restart.c
-> index 652adde..41dfd7d 100644
-> --- a/arch/arm/mach-omap2/omap4-restart.c
-> +++ b/arch/arm/mach-omap2/omap4-restart.c
-> @@ -8,6 +8,7 @@
->    */
->
->   #include <linux/types.h>
-> +#include <linux/reboot.h>
->   #include "prminst44xx.h"
->
->   /**
->
-Same was covered already?
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/178209.html
+This patch adds an irqchip driver for the main interrupt controller found
+on MOXA ART SoCs.
 
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
+
+Notes:
+    Applies to next-20130619
+    
+    Changes since v2:
+    
+    1. bail if irq_alloc_domain_generic_chips fails
+    2. remove separate function "moxart_alloc_gc", move all code to main init
+    3. if of_iomap fails, instead of panic, print error and return -EINVAL
+    4. use of_property_read_u32 instead of be32_to_cpup(of_get_property(..))
+
+ drivers/irqchip/Makefile     |   1 +
+ drivers/irqchip/irq-moxart.c | 110 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 111 insertions(+)
+ create mode 100644 drivers/irqchip/irq-moxart.c
+
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index cda4cb5..956d129 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -16,3 +16,4 @@ obj-$(CONFIG_RENESAS_INTC_IRQPIN)	+= irq-renesas-intc-irqpin.o
+ obj-$(CONFIG_RENESAS_IRQC)		+= irq-renesas-irqc.o
+ obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
+ obj-$(CONFIG_ARCH_VT8500)		+= irq-vt8500.o
++obj-$(CONFIG_ARCH_MOXART)		+= irq-moxart.o
+diff --git a/drivers/irqchip/irq-moxart.c b/drivers/irqchip/irq-moxart.c
+new file mode 100644
+index 0000000..0815108
+--- /dev/null
++++ b/drivers/irqchip/irq-moxart.c
+@@ -0,0 +1,110 @@
++/*
++ * MOXA ART SoCs IRQ chip driver.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/irqdomain.h>
++
++#include <asm/exception.h>
++
++#include "irqchip.h"
++
++#define IRQ_SOURCE_REG		0
++#define IRQ_MASK_REG		0x04
++#define IRQ_CLEAR_REG		0x08
++#define IRQ_MODE_REG		0x0c
++#define IRQ_LEVEL_REG		0x10
++#define IRQ_STATUS_REG		0x14
++
++#define FIQ_SOURCE_REG		0x20
++#define FIQ_MASK_REG		0x24
++#define FIQ_CLEAR_REG		0x28
++#define FIQ_MODE_REG		0x2c
++#define FIQ_LEVEL_REG		0x30
++#define FIQ_STATUS_REG		0x34
++
++static void __iomem *moxart_irq_base;
++static struct irq_domain *moxart_irq_domain;
++static unsigned int interrupt_mask;
++
++asmlinkage void __exception_irq_entry moxart_handle_irq(struct pt_regs *regs)
++{
++	u32 irqstat;
++	int hwirq;
++
++	irqstat = readl(moxart_irq_base + IRQ_STATUS_REG);
++
++	while (irqstat) {
++		hwirq = ffs(irqstat) - 1;
++		handle_IRQ(irq_find_mapping(moxart_irq_domain, hwirq), regs);
++		irqstat &= ~(1 << hwirq);
++	}
++}
++
++static int __init moxart_of_intc_init(struct device_node *node,
++	struct device_node *parent)
++{
++	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
++	int ret;
++	struct irq_chip_generic *gc;
++
++	ret = of_property_read_u32(node, "interrupt-mask", &interrupt_mask);
++	if (ret)
++		pr_err("%s: can't read interrupt-mask DT property\n",
++			   node->full_name);
++	pr_debug("%s: interrupt-mask=%x\n", node->full_name, interrupt_mask);
++
++	moxart_irq_base = of_iomap(node, 0);
++	if (!moxart_irq_base) {
++		pr_err("%s: unable to map INTC CPU registers\n",
++			   node->full_name);
++		return -EINVAL;
++	}
++
++	moxart_irq_domain = irq_domain_add_linear(node,	32,
++					&irq_generic_chip_ops, moxart_irq_base);
++
++	ret = irq_alloc_domain_generic_chips(moxart_irq_domain, 32, 1,
++					"MOXARTINTC", handle_edge_irq,
++					clr, 0, IRQ_GC_INIT_MASK_CACHE);
++
++	if (ret) {
++		pr_err("%s: could not allocate generic chip\n", __func__);
++		return -EINVAL;
++	}
++
++	gc = irq_get_domain_generic_chip(moxart_irq_domain, 0);
++
++	gc->reg_base = moxart_irq_base;
++	gc->chip_types[0].regs.mask = IRQ_MASK_REG;
++	gc->chip_types[0].regs.ack = IRQ_CLEAR_REG;
++	gc->chip_types[0].chip.irq_ack = irq_gc_ack_set_bit;
++	gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
++	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
++
++	writel(0, moxart_irq_base + IRQ_MASK_REG);
++	writel(0xffffffff, moxart_irq_base + IRQ_CLEAR_REG);
++
++	writel(interrupt_mask, moxart_irq_base + IRQ_MODE_REG);
++	writel(interrupt_mask, moxart_irq_base + IRQ_LEVEL_REG);
++
++	set_handle_irq(moxart_handle_irq);
++
++	pr_info("%s: %s finished\n", node->full_name, __func__);
++
++	return 0;
++}
++IRQCHIP_DECLARE(moxa_moxart_ic, "moxa,moxart-interrupt-controller",
++				moxart_of_intc_init);
 -- 
-Regards,
-Nishanth Menon
+1.8.2.1
