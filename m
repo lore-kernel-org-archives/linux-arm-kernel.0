@@ -1,98 +1,40 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Thu, 27 Jun 2013 22:51:01 +0300
-Subject: [linux-sunxi] [PATCH 2/8] clocksource: sun4i: Add clocksource
- and sched clock drivers
-In-Reply-To: <20130627170228.GC4319@lukather>
-References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
- <1372281421-2099-3-git-send-email-maxime.ripard@free-electrons.com>
- <20130627131729.5fff8468@i7> <20130627170228.GC4319@lukather>
-Message-ID: <20130627225101.358208c1@i7>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 27 Jun 2013 14:56:22 -0500
+Subject: [PATCH] Documentation: dt: bindings: TI WiLink modules
+In-Reply-To: <1372362418.21065.25.camel@cumari.coelho.fi>
+References: <1372149330-24335-1-git-send-email-coelho@ti.com>
+ <51CBC1C8.1040301@gmail.com> <1372322851.18889.53.camel@cumari.coelho.fi>
+ <20130627125131.GA27285@kahuna> <1372337887.8383.12.camel@cumari.coelho.fi>
+ <CAGo_u6qbt9dANgKq49xR=1qsCpUBhmVaPL4EK04XvTw+=4Z23g@mail.gmail.com>
+ <1372339148.8383.17.camel@cumari.coelho.fi> <51CC3CEE.3050004@ti.com>
+ <1372339810.8383.20.camel@cumari.coelho.fi>
+ <CAGo_u6pWZX9gbHgBae=gcWk8i6-TnhxH1TdM9QdEDLTow6Pn5A@mail.gmail.com>
+ <1372359090.21065.12.camel@cumari.coelho.fi> <51CC8E80.5030206@ti.com>
+ <1372362418.21065.25.camel@cumari.coelho.fi>
+Message-ID: <51CC98E6.1020104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Jun 2013 19:02:28 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On 06/27/2013 02:46 PM, Luciano Coelho wrote:
+> On Thu, 2013-06-27 at 14:12 -0500, Nishanth Menon wrote:
+[...]
+>> Indexes to another entity is always a maintenance burden in the longer
+>> run and needs judicious control. If it is possible to avoid it by
+>> selecting the right parameters, I am a hard advocate for the same.
+>
+> I tend to agree.  But you need a balance.  In theory you're right.  But
+> I think if you take the real world example, it is over-engineering.
+>
+> Anyway, if you *really* think this needs to be changed, I think we're in
+> a deadlock here and I'd like to hear other people's opinions.  I don't
+> mind making the change, but I'm still not convinced it is worth it,
+> since it just adds complexity.
+>
+> And hey, this is too much bikeshedding for such a small detail.
+Lol :)
 
-> Hi Siarhei,
-> 
-> On Thu, Jun 27, 2013 at 01:17:29PM +0300, Siarhei Siamashka wrote:
-> > On Wed, 26 Jun 2013 23:16:55 +0200
-> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> > 
-> > > The A10 and the A13 has a 64 bits free running counter that we can use
-> > > as a clocksource and a sched clock, that were both not used yet on these
-> > > platforms.
-> > > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > ---
-> > >  drivers/clocksource/sun4i_timer.c | 27 +++++++++++++++++++++++++++
-> > >  1 file changed, 27 insertions(+)
-> > > 
-> > > diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-> > > index bdf34d9..1d2eaa0 100644
-> > > --- a/drivers/clocksource/sun4i_timer.c
-> > > +++ b/drivers/clocksource/sun4i_timer.c
-> > > @@ -23,6 +23,8 @@
-> > >  #include <linux/of_address.h>
-> > >  #include <linux/of_irq.h>
-> > >  
-> > > +#include <asm/sched_clock.h>
-> > > +
-> > >  #define TIMER_IRQ_EN_REG	0x00
-> > >  #define TIMER_IRQ_EN(val)		BIT(val)
-> > >  #define TIMER_IRQ_ST_REG	0x04
-> > > @@ -34,6 +36,11 @@
-> > >  #define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
-> > >  
-> > >  #define TIMER_SCAL		16
-> > > +#define TIMER_CNT64_CTL_REG	0xa0
-> > > +#define TIMER_CNT64_CTL_CLR		BIT(0)
-> > > +#define TIMER_CNT64_CTL_RL		BIT(1)
-> > > +#define TIMER_CNT64_LOW_REG	0xa4
-> > > +#define TIMER_CNT64_HIGH_REG	0xa8
-> > >  
-> > >  static void __iomem *timer_base;
-> > >  
-> > > @@ -96,6 +103,20 @@ static struct irqaction sun4i_timer_irq = {
-> > >  	.dev_id = &sun4i_clockevent,
-> > >  };
-> > >  
-> > > +static u32 sun4i_timer_sched_read(void)
-> > > +{
-> > > +	u32 reg = readl(timer_base + TIMER_CNT64_CTL_REG);
-> > 
-> > If we can be absolutely sure that nothing else may ever change
-> > the TIMER_CNT64_CTL_REG, then its default value can be probably
-> > cached instead of doing expensive read from the hardware register
-> > each time?
-> 
-> Since it's a free-running counter, its value will always change, so the
-> caching will bring no additions at all, right?
-
-Sorry, 'caching' was not a very good description for something that is
-already a compile time constant. I mean just replace
-
-    u32 reg = readl(timer_base + TIMER_CNT64_CTL_REG);
-
-with 
-
-    u32 reg = TIMER_CNT64_CTL_CLR;
-
-Because we know that the TIMER_CNT64_CTL_REG is already supposed
-to have the default TIMER_CNT64_CTL_CLR value (initialized in the
-'sun4i_timer_init' function) between calls to 'sun4i_timer_sched_read'.
-Inside of 'sun4i_timer_sched_read' we set an extra TIMER_CNT64_CTL_RL
-bit in this register, but wait until it clears, effectively reverting
-TIMER_CNT64_CTL_REG register back to the default TIMER_CNT64_CTL_CLR
-value.
-
-Removing this extra HW register read can save roughly a hundred of CPU
-cycles here and provide a ~10% overall improvement for gettimeofday
-(these estimates are based on the earlier benchmarks done with the
-Allwinner 3.4 kernel).
-
-Or maybe I'm overlooking something?
+Alrite, if no one else is complaining, I am not going to block it either.
 
 -- 
-Best regards,
-Siarhei Siamashka
+Regards,
+Nishanth Menon
