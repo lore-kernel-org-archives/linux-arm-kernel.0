@@ -1,63 +1,61 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 27 Jun 2013 19:04:41 +0300
-Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
-In-Reply-To: <20130627144535.GK5523@atomide.com>
-References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
- <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
- <20130625065811.GZ5523@atomide.com> <51CAEA90.90200@ti.com>
- <CACRpkdbKgEcfF67oO9HrczvDp4Po3Xt1hFajJ1vO8kEvsZH4jA@mail.gmail.com>
- <51CC45D3.2000305@ti.com> <20130627144535.GK5523@atomide.com>
-Message-ID: <51CC6299.2070203@ti.com>
+From: balajitk@ti.com (Balaji T K)
+Date: Thu, 27 Jun 2013 21:56:50 +0530
+Subject: [PATCH 0/5] AM33xx: MMC resources from DT without HWMOD data
+In-Reply-To: <CAD=GYpa9LQ1fV6=O9B65sJURVAigsgXCPLWav8cHXTuGQXPc9A@mail.gmail.com>
+References: <1372209808-6532-1-git-send-email-joelagnel@ti.com>
+ <CAD=GYpbdVVrh-tiqOcbHi3mkWRJUBdx0EsEZEFVVbgFgcCWgsw@mail.gmail.com>
+ <51CC2A1E.2040003@ti.com>
+ <CAD=GYpa9LQ1fV6=O9B65sJURVAigsgXCPLWav8cHXTuGQXPc9A@mail.gmail.com>
+Message-ID: <51CC67CA.2070805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2013 05:45 PM, Tony Lindgren wrote:
-> * Grygorii Strashko <grygorii.strashko@ti.com> [130627 07:12]:
+On Thursday 27 June 2013 07:56 PM, Joel A Fernandes wrote:
+> Hi Benoit,
+>
+> On Thu, Jun 27, 2013 at 7:03 AM, Benoit Cousson <b-cousson@ti.com> wrote:
+>> Hi Joel,
 >>
->> As you can see, from 12 pins only 3 pins need to be reconfigured
->> while switching from "active"->"idle" states and back (and as I
->> mentioned above for OMAP "idle" == "sleep" now).
+>> On 06/26/2013 05:28 AM, Joel A Fernandes wrote:
+>>> On Tue, Jun 25, 2013 at 8:23 PM, Joel A Fernandes <joelagnel@ti.com> wrote:
+>>>> From: Joel A Fernandes <agnel.joel@gmail.com>
+>>>>
+>>>> This series is fixes to get MMC working on AM33XX without HWMOD data.
+>>>> On removal of HWMOD data, interrupt and register properties need to be provided
+>>>> for the driver to function correctly.
+>>>
+>>> Please don't pull patches authored by me in this series. I have posted
+>>> them with my wrong email address by mistake. I will correct my email
+>>> during the next repost, after a round of review. Matt's patches in the
+>>> series are still good though.
 >>
->> Regarding "OFF" state:
->> OMAP mux HW defines special state for unused pins which is selected
->> by default after reset and need to be selected when device isn't
->> used, for example:
->> _MUXMODE - Functional multiplexing selection for pad
->> 0x0: Select usbb1_hsic_data
->> 0x3: Select gpio_96
->> 0x7: Select safe_mode <<--- pin unused
+>> In that case, please repost these in two series to avoid pulling the DTS
+>> files in the MMC tree.
 >
-> The off mode bits can be enabled continuously, the mux hardware
-> automatically sets them. So sounds like you don't need any
-> separate "idle" "sleep" and "off" states, the following should
-> do:
+> The series has been replaced with the single patch:
+> "[PATCH v2] ARM: dts: add AM33XX MMC support"
+> http://marc.info/?l=linux-omap&m=137230403815943&w=2
 >
-> "default" (or "static")	static pins that don't need to be touched
-> 			after consumer driver probe
->
-> "active"		dynamic pins that are not a subset of
-> 			"default" needed for runtime; these pins
-> 			are the same as "idle" below, but with
-> 			different muxing or pinconf device
-> 			runtime
->
-> "idle"			dynamic pins that are not a subset of
-> 			"default" needed for various idle modes;
-> 			these pins are the same as "active" above,
-> 			but with different muxing or pinconf for
-> 			various idle states
->
-> Can you please confirm that these named modes are enough for
-> your needs?
-  Confirm )
->
-> If your hardware does not have specific off mode bits, then
-> I can understand that you may need one mor state "off".
->
-> Regards,
->
-> Tony
->
+> Some patches were squashed and others dropped in the series resulting
+> in the single
+> patch above. This patch should be good to apply
+Hi Joel,
 
-Regards,
--grygorii
+Before pushing mmc dts support for am335x, Can you please let me
+know if below 2 patches [1] are merged/accepted,
+IIRC these patches are needed for MMC to work properly.
+
+I suggest to hold the dts patch until slave_sg_limit gets merged
+otherwise it will cause regression in am335x mmc.
+
+[PATCH v4 1/3] dmaengine: add dma_get_slave_sg_limits()
+[PATCH v4 2/3] dma: edma: add device_slave_sg_limits() support
+
+[1]
+https://groups.google.com/forum/#!topic/linux.kernel/khTTcPtQpag
+
+>
+> Thanks,
+>
+> -Joel
+>
