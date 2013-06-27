@@ -1,181 +1,192 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Thu, 27 Jun 2013 16:03:54 +0200
-Subject: [PATCH] clk: add MOXA ART SoCs clock driver
-Message-ID: <1372341834-6557-1-git-send-email-jonas.jensen@gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 27 Jun 2013 17:01:55 +0300
+Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
+In-Reply-To: <CACRpkdbKgEcfF67oO9HrczvDp4Po3Xt1hFajJ1vO8kEvsZH4jA@mail.gmail.com>
+References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
+ <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
+ <20130625065811.GZ5523@atomide.com> <51CAEA90.90200@ti.com>
+ <CACRpkdbKgEcfF67oO9HrczvDp4Po3Xt1hFajJ1vO8kEvsZH4jA@mail.gmail.com>
+Message-ID: <51CC45D3.2000305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds MOXA ART SoCs clock driver support.
+Hi Linus,
+On 06/26/2013 10:31 PM, Linus Walleij wrote:
+> On Wed, Jun 26, 2013 at 3:20 PM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
+>
+>> The "Sleep" pinctrl state is optional - if "sleep" state isn't defined
+>> then "Idle" pinctrl state will be used during suspend.
+>
+> Why? If we have a clear cut semantic that "idle" is for runtime
+> suspend, why should it be a fallback for suspend?
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+Seems, some misunderstanding is here :)
 
-Notes:
-    Applies to next-20130619
+This is OMAP specific - for OMAP the "Idle" state is typically used, and 
+"sleep" state is rather optional. Historically, three states have been 
+defined for OMAP:
+- "enabled"
+- "idle"
+- "off"
 
- drivers/clk/Makefile     |   1 +
- drivers/clk/clk-moxart.c | 141 +++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 142 insertions(+)
- create mode 100644 drivers/clk/clk-moxart.c
+Most of OMAP drivers use Runtime PM only to manage their states - but, 
+any calls to pm_runtime_xxx() helpers are redirected to *OMAP device* 
+framework which physically configures power state/clocks/pins of device.
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index f41e3e3..92e4532 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -31,6 +31,7 @@ obj-$(CONFIG_ARCH_VT8500)	+= clk-vt8500.o
- obj-$(CONFIG_ARCH_ZYNQ)		+= zynq/
- obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
- obj-$(CONFIG_PLAT_SAMSUNG)	+= samsung/
-+obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
- 
- obj-$(CONFIG_X86)		+= x86/
- 
-diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
-new file mode 100644
-index 0000000..893a63b
---- /dev/null
-+++ b/drivers/clk/clk-moxart.c
-@@ -0,0 +1,141 @@
-+/*
-+ * MOXA ART SoCs clock driver.
-+ *
-+ * Copyright (C) 2013 Jonas Jensen
-+ *
-+ * Jonas Jensen <jonas.jensen@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/slab.h>
-+#include <linux/delay.h>
-+#include <linux/module.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/clkdev.h>
-+
-+static DEFINE_SPINLOCK(_lock);
-+
-+struct clk_device {
-+	struct clk_hw	hw;
-+	void __iomem	*reg_pmu;
-+	spinlock_t		*lock;
-+};
-+
-+static unsigned long moxart_recalc_rate(struct clk_hw *c_hw,
-+	unsigned long parent_rate)
-+{
-+	unsigned int mul, val, div;
-+	unsigned long ret;
-+	struct clk_device *dev_clk = container_of(c_hw, struct clk_device, hw);
-+
-+	mul = (readl(dev_clk->reg_pmu + 0x30) >> 3) & 0x1ff;
-+	val = (readl(dev_clk->reg_pmu + 0x0c) >> 4) & 0x7;
-+
-+	switch (val) {
-+	case 0:
-+		div = 2;
-+		break;
-+	case 1:
-+		div = 3;
-+		break;
-+	case 2:
-+		div = 4;
-+		break;
-+	case 3:
-+		div = 6;
-+		break;
-+	case 4:
-+		div = 8;
-+		break;
-+	default:
-+		div = 2;
-+		break;
-+	}
-+
-+	ret = (mul * 1200000 / div);
-+
-+	/* UC-7112-LX: ret=48000000 mul=80 div=2 val=0 */
-+	pr_debug("%s: ret=%lu mul=%d div=%d val=%d\n",
-+		__func__, ret, mul, div, val);
-+	return ret;
-+}
-+
-+static const struct clk_ops moxart_clk_ops = {
-+	.recalc_rate = moxart_recalc_rate,
-+};
-+
-+static const struct of_device_id moxart_pmu_match[] = {
-+	{ .compatible = "moxa,moxart-pmu" },
-+	{ },
-+};
-+
-+static const struct of_device_id moxart_sysclk_match[] = {
-+	{ .compatible = "moxa,moxart-sysclk" },
-+	{ }
-+};
-+
-+void __init moxart_of_clk_init(void)
-+{
-+	struct device_node *node, *clk_node;
-+	struct clk *clk;
-+	struct clk_device *dev_clk;
-+	struct clk_init_data init;
-+	int err;
-+	const char *clk_name;
-+
-+	dev_clk = kzalloc(sizeof(*dev_clk), GFP_KERNEL);
-+	if (WARN_ON(!dev_clk))
-+		return;
-+
-+	dev_clk->lock = &_lock;
-+
-+	node = of_find_matching_node(NULL, moxart_pmu_match);
-+	if (!node) {
-+		pr_err("%s: can't find PMU DT node\n", __func__);
-+		return;
-+	}
-+
-+	dev_clk->reg_pmu = of_iomap(node, 0);
-+	if (IS_ERR(dev_clk->reg_pmu)) {
-+		pr_err("%s: of_iomap failed\n", __func__);
-+		return;
-+	}
-+
-+	clk_node = of_find_matching_node(NULL, moxart_sysclk_match);
-+	if (!clk_node) {
-+		pr_err("%s: can't find sys_clk DT node\n", __func__);
-+		return;
-+	}
-+
-+	clk_name = clk_node->name;
-+
-+	of_property_read_string(clk_node, "clock-output-names",
-+		&clk_name);
-+
-+	init.name = clk_name;
-+	init.ops = &moxart_clk_ops;
-+	init.flags = CLK_IS_ROOT;
-+	init.num_parents = 0;
-+
-+	dev_clk->hw.init = &init;
-+
-+	clk = clk_register(NULL, &dev_clk->hw);
-+
-+	if (WARN_ON(IS_ERR(clk))) {
-+		kfree(dev_clk);
-+		return;
-+	}
-+
-+	clk_register_clkdev(clk, NULL, clk_name);
-+
-+	err = of_clk_add_provider(clk_node, of_clk_src_simple_get, clk);
-+
-+	pr_info("%s: %s finished\n", node->full_name, __func__);
-+}
--- 
-1.8.2.1
+It's the usual situation, when the device is in "Active/ON" state when 
+system is going to suspend, because PM runtime *do not allow* to disable 
+device during system wide suspend. To workaround this, the *OMAP device* 
+framework disables all active devices forcibly at .suspend_noirq() stage 
+- and, at this moment, it should apply "Idle" or "Sleep" configuration 
+on PINs.
+
+I need to note here that "Sleep" state is/will be *not* used during PM 
+runtime operation - it's very specific.
+
+"off" state is used very rare now - and for the cases when device driver 
+is removed or device need to completely switched off (HSI omap_hsi.c and 
+RPROC remoteproc.c).
+
+I think, In the future the OMAP pinctrl configurations would be manged 
+in more flexible way then now (thanks to "pinctrl PM helpers" and you;))
+- "Idle" state will be splitted to "Idle"/"sleep"
+- "default" state will be splitted to "default"/"active"
+
+>
+> You do realize that can just be turned around (as common suspend
+> is more widely implemented than runtime suspend) so that we
+> could say that if "idle" does not exist, we go to "sleep" in
+> runtime suspend.
+>
+>> So, final list of default pnctrl states may be defined as "default",
+>> "active", "idle", "sleep", "off":
+>> - "active", "idle", "sleep": will be handled by omap_device core
+>> - "default", "off": will be handled by driver itself (or Device core).
+>
+> Currently the pinctrl system combines what is called "default"
+> and "active" into one, assuming that all devices shall come up
+> in the active state.
+>
+> Also we haven't seen a device that need some "off" state that
+> is different from "sleep".
+>
+> If you want to drive this state list home you have to give a
+> *real world example*.
+>
+> I want to see a *real* example, for a device and it's pins,
+> that define totally different things for these states, as a
+> rationale.
+>
+> Else we are just defining states to make nice figures or mental
+> maps and that is not helpful for drivers writers.
+OK. Please pay attention to the following example (taken from TI Android 
+product kernel 3.4 - need to have the same in mainline kernel):
+static const struct omap_device_pad port1_phy_pads[] __initconst = {
+	{
+		.name = "usbb1_ulpitll_stp.usbb1_ulpiphy_stp",
+		.flags  = OMAP_DEVICE_PAD_REMUX,
+		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE4,
+		.idle = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE7,
+		.off = OMAP_PIN_OFF_OUTPUT_LOW | OMAP_MUX_MODE7,
+	},
+	{
+		.name = "usbb1_ulpitll_clk.usbb1_ulpiphy_clk",
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+	},
+	{
+		.name = "usbb1_ulpitll_dir.usbb1_ulpiphy_dir",
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+	},
+	{
+		.name = "usbb1_ulpitll_nxt.usbb1_ulpiphy_nxt",
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+	},
+	{
+		.name = "usbb1_ulpitll_dat0.usbb1_ulpiphy_dat0",
+		.flags  = OMAP_DEVICE_PAD_REMUX |OMAP_DEVICE_PAD_WAKEUP,
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+		.idle = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+	},
+	{
+		.name = "usbb1_ulpitll_dat1.usbb1_ulpiphy_dat1",
+		.flags  = OMAP_DEVICE_PAD_REMUX |OMAP_DEVICE_PAD_WAKEUP,
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+		.idle = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+	},
+	{
+		.name = "usbb1_ulpitll_dat2.usbb1_ulpiphy_dat2",
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+	},
+	{
+		.name = "usbb1_ulpitll_dat3.usbb1_ulpiphy_dat3",
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+	},
+	{
+		.name = "usbb1_ulpitll_dat4.usbb1_ulpiphy_dat4",
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+	},
+	{
+		.name = "usbb1_ulpitll_dat5.usbb1_ulpiphy_dat5",
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+	},
+	{
+		.name = "usbb1_ulpitll_dat6.usbb1_ulpiphy_dat6",
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+	},
+	{
+		.name = "usbb1_ulpitll_dat7.usbb1_ulpiphy_dat7",
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+	},
+};
+
+As you can see, from 12 pins only 3 pins need to be reconfigured while 
+switching from "active"->"idle" states and back (and as I mentioned 
+above for OMAP "idle" == "sleep" now).
+
+Regarding "OFF" state:
+OMAP mux HW defines special state for unused pins which is selected by 
+default after reset and need to be selected when device isn't used, for 
+example:
+_MUXMODE - Functional multiplexing selection for pad
+0x0: Select usbb1_hsic_data
+0x3: Select gpio_96
+0x7: Select safe_mode <<--- pin unused
+
+In opposite, in "sleep" state some pins need to be reconfigured in 
+special way to avoid glitches/support wake up/follow HW requirements:
+	{
+		.name = "usbb1_ulpitll_dat0.usbb1_ulpiphy_dat0",
+		.flags  = OMAP_DEVICE_PAD_REMUX |OMAP_DEVICE_PAD_WAKEUP,
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+<<- "active" PIN is input+pulldown
+		.idle = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+<<- "idle/sleep" PIN is input+pulldown+wakeup_en
+	},
+- or -
+	{
+		.name	= "uart2_rts.uart2_rts",
+		.flags  = OMAP_DEVICE_PAD_REMUX,
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+<<- "active" PIN is output
+		.idle   = OMAP_PIN_OFF_INPUT_PULLUP | OMAP_MUX_MODE7,
+<<- "idle/sleep" PIN is input+pullup+safe
+	},
+
+
+More over, OAMP mux HW allow to define special state for PIN which
+will be applied in suspend/OFF mode (OFF-mode deepest possible PM state 
+for OMAP) automatically.
+X_OFFMODEPULLTYPESELECT OffMode mode pullup/down selection for pad
+X_OFFMODEPULLUDENABLE OffMode mode pullup/down enable for pad
+X_OFFMODEOUTVALUE OffMode mode output value for pad
+X_OFFMODEOUTENABLE OffMode mode output enable value for pad
+X_OFFMODEENABLE OffMode mode override control for pad
+
+>
+> Yours,
+> Linus Walleij
+>
+
+Regards,
+-grygorii
