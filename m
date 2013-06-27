@@ -1,77 +1,42 @@
 From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 27 Jun 2013 11:47:01 +0800
-Subject: [PATCH] arch: arm64: include: asm: add pci.h to pass compiling
-In-Reply-To: <51CB9DD8.6040905@asianux.com>
-References: <51CA5F71.207@asianux.com> <20130626140730.GB23309@arm.com>
- <51CB87B0.8030805@asianux.com> <51CB9DD8.6040905@asianux.com>
-Message-ID: <51CBB5B5.3070206@asianux.com>
+Date: Thu, 27 Jun 2013 12:03:25 +0800
+Subject: [PATCH] include/asm-generic/pci.h: include generic "pci-dma-compat.h"
+Message-ID: <51CBB98D.3040304@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2013 10:05 AM, Chen Gang wrote:
-> On 06/27/2013 08:30 AM, Chen Gang wrote:
->> On 06/26/2013 10:07 PM, Catalin Marinas wrote:
->>> On Wed, Jun 26, 2013 at 04:26:41AM +0100, Chen Gang wrote:
->>>>> Need add pci.h for compiling, the related error (with allmodconfig):
->>>>>
->>>>>   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_exit?:
->>>>>   drivers/media/usb/b2c2/flexcop-usb.c:393:3: error: implicit declaration of function ?pci_free_consistent? [-Werror=implicit-function-declaration]
->>>>>   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_init?:
->>>>>   drivers/media/usb/b2c2/flexcop-usb.c:410:2: error: implicit declaration of function ?pci_alloc_consistent? [-Werror=implicit-function-declaration]
->>>>>   drivers/media/usb/b2c2/flexcop-usb.c:410:21: warning: assignment makes pointer from integer without a cast [enabled by default]
->>>>>   cc1: some warnings being treated as errors
->>>>>
->>>>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->>>>> ---
->>>>>  arch/arm64/include/asm/pci.h |   11 +++++++++++
->>>>>  1 files changed, 11 insertions(+), 0 deletions(-)
->>>>>  create mode 100644 arch/arm64/include/asm/pci.h
->>>>>
->>>>> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
->>>>> new file mode 100644
->>>>> index 0000000..2ed467f
->>>>> --- /dev/null
->>>>> +++ b/arch/arm64/include/asm/pci.h
->>>>> @@ -0,0 +1,11 @@
->>>>> +#ifndef ASMARM64_PCI_H
->>>>> +#define ASMARM64_PCI_H
->>>>> +
->>>>> +#ifdef __KERNEL__
->>>>> +
->>>>> +#include <asm-generic/pci-dma-compat.h>
->>>>> +#include <asm-generic/pci.h>
->>>>> +
->>>>> +#endif /* __KERNEL__ */
->>>>> +
->>>>> +#endif
->>> I wonder whether it makes sense to include pci-dma-compat.h in
->>> asm-generic/pci.h, I don't see why one would want the generic pci.h but
->>> not the generic pci-dma-compat.h (cc'ing Arnd).
->>
-> 
+If an architecture need "generic pci.h", it also need generic "pci-dma-
+compat.h",  so recommend to include it in asm-generic directly.
 
-For m32r, it also face the same issue. So I need send related patch to
-asm-generic instead of arm64.
+And now, for arm64 and m32r, may cause compiling error about it.
 
-> For m32r, it needs generic pci.h but not the generic pci-dma-compat.h.
-> 
-> I am just compiling it with allmodconfig to see whether it will can
-> cause issue too, if so I will send the patch for asm-generic. :-)
-> 
-> And, sorry for the original reply below is incorrect.
-> 
->> I think, it will let architecture guys easier to add their own
->> pci-dma-compat.h (although they still need generic pci_dma_compat.h, and
->> generic pci.h, too).
->>
->> e.g. one architecture want include generic pci-dma-compat.h firstly,
->> then define its own features in its own pci-dma-compat.h.
->>
->> Thanks.
->>
-> 
-> 
+The related error (with allmodconfig):
+
+  drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_exit?:
+  drivers/media/usb/b2c2/flexcop-usb.c:393:3: error: implicit declaration of function ?pci_free_consistent? [-Werror=implicit-function-declaration]
+  drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_init?:
+  drivers/media/usb/b2c2/flexcop-usb.c:410:2: error: implicit declaration of function ?pci_alloc_consistent? [-Werror=implicit-function-declaration]
+  drivers/media/usb/b2c2/flexcop-usb.c:410:21: warning: assignment makes pointer from integer without a cast [enabled by default]
+  cc1: some warnings being treated as errors
 
 
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ include/asm-generic/pci.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/include/asm-generic/pci.h b/include/asm-generic/pci.h
+index e80a049..64e2a15 100644
+--- a/include/asm-generic/pci.h
++++ b/include/asm-generic/pci.h
+@@ -6,6 +6,8 @@
+ #ifndef _ASM_GENERIC_PCI_H
+ #define _ASM_GENERIC_PCI_H
+ 
++#include <asm-generic/pci-dma-compat.h>
++
+ static inline struct resource *
+ pcibios_select_root(struct pci_dev *pdev, struct resource *res)
+ {
 -- 
-Chen Gang
+1.7.7.6
