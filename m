@@ -1,40 +1,57 @@
-From: Larry.Finger@lwfinger.net (Larry Finger)
-Date: Thu, 27 Jun 2013 09:45:32 -0500
-Subject: RTL8192CU on ARM not working
-In-Reply-To: <20130627081225.GJ5803@lukather>
-References: <20130627081225.GJ5803@lukather>
-Message-ID: <51CC500C.9050602@lwfinger.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 27 Jun 2013 07:45:35 -0700
+Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
+In-Reply-To: <51CC45D3.2000305@ti.com>
+References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
+ <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
+ <20130625065811.GZ5523@atomide.com> <51CAEA90.90200@ti.com>
+ <CACRpkdbKgEcfF67oO9HrczvDp4Po3Xt1hFajJ1vO8kEvsZH4jA@mail.gmail.com>
+ <51CC45D3.2000305@ti.com>
+Message-ID: <20130627144535.GK5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2013 03:12 AM, Maxime Ripard wrote:
-> Hi everyone,
->
-> I'm currently trying to use a RTL8192CU on an ARM (Freescale imx28,
-> armv5) platform, using 3.10-rc3.
->
-> Trouble is, while the chip is correctly detected and you can use iw on it
-> without any problem it seems, once you start an association to an access
-> point, the association goes on, seems to associate, displaying a WARN()
-> message [1] and then, after what looks like a random amount of time (could
-> be right away, could be after a few minutes), deassociate [2].
->
-> During the time where it's associated, we never seem to transmit any
-> packets, while iw reports packets being sent, I guess we can assume that
-> they are actually never transmitted as well [3].
->
-> What seems odd to me as well is that the signal power reported for the access
-> point is excessively high when using iw scan (10 dbm), and once connected, the
-> signal strength is -64dbm, which makes quite a huge difference.
+* Grygorii Strashko <grygorii.strashko@ti.com> [130627 07:12]:
+> 
+> As you can see, from 12 pins only 3 pins need to be reconfigured
+> while switching from "active"->"idle" states and back (and as I
+> mentioned above for OMAP "idle" == "sleep" now).
+> 
+> Regarding "OFF" state:
+> OMAP mux HW defines special state for unused pins which is selected
+> by default after reset and need to be selected when device isn't
+> used, for example:
+> _MUXMODE - Functional multiplexing selection for pad
+> 0x0: Select usbb1_hsic_data
+> 0x3: Select gpio_96
+> 0x7: Select safe_mode <<--- pin unused
 
-That warning is under discussion. See the thread entitled "rtl8192cu: slow path 
-warning" in the linux-wireless ML. I will add you to the Cc list on those messages.
+The off mode bits can be enabled continuously, the mux hardware
+automatically sets them. So sounds like you don't need any
+separate "idle" "sleep" and "off" states, the following should
+do:
 
-You should switch to kernel 3.10-rc7. There are a lot of changes to rtl8192cu in 
-that version that are not in -rc3. Those updates mostly affect WPA and WEP 
-encryption.
+"default" (or "static")	static pins that don't need to be touched
+			after consumer driver probe
 
-I never take signal power values seriously. Just observe the comments scattered 
-throughout the code regarding them.
+"active"		dynamic pins that are not a subset of
+			"default" needed for runtime; these pins
+			are the same as "idle" below, but with
+			different muxing or pinconf device
+			runtime
 
-Larry
+"idle"			dynamic pins that are not a subset of
+			"default" needed for various idle modes;
+			these pins are the same as "active" above,
+			but with different muxing or pinconf for
+			various idle states
+
+Can you please confirm that these named modes are enough for
+your needs?
+
+If your hardware does not have specific off mode bits, then
+I can understand that you may need one mor state "off".
+
+Regards,
+
+Tony
