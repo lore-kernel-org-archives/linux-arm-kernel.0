@@ -1,48 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jun 2013 10:46:51 +0100
-Subject: amba-pl08x and 'get_signal' namespace collision/build error
-In-Reply-To: <20130626103930.GS23141@intel.com>
-References: <51C97F40.5030101@arm.com>
- <20130625184539.GB2718@n2100.arm.linux.org.uk>
- <20130626044842.GR23141@intel.com>
- <20130626081909.GD2718@n2100.arm.linux.org.uk>
- <20130626103930.GS23141@intel.com>
-Message-ID: <20130627094650.GC4283@n2100.arm.linux.org.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 27 Jun 2013 11:47:55 +0200
+Subject: [PATCH v2 0/3] ARM: shmobile: r8a73a4: add I2C devices and CPUFreq
+ support
+Message-ID: <1372326479-15028-1-git-send-email-g.liakhovetski@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 04:09:30PM +0530, Vinod Koul wrote:
-> On Wed, Jun 26, 2013 at 09:19:09AM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Jun 26, 2013 at 10:18:42AM +0530, Vinod Koul wrote:
-> > > Yup. This is fixed in slave-dma tree by a patch from mark by renaming it.
-> > > 
-> > > This should not show in the -next tree
-> > 
-> > Except, that change probably is probably responsible for this new error:
-> > 
-> > drivers/dma/amba-pl08x.c: In function 'pl08x_request_mux':
-> > drivers/dma/amba-pl08x.c:304:13: error: expected identifier before '(' token
-> This was pushed four days ago and havent seen any error report expect this.
-> 
-> Anyway I rebuild my -next and looks fine for me
-> 
->   CC      drivers/dma/dmaengine.o
->   CC      drivers/dma/virt-dma.o
->   CC      drivers/dma/iovlock.o
->   CC [M]  drivers/dma/dmatest.o
->   CC      drivers/dma/amba-pl08x.o
->   LD      drivers/dma/built-in.o
-> 
-> Can you share your config which failed for you?
-> 
-> Mark, I believe you are testing for this, have you seen above error?
+CPUFreq voltage scaling support for APE6EVM uses an I2C PMIC. This patch 
+series adds support for I2C on r8a73a4 and adds required hooks to APE6EVM. 
+This patch series is identical to v1 with the only difference, that a 
+patch from it has been split into two upon maintainer's request.
 
-Right, what's going on is that I have a commit in my tree which adds an
-include to asm/pgtable.h which introduces a #define for get_signal.
-This becomes visible to amba-pl08x.c.
+Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 
-However, my build test tree fails *every* time because what I'm building
-is Linus' tree, my tree plus arm-soc, and it doesn't include your tree.
-This makes my build testing for the next merge window impossible.
+Guennadi Liakhovetski (3):
+  ARM: shmobile: r8a73a4: add clocks for I2C controllers
+  ARM: shmobile: r8a73a4: add I2C controller DT nodes
+  ARM: shmobile: ape6evm: add CPUFreq support
 
-So, I need the fix to pl08x.c merged into my tree.
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   22 +++++++++
+ arch/arm/boot/dts/r8a73a4.dtsi         |   81 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/clock-r8a73a4.c |   25 +++++++++-
+ 3 files changed, 126 insertions(+), 2 deletions(-)
+
+-- 
+1.7.2.5
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
