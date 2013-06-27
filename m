@@ -1,36 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Jun 2013 16:22:26 +0200
-Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
-In-Reply-To: <CACxGe6tUpo31p6N0BZt_jdonuPP8ijvLBygC76wQ044EFsqOwA@mail.gmail.com>
-References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
- <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
- <CACxGe6tUpo31p6N0BZt_jdonuPP8ijvLBygC76wQ044EFsqOwA@mail.gmail.com>
-Message-ID: <201306271622.26494.arnd@arndb.de>
+From: agnel.joel@gmail.com (Joel A Fernandes)
+Date: Thu, 27 Jun 2013 09:26:04 -0500
+Subject: [PATCH 0/5] AM33xx: MMC resources from DT without HWMOD data
+In-Reply-To: <51CC2A1E.2040003@ti.com>
+References: <1372209808-6532-1-git-send-email-joelagnel@ti.com>
+ <CAD=GYpbdVVrh-tiqOcbHi3mkWRJUBdx0EsEZEFVVbgFgcCWgsw@mail.gmail.com>
+ <51CC2A1E.2040003@ti.com>
+Message-ID: <CAD=GYpa9LQ1fV6=O9B65sJURVAigsgXCPLWav8cHXTuGQXPc9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 June 2013, Grant Likely wrote:
-> > index 0000000..5c48271
-> > --- /dev/null
-> > +++ b/Documentation/arm/uefi.txt
-> > @@ -0,0 +1,39 @@
-> > +The nomenclature EFI and UEFI are used interchangeably in this document.
-> > +
-> > +The implementation depends on receiving pointers to the UEFI memory map
-> > +and System Table in a Flattened Device Tree - so is only available with
-> > +CONFIG_OF.
-> > +
-> > +It (early) parses the FDT for the following parameters:
-> 
-> Need to state which node these properties can be found in. I recommend /chosen
-> 
-> I would also prefix all of the following properties with "linux,"
-> since they are very much about what the Linux kernel needs for
-> booting. EFI stub will be creating these properties specifically for
-> Linux, and the LinuxLoader should do the same (until we eventually
-> kill it).
+Hi Benoit,
 
-Why not make it a separate /efi node instead, mirroring what we
-have for hypervisor specific information and things like rtas?
+On Thu, Jun 27, 2013 at 7:03 AM, Benoit Cousson <b-cousson@ti.com> wrote:
+> Hi Joel,
+>
+> On 06/26/2013 05:28 AM, Joel A Fernandes wrote:
+>> On Tue, Jun 25, 2013 at 8:23 PM, Joel A Fernandes <joelagnel@ti.com> wrote:
+>>> From: Joel A Fernandes <agnel.joel@gmail.com>
+>>>
+>>> This series is fixes to get MMC working on AM33XX without HWMOD data.
+>>> On removal of HWMOD data, interrupt and register properties need to be provided
+>>> for the driver to function correctly.
+>>
+>> Please don't pull patches authored by me in this series. I have posted
+>> them with my wrong email address by mistake. I will correct my email
+>> during the next repost, after a round of review. Matt's patches in the
+>> series are still good though.
+>
+> In that case, please repost these in two series to avoid pulling the DTS
+> files in the MMC tree.
 
-	Arnd
+The series has been replaced with the single patch:
+"[PATCH v2] ARM: dts: add AM33XX MMC support"
+http://marc.info/?l=linux-omap&m=137230403815943&w=2
+
+Some patches were squashed and others dropped in the series resulting
+in the single
+patch above. This patch should be good to apply
+
+Thanks,
+
+-Joel
