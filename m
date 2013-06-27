@@ -1,52 +1,61 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 27 Jun 2013 10:53:04 +0900
-Subject: [PATCH v3 2/2] ARM: shmobile: r8a7790: add thermal driver support
+Date: Thu, 27 Jun 2013 10:53:03 +0900
+Subject: [PATCH v3 1/2] ARM: shmobile: r8a7790: add clocks for thermal
 In-Reply-To: <1372297984-9315-1-git-send-email-horms+renesas@verge.net.au>
 References: <1372297984-9315-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1372297984-9315-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1372297984-9315-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current temperature may be read using:
-cat /sys/class/thermal/thermal_zone0/temp
-
-Based on similar work for the r8a73a4 by Kuninori Morimoto.
-
 Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-r8a7790.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index 28f9475..06c720f 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -149,6 +149,17 @@ static struct resource irqc0_resources[] __initdata = {
- 					  &irqc##idx##_data,		\
- 					  sizeof(struct renesas_irqc_config))
+---
+
+v3
+* Correct title to refer to r8a7790
+
+v2
+* First post
+---
+ arch/arm/mach-shmobile/clock-r8a7790.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index 5d71313..28eccd1 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -49,6 +49,7 @@
  
-+static struct resource thermal_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xe61f0000, 0x14),
-+	DEFINE_RES_MEM(0xe61f0100, 0x38),
-+	DEFINE_RES_IRQ(gic_spi(69)),
-+};
-+
-+#define r8a7790_register_thermal()					\
-+	platform_device_register_simple("rcar_thermal", -1,		\
-+					thermal_resources,		\
-+					ARRAY_SIZE(thermal_resources))
-+
- void __init r8a7790_add_standard_devices(void)
- {
- 	r8a7790_register_scif(SCIFA0);
-@@ -162,6 +173,7 @@ void __init r8a7790_add_standard_devices(void)
- 	r8a7790_register_scif(HSCIF0);
- 	r8a7790_register_scif(HSCIF1);
- 	r8a7790_register_irqc(0);
-+	r8a7790_register_thermal();
- }
+ #define SMSTPCR2 0xe6150138
+ #define SMSTPCR3 0xe615013c
++#define SMSTPCR5 0xe6150144
+ #define SMSTPCR7 0xe615014c
  
- void __init r8a7790_timer_init(void)
+ #define MODEMR		0xE6160060
+@@ -182,6 +183,7 @@ static struct clk div6_clks[DIV6_NR] = {
+ enum {
+ 	MSTP721, MSTP720,
+ 	MSTP717, MSTP716,
++	MSTP522,
+ 	MSTP315, MSTP314, MSTP313, MSTP312, MSTP311, MSTP305, MSTP304,
+ 	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202,
+ 	MSTP_NR
+@@ -203,6 +205,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP204] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 4, 0), /* SCIFA0 */
+ 	[MSTP203] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 3, 0), /* SCIFA1 */
+ 	[MSTP202] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 2, 0), /* SCIFA2 */
++	[MSTP522] = SH_CLK_MSTP32(&extal_clk, SMSTPCR5, 22, 0), /* Thermal */
+ 	[MSTP717] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 17, 0), /* HSCIF0 */
+ 	[MSTP716] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 16, 0), /* HSCIF1 */
+ };
+@@ -254,6 +257,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
+ 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP717]),
+ 	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP716]),
++	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("ee200000.mmcif", &mstp_clks[MSTP315]),
+ 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
+ 	CLKDEV_DEV_ID("ee100000.sdhi", &mstp_clks[MSTP314]),
 -- 
 1.8.2.1
