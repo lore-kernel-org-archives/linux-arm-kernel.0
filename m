@@ -1,119 +1,50 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 27 Jun 2013 08:09:33 +0200
-Subject: [PATCH v2] arm64: add support for kernel mode NEON
-Message-ID: <1372313373-30718-1-git-send-email-ard.biesheuvel@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 27 Jun 2013 09:17:13 +0300
+Subject: [PATCH v2 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+In-Reply-To: <51CB0212.3050103@samsung.com>
+References: <1372170110-12993-1-git-send-email-s.nawrocki@samsung.com>
+ <20130625150649.GA21334@arwen.pp.htv.fi>
+ <51CB0212.3050103@samsung.com>
+Message-ID: <20130627061713.GF15455@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add <asm/neon.h> containing kernel_neon_begin/kernel_neon_end function
-declarations and corresponding definitions in fpsimd.c
+On Wed, Jun 26, 2013 at 05:00:34PM +0200, Sylwester Nawrocki wrote:
+> Hi,
+> 
+> On 06/25/2013 05:06 PM, Felipe Balbi wrote:
+> >> +static struct platform_driver exynos_video_phy_driver = {
+> >> > +	.probe	= exynos_video_phy_probe,
+> >
+> > you *must* provide a remove method. drivers with NULL remove are
+> > non-removable :-)
+> 
+> Actually the remove() callback can be NULL, it's just missing module_exit
+> function that makes a module not unloadable.
 
-These are needed to wrap uses of NEON in kernel mode. The names are
-identical to the ones used in arm/ so code using intrinsics or
-vectorized by GCC can be shared between arm and arm64.
+look at the implementation of platform_drv_remove():
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-Catalin,
+ 499 static int platform_drv_remove(struct device *_dev)
+ 500 {
+ 501         struct platform_driver *drv = to_platform_driver(_dev->driver);
+ 502         struct platform_device *dev = to_platform_device(_dev);
+ 503         int ret;
+ 504 
+ 505         ret = drv->remove(dev);
+ 506         if (ACPI_HANDLE(_dev))
+ 507                 acpi_dev_pm_detach(_dev, true);
+ 508 
+ 509         return ret;
+ 510 }
 
-Following a discussion with Will Deacon, I have switched back to just using
-preempt_disable, which should spot any violations of the no-sleep rule in a
-kernel_neon section in all configurations except non-PREEMPT combined with
-!CONFIG_DEBUG_ATOMIC_SLEEP (which probably accounts for all production servers,
-unfortunately)
+that's not a conditional call right :-)
 
 -- 
-Ard.
-
- arch/arm64/Kconfig            |  3 +++
- arch/arm64/include/asm/neon.h | 14 ++++++++++++++
- arch/arm64/kernel/fpsimd.c    | 32 ++++++++++++++++++++++++++++++++
- 3 files changed, 49 insertions(+)
- create mode 100644 arch/arm64/include/asm/neon.h
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 56b3f6d..46ba680 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -95,6 +95,9 @@ config SWIOTLB
- config IOMMU_HELPER
- 	def_bool SWIOTLB
- 
-+config KERNEL_MODE_NEON
-+	def_bool y
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
-new file mode 100644
-index 0000000..b0cc58a9
---- /dev/null
-+++ b/arch/arm64/include/asm/neon.h
-@@ -0,0 +1,14 @@
-+/*
-+ * linux/arch/arm64/include/asm/neon.h
-+ *
-+ * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#define cpu_has_neon()		(1)
-+
-+void kernel_neon_begin(void);
-+void kernel_neon_end(void);
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index e8b8357..07641c8 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -19,6 +19,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/preempt.h>
- #include <linux/sched.h>
- #include <linux/signal.h>
- 
-@@ -83,6 +84,37 @@ void fpsimd_flush_thread(void)
- 	fpsimd_load_state(&current->thread.fpsimd_state);
- }
- 
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+
-+/*
-+ * Kernel-side NEON support functions
-+ */
-+void kernel_neon_begin(void)
-+{
-+	/*
-+	 * Kernel mode NEON is only allowed outside of interrupt context
-+	 * with preemption disabled. This will make sure that the kernel
-+	 * mode NEON register contents never need to be preserved.
-+	 */
-+	BUG_ON(in_interrupt());
-+	preempt_disable();
-+
-+	if (current->mm)
-+		fpsimd_save_state(&current->thread.fpsimd_state);
-+}
-+EXPORT_SYMBOL(kernel_neon_begin);
-+
-+void kernel_neon_end(void)
-+{
-+	if (current->mm)
-+		fpsimd_load_state(&current->thread.fpsimd_state);
-+
-+	preempt_enable();
-+}
-+EXPORT_SYMBOL(kernel_neon_end);
-+
-+#endif /* CONFIG_KERNEL_MODE_NEON */
-+
- /*
-  * FP/SIMD support code initialisation.
-  */
--- 
-1.8.1.2
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130627/a1d667b6/attachment.sig>
