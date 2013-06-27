@@ -1,36 +1,56 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Thu, 27 Jun 2013 18:28:17 +0100
-Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
-In-Reply-To: <1372345790.2522.26.camel@dabdike>
-References: <51CA2B03.4080106@wwwdotorg.org>
- <CACxGe6vsBKnbipR-Zd1T9Ox1J2ugFmShrGXGUzPa_=D9TJvFQw@mail.gmail.com>
- <20130626135311.GA9078@rocoto.smurfnet.nu>
- <20130626135933.GQ22026@console-pimps.org>
- <1372257499.2168.5.camel@dabdike>
- <20130627013219.GA346@srcf.ucam.org>
- <CACxGe6uFkbuJ3BxM=A0Lu=jZQ79Ba8SmNsdBdTOO13szTfTZ=Q@mail.gmail.com>
- <1372314821.557.33.camel@dabdike>
- <20130627143714.GA12900@srcf.ucam.org>
- <1372345790.2522.26.camel@dabdike>
-Message-ID: <20130627172817.GB16316@srcf.ucam.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 27 Jun 2013 20:36:43 +0300
+Subject: [PATCH 2/8] clocksource: sun4i: Add clocksource and sched clock
+ drivers
+In-Reply-To: <20130627172144.GD4319@lukather>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1372281421-2099-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20130627060234.GD4824@tarshish> <20130627093558.GB8437@lukather>
+ <20130627094649.GM4824@tarshish> <20130627172144.GD4319@lukather>
+Message-ID: <20130627173643.GQ4824@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 08:09:50AM -0700, James Bottomley wrote:
-> On Thu, 2013-06-27 at 15:37 +0100, Matthew Garrett wrote:
-> > And yet it's the only mode in which the firmrware is actually tested 
-> > against an OS, so we don't have any real choice in the matter.
-> 
-> Agree for x86 ... we just have to cope with the implementations we see
-> in the field.  However, ARM has much more scope to have the UEFI
-> implementation developed collaboratively with Linux as the reference
-> platform.  If we can convince the ARM implementors that
-> SetVirtualAddressMap is an accident waiting to happen, they might be
-> more flexible.
+Hi Maxime,
 
-The majority of existing ARM UEFI implementations have only ever been 
-used to boot Windows, so like I said, this really isn't a safe 
-assumption.
+On Thu, Jun 27, 2013 at 07:21:44PM +0200, Maxime Ripard wrote:
+> On Thu, Jun 27, 2013 at 12:46:49PM +0300, Baruch Siach wrote:
+> > On Thu, Jun 27, 2013 at 11:35:58AM +0200, Maxime Ripard wrote:
+> > > On Thu, Jun 27, 2013 at 09:02:34AM +0300, Baruch Siach wrote:
+> > > > On Wed, Jun 26, 2013 at 11:16:55PM +0200, Maxime Ripard wrote:
+> > > > > +static u32 sun4i_timer_sched_read(void)
+> > > > 
+> > > > You commit message mentions "64 bits free running counter", but this one only 
+> > > > returns 32 bit.
+> > > 
+> > > Yeah, the callback setup by setup_sched_clock is supposed to be
+> > > returning a u32, and clocksource_mmio_init only accepts up to 32 bits as
+> > > well, so I'm only using the lower 32bits of this 64 bits counter.
+> > > 
+> > > I'll amend the commit log to state this.
+> > 
+> > But using 64 bit counter for sched_clock is much easier that using 32 bit one. 
+> 
+> Easier in what aspect? Both API looks similar.
+
+You can just implement your own simple sched_clock() that just returns the 
+current value of this 64 bit counter, and do away with all the tricky code in 
+kernel/time/sched_clock.c (in tip.git) that is needed to make the 32 -> 64 
+extension safe. This is not compatible with multi-platform kernel, though.
+
+> > You can either wait for the rest of Stephen's patch set 
+> > (http://thread.gmane.org/gmane.linux.ports.arm.msm/4092) before adding 64 
+> > bit, or you can just make the trivial change to the now generic 
+> > sched_clock code.
+> 
+> I'll wait for the Stephen's patches to be merged then, and add support
+> for 64bits counters to clocksource_mmio_init.
+
+Sound reasonable.
+
+baruch
 
 -- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
