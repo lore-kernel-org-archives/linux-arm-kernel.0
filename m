@@ -1,67 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 27 Jun 2013 12:08:40 +0200
-Subject: [PATCH] pinctrl: elaborate a bit on arrangements in doc
-In-Reply-To: <51CA08A2.4030204@wwwdotorg.org>
-References: <1372169952-22439-1-git-send-email-linus.walleij@stericsson.com>
- <51CA08A2.4030204@wwwdotorg.org>
-Message-ID: <CACRpkdZJ3oP9ARDhwZ1h8CkFXpDTznPChLiSgivTYKGDkWbOZA@mail.gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 27 Jun 2013 18:10:44 +0800
+Subject: [PATCH 05/11] ARM: tegra114: shut off the CPU rail when the
+ last CPU in suspend
+In-Reply-To: <51CB42A0.4070103@wwwdotorg.org>
+References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
+ <1372152475-18617-6-git-send-email-josephl@nvidia.com>
+ <51CB42A0.4070103@wwwdotorg.org>
+Message-ID: <1372327844.9389.31.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 11:16 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/25/2013 08:19 AM, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> This elaborates a bit on the pinctrl vs GPIO arangements
->> in the hardware.
->>
->> Inspired by some drawings in a mail from Christian
->> Ruppert.
-(...)
-> I'm not really sure quite what these diagrams are attempting to convey
-> within the context of this document.
+On Thu, 2013-06-27 at 03:36 +0800, Stephen Warren wrote:
+> On 06/25/2013 03:27 AM, Joseph Lo wrote:
+> > When the last CPU core in suspend, the CPU power rail can be turned off
+> > by setting flags to flow controller. Then the flow controller will inform
+> > PMC to turn off the CPU rail when the last CPU goes into suspend.
+> 
+> > diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+> 
+> > +	/* Turn off CRAIL */
+> > +	if (tegra_chip_id == TEGRA114) {
+> 
+> 
+> Presumably this new code is needed on Tegra114 and chips after it, so
+> not needing it is the exception? If so, I'd suggest the following
+> instead, so the code doesn't have to be modified for later chips:
+> 
+> switch (tegra_chip_id) {
+> case TEGRA20:
+> case TEGRA30:
+> 	break;
+> default:
+> 	the code you added
+> 	break;
+> }
+> 
 
-I am trying to help pinctrl kernel developers understand hardware
-terminology.
+Indeed. Good idea. Will fix.
 
->> +In (A) the GPIO-like functionality of the pin is *always* available.
->
-> Well, that can't really be true.
->
-> It may be possible that you can always read the physical pin's value via
-> a GPIO input register.
->
-> However, you obviously can't always write to a GPIO output register to
-> set the pin's value. If you could, the pin would simply be a GPIO, and
-> never serve any other function.
-
-This is possible on the U300. What happens in practice is
-that what you send out on the output from e.g. the I2C block is
-OR:ed with the GPIO output, so if that is not zero, you jam it to 1.
-
-> If you're saying that it's always possible to put the pin into a mode
-> where you can use the GPIO output register to driver the pin value, well
-> then that's just regular pin-muxing, so I'm not sure why it's worth
-> mentioning.
-
-That's not really the case. It can drive the pin at the same time.
-
-> In (a) there are really two levels of pinmux configuration, one in the
-> GPIO HW block (GPIO-vs-whatever-pinctrl-selects).
->
-> In (b) there is another level of pinmux configuration; some block has to
-> exist between the physical pins and both GPIO/pinctrl HW modules; it
-> simply isn't drawn in the diagram
-
-I've redrawn these a bit to reflect the cases I know exist.
-Check the v2 patch.
-
-> In all cases though, this is just attempting to enumerate different HW
-> designs for pin-muxing I think. Isn't it better to just let each SoC's
-> datasheet specify exactly how things are hooked up?
-
-The intention of this is to understand the datasheet from a kernel
-point of view.
-
-Yours,
-Linus Walleij
+Thanks.
