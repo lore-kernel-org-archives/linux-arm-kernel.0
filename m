@@ -1,43 +1,43 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 27 Jun 2013 11:05:06 +0200 (CEST)
-Subject: [linux-next PATCH] ARM: shmobile: marzen: defconfig: enable DMA
- engine support
-In-Reply-To: <20130627050007.GF28229@verge.net.au>
-References: <1642514.quKgForQrD@amdc1032> <20130626145252.GA4748@verge.net.au>
- <Pine.LNX.4.64.1306261700130.8856@axis700.grange>
- <20130627050007.GF28229@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1306271103470.19503@axis700.grange>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 27 Jun 2013 11:17:32 +0200
+Subject: [PATCH 3/4] hwmon: Add a simple driver to read the MXS SoC
+ temperature
+In-Reply-To: <20130626143927.GB31998@roeck-us.net>
+References: <1372236673-20725-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1372236673-20725-4-git-send-email-alexandre.belloni@free-electrons.com>
+ <20130626143927.GB31998@roeck-us.net>
+Message-ID: <20130627091732.GP5803@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Jun 2013, Simon Horman wrote:
-
-> On Wed, Jun 26, 2013 at 05:01:36PM +0200, Guennadi Liakhovetski wrote:
-> > Hi
+On Wed, Jun 26, 2013 at 07:39:27AM -0700, Guenter Roeck wrote:
+> On Wed, Jun 26, 2013 at 10:51:12AM +0200, Alexandre Belloni wrote:
+> > The low resolution ADC of the mxs is able to read an internal temperature
+> > sensor, expose that using hwmon.
 > > 
-> > On Wed, 26 Jun 2013, Simon Horman wrote:
-> > 
-> > > [ Cc linux-sh and Guennadi ]
-> > > 
-> > > I have not looked into this closely but it seems to me that
-> > > it would be more robust to resolve this problem using Kconfig.
-> > 
-> > I still think this
-> > 
-> > https://patchwork.kernel.org/patch/2640051/
-> > 
-> > is a proper fix. We cannot and do not want to force building shdma on all
-> > platforms, where SDHI or any other potential shdma client is built. It is
-> > perfectly valid to build SDHI with no DMA support, which is exactly what
-> > that patch makes possible.
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > ---
 > 
-> That is fine by me. Is there anything I can do to help move it forward?
+> Wouldn't it make more sense to use iio-hwmon and improve it if necessary ?
 
-Well, you could reply to that thread with your ack or something...
+Actually, I wonder if we should not just put the hwmon driver
+capabilities directly into the mxs-lradc driver, just like it's already
+been done in this driver for the touchscreen support.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+The probing of this hwmon driver doesn't really belong to the DT, it's
+not really realistic to probe it from the machine definition, and it
+really is the IP that is wired that way.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130627/c335f37b/attachment.sig>
