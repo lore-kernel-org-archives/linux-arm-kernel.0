@@ -1,83 +1,71 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 27 Jun 2013 14:00:08 +0900
-Subject: [linux-next PATCH] ARM: shmobile: marzen: defconfig: enable DMA
- engine support
-In-Reply-To: <Pine.LNX.4.64.1306261700130.8856@axis700.grange>
-References: <1642514.quKgForQrD@amdc1032> <20130626145252.GA4748@verge.net.au>
- <Pine.LNX.4.64.1306261700130.8856@axis700.grange>
-Message-ID: <20130627050007.GF28229@verge.net.au>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Wed, 26 Jun 2013 22:19:27 -0700 (PDT)
+Subject: [PATCH v5 1/3] ARM: shmobile: r8a7778: add VIN support
+In-Reply-To: <201306220328.47110.sergei.shtylyov@cogentembedded.com>
+References: <201306220326.46176.sergei.shtylyov@cogentembedded.com>
+ <201306220328.47110.sergei.shtylyov@cogentembedded.com>
+Message-ID: <877ghg2krp.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 05:01:36PM +0200, Guennadi Liakhovetski wrote:
-> Hi
-> 
-> On Wed, 26 Jun 2013, Simon Horman wrote:
-> 
-> > [ Cc linux-sh and Guennadi ]
-> > 
-> > I have not looked into this closely but it seems to me that
-> > it would be more robust to resolve this problem using Kconfig.
-> 
-> I still think this
-> 
-> https://patchwork.kernel.org/patch/2640051/
-> 
-> is a proper fix. We cannot and do not want to force building shdma on all
-> platforms, where SDHI or any other potential shdma client is built. It is
-> perfectly valid to build SDHI with no DMA support, which is exactly what
-> that patch makes possible.
 
-That is fine by me. Is there anything I can do to help move it forward?
+Hi
 
-> Thanks
-> Guennadi
+I have 2 small comments
+
+But, basically, I have no objection to this patch.
+
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 > 
-> > 
-> > On Wed, Jun 26, 2013 at 12:02:55PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> > > From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > > Subject: [linux-next PATCH] ARM: shmobile: marzen: defconfig: enable DMA engine support
-> > > 
-> > > Building marzen_defconfig for next-20130626 results in the following
-> > > build error:
-> > > 
-> > > drivers/built-in.o: In function `sh_mobile_sdhi_probe':
-> > > /home/bzolnier/sam/linux-sprc/drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to `shdma_chan_filter'
-> > > 
-> > > Fix it by adding CONFIG_DMADEVICES=y line to marzen_defconfig. This
-> > > will result in CONFIG_SH_DMAE_BASE being enabled by default and the
-> > > needed code being build.
-> > > 
-> > > Cc: Stephen Rothwell <sfr@canb.auug.org.au>
-> > > Cc: Simon Horman <horms@verge.net.au>
-> > > Cc: Magnus Damm <magnus.damm@gmail.com>
-> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > > ---
-> > >  arch/arm/configs/marzen_defconfig |    1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > Index: b/arch/arm/configs/marzen_defconfig
-> > > ===================================================================
-> > > --- a/arch/arm/configs/marzen_defconfig	2013-06-21 12:04:24.813681807 +0200
-> > > +++ b/arch/arm/configs/marzen_defconfig	2013-06-25 16:43:40.730367398 +0200
-> > > @@ -96,6 +96,7 @@ CONFIG_USB_STORAGE=y
-> > >  CONFIG_NEW_LEDS=y
-> > >  CONFIG_LEDS_CLASS=y
-> > >  CONFIG_LEDS_GPIO=y
-> > > +CONFIG_DMADEVICES=y
-> > >  CONFIG_UIO=y
-> > >  CONFIG_UIO_PDRV_GENIRQ=y
-> > >  # CONFIG_IOMMU_SUPPORT is not set
-> > > 
-> > 
+> Add VIN clocks and platform devices on R8A7778 SoC; add function to register
+> the VIN platform devices.
+> 
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> [Sergei: added 'id' parameter check to r8a7779_add_vin_device(), used '*pdata'
+> in *sizeof* operator there, renamed some variables, annotated 'vin[01]_info' and
+> vin[01]_resources[] as '__initdata'.]
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
 > ---
-> Guennadi Liakhovetski, Ph.D.
-> Freelance Open-Source Software Developer
-> http://www.open-technology.de/
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Changes since version 4:
+> - resolved reject, refreshed the patch.
 > 
+> Changes since version 3:
+> - changed the VIN platform device names to be R8A7778 specific; 
+> - resolved reject in <mach/r8a7778.h>  due to USB patch rework.
+> 
+> Changes from version 2:
+> - annotated 'vin[01]_info' and vin[01]_resources[] as '__initdata' since they're
+>   kmemdup()'ed while registering the platform devices anyway;
+> - refreshed the patch.
+> 
+>  arch/arm/mach-shmobile/clock-r8a7778.c        |    5 +++
+>  arch/arm/mach-shmobile/include/mach/r8a7778.h |    3 ++
+>  arch/arm/mach-shmobile/setup-r8a7778.c        |   33 ++++++++++++++++++++++++++
+>  3 files changed, 41 insertions(+)
+
+Simon (or ARM Maintainer ?) will be happy if clock was separated ?
+
+> Index: renesas/arch/arm/mach-shmobile/clock-r8a7778.c
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/clock-r8a7778.c
+> +++ renesas/arch/arm/mach-shmobile/clock-r8a7778.c
+> @@ -106,6 +106,7 @@ enum {
+>  	MSTP331,
+>  	MSTP323, MSTP322, MSTP321,
+>  	MSTP114,
+> +	MSTP110, MSTP109,
+>  	MSTP100,
+>  	MSTP030,
+
+MSTP114, MSTP110
+MSTP109, MSTP100
+
+is better
+
+
+Best regards
+---
+Kuninori Morimoto
