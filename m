@@ -1,90 +1,58 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 27 Jun 2013 11:47:56 +0200
-Subject: [PATCH 1/3] ARM: shmobile: r8a73a4: add clocks for I2C controllers
-In-Reply-To: <1372326479-15028-1-git-send-email-g.liakhovetski@gmx.de>
-References: <1372326479-15028-1-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <1372326479-15028-2-git-send-email-g.liakhovetski@gmx.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 27 Jun 2013 11:54:11 +0200
+Subject: [linux-sunxi] [PATCH 0/8] clocksource: sunxi: Timer fixes and
+ cleanup
+In-Reply-To: <20130627094307.GC8437@lukather>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+ <51CC0566.8010302@redhat.com> <20130627094307.GC8437@lukather>
+Message-ID: <51CC0BC3.5090309@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-r8a73a4 SoCs have numerous I2C controllers, of which 9 are compatible with
-the i2c-sh_mobile.c driver. This patch adds clock definitions for them.
+Hi,
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
----
- arch/arm/mach-shmobile/clock-r8a73a4.c |   25 +++++++++++++++++++++++--
- 1 files changed, 23 insertions(+), 2 deletions(-)
+On 06/27/2013 11:43 AM, Maxime Ripard wrote:
+> On Thu, Jun 27, 2013 at 11:27:02AM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 06/26/2013 11:16 PM, Maxime Ripard wrote:
+>>> Hi everyone,
+>>>
+>>
+>> <snip>
+>>
+>>> It also finally adds a clocksource from the free running counter found in the
+>>> A10/A13 SoCs.
+>>
+>> Hmm, have you benchmarked this? There have been reports from linux-sunxi kernel
+>> users (xbmc project) that the waiting for the latch is quite slow. Note we
+>> don't have anything better yet in the linux-sunxi kernel.
+>
+> No. I didn't.
+>
+> Do you have any pointers to these discussions?
+>
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-index cbf9852..508cb1e 100644
---- a/arch/arm/mach-shmobile/clock-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-@@ -30,6 +30,7 @@
- 
- #define SMSTPCR2 0xe6150138
- #define SMSTPCR3 0xe615013c
-+#define SMSTPCR4 0xe6150140
- #define SMSTPCR5 0xe6150144
- 
- #define FRQCRA		0xE6150000
-@@ -487,8 +488,10 @@ static struct clk div6_clks[DIV6_NR] = {
- /* MSTP */
- enum {
- 	MSTP217, MSTP216, MSTP207, MSTP206, MSTP204, MSTP203,
--	MSTP315, MSTP314, MSTP313, MSTP312, MSTP305,
--	MSTP522,
-+	MSTP323, MSTP318, MSTP317, MSTP316,
-+	MSTP315, MSTP314, MSTP313, MSTP312, MSTP305, MSTP300,
-+	MSTP411, MSTP410, MSTP409,
-+	MSTP522, MSTP515,
- 	MSTP_NR
- };
- 
-@@ -499,12 +502,21 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP207] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 7, 0), /* SCIFB1 */
- 	[MSTP216] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 16, 0), /* SCIFB2 */
- 	[MSTP217] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 17, 0), /* SCIFB3 */
-+	[MSTP300] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 0, 0), /* IIC2 */
- 	[MSTP305] = SH_CLK_MSTP32(&div6_clks[DIV6_MMC1],SMSTPCR3, 5, 0), /* MMCIF1 */
- 	[MSTP312] = SH_CLK_MSTP32(&div6_clks[DIV6_SDHI2],SMSTPCR3, 12, 0), /* SDHI2 */
- 	[MSTP313] = SH_CLK_MSTP32(&div6_clks[DIV6_SDHI1],SMSTPCR3, 13, 0), /* SDHI1 */
- 	[MSTP314] = SH_CLK_MSTP32(&div6_clks[DIV6_SDHI0],SMSTPCR3, 14, 0), /* SDHI0 */
- 	[MSTP315] = SH_CLK_MSTP32(&div6_clks[DIV6_MMC0],SMSTPCR3, 15, 0), /* MMCIF0 */
-+	[MSTP316] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 16, 0), /* IIC6 */
-+	[MSTP317] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 17, 0), /* IIC7 */
-+	[MSTP318] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 18, 0), /* IIC0 */
-+	[MSTP323] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 23, 0), /* IIC1 */
-+	[MSTP409] = SH_CLK_MSTP32(&main_div2_clk,	SMSTPCR4, 9, 0), /* IIC5 */
-+	[MSTP410] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR4, 10, 0), /* IIC4 */
-+	[MSTP411] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR4, 11, 0), /* IIC3 */
- 	[MSTP522] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR5, 22, 0), /* Thermal */
-+	[MSTP515] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR5, 15, 0), /* IIC8 */
- };
- 
- static struct clk_lookup lookups[] = {
-@@ -549,6 +561,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP216]),
- 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP217]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
-+	CLKDEV_DEV_ID("e6520000.i2c", &mstp_clks[MSTP300]),
- 	CLKDEV_DEV_ID("sh_mmcif.1", &mstp_clks[MSTP305]),
- 	CLKDEV_DEV_ID("ee220000.mmcif", &mstp_clks[MSTP305]),
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP312]),
-@@ -559,6 +572,14 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("ee100000.sdhi", &mstp_clks[MSTP314]),
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
- 	CLKDEV_DEV_ID("ee200000.mmcif", &mstp_clks[MSTP315]),
-+	CLKDEV_DEV_ID("e6550000.i2c", &mstp_clks[MSTP316]),
-+	CLKDEV_DEV_ID("e6560000.i2c", &mstp_clks[MSTP317]),
-+	CLKDEV_DEV_ID("e6500000.i2c", &mstp_clks[MSTP318]),
-+	CLKDEV_DEV_ID("e6510000.i2c", &mstp_clks[MSTP323]),
-+	CLKDEV_DEV_ID("e60b0000.i2c", &mstp_clks[MSTP409]),
-+	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP410]),
-+	CLKDEV_DEV_ID("e6530000.i2c", &mstp_clks[MSTP411]),
-+	CLKDEV_DEV_ID("e6570000.i2c", &mstp_clks[MSTP515]),
- 
- 	/* for DT */
- 	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
--- 
-1.7.2.5
+The original discussion should be somewhere here:
+https://groups.google.com/forum/#!forum/linux-sunxi
+
+But I could not find it (it is probably hidden under
+an unlogical subject).
+
+Looking at my own notes (a small TODO file), I've
+written down that the reporter reports:
+
+  -current clocksource can cause us to run with interrupts disabled for 17%
+   of the time, see "perf top" output
+
+This is with a workload which does a lot of gettimeofday
+calls.
+
+I notice that unlike the sunxi-3.4 code you don't do any locking,
+so how do you stop 2 clocksource calls from racing (and thus
+getting a possible wrong value because of things not
+being properly latched) ?
+
+Regards,
+
+Hans
