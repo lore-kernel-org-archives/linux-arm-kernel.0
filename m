@@ -1,68 +1,48 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 27 Jun 2013 08:39:40 -0500
-Subject: [PATCH] Documentation: dt: bindings: TI WiLink modules
-In-Reply-To: <1372339810.8383.20.camel@cumari.coelho.fi>
-References: <1372149330-24335-1-git-send-email-coelho@ti.com>
- <51CBC1C8.1040301@gmail.com>
- <1372322851.18889.53.camel@cumari.coelho.fi>
- <20130627125131.GA27285@kahuna>
- <1372337887.8383.12.camel@cumari.coelho.fi>
- <CAGo_u6qbt9dANgKq49xR=1qsCpUBhmVaPL4EK04XvTw+=4Z23g@mail.gmail.com>
- <1372339148.8383.17.camel@cumari.coelho.fi>
- <51CC3CEE.3050004@ti.com>
- <1372339810.8383.20.camel@cumari.coelho.fi>
-Message-ID: <CAGo_u6pWZX9gbHgBae=gcWk8i6-TnhxH1TdM9QdEDLTow6Pn5A@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 27 Jun 2013 15:49:00 +0200
+Subject: Chipidea usb otg support for IMX/MXS (device functionality)
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803EFBC6C@039-SN2MPN1-023.039d.mgd.msft.net>
+References: <51A5A808.2070803@digi.com> <201306241551.19831.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803EFBC6C@039-SN2MPN1-023.039d.mgd.msft.net>
+Message-ID: <201306271549.01136.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 8:30 AM, Luciano Coelho <coelho@ti.com> wrote:
-> On Thu, 2013-06-27 at 08:23 -0500, Nishanth Menon wrote:
->> On 06/27/2013 08:19 AM, Luciano Coelho wrote:
->> > On Thu, 2013-06-27 at 08:15 -0500, Nishanth Menon wrote:
->> >> On Thu, Jun 27, 2013 at 7:58 AM, Luciano Coelho <coelho@ti.com> wrote:
->> >>> For the actual DTS files, I could add a wilink.dtsi with enumerations
->> >>> for these values so they could be used in the node definitions.  But I'm
->> >>> not sure it's going to be that valuable in the end.
->> >> The  way GPIO HIGH was defined might help to provide guidance I think :)
->> >
->> > Where? As far as I can see, the GPIO flags are defined in a bitmap.
->>
->> include/dt-bindings/gpio/gpio.h
->
-> Thanks! I don't see these macros used anywhere, though.
-umm... I'd think you have'nt looked deep enough / lists :)
+Hi Peter,
 
->
->> And corresponding kernel header:
->> include/linux/of_gpio.h
->
-> This seems to be a completely different thing.  This is the header that
-> contains the helper functions to get GPIO-related device tree nodes,
-> isn't it?
-That is true, but it also contains the flag for level which needs to
-be in sync with the gpio.h dts header.
->> just a hint. not saying frequencies were defined in header. for systems
->> that define frequencies - example cpufreq OPPs, clock node usage, we do
->> not use indexing to frequency, instead, that is the responsibility of
->> driver to convert frequency back to required index.
->> git grep frequency Documentation/devicetree/bindings gives you how the
->> precedence looks like.
->>
->> Personally, if given a choice, I'd go with actual frequencies rather
->> than indexes.
->
-> If I do that, I need to add also a separate flag to define whether the
-> XTAL clock is used or not.  For instance, we have 26MHz and 26MHz
-> crystal; and 38.4MHz and 38.4MHz crystal...
-Yes, you would have to. at the same time, it is easy for module maker
-to provide dtsi corresponding to exact h/w representation on his
-module using wilink chip without being worried about weird index value
-whose meaning is hidden in binding
-On the flip side, It also allows driver to reject frequencies /
-configurations that are not supported by the corresponding chip.
+> > No, I don't have this one available right now. I tried both MX23
+> > Olinuxino maxi
+> > (I just mutilated the board so that I cut traces to the USB devices on
+> > the board
+> > and routed out USB gadget connector) and a custom MX23 board.
+> > 
+> > Note that both have working USB peripheral mode in U-Boot too, but the
+> > driver in
+> > U-Boot is very minimalistic.
+> 
+> You mean, the larger data transfer with USB peripheral mode is ok at
+> u-boot? but it can't work at Linux Kernel?
 
-As I said, just my 2 cents. Personally, I'd like dts files to be as
-readable as c files without having to dig through bindings document.
+I stumbled across one more problem with the patches:
 
-Regards,
-Nishanth Menon
+- I use OTG on MX28
+- I configured the USB ID pin
+- I set the dr_mode to "otg"
+(so far so good)
+- I use the port in HOST mode by plugging in a USB pendrive over the OTG-capable 
+reduction ; this works OK
+- I disconnect the reduction and connect it to the computer ; here I get 
+"timeout waiting for 00000800 in 11".
+
+This means the BSV bit in OTGSC register wasn't unset.
+
+Interestingly enough, transition the other way around (first use in gadget mode 
+then in host mode) works fine, but if I do host mode -> gadget mode, I get the 
+timeout. Do you have any hint for me?
+
+btw. what is the plan about cleaning up and upstreaming all these patches we 
+have here? Is anyone working on it? I'd hate to stomp on anyones' efforts,but 
+I'd also like to see this mess sorted out.
+
+Best regards,
+Marek Vasut
