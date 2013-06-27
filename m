@@ -1,61 +1,46 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 27 Jun 2013 11:29:34 +0200
-Subject: [PATCH 0/2] arm: add early_ioremap() support
-In-Reply-To: <3503040.vhYAL5xGgS@wuerfel>
-References: <1372182401-11029-1-git-send-email-leif.lindholm@linaro.org>
- <201306270013.55333.arnd@arndb.de>
- <20130626232504.GB18151@rocoto.smurfnet.nu>
- <3503040.vhYAL5xGgS@wuerfel>
-Message-ID: <20130627092934.GD18151@rocoto.smurfnet.nu>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 27 Jun 2013 11:31:06 +0200
+Subject: [RFC PATCH v2 03/12] dmaengine: PL08x: Rework LLI handling to be
+ less fragile
+In-Reply-To: <2212577.G2ANCYONVo@flatron>
+References: <1371933764-24875-1-git-send-email-tomasz.figa@gmail.com>
+ <1371933764-24875-4-git-send-email-tomasz.figa@gmail.com>
+ <CACRpkdYm7gFVLzRpQ2J97M+-zQAug_ftJhyi_kniTgCk=GT_bQ@mail.gmail.com>
+ <2212577.G2ANCYONVo@flatron>
+Message-ID: <CACRpkdYx_K9OkDDcXtHCwg4U3tB+1p3uj35-090sdoH6PU5OZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 10:47:21AM +0200, Arnd Bergmann wrote:
-> > No, the purpose is just like for x86 - do early parsing of things like
-> > the UEFI system and configuration tables, DMI and ACPI, in order to
-> > populate global structs and stuff.
-> 
-> But are those tables actually in MMIO registers? I thought they
-> are just memory, and in that case using any form of ioremap is
-> wrong on ARM. Why do you even have to map them? Can't the boot
-> loader pass those tables in regular addressable memory?
- 
-Don't get too stuck on the name - x86 frequently uses *ioremap() in
-many places when just accessing memory, and that has carried into EFI,
-ACPI and DMI subsystems, which we now want to use on ARM. In fact, they
-have early_memremap(), but don't use it for either EFI or ACPI.
+On Thu, Jun 27, 2013 at 12:04 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 
-The ia64 implementation actually performs a lookup in the EFI memmap
-to decide whether early_ioremap() returns cacheable memory or not
-(and falls back to noncacheable before memory map is available).
+>> > +#define MAX_NUM_TSFR_LLIS      512
+>>
+>> And I like this nice side effect that we allocate a number of LLIs
+>> rather than a fixed-size buffer.
+>
+> As we're at it, is there any reason to choose this particular number of
+> LLis? I have calculated it from the buffer size defined originally, but I
+> wonder if 512 LLIs for single transfer isn't too much?
 
-That said, I had somehow managed to get into my mind that the kernel
-used -fno-unaligned-access, so thought MT_DEV_NONSHARED was safe.
-Clearly it isn't, so that will need to change, making the semantic
-match even worse...
+Hm that would be some kind of rule-of-thumb thing.
 
-As for the need of mapping - some of these descriptors are needed very
-early in the boot process. Also, depending on platform, they may reside
-at any offset from start of RAM (<2^32 physical address), rendering
-__va()/__phys_to_virt()/... unusable.
+It depends on the typical DMA request size divided by the max
+bytes you can stash into an LLI in the smallest case.
 
-> > Well, I did have a crazy idea that much/most of the early_ioremap code
-> > could be made generic and shared between x86 and arm (and any other
-> > 32-bit architecture). Using the fixmap macros would make that possible
-> > with a minimum of ifdefs.
-> > 
-> > If we ever wanted early_ioremap() to work like on x86, beyond kmap_init()
-> > (but not beyond the "booting" system state), using the same macros would
-> > help there too. I had no need for that for my EFI patches.
-> 
-> I guess I need to look at the EFI patches first. It sounds to me
-> like you shouldn't actually be using early_ioremap here or on another
-> architecture.
+For example when issueing things like this:
 
-No, but I had been kind of hoping not having to rework the early memory
-initialisation for three subsystems on two other platforms in order to
-be able to merge common code between them. And it would have felt silly
-to invent a new mechanism just for ARM, preventing that option.
+dd if=/dev/mmc0 of=/dev/null
 
-/
-    Leif
+you can get *really* large LLI lists, maybe if you want to make
+a real engineering exercise you could instrument the code to
+accumulate a few stats and run this stressful usecase on the
+S3C and see where you end up?
+
+Then calculate backwards for the smaller LLI chunks of the
+unmodified PL08x and get a proper estimate.
+
+One way forward would be not to hardcode this as a
+#define but making it a field of the vendor data I guess.
+
+Yours,
+Linus Walleij
