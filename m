@@ -1,29 +1,30 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 27 Jun 2013 09:48:41 -0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable FSL_LPUART support
-Message-ID: <1372337321-8068-1-git-send-email-fabio.estevam@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Jun 2013 15:01:18 +0200
+Subject: [PATCH v4 0/4] Renesas sh-sci updates for v3.11
+In-Reply-To: <1372236787-23342-1-git-send-email-horms+renesas@verge.net.au>
+References: <1372236787-23342-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <201306271501.18968.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the FSL_LPUART driver as it is used by the VF610 family.
+On Wednesday 26 June 2013, Simon Horman wrote:
+> This revised pull-request includes a build-warning fix by myself.
+> The build-warning was reported by Arnd and has been acked by Greg
+> Kroah-Hartman.
+> 
+> I apologise that this is now coming very late in the cycle, this is
+> mostly due to the time it took to address the build-warning.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+Ok. I've also had a simple merge conflict here, better make sure
+it's ok now.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 0837aae..2353bde 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -133,6 +133,8 @@ CONFIG_VT_HW_CONSOLE_BINDING=y
- # CONFIG_DEVKMEM is not set
- CONFIG_SERIAL_IMX=y
- CONFIG_SERIAL_IMX_CONSOLE=y
-+CONFIG_SERIAL_FSL_LPUART=y
-+CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
- CONFIG_HW_RANDOM=y
- CONFIG_HW_RANDOM_MXC_RNGA=y
- CONFIG_I2C=y
--- 
-1.8.1.2
+Pulled into next/late.
+
+> I also apologise that I have not yet addressed your request to
+> drop your addresses from the CC list of the patch emails
+> that follow this one. I will do so before I start sending patches
+> for v3.12.
+
+No worries.
+
+	Arnd
