@@ -1,39 +1,56 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 27 Jun 2013 18:20:39 +0800
-Subject: [PATCH] arch: arm64: include: asm: add pci.h to pass compiling
-In-Reply-To: <9028702.KGsxCx1772@wuerfel>
-References: <51CA5F71.207@asianux.com> <20130626140730.GB23309@arm.com>
- <51CB87B0.8030805@asianux.com> <9028702.KGsxCx1772@wuerfel>
-Message-ID: <51CC11F7.2060306@asianux.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 27 Jun 2013 18:22:37 +0800
+Subject: [PATCH 06/11] ARM: tegra114: hook tegra_tear_down_cpu function
+In-Reply-To: <20130627101335.GB15081@mithrandir>
+References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
+ <1372152475-18617-7-git-send-email-josephl@nvidia.com>
+ <20130627101335.GB15081@mithrandir>
+Message-ID: <1372328557.9389.40.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2013 04:43 PM, Arnd Bergmann wrote:
-> On Thursday 27 June 2013 08:30:40 Chen Gang wrote:
->> > On 06/26/2013 10:07 PM, Catalin Marinas wrote:
->>> > > On Wed, Jun 26, 2013 at 04:26:41AM +0100, Chen Gang wrote:
->>> > > I wonder whether it makes sense to include pci-dma-compat.h in
->>> > > asm-generic/pci.h, I don't see why one would want the generic pci.h but
->>> > > not the generic pci-dma-compat.h (cc'ing Arnd).
->> > 
->> > I think, it will let architecture guys easier to add their own
->> > pci-dma-compat.h (although they still need generic pci_dma_compat.h, and
->> > generic pci.h, too).
->> > 
->> > e.g. one architecture want include generic pci-dma-compat.h firstly,
->> > then define its own features in its own pci-dma-compat.h.
-> I think there is no excuse for still keeping the asm-generic/pci-dma-compat.h
-> header around any more.
+On Thu, 2013-06-27 at 18:13 +0800, Thierry Reding wrote:
+> * PGP Signed by an unknown key
 > 
-> All architectures use the same implementation and have done so for years.
-> We should just convert the remaining users to use the dma_mapping.h
-> interfaces directly.
+> On Tue, Jun 25, 2013 at 05:27:50PM +0800, Joseph Lo wrote:
+> > Hooking tegra_tear_down_cpu for Tegra114 for supporting cluster power
+> > down when CPU cluster suspneded in LP2.
+> > 
+> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> > ---
+> >  arch/arm/mach-tegra/pm.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+> > index 94e69be..a0668a2 100644
+> > --- a/arch/arm/mach-tegra/pm.c
+> > +++ b/arch/arm/mach-tegra/pm.c
+> > @@ -52,6 +52,7 @@ static void tegra_tear_down_cpu_init(void)
+> >  			tegra_tear_down_cpu = tegra20_tear_down_cpu;
+> >  		break;
+> >  	case TEGRA30:
+> > +	case TEGRA114:
+> >  		if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC))
+> >  			tegra_tear_down_cpu = tegra30_tear_down_cpu;
+> 
+> This is getting a little weird. Suppose I want to build a Tegra114 only
+> kernel. With the above code it means the tegra_tear_down_cpu won't be
+> hooked because ARCH_TEGRA_3x_SOC isn't selected.
+> 
+Oops. You are right. Will fix.
 
-in "asm-generic/pci-dma-compat.h", it include "linux/dma-mapping.h" firstly.
+> Perhaps tegra30_tear_down_cpu() should be built unconditionally so that
+> it's always available?
+The tegra30_tear_down_cpu will be built for both Tegra30 or Tegra114.
 
-So can we say it also has additional features (at least for compatible
-old things) which "dma-mapping.h" not have ?
+> 
+> There are other alternatives like adding another Kconfig symbol which
+> doesn't cover all of Tegra30 but only code shared with Tegra114 (and
+> possible future chips) or building sleep-tegra30.S if either one of the
+> ARCH_TEGRA_3x_SOC or ARCH_TEGRA_114_SOC symbols is selected.
+> 
+Yes, we building "sleep-tegra30.S" when either one of the
+ARCH_TEGRA_3x_SOC or ARCH_TEGRA_114_SOC symbols is selected.
 
-Thanks.
--- 
-Chen Gang
+Thanks,
+Joseph
