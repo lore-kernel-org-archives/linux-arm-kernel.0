@@ -1,166 +1,239 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 27 Jun 2013 09:22:09 +0200
-Subject: [PATCH 1/3] ARM: imx: prepare for removal of flexcan_platform_data
+Date: Thu, 27 Jun 2013 09:22:10 +0200
+Subject: [PATCH 2/3] can: flexcan: Use a regulator to control the CAN
+ transceiver
 In-Reply-To: <1372317731-24966-1-git-send-email-mkl@pengutronix.de>
 References: <1372317731-24966-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1372317731-24966-2-git-send-email-mkl@pengutronix.de>
+Message-ID: <1372317731-24966-3-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As there are no imx in-tree users of flexcan_platform_data, this patch removes
-the possibility to register a flexcan device with platform data.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-The functionality to swith on/off CAN transceivers is added to DT via
-regulators on a later patch.
+Instead of using a GPIO to turn on/off the CAN transceiver, it is better to
+use a regulator as some systems may use a PMIC to power the CAN transceiver.
 
-Compile time tested with imx_v4_v5_defconfig and imx_v6_v7_defconfig.
-
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 ---
- arch/arm/mach-imx/devices-imx25.h              | 8 ++++----
- arch/arm/mach-imx/devices-imx35.h              | 8 ++++----
- arch/arm/mach-imx/devices/devices-common.h     | 4 +---
- arch/arm/mach-imx/devices/platform-flexcan.c   | 5 ++---
- arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c | 2 +-
- arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c | 2 +-
- arch/arm/mach-imx/mach-mx25_3ds.c              | 2 +-
- arch/arm/mach-imx/mach-pcm043.c                | 2 +-
- 8 files changed, 15 insertions(+), 18 deletions(-)
+ .../devicetree/bindings/net/can/fsl-flexcan.txt    |  2 +
+ arch/arm/boot/dts/imx28-evk.dts                    | 12 ++++++
+ arch/arm/mach-mxs/mach-mxs.c                       | 50 +---------------------
+ drivers/net/can/flexcan.c                          | 25 +++++------
+ 4 files changed, 28 insertions(+), 61 deletions(-)
 
-diff --git a/arch/arm/mach-imx/devices-imx25.h b/arch/arm/mach-imx/devices-imx25.h
-index 0d2922b..769563f 100644
---- a/arch/arm/mach-imx/devices-imx25.h
-+++ b/arch/arm/mach-imx/devices-imx25.h
-@@ -13,10 +13,10 @@ extern const struct imx_fec_data imx25_fec_data;
- 	imx_add_fec(&imx25_fec_data, pdata)
+diff --git a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+index 8ff324e..56d6cc3 100644
+--- a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
++++ b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+@@ -16,6 +16,8 @@ Optional properties:
  
- extern const struct imx_flexcan_data imx25_flexcan_data[];
--#define imx25_add_flexcan(id, pdata)	\
--	imx_add_flexcan(&imx25_flexcan_data[id], pdata)
--#define imx25_add_flexcan0(pdata)	imx25_add_flexcan(0, pdata)
--#define imx25_add_flexcan1(pdata)	imx25_add_flexcan(1, pdata)
-+#define imx25_add_flexcan(id)	\
-+	imx_add_flexcan(&imx25_flexcan_data[id])
-+#define imx25_add_flexcan0()		imx25_add_flexcan(0)
-+#define imx25_add_flexcan1()		imx25_add_flexcan(1)
+ - clock-frequency : The oscillator frequency driving the flexcan device
  
- extern const struct imx_fsl_usb2_udc_data imx25_fsl_usb2_udc_data;
- #define imx25_add_fsl_usb2_udc(pdata)	\
-diff --git a/arch/arm/mach-imx/devices-imx35.h b/arch/arm/mach-imx/devices-imx35.h
-index e2675f1..780d824 100644
---- a/arch/arm/mach-imx/devices-imx35.h
-+++ b/arch/arm/mach-imx/devices-imx35.h
-@@ -17,10 +17,10 @@ extern const struct imx_fsl_usb2_udc_data imx35_fsl_usb2_udc_data;
- 	imx_add_fsl_usb2_udc(&imx35_fsl_usb2_udc_data, pdata)
++- xceiver-supply: Regulator that powers the CAN transceiver
++
+ Example:
  
- extern const struct imx_flexcan_data imx35_flexcan_data[];
--#define imx35_add_flexcan(id, pdata)	\
--	imx_add_flexcan(&imx35_flexcan_data[id], pdata)
--#define imx35_add_flexcan0(pdata)	imx35_add_flexcan(0, pdata)
--#define imx35_add_flexcan1(pdata)	imx35_add_flexcan(1, pdata)
-+#define imx35_add_flexcan(id)	\
-+	imx_add_flexcan(&imx35_flexcan_data[id])
-+#define imx35_add_flexcan0()		imx35_add_flexcan(0)
-+#define imx35_add_flexcan1()		imx35_add_flexcan(1)
+ 	can at 1c000 {
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index 3637bf3..1f0d38d 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -155,12 +155,14 @@
+ 			can0: can at 80032000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&can0_pins_a>;
++				xceiver-supply = <&reg_can_3v3>;
+ 				status = "okay";
+ 			};
  
- extern const struct imx_imx2_wdt_data imx35_imx2_wdt_data;
- #define imx35_add_imx2_wdt()       \
-diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
-index 453e20b..c13b76b 100644
---- a/arch/arm/mach-imx/devices/devices-common.h
-+++ b/arch/arm/mach-imx/devices/devices-common.h
-@@ -50,7 +50,6 @@ struct platform_device *__init imx_add_fec(
- 		const struct imx_fec_data *data,
- 		const struct fec_platform_data *pdata);
- 
--#include <linux/can/platform/flexcan.h>
- struct imx_flexcan_data {
- 	int id;
- 	resource_size_t iobase;
-@@ -58,8 +57,7 @@ struct imx_flexcan_data {
- 	resource_size_t irq;
- };
- struct platform_device *__init imx_add_flexcan(
--		const struct imx_flexcan_data *data,
--		const struct flexcan_platform_data *pdata);
-+		const struct imx_flexcan_data *data);
- 
- #include <linux/fsl_devices.h>
- struct imx_fsl_usb2_udc_data {
-diff --git a/arch/arm/mach-imx/devices/platform-flexcan.c b/arch/arm/mach-imx/devices/platform-flexcan.c
-index 1078bf0..55d61ea 100644
---- a/arch/arm/mach-imx/devices/platform-flexcan.c
-+++ b/arch/arm/mach-imx/devices/platform-flexcan.c
-@@ -38,8 +38,7 @@ const struct imx_flexcan_data imx35_flexcan_data[] __initconst = {
- #endif /* ifdef CONFIG_SOC_IMX35 */
- 
- struct platform_device *__init imx_add_flexcan(
--		const struct imx_flexcan_data *data,
--		const struct flexcan_platform_data *pdata)
-+		const struct imx_flexcan_data *data)
- {
- 	struct resource res[] = {
- 		{
-@@ -54,5 +53,5 @@ struct platform_device *__init imx_add_flexcan(
+ 			can1: can at 80034000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&can1_pins_a>;
++				xceiver-supply = <&reg_can_3v3>;
+ 				status = "okay";
+ 			};
+ 		};
+@@ -319,6 +321,16 @@
+ 			gpio = <&gpio3 30 0>;
+ 			enable-active-high;
+ 		};
++
++		reg_can_3v3: can-3v3 {
++			compatible = "regulator-fixed";
++			regulator-name = "can-3v3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpio2 13 0>;
++			enable-active-high;
++		};
++
  	};
  
- 	return imx_add_platform_device("flexcan", data->id,
--			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
-+			res, ARRAY_SIZE(res), NULL, 0);
- }
-diff --git a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
-index e2b70f4c..e77cc3a 100644
---- a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
-+++ b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
-@@ -279,7 +279,7 @@ void __init eukrea_mbimxsd25_baseboard_init(void)
- 	imx25_add_imx_fb(&eukrea_mximxsd_fb_pdata);
- 	imx25_add_imx_ssi(0, &eukrea_mbimxsd_ssi_pdata);
- 
--	imx25_add_flexcan1(NULL);
-+	imx25_add_flexcan1();
- 	imx25_add_sdhci_esdhc_imx(0, &sd1_pdata);
- 
- 	gpio_request(GPIO_LED1, "LED1");
-diff --git a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
-index 5a2d5ef..14d6c82 100644
---- a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
-+++ b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
-@@ -287,7 +287,7 @@ void __init eukrea_mbimxsd35_baseboard_init(void)
- 
- 	imx35_add_imx_ssi(0, &eukrea_mbimxsd_ssi_pdata);
- 
--	imx35_add_flexcan1(NULL);
-+	imx35_add_flexcan1();
- 	imx35_add_sdhci_esdhc_imx(0, &sd1_pdata);
- 
- 	gpio_request(GPIO_LED1, "LED1");
-diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
-index 8bcda68..13490c2 100644
---- a/arch/arm/mach-imx/mach-mx25_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx25_3ds.c
-@@ -249,7 +249,7 @@ static void __init mx25pdk_init(void)
- 	imx25_add_imx_i2c0(&mx25_3ds_i2c0_data);
- 
- 	gpio_request_one(MX25PDK_CAN_PWDN, GPIOF_OUT_INIT_LOW, "can-pwdn");
--	imx25_add_flexcan0(NULL);
-+	imx25_add_flexcan0();
+ 	sound {
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 5b62b64..97b8a44 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -14,7 +14,6 @@
+ #include <linux/clk/mxs.h>
+ #include <linux/clkdev.h>
+ #include <linux/clocksource.h>
+-#include <linux/can/platform/flexcan.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/gpio.h>
+@@ -60,41 +59,6 @@ static inline void __mxs_togl(u32 mask, void __iomem *reg)
+ 	__raw_writel(mask, reg + MXS_TOG_ADDR);
  }
  
- static void __init mx25pdk_timer_init(void)
-diff --git a/arch/arm/mach-imx/mach-pcm043.c b/arch/arm/mach-imx/mach-pcm043.c
-index 8ed533f..b726cb1 100644
---- a/arch/arm/mach-imx/mach-pcm043.c
-+++ b/arch/arm/mach-imx/mach-pcm043.c
-@@ -385,7 +385,7 @@ static void __init pcm043_init(void)
- 	if (!otg_mode_host)
- 		imx35_add_fsl_usb2_udc(&otg_device_pdata);
+-/*
+- * MX28EVK_FLEXCAN_SWITCH is shared between both flexcan controllers
+- */
+-#define MX28EVK_FLEXCAN_SWITCH	MXS_GPIO_NR(2, 13)
+-
+-static int flexcan0_en, flexcan1_en;
+-
+-static void mx28evk_flexcan_switch(void)
+-{
+-	if (flexcan0_en || flexcan1_en)
+-		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
+-	else
+-		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
+-}
+-
+-static void mx28evk_flexcan0_switch(int enable)
+-{
+-	flexcan0_en = enable;
+-	mx28evk_flexcan_switch();
+-}
+-
+-static void mx28evk_flexcan1_switch(int enable)
+-{
+-	flexcan1_en = enable;
+-	mx28evk_flexcan_switch();
+-}
+-
+-static struct flexcan_platform_data flexcan_pdata[2];
+-
+-static struct of_dev_auxdata mxs_auxdata_lookup[] __initdata = {
+-	OF_DEV_AUXDATA("fsl,imx28-flexcan", 0x80032000, NULL, &flexcan_pdata[0]),
+-	OF_DEV_AUXDATA("fsl,imx28-flexcan", 0x80034000, NULL, &flexcan_pdata[1]),
+-	{ /* sentinel */ }
+-};
+-
+ #define OCOTP_WORD_OFFSET		0x20
+ #define OCOTP_WORD_COUNT		0x20
  
--	imx35_add_flexcan1(NULL);
-+	imx35_add_flexcan1();
- 	imx35_add_sdhci_esdhc_imx(0, &sd1_pdata);
+@@ -254,15 +218,6 @@ static void __init imx28_evk_init(void)
+ 	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
  }
  
+-static void __init imx28_evk_post_init(void)
+-{
+-	if (!gpio_request_one(MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT,
+-			      "flexcan-switch")) {
+-		flexcan_pdata[0].transceiver_switch = mx28evk_flexcan0_switch;
+-		flexcan_pdata[1].transceiver_switch = mx28evk_flexcan1_switch;
+-	}
+-}
+-
+ static int apx4devkit_phy_fixup(struct phy_device *phy)
+ {
+ 	phy->dev_flags |= MICREL_PHY_50MHZ_CLK;
+@@ -374,13 +329,10 @@ static void __init mxs_machine_init(void)
+ 		cfa10049_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+-			     mxs_auxdata_lookup, NULL);
++			     NULL, NULL);
+ 
+ 	if (of_machine_is_compatible("karo,tx28"))
+ 		tx28_post_init();
+-
+-	if (of_machine_is_compatible("fsl,imx28-evk"))
+-		imx28_evk_post_init();
+ }
+ 
+ #define MX23_CLKCTRL_RESET_OFFSET	0x120
+diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
+index f873b9f..7b0be09 100644
+--- a/drivers/net/can/flexcan.c
++++ b/drivers/net/can/flexcan.c
+@@ -24,7 +24,6 @@
+ #include <linux/can/dev.h>
+ #include <linux/can/error.h>
+ #include <linux/can/led.h>
+-#include <linux/can/platform/flexcan.h>
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/if_arp.h>
+@@ -37,6 +36,7 @@
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
+ 
+ #define DRV_NAME			"flexcan"
+ 
+@@ -211,6 +211,7 @@ struct flexcan_priv {
+ 	struct clk *clk_per;
+ 	struct flexcan_platform_data *pdata;
+ 	const struct flexcan_devtype_data *devtype_data;
++	struct regulator *reg_xceiver;
+ };
+ 
+ static struct flexcan_devtype_data fsl_p1010_devtype_data = {
+@@ -258,15 +259,6 @@ static inline void flexcan_write(u32 val, void __iomem *addr)
+ }
+ #endif
+ 
+-/*
+- * Swtich transceiver on or off
+- */
+-static void flexcan_transceiver_switch(const struct flexcan_priv *priv, int on)
+-{
+-	if (priv->pdata && priv->pdata->transceiver_switch)
+-		priv->pdata->transceiver_switch(on);
+-}
+-
+ static inline int flexcan_has_and_handle_berr(const struct flexcan_priv *priv,
+ 					      u32 reg_esr)
+ {
+@@ -799,7 +791,11 @@ static int flexcan_chip_start(struct net_device *dev)
+ 	if (priv->devtype_data->features & FLEXCAN_HAS_V10_FEATURES)
+ 		flexcan_write(0x0, &regs->rxfgmask);
+ 
+-	flexcan_transceiver_switch(priv, 1);
++	if (priv->reg_xceiver)	{
++		err = regulator_enable(priv->reg_xceiver);
++		if (err)
++			goto out;
++	}
+ 
+ 	/* synchronize with the can bus */
+ 	reg_mcr = flexcan_read(&regs->mcr);
+@@ -842,7 +838,8 @@ static void flexcan_chip_stop(struct net_device *dev)
+ 	reg |= FLEXCAN_MCR_MDIS | FLEXCAN_MCR_HALT;
+ 	flexcan_write(reg, &regs->mcr);
+ 
+-	flexcan_transceiver_switch(priv, 0);
++	if (priv->reg_xceiver)
++		regulator_disable(priv->reg_xceiver);
+ 	priv->can.state = CAN_STATE_STOPPED;
+ 
+ 	return;
+@@ -1084,6 +1081,10 @@ static int flexcan_probe(struct platform_device *pdev)
+ 	priv->pdata = pdev->dev.platform_data;
+ 	priv->devtype_data = devtype_data;
+ 
++	priv->reg_xceiver = devm_regulator_get(&pdev->dev, "xceiver");
++	if (IS_ERR(priv->reg_xceiver))
++		priv->reg_xceiver = NULL;
++
+ 	netif_napi_add(dev, &priv->napi, flexcan_poll, FLEXCAN_NAPI_WEIGHT);
+ 
+ 	dev_set_drvdata(&pdev->dev, dev);
 -- 
 1.8.3.1
