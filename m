@@ -1,33 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 27 Jun 2013 10:41:10 +0200
-Subject: [PATCH 1/3] ARM: imx: prepare for removal of flexcan_platform_data
-In-Reply-To: <1372317731-24966-2-git-send-email-mkl@pengutronix.de>
-References: <1372317731-24966-1-git-send-email-mkl@pengutronix.de>
- <1372317731-24966-2-git-send-email-mkl@pengutronix.de>
-Message-ID: <20130627084110.GE516@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Jun 2013 10:43:01 +0200
+Subject: [PATCH] arch: arm64: include: asm: add pci.h to pass compiling
+In-Reply-To: <51CB87B0.8030805@asianux.com>
+References: <51CA5F71.207@asianux.com> <20130626140730.GB23309@arm.com>
+ <51CB87B0.8030805@asianux.com>
+Message-ID: <9028702.KGsxCx1772@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 09:22:09AM +0200, Marc Kleine-Budde wrote:
-> As there are no imx in-tree users of flexcan_platform_data, this patch removes
-> the possibility to register a flexcan device with platform data.
+On Thursday 27 June 2013 08:30:40 Chen Gang wrote:
+> On 06/26/2013 10:07 PM, Catalin Marinas wrote:
+> > On Wed, Jun 26, 2013 at 04:26:41AM +0100, Chen Gang wrote:
+> > I wonder whether it makes sense to include pci-dma-compat.h in
+> > asm-generic/pci.h, I don't see why one would want the generic pci.h but
+> > not the generic pci-dma-compat.h (cc'ing Arnd).
 > 
-> The functionality to swith on/off CAN transceivers is added to DT via
-> regulators on a later patch.
+> I think, it will let architecture guys easier to add their own
+> pci-dma-compat.h (although they still need generic pci_dma_compat.h, and
+> generic pci.h, too).
 > 
-> Compile time tested with imx_v4_v5_defconfig and imx_v6_v7_defconfig.
-> 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> e.g. one architecture want include generic pci-dma-compat.h firstly,
+> then define its own features in its own pci-dma-compat.h.
 
-I like to see platform stuff go away ;)
+I think there is no excuse for still keeping the asm-generic/pci-dma-compat.h
+header around any more.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+All architectures use the same implementation and have done so for years.
+We should just convert the remaining users to use the dma_mapping.h
+interfaces directly.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
