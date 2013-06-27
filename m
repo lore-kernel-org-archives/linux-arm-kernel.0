@@ -1,25 +1,30 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Thu, 27 Jun 2013 10:26:17 -0400
-Subject: [RESEND PATCH V3 0/8] mmc_of_parse() adaptations,
- switch mvsdio to mmc_of_parse()
-In-Reply-To: <1370808858-32241-1-git-send-email-gmbnomis@gmail.com> (Simon
- Baatz's message of "Sun, 9 Jun 2013 22:14:10 +0200")
-References: <1370808858-32241-1-git-send-email-gmbnomis@gmail.com>
-Message-ID: <87sj03sk8m.fsf@octavius.laptop.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu, 27 Jun 2013 19:50:37 +0530
+Subject: [PATCH 1/2] ARM: EXYNOS: Remove combiner_init declaration
+In-Reply-To: <201306261602.26800.arnd@arndb.de>
+References: <1372246597-32323-1-git-send-email-sachin.kamat@linaro.org>
+ <201306261602.26800.arnd@arndb.de>
+Message-ID: <CAK9yfHx2sQ38xHDM0CyS_+0HP_gLq+XnaJf5PNyLbOFM_LbR+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On 26 June 2013 19:32, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 26 June 2013, Sachin Kamat wrote:
+>> Commit d243997f ("ARM: EXYNOS: Remove legacy interrupt initialization
+>> code") removed the call to combiner_init(). Since there are no more
+>> users in the machine code, remove the declaration as well.
+>>
+>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>
+> Hi,
+>
+> Your two patches look good to me, but I think there is more that
+> can be cleaned up now. See below for my experimental patch.
+> I have not gotten around to test or submit that, but feel
+> free to take any contents for your own patches.
 
-Simon Baatz <gmbnomis@gmail.com> writes:
-> 	RESEND V3:
-> 	- Dropped patches 9 and 10, they are part of linux-next already
-> 	NB: patch 7 as well, but I did not want to change the numbering
+Thanks Arnd. Let me look into it.
 
-I've pushed all patches except 7 to mmc-next for 3.11 now, and I made
-Stephen Warren's nit change to patch 6.  Thanks!
-
-- Chris.
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+With warm regards,
+Sachin
