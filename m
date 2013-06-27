@@ -1,82 +1,136 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 27 Jun 2013 11:36:44 -0400
-Subject: [PATCH 4/8] ARM: OMAP: move cpuidle drivers to drivers/cpuidle/
-In-Reply-To: <1372241747-21083-5-git-send-email-b.zolnierkie@samsung.com>
-References: <1372241747-21083-1-git-send-email-b.zolnierkie@samsung.com>
- <1372241747-21083-5-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <51CC5C0C.2090505@ti.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 27 Jun 2013 11:40:28 -0400 (EDT)
+Subject: [RFC PATCH 4/6] USB: ehci-omap: Suspend the controller during
+ bus suspend
+In-Reply-To: <51CAEEC4.4030304@ti.com>
+Message-ID: <Pine.LNX.4.44L0.1306271032210.1167-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(You have missed few CC's)
+On Wed, 26 Jun 2013, Roger Quadros wrote:
 
-+Kevin, Tero, Rajendra
-
-On Wednesday 26 June 2013 06:15 AM, Bartlomiej Zolnierkiewicz wrote:
-> While at it:
-> - remove file path from comment
-> - fix whitespace issues
+> > Could the mapping be changed so that a different interrupt vector was 
+> > used for wakeups and normal I/O?  That would make this a little easier, 
+> > although it wouldn't solve the general problem.
 > 
-> Compile tested only.
+> I'm not sure which IRQ we can map it to, but it could be mapped to some
+> free IRQ number. Since it doesn't make things easier, I think we can leave
+> it as it is for now.
+
+All right.
+
+> > There's still a race problem.  Suppose a normal wakeup interrupt occurs
+> > just before or as the controller gets suspended.  By the time the code
+> > here runs, HCD_HW_ACCESSIBLE may have been cleared by the suspend
+> > routine.  The interrupt would be lost.  Depending on the design of the
+> > controller, the entire wakeup signal could end up getting lost as well.
 > 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  arch/arm/mach-omap2/Makefile       |   5 -
->  arch/arm/mach-omap2/cpuidle34xx.c  | 344 -------------------------------------
->  arch/arm/mach-omap2/cpuidle44xx.c  | 217 -----------------------
->  drivers/cpuidle/Makefile           |  10 ++
->  drivers/cpuidle/cpuidle-omap34xx.c | 342 ++++++++++++++++++++++++++++++++++++
->  drivers/cpuidle/cpuidle-omap44xx.c | 216 +++++++++++++++++++++++
->  6 files changed, 568 insertions(+), 566 deletions(-)
->  delete mode 100644 arch/arm/mach-omap2/cpuidle34xx.c
->  delete mode 100644 arch/arm/mach-omap2/cpuidle44xx.c
->  create mode 100644 drivers/cpuidle/cpuidle-omap34xx.c
->  create mode 100644 drivers/cpuidle/cpuidle-omap44xx.c
+> But if I call ehci_suspend() in the runtime_suspend handler, this race
+> won't happen right?
+
+That race doesn't apply to your system anyway; it matters only on 
+systems where hcd->has_wakeup_irq isn't set.  The only way to fix it 
+involves changing ehci_suspend() somewhat (and making the equivalent 
+change for other HCDs too).  Those musings above were just me thinking 
+out loud about the problems involved in implementing reliable wakeups.
+
+> > Do you know how the OMAP EHCI controller behaves?  Under what 
+> > conditions does it send the wakeup IRQ?  How do you tell it to turn off 
+> > the wakeup IRQ?
 > 
+> Once the controller is suspended, the wakeup IRQ comes out-of-band. i.e. through
+> pad wakeup and pinctrl subsystem.
+> The only way to turn that wakeup off is to disable the wakeup enable bit on the pad.
+> This could be done by not putting the pins in the IDLE_WAKEUP state during
+> suspend.
 
-[..]
+That's not what I meant.  Never mind the pinctrl; I was asking about
+the EHCI controller itself.  Under what circumstances does the
+controller assert its wakeup signal?  And how do you tell it to stop
+asserting that signal?
 
-> diff --git a/drivers/cpuidle/cpuidle-omap44xx.c b/drivers/cpuidle/cpuidle-omap44xx.c
-> new file mode 100644
-> index 0000000..86b8a51
-> --- /dev/null
-> +++ b/drivers/cpuidle/cpuidle-omap44xx.c
-> @@ -0,0 +1,216 @@
-> +/*
-> + * OMAP4+ CPU idle Routines
-> + *
-> + * Copyright (C) 2011-2013 Texas Instruments, Inc.
-> + * Santosh Shilimkar <santosh.shilimkar@ti.com>
-> + * Rajendra Nayak <rnayak@ti.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/sched.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/cpu_pm.h>
-> +#include <linux/export.h>
-> +
-> +#include <asm/cpuidle.h>
-> +#include <asm/proc-fns.h>
-> +
-> +#include "../../arch/arm/mach-omap2/common.h"
-> +#include "../../arch/arm/mach-omap2/pm.h"
-> +#include "../../arch/arm/mach-omap2/prm.h"
-> +#include "../../arch/arm/mach-omap2/clockdomain.h"
-> +
-We have discussed it already on the list in past. The
-movement was pending exactly for above dependencies.
+> Thanks for the review.
+> 
+> I updated the ehci-omap.c driver to call ehci_suspend/resume during runtime_suspend/resume.
+> After that, it stopped detecting the port status change event when a device was plugged
+> to an external HUB. The wakeup irq was coming and the root hub/controller were being resumed,
+> but after that, no hub_irq.
 
-I let Kevin take a call but moving drivers with
-such dependency with platform code is just not
-right.
+Wait a minute.  I'm not clear on what happened.  You're starting out
+with the controller, the root hub, and the external hub all suspended, 
+right?  Then you plugged a new device into the external hub.  This 
+caused the controller and the root hub to wake up, but not the external 
+hub?
 
-Regards,
-Santosh
+> Adding some delay (or printk) somewhere in the resume path fixes the issue. I'm not sure what
+> is going on and why the delay is needed. Below is the ehci-omap patch. I've put the delay
+> in the runtime_resume handler.
+> 
+> e.g. log
+> 
+> [    8.674377] usb usb1: usb wakeup-resume
+> [    8.678833] ehci-omap 48064800.ehci: omap_ehci_runtime_resume
+> [    8.695190] usb usb1: usb auto-resume
+> [    8.699066] ehci-omap 48064800.ehci: resume root hub
+> [    8.704437] hub 1-0:1.0: hub_resume
+> [    8.708312] hub 1-0:1.0: port 2: status 0507 change 0000
+> [    8.714630] hub 1-0:1.0: state 7 ports 3 chg 0000 evt 0000
+> 
+> <---- gets stuck here in the failing case---->
+> 
+> [    8.723541] hub 1-0:1.0: state 7 ports 3 chg 0000 evt 0004
+> [    8.729400] ehci-omap 48064800.ehci: GetStatus port:2 status 001005 0  ACK POWER sig=se0 PE CONNECT
+> [    8.753204] usb 1-2: usb wakeup-resume
+> [    8.757293] usb 1-2: finish resume
+> [    8.761627] hub 1-2:1.0: hub_resume
+
+Yeah, we need more debugging info.  In ehci_irq(), right after the
+"pstatus = ehci_readl(..." line, what is the value of pstatus?  And in
+the GetPortStatus case of ehci_hub_control(), right after the "temp =
+ehci_readl(..." line, what is the value of temp?
+
+> @@ -286,15 +293,70 @@ static const struct of_device_id omap_ehci_dt_ids[] = {
+>  
+>  MODULE_DEVICE_TABLE(of, omap_ehci_dt_ids);
+>  
+> +static int omap_ehci_suspend(struct device *dev)
+> +{
+> +	struct usb_hcd *hcd = dev_get_drvdata(dev);
+> +	bool do_wakeup = device_may_wakeup(dev);
+> +
+> +	dev_dbg(dev, "%s: do_wakeup: %d\n", __func__, do_wakeup);
+> +
+> +	return ehci_suspend(hcd, do_wakeup);
+> +}
+> +
+> +static int omap_ehci_resume(struct device *dev)
+> +{
+> +	struct usb_hcd *hcd = dev_get_drvdata(dev);
+> +
+> +	dev_dbg(dev, "%s\n", __func__);
+> +
+> +	return ehci_resume(hcd, false);
+> +}
+
+Those two routines look okay.
+
+> +static int omap_ehci_runtime_suspend(struct device *dev)
+> +{
+> +	struct usb_hcd *hcd = dev_get_drvdata(dev);
+> +	struct omap_hcd *omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
+> +	bool do_wakeup = device_may_wakeup(dev);
+> +
+> +	dev_dbg(dev, "%s\n", __func__);
+> +
+> +	if (omap->initialized)
+> +		ehci_suspend(hcd, do_wakeup);
+
+Here you should not use do_wakeup.  The second argument should always
+be "true", because wakeup is always enabled during runtime suspend.
+
+Also, why do you need omap->initialized?  Do you think you might get a 
+wakeup interrupt before the controller has been fully set up?  I don't 
+see how you could, given the pm_runtime_get_sync() call in the probe 
+routine.
+
+Alan Stern
