@@ -1,47 +1,29 @@
-From: vincent.stehle@freescale.com (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
-Date: Thu, 27 Jun 2013 14:49:27 +0200
-Subject: [PATCH linux-next] ARM: keystone: fix compilation warning
-Message-ID: <1372337367-6708-1-git-send-email-vincent.stehle@freescale.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 27 Jun 2013 09:48:41 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable FSL_LPUART support
+Message-ID: <1372337321-8068-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following compilation warning:
+Enable the FSL_LPUART driver as it is used by the VF610 family.
 
-  arch/arm/mach-keystone/keystone.c:74:2: warning: initialization from incompatible pointer type [enabled by default]
-  arch/arm/mach-keystone/keystone.c:74:2: warning: (near initialization for ?__mach_desc_KEYSTONE.restart?) [enabled by default]
-
-Signed-off-by: Vincent Stehl? <vincent.stehle@freescale.com>
-Cc: Robin Holt <holt@sgi.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: trivial at kernel.org
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
+ arch/arm/configs/imx_v6_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-
-Hi,
-
-This warning was seen on linux-next tag next-20130627, with config ARM
-multi_v7_defconfig.
-
-Best regards,
-
-V.
-
-
- arch/arm/mach-keystone/keystone.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
-index fe4d9ff..b661c5c 100644
---- a/arch/arm/mach-keystone/keystone.c
-+++ b/arch/arm/mach-keystone/keystone.c
-@@ -49,7 +49,7 @@ static const char *keystone_match[] __initconst = {
- 	NULL,
- };
- 
--void keystone_restart(char mode, const char *cmd)
-+void keystone_restart(enum reboot_mode mode, const char *cmd)
- {
- 	u32 val;
- 
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 0837aae..2353bde 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -133,6 +133,8 @@ CONFIG_VT_HW_CONSOLE_BINDING=y
+ # CONFIG_DEVKMEM is not set
+ CONFIG_SERIAL_IMX=y
+ CONFIG_SERIAL_IMX_CONSOLE=y
++CONFIG_SERIAL_FSL_LPUART=y
++CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
+ CONFIG_HW_RANDOM=y
+ CONFIG_HW_RANDOM_MXC_RNGA=y
+ CONFIG_I2C=y
 -- 
-1.7.10.4
+1.8.1.2
