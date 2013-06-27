@@ -1,39 +1,53 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 27 Jun 2013 18:01:56 +0800
-Subject: [PATCH 09/11] ARM: tegar: remove the limitation that Tegra114
- can't support suspend
-In-Reply-To: <51CB4398.8050900@wwwdotorg.org>
-References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
- <1372152475-18617-10-git-send-email-josephl@nvidia.com>
- <51CB4398.8050900@wwwdotorg.org>
-Message-ID: <1372327316.9389.26.camel@jlo-ubuntu-64.nvidia.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 27 Jun 2013 13:06:21 +0300
+Subject: [PATCH 2/4] ARM: OMAP5: clockdomain data: add init file for
+ omap54xx
+In-Reply-To: <51CC04C9.3050801@ti.com>
+References: <1372322299-25046-1-git-send-email-t-kristo@ti.com>
+ <1372322299-25046-3-git-send-email-t-kristo@ti.com>
+ <20130627084434.GT15455@arwen.pp.htv.fi> <51CC04C9.3050801@ti.com>
+Message-ID: <20130627100621.GA510@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-06-27 at 03:40 +0800, Stephen Warren wrote:
-> On 06/25/2013 03:27 AM, Joseph Lo wrote:
-> > The Tegra114 can support suspend function now, removing the limitation.
+HI,
+
+On Thu, Jun 27, 2013 at 12:24:25PM +0300, Tero Kristo wrote:
+> On 06/27/2013 11:44 AM, Felipe Balbi wrote:
+> >Hi,
+> >
+> >On Thu, Jun 27, 2013 at 11:38:17AM +0300, Tero Kristo wrote:
+> >>+	rc = clk_set_parent(abe_dpll_ref, sys_32k_ck);
+> >>+	abe_dpll = clk_get_sys(NULL, "dpll_abe_ck");
+> >
+> >should these two lines be swaped ?
 > 
-> OK, so this is the first point at which system suspend is enabled on
-> Tegra114. However, some of the changes in earlier patches sounded like
-> the might affect, or be required by, cpuidle too. Is that the case? If
-> so, can you assure me that bisectability of Tegra114 cpuidle is
-> maintained across this whole series?
+> No, its a different clock. clk_set_parent is done for a clock that is
+> a parent of dpll_abe_ck.
 
-I think you mean one of the patches I changed the init sequence of CPU
-idle driver and hook the "tegra_tear_down_cpu" in tegra_init_suspend
-(under pm.c). I did that was for fixing the dependence of CPU idle and
-suspend driver.
+hah, just now I noticed clk_set_parent() has abe_dpll_ref, not abe_dpll
+as argument :-p
 
-Because we upstreamed the CPU idle "powered-down" support first then
-system suspend. So we hook the "tegra_tear_down_cpu" in CPU idle driver.
-But it would cause the system suspend function fail when disabling
-CPU_IDLE. After reorganizing the sequence, the system suspend is still
-working after disabling CPU_IDLE. If the PM is disabled, the CPU idle
-driver still supports at least WFI state.
+> >>+	if (!rc)
+> >>+		rc = clk_set_rate(abe_dpll, OMAP5_DPLL_ABE_DEFFREQ);
+> >>+	if (rc)
+> >>+		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
+> >>+
+> >>+	return 0;
+> >
+> >so even if (rc) you still return 0 ? Shouldn't you return rc instead ?
+> 
+> Hmm yea, this could be improved. :) Same should be done for O4 / DRA7
+> also. Seems like a long lasting feature actually.
 
-So this series is OK with cpuidle driver. I had tested the previous
-series (already merged in the branch for 3.11) is ok for Tegra20/30 as
-well.
+I see... ;-)
 
-Thanks for take care.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130627/34d5b833/attachment.sig>
