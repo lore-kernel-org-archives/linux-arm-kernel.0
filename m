@@ -1,40 +1,37 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 27 Jun 2013 07:27:58 -0700
-Subject: [PATCH 3/4] hwmon: Add a simple driver to read the MXS SoC
- temperature
-In-Reply-To: <20130627091732.GP5803@lukather>
-References: <1372236673-20725-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1372236673-20725-4-git-send-email-alexandre.belloni@free-electrons.com>
- <20130626143927.GB31998@roeck-us.net>
- <20130627091732.GP5803@lukather>
-Message-ID: <20130627142758.GA5812@roeck-us.net>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Thu, 27 Jun 2013 15:37:14 +0100
+Subject: [PATCH 1/4] Documentation: arm: [U]EFI runtime services
+In-Reply-To: <1372314821.557.33.camel@dabdike>
+References: <1372183863-11333-1-git-send-email-leif.lindholm@linaro.org>
+ <1372183863-11333-2-git-send-email-leif.lindholm@linaro.org>
+ <51CA2B03.4080106@wwwdotorg.org>
+ <CACxGe6vsBKnbipR-Zd1T9Ox1J2ugFmShrGXGUzPa_=D9TJvFQw@mail.gmail.com>
+ <20130626135311.GA9078@rocoto.smurfnet.nu>
+ <20130626135933.GQ22026@console-pimps.org>
+ <1372257499.2168.5.camel@dabdike>
+ <20130627013219.GA346@srcf.ucam.org>
+ <CACxGe6uFkbuJ3BxM=A0Lu=jZQ79Ba8SmNsdBdTOO13szTfTZ=Q@mail.gmail.com>
+ <1372314821.557.33.camel@dabdike>
+Message-ID: <20130627143714.GA12900@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 11:17:32AM +0200, Maxime Ripard wrote:
-> On Wed, Jun 26, 2013 at 07:39:27AM -0700, Guenter Roeck wrote:
-> > On Wed, Jun 26, 2013 at 10:51:12AM +0200, Alexandre Belloni wrote:
-> > > The low resolution ADC of the mxs is able to read an internal temperature
-> > > sensor, expose that using hwmon.
-> > > 
-> > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > > ---
-> > 
-> > Wouldn't it make more sense to use iio-hwmon and improve it if necessary ?
+On Wed, Jun 26, 2013 at 11:33:41PM -0700, James Bottomley wrote:
+> On Thu, 2013-06-27 at 07:23 +0100, Grant Likely wrote:
+> > What is the problem trying to be avoided by not using the virtual map?
+> > Is it passing the virtual mapping data from one kernel to the next
+> > when kexecing? Or something else?
 > 
-> Actually, I wonder if we should not just put the hwmon driver
-> capabilities directly into the mxs-lradc driver, just like it's already
-> been done in this driver for the touchscreen support.
-> 
-> The probing of this hwmon driver doesn't really belong to the DT, it's
-> not really realistic to probe it from the machine definition, and it
-> really is the IP that is wired that way.
-> 
-Merging iio-hwmon functionality into an adc driver seems just as bad
-(or even worse) as copying it into a new driver.
+> Where to begin ... SetVirtualAddressMap() is one massive hack job ...
+> just look at the tiano core implementation.   Basically it has a fixed
+> idea of where all the pointers are and it tries to convert them all to
+> the new address space.  The problem we see in x86 is that this
+> conversion process isn't exhaustive due to implementation cockups, so
+> the post virtual address map image occasionally tries to access
+> unconverted pointers via the old physical address and oopses the kernel.
 
-If the lradc driver knows that the ADC channels are temperature sensors, it
-should register them with the iio subsystem as IIO_TEMP type. Then you should
-be able to use iio_hwmon as is.
+And yet it's the only mode in which the firmrware is actually tested 
+against an OS, so we don't have any real choice in the matter.
 
-Guenter
+-- 
+Matthew Garrett | mjg59 at srcf.ucam.org
