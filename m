@@ -1,167 +1,98 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Thu, 27 Jun 2013 22:46:58 +0300
-Subject: [PATCH] Documentation: dt: bindings: TI WiLink modules
-In-Reply-To: <51CC8E80.5030206@ti.com>
-References: <1372149330-24335-1-git-send-email-coelho@ti.com>
- <51CBC1C8.1040301@gmail.com> <1372322851.18889.53.camel@cumari.coelho.fi>
- <20130627125131.GA27285@kahuna>
- <1372337887.8383.12.camel@cumari.coelho.fi>
- <CAGo_u6qbt9dANgKq49xR=1qsCpUBhmVaPL4EK04XvTw+=4Z23g@mail.gmail.com>
- <1372339148.8383.17.camel@cumari.coelho.fi> <51CC3CEE.3050004@ti.com>
- <1372339810.8383.20.camel@cumari.coelho.fi>
- <CAGo_u6pWZX9gbHgBae=gcWk8i6-TnhxH1TdM9QdEDLTow6Pn5A@mail.gmail.com>
- <1372359090.21065.12.camel@cumari.coelho.fi> <51CC8E80.5030206@ti.com>
-Message-ID: <1372362418.21065.25.camel@cumari.coelho.fi>
+From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
+Date: Thu, 27 Jun 2013 22:51:01 +0300
+Subject: [linux-sunxi] [PATCH 2/8] clocksource: sun4i: Add clocksource
+ and sched clock drivers
+In-Reply-To: <20130627170228.GC4319@lukather>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1372281421-2099-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20130627131729.5fff8468@i7> <20130627170228.GC4319@lukather>
+Message-ID: <20130627225101.358208c1@i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-06-27 at 14:12 -0500, Nishanth Menon wrote:
-> On 06/27/2013 01:51 PM, Luciano Coelho wrote:
-> > On Thu, 2013-06-27 at 08:39 -0500, Nishanth Menon wrote:
-> >> On Thu, Jun 27, 2013 at 8:30 AM, Luciano Coelho <coelho@ti.com> wrote:
-> >>> On Thu, 2013-06-27 at 08:23 -0500, Nishanth Menon wrote:
-> >>>> On 06/27/2013 08:19 AM, Luciano Coelho wrote:
-> >>>>> On Thu, 2013-06-27 at 08:15 -0500, Nishanth Menon wrote:
-> >>>>>> On Thu, Jun 27, 2013 at 7:58 AM, Luciano Coelho <coelho@ti.com> wrote:
-> >>>>>>> For the actual DTS files, I could add a wilink.dtsi with enumerations
-> >>>>>>> for these values so they could be used in the node definitions.  But I'm
-> >>>>>>> not sure it's going to be that valuable in the end.
-> >>>>>> The  way GPIO HIGH was defined might help to provide guidance I think :)
-> >>>>>
-> >>>>> Where? As far as I can see, the GPIO flags are defined in a bitmap.
-> >>>>
-> >>>> include/dt-bindings/gpio/gpio.h
-> >>>
-> >>> Thanks! I don't see these macros used anywhere, though.
-> >> umm... I'd think you have'nt looked deep enough / lists :)
-> >
-> > If you mean mailing lists, you're right, I didn't.  I just did a git
-> > grep for the macros and didn't find any users.
-> git grep "GPIO_ACTIVE_[HIGH|LOW]" arch/arm/boot/dts/|wc -l
-> 344
-> on next-20130626. anyways, besides the point.
+On Thu, 27 Jun 2013 19:02:28 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+
+> Hi Siarhei,
 > 
+> On Thu, Jun 27, 2013 at 01:17:29PM +0300, Siarhei Siamashka wrote:
+> > On Wed, 26 Jun 2013 23:16:55 +0200
+> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > 
+> > > The A10 and the A13 has a 64 bits free running counter that we can use
+> > > as a clocksource and a sched clock, that were both not used yet on these
+> > > platforms.
+> > > 
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > ---
+> > >  drivers/clocksource/sun4i_timer.c | 27 +++++++++++++++++++++++++++
+> > >  1 file changed, 27 insertions(+)
+> > > 
+> > > diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
+> > > index bdf34d9..1d2eaa0 100644
+> > > --- a/drivers/clocksource/sun4i_timer.c
+> > > +++ b/drivers/clocksource/sun4i_timer.c
+> > > @@ -23,6 +23,8 @@
+> > >  #include <linux/of_address.h>
+> > >  #include <linux/of_irq.h>
+> > >  
+> > > +#include <asm/sched_clock.h>
+> > > +
+> > >  #define TIMER_IRQ_EN_REG	0x00
+> > >  #define TIMER_IRQ_EN(val)		BIT(val)
+> > >  #define TIMER_IRQ_ST_REG	0x04
+> > > @@ -34,6 +36,11 @@
+> > >  #define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
+> > >  
+> > >  #define TIMER_SCAL		16
+> > > +#define TIMER_CNT64_CTL_REG	0xa0
+> > > +#define TIMER_CNT64_CTL_CLR		BIT(0)
+> > > +#define TIMER_CNT64_CTL_RL		BIT(1)
+> > > +#define TIMER_CNT64_LOW_REG	0xa4
+> > > +#define TIMER_CNT64_HIGH_REG	0xa8
+> > >  
+> > >  static void __iomem *timer_base;
+> > >  
+> > > @@ -96,6 +103,20 @@ static struct irqaction sun4i_timer_irq = {
+> > >  	.dev_id = &sun4i_clockevent,
+> > >  };
+> > >  
+> > > +static u32 sun4i_timer_sched_read(void)
+> > > +{
+> > > +	u32 reg = readl(timer_base + TIMER_CNT64_CTL_REG);
+> > 
+> > If we can be absolutely sure that nothing else may ever change
+> > the TIMER_CNT64_CTL_REG, then its default value can be probably
+> > cached instead of doing expensive read from the hardware register
+> > each time?
 > 
-> >>> This seems to be a completely different thing.  This is the header that
-> >>> contains the helper functions to get GPIO-related device tree nodes,
-> >>> isn't it?
-> >> That is true, but it also contains the flag for level which needs to
-> >> be in sync with the gpio.h dts header.
-> >>>> just a hint. not saying frequencies were defined in header. for systems
-> >>>> that define frequencies - example cpufreq OPPs, clock node usage, we do
-> >>>> not use indexing to frequency, instead, that is the responsibility of
-> >>>> driver to convert frequency back to required index.
-> >>>> git grep frequency Documentation/devicetree/bindings gives you how the
-> >>>> precedence looks like.
-> >>>>
-> >>>> Personally, if given a choice, I'd go with actual frequencies rather
-> >>>> than indexes.
-> >>>
-> >>> If I do that, I need to add also a separate flag to define whether the
-> >>> XTAL clock is used or not.  For instance, we have 26MHz and 26MHz
-> >>> crystal; and 38.4MHz and 38.4MHz crystal...
-> >> Yes, you would have to. at the same time, it is easy for module maker
-> >> to provide dtsi corresponding to exact h/w representation on his
-> >> module using wilink chip without being worried about weird index value
-> >> whose meaning is hidden in binding
-> >
-> > The module makers need to know about the bindings and read the document
-> > before they specify the node in DTS.  I think for clarity, a comment in
-> > the DTS file stating the actual frequency is good enough.  Simpler and
-> > more efficient (in terms of DT binary size and module code size) than
-> > adding the actual frequencies.
-> >
-> >
-> >> On the flip side, It also allows driver to reject frequencies /
-> >> configurations that are not supported by the corresponding chip.
-> >
-> > It's actually much easier to reject frequencies that are not valid with
-> > the enumeration.  "if (refclock > 5) { bail_out(); }".  If I need to
-> > check every frequency, I need to add an array of valid frequencies and
-> > so on.  Waste of code, IMHO.
-> >
-> >
-> >> As I said, just my 2 cents. Personally, I'd like dts files to be as
-> >> readable as c files without having to dig through bindings document.
-> >
-> > As I said before, for readability, adding a comment with the frequency
-> > is good enough.  This is what I did for PandaES's DTS (not sent out
-> > yet):
-> >
-> > 	wlan {
-> > 	     compatible = "ti,wilink6";
-> > 	     interrupt-parent = <&gpio2>;
-> > 	     interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
-> > 	     refclock = <2>;		/* 38.4 MHz */
-> > 	 };
-> >
-> > Looks more readable to me than:
-> >
-> > 	wlan {
-> > 	     compatible = "ti,wilink6";
-> > 	     interrupt-parent = <&gpio2>;
-> > 	     interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
-> > 	     refclock = <38400>;
-> > 	     refclock_xtal = <0>;
-> > 	 };
-> >
-> > The macro idea sounds better to me, but in this case this code is so
-> > simple that I don't think it's really worth it.
-> >
-> > And, from another point of view, I see this as only a specification of
-> > the module's details.  The frequency value is not really used anywhere
-> > outside the module, so we don't see it.  I don't think there's a good
-> > reason to expose the actual frequency to the kernel (and parse it back
-> > to the values the firmware needs), since nothing else inside the kernel
-> > will care about it.
-> Overview: we are adding bindings for 
-> Documentation/devicetree/bindings/net/wireless/ti-wilink.txt Which I 
-> believe is intended to be generic.
-> 
-> Current frequencies supported for tcxoclock is the following for WiLink7
-> +	0 = 19.200 MHz
-> +	1 = 26.000 MHz
-> +	2 = 38.400 MHz
-> +	3 = 52.000 MHz
-> +	4 = 16.368 MHz
-> +	5 = 32.736 MHz
-> +	6 = 16.800 MHz
-> +	7 = 33.600 MHz
-> Say wilink9 comes along and redefines this map OR introduces support for 
-> 20MHz support making the map 0-8, you'd no longer be able to support 
-> this map. or say a new update of firmware magically changes this mapping 
-> or something unexpected.
+> Since it's a free-running counter, its value will always change, so the
+> caching will bring no additions at all, right?
 
-No problem with adding 20MHz support.  Look at 6 = 16.800 MHz.  That's
-already out of order, so why would 20MHz have to change the mapping?
+Sorry, 'caching' was not a very good description for something that is
+already a compile time constant. I mean just replace
 
-It is true that stupid changes happen in the firmware from time to time.
-But if it happens, the translation could still be done in the driver.
+    u32 reg = readl(timer_base + TIMER_CNT64_CTL_REG);
 
-> If the translation and validation is done in the driver, it is trivial 
-> to handle without redefining the binding and breaking older dtbs (if 
-> relevant)
+with 
 
-The validation can still be done in the driver.  I don't think anything
-has to break here.  The bindings document is the de-facto specifications
-of this stuff.  If something in the lower layers (ie. firmware) breaks,
-the driver can do the translation without having to change anything in
-the DTS.
+    u32 reg = TIMER_CNT64_CTL_CLR;
 
+Because we know that the TIMER_CNT64_CTL_REG is already supposed
+to have the default TIMER_CNT64_CTL_CLR value (initialized in the
+'sun4i_timer_init' function) between calls to 'sun4i_timer_sched_read'.
+Inside of 'sun4i_timer_sched_read' we set an extra TIMER_CNT64_CTL_RL
+bit in this register, but wait until it clears, effectively reverting
+TIMER_CNT64_CTL_REG register back to the default TIMER_CNT64_CTL_CLR
+value.
 
-> Indexes to another entity is always a maintenance burden in the longer 
-> run and needs judicious control. If it is possible to avoid it by 
-> selecting the right parameters, I am a hard advocate for the same.
+Removing this extra HW register read can save roughly a hundred of CPU
+cycles here and provide a ~10% overall improvement for gettimeofday
+(these estimates are based on the earlier benchmarks done with the
+Allwinner 3.4 kernel).
 
-I tend to agree.  But you need a balance.  In theory you're right.  But
-I think if you take the real world example, it is over-engineering.
+Or maybe I'm overlooking something?
 
-Anyway, if you *really* think this needs to be changed, I think we're in
-a deadlock here and I'd like to hear other people's opinions.  I don't
-mind making the change, but I'm still not convinced it is worth it,
-since it just adds complexity.
-
-And hey, this is too much bikeshedding for such a small detail.
-
---
-Luca.
+-- 
+Best regards,
+Siarhei Siamashka
