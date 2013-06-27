@@ -1,56 +1,47 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 27 Jun 2013 20:36:43 +0300
-Subject: [PATCH 2/8] clocksource: sun4i: Add clocksource and sched clock
- drivers
-In-Reply-To: <20130627172144.GD4319@lukather>
-References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
- <1372281421-2099-3-git-send-email-maxime.ripard@free-electrons.com>
- <20130627060234.GD4824@tarshish> <20130627093558.GB8437@lukather>
- <20130627094649.GM4824@tarshish> <20130627172144.GD4319@lukather>
-Message-ID: <20130627173643.GQ4824@tarshish>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 27 Jun 2013 11:48:49 -0600
+Subject: [PATCH 06/11] ARM: tegra114: hook tegra_tear_down_cpu function
+In-Reply-To: <20130627101335.GB15081@mithrandir>
+References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
+ <1372152475-18617-7-git-send-email-josephl@nvidia.com>
+ <20130627101335.GB15081@mithrandir>
+Message-ID: <51CC7B01.30503@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Thu, Jun 27, 2013 at 07:21:44PM +0200, Maxime Ripard wrote:
-> On Thu, Jun 27, 2013 at 12:46:49PM +0300, Baruch Siach wrote:
-> > On Thu, Jun 27, 2013 at 11:35:58AM +0200, Maxime Ripard wrote:
-> > > On Thu, Jun 27, 2013 at 09:02:34AM +0300, Baruch Siach wrote:
-> > > > On Wed, Jun 26, 2013 at 11:16:55PM +0200, Maxime Ripard wrote:
-> > > > > +static u32 sun4i_timer_sched_read(void)
-> > > > 
-> > > > You commit message mentions "64 bits free running counter", but this one only 
-> > > > returns 32 bit.
-> > > 
-> > > Yeah, the callback setup by setup_sched_clock is supposed to be
-> > > returning a u32, and clocksource_mmio_init only accepts up to 32 bits as
-> > > well, so I'm only using the lower 32bits of this 64 bits counter.
-> > > 
-> > > I'll amend the commit log to state this.
-> > 
-> > But using 64 bit counter for sched_clock is much easier that using 32 bit one. 
+On 06/27/2013 04:13 AM, Thierry Reding wrote:
+> On Tue, Jun 25, 2013 at 05:27:50PM +0800, Joseph Lo wrote:
+>> Hooking tegra_tear_down_cpu for Tegra114 for supporting cluster
+>> power down when CPU cluster suspneded in LP2.
+>> 
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com> --- 
+>> arch/arm/mach-tegra/pm.c | 1 + 1 file changed, 1 insertion(+)
+>> 
+>> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c 
+>> index 94e69be..a0668a2 100644 --- a/arch/arm/mach-tegra/pm.c +++
+>> b/arch/arm/mach-tegra/pm.c @@ -52,6 +52,7 @@ static void
+>> tegra_tear_down_cpu_init(void) tegra_tear_down_cpu =
+>> tegra20_tear_down_cpu; break; case TEGRA30: +	case TEGRA114: if
+>> (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC)) tegra_tear_down_cpu =
+>> tegra30_tear_down_cpu;
 > 
-> Easier in what aspect? Both API looks similar.
-
-You can just implement your own simple sched_clock() that just returns the 
-current value of this 64 bit counter, and do away with all the tricky code in 
-kernel/time/sched_clock.c (in tip.git) that is needed to make the 32 -> 64 
-extension safe. This is not compatible with multi-platform kernel, though.
-
-> > You can either wait for the rest of Stephen's patch set 
-> > (http://thread.gmane.org/gmane.linux.ports.arm.msm/4092) before adding 64 
-> > bit, or you can just make the trivial change to the now generic 
-> > sched_clock code.
+> This is getting a little weird. Suppose I want to build a Tegra114
+> only kernel. With the above code it means the tegra_tear_down_cpu
+> won't be hooked because ARCH_TEGRA_3x_SOC isn't selected.
 > 
-> I'll wait for the Stephen's patches to be merged then, and add support
-> for 64bits counters to clocksource_mmio_init.
+> Perhaps tegra30_tear_down_cpu() should be built unconditionally so
+> that it's always available? I suspect that something similar will
+> need to be done for future chips too, further complicating
+> matters.
+> 
+> There are other alternatives like adding another Kconfig symbol
+> which doesn't cover all of Tegra30 but only code shared with
+> Tegra114 (and possible future chips) or building sleep-tegra30.S if
+> either one of the ARCH_TEGRA_3x_SOC or ARCH_TEGRA_114_SOC symbols
+> is selected.
 
-Sound reasonable.
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+To be honest, I wonder if we should just get rid of ARCH_TEGRA_*_SOC,
+and build everything if ARCH_TEGRA is defined. tegra_defconfig enables
+all ARCH_TEGRA_*_SOC anyway, and I'm afraid I don't test other
+configurations very often, and I assume that distros will enable
+everything...
