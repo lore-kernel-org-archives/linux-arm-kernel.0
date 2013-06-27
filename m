@@ -1,118 +1,61 @@
 From: jtzhou@marvell.com (Jett.Zhou)
-Date: Thu, 27 Jun 2013 19:29:29 +0800
-Subject: [V3 7/7] video: mmp: add pitch info in mmp_win structure
-Message-ID: <1372332569-7031-1-git-send-email-jtzhou@marvell.com>
+Date: Thu, 27 Jun 2013 19:28:52 +0800
+Subject: [V3 3/7] video: mmp: optimize some register setting code
+Message-ID: <1372332532-6821-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jing Xiang <jxiang@marvell.com>
+From: Guoqing Li <ligq@marvell.com>
 
-Add pitch length info of graphics/video layer, pitch is used
-to represent line length in byte, the usage depends on pix_fmt.
-If the fmt is YUV, the pitch[0] will be Y length,pitch[1]
-will be U length, pitch[2] will be V lenth.
-If the fmt is RGB, the picth[0] will be line lenth, and
-pitch[1]/pitch[2] will be 0 and not be used.
+There are dumplicate code of the smooth setting based on different
+path, optimized the routine and use readl_relaxed instead.
 
-Signed-off-by: Jing Xiang <jxiang@marvell.com>
 Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+Signed-off-by: Jing Xiang <jxiang@marvell.com>
+Signed-off-by: Guoqing Li <ligq@marvell.com>
 ---
- drivers/video/mmp/fb/mmpfb.c    |    6 ++++++
- drivers/video/mmp/hw/mmp_ctrl.c |   30 +++++++++++++++++++++++-------
- include/video/mmp_disp.h        |    5 +++++
- 3 files changed, 34 insertions(+), 7 deletions(-)
+ drivers/video/mmp/hw/mmp_ctrl.c |   22 +++++++---------------
+ 1 files changed, 7 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/video/mmp/fb/mmpfb.c b/drivers/video/mmp/fb/mmpfb.c
-index 6aa6f72..d9e7c94 100644
---- a/drivers/video/mmp/fb/mmpfb.c
-+++ b/drivers/video/mmp/fb/mmpfb.c
-@@ -395,12 +395,18 @@ static int var_update(struct fb_info *info)
- static void mmpfb_set_win(struct fb_info *info)
- {
- 	struct mmpfb_info *fbi = info->par;
-+	struct fb_var_screeninfo *var = &info->var;
- 	struct mmp_win win;
-+	u32 stride;
- 
- 	memset(&win, 0, sizeof(win));
- 	win.xsrc = win.xdst = fbi->mode.xres;
- 	win.ysrc = win.ydst = fbi->mode.yres;
- 	win.pix_fmt = fbi->pix_fmt;
-+	stride = pixfmt_to_stride(win.pix_fmt);
-+	win.pitch[0] = var->xres_virtual * stride;
-+	win.pitch[1] = win.pitch[2] =
-+		(stride == 1) ? (var->xres_virtual >> 1) : 0;
- 	mmp_overlay_set_win(fbi->overlay, &win);
- }
- 
 diff --git a/drivers/video/mmp/hw/mmp_ctrl.c b/drivers/video/mmp/hw/mmp_ctrl.c
-index a4fc857..1057f82 100644
+index 8801bc9..9ea3f0a 100644
 --- a/drivers/video/mmp/hw/mmp_ctrl.c
 +++ b/drivers/video/mmp/hw/mmp_ctrl.c
-@@ -142,17 +142,27 @@ static void dmafetch_set_fmt(struct mmp_overlay *overlay)
- static void overlay_set_win(struct mmp_overlay *overlay, struct mmp_win *win)
- {
- 	struct lcd_regs *regs = path_regs(overlay->path);
--	u32 pitch;
+@@ -53,7 +53,7 @@ static irqreturn_t ctrl_handle_irq(int irq, void *dev_id)
+ 		tmp = readl_relaxed(ctrl->reg_base + SPU_IRQ_ISR);
+ 		if (tmp & isr)
+ 			writel_relaxed(~isr, ctrl->reg_base + SPU_IRQ_ISR);
+-	} while ((isr = readl(ctrl->reg_base + SPU_IRQ_ISR)) & imask);
++	} while ((isr = readl_relaxed(ctrl->reg_base + SPU_IRQ_ISR)) & imask);
  
- 	/* assert win supported */
- 	memcpy(&overlay->win, win, sizeof(struct mmp_win));
- 
- 	mutex_lock(&overlay->access_ok);
--	pitch = win->xsrc * pixfmt_to_stride(win->pix_fmt);
--	writel_relaxed(pitch, &regs->g_pitch);
--	writel_relaxed((win->ysrc << 16) | win->xsrc, &regs->g_size);
--	writel_relaxed((win->ydst << 16) | win->xdst, &regs->g_size_z);
--	writel_relaxed(0, &regs->g_start);
-+
-+	if (overlay_is_vid(overlay)) {
-+		writel_relaxed(win->pitch[0], &regs->v_pitch_yc);
-+		writel_relaxed(win->pitch[2] << 16 |
-+				win->pitch[1], &regs->v_pitch_uv);
-+
-+		writel_relaxed((win->ysrc << 16) | win->xsrc, &regs->v_size);
-+		writel_relaxed((win->ydst << 16) | win->xdst, &regs->v_size_z);
-+		writel_relaxed(win->ypos << 16 | win->xpos, &regs->v_start);
-+	} else {
-+		writel_relaxed(win->pitch[0], &regs->g_pitch);
-+
-+		writel_relaxed((win->ysrc << 16) | win->xsrc, &regs->g_size);
-+		writel_relaxed((win->ydst << 16) | win->xdst, &regs->g_size_z);
-+		writel_relaxed(win->ypos << 16 | win->xpos, &regs->g_start);
-+	}
- 
- 	dmafetch_set_fmt(overlay);
- 	mutex_unlock(&overlay->access_ok);
-@@ -234,7 +244,13 @@ static int overlay_set_addr(struct mmp_overlay *overlay, struct mmp_addr *addr)
- 
- 	/* FIXME: assert addr supported */
- 	memcpy(&overlay->addr, addr, sizeof(struct mmp_addr));
--	writel(addr->phys[0], &regs->g_0);
-+
-+	if (overlay_is_vid(overlay)) {
-+		writel_relaxed(addr->phys[0], &regs->v_y0);
-+		writel_relaxed(addr->phys[1], &regs->v_u0);
-+		writel_relaxed(addr->phys[2], &regs->v_v0);
-+	} else
-+		writel_relaxed(addr->phys[0], &regs->g_0);
- 
- 	return overlay->addr.phys[0];
+ 	return IRQ_HANDLED;
  }
-diff --git a/include/video/mmp_disp.h b/include/video/mmp_disp.h
-index 32094c0..9fd9398 100644
---- a/include/video/mmp_disp.h
-+++ b/include/video/mmp_disp.h
-@@ -91,6 +91,11 @@ struct mmp_win {
- 	u16	up_crop;
- 	u16	bottom_crop;
- 	int	pix_fmt;
-+	/*
-+	 * pitch[0]: graphics/video layer line length or y pitch
-+	 * pitch[1]/pitch[2]: video u/v pitch if non-zero
-+	 */
-+	u32	pitch[3];
- };
+@@ -372,20 +372,12 @@ static void path_set_default(struct mmp_path *path)
+ 	 * bus arbiter for faster read if not tv path;
+ 	 * 2.enable horizontal smooth filter;
+ 	 */
+-	if (PATH_PN == path->id) {
+-		mask = CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK
+-			| CFG_ARBFAST_ENA(1);
+-		tmp = readl_relaxed(ctrl_regs(path) + dma_ctrl(0, path->id));
+-		tmp |= mask;
+-		writel_relaxed(tmp, ctrl_regs(path) + dma_ctrl(0, path->id));
+-	} else if (PATH_TV == path->id) {
+-		mask = CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK
+-			| CFG_ARBFAST_ENA(1);
+-		tmp = readl_relaxed(ctrl_regs(path) + dma_ctrl(0, path->id));
+-		tmp &= ~mask;
+-		tmp |= CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK;
+-		writel_relaxed(tmp, ctrl_regs(path) + dma_ctrl(0, path->id));
+-	}
++	mask = CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK | CFG_ARBFAST_ENA(1);
++	tmp = readl_relaxed(ctrl_regs(path) + dma_ctrl(0, path->id));
++	tmp |= mask;
++	if (PATH_TV == path->id)
++		tmp &= ~CFG_ARBFAST_ENA(1);
++	writel_relaxed(tmp, ctrl_regs(path) + dma_ctrl(0, path->id));
+ }
  
- struct mmp_addr {
+ static int path_init(struct mmphw_path_plat *path_plat,
 -- 
 1.7.0.4
