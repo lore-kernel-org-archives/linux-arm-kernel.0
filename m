@@ -1,28 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 27 Jun 2013 10:53:02 +0900
-Subject: [PATCH v3 0/2] ARM: shmobile: r8a7790: add thermal driver support
-Message-ID: <1372297984-9315-1-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 27 Jun 2013 10:53:04 +0900
+Subject: [PATCH v3 2/2] ARM: shmobile: r8a7790: add thermal driver support
+In-Reply-To: <1372297984-9315-1-git-send-email-horms+renesas@verge.net.au>
+References: <1372297984-9315-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1372297984-9315-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This short series enables the thermal driver on the r8a7790 SoC
-and thus the lager board.
+The current temperature may be read using:
+cat /sys/class/thermal/thermal_zone0/temp
 
-It is based on renesas-next-20130620
+Based on similar work for the r8a73a4 by Kuninori Morimoto.
 
-v3
-* Correct title of clocks patch to refer to r8a7790
-
-v2
-* Add clocks patch
-
-Simon Horman (2):
-  ARM: shmobile: r8a7790: add clocks for thermal
-  ARM: shmobile: r8a7790: add thermal driver support
-
- arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/setup-r8a7790.c | 12 ++++++++++++
- 2 files changed, 16 insertions(+)
+ 1 file changed, 12 insertions(+)
 
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 28f9475..06c720f 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -149,6 +149,17 @@ static struct resource irqc0_resources[] __initdata = {
+ 					  &irqc##idx##_data,		\
+ 					  sizeof(struct renesas_irqc_config))
+ 
++static struct resource thermal_resources[] __initdata = {
++	DEFINE_RES_MEM(0xe61f0000, 0x14),
++	DEFINE_RES_MEM(0xe61f0100, 0x38),
++	DEFINE_RES_IRQ(gic_spi(69)),
++};
++
++#define r8a7790_register_thermal()					\
++	platform_device_register_simple("rcar_thermal", -1,		\
++					thermal_resources,		\
++					ARRAY_SIZE(thermal_resources))
++
+ void __init r8a7790_add_standard_devices(void)
+ {
+ 	r8a7790_register_scif(SCIFA0);
+@@ -162,6 +173,7 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_scif(HSCIF0);
+ 	r8a7790_register_scif(HSCIF1);
+ 	r8a7790_register_irqc(0);
++	r8a7790_register_thermal();
+ }
+ 
+ void __init r8a7790_timer_init(void)
 -- 
 1.8.2.1
