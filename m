@@ -1,41 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 27 Jun 2013 22:42:57 +0800
-Subject: [PATCH 2/2] ARM i.MX6Q: Use ENET_CLK_SEL defines in
- imx6q_1588_init
-In-Reply-To: <1372252129-18898-2-git-send-email-p.zabel@pengutronix.de>
-References: <1372252129-18898-1-git-send-email-p.zabel@pengutronix.de>
- <1372252129-18898-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130627144255.GE2695@S2101-09.ap.freescale.net>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 27 Jun 2013 15:43:35 +0100
+Subject: [PATCH v6 2/5] kernel: missing include in cputime.c
+In-Reply-To: <20130627141718.GA10056@gmail.com>
+References: <alpine.DEB.2.02.1306271446570.4782@kaball.uk.xensource.com>
+ <1372341272-12512-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130627141209.GB29209@dyad.programming.kicks-ass.net>
+ <20130627141718.GA10056@gmail.com>
+Message-ID: <alpine.DEB.2.02.1306271542530.4782@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 03:08:49PM +0200, Philipp Zabel wrote:
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  arch/arm/mach-imx/mach-imx6q.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+On Thu, 27 Jun 2013, Ingo Molnar wrote:
+> * Peter Zijlstra <peterz@infradead.org> wrote:
 > 
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index db1db78..adabe2b 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -242,7 +242,9 @@ static void __init imx6q_1588_init(void)
->  
->  	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
->  	if (!IS_ERR(gpr))
-> -		regmap_update_bits(gpr, 0x4, 1 << 21, 1 << 21);
-> +		regmap_update_bits(gpr, IOMUXC_GPR1,
-> +				IMX6Q_GPR1_ENET_CLK_SEL_MASK,
-> +				IMX6Q_GPR1_ENET_CLK_SEL_ANATOP);
-
-It needs '#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>'.  I fixed it
-up and applied both patches.
-
-Shawn
-
->  	else
->  		pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
->  
-> -- 
-> 1.8.3.1
+> > On Thu, Jun 27, 2013 at 02:54:29PM +0100, Stefano Stabellini wrote:
+> > > steal_account_process_tick calls paravirt_steal_clock, but paravirt.h is
+> > > currently missing amoung the included header files.
+> > > Add include asm/paravirt.h ifdef CONFIG_PARAVIRT.
+> > > 
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > CC: mingo at redhat.com
+> > > CC: peterz at infradead.org
+> > > 
+> > > Changes in v5:
+> > > - add ifdef CONFIG_PARAVIRT.
+> > > ---
+> > >  kernel/sched/cputime.c |    4 +++-
+> > >  1 files changed, 3 insertions(+), 1 deletions(-)
+> > > 
+> > > diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
+> > > index cc2dc3ee..317a578 100644
+> > > --- a/kernel/sched/cputime.c
+> > > +++ b/kernel/sched/cputime.c
+> > > @@ -5,7 +5,9 @@
+> > >  #include <linux/static_key.h>
+> > >  #include <linux/context_tracking.h>
+> > >  #include "sched.h"
+> > > -
+> > > +#ifdef CONFIG_PARAVIRT
+> > > +#include <asm/paravirt.h>
+> > > +#endif
+> > 
+> > Why isn't that CONFIG stuff inside the header instead of around it?
 > 
+> Indeed.
+> 
+> Once that is fixed then the #ifdef around asm/paravirt.h in 
+> kernel/sched/core.c could be removed as well.
+
+Right, that should work.
+I'll make the change and resend with an additional patch to remove the
+ifdef in kernel/sched/core.c.
