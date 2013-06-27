@@ -1,27 +1,40 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Thu, 27 Jun 2013 10:32:08 -0400
-Subject: [PATCH v2] mmc: sdhci-sirf: let device core setup the default pin
- configuration
-In-Reply-To: <1368522511-26491-1-git-send-email-Baohua.Song@csr.com> (Barry
- Song's message of "Tue, 14 May 2013 17:08:31 +0800")
-References: <1368522511-26491-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <87obarsjyv.fsf@octavius.laptop.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 27 Jun 2013 07:27:58 -0700
+Subject: [PATCH 3/4] hwmon: Add a simple driver to read the MXS SoC
+ temperature
+In-Reply-To: <20130627091732.GP5803@lukather>
+References: <1372236673-20725-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1372236673-20725-4-git-send-email-alexandre.belloni@free-electrons.com>
+ <20130626143927.GB31998@roeck-us.net>
+ <20130627091732.GP5803@lukather>
+Message-ID: <20130627142758.GA5812@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jun 27, 2013 at 11:17:32AM +0200, Maxime Ripard wrote:
+> On Wed, Jun 26, 2013 at 07:39:27AM -0700, Guenter Roeck wrote:
+> > On Wed, Jun 26, 2013 at 10:51:12AM +0200, Alexandre Belloni wrote:
+> > > The low resolution ADC of the mxs is able to read an internal temperature
+> > > sensor, expose that using hwmon.
+> > > 
+> > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > > ---
+> > 
+> > Wouldn't it make more sense to use iio-hwmon and improve it if necessary ?
+> 
+> Actually, I wonder if we should not just put the hwmon driver
+> capabilities directly into the mxs-lradc driver, just like it's already
+> been done in this driver for the touchscreen support.
+> 
+> The probing of this hwmon driver doesn't really belong to the DT, it's
+> not really realistic to probe it from the machine definition, and it
+> really is the IP that is wired that way.
+> 
+Merging iio-hwmon functionality into an adc driver seems just as bad
+(or even worse) as copying it into a new driver.
 
-On Tue, May 14 2013, Barry Song wrote:
-> With device core now able to setup the default pin configuration, the call
-> to devm_pinctrl_get_select_default can be removed. And the pin configuration
-> code based on the deprecated Samsung specific gpio bindings is also removed.
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+If the lradc driver knows that the ADC channels are temperature sensors, it
+should register them with the iio subsystem as IIO_TEMP type. Then you should
+be able to use iio_hwmon as is.
 
-Thanks, pushed to mmc-next for 3.11.
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Guenter
