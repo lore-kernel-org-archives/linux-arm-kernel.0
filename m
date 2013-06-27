@@ -1,61 +1,70 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 27 Jun 2013 10:53:03 +0900
-Subject: [PATCH v3 1/2] ARM: shmobile: r8a7790: add clocks for thermal
-In-Reply-To: <1372297984-9315-1-git-send-email-horms+renesas@verge.net.au>
-References: <1372297984-9315-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1372297984-9315-2-git-send-email-horms+renesas@verge.net.au>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Thu, 27 Jun 2013 10:05:12 +0800
+Subject: [PATCH] arch: arm64: include: asm: add pci.h to pass compiling
+In-Reply-To: <51CB87B0.8030805@asianux.com>
+References: <51CA5F71.207@asianux.com> <20130626140730.GB23309@arm.com>
+ <51CB87B0.8030805@asianux.com>
+Message-ID: <51CB9DD8.6040905@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On 06/27/2013 08:30 AM, Chen Gang wrote:
+> On 06/26/2013 10:07 PM, Catalin Marinas wrote:
+>> On Wed, Jun 26, 2013 at 04:26:41AM +0100, Chen Gang wrote:
+>>>> Need add pci.h for compiling, the related error (with allmodconfig):
+>>>>
+>>>>   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_exit?:
+>>>>   drivers/media/usb/b2c2/flexcop-usb.c:393:3: error: implicit declaration of function ?pci_free_consistent? [-Werror=implicit-function-declaration]
+>>>>   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_init?:
+>>>>   drivers/media/usb/b2c2/flexcop-usb.c:410:2: error: implicit declaration of function ?pci_alloc_consistent? [-Werror=implicit-function-declaration]
+>>>>   drivers/media/usb/b2c2/flexcop-usb.c:410:21: warning: assignment makes pointer from integer without a cast [enabled by default]
+>>>>   cc1: some warnings being treated as errors
+>>>>
+>>>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>>>> ---
+>>>>  arch/arm64/include/asm/pci.h |   11 +++++++++++
+>>>>  1 files changed, 11 insertions(+), 0 deletions(-)
+>>>>  create mode 100644 arch/arm64/include/asm/pci.h
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+>>>> new file mode 100644
+>>>> index 0000000..2ed467f
+>>>> --- /dev/null
+>>>> +++ b/arch/arm64/include/asm/pci.h
+>>>> @@ -0,0 +1,11 @@
+>>>> +#ifndef ASMARM64_PCI_H
+>>>> +#define ASMARM64_PCI_H
+>>>> +
+>>>> +#ifdef __KERNEL__
+>>>> +
+>>>> +#include <asm-generic/pci-dma-compat.h>
+>>>> +#include <asm-generic/pci.h>
+>>>> +
+>>>> +#endif /* __KERNEL__ */
+>>>> +
+>>>> +#endif
+>> I wonder whether it makes sense to include pci-dma-compat.h in
+>> asm-generic/pci.h, I don't see why one would want the generic pci.h but
+>> not the generic pci-dma-compat.h (cc'ing Arnd).
+> 
 
----
+For m32r, it needs generic pci.h but not the generic pci-dma-compat.h.
 
-v3
-* Correct title to refer to r8a7790
+I am just compiling it with allmodconfig to see whether it will can
+cause issue too, if so I will send the patch for asm-generic. :-)
 
-v2
-* First post
----
- arch/arm/mach-shmobile/clock-r8a7790.c | 4 ++++
- 1 file changed, 4 insertions(+)
+And, sorry for the original reply below is incorrect.
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index 5d71313..28eccd1 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -49,6 +49,7 @@
- 
- #define SMSTPCR2 0xe6150138
- #define SMSTPCR3 0xe615013c
-+#define SMSTPCR5 0xe6150144
- #define SMSTPCR7 0xe615014c
- 
- #define MODEMR		0xE6160060
-@@ -182,6 +183,7 @@ static struct clk div6_clks[DIV6_NR] = {
- enum {
- 	MSTP721, MSTP720,
- 	MSTP717, MSTP716,
-+	MSTP522,
- 	MSTP315, MSTP314, MSTP313, MSTP312, MSTP311, MSTP305, MSTP304,
- 	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202,
- 	MSTP_NR
-@@ -203,6 +205,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP204] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 4, 0), /* SCIFA0 */
- 	[MSTP203] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 3, 0), /* SCIFA1 */
- 	[MSTP202] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 2, 0), /* SCIFA2 */
-+	[MSTP522] = SH_CLK_MSTP32(&extal_clk, SMSTPCR5, 22, 0), /* Thermal */
- 	[MSTP717] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 17, 0), /* HSCIF0 */
- 	[MSTP716] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 16, 0), /* HSCIF1 */
- };
-@@ -254,6 +257,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
- 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP717]),
- 	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP716]),
-+	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("ee200000.mmcif", &mstp_clks[MSTP315]),
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
- 	CLKDEV_DEV_ID("ee100000.sdhi", &mstp_clks[MSTP314]),
+> I think, it will let architecture guys easier to add their own
+> pci-dma-compat.h (although they still need generic pci_dma_compat.h, and
+> generic pci.h, too).
+> 
+> e.g. one architecture want include generic pci-dma-compat.h firstly,
+> then define its own features in its own pci-dma-compat.h.
+> 
+> Thanks.
+> 
+
+
 -- 
-1.8.2.1
+Chen Gang
