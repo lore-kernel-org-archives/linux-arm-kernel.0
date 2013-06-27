@@ -1,33 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 27 Jun 2013 09:29:20 +0100
-Subject: [PATCH] include/asm-generic/pci.h: include generic
- "pci-dma-compat.h"
-In-Reply-To: <51CBB98D.3040304@asianux.com>
-References: <51CBB98D.3040304@asianux.com>
-Message-ID: <20130627082920.GA14335@darko.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 27 Jun 2013 10:37:12 +0200
+Subject: [PATCH v3 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+In-Reply-To: <20130627075223.GQ15455@arwen.pp.htv.fi>
+References: <1372258946-15607-1-git-send-email-s.nawrocki@samsung.com>
+ <1372258946-15607-2-git-send-email-s.nawrocki@samsung.com>
+ <20130627075223.GQ15455@arwen.pp.htv.fi>
+Message-ID: <51CBF9B8.70103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 05:03:25AM +0100, Chen Gang wrote:
-> If an architecture need "generic pci.h", it also need generic "pci-dma-
-> compat.h",  so recommend to include it in asm-generic directly.
+On 06/27/2013 09:52 AM, Felipe Balbi wrote:
+> On Wed, Jun 26, 2013 at 05:02:22PM +0200, Sylwester Nawrocki wrote:
+>> Add a PHY provider driver for the Samsung S5P/Exynos SoC MIPI CSI-2
+>> receiver and MIPI DSI transmitter DPHYs.
+>>
+>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> And now, for arm64 and m32r, may cause compiling error about it.
-> 
-> The related error (with allmodconfig):
-> 
->   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_exit?:
->   drivers/media/usb/b2c2/flexcop-usb.c:393:3: error: implicit declaration of function ?pci_free_consistent? [-Werror=implicit-function-declaration]
->   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_init?:
->   drivers/media/usb/b2c2/flexcop-usb.c:410:2: error: implicit declaration of function ?pci_alloc_consistent? [-Werror=implicit-function-declaration]
->   drivers/media/usb/b2c2/flexcop-usb.c:410:21: warning: assignment makes pointer from integer without a cast [enabled by default]
->   cc1: some warnings being treated as errors
-> 
-> 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
 
->From the arm64 perspective:
+Thank you for your review and ack!
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Just for the record, I have tested this driver as a loadable
+module on Exynos4412 TRATS2 board and it all worked fine for
+both the camera and display side.
 
-(but make sure it doesn't break other archs)
+--
+Regards,
+Sylwester
