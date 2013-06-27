@@ -1,32 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Jun 2013 10:43:01 +0200
-Subject: [PATCH] arch: arm64: include: asm: add pci.h to pass compiling
-In-Reply-To: <51CB87B0.8030805@asianux.com>
-References: <51CA5F71.207@asianux.com> <20130626140730.GB23309@arm.com>
- <51CB87B0.8030805@asianux.com>
-Message-ID: <9028702.KGsxCx1772@wuerfel>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 27 Jun 2013 11:44:34 +0300
+Subject: [PATCH 2/4] ARM: OMAP5: clockdomain data: add init file for
+ omap54xx
+In-Reply-To: <1372322299-25046-3-git-send-email-t-kristo@ti.com>
+References: <1372322299-25046-1-git-send-email-t-kristo@ti.com>
+ <1372322299-25046-3-git-send-email-t-kristo@ti.com>
+Message-ID: <20130627084434.GT15455@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 June 2013 08:30:40 Chen Gang wrote:
-> On 06/26/2013 10:07 PM, Catalin Marinas wrote:
-> > On Wed, Jun 26, 2013 at 04:26:41AM +0100, Chen Gang wrote:
-> > I wonder whether it makes sense to include pci-dma-compat.h in
-> > asm-generic/pci.h, I don't see why one would want the generic pci.h but
-> > not the generic pci-dma-compat.h (cc'ing Arnd).
-> 
-> I think, it will let architecture guys easier to add their own
-> pci-dma-compat.h (although they still need generic pci_dma_compat.h, and
-> generic pci.h, too).
-> 
-> e.g. one architecture want include generic pci-dma-compat.h firstly,
-> then define its own features in its own pci-dma-compat.h.
+Hi,
 
-I think there is no excuse for still keeping the asm-generic/pci-dma-compat.h
-header around any more.
+On Thu, Jun 27, 2013 at 11:38:17AM +0300, Tero Kristo wrote:
+> +	rc = clk_set_parent(abe_dpll_ref, sys_32k_ck);
+> +	abe_dpll = clk_get_sys(NULL, "dpll_abe_ck");
 
-All architectures use the same implementation and have done so for years.
-We should just convert the remaining users to use the dma_mapping.h
-interfaces directly.
+should these two lines be swaped ?
 
-	Arnd
+> +	if (!rc)
+> +		rc = clk_set_rate(abe_dpll, OMAP5_DPLL_ABE_DEFFREQ);
+> +	if (rc)
+> +		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
+> +
+> +	return 0;
+
+so even if (rc) you still return 0 ? Shouldn't you return rc instead ?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130627/ef29b2a2/attachment.sig>
