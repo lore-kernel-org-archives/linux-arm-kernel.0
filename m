@@ -1,52 +1,46 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 27 Jun 2013 12:13:36 +0200
-Subject: [PATCH 06/11] ARM: tegra114: hook tegra_tear_down_cpu function
-In-Reply-To: <1372152475-18617-7-git-send-email-josephl@nvidia.com>
-References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
- <1372152475-18617-7-git-send-email-josephl@nvidia.com>
-Message-ID: <20130627101335.GB15081@mithrandir>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Thu, 27 Jun 2013 18:14:09 +0800
+Subject: [PATCH] include/asm-generic/pci.h: include generic
+ "pci-dma-compat.h"
+In-Reply-To: <20130627082920.GA14335@darko.cambridge.arm.com>
+References: <51CBB98D.3040304@asianux.com>
+ <20130627082920.GA14335@darko.cambridge.arm.com>
+Message-ID: <51CC1071.5040802@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 05:27:50PM +0800, Joseph Lo wrote:
-> Hooking tegra_tear_down_cpu for Tegra114 for supporting cluster power
-> down when CPU cluster suspneded in LP2.
+On 06/27/2013 04:29 PM, Catalin Marinas wrote:
+> On Thu, Jun 27, 2013 at 05:03:25AM +0100, Chen Gang wrote:
+>> > If an architecture need "generic pci.h", it also need generic "pci-dma-
+>> > compat.h",  so recommend to include it in asm-generic directly.
+>> > 
+>> > And now, for arm64 and m32r, may cause compiling error about it.
+>> > 
+>> > The related error (with allmodconfig):
+>> > 
+>> >   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_exit?:
+>> >   drivers/media/usb/b2c2/flexcop-usb.c:393:3: error: implicit declaration of function ?pci_free_consistent? [-Werror=implicit-function-declaration]
+>> >   drivers/media/usb/b2c2/flexcop-usb.c: In function ?flexcop_usb_transfer_init?:
+>> >   drivers/media/usb/b2c2/flexcop-usb.c:410:2: error: implicit declaration of function ?pci_alloc_consistent? [-Werror=implicit-function-declaration]
+>> >   drivers/media/usb/b2c2/flexcop-usb.c:410:21: warning: assignment makes pointer from integer without a cast [enabled by default]
+>> >   cc1: some warnings being treated as errors
+>> > 
+>> > 
+>> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> From the arm64 perspective:
 > 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
->  arch/arm/mach-tegra/pm.c | 1 +
->  1 file changed, 1 insertion(+)
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-> index 94e69be..a0668a2 100644
-> --- a/arch/arm/mach-tegra/pm.c
-> +++ b/arch/arm/mach-tegra/pm.c
-> @@ -52,6 +52,7 @@ static void tegra_tear_down_cpu_init(void)
->  			tegra_tear_down_cpu = tegra20_tear_down_cpu;
->  		break;
->  	case TEGRA30:
-> +	case TEGRA114:
->  		if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC))
->  			tegra_tear_down_cpu = tegra30_tear_down_cpu;
 
-This is getting a little weird. Suppose I want to build a Tegra114 only
-kernel. With the above code it means the tegra_tear_down_cpu won't be
-hooked because ARCH_TEGRA_3x_SOC isn't selected.
+Thanks.
 
-Perhaps tegra30_tear_down_cpu() should be built unconditionally so that
-it's always available? I suspect that something similar will need to be
-done for future chips too, further complicating matters.
+> (but make sure it doesn't break other archs)
 
-There are other alternatives like adding another Kconfig symbol which
-doesn't cover all of Tegra30 but only code shared with Tegra114 (and
-possible future chips) or building sleep-tegra30.S if either one of the
-ARCH_TEGRA_3x_SOC or ARCH_TEGRA_114_SOC symbols is selected.
+I will try to check all related archs with allmodconfig (which can also
+find more another patches, and can let me familiar the compiler step by
+step).  ;-)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130627/6254aa58/attachment.sig>
+
+Thanks.
+-- 
+Chen Gang
