@@ -1,30 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jun 2013 10:59:49 +0100
-Subject: Armada DRM driver on OLPC XO
-In-Reply-To: <20130625204726.BF65C12647A@dev.laptop.org>
-References: <20130625204726.BF65C12647A@dev.laptop.org>
-Message-ID: <20130627095949.GD4283@n2100.arm.linux.org.uk>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 27 Jun 2013 18:01:56 +0800
+Subject: [PATCH 09/11] ARM: tegar: remove the limitation that Tegra114
+ can't support suspend
+In-Reply-To: <51CB4398.8050900@wwwdotorg.org>
+References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
+ <1372152475-18617-10-git-send-email-josephl@nvidia.com>
+ <51CB4398.8050900@wwwdotorg.org>
+Message-ID: <1372327316.9389.26.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 04:47:26PM -0400, Daniel Drake wrote:
-> Hi Russell,
+On Thu, 2013-06-27 at 03:40 +0800, Stephen Warren wrote:
+> On 06/25/2013 03:27 AM, Joseph Lo wrote:
+> > The Tegra114 can support suspend function now, removing the limitation.
 > 
-> Thanks a lot for writing the Armada DRM driver.
-> 
-> I have tested it on OLPC XO-1.75 (MMP2 aka Armada610) and OLPC XO-4 (MMP3
-> aka PXA2128). After a bit of fighting, I have it running. Could you share your
-> X driver, or your methodology for testing hardware cursors? I'd like to test
-> your work there too.
-> 
-> It's probably easiest to get your cubox driver merged before adding MMP2/MMP3
-> complications into the mix. At that point, I will hopefully have time to
-> follow up developing MMP2/MMP3 support, which will involve the points
-> mentioned below.
+> OK, so this is the first point at which system suspend is enabled on
+> Tegra114. However, some of the changes in earlier patches sounded like
+> the might affect, or be required by, cpuidle too. Is that the case? If
+> so, can you assure me that bisectability of Tegra114 cpuidle is
+> maintained across this whole series?
 
-As a side note, you've looked at a previous generation of the patches -
-in that same thread, there are two versions of these patches.  The original
-set was an older version that I mis-posted.
+I think you mean one of the patches I changed the init sequence of CPU
+idle driver and hook the "tegra_tear_down_cpu" in tegra_init_suspend
+(under pm.c). I did that was for fixing the dependence of CPU idle and
+suspend driver.
 
-The later version removes the clock handling for the LCDs out of
-armada_crtc.c into armada_drv.c.
+Because we upstreamed the CPU idle "powered-down" support first then
+system suspend. So we hook the "tegra_tear_down_cpu" in CPU idle driver.
+But it would cause the system suspend function fail when disabling
+CPU_IDLE. After reorganizing the sequence, the system suspend is still
+working after disabling CPU_IDLE. If the PM is disabled, the CPU idle
+driver still supports at least WFI state.
+
+So this series is OK with cpuidle driver. I had tested the previous
+series (already merged in the branch for 3.11) is ok for Tegra20/30 as
+well.
+
+Thanks for take care.
