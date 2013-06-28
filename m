@@ -1,36 +1,42 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 28 Jun 2013 16:50:34 +0200
-Subject: [PATCH v3 2/5] ARM: dts: imx27: Add imx framebuffer device
+Date: Fri, 28 Jun 2013 16:50:35 +0200
+Subject: [PATCH v3 3/5] ARM: dts: imx27: Add 1-wire
 In-Reply-To: <1372431037-13519-1-git-send-email-mpa@pengutronix.de>
 References: <1372431037-13519-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1372431037-13519-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <1372431037-13519-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm/boot/dts/imx27.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+
+Notes:
+    Changes in v3:
+     - Removed clock-names, not necessary for this driver.
+    
+    Changes in v2:
+     - Add fsl,imx27-owire as first entry in the compatibility list.
+
+ arch/arm/boot/dts/imx27.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 8603886..10dcbd3 100644
+index 10dcbd3..a79f173 100644
 --- a/arch/arm/boot/dts/imx27.dtsi
 +++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -342,6 +342,15 @@
- 			reg = <0x10020000 0x20000>;
- 			ranges;
+@@ -110,6 +110,13 @@
+ 				clock-names = "ipg", "per";
+ 			};
  
-+			imxfb: fb at 10021000 {
-+				compatible = "fsl,imx27-fb", "fsl,imx21-fb";
-+				interrupts = <61>;
-+				reg = <0x10021000 0x1000>;
-+				clocks = <&clks 36>, <&clks 65>, <&clks 59>;
-+				clock-names = "ipg", "ahb", "per";
++			owire: owire at 10009000 {
++				compatible = "fsl,imx27-owire", "fsl,imx21-owire";
++				reg = <0x10009000 0x1000>;
++				clocks = <&clks 35>;
 +				status = "disabled";
 +			};
 +
- 			coda: coda at 10023000 {
- 				compatible = "fsl,imx27-vpu";
- 				reg = <0x10023000 0x0200>;
+ 			uart1: serial at 1000a000 {
+ 				compatible = "fsl,imx27-uart", "fsl,imx21-uart";
+ 				reg = <0x1000a000 0x1000>;
 -- 
 1.8.2.1
