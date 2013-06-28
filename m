@@ -1,27 +1,37 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 28 Jun 2013 14:41:25 -0300
+Date: Fri, 28 Jun 2013 14:59:33 -0300
 Subject: imx-drm does not report correct info in fbset
-In-Reply-To: <CAOMZO5A=JSHJrkXwXkYYxbkjtcFv3NU5W6F4hSb5Y7ZrpKij=A@mail.gmail.com>
+In-Reply-To: <20130628174916.GG4283@n2100.arm.linux.org.uk>
 References: <CAOMZO5A=JSHJrkXwXkYYxbkjtcFv3NU5W6F4hSb5Y7ZrpKij=A@mail.gmail.com>
-Message-ID: <CAOMZO5ArQdCmQGoEW=57sr4pJhssKXKQhTmDxHo7cVfA1q82Cw@mail.gmail.com>
+ <20130628174916.GG4283@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5CYTwCvi=JzcRDGWnkMggdLn4yOcoEq+wYpnCVy3Se6eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 2:28 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Philipp/Sascha,
+On Fri, Jun 28, 2013 at 2:49 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+
+> What do you think is missing?  This is what gets reported on my laptop:
 >
-> When I enable the parallel display on a mx53qsb, I noticed that fbset
-> does not report the correct information:
->
-> mode "800x480-0"
->         # D: 0.000 MHz, H: 0.000 kHz, V: 0.000 Hz
->         geometry 800 480 800 480 16
->         timings 0 0 0 0 0 0 0
+> mode "1280x800"
+>     geometry 1280 800 1280 1024 32
+>     timings 0 0 0 0 0 0 0
+>     accel true
+>     rgba 8/16,8/8,8/0,0/0
+> endmode
 
-Ok, just realized that my host PC reports the same in the 'timings' line.
+Yes, just saw the same on my PC.
 
-So not an issue with the imx-drm driver then.
+I was thinking that the 'timings' line should show the correct display timings.
 
-Regards,
+So the mx53 board is behaving the same as my laptop with regards to
+'fbset' output.
+
+> DRM doesn't provide full information via fbdev - its fbdev is just a
+> compatibility later nothing more.
+
+Ok, understood.
+
+Thanks,
 
 Fabio Estevam
