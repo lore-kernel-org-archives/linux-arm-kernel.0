@@ -1,285 +1,122 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 28 Jun 2013 16:18:23 +0900
-Subject: [PATCH V2 3/3] video: exynos_dp: Use the generic PHY driver
-Message-ID: <002101ce73cf$ac989b70$05c9d250$@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 28 Jun 2013 09:44:36 +0200
+Subject: [PATCH v2 2/4] mmc: atmel-mci: prepare clk before calling enable
+In-Reply-To: <1372147891-4296-1-git-send-email-b.brezillon@overkiz.com>
+References: <1372147702-4074-1-git-send-email-b.brezillon@overkiz.com>
+ <1372147891-4296-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <51CD3EE4.90902@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the generic PHY API instead of the platform callback to control
-the DP PHY. The 'phy_label' field is added to the platform data
-structure to allow PHY lookup on non-dt platforms.
+On 25/06/2013 10:11, Boris BREZILLON :
+> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+> avoid common clk framework warnings.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
----
- .../devicetree/bindings/video/exynos_dp.txt        |   17 ---
- drivers/video/exynos/exynos_dp_core.c              |  118 ++------------------
- drivers/video/exynos/exynos_dp_core.h              |    2 +
- include/video/exynos_dp.h                          |    6 +-
- 4 files changed, 15 insertions(+), 128 deletions(-)
+It seems that you forgot the Acked-by line from Ludovic.
 
-diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt b/Documentation/devicetree/bindings/video/exynos_dp.txt
-index 84f10c1..a8320e3 100644
---- a/Documentation/devicetree/bindings/video/exynos_dp.txt
-+++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
-@@ -1,17 +1,6 @@
- The Exynos display port interface should be configured based on
- the type of panel connected to it.
- 
--We use two nodes:
--	-dp-controller node
--	-dptx-phy node(defined inside dp-controller node)
--
--For the DP-PHY initialization, we use the dptx-phy node.
--Required properties for dptx-phy:
--	-reg:
--		Base address of DP PHY register.
--	-samsung,enable-mask:
--		The bit-mask used to enable/disable DP PHY.
--
- For the Panel initialization, we read data from dp-controller node.
- Required properties for dp-controller:
- 	-compatible:
-@@ -67,12 +56,6 @@ SOC specific portion:
- 		interrupt-parent = <&combiner>;
- 		clocks = <&clock 342>;
- 		clock-names = "dp";
--
--		dptx-phy {
--			reg = <0x10040720>;
--			samsung,enable-mask = <1>;
--		};
--
- 	};
- 
- Board Specific portion:
-diff --git a/drivers/video/exynos/exynos_dp_core.c b/drivers/video/exynos/exynos_dp_core.c
-index 12bbede..bac515b 100644
---- a/drivers/video/exynos/exynos_dp_core.c
-+++ b/drivers/video/exynos/exynos_dp_core.c
-@@ -19,6 +19,7 @@
- #include <linux/interrupt.h>
- #include <linux/delay.h>
- #include <linux/of.h>
-+#include <linux/phy/phy.h>
- 
- #include <video/exynos_dp.h>
- 
-@@ -960,84 +961,15 @@ static struct exynos_dp_platdata *exynos_dp_dt_parse_pdata(struct device *dev)
- 		return ERR_PTR(-EINVAL);
- 	}
- 
--	return pd;
--}
--
--static int exynos_dp_dt_parse_phydata(struct exynos_dp_device *dp)
--{
--	struct device_node *dp_phy_node = of_node_get(dp->dev->of_node);
--	u32 phy_base;
--	int ret = 0;
--
--	dp_phy_node = of_find_node_by_name(dp_phy_node, "dptx-phy");
--	if (!dp_phy_node) {
--		dev_err(dp->dev, "could not find dptx-phy node\n");
--		return -ENODEV;
--	}
--
--	if (of_property_read_u32(dp_phy_node, "reg", &phy_base)) {
--		dev_err(dp->dev, "failed to get reg for dptx-phy\n");
--		ret = -EINVAL;
--		goto err;
--	}
--
--	if (of_property_read_u32(dp_phy_node, "samsung,enable-mask",
--				&dp->enable_mask)) {
--		dev_err(dp->dev, "failed to get enable-mask for dptx-phy\n");
--		ret = -EINVAL;
--		goto err;
--	}
--
--	dp->phy_addr = ioremap(phy_base, SZ_4);
--	if (!dp->phy_addr) {
--		dev_err(dp->dev, "failed to ioremap dp-phy\n");
--		ret = -ENOMEM;
--		goto err;
--	}
--
--err:
--	of_node_put(dp_phy_node);
--
--	return ret;
--}
--
--static void exynos_dp_phy_init(struct exynos_dp_device *dp)
--{
--	u32 reg;
--
--	reg = __raw_readl(dp->phy_addr);
--	reg |= dp->enable_mask;
--	__raw_writel(reg, dp->phy_addr);
--}
--
--static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
--{
--	u32 reg;
-+	pd->phy_label = "dp";
- 
--	reg = __raw_readl(dp->phy_addr);
--	reg &= ~(dp->enable_mask);
--	__raw_writel(reg, dp->phy_addr);
-+	return pd;
- }
- #else
- static struct exynos_dp_platdata *exynos_dp_dt_parse_pdata(struct device *dev)
- {
- 	return NULL;
- }
--
--static int exynos_dp_dt_parse_phydata(struct exynos_dp_device *dp)
--{
--	return -EINVAL;
--}
--
--static void exynos_dp_phy_init(struct exynos_dp_device *dp)
--{
--	return;
--}
--
--static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
--{
--	return;
--}
- #endif /* CONFIG_OF */
- 
- static int exynos_dp_probe(struct platform_device *pdev)
-@@ -1061,10 +993,6 @@ static int exynos_dp_probe(struct platform_device *pdev)
- 		pdata = exynos_dp_dt_parse_pdata(&pdev->dev);
- 		if (IS_ERR(pdata))
- 			return PTR_ERR(pdata);
--
--		ret = exynos_dp_dt_parse_phydata(dp);
--		if (ret)
--			return ret;
- 	} else {
- 		pdata = pdev->dev.platform_data;
- 		if (!pdata) {
-@@ -1073,6 +1001,10 @@ static int exynos_dp_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	dp->phy = devm_phy_get(&pdev->dev, pdata->phy_label);
-+	if (IS_ERR(dp->phy))
-+		return PTR_ERR(dp->phy);
-+
- 	dp->clock = devm_clk_get(&pdev->dev, "dp");
- 	if (IS_ERR(dp->clock)) {
- 		dev_err(&pdev->dev, "failed to get clock\n");
-@@ -1097,13 +1029,7 @@ static int exynos_dp_probe(struct platform_device *pdev)
- 
- 	dp->video_info = pdata->video_info;
- 
--	if (pdev->dev.of_node) {
--		if (dp->phy_addr)
--			exynos_dp_phy_init(dp);
--	} else {
--		if (pdata->phy_init)
--			pdata->phy_init();
--	}
-+	phy_power_on(dp->phy);
- 
- 	exynos_dp_init_dp(dp);
- 
-@@ -1121,42 +1047,27 @@ static int exynos_dp_probe(struct platform_device *pdev)
- 
- static int exynos_dp_remove(struct platform_device *pdev)
- {
--	struct exynos_dp_platdata *pdata = pdev->dev.platform_data;
- 	struct exynos_dp_device *dp = platform_get_drvdata(pdev);
- 
- 	flush_work(&dp->hotplug_work);
- 
--	if (pdev->dev.of_node) {
--		if (dp->phy_addr)
--			exynos_dp_phy_exit(dp);
--	} else {
--		if (pdata->phy_exit)
--			pdata->phy_exit();
--	}
-+	phy_power_off(dp->phy);
- 
- 	clk_disable_unprepare(dp->clock);
- 
--
- 	return 0;
- }
- 
- #ifdef CONFIG_PM_SLEEP
- static int exynos_dp_suspend(struct device *dev)
- {
--	struct exynos_dp_platdata *pdata = dev->platform_data;
- 	struct exynos_dp_device *dp = dev_get_drvdata(dev);
- 
- 	disable_irq(dp->irq);
- 
- 	flush_work(&dp->hotplug_work);
- 
--	if (dev->of_node) {
--		if (dp->phy_addr)
--			exynos_dp_phy_exit(dp);
--	} else {
--		if (pdata->phy_exit)
--			pdata->phy_exit();
--	}
-+	phy_power_off(dp->phy);
- 
- 	clk_disable_unprepare(dp->clock);
- 
-@@ -1165,16 +1076,9 @@ static int exynos_dp_suspend(struct device *dev)
- 
- static int exynos_dp_resume(struct device *dev)
- {
--	struct exynos_dp_platdata *pdata = dev->platform_data;
- 	struct exynos_dp_device *dp = dev_get_drvdata(dev);
- 
--	if (dev->of_node) {
--		if (dp->phy_addr)
--			exynos_dp_phy_init(dp);
--	} else {
--		if (pdata->phy_init)
--			pdata->phy_init();
--	}
-+	phy_power_on(dp->phy);
- 
- 	clk_prepare_enable(dp->clock);
- 
-diff --git a/drivers/video/exynos/exynos_dp_core.h b/drivers/video/exynos/exynos_dp_core.h
-index 6c567bbf..b3d0328 100644
---- a/drivers/video/exynos/exynos_dp_core.h
-+++ b/drivers/video/exynos/exynos_dp_core.h
-@@ -42,6 +42,8 @@ struct exynos_dp_device {
- 	struct video_info	*video_info;
- 	struct link_train	link_train;
- 	struct work_struct	hotplug_work;
-+
-+	struct phy		*phy;
- };
- 
- /* exynos_dp_reg.c */
-diff --git a/include/video/exynos_dp.h b/include/video/exynos_dp.h
-index bd8cabd..f38c9af 100644
---- a/include/video/exynos_dp.h
-+++ b/include/video/exynos_dp.h
-@@ -122,10 +122,8 @@ struct video_info {
- };
- 
- struct exynos_dp_platdata {
--	struct video_info *video_info;
--
--	void (*phy_init)(void);
--	void (*phy_exit)(void);
-+	struct video_info	*video_info;
-+	const char		*phy_label;
- };
- 
- #endif /* _EXYNOS_DP_H */
+One comment...
+
+> ---
+>   drivers/mmc/host/atmel-mci.c |   27 ++++++++++++++++++---------
+>   1 file changed, 18 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index e75774f..631c4cf 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -380,6 +380,8 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+>   {
+>   	struct atmel_mci	*host = s->private;
+>   	u32			*buf;
+> +	int			ret = 0;
+> +
+>
+>   	buf = kmalloc(ATMCI_REGS_SIZE, GFP_KERNEL);
+>   	if (!buf)
+> @@ -391,9 +393,13 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+>   	 * consistent.
+>   	 */
+>   	spin_lock_bh(&host->lock);
+> -	clk_enable(host->mck);
+> +	ret = clk_prepare_enable(host->mck);
+
+Do you think that it is needed here? I do not think it can be called 
+before the probe() function and I do not know if the result can change 
+depending on when clk_prepare_enable() is called...
+
+> +	if (ret) {
+> +		spin_unlock_bh(&host->lock);
+> +		goto out;
+> +	}
+>   	memcpy_fromio(buf, host->regs, ATMCI_REGS_SIZE);
+> -	clk_disable(host->mck);
+> +	clk_disable_unprepare(host->mck);
+>   	spin_unlock_bh(&host->lock);
+>
+>   	seq_printf(s, "MR:\t0x%08x%s%s ",
+> @@ -444,9 +450,10 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+>   				val & ATMCI_CFG_LSYNC ? " LSYNC" : "");
+>   	}
+>
+> +out:
+>   	kfree(buf);
+>
+> -	return 0;
+> +	return ret;
+>   }
+>
+>   static int atmci_regs_open(struct inode *inode, struct file *file)
+> @@ -1281,7 +1288,7 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>
+>   		spin_lock_bh(&host->lock);
+>   		if (!host->mode_reg) {
+> -			clk_enable(host->mck);
+> +			clk_prepare_enable(host->mck);
+>   			atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+>   			atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIEN);
+>   			if (host->caps.has_cfg_reg)
+> @@ -1361,7 +1368,7 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>   			atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
+>   			if (host->mode_reg) {
+>   				atmci_readl(host, ATMCI_MR);
+> -				clk_disable(host->mck);
+> +				clk_disable_unprepare(host->mck);
+>   			}
+>   			host->mode_reg = 0;
+>   		}
+> @@ -2379,10 +2386,12 @@ static int __init atmci_probe(struct platform_device *pdev)
+>   	if (!host->regs)
+>   		goto err_ioremap;
+>
+> -	clk_enable(host->mck);
+> +	ret = clk_prepare_enable(host->mck);
+> +	if (ret)
+> +		goto err_request_irq;
+>   	atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+>   	host->bus_hz = clk_get_rate(host->mck);
+> -	clk_disable(host->mck);
+> +	clk_disable_unprepare(host->mck);
+>
+>   	host->mapbase = regs->start;
+>
+> @@ -2487,11 +2496,11 @@ static int __exit atmci_remove(struct platform_device *pdev)
+>   			atmci_cleanup_slot(host->slot[i], i);
+>   	}
+>
+> -	clk_enable(host->mck);
+> +	clk_prepare_enable(host->mck);
+>   	atmci_writel(host, ATMCI_IDR, ~0UL);
+>   	atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
+>   	atmci_readl(host, ATMCI_SR);
+> -	clk_disable(host->mck);
+> +	clk_disable_unprepare(host->mck);
+>
+>   	if (host->dma.chan)
+>   		dma_release_channel(host->dma.chan);
+>
+
+
 -- 
-1.7.10.4
+Nicolas Ferre
