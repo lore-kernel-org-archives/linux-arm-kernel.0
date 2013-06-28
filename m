@@ -1,96 +1,52 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Jun 2013 21:56:23 +0200
-Subject: [PATCHv2 5/8] clocksource: sun4i: Factor out some timer code
-In-Reply-To: <1372449386-1334-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1372449386-1334-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1372449386-1334-6-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 28 Jun 2013 22:03:33 +0200
+Subject: [PATCH 0/2] ARM: sunxi: Convert DTSI to new CPU bindings
+In-Reply-To: <20130628171532.GD30603@e102568-lin.cambridge.arm.com>
+References: <1372437844-16325-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20130628171532.GD30603@e102568-lin.cambridge.arm.com>
+Message-ID: <20130628200333.GA2756@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The set_next_event and set_mode callbacks share a lot of common code we
-can easily factor to avoid duplication and mistakes.
+On Fri, Jun 28, 2013 at 06:15:32PM +0100, Lorenzo Pieralisi wrote:
+> On Fri, Jun 28, 2013 at 05:44:02PM +0100, Maxime Ripard wrote:
+> > Hi Arnd, Olof,
+> > 
+> > Sorry for steping in so late, but these two patches fixes a warning
+> > introduced by the commit 1ba9bf0a (ARM: 7762/1: kernel: fix
+> > arm_dt_init_cpu_maps() to skip non-cpu nodes) after 3.10-rc7.
+> > 
+> > These two patches solve the situation for sunxi. The first one by
+> > Lorenzo is to be applied for 3.10 if it's still possible, and the
+> > second one on top of arm-soc/for-next. Tell me if you prefer a more
+> > formal pull request for these patches
+> > 
+> > Thanks!
+> > Maxime
+> > 
+> > Lorenzo Pieralisi (1):
+> >   ARM: dts: sunxi: cpus/cpu nodes dts updates
+> 
+> The patch above should already be queued in next/dt right ?
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clocksource/sun4i_timer.c | 48 ++++++++++++++++++++++++++-------------
- 1 file changed, 32 insertions(+), 16 deletions(-)
+Indeed.
 
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 695c8c8..6ef10d9 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -37,24 +37,46 @@
- 
- static void __iomem *timer_base;
- 
-+static void sun4i_clkevt_time_stop(u8 timer)
-+{
-+	u32 val = readl(timer_base + TIMER_CTL_REG(timer));
-+	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(timer));
-+	udelay(1);
-+}
-+
-+static void sun4i_clkevt_time_setup(u8 timer, unsigned long delay)
-+{
-+	writel(delay, timer_base + TIMER_INTVAL_REG(timer));
-+}
-+
-+static void sun4i_clkevt_time_start(u8 timer, bool periodic)
-+{
-+	u32 val = readl(timer_base + TIMER_CTL_REG(timer));
-+
-+	if (periodic)
-+		val &= ~TIMER_CTL_ONESHOT;
-+	else
-+		val |= TIMER_CTL_ONESHOT;
-+
-+	writel(val | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(timer));
-+}
-+
- static void sun4i_clkevt_mode(enum clock_event_mode mode,
- 			      struct clock_event_device *clk)
- {
--	u32 u = readl(timer_base + TIMER_CTL_REG(0));
--
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
--		u &= ~(TIMER_CTL_ONESHOT);
--		writel(u | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
-+		sun4i_clkevt_time_stop(0);
-+		sun4i_clkevt_time_start(0, true);
- 		break;
--
- 	case CLOCK_EVT_MODE_ONESHOT:
--		writel(u | TIMER_CTL_ONESHOT, timer_base + TIMER_CTL_REG(0));
-+		sun4i_clkevt_time_stop(0);
-+		sun4i_clkevt_time_start(0, false);
- 		break;
- 	case CLOCK_EVT_MODE_UNUSED:
- 	case CLOCK_EVT_MODE_SHUTDOWN:
- 	default:
--		writel(u & ~(TIMER_CTL_ENABLE), timer_base + TIMER_CTL_REG(0));
-+		sun4i_clkevt_time_stop(0);
- 		break;
- 	}
- }
-@@ -62,15 +84,9 @@ static void sun4i_clkevt_mode(enum clock_event_mode mode,
- static int sun4i_clkevt_next_event(unsigned long evt,
- 				   struct clock_event_device *unused)
- {
--	u32 val = readl(timer_base + TIMER_CTL_REG(0));
--	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
--	udelay(1);
--
--	writel(evt, timer_base + TIMER_INTVAL_REG(0));
--
--	val = readl(timer_base + TIMER_CTL_REG(0));
--	writel(val | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
--	       timer_base + TIMER_CTL_REG(0));
-+	sun4i_clkevt_time_stop(0);
-+	sun4i_clkevt_time_setup(0, evt);
-+	sun4i_clkevt_time_start(0, false);
- 
- 	return 0;
- }
+Then why the latest patch of your patchset got in 3.10, while the
+patches actually fixing the DT it would have impacted were delayed to
+3.11?
+
+(And why was it merged so late in the development cycle?)
+
+Maxime
+
 -- 
-1.8.3.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130628/ebf1b3eb/attachment.sig>
