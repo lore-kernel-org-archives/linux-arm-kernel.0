@@ -1,246 +1,135 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 28 Jun 2013 14:54:06 +0900
-Subject: [PATCH 1/3] phy: Add driver for Exynos DP PHY
-In-Reply-To: <51CD1FA7.2010608@ti.com>
-References: <001501ce73bf$87c49c00$974dd400$@samsung.com>
- <51CD1FA7.2010608@ti.com>
-Message-ID: <001801ce73c3$e6838900$b38a9b00$@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 28 Jun 2013 11:28:10 +0530
+Subject: [PATCH 3/3] video: exynos_dp: Use the generic PHY driver
+In-Reply-To: <001701ce73bf$bebf9f20$3c3edd60$@samsung.com>
+References: <001701ce73bf$bebf9f20$3c3edd60$@samsung.com>
+Message-ID: <51CD25F2.5010206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 28, 2013 2:31 PM, Kishon Vijay Abraham I wrote:
-> 
-> Hi,
-> 
-> On Friday 28 June 2013 10:52 AM, Jingoo Han wrote:
-> > Add a PHY provider driver for the Samsung Exynos SoC DP PHY.
-> >
-> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> > ---
-> >   .../phy/samsung,exynos5250-dp-video-phy.txt        |    7 ++
-> >   drivers/phy/Kconfig                                |    8 ++
-> >   drivers/phy/Makefile                               |    3 +-
-> >   drivers/phy/phy-exynos-dp-video.c                  |  130 ++++++++++++++++++++
-> >   4 files changed, 147 insertions(+), 1 deletion(-)
-> >   create mode 100644 Documentation/devicetree/bindings/phy/samsung,exynos5250-dp-video-phy.txt
-> >   create mode 100644 drivers/phy/phy-exynos-dp-video.c
-> >
-> > diff --git a/Documentation/devicetree/bindings/phy/samsung,exynos5250-dp-video-phy.txt
-> > b/Documentation/devicetree/bindings/phy/samsung,exynos5250-dp-video-phy.txt
-> > new file mode 100644
-> > index 0000000..8b6fa79
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/phy/samsung,exynos5250-dp-video-phy.txt
-> > @@ -0,0 +1,7 @@
-> > +Samsung EXYNOS SoC series DP PHY
-> > +-------------------------------------------------
-> > +
-> > +Required properties:
-> > +- compatible : should be "samsung,exynos5250-dp-video-phy";
-> > +- reg : offset and length of the DP PHY register set;
-> > +- #phy-cells : from the generic phy bindings, must be 1;
-> > diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> > index 5f85909..6d10e3b 100644
-> > --- a/drivers/phy/Kconfig
-> > +++ b/drivers/phy/Kconfig
-> > @@ -11,3 +11,11 @@ menuconfig GENERIC_PHY
-> >   	  devices present in the kernel. This layer will have the generic
-> >   	  API by which phy drivers can create PHY using the phy framework and
-> >   	  phy users can obtain reference to the PHY.
-> > +
-> > +if GENERIC_PHY
-> > +
-> > +config PHY_EXYNOS_DP_VIDEO
-> > +	tristate "EXYNOS SoC series DP PHY driver"
-> > +	help
-> > +	  Support for DP PHY found on Samsung EXYNOS SoCs.
-> > +endif
-> > diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> > index 9e9560f..d8d861c 100644
-> > --- a/drivers/phy/Makefile
-> > +++ b/drivers/phy/Makefile
-> > @@ -2,4 +2,5 @@
-> >   # Makefile for the phy drivers.
-> >   #
-> >
-> > -obj-$(CONFIG_GENERIC_PHY)	+= phy-core.o
-> > +obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
-> > +obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
-> > diff --git a/drivers/phy/phy-exynos-dp-video.c b/drivers/phy/phy-exynos-dp-video.c
-> > new file mode 100644
-> > index 0000000..376b3bc2
-> > --- /dev/null
-> > +++ b/drivers/phy/phy-exynos-dp-video.c
-> > @@ -0,0 +1,130 @@
-> > +/*
-> > + * Samsung EXYNOS SoC series DP PHY driver
-> > + *
-> > + * Copyright (C) 2013 Samsung Electronics Co., Ltd.
-> > + * Author: Jingoo Han <jg1.han@samsung.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/delay.h>
-> 
-> this header file is not needed here.
+Hi,
 
-OK, I will remove it.
+On Friday 28 June 2013 10:54 AM, Jingoo Han wrote:
+> Use the generic PHY API instead of the platform callback to control
+> the DP PHY. The 'phy_label' field is added to the platform data
+> structure to allow PHY lookup on non-dt platforms.
+>
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> ---
+>   .../devicetree/bindings/video/exynos_dp.txt        |   17 ---
+>   drivers/video/exynos/exynos_dp_core.c              |  118 ++------------------
+>   drivers/video/exynos/exynos_dp_core.h              |    2 +
+>   include/video/exynos_dp.h                          |    6 +-
+>   4 files changed, 15 insertions(+), 128 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt b/Documentation/devicetree/bindings/video/exynos_dp.txt
+> index 84f10c1..a8320e3 100644
+> --- a/Documentation/devicetree/bindings/video/exynos_dp.txt
+> +++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
+> @@ -1,17 +1,6 @@
+>   The Exynos display port interface should be configured based on
+>   the type of panel connected to it.
+>
+> -We use two nodes:
+> -	-dp-controller node
+> -	-dptx-phy node(defined inside dp-controller node)
+> -
+> -For the DP-PHY initialization, we use the dptx-phy node.
+> -Required properties for dptx-phy:
+> -	-reg:
+> -		Base address of DP PHY register.
+> -	-samsung,enable-mask:
+> -		The bit-mask used to enable/disable DP PHY.
+> -
+>   For the Panel initialization, we read data from dp-controller node.
+>   Required properties for dp-controller:
+>   	-compatible:
+> @@ -67,12 +56,6 @@ SOC specific portion:
+>   		interrupt-parent = <&combiner>;
+>   		clocks = <&clock 342>;
+>   		clock-names = "dp";
+> -
+> -		dptx-phy {
+> -			reg = <0x10040720>;
+> -			samsung,enable-mask = <1>;
+> -		};
+> -
+>   	};
+>
+>   Board Specific portion:
+> diff --git a/drivers/video/exynos/exynos_dp_core.c b/drivers/video/exynos/exynos_dp_core.c
+> index 12bbede..bac515b 100644
+> --- a/drivers/video/exynos/exynos_dp_core.c
+> +++ b/drivers/video/exynos/exynos_dp_core.c
+> @@ -19,6 +19,7 @@
+>   #include <linux/interrupt.h>
+>   #include <linux/delay.h>
+>   #include <linux/of.h>
+> +#include <linux/phy/phy.h>
+>
+>   #include <video/exynos_dp.h>
+>
+> @@ -960,84 +961,15 @@ static struct exynos_dp_platdata *exynos_dp_dt_parse_pdata(struct device *dev)
+>   		return ERR_PTR(-EINVAL);
+>   	}
+>
+> -	return pd;
+> -}
+> -
+> -static int exynos_dp_dt_parse_phydata(struct exynos_dp_device *dp)
+> -{
+> -	struct device_node *dp_phy_node = of_node_get(dp->dev->of_node);
+> -	u32 phy_base;
+> -	int ret = 0;
+> -
+> -	dp_phy_node = of_find_node_by_name(dp_phy_node, "dptx-phy");
+> -	if (!dp_phy_node) {
+> -		dev_err(dp->dev, "could not find dptx-phy node\n");
+> -		return -ENODEV;
+> -	}
+> -
+> -	if (of_property_read_u32(dp_phy_node, "reg", &phy_base)) {
+> -		dev_err(dp->dev, "failed to get reg for dptx-phy\n");
+> -		ret = -EINVAL;
+> -		goto err;
+> -	}
+> -
+> -	if (of_property_read_u32(dp_phy_node, "samsung,enable-mask",
+> -				&dp->enable_mask)) {
+> -		dev_err(dp->dev, "failed to get enable-mask for dptx-phy\n");
+> -		ret = -EINVAL;
+> -		goto err;
+> -	}
+> -
+> -	dp->phy_addr = ioremap(phy_base, SZ_4);
+> -	if (!dp->phy_addr) {
+> -		dev_err(dp->dev, "failed to ioremap dp-phy\n");
+> -		ret = -ENOMEM;
+> -		goto err;
+> -	}
+> -
+> -err:
+> -	of_node_put(dp_phy_node);
+> -
+> -	return ret;
+> -}
+> -
+> -static void exynos_dp_phy_init(struct exynos_dp_device *dp)
+> -{
+> -	u32 reg;
+> -
+> -	reg = __raw_readl(dp->phy_addr);
+> -	reg |= dp->enable_mask;
+> -	__raw_writel(reg, dp->phy_addr);
+> -}
+> -
+> -static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
+> -{
+> -	u32 reg;
+> +	pd->phy_label = "dp";
 
-> 
-> > +#include <linux/io.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/phy/phy.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/spinlock.h>
-> > +
-> > +/* DPTX_PHY_CONTROL register */
-> > +#define EXYNOS_DPTX_PHY_ENABLE		(1 << 0)
-> > +
-> > +struct exynos_dp_video_phy {
-> > +	spinlock_t slock;
-> > +	struct phy *phys;
-> > +	void __iomem *regs;
-> > +};
-> > +
-> > +static int __set_phy_state(struct exynos_dp_video_phy *state, unsigned int on)
-> > +{
-> > +	void __iomem *addr;
-> > +	unsigned long flags;
-> > +	u32 reg;
-> > +
-> > +	addr = state->regs;
-> > +
-> > +	spin_lock_irqsave(&state->slock, flags);
-> > +	reg = readl(addr);
-> > +	if (on)
-> > +		reg |= EXYNOS_DPTX_PHY_ENABLE;
-> > +	else
-> > +		reg &= ~EXYNOS_DPTX_PHY_ENABLE;
-> > +	writel(reg, addr);
-> > +	spin_unlock_irqrestore(&state->slock, flags);
-> > +	return 0;
-> > +}
-> > +
-> > +static int exynos_dp_video_phy_power_on(struct phy *phy)
-> > +{
-> > +	struct exynos_dp_video_phy *state = phy_get_drvdata(phy);
-> > +
-> > +	return __set_phy_state(state, 1);
-> > +}
-> > +
-> > +static int exynos_dp_video_phy_power_off(struct phy *phy)
-> > +{
-> > +	struct exynos_dp_video_phy *state = phy_get_drvdata(phy);
-> > +
-> > +	return __set_phy_state(state, 0);
-> > +}
-> > +
-> > +static struct phy *exynos_dp_video_phy_xlate(struct device *dev,
-> > +					struct of_phandle_args *args)
-> > +{
-> > +	struct exynos_dp_video_phy *state = dev_get_drvdata(dev);
-> > +
-> > +	return state->phys;
-> 
-> you can instead use of_phy_simple_xlate for such simple cases.
+In the case of non-dt boot, this phy_label should have ideally come from
+platform code.
 
-OK, I will use of_phy_simple_xlate().
-
-> > +}
-> > +
-> > +static struct phy_ops exynos_dp_video_phy_ops = {
-> > +	.power_on	= exynos_dp_video_phy_power_on,
-> > +	.power_off	= exynos_dp_video_phy_power_off,
-> > +	.owner		= THIS_MODULE,
-> > +};
-> > +
-> > +static int exynos_dp_video_phy_probe(struct platform_device *pdev)
-> > +{
-> > +	struct exynos_dp_video_phy *state;
-> > +	struct device *dev = &pdev->dev;
-> > +	struct resource *res;
-> > +	struct phy_provider *phy_provider;
-> > +
-> > +	state = devm_kzalloc(dev, sizeof(*state), GFP_KERNEL);
-> > +	if (!state)
-> > +		return -ENOMEM;
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +
-> > +	state->regs = devm_ioremap_resource(dev, res);
-> > +	if (IS_ERR(state->regs))
-> > +		return PTR_ERR(state->regs);
-> > +
-> > +	dev_set_drvdata(dev, state);
-> > +
-> > +	phy_provider = devm_of_phy_provider_register(dev,
-> > +					exynos_dp_video_phy_xlate);
-> > +	if (IS_ERR(phy_provider))
-> > +		return PTR_ERR(phy_provider);
-> > +
-> > +	state->phys = devm_phy_create(dev, 0, &exynos_dp_video_phy_ops, "dp");
-> > +	if (IS_ERR(state->phys)) {
-> > +		dev_err(dev, "failed to create DP PHY\n");
-> > +		return PTR_ERR(state->phys);
-> > +	}
-> > +	phy_set_drvdata(state->phys, state);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id exynos_dp_video_phy_of_match[] = {
-> > +	{ .compatible = "samsung,exynos5250-dp-video-phy" },
-> > +	{ },
-> > +};
-> > +MODULE_DEVICE_TABLE(of, exynos_dp_video_phy_of_match);
-> 
-> This above should come inside #ifdef CONFIG_OF.
-
-OK, I will add '#ifdef CONFIG_OF'.
-
-> > +
-> > +static struct platform_driver exynos_dp_video_phy_driver = {
-> > +	.probe	= exynos_dp_video_phy_probe,
-> 
-> missing .remove?
-
-No, it is intentional.
-
-In the exynos_dp_video_phy_probe(), only devm_*() are called as below.
-  devm_kzalloc(),
-  devm_ioremap_resource(),
-  devm_of_phy_provider_register(),
-  devm_phy_create(),
-
-Also, dev_set_drvdata(dev, NULL), phy_set_drvdata(state->phys, NULL)
-are not necessary in remove(), because driver core clears automatically
-after device_release.
-
-Thus, there is no functions in the remove().
-
-Thank you for your comment. :)
-It is very helpful.
-
-Best regards,
-Jingoo Han
-
-> > +	.driver = {
-> > +		.of_match_table	= exynos_dp_video_phy_of_match,
-> > +		.name  = "exynos-dp-video-phy",
-> > +		.owner = THIS_MODULE,
-> > +	}
-> > +};
-> > +module_platform_driver(exynos_dp_video_phy_driver);
-> > +
-> > +MODULE_DESCRIPTION("Samsung EXYNOS SoC DP PHY driver");
-> > +MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
-> > +MODULE_LICENSE("GPL v2");
-> 
-> Thanks
-> Kishon
+Thanks
+Kishon
