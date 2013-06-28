@@ -1,43 +1,57 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 28 Jun 2013 12:25:44 +0200
-Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
-In-Reply-To: <20130627151318.GB1360@darko.cambridge.arm.com>
-References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
- <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
- <20130626111430.GH26142@mudshark.cambridge.arm.com>
- <CAKv+Gu_R7=Euaa87kQqR5TfGQLyF6Ad51dBm2CroYHcKMRs_dA@mail.gmail.com>
- <20130626124009.GL26142@mudshark.cambridge.arm.com>
- <CAKv+Gu9_V75jGSq675H+Gi7jkDWBkVDLXvewMuv8dWxx7-VxEw@mail.gmail.com>
- <CAKv+Gu-5SsvJCvXkJoqPm-TZx6tr+49pUXfpkSoBo-s+Z8_YmQ@mail.gmail.com>
- <CAKv+Gu_=Ctg8+KVMp9amq+2nOgj8DiUKidNDwas8qy2=y3TX-A@mail.gmail.com>
- <20130627151318.GB1360@darko.cambridge.arm.com>
-Message-ID: <CAKv+Gu8wsXCDO-7FCJG+Rbkkyahm563UX2dMDXVstYhjAZ+TrQ@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 28 Jun 2013 12:26:10 +0200 (CEST)
+Subject: [linux-sunxi] [PATCH 0/8] clocksource: sunxi: Timer fixes and
+ cleanup
+In-Reply-To: <20130628124843.242df804@i7>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+ <51CC0566.8010302@redhat.com> <20130627094307.GC8437@lukather>
+ <51CC0BC3.5090309@redhat.com> <20130627165436.GB4319@lukather>
+ <20130627232608.1174558b@i7> <2013062809433715678058@allwinnertech.com>
+ <20130628124843.242df804@i7>
+Message-ID: <alpine.DEB.2.02.1306281211330.4013@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 June 2013 17:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Jun 27, 2013 at 02:11:27PM +0100, Ard Biesheuvel wrote:
->> OK, just one more question before I respin the next (hopefully final) version:
->> if a caller does sleep after calling kernel_neon_begin() (and thus
->> receives no warning if he runs a non-PREEMPT build with
->> CONFIG_DEBUG_ATOMIC_SLEEP disabled), he will most likely find the
->> NEON/VFP unit disabled after waking up (as we disable it on a context
->> switch), so any subsequent NEON instructions will trigger the undef
->> handler.
->
-> Can you check on the VFP context switch path whether kernel_neon_begin()
-> has been called and we are moving away from the task? You could even
-> store the LR in kernel_neon_begin() to give better error information.
->
+On Fri, 28 Jun 2013, Siarhei Siamashka wrote:
+> On Fri, 28 Jun 2013 09:43:37 +0800
+> ?? <kevin@allwinnertech.com> wrote:
+> 
+> > > The A10 manual from http://free-electrons.com/~maxime/pub/datasheet/
+> > > does not seem to contain any details about what bad things may happen
+> > > if we try to read CNT64_LO_REG while latching is still in progress and
+> > > CNT64_RL_EN bit in CNT64_CTRL_REG has not changed to zero yet.
+> > > I can imagine the following possible scenarios:
+> > >  1. We read either the old stale CNT64_LO_REG value or the new
+> > >     correct value.
+> > >  2. We read either the old stale CNT64_LO_REG value or the new
+> > >     correct value, or some random garbage.
+> > >  3. The processor may deadlock, eat your dog, or do some other
+> > >     nasty thing.
+> > >
+> > > In the case of 1, we probably can get away without using any spinlocks?
+> > 
+> > About the 64bits counter, the latch bit is needed because of the
+> > asynchronous circuit. The internal circuit of 64bits counter is
+> > working under 24Mhz clock, and CNT_LO/HI is read with APB clock.
+> > So the clock synchronize is needed. The function of the latch is
+> > synchronous the 64bits counter from 24Mhz clock domain to APB clock
+> > domain. So, if the latch is not completely, value of the CNT_LO/HI
+> > maybe a random value, because some bits are latched, but others are
+> > not. So, the CNT_LO/HI should be read after latch is completely.
+> > The latch just takes 3 cycles of 24Mhz clock, the time is nearly
+> > 0.125 micro-second.
+> 
+> Thanks for the clarification! It is very much appreciated.
+> 
+> So basically we get scenario 2, which still allows some optimizations
+> compared to scenario 3. On single-core systems (Allwinner A10), it
+> probably makes sense to avoid spinlocks overhead and just place
 
-I wil take this suggestion for the arm64 case, and propose a new
-version next week. For arm, I think we should be ok without this, as
-Will also suggested, because you will always hit the BUG() in
-vfp_kmode_exception() if you touch the NEON from the kernel after a
-context switch (there are only two ways to get the NEON enabled, one
-is through lazy restore, which now only works from userland, and the
-other is through kernel_neon_begin())
+Spinlocks are NOPs on UP and just disable preemption, but they
+provide you the same ordering guarantees as spinlocks on SMP. So no
+special case optimization necessary.
 
--- 
-Ard.
+Thanks,
+
+	tglx
+	
