@@ -1,32 +1,37 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Jun 2013 21:56:21 +0200
-Subject: [PATCHv2 3/8] clocksource: sun4i: Don't forget to enable the clock we
- use
+Date: Fri, 28 Jun 2013 21:56:19 +0200
+Subject: [PATCHv2 1/8] clocksource: sun4i: Use the BIT macros where possible
 In-Reply-To: <1372449386-1334-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1372449386-1334-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1372449386-1334-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1372449386-1334-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even if in our case, this clock was non-gatable, used as a parent clock
-for several IPs, it still is a good idea to enable it.
-
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clocksource/sun4i_timer.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/sun4i_timer.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 050e94f..84ace76 100644
+index d4674e7..bdf34d9 100644
 --- a/drivers/clocksource/sun4i_timer.c
 +++ b/drivers/clocksource/sun4i_timer.c
-@@ -118,6 +118,7 @@ static void __init sun4i_timer_init(struct device_node *node)
- 	clk = of_clk_get(node, 0);
- 	if (IS_ERR(clk))
- 		panic("Can't get timer clock");
-+	clk_prepare_enable(clk);
+@@ -24,12 +24,12 @@
+ #include <linux/of_irq.h>
  
- 	rate = clk_get_rate(clk);
+ #define TIMER_IRQ_EN_REG	0x00
+-#define TIMER_IRQ_EN(val)		(1 << val)
++#define TIMER_IRQ_EN(val)		BIT(val)
+ #define TIMER_IRQ_ST_REG	0x04
+ #define TIMER_CTL_REG(val)	(0x10 * val + 0x10)
+-#define TIMER_CTL_ENABLE		(1 << 0)
+-#define TIMER_CTL_AUTORELOAD		(1 << 1)
+-#define TIMER_CTL_ONESHOT		(1 << 7)
++#define TIMER_CTL_ENABLE		BIT(0)
++#define TIMER_CTL_AUTORELOAD		BIT(1)
++#define TIMER_CTL_ONESHOT		BIT(7)
+ #define TIMER_INTVAL_REG(val)	(0x10 * val + 0x14)
+ #define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
  
 -- 
 1.8.3.1
