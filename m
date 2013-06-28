@@ -1,182 +1,29 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 28 Jun 2013 15:02:55 +0200
-Subject: [PATCHv3 6/8] ARM: mxs: dt: cfa10049: make hogpins grabbed by
- respective drivers
-In-Reply-To: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1372424577-8279-7-git-send-email-alexandre.belloni@free-electrons.com>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Fri, 28 Jun 2013 13:04:09 +0000
+Subject: Chipidea usb otg support for IMX/MXS (device functionality)
+In-Reply-To: <201306281356.51670.marex@denx.de>
+References: <51A5A808.2070803@digi.com> <201306281142.51676.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803EFF551@039-SN2MPN1-023.039d.mgd.msft.net>
+ <201306281356.51670.marex@denx.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803EFF788@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/imx28-cfa10049.dts | 73 +++++++++++++++++++++++++++++++-----
- 1 file changed, 63 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index 04b2f76..06e4cfa 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -22,32 +22,62 @@
- 	apb at 80000000 {
- 		apbh at 80000000 {
- 			pinctrl at 80018000 {
--				pinctrl-names = "default", "default";
--				pinctrl-1 = <&hog_pins_cfa10049
--					&hog_pins_cfa10049_pullup>;
--
--				hog_pins_cfa10049: hog-10049 at 0 {
-+				usb_pins_cfa10049: usb-10049 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
- 						0x0073 /* MX28_PAD_GPMI_D7__GPIO_0_7 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
-+
-+				i2cmux_pins_cfa10049: i2cmux-10049 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
- 						0x1163 /* MX28_PAD_LCD_D22__GPIO_1_22 */
- 						0x1173 /* MX28_PAD_LCD_D22__GPIO_1_23 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
-+
-+				mac0_pins_cfa10049: mac0-10049 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
- 						0x2153 /* MX28_PAD_SSP2_D5__GPIO_2_21 */
--						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
- 					>;
- 					fsl,drive-strength = <0>;
- 					fsl,voltage = <1>;
- 					fsl,pull-up = <0>;
- 				};
  
--				hog_pins_cfa10049_pullup: hog-10049-pullup at 0 {
-+				pca_pins_cfa10049: pca-10049 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
- 						0x2133 /* MX28_PAD_SSP2_D3__GPIO_2_19 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+
-+				rotary_pins_cfa10049: rotary-10049 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
- 						0x3183 /* MX28_PAD_I2C0_SCL__GPIO_3_24 */
- 						0x3193 /* MX28_PAD_I2C0_SDA__GPIO_3_25 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+
-+				rotary_btn_pins_cfa10049: rotary-btn-10049 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
- 						0x31a3 /* MX28_PAD_SAIF_SDATA0__GPIO_3_26 */
--						0x31e3 /* MX28_PAD_LCD_RESET__GPIO_3_30 */
- 					>;
- 					fsl,drive-strength = <0>;
- 					fsl,voltage = <1>;
-@@ -60,6 +90,7 @@
- 						0x2103 /* MX28_PAD_SSP2_SCK__GPIO_2_16 */
- 						0x2113 /* MX28_PAD_SSP2_CMD__GPIO_2_17 */
- 						0x2123 /* MX28_PAD_SSP2_D0__GPIO_2_18 */
-+						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
- 					>;
- 					fsl,drive-strength = <1>;
- 					fsl,voltage = <1>;
-@@ -120,6 +151,16 @@
- 					fsl,pull-up = <0>;
- 				};
- 
-+				lcdif_pins_cfa10049_pullup: lcdif-10049-pullup at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x31e3 /* MX28_PAD_LCD_RESET__GPIO_3_30 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+
- 				w1_gpio_pins: w1-gpio at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
-@@ -134,7 +175,8 @@
- 			lcdif@80030000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&lcdif_18bit_pins_cfa10049
--					     &lcdif_pins_cfa10049>;
-+					     &lcdif_pins_cfa10049
-+					     &lcdif_pins_cfa10049_pullup>;
- 				display = <&display>;
- 				status = "okay";
- 
-@@ -181,6 +223,8 @@
- 				compatible = "i2c-mux-gpio";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&i2cmux_pins_cfa10049>;
- 				mux-gpios = <&gpio1 22 0 &gpio1 23 0>;
- 				i2c-parent = <&i2c1>;
- 
-@@ -203,6 +247,8 @@
- 
- 					pca9555: pca9555 at 20 {
- 						compatible = "nxp,pca9555";
-+						pinctrl-names = "default";
-+						pinctrl-0 = <&pca_pins_cfa10049>;
- 						interrupt-parent = <&gpio2>;
- 						interrupts = <19 0x2>;
- 						gpio-controller;
-@@ -239,6 +285,8 @@
- 
- 		reg_usb1_vbus: usb1_vbus {
- 			compatible = "regulator-fixed";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&usb_pins_cfa10049>;
- 			regulator-name = "usb1_vbus";
- 			regulator-min-microvolt = <5000000>;
- 			regulator-max-microvolt = <5000000>;
-@@ -250,7 +298,8 @@
- 		mac0: ethernet at 800f0000 {
- 			phy-mode = "rmii";
- 			pinctrl-names = "default";
--			pinctrl-0 = <&mac0_pins_a>;
-+			pinctrl-0 = <&mac0_pins_a
-+				&mac0_pins_cfa10049>;
- 			phy-reset-gpios = <&gpio2 21 0>;
- 			phy-reset-duration = <100>;
- 			status = "okay";
-@@ -320,6 +369,8 @@
- 
- 	gpio_keys {
- 		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&rotary_btn_pins_cfa10049>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
-@@ -333,6 +384,8 @@
- 
- 	rotary {
- 		compatible = "rotary-encoder";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&rotary_pins_cfa10049>;
- 		gpios = <&gpio3 24 1>, <&gpio3 25 1>;
- 		linux,axis = <1>; /* REL_Y */
- 		rotary-encoder,relative-axis;
--- 
-1.8.1.2
+> >
+> > Just measure the voltage of your otg vbus pin.
+> 
+> Ok, I see it's 2.25 volts after I disconnect the microB-A thing . I
+> should see
+> 0.8V constantly with nothing connected on the port?
+> 
+
+You should see the voltage of vbus pin is less than 0.8v when
+nothing is connected, we use B_SESSION_VALID (0.8v) to judge
+it is connected or not.
+
+You get 2.25 all the time or it is discharged very slowly?
+
+Best regards,
+Peter
