@@ -1,89 +1,49 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Fri, 28 Jun 2013 10:18:48 +0800
-Subject: ARM pagetable setting in Linux
-In-Reply-To: <20130626175430.GH2718@n2100.arm.linux.org.uk>
-References: <35FD53F367049845BC99AC72306C23D19441BF5863@CNBJMBX05.corpusers.net>
- <20130626171649.GG10333@mudshark.cambridge.arm.com>
- <20130626175430.GH2718@n2100.arm.linux.org.uk>
-Message-ID: <35FD53F367049845BC99AC72306C23D19441BF5867@CNBJMBX05.corpusers.net>
+From: vapier@gentoo.org (Mike Frysinger)
+Date: Thu, 27 Jun 2013 22:42:36 -0400
+Subject: [PATCH] ARM: footbridge: fix overlapping PCI mappings
+Message-ID: <1372387356-15341-1-git-send-email-vapier@gentoo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear  Both,
+Commit 8ef6e6201b26cb9fde79c1baa08145af6aca2815 (ARM: footbridge: use
+fixed PCI i/o mapping) broke booting on my netwinder.  Before that,
+everything boots fine.  Since then, it crashes on boot.
 
-Thanks for your reply ,
+With earlyprintk, I see it BUG-ing like so:
+kernel BUG at lib/ioremap.c:27!
+Internal error: Oops - BUG: 0 [#1] ARM
+...
+[<c0139b54>] (ioremap_page_range+0x128/0x154) from [<c02e6a6c>] (dc21285_setup+0xd0/0x114)
+[<c02e6a6c>] (dc21285_setup+0xd0/0x114) from [<c02e4874>] (pci_common_init+0xa0/0x298)
+[<c02e4874>] (pci_common_init+0xa0/0x298) from [<c02e793c>] (netwinder_pci_init+0xc/0x18)
+[<c02e793c>] (netwinder_pci_init+0xc/0x18) from [<c02e27d0>] (do_one_initcall+0xb4/0x180)
+...
 
-mmm...   The meaning of the first level pagetables need copy is that :
+Russell points out it's because of overlapping PCI mappings that was
+added with the aforementioned commit.  Rob thought the code would re-use
+the static mapping, but that turns out to not be the case and instead
+hits the BUG further down.
 
-https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/arch/arm/mm/fault.c?h=misc-patches
+After deleting this hunk as suggested by Russel, the system boots up fine
+again and all my PCI devices work (IDE, ethernet, the DC21285).
 
-line:474   (do_translation_fault())
-This happened if some kernel drivers call vmalloc / kmap / ioremap function,
-It can happen  even after fork() a new process .
+Signed-off-by: Mike Frysinger <vapier@gentoo.org>
+---
+ arch/arm/mach-footbridge/dc21285.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-
-
-https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/arch/arm/mm/pgd.c?h=misc-patches
-
-line:50 (pgd_alloc())
-This just happened when fork() a new process .
-
-
-Anyway, I see your concerns now , 
-I will have a discussion about this .
-
-Thank you both !
-
-
------Original Message-----
-From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-Sent: Thursday, June 27, 2013 1:55 AM
-To: Will Deacon
-Cc: Wang, Yalin; 'linux-arch at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; linux-arm-kernel at lists.infradead.org
-Subject: Re: ARM pagetable setting in Linux
-
-As I don't have the original mail (because it wasn't copied to the right
-list) I can't reply to the original author, so I'll do it like this instead.
-
-On Wed, Jun 26, 2013 at 06:16:49PM +0100, Will Deacon wrote:
-> [adding the ARM list -- please try and remember to do that in future]
-> 
-> On Wed, Jun 26, 2013 at 03:41:40AM +0100, Wang, Yalin wrote:
-> > Hi  Will,
-> 
-> Hello,
-> 
-> > I have a question about  arm pagetable setting in Linux .
-> > 
-> > From armV6,  there is TTBR0 and TTBR1  translation base address registers  in mmu .
-> > But I  found linux only use TTBR0 for translation base address , 
-> > Could we use TTBR0 and TTBR1 to split user task and kernel 
-> > pagetables (swapper_pg_dir)?
-
-We don't use TTBR1 because the configurable page table splits between
-TTBR0 and TTBR1 are not appropriate for Linux kernels.  The common configuration is to have 3GB of userspace and 1GB of kernel space.
-
-However, the TTBR splits supported are 2GB, 1GB, 512MB etc.  As I had prior knowledge of ARMv6 before it was released, I raised this point with ARM Ltd because I knew that it would not be appropriate for Linux.
-Unfortunately, the response was basically that they didn't want to know.
-So, as the hardware provided support mismatches what we want, we don't use the feature.
-
-It's as simple as that; had we been listened to and the architecture altered to do what we required, then we'd be using it...
-
-> > 1. Because we don?t need copy kernel first ?level pagetables into 
-> > every User task?s pagetables and flush tlb (for example fork() a new process).
-> 
-> Well, you still need the TLB maintenance for setting up CoW, so this 
-> win is probably not very big.
-> 
-> > 2. And don?t need handle kernel page fault because that user task?s 
-> > kernel Pagetable when it is not set up , need copy again( for 
-> > example vmalloc()  ioremap()  kmap()  will change Kernel pagetables and need update to every task pagetables ) .
-> 
-> Is that really a fastpath?
-
-No it isn't, because for all of the above cases we're talking about copying
-L1 page table entries, not the individual L2 page table entries between threads.
-
-Every page table above TASK_SIZE gets shared between processes, and once it's been shared to a process, any new process forked from that gets its own pointer to that 2nd level page table immediately.
-
-So, during the initial boot there will be a number of the L1 copies, but the system will stabilize and there will be no further L1 faulted copies needed.
+diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
+index a7cd2cf..3490a24 100644
+--- a/arch/arm/mach-footbridge/dc21285.c
++++ b/arch/arm/mach-footbridge/dc21285.c
+@@ -276,8 +276,6 @@ int __init dc21285_setup(int nr, struct pci_sys_data *sys)
+ 
+ 	sys->mem_offset  = DC21285_PCI_MEM;
+ 
+-	pci_ioremap_io(0, DC21285_PCI_IO);
+-
+ 	pci_add_resource_offset(&sys->resources, &res[0], sys->mem_offset);
+ 	pci_add_resource_offset(&sys->resources, &res[1], sys->mem_offset);
+ 
+-- 
+1.8.2.1
