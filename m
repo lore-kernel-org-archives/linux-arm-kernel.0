@@ -1,39 +1,40 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 28 Jun 2013 19:10:06 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MyAyLzVdIEFSTTogZHRzOiBpbXgyNzogQWRkIGlteCBm?=
- =?UTF-8?B?cmFtZWJ1ZmZlciBkZXZpY2U=?=
-In-Reply-To: <1372431037-13519-3-git-send-email-mpa@pengutronix.de>
-References: <1372431037-13519-1-git-send-email-mpa@pengutronix.de>
- <1372431037-13519-3-git-send-email-mpa@pengutronix.de>
-Message-ID: <1372432206.785926201@f326.mail.ru>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 28 Jun 2013 17:24:43 +0200
+Subject: [PATCH 3/4] hwmon: Add a simple driver to read the MXS SoC
+ temperature
+In-Reply-To: <51CDA2BF.5050501@free-electrons.com>
+References: <1372236673-20725-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1372236673-20725-4-git-send-email-alexandre.belloni@free-electrons.com>
+ <20130626143927.GB31998@roeck-us.net> <20130627091732.GP5803@lukather>
+ <20130627142758.GA5812@roeck-us.net> <51CC91E8.50605@free-electrons.com>
+ <51CD9B19.90407@metafoo.de> <51CDA2BF.5050501@free-electrons.com>
+Message-ID: <51CDAABB.4020505@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx27.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
+On 06/28/2013 04:50 PM, Alexandre Belloni wrote:
+> On 28/06/2013 16:18, Lars-Peter Clausen wrote:
+>> On 06/27/2013 09:26 PM, Alexandre Belloni wrote:
+>>>
+>>> They are already registered as IIO_TEMP but only implement read_raw. Also,
+>>>
+>>> iio_hwmon_read_val() is using iio_read_channel_processed() and that will
+>>> basically only read one of the 2 channels. As I documented, you actually
+>>> need to read both channel 8 and channel 9 and then compute the value in
+>>> Kelvins. I'm not sure how you want me to do that in the current framework.
+>> What are these two channels actually measuring? Is the value of a single
+>> channel meaningful on it's own? If not it might make sense to update the IIO
+>> driver to just have one temperature channel.
 > 
-> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> index 8603886..10dcbd3 100644
-> --- a/arch/arm/boot/dts/imx27.dtsi
-> +++ b/arch/arm/boot/dts/imx27.dtsi
-> @@ -342,6 +342,15 @@
->  			reg = <0x10020000 0x20000>;
->  			ranges;
->  
-> +			imxfb: fb at 10021000 {
+> It's not actually meaningful on its own. So, what you would do is expose
+> one iio channel for two ADC channels and do the computation in read_raw
+> ? or read_processed ? Then using iio-hwon to export it. ?
+> 
+> Regards,
+> 
 
-If it can be fixed while applying, it would be right to use just "fb" here.
-We now use a lot of devices without "imx"-prefix, so I do not see any need to use it here.
+Yes, return channel9 - channel8 as the raw value for the temperature channel
+and provide proper scale and offset values, so that
+iio_read_channel_processed() will return the correct value.
 
-> +				compatible = "fsl,imx27-fb", "fsl,imx21-fb";
-> +				interrupts = <61>;
-> +				reg = <0x10021000 0x1000>;
-> +				clocks = <&clks 36>, <&clks 65>, <&clks 59>;
-> +				clock-names = "ipg", "ahb", "per";
-> +				status = "disabled";
-> +			};
-> +
-
----
+- Lars
