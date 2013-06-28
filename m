@@ -1,58 +1,39 @@
 From: gururaja.hebbar@ti.com (Hebbar Gururaja)
-Date: Fri, 28 Jun 2013 15:05:06 +0530
-Subject: [PATCH 1/4] rtc: omap: restore back (hard-code) wakeup support
+Date: Fri, 28 Jun 2013 15:05:09 +0530
+Subject: [PATCH 4/4] ARM: dts: AM33XX: update rtc node compatibility
 In-Reply-To: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
 References: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1372412109-986-2-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <1372412109-986-5-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rtc-omap driver modules is used both by OMAP1/2, Davinci SoC platforms.
+Since AM33xx  RTC IP has RTC_IRQWAKEEN to support Alarm Wake-up.
 
-However, rtc wake support on OMAP1 is broken. Hence the
-device_init_wakeup() was removed from rtc-omap driver and moved to
-platform board files that supported it (DA850/OMAP-L138). [1]
-
-However, recently [2] it was suggested that driver should always do a
-device_init_wakeup(dev, true). Platforms that don't want/need
-wakeup support can disable it from userspace via:
-
-    echo disabled > /sys/devices/.../power/wakeup
-
-Also, with the new DT boot-up, board file doesn't exist and hence there
-is no way to have device wakeup support rtc.
-
-The fix for above issues, is to hard code device_init_wakeup() inside
-driver and let platforms that don't need this, handle it through the
-sysfs power entry.
-
-[1]
-https://patchwork.kernel.org/patch/136731/
-
-[2]
-http://www.mail-archive.com/davinci-linux-open-source at linux.
-davincidsp.com/msg26077.html
+Update the rtc compatible property to "ti,am3352-rtc" to enable handling
+of this feature inside rtc-omap driver.
 
 Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-Cc: Alessandro Zummo <a.zummo@towertech.it>
-Cc: rtc-linux at googlegroups.com
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: b-cousson at ti.com
 ---
-:100644 100644 b0ba3fc... 761919d... M	drivers/rtc/rtc-omap.c
- drivers/rtc/rtc-omap.c |    2 ++
- 1 file changed, 2 insertions(+)
+:100644 100644 77aa1b0... dde180a... M	arch/arm/boot/dts/am33xx.dtsi
+ arch/arm/boot/dts/am33xx.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index b0ba3fc..761919d 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -423,6 +423,8 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 	 *    is write-only, and always reads as zero...)
- 	 */
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 77aa1b0..dde180a 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -297,7 +297,7 @@
+ 		};
  
-+	device_init_wakeup(&pdev->dev, true);
-+
- 	if (new_ctrl & (u8) OMAP_RTC_CTRL_SPLIT)
- 		pr_info("%s: split power mode\n", pdev->name);
- 
+ 		rtc at 44e3e000 {
+-			compatible = "ti,da830-rtc";
++			compatible = "ti,am3352-rtc";
+ 			reg = <0x44e3e000 0x1000>;
+ 			interrupts = <75
+ 				      76>;
 -- 
 1.7.9.5
