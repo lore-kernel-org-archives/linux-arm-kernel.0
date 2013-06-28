@@ -1,178 +1,52 @@
 From: gururaja.hebbar@ti.com (Hebbar Gururaja)
-Date: Fri, 28 Jun 2013 15:05:08 +0530
-Subject: [PATCH 3/4] rtc: omap: add rtc wakeup support to alarm events
+Date: Fri, 28 Jun 2013 15:05:07 +0530
+Subject: [PATCH 2/4] davinci: da8xx/omap-l1: Remove hard coding of rtc device
+ wakeup
 In-Reply-To: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
 References: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1372412109-986-4-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <1372412109-986-3-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms (like AM33xx), a special register (RTC_IRQWAKEEN)
-is available to enable Alarm Wakeup feature. This register needs to be
-properly handled for the rtcwake to work properly.
+Since now rtc-omap driver itself calls deice_init_wakeup(dev, true),
+duplicate call from the rtc device registration can be removed.
 
-Platforms using such IP should set "ti,am3352-rtc" in rtc device dt
-compatibility node.
+This is basically a partial revert of the prev commit
+
+commit 75c99bb0006ee065b4e2995078d779418b0fab54
+Author: Sekhar Nori <nsekhar@ti.com>
+
+    davinci: da8xx/omap-l1: mark RTC as a wakeup source
 
 Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Rob Landley <rob@landley.net>
 Cc: Sekhar Nori <nsekhar@ti.com>
 Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Alessandro Zummo <a.zummo@towertech.it>
-Cc: rtc-linux at googlegroups.com
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: linux-doc at vger.kernel.org
----
-:100644 100644 b47aa41... 5a0f02d... M	Documentation/devicetree/bindings/rtc/rtc-omap.txt
-:100644 100644 761919d... 666b0c2... M	drivers/rtc/rtc-omap.c
- Documentation/devicetree/bindings/rtc/rtc-omap.txt |    6 ++-
- drivers/rtc/rtc-omap.c                             |   56 +++++++++++++++++---
- 2 files changed, 54 insertions(+), 8 deletions(-)
+Cc: Russell King <linux@arm.linux.org.uk>
 
-diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-index b47aa41..5a0f02d 100644
---- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-+++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-@@ -1,7 +1,11 @@
- TI Real Time Clock
+---
+:100644 100644 bf57252... 85a900c... M	arch/arm/mach-davinci/devices-da8xx.c
+ arch/arm/mach-davinci/devices-da8xx.c |    9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index bf57252..85a900c 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -827,14 +827,7 @@ static struct platform_device da8xx_rtc_device = {
  
- Required properties:
--- compatible: "ti,da830-rtc"
-+- compatible:
-+	- "ti,da830-rtc"  - for RTC IP used similar to that on DA8xx SoC family.
-+	- "ti,am3352-rtc" - for RTC IP used similar to that on AM335x SoC family.
-+			    This RTC IP has special WAKE-EN Register to enable
-+			    Wakeup generation for event Alarm.
- - reg: Address range of rtc register set
- - interrupts: rtc timer, alarm interrupts in order
- - interrupt-parent: phandle for the interrupt controller
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index 761919d..666b0c2 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -72,6 +72,8 @@
- #define OMAP_RTC_KICK0_REG		0x6c
- #define OMAP_RTC_KICK1_REG		0x70
- 
-+#define OMAP_RTC_IRQWAKEEN		0x7C
-+
- /* OMAP_RTC_CTRL_REG bit fields: */
- #define OMAP_RTC_CTRL_SPLIT		(1<<7)
- #define OMAP_RTC_CTRL_DISABLE		(1<<6)
-@@ -96,12 +98,21 @@
- #define OMAP_RTC_INTERRUPTS_IT_ALARM    (1<<3)
- #define OMAP_RTC_INTERRUPTS_IT_TIMER    (1<<2)
- 
-+/* OMAP_RTC_IRQWAKEEN bit fields: */
-+#define OMAP_RTC_IRQWAKEEN_ALARM_WAKEEN    (1<<1)
-+
- /* OMAP_RTC_KICKER values */
- #define	KICK0_VALUE			0x83e70b13
- #define	KICK1_VALUE			0x95a4f1e0
- 
- #define	OMAP_RTC_HAS_KICKER		0x1
- 
-+/*
-+ * Few RTC IP revisions has special WAKE-EN Register to enable Wakeup
-+ * generation for event Alarm.
-+ */
-+#define	OMAP_RTC_HAS_IRQWAKEEN		0x2
-+
- static void __iomem	*rtc_base;
- 
- #define rtc_read(addr)		readb(rtc_base + (addr))
-@@ -301,7 +312,8 @@ static struct rtc_class_ops omap_rtc_ops = {
- static int omap_rtc_alarm;
- static int omap_rtc_timer;
- 
--#define	OMAP_RTC_DATA_DA830_IDX	1
-+#define	OMAP_RTC_DATA_DA830_IDX		1
-+#define	OMAP_RTC_DATA_AM335X_IDX	2
- 
- static struct platform_device_id omap_rtc_devtype[] = {
- 	{
-@@ -309,6 +321,9 @@ static struct platform_device_id omap_rtc_devtype[] = {
- 	}, {
- 		.name	= "da830-rtc",
- 		.driver_data = OMAP_RTC_HAS_KICKER,
-+	}, {
-+		.name	= "am335x-rtc",
-+		.driver_data = OMAP_RTC_HAS_KICKER | OMAP_RTC_HAS_IRQWAKEEN,
- 	},
- 	{},
- };
-@@ -318,6 +333,9 @@ static const struct of_device_id omap_rtc_of_match[] = {
- 	{	.compatible	= "ti,da830-rtc",
- 		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_DA830_IDX],
- 	},
-+	{	.compatible	= "ti,am3352-rtc",
-+		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_AM335X_IDX],
-+	},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, omap_rtc_of_match);
-@@ -466,16 +484,28 @@ static u8 irqstat;
- 
- static int omap_rtc_suspend(struct device *dev)
+ int da8xx_register_rtc(void)
  {
-+	u8 irqwake_stat;
-+	struct platform_device *pdev = to_platform_device(dev);
-+	const struct platform_device_id *id_entry =
-+					platform_get_device_id(pdev);
-+
- 	irqstat = rtc_read(OMAP_RTC_INTERRUPTS_REG);
- 
- 	/* FIXME the RTC alarm is not currently acting as a wakeup event
--	 * source, and in fact this enable() call is just saving a flag
--	 * that's never used...
-+	 * source on some platforms, and in fact this enable() call is just
-+	 * saving a flag that's never used...
- 	 */
--	if (device_may_wakeup(dev))
-+	if (device_may_wakeup(dev)) {
- 		enable_irq_wake(omap_rtc_alarm);
--	else
-+
-+		if (id_entry->driver_data & OMAP_RTC_HAS_IRQWAKEEN) {
-+			irqwake_stat = rtc_read(OMAP_RTC_IRQWAKEEN);
-+			irqwake_stat |= OMAP_RTC_IRQWAKEEN_ALARM_WAKEEN;
-+			rtc_write(irqwake_stat, OMAP_RTC_IRQWAKEEN);
-+		}
-+	} else {
- 		rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
-+	}
- 
- 	/* Disable the clock/module */
- 	pm_runtime_put_sync(dev);
-@@ -485,13 +515,25 @@ static int omap_rtc_suspend(struct device *dev)
- 
- static int omap_rtc_resume(struct device *dev)
- {
-+	u8 irqwake_stat;
-+	struct platform_device *pdev = to_platform_device(dev);
-+	const struct platform_device_id *id_entry =
-+				platform_get_device_id(pdev);
-+
- 	/* Enable the clock/module so that we can access the registers */
- 	pm_runtime_get_sync(dev);
- 
--	if (device_may_wakeup(dev))
-+	if (device_may_wakeup(dev)) {
- 		disable_irq_wake(omap_rtc_alarm);
--	else
-+
-+		if (id_entry->driver_data & OMAP_RTC_HAS_IRQWAKEEN) {
-+			irqwake_stat = rtc_read(OMAP_RTC_IRQWAKEEN);
-+			irqwake_stat &= ~OMAP_RTC_IRQWAKEEN_ALARM_WAKEEN;
-+			rtc_write(irqwake_stat, OMAP_RTC_IRQWAKEEN);
-+		}
-+	} else {
- 		rtc_write(irqstat, OMAP_RTC_INTERRUPTS_REG);
-+	}
- 	return 0;
+-	int ret;
+-
+-	ret = platform_device_register(&da8xx_rtc_device);
+-	if (!ret)
+-		/* Atleast on DA850, RTC is a wakeup source */
+-		device_init_wakeup(&da8xx_rtc_device.dev, true);
+-
+-	return ret;
++	return  platform_device_register(&da8xx_rtc_device);
  }
- #endif
+ 
+ static void __iomem *da8xx_ddr2_ctlr_base;
 -- 
 1.7.9.5
