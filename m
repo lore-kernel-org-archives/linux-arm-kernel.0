@@ -1,61 +1,140 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 28 Jun 2013 15:49:31 +0200
-Subject: [PATCH] of: Specify initrd location using 64-bit
-In-Reply-To: <CACxGe6vOH0sCFVVXrYqD3dbYdOvithVu7-d1cvy5885i8x_Myw@mail.gmail.com>
-References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
- <51C4171C.9050908@linutronix.de> <51C48B5A.2040404@ti.com>
- <51CCA67C.2010803@gmail.com>
- <CACxGe6vOH0sCFVVXrYqD3dbYdOvithVu7-d1cvy5885i8x_Myw@mail.gmail.com>
-Message-ID: <20130628134931.GD21034@game.jcrosoft.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 28 Jun 2013 16:57:55 +0300
+Subject: [RFC PATCH 4/6] USB: ehci-omap: Suspend the controller during
+ bus suspend
+In-Reply-To: <51CD7FA1.3020005@ti.com>
+References: <Pine.LNX.4.44L0.1306271032210.1167-100000@iolanthe.rowland.org>
+ <51CD7FA1.3020005@ti.com>
+Message-ID: <51CD9663.6060806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:59 Fri 28 Jun     , Grant Likely wrote:
-> On Thu, Jun 27, 2013 at 9:54 PM, Rob Herring <robherring2@gmail.com> wrote:
-> > On 06/21/2013 12:20 PM, Santosh Shilimkar wrote:
-> >> On Friday 21 June 2013 05:04 AM, Sebastian Andrzej Siewior wrote:
-> >>> On 06/21/2013 02:52 AM, Santosh Shilimkar wrote:
-> >>>> diff --git a/arch/microblaze/kernel/prom.c b/arch/microblaze/kernel/prom.c
-> >>>> index 0a2c68f..62e2e8f 100644
-> >>>> --- a/arch/microblaze/kernel/prom.c
-> >>>> +++ b/arch/microblaze/kernel/prom.c
-> >>>> @@ -136,8 +136,7 @@ void __init early_init_devtree(void *params)
-> >>>>  }
-> >>>>
-> >>>>  #ifdef CONFIG_BLK_DEV_INITRD
-> >>>> -void __init early_init_dt_setup_initrd_arch(unsigned long start,
-> >>>> -           unsigned long end)
-> >>>> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
-> >>>>  {
-> >>>>     initrd_start = (unsigned long)__va(start);
-> >>>>     initrd_end = (unsigned long)__va(end);
-> >>>
-> >>> I think it would better to go here for phys_addr_t instead of u64. This
-> >>> would force you in of_flat_dt_match() to check if the value passed from
-> >>> DT specifies a memory address outside of 32bit address space and the
-> >>> kernel can't deal with this because its phys_addr_t is 32bit only due
-> >>> to a Kconfig switch.
-> >>>
-> >>> For x86, the initrd has to remain in the 32bit address space so passing
-> >>> the initrd in the upper range would violate the ABI. Not sure if this
-> >>> is true for other archs as well (ARM obviously not).
-> >>>
-> >> That pretty much means phys_addr_t. It will work for me as well but
-> >> in last thread from consistency with memory and reserved node, Rob
-> >> insisted to keep it as u64. So before I re-spin another version,
-> >> would like to here what Rob has to say considering the x86 requirement.
-> >>
-> >> Rob,
-> >> Are you ok with phys_addr_t since your concern was about rest
-> >> of the memory specific bits of the device-tree code use u64 ?
-> >
-> > No. I still think it should be u64 for same reasons I said originally.
-> 
-> +1
-> 
-+1
+On 06/28/2013 03:20 PM, Roger Quadros wrote:
+> On 06/27/2013 06:40 PM, Alan Stern wrote:
+>> On Wed, 26 Jun 2013, Roger Quadros wrote:
+>>
 
-fix type
+>>> I updated the ehci-omap.c driver to call ehci_suspend/resume during runtime_suspend/resume.
+>>> After that, it stopped detecting the port status change event when a device was plugged
+>>> to an external HUB. The wakeup irq was coming and the root hub/controller were being resumed,
+>>> but after that, no hub_irq.
+>>
+>> Wait a minute.  I'm not clear on what happened.  You're starting out
+>> with the controller, the root hub, and the external hub all suspended, 
+>> right?  Then you plugged a new device into the external hub.  This 
+> 
+> This is right.
+> 
+>> caused the controller and the root hub to wake up, but not the external 
+>> hub?
+>>
+> Right. It seems the external hub has signaled remote wakeup but the kernel doesn't
+> resume the root hub's port it is connected to.
+> 
+> By observing the detailed logs below you can see that the root hub does not generate
+> an INTerrupt transaction to notify the port status change event. I've captured the pstatus
+> and GetPortStatus info as well.
+> 
+> Failing case
+> ------------
+> 
+> [   16.108032] usb usb1: usb auto-resume
+> [   16.108062] ehci-omap 48064800.ehci: resume root hub
+> [   16.108154] hub 1-0:1.0: hub_resume
+> [   16.108398] ehci_hub_control GetPortStatus, port 1 temp = 0x1000
+> [   16.108459] ehci_hub_control GetPortStatus, port 2 temp = 0x14c5
+> [   16.108551] hub 1-0:1.0: port 2: status 0507 change 0000
+> [   16.108612] ehci_hub_control GetPortStatus, port 3 temp = 0x1000
+> [   16.108642] hub 1-0:1.0: hub_activate submitting urb
+> [   16.109222] ehci_irq port 3 pstatus 0x1000
+> [   16.109222] ehci_irq port 2 pstatus 0x14c5
+> [   16.109252] ehci_irq port 1 pstatus 0x1000
+> [   16.109374] hub 1-0:1.0: state 7 ports 3 chg 0000 evt 0000
+> 
+> Passing case
+> ------------
+> 
+> / # [   19.704589] usb usb1: usb wakeup-resume
+> [   19.709075] ehci-omap 48064800.ehci: omap_ehci_runtime_resume
+> [   19.715423] usb usb1: usb auto-resume
+> [   19.719299] ehci-omap 48064800.ehci: resume root hub
+> [   19.724670] hub 1-0:1.0: hub_resume
+> [   19.728424] ehci_hub_control GetPortStatus, port 1 temp = 0x1000
+> [   19.734863] ehci_hub_control GetPortStatus, port 2 temp = 0x14c5
+> [   19.741271] hub 1-0:1.0: port 2: status 0507 change 0000
+> [   19.746948] ehci_hub_control GetPortStatus, port 3 temp = 0x1000
+> [   19.753448] hub 1-0:1.0: hub_activate submitting urb
+> [   19.759216] ehci_irq port 3 pstatus 0x1000
+> [   19.763519] ehci_irq port 2 pstatus 0x14c5
+> [   19.767822] ehci_irq port 1 pstatus 0x1000
+> [   19.772155] hub 1-0:1.0: hub_irq 
+> 
+> <---This is the Port Status change hub INT which is missing in the failing case--->
+> 
+> [   19.775604] hub 1-0:1.0: hub_irq submitting urb
+> [   19.780548] hub 1-0:1.0: state 7 ports 3 chg 0000 evt 0004
+> [   19.786407] hub 1-0:1.0: hub_irq
+> [   19.789916] hub 1-0:1.0: hub_irq submitting urb
+> [   19.794799] ehci_hub_control GetPortStatus, port 2 temp = 0x14c5
+> [   19.801147] ehci-omap 48064800.ehci: GetStatus port:2 status 001005 0  ACK POWER sig=se0 PE CONNECT
+> [   19.822937] usb 1-2: usb wakeup-resume
+> [   19.826995] ehci_hub_control GetPortStatus, port 2 temp = 0x1005
+> [   19.833404] usb 1-2: finish resume
+> [   19.837738] hub 1-2:1.0: hub_resume
+> [   19.841613] hub 1-2:1.0: port 1: status 0507 change 0000
+> [   19.848358] hub 1-2:1.0: port 4: status 0101 change 0001
+> [   19.962890] hub 1-2:1.0: hub_activate submitting urb
+> [   19.968139] ehci-omap 48064800.ehci: reused qh dd450200 schedule
+> [   19.974456] usb 1-2: link qh256-0001/dd450200 start 1 [1/0 us]
+> [   19.980743] hub 1-0:1.0: resume on port 2, status 0
+> [   19.985961] hub 1-0:1.0: state 7 ports 3 chg 0000 evt 0000
+> [   19.991760] hub 1-2:1.0: state 7 ports 5 chg 0010 evt 0000
+> [   19.997741] hub 1-2:1.0: port 4, status 0101, change 0000, 12 Mb/s
+> [   20.083129] usb 1-2.4: new high-speed USB device number 4 using ehci-omap
+> <snip>
+> 
+> One more thing is that the delay didn't help if I reduce printk verbosity to 7.
+> So the debug prints are also adding some delays around the place which is affecting
+> the behaviour.
 
-Best Regards,
-J.
+
+Just found the problem. It seems that enabling the ehci_irq _after_ the root hub is resumed
+is the root cause of the problem. Doing so will miss events from the root hub.
+
+The following modification worked for me without any delays.
+
+diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
+index 72df4eb..b3af1aa 100644
+--- a/drivers/usb/core/hcd.c
++++ b/drivers/usb/core/hcd.c
+@@ -2136,11 +2136,6 @@ static void hcd_resume_work(struct work_struct *work)
+ 	usb_lock_device(udev);
+ 	usb_remote_wakeup(udev);
+ 	usb_unlock_device(udev);
+-	if (HCD_IRQ_DISABLED(hcd)) {
+-		/* Interrupt was disabled */
+-		clear_bit(HCD_FLAG_IRQ_DISABLED, &hcd->flags);
+-		enable_irq(hcd->irq);
+-	}
+ }
+ 
+ /**
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index 593d28d..f2a1a46 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -1110,6 +1110,12 @@ int ehci_resume(struct usb_hcd *hcd, bool hibernated)
+ {
+ 	struct ehci_hcd		*ehci = hcd_to_ehci(hcd);
+ 
++	if (HCD_IRQ_DISABLED(hcd)) {
++		/* Interrupt was disabled */
++		clear_bit(HCD_FLAG_IRQ_DISABLED, &hcd->flags);
++		enable_irq(hcd->irq);
++	}
++
+ 	if (time_before(jiffies, ehci->next_statechange))
+ 		msleep(100);
+ 
+cheers,
+-roger
