@@ -1,36 +1,39 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 28 Jun 2013 11:11:40 +0530
-Subject: [PATCH 2/3] ARM: dts: Add DP PHY node to exynos5250.dtsi
-In-Reply-To: <001601ce73bf$9f2e9120$dd8bb360$@samsung.com>
-References: <001601ce73bf$9f2e9120$dd8bb360$@samsung.com>
-Message-ID: <51CD2214.10506@ti.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Fri, 28 Jun 2013 13:49:28 +0800
+Subject: No subject
+Message-ID: <35FD53F367049845BC99AC72306C23D19441BF5868@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sboy,
 
-On Friday 28 June 2013 10:53 AM, Jingoo Han wrote:
-> Add PHY provider node for the DP PHY.
->
-> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> ---
->   arch/arm/boot/dts/exynos5250.dtsi |   13 ++++++++-----
->   1 file changed, 8 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 41cd625..d1d6e14 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -614,6 +614,12 @@
->   		interrupts = <0 94 0>;
->   	};
->
-> +	dp_phy: video-phy at 10040720 {
-> +		compatible = "samsung,exynos5250-dp-video-phy";
-> +		reg = <0x10040720 4>;
-> +		#phy-cells = <1>;
+I don't know who should I send this mail to .
+If you are not the right person, please forward 
+To the right responsible person , Thank you !
 
-phy-cells can be '0' here since this phy_provider implements only one PHY.
+I have a question about msm kernel code :
 
-Thanks
-Kishon
+File: Arch/arm/msm/memory.c
+
+reserve_memory_for_mempools()
+it call memblock_remove() directly,
+I think it's not safe sometimes ,
+Should use arm_memblock_steal() function or some other similar
+Function to make sure the removed memory is not reserved by memblock driver,
+In case the removed memory is reserved by some driver.
+
+
+Thanks 
+
+
+Yalin.Wang
+Software Engineer 
+OS Kernel&Graphics
+?
+Sony Mobile Communications
+Tel: +86 10 5966 9819
+Phone: 18610323092
+Address: No.16 Guangshun South Street, Chaoyang, Beijing, P.R.C.
+
+sonymobile.com
+??
