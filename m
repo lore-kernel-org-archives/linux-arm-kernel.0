@@ -1,175 +1,50 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 28 Jun 2013 13:39:42 +0800
-Subject: [PATCH v2] serial: imx: remove the uart_console() check
-Message-ID: <1372397982-19017-1-git-send-email-b32955@freescale.com>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Fri, 28 Jun 2013 14:06:55 +0800
+Subject: [PATCH 2/3] ARM: dts: Add DP PHY node to exynos5250.dtsi
+In-Reply-To: <001b01ce73c4$88f45020$9adcf060$@samsung.com>
+References: <001601ce73bf$9f2e9120$dd8bb360$@samsung.com>
+ <51CD2214.10506@ti.com> <001b01ce73c4$88f45020$9adcf060$@samsung.com>
+Message-ID: <51CD27FF.1060706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The uart_console() check makes the clocks(clk_per and clk_ipg) opened
-even when we close the console uart.
-
-This patch enable/disable the clocks in imx_console_write(),
-so we can keep the clocks closed when the console uart is closed.
-
-Also remove the clock enable/disable oprations in the probe, we do not
-need them any more.
-
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
-v1 --> v2:
-	[0] Squash the two patch into one patch.
-	[1] only enable the ipg clock in the imx_console_setup().
-        [2] remove all the clock oprations in probe().	
----
- drivers/tty/serial/imx.c |   69 ++++++++++++++++++++++++++++-----------------
- 1 files changed, 43 insertions(+), 26 deletions(-)
-
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 415cec6..48bace0 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -702,15 +702,13 @@ static int imx_startup(struct uart_port *port)
- 	int retval;
- 	unsigned long flags, temp;
- 
--	if (!uart_console(port)) {
--		retval = clk_prepare_enable(sport->clk_per);
--		if (retval)
--			goto error_out1;
--		retval = clk_prepare_enable(sport->clk_ipg);
--		if (retval) {
--			clk_disable_unprepare(sport->clk_per);
--			goto error_out1;
--		}
-+	retval = clk_prepare_enable(sport->clk_per);
-+	if (retval)
-+		goto error_out1;
-+	retval = clk_prepare_enable(sport->clk_ipg);
-+	if (retval) {
-+		clk_disable_unprepare(sport->clk_per);
-+		goto error_out1;
- 	}
- 
- 	imx_setup_ufcr(sport, 0);
-@@ -901,10 +899,8 @@ static void imx_shutdown(struct uart_port *port)
- 	writel(temp, sport->port.membase + UCR1);
- 	spin_unlock_irqrestore(&sport->port.lock, flags);
- 
--	if (!uart_console(&sport->port)) {
--		clk_disable_unprepare(sport->clk_per);
--		clk_disable_unprepare(sport->clk_ipg);
--	}
-+	clk_disable_unprepare(sport->clk_per);
-+	clk_disable_unprepare(sport->clk_ipg);
- }
- 
- static void
-@@ -1251,6 +1247,16 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
- 	unsigned int ucr1;
- 	unsigned long flags = 0;
- 	int locked = 1;
-+	int retval;
-+
-+	retval = clk_enable(sport->clk_per);
-+	if (retval)
-+		return;
-+	retval = clk_enable(sport->clk_ipg);
-+	if (retval) {
-+		clk_disable(sport->clk_per);
-+		return;
-+	}
- 
- 	if (sport->port.sysrq)
- 		locked = 0;
-@@ -1286,6 +1292,9 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
- 
- 	if (locked)
- 		spin_unlock_irqrestore(&sport->port.lock, flags);
-+
-+	clk_disable(sport->clk_ipg);
-+	clk_disable(sport->clk_per);
- }
- 
- /*
-@@ -1359,6 +1368,7 @@ imx_console_setup(struct console *co, char *options)
- 	int bits = 8;
- 	int parity = 'n';
- 	int flow = 'n';
-+	int retval;
- 
- 	/*
- 	 * Check whether an invalid uart number has been specified, and
-@@ -1371,6 +1381,11 @@ imx_console_setup(struct console *co, char *options)
- 	if (sport == NULL)
- 		return -ENODEV;
- 
-+	/* For setting the registers, we only need to enable the ipg clock. */
-+	retval = clk_prepare_enable(sport->clk_ipg);
-+	if (retval)
-+		goto error_console;
-+
- 	if (options)
- 		uart_parse_options(options, &baud, &parity, &bits, &flow);
- 	else
-@@ -1378,7 +1393,20 @@ imx_console_setup(struct console *co, char *options)
- 
- 	imx_setup_ufcr(sport, 0);
- 
--	return uart_set_options(&sport->port, co, baud, parity, bits, flow);
-+	retval = uart_set_options(&sport->port, co, baud, parity, bits, flow);
-+
-+	clk_disable(sport->clk_ipg);
-+	if (retval) {
-+		clk_unprepare(sport->clk_ipg);
-+		goto error_console;
-+	}
-+
-+	retval = clk_prepare(sport->clk_per);
-+	if (retval)
-+		clk_disable_unprepare(sport->clk_ipg);
-+
-+error_console:
-+	return retval;
- }
- 
- static struct uart_driver imx_reg;
-@@ -1564,9 +1592,6 @@ static int serial_imx_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	clk_prepare_enable(sport->clk_per);
--	clk_prepare_enable(sport->clk_ipg);
--
- 	sport->port.uartclk = clk_get_rate(sport->clk_per);
- 
- 	imx_ports[sport->port.line] = sport;
-@@ -1575,7 +1600,7 @@ static int serial_imx_probe(struct platform_device *pdev)
- 	if (pdata && pdata->init) {
- 		ret = pdata->init(pdev);
- 		if (ret)
--			goto clkput;
-+			return ret;
- 	}
- 
- 	ret = uart_add_one_port(&imx_reg, &sport->port);
-@@ -1583,18 +1608,10 @@ static int serial_imx_probe(struct platform_device *pdev)
- 		goto deinit;
- 	platform_set_drvdata(pdev, sport);
- 
--	if (!uart_console(&sport->port)) {
--		clk_disable_unprepare(sport->clk_per);
--		clk_disable_unprepare(sport->clk_ipg);
--	}
--
- 	return 0;
- deinit:
- 	if (pdata && pdata->exit)
- 		pdata->exit(pdev);
--clkput:
--	clk_disable_unprepare(sport->clk_per);
--	clk_disable_unprepare(sport->clk_ipg);
- 	return ret;
- }
- 
--- 
-1.7.1
+On 06/28/2013 01:58 PM, Jingoo Han wrote:
+> On Friday, June 28, 2013 2:42 PM, Kishon Vijay Abraham I wrote:
+>> Hi,
+>>
+>> On Friday 28 June 2013 10:53 AM, Jingoo Han wrote:
+>>> Add PHY provider node for the DP PHY.
+>>>
+>>> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+>>> ---
+>>>    arch/arm/boot/dts/exynos5250.dtsi |   13 ++++++++-----
+>>>    1 file changed, 8 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+>>> index 41cd625..d1d6e14 100644
+>>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>>> @@ -614,6 +614,12 @@
+>>>    		interrupts = <0 94 0>;
+>>>    	};
+>>>
+>>> +	dp_phy: video-phy at 10040720 {
+>>> +		compatible = "samsung,exynos5250-dp-video-phy";
+>>> +		reg = <0x10040720 4>;
+>>> +		#phy-cells = <1>;
+>> phy-cells can be '0' here since this phy_provider implements only one PHY.
+> Oh, thank you.
+> I will fix it.
+Don't forget to fix the corresponding description in the 
+samsung,exynos5250-dp-video-phy.txt as well. :-)
+> Best regards,
+> Jingoo Han
+>
+>> Thanks
+>> Kishon
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
