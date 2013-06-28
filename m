@@ -1,61 +1,37 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 28 Jun 2013 15:09:43 +0900
-Subject: [PATCH 2/3] ARM: dts: Add DP PHY node to exynos5250.dtsi
-In-Reply-To: <51CD27FF.1060706@gmail.com>
-References: <001601ce73bf$9f2e9120$dd8bb360$@samsung.com>
- <51CD2214.10506@ti.com> <001b01ce73c4$88f45020$9adcf060$@samsung.com>
- <51CD27FF.1060706@gmail.com>
-Message-ID: <001d01ce73c6$155eb450$401c1cf0$@samsung.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Fri, 28 Jun 2013 14:14:54 +0800
+Subject: FW: Arch/arm/msm/memory.c:reserve_memory_for_mempools( )
+Message-ID: <35FD53F367049845BC99AC72306C23D19441BF586A@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 28, 2013 3:07 PM, Hui Wang wrote:
-> On 06/28/2013 01:58 PM, Jingoo Han wrote:
-> > On Friday, June 28, 2013 2:42 PM, Kishon Vijay Abraham I wrote:
-> >> Hi,
-> >>
-> >> On Friday 28 June 2013 10:53 AM, Jingoo Han wrote:
-> >>> Add PHY provider node for the DP PHY.
-> >>>
-> >>> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> >>> ---
-> >>>    arch/arm/boot/dts/exynos5250.dtsi |   13 ++++++++-----
-> >>>    1 file changed, 8 insertions(+), 5 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> >>> index 41cd625..d1d6e14 100644
-> >>> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> >>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> >>> @@ -614,6 +614,12 @@
-> >>>    		interrupts = <0 94 0>;
-> >>>    	};
-> >>>
-> >>> +	dp_phy: video-phy at 10040720 {
-> >>> +		compatible = "samsung,exynos5250-dp-video-phy";
-> >>> +		reg = <0x10040720 4>;
-> >>> +		#phy-cells = <1>;
-> >> phy-cells can be '0' here since this phy_provider implements only one PHY.
-> > Oh, thank you.
-> > I will fix it.
-> Don't forget to fix the corresponding description in the
-> samsung,exynos5250-dp-video-phy.txt as well. :-)
 
-Hi 
+Hi Sboy,
 
-OK, I already fixed it. :)
-Thank you for reminding me.
+I don't know who should I send this mail to .
+If you are not the right person, please forward To the right responsible person , Thank you !
 
-Best regards,
-Jignoo Han
+I have a question about msm kernel code :
 
-> > Best regards,
-> > Jingoo Han
-> >
-> >> Thanks
-> >> Kishon
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
-> >
+File: Arch/arm/msm/memory.c
+
+reserve_memory_for_mempools()
+it call memblock_remove() directly,
+I think it's not safe sometimes ,
+Should use arm_memblock_steal() function or some other similar Function to make sure the removed memory is not reserved by memblock driver, In case the removed memory is reserved by some other driver.
+
+
+Thanks 
+
+
+Yalin.Wang
+Software Engineer
+OS Kernel&Graphics
+?
+Sony Mobile Communications
+Tel: +86 10 5966 9819
+Phone: 18610323092
+Address: No.16 Guangshun South Street, Chaoyang, Beijing, P.R.C.
+
+sonymobile.com
+??
