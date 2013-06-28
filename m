@@ -1,38 +1,48 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 28 Jun 2013 12:12:43 +0530
-Subject: [PATCH V2] ARM: cpuidle: davinci: Fix target residency
-In-Reply-To: <1372345800-26792-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1372345800-26792-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <51CD3063.5010309@ti.com>
+From: george.cherian@ti.com (George Cherian)
+Date: Fri, 28 Jun 2013 12:14:47 +0530
+Subject: [PATCH] arm: dts: AM43x: Add usb_otg_hs node
+Message-ID: <1372401887-19422-1-git-send-email-george.cherian@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/27/2013 8:40 PM, Daniel Lezcano wrote:
-> The commit 19976c2a88d125aec16b9255c7197c297bbdd637 changed the target
-> residency to 100000, assuming this is a careless mistake.
-> 
-> commit 19976c2a88d125aec16b9255c7197c297bbdd637
-> Author: Robert Lee <rob.lee@linaro.org>
-> Date:   Tue Mar 20 15:22:45 2012 -0500
-> 
->     ARM: davinci: Consolidate time keeping and irq enable
-> 
->     Enable core cpuidle timekeeping and irq enabling and remove that
->     handling from this code.
-> 
->     Signed-off-by: Robert Lee <rob.lee@linaro.org>
->     Reviewed-by: Kevin Hilman <khilman@ti.com>
->     Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->     Acked-by: Jean Pihet <j-pihet@ti.com>
->     Signed-off-by: Len Brown <len.brown@intel.com>
-> 
-> The same happened to the at91's cpuidle driver.
-> 
-> Fix it by putting the initial value to 10000.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Adds device node for HS USB Host module for AM437x
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: George Cherian <george.cherian@ti.com>
+---
+ This patch is on top of 
+ git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.11/dts
 
-Thanks,
-Sekhar
+ arch/arm/boot/dts/am4372.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index ddc1df7..e4f5eb8 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -64,5 +64,24 @@
+ 			compatible = "ti,am4372-counter32k","ti,omap-counter32k";
+ 			reg = <0x44e86000 0x40>;
+ 		};
++
++		usb_otg_hs1: am4372_dwc3 at 48380000 {
++			compatible = "ti,am437x-dwc3";
++			reg = <0x48380000 0x1ff>;
++			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			utmi-mode = <1>;
++			ranges;
++
++			dwc3 at 48390000 {
++				compatible = "synopsys,dwc3";
++				reg = <0x48390000 0xcfff>;
++				interrupts = <GIC_SPI  168 IRQ_TYPE_LEVEL_HIGH>;
++				tx-fifo-resize;
++			};
++
++		};
++
+ 	};
+ };
+-- 
+1.8.1.4
