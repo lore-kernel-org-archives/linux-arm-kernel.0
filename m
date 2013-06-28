@@ -1,39 +1,82 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 28 Jun 2013 12:20:43 +0100
-Subject: [PATCH v7 2/6] kernel: missing include in cputime.c
+Date: Fri, 28 Jun 2013 12:20:47 +0100
+Subject: [PATCH v7 6/6] xen/arm: account for stolen ticks
 In-Reply-To: <alpine.DEB.2.02.1306271614260.4782@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1306271614260.4782@kaball.uk.xensource.com>
-Message-ID: <1372418447-24066-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1372418447-24066-6-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-steal_account_process_tick calls paravirt_steal_clock, but paravirt.h is
-currently missing amoung the included header files.
-Add include asm/paravirt.h.
+Register the runstate_memory_area with the hypervisor.
+Use pv_time_ops.steal_clock to account for stolen ticks.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-CC: mingo at redhat.com
-CC: peterz at infradead.org
+
 
 ---
-Changes in v7:
-- remove ifdef CONFIG_PARAVIRT (the ifdef has been moved inside the
-  paravirt headers).
----
- kernel/sched/cputime.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Changes in v4:
+- don't use paravirt_steal_rq_enabled: we do not support retrieving
+stolen ticks for vcpus other than one we are running on.
 
-diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
-index cc2dc3ee..a5d1a9b 100644
---- a/kernel/sched/cputime.c
-+++ b/kernel/sched/cputime.c
-@@ -5,6 +5,7 @@
- #include <linux/static_key.h>
- #include <linux/context_tracking.h>
- #include "sched.h"
+Changes in v3:
+- use BUG_ON and smp_processor_id.
+---
+ arch/arm/xen/enlighten.c |   21 +++++++++++++++++++++
+ 1 files changed, 21 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 13609e0..49839d8 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -14,7 +14,10 @@
+ #include <xen/xen-ops.h>
+ #include <asm/xen/hypervisor.h>
+ #include <asm/xen/hypercall.h>
++#include <asm/arch_timer.h>
+ #include <asm/system_misc.h>
 +#include <asm/paravirt.h>
++#include <linux/jump_label.h>
+ #include <linux/interrupt.h>
+ #include <linux/irqreturn.h>
+ #include <linux/module.h>
+@@ -152,6 +155,19 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
+ }
+ EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
  
++unsigned long long xen_stolen_accounting(int cpu)
++{
++	struct vcpu_runstate_info state;
++
++	BUG_ON(cpu != smp_processor_id());
++
++	xen_get_runstate_snapshot(&state);
++
++	WARN_ON(state.state != RUNSTATE_running);
++
++	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
++}
++
+ static void __init xen_percpu_init(void *unused)
+ {
+ 	struct vcpu_register_vcpu_info info;
+@@ -169,6 +185,8 @@ static void __init xen_percpu_init(void *unused)
+ 	BUG_ON(err);
+ 	per_cpu(xen_vcpu, cpu) = vcpup;
  
- #ifdef CONFIG_IRQ_TIME_ACCOUNTING
++	xen_setup_runstate_info(cpu);
++
+ 	enable_percpu_irq(xen_events_irq, 0);
+ }
+ 
+@@ -300,6 +318,9 @@ static int __init xen_init_events(void)
+ 
+ 	on_each_cpu(xen_percpu_init, NULL, 0);
+ 
++	pv_time_ops.steal_clock = xen_stolen_accounting;
++	static_key_slow_inc(&paravirt_steal_enabled);
++
+ 	return 0;
+ }
+ postcore_initcall(xen_init_events);
 -- 
 1.7.2.5
