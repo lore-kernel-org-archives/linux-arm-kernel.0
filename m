@@ -1,50 +1,32 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Jun 2013 21:56:18 +0200
-Subject: [PATCHv2 0/8] clocksource: sunxi: Timer fixes and cleanup
-Message-ID: <1372449386-1334-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 28 Jun 2013 21:56:21 +0200
+Subject: [PATCHv2 3/8] clocksource: sun4i: Don't forget to enable the clock we
+ use
+In-Reply-To: <1372449386-1334-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1372449386-1334-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1372449386-1334-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Even if in our case, this clock was non-gatable, used as a parent clock
+for several IPs, it still is a good idea to enable it.
 
-The first timer code we merged when adding support for the A13 some
-time back was mostly a clean up from the source drop we had, without
-any documentation.  This happened to work, but the code merged in
-turned out to be far from perfect, and had several flaws.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clocksource/sun4i_timer.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-This patchset hopefully fixes these flaws, and cleanup most of the
-driver as well, to end up in an almost complete rewrite of it (even
-though it's not that long).
-
-It also finally adds a clocksource from the free running counter found
-in the A10/A13 SoCs.
-
-These flaws have all been spotted when trying to add the A31 support,
-work that is still ongoing, but will hopefully benefit from this
-patchset as well.
-
-Thanks,
-Maxime
-
-Changes from v1:
-  - Rebased on top of linux-next to benefit from the move to all
-    architectures of the sched_clock functions
-  - Moved the clock source to the second timer instead of the 64 bits
-    free-running counter like suggested by Thomas.
-
-Maxime Ripard (8):
-  clocksource: sun4i: Use the BIT macros where possible
-  clocksource: sun4i: Add clocksource and sched clock drivers
-  clocksource: sun4i: Don't forget to enable the clock we use
-  clocksource: sun4i: Fix the next event code
-  clocksource: sun4i: Factor out some timer code
-  clocksource: sun4i: Remove TIMER_SCAL variable
-  clocksource: sun4i: Cleanup parent clock setup
-  clocksource: sun4i: Fix bug when switching from periodic to oneshot
-    modes
-
- drivers/clocksource/sun4i_timer.c | 97 ++++++++++++++++++++++++++-------------
- 1 file changed, 64 insertions(+), 33 deletions(-)
-
+diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
+index 050e94f..84ace76 100644
+--- a/drivers/clocksource/sun4i_timer.c
++++ b/drivers/clocksource/sun4i_timer.c
+@@ -118,6 +118,7 @@ static void __init sun4i_timer_init(struct device_node *node)
+ 	clk = of_clk_get(node, 0);
+ 	if (IS_ERR(clk))
+ 		panic("Can't get timer clock");
++	clk_prepare_enable(clk);
+ 
+ 	rate = clk_get_rate(clk);
+ 
 -- 
 1.8.3.1
