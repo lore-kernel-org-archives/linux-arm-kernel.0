@@ -1,134 +1,114 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 28 Jun 2013 15:34:45 +0200 (CEST)
-Subject: [PATCH v3] ARM: clocksource: add support for MOXA ART SoCs
-In-Reply-To: <1372332203-30228-1-git-send-email-jonas.jensen@gmail.com>
-References: <1372258383-24524-1-git-send-email-jonas.jensen@gmail.com>
- <1372332203-30228-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <alpine.DEB.2.02.1306281518380.4013@ionos.tec.linutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 28 Jun 2013 15:40:08 +0200
+Subject: RTL8192CU on ARM not working
+In-Reply-To: <CACQ1gAiHVxjnt2qx5Y9dEMAbZs5Ki_wEHLhOjDRcPc+xjBU76A@mail.gmail.com>
+References: <20130627081225.GJ5803@lukather>
+ <CACQ1gAiHVxjnt2qx5Y9dEMAbZs5Ki_wEHLhOjDRcPc+xjBU76A@mail.gmail.com>
+Message-ID: <20130628134008.GI4319@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Jun 2013, Jonas Jensen wrote:
-> +#define TIMER_CR			0x30
-> +#define TIMER_INTR_STATE	0x34
-> +#define TIMER_INTR_MASK		0x38
+Hi Richard, Larry,
 
-Please use the same indent level for all.
+On Thu, Jun 27, 2013 at 02:13:31PM +0200, Richard Genoud wrote:
+> 2013/6/27 Maxime Ripard <maxime.ripard@free-electrons.com>:
+> > Hi everyone,
+> >
+> > I'm currently trying to use a RTL8192CU on an ARM (Freescale imx28,
+> > armv5) platform, using 3.10-rc3.
+> >
+> > Trouble is, while the chip is correctly detected and you can use iw on it
+> > without any problem it seems, once you start an association to an access
+> > point, the association goes on, seems to associate, displaying a WARN()
+> > message [1] and then, after what looks like a random amount of time (could
+> > be right away, could be after a few minutes), deassociate [2].
+> >
+> > During the time where it's associated, we never seem to transmit any
+> > packets, while iw reports packets being sent, I guess we can assume that
+> > they are actually never transmitted as well [3].
+> >
+> > What seems odd to me as well is that the signal power reported for the access
+> > point is excessively high when using iw scan (10 dbm), and once connected, the
+> > signal strength is -64dbm, which makes quite a huge difference.
+> >
+> > Do you have any suggestions on how to solve this issue?
+> >
+> > Thanks,
+> > Maxime
+> >
+> >
+> > [1]:
+> > # iw wlan0 connect FreeWifi 2447
+> > # [  485.010858] wlan0: authenticate with f4:ca:e5:c9:f5:91
+> > [  485.065514] wlan0: send auth to f4:ca:e5:c9:f5:91 (try 1/3)
+> > [  485.075963] wlan0: authenticated
+> > [  485.088915] wlan0: associate with f4:ca:e5:c9:f5:91 (try 1/3)
+> > [  485.117137] wlan0: RX AssocResp from f4:ca:e5:c9:f5:91 (capab=0x401 status=0 aid=1)
+> > [  485.130607] wlan0: associated
+> > [  486.917555] ------------[ cut here ]------------
+> > [  486.922277] WARNING: at kernel/workqueue.c:1365 __queue_work+0x1f0/0x2f4()
+> > [  486.929175] Modules linked in:
+> > [  486.932284] CPU: 0 PID: 615 Comm: kworker/0:2 Not tainted 3.10.0-rc3 #2
+> > [  486.938958] Workqueue: rtl92c_usb rtl_watchdog_wq_callback
+> > [  486.944548] [<c00147dc>] (unwind_backtrace+0x0/0xf0) from [<c00120a0>] (show_stack+0x10/0x14)
+> > [  486.953132] [<c00120a0>] (show_stack+0x10/0x14) from [<c001d2ec>] (warn_slowpath_common+0x4c/0x68)
+> > [  486.962140] [<c001d2ec>] (warn_slowpath_common+0x4c/0x68) from [<c001d324>] (warn_slowpath_null+0x1c/0x24)
+> > [  486.971844] [<c001d324>] (warn_slowpath_null+0x1c/0x24) from [<c003769c>] (__queue_work+0x1f0/0x2f4)
+> > [  486.981025] [<c003769c>] (__queue_work+0x1f0/0x2f4) from [<c0037830>] (queue_work_on+0x80/0x88)
+> > [  486.989777] [<c0037830>] (queue_work_on+0x80/0x88) from [<c0267ca4>] (rtl_watchdog_wq_callback+0x5dc/0x8bc)
+> > [  486.999572] [<c0267ca4>] (rtl_watchdog_wq_callback+0x5dc/0x8bc) from [<c0038cbc>] (process_one_work+0x1c0/0x4c8)
+> > [  487.009795] [<c0038cbc>] (process_one_work+0x1c0/0x4c8) from [<c0039684>] (worker_thread+0x140/0x3ac)
+> > [  487.019065] [<c0039684>] (worker_thread+0x140/0x3ac) from [<c003f914>] (kthread+0xa4/0xb0)
+> > [  487.027381] [<c003f914>] (kthread+0xa4/0xb0) from [<c000f0c0>] (ret_from_fork+0x14/0x34)
+> > [  487.035498] ---[ end trace 93341a0c249e647e ]---
+> >
+> >
+> > [2]:
+> >
+> > # [  786.086127] wlan0: deauthenticated from f4:ca:e5:c9:f5:91 (Reason: 2)
+> > [  786.126368] cfg80211: Calling CRDA to update world regulatory domain
+> >
+> >
+> > [3]:
+> > # iw wlan0 station dump
+> > Station f4:ca:e5:c9:f5:91 (on wlan0)
+> >         inactive time:  55430 ms
+> >         rx bytes:       77826
+> >         rx packets:     1026
+> >         tx packets:     2
+> >         tx retries:     0
+> >         tx failed:      0
+> >         signal:         -64 dBm
+> >         signal avg:     -63 dBm
+> >         tx bitrate:     1.0 MBit/s
+> >         authorized:     yes
+> >         authenticated:  yes
+> >         preamble:       long
+> >         WMM/WME:        yes
+> >         MFP:            no
+> >         TDLS peer:      no
+> 
+> Hi Maxime,
+> 
+> You should have a look at https://lkml.org/lkml/2013/6/11/300
+> (in short, use 3.10-rc7)
+> 
+> The warning is still there, but I managed use this device on ARM
+> (sam9g35) as a client.
 
-> +
-> +static void moxart_clkevt_mode(enum clock_event_mode mode,
-> +	struct clock_event_device *clk)
+Indeed, the client mode works way better with 3.10-rc7.
 
-Please align it like this:
+Thanks to you two!
+Maxime
 
-static void moxart_clkevt_mode(enum clock_event_mode mode,
-       	    		       struct clock_event_device *clk)
-
-Makes the code way simpler to read.
-
-> +{
-> +static int moxart_clkevt_next_event(unsigned long cycles,
-> +	struct clock_event_device *unused)
-
-Ditto.
-
-> +{
-> +	u32 u;
-
-Newline between variable declaration and code please. All over the
-place.
-
-> +	u = readl(base + TIMER1_BASE + REG_COUNT) - cycles;
-> +	writel(u, base + TIMER1_BASE + REG_MATCH1);
-
-Is this a real match functionality, i.e. is the trigger on == ?
-
-If yes, how is guaranteed, that for a small cycles value the counter
-has not passed the match value already?
-
-> +	u = readl(base + TIMER_CR) | TIMEREG_CR_1_ENABLE;
-> +	writel(u, base + TIMER_CR);
-> +	return 0;
-> +}
-> +
-> +static struct clock_event_device moxart_clockevent = {
-> +	.name = "moxart_timer",
-
-Could you please align the assigned values? i.e.
-
-      .name	 = "moxart_timer",
-      .rating	 = 200,
-
-Way better readable than:
-
-> +	.rating = 200,
-> +	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-
-
-> +static void __init moxart_timer_init(struct device_node *node)
-> +{
-> +	int ret, irq;
-> +	unsigned long pclk;
-> +	struct clk *clk;
-> +
-> +	base = of_iomap(node, 0);
-> +	if (!base)
-> +		panic("%s: failed to map base\n", node->full_name);
-> +
-> +	irq = irq_of_parse_and_map(node, 0);
-> +	if (irq <= 0)
-> +		panic("%s: can't parse IRQ\n", node->full_name);
-> +
-> +	ret = setup_irq(irq, &moxart_timer_irq);
-> +	if (ret) {
-> +		pr_err("%s: failed to setup IRQ %d\n", node->full_name, irq);
-> +		return;
-
-This is inconsistent. You panic on the first two checks and then you
-simply return.
-
-> +	}
-> +
-> +	clk = of_clk_get(node, 0);
-> +	if (IS_ERR(clk)) {
-> +		pr_err("%s: of_clk_get failed\n", __func__);
-
-Your pr_errs are inconsistent. node->full_name in one and __func__ in
-the next. __func__ is really not important. The node_name or simply
-"moxatimer" is describing for what the clk_get failed.
-
-> +		return;
-> +	}
-> +
-> +	pclk = clk_get_rate(clk);
-> +	clock_count_per_tick = DIV_ROUND_CLOSEST(pclk, HZ);
-> +
-> +	writel(~0, base + TIMER2_BASE + REG_LOAD);
-> +
-> +	writel(TIMEREG_CR_2_ENABLE, base + TIMER_CR);
-> +
-> +	if (clocksource_mmio_init(base + TIMER2_BASE + REG_COUNT,
-> +					"moxart_timer", pclk, 200, 32,
-> +					clocksource_mmio_readl_down)) {
-
-Please align the arguments consistently.
-
-	if (clocksource_mmio_init(base + TIMER2_BASE + REG_COUNT,
-				  "moxart_timer", pclk, 200, 32,
-				  clocksource_mmio_readl_down)) {
-
-
-> +	clockevents_config_and_register(&moxart_clockevent, pclk,
-> +					0x4, 0xf0000000);
-
-How did you come up with 0xf0000000? Random number generator?
-
-> +	pr_info("%s: %s finished pclk=%lu HZ=%d IRQ=%d\n",
-> +			node->full_name, __func__, pclk, HZ, irq);
-
-We really do not need to know about the function name and "finished"
-is completely pointless information as well.
-
-Thanks,
-
-	tglx
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130628/1c17908b/attachment.sig>
