@@ -1,114 +1,82 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Jun 2013 15:40:08 +0200
-Subject: RTL8192CU on ARM not working
-In-Reply-To: <CACQ1gAiHVxjnt2qx5Y9dEMAbZs5Ki_wEHLhOjDRcPc+xjBU76A@mail.gmail.com>
-References: <20130627081225.GJ5803@lukather>
- <CACQ1gAiHVxjnt2qx5Y9dEMAbZs5Ki_wEHLhOjDRcPc+xjBU76A@mail.gmail.com>
-Message-ID: <20130628134008.GI4319@lukather>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 28 Jun 2013 15:43:06 +0200
+Subject: [PATCH v4 0/5] Generic PHY driver for the Exynos SoC MIPI CSI-2/DSI
+ DPHYs
+Message-ID: <1372426991-2482-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard, Larry,
+This patch series adds a simple driver for the Samsung S5P/Exynos SoC
+series MIPI CSI-2 receiver (MIPI CSIS) and MIPI DSI transmitter (MIPI
+DSIM) DPHYs, using the generic PHY framework [1]. Previously the MIPI
+CSIS and MIPI DSIM used a platform callback to control the PHY power
+enable and reset bits. The platform callback can now be dropped and
+those drivers don't need any calls back to the platform code, which
+makes migration to the device tree complete for MIPI CSIS.
 
-On Thu, Jun 27, 2013 at 02:13:31PM +0200, Richard Genoud wrote:
-> 2013/6/27 Maxime Ripard <maxime.ripard@free-electrons.com>:
-> > Hi everyone,
-> >
-> > I'm currently trying to use a RTL8192CU on an ARM (Freescale imx28,
-> > armv5) platform, using 3.10-rc3.
-> >
-> > Trouble is, while the chip is correctly detected and you can use iw on it
-> > without any problem it seems, once you start an association to an access
-> > point, the association goes on, seems to associate, displaying a WARN()
-> > message [1] and then, after what looks like a random amount of time (could
-> > be right away, could be after a few minutes), deassociate [2].
-> >
-> > During the time where it's associated, we never seem to transmit any
-> > packets, while iw reports packets being sent, I guess we can assume that
-> > they are actually never transmitted as well [3].
-> >
-> > What seems odd to me as well is that the signal power reported for the access
-> > point is excessively high when using iw scan (10 dbm), and once connected, the
-> > signal strength is -64dbm, which makes quite a huge difference.
-> >
-> > Do you have any suggestions on how to solve this issue?
-> >
-> > Thanks,
-> > Maxime
-> >
-> >
-> > [1]:
-> > # iw wlan0 connect FreeWifi 2447
-> > # [  485.010858] wlan0: authenticate with f4:ca:e5:c9:f5:91
-> > [  485.065514] wlan0: send auth to f4:ca:e5:c9:f5:91 (try 1/3)
-> > [  485.075963] wlan0: authenticated
-> > [  485.088915] wlan0: associate with f4:ca:e5:c9:f5:91 (try 1/3)
-> > [  485.117137] wlan0: RX AssocResp from f4:ca:e5:c9:f5:91 (capab=0x401 status=0 aid=1)
-> > [  485.130607] wlan0: associated
-> > [  486.917555] ------------[ cut here ]------------
-> > [  486.922277] WARNING: at kernel/workqueue.c:1365 __queue_work+0x1f0/0x2f4()
-> > [  486.929175] Modules linked in:
-> > [  486.932284] CPU: 0 PID: 615 Comm: kworker/0:2 Not tainted 3.10.0-rc3 #2
-> > [  486.938958] Workqueue: rtl92c_usb rtl_watchdog_wq_callback
-> > [  486.944548] [<c00147dc>] (unwind_backtrace+0x0/0xf0) from [<c00120a0>] (show_stack+0x10/0x14)
-> > [  486.953132] [<c00120a0>] (show_stack+0x10/0x14) from [<c001d2ec>] (warn_slowpath_common+0x4c/0x68)
-> > [  486.962140] [<c001d2ec>] (warn_slowpath_common+0x4c/0x68) from [<c001d324>] (warn_slowpath_null+0x1c/0x24)
-> > [  486.971844] [<c001d324>] (warn_slowpath_null+0x1c/0x24) from [<c003769c>] (__queue_work+0x1f0/0x2f4)
-> > [  486.981025] [<c003769c>] (__queue_work+0x1f0/0x2f4) from [<c0037830>] (queue_work_on+0x80/0x88)
-> > [  486.989777] [<c0037830>] (queue_work_on+0x80/0x88) from [<c0267ca4>] (rtl_watchdog_wq_callback+0x5dc/0x8bc)
-> > [  486.999572] [<c0267ca4>] (rtl_watchdog_wq_callback+0x5dc/0x8bc) from [<c0038cbc>] (process_one_work+0x1c0/0x4c8)
-> > [  487.009795] [<c0038cbc>] (process_one_work+0x1c0/0x4c8) from [<c0039684>] (worker_thread+0x140/0x3ac)
-> > [  487.019065] [<c0039684>] (worker_thread+0x140/0x3ac) from [<c003f914>] (kthread+0xa4/0xb0)
-> > [  487.027381] [<c003f914>] (kthread+0xa4/0xb0) from [<c000f0c0>] (ret_from_fork+0x14/0x34)
-> > [  487.035498] ---[ end trace 93341a0c249e647e ]---
-> >
-> >
-> > [2]:
-> >
-> > # [  786.086127] wlan0: deauthenticated from f4:ca:e5:c9:f5:91 (Reason: 2)
-> > [  786.126368] cfg80211: Calling CRDA to update world regulatory domain
-> >
-> >
-> > [3]:
-> > # iw wlan0 station dump
-> > Station f4:ca:e5:c9:f5:91 (on wlan0)
-> >         inactive time:  55430 ms
-> >         rx bytes:       77826
-> >         rx packets:     1026
-> >         tx packets:     2
-> >         tx retries:     0
-> >         tx failed:      0
-> >         signal:         -64 dBm
-> >         signal avg:     -63 dBm
-> >         tx bitrate:     1.0 MBit/s
-> >         authorized:     yes
-> >         authenticated:  yes
-> >         preamble:       long
-> >         WMM/WME:        yes
-> >         MFP:            no
-> >         TDLS peer:      no
-> 
-> Hi Maxime,
-> 
-> You should have a look at https://lkml.org/lkml/2013/6/11/300
-> (in short, use 3.10-rc7)
-> 
-> The warning is still there, but I managed use this device on ARM
-> (sam9g35) as a client.
+Changes since v3 (only patch 1/5):
+ - replaced spin_(un)lock_irq_{save,restore} with spin_{lock,unlock}.
+ - DT binding file renamed to samsung-phy.txt, so it can be used for
+   other PHYs as well,
+ - removed <linux/delay.h> inclusion,
+ - added missing spin_lock_init().
 
-Indeed, the client mode works way better with 3.10-rc7.
+Changes since v2:
+ - adapted to the generic PHY API v9: use phy_set/get_drvdata(),
+ - fixed of_xlate callback to return ERR_PTR() instead of NULL,
+ - namespace cleanup, put "GPL v2" as MODULE_LICENSE, removed pr_debug,
+ - removed phy id check in __set_phy_state().
 
-Thanks to you two!
-Maxime
+Patches 2...3/5 are unchanged, description of patch 5/5 has been
+updated.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130628/1c17908b/attachment.sig>
+Changes since v1:
+ - enabled build as module and with CONFIG_OF disabled,
+ - added phy_id enum,
+ - of_address_to_resource() replaced with platform_get_resource(),
+ - adapted to changes in the PHY API v7, v8 - added phy labels,
+ - added MODULE_DEVICE_TABLE() entry,
+ - the driver file renamed to phy-exynos-mipi-video.c,
+ - changed DT compatible string to "samsung,s5pv210-mipi-video-phy",
+ - corrected the compatible property's description.
+ - patch 3/5 "video: exynos_dsi: Use generic PHY driver" replaced
+   with a patch modifying the MIPI DSIM driver which is currently
+   in mainline.
+
+This series depends on the generic PHY framework [1]. It can be browsed at:
+ http://git.linuxtv.org/snawrocki/samsung.git/exynos-mipi-phy
+This branch is based on the 'for-next' branch from:
+ git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+and the patch series:
+ http://www.spinics.net/lists/arm-kernel/msg254667.html
+
+[1] https://lkml.org/lkml/2013/6/26/259
+
+Sylwester Nawrocki (5):
+  ARM: dts: Add MIPI PHY node to exynos4.dtsi
+  phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+  video: exynos_mipi_dsim: Use the generic PHY driver
+  [media] exynos4-is: Use the generic MIPI CSIS PHY driver
+  ARM: Samsung: Remove the MIPI PHY setup code
+
+ .../devicetree/bindings/phy/samsung-phy.txt        |   14 ++
+ arch/arm/boot/dts/exynos4.dtsi                     |   10 ++
+ arch/arm/mach-exynos/include/mach/regs-pmu.h       |    5 -
+ arch/arm/mach-s5pv210/include/mach/regs-clock.h    |    4 -
+ arch/arm/plat-samsung/Kconfig                      |    5 -
+ arch/arm/plat-samsung/Makefile                     |    1 -
+ arch/arm/plat-samsung/setup-mipiphy.c              |   60 -------
+ drivers/media/platform/exynos4-is/mipi-csis.c      |   16 +-
+ drivers/phy/Kconfig                                |    9 ++
+ drivers/phy/Makefile                               |    3 +-
+ drivers/phy/phy-exynos-mipi-video.c                |  169 ++++++++++++++++++++
+ drivers/video/exynos/exynos_mipi_dsi.c             |   19 +--
+ include/linux/platform_data/mipi-csis.h            |   11 +-
+ include/video/exynos_mipi_dsim.h                   |    6 +-
+ 14 files changed, 233 insertions(+), 99 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/samsung-phy.txt
+ delete mode 100644 arch/arm/plat-samsung/setup-mipiphy.c
+ create mode 100644 drivers/phy/phy-exynos-mipi-video.c
+
+--
+1.7.9.5
