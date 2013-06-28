@@ -1,53 +1,76 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 28 Jun 2013 22:17:06 +0200
-Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
-In-Reply-To: <20130628154622.GF1643@arm.com>
-References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
- <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
- <20130628134600.GC21034@game.jcrosoft.org>
- <CAKv+Gu92+pMLF9FPwbrkVLLhnPdBB702PXG-F2-3kqZx60TEHg@mail.gmail.com>
- <20130628154622.GF1643@arm.com>
-Message-ID: <CAKv+Gu-A27dDV0HNRiH_=Dctfm5N2YNA-6zS-gWX9rR6TVDztQ@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 28 Jun 2013 22:35:29 +0200
+Subject: [PATCHv2 4/8] clocksource: sun4i: Fix the next event code
+In-Reply-To: <alpine.DEB.2.02.1306282204220.4013@ionos.tec.linutronix.de>
+References: <1372449386-1334-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1372449386-1334-5-git-send-email-maxime.ripard@free-electrons.com>
+ <alpine.DEB.2.02.1306282204220.4013@ionos.tec.linutronix.de>
+Message-ID: <7300725.devmrYGi4t@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 June 2013 17:46, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Jun 28, 2013 at 03:00:02PM +0100, Ard Biesheuvel wrote:
->> On 28 June 2013 15:46, Jean-Christophe PLAGNIOL-VILLARD
->> <plagnioj@jcrosoft.com> wrote:
->> > On 12:55 Wed 26 Jun     , Ard Biesheuvel wrote:
->> >> Meh. This is not going to please the RT crowd, as preempt_schedule()
->> >> will not be called on PREEMPT builds in this case.
->> >>
->> >> Propose to replace it with
->> >>
->> >>     preempt_enable();
->> >> #ifndef CONFIG_PREEMPT_COUNT
->> > if (IS_ENABLED(CONFIG_xxx)) at least
->> >>     /* in this case, the preempt_enable() right above is just a barrier() */
->> >>     dec_preempt_count();
->> >> #endif
->> >
->> > but why do you need to call inc_preempt and dec directly?
->>
->> There is a concern that violations of the rule that a task should not
->> sleep between kernel_neon_begin and kernel_neon_end calls may not be
->> spotted on non-PREEMPT builds that don't have
->> CONFIG_DEBUG_ATOMIC_SLEEP set.
->
-> Would an explicit call to schedule() trigger with
-> CONFIG_DEBUG_ATOMIC_SLEEP? It looks that this config option only
-> triggers for explicit might_sleep() calls but we don't have one for
-> explicit schedule() calls (cond_resched() call has might_sleep()).
->
+On Friday 28 of June 2013 22:13:08 Thomas Gleixner wrote:
+> On Fri, 28 Jun 2013, Maxime Ripard wrote:
+> > The next_event logic was setting the next interval to fire in the
+> > current timer value instead of the interval value register, which is
+> > obviously wrong.
+> 
+> Ok.
+> 
+> > Plus the logic to set the actual value was wrong as well, so this
+> > code has always been broken.
+> 
+> This lacks an explanation why the logic is wrong and what the actual
+> fix is.
+> 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> > 
+> >  drivers/clocksource/sun4i_timer.c | 12 +++++++++---
+> >  1 file changed, 9 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/clocksource/sun4i_timer.c
+> > b/drivers/clocksource/sun4i_timer.c index 84ace76..695c8c8 100644
+> > --- a/drivers/clocksource/sun4i_timer.c
+> > +++ b/drivers/clocksource/sun4i_timer.c
+> > @@ -16,6 +16,7 @@
+> > 
+> >  #include <linux/clk.h>
+> >  #include <linux/clockchips.h>
+> > 
+> > +#include <linux/delay.h>
+> > 
+> >  #include <linux/interrupt.h>
+> >  #include <linux/irq.h>
+> >  #include <linux/irqreturn.h>
+> > 
+> > @@ -61,9 +62,14 @@ static void sun4i_clkevt_mode(enum clock_event_mode
+> > mode,> 
+> >  static int sun4i_clkevt_next_event(unsigned long evt,
+> >  
+> >  				   struct clock_event_device *unused)
+> >  
+> >  {
+> > 
+> > -	u32 u = readl(timer_base + TIMER_CTL_REG(0));
+> > -	writel(evt, timer_base + TIMER_CNTVAL_REG(0));
+> > -	writel(u | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
+> > +	u32 val = readl(timer_base + TIMER_CTL_REG(0));
+> > +	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
+> > +	udelay(1);
+> 
+> That udelay() is more than suspicious.
 
-CONFIG_DEBUG_ATOMIC_SLEEP enables CONFIG_PREEMPT_COUNT, which is
-enough for schedule_debug() to barf if schedule() is called in a
-preempt_enable/disable section. (Hence my original approach to
-increase/decrease the preempt count, but the problem with that is that
-it doesn't force the schedule() to occur when the preempt count drops
-to zero)
+Not only it is suspicious, but also delays the event by 1 microsecond. Not 
+much, given usual usage of clock events, but still.
 
--- 
-Ard.
+>From what I understand from this code, you keep this timer running and 
+just stop it to set new event. Can you simply disable autoreload and just 
+program this timer to start counting from evt down to 0 when it generates 
+interrupt and just stops itself?
+
+I believe this would simplify the logic a bit, but is it possible with 
+this hardware?
+
+Best regards,
+Tomasz
