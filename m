@@ -1,190 +1,86 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Fri, 28 Jun 2013 14:07:24 -0700
-Subject: [PATCH 1/2] ARM: bcm281xx: Board specific reboot code
-In-Reply-To: <1372453018-5830-2-git-send-email-markus.mayer@linaro.org>
-References: <1372453018-5830-1-git-send-email-markus.mayer@linaro.org>
- <1372453018-5830-2-git-send-email-markus.mayer@linaro.org>
-Message-ID: <CAPdLdqmnbt0ApMeupabh8qDD1Juf_8aOymayNhvG-OzGW+5Cyw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 28 Jun 2013 23:08:53 +0200
+Subject: [PATCHv2 4/8] clocksource: sun4i: Fix the next event code
+In-Reply-To: <alpine.DEB.2.02.1306282204220.4013@ionos.tec.linutronix.de>
+References: <1372449386-1334-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1372449386-1334-5-git-send-email-maxime.ripard@free-electrons.com>
+ <alpine.DEB.2.02.1306282204220.4013@ionos.tec.linutronix.de>
+Message-ID: <20130628210853.GB2756@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding Christian who got dropped from the Cc list.
+Hi Thomas,
 
--Markus
+On Fri, Jun 28, 2013 at 10:13:08PM +0200, Thomas Gleixner wrote:
+> On Fri, 28 Jun 2013, Maxime Ripard wrote:
+> 
+> > The next_event logic was setting the next interval to fire in the
+> > current timer value instead of the interval value register, which is
+> > obviously wrong.
+> 
+> Ok.
+> 
+> > Plus the logic to set the actual value was wrong as well, so this
+> > code has always been broken.
+> 
+> This lacks an explanation why the logic is wrong and what the actual
+> fix is.
 
-On 28 June 2013 13:56, Markus Mayer <markus.mayer@linaro.org> wrote:
-> This patch adds the code needed to trigger a reboot on the bcm281xx
-> family.
->
-> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> Acked-by: Christian Daudt <csd@broadcom.com>
-> ---
->  arch/arm/mach-bcm/Makefile    |    4 +--
->  arch/arm/mach-bcm/board_bcm.c |   20 ++++++++++++---
->  arch/arm/mach-bcm/kona.c      |   54 +++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-bcm/kona.h      |   15 ++++++++++++
->  4 files changed, 88 insertions(+), 5 deletions(-)
->  create mode 100644 arch/arm/mach-bcm/kona.c
->  create mode 100644 arch/arm/mach-bcm/kona.h
->
-> diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-> index 6adb6aec..7e5ca0a 100644
-> --- a/arch/arm/mach-bcm/Makefile
-> +++ b/arch/arm/mach-bcm/Makefile
-> @@ -1,5 +1,5 @@
->  #
-> -# Copyright (C) 2012 Broadcom Corporation
-> +# Copyright (C) 2012-2013 Broadcom Corporation
->  #
->  # This program is free software; you can redistribute it and/or
->  # modify it under the terms of the GNU General Public License as
-> @@ -10,6 +10,6 @@
->  # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->  # GNU General Public License for more details.
->
-> -obj-$(CONFIG_ARCH_BCM)         := board_bcm.o bcm_kona_smc.o bcm_kona_smc_asm.o
-> +obj-$(CONFIG_ARCH_BCM) := board_bcm.o bcm_kona_smc.o bcm_kona_smc_asm.o kona.o
->  plus_sec := $(call as-instr,.arch_extension sec,+sec)
->  AFLAGS_bcm_kona_smc_asm.o      :=-Wa,-march=armv7-a$(plus_sec)
-> diff --git a/arch/arm/mach-bcm/board_bcm.c b/arch/arm/mach-bcm/board_bcm.c
-> index 22e8421..2dc9f95 100644
-> --- a/arch/arm/mach-bcm/board_bcm.c
-> +++ b/arch/arm/mach-bcm/board_bcm.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * Copyright (C) 2012 Broadcom Corporation
-> + * Copyright (C) 2012-2013 Broadcom Corporation
->   *
->   * This program is free software; you can redistribute it and/or
->   * modify it under the terms of the GNU General Public License as
-> @@ -22,8 +22,8 @@
->  #include <asm/mach/time.h>
->  #include <asm/hardware/cache-l2x0.h>
->
-> -
->  #include "bcm_kona_smc.h"
-> +#include "kona.h"
->
->  static int __init kona_l2_cache_init(void)
->  {
-> @@ -41,13 +41,26 @@ static int __init kona_l2_cache_init(void)
->         return 0;
->  }
->
-> +static void bcm_board_setup_restart(void)
-> +{
-> +       struct device_node *np;
-> +
-> +       np = of_find_compatible_node(NULL, NULL, "bcm,bcm11351");
-> +       if (np) {
-> +               if (of_device_is_available(np))
-> +                       bcm_kona_setup_restart();
-> +               of_node_put(np);
-> +       }
-> +       /* Restart setup for other boards goes here */
-> +}
-> +
->  static void __init board_init(void)
->  {
->         of_platform_populate(NULL, of_default_bus_match_table, NULL,
->                 &platform_bus);
->
->         bcm_kona_smc_init();
-> -
-> +       bcm_board_setup_restart();
->         kona_l2_cache_init();
->  }
->
-> @@ -57,5 +70,6 @@ DT_MACHINE_START(BCM11351_DT, "Broadcom Application Processor")
->         .init_irq = irqchip_init,
->         .init_time = clocksource_of_init,
->         .init_machine = board_init,
-> +       .restart = bcm_kona_restart,
->         .dt_compat = bcm11351_dt_compat,
->  MACHINE_END
-> diff --git a/arch/arm/mach-bcm/kona.c b/arch/arm/mach-bcm/kona.c
-> new file mode 100644
-> index 0000000..4492b9f
-> --- /dev/null
-> +++ b/arch/arm/mach-bcm/kona.c
-> @@ -0,0 +1,54 @@
-> +/*
-> + * Copyright (C) 2013 Broadcom Corporation
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/of_address.h>
-> +#include <asm/io.h>
-> +
-> +#include "kona.h"
-> +
-> +static void __iomem *watchdog_base;
-> +
-> +void bcm_kona_setup_restart(void)
-> +{
-> +       struct device_node *np_wdog;
-> +
-> +       np_wdog = of_find_compatible_node(NULL, NULL, "bcm,kona-wdt");
-> +       watchdog_base = of_iomap(np_wdog, 0);
-> +       WARN(!watchdog_base, "failed to map watchdog base");
-> +       of_node_put(np_wdog);
-> +}
-> +
-> +#define GICDIST_ENABLE_OFFSET          0x00000000
-> +#define SECWDOG_OFFSET                 0x00000000
-> +#define SECWDOG_RESERVED_MASK          0xE2000000
-> +#define SECWDOG_WD_LOAD_FLAG_MASK      0x10000000
-> +#define SECWDOG_EN_MASK                        0x08000000
-> +#define SECWDOG_SRSTEN_MASK            0x04000000
-> +#define SECWDOG_CLKS_SHIFT             20
-> +#define SECWDOG_LOCK_SHIFT             0
-> +
-> +void bcm_kona_restart(char mode, const char *cmd)
-> +{
-> +       uint32_t val;
-> +
-> +       /* Enable watchdog 2 with very short timeout. */
-> +       val = readl(watchdog_base + SECWDOG_OFFSET);
-> +       val &= SECWDOG_RESERVED_MASK | SECWDOG_WD_LOAD_FLAG_MASK;
-> +       val |= SECWDOG_EN_MASK | SECWDOG_SRSTEN_MASK |
-> +               (0x8 << SECWDOG_CLKS_SHIFT) |
-> +               (0x8 << SECWDOG_LOCK_SHIFT);
-> +       writel(val, watchdog_base + SECWDOG_OFFSET);
-> +
-> +       while (1)
-> +               ;
-> +}
-> diff --git a/arch/arm/mach-bcm/kona.h b/arch/arm/mach-bcm/kona.h
-> new file mode 100644
-> index 0000000..ecb417e
-> --- /dev/null
-> +++ b/arch/arm/mach-bcm/kona.h
-> @@ -0,0 +1,15 @@
-> +/*
-> + * Copyright (C) 2013 Broadcom Corporation
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +void bcm_kona_setup_restart(void);
-> +void bcm_kona_restart(char mode, const char *cmd);
-> --
-> 1.7.9.5
->
->
+Right.
+
+Actually, the interval register can only be modified when the timer is
+disabled. So we first need, to disable it, change the interval, and then
+enable it back.
+
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/clocksource/sun4i_timer.c | 12 +++++++++---
+> >  1 file changed, 9 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
+> > index 84ace76..695c8c8 100644
+> > --- a/drivers/clocksource/sun4i_timer.c
+> > +++ b/drivers/clocksource/sun4i_timer.c
+> > @@ -16,6 +16,7 @@
+> >  
+> >  #include <linux/clk.h>
+> >  #include <linux/clockchips.h>
+> > +#include <linux/delay.h>
+> >  #include <linux/interrupt.h>
+> >  #include <linux/irq.h>
+> >  #include <linux/irqreturn.h>
+> > @@ -61,9 +62,14 @@ static void sun4i_clkevt_mode(enum clock_event_mode mode,
+> >  static int sun4i_clkevt_next_event(unsigned long evt,
+> >  				   struct clock_event_device *unused)
+> >  {
+> > -	u32 u = readl(timer_base + TIMER_CTL_REG(0));
+> > -	writel(evt, timer_base + TIMER_CNTVAL_REG(0));
+> > -	writel(u | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
+> > +	u32 val = readl(timer_base + TIMER_CTL_REG(0));
+> > +	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
+> > +	udelay(1);
+> 
+> That udelay() is more than suspicious. Is there really no other way to
+> deal with that hardware?
+> 
+> If no, you really need to put a proper explanation for that into the code.
+
+The datasheet states that you have to wait for two ticks of the timer
+clock source (in that case, 24MHz, which makes it around 80-85ns) before
+you can actually enable it back.
+
+I didn't came up with a better solution.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130628/0f311dd3/attachment.sig>
