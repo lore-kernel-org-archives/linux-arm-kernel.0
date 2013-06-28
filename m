@@ -1,84 +1,50 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Fri, 28 Jun 2013 14:22:11 +0300
-Subject: [PATCH] Documentation: dt: bindings: TI WiLink modules
-In-Reply-To: <1372415514.21065.50.camel@cumari.coelho.fi>
-References: <1372149330-24335-1-git-send-email-coelho@ti.com>
- <20130628093848.GA2139@e106331-lin.cambridge.arm.com>
- <1372413215.21065.41.camel@cumari.coelho.fi>
- <20130628102145.GB2139@e106331-lin.cambridge.arm.com>
- <1372415514.21065.50.camel@cumari.coelho.fi>
-Message-ID: <1372418531.21065.53.camel@cumari.coelho.fi>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 28 Jun 2013 20:26:55 +0900
+Subject: [PATCH 00/04] ARM: shmobile: r8a73a4/r8a7790 CMT and Arch timer update
+Message-ID: <20130628112655.23809.39115.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-06-28 at 13:31 +0300, Luciano Coelho wrote:
-> (fixed Mike's address)
-> 
-> On Fri, 2013-06-28 at 11:21 +0100, Mark Rutland wrote:
-> > On Fri, Jun 28, 2013 at 10:53:35AM +0100, Luciano Coelho wrote:
-> > > On Fri, 2013-06-28 at 10:38 +0100, Mark Rutland wrote:
-> > > > On Tue, Jun 25, 2013 at 09:35:30AM +0100, Luciano Coelho wrote:
-> > > > > +Optional properties:
-> > > > > +--------------------
-> > > > > +
-> > > > > +- refclock: the internal WLAN reference clock frequency (required for
-> > > > > +  WiLink6 and WiLink7; not used for WiLink8).  Must be one of the
-> > > > > +  following:
-> > > > > +	0 = 19.2 MHz
-> > > > > +	1 = 26.0 MHz
-> > > > > +	2 = 38.4 MHz
-> > > > > +	3 = 52.0 MHz
-> > > > > +	4 = 38.4 MHz, XTAL
-> > > > > +	5 = 26.0 MHz, XTAL
-> > > > > +
-> > > > > +- tcxoclock: the internal WLAN TCXO clock frequency (required for
-> > > > > +  WiLink7 not used for WiLink6 and WiLink8).  Must be one of the
-> > > > > +  following:
-> > > > > +	0 = 19.200 MHz
-> > > > > +	1 = 26.000 MHz
-> > > > > +	2 = 38.400 MHz
-> > > > > +	3 = 52.000 MHz
-> > > > > +	4 = 16.368 MHz
-> > > > > +	5 = 32.736 MHz
-> > > > > +	6 = 16.800 MHz
-> > > > > +	7 = 33.600 MHz
-> > > > 
-> > > > This looks suspiciously like what we have the common clock bindings for:
-> > > > 
-> > > > refclk {
-> > > > 	compatible = "fixed-clock";
-> > > > 	#clock-cells = <0>;
-> > > > 	clock-frequency = <19200000>;
-> > > > }
-> > > > 
-> > > > wilink {
-> > > > 	compatible = "ti,wilink7";
-> > > > 	interrupt-parent = <&some_interrupt_controller>;
-> > > > 	interrupts = <0 1 1>;
-> > > > 	clocks = <&refclk>, <&refclk>;
-> > > > 	clock-names = "refclk", "txoclk";
-> > > > };
-> > > > 
-> > > > Could you not use them?
-> > > 
-> > > Hmmm... this actually does look good.  But these are internal clocks in
-> > > the modules, they cannot be accessed from outside.  Does it make sense
-> > > to register them with the clock framework?
-> > 
-> > Given we already have a common way of describing clocks, I think it
-> > makes sense to use it -- people already understand the common bindings,
-> > and it's less code to add add to the kernel. I don't think the fact
-> > these clocks are internal should prevent us from describing them as we
-> > would an external clock.
-> 
-> Yes, I agree with you.  Thanks for the suggestion! I think it will look
-> much better.  And now that I dug a bit more into the code, I can see
-> that there are only structs being populated, so there shouldn't be any
-> other side-effects.
+ARM: shmobile: r8a73a4/r8a7790 CMT and Arch timer update
 
-Hmmm, one thing that escaped me.  Besides the frequency, I also need a
-boolean that tells if the clock is XTAL or not.  I can't figure out how
-to pass this if I use the generic clock framework.  Any suggestions?
+[PATCH 01/04] ARM: shmobile: Add r8a7790 CMT00 clock event
+[PATCH 02/04] ARM: shmobile: Make r8a7790 Arch timer optional
+[PATCH 03/04] ARM: shmobile: Add r8a73a4 CMT10 clock event
+[PATCH 04/04] ARM: shmobile: Make r8a73a4 Arch timer optional
 
---
-Luca.
+Add clock event support through a CMT timer channel for the
+SoCs r8a7790 and r8a73a4 as well as APE6EVM and Lager boards.
+
+Also, to be able to test the CMT timers, make it possible to
+deselect Arch timer and instead rely on predefined values for
+udelay() and instead of local timer for SMP use broadcast.
+
+A nice side effect of this is that high resolution timers
+now become available. The reason for the is that the Arch
+timer sets the C3STOP flag which in turn will tell the
+time keeping code to not allow high resolution timer without
+an additional clock event. So here they are.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Written against renesas.git renesas-next-20130628 plus
+ [PATCH] ARM: shmobile: Sort r8a7790 MSTP entries
+ [PATCH 00/06] ARM: shmobile: Remove unused auxdata tables
+
+ For proper run time operation the following patch
+ included in renesas-next-20130628 must be included
+ in the CMT driver:
+
+ clocksource: sh_cmt: 32-bit control register support
+
+ arch/arm/mach-shmobile/Kconfig                |    2 -
+ arch/arm/mach-shmobile/board-ape6evm.c        |    1 
+ arch/arm/mach-shmobile/board-lager.c          |    1 
+ arch/arm/mach-shmobile/clock-r8a73a4.c        |    4 ++-
+ arch/arm/mach-shmobile/clock-r8a7790.c        |    4 +++
+ arch/arm/mach-shmobile/include/mach/r8a73a4.h |    1 
+ arch/arm/mach-shmobile/include/mach/r8a7790.h |    1 
+ arch/arm/mach-shmobile/setup-r8a73a4.c        |   29 +++++++++++++++++++++++++
+ arch/arm/mach-shmobile/setup-r8a7790.c        |   29 +++++++++++++++++++++++++
+ 9 files changed, 69 insertions(+), 3 deletions(-)
