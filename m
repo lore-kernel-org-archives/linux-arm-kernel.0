@@ -1,62 +1,83 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Jun 2013 10:06:35 +0100
-Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
- MMU binding
-In-Reply-To: <CALRxmdD5fyp06xW+z=rWagJc_bcJmpr1H9Zbdf=xbg9cCzvVfw@mail.gmail.com>
-References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
- <1370889285-22799-8-git-send-email-will.deacon@arm.com>
- <CALRxmdBxFWoRKv+bUu8VEwNNcAJUej9jM2V8N0rrqrr_Vpe8fQ@mail.gmail.com>
- <20130626133941.GD7417@mudshark.cambridge.arm.com>
- <CALRxmdCycFK2wW=C4aU79mudSaT+2vU8nzXxepdstubg+YSdQg@mail.gmail.com>
- <20130626174231.GH10333@mudshark.cambridge.arm.com>
- <CALRxmdD5fyp06xW+z=rWagJc_bcJmpr1H9Zbdf=xbg9cCzvVfw@mail.gmail.com>
-Message-ID: <20130628090635.GB29002@mudshark.cambridge.arm.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Fri, 28 Jun 2013 17:07:49 +0800
+Subject: [PATCH v3 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+Message-ID: <1372410473-30920-1-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 07:22:30PM +0100, Stuart Yoder wrote:
-> On Wed, Jun 26, 2013 at 12:42 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Jun 26, 2013 at 05:19:48PM +0100, Stuart Yoder wrote:
-> >> On Wed, Jun 26, 2013 at 8:39 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >> > I'd suggest looking at the driver I posted to get a gist of how the parsing
-> >> > code works, but suffice to say that we describe both the number of
-> >> > interrupts and the actual interrupt numbers here.
-> >>
-> >> I understand that the number of interrupts and actual interrupt numbers
-> >> are described here, but was referring to the _meaning_ of the interrupt
-> >> numbers.   A binding for a device with 2 interrupts, a TX and RX would
-> >> normally identify which interrupt specifier is for TX and which is for RX.
-> >>
-> >> Based on your code, the 2 global interrupts seem to be the secure
-> >> and non-secure fault interrupts...which your driver does not differentiate.
-> >> However, the device tree is describing hardware and  you can't assume
-> >> that all drivers don't care which is which.
-> >
-> > Currently, the driver only works when Linux is running as non-secure, which is
-> > becoming more and more common since it is required to be able to make use of
-> > hyp mode.
-> >
-> > There are actually two global interrupts for SMMUv1 and SMMUv2, which
-> > correspond to configuration faults and `other' global faults.
-> 
-> So, why don't we define which interrupt is which in this binding?
-> ...e.g. "The first
-> interrupt specifier is for the configuration access fault interrupt, the second
-> interrupt specifier is for other global faults."
+The patchset supports to run giveback of URB in tasklet context, so that
+DMA unmapping/mapping on transfer buffer and compelte() callback can be
+run with interrupt enabled, then time of HCD interrupt handler(IRQs
+disabled time) can be saved much. Also this approach may simplify HCD
+since HCD lock needn't be released any more before calling
+usb_hcd_giveback_urb().
 
-Well, first of all, they're both global interrupts and the handler will have
-to go and access exactly the same registers to deal with the fault, so you
-don't really gain anything.
+The patchset enables the mechanism on EHCI HCD now.
 
-However, the main reason is that you need to be able to handle:
+In the commit log of patch 4/4, detailed test result on three machines
+(ARM A9/A15 dual core, X86) are provided about transfer performance and
+ehci irq handling time. From the result, basically no transfer performance
+loss is found and ehci irq handling time drops much with the patchset.
 
-  (1) Only one of the interrupts is routed to the interrupt controller
-  (2) The interrupts are ORd into a single line
+V3:
+	- 1/4: don't check HCD_BH when initializing tasklet
+	- 1/4: don't save flags for spin_lock_irq in tasklet
+	- 1/4: use true/false for bool variable
+	- 1/4: other trivial changes(patch style, vairable name, ...)
+	- 3/4: reorganize code to make output of diff friendly
+	- 3/4: don't cancel hrtimer to make change simple(mark it as TODO)
+	- 4/4: add worst case test data on reading mass storage device
+	as required by Oliver
 
-> How else is software supposed to know which interrupt corresponds to what
-> event.
+V2:
+        - 1/4: always run URB complete() of root-hub in tasklet
+        - 1/4: store urb status in urb->unlinked
+        - 1/4: don't allocate 'struct giveback_urb_bh' dynamically
+        - 1/4: other minor changes
+        - 2/4: descript changes simply
+        - 3/4: don't use QH_STATE_UNLINK_WAIT to implement intr qh
+        unlink wait
+        - 3/4: cancel unlink wait change
+        - 4/4: merge HCD private lock changes
+        - rebase on 3.10-rc7-next20130624
 
-It really doesn't care. It can't, otherwise we break in the above
-situations.
+V1:
+        - change percput tasklet into tasklet in HCD to avoid out of order
+        of URB->complete() for same endpoint
 
-Will
+        - disable local IRQs when calling complete() from tasklet to
+        avoid deadlock which is caused by holding lock via spin_lock
+        and the same lock might be acquired in hard irq context
+
+        - document coming change about calling complete() with irq enabled
+        so that we can start to clean up USB drivers which call spin_lock()
+        in complete()
+
+ Documentation/usb/URB.txt         |   21 +++---
+ drivers/usb/core/hcd.c            |  147 +++++++++++++++++++++++++++++--------
+ drivers/usb/host/ehci-fsl.c       |    2 +-
+ drivers/usb/host/ehci-grlib.c     |    2 +-
+ drivers/usb/host/ehci-hcd.c       |    3 +-
+ drivers/usb/host/ehci-hub.c       |    1 +
+ drivers/usb/host/ehci-mem.c       |    1 +
+ drivers/usb/host/ehci-mv.c        |    2 +-
+ drivers/usb/host/ehci-octeon.c    |    2 +-
+ drivers/usb/host/ehci-pmcmsp.c    |    2 +-
+ drivers/usb/host/ehci-ppc-of.c    |    2 +-
+ drivers/usb/host/ehci-ps3.c       |    2 +-
+ drivers/usb/host/ehci-q.c         |    5 --
+ drivers/usb/host/ehci-sched.c     |   47 +++++++++++-
+ drivers/usb/host/ehci-sead3.c     |    2 +-
+ drivers/usb/host/ehci-sh.c        |    2 +-
+ drivers/usb/host/ehci-tilegx.c    |    2 +-
+ drivers/usb/host/ehci-timer.c     |   35 ++++++++-
+ drivers/usb/host/ehci-w90x900.c   |    2 +-
+ drivers/usb/host/ehci-xilinx-of.c |    2 +-
+ drivers/usb/host/ehci.h           |    3 +
+ include/linux/usb/hcd.h           |   17 +++++
+ 22 files changed, 242 insertions(+), 62 deletions(-)
+
+
+Thanks,
+--
+Ming Lei
