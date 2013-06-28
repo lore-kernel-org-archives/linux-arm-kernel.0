@@ -1,254 +1,342 @@
 From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 28 Jun 2013 17:07:52 +0800
-Subject: [PATCH v3 3/4] USB: EHCI: improve interrupt qh unlink
+Date: Fri, 28 Jun 2013 17:07:53 +0800
+Subject: [PATCH v3 4/4] USB: EHCI: support running URB giveback in tasklet
+ context
 In-Reply-To: <1372410473-30920-1-git-send-email-ming.lei@canonical.com>
 References: <1372410473-30920-1-git-send-email-ming.lei@canonical.com>
-Message-ID: <1372410473-30920-4-git-send-email-ming.lei@canonical.com>
+Message-ID: <1372410473-30920-5-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ehci-hcd currently unlinks an interrupt QH when it becomes empty, that
-is, after its last URB completes.  This works well because in almost
-all cases, the completion handler for an interrupt URB resubmits the
-URB; therefore the QH doesn't become empty and doesn't get unlinked.
+All 4 transfer types can work well on EHCI HCD after switching to run
+URB giveback in tasklet context, so mark all HCD drivers to support
+it.
 
-When we start using tasklets for URB completion, this scheme won't work
-as well.  The resubmission won't occur until the tasklet runs, which
-will be some time after the completion is queued with the tasklet.
-During that delay, the QH will be empty and so will be unlinked
-unnecessarily.
+Also we don't need to release ehci->lock during URB giveback any more.
 
-To prevent this problem, this patch adds a 5-ms time delay before empty
-interrupt QHs are unlinked.  Most often, during that time the interrupt
-URB will be resubmitted and thus we can avoid unlinking the QH.
+>From below test results on 3 machines(2 ARM and one x86), time
+consumed by EHCI interrupt handler droped much without performance
+loss.
 
-Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
+1 test description
+1.1 mass storage performance test:
+- run below command 10 times and compute the average performance
+
+    dd if=/dev/sdN iflag=direct of=/dev/null bs=200M count=1
+
+- two usb mass storage device:
+A: sandisk extreme USB 3.0 16G(used in test case 1 & case 2)
+B: kingston DataTraveler G2 4GB(only used in test case 2)
+
+1.2 uvc function test:
+- run one simple capture program in the below link
+
+   http://kernel.ubuntu.com/~ming/up/capture.c
+
+- capture format 640*480 and results in High Bandwidth mode on the
+uvc device: Z-Star 0x0ac8/0x3450
+
+- on T410(x86) laptop, also use guvcview to watch video capture/playback
+
+1.3 about test2 and test4
+- both two devices involved are tested concurrently by above test items
+
+1.4 how to compute irq time(the time consumed by ehci_irq)
+- use trace points of irq:irq_handler_entry and irq:irq_handler_exit
+
+1.5 kernel
+3.10.0-rc3-next-20130528
+
+1.6 test machines
+Pandaboard A1: ARM CortexA9 dural core
+Arndale board: ARM CortexA15 dural core
+T410: i5 CPU 2.67GHz quad core
+
+2 test result
+2.1 test case1: single mass storage device performance test
+--------------------------------------------------------------------
+		upstream 		| patched
+		perf(MB/s)+irq time(us)	| perf(MB/s)+irq time(us)
+--------------------------------------------------------------------
+Pandaboard A1:  25.280(avg:145,max:772)	| 25.540(avg:14, max:75)
+Arndale board:  29.700(avg:33, max:129)	| 29.700(avg:10,  max:50)
+T410: 		34.430(avg:17, max:154*)| 34.660(avg:12, max:155)
+---------------------------------------------------------------------
+
+2.2 test case2: two mass storage devices' performance test
+--------------------------------------------------------------------
+		upstream 			| patched
+		perf(MB/s)+irq time(us)		| perf(MB/s)+irq time(us)
+--------------------------------------------------------------------
+Pandaboard A1:  15.840/15.580(avg:158,max:1216)	| 16.500/16.160(avg:15,max:139)
+Arndale board:  17.370/16.220(avg:33 max:234)	| 17.480/16.200(avg:11, max:91)
+T410: 		21.180/19.820(avg:18 max:160)	| 21.220/19.880(avg:11, max:149)
+---------------------------------------------------------------------
+
+2.3 test case3: one uvc streaming test
+- uvc device works well(on x86, luvcview can be used too and has
+same result with uvc capture)
+--------------------------------------------------------------------
+		upstream 		| patched
+		irq time(us)		| irq time(us)
+--------------------------------------------------------------------
+Pandaboard A1:  (avg:445, max:873)	| (avg:33, max:44)
+Arndale board:  (avg:316, max:630)	| (avg:20, max:27)
+T410: 		(avg:39,  max:107)	| (avg:10, max:65)
+---------------------------------------------------------------------
+
+2.4 test case4: one uvc streaming plus one mass storage device test
+--------------------------------------------------------------------
+		upstream 		| patched
+		perf(MB/s)+irq time(us)	| perf(MB/s)+irq time(us)
+--------------------------------------------------------------------
+Pandaboard A1:  20.340(avg:259,max:1704)| 20.390(avg:24, max:101)
+Arndale board:  23.460(avg:124,max:726)	| 23.370(avg:15, max:52)
+T410: 		28.520(avg:27, max:169)	| 28.630(avg:13, max:160)
+---------------------------------------------------------------------
+
+2.5 test case5: read single mass storage device with small transfer
+- run below command 10 times and compute the average speed
+
+ dd if=/dev/sdN iflag=direct of=/dev/null bs=4K count=4000
+
+1), test device A:
+--------------------------------------------------------------------
+		upstream 		| patched
+		perf(MB/s)+irq time(us)	| perf(MB/s)+irq time(us)
+--------------------------------------------------------------------
+Pandaboard A1:  6.5(avg:21, max:64)	| 6.5(avg:10, max:24)
+Arndale board:  8.13(avg:12, max:23)	| 8.06(avg:7,  max:17)
+T410: 		6.66(avg:13, max:131)   | 6.84(avg:11, max:149)
+---------------------------------------------------------------------
+
+2), test device B:
+--------------------------------------------------------------------
+		upstream 		| patched
+		perf(MB/s)+irq time(us)	| perf(MB/s)+irq time(us)
+--------------------------------------------------------------------
+Pandaboard A1:  5.5(avg:21,max:43)	| 5.49(avg:10, max:24)
+Arndale board:  5.9(avg:12, max:22)	| 5.9(avg:7, max:17)
+T410: 		5.48(avg:13, max:155)	| 5.48(avg:7, max:140)
+---------------------------------------------------------------------
+
+* On T410, sometimes read ehci status register in ehci_irq takes more
+than 100us, and the problem has been reported on the link:
+
+	http://marc.info/?t=137065867300001&r=1&w=2
+
+Cc: Alan Stern <stern@rowland.harvard.edu>
 Signed-off-by: Ming Lei <ming.lei@canonical.com>
 ---
- drivers/usb/host/ehci-hcd.c   |    1 +
- drivers/usb/host/ehci-hub.c   |    1 +
- drivers/usb/host/ehci-mem.c   |    1 +
- drivers/usb/host/ehci-sched.c |   47 ++++++++++++++++++++++++++++++++++++++++-
- drivers/usb/host/ehci-timer.c |   35 ++++++++++++++++++++++++++++--
- drivers/usb/host/ehci.h       |    3 +++
- 6 files changed, 85 insertions(+), 3 deletions(-)
+ drivers/usb/host/ehci-fsl.c       |    2 +-
+ drivers/usb/host/ehci-grlib.c     |    2 +-
+ drivers/usb/host/ehci-hcd.c       |    2 +-
+ drivers/usb/host/ehci-mv.c        |    2 +-
+ drivers/usb/host/ehci-octeon.c    |    2 +-
+ drivers/usb/host/ehci-pmcmsp.c    |    2 +-
+ drivers/usb/host/ehci-ppc-of.c    |    2 +-
+ drivers/usb/host/ehci-ps3.c       |    2 +-
+ drivers/usb/host/ehci-q.c         |    5 -----
+ drivers/usb/host/ehci-sead3.c     |    2 +-
+ drivers/usb/host/ehci-sh.c        |    2 +-
+ drivers/usb/host/ehci-tilegx.c    |    2 +-
+ drivers/usb/host/ehci-w90x900.c   |    2 +-
+ drivers/usb/host/ehci-xilinx-of.c |    2 +-
+ 14 files changed, 13 insertions(+), 18 deletions(-)
 
+diff --git a/drivers/usb/host/ehci-fsl.c b/drivers/usb/host/ehci-fsl.c
+index bd831ec..330274a 100644
+--- a/drivers/usb/host/ehci-fsl.c
++++ b/drivers/usb/host/ehci-fsl.c
+@@ -669,7 +669,7 @@ static const struct hc_driver ehci_fsl_hc_driver = {
+ 	 * generic hardware linkage
+ 	 */
+ 	.irq = ehci_irq,
+-	.flags = HCD_USB2 | HCD_MEMORY,
++	.flags = HCD_USB2 | HCD_MEMORY | HCD_BH,
+ 
+ 	/*
+ 	 * basic lifecycle operations
+diff --git a/drivers/usb/host/ehci-grlib.c b/drivers/usb/host/ehci-grlib.c
+index 5d75de9..c6048ee 100644
+--- a/drivers/usb/host/ehci-grlib.c
++++ b/drivers/usb/host/ehci-grlib.c
+@@ -43,7 +43,7 @@ static const struct hc_driver ehci_grlib_hc_driver = {
+ 	 * generic hardware linkage
+ 	 */
+ 	.irq			= ehci_irq,
+-	.flags			= HCD_MEMORY | HCD_USB2,
++	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
+ 
+ 	/*
+ 	 * basic lifecycle operations
 diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index 246e124..e2fccc0 100644
+index e2fccc0..a0c27fd 100644
 --- a/drivers/usb/host/ehci-hcd.c
 +++ b/drivers/usb/host/ehci-hcd.c
-@@ -484,6 +484,7 @@ static int ehci_init(struct usb_hcd *hcd)
- 	ehci->periodic_size = DEFAULT_I_TDPS;
- 	INIT_LIST_HEAD(&ehci->async_unlink);
- 	INIT_LIST_HEAD(&ehci->async_idle);
-+	INIT_LIST_HEAD(&ehci->intr_unlink_wait);
- 	INIT_LIST_HEAD(&ehci->intr_unlink);
- 	INIT_LIST_HEAD(&ehci->intr_qh_list);
- 	INIT_LIST_HEAD(&ehci->cached_itd_list);
-diff --git a/drivers/usb/host/ehci-hub.c b/drivers/usb/host/ehci-hub.c
-index b2f6450..4104c66 100644
---- a/drivers/usb/host/ehci-hub.c
-+++ b/drivers/usb/host/ehci-hub.c
-@@ -345,6 +345,7 @@ static int ehci_bus_suspend (struct usb_hcd *hcd)
+@@ -1167,7 +1167,7 @@ static const struct hc_driver ehci_hc_driver = {
+ 	 * generic hardware linkage
+ 	 */
+ 	.irq =			ehci_irq,
+-	.flags =		HCD_MEMORY | HCD_USB2,
++	.flags =		HCD_MEMORY | HCD_USB2 | HCD_BH,
  
- 	end_unlink_async(ehci);
- 	unlink_empty_async_suspended(ehci);
-+	ehci_handle_start_intr_unlinks(ehci);
- 	ehci_handle_intr_unlinks(ehci);
- 	end_free_itds(ehci);
+ 	/*
+ 	 * basic lifecycle operations
+diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
+index 915c2db..ce18a36 100644
+--- a/drivers/usb/host/ehci-mv.c
++++ b/drivers/usb/host/ehci-mv.c
+@@ -96,7 +96,7 @@ static const struct hc_driver mv_ehci_hc_driver = {
+ 	 * generic hardware linkage
+ 	 */
+ 	.irq = ehci_irq,
+-	.flags = HCD_MEMORY | HCD_USB2,
++	.flags = HCD_MEMORY | HCD_USB2 | HCD_BH,
  
-diff --git a/drivers/usb/host/ehci-mem.c b/drivers/usb/host/ehci-mem.c
-index ef2c3a1..52a7773 100644
---- a/drivers/usb/host/ehci-mem.c
-+++ b/drivers/usb/host/ehci-mem.c
-@@ -93,6 +93,7 @@ static struct ehci_qh *ehci_qh_alloc (struct ehci_hcd *ehci, gfp_t flags)
- 	qh->qh_dma = dma;
- 	// INIT_LIST_HEAD (&qh->qh_list);
- 	INIT_LIST_HEAD (&qh->qtd_list);
-+	INIT_LIST_HEAD(&qh->unlink_node);
+ 	/*
+ 	 * basic lifecycle operations
+diff --git a/drivers/usb/host/ehci-octeon.c b/drivers/usb/host/ehci-octeon.c
+index 45cc001..ab0397e 100644
+--- a/drivers/usb/host/ehci-octeon.c
++++ b/drivers/usb/host/ehci-octeon.c
+@@ -51,7 +51,7 @@ static const struct hc_driver ehci_octeon_hc_driver = {
+ 	 * generic hardware linkage
+ 	 */
+ 	.irq			= ehci_irq,
+-	.flags			= HCD_MEMORY | HCD_USB2,
++	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
  
- 	/* dummy td enables safe urb queuing */
- 	qh->dummy = ehci_qtd_alloc (ehci, flags);
-diff --git a/drivers/usb/host/ehci-sched.c b/drivers/usb/host/ehci-sched.c
-index acff5b8..101aea6 100644
---- a/drivers/usb/host/ehci-sched.c
-+++ b/drivers/usb/host/ehci-sched.c
-@@ -601,12 +601,29 @@ static void qh_unlink_periodic(struct ehci_hcd *ehci, struct ehci_qh *qh)
- 	list_del(&qh->intr_node);
- }
+ 	/*
+ 	 * basic lifecycle operations
+diff --git a/drivers/usb/host/ehci-pmcmsp.c b/drivers/usb/host/ehci-pmcmsp.c
+index 363890e..3ab32a2 100644
+--- a/drivers/usb/host/ehci-pmcmsp.c
++++ b/drivers/usb/host/ehci-pmcmsp.c
+@@ -286,7 +286,7 @@ static const struct hc_driver ehci_msp_hc_driver = {
+ #else
+ 	.irq =			ehci_irq,
+ #endif
+-	.flags =		HCD_MEMORY | HCD_USB2,
++	.flags =		HCD_MEMORY | HCD_USB2 | HCD_BH,
  
-+static void cancel_unlink_wait_intr(struct ehci_hcd *ehci, struct ehci_qh *qh)
-+{
-+	if (qh->qh_state != QH_STATE_LINKED ||
-+			list_empty(&qh->unlink_node))
-+		return;
-+
-+	list_del_init(&qh->unlink_node);
-+
-+	/*
-+	 * TODO: disable the event of EHCI_HRTIMER_START_UNLINK_INTR for
-+	 * avoiding unnecessary CPU wakeup
-+	 */
-+}
-+
- static void start_unlink_intr(struct ehci_hcd *ehci, struct ehci_qh *qh)
+ 	/*
+ 	 * basic lifecycle operations
+diff --git a/drivers/usb/host/ehci-ppc-of.c b/drivers/usb/host/ehci-ppc-of.c
+index 56dc732..da95a31 100644
+--- a/drivers/usb/host/ehci-ppc-of.c
++++ b/drivers/usb/host/ehci-ppc-of.c
+@@ -28,7 +28,7 @@ static const struct hc_driver ehci_ppc_of_hc_driver = {
+ 	 * generic hardware linkage
+ 	 */
+ 	.irq			= ehci_irq,
+-	.flags			= HCD_MEMORY | HCD_USB2,
++	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
+ 
+ 	/*
+ 	 * basic lifecycle operations
+diff --git a/drivers/usb/host/ehci-ps3.c b/drivers/usb/host/ehci-ps3.c
+index fd98377..8188542 100644
+--- a/drivers/usb/host/ehci-ps3.c
++++ b/drivers/usb/host/ehci-ps3.c
+@@ -71,7 +71,7 @@ static const struct hc_driver ps3_ehci_hc_driver = {
+ 	.product_desc		= "PS3 EHCI Host Controller",
+ 	.hcd_priv_size		= sizeof(struct ehci_hcd),
+ 	.irq			= ehci_irq,
+-	.flags			= HCD_MEMORY | HCD_USB2,
++	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
+ 	.reset			= ps3_ehci_hc_reset,
+ 	.start			= ehci_run,
+ 	.stop			= ehci_stop,
+diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
+index d34b399..b637a65 100644
+--- a/drivers/usb/host/ehci-q.c
++++ b/drivers/usb/host/ehci-q.c
+@@ -254,8 +254,6 @@ static int qtd_copy_status (
+ 
+ static void
+ ehci_urb_done(struct ehci_hcd *ehci, struct urb *urb, int status)
+-__releases(ehci->lock)
+-__acquires(ehci->lock)
  {
- 	/* If the QH isn't linked then there's nothing we can do. */
- 	if (qh->qh_state != QH_STATE_LINKED)
- 		return;
+ 	if (usb_pipetype(urb->pipe) == PIPE_INTERRUPT) {
+ 		/* ... update hc-wide periodic stats */
+@@ -281,11 +279,8 @@ __acquires(ehci->lock)
+ 		urb->actual_length, urb->transfer_buffer_length);
+ #endif
  
-+	/* if the qh is waiting for unlink, cancel it now */
-+	cancel_unlink_wait_intr(ehci, qh);
-+
- 	qh_unlink_periodic (ehci, qh);
- 
- 	/* Make sure the unlinks are visible before starting the timer */
-@@ -632,6 +649,31 @@ static void start_unlink_intr(struct ehci_hcd *ehci, struct ehci_qh *qh)
- 	}
+-	/* complete() can reenter this HCD */
+ 	usb_hcd_unlink_urb_from_ep(ehci_to_hcd(ehci), urb);
+-	spin_unlock (&ehci->lock);
+ 	usb_hcd_giveback_urb(ehci_to_hcd(ehci), urb, status);
+-	spin_lock (&ehci->lock);
  }
  
-+/*
-+ * It is common only one intr URB is scheduled on one qh, and
-+ * given complete() is run in tasklet context, introduce a bit
-+ * delay to avoid unlink qh too early.
-+ */
-+static void start_unlink_intr_wait(struct ehci_hcd *ehci,
-+				   struct ehci_qh *qh)
-+{
-+	/* If the QH isn't linked then there's nothing we can do. */
-+	if (qh->qh_state != QH_STATE_LINKED)
-+		return;
-+
-+	qh->unlink_cycle = ehci->intr_unlink_wait_cycle;
-+
-+	/* New entries go at the end of the intr_unlink_wait list */
-+	list_add_tail(&qh->unlink_node, &ehci->intr_unlink_wait);
-+
-+	if (ehci->rh_state < EHCI_RH_RUNNING)
-+		ehci_handle_start_intr_unlinks(ehci);
-+	else if (ehci->intr_unlink_wait.next == &qh->unlink_node) {
-+		ehci_enable_event(ehci, EHCI_HRTIMER_START_UNLINK_INTR, true);
-+		++ehci->intr_unlink_wait_cycle;
-+	}
-+}
-+
- static void end_unlink_intr(struct ehci_hcd *ehci, struct ehci_qh *qh)
- {
- 	struct ehci_qh_hw	*hw = qh->hw;
-@@ -884,6 +926,9 @@ static int intr_submit (
- 	if (qh->qh_state == QH_STATE_IDLE) {
- 		qh_refresh(ehci, qh);
- 		qh_link_periodic(ehci, qh);
-+	} else {
-+		/* cancel unlink wait for the qh */
-+		cancel_unlink_wait_intr(ehci, qh);
- 	}
+ static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh);
+diff --git a/drivers/usb/host/ehci-sead3.c b/drivers/usb/host/ehci-sead3.c
+index b2de52d..8a73449 100644
+--- a/drivers/usb/host/ehci-sead3.c
++++ b/drivers/usb/host/ehci-sead3.c
+@@ -55,7 +55,7 @@ const struct hc_driver ehci_sead3_hc_driver = {
+ 	 * generic hardware linkage
+ 	 */
+ 	.irq			= ehci_irq,
+-	.flags			= HCD_MEMORY | HCD_USB2,
++	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
  
- 	/* ... update usbfs periodic stats */
-@@ -921,7 +966,7 @@ static void scan_intr(struct ehci_hcd *ehci)
- 			temp = qh_completions(ehci, qh);
- 			if (unlikely(temp || (list_empty(&qh->qtd_list) &&
- 					qh->qh_state == QH_STATE_LINKED)))
--				start_unlink_intr(ehci, qh);
-+				start_unlink_intr_wait(ehci, qh);
- 		}
- 	}
- }
-diff --git a/drivers/usb/host/ehci-timer.c b/drivers/usb/host/ehci-timer.c
-index 11e5b32..25b9fa3 100644
---- a/drivers/usb/host/ehci-timer.c
-+++ b/drivers/usb/host/ehci-timer.c
-@@ -72,6 +72,7 @@ static unsigned event_delays_ns[] = {
- 	1 * NSEC_PER_MSEC,	/* EHCI_HRTIMER_POLL_DEAD */
- 	1125 * NSEC_PER_USEC,	/* EHCI_HRTIMER_UNLINK_INTR */
- 	2 * NSEC_PER_MSEC,	/* EHCI_HRTIMER_FREE_ITDS */
-+	5 * NSEC_PER_MSEC,	/* EHCI_HRTIMER_START_UNLINK_INTR */
- 	6 * NSEC_PER_MSEC,	/* EHCI_HRTIMER_ASYNC_UNLINKS */
- 	10 * NSEC_PER_MSEC,	/* EHCI_HRTIMER_IAA_WATCHDOG */
- 	10 * NSEC_PER_MSEC,	/* EHCI_HRTIMER_DISABLE_PERIODIC */
-@@ -98,7 +99,6 @@ static void ehci_enable_event(struct ehci_hcd *ehci, unsigned event,
- 	}
- }
+ 	/*
+ 	 * basic lifecycle operations
+diff --git a/drivers/usb/host/ehci-sh.c b/drivers/usb/host/ehci-sh.c
+index c4c0ee9..1691f8e 100644
+--- a/drivers/usb/host/ehci-sh.c
++++ b/drivers/usb/host/ehci-sh.c
+@@ -36,7 +36,7 @@ static const struct hc_driver ehci_sh_hc_driver = {
+ 	 * generic hardware linkage
+ 	 */
+ 	.irq				= ehci_irq,
+-	.flags				= HCD_USB2 | HCD_MEMORY,
++	.flags				= HCD_USB2 | HCD_MEMORY | HCD_BH,
  
--
- /* Poll the STS_ASS status bit; see when it agrees with CMD_ASE */
- static void ehci_poll_ASS(struct ehci_hcd *ehci)
- {
-@@ -215,6 +215,36 @@ static void ehci_handle_controller_death(struct ehci_hcd *ehci)
- 	/* Not in process context, so don't try to reset the controller */
- }
+ 	/*
+ 	 * basic lifecycle operations
+diff --git a/drivers/usb/host/ehci-tilegx.c b/drivers/usb/host/ehci-tilegx.c
+index d72b292..204d3b6 100644
+--- a/drivers/usb/host/ehci-tilegx.c
++++ b/drivers/usb/host/ehci-tilegx.c
+@@ -61,7 +61,7 @@ static const struct hc_driver ehci_tilegx_hc_driver = {
+ 	 * Generic hardware linkage.
+ 	 */
+ 	.irq			= ehci_irq,
+-	.flags			= HCD_MEMORY | HCD_USB2,
++	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
  
-+/* start to unlink interrupt QHs  */
-+static void ehci_handle_start_intr_unlinks(struct ehci_hcd *ehci)
-+{
-+	bool		stopped = (ehci->rh_state < EHCI_RH_RUNNING);
-+
-+	/*
-+	 * Process all the QHs on the intr_unlink list that were added
-+	 * before the current unlink cycle began.  The list is in
-+	 * temporal order, so stop when we reach the first entry in the
-+	 * current cycle.  But if the root hub isn't running then
-+	 * process all the QHs on the list.
-+	 */
-+	while (!list_empty(&ehci->intr_unlink_wait)) {
-+		struct ehci_qh	*qh;
-+
-+		qh = list_first_entry(&ehci->intr_unlink_wait,
-+				struct ehci_qh, unlink_node);
-+		if (!stopped && (qh->unlink_cycle ==
-+				ehci->intr_unlink_wait_cycle))
-+			break;
-+		list_del_init(&qh->unlink_node);
-+		start_unlink_intr(ehci, qh);
-+	}
-+
-+	/* Handle remaining entries later */
-+	if (!list_empty(&ehci->intr_unlink_wait)) {
-+		ehci_enable_event(ehci, EHCI_HRTIMER_START_UNLINK_INTR, true);
-+		++ehci->intr_unlink_wait_cycle;
-+	}
-+}
+ 	/*
+ 	 * Basic lifecycle operations.
+diff --git a/drivers/usb/host/ehci-w90x900.c b/drivers/usb/host/ehci-w90x900.c
+index 59e0e24..1c370df 100644
+--- a/drivers/usb/host/ehci-w90x900.c
++++ b/drivers/usb/host/ehci-w90x900.c
+@@ -108,7 +108,7 @@ static const struct hc_driver ehci_w90x900_hc_driver = {
+ 	 * generic hardware linkage
+ 	 */
+ 	.irq = ehci_irq,
+-	.flags = HCD_USB2|HCD_MEMORY,
++	.flags = HCD_USB2|HCD_MEMORY|HCD_BH,
  
- /* Handle unlinked interrupt QHs once they are gone from the hardware */
- static void ehci_handle_intr_unlinks(struct ehci_hcd *ehci)
-@@ -236,7 +266,7 @@ static void ehci_handle_intr_unlinks(struct ehci_hcd *ehci)
- 				unlink_node);
- 		if (!stopped && qh->unlink_cycle == ehci->intr_unlink_cycle)
- 			break;
--		list_del(&qh->unlink_node);
-+		list_del_init(&qh->unlink_node);
- 		end_unlink_intr(ehci, qh);
- 	}
+ 	/*
+ 	 * basic lifecycle operations
+diff --git a/drivers/usb/host/ehci-xilinx-of.c b/drivers/usb/host/ehci-xilinx-of.c
+index d845e3b..bb96a68 100644
+--- a/drivers/usb/host/ehci-xilinx-of.c
++++ b/drivers/usb/host/ehci-xilinx-of.c
+@@ -79,7 +79,7 @@ static const struct hc_driver ehci_xilinx_of_hc_driver = {
+ 	 * generic hardware linkage
+ 	 */
+ 	.irq			= ehci_irq,
+-	.flags			= HCD_MEMORY | HCD_USB2,
++	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
  
-@@ -363,6 +393,7 @@ static void (*event_handlers[])(struct ehci_hcd *) = {
- 	ehci_handle_controller_death,	/* EHCI_HRTIMER_POLL_DEAD */
- 	ehci_handle_intr_unlinks,	/* EHCI_HRTIMER_UNLINK_INTR */
- 	end_free_itds,			/* EHCI_HRTIMER_FREE_ITDS */
-+	ehci_handle_start_intr_unlinks,	/* EHCI_HRTIMER_START_UNLINK_INTR */
- 	unlink_empty_async,		/* EHCI_HRTIMER_ASYNC_UNLINKS */
- 	ehci_iaa_watchdog,		/* EHCI_HRTIMER_IAA_WATCHDOG */
- 	ehci_disable_PSE,		/* EHCI_HRTIMER_DISABLE_PERIODIC */
-diff --git a/drivers/usb/host/ehci.h b/drivers/usb/host/ehci.h
-index 7c978b2..2a55504 100644
---- a/drivers/usb/host/ehci.h
-+++ b/drivers/usb/host/ehci.h
-@@ -88,6 +88,7 @@ enum ehci_hrtimer_event {
- 	EHCI_HRTIMER_POLL_DEAD,		/* Wait for dead controller to stop */
- 	EHCI_HRTIMER_UNLINK_INTR,	/* Wait for interrupt QH unlink */
- 	EHCI_HRTIMER_FREE_ITDS,		/* Wait for unused iTDs and siTDs */
-+	EHCI_HRTIMER_START_UNLINK_INTR, /* Unlink empty interrupt QHs */
- 	EHCI_HRTIMER_ASYNC_UNLINKS,	/* Unlink empty async QHs */
- 	EHCI_HRTIMER_IAA_WATCHDOG,	/* Handle lost IAA interrupts */
- 	EHCI_HRTIMER_DISABLE_PERIODIC,	/* Wait to disable periodic sched */
-@@ -143,7 +144,9 @@ struct ehci_hcd {			/* one per controller */
- 	unsigned		i_thresh;	/* uframes HC might cache */
- 
- 	union ehci_shadow	*pshadow;	/* mirror hw periodic table */
-+	struct list_head	intr_unlink_wait;
- 	struct list_head	intr_unlink;
-+	unsigned		intr_unlink_wait_cycle;
- 	unsigned		intr_unlink_cycle;
- 	unsigned		now_frame;	/* frame from HC hardware */
- 	unsigned		last_iso_frame;	/* last frame scanned for iso */
+ 	/*
+ 	 * basic lifecycle operations
 -- 
 1.7.9.5
