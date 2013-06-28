@@ -1,71 +1,71 @@
-From: joelf@ti.com (Fernandes, Joel)
-Date: Fri, 28 Jun 2013 16:56:04 +0000
-Subject: [PATCH 0/5] AM33xx: MMC resources from DT without HWMOD data
-In-Reply-To: <51CDB06B.9010604@ti.com>
-References: <1372209808-6532-1-git-send-email-joelagnel@ti.com>
- <CAD=GYpbdVVrh-tiqOcbHi3mkWRJUBdx0EsEZEFVVbgFgcCWgsw@mail.gmail.com>
- <51CC2A1E.2040003@ti.com>
- <CAD=GYpa9LQ1fV6=O9B65sJURVAigsgXCPLWav8cHXTuGQXPc9A@mail.gmail.com>
- <51CC67CA.2070805@ti.com>
- <083BC63EECB6FD41B8E81CF7FD87CC0F2E4F0F95@DLEE08.ent.ti.com>
- <51CDB06B.9010604@ti.com>
-Message-ID: <083BC63EECB6FD41B8E81CF7FD87CC0F2E4F186C@DLEE08.ent.ti.com>
+From: maxime.ripard@free-electrons.com (maxime.ripard)
+Date: Fri, 28 Jun 2013 19:03:01 +0200
+Subject: [linux-sunxi] [PATCH 0/8] clocksource: sunxi: Timer fixes
+ and cleanup
+In-Reply-To: <alpine.DEB.2.02.1306281559490.4013@ionos.tec.linutronix.de>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+ <51CC0566.8010302@redhat.com> <20130627094307.GC8437@lukather>
+ <51CC0BC3.5090309@redhat.com> <20130627165436.GB4319@lukather>
+ <20130627232608.1174558b@i7>
+ <2013062809433715678058@allwinnertech.com>
+ <alpine.DEB.2.02.1306281559490.4013@ionos.tec.linutronix.de>
+Message-ID: <20130628170301.GN4319@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Krishnamoorthy, Balaji T
-> Sent: Friday, June 28, 2013 10:49 AM
-> To: Fernandes, Joel
-> Cc: benoit.cousson at gmail.com; lars at metafoo.de; Tony Lindgren; Nori, Sekhar;
-> Matt Porter; Grant Likely; Rob Herring; Vinod Koul; Mark Brown; Russell King;
-> Rob Landley; Andrew Morton; Jason Kridner; Koen Kooi; Chris Ball; Devicetree
-> Discuss; Linux OMAP List; Linux ARM Kernel List; Linux DaVinci Kernel List;
-> Linux Kernel Mailing List; Linux MMC List; Arnd Bergmann
-> Subject: Re: [PATCH 0/5] AM33xx: MMC resources from DT without HWMOD
-> data
-> 
-> On Thursday 27 June 2013 11:38 PM, Fernandes, Joel wrote:
-> > Hi Balaji,
-> >
-> 
-> <snip>
-> 
-> >>> Some patches were squashed and others dropped in the series
-> >>> resulting in the single patch above. This patch should be good to
-> >>> apply
-> >> Hi Joel,
-> >>
-> >> Before pushing mmc dts support for am335x, Can you please let me know
-> >> if below 2 patches [1] are merged/accepted, IIRC these patches are
-> >> needed for MMC to work properly.
-> >>
-> >> I suggest to hold the dts patch until slave_sg_limit gets merged
-> >> otherwise it will cause regression in am335x mmc.
-> >>
-> >> [PATCH v4 1/3] dmaengine: add dma_get_slave_sg_limits() [PATCH v4
-> >> 2/3] dma: edma: add device_slave_sg_limits() support
-> >
-> > Actually this is an independent regression and is currently worked on by Lars-
-> Peter Clausen [1].
-> >
-> > Currently not having the MMC DTS merged is also a regression,
-> 
-> No, Right now mmc support is not added to am335x, so it is not really a
-> regression.
-> 
->  > so I suggest lets take it one
-> > step at a time and get the DTS merged in first. Also there will be
-> > overhead of reposting this DTS patch later again which will not change. What
-> do you say?
-> >
-> 
-> If it gets enabled via dts, without slave sg limit support, file read/write will fail,
-> possibly corrupting file system.
+Hi Thomas,
 
-I agree with this. Thank you.
+On Fri, Jun 28, 2013 at 04:02:23PM +0200, Thomas Gleixner wrote:
+> On Fri, 28 Jun 2013, ?? wrote:
+> > > The A10 manual from http://free-electrons.com/~maxime/pub/datasheet/
+> > > does not seem to contain any details about what bad things may happen
+> > > if we try to read CNT64_LO_REG while latching is still in progress and
+> > > CNT64_RL_EN bit in CNT64_CTRL_REG has not changed to zero yet.
+> > > I can imagine the following possible scenarios:
+> > >  1. We read either the old stale CNT64_LO_REG value or the new
+> > >     correct value.
+> > >  2. We read either the old stale CNT64_LO_REG value or the new
+> > >     correct value, or some random garbage.
+> > >  3. The processor may deadlock, eat your dog, or do some other
+> > >     nasty thing.
+> > >
+> > > In the case of 1, we probably can get away without using any spinlocks?
+> > 
+> > About the 64bits counter, the latch bit is needed because of the asynchronous circuit.
+> > The internal circuit of 64bits counter is working under 24Mhz clock, and CNT_LO/HI
+> > is read with APB clock. So the clock synchronize is needed. The function of the latch
+> > is synchronous the 64bits counter from 24Mhz clock domain to APB clock domain.
+> > So, if the latch is not completely, value of the CNT_LO/HI maybe a random value, because
+> > some bits are latched, but others are not. So, the CNT_LO/HI should be read after
+> > latch is completely.
+> > The latch just takes 3 cycles of 24Mhz clock, the time is nearly 0.125 micro-second.
+> > 
+> 
+> I really wonder why we're trying to use that timer. AFAICT the A10 has
+> another six 32bit timers which do not have this restriction and the
+> clocksoure/sched_clock implementation works nicely with 32 bits. So
+> what's the point of using that 64 bit counter if it's horrible to
+> access?
 
-Tony, Benoit, I guess let's just not apply the DTS yet till the slave-sg limits support
-is merged as well. Sorry for the noise. Thanks.
+Yes, you're right. I actually wanted at first not to use a timer for
+this since we had a counter to do just that.
 
--Joel
+But that's true that actually using a timer would make the code simpler
+and presumably faster as well.
+
+I'll change this in the v2.
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130628/3705a440/attachment.sig>
