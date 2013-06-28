@@ -1,43 +1,68 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 28 Jun 2013 19:13:27 +0900
-Subject: [PATCH] ARM: shmobile: Sort r8a7790 MSTP entries
-Message-ID: <20130628101327.26876.89435.sendpatchset@w520>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Fri, 28 Jun 2013 10:14:34 +0000
+Subject: [PATCH 2/4] davinci: da8xx/omap-l1: Remove hard coding of rtc
+ device	wakeup
+In-Reply-To: <1372412109-986-3-git-send-email-gururaja.hebbar@ti.com>
+References: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
+ <1372412109-986-3-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA95D17@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi,
 
-The r8a7790 MSTP bits should be kept sorted in the same way
-as on other mach-shmobile SoCs. Move the HSCIF and thermal
-bits to clean up the current state.
+On Fri, Jun 28, 2013 at 15:05:07, Hebbar, Gururaja wrote:
+> Since now rtc-omap driver itself calls deice_init_wakeup(dev, true),
+> duplicate call from the rtc device registration can be removed.
+> 
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+Tested on da850-evm for rtc wake along with patch 1/2.
+$rtcwake -s 2 -d /dev/rtc0 -m mem
 
- Written on top of renesas-next-20130628
+Tested-by: Manjunathappa, Prakash <prakash.pm@ti.com>
 
- arch/arm/mach-shmobile/clock-r8a7790.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ work/arch/arm/mach-shmobile/clock-r8a7790.c	2013-06-28 15:15:50.000000000 +0900
-@@ -192,6 +192,9 @@ enum {
- static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
- 	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
-+	[MSTP717] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 17, 0), /* HSCIF0 */
-+	[MSTP716] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 16, 0), /* HSCIF1 */
-+	[MSTP522] = SH_CLK_MSTP32(&extal_clk, SMSTPCR5, 22, 0), /* Thermal */
- 	[MSTP315] = SH_CLK_MSTP32(&div6_clks[DIV6_MMC0], SMSTPCR3, 15, 0), /* MMC0 */
- 	[MSTP314] = SH_CLK_MSTP32(&div4_clks[DIV4_SD0], SMSTPCR3, 14, 0), /* SDHI0 */
- 	[MSTP313] = SH_CLK_MSTP32(&div4_clks[DIV4_SD1], SMSTPCR3, 13, 0), /* SDHI1 */
-@@ -205,9 +208,6 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP204] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 4, 0), /* SCIFA0 */
- 	[MSTP203] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 3, 0), /* SCIFA1 */
- 	[MSTP202] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 2, 0), /* SCIFA2 */
--	[MSTP522] = SH_CLK_MSTP32(&extal_clk, SMSTPCR5, 22, 0), /* Thermal */
--	[MSTP717] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 17, 0), /* HSCIF0 */
--	[MSTP716] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 16, 0), /* HSCIF1 */
- };
- 
- static struct clk_lookup lookups[] = {
+> This is basically a partial revert of the prev commit
+> 
+> commit 75c99bb0006ee065b4e2995078d779418b0fab54
+> Author: Sekhar Nori <nsekhar@ti.com>
+> 
+>     davinci: da8xx/omap-l1: mark RTC as a wakeup source
+> 
+> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> 
+> ---
+> :100644 100644 bf57252... 85a900c... M	arch/arm/mach-davinci/devices-da8xx.c
+>  arch/arm/mach-davinci/devices-da8xx.c |    9 +--------
+>  1 file changed, 1 insertion(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> index bf57252..85a900c 100644
+> --- a/arch/arm/mach-davinci/devices-da8xx.c
+> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> @@ -827,14 +827,7 @@ static struct platform_device da8xx_rtc_device = {
+>  
+>  int da8xx_register_rtc(void)
+>  {
+> -	int ret;
+> -
+> -	ret = platform_device_register(&da8xx_rtc_device);
+> -	if (!ret)
+> -		/* Atleast on DA850, RTC is a wakeup source */
+> -		device_init_wakeup(&da8xx_rtc_device.dev, true);
+> -
+> -	return ret;
+> +	return  platform_device_register(&da8xx_rtc_device);
+>  }
+>  
+>  static void __iomem *da8xx_ddr2_ctlr_base;
+> -- 
+> 1.7.9.5
+> 
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+> 
