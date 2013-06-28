@@ -1,39 +1,27 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 28 Jun 2013 09:53:04 +0200
-Subject: [PATCH] ARM: zImage: fix path to fonts which moved to lib/fonts
-In-Reply-To: <1372363940-13023-1-git-send-email-khilman@linaro.org>
-References: <1372363940-13023-1-git-send-email-khilman@linaro.org>
-Message-ID: <CAMuHMdVoqKTwgYLCu2ktcWEOYHy+jGo4YZ7ithAgQ6EN0Nhnqw@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 28 Jun 2013 09:54:13 +0200
+Subject: [PATCH] of: Specify initrd location using 64-bit
+In-Reply-To: <51CCA67C.2010803@gmail.com>
+References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
+ <51C4171C.9050908@linutronix.de> <51C48B5A.2040404@ti.com>
+ <51CCA67C.2010803@gmail.com>
+Message-ID: <51CD4125.5060305@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 10:12 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> commit 1affee67 (lib: Move fonts from drivers/video/console/ to lib/fonts/)
-> moved fonts from drivers/video/console/ to lib/fonts, but the ARM zImage
-> build still references the old location.
->
-> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
-> Found due to build failures on ARM in next-20130627.
->
-> Rather than go through the ARM tree, this should probably be included
-> with the original series from Geert.
+On 06/27/2013 10:54 PM, Rob Herring wrote:
 
-Thanks! Sorry for missing this.
+>> Rob,
+>> Are you ok with phys_addr_t since your concern was about rest
+>> of the memory specific bits of the device-tree code use u64 ?
+> 
+> No. I still think it should be u64 for same reasons I said originally.
 
-There's a similar one in the unicore32 boot code, and a few stale references
-in comments and documentation. I'll fold all of these in the original commit.
+The physical address space is represented by phys_addr_t and not u64
+within the kernel. If you go for u64 you may waste 32bit and you need
+to check if the running kernel can deal with this.
+Why was u64 such a good thing?
 
-Gr{oetje,eeting}s,
+> Rob
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Sebastian
