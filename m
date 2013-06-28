@@ -1,52 +1,27 @@
-From: gururaja.hebbar@ti.com (Hebbar Gururaja)
-Date: Fri, 28 Jun 2013 15:05:07 +0530
-Subject: [PATCH 2/4] davinci: da8xx/omap-l1: Remove hard coding of rtc device
- wakeup
-In-Reply-To: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1372412109-986-3-git-send-email-gururaja.hebbar@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 28 Jun 2013 12:32:47 +0300
+Subject: [PATCH V2 1/3] phy: Add driver for Exynos DP PHY
+In-Reply-To: <001f01ce73cf$46d8c940$d48a5bc0$@samsung.com>
+References: <001f01ce73cf$46d8c940$d48a5bc0$@samsung.com>
+Message-ID: <20130628093247.GB11297@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since now rtc-omap driver itself calls deice_init_wakeup(dev, true),
-duplicate call from the rtc device registration can be removed.
+On Fri, Jun 28, 2013 at 04:15:32PM +0900, Jingoo Han wrote:
+> Add a PHY provider driver for the Samsung Exynos SoC DP PHY.
+> 
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
 
-This is basically a partial revert of the prev commit
+Now that you fixed Kishon's concerns, this looks pretty good:
 
-commit 75c99bb0006ee065b4e2995078d779418b0fab54
-Author: Sekhar Nori <nsekhar@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-    davinci: da8xx/omap-l1: mark RTC as a wakeup source
-
-Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-
----
-:100644 100644 bf57252... 85a900c... M	arch/arm/mach-davinci/devices-da8xx.c
- arch/arm/mach-davinci/devices-da8xx.c |    9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index bf57252..85a900c 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -827,14 +827,7 @@ static struct platform_device da8xx_rtc_device = {
- 
- int da8xx_register_rtc(void)
- {
--	int ret;
--
--	ret = platform_device_register(&da8xx_rtc_device);
--	if (!ret)
--		/* Atleast on DA850, RTC is a wakeup source */
--		device_init_wakeup(&da8xx_rtc_device.dev, true);
--
--	return ret;
-+	return  platform_device_register(&da8xx_rtc_device);
- }
- 
- static void __iomem *da8xx_ddr2_ctlr_base;
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130628/38302254/attachment.sig>
