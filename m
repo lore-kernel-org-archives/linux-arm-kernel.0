@@ -1,77 +1,140 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 28 Jun 2013 22:45:12 +0100
-Subject: [PATCH 0/2] ARM: sunxi: Convert DTSI to new CPU bindings
-In-Reply-To: <CAOesGMgsD+tK4+ywvLzsWd+mngrP7zGgSFn0naWjSsQLGaUn2Q@mail.gmail.com>
-References: <1372437844-16325-1-git-send-email-maxime.ripard@free-electrons.com>
- <20130628171532.GD30603@e102568-lin.cambridge.arm.com>
- <20130628200333.GA2756@lukather>
- <CAOesGMgsD+tK4+ywvLzsWd+mngrP7zGgSFn0naWjSsQLGaUn2Q@mail.gmail.com>
-Message-ID: <20130628214512.GA11985@e102568-lin.cambridge.arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 28 Jun 2013 23:47:49 +0200
+Subject: [PATCH 1/3] ARM: EXYNOS: remove non-working AFTR mode support
+In-Reply-To: <2484012.IH9WOi4iIR@amdc1032>
+References: <1372241627-22695-1-git-send-email-b.zolnierkie@samsung.com>
+ <19893620.AhWB5HomTT@amdc1227> <51CD7169.6010905@linaro.org>
+ <2484012.IH9WOi4iIR@amdc1032>
+Message-ID: <51CE0485.8020109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 09:05:42PM +0100, Olof Johansson wrote:
-> On Fri, Jun 28, 2013 at 1:03 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Fri, Jun 28, 2013 at 06:15:32PM +0100, Lorenzo Pieralisi wrote:
-> >> On Fri, Jun 28, 2013 at 05:44:02PM +0100, Maxime Ripard wrote:
-> >> > Hi Arnd, Olof,
-> >> >
-> >> > Sorry for steping in so late, but these two patches fixes a warning
-> >> > introduced by the commit 1ba9bf0a (ARM: 7762/1: kernel: fix
-> >> > arm_dt_init_cpu_maps() to skip non-cpu nodes) after 3.10-rc7.
-> >> >
-> >> > These two patches solve the situation for sunxi. The first one by
-> >> > Lorenzo is to be applied for 3.10 if it's still possible, and the
-> >> > second one on top of arm-soc/for-next. Tell me if you prefer a more
-> >> > formal pull request for these patches
-> >> >
-> >> > Thanks!
-> >> > Maxime
-> >> >
-> >> > Lorenzo Pieralisi (1):
-> >> >   ARM: dts: sunxi: cpus/cpu nodes dts updates
-> >>
-> >> The patch above should already be queued in next/dt right ?
-> >
-> > Indeed.
-> >
-> > Then why the latest patch of your patchset got in 3.10, while the
-> > patches actually fixing the DT it would have impacted were delayed to
-> > 3.11?
-> >
-> > (And why was it merged so late in the development cycle?)
+On 06/28/2013 06:27 PM, Bartlomiej Zolnierkiewicz wrote:
+> On Friday, June 28, 2013 01:20:09 PM Daniel Lezcano wrote:
+>> On 06/28/2013 12:11 PM, Tomasz Figa wrote:
+>>> Hi Daniel,
+>>>
+>>> I've been fighting with this whole AFTR state as well, before Bartlomiej. 
+>>> Let me share my thoughts on this.
+>>>
+
+[ ... ]
+
+>>>
+>>> If you don't unplug all the CPUs >0 the state is obviously never reached. 
+>>> Otherwise the whole system hangs after it tries to enter this mode without 
+>>> any reaction for external events, other than reset.
+>>
+>> Need investigation.
+>>
+>> What is the exynos board version where that occurs ?
 > 
-> This. So now we have to scramble because some device trees will
-> produce warnings at boot.
+> Could you please tell me what exactly do you mean by that?
 > 
-> Russell, the alternative is to revert Lorenzo's patch for 3.10 (and
-> re-introduce it for 3.11). Do you have a preference?
+> I already wrote that we can reproduce the problem on EXYNOS4210 rev0
+> and rev1.1 (we don't have rev1.0). Tomek has also reproduced the problem
+> on some later SoCs (I hope that he can give you exact revisions).
+> 
+> In our testing we didn't encounter the board on which the problem
+> doesn't occur. Our current working theory is that the problem may be
+> u-boot (or first stage bootloader) related.
 
-Ok, sorry about this guys. Technically speaking the DT bindings updates
-(cpu/cpus nodes), dts updates and the ARM 7762/1 merged through Russell's
-tree all are fixes, but probably we should not get them in as such.
+Ok, the status for what I know:
 
-ARM: 7762/1 was implemented to fix the warnings caused by new dts with
-topology nodes (cpu-map node), and should go to stable kernels as well
-since we want those kernels to boot with new DTs.
+Origen Exynos4210, board ver A: works for me
+Arndale Exynos5250: works for me but only if u-boot does not enable the
+hypervisor mode.
+Chromebook Exynos5250: works for me
 
-I should have prevented it from getting in as a fix, I really apologize.
-I should also ask to drop the patch from the stable kernel queues, since this
-would cause further issues (basically we should send all dts updates to
-stable kernels as well, and unfortunately that's something we will have
-to do anyway, when it has to be decided, if 7762/1 goes in 3.11 or later with
-CC'ed stable we should send the dts updates to stable as well at the same
-time).
+I found the following drivers:
 
-I think the best solution is to revert ARM 7762/1 now and re-introduce it as
-a fix after 3.11, when the dust has settled, I will drop it from stable
-kernels queue as well if we all agree.
+https://github.com/AndreiLux/Perseus-UNIVERSAL5410/blob/samsung/arch/arm/mach-exynos/cpuidle.c
 
-If we drop ARM 7762/1, 7764/1 needs rebasing since those patches order
-unfortunately matters.
+https://github.com/CyanogenMod/hardkernel-kernel-4412/blob/cm-10.1/arch/arm/mach-exynos/cpuidle-exynos4.c
 
-Again, my apologies, I am really sorry, please advise on the best way to do it.
+Sounds like the num cpus > 1 is still there.
 
-Thanks,
-Lorenzo
+[ ... ]
+
+>> The kernel is not a playground where you can upstream code and then
+>> remove it because a feature seems broken and you don't have an idea of why.
+> 
+> Neither me or Tomek did upstream this code and we couldn't react in
+> time because we haven't noticed that it is completely unusable for us
+> as EXYNOS cpuidle driver is not even used by default on EXYNOS (it is
+> not enabled either in defconfig or Kconfig).
+> 
+> Moreover the feature we are talking about (AFTR mode) is also not used
+> by default (except EXYNOS4210 rev0 on which it lockups system for us)
+> even with EXYNOS cpuidle driver being enabled (because this specific
+> feature depends on CPU hot-unplug which is not done automatically right
+> now).
+> 
+> Such things like unused/broken code removal is not something very
+> unusual in the upstream kernel (I'm speaking from the experience here
+> having maintained large subsystem for a couple of years). In this
+> particular case we are talking about ~130 lines of code which can
+> be trivially brought back later when/if needed.
+> 
+> Anyway if the code removal is controversial for you we can just disable
+> AFTR mode by default and enable it only when special command line option
+> is given (i.e. "aftr"). This would fix all the broken configuration
+> while still allowing the feature to be enabled on systems that had it
+> working previously (since you claim that it works on some chipset/u-boot
+> configurations).
+
+Actually, there are several reasons I am not in favor for the moment to
+remove this code:
+
+1) code can't be pushed upstream and then removed so easily
+2) I asked several times what was this cpu1 hack, I had no answer
+3) I tried to make both cpus entering the AFTR state, but the cpu1 never
+wakes up, I asked but no answer.
+
+I would like to have some answers :)
+
+Before taking the decision to remove this state (btw you can remove the
+driver directly, no ? the default idle function is WFI), IMO it is worth
+to investigate and to spend some time to clarify what is happening. Then
+we can take a decision.
+
+I am willing to help.
+
+>> I asked several times the reasons of why the AFTR state couldn't work
+>> with multiple CPUs and I had no answer.
+> 
+> Unfortunately I don't know the answer for your question.
+> 
+> The AFTR mode doesn't work for us *at*all* (even with *one* CPU).
+> 
+>> Frankly speaking I have a couple of hypothesis:
+>>
+>> 1. something is not correctly setup and the PMU does not wake up the CPU1
+>> 2. there is a silicon bug and no one wants to tell it is the case
+>>
+>> In any case, this must be investigated and identified. And then we can
+>> take a decision about this state.
+> 
+> I don't have good idea currently how to investigate it further.
+> 
+> I also don't have any prove that the actual work is worth it
+> (and this work can easily take some weeks).
+> 
+> One of main responsibilities of the maintainer it to make sure that
+> the code does indeed work and that regressions (like these caused by
+> AFTR mode feature) are fixed in the timely manner, not let the code
+> sit in the limbo state for large periods of time.  It is already very
+> bad situation that the regression we are hitting was present since
+> v3.4 and we are in v3.10 now, I would like to have it fixed ASAP so
+> we may actually consider enabling cpuidle in our exynos_defconfig.
+
+I agree.
+
+Thanks
+  -- Daniel
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
