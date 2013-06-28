@@ -1,33 +1,134 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 28 Jun 2013 17:26:00 +0400
-Subject: [PATCH 00/06] ARM: shmobile: Remove unused auxdata tables
-In-Reply-To: <20130628102930.31451.85334.sendpatchset@w520>
-References: <20130628102930.31451.85334.sendpatchset@w520>
-Message-ID: <51CD8EE8.7090506@cogentembedded.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 28 Jun 2013 15:34:45 +0200 (CEST)
+Subject: [PATCH v3] ARM: clocksource: add support for MOXA ART SoCs
+In-Reply-To: <1372332203-30228-1-git-send-email-jonas.jensen@gmail.com>
+References: <1372258383-24524-1-git-send-email-jonas.jensen@gmail.com>
+ <1372332203-30228-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <alpine.DEB.2.02.1306281518380.4013@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, 27 Jun 2013, Jonas Jensen wrote:
+> +#define TIMER_CR			0x30
+> +#define TIMER_INTR_STATE	0x34
+> +#define TIMER_INTR_MASK		0x38
 
-On 28-06-2013 14:29, Magnus Damm wrote:
+Please use the same indent level for all.
 
-> ARM: shmobile: Remove unused auxdata tables
+> +
+> +static void moxart_clkevt_mode(enum clock_event_mode mode,
+> +	struct clock_event_device *clk)
 
-> [PATCH 01/06] ARM: shmobile: Remove unused EMEV2 auxdata table
-> [PATCH 02/06] ARM: shmobile: Remove unused r8a7740 auxdata table
-> [PATCH 03/06] ARM: shmobile: Remove unused r8a7778 auxdata table
-> [PATCH 04/06] ARM: shmobile: Remove unused r8a7779 auxdata table
-> [PATCH 05/06] ARM: shmobile: Remove unused sh7372 auxdata table
-> [PATCH 06/06] ARM: shmobile: Remove unused sh73a0 auxdata table
+Please align it like this:
 
-> Rework the mach-shmobile code to pass NULL to of_platform_populate()
-> instead of empty lists. This cleans up the code and reduces the
-> number of lines. The recently added SoCs r8a7790 and r8a73a4 are
-> already following this style, so no need to touch them.
+static void moxart_clkevt_mode(enum clock_event_mode mode,
+       	    		       struct clock_event_device *clk)
 
-    Right, these tables will actually be needed in the board code 
-instead, e.g. for Ether. Although, for the USB devices we might still 
-need them where they are, once these devices are described in DT.
-Dilemma... I suspect we might be too hasty with this patch.
+Makes the code way simpler to read.
 
-WBR, Sergei
+> +{
+> +static int moxart_clkevt_next_event(unsigned long cycles,
+> +	struct clock_event_device *unused)
+
+Ditto.
+
+> +{
+> +	u32 u;
+
+Newline between variable declaration and code please. All over the
+place.
+
+> +	u = readl(base + TIMER1_BASE + REG_COUNT) - cycles;
+> +	writel(u, base + TIMER1_BASE + REG_MATCH1);
+
+Is this a real match functionality, i.e. is the trigger on == ?
+
+If yes, how is guaranteed, that for a small cycles value the counter
+has not passed the match value already?
+
+> +	u = readl(base + TIMER_CR) | TIMEREG_CR_1_ENABLE;
+> +	writel(u, base + TIMER_CR);
+> +	return 0;
+> +}
+> +
+> +static struct clock_event_device moxart_clockevent = {
+> +	.name = "moxart_timer",
+
+Could you please align the assigned values? i.e.
+
+      .name	 = "moxart_timer",
+      .rating	 = 200,
+
+Way better readable than:
+
+> +	.rating = 200,
+> +	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+
+
+> +static void __init moxart_timer_init(struct device_node *node)
+> +{
+> +	int ret, irq;
+> +	unsigned long pclk;
+> +	struct clk *clk;
+> +
+> +	base = of_iomap(node, 0);
+> +	if (!base)
+> +		panic("%s: failed to map base\n", node->full_name);
+> +
+> +	irq = irq_of_parse_and_map(node, 0);
+> +	if (irq <= 0)
+> +		panic("%s: can't parse IRQ\n", node->full_name);
+> +
+> +	ret = setup_irq(irq, &moxart_timer_irq);
+> +	if (ret) {
+> +		pr_err("%s: failed to setup IRQ %d\n", node->full_name, irq);
+> +		return;
+
+This is inconsistent. You panic on the first two checks and then you
+simply return.
+
+> +	}
+> +
+> +	clk = of_clk_get(node, 0);
+> +	if (IS_ERR(clk)) {
+> +		pr_err("%s: of_clk_get failed\n", __func__);
+
+Your pr_errs are inconsistent. node->full_name in one and __func__ in
+the next. __func__ is really not important. The node_name or simply
+"moxatimer" is describing for what the clk_get failed.
+
+> +		return;
+> +	}
+> +
+> +	pclk = clk_get_rate(clk);
+> +	clock_count_per_tick = DIV_ROUND_CLOSEST(pclk, HZ);
+> +
+> +	writel(~0, base + TIMER2_BASE + REG_LOAD);
+> +
+> +	writel(TIMEREG_CR_2_ENABLE, base + TIMER_CR);
+> +
+> +	if (clocksource_mmio_init(base + TIMER2_BASE + REG_COUNT,
+> +					"moxart_timer", pclk, 200, 32,
+> +					clocksource_mmio_readl_down)) {
+
+Please align the arguments consistently.
+
+	if (clocksource_mmio_init(base + TIMER2_BASE + REG_COUNT,
+				  "moxart_timer", pclk, 200, 32,
+				  clocksource_mmio_readl_down)) {
+
+
+> +	clockevents_config_and_register(&moxart_clockevent, pclk,
+> +					0x4, 0xf0000000);
+
+How did you come up with 0xf0000000? Random number generator?
+
+> +	pr_info("%s: %s finished pclk=%lu HZ=%d IRQ=%d\n",
+> +			node->full_name, __func__, pclk, HZ, irq);
+
+We really do not need to know about the function name and "finished"
+is completely pointless information as well.
+
+Thanks,
+
+	tglx
