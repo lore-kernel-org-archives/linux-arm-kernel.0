@@ -1,33 +1,139 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 28 Jun 2013 10:11:12 -0300
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803EFF788@039-SN2MPN1-023.039d.mgd.msft.net>
-References: <51A5A808.2070803@digi.com> <201306281142.51676.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803EFF551@039-SN2MPN1-023.039d.mgd.msft.net>
- <201306281356.51670.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803EFF788@039-SN2MPN1-023.039d.mgd.msft.net>
-Message-ID: <CAOMZO5AW1jcjVqEyh=qP3kQK75dZvpOY+BYcKGiymfJPLa94ew@mail.gmail.com>
+From: coelho@ti.com (Luciano Coelho)
+Date: Fri, 28 Jun 2013 16:21:10 +0300
+Subject: [PATCH] Documentation: dt: bindings: TI WiLink modules
+In-Reply-To: <20130628121859.GP11297@arwen.pp.htv.fi>
+References: <1372149330-24335-1-git-send-email-coelho@ti.com>
+ <20130628093848.GA2139@e106331-lin.cambridge.arm.com>
+ <1372413215.21065.41.camel@cumari.coelho.fi>
+ <20130628102145.GB2139@e106331-lin.cambridge.arm.com>
+ <1372415514.21065.50.camel@cumari.coelho.fi>
+ <1372418531.21065.53.camel@cumari.coelho.fi>
+ <20130628114129.GO11297@arwen.pp.htv.fi>
+ <1372421632.21065.60.camel@cumari.coelho.fi>
+ <20130628121859.GP11297@arwen.pp.htv.fi>
+Message-ID: <1372425670.21065.61.camel@cumari.coelho.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 10:04 AM, Chen Peter-B29397
-<B29397@freescale.com> wrote:
->
->
->> >
->> > Just measure the voltage of your otg vbus pin.
->>
->> Ok, I see it's 2.25 volts after I disconnect the microB-A thing . I
->> should see
->> 0.8V constantly with nothing connected on the port?
->>
->
-> You should see the voltage of vbus pin is less than 0.8v when
-> nothing is connected, we use B_SESSION_VALID (0.8v) to judge
-> it is connected or not.
->
-> You get 2.25 all the time or it is discharged very slowly?
+On Fri, 2013-06-28 at 15:18 +0300, Felipe Balbi wrote:
+> On Fri, Jun 28, 2013 at 03:13:52PM +0300, Luciano Coelho wrote:
+> > On Fri, 2013-06-28 at 14:41 +0300, Felipe Balbi wrote:
+> > > On Fri, Jun 28, 2013 at 02:22:11PM +0300, Luciano Coelho wrote:
+> > > > On Fri, 2013-06-28 at 13:31 +0300, Luciano Coelho wrote:
+> > > > > (fixed Mike's address)
+> > > > > 
+> > > > > On Fri, 2013-06-28 at 11:21 +0100, Mark Rutland wrote:
+> > > > > > On Fri, Jun 28, 2013 at 10:53:35AM +0100, Luciano Coelho wrote:
+> > > > > > > On Fri, 2013-06-28 at 10:38 +0100, Mark Rutland wrote:
+> > > > > > > > On Tue, Jun 25, 2013 at 09:35:30AM +0100, Luciano Coelho wrote:
+> > > > > > > > > +Optional properties:
+> > > > > > > > > +--------------------
+> > > > > > > > > +
+> > > > > > > > > +- refclock: the internal WLAN reference clock frequency (required for
+> > > > > > > > > +  WiLink6 and WiLink7; not used for WiLink8).  Must be one of the
+> > > > > > > > > +  following:
+> > > > > > > > > +	0 = 19.2 MHz
+> > > > > > > > > +	1 = 26.0 MHz
+> > > > > > > > > +	2 = 38.4 MHz
+> > > > > > > > > +	3 = 52.0 MHz
+> > > > > > > > > +	4 = 38.4 MHz, XTAL
+> > > > > > > > > +	5 = 26.0 MHz, XTAL
+> > > > > > > > > +
+> > > > > > > > > +- tcxoclock: the internal WLAN TCXO clock frequency (required for
+> > > > > > > > > +  WiLink7 not used for WiLink6 and WiLink8).  Must be one of the
+> > > > > > > > > +  following:
+> > > > > > > > > +	0 = 19.200 MHz
+> > > > > > > > > +	1 = 26.000 MHz
+> > > > > > > > > +	2 = 38.400 MHz
+> > > > > > > > > +	3 = 52.000 MHz
+> > > > > > > > > +	4 = 16.368 MHz
+> > > > > > > > > +	5 = 32.736 MHz
+> > > > > > > > > +	6 = 16.800 MHz
+> > > > > > > > > +	7 = 33.600 MHz
+> > > > > > > > 
+> > > > > > > > This looks suspiciously like what we have the common clock bindings for:
+> > > > > > > > 
+> > > > > > > > refclk {
+> > > > > > > > 	compatible = "fixed-clock";
+> > > > > > > > 	#clock-cells = <0>;
+> > > > > > > > 	clock-frequency = <19200000>;
+> > > > > > > > }
+> > > > > > > > 
+> > > > > > > > wilink {
+> > > > > > > > 	compatible = "ti,wilink7";
+> > > > > > > > 	interrupt-parent = <&some_interrupt_controller>;
+> > > > > > > > 	interrupts = <0 1 1>;
+> > > > > > > > 	clocks = <&refclk>, <&refclk>;
+> > > > > > > > 	clock-names = "refclk", "txoclk";
+> > > > > > > > };
+> > > > > > > > 
+> > > > > > > > Could you not use them?
+> > > > > > > 
+> > > > > > > Hmmm... this actually does look good.  But these are internal clocks in
+> > > > > > > the modules, they cannot be accessed from outside.  Does it make sense
+> > > > > > > to register them with the clock framework?
+> > > > > > 
+> > > > > > Given we already have a common way of describing clocks, I think it
+> > > > > > makes sense to use it -- people already understand the common bindings,
+> > > > > > and it's less code to add add to the kernel. I don't think the fact
+> > > > > > these clocks are internal should prevent us from describing them as we
+> > > > > > would an external clock.
+> > > > > 
+> > > > > Yes, I agree with you.  Thanks for the suggestion! I think it will look
+> > > > > much better.  And now that I dug a bit more into the code, I can see
+> > > > > that there are only structs being populated, so there shouldn't be any
+> > > > > other side-effects.
+> > > > 
+> > > > Hmmm, one thing that escaped me.  Besides the frequency, I also need a
+> > > > boolean that tells if the clock is XTAL or not.  I can't figure out how
+> > > > to pass this if I use the generic clock framework.  Any suggestions?
+> > > 
+> > > Could you use clock-output-names for that ?
+> > > 
+> > > XTAL clock:
+> > > 
+> > > refclk {
+> > > 	compatible = "fixed-clock";
+> > > 	#clock cells = <0>;
+> > > 	clock-frequency = <19200000>;
+> > > 	clock-output-names = "xtal";
+> > > };
+> > > 
+> > > non-XTAL clock:
+> > > 
+> > > refclk {
+> > > 	compatible = "fixed-clock";
+> > > 	#clock cells = <0>;
+> > > 	clock-frequency = <19200000>;
+> > > 	clock-output-names = "osc"; /* any better name ? */
+> > > };
+> > 
+> > This starts looking a bit hacky.  Using the output name as a flag is not
+> > very pretty.
+> > 
+> > I think it would be better to have a separate flag for it in the wlan
+> > node.  Like an optional "refclock-xtal" boolean or something.  The
+> > downside of this is that we would be adding information about the clock
+> > details in the wilink node. :(
+> > 
+> > OTOH, we could add a flag to the generic clock binding? A new optional
+> > boolean that tells whether the clock is XTAL or not:
+> > 
+> > refclk {
+> > 	compatible = "fixed-clock";
+> > 	#clock cells = <0>;
+> > 	clock-frequency = <19200000>;
+> > 	clock-xtal;
+> > };
+> > 
+> > Do you think that would make sense?
+> 
+> sure, that looks alright to me. Surely there are other devices out there
+> who want to know if the clock comes from a crystal or not ?!?
 
-On my mx28evk it discharges very very slowly. Any hints about it?
+Mike, what do you think about this idea? If it sounds okay to you, I can
+cook up a patch adding this flag.
 
-Thanks
+--
+Cheers,
+Luca.
