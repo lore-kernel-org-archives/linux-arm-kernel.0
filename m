@@ -1,27 +1,55 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 28 Jun 2013 12:32:47 +0300
-Subject: [PATCH V2 1/3] phy: Add driver for Exynos DP PHY
-In-Reply-To: <001f01ce73cf$46d8c940$d48a5bc0$@samsung.com>
-References: <001f01ce73cf$46d8c940$d48a5bc0$@samsung.com>
-Message-ID: <20130628093247.GB11297@arwen.pp.htv.fi>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 28 Jun 2013 17:07:34 +0800
+Subject: [PATCH] ARM: dts: imx: remove the unused property
+Message-ID: <1372410454-14628-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 04:15:32PM +0900, Jingoo Han wrote:
-> Add a PHY provider driver for the Samsung Exynos SoC DP PHY.
-> 
-> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+The "fsl,gpmi-dma-channel" is not used any more, just remove it
+from all the dts file.
 
-Now that you fixed Kishon's concerns, this looks pretty good:
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ arch/arm/boot/dts/imx23.dtsi   |    1 -
+ arch/arm/boot/dts/imx28.dtsi   |    1 -
+ arch/arm/boot/dts/imx6qdl.dtsi |    1 -
+ 3 files changed, 0 insertions(+), 3 deletions(-)
 
-Acked-by: Felipe Balbi <balbi@ti.com>
-
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 587ceef..399b0a0 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -82,7 +82,6 @@
+ 				clock-names = "gpmi_io";
+ 				dmas = <&dma_apbh 4>;
+ 				dma-names = "rx-tx";
+-				fsl,gpmi-dma-channel = <4>;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 6a8acb0..cc65572 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -104,7 +104,6 @@
+ 				clock-names = "gpmi_io";
+ 				dmas = <&dma_apbh 4>;
+ 				dma-names = "rx-tx";
+-				fsl,gpmi-dma-channel = <4>;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index f2c623d..0641652 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -89,7 +89,6 @@
+ 				      "gpmi_bch_apb", "per1_bch";
+ 			dmas = <&dma_apbh 0>;
+ 			dma-names = "rx-tx";
+-			fsl,gpmi-dma-channel = <0>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130628/38302254/attachment.sig>
+1.7.1
