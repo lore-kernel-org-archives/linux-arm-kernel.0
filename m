@@ -1,51 +1,53 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Jun 2013 21:56:22 +0200
-Subject: [PATCHv2 4/8] clocksource: sun4i: Fix the next event code
+Date: Fri, 28 Jun 2013 21:56:25 +0200
+Subject: [PATCHv2 7/8] clocksource: sun4i: Cleanup parent clock setup
 In-Reply-To: <1372449386-1334-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1372449386-1334-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1372449386-1334-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1372449386-1334-8-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The next_event logic was setting the next interval to fire in the
-current timer value instead of the interval value register, which is
-obviously wrong. Plus the logic to set the actual value was wrong as
-well, so this code has always been broken.
+The current bring-up code for the timer was overly complicated. The only
+thing we need is actually which clock we want to use as source and
+that's pretty much all. Let's keep it that way.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clocksource/sun4i_timer.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ drivers/clocksource/sun4i_timer.c | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 84ace76..695c8c8 100644
+index d6621c5..a77fa29 100644
 --- a/drivers/clocksource/sun4i_timer.c
 +++ b/drivers/clocksource/sun4i_timer.c
-@@ -16,6 +16,7 @@
+@@ -31,6 +31,9 @@
+ #define TIMER_CTL_REG(val)	(0x10 * val + 0x10)
+ #define TIMER_CTL_ENABLE		BIT(0)
+ #define TIMER_CTL_AUTORELOAD		BIT(1)
++#define TIMER_CTL_CLK_SRC(val)		(((val) & 0x3) << 2)
++#define TIMER_CTL_CLK_SRC_OSC24M		(1)
++#define TIMER_CTL_CLK_PRES(val)		(((val) & 0x7) << 4)
+ #define TIMER_CTL_ONESHOT		BIT(7)
+ #define TIMER_INTVAL_REG(val)	(0x10 * val + 0x14)
+ #define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
+@@ -144,16 +147,8 @@ static void __init sun4i_timer_init(struct device_node *node)
+ 	writel(clk_get_rate(clk) / HZ,
+ 	       timer_base + TIMER_INTVAL_REG(0));
  
- #include <linux/clk.h>
- #include <linux/clockchips.h>
-+#include <linux/delay.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/irqreturn.h>
-@@ -61,9 +62,14 @@ static void sun4i_clkevt_mode(enum clock_event_mode mode,
- static int sun4i_clkevt_next_event(unsigned long evt,
- 				   struct clock_event_device *unused)
- {
--	u32 u = readl(timer_base + TIMER_CTL_REG(0));
--	writel(evt, timer_base + TIMER_CNTVAL_REG(0));
--	writel(u | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
-+	u32 val = readl(timer_base + TIMER_CTL_REG(0));
-+	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
-+	udelay(1);
-+
-+	writel(evt, timer_base + TIMER_INTVAL_REG(0));
-+
-+	val = readl(timer_base + TIMER_CTL_REG(0));
-+	writel(val | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
- 	       timer_base + TIMER_CTL_REG(0));
+-	/* set clock source to HOSC, 16 pre-division */
+-	val = readl(timer_base + TIMER_CTL_REG(0));
+-	val &= ~(0x07 << 4);
+-	val &= ~(0x03 << 2);
+-	val |= (4 << 4) | (1 << 2);
+-	writel(val, timer_base + TIMER_CTL_REG(0));
+-
+-	/* set mode to auto reload */
+-	val = readl(timer_base + TIMER_CTL_REG(0));
+-	writel(val | TIMER_CTL_AUTORELOAD, timer_base + TIMER_CTL_REG(0));
++	writel(TIMER_CTL_CLK_SRC(TIMER_CTL_CLK_SRC_OSC24M) | TIMER_CTL_AUTORELOAD,
++	       timer_base + TIMER_CTL_REG(0));
  
- 	return 0;
+ 	ret = setup_irq(irq, &sun4i_timer_irq);
+ 	if (ret)
 -- 
 1.8.3.1
