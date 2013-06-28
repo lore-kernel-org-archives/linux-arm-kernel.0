@@ -1,42 +1,33 @@
-From: dsd@laptop.org (Daniel Drake)
-Date: Fri, 28 Jun 2013 08:24:30 -0600
-Subject: [PATCH] mmp: irq: Don't clear unused interrupt enable bits
-In-Reply-To: <CAMPhdO_Ccp_JeuNNkqP6Q+ubmG8rah_hkxFJmOBsetysu-+dNw@mail.gmail.com>
-References: <20130627175118.8A9FEFAACF@dev.laptop.org>
- <CAMPhdO_Ccp_JeuNNkqP6Q+ubmG8rah_hkxFJmOBsetysu-+dNw@mail.gmail.com>
-Message-ID: <CAMLZHHSS75dSd_PM5-Gu2K-kP+RF0Fx1E+TL=d-TeXzYSLsQPg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Jun 2013 16:32:43 +0200
+Subject: [PATCH v2 1/2] dmaengine: add interface of dma_get_slave_channel
+In-Reply-To: <1372423153-6742-2-git-send-email-zhangfei.gao@linaro.org>
+References: <1372423153-6742-1-git-send-email-zhangfei.gao@linaro.org>
+ <1372423153-6742-2-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <201306281632.43409.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 11:15 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> Is there any way to check this at run-time or at least by boot parameters?
+On Friday 28 June 2013, Zhangfei Gao wrote:
+> Suggested by Arnd, add dma_get_slave_channel interface
+> Dma host driver could get specific channel specificied by request line, rather than filter.
+> 
+> host example:
+> static struct dma_chan *xx_of_dma_simple_xlate(struct of_phandle_args *dma_spec,
+>                 struct of_dma *ofdma)
+> {
+>         struct xx_dma_dev *d = ofdma->of_dma_data;
+>         unsigned int request = dma_spec->args[0];
+> 
+>         if (request > d->dma_requests)
+>                 return NULL;
+> 
+>         return dma_get_slave_channel(&(d->chans[request].vc.chan));
+> }
+> 
+> probe:
+> of_dma_controller_register((&op->dev)->of_node, xx_of_dma_simple_xlate, d);
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 
-The only thing that occurs to me would be checking for the device tree
-node that corresponds to our input serio. But doing that from platform
-code would be horrible, and it would also be nasty doing it from the
-input driver.
-
-> Decide whether the interrupt gets delivered to SP seems to be a choice
-> that the main CPU should be doing, as well as the interrupt priority.
-
-Incidentally the main CPU does make these choices - just before Linux
-has booted.
-
-While Linux has no interaction with the SP (it is not even aware of
-it), I would say not stomping on its configuration is an OK policy to
-have.
-
-> And this is really all about bit 4 right?
-
-Yes, bit 4 is the crucial one, it is required for the OLPC inbuilt
-keyboard/touchpad to work.
-
-However on numerous occasions during interactions with Marvell they
-have stressed the importance of setting interrupt priorities on
-interrupts used for wakeups. We don't think it makes a difference for
-the issues that we have seen, but we do not ignore the request. As
-that cannot be done in Linux, we do it in the firmware, and it seems
-like while Linux does not work with interrupt priorities it should not
-overwite any earlier setup.
-
-Daniel
+Acked-by: Arnd Bergmann <arnd@arndb.de>
