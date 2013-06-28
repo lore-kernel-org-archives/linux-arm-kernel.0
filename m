@@ -1,342 +1,151 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 28 Jun 2013 17:07:53 +0800
-Subject: [PATCH v3 4/4] USB: EHCI: support running URB giveback in tasklet
- context
-In-Reply-To: <1372410473-30920-1-git-send-email-ming.lei@canonical.com>
-References: <1372410473-30920-1-git-send-email-ming.lei@canonical.com>
-Message-ID: <1372410473-30920-5-git-send-email-ming.lei@canonical.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 28 Jun 2013 14:57:26 +0530
+Subject: [PATCH 3/3] video: exynos_dp: Use the generic PHY driver
+In-Reply-To: <001c01ce73c5$552e1cc0$ff8a5640$@samsung.com>
+References: <001701ce73bf$bebf9f20$3c3edd60$@samsung.com>
+ <51CD25F2.5010206@ti.com> <001c01ce73c5$552e1cc0$ff8a5640$@samsung.com>
+Message-ID: <51CD56FE.4020302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All 4 transfer types can work well on EHCI HCD after switching to run
-URB giveback in tasklet context, so mark all HCD drivers to support
-it.
+Hi,
 
-Also we don't need to release ehci->lock during URB giveback any more.
+On Friday 28 June 2013 11:34 AM, Jingoo Han wrote:
+> On Friday, June 28, 2013 2:58 PM, Kishon Vijay Abraham I wrote:
+>>
+>> Hi,
+>>
+>> On Friday 28 June 2013 10:54 AM, Jingoo Han wrote:
+>>> Use the generic PHY API instead of the platform callback to control
+>>> the DP PHY. The 'phy_label' field is added to the platform data
+>>> structure to allow PHY lookup on non-dt platforms.
+>>>
+>>> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+>>> ---
+>>>    .../devicetree/bindings/video/exynos_dp.txt        |   17 ---
+>>>    drivers/video/exynos/exynos_dp_core.c              |  118 ++------------------
+>>>    drivers/video/exynos/exynos_dp_core.h              |    2 +
+>>>    include/video/exynos_dp.h                          |    6 +-
+>>>    4 files changed, 15 insertions(+), 128 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt
+>> b/Documentation/devicetree/bindings/video/exynos_dp.txt
+>>> index 84f10c1..a8320e3 100644
+>>> --- a/Documentation/devicetree/bindings/video/exynos_dp.txt
+>>> +++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
+>>> @@ -1,17 +1,6 @@
+>>>    The Exynos display port interface should be configured based on
+>>>    the type of panel connected to it.
+>>>
+>>> -We use two nodes:
+>>> -	-dp-controller node
+>>> -	-dptx-phy node(defined inside dp-controller node)
+>>> -
+>>> -For the DP-PHY initialization, we use the dptx-phy node.
+>>> -Required properties for dptx-phy:
+>>> -	-reg:
+>>> -		Base address of DP PHY register.
+>>> -	-samsung,enable-mask:
+>>> -		The bit-mask used to enable/disable DP PHY.
+>>> -
+>>>    For the Panel initialization, we read data from dp-controller node.
+>>>    Required properties for dp-controller:
+>>>    	-compatible:
+>>> @@ -67,12 +56,6 @@ SOC specific portion:
+>>>    		interrupt-parent = <&combiner>;
+>>>    		clocks = <&clock 342>;
+>>>    		clock-names = "dp";
+>>> -
+>>> -		dptx-phy {
+>>> -			reg = <0x10040720>;
+>>> -			samsung,enable-mask = <1>;
+>>> -		};
+>>> -
+>>>    	};
+>>>
+>>>    Board Specific portion:
+>>> diff --git a/drivers/video/exynos/exynos_dp_core.c b/drivers/video/exynos/exynos_dp_core.c
+>>> index 12bbede..bac515b 100644
+>>> --- a/drivers/video/exynos/exynos_dp_core.c
+>>> +++ b/drivers/video/exynos/exynos_dp_core.c
+>>> @@ -19,6 +19,7 @@
+>>>    #include <linux/interrupt.h>
+>>>    #include <linux/delay.h>
+>>>    #include <linux/of.h>
+>>> +#include <linux/phy/phy.h>
+>>>
+>>>    #include <video/exynos_dp.h>
+>>>
+>>> @@ -960,84 +961,15 @@ static struct exynos_dp_platdata *exynos_dp_dt_parse_pdata(struct device *dev)
+>>>    		return ERR_PTR(-EINVAL);
+>>>    	}
+>>>
+>>> -	return pd;
+>>> -}
+>>> -
+>>> -static int exynos_dp_dt_parse_phydata(struct exynos_dp_device *dp)
+>>> -{
+>>> -	struct device_node *dp_phy_node = of_node_get(dp->dev->of_node);
+>>> -	u32 phy_base;
+>>> -	int ret = 0;
+>>> -
+>>> -	dp_phy_node = of_find_node_by_name(dp_phy_node, "dptx-phy");
+>>> -	if (!dp_phy_node) {
+>>> -		dev_err(dp->dev, "could not find dptx-phy node\n");
+>>> -		return -ENODEV;
+>>> -	}
+>>> -
+>>> -	if (of_property_read_u32(dp_phy_node, "reg", &phy_base)) {
+>>> -		dev_err(dp->dev, "failed to get reg for dptx-phy\n");
+>>> -		ret = -EINVAL;
+>>> -		goto err;
+>>> -	}
+>>> -
+>>> -	if (of_property_read_u32(dp_phy_node, "samsung,enable-mask",
+>>> -				&dp->enable_mask)) {
+>>> -		dev_err(dp->dev, "failed to get enable-mask for dptx-phy\n");
+>>> -		ret = -EINVAL;
+>>> -		goto err;
+>>> -	}
+>>> -
+>>> -	dp->phy_addr = ioremap(phy_base, SZ_4);
+>>> -	if (!dp->phy_addr) {
+>>> -		dev_err(dp->dev, "failed to ioremap dp-phy\n");
+>>> -		ret = -ENOMEM;
+>>> -		goto err;
+>>> -	}
+>>> -
+>>> -err:
+>>> -	of_node_put(dp_phy_node);
+>>> -
+>>> -	return ret;
+>>> -}
+>>> -
+>>> -static void exynos_dp_phy_init(struct exynos_dp_device *dp)
+>>> -{
+>>> -	u32 reg;
+>>> -
+>>> -	reg = __raw_readl(dp->phy_addr);
+>>> -	reg |= dp->enable_mask;
+>>> -	__raw_writel(reg, dp->phy_addr);
+>>> -}
+>>> -
+>>> -static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
+>>> -{
+>>> -	u32 reg;
+>>> +	pd->phy_label = "dp";
+>>
+>> In the case of non-dt boot, this phy_label should have ideally come from
+>> platform code.
+>
+> No, this is NOT the case of non-dt.
+>
+> 'pd->phy_label = "dp";' is included in exynos_dp_dt_parse_pdata(),
+> not exynos_dp_phy_exit().
+> Also, exynos_dp_dt_parse_pdata() is called in the case of dt.
 
->From below test results on 3 machines(2 ARM and one x86), time
-consumed by EHCI interrupt handler droped much without performance
-loss.
+ah.. right. Do you support non-dt boot. I dont see any modifications in
+the platform code?
 
-1 test description
-1.1 mass storage performance test:
-- run below command 10 times and compute the average performance
-
-    dd if=/dev/sdN iflag=direct of=/dev/null bs=200M count=1
-
-- two usb mass storage device:
-A: sandisk extreme USB 3.0 16G(used in test case 1 & case 2)
-B: kingston DataTraveler G2 4GB(only used in test case 2)
-
-1.2 uvc function test:
-- run one simple capture program in the below link
-
-   http://kernel.ubuntu.com/~ming/up/capture.c
-
-- capture format 640*480 and results in High Bandwidth mode on the
-uvc device: Z-Star 0x0ac8/0x3450
-
-- on T410(x86) laptop, also use guvcview to watch video capture/playback
-
-1.3 about test2 and test4
-- both two devices involved are tested concurrently by above test items
-
-1.4 how to compute irq time(the time consumed by ehci_irq)
-- use trace points of irq:irq_handler_entry and irq:irq_handler_exit
-
-1.5 kernel
-3.10.0-rc3-next-20130528
-
-1.6 test machines
-Pandaboard A1: ARM CortexA9 dural core
-Arndale board: ARM CortexA15 dural core
-T410: i5 CPU 2.67GHz quad core
-
-2 test result
-2.1 test case1: single mass storage device performance test
---------------------------------------------------------------------
-		upstream 		| patched
-		perf(MB/s)+irq time(us)	| perf(MB/s)+irq time(us)
---------------------------------------------------------------------
-Pandaboard A1:  25.280(avg:145,max:772)	| 25.540(avg:14, max:75)
-Arndale board:  29.700(avg:33, max:129)	| 29.700(avg:10,  max:50)
-T410: 		34.430(avg:17, max:154*)| 34.660(avg:12, max:155)
----------------------------------------------------------------------
-
-2.2 test case2: two mass storage devices' performance test
---------------------------------------------------------------------
-		upstream 			| patched
-		perf(MB/s)+irq time(us)		| perf(MB/s)+irq time(us)
---------------------------------------------------------------------
-Pandaboard A1:  15.840/15.580(avg:158,max:1216)	| 16.500/16.160(avg:15,max:139)
-Arndale board:  17.370/16.220(avg:33 max:234)	| 17.480/16.200(avg:11, max:91)
-T410: 		21.180/19.820(avg:18 max:160)	| 21.220/19.880(avg:11, max:149)
----------------------------------------------------------------------
-
-2.3 test case3: one uvc streaming test
-- uvc device works well(on x86, luvcview can be used too and has
-same result with uvc capture)
---------------------------------------------------------------------
-		upstream 		| patched
-		irq time(us)		| irq time(us)
---------------------------------------------------------------------
-Pandaboard A1:  (avg:445, max:873)	| (avg:33, max:44)
-Arndale board:  (avg:316, max:630)	| (avg:20, max:27)
-T410: 		(avg:39,  max:107)	| (avg:10, max:65)
----------------------------------------------------------------------
-
-2.4 test case4: one uvc streaming plus one mass storage device test
---------------------------------------------------------------------
-		upstream 		| patched
-		perf(MB/s)+irq time(us)	| perf(MB/s)+irq time(us)
---------------------------------------------------------------------
-Pandaboard A1:  20.340(avg:259,max:1704)| 20.390(avg:24, max:101)
-Arndale board:  23.460(avg:124,max:726)	| 23.370(avg:15, max:52)
-T410: 		28.520(avg:27, max:169)	| 28.630(avg:13, max:160)
----------------------------------------------------------------------
-
-2.5 test case5: read single mass storage device with small transfer
-- run below command 10 times and compute the average speed
-
- dd if=/dev/sdN iflag=direct of=/dev/null bs=4K count=4000
-
-1), test device A:
---------------------------------------------------------------------
-		upstream 		| patched
-		perf(MB/s)+irq time(us)	| perf(MB/s)+irq time(us)
---------------------------------------------------------------------
-Pandaboard A1:  6.5(avg:21, max:64)	| 6.5(avg:10, max:24)
-Arndale board:  8.13(avg:12, max:23)	| 8.06(avg:7,  max:17)
-T410: 		6.66(avg:13, max:131)   | 6.84(avg:11, max:149)
----------------------------------------------------------------------
-
-2), test device B:
---------------------------------------------------------------------
-		upstream 		| patched
-		perf(MB/s)+irq time(us)	| perf(MB/s)+irq time(us)
---------------------------------------------------------------------
-Pandaboard A1:  5.5(avg:21,max:43)	| 5.49(avg:10, max:24)
-Arndale board:  5.9(avg:12, max:22)	| 5.9(avg:7, max:17)
-T410: 		5.48(avg:13, max:155)	| 5.48(avg:7, max:140)
----------------------------------------------------------------------
-
-* On T410, sometimes read ehci status register in ehci_irq takes more
-than 100us, and the problem has been reported on the link:
-
-	http://marc.info/?t=137065867300001&r=1&w=2
-
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Signed-off-by: Ming Lei <ming.lei@canonical.com>
----
- drivers/usb/host/ehci-fsl.c       |    2 +-
- drivers/usb/host/ehci-grlib.c     |    2 +-
- drivers/usb/host/ehci-hcd.c       |    2 +-
- drivers/usb/host/ehci-mv.c        |    2 +-
- drivers/usb/host/ehci-octeon.c    |    2 +-
- drivers/usb/host/ehci-pmcmsp.c    |    2 +-
- drivers/usb/host/ehci-ppc-of.c    |    2 +-
- drivers/usb/host/ehci-ps3.c       |    2 +-
- drivers/usb/host/ehci-q.c         |    5 -----
- drivers/usb/host/ehci-sead3.c     |    2 +-
- drivers/usb/host/ehci-sh.c        |    2 +-
- drivers/usb/host/ehci-tilegx.c    |    2 +-
- drivers/usb/host/ehci-w90x900.c   |    2 +-
- drivers/usb/host/ehci-xilinx-of.c |    2 +-
- 14 files changed, 13 insertions(+), 18 deletions(-)
-
-diff --git a/drivers/usb/host/ehci-fsl.c b/drivers/usb/host/ehci-fsl.c
-index bd831ec..330274a 100644
---- a/drivers/usb/host/ehci-fsl.c
-+++ b/drivers/usb/host/ehci-fsl.c
-@@ -669,7 +669,7 @@ static const struct hc_driver ehci_fsl_hc_driver = {
- 	 * generic hardware linkage
- 	 */
- 	.irq = ehci_irq,
--	.flags = HCD_USB2 | HCD_MEMORY,
-+	.flags = HCD_USB2 | HCD_MEMORY | HCD_BH,
- 
- 	/*
- 	 * basic lifecycle operations
-diff --git a/drivers/usb/host/ehci-grlib.c b/drivers/usb/host/ehci-grlib.c
-index 5d75de9..c6048ee 100644
---- a/drivers/usb/host/ehci-grlib.c
-+++ b/drivers/usb/host/ehci-grlib.c
-@@ -43,7 +43,7 @@ static const struct hc_driver ehci_grlib_hc_driver = {
- 	 * generic hardware linkage
- 	 */
- 	.irq			= ehci_irq,
--	.flags			= HCD_MEMORY | HCD_USB2,
-+	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
- 
- 	/*
- 	 * basic lifecycle operations
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index e2fccc0..a0c27fd 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1167,7 +1167,7 @@ static const struct hc_driver ehci_hc_driver = {
- 	 * generic hardware linkage
- 	 */
- 	.irq =			ehci_irq,
--	.flags =		HCD_MEMORY | HCD_USB2,
-+	.flags =		HCD_MEMORY | HCD_USB2 | HCD_BH,
- 
- 	/*
- 	 * basic lifecycle operations
-diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
-index 915c2db..ce18a36 100644
---- a/drivers/usb/host/ehci-mv.c
-+++ b/drivers/usb/host/ehci-mv.c
-@@ -96,7 +96,7 @@ static const struct hc_driver mv_ehci_hc_driver = {
- 	 * generic hardware linkage
- 	 */
- 	.irq = ehci_irq,
--	.flags = HCD_MEMORY | HCD_USB2,
-+	.flags = HCD_MEMORY | HCD_USB2 | HCD_BH,
- 
- 	/*
- 	 * basic lifecycle operations
-diff --git a/drivers/usb/host/ehci-octeon.c b/drivers/usb/host/ehci-octeon.c
-index 45cc001..ab0397e 100644
---- a/drivers/usb/host/ehci-octeon.c
-+++ b/drivers/usb/host/ehci-octeon.c
-@@ -51,7 +51,7 @@ static const struct hc_driver ehci_octeon_hc_driver = {
- 	 * generic hardware linkage
- 	 */
- 	.irq			= ehci_irq,
--	.flags			= HCD_MEMORY | HCD_USB2,
-+	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
- 
- 	/*
- 	 * basic lifecycle operations
-diff --git a/drivers/usb/host/ehci-pmcmsp.c b/drivers/usb/host/ehci-pmcmsp.c
-index 363890e..3ab32a2 100644
---- a/drivers/usb/host/ehci-pmcmsp.c
-+++ b/drivers/usb/host/ehci-pmcmsp.c
-@@ -286,7 +286,7 @@ static const struct hc_driver ehci_msp_hc_driver = {
- #else
- 	.irq =			ehci_irq,
- #endif
--	.flags =		HCD_MEMORY | HCD_USB2,
-+	.flags =		HCD_MEMORY | HCD_USB2 | HCD_BH,
- 
- 	/*
- 	 * basic lifecycle operations
-diff --git a/drivers/usb/host/ehci-ppc-of.c b/drivers/usb/host/ehci-ppc-of.c
-index 56dc732..da95a31 100644
---- a/drivers/usb/host/ehci-ppc-of.c
-+++ b/drivers/usb/host/ehci-ppc-of.c
-@@ -28,7 +28,7 @@ static const struct hc_driver ehci_ppc_of_hc_driver = {
- 	 * generic hardware linkage
- 	 */
- 	.irq			= ehci_irq,
--	.flags			= HCD_MEMORY | HCD_USB2,
-+	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
- 
- 	/*
- 	 * basic lifecycle operations
-diff --git a/drivers/usb/host/ehci-ps3.c b/drivers/usb/host/ehci-ps3.c
-index fd98377..8188542 100644
---- a/drivers/usb/host/ehci-ps3.c
-+++ b/drivers/usb/host/ehci-ps3.c
-@@ -71,7 +71,7 @@ static const struct hc_driver ps3_ehci_hc_driver = {
- 	.product_desc		= "PS3 EHCI Host Controller",
- 	.hcd_priv_size		= sizeof(struct ehci_hcd),
- 	.irq			= ehci_irq,
--	.flags			= HCD_MEMORY | HCD_USB2,
-+	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
- 	.reset			= ps3_ehci_hc_reset,
- 	.start			= ehci_run,
- 	.stop			= ehci_stop,
-diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
-index d34b399..b637a65 100644
---- a/drivers/usb/host/ehci-q.c
-+++ b/drivers/usb/host/ehci-q.c
-@@ -254,8 +254,6 @@ static int qtd_copy_status (
- 
- static void
- ehci_urb_done(struct ehci_hcd *ehci, struct urb *urb, int status)
--__releases(ehci->lock)
--__acquires(ehci->lock)
- {
- 	if (usb_pipetype(urb->pipe) == PIPE_INTERRUPT) {
- 		/* ... update hc-wide periodic stats */
-@@ -281,11 +279,8 @@ __acquires(ehci->lock)
- 		urb->actual_length, urb->transfer_buffer_length);
- #endif
- 
--	/* complete() can reenter this HCD */
- 	usb_hcd_unlink_urb_from_ep(ehci_to_hcd(ehci), urb);
--	spin_unlock (&ehci->lock);
- 	usb_hcd_giveback_urb(ehci_to_hcd(ehci), urb, status);
--	spin_lock (&ehci->lock);
- }
- 
- static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh);
-diff --git a/drivers/usb/host/ehci-sead3.c b/drivers/usb/host/ehci-sead3.c
-index b2de52d..8a73449 100644
---- a/drivers/usb/host/ehci-sead3.c
-+++ b/drivers/usb/host/ehci-sead3.c
-@@ -55,7 +55,7 @@ const struct hc_driver ehci_sead3_hc_driver = {
- 	 * generic hardware linkage
- 	 */
- 	.irq			= ehci_irq,
--	.flags			= HCD_MEMORY | HCD_USB2,
-+	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
- 
- 	/*
- 	 * basic lifecycle operations
-diff --git a/drivers/usb/host/ehci-sh.c b/drivers/usb/host/ehci-sh.c
-index c4c0ee9..1691f8e 100644
---- a/drivers/usb/host/ehci-sh.c
-+++ b/drivers/usb/host/ehci-sh.c
-@@ -36,7 +36,7 @@ static const struct hc_driver ehci_sh_hc_driver = {
- 	 * generic hardware linkage
- 	 */
- 	.irq				= ehci_irq,
--	.flags				= HCD_USB2 | HCD_MEMORY,
-+	.flags				= HCD_USB2 | HCD_MEMORY | HCD_BH,
- 
- 	/*
- 	 * basic lifecycle operations
-diff --git a/drivers/usb/host/ehci-tilegx.c b/drivers/usb/host/ehci-tilegx.c
-index d72b292..204d3b6 100644
---- a/drivers/usb/host/ehci-tilegx.c
-+++ b/drivers/usb/host/ehci-tilegx.c
-@@ -61,7 +61,7 @@ static const struct hc_driver ehci_tilegx_hc_driver = {
- 	 * Generic hardware linkage.
- 	 */
- 	.irq			= ehci_irq,
--	.flags			= HCD_MEMORY | HCD_USB2,
-+	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
- 
- 	/*
- 	 * Basic lifecycle operations.
-diff --git a/drivers/usb/host/ehci-w90x900.c b/drivers/usb/host/ehci-w90x900.c
-index 59e0e24..1c370df 100644
---- a/drivers/usb/host/ehci-w90x900.c
-+++ b/drivers/usb/host/ehci-w90x900.c
-@@ -108,7 +108,7 @@ static const struct hc_driver ehci_w90x900_hc_driver = {
- 	 * generic hardware linkage
- 	 */
- 	.irq = ehci_irq,
--	.flags = HCD_USB2|HCD_MEMORY,
-+	.flags = HCD_USB2|HCD_MEMORY|HCD_BH,
- 
- 	/*
- 	 * basic lifecycle operations
-diff --git a/drivers/usb/host/ehci-xilinx-of.c b/drivers/usb/host/ehci-xilinx-of.c
-index d845e3b..bb96a68 100644
---- a/drivers/usb/host/ehci-xilinx-of.c
-+++ b/drivers/usb/host/ehci-xilinx-of.c
-@@ -79,7 +79,7 @@ static const struct hc_driver ehci_xilinx_of_hc_driver = {
- 	 * generic hardware linkage
- 	 */
- 	.irq			= ehci_irq,
--	.flags			= HCD_MEMORY | HCD_USB2,
-+	.flags			= HCD_MEMORY | HCD_USB2 | HCD_BH,
- 
- 	/*
- 	 * basic lifecycle operations
--- 
-1.7.9.5
+Thanks
+Kishon
