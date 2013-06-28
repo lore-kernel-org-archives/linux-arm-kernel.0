@@ -1,94 +1,21 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Fri, 28 Jun 2013 10:24:22 +0200
-Subject: [PATCH v1 01/12] input: matrix-keypad: update devicetree binding
- doc
-In-Reply-To: <51C8C17A.1050700@wwwdotorg.org>
-References: <1371838198-7327-1-git-send-email-gsi@denx.de>
- <1371838198-7327-2-git-send-email-gsi@denx.de>
- <51C4C63B.3030300@wwwdotorg.org>
- <20130622092319.GE24305@book.gsilab.sittig.org>
- <51C8C17A.1050700@wwwdotorg.org>
-Message-ID: <20130628082422.GV24305@book.gsilab.sittig.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 28 Jun 2013 17:26:25 +0900
+Subject: [PATCH 1/3] ARM: shmobile: r8a73a4: add clocks for I2C controllers
+In-Reply-To: <1372326479-15028-2-git-send-email-g.liakhovetski@gmx.de>
+References: <1372326479-15028-1-git-send-email-g.liakhovetski@gmx.de>
+ <1372326479-15028-2-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <20130628082624.GB29517@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 16:00 -0600, Stephen Warren wrote:
+On Thu, Jun 27, 2013 at 11:47:56AM +0200, Guennadi Liakhovetski wrote:
+> r8a73a4 SoCs have numerous I2C controllers, of which 9 are compatible with
+> the i2c-sh_mobile.c driver. This patch adds clock definitions for them.
 > 
-> On 06/22/2013 03:23 AM, Gerhard Sittig wrote:
-> ...
-> 
-> [ device tree binding doc, discussing matrix hardware layouts ]
-> 
-> I think both "simple" and "mechanical" should be removed. My reasoning:
-> 
-> At the level of connection between rows/columns, aren't all matrix
-> keypads set up such that something connects a row to a column to signify
-> a keypress, not just "simple layouts".
-> 
-> Similarly, "mechanical" should be removed since it's not always true,
-> and even if it were, it would be irrelevant to anything outside the
-> keyboard, perhaps aside from the need to debounce.
-> 
-> In fact, thinking about this more, I think all four paragraphs of text
-> that this patch adds would be better in Documentation/input/, as you
-> mentioned elsewhere. When introducing any extra properties, you could
-> mention their potential use by a driver, as explanation for why they're
-> useful, but there's probably no need to describe the complete operation
-> of the driver in the DT binding.
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> ---
+>  arch/arm/mach-shmobile/clock-r8a73a4.c |   25 +++++++++++++++++++++++--
+>  1 files changed, 23 insertions(+), 2 deletions(-)
 
-So the direction to go is
-- move the Linux driver specific discussion to
-  Documentation/input/ including potential hardware setups and
-  the background on the driver's theory of operation
-- just concentrate on "adjustables" in the binding document,
-  merely listing the set and their units, while the motivation or
-  background either "is obvious" or can get looked up in the
-  driver's discussion
-
-Reducing the set of options is orthogonal to that.  Breaking
-backwards compatibility by changing the default behaviour after
-introducing more generic approaches to the specific issue is an
-option that remains for future changes.
-
-> >>> +- gpio-activelow:	row pins as well as column pins are active low
-> >>
-> >> That one change is definitely wrong. Each entry in row-gpios and
-> >> col-gpios should include GPIO flags (in a format defined by the binding
-> >> for the DT node providing the GPIO). Those flags include an active-high
-> >> vs. active-low bit. In Linux, you can use of_get_gpio_flags() to
-> >> retrieve a standardized representation of the flags.
-> > 
-> > See my introduction above.  This isn't a "change", it's just
-> > catching up in the documentation and adding what was omitted
-> > before.
-> 
-> Oh dear, that's quite unfortunate. I see that even though that property
-> wasn't documented in the binding doc, arch/powerpc/boot/dts/ac14xx.dts
-> has still already used it, so we probably can't fix it. I suppose we
-> must simply document it, and ignore the shortcomings of that binding:-(
-
-Don't worry about the 'AC14xx' board too long, its using the
-keypad matrix driver is new in mainline, and still can get
-adjusted without too much problems before more wide spread use.
-"Getting it right" is what I'm currently heading for, while
-nothing is set in stone yet.
-
-The actual issue I see is that
-- the device tree binding specs get mapped to platform data
-- the platform data is shared among the (device tree capable but
-  as well used without a device tree) keypad matrix driver _and_
-  the other platform data providing machines (mostly ARM based)
-
-So the drivers' logic referenced the 'active low' flag which the
-platform data already carried, which the device tree parse
-routines happen to setup.  So when you see a reference to the
-property in a .dts, it's just "the tip of the ice berg" since
-there are other ways to communicate or setup that property.
-
-
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+Thanks, queued-up for v3.12 in the soc branch.
