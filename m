@@ -1,42 +1,54 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 28 Jun 2013 15:02:53 +0200
-Subject: [PATCHv3 4/8] ARM: mxs: dt: cfa10036: make hogpins grabbed by
- respective drivers
-In-Reply-To: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1372424577-8279-5-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Fri, 28 Jun 2013 15:02:49 +0200
+Subject: [PATCHv3 0/8] ARM: mxs: Various Crystalfontz DT additions
+Message-ID: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/imx28-cfa10036.dts | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+Hi,
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
-index 94c4476..1ec8c94 100644
---- a/arch/arm/boot/dts/imx28-cfa10036.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10036.dts
-@@ -23,10 +23,7 @@
- 	apb at 80000000 {
- 		apbh at 80000000 {
- 			pinctrl at 80018000 {
--				pinctrl-names = "default";
--				pinctrl-0 = <&hog_pins_cfa10036>;
--
--				hog_pins_cfa10036: hog-10036 at 0 {
-+				ssd1306_cfa10036: ssd1306-10036 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
- 						0x2073 /* MX28_PAD_SSP0_D7__GPIO_2_7 */
-@@ -83,6 +80,8 @@
- 
- 				ssd1306: oled@3c {
- 					compatible = "solomon,ssd1306fb-i2c";
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&ssd1306_cfa10036>;
- 					reg = <0x3c>;
- 					reset-gpios = <&gpio2 7 0>;
- 					solomon,height = <32>;
+This patch series add DT for the Crystalfontz CFA-10056 and Crystalfontz
+CFA-10058.
+
+The first patch simplifies board detection in mach-mxs.c as suggested by Thomas
+Petazzoni in his review of the precedent DT additions.
+
+The next two patches are adding the DTs.
+
+The last patches are cleaning up the remaining boards DTs.
+
+Changes in v3
+ - Cleaned up all the DTs for crystalfontz boards.
+
+Changes in v2:
+ - took into account the review from Maxime Ripard
+
+Thanks,
+
+Alexandre Belloni (6):
+  ARM: mxs: Simplify detection of CrystalFontz boards
+  ARM: mxs: dt: cfa10036: make hogpins grabbed by respective drivers
+  ARM: mxs: dt: cfa10037: make hogpins grabbed by respective drivers
+  ARM: mxs: dt: cfa10049: make hogpins grabbed by respective drivers
+  ARM: mxs: dt: cfa10055: make hogpins grabbed by respective drivers
+  ARM: mxs: dt: cfa10057: remove hogpins
+
+Brian Lilly (2):
+  ARM: mxs: dt: Add Crystalfontz CFA-10056 device tree
+  ARM: mxs: dt: Add Crystalfontz CFA-10058 device tree
+
+ arch/arm/boot/dts/Makefile           |   2 +
+ arch/arm/boot/dts/imx28-cfa10036.dts |   7 +-
+ arch/arm/boot/dts/imx28-cfa10037.dts |  19 +++--
+ arch/arm/boot/dts/imx28-cfa10049.dts |  73 +++++++++++++++---
+ arch/arm/boot/dts/imx28-cfa10055.dts |  38 ++++------
+ arch/arm/boot/dts/imx28-cfa10056.dts | 120 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx28-cfa10057.dts |  23 +-----
+ arch/arm/boot/dts/imx28-cfa10058.dts | 141 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mxs/mach-mxs.c         |   5 +-
+ 9 files changed, 360 insertions(+), 68 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx28-cfa10056.dts
+ create mode 100644 arch/arm/boot/dts/imx28-cfa10058.dts
+
 -- 
 1.8.1.2
