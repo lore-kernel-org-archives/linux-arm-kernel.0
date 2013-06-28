@@ -1,83 +1,348 @@
 From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 28 Jun 2013 17:07:49 +0800
-Subject: [PATCH v3 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-Message-ID: <1372410473-30920-1-git-send-email-ming.lei@canonical.com>
+Date: Fri, 28 Jun 2013 17:07:50 +0800
+Subject: [PATCH v3 1/4] USB: HCD: support giveback of URB in tasklet context
+In-Reply-To: <1372410473-30920-1-git-send-email-ming.lei@canonical.com>
+References: <1372410473-30920-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <1372410473-30920-2-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patchset supports to run giveback of URB in tasklet context, so that
-DMA unmapping/mapping on transfer buffer and compelte() callback can be
-run with interrupt enabled, then time of HCD interrupt handler(IRQs
-disabled time) can be saved much. Also this approach may simplify HCD
-since HCD lock needn't be released any more before calling
-usb_hcd_giveback_urb().
+This patch implements the mechanism of giveback of URB in
+tasklet context, so that hardware interrupt handling time for
+usb host controller can be saved much, and HCD interrupt handling
+can be simplified.
 
-The patchset enables the mechanism on EHCI HCD now.
+Motivations:
 
-In the commit log of patch 4/4, detailed test result on three machines
-(ARM A9/A15 dual core, X86) are provided about transfer performance and
-ehci irq handling time. From the result, basically no transfer performance
-loss is found and ehci irq handling time drops much with the patchset.
+1), on some arch(such as ARM), DMA mapping/unmapping is a bit
+time-consuming, for example: when accessing usb mass storage
+via EHCI on pandaboard, the common length of transfer buffer is 120KB,
+the time consumed on DMA unmapping may reach hundreds of microseconds;
+even on A15 based box, the time is still about scores of microseconds
 
-V3:
-	- 1/4: don't check HCD_BH when initializing tasklet
-	- 1/4: don't save flags for spin_lock_irq in tasklet
-	- 1/4: use true/false for bool variable
-	- 1/4: other trivial changes(patch style, vairable name, ...)
-	- 3/4: reorganize code to make output of diff friendly
-	- 3/4: don't cancel hrtimer to make change simple(mark it as TODO)
-	- 4/4: add worst case test data on reading mass storage device
-	as required by Oliver
+2), on some arch, reading DMA coherent memoery is very time-consuming,
+the most common example is usb video class driver[1]
 
-V2:
-        - 1/4: always run URB complete() of root-hub in tasklet
-        - 1/4: store urb status in urb->unlinked
-        - 1/4: don't allocate 'struct giveback_urb_bh' dynamically
-        - 1/4: other minor changes
-        - 2/4: descript changes simply
-        - 3/4: don't use QH_STATE_UNLINK_WAIT to implement intr qh
-        unlink wait
-        - 3/4: cancel unlink wait change
-        - 4/4: merge HCD private lock changes
-        - rebase on 3.10-rc7-next20130624
+3), driver's complete() callback may do much things which is driver
+specific, so the time is consumed unnecessarily in hardware irq context.
 
-V1:
-        - change percput tasklet into tasklet in HCD to avoid out of order
-        of URB->complete() for same endpoint
+4), running driver's complete() callback in hardware irq context causes
+that host controller driver has to release its lock in interrupt handler,
+so reacquiring the lock after return may busy wait a while and increase
+interrupt handling time. More seriously, releasing the HCD lock makes
+HCD becoming quite complicated to deal with introduced races.
 
-        - disable local IRQs when calling complete() from tasklet to
-        avoid deadlock which is caused by holding lock via spin_lock
-        and the same lock might be acquired in hard irq context
+So the patch proposes to run giveback of URB in tasklet context, then
+time consumed in HCD irq handling doesn't depend on drivers' complete and
+DMA mapping/unmapping any more, also we can simplify HCD since the HCD
+lock isn't needed to be released during irq handling.
 
-        - document coming change about calling complete() with irq enabled
-        so that we can start to clean up USB drivers which call spin_lock()
-        in complete()
+The patch should be reasonable and doable:
 
- Documentation/usb/URB.txt         |   21 +++---
- drivers/usb/core/hcd.c            |  147 +++++++++++++++++++++++++++++--------
- drivers/usb/host/ehci-fsl.c       |    2 +-
- drivers/usb/host/ehci-grlib.c     |    2 +-
- drivers/usb/host/ehci-hcd.c       |    3 +-
- drivers/usb/host/ehci-hub.c       |    1 +
- drivers/usb/host/ehci-mem.c       |    1 +
- drivers/usb/host/ehci-mv.c        |    2 +-
- drivers/usb/host/ehci-octeon.c    |    2 +-
- drivers/usb/host/ehci-pmcmsp.c    |    2 +-
- drivers/usb/host/ehci-ppc-of.c    |    2 +-
- drivers/usb/host/ehci-ps3.c       |    2 +-
- drivers/usb/host/ehci-q.c         |    5 --
- drivers/usb/host/ehci-sched.c     |   47 +++++++++++-
- drivers/usb/host/ehci-sead3.c     |    2 +-
- drivers/usb/host/ehci-sh.c        |    2 +-
- drivers/usb/host/ehci-tilegx.c    |    2 +-
- drivers/usb/host/ehci-timer.c     |   35 ++++++++-
- drivers/usb/host/ehci-w90x900.c   |    2 +-
- drivers/usb/host/ehci-xilinx-of.c |    2 +-
- drivers/usb/host/ehci.h           |    3 +
- include/linux/usb/hcd.h           |   17 +++++
- 22 files changed, 242 insertions(+), 62 deletions(-)
+1), for drivers, they don't care if the complete() is called in hard irq
+context or softirq context
 
+2), the biggest change is the situation in which usb_submit_urb() is called
+in complete() callback, so the introduced tasklet schedule delay might be a
+con, but it shouldn't be a big deal:
 
-Thanks,
---
-Ming Lei
+	- control/bulk asynchronous transfer isn't sensitive to schedule
+	  delay
+
+	- the patch schedules giveback of periodic URBs using
+	  tasklet_hi_schedule, so the introduced delay should be very
+	  small
+
+	- for ISOC transfer, generally, drivers submit several URBs
+	  concurrently to avoid interrupt delay, so it is OK with the
+	  little schedule delay.
+
+	- for interrupt transfer, generally, drivers only submit one URB
+	  at the same time, but interrupt transfer is often used in event
+	  report, polling, ... situations, and a little delay should be OK.
+
+Considered that HCDs may optimize on submitting URB in complete(), the
+patch may cause the optimization not working, so introduces one flag to mark
+if the HCD supports to run giveback URB in tasklet context. When all HCDs
+are ready, the flag can be removed.
+
+[1], http://marc.info/?t=136438111600010&r=1&w=2
+
+Cc: Oliver Neukum <oliver@neukum.org>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Signed-off-by: Ming Lei <ming.lei@canonical.com>
+---
+ drivers/usb/core/hcd.c  |  147 +++++++++++++++++++++++++++++++++++++----------
+ include/linux/usb/hcd.h |   17 ++++++
+ 2 files changed, 134 insertions(+), 30 deletions(-)
+
+diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
+index d53547d..b851c88 100644
+--- a/drivers/usb/core/hcd.c
++++ b/drivers/usb/core/hcd.c
+@@ -669,15 +669,7 @@ error:
+ 	/* any errors get returned through the urb completion */
+ 	spin_lock_irq(&hcd_root_hub_lock);
+ 	usb_hcd_unlink_urb_from_ep(hcd, urb);
+-
+-	/* This peculiar use of spinlocks echoes what real HC drivers do.
+-	 * Avoiding calls to local_irq_disable/enable makes the code
+-	 * RT-friendly.
+-	 */
+-	spin_unlock(&hcd_root_hub_lock);
+ 	usb_hcd_giveback_urb(hcd, urb, status);
+-	spin_lock(&hcd_root_hub_lock);
+-
+ 	spin_unlock_irq(&hcd_root_hub_lock);
+ 	return 0;
+ }
+@@ -717,9 +709,7 @@ void usb_hcd_poll_rh_status(struct usb_hcd *hcd)
+ 			memcpy(urb->transfer_buffer, buffer, length);
+ 
+ 			usb_hcd_unlink_urb_from_ep(hcd, urb);
+-			spin_unlock(&hcd_root_hub_lock);
+ 			usb_hcd_giveback_urb(hcd, urb, 0);
+-			spin_lock(&hcd_root_hub_lock);
+ 		} else {
+ 			length = 0;
+ 			set_bit(HCD_FLAG_POLL_PENDING, &hcd->flags);
+@@ -809,10 +799,7 @@ static int usb_rh_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
+ 		if (urb == hcd->status_urb) {
+ 			hcd->status_urb = NULL;
+ 			usb_hcd_unlink_urb_from_ep(hcd, urb);
+-
+-			spin_unlock(&hcd_root_hub_lock);
+ 			usb_hcd_giveback_urb(hcd, urb, status);
+-			spin_lock(&hcd_root_hub_lock);
+ 		}
+ 	}
+  done:
+@@ -1623,6 +1610,72 @@ int usb_hcd_unlink_urb (struct urb *urb, int status)
+ 
+ /*-------------------------------------------------------------------------*/
+ 
++static void __usb_hcd_giveback_urb(struct urb *urb)
++{
++	struct usb_hcd *hcd = bus_to_hcd(urb->dev->bus);
++	int status = urb->unlinked;
++	unsigned long flags;
++
++	urb->hcpriv = NULL;
++	if (unlikely((urb->transfer_flags & URB_SHORT_NOT_OK) &&
++	    urb->actual_length < urb->transfer_buffer_length &&
++	    !status))
++		status = -EREMOTEIO;
++
++	unmap_urb_for_dma(hcd, urb);
++	usbmon_urb_complete(&hcd->self, urb, status);
++	usb_unanchor_urb(urb);
++
++	/* pass ownership to the completion handler */
++	urb->status = status;
++
++	/*
++	 * We disable local IRQs here avoid possible deadlock because
++	 * drivers may call spin_lock() to hold lock which might be
++	 * acquired in one hard interrupt handler.
++	 *
++	 * The local_irq_save()/local_irq_restore() around complete()
++	 * will be removed if current USB drivers have been cleaned up
++	 * and no one may trigger the above deadlock situation when
++	 * running complete() in tasklet.
++	 */
++	local_irq_save(flags);
++	urb->complete(urb);
++	local_irq_restore(flags);
++
++	atomic_dec(&urb->use_count);
++	if (unlikely(atomic_read(&urb->reject)))
++		wake_up(&usb_kill_urb_queue);
++	usb_put_urb(urb);
++}
++
++static void usb_giveback_urb_bh(unsigned long param)
++{
++	struct giveback_urb_bh *bh = (struct giveback_urb_bh *)param;
++	struct list_head local_list;
++
++	spin_lock_irq(&bh->lock);
++	bh->running = true;
++ restart:
++	list_replace_init(&bh->head, &local_list);
++	spin_unlock_irq(&bh->lock);
++
++	while (!list_empty(&local_list)) {
++		struct urb *urb;
++
++		urb = list_entry(local_list.next, struct urb, urb_list);
++		list_del_init(&urb->urb_list);
++		__usb_hcd_giveback_urb(urb);
++	}
++
++	/* check if there are new URBs to giveback */
++	spin_lock_irq(&bh->lock);
++	if (!list_empty(&bh->head))
++		goto restart;
++	bh->running = false;
++	spin_unlock_irq(&bh->lock);
++}
++
+ /**
+  * usb_hcd_giveback_urb - return URB from HCD to device driver
+  * @hcd: host controller returning the URB
+@@ -1642,25 +1695,37 @@ int usb_hcd_unlink_urb (struct urb *urb, int status)
+  */
+ void usb_hcd_giveback_urb(struct usb_hcd *hcd, struct urb *urb, int status)
+ {
+-	urb->hcpriv = NULL;
+-	if (unlikely(urb->unlinked))
+-		status = urb->unlinked;
+-	else if (unlikely((urb->transfer_flags & URB_SHORT_NOT_OK) &&
+-			urb->actual_length < urb->transfer_buffer_length &&
+-			!status))
+-		status = -EREMOTEIO;
++	struct giveback_urb_bh *bh;
++	bool running, high_prio_bh;
+ 
+-	unmap_urb_for_dma(hcd, urb);
+-	usbmon_urb_complete(&hcd->self, urb, status);
+-	usb_unanchor_urb(urb);
++	/* pass status to tasklet via unlinked */
++	if (likely(!urb->unlinked))
++		urb->unlinked = status;
+ 
+-	/* pass ownership to the completion handler */
+-	urb->status = status;
+-	urb->complete (urb);
+-	atomic_dec (&urb->use_count);
+-	if (unlikely(atomic_read(&urb->reject)))
+-		wake_up (&usb_kill_urb_queue);
+-	usb_put_urb (urb);
++	if (!hcd_giveback_urb_in_bh(hcd) && !is_root_hub(urb->dev)) {
++		__usb_hcd_giveback_urb(urb);
++		return;
++	}
++
++	if (usb_pipeisoc(urb->pipe) || usb_pipeint(urb->pipe)) {
++		bh = &hcd->high_prio_bh;
++		high_prio_bh = true;
++	} else {
++		bh = &hcd->low_prio_bh;
++		high_prio_bh = false;
++	}
++
++	spin_lock(&bh->lock);
++	list_add_tail(&urb->urb_list, &bh->head);
++	running = bh->running;
++	spin_unlock(&bh->lock);
++
++	if (running)
++		;
++	else if (high_prio_bh)
++		tasklet_hi_schedule(&bh->bh);
++	else
++		tasklet_schedule(&bh->bh);
+ }
+ EXPORT_SYMBOL_GPL(usb_hcd_giveback_urb);
+ 
+@@ -2282,6 +2347,14 @@ EXPORT_SYMBOL_GPL (usb_hc_died);
+ 
+ /*-------------------------------------------------------------------------*/
+ 
++static void init_giveback_urb_bh(struct giveback_urb_bh *bh)
++{
++
++	spin_lock_init(&bh->lock);
++	INIT_LIST_HEAD(&bh->head);
++	tasklet_init(&bh->bh, usb_giveback_urb_bh, (unsigned long)bh);
++}
++
+ /**
+  * usb_create_shared_hcd - create and initialize an HCD structure
+  * @driver: HC driver that will use this hcd
+@@ -2545,6 +2618,10 @@ int usb_add_hcd(struct usb_hcd *hcd,
+ 			&& device_can_wakeup(&hcd->self.root_hub->dev))
+ 		dev_dbg(hcd->self.controller, "supports USB remote wakeup\n");
+ 
++	/* initialize tasklets */
++	init_giveback_urb_bh(&hcd->high_prio_bh);
++	init_giveback_urb_bh(&hcd->low_prio_bh);
++
+ 	/* enable irqs just before we start the controller,
+ 	 * if the BIOS provides legacy PCI irqs.
+ 	 */
+@@ -2653,6 +2730,16 @@ void usb_remove_hcd(struct usb_hcd *hcd)
+ 	usb_disconnect(&rhdev);		/* Sets rhdev to NULL */
+ 	mutex_unlock(&usb_bus_list_lock);
+ 
++	/*
++	 * tasklet_kill() isn't needed here because:
++	 * - driver's disconnect() called from usb_disconnect() should
++	 *   make sure its URBs are completed during the disconnect()
++	 *   callback
++	 *
++	 * - it is too late to run complete() here since driver may have
++	 *   been removed already now
++	 */
++
+ 	/* Prevent any more root-hub status calls from the timer.
+ 	 * The HCD might still restart the timer (if a port status change
+ 	 * interrupt occurs), but usb_hcd_poll_rh_status() won't invoke
+diff --git a/include/linux/usb/hcd.h b/include/linux/usb/hcd.h
+index f5f5c7d..295c98b 100644
+--- a/include/linux/usb/hcd.h
++++ b/include/linux/usb/hcd.h
+@@ -22,6 +22,7 @@
+ #ifdef __KERNEL__
+ 
+ #include <linux/rwsem.h>
++#include <linux/interrupt.h>
+ 
+ #define MAX_TOPO_LEVEL		6
+ 
+@@ -67,6 +68,13 @@
+ 
+ /*-------------------------------------------------------------------------*/
+ 
++struct giveback_urb_bh {
++	bool running;
++	spinlock_t lock;
++	struct list_head  head;
++	struct tasklet_struct bh;
++};
++
+ struct usb_hcd {
+ 
+ 	/*
+@@ -139,6 +147,9 @@ struct usb_hcd {
+ 	resource_size_t		rsrc_len;	/* memory/io resource length */
+ 	unsigned		power_budget;	/* in mA, 0 = no limit */
+ 
++	struct giveback_urb_bh  high_prio_bh;
++	struct giveback_urb_bh  low_prio_bh;
++
+ 	/* bandwidth_mutex should be taken before adding or removing
+ 	 * any new bus bandwidth constraints:
+ 	 *   1. Before adding a configuration for a new device.
+@@ -220,6 +231,7 @@ struct hc_driver {
+ #define	HCD_USB2	0x0020		/* USB 2.0 */
+ #define	HCD_USB3	0x0040		/* USB 3.0 */
+ #define	HCD_MASK	0x0070
++#define	HCD_BH		0x0100		/* URB complete in BH context */
+ 
+ 	/* called to init HCD and root hub */
+ 	int	(*reset) (struct usb_hcd *hcd);
+@@ -360,6 +372,11 @@ struct hc_driver {
+ 	int	(*find_raw_port_number)(struct usb_hcd *, int);
+ };
+ 
++static inline int hcd_giveback_urb_in_bh(struct usb_hcd *hcd)
++{
++	return hcd->driver->flags & HCD_BH;
++}
++
+ extern int usb_hcd_link_urb_to_ep(struct usb_hcd *hcd, struct urb *urb);
+ extern int usb_hcd_check_unlink_urb(struct usb_hcd *hcd, struct urb *urb,
+ 		int status);
+-- 
+1.7.9.5
