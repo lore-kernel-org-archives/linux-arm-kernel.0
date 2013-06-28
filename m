@@ -1,307 +1,70 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 28 Jun 2013 18:21:24 +0200
-Subject: [PATCH 1/3] ARM: EXYNOS: remove non-working AFTR mode support
-In-Reply-To: <20130628111333.GA30603@e102568-lin.cambridge.arm.com>
-References: <1372241627-22695-1-git-send-email-b.zolnierkie@samsung.com>
- <19893620.AhWB5HomTT@amdc1227>
- <20130628111333.GA30603@e102568-lin.cambridge.arm.com>
-Message-ID: <1685465.MBZtS3fCrQ@amdc1227>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 28 Jun 2013 17:27:58 +0100
+Subject: [PATCH v7 0/6] xen/arm/arm64: CONFIG_PARAVIRT and stolen ticks
+ accounting
+In-Reply-To: <20130628160156.GH1643@arm.com>
+References: <alpine.DEB.2.02.1306271614260.4782@kaball.uk.xensource.com>
+ <20130628155840.GA13468@phenom.dumpdata.com> <20130628160156.GH1643@arm.com>
+Message-ID: <alpine.DEB.2.02.1306281717150.4782@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-On Friday 28 of June 2013 12:13:33 Lorenzo Pieralisi wrote:
-> On Fri, Jun 28, 2013 at 11:11:24AM +0100, Tomasz Figa wrote:
-> > Hi Daniel,
-> > 
-> > I've been fighting with this whole AFTR state as well, before
-> > Bartlomiej. Let me share my thoughts on this.
-> > 
-> > On Friday 28 of June 2013 11:57:25 Daniel Lezcano wrote:
-> > > On 06/27/2013 08:10 PM, Bartlomiej Zolnierkiewicz wrote:
-> > > > On Wednesday, June 26, 2013 12:36:12 PM Daniel Lezcano wrote:
-> > > >> On 06/26/2013 12:13 PM, Bartlomiej Zolnierkiewicz wrote:
-> > > >>> AFTR mode support was introduced by commit 67173ca ("ARM: EXYNOS:
-> > > >>> Add
-> > > >>> support AFTR mode on EXYNOS4210") in v3.4 kernel.  Unfortunately
-> > > >>> even
-> > > >>> in v3.4 kernel it hasn't worked as supposed and this is still the
-> > > >>> case
-> > > >>> with v3.10-rc6 (it probably wasn't noticed because
-> > > >>> CONFIG_CPU_IDLE is
-> > > >>> not turned on by default):
-> > > >>> 
-> > > >>> - on revision 0 of Exynos4210 (Universal C210 board) it causes
-> > > >>> lockup
-> > > >>> 
-> > > >>>   (on this revision only one core is usable so entry to AFTR mode
-> > > >>>   is
-> > > >>>   always attempted because the code tries to go into AFTR mode
-> > > >>>   when
-> > > >>>   all
-> > > >>>   other CPUs except CPU0 are offlined)
-> > > >>> 
-> > > >>> - on revision 1.1 of Exynos4210 (Trats board) it causes a lockup
-> > > >>> when
-> > > >>> 
-> > > >>>   CPU1 is offlined (i.e. echo 0 >
-> > > >>>   /sys/devices/system/cpu/cpu1/online)
-> > > >>> 
-> > > >>> - on later Exynos4/5 SoCs wrong registers may be accessed when
-> > > >>> all
-> > > >>> CPUs
-> > > >>> 
-> > > >>>   except CPU0 are offlined resulting in panic/lockup
-> > > >>>   (REG_DIRECTGO_ADDR
-> > > >>>   and REG_DIRECTGO_FLAG register selections was implemented only
-> > > >>>   for
-> > > >>>   Exynos4210)
-> > > >>> 
-> > > >>> Just remove AFTR mode support for now.
-> > > >> 
-> > > >> Ok, I will jump on the opportunity to talk about this state.
-> > > >> 
-> > > >> 1. I tried different ways to make the AFTR state to be entered
-> > > >> with
-> > > >> *both* cpu online. It goes successfully to this state. The CPU0 is
-> > > >> correctly woken up but the CPU1 is never woken up, why is it
-> > > >> happening
-> > > >> ?
-> > > >> 
-> > > >> https://bugs.launchpad.net/linaro-landing-team-samsung/+bug/117151
-> > > >> 8
-> > > > 
-> > > > No idea here, AFTR doesn't work for me with upstream kernels even
-> > > > if
-> > > > only one CPU is online.
+On Fri, 28 Jun 2013, Catalin Marinas wrote:
+> On Fri, Jun 28, 2013 at 04:58:40PM +0100, Konrad Rzeszutek Wilk wrote:
+> > On Fri, Jun 28, 2013 at 12:19:54PM +0100, Stefano Stabellini wrote:
+> > > Hi all,
+> > > this patch series introduces stolen ticks accounting for Xen on ARM and
+> > > ARM64.
+> > > Stolen ticks are clocksource ticks that have been "stolen" from the cpu,
+> > > typically because Linux is running in a virtual machine and the vcpu has
+> > > been descheduled.
+> > > To account for these ticks we introduce CONFIG_PARAVIRT and pv_time_ops
+> > > so that we can make use of:
 > > > 
-> > > What do you mean by "AFTR doesn't work" ? Is the kernel hanging ? The
-> > > state is never reached ?
-> > 
-> > If you don't unplug all the CPUs >0 the state is obviously never
-> > reached. Otherwise the whole system hangs after it tries to enter this
-> > mode without any reaction for external events, other than reset.
-> > 
-> > > > Also the documentation says that before entering system-level
-> > > > power-down
-> > > > mode (such as AFTR) when multiple CPUs cores are used all other CPU
-> > > > cores should stop interrupt service so I'm not sure how the way
-> > > > attempted by you should work.
+> > > kernel/sched/cputime.c:steal_account_process_tick
 > > > 
-> > > The cpu enters the idle mode with the interrupts disabled.
-> > 
-> > Hmm? What is supposed to wake it up then? AFAIK the whole idea of any
-> > idle or sleep is to sit in such low power mode until some interrupt
-> > fires (and so the name of the WFI, wait for interrupt, instruction).
-> 
-> WFI completes upon IRQ even if irqs are disabled for a CPU, unless the
-> GIC CPU interface is disabled for that CPU as well. How the power
-> controller wakes up the CPUs from shutdown is strictly related to the
-> power controller behaviour. The problem here I think is completely
-> different and it is related to how the power controller behaves on
-> Exynos. I think the issues are a combination of power controller/boot
-> firmware that prevents CPU1 to go into idle independently of CPU0, but I
-> might be mistaken.
-
-We are not talking here about the normal WFI idle mode. This one works 
-correctly and gives huge power savings.
-
-AFTR (which stands for ARM off, TOP running, TOP being a power domain) is a 
-mode that is supposed to be deeper than WFI, with all ARM cores powered off, 
-but some of the blocks around them keep their state, so the whole system 
-can be quickly woke up.
-
-Based on our measurements on Exynos 4210 and 4x12, powering off ARM cores 
-don't give any significant amount of power savings (few milliamperes per 
-core), with most of the savings already achieved by WFI idle. Since AFTR is 
-basically just powering off all ARM cores, including CPU0, I doubt it is 
-going to give much higher savings than that.
-
-> If you want to get to the bottom of this you need to get detailed
-> information on how the firmware and power controller behave, trial and
-> error won't work.
-
-I don't think we want to put unjustified effort into this. If we are to fix 
-it, we should first make sure that it is something that is worth this effort.
-
-The commit that introduced this feature didn't have any rationale to begin 
-with, not even saying about any evidence of actual power saving such as 
-measurements.
-
-Just for reference, here's commit message of that commit:
-
-	ARM: EXYNOS: Add support AFTR mode on EXYNOS4210
-
-	This patch adds support AFTR(ARM OFF TOP RUNNING) mode in
-	cpuidle driver. L2 cache keeps their data in this mode.
-	This patch ports the code to the latest interfaces to
-	save/restore CPU state inclusive of CPU PM notifiers, l2
-	resume and cpu_suspend/resume.
-
-Nothing saying _why_ this is added, just _what_ is added.
-
-> > > >> 2. The CPU1 hotplug bug should been fixed and if I am not wrong
-> > > >> there
-> > > >> is
-> > > >> a patch somewhere fixing this.
-> > > >> 
-> > > >> https://bugs.launchpad.net/linaro-power-kernel/+bug/1171382
-> > > > 
-> > > > Unfortunately none of the patches there helps with my issues.
-> > > > 
-> > > >> 3. What is the fix for Exynos5 ?
-> > > >> 
-> > > >> https://bugs.launchpad.net/linaro-power-kernel/+bug/1171253
-> > > >> 
-> > > >> It sounds like depending on Hypervisor mode is enabled or not, the
-> > > >> AFTR
-> > > >> does not work correctly.
-> > > > 
-> > > > Sorry no idea here either.  On any SoCs later than EXYNOS4210 the
-> > > > registers used for s3c_cpu_resume address and 0xFCBA0D10 magic
-> > > > number
-> > > > may be different than EXYNOS4210 defaults (at least on EXYNOS4412
-> > > > they
-> > > > indeed are different, unfortunately I lack any info needed for
-> > > > EXYNOS5
-> > > > support). You are lucky that it even works in some cases on
-> > > > EXYNOS5250.
-> > > > 
-> > > >> In other words, instead of removing the AFTR state I suggest to
-> > > >> fix
-> > > >> it:
-> > > >> both core being online, split driver for exynos4 and 5.
-> > > > 
-> > > > My main problem is that with the upstream kernel even on EXYNOS4210
-> > > > rev0 (only one core useable due to hardware issues) the kernel goes
-> > > > into AFTR state for the first few times during boot and then it
-> > > > just
-> > > > lockups (after going into cpu_do_idle() which is really
-> > > > cpu_v7_do_idle()
-> > > > and which does wfi call) and doesn't wake up CPU0. I have currently
-> > > > no idea how to fix or debug it further.
 > > > 
-> > > I have an Origen 4210 board Ver A. and it works without problem with
-> > > the
-> > > AFTR mode (cpu1 unplugged).
-> > 
-> > Great!
-> > 
-> > Since benefits of this feature are rather questionable, especially when
-> > you consider all the maintenance burden caused by it, could you do
-> > some measurements to check if power saving thanks to this mode is of
-> > any significance?
-> 
-> Questionable ? Questionable is the way this code has been put on the
-> backburner without upstreaming it properly.
-
-I agree, it has not been upstreamed properly, becausE:
- 1) it doesn't work,
- 2) there was no rationale behind it or at least none was provided in patch 
-descriptions.
-
-> > > > The issue happens with every upstream kernel version tried (from
-> > > > v3.4
-> > > > to v3.10-rc6).  Lockups also happen on EXYNOS4210 rev1.1 when CPU1
-> > > > is
-> > > > offlined by hand and then cpuidle driver tries to go into AFTR mode
-> > > > (because by default it doesn't go into AFTR mode on any SoC except
-> > > > EXYNOS4210 rev0).
-> > > > 
-> > > > I don't have EXYNOS4210 rev1.0 but it seems that in the upstream
-> > > > AFTR
-> > > > mode has never worked (even on hardware that it was originally
-> > > > developed
-> > > > on) since its introduction in v3.4 (which was released on 20th May
-> > > > 2012).
-> > > > 
-> > > > IOW for over the year nobody cared to make it work and I have
-> > > > currently
-> > > > no fix at hand so the corrent upstream resolution is to just remove
-> > > > the
-> > > > known non-working code and re-introduce it later when/if needed (I
-> > > > can
-> > > > just disable it with a small fix but we don't keep such long-term
-> > > > broken
-> > > > code as placeholder in the upstream kernel).  If left as it is
-> > > > people
-> > > > can hit the known issues and waste time debugging them, just like
-> > > > this
-> > > > happenend for me [1].
-> > > > 
-> > > > If you have AFTR mode working (especially on EXYNOS4210) in Linaro
-> > > > kernels please get fixes upstream ASAP. However I still wonder
-> > > > whether
-> > > > the maintanance nightmare (bugs for different cases in your
-> > > > launchpad)
-> > > > is worth gains over standard idle mode as the rumor around here is
-> > > > that
-> > > > they are not that great (unfortunately no numbers were provided
-> > > > during
-> > > > original feature addition).
+> > > Stefano Stabellini (6):
+> > >       xen: move xen_setup_runstate_info and get_runstate_snapshot to drivers/xen/time.c
+> > >       kernel: missing include in cputime.c
+> > >       arm: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+> > >       arm64: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+> > >       core: remove ifdef CONFIG_PARAVIRT
+> > >       xen/arm: account for stolen ticks
 > > > 
-> > > It works forme with a vanilla kernel 3.10.0-rc7.
+> > >  arch/arm/Kconfig                  |   20 ++++++++
+> > >  arch/arm/include/asm/paravirt.h   |   20 ++++++++
+> > >  arch/arm/kernel/Makefile          |    1 +
+> > >  arch/arm/kernel/paravirt.c        |   25 ++++++++++
+> > >  arch/arm/xen/enlighten.c          |   21 +++++++++
+> > >  arch/arm64/Kconfig                |   20 ++++++++
+> > >  arch/arm64/include/asm/paravirt.h |   20 ++++++++
+> > >  arch/arm64/kernel/Makefile        |    1 +
+> > >  arch/arm64/kernel/paravirt.c      |   25 ++++++++++
+> > >  arch/ia64/xen/time.c              |   48 +++-----------------
+> > >  arch/x86/xen/time.c               |   76 +------------------------------
 > > 
-> > As Bartek already said, I haven't worked on any of our Exynos 4210
-> > based
-> > boards since it got introduced in Linux 3.4, with exactly the same
-> > effect we described.
+> > This is going to hit some of the patches that David
+> > has sent to tglx, I think. You might want to try to rebase on top
+> > of them (tip/time/for-xen, or something like that ) when they
+> > are ready.
 > > 
-> > > Removing a feature because it seems not working is not a good
-> > > solution.
-> > > The right way is to investigate what is happening and why.
+> > But for the Xen generic maintainer I am OK with these changes
+> > so you can stick Acked-by on them.
 > > 
-> > I can agree only partially. Keeping a feature that is broken and
-> > without
-> > any significant benefits does not make sense for me. Neither does
-> > putting efforts into fixing it, only to find that it is of no use.
+> > Are you thinking to push them yourself or via the arm64 maintainer?
 > 
-> Well, either power management HW works on these boards, so there are
-> significant benefits in fixing the code, or it does not and you are right
-> then.
+> Once the core Xen support is pushed via the arm64 tree (queued for
+> 3.11-rc1), I'm happy for the subsequent Xen patches to go directly
+> (similarly for KVM). But it's -rc7 now and I'm not taking any more
+> patches for the upcoming merging window (unless they are fixes).
 
-This mode doesn't have anything to do with power management HW other than 
-power management unit inside of the SoC, which is not board specific.
+The problem is that I haven't received any comments on the arm32
+changes. Until I get a "go ahead" from Russell I don't feel comfortable
+with sending a pull request to Linus with the third patch of the series
+in it.
 
-> If power management HW works there are benefits and they are significant
-> for manifold reasons (first and foremost, since these are dev boards, to
-> show how power management backends must be written, but honestly this
-> driver fails in that respect). It is absolutely worth putting effort in
-> fixing the behaviour, the problem is finding people who can answer
-> questions on how the power controller and firmware are *supposed* to be
-> working, otherwise we will never get to the bottom of this.
+As a consequence I think I'll have to skip the next merge window.
 
-I don't see a point to have code that works, but doesn't do anything useful 
-(other than some example/skeleton drivers which aren't supposed to be used 
-in other way than as aid for developers). This is why I'd like to see some 
-evidence that this feature is good to have, before we start putting effort 
-into fixing it on other boards (because this is possibly firmware/bootloader 
-specific issue).
-
-> I understand that these bits of information are hard to come by, and for
-> that reason we might be forced to drop this code, but this does not mean
-> that these features are not useful.
-
-I agree. This is not what I meant. What I wanted to say is that no 
-rationale has ever been provided for this feature and so we don't know if 
-it is worth putting effort into it.
-
-Our internal measurements of similar features tell us that it is unlikely, 
-but this is not a result that can be relied on, so I asked for measurements 
-on boards for which it works.
-
-> > However this is purely a speculation. Could you test on your Origen, on
-> > which it is supposed to work, if this feature is of any use ?
-> 
-> If power management HW works properly on these boards, and I hope it
-> does (but the only way to check it is by measuring power drawn), this
-> feature is useful, now the question is to understand how and who is
-> going to fix it, if we can manage to do that.
-
-Again, this feature is only related to SoC internals and lowest level 
-firmware (first stage bootloader, which resumes the CPU), so power saving is 
-not board specific here, but SoC-specific.
-
-Best regards,
-Tomasz
+After that, I might consider making this patch series arm64 only and
+send it to Linus myself or via Catalin.
