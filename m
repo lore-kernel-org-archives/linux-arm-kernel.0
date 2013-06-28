@@ -1,114 +1,85 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 28 Jun 2013 10:42:59 +0200 (CEST)
-Subject: [PATCH] ARM: zImage: fix path to fonts which moved to
- lib/fonts
-In-Reply-To: <CAMuHMdVoqKTwgYLCu2ktcWEOYHy+jGo4YZ7ithAgQ6EN0Nhnqw@mail.gmail.com>
-References: <1372363940-13023-1-git-send-email-khilman@linaro.org>
- <CAMuHMdVoqKTwgYLCu2ktcWEOYHy+jGo4YZ7ithAgQ6EN0Nhnqw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1306281041100.25479@ayla.of.borg>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Fri, 28 Jun 2013 08:49:41 +0000
+Subject: [PATCH v2 2/2] i2c: imx: Add Vybrid VF610 I2C controller support
+In-Reply-To: <20130620080406.GD14308@pengutronix.de>
+References: <1371545327-12481-1-git-send-email-b35083@freescale.com>
+ <20130620080406.GD14308@pengutronix.de>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E851E39D8@039-SN1MPN1-005.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Jun 2013, Geert Uytterhoeven wrote:
-> On Thu, Jun 27, 2013 at 10:12 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> > commit 1affee67 (lib: Move fonts from drivers/video/console/ to lib/fonts/)
-> > moved fonts from drivers/video/console/ to lib/fonts, but the ARM zImage
-> > build still references the old location.
-> >
-> > Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Olof Johansson <olof@lixom.net>
-> > Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> > ---
-> > Found due to build failures on ARM in next-20130627.
-> >
-> > Rather than go through the ARM tree, this should probably be included
-> > with the original series from Geert.
-> 
-> Thanks! Sorry for missing this.
-> 
-> There's a similar one in the unicore32 boot code, and a few stale references
-> in comments and documentation. I'll fold all of these in the original commit.
+>-----Original Message-----
+>From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+>Sent: Thursday, June 20, 2013 4:04 PM
+>To: Lu Jingchang-B35083
+>Cc: wsa at the-dreams.de; shawn.guo at linaro.org; Estevam Fabio-R49496; linux-
+>i2c at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Jin Zhengxiong-
+>R64188; Li Xiaochun-B41219
+>Subject: Re: [PATCH v2 2/2] i2c: imx: Add Vybrid VF610 I2C controller
+>support
+>
+>On Tue, Jun 18, 2013 at 04:48:47PM +0800, Jingchang Lu wrote:
+>> +static u16 imx_i2c_clk_div[50][2] = {
+>>  	{ 22,	0x20 }, { 24,	0x21 }, { 26,	0x22 }, { 28,	0x23 },
+>>  	{ 30,	0x00 },	{ 32,	0x24 }, { 36,	0x25 }, { 40,	0x26 },
+>>  	{ 42,	0x03 }, { 44,	0x27 },	{ 48,	0x28 }, { 52,	0x05 },
+>> @@ -112,11 +107,67 @@ static u16 __initdata i2c_clk_div[50][2] = {
+>>  	{ 3072,	0x1E }, { 3840,	0x1F }
+>>  };
+>>
+>> +/* Vybrid VF610 clock divider, register value pairs */
+>> +static u16 vf610_i2c_clk_div[60][2] = {
+>> +	{ 20,   0x00 }, { 22,   0x01 }, { 24,   0x02 }, { 26,   0x03 },
+>> +	{ 28,   0x04 }, { 30,   0x05 }, { 32,   0x09 }, { 34,   0x06 },
+>> +	{ 36,   0x0A }, { 40,   0x07 }, { 44,   0x0C }, { 48,   0x0D },
+>> +	{ 52,   0x43 }, { 56,   0x0E }, { 60,   0x45 }, { 64,   0x12 },
+>> +	{ 68,   0x0F }, { 72,   0x13 }, { 80,   0x14 }, { 88,   0x15 },
+>> +	{ 96,   0x19 }, { 104,  0x16 }, { 112,  0x1A }, { 128,  0x17 },
+>> +	{ 136,  0x4F }, { 144,  0x1C }, { 160,  0x1D }, { 176,  0x55 },
+>> +	{ 192,  0x1E }, { 208,  0x56 }, { 224,  0x22 }, { 228,  0x24 },
+>> +	{ 240,  0x1F }, { 256,  0x23 }, { 288,  0x5C }, { 320,  0x25 },
+>> +	{ 384,  0x26 }, { 448,  0x2A }, { 480,  0x27 }, { 512,  0x2B },
+>> +	{ 576,  0x2C }, { 640,  0x2D }, { 768,  0x31 }, { 896,  0x32 },
+>> +	{ 960,  0x2F }, { 1024, 0x33 }, { 1152, 0x34 }, { 1280, 0x35 },
+>> +	{ 1536, 0x36 }, { 1792, 0x3A }, { 1920, 0x37 }, { 2048, 0x3B },
+>> +	{ 2304, 0x3C }, { 2560, 0x3D }, { 3072, 0x3E }, { 3584, 0x7A },
+>> +	{ 3840, 0x3F }, { 4096, 0x7B }, { 5120, 0x7D }, { 6144, 0x7E },
+>> +};
+>
+>...
+>
+>> +static struct imx_i2c_hwdata imx_i2c_hwdata = {
+>> +	.addr_reg		= 0x00,
+>> +	.freq_reg		= 0x04,
+>> +	.ctrl_reg		= 0x08,
+>> +	.status_reg		= 0x0c,
+>> +	.data_reg		= 0x10,
+>> +	.clk_div		= imx_i2c_clk_div,
+>> +	.ndivs			= ARRAY_SIZE(imx_i2c_clk_div),
+>> +	.i2sr_clr_opcode	= I2SR_CLR_OPCODE_W0C,
+>> +	.i2cr_ien_opcode	= I2CR_IEN_OPCODE_1,
+>> +
+>> +};
+>> +
+>> +static struct imx_i2c_hwdata vf610_i2c_hwdata = {
+>> +	.addr_reg		= 0x00,
+>> +	.freq_reg		= 0x01,
+>> +	.ctrl_reg		= 0x02,
+>> +	.status_reg		= 0x03,
+>> +	.data_reg		= 0x04,
+>> +	.clk_div		= vf610_i2c_clk_div,
+>> +	.ndivs			= ARRAY_SIZE(vf610_i2c_clk_div),
+>> +	.i2sr_clr_opcode	= I2SR_CLR_OPCODE_W1C,
+>> +	.i2cr_ien_opcode	= I2CR_IEN_OPCODE_0,
+>> +
+>> +};
+>
+>Wow. The i2c unit remained unchanged since the i.MX21 days. Shuffling
+>some registers or divider values was long overdue...
+>
+[Lu Jingchang-B35083] 
+ Could I understand that you are OK for the patch? If yes, Could you please ACKed it? Thanks.
 
-I ammended it with the below, and pushed it out.
 
-[Kevin Hilman <khilman@linaro.org>: Update arch/arm/boot/compressed/Makefile]
-
-diff --git a/Documentation/DocBook/device-drivers.tmpl b/Documentation/DocBook/device-drivers.tmpl
-index c36892c..fca3419 100644
---- a/Documentation/DocBook/device-drivers.tmpl
-+++ b/Documentation/DocBook/device-drivers.tmpl
-@@ -297,10 +297,10 @@ KAO -->
-      </sect1>
-      <sect1><title>Frame Buffer Fonts</title>
-         <para>
--           Refer to the file drivers/video/console/fonts.c for more information.
-+           Refer to the file lib/fonts/fonts.c for more information.
-         </para>
- <!-- FIXME: Removed for now since no structured comments in source
--X!Idrivers/video/console/fonts.c
-+X!Ilib/fonts/fonts.c
- -->
-      </sect1>
-   </chapter>
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 120b83b..48d0a44 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -27,7 +27,7 @@ OBJS	+= misc.o decompress.o
- ifeq ($(CONFIG_DEBUG_UNCOMPRESS),y)
- OBJS	+= debug.o
- endif
--FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
-+FONTC	= $(srctree)/lib/fonts/font_acorn_8x8.c
- 
- # string library code (-Os is enforced to keep it much smaller)
- OBJS		+= string.o
-diff --git a/arch/m68k/kernel/asm-offsets.c b/arch/m68k/kernel/asm-offsets.c
-index a972b00..8b7b228 100644
---- a/arch/m68k/kernel/asm-offsets.c
-+++ b/arch/m68k/kernel/asm-offsets.c
-@@ -77,7 +77,7 @@ int main(void)
- 	DEFINE(BIR_SIZE, offsetof(struct bi_record, size));
- 	DEFINE(BIR_DATA, offsetof(struct bi_record, data));
- 
--	/* offsets into font_desc (drivers/video/console/font.h) */
-+	/* offsets into the font_desc struct */
- 	DEFINE(FONT_DESC_IDX, offsetof(struct font_desc, idx));
- 	DEFINE(FONT_DESC_NAME, offsetof(struct font_desc, name));
- 	DEFINE(FONT_DESC_WIDTH, offsetof(struct font_desc, width));
-diff --git a/arch/unicore32/boot/compressed/Makefile b/arch/unicore32/boot/compressed/Makefile
-index 950a9af..96494fb 100644
---- a/arch/unicore32/boot/compressed/Makefile
-+++ b/arch/unicore32/boot/compressed/Makefile
-@@ -17,7 +17,7 @@ OBJS		:= misc.o
- 
- # font.c and font.o
- CFLAGS_font.o	:= -Dstatic=
--$(obj)/font.c: $(srctree)/drivers/video/console/font_8x8.c
-+$(obj)/font.c: $(srctree)/lib/fonts/font_8x8.c
- 	$(call cmd,shipped)
- 
- # piggy.S and piggy.o
-diff --git a/lib/fonts/fonts.c b/lib/fonts/fonts.c
-index d0c03fd..f947189 100644
---- a/lib/fonts/fonts.c
-+++ b/lib/fonts/fonts.c
-@@ -1,5 +1,5 @@
- /*
-- * linux/drivers/video/fonts.c -- `Soft' font definitions
-+ * `Soft' font definitions
-  *
-  *    Created 1995 by Geert Uytterhoeven
-  *    Rewritten 1998 by Martin Mares <mj@ucw.cz>
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+Best Regards,
+Jingchang
