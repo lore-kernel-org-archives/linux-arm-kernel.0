@@ -1,27 +1,144 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 28 Jun 2013 09:54:13 +0200
-Subject: [PATCH] of: Specify initrd location using 64-bit
-In-Reply-To: <51CCA67C.2010803@gmail.com>
-References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
- <51C4171C.9050908@linutronix.de> <51C48B5A.2040404@ti.com>
- <51CCA67C.2010803@gmail.com>
-Message-ID: <51CD4125.5060305@linutronix.de>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Fri, 28 Jun 2013 10:06:12 +0200
+Subject: [PATCH v2 2/4] mmc: atmel-mci: prepare clk before calling enable
+In-Reply-To: <51CD3EE4.90902@atmel.com>
+References: <1372147702-4074-1-git-send-email-b.brezillon@overkiz.com>
+ <1372147891-4296-1-git-send-email-b.brezillon@overkiz.com>
+ <51CD3EE4.90902@atmel.com>
+Message-ID: <51CD43F4.2000601@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2013 10:54 PM, Rob Herring wrote:
+On 28/06/2013 09:44, Nicolas Ferre wrote:
+> On 25/06/2013 10:11, Boris BREZILLON :
+>> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+>> avoid common clk framework warnings.
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>
+> It seems that you forgot the Acked-by line from Ludovic.
+>
+> One comment...
+>
+>> ---
+>>   drivers/mmc/host/atmel-mci.c |   27 ++++++++++++++++++---------
+>>   1 file changed, 18 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+>> index e75774f..631c4cf 100644
+>> --- a/drivers/mmc/host/atmel-mci.c
+>> +++ b/drivers/mmc/host/atmel-mci.c
+>> @@ -380,6 +380,8 @@ static int atmci_regs_show(struct seq_file *s, 
+>> void *v)
+>>   {
+>>       struct atmel_mci    *host = s->private;
+>>       u32            *buf;
+>> +    int            ret = 0;
+>> +
+>>
+>>       buf = kmalloc(ATMCI_REGS_SIZE, GFP_KERNEL);
+>>       if (!buf)
+>> @@ -391,9 +393,13 @@ static int atmci_regs_show(struct seq_file *s, 
+>> void *v)
+>>        * consistent.
+>>        */
+>>       spin_lock_bh(&host->lock);
+>> -    clk_enable(host->mck);
+>> +    ret = clk_prepare_enable(host->mck);
+>
+> Do you think that it is needed here? I do not think it can be called 
+> before the probe() function and I do not know if the result can change 
+> depending on when clk_prepare_enable() is called...
+Same as for other patches: it should not fail if this function is called 
+after probe,
+because the prepare and enable process already succeed once.
 
->> Rob,
->> Are you ok with phys_addr_t since your concern was about rest
->> of the memory specific bits of the device-tree code use u64 ?
-> 
-> No. I still think it should be u64 for same reasons I said originally.
+But I think this is better to keep the check wherever we can reflect the 
+error to the caller:
+the code will be more robust to clk framework or at91 clk implementation 
+changes.
 
-The physical address space is represented by phys_addr_t and not u64
-within the kernel. If you go for u64 you may waste 32bit and you need
-to check if the running kernel can deal with this.
-Why was u64 such a good thing?
+I know I told you this kind of check could be removed from dma driver, 
+so this is a bit inconsistent.
 
-> Rob
+It's up to you, tell me if you want me to remove this part.
 
-Sebastian
+
+>
+>> +    if (ret) {
+>> +        spin_unlock_bh(&host->lock);
+>> +        goto out;
+>> +    }
+>>       memcpy_fromio(buf, host->regs, ATMCI_REGS_SIZE);
+>> -    clk_disable(host->mck);
+>> +    clk_disable_unprepare(host->mck);
+>>       spin_unlock_bh(&host->lock);
+>>
+>>       seq_printf(s, "MR:\t0x%08x%s%s ",
+>> @@ -444,9 +450,10 @@ static int atmci_regs_show(struct seq_file *s, 
+>> void *v)
+>>                   val & ATMCI_CFG_LSYNC ? " LSYNC" : "");
+>>       }
+>>
+>> +out:
+>>       kfree(buf);
+>>
+>> -    return 0;
+>> +    return ret;
+>>   }
+>>
+>>   static int atmci_regs_open(struct inode *inode, struct file *file)
+>> @@ -1281,7 +1288,7 @@ static void atmci_set_ios(struct mmc_host *mmc, 
+>> struct mmc_ios *ios)
+>>
+>>           spin_lock_bh(&host->lock);
+>>           if (!host->mode_reg) {
+>> -            clk_enable(host->mck);
+>> +            clk_prepare_enable(host->mck);
+>>               atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+>>               atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIEN);
+>>               if (host->caps.has_cfg_reg)
+>> @@ -1361,7 +1368,7 @@ static void atmci_set_ios(struct mmc_host *mmc, 
+>> struct mmc_ios *ios)
+>>               atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
+>>               if (host->mode_reg) {
+>>                   atmci_readl(host, ATMCI_MR);
+>> -                clk_disable(host->mck);
+>> +                clk_disable_unprepare(host->mck);
+>>               }
+>>               host->mode_reg = 0;
+>>           }
+>> @@ -2379,10 +2386,12 @@ static int __init atmci_probe(struct 
+>> platform_device *pdev)
+>>       if (!host->regs)
+>>           goto err_ioremap;
+>>
+>> -    clk_enable(host->mck);
+>> +    ret = clk_prepare_enable(host->mck);
+>> +    if (ret)
+>> +        goto err_request_irq;
+>>       atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+>>       host->bus_hz = clk_get_rate(host->mck);
+>> -    clk_disable(host->mck);
+>> +    clk_disable_unprepare(host->mck);
+>>
+>>       host->mapbase = regs->start;
+>>
+>> @@ -2487,11 +2496,11 @@ static int __exit atmci_remove(struct 
+>> platform_device *pdev)
+>>               atmci_cleanup_slot(host->slot[i], i);
+>>       }
+>>
+>> -    clk_enable(host->mck);
+>> +    clk_prepare_enable(host->mck);
+>>       atmci_writel(host, ATMCI_IDR, ~0UL);
+>>       atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
+>>       atmci_readl(host, ATMCI_SR);
+>> -    clk_disable(host->mck);
+>> +    clk_disable_unprepare(host->mck);
+>>
+>>       if (host->dma.chan)
+>>           dma_release_channel(host->dma.chan);
+>>
+>
+>
