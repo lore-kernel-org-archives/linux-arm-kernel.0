@@ -1,140 +1,78 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 28 Jun 2013 23:47:49 +0200
-Subject: [PATCH 1/3] ARM: EXYNOS: remove non-working AFTR mode support
-In-Reply-To: <2484012.IH9WOi4iIR@amdc1032>
-References: <1372241627-22695-1-git-send-email-b.zolnierkie@samsung.com>
- <19893620.AhWB5HomTT@amdc1227> <51CD7169.6010905@linaro.org>
- <2484012.IH9WOi4iIR@amdc1032>
-Message-ID: <51CE0485.8020109@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Jun 2013 22:51:33 +0100
+Subject: armada_drm clock selection
+In-Reply-To: <20130628211848.GJ4283@n2100.arm.linux.org.uk>
+References: <20130628201133.1D6D2FAAD5@dev.laptop.org>
+ <20130628211848.GJ4283@n2100.arm.linux.org.uk>
+Message-ID: <20130628215133.GL4283@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2013 06:27 PM, Bartlomiej Zolnierkiewicz wrote:
-> On Friday, June 28, 2013 01:20:09 PM Daniel Lezcano wrote:
->> On 06/28/2013 12:11 PM, Tomasz Figa wrote:
->>> Hi Daniel,
->>>
->>> I've been fighting with this whole AFTR state as well, before Bartlomiej. 
->>> Let me share my thoughts on this.
->>>
-
-[ ... ]
-
->>>
->>> If you don't unplug all the CPUs >0 the state is obviously never reached. 
->>> Otherwise the whole system hangs after it tries to enter this mode without 
->>> any reaction for external events, other than reset.
->>
->> Need investigation.
->>
->> What is the exynos board version where that occurs ?
+On Fri, Jun 28, 2013 at 10:18:48PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jun 28, 2013 at 04:11:32PM -0400, Daniel Drake wrote:
+> > +int armada_drm_find_best_clock(struct armada_private *priv, long needed_rate)
+> > +{
+> > +	int i;
+> > +
+> > +	/* check if any clock can meet this rate directly */
+> > +	for (i = 0; i < ARMADA_MAX_CLOCK; i++) {
+> > +		struct clk *clk = priv->clk[i];
+> > +		long ref;
+> > +
+> > +		if (!clk)
+> > +			continue;
+> > +
+> > +		clk_set_rate(clk, needed_rate);
+> > +		ref = clk_get_rate(clk);
+> > +
+> > +		if (ref % needed_rate == 0)
+> > +			return i;
+> > +	}
+> > +
+> > +	/* fallback: return first available clock */
+> > +	for (i = 0; i < ARMADA_MAX_CLOCK; i++) {
+> > +		struct clk *clk = priv->clk[i];
+> > +		if (clk)
+> > +			return i;
+> > +	}
+> > +
+> > +	return -ENOENT;
+> > +}
 > 
-> Could you please tell me what exactly do you mean by that?
+> This can be a library function called by the compute_clock implementation.
+> However, it's buggy.  It's not returning the best clock.  If we're going
+> to go to the expense of potentially causing the clock tree to recalculate
+> for every clock connected to this device, then we'd better do a good job
+> here.
 > 
-> I already wrote that we can reproduce the problem on EXYNOS4210 rev0
-> and rev1.1 (we don't have rev1.0). Tomek has also reproduced the problem
-> on some later SoCs (I hope that he can give you exact revisions).
+> That is - compute the source clock which can give us the _best_
+> approximation to the required clock.  We're almost doing that with the
+> "ref % needed_rate" line, so if we're already doing that calculation,
+> let's track for each iteration whether the clock gives us a better match
+> than our previous one - and return the best approximation.
 > 
-> In our testing we didn't encounter the board on which the problem
-> doesn't occur. Our current working theory is that the problem may be
-> u-boot (or first stage bootloader) related.
+> And why use clk_set_rate()/clk_get_rate()?  (a) what if clk_set_rate()
+> fails (the API allows it to.)  (b) what's wrong with clk_round_rate()?
 
-Ok, the status for what I know:
+There's a more fundamental point here.
 
-Origen Exynos4210, board ver A: works for me
-Arndale Exynos5250: works for me but only if u-boot does not enable the
-hypervisor mode.
-Chromebook Exynos5250: works for me
+The AXI and PLL clocks are shared between the two LCD controllers in
+the 510.  If one LCD controller is using one clock, what happens when
+we call clk_set_rate() on that clock due to a change on the other LCD
+controller.
 
-I found the following drivers:
+That might result in the PLL dividers being modified and changing the
+clock input to the other LCD controller.  Moreover, we might find that
+the rate isn't suitable for us, so we've just disrupted a clock for
+no gain what so ever.  That's even more reason to use the clk_round_rate(),
+but it also opens the bigger question: if we're going to dynamically
+select the clock input, we need to take notice of _both_ LCD controller
+requirements.
 
-https://github.com/AndreiLux/Perseus-UNIVERSAL5410/blob/samsung/arch/arm/mach-exynos/cpuidle.c
-
-https://github.com/CyanogenMod/hardkernel-kernel-4412/blob/cm-10.1/arch/arm/mach-exynos/cpuidle-exynos4.c
-
-Sounds like the num cpus > 1 is still there.
-
-[ ... ]
-
->> The kernel is not a playground where you can upstream code and then
->> remove it because a feature seems broken and you don't have an idea of why.
-> 
-> Neither me or Tomek did upstream this code and we couldn't react in
-> time because we haven't noticed that it is completely unusable for us
-> as EXYNOS cpuidle driver is not even used by default on EXYNOS (it is
-> not enabled either in defconfig or Kconfig).
-> 
-> Moreover the feature we are talking about (AFTR mode) is also not used
-> by default (except EXYNOS4210 rev0 on which it lockups system for us)
-> even with EXYNOS cpuidle driver being enabled (because this specific
-> feature depends on CPU hot-unplug which is not done automatically right
-> now).
-> 
-> Such things like unused/broken code removal is not something very
-> unusual in the upstream kernel (I'm speaking from the experience here
-> having maintained large subsystem for a couple of years). In this
-> particular case we are talking about ~130 lines of code which can
-> be trivially brought back later when/if needed.
-> 
-> Anyway if the code removal is controversial for you we can just disable
-> AFTR mode by default and enable it only when special command line option
-> is given (i.e. "aftr"). This would fix all the broken configuration
-> while still allowing the feature to be enabled on systems that had it
-> working previously (since you claim that it works on some chipset/u-boot
-> configurations).
-
-Actually, there are several reasons I am not in favor for the moment to
-remove this code:
-
-1) code can't be pushed upstream and then removed so easily
-2) I asked several times what was this cpu1 hack, I had no answer
-3) I tried to make both cpus entering the AFTR state, but the cpu1 never
-wakes up, I asked but no answer.
-
-I would like to have some answers :)
-
-Before taking the decision to remove this state (btw you can remove the
-driver directly, no ? the default idle function is WFI), IMO it is worth
-to investigate and to spend some time to clarify what is happening. Then
-we can take a decision.
-
-I am willing to help.
-
->> I asked several times the reasons of why the AFTR state couldn't work
->> with multiple CPUs and I had no answer.
-> 
-> Unfortunately I don't know the answer for your question.
-> 
-> The AFTR mode doesn't work for us *at*all* (even with *one* CPU).
-> 
->> Frankly speaking I have a couple of hypothesis:
->>
->> 1. something is not correctly setup and the PMU does not wake up the CPU1
->> 2. there is a silicon bug and no one wants to tell it is the case
->>
->> In any case, this must be investigated and identified. And then we can
->> take a decision about this state.
-> 
-> I don't have good idea currently how to investigate it further.
-> 
-> I also don't have any prove that the actual work is worth it
-> (and this work can easily take some weeks).
-> 
-> One of main responsibilities of the maintainer it to make sure that
-> the code does indeed work and that regressions (like these caused by
-> AFTR mode feature) are fixed in the timely manner, not let the code
-> sit in the limbo state for large periods of time.  It is already very
-> bad situation that the regression we are hitting was present since
-> v3.4 and we are in v3.10 now, I would like to have it fixed ASAP so
-> we may actually consider enabling cpuidle in our exynos_defconfig.
-
-I agree.
-
-Thanks
-  -- Daniel
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Moreover, the AXI bus clock (yes, it's the actual bus clock) is one
+available input to the LCD controller pixel clock.  We certainly do
+not want to go fiddling with that clock rate without good reason to
+(iow, we're pretty sure we want to reprogram its rate _and_ use it,
+and disrupt the clock rate that the AXI bus sees.)  That will have
+a direct impact on the throughput of all masters on the AXI bus -
+which includes the CPU and memory.
