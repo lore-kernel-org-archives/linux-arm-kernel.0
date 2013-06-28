@@ -1,42 +1,90 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 28 Jun 2013 16:50:32 +0200
-Subject: [PATCH v3 0/5] ARM: dts: imx27 Phytec phyCARD-S
-Message-ID: <1372431037-13519-1-git-send-email-mpa@pengutronix.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 28 Jun 2013 09:01:13 -0600
+Subject: [PATCH v1 04/12] input: matrix-keypad: push/pull,
+ separate polarity
+In-Reply-To: <20130628083354.GW24305@book.gsilab.sittig.org>
+References: <1371838198-7327-1-git-send-email-gsi@denx.de>
+ <1371838198-7327-5-git-send-email-gsi@denx.de>
+ <51C4C6C9.6030000@wwwdotorg.org>
+ <20130622093649.GF24305@book.gsilab.sittig.org>
+ <51C8D2BC.9010507@wwwdotorg.org>
+ <20130628083354.GW24305@book.gsilab.sittig.org>
+Message-ID: <51CDA539.1020405@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/28/2013 02:33 AM, Gerhard Sittig wrote:
+> On Mon, Jun 24, 2013 at 17:14 -0600, Stephen Warren wrote:
+>>
+>> [ active low pins, individually for sets or even single pins ]
+>>
+>> Can't you add this enhancement as follows:
+>>
+>> Update the driver to look at the per-pin GPIO flags in all cases.
+>> Presumably in any existing cases, those flags all say "active high"
+>> anyway, since specifying anything else was useless. In the very unlikely
+>> case this isn't true, one could always add a quirk based on the
+>> HW-specific compatible value.
+> 
+> Maybe I missed something, but
+> - is "the 'active low' property of a GPIO pin" something platform
+>   specific? (maybe ARM inspired, introduced with pinctrl features)
+> - is it only available for specific GPIO controller drivers
+>   ("chips" or "banks"), or is it in some layer on top of gpiolib?
 
-This series adds some device nodes for imx27 and board files for Phytec
-phyCARD-S SOM and RDK. It is based on shawn's branch "imx/dt".
+The way this property is represented is technically defined by each
+individual GPIO controller's DT binding. However, at least on ARM (and
+in fact I'd guess everywhere), many/most controllers do this in the same
+way; by adding an additional cell to #gpio-cells, which holds flags
+data, with values in that cell containing:
 
-Regards,
+include/linux/of_gpio.h:
 
-Markus
+> /*
+>  * This is Linux-specific flags. By default controllers' and Linux' mapping
+>  * match, but GPIO controllers are free to translate their own flags to
+>  * Linux-specific in their .xlate callback. Though, 1:1 mapping is recommended.
+>  */
+> enum of_gpio_flags {
+>         OF_GPIO_ACTIVE_LOW = 0x1,
+> };
 
-Changes in v3:
- - Removed unnecessary clock-names from owire node
- - Update memory offset
+include/dt-bindings/gpio/gpio.h:
 
-Changes in v2:
- - Removed already accepted clocks patch
-   "ARM: mx27: Replace clk_register_clkdev with clock DT lookup"
- - pca100 board file was splitted into two parts SOM and RDK
- - other changes described in patch notes
+> #define GPIO_ACTIVE_HIGH 0
+> #define GPIO_ACTIVE_LOW 1
 
-Fabio Estevam (1):
-      ARM: imx27: Use 'AITC' for the interrupt controller name
+I'm not sure how new this is; it's possible older bindings don't have
+this extra cell. A quick grep of arch/*/boot/dts shows that almost all
+values of #gpio-cells are 2, so likely this is almost everywhere though.
 
-Markus Pargmann (4):
-      ARM: dts: imx27: Add imx framebuffer device
-      ARM: dts: imx27: Add 1-wire
-      ARM: dts: imx27 cpufreq-cpu0 frequencies
-      ARM: dts: Add device tree support for phycard pca100
+> - is it in some other tree or branch than mainline?
 
- arch/arm/boot/dts/Makefile                       |  2 +
- arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts | 62 ++++++++++++++++++++
- arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts | 72 ++++++++++++++++++++++++
- arch/arm/boot/dts/imx27.dtsi                     | 40 ++++++++++++-
- 4 files changed, 173 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
- create mode 100644 arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+It's been in mainline for quite a while now; a good number of kernel
+releases.
+
+> Documentation/gpio.txt suggests and eyeballing the gpiolib.c
+> source supports (v3.10-rc7) that the in-kernel API doesn't have
+> an 'active-low' for pins.  There is one for the sysfs API and
+> pins that were exported to user space, but not for in-kernel use.
+> 
+> This fits with my observation that application drivers on top of
+> gpiolib often take care of such a property which actually looks
+> like it would belong to the physical attachment.
+> 
+> I understand that a chip's driver will hide when a SoC's pin is
+> inverted, but I cannot see where gpiolib provides a means to hide
+> an externally connected inverting driver.
+
+With the current gpiolib APIs, gpiolib only provides a way for GPIO
+clients to retrieve the GPIO flags from DT. It's then up to the GPIO
+client to actually make use of the flag, by inverting the value passed
+to gpio_set(), or returned from gpio_get().
+
+Flags are retrieved by calling of_get_named_gpio_flags() rather than
+of_get_named_gpio().
+
+There is a new GPIO API under development which I /think/ will hide this
+flag inside the GPIO core, so that GPIO clients don't have to care about
+it, and it all works automatically. I'm not sure what the status of this
+is though. Search Google for "gpio_get()".
