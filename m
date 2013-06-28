@@ -1,44 +1,29 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 28 Jun 2013 14:22:16 +0200 (CEST)
-Subject: hrtimer: one more expiry time overflow check in hrtimer_interrupt
-In-Reply-To: <51B6D4C4.9080400@renesas.com>
-References: <51B6D4C4.9080400@renesas.com>
-Message-ID: <alpine.DEB.2.02.1306281416080.4013@ionos.tec.linutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 28 Jun 2013 14:24:15 +0200
+Subject: [PATCH 1/2] ARM i.MX6DL: parent LDB DI clocks to PLL5 on i.MX6S/DL
+Message-ID: <1372422256-22037-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Jun 2013, Shinya Kuribayashi wrote:
+i.MX6S/DL have the Video PLL post dividers fixed already in revision 1.0
 
-> When executing a date command to set the system date and time to a few
-> seconds before the 2038 problem expiration time, we got a WARN_ON_ONCE()
-> like this:
-> 
->   root at renesas:~# date -s "2038-1-19 3:14:00"
->   Tue Jan 19 03:14:00 GMT 2038
->   (then wait for 7-8 seconds)
->   root at renesas:~# [   27.662658] ------------[ cut here ]------------
->   [   27.667297] WARNING: at kernel/time/clockevents.c:209 clockevents_program_event+0x3c/0x138()
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/mach-imx/clk-imx6q.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> I found a similar issue fixed in v3.9 by Prarit Bhargava in commit
-> 8f294b5a13 (hrtimer: Add expiry time overflow check in hrtimer_interrupt,
-> 2013-04-08).  It tried to resolve a overflow issue detected around 1970
-> + 100 seconds.
-> 
-> On the other hand, we have another call site of tick_program_event() at
-> the bottom of hrtimer_interrupt().  The warning this time is triggered
-> there, so we need to apply the same fix to it.
-
-Well, the problem is that you are just papering over the underlying
-issue of 32bit systems not being prepared for the year 2038 issue.
-
-Just blindly silencing the warning is not going to make the system
-survive 2038 in any sane way. All timespec/val related time functions
-dealing with the clock realtime domain are simply broken in 2038 on
-32bit, so it does not matter whether a warning triggers or not.
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 4282e99f..eb02b49 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -553,7 +553,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk_register_clkdev(clk[pll4_post_div], "pll4_post_div", NULL);
+ 	clk_register_clkdev(clk[pll4_audio], "pll4_audio", NULL);
  
-We really need to tackle the underlying problem and not bandaiding a
-known to be broken system.
-
-Thanks,
-
-	tglx
+-	if (imx6q_revision() != IMX_CHIP_REVISION_1_0) {
++	if ((imx6q_revision() != IMX_CHIP_REVISION_1_0) || cpu_is_imx6dl()) {
+ 		clk_set_parent(clk[ldb_di0_sel], clk[pll5_video_div]);
+ 		clk_set_parent(clk[ldb_di1_sel], clk[pll5_video_div]);
+ 	}
+-- 
+1.8.3.1
