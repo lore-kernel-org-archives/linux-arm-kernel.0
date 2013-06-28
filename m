@@ -1,67 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Jun 2013 12:19:11 +0200
-Subject: [linux-sunxi] [PATCH 2/8] clocksource: sun4i: Add clocksource
- and sched clock drivers
-In-Reply-To: <20130627225101.358208c1@i7>
-References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
- <1372281421-2099-3-git-send-email-maxime.ripard@free-electrons.com>
- <20130627131729.5fff8468@i7> <20130627170228.GC4319@lukather>
- <20130627225101.358208c1@i7>
-Message-ID: <20130628101911.GF4319@lukather>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 28 Jun 2013 12:25:44 +0200
+Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
+In-Reply-To: <20130627151318.GB1360@darko.cambridge.arm.com>
+References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
+ <20130626111430.GH26142@mudshark.cambridge.arm.com>
+ <CAKv+Gu_R7=Euaa87kQqR5TfGQLyF6Ad51dBm2CroYHcKMRs_dA@mail.gmail.com>
+ <20130626124009.GL26142@mudshark.cambridge.arm.com>
+ <CAKv+Gu9_V75jGSq675H+Gi7jkDWBkVDLXvewMuv8dWxx7-VxEw@mail.gmail.com>
+ <CAKv+Gu-5SsvJCvXkJoqPm-TZx6tr+49pUXfpkSoBo-s+Z8_YmQ@mail.gmail.com>
+ <CAKv+Gu_=Ctg8+KVMp9amq+2nOgj8DiUKidNDwas8qy2=y3TX-A@mail.gmail.com>
+ <20130627151318.GB1360@darko.cambridge.arm.com>
+Message-ID: <CAKv+Gu8wsXCDO-7FCJG+Rbkkyahm563UX2dMDXVstYhjAZ+TrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Siarhei,
+On 27 June 2013 17:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, Jun 27, 2013 at 02:11:27PM +0100, Ard Biesheuvel wrote:
+>> OK, just one more question before I respin the next (hopefully final) version:
+>> if a caller does sleep after calling kernel_neon_begin() (and thus
+>> receives no warning if he runs a non-PREEMPT build with
+>> CONFIG_DEBUG_ATOMIC_SLEEP disabled), he will most likely find the
+>> NEON/VFP unit disabled after waking up (as we disable it on a context
+>> switch), so any subsequent NEON instructions will trigger the undef
+>> handler.
+>
+> Can you check on the VFP context switch path whether kernel_neon_begin()
+> has been called and we are moving away from the task? You could even
+> store the LR in kernel_neon_begin() to give better error information.
+>
 
-> > > If we can be absolutely sure that nothing else may ever change
-> > > the TIMER_CNT64_CTL_REG, then its default value can be probably
-> > > cached instead of doing expensive read from the hardware register
-> > > each time?
-> > 
-> > Since it's a free-running counter, its value will always change, so the
-> > caching will bring no additions at all, right?
-> 
-> Sorry, 'caching' was not a very good description for something that is
-> already a compile time constant. I mean just replace
-> 
->     u32 reg = readl(timer_base + TIMER_CNT64_CTL_REG);
-> 
-> with 
-> 
->     u32 reg = TIMER_CNT64_CTL_CLR;
-> 
-> Because we know that the TIMER_CNT64_CTL_REG is already supposed
-> to have the default TIMER_CNT64_CTL_CLR value (initialized in the
-> 'sun4i_timer_init' function) between calls to 'sun4i_timer_sched_read'.
-> Inside of 'sun4i_timer_sched_read' we set an extra TIMER_CNT64_CTL_RL
-> bit in this register, but wait until it clears, effectively reverting
-> TIMER_CNT64_CTL_REG register back to the default TIMER_CNT64_CTL_CLR
-> value.
-> 
-> Removing this extra HW register read can save roughly a hundred of CPU
-> cycles here and provide a ~10% overall improvement for gettimeofday
-> (these estimates are based on the earlier benchmarks done with the
-> Allwinner 3.4 kernel).
-> 
-> Or maybe I'm overlooking something?
-
-Ah, I get what you mean now. We don't even need to bother about
-TIMER_CNT64_CTL_CLR now, since it's suppose to be cleared once the
-counter is reset.
-
-However, I'd very much prefer to take the safer approach for now, and
-try to optimise afterwards.
-
-Maxime
+I wil take this suggestion for the arm64 case, and propose a new
+version next week. For arm, I think we should be ok without this, as
+Will also suggested, because you will always hit the BUG() in
+vfp_kmode_exception() if you touch the NEON from the kernel after a
+context switch (there are only two ways to get the NEON enabled, one
+is through lazy restore, which now only works from userland, and the
+other is through kernel_neon_begin())
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130628/844d3b16/attachment.sig>
+Ard.
