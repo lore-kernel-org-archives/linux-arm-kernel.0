@@ -1,23 +1,50 @@
-From: dsd@laptop.org (Daniel Drake)
-Date: Fri, 28 Jun 2013 13:54:21 -0600
-Subject: Armada DRM driver on OLPC XO
-In-Reply-To: <20130626184250.43f36e47@armhf>
-References: <20130625204726.BF65C12647A@dev.laptop.org>
- <20130626184250.43f36e47@armhf>
-Message-ID: <CAMLZHHQNB4Y16rg2052wpZosaUuCC_oYpq0DKp=uHSuPg-Z53g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 28 Jun 2013 21:56:18 +0200
+Subject: [PATCHv2 0/8] clocksource: sunxi: Timer fixes and cleanup
+Message-ID: <1372449386-1334-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 26, 2013 at 10:42 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> Do you know that there are 2 drm drivers for the Cubox? I posted mine
-> (http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/168732.html)
-> before Russell, but I got no return about it yet.
+Hi everyone,
 
-I thought there was some agreement that you would merge your efforts
-into Russell's driver. Is that still the plan?
+The first timer code we merged when adding support for the A13 some
+time back was mostly a clean up from the source drop we had, without
+any documentation.  This happened to work, but the code merged in
+turned out to be far from perfect, and had several flaws.
 
-Thanks for the links - I think we can learn something about timer
-handling from your work. I'll send a patch shortly incorporating the
-basis of something like this into armada_drm.
+This patchset hopefully fixes these flaws, and cleanup most of the
+driver as well, to end up in an almost complete rewrite of it (even
+though it's not that long).
 
-Daniel
+It also finally adds a clocksource from the free running counter found
+in the A10/A13 SoCs.
+
+These flaws have all been spotted when trying to add the A31 support,
+work that is still ongoing, but will hopefully benefit from this
+patchset as well.
+
+Thanks,
+Maxime
+
+Changes from v1:
+  - Rebased on top of linux-next to benefit from the move to all
+    architectures of the sched_clock functions
+  - Moved the clock source to the second timer instead of the 64 bits
+    free-running counter like suggested by Thomas.
+
+Maxime Ripard (8):
+  clocksource: sun4i: Use the BIT macros where possible
+  clocksource: sun4i: Add clocksource and sched clock drivers
+  clocksource: sun4i: Don't forget to enable the clock we use
+  clocksource: sun4i: Fix the next event code
+  clocksource: sun4i: Factor out some timer code
+  clocksource: sun4i: Remove TIMER_SCAL variable
+  clocksource: sun4i: Cleanup parent clock setup
+  clocksource: sun4i: Fix bug when switching from periodic to oneshot
+    modes
+
+ drivers/clocksource/sun4i_timer.c | 97 ++++++++++++++++++++++++++-------------
+ 1 file changed, 64 insertions(+), 33 deletions(-)
+
+-- 
+1.8.3.1
