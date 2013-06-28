@@ -1,45 +1,43 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 28 Jun 2013 12:11:31 +0200
-Subject: [PATCH v3 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
-In-Reply-To: <51CD4698.3070409@gmail.com>
-References: <1372258946-15607-1-git-send-email-s.nawrocki@samsung.com>
- <1372258946-15607-2-git-send-email-s.nawrocki@samsung.com>
- <51CD4698.3070409@gmail.com>
-Message-ID: <51CD6153.5050406@samsung.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 28 Jun 2013 19:13:27 +0900
+Subject: [PATCH] ARM: shmobile: Sort r8a7790 MSTP entries
+Message-ID: <20130628101327.26876.89435.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2013 10:17 AM, Hui Wang wrote:
-> On 06/26/2013 11:02 PM, Sylwester Nawrocki wrote:
->> Add a PHY provider driver for the Samsung S5P/Exynos SoC MIPI CSI-2
->> receiver and MIPI DSI transmitter DPHYs.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> Changes since v2:
->>   - adapted to the generic PHY API v9: use phy_set/get_drvdata(),
->>   - fixed of_xlate callback to return ERR_PTR() instead of NULL,
->>   - namespace cleanup, put "GPL v2" as MODULE_LICENSE, removed pr_debug,
->>   - removed phy id check in __set_phy_state().
->> ---
-> [...]
->> +
->> +	if (IS_EXYNOS_MIPI_DSIM_PHY_ID(id))
->> +		reset = EXYNOS_MIPI_PHY_MRESETN;
->> +	else
->> +		reset = EXYNOS_MIPI_PHY_SRESETN;
->> +
->> +	spin_lock_irqsave(&state->slock, flags);
->
-> Sorry for one stupid question here, why do you use spin_lock_irqsave() 
-> rather than spin_lock(),
-> I don't see the irq handler will use this spinlock anywhere in this c file.
+From: Magnus Damm <damm@opensource.se>
 
-Yes, there is no chance the PHY users could call the phy ops from within
-an interrupt context. Especially now when there is a per phy object 
-mutex used in the PHY operation helpers. So I'll replace it with plain 
-spin_lock/unlock. Thank you for the review.
+The r8a7790 MSTP bits should be kept sorted in the same way
+as on other mach-shmobile SoCs. Move the HSCIF and thermal
+bits to clean up the current state.
 
-Regards,
-Sylwester
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Written on top of renesas-next-20130628
+
+ arch/arm/mach-shmobile/clock-r8a7790.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+--- 0001/arch/arm/mach-shmobile/clock-r8a7790.c
++++ work/arch/arm/mach-shmobile/clock-r8a7790.c	2013-06-28 15:15:50.000000000 +0900
+@@ -192,6 +192,9 @@ enum {
+ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
+ 	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
++	[MSTP717] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 17, 0), /* HSCIF0 */
++	[MSTP716] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 16, 0), /* HSCIF1 */
++	[MSTP522] = SH_CLK_MSTP32(&extal_clk, SMSTPCR5, 22, 0), /* Thermal */
+ 	[MSTP315] = SH_CLK_MSTP32(&div6_clks[DIV6_MMC0], SMSTPCR3, 15, 0), /* MMC0 */
+ 	[MSTP314] = SH_CLK_MSTP32(&div4_clks[DIV4_SD0], SMSTPCR3, 14, 0), /* SDHI0 */
+ 	[MSTP313] = SH_CLK_MSTP32(&div4_clks[DIV4_SD1], SMSTPCR3, 13, 0), /* SDHI1 */
+@@ -205,9 +208,6 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP204] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 4, 0), /* SCIFA0 */
+ 	[MSTP203] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 3, 0), /* SCIFA1 */
+ 	[MSTP202] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 2, 0), /* SCIFA2 */
+-	[MSTP522] = SH_CLK_MSTP32(&extal_clk, SMSTPCR5, 22, 0), /* Thermal */
+-	[MSTP717] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 17, 0), /* HSCIF0 */
+-	[MSTP716] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 16, 0), /* HSCIF1 */
+ };
+ 
+ static struct clk_lookup lookups[] = {
