@@ -1,47 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 28 Jun 2013 16:00:02 +0200
-Subject: [PATCH v2 3/5] ARM: add support for kernel mode NEON
-In-Reply-To: <20130628134600.GC21034@game.jcrosoft.org>
-References: <1372191891-24574-1-git-send-email-ard.biesheuvel@linaro.org>
- <1372191891-24574-4-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_NZNAcW13CBP=QJQ8KXD6H9zx_T6ZQPsWuagRm3n6Okg@mail.gmail.com>
- <20130628134600.GC21034@game.jcrosoft.org>
-Message-ID: <CAKv+Gu92+pMLF9FPwbrkVLLhnPdBB702PXG-F2-3kqZx60TEHg@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 28 Jun 2013 16:02:23 +0200 (CEST)
+Subject: [linux-sunxi] [PATCH 0/8] clocksource: sunxi: Timer fixes
+ and cleanup
+In-Reply-To: <2013062809433715678058@allwinnertech.com>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+ <51CC0566.8010302@redhat.com> <20130627094307.GC8437@lukather>
+ <51CC0BC3.5090309@redhat.com> <20130627165436.GB4319@lukather>,
+ <20130627232608.1174558b@i7>
+ <2013062809433715678058@allwinnertech.com>
+Message-ID: <alpine.DEB.2.02.1306281559490.4013@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 June 2013 15:46, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 12:55 Wed 26 Jun     , Ard Biesheuvel wrote:
->> Meh. This is not going to please the RT crowd, as preempt_schedule()
->> will not be called on PREEMPT builds in this case.
->>
->> Propose to replace it with
->>
->>     preempt_enable();
->> #ifndef CONFIG_PREEMPT_COUNT
-> if (IS_ENABLED(CONFIG_xxx)) at least
->>     /* in this case, the preempt_enable() right above is just a barrier() */
->>     dec_preempt_count();
->> #endif
->
-> but why do you need to call inc_preempt and dec directly?
->
+On Fri, 28 Jun 2013, ?? wrote:
+> > The A10 manual from http://free-electrons.com/~maxime/pub/datasheet/
+> > does not seem to contain any details about what bad things may happen
+> > if we try to read CNT64_LO_REG while latching is still in progress and
+> > CNT64_RL_EN bit in CNT64_CTRL_REG has not changed to zero yet.
+> > I can imagine the following possible scenarios:
+> >  1. We read either the old stale CNT64_LO_REG value or the new
+> >     correct value.
+> >  2. We read either the old stale CNT64_LO_REG value or the new
+> >     correct value, or some random garbage.
+> >  3. The processor may deadlock, eat your dog, or do some other
+> >     nasty thing.
+> >
+> > In the case of 1, we probably can get away without using any spinlocks?
+> 
+> About the 64bits counter, the latch bit is needed because of the asynchronous circuit.
+> The internal circuit of 64bits counter is working under 24Mhz clock, and CNT_LO/HI
+> is read with APB clock. So the clock synchronize is needed. The function of the latch
+> is synchronous the 64bits counter from 24Mhz clock domain to APB clock domain.
+> So, if the latch is not completely, value of the CNT_LO/HI maybe a random value, because
+> some bits are latched, but others are not. So, the CNT_LO/HI should be read after
+> latch is completely.
+> The latch just takes 3 cycles of 24Mhz clock, the time is nearly 0.125 micro-second.
+> 
 
-There is a concern that violations of the rule that a task should not
-sleep between kernel_neon_begin and kernel_neon_end calls may not be
-spotted on non-PREEMPT builds that don't have
-CONFIG_DEBUG_ATOMIC_SLEEP set. However, in this case (as I pointed out
-in my previous mail), you will at least oops the kernel with a message
-that points to in-kernel use of the NEON/VFP, so perhaps we should not
-be too paranoid about this. On the other hand, considering that this
-stuff is intended to be used for RAID-6 checksumming etc, it's better
-to err on the side of caution.
+I really wonder why we're trying to use that timer. AFAICT the A10 has
+another six 32bit timers which do not have this restriction and the
+clocksoure/sched_clock implementation works nicely with 32 bits. So
+what's the point of using that 64 bit counter if it's horrible to
+access?
 
-On arm64, it's a bit worse, as there is not lazy restore for the FP
-context (and hence no oops if you sleep in the wrong place), so
-context switches that clobber the NEON register contents may not be
-detectable at all.
+Thanks,
 
--- 
-Ard.
+	tglx
