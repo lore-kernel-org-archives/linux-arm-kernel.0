@@ -1,45 +1,76 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 28 Jun 2013 08:35:42 -0600
-Subject: [PATCH v1 08/12] input: keypad-matrix: tell GPIO pins from matrix
- lines
-In-Reply-To: <20130628075240.GU24305@book.gsilab.sittig.org>
+Date: Fri, 28 Jun 2013 08:50:26 -0600
+Subject: [PATCH v1 01/12] input: matrix-keypad: update devicetree binding
+ doc
+In-Reply-To: <20130628082422.GV24305@book.gsilab.sittig.org>
 References: <1371838198-7327-1-git-send-email-gsi@denx.de>
- <1371838198-7327-9-git-send-email-gsi@denx.de>
- <51C4C87B.3050300@wwwdotorg.org>
- <20130622100052.GH24305@book.gsilab.sittig.org>
- <51C8D599.2010706@wwwdotorg.org>
- <20130628075240.GU24305@book.gsilab.sittig.org>
-Message-ID: <51CD9F3E.9060003@wwwdotorg.org>
+ <1371838198-7327-2-git-send-email-gsi@denx.de>
+ <51C4C63B.3030300@wwwdotorg.org>
+ <20130622092319.GE24305@book.gsilab.sittig.org>
+ <51C8C17A.1050700@wwwdotorg.org>
+ <20130628082422.GV24305@book.gsilab.sittig.org>
+Message-ID: <51CDA2B2.7090304@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2013 01:52 AM, Gerhard Sittig wrote:
-> 
-> [ late reply, just catching up with the backlog ]
-> 
-> On Mon, Jun 24, 2013 at 17:26 -0600, Stephen Warren wrote:
+On 06/28/2013 02:24 AM, Gerhard Sittig wrote:
+> On Mon, Jun 24, 2013 at 16:00 -0600, Stephen Warren wrote:
 >>
->> [ ... sparse matrices, not all columns/rows populated ... ]
+>> On 06/22/2013 03:23 AM, Gerhard Sittig wrote:
+...
+> So the direction to go is
+> - move the Linux driver specific discussion to
+>   Documentation/input/ including potential hardware setups and
+>   the background on the driver's theory of operation
+> - just concentrate on "adjustables" in the binding document,
+>   merely listing the set and their units, while the motivation or
+>   background either "is obvious" or can get looked up in the
+>   driver's discussion
+>
+> Reducing the set of options is orthogonal to that.
 
->> On some Tegra boards, there end up
->> being rather tri-angular keymaps, where key positions (0, 0), (0, 1),
->> (0, 2), (1, 1), (1, 2), (2, 2) end up being used. In this scenario,
->> detailed investigation of the keymap would reveal:
+Yup, sounds good.
+
+> Breaking
+> backwards compatibility by changing the default behaviour after
+> introducing more generic approaches to the specific issue is an
+> option that remains for future changes.
+
+Breaking backwards-compatibility in the DT bindings would be
+problematic. They're supposed to be an ABI, which if it evolves, does so
+entirely in a backwards-compatible fashion.
+
+This can usually be achieved by something like:
+
+* If new DT properties present, enable new behaviour.
+* If old DT properties present, or lack of new properties, enable old
+behaviour.
+
+This allows somebody to install a specific DT on a system, then continue
+booting arbitrary new kernels on it without loss of functionality.
+
+>>>> That one change is definitely wrong. Each entry in row-gpios and
+>>>> col-gpios should include GPIO flags (in a format defined by the binding
+>>>> for the DT node providing the GPIO). Those flags include an active-high
+>>>> vs. active-low bit. In Linux, you can use of_get_gpio_flags() to
+>>>> retrieve a standardized representation of the flags.
+>>>
+>>> See my introduction above.  This isn't a "change", it's just
+>>> catching up in the documentation and adding what was omitted
+>>> before.
 >>
->> * Only scan columns 0..2
->> * For column 0, scan rows 0..2
->> * For column 1, scan rows 1..2
->> * For columm 2, scan row 2.
+>> Oh dear, that's quite unfortunate. I see that even though that property
+>> wasn't documented in the binding doc, arch/powerpc/boot/dts/ac14xx.dts
+>> has still already used it, so we probably can't fix it. I suppose we
+>> must simply document it, and ignore the shortcomings of that binding:-(
 > 
-> That's another question I had.  So far I was concerned with just
-> polling or scanning the relevant columns, while all the rows for
-> a given column were queried (as the driver always used to do).
-> 
-> Now you raise the question of whether rows should get queried as
-> well depending on whether "a key may sit there".  It wasn't the
-> exact question I raised, but I added a comment to the spot where
-> input subsystem events get generated:  Is the driver expected to
-> emit events for matrix positions where no key map entry exists?
+> Don't worry about the 'AC14xx' board too long, its using the
+> keypad matrix driver is new in mainline, and still can get
+> adjusted without too much problems before more wide spread use.
+> "Getting it right" is what I'm currently heading for, while
+> nothing is set in stone yet.
 
-I would assume there is no need to, but I don't know for sure. Perhaps
-Dmitry can answer that?
+Given the "ABI-ness" of DT, I'm not convinced we don't have to worry
+about the AC14xx. I think we'll have to continue supporting that
+property, even if there's a newer/better/more-flexible way of
+representing the information too.
