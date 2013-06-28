@@ -1,37 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 28 Jun 2013 10:55:19 +0800
-Subject: [PATCH 1/2] serial: imx: remove the uart_console() check
-In-Reply-To: <51CCF24D.1060007@freescale.com>
-References: <1372239359-4054-1-git-send-email-b32955@freescale.com>
- <20130627141535.GD2695@S2101-09.ap.freescale.net>
- <51CCF24D.1060007@freescale.com>
-Message-ID: <20130628025517.GA11043@S2101-09.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 28 Jun 2013 00:28:07 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable LVDS Display Bridge
+Message-ID: <1372390087-7362-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 10:17:49AM +0800, Huang Shijie wrote:
-> We need to set the imx_setUp_ufcr() in our imx_console_setup(),
-> so we need to enable the clocks, aren't we?
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Ah, yes, I missed that.  But register access only needs ipg clock and
-per clock still does not need to be enabled here, right?
+Let IMX_LDB driver be built by default.
 
-> In the probe's uart_add_one_port(), we will register the console and
-> call the setup() hook,
-> so it's ok to disable the clocks in the end of the probe.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Look, here is what you do in .probe().
-
-	clk_prepare_enable(sport->clk_per);
-	clk_prepare_enable(sport->clk_ipg); 
-	...
-	uart_add_one_port(&imx_reg, &sport->port);
-	...
-	clk_disable_unprepare(sport->clk_per);
-	clk_disable_unprepare(sport->clk_ipg);
-
-Since imx_console_setup() will be called in uart_add_one_port() and
-clocks are already being taken care of in imx_console_setup(), why do
-you need all these clock operations here at all?
-
-Shawn
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 0837aae..75514e9 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -215,6 +215,7 @@ CONFIG_MXS_DMA=y
+ CONFIG_STAGING=y
+ CONFIG_DRM_IMX=y
+ CONFIG_DRM_IMX_TVE=y
++CONFIG_DRM_IMX_LDB=y
+ CONFIG_DRM_IMX_FB_HELPER=y
+ CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
+ CONFIG_DRM_IMX_IPUV3_CORE=y
+-- 
+1.8.1.2
