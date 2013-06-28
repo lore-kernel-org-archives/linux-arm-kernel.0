@@ -1,36 +1,42 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 28 Jun 2013 15:02:50 +0200
-Subject: [PATCHv3 1/8] ARM: mxs: Simplify detection of CrystalFontz boards
+Date: Fri, 28 Jun 2013 15:02:53 +0200
+Subject: [PATCHv3 4/8] ARM: mxs: dt: cfa10036: make hogpins grabbed by
+ respective drivers
 In-Reply-To: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1372424577-8279-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1372424577-8279-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As all CrystalFontz boards are compatible with "crystalfontz,cfa10036", make it
-easier to add future boards.
-
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-mxs/mach-mxs.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ arch/arm/boot/dts/imx28-cfa10036.dts | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 6298adb..1b8c274 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -478,10 +478,7 @@ static void __init mxs_machine_init(void)
- 		imx28_evk_init();
- 	else if (of_machine_is_compatible("bluegiga,apx4devkit"))
- 		apx4devkit_init();
--	else if (of_machine_is_compatible("crystalfontz,cfa10037") ||
--		 of_machine_is_compatible("crystalfontz,cfa10049") ||
--		 of_machine_is_compatible("crystalfontz,cfa10055") ||
--		 of_machine_is_compatible("crystalfontz,cfa10057"))
-+	else if (of_machine_is_compatible("crystalfontz,cfa10036"))
- 		crystalfontz_init();
+diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
+index 94c4476..1ec8c94 100644
+--- a/arch/arm/boot/dts/imx28-cfa10036.dts
++++ b/arch/arm/boot/dts/imx28-cfa10036.dts
+@@ -23,10 +23,7 @@
+ 	apb at 80000000 {
+ 		apbh at 80000000 {
+ 			pinctrl at 80018000 {
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&hog_pins_cfa10036>;
+-
+-				hog_pins_cfa10036: hog-10036 at 0 {
++				ssd1306_cfa10036: ssd1306-10036 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+ 						0x2073 /* MX28_PAD_SSP0_D7__GPIO_2_7 */
+@@ -83,6 +80,8 @@
  
- 	of_platform_populate(NULL, of_default_bus_match_table,
+ 				ssd1306: oled@3c {
+ 					compatible = "solomon,ssd1306fb-i2c";
++					pinctrl-names = "default";
++					pinctrl-0 = <&ssd1306_cfa10036>;
+ 					reg = <0x3c>;
+ 					reset-gpios = <&gpio2 7 0>;
+ 					solomon,height = <32>;
 -- 
 1.8.1.2
