@@ -1,75 +1,40 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Jun 2013 14:20:44 +0900
-Subject: [PATCH 1/2] ARM: shmobile: r8a7790: Initialise clocks and SCIF in
- r8a7790_add_dt_devices()
-In-Reply-To: <1372396845-28767-1-git-send-email-horms+renesas@verge.net.au>
-References: <1372396845-28767-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1372396845-28767-2-git-send-email-horms+renesas@verge.net.au>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 28 Jun 2013 14:21:15 +0900
+Subject: [PATCH 0/3] Generic PHY driver for the Exynos SoC DP PHY
+Message-ID: <001401ce73bf$4f9a67b0$eecf3710$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is sufficient to allow boot of the Lager board with
-a console without boards-lager.c compiled into the kernel.
-This is an example of a minimal but still useful initialisation
-of the board using DT as much as possible.
+This patch series adds a simple driver for the Samsung Exynos SoC
+series DP transmitter PHY, using the generic PHY framework [1].
+Previously the DP PHY used a platform callback or internal DT node
+to control the PHY power enable bit.
+The platform callback and internal DT node can be dropped and this
+driver does not need any calls back to the platform code.
 
-Also provide r8a7790_add_dt_device() in
-r8a7790.h to allow it be used from a boards-lager-reference.c
-file which will be added by a subsequent patch.
+This series depends on the generic PHY framework [1]. These patches
+refer to Sylwester Nawrocki's patches about Exynos MIPI [2].
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/include/mach/r8a7790.h |  1 +
- arch/arm/mach-shmobile/setup-r8a7790.c        | 11 ++++++++++-
- 2 files changed, 11 insertions(+), 1 deletion(-)
+[1] https://lkml.org/lkml/2013/6/26/259
+[2] http://www.spinics.net/lists/linux-samsung-soc/msg20034.html
 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-index 2e919e6..d50403e 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-@@ -2,6 +2,7 @@
- #define __ASM_R8A7790_H__
- 
- void r8a7790_add_standard_devices(void);
-+void r8a7790_add_standard_devices_dt(void);
- void r8a7790_clock_init(void);
- void r8a7790_pinmux_init(void);
- void r8a7790_timer_init(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index 06c720f..a6344a1 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -160,7 +160,7 @@ static struct resource thermal_resources[] __initdata = {
- 					thermal_resources,		\
- 					ARRAY_SIZE(thermal_resources))
- 
--void __init r8a7790_add_standard_devices(void)
-+void __init r8a7790_add_dt_devices(void)
- {
- 	r8a7790_register_scif(SCIFA0);
- 	r8a7790_register_scif(SCIFA1);
-@@ -172,6 +172,11 @@ void __init r8a7790_add_standard_devices(void)
- 	r8a7790_register_scif(SCIF1);
- 	r8a7790_register_scif(HSCIF0);
- 	r8a7790_register_scif(HSCIF1);
-+}
-+
-+void __init r8a7790_add_standard_devices(void)
-+{
-+	r8a7790_add_dt_devices();
- 	r8a7790_register_irqc(0);
- 	r8a7790_register_thermal();
- }
-@@ -191,6 +196,10 @@ void __init r8a7790_timer_init(void)
- #ifdef CONFIG_USE_OF
- void __init r8a7790_add_standard_devices_dt(void)
- {
-+	/* clocks are setup late during boot in the case of DT */
-+	r8a7790_clock_init();
-+
-+	r8a7790_add_dt_devices();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--- 
-1.8.2.1
+Jingoo Han (3):
+  phy: Add driver for Exynos DP PHY
+  ARM: dts: Add DP PHY node to exynos5250.dtsi
+  video: exynos_dp: Use the generic PHY driver
+
+ .../phy/samsung,exynos5250-dp-video-phy.txt        |    7 ++
+ .../devicetree/bindings/video/exynos_dp.txt        |   17 ---
+ arch/arm/boot/dts/exynos5250.dtsi                  |   13 ++++++++-----
+ drivers/phy/Kconfig                                |    8 ++
+ drivers/phy/Makefile                               |    3 +-
+ drivers/phy/phy-exynos-dp-video.c                  |  130 ++++++++++++++++++++
+ drivers/video/exynos/exynos_dp_core.c              |  118 ++------------------
+ drivers/video/exynos/exynos_dp_core.h              |    2 +
+ include/video/exynos_dp.h                          |    6 +-
+ 9 files changed, 170 insertions(+), 134 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/samsung,exynos5250-dp-video-phy.txt
+ create mode 100644 drivers/phy/phy-exynos-dp-video.c
+
+--
+1.7.10.4
