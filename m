@@ -1,46 +1,53 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Fri, 28 Jun 2013 06:48:30 +0000
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <201306271549.01136.marex@denx.de>
-References: <51A5A808.2070803@digi.com> <201306241551.19831.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803EFBC6C@039-SN2MPN1-023.039d.mgd.msft.net>
- <201306271549.01136.marex@denx.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803EFF1F2@039-SN2MPN1-023.039d.mgd.msft.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 28 Jun 2013 16:14:18 +0900
+Subject: [PATCH V2 0/3] Generic PHY driver for the Exynos SoC DP PHY
+Message-ID: <001e01ce73cf$1ab3ab50$501b01f0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> - I use the port in HOST mode by plugging in a USB pendrive over the OTG-
-> capable
-> reduction ; this works OK
-> - I disconnect the reduction and connect it to the computer ; here I get
-> "timeout waiting for 00000800 in 11".
-> 
-> This means the BSV bit in OTGSC register wasn't unset.
-> 
-> Interestingly enough, transition the other way around (first use in
-> gadget mode
-> then in host mode) works fine, but if I do host mode -> gadget mode, I
-> get the
-> timeout. Do you have any hint for me?
-> 
+This patch series adds a simple driver for the Samsung Exynos SoC
+series DP transmitter PHY, using the generic PHY framework [1].
+Previously the DP PHY used a platform callback or internal DT node
+to control the PHY power enable bit.
+The platform callback and internal DT node can be dropped and this
+driver does not need any calls back to the platform code.
 
-It means your OTG VBUS does not lower than BSV (B SESSION VALID, 0.8v) after
-plugging out Micro-B-TO-A cable. Two possible reasons:
+These patches was tested on Exynos5250.
 
-1. You have not gpio control for vbus toggle when role switches.
-2. Your hardware has some problems that the vbus can't lower than 0.8v.
+This PATCH v2 follows:
+ * PATCH v1, sent on June, 28th 2013
 
-> btw. what is the plan about cleaning up and upstreaming all these patches
-> we
-> have here? Is anyone working on it? I'd hate to stomp on anyones'
-> efforts,but
-> I'd also like to see this mess sorted out.
+Changes between v1 and v2:
+  * Replaced exynos_dp_video_phy_xlate() with of_phy_simple_xlate(),
+    as Kishon Vijay Abraham I guided.
+  * Set the value of phy-cells as 0, because the phy_provider implements
+    only one PHY.
+  * Removed unnecessary header include.
+  * Added '#ifdef CONFIG_OF' and of_match_ptr macro.
 
-We had something un-decided before, now, things almost are cleared.
-But I am a little busy recently, I hope I can begin to work on it
-from next week.
+This series depends on the generic PHY framework [1]. These patches
+refer to Sylwester Nawrocki's patches about Exynos MIPI [2].
 
-Best regards,
-Peter
- 
+[1] https://lkml.org/lkml/2013/6/26/259
+[2] http://www.spinics.net/lists/linux-samsung-soc/msg20034.html
+
+Jingoo Han (3):
+  phy: Add driver for Exynos DP PHY
+  ARM: dts: Add DP PHY node to exynos5250.dtsi
+  video: exynos_dp: Use the generic PHY driver
+
+ .../phy/samsung,exynos5250-dp-video-phy.txt        |    7 ++
+ .../devicetree/bindings/video/exynos_dp.txt        |   17 ---
+ arch/arm/boot/dts/exynos5250.dtsi                  |   13 ++++++++-----
+ drivers/phy/Kconfig                                |    8 ++
+ drivers/phy/Makefile                               |    3 +-
+ drivers/phy/phy-exynos-dp-video.c                  |  122 ++++++++++++++++++++
+ drivers/video/exynos/exynos_dp_core.c              |  118 ++------------------
+ drivers/video/exynos/exynos_dp_core.h              |    2 +
+ include/video/exynos_dp.h                          |    6 +-
+ 9 files changed, 162 insertions(+), 134 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/samsung,exynos5250-dp-video-phy.txt
+ create mode 100644 drivers/phy/phy-exynos-dp-video.c
+
+--
+1.7.10.4
