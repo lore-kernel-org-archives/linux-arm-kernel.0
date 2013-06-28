@@ -1,44 +1,59 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 28 Jun 2013 19:30:26 +0900
-Subject: [PATCH 06/06] ARM: shmobile: Remove unused sh73a0 auxdata table
-In-Reply-To: <20130628102930.31451.85334.sendpatchset@w520>
-References: <20130628102930.31451.85334.sendpatchset@w520>
-Message-ID: <20130628103026.31451.71277.sendpatchset@w520>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 28 Jun 2013 12:27:02 +0200
+Subject: [PATCH V2 3/3] video: exynos_dp: Use the generic PHY driver
+In-Reply-To: <20130628093459.GD11297@arwen.pp.htv.fi>
+References: <002101ce73cf$ac989b70$05c9d250$@samsung.com>
+ <20130628093459.GD11297@arwen.pp.htv.fi>
+Message-ID: <20130628102702.GK305@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On 12:35 Fri 28 Jun     , Felipe Balbi wrote:
+> On Fri, Jun 28, 2013 at 04:18:23PM +0900, Jingoo Han wrote:
+> > Use the generic PHY API instead of the platform callback to control
+> > the DP PHY. The 'phy_label' field is added to the platform data
+> > structure to allow PHY lookup on non-dt platforms.
+> > 
+> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> > ---
+> >  .../devicetree/bindings/video/exynos_dp.txt        |   17 ---
+> >  drivers/video/exynos/exynos_dp_core.c              |  118 ++------------------
+> >  drivers/video/exynos/exynos_dp_core.h              |    2 +
+> >  include/video/exynos_dp.h                          |    6 +-
+> >  4 files changed, 15 insertions(+), 128 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt b/Documentation/devicetree/bindings/video/exynos_dp.txt
+> > index 84f10c1..a8320e3 100644
+> > --- a/Documentation/devicetree/bindings/video/exynos_dp.txt
+> > +++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
+> > @@ -1,17 +1,6 @@
+> >  The Exynos display port interface should be configured based on
+> >  the type of panel connected to it.
+> >  
+> > -We use two nodes:
+> > -	-dp-controller node
+> > -	-dptx-phy node(defined inside dp-controller node)
+> > -
+> > -For the DP-PHY initialization, we use the dptx-phy node.
+> > -Required properties for dptx-phy:
+> > -	-reg:
+> > -		Base address of DP PHY register.
+> > -	-samsung,enable-mask:
+> > -		The bit-mask used to enable/disable DP PHY.
+> > -
+> >  For the Panel initialization, we read data from dp-controller node.
+> >  Required properties for dp-controller:
+> >  	-compatible:
+> > @@ -67,12 +56,6 @@ SOC specific portion:
+> >  		interrupt-parent = <&combiner>;
+> >  		clocks = <&clock 342>;
+> >  		clock-names = "dp";
+> > -
+> > -		dptx-phy {
+> > -			reg = <0x10040720>;
+> > -			samsung,enable-mask = <1>;
+> > -		};
+I've an issue here you break dt compatibilty
 
-Pass NULL to of_platform_populate instead of passing
-an empty list. This cleans up the code and reduces the
-number of lines.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- arch/arm/mach-shmobile/setup-sh73a0.c |    7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ work/arch/arm/mach-shmobile/setup-sh73a0.c	2013-06-28 19:16:07.000000000 +0900
-@@ -958,10 +958,6 @@ void __init sh73a0_add_early_devices(voi
- 
- #ifdef CONFIG_USE_OF
- 
--static const struct of_dev_auxdata sh73a0_auxdata_lookup[] __initconst = {
--	{},
--};
--
- void __init sh73a0_add_standard_devices_dt(void)
- {
- 	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", .id = -1, };
-@@ -971,8 +967,7 @@ void __init sh73a0_add_standard_devices_
- 
- 	platform_add_devices(sh73a0_devices_dt,
- 			     ARRAY_SIZE(sh73a0_devices_dt));
--	of_platform_populate(NULL, of_default_bus_match_table,
--			     sh73a0_auxdata_lookup, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
- 	/* Instantiate cpufreq-cpu0 */
- 	platform_device_register_full(&devinfo);
+Best Regards,
+J.
