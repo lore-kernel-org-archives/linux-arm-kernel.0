@@ -1,54 +1,162 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 28 Jun 2013 15:02:49 +0200
-Subject: [PATCHv3 0/8] ARM: mxs: Various Crystalfontz DT additions
-Message-ID: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Fri, 28 Jun 2013 15:02:51 +0200
+Subject: [PATCHv3 2/8] ARM: mxs: dt: Add Crystalfontz CFA-10056 device tree
+In-Reply-To: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1372424577-8279-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Brian Lilly <brian@crystalfontz.com>
 
-This patch series add DT for the Crystalfontz CFA-10056 and Crystalfontz
-CFA-10058.
+The CFA-10056 is a breakout board for the CFA-10036, and is
+basically a CFA-10037, with a 4.3" screen.
 
-The first patch simplifies board detection in mach-mxs.c as suggested by Thomas
-Petazzoni in his review of the precedent DT additions.
-
-The next two patches are adding the DTs.
-
-The last patches are cleaning up the remaining boards DTs.
-
-Changes in v3
- - Cleaned up all the DTs for crystalfontz boards.
-
-Changes in v2:
- - took into account the review from Maxime Ripard
-
-Thanks,
-
-Alexandre Belloni (6):
-  ARM: mxs: Simplify detection of CrystalFontz boards
-  ARM: mxs: dt: cfa10036: make hogpins grabbed by respective drivers
-  ARM: mxs: dt: cfa10037: make hogpins grabbed by respective drivers
-  ARM: mxs: dt: cfa10049: make hogpins grabbed by respective drivers
-  ARM: mxs: dt: cfa10055: make hogpins grabbed by respective drivers
-  ARM: mxs: dt: cfa10057: remove hogpins
-
-Brian Lilly (2):
-  ARM: mxs: dt: Add Crystalfontz CFA-10056 device tree
-  ARM: mxs: dt: Add Crystalfontz CFA-10058 device tree
-
- arch/arm/boot/dts/Makefile           |   2 +
- arch/arm/boot/dts/imx28-cfa10036.dts |   7 +-
- arch/arm/boot/dts/imx28-cfa10037.dts |  19 +++--
- arch/arm/boot/dts/imx28-cfa10049.dts |  73 +++++++++++++++---
- arch/arm/boot/dts/imx28-cfa10055.dts |  38 ++++------
- arch/arm/boot/dts/imx28-cfa10056.dts | 120 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx28-cfa10057.dts |  23 +-----
- arch/arm/boot/dts/imx28-cfa10058.dts | 141 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-mxs/mach-mxs.c         |   5 +-
- 9 files changed, 360 insertions(+), 68 deletions(-)
+Signed-off-by: Brian Lilly <brian@crystalfontz.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/Makefile           |   1 +
+ arch/arm/boot/dts/imx28-cfa10056.dts | 120 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 121 insertions(+)
  create mode 100644 arch/arm/boot/dts/imx28-cfa10056.dts
- create mode 100644 arch/arm/boot/dts/imx28-cfa10058.dts
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 641b3c9..da75139 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -143,6 +143,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+ 	imx28-cfa10037.dtb \
+ 	imx28-cfa10049.dtb \
+ 	imx28-cfa10055.dtb \
++	imx28-cfa10056.dtb \
+ 	imx28-cfa10057.dtb \
+ 	imx28-evk.dtb \
+ 	imx28-m28evk.dtb \
+diff --git a/arch/arm/boot/dts/imx28-cfa10056.dts b/arch/arm/boot/dts/imx28-cfa10056.dts
+new file mode 100644
+index 0000000..0f66c40
+--- /dev/null
++++ b/arch/arm/boot/dts/imx28-cfa10056.dts
+@@ -0,0 +1,120 @@
++/*
++ * Copyright 2013 Free Electrons
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/*
++ * The CFA-10056 is an expansion board for the CFA-10036 module, thus we
++ * need to include the CFA-10036 DTS.
++ */
++/include/ "imx28-cfa10037.dts"
++
++/ {
++	model = "Crystalfontz CFA-10056 Board";
++	compatible = "crystalfontz,cfa10056", "crystalfontz,cfa10036", "fsl,imx28";
++
++	apb at 80000000 {
++		apbh at 80000000 {
++			pinctrl at 80018000 {
++				spi2_pins_cfa10056: spi2-cfa10056 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x2103 /* MX28_PAD_SSP2_SCK__GPIO_2_16 */
++						0x2113 /* MX28_PAD_SSP2_CMD__GPIO_2_17 */
++						0x2123 /* MX28_PAD_SSP2_D0__GPIO_2_18 */
++						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
++					>;
++					fsl,drive-strength = <1>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
++
++				lcdif_pins_cfa10056: lcdif-10056 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x1181 /* MX28_PAD_LCD_RD_E__LCD_VSYNC */
++						0x1191 /* MX28_PAD_LCD_WR_RWN__LCD_HSYNC */
++						0x11a1 /* MX28_PAD_LCD_RS__LCD_DOTCLK */
++						0x11b1 /* MX28_PAD_LCD_CS__LCD_ENABLE */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
++				lcdif_pins_cfa10056_pullup: lcdif-10056-pullup at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x31e3 /* MX28_PAD_LCD_RESET__GPIO_3_30 */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
++
++			};
++
++			lcdif at 80030000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&lcdif_24bit_pins_a
++						&lcdif_pins_cfa10056
++						&lcdif_pins_cfa10056_pullup >;
++				display = <&display>;
++				status = "okay";
++
++				display: display {
++					bits-per-pixel = <32>;
++					bus-width = <24>;
++
++					display-timings {
++						native-mode = <&timing0>;
++						timing0: timing0 {
++							clock-frequency = <32000000>;
++							hactive = <480>;
++							vactive = <800>;
++							hback-porch = <2>;
++							hfront-porch = <2>;
++							vback-porch = <2>;
++							vfront-porch = <2>;
++							hsync-len = <5>;
++							vsync-len = <5>;
++							hsync-active = <0>;
++							vsync-active = <0>;
++							de-active = <1>;
++							pixelclk-active = <1>;
++						};
++					};
++				};
++			};
++		};
++	};
++
++	spi2 {
++		compatible = "spi-gpio";
++		pinctrl-names = "default";
++		pinctrl-0 = <&spi2_pins_cfa10056>;
++		status = "okay";
++		gpio-sck = <&gpio2 16 0>;
++		gpio-mosi = <&gpio2 17 0>;
++		gpio-miso = <&gpio2 18 0>;
++		cs-gpios = <&gpio3 5 0>;
++		num-chipselects = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		hx8369: hx8369 at 0 {
++			compatible = "himax,hx8369a", "himax,hx8369";
++			reg = <0>;
++			spi-max-frequency = <100000>;
++			spi-cpol;
++			spi-cpha;
++			gpios-reset = <&gpio3 30 0>;
++		};
++	};
++};
 -- 
 1.8.1.2
