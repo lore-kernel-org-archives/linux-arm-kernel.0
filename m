@@ -1,54 +1,29 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 28 Jun 2013 10:59:52 +0100
-Subject: [PATCH] of: Specify initrd location using 64-bit
-In-Reply-To: <51CCA67C.2010803@gmail.com>
-References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
- <51C4171C.9050908@linutronix.de> <51C48B5A.2040404@ti.com>
- <51CCA67C.2010803@gmail.com>
-Message-ID: <CACxGe6vOH0sCFVVXrYqD3dbYdOvithVu7-d1cvy5885i8x_Myw@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 28 Jun 2013 12:02:36 +0200
+Subject: [PATCH 1/3] phy: Add driver for Exynos DP PHY
+In-Reply-To: <51CD57EF.5010808@ti.com>
+References: <001501ce73bf$87c49c00$974dd400$@samsung.com>
+ <51CD57EF.5010808@ti.com>
+Message-ID: <51CD5F3C.4010504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 9:54 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 06/21/2013 12:20 PM, Santosh Shilimkar wrote:
->> On Friday 21 June 2013 05:04 AM, Sebastian Andrzej Siewior wrote:
->>> On 06/21/2013 02:52 AM, Santosh Shilimkar wrote:
->>>> diff --git a/arch/microblaze/kernel/prom.c b/arch/microblaze/kernel/prom.c
->>>> index 0a2c68f..62e2e8f 100644
->>>> --- a/arch/microblaze/kernel/prom.c
->>>> +++ b/arch/microblaze/kernel/prom.c
->>>> @@ -136,8 +136,7 @@ void __init early_init_devtree(void *params)
->>>>  }
->>>>
->>>>  #ifdef CONFIG_BLK_DEV_INITRD
->>>> -void __init early_init_dt_setup_initrd_arch(unsigned long start,
->>>> -           unsigned long end)
->>>> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
->>>>  {
->>>>     initrd_start = (unsigned long)__va(start);
->>>>     initrd_end = (unsigned long)__va(end);
->>>
->>> I think it would better to go here for phys_addr_t instead of u64. This
->>> would force you in of_flat_dt_match() to check if the value passed from
->>> DT specifies a memory address outside of 32bit address space and the
->>> kernel can't deal with this because its phys_addr_t is 32bit only due
->>> to a Kconfig switch.
->>>
->>> For x86, the initrd has to remain in the 32bit address space so passing
->>> the initrd in the upper range would violate the ABI. Not sure if this
->>> is true for other archs as well (ARM obviously not).
->>>
->> That pretty much means phys_addr_t. It will work for me as well but
->> in last thread from consistency with memory and reserved node, Rob
->> insisted to keep it as u64. So before I re-spin another version,
->> would like to here what Rob has to say considering the x86 requirement.
->>
->> Rob,
->> Are you ok with phys_addr_t since your concern was about rest
->> of the memory specific bits of the device-tree code use u64 ?
->
-> No. I still think it should be u64 for same reasons I said originally.
+Hi,
 
-+1
+On 06/28/2013 11:31 AM, Kishon Vijay Abraham I wrote:
+>> diff --git a/Documentation/devicetree/bindings/phy/samsung,exynos5250-dp-video-phy.txt
+>> b/Documentation/devicetree/bindings/phy/samsung,exynos5250-dp-video-phy.txt
+>> new file mode 100644
+>> index 0000000..8b6fa79
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/phy/samsung,exynos5250-dp-video-phy.txt
+> 
+> How about creating a single Documentation file for all samsung video phys? 
+> Sylwester?
 
-g.
+Yes, makes sense. There are quite a few various PHYs on the Exynos SoC.
+Let me resend my series with the binding description file name changed
+to samsung-phy.txt. I need to add couple fixes to that series anyway.
+
+Regards,
+Sylwester
