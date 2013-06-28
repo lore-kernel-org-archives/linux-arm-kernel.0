@@ -1,55 +1,67 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 28 Jun 2013 17:07:34 +0800
-Subject: [PATCH] ARM: dts: imx: remove the unused property
-Message-ID: <1372410454-14628-1-git-send-email-b32955@freescale.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 28 Jun 2013 12:34:06 +0300
+Subject: [PATCH V2 2/3] ARM: dts: Add DP PHY node to exynos5250.dtsi
+In-Reply-To: <002001ce73cf$721b9d80$5652d880$@samsung.com>
+References: <002001ce73cf$721b9d80$5652d880$@samsung.com>
+Message-ID: <20130628093406.GC11297@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "fsl,gpmi-dma-channel" is not used any more, just remove it
-from all the dts file.
+On Fri, Jun 28, 2013 at 04:16:44PM +0900, Jingoo Han wrote:
+> Add PHY provider node for the DP PHY.
+> 
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5250.dtsi |   13 ++++++++-----
+>  1 file changed, 8 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index 41cd625..f7bac75 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -614,6 +614,12 @@
+>  		interrupts = <0 94 0>;
+>  	};
+>  
+> +	dp_phy: video-phy at 10040720 {
+> +		compatible = "samsung,exynos5250-dp-video-phy";
+> +		reg = <0x10040720 4>;
+> +		#phy-cells = <0>;
+> +	};
+> +
+>  	dp-controller {
+>  		compatible = "samsung,exynos5-dp";
+>  		reg = <0x145b0000 0x1000>;
+> @@ -623,11 +629,8 @@
+>  		clock-names = "dp";
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -
+> -		dptx-phy {
+> -			reg = <0x10040720>;
+> -			samsung,enable-mask = <1>;
+> -		};
+> +		phys = <&dp_phy 0>;
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/boot/dts/imx23.dtsi   |    1 -
- arch/arm/boot/dts/imx28.dtsi   |    1 -
- arch/arm/boot/dts/imx6qdl.dtsi |    1 -
- 3 files changed, 0 insertions(+), 3 deletions(-)
+phy-cells being 0, means that this would become:
 
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index 587ceef..399b0a0 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -82,7 +82,6 @@
- 				clock-names = "gpmi_io";
- 				dmas = <&dma_apbh 4>;
- 				dma-names = "rx-tx";
--				fsl,gpmi-dma-channel = <4>;
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 6a8acb0..cc65572 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -104,7 +104,6 @@
- 				clock-names = "gpmi_io";
- 				dmas = <&dma_apbh 4>;
- 				dma-names = "rx-tx";
--				fsl,gpmi-dma-channel = <4>;
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index f2c623d..0641652 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -89,7 +89,6 @@
- 				      "gpmi_bch_apb", "per1_bch";
- 			dmas = <&dma_apbh 0>;
- 			dma-names = "rx-tx";
--			fsl,gpmi-dma-channel = <0>;
- 			status = "disabled";
- 		};
- 
+		phys = <&dp_phy>;
+
+> +		phy-names = "dp";
+
+for the label, I would use something more descriptive such as
+'display-port'.
+
+other than that:
+
+Acked-by: Felipe Balbi <balbi@ti.com>
+
 -- 
-1.7.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130628/fbda190c/attachment.sig>
