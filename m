@@ -1,32 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 27 Jun 2013 17:06:21 -0700
-Subject: [GIT PULL v2] msm clock for 3.11
-In-Reply-To: <1372107629-25862-1-git-send-email-davidb@codeaurora.org>
-References: <20130614195238.GA2381@codeaurora.org>
- <1372107629-25862-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <20130628000621.GA11547@quad.lixom.net>
+Date: Thu, 27 Jun 2013 17:08:53 -0700
+Subject: [GIT PULL] Remove ARM local timer API
+In-Reply-To: <20130625200211.GA11625@codeaurora.org>
+References: <20130625200211.GA11625@codeaurora.org>
+Message-ID: <20130628000853.GB11547@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 02:00:28PM -0700, David Brown wrote:
-> This pull request differs from the previous one for the clock code by:
+On Tue, Jun 25, 2013 at 01:02:12PM -0700, Stephen Boyd wrote:
+> Olof/Arnd,
 > 
->   - Gathered additional Acked-by lines.
->   - A small #include fixup found by Stephen Boyd
-> 
-> The only Ack not received was from Chris Ball, who is CC'd on this
-> request.
-> 
-> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
-> 
->   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-clock-for-3.11b
+> These patches remove the ARM local timer API. The ARM architected
+> timers have already moved away from this API so this series
+> migrates the rest of the users allowing us to remove the API
+> entirely. Thomas has been kind enough to take the first two
+> patches into timers/core in the tip tree (thanks Thomas!) so I've
+> merged that into v3.10-rc1 and then applied the rest of the
+> patches on top. Let me know if this is acceptable.
 
-Thanks, pulled into next/late. This conflicts with a fixes-non-critical
-fix to removed code, trivially resolved.
+We need guarantees from Thomas that the branch is stable and will never be
+rebased before it hit Linus tree, or we'll be in a world of pain for
+dependencies like these.
+
+Thomas, is this branch stable or do you anticipate a rebase?
 
 
 -Olof
