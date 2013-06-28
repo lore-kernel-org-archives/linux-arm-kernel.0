@@ -1,14 +1,15 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 28 Jun 2013 12:20:44 +0100
-Subject: [PATCH v7 3/6] arm: introduce CONFIG_PARAVIRT,
+Date: Fri, 28 Jun 2013 12:20:45 +0100
+Subject: [PATCH v7 4/6] arm64: introduce CONFIG_PARAVIRT,
  PARAVIRT_TIME_ACCOUNTING and pv_time_ops
 In-Reply-To: <alpine.DEB.2.02.1306271614260.4782@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1306271614260.4782@kaball.uk.xensource.com>
-Message-ID: <1372418447-24066-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1372418447-24066-4-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM.
+Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
+Necessary duplication of paravirt.h and paravirt.c with ARM.
 
 The only paravirt interface supported is pv_time_ops.steal_clock, so no
 runtime pvops patching needed.
@@ -17,39 +18,33 @@ This allows us to make use of steal_account_process_tick for stolen
 ticks accounting.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Christopher Covington <cov@codeaurora.org>
-CC: linux at arm.linux.org.uk
 CC: will.deacon at arm.com
 CC: nico at linaro.org
 CC: marc.zyngier at arm.com
 CC: cov at codeaurora.org
 CC: arnd at arndb.de
 CC: olof at lixom.net
+CC: Catalin.Marinas at arm.com
 
 ---
 Changes in v7:
 - ifdef CONFIG_PARAVIRT the content of paravirt.h.
-
-Changes in v3:
-- improve commit description and Kconfig help text;
-- no need to initialize pv_time_ops;
-- add PARAVIRT_TIME_ACCOUNTING.
 ---
- arch/arm/Kconfig                |   20 ++++++++++++++++++++
- arch/arm/include/asm/paravirt.h |   20 ++++++++++++++++++++
- arch/arm/kernel/Makefile        |    1 +
- arch/arm/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
+ arch/arm64/Kconfig                |   20 ++++++++++++++++++++
+ arch/arm64/include/asm/paravirt.h |   20 ++++++++++++++++++++
+ arch/arm64/kernel/Makefile        |    1 +
+ arch/arm64/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
  4 files changed, 66 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/paravirt.h
- create mode 100644 arch/arm/kernel/paravirt.c
+ create mode 100644 arch/arm64/include/asm/paravirt.h
+ create mode 100644 arch/arm64/kernel/paravirt.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 49d993c..5621a02 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1786,12 +1786,32 @@ config XEN_DOM0
- 	def_bool y
- 	depends on XEN
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1fac4e5..4c4f213 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -190,6 +190,25 @@ config HW_PERF_EVENTS
+ 
+ source "mm/Kconfig"
  
 +config PARAVIRT
 +	bool "Enable paravirtualization code"
@@ -70,24 +65,25 @@ index 49d993c..5621a02 100644
 +
 +	  If in doubt, say N here.
 +
+ config XEN_DOM0
+ 	def_bool y
+ 	depends on XEN
+@@ -197,6 +216,7 @@ config XEN_DOM0
  config XEN
- 	bool "Xen guest support on ARM (EXPERIMENTAL)"
- 	depends on ARM && AEABI && OF
- 	depends on CPU_V7 && !CPU_V6
- 	depends on !GENERIC_ATOMIC64
- 	select ARM_PSCI
+ 	bool "Xen guest support on ARM64 (EXPERIMENTAL)"
+ 	depends on ARM64 && OF
 +	select PARAVIRT
  	help
- 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM64.
  
-diff --git a/arch/arm/include/asm/paravirt.h b/arch/arm/include/asm/paravirt.h
+diff --git a/arch/arm64/include/asm/paravirt.h b/arch/arm64/include/asm/paravirt.h
 new file mode 100644
-index 0000000..8435ff59
+index 0000000..fd5f428
 --- /dev/null
-+++ b/arch/arm/include/asm/paravirt.h
++++ b/arch/arm64/include/asm/paravirt.h
 @@ -0,0 +1,20 @@
-+#ifndef _ASM_ARM_PARAVIRT_H
-+#define _ASM_ARM_PARAVIRT_H
++#ifndef _ASM_ARM64_PARAVIRT_H
++#define _ASM_ARM64_PARAVIRT_H
 +
 +#ifdef CONFIG_PARAVIRT
 +struct static_key;
@@ -106,23 +102,23 @@ index 0000000..8435ff59
 +#endif
 +
 +#endif
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 5f3338e..d911db6 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -76,6 +76,7 @@ obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
- ifneq ($(CONFIG_ARCH_EBSA110),y)
-   obj-y		+= io.o
- endif
-+obj-$(CONFIG_PARAVIRT)	+= paravirt.o
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 7b4b564..17613ad 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o smp_psci.o
+ arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
+ arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
++arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
  
- head-y			:= head$(MMUEXT).o
- obj-$(CONFIG_DEBUG_LL)	+= debug.o
-diff --git a/arch/arm/kernel/paravirt.c b/arch/arm/kernel/paravirt.c
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/paravirt.c b/arch/arm64/kernel/paravirt.c
 new file mode 100644
 index 0000000..53f371e
 --- /dev/null
-+++ b/arch/arm/kernel/paravirt.c
++++ b/arch/arm64/kernel/paravirt.c
 @@ -0,0 +1,25 @@
 +/*
 + * This program is free software; you can redistribute it and/or modify
