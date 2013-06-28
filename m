@@ -1,49 +1,37 @@
-From: vapier@gentoo.org (Mike Frysinger)
-Date: Thu, 27 Jun 2013 22:42:36 -0400
-Subject: [PATCH] ARM: footbridge: fix overlapping PCI mappings
-Message-ID: <1372387356-15341-1-git-send-email-vapier@gentoo.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 28 Jun 2013 10:55:19 +0800
+Subject: [PATCH 1/2] serial: imx: remove the uart_console() check
+In-Reply-To: <51CCF24D.1060007@freescale.com>
+References: <1372239359-4054-1-git-send-email-b32955@freescale.com>
+ <20130627141535.GD2695@S2101-09.ap.freescale.net>
+ <51CCF24D.1060007@freescale.com>
+Message-ID: <20130628025517.GA11043@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 8ef6e6201b26cb9fde79c1baa08145af6aca2815 (ARM: footbridge: use
-fixed PCI i/o mapping) broke booting on my netwinder.  Before that,
-everything boots fine.  Since then, it crashes on boot.
+On Fri, Jun 28, 2013 at 10:17:49AM +0800, Huang Shijie wrote:
+> We need to set the imx_setUp_ufcr() in our imx_console_setup(),
+> so we need to enable the clocks, aren't we?
 
-With earlyprintk, I see it BUG-ing like so:
-kernel BUG at lib/ioremap.c:27!
-Internal error: Oops - BUG: 0 [#1] ARM
-...
-[<c0139b54>] (ioremap_page_range+0x128/0x154) from [<c02e6a6c>] (dc21285_setup+0xd0/0x114)
-[<c02e6a6c>] (dc21285_setup+0xd0/0x114) from [<c02e4874>] (pci_common_init+0xa0/0x298)
-[<c02e4874>] (pci_common_init+0xa0/0x298) from [<c02e793c>] (netwinder_pci_init+0xc/0x18)
-[<c02e793c>] (netwinder_pci_init+0xc/0x18) from [<c02e27d0>] (do_one_initcall+0xb4/0x180)
-...
+Ah, yes, I missed that.  But register access only needs ipg clock and
+per clock still does not need to be enabled here, right?
 
-Russell points out it's because of overlapping PCI mappings that was
-added with the aforementioned commit.  Rob thought the code would re-use
-the static mapping, but that turns out to not be the case and instead
-hits the BUG further down.
+> In the probe's uart_add_one_port(), we will register the console and
+> call the setup() hook,
+> so it's ok to disable the clocks in the end of the probe.
 
-After deleting this hunk as suggested by Russel, the system boots up fine
-again and all my PCI devices work (IDE, ethernet, the DC21285).
+Look, here is what you do in .probe().
 
-Signed-off-by: Mike Frysinger <vapier@gentoo.org>
----
- arch/arm/mach-footbridge/dc21285.c | 2 --
- 1 file changed, 2 deletions(-)
+	clk_prepare_enable(sport->clk_per);
+	clk_prepare_enable(sport->clk_ipg); 
+	...
+	uart_add_one_port(&imx_reg, &sport->port);
+	...
+	clk_disable_unprepare(sport->clk_per);
+	clk_disable_unprepare(sport->clk_ipg);
 
-diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
-index a7cd2cf..3490a24 100644
---- a/arch/arm/mach-footbridge/dc21285.c
-+++ b/arch/arm/mach-footbridge/dc21285.c
-@@ -276,8 +276,6 @@ int __init dc21285_setup(int nr, struct pci_sys_data *sys)
- 
- 	sys->mem_offset  = DC21285_PCI_MEM;
- 
--	pci_ioremap_io(0, DC21285_PCI_IO);
--
- 	pci_add_resource_offset(&sys->resources, &res[0], sys->mem_offset);
- 	pci_add_resource_offset(&sys->resources, &res[1], sys->mem_offset);
- 
--- 
-1.8.2.1
+Since imx_console_setup() will be called in uart_add_one_port() and
+clocks are already being taken care of in imx_console_setup(), why do
+you need all these clock operations here at all?
+
+Shawn
