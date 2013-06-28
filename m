@@ -1,85 +1,124 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Fri, 28 Jun 2013 08:49:41 +0000
-Subject: [PATCH v2 2/2] i2c: imx: Add Vybrid VF610 I2C controller support
-In-Reply-To: <20130620080406.GD14308@pengutronix.de>
-References: <1371545327-12481-1-git-send-email-b35083@freescale.com>
- <20130620080406.GD14308@pengutronix.de>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E851E39D8@039-SN1MPN1-005.039d.mgd.msft.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Jun 2013 09:57:19 +0100
+Subject: dummy_flush_tlb_a15_erratum in check_and_switch_context
+In-Reply-To: <51CD077E.7040207@jonmasters.org>
+References: <51CD077E.7040207@jonmasters.org>
+Message-ID: <20130628085719.GA29002@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
->Sent: Thursday, June 20, 2013 4:04 PM
->To: Lu Jingchang-B35083
->Cc: wsa at the-dreams.de; shawn.guo at linaro.org; Estevam Fabio-R49496; linux-
->i2c at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Jin Zhengxiong-
->R64188; Li Xiaochun-B41219
->Subject: Re: [PATCH v2 2/2] i2c: imx: Add Vybrid VF610 I2C controller
->support
->
->On Tue, Jun 18, 2013 at 04:48:47PM +0800, Jingchang Lu wrote:
->> +static u16 imx_i2c_clk_div[50][2] = {
->>  	{ 22,	0x20 }, { 24,	0x21 }, { 26,	0x22 }, { 28,	0x23 },
->>  	{ 30,	0x00 },	{ 32,	0x24 }, { 36,	0x25 }, { 40,	0x26 },
->>  	{ 42,	0x03 }, { 44,	0x27 },	{ 48,	0x28 }, { 52,	0x05 },
->> @@ -112,11 +107,67 @@ static u16 __initdata i2c_clk_div[50][2] = {
->>  	{ 3072,	0x1E }, { 3840,	0x1F }
->>  };
->>
->> +/* Vybrid VF610 clock divider, register value pairs */
->> +static u16 vf610_i2c_clk_div[60][2] = {
->> +	{ 20,   0x00 }, { 22,   0x01 }, { 24,   0x02 }, { 26,   0x03 },
->> +	{ 28,   0x04 }, { 30,   0x05 }, { 32,   0x09 }, { 34,   0x06 },
->> +	{ 36,   0x0A }, { 40,   0x07 }, { 44,   0x0C }, { 48,   0x0D },
->> +	{ 52,   0x43 }, { 56,   0x0E }, { 60,   0x45 }, { 64,   0x12 },
->> +	{ 68,   0x0F }, { 72,   0x13 }, { 80,   0x14 }, { 88,   0x15 },
->> +	{ 96,   0x19 }, { 104,  0x16 }, { 112,  0x1A }, { 128,  0x17 },
->> +	{ 136,  0x4F }, { 144,  0x1C }, { 160,  0x1D }, { 176,  0x55 },
->> +	{ 192,  0x1E }, { 208,  0x56 }, { 224,  0x22 }, { 228,  0x24 },
->> +	{ 240,  0x1F }, { 256,  0x23 }, { 288,  0x5C }, { 320,  0x25 },
->> +	{ 384,  0x26 }, { 448,  0x2A }, { 480,  0x27 }, { 512,  0x2B },
->> +	{ 576,  0x2C }, { 640,  0x2D }, { 768,  0x31 }, { 896,  0x32 },
->> +	{ 960,  0x2F }, { 1024, 0x33 }, { 1152, 0x34 }, { 1280, 0x35 },
->> +	{ 1536, 0x36 }, { 1792, 0x3A }, { 1920, 0x37 }, { 2048, 0x3B },
->> +	{ 2304, 0x3C }, { 2560, 0x3D }, { 3072, 0x3E }, { 3584, 0x7A },
->> +	{ 3840, 0x3F }, { 4096, 0x7B }, { 5120, 0x7D }, { 6144, 0x7E },
->> +};
->
->...
->
->> +static struct imx_i2c_hwdata imx_i2c_hwdata = {
->> +	.addr_reg		= 0x00,
->> +	.freq_reg		= 0x04,
->> +	.ctrl_reg		= 0x08,
->> +	.status_reg		= 0x0c,
->> +	.data_reg		= 0x10,
->> +	.clk_div		= imx_i2c_clk_div,
->> +	.ndivs			= ARRAY_SIZE(imx_i2c_clk_div),
->> +	.i2sr_clr_opcode	= I2SR_CLR_OPCODE_W0C,
->> +	.i2cr_ien_opcode	= I2CR_IEN_OPCODE_1,
->> +
->> +};
->> +
->> +static struct imx_i2c_hwdata vf610_i2c_hwdata = {
->> +	.addr_reg		= 0x00,
->> +	.freq_reg		= 0x01,
->> +	.ctrl_reg		= 0x02,
->> +	.status_reg		= 0x03,
->> +	.data_reg		= 0x04,
->> +	.clk_div		= vf610_i2c_clk_div,
->> +	.ndivs			= ARRAY_SIZE(vf610_i2c_clk_div),
->> +	.i2sr_clr_opcode	= I2SR_CLR_OPCODE_W1C,
->> +	.i2cr_ien_opcode	= I2CR_IEN_OPCODE_0,
->> +
->> +};
->
->Wow. The i2c unit remained unchanged since the i.MX21 days. Shuffling
->some registers or divider values was long overdue...
->
-[Lu Jingchang-B35083] 
- Could I understand that you are OK for the patch? If yes, Could you please ACKed it? Thanks.
+On Fri, Jun 28, 2013 at 04:48:14AM +0100, Jon Masters wrote:
+> Hi Folks,
 
+Hi Jon,
 
-Best Regards,
-Jingchang
+It's usually best to CC people explicitly when reporting bugs in their code
+[adding Catalin] ;)
+
+> Post mostly for Google's benefit. Fedora folks were reporting the
+> following backtrace on Cortex-A8 OMAP:
+> 
+> [   12.182873] Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
+> [   12.189971] Modules linked in: drm_kms_helper drm
+> [   12.194965] CPU: 0 PID: 153 Comm: dracut-initqueu Not tainted
+> 3.10.0-0.rc7.git0.2.fc20.armv7hl #1
+> [   12.204317] task: c9ee9b80 ti: c9f50000 task.ti: c9f50000
+> [   12.210025] PC is at check_and_switch_context+0x3c0/0x44c
+> [   12.215724] LR is at check_and_switch_context+0x364/0x44c
+> [   12.221424] pc : [<c001dbd4>]    lr : [<c001db78>]    psr: 400f0093
+> [   12.221424] sp : c9f51e40  ip : 00000000  fp : c9ebe860
+> [   12.233532] r10: c08cb470  r9 : c08d97c8  r8 : c9ebe700
+> [   12.239044] r7 : 00000000  r6 : 00000200  r5 : 00000000  r4 : 00000201
+> [   12.245929] r3 : 00000000  r2 : 00000000  r1 : 00000000  r0 : 00000001
+> [   12.252817] Flags: nZcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM
+> Segment user
+> [   12.260436] Control: 10c5387d  Table: 80004019  DAC: 00000015
+> [   12.266497] Process dracut-initqueu (pid: 153, stack limit = 0xc9f50240)
+> [   12.273568] Stack: (0xc9f51e40 to 0xc9f52000)
+> [   12.278174] 1e40: c08cb478 00000000 00000200 00000000 200f0093
+> c08d853c c9f41e00 c9ebe380
+> [   12.286808] 1e60: 00000000 c9ee9b80 c0c7db80 c9f50000 c9eeb700
+> c9ebe700 c9f51f24 c05994b8
+> [   12.295440] 1e80: 00000004 c0250920 00000004 c0047954 d6266cd2
+> 00000002 00000000 00000000
+> [   12.304074] 1ea0: 00000000 c0048854 c08cdb80 003b0000 d6266cd2
+> 00000002 00006ae1 c007a670
+> [   12.312708] 1ec0: 00000139 00000000 0000b40e 0000b40e 00006a0d
+> c007a670 f5257d14 c0079274
+> [   12.321342] 1ee0: c9f41e00 00000000 00000003 0000081f c08ded98
+> bea94f88 c9f51fb0 000cf704
+> [   12.329976] 1f00: c9f51f84 c9f51f60 c9f50028 c9ee9b80 00000000
+> c9f51f78 fffffff6 c9f50000
+> [   12.338598] 1f20: c9f50000 c0048854 c9ee9dcc c9eeb700 c9f51f38
+> c9ee9e14 00000000 00000000
+> [   12.347220] 1f40: 00000004 00000000 00000000 bea951a8 c9f50000
+> 00000000 000d6d64 c004988c
+> [   12.355841] 1f60: 00000003 00000004 00000000 00000000 bea951a8
+> 00000000 00000000 c9ee9b80
+> [   12.364463] 1f80: c0047438 c9eeedd0 c9eeedd0 00000000 00000000
+> bea951a8 ffffffff 00000072
+> [   12.373084] 1fa0: c000e344 c000e1a0 00000000 bea951a8 ffffffff
+> bea951a8 00000000 00000000
+> [   12.381705] 1fc0: 00000000 bea951a8 ffffffff 00000072 000cf704
+> 000d6094 00000000 000d6d64
+> [   12.390328] 1fe0: 000cf164 bea95158 00045180 b6e37ae0 600f0010
+> ffffffff 2d10a02c c8542a0a
+> [   12.398987] [<c001dbd4>] (check_and_switch_context+0x3c0/0x44c) from
+> [<c05994b8>] (__schedule+0x4ac/0x750)
+> [   12.409193] [<c05994b8>] (__schedule+0x4ac/0x750) from [<c0048854>]
+> (do_wait+0x1ec/0x244)
+> [   12.417834] [<c0048854>] (do_wait+0x1ec/0x244) from [<c004988c>]
+> (SyS_wait4+0xa8/0xc8)
+> [   12.426206] [<c004988c>] (SyS_wait4+0xa8/0xc8) from [<c000e1a0>]
+> (ret_fast_syscall+0x0/0x30)
+> [   12.435116] Code: 1e082f13 f57ff04f f57ff06f e3a03000 (ee083f33)
+> [   12.441552] ---[ end trace c0816de7f5b496a8 ]---
+> 
+> I disassembled that faulting instruction manually just now, and it
+> appears to be:
+> 
+> 1110 1110 000  0 1000 0011 1111   001  1  0011
+>           opc1   CRn  Rt   coproc opc2    CRm
+> 
+> MCR cp15, 0, r3, c8, c3, 1
+> 
+> Which maps back to the call to dummt_flush_tlb_a15_erratum in
+> check_and_switch_context:
+> 
+> #ifdef CONFIG_ARM_ERRATA_798181
+> static inline void dummy_flush_tlb_a15_erratum(void)
+> {
+>         /*
+>          * Dummy TLBIMVAIS. Using the unmapped address 0 and ASID 0.
+>          */
+>         asm("mcr p15, 0, %0, c8, c3, 1" : : "r" (0));
+>         dsb();
+> }
+> #else
+> static inline void dummy_flush_tlb_a15_erratum(void)
+> {
+> }
+> #endif
+
+Yep, the -IS variants are only available on SMP cores.
+
+> Now I think it's personally just easier to only turn on that errata on
+> LPAE/A15 kernels and just leave it at that (I've requested this get
+> moved to the lpae config and out of the base config so this is what
+> should happen shortly - clearly the intention), but some folks out there
+> want to do exciting things...I got asked if this could be runtime
+> patched (which I guess in theory is possible), but I'm not going there.
+> 
+> Anyway, in addition, does this kind of thing need fixing with a more
+> specific Kconfig so that there's an explicit A15 dependency in there?
+> Rather just "depends on CPU_V7 && SMP"?
+
+Even better: my TLB optimisation series removes this line of code
+altogether:
+
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/178592.html
+
+If we need a quick fix for stable, we should just check the CPUID on
+the context-switch slow(er) path.
+
+Will
