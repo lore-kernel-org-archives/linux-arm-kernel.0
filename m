@@ -1,36 +1,85 @@
 From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Fri, 28 Jun 2013 20:39:11 +0800
-Subject: [PATCH v2 0/2] dmaengine: add k3dma 
-Message-ID: <1372423153-6742-1-git-send-email-zhangfei.gao@linaro.org>
+Date: Fri, 28 Jun 2013 20:39:12 +0800
+Subject: [PATCH v2 1/2] dmaengine: add interface of dma_get_slave_channel
+In-Reply-To: <1372423153-6742-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1372423153-6742-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1372423153-6742-2-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-change since v1:
-Follow Arnd suggestion:
-using dma_get_slave_channel interface
-Correct dma-channels and dma-requests for phy and virt channel
+Suggested by Arnd, add dma_get_slave_channel interface
+Dma host driver could get specific channel specificied by request line, rather than filter.
 
-Follow Vinod suggestion:
-add name space
-use SIMPLE_DEV_PM_OPS
+host example:
+static struct dma_chan *xx_of_dma_simple_xlate(struct of_phandle_args *dma_spec,
+		struct of_dma *ofdma)
+{
+	struct xx_dma_dev *d = ofdma->of_dma_data;
+	unsigned int request = dma_spec->args[0];
 
-Besides:
-add pause/resume
-Using kzalloc instead of dma pool
+	if (request > d->dma_requests)
+		return NULL;
 
-Zhangfei Gao (2):
-  dmaengine: add interface of dma_get_slave_channel
-  dmaengine: Add hisilicon k3 DMA engine driver
+	return dma_get_slave_channel(&(d->chans[request].vc.chan));
+}
 
- Documentation/devicetree/bindings/dma/k3dma.txt |   46 ++
- drivers/dma/Kconfig                             |    9 +
- drivers/dma/Makefile                            |    1 +
- drivers/dma/dmaengine.c                         |   26 +
- drivers/dma/k3dma.c                             |  853 +++++++++++++++++++++++
- include/linux/dmaengine.h                       |    1 +
- 6 files changed, 936 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/k3dma.txt
- create mode 100644 drivers/dma/k3dma.c
+probe:
+of_dma_controller_register((&op->dev)->of_node, xx_of_dma_simple_xlate, d);
 
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+---
+ drivers/dma/dmaengine.c   |   26 ++++++++++++++++++++++++++
+ include/linux/dmaengine.h |    1 +
+ 2 files changed, 27 insertions(+)
+
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 93f7992..78dbbe0 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -504,6 +504,32 @@ static struct dma_chan *private_candidate(const dma_cap_mask_t *mask,
+ }
+ 
+ /**
++ * dma_request_channel - try to get specific channel exclusively
++ * @chan: target channel
++ */
++struct dma_chan *dma_get_slave_channel(struct dma_chan *chan)
++{
++	int err = -EBUSY;
++
++	/* lock against __dma_request_channel */
++	mutex_lock(&dma_list_mutex);
++
++	if (chan->client_count == 0)
++		err = dma_chan_get(chan);
++	else
++		chan = NULL;
++
++	mutex_unlock(&dma_list_mutex);
++
++	if (err)
++		pr_debug("%s: failed to get %s: (%d)\n",
++			__func__, dma_chan_name(chan), err);
++
++	return chan;
++}
++EXPORT_SYMBOL_GPL(dma_get_slave_channel);
++
++/**
+  * dma_request_channel - try to allocate an exclusive channel
+  * @mask: capabilities that the channel must satisfy
+  * @fn: optional callback to disposition available channels
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 96d3e4a..4e1c843 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -1000,6 +1000,7 @@ int dma_async_device_register(struct dma_device *device);
+ void dma_async_device_unregister(struct dma_device *device);
+ void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
+ struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
++struct dma_chan *dma_get_slave_channel(struct dma_chan *chan);
+ struct dma_chan *net_dma_find_channel(void);
+ #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
+ #define dma_request_slave_channel_compat(mask, x, y, dev, name) \
 -- 
 1.7.9.5
