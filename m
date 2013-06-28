@@ -1,48 +1,53 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 28 Jun 2013 16:02:23 +0200 (CEST)
-Subject: [linux-sunxi] [PATCH 0/8] clocksource: sunxi: Timer fixes
- and cleanup
-In-Reply-To: <2013062809433715678058@allwinnertech.com>
-References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
- <51CC0566.8010302@redhat.com> <20130627094307.GC8437@lukather>
- <51CC0BC3.5090309@redhat.com> <20130627165436.GB4319@lukather>,
- <20130627232608.1174558b@i7>
- <2013062809433715678058@allwinnertech.com>
-Message-ID: <alpine.DEB.2.02.1306281559490.4013@ionos.tec.linutronix.de>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 28 Jun 2013 16:18:01 +0200
+Subject: [PATCH 3/4] hwmon: Add a simple driver to read the MXS SoC
+ temperature
+In-Reply-To: <51CC91E8.50605@free-electrons.com>
+References: <1372236673-20725-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1372236673-20725-4-git-send-email-alexandre.belloni@free-electrons.com>
+ <20130626143927.GB31998@roeck-us.net> <20130627091732.GP5803@lukather>
+ <20130627142758.GA5812@roeck-us.net> <51CC91E8.50605@free-electrons.com>
+Message-ID: <51CD9B19.90407@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Jun 2013, ?? wrote:
-> > The A10 manual from http://free-electrons.com/~maxime/pub/datasheet/
-> > does not seem to contain any details about what bad things may happen
-> > if we try to read CNT64_LO_REG while latching is still in progress and
-> > CNT64_RL_EN bit in CNT64_CTRL_REG has not changed to zero yet.
-> > I can imagine the following possible scenarios:
-> >  1. We read either the old stale CNT64_LO_REG value or the new
-> >     correct value.
-> >  2. We read either the old stale CNT64_LO_REG value or the new
-> >     correct value, or some random garbage.
-> >  3. The processor may deadlock, eat your dog, or do some other
-> >     nasty thing.
-> >
-> > In the case of 1, we probably can get away without using any spinlocks?
+On 06/27/2013 09:26 PM, Alexandre Belloni wrote:
+> Hi,
 > 
-> About the 64bits counter, the latch bit is needed because of the asynchronous circuit.
-> The internal circuit of 64bits counter is working under 24Mhz clock, and CNT_LO/HI
-> is read with APB clock. So the clock synchronize is needed. The function of the latch
-> is synchronous the 64bits counter from 24Mhz clock domain to APB clock domain.
-> So, if the latch is not completely, value of the CNT_LO/HI maybe a random value, because
-> some bits are latched, but others are not. So, the CNT_LO/HI should be read after
-> latch is completely.
-> The latch just takes 3 cycles of 24Mhz clock, the time is nearly 0.125 micro-second.
+> On 27/06/2013 16:27, Guenter Roeck wrote:
+>> On Thu, Jun 27, 2013 at 11:17:32AM +0200, Maxime Ripard wrote:
+>>> On Wed, Jun 26, 2013 at 07:39:27AM -0700, Guenter Roeck wrote:
+>>>> On Wed, Jun 26, 2013 at 10:51:12AM +0200, Alexandre Belloni wrote:
+>>>>> The low resolution ADC of the mxs is able to read an internal temperature
+>>>>> sensor, expose that using hwmon.
+>>>>>
+>>>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>>>> ---
+>>>> Wouldn't it make more sense to use iio-hwmon and improve it if necessary ?
+>>> Actually, I wonder if we should not just put the hwmon driver
+>>> capabilities directly into the mxs-lradc driver, just like it's already
+>>> been done in this driver for the touchscreen support.
+>>>
+>>> The probing of this hwmon driver doesn't really belong to the DT, it's
+>>> not really realistic to probe it from the machine definition, and it
+>>> really is the IP that is wired that way.
+>>>
+>> Merging iio-hwmon functionality into an adc driver seems just as bad
+>> (or even worse) as copying it into a new driver.
+>>
+>> If the lradc driver knows that the ADC channels are temperature sensors, it
+>> should register them with the iio subsystem as IIO_TEMP type. Then you should
+>> be able to use iio_hwmon as is.
 > 
+> They are already registered as IIO_TEMP but only implement read_raw. Also,
+> 
+> iio_hwmon_read_val() is using iio_read_channel_processed() and that will
+> basically only read one of the 2 channels. As I documented, you actually
+> need to read both channel 8 and channel 9 and then compute the value in
+> Kelvins. I'm not sure how you want me to do that in the current framework.
 
-I really wonder why we're trying to use that timer. AFAICT the A10 has
-another six 32bit timers which do not have this restriction and the
-clocksoure/sched_clock implementation works nicely with 32 bits. So
-what's the point of using that 64 bit counter if it's horrible to
-access?
+What are these two channels actually measuring? Is the value of a single
+channel meaningful on it's own? If not it might make sense to update the IIO
+driver to just have one temperature channel.
 
-Thanks,
-
-	tglx
+- Lars
