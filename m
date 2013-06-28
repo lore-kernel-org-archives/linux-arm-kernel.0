@@ -1,31 +1,48 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Fri, 28 Jun 2013 10:46:09 +0000
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <201306281142.51676.marex@denx.de>
-References: <51A5A808.2070803@digi.com> <201306271549.01136.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803EFF1F2@039-SN2MPN1-023.039d.mgd.msft.net>
- <201306281142.51676.marex@denx.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803EFF551@039-SN2MPN1-023.039d.mgd.msft.net>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 28 Jun 2013 12:53:18 +0200
+Subject: [PATCH] ARM: dts: add sram for imx53 and imx6q
+Message-ID: <1372416798-2828-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx53.dtsi   | 5 +++++
+ arch/arm/boot/dts/imx6qdl.dtsi | 6 ++++++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index d437bfb..3def46f 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -1087,5 +1087,10 @@
+ 				status = "disabled";
+ 			};
+ 		};
++
++		ocram: ocram at f8000000 {
++			compatible = "fsl,imx-ocram", "mmio-sram";
++			reg = <0xf8000000 0x20000>;
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 2d73f83..e1fe8a4 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -100,6 +100,12 @@
+ 			status = "disabled";
+ 		};
  
-> 
-> Where can I measure this?
-> 
-> > Two possible reasons:
-> >
-> > 1. You have not gpio control for vbus toggle when role switches.
-> 
-> This works well.
-> 
-> > 2. Your hardware has some problems that the vbus can't lower than 0.8v.
-> 
-> How can I check that?
-> 
-
-Just measure the voltage of your otg vbus pin.
-
-
-Best regards,
-Peter
++		ocram: ocram at 00900000 {
++			compatible = "fsl,imx-ocram", "mmio-sram";
++			reg = <0x00900000 0x3f000>;
++			clocks = <&clks 142>;
++		};
++
+ 		timer at 00a00600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0x00a00600 0x20>;
+-- 
+1.8.3.1
