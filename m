@@ -1,63 +1,23 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 28 Jun 2013 15:18:27 -0400 (EDT)
-Subject: [RFC PATCH 4/6] USB: ehci-omap: Suspend the controller during
- bus suspend
-In-Reply-To: <51CD9663.6060806@ti.com>
-Message-ID: <Pine.LNX.4.44L0.1306281507020.1047-100000@iolanthe.rowland.org>
+From: dsd@laptop.org (Daniel Drake)
+Date: Fri, 28 Jun 2013 13:54:21 -0600
+Subject: Armada DRM driver on OLPC XO
+In-Reply-To: <20130626184250.43f36e47@armhf>
+References: <20130625204726.BF65C12647A@dev.laptop.org>
+ <20130626184250.43f36e47@armhf>
+Message-ID: <CAMLZHHQNB4Y16rg2052wpZosaUuCC_oYpq0DKp=uHSuPg-Z53g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Jun 2013, Roger Quadros wrote:
+On Wed, Jun 26, 2013 at 10:42 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> Do you know that there are 2 drm drivers for the Cubox? I posted mine
+> (http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/168732.html)
+> before Russell, but I got no return about it yet.
 
-> Just found the problem. It seems that enabling the ehci_irq _after_ the root hub is resumed
-> is the root cause of the problem. Doing so will miss events from the root hub.
+I thought there was some agreement that you would merge your efforts
+into Russell's driver. Is that still the plan?
 
-This sounds like a bug in the IRQ setup.  It's the sort of thing you 
-see when a level-triggered IRQ is treated as though it were 
-edge-triggered.
+Thanks for the links - I think we can learn something about timer
+handling from your work. I'll send a patch shortly incorporating the
+basis of something like this into armada_drm.
 
-In any case, the wakeup should have worked whether the IRQ was issued 
-or not.
-
-> The following modification worked for me without any delays.
-> 
-> diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
-> index 72df4eb..b3af1aa 100644
-> --- a/drivers/usb/core/hcd.c
-> +++ b/drivers/usb/core/hcd.c
-> @@ -2136,11 +2136,6 @@ static void hcd_resume_work(struct work_struct *work)
->  	usb_lock_device(udev);
->  	usb_remote_wakeup(udev);
->  	usb_unlock_device(udev);
-> -	if (HCD_IRQ_DISABLED(hcd)) {
-> -		/* Interrupt was disabled */
-> -		clear_bit(HCD_FLAG_IRQ_DISABLED, &hcd->flags);
-> -		enable_irq(hcd->irq);
-> -	}
->  }
->  
->  /**
-> diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-> index 593d28d..f2a1a46 100644
-> --- a/drivers/usb/host/ehci-hcd.c
-> +++ b/drivers/usb/host/ehci-hcd.c
-> @@ -1110,6 +1110,12 @@ int ehci_resume(struct usb_hcd *hcd, bool hibernated)
->  {
->  	struct ehci_hcd		*ehci = hcd_to_ehci(hcd);
->  
-> +	if (HCD_IRQ_DISABLED(hcd)) {
-> +		/* Interrupt was disabled */
-> +		clear_bit(HCD_FLAG_IRQ_DISABLED, &hcd->flags);
-> +		enable_irq(hcd->irq);
-> +	}
-> +
->  	if (time_before(jiffies, ehci->next_statechange))
->  		msleep(100);
-
-I appreciate the symmetry of putting the enable_irq call in ehci-hcd, 
-seeing as how the disable_irq is there too.  On the other hand, every 
-HCD using this mechanism is going to have to do the same thing, which 
-argues for putting the enable call in the core.  Perhaps at the start 
-of hcd_resume_work() instead of the end.
-
-Alan Stern
+Daniel
