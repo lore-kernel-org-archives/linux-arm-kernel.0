@@ -1,64 +1,49 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 28 Jun 2013 20:34:24 +0200
-Subject: [PATCH 06/11] ARM: tegra114: hook tegra_tear_down_cpu function
-In-Reply-To: <51CC7B01.30503@wwwdotorg.org>
-References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
- <1372152475-18617-7-git-send-email-josephl@nvidia.com>
- <20130627101335.GB15081@mithrandir> <51CC7B01.30503@wwwdotorg.org>
-Message-ID: <20130628183423.GA15416@manwe>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 28 Jun 2013 18:45:38 +0000 (UTC)
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <51CBBCD8.5030600@ti.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+ <51CAEB33.5010101@ti.com>
+ <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
+ <51CBBCD8.5030600@ti.com>
+Message-ID: <alpine.DEB.2.02.1306281844090.8767@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 11:48:49AM -0600, Stephen Warren wrote:
-> On 06/27/2013 04:13 AM, Thierry Reding wrote:
-> > On Tue, Jun 25, 2013 at 05:27:50PM +0800, Joseph Lo wrote:
-> >> Hooking tegra_tear_down_cpu for Tegra114 for supporting cluster
-> >> power down when CPU cluster suspneded in LP2.
-> >> 
-> >> Signed-off-by: Joseph Lo <josephl@nvidia.com> --- 
-> >> arch/arm/mach-tegra/pm.c | 1 + 1 file changed, 1 insertion(+)
-> >> 
-> >> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c 
-> >> index 94e69be..a0668a2 100644 --- a/arch/arm/mach-tegra/pm.c +++
-> >> b/arch/arm/mach-tegra/pm.c @@ -52,6 +52,7 @@ static void
-> >> tegra_tear_down_cpu_init(void) tegra_tear_down_cpu =
-> >> tegra20_tear_down_cpu; break; case TEGRA30: +	case TEGRA114: if
-> >> (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC)) tegra_tear_down_cpu =
-> >> tegra30_tear_down_cpu;
-> > 
-> > This is getting a little weird. Suppose I want to build a Tegra114
-> > only kernel. With the above code it means the tegra_tear_down_cpu
-> > won't be hooked because ARCH_TEGRA_3x_SOC isn't selected.
-> > 
-> > Perhaps tegra30_tear_down_cpu() should be built unconditionally so
-> > that it's always available? I suspect that something similar will
-> > need to be done for future chips too, further complicating
-> > matters.
-> > 
-> > There are other alternatives like adding another Kconfig symbol
-> > which doesn't cover all of Tegra30 but only code shared with
-> > Tegra114 (and possible future chips) or building sleep-tegra30.S if
-> > either one of the ARCH_TEGRA_3x_SOC or ARCH_TEGRA_114_SOC symbols
-> > is selected.
-> 
-> To be honest, I wonder if we should just get rid of ARCH_TEGRA_*_SOC,
-> and build everything if ARCH_TEGRA is defined. tegra_defconfig enables
-> all ARCH_TEGRA_*_SOC anyway, and I'm afraid I don't test other
-> configurations very often, and I assume that distros will enable
-> everything...
+Hi Lokesh
 
-The same thing had occurred to me as well. Obviously there could be some
-savings in executable code for people that really only need one specific
-generation. But, without having any concrete numbers, I suspect that all
-the ARCH_TEGRA code is less than 100 KiB in total so I don't think it
-matters that much given that there aren't any devices with less than 256
-MiB of RAM (that I've heard of at least).
+On Thu, 27 Jun 2013, Lokesh Vutla wrote:
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130628/157358c0/attachment.sig>
+> On Wednesday 26 June 2013 10:56 PM, Paul Walmsley wrote:
+> > 
+> > Here's how I do it:
+> > 
+> > ARCH=arm CROSS_COMPILE=${TOOLCHAIN_PATH}/bin/${TOOLCHAIN_PREFIX} nice make
+> > -j$CORES zImage am335x-bone.dtb
+> > 
+> > cat arch/arm/boot/zImage arch/arm/boot/am335x-bone.dtb >
+> > arch/arm/boot/zImage-dtb.am335x-bone
+> Here is the catch..
+> Your dtb is generated in arch/arm/boot/dts/ folder(before V3.8 dtb was
+> generated in arch/arm/boot).
+
+Ugh... that's probably it :-(
+
+> You are using very old dtb file. Please delete all your dtb files in
+> arch/arm/boot/ folder and check once.
+
+The tree is freshly recreated for each build, so the most likely scenario 
+is that there's no DTB file at all appended to the image.
+
+> Here is the patch from Grant Likely which does that.
+> https://patchwork.kernel.org/patch/1813321/
+> Can you please give a try updating this ..:)
+
+Yeah will try that, probably either today or tomorrow.
+
+
+- Paul
