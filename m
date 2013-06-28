@@ -1,78 +1,42 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Jun 2013 22:51:33 +0100
-Subject: armada_drm clock selection
-In-Reply-To: <20130628211848.GJ4283@n2100.arm.linux.org.uk>
-References: <20130628201133.1D6D2FAAD5@dev.laptop.org>
- <20130628211848.GJ4283@n2100.arm.linux.org.uk>
-Message-ID: <20130628215133.GL4283@n2100.arm.linux.org.uk>
+Date: Fri, 28 Jun 2013 22:55:12 +0100
+Subject: Armada DRM driver on OLPC XO
+In-Reply-To: <CAMLZHHSmoxDamhW6vcdfqhWH=FKR1m5-Z95P8LSZ+SFDO=yVhA@mail.gmail.com>
+References: <20130625204726.BF65C12647A@dev.laptop.org>
+ <20130628212723.GK4283@n2100.arm.linux.org.uk>
+ <CAMLZHHSmoxDamhW6vcdfqhWH=FKR1m5-Z95P8LSZ+SFDO=yVhA@mail.gmail.com>
+Message-ID: <20130628215512.GM4283@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 10:18:48PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jun 28, 2013 at 04:11:32PM -0400, Daniel Drake wrote:
-> > +int armada_drm_find_best_clock(struct armada_private *priv, long needed_rate)
-> > +{
-> > +	int i;
-> > +
-> > +	/* check if any clock can meet this rate directly */
-> > +	for (i = 0; i < ARMADA_MAX_CLOCK; i++) {
-> > +		struct clk *clk = priv->clk[i];
-> > +		long ref;
-> > +
-> > +		if (!clk)
-> > +			continue;
-> > +
-> > +		clk_set_rate(clk, needed_rate);
-> > +		ref = clk_get_rate(clk);
-> > +
-> > +		if (ref % needed_rate == 0)
-> > +			return i;
-> > +	}
-> > +
-> > +	/* fallback: return first available clock */
-> > +	for (i = 0; i < ARMADA_MAX_CLOCK; i++) {
-> > +		struct clk *clk = priv->clk[i];
-> > +		if (clk)
-> > +			return i;
-> > +	}
-> > +
-> > +	return -ENOENT;
-> > +}
+On Fri, Jun 28, 2013 at 03:36:37PM -0600, Daniel Drake wrote:
+> On Fri, Jun 28, 2013 at 3:27 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Jun 25, 2013 at 04:47:26PM -0400, Daniel Drake wrote:
+> >> I have tested it on OLPC XO-1.75 (MMP2 aka Armada610) and OLPC XO-4 (MMP3
+> >> aka PXA2128). After a bit of fighting, I have it running. Could you share your
+> >> X driver, or your methodology for testing hardware cursors? I'd like to test
+> >> your work there too.
+> >
+> > BTW... a point on this.  As you don't have the LCD_SPU_ADV_REG register,
+> > you probably don't have support for ARGB cursors.  DRM only supports ARGB
+> > cursors.  You can't down-convert an ARGB cursor to something which looks
+> > reasonable in the kernel, so I'd suggest forgetting hardware cursors.
+> > Even converting ARGB to transparency + RGB looks rubbish and wrong.
 > 
-> This can be a library function called by the compute_clock implementation.
-> However, it's buggy.  It's not returning the best clock.  If we're going
-> to go to the expense of potentially causing the clock tree to recalculate
-> for every clock connected to this device, then we'd better do a good job
-> here.
-> 
-> That is - compute the source clock which can give us the _best_
-> approximation to the required clock.  We're almost doing that with the
-> "ref % needed_rate" line, so if we're already doing that calculation,
-> let's track for each iteration whether the clock gives us a better match
-> than our previous one - and return the best approximation.
-> 
-> And why use clk_set_rate()/clk_get_rate()?  (a) what if clk_set_rate()
-> fails (the API allows it to.)  (b) what's wrong with clk_round_rate()?
+> Interesting. Yes, a previous developer battled unsuccessfully with
+> hardware cursors and in the end we ended up using low color depth ones
+> which don't look great. I was wondering if you had found something
+> new, but it sounds like that we really are limited by the hardware.
 
-There's a more fundamental point here.
+The "something new" is that the Armada 510 has support for ARGB, not
+quite in the size that X and DRM prefers (64x64), but nevertheless
+it's full alpha-blended RGB.  64x32 seems to work and X seems to be
+happy with it - but there's no way at the moment for DRM to tell X
+about that kind of capability (so a generic kms driver can't use it.)
 
-The AXI and PLL clocks are shared between the two LCD controllers in
-the 510.  If one LCD controller is using one clock, what happens when
-we call clk_set_rate() on that clock due to a change on the other LCD
-controller.
+However, as I say, that's not available on your SoC if you don't have
+the LCD_SPU_ADV_REG register.
 
-That might result in the PLL dividers being modified and changing the
-clock input to the other LCD controller.  Moreover, we might find that
-the rate isn't suitable for us, so we've just disrupted a clock for
-no gain what so ever.  That's even more reason to use the clk_round_rate(),
-but it also opens the bigger question: if we're going to dynamically
-select the clock input, we need to take notice of _both_ LCD controller
-requirements.
-
-Moreover, the AXI bus clock (yes, it's the actual bus clock) is one
-available input to the LCD controller pixel clock.  We certainly do
-not want to go fiddling with that clock rate without good reason to
-(iow, we're pretty sure we want to reprogram its rate _and_ use it,
-and disrupt the clock rate that the AXI bus sees.)  That will have
-a direct impact on the throughput of all masters on the AXI bus -
-which includes the CPU and memory.
+My plan is to push the cursor support out to the growing variant
+backends, and leave it unimplemented on anything but Armada 510.
