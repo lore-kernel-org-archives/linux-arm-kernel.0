@@ -1,31 +1,46 @@
-From: dsd@laptop.org (Daniel Drake)
-Date: Fri, 28 Jun 2013 15:36:37 -0600
-Subject: Armada DRM driver on OLPC XO
-In-Reply-To: <20130628212723.GK4283@n2100.arm.linux.org.uk>
-References: <20130625204726.BF65C12647A@dev.laptop.org>
- <20130628212723.GK4283@n2100.arm.linux.org.uk>
-Message-ID: <CAMLZHHSmoxDamhW6vcdfqhWH=FKR1m5-Z95P8LSZ+SFDO=yVhA@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 28 Jun 2013 14:35:52 -0700
+Subject: [PATCH] i2c: iop3xxx: fix build failure after waitqueue changes
+Message-ID: <1372455352-26260-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 3:27 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jun 25, 2013 at 04:47:26PM -0400, Daniel Drake wrote:
->> I have tested it on OLPC XO-1.75 (MMP2 aka Armada610) and OLPC XO-4 (MMP3
->> aka PXA2128). After a bit of fighting, I have it running. Could you share your
->> X driver, or your methodology for testing hardware cursors? I'd like to test
->> your work there too.
->
-> BTW... a point on this.  As you don't have the LCD_SPU_ADV_REG register,
-> you probably don't have support for ARGB cursors.  DRM only supports ARGB
-> cursors.  You can't down-convert an ARGB cursor to something which looks
-> reasonable in the kernel, so I'd suggest forgetting hardware cursors.
-> Even converting ARGB to transparency + RGB looks rubbish and wrong.
+There has long been a syntax problem in iop3xx_i2c_wait_event() which
+has been somehow hidden by the macros in <linux/wait.h>.  After some
+recent cleanup/rework of the wait_event_* helpers, the bug has come
+out from hiding and now results in build failure:
 
-Interesting. Yes, a previous developer battled unsuccessfully with
-hardware cursors and in the end we ended up using low color depth ones
-which don't look great. I was wondering if you had found something
-new, but it sounds like that we really are limited by the hardware.
+/work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c: In function 'iop3xx_i2c_wait_event':
+/work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:143: error: expected ')' before ';' token
+/work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:157: error: expected ')' before ';' token
+/work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:213: error: expected ')' before ';' token
+/work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:291: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
+/work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:551: error: expected ')' before ';' token
+/work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:565: error: expected ')' before ';' token
+/work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:764: error: expected ')' before ';' token
+/work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:778: error: expected ')' b
 
-Thanks
-Daniel
+Fix by removing stray ';'
+
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+Discovered in new build failure of iop32xx_defconfig with next-20130628
+
+ drivers/i2c/busses/i2c-iop3xx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-iop3xx.c b/drivers/i2c/busses/i2c-iop3xx.c
+index bc99333..dd24aa0 100644
+--- a/drivers/i2c/busses/i2c-iop3xx.c
++++ b/drivers/i2c/busses/i2c-iop3xx.c
+@@ -176,7 +176,7 @@ iop3xx_i2c_wait_event(struct i2c_algo_iop3xx_data *iop3xx_adap,
+ 		interrupted = wait_event_interruptible_timeout (
+ 			iop3xx_adap->waitq,
+ 			(done = compare( sr = iop3xx_i2c_get_srstat(iop3xx_adap) ,flags )),
+-			1 * HZ;
++			1 * HZ
+ 			);
+ 		if ((rc = iop3xx_i2c_error(sr)) < 0) {
+ 			*status = sr;
+-- 
+1.8.3
