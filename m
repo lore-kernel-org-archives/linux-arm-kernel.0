@@ -1,122 +1,74 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 28 Jun 2013 09:44:36 +0200
-Subject: [PATCH v2 2/4] mmc: atmel-mci: prepare clk before calling enable
-In-Reply-To: <1372147891-4296-1-git-send-email-b.brezillon@overkiz.com>
-References: <1372147702-4074-1-git-send-email-b.brezillon@overkiz.com>
- <1372147891-4296-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <51CD3EE4.90902@atmel.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Fri, 28 Jun 2013 09:52:40 +0200
+Subject: [PATCH v1 08/12] input: keypad-matrix: tell GPIO pins from
+ matrix lines
+In-Reply-To: <51C8D599.2010706@wwwdotorg.org>
+References: <1371838198-7327-1-git-send-email-gsi@denx.de>
+ <1371838198-7327-9-git-send-email-gsi@denx.de>
+ <51C4C87B.3050300@wwwdotorg.org>
+ <20130622100052.GH24305@book.gsilab.sittig.org>
+ <51C8D599.2010706@wwwdotorg.org>
+Message-ID: <20130628075240.GU24305@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/06/2013 10:11, Boris BREZILLON :
-> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
-> avoid common clk framework warnings.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-It seems that you forgot the Acked-by line from Ludovic.
+[ late reply, just catching up with the backlog ]
 
-One comment...
+On Mon, Jun 24, 2013 at 17:26 -0600, Stephen Warren wrote:
+> 
+> [ ... sparse matrices, not all columns/rows populated ... ]
+> 
+> Looking at this from the approach of the keymap data: Why does the DT
+> need to say "these columns are used" or "these rows are used"? That data
+> is already available from a simple search of the keymap for the various
+> row-/column-IDs. Let the driver or keymap parser calculate the set of
+> valid rows/columns when the keymap is installed. With this approach, you
+> could even get far more optimal.
 
-> ---
->   drivers/mmc/host/atmel-mci.c |   27 ++++++++++++++++++---------
->   1 file changed, 18 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index e75774f..631c4cf 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -380,6 +380,8 @@ static int atmci_regs_show(struct seq_file *s, void *v)
->   {
->   	struct atmel_mci	*host = s->private;
->   	u32			*buf;
-> +	int			ret = 0;
-> +
->
->   	buf = kmalloc(ATMCI_REGS_SIZE, GFP_KERNEL);
->   	if (!buf)
-> @@ -391,9 +393,13 @@ static int atmci_regs_show(struct seq_file *s, void *v)
->   	 * consistent.
->   	 */
->   	spin_lock_bh(&host->lock);
-> -	clk_enable(host->mck);
-> +	ret = clk_prepare_enable(host->mck);
+I agree that this reduces pain for .dts authors, which is a very
+good thing.  They need to provide the key map anyway, and the set
+of interconnections in the matrix can thus get determined
+programmatically.  Data overhead should be acceptable given the
+maximum matrix dimensions of 32x32.  I'll look into this ...
 
-Do you think that it is needed here? I do not think it can be called 
-before the probe() function and I do not know if the result can change 
-depending on when clk_prepare_enable() is called...
+> On some Tegra boards, there end up
+> being rather tri-angular keymaps, where key positions (0, 0), (0, 1),
+> (0, 2), (1, 1), (1, 2), (2, 2) end up being used. In this scenario,
+> detailed investigation of the keymap would reveal:
+> 
+> * Only scan columns 0..2
+> * For column 0, scan rows 0..2
+> * For column 1, scan rows 1..2
+> * For columm 2, scan row 2.
 
-> +	if (ret) {
-> +		spin_unlock_bh(&host->lock);
-> +		goto out;
-> +	}
->   	memcpy_fromio(buf, host->regs, ATMCI_REGS_SIZE);
-> -	clk_disable(host->mck);
-> +	clk_disable_unprepare(host->mck);
->   	spin_unlock_bh(&host->lock);
->
->   	seq_printf(s, "MR:\t0x%08x%s%s ",
-> @@ -444,9 +450,10 @@ static int atmci_regs_show(struct seq_file *s, void *v)
->   				val & ATMCI_CFG_LSYNC ? " LSYNC" : "");
->   	}
->
-> +out:
->   	kfree(buf);
->
-> -	return 0;
-> +	return ret;
->   }
->
->   static int atmci_regs_open(struct inode *inode, struct file *file)
-> @@ -1281,7 +1288,7 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->
->   		spin_lock_bh(&host->lock);
->   		if (!host->mode_reg) {
-> -			clk_enable(host->mck);
-> +			clk_prepare_enable(host->mck);
->   			atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
->   			atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIEN);
->   			if (host->caps.has_cfg_reg)
-> @@ -1361,7 +1368,7 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->   			atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
->   			if (host->mode_reg) {
->   				atmci_readl(host, ATMCI_MR);
-> -				clk_disable(host->mck);
-> +				clk_disable_unprepare(host->mck);
->   			}
->   			host->mode_reg = 0;
->   		}
-> @@ -2379,10 +2386,12 @@ static int __init atmci_probe(struct platform_device *pdev)
->   	if (!host->regs)
->   		goto err_ioremap;
->
-> -	clk_enable(host->mck);
-> +	ret = clk_prepare_enable(host->mck);
-> +	if (ret)
-> +		goto err_request_irq;
->   	atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
->   	host->bus_hz = clk_get_rate(host->mck);
-> -	clk_disable(host->mck);
-> +	clk_disable_unprepare(host->mck);
->
->   	host->mapbase = regs->start;
->
-> @@ -2487,11 +2496,11 @@ static int __exit atmci_remove(struct platform_device *pdev)
->   			atmci_cleanup_slot(host->slot[i], i);
->   	}
->
-> -	clk_enable(host->mck);
-> +	clk_prepare_enable(host->mck);
->   	atmci_writel(host, ATMCI_IDR, ~0UL);
->   	atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
->   	atmci_readl(host, ATMCI_SR);
-> -	clk_disable(host->mck);
-> +	clk_disable_unprepare(host->mck);
->
->   	if (host->dma.chan)
->   		dma_release_channel(host->dma.chan);
->
+That's another question I had.  So far I was concerned with just
+polling or scanning the relevant columns, while all the rows for
+a given column were queried (as the driver always used to do).
+
+Now you raise the question of whether rows should get queried as
+well depending on whether "a key may sit there".  It wasn't the
+exact question I raised, but I added a comment to the spot where
+input subsystem events get generated:  Is the driver expected to
+emit events for matrix positions where no key map entry exists?
+OTOH was my further reasoning that in theory the keymap shall
+reflect the hardware implementation, so users should not be able
+to press keys which don't have a corresponding key map entry.
+And switching or modifying key maps from software shall cope with
+the fact when "raw keys" get reported which don't carry a code.
+
+Enter the above row/column filter based on the keymap:  Only
+controlling those pins where interconnections have a keymap entry
+(an operation that's cheap) reduces access to GPIOs (which may or
+may not be expensive in "abolute" terms, but certainly is more
+expensive than a keymap check), and eliminiates the issue of
+emitting events which lack codes.  Sounds like the appropriate
+solution to the problem.
 
 
+virtually yours
+Gerhard Sittig
 -- 
-Nicolas Ferre
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
