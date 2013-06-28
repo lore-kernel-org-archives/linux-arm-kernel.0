@@ -1,68 +1,67 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Fri, 28 Jun 2013 10:14:34 +0000
-Subject: [PATCH 2/4] davinci: da8xx/omap-l1: Remove hard coding of rtc
- device	wakeup
-In-Reply-To: <1372412109-986-3-git-send-email-gururaja.hebbar@ti.com>
-References: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
- <1372412109-986-3-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA95D17@DBDE04.ent.ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 28 Jun 2013 12:19:11 +0200
+Subject: [linux-sunxi] [PATCH 2/8] clocksource: sun4i: Add clocksource
+ and sched clock drivers
+In-Reply-To: <20130627225101.358208c1@i7>
+References: <1372281421-2099-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1372281421-2099-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20130627131729.5fff8468@i7> <20130627170228.GC4319@lukather>
+ <20130627225101.358208c1@i7>
+Message-ID: <20130628101911.GF4319@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Siarhei,
 
-On Fri, Jun 28, 2013 at 15:05:07, Hebbar, Gururaja wrote:
-> Since now rtc-omap driver itself calls deice_init_wakeup(dev, true),
-> duplicate call from the rtc device registration can be removed.
+> > > If we can be absolutely sure that nothing else may ever change
+> > > the TIMER_CNT64_CTL_REG, then its default value can be probably
+> > > cached instead of doing expensive read from the hardware register
+> > > each time?
+> > 
+> > Since it's a free-running counter, its value will always change, so the
+> > caching will bring no additions at all, right?
 > 
+> Sorry, 'caching' was not a very good description for something that is
+> already a compile time constant. I mean just replace
+> 
+>     u32 reg = readl(timer_base + TIMER_CNT64_CTL_REG);
+> 
+> with 
+> 
+>     u32 reg = TIMER_CNT64_CTL_CLR;
+> 
+> Because we know that the TIMER_CNT64_CTL_REG is already supposed
+> to have the default TIMER_CNT64_CTL_CLR value (initialized in the
+> 'sun4i_timer_init' function) between calls to 'sun4i_timer_sched_read'.
+> Inside of 'sun4i_timer_sched_read' we set an extra TIMER_CNT64_CTL_RL
+> bit in this register, but wait until it clears, effectively reverting
+> TIMER_CNT64_CTL_REG register back to the default TIMER_CNT64_CTL_CLR
+> value.
+> 
+> Removing this extra HW register read can save roughly a hundred of CPU
+> cycles here and provide a ~10% overall improvement for gettimeofday
+> (these estimates are based on the earlier benchmarks done with the
+> Allwinner 3.4 kernel).
+> 
+> Or maybe I'm overlooking something?
 
-Tested on da850-evm for rtc wake along with patch 1/2.
-$rtcwake -s 2 -d /dev/rtc0 -m mem
+Ah, I get what you mean now. We don't even need to bother about
+TIMER_CNT64_CTL_CLR now, since it's suppose to be cleared once the
+counter is reset.
 
-Tested-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+However, I'd very much prefer to take the safer approach for now, and
+try to optimise afterwards.
 
-> This is basically a partial revert of the prev commit
-> 
-> commit 75c99bb0006ee065b4e2995078d779418b0fab54
-> Author: Sekhar Nori <nsekhar@ti.com>
-> 
->     davinci: da8xx/omap-l1: mark RTC as a wakeup source
-> 
-> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> 
-> ---
-> :100644 100644 bf57252... 85a900c... M	arch/arm/mach-davinci/devices-da8xx.c
->  arch/arm/mach-davinci/devices-da8xx.c |    9 +--------
->  1 file changed, 1 insertion(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-> index bf57252..85a900c 100644
-> --- a/arch/arm/mach-davinci/devices-da8xx.c
-> +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> @@ -827,14 +827,7 @@ static struct platform_device da8xx_rtc_device = {
->  
->  int da8xx_register_rtc(void)
->  {
-> -	int ret;
-> -
-> -	ret = platform_device_register(&da8xx_rtc_device);
-> -	if (!ret)
-> -		/* Atleast on DA850, RTC is a wakeup source */
-> -		device_init_wakeup(&da8xx_rtc_device.dev, true);
-> -
-> -	return ret;
-> +	return  platform_device_register(&da8xx_rtc_device);
->  }
->  
->  static void __iomem *da8xx_ddr2_ctlr_base;
-> -- 
-> 1.7.9.5
-> 
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
-> 
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130628/844d3b16/attachment.sig>
