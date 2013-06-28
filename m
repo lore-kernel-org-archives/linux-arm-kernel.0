@@ -1,23 +1,27 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 28 Jun 2013 13:37:16 -0400 (EDT)
-Subject: [PATCH v3 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <1372410473-30920-1-git-send-email-ming.lei@canonical.com>
-Message-ID: <Pine.LNX.4.44L0.1306281336220.1047-100000@iolanthe.rowland.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 28 Jun 2013 14:41:25 -0300
+Subject: imx-drm does not report correct info in fbset
+In-Reply-To: <CAOMZO5A=JSHJrkXwXkYYxbkjtcFv3NU5W6F4hSb5Y7ZrpKij=A@mail.gmail.com>
+References: <CAOMZO5A=JSHJrkXwXkYYxbkjtcFv3NU5W6F4hSb5Y7ZrpKij=A@mail.gmail.com>
+Message-ID: <CAOMZO5ArQdCmQGoEW=57sr4pJhssKXKQhTmDxHo7cVfA1q82Cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Jun 2013, Ming Lei wrote:
+On Fri, Jun 28, 2013 at 2:28 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Philipp/Sascha,
+>
+> When I enable the parallel display on a mx53qsb, I noticed that fbset
+> does not report the correct information:
+>
+> mode "800x480-0"
+>         # D: 0.000 MHz, H: 0.000 kHz, V: 0.000 Hz
+>         geometry 800 480 800 480 16
+>         timings 0 0 0 0 0 0 0
 
-> The patchset supports to run giveback of URB in tasklet context, so that
-> DMA unmapping/mapping on transfer buffer and compelte() callback can be
-> run with interrupt enabled, then time of HCD interrupt handler(IRQs
-> disabled time) can be saved much. Also this approach may simplify HCD
-> since HCD lock needn't be released any more before calling
-> usb_hcd_giveback_urb().
-> 
-> The patchset enables the mechanism on EHCI HCD now.
+Ok, just realized that my host PC reports the same in the 'timings' line.
 
-Patches 1, 2, 4 all look okay.  Patch 3 needs a little more work, as 
-described in a separate reply.
+So not an issue with the imx-drm driver then.
 
-Alan Stern
+Regards,
+
+Fabio Estevam
