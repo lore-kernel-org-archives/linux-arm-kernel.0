@@ -1,63 +1,64 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 28 Jun 2013 11:25:56 -0700
-Subject: [PATCH v1 08/12] input: keypad-matrix: tell GPIO pins from
- matrix lines
-In-Reply-To: <51CD9F3E.9060003@wwwdotorg.org>
-References: <1371838198-7327-1-git-send-email-gsi@denx.de>
- <1371838198-7327-9-git-send-email-gsi@denx.de>
- <51C4C87B.3050300@wwwdotorg.org>
- <20130622100052.GH24305@book.gsilab.sittig.org>
- <51C8D599.2010706@wwwdotorg.org>
- <20130628075240.GU24305@book.gsilab.sittig.org>
- <51CD9F3E.9060003@wwwdotorg.org>
-Message-ID: <20130628182556.GB21589@core.coreip.homeip.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 28 Jun 2013 20:34:24 +0200
+Subject: [PATCH 06/11] ARM: tegra114: hook tegra_tear_down_cpu function
+In-Reply-To: <51CC7B01.30503@wwwdotorg.org>
+References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
+ <1372152475-18617-7-git-send-email-josephl@nvidia.com>
+ <20130627101335.GB15081@mithrandir> <51CC7B01.30503@wwwdotorg.org>
+Message-ID: <20130628183423.GA15416@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 08:35:42AM -0600, Stephen Warren wrote:
-> On 06/28/2013 01:52 AM, Gerhard Sittig wrote:
+On Thu, Jun 27, 2013 at 11:48:49AM -0600, Stephen Warren wrote:
+> On 06/27/2013 04:13 AM, Thierry Reding wrote:
+> > On Tue, Jun 25, 2013 at 05:27:50PM +0800, Joseph Lo wrote:
+> >> Hooking tegra_tear_down_cpu for Tegra114 for supporting cluster
+> >> power down when CPU cluster suspneded in LP2.
+> >> 
+> >> Signed-off-by: Joseph Lo <josephl@nvidia.com> --- 
+> >> arch/arm/mach-tegra/pm.c | 1 + 1 file changed, 1 insertion(+)
+> >> 
+> >> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c 
+> >> index 94e69be..a0668a2 100644 --- a/arch/arm/mach-tegra/pm.c +++
+> >> b/arch/arm/mach-tegra/pm.c @@ -52,6 +52,7 @@ static void
+> >> tegra_tear_down_cpu_init(void) tegra_tear_down_cpu =
+> >> tegra20_tear_down_cpu; break; case TEGRA30: +	case TEGRA114: if
+> >> (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC)) tegra_tear_down_cpu =
+> >> tegra30_tear_down_cpu;
 > > 
-> > [ late reply, just catching up with the backlog ]
+> > This is getting a little weird. Suppose I want to build a Tegra114
+> > only kernel. With the above code it means the tegra_tear_down_cpu
+> > won't be hooked because ARCH_TEGRA_3x_SOC isn't selected.
 > > 
-> > On Mon, Jun 24, 2013 at 17:26 -0600, Stephen Warren wrote:
-> >>
-> >> [ ... sparse matrices, not all columns/rows populated ... ]
+> > Perhaps tegra30_tear_down_cpu() should be built unconditionally so
+> > that it's always available? I suspect that something similar will
+> > need to be done for future chips too, further complicating
+> > matters.
+> > 
+> > There are other alternatives like adding another Kconfig symbol
+> > which doesn't cover all of Tegra30 but only code shared with
+> > Tegra114 (and possible future chips) or building sleep-tegra30.S if
+> > either one of the ARCH_TEGRA_3x_SOC or ARCH_TEGRA_114_SOC symbols
+> > is selected.
 > 
-> >> On some Tegra boards, there end up
-> >> being rather tri-angular keymaps, where key positions (0, 0), (0, 1),
-> >> (0, 2), (1, 1), (1, 2), (2, 2) end up being used. In this scenario,
-> >> detailed investigation of the keymap would reveal:
-> >>
-> >> * Only scan columns 0..2
-> >> * For column 0, scan rows 0..2
-> >> * For column 1, scan rows 1..2
-> >> * For columm 2, scan row 2.
-> > 
-> > That's another question I had.  So far I was concerned with just
-> > polling or scanning the relevant columns, while all the rows for
-> > a given column were queried (as the driver always used to do).
-> > 
-> > Now you raise the question of whether rows should get queried as
-> > well depending on whether "a key may sit there".  It wasn't the
-> > exact question I raised, but I added a comment to the spot where
-> > input subsystem events get generated:  Is the driver expected to
-> > emit events for matrix positions where no key map entry exists?
-> 
-> I would assume there is no need to, but I don't know for sure. Perhaps
-> Dmitry can answer that?
+> To be honest, I wonder if we should just get rid of ARCH_TEGRA_*_SOC,
+> and build everything if ARCH_TEGRA is defined. tegra_defconfig enables
+> all ARCH_TEGRA_*_SOC anyway, and I'm afraid I don't test other
+> configurations very often, and I assume that distros will enable
+> everything...
 
-It really depends whether the driver can absolutely be sure that the key
-is not there or if it might be. Because keymaps are configurable from
-userspace the driver should not make this decision based on keymap
-itself.
+The same thing had occurred to me as well. Obviously there could be some
+savings in executable code for people that really only need one specific
+generation. But, without having any concrete numbers, I suspect that all
+the ARCH_TEGRA code is less than 100 KiB in total so I don't think it
+matters that much given that there aren't any devices with less than 256
+MiB of RAM (that I've heard of at least).
 
-When you scan a matrix and come upon the "pressed key" condition, you
-supposed to emit EV_MSC/MSC_SCAN, followed by appropriate EV_KEY/KEY_*.
-Normally the "keys that aren't there" generate KEY_RESERVED events that
-are simply dropped by input core (cause it is easier to implement).
-MSC_SCAN events, however, reach the userspace intact.
-
-Hope this helps.
-
--- 
-Dmitry
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130628/157358c0/attachment.sig>
