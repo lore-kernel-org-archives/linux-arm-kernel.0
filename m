@@ -1,33 +1,78 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 28 Jun 2013 10:38:55 +1000
-Subject: [PATCH linux-next] arm: zynq: fix compilation warning
-In-Reply-To: <51CC37BF.8030309@monstr.eu>
-References: <1372336962-6459-1-git-send-email-vincent.stehle@freescale.com>
- <51CC37BF.8030309@monstr.eu>
-Message-ID: <20130628103855.c4a89a6f1c6ef425fee34bc6@canb.auug.org.au>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 28 Jun 2013 10:17:49 +0800
+Subject: [PATCH 1/2] serial: imx: remove the uart_console() check
+In-Reply-To: <20130627141535.GD2695@S2101-09.ap.freescale.net>
+References: <1372239359-4054-1-git-send-email-b32955@freescale.com>
+ <20130627141535.GD2695@S2101-09.ap.freescale.net>
+Message-ID: <51CCF24D.1060007@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Jun 2013 15:01:51 +0200 Michal Simek <monstr@monstr.eu> wrote:
+? 2013?06?27? 22:15, Shawn Guo ??:
+>>   	* Check whether an invalid uart number has been specified, and
+>> >  @@ -1371,6 +1381,15 @@ imx_console_setup(struct console *co, char *options)
+>> >    	if (sport == NULL)
+>> >    		return -ENODEV;
+>> >  
+>> >  +	retval = clk_prepare_enable(sport->clk_per);
+>> >  +	if (retval)
+>> >  +		goto error_console;
+>> >  +	retval = clk_prepare_enable(sport->clk_ipg);
+>> >  +	if (retval) {
+>> >  +		clk_disable_unprepare(sport->clk_per);
+>> >  +		goto error_console;
+>> >  +	}
+>> >  +
+> Why do we need clk_enable() here at all?  The amba-pl011 driver only
+> calls clk_prepare() in console .setup().
 >
-> Arnd asked in this post
-> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg454947.html
-> to fold his small patch to that larger one.
-> 
-> Not sure why it is not there.
-> Arnd, Robin?
+We need to set the imx_setUp_ufcr() in our imx_console_setup(),
+so we need to enable the clocks, aren't we?
+>> >    	if (options)
+>> >    		uart_parse_options(options,&baud,&parity,&bits,&flow);
+>> >    	else
+>> >  @@ -1378,7 +1397,17 @@ imx_console_setup(struct console *co, char *options)
+>> >  
+>> >    	imx_setup_ufcr(sport, 0);
+>> >  
+>> >  -	return uart_set_options(&sport->port, co, baud, parity, bits, flow);
+>> >  +	retval = uart_set_options(&sport->port, co, baud, parity, bits, flow);
+>> >  +
+>> >  +	clk_disable(sport->clk_per);
+>> >  +	clk_disable(sport->clk_ipg);
+>> >  +	if (retval) {
+>> >  +		clk_unprepare(sport->clk_per);
+>> >  +		clk_unprepare(sport->clk_ipg);
+>> >  +	}
+>> >  +
+>> >  +error_console:
+>> >  +	return retval;
+>> >    }
+>> >  
+>> >    static struct uart_driver imx_reg;
+>> >  @@ -1583,10 +1612,8 @@ static int serial_imx_probe(struct platform_device *pdev)
+>> >    		goto deinit;
+>> >    	platform_set_drvdata(pdev, sport);
+>> >  
+>> >  -	if (!uart_console(&sport->port)) {
+>> >  -		clk_disable_unprepare(sport->clk_per);
+>> >  -		clk_disable_unprepare(sport->clk_ipg);
+>> >  -	}
+>> >  +	clk_disable_unprepare(sport->clk_per);
+>> >  +	clk_disable_unprepare(sport->clk_ipg);
+> I also had a hard time to understand why we need to turn on the clocks
+> in .probe() for a while and then turn them off.
+In the probe's uart_add_one_port(), we will register the console and 
+call the setup() hook,
+so it's ok to disable the clocks in the end of the probe.
+> It just reminds me a thing.  Did you test CONFIG_CONSOLE_POLL support
+> when your commit 28eb427 (serial: imx: enable the clocks only when the
+> uart is used) went in?  The commit turns off the clocks at the
+sorry, i did not do this.
+> end of .probe(), but who will enable the clocks for .poll_get_char()
+> and .poll_put_char()?  The amba-pl011 driver does that in .poll_init().
+>
+dido. in the uart_add_one_port().
 
-Should have asked Andrew :-)
-
-I have added (most of) Arnd's patch to the end of the akpm tree today.
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130628/ceca51ac/attachment.sig>
+thanks
+Huang Shijie
