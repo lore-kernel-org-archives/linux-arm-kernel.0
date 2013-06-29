@@ -1,91 +1,73 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 29 Jun 2013 16:04:05 -0300
-Subject: [PATCH v5 02/12] bus: mvebu-mbus: Introduce device tree binding
+Date: Sat, 29 Jun 2013 16:04:08 -0300
+Subject: [PATCH v5 05/12] ARM: mvebu: Remove the harcoded BootROM window
+ allocation
 In-Reply-To: <1372532655-20321-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1372532655-20321-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1372532655-20321-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1372532655-20321-6-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the most fundamental device-tree initialization.
-We only introduce what's required to be able to probe the mvebu-mbus
-driver from the DT. Follow-up patches will extend the device tree binding,
-allowing to describe static address decoding windows.
+The address decoding window to access the BootROM should not be
+allocated programatically, but instead declared in the device tree.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/bus/mvebu-mbus.c | 49 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mbus.h     |  1 +
- 2 files changed, 50 insertions(+)
+ arch/arm/mach-mvebu/platsmp.c | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index d0feee5..1f8b5c8 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -883,3 +883,52 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
- 			sdramwins_phys_base,
- 			sdramwins_size);
- }
-+
-+#ifdef CONFIG_OF
-+int __init mvebu_mbus_dt_init(void)
-+{
-+	struct resource mbuswins_res, sdramwins_res;
-+	struct device_node *np, *controller;
-+	const struct of_device_id *of_id;
-+	const __be32 *prop;
-+	int ret;
-+
-+	np = of_find_matching_node(NULL, of_mvebu_mbus_ids);
-+	if (!np) {
-+		pr_err("could not find a matching SoC family\n");
-+		return -ENODEV;
-+	}
-+
-+	of_id = of_match_node(of_mvebu_mbus_ids, np);
-+	mbus_state.soc = of_id->data;
-+
-+	prop = of_get_property(np, "controller", NULL);
-+	if (!prop) {
-+		pr_err("required 'controller' property missing\n");
-+		return -EINVAL;
-+	}
-+
-+	controller = of_find_node_by_phandle(be32_to_cpup(prop));
-+	if (!controller) {
-+		pr_err("could not find an 'mbus-controller' node\n");
-+		return -ENODEV;
-+	}
-+
-+	if (of_address_to_resource(controller, 0, &mbuswins_res)) {
-+		pr_err("cannot get MBUS register address\n");
-+		return -EINVAL;
-+	}
-+
-+	if (of_address_to_resource(controller, 1, &sdramwins_res)) {
-+		pr_err("cannot get SDRAM register address\n");
-+		return -EINVAL;
-+	}
-+
-+	ret = mvebu_mbus_common_init(&mbus_state,
-+				     mbuswins_res.start,
-+				     resource_size(&mbuswins_res),
-+				     sdramwins_res.start,
-+				     resource_size(&sdramwins_res));
-+	return ret;
-+}
-+#endif
-diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index dba482e..a93c62b 100644
---- a/include/linux/mbus.h
-+++ b/include/linux/mbus.h
-@@ -68,5 +68,6 @@ int mvebu_mbus_del_window(phys_addr_t base, size_t size);
- int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
- 		    size_t mbus_size, phys_addr_t sdram_phys_base,
- 		    size_t sdram_size);
-+int mvebu_mbus_dt_init(void);
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index 93f2f3a..a952f8d 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -21,6 +21,7 @@
+ #include <linux/smp.h>
+ #include <linux/clk.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/mbus.h>
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+@@ -29,6 +30,9 @@
+ #include "pmsu.h"
+ #include "coherency.h"
  
- #endif /* __LINUX_MBUS_H */
++#define AXP_BOOTROM_BASE 0xfff00000
++#define AXP_BOOTROM_SIZE 0x100000
++
+ void __init set_secondary_cpus_clock(void)
+ {
+ 	int thiscpu;
+@@ -115,10 +119,29 @@ static void __init armada_xp_smp_init_cpus(void)
+ 
+ void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
+ {
++	struct device_node *node;
++	struct resource res;
++	int err;
++
+ 	set_secondary_cpus_clock();
+ 	flush_cache_all();
+ 	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+-	mvebu_mbus_add_window("bootrom", 0xfff00000, SZ_1M);
++
++	/*
++	 * In order to boot the secondary CPUs we need to ensure
++	 * the bootROM is mapped at the correct address.
++	 */
++	node = of_find_compatible_node(NULL, NULL, "marvell,bootrom");
++	if (!node)
++		panic("Cannot find 'marvell,bootrom' compatible node");
++
++	err = of_address_to_resource(node, 0, &res);
++	if (err < 0)
++		panic("Cannot get 'bootrom' node address");
++
++	if (res.start != AXP_BOOTROM_BASE ||
++	    resource_size(&res) != AXP_BOOTROM_SIZE)
++		panic("The address for the BootROM is incorrect");
+ }
+ 
+ struct smp_operations armada_xp_smp_ops __initdata = {
 -- 
 1.8.1.5
