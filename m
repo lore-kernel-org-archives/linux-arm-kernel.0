@@ -1,61 +1,64 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Sat, 29 Jun 2013 21:11:32 +0100
-Subject: [PATCH 0/2] ARM: sunxi: Convert DTSI to new CPU bindings
-In-Reply-To: <20130629193819.GD3353@n2100.arm.linux.org.uk>
-References: <1372437844-16325-1-git-send-email-maxime.ripard@free-electrons.com>
- <20130628171532.GD30603@e102568-lin.cambridge.arm.com>
- <20130628200333.GA2756@lukather>
- <CAOesGMgsD+tK4+ywvLzsWd+mngrP7zGgSFn0naWjSsQLGaUn2Q@mail.gmail.com>
- <20130629193819.GD3353@n2100.arm.linux.org.uk>
-Message-ID: <20130629201132.GA9375@e102568-lin.cambridge.arm.com>
+From: dsd@laptop.org (Daniel Drake)
+Date: Sat, 29 Jun 2013 14:15:58 -0600
+Subject: armada_drm clock selection
+In-Reply-To: <20130629192616.GC3353@n2100.arm.linux.org.uk>
+References: <20130628201133.1D6D2FAAD5@dev.laptop.org>
+ <20130628211848.GJ4283@n2100.arm.linux.org.uk>
+ <CAMLZHHQZ+36g9EQhj+LOgQioj8T5VDwvUdNrkVLboT8tYi9gXQ@mail.gmail.com>
+ <20130629192616.GC3353@n2100.arm.linux.org.uk>
+Message-ID: <CAMLZHHTFF2Ca7vr-gccLxPMW=vjAwApCLgtKJRQpz-bT5KVv=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 29, 2013 at 08:38:19PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jun 28, 2013 at 01:05:42PM -0700, Olof Johansson wrote:
-> > On Fri, Jun 28, 2013 at 1:03 PM, Maxime Ripard
-> > <maxime.ripard@free-electrons.com> wrote:
-> > > On Fri, Jun 28, 2013 at 06:15:32PM +0100, Lorenzo Pieralisi wrote:
-> > >> The patch above should already be queued in next/dt right ?
-> > >
-> > > Indeed.
-> > >
-> > > Then why the latest patch of your patchset got in 3.10, while the
-> > > patches actually fixing the DT it would have impacted were delayed to
-> > > 3.11?
-> > >
-> > > (And why was it merged so late in the development cycle?)
-> > 
-> > This. So now we have to scramble because some device trees will
-> > produce warnings at boot.
-> > 
-> > Russell, the alternative is to revert Lorenzo's patch for 3.10 (and
-> > re-introduce it for 3.11). Do you have a preference?
-> 
-> Sorry but I really don't understand what all the fuss in this thread
-> is about.
-> 
-> This thread seems to be saying that two development patches were
-> merged, which were 7762/1 and 7763/1, and that 7764/1 is a fix?
-> Are you sure about that, because that's not how they're described,
-> and not how they look either.
+On Sat, Jun 29, 2013 at 1:26 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> So, I'd suggest that an initial approach would be something along the
+> lines of:
+> - if there is an external clock, can it generate the desired rate?
+>   if yes, use it.
+> - otherwise, get the clock rate from the internal clocks and calculate
+>   the appropriate divider.  Use which ever one gives you the best
+>   approximation that's better than (eg) 1%.  If not, fail the mode set.
 
-Russell, technically speaking what are you saying is correct, but the
-problem is that the 7762/1, 7763/1 and 7764/1 were part of a series
-to update DT cpu/cpus bindings, topology, bring dts files up to standard
-and update kernel code to comply. The problem is the following: if
-7762/1 is merged but dts updates in the arm-soc tree (that can be
-considered fixes, but as I said it is hard to draw a line between fixes
-and dev since this series is meant to redefine the DT bindings themselves
-to make them as compliant as possible with ePAPR) are not merged at the same
-time, the kernel triggers warnings for boards with non-compliant dts.
+This sounds sane to me.
 
-That's the same reason why I asked to drop 7762/1 from stable queues,
-since if it gets there all dts updates should get there at the same
-time.
+According to your earlier mail, armada 510 is the only current target
+platform that has external clocks. For the fallback on internal
+clocks, we would not try to change the rate of any of them, we would
+just look at how close they can bring us to what is needed, as you
+describe.
 
-Please let me know if that's unclear and how I can help you fix the
-problem, I am just trying to syncronize all the changes the best I can.
+If any clocks are broken or useless on a specific platform, then they
+can be excluded from the DT or platform data. So this is really not
+far off from the ideas from Sebastian and me where we would simply
+pass in the information about the "interesting" clocks and be done
+with it.
 
-Apologies and thanks,
-Lorenzo
+I agree that we need the DT have a way of not only providing the
+clock, but also indicating which clock in the SCLK register it refers
+to, and I also think the way to do that is by having a fixed,
+documented clock naming scheme. So that should not be a problem. I'll
+avoid putting register values in the DT.
+
+I think that resolves all the open questions that I had, so I will
+work on this early next week.
+
+> This now brings me on to another important subject with DT vs DRM.
+> The way DRM is setup, it expects all resources for a particular
+> implementation to be known at 'drm_device' creation time.  You can't
+> "hot-plug" additional parts of the "drm system" together.  What this
+> means is that at driver load time (to use DRM terms) all parts must
+> be known.
+
+Its unfortunate that we can't hotplug the DRM bits, but at least that
+is no longer an open question.
+
+The super-device approach sounds sane and would seem to reflect on
+other parts of the DT that I have worked with. It seems reasonable to
+take the viewpoint that the LCD is a child connected to the display
+controller parent, which is what the DT layout suggests.
+
+I wonder what other DRM drivers do DT-wise? Maybe I will look into
+that after we've progressed with the clocks.
+
+Daniel
