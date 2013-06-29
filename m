@@ -1,86 +1,59 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Fri, 28 Jun 2013 23:49:10 -0500
-Subject: [PATCH 1/2] ARM: dts: mx53qsb: Enable VPU support
-In-Reply-To: <1372459759-10488-1-git-send-email-festevam@gmail.com>
-References: <1372459759-10488-1-git-send-email-festevam@gmail.com>
-Message-ID: <CAHCPf3s6_+aNs=LycgJzcOajmFuWy-mp66-BX+OMCLYDApS9cg@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 29 Jun 2013 12:55:03 +0800
+Subject: [PATCH] mmp: irq: Don't clear unused interrupt enable bits
+In-Reply-To: <CAMLZHHSS75dSd_PM5-Gu2K-kP+RF0Fx1E+TL=d-TeXzYSLsQPg@mail.gmail.com>
+References: <20130627175118.8A9FEFAACF@dev.laptop.org>
+ <CAMPhdO_Ccp_JeuNNkqP6Q+ubmG8rah_hkxFJmOBsetysu-+dNw@mail.gmail.com>
+ <CAMLZHHSS75dSd_PM5-Gu2K-kP+RF0Fx1E+TL=d-TeXzYSLsQPg@mail.gmail.com>
+Message-ID: <CAMPhdO8jAN5kCT_tgH4NxTJ=GOGQqXukUrxNWsHExUSXZ+44bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 5:49 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Jun 28, 2013 at 10:24 PM, Daniel Drake <dsd@laptop.org> wrote:
+> On Thu, Jun 27, 2013 at 11:15 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>> Is there any way to check this at run-time or at least by boot parameters?
 >
-> Enable Video Processing Unit (VPU) support.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Depends on Philipp Zabel's patch:
-> [PATCH] ARM: dts: add sram for imx53 and imx6q
->
-> Philipp,
->
-> I tried using the original mx53 vpu firmware that comes with the FSL BSP, but it
-> failed to load:
->
-> coda 63ff4000.vpu: firmware get command error
-> coda 63ff4000.vpu: HW initialization failed
->
-> Any suggestions?
->
-> Thanks!
->
->  arch/arm/boot/dts/imx53-qsb.dts |  4 ++++
->  arch/arm/boot/dts/imx53.dtsi    | 10 ++++++++++
->  2 files changed, 14 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-> index 512a1f6..eedd27e 100644
-> --- a/arch/arm/boot/dts/imx53-qsb.dts
-> +++ b/arch/arm/boot/dts/imx53-qsb.dts
-> @@ -297,6 +297,10 @@
->         status = "okay";
->  };
->
-> +&vpu {
-> +       status = "okay";
-> +};
-> +
->  &usbh1 {
->         status = "okay";
->  };
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index 3def46f..f94d4e5 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -1086,6 +1086,16 @@
->                                 crtcs = <&ipu 1>;
->                                 status = "disabled";
->                         };
-> +
-> +                       vpu: vpu at 63ff4000 {
-> +                               compatible = "fsl,imx53-vpu";
-> +                               reg = <0x63ff4000 0x1000>;
-> +                               interrupts = <9>;
-> +                               clocks = <&clks 63>, <&clks 63>;
-> +                               clock-names = "per", "ahb";
-> +                               iram = <&ocram>;
-> +                               status = "disabled";
-> +                       };
->                 };
->
->                 ocram: ocram at f8000000 {
+> The only thing that occurs to me would be checking for the device tree
+> node that corresponds to our input serio. But doing that from platform
+> code would be horrible, and it would also be nasty doing it from the
+> input driver.
 
-Nitpick: what I see here around enabling the VPU driver is;
+I think that should be OK and clean, e.g.
 
-* A property called iram
-* ... that references a node called ocram
-* ... which is coincidentally driven by a driver called sram
+  if (of_property_read_bool(np, "irq-route-to-sp")) {
+     ....
+  }
 
-Could we make up our minds as to what to call it? Something generic
-that's potentially not i.MX-specific (since it does change over the
-models, and it may not be technically SRAM..) that gets used
-everywhere and belies it's purpose rather than naming a particular
-technology, or particular IP core documentation if it changes a lot?
+I'm fine with leaving these bits out as your patch does, the only concern
+is some other code may have a chance to depend on this, and may
+benefit from this boot configuration flexibility as well.
 
---
-Matt Sealey <neko@bakuhatsu.net>
+>
+>> Decide whether the interrupt gets delivered to SP seems to be a choice
+>> that the main CPU should be doing, as well as the interrupt priority.
+>
+> Incidentally the main CPU does make these choices - just before Linux
+> has booted.
+>
+> While Linux has no interaction with the SP (it is not even aware of
+> it), I would say not stomping on its configuration is an OK policy to
+> have.
+>
+>> And this is really all about bit 4 right?
+>
+> Yes, bit 4 is the crucial one, it is required for the OLPC inbuilt
+> keyboard/touchpad to work.
+>
+> However on numerous occasions during interactions with Marvell they
+> have stressed the importance of setting interrupt priorities on
+> interrupts used for wakeups. We don't think it makes a difference for
+> the issues that we have seen, but we do not ignore the request. As
+> that cannot be done in Linux, we do it in the firmware, and it seems
+> like while Linux does not work with interrupt priorities it should not
+> overwite any earlier setup.
+
+Haojian & Mingliang, could you help check this is the case, and that no
+known driver (including those for upstream) is depending on this behavior?
+
+>
+> Daniel
