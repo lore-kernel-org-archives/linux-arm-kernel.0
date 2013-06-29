@@ -1,57 +1,39 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sat, 29 Jun 2013 21:34:03 +0200
-Subject: [PATCH v3 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
-In-Reply-To: <51CEA197.8070207@ti.com>
-References: <1372258946-15607-1-git-send-email-s.nawrocki@samsung.com>
- <1372258946-15607-2-git-send-email-s.nawrocki@samsung.com>
- <51CD4698.3070409@gmail.com> <51CD6153.5050406@samsung.com>
- <51CEA197.8070207@ti.com>
-Message-ID: <51CF36AB.4010300@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 29 Jun 2013 20:38:19 +0100
+Subject: [PATCH 0/2] ARM: sunxi: Convert DTSI to new CPU bindings
+In-Reply-To: <CAOesGMgsD+tK4+ywvLzsWd+mngrP7zGgSFn0naWjSsQLGaUn2Q@mail.gmail.com>
+References: <1372437844-16325-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20130628171532.GD30603@e102568-lin.cambridge.arm.com>
+ <20130628200333.GA2756@lukather>
+ <CAOesGMgsD+tK4+ywvLzsWd+mngrP7zGgSFn0naWjSsQLGaUn2Q@mail.gmail.com>
+Message-ID: <20130629193819.GD3353@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jun 28, 2013 at 01:05:42PM -0700, Olof Johansson wrote:
+> On Fri, Jun 28, 2013 at 1:03 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Fri, Jun 28, 2013 at 06:15:32PM +0100, Lorenzo Pieralisi wrote:
+> >> The patch above should already be queued in next/dt right ?
+> >
+> > Indeed.
+> >
+> > Then why the latest patch of your patchset got in 3.10, while the
+> > patches actually fixing the DT it would have impacted were delayed to
+> > 3.11?
+> >
+> > (And why was it merged so late in the development cycle?)
+> 
+> This. So now we have to scramble because some device trees will
+> produce warnings at boot.
+> 
+> Russell, the alternative is to revert Lorenzo's patch for 3.10 (and
+> re-introduce it for 3.11). Do you have a preference?
 
-On 06/29/2013 10:57 AM, Kishon Vijay Abraham I wrote:
-> On Friday 28 June 2013 03:41 PM, Sylwester Nawrocki wrote:
->> On 06/28/2013 10:17 AM, Hui Wang wrote:
->>> On 06/26/2013 11:02 PM, Sylwester Nawrocki wrote:
->>>> Add a PHY provider driver for the Samsung S5P/Exynos SoC MIPI CSI-2
->>>> receiver and MIPI DSI transmitter DPHYs.
->>>>
->>>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>>> ---
->>>> Changes since v2:
->>>> - adapted to the generic PHY API v9: use phy_set/get_drvdata(),
->>>> - fixed of_xlate callback to return ERR_PTR() instead of NULL,
->>>> - namespace cleanup, put "GPL v2" as MODULE_LICENSE, removed pr_debug,
->>>> - removed phy id check in __set_phy_state().
->>>> ---
->>> [...]
->>>> +
->>>> + if (IS_EXYNOS_MIPI_DSIM_PHY_ID(id))
->>>> + reset = EXYNOS_MIPI_PHY_MRESETN;
->>>> + else
->>>> + reset = EXYNOS_MIPI_PHY_SRESETN;
->>>> +
->>>> + spin_lock_irqsave(&state->slock, flags);
->>>
->>> Sorry for one stupid question here, why do you use spin_lock_irqsave()
->>> rather than spin_lock(),
->>> I don't see the irq handler will use this spinlock anywhere in this c
->>> file.
->>
->> Yes, there is no chance the PHY users could call the phy ops from within
->> an interrupt context. Especially now when there is a per phy object
->> mutex used in the PHY operation helpers. So I'll replace it with plain
->> spin_lock/unlock. Thank you for the review.
->
-> Now that PHY ops is already protected, do you really need a spin_lock here?
+Sorry but I really don't understand what all the fuss in this thread
+is about.
 
-It is still needed, to synchronize access to the control register from
-two separate PHY objects. The mutex is per PHY object, while the spinlock
-is per PHY provider.
-
-Thanks,
-Sylwester
+This thread seems to be saying that two development patches were
+merged, which were 7762/1 and 7763/1, and that 7764/1 is a fix?
+Are you sure about that, because that's not how they're described,
+and not how they look either.
