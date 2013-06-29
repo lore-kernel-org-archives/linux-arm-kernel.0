@@ -1,115 +1,156 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 29 Jun 2013 16:04:09 -0300
-Subject: [PATCH v5 06/12] memory: mvebu-devbus: Remove address decoding window
- workaround
+Date: Sat, 29 Jun 2013 16:04:10 -0300
+Subject: [PATCH v5 07/12] ARM: mvebu: Use the preprocessor on Armada 370/XP
+ device tree files
 In-Reply-To: <1372532655-20321-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1372532655-20321-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1372532655-20321-7-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1372532655-20321-8-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that mbus device tree binding has been introduced, remove the address
-decoding window management from this driver.
-A suitable 'ranges' entry should be added to the devbus-compatible node in
-the device tree, as described by the mbus binding documentation.
-
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/memory/mvebu-devbus.c | 64 ++-----------------------------------------
- 1 file changed, 2 insertions(+), 62 deletions(-)
+ arch/arm/boot/dts/armada-370-db.dts              | 2 +-
+ arch/arm/boot/dts/armada-370-mirabox.dts         | 2 +-
+ arch/arm/boot/dts/armada-370-rd.dts              | 2 +-
+ arch/arm/boot/dts/armada-370.dtsi                | 2 +-
+ arch/arm/boot/dts/armada-xp-db.dts               | 2 +-
+ arch/arm/boot/dts/armada-xp-gp.dts               | 2 +-
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi         | 2 +-
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi         | 2 +-
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 2 +-
+ arch/arm/boot/dts/armada-xp.dtsi                 | 2 +-
+ 10 files changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/memory/mvebu-devbus.c b/drivers/memory/mvebu-devbus.c
-index 978e8e3..94c9248 100644
---- a/drivers/memory/mvebu-devbus.c
-+++ b/drivers/memory/mvebu-devbus.c
-@@ -208,16 +208,11 @@ static int mvebu_devbus_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct device_node *node = pdev->dev.of_node;
--	struct device_node *parent;
- 	struct devbus *devbus;
- 	struct resource *res;
- 	struct clk *clk;
- 	unsigned long rate;
--	const __be32 *ranges;
--	int err, cs;
--	int addr_cells, p_addr_cells, size_cells;
--	int ranges_len, tuple_len;
--	u32 base, size;
-+	int err;
+diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+index 2353b1f..231f8b2 100644
+--- a/arch/arm/boot/dts/armada-370-db.dts
++++ b/arch/arm/boot/dts/armada-370-db.dts
+@@ -14,7 +14,7 @@
+  */
  
- 	devbus = devm_kzalloc(&pdev->dev, sizeof(struct devbus), GFP_KERNEL);
- 	if (!devbus)
-@@ -248,68 +243,13 @@ static int mvebu_devbus_probe(struct platform_device *pdev)
- 		return err;
+ /dts-v1/;
+-/include/ "armada-370.dtsi"
++#include "armada-370.dtsi"
  
- 	/*
--	 * Allocate an address window for this device.
--	 * If the device probing fails, then we won't be able to
--	 * remove the allocated address decoding window.
--	 *
--	 * FIXME: This is only a temporary hack! We need to do this here
--	 * because we still don't have device tree bindings for mbus.
--	 * Once that support is added, we will declare these address windows
--	 * statically in the device tree, and remove the window configuration
--	 * from here.
--	 */
--
--	/*
--	 * Get the CS to choose the window string.
--	 * This is a bit hacky, but it will be removed once the
--	 * address windows are declared in the device tree.
--	 */
--	cs = (((unsigned long)devbus->base) % 0x400) / 8;
--
--	/*
--	 * Parse 'ranges' property to obtain a (base,size) window tuple.
--	 * This will be removed once the address windows
--	 * are declared in the device tree.
--	 */
--	parent = of_get_parent(node);
--	if (!parent)
--		return -EINVAL;
--
--	p_addr_cells = of_n_addr_cells(parent);
--	of_node_put(parent);
--
--	addr_cells = of_n_addr_cells(node);
--	size_cells = of_n_size_cells(node);
--	tuple_len = (p_addr_cells + addr_cells + size_cells) * sizeof(__be32);
--
--	ranges = of_get_property(node, "ranges", &ranges_len);
--	if (ranges == NULL || ranges_len != tuple_len)
--		return -EINVAL;
--
--	base = of_translate_address(node, ranges + addr_cells);
--	if (base == OF_BAD_ADDR)
--		return -EINVAL;
--	size = of_read_number(ranges + addr_cells + p_addr_cells, size_cells);
--
--	/*
--	 * Create an mbus address windows.
--	 * FIXME: Remove this, together with the above code, once the
--	 * address windows are declared in the device tree.
--	 */
--	err = mvebu_mbus_add_window(devbus_wins[cs], base, size);
--	if (err < 0)
--		return err;
--
--	/*
- 	 * We need to create a child device explicitly from here to
- 	 * guarantee that the child will be probed after the timing
- 	 * parameters for the bus are written.
- 	 */
- 	err = of_platform_populate(node, NULL, NULL, dev);
--	if (err < 0) {
--		mvebu_mbus_del_window(base, size);
-+	if (err < 0)
- 		return err;
--	}
+ / {
+ 	model = "Marvell Armada 370 Evaluation Board";
+diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+index 14e36e1..7005f27 100644
+--- a/arch/arm/boot/dts/armada-370-mirabox.dts
++++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+@@ -9,7 +9,7 @@
+  */
  
- 	return 0;
- }
+ /dts-v1/;
+-/include/ "armada-370.dtsi"
++#include "armada-370.dtsi"
+ 
+ / {
+ 	model = "Globalscale Mirabox";
+diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+index 130f839..5c3a1ec 100644
+--- a/arch/arm/boot/dts/armada-370-rd.dts
++++ b/arch/arm/boot/dts/armada-370-rd.dts
+@@ -12,7 +12,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "armada-370.dtsi"
++#include "armada-370.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada 370 Reference Design";
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index fa3dfc6..08ec6e3 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -15,7 +15,7 @@
+  * common to all Armada SoCs.
+  */
+ 
+-/include/ "armada-370-xp.dtsi"
++#include "armada-370-xp.dtsi"
+ /include/ "skeleton.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index d6cc8bf..9a6ad0e 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -14,7 +14,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "armada-xp-mv78460.dtsi"
++#include "armada-xp-mv78460.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada XP Evaluation Board";
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 76db557..df1caa3 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -14,7 +14,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "armada-xp-mv78460.dtsi"
++#include "armada-xp-mv78460.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada XP Development Board DB-MV784MP-GP";
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index 2d9335d..985373a 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -13,7 +13,7 @@
+  * common to all Armada XP SoCs.
+  */
+ 
+-/include/ "armada-xp.dtsi"
++#include "armada-xp.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada XP MV78260 SoC";
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index 488ca5e..3874548 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+@@ -13,7 +13,7 @@
+  * common to all Armada XP SoCs.
+  */
+ 
+-/include/ "armada-xp.dtsi"
++#include "armada-xp.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada XP MV78460 SoC";
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index fdea75c..5f59a17 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -11,7 +11,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "armada-xp-mv78260.dtsi"
++#include "armada-xp-mv78260.dtsi"
+ 
+ / {
+ 	model = "PlatHome OpenBlocks AX3-4 board";
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 1ee8540..3e770db 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -16,7 +16,7 @@
+  * common to all Armada SoCs.
+  */
+ 
+-/include/ "armada-370-xp.dtsi"
++#include "armada-370-xp.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada XP family SoC";
 -- 
 1.8.1.5
