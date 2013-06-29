@@ -1,59 +1,58 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 29 Jun 2013 12:55:03 +0800
-Subject: [PATCH] mmp: irq: Don't clear unused interrupt enable bits
-In-Reply-To: <CAMLZHHSS75dSd_PM5-Gu2K-kP+RF0Fx1E+TL=d-TeXzYSLsQPg@mail.gmail.com>
-References: <20130627175118.8A9FEFAACF@dev.laptop.org>
- <CAMPhdO_Ccp_JeuNNkqP6Q+ubmG8rah_hkxFJmOBsetysu-+dNw@mail.gmail.com>
- <CAMLZHHSS75dSd_PM5-Gu2K-kP+RF0Fx1E+TL=d-TeXzYSLsQPg@mail.gmail.com>
-Message-ID: <CAMPhdO8jAN5kCT_tgH4NxTJ=GOGQqXukUrxNWsHExUSXZ+44bA@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 29 Jun 2013 10:28:45 +0400
+Subject: [PATCH] ARM: dts: i.MX27: Add Secondary AHB Port definitions
+Message-ID: <1372487325-14405-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 10:24 PM, Daniel Drake <dsd@laptop.org> wrote:
-> On Thu, Jun 27, 2013 at 11:15 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->> Is there any way to check this at run-time or at least by boot parameters?
->
-> The only thing that occurs to me would be checking for the device tree
-> node that corresponds to our input serio. But doing that from platform
-> code would be horrible, and it would also be nasty doing it from the
-> input driver.
+Patch adds Secondary AHB Port definitions for i.MX27 SOC and
+moves NAND Flash Controller (NFC) under AHB Slave Port 1.
 
-I think that should be OK and clean, e.g.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/boot/dts/imx27.dtsi | 28 ++++++++++++++++++++++------
+ 1 file changed, 22 insertions(+), 6 deletions(-)
 
-  if (of_property_read_bool(np, "irq-route-to-sp")) {
-     ....
-  }
-
-I'm fine with leaving these bits out as your patch does, the only concern
-is some other code may have a chance to depend on this, and may
-benefit from this boot configuration flexibility as well.
-
->
->> Decide whether the interrupt gets delivered to SP seems to be a choice
->> that the main CPU should be doing, as well as the interrupt priority.
->
-> Incidentally the main CPU does make these choices - just before Linux
-> has booted.
->
-> While Linux has no interaction with the SP (it is not even aware of
-> it), I would say not stomping on its configuration is an OK policy to
-> have.
->
->> And this is really all about bit 4 right?
->
-> Yes, bit 4 is the crucial one, it is required for the OLPC inbuilt
-> keyboard/touchpad to work.
->
-> However on numerous occasions during interactions with Marvell they
-> have stressed the importance of setting interrupt priorities on
-> interrupts used for wakeups. We don't think it makes a difference for
-> the issues that we have seen, but we do not ignore the request. As
-> that cannot be done in Linux, we do it in the firmware, and it seems
-> like while Linux does not work with interrupt priorities it should not
-> overwite any earlier setup.
-
-Haojian & Mingliang, could you help check this is the case, and that no
-known driver (including those for upstream) is depending on this behavior?
-
->
-> Daniel
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 86b6f5f..7c0179e 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -399,14 +399,30 @@
+ 			};
+ 		};
+ 
+-		nfc: nand at d8000000 {
++		ahb1: ahb at 80000000 { /* Secondary AHB Slave Port 1 */
++			compatible = "fsl,ahb-bus", "simple-bus";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			compatible = "fsl,imx27-nand";
+-			reg = <0xd8000000 0x1000>;
+-			interrupts = <29>;
+-			clocks = <&clks 54>;
+-			status = "disabled";
++			reg = <0x80000000 0x20000000>;
++			ranges;
++		};
++
++		ahb2: ahb at a0000000 { /* Secondary AHB Slave Port 2 */
++			compatible = "fsl,ahb-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0xa0000000 0x40000000>;
++			ranges;
++
++			nfc: nand at d8000000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "fsl,imx27-nand";
++				reg = <0xd8000000 0x1000>;
++				interrupts = <29>;
++				clocks = <&clks 54>;
++				status = "disabled";
++			};
+ 		};
+ 
+ 		iram: iram at ffff4c00 {
+-- 
+1.8.1.5
