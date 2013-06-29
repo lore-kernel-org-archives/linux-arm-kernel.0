@@ -1,33 +1,51 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sun, 30 Jun 2013 01:33:35 +0400
-Subject: =?UTF-8?B?UmVbM106IFtQQVRDSCB2MyAxLzVdIHJ0YzogbXhjX3J0YzogRHJpdmVyIHJl?=
- =?UTF-8?B?d29yaw==?=
-In-Reply-To: <1372539675.868823715@f393.i.mail.ru>
-References: <1372495244-21215-1-git-send-email-shc_work@mail.ru>
- <20130629121409.GQ516@pengutronix.de>
- <1372539675.868823715@f393.i.mail.ru>
-Message-ID: <1372541615.220890134@f402.i.mail.ru>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 30 Jun 2013 02:45:58 +0400
+Subject: [PATCH 1/3] ARM: shmobile: use common platform header for HPB-DMAC
+In-Reply-To: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
+References: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201306300245.58486.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > On Sat, Jun 29, 2013 at 12:40:40PM +0400, Alexander Shiyan wrote:
-> > > This patch rework mxc_rtc driver.
-> > > Major changes have been made:
-> > > - Added second clock support (optional) which permit module functionality.
-> > > - Implemented support for periodic interrupts.
-> > > - Some code have been optimized.
-> > 
-> > You won't get any further with this if you don't listen to comments.
-> > 
-> > We're at v3 and Still this patch combines many totally unrelated changes
-> > in a single patch. This was noted by Shawn and more detailed by myself.
-> 
-> Where Sascha?
-> v3 is so different than v2. Can you inline your comments in v3?
+From: Max Filippov <max.filippov@cogentembedded.com>
 
-At the moment, the driver does not work at all, even for a boards which declared.
-I do not understand the issue of making changes if we can correct this situation 
-Please fix me.
-Once again, now driver not work at all .....
+Use previously empty <mach/dma.h> to declare HPB-DMA slave IDs.
+
+Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
+[Sergei: changed the guard macro name, fixed comment, extended copyright.]
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
+ arch/arm/mach-shmobile/include/mach/dma.h |   25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
+
+Index: renesas/arch/arm/mach-shmobile/include/mach/dma.h
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/include/mach/dma.h
++++ renesas/arch/arm/mach-shmobile/include/mach/dma.h
+@@ -1 +1,24 @@
+-/* empty */
++/*
++ * Copyright (C) 2011-2013 Renesas Electronics Corporation
++ * Copyright (C) 2013 Cogent Embedded, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2
++ * as published by the Free Software Foundation.
++ */
++
++#ifndef __MACH_DMA_H
++#define __MACH_DMA_H
++
++/* HPB-DMA slave IDs */
++enum {
++	HPBDMA_SLAVE_DUMMY,
++	HPBDMA_SLAVE_SDHI0_TX,
++	HPBDMA_SLAVE_SDHI0_RX,
++	HPBDMA_SLAVE_SSI0_TX_ST,
++	HPBDMA_SLAVE_SSI0_TX_MN,
++	HPBDMA_SLAVE_SSI1_RX_ST,
++	HPBDMA_SLAVE_SSI1_RX_MN,
++};
++
++#endif /* __MACH_DMA_H */
