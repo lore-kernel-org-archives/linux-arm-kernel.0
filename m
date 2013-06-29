@@ -1,185 +1,86 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 29 Jun 2013 08:27:54 +0400
-Subject: [PATCH v4 5/5] drivers: bus: imx-weim: Add support for
- i.MX1/21/25/27/31/35/50/51/53
-In-Reply-To: <1372480074-24740-1-git-send-email-shc_work@mail.ru>
-References: <1372480074-24740-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1372480074-24740-5-git-send-email-shc_work@mail.ru>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Fri, 28 Jun 2013 23:49:10 -0500
+Subject: [PATCH 1/2] ARM: dts: mx53qsb: Enable VPU support
+In-Reply-To: <1372459759-10488-1-git-send-email-festevam@gmail.com>
+References: <1372459759-10488-1-git-send-email-festevam@gmail.com>
+Message-ID: <CAHCPf3s6_+aNs=LycgJzcOajmFuWy-mp66-BX+OMCLYDApS9cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds WEIM support for all i.MX CPUs supported by the kernel.
+On Fri, Jun 28, 2013 at 5:49 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+>
+> Enable Video Processing Unit (VPU) support.
+>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Depends on Philipp Zabel's patch:
+> [PATCH] ARM: dts: add sram for imx53 and imx6q
+>
+> Philipp,
+>
+> I tried using the original mx53 vpu firmware that comes with the FSL BSP, but it
+> failed to load:
+>
+> coda 63ff4000.vpu: firmware get command error
+> coda 63ff4000.vpu: HW initialization failed
+>
+> Any suggestions?
+>
+> Thanks!
+>
+>  arch/arm/boot/dts/imx53-qsb.dts |  4 ++++
+>  arch/arm/boot/dts/imx53.dtsi    | 10 ++++++++++
+>  2 files changed, 14 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+> index 512a1f6..eedd27e 100644
+> --- a/arch/arm/boot/dts/imx53-qsb.dts
+> +++ b/arch/arm/boot/dts/imx53-qsb.dts
+> @@ -297,6 +297,10 @@
+>         status = "okay";
+>  };
+>
+> +&vpu {
+> +       status = "okay";
+> +};
+> +
+>  &usbh1 {
+>         status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index 3def46f..f94d4e5 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -1086,6 +1086,16 @@
+>                                 crtcs = <&ipu 1>;
+>                                 status = "disabled";
+>                         };
+> +
+> +                       vpu: vpu at 63ff4000 {
+> +                               compatible = "fsl,imx53-vpu";
+> +                               reg = <0x63ff4000 0x1000>;
+> +                               interrupts = <9>;
+> +                               clocks = <&clks 63>, <&clks 63>;
+> +                               clock-names = "per", "ahb";
+> +                               iram = <&ocram>;
+> +                               status = "disabled";
+> +                       };
+>                 };
+>
+>                 ocram: ocram at f8000000 {
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- Documentation/devicetree/bindings/bus/imx-weim.txt | 17 ++++--
- drivers/bus/Kconfig                                |  3 +-
- drivers/bus/imx-weim.c                             | 69 +++++++++++++++++-----
- 3 files changed, 66 insertions(+), 23 deletions(-)
+Nitpick: what I see here around enabling the VPU driver is;
 
-diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
-index cedc2a9..0fd76c4 100644
---- a/Documentation/devicetree/bindings/bus/imx-weim.txt
-+++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
-@@ -8,7 +8,7 @@ The actual devices are instantiated from the child nodes of a WEIM node.
- 
- Required properties:
- 
-- - compatible:		Should be set to "fsl,imx6q-weim"
-+ - compatible:		Should be set to "fsl,<soc>-weim"
-  - reg:			A resource specifier for the register space
- 			(see the example below)
-  - clocks:		the clock, see the example below.
-@@ -21,11 +21,18 @@ Required properties:
- 
- Timing property for child nodes. It is mandatory, not optional.
- 
-- - fsl,weim-cs-timing:	The timing array, contains 6 timing values for the
-+ - fsl,weim-cs-timing:	The timing array, contains timing values for the
- 			child node. We can get the CS index from the child
--			node's "reg" property. This property contains the values
--			for the registers EIM_CSnGCR1, EIM_CSnGCR2, EIM_CSnRCR1,
--			EIM_CSnRCR2, EIM_CSnWCR1, EIM_CSnWCR2 in this order.
-+			node's "reg" property. The number of registers depends
-+			on the selected chip.
-+			For i.MX1, i.MX21 ("fsl,imx1-weim") there are two
-+			registers: CSxU, CSxL.
-+			For i.MX25, i.MX27, i.MX31 and i.MX35 ("fsl,imx27-weim")
-+			there are three registers: CSCRxU, CSCRxL, CSCRxA.
-+			For i.MX50, i.MX53 ("fsl,imx50-weim"),
-+			i.MX51 ("fsl,imx51-weim") and i.MX6Q ("fsl,imx6q-weim")
-+			there are six registers: CSxGCR1, CSxGCR2, CSxRCR1,
-+			CSxRCR2, CSxWCR1, CSxWCR2.
- 
- Example for an imx6q-sabreauto board, the NOR flash connected to the WEIM:
- 
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 1f70e84..552373c 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -8,10 +8,9 @@ config IMX_WEIM
- 	bool "Freescale EIM DRIVER"
- 	depends on ARCH_MXC
- 	help
--	  Driver for i.MX6 WEIM controller.
-+	  Driver for i.MX WEIM controller.
- 	  The WEIM(Wireless External Interface Module) works like a bus.
- 	  You can attach many different devices on it, such as NOR, onenand.
--	  But now, we only support the Parallel NOR.
- 
- config MVEBU_MBUS
- 	bool
-diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-index dc860a4..3ef58c8 100644
---- a/drivers/bus/imx-weim.c
-+++ b/drivers/bus/imx-weim.c
-@@ -12,46 +12,83 @@
- #include <linux/io.h>
- #include <linux/of_device.h>
- 
-+struct imx_weim_devtype {
-+	unsigned int	cs_count;
-+	unsigned int	cs_regs_count;
-+	unsigned int	cs_stride;
-+};
-+
-+static const struct imx_weim_devtype imx1_weim_devtype = {
-+	.cs_count	= 6,
-+	.cs_regs_count	= 2,
-+	.cs_stride	= 0x08,
-+};
-+
-+static const struct imx_weim_devtype imx27_weim_devtype = {
-+	.cs_count	= 6,
-+	.cs_regs_count	= 3,
-+	.cs_stride	= 0x10,
-+};
-+
-+static const struct imx_weim_devtype imx50_weim_devtype = {
-+	.cs_count	= 4,
-+	.cs_regs_count	= 6,
-+	.cs_stride	= 0x18,
-+};
-+
-+static const struct imx_weim_devtype imx51_weim_devtype = {
-+	.cs_count	= 6,
-+	.cs_regs_count	= 6,
-+	.cs_stride	= 0x18,
-+};
-+
- static const struct of_device_id weim_id_table[] = {
--	{ .compatible = "fsl,imx6q-weim", },
--	{}
-+	/* i.MX1/21 */
-+	{ .compatible = "fsl,imx1-weim", .data = &imx1_weim_devtype, },
-+	/* i.MX25/27/31/35 */
-+	{ .compatible = "fsl,imx27-weim", .data = &imx27_weim_devtype, },
-+	/* i.MX50/53/6Q */
-+	{ .compatible = "fsl,imx50-weim", .data = &imx50_weim_devtype, },
-+	{ .compatible = "fsl,imx6q-weim", .data = &imx50_weim_devtype, },
-+	/* i.MX51 */
-+	{ .compatible = "fsl,imx51-weim", .data = &imx51_weim_devtype, },
-+	{ }
- };
- MODULE_DEVICE_TABLE(of, weim_id_table);
- 
--#define CS_TIMING_LEN 6
--#define CS_REG_RANGE  0x18
--
- /* Parse and set the timing for this device. */
--static int __init weim_timing_setup(struct device_node *np, void __iomem *base)
-+static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
-+				    const struct imx_weim_devtype *devtype)
- {
--	u32 value[CS_TIMING_LEN];
--	u32 cs_idx;
--	int ret;
--	int i;
-+	u32 cs_idx, value[devtype->cs_regs_count];
-+	int i, ret;
- 
- 	/* get the CS index from this child node's "reg" property. */
- 	ret = of_property_read_u32(np, "reg", &cs_idx);
- 	if (ret)
- 		return ret;
- 
--	/* The weim has four chip selects. */
--	if (cs_idx > 3)
-+	if (cs_idx >= devtype->cs_count)
- 		return -EINVAL;
- 
- 	ret = of_property_read_u32_array(np, "fsl,weim-cs-timing",
--					value, CS_TIMING_LEN);
-+					 value, devtype->cs_regs_count);
- 	if (ret)
- 		return ret;
- 
- 	/* set the timing for WEIM */
--	for (i = 0; i < CS_TIMING_LEN; i++)
--		writel(value[i], base + cs_idx * CS_REG_RANGE + i * 4);
-+	for (i = 0; i < devtype->cs_regs_count; i++)
-+		writel(value[i], base + cs_idx * devtype->cs_stride + i * 4);
-+
- 	return 0;
- }
- 
- static int __init weim_parse_dt(struct platform_device *pdev,
- 				void __iomem *base)
- {
-+	const struct of_device_id *of_id = of_match_device(weim_id_table,
-+							   &pdev->dev);
-+	const struct imx_weim_devtype *devtype = of_id->data;
- 	struct device_node *child;
- 	int ret;
- 
-@@ -59,7 +96,7 @@ static int __init weim_parse_dt(struct platform_device *pdev,
- 		if (!child->name)
- 			continue;
- 
--		ret = weim_timing_setup(child, base);
-+		ret = weim_timing_setup(child, base, devtype);
- 		if (ret) {
- 			dev_err(&pdev->dev, "%s set timing failed.\n",
- 				child->full_name);
--- 
-1.8.1.5
+* A property called iram
+* ... that references a node called ocram
+* ... which is coincidentally driven by a driver called sram
+
+Could we make up our minds as to what to call it? Something generic
+that's potentially not i.MX-specific (since it does change over the
+models, and it may not be technically SRAM..) that gets used
+everywhere and belies it's purpose rather than naming a particular
+technology, or particular IP core documentation if it changes a lot?
+
+--
+Matt Sealey <neko@bakuhatsu.net>
