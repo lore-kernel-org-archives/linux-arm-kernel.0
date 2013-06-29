@@ -1,95 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 29 Jun 2013 23:52:10 +0100
-Subject: [PATCH RFC v4 0/3] Armada DRM driver
-Message-ID: <20130629225210.GF3353@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 29 Jun 2013 15:54:26 -0700
+Subject: [PATCH 0/2] ARM: sunxi: Convert DTSI to new CPU bindings
+In-Reply-To: <20130629193819.GD3353@n2100.arm.linux.org.uk>
+References: <1372437844-16325-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20130628171532.GD30603@e102568-lin.cambridge.arm.com>
+ <20130628200333.GA2756@lukather>
+ <CAOesGMgsD+tK4+ywvLzsWd+mngrP7zGgSFn0naWjSsQLGaUn2Q@mail.gmail.com>
+ <20130629193819.GD3353@n2100.arm.linux.org.uk>
+Message-ID: <20130629225426.GA12221@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quite a number of things has changed since the last revision in the
-core code - notably the move to use drm_plane for overlay, and the
-limited and restricted use of dma_buf so that gem objects can be
-passed to the GALCORE code and libbmm contiguous video frames can
-be imported into DRM.
+On Sat, Jun 29, 2013 at 08:38:19PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jun 28, 2013 at 01:05:42PM -0700, Olof Johansson wrote:
+> > On Fri, Jun 28, 2013 at 1:03 PM, Maxime Ripard
+> > <maxime.ripard@free-electrons.com> wrote:
+> > > On Fri, Jun 28, 2013 at 06:15:32PM +0100, Lorenzo Pieralisi wrote:
+> > >> The patch above should already be queued in next/dt right ?
+> > >
+> > > Indeed.
+> > >
+> > > Then why the latest patch of your patchset got in 3.10, while the
+> > > patches actually fixing the DT it would have impacted were delayed to
+> > > 3.11?
+> > >
+> > > (And why was it merged so late in the development cycle?)
+> > 
+> > This. So now we have to scramble because some device trees will
+> > produce warnings at boot.
+> > 
+> > Russell, the alternative is to revert Lorenzo's patch for 3.10 (and
+> > re-introduce it for 3.11). Do you have a preference?
+> 
+> Sorry but I really don't understand what all the fuss in this thread
+> is about.
+> 
+> This thread seems to be saying that two development patches were
+> merged, which were 7762/1 and 7763/1, and that 7764/1 is a fix?
+> Are you sure about that, because that's not how they're described,
+> and not how they look either.
 
-As I thought, this does require quite a number of new system calls,
-but the case which I care more about (vlc) doesn't pass rendered
-frames directly to the X server by physical address, it's not
-something I'm particularly concerned about - for vlc and the "normal"
-Xv protocol we can cache four DRM gem objects with their framebuffers
-pre-prepared meaning we just copy the frame and call the DRM set_plane
-function.
+Most of this ruffle seems to be about the fact that booting a kernel
+with a device tree that doesn't conform to the brand spanking new,
+and never previously enforced, binding for the cpu nodes will produce
+a WARN_ON(). Lots of our in-tree device trees fall into this category.
 
-What the loss of the create_phys() interface does mean is that the
-modified gstreamer gstbmmxvimagesink plugin will not work; it will
-need to be updated.  I do *not* intend to support the hacky
-bidirectional Xv SHM hack which Marvell came up with there!
+And while I think it was a bad idea for Lorenzo to ask for this to be
+merged as a fix this late (and most in particular for stable), as far
+as I can tell nothing (new) is broken by it -- just the alarming warning
+is being printed.
 
-I've left out the TDA998x changes and the final patch which depends
-on those changes which add the HDMI output for the cubox, so this
-series will be lacking the final parts of connector support.  It is
-probable that the patch from the previous series can be trivially
-applied to this (or easily adapted if not.)
+I think it probably makes sense to downgrade the WARN to just a printk, and
+people will be a lot less worried. How about the below?
 
-Other changes:
-- the crtc exports a few attributes now for setting the colour
-  transform mode.  (CCIR601/709 to Computer vs "Studio" RGB).
-  An automatic mode for these settings provided depending on selected
-  resolution.
-- overlay has working brightness/contrast/saturation settings, but
-  not hue - not worked that bit out yet.
-- hardware ARGB cursor support only in this version.
-- backend ops are now called variants, because the structure started
-  to contain other stuff other than just function pointers.  Armada510
-  backend moved to a separate file.
-- features requiring the SPU_ADV_REG (only present on Armada 510)
-  can be disabled by the variant structure - such as interlace and
-  ARGB cursor.
-- use of page_alloc() reduced down to 8K, enough to store the hardware
-  cursor.  This is all that that allocation was really used for anyway.
-- now uses a common kfifo queue to free used framebuffers at the
-  appropriate time, both from the crtc code and the drm_plane code,
-  rather than having this logic in several places.  kfifo is a weird
-  API and there's a note in the driver about that.
-- framebuffers now carry their configuration with them, to save having
-  the pixel format decode scattered in several places in the driver.
-- power down FIFOs and RAMs not being used, and keep them powered down
-  where possible.
-- minimum framebuffer size added, moved out from the X server driver.
-- maximum horizontal resolution dropped to 1920 to avoid a potential
-  problem with V scaling (the RAM is apparantly 1920 pixels by 3 lines.)
-- protection preventing various gem objects being used in unexpected
-  ways added - eg, you can't create a framebuffer from a cursor gem
-  object or an imported object which is non-contiguous.
-- full range of colorkey modes for video supported (hey, it's just
-  drm plane properties!)
-- loads of smaller cleanups, and a number of checkpatch fixes.
+If you're OK with it, Russell, can we get your ack so Linus can apply
+directly given the imminence of final 3.10? Or, if you prefer, you can of
+course apply and send it on instead.
 
-Things left to do, in no particular order:
-- Creation of planar YUV formatted framebuffers - I suspect the planar
-  YUV formats are not supported for graphic framebuffers even though
-  Marvell document the register settings.  (Where do you program the
-  base addresses of the U and V planes?)  Not a high priority as Vmeta
-  produces UYVY encoded frames and it's more efficient to keep the
-  native format.
-- Gamma support if anyone cares.  Again, not high priority.
-- Resolution of the clocking conundrum.
-- Resolution of the DT specification conundrum (super-device?)
-- Specification of DRM connectors (DT but how?), their configuration,
-  what they're connected to and what fixed format(s) they support.
-- CMA or no CMA - I've added a comment pointing out additional concerns
-  about how to get the physical address from CMA.  I think for most
-  platforms this driver will be used on, the device address and physical
-  address will be the same, but _conceptually_ they have never been the
-  same in the kernel.
-- DCON support... I have no use for this, and the information in my
-  documentation is pretty damned poor, so much so that I'm reluctant to
-  try prodding around with it, especially as some of it is
-  self-contradictory.  Anyone who really cares about this can look at
-  the issues there.
 
-Stuff omitted:
-- the DRM refcounting bug fix which breaks the i915 driver (but without
-  it, booting with this driver results in a leaked refcount on the
-  framebuffer thanks what I consider to be a bug in the DRM crtc code.)
-  So don't boot this without something reporting itself as being
-  connected with a valid mode.
+Thanks,
+
+-Olof
+
+
+-----
+
+ARM: dt: Only print warning, not WARN() on bad cpu map in device tree
+
+Due to recent changes and expecations of proper cpu bindings, there are now
+cases for many of the in-tree devicetrees where a WARN() will hit on boot due
+to badly formatted /cpus nodes.
+
+Downgrade this to a pr_warn() to be less alarmist, since it's not a new
+problem.
+
+Tested on Arndale, Cubox, Seaboard and Panda ES. Panda hits the WARN
+without this, the others do not.
+
+Signed-off-by: Olof Johansson <olof@lixom.net>
+
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 0905502..707f99e 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -152,9 +152,11 @@ void __init arm_dt_init_cpu_maps(void)
+ 		tmp_map[i] = hwid;
+ 	}
+ 
+-	if (WARN(!bootcpu_valid, "DT missing boot CPU MPIDR[23:0], "
+-				 "fall back to default cpu_logical_map\n"))
++	if (!bootcpu_valid) {
++		pr_warn("DT missing boot CPU MPIDR[23:0], fall back to "
++			"default cpu_logical_map\n");
+ 		return;
++	}
+ 
+ 	/*
+ 	 * Since the boot CPU node contains proper data, and all nodes have
