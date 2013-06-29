@@ -1,30 +1,24 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 29 Jun 2013 14:14:09 +0200
-Subject: [PATCH v3 1/5] rtc: mxc_rtc: Driver rework
-In-Reply-To: <1372495244-21215-1-git-send-email-shc_work@mail.ru>
-References: <1372495244-21215-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20130629121409.GQ516@pengutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 29 Jun 2013 13:24:58 +0100
+Subject: [PATCH 0/2] ASoc: ac97: fix multi-platform build failures
+In-Reply-To: <1372443469-20191-1-git-send-email-khilman@linaro.org>
+References: <1372443469-20191-1-git-send-email-khilman@linaro.org>
+Message-ID: <20130629122458.GN27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexander,
+On Fri, Jun 28, 2013 at 11:17:47AM -0700, Kevin Hilman wrote:
+> Hi Mark,
+> 
+> When building next-20130628, I noticed a few build errors for
+> cm_x300_defconfig that were introduced by the new multi-platform AC'97
+> support.
 
-On Sat, Jun 29, 2013 at 12:40:40PM +0400, Alexander Shiyan wrote:
-> This patch rework mxc_rtc driver.
-> Major changes have been made:
-> - Added second clock support (optional) which permit module functionality.
-> - Implemented support for periodic interrupts.
-> - Some code have been optimized.
-
-You won't get any further with this if you don't listen to comments.
-
-We're at v3 and Still this patch combines many totally unrelated changes
-in a single patch. This was noted by Shawn and more detailed by myself.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Applied both, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130629/1d926f2b/attachment.sig>
