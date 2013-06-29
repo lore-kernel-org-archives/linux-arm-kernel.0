@@ -1,74 +1,90 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 28 Jun 2013 19:43:14 -0400
-Subject: [PATCH] of: Specify initrd location using 64-bit
-In-Reply-To: <20130628134931.GD21034@game.jcrosoft.org>
-References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
- <51C4171C.9050908@linutronix.de> <51C48B5A.2040404@ti.com>
- <51CCA67C.2010803@gmail.com>
- <CACxGe6vOH0sCFVVXrYqD3dbYdOvithVu7-d1cvy5885i8x_Myw@mail.gmail.com>
- <20130628134931.GD21034@game.jcrosoft.org>
-Message-ID: <51CE1F92.3070802@ti.com>
+From: sukadev@linux.vnet.ibm.com (Sukadev Bhattiprolu)
+Date: Fri, 28 Jun 2013 17:09:51 -0700
+Subject: [PATCH] perf: ARM: Record the user-mode PC in the call chain.
+In-Reply-To: <20130620090728.GA2842@mudshark.cambridge.arm.com>
+References: <20130613232111.GA12536@mozilla.com>
+ <20130618131319.GC6801@mudshark.cambridge.arm.com>
+ <20130620031706.GB27428@mozilla.com>
+ <20130620090728.GA2842@mudshark.cambridge.arm.com>
+Message-ID: <20130629000951.GA5117@us.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Will Deacon [will.deacon at arm.com] wrote:
+| On Thu, Jun 20, 2013 at 04:17:06AM +0100, Jed Davis wrote:
+| > On Tue, Jun 18, 2013 at 02:13:19PM +0100, Will Deacon wrote:
+| > > On Fri, Jun 14, 2013 at 12:21:11AM +0100, Jed Davis wrote:
+| > > > With this change, we no longer lose the innermost entry in the user-mode
+| > > > part of the call chain.  See also the x86 port, which includes the ip.
+| > > > 
+| > > > It's possible to partially work around this problem by post-processing
+| > > > the data to use the PERF_SAMPLE_IP value, but this works only if the CPU
+| > > > wasn't in the kernel when the sample was taken.
+| > > 
+| > > Thanks. I guess we need something similar for arm64 too. Could you cook a
+| > > similar patch please?
+| > 
+| > Done (and tested, on the ARM V8 Foundation Model).
+| 
+| Wow, I didn't expect you to test it. Thanks!
+| 
+| > It looked as if the powerpc and sparc ports might have similar issues,
+| > but I haven't checked on them yet.
+| 
+| I can extract some hardware from the pile in the corner of my flat if you
+| want a hand with testing.
 
-Sebastian,
+Interesting. Powerpc already saves the next_ip for the first entry:
 
-On Friday 28 June 2013 09:49 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 10:59 Fri 28 Jun     , Grant Likely wrote:
->> On Thu, Jun 27, 2013 at 9:54 PM, Rob Herring <robherring2@gmail.com> wrote:
->>> On 06/21/2013 12:20 PM, Santosh Shilimkar wrote:
->>>> On Friday 21 June 2013 05:04 AM, Sebastian Andrzej Siewior wrote:
->>>>> On 06/21/2013 02:52 AM, Santosh Shilimkar wrote:
->>>>>> diff --git a/arch/microblaze/kernel/prom.c b/arch/microblaze/kernel/prom.c
->>>>>> index 0a2c68f..62e2e8f 100644
->>>>>> --- a/arch/microblaze/kernel/prom.c
->>>>>> +++ b/arch/microblaze/kernel/prom.c
->>>>>> @@ -136,8 +136,7 @@ void __init early_init_devtree(void *params)
->>>>>>  }
->>>>>>
->>>>>>  #ifdef CONFIG_BLK_DEV_INITRD
->>>>>> -void __init early_init_dt_setup_initrd_arch(unsigned long start,
->>>>>> -           unsigned long end)
->>>>>> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
->>>>>>  {
->>>>>>     initrd_start = (unsigned long)__va(start);
->>>>>>     initrd_end = (unsigned long)__va(end);
->>>>>
->>>>> I think it would better to go here for phys_addr_t instead of u64. This
->>>>> would force you in of_flat_dt_match() to check if the value passed from
->>>>> DT specifies a memory address outside of 32bit address space and the
->>>>> kernel can't deal with this because its phys_addr_t is 32bit only due
->>>>> to a Kconfig switch.
->>>>>
->>>>> For x86, the initrd has to remain in the 32bit address space so passing
->>>>> the initrd in the upper range would violate the ABI. Not sure if this
->>>>> is true for other archs as well (ARM obviously not).
->>>>>
->>>> That pretty much means phys_addr_t. It will work for me as well but
->>>> in last thread from consistency with memory and reserved node, Rob
->>>> insisted to keep it as u64. So before I re-spin another version,
->>>> would like to here what Rob has to say considering the x86 requirement.
->>>>
->>>> Rob,
->>>> Are you ok with phys_addr_t since your concern was about rest
->>>> of the memory specific bits of the device-tree code use u64 ?
->>>
->>> No. I still think it should be u64 for same reasons I said originally.
->>
->> +1
->>
-> +1
-> 
-> fix type
-> 
-Apart from waste of 32bit, what is the other concern you
-have ? I really want to converge on this patch because it
-has been a open ended discussion for quite some time. Does
-that really break any thing on x86 or your concern is more
-from semantics of the physical address.
+	arch/powerpc/perf/callchain.c:
 
-Thanks for help.
+	perf_callchain_user_64():
+	...
 
-Regards,
-Santosh
+		next_ip = perf_instruction_pointer(regs);
+		lr = regs->link;
+		sp = regs->gpr[1];
+		perf_callchain_store(entry, next_ip);
+
+		for (;;) {
+
+
+Do you have a test case/output that I can run on Power ?
+
+We actually have the opposite problem where we see duplication in
+callchains like this. We considered not saving the "link register"
+but that seems to break for a "leaf-node" functions.
+
+    13.65%  sprintft  libc-2.12.so       [.] __random                            
+            | 
+            --- __random
+               |           
+               |--62.82%-- __random
+               |          |    
+               |          |--97.31%-- rand
+               |          |          do_my_sprintf
+               |          |          main
+               |          |          generic_start_main
+               |          |          __libc_start_main
+               |          |          0x0
+               |          |
+               |           --2.69%-- do_my_sprintf
+               |                     main
+               |                     generic_start_main
+               |                     __libc_start_main
+               |                     0x0
+               |
+                --37.18%-- rand
+                          |
+                          |--93.30%-- rand
+                          |          do_my_sprintf
+                          |          main
+                          |          generic_start_main
+                          |          __libc_start_main
+                          |          0x0
+                          |
+                           --6.70%-- do_my_sprintf
+                                     main
+                                     generic_start_main
+                                     __libc_start_main
+                                     0x0
