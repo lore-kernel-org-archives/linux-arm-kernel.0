@@ -1,60 +1,97 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Sat, 29 Jun 2013 10:57:43 -0700
-Subject: [PATCH] WIP: HACK: LPAE, BOOTMEM and NO_BOOTMEM
-In-Reply-To: <20130629172123.GA3353@n2100.arm.linux.org.uk>
-References: <1372467663-31425-1-git-send-email-santosh.shilimkar@ti.com>
- <20130629152959.GB31339@mtj.dyndns.org>
- <20130629172123.GA3353@n2100.arm.linux.org.uk>
-Message-ID: <20130629175743.GA382@mtj.dyndns.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 29 Jun 2013 20:07:30 +0200
+Subject: [PATCH 0/2] ARM: sunxi: Convert DTSI to new CPU bindings
+In-Reply-To: <20130628214512.GA11985@e102568-lin.cambridge.arm.com>
+References: <1372437844-16325-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20130628171532.GD30603@e102568-lin.cambridge.arm.com>
+ <20130628200333.GA2756@lukather>
+ <CAOesGMgsD+tK4+ywvLzsWd+mngrP7zGgSFn0naWjSsQLGaUn2Q@mail.gmail.com>
+ <20130628214512.GA11985@e102568-lin.cambridge.arm.com>
+Message-ID: <20130629180730.GI2593@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-( Expanding cc list, original thread is at
-  http://thread.gmane.org/gmane.linux.kernel/1518046 )
-
-Hello,
-
-On Sat, Jun 29, 2013 at 06:21:24PM +0100, Russell King - ARM Linux wrote:
-> Unfortunately, that has not been true on ARM - it's very common for
-> there to be an offset on physical memory, sometimes of the order of
-> 3GB or more.  This is because on reset, ARMs start executing the code
-> at physical address zero, which therefore can't be RAM - and there's
-> a desire to avoid complex switching games in hardware to temporarily
-> map ROM there instead of RAM.
+On Fri, Jun 28, 2013 at 10:45:12PM +0100, Lorenzo Pieralisi wrote:
+> On Fri, Jun 28, 2013 at 09:05:42PM +0100, Olof Johansson wrote:
+> > On Fri, Jun 28, 2013 at 1:03 PM, Maxime Ripard
+> > <maxime.ripard@free-electrons.com> wrote:
+> > > On Fri, Jun 28, 2013 at 06:15:32PM +0100, Lorenzo Pieralisi wrote:
+> > >> On Fri, Jun 28, 2013 at 05:44:02PM +0100, Maxime Ripard wrote:
+> > >> > Hi Arnd, Olof,
+> > >> >
+> > >> > Sorry for steping in so late, but these two patches fixes a warning
+> > >> > introduced by the commit 1ba9bf0a (ARM: 7762/1: kernel: fix
+> > >> > arm_dt_init_cpu_maps() to skip non-cpu nodes) after 3.10-rc7.
+> > >> >
+> > >> > These two patches solve the situation for sunxi. The first one by
+> > >> > Lorenzo is to be applied for 3.10 if it's still possible, and the
+> > >> > second one on top of arm-soc/for-next. Tell me if you prefer a more
+> > >> > formal pull request for these patches
+> > >> >
+> > >> > Thanks!
+> > >> > Maxime
+> > >> >
+> > >> > Lorenzo Pieralisi (1):
+> > >> >   ARM: dts: sunxi: cpus/cpu nodes dts updates
+> > >>
+> > >> The patch above should already be queued in next/dt right ?
+> > >
+> > > Indeed.
+> > >
+> > > Then why the latest patch of your patchset got in 3.10, while the
+> > > patches actually fixing the DT it would have impacted were delayed to
+> > > 3.11?
+> > >
+> > > (And why was it merged so late in the development cycle?)
+> > 
+> > This. So now we have to scramble because some device trees will
+> > produce warnings at boot.
+> > 
+> > Russell, the alternative is to revert Lorenzo's patch for 3.10 (and
+> > re-introduce it for 3.11). Do you have a preference?
 > 
-> On these SoCs which Santosh is working on, the main physical memory
-> mapping is above 4GB, with just a small alias below 4GB to allow the
-> system to boot without the MMU being on, as they may have more than
-> 4GB of RAM.  As I understand it, the small alias below 4GB is not
-> suitable for use as a "lowmem" mapping.
+> Ok, sorry about this guys. Technically speaking the DT bindings updates
+> (cpu/cpus nodes), dts updates and the ARM 7762/1 merged through Russell's
+> tree all are fixes, but probably we should not get them in as such.
+> 
+> ARM: 7762/1 was implemented to fix the warnings caused by new dts with
+> topology nodes (cpu-map node), and should go to stable kernels as well
+> since we want those kernels to boot with new DTs.
+> 
+> I should have prevented it from getting in as a fix, I really apologize.
+> I should also ask to drop the patch from the stable kernel queues, since this
+> would cause further issues (basically we should send all dts updates to
+> stable kernels as well, and unfortunately that's something we will have
+> to do anyway, when it has to be decided, if 7762/1 goes in 3.11 or later with
+> CC'ed stable we should send the dts updates to stable as well at the same
+> time).
+> 
+> I think the best solution is to revert ARM 7762/1 now and re-introduce it as
+> a fix after 3.11, when the dust has settled, I will drop it from stable
+> kernels queue as well if we all agree.
+> 
+> If we drop ARM 7762/1, 7764/1 needs rebasing since those patches order
+> unfortunately matters.
 
-Ah, okay, so the @limit which is in physical address can be over 4GB
-even for lowmem mappings and alloc_bootmem takes them in ulongs,
-urghhh....
+Ok, so you're saying we need to revert 1ba9bf0a and 7764/1. I couldn't
+find a commit corresponding to this one, however there is a commit
+labelled 7763/1 from you that touch the same area (18d7f152). Are these
+the commits that need to be reverted (and then reapplied for 3.11) ?
 
-Given that still about half of the archs aren't using memblock yet, I
-think there are three options.
+Russell, Arnd, Olof, who should revert this patch, and through which
+tree?
 
-1. Converting all bootmem interface to use physaddr_t.  But that's
-   what memblock is.
-
-2. Introducing new interface.  Easier right now but the danger there
-   is that it might end up duplicating most of alloc_bootmem()
-   interface anyway and we'll have yet another variant of early mem
-   allocator to enjoy.
-
-3. Make all generic code use memblock interface instead of bootmem and
-   implement memblock wrapper on archs which don't use memblock yet.
-   We'll probably need to sort out different combinations of
-   HAVE_MEMBLOCK and NO_BOOTMEM.  If this is doable, it probably is
-   the most future proof way.  While it adds new memblock interface
-   built on top of bootmem, it would also allow removing the bootmem
-   interface built on top of memblock - ie. nobootmem.c, which
-   probably is what we should have done from the beginning.
-
-What do you guys think?
-
-Thanks.
+Thanks,
+Maxime
 
 -- 
-tejun
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130629/93935562/attachment.sig>
