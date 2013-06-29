@@ -1,47 +1,24 @@
-From: yinghai@kernel.org (Yinghai Lu)
-Date: Sat, 29 Jun 2013 13:08:13 -0700
-Subject: [PATCH] WIP: HACK: LPAE, BOOTMEM and NO_BOOTMEM
-In-Reply-To: <20130629195549.GE3353@n2100.arm.linux.org.uk>
-References: <1372467663-31425-1-git-send-email-santosh.shilimkar@ti.com>
- <20130629152959.GB31339@mtj.dyndns.org>
- <20130629172123.GA3353@n2100.arm.linux.org.uk>
- <20130629175743.GA382@mtj.dyndns.org>
- <CAE9FiQXHuP-n0eZ9wN73V4nSvE+XEExDsx1t50_=YaW+V=LGLg@mail.gmail.com>
- <20130629195549.GE3353@n2100.arm.linux.org.uk>
-Message-ID: <CAE9FiQUoVNvWmmTV2+ZkU_nMxFToTHw6QLwp_Z_EjwMzqdLwuA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 29 Jun 2013 13:11:24 -0700
+Subject: [PATCH v5 06/12] memory: mvebu-devbus: Remove address decoding
+ window workaround
+In-Reply-To: <1372532655-20321-7-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1372532655-20321-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1372532655-20321-7-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130629201124.GA15981@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 29, 2013 at 12:55 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Jun 29, 2013 at 12:29:55PM -0700, Yinghai Lu wrote:
->> >> On these SoCs which Santosh is working on, the main physical memory
->> >> mapping is above 4GB, with just a small alias below 4GB to allow the
->> >> system to boot without the MMU being on, as they may have more than
->> >> 4GB of RAM.  As I understand it, the small alias below 4GB is not
->> >> suitable for use as a "lowmem" mapping.
->>
->> is that 32bit ARM or 64bit ARM?
->
-> Only 32-bit has LPAE.  Such things don't make sense on 64-bit CPUs.
+On Sat, Jun 29, 2013 at 04:04:09PM -0300, Ezequiel Garcia wrote:
+> Now that mbus device tree binding has been introduced, remove the address
+> decoding window management from this driver.
+> A suitable 'ranges' entry should be added to the devbus-compatible node in
+> the device tree, as described by the mbus binding documentation.
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  drivers/memory/mvebu-devbus.c | 64 ++-----------------------------------------
+>  1 file changed, 2 insertions(+), 62 deletions(-)
 
-32bit ARM does not support NO_BOOTMEM yet.
-
-arch/arc/Kconfig:       select NO_BOOTMEM
-arch/arm64/Kconfig:     select NO_BOOTMEM
-arch/sparc/Kconfig:     select NO_BOOTMEM
-arch/x86/Kconfig:config NO_BOOTMEM
-
-
-so may need to
-1. make 32bit ARM to use NO_BOOTMEM at first.
-
-2 .we can add alloc_memblock as MACRO or inline for bootmem arches,
-
-3. NO_BOOTMEM arches will have alloc_memblock in nobootmem.c
-
-4. replace alloc_bootmem calling with alloc_memblock calling in core code.
-
-Thanks
-
-Yinghai
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
