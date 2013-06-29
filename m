@@ -1,107 +1,125 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 29 Jun 2013 12:40:42 +0400
-Subject: [PATCH v3 4/5] rtc: mxc_rtc: Add DT support
+Date: Sat, 29 Jun 2013 12:40:41 +0400
+Subject: [PATCH v3 2/5] rtc: mxc_rtc: Cleanup code
 In-Reply-To: <1372495244-21215-1-git-send-email-shc_work@mail.ru>
 References: <1372495244-21215-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1372495244-21215-3-git-send-email-shc_work@mail.ru>
+Message-ID: <1372495244-21215-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings for the mxc_rtc driver and read the device
-configuration from the DT node at probe time if available.
+This patch provide cleanup mxc_rtc driver code (spaces to tabs).
+No functional changes.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- Documentation/devicetree/bindings/rtc/mxc-rtc.txt | 21 ++++++++++++++++++
- drivers/rtc/rtc-mxc.c                             | 27 +++++++++++++++++++----
- 2 files changed, 44 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/rtc/mxc-rtc.txt
+ drivers/rtc/rtc-mxc.c | 52 ++++++++++++++++++++++++++-------------------------
+ 1 file changed, 27 insertions(+), 25 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/rtc/mxc-rtc.txt b/Documentation/devicetree/bindings/rtc/mxc-rtc.txt
-new file mode 100644
-index 0000000..ad8b0b3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/mxc-rtc.txt
-@@ -0,0 +1,21 @@
-+* i.MX Real Time Clock controller
-+
-+This binding supports the following chips: i.MX1, i.MX27, i.MX31, i.MX35
-+
-+Required properties:
-+- compatible: should be: "fsl,imx1-rtc" or "fsl,imx21-rtc"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- interrupts: rtc alarm interrupt
-+- clocks : Should contain the rtc and ipg clocks, in the order
-+  determined by the clock-names property.
-+
-+Example:
-+
-+rtc at 10007000 {
-+	compatible = "fsl,imx27-rtc", "fsl,imx21-rtc";
-+	reg = <0x10007000 0x1000>;
-+	interrupts = <22>;
-+	clocks = <&clks 2>, <&clks 33>;
-+	clock-names = "rtc", "ipg";
-+};
 diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
-index 80c6f1f..5079c44 100644
+index 8ec47c8..f333581 100644
 --- a/drivers/rtc/rtc-mxc.c
 +++ b/drivers/rtc/rtc-mxc.c
-@@ -13,6 +13,8 @@
- #include <linux/rtc.h>
- #include <linux/module.h>
- #include <linux/interrupt.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
+@@ -20,23 +20,23 @@
+ #define RTC_INPUT_CLK_32000HZ	(0x01 << 5)
+ #define RTC_INPUT_CLK_38400HZ	(0x02 << 5)
  
-@@ -377,7 +379,16 @@ static int mxc_rtc_probe(struct platform_device *pdev)
- 	/* Disable all interrupts */
- 	writew(0, pdata->ioaddr + RTC_RTCIENR);
+-#define RTC_SW_BIT      (1 << 0)
+-#define RTC_ALM_BIT     (1 << 2)
+-#define RTC_1HZ_BIT     (1 << 4)
+-#define RTC_2HZ_BIT     (1 << 7)
+-#define RTC_SAM0_BIT    (1 << 8)
+-#define RTC_SAM1_BIT    (1 << 9)
+-#define RTC_SAM2_BIT    (1 << 10)
+-#define RTC_SAM3_BIT    (1 << 11)
+-#define RTC_SAM4_BIT    (1 << 12)
+-#define RTC_SAM5_BIT    (1 << 13)
+-#define RTC_SAM6_BIT    (1 << 14)
+-#define RTC_SAM7_BIT    (1 << 15)
+-#define PIT_ALL_ON      (RTC_2HZ_BIT | RTC_SAM0_BIT | RTC_SAM1_BIT | \
++#define RTC_SW_BIT	(1 << 0)
++#define RTC_ALM_BIT	(1 << 2)
++#define RTC_1HZ_BIT	(1 << 4)
++#define RTC_2HZ_BIT	(1 << 7)
++#define RTC_SAM0_BIT	(1 << 8)
++#define RTC_SAM1_BIT	(1 << 9)
++#define RTC_SAM2_BIT	(1 << 10)
++#define RTC_SAM3_BIT	(1 << 11)
++#define RTC_SAM4_BIT	(1 << 12)
++#define RTC_SAM5_BIT	(1 << 13)
++#define RTC_SAM6_BIT	(1 << 14)
++#define RTC_SAM7_BIT	(1 << 15)
++#define PIT_ALL_ON	(RTC_2HZ_BIT | RTC_SAM0_BIT | RTC_SAM1_BIT | \
+ 			 RTC_SAM2_BIT | RTC_SAM3_BIT | RTC_SAM4_BIT | \
+ 			 RTC_SAM5_BIT | RTC_SAM6_BIT | RTC_SAM7_BIT)
  
--	pdata->devtype = pdev->id_entry->driver_data;
-+	if (pdev->dev.of_node) {
-+		struct platform_driver *pdrv = container_of(pdev->dev.driver,
-+						struct platform_driver, driver);
-+		const struct of_device_id *of_id =
-+			of_match_device(pdrv->driver.of_match_table, &pdev->dev);
+-#define RTC_ENABLE_BIT  (1 << 7)
++#define RTC_ENABLE_BIT	(1 << 7)
+ 
+ #define MXC_RTC_TIME	0
+ #define MXC_RTC_ALARM	1
+@@ -58,13 +58,13 @@ enum imx_rtc_type {
+ };
+ 
+ struct rtc_plat_data {
+-	struct rtc_device *rtc;
+-	void __iomem *ioaddr;
+-	int irq;
++	struct rtc_device	*rtc;
++	void __iomem		*ioaddr;
++	int			irq;
+ 	struct rtc_class_ops	rtc_ops;
+ 	struct clk		*clk_rtc;
+ 	struct clk		*clk_ipg;
+-	enum imx_rtc_type devtype;
++	enum imx_rtc_type	devtype;
+ };
+ 
+ /*
+@@ -156,7 +156,7 @@ static int rtc_update_alarm(struct device *dev, struct rtc_time *alrm)
+ }
+ 
+ static void mxc_rtc_irq_enable(struct device *dev, unsigned int bit,
+-				unsigned int enabled)
++			       unsigned int enabled)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
+@@ -187,6 +187,7 @@ static irqreturn_t mxc_rtc_interrupt(int irq, void *dev_id)
+ 	u32 events = 0;
+ 
+ 	spin_lock_irqsave(&pdata->rtc->irq_lock, flags);
 +
-+		pdata->devtype = (enum imx_rtc_type)of_id->data;
-+	} else
-+		pdata->devtype = pdev->id_entry->driver_data;
+ 	status = readw(ioaddr + RTC_RTCISR) & readw(ioaddr + RTC_RTCIENR);
+ 	/* clear interrupt sources */
+ 	writew(status, ioaddr + RTC_RTCISR);
+@@ -205,6 +206,7 @@ static irqreturn_t mxc_rtc_interrupt(int irq, void *dev_id)
+ 		events |= (RTC_PF | RTC_IRQF);
+ 
+ 	rtc_update_irq(pdata->rtc, 1, events);
 +
- 	platform_set_drvdata(pdev, pdata);
+ 	spin_unlock_irqrestore(&pdata->rtc->irq_lock, flags);
  
- 	pdata->rtc_ops.open		= mxc_rtc_open;
-@@ -448,6 +459,13 @@ static int __maybe_unused mxc_rtc_resume(struct device *dev)
- 
- static SIMPLE_DEV_PM_OPS(mxc_rtc_pm_ops, mxc_rtc_suspend, mxc_rtc_resume);
- 
-+static const struct of_device_id mxc_rtc_dt_ids[] = {
-+	{ .compatible = "fsl,imx1-rtc", .data = (void *)IMX1_RTC, },
-+	{ .compatible = "fsl,imx21-rtc", .data = (void *)IMX21_RTC, },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, mxc_rtc_dt_ids);
-+
- static const struct platform_device_id mxc_rtc_id_table[] = {
- 	{ .name = "imx1-rtc", .driver_data = IMX1_RTC, },
- 	{ .name = "imx21-rtc", .driver_data = IMX21_RTC, },
-@@ -457,9 +475,10 @@ MODULE_DEVICE_TABLE(platform, mxc_rtc_id_table);
+ 	return IRQ_HANDLED;
+@@ -454,14 +456,14 @@ static const struct platform_device_id mxc_rtc_id_table[] = {
+ MODULE_DEVICE_TABLE(platform, mxc_rtc_id_table);
  
  static struct platform_driver mxc_rtc_driver = {
- 	.driver	= {
--		.name	= "mxc_rtc",
--		.owner	= THIS_MODULE,
--		.pm	= &mxc_rtc_pm_ops,
-+		.name		= "mxc_rtc",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= mxc_rtc_dt_ids,
-+		.pm		= &mxc_rtc_pm_ops,
+-	.driver = {
+-		   .name	= "mxc_rtc",
+-		   .pm		= &mxc_rtc_pm_ops,
+-		   .owner	= THIS_MODULE,
++	.driver	= {
++		.name	= "mxc_rtc",
++		.owner	= THIS_MODULE,
++		.pm	= &mxc_rtc_pm_ops,
  	},
  	.id_table = mxc_rtc_id_table,
- 	.probe	= mxc_rtc_probe,
+-	.probe = mxc_rtc_probe,
+-	.remove = mxc_rtc_remove,
++	.probe	= mxc_rtc_probe,
++	.remove	= mxc_rtc_remove,
+ };
+ module_platform_driver(mxc_rtc_driver)
+ 
 -- 
 1.8.1.5
