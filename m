@@ -1,182 +1,74 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 29 Jun 2013 23:55:23 +0100
-Subject: [PATCH RFC 3/3] DRM: Armada: support for dma_buf import into gem
-In-Reply-To: <20130629225210.GF3353@n2100.arm.linux.org.uk>
-References: <20130629225210.GF3353@n2100.arm.linux.org.uk>
-Message-ID: <E1Ut439-0000wv-2e@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 30 Jun 2013 00:14:26 +0100
+Subject: [PATCH 0/2] ARM: sunxi: Convert DTSI to new CPU bindings
+In-Reply-To: <20130629225426.GA12221@quad.lixom.net>
+References: <1372437844-16325-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20130628171532.GD30603@e102568-lin.cambridge.arm.com>
+ <20130628200333.GA2756@lukather>
+ <CAOesGMgsD+tK4+ywvLzsWd+mngrP7zGgSFn0naWjSsQLGaUn2Q@mail.gmail.com>
+ <20130629193819.GD3353@n2100.arm.linux.org.uk>
+ <20130629225426.GA12221@quad.lixom.net>
+Message-ID: <20130629231425.GG3353@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support importing certain dma_bufs back into gem - notably those which
-are either contiguous or are our own exports which do not use
-dma_map_sg().
+On Sat, Jun 29, 2013 at 03:54:26PM -0700, Olof Johansson wrote:
+> Most of this ruffle seems to be about the fact that booting a kernel
+> with a device tree that doesn't conform to the brand spanking new,
+> and never previously enforced, binding for the cpu nodes will produce
+> a WARN_ON(). Lots of our in-tree device trees fall into this category.
+> 
+> And while I think it was a bad idea for Lorenzo to ask for this to be
+> merged as a fix this late (and most in particular for stable), as far
+> as I can tell nothing (new) is broken by it -- just the alarming warning
+> is being printed.
+> 
+> I think it probably makes sense to downgrade the WARN to just a printk, and
+> people will be a lot less worried. How about the below?
+> 
+> If you're OK with it, Russell, can we get your ack so Linus can apply
+> directly given the imminence of final 3.10? Or, if you prefer, you can of
+> course apply and send it on instead.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/gpu/drm/armada/armada_drv.c |    4 +-
- drivers/gpu/drm/armada/armada_fb.c  |    6 +++
- drivers/gpu/drm/armada/armada_gem.c |   81 ++++++++++++++++++++++++++++++++++-
- drivers/gpu/drm/armada/armada_gem.h |    4 ++
- 4 files changed, 92 insertions(+), 3 deletions(-)
+You can have my usual rmk+kernel ack for it with one change...
 
-diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
-index e0a08e9..268ea28 100644
---- a/drivers/gpu/drm/armada/armada_drv.c
-+++ b/drivers/gpu/drm/armada/armada_drv.c
-@@ -311,9 +311,9 @@ static struct drm_driver armada_drm_driver = {
- 	.gem_init_object	= NULL,
- 	.gem_free_object	= armada_gem_free_object,
- 	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
--	.prime_fd_to_handle	= NULL,
-+	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
- 	.gem_prime_export	= armada_gem_prime_export,
--	.gem_prime_import	= NULL,
-+	.gem_prime_import	= armada_gem_prime_import,
- 	.dumb_create		= armada_gem_dumb_create,
- 	.dumb_map_offset	= armada_gem_dumb_map_offset,
- 	.dumb_destroy		= armada_gem_dumb_destroy,
-diff --git a/drivers/gpu/drm/armada/armada_fb.c b/drivers/gpu/drm/armada/armada_fb.c
-index 5154f04..28965e3 100644
---- a/drivers/gpu/drm/armada/armada_fb.c
-+++ b/drivers/gpu/drm/armada/armada_fb.c
-@@ -120,6 +120,12 @@ static struct drm_framebuffer *armada_fb_create(struct drm_device *dev,
- 		return ERR_PTR(-ENOENT);
- 	}
- 
-+	if (obj->obj.import_attach && !obj->sgt) {
-+		ret = armada_gem_map_import(obj);
-+		if (ret)
-+			goto unref;
-+	}
-+
- 	/* Framebuffer objects must have a valid device address for scanout */
- 	if (obj->dev_addr == DMA_ERROR_CODE) {
- 		ret = -EINVAL;
-diff --git a/drivers/gpu/drm/armada/armada_gem.c b/drivers/gpu/drm/armada/armada_gem.c
-index d09fa14..ad517ce 100644
---- a/drivers/gpu/drm/armada/armada_gem.c
-+++ b/drivers/gpu/drm/armada/armada_gem.c
-@@ -70,6 +70,12 @@ void armada_gem_free_object(struct drm_gem_object *obj)
- 			iounmap(dobj->addr);
- 	}
- 
-+	if (dobj->obj.import_attach) {
-+		/* We only ever display imported data */
-+		dma_buf_unmap_attachment(dobj->obj.import_attach, dobj->sgt,
-+					 DMA_TO_DEVICE);
-+		drm_prime_gem_destroy(&dobj->obj, NULL);
-+	}
- 
- 	drm_gem_object_release(&dobj->obj);
- 
-@@ -270,6 +276,12 @@ int armada_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
- 		goto err_unlock;
- 	}
- 
-+	/* Don't allow imported objects to be mapped */
-+	if (obj->obj.import_attach) {
-+		ret = -EINVAL;
-+		goto err_unlock;
-+	}
-+
- 	if (!obj->obj.map_list.map)
- 		ret = drm_gem_create_mmap_offset(&obj->obj);
- 
-@@ -537,5 +549,72 @@ armada_gem_prime_export(struct drm_device *dev, struct drm_gem_object *obj,
- 	int flags)
- {
- 	return dma_buf_export(obj, &armada_gem_prime_dmabuf_ops, obj->size,
--			      flags);
-+			      O_RDWR);
-+}
-+
-+struct drm_gem_object *
-+armada_gem_prime_import(struct drm_device *dev, struct dma_buf *buf)
-+{
-+	struct dma_buf_attachment *attach;
-+	struct armada_gem_object *dobj;
-+
-+	if (buf->ops == &armada_gem_prime_dmabuf_ops) {
-+		struct drm_gem_object *obj = buf->priv;
-+		if (obj->dev == dev) {
-+			/*
-+			 * Importing our own dmabuf(s) increases the
-+			 * refcount on the gem object itself.
-+			 */
-+			drm_gem_object_reference(obj);
-+			dma_buf_put(buf);
-+			return obj;
-+		}
-+	}
-+
-+	attach = dma_buf_attach(buf, dev->dev);
-+	if (IS_ERR(attach))
-+		return ERR_CAST(attach);
-+
-+	dobj = armada_gem_alloc_private_object(dev, buf->size);
-+	if (!dobj) {
-+		dma_buf_detach(buf, attach);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	dobj->obj.import_attach = attach;
-+
-+	/*
-+	 * Don't call dma_buf_map_attachment() here - it maps the
-+	 * scatterlist immediately for DMA, and this is not always
-+	 * an appropriate thing to do.
-+	 */
-+	return &dobj->obj;
-+}
-+
-+int armada_gem_map_import(struct armada_gem_object *dobj)
-+{
-+	int ret;
-+
-+	dobj->sgt = dma_buf_map_attachment(dobj->obj.import_attach,
-+					  DMA_TO_DEVICE);
-+	if (!dobj->sgt) {
-+		DRM_ERROR("dma_buf_map_attachment() returned NULL\n");
-+		return -EINVAL;
-+	}
-+	if (IS_ERR(dobj->sgt)) {
-+		ret = PTR_ERR(dobj->sgt);
-+		dobj->sgt = NULL;
-+		DRM_ERROR("dma_buf_map_attachment() error: %d\n", ret);
-+		return ret;
-+	}
-+	if (dobj->sgt->nents > 1) {
-+		DRM_ERROR("dma_buf_map_attachment() returned an (unsupported) scattered list\n");
-+		return -EINVAL;
-+	}
-+	if (sg_dma_len(dobj->sgt->sgl) < dobj->obj.size) {
-+		DRM_ERROR("dma_buf_map_attachment() returned a small buffer\n");
-+		return -EINVAL;
-+	}
-+	dobj->dev_addr = sg_dma_address(dobj->sgt->sgl);
-+	return 0;
- }
-diff --git a/drivers/gpu/drm/armada/armada_gem.h b/drivers/gpu/drm/armada/armada_gem.h
-index e3bce9f..00b6cd4 100644
---- a/drivers/gpu/drm/armada/armada_gem.h
-+++ b/drivers/gpu/drm/armada/armada_gem.h
-@@ -16,6 +16,7 @@ struct armada_gem_object {
- 	resource_size_t		dev_addr;
- 	struct drm_mm_node	*linear;	/* for linear backed */
- 	struct page		*page;		/* for page backed */
-+	struct sg_table		*sgt;		/* for imported */
- 	void			(*update)(void *);
- 	void			*update_data;
- };
-@@ -37,6 +38,9 @@ int armada_gem_dumb_destroy(struct drm_file *, struct drm_device *,
- 	uint32_t);
- struct dma_buf *armada_gem_prime_export(struct drm_device *dev,
- 	struct drm_gem_object *obj, int flags);
-+struct drm_gem_object *armada_gem_prime_import(struct drm_device *,
-+	struct dma_buf *);
-+int armada_gem_map_import(struct armada_gem_object *);
- 
- static inline struct armada_gem_object *armada_gem_object_lookup(
- 	struct drm_device *dev, struct drm_file *dfile, unsigned handle)
--- 
-1.7.4.4
+> +	if (!bootcpu_valid) {
+> +		pr_warn("DT missing boot CPU MPIDR[23:0], fall back to "
+> +			"default cpu_logical_map\n");
+
+Don't wrap messages kernel messages inspite of what checkpatch says.
+Always keep messages like that on a single line so they're greppable.
+Checkpatch is far from perfect and does get stuff wrong, and this is
+one of its common mistakes.
+
+Incidentally, here's a few of fun ones I found today which illustrates
+why checkpatch can be bad news if everything it spits out is believed
+by the user:
+
+WARNING: simple_strtoul is obsolete, use kstrtoul instead
+#1424: FILE: drivers/gpu/drm/armada/armada_debugfs.c:90:
++       reg = simple_strtoul(buf, &p, 16);
+
+Umm yes, and to use kstrtoul(), I'd have to:
+- copy the string _safely_ to avoid any buffer overflow
+- find the first non-value character
+- terminate the string with a \0 or a \n\0
+- remember where in the string I'd got to to parse the next argument
+And pushing that complexity into drivers, which if it's wrong causes
+security problems, is better than using simple_strtoul() because ...?
+
+ERROR: Macros with multiple statements should be enclosed in a do - while loop
+#2122: FILE: drivers/gpu/drm/armada/armada_fb.c:45:
++#define FMT(drm, fmt, mod)             \
++       case DRM_FORMAT_##drm:          \
++               format = CFG_##fmt;     \
++               config = mod;           \
++               break
+
+Oh yea, that's really going to work for that isn't it!
+
+WARNING: externs should be avoided in .c files
+#2126: FILE: drivers/gpu/drm/armada/armada_fb.c:49:
++               break
+
+Err, what extern? :)
