@@ -1,50 +1,107 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Sat, 29 Jun 2013 14:27:59 +0530
-Subject: [PATCH v3 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
-In-Reply-To: <51CD6153.5050406@samsung.com>
-References: <1372258946-15607-1-git-send-email-s.nawrocki@samsung.com>
- <1372258946-15607-2-git-send-email-s.nawrocki@samsung.com>
- <51CD4698.3070409@gmail.com> <51CD6153.5050406@samsung.com>
-Message-ID: <51CEA197.8070207@ti.com>
+Date: Sat, 29 Jun 2013 14:30:09 +0530
+Subject: [PATCH V2 1/3] phy: Add driver for Exynos DP PHY
+In-Reply-To: <001f01ce73cf$46d8c940$d48a5bc0$@samsung.com>
+References: <001f01ce73cf$46d8c940$d48a5bc0$@samsung.com>
+Message-ID: <51CEA219.8030001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Friday 28 June 2013 03:41 PM, Sylwester Nawrocki wrote:
-> On 06/28/2013 10:17 AM, Hui Wang wrote:
->> On 06/26/2013 11:02 PM, Sylwester Nawrocki wrote:
->>> Add a PHY provider driver for the Samsung S5P/Exynos SoC MIPI CSI-2
->>> receiver and MIPI DSI transmitter DPHYs.
->>>
->>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>> ---
->>> Changes since v2:
->>>    - adapted to the generic PHY API v9: use phy_set/get_drvdata(),
->>>    - fixed of_xlate callback to return ERR_PTR() instead of NULL,
->>>    - namespace cleanup, put "GPL v2" as MODULE_LICENSE, removed pr_debug,
->>>    - removed phy id check in __set_phy_state().
->>> ---
->> [...]
->>> +
->>> +	if (IS_EXYNOS_MIPI_DSIM_PHY_ID(id))
->>> +		reset = EXYNOS_MIPI_PHY_MRESETN;
->>> +	else
->>> +		reset = EXYNOS_MIPI_PHY_SRESETN;
->>> +
->>> +	spin_lock_irqsave(&state->slock, flags);
->>
->> Sorry for one stupid question here, why do you use spin_lock_irqsave()
->> rather than spin_lock(),
->> I don't see the irq handler will use this spinlock anywhere in this c file.
+On Friday 28 June 2013 12:45 PM, Jingoo Han wrote:
+> Add a PHY provider driver for the Samsung Exynos SoC DP PHY.
 >
-> Yes, there is no chance the PHY users could call the phy ops from within
-> an interrupt context. Especially now when there is a per phy object
-> mutex used in the PHY operation helpers. So I'll replace it with plain
-> spin_lock/unlock. Thank you for the review.
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> ---
+>   .../phy/samsung,exynos5250-dp-video-phy.txt        |    7 ++
+>   drivers/phy/Kconfig                                |    8 ++
+>   drivers/phy/Makefile                               |    3 +-
+>   drivers/phy/phy-exynos-dp-video.c                  |  122 ++++++++++++++++++++
+>   4 files changed, 139 insertions(+), 1 deletion(-)
+>   create mode 100644 Documentation/devicetree/bindings/phy/samsung,exynos5250-dp-video-phy.txt
+>   create mode 100644 drivers/phy/phy-exynos-dp-video.c
+>
+> diff --git a/Documentation/devicetree/bindings/phy/samsung,exynos5250-dp-video-phy.txt
+> b/Documentation/devicetree/bindings/phy/samsung,exynos5250-dp-video-phy.txt
+> new file mode 100644
+> index 0000000..d1771ef
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/samsung,exynos5250-dp-video-phy.txt
+> @@ -0,0 +1,7 @@
+> +Samsung EXYNOS SoC series DP PHY
+> +-------------------------------------------------
+> +
+> +Required properties:
+> +- compatible : should be "samsung,exynos5250-dp-video-phy";
+> +- reg : offset and length of the DP PHY register set;
+> +- #phy-cells : from the generic phy bindings, must be 0;
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 5f85909..6d10e3b 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -11,3 +11,11 @@ menuconfig GENERIC_PHY
+>   	  devices present in the kernel. This layer will have the generic
+>   	  API by which phy drivers can create PHY using the phy framework and
+>   	  phy users can obtain reference to the PHY.
+> +
+> +if GENERIC_PHY
+> +
+> +config PHY_EXYNOS_DP_VIDEO
+> +	tristate "EXYNOS SoC series DP PHY driver"
+> +	help
+> +	  Support for DP PHY found on Samsung EXYNOS SoCs.
+> +endif
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index 9e9560f..d8d861c 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -2,4 +2,5 @@
+>   # Makefile for the phy drivers.
+>   #
+>
+> -obj-$(CONFIG_GENERIC_PHY)	+= phy-core.o
+> +obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
+> +obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
+> diff --git a/drivers/phy/phy-exynos-dp-video.c b/drivers/phy/phy-exynos-dp-video.c
+> new file mode 100644
+> index 0000000..9a3d6f1
+> --- /dev/null
+> +++ b/drivers/phy/phy-exynos-dp-video.c
+> @@ -0,0 +1,122 @@
+> +/*
+> + * Samsung EXYNOS SoC series DP PHY driver
+> + *
+> + * Copyright (C) 2013 Samsung Electronics Co., Ltd.
+> + * Author: Jingoo Han <jg1.han@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/spinlock.h>
+> +
+> +/* DPTX_PHY_CONTROL register */
+> +#define EXYNOS_DPTX_PHY_ENABLE		(1 << 0)
+> +
+> +struct exynos_dp_video_phy {
+> +	spinlock_t slock;
 
-Now that PHY ops is already protected, do you really need a spin_lock here?
+I think spinlock is not needed at all since the PHY ops is already protected
+by a mutex.
+> +	struct phy *phys;
+
+_phys_ no longer need to part of this structure.
+> +	void __iomem *regs;
+> +};
 
 Thanks
 Kishon
