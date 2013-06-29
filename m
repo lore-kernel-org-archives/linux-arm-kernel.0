@@ -1,69 +1,57 @@
-From: yinghai@kernel.org (Yinghai Lu)
-Date: Sat, 29 Jun 2013 12:29:55 -0700
-Subject: [PATCH] WIP: HACK: LPAE, BOOTMEM and NO_BOOTMEM
-In-Reply-To: <20130629175743.GA382@mtj.dyndns.org>
-References: <1372467663-31425-1-git-send-email-santosh.shilimkar@ti.com>
- <20130629152959.GB31339@mtj.dyndns.org>
- <20130629172123.GA3353@n2100.arm.linux.org.uk>
- <20130629175743.GA382@mtj.dyndns.org>
-Message-ID: <CAE9FiQXHuP-n0eZ9wN73V4nSvE+XEExDsx1t50_=YaW+V=LGLg@mail.gmail.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sat, 29 Jun 2013 21:34:03 +0200
+Subject: [PATCH v3 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+In-Reply-To: <51CEA197.8070207@ti.com>
+References: <1372258946-15607-1-git-send-email-s.nawrocki@samsung.com>
+ <1372258946-15607-2-git-send-email-s.nawrocki@samsung.com>
+ <51CD4698.3070409@gmail.com> <51CD6153.5050406@samsung.com>
+ <51CEA197.8070207@ti.com>
+Message-ID: <51CF36AB.4010300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 29, 2013 at 10:57 AM, Tejun Heo <tj@kernel.org> wrote:
-> ( Expanding cc list, original thread is at
->   http://thread.gmane.org/gmane.linux.kernel/1518046 )
->
-> Hello,
->
-> On Sat, Jun 29, 2013 at 06:21:24PM +0100, Russell King - ARM Linux wrote:
->> Unfortunately, that has not been true on ARM - it's very common for
->> there to be an offset on physical memory, sometimes of the order of
->> 3GB or more.  This is because on reset, ARMs start executing the code
->> at physical address zero, which therefore can't be RAM - and there's
->> a desire to avoid complex switching games in hardware to temporarily
->> map ROM there instead of RAM.
+Hi,
+
+On 06/29/2013 10:57 AM, Kishon Vijay Abraham I wrote:
+> On Friday 28 June 2013 03:41 PM, Sylwester Nawrocki wrote:
+>> On 06/28/2013 10:17 AM, Hui Wang wrote:
+>>> On 06/26/2013 11:02 PM, Sylwester Nawrocki wrote:
+>>>> Add a PHY provider driver for the Samsung S5P/Exynos SoC MIPI CSI-2
+>>>> receiver and MIPI DSI transmitter DPHYs.
+>>>>
+>>>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>>> ---
+>>>> Changes since v2:
+>>>> - adapted to the generic PHY API v9: use phy_set/get_drvdata(),
+>>>> - fixed of_xlate callback to return ERR_PTR() instead of NULL,
+>>>> - namespace cleanup, put "GPL v2" as MODULE_LICENSE, removed pr_debug,
+>>>> - removed phy id check in __set_phy_state().
+>>>> ---
+>>> [...]
+>>>> +
+>>>> + if (IS_EXYNOS_MIPI_DSIM_PHY_ID(id))
+>>>> + reset = EXYNOS_MIPI_PHY_MRESETN;
+>>>> + else
+>>>> + reset = EXYNOS_MIPI_PHY_SRESETN;
+>>>> +
+>>>> + spin_lock_irqsave(&state->slock, flags);
+>>>
+>>> Sorry for one stupid question here, why do you use spin_lock_irqsave()
+>>> rather than spin_lock(),
+>>> I don't see the irq handler will use this spinlock anywhere in this c
+>>> file.
 >>
->> On these SoCs which Santosh is working on, the main physical memory
->> mapping is above 4GB, with just a small alias below 4GB to allow the
->> system to boot without the MMU being on, as they may have more than
->> 4GB of RAM.  As I understand it, the small alias below 4GB is not
->> suitable for use as a "lowmem" mapping.
-
-is that 32bit ARM or 64bit ARM?
-
+>> Yes, there is no chance the PHY users could call the phy ops from within
+>> an interrupt context. Especially now when there is a per phy object
+>> mutex used in the PHY operation helpers. So I'll replace it with plain
+>> spin_lock/unlock. Thank you for the review.
 >
-> Ah, okay, so the @limit which is in physical address can be over 4GB
-> even for lowmem mappings and alloc_bootmem takes them in ulongs,
-> urghhh....
->
-> Given that still about half of the archs aren't using memblock yet, I
-> think there are three options.
->
-> 1. Converting all bootmem interface to use physaddr_t.  But that's
->    what memblock is.
->
-> 2. Introducing new interface.  Easier right now but the danger there
->    is that it might end up duplicating most of alloc_bootmem()
->    interface anyway and we'll have yet another variant of early mem
->    allocator to enjoy.
->
-> 3. Make all generic code use memblock interface instead of bootmem and
->    implement memblock wrapper on archs which don't use memblock yet.
->    We'll probably need to sort out different combinations of
->    HAVE_MEMBLOCK and NO_BOOTMEM.  If this is doable, it probably is
->    the most future proof way.  While it adds new memblock interface
->    built on top of bootmem, it would also allow removing the bootmem
->    interface built on top of memblock - ie. nobootmem.c, which
->    probably is what we should have done from the beginning.
->
-> What do you guys think?
+> Now that PHY ops is already protected, do you really need a spin_lock here?
 
-2. looks more simple.
-but will use alloc_memblock as interface.
+It is still needed, to synchronize access to the control register from
+two separate PHY objects. The mutex is per PHY object, while the spinlock
+is per PHY provider.
 
-We don't need to use __alloc_memory_core_early() directly, right?
-
-Thanks
-
-Yinghai
+Thanks,
+Sylwester
