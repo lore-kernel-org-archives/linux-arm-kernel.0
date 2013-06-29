@@ -1,66 +1,96 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Sat, 29 Jun 2013 11:23:43 -0700
-Subject: [PATCH] WIP: HACK: LPAE, BOOTMEM and NO_BOOTMEM
-In-Reply-To: <20130629175743.GA382@mtj.dyndns.org>
-References: <1372467663-31425-1-git-send-email-santosh.shilimkar@ti.com>
- <20130629152959.GB31339@mtj.dyndns.org>
- <20130629172123.GA3353@n2100.arm.linux.org.uk>
- <20130629175743.GA382@mtj.dyndns.org>
-Message-ID: <23a25575-484a-4013-b555-f7f79534589d@email.android.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 29 Jun 2013 19:45:53 +0100
+Subject: armada_drm clock selection
+In-Reply-To: <51CF0422.5020302@gmail.com>
+References: <20130628201133.1D6D2FAAD5@dev.laptop.org>
+ <20130628211848.GJ4283@n2100.arm.linux.org.uk>
+ <CAMLZHHQZ+36g9EQhj+LOgQioj8T5VDwvUdNrkVLboT8tYi9gXQ@mail.gmail.com>
+ <51CF0422.5020302@gmail.com>
+Message-ID: <20130629184553.GB3353@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3 makes sense to me.
+On Sat, Jun 29, 2013 at 05:58:26PM +0200, Sebastian Hesselbarth wrote:
+> On 06/29/2013 05:06 PM, Daniel Drake wrote:
+>> On Fri, Jun 28, 2013 at 3:18 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk>  wrote:
+>>> Sure... lets add some background info first: the big problem here is the
+>>> completely different register layouts for the clock register:
+>>>
+>>> On Armada 510:
+>>> 31:30 - select the clock input from 4 possible sources:
+>>>          0 - AXI, 1 - EXT0, 2 - PLL, 3 - EXT1
+>>> 29    - loads the divider values
+>>> 27:16 - (broken) fractional divider - you never want to use this
+>>> 15:0  - integer divider
+>
+> The reason why I called fractional divider broken is because it skips
+> clock cycles which renders the clock useless for continuous clocking
+> requirements. For smart panel SPI, it might work - but as soon as no
+> board with that pops up, I suggest not to go for it.
 
-Tejun Heo <tj@kernel.org> wrote:
+I think you mean "let's ignore the fractional divider until we have a
+board which uses a smart panel".
 
->( Expanding cc list, original thread is at
->  http://thread.gmane.org/gmane.linux.kernel/1518046 )
+>> With your clear explanations I think I can come up with an
+>> implementation that takes all these factors into account, offering
+>> access to a great deal of the available functionality. Should not be
+>> too difficult now that we have had this discussion, and I'd be happy
+>> to do so. But before I do that, a question popped up into my mind: is
+>> this complexity really worth it?
 >
->Hello,
->
->On Sat, Jun 29, 2013 at 06:21:24PM +0100, Russell King - ARM Linux
->wrote:
->> Unfortunately, that has not been true on ARM - it's very common for
->> there to be an offset on physical memory, sometimes of the order of
->> 3GB or more.  This is because on reset, ARMs start executing the code
->> at physical address zero, which therefore can't be RAM - and there's
->> a desire to avoid complex switching games in hardware to temporarily
->> map ROM there instead of RAM.
->> 
->> On these SoCs which Santosh is working on, the main physical memory
->> mapping is above 4GB, with just a small alias below 4GB to allow the
->> system to boot without the MMU being on, as they may have more than
->> 4GB of RAM.  As I understand it, the small alias below 4GB is not
->> suitable for use as a "lowmem" mapping.
->
->Ah, okay, so the @limit which is in physical address can be over 4GB
->even for lowmem mappings and alloc_bootmem takes them in ulongs,
->urghhh....
->
->Given that still about half of the archs aren't using memblock yet, I
->think there are three options.
->
->1. Converting all bootmem interface to use physaddr_t.  But that's
->   what memblock is.
->
->2. Introducing new interface.  Easier right now but the danger there
->   is that it might end up duplicating most of alloc_bootmem()
->   interface anyway and we'll have yet another variant of early mem
->   allocator to enjoy.
->
->3. Make all generic code use memblock interface instead of bootmem and
->   implement memblock wrapper on archs which don't use memblock yet.
->   We'll probably need to sort out different combinations of
->   HAVE_MEMBLOCK and NO_BOOTMEM.  If this is doable, it probably is
->   the most future proof way.  While it adds new memblock interface
->   built on top of bootmem, it would also allow removing the bootmem
->   interface built on top of memblock - ie. nobootmem.c, which
->   probably is what we should have done from the beginning.
->
->What do you guys think?
->
->Thanks.
+> Depends, with per-SoC callbacks we should be safe for every possible
+> requirement. With DT, the user always will have the option to add/remove
+> clocks passed by clocks/clock-names matching his requirements.
 
--- 
-Sent from my mobile phone. Please excuse brevity and lack of formatting.
+That, I think, is why clock names have to be mandatory for this driver,
+so we know what each DT clock specified actually is.  We can't really
+go and just specify one or two clocks when they may just be the external
+clocks and have no way for the driver to know that.
+
+>> For OLPC, we only ever use LCD1 with divider 2 for our panel, which
+>> only has 1 resolution. I think we use the fast AXI clock for HDMI
+>> path, which has a separate SCLK register. For armada 510, it looks
+>> like you are quite happy with the EXT1 clock, and you mentioned that
+>> on the 16x most of the clocks are broken, which might mean there is
+>> again just one clock of preference?
+>
+> As soon as you are required to use EDID provided modes, you will have
+> to provide the exact clock rate. With broken fractional divider on Dove
+> above, you are stuck to integer division. And none of the internal
+> frequencies give you multiple of 74.25MHz which is what you want for TV
+> applications. So for Dove, you almost always want to use extclk, if
+> connected to an external pll.
+
+Ahem.  There is no such thing as an "exact clock rate".  Even the world's
+most accurate clock (caesium fountain) is only accurate to 1 part in 10^14!
+(I have in the past worked in an equipment calibration laboratory with
+their own Rubidium standard synchronized to a remote Caesium fountain
+standard at the UK NPL, so you'll excuse me for being a pedant when it
+comes to that!)
+
+All that's required here is a clock rate which is "good enough".  Getting
+it accurate to 4 significant digits is likely to be "good enough".
+
+The problem here is that the internal clocks are be 2GHz divided by an
+integer divider.  The closest to 74.25MHz from the Dove's internal clocks
+is with a divider of 27, which gives you 74.07MHz, which is off by about
+2.4% - far from "good enough", especially when you consider the video/
+audio sync issues that would cause (you'd need about 1 additional audio
+sample per 50).
+
+>> So, could we just specify per-CRTC clock preference in platform data,
+>> DT, or something like that? e.g. we could just specify which SCLK bits
+>> to set and clear, and which Linux-level struct clk is engaged as a
+>> result. It adds a little burden for the platform implementor, but it
+>> would avoid all of the complications that you have mentioned. Or do
+>> you have a preference for the added flexibility?
+>
+> I suggest not to do any sophisticated approach to determine the "best"
+> clock. Just set the SCLK source determined by the name of first clock
+> passed either by DT or platform_data. This gives everybody the
+> flexibility but keeps implementation overhead small.
+
+The problem this gives is we need to know what SCLK setting to use,
+and I don't think specifying raw register values in DT is a particularly
+good solution to that.
