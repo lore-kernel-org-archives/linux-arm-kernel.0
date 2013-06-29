@@ -1,83 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 29 Jun 2013 09:13:33 +0200
-Subject: [PATCHv3 2/8] ARM: mxs: dt: Add Crystalfontz CFA-10056 device tree
-In-Reply-To: <1372424577-8279-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1372424577-8279-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20130629071333.GH2593@lukather>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sat, 29 Jun 2013 10:34:27 +0200
+Subject: [PATCH] of: Specify initrd location using 64-bit
+In-Reply-To: <51CE1F92.3070802@ti.com>
+References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
+ <51C4171C.9050908@linutronix.de> <51C48B5A.2040404@ti.com>
+ <51CCA67C.2010803@gmail.com>
+ <CACxGe6vOH0sCFVVXrYqD3dbYdOvithVu7-d1cvy5885i8x_Myw@mail.gmail.com>
+ <20130628134931.GD21034@game.jcrosoft.org>
+ <51CE1F92.3070802@ti.com>
+Message-ID: <CAMuHMdWjaakS-hvor7Ftyr=g-iF2kbrLryn_+YFXDDN5tS_QOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 03:02:51PM +0200, Alexandre Belloni wrote:
-> From: Brian Lilly <brian@crystalfontz.com>
-> 
-> The CFA-10056 is a breakout board for the CFA-10036, and is
-> basically a CFA-10037, with a 4.3" screen.
-> 
-> Signed-off-by: Brian Lilly <brian@crystalfontz.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/Makefile           |   1 +
->  arch/arm/boot/dts/imx28-cfa10056.dts | 120 +++++++++++++++++++++++++++++++++++
->  2 files changed, 121 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx28-cfa10056.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 641b3c9..da75139 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -143,6 +143,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
->  	imx28-cfa10037.dtb \
->  	imx28-cfa10049.dtb \
->  	imx28-cfa10055.dtb \
-> +	imx28-cfa10056.dtb \
->  	imx28-cfa10057.dtb \
->  	imx28-evk.dtb \
->  	imx28-m28evk.dtb \
-> diff --git a/arch/arm/boot/dts/imx28-cfa10056.dts b/arch/arm/boot/dts/imx28-cfa10056.dts
-> new file mode 100644
-> index 0000000..0f66c40
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx28-cfa10056.dts
-> @@ -0,0 +1,120 @@
-> +/*
-> + * Copyright 2013 Free Electrons
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/*
-> + * The CFA-10056 is an expansion board for the CFA-10036 module, thus we
-> + * need to include the CFA-10036 DTS.
-> + */
-> +/include/ "imx28-cfa10037.dts"
+On Sat, Jun 29, 2013 at 1:43 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+>>>>> Rob,
+>>>>> Are you ok with phys_addr_t since your concern was about rest
+>>>>> of the memory specific bits of the device-tree code use u64 ?
+>>>>
+>>>> No. I still think it should be u64 for same reasons I said originally.
+>>>
+>>> +1
+>>>
+>> +1
+>>
+>> fix type
+>>
+> Apart from waste of 32bit, what is the other concern you
+> have ? I really want to converge on this patch because it
+> has been a open ended discussion for quite some time. Does
+> that really break any thing on x86 or your concern is more
+> from semantics of the physical address.
 
-The comment is wrong here. You say that you need to include the 10036
-DTS, while you actually include the 10037 one.
+As the "original reasons" were not in this thread, I had to search a bit.
+I suppose you mean this one: https://lkml.org/lkml/2012/9/13/544 ?
 
-> +
-> +/ {
-> +	model = "Crystalfontz CFA-10056 Board";
-> +	compatible = "crystalfontz,cfa10056", "crystalfontz,cfa10036", "fsl,imx28";
+Summarized:
+| The address to load the initrd is decided by the bootloader/user and set
+| at that point later in time.
+| The dtb should not be tied to the kernel you are booting.
 
-Adding the cfa10037 compatible here would probably make sense as well.
+Gr{oetje,eeting}s,
 
-Thanks!
-Maxime
+                        Geert
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130629/e3cfd433/attachment.sig>
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
