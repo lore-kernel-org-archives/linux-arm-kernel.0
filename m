@@ -1,114 +1,105 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Sun, 30 Jun 2013 14:03:07 +0200
-Subject: [PATCH v1 08/12] input: keypad-matrix: tell GPIO pins from
- matrix lines
-In-Reply-To: <20130628182556.GB21589@core.coreip.homeip.net>
-References: <1371838198-7327-1-git-send-email-gsi@denx.de>
- <1371838198-7327-9-git-send-email-gsi@denx.de>
- <51C4C87B.3050300@wwwdotorg.org>
- <20130622100052.GH24305@book.gsilab.sittig.org>
- <51C8D599.2010706@wwwdotorg.org>
- <20130628075240.GU24305@book.gsilab.sittig.org>
- <51CD9F3E.9060003@wwwdotorg.org>
- <20130628182556.GB21589@core.coreip.homeip.net>
-Message-ID: <20130630120307.GB24305@book.gsilab.sittig.org>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Sun, 30 Jun 2013 14:37:41 +0200
+Subject: [PATCH RFC 1/3] DRM: Armada: Add Armada DRM driver
+In-Reply-To: <E1Ut41C-0000wl-Ff@rmk-PC.arm.linux.org.uk>
+References: <20130629225210.GF3353@n2100.arm.linux.org.uk>
+ <E1Ut41C-0000wl-Ff@rmk-PC.arm.linux.org.uk>
+Message-ID: <20130630123741.GJ18285@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 11:25 -0700, Dmitry Torokhov wrote:
+On Sat, Jun 29, 2013 at 11:53:22PM +0100, Russell King wrote:
+> This patch adds support for the pair of LCD controllers on the Marvell
+> Armada 510 SoCs.  This driver supports:
+> - multiple contiguous scanout buffers for video and graphics
+> - shm backed cacheable buffer objects for X pixmaps for Vivante GPU
+>   acceleration
+> - dual lcd0 and lcd1 crt operation
+> - video overlay on each LCD crt
+> - page flipping of the main scanout buffers
 > 
-> On Fri, Jun 28, 2013 at 08:35:42AM -0600, Stephen Warren wrote:
-> > On 06/28/2013 01:52 AM, Gerhard Sittig wrote:
-> > > 
-> > > [ late reply, just catching up with the backlog ]
-> > > 
-> > > On Mon, Jun 24, 2013 at 17:26 -0600, Stephen Warren wrote:
-> > >>
-> > >> [ ... sparse matrices, not all columns/rows populated ... ]
-> > 
-> > >> On some Tegra boards, there end up
-> > >> being rather tri-angular keymaps, where key positions (0, 0), (0, 1),
-> > >> (0, 2), (1, 1), (1, 2), (2, 2) end up being used. In this scenario,
-> > >> detailed investigation of the keymap would reveal:
-> > >>
-> > >> * Only scan columns 0..2
-> > >> * For column 0, scan rows 0..2
-> > >> * For column 1, scan rows 1..2
-> > >> * For columm 2, scan row 2.
-> > > 
-> > > That's another question I had.  So far I was concerned with just
-> > > polling or scanning the relevant columns, while all the rows for
-> > > a given column were queried (as the driver always used to do).
-> > > 
-> > > Now you raise the question of whether rows should get queried as
-> > > well depending on whether "a key may sit there".  It wasn't the
-> > > exact question I raised, but I added a comment to the spot where
-> > > input subsystem events get generated:  Is the driver expected to
-> > > emit events for matrix positions where no key map entry exists?
-> > 
-> > I would assume there is no need to, but I don't know for sure. Perhaps
-> > Dmitry can answer that?
+> Included in this commit is the core driver with no output support; output
+> support is platform and encoder driver dependent.
 > 
-> It really depends whether the driver can absolutely be sure that the key
-> is not there or if it might be. Because keymaps are configurable from
-> userspace the driver should not make this decision based on keymap
-> itself.
-> 
-> When you scan a matrix and come upon the "pressed key" condition, you
-> supposed to emit EV_MSC/MSC_SCAN, followed by appropriate EV_KEY/KEY_*.
-> Normally the "keys that aren't there" generate KEY_RESERVED events that
-> are simply dropped by input core (cause it is easier to implement).
-> MSC_SCAN events, however, reach the userspace intact.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-OK, so I understand that
-- filtering events based on the keymap entry being present would
-  be inappropriate, the driver MUST emit key press events even if
-  no key code is mapped to that position (especially since keymap
-  entries may get modified at runtime)
-- it's perfectly appropriate for a driver to assume that _any_
-  intersection in the matrix _may_ carry a key, and scan for
-  changes on that position, to derive input events (this is what
-  the current implementation of the matrix driver does)
-- it's an _option_ whether the theoretically possible set of key
-  positions further gets reduced to some "really physically
-  present" and thus "to get scanned only" set, which currently
-  isn't done and isn't mandatory, as in theory absent keys cannot
-  lead to changes and thus should never result in input events
+Found one more ...
 
-So optionally reducing the set of "to get scanned" positions is
-some kind of micro-optimization (depending on the cost of GPIO
-access, or in the polling scenario depending on how many columns
-are empty).
+[snip]
 
+> +int
+> +armada_gem_linear_back(struct drm_device *dev, struct armada_gem_object *obj)
+> +{
+> +	struct armada_private *priv = dev->dev_private;
+> +	size_t size = obj->obj.size;
+> +
+> +	if (obj->page || obj->linear)
+> +		return 0;
+> +
+> +	/*
+> +	 * If it is a small allocation (typically cursor, which will
+> +	 * be 32x64 or 64x32 ARGB pixels) try to get it from the system.
+> +	 * Framebuffers will never be this small (our minimum size for
+> +	 * framebuffers is larger than this anyway.)  Such objects are
+> +	 * only accessed by the CPU so we don't need any special handing
+> +	 * here.
+> +	 */
+> +	if (size <= 8192) {
+> +		unsigned int order = get_order(size);
+> +		struct page *p = alloc_pages(GFP_KERNEL, order);
+> +
+> +		if (p) {
+> +			obj->addr = page_address(p);
+> +			obj->phys_addr = page_to_phys(p);
+> +			obj->page = p;
+> +
+> +			memset(obj->addr, 0, PAGE_ALIGN(size));
+> +		}
+> +	}
+> +
+> +	/*
+> +	 * We could grab something from CMA if it's enabled, but that
+> +	 * involves building in a problem:
+> +	 *
+> +	 * CMA's interface uses dma_alloc_coherent(), which provides us
+> +	 * with an CPU virtual address and a device address.
+> +	 *
+> +	 * The CPU virtual address may be either an address in the kernel
+> +	 * direct mapped region (for example, as it would be on x86) or
+> +	 * it may be remapped into another part of kernel memory space
+> +	 * (eg, as it would be on ARM.)  This means virt_to_phys() on the
+> +	 * returned virtual address is invalid depending on the architecture
+> +	 * implementation.
+> +	 *
+> +	 * The device address may also not be a physical address; it may
+> +	 * be that there is some kind of remapping between the device and
+> +	 * system RAM, which makes the use of the device address also
+> +	 * unsafe to re-use as a physical address.
+> +	 *
+> +	 * This makes DRM usage of dma_alloc_coherent() in a generic way
+> +	 * at best very questionable and unsafe.
+> +	 */
+> +
+> +	/* Otherwise, grab it from our linear allocation */
+> +	if (!obj->page) {
+> +		struct drm_mm_node *free;
+> +		unsigned align = min_t(unsigned, size, SZ_2M);
+> +		void __iomem *ptr;
+> +
+> +		mutex_lock(&dev->struct_mutex);
+> +		free = drm_mm_search_free(&priv->linear, size, align, 0);
+> +		if (free)
+> +			obj->linear = drm_mm_get_block(free, size, align);
+> +		mutex_unlock(&dev->struct_mutex);
 
-My patch did not introduce the filter with new keywords, it just
-made the existing driver use an existing DT parse routine which
-scans for already documented properties of the keymap helper.
-This simple approach assumes that the populated set always is in
-the range from 0 .. N-1, sparse layouts beyond that simple
-approach are possible and get processed correctly in the driver,
-but cannot get described in the device tree.  Which still results
-in non-optimized but correct behaviour.
+The two-stage search_free+get_block drm_mm interface is something I'd like
+to remove since it' complicates the interface for no gain. And the
+preallocation trick for atomic contexts is pretty racy as-is. Can you
+please convert this over to the insert_node interfaces which take a
+preallocate drm_mm_node?
 
-Finer grained control beyond what my patch addresses would be
-possible but remain an option for later improvement (if desire is
-big enough to describe non-square layouts or sparse layouts where
-the gaps are in any arbitrary position).
-
-> Hope this helps.
-
-Yes, your response answers a question that I raised elsewhere in
-the form of a TODO comment, that now has become obsolete.  I will
-reword it to not raise the question, but to mention that emitting
-input events for key positions even in the absence of a key code
-is not just desirable but actually required.
-
-Thank you!
-
-
-virtually yours
-Gerhard Sittig
+Thanks, Daniel
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
