@@ -1,84 +1,377 @@
 From: daniel@ffwll.ch (Daniel Vetter)
-Date: Sun, 30 Jun 2013 18:58:48 +0200
+Date: Sun, 30 Jun 2013 19:29:27 +0200
 Subject: [PATCH RFC 1/3] DRM: Armada: Add Armada DRM driver
-In-Reply-To: <20130630134151.GJ3353@n2100.arm.linux.org.uk>
+In-Reply-To: <20130630125238.GH3353@n2100.arm.linux.org.uk>
 References: <20130629225210.GF3353@n2100.arm.linux.org.uk>
  <E1Ut41C-0000wl-Ff@rmk-PC.arm.linux.org.uk>
- <20130630123741.GJ18285@phenom.ffwll.local>
- <20130630130456.GI3353@n2100.arm.linux.org.uk>
- <20130630134151.GJ3353@n2100.arm.linux.org.uk>
-Message-ID: <CAKMK7uHVQd7wF3pYwGWf7k=Xjas9qTKTmGhjARrLVENNZLkVJw@mail.gmail.com>
+ <20130630115941.GG18285@phenom.ffwll.local>
+ <20130630125238.GH3353@n2100.arm.linux.org.uk>
+Message-ID: <CAKMK7uFcsbxciq-J_HLCm61kOtGpeAK0Tg2=2AOWSa9YYc4TeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 30, 2013 at 3:41 PM, Russell King - ARM Linux
+On Sun, Jun 30, 2013 at 2:52 PM, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
-> On Sun, Jun 30, 2013 at 02:04:56PM +0100, Russell King - ARM Linux wrote:
->> On Sun, Jun 30, 2013 at 02:37:41PM +0200, Daniel Vetter wrote:
->> > On Sat, Jun 29, 2013 at 11:53:22PM +0100, Russell King wrote:
->> > > +         mutex_lock(&dev->struct_mutex);
->> > > +         free = drm_mm_search_free(&priv->linear, size, align, 0);
->> > > +         if (free)
->> > > +                 obj->linear = drm_mm_get_block(free, size, align);
->> > > +         mutex_unlock(&dev->struct_mutex);
->> >
->> > The two-stage search_free+get_block drm_mm interface is something I'd like
->> > to remove since it' complicates the interface for no gain. And the
->> > preallocation trick for atomic contexts is pretty racy as-is. Can you
->> > please convert this over to the insert_node interfaces which take a
->> > preallocate drm_mm_node?
+> On Sun, Jun 30, 2013 at 01:59:41PM +0200, Daniel Vetter wrote:
+>> On Sat, Jun 29, 2013 at 11:53:22PM +0100, Russell King wrote:
+>> > +static uint32_t armada_drm_crtc_calculate_csc(struct armada_crtc *dcrtc)
+>> > +{
+>> > +   struct drm_display_mode *adj = &dcrtc->crtc.mode;
+>> > +   uint32_t val = 0;
+>> > +
+>> > +   if (dcrtc->csc_yuv_mode == CSC_YUV_CCIR709)
+>> > +           val |= CFG_CSC_YUV_CCIR709;
+>> > +   if (dcrtc->csc_rgb_mode == CSC_RGB_STUDIO)
+>> > +           val |= CFG_CSC_RGB_STUDIO;
+>> > +
+>> > +   /*
+>> > +    * In auto mode, set the colorimetry, based upon the HDMI spec.
+>> > +    * 1280x720p, 1920x1080p and 1920x1080i use ITU709, others use
+>> > +    * ITU601.  It may be more appropriate to set this depending on
+>> > +    * the source - but what if the graphic frame is YUV and the
+>> > +    * video frame is RGB?
+>> > +    */
+>> > +   if ((adj->hdisplay == 1280 && adj->vdisplay == 720 &&
+>> > +        !(adj->flags & DRM_MODE_FLAG_INTERLACE)) ||
+>> > +       (adj->hdisplay == 1920 && adj->vdisplay == 1080)) {
+>> > +           if (dcrtc->csc_yuv_mode == CSC_AUTO)
+>> > +                   val |= CFG_CSC_YUV_CCIR709;
+>> > +   }
+>> > +
+>> > +   /*
+>> > +    * We assume we're connected to a TV-like device, so the YUV->RGB
+>> > +    * conversion should produce a limited range.  We should set this
+>> > +    * depending on the connectors attached to this CRTC, and what
+>> > +    * kind of device they report being connected.
+>> > +    */
+>> > +   if (dcrtc->csc_rgb_mode == CSC_AUTO)
+>> > +           val |= CFG_CSC_RGB_STUDIO;
 >>
->> Yes and no.  This is only racy if it is callable from atomic contexts,
->> which the above isn't, because it takes a mutex, and the above is the
->> only place which allocations against that pool are done.  Mutexes can't
->> be taken in atomic contexts.  Plus it's using the non-atomic drm_mm_*
->> interfaces.
+>> In the intel driver we check whether it's an cea mode with
+>> drm_match_cea_mode, e.g. in intel_hdmi.c:
 >>
->> However, the insert_node interfaces appear not to solve any kind of race.
->> All they do is allow the kmalloc to be moved out of this region into
->> the user of this code sequence, while offering no additional locking or
->> safety.  So the mutex lock around a call to drm_mm_insert_node*() is
->> still required.
+>>       if (intel_hdmi->color_range_auto) {
+>>               /* See CEA-861-E - 5.1 Default Encoding Parameters */
+>>               if (intel_hdmi->has_hdmi_sink &&
+>>                   drm_match_cea_mode(adjusted_mode) > 1)
+>>                       intel_hdmi->color_range = HDMI_COLOR_RANGE_16_235;
+>>               else
+>>                       intel_hdmi->color_range = 0;
+>>       }
 >>
->> As the kmalloc() happens beneath the mutex lock, another thread can't race
->> with an allocation in the above code anyway.  The *only* reason I'll change
->> this is that it is nicer to the system not to hold locks while allocating
->> memory.
+>> (The color_range gets then propageted to the right place since different
+>> platforms have different ways to do that in intel hw).
 >
-> Err.  There's bugs here in the other drivers such as i915 which follow
-> your suggestion.  The problem is this:
+> Unfortunately, this disagrees with the HDMI v1.3a specification:
 >
-> Every time they allocate using drm_mm_insert_node(), they kmalloc a new
-> struct drm_mm_node for this function to fill in and attach.
+> | Default Colorimetry
+> |
+> | ...
+> |
+> | 480p, 480i, 576p, 576i, 240p and 288p
+> |
+> | The default colorimetry for all 480-line, 576-line, 240-line, and 288-line
+> | video formats described in CEA-861-D is based on SMPTE 170M.
+> |
+> | 1080i, 1080p and 720p
+> |
+> | The default colorimetry for high-definition video formats (1080i, 1080p and
+> | 720p) described in CEA-861-D is based on ITU-R BT.709-5.
 >
-> When they've done with the allocation, they call drm_mm_put_block().
-> This places the node onto the mm's unused_nodes list provided we don't
-> already have MM_UNUSED_TARGET nodes on that list.
-
-Yeah, for drivers that never use the atomic alloc stuff it's pointless
-waste of memory.
-
-> So, we end up filling up the unused nodes list to MM_UNUSED_TARGET,
-> at which point we then start freeing any further nodes - and with no
-> way to pull these off that list, they all just sit there not being
-> used.
+> As the HDMI spec refers to the CEA-861 specs, the HDMI spec overrides
+> CEA when dealing with HDMI specifics.
 >
-> The only function which takes nodes off that list is drm_mm_kmalloc(),
-> which is declared statically, and so isn't available to drivers.
+> So, according to the HDMI specification, the default is that it's only
+> 1080i, 1080p and 720p which are 709, the others are 601.  This does not
+> correspond with "drm_match_cea_mode(adjusted_mode) > 1".
+
+Hm, sounds like we need to improve stuff a bit, maybe add a common cea
+helper to the drm core with a bool is_hdmi to decide whether it's
+palin CEA or HDMI-CEA. Ville (who's written the current code and the
+match cea mode helper) can you please take a look?
+
+> Unfortunately, given DRM's structure, there's no way for the CRTC layer
+> to really know what its driving, and this setting is at the CRTC layer,
+> not the output layer.  It may be that you have the CRTC duplicated
+> between two different display devices with different characteristics,
+> which means you have to "choose" one - or just not bother.  I've chosen
+> the latter because it's a simpler solution, and is in no way any more
+> correct than any other solution.
 >
-> Are drivers which use the drm_mm_insert_node() function expected to
-> also use drm_mm_remove_node(), kfreeing the node after that call,
-> rather than using drm_mm_put_block() ?
+> This is also why these are exported to userspace via properties, so if
+> userspace knows better, it can deal with those issues.
 
-Yeah, with the insert_node interface deallocing the node is the
-driver's responsibility.
+Yeah, allowing userspace to overwrite the default selection makes lots
+of sense, we expose similar properties.
 
-> Either way, I think someone needs to fix the other drivers and Cc those
-> patches to Stable...
+>> > +struct armada_framebuffer *armada_framebuffer_create(struct drm_device *dev,
+>> > +   struct drm_mode_fb_cmd2 *mode, struct armada_gem_object *obj)
+>> > +{
+>> > +   struct armada_framebuffer *dfb;
+>> > +   uint8_t format, config;
+>> > +   int ret;
+>> > +
+>> > +   switch (mode->pixel_format) {
+>> > +#define FMT(drm, fmt, mod)         \
+>> > +   case DRM_FORMAT_##drm:          \
+>> > +           format = CFG_##fmt;     \
+>> > +           config = mod;           \
+>> > +           break
+>> > +   FMT(RGB565,     565,            CFG_SWAPRB);
+>> > +   FMT(BGR565,     565,            0);
+>> > +   FMT(ARGB1555,   1555,           CFG_SWAPRB);
+>> > +   FMT(ABGR1555,   1555,           0);
+>> > +   FMT(RGB888,     888PACK,        CFG_SWAPRB);
+>> > +   FMT(BGR888,     888PACK,        0);
+>> > +   FMT(XRGB8888,   X888,           CFG_SWAPRB);
+>> > +   FMT(XBGR8888,   X888,           0);
+>> > +   FMT(ARGB8888,   8888,           CFG_SWAPRB);
+>> > +   FMT(ABGR8888,   8888,           0);
+>> > +   FMT(YUYV,       422PACK,        CFG_YUV2RGB | CFG_SWAPYU | CFG_SWAPUV);
+>> > +   FMT(UYVY,       422PACK,        CFG_YUV2RGB);
+>> > +   FMT(VYUY,       422PACK,        CFG_YUV2RGB | CFG_SWAPUV);
+>> > +   FMT(YVYU,       422PACK,        CFG_YUV2RGB | CFG_SWAPYU);
+>> > +   FMT(YUV422,     422,            CFG_YUV2RGB | CFG_SWAPUV);
+>> > +   FMT(YVU422,     422,            CFG_YUV2RGB);
+>> > +   FMT(YUV420,     420,            CFG_YUV2RGB | CFG_SWAPUV);
+>> > +   FMT(YVU420,     420,            CFG_YUV2RGB);
+>> > +   FMT(C8,         PSEUDO8,        0);
+>> > +#undef FMT
+>> > +   default:
+>> > +           return ERR_PTR(-EINVAL);
+>> > +   }
+>> > +
+>> > +   dfb = kzalloc(sizeof(*dfb), GFP_KERNEL);
+>> > +   if (!dfb) {
+>> > +           DRM_ERROR("failed to allocate Armada fb object\n");
+>> > +           return ERR_PTR(-ENOMEM);
+>> > +   }
+>> > +
+>> > +   dfb->fmt = format;
+>> > +   dfb->mod = config;
+>> > +
+>> > +   ret = drm_framebuffer_init(dev, &dfb->fb, &armada_fb_funcs);
+>> > +   if (ret) {
+>> > +           kfree(dfb);
+>> > +           return ERR_PTR(ret);
+>> > +   }
+>>
+>> drm_framebuffer_init publishes the fb object to the world, hence
+>> initialization of all invariant state _must_ be done beforehand. This is a
+>> new requirement since the kms locking rework. So all the below should be
+>> moved above.
+>
+> The constant rewriting of DRM is a right pain in the arse.  I'm dealing
+> with v3.9 here, and v3.9 only... However, it doesn't harm moving the
+> below so I'll do that.  When v3.10 comes along, that's the kernel I'll
+> care about, and not v3.10-rcwhatever.
 
-Yeah, I think it's time that I move that item up my todo list a lot.
-And also add some decent kerneldoc to the drm_mm stuff.
--Daniel
+On the upside thus far we've used every reorg to also massively
+improve the docs. So hopefully just diffing the kerneldoc stuff in the
+future should be good enough to figure out what needs to be updated.
+
+>> > +
+>> > +   drm_helper_mode_fill_fb_struct(&dfb->fb, mode);
+>> > +
+>> > +   /*
+>> > +    * Take a reference on our object - the caller is expected
+>> > +    * to drop their reference to it.
+>> > +    */
+>> > +   drm_gem_object_reference(&obj->obj);
+>> > +   dfb->obj = obj;
+>> > +
+>> > +   return dfb;
+>> > +}
+>>
+>> [snip]
+>>
+>> > +static int armada_fb_create(struct drm_fb_helper *fbh,
+>> > +   struct drm_fb_helper_surface_size *sizes)
+>> > +{
+>> > +   struct drm_device *dev = fbh->dev;
+>> > +   struct drm_mode_fb_cmd2 mode;
+>> > +   struct armada_framebuffer *dfb;
+>> > +   struct armada_gem_object *obj;
+>> > +   struct fb_info *info;
+>> > +   int size, ret;
+>> > +   void *ptr;
+>> > +
+>> > +   memset(&mode, 0, sizeof(mode));
+>> > +   mode.width = sizes->surface_width;
+>> > +   mode.height = sizes->surface_height;
+>> > +   mode.pitches[0] = armada_pitch(mode.width, sizes->surface_bpp);
+>> > +   mode.pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
+>> > +                                   sizes->surface_depth);
+>> > +
+>> > +   size = mode.pitches[0] * mode.height;
+>> > +   obj = armada_gem_alloc_private_object(dev, size);
+>> > +   if (!obj) {
+>> > +           DRM_ERROR("failed to allocate fb memory\n");
+>> > +           return -ENOMEM;
+>> > +   }
+>> > +
+>> > +   ret = armada_gem_linear_back(dev, obj);
+>> > +   if (ret) {
+>> > +           drm_gem_object_unreference_unlocked(&obj->obj);
+>> > +           return ret;
+>> > +   }
+>> > +
+>> > +   ptr = armada_gem_map_object(dev, obj);
+>> > +   if (!ptr) {
+>> > +           drm_gem_object_unreference_unlocked(&obj->obj);
+>> > +           return -ENOMEM;
+>> > +   }
+>> > +
+>> > +   dfb = armada_framebuffer_create(dev, &mode, obj);
+>> > +   if (IS_ERR(dfb)) {
+>> > +           ret = PTR_ERR(dfb);
+>> > +           goto err_fbcreate;
+>> > +   }
+>> > +
+>> > +   mutex_lock(&dev->struct_mutex);
+>>
+>> I don't understand what exactly the dev->struct_mutex protects here, I
+>> think it can be dropped.
+>>
+>> I'm just trying to reduce proliferation of that lock as much as possible,
+>> since it's deeply interwoven with the legacy drm dragons ...
+>
+> Bear in mind much of this was written when I had very little clue as to
+> what DRM required, so there's lots of stuff which was worked out from
+> the i915 driver - if the i915 driver did something like that, then I
+> initially copied that pattern.
+
+Well, in i915.ko we need that locking to keep a bunch of asserts
+happy. But it shouldn't really be needed for us either. The reason
+I've asked whether you really need it is that the drm driver load
+sequence is laden with historical baggage and locking with
+dev->struct_mutex even more so. Hence I like to double-check these
+places for whether we really need it or whether it's just cargo-cult
+locking.
+
+I'm ok if you keep this, just wanted to raise awereness of the
+historical dragons a bit..
+
+> You may wish to ask the exact same question of the i915 driver which still
+> takes that lock over a similar section of code.
+
+Oh, a full overhaul of the drm driver load sequence is on my todo list
+somewhere, including checking all the locking around it. But there's a
+few other things that need to be done first.
+
+>> > +static int armada_gem_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+>> > +{
+>> > +   struct armada_gem_object *obj = drm_to_armada_gem(vma->vm_private_data);
+>> > +   unsigned long addr = (unsigned long)vmf->virtual_address;
+>> > +   unsigned long pfn = obj->phys_addr >> PAGE_SHIFT;
+>> > +   int ret;
+>> > +
+>> > +   pfn += (addr - vma->vm_start) >> PAGE_SHIFT;
+>> > +   ret = vm_insert_pfn(vma, addr, pfn);
+>> > +
+>> > +   switch (ret) {
+>> > +   case -EIO:
+>> > +   case -EAGAIN:
+>> > +           set_need_resched();
+>> > +   case 0:
+>> > +   case -ERESTARTSYS:
+>> > +   case -EINTR:
+>> > +           return VM_FAULT_NOPAGE;
+>> > +   case -ENOMEM:
+>> > +           return VM_FAULT_OOM;
+>> > +   default:
+>>
+>> You don't handle -EBUSY from vm_insert_pfn here. This can happen when
+>> mulitple threads concurrently fault on the same address. See
+>>
+>> commit e79e0fe380847493266fba557217e2773c61bd1b
+>> Author: Dmitry Rogozhkin <dmitry.v.rogozhkin@intel.com>
+>> Date:   Wed Oct 3 17:15:26 2012 +0300
+>>
+>>     drm/i915: EBUSY status handling added to i915_gem_fault().
+>
+> Ok.
+>
+>>
+>> > +           return VM_FAULT_SIGBUS;
+>> > +   }
+>> > +}
+>>
+>> [snip]
+>>
+>> > diff --git a/drivers/gpu/drm/armada/drm_helper.h b/drivers/gpu/drm/armada/drm_helper.h
+>> > new file mode 100644
+>> > index 0000000..d9f2e8d
+>> > --- /dev/null
+>> > +++ b/drivers/gpu/drm/armada/drm_helper.h
+>> > @@ -0,0 +1,31 @@
+>> > +/*
+>> > + * Copyright (C) 2012 Russell King
+>> > + *
+>> > + * This program is free software; you can redistribute it and/or modify
+>> > + * it under the terms of the GNU General Public License version 2 as
+>> > + * published by the Free Software Foundation.
+>> > + */
+>> > +#ifndef DRM_HELPER_H
+>> > +#define DRM_HELPER_H
+>> > +
+>> > +/* Useful helpers I wish the DRM core would provide */
+>>
+>> With the addition of variants for connectors/planes and rolling it out in
+>> drm_crtc.c this sounds like a nice up-front patch. I agree that this
+>> doesn't really belong in drivers ;-)
+>
+> If DRM people want to take this and do that, then that's fine, but
+> otherwise I have more than enough on my plate that moving those and
+> then fixing up all the DRM drivers is way beyond what I'm prepared
+> to do.  (Consider that it has been more than two weeks between this
+> posting and the previous posting...)
+>
+> In any case, I disagree with the idea that they should find their way
+> into drm_crtc.c - they're small enough to go into a header file as
+> inline functions as I've shown in this patch.  Do we really need the
+> overhead of function calls for this, especially when these may be used
+> in various fast paths?
+
+Oh, my comment about drm_crtc.c was to use them in that file since
+there's a few places which do exactly that. Of cours the code itself
+should be static inline functions in a header file.
+
+> However, at least I've taken the time to _think_ about what I'm doing
+> and realise that there _is_ scope here for the DRM core to improve,
+> rather than burying this stuff deep inside my driver like everyone else
+> has.  That's no reason to penalise patches from the "good guys" who think
+> about what they're doing while accepting drivers from people who don't
+> (like everyone else who's submitted a DRM driver recently without doing
+> this.)
+
+Iirc we've had:
+- omapdrm/gma500: extracted the gem helpers
+- tilcdc: Rob Clark refactored the drm property code to allow
+plane/crtc properties
+- tegra: Created the infoframe helpers (although partially outside the
+drm subsystem to also use it with fbdevs, but still)
+- rcar/shmob: Laurent created tons of kerneldoc/DocBook patches for
+the modesetting stuff while writing his drm drivers. Most of what we
+have now is from him.
+
+On top of that we have all the ongoing refactoring and extracting of
+driver logic into drm helpers by the established drivers. As drm/i915
+maintainer I volunteer tons of that stuff myself for ongoing drm/i915
+feature work.
+
+So on a quick look it's only the exynos guys that bail here, and since
+you've participated a bit in the discussion around their dma-buf sync
+proposal patches that's not necessarily due to lack of effort from
+their side.
+
+The drm subsystem simply accumulated technical debt for years
+(hardware abstraction layer shared with *BSDs and out-of-tree driver
+just ain't no good) and imo it's fair to distribute efforts to fix
+that. Especially since you've already spotted another opportunity
+here.
+
+Cheers, Daniel
 --
 Daniel Vetter
 Software Engineer, Intel Corporation
