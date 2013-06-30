@@ -1,67 +1,67 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sun, 30 Jun 2013 12:16:32 +0200
-Subject: [PATCH v3 1/5] rtc: mxc_rtc: Driver rework
-In-Reply-To: <1372583433.705420573@f307.mail.ru>
-References: <1372495244-21215-1-git-send-email-shc_work@mail.ru>
- <1372541615.220890134@f402.i.mail.ru>
- <20130630080546.GS516@pengutronix.de>
- <1372583433.705420573@f307.mail.ru>
-Message-ID: <20130630101632.GT516@pengutronix.de>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Sun, 30 Jun 2013 13:04:38 +0200
+Subject: [PATCH v1 01/12] input: matrix-keypad: update devicetree binding
+ doc
+In-Reply-To: <51CDA2B2.7090304@wwwdotorg.org>
+References: <1371838198-7327-1-git-send-email-gsi@denx.de>
+ <1371838198-7327-2-git-send-email-gsi@denx.de>
+ <51C4C63B.3030300@wwwdotorg.org>
+ <20130622092319.GE24305@book.gsilab.sittig.org>
+ <51C8C17A.1050700@wwwdotorg.org>
+ <20130628082422.GV24305@book.gsilab.sittig.org>
+ <51CDA2B2.7090304@wwwdotorg.org>
+Message-ID: <20130630110438.GZ24305@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 30, 2013 at 01:10:33PM +0400, Alexander Shiyan wrote:
-> > > > > On Sat, Jun 29, 2013 at 12:40:40PM +0400, Alexander Shiyan wrote:
-> > > > > > This patch rework mxc_rtc driver.
-> > > > > > Major changes have been made:
-> > > > > > - Added second clock support (optional) which permit module functionality.
-> > > > > > - Implemented support for periodic interrupts.
-> > > > > > - Some code have been optimized.
-> > > > > 
-> > > > > You won't get any further with this if you don't listen to comments.
-> > > > > 
-> > > > > We're at v3 and Still this patch combines many totally unrelated changes
-> > > > > in a single patch. This was noted by Shawn and more detailed by myself.
-> > > > 
-> > > > Where Sascha?
-> > > > v3 is so different than v2. Can you inline your comments in v3?
-> > 
-> > I just did that.
-> > 
-> > > 
-> > > At the moment, the driver does not work at all, even for a boards which declared.
-> > > I do not understand the issue of making changes if we can correct this situation 
-> > > Please fix me.
-> > > Once again, now driver not work at all .....
-> > 
-> > If the driver is really so broken and ugly that it can't be fixed or
-> > only with a huge amount of work, then your option would be to replace it
-> > completely and clearly say why you think it's broken and why we need a
-> > new driver.
-> > 
-> > I don't think that's the case. The driver has it's deficiencies, but
-> > they can be fixed. Many of your changes are fine, but it's really 5-10
-> > patches you have thrown into a single patch.
-> > This is simply not nice to people reviewing it.
+On Fri, Jun 28, 2013 at 08:50 -0600, Stephen Warren wrote:
 > 
-> The situation is this: I do not use this device in their work, I just wanted to
-> add the driver to the DT-tree, respectively I had to check if it works.
-> Well, I got around to it, and the result was a series of patches to achieve the
-> ultimate goal - RTC DT-node.
-> The driver has not been updated for a long time and is very bad that my efforts
-> were in vain verification. On my opinion, any changes it is better than inaction.
-> Well, leave it to the discretion of the community.
+> [ ... just one reference in arch/powerpc/boot/dts/ac14xx.dts ... ]
+> > 
+> > Don't worry about the 'AC14xx' board too long, its using the
+> > keypad matrix driver is new in mainline, and still can get
+> > adjusted without too much problems before more wide spread use.
+> > "Getting it right" is what I'm currently heading for, while
+> > nothing is set in stone yet.
+> 
+> Given the "ABI-ness" of DT, I'm not convinced we don't have to worry
+> about the AC14xx. I think we'll have to continue supporting that
+> property, even if there's a newer/better/more-flexible way of
+> representing the information too.
 
-Most of your patches are fine, it's just that the first one does too
-much in a single patch and it would be easy to split that up.
+Don't get me wrong, I wasn't putting this lightly.  From first
+hand experience I can tell that none of those boards in the field
+use current or even recent mainline kernels.  All of them are
+running an older version which predates the introduction of
+'AC14xx' support in kernel.org sources.  Extending official
+support and "doing it the right way" is what I'm currently
+working on, before those boards may switch to running mainline
+kernels and compatibility with the first version that was used
+will become an issue.  So to put it into other words:
 
-Anyway, I'm not the one applying it. If anyone thinks I'm too picky here
-just rule me out.
+_If_ the 'AC14xx' board is the _only_ entity which references the
+property, then there's no problem at all.  Incompatible changes
+for _this_one_board_ are acceptable since at the moment the
+current implementation is not used in the field.
 
-Sascha
+Of course I agree that breaking any other board isn't acceptable,
+which is why I followed the approach of strictly keeping
+backwards compatible behaviour even in those spots where a
+different approach or a different default would have looked more
+desireable.
 
+Which is why I'm still reluctant to more intrusively change the
+general working of the keypad matrix driver in contrast to
+introducing strictly local changes which only optionally add
+additional features which explicitly must get enabled before
+changed behaviour will occur.  So I need some more time to think
+of which parts to change in which ways and how to make sure that
+nothings breaks ...
+
+
+virtually yours
+Gerhard Sittig
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
