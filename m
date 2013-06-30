@@ -1,65 +1,85 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 30 Jun 2013 18:11:16 +0200
-Subject: [PATCHv3 5/8] ARM: mxs: dt: cfa10037: make hogpins grabbed by
- respective drivers
-In-Reply-To: <20130629070529.GD2593@lukather>
-References: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1372424577-8279-6-git-send-email-alexandre.belloni@free-electrons.com>
- <20130629070529.GD2593@lukather>
-Message-ID: <51D058A4.7020101@free-electrons.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Sun, 30 Jun 2013 18:58:48 +0200
+Subject: [PATCH RFC 1/3] DRM: Armada: Add Armada DRM driver
+In-Reply-To: <20130630134151.GJ3353@n2100.arm.linux.org.uk>
+References: <20130629225210.GF3353@n2100.arm.linux.org.uk>
+ <E1Ut41C-0000wl-Ff@rmk-PC.arm.linux.org.uk>
+ <20130630123741.GJ18285@phenom.ffwll.local>
+ <20130630130456.GI3353@n2100.arm.linux.org.uk>
+ <20130630134151.GJ3353@n2100.arm.linux.org.uk>
+Message-ID: <CAKMK7uHVQd7wF3pYwGWf7k=Xjas9qTKTmGhjARrLVENNZLkVJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA256
-
-Hi Shawn,
-
-On 29/06/2013 09:05, Maxime Ripard wrote:
->> ---
->>  arch/arm/boot/dts/imx28-cfa10037.dts | 19 ++++++++++++++-----
->>  1 file changed, 14 insertions(+), 5 deletions(-)
+On Sun, Jun 30, 2013 at 3:41 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Jun 30, 2013 at 02:04:56PM +0100, Russell King - ARM Linux wrote:
+>> On Sun, Jun 30, 2013 at 02:37:41PM +0200, Daniel Vetter wrote:
+>> > On Sat, Jun 29, 2013 at 11:53:22PM +0100, Russell King wrote:
+>> > > +         mutex_lock(&dev->struct_mutex);
+>> > > +         free = drm_mm_search_free(&priv->linear, size, align, 0);
+>> > > +         if (free)
+>> > > +                 obj->linear = drm_mm_get_block(free, size, align);
+>> > > +         mutex_unlock(&dev->struct_mutex);
+>> >
+>> > The two-stage search_free+get_block drm_mm interface is something I'd like
+>> > to remove since it' complicates the interface for no gain. And the
+>> > preallocation trick for atomic contexts is pretty racy as-is. Can you
+>> > please convert this over to the insert_node interfaces which take a
+>> > preallocate drm_mm_node?
 >>
->> diff --git a/arch/arm/boot/dts/imx28-cfa10037.dts
-b/arch/arm/boot/dts/imx28-cfa10037.dts
->> index c2ef3a3..182b99f 100644
->> --- a/arch/arm/boot/dts/imx28-cfa10037.dts
->> +++ b/arch/arm/boot/dts/imx28-cfa10037.dts
->> @@ -22,13 +22,19 @@
->>      apb at 80000000 {
->>          apbh at 80000000 {
->>              pinctrl at 80018000 {
->> -                pinctrl-names = "default", "default";
->> -                pinctrl-1 = <&hog_pins_cfa10037>;
+>> Yes and no.  This is only racy if it is callable from atomic contexts,
+>> which the above isn't, because it takes a mutex, and the above is the
+>> only place which allocations against that pool are done.  Mutexes can't
+>> be taken in atomic contexts.  Plus it's using the non-atomic drm_mm_*
+>> interfaces.
+>>
+>> However, the insert_node interfaces appear not to solve any kind of race.
+>> All they do is allow the kmalloc to be moved out of this region into
+>> the user of this code sequence, while offering no additional locking or
+>> safety.  So the mutex lock around a call to drm_mm_insert_node*() is
+>> still required.
+>>
+>> As the kmalloc() happens beneath the mutex lock, another thread can't race
+>> with an allocation in the above code anyway.  The *only* reason I'll change
+>> this is that it is nicer to the system not to hold locks while allocating
+>> memory.
 >
-> The pinctrl-name property isn't relevant since the 10036 patch. You
-> should probably have ordered them the other way around: first the
-> breakout board, then the 10036.
+> Err.  There's bugs here in the other drivers such as i915 which follow
+> your suggestion.  The problem is this:
+>
+> Every time they allocate using drm_mm_insert_node(), they kmalloc a new
+> struct drm_mm_node for this function to fill in and attach.
+>
+> When they've done with the allocation, they call drm_mm_put_block().
+> This places the node onto the mm's unused_nodes list provided we don't
+> already have MM_UNUSED_TARGET nodes on that list.
 
-Do you want me to send a reordered serie or will you do it when applying
-the patches ? You can just apply patch 4/8 last.
+Yeah, for drivers that never use the atomic alloc stuff it's pointless
+waste of memory.
 
-thanks,
+> So, we end up filling up the unused nodes list to MM_UNUSED_TARGET,
+> at which point we then start freeing any further nodes - and with no
+> way to pull these off that list, they all just sit there not being
+> used.
+>
+> The only function which takes nodes off that list is drm_mm_kmalloc(),
+> which is declared statically, and so isn't available to drivers.
+>
+> Are drivers which use the drm_mm_insert_node() function expected to
+> also use drm_mm_remove_node(), kfreeing the node after that call,
+> rather than using drm_mm_put_block() ?
 
-- -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.12 (GNU/Linux)
+Yeah, with the insert_node interface deallocing the node is the
+driver's responsibility.
 
-iQIcBAEBCAAGBQJR0FikAAoJEKbNnwlvZCyz40UQAMwmqHS1p0tY6MJ6fPy6rBK8
-SH/a1afzKxudNxT5JzM4k5YR1V9TjJXnq658jcu0p5HiYpvCpgXDbde1QKJwf5Hg
-lZMw8hg2ogEvCOvaiOGbXc4qEReVWPV5xKw26ur7S8rwNg1AenDJw0tBZIjHzOUp
-yo1ZaGC5mV3MDzOcbZ1sfrMXCB2Alwa0zS5Mc1cKIj9d2uVp0U6feWAZ2+1iVcK8
-Js23PEpMaagwAWxVjfMH2LThj/vxnM7lkOisaAsbnTyalW7ztdqUhzL4qqFQ7WrC
-D8gKgEo9cFTNJrfuwB09eVZmCW8/OqBC0uTH4StgneOwWsiRAn2UZPqwxW2BChik
-LeQI+1W67GzVFyuxwmipQyNOCU8iJOKST4a2wIgCiZ27iWPRX5TFOqSr2E1L/lzX
-Fdmjjjr9ezxbyFx/hOOvYxZtfCpeyFo0nHfnSU4JnAncC5pQqzgo2ZvvmoGFJE92
-jVvhThOGh+glDk85/7Dt5PhXCPQWdwDxu8V6QlWD4RXfAAixq1vCo2odKjaC6P5W
-2aEaBaT0oe1YKCKL7s/62gLNwwUtasZyJChhJikhV06aQt8qYdVyP7MYRZaXC8EZ
-LcRSAhj+IZUqykqW6VhBlxjxq5Q/HdzgUcwn0EKdhQ2blHhB5cdfQxFLXZpGPsoi
-b0+7VLLSM9VeofjhDB2Z
-=/A5s
------END PGP SIGNATURE-----
+> Either way, I think someone needs to fix the other drivers and Cc those
+> patches to Stable...
+
+Yeah, I think it's time that I move that item up my todo list a lot.
+And also add some decent kerneldoc to the drm_mm stuff.
+-Daniel
+--
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
