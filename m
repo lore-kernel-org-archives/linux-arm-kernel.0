@@ -1,55 +1,50 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sun, 30 Jun 2013 13:10:33 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCB2MyAxLzVdIHJ0YzogbXhjX3J0YzogRHJpdmVyIHJl?=
- =?UTF-8?B?d29yaw==?=
-In-Reply-To: <20130630080546.GS516@pengutronix.de>
-References: <1372495244-21215-1-git-send-email-shc_work@mail.ru>
- <1372541615.220890134@f402.i.mail.ru>
- <20130630080546.GS516@pengutronix.de>
-Message-ID: <1372583433.705420573@f307.mail.ru>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Sun, 30 Jun 2013 10:48:46 +0100
+Subject: [PATCH 0/2] ARM: sunxi: Convert DTSI to new CPU bindings
+In-Reply-To: <20130629193819.GD3353@n2100.arm.linux.org.uk>
+References: <1372437844-16325-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20130628171532.GD30603@e102568-lin.cambridge.arm.com>
+ <20130628200333.GA2756@lukather>
+ <CAOesGMgsD+tK4+ywvLzsWd+mngrP7zGgSFn0naWjSsQLGaUn2Q@mail.gmail.com>
+ <20130629193819.GD3353@n2100.arm.linux.org.uk>
+Message-ID: <20130630094846.GA27559@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > On Sat, Jun 29, 2013 at 12:40:40PM +0400, Alexander Shiyan wrote:
-> > > > > This patch rework mxc_rtc driver.
-> > > > > Major changes have been made:
-> > > > > - Added second clock support (optional) which permit module functionality.
-> > > > > - Implemented support for periodic interrupts.
-> > > > > - Some code have been optimized.
-> > > > 
-> > > > You won't get any further with this if you don't listen to comments.
-> > > > 
-> > > > We're at v3 and Still this patch combines many totally unrelated changes
-> > > > in a single patch. This was noted by Shawn and more detailed by myself.
-> > > 
-> > > Where Sascha?
-> > > v3 is so different than v2. Can you inline your comments in v3?
-> 
-> I just did that.
-> 
+On Sat, Jun 29, 2013 at 08:38:19PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jun 28, 2013 at 01:05:42PM -0700, Olof Johansson wrote:
+> > On Fri, Jun 28, 2013 at 1:03 PM, Maxime Ripard
+> > <maxime.ripard@free-electrons.com> wrote:
+> > > On Fri, Jun 28, 2013 at 06:15:32PM +0100, Lorenzo Pieralisi wrote:
+> > >> The patch above should already be queued in next/dt right ?
+> > >
+> > > Indeed.
+> > >
+> > > Then why the latest patch of your patchset got in 3.10, while the
+> > > patches actually fixing the DT it would have impacted were delayed to
+> > > 3.11?
+> > >
+> > > (And why was it merged so late in the development cycle?)
 > > 
-> > At the moment, the driver does not work at all, even for a boards which declared.
-> > I do not understand the issue of making changes if we can correct this situation 
-> > Please fix me.
-> > Once again, now driver not work at all .....
+> > This. So now we have to scramble because some device trees will
+> > produce warnings at boot.
+> > 
+> > Russell, the alternative is to revert Lorenzo's patch for 3.10 (and
+> > re-introduce it for 3.11). Do you have a preference?
 > 
-> If the driver is really so broken and ugly that it can't be fixed or
-> only with a huge amount of work, then your option would be to replace it
-> completely and clearly say why you think it's broken and why we need a
-> new driver.
+> Sorry but I really don't understand what all the fuss in this thread
+> is about.
 > 
-> I don't think that's the case. The driver has it's deficiencies, but
-> they can be fixed. Many of your changes are fine, but it's really 5-10
-> patches you have thrown into a single patch.
-> This is simply not nice to people reviewing it.
+> This thread seems to be saying that two development patches were
+> merged, which were 7762/1 and 7763/1, and that 7764/1 is a fix?
+> Are you sure about that, because that's not how they're described,
+> and not how they look either.
 
-The situation is this: I do not use this device in their work, I just wanted to
-add the driver to the DT-tree, respectively I had to check if it works.
-Well, I got around to it, and the result was a series of patches to achieve the
-ultimate goal - RTC DT-node.
-The driver has not been updated for a long time and is very bad that my efforts
-were in vain verification. On my opinion, any changes it is better than inaction.
-Well, leave it to the discretion of the community.
-Thanks.
+As Olof's warning downgrade is being merged (thanks for that and apologies for
+failing to explain patches dependencies properly and stable related issues),
+7764/1 won't apply cleanly anymore. Can you please drop it from the patch
+system, I will update it and test it first thing tomorrow and send a
+final version to the patch system.
 
----
+Thank you very much,
+Lorenzo
