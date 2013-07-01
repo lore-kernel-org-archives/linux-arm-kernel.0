@@ -1,33 +1,41 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  1 Jul 2013 13:25:52 +0900
-Subject: [PATCH v3 0/3] ARM: shmobile: lager: enable Ether
-Message-ID: <1372652755-16948-1-git-send-email-horms+renesas@verge.net.au>
+Date: Mon,  1 Jul 2013 13:25:55 +0900
+Subject: [PATCH v3 3/3] ARM: shmobile: lager: enable nfsroot in DTS
+In-Reply-To: <1372652755-16948-1-git-send-email-horms+renesas@verge.net.au>
+References: <1372652755-16948-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1372652755-16948-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Now that Ether support has been added to the lager board
+it is possible to use nfsroot. This configuration is
+in line with that of other shmobile boards.
 
-this short series enables the on-board ethernet
-of the r8a7790 SoC for on lager baord.
+Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-It is based on the renesas-next-20130509 tag of my renesas tree.
+---
 
-It has a run-time dependency on
-"sh_eth: add support for r8a7790 SoC"
+This patch has a run-time dependency on "ARM: shmobile: lager: enable Ether"
 
-It has been built on top of renesas-next-20130701.
+v2
+* Split out as a new patch from "ARM: shmobile: lager: enable Ether"
+---
+ arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Simon Horman (3):
-  ARM: shmobile: r8a7790: add Ether support
-  ARM: shmobile: lager: enable Ether
-  ARM: shmobile: lager: enable nfsroot in DTS
-
- arch/arm/boot/dts/r8a7790-lager.dts           |  2 +-
- arch/arm/mach-shmobile/board-lager.c          | 24 ++++++++++++++++++++++++
- arch/arm/mach-shmobile/clock-r8a7790.c        |  4 ++++
- arch/arm/mach-shmobile/include/mach/r8a7790.h |  3 +++
- arch/arm/mach-shmobile/setup-r8a7790.c        | 14 ++++++++++++++
- 5 files changed, 46 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 09a84fc..b2f61f0 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -16,7 +16,7 @@
+ 	compatible = "renesas,lager", "renesas,r8a7790";
+ 
+ 	chosen {
+-		bootargs = "console=ttySC6,115200 ignore_loglevel";
++		bootargs = "console=ttySC6,115200 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096 rw";
+ 	};
+ 
+ 	memory at 40000000 {
 -- 
 1.8.2.1
