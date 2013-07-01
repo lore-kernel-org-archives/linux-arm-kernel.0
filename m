@@ -1,39 +1,48 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Jul 2013 16:16:07 +0800
-Subject: [PATCH 0/4] Fix mxs audio regressions
-Message-ID: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
+Date: Mon, 1 Jul 2013 16:16:08 +0800
+Subject: [PATCH 1/4] ASoC: sgtl5000: give it a ramping time before writting
+In-Reply-To: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
+References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxs audio got terribly broken during 3.11 development cycle due to
-the following two commits.
+Since commit af8ee11 (ASoC: sgtl5000: Fix driver probe after reset),
+it's very ofen to run into the following probe error on imx28. It is
+caused by the regmap_write() failure in sgtl5000_fill_defaults().
+However, the regmap_read() before this has already been working.  It
+seems that sgtl5000 takes a longer ramping time to get the registers
+ready for write than read.
 
-  af8ee11 ASoC: sgtl5000: Fix driver probe after reset
-  9e13f34 ASoC: sgtl5000: Let the codec acquire its clock
+[    1.991579] sgtl5000 0-000a: sgtl5000 revision 0x11
+[    2.021655] mxs-sgtl5000 sound.12: ASoC: CODEC (null) not registered
+[    2.039087] mxs-sgtl5000 sound.12: snd_soc_register_card failed (-517)
+[    2.046299] platform sound.12: Driver mxs-sgtl5000 requests probe deferral
 
-The series fixes the regressions and bring mxs audio back to work.
+Fix the regression by giving it a ramping time before the first write.
 
-Mark,
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ sound/soc/codecs/sgtl5000.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Please consider to take the whole series as fixes through your tree
-during 3.11-rc, so that we do not get a regression in the final v3.11
-release.
-
-Shawn
-
-Shawn Guo (4):
-  ASoC: sgtl5000: give it a ramping time before writting
-  ASoC: sgtl5000: defer the probe if clock is not found
-  ASoC: mxs: register saif mclk to clock framework
-  ARM: mxs: saif0 is the clock provider to sgtl5000
-
- arch/arm/boot/dts/imx28-apx4devkit.dts |    2 +-
- arch/arm/boot/dts/imx28-evk.dts        |    2 +-
- arch/arm/boot/dts/imx28-m28evk.dts     |    2 +-
- arch/arm/boot/dts/imx28.dtsi           |    1 +
- sound/soc/codecs/sgtl5000.c            |   10 ++++++++-
- sound/soc/mxs/mxs-saif.c               |   35 ++++++++++++++++++++++++++++++++
- 6 files changed, 48 insertions(+), 4 deletions(-)
-
+diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
+index d441559..20bca03 100644
+--- a/sound/soc/codecs/sgtl5000.c
++++ b/sound/soc/codecs/sgtl5000.c
+@@ -1552,6 +1552,13 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
+ 
+ 	i2c_set_clientdata(client, sgtl5000);
+ 
++	/*
++	 * It seems that sgtl5000 takes a longer time to get the registers
++	 * ready for write than bread.  Let's give it a ramping time before
++	 * the first write goes.
++	 */
++	msleep(50);
++
+ 	/* Ensure sgtl5000 will start with sane register values */
+ 	ret = sgtl5000_fill_defaults(sgtl5000);
+ 	if (ret)
 -- 
 1.7.9.5
