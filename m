@@ -1,72 +1,48 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 01 Jul 2013 22:45:02 +0200
-Subject: [PATCH,
- RESEND] arm: kirkwood: readynas duo v2: Add GMT G762 Fan Controller
-Message-ID: <874nceui0h.fsf@natisbad.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 1 Jul 2013 23:46:33 +0300
+Subject: [RFC] wlcore: sdio: add wilink clock providers
+In-Reply-To: <1372707250-11998-1-git-send-email-coelho@ti.com>
+References: <1372707250-11998-1-git-send-email-coelho@ti.com>
+Message-ID: <20130701204633.GB805@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Now that GMT G762 PWM Fan Controller is available upstream, let's add
-missing bindings in Netgear ReadyNAS Duo v2 .dts file.
+On Mon, Jul 01, 2013 at 10:34:10PM +0300, Luciano Coelho wrote:
+> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> index 670c3ce..7f061b8 100644
+> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> @@ -65,11 +65,19 @@
+>  		enable-active-high;
+>  	};
+>  
+> +
+>  	wlan {
+> -	     compatible = "ti,wilink6";
+> -	     interrupt-parent = <&gpio2>;
+> -	     interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
+> -	     refclock = <2>;		/* 38.4 MHz */
+> +		compatible = "ti,wilink6";
+> +		interrupt-parent = <&gpio2>;
+> +		interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
+> +		clocks = <&refclock>;
+> +		clock-names = "refclock";
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
-Hi Jason and Andrew,
+hmmm, shouldn't you provide both clocks (refclock and tcx0clock)
+explicitly here ?
 
-This one applies and has been tested against Stephen Rothwell tree.
-Can you make it flow to Linus tree during the merge window?
+Also, you should probably make it clear that the WiLink module is fed by
+the 32K sync clock just to make sure clock usecounts are correctly
+incremented ?
 
-Following Thomas feedback, this is a resend of previous version, this
-time w/o fixes for bad spaces at the end of the file. Just tell me if
-I should send a separate one for that purpose.
-
-Thanks in advance.
-
-Cheers,
-
-a+
-
- .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts    | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
-
-diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-index ad6ade7..cc43d24 100644
---- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-+++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-@@ -52,6 +52,17 @@
- 			};
- 		};
- 
-+		clocks {
-+		       #address-cells = <1>;
-+		       #size-cells = <0>;
-+
-+		       g762_clk: fixedclk {
-+				 compatible = "fixed-clock";
-+				 #clock-cells = <0>;
-+				 clock-frequency = <8192>;
-+		       };
-+		};
-+
- 		i2c at 11000 {
- 			status = "okay";
- 
-@@ -59,6 +70,15 @@
- 				compatible = "ricoh,rs5c372a";
- 				reg = <0x32>;
- 			};
-+
-+			g762: g762 at 3e {
-+				compatible = "gmt,g762";
-+				reg = <0x3e>;
-+				clocks = <&g762_clk>; /* input clock */
-+				fan_gear_mode = <0>;
-+				fan_startv = <1>;
-+				pwm_polarity = <0>;
-+			};
- 		};
- 
- 		serial at 12000 {
 -- 
-1.8.3.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130701/09e9beae/attachment.sig>
