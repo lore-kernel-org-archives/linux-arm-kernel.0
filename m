@@ -1,36 +1,53 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 1 Jul 2013 22:53:53 +0200
-Subject: [PATCH] N900: fix operation on emulator
-In-Reply-To: <51D1C8DD.6040409@cogentembedded.com>
-References: <20130613142809.GA3775@amd.pavel.ucw.cz>
- <20130613145724.GH8164@atomide.com>
- <20130613155240.GB3775@amd.pavel.ucw.cz>
- <20130613161418.GJ8164@atomide.com>
- <20130613230808.GA14876@amd.pavel.ucw.cz>
- <20130614055629.GM8164@atomide.com>
- <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
- <20130617111031.GQ20992@atomide.com>
- <20130701140315.GA15318@amd.pavel.ucw.cz>
- <51D1C8DD.6040409@cogentembedded.com>
-Message-ID: <20130701205353.GB22174@amd.pavel.ucw.cz>
+From: coelho@ti.com (Luciano Coelho)
+Date: Mon, 1 Jul 2013 23:55:28 +0300
+Subject: [RFC] wlcore: sdio: add wilink clock providers
+In-Reply-To: <20130701204633.GB805@arwen.pp.htv.fi>
+References: <1372707250-11998-1-git-send-email-coelho@ti.com>
+ <20130701204633.GB805@arwen.pp.htv.fi>
+Message-ID: <1372712128.21065.71.camel@cumari.coelho.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Mon, 2013-07-01 at 23:46 +0300, Felipe Balbi wrote:
+> Hi,
+> 
+> On Mon, Jul 01, 2013 at 10:34:10PM +0300, Luciano Coelho wrote:
+> > diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> > index 670c3ce..7f061b8 100644
+> > --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> > +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> > @@ -65,11 +65,19 @@
+> >  		enable-active-high;
+> >  	};
+> >  
+> > +
+> >  	wlan {
+> > -	     compatible = "ti,wilink6";
+> > -	     interrupt-parent = <&gpio2>;
+> > -	     interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
+> > -	     refclock = <2>;		/* 38.4 MHz */
+> > +		compatible = "ti,wilink6";
+> > +		interrupt-parent = <&gpio2>;
+> > +		interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
+> > +		clocks = <&refclock>;
+> > +		clock-names = "refclock";
+> 
+> hmmm, shouldn't you provide both clocks (refclock and tcx0clock)
+> explicitly here ?
 
-> >Errata workarounds for N900 hardware actually break operation on
-> >emulator. Fix it.
-> 
-> >This approach was suggested by Pali Roh?r <pali.rohar@gmail.com>
-> >(thanks!).
-> 
-> >(Also explain what "sleep_ind" led actually does).
-> 
->    Looks like unrelated change and probably worth another patch?
+No, not needed for Panda.  Panda uses WiLink6 and only the refclock
+needs to be provided.
 
-Ok, more serious issue is that code this was modifying is not yet in
-mainline. Sorry.
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+
+> Also, you should probably make it clear that the WiLink module is fed by
+> the 32K sync clock just to make sure clock usecounts are correctly
+> incremented ?
+
+Hmmm, yes, that is probably a good idea.  At least to make sure
+everything is initialized properly before the WiLink module is up and
+running.  I'll look into it and eventually add in a separate patch.
+
+Thanks for your comments!
+
+--
+Luca.
