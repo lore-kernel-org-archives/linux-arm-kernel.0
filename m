@@ -1,39 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Jul 2013 21:55:24 +0800
-Subject: [PATCH 1/4] ASoC: sgtl5000: give it a ramping time before writting
-In-Reply-To: <201307011254.18952.marex@denx.de>
-References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
- <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
- <20130701100710.GB27646@sirena.org.uk>
- <201307011254.18952.marex@denx.de>
-Message-ID: <20130701135522.GO13206@S2101-09.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 1 Jul 2013 09:58:35 -0400
+Subject: [PATCH] of: Specify initrd location using 64-bit
+In-Reply-To: <CAMuHMdV6YM3-hASqjxkguEukZjnjK80gBjDNiabxjfQtC=c8ag@mail.gmail.com>
+References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
+ <51C4171C.9050908@linutronix.de> <51C48B5A.2040404@ti.com>
+ <51CCA67C.2010803@gmail.com>
+ <CACxGe6vOH0sCFVVXrYqD3dbYdOvithVu7-d1cvy5885i8x_Myw@mail.gmail.com>
+ <20130628134931.GD21034@game.jcrosoft.org> <51CE1F92.3070802@ti.com>
+ <51D1345B.8020509@linutronix.de>
+ <CAMuHMdV6YM3-hASqjxkguEukZjnjK80gBjDNiabxjfQtC=c8ag@mail.gmail.com>
+Message-ID: <51D18B0B.1060906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 12:54:18PM +0200, Marek Vasut wrote:
-> Dear Mark Brown,
+On Monday 01 July 2013 03:59 AM, Geert Uytterhoeven wrote:
+> On Mon, Jul 1, 2013 at 9:48 AM, Sebastian Andrzej Siewior
+> <bigeasy@linutronix.de> wrote:
+>> On 06/29/2013 01:43 AM, Santosh Shilimkar wrote:
+>>> Apart from waste of 32bit, what is the other concern you
+>>> have ?
+>>
+>> You pass a u64 as a physical address which is represented in other
+>> parts of the kernel (for a good reason) by phys_addr_t.
+>>
+>>> I really want to converge on this patch because it
+>>> has been a open ended discussion for quite some time. Does
+>>> that really break any thing on x86 or your concern is more
+>>> from semantics of the physical address.
+>> You want to have your code in so you can continue with your work, that
+>> is okay. The other two arguments why u64 here is a good thing was "due
+>> to what I said earlier" and "+1" and I don't have the time to look
+>> that up.
+>>
+>> There should be no problems on x86 if this goes in as it is now.
+>>
+>> But think about this: What happens if you boot your ARM device without
+>> PAE and your initrd is in the upper region? If you are lucky the kernel
+>> looks at a different place where it also has a read permission, notices
+>> nothing sane is there, writes a message and continues. And if it is not
+>> allowed to read? It is clearly the user's fault for booting a non-PAE
+>> kernel.
 > 
-> > On Mon, Jul 01, 2013 at 04:16:08PM +0800, Shawn Guo wrote:
-> > > +	/*
-> > > +	 * It seems that sgtl5000 takes a longer time to get the registers
-> > > +	 * ready for write than bread.  Let's give it a ramping time before
-> > > +	 * the first write goes.
-> > > +	 */
-> > > +	msleep(50);
-> > > +
-> > > 
-> > >  	/* Ensure sgtl5000 will start with sane register values */
-> > >  	ret = sgtl5000_fill_defaults(sgtl5000);
-> > >  	if (ret)
-> > 
-> > This seems like a really odd place to add the sleep - I'd have expected
-> > this to be a part of or just after the reset operation.  It's a *really*
-> > long sleep too, though if that's what you need that's what you need.
+> That's actual the original reason: DT has it as 64 bit, and passes it to a
+> 32 bit kernel when running in 32 bit mode without PAE.
 > 
-> The delay might also be caused by the I2C driver, I have this in my ToDo to 
-> check, but I didn't get to it yet. On the other hand, if subsequent IO does 
-> work, then it's unlikely to be the case.
+Thanks all for comments and useful discussion. I will resubmit the
+patch with update to fix the printk warnings reported by Vineet and
+James post the $subject change.
 
-Right, since read is already working there.
+Am assuming the patch will go via Grant Likely's tree.
 
-Shawn
+Regards,
+Santosh
