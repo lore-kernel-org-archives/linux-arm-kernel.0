@@ -1,135 +1,66 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 1 Jul 2013 23:17:54 +0200
-Subject: [PATCH] N900: add device tree
-In-Reply-To: <20130617111031.GQ20992@atomide.com>
-References: <20130613132624.GA3464@amd.pavel.ucw.cz>
- <20130613141001.GF8164@atomide.com>
- <20130613142809.GA3775@amd.pavel.ucw.cz>
- <20130613145724.GH8164@atomide.com>
- <20130613155240.GB3775@amd.pavel.ucw.cz>
- <20130613161418.GJ8164@atomide.com>
- <20130613230808.GA14876@amd.pavel.ucw.cz>
- <20130614055629.GM8164@atomide.com>
- <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
- <20130617111031.GQ20992@atomide.com>
-Message-ID: <20130701211753.GC15318@amd.pavel.ucw.cz>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 1 Jul 2013 17:24:49 -0400
+Subject: [PATCH] arm: kirkwood: readynas duo v2: Add GMT G762 Fan
+ Controller DT bindings
+In-Reply-To: <87k3lauimd.fsf@natisbad.org>
+References: <87sizyuj0t.fsf@natisbad.org> <20130701222814.36ca395a@skate>
+ <87k3lauimd.fsf@natisbad.org>
+Message-ID: <20130701212449.GE19937@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jul 01, 2013 at 10:31:54PM +0200, Arnaud Ebalard wrote:
+> Hi Thomas,
+> 
+> Thomas Petazzoni <thomas.petazzoni@free-electrons.com> writes:
+> 
+> > On Mon, 01 Jul 2013 22:23:14 +0200, Arnaud Ebalard wrote:
+> >
+> >> -        regulators {
+> >> -                compatible = "simple-bus";
+> >> -                #address-cells = <1>;
+> >> -                #size-cells = <0>;
+> >> -
+> >> -                usb_power: regulator at 1 {
+> >> -                        compatible = "regulator-fixed";
+> >> -                        reg = <1>;
+> >> -                        regulator-name = "USB 3.0 Power";
+> >> -                        regulator-min-microvolt = <5000000>;
+> >> -                        regulator-max-microvolt = <5000000>;
+> >> -                        enable-active-high;
+> >> -                        regulator-always-on;
+> >> -                        regulator-boot-on;
+> >> -                        gpio = <&gpio1 14 0>;
+> >> -                };
+> >> -        };
+> >> +	regulators {
+> >> +		compatible = "simple-bus";
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <0>;
+> >> +
+> >> +		usb_power: regulator at 1 {
+> >> +			compatible = "regulator-fixed";
+> >> +			reg = <1>;
+> >> +			regulator-name = "USB 3.0 Power";
+> >> +			regulator-min-microvolt = <5000000>;
+> >> +			regulator-max-microvolt = <5000000>;
+> >> +			enable-active-high;
+> >> +			regulator-always-on;
+> >> +			regulator-boot-on;
+> >> +			gpio = <&gpio1 14 0>;
+> >> +		};
+> >> +	};
+> >>  };
+> >
+> > Those white-space changes are not related to the addition of the G762
+> > Device Tree informations.
+> 
+> Should I make two unrelated patches (one for G762 and another cosmetic
+> one) or simply let the spaces as they are in .dts?
 
-This adds device tree with neccessary support to boot with functional
-video (on both emulator and real N900 device).
+Leave them as they are.  I'm intending to do a cleanup series for all
+the whitespace issues in the dts files.
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+thx,
 
---- linux-delme-clean//arch/arm/boot/dts/Makefile	2013-07-01 21:51:00.000000000 +0200
-+++ linux-delme/arch/arm/boot/dts/Makefile	2013-07-01 22:53:06.000000000 +0200
-@@ -141,6 +141,7 @@
- 	omap3-devkit8000.dtb \
- 	omap3-beagle-xm.dtb \
- 	omap3-evm.dtb \
-+	omap3-n900.dtb \
- 	omap3-tobi.dtb \
- 	omap3-igep0020.dtb \
- 	omap3-igep0030.dtb \
---- linux-delme-clean//arch/arm/boot/dts/omap3-n900.dts	1970-01-01 01:00:00.000000000 +0100
-+++ linux-delme/arch/arm/boot/dts/omap3-n900.dts	2013-07-01 22:50:21.000000000 +0200
-@@ -0,0 +1,94 @@
-+/*
-+ * Copyright (C) 2013 Pavel Machek <pavel@ucw.cz>
-+ * Copyright 2013 Aaro Koskinen <aaro.koskinen@iki.fi>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 (or later) as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+
-+/include/ "omap34xx.dtsi"
-+
-+/ {
-+	model = "Nokia N900";
-+	compatible = "nokia,omap3-n900", "ti,omap3";
-+
-+	cpus {
-+		cpu at 0 {
-+//			cpu0-supply = <&vcc>;
-+		};
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>; /* 256 MB */
-+	};
-+
-+};
-+
-+&i2c1 {
-+	clock-frequency = <2200000>;
-+
-+	twl: twl at 48 {
-+		reg = <0x48>;
-+		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-+		interrupt-parent = <&intc>;
-+	};
-+};
-+
-+/include/ "twl4030.dtsi"
-+
-+&twl_gpio {
-+	ti,pullups	= <0x0>;
-+	ti,pulldowns	= <0x03ff3f>; /* BIT(0..5) | BIT(8..17) */
-+};
-+
-+&i2c2 {
-+	clock-frequency = <400000>;
-+};
-+
-+&i2c3 {
-+	clock-frequency = <100000>;
-+};
-+
-+&mmc1 {
-+	status = "disabled";
-+};
-+
-+&mmc2 {
-+	status = "disabled";
-+};
-+
-+&mmc3 {
-+	status = "disabled";
-+};
-+
-+&mcspi1 {
-+	// For some reason, touchscreen is neccessary for screen to work at 
-+	// all on real hw. It works well without it on emulator.
-+	//
-+	// Also... order in the device tree actually matters here.
-+	tsc2005 at 0 {
-+		compatible = "tsc2005";
-+		spi-max-frequency = <6000000>;
-+		reg = <0>;
-+	};
-+	mipid at 2 {
-+		compatible = "acx565akm";
-+		spi-max-frequency = <6000000>;
-+		reg = <2>;
-+		// turbo_mode = 0,
-+		// cs_per_word = 0
-+	};
-+};
-+
-+/*
-+&usb_otg_hs {
-+	interface-type = <0>;
-+	usb-phy = <&usb2_phy>;
-+	mode = <2>;
-+	power = <50>;
-+};
-+*/
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Jason.
