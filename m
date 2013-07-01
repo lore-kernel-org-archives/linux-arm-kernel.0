@@ -1,86 +1,149 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 1 Jul 2013 14:55:08 +0200
-Subject: [v2 2/4] imx: ahci: enable ahci sata on imx6q platforms
-In-Reply-To: <1372672975-2997-3-git-send-email-r65037@freescale.com>
-References: <1372672975-2997-1-git-send-email-r65037@freescale.com>
- <1372672975-2997-3-git-send-email-r65037@freescale.com>
-Message-ID: <20130701125508.GX516@pengutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon,  1 Jul 2013 13:55:55 +0100
+Subject: [PATCH] drm/exynos: Add missing includes
+Message-ID: <1372683355-27460-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 06:02:53PM +0800, Richard Zhu wrote:
-> Only the imx6q contains the ahci sata controller,
-> other imx6 SoCs don't have it.
-> 
-> Enable the ahci sata only on imx6q platforms
-> 
-> Signed-off-by: Richard Zhu <r65037@freescale.com>
-> ---
->  arch/arm/mach-imx/mach-imx6q.c |   85 +++++++++++++++++++++++++++++++++++++++-
-> +/* imx6q ahci module initialization. */
-> +static int imx6q_sata_phy_clk(struct device *dev, int enable)
-> +{
-> +	int ret = 0;
-> +	struct clk *sata_ref_clk;
-> +
-> +	sata_ref_clk = devm_clk_get(dev, "sata_ref_100m");
-> +	if (IS_ERR(sata_ref_clk)) {
-> +		dev_err(dev, "can't get sata_ref clock.\n");
-> +		return PTR_ERR(sata_ref_clk);
-> +	}
+From: Mark Brown <broonie@linaro.org>
 
-devm_clk_get takes a reference to the clock. That's not something you
-want to do each time you enable/disable a clock.
+Ensure that all externally accessed functions are correctly prototyped
+when defined in each file by making sure the headers with the protoypes
+are included in the file with the definition.
 
-> +	if (enable) {
-> +		/* Enable PHY clock */
-> +		ret = clk_prepare_enable(sata_ref_clk);
-> +		if (ret < 0) {
-> +			dev_err(dev, "can't prepare-enable sata_ref clock\n");
-> +			clk_put(sata_ref_clk);
-> +			ret = PTR_ERR(sata_ref_clk);
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ drivers/gpu/drm/exynos/exynos_drm_connector.c | 1 +
+ drivers/gpu/drm/exynos/exynos_drm_crtc.c      | 1 +
+ drivers/gpu/drm/exynos/exynos_drm_dmabuf.c    | 1 +
+ drivers/gpu/drm/exynos/exynos_drm_fbdev.c     | 1 +
+ drivers/gpu/drm/exynos/exynos_drm_fimc.c      | 1 +
+ drivers/gpu/drm/exynos/exynos_drm_g2d.c       | 1 +
+ drivers/gpu/drm/exynos/exynos_drm_gsc.c       | 1 +
+ drivers/gpu/drm/exynos/exynos_drm_plane.c     | 1 +
+ drivers/gpu/drm/exynos/exynos_drm_rotator.c   | 1 +
+ drivers/gpu/drm/exynos/exynos_drm_vidi.c      | 1 +
+ 10 files changed, 10 insertions(+)
 
-What are you intending by converting a valid pointer to an error code?
-
-> +		}
-> +	} else {
-> +		/* Disable PHY clock */
-> +		clk_disable_unprepare(sata_ref_clk);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static int imx6q_sata_init(struct device *dev, void __iomem *addr)
-> +{
-> +	int ret = 0;
-> +	struct regmap *gpr;
-> +
-> +	ret = imx6q_sata_phy_clk(dev, true);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
-> +	if (IS_ERR(gpr)) {
-> +		pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
-> +		return PTR_ERR(gpr);
-> +	}
-> +
-> +	/*
-> +	 * set PHY Paremeters, two steps to configure the GPR13,
-> +	 * one write for rest of parameters, mask of first write
-> +	 * is 0x07fffffd, and the other one write for setting
-> +	 * the mpll_clk_en.
-> +	 */
-> +	regmap_update_bits(gpr, 0x34, 0x07fffffd, 0x0593e4c4);
-
-You are adding the register defines in the next patch. Wouldn't it make
-sense to use them?
-
-Sascha
-
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_connector.c b/drivers/gpu/drm/exynos/exynos_drm_connector.c
+index 8bcc13a..ec80293 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_connector.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_connector.c
+@@ -17,6 +17,7 @@
+ #include <drm/exynos_drm.h>
+ #include "exynos_drm_drv.h"
+ #include "exynos_drm_encoder.h"
++#include "exynos_drm_connector.h"
+ 
+ #define to_exynos_connector(x)	container_of(x, struct exynos_drm_connector,\
+ 				drm_connector)
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_crtc.c b/drivers/gpu/drm/exynos/exynos_drm_crtc.c
+index 073c10a..6933ee9 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_crtc.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_crtc.c
+@@ -15,6 +15,7 @@
+ #include <drm/drmP.h>
+ #include <drm/drm_crtc_helper.h>
+ 
++#include "exynos_drm_crtc.h"
+ #include "exynos_drm_drv.h"
+ #include "exynos_drm_encoder.h"
+ #include "exynos_drm_plane.h"
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c b/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
+index ff7f2a8..8adafde 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
+@@ -11,6 +11,7 @@
+ 
+ #include <drm/drmP.h>
+ #include <drm/exynos_drm.h>
++#include "exynos_drm_dmabuf.h"
+ #include "exynos_drm_drv.h"
+ #include "exynos_drm_gem.h"
+ 
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+index 8f007aa..45b6cb3 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+@@ -19,6 +19,7 @@
+ 
+ #include "exynos_drm_drv.h"
+ #include "exynos_drm_fb.h"
++#include "exynos_drm_fbdev.h"
+ #include "exynos_drm_gem.h"
+ #include "exynos_drm_iommu.h"
+ 
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimc.c b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
+index 4a1616a..a83e664 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fimc.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
+@@ -22,6 +22,7 @@
+ #include <drm/drmP.h>
+ #include <drm/exynos_drm.h>
+ #include "regs-fimc.h"
++#include "exynos_drm_drv.h"
+ #include "exynos_drm_ipp.h"
+ #include "exynos_drm_fimc.h"
+ 
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+index af75434..03ba897 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+@@ -24,6 +24,7 @@
+ #include <drm/drmP.h>
+ #include <drm/exynos_drm.h>
+ #include "exynos_drm_drv.h"
++#include "exynos_drm_g2d.h"
+ #include "exynos_drm_gem.h"
+ #include "exynos_drm_iommu.h"
+ 
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_gsc.c b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
+index 762f40d..4683251 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
+@@ -21,6 +21,7 @@
+ #include <drm/drmP.h>
+ #include <drm/exynos_drm.h>
+ #include "regs-gsc.h"
++#include "exynos_drm_drv.h"
+ #include "exynos_drm_ipp.h"
+ #include "exynos_drm_gsc.h"
+ 
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_plane.c b/drivers/gpu/drm/exynos/exynos_drm_plane.c
+index 83efc66..63ebeeb 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_plane.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_plane.c
+@@ -16,6 +16,7 @@
+ #include "exynos_drm_encoder.h"
+ #include "exynos_drm_fb.h"
+ #include "exynos_drm_gem.h"
++#include "exynos_drm_plane.h"
+ 
+ #define to_exynos_plane(x)	container_of(x, struct exynos_plane, base)
+ 
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_rotator.c b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+index 9b6c709..2e9eee2 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+@@ -22,6 +22,7 @@
+ #include <drm/exynos_drm.h>
+ #include "regs-rotator.h"
+ #include "exynos_drm.h"
++#include "exynos_drm_drv.h"
+ #include "exynos_drm_ipp.h"
+ 
+ /*
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_vidi.c b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
+index 24376c1..498647a 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_vidi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
+@@ -24,6 +24,7 @@
+ #include "exynos_drm_drv.h"
+ #include "exynos_drm_crtc.h"
+ #include "exynos_drm_encoder.h"
++#include "exynos_drm_vidi.h"
+ 
+ /* vidi has totally three virtual windows. */
+ #define WINDOWS_NR		3
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.3.1
