@@ -1,200 +1,287 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  1 Jul 2013 15:42:05 +0200
-Subject: [PATCHv4 00/11] MSI support for Marvell EBU PCIe driver
-Message-ID: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon,  1 Jul 2013 15:42:07 +0200
+Subject: [PATCHv4 02/11] pci: use weak functions for MSI arch-specific
+ functions
+In-Reply-To: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1372686136-1370-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Until now, the MSI architecture-specific functions could be overloaded
+using a fairly complex set of #define and compile-time
+conditionals. In order to prepare for the introduction of the msi_chip
+infrastructure, it is desirable to switch all those functions to use
+the 'weak' mechanism. This commit converts all the architectures that
+were overidding those MSI functions to use the new strategy.
 
-This set of patches introduces Message Signaled Interrupt support in
-the Marvell EBU PCIe driver. It has been successfully tested on the
-Armada XP GP platform with an Intel e1000e PCIe network card that
-supports MSI.
+Note that we keep a separate, non-weak, function
+default_teardown_msi_irqs() for the default behavior of the
+arch_teardown_msi_irqs(), as the default behavior is needed by the Xen
+x86 PCI code.
 
-The patches do the following:
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+Cc: linux390 at de.ibm.com
+Cc: linux-s390 at vger.kernel.org
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: x86 at kernel.org
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Tony Luck <tony.luck@intel.com>
+Cc: Fenghua Yu <fenghua.yu@intel.com>
+Cc: linux-ia64 at vger.kernel.org
+Cc: Ralf Baechle <ralf@linux-mips.org>
+Cc: linux-mips at linux-mips.org
+Cc: David S. Miller <davem@davemloft.net>
+Cc: sparclinux at vger.kernel.org
+Cc: Chris Metcalf <cmetcalf@tilera.com>
+---
+ arch/mips/include/asm/pci.h    |  5 -----
+ arch/powerpc/include/asm/pci.h |  5 -----
+ arch/s390/include/asm/pci.h    |  4 ----
+ arch/x86/include/asm/pci.h     | 28 --------------------------
+ arch/x86/kernel/x86_init.c     | 21 ++++++++++++++++++++
+ drivers/pci/msi.c              | 45 +++++++++++++++++++-----------------------
+ include/linux/msi.h            |  7 ++++++-
+ 7 files changed, 47 insertions(+), 68 deletions(-)
 
- * Patch 1 adds an IRQ domain function that allows to allocate
-   dynamically a free hwirq number from an IRQ domain, and create a
-   virq mapping to it. It was suggested by Grant Likely in order to
-   remove the hwirq allocation code from the IRQ driver itself.
-
-   This patch needs the Ack of Grant Likely.
-
- * Patch 2 reworks how the architecture-specific MSI functions can be
-   overriden by architecture-specific code, by using weak
-   functions. It was suggested by Bjorn Helgaas.
-
-   This patch needs the Ack from Bjorn Helgaas, and the relevant
-   architecture maintainers.
-
- * Patch 3 removes the ARCH_SUPPORTS_MSI hidden kconfig boolean which
-   is no longer needed now that we have weak functions for all MSI
-   architecture-specific hooks.
-
-   This patch needs the Ack from Bjorn Helgaas, and the relevant
-   architecture maintainers.
-
- * Patch 4 adds a minimal msi_chip infrastructure, that allows a
-   pci_bus to be connected to a msi_chip, and that provides default
-   implementations of the architecture-specific MSI functions to use
-   msi_chip.
-
-   This patch needs the Ack from Bjorn Helgaas.
-
- * Patch 5 adds a small registry of msi_chip <-> of_node in the OF
-   code. It was originally located in drivers/pci/msi.c, but Bjorn
-   Helgaas suggested that it probably belongs to drivers/of/.
-
-   This patch needs the Ack from Grant Likely or Rob Herring, and
-   probably Bjorn Helgaas as well.
-
- * Patch 6 makes some not very interesting preparation in the Armada
-   370/XP IRQ controller driver.
-
-   This patch needs the Ack from Thomas Gleixner.
-
- * Patch 7 implements the MSI support in the Armada 370/XP IRQ
-   controller driver. It registers an msi_chip using the
-   msi_chip_add() function added in PATCH 3.
-
-   This patch needs the Ack from Thomas Gleixner.
-
- * Patch 8 extends the ARM PCI core to expose ->add_bus() and
-   ->remove_bus() hooks to PCI drivers. This was suggested by Bjorn
-   Helgaas to allow the PCI driver to connected the PCI busses with
-   the corresponding MSI chip.
-
-   This patch needs the Ack from Russell King.
-
- * Patch 9 adjust the Armada 370/XP Device Tree to indicate that the
-   MPIC is not only an interrupt-controller, but also an
-   msi-controller.
-
-   This patch needs the Ack from Jason Cooper, Gregory Clement
-   and/or Andrew Lunn, the Marvell Maintainers.
-
- * Patch 10 adds MSI support in the Marvell PCIe host controller
-   driver. The work to do here is minimal: get a reference to the
-   msi-parent controller thanks to msi_chip_find_by_of_node(), and
-   link it to the pci_bus structure before the bus gets enumerated.
-
-   This patch needs the Ack from Bjorn Helgaas.
-
- * Patch 11 adjusts the Armada 370/XP Device Tree to add the msi-parent
-   properties in the PCIe controller nodes.
-
-   This patch needs the Ack from Jason Cooper, Gregory Clement
-   and/or Andrew Lunn, the Marvell Maintainers.
-
-This version 4 follows:
- * PATCH version 3 sent on June, 19th 2013
- * PATCH version 2 sent on June, 6th 2013
- * RFC version 1 sent on March, 26th 2013
-
-Changes since v3:
-
- * Keep only a default_teardown_msi_irqs() function needed for the Xen
-   PCI x86 code, and remove all other default_*() function and put the
-   default behavior directly in the weak functions. Suggested by
-   Thierry Redding and Bjorn Helgaas.
-
- * Misc small improvements the MSI chip registry code: compiled only
-   under CONFIG_PCI_MSI, functions exported to modules, addition of an
-   of_msi_chip_remove() function, renaming of
-   of_msi_chip_find_by_node() to of_find_msi_chip_by_node(), move the
-   test of the "msi-controller" property to the of_msi_chip_add()
-   function, renamed the list_head field from link to list, added
-   dummy functions in the header files when !CONFIG_PCI_MSI &&
-   !CONFIG_OF. All suggested by Thierry Redding.
-
- * Add a patch that entirely removes the ARCH_SUPPORTS_MSI, as we now
-   have weak functions, so even if an arch doesn't actually
-   use/support MSI, the code will build properly. Suggested by Thierry
-   Redding.
-
- * Added Device Tree binding documentation updates for the IRQ
-   controller and the PCIe controller.
-
-Changes since v2:
-
- * Add an IRQ domain function that allows to allocate dynamically a
-   free hwirq number from an IRQ domain, and create a virq mapping to
-   it. It was suggested by Grant Likely in order to remove the hwirq
-   allocation code from the IRQ driver itself. (PATCH 1)
-
- * Separate the use of weak functions from the introduction of the
-   msi_chip infrastructure, and use weak functions for all
-   architecture-specific MSI hooks. Suggested by Bjorn Helgaas (PATCH
-   2).
-
- * Move the msi_chip registry to drivers/of. Suggested by Bjorn
-   Helgaas (PATCH 4).
-
- * Use pcibios_add_bus() and pcibios_remove_bus() to connect the PCI
-   busses to their msi_chip, as suggested by Bjorn Helgaas. Requires
-   some ARM PCI core changes (PATCH 7), and then changes to the PCI
-   driver itself (PATCH 9).
-
-This set of patches currently applies on top of the current "for-next"
-branch of Jason Cooper's repository + the irqdomain/test branch of
-Grant Likely's tree. I will rebase them on top of 3.11-rc1 when it
-lands, but I'd like to start collecting Acked-by from maintainers in
-the mean time.
-
-Thanks,
-
-Thomas
-
-Thierry Reding (1):
-  PCI: Introduce new MSI chip infrastructure
-
-Thomas Petazzoni (10):
-  irqdomain: add irq_alloc_mapping() function
-  pci: use weak functions for MSI arch-specific functions
-  pci: remove ARCH_SUPPORTS_MSI kconfig option
-  of: pci: add registry of MSI chips
-  irqchip: armada-370-xp: properly request resources
-  irqchip: armada-370-xp: implement MSI support
-  arm: pci: add ->add_bus() and ->remove_bus() hooks to hw_pci
-  arm: mvebu: the MPIC now provides MSI controller features
-  pci: mvebu: add support for MSI
-  arm: mvebu: link PCIe controllers to the MSI controller
-
- .../devicetree/bindings/arm/armada-370-xp-mpic.txt |   3 +
- .../devicetree/bindings/pci/mvebu-pci.txt          |   3 +
- arch/arm/Kconfig                                   |   1 -
- arch/arm/boot/dts/armada-370-xp.dtsi               |   1 +
- arch/arm/boot/dts/armada-370.dtsi                  |   1 +
- arch/arm/boot/dts/armada-xp-mv78230.dtsi           |   1 +
- arch/arm/boot/dts/armada-xp-mv78260.dtsi           |   1 +
- arch/arm/boot/dts/armada-xp-mv78460.dtsi           |   1 +
- arch/arm/include/asm/mach/pci.h                    |   4 +
- arch/arm/kernel/bios32.c                           |  16 ++
- arch/ia64/Kconfig                                  |   1 -
- arch/mips/Kconfig                                  |   2 -
- arch/mips/include/asm/pci.h                        |   5 -
- arch/powerpc/Kconfig                               |   1 -
- arch/powerpc/include/asm/pci.h                     |   5 -
- arch/s390/Kconfig                                  |   1 -
- arch/s390/include/asm/pci.h                        |   4 -
- arch/sparc/Kconfig                                 |   1 -
- arch/tile/Kconfig                                  |   1 -
- arch/x86/Kconfig                                   |   1 -
- arch/x86/include/asm/pci.h                         |  28 ----
- arch/x86/kernel/x86_init.c                         |  21 +++
- drivers/irqchip/irq-armada-370-xp.c                | 161 ++++++++++++++++++++-
- drivers/of/of_pci.c                                |  40 +++++
- drivers/pci/Kconfig                                |   4 -
- drivers/pci/host/pci-mvebu.c                       |  26 ++++
- drivers/pci/msi.c                                  |  67 +++++----
- drivers/pci/probe.c                                |   1 +
- include/linux/irqdomain.h                          |   2 +
- include/linux/msi.h                                |  20 ++-
- include/linux/of_pci.h                             |  12 ++
- include/linux/pci.h                                |   1 +
- kernel/irq/irqdomain.c                             |  32 ++++
- 33 files changed, 383 insertions(+), 86 deletions(-)
-
+diff --git a/arch/mips/include/asm/pci.h b/arch/mips/include/asm/pci.h
+index b8e24fd..031f4c1 100644
+--- a/arch/mips/include/asm/pci.h
++++ b/arch/mips/include/asm/pci.h
+@@ -137,11 +137,6 @@ static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
+ 	return channel ? 15 : 14;
+ }
+ 
+-#ifdef CONFIG_CPU_CAVIUM_OCTEON
+-/* MSI arch hook for OCTEON */
+-#define arch_setup_msi_irqs arch_setup_msi_irqs
+-#endif
+-
+ extern char * (*pcibios_plat_setup)(char *str);
+ 
+ #ifdef CONFIG_OF
+diff --git a/arch/powerpc/include/asm/pci.h b/arch/powerpc/include/asm/pci.h
+index 6653f27..95145a1 100644
+--- a/arch/powerpc/include/asm/pci.h
++++ b/arch/powerpc/include/asm/pci.h
+@@ -113,11 +113,6 @@ extern int pci_domain_nr(struct pci_bus *bus);
+ /* Decide whether to display the domain number in /proc */
+ extern int pci_proc_domain(struct pci_bus *bus);
+ 
+-/* MSI arch hooks */
+-#define arch_setup_msi_irqs arch_setup_msi_irqs
+-#define arch_teardown_msi_irqs arch_teardown_msi_irqs
+-#define arch_msi_check_device arch_msi_check_device
+-
+ struct vm_area_struct;
+ /* Map a range of PCI memory or I/O space for a device into user space */
+ int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,
+diff --git a/arch/s390/include/asm/pci.h b/arch/s390/include/asm/pci.h
+index 6c18012..8641e8d 100644
+--- a/arch/s390/include/asm/pci.h
++++ b/arch/s390/include/asm/pci.h
+@@ -21,10 +21,6 @@ void pci_iounmap(struct pci_dev *, void __iomem *);
+ int pci_domain_nr(struct pci_bus *);
+ int pci_proc_domain(struct pci_bus *);
+ 
+-/* MSI arch hooks */
+-#define arch_setup_msi_irqs	arch_setup_msi_irqs
+-#define arch_teardown_msi_irqs	arch_teardown_msi_irqs
+-
+ #define ZPCI_BUS_NR			0	/* default bus number */
+ #define ZPCI_DEVFN			0	/* default device number */
+ 
+diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+index d9e9e6c..8c61de0 100644
+--- a/arch/x86/include/asm/pci.h
++++ b/arch/x86/include/asm/pci.h
+@@ -100,29 +100,6 @@ static inline void early_quirks(void) { }
+ extern void pci_iommu_alloc(void);
+ 
+ #ifdef CONFIG_PCI_MSI
+-/* MSI arch specific hooks */
+-static inline int x86_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+-{
+-	return x86_msi.setup_msi_irqs(dev, nvec, type);
+-}
+-
+-static inline void x86_teardown_msi_irqs(struct pci_dev *dev)
+-{
+-	x86_msi.teardown_msi_irqs(dev);
+-}
+-
+-static inline void x86_teardown_msi_irq(unsigned int irq)
+-{
+-	x86_msi.teardown_msi_irq(irq);
+-}
+-static inline void x86_restore_msi_irqs(struct pci_dev *dev, int irq)
+-{
+-	x86_msi.restore_msi_irqs(dev, irq);
+-}
+-#define arch_setup_msi_irqs x86_setup_msi_irqs
+-#define arch_teardown_msi_irqs x86_teardown_msi_irqs
+-#define arch_teardown_msi_irq x86_teardown_msi_irq
+-#define arch_restore_msi_irqs x86_restore_msi_irqs
+ /* implemented in arch/x86/kernel/apic/io_apic. */
+ struct msi_desc;
+ int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
+@@ -130,11 +107,6 @@ void native_teardown_msi_irq(unsigned int irq);
+ void native_restore_msi_irqs(struct pci_dev *dev, int irq);
+ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
+ 		  unsigned int irq_base, unsigned int irq_offset);
+-/* default to the implementation in drivers/lib/msi.c */
+-#define HAVE_DEFAULT_MSI_TEARDOWN_IRQS
+-#define HAVE_DEFAULT_MSI_RESTORE_IRQS
+-void default_teardown_msi_irqs(struct pci_dev *dev);
+-void default_restore_msi_irqs(struct pci_dev *dev, int irq);
+ #else
+ #define native_setup_msi_irqs		NULL
+ #define native_teardown_msi_irq		NULL
+diff --git a/arch/x86/kernel/x86_init.c b/arch/x86/kernel/x86_init.c
+index 45a14db..a2b189c 100644
+--- a/arch/x86/kernel/x86_init.c
++++ b/arch/x86/kernel/x86_init.c
+@@ -116,6 +116,27 @@ struct x86_msi_ops x86_msi = {
+ 	.setup_hpet_msi		= default_setup_hpet_msi,
+ };
+ 
++/* MSI arch specific hooks */
++int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
++{
++	return x86_msi.setup_msi_irqs(dev, nvec, type);
++}
++
++void arch_teardown_msi_irqs(struct pci_dev *dev)
++{
++	x86_msi.teardown_msi_irqs(dev);
++}
++
++void arch_teardown_msi_irq(unsigned int irq)
++{
++	x86_msi.teardown_msi_irq(irq);
++}
++
++void arch_restore_msi_irqs(struct pci_dev *dev, int irq)
++{
++	x86_msi.restore_msi_irqs(dev, irq);
++}
++
+ struct x86_io_apic_ops x86_io_apic_ops = {
+ 	.init			= native_io_apic_init_mappings,
+ 	.read			= native_io_apic_read,
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 2c10752..289fbfd 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -30,20 +30,21 @@ static int pci_msi_enable = 1;
+ 
+ /* Arch hooks */
+ 
+-#ifndef arch_msi_check_device
+-int arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
++int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ {
+-	return 0;
++	return -EINVAL;
+ }
+-#endif
+ 
+-#ifndef arch_setup_msi_irqs
+-# define arch_setup_msi_irqs default_setup_msi_irqs
+-# define HAVE_DEFAULT_MSI_SETUP_IRQS
+-#endif
++void __weak arch_teardown_msi_irq(unsigned int irq)
++{
++}
+ 
+-#ifdef HAVE_DEFAULT_MSI_SETUP_IRQS
+-int default_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
++int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
++{
++	return 0;
++}
++
++int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ {
+ 	struct msi_desc *entry;
+ 	int ret;
+@@ -65,14 +66,11 @@ int default_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ 
+ 	return 0;
+ }
+-#endif
+ 
+-#ifndef arch_teardown_msi_irqs
+-# define arch_teardown_msi_irqs default_teardown_msi_irqs
+-# define HAVE_DEFAULT_MSI_TEARDOWN_IRQS
+-#endif
+-
+-#ifdef HAVE_DEFAULT_MSI_TEARDOWN_IRQS
++/*
++ * We have a default implementation available as a separate non-weak
++ * function, as it is used by the Xen x86 PCI code
++ */
+ void default_teardown_msi_irqs(struct pci_dev *dev)
+ {
+ 	struct msi_desc *entry;
+@@ -86,15 +84,13 @@ void default_teardown_msi_irqs(struct pci_dev *dev)
+ 			arch_teardown_msi_irq(entry->irq + i);
+ 	}
+ }
+-#endif
+ 
+-#ifndef arch_restore_msi_irqs
+-# define arch_restore_msi_irqs default_restore_msi_irqs
+-# define HAVE_DEFAULT_MSI_RESTORE_IRQS
+-#endif
++void __weak arch_teardown_msi_irqs(struct pci_dev *dev)
++{
++	return default_teardown_msi_irqs(dev);
++}
+ 
+-#ifdef HAVE_DEFAULT_MSI_RESTORE_IRQS
+-void default_restore_msi_irqs(struct pci_dev *dev, int irq)
++void __weak arch_restore_msi_irqs(struct pci_dev *dev, int irq)
+ {
+ 	struct msi_desc *entry;
+ 
+@@ -111,7 +107,6 @@ void default_restore_msi_irqs(struct pci_dev *dev, int irq)
+ 	if (entry)
+ 		write_msi_msg(irq, &entry->msg);
+ }
+-#endif
+ 
+ static void msi_set_enable(struct pci_dev *dev, int enable)
+ {
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 20c2d6d..c82ff8d 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -50,12 +50,17 @@ struct msi_desc {
+ };
+ 
+ /*
+- * The arch hook for setup up msi irqs
++ * The arch hooks to setup up msi irqs. Those functions are
++ * implemented as weak symbols so that they /can/ be overriden by
++ * architecture specific code if needed.
+  */
+ int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc);
+ void arch_teardown_msi_irq(unsigned int irq);
+ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
+ void arch_teardown_msi_irqs(struct pci_dev *dev);
+ int arch_msi_check_device(struct pci_dev* dev, int nvec, int type);
++void arch_restore_msi_irqs(struct pci_dev *dev, int irq);
++
++void default_teardown_msi_irqs(struct pci_dev *dev);
+ 
+ #endif /* LINUX_MSI_H */
 -- 
 1.8.1.2
