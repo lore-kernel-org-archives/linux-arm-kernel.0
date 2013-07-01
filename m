@@ -1,33 +1,37 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Mon, 1 Jul 2013 02:06:10 +0000
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <CAOMZO5AW1jcjVqEyh=qP3kQK75dZvpOY+BYcKGiymfJPLa94ew@mail.gmail.com>
-References: <51A5A808.2070803@digi.com>	<201306281142.51676.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803EFF551@039-SN2MPN1-023.039d.mgd.msft.net>
- <201306281356.51670.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803EFF788@039-SN2MPN1-023.039d.mgd.msft.net>
- <CAOMZO5AW1jcjVqEyh=qP3kQK75dZvpOY+BYcKGiymfJPLa94ew@mail.gmail.com>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803F016E2@039-SN2MPN1-023.039d.mgd.msft.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 1 Jul 2013 02:15:38 +0000 (UTC)
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <alpine.DEB.2.02.1306281844090.8767@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+ <51CAEB33.5010101@ti.com>
+ <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
+ <51CBBCD8.5030600@ti.com>
+ <alpine.DEB.2.02.1306281844090.8767@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1307010211580.3741@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> >
-> > You should see the voltage of vbus pin is less than 0.8v when
-> > nothing is connected, we use B_SESSION_VALID (0.8v) to judge
-> > it is connected or not.
-> >
-> > You get 2.25 all the time or it is discharged very slowly?
+On Fri, 28 Jun 2013, Paul Walmsley wrote:
+
+> On Thu, 27 Jun 2013, Lokesh Vutla wrote:
+>
+> > Here is the catch..
+> > Your dtb is generated in arch/arm/boot/dts/ folder(before V3.8 dtb was
+> > generated in arch/arm/boot).
 > 
-> On my mx28evk it discharges very very slowly. Any hints about it?
-> 
+> Ugh... that's probably it :-(
 
-Due to some hardware limitations, the dual-role functions at OTG port
-can't be used with host 1 port at the same time at mx28evk. Please follow
-below to use USB ports at mx28evk.
+Indeed, this was at least one major problem.  With this fixed, and with 
+CONFIG_MACH_OMAP_GENERIC=y in the v3.10-rc Kconfigs, the BeagleBone white 
+boots here now with v3.10-rc7.  Will test the previous releases going back 
+to v3.8 and will update the web-linked READMEs as appropriate.
 
-When testing usb OTG port, please switch VDD 5V SOURCE SELECT to USB 5V
-When testing usb host1 port, please switch VDD 5V SOURCE SELECT to WALL 5V
+Thanks for the help and the fixes.  Vaibhav and Rajendra, thanks also for 
+looking into it.
 
-Best regards,
-Peter
+
+- Paul
