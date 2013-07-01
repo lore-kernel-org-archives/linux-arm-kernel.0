@@ -1,287 +1,117 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  1 Jul 2013 15:42:07 +0200
-Subject: [PATCHv4 02/11] pci: use weak functions for MSI arch-specific
- functions
+Date: Mon,  1 Jul 2013 15:42:09 +0200
+Subject: [PATCHv4 04/11] PCI: Introduce new MSI chip infrastructure
 In-Reply-To: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1372686136-1370-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1372686136-1370-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now, the MSI architecture-specific functions could be overloaded
-using a fairly complex set of #define and compile-time
-conditionals. In order to prepare for the introduction of the msi_chip
-infrastructure, it is desirable to switch all those functions to use
-the 'weak' mechanism. This commit converts all the architectures that
-were overidding those MSI functions to use the new strategy.
+From: Thierry Reding <thierry.reding@avionic-design.de>
 
-Note that we keep a separate, non-weak, function
-default_teardown_msi_irqs() for the default behavior of the
-arch_teardown_msi_irqs(), as the default behavior is needed by the Xen
-x86 PCI code.
+The new struct msi_chip is used to associated an MSI controller with a
+PCI bus. It is automatically handed down from the root to its children
+during bus enumeration.
 
+This patch provides default (weak) implementations for the architecture-
+specific MSI functions (arch_setup_msi_irq(), arch_teardown_msi_irq()
+and arch_msi_check_device()) which check if a PCI device's bus has an
+attached MSI chip and forward the call appropriately.
+
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: linux390 at de.ibm.com
-Cc: linux-s390 at vger.kernel.org
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: H. Peter Anvin <hpa@zytor.com>
-Cc: x86 at kernel.org
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Tony Luck <tony.luck@intel.com>
-Cc: Fenghua Yu <fenghua.yu@intel.com>
-Cc: linux-ia64 at vger.kernel.org
-Cc: Ralf Baechle <ralf@linux-mips.org>
-Cc: linux-mips at linux-mips.org
-Cc: David S. Miller <davem@davemloft.net>
-Cc: sparclinux at vger.kernel.org
-Cc: Chris Metcalf <cmetcalf@tilera.com>
 ---
- arch/mips/include/asm/pci.h    |  5 -----
- arch/powerpc/include/asm/pci.h |  5 -----
- arch/s390/include/asm/pci.h    |  4 ----
- arch/x86/include/asm/pci.h     | 28 --------------------------
- arch/x86/kernel/x86_init.c     | 21 ++++++++++++++++++++
- drivers/pci/msi.c              | 45 +++++++++++++++++++-----------------------
- include/linux/msi.h            |  7 ++++++-
- 7 files changed, 47 insertions(+), 68 deletions(-)
+ drivers/pci/msi.c   | 22 ++++++++++++++++++++++
+ drivers/pci/probe.c |  1 +
+ include/linux/msi.h | 11 +++++++++++
+ include/linux/pci.h |  1 +
+ 4 files changed, 35 insertions(+)
 
-diff --git a/arch/mips/include/asm/pci.h b/arch/mips/include/asm/pci.h
-index b8e24fd..031f4c1 100644
---- a/arch/mips/include/asm/pci.h
-+++ b/arch/mips/include/asm/pci.h
-@@ -137,11 +137,6 @@ static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
- 	return channel ? 15 : 14;
- }
- 
--#ifdef CONFIG_CPU_CAVIUM_OCTEON
--/* MSI arch hook for OCTEON */
--#define arch_setup_msi_irqs arch_setup_msi_irqs
--#endif
--
- extern char * (*pcibios_plat_setup)(char *str);
- 
- #ifdef CONFIG_OF
-diff --git a/arch/powerpc/include/asm/pci.h b/arch/powerpc/include/asm/pci.h
-index 6653f27..95145a1 100644
---- a/arch/powerpc/include/asm/pci.h
-+++ b/arch/powerpc/include/asm/pci.h
-@@ -113,11 +113,6 @@ extern int pci_domain_nr(struct pci_bus *bus);
- /* Decide whether to display the domain number in /proc */
- extern int pci_proc_domain(struct pci_bus *bus);
- 
--/* MSI arch hooks */
--#define arch_setup_msi_irqs arch_setup_msi_irqs
--#define arch_teardown_msi_irqs arch_teardown_msi_irqs
--#define arch_msi_check_device arch_msi_check_device
--
- struct vm_area_struct;
- /* Map a range of PCI memory or I/O space for a device into user space */
- int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,
-diff --git a/arch/s390/include/asm/pci.h b/arch/s390/include/asm/pci.h
-index 6c18012..8641e8d 100644
---- a/arch/s390/include/asm/pci.h
-+++ b/arch/s390/include/asm/pci.h
-@@ -21,10 +21,6 @@ void pci_iounmap(struct pci_dev *, void __iomem *);
- int pci_domain_nr(struct pci_bus *);
- int pci_proc_domain(struct pci_bus *);
- 
--/* MSI arch hooks */
--#define arch_setup_msi_irqs	arch_setup_msi_irqs
--#define arch_teardown_msi_irqs	arch_teardown_msi_irqs
--
- #define ZPCI_BUS_NR			0	/* default bus number */
- #define ZPCI_DEVFN			0	/* default device number */
- 
-diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
-index d9e9e6c..8c61de0 100644
---- a/arch/x86/include/asm/pci.h
-+++ b/arch/x86/include/asm/pci.h
-@@ -100,29 +100,6 @@ static inline void early_quirks(void) { }
- extern void pci_iommu_alloc(void);
- 
- #ifdef CONFIG_PCI_MSI
--/* MSI arch specific hooks */
--static inline int x86_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
--{
--	return x86_msi.setup_msi_irqs(dev, nvec, type);
--}
--
--static inline void x86_teardown_msi_irqs(struct pci_dev *dev)
--{
--	x86_msi.teardown_msi_irqs(dev);
--}
--
--static inline void x86_teardown_msi_irq(unsigned int irq)
--{
--	x86_msi.teardown_msi_irq(irq);
--}
--static inline void x86_restore_msi_irqs(struct pci_dev *dev, int irq)
--{
--	x86_msi.restore_msi_irqs(dev, irq);
--}
--#define arch_setup_msi_irqs x86_setup_msi_irqs
--#define arch_teardown_msi_irqs x86_teardown_msi_irqs
--#define arch_teardown_msi_irq x86_teardown_msi_irq
--#define arch_restore_msi_irqs x86_restore_msi_irqs
- /* implemented in arch/x86/kernel/apic/io_apic. */
- struct msi_desc;
- int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
-@@ -130,11 +107,6 @@ void native_teardown_msi_irq(unsigned int irq);
- void native_restore_msi_irqs(struct pci_dev *dev, int irq);
- int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
- 		  unsigned int irq_base, unsigned int irq_offset);
--/* default to the implementation in drivers/lib/msi.c */
--#define HAVE_DEFAULT_MSI_TEARDOWN_IRQS
--#define HAVE_DEFAULT_MSI_RESTORE_IRQS
--void default_teardown_msi_irqs(struct pci_dev *dev);
--void default_restore_msi_irqs(struct pci_dev *dev, int irq);
- #else
- #define native_setup_msi_irqs		NULL
- #define native_teardown_msi_irq		NULL
-diff --git a/arch/x86/kernel/x86_init.c b/arch/x86/kernel/x86_init.c
-index 45a14db..a2b189c 100644
---- a/arch/x86/kernel/x86_init.c
-+++ b/arch/x86/kernel/x86_init.c
-@@ -116,6 +116,27 @@ struct x86_msi_ops x86_msi = {
- 	.setup_hpet_msi		= default_setup_hpet_msi,
- };
- 
-+/* MSI arch specific hooks */
-+int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-+{
-+	return x86_msi.setup_msi_irqs(dev, nvec, type);
-+}
-+
-+void arch_teardown_msi_irqs(struct pci_dev *dev)
-+{
-+	x86_msi.teardown_msi_irqs(dev);
-+}
-+
-+void arch_teardown_msi_irq(unsigned int irq)
-+{
-+	x86_msi.teardown_msi_irq(irq);
-+}
-+
-+void arch_restore_msi_irqs(struct pci_dev *dev, int irq)
-+{
-+	x86_msi.restore_msi_irqs(dev, irq);
-+}
-+
- struct x86_io_apic_ops x86_io_apic_ops = {
- 	.init			= native_io_apic_init_mappings,
- 	.read			= native_io_apic_read,
 diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 2c10752..289fbfd 100644
+index 289fbfd..62eb3d5 100644
 --- a/drivers/pci/msi.c
 +++ b/drivers/pci/msi.c
-@@ -30,20 +30,21 @@ static int pci_msi_enable = 1;
+@@ -32,15 +32,37 @@ static int pci_msi_enable = 1;
  
- /* Arch hooks */
- 
--#ifndef arch_msi_check_device
--int arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
-+int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
  {
--	return 0;
-+	return -EINVAL;
- }
--#endif
- 
--#ifndef arch_setup_msi_irqs
--# define arch_setup_msi_irqs default_setup_msi_irqs
--# define HAVE_DEFAULT_MSI_SETUP_IRQS
--#endif
-+void __weak arch_teardown_msi_irq(unsigned int irq)
-+{
-+}
- 
--#ifdef HAVE_DEFAULT_MSI_SETUP_IRQS
--int default_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-+int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
-+{
-+	return 0;
-+}
++	struct msi_chip *chip = dev->bus->msi;
 +
-+int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- {
- 	struct msi_desc *entry;
- 	int ret;
-@@ -65,14 +66,11 @@ int default_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
++	if (chip && chip->setup_irq) {
++		int err;
++
++		err = chip->setup_irq(chip, dev, desc);
++		if (err < 0)
++			return err;
++
++		irq_set_chip_data(desc->irq, chip);
++		return err;
++	}
++
+ 	return -EINVAL;
+ }
  
+ void __weak arch_teardown_msi_irq(unsigned int irq)
+ {
++	struct msi_chip *chip = irq_get_chip_data(irq);
++
++	if (chip && chip->teardown_irq)
++		chip->teardown_irq(chip, irq);
+ }
+ 
+ int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
+ {
++	struct msi_chip *chip = dev->bus->msi;
++
++	if (chip && chip->check_device)
++		return chip->check_device(chip, dev, nvec, type);
++
  	return 0;
  }
--#endif
  
--#ifndef arch_teardown_msi_irqs
--# define arch_teardown_msi_irqs default_teardown_msi_irqs
--# define HAVE_DEFAULT_MSI_TEARDOWN_IRQS
--#endif
--
--#ifdef HAVE_DEFAULT_MSI_TEARDOWN_IRQS
-+/*
-+ * We have a default implementation available as a separate non-weak
-+ * function, as it is used by the Xen x86 PCI code
-+ */
- void default_teardown_msi_irqs(struct pci_dev *dev)
- {
- 	struct msi_desc *entry;
-@@ -86,15 +84,13 @@ void default_teardown_msi_irqs(struct pci_dev *dev)
- 			arch_teardown_msi_irq(entry->irq + i);
- 	}
- }
--#endif
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 70f10fa..c8591e4 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -634,6 +634,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
  
--#ifndef arch_restore_msi_irqs
--# define arch_restore_msi_irqs default_restore_msi_irqs
--# define HAVE_DEFAULT_MSI_RESTORE_IRQS
--#endif
-+void __weak arch_teardown_msi_irqs(struct pci_dev *dev)
-+{
-+	return default_teardown_msi_irqs(dev);
-+}
+ 	child->parent = parent;
+ 	child->ops = parent->ops;
++	child->msi = parent->msi;
+ 	child->sysdata = parent->sysdata;
+ 	child->bus_flags = parent->bus_flags;
  
--#ifdef HAVE_DEFAULT_MSI_RESTORE_IRQS
--void default_restore_msi_irqs(struct pci_dev *dev, int irq)
-+void __weak arch_restore_msi_irqs(struct pci_dev *dev, int irq)
- {
- 	struct msi_desc *entry;
- 
-@@ -111,7 +107,6 @@ void default_restore_msi_irqs(struct pci_dev *dev, int irq)
- 	if (entry)
- 		write_msi_msg(irq, &entry->msg);
- }
--#endif
- 
- static void msi_set_enable(struct pci_dev *dev, int enable)
- {
 diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 20c2d6d..c82ff8d 100644
+index c82ff8d..5b357d92 100644
 --- a/include/linux/msi.h
 +++ b/include/linux/msi.h
-@@ -50,12 +50,17 @@ struct msi_desc {
- };
+@@ -63,4 +63,15 @@ void arch_restore_msi_irqs(struct pci_dev *dev, int irq);
  
- /*
-- * The arch hook for setup up msi irqs
-+ * The arch hooks to setup up msi irqs. Those functions are
-+ * implemented as weak symbols so that they /can/ be overriden by
-+ * architecture specific code if needed.
-  */
- int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc);
- void arch_teardown_msi_irq(unsigned int irq);
- int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
- void arch_teardown_msi_irqs(struct pci_dev *dev);
- int arch_msi_check_device(struct pci_dev* dev, int nvec, int type);
-+void arch_restore_msi_irqs(struct pci_dev *dev, int irq);
+ void default_teardown_msi_irqs(struct pci_dev *dev);
+ 
++struct msi_chip {
++	struct module *owner;
++	struct device *dev;
 +
-+void default_teardown_msi_irqs(struct pci_dev *dev);
- 
++	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
++			 struct msi_desc *desc);
++	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
++	int (*check_device)(struct msi_chip *chip, struct pci_dev *dev,
++			    int nvec, int type);
++};
++
  #endif /* LINUX_MSI_H */
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 3a24e4f..7ffc012 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -432,6 +432,7 @@ struct pci_bus {
+ 	struct resource busn_res;	/* bus numbers routed to this bus */
+ 
+ 	struct pci_ops	*ops;		/* configuration access functions */
++	struct msi_chip	*msi;		/* MSI controller */
+ 	void		*sysdata;	/* hook for sys-specific extension */
+ 	struct proc_dir_entry *procdir;	/* directory entry in /proc/bus/pci */
+ 
 -- 
 1.8.1.2
