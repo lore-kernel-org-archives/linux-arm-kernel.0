@@ -1,48 +1,63 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 01 Jul 2013 18:08:10 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSF0gQVJNOiBkdHM6IGkuTVgyNzogQWRkIFNlY29uZGFy?=
- =?UTF-8?B?eSBBSEIgUG9ydCBkZWZpbml0aW9ucw==?=
-In-Reply-To: <20130701125819.GJ13206@S2101-09.ap.freescale.net>
-References: <1372487325-14405-1-git-send-email-shc_work@mail.ru>
- <20130701125819.GJ13206@S2101-09.ap.freescale.net>
-Message-ID: <1372687690.31793480@f308.mail.ru>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 1 Jul 2013 10:10:02 -0400
+Subject: [PATCH] WIP: HACK: LPAE, BOOTMEM and NO_BOOTMEM
+In-Reply-To: <CAE9FiQUoVNvWmmTV2+ZkU_nMxFToTHw6QLwp_Z_EjwMzqdLwuA@mail.gmail.com>
+References: <1372467663-31425-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130629152959.GB31339@mtj.dyndns.org>
+ <20130629172123.GA3353@n2100.arm.linux.org.uk>
+ <20130629175743.GA382@mtj.dyndns.org>
+ <CAE9FiQXHuP-n0eZ9wN73V4nSvE+XEExDsx1t50_=YaW+V=LGLg@mail.gmail.com>
+ <20130629195549.GE3353@n2100.arm.linux.org.uk>
+ <CAE9FiQUoVNvWmmTV2+ZkU_nMxFToTHw6QLwp_Z_EjwMzqdLwuA@mail.gmail.com>
+Message-ID: <51D18DBA.6090608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Sat, Jun 29, 2013 at 10:28:45AM +0400, Alexander Shiyan wrote:
-> > Patch adds Secondary AHB Port definitions for i.MX27 SOC and
-> > moves NAND Flash Controller (NFC) under AHB Slave Port 1.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
-> >  arch/arm/boot/dts/imx27.dtsi | 28 ++++++++++++++++++++++------
-> >  1 file changed, 22 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> > index 86b6f5f..7c0179e 100644
-> > --- a/arch/arm/boot/dts/imx27.dtsi
-> > +++ b/arch/arm/boot/dts/imx27.dtsi
-> > @@ -399,14 +399,30 @@
-> >  			};
-> >  		};
-> >  
-> > -		nfc: nand at d8000000 {
-> > +		ahb1: ahb at 80000000 { /* Secondary AHB Slave Port 1 */
+On Saturday 29 June 2013 04:08 PM, Yinghai Lu wrote:
+> On Sat, Jun 29, 2013 at 12:55 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Sat, Jun 29, 2013 at 12:29:55PM -0700, Yinghai Lu wrote:
+>>>>> On these SoCs which Santosh is working on, the main physical memory
+>>>>> mapping is above 4GB, with just a small alias below 4GB to allow the
+>>>>> system to boot without the MMU being on, as they may have more than
+>>>>> 4GB of RAM.  As I understand it, the small alias below 4GB is not
+>>>>> suitable for use as a "lowmem" mapping.
+>>>
+>>> is that 32bit ARM or 64bit ARM?
+>>
+>> Only 32-bit has LPAE.  Such things don't make sense on 64-bit CPUs.
 > 
-> We do not have the top level of AHB bus topology represented in device
-> tree.  Your patch introduces it, partially - all about Secondary AHB
-> Slave but nothing about Primary AHB.
+Thanks Russell for clarifying the issue on the thread. Another major
+reason of not being to use 32 bit alias address space for lowmem
+is that address space isn't coherent on the SOC am dealing with.
+
+> 32bit ARM does not support NO_BOOTMEM yet.
 > 
-> I'm not really fond of the change, since it's not extremely useful to
-> me.  Do you have a real reason for the change?
+> arch/arc/Kconfig:       select NO_BOOTMEM
+> arch/arm64/Kconfig:     select NO_BOOTMEM
+> arch/sparc/Kconfig:     select NO_BOOTMEM
+> arch/x86/Kconfig:config NO_BOOTMEM
+> 
+> 
+> so may need to
+> 1. make 32bit ARM to use NO_BOOTMEM at first.
+> 
+Sorry. I should have mentioned that in the change-log. 
+I have been carrying some WIP patches for ARM. Will post them
+on ARM list after finishing remainder of the testing.
 
-Introducing primary bus will produce a completely different i.MX27 DTS,
-since it contain AIPI1,2 and iram.
-Introduction of buses has no effect, other than the possibility of using labels
-and minimal validation of nodes to the correct address.
-In this case, I define the bus here for the subsequent addition of WEIM,
-for a better understanding of what and where is.
-Of course we can do without it. Think is it unnecessary?
-Thanks.
+> 2 .we can add alloc_memblock as MACRO or inline for bootmem arches,
+> 
+> 3. NO_BOOTMEM arches will have alloc_memblock in nobootmem.c
+> 
+> 4. replace alloc_bootmem calling with alloc_memblock calling in core code.
+> 
+Great that we all agree to see back of nobootmem.c and have a direct
+memblock API. Will be happy to help in conversion to proposed new interfaces
+if I can get the alloc_memblock API and core related changes.
 
----
+Will be good to know who is going to create proposed memblock API
+so that we all can collaborate in conversion.
+
+Regards,
+Santosh 
