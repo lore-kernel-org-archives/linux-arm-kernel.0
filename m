@@ -1,54 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 1 Jul 2013 09:58:35 -0400
-Subject: [PATCH] of: Specify initrd location using 64-bit
-In-Reply-To: <CAMuHMdV6YM3-hASqjxkguEukZjnjK80gBjDNiabxjfQtC=c8ag@mail.gmail.com>
-References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
- <51C4171C.9050908@linutronix.de> <51C48B5A.2040404@ti.com>
- <51CCA67C.2010803@gmail.com>
- <CACxGe6vOH0sCFVVXrYqD3dbYdOvithVu7-d1cvy5885i8x_Myw@mail.gmail.com>
- <20130628134931.GD21034@game.jcrosoft.org> <51CE1F92.3070802@ti.com>
- <51D1345B.8020509@linutronix.de>
- <CAMuHMdV6YM3-hASqjxkguEukZjnjK80gBjDNiabxjfQtC=c8ag@mail.gmail.com>
-Message-ID: <51D18B0B.1060906@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 1 Jul 2013 10:59:20 -0300
+Subject: [PATCH 1/2] ARM: dts: mx53qsb: Enable VPU support
+In-Reply-To: <CAOMZO5Chnn72t12rf6tkrWNSnDreKsh57nagKc5_Vhi0j_mSWw@mail.gmail.com>
+References: <1372459759-10488-1-git-send-email-festevam@gmail.com>
+ <1372683396.4971.35.camel@pizza.hi.pengutronix.de>
+ <CAOMZO5Chnn72t12rf6tkrWNSnDreKsh57nagKc5_Vhi0j_mSWw@mail.gmail.com>
+Message-ID: <CAOMZO5DGcrB-mGMODJFY2fXxNKt9dDPc5i5KUMJ_bwbBFQJMxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 July 2013 03:59 AM, Geert Uytterhoeven wrote:
-> On Mon, Jul 1, 2013 at 9:48 AM, Sebastian Andrzej Siewior
-> <bigeasy@linutronix.de> wrote:
->> On 06/29/2013 01:43 AM, Santosh Shilimkar wrote:
->>> Apart from waste of 32bit, what is the other concern you
->>> have ?
->>
->> You pass a u64 as a physical address which is represented in other
->> parts of the kernel (for a good reason) by phys_addr_t.
->>
->>> I really want to converge on this patch because it
->>> has been a open ended discussion for quite some time. Does
->>> that really break any thing on x86 or your concern is more
->>> from semantics of the physical address.
->> You want to have your code in so you can continue with your work, that
->> is okay. The other two arguments why u64 here is a good thing was "due
->> to what I said earlier" and "+1" and I don't have the time to look
->> that up.
->>
->> There should be no problems on x86 if this goes in as it is now.
->>
->> But think about this: What happens if you boot your ARM device without
->> PAE and your initrd is in the upper region? If you are lucky the kernel
->> looks at a different place where it also has a read permission, notices
->> nothing sane is there, writes a message and continues. And if it is not
->> allowed to read? It is clearly the user's fault for booting a non-PAE
->> kernel.
-> 
-> That's actual the original reason: DT has it as 64 bit, and passes it to a
-> 32 bit kernel when running in 32 bit mode without PAE.
-> 
-Thanks all for comments and useful discussion. I will resubmit the
-patch with update to fix the printk warnings reported by Vineet and
-James post the $subject change.
+Hi Philipp,
 
-Am assuming the patch will go via Grant Likely's tree.
+On Mon, Jul 1, 2013 at 10:46 AM, Fabio Estevam <festevam@gmail.com> wrote:
 
-Regards,
-Santosh
+> Thanks for your C code, Philipp.
+>
+> Now I get:
+>
+> coda 63ff4000.vpu: Initialized CODA7541.
+> coda 63ff4000.vpu: Unsupported firmware version: 13.4.41
+> coda 63ff4000.vpu: codec registered as /dev/video0
+>
+> As input file I am using the vpu_fw_imx53.bin from FSL BSP version 11.09.
+>
+> Where should I get the vpu_fw_imx53.bin file so that I do not get the
+> unsupported warning?
+
+Ok, now I used the mx53 firmware from the latest FSL 4.0.0 BSP and I get:
+
+coda 63ff4000.vpu: Initialized CODA7541.
+coda 63ff4000.vpu: Unsupported firmware version: 1.4.50
+coda 63ff4000.vpu: codec registered as /dev/video0
+
+and it seems that the version warning appears because your patch:
+https://linuxtv.org/patch/19020/ is not applied in the tree linux-next
+tree I am using.
+
+Thanks,
+
+Fabio Estevam
