@@ -1,55 +1,50 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 01 Jul 2013 17:22:35 +0200
-Subject: [PATCH v3 13/13] ARM: dts: Add MIPI PHY node to exynos4.dtsi
-In-Reply-To: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
-References: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1372692155-17653-14-git-send-email-s.nawrocki@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 1 Jul 2013 23:29:56 +0800
+Subject: [v2 4/4] sata: imx: add ahci sata support on imx platforms
+In-Reply-To: <20130701124445.GW516@pengutronix.de>
+References: <1372672975-2997-1-git-send-email-r65037@freescale.com>
+ <1372672975-2997-5-git-send-email-r65037@freescale.com>
+ <20130701124445.GW516@pengutronix.de>
+Message-ID: <20130701152955.GW13206@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PHY provider node for the MIPI CSIS and MIPI DSIM PHYs.
+On Mon, Jul 01, 2013 at 02:44:45PM +0200, Sascha Hauer wrote:
+> On Mon, Jul 01, 2013 at 06:02:55PM +0800, Richard Zhu wrote:
+> > imx6q contains one Synopsys AHCI SATA controller,
+> > But it can't shares ahci_platform driver with other
+> > controllers.
+> > Because there are some misalignments of the bits
+> > definitions of the HBA registers and the Vendor
+> > Specific registers
+> >  - CAP_SSS(bit20) of the HOST_CAP is writable, default
+> >  value is '0', should be configured to be '1'
+> >  - bit0 (only one AHCI SATA port on imx6q) of the
+> >  HOST_PORTS_IMPL should be set to be '1'.(default 0)
+> >  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)
+> >  should be configured regarding to the frequency of AHB
+> >  bus clock.
+> > 
+> > Setup its own ahci sata driver, enable the imx6q ahci
+> > sata support, and update the ahci sata binding document.
+> > 
+> > Signed-off-by: Richard Zhu <r65037@freescale.com>
+> 
+> Wait a minute. We suggested to add a i.MX specific ahci driver to put
+> the i.MX speicific setup in there. Now you really post a separate i.MX
+> driver, but instead of putting the setup in there, it's a nearly
+> identical copy of the generic driver *without* the setup and the setup
+> is still in arch/arm/. That doesn't make sense to me.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/boot/dts/exynos4.dtsi |   10 ++++++++++
- 1 file changed, 10 insertions(+)
++1
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index 752624f..e27eba8 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -49,6 +49,12 @@
- 		reg = <0x10000000 0x100>;
- 	};
- 
-+	mipi_phy: video-phy at 10020710 {
-+		compatible = "samsung,s5pv210-mipi-video-phy";
-+		reg = <0x10020710 8>;
-+		#phy-cells = <1>;
-+	};
-+
- 	pd_mfc: mfc-power-domain at 10023C40 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10023C40 0x20>;
-@@ -157,6 +163,8 @@
- 			clock-names = "csis", "sclk_csis";
- 			bus-width = <4>;
- 			samsung,power-domain = <&pd_cam>;
-+			phys = <&mipi_phy 0>;
-+			phy-names = "csis";
- 			status = "disabled";
- 		};
- 
-@@ -168,6 +176,8 @@
- 			clock-names = "csis", "sclk_csis";
- 			bus-width = <2>;
- 			samsung,power-domain = <&pd_cam>;
-+			phys = <&mipi_phy 2>;
-+			phy-names = "csis";
- 			status = "disabled";
- 		};
- 	};
--- 
-1.7.9.5
+Richard,
+
+You could have confused by me with pointing you to the sata_highbank
+driver.  Sorry.  But Sascha posted his work [1] later in the same
+thread.  That's obviously the way we should go, and I thought you
+knew you should start your v2 based on that.  You missed that?
+
+Shawn
+
+[1] http://thread.gmane.org/gmane.linux.ide/54410/focus=54434
