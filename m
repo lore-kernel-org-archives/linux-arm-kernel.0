@@ -1,42 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Jul 2013 23:33:29 +0800
-Subject: [alsa-devel] [PATCH 1/4] ASoC: sgtl5000: give it a ramping time
- before writting
-In-Reply-To: <CAOMZO5Bh5CZLBO-epVA9Vivo-mqmBJZhy7iA6HiMy+xLzDj40w@mail.gmail.com>
-References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
- <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
- <20130701100710.GB27646@sirena.org.uk>
- <201307011254.18952.marex@denx.de>
- <CAOMZO5BAs5-Tf_O0TVLFAuCchVuukV+bH2MpjqMU83tTw2GD=Q@mail.gmail.com>
- <20130701142610.GR13206@S2101-09.ap.freescale.net>
- <20130701143415.GA14172@S2101-09.ap.freescale.net>
- <CAOMZO5Bh5CZLBO-epVA9Vivo-mqmBJZhy7iA6HiMy+xLzDj40w@mail.gmail.com>
-Message-ID: <20130701153327.GX13206@S2101-09.ap.freescale.net>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 01 Jul 2013 16:34:22 +0100
+Subject: [PATCH] ARM: vexpress_defconfig: Enable voltage regulators
+In-Reply-To: <1370901015-4159-1-git-send-email-christoffer.dall@linaro.org>
+References: <1370901015-4159-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1372692862.3716.57.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 12:11:58PM -0300, Fabio Estevam wrote:
-> On Mon, Jul 1, 2013 at 11:34 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Mon, 2013-06-10 at 14:50 -0700, Christoffer Dall wrote:
+> Enable the Versatile Express voltage regulators by default.
 > 
-> > And also why we do not see the impact of i2c issue on sgtl5000 before
-> > the offending commit af8ee11 (ASoC: sgtl5000: Fix driver probe after
-> > reset)?
+> This should work on all verstatile express platforms and not enabling it
+> prevents a defconfig'ed kernel from using the SD card controller on the
+> qemu emulated platform, which is unfortunate for first-time casual
+> users.
 > 
-> Probably because the mxs i2c was working before this commit.
+> Cc: Peter Maydell <peter.maydell@linaro.org>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/configs/vexpress_defconfig |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
+> index f2de51f..17104d9 100644
+> --- a/arch/arm/configs/vexpress_defconfig
+> +++ b/arch/arm/configs/vexpress_defconfig
+> @@ -138,3 +138,6 @@ CONFIG_DEBUG_LL=y
+>  CONFIG_EARLY_PRINTK=y
+>  # CONFIG_CRYPTO_ANSI_CPRNG is not set
+>  # CONFIG_CRYPTO_HW is not set
+> +CONFIG_REGULATOR=y
+> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
+> +CONFIG_REGULATOR_VEXPRESS=y
 
-Do you have a commit id at which mxs i2c is known good?  I would like to
-find out it's a mxs i2c issue or sgtl5000 problem.
+>From my testing, only the CONFIG_REGULATOR=y is required to get MMC
+working on real hardware with Linux 3.10. Is CONFIG_REGULATOR_VEXPRESS
+actually required to get QEMU working properly?
 
-> 
-> Commit af8ee11 does fix the reset probe on mx51/mx53/mx6.
-> 
-> It's only on mx28 that we have this issue.
-> 
-> Also, please see this patch from Alexandre Belloni:
-> https://lkml.org/lkml/2013/6/24/430
-> 
-> He can only connect the ADC chip if he uses I2C bitbang mode on mx28.
+We definitely don't need CONFIG_REGULATOR_FIXED_VOLTAGE because config
+ARCH_VEXPRESS has "select REGULATOR_FIXED_VOLTAGE if REGULATOR".
 
-Does I2C bitbang mode help fix the sgtl5000 issue here?
-
-Shawn
+-- 
+Tixy
