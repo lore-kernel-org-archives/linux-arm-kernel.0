@@ -1,81 +1,163 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Jul 2013 01:17:53 +0100
-Subject: [PATCH RFC 1/3] DRM: Armada: Add Armada DRM driver
-In-Reply-To: <CAPM=9tydcpP2-A6fnnHB873Nekj4HnxjraZ3TtRG3UF-Bqa6OQ@mail.gmail.com>
-References: <20130629225210.GF3353@n2100.arm.linux.org.uk>
- <E1Ut41C-0000wl-Ff@rmk-PC.arm.linux.org.uk>
- <20130630115941.GG18285@phenom.ffwll.local>
- <20130630125238.GH3353@n2100.arm.linux.org.uk>
- <CAPM=9tydcpP2-A6fnnHB873Nekj4HnxjraZ3TtRG3UF-Bqa6OQ@mail.gmail.com>
-Message-ID: <20130701001752.GL3353@n2100.arm.linux.org.uk>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 01 Jul 2013 09:35:15 +0900
+Subject: [PATCH 3/3] video: exynos_dp: Use the generic PHY driver
+In-Reply-To: <51CD56FE.4020302@ti.com>
+References: <001701ce73bf$bebf9f20$3c3edd60$@samsung.com>
+ <51CD25F2.5010206@ti.com> <001c01ce73c5$552e1cc0$ff8a5640$@samsung.com>
+ <51CD56FE.4020302@ti.com>
+Message-ID: <000001ce75f2$db156170$91402450$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 10:01:30AM +1000, Dave Airlie wrote:
-> OMG I'm working in a subsystem where stuff is being developed, with only
-> a few resources! I know my full time job isn't maintaining a 500,000
-> line subsystem,
-> and the sub maintainers and developers do a great job refactoring
-> where required.
+On Friday, June 28, 2013 6:27 PM, Kishon Vijay Abraham I wrote:
 > 
-> lots of other driver authors have made substantial changes to the drm core as
-> they've written drivers, you spot one bit of refactoring and its a
-> major shortcoming
-> of the entire subsystem and development community.
+> Hi,
 > 
-> how about instead of writing:
-> "However, at least I've taken the time to _think_ about what I'm doing
-> and realise that there _is_ scope here for the DRM core to improve,
-> rather than burying this stuff deep inside my driver like everyone else
-> has.  That's no reason to penalise patches from the "good guys" who think"
+> On Friday 28 June 2013 11:34 AM, Jingoo Han wrote:
+> > On Friday, June 28, 2013 2:58 PM, Kishon Vijay Abraham I wrote:
+> >>
+> >> Hi,
+> >>
+> >> On Friday 28 June 2013 10:54 AM, Jingoo Han wrote:
+> >>> Use the generic PHY API instead of the platform callback to control
+> >>> the DP PHY. The 'phy_label' field is added to the platform data
+> >>> structure to allow PHY lookup on non-dt platforms.
+> >>>
+> >>> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> >>> ---
+> >>>    .../devicetree/bindings/video/exynos_dp.txt        |   17 ---
+> >>>    drivers/video/exynos/exynos_dp_core.c              |  118 ++------------------
+> >>>    drivers/video/exynos/exynos_dp_core.h              |    2 +
+> >>>    include/video/exynos_dp.h                          |    6 +-
+> >>>    4 files changed, 15 insertions(+), 128 deletions(-)
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt
+> >> b/Documentation/devicetree/bindings/video/exynos_dp.txt
+> >>> index 84f10c1..a8320e3 100644
+> >>> --- a/Documentation/devicetree/bindings/video/exynos_dp.txt
+> >>> +++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
+> >>> @@ -1,17 +1,6 @@
+> >>>    The Exynos display port interface should be configured based on
+> >>>    the type of panel connected to it.
+> >>>
+> >>> -We use two nodes:
+> >>> -	-dp-controller node
+> >>> -	-dptx-phy node(defined inside dp-controller node)
+> >>> -
+> >>> -For the DP-PHY initialization, we use the dptx-phy node.
+> >>> -Required properties for dptx-phy:
+> >>> -	-reg:
+> >>> -		Base address of DP PHY register.
+> >>> -	-samsung,enable-mask:
+> >>> -		The bit-mask used to enable/disable DP PHY.
+> >>> -
+> >>>    For the Panel initialization, we read data from dp-controller node.
+> >>>    Required properties for dp-controller:
+> >>>    	-compatible:
+> >>> @@ -67,12 +56,6 @@ SOC specific portion:
+> >>>    		interrupt-parent = <&combiner>;
+> >>>    		clocks = <&clock 342>;
+> >>>    		clock-names = "dp";
+> >>> -
+> >>> -		dptx-phy {
+> >>> -			reg = <0x10040720>;
+> >>> -			samsung,enable-mask = <1>;
+> >>> -		};
+> >>> -
+> >>>    	};
+> >>>
+> >>>    Board Specific portion:
+> >>> diff --git a/drivers/video/exynos/exynos_dp_core.c b/drivers/video/exynos/exynos_dp_core.c
+> >>> index 12bbede..bac515b 100644
+> >>> --- a/drivers/video/exynos/exynos_dp_core.c
+> >>> +++ b/drivers/video/exynos/exynos_dp_core.c
+> >>> @@ -19,6 +19,7 @@
+> >>>    #include <linux/interrupt.h>
+> >>>    #include <linux/delay.h>
+> >>>    #include <linux/of.h>
+> >>> +#include <linux/phy/phy.h>
+> >>>
+> >>>    #include <video/exynos_dp.h>
+> >>>
+> >>> @@ -960,84 +961,15 @@ static struct exynos_dp_platdata *exynos_dp_dt_parse_pdata(struct device
+> *dev)
+> >>>    		return ERR_PTR(-EINVAL);
+> >>>    	}
+> >>>
+> >>> -	return pd;
+> >>> -}
+> >>> -
+> >>> -static int exynos_dp_dt_parse_phydata(struct exynos_dp_device *dp)
+> >>> -{
+> >>> -	struct device_node *dp_phy_node = of_node_get(dp->dev->of_node);
+> >>> -	u32 phy_base;
+> >>> -	int ret = 0;
+> >>> -
+> >>> -	dp_phy_node = of_find_node_by_name(dp_phy_node, "dptx-phy");
+> >>> -	if (!dp_phy_node) {
+> >>> -		dev_err(dp->dev, "could not find dptx-phy node\n");
+> >>> -		return -ENODEV;
+> >>> -	}
+> >>> -
+> >>> -	if (of_property_read_u32(dp_phy_node, "reg", &phy_base)) {
+> >>> -		dev_err(dp->dev, "failed to get reg for dptx-phy\n");
+> >>> -		ret = -EINVAL;
+> >>> -		goto err;
+> >>> -	}
+> >>> -
+> >>> -	if (of_property_read_u32(dp_phy_node, "samsung,enable-mask",
+> >>> -				&dp->enable_mask)) {
+> >>> -		dev_err(dp->dev, "failed to get enable-mask for dptx-phy\n");
+> >>> -		ret = -EINVAL;
+> >>> -		goto err;
+> >>> -	}
+> >>> -
+> >>> -	dp->phy_addr = ioremap(phy_base, SZ_4);
+> >>> -	if (!dp->phy_addr) {
+> >>> -		dev_err(dp->dev, "failed to ioremap dp-phy\n");
+> >>> -		ret = -ENOMEM;
+> >>> -		goto err;
+> >>> -	}
+> >>> -
+> >>> -err:
+> >>> -	of_node_put(dp_phy_node);
+> >>> -
+> >>> -	return ret;
+> >>> -}
+> >>> -
+> >>> -static void exynos_dp_phy_init(struct exynos_dp_device *dp)
+> >>> -{
+> >>> -	u32 reg;
+> >>> -
+> >>> -	reg = __raw_readl(dp->phy_addr);
+> >>> -	reg |= dp->enable_mask;
+> >>> -	__raw_writel(reg, dp->phy_addr);
+> >>> -}
+> >>> -
+> >>> -static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
+> >>> -{
+> >>> -	u32 reg;
+> >>> +	pd->phy_label = "dp";
+> >>
+> >> In the case of non-dt boot, this phy_label should have ideally come from
+> >> platform code.
+> >
+> > No, this is NOT the case of non-dt.
+> >
+> > 'pd->phy_label = "dp";' is included in exynos_dp_dt_parse_pdata(),
+> > not exynos_dp_phy_exit().
+> > Also, exynos_dp_dt_parse_pdata() is called in the case of dt.
 > 
-> you go with
-> "I noticed this piece of functionality could be refactored, here is a
-> patch adding them to
-> the core, does anyone think its a good idea?"
+> ah.. right. Do you support non-dt boot. I dont see any modifications in
+> the platform code?
+
+Platform code for non-DT has not been added; thus, there is no modification
+in the platform code.
+
+
+Best regards,
+Jingoo Han
+
 > 
-> As Daniel pointed out every driver submitted has refactored things,
-> even exynos did a
-> lot of work to be the first ARM driver we shipped, the DRM core
-> doesn't write itself and
-> I fully expect driver authors to be the ones that tell me what needs
-> refactoring, since
-> they are on the pointy end, but to state that you are the only person
-> ever to think about
-> things is frankly being a dick.
-> 
-> Lets try for less dick, and more productive in future.
-
-And you can stick your dick back where you got it from David.  Really,
-your response is totally uncalled for.
-
-Let's try realising that I only have very limited time to put into this
-and unlike the other submitters who have been _paid_ to get their code
-sorted, this is being done purely for free - which means it's really
-low priority.  As you should already realise because I've stated already
-that I *really* don't care whether it gets into mainline or not.
-
-I am *NOT* planning on spending any time on this during the next week
-as I have *paid* work to do, and probably not next weekend nor the
-following week either.  So the next time that I'm likely to do anything
-on this is in a fortnight or longer.
-
-If you want stuff to be refactored in DRM, you need to find someone
-with more time to do it.
-
-And before you continue making a mountain out of a molehill, as you
-seem to like doing, the "let's make it a core thing" is REALLY BLOODY
-SIMPLE.  All it takes is for the header file to go into include/drm.
-It's now available to anyone who wants to use that - and all that's
-left is to sort out all those drivers *WHICH I CANT TEST* to use
-that stuff.
-
-And, frankly, when I was going to post this latest RFC, I gave serious
-consideration to quite simply not posting it to dri-devel and copying
-you or any other person listed as a maintainer for DRM, and only posting
-it to the people interested in it on the ARM side, because I'd already
-given up hope of it ever being merged into mainline.
-
-Your totally over the top and rediculous response just confirms that.
-
-Further postings will now omit you and dri-devel.
+> Thanks
+> Kishon
