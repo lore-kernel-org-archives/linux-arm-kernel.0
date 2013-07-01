@@ -1,39 +1,39 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 01 Jul 2013 19:29:50 +0200
-Subject: [PATCH] DMA: Fix Marvell Orion and mv_xor after MEMSET removal
-In-Reply-To: <6583540.4QCOENPlIG@amdc1032>
-References: <1372690589-2218-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <51D19CD1.3030900@gmail.com> <20130701151720.GC19937@titan.lakedaemon.net>
- <6583540.4QCOENPlIG@amdc1032>
-Message-ID: <51D1BC8E.6000204@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 1 Jul 2013 19:43:27 +0200
+Subject: [alsa-devel] [PATCH 1/4] ASoC: sgtl5000: give it a ramping time
+ before writting
+In-Reply-To: <CAOMZO5B5jh1XciO4K1u3yBcHHDAgi8hA3GcywnJd11M7=aOPxA@mail.gmail.com>
+References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
+ <20130701153327.GX13206@S2101-09.ap.freescale.net>
+ <CAOMZO5B5jh1XciO4K1u3yBcHHDAgi8hA3GcywnJd11M7=aOPxA@mail.gmail.com>
+Message-ID: <201307011943.27489.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/13 19:24, Bartlomiej Zolnierkiewicz wrote:
-> On Monday, July 01, 2013 11:17:20 AM Jason Cooper wrote:
->> On Mon, Jul 01, 2013 at 05:14:25PM +0200, Sebastian Hesselbarth wrote:
->>> On 07/01/13 17:04, Jason Cooper wrote:
->>>> On Mon, Jul 01, 2013 at 04:56:29PM +0200, Sebastian Hesselbarth wrote:
->>> Also, I will sent a follow-up patch to remove memset references from
->>> Marvell SoC dts/dtsi and the binding documentation soon.
->>>
->>> I guess, Bartolomiej should pick them up and resend his patch set, or
->>> leave Marvell alone and you pick them up.
->>
->> If Bartolomiej doesn't take it, please split your changes into two
->> patches, one for plat-orion, and one for drivers.
->
-> Andrew has already applied incremental patch fixing build problems to his
-> tree (though it is not yet in linux-next):
->
-> 	http://www.ozlabs.org/~akpm/mmots/broken-out/drivers-dma-remove-unused-support-for-memset-operations-v3.patch
->
-> The rest of changes from Sebastian are contained in another incremental
-> patch which I've attached to this mail. They can be also folded into
-> the first patch (which is what Andrew will probably do before sending them
-> to Linus).
+Dear Fabio Estevam,
 
-Ok, great! Then I will sent the DT clean-up patches to be taken through
-Jason's tree with the other stuff I have for v3.11-rc1.
+> On Mon, Jul 1, 2013 at 12:33 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > On Mon, Jul 01, 2013 at 12:11:58PM -0300, Fabio Estevam wrote:
+> >> On Mon, Jul 1, 2013 at 11:34 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> >> > And also why we do not see the impact of i2c issue on sgtl5000 before
+> >> > the offending commit af8ee11 (ASoC: sgtl5000: Fix driver probe after
+> >> > reset)?
+> >> 
+> >> Probably because the mxs i2c was working before this commit.
+> > 
+> > Do you have a commit id at which mxs i2c is known good?  I would like to
+> > find out it's a mxs i2c issue or sgtl5000 problem.
+> 
+> I don't have it, but I am adding Alexandre in case he knows.
+> 
+> Alexandre,
+> 
+> Do you happen to know a commit id which does not show the mxs i2c
+> timeouts you have been observing?
 
-Sebastian
+I think you can just disable the PIO mode altogether (around line 500 ... if 
+(msg->len < 8) ... replace this with if (0) ) and then the problem should not be 
+there (if it's a PIO problem).
+
+Best regards,
+Marek Vasut
