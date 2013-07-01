@@ -1,43 +1,40 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 1 Jul 2013 10:32:59 +0200
-Subject: [PATCH 19/23] iommu/tegra: smmu: Unfied driver for Tegra SoCs
-In-Reply-To: <20130626110747.GP27083@manwe>
-References: <1372238906-9346-20-git-send-email-hdoyu@nvidia.com><20130626110747.GP27083@manwe>
-Message-ID: <20130701.113259.1041478084393668638.hdoyu@nvidia.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 1 Jul 2013 11:33:52 +0300
+Subject: [RFC PATCH 4/6] USB: ehci-omap: Suspend the controller during
+ bus suspend
+In-Reply-To: <Pine.LNX.4.44L0.1306281507020.1047-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1306281507020.1047-100000@iolanthe.rowland.org>
+Message-ID: <51D13EF0.6030702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 26 Jun 2013 13:07:47 +0200:
+On 06/28/2013 10:18 PM, Alan Stern wrote:
+> On Fri, 28 Jun 2013, Roger Quadros wrote:
+> 
+>> Just found the problem. It seems that enabling the ehci_irq _after_ the root hub is resumed
+>> is the root cause of the problem. Doing so will miss events from the root hub.
+> 
+> This sounds like a bug in the IRQ setup.  It's the sort of thing you 
+> see when a level-triggered IRQ is treated as though it were 
+> edge-triggered.
+> 
+> In any case, the wakeup should have worked whether the IRQ was issued 
+> or not.
+> 
+OK.
+> 
+> I appreciate the symmetry of putting the enable_irq call in ehci-hcd, 
+> seeing as how the disable_irq is there too.  On the other hand, every 
+> HCD using this mechanism is going to have to do the same thing, which 
+> argues for putting the enable call in the core.  Perhaps at the start 
 
-> * PGP Signed by an unknown key
-> 
-> On Wed, Jun 26, 2013 at 12:28:22PM +0300, Hiroshi Doyu wrote:
-> > Support multiple generation of Tegra SoCs with this unified
-> > SMMU driver. Necessary info is expected to be passed from DT.
-> > 
-> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> > ---
-> >  drivers/iommu/tegra-smmu.c | 80 ++--------------------------------------------
-> >  1 file changed, 3 insertions(+), 77 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-> > index 6e82df3..ae71721 100644
-> > --- a/drivers/iommu/tegra-smmu.c
-> > +++ b/drivers/iommu/tegra-smmu.c
-> > @@ -1,5 +1,5 @@
-> >  /*
-> > - * IOMMU API for SMMU in Tegra30
-> > + * IOMMU API for SMMU in Tegra SoC
-> 
-> Maybe "Tegra30 and later SoCs" given that Tegra20 has no compatible
-> IOMMU?
-> 
-> > -MODULE_DESCRIPTION("IOMMU API for SMMU in Tegra30");
-> > +MODULE_DESCRIPTION("IOMMU API for SMMU in Tegra SoC");
-> 
-> Same here.
+OK.
 
-Currently most of Tegra SoC has SMMU, and which doesn't have can be
-identified from DT. IMHO, we don't have to be so strict on this
-decritpions. Otherwise, we would need to list up which one (doesn't)
-has whenever a new one comes?
+> of hcd_resume_work() instead of the end.
+> 
+
+We can't enable_irq at the start as the controller will only be resumed
+after usb_remote_wakeup().
+
+cheers,
+-roger
