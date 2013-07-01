@@ -1,48 +1,67 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 1 Jul 2013 23:46:33 +0300
-Subject: [RFC] wlcore: sdio: add wilink clock providers
-In-Reply-To: <1372707250-11998-1-git-send-email-coelho@ti.com>
-References: <1372707250-11998-1-git-send-email-coelho@ti.com>
-Message-ID: <20130701204633.GB805@arwen.pp.htv.fi>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 1 Jul 2013 16:50:58 -0400 (EDT)
+Subject: [PATCH] USB: OHCI: make ohci-nxp a separate driver
+In-Reply-To: <1372585818-8441-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1307011649190.1547-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, 30 Jun 2013, Manjunath Goudar wrote:
 
-On Mon, Jul 01, 2013 at 10:34:10PM +0300, Luciano Coelho wrote:
-> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> index 670c3ce..7f061b8 100644
-> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> @@ -65,11 +65,19 @@
->  		enable-active-high;
->  	};
+> Separate the OHCI NXP host controller driver from ohci-hcd
+> host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM.
+> 
+> Many place function name and struct name started with usb,
+> current scenario replaced usb with ohci for proper naming.
+
+> diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+> index f3dcaa2..9a0b023 100644
+> --- a/drivers/usb/host/ohci-hcd.c
+> +++ b/drivers/usb/host/ohci-hcd.c
+> @@ -1194,11 +1194,6 @@ MODULE_LICENSE ("GPL");
+>  #define EP93XX_PLATFORM_DRIVER	ohci_hcd_ep93xx_driver
+>  #endif
 >  
-> +
->  	wlan {
-> -	     compatible = "ti,wilink6";
-> -	     interrupt-parent = <&gpio2>;
-> -	     interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
-> -	     refclock = <2>;		/* 38.4 MHz */
-> +		compatible = "ti,wilink6";
-> +		interrupt-parent = <&gpio2>;
-> +		interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
-> +		clocks = <&refclock>;
-> +		clock-names = "refclock";
+> -#ifdef CONFIG_ARCH_LPC32XX
+> -#include "ohci-nxp.c"
+> -#define NXP_PLATFORM_DRIVER	usb_hcd_nxp_driver
+> -#endif
+> -
+>  #ifdef CONFIG_ARCH_DAVINCI_DA8XX
+>  #include "ohci-da8xx.c"
+>  #define DAVINCI_PLATFORM_DRIVER	ohci_hcd_da8xx_driver
+> @@ -1301,12 +1296,6 @@ static int __init ohci_hcd_mod_init(void)
+>  		goto error_ep93xx;
+>  #endif
+>  
+> -#ifdef NXP_PLATFORM_DRIVER
+> -	retval = platform_driver_register(&NXP_PLATFORM_DRIVER);
+> -	if (retval < 0)
+> -		goto error_nxp;
+> -#endif
+> -
+>  #ifdef DAVINCI_PLATFORM_DRIVER
+>  	retval = platform_driver_register(&DAVINCI_PLATFORM_DRIVER);
+>  	if (retval < 0)
+> @@ -1320,10 +1309,6 @@ static int __init ohci_hcd_mod_init(void)
+>  	platform_driver_unregister(&DAVINCI_PLATFORM_DRIVER);
+>   error_davinci:
+>  #endif
+> -#ifdef NXP_PLATFORM_DRIVER
+> -	platform_driver_unregister(&NXP_PLATFORM_DRIVER);
+> - error_nxp:
+> -#endif
+>  #ifdef EP93XX_PLATFORM_DRIVER
+>  	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
+>   error_ep93xx:
 
-hmmm, shouldn't you provide both clocks (refclock and tcx0clock)
-explicitly here ?
+You forgot to remove
 
-Also, you should probably make it clear that the WiLink module is fed by
-the 32K sync clock just to make sure clock usecounts are correctly
-incremented ?
+#ifdef NXP_PLATFORM_DRIVER
+	platform_driver_unregister(&NXP_PLATFORM_DRIVER);
+#endif
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130701/09e9beae/attachment.sig>
+from ohci_hcd_mod_exit().  The rest is okay.
+
+Alan Stern
