@@ -1,43 +1,108 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 01 Jul 2013 11:51:01 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAzLzRdIFBDSTogQWRkIGRyaXZlciBmb3IgaS5NWDYgUENJ?=
- =?UTF-8?B?IEV4cHJlc3M=?=
-In-Reply-To: <1372662947-27160-4-git-send-email-xobs@kosagi.com>
-References: <1372662947-27160-1-git-send-email-xobs@kosagi.com>
- <1372662947-27160-4-git-send-email-xobs@kosagi.com>
-Message-ID: <1372665061.36667486@f35.mail.ru>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 1 Jul 2013 16:52:09 +0900
+Subject: [PATCH 03/04] ARM: shmobile: Use default ->init_irq() on r8a7790
+In-Reply-To: <20130701060131.21728.85765.sendpatchset@w520>
+References: <20130701060103.21728.83833.sendpatchset@w520>
+ <20130701060131.21728.85765.sendpatchset@w520>
+Message-ID: <20130701075208.GW14567@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This adds a PCI Express port driver for the on-chip PCI Express port
-> present on the i.MX6 SoC.  It is based on the PCI Express driver available
-> in the Freescale BSP.
+On Mon, Jul 01, 2013 at 03:01:31PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
 > 
-> Signed-off-by: Sean Cross <xobs@kosagi.com>
-...
-> +++ b/Documentation/devicetree/bindings/pci/imx6q-pcie.txt
-> @@ -0,0 +1,20 @@
-> +* Freescale i.MX6Q PCI Express bridge
-> +
-> +Example (i.MX6Q)
-> +	pcie: pcie at 01ffc000 {
-> +		compatible = "fsl,imx6q-pcie";
-> +		reg = <0x01ffc000 0x4000>,
-> +		      <0x01000000 0x100000>,
-> +		      <0x01100000 0xe00000>,
-> +		      <0x01f00000 0xfc000>;
-> +		interrupts = <0 122 0x04>;
-> +		clocks = <&clks 186>, <&clks 189>, <&clks 196>,
-> +			 <&clks 198>, <&clks 144>;
-> +		clock-names = "sata_ref", "pcie_ref_125m", "lvds1_sel",
-> +			      "lvds1", "pcie_axi";
-> +		power-enable = <&gpio7 12 0>;
-> +		pcie-reset = <&gpio3 29 0>;
+> Remove redundant irqchip_init() callback. The default case
+> of NULL will result in invoking irqchip_init() anyway.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  arch/arm/mach-shmobile/board-lager.c   |    2 --
+>  arch/arm/mach-shmobile/setup-r8a7790.c |    2 --
+>  2 files changed, 4 deletions(-)
+> 
+> --- 0001/arch/arm/mach-shmobile/board-lager.c
+> +++ work/arch/arm/mach-shmobile/board-lager.c	2013-07-01 13:27:30.000000000 +0900
+> @@ -22,7 +22,6 @@
+>  #include <linux/gpio_keys.h>
+>  #include <linux/input.h>
+>  #include <linux/interrupt.h>
+> -#include <linux/irqchip.h>
+>  #include <linux/kernel.h>
+>  #include <linux/leds.h>
+>  #include <linux/pinctrl/machine.h>
+> @@ -104,7 +103,6 @@ static const char *lager_boards_compat_d
+>  
+>  DT_MACHINE_START(LAGER_DT, "lager")
+>  	.init_early	= r8a7790_init_delay,
+> -	.init_irq	= irqchip_init,
+>  	.init_time	= r8a7790_timer_init,
+>  	.init_machine	= lager_add_standard_devices,
+>  	.dt_compat	= lager_boards_compat_dt,
+> --- 0008/arch/arm/mach-shmobile/setup-r8a7790.c
+> +++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-07-01 13:27:52.000000000 +0900
+> @@ -19,7 +19,6 @@
+>   */
+>  
+>  #include <linux/irq.h>
+> -#include <linux/irqchip.h>
+>  #include <linux/kernel.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/platform_data/gpio-rcar.h>
+> @@ -225,7 +224,6 @@ static const char *r8a7790_boards_compat
+>  
+>  DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
+>  	.init_early	= r8a7790_init_delay,
+> -	.init_irq	= irqchip_init,
+>  	.init_time	= r8a7790_timer_init,
+>  	.dt_compat	= r8a7790_boards_compat_dt,
+>  MACHINE_END
 
-Can this be replaced with regulator/reset API?
+Hi Magnus,
 
-> +		wake-up = <&gpio3 22 0>;
-> +		disable-endpoint = <&gpio2 16 0>;
-> +	};
+as per my remark about the emev2, I accidently dropped a patch
+from Maxime Ripard which corresponds to the setup-r8a7790.c portion of
+your above patch. Accordingly I have re-queued up Maxime's patch for v3.12
+and applied the board-lager.c portion of your patch as follows.
+I have altered the title, partially so it uses the same scheme
+used by Maxime's patches and partially to reflect that it
+now only covers the lager board.
 
----
+The result will be in the cleanup branch the next time that I push my tree,
+most likely later this afternoon.
+
+commit 4a94ed71a7b3e17c46a23b89039cfa113fbfaa43
+Author: Magnus Damm <damm@opensource.se>
+Date:   Mon Jul 1 15:01:31 2013 +0900
+
+    ARM: shmobile: lager: Remove init_irq declaration in machine description
+    
+    Remove redundant irqchip_init() callback. The default case
+    of NULL will result in invoking irqchip_init() anyway.
+    
+    Signed-off-by: Magnus Damm <damm@opensource.se>
+    [ horms+renesas at verge.net.au: Trimmed patch to remove portion
+      that updates the r8a7790 SoC and altered the subject to
+      use the same format as the patch that updates the r8a7790. ]
+    Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index d73e21d..1e99b17 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -22,7 +22,6 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/interrupt.h>
+-#include <linux/irqchip.h>
+ #include <linux/kernel.h>
+ #include <linux/leds.h>
+ #include <linux/pinctrl/machine.h>
+@@ -103,7 +102,6 @@ static const char *lager_boards_compat_dt[] __initdata = {
+ };
+ 
+ DT_MACHINE_START(LAGER_DT, "lager")
+-	.init_irq	= irqchip_init,
+ 	.init_time	= r8a7790_timer_init,
+ 	.init_machine	= lager_add_standard_devices,
+ 	.dt_compat	= lager_boards_compat_dt,
