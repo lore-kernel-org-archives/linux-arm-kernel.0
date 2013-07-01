@@ -1,40 +1,57 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 1 Jul 2013 12:54:18 +0200
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 1 Jul 2013 12:57:44 +0200
 Subject: [PATCH 1/4] ASoC: sgtl5000: give it a ramping time before writting
-In-Reply-To: <20130701100710.GB27646@sirena.org.uk>
+In-Reply-To: <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
 References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
  <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
- <20130701100710.GB27646@sirena.org.uk>
-Message-ID: <201307011254.18952.marex@denx.de>
+Message-ID: <20945.24744.908437.551717@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark Brown,
-
-> On Mon, Jul 01, 2013 at 04:16:08PM +0800, Shawn Guo wrote:
-> > +	/*
-> > +	 * It seems that sgtl5000 takes a longer time to get the registers
-> > +	 * ready for write than bread.  Let's give it a ramping time before
-> > +	 * the first write goes.
-> > +	 */
-> > +	msleep(50);
-> > +
-> > 
-> >  	/* Ensure sgtl5000 will start with sane register values */
-> >  	ret = sgtl5000_fill_defaults(sgtl5000);
-> >  	if (ret)
+Shawn Guo writes:
+> Since commit af8ee11 (ASoC: sgtl5000: Fix driver probe after reset),
+> it's very ofen to run into the following probe error on imx28. It is
+> caused by the regmap_write() failure in sgtl5000_fill_defaults().
+> However, the regmap_read() before this has already been working.  It
+> seems that sgtl5000 takes a longer ramping time to get the registers
+> ready for write than read.
 > 
-> This seems like a really odd place to add the sleep - I'd have expected
-> this to be a part of or just after the reset operation.  It's a *really*
-> long sleep too, though if that's what you need that's what you need.
+> [    1.991579] sgtl5000 0-000a: sgtl5000 revision 0x11
+> [    2.021655] mxs-sgtl5000 sound.12: ASoC: CODEC (null) not registered
+> [    2.039087] mxs-sgtl5000 sound.12: snd_soc_register_card failed (-517)
+> [    2.046299] platform sound.12: Driver mxs-sgtl5000 requests probe deferral
+> 
+> Fix the regression by giving it a ramping time before the first write.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  sound/soc/codecs/sgtl5000.c |    7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
+> index d441559..20bca03 100644
+> --- a/sound/soc/codecs/sgtl5000.c
+> +++ b/sound/soc/codecs/sgtl5000.c
+> @@ -1552,6 +1552,13 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
+>  
+>  	i2c_set_clientdata(client, sgtl5000);
+>  
+> +	/*
+> +	 * It seems that sgtl5000 takes a longer time to get the registers
+> +	 * ready for write than bread.  Let's give it a ramping time before
+                                ^^^^^
+>
+What sort of bread? ;-)
 
-The delay might also be caused by the I2C driver, I have this in my ToDo to 
-check, but I didn't get to it yet. On the other hand, if subsequent IO does 
-work, then it's unlikely to be the case.
 
-> Also "bread" :)
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Of course, sometimes you want to put a lot of things on it, like bacon and such.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-Best regards,
-Marek Vasut
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
