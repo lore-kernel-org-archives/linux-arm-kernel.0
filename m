@@ -1,223 +1,166 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Mon, 01 Jul 2013 21:48:00 +0200
-Subject: [PATCH V3 2/3] phy: Add driver for Exynos DP PHY
-In-Reply-To: <005301ce761b$32adf960$9809ec20$@samsung.com>
-References: <005301ce761b$32adf960$9809ec20$@samsung.com>
-Message-ID: <51D1DCF0.50803@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 1 Jul 2013 19:48:50 +0000 (UTC)
+Subject: OMAP baseline test results for v3.10-rc7
+Message-ID: <alpine.DEB.2.02.1307011946180.4358@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2013 07:24 AM, Jingoo Han wrote:
-> Add a PHY provider driver for the Samsung Exynos SoC DP PHY.
->
-> Signed-off-by: Jingoo Han<jg1.han@samsung.com>
-> Cc: Sylwester Nawrocki<s.nawrocki@samsung.com>
-> Acked-by: Felipe Balbi<balbi@ti.com>
-> ---
->   .../devicetree/bindings/phy/samsung-phy.txt        |    8 ++
->   drivers/phy/Kconfig                                |    5 +
->   drivers/phy/Makefile                               |    1 +
->   drivers/phy/phy-exynos-dp-video.c                  |  118 ++++++++++++++++++++
->   4 files changed, 132 insertions(+)
->   create mode 100644 drivers/phy/phy-exynos-dp-video.c
->
-> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> index 5ff208c..3fb656a 100644
-> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> @@ -12,3 +12,11 @@ the PHY specifier identifies the PHY and its meaning is as follows:
->     1 - MIPI DSIM 0,
->     2 - MIPI CSIS 1,
->     3 - MIPI DSIM 1.
-> +
-> +Samsung EXYNOS SoC series DP PHY
 
-I would make it "Samsung EXYNOS SoC series Display Port PHY"
+Here are some basic OMAP test results for Linux v3.10-rc7.
+Logs and other details at:
 
-> +-------------------------------------------------
-> +
-> +Required properties:
-> +- compatible : should be "samsung,exynos5250-dp-video-phy";
-> +- reg : offset and length of the DP PHY register set;
-> +- #phy-cells : from the generic phy bindings, must be 0;
+    http://www.pwsan.com/omap/testlogs/test_v3.10-rc7/20130630191558/
 
-s/phy/PHY ?
+Special thanks to Lokesh Vutla, Vaibhav Hiremath, Kevin Hilman, and 
+Rajendra Nayak for helping unravel the Beaglebone-White test problems.
 
-> \ No newline at end of file
 
-Missing new line character.
+Test summary
+------------
 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 6f446d0..760f55a 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -19,4 +19,9 @@ config PHY_EXYNOS_MIPI_VIDEO
->   	help
->   	  Support for MIPI CSI-2 and MIPI DSI DPHY found on Samsung
->   	  S5P and EXYNOS SoCs.
-> +
-> +config PHY_EXYNOS_DP_VIDEO
-> +	tristate "EXYNOS SoC series DP PHY driver"
+Build: uImage:
+    Pass (16/16): am33xx_only, n800_multi_omap2xxx, n800_only_a,
+                  omap1_defconfig, omap1_defconfig_1510innovator_only, 
+                  omap1_defconfig_5912osk_only, omap2plus_defconfig, 
+                  omap2plus_defconfig_2430sdp_only
+                  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm, 
+                  omap2plus_defconfig_omap2_4_only, 
+                  omap2plus_defconfig_omap3_4_only, 
+                  rmk_omap3430_ldp_allnoconfig, 
+                  rmk_omap3430_ldp_oldconfig, 
+                  rmk_omap4430_sdp_allnoconfig, 
+                  rmk_omap4430_sdp_oldconfig
 
-"EXYNOS SoC series Display Port PHY driver" ?
+Build: zImage:
+    Pass ( 1/ 1): omap2plus_defconfig
 
-> +	help
-> +	  Support for DP PHY found on Samsung EXYNOS SoCs.
+Boot to userspace:
+    FAIL ( 2/12): 37xxevm, am335xbonelt
+    Pass (10/12): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
+                  3730beaglexm, 4430es2panda, 4460pandaes, 5912osk,
+                  am335xbone, cmt3517
 
-s/DP/Display Port ?
+PM: chip retention via suspend:
+    FAIL ( 3/ 6): 2430sdp, 37xxevm, 4430es2panda
+    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 4460pandaes
 
->   endif
-> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> index 71d8841..0fd1340 100644
-> --- a/drivers/phy/Makefile
-> +++ b/drivers/phy/Makefile
-> @@ -4,3 +4,4 @@
->
->   obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
->   obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
-> +obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
-> diff --git a/drivers/phy/phy-exynos-dp-video.c b/drivers/phy/phy-exynos-dp-video.c
-> new file mode 100644
-> index 0000000..75e1d11
-> --- /dev/null
-> +++ b/drivers/phy/phy-exynos-dp-video.c
-> @@ -0,0 +1,118 @@
-> +/*
-> + * Samsung EXYNOS SoC series DP PHY driver
+PM: chip retention via dynamic idle:
+    FAIL ( 4/ 6): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes
+    Pass ( 2/ 6): 3530es3beagle, 3730beaglexm
 
-s/DP/Display Port ?
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
 
-> + *
-> + * Copyright (C) 2013 Samsung Electronics Co., Ltd.
-> + * Author: Jingoo Han<jg1.han@samsung.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include<linux/io.h>
-> +#include<linux/kernel.h>
-> +#include<linux/module.h>
-> +#include<linux/of.h>
-> +#include<linux/of_address.h>
-> +#include<linux/phy/phy.h>
-> +#include<linux/platform_device.h>
-> +
-> +/* DPTX_PHY_CONTROL register */
-> +#define EXYNOS_DPTX_PHY_ENABLE		(1<<  0)
-> +
-> +struct exynos_dp_video_phy {
-> +	void __iomem *regs;
-> +};
-> +
-> +static int __set_phy_state(struct exynos_dp_video_phy *state, unsigned int on)
-> +{
-> +	void __iomem *addr;
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
 
-How about just dropping this local variable ?
+PM: chip off via suspend:
+    FAIL ( 3/ 4): 37xxevm, 4430es2panda, 4460pandaes
+    Pass ( 1/ 4): 3530es3beagle
 
-> +	u32 reg;
-> +
-> +	addr = state->regs;
-> +
-> +	reg = readl(addr);
-> +	if (on)
-> +		reg |= EXYNOS_DPTX_PHY_ENABLE;
-> +	else
-> +		reg&= ~EXYNOS_DPTX_PHY_ENABLE;
-> +	writel(reg, addr);
-> +
-> +	return 0;
-> +}
-> +
-> +static int exynos_dp_video_phy_power_on(struct phy *phy)
-> +{
-> +	struct exynos_dp_video_phy *state = phy_get_drvdata(phy);
-> +
-> +	return __set_phy_state(state, 1);
-> +}
-> +
-> +static int exynos_dp_video_phy_power_off(struct phy *phy)
-> +{
-> +	struct exynos_dp_video_phy *state = phy_get_drvdata(phy);
-> +
-> +	return __set_phy_state(state, 0);
-> +}
-> +
-> +static struct phy_ops exynos_dp_video_phy_ops = {
-> +	.power_on	= exynos_dp_video_phy_power_on,
-> +	.power_off	= exynos_dp_video_phy_power_off,
-> +	.owner		= THIS_MODULE,
-> +};
-> +
-> +static int exynos_dp_video_phy_probe(struct platform_device *pdev)
-> +{
-> +	struct exynos_dp_video_phy *state;
-> +	struct device *dev =&pdev->dev;
-> +	struct resource *res;
-> +	struct phy_provider *phy_provider;
-> +	struct phy *phy;
-> +
-> +	state = devm_kzalloc(dev, sizeof(*state), GFP_KERNEL);
-> +	if (!state)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +
-> +	state->regs = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(state->regs))
-> +		return PTR_ERR(state->regs);
-> +
-> +	dev_set_drvdata(dev, state);
+PM: chip off via dynamic idle:
+    FAIL ( 3/ 4): 37xxevm, 4430es2panda, 4460pandaes
+    Pass ( 1/ 4): 3530es3beagle
 
-I can't see any corresponding dev_get_drvdata(), it should be safe
-to remove this assignment.
 
-> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
-> +	if (IS_ERR(phy_provider))
-> +		return PTR_ERR(phy_provider);
-> +
-> +	phy = devm_phy_create(dev, 0,&exynos_dp_video_phy_ops, "dp");
+Failing tests: fixed by posted patches
+--------------------------------------
 
-The label could be NULL, since there is no need to support non-dt config.
+* 37xx EVM: boot fails
+  - as of v3.10-rc1
+  - Fixed by http://marc.info/?l=linux-arm-kernel&m=137112093431021&w=2
+  
 
-> +	if (IS_ERR(phy)) {
-> +		dev_err(dev, "failed to create DP PHY\n");
-> +		return PTR_ERR(phy);
-> +	}
-> +	phy_set_drvdata(phy, state);
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_OF
+Failing tests: needing investigation
+------------------------------------
 
-You don't use of_match_ptr() macro to assign of_match_table to the driver
-structure below. This means build with CONFIG_OF disabled is broken now.
-I would just remove that #ifdef and would make the driver depends on
-CONFIG_OF.
+Boot tests:
 
-> +static const struct of_device_id exynos_dp_video_phy_of_match[] = {
-> +	{ .compatible = "samsung,exynos5250-dp-video-phy" },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, exynos_dp_video_phy_of_match);
-> +#endif
-> +
-> +static struct platform_driver exynos_dp_video_phy_driver = {
-> +	.probe	= exynos_dp_video_phy_probe,
-> +	.driver = {
-> +		.name	= "exynos-dp-video-phy",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table	= exynos_dp_video_phy_of_match,
-> +	}
-> +};
-> +module_platform_driver(exynos_dp_video_phy_driver);
-> +
-> +MODULE_AUTHOR("Jingoo Han<jg1.han@samsung.com>");
-> +MODULE_DESCRIPTION("Samsung EXYNOS SoC DP PHY driver");
-> +MODULE_LICENSE("GPL v2");
+* 3517EVM & CM-T3517: boot hangs with NFS root
+  - Likely some Kconfig, board file, and PM issues with EMAC
+  - Longstanding bug
+  - Not currently part of the automated test suite
 
-Thanks,
-Sylwester
+Boot warnings:
+
+* 2420N800, 2430sdp: failed to get counter_32k resource
+  - "omap2_sync32k_clocksource_init: failed to get counter_32k resource"
+  - Cause unknown
+
+* CM-T3517: L3 in-band error with IPSS during boot
+  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
+  - Longstanding issue; does not occur on the 3517EVM
+
+* 3730 Beagle XM, 3517EVM, CM-T3517: uart4_rx.uart4_rx mux failure
+  - Cause unknown
+  - May be related to the OMAP serial driver and/or DT mux data
+  - http://marc.info/?l=linux-arm-kernel&m=137121357528854&w=2
+
+PM tests:
+
+* 2430sdp: power domains not entering retention
+  - Cause unknown
+
+* 3730 Beagle XM: does not serial wake from off-idle suspend when console
+  UART doesn't clock-gate ("debug ignore_loglevel")
+  - Cause unknown
+  - Not yet part of the automated test suite
+  - Re-tested at v3.7; still failing:
+    http://www.pwsan.com/omap/transcripts/20121211-3730beaglexm-3.7-pm-offmode-fail-debug.txt
+
+* 4430es2panda: pwrdm state mismatch on CAM, DSS
+
+* 4430es2panda: CORE, TESLA, IVAHD, L3INIT didn't enter target state
+  - Probably due to lack of reset code for M3, DSP, SL2IF, FSUSB
+    per discussion with Tero Kristo
+  - Likely dependent on the bootloader version
+    - fails with 2012.07-00136-g755de79
+  - http://marc.info/?l=linux-arm-kernel&m=136432340618226&w=2
+
+* 4430es2panda: MPU, ABE didn't enter target state
+  - New for v3.10-rc
+
+* 4460pandaes: pwrdm state mismatch on DSS, ABE, IVAHD, TESLA
+
+* 4460pandaes: chip not entering retention in dynamic idle
+  - Presumably 4430es2panda also fails this
+  - Suspend-to-RAM enters full chip retention
+
+Other:
+
+* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
+  - Unknown cause; could be due to the lack of hierarchical enable/disable
+    in hwmod code
+  - Jon Hunter and Santosh Shilimkar report this does not appear with
+    the same X-loader/bootloader on his 4430ES2.3 Panda, so could be
+    ES-level dependent
+
+
+Failing tests: reported by others 
+---------------------------------
+
+- RTC wakeup from suspend broken on 3730beaglexm
+  - as of v3.10-rc1
+  - discussion here: http://marc.info/?l=linux-omap&m=136915841625434&w=2
+
+
+vmlinux object size
+(delta in bytes from test_v3.10-rc6 
+(7d132055814ef17a6c7b69f342244c410a5e000f)):
+   text     data      bss    total  kernel
+   +969     +600        0    +1569  am33xx_only
+   +813        0        0     +813  n800_multi_omap2xxx
+   +813        0        0     +813  n800_only_a
+   +861       -8        0     +853  omap1_defconfig
+   +861        0        0     +861  omap1_defconfig_1510innovator_only
+   +861      +24        0     +885  omap1_defconfig_5912osk_only
+   +925        0        0     +925  omap2plus_defconfig
+   +901        0        0     +901  omap2plus_defconfig_2430sdp_only
+   +925        0        0     +925  omap2plus_defconfig_cpupm
+ -14807    -1880    -8256   -24943  omap2plus_defconfig_no_pm
+   +989        0        0     +989  omap2plus_defconfig_omap2_4_only
+   +925        0        0     +925  omap2plus_defconfig_omap3_4_only
+   +384        0      -16     +368  rmk_omap3430_ldp_allnoconfig
+   +285        0        0     +285  rmk_omap3430_ldp_oldconfig
+   +384        0      -16     +368  rmk_omap4430_sdp_allnoconfig
+   +257        0        0     +257  rmk_omap4430_sdp_oldconfig
