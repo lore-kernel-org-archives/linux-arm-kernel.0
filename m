@@ -1,148 +1,30 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon,  1 Jul 2013 10:39:26 +0200
-Subject: [RFC PATCH 01/13] misc: atmel_ssc: add device tree DMA support
+Date: Mon,  1 Jul 2013 10:39:29 +0200
+Subject: [RFC PATCH 04/13] ARM: at91: DTS: sam9x5: add SSC DMA parameters
 In-Reply-To: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
 References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1372667978-4718-2-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1372667978-4718-5-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ssc device has to fill the at_dma_slave structure with the
-device tree informations.
-Doing a of_dma_request_slave_channel()+dma_release_channel() for that
-seems wrong (or at least not very clean).
-
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 ---
- drivers/misc/atmel-ssc.c                |   56 +++++++++++++++++++++++++++++++
- include/linux/atmel-ssc.h               |    2 ++
- include/linux/platform_data/dma-atmel.h |    2 ++
- 3 files changed, 60 insertions(+)
+ arch/arm/boot/dts/at91sam9x5.dtsi |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-index f7b90661..3afbd82 100644
---- a/drivers/misc/atmel-ssc.c
-+++ b/drivers/misc/atmel-ssc.c
-@@ -19,7 +19,9 @@
- #include <linux/module.h>
- 
- #include <linux/of.h>
-+#include <linux/of_dma.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/platform_data/dma-atmel.h>
- 
- /* Serialize access to ssc_list and user count */
- static DEFINE_SPINLOCK(user_lock);
-@@ -127,12 +129,57 @@ static inline const struct atmel_ssc_platform_data * __init
- 		platform_get_device_id(pdev)->driver_data;
- }
- 
-+static int atmel_ssc_get_dma_data(struct device_node *np,
-+				  struct at_dma_slave *sdata)
-+{
-+	struct dma_chan *chan;
-+	struct at_dma_slave *rx_data;
-+	int err = -1;
-+
-+	/*
-+	 * FIXME: this is clearly not the right way to do it.
-+	 * In order to fill struct at_dma_slave with both rx and tx data,
-+	 * we request and release both channels.
-+	 * Et voila ! We've got all the whole structure !
-+	 * upside: it works(R)
-+	 * downside: feels wrong, dirty, not optimized...
-+	 */
-+	chan = of_dma_request_slave_channel(np, "tx");
-+	if (!chan)
-+		return err;
-+
-+	if (chan->private)
-+		memcpy(sdata, chan->private, sizeof(*sdata));
-+	else
-+		goto out;
-+
-+	dma_release_channel(chan);
-+
-+	chan = of_dma_request_slave_channel(np, "rx");
-+	if (!chan)
-+		goto out;
-+
-+	if (chan->private) {
-+		rx_data = chan->private;
-+		sdata->cfg &= ~(ATC_SRC_PER_MSB(0xff) | ATC_SRC_PER(0xff));
-+		sdata->cfg |= ATC_GET_SRC_ID(rx_data->cfg);
-+		err = 0;
-+	}
-+
-+out:
-+	if (chan)
-+		dma_release_channel(chan);
-+
-+	return err;
-+}
-+
- static int ssc_probe(struct platform_device *pdev)
- {
- 	struct resource *regs;
- 	struct ssc_device *ssc;
- 	const struct atmel_ssc_platform_data *plat_dat;
- 	struct pinctrl *pinctrl;
-+	struct device_node *of = pdev->dev.of_node;
- 
- 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
- 	if (IS_ERR(pinctrl)) {
-@@ -166,6 +213,15 @@ static int ssc_probe(struct platform_device *pdev)
- 		return -ENXIO;
- 	}
- 
-+	/* populate platform_data from device tree */
-+	if (ssc->pdata && ssc->pdata->use_dma && of) {
-+		if (atmel_ssc_get_dma_data(of, &ssc->pdata->dma_slave)) {
-+			dev_err(&pdev->dev, "could not get DMA\n");
-+			return -EINVAL;
-+		}
-+	}
-+	ssc->pdev->dev.platform_data = &ssc->pdata->dma_slave;
-+
- 	/* disable all interrupts */
- 	clk_prepare_enable(ssc->clk);
- 	ssc_writel(ssc->regs, IDR, -1);
-diff --git a/include/linux/atmel-ssc.h b/include/linux/atmel-ssc.h
-index deb0ae5..80c83ee 100644
---- a/include/linux/atmel-ssc.h
-+++ b/include/linux/atmel-ssc.h
-@@ -1,12 +1,14 @@
- #ifndef __INCLUDE_ATMEL_SSC_H
- #define __INCLUDE_ATMEL_SSC_H
- 
-+#include <linux/platform_data/dma-atmel.h>
- #include <linux/platform_device.h>
- #include <linux/list.h>
- #include <linux/io.h>
- 
- struct atmel_ssc_platform_data {
- 	int			use_dma;
-+	struct at_dma_slave	dma_slave;
- };
- 
- struct ssc_device {
-diff --git a/include/linux/platform_data/dma-atmel.h b/include/linux/platform_data/dma-atmel.h
-index e95f19c..0d8b9d6 100644
---- a/include/linux/platform_data/dma-atmel.h
-+++ b/include/linux/platform_data/dma-atmel.h
-@@ -44,11 +44,13 @@ struct at_dma_slave {
- #define		ATC_SRC_H2SEL_SW	(0x0 <<  9)
- #define		ATC_SRC_H2SEL_HW	(0x1 <<  9)
- #define	ATC_SRC_PER_MSB(h)	(ATC_PER_MSB(h) << 10)	/* Channel src rq (most significant bits) */
-+#define ATC_GET_SRC_ID(h) ((((h) >> 6) & 0x3U) | ((h) & 0xFU)) /* Retrieve channel src id */
- #define	ATC_DST_REP		(0x1 << 12)	/* Destination Replay Mod */
- #define	ATC_DST_H2SEL		(0x1 << 13)	/* Destination Handshaking Mod */
- #define		ATC_DST_H2SEL_SW	(0x0 << 13)
- #define		ATC_DST_H2SEL_HW	(0x1 << 13)
- #define	ATC_DST_PER_MSB(h)	(ATC_PER_MSB(h) << 14)	/* Channel dst rq (most significant bits) */
-+#define ATC_GET_DST_ID(h) ((((h) >> 10) & 0x3U) | (((h) >> 4) & 0xFU)) /* Retrieve channel dst id */
- #define	ATC_SOD			(0x1 << 16)	/* Stop On Done */
- #define	ATC_LOCK_IF		(0x1 << 20)	/* Interface Lock */
- #define	ATC_LOCK_B		(0x1 << 21)	/* AHB Bus Lock */
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 57d45f5..cf78ac0 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -542,6 +542,9 @@
+ 				compatible = "atmel,at91sam9g45-ssc";
+ 				reg = <0xf0010000 0x4000>;
+ 				interrupts = <28 IRQ_TYPE_LEVEL_HIGH 5>;
++				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(13)>,
++				       <&dma0 1 AT91_DMA_CFG_PER_ID(14)>;
++				dma-names = "tx", "rx";
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+ 				status = "disabled";
 -- 
 1.7.10.4
