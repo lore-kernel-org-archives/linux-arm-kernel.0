@@ -1,40 +1,61 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Jul 2013 23:21:37 +0800
-Subject: [v2 4/4] sata: imx: add ahci sata support on imx platforms
-In-Reply-To: <20130701133611.GB11408@mtj.dyndns.org>
-References: <1372672975-2997-1-git-send-email-r65037@freescale.com>
- <1372672975-2997-5-git-send-email-r65037@freescale.com>
- <20130701133611.GB11408@mtj.dyndns.org>
-Message-ID: <20130701152135.GV13206@S2101-09.ap.freescale.net>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 01 Jul 2013 17:22:22 +0200
+Subject: [PATCH v3 00/13] ARM: dts: Add camera and magnetometer support for
+ TRATS(2) board
+Message-ID: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 06:36:11AM -0700, Tejun Heo wrote:
-> On Mon, Jul 01, 2013 at 06:02:55PM +0800, Richard Zhu wrote:
-> > imx6q contains one Synopsys AHCI SATA controller,
-> > But it can't shares ahci_platform driver with other
-> > controllers.
-> > Because there are some misalignments of the bits
-> > definitions of the HBA registers and the Vendor
-> > Specific registers
-> >  - CAP_SSS(bit20) of the HOST_CAP is writable, default
-> >  value is '0', should be configured to be '1'
-> >  - bit0 (only one AHCI SATA port on imx6q) of the
-> >  HOST_PORTS_IMPL should be set to be '1'.(default 0)
-> >  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)
-> >  should be configured regarding to the frequency of AHB
-> >  bus clock.
-> 
-> If these are the only differences, can't you make ahci_platform deal
-> with different variants?  That's how we deal with subtly different
-> variants of about the same controllers.
+This patch series includes some fixes and extensions to the Exynos dts
+files to add the camera and magnetometer sensor support for the TRATS
+and TRATS2 board. It depends on a patch from Tomasz adding initial
+TRATS2 board dts file [1].
 
-There are more:
+Comparing to the previous version of this patch set I've added a few
+more patches, for the Exynos4210 based TRATS board and a patch adding
+MIPI CSIS/DSIM PHY provider nodes and related properties to the PHY
+consumer nodes.
 
- - There is an additional phy clock to manage
- - There are some i.MX SoC integration level registers to set up
+This series has been tested with the S5K6A3/FIMC-IS and S5K5BAFX
+(front facing) cameras on top of next-20130627 tag. It can be found
+also at:
+http://git.linuxtv.org/snawrocki/samsung.git/next-20130627-dts-trats-v3
 
-I prefer to that we reuse the generic ahci_platform stuff, and handle
-the differences in a sata_imx.c via pdata->init() interface.
+Detailed changes since v2 are listed in each patch.
 
-Shawn
+Changes since v1:
+ - enabled pull down in cam-port-{a, b}-clk-idle nodes (1/8)
+ - added node alias for i2c-gpio at 0 I2C controller node (7/8).
+
+[1] http://www.spinics.net/lists/arm-kernel/msg253184.html
+
+Andrzej Hajda (2):
+  ARM: dts: Add Exynos4210 SoC camera port pinctrl nodes
+  ARM: dts: Add S5K5BA sensor regulator definitions for Trats board
+
+Jacek Anaszewski (1):
+  ARM: dts: Add AK8975 device node for Exynos4412 TRATS2 board
+
+Sylwester Nawrocki (10):
+  ARM: dts: Correct camera pinctrl nodes for Exynos4x12 SoCs
+  ARM: dts: Add pinctrl entries for Exynos4x12 FIMC-IS peripherals
+  ARM: dts: Add ISP power domain node for Exynos4x12
+  ARM: dts: Use generic DMA bindings for Exynos4 SPI devices
+  ARM: dts: Add camera subsystem device nodes to exynos4.dtsi
+  ARM: dts: Add camera subsystem nodes to exynos4x12.dtsi
+  ARM: dts: Add camera device nodes for Exynos4412 TRATS2 board
+  ARM: dts: Add camera device nodes for Exynos4210 SoCs
+  ARM: dts: Add FIMC nodes for Exynos4210 Trats board
+  ARM: dts: Add MIPI PHY node to exynos4.dtsi
+
+ arch/arm/boot/dts/exynos4.dtsi            |  102 ++++++++++++++++++++++++--
+ arch/arm/boot/dts/exynos4210-pinctrl.dtsi |   23 ++++++
+ arch/arm/boot/dts/exynos4210-trats.dts    |  103 ++++++++++++++++++++++-----
+ arch/arm/boot/dts/exynos4210.dtsi         |   30 ++++++++
+ arch/arm/boot/dts/exynos4412-trats2.dts   |  110 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4x12-pinctrl.dtsi |   61 ++++++++++++++--
+ arch/arm/boot/dts/exynos4x12.dtsi         |  103 +++++++++++++++++++++++++++
+ 7 files changed, 503 insertions(+), 29 deletions(-)
+
+--
+1.7.9.5
