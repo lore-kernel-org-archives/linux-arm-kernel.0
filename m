@@ -1,9 +1,9 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 01 Jul 2013 15:01:31 +0900
-Subject: [PATCH 03/04] ARM: shmobile: Use default ->init_irq() on r8a7790
+Date: Mon, 01 Jul 2013 15:01:40 +0900
+Subject: [PATCH 04/04] ARM: shmobile: Use default ->init_irq() on sh73a0
 In-Reply-To: <20130701060103.21728.83833.sendpatchset@w520>
 References: <20130701060103.21728.83833.sendpatchset@w520>
-Message-ID: <20130701060131.21728.85765.sendpatchset@w520>
+Message-ID: <20130701060140.21728.27213.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,43 +15,43 @@ of NULL will result in invoking irqchip_init() anyway.
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/board-lager.c   |    2 --
- arch/arm/mach-shmobile/setup-r8a7790.c |    2 --
+ arch/arm/mach-shmobile/board-kzm9g-reference.c |    2 --
+ arch/arm/mach-shmobile/setup-sh73a0.c          |    2 --
  2 files changed, 4 deletions(-)
 
---- 0001/arch/arm/mach-shmobile/board-lager.c
-+++ work/arch/arm/mach-shmobile/board-lager.c	2013-07-01 13:27:30.000000000 +0900
-@@ -22,7 +22,6 @@
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
- #include <linux/interrupt.h>
--#include <linux/irqchip.h>
- #include <linux/kernel.h>
- #include <linux/leds.h>
- #include <linux/pinctrl/machine.h>
-@@ -104,7 +103,6 @@ static const char *lager_boards_compat_d
- 
- DT_MACHINE_START(LAGER_DT, "lager")
- 	.init_early	= r8a7790_init_delay,
--	.init_irq	= irqchip_init,
- 	.init_time	= r8a7790_timer_init,
- 	.init_machine	= lager_add_standard_devices,
- 	.dt_compat	= lager_boards_compat_dt,
---- 0008/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-07-01 13:27:52.000000000 +0900
-@@ -19,7 +19,6 @@
-  */
- 
+--- 0001/arch/arm/mach-shmobile/board-kzm9g-reference.c
++++ work/arch/arm/mach-shmobile/board-kzm9g-reference.c	2013-06-28 16:04:39.000000000 +0900
+@@ -24,7 +24,6 @@
+ #include <linux/gpio.h>
+ #include <linux/io.h>
  #include <linux/irq.h>
 -#include <linux/irqchip.h>
- #include <linux/kernel.h>
+ #include <linux/input.h>
  #include <linux/of_platform.h>
- #include <linux/platform_data/gpio-rcar.h>
-@@ -225,7 +224,6 @@ static const char *r8a7790_boards_compat
- 
- DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
- 	.init_early	= r8a7790_init_delay,
+ #include <linux/pinctrl/machine.h>
+@@ -99,7 +98,6 @@ DT_MACHINE_START(KZM9G_DT, "kzm9g-refere
+ 	.map_io		= sh73a0_map_io,
+ 	.init_early	= sh73a0_init_delay,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
 -	.init_irq	= irqchip_init,
- 	.init_time	= r8a7790_timer_init,
- 	.dt_compat	= r8a7790_boards_compat_dt,
+ 	.init_machine	= kzm_init,
+ 	.init_time	= shmobile_timer_init,
+ 	.dt_compat	= kzm9g_boards_compat_dt,
+--- 0007/arch/arm/mach-shmobile/setup-sh73a0.c
++++ work/arch/arm/mach-shmobile/setup-sh73a0.c	2013-06-28 16:04:47.000000000 +0900
+@@ -22,7 +22,6 @@
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+-#include <linux/irqchip.h>
+ #include <linux/platform_device.h>
+ #include <linux/of_platform.h>
+ #include <linux/delay.h>
+@@ -983,7 +982,6 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH7
+ 	.map_io		= sh73a0_map_io,
+ 	.init_early	= sh73a0_init_delay,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+-	.init_irq	= irqchip_init,
+ 	.init_machine	= sh73a0_add_standard_devices_dt,
+ 	.dt_compat	= sh73a0_boards_compat_dt,
  MACHINE_END
