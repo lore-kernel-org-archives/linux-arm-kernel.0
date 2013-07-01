@@ -1,45 +1,31 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 1 Jul 2013 10:14:45 -0400
-Subject: [RFC PATCH 5/6] ARM, mm: change meaning of max_low_pfn to maximum
- pfn for nobootmem
-In-Reply-To: <1364184674-13798-6-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1364184674-13798-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1364184674-13798-6-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <51D18ED5.50103@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 1 Jul 2013 22:17:12 +0800
+Subject: [PATCH] ARM: dts: i.MX27: Add Secondary AHB Port definitions
+In-Reply-To: <1372687690.31793480@f308.mail.ru>
+References: <1372487325-14405-1-git-send-email-shc_work@mail.ru>
+ <20130701125819.GJ13206@S2101-09.ap.freescale.net>
+ <1372687690.31793480@f308.mail.ru>
+Message-ID: <20130701141710.GQ13206@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonsoo,
+On Mon, Jul 01, 2013 at 06:08:10PM +0400, Alexander Shiyan wrote:
+> Introducing primary bus will produce a completely different i.MX27 DTS,
+> since it contain AIPI1,2 and iram.
 
-On Monday 25 March 2013 12:11 AM, Joonsoo Kim wrote:
-> nobootmem use max_low_pfn for computing boundary in free_all_bootmem()
-> So we need proper value to max_low_pfn.
-> 
-> But, there is some difficulty related to max_low_pfn. max_low_pfn is used
-> for two meanings in various architectures. One is for number of pages
-> in lowmem and the other is for maximum lowmem pfn. Now, in ARM, it is used
-> as number of pages in lowmem. You can get more information in below link.
-> http://lwn.net/Articles/543408/
-> http://lwn.net/Articles/543424/
-> 
-> As I investigated, architectures which use max_low_pfn as maximum pfn are
-> more than others, so to change meaning of max_low_pfn to maximum pfn
-> is preferable solution to me. This patch change max_low_pfn as maximum
-> lowmem pfn in ARM. In addition, min_low_pfn, max_pfn is assigned according
-> to this criteria.
-> 
-> There is no real user for max_low_pfn except block/blk-setting.c and
-> blk-setting.c assume that max_low_pfn is maximum lowmem pfn,
-> so this patch may not harm anything.
-> 
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->
-I have been also carrying similar patch as yours in an attempt
-to make LPAE kernel work on ARM. Your patch carries better
-description, so will your version and include in my series
-which I plan to post on the list after some more testing.
-Will copy you. The changes are very similar to your series.
+That's one reason I would stay away from the change, because if the
+addition of Secondary AHB is accepted, it will be a little more
+difficult for us to say NO to people who love to have Primary AHB added.
 
-Regards,
-Santosh
- 
+> Introduction of buses has no effect, other than the possibility of using labels
+> and minimal validation of nodes to the correct address.
+
+Only if there is no code in the kernel searching a node via node path.
+
+> In this case, I define the bus here for the subsequent addition of WEIM,
+> for a better understanding of what and where is.
+> Of course we can do without it. Think is it unnecessary?
+
+Great, please do without it then, thanks.
+
+Shawn
