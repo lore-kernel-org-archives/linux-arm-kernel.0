@@ -1,177 +1,328 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Mon, 1 Jul 2013 22:34:10 +0300
-Subject: [RFC] wlcore: sdio: add wilink clock providers
-Message-ID: <1372707250-11998-1-git-send-email-coelho@ti.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Mon, 01 Jul 2013 21:35:35 +0200
+Subject: [PATCH V3 3/3] video: exynos_dp: Use the generic PHY driver
+In-Reply-To: <005401ce761b$504d7090$f0e851b0$@samsung.com>
+References: <005401ce761b$504d7090$f0e851b0$@samsung.com>
+Message-ID: <51D1DA07.3010803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add refclock and tcxoclock as clock providers in WiLink.  These clocks
-are not accesible outside the WiLink module, but they are registered
-in the clock framework anyway.  Only the WiLink chip consumes these
-clocks.
+Hi Jingoo,
 
-In theory, the WiLink chip could be connected to external clocks
-instead of using these internal clocks, so make the clock consumer
-code generic enough.  If external clocks are used, then the internal
-clock device tree nodes are not necessary, but the external ones must
-be specified.
+On 07/01/2013 07:24 AM, Jingoo Han wrote:
+> Use the generic PHY API instead of the platform callback to control
+> the DP PHY. The 'phy_label' field is added to the platform data
+> structure to allow PHY lookup on non-dt platforms.
 
-Signed-off-by: Luciano Coelho <coelho@ti.com>
----
+Since Exynos is currently a dt-only platform upstream, how about
+first making a pre-requisite patch that would remove support for
+non-dt platforms from this driver ? I think you could now move the
+content of file include/video/exynos_dp.h to e.g. drivers/video/
+exynos/exynos_dp_core.h and remove the public exynos_dp.h file.
+pdata->phy_init/exit could also be dropped and you wouldn't need
+to care about non-dt support with the generic PHY API.
 
-Hi,
+> Signed-off-by: Jingoo Han<jg1.han@samsung.com>
+> Acked-by: Felipe Balbi<balbi@ti.com>
+> ---
+>   .../devicetree/bindings/video/exynos_dp.txt        |   23 +---
+>   drivers/video/exynos/exynos_dp_core.c              |  118 ++------------------
+>   drivers/video/exynos/exynos_dp_core.h              |    2 +
+>   include/video/exynos_dp.h                          |    6 +-
+>   4 files changed, 21 insertions(+), 128 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt b/Documentation/devicetree/bindings/video/exynos_dp.txt
+> index 84f10c1..71645dc 100644
+> --- a/Documentation/devicetree/bindings/video/exynos_dp.txt
+> +++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
+> @@ -1,17 +1,6 @@
+>   The Exynos display port interface should be configured based on
+>   the type of panel connected to it.
+>
+> -We use two nodes:
+> -	-dp-controller node
+> -	-dptx-phy node(defined inside dp-controller node)
+> -
+> -For the DP-PHY initialization, we use the dptx-phy node.
+> -Required properties for dptx-phy:
+> -	-reg:
+> -		Base address of DP PHY register.
+> -	-samsung,enable-mask:
+> -		The bit-mask used to enable/disable DP PHY.
+> -
+>   For the Panel initialization, we read data from dp-controller node.
+>   Required properties for dp-controller:
+>   	-compatible:
+> @@ -25,6 +14,10 @@ Required properties for dp-controller:
+>   		from common clock binding: handle to dp clock.
+>   	-clock-names:
+>   		from common clock binding: Shall be "dp".
+> +	-phys:
+> +		from general phy binding: the phandle for the PHY device.
+> +	-phy-names:
+> +		from general phy binding: Should be "dp".
+>   	-interrupt-parent:
+>   		phandle to Interrupt combiner node.
+>   	-samsung,color-space:
+> @@ -67,12 +60,8 @@ SOC specific portion:
+>   		interrupt-parent =<&combiner>;
+>   		clocks =<&clock 342>;
+>   		clock-names = "dp";
+> -
+> -		dptx-phy {
+> -			reg =<0x10040720>;
+> -			samsung,enable-mask =<1>;
+> -		};
+> -
+> +		phys =<&dp_phy>;
+> +		phy-names = "dp";
+>   	};
+>
+>   Board Specific portion:
+> diff --git a/drivers/video/exynos/exynos_dp_core.c b/drivers/video/exynos/exynos_dp_core.c
+> index 12bbede..bac515b 100644
+> --- a/drivers/video/exynos/exynos_dp_core.c
+> +++ b/drivers/video/exynos/exynos_dp_core.c
+> @@ -19,6 +19,7 @@
+>   #include<linux/interrupt.h>
+>   #include<linux/delay.h>
+>   #include<linux/of.h>
+> +#include<linux/phy/phy.h>
+>
+>   #include<video/exynos_dp.h>
+>
+> @@ -960,84 +961,15 @@ static struct exynos_dp_platdata *exynos_dp_dt_parse_pdata(struct device *dev)
+>   		return ERR_PTR(-EINVAL);
+>   	}
+>
+> -	return pd;
+> -}
+> -
+> -static int exynos_dp_dt_parse_phydata(struct exynos_dp_device *dp)
+> -{
+> -	struct device_node *dp_phy_node = of_node_get(dp->dev->of_node);
+> -	u32 phy_base;
+> -	int ret = 0;
+> -
+> -	dp_phy_node = of_find_node_by_name(dp_phy_node, "dptx-phy");
+> -	if (!dp_phy_node) {
+> -		dev_err(dp->dev, "could not find dptx-phy node\n");
+> -		return -ENODEV;
+> -	}
+> -
+> -	if (of_property_read_u32(dp_phy_node, "reg",&phy_base)) {
+> -		dev_err(dp->dev, "failed to get reg for dptx-phy\n");
+> -		ret = -EINVAL;
+> -		goto err;
+> -	}
+> -
+> -	if (of_property_read_u32(dp_phy_node, "samsung,enable-mask",
+> -				&dp->enable_mask)) {
+> -		dev_err(dp->dev, "failed to get enable-mask for dptx-phy\n");
+> -		ret = -EINVAL;
+> -		goto err;
+> -	}
+> -
+> -	dp->phy_addr = ioremap(phy_base, SZ_4);
+> -	if (!dp->phy_addr) {
+> -		dev_err(dp->dev, "failed to ioremap dp-phy\n");
+> -		ret = -ENOMEM;
+> -		goto err;
+> -	}
+> -
+> -err:
+> -	of_node_put(dp_phy_node);
+> -
+> -	return ret;
+> -}
+> -
+> -static void exynos_dp_phy_init(struct exynos_dp_device *dp)
+> -{
+> -	u32 reg;
+> -
+> -	reg = __raw_readl(dp->phy_addr);
+> -	reg |= dp->enable_mask;
+> -	__raw_writel(reg, dp->phy_addr);
+> -}
+> -
+> -static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
+> -{
+> -	u32 reg;
+> +	pd->phy_label = "dp";
+>
+> -	reg = __raw_readl(dp->phy_addr);
+> -	reg&= ~(dp->enable_mask);
+> -	__raw_writel(reg, dp->phy_addr);
+> +	return pd;
+>   }
 
-I came up with this code, trying to make the WiLink clocks definitions
-as generic as possible and use existing fixed-clock bindings.  This
-looks relatively clean to me, even though it adds some complexity.
-But I think it's better than the original bindings I had defined.
+I'm afraid you cannot simply remove the above code, the original binding
+still needs to be supported. As far as I can see Arndale and smdk5250 are
+already users of that binding in mainline now.
 
-I still need to take care of the XTAL/not-XTAl boolean, but I will do
-that separately.
+Thus the benefits of adding the generic PHY support to this Display Port
+controller driver are starting to be a bit questionable.
 
-This patch will be split (to take away the Panda DTS part) and
-squashed in other patches in my series.
+>   #else
+>   static struct exynos_dp_platdata *exynos_dp_dt_parse_pdata(struct device *dev)
+>   {
+>   	return NULL;
+>   }
+> -
+> -static int exynos_dp_dt_parse_phydata(struct exynos_dp_device *dp)
+> -{
+> -	return -EINVAL;
+> -}
+> -
+> -static void exynos_dp_phy_init(struct exynos_dp_device *dp)
+> -{
+> -	return;
+> -}
+> -
+> -static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
+> -{
+> -	return;
+> -}
+>   #endif /* CONFIG_OF */
 
-Please let me know what you think.
+I think you could make the driver dependent on CONFIG_OF now and
+related #ifdefs and !CONFIG_OF function stubs could be removed.
 
---
-Cheers,
-Luca.
+>   static int exynos_dp_probe(struct platform_device *pdev)
+> @@ -1061,10 +993,6 @@ static int exynos_dp_probe(struct platform_device *pdev)
+>   		pdata = exynos_dp_dt_parse_pdata(&pdev->dev);
+>   		if (IS_ERR(pdata))
+>   			return PTR_ERR(pdata);
+> -
+> -		ret = exynos_dp_dt_parse_phydata(dp);
+> -		if (ret)
+> -			return ret;
+>   	} else {
+>   		pdata = pdev->dev.platform_data;
+>   		if (!pdata) {
+> @@ -1073,6 +1001,10 @@ static int exynos_dp_probe(struct platform_device *pdev)
+>   		}
+>   	}
+>
+> +	dp->phy = devm_phy_get(&pdev->dev, pdata->phy_label);
+> +	if (IS_ERR(dp->phy))
+> +		return PTR_ERR(dp->phy);
+> +
+>   	dp->clock = devm_clk_get(&pdev->dev, "dp");
+>   	if (IS_ERR(dp->clock)) {
+>   		dev_err(&pdev->dev, "failed to get clock\n");
+> @@ -1097,13 +1029,7 @@ static int exynos_dp_probe(struct platform_device *pdev)
+>
+>   	dp->video_info = pdata->video_info;
+>
+> -	if (pdev->dev.of_node) {
+> -		if (dp->phy_addr)
+> -			exynos_dp_phy_init(dp);
+> -	} else {
+> -		if (pdata->phy_init)
+> -			pdata->phy_init();
+> -	}
+> +	phy_power_on(dp->phy);
+>
+>   	exynos_dp_init_dp(dp);
+>
+> @@ -1121,42 +1047,27 @@ static int exynos_dp_probe(struct platform_device *pdev)
+>
+>   static int exynos_dp_remove(struct platform_device *pdev)
+>   {
+> -	struct exynos_dp_platdata *pdata = pdev->dev.platform_data;
+>   	struct exynos_dp_device *dp = platform_get_drvdata(pdev);
+>
+>   	flush_work(&dp->hotplug_work);
+>
+> -	if (pdev->dev.of_node) {
+> -		if (dp->phy_addr)
+> -			exynos_dp_phy_exit(dp);
+> -	} else {
+> -		if (pdata->phy_exit)
+> -			pdata->phy_exit();
+> -	}
+> +	phy_power_off(dp->phy);
+>
+>   	clk_disable_unprepare(dp->clock);
+>
+> -
+>   	return 0;
+>   }
+>
+>   #ifdef CONFIG_PM_SLEEP
+>   static int exynos_dp_suspend(struct device *dev)
+>   {
+> -	struct exynos_dp_platdata *pdata = dev->platform_data;
+>   	struct exynos_dp_device *dp = dev_get_drvdata(dev);
+>
+>   	disable_irq(dp->irq);
+>
+>   	flush_work(&dp->hotplug_work);
+>
+> -	if (dev->of_node) {
+> -		if (dp->phy_addr)
+> -			exynos_dp_phy_exit(dp);
+> -	} else {
+> -		if (pdata->phy_exit)
+> -			pdata->phy_exit();
+> -	}
+> +	phy_power_off(dp->phy);
+>
+>   	clk_disable_unprepare(dp->clock);
+>
+> @@ -1165,16 +1076,9 @@ static int exynos_dp_suspend(struct device *dev)
+>
+>   static int exynos_dp_resume(struct device *dev)
+>   {
+> -	struct exynos_dp_platdata *pdata = dev->platform_data;
+>   	struct exynos_dp_device *dp = dev_get_drvdata(dev);
+>
+> -	if (dev->of_node) {
+> -		if (dp->phy_addr)
+> -			exynos_dp_phy_init(dp);
+> -	} else {
+> -		if (pdata->phy_init)
+> -			pdata->phy_init();
+> -	}
+> +	phy_power_on(dp->phy);
+>
+>   	clk_prepare_enable(dp->clock);
+>
+> diff --git a/drivers/video/exynos/exynos_dp_core.h b/drivers/video/exynos/exynos_dp_core.h
+> index 6c567bbf..b3d0328 100644
+> --- a/drivers/video/exynos/exynos_dp_core.h
+> +++ b/drivers/video/exynos/exynos_dp_core.h
+> @@ -42,6 +42,8 @@ struct exynos_dp_device {
+>   	struct video_info	*video_info;
+>   	struct link_train	link_train;
+>   	struct work_struct	hotplug_work;
+> +
+> +	struct phy		*phy;
+>   };
+>
+>   /* exynos_dp_reg.c */
+> diff --git a/include/video/exynos_dp.h b/include/video/exynos_dp.h
+> index bd8cabd..f38c9af 100644
+> --- a/include/video/exynos_dp.h
+> +++ b/include/video/exynos_dp.h
+> @@ -122,10 +122,8 @@ struct video_info {
+>   };
+>
+>   struct exynos_dp_platdata {
 
- arch/arm/boot/dts/omap4-panda-common.dtsi |   16 ++++++++---
- drivers/net/wireless/ti/wlcore/sdio.c     |   43 ++++++++++++++++++++++++++---
- 2 files changed, 51 insertions(+), 8 deletions(-)
+Since Exynos doesn't support non-dt boot now this platform data structure
+is not used, is it ?
 
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index 670c3ce..7f061b8 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -65,11 +65,19 @@
- 		enable-active-high;
- 	};
- 
-+
- 	wlan {
--	     compatible = "ti,wilink6";
--	     interrupt-parent = <&gpio2>;
--	     interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
--	     refclock = <2>;		/* 38.4 MHz */
-+		compatible = "ti,wilink6";
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
-+		clocks = <&refclock>;
-+		clock-names = "refclock";
-+
-+		refclock: refclock {
-+			compatible = "ti,wilink-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <38400000>;
-+		};
- 	 };
- };
- 
-diff --git a/drivers/net/wireless/ti/wlcore/sdio.c b/drivers/net/wireless/ti/wlcore/sdio.c
-index 5b08620..60fce49 100644
---- a/drivers/net/wireless/ti/wlcore/sdio.c
-+++ b/drivers/net/wireless/ti/wlcore/sdio.c
-@@ -34,6 +34,7 @@
- #include <linux/wl12xx.h>
- #include <linux/pm_runtime.h>
- #include <linux/printk.h>
-+#include <linux/clk-provider.h>
- 
- #include "wlcore.h"
- #include "wl12xx_80211.h"
-@@ -52,6 +53,7 @@ static bool dump = false;
- struct wl12xx_sdio_glue {
- 	struct device *dev;
- 	struct platform_device *core;
-+	struct clk *refclock, *tcxoclock;
- };
- 
- static const struct sdio_device_id wl1271_devices[] = {
-@@ -214,10 +216,16 @@ static struct wl1271_if_operations sdio_ops = {
- 	.set_block_size = wl1271_sdio_set_block_size,
- };
- 
-+static const struct of_device_id wlcore_sdio_of_clk_match_table[] = {
-+	{ .compatible = "ti,wilink-clock" },
-+};
-+
- static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
- {
- 	struct wl12xx_platform_data *pdata;
- 	struct device_node *np = dev->of_node;
-+	struct device_node *clock_node;
-+	struct wl12xx_sdio_glue *glue = sdio_get_drvdata(dev_to_sdio_func(dev));
- 
- 	if (!np) {
- 		np = of_find_matching_node(NULL, dev->driver->of_match_table);
-@@ -241,11 +249,28 @@ static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
- 		goto out_free;
- 	}
- 
-+	for_each_matching_node(clock_node, wlcore_sdio_of_clk_match_table)
-+		of_fixed_clk_setup(clock_node);
-+
- 	/* TODO: make sure we have this when needed (ie. for WL6 and WL7) */
--	of_property_read_u32(np, "refclock", &pdata->ref_clock_freq);
-+	glue->refclock = of_clk_get_by_name(np, "refclock");
-+	if (IS_ERR(glue->refclock)) {
-+		dev_err(dev, "couldn't find refclock on the device tree\n");
-+		glue->refclock = NULL;
-+	} else {
-+		clk_prepare_enable(glue->refclock);
-+		pdata->ref_clock_freq = clk_get_rate(glue->refclock);
-+	}
- 
- 	/* TODO: make sure we have this when needed (ie. for WL7) */
--	of_property_read_u32(np, "tcxoclock", &pdata->tcxo_clock_freq);
-+	glue->tcxoclock = of_clk_get_by_name(np, "tcxoclock");
-+	if (IS_ERR(glue->tcxoclock)) {
-+		dev_err(dev, "couldn't find tcxoclock on the device tree\n");
-+		glue->tcxoclock = NULL;
-+	} else {
-+		clk_prepare_enable(glue->tcxoclock);
-+		pdata->ref_clock_freq = clk_get_rate(glue->tcxoclock);
-+	}
- 
- 	goto out;
- 
-@@ -291,6 +316,8 @@ static int wl1271_probe(struct sdio_func *func,
- 	/* Use block mode for transferring over one block size of data */
- 	func->card->quirks |= MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
- 
-+	sdio_set_drvdata(func, glue);
-+
- 	/* The pdata allocated here is freed when the device is freed,
- 	 * so we don't need an additional out label to free it in case
- 	 * of error further on.
-@@ -316,8 +343,6 @@ static int wl1271_probe(struct sdio_func *func,
- 	if (mmcflags & MMC_PM_KEEP_POWER)
- 		pdev_data->pwr_in_suspend = true;
- 
--	sdio_set_drvdata(func, glue);
--
- 	/* Tell PM core that we don't need the card to be powered now */
- 	pm_runtime_put_noidle(&func->dev);
- 
-@@ -384,6 +409,16 @@ static void wl1271_remove(struct sdio_func *func)
- {
- 	struct wl12xx_sdio_glue *glue = sdio_get_drvdata(func);
- 
-+	if (glue->refclock) {
-+		clk_disable_unprepare(glue->refclock);
-+		clk_put(glue->refclock);
-+	}
-+
-+	if (glue->tcxoclock) {
-+		clk_disable_unprepare(glue->tcxoclock);
-+		clk_put(glue->tcxoclock);
-+	}
-+
- 	/* Undo decrement done above in wl1271_probe */
- 	pm_runtime_get_noresume(&func->dev);
- 
--- 
-1.7.10.4
+> -	struct video_info *video_info;
+> -
+> -	void (*phy_init)(void);
+> -	void (*phy_exit)(void);
+> +	struct video_info	*video_info;
+> +	const char		*phy_label;
+>   };
+>
+>   #endif /* _EXYNOS_DP_H */
+
+Regards,
+Sylwester
