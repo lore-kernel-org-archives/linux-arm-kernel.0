@@ -1,36 +1,60 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon,  1 Jul 2013 10:39:38 +0200
-Subject: [RFC PATCH 13/13] sound: codec: wm8371: correct capture line/mic
-In-Reply-To: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
-References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1372667978-4718-14-git-send-email-richard.genoud@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 1 Jul 2013 16:43:25 +0800
+Subject: [PATCH] ARM: dts: add sram for imx53 and imx6q
+In-Reply-To: <1372416798-2828-1-git-send-email-p.zabel@pengutronix.de>
+References: <1372416798-2828-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130701084323.GC13206@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the "switch" text, we can't enable the line and mic capture in
-alsamixer.
+On Fri, Jun 28, 2013 at 12:53:18PM +0200, Philipp Zabel wrote:
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx53.dtsi   | 5 +++++
+>  arch/arm/boot/dts/imx6qdl.dtsi | 6 ++++++
+>  2 files changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index d437bfb..3def46f 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -1087,5 +1087,10 @@
+>  				status = "disabled";
+>  			};
+>  		};
+> +
+> +		ocram: ocram at f8000000 {
+> +			compatible = "fsl,imx-ocram", "mmio-sram";
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
----
- sound/soc/codecs/wm8731.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I think we agreed to drop this custom compatible "fsl,imx-ocram" for
+now [1]?
 
-diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
-index 3cf6b20..dae1403 100644
---- a/sound/soc/codecs/wm8731.c
-+++ b/sound/soc/codecs/wm8731.c
-@@ -164,10 +164,10 @@ SOC_DOUBLE_R("Master Playback ZC Switch", WM8731_LOUT1V, WM8731_ROUT1V,
- 
- SOC_DOUBLE_R_TLV("Capture Volume", WM8731_LINVOL, WM8731_RINVOL, 0, 31, 0,
- 		 in_tlv),
--SOC_DOUBLE_R("Line Capture Switch", WM8731_LINVOL, WM8731_RINVOL, 7, 1, 1),
-+SOC_DOUBLE_R("Line Capture", WM8731_LINVOL, WM8731_RINVOL, 7, 1, 1),
- 
- SOC_SINGLE_TLV("Mic Boost Volume", WM8731_APANA, 0, 1, 0, mic_tlv),
--SOC_SINGLE("Mic Capture Switch", WM8731_APANA, 1, 1, 1),
-+SOC_SINGLE("Mic Capture", WM8731_APANA, 1, 1, 1),
- 
- SOC_SINGLE_TLV("Sidetone Playback Volume", WM8731_APANA, 6, 3, 1,
- 	       sidetone_tlv),
--- 
-1.7.10.4
+Shawn
+
+[1] http://thread.gmane.org/gmane.linux.kernel/1460369/focus=1465840
+
+> +			reg = <0xf8000000 0x20000>;
+> +		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index 2d73f83..e1fe8a4 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -100,6 +100,12 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		ocram: ocram at 00900000 {
+> +			compatible = "fsl,imx-ocram", "mmio-sram";
+> +			reg = <0x00900000 0x3f000>;
+> +			clocks = <&clks 142>;
+> +		};
+> +
+>  		timer at 00a00600 {
+>  			compatible = "arm,cortex-a9-twd-timer";
+>  			reg = <0x00a00600 0x20>;
+> -- 
+> 1.8.3.1
+> 
