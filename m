@@ -1,72 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Jul 2013 20:58:21 +0800
-Subject: [PATCH] ARM: dts: i.MX27: Add Secondary AHB Port definitions
-In-Reply-To: <1372487325-14405-1-git-send-email-shc_work@mail.ru>
-References: <1372487325-14405-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20130701125819.GJ13206@S2101-09.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 1 Jul 2013 15:03:43 +0200
+Subject: [v2 4/4] sata: imx: add ahci sata support on imx platforms
+In-Reply-To: <51D17AF1.2060504@gmail.com>
+References: <1372672975-2997-1-git-send-email-r65037@freescale.com>
+ <1372672975-2997-5-git-send-email-r65037@freescale.com>
+ <51D17AF1.2060504@gmail.com>
+Message-ID: <20130701130343.GY516@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 29, 2013 at 10:28:45AM +0400, Alexander Shiyan wrote:
-> Patch adds Secondary AHB Port definitions for i.MX27 SOC and
-> moves NAND Flash Controller (NFC) under AHB Slave Port 1.
+On Mon, Jul 01, 2013 at 07:49:53AM -0500, Rob Herring wrote:
+> On 07/01/2013 05:02 AM, Richard Zhu wrote:
+> > imx6q contains one Synopsys AHCI SATA controller,
+> > But it can't shares ahci_platform driver with other
+> > controllers.
+> > Because there are some misalignments of the bits
+> > definitions of the HBA registers and the Vendor
+> > Specific registers
+> >  - CAP_SSS(bit20) of the HOST_CAP is writable, default
+> >  value is '0', should be configured to be '1'
+> >  - bit0 (only one AHCI SATA port on imx6q) of the
+> >  HOST_PORTS_IMPL should be set to be '1'.(default 0)
+> >  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)
+> >  should be configured regarding to the frequency of AHB
+> >  bus clock.
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/boot/dts/imx27.dtsi | 28 ++++++++++++++++++++++------
->  1 file changed, 22 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> index 86b6f5f..7c0179e 100644
-> --- a/arch/arm/boot/dts/imx27.dtsi
-> +++ b/arch/arm/boot/dts/imx27.dtsi
-> @@ -399,14 +399,30 @@
->  			};
->  		};
->  
-> -		nfc: nand at d8000000 {
-> +		ahb1: ahb at 80000000 { /* Secondary AHB Slave Port 1 */
+> All this really belongs in the bootloader.
 
-We do not have the top level of AHB bus topology represented in device
-tree.  Your patch introduces it, partially - all about Secondary AHB
-Slave but nothing about Primary AHB.
+I beg to differ. Normally we do not write the kernel that it depends on
+setup being done by the bootloader.
 
-I'm not really fond of the change, since it's not extremely useful to
-me.  Do you have a real reason for the change?
+> Wouldn't you most likely be
+> booting the kernel from SATA as well?
 
-Shawn
+Having a SATA disk attached doesn't mean you boot from it.
 
-> +			compatible = "fsl,ahb-bus", "simple-bus";
->  			#address-cells = <1>;
->  			#size-cells = <1>;
-> -			compatible = "fsl,imx27-nand";
-> -			reg = <0xd8000000 0x1000>;
-> -			interrupts = <29>;
-> -			clocks = <&clks 54>;
-> -			status = "disabled";
-> +			reg = <0x80000000 0x20000000>;
-> +			ranges;
-> +		};
-> +
-> +		ahb2: ahb at a0000000 { /* Secondary AHB Slave Port 2 */
-> +			compatible = "fsl,ahb-bus", "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			reg = <0xa0000000 0x40000000>;
-> +			ranges;
-> +
-> +			nfc: nand at d8000000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				compatible = "fsl,imx27-nand";
-> +				reg = <0xd8000000 0x1000>;
-> +				interrupts = <29>;
-> +				clocks = <&clks 54>;
-> +				status = "disabled";
-> +			};
->  		};
->  
->  		iram: iram at ffff4c00 {
-> -- 
-> 1.8.1.5
-> 
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
