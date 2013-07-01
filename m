@@ -1,64 +1,48 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 01 Jul 2013 16:06:00 +0200
-Subject: [PATCH 1/2] ARM: dts: mx53qsb: Enable VPU support
-In-Reply-To: <CAOMZO5Chnn72t12rf6tkrWNSnDreKsh57nagKc5_Vhi0j_mSWw@mail.gmail.com>
-References: <1372459759-10488-1-git-send-email-festevam@gmail.com>
- <1372683396.4971.35.camel@pizza.hi.pengutronix.de>
- <CAOMZO5Chnn72t12rf6tkrWNSnDreKsh57nagKc5_Vhi0j_mSWw@mail.gmail.com>
-Message-ID: <1372687560.4971.40.camel@pizza.hi.pengutronix.de>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 01 Jul 2013 18:08:10 +0400
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSF0gQVJNOiBkdHM6IGkuTVgyNzogQWRkIFNlY29uZGFy?=
+ =?UTF-8?B?eSBBSEIgUG9ydCBkZWZpbml0aW9ucw==?=
+In-Reply-To: <20130701125819.GJ13206@S2101-09.ap.freescale.net>
+References: <1372487325-14405-1-git-send-email-shc_work@mail.ru>
+ <20130701125819.GJ13206@S2101-09.ap.freescale.net>
+Message-ID: <1372687690.31793480@f308.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+> On Sat, Jun 29, 2013 at 10:28:45AM +0400, Alexander Shiyan wrote:
+> > Patch adds Secondary AHB Port definitions for i.MX27 SOC and
+> > moves NAND Flash Controller (NFC) under AHB Slave Port 1.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+> >  arch/arm/boot/dts/imx27.dtsi | 28 ++++++++++++++++++++++------
+> >  1 file changed, 22 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> > index 86b6f5f..7c0179e 100644
+> > --- a/arch/arm/boot/dts/imx27.dtsi
+> > +++ b/arch/arm/boot/dts/imx27.dtsi
+> > @@ -399,14 +399,30 @@
+> >  			};
+> >  		};
+> >  
+> > -		nfc: nand at d8000000 {
+> > +		ahb1: ahb at 80000000 { /* Secondary AHB Slave Port 1 */
+> 
+> We do not have the top level of AHB bus topology represented in device
+> tree.  Your patch introduces it, partially - all about Secondary AHB
+> Slave but nothing about Primary AHB.
+> 
+> I'm not really fond of the change, since it's not extremely useful to
+> me.  Do you have a real reason for the change?
 
-Am Montag, den 01.07.2013, 10:46 -0300 schrieb Fabio Estevam:
-> On Mon, Jul 1, 2013 at 9:56 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> > Hi Fabio,
-> >
-> > Am Freitag, den 28.06.2013, 19:49 -0300 schrieb Fabio Estevam:
-> >> From: Fabio Estevam <fabio.estevam@freescale.com>
-> >>
-> >> Enable Video Processing Unit (VPU) support.
-> >>
-> >> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> >> ---
-> >> Depends on Philipp Zabel's patch:
-> >> [PATCH] ARM: dts: add sram for imx53 and imx6q
-> >>
-> >> Philipp,
-> >>
-> >> I tried using the original mx53 vpu firmware that comes with the FSL BSP, but it
-> >> failed to load:
-> >>
-> >> coda 63ff4000.vpu: firmware get command error
-> >> coda 63ff4000.vpu: HW initialization failed
-> >>
-> >> Any suggestions?
-> >>
-> >> Thanks!
-> >
-> > /*
-> >  * The CODA driver needs the raw firmware without header in memory order.
-> >  * This is how I converted vpu_fw_imx53.bin from the Freescale BSP into
-> >  * v4l2-coda7541-imx53.bin:
-> >  */
-> 
-> Thanks for your C code, Philipp.
-> 
-> Now I get:
-> 
-> coda 63ff4000.vpu: Initialized CODA7541.
-> coda 63ff4000.vpu: Unsupported firmware version: 13.4.41
-> coda 63ff4000.vpu: codec registered as /dev/video0
-> 
-> As input file I am using the vpu_fw_imx53.bin from FSL BSP version 11.09.
-> 
-> Where should I get the vpu_fw_imx53.bin file so that I do not get the
-> unsupported warning?
+Introducing primary bus will produce a completely different i.MX27 DTS,
+since it contain AIPI1,2 and iram.
+Introduction of buses has no effect, other than the possibility of using labels
+and minimal validation of nodes to the correct address.
+In this case, I define the bus here for the subsequent addition of WEIM,
+for a better understanding of what and where is.
+Of course we can do without it. Think is it unnecessary?
+Thanks.
 
-The current firmware version is 1.4.50 (yes, 1.4.50 > 13.4.41). It is
-contained in the L3.0.35_12.09.01 or L3.0.35_4.0.0 (20130424) BSP
-releases.
-
-regards
-Philipp
+---
