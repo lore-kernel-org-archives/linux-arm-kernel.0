@@ -1,43 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Jul 2013 23:17:40 +0800
-Subject: [v2 4/4] sata: imx: add ahci sata support on imx platforms
-In-Reply-To: <CAGxe1ZEhTumWC5mpirjSqg2fogFz5VuLKLtxUpA=ctxdwU-i6w@mail.gmail.com>
-References: <1372672975-2997-1-git-send-email-r65037@freescale.com>
- <1372672975-2997-5-git-send-email-r65037@freescale.com>
- <CAGxe1ZEHWQUXmjgmGGkpy3wgxoS8ti0-eYZPHkQKzjD9pWqZ0Q@mail.gmail.com>
- <20130701144817.GT13206@S2101-09.ap.freescale.net>
- <CAGxe1ZEhTumWC5mpirjSqg2fogFz5VuLKLtxUpA=ctxdwU-i6w@mail.gmail.com>
-Message-ID: <20130701151737.GB14172@S2101-09.ap.freescale.net>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 01 Jul 2013 16:20:47 +0100
+Subject: v3.10 - big endian core support
+In-Reply-To: <20130701163301.7c1228df@skate>
+References: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
+ <20130701163301.7c1228df@skate>
+Message-ID: <51D19E4F.1060806@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 08:34:38PM +0530, Girish K S wrote:
-> On 1 July 2013 20:18, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > On Mon, Jul 01, 2013 at 04:57:35PM +0530, Girish K S wrote:
-> >> Hello Richard,
-> >>
-> >> Instead of writing a separate driver for the changes you mentioned in
-> >> the commit message. you can just add those changes to
-> >> the platform data (pdata-> init).
-> >
-> > No. The platform init hook is not used to do IP block related setup.
-> > If we're mapping ahci block and setting up ahci registers in platform
-> > code, we are generally not doing the right thing.
-> 
-> Yes I understand (anything specific to driver should be part of
-> driver). I need to touch few platforms that are already doing this.
-> Then how about keeping setup as part of driver data for the specific controller.
+On 01/07/13 15:33, Thomas Petazzoni wrote:
+> Dear Ben Dooks,
+>
+> On Mon,  1 Jul 2013 12:03:58 +0100, Ben Dooks wrote:
+>> The latest big-endian changes, now on:
+>>
+>> 	git://git.baserock.org/delta/linux baserock/311/be/core
+>>
+>> This has a minor fix from the last version where a rebase missed a change
+>> in the smp_scu code.
+>
+> Patches 1, 2, 3, 4 and 9:
+>
+> Tested-by: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
 
-I was too rush in writing the reply.  Here is what I meant.
+Thanks.
 
-We should reuse the generic ahci_platform driver. And that means we
-have to use pdata->init() hook to do vendor specific setup.  But the
-hook shouldn't be implemented in arch code (e.g.
-arch/arm/mach-imx/mach-imx6q.c), and it should be implemented in
-a vendor specific driver like sata_imx.c.  IOW, we reuse everything
-implemented in the generic ahci_platform driver, and handle differences
-in vendor specific ahci driver via pdata->init() hook.
-
-Does that make the most sense?
-
-Shawn 
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
