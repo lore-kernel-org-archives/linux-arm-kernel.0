@@ -1,49 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 1 Jul 2013 11:02:06 +0900
-Subject: [PATCH 00/04] ARM: shmobile: r8a73a4/r8a7790 CMT and Arch timer
- update
-In-Reply-To: <20130628112655.23809.39115.sendpatchset@w520>
-References: <20130628112655.23809.39115.sendpatchset@w520>
-Message-ID: <20130701020206.GE14567@verge.net.au>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Mon, 1 Jul 2013 02:06:10 +0000
+Subject: Chipidea usb otg support for IMX/MXS (device functionality)
+In-Reply-To: <CAOMZO5AW1jcjVqEyh=qP3kQK75dZvpOY+BYcKGiymfJPLa94ew@mail.gmail.com>
+References: <51A5A808.2070803@digi.com>	<201306281142.51676.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803EFF551@039-SN2MPN1-023.039d.mgd.msft.net>
+ <201306281356.51670.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803EFF788@039-SN2MPN1-023.039d.mgd.msft.net>
+ <CAOMZO5AW1jcjVqEyh=qP3kQK75dZvpOY+BYcKGiymfJPLa94ew@mail.gmail.com>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803F016E2@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 08:26:55PM +0900, Magnus Damm wrote:
-> ARM: shmobile: r8a73a4/r8a7790 CMT and Arch timer update
+ 
+> >
+> > You should see the voltage of vbus pin is less than 0.8v when
+> > nothing is connected, we use B_SESSION_VALID (0.8v) to judge
+> > it is connected or not.
+> >
+> > You get 2.25 all the time or it is discharged very slowly?
 > 
-> [PATCH 01/04] ARM: shmobile: Add r8a7790 CMT00 clock event
-> [PATCH 02/04] ARM: shmobile: Make r8a7790 Arch timer optional
-> [PATCH 03/04] ARM: shmobile: Add r8a73a4 CMT10 clock event
-> [PATCH 04/04] ARM: shmobile: Make r8a73a4 Arch timer optional
+> On my mx28evk it discharges very very slowly. Any hints about it?
 > 
-> Add clock event support through a CMT timer channel for the
-> SoCs r8a7790 and r8a73a4 as well as APE6EVM and Lager boards.
-> 
-> Also, to be able to test the CMT timers, make it possible to
-> deselect Arch timer and instead rely on predefined values for
-> udelay() and instead of local timer for SMP use broadcast.
-> 
-> A nice side effect of this is that high resolution timers
-> now become available. The reason for the is that the Arch
-> timer sets the C3STOP flag which in turn will tell the
-> time keeping code to not allow high resolution timer without
-> an additional clock event. So here they are.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  Written against renesas.git renesas-next-20130628 plus
->  [PATCH] ARM: shmobile: Sort r8a7790 MSTP entries
->  [PATCH 00/06] ARM: shmobile: Remove unused auxdata tables
-> 
->  For proper run time operation the following patch
->  included in renesas-next-20130628 must be included
->  in the CMT driver:
 
-Thanks, Magnus.
+Due to some hardware limitations, the dual-role functions at OTG port
+can't be used with host 1 port at the same time at mx28evk. Please follow
+below to use USB ports at mx28evk.
 
-I have queued these up in the soc branch.
+When testing usb OTG port, please switch VDD 5V SOURCE SELECT to USB 5V
+When testing usb host1 port, please switch VDD 5V SOURCE SELECT to WALL 5V
 
-I applied the first patch of the series manually as there was
-some conflicts for one reason or another. Please check that I applied
-it correctly.
+Best regards,
+Peter
