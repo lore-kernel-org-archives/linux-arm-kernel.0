@@ -1,43 +1,85 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  1 Jul 2013 15:23:29 +0200
-Subject: [PATCHv4 8/8] ARM: mxs: dt: cfa10036: make hogpins grabbed by
+Date: Mon,  1 Jul 2013 15:23:27 +0200
+Subject: [PATCHv4 6/8] ARM: mxs: dt: cfa10055: make hogpins grabbed by
  respective drivers
 In-Reply-To: <1372685009-15564-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1372685009-15564-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1372685009-15564-9-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1372685009-15564-7-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/imx28-cfa10036.dts | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/imx28-cfa10055.dts | 38 ++++++++++++------------------------
+ 1 file changed, 13 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
-index 94c4476..1ec8c94 100644
---- a/arch/arm/boot/dts/imx28-cfa10036.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10036.dts
-@@ -23,10 +23,7 @@
+diff --git a/arch/arm/boot/dts/imx28-cfa10055.dts b/arch/arm/boot/dts/imx28-cfa10055.dts
+index 1581112..171bcbe 100644
+--- a/arch/arm/boot/dts/imx28-cfa10055.dts
++++ b/arch/arm/boot/dts/imx28-cfa10055.dts
+@@ -23,36 +23,13 @@
  	apb at 80000000 {
  		apbh at 80000000 {
  			pinctrl at 80018000 {
--				pinctrl-names = "default";
--				pinctrl-0 = <&hog_pins_cfa10036>;
+-				pinctrl-names = "default", "default";
+-				pinctrl-1 = <&hog_pins_cfa10055
+-					&hog_pins_cfa10055_pullup>;
 -
--				hog_pins_cfa10036: hog-10036 at 0 {
-+				ssd1306_cfa10036: ssd1306-10036 at 0 {
+-				hog_pins_cfa10055: hog-10055 at 0 {
+-					reg = <0>;
+-					fsl,pinmux-ids = <
+-						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
+-					>;
+-					fsl,drive-strength = <0>;
+-					fsl,voltage = <1>;
+-					fsl,pull-up = <0>;
+-				};
+-
+-				hog_pins_cfa10055_pullup: hog-10055-pullup at 0 {
+-					reg = <0>;
+-					fsl,pinmux-ids = <
+-						0x31e3 /* MX28_PAD_LCD_RESET__GPIO_3_30 */
+-					>;
+-					fsl,drive-strength = <0>;
+-					fsl,voltage = <1>;
+-					fsl,pull-up = <1>;
+-				};
+-
+ 				spi2_pins_cfa10055: spi2-cfa10055 at 0 {
  					reg = <0>;
  					fsl,pinmux-ids = <
- 						0x2073 /* MX28_PAD_SSP0_D7__GPIO_2_7 */
-@@ -83,6 +80,8 @@
+ 						0x2103 /* MX28_PAD_SSP2_SCK__GPIO_2_16 */
+ 						0x2113 /* MX28_PAD_SSP2_CMD__GPIO_2_17 */
+ 						0x2123 /* MX28_PAD_SSP2_D0__GPIO_2_18 */
++						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
+ 					>;
+ 					fsl,drive-strength = <1>;
+ 					fsl,voltage = <1>;
+@@ -98,12 +75,23 @@
+ 					fsl,voltage = <1>;
+ 					fsl,pull-up = <0>;
+ 				};
++
++				lcdif_pins_cfa10055_pullup: lcdif-10055-pullup at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x31e3 /* MX28_PAD_LCD_RESET__GPIO_3_30 */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
+ 			};
  
- 				ssd1306: oled@3c {
- 					compatible = "solomon,ssd1306fb-i2c";
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&ssd1306_cfa10036>;
- 					reg = <0x3c>;
- 					reset-gpios = <&gpio2 7 0>;
- 					solomon,height = <32>;
+ 			lcdif at 80030000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&lcdif_18bit_pins_cfa10055
+-					     &lcdif_pins_cfa10055>;
++					     &lcdif_pins_cfa10055
++					     &lcdif_pins_cfa10055_pullup>;
+ 				display = <&display>;
+ 				status = "okay";
+ 
 -- 
 1.8.1.2
