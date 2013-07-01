@@ -1,50 +1,42 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Jul 2013 23:29:56 +0800
-Subject: [v2 4/4] sata: imx: add ahci sata support on imx platforms
-In-Reply-To: <20130701124445.GW516@pengutronix.de>
-References: <1372672975-2997-1-git-send-email-r65037@freescale.com>
- <1372672975-2997-5-git-send-email-r65037@freescale.com>
- <20130701124445.GW516@pengutronix.de>
-Message-ID: <20130701152955.GW13206@S2101-09.ap.freescale.net>
+Date: Mon, 1 Jul 2013 23:33:29 +0800
+Subject: [alsa-devel] [PATCH 1/4] ASoC: sgtl5000: give it a ramping time
+ before writting
+In-Reply-To: <CAOMZO5Bh5CZLBO-epVA9Vivo-mqmBJZhy7iA6HiMy+xLzDj40w@mail.gmail.com>
+References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
+ <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
+ <20130701100710.GB27646@sirena.org.uk>
+ <201307011254.18952.marex@denx.de>
+ <CAOMZO5BAs5-Tf_O0TVLFAuCchVuukV+bH2MpjqMU83tTw2GD=Q@mail.gmail.com>
+ <20130701142610.GR13206@S2101-09.ap.freescale.net>
+ <20130701143415.GA14172@S2101-09.ap.freescale.net>
+ <CAOMZO5Bh5CZLBO-epVA9Vivo-mqmBJZhy7iA6HiMy+xLzDj40w@mail.gmail.com>
+Message-ID: <20130701153327.GX13206@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 02:44:45PM +0200, Sascha Hauer wrote:
-> On Mon, Jul 01, 2013 at 06:02:55PM +0800, Richard Zhu wrote:
-> > imx6q contains one Synopsys AHCI SATA controller,
-> > But it can't shares ahci_platform driver with other
-> > controllers.
-> > Because there are some misalignments of the bits
-> > definitions of the HBA registers and the Vendor
-> > Specific registers
-> >  - CAP_SSS(bit20) of the HOST_CAP is writable, default
-> >  value is '0', should be configured to be '1'
-> >  - bit0 (only one AHCI SATA port on imx6q) of the
-> >  HOST_PORTS_IMPL should be set to be '1'.(default 0)
-> >  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)
-> >  should be configured regarding to the frequency of AHB
-> >  bus clock.
-> > 
-> > Setup its own ahci sata driver, enable the imx6q ahci
-> > sata support, and update the ahci sata binding document.
-> > 
-> > Signed-off-by: Richard Zhu <r65037@freescale.com>
+On Mon, Jul 01, 2013 at 12:11:58PM -0300, Fabio Estevam wrote:
+> On Mon, Jul 1, 2013 at 11:34 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 > 
-> Wait a minute. We suggested to add a i.MX specific ahci driver to put
-> the i.MX speicific setup in there. Now you really post a separate i.MX
-> driver, but instead of putting the setup in there, it's a nearly
-> identical copy of the generic driver *without* the setup and the setup
-> is still in arch/arm/. That doesn't make sense to me.
+> > And also why we do not see the impact of i2c issue on sgtl5000 before
+> > the offending commit af8ee11 (ASoC: sgtl5000: Fix driver probe after
+> > reset)?
+> 
+> Probably because the mxs i2c was working before this commit.
 
-+1
+Do you have a commit id at which mxs i2c is known good?  I would like to
+find out it's a mxs i2c issue or sgtl5000 problem.
 
-Richard,
+> 
+> Commit af8ee11 does fix the reset probe on mx51/mx53/mx6.
+> 
+> It's only on mx28 that we have this issue.
+> 
+> Also, please see this patch from Alexandre Belloni:
+> https://lkml.org/lkml/2013/6/24/430
+> 
+> He can only connect the ADC chip if he uses I2C bitbang mode on mx28.
 
-You could have confused by me with pointing you to the sata_highbank
-driver.  Sorry.  But Sascha posted his work [1] later in the same
-thread.  That's obviously the way we should go, and I thought you
-knew you should start your v2 based on that.  You missed that?
+Does I2C bitbang mode help fix the sgtl5000 issue here?
 
 Shawn
-
-[1] http://thread.gmane.org/gmane.linux.ide/54410/focus=54434
