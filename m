@@ -1,30 +1,30 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 01 Jul 2013 10:09:34 +0200
-Subject: [PATCH] of: Specify initrd location using 64-bit
-In-Reply-To: <CAMuHMdV6YM3-hASqjxkguEukZjnjK80gBjDNiabxjfQtC=c8ag@mail.gmail.com>
-References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
- <51C4171C.9050908@linutronix.de> <51C48B5A.2040404@ti.com>
- <51CCA67C.2010803@gmail.com>
- <CACxGe6vOH0sCFVVXrYqD3dbYdOvithVu7-d1cvy5885i8x_Myw@mail.gmail.com>
- <20130628134931.GD21034@game.jcrosoft.org> <51CE1F92.3070802@ti.com>
- <51D1345B.8020509@linutronix.de>
- <CAMuHMdV6YM3-hASqjxkguEukZjnjK80gBjDNiabxjfQtC=c8ag@mail.gmail.com>
-Message-ID: <51D1393E.6060001@linutronix.de>
+From: naresh.kamboju@linaro.org (Naresh Kamboju)
+Date: Mon, 1 Jul 2013 13:44:49 +0530
+Subject: linux-next: panda build failed at
+ arch/arm/mach-omap2/omap4-restart.c
+In-Reply-To: <874ncluatb.fsf@linaro.org>
+References: <CA+G9fYv_9EQUmpRNPUwioSwJVXnXJC5odEKiMd=vKHNWYRT8xw@mail.gmail.com>
+ <CA+G9fYupw8Gi=5p2nKVJ9GqfhwBcTw7hyzGA8+K+gHmdL96mJg@mail.gmail.com>
+ <874ncluatb.fsf@linaro.org>
+Message-ID: <CA+G9fYtYV6htwVP9aTM+Pc0jFyowDoTdiykxF0cY8RAwcpmKVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2013 09:59 AM, Geert Uytterhoeven wrote:
-> That's actual the original reason: DT has it as 64 bit, and passes it to a
-> 32 bit kernel when running in 32 bit mode without PAE.
+Hi Kevin,
 
-And I think the DT code should check if the u64 fits in phys_addr_t and
-if does not it should write an error message and act like no initrd was
-specified (instead of passing "something" to the architecture).
+On 26 June 2013 03:12, Kevin Hilman <khilman@linaro.org> wrote:
+> Naresh Kamboju <naresh.kamboju@linaro.org> writes:
+>
+>> ping
+>
+> This is a known issue[1] and already has some proposed fixes, they are just
+> not merged yet.
+>
+> Kevin
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/178209.html
+>
 
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-
-Sebastian
+Now the panda builds are back to work on linux-next.
+https://ci.linaro.org/jenkins/job/linux-next/
+-Naresh Kamboju
