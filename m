@@ -1,56 +1,86 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 1 Jul 2013 13:51:13 +0100
-Subject: [PATCH 2/4] ASoC: sgtl5000: defer the probe if clock is not found
-In-Reply-To: <20130701113310.GA24642@n2100.arm.linux.org.uk>
-References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
- <1372666571-17276-3-git-send-email-shawn.guo@linaro.org>
- <20130701094525.GY27646@sirena.org.uk>
- <20130701113310.GA24642@n2100.arm.linux.org.uk>
-Message-ID: <20130701125113.GK27646@sirena.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 1 Jul 2013 14:55:08 +0200
+Subject: [v2 2/4] imx: ahci: enable ahci sata on imx6q platforms
+In-Reply-To: <1372672975-2997-3-git-send-email-r65037@freescale.com>
+References: <1372672975-2997-1-git-send-email-r65037@freescale.com>
+ <1372672975-2997-3-git-send-email-r65037@freescale.com>
+Message-ID: <20130701125508.GX516@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 12:33:10PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 01, 2013 at 10:45:25AM +0100, Mark Brown wrote:
+On Mon, Jul 01, 2013 at 06:02:53PM +0800, Richard Zhu wrote:
+> Only the imx6q contains the ahci sata controller,
+> other imx6 SoCs don't have it.
+> 
+> Enable the ahci sata only on imx6q platforms
+> 
+> Signed-off-by: Richard Zhu <r65037@freescale.com>
+> ---
+>  arch/arm/mach-imx/mach-imx6q.c |   85 +++++++++++++++++++++++++++++++++++++++-
+> +/* imx6q ahci module initialization. */
+> +static int imx6q_sata_phy_clk(struct device *dev, int enable)
+> +{
+> +	int ret = 0;
+> +	struct clk *sata_ref_clk;
+> +
+> +	sata_ref_clk = devm_clk_get(dev, "sata_ref_100m");
+> +	if (IS_ERR(sata_ref_clk)) {
+> +		dev_err(dev, "can't get sata_ref clock.\n");
+> +		return PTR_ERR(sata_ref_clk);
+> +	}
 
-> > Why not fix this in the clock API - the same logic is going to apply to
-> > a great proportion of clocks?
+devm_clk_get takes a reference to the clock. That's not something you
+want to do each time you enable/disable a clock.
 
-> It's not ever clear whether a missing clock is because it's just not
-> provided or whether it's because it hasn't been registered yet.  The
-> decision to defer on missing resources is something which a _driver_
-> using the resource should make, not the subsystem providing the
-> resource - because the driver should know better whether that resource
-> is optional, whether it can continue to initialise without it and maybe
-> try again later, or whether it does need to defer.
+> +	if (enable) {
+> +		/* Enable PHY clock */
+> +		ret = clk_prepare_enable(sata_ref_clk);
+> +		if (ret < 0) {
+> +			dev_err(dev, "can't prepare-enable sata_ref clock\n");
+> +			clk_put(sata_ref_clk);
+> +			ret = PTR_ERR(sata_ref_clk);
 
-Given how common it is to have a hard requirement for a clock I think we
-should at least have a helper which implements deferral, even if it's
-not part of the default request function, since so many drivers ought to
-be using it.  Doing this in by default doesn't prevent the driver
-overriding, though - the driver can choose to squash down the PROBE_DEFER
-into a fatal error.
+What are you intending by converting a valid pointer to an error code?
 
-One nice thing you can sometimes do here in the DT case is to have the
-subsystem tell the driver the difference between "this clock is mapped
-but not yet registered" and "this clock is not physically present"
-though there's never any guarantee that the provided resource will
-actually load.  I don't think the idiom for the clock API is to provide
-every single clock in DT though so that might not be doable.
+> +		}
+> +	} else {
+> +		/* Disable PHY clock */
+> +		clk_disable_unprepare(sata_ref_clk);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static int imx6q_sata_init(struct device *dev, void __iomem *addr)
+> +{
+> +	int ret = 0;
+> +	struct regmap *gpr;
+> +
+> +	ret = imx6q_sata_phy_clk(dev, true);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+> +	if (IS_ERR(gpr)) {
+> +		pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
+> +		return PTR_ERR(gpr);
+> +	}
+> +
+> +	/*
+> +	 * set PHY Paremeters, two steps to configure the GPR13,
+> +	 * one write for rest of parameters, mask of first write
+> +	 * is 0x07fffffd, and the other one write for setting
+> +	 * the mpll_clk_en.
+> +	 */
+> +	regmap_update_bits(gpr, 0x34, 0x07fffffd, 0x0593e4c4);
 
-> Take for instance a video driver. :)  It may be that it can't do all
-> resolutions, but it can do some without an external clock, so it may
-> decide that it can initialise without the external clock and allow one
-> of the possible modes to be set - and when the external clock does
-> appear, it can then allow the other modes.
+You are adding the register defines in the next patch. Wouldn't it make
+sense to use them?
 
-Yes, that's the sort of case where you do definitely want to just carry
-on (though there is then some vulnerability to changes in init ordering
-with things like modular kernels).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130701/34be7eea/attachment.sig>
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
