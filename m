@@ -1,110 +1,34 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 1 Jul 2013 11:16:45 +0300
-Subject: [RFC PATCH 4/6] USB: ehci-omap: Suspend the controller during
- bus suspend
-In-Reply-To: <Pine.LNX.4.44L0.1306281346430.1047-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1306281346430.1047-100000@iolanthe.rowland.org>
-Message-ID: <51D13AED.4010307@ti.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 1 Jul 2013 10:18:32 +0200
+Subject: [PATCH 03/23] ARM: dt: tegra30: iommu: Add "nvidia,memory-clients"
+In-Reply-To: <1372244646.2986.17.camel@jlo-ubuntu-64.nvidia.com>
+References: <20130626101028.GD27083@manwe><20130626.133314.1520719774895092173.hdoyu@nvidia.com><1372244646.2986.17.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <20130701.111832.2076981043593380845.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2013 10:06 PM, Alan Stern wrote:
-> On Fri, 28 Jun 2013, Roger Quadros wrote:
-> 
->>> That's not what I meant.  Never mind the pinctrl; I was asking about
->>> the EHCI controller itself.  Under what circumstances does the
->>> controller assert its wakeup signal?  And how do you tell it to stop
->>> asserting that signal?
->>
->> I believe this would be through the EHCI Interrupt enable register (USBINTR).
->> I'm not aware of any other mechanism.
-> 
-> That's strange, because ehci_suspend() sets the intr_enable register to 
-> 0.  So how do you ever get any wakeup interrupts at all?
+Joseph Lo <josephl@nvidia.com> wrote @ Wed, 26 Jun 2013 13:04:06 +0200:
 
-Because after ehci_suspend() for OMAP, we solely rely on the out of band wake up
-mechanism. i.e. Pad wakeup.
+> On Wed, 2013-06-26 at 18:33 +0800, Hiroshi Doyu wrote:
+> > Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 26 Jun 2013 12:10:30 +0200:
+> > 
+> > > * PGP Signed by an unknown key
+> > > 
+> > > On Wed, Jun 26, 2013 at 12:28:06PM +0300, Hiroshi Doyu wrote:
+> > > > Add "nvidia,memory-clients" to identify which swgroup ID a device
+> > > > belongs to.
+> > > 
+> > > Why not call the property "nvidia,swgid" instead? That seems a lot more
+> > > intuitive.
+> > 
+> > Tegra powerdomain also needs this info. Joseph?
 > 
->> Right. It seems the external hub has signaled remote wakeup but the kernel doesn't
->> resume the root hub's port it is connected to.
->>
->> By observing the detailed logs below you can see that the root hub does not generate
->> an INTerrupt transaction to notify the port status change event. I've captured the pstatus
->> and GetPortStatus info as well.
-> 
-> We don't need an interrupt.  The driver is supposed to detect the
-> remote wakeup sent by the external hub all by itself.
+> Ah, yes. We need some kind of this information to know the relation in
+> the power domain when we wants to power down it.  But it didn't upstream
+> yet and still in very early stage of the design. I believe you can
+> ignore that and do the good design here for your usage. We can re-use
+> the binding if it point to the same HW behind that.
 
-OK. Then it could point to a bug in our stack.
-> 
->> Failing case
->> ------------
->>
->> [   16.108032] usb usb1: usb auto-resume
->> [   16.108062] ehci-omap 48064800.ehci: resume root hub
->> [   16.108154] hub 1-0:1.0: hub_resume
->> [   16.108398] ehci_hub_control GetPortStatus, port 1 temp = 0x1000
->> [   16.108459] ehci_hub_control GetPortStatus, port 2 temp = 0x14c5
-> 
-> Here's where we should detect it.  Look at the GetPortStatus case in
-> ehci_hub_control(); the PORT_RESUME bit (0x0040) is set in temp, so the
-> "Remote Wakeup received?" code should run.  In particular, these lines
-> should run:
-> 
-> 			/* resume signaling for 20 msec */
-> 			ehci->reset_done[wIndex] = jiffies
-> 					+ msecs_to_jiffies(20);
-> 			usb_hcd_start_port_resume(&hcd->self, wIndex);
-> 			/* check the port again */
-> 			mod_timer(&ehci_to_hcd(ehci)->rh_timer,
-> 					ehci->reset_done[wIndex]);
-> 
-> Therefore 20 ms later, around timestamp 16.128459,
-> ehci_hub_status_data() should have been called.  At that time, the
-> root-hub port should have been fully resumed.
-
-OK. right.
-> 
->> [   16.108551] hub 1-0:1.0: port 2: status 0507 change 0000
->> [   16.108612] ehci_hub_control GetPortStatus, port 3 temp = 0x1000
->> [   16.108642] hub 1-0:1.0: hub_activate submitting urb
->> [   16.109222] ehci_irq port 3 pstatus 0x1000
->> [   16.109222] ehci_irq port 2 pstatus 0x14c5
->> [   16.109252] ehci_irq port 1 pstatus 0x1000
->> [   16.109374] hub 1-0:1.0: state 7 ports 3 chg 0000 evt 0000
-> 
-> But apparently nothing happened.  Why not?  Did the rh_timer get reset?  
-> Maybe you can find out what went wrong.
-> 
-
-Sure. I'll investigate.
-
-> (Hmmm, we seem to be missing a
-> 
-> 			set_bit(wIndex, &ehci->resuming_ports);
-> 
-> line in there...)
-> 
->>> Also, why do you need omap->initialized?  Do you think you might get a 
->>> wakeup interrupt before the controller has been fully set up?  I don't 
->>> see how you could, given the pm_runtime_get_sync() call in the probe 
->>> routine.
->>>
->>
->> During probe we need to runtime_resume the device before usb_add_hcd() since the
->> controller clocks must be enabled before any registers are accessed.
->> However, we cannot call ehci_resume() before usb_add_hcd(). So to prevent this
->> chicken & egg situation, I've used the omap->initialized flag. It only indicates that
->> the ehci structures are initialized and we can call ehci_resume/suspend().
-> 
-> Ah, yes.  Other subsystems, such as PCI, face exactly the same problem.
-> 
-> You probably shouldn't call it "initialized", though, because the same
-> issue arises in ehci_hcd_omap_remove() -- the pm_runtime_put_sync()  
-> there would end up calling ehci_suspend() after usb_remove_hcd().  
-> "bound" or "started" would be better names.
-> 
-OK. Started seems fine.
-
-cheers,
--roger
+Ok, at least, I'll move this "tegra-swgid.h" to under "include/dt-bindings/memory/".
+This look to suite better than "include/dt-bindings/iommu/" since this
+isn't specific to iommu but others needs from memory client POV.
