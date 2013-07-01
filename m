@@ -1,25 +1,33 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Wed, 31 Jul 2013 23:43:18 -0500
-Subject: [PATCH 2/2] Convert PowerPC macro spin_event_timeout() to
- architecture independent macro
-In-Reply-To: <0DFB48290CDB0C4680160EBE62E8F9A809E9A2E0@039-SN2MPN1-023.039d.mgd.msft.net>
-References: <1375187900-17582-1-git-send-email-B44344@freescale.com>	<1375187900-17582-3-git-send-email-B44344@freescale.com>
- <CAOZdJXW8uF_e2nQr3gAiMf4E5pvsH_S-ztAXvx9R7-nXyaZGag@mail.gmail.com>
- <0DFB48290CDB0C4680160EBE62E8F9A809E9A2E0@039-SN2MPN1-023.039d.mgd.msft.net>
-Message-ID: <51F9E766.604@tabi.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon,  1 Jul 2013 13:25:52 +0900
+Subject: [PATCH v3 0/3] ARM: shmobile: lager: enable Ether
+Message-ID: <1372652755-16948-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Goel Arpit-B44344 wrote:
-> PowerPC uses hardware timer registers provided by PowerPC architecture to implement spin_event_timeout(). These registers make
-> PowerPC implementation of spin_event_timeout() more granular in comparison to ones using generic USECS_PER_JIFFY framework. This
-> would handle those cases more granularly in which evaluation of "condition" is taking time or fails.
+Hi,
 
-LOL, it seems I forgot how my own code works.  Thanks for the reminder. 
-  For some reason, I thought the PowerPC version was also using 
-'jiffies'.  The concern about using 'jiffies' makes a lot more sense now.
+this short series enables the on-board ethernet
+of the r8a7790 SoC for on lager baord.
 
-Almost every architecture has a timebase counter.  Wouldn't it make more 
-sense to port tb_ticks_per_usec, get_tbl(), and tb_ticks_since() to 
-other architectures instead?  I don't think 'jiffies' is granular enough 
-for spin_event_timeout().
+It is based on the renesas-next-20130509 tag of my renesas tree.
+
+It has a run-time dependency on
+"sh_eth: add support for r8a7790 SoC"
+
+It has been built on top of renesas-next-20130701.
+
+Simon Horman (3):
+  ARM: shmobile: r8a7790: add Ether support
+  ARM: shmobile: lager: enable Ether
+  ARM: shmobile: lager: enable nfsroot in DTS
+
+ arch/arm/boot/dts/r8a7790-lager.dts           |  2 +-
+ arch/arm/mach-shmobile/board-lager.c          | 24 ++++++++++++++++++++++++
+ arch/arm/mach-shmobile/clock-r8a7790.c        |  4 ++++
+ arch/arm/mach-shmobile/include/mach/r8a7790.h |  3 +++
+ arch/arm/mach-shmobile/setup-r8a7790.c        | 14 ++++++++++++++
+ 5 files changed, 46 insertions(+), 1 deletion(-)
+
+-- 
+1.8.2.1
