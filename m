@@ -1,17 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Jul 2013 16:45:10 +0800
-Subject: [PATCH 1/2] ARM i.MX6DL: parent LDB DI clocks to PLL5 on i.MX6S/DL
-In-Reply-To: <1372422256-22037-1-git-send-email-p.zabel@pengutronix.de>
-References: <1372422256-22037-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130701084508.GD13206@S2101-09.ap.freescale.net>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon,  1 Jul 2013 10:39:36 +0200
+Subject: [RFC PATCH 11/13] sound: atmel-pcm-dma: check pointer before
+ dereference
+In-Reply-To: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
+References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1372667978-4718-12-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 02:24:15PM +0200, Philipp Zabel wrote:
-> i.MX6S/DL have the Video PLL post dividers fixed already in revision 1.0
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+If platform_data is NULL, filter() is called with a NULL slave
+parameter.
 
-Applied, thanks.
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+ sound/soc/atmel/atmel-pcm-dma.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-Shawn
+diff --git a/sound/soc/atmel/atmel-pcm-dma.c b/sound/soc/atmel/atmel-pcm-dma.c
+index 1d38fd0..b20dbba 100644
+--- a/sound/soc/atmel/atmel-pcm-dma.c
++++ b/sound/soc/atmel/atmel-pcm-dma.c
+@@ -96,6 +96,9 @@ static bool filter(struct dma_chan *chan, void *slave)
+ {
+ 	struct at_dma_slave *sl = slave;
+ 
++	if (!sl)
++		return false;
++
+ 	if (sl->dma_dev == chan->device->dev) {
+ 		chan->private = sl;
+ 		return true;
+-- 
+1.7.10.4
