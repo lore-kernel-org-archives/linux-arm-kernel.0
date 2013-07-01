@@ -1,54 +1,159 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 1 Jul 2013 16:28:12 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the net-next tree
-Message-ID: <20130701162812.def47813e7d94c27950f3e82@canb.auug.org.au>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 01 Jul 2013 16:07:24 +0900
+Subject: [PATCH V3 3/3] video: exynos_dp: Use the generic PHY driver
+In-Reply-To: <51D12164.6030507@ti.com>
+References: <005401ce761b$504d7090$f0e851b0$@samsung.com>
+ <51D12164.6030507@ti.com>
+Message-ID: <005d01ce7629$a3801520$ea803f60$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Monday, July 01, 2013 3:28 PM, Kishon Vijay Abraham I wrote:
+> 
+> Hi,
+> 
+> On Monday 01 July 2013 10:54 AM, Jingoo Han wrote:
+> > Use the generic PHY API instead of the platform callback to control
+> > the DP PHY. The 'phy_label' field is added to the platform data
+> > structure to allow PHY lookup on non-dt platforms.
+> >
+> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> > Acked-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >   .../devicetree/bindings/video/exynos_dp.txt        |   23 +---
+> >   drivers/video/exynos/exynos_dp_core.c              |  118 ++------------------
+> >   drivers/video/exynos/exynos_dp_core.h              |    2 +
+> >   include/video/exynos_dp.h                          |    6 +-
+> >   4 files changed, 21 insertions(+), 128 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt
+> b/Documentation/devicetree/bindings/video/exynos_dp.txt
+> > index 84f10c1..71645dc 100644
+> > --- a/Documentation/devicetree/bindings/video/exynos_dp.txt
+> > +++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
+> > @@ -1,17 +1,6 @@
+> >   The Exynos display port interface should be configured based on
+> >   the type of panel connected to it.
+> >
+> > -We use two nodes:
+> > -	-dp-controller node
+> > -	-dptx-phy node(defined inside dp-controller node)
+> > -
+> > -For the DP-PHY initialization, we use the dptx-phy node.
+> > -Required properties for dptx-phy:
+> > -	-reg:
+> > -		Base address of DP PHY register.
+> > -	-samsung,enable-mask:
+> > -		The bit-mask used to enable/disable DP PHY.
+> > -
+> >   For the Panel initialization, we read data from dp-controller node.
+> >   Required properties for dp-controller:
+> >   	-compatible:
+> > @@ -25,6 +14,10 @@ Required properties for dp-controller:
+> >   		from common clock binding: handle to dp clock.
+> >   	-clock-names:
+> >   		from common clock binding: Shall be "dp".
+> > +	-phys:
+> > +		from general phy binding: the phandle for the PHY device.
+> > +	-phy-names:
+> > +		from general phy binding: Should be "dp".
+> >   	-interrupt-parent:
+> >   		phandle to Interrupt combiner node.
+> >   	-samsung,color-space:
+> > @@ -67,12 +60,8 @@ SOC specific portion:
+> >   		interrupt-parent = <&combiner>;
+> >   		clocks = <&clock 342>;
+> >   		clock-names = "dp";
+> > -
+> > -		dptx-phy {
+> > -			reg = <0x10040720>;
+> > -			samsung,enable-mask = <1>;
+> > -		};
+> > -
+> > +		phys = <&dp_phy>;
+> > +		phy-names = "dp";
+> >   	};
+> >
+> >   Board Specific portion:
+> > diff --git a/drivers/video/exynos/exynos_dp_core.c b/drivers/video/exynos/exynos_dp_core.c
+> > index 12bbede..bac515b 100644
+> > --- a/drivers/video/exynos/exynos_dp_core.c
+> > +++ b/drivers/video/exynos/exynos_dp_core.c
+> > @@ -19,6 +19,7 @@
+> >   #include <linux/interrupt.h>
+> >   #include <linux/delay.h>
+> >   #include <linux/of.h>
+> > +#include <linux/phy/phy.h>
+> >
+> >   #include <video/exynos_dp.h>
+> >
+> > @@ -960,84 +961,15 @@ static struct exynos_dp_platdata *exynos_dp_dt_parse_pdata(struct device *dev)
+> >   		return ERR_PTR(-EINVAL);
+> >   	}
+> >
+> > -	return pd;
+> > -}
+> > -
+> > -static int exynos_dp_dt_parse_phydata(struct exynos_dp_device *dp)
+> > -{
+> > -	struct device_node *dp_phy_node = of_node_get(dp->dev->of_node);
+> > -	u32 phy_base;
+> > -	int ret = 0;
+> > -
+> > -	dp_phy_node = of_find_node_by_name(dp_phy_node, "dptx-phy");
+> > -	if (!dp_phy_node) {
+> > -		dev_err(dp->dev, "could not find dptx-phy node\n");
+> > -		return -ENODEV;
+> > -	}
+> > -
+> > -	if (of_property_read_u32(dp_phy_node, "reg", &phy_base)) {
+> > -		dev_err(dp->dev, "failed to get reg for dptx-phy\n");
+> > -		ret = -EINVAL;
+> > -		goto err;
+> > -	}
+> > -
+> > -	if (of_property_read_u32(dp_phy_node, "samsung,enable-mask",
+> > -				&dp->enable_mask)) {
+> > -		dev_err(dp->dev, "failed to get enable-mask for dptx-phy\n");
+> > -		ret = -EINVAL;
+> > -		goto err;
+> > -	}
+> > -
+> > -	dp->phy_addr = ioremap(phy_base, SZ_4);
+> > -	if (!dp->phy_addr) {
+> > -		dev_err(dp->dev, "failed to ioremap dp-phy\n");
+> > -		ret = -ENOMEM;
+> > -		goto err;
+> > -	}
+> > -
+> > -err:
+> > -	of_node_put(dp_phy_node);
+> > -
+> > -	return ret;
+> > -}
+> > -
+> > -static void exynos_dp_phy_init(struct exynos_dp_device *dp)
+> > -{
+> > -	u32 reg;
+> > -
+> > -	reg = __raw_readl(dp->phy_addr);
+> > -	reg |= dp->enable_mask;
+> > -	__raw_writel(reg, dp->phy_addr);
+> > -}
+> > -
+> > -static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
+> > -{
+> > -	u32 reg;
+> > +	pd->phy_label = "dp";
+> 
+> Felipe had a comment to change the label to *display-port* no?
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-mxs/mach-mxs.c between commit b7c4114b07bb ("can: flexcan:
-Use a regulator to control the CAN transceiver") from the net-next tree
-and commit 2046338dcbc6 ("ARM: mxs: Use soc bus infrastructure") from the
-arm-soc tree.
+No, I don't think so. :)
+I would like to use 'dp'.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Best regards,
+Jingoo Han
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-mxs/mach-mxs.c
-index 97b8a44,7fa611c..0000000
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@@ -323,13 -477,14 +432,14 @@@ static void __init mxs_machine_init(voi
-  		imx28_evk_init();
-  	else if (of_machine_is_compatible("bluegiga,apx4devkit"))
-  		apx4devkit_init();
-- 	else if (of_machine_is_compatible("crystalfontz,cfa10037"))
-- 		cfa10037_init();
-- 	else if (of_machine_is_compatible("crystalfontz,cfa10049"))
-- 		cfa10049_init();
-+ 	else if (of_machine_is_compatible("crystalfontz,cfa10037") ||
-+ 		 of_machine_is_compatible("crystalfontz,cfa10049") ||
-+ 		 of_machine_is_compatible("crystalfontz,cfa10055") ||
-+ 		 of_machine_is_compatible("crystalfontz,cfa10057"))
-+ 		crystalfontz_init();
-  
-  	of_platform_populate(NULL, of_default_bus_match_table,
-- 			     NULL, NULL);
- -			     mxs_auxdata_lookup, parent);
-++			     NULL, parent);
-  
-  	if (of_machine_is_compatible("karo,tx28"))
-  		tx28_post_init();
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130701/20d169de/attachment.sig>
+> 
+> Thanks
+> Kishon
