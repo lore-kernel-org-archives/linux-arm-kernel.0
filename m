@@ -1,70 +1,43 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  1 Jul 2013 15:23:28 +0200
-Subject: [PATCHv4 7/8] ARM: mxs: dt: cfa10057: remove hogpins
+Date: Mon,  1 Jul 2013 15:23:29 +0200
+Subject: [PATCHv4 8/8] ARM: mxs: dt: cfa10036: make hogpins grabbed by
+ respective drivers
 In-Reply-To: <1372685009-15564-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1372685009-15564-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1372685009-15564-8-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1372685009-15564-9-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Necessary pins are now grabbed by respective drivers. Unecessary hogpins are
-simply removed.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/imx28-cfa10057.dts | 23 +++--------------------
- 1 file changed, 3 insertions(+), 20 deletions(-)
+ arch/arm/boot/dts/imx28-cfa10036.dts | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10057.dts b/arch/arm/boot/dts/imx28-cfa10057.dts
-index 2da713c..0333c05 100644
---- a/arch/arm/boot/dts/imx28-cfa10057.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10057.dts
-@@ -23,35 +23,16 @@
+diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
+index 94c4476..1ec8c94 100644
+--- a/arch/arm/boot/dts/imx28-cfa10036.dts
++++ b/arch/arm/boot/dts/imx28-cfa10036.dts
+@@ -23,10 +23,7 @@
  	apb at 80000000 {
  		apbh at 80000000 {
  			pinctrl at 80018000 {
--				pinctrl-names = "default", "default";
--				pinctrl-1 = <&hog_pins_cfa10057
--					&hog_pins_cfa10057_pullup>;
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&hog_pins_cfa10036>;
 -
--				hog_pins_cfa10057: hog-10057 at 0 {
-+				usb_pins_cfa10057: usb-10057 at 0 {
+-				hog_pins_cfa10036: hog-10036 at 0 {
++				ssd1306_cfa10036: ssd1306-10036 at 0 {
  					reg = <0>;
  					fsl,pinmux-ids = <
- 						0x0073 /* MX28_PAD_GPMI_D7__GPIO_0_7 */
--						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
- 					>;
- 					fsl,drive-strength = <0>;
- 					fsl,voltage = <1>;
- 					fsl,pull-up = <0>;
- 				};
+ 						0x2073 /* MX28_PAD_SSP0_D7__GPIO_2_7 */
+@@ -83,6 +80,8 @@
  
--				hog_pins_cfa10057_pullup: hog-10057-pullup at 0 {
--					reg = <0>;
--					fsl,pinmux-ids = <
--						0x2133 /* MX28_PAD_SSP2_D3__GPIO_2_19 */
--						0x3183 /* MX28_PAD_I2C0_SCL__GPIO_3_24 */
--						0x3193 /* MX28_PAD_I2C0_SDA__GPIO_3_25 */
--						0x31a3 /* MX28_PAD_SAIF_SDATA0__GPIO_3_26 */
--						0x31e3 /* MX28_PAD_LCD_RESET__GPIO_3_30 */
--					>;
--					fsl,drive-strength = <0>;
--					fsl,voltage = <1>;
--					fsl,pull-up = <1>;
--				};
--
- 				lcdif_18bit_pins_cfa10057: lcdif-18bit at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
-@@ -164,6 +145,8 @@
- 
- 		reg_usb1_vbus: usb1_vbus {
- 			compatible = "regulator-fixed";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&usb_pins_cfa10057>;
- 			regulator-name = "usb1_vbus";
- 			regulator-min-microvolt = <5000000>;
- 			regulator-max-microvolt = <5000000>;
+ 				ssd1306: oled@3c {
+ 					compatible = "solomon,ssd1306fb-i2c";
++					pinctrl-names = "default";
++					pinctrl-0 = <&ssd1306_cfa10036>;
+ 					reg = <0x3c>;
+ 					reset-gpios = <&gpio2 7 0>;
+ 					solomon,height = <32>;
 -- 
 1.8.1.2
