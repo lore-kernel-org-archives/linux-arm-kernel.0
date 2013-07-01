@@ -1,53 +1,130 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon,  1 Jul 2013 11:06:09 +0200
-Subject: [PATCH v2] ARM: dts: add sram for imx53 and imx6q
-Message-ID: <1372669569-12446-1-git-send-email-p.zabel@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 01 Jul 2013 11:23:43 +0200
+Subject: [PATCH 1/3] ARM: EXYNOS: remove non-working AFTR mode support
+In-Reply-To: <23262498.GmEHQP5Xlz@flatron>
+References: <1372241627-22695-1-git-send-email-b.zolnierkie@samsung.com>
+ <1721255.XMYjiW81jp@amdc1227> <51CE0DB8.5040407@linaro.org>
+ <23262498.GmEHQP5Xlz@flatron>
+Message-ID: <51D14A9F.6000407@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the On-Chip SRAM (OCRAM) on i.MX53 and i.MX6 SoCs.
+On 06/29/2013 01:07 AM, Tomasz Figa wrote:
+> On Saturday 29 of June 2013 00:27:04 Daniel Lezcano wrote:
+>> On 06/28/2013 07:31 PM, Tomasz Figa wrote:
+>>> On Friday 28 of June 2013 13:20:09 Daniel Lezcano wrote:
+>> [ ... ]
+>>
+>>>> The kernel is not a playground where you can upstream code and then
+>>>> remove it because a feature seems broken and you don't have an idea
+>>>> of
+>>>> why.
+>>>
+>>> Well, first of all, it has not been upstreamed correctly: a) without
+>>> any given rationale (or at least without any I could find) and b)
+>>> without enough testing.
+>>
+>> +1
+>>
+>>>> I asked several times the reasons of why the AFTR state couldn't work
+>>>> with multiple CPUs and I had no answer.
+>>>>
+>>>> Frankly speaking I have a couple of hypothesis:
+>>>>
+>>>> 1. something is not correctly setup and the PMU does not wake up the
+>>>> CPU1 2. there is a silicon bug and no one wants to tell it is the
+>>>> case
+>>>>
+>>>> In any case, this must be investigated and identified. And then we
+>>>> can
+>>>> take a decision about this state.
+>>>
+>>> Well, everything you're saying is correct, assuming that this feature
+>>> is useful, which needs confirmation. I'd still want any evidence of
+>>> this feature being of any use first, to not waste time on something
+>>> that is useless.
+>>
+>> IMHO, it is useful. That's sure a highly integrated hardware with a lot
+>> of peripherals, the power saving is lost in the noise but with a small
+>> embedded device, the power saving is significant.
+> 
+> Be aware that we might be talking here about savings of single 
+> milliamperes, because the highest, dynamic, power consumption is already 
+> bypassed in WFI idle mode, with stopped core clock.
+> 
+> Our measurements have shown that static leakage is pretty low on SoCs we 
+> checked, that is Exynos 4210 and Exynos 4412. I don't remember exactly 
+> ATM, because it was some time ago, but it was something around 2 mA per 
+> core.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
----
-Changes since v1:
- - Fixed compatible property to only include "mmio-sram"
- - Renamed device nodes to "sram"
----
- arch/arm/boot/dts/imx53.dtsi   | 5 +++++
- arch/arm/boot/dts/imx6qdl.dtsi | 6 ++++++
- 2 files changed, 11 insertions(+)
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index d437bfb..cec6cdd 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -1087,5 +1087,10 @@
- 				status = "disabled";
- 			};
- 		};
-+
-+		ocram: sram at f8000000 {
-+			compatible = "mmio-sram";
-+			reg = <0xf8000000 0x20000>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 2d73f83..4033ad4 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -100,6 +100,12 @@
- 			status = "disabled";
- 		};
- 
-+		ocram: sram at 00900000 {
-+			compatible = "mmio-sram";
-+			reg = <0x00900000 0x3f000>;
-+			clocks = <&clks 142>;
-+		};
-+
- 		timer at 00a00600 {
- 			compatible = "arm,cortex-a9-twd-timer";
- 			reg = <0x00a00600 0x20>;
+Ok I don't know exactly the values but I am a bit surprised by this
+small value. When I measured the power consumption with a core offline
+it saved roughly 100mA (AFAIR). Of course, there is no dynamic with the
+hotplugging but there is really a big difference here.
+
+With another board with similar hardware (but a different SoC), just
+putting the cores in retention mode in the cpuidle drivers saved 13mA.
+
+Is it possible for the exynos board, the target residency is too large
+for AFTR mode ? Is this value really resulting from a measurement or
+just put there arbitrarily ? And, may be, it does not enter enough in
+this state to have a significant power saving.
+
+> Now it depends on overall power consumption of given system, whether such 
+> saving is significant or ignorable - in our case it is the latter, because 
+> consumption caused by rest of the system (think of display, wireless 
+> radios, etc.) is much higher.
+> 
+>> What I am worried about is the different SoCs being introduced in this
+>> driver without investigating this cpu1 restriction and it sounds like
+>> the AFTR seems to work (I have an odroid-u2 with a 4412 I will test to
+>> check if the AFTR works on it) and nobody seems to be hurt by this and,
+>> as you stated, there is no rational about it. That means the Exynos will
+>> become really more and more power aggressive with 4/A15 or 8/A15 based
+>> boards if the AFTR state is not correctly supported.
+> 
+> See my other reply, for a bit more information about this state and CPU1 
+> restriction.
+> 
+>> AFAICT, there is also the LPA state and the DEEPSLEEP, right ? If the
+>> AFTR does not work, I don't see these states working too.
+> 
+> Yes, there are other states as well. With similar execution flow, but 
+> different set of preserved and lost context, requiring more or less save 
+> and restore on kernel side.
+> 
+>> The cpuidle driver is critical for the new b.L architecture. If we
+>> aren't able to put a cluster of big cpus in a power down state, we lose
+>> the benefit of all the work made up-front at the scheduler level (eg.
+>> small task packing, workqueue/timer migration) and more generally we
+>> lose the benefit of the b.L architecture (except if we do some hacks
+>> which are orthogonal to the generic approach).
+> 
+> In this case just simple power down of CPU cores is enough, which doesn't 
+> require entering system-wide low power state, such as AFTR and friends. 
+> Such low power mode is needed only when you want to power off all the 
+> cores, which makes you lose program execution state.
+> 
+> When at least one of the cores is still active, the whole system is in 
+> control of kernel and no special care must be taken to bring up cores that 
+> are down and back, just standard SMP/hotplug ops.
+
+Yes but unfortunately this approach has been nacked by the community
+last year with the OMAP4.
+
+
 -- 
-1.8.3.1
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
+
+  * English - detected
+  * English
+  * French
+
+  * English
+  * French
+
+ <javascript:void(0);>
