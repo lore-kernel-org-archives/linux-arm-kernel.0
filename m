@@ -1,33 +1,42 @@
 From: xobs@kosagi.com (Sean Cross)
-Date: Mon,  1 Jul 2013 07:15:45 +0000
-Subject: [PATCH 2/4] ARM: Enable PCI Express on ARM
+Date: Mon,  1 Jul 2013 07:15:47 +0000
+Subject: [PATCH 4/4] ARM i.MX6: Add PCI Express to device tree
 In-Reply-To: <1372662947-27160-1-git-send-email-xobs@kosagi.com>
 References: <1372662947-27160-1-git-send-email-xobs@kosagi.com>
-Message-ID: <1372662947-27160-3-git-send-email-xobs@kosagi.com>
+Message-ID: <1372662947-27160-5-git-send-email-xobs@kosagi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some ARM devices have PCI Express hardware, and should be able to take
-advantage of PCI Express code present in the common driver files.  Enable
-PCI Express on ARM, when PCI is available.
+Add a PCI Express port to the i.MX6 device tree using interrupts, clocks,
+and memory ranges appropriate for the device.
 
 Signed-off-by: Sean Cross <xobs@kosagi.com>
 ---
- arch/arm/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/imx6qdl.dtsi |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 136f263..2f51f13 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1418,6 +1418,8 @@ config PCI_HOST_ITE8152
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 9e8296e..4b5facb 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -654,6 +654,18 @@
+ 				status = "disabled";
+ 			};
  
- source "drivers/pci/Kconfig"
- 
-+source "drivers/pci/pcie/Kconfig"
++			pcie: pcie at 01ffc000 {
++				compatible = "fsl,imx6q-pcie";
++				reg = <0x01ffc000 0x4000>,
++				      <0x01000000 0x100000>,
++				      <0x01100000 0xe00000>,
++				      <0x01f00000 0xfc000>;
++				interrupts = <0 122 0x04>;
++				clocks = <&clks 186>, <&clks 189>, <&clks 196>, <&clks 198>, <&clks 144>;
++				clock-names = "sata_ref", "pcie_ref_125m", "lvds1_sel", "lvds1", "pcie_axi";
++				status = "disabled";
++			};
 +
- source "drivers/pcmcia/Kconfig"
- 
- endmenu
+ 			mlb at 0218c000 {
+ 				reg = <0x0218c000 0x4000>;
+ 				interrupts = <0 53 0x04 0 117 0x04 0 126 0x04>;
 -- 
 1.7.9.5
