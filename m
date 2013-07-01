@@ -1,115 +1,79 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  1 Jul 2013 16:20:32 +0900
-Subject: [PATCH v4 1/3] ARM: shmobile: r8a7790: add Ether support
-In-Reply-To: <1372663234-13486-1-git-send-email-horms+renesas@verge.net.au>
-References: <1372663234-13486-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1372663234-13486-2-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 1 Jul 2013 16:32:38 +0900
+Subject: [PATCH 01/04] ARM: shmobile: Use default ->init_irq() on EMEV2
+In-Reply-To: <20130701060112.21728.37189.sendpatchset@w520>
+References: <20130701060103.21728.83833.sendpatchset@w520>
+ <20130701060112.21728.37189.sendpatchset@w520>
+Message-ID: <20130701073237.GU14567@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Ether clock and platform device for R8A7779 SoC; add a function to
-register this device with board-specific platform data.
+On Mon, Jul 01, 2013 at 03:01:12PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Remove redundant irqchip_init() callback. The default case
+> of NULL will result in invoking irqchip_init() anyway.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  arch/arm/mach-shmobile/setup-emev2.c |    2 --
+>  1 file changed, 2 deletions(-)
+> 
+> --- 0005/arch/arm/mach-shmobile/setup-emev2.c
+> +++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-07-01 13:33:39.000000000 +0900
+> @@ -20,7 +20,6 @@
+>  #include <linux/init.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+> -#include <linux/irqchip.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/platform_data/gpio-em.h>
+>  #include <linux/of_platform.h>
+> @@ -445,7 +444,6 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma
+>  	.smp		= smp_ops(emev2_smp_ops),
+>  	.init_early	= emev2_init_delay,
+>  	.nr_irqs	= NR_IRQS_LEGACY,
+> -	.init_irq	= irqchip_init,
+>  	.dt_compat	= emev2_boards_compat_dt,
+>  MACHINE_END
 
-Based on a similar change for the r8a7779 by Sergei Shtylyov.
+Hi Magnus,
 
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+I mistakenly dropped the following patch from Maxime Ripard from
+v3.11. I have re-queued it up, for v3.12, in the cleanup branch:
 
----
+commit 4042de1229ecf083890d8ad5c9327e03b648c1a2
+Author: Maxime Ripard <maxime.ripard@free-electrons.com>
+Date:   Sun May 26 22:05:23 2013 +0900
 
-This patch has a run-time dependency on "sh_eth: add support for r8a7790 SoC".
+    ARM: shmobile: emev2: Remove init_irq declaration in machine description
+    
+    Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
+    specified") removed the need to explictly setup the init_irq field in
+    the machine description when using only irqchip_init. Remove that
+    declaration for shmobile as well.
+    
+    Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+    Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-v3
-* Use newly added "r8a7790-ether" instead of "sh-eth"
-
-v2
-* Do not add MSTP812, EtherAVB. It is not used.
-* As suggested by Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-  - Move Ethernet element of MSTP enum to a separate line
-  - Move declaration of r8a7790_add_ether_device() to immediately
-    after that of r8a7790_add_standard_devices()
-  - Add __initdata annotation to ether_resource.
----
- arch/arm/mach-shmobile/clock-r8a7790.c        |  4 ++++
- arch/arm/mach-shmobile/include/mach/r8a7790.h |  3 +++
- arch/arm/mach-shmobile/setup-r8a7790.c        | 14 ++++++++++++++
- 3 files changed, 21 insertions(+)
-
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index 62d8162..2f52c0f 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -52,6 +52,7 @@
- #define SMSTPCR3 0xe615013c
- #define SMSTPCR5 0xe6150144
- #define SMSTPCR7 0xe615014c
-+#define SMSTPCR8 0xe6150990
- 
- #define MODEMR		0xE6160060
- #define SDCKCR		0xE6150074
-@@ -182,6 +183,7 @@ static struct clk div6_clks[DIV6_NR] = {
- 
- /* MSTP */
- enum {
-+	MSTP813,
- 	MSTP721, MSTP720,
- 	MSTP717, MSTP716,
- 	MSTP522,
-@@ -192,6 +194,7 @@ enum {
- };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
- 	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
- 	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
- 	[MSTP717] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 17, 0), /* HSCIF0 */
-@@ -260,6 +263,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
- 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP717]),
- 	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP716]),
-+	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("ee200000.mmcif", &mstp_clks[MSTP315]),
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-index 7851cc1..b827b49 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-@@ -1,7 +1,10 @@
- #ifndef __ASM_R8A7790_H__
- #define __ASM_R8A7790_H__
- 
-+#include <linux/sh_eth.h>
-+
- void r8a7790_add_standard_devices(void);
-+void r8a7790_add_ether_device(struct sh_eth_plat_data *pdata);
- void r8a7790_clock_init(void);
- void r8a7790_pinmux_init(void);
- void r8a7790_init_delay(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index d89cd83..fad4251 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -31,6 +31,20 @@
- #include <mach/r8a7790.h>
- #include <asm/mach/arch.h>
- 
-+/* Ether */
-+static struct resource ether_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xee700000, 0x400),
-+	DEFINE_RES_IRQ(gic_spi(162)), /* IRQ0 */
-+};
-+
-+void __init r8a7790_add_ether_device(struct sh_eth_plat_data *pdata)
-+{
-+	platform_device_register_resndata(&platform_bus, "r8a7790-ether", -1,
-+					  ether_resources,
-+					  ARRAY_SIZE(ether_resources),
-+					  pdata, sizeof(*pdata));
-+}
-+
- static struct resource pfc_resources[] __initdata = {
- 	DEFINE_RES_MEM(0xe6060000, 0x250),
- };
--- 
-1.8.2.1
+diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
+index 899a86c..66694e0 100644
+--- a/arch/arm/mach-shmobile/setup-emev2.c
++++ b/arch/arm/mach-shmobile/setup-emev2.c
+@@ -20,7 +20,6 @@
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+-#include <linux/irqchip.h>
+ #include <linux/platform_device.h>
+ #include <linux/platform_data/gpio-em.h>
+ #include <linux/of_platform.h>
+@@ -454,7 +453,6 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
+ 	.smp		= smp_ops(emev2_smp_ops),
+ 	.init_early	= emev2_init_delay,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+-	.init_irq	= irqchip_init,
+ 	.init_machine	= emev2_add_standard_devices_dt,
+ 	.dt_compat	= emev2_boards_compat_dt,
+ MACHINE_END
