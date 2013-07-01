@@ -1,42 +1,51 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon,  1 Jul 2013 12:04:03 +0100
-Subject: [PATCH 05/10] ARM: pl01x debug code endian fix
+Date: Mon,  1 Jul 2013 12:04:08 +0100
+Subject: [PATCH 10/10] vexpress: add big endian support
 In-Reply-To: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1372676648-9254-6-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1372676648-9254-11-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PL01X debug code needs to take into account which endian mode the
-processor is running in. If it is big-endian, ensure the data is swapped
-appropriately.
-
-Note, we could do this slightly more efficiently if we have an macro to
-do the necessary swap for the bits used by test.
+Add support for the versatile express systems to boot big-endian.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/include/asm/hardware/debug-pl01x.S |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-vexpress/Kconfig    |    1 +
+ arch/arm/plat-versatile/headsmp.S |    2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/arm/include/asm/hardware/debug-pl01x.S b/arch/arm/include/asm/hardware/debug-pl01x.S
-index f9fd083..6489d1f 100644
---- a/arch/arm/include/asm/hardware/debug-pl01x.S
-+++ b/arch/arm/include/asm/hardware/debug-pl01x.S
-@@ -18,12 +18,14 @@
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 5907e10..fa69d4e 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -1,6 +1,7 @@
+ config ARCH_VEXPRESS
+ 	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARM_AMBA
+ 	select ARM_GIC
+ 	select ARM_TIMER_SP804
+diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
+index b178d44..4c5c8ca 100644
+--- a/arch/arm/plat-versatile/headsmp.S
++++ b/arch/arm/plat-versatile/headsmp.S
+@@ -10,6 +10,7 @@
+  */
+ #include <linux/linkage.h>
+ #include <linux/init.h>
++#include <asm/assembler.h>
  
- 		.macro	waituart,rd,rx
- 1001:		ldr	\rd, [\rx, #UART01x_FR]
-+ ARM_BE8(	rev	\rd, \rd )
- 		tst	\rd, #UART01x_FR_TXFF
- 		bne	1001b
- 		.endm
+ 	__INIT
  
- 		.macro	busyuart,rd,rx
- 1001:		ldr	\rd, [\rx, #UART01x_FR]
-+ ARM_BE8(	rev	\rd, \rd )
- 		tst	\rd, #UART01x_FR_BUSY
- 		bne	1001b
- 		.endm
+@@ -19,6 +20,7 @@
+  * until we're ready for them to initialise.
+  */
+ ENTRY(versatile_secondary_startup)
++ ARM_BE8(setend	be)
+ 	mrc	p15, 0, r0, c0, c0, 5
+ 	bic	r0, #0xff000000
+ 	adr	r4, 1f
 -- 
 1.7.10.4
