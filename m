@@ -1,36 +1,170 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 1 Jul 2013 16:33:01 +0200
-Subject: v3.10 - big endian core support
-In-Reply-To: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130701163301.7c1228df@skate>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Mon,  1 Jul 2013 16:34:01 +0200
+Subject: [PATCH v4] ARM: irqchip: add support for MOXA ART SoCs
+In-Reply-To: <1372339773-4974-1-git-send-email-jonas.jensen@gmail.com>
+References: <1372339773-4974-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1372689241-18758-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ben Dooks,
+This patch adds an irqchip driver for the main interrupt controller found
+on MOXA ART SoCs.
 
-On Mon,  1 Jul 2013 12:03:58 +0100, Ben Dooks wrote:
-> The latest big-endian changes, now on:
-> 
-> 	git://git.baserock.org/delta/linux baserock/311/be/core
-> 
-> This has a minor fix from the last version where a rebase missed a change
-> in the smp_scu code.
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-Patches 1, 2, 3, 4 and 9:
+Notes:
+    Applies to next-20130619
+    
+    Changes since v3:
+    
+    1. pack global variables in struct
+    2. make handle_irq function static
+    3. call irq_linear_revmap instead of irq_find_mapping
+    4. fix indentation
+    5. add error handling after irq_domain_add_linear
+    6. free the domain if irq_alloc_domain_generic_chips fails
+    7. use node->full_name instead of __func__ in messages
+    8. remove debug messages
+    9. make messages more consistent
 
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ drivers/irqchip/Makefile     |   1 +
+ drivers/irqchip/irq-moxart.c | 118 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 119 insertions(+)
+ create mode 100644 drivers/irqchip/irq-moxart.c
 
-on an Armada XP GP board. The other patches are not exercised by this
-particular testing.
-
-I'm interested in seeing this series merged.
-
-Best regards,
-
-Thomas
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index cda4cb5..956d129 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -16,3 +16,4 @@ obj-$(CONFIG_RENESAS_INTC_IRQPIN)	+= irq-renesas-intc-irqpin.o
+ obj-$(CONFIG_RENESAS_IRQC)		+= irq-renesas-irqc.o
+ obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
+ obj-$(CONFIG_ARCH_VT8500)		+= irq-vt8500.o
++obj-$(CONFIG_ARCH_MOXART)		+= irq-moxart.o
+diff --git a/drivers/irqchip/irq-moxart.c b/drivers/irqchip/irq-moxart.c
+new file mode 100644
+index 0000000..a84b001
+--- /dev/null
++++ b/drivers/irqchip/irq-moxart.c
+@@ -0,0 +1,118 @@
++/*
++ * MOXA ART SoCs IRQ chip driver.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/irqdomain.h>
++
++#include <asm/exception.h>
++
++#include "irqchip.h"
++
++#define IRQ_SOURCE_REG		0
++#define IRQ_MASK_REG		0x04
++#define IRQ_CLEAR_REG		0x08
++#define IRQ_MODE_REG		0x0c
++#define IRQ_LEVEL_REG		0x10
++#define IRQ_STATUS_REG		0x14
++
++#define FIQ_SOURCE_REG		0x20
++#define FIQ_MASK_REG		0x24
++#define FIQ_CLEAR_REG		0x28
++#define FIQ_MODE_REG		0x2c
++#define FIQ_LEVEL_REG		0x30
++#define FIQ_STATUS_REG		0x34
++
++
++struct moxart_irq_data {
++	void __iomem *base;
++	struct irq_domain *domain;
++	unsigned int interrupt_mask;
++};
++
++static struct moxart_irq_data intc;
++
++static asmlinkage void __exception_irq_entry handle_irq(struct pt_regs *regs)
++{
++	u32 irqstat;
++	int hwirq;
++
++	irqstat = readl(intc.base + IRQ_STATUS_REG);
++
++	while (irqstat) {
++		hwirq = ffs(irqstat) - 1;
++		handle_IRQ(irq_linear_revmap(intc.domain, hwirq), regs);
++		irqstat &= ~(1 << hwirq);
++	}
++}
++
++static int __init moxart_of_intc_init(struct device_node *node,
++				      struct device_node *parent)
++{
++	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
++	int ret;
++	struct irq_chip_generic *gc;
++
++	intc.base = of_iomap(node, 0);
++	if (!intc.base) {
++		pr_err("%s: unable to map IC registers\n",
++		       node->full_name);
++		return -EINVAL;
++	}
++
++	intc.domain = irq_domain_add_linear(node, 32, &irq_generic_chip_ops,
++					    intc.base);
++	if (!intc.domain) {
++		pr_err("%s: unable to create IRQ domain\n", node->full_name);
++		return -EINVAL;
++	}
++
++	ret = irq_alloc_domain_generic_chips(intc.domain, 32, 1,
++					     "MOXARTINTC", handle_edge_irq,
++					     clr, 0, IRQ_GC_INIT_MASK_CACHE);
++	if (ret) {
++		pr_err("%s: could not allocate generic chip\n",
++		       node->full_name);
++		irq_domain_remove(intc.domain);
++		return -EINVAL;
++	}
++
++	ret = of_property_read_u32(node, "interrupt-mask",
++				   &intc.interrupt_mask);
++	if (ret)
++		pr_err("%s: could not read interrupt-mask DT property\n",
++		       node->full_name);
++
++	gc = irq_get_domain_generic_chip(intc.domain, 0);
++
++	gc->reg_base = intc.base;
++	gc->chip_types[0].regs.mask = IRQ_MASK_REG;
++	gc->chip_types[0].regs.ack = IRQ_CLEAR_REG;
++	gc->chip_types[0].chip.irq_ack = irq_gc_ack_set_bit;
++	gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
++	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
++
++	writel(0, intc.base + IRQ_MASK_REG);
++	writel(0xffffffff, intc.base + IRQ_CLEAR_REG);
++
++	writel(intc.interrupt_mask, intc.base + IRQ_MODE_REG);
++	writel(intc.interrupt_mask, intc.base + IRQ_LEVEL_REG);
++
++	set_handle_irq(handle_irq);
++
++	return 0;
++}
++IRQCHIP_DECLARE(moxa_moxart_ic, "moxa,moxart-interrupt-controller",
++		moxart_of_intc_init);
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.2.1
