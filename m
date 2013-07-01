@@ -1,28 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 1 Jul 2013 11:12:48 -0300
-Subject: [alsa-devel] [PATCH 1/4] ASoC: sgtl5000: give it a ramping time
- before writting
-In-Reply-To: <201307011254.18952.marex@denx.de>
-References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
- <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
- <20130701100710.GB27646@sirena.org.uk>
- <201307011254.18952.marex@denx.de>
-Message-ID: <CAOMZO5BAs5-Tf_O0TVLFAuCchVuukV+bH2MpjqMU83tTw2GD=Q@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 1 Jul 2013 10:14:45 -0400
+Subject: [RFC PATCH 5/6] ARM, mm: change meaning of max_low_pfn to maximum
+ pfn for nobootmem
+In-Reply-To: <1364184674-13798-6-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1364184674-13798-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1364184674-13798-6-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <51D18ED5.50103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 1, 2013 at 7:54 AM, Marek Vasut <marex@denx.de> wrote:
+Joonsoo,
 
-> The delay might also be caused by the I2C driver, I have this in my ToDo to
-
-Yes, this extra delay could be related to the mxs i2c driver, as we do
-not need to add this delay when using sgtl5000 on other i.mx devices.
-
-Other people have also reported mxs i2c issues currently:
-http://marc.info/?l=linux-i2c&m=137241339917261&w=2
-
-,so this may be related some how.
+On Monday 25 March 2013 12:11 AM, Joonsoo Kim wrote:
+> nobootmem use max_low_pfn for computing boundary in free_all_bootmem()
+> So we need proper value to max_low_pfn.
+> 
+> But, there is some difficulty related to max_low_pfn. max_low_pfn is used
+> for two meanings in various architectures. One is for number of pages
+> in lowmem and the other is for maximum lowmem pfn. Now, in ARM, it is used
+> as number of pages in lowmem. You can get more information in below link.
+> http://lwn.net/Articles/543408/
+> http://lwn.net/Articles/543424/
+> 
+> As I investigated, architectures which use max_low_pfn as maximum pfn are
+> more than others, so to change meaning of max_low_pfn to maximum pfn
+> is preferable solution to me. This patch change max_low_pfn as maximum
+> lowmem pfn in ARM. In addition, min_low_pfn, max_pfn is assigned according
+> to this criteria.
+> 
+> There is no real user for max_low_pfn except block/blk-setting.c and
+> blk-setting.c assume that max_low_pfn is maximum lowmem pfn,
+> so this patch may not harm anything.
+> 
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+>
+I have been also carrying similar patch as yours in an attempt
+to make LPAE kernel work on ARM. Your patch carries better
+description, so will your version and include in my series
+which I plan to post on the list after some more testing.
+Will copy you. The changes are very similar to your series.
 
 Regards,
-
-Fabio Estevam
+Santosh
+ 
