@@ -1,72 +1,57 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  1 Jul 2013 15:42:16 +0200
-Subject: [PATCHv4 11/11] arm: mvebu: link PCIe controllers to the MSI
- controller
-In-Reply-To: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1372686136-1370-12-git-send-email-thomas.petazzoni@free-electrons.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 1 Jul 2013 10:46:37 -0300
+Subject: [PATCH 1/2] ARM: dts: mx53qsb: Enable VPU support
+In-Reply-To: <1372683396.4971.35.camel@pizza.hi.pengutronix.de>
+References: <1372459759-10488-1-git-send-email-festevam@gmail.com>
+ <1372683396.4971.35.camel@pizza.hi.pengutronix.de>
+Message-ID: <CAOMZO5Chnn72t12rf6tkrWNSnDreKsh57nagKc5_Vhi0j_mSWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adjusts the Armada 370 and Armada XP PCIe controllers
-Device Tree informations to reference their MSI controller. In the
-case of this platform, the MSI controller is implemented by the MPIC.
+On Mon, Jul 1, 2013 at 9:56 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Hi Fabio,
+>
+> Am Freitag, den 28.06.2013, 19:49 -0300 schrieb Fabio Estevam:
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>> Enable Video Processing Unit (VPU) support.
+>>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> ---
+>> Depends on Philipp Zabel's patch:
+>> [PATCH] ARM: dts: add sram for imx53 and imx6q
+>>
+>> Philipp,
+>>
+>> I tried using the original mx53 vpu firmware that comes with the FSL BSP, but it
+>> failed to load:
+>>
+>> coda 63ff4000.vpu: firmware get command error
+>> coda 63ff4000.vpu: HW initialization failed
+>>
+>> Any suggestions?
+>>
+>> Thanks!
+>
+> /*
+>  * The CODA driver needs the raw firmware without header in memory order.
+>  * This is how I converted vpu_fw_imx53.bin from the Freescale BSP into
+>  * v4l2-coda7541-imx53.bin:
+>  */
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-370.dtsi        | 1 +
- arch/arm/boot/dts/armada-xp-mv78230.dtsi | 1 +
- arch/arm/boot/dts/armada-xp-mv78260.dtsi | 1 +
- arch/arm/boot/dts/armada-xp-mv78460.dtsi | 1 +
- 4 files changed, 4 insertions(+)
+Thanks for your C code, Philipp.
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index fa3dfc6..a60018d 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -178,6 +178,7 @@
- 				#address-cells = <3>;
- 				#size-cells = <2>;
- 
-+				msi-parent = <&mpic>;
- 				bus-range = <0x00 0xff>;
- 
- 				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index f8eaa38..4a9a305 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -91,6 +91,7 @@
- #address-cells = <3>;
- #size-cells = <2>;
- 
-+				msi-parent = <&mpic>;
- 				bus-range = <0x00 0xff>;
- 
- 				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index f4029f0..bc63783 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -111,6 +111,7 @@
- 				#address-cells = <3>;
- 				#size-cells = <2>;
- 
-+				msi-parent = <&mpic>;
- 				bus-range = <0x00 0xff>;
- 
- 				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index c7b1f4d..77db2bc 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -127,6 +127,7 @@
- 				#address-cells = <3>;
- 				#size-cells = <2>;
- 
-+				msi-parent = <&mpic>;
- 				bus-range = <0x00 0xff>;
- 
- 				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
--- 
-1.8.1.2
+Now I get:
+
+coda 63ff4000.vpu: Initialized CODA7541.
+coda 63ff4000.vpu: Unsupported firmware version: 13.4.41
+coda 63ff4000.vpu: codec registered as /dev/video0
+
+As input file I am using the vpu_fw_imx53.bin from FSL BSP version 11.09.
+
+Where should I get the vpu_fw_imx53.bin file so that I do not get the
+unsupported warning?
+
+Thanks,
+
+Fabio Estevam
