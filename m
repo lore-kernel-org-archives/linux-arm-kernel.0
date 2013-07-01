@@ -1,32 +1,51 @@
-From: trini@ti.com (Tom Rini)
-Date: Mon,  1 Jul 2013 09:13:13 -0400
-Subject: [PATCH] ARM: OMAP2+: omap2plus_defconfig: Enable appended DTB support
-Message-ID: <1372684393-19025-1-git-send-email-trini@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 1 Jul 2013 21:16:50 +0800
+Subject: [PATCH] ARM: dts: imx6: add #dma-cells property for sdma
+In-Reply-To: <1372665434-2515-1-git-send-email-b32955@freescale.com>
+References: <1372665434-2515-1-git-send-email-b32955@freescale.com>
+Message-ID: <20130701131648.GL13206@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As this config must support boards which cannot support separate device
-trees, enable support for appended ones.
+On Mon, Jul 01, 2013 at 03:57:14PM +0800, Huang Shijie wrote:
+> Add the #dma-cells property for imx6 sdma.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl.dtsi |    1 +
+>  arch/arm/boot/dts/imx6sl.dtsi  |    1 +
 
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Tom Rini <trini@ti.com>
----
- arch/arm/configs/omap2plus_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+Can you please also update imx51.dtsi and imx53.dtsi?
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index abbe319..ec4deb9 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -34,6 +34,8 @@ CONFIG_NR_CPUS=2
- CONFIG_LEDS=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_CMDLINE="root=/dev/mmcblk0p2 rootwait console=ttyO2,115200"
- CONFIG_KEXEC=y
- CONFIG_FPE_NWFPE=y
--- 
-1.7.9.5
+Shawn
+
+>  2 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index b381c85..ec5552b 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -581,6 +581,7 @@
+>  				interrupts = <0 2 0x04>;
+>  				clocks = <&clks 155>, <&clks 155>;
+>  				clock-names = "ipg", "ahb";
+> +				#dma-cells = <3>;
+>  				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
+>  			};
+>  		};
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index c5e5da0..9138c67 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -594,6 +594,7 @@
+>  				clocks = <&clks IMX6SL_CLK_SDMA>,
+>  					 <&clks IMX6SL_CLK_SDMA>;
+>  				clock-names = "ipg", "ahb";
+> +				#dma-cells = <3>;
+>  				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6sl.bin";
+>  			};
+>  
+> -- 
+> 1.7.1
+> 
+> 
