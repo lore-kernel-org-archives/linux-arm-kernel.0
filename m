@@ -1,159 +1,102 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 01 Jul 2013 16:07:24 +0900
-Subject: [PATCH V3 3/3] video: exynos_dp: Use the generic PHY driver
-In-Reply-To: <51D12164.6030507@ti.com>
-References: <005401ce761b$504d7090$f0e851b0$@samsung.com>
- <51D12164.6030507@ti.com>
-Message-ID: <005d01ce7629$a3801520$ea803f60$@samsung.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 01 Jul 2013 09:07:20 +0200
+Subject: [PATCH 1/2] ARM: dts: mx53qsb: Enable VPU support
+In-Reply-To: <CAHCPf3s6_+aNs=LycgJzcOajmFuWy-mp66-BX+OMCLYDApS9cg@mail.gmail.com>
+References: <1372459759-10488-1-git-send-email-festevam@gmail.com>
+ <CAHCPf3s6_+aNs=LycgJzcOajmFuWy-mp66-BX+OMCLYDApS9cg@mail.gmail.com>
+Message-ID: <1372662440.4971.15.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 01, 2013 3:28 PM, Kishon Vijay Abraham I wrote:
-> 
-> Hi,
-> 
-> On Monday 01 July 2013 10:54 AM, Jingoo Han wrote:
-> > Use the generic PHY API instead of the platform callback to control
-> > the DP PHY. The 'phy_label' field is added to the platform data
-> > structure to allow PHY lookup on non-dt platforms.
+Hi Matt,
+
+[Cc: devicetree-discuss at lists.ozlabs.org]
+
+Am Freitag, den 28.06.2013, 23:49 -0500 schrieb Matt Sealey:
+> On Fri, Jun 28, 2013 at 5:49 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
 > >
-> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> > Acked-by: Felipe Balbi <balbi@ti.com>
+> > Enable Video Processing Unit (VPU) support.
+> >
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > > ---
-> >   .../devicetree/bindings/video/exynos_dp.txt        |   23 +---
-> >   drivers/video/exynos/exynos_dp_core.c              |  118 ++------------------
-> >   drivers/video/exynos/exynos_dp_core.h              |    2 +
-> >   include/video/exynos_dp.h                          |    6 +-
-> >   4 files changed, 21 insertions(+), 128 deletions(-)
+> > Depends on Philipp Zabel's patch:
+> > [PATCH] ARM: dts: add sram for imx53 and imx6q
 > >
-> > diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt
-> b/Documentation/devicetree/bindings/video/exynos_dp.txt
-> > index 84f10c1..71645dc 100644
-> > --- a/Documentation/devicetree/bindings/video/exynos_dp.txt
-> > +++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
-> > @@ -1,17 +1,6 @@
-> >   The Exynos display port interface should be configured based on
-> >   the type of panel connected to it.
+> > Philipp,
 > >
-> > -We use two nodes:
-> > -	-dp-controller node
-> > -	-dptx-phy node(defined inside dp-controller node)
-> > -
-> > -For the DP-PHY initialization, we use the dptx-phy node.
-> > -Required properties for dptx-phy:
-> > -	-reg:
-> > -		Base address of DP PHY register.
-> > -	-samsung,enable-mask:
-> > -		The bit-mask used to enable/disable DP PHY.
-> > -
-> >   For the Panel initialization, we read data from dp-controller node.
-> >   Required properties for dp-controller:
-> >   	-compatible:
-> > @@ -25,6 +14,10 @@ Required properties for dp-controller:
-> >   		from common clock binding: handle to dp clock.
-> >   	-clock-names:
-> >   		from common clock binding: Shall be "dp".
-> > +	-phys:
-> > +		from general phy binding: the phandle for the PHY device.
-> > +	-phy-names:
-> > +		from general phy binding: Should be "dp".
-> >   	-interrupt-parent:
-> >   		phandle to Interrupt combiner node.
-> >   	-samsung,color-space:
-> > @@ -67,12 +60,8 @@ SOC specific portion:
-> >   		interrupt-parent = <&combiner>;
-> >   		clocks = <&clock 342>;
-> >   		clock-names = "dp";
-> > -
-> > -		dptx-phy {
-> > -			reg = <0x10040720>;
-> > -			samsung,enable-mask = <1>;
-> > -		};
-> > -
-> > +		phys = <&dp_phy>;
-> > +		phy-names = "dp";
-> >   	};
+> > I tried using the original mx53 vpu firmware that comes with the FSL BSP, but it
+> > failed to load:
 > >
-> >   Board Specific portion:
-> > diff --git a/drivers/video/exynos/exynos_dp_core.c b/drivers/video/exynos/exynos_dp_core.c
-> > index 12bbede..bac515b 100644
-> > --- a/drivers/video/exynos/exynos_dp_core.c
-> > +++ b/drivers/video/exynos/exynos_dp_core.c
-> > @@ -19,6 +19,7 @@
-> >   #include <linux/interrupt.h>
-> >   #include <linux/delay.h>
-> >   #include <linux/of.h>
-> > +#include <linux/phy/phy.h>
+> > coda 63ff4000.vpu: firmware get command error
+> > coda 63ff4000.vpu: HW initialization failed
 > >
-> >   #include <video/exynos_dp.h>
+> > Any suggestions?
 > >
-> > @@ -960,84 +961,15 @@ static struct exynos_dp_platdata *exynos_dp_dt_parse_pdata(struct device *dev)
-> >   		return ERR_PTR(-EINVAL);
-> >   	}
+> > Thanks!
 > >
-> > -	return pd;
-> > -}
-> > -
-> > -static int exynos_dp_dt_parse_phydata(struct exynos_dp_device *dp)
-> > -{
-> > -	struct device_node *dp_phy_node = of_node_get(dp->dev->of_node);
-> > -	u32 phy_base;
-> > -	int ret = 0;
-> > -
-> > -	dp_phy_node = of_find_node_by_name(dp_phy_node, "dptx-phy");
-> > -	if (!dp_phy_node) {
-> > -		dev_err(dp->dev, "could not find dptx-phy node\n");
-> > -		return -ENODEV;
-> > -	}
-> > -
-> > -	if (of_property_read_u32(dp_phy_node, "reg", &phy_base)) {
-> > -		dev_err(dp->dev, "failed to get reg for dptx-phy\n");
-> > -		ret = -EINVAL;
-> > -		goto err;
-> > -	}
-> > -
-> > -	if (of_property_read_u32(dp_phy_node, "samsung,enable-mask",
-> > -				&dp->enable_mask)) {
-> > -		dev_err(dp->dev, "failed to get enable-mask for dptx-phy\n");
-> > -		ret = -EINVAL;
-> > -		goto err;
-> > -	}
-> > -
-> > -	dp->phy_addr = ioremap(phy_base, SZ_4);
-> > -	if (!dp->phy_addr) {
-> > -		dev_err(dp->dev, "failed to ioremap dp-phy\n");
-> > -		ret = -ENOMEM;
-> > -		goto err;
-> > -	}
-> > -
-> > -err:
-> > -	of_node_put(dp_phy_node);
-> > -
-> > -	return ret;
-> > -}
-> > -
-> > -static void exynos_dp_phy_init(struct exynos_dp_device *dp)
-> > -{
-> > -	u32 reg;
-> > -
-> > -	reg = __raw_readl(dp->phy_addr);
-> > -	reg |= dp->enable_mask;
-> > -	__raw_writel(reg, dp->phy_addr);
-> > -}
-> > -
-> > -static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
-> > -{
-> > -	u32 reg;
-> > +	pd->phy_label = "dp";
+> >  arch/arm/boot/dts/imx53-qsb.dts |  4 ++++
+> >  arch/arm/boot/dts/imx53.dtsi    | 10 ++++++++++
+> >  2 files changed, 14 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+> > index 512a1f6..eedd27e 100644
+> > --- a/arch/arm/boot/dts/imx53-qsb.dts
+> > +++ b/arch/arm/boot/dts/imx53-qsb.dts
+> > @@ -297,6 +297,10 @@
+> >         status = "okay";
+> >  };
+> >
+> > +&vpu {
+> > +       status = "okay";
+> > +};
+> > +
+> >  &usbh1 {
+> >         status = "okay";
+> >  };
+> > diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> > index 3def46f..f94d4e5 100644
+> > --- a/arch/arm/boot/dts/imx53.dtsi
+> > +++ b/arch/arm/boot/dts/imx53.dtsi
+> > @@ -1086,6 +1086,16 @@
+> >                                 crtcs = <&ipu 1>;
+> >                                 status = "disabled";
+> >                         };
+> > +
+> > +                       vpu: vpu at 63ff4000 {
+> > +                               compatible = "fsl,imx53-vpu";
+> > +                               reg = <0x63ff4000 0x1000>;
+> > +                               interrupts = <9>;
+> > +                               clocks = <&clks 63>, <&clks 63>;
+> > +                               clock-names = "per", "ahb";
+> > +                               iram = <&ocram>;
+> > +                               status = "disabled";
+> > +                       };
+> >                 };
+> >
+> >                 ocram: ocram at f8000000 {
 > 
-> Felipe had a comment to change the label to *display-port* no?
-
-No, I don't think so. :)
-I would like to use 'dp'.
-
-Best regards,
-Jingoo Han
-
+> Nitpick: what I see here around enabling the VPU driver is;
 > 
-> Thanks
-> Kishon
+> * A property called iram
+> * ... that references a node called ocram
+> * ... which is coincidentally driven by a driver called sram
+> 
+> Could we make up our minds as to what to call it? Something generic
+> that's potentially not i.MX-specific (since it does change over the
+> models, and it may not be technically SRAM..) that gets used
+> everywhere and belies it's purpose rather than naming a particular
+> technology, or particular IP core documentation if it changes a lot?
+
+I'd be in favor of changing
+-                 ocram: ocram at f8000000 {
++                 ocram: sram at f8000000 {
+but it is very convenient to have the IP vendor's creative name in
+there, too, if I have to look it up in the reference manual.
+
+>From point of view of the VPU, the SRAM is a more local memory, in most
+implementations connected via a dedicated AXI bus to avoid load on the
+main memory bus.
+
+regards
+Philipp
