@@ -1,32 +1,32 @@
-From: girish.shivananjappa@linaro.org (Girish K S)
-Date: Mon, 1 Jul 2013 20:34:38 +0530
-Subject: [v2 4/4] sata: imx: add ahci sata support on imx platforms
-In-Reply-To: <20130701144817.GT13206@S2101-09.ap.freescale.net>
-References: <1372672975-2997-1-git-send-email-r65037@freescale.com>
- <1372672975-2997-5-git-send-email-r65037@freescale.com>
- <CAGxe1ZEHWQUXmjgmGGkpy3wgxoS8ti0-eYZPHkQKzjD9pWqZ0Q@mail.gmail.com>
- <20130701144817.GT13206@S2101-09.ap.freescale.net>
-Message-ID: <CAGxe1ZEhTumWC5mpirjSqg2fogFz5VuLKLtxUpA=ctxdwU-i6w@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 1 Jul 2013 12:11:58 -0300
+Subject: [alsa-devel] [PATCH 1/4] ASoC: sgtl5000: give it a ramping time
+ before writting
+In-Reply-To: <20130701143415.GA14172@S2101-09.ap.freescale.net>
+References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
+ <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
+ <20130701100710.GB27646@sirena.org.uk>
+ <201307011254.18952.marex@denx.de>
+ <CAOMZO5BAs5-Tf_O0TVLFAuCchVuukV+bH2MpjqMU83tTw2GD=Q@mail.gmail.com>
+ <20130701142610.GR13206@S2101-09.ap.freescale.net>
+ <20130701143415.GA14172@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5Bh5CZLBO-epVA9Vivo-mqmBJZhy7iA6HiMy+xLzDj40w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 July 2013 20:18, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Mon, Jul 01, 2013 at 04:57:35PM +0530, Girish K S wrote:
->> Hello Richard,
->>
->> Instead of writing a separate driver for the changes you mentioned in
->> the commit message. you can just add those changes to
->> the platform data (pdata-> init).
->
-> No. The platform init hook is not used to do IP block related setup.
-> If we're mapping ahci block and setting up ahci registers in platform
-> code, we are generally not doing the right thing.
+On Mon, Jul 1, 2013 at 11:34 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Yes I understand (anything specific to driver should be part of
-driver). I need to touch few platforms that are already doing this.
-Then how about keeping setup as part of driver data for the specific controller.
+> And also why we do not see the impact of i2c issue on sgtl5000 before
+> the offending commit af8ee11 (ASoC: sgtl5000: Fix driver probe after
+> reset)?
 
+Probably because the mxs i2c was working before this commit.
 
->
-> Shawn
->
+Commit af8ee11 does fix the reset probe on mx51/mx53/mx6.
+
+It's only on mx28 that we have this issue.
+
+Also, please see this patch from Alexandre Belloni:
+https://lkml.org/lkml/2013/6/24/430
+
+He can only connect the ADC chip if he uses I2C bitbang mode on mx28.
