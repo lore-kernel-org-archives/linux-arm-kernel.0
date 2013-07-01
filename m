@@ -1,25 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 1 Jul 2013 10:27:24 +0100
-Subject: question about iotable_init( )  function
-In-Reply-To: <35FD53F367049845BC99AC72306C23D19441BF586F@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D19441BF586F@CNBJMBX05.corpusers.net>
-Message-ID: <20130701092723.GE14027@mudshark.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 1 Jul 2013 17:30:34 +0800
+Subject: [PATCH v3 2/5] ARM: dts: imx27: Add imx framebuffer device
+In-Reply-To: <1372432206.785926201@f326.mail.ru>
+References: <1372431037-13519-1-git-send-email-mpa@pengutronix.de>
+ <1372431037-13519-3-git-send-email-mpa@pengutronix.de>
+ <1372432206.785926201@f326.mail.ru>
+Message-ID: <20130701093032.GG13206@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 08:31:38AM +0100, Wang, Yalin wrote:
-> Hi  Will,
+On Fri, Jun 28, 2013 at 07:10:06PM +0400, Alexander Shiyan wrote:
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  arch/arm/boot/dts/imx27.dtsi | 9 +++++++++
+> >  1 file changed, 9 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> > index 8603886..10dcbd3 100644
+> > --- a/arch/arm/boot/dts/imx27.dtsi
+> > +++ b/arch/arm/boot/dts/imx27.dtsi
+> > @@ -342,6 +342,15 @@
+> >  			reg = <0x10020000 0x20000>;
+> >  			ranges;
+> >  
+> > +			imxfb: fb at 10021000 {
 > 
-> I have a question about iotable_init()  function (arch/arm/mm/mmu.c)
-> I found  in this function it only allocate a vm_struct and insert it into vmlist ,
-> But it didn?t allocate a vmap_area  to insert it  into vmap_area_root tree (mm/vmalloc.c).
-> 
-> So this means that the virtual address reserverd by iotable_init is not declared
-> In vmap_area_root  ,  this is not safe ,  maybe some driver will use this virtual address as vmalloc again,
-> I think it ?s not safe in this condition ,  should also add a vmap_area   node into vmap_area_root to
-> Hold this virtual address not used by others .
+> If it can be fixed while applying, it would be right to use just "fb" here.
+> We now use a lot of devices without "imx"-prefix, so I do not see any need to use it here.
 
-The vmap_area structures are allocated and inserted later on by vmalloc_init
-(iotable init is for static mappings early during boot).
+I actually prefer to use the block name if it's not a thing defined by
+ePAPR.  In this case, it's "lcdc".  But since "fb" is already used in
+compatible.  Okay, I fixed it up by dropping "imx" prefix.
 
-Will
+Applied the whole series, thanks.
+
+Shawn
