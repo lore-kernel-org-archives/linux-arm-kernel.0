@@ -1,34 +1,48 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 1 Jul 2013 10:18:32 +0200
-Subject: [PATCH 03/23] ARM: dt: tegra30: iommu: Add "nvidia,memory-clients"
-In-Reply-To: <1372244646.2986.17.camel@jlo-ubuntu-64.nvidia.com>
-References: <20130626101028.GD27083@manwe><20130626.133314.1520719774895092173.hdoyu@nvidia.com><1372244646.2986.17.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <20130701.111832.2076981043593380845.hdoyu@nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 1 Jul 2013 17:23:05 +0900
+Subject: [PATCH] ARM: shmobile: r8a73a4: Fix resources for SCIFB0
+In-Reply-To: <CANqRtoSq12g-+CC9g9Kz2VpXhGKd=s_ZyHpJ2KDwgV1Lh5t41g@mail.gmail.com>
+References: <51D1320D.4010709@igel.co.jp>
+ <CANqRtoSq12g-+CC9g9Kz2VpXhGKd=s_ZyHpJ2KDwgV1Lh5t41g@mail.gmail.com>
+Message-ID: <20130701082304.GZ14567@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joseph Lo <josephl@nvidia.com> wrote @ Wed, 26 Jun 2013 13:04:06 +0200:
-
-> On Wed, 2013-06-26 at 18:33 +0800, Hiroshi Doyu wrote:
-> > Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 26 Jun 2013 12:10:30 +0200:
-> > 
-> > > * PGP Signed by an unknown key
-> > > 
-> > > On Wed, Jun 26, 2013 at 12:28:06PM +0300, Hiroshi Doyu wrote:
-> > > > Add "nvidia,memory-clients" to identify which swgroup ID a device
-> > > > belongs to.
-> > > 
-> > > Why not call the property "nvidia,swgid" instead? That seems a lot more
-> > > intuitive.
-> > 
-> > Tegra powerdomain also needs this info. Joseph?
+On Mon, Jul 01, 2013 at 04:55:24PM +0900, Magnus Damm wrote:
+> Hi Hayama-san,
 > 
-> Ah, yes. We need some kind of this information to know the relation in
-> the power domain when we wants to power down it.  But it didn't upstream
-> yet and still in very early stage of the design. I believe you can
-> ignore that and do the good design here for your usage. We can re-use
-> the binding if it point to the same HW behind that.
+> On Mon, Jul 1, 2013 at 4:38 PM, Takanari Hayama <taki@igel.co.jp> wrote:
+> > From: Takanari Hayama <taki@igel.co.jp>
+> >
+> > Fix base address and IRQ resources associated with SCIFB0.
+> >
+> > Signed-off-by: Takanari Hayama <taki@igel.co.jp>
+> > ---
+> >  arch/arm/mach-shmobile/setup-r8a73a4.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c
+> > b/arch/arm/mach-shmobile/setup-r8a73a4.c
+> > index c5a75a7..7f45c2e 100644
+> > --- a/arch/arm/mach-shmobile/setup-r8a73a4.c
+> > +++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+> > @@ -62,7 +62,7 @@ enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFB3 };
+> >  static const struct plat_sci_port scif[] = {
+> >         SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
+> >         SCIFA_DATA(SCIFA1, 0xe6c50000, gic_spi(145)), /* SCIFA1 */
+> > -       SCIFB_DATA(SCIFB0, 0xe6c50000, gic_spi(145)), /* SCIFB0 */
+> > +       SCIFB_DATA(SCIFB0, 0xe6c20000, gic_spi(148)), /* SCIFB0 */
+> >         SCIFB_DATA(SCIFB1, 0xe6c30000, gic_spi(149)), /* SCIFB1 */
+> >         SCIFB_DATA(SCIFB2, 0xe6ce0000, gic_spi(150)), /* SCIFB2 */
+> >         SCIFB_DATA(SCIFB3, 0xe6cf0000, gic_spi(151)), /* SCIFB3 */
+> > --
+> > 1.8.0
+> 
+> Thanks for catching this and submitting a fix. I've verified the
+> proposed change using the APE6 rev0.7 hardware manual and it looks
+> good to me.
+> 
+> Acked-by: Magnus Damm <damm@opensource.se>
 
-Ok, at least, I'll move this "tegra-swgid.h" to under "include/dt-bindings/memory/".
-This look to suite better than "include/dt-bindings/iommu/" since this
-isn't specific to iommu but others needs from memory client POV.
+Thanks, I will try and get this included in v3.11 as a fix
+and then added to v3.10 stable.
