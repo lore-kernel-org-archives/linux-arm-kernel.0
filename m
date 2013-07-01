@@ -1,74 +1,82 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Jul 2013 16:16:11 +0800
-Subject: [PATCH 4/4] ARM: mxs: saif0 is the clock provider to sgtl5000
+Date: Mon, 1 Jul 2013 16:16:10 +0800
+Subject: [PATCH 3/4] ASoC: mxs: register saif mclk to clock framework
 In-Reply-To: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
 References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1372666571-17276-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1372666571-17276-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These systems all use saif0 as the mclock provider to codec sgtl5000.
-Reflect that in device tree source, so that sgtl5000 can find the clock
-by calling clk_get().
+Mostly the mxs system design uses saif0 mclk output as the clock source
+of codec.  Since the mclk is implemented as a general divider with the
+saif clk as the parent clock, let's register the mclk as a basic
+clk-divider to common clock framework.  Then with it being a clock
+provdier, clk_get() call in codec driver probe function will just work.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx28-apx4devkit.dts |    2 +-
- arch/arm/boot/dts/imx28-evk.dts        |    2 +-
- arch/arm/boot/dts/imx28-m28evk.dts     |    2 +-
- arch/arm/boot/dts/imx28.dtsi           |    1 +
- 4 files changed, 4 insertions(+), 3 deletions(-)
+ sound/soc/mxs/mxs-saif.c |   35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx28-apx4devkit.dts b/arch/arm/boot/dts/imx28-apx4devkit.dts
-index 43bf3c7..0e7fed4 100644
---- a/arch/arm/boot/dts/imx28-apx4devkit.dts
-+++ b/arch/arm/boot/dts/imx28-apx4devkit.dts
-@@ -147,7 +147,7 @@
- 					reg = <0x0a>;
- 					VDDA-supply = <&reg_3p3v>;
- 					VDDIO-supply = <&reg_3p3v>;
--
-+					clocks = <&saif0>;
- 				};
+diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+index 49d8700..54511c5 100644
+--- a/sound/soc/mxs/mxs-saif.c
++++ b/sound/soc/mxs/mxs-saif.c
+@@ -24,6 +24,7 @@
+ #include <linux/slab.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/clk.h>
++#include <linux/clk-provider.h>
+ #include <linux/delay.h>
+ #include <linux/time.h>
+ #include <sound/core.h>
+@@ -658,6 +659,33 @@ static irqreturn_t mxs_saif_irq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
  
- 				pcf8563: rtc at 51 {
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 3637bf3..dccb223 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -193,7 +193,7 @@
- 					reg = <0x0a>;
- 					VDDA-supply = <&reg_3p3v>;
- 					VDDIO-supply = <&reg_3p3v>;
--
-+					clocks = <&saif0>;
- 				};
++static int mxs_saif_mclk_init(struct platform_device *pdev)
++{
++	struct mxs_saif *saif = platform_get_drvdata(pdev);
++	struct device_node *np = pdev->dev.of_node;
++	struct clk *clk;
++	int ret;
++
++	clk = clk_register_divider(&pdev->dev, "mxs_saif_mclk",
++				   __clk_get_name(saif->clk), 0,
++				   saif->base + SAIF_CTRL,
++				   BP_SAIF_CTRL_BITCLK_MULT_RATE, 3,
++				   0, NULL);
++	if (IS_ERR(clk)) {
++		ret = PTR_ERR(clk);
++		if (ret == -EEXIST)
++			return 0;
++		dev_err(&pdev->dev, "failed to register mclk: %d\n", ret);
++		return PTR_ERR(clk);
++	}
++
++	ret = of_clk_add_provider(np, of_clk_src_simple_get, clk);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
+ static int mxs_saif_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -734,6 +762,13 @@ static int mxs_saif_probe(struct platform_device *pdev)
  
- 				at24 at 51 {
-diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
-index 880df2f..44d9da5 100644
---- a/arch/arm/boot/dts/imx28-m28evk.dts
-+++ b/arch/arm/boot/dts/imx28-m28evk.dts
-@@ -184,7 +184,7 @@
- 					reg = <0x0a>;
- 					VDDA-supply = <&reg_3p3v>;
- 					VDDIO-supply = <&reg_3p3v>;
--
-+					clocks = <&saif0>;
- 				};
+ 	platform_set_drvdata(pdev, saif);
  
- 				eeprom: eeprom at 51 {
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 6a8acb0..9524a05 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -837,6 +837,7 @@
- 				compatible = "fsl,imx28-saif";
- 				reg = <0x80042000 0x2000>;
- 				interrupts = <59 80>;
-+				#clock-cells = <0>;
- 				clocks = <&clks 53>;
- 				dmas = <&dma_apbx 4>;
- 				dma-names = "rx-tx";
++	/* We only support saif0 being tx and clock master */
++	if (saif->id == 0) {
++		ret = mxs_saif_mclk_init(pdev);
++		if (ret)
++			dev_warn(&pdev->dev, "failed to init clocks\n");
++	}
++
+ 	ret = snd_soc_register_component(&pdev->dev, &mxs_saif_component,
+ 					 &mxs_saif_dai, 1);
+ 	if (ret) {
 -- 
 1.7.9.5
