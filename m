@@ -1,57 +1,43 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 1 Jul 2013 11:17:20 -0400
-Subject: [PATCH] DMA: Fix Marvell Orion and mv_xor after MEMSET removal
-In-Reply-To: <51D19CD1.3030900@gmail.com>
-References: <1372690589-2218-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130701150407.GB19937@titan.lakedaemon.net>
- <51D19CD1.3030900@gmail.com>
-Message-ID: <20130701151720.GC19937@titan.lakedaemon.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 1 Jul 2013 23:17:40 +0800
+Subject: [v2 4/4] sata: imx: add ahci sata support on imx platforms
+In-Reply-To: <CAGxe1ZEhTumWC5mpirjSqg2fogFz5VuLKLtxUpA=ctxdwU-i6w@mail.gmail.com>
+References: <1372672975-2997-1-git-send-email-r65037@freescale.com>
+ <1372672975-2997-5-git-send-email-r65037@freescale.com>
+ <CAGxe1ZEHWQUXmjgmGGkpy3wgxoS8ti0-eYZPHkQKzjD9pWqZ0Q@mail.gmail.com>
+ <20130701144817.GT13206@S2101-09.ap.freescale.net>
+ <CAGxe1ZEhTumWC5mpirjSqg2fogFz5VuLKLtxUpA=ctxdwU-i6w@mail.gmail.com>
+Message-ID: <20130701151737.GB14172@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 05:14:25PM +0200, Sebastian Hesselbarth wrote:
-> On 07/01/13 17:04, Jason Cooper wrote:
-> >On Mon, Jul 01, 2013 at 04:56:29PM +0200, Sebastian Hesselbarth wrote:
-> >>Commit 834cbfe966bece50afded79da8e975d255bf0772
-> >>  ("drivers/dma: remove unused support for MEMSET operations")
-> >>removes MEMSET from dmaengine but does not completely removes it from
-> >>Marvell Orion (arch/arm/plat-orion) and XOR (drivers/dma/mv_xor).
-> >>This also fixes some compiler warnings about now obsolete functions by
-> >>removing those.
+On Mon, Jul 01, 2013 at 08:34:38PM +0530, Girish K S wrote:
+> On 1 July 2013 20:18, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > On Mon, Jul 01, 2013 at 04:57:35PM +0530, Girish K S wrote:
+> >> Hello Richard,
 > >>
-> >>Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> >>---
-> >>Cc: Jason Cooper <jason@lakedaemon.net>
-> >>Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> >>Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> >>Cc: Andrew Morton <akpm@linux-foundation.org>
-> >>Cc: linux-arm-kernel at lists.infradead.org
-> >>Cc: linux-kernel at vger.kernel.org
-> >>---
-> >>  arch/arm/plat-orion/common.c |    6 ------
-> >>  drivers/dma/mv_xor.c         |   25 +------------------------
-> >>  2 files changed, 1 insertions(+), 30 deletions(-)
+> >> Instead of writing a separate driver for the changes you mentioned in
+> >> the commit message. you can just add those changes to
+> >> the platform data (pdata-> init).
 > >
-> >Please take a look at the email from lkml I just forwarded to you.  I
-> >believe this solves your problem, but I don't have time to look closely
-> >atm.
+> > No. The platform init hook is not used to do IP block related setup.
+> > If we're mapping ahci block and setting up ahci registers in platform
+> > code, we are generally not doing the right thing.
 > 
-> Jason,
-> 
-> I have seen the forwarded patch before. I don't know what version this
-> is based on. Some of the modifications are in next-20130701, some are
-> not. I have stripped the Marvell modifications from the patch you
-> forwarded and fixed all remaining issues.
-> 
-> Also, I will sent a follow-up patch to remove memset references from
-> Marvell SoC dts/dtsi and the binding documentation soon.
-> 
-> I guess, Bartolomiej should pick them up and resend his patch set, or
-> leave Marvell alone and you pick them up.
+> Yes I understand (anything specific to driver should be part of
+> driver). I need to touch few platforms that are already doing this.
+> Then how about keeping setup as part of driver data for the specific controller.
 
-If Bartolomiej doesn't take it, please split your changes into two
-patches, one for plat-orion, and one for drivers.
+I was too rush in writing the reply.  Here is what I meant.
 
-thx,
+We should reuse the generic ahci_platform driver. And that means we
+have to use pdata->init() hook to do vendor specific setup.  But the
+hook shouldn't be implemented in arch code (e.g.
+arch/arm/mach-imx/mach-imx6q.c), and it should be implemented in
+a vendor specific driver like sata_imx.c.  IOW, we reuse everything
+implemented in the generic ahci_platform driver, and handle differences
+in vendor specific ahci driver via pdata->init() hook.
 
-Jason.
+Does that make the most sense?
+
+Shawn 
