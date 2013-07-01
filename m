@@ -1,44 +1,63 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 01 Jul 2013 16:34:22 +0100
-Subject: [PATCH] ARM: vexpress_defconfig: Enable voltage regulators
-In-Reply-To: <1370901015-4159-1-git-send-email-christoffer.dall@linaro.org>
-References: <1370901015-4159-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1372692862.3716.57.camel@linaro1.home>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 1 Jul 2013 10:34:21 -0500
+Subject: [-next PATCH 0/2] ARM: OMAP5: fix build breakage due to SCU usage
+In-Reply-To: <1372257587-21720-1-git-send-email-nm@ti.com>
+References: <1372257587-21720-1-git-send-email-nm@ti.com>
+Message-ID: <51D1A17D.9070701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-06-10 at 14:50 -0700, Christoffer Dall wrote:
-> Enable the Versatile Express voltage regulators by default.
-> 
-> This should work on all verstatile express platforms and not enabling it
-> prevents a defconfig'ed kernel from using the SD card controller on the
-> qemu emulated platform, which is unfortunate for first-time casual
-> users.
-> 
-> Cc: Peter Maydell <peter.maydell@linaro.org>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm/configs/vexpress_defconfig |    3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
-> index f2de51f..17104d9 100644
-> --- a/arch/arm/configs/vexpress_defconfig
-> +++ b/arch/arm/configs/vexpress_defconfig
-> @@ -138,3 +138,6 @@ CONFIG_DEBUG_LL=y
->  CONFIG_EARLY_PRINTK=y
->  # CONFIG_CRYPTO_ANSI_CPRNG is not set
->  # CONFIG_CRYPTO_HW is not set
-> +CONFIG_REGULATOR=y
-> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
-> +CONFIG_REGULATOR_VEXPRESS=y
+Tony,
 
->From my testing, only the CONFIG_REGULATOR=y is required to get MMC
-working on real hardware with Linux 3.10. Is CONFIG_REGULATOR_VEXPRESS
-actually required to get QEMU working properly?
+Any chance of picking these up?
 
-We definitely don't need CONFIG_REGULATOR_FIXED_VOLTAGE because config
-ARCH_VEXPRESS has "select REGULATOR_FIXED_VOLTAGE if REGULATOR".
+I see that next-20130701 is broke as well in an OMAP5 only build. beyond 
+the fixes already merged in - the missing series seems to be the 
+$subject series to allow an OMAP5 only build.
+
+On 06/26/2013 09:39 AM, Nishanth Menon wrote:
+> Hi,
+>
+> Cortex-A15 based OMAP5 does not use Snoop Control Unit(SCU)[1].
+> However, there is lot of code that is shared between Cortex-A9 based
+> OMAP4 and OMAP5, hence functionality code is shared with runtime usage
+> of SCU based on SoC worked on. However on building with OMAP5 only
+> generates the following errors:
+> arch/arm/mach-omap2/built-in.o: In function `scu_gp_set':
+> arch/arm/mach-omap2/sleep44xx.S:132: undefined reference to `scu_power_mode'
+> arch/arm/mach-omap2/built-in.o: In function `scu_gp_clear':
+> arch/arm/mach-omap2/sleep44xx.S:229: undefined reference to `scu_power_mode'
+> arch/arm/mach-omap2/built-in.o: In function `omap4_smp_init_cpus':
+> arch/arm/mach-omap2/omap-smp.c:185: undefined reference to `scu_get_core_count'
+> arch/arm/mach-omap2/built-in.o: In function `omap4_smp_prepare_cpus':
+> arch/arm/mach-omap2/omap-smp.c:211: undefined reference to `scu_enable'
+>
+> This was attempted to be "fixed" in various attempts in the past [2] [3].
+>
+> This series applies on top of the other fixes in discussion for linux-next [4] [5].
+>
+> Based on:
+> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git  next-20130626
+>
+> Nishanth Menon (2):
+>    ARM: OMAP4: sleep: build OMAP4 specific functions only for OMAP4
+>    ARM: scu: provide inline dummy functions when SCU is not present
+>
+>   arch/arm/include/asm/smp_scu.h  |   13 ++++++++++++-
+>   arch/arm/mach-omap2/sleep44xx.S |    6 +++++-
+>   2 files changed, 17 insertions(+), 2 deletions(-)
+>
+> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407e/CHDFJICC.html
+> [2] https://patchwork.kernel.org/patch/2568091/
+> [3] http://marc.info/?t=137120115400001&r=1&w=2
+> [4] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/178209.html
+> [5] https://patchwork.kernel.org/patch/2781471/
+>
+> Regards,
+> Nishanth Menon
+>
+
 
 -- 
-Tixy
+Regards,
+Nishanth Menon
