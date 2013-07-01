@@ -1,62 +1,63 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 01 Jul 2013 22:31:54 +0200
-Subject: [PATCH] arm: kirkwood: readynas duo v2: Add GMT G762 Fan
- Controller DT bindings
-In-Reply-To: <20130701222814.36ca395a@skate> (Thomas Petazzoni's message of
- "Mon, 1 Jul 2013 22:28:14 +0200")
-References: <87sizyuj0t.fsf@natisbad.org> <20130701222814.36ca395a@skate>
-Message-ID: <87k3lauimd.fsf@natisbad.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 1 Jul 2013 23:42:36 +0300
+Subject: OMAP baseline test results for v3.10-rc7
+In-Reply-To: <alpine.DEB.2.02.1307011946180.4358@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1307011946180.4358@utopia.booyaka.com>
+Message-ID: <20130701204236.GA805@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi,
 
-Thomas Petazzoni <thomas.petazzoni@free-electrons.com> writes:
+On Mon, Jul 01, 2013 at 07:48:50PM +0000, Paul Walmsley wrote:
+> Boot to userspace:
+>     FAIL ( 2/12): 37xxevm, am335xbonelt
 
-> On Mon, 01 Jul 2013 22:23:14 +0200, Arnaud Ebalard wrote:
->
->> -        regulators {
->> -                compatible = "simple-bus";
->> -                #address-cells = <1>;
->> -                #size-cells = <0>;
->> -
->> -                usb_power: regulator at 1 {
->> -                        compatible = "regulator-fixed";
->> -                        reg = <1>;
->> -                        regulator-name = "USB 3.0 Power";
->> -                        regulator-min-microvolt = <5000000>;
->> -                        regulator-max-microvolt = <5000000>;
->> -                        enable-active-high;
->> -                        regulator-always-on;
->> -                        regulator-boot-on;
->> -                        gpio = <&gpio1 14 0>;
->> -                };
->> -        };
->> +	regulators {
->> +		compatible = "simple-bus";
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		usb_power: regulator at 1 {
->> +			compatible = "regulator-fixed";
->> +			reg = <1>;
->> +			regulator-name = "USB 3.0 Power";
->> +			regulator-min-microvolt = <5000000>;
->> +			regulator-max-microvolt = <5000000>;
->> +			enable-active-high;
->> +			regulator-always-on;
->> +			regulator-boot-on;
->> +			gpio = <&gpio1 14 0>;
->> +		};
->> +	};
->>  };
->
-> Those white-space changes are not related to the addition of the G762
-> Device Tree informations.
+<quoting part of [1]>
+| U-Boot# tftp 0x82000000 am335x-boneblack.dtb
+| link up on port 0, speed 100, full duplex
+| Using cpsw device
+| TFTP from server 192.168.57.1; our IP address is 192.168.57.138
+| Filename 'am335x-boneblack.dtb'.
 
-Should I make two unrelated patches (one for G762 and another cosmetic
-one) or simply let the spaces as they are in .dts?
+Where are you taking am335x-boneblack.dtb from ? It's not in mainline
+v3.10-rc7 kernel:
 
-Cheers,
+$ ls arch/arm/boot/dts/am33*.dts
+arch/arm/boot/dts/am335x-bone.dts  arch/arm/boot/dts/am335x-evm.dts
+arch/arm/boot/dts/am335x-evmsk.dts
+$ git grep -e boneblack arch/arm/
+$ echo $
+1
+$ git show
+commit 9e895ace5d82df8929b16f58e9f515f6d54ab82d
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Sat Jun 22 09:47:31 2013 -1000
 
-a+
+    Linux 3.10-rc7
+
+diff --git a/Makefile b/Makefile
+index c6863b5..0142c93 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
+ VERSION = 3
+ PATCHLEVEL = 10
+ SUBLEVEL = 0
+-EXTRAVERSION = -rc6
++EXTRAVERSION = -rc7
+ NAME = Unicycling Gorilla
+ 
+ # *DOCUMENTATION*
+
+[1] http://www.pwsan.com/omap/testlogs/test_v3.10-rc7/20130630191558/boot/am335xbonelt/am335x-bone/am335xbonelt_log.txt
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130701/beaafe0a/attachment.sig>
