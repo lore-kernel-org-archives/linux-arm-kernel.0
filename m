@@ -1,157 +1,86 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Mon, 1 Jul 2013 15:39:30 +0300
-Subject: [PATCH] Documentation: dt: bindings: TI WiLink modules
-In-Reply-To: <1372425670.21065.61.camel@cumari.coelho.fi>
-References: <1372149330-24335-1-git-send-email-coelho@ti.com>
- <20130628093848.GA2139@e106331-lin.cambridge.arm.com>
- <1372413215.21065.41.camel@cumari.coelho.fi>
- <20130628102145.GB2139@e106331-lin.cambridge.arm.com>
- <1372415514.21065.50.camel@cumari.coelho.fi>
- <1372418531.21065.53.camel@cumari.coelho.fi>
- <20130628114129.GO11297@arwen.pp.htv.fi>
- <1372421632.21065.60.camel@cumari.coelho.fi>
- <20130628121859.GP11297@arwen.pp.htv.fi>
- <1372425670.21065.61.camel@cumari.coelho.fi>
-Message-ID: <1372682370.21065.68.camel@cumari.coelho.fi>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 1 Jul 2013 14:44:45 +0200
+Subject: [v2 4/4] sata: imx: add ahci sata support on imx platforms
+In-Reply-To: <1372672975-2997-5-git-send-email-r65037@freescale.com>
+References: <1372672975-2997-1-git-send-email-r65037@freescale.com>
+ <1372672975-2997-5-git-send-email-r65037@freescale.com>
+Message-ID: <20130701124445.GW516@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-06-28 at 16:21 +0300, Luciano Coelho wrote:
-> On Fri, 2013-06-28 at 15:18 +0300, Felipe Balbi wrote:
-> > On Fri, Jun 28, 2013 at 03:13:52PM +0300, Luciano Coelho wrote:
-> > > On Fri, 2013-06-28 at 14:41 +0300, Felipe Balbi wrote:
-> > > > On Fri, Jun 28, 2013 at 02:22:11PM +0300, Luciano Coelho wrote:
-> > > > > On Fri, 2013-06-28 at 13:31 +0300, Luciano Coelho wrote:
-> > > > > > (fixed Mike's address)
-> > > > > > 
-> > > > > > On Fri, 2013-06-28 at 11:21 +0100, Mark Rutland wrote:
-> > > > > > > On Fri, Jun 28, 2013 at 10:53:35AM +0100, Luciano Coelho wrote:
-> > > > > > > > On Fri, 2013-06-28 at 10:38 +0100, Mark Rutland wrote:
-> > > > > > > > > On Tue, Jun 25, 2013 at 09:35:30AM +0100, Luciano Coelho wrote:
-> > > > > > > > > > +Optional properties:
-> > > > > > > > > > +--------------------
-> > > > > > > > > > +
-> > > > > > > > > > +- refclock: the internal WLAN reference clock frequency (required for
-> > > > > > > > > > +  WiLink6 and WiLink7; not used for WiLink8).  Must be one of the
-> > > > > > > > > > +  following:
-> > > > > > > > > > +	0 = 19.2 MHz
-> > > > > > > > > > +	1 = 26.0 MHz
-> > > > > > > > > > +	2 = 38.4 MHz
-> > > > > > > > > > +	3 = 52.0 MHz
-> > > > > > > > > > +	4 = 38.4 MHz, XTAL
-> > > > > > > > > > +	5 = 26.0 MHz, XTAL
-> > > > > > > > > > +
-> > > > > > > > > > +- tcxoclock: the internal WLAN TCXO clock frequency (required for
-> > > > > > > > > > +  WiLink7 not used for WiLink6 and WiLink8).  Must be one of the
-> > > > > > > > > > +  following:
-> > > > > > > > > > +	0 = 19.200 MHz
-> > > > > > > > > > +	1 = 26.000 MHz
-> > > > > > > > > > +	2 = 38.400 MHz
-> > > > > > > > > > +	3 = 52.000 MHz
-> > > > > > > > > > +	4 = 16.368 MHz
-> > > > > > > > > > +	5 = 32.736 MHz
-> > > > > > > > > > +	6 = 16.800 MHz
-> > > > > > > > > > +	7 = 33.600 MHz
-> > > > > > > > > 
-> > > > > > > > > This looks suspiciously like what we have the common clock bindings for:
-> > > > > > > > > 
-> > > > > > > > > refclk {
-> > > > > > > > > 	compatible = "fixed-clock";
-> > > > > > > > > 	#clock-cells = <0>;
-> > > > > > > > > 	clock-frequency = <19200000>;
-> > > > > > > > > }
-> > > > > > > > > 
-> > > > > > > > > wilink {
-> > > > > > > > > 	compatible = "ti,wilink7";
-> > > > > > > > > 	interrupt-parent = <&some_interrupt_controller>;
-> > > > > > > > > 	interrupts = <0 1 1>;
-> > > > > > > > > 	clocks = <&refclk>, <&refclk>;
-> > > > > > > > > 	clock-names = "refclk", "txoclk";
-> > > > > > > > > };
-> > > > > > > > > 
-> > > > > > > > > Could you not use them?
-> > > > > > > > 
-> > > > > > > > Hmmm... this actually does look good.  But these are internal clocks in
-> > > > > > > > the modules, they cannot be accessed from outside.  Does it make sense
-> > > > > > > > to register them with the clock framework?
-> > > > > > > 
-> > > > > > > Given we already have a common way of describing clocks, I think it
-> > > > > > > makes sense to use it -- people already understand the common bindings,
-> > > > > > > and it's less code to add add to the kernel. I don't think the fact
-> > > > > > > these clocks are internal should prevent us from describing them as we
-> > > > > > > would an external clock.
-> > > > > > 
-> > > > > > Yes, I agree with you.  Thanks for the suggestion! I think it will look
-> > > > > > much better.  And now that I dug a bit more into the code, I can see
-> > > > > > that there are only structs being populated, so there shouldn't be any
-> > > > > > other side-effects.
-> > > > > 
-> > > > > Hmmm, one thing that escaped me.  Besides the frequency, I also need a
-> > > > > boolean that tells if the clock is XTAL or not.  I can't figure out how
-> > > > > to pass this if I use the generic clock framework.  Any suggestions?
-> > > > 
-> > > > Could you use clock-output-names for that ?
-> > > > 
-> > > > XTAL clock:
-> > > > 
-> > > > refclk {
-> > > > 	compatible = "fixed-clock";
-> > > > 	#clock cells = <0>;
-> > > > 	clock-frequency = <19200000>;
-> > > > 	clock-output-names = "xtal";
-> > > > };
-> > > > 
-> > > > non-XTAL clock:
-> > > > 
-> > > > refclk {
-> > > > 	compatible = "fixed-clock";
-> > > > 	#clock cells = <0>;
-> > > > 	clock-frequency = <19200000>;
-> > > > 	clock-output-names = "osc"; /* any better name ? */
-> > > > };
-> > > 
-> > > This starts looking a bit hacky.  Using the output name as a flag is not
-> > > very pretty.
-> > > 
-> > > I think it would be better to have a separate flag for it in the wlan
-> > > node.  Like an optional "refclock-xtal" boolean or something.  The
-> > > downside of this is that we would be adding information about the clock
-> > > details in the wilink node. :(
-> > > 
-> > > OTOH, we could add a flag to the generic clock binding? A new optional
-> > > boolean that tells whether the clock is XTAL or not:
-> > > 
-> > > refclk {
-> > > 	compatible = "fixed-clock";
-> > > 	#clock cells = <0>;
-> > > 	clock-frequency = <19200000>;
-> > > 	clock-xtal;
-> > > };
-> > > 
-> > > Do you think that would make sense?
-> > 
-> > sure, that looks alright to me. Surely there are other devices out there
-> > who want to know if the clock comes from a crystal or not ?!?
+On Mon, Jul 01, 2013 at 06:02:55PM +0800, Richard Zhu wrote:
+> imx6q contains one Synopsys AHCI SATA controller,
+> But it can't shares ahci_platform driver with other
+> controllers.
+> Because there are some misalignments of the bits
+> definitions of the HBA registers and the Vendor
+> Specific registers
+>  - CAP_SSS(bit20) of the HOST_CAP is writable, default
+>  value is '0', should be configured to be '1'
+>  - bit0 (only one AHCI SATA port on imx6q) of the
+>  HOST_PORTS_IMPL should be set to be '1'.(default 0)
+>  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)
+>  should be configured regarding to the frequency of AHB
+>  bus clock.
 > 
-> Mike, what do you think about this idea? If it sounds okay to you, I can
-> cook up a patch adding this flag.
+> Setup its own ahci sata driver, enable the imx6q ahci
+> sata support, and update the ahci sata binding document.
+> 
+> Signed-off-by: Richard Zhu <r65037@freescale.com>
 
-Hmmm... I started implementing this whole thing, but using these clocks
-as "fixed-clock"s is not so straightforward.  The problem is that I
-would need to register my driver as a clock provider and add the OF
-match for "fixed-clock".
+Wait a minute. We suggested to add a i.MX specific ahci driver to put
+the i.MX speicific setup in there. Now you really post a separate i.MX
+driver, but instead of putting the setup in there, it's a nearly
+identical copy of the generic driver *without* the setup and the setup
+is still in arch/arm/. That doesn't make sense to me.
 
-If I do that, all the other "fixed-clock" nodes would be passed to my
-driver too, which is wrong.  Or, the platform should register the
-"fixed-clock" match, but this would be wrong too, since it would find
-*my* fixed-clocks.
+> + */
+> +static int imx_sata_init(void __iomem *mmio)
+> +{
+> +	int ret;
+> +	struct clk *ahb_clk;
+> +
+> +	ret = readl(mmio + HOST_CAP);
+> +	if (!(ret & HOST_CAP_SSS))
+> +		writel(ret |= HOST_CAP_SSS, mmio + HOST_CAP);
+> +	ret = readl(mmio + HOST_PORTS_IMPL);
+> +	if (!(ret & 0x1))
+> +		writel((ret | 0x1), mmio + HOST_PORTS_IMPL);
+> +	ahb_clk = clk_get_sys(NULL, "ahb");
 
-The only thing I can come up with is to make a small clock driver (maybe
-even inside the WiLink module itself) that registers a new type of
-clock, "ti,wilink-clock" or something.  But this would really be
-overkill, wouldn't it?
+use devm_clk_get
 
-Any other ideas?
+> +
+> +	if (pdata && pdata->ata_port_info)
+> +		pi = *pdata->ata_port_info;
+> +
+> +	hpriv = devm_kzalloc(dev, sizeof(*hpriv), GFP_KERNEL);
+> +	if (!hpriv) {
+> +		dev_err(dev, "can't alloc ahci_host_priv\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	hpriv->flags |= (unsigned long)pi.private_data;
+> +
+> +	hpriv->mmio = devm_ioremap(dev, mem->start, resource_size(mem));
+> +	if (!hpriv->mmio) {
+> +		dev_err(dev, "can't map %pR\n", mem);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	hpriv->clk = clk_get(dev, NULL);
 
---
-Luca.
+devm_clk_get.
+
+> +	if (IS_ERR(hpriv->clk)) {
+> +		dev_err(dev, "can't get clock\n");
+
+That's an error. You should react to it.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
