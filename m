@@ -1,59 +1,21 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 01 Jul 2013 10:59:05 +0200
-Subject: [PATCH 2/2] ARM i.MX6DL: dts: add clock and mux configuration
- for LDB
-In-Reply-To: <20130701085255.GE13206@S2101-09.ap.freescale.net>
-References: <1372422256-22037-1-git-send-email-p.zabel@pengutronix.de>
- <1372422256-22037-2-git-send-email-p.zabel@pengutronix.de>
- <20130701085255.GE13206@S2101-09.ap.freescale.net>
-Message-ID: <1372669145.4971.22.camel@pizza.hi.pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 1 Jul 2013 17:06:32 +0800
+Subject: [PATCHv3 5/8] ARM: mxs: dt: cfa10037: make hogpins grabbed by
+ respective drivers
+In-Reply-To: <51D058A4.7020101@free-electrons.com>
+References: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1372424577-8279-6-git-send-email-alexandre.belloni@free-electrons.com>
+ <20130629070529.GD2593@lukather>
+ <51D058A4.7020101@free-electrons.com>
+Message-ID: <20130701090630.GF13206@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Sun, Jun 30, 2013 at 06:11:16PM +0200, Alexandre Belloni wrote:
+> Do you want me to send a reordered serie or will you do it when applying
+> the patches ? You can just apply patch 4/8 last.
 
-Am Montag, den 01.07.2013, 16:52 +0800 schrieb Shawn Guo:
-> On Fri, Jun 28, 2013 at 02:24:16PM +0200, Philipp Zabel wrote:
-> > i.MX6DL does not have the second IPU, but the LVDS multiplexers can connect
-> > either LVDS channel of the LDB to IPU1 DI0 or IPU1 DI1.
-> > 
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/imx6dl.dtsi | 17 +++++++++++++++++
-> >  1 file changed, 17 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-> > index 80155fde..5ec89eb 100644
-> > --- a/arch/arm/boot/dts/imx6dl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6dl.dtsi
-> > @@ -417,3 +417,20 @@
-> >  		};
-> >  	};
-> >  };
-> > +
-> > +&ldb {
-> > +	clocks = <&clks 33>, <&clks 34>,
-> > +		 <&clks 39>, <&clks 40>,
-> > +		 <&clks 135>, <&clks 136>;
-> > +	clock-names = "di0_pll", "di1_pll",
-> > +		      "di0_sel", "di1_sel",
-> > +		      "di0", "di1";
-> > +
-> > +	lvds-channel at 0 {
-> > +		crtcs = <&ipu1 0>, <&ipu1 1>;
-> > +	};
-> > +
-> > +	lvds-channel at 1 {
-> > +		crtcs = <&ipu1 0>, <&ipu1 1>;
-> > +	};
-> 
-> So now we have both imx6q.dtsi and imx6dl.dtsi overwrite the "crtcs"
-> defined in imx6qdl.dtsi.  Should we remove it from imx6qdl.dtsi, or
-> define a sane one in imx6qdl.dtsi to save one overwrite?
-> 
-> Shawn
+Please resend, since you have some comments from Maxime on patch #2
+unresolved? 
 
-I'd rather remove it from imx6qdl.dtsi completely.
-
-regards
-Philipp
+Shawn
