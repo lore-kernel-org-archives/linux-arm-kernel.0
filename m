@@ -1,149 +1,109 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon,  1 Jul 2013 13:55:55 +0100
-Subject: [PATCH] drm/exynos: Add missing includes
-Message-ID: <1372683355-27460-1-git-send-email-broonie@kernel.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 01 Jul 2013 14:56:36 +0200
+Subject: [PATCH 1/2] ARM: dts: mx53qsb: Enable VPU support
+In-Reply-To: <1372459759-10488-1-git-send-email-festevam@gmail.com>
+References: <1372459759-10488-1-git-send-email-festevam@gmail.com>
+Message-ID: <1372683396.4971.35.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+Hi Fabio,
 
-Ensure that all externally accessed functions are correctly prototyped
-when defined in each file by making sure the headers with the protoypes
-are included in the file with the definition.
+Am Freitag, den 28.06.2013, 19:49 -0300 schrieb Fabio Estevam:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Enable Video Processing Unit (VPU) support.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Depends on Philipp Zabel's patch:
+> [PATCH] ARM: dts: add sram for imx53 and imx6q
+> 
+> Philipp,
+> 
+> I tried using the original mx53 vpu firmware that comes with the FSL BSP, but it
+> failed to load:
+> 
+> coda 63ff4000.vpu: firmware get command error                                   
+> coda 63ff4000.vpu: HW initialization failed  
+> 
+> Any suggestions?
+> 
+> Thanks!
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- drivers/gpu/drm/exynos/exynos_drm_connector.c | 1 +
- drivers/gpu/drm/exynos/exynos_drm_crtc.c      | 1 +
- drivers/gpu/drm/exynos/exynos_drm_dmabuf.c    | 1 +
- drivers/gpu/drm/exynos/exynos_drm_fbdev.c     | 1 +
- drivers/gpu/drm/exynos/exynos_drm_fimc.c      | 1 +
- drivers/gpu/drm/exynos/exynos_drm_g2d.c       | 1 +
- drivers/gpu/drm/exynos/exynos_drm_gsc.c       | 1 +
- drivers/gpu/drm/exynos/exynos_drm_plane.c     | 1 +
- drivers/gpu/drm/exynos/exynos_drm_rotator.c   | 1 +
- drivers/gpu/drm/exynos/exynos_drm_vidi.c      | 1 +
- 10 files changed, 10 insertions(+)
+/*
+ * The CODA driver needs the raw firmware without header in memory order.
+ * This is how I converted vpu_fw_imx53.bin from the Freescale BSP into
+ * v4l2-coda7541-imx53.bin:
+ */
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_connector.c b/drivers/gpu/drm/exynos/exynos_drm_connector.c
-index 8bcc13a..ec80293 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_connector.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_connector.c
-@@ -17,6 +17,7 @@
- #include <drm/exynos_drm.h>
- #include "exynos_drm_drv.h"
- #include "exynos_drm_encoder.h"
-+#include "exynos_drm_connector.h"
- 
- #define to_exynos_connector(x)	container_of(x, struct exynos_drm_connector,\
- 				drm_connector)
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_crtc.c b/drivers/gpu/drm/exynos/exynos_drm_crtc.c
-index 073c10a..6933ee9 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_crtc.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_crtc.c
-@@ -15,6 +15,7 @@
- #include <drm/drmP.h>
- #include <drm/drm_crtc_helper.h>
- 
-+#include "exynos_drm_crtc.h"
- #include "exynos_drm_drv.h"
- #include "exynos_drm_encoder.h"
- #include "exynos_drm_plane.h"
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c b/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
-index ff7f2a8..8adafde 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
-@@ -11,6 +11,7 @@
- 
- #include <drm/drmP.h>
- #include <drm/exynos_drm.h>
-+#include "exynos_drm_dmabuf.h"
- #include "exynos_drm_drv.h"
- #include "exynos_drm_gem.h"
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-index 8f007aa..45b6cb3 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-@@ -19,6 +19,7 @@
- 
- #include "exynos_drm_drv.h"
- #include "exynos_drm_fb.h"
-+#include "exynos_drm_fbdev.h"
- #include "exynos_drm_gem.h"
- #include "exynos_drm_iommu.h"
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimc.c b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-index 4a1616a..a83e664 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-@@ -22,6 +22,7 @@
- #include <drm/drmP.h>
- #include <drm/exynos_drm.h>
- #include "regs-fimc.h"
-+#include "exynos_drm_drv.h"
- #include "exynos_drm_ipp.h"
- #include "exynos_drm_fimc.h"
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-index af75434..03ba897 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-@@ -24,6 +24,7 @@
- #include <drm/drmP.h>
- #include <drm/exynos_drm.h>
- #include "exynos_drm_drv.h"
-+#include "exynos_drm_g2d.h"
- #include "exynos_drm_gem.h"
- #include "exynos_drm_iommu.h"
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_gsc.c b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-index 762f40d..4683251 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-@@ -21,6 +21,7 @@
- #include <drm/drmP.h>
- #include <drm/exynos_drm.h>
- #include "regs-gsc.h"
-+#include "exynos_drm_drv.h"
- #include "exynos_drm_ipp.h"
- #include "exynos_drm_gsc.h"
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_plane.c b/drivers/gpu/drm/exynos/exynos_drm_plane.c
-index 83efc66..63ebeeb 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_plane.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_plane.c
-@@ -16,6 +16,7 @@
- #include "exynos_drm_encoder.h"
- #include "exynos_drm_fb.h"
- #include "exynos_drm_gem.h"
-+#include "exynos_drm_plane.h"
- 
- #define to_exynos_plane(x)	container_of(x, struct exynos_plane, base)
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_rotator.c b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-index 9b6c709..2e9eee2 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-@@ -22,6 +22,7 @@
- #include <drm/exynos_drm.h>
- #include "regs-rotator.h"
- #include "exynos_drm.h"
-+#include "exynos_drm_drv.h"
- #include "exynos_drm_ipp.h"
- 
- /*
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_vidi.c b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
-index 24376c1..498647a 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_vidi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
-@@ -24,6 +24,7 @@
- #include "exynos_drm_drv.h"
- #include "exynos_drm_crtc.h"
- #include "exynos_drm_encoder.h"
-+#include "exynos_drm_vidi.h"
- 
- /* vidi has totally three virtual windows. */
- #define WINDOWS_NR		3
--- 
-1.8.3.1
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+
+struct fw_header_info {
+	u_int8_t  platform[12];
+	u_int32_t size;
+};
+
+int main(int argc, char *argv[])
+{
+	int fd, i, n, size;
+	struct fw_header_info header;
+	u_int32_t *buf;
+
+	if (argc < 3) {
+		fprintf(stderr, "usage: %s <infile> <outfile>\n", argv[0]);
+		fprintf(stderr, "example: %s vpu_fw_imx53.bin v4l2-coda7541-imx53.bin\n", argv[0]);
+		return 0;
+	}
+
+	fd = open(argv[1], O_RDONLY);
+	if (fd < 0) {
+		fprintf(stderr, "Failed to open source file '%s'.\n", argv[1]);
+		return EXIT_FAILURE;
+	}
+
+	n = read(fd, &header, sizeof(header));
+	if (n != sizeof(header)) {
+		fprintf(stderr, "Failed to read header.\n");
+		return EXIT_FAILURE;
+	}
+
+	size = header.size * sizeof(u_int16_t);
+	buf = malloc(size);
+	if (buf == NULL)
+		return EXIT_FAILURE;
+
+	n = read(fd, buf, size);
+	if (n != size) {
+		fprintf(stderr, "Failed to read firmware.\n");
+		return EXIT_FAILURE;
+	}
+
+	close(fd);
+
+	for (i = 0; i < size / 4; i += 2) {
+		u_int32_t tmp = buf[i + 1] << 16 | buf[i + 1] >> 16;
+		buf[i + 1] = buf[i] << 16 | buf[i] >> 16;
+		buf[i] = tmp;
+	}
+
+	fd = open(argv[2], O_RDWR | O_CREAT, 0644);
+	if (fd < 0)
+		error("Failed to open target file '%s'.\n", argv[2]);
+
+	n = write(fd, buf, size);
+	if (n != size)
+		error("Failed to write reordered firmware\n");
+
+	close(fd);
+
+	return 0;
+}
+
+/*
+ * regards
+ * Philipp
+ */
