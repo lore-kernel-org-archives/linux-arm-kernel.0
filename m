@@ -1,44 +1,177 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 01 Jul 2013 21:28:26 +0200
-Subject: [alsa-devel] [PATCH 1/4] ASoC: sgtl5000: give it a ramping time
- before writting
-In-Reply-To: <CAOMZO5DtgahX3WLdM-P9=ODhJVMTRHFuS9=6zHQiS9-3wCJcmA@mail.gmail.com>
-References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
- <20130701153327.GX13206@S2101-09.ap.freescale.net>
- <CAOMZO5B5jh1XciO4K1u3yBcHHDAgi8hA3GcywnJd11M7=aOPxA@mail.gmail.com>
- <201307011943.27489.marex@denx.de>
- <CAOMZO5DtgahX3WLdM-P9=ODhJVMTRHFuS9=6zHQiS9-3wCJcmA@mail.gmail.com>
-Message-ID: <51D1D85A.8060807@free-electrons.com>
+From: coelho@ti.com (Luciano Coelho)
+Date: Mon, 1 Jul 2013 22:34:10 +0300
+Subject: [RFC] wlcore: sdio: add wilink clock providers
+Message-ID: <1372707250-11998-1-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add refclock and tcxoclock as clock providers in WiLink.  These clocks
+are not accesible outside the WiLink module, but they are registered
+in the clock framework anyway.  Only the WiLink chip consumes these
+clocks.
+
+In theory, the WiLink chip could be connected to external clocks
+instead of using these internal clocks, so make the clock consumer
+code generic enough.  If external clocks are used, then the internal
+clock device tree nodes are not necessary, but the external ones must
+be specified.
+
+Signed-off-by: Luciano Coelho <coelho@ti.com>
+---
+
 Hi,
 
-On 01/07/2013 21:14, Fabio Estevam wrote:
-> Hi Marek,
-> 
-> On Mon, Jul 1, 2013 at 2:43 PM, Marek Vasut <marex@denx.de> wrote:
-> 
->> I think you can just disable the PIO mode altogether (around line 500 ... if
->> (msg->len < 8) ... replace this with if (0) ) and then the problem should not be
->> there (if it's a PIO problem).
-> 
-> Yes, this is a good suggestion.
-> 
-> This is what I did on 3.10 kernel:
-> 
-> - Booted a 3.10 kernel, audio is probed correctly
-> 
-> - Enabled touchscreen:
-> 
+I came up with this code, trying to make the WiLink clocks definitions
+as generic as possible and use existing fixed-clock bindings.  This
+looks relatively clean to me, even though it adds some complexity.
+But I think it's better than the original bindings I had defined.
 
-It definitely seems to be an issue with PIO mode as the investigation
-from Torsten Fleischer showed. I'll test that on my boards tonight. I'll
-also try to remove the touchscreen support to see if I observe the same
-thing as you do.
+I still need to take care of the XTAL/not-XTAl boolean, but I will do
+that separately.
 
+This patch will be split (to take away the Panda DTS part) and
+squashed in other patches in my series.
 
+Please let me know what you think.
+
+--
+Cheers,
+Luca.
+
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   16 ++++++++---
+ drivers/net/wireless/ti/wlcore/sdio.c     |   43 ++++++++++++++++++++++++++---
+ 2 files changed, 51 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index 670c3ce..7f061b8 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -65,11 +65,19 @@
+ 		enable-active-high;
+ 	};
+ 
++
+ 	wlan {
+-	     compatible = "ti,wilink6";
+-	     interrupt-parent = <&gpio2>;
+-	     interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
+-	     refclock = <2>;		/* 38.4 MHz */
++		compatible = "ti,wilink6";
++		interrupt-parent = <&gpio2>;
++		interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
++		clocks = <&refclock>;
++		clock-names = "refclock";
++
++		refclock: refclock {
++			compatible = "ti,wilink-clock";
++			#clock-cells = <0>;
++			clock-frequency = <38400000>;
++		};
+ 	 };
+ };
+ 
+diff --git a/drivers/net/wireless/ti/wlcore/sdio.c b/drivers/net/wireless/ti/wlcore/sdio.c
+index 5b08620..60fce49 100644
+--- a/drivers/net/wireless/ti/wlcore/sdio.c
++++ b/drivers/net/wireless/ti/wlcore/sdio.c
+@@ -34,6 +34,7 @@
+ #include <linux/wl12xx.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/printk.h>
++#include <linux/clk-provider.h>
+ 
+ #include "wlcore.h"
+ #include "wl12xx_80211.h"
+@@ -52,6 +53,7 @@ static bool dump = false;
+ struct wl12xx_sdio_glue {
+ 	struct device *dev;
+ 	struct platform_device *core;
++	struct clk *refclock, *tcxoclock;
+ };
+ 
+ static const struct sdio_device_id wl1271_devices[] = {
+@@ -214,10 +216,16 @@ static struct wl1271_if_operations sdio_ops = {
+ 	.set_block_size = wl1271_sdio_set_block_size,
+ };
+ 
++static const struct of_device_id wlcore_sdio_of_clk_match_table[] = {
++	{ .compatible = "ti,wilink-clock" },
++};
++
+ static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
+ {
+ 	struct wl12xx_platform_data *pdata;
+ 	struct device_node *np = dev->of_node;
++	struct device_node *clock_node;
++	struct wl12xx_sdio_glue *glue = sdio_get_drvdata(dev_to_sdio_func(dev));
+ 
+ 	if (!np) {
+ 		np = of_find_matching_node(NULL, dev->driver->of_match_table);
+@@ -241,11 +249,28 @@ static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
+ 		goto out_free;
+ 	}
+ 
++	for_each_matching_node(clock_node, wlcore_sdio_of_clk_match_table)
++		of_fixed_clk_setup(clock_node);
++
+ 	/* TODO: make sure we have this when needed (ie. for WL6 and WL7) */
+-	of_property_read_u32(np, "refclock", &pdata->ref_clock_freq);
++	glue->refclock = of_clk_get_by_name(np, "refclock");
++	if (IS_ERR(glue->refclock)) {
++		dev_err(dev, "couldn't find refclock on the device tree\n");
++		glue->refclock = NULL;
++	} else {
++		clk_prepare_enable(glue->refclock);
++		pdata->ref_clock_freq = clk_get_rate(glue->refclock);
++	}
+ 
+ 	/* TODO: make sure we have this when needed (ie. for WL7) */
+-	of_property_read_u32(np, "tcxoclock", &pdata->tcxo_clock_freq);
++	glue->tcxoclock = of_clk_get_by_name(np, "tcxoclock");
++	if (IS_ERR(glue->tcxoclock)) {
++		dev_err(dev, "couldn't find tcxoclock on the device tree\n");
++		glue->tcxoclock = NULL;
++	} else {
++		clk_prepare_enable(glue->tcxoclock);
++		pdata->ref_clock_freq = clk_get_rate(glue->tcxoclock);
++	}
+ 
+ 	goto out;
+ 
+@@ -291,6 +316,8 @@ static int wl1271_probe(struct sdio_func *func,
+ 	/* Use block mode for transferring over one block size of data */
+ 	func->card->quirks |= MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
+ 
++	sdio_set_drvdata(func, glue);
++
+ 	/* The pdata allocated here is freed when the device is freed,
+ 	 * so we don't need an additional out label to free it in case
+ 	 * of error further on.
+@@ -316,8 +343,6 @@ static int wl1271_probe(struct sdio_func *func,
+ 	if (mmcflags & MMC_PM_KEEP_POWER)
+ 		pdev_data->pwr_in_suspend = true;
+ 
+-	sdio_set_drvdata(func, glue);
+-
+ 	/* Tell PM core that we don't need the card to be powered now */
+ 	pm_runtime_put_noidle(&func->dev);
+ 
+@@ -384,6 +409,16 @@ static void wl1271_remove(struct sdio_func *func)
+ {
+ 	struct wl12xx_sdio_glue *glue = sdio_get_drvdata(func);
+ 
++	if (glue->refclock) {
++		clk_disable_unprepare(glue->refclock);
++		clk_put(glue->refclock);
++	}
++
++	if (glue->tcxoclock) {
++		clk_disable_unprepare(glue->tcxoclock);
++		clk_put(glue->tcxoclock);
++	}
++
+ 	/* Undo decrement done above in wl1271_probe */
+ 	pm_runtime_get_noresume(&func->dev);
+ 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.10.4
