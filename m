@@ -1,36 +1,65 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  1 Jul 2013 15:23:22 +0200
-Subject: [PATCHv4 1/8] ARM: mxs: Simplify detection of CrystalFontz boards
+Date: Mon,  1 Jul 2013 15:23:25 +0200
+Subject: [PATCHv4 4/8] ARM: mxs: dt: cfa10037: make hogpins grabbed by
+ respective drivers
 In-Reply-To: <1372685009-15564-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1372685009-15564-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1372685009-15564-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1372685009-15564-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-As all CrystalFontz boards are compatible with "crystalfontz,cfa10036", make it
-easier to add future boards.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-mxs/mach-mxs.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ arch/arm/boot/dts/imx28-cfa10037.dts | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 6298adb..1b8c274 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -478,10 +478,7 @@ static void __init mxs_machine_init(void)
- 		imx28_evk_init();
- 	else if (of_machine_is_compatible("bluegiga,apx4devkit"))
- 		apx4devkit_init();
--	else if (of_machine_is_compatible("crystalfontz,cfa10037") ||
--		 of_machine_is_compatible("crystalfontz,cfa10049") ||
--		 of_machine_is_compatible("crystalfontz,cfa10055") ||
--		 of_machine_is_compatible("crystalfontz,cfa10057"))
-+	else if (of_machine_is_compatible("crystalfontz,cfa10036"))
- 		crystalfontz_init();
+diff --git a/arch/arm/boot/dts/imx28-cfa10037.dts b/arch/arm/boot/dts/imx28-cfa10037.dts
+index c2ef3a3..182b99f 100644
+--- a/arch/arm/boot/dts/imx28-cfa10037.dts
++++ b/arch/arm/boot/dts/imx28-cfa10037.dts
+@@ -22,13 +22,19 @@
+ 	apb at 80000000 {
+ 		apbh at 80000000 {
+ 			pinctrl at 80018000 {
+-				pinctrl-names = "default", "default";
+-				pinctrl-1 = <&hog_pins_cfa10037>;
+-
+-				hog_pins_cfa10037: hog-10037 at 0 {
++				usb_pins_cfa10037: usb-10037 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+ 						0x0073 /* MX28_PAD_GPMI_D7__GPIO_0_7 */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
++				mac0_pins_cfa10037: mac0-10037 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
+ 						0x2153 /* MX28_PAD_SSP2_D5__GPIO_2_21 */
+ 					>;
+ 					fsl,drive-strength = <0>;
+@@ -56,7 +62,8 @@
+ 		mac0: ethernet at 800f0000 {
+ 			phy-mode = "rmii";
+ 			pinctrl-names = "default";
+-			pinctrl-0 = <&mac0_pins_a>;
++			pinctrl-0 = <&mac0_pins_a
++				&mac0_pins_cfa10037>;
+ 			phy-reset-gpios = <&gpio2 21 0>;
+ 			phy-reset-duration = <100>;
+ 			status = "okay";
+@@ -68,6 +75,8 @@
  
- 	of_platform_populate(NULL, of_default_bus_match_table,
+ 		reg_usb1_vbus: usb1_vbus {
+ 			compatible = "regulator-fixed";
++			pinctrl-names = "default";
++			pinctrl-0 = <&usb_pins_cfa10037>;
+ 			regulator-name = "usb1_vbus";
+ 			regulator-min-microvolt = <5000000>;
+ 			regulator-max-microvolt = <5000000>;
 -- 
 1.8.1.2
