@@ -1,109 +1,72 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 01 Jul 2013 14:56:36 +0200
-Subject: [PATCH 1/2] ARM: dts: mx53qsb: Enable VPU support
-In-Reply-To: <1372459759-10488-1-git-send-email-festevam@gmail.com>
-References: <1372459759-10488-1-git-send-email-festevam@gmail.com>
-Message-ID: <1372683396.4971.35.camel@pizza.hi.pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 1 Jul 2013 20:58:21 +0800
+Subject: [PATCH] ARM: dts: i.MX27: Add Secondary AHB Port definitions
+In-Reply-To: <1372487325-14405-1-git-send-email-shc_work@mail.ru>
+References: <1372487325-14405-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20130701125819.GJ13206@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-Am Freitag, den 28.06.2013, 19:49 -0300 schrieb Fabio Estevam:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Sat, Jun 29, 2013 at 10:28:45AM +0400, Alexander Shiyan wrote:
+> Patch adds Secondary AHB Port definitions for i.MX27 SOC and
+> moves NAND Flash Controller (NFC) under AHB Slave Port 1.
 > 
-> Enable Video Processing Unit (VPU) support.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 > ---
-> Depends on Philipp Zabel's patch:
-> [PATCH] ARM: dts: add sram for imx53 and imx6q
+>  arch/arm/boot/dts/imx27.dtsi | 28 ++++++++++++++++++++++------
+>  1 file changed, 22 insertions(+), 6 deletions(-)
 > 
-> Philipp,
+> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> index 86b6f5f..7c0179e 100644
+> --- a/arch/arm/boot/dts/imx27.dtsi
+> +++ b/arch/arm/boot/dts/imx27.dtsi
+> @@ -399,14 +399,30 @@
+>  			};
+>  		};
+>  
+> -		nfc: nand at d8000000 {
+> +		ahb1: ahb at 80000000 { /* Secondary AHB Slave Port 1 */
+
+We do not have the top level of AHB bus topology represented in device
+tree.  Your patch introduces it, partially - all about Secondary AHB
+Slave but nothing about Primary AHB.
+
+I'm not really fond of the change, since it's not extremely useful to
+me.  Do you have a real reason for the change?
+
+Shawn
+
+> +			compatible = "fsl,ahb-bus", "simple-bus";
+>  			#address-cells = <1>;
+>  			#size-cells = <1>;
+> -			compatible = "fsl,imx27-nand";
+> -			reg = <0xd8000000 0x1000>;
+> -			interrupts = <29>;
+> -			clocks = <&clks 54>;
+> -			status = "disabled";
+> +			reg = <0x80000000 0x20000000>;
+> +			ranges;
+> +		};
+> +
+> +		ahb2: ahb at a0000000 { /* Secondary AHB Slave Port 2 */
+> +			compatible = "fsl,ahb-bus", "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0xa0000000 0x40000000>;
+> +			ranges;
+> +
+> +			nfc: nand at d8000000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				compatible = "fsl,imx27-nand";
+> +				reg = <0xd8000000 0x1000>;
+> +				interrupts = <29>;
+> +				clocks = <&clks 54>;
+> +				status = "disabled";
+> +			};
+>  		};
+>  
+>  		iram: iram at ffff4c00 {
+> -- 
+> 1.8.1.5
 > 
-> I tried using the original mx53 vpu firmware that comes with the FSL BSP, but it
-> failed to load:
-> 
-> coda 63ff4000.vpu: firmware get command error                                   
-> coda 63ff4000.vpu: HW initialization failed  
-> 
-> Any suggestions?
-> 
-> Thanks!
-
-/*
- * The CODA driver needs the raw firmware without header in memory order.
- * This is how I converted vpu_fw_imx53.bin from the Freescale BSP into
- * v4l2-coda7541-imx53.bin:
- */
-
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-
-struct fw_header_info {
-	u_int8_t  platform[12];
-	u_int32_t size;
-};
-
-int main(int argc, char *argv[])
-{
-	int fd, i, n, size;
-	struct fw_header_info header;
-	u_int32_t *buf;
-
-	if (argc < 3) {
-		fprintf(stderr, "usage: %s <infile> <outfile>\n", argv[0]);
-		fprintf(stderr, "example: %s vpu_fw_imx53.bin v4l2-coda7541-imx53.bin\n", argv[0]);
-		return 0;
-	}
-
-	fd = open(argv[1], O_RDONLY);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to open source file '%s'.\n", argv[1]);
-		return EXIT_FAILURE;
-	}
-
-	n = read(fd, &header, sizeof(header));
-	if (n != sizeof(header)) {
-		fprintf(stderr, "Failed to read header.\n");
-		return EXIT_FAILURE;
-	}
-
-	size = header.size * sizeof(u_int16_t);
-	buf = malloc(size);
-	if (buf == NULL)
-		return EXIT_FAILURE;
-
-	n = read(fd, buf, size);
-	if (n != size) {
-		fprintf(stderr, "Failed to read firmware.\n");
-		return EXIT_FAILURE;
-	}
-
-	close(fd);
-
-	for (i = 0; i < size / 4; i += 2) {
-		u_int32_t tmp = buf[i + 1] << 16 | buf[i + 1] >> 16;
-		buf[i + 1] = buf[i] << 16 | buf[i] >> 16;
-		buf[i] = tmp;
-	}
-
-	fd = open(argv[2], O_RDWR | O_CREAT, 0644);
-	if (fd < 0)
-		error("Failed to open target file '%s'.\n", argv[2]);
-
-	n = write(fd, buf, size);
-	if (n != size)
-		error("Failed to write reordered firmware\n");
-
-	close(fd);
-
-	return 0;
-}
-
-/*
- * regards
- * Philipp
- */
