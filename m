@@ -1,63 +1,72 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 1 Jul 2013 23:42:36 +0300
-Subject: OMAP baseline test results for v3.10-rc7
-In-Reply-To: <alpine.DEB.2.02.1307011946180.4358@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1307011946180.4358@utopia.booyaka.com>
-Message-ID: <20130701204236.GA805@arwen.pp.htv.fi>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Mon, 01 Jul 2013 22:45:02 +0200
+Subject: [PATCH,
+ RESEND] arm: kirkwood: readynas duo v2: Add GMT G762 Fan Controller
+Message-ID: <874nceui0h.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Mon, Jul 01, 2013 at 07:48:50PM +0000, Paul Walmsley wrote:
-> Boot to userspace:
->     FAIL ( 2/12): 37xxevm, am335xbonelt
+Now that GMT G762 PWM Fan Controller is available upstream, let's add
+missing bindings in Netgear ReadyNAS Duo v2 .dts file.
 
-<quoting part of [1]>
-| U-Boot# tftp 0x82000000 am335x-boneblack.dtb
-| link up on port 0, speed 100, full duplex
-| Using cpsw device
-| TFTP from server 192.168.57.1; our IP address is 192.168.57.138
-| Filename 'am335x-boneblack.dtb'.
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+Hi Jason and Andrew,
 
-Where are you taking am335x-boneblack.dtb from ? It's not in mainline
-v3.10-rc7 kernel:
+This one applies and has been tested against Stephen Rothwell tree.
+Can you make it flow to Linus tree during the merge window?
 
-$ ls arch/arm/boot/dts/am33*.dts
-arch/arm/boot/dts/am335x-bone.dts  arch/arm/boot/dts/am335x-evm.dts
-arch/arm/boot/dts/am335x-evmsk.dts
-$ git grep -e boneblack arch/arm/
-$ echo $
-1
-$ git show
-commit 9e895ace5d82df8929b16f58e9f515f6d54ab82d
-Author: Linus Torvalds <torvalds@linux-foundation.org>
-Date:   Sat Jun 22 09:47:31 2013 -1000
+Following Thomas feedback, this is a resend of previous version, this
+time w/o fixes for bad spaces at the end of the file. Just tell me if
+I should send a separate one for that purpose.
 
-    Linux 3.10-rc7
+Thanks in advance.
 
-diff --git a/Makefile b/Makefile
-index c6863b5..0142c93 100644
---- a/Makefile
-+++ b/Makefile
-@@ -1,7 +1,7 @@
- VERSION = 3
- PATCHLEVEL = 10
- SUBLEVEL = 0
--EXTRAVERSION = -rc6
-+EXTRAVERSION = -rc7
- NAME = Unicycling Gorilla
+Cheers,
+
+a+
+
+ .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts    | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
+index ad6ade7..cc43d24 100644
+--- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
++++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
+@@ -52,6 +52,17 @@
+ 			};
+ 		};
  
- # *DOCUMENTATION*
-
-[1] http://www.pwsan.com/omap/testlogs/test_v3.10-rc7/20130630191558/boot/am335xbonelt/am335x-bone/am335xbonelt_log.txt
-
++		clocks {
++		       #address-cells = <1>;
++		       #size-cells = <0>;
++
++		       g762_clk: fixedclk {
++				 compatible = "fixed-clock";
++				 #clock-cells = <0>;
++				 clock-frequency = <8192>;
++		       };
++		};
++
+ 		i2c at 11000 {
+ 			status = "okay";
+ 
+@@ -59,6 +70,15 @@
+ 				compatible = "ricoh,rs5c372a";
+ 				reg = <0x32>;
+ 			};
++
++			g762: g762 at 3e {
++				compatible = "gmt,g762";
++				reg = <0x3e>;
++				clocks = <&g762_clk>; /* input clock */
++				fan_gear_mode = <0>;
++				fan_startv = <1>;
++				pwm_polarity = <0>;
++			};
+ 		};
+ 
+ 		serial at 12000 {
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130701/beaafe0a/attachment.sig>
+1.8.3.1
