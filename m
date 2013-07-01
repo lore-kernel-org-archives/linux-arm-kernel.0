@@ -1,42 +1,38 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 01 Jul 2013 14:42:13 +0900
-Subject: [PATCH 07/07] ARM: shmobile: Remove redundant r8a7790 callback
-In-Reply-To: <20130701054106.19319.46845.sendpatchset@w520>
-References: <20130701054106.19319.46845.sendpatchset@w520>
-Message-ID: <20130701054213.19319.40704.sendpatchset@w520>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 1 Jul 2013 07:50:51 +0200
+Subject: [PATCH] i2c: iop3xxx: fix build failure after waitqueue changes
+In-Reply-To: <1372455352-26260-1-git-send-email-khilman@linaro.org>
+References: <1372455352-26260-1-git-send-email-khilman@linaro.org>
+Message-ID: <20130701055051.GA2976@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Fri, Jun 28, 2013 at 02:35:52PM -0700, Kevin Hilman wrote:
+> There has long been a syntax problem in iop3xx_i2c_wait_event() which
+> has been somehow hidden by the macros in <linux/wait.h>.  After some
+> recent cleanup/rework of the wait_event_* helpers, the bug has come
+> out from hiding and now results in build failure:
+> 
+> /work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c: In function 'iop3xx_i2c_wait_event':
+> /work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:143: error: expected ')' before ';' token
+> /work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:157: error: expected ')' before ';' token
+> /work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:213: error: expected ')' before ';' token
+> /work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:291: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
+> /work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:551: error: expected ')' before ';' token
+> /work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:565: error: expected ')' before ';' token
+> /work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:764: error: expected ')' before ';' token
+> /work/kernel/next/drivers/i2c/busses/i2c-iop3xx.c:176:778: error: expected ')' b
+> 
+> Fix by removing stray ';'
+> 
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
 
-Replace the SoC-specific callback init_machine() with 
-a NULL to use the default code. This cleans up the code
-and reduces the number of lines.
+Applied to for-next, thanks! (Geez, that original code looks ugly...)
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- arch/arm/mach-shmobile/setup-r8a7790.c |    5 -----
- 1 file changed, 5 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-07-01 13:24:33.000000000 +0900
-@@ -217,10 +217,6 @@ void __init r8a7790_init_delay(void)
- }
- 
- #ifdef CONFIG_USE_OF
--void __init r8a7790_add_standard_devices_dt(void)
--{
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
- 
- static const char *r8a7790_boards_compat_dt[] __initdata = {
- 	"renesas,r8a7790",
-@@ -230,7 +226,6 @@ static const char *r8a7790_boards_compat
- DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
- 	.init_early	= r8a7790_init_delay,
- 	.init_irq	= irqchip_init,
--	.init_machine	= r8a7790_add_standard_devices_dt,
- 	.init_time	= r8a7790_timer_init,
- 	.dt_compat	= r8a7790_boards_compat_dt,
- MACHINE_END
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130701/27ff2488/attachment.sig>
