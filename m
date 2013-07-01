@@ -1,64 +1,43 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 1 Jul 2013 16:03:20 +0200
-Subject: [PATCH] N900: fix operation on emulator
-In-Reply-To: <20130617111031.GQ20992@atomide.com>
-References: <20130613132624.GA3464@amd.pavel.ucw.cz>
- <20130613141001.GF8164@atomide.com>
- <20130613142809.GA3775@amd.pavel.ucw.cz>
- <20130613145724.GH8164@atomide.com>
- <20130613155240.GB3775@amd.pavel.ucw.cz>
- <20130613161418.GJ8164@atomide.com>
- <20130613230808.GA14876@amd.pavel.ucw.cz>
- <20130614055629.GM8164@atomide.com>
- <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
- <20130617111031.GQ20992@atomide.com>
-Message-ID: <20130701140315.GA15318@amd.pavel.ucw.cz>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 1 Jul 2013 22:04:55 +0800
+Subject: [PATCH 1/4] ASoC: sgtl5000: give it a ramping time before writting
+In-Reply-To: <20130701100710.GB27646@sirena.org.uk>
+References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
+ <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
+ <20130701100710.GB27646@sirena.org.uk>
+Message-ID: <20130701140454.GP13206@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Errata workarounds for N900 hardware actually break operation on
-emulator. Fix it.
+On Mon, Jul 01, 2013 at 11:07:10AM +0100, Mark Brown wrote:
+> On Mon, Jul 01, 2013 at 04:16:08PM +0800, Shawn Guo wrote:
+> 
+> > +	/*
+> > +	 * It seems that sgtl5000 takes a longer time to get the registers
+> > +	 * ready for write than bread.  Let's give it a ramping time before
+> > +	 * the first write goes.
+> > +	 */
+> > +	msleep(50);
+> > +
+> >  	/* Ensure sgtl5000 will start with sane register values */
+> >  	ret = sgtl5000_fill_defaults(sgtl5000);
+> >  	if (ret)
+> 
+> This seems like a really odd place to add the sleep - I'd have expected
+> this to be a part of or just after the reset operation.
 
-This approach was suggested by Pali Roh?r <pali.rohar@gmail.com>
-(thanks!).
+Since I do not see any reset operation between clk_prepare_enable()
+and sgtl5000_fill_defaults(), so I will move the sleep into
+sgtl5000_fill_defaults() call.
 
-(Also explain what "sleep_ind" led actually does).
+> It's a *really*
+> long sleep too, though if that's what you need that's what you need.
+> 
+Yeah, from my testing it's what we need.
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-index 74f83a5..81f7b9f 100644
---- a/arch/arm/mach-omap2/board-rx51.c
-+++ b/arch/arm/mach-omap2/board-rx51.c
-@@ -33,9 +33,12 @@
- #include "pm.h"
- #include "sdram-nokia.h"
- #include "board-rx51-secure.h"
-+#include "soc.h"
- 
- #define RX51_GPIO_SLEEP_IND 162
- 
-+/* This lights up left part of keyboard */
-+
- static struct gpio_led gpio_leds[] = {
- 	{
- 		.name	= "sleep_ind",
-@@ -107,9 +110,11 @@ static void __init rx51_init(void)
- 	rx51_camera_init();
- 
- #ifdef CONFIG_ARM_ERRATA_430973
--	printk(KERN_INFO "RX-51: Enabling ARM errata 430973 workaround.\n");
--	/* set IBE to 1 */
--	rx51_secure_update_aux_cr(1 << 6, 0);
-+	if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
-+		printk(KERN_INFO "RX-51: Enabling ARM errata 430973 workaround.\n");
-+		/* set IBE to 1 */
-+		rx51_secure_update_aux_cr(1 << 6, 0);
-+	}
- #endif
- 
- 	/* Ensure SDRC pins are mux'd for self-refresh */
+> Also "bread" :)
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Yeah, I was really hungry when writing the comment.
+
+Shawn
