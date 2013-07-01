@@ -1,24 +1,24 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 1 Jul 2013 10:29:26 +0900
-Subject: [PATCH] ARM: shmobile: Sort r8a7790 MSTP entries
-In-Reply-To: <20130701011456.GA14567@verge.net.au>
-References: <20130628101327.26876.89435.sendpatchset@w520>
- <20130701011456.GA14567@verge.net.au>
-Message-ID: <20130701012925.GB14567@verge.net.au>
+Date: Mon, 1 Jul 2013 10:30:36 +0900
+Subject: [PATCH 0/3] R8A7778/BOCK-W: HPB-DMAC support for SDHI0
+In-Reply-To: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
+References: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130701013036.GC14567@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 10:14:57AM +0900, Simon Horman wrote:
-> On Fri, Jun 28, 2013 at 07:13:27PM +0900, Magnus Damm wrote:
-> > From: Magnus Damm <damm@opensource.se>
-> > 
-> > The r8a7790 MSTP bits should be kept sorted in the same way
-> > as on other mach-shmobile SoCs. Move the HSCIF and thermal
-> > bits to clean up the current state.
-> > 
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
+On Sun, Jun 30, 2013 at 02:43:56AM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Thanks, I will queue this up in the cleanup branch.
+>    Here's the set of 3 patches against the Simon Horman's 'renesas.git' repo,
+> 'renesas-next-20130628' tag. Here we add the HPB-DMAC platform code working on
+> the R8A7778 and enable DMA for SDHI0 on BOCK-W. The patchset depends on the
+> R-Car HPB-DMAC driver patch posted earlier.
+> 
+> [1/3] ARM: shmobile: use common platform header for HPB-DMAC
+> [2/3] ARM: shmobile: r8a7778: add HPB-DMAC support
+> [3/3] ARM: shmobile: BOCK-W: enable DMA for SDHI0
 
-I've added it to the soc branch instead as it is depended
-on by other patches that seem to make sense there.
+Hi Magnus, Hi Morimoto-san,
+
+could you please review is series?
