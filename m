@@ -1,122 +1,140 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 01 Jul 2013 17:22:27 +0200
-Subject: [PATCH v3 05/13] ARM: dts: Add camera subsystem device nodes to
- exynos4.dtsi
+Date: Mon, 01 Jul 2013 17:22:28 +0200
+Subject: [PATCH v3 06/13] ARM: dts: Add camera subsystem nodes to
+ exynos4x12.dtsi
 In-Reply-To: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
 References: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1372692155-17653-6-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1372692155-17653-7-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the FIMC and MIPI CSIS device nodes common to the Exynos4
-SoC series.
+Add common camera node and Exynos4212/4412 specific nodes for
+FIMC, MIPI-CSIS, FIMC-LITE and FIMC-IS devices.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
 Changes since v2:
- - added fimc/csis clock properties common for exynos4210 and exynos4x12
+ - fixed typo in exynos4x12 i2c_isp node reg property,
+ - removed the clock properties which are now moved to exynos4.dtsi,
+   "mux" and "parent" clock entries are dropped.
 ---
- arch/arm/boot/dts/exynos4.dtsi |   80 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 80 insertions(+)
+ arch/arm/boot/dts/exynos4x12.dtsi |   98 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 98 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index bce2254..752624f 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -36,6 +36,12 @@
- 		i2c5 = &i2c_5;
- 		i2c6 = &i2c_6;
- 		i2c7 = &i2c_7;
-+		csis0 = &csis_0;
-+		csis1 = &csis_1;
-+		fimc0 = &fimc_0;
-+		fimc1 = &fimc_1;
-+		fimc2 = &fimc_2;
-+		fimc3 = &fimc_3;
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index 0e24d85..954628c 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -26,6 +26,8 @@
+ 		pinctrl1 = &pinctrl_1;
+ 		pinctrl2 = &pinctrl_2;
+ 		pinctrl3 = &pinctrl_3;
++		fimc-lite0 = &fimc_lite_0;
++		fimc-lite1 = &fimc_lite_1;
  	};
-
- 	chipid at 10000000 {
-@@ -92,6 +98,80 @@
- 		reg = <0x10010000 0x400>;
+ 
+ 	pd_isp: isp-power-domain at 10023CA0 {
+@@ -78,4 +80,100 @@
+ 		clock-names = "sclk_fimg2d", "fimg2d";
+ 		status = "disabled";
  	};
-
++
 +	camera {
-+		compatible = "samsung,fimc", "simple-bus";
-+		status = "disabled";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
++		clocks = <&clock 132>, <&clock 133>, <&clock 351>, <&clock 352>;
++		clock-names = "sclk_cam0", "sclk_cam1", "pxl_async0", "pxl_async1";
 +
 +		fimc_0: fimc at 11800000 {
-+			compatible = "samsung,exynos4210-fimc";
-+			reg = <0x11800000 0x1000>;
-+			interrupts = <0 84 0>;
-+			clocks = <&clock 256>, <&clock 128>;
-+			clock-names = "fimc", "sclk_fimc";
-+			samsung,power-domain = <&pd_cam>;
-+			samsung,sysreg = <&sys_reg>;
-+			status = "disabled";
++			compatible = "samsung,exynos4212-fimc";
++			samsung,pix-limits = <4224 8192 1920 4224>;
++			samsung,mainscaler-ext;
++			samsung,isp-wb;
++			samsung,cam-if;
 +		};
 +
 +		fimc_1: fimc at 11810000 {
-+			compatible = "samsung,exynos4210-fimc";
-+			reg = <0x11810000 0x1000>;
-+			interrupts = <0 85 0>;
-+			clocks = <&clock 257>, <&clock 129>;
-+			clock-names = "fimc", "sclk_fimc";
-+			samsung,power-domain = <&pd_cam>;
-+			samsung,sysreg = <&sys_reg>;
-+			status = "disabled";
++			compatible = "samsung,exynos4212-fimc";
++			samsung,pix-limits = <4224 8192 1920 4224>;
++			samsung,mainscaler-ext;
++			samsung,isp-wb;
++			samsung,cam-if;
 +		};
 +
 +		fimc_2: fimc at 11820000 {
-+			compatible = "samsung,exynos4210-fimc";
-+			reg = <0x11820000 0x1000>;
-+			interrupts = <0 86 0>;
-+			clocks = <&clock 258>, <&clock 130>;
-+			clock-names = "fimc", "sclk_fimc";
-+			samsung,power-domain = <&pd_cam>;
-+			samsung,sysreg = <&sys_reg>;
-+			status = "disabled";
++			compatible = "samsung,exynos4212-fimc";
++			samsung,pix-limits = <4224 8192 1920 4224>;
++			samsung,mainscaler-ext;
++			samsung,isp-wb;
++			samsung,lcd-wb;
++			samsung,cam-if;
 +		};
 +
 +		fimc_3: fimc at 11830000 {
-+			compatible = "samsung,exynos4210-fimc";
-+			reg = <0x11830000 0x1000>;
-+			interrupts = <0 87 0>;
-+			clocks = <&clock 259>, <&clock 131>;
-+			clock-names = "fimc", "sclk_fimc";
-+			samsung,power-domain = <&pd_cam>;
-+			samsung,sysreg = <&sys_reg>;
++			compatible = "samsung,exynos4212-fimc";
++			samsung,pix-limits = <1920 8192 1366 1920>;
++			samsung,rotators = <0>;
++			samsung,mainscaler-ext;
++			samsung,isp-wb;
++			samsung,lcd-wb;
++		};
++
++		fimc_lite_0: fimc-lite at 12390000 {
++			compatible = "samsung,exynos4212-fimc-lite";
++			reg = <0x12390000 0x1000>;
++			interrupts = <0 105 0>;
++			samsung,power-domain = <&pd_isp>;
++			clocks = <&clock 353>;
++			clock-names = "flite";
 +			status = "disabled";
 +		};
 +
-+		csis_0: csis at 11880000 {
-+			compatible = "samsung,exynos4210-csis";
-+			reg = <0x11880000 0x4000>;
-+			interrupts = <0 78 0>;
-+			clocks = <&clock 260>, <&clock 134>;
-+			clock-names = "csis", "sclk_csis";
-+			bus-width = <4>;
-+			samsung,power-domain = <&pd_cam>;
++		fimc_lite_1: fimc-lite at 123A0000 {
++			compatible = "samsung,exynos4212-fimc-lite";
++			reg = <0x123A0000 0x1000>;
++			interrupts = <0 106 0>;
++			samsung,power-domain = <&pd_isp>;
++			clocks = <&clock 354>;
++			clock-names = "flite";
 +			status = "disabled";
 +		};
 +
-+		csis_1: csis at 11890000 {
-+			compatible = "samsung,exynos4210-csis";
-+			reg = <0x11890000 0x4000>;
-+			interrupts = <0 80 0>;
-+			clocks = <&clock 261>, <&clock 135>;
-+			clock-names = "csis", "sclk_csis";
-+			bus-width = <2>;
-+			samsung,power-domain = <&pd_cam>;
++		fimc_is: fimc-is at 12000000 {
++			compatible = "samsung,exynos4212-fimc-is", "simple-bus";
++			reg = <0x12000000 0x260000>;
++			interrupts = <0 90 0>, <0 95 0>;
++			samsung,power-domain = <&pd_isp>;
++			clocks = <&clock 353>, <&clock 354>, <&clock 355>,
++				<&clock 356>, <&clock 17>, <&clock 357>,
++				<&clock 358>, <&clock 359>, <&clock 360>,
++				<&clock 450>,<&clock 451>, <&clock 452>,
++				<&clock 453>, <&clock 176>, <&clock 13>,
++				<&clock 454>, <&clock 395>, <&clock 455>;
++			clock-names = "lite0", "lite1", "ppmuispx",
++				      "ppmuispmx", "mpll", "isp",
++				      "drc", "fd", "mcuisp",
++				      "ispdiv0", "ispdiv1", "mcuispdiv0",
++				      "mcuispdiv1", "uart", "aclk200",
++				      "div_aclk200", "aclk400mcuisp",
++				      "div_aclk400mcuisp";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
 +			status = "disabled";
++
++			pmu {
++				reg = <0x10020000 0x3000>;
++			};
++
++			i2c1_isp: i2c-isp at 12140000 {
++				compatible = "samsung,exynos4212-i2c-isp";
++				reg = <0x12140000 0x100>;
++				clocks = <&clock 370>;
++				clock-names = "i2c_isp";
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
 +		};
 +	};
-+
- 	watchdog at 10060000 {
- 		compatible = "samsung,s3c2410-wdt";
- 		reg = <0x10060000 0x100>;
---
+ };
+-- 
 1.7.9.5
