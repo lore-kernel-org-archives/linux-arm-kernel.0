@@ -1,76 +1,103 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon,  1 Jul 2013 12:04:07 +0100
-Subject: [PATCH 09/10] mvebu: support running big-endian
+Date: Mon,  1 Jul 2013 12:04:04 +0100
+Subject: [PATCH 06/10] ARM: twd: data endian fix
 In-Reply-To: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1372676648-9254-10-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1372676648-9254-7-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add indication we can run these cores in BE mode, and ensure that the
-secondary CPU is set to big-endian mode in the initialisation code as
-the initial code runs little-endian.
+Ensure the twd driver uses the correct calls to access the hardware
+to ensure that we do not end up with data in the wrong endian format.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/mach-mvebu/Kconfig        |    1 +
- arch/arm/mach-mvebu/coherency_ll.S |    3 +++
- arch/arm/mach-mvebu/headsmp.S      |    4 ++++
- 3 files changed, 8 insertions(+)
+ arch/arm/kernel/smp_twd.c |   24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 80a8bca..317cdb8 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -1,5 +1,6 @@
- config ARCH_MVEBU
- 	bool "Marvell SOCs with Device Tree support" if ARCH_MULTI_V7
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select CLKSRC_MMIO
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
-index 5476669..ee7598f 100644
---- a/arch/arm/mach-mvebu/coherency_ll.S
-+++ b/arch/arm/mach-mvebu/coherency_ll.S
-@@ -20,6 +20,8 @@
- #define ARMADA_XP_CFB_CTL_REG_OFFSET 0x0
- #define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 90525d9..804d3f8 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -45,7 +45,7 @@ static void twd_set_mode(enum clock_event_mode mode,
+ 	case CLOCK_EVT_MODE_PERIODIC:
+ 		ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
+ 			| TWD_TIMER_CONTROL_PERIODIC;
+-		__raw_writel(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
++		writel_relaxed(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
+ 			twd_base + TWD_TIMER_LOAD);
+ 		break;
+ 	case CLOCK_EVT_MODE_ONESHOT:
+@@ -58,18 +58,18 @@ static void twd_set_mode(enum clock_event_mode mode,
+ 		ctrl = 0;
+ 	}
  
-+#include <asm/assembler.h>
-+
- 	.text
- /*
-  * r0: Coherency fabric base register address
-@@ -29,6 +31,7 @@ ENTRY(ll_set_cpu_coherent)
- 	/* Create bit by cpu index */
- 	mov	r3, #(1 << 24)
- 	lsl	r1, r3, r1
-+ARM_BE8(rev	r1, r1)
+-	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
++	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
+ }
  
- 	/* Add CPU to SMP group - Atomic */
- 	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
-diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
-index a06e0ed..a4f995d 100644
---- a/arch/arm/mach-mvebu/headsmp.S
-+++ b/arch/arm/mach-mvebu/headsmp.S
-@@ -21,6 +21,8 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
+ static int twd_set_next_event(unsigned long evt,
+ 			struct clock_event_device *unused)
+ {
+-	unsigned long ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
++	unsigned long ctrl = readl_relaxed(twd_base + TWD_TIMER_CONTROL);
  
-+#include <asm/assembler.h>
-+
- /*
-  * At this stage the secondary CPUs don't have acces yet to the MMU, so
-  * we have to provide physical addresses
-@@ -36,6 +38,8 @@
+ 	ctrl |= TWD_TIMER_CONTROL_ENABLE;
+ 
+-	__raw_writel(evt, twd_base + TWD_TIMER_COUNTER);
+-	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
++	writel_relaxed(evt, twd_base + TWD_TIMER_COUNTER);
++	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
+ 
+ 	return 0;
+ }
+@@ -82,8 +82,8 @@ static int twd_set_next_event(unsigned long evt,
   */
- ENTRY(armada_xp_secondary_startup)
+ static int twd_timer_ack(void)
+ {
+-	if (__raw_readl(twd_base + TWD_TIMER_INTSTAT)) {
+-		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
++	if (readl_relaxed(twd_base + TWD_TIMER_INTSTAT)) {
++		writel_relaxed(1, twd_base + TWD_TIMER_INTSTAT);
+ 		return 1;
+ 	}
  
-+ ARM_BE8(setend	be )			@ go BE8 if booted LE
-+
- 	/* Read CPU id */
- 	mrc     p15, 0, r1, c0, c0, 5
- 	and     r1, r1, #0xF
+@@ -209,15 +209,15 @@ static void __cpuinit twd_calibrate_rate(void)
+ 		waitjiffies += 5;
+ 
+ 				 /* enable, no interrupt or reload */
+-		__raw_writel(0x1, twd_base + TWD_TIMER_CONTROL);
++		writel_relaxed(0x1, twd_base + TWD_TIMER_CONTROL);
+ 
+ 				 /* maximum value */
+-		__raw_writel(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
++		writel_relaxed(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
+ 
+ 		while (get_jiffies_64() < waitjiffies)
+ 			udelay(10);
+ 
+-		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
++		count = readl_relaxed(twd_base + TWD_TIMER_COUNTER);
+ 
+ 		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
+ 
+@@ -275,7 +275,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	 * bother with the below.
+ 	 */
+ 	if (per_cpu(percpu_setup_called, cpu)) {
+-		__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
++		writel_relaxed(0, twd_base + TWD_TIMER_CONTROL);
+ 		clockevents_register_device(*__this_cpu_ptr(twd_evt));
+ 		enable_percpu_irq(clk->irq, 0);
+ 		return 0;
+@@ -288,7 +288,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	 * The following is done once per CPU the first time .setup() is
+ 	 * called.
+ 	 */
+-	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
++	writel_relaxed(0, twd_base + TWD_TIMER_CONTROL);
+ 
+ 	clk->name = "local_timer";
+ 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
 -- 
 1.7.10.4
