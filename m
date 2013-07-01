@@ -1,107 +1,61 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 01 Jul 2013 22:23:14 +0200
-Subject: [PATCH] arm: kirkwood: readynas duo v2: Add GMT G762 Fan Controller
- DT bindings
-Message-ID: <87sizyuj0t.fsf@natisbad.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 1 Jul 2013 22:28:14 +0200
+Subject: [PATCH] arm: kirkwood: readynas duo v2: Add GMT G762 Fan
+ Controller DT bindings
+In-Reply-To: <87sizyuj0t.fsf@natisbad.org>
+References: <87sizyuj0t.fsf@natisbad.org>
+Message-ID: <20130701222814.36ca395a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Arnaud Ebalard,
 
-Now that GMT G762 PWM Fan Controller is available upstream, let's add
-missing bindings in Netgear ReadyNAS Duo v2 .dts file. Let's also take
-the opportunity to fix space issues at the end of the file.
+On Mon, 01 Jul 2013 22:23:14 +0200, Arnaud Ebalard wrote:
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
-Hi Jason and Andrew,
+> -        regulators {
+> -                compatible = "simple-bus";
+> -                #address-cells = <1>;
+> -                #size-cells = <0>;
+> -
+> -                usb_power: regulator at 1 {
+> -                        compatible = "regulator-fixed";
+> -                        reg = <1>;
+> -                        regulator-name = "USB 3.0 Power";
+> -                        regulator-min-microvolt = <5000000>;
+> -                        regulator-max-microvolt = <5000000>;
+> -                        enable-active-high;
+> -                        regulator-always-on;
+> -                        regulator-boot-on;
+> -                        gpio = <&gpio1 14 0>;
+> -                };
+> -        };
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		usb_power: regulator at 1 {
+> +			compatible = "regulator-fixed";
+> +			reg = <1>;
+> +			regulator-name = "USB 3.0 Power";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			enable-active-high;
+> +			regulator-always-on;
+> +			regulator-boot-on;
+> +			gpio = <&gpio1 14 0>;
+> +		};
+> +	};
+>  };
 
-This one applies and has been tested against Stephen Rothwell tree.
-Can you make it flow to Linus tree during the merge window? Thanks
-in advance.
+Those white-space changes are not related to the addition of the G762
+Device Tree informations.
 
-Cheers,
+Thanks,
 
-a+
-
- .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  | 54 +++++++++++++++-------
- 1 file changed, 37 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-index ad6ade7..796a307 100644
---- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-+++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-@@ -52,6 +52,17 @@
- 			};
- 		};
- 
-+		clocks {
-+		       #address-cells = <1>;
-+		       #size-cells = <0>;
-+
-+		       g762_clk: fixedclk {
-+				 compatible = "fixed-clock";
-+				 #clock-cells = <0>;
-+				 clock-frequency = <8192>;
-+		       };
-+		};
-+
- 		i2c at 11000 {
- 			status = "okay";
- 
-@@ -59,6 +70,15 @@
- 				compatible = "ricoh,rs5c372a";
- 				reg = <0x32>;
- 			};
-+
-+			g762: g762 at 3e {
-+				compatible = "gmt,g762";
-+				reg = <0x3e>;
-+				clocks = <&g762_clk>; /* input clock */
-+				fan_gear_mode = <0>;
-+				fan_startv = <1>;
-+				pwm_polarity = <0>;
-+			};
- 		};
- 
- 		serial at 12000 {
-@@ -166,21 +186,21 @@
- 		};
- 	};
- 
--        regulators {
--                compatible = "simple-bus";
--                #address-cells = <1>;
--                #size-cells = <0>;
--
--                usb_power: regulator at 1 {
--                        compatible = "regulator-fixed";
--                        reg = <1>;
--                        regulator-name = "USB 3.0 Power";
--                        regulator-min-microvolt = <5000000>;
--                        regulator-max-microvolt = <5000000>;
--                        enable-active-high;
--                        regulator-always-on;
--                        regulator-boot-on;
--                        gpio = <&gpio1 14 0>;
--                };
--        };
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		usb_power: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "USB 3.0 Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio1 14 0>;
-+		};
-+	};
- };
+Thomas
 -- 
-1.8.3.1
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
