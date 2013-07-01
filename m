@@ -1,79 +1,39 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 1 Jul 2013 16:32:38 +0900
-Subject: [PATCH 01/04] ARM: shmobile: Use default ->init_irq() on EMEV2
-In-Reply-To: <20130701060112.21728.37189.sendpatchset@w520>
-References: <20130701060103.21728.83833.sendpatchset@w520>
- <20130701060112.21728.37189.sendpatchset@w520>
-Message-ID: <20130701073237.GU14567@verge.net.au>
+From: xobs@kosagi.com (Sean Cross)
+Date: Mon,  1 Jul 2013 07:15:43 +0000
+Subject: [PATCH 0/4] Add PCI Express to i.MX6
+Message-ID: <1372662947-27160-1-git-send-email-xobs@kosagi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 03:01:12PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> Remove redundant irqchip_init() callback. The default case
-> of NULL will result in invoking irqchip_init() anyway.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  arch/arm/mach-shmobile/setup-emev2.c |    2 --
->  1 file changed, 2 deletions(-)
-> 
-> --- 0005/arch/arm/mach-shmobile/setup-emev2.c
-> +++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-07-01 13:33:39.000000000 +0900
-> @@ -20,7 +20,6 @@
->  #include <linux/init.h>
->  #include <linux/interrupt.h>
->  #include <linux/irq.h>
-> -#include <linux/irqchip.h>
->  #include <linux/platform_device.h>
->  #include <linux/platform_data/gpio-em.h>
->  #include <linux/of_platform.h>
-> @@ -445,7 +444,6 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma
->  	.smp		= smp_ops(emev2_smp_ops),
->  	.init_early	= emev2_init_delay,
->  	.nr_irqs	= NR_IRQS_LEGACY,
-> -	.init_irq	= irqchip_init,
->  	.dt_compat	= emev2_boards_compat_dt,
->  MACHINE_END
+This patchset adds a PCI Express driver for the Freescale i.MX6 series of 
+SoCs.  It is based on the BSP driver, available from Freescale
+athttp://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git
 
-Hi Magnus,
+This patchset does the following:
 
-I mistakenly dropped the following patch from Maxime Ripard from
-v3.11. I have re-queued it up, for v3.12, in the cleanup branch:
+    1) Add general-purpose LVDS clocks to drive the bus
+    2) Enable PCI Express on ARM
+    3) Add the pcie-imx driver
+    4) Add device tree bindings for imx6qdl.dtsi
 
-commit 4042de1229ecf083890d8ad5c9327e03b648c1a2
-Author: Maxime Ripard <maxime.ripard@free-electrons.com>
-Date:   Sun May 26 22:05:23 2013 +0900
+Sean Cross (4):
+  ARM i.MX6q: Add descriptors for LVDS clocks
+  ARM: Enable PCI Express on ARM
+  PCI: Add driver for i.MX6 PCI Express
+  ARM i.MX6: Add PCI Express to device tree
 
-    ARM: shmobile: emev2: Remove init_irq declaration in machine description
-    
-    Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
-    specified") removed the need to explictly setup the init_irq field in
-    the machine description when using only irqchip_init. Remove that
-    declaration for shmobile as well.
-    
-    Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-    Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+ .../devicetree/bindings/clock/imx6q-clock.txt      |    4 +
+ .../devicetree/bindings/pci/imx6q-pcie.txt         |   20 +
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   12 +
+ arch/arm/mach-imx/Kconfig                          |    1 +
+ arch/arm/mach-imx/clk-imx6q.c                      |   13 +-
+ drivers/pci/pcie/Kconfig                           |   10 +
+ drivers/pci/pcie/Makefile                          |    2 +
+ drivers/pci/pcie/pcie-imx.c                        | 1049 ++++++++++++++++++++
+ 9 files changed, 1111 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/imx6q-pcie.txt
+ create mode 100644 drivers/pci/pcie/pcie-imx.c
 
-diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
-index 899a86c..66694e0 100644
---- a/arch/arm/mach-shmobile/setup-emev2.c
-+++ b/arch/arm/mach-shmobile/setup-emev2.c
-@@ -20,7 +20,6 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
--#include <linux/irqchip.h>
- #include <linux/platform_device.h>
- #include <linux/platform_data/gpio-em.h>
- #include <linux/of_platform.h>
-@@ -454,7 +453,6 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
- 	.smp		= smp_ops(emev2_smp_ops),
- 	.init_early	= emev2_init_delay,
- 	.nr_irqs	= NR_IRQS_LEGACY,
--	.init_irq	= irqchip_init,
- 	.init_machine	= emev2_add_standard_devices_dt,
- 	.dt_compat	= emev2_boards_compat_dt,
- MACHINE_END
+-- 
+1.7.9.5
