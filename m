@@ -1,31 +1,31 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Jul 2013 22:17:12 +0800
-Subject: [PATCH] ARM: dts: i.MX27: Add Secondary AHB Port definitions
-In-Reply-To: <1372687690.31793480@f308.mail.ru>
-References: <1372487325-14405-1-git-send-email-shc_work@mail.ru>
- <20130701125819.GJ13206@S2101-09.ap.freescale.net>
- <1372687690.31793480@f308.mail.ru>
-Message-ID: <20130701141710.GQ13206@S2101-09.ap.freescale.net>
+Date: Mon, 1 Jul 2013 22:26:12 +0800
+Subject: [alsa-devel] [PATCH 1/4] ASoC: sgtl5000: give it a ramping time
+ before writting
+In-Reply-To: <CAOMZO5BAs5-Tf_O0TVLFAuCchVuukV+bH2MpjqMU83tTw2GD=Q@mail.gmail.com>
+References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
+ <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
+ <20130701100710.GB27646@sirena.org.uk>
+ <201307011254.18952.marex@denx.de>
+ <CAOMZO5BAs5-Tf_O0TVLFAuCchVuukV+bH2MpjqMU83tTw2GD=Q@mail.gmail.com>
+Message-ID: <20130701142610.GR13206@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 06:08:10PM +0400, Alexander Shiyan wrote:
-> Introducing primary bus will produce a completely different i.MX27 DTS,
-> since it contain AIPI1,2 and iram.
+On Mon, Jul 01, 2013 at 11:12:48AM -0300, Fabio Estevam wrote:
+> On Mon, Jul 1, 2013 at 7:54 AM, Marek Vasut <marex@denx.de> wrote:
+> 
+> > The delay might also be caused by the I2C driver, I have this in my ToDo to
+> 
+> Yes, this extra delay could be related to the mxs i2c driver, as we do
+> not need to add this delay when using sgtl5000 on other i.mx devices.
+> 
+> Other people have also reported mxs i2c issues currently:
+> http://marc.info/?l=linux-i2c&m=137241339917261&w=2
+> 
+> ,so this may be related some how.
 
-That's one reason I would stay away from the change, because if the
-addition of Secondary AHB is accepted, it will be a little more
-difficult for us to say NO to people who love to have Primary AHB added.
-
-> Introduction of buses has no effect, other than the possibility of using labels
-> and minimal validation of nodes to the correct address.
-
-Only if there is no code in the kernel searching a node via node path.
-
-> In this case, I define the bus here for the subsequent addition of WEIM,
-> for a better understanding of what and where is.
-> Of course we can do without it. Think is it unnecessary?
-
-Great, please do without it then, thanks.
+How does it explain the fact that sgtl5000 read has been working there?
+The sgtl5000 revision has been successfully read out at that point.
 
 Shawn
