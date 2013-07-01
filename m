@@ -1,344 +1,110 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 01 Jul 2013 15:13:40 +0900
-Subject: [PATCH] ARM: shmobile: r8a7790 SMP prototype v3
-Message-ID: <20130701061340.22064.93012.sendpatchset@w520>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 1 Jul 2013 08:17:22 +0200
+Subject: [PATCH v10] i2c: exynos5: add High Speed I2C controller driver
+In-Reply-To: <1371638905-30633-1-git-send-email-ch.naveen@samsung.com>
+References: <1354021236-28596-2-git-send-email-ch.naveen@samsung.com>
+ <1371638905-30633-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <20130701061722.GB2976@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Wed, Jun 19, 2013 at 04:18:25PM +0530, Naveen Krishna Chatradhi wrote:
+> Adds support for High Speed I2C driver found in Exynos5 and
+> later SoCs from Samsung.
+> 
+> Driver only supports Device Tree method.
+> 
+> Changes since v1:
+> 1. Added FIFO functionality
+> 2. Added High speed mode functionality
+> 3. Remove SMBUS_QUICK
+> 4. Remove the debugfs functionality
+> 5. Use devm_* functions where ever possible
+> 6. Driver is free from GPIO configs
+> 7. Use OF data string "clock-frequency" to get the bus operating frequencies
+> 8. Split the clock divisor calculation function
+> 9. Add resets for the failed transacton cases
+> 10. Removed retries as core does retries if -EAGAIN is returned
+> 11. Removed mode from device tree info (use speed to distinguish
+>     the mode of operation)
+> 12. Use wait_for_completion_timeout as the interruptible case is not tested well
+> 13. few other bug fixes and cosmetic changes
+> 
+> Signed-off-by: Taekgyun Ko <taeggyun.ko@samsung.com>
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> Reviewed-by: Simon Glass <sjg@google.com>
+> Tested-by: Andrew Bresticker <abrestic@google.com>
+> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> Signed-off-by: Andrew Bresticker <abrestic@google.com>
+> ---
+> 
+> +Optional properties:
+> +  - clock-frequency: Desired operating frequency in Hz of the bus.
+> +    -> If not specified, the default value is 100khz in fast-speed mode and
+> +       1Mhz in high-speed mode.
 
-Add SMP prototype support for r8a7790 by enabling
-one cluster of either 4 x Cortex-A7 or 4 x Cortex-A15.
+? If not specified, the default is 100kHz. There is no way to get 1MHz,
+or?
 
-This patch only adds support for booting, at this point
-no CPU Hotplug is included. Both the big and the LITTLE
-cluster are working at this point, but in case of LITTLE
-broadcast timer and CMT are known to work while CA7 arch
-timer support needs more work.
+...
 
-On r8a7790 the MD6 pin control boot processor, and on the
-Lager board SW8.7 can be used to select big or LITTLE.
+> +static int exynos5_i2c_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct exynos5_i2c *i2c;
+> +	struct resource *mem;
+> +	unsigned int op_clock;
 
-In big boot mode the CPU cores will be configured as:
- - CPU0, CPU1, CPU2, CPU3: enabled (CA15)
- - CPU4, CPU5, CPU6, CPU7: disabled (CA7)
+My compiler says:
 
-In LITTLE boot mode the CPU cores will be configured as:
- - CPU0, CPU5, CPU6, CPU7: enabled (CA7)
- - CPU1, CPU2, CPU3, CPU4: disabled (CA15)
+drivers/i2c/busses/i2c-exynos5.c: In function ?exynos5_i2c_probe?:
+drivers/i2c/busses/i2c-exynos5.c:687:5: warning: ?op_clock? may be used uninitialized in this function [-Wuninitialized]
 
-In case of LITTLE boot mode make sure to disable arch timer
-support in the kernel config with CONFIG_HAVE_ARM_ARCH_TIMER=n.
+so...
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
- Written against renesas.git renesas-next-20130701 and
- [PATCH v2 00/07] ARM: shmobile: Remove unused auxdata and callbacks
- [PATCH 00/04] ARM: shmobile: Use default ->init_irq()
+> +	int ret;
+> +
+> +	if (!np) {
+> +		dev_err(&pdev->dev, "no device node\n");
+> +		return -ENOENT;
+> +	}
+> +
+> +	i2c = devm_kzalloc(&pdev->dev, sizeof(struct exynos5_i2c), GFP_KERNEL);
+> +	if (!i2c) {
+> +		dev_err(&pdev->dev, "no memory for state\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	if (of_property_read_u32(np, "clock-frequency", &op_clock)) {
+> +		i2c->speed_mode = HSI2C_FAST_SPD;
+> +		i2c->fs_clock = HSI2C_FS_TX_CLOCK;
+> +	}
+> +
+> +	if (op_clock >= HSI2C_HS_TX_CLOCK) {
 
- arch/arm/boot/dts/r8a7790.dtsi                |   49 ++++++
- arch/arm/mach-shmobile/Makefile               |    1 
- arch/arm/mach-shmobile/board-lager.c          |    1 
- arch/arm/mach-shmobile/include/mach/common.h  |    1 
- arch/arm/mach-shmobile/include/mach/r8a7790.h |    1 
- arch/arm/mach-shmobile/setup-r8a7790.c        |    1 
- arch/arm/mach-shmobile/smp-r8a7790.c          |  187 +++++++++++++++++++++++++
- 7 files changed, 241 insertions(+)
+... this should be 'else if'
 
---- 0001/arch/arm/boot/dts/r8a7790.dtsi
-+++ work/arch/arm/boot/dts/r8a7790.dtsi	2013-07-01 13:41:31.000000000 +0900
-@@ -24,6 +24,55 @@
- 			reg = <0>;
- 			clock-frequency = <1300000000>;
- 		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+			clock-frequency = <1300000000>;
-+		};
-+
-+		cpu2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <2>;
-+			clock-frequency = <1300000000>;
-+		};
-+
-+		cpu3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <3>;
-+			clock-frequency = <1300000000>;
-+		};
-+
-+		cpu4: cpu at 4 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x100>;
-+			clock-frequency = <780000000>;
-+		};
-+
-+		cpu5: cpu at 5 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x101>;
-+			clock-frequency = <780000000>;
-+		};
-+
-+		cpu6: cpu at 6 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x102>;
-+			clock-frequency = <780000000>;
-+		};
-+
-+		cpu7: cpu at 7 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x103>;
-+			clock-frequency = <780000000>;
-+		};
- 	};
- 
- 	gic: interrupt-controller at f1001000 {
---- 0001/arch/arm/mach-shmobile/Makefile
-+++ work/arch/arm/mach-shmobile/Makefile	2013-07-01 13:41:31.000000000 +0900
-@@ -19,6 +19,7 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.
- smp-y				:= platsmp.o headsmp.o
- smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o
-+smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o
- smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o
- 
- # IRQ objects
---- 0009/arch/arm/mach-shmobile/board-lager.c
-+++ work/arch/arm/mach-shmobile/board-lager.c	2013-07-01 13:41:31.000000000 +0900
-@@ -102,6 +102,7 @@ static const char *lager_boards_compat_d
- };
- 
- DT_MACHINE_START(LAGER_DT, "lager")
-+	.smp		= smp_ops(r8a7790_smp_ops),
- 	.init_early	= r8a7790_init_delay,
- 	.init_time	= r8a7790_timer_init,
- 	.init_machine	= lager_add_standard_devices,
---- 0001/arch/arm/mach-shmobile/include/mach/common.h
-+++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-07-01 13:41:31.000000000 +0900
-@@ -11,6 +11,7 @@ extern void shmobile_boot_vector(void);
- extern unsigned long shmobile_boot_fn;
- extern unsigned long shmobile_boot_arg;
- extern void shmobile_boot_scu(void);
-+extern void shmobile_invalidate_start(void);
- struct clk;
- extern int shmobile_clk_init(void);
- extern void shmobile_handle_irq_intc(struct pt_regs *);
---- 0001/arch/arm/mach-shmobile/include/mach/r8a7790.h
-+++ work/arch/arm/mach-shmobile/include/mach/r8a7790.h	2013-07-01 13:41:31.000000000 +0900
-@@ -6,5 +6,6 @@ void r8a7790_clock_init(void);
- void r8a7790_pinmux_init(void);
- void r8a7790_init_delay(void);
- void r8a7790_timer_init(void);
-+extern struct smp_operations r8a7790_smp_ops;
- 
- #endif /* __ASM_R8A7790_H__ */
---- 0009/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-07-01 13:41:31.000000000 +0900
-@@ -223,6 +223,7 @@ static const char *r8a7790_boards_compat
- };
- 
- DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
-+	.smp		= smp_ops(r8a7790_smp_ops),
- 	.init_early	= r8a7790_init_delay,
- 	.init_time	= r8a7790_timer_init,
- 	.dt_compat	= r8a7790_boards_compat_dt,
---- /dev/null
-+++ work/arch/arm/mach-shmobile/smp-r8a7790.c	2013-07-01 13:41:32.000000000 +0900
-@@ -0,0 +1,187 @@
-+/*
-+ * SMP support for r8a7790
-+ *
-+ * Copyright (C) 2012-2013 Renesas Solutions Corp.
-+ * Copyright (C) 2012 Takashi Yoshii <takashi.yoshii.ze@renesas.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/delay.h>
-+#include <linux/jiffies.h>
-+#include <linux/smp.h>
-+#include <linux/irqchip/arm-gic.h>
-+#include <asm/cacheflush.h>
-+#include <asm/io.h>
-+#include <asm/smp_plat.h>
-+#include <asm/suspend.h>
-+#include <mach/common.h>
-+#include <mach/hardware.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/cp15.h>
-+#include <asm/smp_plat.h>
-+
-+#define SYSC	0xe6180000
-+#define SYSCSR  0x0000
-+
-+#define RST	0xe6160000
-+#define CA15BAR	0x6020
-+#define CA15RESCNT 0x0040
-+#define CA7BAR	0x4030
-+#define CA7RESCNT 0x0044
-+#define RESCNT	0x0050
-+
-+#define APMU	0xe6150000
-+#define CA15WUPCR 0x2010
-+#define CA7WUPCR 0x1010
-+
-+#define MERAM	0xe8080000
-+
-+enum { R8A7790_CLST_CA15, R8A7790_CLST_CA7, R8A7790_CLST_NR };
-+
-+static struct {
-+	unsigned int cabar;
-+	unsigned int carescnt;
-+	unsigned int carescnt_magic;
-+	unsigned int rescnt_bit;
-+	unsigned int use_count;
-+} r8a7790_clst[R8A7790_CLST_NR] = {
-+	[R8A7790_CLST_CA15] = {
-+		.cabar = CA15BAR,
-+		.carescnt = CA15RESCNT,
-+		.carescnt_magic = 0xa5a50000,
-+		.rescnt_bit = 1,
-+	},
-+	[R8A7790_CLST_CA7] = {
-+		.cabar = CA7BAR,
-+		.carescnt = CA7RESCNT,
-+		.carescnt_magic = 0x5a5a0000,
-+		.rescnt_bit = 0,
-+	},
-+};
-+
-+#define r8a7790_clst_id(cpu) (cpu_logical_map((cpu)) >> 8)
-+#define r8a7790_cpu_id(cpu) (cpu_logical_map((cpu)) & 0xff)
-+
-+static void r8a7790_deassert_reset(unsigned int cpu)
-+{
-+	void __iomem *p, *carescnt;
-+	u32 bar, mask, magic;
-+	unsigned int clst_id = r8a7790_clst_id(cpu);
-+
-+	/* setup reset vectors */
-+	p = ioremap_nocache(RST, 0x7000);
-+	bar = (MERAM >> 8) & 0xfffffc00;
-+	__raw_writel(bar, p + r8a7790_clst[clst_id].cabar);
-+	__raw_writel(bar | 0x10, p + r8a7790_clst[clst_id].cabar);
-+
-+	/* enable clocks for cluster */
-+	if (r8a7790_clst[clst_id].use_count++ == 0) {
-+		mask = 1 << r8a7790_clst[clst_id].rescnt_bit;
-+		__raw_writel(__raw_readl(p + RESCNT) & ~mask, p + RESCNT);
-+	}
-+
-+	/* enable per-core clocks */
-+	mask = BIT(3 - r8a7790_cpu_id(cpu));
-+	magic = r8a7790_clst[clst_id].carescnt_magic;
-+	carescnt = p + r8a7790_clst[clst_id].carescnt;
-+	__raw_writel((__raw_readl(carescnt) & ~mask) | magic, carescnt);
-+
-+	iounmap(p);
-+}
-+
-+static void r8a7790_assert_reset(unsigned int cpu)
-+{
-+	void __iomem *p, *carescnt;
-+	u32 mask, magic;
-+	unsigned int clst_id = r8a7790_clst_id(cpu);
-+
-+	p = ioremap_nocache(RST, 0x7000);
-+
-+	/* disable per-core clocks */
-+	mask = BIT(3 - r8a7790_cpu_id(cpu));
-+	magic = r8a7790_clst[clst_id].carescnt_magic;
-+	carescnt = p + r8a7790_clst[clst_id].carescnt;
-+	__raw_writel((__raw_readl(carescnt) | mask) | magic, carescnt);
-+
-+	/* disable clocks for cluster */
-+	if (r8a7790_clst[clst_id].use_count == 1) {
-+		mask = 1 << r8a7790_clst[clst_id].rescnt_bit;
-+		__raw_writel(__raw_readl(p + RESCNT) | mask, p + RESCNT);
-+	}
-+
-+	if (r8a7790_clst[clst_id].use_count > 0)
-+		r8a7790_clst[clst_id].use_count--;
-+
-+	iounmap(p);
-+}
-+
-+static void r8a7790_power_on(unsigned int cpu)
-+{
-+	void __iomem *p, *p2, *cawupcr;
-+
-+	/* wake up CPU core via APMU */
-+	p = ioremap_nocache(APMU, 0x3000);
-+	cawupcr = p + (r8a7790_clst_id(cpu) ? CA7WUPCR : CA15WUPCR);
-+	__raw_writel(BIT(r8a7790_cpu_id(cpu)), cawupcr);
-+
-+	/* wait for SYSC to finish wake up sequence */
-+	p2 = ioremap_nocache(SYSC, 0x1000);
-+	while ((__raw_readl(p2 + SYSCSR) & 0x3) != 0x3)
-+		;
-+
-+	/* wait for APMU to finish */
-+	while (__raw_readl(cawupcr) != 0)
-+		;
-+
-+	iounmap(p2);
-+	iounmap(p);
-+}
-+
-+static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	void __iomem *p;
-+	unsigned int k;
-+
-+	shmobile_boot_fn = virt_to_phys(shmobile_invalidate_start);
-+
-+	/* MERAM for jump stub, because BAR requires 256KB aligned address */
-+	p = ioremap_nocache(MERAM, 16);
-+	memcpy(p, shmobile_boot_vector, 16);
-+	iounmap(p);
-+
-+	flush_cache_louis();
-+
-+	/* keep secondary CPU cores in reset, but powered on */
-+	for (k = 1; k < 8; k++) {
-+		r8a7790_assert_reset(k);
-+		r8a7790_power_on(k);
-+	}
-+
-+	r8a7790_deassert_reset(0);
-+}
-+
-+static int __cpuinit r8a7790_boot_secondary(unsigned int cpu,
-+					    struct task_struct *idle)
-+{
-+	/* only allow a single cluster for now */
-+	if (r8a7790_clst_id(cpu) != r8a7790_clst_id(0))
-+		return -ENOTSUPP;
-+
-+	r8a7790_deassert_reset(cpu);
-+	return 0;
-+}
-+
-+struct smp_operations r8a7790_smp_ops __initdata = {
-+	.smp_prepare_cpus	= r8a7790_smp_prepare_cpus,
-+	.smp_boot_secondary	= r8a7790_boot_secondary,
-+};
+> +		i2c->speed_mode = HSI2C_HIGH_SPD;
+> +		i2c->fs_clock = HSI2C_FS_TX_CLOCK;
+> +		i2c->hs_clock = op_clock;
+> +	} else {
+> +		i2c->speed_mode = HSI2C_FAST_SPD;
+> +		i2c->fs_clock = op_clock;
+> +	}
+
+...
+
+> +	i2c->bus_id = of_alias_get_id(i2c->adap.dev.of_node, "hsi2c");
+
+Huh, the core already gets an alias for you. Can't you use 'adap.nr'?
+
+Rest looks good.
+
+Thanks!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130701/5b228867/attachment.sig>
