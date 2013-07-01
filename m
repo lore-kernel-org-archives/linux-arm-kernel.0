@@ -1,56 +1,25 @@
-From: xobs@kosagi.com (Sean Cross)
-Date: Mon, 1 Jul 2013 17:24:00 +0800
-Subject: [PATCH 3/4] PCI: Add driver for i.MX6 PCI Express
-In-Reply-To: <1372665061.36667486@f35.mail.ru>
-References: <1372662947-27160-1-git-send-email-xobs@kosagi.com>
- <1372662947-27160-4-git-send-email-xobs@kosagi.com>
- <1372665061.36667486@f35.mail.ru>
-Message-ID: <C89FF158E3384F0E90A288AE1A712972@kosagi.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 1 Jul 2013 10:27:24 +0100
+Subject: question about iotable_init( )  function
+In-Reply-To: <35FD53F367049845BC99AC72306C23D19441BF586F@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D19441BF586F@CNBJMBX05.corpusers.net>
+Message-ID: <20130701092723.GE14027@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 1, 2013 at 3:51 PM, Alexander Shiyan wrote:
-> > This adds a PCI Express port driver for the on-chip PCI Express port
-> > present on the i.MX6 SoC. It is based on the PCI Express driver available
-> > in the Freescale BSP.
-> > 
-> > Signed-off-by: Sean Cross <xobs at kosagi.com (mailto:xobs@kosagi.com)>
-> ...
-> > +++ b/Documentation/devicetree/bindings/pci/imx6q-pcie.txt
-> > @@ -0,0 +1,20 @@
-> > +* Freescale i.MX6Q PCI Express bridge
-> > +
-> > +Example (i.MX6Q)
-> > + pcie: pcie at 01ffc000 {
-> > + compatible = "fsl,imx6q-pcie";
-> > + reg = <0x01ffc000 0x4000>,
-> > + <0x01000000 0x100000>,
-> > + <0x01100000 0xe00000>,
-> > + <0x01f00000 0xfc000>;
-> > + interrupts = <0 122 0x04>;
-> > + clocks = <&clks 186>, <&clks 189>, <&clks 196>,
-> > + <&clks 198>, <&clks 144>;
-> > + clock-names = "sata_ref", "pcie_ref_125m", "lvds1_sel",
-> > + "lvds1", "pcie_axi";
-> > + power-enable = <&gpio7 12 0>;
-> > + pcie-reset = <&gpio3 29 0>;
+On Mon, Jul 01, 2013 at 08:31:38AM +0100, Wang, Yalin wrote:
+> Hi  Will,
 > 
+> I have a question about iotable_init()  function (arch/arm/mm/mmu.c)
+> I found  in this function it only allocate a vm_struct and insert it into vmlist ,
+> But it didn?t allocate a vmap_area  to insert it  into vmap_area_root tree (mm/vmalloc.c).
 > 
-> 
-> Can this be replaced with regulator/reset API?
-I agree that power-enable might be better replaced with regulator API calls, and I'll rework this patch to incorporate a regulator.
+> So this means that the virtual address reserverd by iotable_init is not declared
+> In vmap_area_root  ,  this is not safe ,  maybe some driver will use this virtual address as vmalloc again,
+> I think it ?s not safe in this condition ,  should also add a vmap_area   node into vmap_area_root to
+> Hold this virtual address not used by others .
 
-I hadn't heard of the reset API before, and I note in the documentation that it says:
+The vmap_area structures are allocated and inserted later on by vmalloc_init
+(iotable init is for static mappings early during boot).
 
-    Reset signals for whole standalone chips are most likely better represented as
-    GPIOs, although there are likely to be exceptions to this rule.
-
-This is a reset line going directly to a PCIe slot, which I think counts as a "standalone chip".
-
-> > + wake-up = <&gpio3 22 0>;
-> > + disable-endpoint = <&gpio2 16 0>;
-> > + };
-> 
-> 
-> 
-> --- 
+Will
