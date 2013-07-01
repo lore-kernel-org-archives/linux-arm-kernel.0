@@ -1,48 +1,43 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 01 Jul 2013 09:48:43 +0200
-Subject: [PATCH] of: Specify initrd location using 64-bit
-In-Reply-To: <51CE1F92.3070802@ti.com>
-References: <1371775956-16453-1-git-send-email-santosh.shilimkar@ti.com>
- <51C4171C.9050908@linutronix.de> <51C48B5A.2040404@ti.com>
- <51CCA67C.2010803@gmail.com>
- <CACxGe6vOH0sCFVVXrYqD3dbYdOvithVu7-d1cvy5885i8x_Myw@mail.gmail.com>
- <20130628134931.GD21034@game.jcrosoft.org> <51CE1F92.3070802@ti.com>
-Message-ID: <51D1345B.8020509@linutronix.de>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 01 Jul 2013 11:51:01 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAzLzRdIFBDSTogQWRkIGRyaXZlciBmb3IgaS5NWDYgUENJ?=
+ =?UTF-8?B?IEV4cHJlc3M=?=
+In-Reply-To: <1372662947-27160-4-git-send-email-xobs@kosagi.com>
+References: <1372662947-27160-1-git-send-email-xobs@kosagi.com>
+ <1372662947-27160-4-git-send-email-xobs@kosagi.com>
+Message-ID: <1372665061.36667486@f35.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/2013 01:43 AM, Santosh Shilimkar wrote:
+> This adds a PCI Express port driver for the on-chip PCI Express port
+> present on the i.MX6 SoC.  It is based on the PCI Express driver available
+> in the Freescale BSP.
 > 
-> Sebastian,
-> 
-> Apart from waste of 32bit, what is the other concern you
-> have ?
+> Signed-off-by: Sean Cross <xobs@kosagi.com>
+...
+> +++ b/Documentation/devicetree/bindings/pci/imx6q-pcie.txt
+> @@ -0,0 +1,20 @@
+> +* Freescale i.MX6Q PCI Express bridge
+> +
+> +Example (i.MX6Q)
+> +	pcie: pcie at 01ffc000 {
+> +		compatible = "fsl,imx6q-pcie";
+> +		reg = <0x01ffc000 0x4000>,
+> +		      <0x01000000 0x100000>,
+> +		      <0x01100000 0xe00000>,
+> +		      <0x01f00000 0xfc000>;
+> +		interrupts = <0 122 0x04>;
+> +		clocks = <&clks 186>, <&clks 189>, <&clks 196>,
+> +			 <&clks 198>, <&clks 144>;
+> +		clock-names = "sata_ref", "pcie_ref_125m", "lvds1_sel",
+> +			      "lvds1", "pcie_axi";
+> +		power-enable = <&gpio7 12 0>;
+> +		pcie-reset = <&gpio3 29 0>;
 
-You pass a u64 as a physical address which is represented in other
-parts of the kernel (for a good reason) by phys_addr_t.
+Can this be replaced with regulator/reset API?
 
-> I really want to converge on this patch because it
-> has been a open ended discussion for quite some time. Does
-> that really break any thing on x86 or your concern is more
-> from semantics of the physical address.
-You want to have your code in so you can continue with your work, that
-is okay. The other two arguments why u64 here is a good thing was "due
-to what I said earlier" and "+1" and I don't have the time to look
-that up.
+> +		wake-up = <&gpio3 22 0>;
+> +		disable-endpoint = <&gpio2 16 0>;
+> +	};
 
-There should be no problems on x86 if this goes in as it is now.
-
-But think about this: What happens if you boot your ARM device without
-PAE and your initrd is in the upper region? If you are lucky the kernel
-looks at a different place where it also has a read permission, notices
-nothing sane is there, writes a message and continues. And if it is not
-allowed to read? It is clearly the user's fault for booting a non-PAE
-kernel.
-
-> 
-> Thanks for help.
-> 
-> Regards,
-> Santosh
-
-Sebastian
+---
