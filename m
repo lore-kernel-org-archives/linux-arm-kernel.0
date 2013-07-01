@@ -1,67 +1,38 @@
-From: r64343@freescale.com (Liu Hui-R64343)
-Date: Mon, 1 Jul 2013 10:37:12 +0000
-Subject: [PATCH] ARM: smp_twd: twd_update_frequency need be run on all
- online CPUs
-In-Reply-To: <51CADE8A.7010008@de.bosch.com>
-References: <1371079180-22344-1-git-send-email-r64343@freescale.com>
- <20130617073120.GA4537@S2101-09.ap.freescale.net>
- <AD13664F485EE54694E29A7F9D5BE1AF84939C@039-SN2MPN1-022.039d.mgd.msft.net>
- <51CADE8A.7010008@de.bosch.com>
-Message-ID: <AD13664F485EE54694E29A7F9D5BE1AF8729B7@039-SN2MPN1-022.039d.mgd.msft.net>
+From: user@jinso.co.jp (Nguyen Viet Dung)
+Date: Mon,  1 Jul 2013 19:00:07 +0900
+Subject: [PATCH 0/4] ARM: shmobile: r8a7790: add I2C support
+Message-ID: <1372672810-20609-1-git-send-email-user@jinso.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Dirk Behme [mailto:dirk.behme at de.bosch.com]
->Sent: Wednesday, June 26, 2013 8:29 PM
->To: Liu Hui-R64343; Mike Turquette
->Cc: Shawn Guo; Linus Walleij; rob.herring at calxeda.com; Russell King -
->ARM Linux; linux-arm-kernel at lists.infradead.org
->Subject: Re: [PATCH] ARM: smp_twd: twd_update_frequency need be run on
->all online CPUs
->
->On 17.06.2013 10:11, Liu Hui-R64343 wrote:
->>> -----Original Message-----
->>> From: Shawn Guo [mailto:shawn.guo at linaro.org]
->>> Sent: Monday, June 17, 2013 3:31 PM
->>> To: Liu Hui-R64343
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Subject: Re: [PATCH] ARM: smp_twd: twd_update_frequency need be run
->>> on all online CPUs
->>>
->>> On Thu, Jun 13, 2013 at 07:19:40AM +0800, Jason Liu wrote:
->>>> When the local timer freq changed, the twd_update_frequency function
->>>> should be run all the CPUs include itself, otherwise, the twd freq
->>>> will not get updated and the local timer will not run correcttly.
->>>>
->>>> smp_call_function will run functions on all other CPUs, but not
->>>> include himself, this is not correct,use on_each_cpu instead to fix
->>> this issue.
->>>>
->>>> Signed-off-by: Jason Liu <r64343@freescale.com>
->>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>> Cc: Linus Walleij <linus.walleij@linaro.org>
->>>> Cc: Rob Herring <rob.herring@calxeda.com>
->>>> Cc: Shawn Guo <shawn.guo@linaro.org>
->>>
->>> Acked-by: Shawn Guo <shawn.guo@linaro.org>
->>
->> Thanks Shawn.
->>
->>>
->>> BTW, is there anything wrong with your mailer (git send-email command
->>> line)?  I do not see people you put on Cc tag here show up in Cc of
->>> the email.  And that might the be reason why people are not
->>> responding so far.
->>
->> Yes, there is one issue in my script and get fixed. I will put the
->> patch Into Russell's patch tracking system after Mike and Russell
->> reviewed it And also Cc stable kernel as Linus W. said.
->
->Any news on this?
+From: Nguyen Viet Dung <nv-dung@jinso.co.jp>
 
-I have put the patch into Russell's patch tracking system. 
+Hello,
+CC Morimoto
 
->
->Thanks
->
+Please consider the following patches for the r8a7790 Soc.
+These patches add I2C support for the r8a7790 Soc.
+These patches was developed base on the renesas-next-20130528 branch.
+Input clock of I2C is peripheral module clock.
+It is named peripheral_clk in clock code. 
+These patches have tested on the lager board.
+
+Thanks,
+Nguyen viet Dung
+
+Nguyen Viet Dung (4):
+  i2c: rcar: modify I2C driver
+  ARM: shmobile: r8a7790: add I2C setup
+  ARM: shmobile: r8a7790: add I2C clock
+  ARM: shmobile: lager: register channels of I2C
+
+ arch/arm/mach-shmobile/board-lager.c          |   11 ++++++++++
+ arch/arm/mach-shmobile/clock-r8a7790.c        |   11 ++++++++++
+ arch/arm/mach-shmobile/include/mach/r8a7790.h |    3 +++
+ arch/arm/mach-shmobile/setup-r8a7790.c        |   28 +++++++++++++++++++++++++
+ drivers/i2c/busses/i2c-rcar.c                 |   17 +++++++++++++--
+ include/linux/i2c/i2c-rcar.h                  |    4 ++++
+ 6 files changed, 72 insertions(+), 2 deletions(-)
+
+-- 
+1.7.9.5
