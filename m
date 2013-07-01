@@ -1,110 +1,148 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Mon, 1 Jul 2013 14:48:54 +0000
-Subject: [v2 1/4] ARM: dtsi: enable ahci sata on imx6q platforms
-In-Reply-To: <20130701143708.GS13206@S2101-09.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 1 Jul 2013 22:53:58 +0800
+Subject: [v2 2/4] imx: ahci: enable ahci sata on imx6q platforms
+In-Reply-To: <1372672975-2997-3-git-send-email-r65037@freescale.com>
 References: <1372672975-2997-1-git-send-email-r65037@freescale.com>
- <1372672975-2997-2-git-send-email-r65037@freescale.com>,
- <20130701143708.GS13206@S2101-09.ap.freescale.net>
-Message-ID: <0E83723C55F66F43A6041464FE31119D30C2FE@039-SN2MPN1-013.039d.mgd.msft.net>
+ <1372672975-2997-3-git-send-email-r65037@freescale.com>
+Message-ID: <20130701145356.GU13206@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn:
-Thanks for your comments.
-
-Best Regards
-Richard Zhu
-________________________________________
-From: Shawn Guo [shawn.guo at linaro.org]
-Sent: Monday, July 01, 2013 10:37 PM
-To: Richard Zhu
-Cc: linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; avorontsov at ru.mvista.com; rob.herring at calxeda.com; s.hauer at pengutronix.de; linux-ide at vger.kernel.org; Zhu Richard-R65037
-Subject: Re: [v2 1/4] ARM: dtsi: enable ahci sata on imx6q platforms
-
-On Mon, Jul 01, 2013 at 06:02:52PM +0800, Richard Zhu wrote:
-> Only imx6q has the ahci sata controller, enable
-> it on imx6q platforms.
->
+On Mon, Jul 01, 2013 at 06:02:53PM +0800, Richard Zhu wrote:
+> Only the imx6q contains the ahci sata controller,
+> other imx6 SoCs don't have it.
+> 
+> Enable the ahci sata only on imx6q platforms
+> 
 > Signed-off-by: Richard Zhu <r65037@freescale.com>
 > ---
->  arch/arm/boot/dts/imx6q-sabreauto.dts |    4 ++++
->  arch/arm/boot/dts/imx6q-sabrelite.dts |    4 ++++
->  arch/arm/boot/dts/imx6q-sabresd.dts   |    4 ++++
->  arch/arm/boot/dts/imx6q.dtsi          |    9 +++++++++
->  4 files changed, 21 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-sabreauto.dts
-> index 09a7580..dd40f00 100644
-> --- a/arch/arm/boot/dts/imx6q-sabreauto.dts
-> +++ b/arch/arm/boot/dts/imx6q-sabreauto.dts
-> @@ -20,6 +20,10 @@
->       compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
->  };
->
-> +&ahci { /* AHCI SATA */
+>  arch/arm/mach-imx/mach-imx6q.c |   85 +++++++++++++++++++++++++++++++++++++++-
+>  1 files changed, 84 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 045e5e3..ab81fa3 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/regmap.h>
+>  #include <linux/micrel_phy.h>
+>  #include <linux/mfd/syscon.h>
+> +#include <linux/ahci_platform.h>
+>  #include <asm/hardware/cache-l2x0.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+> @@ -39,6 +40,8 @@
+>  #include "cpuidle.h"
+>  #include "hardware.h"
+>  
+> +#define MX6Q_SATA_BASE_ADDR	0x02200000
+> +
+>  static u32 chip_revision;
+>  
+>  int imx6q_revision(void)
+> @@ -162,12 +165,92 @@ static void __init imx6q_usb_init(void)
+>  	imx_anatop_usb_chrg_detect_disable();
+>  }
+>  
+> +/* imx6q ahci module initialization. */
+> +static int imx6q_sata_phy_clk(struct device *dev, int enable)
+> +{
+> +	int ret = 0;
+> +	struct clk *sata_ref_clk;
+> +
+> +	sata_ref_clk = devm_clk_get(dev, "sata_ref_100m");
+> +	if (IS_ERR(sata_ref_clk)) {
+> +		dev_err(dev, "can't get sata_ref clock.\n");
+> +		return PTR_ERR(sata_ref_clk);
+> +	}
+> +	if (enable) {
+> +		/* Enable PHY clock */
+> +		ret = clk_prepare_enable(sata_ref_clk);
+> +		if (ret < 0) {
+> +			dev_err(dev, "can't prepare-enable sata_ref clock\n");
+> +			clk_put(sata_ref_clk);
+> +			ret = PTR_ERR(sata_ref_clk);
+> +		}
+> +	} else {
+> +		/* Disable PHY clock */
+> +		clk_disable_unprepare(sata_ref_clk);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static int imx6q_sata_init(struct device *dev, void __iomem *addr)
+> +{
+> +	int ret = 0;
+> +	struct regmap *gpr;
+> +
+> +	ret = imx6q_sata_phy_clk(dev, true);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+> +	if (IS_ERR(gpr)) {
+> +		pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
+> +		return PTR_ERR(gpr);
+> +	}
+> +
+> +	/*
+> +	 * set PHY Paremeters, two steps to configure the GPR13,
+> +	 * one write for rest of parameters, mask of first write
+> +	 * is 0x07fffffd, and the other one write for setting
+> +	 * the mpll_clk_en.
+> +	 */
+> +	regmap_update_bits(gpr, 0x34, 0x07fffffd, 0x0593e4c4);
+> +	regmap_update_bits(gpr, 0x34, 0x2, 0x2);
+> +	usleep_range(100, 200);
+> +
+> +	return 0;
+> +}
+> +
+> +static void imx6q_sata_exit(struct device *dev)
+> +{
+> +	struct regmap *gpr;
+> +
+> +	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+> +	if (IS_ERR(gpr))
+> +		pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
+> +
+> +	regmap_update_bits(gpr, 0x34, 0x2, 0x0);
+> +
+> +	imx6q_sata_phy_clk(dev, false);
+> +}
+> +
+> +static struct ahci_platform_data imx6q_sata_pdata = {
+> +	.init = imx6q_sata_init,
+> +	.exit = imx6q_sata_exit,
+> +};
+> +
+> +static const struct of_dev_auxdata imx6q_auxdata_lookup[] __initconst = {
+> +	OF_DEV_AUXDATA("snps,imx-ahci", MX6Q_SATA_BASE_ADDR, "imx-ahci",
+> +			&imx6q_sata_pdata),
+> +	{ /* sentinel */ }
+> +};
+> +
 
-All these "AHCI SATA" comments are not so useful.  Please just drop
-them.
-[Richard] Ok, they would be removed in next version.
+This is wrong.  The whole point of having an imx specific ahci platform
+driver is to have all these setup done in that driver instead of
+platform code.  Using auxdata is generally a sign of
+not-doing-the-right-thing on a recent platform with a new created
+driver.
 
 Shawn
 
-> +     status = "okay";
-> +};
-> +
->  &iomuxc {
->       pinctrl-names = "default";
->       pinctrl-0 = <&pinctrl_hog>;
-> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> index 6a00066..fde2afd 100644
-> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> @@ -65,6 +65,10 @@
->       };
->  };
->
-> +&ahci { /* AHCI SATA */
-> +     status = "okay";
-> +};
-> +
->  &ecspi1 {
->       fsl,spi-num-chipselects = <1>;
->       cs-gpios = <&gpio3 19 0>;
-> diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
-> index 0038228..e9b6825 100644
-> --- a/arch/arm/boot/dts/imx6q-sabresd.dts
-> +++ b/arch/arm/boot/dts/imx6q-sabresd.dts
-> @@ -20,6 +20,10 @@
->       compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
->  };
->
-> +&ahci { /* AHCI SATA */
-> +     status = "okay";
-> +};
-> +
->  &iomuxc {
->       pinctrl-names = "default";
->       pinctrl-0 = <&pinctrl_hog>;
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index e7dd2c4..7c1af2b 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -424,6 +424,15 @@
->                       };
->               };
->
-> +             ahci: ahci at 02200000 { /* AHCI SATA */
-> +                     compatible = "snps,imx-ahci";
-> +                     reg = <0x02200000 0x4000>;
-> +                     interrupts = <0 39 0x04>;
-> +                     clocks = <&clks 154>, <&clks 187>;
-> +                     clock-names = "sata", "sata_ref_100m";
-> +                     status = "disabled";
-> +             };
-> +
->               ipu2: ipu at 02800000 {
->                       #crtc-cells = <1>;
->                       compatible = "fsl,imx6q-ipu";
-> --
+>  static void __init imx6q_init_machine(void)
+>  {
+>  	if (of_machine_is_compatible("fsl,imx6q-sabrelite"))
+>  		imx6q_sabrelite_init();
+>  
+> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +	of_platform_populate(NULL, of_default_bus_match_table,
+> +			imx6q_auxdata_lookup, NULL);
+>  
+>  	imx_anatop_init();
+>  	imx6q_pm_init();
+> -- 
 > 1.7.5.4
->
+> 
