@@ -1,35 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 1 Jul 2013 11:07:10 +0100
-Subject: [PATCH 1/4] ASoC: sgtl5000: give it a ramping time before writting
-In-Reply-To: <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
-References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
- <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130701100710.GB27646@sirena.org.uk>
+From: pratyush.anand@st.com (Pratyush Anand)
+Date: Mon, 1 Jul 2013 15:38:19 +0530
+Subject: [PATCH 3/4] PCI: Add driver for i.MX6 PCI Express
+In-Reply-To: <1372662947-27160-4-git-send-email-xobs@kosagi.com>
+References: <1372662947-27160-1-git-send-email-xobs@kosagi.com>
+ <1372662947-27160-4-git-send-email-xobs@kosagi.com>
+Message-ID: <51D15513.7020101@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 04:16:08PM +0800, Shawn Guo wrote:
+On 7/1/2013 12:45 PM, Sean Cross wrote:
+> This adds a PCI Express port driver for the on-chip PCI Express port
+> present on the i.MX6 SoC.  It is based on the PCI Express driver available
+> in the Freescale BSP.
+>
+> Signed-off-by: Sean Cross <xobs@kosagi.com>
+> ---
 
-> +	/*
-> +	 * It seems that sgtl5000 takes a longer time to get the registers
-> +	 * ready for write than bread.  Let's give it a ramping time before
-> +	 * the first write goes.
-> +	 */
-> +	msleep(50);
-> +
->  	/* Ensure sgtl5000 will start with sane register values */
->  	ret = sgtl5000_fill_defaults(sgtl5000);
->  	if (ret)
+...
 
-This seems like a really odd place to add the sleep - I'd have expected
-this to be a part of or just after the reset operation.  It's a *really*
-long sleep too, though if that's what you need that's what you need.
+> diff --git a/drivers/pci/pcie/pcie-imx.c b/drivers/pci/pcie/pcie-imx.c
+> new file mode 100644
+> index 0000000..664679e
+> --- /dev/null
+> +++ b/drivers/pci/pcie/pcie-imx.c
 
-Also "bread" :)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130701/38567814/attachment.sig>
+Should go to drivers/pci/host/
+
+> @@ -0,0 +1,1049 @@
+> +/*
+> + * drivers/pci/pcie/pcie-imx.c
+> + *
+
+...
+
+
+> +#define ATU_R_BaseAddress 0x900
+> +#define PCIE_PL_iATUVR (ATU_R_BaseAddress + 0x0)
+> +#define PCIE_PL_iATURC1 (ATU_R_BaseAddress + 0x4)
+> +#define PCIE_PL_iATURC2 (ATU_R_BaseAddress + 0x8)
+> +#define PCIE_PL_iATURLBA (ATU_R_BaseAddress + 0xC)
+> +#define PCIE_PL_iATURUBA (ATU_R_BaseAddress + 0x10)
+> +#define PCIE_PL_iATURLA (ATU_R_BaseAddress + 0x14)
+> +#define PCIE_PL_iATURLTA (ATU_R_BaseAddress + 0x18)
+> +#define PCIE_PL_iATURUTA (ATU_R_BaseAddress + 0x1C)
+
+I may be wrong, but from these offset it seems to me that it is SNPS 
+controller. If yes, then please go through comments of
+"[PATCH V1-10 0/4] PCIe support for Samsung Exynos5440 SoC"
+
+Regards
+Pratyush
