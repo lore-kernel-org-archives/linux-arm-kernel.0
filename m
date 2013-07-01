@@ -1,39 +1,33 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Mon, 1 Jul 2013 15:27:41 +0530
-Subject: [PATCH 2/4] ARM: Enable PCI Express on ARM
-In-Reply-To: <1372662947-27160-3-git-send-email-xobs@kosagi.com>
-References: <1372662947-27160-1-git-send-email-xobs@kosagi.com>
- <1372662947-27160-3-git-send-email-xobs@kosagi.com>
-Message-ID: <51D15295.2000601@st.com>
+From: richard.zhuhongxing@gmail.com (Richard Zhu)
+Date: Mon,  1 Jul 2013 18:02:51 +0800
+Subject: [PATCH v2 0/4] ahci: enable ahci sata support on imx6q
+Message-ID: <1372672975-2997-1-git-send-email-r65037@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/1/2013 12:45 PM, Sean Cross wrote:
-> Some ARM devices have PCI Express hardware, and should be able to take
-> advantage of PCI Express code present in the common driver files.  Enable
-> PCI Express on ARM, when PCI is available.
->
-> Signed-off-by: Sean Cross <xobs@kosagi.com>
-> ---
->   arch/arm/Kconfig |    2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 136f263..2f51f13 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1418,6 +1418,8 @@ config PCI_HOST_ITE8152
->
->   source "drivers/pci/Kconfig"
->
-> +source "drivers/pci/pcie/Kconfig"
-> +
->
+v2: add imx6q specific ahci sata support
+ - Setup standalone imx ahci sata driver, because of
+ the misalignments of the bits definition of the HBA register.
+ - Replace the node by the label in the board dts.
+ - 
 
-[PATCH V10 2/4] ARM: EXYNOS: Enable PCIe support for Exynos5440 does the 
-same thing.
+v1: http://www.spinics.net/lists/linux-ide/msg45581.html
+ - add imx6q specific ahci sata support to arch/arm/mach-imx/mach-imx6q.c
 
-  source "drivers/pcmcia/Kconfig"
->
->   endmenu
->
+These patches is based on imx/dt branch of
+"http://git.linaro.org/git-ro/people/shawnguo/linux-2.6.git"
+
+
+
+[v2 1/4] ARM: dtsi: enable ahci sata on imx6q platforms
+[v2 2/4] imx: ahci: enable ahci sata on imx6q platforms
+[v2 3/4] ARM: imx6q: update the sata bits definitions of gpr13
+[v2 4/4] sata: imx: add ahci sata support on imx platforms
+
+.../devicetree/bindings/ata/ahci-platform.txt      |    2 +-
+arch/arm/mach-imx/mach-imx6q.c                     |   85 +++++-
+drivers/ata/Kconfig                                |    8 +
+drivers/ata/Makefile                               |    1 +
+drivers/ata/sata_imx.c                             |  349 ++++++++++++++++++++
+include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |  121 +++++--
+6 files changed, 527 insertions(+), 39 deletions(-)
