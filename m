@@ -1,186 +1,62 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 01 Jul 2013 14:24:02 +0900
-Subject: [PATCH V3 2/3] phy: Add driver for Exynos DP PHY
-Message-ID: <005301ce761b$32adf960$9809ec20$@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 1 Jul 2013 10:54:28 +0530
+Subject: [PATCH v3 1/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+In-Reply-To: <51CF36AB.4010300@gmail.com>
+References: <1372258946-15607-1-git-send-email-s.nawrocki@samsung.com>
+ <1372258946-15607-2-git-send-email-s.nawrocki@samsung.com>
+ <51CD4698.3070409@gmail.com> <51CD6153.5050406@samsung.com>
+ <51CEA197.8070207@ti.com> <51CF36AB.4010300@gmail.com>
+Message-ID: <51D1128C.90009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a PHY provider driver for the Samsung Exynos SoC DP PHY.
+Hi,
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
----
- .../devicetree/bindings/phy/samsung-phy.txt        |    8 ++
- drivers/phy/Kconfig                                |    5 +
- drivers/phy/Makefile                               |    1 +
- drivers/phy/phy-exynos-dp-video.c                  |  118 ++++++++++++++++++++
- 4 files changed, 132 insertions(+)
- create mode 100644 drivers/phy/phy-exynos-dp-video.c
+On Sunday 30 June 2013 01:04 AM, Sylwester Nawrocki wrote:
+> Hi,
+>
+> On 06/29/2013 10:57 AM, Kishon Vijay Abraham I wrote:
+>> On Friday 28 June 2013 03:41 PM, Sylwester Nawrocki wrote:
+>>> On 06/28/2013 10:17 AM, Hui Wang wrote:
+>>>> On 06/26/2013 11:02 PM, Sylwester Nawrocki wrote:
+>>>>> Add a PHY provider driver for the Samsung S5P/Exynos SoC MIPI CSI-2
+>>>>> receiver and MIPI DSI transmitter DPHYs.
+>>>>>
+>>>>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>>>> ---
+>>>>> Changes since v2:
+>>>>> - adapted to the generic PHY API v9: use phy_set/get_drvdata(),
+>>>>> - fixed of_xlate callback to return ERR_PTR() instead of NULL,
+>>>>> - namespace cleanup, put "GPL v2" as MODULE_LICENSE, removed pr_debug,
+>>>>> - removed phy id check in __set_phy_state().
+>>>>> ---
+>>>> [...]
+>>>>> +
+>>>>> + if (IS_EXYNOS_MIPI_DSIM_PHY_ID(id))
+>>>>> + reset = EXYNOS_MIPI_PHY_MRESETN;
+>>>>> + else
+>>>>> + reset = EXYNOS_MIPI_PHY_SRESETN;
+>>>>> +
+>>>>> + spin_lock_irqsave(&state->slock, flags);
+>>>>
+>>>> Sorry for one stupid question here, why do you use spin_lock_irqsave()
+>>>> rather than spin_lock(),
+>>>> I don't see the irq handler will use this spinlock anywhere in this c
+>>>> file.
+>>>
+>>> Yes, there is no chance the PHY users could call the phy ops from within
+>>> an interrupt context. Especially now when there is a per phy object
+>>> mutex used in the PHY operation helpers. So I'll replace it with plain
+>>> spin_lock/unlock. Thank you for the review.
+>>
+>> Now that PHY ops is already protected, do you really need a spin_lock here?
+>
+> It is still needed, to synchronize access to the control register from
+> two separate PHY objects. The mutex is per PHY object, while the spinlock
+> is per PHY provider.
 
-diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-index 5ff208c..3fb656a 100644
---- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-@@ -12,3 +12,11 @@ the PHY specifier identifies the PHY and its meaning is as follows:
-   1 - MIPI DSIM 0,
-   2 - MIPI CSIS 1,
-   3 - MIPI DSIM 1.
-+
-+Samsung EXYNOS SoC series DP PHY
-+-------------------------------------------------
-+
-+Required properties:
-+- compatible : should be "samsung,exynos5250-dp-video-phy";
-+- reg : offset and length of the DP PHY register set;
-+- #phy-cells : from the generic phy bindings, must be 0;
-\ No newline at end of file
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 6f446d0..760f55a 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -19,4 +19,9 @@ config PHY_EXYNOS_MIPI_VIDEO
- 	help
- 	  Support for MIPI CSI-2 and MIPI DSI DPHY found on Samsung
- 	  S5P and EXYNOS SoCs.
-+
-+config PHY_EXYNOS_DP_VIDEO
-+	tristate "EXYNOS SoC series DP PHY driver"
-+	help
-+	  Support for DP PHY found on Samsung EXYNOS SoCs.
- endif
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index 71d8841..0fd1340 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -4,3 +4,4 @@
- 
- obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
- obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
-+obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
-diff --git a/drivers/phy/phy-exynos-dp-video.c b/drivers/phy/phy-exynos-dp-video.c
-new file mode 100644
-index 0000000..75e1d11
---- /dev/null
-+++ b/drivers/phy/phy-exynos-dp-video.c
-@@ -0,0 +1,118 @@
-+/*
-+ * Samsung EXYNOS SoC series DP PHY driver
-+ *
-+ * Copyright (C) 2013 Samsung Electronics Co., Ltd.
-+ * Author: Jingoo Han <jg1.han@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/phy/phy.h>
-+#include <linux/platform_device.h>
-+
-+/* DPTX_PHY_CONTROL register */
-+#define EXYNOS_DPTX_PHY_ENABLE		(1 << 0)
-+
-+struct exynos_dp_video_phy {
-+	void __iomem *regs;
-+};
-+
-+static int __set_phy_state(struct exynos_dp_video_phy *state, unsigned int on)
-+{
-+	void __iomem *addr;
-+	u32 reg;
-+
-+	addr = state->regs;
-+
-+	reg = readl(addr);
-+	if (on)
-+		reg |= EXYNOS_DPTX_PHY_ENABLE;
-+	else
-+		reg &= ~EXYNOS_DPTX_PHY_ENABLE;
-+	writel(reg, addr);
-+
-+	return 0;
-+}
-+
-+static int exynos_dp_video_phy_power_on(struct phy *phy)
-+{
-+	struct exynos_dp_video_phy *state = phy_get_drvdata(phy);
-+
-+	return __set_phy_state(state, 1);
-+}
-+
-+static int exynos_dp_video_phy_power_off(struct phy *phy)
-+{
-+	struct exynos_dp_video_phy *state = phy_get_drvdata(phy);
-+
-+	return __set_phy_state(state, 0);
-+}
-+
-+static struct phy_ops exynos_dp_video_phy_ops = {
-+	.power_on	= exynos_dp_video_phy_power_on,
-+	.power_off	= exynos_dp_video_phy_power_off,
-+	.owner		= THIS_MODULE,
-+};
-+
-+static int exynos_dp_video_phy_probe(struct platform_device *pdev)
-+{
-+	struct exynos_dp_video_phy *state;
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	struct phy_provider *phy_provider;
-+	struct phy *phy;
-+
-+	state = devm_kzalloc(dev, sizeof(*state), GFP_KERNEL);
-+	if (!state)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	state->regs = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(state->regs))
-+		return PTR_ERR(state->regs);
-+
-+	dev_set_drvdata(dev, state);
-+
-+	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
-+	if (IS_ERR(phy_provider))
-+		return PTR_ERR(phy_provider);
-+
-+	phy = devm_phy_create(dev, 0, &exynos_dp_video_phy_ops, "dp");
-+	if (IS_ERR(phy)) {
-+		dev_err(dev, "failed to create DP PHY\n");
-+		return PTR_ERR(phy);
-+	}
-+	phy_set_drvdata(phy, state);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id exynos_dp_video_phy_of_match[] = {
-+	{ .compatible = "samsung,exynos5250-dp-video-phy" },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, exynos_dp_video_phy_of_match);
-+#endif
-+
-+static struct platform_driver exynos_dp_video_phy_driver = {
-+	.probe	= exynos_dp_video_phy_probe,
-+	.driver = {
-+		.name	= "exynos-dp-video-phy",
-+		.owner	= THIS_MODULE,
-+		.of_match_table	= exynos_dp_video_phy_of_match,
-+	}
-+};
-+module_platform_driver(exynos_dp_video_phy_driver);
-+
-+MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
-+MODULE_DESCRIPTION("Samsung EXYNOS SoC DP PHY driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.10.4
+Ok. Makes sense.
+
+Thanks
+Kishon
