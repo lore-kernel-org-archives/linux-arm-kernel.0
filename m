@@ -1,37 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Jul 2013 22:34:19 +0800
-Subject: [alsa-devel] [PATCH 1/4] ASoC: sgtl5000: give it a ramping time
- before writting
-In-Reply-To: <20130701142610.GR13206@S2101-09.ap.freescale.net>
-References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
- <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
- <20130701100710.GB27646@sirena.org.uk>
- <201307011254.18952.marex@denx.de>
- <CAOMZO5BAs5-Tf_O0TVLFAuCchVuukV+bH2MpjqMU83tTw2GD=Q@mail.gmail.com>
- <20130701142610.GR13206@S2101-09.ap.freescale.net>
-Message-ID: <20130701143415.GA14172@S2101-09.ap.freescale.net>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 01 Jul 2013 16:33:49 +0200
+Subject: [PATCH] arm: allow all architectures to change max zone order
+In-Reply-To: <1370019744-7588-1-git-send-email-l.stach@pengutronix.de>
+References: <1370019744-7588-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1372689229.4277.4.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 10:26:12PM +0800, Shawn Guo wrote:
-> On Mon, Jul 01, 2013 at 11:12:48AM -0300, Fabio Estevam wrote:
-> > On Mon, Jul 1, 2013 at 7:54 AM, Marek Vasut <marex@denx.de> wrote:
-> > 
-> > > The delay might also be caused by the I2C driver, I have this in my ToDo to
-> > 
-> > Yes, this extra delay could be related to the mxs i2c driver, as we do
-> > not need to add this delay when using sgtl5000 on other i.mx devices.
-> > 
-> > Other people have also reported mxs i2c issues currently:
-> > http://marc.info/?l=linux-i2c&m=137241339917261&w=2
-> > 
-> > ,so this may be related some how.
+Am Freitag, den 31.05.2013, 19:02 +0200 schrieb Lucas Stach:
+> Many multimedia applications on architectures without an
+> IOMMU need large physically contiguous buffers and so need
+> to adjust the max zone order of the page allocator.
 > 
-> How does it explain the fact that sgtl5000 read has been working there?
-> The sgtl5000 revision has been successfully read out at that point.
+> There is zero reason to not allow this adjustment on arches
+> other than SHMOBILE.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 49d993c..6ceace8 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1710,7 +1710,7 @@ config HW_PERF_EVENTS
+>  source "mm/Kconfig"
+>  
+>  config FORCE_MAX_ZONEORDER
+> -	int "Maximum zone order" if ARCH_SHMOBILE
+> +	int "Maximum zone order"
+>  	range 11 64 if ARCH_SHMOBILE
+>  	default "12" if SOC_AM33XX
+>  	default "9" if SA1111
 
-And also why we do not see the impact of i2c issue on sgtl5000 before
-the offending commit af8ee11 (ASoC: sgtl5000: Fix driver probe after
-reset)?
-
-Shawn
+Ping. This is really straight forward and low risk.
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
