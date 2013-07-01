@@ -1,40 +1,60 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Wed, 01 May 2013 11:37:36 +0930
-Subject: [PATCH 0/2] Early printk support for virtio console devices.
-In-Reply-To: <C52CCDD4-D8FB-4AD6-B83D-3B5251A7A0F5@suse.de>
-References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
- <BA2076A6-0688-4E5C-85F9-A9CA8FD75782@suse.de>
- <87obcyc9sh.fsf@rustcorp.com.au>
- <336C59AA-D5D7-472E-A8DA-EEB413DD6C68@suse.de>
- <CAAHg+Hj0tySbzUGnoFE9ybVYP291B-i8-Ck1EkwD57t8yG5wwg@mail.gmail.com>
- <C52CCDD4-D8FB-4AD6-B83D-3B5251A7A0F5@suse.de>
-Message-ID: <87sj27xxjr.fsf@rustcorp.com.au>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Sun, 30 Jun 2013 21:11:39 -0700 (PDT)
+Subject: [PATCH 1/3] ARM: shmobile: use common platform header for HPB-DMAC
+In-Reply-To: <201306300245.58486.sergei.shtylyov@cogentembedded.com>
+References: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
+ <201306300245.58486.sergei.shtylyov@cogentembedded.com>
+Message-ID: <87ehbij4wc.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexander Graf <agraf@suse.de> writes:
-> There are not device specific registers in
-> virtio-console. Virtio-console lives behind a virtio bus which doesn't
-> know what these registers are.
 
-You're not going to make coherent arguments without reading that actual
-patch we're discussing.  And you're going to just waste everyone else's
-time.
+Hi
 
-> Even if you shove it into config space,
+> From: Max Filippov <max.filippov@cogentembedded.com>
+> 
+> Use previously empty <mach/dma.h> to declare HPB-DMA slave IDs.
+> 
+> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
+> [Sergei: changed the guard macro name, fixed comment, extended copyright.]
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> ---
+>  arch/arm/mach-shmobile/include/mach/dma.h |   25 ++++++++++++++++++++++++-
+>  1 file changed, 24 insertions(+), 1 deletion(-)
+> 
+> Index: renesas/arch/arm/mach-shmobile/include/mach/dma.h
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/include/mach/dma.h
+> +++ renesas/arch/arm/mach-shmobile/include/mach/dma.h
+> @@ -1 +1,24 @@
+> -/* empty */
+> +/*
+> + * Copyright (C) 2011-2013 Renesas Electronics Corporation
+> + * Copyright (C) 2013 Cogent Embedded, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2
+> + * as published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __MACH_DMA_H
+> +#define __MACH_DMA_H
+> +
+> +/* HPB-DMA slave IDs */
+> +enum {
+> +	HPBDMA_SLAVE_DUMMY,
+> +	HPBDMA_SLAVE_SDHI0_TX,
+> +	HPBDMA_SLAVE_SDHI0_RX,
+> +	HPBDMA_SLAVE_SSI0_TX_ST,
+> +	HPBDMA_SLAVE_SSI0_TX_MN,
+> +	HPBDMA_SLAVE_SSI1_RX_ST,
+> +	HPBDMA_SLAVE_SSI1_RX_MN,
+> +};
 
-Which is what the patch does...
+it should be in r8a7778.h
 
-> it'd be broken because config access happens without intercepts on
-> some platforms.
 
-But people keep assuming it, which is one reason virtio_ccw switched
-from passive lguest-style config to active.  Only lguest and the old kvm
-virtio use it, and lguest can change.
-
-An emergency output is a reasonable idea, and this is a reasonable
-implementation.  The question is practical: will it be used?  Because we
-don't implement reasonable ideas which aren't going to be used.
-
-Cheers,
-Rusty.
+Best regards
+---
+Kuninori Morimoto
