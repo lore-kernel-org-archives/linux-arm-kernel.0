@@ -1,27 +1,41 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 1 Jul 2013 13:45:33 +0200
-Subject: [PATCH] ARM: mxs: Fix mxs_pm_init if CONFIG_PM undefined
-In-Reply-To: <CAOMZO5Bk6ZCtK61p+qhmedFQ8gy6K2jHGCn-e5YTLhPC4nJ78Q@mail.gmail.com>
-References: <1372678590-8765-1-git-send-email-marex@denx.de>
- <CAOMZO5Bk6ZCtK61p+qhmedFQ8gy6K2jHGCn-e5YTLhPC4nJ78Q@mail.gmail.com>
-Message-ID: <201307011345.33911.marex@denx.de>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 01 Jul 2013 20:48:07 +0900
+Subject: [PATCH] ARM: shmobile: emev2 GIO3 resource fix
+Message-ID: <20130701114807.29137.43972.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Fabio Estevam,
+From: Magnus Damm <damm@opensource.se>
 
-> On Mon, Jul 1, 2013 at 8:36 AM, Marek Vasut <marex@denx.de> wrote:
-> > In case the CONFIG_PM is not defined, the mxs_pm_init() from pm.c
-> > is not compiled and therefore mxs_pm_init() is not available. Make
-> > sure that the kernel builds even if CONFIG_PM is not defined.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Arnd has already sent a fix for this:
-> http://www.spinics.net/lists/arm-kernel/msg254288.html
+Fix GIO3 base addresses for EMEV2.
 
-Ok, thanks. Will this hit 3.10 in any subsequent update?
+This bug was introduced by 088efd9273b5076a0aead479aa31f1066d182b3e
+("mach-shmobile: Emma Mobile EV2 GPIO support V3") which was included in v3.5.
 
-Best regards,
-Marek Vasut
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ arch/arm/mach-shmobile/setup-emev2.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+--- 0015/arch/arm/mach-shmobile/setup-emev2.c
++++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-07-01 20:21:29.000000000 +0900
+@@ -286,14 +286,14 @@ static struct gpio_em_config gio3_config
+ static struct resource gio3_resources[] = {
+ 	[0] = {
+ 		.name	= "GIO_096",
+-		.start	= 0xe0050100,
+-		.end	= 0xe005012b,
++		.start	= 0xe0050180,
++		.end	= 0xe00501ab,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+ 		.name	= "GIO_096",
+-		.start	= 0xe0050140,
+-		.end	= 0xe005015f,
++		.start	= 0xe00501c0,
++		.end	= 0xe00501df,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[2] = {
