@@ -1,52 +1,59 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 01 Jul 2013 17:22:24 +0200
-Subject: [PATCH v3 02/13] ARM: dts: Add pinctrl entries for Exynos4x12 FIMC-IS
- peripherals
+Date: Mon, 01 Jul 2013 17:22:29 +0200
+Subject: [PATCH v3 07/13] ARM: dts: Add AK8975 device node for Exynos4412
+ TRATS2 board
 In-Reply-To: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
 References: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1372692155-17653-3-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1372692155-17653-8-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl nodes for the ISP I2C0, ISP I2C1 and ISP UART devices.
+From: Jacek Anaszewski <j.anaszewski@samsung.com>
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+This patch adds AK8975 magnetometer node and corresponding
+i2c-gpio bus node for TRATS2 board.
+
+Signed-off-by: Jacek Anaszewski <j.anaszewski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- arch/arm/boot/dts/exynos4x12-pinctrl.dtsi |   21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/boot/dts/exynos4412-trats2.dts |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-index 55ff73b..99b26df 100644
---- a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-@@ -848,6 +848,27 @@
- 			samsung,pin-pud = <0>;
- 			samsung,pin-drv = <0>;
- 		};
-+
-+		fimc_is_i2c0: fimc-is-i2c0 {
-+			samsung,pins = "gpm4-0", "gpm4-1";
-+			samsung,pin-function = <2>;
-+			samsung,pin-pud = <0>;
-+			samsung,pin-drv = <0>;
-+		};
-+
-+		fimc_is_i2c1: fimc-is-i2c1 {
-+			samsung,pins = "gpm4-2", "gpm4-3";
-+			samsung,pin-function = <2>;
-+			samsung,pin-pud = <0>;
-+			samsung,pin-drv = <0>;
-+		};
-+
-+		fimc_is_uart: fimc-is-uart {
-+			samsung,pins = "gpm3-5", "gpm3-7";
-+			samsung,pin-function = <3>;
-+			samsung,pin-pud = <0>;
-+			samsung,pin-drv = <0>;
-+		};
- 	};
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 056b835..b9de3b5 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -19,6 +19,10 @@
+ 	model = "Samsung Trats 2 based on Exynos4412";
+ 	compatible = "samsung,trats2", "samsung,exynos4412";
  
- 	pinctrl at 03860000 {
++	aliases {
++		i2c8 = &i2c_ak8975;
++	};
++
+ 	memory {
+ 		reg =  <0x40000000 0x40000000>;
+ 	};
+@@ -453,4 +457,19 @@
+ 	serial at 13830000 {
+ 		status = "okay";
+ 	};
++
++	i2c_ak8975: i2c-gpio at 0 {
++		compatible = "i2c-gpio";
++		gpios = <&gpy2 4 0>, <&gpy2 5 0>;
++		i2c-gpio,delay-us = <2>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "okay";
++
++		ak8975 at 0c {
++			compatible = "asahi-kasei,ak8975";
++			reg = <0x0c>;
++			gpios = <&gpj0 7 0>;
++		};
++	};
+ };
 -- 
 1.7.9.5
