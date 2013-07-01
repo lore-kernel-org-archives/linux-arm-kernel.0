@@ -1,33 +1,75 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon,  1 Jul 2013 10:39:34 +0200
-Subject: [RFC PATCH 09/13] sound: atmel-pcm: don't return ok if pcm-dma is not
- implemented
+Date: Mon,  1 Jul 2013 10:39:35 +0200
+Subject: [RFC PATCH 10/13] sound: atmel_ssc_dai: PM: actually stopping clock
+ on suspend/resume
 In-Reply-To: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
 References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1372667978-4718-10-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1372667978-4718-11-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If DMA is not selected, atmel_pcm_dma_platform_register() should fail.
-Like that, the driver knows it can't use it.
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+Stop SSC clock on suspend/resume cycle checking if the controller is actually
+initialized. This will save power while sleeping.
+
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- sound/soc/atmel/atmel-pcm.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ sound/soc/atmel/atmel_ssc_dai.c |   20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
-diff --git a/sound/soc/atmel/atmel-pcm.h b/sound/soc/atmel/atmel-pcm.h
-index 12ae814..c0a01fa 100644
---- a/sound/soc/atmel/atmel-pcm.h
-+++ b/sound/soc/atmel/atmel-pcm.h
-@@ -109,7 +109,7 @@ void atmel_pcm_dma_platform_unregister(struct device *dev);
- #else
- static inline int atmel_pcm_dma_platform_register(struct device *dev)
+diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+index f3fdfa0..14da27a 100644
+--- a/sound/soc/atmel/atmel_ssc_dai.c
++++ b/sound/soc/atmel/atmel_ssc_dai.c
+@@ -659,12 +659,10 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
+ #ifdef CONFIG_PM
+ static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
  {
--	return 0;
-+	return -1;
+-	struct atmel_ssc_info *ssc_p;
++	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
+ 
+ 	if (!cpu_dai->active)
+-		return 0;
+-
+-	ssc_p = &ssc_info[cpu_dai->id];
++		goto out;
+ 
+ 	/* Save the status register before disabling transmit and receive */
+ 	ssc_p->ssc_state.ssc_sr = ssc_readl(ssc_p->ssc->regs, SR);
+@@ -680,6 +678,11 @@ static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
+ 	ssc_p->ssc_state.ssc_tcmr = ssc_readl(ssc_p->ssc->regs, TCMR);
+ 	ssc_p->ssc_state.ssc_tfmr = ssc_readl(ssc_p->ssc->regs, TFMR);
+ 
++out:
++	if (ssc_p->initialized) {
++		pr_debug("atmel_ssc_dai: suspend - stop clock\n");
++		clk_disable(ssc_p->ssc->clk);
++	}
+ 	return 0;
  }
- static inline void atmel_pcm_dma_platform_unregister(struct device *dev)
+ 
+@@ -687,14 +690,17 @@ static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
+ 
+ static int atmel_ssc_resume(struct snd_soc_dai *cpu_dai)
  {
+-	struct atmel_ssc_info *ssc_p;
++	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
+ 	u32 cr;
+ 
++	if (ssc_p->initialized) {
++		pr_debug("atmel_ssc_dai: resume - restart clock\n");
++		clk_enable(ssc_p->ssc->clk);
++	}
++
+ 	if (!cpu_dai->active)
+ 		return 0;
+ 
+-	ssc_p = &ssc_info[cpu_dai->id];
+-
+ 	/* restore SSC register settings */
+ 	ssc_writel(ssc_p->ssc->regs, TFMR, ssc_p->ssc_state.ssc_tfmr);
+ 	ssc_writel(ssc_p->ssc->regs, TCMR, ssc_p->ssc_state.ssc_tcmr);
 -- 
 1.7.10.4
