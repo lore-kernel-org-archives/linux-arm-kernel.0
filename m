@@ -1,47 +1,41 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 01 Jul 2013 14:41:15 +0900
-Subject: [PATCH 01/07] ARM: shmobile: Remove unused EMEV2 auxdata and callback
+Date: Mon, 01 Jul 2013 14:41:24 +0900
+Subject: [PATCH 02/07] ARM: shmobile: Remove unused r8a7740 auxdata table
 In-Reply-To: <20130701054106.19319.46845.sendpatchset@w520>
 References: <20130701054106.19319.46845.sendpatchset@w520>
-Message-ID: <20130701054115.19319.64158.sendpatchset@w520>
+Message-ID: <20130701054124.19319.75931.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Replace the SoC-specific callback init_machine() with 
-a NULL to use the default code. This cleans up the code
-and reduces the number of lines.
+Pass NULL to of_platform_populate instead of passing
+an empty list. This cleans up the code and reduces the
+number of lines.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/setup-emev2.c |   10 ----------
- 1 file changed, 10 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7740.c |    7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
---- 0001/arch/arm/mach-shmobile/setup-emev2.c
-+++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-07-01 13:19:32.000000000 +0900
-@@ -435,15 +435,6 @@ void __init emev2_init_irq(void)
- }
+--- 0001/arch/arm/mach-shmobile/setup-r8a7740.c
++++ work/arch/arm/mach-shmobile/setup-r8a7740.c	2013-06-28 15:43:04.000000000 +0900
+@@ -986,16 +986,11 @@ void __init r8a7740_add_early_devices(vo
  
  #ifdef CONFIG_USE_OF
--static const struct of_dev_auxdata emev2_auxdata_lookup[] __initconst = {
+ 
+-static const struct of_dev_auxdata r8a7740_auxdata_lookup[] __initconst = {
 -	{ }
 -};
 -
--static void __init emev2_add_standard_devices_dt(void)
--{
+ void __init r8a7740_add_standard_devices_dt(void)
+ {
+ 	platform_add_devices(r8a7740_devices_dt,
+ 			    ARRAY_SIZE(r8a7740_devices_dt));
 -	of_platform_populate(NULL, of_default_bus_match_table,
--			     emev2_auxdata_lookup, NULL);
--}
+-			     r8a7740_auxdata_lookup, NULL);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
  
- static const char *emev2_boards_compat_dt[] __initdata = {
- 	"renesas,emev2",
-@@ -455,7 +446,6 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma
- 	.init_early	= emev2_init_delay,
- 	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= irqchip_init,
--	.init_machine	= emev2_add_standard_devices_dt,
- 	.dt_compat	= emev2_boards_compat_dt,
- MACHINE_END
- 
+ void __init r8a7740_init_delay(void)
