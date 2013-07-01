@@ -1,102 +1,89 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 01 Jul 2013 09:07:20 +0200
-Subject: [PATCH 1/2] ARM: dts: mx53qsb: Enable VPU support
-In-Reply-To: <CAHCPf3s6_+aNs=LycgJzcOajmFuWy-mp66-BX+OMCLYDApS9cg@mail.gmail.com>
-References: <1372459759-10488-1-git-send-email-festevam@gmail.com>
- <CAHCPf3s6_+aNs=LycgJzcOajmFuWy-mp66-BX+OMCLYDApS9cg@mail.gmail.com>
-Message-ID: <1372662440.4971.15.camel@pizza.hi.pengutronix.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 1 Jul 2013 16:18:48 +0900
+Subject: [PATCH v3 2/3] ARM: shmobile: lager: enable Ether
+In-Reply-To: <1372652755-16948-3-git-send-email-horms+renesas@verge.net.au>
+References: <1372652755-16948-1-git-send-email-horms+renesas@verge.net.au>
+ <1372652755-16948-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130701071848.GT14567@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
-
-[Cc: devicetree-discuss at lists.ozlabs.org]
-
-Am Freitag, den 28.06.2013, 23:49 -0500 schrieb Matt Sealey:
-> On Fri, Jun 28, 2013 at 5:49 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
-> >
-> > Enable Video Processing Unit (VPU) support.
-> >
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> > Depends on Philipp Zabel's patch:
-> > [PATCH] ARM: dts: add sram for imx53 and imx6q
-> >
-> > Philipp,
-> >
-> > I tried using the original mx53 vpu firmware that comes with the FSL BSP, but it
-> > failed to load:
-> >
-> > coda 63ff4000.vpu: firmware get command error
-> > coda 63ff4000.vpu: HW initialization failed
-> >
-> > Any suggestions?
-> >
-> > Thanks!
-> >
-> >  arch/arm/boot/dts/imx53-qsb.dts |  4 ++++
-> >  arch/arm/boot/dts/imx53.dtsi    | 10 ++++++++++
-> >  2 files changed, 14 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-> > index 512a1f6..eedd27e 100644
-> > --- a/arch/arm/boot/dts/imx53-qsb.dts
-> > +++ b/arch/arm/boot/dts/imx53-qsb.dts
-> > @@ -297,6 +297,10 @@
-> >         status = "okay";
-> >  };
-> >
-> > +&vpu {
-> > +       status = "okay";
-> > +};
-> > +
-> >  &usbh1 {
-> >         status = "okay";
-> >  };
-> > diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> > index 3def46f..f94d4e5 100644
-> > --- a/arch/arm/boot/dts/imx53.dtsi
-> > +++ b/arch/arm/boot/dts/imx53.dtsi
-> > @@ -1086,6 +1086,16 @@
-> >                                 crtcs = <&ipu 1>;
-> >                                 status = "disabled";
-> >                         };
-> > +
-> > +                       vpu: vpu at 63ff4000 {
-> > +                               compatible = "fsl,imx53-vpu";
-> > +                               reg = <0x63ff4000 0x1000>;
-> > +                               interrupts = <9>;
-> > +                               clocks = <&clks 63>, <&clks 63>;
-> > +                               clock-names = "per", "ahb";
-> > +                               iram = <&ocram>;
-> > +                               status = "disabled";
-> > +                       };
-> >                 };
-> >
-> >                 ocram: ocram at f8000000 {
+On Mon, Jul 01, 2013 at 01:25:54PM +0900, Simon Horman wrote:
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> Nitpick: what I see here around enabling the VPU driver is;
+> ---
 > 
-> * A property called iram
-> * ... that references a node called ocram
-> * ... which is coincidentally driven by a driver called sram
+> This patch has a build-time dependency on "sh_eth: add support for gpio reset".
+> This patch has a run-time dependency on "sh_eth: add support for r8a7790 SoC".
 > 
-> Could we make up our minds as to what to call it? Something generic
-> that's potentially not i.MX-specific (since it does change over the
-> models, and it may not be technically SRAM..) that gets used
-> everywhere and belies it's purpose rather than naming a particular
-> technology, or particular IP core documentation if it changes a lot?
+> v3
+> * Rebase
+> 
+> v2
+> * As suggested by Laurent Pinchart
+>   - Do not manipilate sh_eth reset GPIO directly,
+>     rather, do so through newly proposed support for this in
+>     the sh_eth driver.
+> * A suggested by Sergei Shtylyov
+>   - Move DTS portion into a separate patch
+> ---
+>  arch/arm/mach-shmobile/board-lager.c | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+> index 0b4a1f9..4fecaf6 100644
+> --- a/arch/arm/mach-shmobile/board-lager.c
+> +++ b/arch/arm/mach-shmobile/board-lager.c
+> @@ -71,6 +71,17 @@ static __initdata struct gpio_keys_platform_data lager_keys_pdata = {
+>  	.nbuttons	= ARRAY_SIZE(gpio_buttons),
+>  };
+>  
+> +/* Ether */
+> +static struct sh_eth_plat_data ether_platdata = {
 
-I'd be in favor of changing
--                 ocram: ocram at f8000000 {
-+                 ocram: sram at f8000000 {
-but it is very convenient to have the IP vendor's creative name in
-there, too, if I have to look it up in the reference manual.
+This should be annotated as __initdata, I will re-post.
 
->From point of view of the VPU, the SRAM is a more local memory, in most
-implementations connected via a dedicated AXI bus to avoid load on the
-main memory bus.
-
-regards
-Philipp
+> +	.phy			= 0x1,
+> +	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
+> +	.register_type		= SH_ETH_REG_FAST_RCAR,
+> +	.phy_interface		= PHY_INTERFACE_MODE_RMII,
+> +	.ether_link_active_low	= 1,
+> +	.needs_gpio_reset	= 1,
+> +	.reset_gpio		= RCAR_GP_PIN(5, 31),
+> +};
+> +
+>  static const struct pinctrl_map lager_pinctrl_map[] = {
+>  	/* SCIF0 (CN19: DEBUG SERIAL0) */
+>  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
+> @@ -78,6 +89,17 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
+>  	/* SCIF1 (CN20: DEBUG SERIAL1) */
+>  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.7", "pfc-r8a7790",
+>  				  "scif1_data", "scif1"),
+> +	/* Ether */
+> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
+> +				  "eth_link", "eth"),
+> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
+> +				  "eth_magic", "eth"),
+> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
+> +				  "eth_mdio", "eth"),
+> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
+> +				  "eth_rmii", "eth"),
+> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
+> +				  "intc_irq0", "intc"),
+>  };
+>  
+>  static void __init lager_add_standard_devices(void)
+> @@ -89,6 +111,8 @@ static void __init lager_add_standard_devices(void)
+>  	r8a7790_pinmux_init();
+>  
+>  	r8a7790_add_standard_devices();
+> +	r8a7790_add_ether_device(&ether_platdata);
+> +
+>  	platform_device_register_data(&platform_bus, "leds-gpio", -1,
+>  				      &lager_leds_pdata,
+>  				      sizeof(lager_leds_pdata));
+> -- 
+> 1.8.2.1
+> 
