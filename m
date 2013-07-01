@@ -1,73 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon,  1 Jul 2013 15:07:05 -0600
-Subject: [PATCH] ARM: tegra: fix VBUS regulator GPIO polarity in DT
-Message-ID: <1372712825-13757-1-git-send-email-swarren@wwwdotorg.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 1 Jul 2013 23:15:04 +0200
+Subject: [PATCH] N900: enable N900-specific drivers even if device tree is
+ enabled
+In-Reply-To: <20130617111031.GQ20992@atomide.com>
+References: <20130613132624.GA3464@amd.pavel.ucw.cz>
+ <20130613141001.GF8164@atomide.com>
+ <20130613142809.GA3775@amd.pavel.ucw.cz>
+ <20130613145724.GH8164@atomide.com>
+ <20130613155240.GB3775@amd.pavel.ucw.cz>
+ <20130613161418.GJ8164@atomide.com>
+ <20130613230808.GA14876@amd.pavel.ucw.cz>
+ <20130614055629.GM8164@atomide.com>
+ <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
+ <20130617111031.GQ20992@atomide.com>
+Message-ID: <20130701211504.GB15318@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
 
-Commit 4c94c8b "ARM: tegra: update device trees for USB binding rework"
-added regulator definitions for GPIO-controlled USB VBUS. However, none
-of these contained the essential DT property enable-active-high. Add
-this so that the regulator definitions are correct.
+We still need video & sound drivers with device tree enabled.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
 ---
-I'm sending this to arm-soc to be taken into v3.11-rc1. However, if it
-won't get in until -rc2, let me know; I'd be tempted not to fix it in
-3.11 in that case, so I don't have to wait until v3.11-rc2 before
-applying patches that use these new regulators, since they rely on this
-fix going in first.
 
- arch/arm/boot/dts/tegra20-seaboard.dts  | 1 +
- arch/arm/boot/dts/tegra20-trimslice.dts | 1 +
- arch/arm/boot/dts/tegra20-whistler.dts  | 2 ++
- 3 files changed, 4 insertions(+)
+Patch against 3.10.
 
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index 9c5cb54..7f460bb 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -814,6 +814,7 @@
- 			regulator-name = "vdd_vbus_wup1";
- 			regulator-min-microvolt = <5000000>;
- 			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
- 			gpio = <&gpio 24 0>; /* PD0 */
- 		};
+--- linux-delme-clean//arch/arm/mach-omap2/board-rx51-video.c	2013-07-01 21:51:07.000000000 +0200
++++ linux-delme/arch/arm/mach-omap2/board-rx51-video.c	2013-07-01 22:50:27.000000000 +0200
+@@ -61,7 +61,7 @@
  
-diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
-index a997eaf..77efb09 100644
---- a/arch/arm/boot/dts/tegra20-trimslice.dts
-+++ b/arch/arm/boot/dts/tegra20-trimslice.dts
-@@ -417,6 +417,7 @@
- 			regulator-name = "usb1_vbus";
- 			regulator-min-microvolt = <5000000>;
- 			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
- 			gpio = <&gpio 170 0>; /* PV2 */
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
-index e07f210..a6b1b5b 100644
---- a/arch/arm/boot/dts/tegra20-whistler.dts
-+++ b/arch/arm/boot/dts/tegra20-whistler.dts
-@@ -584,6 +584,7 @@
- 			regulator-name = "vbus1";
- 			regulator-min-microvolt = <5000000>;
- 			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
- 			gpio = <&tca6416 0 0>; /* GPIO_PMU0 */
- 		};
+ static int __init rx51_video_init(void)
+ {
+-	if (!machine_is_nokia_rx51())
++	if (!machine_is_nokia_rx51() && !of_machine_is_compatible("nokia,omap3-n900"))
+ 		return 0;
  
-@@ -593,6 +594,7 @@
- 			regulator-name = "vbus3";
- 			regulator-min-microvolt = <5000000>;
- 			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
- 			gpio = <&tca6416 1 0>; /* GPIO_PMU1 */
- 		};
- 	};
+ 	if (omap_mux_init_gpio(RX51_LCD_RESET_GPIO, OMAP_PIN_OUTPUT)) {
+diff -urN linux-delme-clean//sound/soc/omap/rx51.c linux-delme/sound/soc/omap/rx51.c
+--- linux-delme-clean//sound/soc/omap/rx51.c	2013-07-01 21:54:49.000000000 +0200
++++ linux-delme/sound/soc/omap/rx51.c	2013-07-01 22:50:27.000000000 +0200
+@@ -396,7 +396,7 @@
+ {
+ 	int err;
+ 
+-	if (!machine_is_nokia_rx51())
++	if (!machine_is_nokia_rx51() && !of_machine_is_compatible("nokia,omap3-n900"))
+ 		return -ENODEV;
+ 
+ 	err = gpio_request_one(RX51_TVOUT_SEL_GPIO,
+
 -- 
-1.8.1.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
