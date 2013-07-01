@@ -1,75 +1,47 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon,  1 Jul 2013 10:39:35 +0200
-Subject: [RFC PATCH 10/13] sound: atmel_ssc_dai: PM: actually stopping clock
- on suspend/resume
+Date: Mon,  1 Jul 2013 10:39:37 +0200
+Subject: [RFC PATCH 12/13] sound: wm8731: rework power management
 In-Reply-To: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
 References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1372667978-4718-11-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1372667978-4718-13-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Stop SSC clock on suspend/resume cycle checking if the controller is actually
-initialized. This will save power while sleeping.
+- preserve crystal oscillator across suspend/resume sequence:
+  enabled by default,it should be kept enabled on resume.
+- if codec is in active state: set the active bit at resume time.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- sound/soc/atmel/atmel_ssc_dai.c |   20 +++++++++++++-------
- 1 file changed, 13 insertions(+), 7 deletions(-)
+ sound/soc/codecs/wm8731.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-index f3fdfa0..14da27a 100644
---- a/sound/soc/atmel/atmel_ssc_dai.c
-+++ b/sound/soc/atmel/atmel_ssc_dai.c
-@@ -659,12 +659,10 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
- #ifdef CONFIG_PM
- static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
+diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
+index 5276062..3cf6b20 100644
+--- a/sound/soc/codecs/wm8731.c
++++ b/sound/soc/codecs/wm8731.c
+@@ -465,7 +465,9 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
+ 		snd_soc_write(codec, WM8731_PWR, reg | 0x0040);
+ 		break;
+ 	case SND_SOC_BIAS_OFF:
+-		snd_soc_write(codec, WM8731_PWR, 0xffff);
++		snd_soc_write(codec, WM8731_ACTIVE, 0x0);
++		/* standby: keep crystal oscillator enabled */
++		snd_soc_write(codec, WM8731_PWR, 0x00df);
+ 		regulator_bulk_disable(ARRAY_SIZE(wm8731->supplies),
+ 				       wm8731->supplies);
+ 		regcache_mark_dirty(wm8731->regmap);
+@@ -516,6 +518,8 @@ static int wm8731_suspend(struct snd_soc_codec *codec)
+ static int wm8731_resume(struct snd_soc_codec *codec)
  {
--	struct atmel_ssc_info *ssc_p;
-+	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
+ 	wm8731_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
++	if (codec->active)
++		snd_soc_write(codec, WM8731_ACTIVE, 0x0001);
  
- 	if (!cpu_dai->active)
--		return 0;
--
--	ssc_p = &ssc_info[cpu_dai->id];
-+		goto out;
- 
- 	/* Save the status register before disabling transmit and receive */
- 	ssc_p->ssc_state.ssc_sr = ssc_readl(ssc_p->ssc->regs, SR);
-@@ -680,6 +678,11 @@ static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
- 	ssc_p->ssc_state.ssc_tcmr = ssc_readl(ssc_p->ssc->regs, TCMR);
- 	ssc_p->ssc_state.ssc_tfmr = ssc_readl(ssc_p->ssc->regs, TFMR);
- 
-+out:
-+	if (ssc_p->initialized) {
-+		pr_debug("atmel_ssc_dai: suspend - stop clock\n");
-+		clk_disable(ssc_p->ssc->clk);
-+	}
  	return 0;
  }
- 
-@@ -687,14 +690,17 @@ static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
- 
- static int atmel_ssc_resume(struct snd_soc_dai *cpu_dai)
- {
--	struct atmel_ssc_info *ssc_p;
-+	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
- 	u32 cr;
- 
-+	if (ssc_p->initialized) {
-+		pr_debug("atmel_ssc_dai: resume - restart clock\n");
-+		clk_enable(ssc_p->ssc->clk);
-+	}
-+
- 	if (!cpu_dai->active)
- 		return 0;
- 
--	ssc_p = &ssc_info[cpu_dai->id];
--
- 	/* restore SSC register settings */
- 	ssc_writel(ssc_p->ssc->regs, TFMR, ssc_p->ssc_state.ssc_tfmr);
- 	ssc_writel(ssc_p->ssc->regs, TCMR, ssc_p->ssc_state.ssc_tcmr);
 -- 
 1.7.10.4
