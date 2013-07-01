@@ -1,57 +1,32 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Mon, 1 Jul 2013 12:57:44 +0200
-Subject: [PATCH 1/4] ASoC: sgtl5000: give it a ramping time before writting
-In-Reply-To: <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
-References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
- <1372666571-17276-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20945.24744.908437.551717@ipc1.ka-ro>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 01 Jul 2013 13:00:23 +0200
+Subject: [PATCHv3 5/8] ARM: mxs: dt: cfa10037: make hogpins grabbed by
+ respective drivers
+In-Reply-To: <20130701090630.GF13206@S2101-09.ap.freescale.net>
+References: <1372424577-8279-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1372424577-8279-6-git-send-email-alexandre.belloni@free-electrons.com>
+ <20130629070529.GD2593@lukather> <51D058A4.7020101@free-electrons.com>
+ <20130701090630.GF13206@S2101-09.ap.freescale.net>
+Message-ID: <51D16147.7040509@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo writes:
-> Since commit af8ee11 (ASoC: sgtl5000: Fix driver probe after reset),
-> it's very ofen to run into the following probe error on imx28. It is
-> caused by the regmap_write() failure in sgtl5000_fill_defaults().
-> However, the regmap_read() before this has already been working.  It
-> seems that sgtl5000 takes a longer ramping time to get the registers
-> ready for write than read.
+On 01/07/2013 11:06, Shawn Guo wrote:
+> On Sun, Jun 30, 2013 at 06:11:16PM +0200, Alexandre Belloni wrote:
+>> Do you want me to send a reordered serie or will you do it when applying
+>> the patches ? You can just apply patch 4/8 last.
 > 
-> [    1.991579] sgtl5000 0-000a: sgtl5000 revision 0x11
-> [    2.021655] mxs-sgtl5000 sound.12: ASoC: CODEC (null) not registered
-> [    2.039087] mxs-sgtl5000 sound.12: snd_soc_register_card failed (-517)
-> [    2.046299] platform sound.12: Driver mxs-sgtl5000 requests probe deferral
+> Please resend, since you have some comments from Maxime on patch #2
+> unresolved? 
 > 
-> Fix the regression by giving it a ramping time before the first write.
+
+Oh right, forgot about that one, sorry. I will send v4.
+
+> Shawn
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  sound/soc/codecs/sgtl5000.c |    7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
-> index d441559..20bca03 100644
-> --- a/sound/soc/codecs/sgtl5000.c
-> +++ b/sound/soc/codecs/sgtl5000.c
-> @@ -1552,6 +1552,13 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
->  
->  	i2c_set_clientdata(client, sgtl5000);
->  
-> +	/*
-> +	 * It seems that sgtl5000 takes a longer time to get the registers
-> +	 * ready for write than bread.  Let's give it a ramping time before
-                                ^^^^^
->
-What sort of bread? ;-)
 
 
-Lothar Wa?mann
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
