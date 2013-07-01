@@ -1,87 +1,111 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  1 Jul 2013 15:42:13 +0200
-Subject: [PATCHv4 08/11] arm: pci: add ->add_bus() and ->remove_bus() hooks to
- hw_pci
+Date: Mon,  1 Jul 2013 15:42:10 +0200
+Subject: [PATCHv4 05/11] of: pci: add registry of MSI chips
 In-Reply-To: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1372686136-1370-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1372686136-1370-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some PCI drivers may need to adjust the pci_bus structure after it has
-been allocated by the Linux PCI core. The PCI core allows
-architectures to implement the pcibios_add_bus() and
-pcibios_remove_bus() for this purpose. This commit therefore extends
-the hw_pci and pci_sys_data structures of the ARM PCI core to allow
-PCI drivers to register ->add_bus() and ->remove_bus() in hw_pci,
-which will get called when a bus is added or removed from the system.
-
-This will be used for example by the Marvell PCIe driver to connect a
-particular PCI bus with its corresponding MSI chip to handle Message
-Signaled Interrupts.
+This commit adds a very basic registry of msi_chip structures, so that
+an IRQ controller driver can register an msi_chip, and a PCIe host
+controller can find it, based on a 'struct device_node'.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
 ---
- arch/arm/include/asm/mach/pci.h |  4 ++++
- arch/arm/kernel/bios32.c        | 16 ++++++++++++++++
- 2 files changed, 20 insertions(+)
+ drivers/of/of_pci.c    | 40 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/msi.h    |  2 ++
+ include/linux/of_pci.h | 12 ++++++++++++
+ 3 files changed, 54 insertions(+)
 
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index 7d2c3c8..b71cc9d 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -35,6 +35,8 @@ struct hw_pci {
- 					  resource_size_t start,
- 					  resource_size_t size,
- 					  resource_size_t align);
-+	void            (*add_bus)(struct pci_bus *bus);
-+	void            (*remove_bus)(struct pci_bus *bus);
- };
- 
- /*
-@@ -62,6 +64,8 @@ struct pci_sys_data {
- 					  resource_size_t start,
- 					  resource_size_t size,
- 					  resource_size_t align);
-+	void            (*add_bus)(struct pci_bus *bus);
-+	void            (*remove_bus)(struct pci_bus *bus);
- 	void		*private_data;	/* platform controller private data	*/
- };
- 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index b2ed73c..0a441f8 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -363,6 +363,20 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 42c687a..f516632 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -89,3 +89,43 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
+ 	return 0;
  }
- EXPORT_SYMBOL(pcibios_fixup_bus);
- 
-+void pcibios_add_bus(struct pci_bus *bus)
-+{
-+	struct pci_sys_data *sys = bus->sysdata;
-+	if (sys->add_bus)
-+		sys->add_bus(bus);
-+}
+ EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
 +
-+void pcibios_remove_bus(struct pci_bus *bus)
-+{
-+	struct pci_sys_data *sys = bus->sysdata;
-+	if (sys->remove_bus)
-+		sys->remove_bus(bus);
-+}
++#ifdef CONFIG_PCI_MSI
 +
- /*
-  * Swizzle the device pin each time we cross a bridge.  If a platform does
-  * not provide a swizzle function, we perform the standard PCI swizzling.
-@@ -463,6 +477,8 @@ static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
- 		sys->swizzle = hw->swizzle;
- 		sys->map_irq = hw->map_irq;
- 		sys->align_resource = hw->align_resource;
-+		sys->add_bus        = hw->add_bus;
-+		sys->remove_bus     = hw->remove_bus;
- 		INIT_LIST_HEAD(&sys->resources);
++static LIST_HEAD(msi_chip_list);
++static DEFINE_MUTEX(msi_chip_mutex);
++
++int of_msi_chip_add(struct msi_chip *chip)
++{
++	if (! of_property_read_bool(chip->of_node, "msi-controller"))
++		return -EINVAL;
++
++	mutex_lock(&msi_chip_mutex);
++	list_add(&chip->list, &msi_chip_list);
++	mutex_unlock(&msi_chip_mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(of_msi_chip_add);
++
++void of_msi_chip_remove(struct msi_chip *chip)
++{
++	mutex_lock(&msi_chip_mutex);
++	list_del(&chip->list);
++	mutex_unlock(&msi_chip_mutex);
++}
++EXPORT_SYMBOL_GPL(of_msi_chip_remove);
++
++struct msi_chip *of_find_msi_chip_by_node(struct device_node *of_node)
++{
++	struct msi_chip *c;
++	list_for_each_entry(c, &msi_chip_list, list) {
++		if (c->of_node == of_node)
++			return c;
++	}
++
++	return NULL;
++}
++EXPORT_SYMBOL_GPL(of_find_msi_chip_by_node);
++
++#endif /* CONFIG_PCI_MSI */
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 5b357d92..9e1a44b 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -66,6 +66,8 @@ void default_teardown_msi_irqs(struct pci_dev *dev);
+ struct msi_chip {
+ 	struct module *owner;
+ 	struct device *dev;
++	struct device_node *of_node;
++	struct list_head list;
  
- 		if (hw->private_data)
+ 	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
+ 			 struct msi_desc *desc);
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index 7a04826..99e4361 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -2,6 +2,7 @@
+ #define __OF_PCI_H
+ 
+ #include <linux/pci.h>
++#include <linux/msi.h>
+ 
+ struct pci_dev;
+ struct of_irq;
+@@ -13,4 +14,15 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
+ int of_pci_get_devfn(struct device_node *np);
+ int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+ 
++#if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
++int of_msi_chip_add(struct msi_chip *chip);
++void of_msi_chip_remove(struct msi_chip *chip);
++struct msi_chip *of_find_msi_chip_by_node(struct device_node *of_node);
++#else
++static inline int of_msi_chip_add(struct msi_chip *chip) { return -EINVAL; }
++static inline void of_msi_chip_remove(struct msi_chip *chip) { }
++static inline struct msi_chip *
++of_find_msi_chip_by_node(struct device_node *of_node) { return NULL };
++#endif
++
+ #endif
 -- 
 1.8.1.2
