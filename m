@@ -1,17 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Jul 2013 16:32:14 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable LVDS Display Bridge
-In-Reply-To: <1372390087-7362-1-git-send-email-festevam@gmail.com>
-References: <1372390087-7362-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130701083211.GA13206@S2101-09.ap.freescale.net>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 1 Jul 2013 10:32:59 +0200
+Subject: [PATCH 19/23] iommu/tegra: smmu: Unfied driver for Tegra SoCs
+In-Reply-To: <20130626110747.GP27083@manwe>
+References: <1372238906-9346-20-git-send-email-hdoyu@nvidia.com><20130626110747.GP27083@manwe>
+Message-ID: <20130701.113259.1041478084393668638.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 12:28:07AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Let IMX_LDB driver be built by default.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 26 Jun 2013 13:07:47 +0200:
 
-Applied, thanks.
+> * PGP Signed by an unknown key
+> 
+> On Wed, Jun 26, 2013 at 12:28:22PM +0300, Hiroshi Doyu wrote:
+> > Support multiple generation of Tegra SoCs with this unified
+> > SMMU driver. Necessary info is expected to be passed from DT.
+> > 
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > ---
+> >  drivers/iommu/tegra-smmu.c | 80 ++--------------------------------------------
+> >  1 file changed, 3 insertions(+), 77 deletions(-)
+> > 
+> > diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+> > index 6e82df3..ae71721 100644
+> > --- a/drivers/iommu/tegra-smmu.c
+> > +++ b/drivers/iommu/tegra-smmu.c
+> > @@ -1,5 +1,5 @@
+> >  /*
+> > - * IOMMU API for SMMU in Tegra30
+> > + * IOMMU API for SMMU in Tegra SoC
+> 
+> Maybe "Tegra30 and later SoCs" given that Tegra20 has no compatible
+> IOMMU?
+> 
+> > -MODULE_DESCRIPTION("IOMMU API for SMMU in Tegra30");
+> > +MODULE_DESCRIPTION("IOMMU API for SMMU in Tegra SoC");
+> 
+> Same here.
+
+Currently most of Tegra SoC has SMMU, and which doesn't have can be
+identified from DT. IMHO, we don't have to be so strict on this
+decritpions. Otherwise, we would need to list up which one (doesn't)
+has whenever a new one comes?
