@@ -1,24 +1,34 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 1 Jul 2013 10:30:36 +0900
-Subject: [PATCH 0/3] R8A7778/BOCK-W: HPB-DMAC support for SDHI0
-In-Reply-To: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
-References: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130701013036.GC14567@verge.net.au>
+Date: Mon, 1 Jul 2013 10:36:28 +0900
+Subject: [PATCH] ARM: shmobile: Update romImage to relocate appended DTB
+In-Reply-To: <20130626234807.11425.24645.sendpatchset@w520>
+References: <20130626234807.11425.24645.sendpatchset@w520>
+Message-ID: <20130701013627.GD14567@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 30, 2013 at 02:43:56AM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Thu, Jun 27, 2013 at 08:48:07AM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
 > 
->    Here's the set of 3 patches against the Simon Horman's 'renesas.git' repo,
-> 'renesas-next-20130628' tag. Here we add the HPB-DMAC platform code working on
-> the R8A7778 and enable DMA for SDHI0 on BOCK-W. The patchset depends on the
-> R-Car HPB-DMAC driver patch posted earlier.
+> Instead of relying of MACH_TYPE for board identification,
+> update the romImage code to relocate an appended DTB to
+> the beginning of RAM. This implementation is independent
+> of ARM_APPENDED_DTB, this because it is necessary to copy
+> the DTB to memory so the kernel can access it.
 > 
-> [1/3] ARM: shmobile: use common platform header for HPB-DMAC
-> [2/3] ARM: shmobile: r8a7778: add HPB-DMAC support
-> [3/3] ARM: shmobile: BOCK-W: enable DMA for SDHI0
+> Without this patch Mackerel does not boot via the Mask ROM
+> over USB (r_usb_boot) - this since non-DT boot was broken
+> ages ago in commit:
+> 
+> 0ce53cd ARM: mach-shmobile: Use DT_MACHINE for mackerel
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  Written against renesas-next-20130620
+> 
+>  arch/arm/boot/compressed/head-shmobile.S    |   43 ++++++++++++++++++++++++---
+>  arch/arm/mach-shmobile/include/mach/zboot.h |    2 -
+>  2 files changed, 39 insertions(+), 6 deletions(-)
 
-Hi Magnus, Hi Morimoto-san,
-
-could you please review is series?
+Thanks, I have queued this up in the boot-cleanup branch.
