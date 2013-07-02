@@ -1,30 +1,43 @@
 From: coelho@ti.com (Luciano Coelho)
-Date: Tue, 2 Jul 2013 23:19:54 +0300
-Subject: [PATCH v2 8/9] wlcore: sdio: get clocks from device tree
-In-Reply-To: <20130702153526.GI7013@arwen.pp.htv.fi>
+Date: Tue, 2 Jul 2013 23:27:30 +0300
+Subject: [PATCH v2 4/9] wl12xx: use frequency instead of enumerations
+ for pdata clocks
+In-Reply-To: <20130702150208.GA4233@kahuna>
 References: <1372776948-24840-1-git-send-email-coelho@ti.com>
- <1372776948-24840-9-git-send-email-coelho@ti.com>
- <20130702153526.GI7013@arwen.pp.htv.fi>
-Message-ID: <1372796394.21065.89.camel@cumari.coelho.fi>
+ <1372776948-24840-5-git-send-email-coelho@ti.com>
+ <20130702150208.GA4233@kahuna>
+Message-ID: <1372796850.21065.93.camel@cumari.coelho.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-07-02 at 18:35 +0300, Felipe Balbi wrote:
-> Hi,
-> 
-> On Tue, Jul 02, 2013 at 05:55:47PM +0300, Luciano Coelho wrote:
-> > @@ -294,6 +316,8 @@ static int wl1271_probe(struct sdio_func *func,
-> >  	/* Use block mode for transferring over one block size of data */
-> >  	func->card->quirks |= MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
-> >  
-> > +	sdio_set_drvdata(func, glue);
-> 
-> is this move really necessary ?
+On Tue, 2013-07-02 at 10:02 -0500, Nishanth Menon wrote:
+> On 17:55-20130702, Luciano Coelho wrote:
+> > Instead of defining an enumeration with the FW specific values for the
+> > different clock rates, use the actual frequency instead.  Also add a
+> > boolean to specify whether the clock is XTAL or not.
+> > 
+> > Change all board files to reflect this.
+> > 
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Sekhar Nori <nsekhar@ti.com>
+> > Signed-off-by: Luciano Coelho <coelho@ti.com>
+> > ---
+> >  arch/arm/mach-davinci/board-da850-evm.c      |    3 +-
+> >  arch/arm/mach-omap2/board-4430sdp.c          |    5 ++-
+> ^^
+> >  arch/arm/mach-omap2/board-omap3evm.c         |    3 +-
+> >  arch/arm/mach-omap2/board-omap4panda.c       |    3 +-
+> ^^
+> Please do not add more platform data to platforms that are DT only.
 
-It is, because I use the glue in wlcore_get_pdata_from_of(), so I need
-to call sdio_set_drvdata() earlier.  I reckoned it wouldn't hurt to move
-this, so I wouldn't have to pass the glue in the
-wlcore_get_pdata_from_of() call.
+Ah, I hadn't realized that board_omap4panda.c and board-4430sdp.c had
+been removed in linux-next.  I base my tree on wireless-next and it
+doesn't contain these changes yet.  I would only have noticed this when
+I rebased my tree once the merge window is closed. ;)
+
+Thanks for pointing out, I'll make sure these changes will not be there
+when I send the pull request.
 
 --
+Cheers,
 Luca.
