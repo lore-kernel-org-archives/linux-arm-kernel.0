@@ -1,38 +1,45 @@
-From: lho@apm.com (Loc Ho)
-Date: Tue,  2 Jul 2013 14:38:59 -0600
-Subject: [PATCH 2/2] power: arm64: Add DTS entry for APM X-Gene reboot driver.
-In-Reply-To: <1372797539-13111-2-git-send-email-lho@apm.com>
-References: <1372797539-13111-1-git-send-email-lho@apm.com>
- <1372797539-13111-2-git-send-email-lho@apm.com>
-Message-ID: <1372797539-13111-3-git-send-email-lho@apm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 3 Jul 2013 00:30:30 +0300
+Subject: [PATCH v2 7/9] wlcore: sdio: add wilink clock providers
+In-Reply-To: <20130702153423.GH7013@arwen.pp.htv.fi>
+References: <1372776948-24840-1-git-send-email-coelho@ti.com>
+ <1372776948-24840-8-git-send-email-coelho@ti.com>
+ <20130702153423.GH7013@arwen.pp.htv.fi>
+Message-ID: <20130702213030.GB10388@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-power: arm64: Add DTS entry for APM X-Gene reboot driver.
+Hi,
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Feng Kan <fkan@apm.com>
-Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+On Tue, Jul 02, 2013 at 06:34:23PM +0300, Felipe Balbi wrote:
+> On Tue, Jul 02, 2013 at 05:55:46PM +0300, Luciano Coelho wrote:
+> > Add refclock and tcxoclock as clock providers in WiLink.  These clocks
+> > are not accesible outside the WiLink module, but they are registered
+> > in the clock framework anyway.  Only the WiLink chip consumes these
+> > clocks.
+> > 
+> > In theory, the WiLink chip could be connected to external clocks
+> > instead of using these internal clocks, so make the clock consumer
+> > code generic enough.  If external clocks are used, then the internal
+> > clock device tree nodes are not necessary, but the external ones must
+> > be specified.
+> > 
+> > Signed-off-by: Luciano Coelho <coelho@ti.com>
+> 
+> Acked-by: Felipe Balbi <balbi@ti.com>
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index d37d736..e686919 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -178,6 +178,12 @@
- 			};
- 		};
- 
-+                reboot at 0x17000014 {
-+                        compatible = "apm,xgene-reboot";
-+                        reg = <0x0 0x17000014 0x0 0x100>;
-+                        mask = <0x1>;
-+                };
-+
- 		serial0: serial at 1c020000 {
- 			device_type = "serial";
- 			compatible = "ns16550";
+I guess this should've been
+
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+
+instead
+
 -- 
-1.5.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130703/5194aa14/attachment.sig>
