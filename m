@@ -1,38 +1,99 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 2 Jul 2013 11:14:01 -0600
-Subject: [PATCHv4 02/11] pci: use weak functions for MSI arch-specific
- functions
-In-Reply-To: <20130702073037.55a53642@skate>
-References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1372686136-1370-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <1372726396.17904.1.camel@concordia> <20130702073037.55a53642@skate>
-Message-ID: <CAErSpo5NuwC5cWiWxOb0c3tO47SPBcbW3Vx5vMu=cCu2m4vYLw@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 02 Jul 2013 19:15:49 +0200
+Subject: [PATCHv3 2/3] ARM: mxs: cfa10049: Switch bus i2c1 to bitbanging
+In-Reply-To: <201307021833.04282.marex@denx.de>
+References: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <51D2BEA1.6010206@free-electrons.com> <51D2DE5B.9060309@free-electrons.com>
+ <201307021833.04282.marex@denx.de>
+Message-ID: <51D30AC5.9000701@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 1, 2013 at 11:30 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Dear Michael Ellerman,
->
-> On Tue, 02 Jul 2013 10:53:16 +1000, Michael Ellerman wrote:
->> On Mon, 2013-07-01 at 15:42 +0200, Thomas Petazzoni wrote:
->> > Until now, the MSI architecture-specific functions could be overloaded
->> > using a fairly complex set of #define and compile-time
->> > conditionals. In order to prepare for the introduction of the msi_chip
->> > infrastructure, it is desirable to switch all those functions to use
->> > the 'weak' mechanism. This commit converts all the architectures that
->> > were overidding those MSI functions to use the new strategy.
+On 02/07/2013 18:33, Marek Vasut wrote:
+> Dear Alexandre Belloni,
+> 
+>> On 02/07/2013 13:50, Alexandre Belloni wrote:
+>>> On 02/07/2013 13:45, Fabio Estevam wrote:
+>>>> Shouldn't this be
+>>>>
+>>>>          i2c at 1 {
+>>>>          
+>>>>                  reg = <1>; ?
+>>>
+>>> No, we have 4 devices on that mux and 2 pins to select the muxing.
 >>
->> The MSI code used to use weak functions, until we discovered they were
->> being miscompiled on some toolchains (11df1f0). I assume these days
->> we're confident they work correctly.
->
-> Hum, interesting. I see from your commit that gcc 4.3.2 was apparently
-> affected, and gcc 4.3.x is not /that/ old. Bjorn, what's your point of
-> view on this?
+>> OK, got it working.
+>>
+>> So, the results:
+>>
+>> bitbanging:
+>>
+>> # time cat /sys/bus/iio/devices/iio\:device1/in_voltage0_raw
+>> 2637
+>> real	0m 0.09s
+>> user	0m 0.01s
+>> sys	0m 0.01s
+>>
+>>
+>> i2c-mxs PIO mode:
+>>
+>> # time cat /sys/bus/iio/devices/iio\:device1/in_voltage0_raw
+>> [   35.007650] [sched_delayed] sched: RT throttling activated
+>> 2627
+>> real	0m 7.14s
+>> user	0m 0.02s
+>> sys	0m 0.01s
+>>
+>>
+>> i2c-mxs PIO mode without LRADC:
+>>
+>> # time cat /sys/bus/iio/devices/iio\:device1/in_voltage0_raw
+>> [   18.007432] [sched_delayed] sched: RT throttling activated
+>> 2629
+>> real	0m 7.09s
+>> user	0m 0.00s
+>> sys	0m 0.03s
+>>
+>>
+>> i2c-mxs DMA mode:
+>>
+>> # time cat /sys/bus/iio/devices/iio\:device1/in_voltage0_raw
+>> 2631
+>> real	0m 0.12s
+>> user	0m 0.01s
+>> sys	0m 0.01s
+>>
+>>
+>> It seems fine for me.
+> 
+> I think I'm getting a little lost in these gazilions of i2c and lradc threads. 
+> Can we not create one thread and keep the related stuff in there instead of 
+> discussing it all around !?
+> 
+> Only one question comes to mind with this email -- what do LRADC and I2C have to 
+> do with each other here ?
+> 
 
-There *were* compilation issues with weak functions, but AFAIK they've
-been resolved and there's no reason to avoid them.  Commit f9d142500
-addressed this.
+Yeah, sorry, I meant the lradc touchscreen support. This seemed to
+trigger the issue for Fabio but as my testing shows, this is not the
+case for me, I get the issue with PIO, whether the lradc touchscreen
+support is activated or not.
 
-Bjorn
+I think Torsten is the one that investigated it the most :
+
+http://www.spinics.net/lists/linux-i2c/msg12619.html
+
+
+> It'd be nice if someone could summarize on what I should focus and possibly 
+> prepare a testcase.
+> 
+
+On my setup, it happens on every i2c read that are done in PIO mode.
+But, my setup may be a bit unconventional as we are using a i2c gpio muxer.
+
+Regards,
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
