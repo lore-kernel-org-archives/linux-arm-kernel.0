@@ -1,80 +1,73 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 2 Jul 2013 10:15:29 +0800
-Subject: [PATCH] ARM: dts: imx: add #dma-cells property for sdma
-Message-ID: <1372731329-1016-1-git-send-email-b32955@freescale.com>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Tue, 2 Jul 2013 10:42:46 +0800
+Subject: [PATCH] sdhci:sirf:drop SDHCI_QUIRK_INVERTED_WRITE_PROTECT as only
+ sd0 has inverted_wp
+Message-ID: <1372732966-9464-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the #dma-cells property for all the sdma in all the imx platforms.
+From: Bin Shi <Bin.Shi@csr.com>
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
+only sd0 has the issue that WP is inverted, so we drop the global set of
+SDHCI_QUIRK_INVERTED_WRITE_PROTECT and only enable the "wp-inverted" prop
+for sd0 in dts.
+
+Signed-off-by: Bin Shi <Bin.Shi@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/boot/dts/imx25.dtsi   |    1 +
- arch/arm/boot/dts/imx51.dtsi   |    1 +
- arch/arm/boot/dts/imx53.dtsi   |    1 +
- arch/arm/boot/dts/imx6qdl.dtsi |    1 +
- arch/arm/boot/dts/imx6sl.dtsi  |    1 +
- 5 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/atlas6.dtsi | 1 +
+ arch/arm/boot/dts/prima2.dtsi | 1 +
+ drivers/mmc/host/sdhci-sirf.c | 2 +-
+ 3 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index 7011539..1f72862 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -424,6 +424,7 @@
- 				reg = <0x53fd4000 0x4000>;
- 				clocks = <&clks 112>, <&clks 68>;
- 				clock-names = "ipg", "ahb";
-+				#dma-cells = <3>;
- 				interrupts = <34>;
- 			};
+diff --git a/arch/arm/boot/dts/atlas6.dtsi b/arch/arm/boot/dts/atlas6.dtsi
+index 7d1a279..d928b11 100644
+--- a/arch/arm/boot/dts/atlas6.dtsi
++++ b/arch/arm/boot/dts/atlas6.dtsi
+@@ -561,6 +561,7 @@
+ 					interrupts = <38>;
+ 					bus-width = <8>;
+ 					clocks = <&clks 36>;
++					wp-inverted;
+ 				};
  
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 25764b5..40ab745 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -645,6 +645,7 @@
- 				interrupts = <6>;
- 				clocks = <&clks 56>, <&clks 56>;
- 				clock-names = "ipg", "ahb";
-+				#dma-cells = <3>;
- 				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
- 			};
+ 				sd1: sdhci at 56100000 {
+diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
+index 3329719..36cb064 100644
+--- a/arch/arm/boot/dts/prima2.dtsi
++++ b/arch/arm/boot/dts/prima2.dtsi
+@@ -557,6 +557,7 @@
+ 					compatible = "sirf,prima2-sdhc";
+ 					reg = <0x56000000 0x100000>;
+ 					interrupts = <38>;
++					wp-inverted;
+ 				};
  
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 569aa9f..78bcd9a 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -990,6 +990,7 @@
- 				interrupts = <6>;
- 				clocks = <&clks 56>, <&clks 56>;
- 				clock-names = "ipg", "ahb";
-+				#dma-cells = <3>;
- 				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
- 			};
+ 				sd1: sdhci at 56100000 {
+diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
+index 62a4a83..38e69f7 100644
+--- a/drivers/mmc/host/sdhci-sirf.c
++++ b/drivers/mmc/host/sdhci-sirf.c
+@@ -36,7 +36,6 @@ static struct sdhci_pltfm_data sdhci_sirf_pdata = {
+ 	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
+ 		SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
+ 		SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
+-		SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
+ 		SDHCI_QUIRK_DELAY_AFTER_POWER,
+ };
  
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index f21d259..0509344 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -582,6 +582,7 @@
- 				interrupts = <0 2 0x04>;
- 				clocks = <&clks 155>, <&clks 155>;
- 				clock-names = "ipg", "ahb";
-+				#dma-cells = <3>;
- 				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index c5e5da0..9138c67 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -594,6 +594,7 @@
- 				clocks = <&clks IMX6SL_CLK_SDMA>,
- 					 <&clks IMX6SL_CLK_SDMA>;
- 				clock-names = "ipg", "ahb";
-+				#dma-cells = <3>;
- 				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6sl.bin";
- 			};
+@@ -70,6 +69,7 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
+ 	priv->gpio_cd = gpio_cd;
  
+ 	sdhci_get_of_property(pdev);
++	mmc_of_parse(host->mmc);
+ 
+ 	ret = clk_prepare_enable(priv->clk);
+ 	if (ret)
 -- 
-1.7.1
+1.8.2.3
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
