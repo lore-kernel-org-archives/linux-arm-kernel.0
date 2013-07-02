@@ -1,54 +1,65 @@
-From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Tue, 2 Jul 2013 16:58:09 +0530
-Subject: [RFC 0/9] Consolidate AM335x and OMAP4 PRM/CM APIs
-Message-ID: <1372764498-32503-1-git-send-email-vaibhav.bedia@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 02 Jul 2013 13:35:33 +0200
+Subject: [PATCHv3 2/3] ARM: mxs: cfa10049: Switch bus i2c1 to bitbanging
+In-Reply-To: <CAOMZO5CLcT=OXYd=ggxpDzUqFxoXSaanqUPGugYLT2Og-VgzCA@mail.gmail.com>
+References: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1372094699-3832-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <CAOMZO5CLcT=OXYd=ggxpDzUqFxoXSaanqUPGugYLT2Og-VgzCA@mail.gmail.com>
+Message-ID: <51D2BB05.9040201@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even though there are differences in the PRCM features on different
-TI SoCs (mostly OMAP3+) the underlying PRCM architecture is similar
-on OMAP4+, AM335x, AM437x (and DM81xx). With some rework of the OMAP4
-APIs we can easily consolidate the low level PRM/CM APIs for these
-SoCs and cut down 800+ lines under mach-omap2.
+Hi,
 
-These patches go on top of v3.10-rc7 (would rebase once 3.11-rc1 is out)
-and have been boot tested on AM335x EVM. I have tried to ensure OMAP4+
-is not affected but any testing on OMAP4+ would be helpful.
+On 02/07/2013 04:45, Fabio Estevam wrote:
+> Are you able to use the mxs i2c controller instead of bitbang if you
+> use this patch?
+> http://www.spinics.net/lists/stable/msg13202.html
+> 
 
-NOTE: The last patch which has the AM335x restart function would need
-to be reworked since the OMAP4 code is moving to a different file.
+Actually, it gets worse. I'm probably doing something wrong but I get:
 
-Vaibhav Bedia (9):
-  ARM: OMAP2+: AM335X: Add a constant CM_INST for all the clkdomains
-  ARM: OMAP2+: CM code: Reintroduce SW_SLEEP for OMAP4 class of devices
-  ARM: OMAP2+: AM335X: Add a constant PRCM_PARITION for the pwrdomains
-  ARM: OMAP4: PRM: Get rid of hardcoded offsets
-  ARM: OMAP4: Add offsets for pwrstctrl and pwrstst
-  ARM: OMAP4: CM code: Remove the check for non-zero clkctrl_offs
-  ARM: OMAP4: Generalize reset handling API
-  ARM: OMAP2+: AM335x: Migrate to OMAP4 PRM/CM APIs
-  ARM: OMAP2+: AM33XX: Get rid of custom PRM, CM APIs
+mxs-i2c 8005a000.i2c: Failed to get PIO reg. write descriptor.
 
- arch/arm/mach-omap2/Makefile                |   3 +-
- arch/arm/mach-omap2/am33xx-restart.c        |  34 ---
- arch/arm/mach-omap2/clockdomains33xx_data.c |  18 ++
- arch/arm/mach-omap2/cm33xx.c                | 364 ----------------------------
- arch/arm/mach-omap2/cm33xx.h                |  41 +---
- arch/arm/mach-omap2/cminst44xx.c            |  31 ++-
- arch/arm/mach-omap2/io.c                    |   3 +
- arch/arm/mach-omap2/omap4-common.c          |  14 ++
- arch/arm/mach-omap2/omap_hwmod.c            | 184 +-------------
- arch/arm/mach-omap2/powerdomains33xx_data.c |   6 +
- arch/arm/mach-omap2/powerdomains44xx_data.c |  32 +++
- arch/arm/mach-omap2/prm33xx.c               | 338 --------------------------
- arch/arm/mach-omap2/prm33xx.h               |  12 +-
- arch/arm/mach-omap2/prm44xx.c               |  45 ++--
- arch/arm/mach-omap2/prminst44xx.c           |  47 +++-
- arch/arm/mach-omap2/prminst44xx.h           |   6 +-
- 16 files changed, 183 insertions(+), 995 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/am33xx-restart.c
- delete mode 100644 arch/arm/mach-omap2/cm33xx.c
- delete mode 100644 arch/arm/mach-omap2/prm33xx.c
+That is the one line 243. I'm open to any suggestion.
+
+BTW, I also tested PIO mode with and without touchscreen support as that
+seemed to toggle the issue on your side. It is also worse than what it
+was in 3.9. Trying to read the nau7802 ADC never returns.
+
+The excerpt from my DT:
+
+i2c1: i2c at 8005a000 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c1_pins_a>;
+	status = "okay";
+};
+
+i2cmux {
+	compatible = "i2c-mux-gpio";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2cmux_pins_cfa10049>;
+	mux-gpios = <&gpio1 22 0 &gpio1 23 0>;
+	i2c-parent = <&i2c1>;
+
+	i2c at 0 {
+		reg = <0>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		adc0: nau7802 at 2a {
+			compatible = "nuvoton,nau7802";
+			reg = <0x2a>;
+			nuvoton,vldo = <3000>;
+		};
+	};
+
+[...]
+
 
 -- 
-1.8.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
