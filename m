@@ -1,69 +1,52 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 02 Jul 2013 18:24:31 +0100
-Subject: [PATCH 4/4] drivers: clocksource: add CPU PM notifier for ARM
- architected timer
-In-Reply-To: <1372781381.3689.27.camel@linaro1.home>
-References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1371575223-21702-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1372781381.3689.27.camel@linaro1.home>
-Message-ID: <51D30CCF.5020808@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 2 Jul 2013 13:38:21 -0400
+Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
+In-Reply-To: <87vc4sho7j.fsf@natisbad.org>
+References: <87fvvzfh70.fsf@natisbad.org>
+ <20130702124639.GI19937@titan.lakedaemon.net>
+ <87vc4sho7j.fsf@natisbad.org>
+Message-ID: <20130702173821.GE17110@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/13 17:09, Jon Medhurst (Tixy) wrote:
-> On Tue, 2013-06-18 at 18:07 +0100, Sudeep KarkadaNagesha wrote:
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> Few control settings done in architected timer as part of initialisation
->> are lost when CPU enters deeper power states. They need to be re-initialised
->> when the CPU is (warm)reset again.
->>
->> This patch moves all such initialisation into separate function that can
->> be used both in cold and warm CPU reset paths. It also adds CPU PM
->> notifiers to do the timer initialisation on warm resets.
->>
->> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Reviewed-by: Will Deacon <will.deacon@arm.com>
->> ---
->>  drivers/clocksource/arm_arch_timer.c | 51 +++++++++++++++++++++++++++++++-----
->>  1 file changed, 44 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index 11aaf06..1c691b1 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -13,6 +13,7 @@
->>  #include <linux/device.h>
->>  #include <linux/smp.h>
->>  #include <linux/cpu.h>
->> +#include <linux/cpu_pm.h>
->>  #include <linux/clockchips.h>
->>  #include <linux/interrupt.h>
->>  #include <linux/of_irq.h>
->> @@ -123,10 +124,20 @@ static int arch_timer_set_next_event_phys(unsigned long evt,
->>  	return 0;
->>  }
->>  
->> -static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
->> +static void arch_timer_initialise(void)
->>  {
->>  	int evt_stream_div, pos;
->>  
->> +	/* Find the closest power of two to the divisor */
->> +	evt_stream_div = arch_timer_rate / ARCH_TIMER_EVT_STREAM_FREQ;
->> +	pos = fls(evt_stream_div);
->> +	if (pos > 1 && !(evt_stream_div & (1 << (pos - 2))))
->> +		pos--;
->> +	arch_counter_set_user_access(min(pos, 15));
+On Tue, Jul 02, 2013 at 07:21:52PM +0200, Arnaud Ebalard wrote:
+> Jason Cooper <jason@lakedaemon.net> writes:
 > 
-> Would it not be good to calculate the value once in arch_timer_setup
-> rather than repeatedly in this function? The calculations aren't that
-> expensive, but when I gave these patches a spin on TC2 I noticed that
-> this function gets called >500 times a second, so it seems a bit
-> wasteful.
+> >>  - G762 PWM fan controller on I2C bus: it requires G762 driver which
+> >>    is *currently sitting in hwmon maintainer tree* and will be available
+> >>    in 3.11. Jason, as a side note I have a short patch for available for
+> >>    ReadyNAS Duo v2 .dts file (the device also has a G762). I can hold
+> >>    it until rc cycle if you prefer.
+> >
+> > Nope, post patches when you have them ready.  I am capable of holding
+> > them until -rc1 drops ;-)
 > 
-Makes sense, will save the divider and re-use it.
+> That's the one I sent yesterday (the patch tagged RESEND, i.e. w/o the
+> fixes for space issue in .dts file)
 
-Regards,
-Sudeep
+Yep, I have it queued up.
+
+> >> +			i2c at 11000 {
+> >> +				compatible = "marvell,mv64xxx-i2c";
+> >> +				clock-frequency = <100000>;
+> >> +				status = "okay";
+> >> +
+> >> +				isl12057: isl12057 at 68 {
+> >> +					compatible = "isil,isl12057";
+> >> +					reg = <0x68>;
+> >> +					wakeup-source;
+> >> +				};
+> 
+> My main question is for ISL12057 RTC chip: I guess it's just pointless to
+> push the .dts file for the RN102 w/o a working RTC clock?
+
+Not necessarily.  Support for the rtc can be done in a follow on patch
+once you have the driver mainlined.
+
+I have a bunch of boards that boot up and think it's 1970...
+
+Afterall, the mirabox doesn't have nand support :-P
+
+thx,
+
+Jason.
