@@ -1,57 +1,49 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Tue, 2 Jul 2013 15:49:47 +0200
-Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
-In-Reply-To: <20130702134421.GC17110@titan.lakedaemon.net>
-References: <87fvvzfh70.fsf@natisbad.org>
- <20130702124639.GI19937@titan.lakedaemon.net> <20130702151407.01680d21@skate>
- <20130702133337.GA17110@titan.lakedaemon.net> <20130702153825.139a93a5@skate>
- <20130702134421.GC17110@titan.lakedaemon.net>
-Message-ID: <20130702134947.GC6740@1wt.eu>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 2 Jul 2013 10:57:04 -0300
+Subject: [PATCHv2 2/3] ARM: mxs: cfa10049: Switch bus i2c1 to bitbanging
+In-Reply-To: <1235070882.565234.1372771759233.open-xchange@email.1und1.de>
+References: <1371754675-12242-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1371754675-12242-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <1235070882.565234.1372771759233.open-xchange@email.1und1.de>
+Message-ID: <CAOMZO5AASS4sr08i4K-uSUuvG+x9cjfFUtheY9JatA4dWCB0ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 02, 2013 at 09:44:21AM -0400, Jason Cooper wrote:
-> On Tue, Jul 02, 2013 at 03:38:25PM +0200, Thomas Petazzoni wrote:
-> > Dear Jason Cooper,
-> > 
-> > On Tue, 2 Jul 2013 09:33:37 -0400, Jason Cooper wrote:
-> > 
-> > > > The big blocker is that no-one has written  the driver for it. It is
-> > > > still on our (Free Electrons) TODO-list, but not as a top-priority item
-> > > > for the moment.
-> > > 
-> > > Ok.
-> > > 
-> > > > Ezequiel had started to do some preliminary cleanup work on the
-> > > > pxa3xx-nand driver, with the ultimate goal of making it support Armada
-> > > > 370/XP (because the IP in the Armada 370/XP is apparently an evolution
-> > > > of the PXA3xx NAND controller), but our priorities shifted to those
-> > > > other topics. We will back on it some day, but I can't say when at the
-> > > > moment.
-> > > 
-> > > Is this under contract?  If so, I don't want to take it from you.  If it
-> > > isn't, perhaps Ezequiel and Arnaud could mind-meld?
-> > 
-> > The big problem is that the Armada 370 and Armada XP datasheets are
-> > still only available under NDA, so it's quite hard for someone to step
-> > up and do this, without access to those datasheets.
-> 
-> bummer.
-> 
-> > It used to be on our TODO-list, but isn't any longer, and I have no
-> > informations about when it will re-appear on our TODO-list at this
-> > point.
-> 
-> So, Arnaud, how do you feel about tackling the nand driver based on the
-> sources you have and the pointers above?
+Hi Christoph,
 
-BTW if that can help, I already have a working port of the driver that is
-present in Marvell's kernel. The port is absolutely ugly, it's plain copy
-paste of the HAL parts that I needed until it built and booted. It worked
-on my mirabox with 3.8. I know it doesn't work since recently (I believe
-since introduction of the mbus driver) though I haven't had time to check
-why yet. The advantage of such an ugly work is that I'm sure that it will
-never be merged into mainline :-)
+On Tue, Jul 2, 2013 at 10:29 AM, Christoph G. Baumann <cb@sgoc.de> wrote:
+> Hello Alexandre,
+>
+>> The ADCs connected to this bus have been experiencing some timeout
+>> issues when using the iMX28 i2c controller. Switching back to bitbanging
+>> solves this.
+>
+> the chip errata for i.MX23(!) contains an issue (no 2727) with the I2C
+> controller that is also applicable for the i.MX28:
+>
+> "
+> 2727 I2C 9th Clock Pulse (ACK) not generated when RETAIN_CLOCK set.
+>
+> Description:
+> When RETAIN_CLOCK is set, the ninth clock pulse (ACK) is not generated. However,
+> the SDA
+> line is read at the proper timing interval. If RETAIN_CLOCK is cleared, the
+> ninth clock pulse is
+> generated.
+> Also, the HW_I2C_VERSION register incorrectly states the version is 1.2. It
+> should be 1.3.
+>
+> Workaround:
+> HW_I2C_CTRL1[ACK_MODE] has default value of 0. It should be set to 1 to enable
+> the fix for
+> this issue.
+
+Differently than mx23, the mx28 reference manual states that ACK_MODE
+bit has a default value of 1.
+
+Thanks for pointing this out, as we need to take this into
+consideration for supporting mx23 in the mxs i2c driver.
 
 Regards,
-Willy
+
+Fabio Estevam
