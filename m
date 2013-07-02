@@ -1,14 +1,14 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue,  2 Jul 2013 13:00:21 +0200
-Subject: [PATCH v6 4/7] ARM: dove: remove legacy mv643xx_eth setup
+Date: Tue,  2 Jul 2013 13:00:23 +0200
+Subject: [PATCH v6 6/7] ARM: kirkwood: remove legacy clk alias for mv643xx_eth
 In-Reply-To: <1372762824-12202-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1372762824-12202-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1372762824-12202-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1372762824-12202-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With DT support for mv643xx_eth we do not need legacy platform_data
-based setup for DT enabled boards anymore.
+With all boards converted to DT enabled mv643xx_eth we can now
+remove the clock alias for gbe clocks.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -25,42 +25,25 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Cc: netdev at vger.kernel.org
 ---
- arch/arm/mach-dove/board-dt.c |    9 ---------
- 1 files changed, 0 insertions(+), 9 deletions(-)
+ arch/arm/mach-kirkwood/board-dt.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
-index f3755ac..b5ccc1c 100644
---- a/arch/arm/mach-dove/board-dt.c
-+++ b/arch/arm/mach-dove/board-dt.c
-@@ -33,10 +33,6 @@ static void __init dove_legacy_clk_init(void)
- 	clkspec.np = np;
- 	clkspec.args_count = 1;
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index a3271f6..881f37e 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -60,12 +60,10 @@ static void __init kirkwood_legacy_clk_init(void)
+ 	 */
+ 	clkspec.args[0] = CGC_BIT_GE0;
+ 	clk = of_clk_get_from_provider(&clkspec);
+-	orion_clkdev_add(NULL, "mv643xx_eth_port.0", clk);
+ 	clk_prepare_enable(clk);
  
--	clkspec.args[0] = CLOCK_GATING_BIT_GBE;
--	orion_clkdev_add(NULL, "mv643xx_eth_port.0",
--			 of_clk_get_from_provider(&clkspec));
--
- 	clkspec.args[0] = CLOCK_GATING_BIT_PCIE0;
- 	orion_clkdev_add("0", "pcie",
- 			 of_clk_get_from_provider(&clkspec));
-@@ -52,10 +48,6 @@ static void __init dove_of_clk_init(void)
- 	dove_legacy_clk_init();
+ 	clkspec.args[0] = CGC_BIT_GE1;
+ 	clk = of_clk_get_from_provider(&clkspec);
+-	orion_clkdev_add(NULL, "mv643xx_eth_port.1", clk);
+ 	clk_prepare_enable(clk);
  }
  
--static struct mv643xx_eth_platform_data dove_dt_ge00_data = {
--	.phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT,
--};
--
- static void __init dove_dt_init(void)
- {
- 	pr_info("Dove 88AP510 SoC\n");
-@@ -69,7 +61,6 @@ static void __init dove_dt_init(void)
- 	dove_of_clk_init();
- 
- 	/* Internal devices not ported to DT yet */
--	dove_ge00_init(&dove_dt_ge00_data);
- 	dove_pcie_init(1, 1);
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 -- 
 1.7.2.5
