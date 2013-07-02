@@ -1,38 +1,37 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 3 Jul 2013 00:30:30 +0300
-Subject: [PATCH v2 7/9] wlcore: sdio: add wilink clock providers
-In-Reply-To: <20130702153423.GH7013@arwen.pp.htv.fi>
+Date: Wed, 3 Jul 2013 00:32:08 +0300
+Subject: [PATCH v2 8/9] wlcore: sdio: get clocks from device tree
+In-Reply-To: <1372796394.21065.89.camel@cumari.coelho.fi>
 References: <1372776948-24840-1-git-send-email-coelho@ti.com>
- <1372776948-24840-8-git-send-email-coelho@ti.com>
- <20130702153423.GH7013@arwen.pp.htv.fi>
-Message-ID: <20130702213030.GB10388@arwen.pp.htv.fi>
+ <1372776948-24840-9-git-send-email-coelho@ti.com>
+ <20130702153526.GI7013@arwen.pp.htv.fi>
+ <1372796394.21065.89.camel@cumari.coelho.fi>
+Message-ID: <20130702213208.GC10388@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jul 02, 2013 at 06:34:23PM +0300, Felipe Balbi wrote:
-> On Tue, Jul 02, 2013 at 05:55:46PM +0300, Luciano Coelho wrote:
-> > Add refclock and tcxoclock as clock providers in WiLink.  These clocks
-> > are not accesible outside the WiLink module, but they are registered
-> > in the clock framework anyway.  Only the WiLink chip consumes these
-> > clocks.
+On Tue, Jul 02, 2013 at 11:19:54PM +0300, Luciano Coelho wrote:
+> On Tue, 2013-07-02 at 18:35 +0300, Felipe Balbi wrote:
+> > Hi,
 > > 
-> > In theory, the WiLink chip could be connected to external clocks
-> > instead of using these internal clocks, so make the clock consumer
-> > code generic enough.  If external clocks are used, then the internal
-> > clock device tree nodes are not necessary, but the external ones must
-> > be specified.
+> > On Tue, Jul 02, 2013 at 05:55:47PM +0300, Luciano Coelho wrote:
+> > > @@ -294,6 +316,8 @@ static int wl1271_probe(struct sdio_func *func,
+> > >  	/* Use block mode for transferring over one block size of data */
+> > >  	func->card->quirks |= MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
+> > >  
+> > > +	sdio_set_drvdata(func, glue);
 > > 
-> > Signed-off-by: Luciano Coelho <coelho@ti.com>
+> > is this move really necessary ?
 > 
-> Acked-by: Felipe Balbi <balbi@ti.com>
+> It is, because I use the glue in wlcore_get_pdata_from_of(), so I need
+> to call sdio_set_drvdata() earlier.  I reckoned it wouldn't hurt to move
+> this, so I wouldn't have to pass the glue in the
+> wlcore_get_pdata_from_of() call.
 
-I guess this should've been
+that's alright, it does look like it deserves a mention in changelog
+though. Other than that:
 
 Reviewed-by: Felipe Balbi <balbi@ti.com>
-
-instead
 
 -- 
 balbi
@@ -42,4 +41,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130703/5194aa14/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130703/ec49d171/attachment.sig>
