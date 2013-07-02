@@ -1,47 +1,57 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue,  2 Jul 2013 20:02:25 +0400
-Subject: [PATCH 2/6] ARM: dts: i.MX27: Add WEIM node
+Date: Tue,  2 Jul 2013 20:02:26 +0400
+Subject: [PATCH 3/6] ARM: dts: imx27-phytec-phycore-som: Add WEIM node
 In-Reply-To: <1372780949-31897-1-git-send-email-shc_work@mail.ru>
 References: <1372780949-31897-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1372780949-31897-2-git-send-email-shc_work@mail.ru>
+Message-ID: <1372780949-31897-3-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the missing (Wireless External Interface Module) WEIM
-devicetree node for i.MX27 CPUs.
+This patch adds WEIM node for Phytec PCM-038 module.
+Migrate existing on-module NOR-flash as children of WEIM CS0.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dts | 23 ++++++++++++++---------
+ 1 file changed, 14 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 516473c..056e33b 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -443,6 +443,23 @@
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
+index 76edf59..92765ee 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
+@@ -52,15 +52,6 @@
+ 			};
  		};
+ 	};
+-
+-	nor_flash at c0000000 {
+-		compatible = "cfi-flash";
+-		bank-width = <2>;
+-		reg = <0xc0000000 0x02000000>;
+-		linux,mtd-name = "physmap-flash.0";
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-	};
+ };
  
-+		weim: weim at d8002000 {
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			compatible = "fsl,imx27-weim";
-+			reg = <0xd8002000 0x1000>;
-+			clocks = <&clks 0>;
-+			ranges = <
-+				0 0 0xc0000000 0x08000000
-+				1 0 0xc8000000 0x08000000
-+				2 0 0xd0000000 0x02000000
-+				3 0 0xd2000000 0x02000000
-+				4 0 0xd4000000 0x02000000
-+				5 0 0xd6000000 0x02000000
-+			>;
-+			status = "disabled";
-+		};
+ &cspi1 {
+@@ -177,3 +168,17 @@
+ 	nand-ecc-mode = "hw";
+ 	status = "okay";
+ };
 +
- 		iram: iram at ffff4c00 {
- 			compatible = "mmio-sram";
- 			reg = <0xffff4c00 0xb400>;
++&weim {
++	status = "okay";
++
++	nor: nor at c0000000 {
++		compatible = "cfi-flash";
++		reg = <0 0x00000000 0x02000000>;
++		bank-width = <2>;
++		linux,mtd-name = "physmap-flash.0";
++		fsl,weim-cs-timing = <0x22c2cf00 0x75000d01 0x00000900>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++	};
++};
 -- 
 1.8.1.5
