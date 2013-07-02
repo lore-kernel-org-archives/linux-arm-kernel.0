@@ -1,86 +1,45 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Tue, 2 Jul 2013 10:11:55 +0530
-Subject: [PATCH 3/4] PCI: Add driver for i.MX6 PCI Express
-In-Reply-To: <2E3BDF14016345FA887E3BACAE05DADA@kosagi.com>
-References: <1372662947-27160-1-git-send-email-xobs@kosagi.com>
- <1372662947-27160-4-git-send-email-xobs@kosagi.com> <51D15513.7020101@st.com>
- <2E3BDF14016345FA887E3BACAE05DADA@kosagi.com>
-Message-ID: <51D25A13.9060006@st.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 1 Jul 2013 21:53:04 -0700
+Subject: [GIT PULL] Initial OLPC XO-1.75/XO-4 support
+In-Reply-To: <20130702031244.B2D74FAAD2@dev.laptop.org>
+References: <20130702031244.B2D74FAAD2@dev.laptop.org>
+Message-ID: <20130702045304.GA27829@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/2/2013 9:16 AM, Sean Cross wrote:
->> >I may be wrong, but from these offset it seems to me that it is SNPS
->> >controller. If yes, then please go through comments of
->> >"[PATCH V1-10 0/4] PCIe support for Samsung Exynos5440 SoC"
-> Exynos5440 appears to use the same port logic controller.  However, the PHYs are different.  I'm not exactly certain which comments you want me to notice in that series of patchsets, but I see references to splitting Exynos-specific code into its own project.  Based on that, it seems like the best approach would be to:
->
->      1) Move Exynos code into its own file, say, pcie-exynos.c.  This would leave only Synopsys-specific ATC code in pcie-designware.c
->      2) Rename generic exynos functions to reflect the fact that they're designware-generic functions.
->      3) Have pcie-imx.c reference this generic designware ATC code.
->
-> I'll rework the patch and re-submit it following these three changes.
+On Mon, Jul 01, 2013 at 11:12:44PM -0400, Daniel Drake wrote:
+> Hi,
+> 
+> These patches add support for booting OLPC XO-1.75 (Marvell MMP2) and OLPC
+> XO-4 (Marvell MMP3) which present device trees from OpenFirmware.
+> 
+> With the exception of the most recent patch, which has been acked (I think),
+> the other patches were posted about 2 weeks ago and haven't received
+> any comments from the MMP arch maintainers.
+> 
+> Please consider for the next available merge window (not sure if we're
+> now too late for 3.11, no big deal if so).
 
-Correct, Exactly these steps has to be done. But, Mohit might be doing 
-similar work, so it would be better to get consensus on what has to be done.
+Daniel,
 
-IMO, there should be three categories of functions. May be arnd can 
-comment if we can do even something better.
+Unfortunately too late for 3.11 indeed, so this is 3.12 material at this point.
+Given that the merge window just opened, most maintainers will be too busy to
+look at much new patches at this time as well.
 
-Group I: Initially, These functions should remain in pcie-designware.c 
-(offcourse by changing exynos tag to dw). Latter on, we can see if some 
-of them can even be moved to common pci layer.
+Can I ask you to do a few things though?
 
-sys_to_pcie
-cfg_read
-cfg_write
-dw_pcie_prog_viewport_cfg0
-dw_pcie_prog_viewport_cfg1
-dw_pcie_prog_viewport_mem_outbound
-dw_pcie_prog_viewport_io_outbound
-dw_pcie_rd_other_conf
-dw_pcie_wr_other_conf
-dw_pcie_setup
-dw_pcie_valid_config
-dw_pcie_rd_conf
-dw_pcie_wd_conf
-dw_pcie_scan_bus
-dw_pcie_map_irq
-dw_pcie_setup_rc
-add_pcie_port (after a bit of generalization)
-dw_pcie_probe
-dw_pcie_remove
+1) Please post the drivers/clk patches to mturquette. THey don't look dependent
+   on the rest of the patches, just general improvements and cleanups.
+2) I really wish there was a generic catch-all compat for the boards, so we
+   didn't have to modify mmp2-dt.c for every new board added -- it really
+   defies the purpose of only changing the data you pass into the kernel. This
+   is mostly something for Eric/Haojian to sort out though.
+3) Please post the patches as a series instead of a pull request, given that
+   they should probably take different paths up the tree (clk vs the platform,
+   etc). You should at least get review/acked-by of the clk pieces from Mike
+   Turquette.
+
+Beyond that I didn't look all that closely at the patches yet.
 
 
-Group II: These functions should still remain as dummy in 
-pcie-designware.c , and should be classified as __week. So, each 
-implementer of designware controller say Exynos/SPEAr/imx will have to 
-define their own function to super-seed default dummy definitions.
-
-dw_readl_rc
-dw_writel_rc
-dw_pcie_rd_own_conf
-dw_pcie_wr_own_conf
-dw_pcie_link_up
-dw_pcie_host_init (will contain all platform specific and phy 
-initialization)
-
-Group III: Functions specific to Exynos, which should move to pcie-exynos.c
-
-exynos_pcie_sideband_dbi_w_mode
-exynos_pcie_sideband_dbi_r_mode
-exynos_pcie_assert_core_reset
-exynos_pcie_deassert_core_reset
-exynos_pcie_assert_phy_reset
-exynos_pcie_deassert_phy_reset
-exynos_pcie_init_phy
-exynos_pcie_assert_reset
-exynos_pcie_establish_link
-
-
-@Mohit, See if you have BW then please take it further.
-
-arnd, are exynos patches applied to any branch of arm-soc git tree?
-
-Regards
-Pratyush
+-Olof
