@@ -1,57 +1,51 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 02 Jul 2013 18:28:14 +0900
-Subject: [PATCH 06/08] ARM: shmobile: Use DT for SMP on EMEV2 and KZM9D
+Date: Tue, 02 Jul 2013 18:28:22 +0900
+Subject: [PATCH 07/08] ARM: shmobile: EMEV2 map_io update
 In-Reply-To: <20130702092725.32066.54861.sendpatchset@w520>
 References: <20130702092725.32066.54861.sendpatchset@w520>
-Message-ID: <20130702092814.32066.30138.sendpatchset@w520>
+Message-ID: <20130702092822.32066.80242.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Rework the EMEV2 SMP code to rely on DT for CPU information
-instead of reading out number of CPU cores from the SCU.
+Update the EMEV2 struct map_desc to exclude the SMU
+and also include the ->map_io() callback in the DT
+version of EMEV2 board support.
+
+The EMEV2 SMP code can these days perform ioremap()
+early on without the SMU information in the io_desc[].
+
+To correctly support SMP in case of DT-only board
+support then the ->map_io() callback is needed.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/smp-emev2.c |   17 +++--------------
- 1 file changed, 3 insertions(+), 14 deletions(-)
+ arch/arm/mach-shmobile/setup-emev2.c |    8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
---- 0001/arch/arm/mach-shmobile/smp-emev2.c
-+++ work/arch/arm/mach-shmobile/smp-emev2.c	2013-07-02 15:09:53.000000000 +0900
-@@ -38,9 +38,12 @@ static int __cpuinit emev2_boot_secondar
+--- 0004/arch/arm/mach-shmobile/setup-emev2.c
++++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-07-02 15:22:37.000000000 +0900
+@@ -38,13 +38,6 @@
  
- static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
- {
-+	/* setup EMEV2 specific SCU base, enable */
-+	shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
- 	scu_enable(shmobile_scu_base);
+ static struct map_desc emev2_io_desc[] __initdata = {
+ #ifdef CONFIG_SMP
+-	/* 128K entity map for 0xe0100000 (SMU) */
+-	{
+-		.virtual	= 0xe0100000,
+-		.pfn		= __phys_to_pfn(0xe0100000),
+-		.length		= SZ_128K,
+-		.type		= MT_DEVICE
+-	},
+ 	/* 2M mapping for SCU + L2 controller */
+ 	{
+ 		.virtual	= 0xf0000000,
+@@ -220,6 +213,7 @@ static const char *emev2_boards_compat_d
  
- 	/* Tell ROM loader about our vector (in headsmp-scu.S, headsmp.S) */
-+	emev2_clock_init(); /* need ioremapped SMU */
- 	emev2_set_boot_vector(__pa(shmobile_boot_vector));
- 	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
- 	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
-@@ -49,21 +52,7 @@ static void __init emev2_smp_prepare_cpu
- 	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
- }
- 
--static void __init emev2_smp_init_cpus(void)
--{
--	unsigned int ncores;
--
--	/* setup EMEV2 specific SCU base */
--	shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
--	emev2_clock_init(); /* need ioremapped SMU */
--
--	ncores = shmobile_scu_base ? scu_get_core_count(shmobile_scu_base) : 1;
--
--	shmobile_smp_init_cpus(ncores);
--}
--
- struct smp_operations emev2_smp_ops __initdata = {
--	.smp_init_cpus		= emev2_smp_init_cpus,
- 	.smp_prepare_cpus	= emev2_smp_prepare_cpus,
- 	.smp_boot_secondary	= emev2_boot_secondary,
- };
+ DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
+ 	.smp		= smp_ops(emev2_smp_ops),
++	.map_io		= emev2_map_io,
+ 	.init_early	= emev2_init_delay,
+ 	.init_machine	= emev2_add_standard_devices_dt,
+ 	.dt_compat	= emev2_boards_compat_dt,
