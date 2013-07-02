@@ -1,107 +1,141 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 02 Jul 2013 18:28:30 +0900
-Subject: [PATCH 08/08] ARM: shmobile: Disconnect EMEV2 SMP code from clocks
-In-Reply-To: <20130702092725.32066.54861.sendpatchset@w520>
-References: <20130702092725.32066.54861.sendpatchset@w520>
-Message-ID: <20130702092830.32066.8431.sendpatchset@w520>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 2 Jul 2013 10:56:45 +0100
+Subject: [PATCH 3/5] ARM: dts: imx6: rename the uart's compatible property
+In-Reply-To: <1372746628-20092-4-git-send-email-b32955@freescale.com>
+References: <1372746628-20092-1-git-send-email-b32955@freescale.com>
+ <1372746628-20092-4-git-send-email-b32955@freescale.com>
+Message-ID: <20130702095645.GD31358@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Tue, Jul 02, 2013 at 07:30:26AM +0100, Huang Shijie wrote:
+> The imx6 uart can supports the DMA, imx uart driver has added a new
+> compatible property for the imx6 uart.
+> 
+> In order to enable the DMA for some uart port in imx6, we rename the
+> uart's compatible property to "fsl,imx6-uart".
 
-Update the EMEV2 SMP code to access the SMU directly
-instead of relying on help from the legacy clock code.
+Doesn't this change break using these dts with an older kernel? You
+remove the "fsl,imx21-uart" string older kernels understand.
 
-This change moves us one step closer to common clocks.
+Given you already had "fsl,imx6q-uart" and "fsl,imx6sl-uart" strings,
+would it not have made more sense to just add these to the driver?
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+Thanks,
+Mark.
 
- arch/arm/mach-shmobile/clock-emev2.c        |   18 ------------------
- arch/arm/mach-shmobile/include/mach/emev2.h |    1 -
- arch/arm/mach-shmobile/smp-emev2.c          |   11 +++++++++--
- 3 files changed, 9 insertions(+), 21 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/clock-emev2.c
-+++ work/arch/arm/mach-shmobile/clock-emev2.c	2013-07-02 15:31:52.000000000 +0900
-@@ -40,7 +40,6 @@
- #define USIB2SCLKDIV 0x65c
- #define USIB3SCLKDIV 0x660
- #define STI_CLKSEL 0x688
--#define SMU_GENERAL_REG0 0x7c0
- 
- /* not pretty, but hey */
- static void __iomem *smu_base;
-@@ -51,11 +50,6 @@ static void emev2_smu_write(unsigned lon
- 	iowrite32(value, smu_base + offs);
- }
- 
--void emev2_set_boot_vector(unsigned long value)
--{
--	emev2_smu_write(value, SMU_GENERAL_REG0);
--}
--
- static struct clk_mapping smu_mapping = {
- 	.phys	= EMEV2_SMU_BASE,
- 	.len	= PAGE_SIZE,
-@@ -205,18 +199,6 @@ static struct clk_lookup lookups[] = {
- void __init emev2_clock_init(void)
- {
- 	int k, ret = 0;
--	static int is_setup;
--
--	/* yuck, this is ugly as hell, but the non-smp case of clocks
--	 * code is now designed to rely on ioremap() instead of static
--	 * entity maps. in the case of smp we need access to the SMU
--	 * register earlier than ioremap() is actually working without
--	 * any static maps. to enable SMP in ugly but with dynamic
--	 * mappings we have to call emev2_clock_init() from different
--	 * places depending on UP and SMP...
--	 */
--	if (is_setup++)
--		return;
- 
- 	smu_base = ioremap(EMEV2_SMU_BASE, PAGE_SIZE);
- 	BUG_ON(!smu_base);
---- 0004/arch/arm/mach-shmobile/include/mach/emev2.h
-+++ work/arch/arm/mach-shmobile/include/mach/emev2.h	2013-07-02 15:32:05.000000000 +0900
-@@ -5,7 +5,6 @@ extern void emev2_map_io(void);
- extern void emev2_init_delay(void);
- extern void emev2_add_standard_devices(void);
- extern void emev2_clock_init(void);
--extern void emev2_set_boot_vector(unsigned long value);
- 
- #define EMEV2_GPIO_BASE 200
- #define EMEV2_GPIO_IRQ(n) (EMEV2_GPIO_BASE + (n))
---- 0005/arch/arm/mach-shmobile/smp-emev2.c
-+++ work/arch/arm/mach-shmobile/smp-emev2.c	2013-07-02 15:31:01.000000000 +0900
-@@ -29,6 +29,8 @@
- #include <asm/smp_scu.h>
- 
- #define EMEV2_SCU_BASE 0x1e000000
-+#define EMEV2_SMU_BASE 0xe0110000
-+#define SMU_GENERAL_REG0 0x7c0
- 
- static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
-@@ -38,13 +40,18 @@ static int __cpuinit emev2_boot_secondar
- 
- static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
- {
-+	void __iomem *smu;
-+
- 	/* setup EMEV2 specific SCU base, enable */
- 	shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
- 	scu_enable(shmobile_scu_base);
- 
- 	/* Tell ROM loader about our vector (in headsmp-scu.S, headsmp.S) */
--	emev2_clock_init(); /* need ioremapped SMU */
--	emev2_set_boot_vector(__pa(shmobile_boot_vector));
-+	smu = ioremap(EMEV2_SMU_BASE, PAGE_SIZE);
-+	if (smu) {
-+		iowrite32(__pa(shmobile_boot_vector), smu + SMU_GENERAL_REG0);
-+		iounmap(smu);
-+	}
- 	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
- 	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
- 
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl.dtsi |   10 +++++-----
+>  arch/arm/boot/dts/imx6sl.dtsi  |   10 +++++-----
+>  2 files changed, 10 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index 0509344..d4ab0ee 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -179,7 +179,7 @@
+>  				};
+>  
+>  				uart1: serial at 02020000 {
+> -					compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+> +					compatible = "fsl,imx6-uart";
+>  					reg = <0x02020000 0x4000>;
+>  					interrupts = <0 26 0x04>;
+>  					clocks = <&clks 160>, <&clks 161>;
+> @@ -787,7 +787,7 @@
+>  			};
+>  
+>  			uart2: serial at 021e8000 {
+> -				compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+> +				compatible = "fsl,imx6-uart";
+>  				reg = <0x021e8000 0x4000>;
+>  				interrupts = <0 27 0x04>;
+>  				clocks = <&clks 160>, <&clks 161>;
+> @@ -796,7 +796,7 @@
+>  			};
+>  
+>  			uart3: serial at 021ec000 {
+> -				compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+> +				compatible = "fsl,imx6-uart";
+>  				reg = <0x021ec000 0x4000>;
+>  				interrupts = <0 28 0x04>;
+>  				clocks = <&clks 160>, <&clks 161>;
+> @@ -805,7 +805,7 @@
+>  			};
+>  
+>  			uart4: serial at 021f0000 {
+> -				compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+> +				compatible = "fsl,imx6-uart";
+>  				reg = <0x021f0000 0x4000>;
+>  				interrupts = <0 29 0x04>;
+>  				clocks = <&clks 160>, <&clks 161>;
+> @@ -814,7 +814,7 @@
+>  			};
+>  
+>  			uart5: serial at 021f4000 {
+> -				compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+> +				compatible = "fsl,imx6-uart";
+>  				reg = <0x021f4000 0x4000>;
+>  				interrupts = <0 30 0x04>;
+>  				clocks = <&clks 160>, <&clks 161>;
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index 9138c67..ca1527f 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -152,7 +152,7 @@
+>  				};
+>  
+>  				uart5: serial at 02018000 {
+> -					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
+> +					compatible = "fsl,imx6-uart";
+>  					reg = <0x02018000 0x4000>;
+>  					interrupts = <0 30 0x04>;
+>  					clocks = <&clks IMX6SL_CLK_UART>,
+> @@ -162,7 +162,7 @@
+>  				};
+>  
+>  				uart1: serial at 02020000 {
+> -					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
+> +					compatible = "fsl,imx6-uart";
+>  					reg = <0x02020000 0x4000>;
+>  					interrupts = <0 26 0x04>;
+>  					clocks = <&clks IMX6SL_CLK_UART>,
+> @@ -172,7 +172,7 @@
+>  				};
+>  
+>  				uart2: serial at 02024000 {
+> -					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
+> +					compatible = "fsl,imx6-uart";
+>  					reg = <0x02024000 0x4000>;
+>  					interrupts = <0 27 0x04>;
+>  					clocks = <&clks IMX6SL_CLK_UART>,
+> @@ -209,7 +209,7 @@
+>  				};
+>  
+>  				uart3: serial at 02034000 {
+> -					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
+> +					compatible = "fsl,imx6-uart";
+>  					reg = <0x02034000 0x4000>;
+>  					interrupts = <0 28 0x04>;
+>  					clocks = <&clks IMX6SL_CLK_UART>,
+> @@ -219,7 +219,7 @@
+>  				};
+>  
+>  				uart4: serial at 02038000 {
+> -					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
+> +					compatible = "fsl,imx6-uart";
+>  					reg = <0x02038000 0x4000>;
+>  					interrupts = <0 29 0x04>;
+>  					clocks = <&clks IMX6SL_CLK_UART>,
+> -- 
+> 1.7.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
