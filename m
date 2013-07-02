@@ -1,60 +1,48 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 02 Jul 2013 17:34:30 +0200
-Subject: [alsa-devel] [PATCH 2/2] ASoC: atmel-pcm: use generic dmaengine
- framework
-In-Reply-To: <1372755849-19546-3-git-send-email-voice.shen@atmel.com>
-References: <1372755849-19546-1-git-send-email-voice.shen@atmel.com>
- <1372755849-19546-3-git-send-email-voice.shen@atmel.com>
-Message-ID: <51D2F306.7040603@metafoo.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 2 Jul 2013 18:31:13 +0300
+Subject: [PATCH v2 4/9] wl12xx: use frequency instead of enumerations for
+ pdata clocks
+In-Reply-To: <1372776948-24840-5-git-send-email-coelho@ti.com>
+References: <1372776948-24840-1-git-send-email-coelho@ti.com>
+ <1372776948-24840-5-git-send-email-coelho@ti.com>
+Message-ID: <20130702153113.GF7013@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2013 11:04 AM, Bo Shen wrote:
-[...]
-> -/*--------------------------------------------------------------------------*\
-> - * DMAENGINE operations
-> -\*--------------------------------------------------------------------------*/
-> -static bool filter(struct dma_chan *chan, void *slave)
-> -{
-> -	struct at_dma_slave *sl = slave;
-> -
-> -	if (sl->dma_dev == chan->device->dev) {
-> -		chan->private = sl;
-> -		return true;
-> -	} else {
-> -		return false;
-> -	}
-> -}
+Hi,
 
-I'm wondering why is filtering no longer required?
-
-[...]
-> +		slave_config->dst_addr = (dma_addr_t)ssc->phybase + SSC_THR;
-[...]
-> +		slave_config->src_addr = (dma_addr_t)ssc->phybase + SSC_RHR;
-
-Change the type of phybase to dma_addr_t
-
-[...]
->  }
+On Tue, Jul 02, 2013 at 05:55:43PM +0300, Luciano Coelho wrote:
+> diff --git a/drivers/net/wireless/ti/wl12xx/main.c b/drivers/net/wireless/ti/wl12xx/main.c
+> index 1c627da..903dcb3 100644
+> --- a/drivers/net/wireless/ti/wl12xx/main.c
+> +++ b/drivers/net/wireless/ti/wl12xx/main.c
+> @@ -1701,6 +1701,42 @@ static struct ieee80211_sta_ht_cap wl12xx_ht_cap = {
+>  		},
+>  };
 >  
-> -static int atmel_pcm_dma_prepare(struct snd_pcm_substream *substream)
-> -{
-> -	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-> -	struct atmel_pcm_dma_params *prtd;
-> -
-> -	prtd = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
-> -
-> -	ssc_writex(prtd->ssc->regs, SSC_IER, prtd->mask->ssc_error);
-> -	ssc_writex(prtd->ssc->regs, SSC_CR, prtd->mask->ssc_enable);
+> +static struct wl12xx_clock wl12xx_refclock_table[] = {
 
-These writes are also completely lost
+const
 
-> -
-> -	return 0;
-> -}
+> +	{ 19200000,	false,	WL12XX_REFCLOCK_19	},
+> +	{ 26000000,	false,	WL12XX_REFCLOCK_26	},
+> +	{ 26000000,	true,	WL12XX_REFCLOCK_26_XTAL	},
+> +	{ 38400000,	false,	WL12XX_REFCLOCK_38	},
+> +	{ 38400000,	true,	WL12XX_REFCLOCK_38_XTAL	},
+> +	{ 52000000,	false,	WL12XX_REFCLOCK_52	},
+> +	{ 0,		false,	0 }
+> +};
+> +
+> +static struct wl12xx_clock wl12xx_tcxoclock_table[] = {
 
-I think it would also be good to get rid of any references to the ssc struct
-from the DMA driver and move them over to the DAI driver.
+const
 
-- Lars
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130702/38e6d799/attachment.sig>
