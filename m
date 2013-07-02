@@ -1,75 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 2 Jul 2013 09:00:13 -0400
-Subject: [PATCH v4 5/7] ARM: kirkwood: convert to DT irqchip and
- clocksource
-In-Reply-To: <51D2CCC4.30109@gmail.com>
-References: <1372763023-12374-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1372763023-12374-6-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130702115311.GG19937@titan.lakedaemon.net>
- <51D2CCC4.30109@gmail.com>
-Message-ID: <20130702130013.GJ19937@titan.lakedaemon.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 2 Jul 2013 15:14:07 +0200
+Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
+In-Reply-To: <20130702124639.GI19937@titan.lakedaemon.net>
+References: <87fvvzfh70.fsf@natisbad.org>
+ <20130702124639.GI19937@titan.lakedaemon.net>
+Message-ID: <20130702151407.01680d21@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 02, 2013 at 02:51:16PM +0200, Sebastian Hesselbarth wrote:
-> On 07/02/13 13:53, Jason Cooper wrote:
-> >On Tue, Jul 02, 2013 at 01:03:41PM +0200, Sebastian Hesselbarth wrote:
-> >>With recent support for true irqchip and clocksource drivers for Orion
-> >>SoCs, now make use of it on DT enabled Kirkwood boards.
-> >>
-> >>This also introduces a new Kconfig option for legacy (non-DT) Kirkwood
-> >>where old code is moved out to and polishes DT board file a little bit.
-> >>
-> >>Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> >>---
-> [...]
-> >>diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> >>index 881f37e..385244c 100644
-> >>--- a/arch/arm/mach-kirkwood/board-dt.c
-> >>+++ b/arch/arm/mach-kirkwood/board-dt.c
-> >>@@ -15,6 +15,9 @@
-> >>  #include <linux/of.h>
-> >>  #include <linux/of_platform.h>
-> >>  #include <linux/clk-provider.h>
-> >>+#include <linux/clocksource.h>
-> >>+#include <linux/dma-mapping.h>
-> >>+#include <linux/irqchip.h>
-> >>  #include <linux/kexec.h>
-> >>  #include <asm/mach/arch.h>
-> >>  #include <asm/mach/map.h>
-> >>@@ -67,10 +70,18 @@ static void __init kirkwood_legacy_clk_init(void)
-> >>  	clk_prepare_enable(clk);
-> >>  }
-> >>
-> >>-static void __init kirkwood_of_clk_init(void)
-> >>+static void __init kirkwood_dt_time_init(void)
-> >>  {
-> >>  	of_clk_init(NULL);
-> >>-	kirkwood_legacy_clk_init();
-> >>+	clocksource_of_init();
-> >>+}
-> >>+
-> >>+static void __init kirkwood_dt_init_early(void)
-> >>+{
-> >
-> >
-> >>+	init_dma_coherent_pool_size(SZ_1M);
-> >
-> >This shouldn't be needed any more.  Is there a reason you're adding it
-> >back in?
+Dear Jason Cooper,
+
+On Tue, 2 Jul 2013 08:46:39 -0400, Jason Cooper wrote:
+
+> > In the end, the main missing part is the NAND but I guess this is the
+> > same for all Aramda 370/XP boards and this is not a big issue as it is
+> > still possible to interact w/ it via u-boot and install a set of
+> > uImage/uInitramfs that way. 
 > 
-> Jason, thanks for catching this. The last patch I had was before removal
-> of init_dma_coherent_pool_size. I slipped back in because I missed the
-> removal patches.
+> What's the big blocker for this?  Once this is done, debian should be
+> able to add support for this board.  After all, upgrading the kernel and
+> initrd from userspace is a desirable option.
 
-ah, ok.
+The big blocker is that no-one has written  the driver for it. It is
+still on our (Free Electrons) TODO-list, but not as a top-priority item
+for the moment.
 
-> Can you remove it prior merge, should I prepare a fixup patch, or respin
-> this patch?
+Ezequiel had started to do some preliminary cleanup work on the
+pxa3xx-nand driver, with the ultimate goal of making it support Armada
+370/XP (because the IP in the Armada 370/XP is apparently an evolution
+of the PXA3xx NAND controller), but our priorities shifted to those
+other topics. We will back on it some day, but I can't say when at the
+moment.
 
-Please check for other occurrences (all should be gone), and post a v2
-of only the affected patches.
+Best regards,
 
-thx,
-
-Jason.
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
