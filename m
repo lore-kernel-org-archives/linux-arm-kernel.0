@@ -1,45 +1,92 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 2 Jul 2013 14:30:23 +0800
-Subject: [PATCH 0/5] serial: imx: add DMA support for imx6
-Message-ID: <1372746628-20092-1-git-send-email-b32955@freescale.com>
+Date: Tue, 2 Jul 2013 14:30:24 +0800
+Subject: [PATCH 1/5] serial: imx: distinguish the imx6 uart from the others
+In-Reply-To: <1372746628-20092-1-git-send-email-b32955@freescale.com>
+References: <1372746628-20092-1-git-send-email-b32955@freescale.com>
+Message-ID: <1372746628-20092-2-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(1) This patch set adds the DMA support for the imx serial driver.
-    The uart with the dma support is usually used by the Bluetooth.
+We will add the DMA support for the imx uart. For the firmware's limit,
+only the imx6 uart can supports the DMA.
 
-    For the firmware's limit, i only enable the DMA for imx6.
-    If we have proper firmware for imx53 (or other chips), we can also
-    enable the DMA for it.
+This patch adds the necessary macro and helper to distinguish the imx6 uart
+from the other imx uart.
 
-(2) We only enable the DMA support when the following are meet:
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ drivers/tty/serial/imx.c |   17 +++++++++++++++--
+ 1 files changed, 15 insertions(+), 2 deletions(-)
 
-    [1] The uart port supports the hardware flow control(CTS/RTS).
-      (Some uart port does not support the CTS/RTS.)
-
-    [2] The application enables the CTS/RTS.
-
-    [3] The Soc is imx6.
-      For the sdma's firmware limit, we do not support the DMA except
-      the imx6 platform.
-
-    [4] The uart is not used as a console.
-
-
-(3) Tested this patch set by:
-	connecting a imx6q-arm2 board(DTE) with a imx53 board(DCE).
-
-
-Huang Shijie (5):
-  serial: imx: distinguish the imx6 uart from the others
-  serial: imx: add DMA support for imx6
-  ARM: dts: imx6: rename the uart's compatible property
-  ARM: dts: imx6: add dte pinctrl for uart2
-  ARM: dts: enable the uart2 for imx6q-arm2
-
- arch/arm/boot/dts/imx6q-arm2.dts |   10 +
- arch/arm/boot/dts/imx6q.dtsi     |    9 +
- arch/arm/boot/dts/imx6qdl.dtsi   |   10 +-
- arch/arm/boot/dts/imx6sl.dtsi    |   10 +-
- drivers/tty/serial/imx.c         |  430 +++++++++++++++++++++++++++++++++++++-
- 5 files changed, 452 insertions(+), 17 deletions(-)
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 48bace0..d215fa9 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -187,6 +187,7 @@
+ enum imx_uart_type {
+ 	IMX1_UART,
+ 	IMX21_UART,
++	IMX6_UART,
+ };
+ 
+ /* device type dependent stuff */
+@@ -232,6 +233,10 @@ static struct imx_uart_data imx_uart_devdata[] = {
+ 		.uts_reg = IMX21_UTS,
+ 		.devtype = IMX21_UART,
+ 	},
++	[IMX6_UART] = {
++		.uts_reg = IMX21_UTS,
++		.devtype = IMX6_UART,
++	},
+ };
+ 
+ static struct platform_device_id imx_uart_devtype[] = {
+@@ -242,6 +247,9 @@ static struct platform_device_id imx_uart_devtype[] = {
+ 		.name = "imx21-uart",
+ 		.driver_data = (kernel_ulong_t) &imx_uart_devdata[IMX21_UART],
+ 	}, {
++		.name = "imx6-uart",
++		.driver_data = (kernel_ulong_t) &imx_uart_devdata[IMX6_UART],
++	}, {
+ 		/* sentinel */
+ 	}
+ };
+@@ -250,6 +258,7 @@ MODULE_DEVICE_TABLE(platform, imx_uart_devtype);
+ static struct of_device_id imx_uart_dt_ids[] = {
+ 	{ .compatible = "fsl,imx1-uart", .data = &imx_uart_devdata[IMX1_UART], },
+ 	{ .compatible = "fsl,imx21-uart", .data = &imx_uart_devdata[IMX21_UART], },
++	{ .compatible = "fsl,imx6-uart", .data = &imx_uart_devdata[IMX6_UART], },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, imx_uart_dt_ids);
+@@ -269,6 +278,10 @@ static inline int is_imx21_uart(struct imx_port *sport)
+ 	return sport->devdata->devtype == IMX21_UART;
+ }
+ 
++static inline int is_imx6_uart(struct imx_port *sport)
++{
++	return sport->devdata->devtype == IMX6_UART;
++}
+ /*
+  * Save and restore functions for UCR1, UCR2 and UCR3 registers
+  */
+@@ -801,7 +814,7 @@ static int imx_startup(struct uart_port *port)
+ 		}
+ 	}
+ 
+-	if (is_imx21_uart(sport)) {
++	if (is_imx21_uart(sport) || is_imx6_uart(sport)) {
+ 		temp = readl(sport->port.membase + UCR3);
+ 		temp |= IMX21_UCR3_RXDMUXSEL;
+ 		writel(temp, sport->port.membase + UCR3);
+@@ -1044,7 +1057,7 @@ imx_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	writel(num, sport->port.membase + UBIR);
+ 	writel(denom, sport->port.membase + UBMR);
+ 
+-	if (is_imx21_uart(sport))
++	if (is_imx21_uart(sport) || is_imx6_uart(sport))
+ 		writel(sport->port.uartclk / div / 1000,
+ 				sport->port.membase + IMX21_ONEMS);
+ 
+-- 
+1.7.1
