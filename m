@@ -1,47 +1,182 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 2 Jul 2013 14:12:25 +0200
-Subject: [PATCH 0/2] ARM: sunxi: Convert DTSI to new CPU bindings
-In-Reply-To: <1372437844-16325-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1372437844-16325-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <51D2C3A9.5080809@atmel.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 02 Jul 2013 21:21:32 +0900
+Subject: [PATCH] drm/exynos: Add missing includes
+In-Reply-To: <1372683355-27460-1-git-send-email-broonie@kernel.org>
+References: <1372683355-27460-1-git-send-email-broonie@kernel.org>
+Message-ID: <008a01ce771e$afe02670$0fa07350$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/06/2013 18:44, Maxime Ripard :
-> Hi Arnd, Olof,
->
-> Sorry for steping in so late, but these two patches fixes a warning
-> introduced by the commit 1ba9bf0a (ARM: 7762/1: kernel: fix
-> arm_dt_init_cpu_maps() to skip non-cpu nodes) after 3.10-rc7.
->
-> These two patches solve the situation for sunxi. The first one by
-> Lorenzo is to be applied for 3.10 if it's still possible, and the
-> second one on top of arm-soc/for-next. Tell me if you prefer a more
-> formal pull request for these patches
-
-Just for the heads-up, the same happened to AT91 SAMA5D3.
-As the solution is already in linux-next, we simply have to make sure 
-that the patch is reported to the stable branches...
-
-Bye,
 
 
->
-> Thanks!
-> Maxime
->
-> Lorenzo Pieralisi (1):
->    ARM: dts: sunxi: cpus/cpu nodes dts updates
->
-> Maxime Ripard (1):
->    sunxi: a10s: dtsi: Convert cpu node to the new cpu bindings
->
->   arch/arm/boot/dts/sun4i-a10.dtsi  | 2 ++
->   arch/arm/boot/dts/sun5i-a10s.dtsi | 2 ++
->   arch/arm/boot/dts/sun5i-a13.dtsi  | 2 ++
->   3 files changed, 6 insertions(+)
->
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at kernel.org]
+> Sent: Monday, July 01, 2013 9:56 PM
+> To: Inki Dae; Joonyoung Shim; Seung-Woo Kim; Kyungmin Park; David Airlie
+> Cc: dri-devel at lists.freedesktop.org; linux-arm-kernel at lists.infradead.org;
+> linux-samsung-soc at vger.kernel.org; Mark Brown
+> Subject: [PATCH] drm/exynos: Add missing includes
+> 
+> From: Mark Brown <broonie@linaro.org>
+> 
+> Ensure that all externally accessed functions are correctly prototyped
+> when defined in each file by making sure the headers with the protoypes
+> are included in the file with the definition.
+> 
 
+Hi Mark,
 
--- 
-Nicolas Ferre
+I don't see why this patch is needed. it seems like including unnecessary
+headers so it makes the code size enlarged.
+
+Thanks,
+Inki Dae
+
+> Signed-off-by: Mark Brown <broonie@linaro.org>
+> ---
+>  drivers/gpu/drm/exynos/exynos_drm_connector.c | 1 +
+>  drivers/gpu/drm/exynos/exynos_drm_crtc.c      | 1 +
+>  drivers/gpu/drm/exynos/exynos_drm_dmabuf.c    | 1 +
+>  drivers/gpu/drm/exynos/exynos_drm_fbdev.c     | 1 +
+>  drivers/gpu/drm/exynos/exynos_drm_fimc.c      | 1 +
+>  drivers/gpu/drm/exynos/exynos_drm_g2d.c       | 1 +
+>  drivers/gpu/drm/exynos/exynos_drm_gsc.c       | 1 +
+>  drivers/gpu/drm/exynos/exynos_drm_plane.c     | 1 +
+>  drivers/gpu/drm/exynos/exynos_drm_rotator.c   | 1 +
+>  drivers/gpu/drm/exynos/exynos_drm_vidi.c      | 1 +
+>  10 files changed, 10 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_connector.c
+> b/drivers/gpu/drm/exynos/exynos_drm_connector.c
+> index 8bcc13a..ec80293 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_connector.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_connector.c
+> @@ -17,6 +17,7 @@
+>  #include <drm/exynos_drm.h>
+>  #include "exynos_drm_drv.h"
+>  #include "exynos_drm_encoder.h"
+> +#include "exynos_drm_connector.h"
+> 
+>  #define to_exynos_connector(x)	container_of(x, struct
+> exynos_drm_connector,\
+>  				drm_connector)
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_crtc.c
+> b/drivers/gpu/drm/exynos/exynos_drm_crtc.c
+> index 073c10a..6933ee9 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_crtc.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_crtc.c
+> @@ -15,6 +15,7 @@
+>  #include <drm/drmP.h>
+>  #include <drm/drm_crtc_helper.h>
+> 
+> +#include "exynos_drm_crtc.h"
+>  #include "exynos_drm_drv.h"
+>  #include "exynos_drm_encoder.h"
+>  #include "exynos_drm_plane.h"
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
+> b/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
+> index ff7f2a8..8adafde 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
+> @@ -11,6 +11,7 @@
+> 
+>  #include <drm/drmP.h>
+>  #include <drm/exynos_drm.h>
+> +#include "exynos_drm_dmabuf.h"
+>  #include "exynos_drm_drv.h"
+>  #include "exynos_drm_gem.h"
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> index 8f007aa..45b6cb3 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> @@ -19,6 +19,7 @@
+> 
+>  #include "exynos_drm_drv.h"
+>  #include "exynos_drm_fb.h"
+> +#include "exynos_drm_fbdev.h"
+>  #include "exynos_drm_gem.h"
+>  #include "exynos_drm_iommu.h"
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimc.c
+> b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
+> index 4a1616a..a83e664 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fimc.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
+> @@ -22,6 +22,7 @@
+>  #include <drm/drmP.h>
+>  #include <drm/exynos_drm.h>
+>  #include "regs-fimc.h"
+> +#include "exynos_drm_drv.h"
+>  #include "exynos_drm_ipp.h"
+>  #include "exynos_drm_fimc.h"
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+> b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+> index af75434..03ba897 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+> @@ -24,6 +24,7 @@
+>  #include <drm/drmP.h>
+>  #include <drm/exynos_drm.h>
+>  #include "exynos_drm_drv.h"
+> +#include "exynos_drm_g2d.h"
+>  #include "exynos_drm_gem.h"
+>  #include "exynos_drm_iommu.h"
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
+> b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
+> index 762f40d..4683251 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
+> @@ -21,6 +21,7 @@
+>  #include <drm/drmP.h>
+>  #include <drm/exynos_drm.h>
+>  #include "regs-gsc.h"
+> +#include "exynos_drm_drv.h"
+>  #include "exynos_drm_ipp.h"
+>  #include "exynos_drm_gsc.h"
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_plane.c
+> b/drivers/gpu/drm/exynos/exynos_drm_plane.c
+> index 83efc66..63ebeeb 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_plane.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_plane.c
+> @@ -16,6 +16,7 @@
+>  #include "exynos_drm_encoder.h"
+>  #include "exynos_drm_fb.h"
+>  #include "exynos_drm_gem.h"
+> +#include "exynos_drm_plane.h"
+> 
+>  #define to_exynos_plane(x)	container_of(x, struct exynos_plane,
+> base)
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+> b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+> index 9b6c709..2e9eee2 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+> @@ -22,6 +22,7 @@
+>  #include <drm/exynos_drm.h>
+>  #include "regs-rotator.h"
+>  #include "exynos_drm.h"
+> +#include "exynos_drm_drv.h"
+>  #include "exynos_drm_ipp.h"
+> 
+>  /*
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_vidi.c
+> b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
+> index 24376c1..498647a 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_vidi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
+> @@ -24,6 +24,7 @@
+>  #include "exynos_drm_drv.h"
+>  #include "exynos_drm_crtc.h"
+>  #include "exynos_drm_encoder.h"
+> +#include "exynos_drm_vidi.h"
+> 
+>  /* vidi has totally three virtual windows. */
+>  #define WINDOWS_NR		3
+> --
+> 1.8.3.1
