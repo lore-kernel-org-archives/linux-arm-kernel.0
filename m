@@ -1,110 +1,87 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 02 Jul 2013 18:50:08 +0400
-Subject: [PATCH] USB: OHCI: make ohci-da8xx a separate driver
-In-Reply-To: <1372765019-7191-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1372765019-7191-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <51D2E8A0.1080102@cogentembedded.com>
+From: coelho@ti.com (Luciano Coelho)
+Date: Tue, 2 Jul 2013 17:55:39 +0300
+Subject: [PATCH v2 0/9] wilink: add device tree support
+Message-ID: <1372776948-24840-1-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi,
 
-On 02-07-2013 15:36, Manjunath Goudar wrote:
+This is a follow-up on a previous patch set that had a smaller
+audience.  This time, I added the lists and people who were involved
+in the review of the bindings documentation, since most of my changes
+in v2 are coming from discussions there.
 
-> Separate the Davinci OHCI host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> it would be nice to have in 3.11.
+This patch series adds device tree support to the wlcore_sdio driver,
+which is used by WiLink6, WiLink7 and WiLink8.
 
-> One preexisting error:
-> "da8xx_syscfg0_base" [drivers/usb/host/ohci-da8xx.ko] undefined!
+The first patches do some clean-up to make the data needed in the
+wilink device tree node smaller.  The remaining patches implement the
+actual device tree node parsing in wlcore_sdio.
 
-> Fixed eventually using below modification:
-> added EXPORT_SYMBOL_GPL(da8xx_syscfg0_base) in
-> arch/arm/mach-davinci/devices-da8xx.c.
+I still need to figure out how to add the information about whether
+the clocks are XTAL or not.  I'll send it in a separate patche set.
 
-    And you managed to get this fix into the DaVinci tree? I tried it 
-long ago and it was refused by then DaVinci maintainer Kevin Hilman.
+The DTS file changes will be sent separately, since they need to go
+via different trees.
 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Sergei Shtylyov <sshtylyov@ru.mvista.com>
-> Cc: Kevin Hilman <kjh@hilman.org>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: linux-usb at vger.kernel.org
-> ---
->   drivers/usb/host/Kconfig      |    8 +++
->   drivers/usb/host/Makefile     |    1 +
->   drivers/usb/host/ohci-da8xx.c |  139 +++++++++++++++++++----------------------
->   drivers/usb/host/ohci-hcd.c   |   18 ------
->   4 files changed, 75 insertions(+), 91 deletions(-)
+The bindings documentation patch will also be updated and sent
+separately, once the XTAL issue is solved.
 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 002bf73..bf2689d 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -406,6 +406,14 @@ config USB_OHCI_HCD_LPC32XX
->             Enables support for the on-chip OHCI controller on
->             NXP chips.
->
-> +config USB_OHCI_HCD_DA8XX
-> +	tristate "Support for DAVINCI on-chip OHCI USB controller"
-> +	depends on USB_OHCI_HCD && ARCH_DAVINCI_DA8XX
-> +	default y
-> +	---help---
-> +          Enables support for the on-chip OHCI controller on
-> +          Davinci chips.
+Tony has acked some of the patches that touch OMAP areas.  I still
+need one more ack to a new patch I added (wl12xx: use frequency
+instead of enumerations for pdata clocks).
 
-    DA8xx is not a real DaVinci chip. The real DaVincis don't have OHCI 
-at all. Please replace "Davinci" with "DA8xx/OMAP-L1x" in both the 
-prompt and help text.
+Sekhar, can you please check the patches that touch the davinci board
+file and ack them?
 
-> diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
-> index c649a35..9b4d1e4 100644
-> --- a/drivers/usb/host/ohci-da8xx.c
-> +++ b/drivers/usb/host/ohci-da8xx.c
-> @@ -11,20 +11,35 @@
-p...]
-> +#define DRIVER_DESC "OHCI DA8XX driver"
+Changes in v2:
 
-    Better "DA8xx".
+* New clean-up patch (4/9);
 
-[...]
-> @@ -444,6 +397,11 @@ static int ohci_da8xx_resume(struct platform_device *dev)
->   }
->   #endif
->
-> +static const struct ohci_driver_overrides da8xx_overrides __initconst = {
-> +	.reset		= ohci_da8xx_reset
+* Patch 6/9 (previously patch 5/5) now doesn't add the clock parsing,
+  since it became more complicated and I added separate patches for
+  that;
 
-    Better terminate the line with comma.
+* 3 new patches (from 7/9 till 9/9) to handle the clock reading in the
+  device tree;
 
-> +};
-> +
-> +
+Please review.
 
-    Too many blank lines?
+--
+Cheers,
+Luca.
 
-> @@ -461,4 +419,39 @@ static struct platform_driver ohci_hcd_da8xx_driver = {
->   	},
->   };
->
-> +static int __init ohci_da8xx_init(void)
-> +{
-> +	if (usb_disabled())
-> +		return -ENODEV;
-> +
-> +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-> +	ohci_init_driver(&ohci_da8xx_hc_driver, &da8xx_overrides);
-> +
-> +	/*
-> +	 * The Davinci da8xx HW has some unusual quirks, which require
-> +	 * da8xx-specific workarounds. We override certain hc_driver
-> +	 * functions here to achieve that. We explicitly do not enhance
-> +	 * ohci_driver_overrides to allow this more easily, since this
-> +	 * is an unusual case, and we don't want to encourage others to
+Luciano Coelho (9):
+  wl1251: split wl251 platform data to a separate structure
+  wlcore: use irq_flags in pdata instead of hiding it behind a quirk
+  wlcore: remove pwr_in_suspend from platform data
+  wl12xx: use frequency instead of enumerations for pdata clocks
+  wlcore: always use one-shot IRQ
+  wlcore: add initial device tree support to the sdio module
+  wlcore: sdio: add wilink clock providers
+  wlcore: sdio: get clocks from device tree
+  wlcore/wl12xx: check if we got correct clock data from DT
 
-    Not as unusual as it seems. IIRC Samsung OHCI has the same quirks.
+ arch/arm/mach-davinci/board-da850-evm.c        |    5 +-
+ arch/arm/mach-omap2/board-4430sdp.c            |    6 +-
+ arch/arm/mach-omap2/board-omap3evm.c           |    4 +-
+ arch/arm/mach-omap2/board-omap3pandora.c       |    4 +-
+ arch/arm/mach-omap2/board-omap4panda.c         |    4 +-
+ arch/arm/mach-omap2/board-rx51-peripherals.c   |    2 +-
+ arch/arm/mach-omap2/board-zoom-peripherals.c   |    4 +-
+ drivers/net/wireless/ti/wilink_platform_data.c |   37 ++++++--
+ drivers/net/wireless/ti/wl1251/sdio.c          |   12 +--
+ drivers/net/wireless/ti/wl1251/spi.c           |    2 +-
+ drivers/net/wireless/ti/wl12xx/main.c          |   78 +++++++++++++++--
+ drivers/net/wireless/ti/wl12xx/wl12xx.h        |   28 ++++++
+ drivers/net/wireless/ti/wlcore/debugfs.c       |    2 +-
+ drivers/net/wireless/ti/wlcore/main.c          |   16 ++--
+ drivers/net/wireless/ti/wlcore/sdio.c          |  112 ++++++++++++++++++++++--
+ drivers/net/wireless/ti/wlcore/wlcore.h        |    5 +-
+ drivers/net/wireless/ti/wlcore/wlcore_i.h      |    1 +
+ include/linux/wl12xx.h                         |   54 ++++++------
+ 18 files changed, 295 insertions(+), 81 deletions(-)
 
-WBR, Sergei
+-- 
+1.7.10.4
