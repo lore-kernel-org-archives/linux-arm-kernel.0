@@ -1,92 +1,74 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 02 Jul 2013 18:27:57 +0900
-Subject: [PATCH 04/08] ARM: shmobile: Add GIO to EMEV2 dtsi
+Date: Tue, 02 Jul 2013 18:28:06 +0900
+Subject: [PATCH 05/08] ARM: shmobile: Use DT for GIC on EMEV2 and KZM9D
 In-Reply-To: <20130702092725.32066.54861.sendpatchset@w520>
 References: <20130702092725.32066.54861.sendpatchset@w520>
-Message-ID: <20130702092757.32066.58136.sendpatchset@w520>
+Message-ID: <20130702092806.32066.58281.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add GIO0->GIO4 device nodes to the EMEV2 dtsi file.
+Remove the C version of the EMEV2 GIC setup code,
+instead rely on GIC information provided by DT.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/boot/dts/emev2.dtsi |   59 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+ arch/arm/mach-shmobile/board-kzm9d.c        |    2 --
+ arch/arm/mach-shmobile/include/mach/emev2.h |    1 -
+ arch/arm/mach-shmobile/setup-emev2.c        |   15 ---------------
+ 3 files changed, 18 deletions(-)
 
---- 0001/arch/arm/boot/dts/emev2.dtsi
-+++ work/arch/arm/boot/dts/emev2.dtsi	2013-07-02 16:27:34.000000000 +0900
-@@ -14,6 +14,14 @@
- 	compatible = "renesas,emev2";
- 	interrupt-parent = <&gic>;
+--- 0002/arch/arm/mach-shmobile/board-kzm9d.c
++++ work/arch/arm/mach-shmobile/board-kzm9d.c	2013-07-02 15:01:32.000000000 +0900
+@@ -86,8 +86,6 @@ DT_MACHINE_START(KZM9D_DT, "kzm9d")
+ 	.smp		= smp_ops(emev2_smp_ops),
+ 	.map_io		= emev2_map_io,
+ 	.init_early	= emev2_init_delay,
+-	.nr_irqs	= NR_IRQS_LEGACY,
+-	.init_irq	= emev2_init_irq,
+ 	.init_machine	= kzm9d_add_standard_devices,
+ 	.init_late	= shmobile_init_late,
+ 	.dt_compat	= kzm9d_boards_compat_dt,
+--- 0002/arch/arm/mach-shmobile/include/mach/emev2.h
++++ work/arch/arm/mach-shmobile/include/mach/emev2.h	2013-07-02 15:01:48.000000000 +0900
+@@ -2,7 +2,6 @@
+ #define __ASM_EMEV2_H__
  
-+	aliases {
-+		gpio0 = &gpio0;
-+		gpio1 = &gpio1;
-+		gpio2 = &gpio2;
-+		gpio3 = &gpio3;
-+		gpio4 = &gpio4;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -67,4 +75,55 @@
- 		reg = <0xe1050000 0x38>;
- 		interrupts = <0 11 0>;
- 	};
-+
-+	gpio0: gpio at e0050000 {
-+		compatible = "renesas,em-gio";
-+		reg = <0xe0050000 0x2c>, <0xe0050040 0x20>;
-+		interrupts = <0 67 0>, <0 68 0>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		ngpios = <32>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+	gpio1: gpio at e0050080 {
-+		compatible = "renesas,em-gio";
-+		reg = <0xe0050080 0x2c>, <0xe00500c0 0x20>;
-+		interrupts = <0 69 0>, <0 70 0>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		ngpios = <32>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+	gpio2: gpio at e0050100 {
-+		compatible = "renesas,em-gio";
-+		reg = <0xe0050100 0x2c>, <0xe0050140 0x20>;
-+		interrupts = <0 71 0>, <0 72 0>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		ngpios = <32>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+	gpio3: gpio at e0050180 {
-+		compatible = "renesas,em-gio";
-+		reg = <0xe0050180 0x2c>, <0xe00501c0 0x20>;
-+		interrupts = <0 73 0>, <0 74 0>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		ngpios = <32>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+	gpio4: gpio at e0050200 {
-+		compatible = "renesas,em-gio";
-+		reg = <0xe0050200 0x2c>, <0xe0050240 0x20>;
-+		interrupts = <0 75 0>, <0 76 0>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		ngpios = <31>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
- };
+ extern void emev2_map_io(void);
+-extern void emev2_init_irq(void);
+ extern void emev2_init_delay(void);
+ extern void emev2_add_standard_devices(void);
+ extern void emev2_clock_init(void);
+--- 0003/arch/arm/mach-shmobile/setup-emev2.c
++++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-07-02 15:01:17.000000000 +0900
+@@ -202,20 +202,6 @@ void __init emev2_init_delay(void)
+ 	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
+ }
+ 
+-void __init emev2_init_irq(void)
+-{
+-	void __iomem *gic_dist_base;
+-	void __iomem *gic_cpu_base;
+-
+-	/* Static mappings, never released */
+-	gic_dist_base = ioremap(0xe0028000, PAGE_SIZE);
+-	gic_cpu_base = ioremap(0xe0020000, PAGE_SIZE);
+-	BUG_ON(!gic_dist_base || !gic_cpu_base);
+-
+-	/* Use GIC to handle interrupts */
+-	gic_init(0, 29, gic_dist_base, gic_cpu_base);
+-}
+-
+ #ifdef CONFIG_USE_OF
+ static const struct of_dev_auxdata emev2_auxdata_lookup[] __initconst = {
+ 	{ }
+@@ -235,7 +221,6 @@ static const char *emev2_boards_compat_d
+ DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
+ 	.smp		= smp_ops(emev2_smp_ops),
+ 	.init_early	= emev2_init_delay,
+-	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_machine	= emev2_add_standard_devices_dt,
+ 	.dt_compat	= emev2_boards_compat_dt,
+ MACHINE_END
