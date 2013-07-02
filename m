@@ -1,53 +1,37 @@
 From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 2 Jul 2013 11:03:52 +0800
-Subject: [RFC PATCH 02/13] misc: atmel_ssc: keep the count of pdev->id
-In-Reply-To: <1372667978-4718-3-git-send-email-richard.genoud@gmail.com>
+Date: Tue, 2 Jul 2013 11:05:10 +0800
+Subject: [RFC PATCH 03/13] ARM: at91: DTS: sam9x5: add clock for SSC DT
+ entry
+In-Reply-To: <1372667978-4718-4-git-send-email-richard.genoud@gmail.com>
 References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
- <1372667978-4718-3-git-send-email-richard.genoud@gmail.com>
-Message-ID: <51D24318.40908@atmel.com>
+ <1372667978-4718-4-git-send-email-richard.genoud@gmail.com>
+Message-ID: <51D24366.5000101@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Richard,
 
 On 7/1/2013 16:39, Richard Genoud wrote:
-> With device tree, pdev->id is always -1, so we introduce a local
-> counter.
->
 > Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 > ---
->   drivers/misc/atmel-ssc.c |    7 +++++++
->   1 file changed, 7 insertions(+)
+>   arch/arm/mach-at91/at91sam9x5.c |    1 +
+>   1 file changed, 1 insertion(+)
 >
-> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-> index 3afbd82..d1ec5ab 100644
-> --- a/drivers/misc/atmel-ssc.c
-> +++ b/drivers/misc/atmel-ssc.c
-> @@ -173,6 +173,12 @@ out:
->   	return err;
->   }
->
-> +/* counter of ssc devive instances.
-> + * With device tree pdev->id is always -1, so we have to keep the
-> + * count ourselves
-> + */
-> +static int ssc_device_id;
+> diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+> index 2abee66..191eb4b 100644
+> --- a/arch/arm/mach-at91/at91sam9x5.c
+> +++ b/arch/arm/mach-at91/at91sam9x5.c
+> @@ -233,6 +233,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>   	CLKDEV_CON_DEV_ID("mci_clk", "f000c000.mmc", &mmc1_clk),
+>   	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma0_clk),
+>   	CLKDEV_CON_DEV_ID("dma_clk", "ffffee00.dma-controller", &dma1_clk),
+> +	CLKDEV_CON_DEV_ID("pclk", "at91sam9g45_ssc.0", &ssc_clk),
 
-Do we really need this? If Yes, would it better to get from device 
-through of_alias_get_id?
+Actually, we don't use this anymore. Am I right?
 
-> +
->   static int ssc_probe(struct platform_device *pdev)
->   {
->   	struct resource *regs;
-> @@ -235,6 +241,7 @@ static int ssc_probe(struct platform_device *pdev)
->   	}
->
->   	spin_lock(&user_lock);
-> +	pdev->id = ssc_device_id++;
->   	list_add_tail(&ssc->list, &ssc_list);
->   	spin_unlock(&user_lock);
->
+>   	CLKDEV_CON_DEV_ID("pclk", "f0010000.ssc", &ssc_clk),
+>   	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
+>   	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
 >
 
 Best Regards,
