@@ -1,429 +1,355 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 2 Jul 2013 21:18:21 +0200
-Subject: [GIT PULL 0/7] ARM SoC updates for 3.11
-Message-ID: <201307022118.21872.arnd@arndb.de>
+Date: Tue, 2 Jul 2013 21:12:13 +0200
+Subject: [GIT PULL 6/7] ARM SoC driver specific changes
+In-Reply-To: <201307022055.50717.arnd@arndb.de>
+References: <201307022055.50717.arnd@arndb.de>
+Message-ID: <201307022112.13518.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
 
-Here are the pull requests for arm-soc for 3.11. Things are not all that
-different from the previous times, but we decided to reduce the number of
-branches a bit, which simplified the work for us and resulted in fewer
-conflicts between our branches.
+  Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
 
-While in 3.10 there were lots of platforms converted to "multiplatform",
-that trend did not continue this time. Instead, we have four new
-SoC platforms that got added, and a couple of platforms have gotten
-smaller as we remove support for non-devicetree based booting.
+are available in the git repository at:
 
-Changes to the device tree source files now make up the larges chunk
-of the total changesets, which I consider a good thing. Once the 
-process of converting platforms and drivers to devicetree has completed
-enough, those files will get moved out of the kernel and get maintained
-as a separate project.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/drivers-for-linus
 
-For reference, a merge of all seven branches is available at
-git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-linus
+for you to fetch changes up to 5c913a9a9772f4b434aaea7328836419287b5d1c:
 
-I believe this merge window has the larges number of ARM related changes
-so far, here are some overall statistics:
+  Merge tag 'ux500-dma40-for-arm-soc-3' of git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson into next/drivers (2013-06-25 11:20:15 -0700)
 
-* 1241 non-merge changesets
+----------------------------------------------------------------
 
-* 132 branches merged into arm-soc
+ARM SoC driver specific changes
 
-* 162 individual contributors
+These changes are all driver specific and cross over between arm-soc
+contents and some other subsystem, in these cases cpufreq, crypto,
+dma, pinctrl, mailbox and usb, and the subsystem owners agreed to
+have these changes merged through arm-soc. As we proceed to untangle
+the dependencies between platform code and driver code, the amount of
+changes in this category is fortunately shrinking, for 3.11 we have
+16 branches here and 101 non-merge changesets, the majority of which
+are for the stedma40 dma engine driver used in the ux500 platform.
+Cleaning up that code touches multiple subsystems, but gets rid
+of the dependency in the end.
 
-* 1105 files changed, 62057 insertions, 34538 deletions
+The mailbox code moved out from mach-omap2 to drivers/mailbox
+is an intermediate step and is still omap specific at the moment.
+Patches exist to generalize the subsystem and add other drivers
+with the same API, but those did not make it for 3.11.
 
-* Top contributors in number of patches:
+Conflicts:
+* In cpu-db8500.c results from the removal of the u8500_of_init_devices
+  function in combination with the split of u8500_auxdata_lookup.
 
- Laurent Pinchart (105)
- Lee Jones (86)
- Linus Walleij (67)
- Thomas Petazzoni (55)
- Kuninori Morimoto (50)
- Tomasz Figa (37)
- Maxime Ripard (32)
- Alexander Shiyan (29)
- Arnd Bergmann (26)
- Jean-Christophe PLAGNIOL-VILLARD (23)
- Sergei Shtylyov (21)
- Magnus Damm (19)
- Guennadi Liakhovetski (18)
+* In arch/arm/mach-omap2/devices.c, the includes got reshuffled.
+  we need to keep linux/wl12xx.h and linux/platform_data/mailbox-omap.h.
 
-* Interesting note:
 
-  Almost all of the people above are European, some Asian, and no American,
-  contrary to the usual distribution of geographies we have in other parts
-  of the kernel.
+----------------------------------------------------------------
 
-* Dirstat:
+Arnd Bergmann (10):
+      gpio: rcar: fix gpio_rcar_of_table
+      Merge tag 'omap-for-v3.11/gpmc-part2-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/drivers
+      Merge tag 'omap-for-v3.11/mailbox-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/drivers
+      Merge branches 'samsung/exynos-dt2' and 'samsung/s3c24xx-dt2' into next/drivers
+      Merge tag 'common-clk-audio' of git://git.kernel.org/.../kgene/linux-samsung into next/drivers
+      Merge tag 's3c24xx-pinctrl-2' of git://git.kernel.org/.../kgene/linux-samsung into next/drivers
+      Merge branch 'ux500/cleanup' into next/drivers
+      Merge tag 'renesas-pinmux2-for-v3.11' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'renesas-gpio-rcar2-for-v3.11' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'drivers-for-linus' into for-linus
 
-   0.8% Documentation/devicetree/bindings/clock/
-   1.5% Documentation/devicetree/bindings/
-  21.8% arch/arm/boot/dts/
-   0.9% arch/arm/configs/
-   0.4% arch/arm/include/asm/
-   0.7% arch/arm/mach-at91/
-   0.9% arch/arm/mach-clps711x/
-   1.4% arch/arm/mach-exynos/include/mach/
-   6.3% arch/arm/mach-exynos/
-   1.9% arch/arm/mach-imx/
-   0.7% arch/arm/mach-integrator/
-   0.8% arch/arm/mach-msm/
-  18.9% arch/arm/mach-omap2/
-   1.1% arch/arm/mach-shmobile/include/mach/
-   4.2% arch/arm/mach-shmobile/
-   1.1% arch/arm/mach-u300/include/mach/
-   1.3% arch/arm/mach-u300/
-   1.2% arch/arm/mach-ux500/
-   5.2% arch/arm/
-   0.6% drivers/bus/
-   1.7% drivers/clk/mvebu/
-   1.2% drivers/clk/samsung/
-   0.8% drivers/clk/zynq/
-   1.9% drivers/clk/
-   0.8% drivers/dma/
-   0.6% drivers/gpio/
-   1.8% drivers/pci/host/
-  13.1% drivers/pinctrl/sh-pfc/
-   0.8% drivers/pinctrl/
-   0.5% drivers/usb/
-   1.5% drivers/
-   1.0% include/dt-bindings/clock/
-   0.6% include/linux/
+Christoph Fritz (1):
+      ARM: OMAP2+: nand: reorganize gpmc timing values
 
-* List of all pull requests we got for each of our branches
+Fabio Baltieri (8):
+      clocksource: dbx500-prcmu: comment cleanup
+      dmaengine: ste_dma40: Declare memcpy config as static
+      crypto: ux500/hash: use readl on iomem addresses
+      crypto: ux500/hash: add missing static qualifiers
+      crypto: ux500/crypt: add missing __iomem qualifiers
+      crypto: ux500: use dmaengine_device_control API
+      crypto: ux500: use dmaengine_prep_slave_sg API
+      crypto: ux500: use dmaengine_submit API
 
-next/fixes-non-critical
-	mvebu/fixes-non-critical
-		git://git.infradead.org/users/jcooper/linux.git tags/fixes-non-3.11-1
-	sirf/fixes-non-critical
-		git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git tags/sirf-arm-soc-v3.10-fixes
-	omap/fixes-non-critical
-		git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/fixes-non-critical-signed
-	davinci/board
-		git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.11/board
-	msm/fixes
-		git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-fix-for-3.11
-	patches
-		MAINTAINERS: ARM: SIRF: add the source code tree path
-		ARM: dts: msm: Fix merge resolution
-		clocksource: kona: adapt to CLOCKSOURCE_OF_DECLARE change
-		X.509: do not emit any informational output
-		mtd: omap2: allow bulding as a module
-		[SCSI] nsp32: use mdelay instead of large udelay constants
-		hwrng: bcm2835: fix MODULE_LICENSE tag
-		ARM: sirf: use CONFIG_SIRF rather than CONFIG_PRIMA2 where necessary
-	at91/fixes
-		git://github.com/at91linux/linux-at91.git tags/at91-fixes
-	exynos/fixes
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/non-critical-fixes-1
-	patches
-		ARM: mxs: don't select HAVE_PWM
-		ARM: mxs: stub out mxs_pm_init for !CONFIG_PM
-		cpuidle: calxeda: select ARM_CPU_SUSPEND
-	at91/fixes2
-		git://github.com/at91linux/linux-at91.git tags/at91-fixes
+Guennadi Liakhovetski (2):
+      pinctrl: r8a73a4: add pinmux data for MMCIF and SDHI interfaces
+      pinctrl: r8a7790: fix two pin numbers
 
-next/cleanup
-	at91/cleanup
-		git://github.com/at91linux/linux-at91.git tags/at91-cleanup
-	machdesc/cleanup
-		git://github.com/mripard/linux.git tags/arm-soc-cleanups-for-3.11
-	mvebu/cleanup
-		git://git.infradead.org/users/jcooper/linux.git tags/cleanup-3.11-3
-	dt/pci-helpers
-		git://git.infradead.org/users/jcooper/linux.git tags/of_pci-3.11
-	omap/cleanup
-		git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/cleanup-signed
-	mvebu/cleanup4
-		git://git.infradead.org/users/jcooper/linux.git tags/cleanup-3.11-4
-	msm/cleanup
-		git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-fix-for-3.11
-	sunxi/core
-		git://github.com/mripard/linux.git tags/sunxi-core-for-3.11
-	zynq/cleanup
-		git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.11
-	at91/cleanup2
-		git://github.com/at91linux/linux-at91.git tags/at91-cleanup
-	picoxcell/cleanup
-		git://github.com/jamieiles/linux-2.6-ji.git picoxcell-next
-	omap/pm-serial-cleanup
-		git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm into omap-for-v3.11/pm-serial
-	omap/pm-voltdomain-cleanup
-		git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/pm-voltdomain-signed
-	omap/dma-cleanup
-		git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/dma-signed
-	samsung/cleanup
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/samsung-cleanup-1
-	bcm/cleanup
-		git://github.com/broadcom/bcm11351.git armsoc/for-3.11/cleanups
+Gupta Pekon (1):
+      ARM: OMAP2+: gpmc: get number of useable GPMC chip-selects via DT
 
-next/soc
-	mvebu/soc
-		git://git.infradead.org/users/jcooper/linux.git tags/soc-3.11-2
-	mvebu/defconfig
-		git://git.infradead.org/users/jcooper/linux.git tags/defconfig-3.11-3
-	mvebu/pcie
-		git://git.infradead.org/users/jcooper/linux.git tags/pcie-3.11-2
-	mvebu/pcie-kirkwood
-		git://git.infradead.org/users/jcooper/linux.git tags/pcie_kw-3.11
-	mvebu/pcie2
-		git://git.infradead.org/users/jcooper/linux.git tags/pcie_bridge-3.11
-	mvebu/clk-cleanup
-		git://git.infradead.org/users/jcooper/linux.git tags/seb_clk-3.11
-	vexpress/dual-cluster
-		git://git.linaro.org/people/nico/linux VExpress_DCSCB
-		depends on depends/rmk-devel-stable
-		+patch "drivers/bus: arm-cci: fix combined ARMv6+v7 build"
-	zynq/clk
-		git://git.xilinx.com/linux-xlnx tags/zynq-clk-for-3.11
-	mvebu/pcie-kirkwood2
-		git://git.infradead.org/users/jcooper/linux.git tags/pcie_kw-3.11-2
-	renesas/pinmux-gpio
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pinmux-for-v3.11
-	renesas/soc
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.11
-	clps711x/soc
-		patches
-			GPIO: clps711x: Rewrite driver for using generic GPIO cod
-			GPIO: clps711x: Add DT support
-			ARM: clps711x: Re-add GPIO support
-			ARM: clps711x: Remove NEED_MACH_MEMORY_H dependency
-			ARM: clps711x: Set PLL clock to zero if we work from 13 mHz sourc
-			ARM: clps711x: autcpu12: Move LCD DPOT definitions to board file
-			ARM: clps711x: autcpu12: Add support for NOR flash
-			ARM: clps711x: autcpu12: Special driver for handling memory is re
-			ARM: clps711x: autcpu12: Move remaining specific definitions to b
-			ARM: clps711x: p720t: Define PLD registers as GPIOs
-			ARM: clps711x: Move specific definitions from hardware.h to board
-			ARM: clps711x: Replace "arch_initcall" in common code with ".init
-			ARM: clps711x: Add clocksource framework
-			ARM: clps711x: Optimize interrupt handling
-			ARM: clps711x: edb7211: Add support for I2C
-			ARM: clps711x: edb7211: Control LCD backlight via PWM
-			ARM: clps711x: Add support for SYSCON driver
-			ARM: clps711x: Update defconfig
-	patches
-		ARM: socfpga: Add support to gate peripheral clocks
-		ARM: socfpga: Add syscon to be part of socfpga
-	samsung/s3c24xx-arch
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/s3c24xx-arch-1
-	omap/pm
-		git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/pm-signed
-	omap/soc
-		git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/gpmc-signed
-	omap/omap5
-		git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/soc-signed
-	mvebu/regmap
-		git://git.infradead.org/users/jcooper/linux.git tags/regmap-3.11
-			depends on cleanup and fixes-non-critical branches
-	renesas/usb
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-phy-rcar-usb-for-v3.11
-	renesas/soc2
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.11
-	tegra/soc
-		git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.11-soc
-	keystone/soc
-		git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc-for-arm-soc
-	integrator/pci
-		git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git tags/integrator-pci-for-arm-soc
-	u300/multiplatform
-		git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git tags/u300-multiplatform
-	imx/soc
-		git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-soc-3.11
-	davinci/soc
-		git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.11/soc-v2
-i	sunxi/defconfig
-		git://github.com/mripard/linux.git tags/sunxi-defconfig-for-3.11
-	sunxi/core2
-		git://github.com/mripard/linux.git tags/sunxi-core-for-3.11-2
-	omap/soc2
-		git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/soc-part2-signed
-	samsung/exynos-arch
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/exynos-arch-2
-	rockchip/soc
-		git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.11-rockchip-basics
-	renesas/soc-cleanup
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-boot-for-v3.11
-	patches
-		ARM: dts: Add pcie controller node for exynos5440-ssdk5440
-		ARM: dts: Add pcie controller node for Samsung EXYNOS5440 SoC
-		ARM: EXYNOS: Enable PCIe support for Exynos5440
-		pci: Add PCIe driver for Samsung Exynos
-		ARM: integrator: let pciv3 use mem/premem from device tree
-		ARM: integrator: set local side PCI addresses right
+Heiko Stuebner (2):
+      pinctrl: Add pinctrl-s3c24xx driver
+      pinctrl: s3c24xx: use correct header for chained_irq functions
 
-next/boards
-	mvebu/boards
-		  git://git.infradead.org/users/jcooper/linux.git tags/boards-3.11-2
-	renesas/defconfig
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v3.11
-	renesas/boards
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards-for-v3.11
-		depends on renesas/pinmux-gpio
-		depends on renesas/soc
-	ux500/core
-		git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git tags/ux500-core-for-arm-soc
-	ux500/pinctrl
-		git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git tags/ux500-pinctrl-for-arm-soc
-	patch
-		"ARM: ux500: board-mop500: remove unused pin modes"
-	bcm2835/defconfig
-		git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.11-defconfig
-	renesas/defconfig2
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v3.11
-	tegra/defconfig
-		git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.11-defconfig
-	omap/boards
-		git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/mailbox-signed
-	samsung/exynos-remove-nondt
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/remove-nondt-exynos-3
-	samsung/defconfig
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/samsung-defconfig-1
-	renesas/boards
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards2-for-v3.11
-	zynq/defconfig
-		git://git.xilinx.com/linux-xlnx.git tags/zynq-defconfig-for-3.11
-	mvebu/regmap2
-		git://git.infradead.org/users/jcooper/linux.git tags/regmap-3.11-2
-	patches
-		ARM: multiplatform: always pick one CPU type
-		ARM: imx: select syscon for IMX6SL
-		ARM: keystone: select ARM_ERRATA_798181 only for SMP
-		ARM: imx: Synertronixx scb9328 needs to select SOC_IMX1
-		ARM: OMAP2+: AM43x: resolve SMP related build error
-		ARM: keystone: Move CPU bringup code to dedicated asm file
-	davinci/soc2
-		git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.11/soc-2
-	omap/voltdm
-		git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.11/fixes/omap5-voltdm
+Jean-Christophe PLAGNIOL-VILLARD (3):
+      USB: gadget: atmel_usba: move global struct usba_ep usba_ep to struct usba_udc
+      USB: gadget: atmel_usba: allow multi instance
+      USB: gadget: atmel_usba: add DT support
 
-next/dt
-	nomadik/dt
-		git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git tags/nomadik-dt-for-arm-soc
-	mvebu/dt
-		git://git.infradead.org/users/jcooper/linux.git tags/dt-3.11-3
-	patch
-		"ARM: nomadik: fix clocksource warning"
-	at91/dt
-		git://github.com/at91linux/linux-at91.git tags/at91-dt
-	vt8500/dt
-		git://github.com/linux-wmt/linux-vtwm vt8500/dts-3.11
-	cleanup/dts-cpus
-		git://linux-arm.org/linux-2.6-lp dts-cpus-updates
-	patch
-		"ARM: dts: add missing cpu #address-cell values"
-	mvebu/dt4
-		git://git.infradead.org/users/jcooper/linux.git tags/dt-3.11-4
-	renesas/dt
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v3.11
-	patches
-		ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
-		ARM: socfpga: dts: Add gate-clock bindings
-	samsung/s3c24xx-dt
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/s3c24xx-dt-1
-	samsung/exynos-dt
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/exynos-dt-1
-	mvebu/dt5
-		git://git.infradead.org/users/jcooper/linux.git tags/dt-3.11-5
-	ux500/dt
-		git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git tags/ux500-dt-for-arm-soc
-	bcm2835/dt
-		git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.11-dt
-	tegra/dt
-		git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.11-dt
-	sunxi/dt
-		git://github.com/mripard/linux.git tags/sunxi-dt-for-3.11
-	at91/dt2
-		git://github.com/at91linux/linux-at91.git tags/at91-dt
-	zynq/dt
-		git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-for-3.11
-	mxs/dt
-		git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-dt-3.11
-	imx/dt
-		git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-dt-3.11
-	sunxi/dt2
-		git://github.com/mripard/linux.git tags/sunxi-dt-for-3.11-2
-	nomadik/dt2
-		git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git tags/nomadik-dt-2
-	samsung/exynos-dt2
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/exynos-dt-2
-	samsung/s3c24xx-dt2
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/s3c24xx-dt-2
-	omap/dt
-		git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.11/dts
-	bcm/dt
-		git://github.com/broadcom/bcm11351.git armsoc/for-3.11/dt
-	renesas/dt
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v3.11
-	mvebu/dt6
-		git://git.infradead.org/users/jcooper/linux.git tags/dt-3.11-6
-	at91/dt3
-		git://github.com/at91linux/linux-at91.git tags/at91-dt
+Jon Hunter (1):
+      ARM: dts: OMAP2+: Simplify NAND support
 
-next/drivers
-	ux500/dma40
-		git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git tags/ux500-dma40-for-arm-soc
-	timer/dw_apb_timer_of
-		git://github.com/mmind/linux-rockchip.git tags/dw_apb_timer_of
-	samsung/s3c24xx-drivers
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/s3c24xx-driver-1
-	omap/gpmc
-		git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/gpmc-signed
-	ux500/clksrc
-		git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git tags/ux500-clksrc-for-arm-soc
-	ux500/dma540_2
-		git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git tags/ux500-dma40-for-arm-soc-2
-	renesas/rcar-gpio
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-gpio-rcar-for-v3.11
-		depends on renesas/pinmux-gpio
-	at91/drivers
-		git://github.com/at91linux/linux-at91.git tags/at91-drivers
-	patch
-		gpio: rcar: fix gpio_rcar_of_table
-	omap/gpmc2
-		git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/gpmc-part2-signed
-	drivers/mailbox
-		git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/mailbox-signed
-	samsung/common-clk-audio
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/common-clk-audio
-	samsung/s3c24xx-pinctrl2
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/s3c24xx-pinctrl-2
-	ux500/cleanup patches
-		ARM: ux500: Provide a AB8500 GPIO Device Tree node
-		ARM: ux500: Correct the EN_3v3 regulator's on/off GPIO
-		ARM: ux500: Remove mop500_snowball_ethernet_clock_enable()
-	renesas/pinmux2
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pinmux2-for-v3.11
-	renesas/gpio-rcar2
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-gpio-rcar2-for-v3.11
+Kukjin Kim (4):
+      Merge branch 'v3.11-next/driver-gpio' into v3.11-next/s3c24xx-driver
+      Merge branch 'v3.11-next/driver-pinctrl' into v3.11-next/s3c24xx-driver
+      Merge branch 'v3.11-next/driver-cpufreq' into v3.11-next/s3c24xx-driver
+      Merge branch 'v3.11-next/s3c24xx-dt-2' into v3.11-next/dt-n-clk-audio
 
-next/late
-	renesas/cleanup
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-for-v3.11
-	samsung/exynos5420
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/soc-exynos5420-1
-	samsung/soc2
-		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/soc-exynos5420-2
-	nspire/soc patches 
-		arm: Add Initial TI-Nspire support
-		arm: Add device trees for TI-Nspire hardware
-	sti/soc patches
-		ARM: sti: Add STiH415 SOC support
-		ARM: sti: Add STiH416 SOC support
-		ARM: sti: Add DEBUG_LL console support
-		ARM: stih41x: Add B2000 board support
-		ARM: stih41x: Add B2020 board support
-	rensas/sh-sci
-		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh-sci-for-v3.11
-	patches
-		ARM: ux500: bail out on alien cpus
-	davinci/dt
-		git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci davinci-for-v3.11/dt
-	msm/clock
-		git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-clock-for-3.11b
-		based on msm/fixes to avoid conflict
+Kuninori Morimoto (1):
+      sh-pfc: r8a7778: tidyup MMC_D1 pin
+
+Laurent Pinchart (3):
+      gpio-rcar: Add DT support
+      gpio-rcar: Reference core gpio documentation in the DT bindings
+      gpio-rcar: Remove #ifdef CONFIG_OF around OF-specific sections
+
+Lee Jones (57):
+      dmaengine: ste_dma40: Assign memcpy channels in the driver
+      dmaengine: ste_dma40: Move default memcpy configs into the driver
+      dmaengine: ste_dma40: Rectify incorrect configuration validation checking
+      dmaengine: ste_dma40: Amalgamate DMA source and destination channel numbers
+      ARM: ux500: Strip out duplicate USB DMA configuration
+      dmaengine: ste_dma40: Remove home-brew MAX() macro
+      ARM: ux500: Remove unused 'data_width' attributes from SDI DMA configs
+      ARM: ux500: Remove unused 'data_width' attributes from SSP DMA configs
+      ARM: ux500: Remove unused 'data_width' attributes from UART DMA configs
+      ARM: ux500: Remove superfluous 'psize' attribute from Audio platform data
+      dmaengine: ste_dma40: Calculate number of logical channels from physical ones
+      dmaengine: ste_dma40: Remove 'always true' checking
+      dmaengine: ste_dma40: Move rev error-check up to revision acquisition
+      dmaengine: ste_dma40: Also report the number of logical channels
+      dmaengine: ste_dma40: Allocate plat_data on declaration
+      dmaengine: ste_dma40: Allow driver to be probe()able when DT is enabled
+      dmaengine: ste_dma40: Supply full Device Tree parsing support
+      ARM: ux500: Pass remnant platform data though to DMA40 driver
+      dmaengine: ste_dma40: Separate Logical Global Interrupt Mask (GIM) unmasking
+      dmaengine: ste_dma40: Remove unnecessary call to d40_phy_cfg()
+      dmaengine: ste_dma40: Don't configure runtime configurable setup during allocate
+      ARM: ux500: Stop passing UART's platform data for Device Tree boots
+      dmaengine: ste_dma40: Only use addresses passed as configuration information
+      dmaengine: ste_dma40: Remove redundant address fetching function
+      ARM: ux500: Remove DMA address look-up table
+      dmaengine: ste_dma40: Correct copy/paste error
+      ARM: ux500: Remove unnecessary attributes from DMA channel request pdata
+      crypto: ux500/hash - Prepare clock before enabling it
+      crypto: ux500/hash - Set DMA configuration though dma_slave_config()
+      ARM: ux500: Stop passing Hash DMA channel config information though pdata
+      crypto: ux500/cryp - Prepare clock before enabling it
+      crypto: ux500/cryp - Set DMA configuration though dma_slave_config()
+      ARM: ux500: Stop passing Cryp DMA channel config information though pdata
+      crypto: ux500/[cryp|hash] - Show successful start-up in the bootlog
+      ARM: ux500: Register Cryp and Hash platform drivers on Snowball
+      usb: musb: ux500: move channel number knowledge into the driver
+      usb: musb: ux500: move the MUSB HDRC configuration into the driver
+      usb: musb: ux500: take the dma_mask from coherent_dma_mask
+      usb: musb: ux500: harden checks for platform data
+      usb: musb: ux500: attempt to find channels by name before using pdata
+      usb: musb: ux500: add device tree probing support
+      ARM: ux500: Remove ux500-musb platform registation when booting with DT
+      ARM: ux500: Remove empty function u8500_of_init_devices()
+      dmaengine: ste_dma40: Use the BIT macro to replace ugly '(1 << x)'s
+      ARM: ux500: Replace ST-E's home-brew DMA direction definition with the generic one
+      dmaengine: ste_dma40: Replace ST-E's home-brew DMA direction defs with generic ones
+      ARM: ux500: Remove recently unused stedma40_xfer_dir enums
+      dmaengine: ste_dma40_ll: Use the BIT macro to replace ugly '(1 << x)'s
+      dmaengine: ste_dma40: Convert data_width from register bit format to value
+      dmaengine: ste_dma40_ll: Replace meaningless register set with comment
+      dmaengine: ste_dma40: Allow memcpy channels to be configured from DT
+      ARM: ux500: Stop passing DMA platform data though AUXDATA
+      dmaengine: ste_dma40: Fetch the number of physical channels from DT
+      dmaengine: ste_dma40: Fetch disabled channels from DT
+      ARM: ux500: Provide a AB8500 GPIO Device Tree node
+      ARM: ux500: Correct the EN_3v3 regulator's on/off GPIO
+      ARM: ux500: Remove mop500_snowball_ethernet_clock_enable()
+
+Linus Walleij (1):
+      dmaengine: ste_dma40: Fix up static memcpy event lines
+
+Mark Jackson (1):
+      ARM: OMAP2+: Allow NAND transfer mode to be specified in DT
+
+Olof Johansson (9):
+      Merge tag 'ux500-dma40-for-arm-soc' of git://git.kernel.org/.../linusw/linux-stericsson into next/drivers
+      Merge tag 'dw_apb_timer_of' of git://github.com/mmind/linux-rockchip into next/drivers
+      Merge tag 's3c24xx-driver-1' of git://git.kernel.org/.../kgene/linux-samsung into next/drivers
+      Merge tag 'omap-for-v3.11/gpmc-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/drivers
+      Merge tag 'ux500-clksrc-for-arm-soc' of git://git.kernel.org/.../linusw/linux-stericsson into next/drivers
+      Merge tag 'ux500-dma40-for-arm-soc-2' of git://git.kernel.org/.../linusw/linux-stericsson into next/drivers
+      Merge tag 'renesas-gpio-rcar-for-v3.11' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'at91-drivers' of git://github.com/at91linux/linux-at91 into next/drivers
+      Merge tag 'ux500-dma40-for-arm-soc-3' of git://git.kernel.org/.../linusw/linux-stericsson into next/drivers
+
+Padmavathi Venna (6):
+      ARM: dts: use #include for all device trees for Samsung
+      clk: samsung: register audio subsystem clocks using common clock framework
+      ARM: dts: add Exynos audio subsystem clock controller node
+      ARM: dts: add clock provider information for i2s controllers in Exynos5250
+      ARM: dts: Update Samsung I2S documentation
+      clk: exynos5250: Add enum entries for divider clock of i2s1 and i2s2
+
+Rabin Vincent (1):
+      clocksource: dbx500-prcmu: use relaxed readl variant
+
+Suman Anna (6):
+      omap: mailbox: check iomem resource before dereferencing it
+      omap: mailbox: call request_irq after mbox queues are allocated
+      omap: mailbox: correct the argument type for irq ops
+      ARM: OMAP2+: mbox: remove dependencies with soc.h
+      ARM: OMAP2+: add user and fifo info to mailbox platform data
+      mailbox/omap: move the OMAP mailbox framework to drivers
+
+Sylwester Nawrocki (1):
+      gpio: samsung: Remove OF support for s3c24xx
+
+Tony Lindgren (1):
+      Merge tag 'omap-mailbox-for-v3.11' of git://github.com/sumananna/mailbox into omap-for-v3.11/mailbox
+
+Ulrich Hecht (1):
+      sh-pfc: r8a7790: add HSCIF pin groups
+
+Viresh Kumar (1):
+      cpufreq: s3c24xx: move cpufreq driver to drivers/cpufreq
+
+Wei Yongjun (1):
+      dmaengine: ste_dma40: fix error return code in d40_probe()
+
+avinash philip (2):
+      ARM: OMAP2+: gpmc: Converts GPMC driver to pm_runtime capable
+      ARM: OMAP2+: gpmc: Low power transition support
+
+ Documentation/devicetree/bindings/bus/ti-gpmc.txt  |   1 -
+ .../devicetree/bindings/clock/clk-exynos-audss.txt |  64 ++
+ .../devicetree/bindings/dma/ste-dma40.txt          |  66 +++
+ .../devicetree/bindings/gpio/gpio-samsung.txt      |  43 --
+ .../devicetree/bindings/gpio/renesas,gpio-rcar.txt |  46 ++
+ .../devicetree/bindings/mtd/gpmc-nand.txt          |   8 +
+ .../bindings/pinctrl/samsung-pinctrl.txt           |   8 +
+ .../devicetree/bindings/sound/samsung-i2s.txt      |  46 +-
+ .../devicetree/bindings/usb/atmel-usb.txt          |  82 +++
+ .../devicetree/bindings/usb/ux500-usb.txt          |  50 ++
+ arch/arm/Kconfig                                   |  47 --
+ arch/arm/boot/dts/dbx5x0.dtsi                      |   5 +
+ arch/arm/boot/dts/exynos4.dtsi                     |   2 +-
+ arch/arm/boot/dts/exynos4210-origen.dts            |   2 +-
+ arch/arm/boot/dts/exynos4210-smdkv310.dts          |   2 +-
+ arch/arm/boot/dts/exynos4210-trats.dts             |   2 +-
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |   2 +-
+ arch/arm/boot/dts/exynos4210.dtsi                  |   4 +-
+ arch/arm/boot/dts/exynos4212.dtsi                  |   2 +-
+ arch/arm/boot/dts/exynos4412-odroidx.dts           |   2 +-
+ arch/arm/boot/dts/exynos4412-origen.dts            |   2 +-
+ arch/arm/boot/dts/exynos4412-smdk4412.dts          |   2 +-
+ arch/arm/boot/dts/exynos4412.dtsi                  |   2 +-
+ arch/arm/boot/dts/exynos4x12.dtsi                  |   4 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts           |   2 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |   2 +-
+ arch/arm/boot/dts/exynos5250-snow.dts              |   4 +-
+ arch/arm/boot/dts/exynos5250.dtsi                  |  20 +-
+ arch/arm/boot/dts/exynos5440-sd5v1.dts             |   2 +-
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts          |   2 +-
+ arch/arm/boot/dts/exynos5440.dtsi                  |   2 +-
+ arch/arm/boot/dts/omap3430-sdp.dts                 |   1 -
+ arch/arm/boot/dts/s3c2416-smdk2416.dts             |   2 +-
+ arch/arm/boot/dts/s3c2416.dtsi                     |   4 +-
+ arch/arm/boot/dts/s3c24xx.dtsi                     |   2 +-
+ arch/arm/boot/dts/snowball.dts                     |  13 +-
+ arch/arm/configs/omap1_defconfig                   |   3 +-
+ arch/arm/mach-omap1/Makefile                       |   4 -
+ arch/arm/mach-omap2/Makefile                       |   3 -
+ arch/arm/mach-omap2/board-flash.c                  |   3 +
+ arch/arm/mach-omap2/devices.c                      |  13 +-
+ arch/arm/mach-omap2/gpmc-nand.c                    |  44 +-
+ arch/arm/mach-omap2/gpmc.c                         |  82 ++-
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |  14 +
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |  13 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  13 +
+ arch/arm/mach-s3c24xx/Kconfig                      |  66 +--
+ arch/arm/mach-s3c24xx/Makefile                     |   6 -
+ arch/arm/mach-s3c24xx/{ => include/mach}/s3c2412.h |   0
+ arch/arm/mach-s3c24xx/iotiming-s3c2412.c           |   2 +-
+ arch/arm/mach-ux500/board-mop500-audio.c           |  68 +--
+ arch/arm/mach-ux500/board-mop500-sdi.c             |  56 +-
+ arch/arm/mach-ux500/board-mop500.c                 |  94 +--
+ arch/arm/mach-ux500/board-mop500.h                 |   2 +-
+ arch/arm/mach-ux500/cpu-db8500.c                   |  66 +--
+ arch/arm/mach-ux500/devices-db8500.c               | 123 +---
+ arch/arm/mach-ux500/ste-dma40-db8500.h             | 193 +++---
+ arch/arm/mach-ux500/usb.c                          |  47 +-
+ arch/arm/plat-omap/Kconfig                         |  16 -
+ arch/arm/plat-omap/Makefile                        |   3 -
+ arch/arm/plat-samsung/include/plat/cpu-freq-core.h |  10 +-
+ arch/arm/plat-samsung/include/plat/cpu-freq.h      |   6 +-
+ drivers/clk/samsung/Makefile                       |   1 +
+ drivers/clk/samsung/clk-exynos-audss.c             | 133 +++++
+ drivers/clk/samsung/clk-exynos5250.c               |   5 +-
+ drivers/clocksource/clksrc-dbx500-prcmu.c          |  11 +-
+ drivers/cpufreq/Kconfig.arm                        |  58 ++
+ drivers/cpufreq/Makefile                           |   5 +
+ .../cpufreq/s3c2410-cpufreq.c                      |   0
+ .../cpufreq/s3c2412-cpufreq.c                      |   3 +-
+ .../cpufreq/s3c2440-cpufreq.c                      |   0
+ .../cpufreq/s3c24xx-cpufreq-debugfs.c              |   0
+ .../cpufreq.c => drivers/cpufreq/s3c24xx-cpufreq.c |   0
+ drivers/crypto/ux500/cryp/cryp.c                   |   4 +-
+ drivers/crypto/ux500/cryp/cryp.h                   |   7 +-
+ drivers/crypto/ux500/cryp/cryp_core.c              |  57 +-
+ drivers/crypto/ux500/hash/hash_alg.h               |   5 +-
+ drivers/crypto/ux500/hash/hash_core.c              |  57 +-
+ drivers/dma/ste_dma40.c                            | 533 ++++++++++-------
+ drivers/dma/ste_dma40_ll.c                         | 189 +++---
+ drivers/dma/ste_dma40_ll.h                         |   3 +-
+ drivers/gpio/gpio-rcar.c                           |  63 +-
+ drivers/gpio/gpio-samsung.c                        |  67 +--
+ drivers/mailbox/Kconfig                            |  34 ++
+ drivers/mailbox/Makefile                           |   6 +
+ .../mailbox.c => drivers/mailbox/mailbox-omap1.c   |  12 +-
+ .../mailbox.c => drivers/mailbox/mailbox-omap2.c   | 276 ++++-----
+ .../mailbox.c => drivers/mailbox/omap-mailbox.c    |  54 +-
+ .../plat/mailbox.h => drivers/mailbox/omap-mbox.h  |  70 +--
+ drivers/pinctrl/Kconfig                            |   5 +
+ drivers/pinctrl/Makefile                           |   1 +
+ drivers/pinctrl/pinctrl-s3c24xx.c                  | 651 +++++++++++++++++++++
+ drivers/pinctrl/pinctrl-samsung.c                  |  10 +
+ drivers/pinctrl/pinctrl-samsung.h                  |   4 +
+ drivers/pinctrl/sh-pfc/pfc-r8a73a4.c               | 198 +++++++
+ drivers/pinctrl/sh-pfc/pfc-r8a7778.c               |   4 +-
+ drivers/pinctrl/sh-pfc/pfc-r8a7790.c               | 227 ++++++-
+ drivers/remoteproc/Kconfig                         |   3 +-
+ drivers/remoteproc/omap_remoteproc.c               |   2 +-
+ drivers/staging/tidspbridge/Kconfig                |   3 +-
+ .../tidspbridge/include/dspbridge/host_os.h        |   2 +-
+ drivers/usb/gadget/Kconfig                         |   2 +-
+ drivers/usb/gadget/atmel_usba_udc.c                | 264 ++++++---
+ drivers/usb/gadget/atmel_usba_udc.h                |   2 +
+ drivers/usb/musb/ux500.c                           |  61 +-
+ drivers/usb/musb/ux500_dma.c                       |  59 +-
+ include/dt-bindings/clk/exynos-audss-clk.h         |  25 +
+ include/linux/omap-mailbox.h                       |  29 +
+ include/linux/platform_data/dma-ste-dma40.h        |  41 +-
+ include/linux/platform_data/mailbox-omap.h         |  58 ++
+ include/linux/platform_data/usb-musb-ux500.h       |   5 +-
+ sound/soc/ux500/ux500_pcm.c                        |  10 +-
+ 112 files changed, 3168 insertions(+), 1651 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/clk-exynos-audss.txt
+ create mode 100644 Documentation/devicetree/bindings/dma/ste-dma40.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/ux500-usb.txt
+ rename arch/arm/mach-s3c24xx/{ => include/mach}/s3c2412.h (100%)
+ create mode 100644 drivers/clk/samsung/clk-exynos-audss.c
+ rename arch/arm/mach-s3c24xx/cpufreq-s3c2410.c => drivers/cpufreq/s3c2410-cpufreq.c (100%)
+ rename arch/arm/mach-s3c24xx/cpufreq-s3c2412.c => drivers/cpufreq/s3c2412-cpufreq.c (99%)
+ rename arch/arm/mach-s3c24xx/cpufreq-s3c2440.c => drivers/cpufreq/s3c2440-cpufreq.c (100%)
+ rename arch/arm/mach-s3c24xx/cpufreq-debugfs.c => drivers/cpufreq/s3c24xx-cpufreq-debugfs.c (100%)
+ rename arch/arm/mach-s3c24xx/cpufreq.c => drivers/cpufreq/s3c24xx-cpufreq.c (100%)
+ rename arch/arm/mach-omap1/mailbox.c => drivers/mailbox/mailbox-omap1.c (94%)
+ rename arch/arm/mach-omap2/mailbox.c => drivers/mailbox/mailbox-omap2.c (59%)
+ rename arch/arm/plat-omap/mailbox.c => drivers/mailbox/omap-mailbox.c (92%)
+ rename arch/arm/plat-omap/include/plat/mailbox.h => drivers/mailbox/omap-mbox.h (54%)
+ create mode 100644 drivers/pinctrl/pinctrl-s3c24xx.c
+ create mode 100644 include/dt-bindings/clk/exynos-audss-clk.h
+ create mode 100644 include/linux/omap-mailbox.h
+ create mode 100644 include/linux/platform_data/mailbox-omap.h
