@@ -1,49 +1,41 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Jul 2013 13:35:32 +0900
-Subject: [GIT PULL 0/2] Renesas ARM based SoC fixes for v3.11
-Message-ID: <cover.1372739438.git.horms+renesas@verge.net.au>
+Date: Tue,  2 Jul 2013 13:35:53 +0900
+Subject: [PATCH 1/2] ARM: shmobile: r8a73a4: Fix resources for SCIFB0
+In-Reply-To: <cover.1372739438.git.horms+renesas@verge.net.au>
+References: <cover.1372739438.git.horms+renesas@verge.net.au>
+Message-ID: <f820b60582f75e73e83b8505d7e48fe59770f558.1372739438.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof,
+From: Takanari Hayama <taki@igel.co.jp>
 
-please consider the following fixes for v3.11, both of which are suitable for
-stable.
+Fix base address and IRQ resources associated with SCIFB0.
 
-This pull request is based on renesas-soc2-for-v3.11 which you have
-already pulled.
+This bug was introduced by e481a528901d0cd18b5b5fcbdc55207ea3b6ef68
+("ARM: shmobile: r8a73a4 SCIF support V3") which was included in v3.10.
 
-
-The following changes since commit 018222f5d32bc5ca9fd830aebfeed10f1be96c93:
-
-  ARM: shmobile: r8a7790: add clock definitions and aliases for MMCIF and SDHI (2013-06-12 21:07:38 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v3.11
-
-for you to fetch changes up to 1eb14ea1e6bcd11d6d0ba937fc39808bb4d3453e:
-
-  ARM: shmobile: emev2 GIO3 resource fix (2013-07-02 12:28:01 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based SoC fixes for v3.11
-
-* Correct GIO3 base addresses for EMEV2 SoC
-  - This bug bug added when GPIO support was added for the EMEV2 SoC
-    in v3.5
-
-* Correct SCIFB0 resources for r8a77a4 SoC
-  - This was a bug was added when SCIF support was added for the r8a77a4 SoC
-    in v3.10
-
-----------------------------------------------------------------
-Magnus Damm (1):
-      ARM: shmobile: emev2 GIO3 resource fix
-
-Takanari Hayama (1):
-      ARM: shmobile: r8a73a4: Fix resources for SCIFB0
-
- arch/arm/mach-shmobile/setup-emev2.c   | 8 ++++----
+Signed-off-by: Takanari Hayama <taki@igel.co.jp>
+Acked-by: Magnus Damm <damm@opensource.se>
+[ horms+renesas at verge.net.au: Add information about commit and version
+  this bug was added in ]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Cc: stable at vger.kernel.org
+---
  arch/arm/mach-shmobile/setup-r8a73a4.c | 2 +-
- 2 files changed, 5 insertions(+), 5 deletions(-)
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
+index c5a75a7..7f45c2e 100644
+--- a/arch/arm/mach-shmobile/setup-r8a73a4.c
++++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+@@ -62,7 +62,7 @@ enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFB3 };
+ static const struct plat_sci_port scif[] = {
+ 	SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
+ 	SCIFA_DATA(SCIFA1, 0xe6c50000, gic_spi(145)), /* SCIFA1 */
+-	SCIFB_DATA(SCIFB0, 0xe6c50000, gic_spi(145)), /* SCIFB0 */
++	SCIFB_DATA(SCIFB0, 0xe6c20000, gic_spi(148)), /* SCIFB0 */
+ 	SCIFB_DATA(SCIFB1, 0xe6c30000, gic_spi(149)), /* SCIFB1 */
+ 	SCIFB_DATA(SCIFB2, 0xe6ce0000, gic_spi(150)), /* SCIFB2 */
+ 	SCIFB_DATA(SCIFB3, 0xe6cf0000, gic_spi(151)), /* SCIFB3 */
+-- 
+1.8.2.1
