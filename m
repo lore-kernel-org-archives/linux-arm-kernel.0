@@ -1,99 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 02 Jul 2013 19:15:49 +0200
-Subject: [PATCHv3 2/3] ARM: mxs: cfa10049: Switch bus i2c1 to bitbanging
-In-Reply-To: <201307021833.04282.marex@denx.de>
-References: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
- <51D2BEA1.6010206@free-electrons.com> <51D2DE5B.9060309@free-electrons.com>
- <201307021833.04282.marex@denx.de>
-Message-ID: <51D30AC5.9000701@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 2 Jul 2013 18:15:31 +0100
+Subject: [PATCH v2] ARM: LPAE: don't reject mapping /dev/mem above 4GB
+In-Reply-To: <1372780685-2528-1-git-send-email-dserrg@gmail.com>
+References: <1372780685-2528-1-git-send-email-dserrg@gmail.com>
+Message-ID: <20130702171530.GG24828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2013 18:33, Marek Vasut wrote:
-> Dear Alexandre Belloni,
+On Tue, Jul 02, 2013 at 04:58:05PM +0100, Sergey Dyasly wrote:
+> With LPAE enabled, physical address space is larger than 4GB. Allow mapping any
+> part of it via /dev/mem by utilizing the same check as in arm64.
 > 
->> On 02/07/2013 13:50, Alexandre Belloni wrote:
->>> On 02/07/2013 13:45, Fabio Estevam wrote:
->>>> Shouldn't this be
->>>>
->>>>          i2c at 1 {
->>>>          
->>>>                  reg = <1>; ?
->>>
->>> No, we have 4 devices on that mux and 2 pins to select the muxing.
->>
->> OK, got it working.
->>
->> So, the results:
->>
->> bitbanging:
->>
->> # time cat /sys/bus/iio/devices/iio\:device1/in_voltage0_raw
->> 2637
->> real	0m 0.09s
->> user	0m 0.01s
->> sys	0m 0.01s
->>
->>
->> i2c-mxs PIO mode:
->>
->> # time cat /sys/bus/iio/devices/iio\:device1/in_voltage0_raw
->> [   35.007650] [sched_delayed] sched: RT throttling activated
->> 2627
->> real	0m 7.14s
->> user	0m 0.02s
->> sys	0m 0.01s
->>
->>
->> i2c-mxs PIO mode without LRADC:
->>
->> # time cat /sys/bus/iio/devices/iio\:device1/in_voltage0_raw
->> [   18.007432] [sched_delayed] sched: RT throttling activated
->> 2629
->> real	0m 7.09s
->> user	0m 0.00s
->> sys	0m 0.03s
->>
->>
->> i2c-mxs DMA mode:
->>
->> # time cat /sys/bus/iio/devices/iio\:device1/in_voltage0_raw
->> 2631
->> real	0m 0.12s
->> user	0m 0.01s
->> sys	0m 0.01s
->>
->>
->> It seems fine for me.
+> PHYS_MASK covers 40 bits with LPAE enabled and 32 bits otherwise.
 > 
-> I think I'm getting a little lost in these gazilions of i2c and lradc threads. 
-> Can we not create one thread and keep the related stuff in there instead of 
-> discussing it all around !?
+> Signed-off-by: Sergey Dyasly <dserrg@gmail.com>
+> ---
 > 
-> Only one question comes to mind with this email -- what do LRADC and I2C have to 
-> do with each other here ?
+> v2:
+> - Removed #ifdef and changed original function as suggested by Catalin Marinas
 > 
-
-Yeah, sorry, I meant the lradc touchscreen support. This seemed to
-trigger the issue for Fabio but as my testing shows, this is not the
-case for me, I get the issue with PIO, whether the lradc touchscreen
-support is activated or not.
-
-I think Torsten is the one that investigated it the most :
-
-http://www.spinics.net/lists/linux-i2c/msg12619.html
-
-
-> It'd be nice if someone could summarize on what I should focus and possibly 
-> prepare a testcase.
+>  arch/arm/mm/mmap.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
 > 
+> diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
+> index 10062ce..09bab92 100644
+> --- a/arch/arm/mm/mmap.c
+> +++ b/arch/arm/mm/mmap.c
+> @@ -204,13 +204,11 @@ int valid_phys_addr_range(phys_addr_t addr, size_t size)
+>  }
+>  
+>  /*
+> - * We don't use supersection mappings for mmap() on /dev/mem, which
+> - * means that we can't map the memory area above the 4G barrier into
+> - * userspace.
+> + * Do not allow /dev/mem mappings beyond the supported physical range.
+>   */
+>  int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
+>  {
+> -	return !(pfn + (size >> PAGE_SHIFT) > 0x00100000);
+> +	return !(((pfn << PAGE_SHIFT) + size) & ~PHYS_MASK);
 
-On my setup, it happens on every i2c read that are done in PIO mode.
-But, my setup may be a bit unconventional as we are using a i2c gpio muxer.
-
-Regards,
+I don't think that's what I suggested. For classic MMU ~PHYS_MASK is 0.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Catalin
