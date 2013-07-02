@@ -1,27 +1,44 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 2 Jul 2013 13:38:20 -0400
-Subject: [RFC PATCH 5/6] ARM, mm: change meaning of max_low_pfn to maximum
- pfn for nobootmem
-In-Reply-To: <20130701170941.GC24642@n2100.arm.linux.org.uk>
-References: <1364184674-13798-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1364184674-13798-6-git-send-email-iamjoonsoo.kim@lge.com>
- <51D18ED5.50103@ti.com> <20130701170941.GC24642@n2100.arm.linux.org.uk>
-Message-ID: <51D3100C.6010209@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 2 Jul 2013 13:41:11 -0400
+Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
+In-Reply-To: <87obakho6d.fsf@natisbad.org>
+References: <87fvvzfh70.fsf@natisbad.org>
+ <20130702124639.GI19937@titan.lakedaemon.net>
+ <20130702151407.01680d21@skate>
+ <20130702133337.GA17110@titan.lakedaemon.net>
+ <20130702153825.139a93a5@skate>
+ <20130702134421.GC17110@titan.lakedaemon.net>
+ <87obakho6d.fsf@natisbad.org>
+Message-ID: <20130702174111.GF17110@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 July 2013 01:09 PM, Russell King - ARM Linux wrote:
-> On Mon, Jul 01, 2013 at 10:14:45AM -0400, Santosh Shilimkar wrote:
->> I have been also carrying similar patch as yours in an attempt
->> to make LPAE kernel work on ARM. Your patch carries better
->> description, so will your version and include in my series
->> which I plan to post on the list after some more testing.
->> Will copy you. The changes are very similar to your series.
+On Tue, Jul 02, 2013 at 07:22:34PM +0200, Arnaud Ebalard wrote:
+> Hi,
 > 
-> And will you try to investigate and/or address my concerns with this
-> change?
+> Jason Cooper <jason@lakedaemon.net> writes:
 > 
-Sure. Will try to look and come back to you. 
+> >> The big problem is that the Armada 370 and Armada XP datasheets are
+> >> still only available under NDA, so it's quite hard for someone to step
+> >> up and do this, without access to those datasheets.
+> >
+> > bummer.
+> >
+> >> It used to be on our TODO-list, but isn't any longer, and I have no
+> >> informations about when it will re-appear on our TODO-list at this
+> >> point.
+> >
+> > So, Arnaud, how do you feel about tackling the nand driver based on the
+> > sources you have and the pointers above?
+> 
+> Sadly, I do not have enough spare time to work on this: at the moment, I
+> intend to focus on writing a clean driver for ISL 12057 RTC/Alarm chip
+> and get it accepted for 3.12.
 
-Regards,
-Santosh 
+more bummer.  Willy, mind posting what you have?  Arnaud, do you have a
+link to the source code for your device?  And have you found the code
+they started with?
+
+thx,
+
+Jason.
