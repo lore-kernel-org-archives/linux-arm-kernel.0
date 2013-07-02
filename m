@@ -1,9 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 2 Jul 2013 21:06:06 +0200
-Subject: [GIT PULL 4/7] ARM SoC board specific changes
+Date: Tue, 2 Jul 2013 21:14:19 +0200
+Subject: [GIT PULL 7/7] ARM SoC late changes
 In-Reply-To: <201307022055.50717.arnd@arndb.de>
 References: <201307022055.50717.arnd@arndb.de>
-Message-ID: <201307022106.06880.arnd@arndb.de>
+Message-ID: <201307022114.19228.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,164 +13,254 @@ The following changes since commit 7d132055814ef17a6c7b69f342244c410a5e000f:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/boards-for-linus
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/late-for-linus
 
-for you to fetch changes up to f8ace40e88eb7063f66697713373ac64cbc1412a:
+for you to fetch changes up to 8c3d913888cfb0066d62831969c3a992f7e4aba5:
 
-  Merge tag 'zynq-defconfig-for-3.11' of git://git.xilinx.com/linux-xlnx into next/boards (2013-06-21 15:48:32 +0200)
-
-----------------------------------------------------------------
-
-ARM SoC board specific changes
-
-These are 18 branches on 9 platforms with board specific changes, mostly
-for defconfig files, but nothing really exciting in here.
-
-Since the shmobile platform still uses board files for some of the newer
-machines, we get a few changes there as the result of drivers getting
-enabled for those boards. This causes some conflicts with contents getting
-added from multiple branches in sh-mobile specific files. Renesas is
-putting a lot of work into migrating to device-tree based setup, which
-will make all those files obsolete in the future and avoid both the
-conflicts and the need to have these files in the first place.
+  Merge tag 'msm-clock-for-3.11b' of git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm into next/late (2013-06-27 17:04:27 -0700)
 
 ----------------------------------------------------------------
 
-Aaro Koskinen (1):
-      ARM: OMAP1: nokia770: enable Tahvo
+ARM SoC late changes
 
-Adrien Verg? (1):
-      ARM: omap2plus_defconfig: enable USB_PHY and NOP_USB_XCEIV
+These are changes that arrived a little late before the merge
+window or that have multiple dependencies on previous branches
+so they did not fit into one of the earlier ones. There
+are 10 branches merged here, a total of 39 non-merge commits.
+Contents are a mixed bag for the above reasons:
 
-Andrew Lunn (2):
-      ARM: Kirkwood: Make use of the QNAP Power off driver.
-      ARM: Kirkwood: Convert LSXL to restart-poweroff driver.
+* Two new SoC platforms: ST microelectronics stixxxx and
+  the TI 'Nspire' graphing calculator. These should have
+  been in the 'soc' branch but were a little late
+* Support for the Exynos 5420 variant in mach-exynos,
+  which is based on the other exynos branches to avoid
+  conflicts.
+* Various small changes for sh-mobile, ux500 and davinci
+* Common clk support for MSM
 
-Arnd Bergmann (5):
-      ARM: ux500: avoid warning in ux500_read_asicid
-      Merge tag 'omap-for-v3.11/board-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/boards
-      Merge tag 'renesas-boards2-for-v3.11' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge tag 'zynq-defconfig-for-3.11' of git://git.xilinx.com/linux-xlnx into next/boards
-      Merge tag 'boards-for-linus' into for-linus
+Conflicts:
+* In Kconfig.debug, various additions trivially conflict,
+  the list should be kept in alphabetical order when
+  resolving.
 
-Fabio Baltieri (1):
-      ARM: ux500: update MSP1 pinctrl defintions
+----------------------------------------------------------------
 
-Florian Vaussard (1):
-      arm: omap: board-overo: reset GPIO for SMSC911x
+Arnd Bergmann (6):
+      Merge tag 'renesas-cleanup-for-v3.11' of git://git.kernel.org/.../horms/renesas into next/late
+      Merge tag 'soc-exynos5420-1' of git://git.kernel.org/.../kgene/linux-samsung into next/late
+      Merge branch 'renesas/boards2' into next/late
+      Merge tag 'renesas-sh-sci-for-v3.11' of git://git.kernel.org/.../horms/renesas into next/late
+      Merge tag 'davinci-for-v3.11/dt' of git://git.kernel.org/.../nsekhar/linux-davinci into next/late
+      Merge tag 'late-for-linus' into for-linus
 
-Guennadi Liakhovetski (2):
-      ARM: shmobile: kzm9g: enable AS3711 PMIC in defconfig
-      ARM: shmobile: kzm9g: add AS3711 PMIC platform data
+Chander Kashyap (10):
+      ARM: dts: fork out common EXYNOS5 nodes
+      ARM: dts: list the CPU nodes for EXYNOS5250
+      ARM: EXYNOS: Add support for EXYNOS5420 SoC
+      serial: samsung: select EXYNOS specific driver data if ARCH_EXYNOS is defined
+      ARM: EXYNOS: use four additional chipid bits to identify EXYNOS family
+      clk: exynos5420: register clocks using common clock framework
+      ARM: dts: Add initial device tree support for EXYNOS5420
+      clocksource: exynos_mct: use (request/free)_irq calls for local timer registration
+      ARM: EXYNOS: add secondary CPU boot base location for EXYNOS5420
+      ARM: EXYNOS: extend soft-reset support for EXYNOS5420
 
-Kuninori Morimoto (13):
-      ARM: shmobile: bockw: enable SDHI on defconfig
-      ARM: shmobile: ape6evm: MP clock parent become EXTAL2
-      ARM: shmobile: bockw: define FPGA address and rename iomem variable
-      ARM: shmobile: bockw: add CN9 SCIF/RCAN selection dipswitch explanation
-      ARM: shmobile: bockw: add dummy regulators for SMSC
-      ARM: shmobile: bockw: add SDHI0 support
-      ARM: shmobile: marzen: keep local function as static
-      ARM: shmobile: bockw defconfig: add RTC RX8581 support
-      ARM: shmobile: bockw defconfig: add M25P80 support
-      ARM: shmobile: bockw defconfig: add MMCIF support
-      ARM: shmobile: bockw: add I2C device support
-      ARM: shmobile: bockw: add SPI FLASH support
-      ARM: shmobile: bockw: add MMCIF support
+Daniel Tang (2):
+      arm: Add device trees for TI-Nspire hardware
+      arm: Add Initial TI-Nspire support
 
-Lee Jones (3):
-      ARM: ux500: Increase the size of the PRCMU's TCPM size
-      ARM: ux500: Remove incorrect DB9540 PRCMU TCDM base location
-      ARM: ux500: regulators: Remove misleading comment
+Kuninori Morimoto (1):
+      ARM: shmobile: r8a7790: add __initdata on resource and device data
 
-Lokesh Vutla (1):
-      ARM: OMAP3EVM: Marking omap3_evm_display_init() with CONFIG_BROKEN
+Leela Krishna Amudala (2):
+      ARM: dts: add pinctrl support to EXYNOS5420
+      pinctrl: exynos: add exynos5420 SoC specific data
 
-Nobuhiro Iwamatsu (1):
-      ARM: shmobile: armadillo800eva: Fix maximum number of SCIF
+Linus Walleij (1):
+      ARM: ux500: bail out on alien cpus
 
-Olof Johansson (11):
-      Merge tag 'boards-3.11-2' of git://git.infradead.org/users/jcooper/linux into next/boards
-      Merge tag 'renesas-defconfig-for-v3.11' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge branch 'renesas/pinmux-gpio' into next/boards
-      Merge branch 'renesas/soc' into next/boards
-      Merge tag 'renesas-boards-for-v3.11' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge tag 'ux500-core-for-arm-soc' of git://git.kernel.org/.../linusw/linux-stericsson into next/boards
-      Merge tag 'ux500-pinctrl-for-arm-soc' of git://git.kernel.org/.../linusw/linux-stericsson into next/boards
-      ARM: ux500: board-mop500: remove unused pin modes
-      Merge tag 'bcm2835-for-3.11-defconfig' of git://git.kernel.org/.../swarren/linux-rpi into next/boards
-      Merge tag 'renesas-defconfig2-for-v3.11' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge tag 'tegra-for-3.11-defconfig' of git://git.kernel.org/.../swarren/linux-tegra into next/boards
+Manjunathappa, Prakash (1):
+      ARM: davinci: da850: adopt to pinctrl-single change for configuring multiple pins
 
-Patrice Chotard (1):
-      ARM: ux500: add ABx500 pinctrl tables
+Olof Johansson (5):
+      Merge tag 'soc-exynos5420-2' of git://git.kernel.org/.../kgene/linux-samsung into next/late
+      Merge branch 'nspire/soc' into next/late
+      Merge branch 'sti/soc' into next/late
+      Merge branch 'msm/fixes' into next/late
+      Merge tag 'msm-clock-for-3.11b' of git://git.kernel.org/.../davidb/linux-msm into next/late
 
-Sergei Shtylyov (3):
-      ARM: shmobile: bockw: enable USB in defconfig
-      ARM: shmobile: BOCK-W: add Ether support
-      ARM: shmobile: BOCK-W: change Ether device name
+Philip Avinash (1):
+      ARM: davinci: da850: Use #include for all device trees
 
-Simon Baatz (1):
-      ARM: Kirkwood: add DT support for Sheevaplug and Sheevaplug eSATA
+Simon Horman (2):
+      Merge tags 'renesas-pinmux-for-v3.11' and 'renesas-soc-for-v3.11' into cleanup
+      serial: sh-sci: Initialise variables before access in sci_set_termios()
 
-Simon Horman (6):
-      Merge branches 'pinmux' and 'soc' into boards-base
-      ARM: shmobile: kzm9d: resigser smsc911x platform device with id -1
-      ARM: shmobile: lager: Add GPIO LEDs
-      ARM: shmobile: lager: support GPIO switches
-      ARM: shmobile: marzen: Use INTC External IRQ pin driver for SMSC
-      Merge branch 'soc2' into boards-base
+Srinivas Kandagatla (5):
+      ARM: sti: Add STiH415 SOC support
+      ARM: sti: Add STiH416 SOC support
+      ARM: sti: Add DEBUG_LL console support
+      ARM: stih41x: Add B2000 board support
+      ARM: stih41x: Add B2020 board support
 
-Soren Brinkmann (2):
-      arm: multi_v7_defconfig: Enable Zynq UART driver
-      arm: multi_v7_defconfig: Enable initrd/initramfs support
+Stephen Boyd (12):
+      msm_serial: Convert to clk_prepare/unprepare
+      msm_serial: Use devm_clk_get() and properly return errors
+      usb: otg: msm: Convert to clk_prepare/unprepare
+      msm_sdcc: Convert to clk_prepare/unprepare
+      msm: iommu: Convert to clk_prepare/unprepare
+      msm: iommu: Use clk_set_rate() instead of clk_set_min_rate()
+      ARM: msm: Remove custom clk_set_flags() API
+      ARM: msm: Remove custom clk_set_{max,min}_rate() API
+      ARM: msm: Remove clock-7x30.h include file
+      ARM: msm: Prepare clk_get() users in mach-msm for clock-pcom driver
+      ARM: msm: Make proc_comm clock control into a platform driver
+      ARM: msm: Migrate to common clock framework
 
-Stephen Warren (2):
-      ARM: bcm2835: defconfig updates
-      ARM: tegra: defconfig updates
+Ulrich Hecht (3):
+      serial: sh-sci: HSCIF support
+      ARM: shmobile: r8a7790: HSCIF support
+      ARM: shmobile: r8a7790: don't use external clock for SCIFs
 
-Ulf Hansson (6):
-      ARM: ux500: Enable 100MHz for SD/SDIO/MMC devices
-      ARM: ux500: Don't set plf ocr mask for SD/MMC device
-      ARM: ux500: Enable support for RPMB and Reliable Write for eMMC
-      ARM: ux500: Enable support for discard for MMC/SD
-      ARM: ux500: Set eMMC and WLAN card slot as non-removable
-      ARM: ux500: Enable support for UHS-I SD-cards
-
-Vladimir Barinov (2):
-      ARM: shmobile: bockw: enable I2C in defconfig
-      ARM: shmobile: bockw: enable CONFIG_PM_RUNTIME in defconfig
-
- arch/arm/boot/dts/kirkwood-lsxl.dtsi          |   4 +
- arch/arm/boot/dts/kirkwood-ts219.dtsi         |   5 +
- arch/arm/configs/armadillo800eva_defconfig    |   2 +-
- arch/arm/configs/bcm2835_defconfig            |  19 +-
- arch/arm/configs/bockw_defconfig              |  27 ++-
- arch/arm/configs/kzm9g_defconfig              |   3 +
- arch/arm/configs/multi_v7_defconfig           |   3 +
- arch/arm/configs/omap2plus_defconfig          |   2 +
- arch/arm/configs/tegra_defconfig              |  23 ++-
- arch/arm/mach-kirkwood/Kconfig                |   9 +
- arch/arm/mach-kirkwood/Makefile               |   1 +
- arch/arm/mach-kirkwood/board-dt.c             |   4 +
- arch/arm/mach-kirkwood/board-lsxl.c           |  16 --
- arch/arm/mach-kirkwood/board-sheevaplug.c     |  27 +++
- arch/arm/mach-kirkwood/board-ts219.c          |   3 -
- arch/arm/mach-kirkwood/common.h               |   5 +
- arch/arm/mach-omap1/board-nokia770.c          |  10 +
- arch/arm/mach-omap2/board-omap3evm.c          |   4 +
- arch/arm/mach-omap2/board-overo.c             |   3 +-
- arch/arm/mach-shmobile/board-ape6evm.c        |  15 ++
- arch/arm/mach-shmobile/board-bockw.c          | 158 +++++++++++++-
- arch/arm/mach-shmobile/board-kzm9d.c          |   2 +-
- arch/arm/mach-shmobile/board-kzm9g.c          | 193 +++++++++++++-----
- arch/arm/mach-shmobile/board-lager.c          |  49 +++++
- arch/arm/mach-shmobile/board-marzen.c         |   3 +-
- arch/arm/mach-ux500/board-mop500-pins.c       | 283 ++++++++++++++++++++++++--
- arch/arm/mach-ux500/board-mop500-regulators.c |   1 -
- arch/arm/mach-ux500/board-mop500-sdi.c        |  34 ++--
- arch/arm/mach-ux500/db8500-regs.h             |   3 +-
- arch/arm/mach-ux500/devices-db8500.c          |   2 +-
- arch/arm/mach-ux500/id.c                      |   6 +-
- 31 files changed, 791 insertions(+), 128 deletions(-)
- create mode 100644 arch/arm/mach-kirkwood/board-sheevaplug.c
+ Documentation/arm/sti/overview.txt                 |  33 +
+ Documentation/arm/sti/stih415-overview.txt         |  12 +
+ Documentation/arm/sti/stih416-overview.txt         |  12 +
+ Documentation/devicetree/bindings/arm/nspire.txt   |  14 +
+ .../devicetree/bindings/clock/exynos5420-clock.txt | 201 ++++++
+ .../bindings/pinctrl/samsung-pinctrl.txt           |   1 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ MAINTAINERS                                        |   9 +
+ arch/arm/Kconfig                                   |   6 +-
+ arch/arm/Kconfig.debug                             |  52 ++
+ arch/arm/Makefile                                  |   2 +
+ arch/arm/boot/dts/Makefile                         |   8 +
+ arch/arm/boot/dts/da850-enbw-cmc.dts               |   2 +-
+ arch/arm/boot/dts/da850-evm.dts                    |   2 +-
+ arch/arm/boot/dts/da850.dtsi                       |   4 +-
+ arch/arm/boot/dts/exynos5.dtsi                     | 111 +++
+ arch/arm/boot/dts/exynos5250.dtsi                  |  78 +--
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi          | 680 ++++++++++++++++++
+ arch/arm/boot/dts/exynos5420-smdk5420.dts          |  33 +
+ arch/arm/boot/dts/exynos5420.dtsi                  | 148 ++++
+ arch/arm/boot/dts/nspire-classic.dtsi              |  74 ++
+ arch/arm/boot/dts/nspire-clp.dts                   |  45 ++
+ arch/arm/boot/dts/nspire-cx.dts                    | 112 +++
+ arch/arm/boot/dts/nspire-tp.dts                    |  44 ++
+ arch/arm/boot/dts/nspire.dtsi                      | 175 +++++
+ arch/arm/boot/dts/st-pincfg.h                      |  71 ++
+ arch/arm/boot/dts/stih415-b2000.dts                |  15 +
+ arch/arm/boot/dts/stih415-b2020.dts                |  15 +
+ arch/arm/boot/dts/stih415-clock.dtsi               |  38 +
+ arch/arm/boot/dts/stih415-pinctrl.dtsi             | 268 ++++++++
+ arch/arm/boot/dts/stih415.dtsi                     |  87 +++
+ arch/arm/boot/dts/stih416-b2000.dts                |  16 +
+ arch/arm/boot/dts/stih416-b2020.dts                |  16 +
+ arch/arm/boot/dts/stih416-clock.dtsi               |  41 ++
+ arch/arm/boot/dts/stih416-pinctrl.dtsi             | 295 ++++++++
+ arch/arm/boot/dts/stih416.dtsi                     |  96 +++
+ arch/arm/boot/dts/stih41x-b2000.dtsi               |  41 ++
+ arch/arm/boot/dts/stih41x-b2020.dtsi               |  42 ++
+ arch/arm/boot/dts/stih41x.dtsi                     |  38 +
+ arch/arm/include/debug/nspire.S                    |  28 +
+ arch/arm/include/debug/sti.S                       |  61 ++
+ arch/arm/mach-exynos/Kconfig                       |  10 +
+ arch/arm/mach-exynos/common.c                      |  18 +-
+ arch/arm/mach-exynos/include/mach/uncompress.h     |   7 +-
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |   1 +
+ arch/arm/mach-exynos/platsmp.c                     |  12 +-
+ arch/arm/mach-msm/Makefile                         |  10 +-
+ arch/arm/mach-msm/board-halibut.c                  |   2 +-
+ arch/arm/mach-msm/board-msm7x30.c                  |   2 +-
+ arch/arm/mach-msm/board-qsd8x50.c                  |   2 +-
+ arch/arm/mach-msm/board-trout-panel.c              |  19 +-
+ arch/arm/mach-msm/board-trout.c                    |   3 +-
+ arch/arm/mach-msm/clock-7x30.h                     | 155 -----
+ arch/arm/mach-msm/clock-debug.c                    | 130 ----
+ arch/arm/mach-msm/clock-pcom.c                     | 149 ++--
+ arch/arm/mach-msm/clock-pcom.h                     |  31 +-
+ arch/arm/mach-msm/clock.c                          | 166 +----
+ arch/arm/mach-msm/clock.h                          |  51 +-
+ arch/arm/mach-msm/devices-msm7x00.c                |  12 +-
+ arch/arm/mach-msm/devices-msm7x30.c                |  15 +-
+ arch/arm/mach-msm/devices-qsd8x50.c                |  12 +-
+ arch/arm/mach-msm/devices.h                        |  15 +-
+ arch/arm/mach-msm/dma.c                            |   5 +-
+ arch/arm/mach-msm/include/mach/board.h             |   5 -
+ arch/arm/mach-msm/include/mach/clk.h               |   9 -
+ arch/arm/mach-nspire/Kconfig                       |  16 +
+ arch/arm/mach-nspire/Makefile                      |   2 +
+ arch/arm/mach-nspire/Makefile.boot                 |   0
+ arch/arm/mach-nspire/clcd.c                        | 119 ++++
+ arch/arm/mach-nspire/clcd.h                        |  14 +
+ arch/arm/mach-nspire/mmio.h                        |  20 +
+ arch/arm/mach-nspire/nspire.c                      |  89 +++
+ arch/arm/mach-shmobile/setup-r8a7790.c             |  28 +-
+ arch/arm/mach-sti/Kconfig                          |  45 ++
+ arch/arm/mach-sti/Makefile                         |   2 +
+ arch/arm/mach-sti/board-dt.c                       |  48 ++
+ arch/arm/mach-sti/headsmp.S                        |  44 ++
+ arch/arm/mach-sti/platsmp.c                        | 117 ++++
+ arch/arm/mach-sti/smp.h                            |  17 +
+ arch/arm/mach-ux500/cache-l2x0.c                   |   3 +-
+ arch/arm/plat-samsung/include/plat/cpu.h           |   8 +
+ drivers/clk/samsung/Makefile                       |   1 +
+ drivers/clk/samsung/clk-exynos5420.c               | 762 +++++++++++++++++++++
+ drivers/clocksource/exynos_mct.c                   |  35 +-
+ drivers/iommu/msm_iommu_dev.c                      |  20 +-
+ drivers/mmc/host/msm_sdcc.c                        |  14 +-
+ drivers/pinctrl/pinctrl-exynos.c                   | 118 ++++
+ drivers/pinctrl/pinctrl-samsung.c                  |   2 +
+ drivers/pinctrl/pinctrl-samsung.h                  |   1 +
+ drivers/tty/serial/msm_serial.c                    |  35 +-
+ drivers/tty/serial/samsung.c                       |   4 +-
+ drivers/tty/serial/sh-sci.c                        | 104 ++-
+ drivers/usb/phy/phy-msm-usb.c                      |  38 +-
+ include/linux/serial_sci.h                         |  12 +-
+ include/uapi/linux/serial_core.h                   |   3 +
+ 95 files changed, 4799 insertions(+), 790 deletions(-)
+ create mode 100644 Documentation/arm/sti/overview.txt
+ create mode 100644 Documentation/arm/sti/stih415-overview.txt
+ create mode 100644 Documentation/arm/sti/stih416-overview.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/nspire.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos5420-clock.txt
+ create mode 100644 arch/arm/boot/dts/exynos5.dtsi
+ create mode 100644 arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/exynos5420-smdk5420.dts
+ create mode 100644 arch/arm/boot/dts/exynos5420.dtsi
+ create mode 100644 arch/arm/boot/dts/nspire-classic.dtsi
+ create mode 100644 arch/arm/boot/dts/nspire-clp.dts
+ create mode 100644 arch/arm/boot/dts/nspire-cx.dts
+ create mode 100644 arch/arm/boot/dts/nspire-tp.dts
+ create mode 100644 arch/arm/boot/dts/nspire.dtsi
+ create mode 100644 arch/arm/boot/dts/st-pincfg.h
+ create mode 100644 arch/arm/boot/dts/stih415-b2000.dts
+ create mode 100644 arch/arm/boot/dts/stih415-b2020.dts
+ create mode 100644 arch/arm/boot/dts/stih415-clock.dtsi
+ create mode 100644 arch/arm/boot/dts/stih415-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/stih415.dtsi
+ create mode 100644 arch/arm/boot/dts/stih416-b2000.dts
+ create mode 100644 arch/arm/boot/dts/stih416-b2020.dts
+ create mode 100644 arch/arm/boot/dts/stih416-clock.dtsi
+ create mode 100644 arch/arm/boot/dts/stih416-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/stih416.dtsi
+ create mode 100644 arch/arm/boot/dts/stih41x-b2000.dtsi
+ create mode 100644 arch/arm/boot/dts/stih41x-b2020.dtsi
+ create mode 100644 arch/arm/boot/dts/stih41x.dtsi
+ create mode 100644 arch/arm/include/debug/nspire.S
+ create mode 100644 arch/arm/include/debug/sti.S
+ delete mode 100644 arch/arm/mach-msm/clock-7x30.h
+ delete mode 100644 arch/arm/mach-msm/clock-debug.c
+ create mode 100644 arch/arm/mach-nspire/Kconfig
+ create mode 100644 arch/arm/mach-nspire/Makefile
+ create mode 100644 arch/arm/mach-nspire/Makefile.boot
+ create mode 100644 arch/arm/mach-nspire/clcd.c
+ create mode 100644 arch/arm/mach-nspire/clcd.h
+ create mode 100644 arch/arm/mach-nspire/mmio.h
+ create mode 100644 arch/arm/mach-nspire/nspire.c
+ create mode 100644 arch/arm/mach-sti/Kconfig
+ create mode 100644 arch/arm/mach-sti/Makefile
+ create mode 100644 arch/arm/mach-sti/board-dt.c
+ create mode 100644 arch/arm/mach-sti/headsmp.S
+ create mode 100644 arch/arm/mach-sti/platsmp.c
+ create mode 100644 arch/arm/mach-sti/smp.h
+ create mode 100644 drivers/clk/samsung/clk-exynos5420.c
