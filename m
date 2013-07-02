@@ -1,43 +1,74 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 2 Jul 2013 07:30:37 +0200
-Subject: [PATCHv4 02/11] pci: use weak functions for MSI arch-specific
- functions
-In-Reply-To: <1372726396.17904.1.camel@concordia>
-References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1372686136-1370-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <1372726396.17904.1.camel@concordia>
-Message-ID: <20130702073037.55a53642@skate>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 2 Jul 2013 15:33:48 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the l2-mtd tree
+Message-ID: <20130702153348.ce27e4a6185c0b403e039e06@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Michael Ellerman,
+Hi all,
 
-On Tue, 02 Jul 2013 10:53:16 +1000, Michael Ellerman wrote:
-> On Mon, 2013-07-01 at 15:42 +0200, Thomas Petazzoni wrote:
-> > Until now, the MSI architecture-specific functions could be overloaded
-> > using a fairly complex set of #define and compile-time
-> > conditionals. In order to prepare for the introduction of the msi_chip
-> > infrastructure, it is desirable to switch all those functions to use
-> > the 'weak' mechanism. This commit converts all the architectures that
-> > were overidding those MSI functions to use the new strategy.
-> 
-> The MSI code used to use weak functions, until we discovered they were
-> being miscompiled on some toolchains (11df1f0). I assume these days
-> we're confident they work correctly.
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/mtd/nand/Kconfig between commit 212012138deb ("mtd: nand: omap2:
+updated support for BCH4 ECC scheme") from the l2-mtd tree and commit
+930d800bded7 ("mtd: omap2: allow bulding as a module") from the arm-soc
+tree.
 
-Hum, interesting. I see from your commit that gcc 4.3.2 was apparently
-affected, and gcc 4.3.x is not /that/ old. Bjorn, what's your point of
-view on this?
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-Another option would be to have architecture register some msi_arch_ops
-structure, with a set of operations, which I believe is a pattern that
-is more widespread in the kernel than weak functions.
-
-Thoughts?
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/mtd/nand/Kconfig
+index a6e247c,50543f1..0000000
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@@ -95,13 -95,35 +95,13 @@@ config MTD_NAND_OMAP
+  
+  config MTD_NAND_OMAP_BCH
+  	depends on MTD_NAND && MTD_NAND_OMAP2 && ARCH_OMAP3
+- 	bool "Support hardware based BCH error correction"
+ -	tristate "Enable support for hardware BCH error correction"
+++	tristate "Support hardware based BCH error correction"
+  	default n
+  	select BCH
+ -	select BCH_CONST_PARAMS
+  	help
+ -	 Support for hardware BCH error correction.
+ -
+ -choice
+ -	prompt "BCH error correction capability"
+ -	depends on MTD_NAND_OMAP_BCH
+ -
+ -config MTD_NAND_OMAP_BCH8
+ -	bool "8 bits / 512 bytes (recommended)"
+ -	help
+ -	 Support correcting up to 8 bitflips per 512-byte block.
+ -	 This will use 13 bytes of spare area per 512 bytes of page data.
+ -	 This is the recommended mode, as 4-bit mode does not work
+ -	 on some OMAP3 revisions, due to a hardware bug.
+ -
+ -config MTD_NAND_OMAP_BCH4
+ -	bool "4 bits / 512 bytes"
+ -	help
+ -	 Support correcting up to 4 bitflips per 512-byte block.
+ -	 This will use 7 bytes of spare area per 512 bytes of page data.
+ -	 Note that this mode does not work on some OMAP3 revisions, due to a
+ -	 hardware bug. Please check your OMAP datasheet before selecting this
+ -	 mode.
+ -
+ -endchoice
+ +	  Some devices have built-in ELM hardware engine, which can be used to
+ +	  locate and correct errors when using BCH ECC scheme. This enables the
+ +	  driver support for same.
+  
+  if MTD_NAND_OMAP_BCH
+  config BCH_CONST_M
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130702/008501bf/attachment.sig>
