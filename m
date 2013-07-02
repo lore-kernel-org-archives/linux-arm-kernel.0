@@ -1,52 +1,71 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 2 Jul 2013 13:59:20 +0900
-Subject: [PATCH 1/3] ARM: shmobile: use common platform header for HPB-DMAC
-In-Reply-To: <201306300245.58486.sergei.shtylyov@cogentembedded.com>
-References: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
- <201306300245.58486.sergei.shtylyov@cogentembedded.com>
-Message-ID: <CANqRtoTCaJfbECSpX7nMZoV8SPeQqs-xrJQ0-+-smA+bx3QG=w@mail.gmail.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Tue, 2 Jul 2013 05:20:29 +0000
+Subject: [PATCH 2/4] davinci: da8xx/omap-l1: Remove hard coding of rtc
+ device wakeup
+In-Reply-To: <87a9m5omcw.fsf@linaro.org>
+References: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
+ <1372412109-986-3-git-send-email-gururaja.hebbar@ti.com>
+ <87a9m5omcw.fsf@linaro.org>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EC4E6EE@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Tue, Jul 02, 2013 at 05:37:43, Kevin Hilman wrote:
+> Hebbar Gururaja <gururaja.hebbar@ti.com> writes:
+> 
+> > Since now rtc-omap driver itself calls deice_init_wakeup(dev, true),
+> > duplicate call from the rtc device registration can be removed.
+> >
+> > This is basically a partial revert of the prev commit
+> >
+> > commit 75c99bb0006ee065b4e2995078d779418b0fab54
+> > Author: Sekhar Nori <nsekhar@ti.com>
+> >
+> >     davinci: da8xx/omap-l1: mark RTC as a wakeup source
+> >
+> > Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> > Cc: Sekhar Nori <nsekhar@ti.com>
+> > Cc: Kevin Hilman <khilman@linaro.org>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> >
+> > ---
+> > :100644 100644 bf57252... 85a900c... M	arch/arm/mach-davinci/devices-da8xx.c
+> >  arch/arm/mach-davinci/devices-da8xx.c |    9 +--------
+> >  1 file changed, 1 insertion(+), 8 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> > index bf57252..85a900c 100644
+> > --- a/arch/arm/mach-davinci/devices-da8xx.c
+> > +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> > @@ -827,14 +827,7 @@ static struct platform_device da8xx_rtc_device = {
+> >  
+> >  int da8xx_register_rtc(void)
+> >  {
+> > -	int ret;
+> > -
+> > -	ret = platform_device_register(&da8xx_rtc_device);
+> > -	if (!ret)
+> > -		/* Atleast on DA850, RTC is a wakeup source */
+> > -		device_init_wakeup(&da8xx_rtc_device.dev, true);
+> > -
+> > -	return ret;
+> > +	return  platform_device_register(&da8xx_rtc_device);
+> 
+> nit: extra space between 'return' and 'platform_'
 
-On Sun, Jun 30, 2013 at 7:45 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> From: Max Filippov <max.filippov@cogentembedded.com>
->
-> Use previously empty <mach/dma.h> to declare HPB-DMA slave IDs.
->
-> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
-> [Sergei: changed the guard macro name, fixed comment, extended copyright.]
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-> ---
->  arch/arm/mach-shmobile/include/mach/dma.h |   25 ++++++++++++++++++++++++-
->  1 file changed, 24 insertions(+), 1 deletion(-)
+Thanks for the review. V2 will soon follow.
 
-Thanks for your patch. Can you please explain the reason why you put
-this shared information under mach/?
+> 
+> >  }
+> >  
+> >  static void __iomem *da8xx_ddr2_ctlr_base;
+> 
+> Otherwise,
+> 
+> Acked-by: Kevin Hilman <khilman@linaro.org>
+> 
+> 
 
->From my point of view we should really have as few special things as
-possible under mach/. Starting to share DMA stuff here looks special.
-I would like mach-shmobile to be as standard as possible (basically
-only ARM code in the future), and in the case we have I/O devices or
-other IOMMUs or DMA controllers then we should use include/linux or
-that recently added platform data directory if needed. We need to make
-sure that our headers stay compatible with multiplatform support.
 
-I realize you may want to share this header between multiple SoCs, but
-I really want to avoid creating local common code under arch/arm/ that
-has nothing to do with ARM. Also, this is IMO a total non-issue,
-instead of merging code and making back porting more difficult for any
-particular SoC, then how about spending effort on the ling term
-instead, like DMA DT?
-
-So my recommendation is to keep this information together with each
-SoC. And also work on DT. In between have a coffee or work on DT, but
-please do not spend time on merging short term per-SoC information and
-making back porting more difficult.
-
-Thanks,
-
-/ magnus
+Regards, 
+Gururaja
