@@ -1,74 +1,57 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 02 Jul 2013 18:28:06 +0900
-Subject: [PATCH 05/08] ARM: shmobile: Use DT for GIC on EMEV2 and KZM9D
+Date: Tue, 02 Jul 2013 18:28:14 +0900
+Subject: [PATCH 06/08] ARM: shmobile: Use DT for SMP on EMEV2 and KZM9D
 In-Reply-To: <20130702092725.32066.54861.sendpatchset@w520>
 References: <20130702092725.32066.54861.sendpatchset@w520>
-Message-ID: <20130702092806.32066.58281.sendpatchset@w520>
+Message-ID: <20130702092814.32066.30138.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Remove the C version of the EMEV2 GIC setup code,
-instead rely on GIC information provided by DT.
+Rework the EMEV2 SMP code to rely on DT for CPU information
+instead of reading out number of CPU cores from the SCU.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/board-kzm9d.c        |    2 --
- arch/arm/mach-shmobile/include/mach/emev2.h |    1 -
- arch/arm/mach-shmobile/setup-emev2.c        |   15 ---------------
- 3 files changed, 18 deletions(-)
+ arch/arm/mach-shmobile/smp-emev2.c |   17 +++--------------
+ 1 file changed, 3 insertions(+), 14 deletions(-)
 
---- 0002/arch/arm/mach-shmobile/board-kzm9d.c
-+++ work/arch/arm/mach-shmobile/board-kzm9d.c	2013-07-02 15:01:32.000000000 +0900
-@@ -86,8 +86,6 @@ DT_MACHINE_START(KZM9D_DT, "kzm9d")
- 	.smp		= smp_ops(emev2_smp_ops),
- 	.map_io		= emev2_map_io,
- 	.init_early	= emev2_init_delay,
--	.nr_irqs	= NR_IRQS_LEGACY,
--	.init_irq	= emev2_init_irq,
- 	.init_machine	= kzm9d_add_standard_devices,
- 	.init_late	= shmobile_init_late,
- 	.dt_compat	= kzm9d_boards_compat_dt,
---- 0002/arch/arm/mach-shmobile/include/mach/emev2.h
-+++ work/arch/arm/mach-shmobile/include/mach/emev2.h	2013-07-02 15:01:48.000000000 +0900
-@@ -2,7 +2,6 @@
- #define __ASM_EMEV2_H__
+--- 0001/arch/arm/mach-shmobile/smp-emev2.c
++++ work/arch/arm/mach-shmobile/smp-emev2.c	2013-07-02 15:09:53.000000000 +0900
+@@ -38,9 +38,12 @@ static int __cpuinit emev2_boot_secondar
  
- extern void emev2_map_io(void);
--extern void emev2_init_irq(void);
- extern void emev2_init_delay(void);
- extern void emev2_add_standard_devices(void);
- extern void emev2_clock_init(void);
---- 0003/arch/arm/mach-shmobile/setup-emev2.c
-+++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-07-02 15:01:17.000000000 +0900
-@@ -202,20 +202,6 @@ void __init emev2_init_delay(void)
- 	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
+ static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
+ {
++	/* setup EMEV2 specific SCU base, enable */
++	shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
+ 	scu_enable(shmobile_scu_base);
+ 
+ 	/* Tell ROM loader about our vector (in headsmp-scu.S, headsmp.S) */
++	emev2_clock_init(); /* need ioremapped SMU */
+ 	emev2_set_boot_vector(__pa(shmobile_boot_vector));
+ 	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
+ 	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
+@@ -49,21 +52,7 @@ static void __init emev2_smp_prepare_cpu
+ 	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
  }
  
--void __init emev2_init_irq(void)
+-static void __init emev2_smp_init_cpus(void)
 -{
--	void __iomem *gic_dist_base;
--	void __iomem *gic_cpu_base;
+-	unsigned int ncores;
 -
--	/* Static mappings, never released */
--	gic_dist_base = ioremap(0xe0028000, PAGE_SIZE);
--	gic_cpu_base = ioremap(0xe0020000, PAGE_SIZE);
--	BUG_ON(!gic_dist_base || !gic_cpu_base);
+-	/* setup EMEV2 specific SCU base */
+-	shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
+-	emev2_clock_init(); /* need ioremapped SMU */
 -
--	/* Use GIC to handle interrupts */
--	gic_init(0, 29, gic_dist_base, gic_cpu_base);
+-	ncores = shmobile_scu_base ? scu_get_core_count(shmobile_scu_base) : 1;
+-
+-	shmobile_smp_init_cpus(ncores);
 -}
 -
- #ifdef CONFIG_USE_OF
- static const struct of_dev_auxdata emev2_auxdata_lookup[] __initconst = {
- 	{ }
-@@ -235,7 +221,6 @@ static const char *emev2_boards_compat_d
- DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
- 	.smp		= smp_ops(emev2_smp_ops),
- 	.init_early	= emev2_init_delay,
--	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_machine	= emev2_add_standard_devices_dt,
- 	.dt_compat	= emev2_boards_compat_dt,
- MACHINE_END
+ struct smp_operations emev2_smp_ops __initdata = {
+-	.smp_init_cpus		= emev2_smp_init_cpus,
+ 	.smp_prepare_cpus	= emev2_smp_prepare_cpus,
+ 	.smp_boot_secondary	= emev2_boot_secondary,
+ };
