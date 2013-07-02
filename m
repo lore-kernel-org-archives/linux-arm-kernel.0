@@ -1,7 +1,7 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Tue, 2 Jul 2013 17:26:21 +0800
-Subject: [PATCH] ASoC: brownstone: add .owner to struct snd_soc_card
-Message-ID: <CAPgLHd-VN4BiM=cEkFF4EgbL7iqR1XrhEzBiKyoJBVnzKspHJg@mail.gmail.com>
+Date: Tue, 2 Jul 2013 17:26:40 +0800
+Subject: [PATCH] ASoC: ttc_dkb: add .owner to struct snd_soc_card
+Message-ID: <CAPgLHd_CJUYf8Ry=J9Y8ZPSrCgqPLTj74rDr__bxoymQ8GR_1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,18 +12,18 @@ module from being removed from underneath its users.
 
 Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- sound/soc/pxa/brownstone.c | 1 +
+ sound/soc/pxa/ttc-dkb.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/sound/soc/pxa/brownstone.c b/sound/soc/pxa/brownstone.c
-index 4ad7609..e582c05 100644
---- a/sound/soc/pxa/brownstone.c
-+++ b/sound/soc/pxa/brownstone.c
-@@ -129,6 +129,7 @@ static struct snd_soc_dai_link brownstone_wm8994_dai[] = {
- /* audio machine driver */
- static struct snd_soc_card brownstone = {
- 	.name         = "brownstone",
-+	.owner        = THIS_MODULE,
- 	.dai_link     = brownstone_wm8994_dai,
- 	.num_links    = ARRAY_SIZE(brownstone_wm8994_dai),
+diff --git a/sound/soc/pxa/ttc-dkb.c b/sound/soc/pxa/ttc-dkb.c
+index f4ea4f6..13c9ee0 100644
+--- a/sound/soc/pxa/ttc-dkb.c
++++ b/sound/soc/pxa/ttc-dkb.c
+@@ -122,6 +122,7 @@ static struct snd_soc_dai_link ttc_pm860x_hifi_dai[] = {
+ /* ttc/td audio machine driver */
+ static struct snd_soc_card ttc_dkb_card = {
+ 	.name = "ttc-dkb-hifi",
++	.owner = THIS_MODULE,
+ 	.dai_link = ttc_pm860x_hifi_dai,
+ 	.num_links = ARRAY_SIZE(ttc_pm860x_hifi_dai),
  
