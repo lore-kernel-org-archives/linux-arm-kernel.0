@@ -1,156 +1,38 @@
 From: lho@apm.com (Loc Ho)
-Date: Tue,  2 Jul 2013 14:38:58 -0600
-Subject: [PATCH 1/2] power: Add APM X-Gene system reboot driver
-In-Reply-To: <1372797539-13111-1-git-send-email-lho@apm.com>
+Date: Tue,  2 Jul 2013 14:38:59 -0600
+Subject: [PATCH 2/2] power: arm64: Add DTS entry for APM X-Gene reboot driver.
+In-Reply-To: <1372797539-13111-2-git-send-email-lho@apm.com>
 References: <1372797539-13111-1-git-send-email-lho@apm.com>
-Message-ID: <1372797539-13111-2-git-send-email-lho@apm.com>
+ <1372797539-13111-2-git-send-email-lho@apm.com>
+Message-ID: <1372797539-13111-3-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-power: Add APM X-Gene SoC system reboot driver. This driver handles only
-system reboot. System shutdown is board specific and can be handled by board
-driver or GPIO based shutdown driver.
+power: arm64: Add DTS entry for APM X-Gene reboot driver.
 
 Signed-off-by: Loc Ho <lho@apm.com>
 Signed-off-by: Feng Kan <fkan@apm.com>
 Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
 ---
- drivers/power/reset/Kconfig        |    7 +++
- drivers/power/reset/Makefile       |    1 +
- drivers/power/reset/xgene-reboot.c |  101 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 109 insertions(+), 0 deletions(-)
- create mode 100755 drivers/power/reset/xgene-reboot.c
+ arch/arm64/boot/dts/apm-storm.dtsi |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index 349e9ae..c41a7de 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -37,3 +37,10 @@ config POWER_RESET_VEXPRESS
- 	help
- 	  Power off and reset support for the ARM Ltd. Versatile
- 	  Express boards.
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index d37d736..e686919 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -178,6 +178,12 @@
+ 			};
+ 		};
+ 
++                reboot at 0x17000014 {
++                        compatible = "apm,xgene-reboot";
++                        reg = <0x0 0x17000014 0x0 0x100>;
++                        mask = <0x1>;
++                };
 +
-+config POWER_RESET_XGENE
-+        bool
-+	default y if ARM64
-+        depends on POWER_RESET	
-+        help
-+          Reboot support for the APM SoC X-Gene Eval boards.
-diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index 372807f..e75d54c 100644
---- a/drivers/power/reset/Makefile
-+++ b/drivers/power/reset/Makefile
-@@ -2,3 +2,4 @@ obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
- obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
- obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
- obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
-+obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
-diff --git a/drivers/power/reset/xgene-reboot.c b/drivers/power/reset/xgene-reboot.c
-new file mode 100755
-index 0000000..e6e4178
---- /dev/null
-+++ b/drivers/power/reset/xgene-reboot.c
-@@ -0,0 +1,101 @@
-+/*
-+ * xgene-reboot.c - AppliedMicro X-Gene SoC Reboot Driver
-+ *
-+ * Copyright (c) 2013, Applied Micro Circuits Corporation
-+ * Author: Feng Kan <fkan@apm.com>
-+ * Author: Loc Ho <lho@apm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-+ * MA 02111-1307 USA
-+ *
-+ * This driver provides system reboot functionality for APM X-Gene SoC.
-+ * For system shutdown, this is board specify. If a board designer
-+ * implements GPIO shutdown, use the gpio-poweroff.c driver.
-+ *
-+ */
-+#include <linux/io.h>
-+#include <linux/of_device.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/stat.h>
-+#include <linux/slab.h>
-+#include <asm/system_misc.h>
-+
-+struct xgene_reboot_context {
-+	struct platform_device *pdev;
-+	void *csr;
-+	u32 mask;
-+};
-+
-+static struct xgene_reboot_context *xgene_restart_ctx;
-+
-+static void xgene_restart(char str, const char *cmd)
-+{
-+	struct xgene_reboot_context *ctx = xgene_restart_ctx;
-+	unsigned long timeout;
-+
-+	/* Issue the reboot */
-+	if (ctx)
-+		writel(ctx->mask, ctx->csr);
-+
-+	timeout = jiffies + HZ;
-+	while (time_before(jiffies, timeout))
-+		cpu_relax();
-+
-+	dev_emerg(&ctx->pdev->dev, "Unable to restart system\n");
-+}
-+
-+static int xgene_reboot_probe(struct platform_device *pdev)
-+{
-+	struct xgene_reboot_context *ctx;
-+
-+	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
-+	if (ctx == NULL) {
-+		dev_err(&pdev->dev, "out of memory for context\n");
-+		return -ENODEV;
-+	}
-+	ctx->csr = of_iomap(pdev->dev.of_node, 0);
-+	if (ctx->csr == NULL) {
-+		devm_kfree(&pdev->dev, ctx);
-+		dev_err(&pdev->dev, "can not map resource\n");
-+		return -ENODEV;
-+	}
-+	if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
-+		ctx->mask = 0xFFFFFFFF;
-+	ctx->pdev = pdev;
-+	arm_pm_restart = xgene_restart;
-+	xgene_restart_ctx = ctx;
-+
-+	return 0;
-+}
-+
-+static struct of_device_id xgene_reboot_of_match[] = {
-+	{ .compatible = "apm,xgene-reboot" },
-+	{}
-+};
-+
-+static struct platform_driver xgene_reboot_driver = {
-+	.probe = xgene_reboot_probe,
-+	.driver = {
-+		.name = "xgene-reboot",
-+		.of_match_table = xgene_reboot_of_match,
-+	},
-+};
-+
-+static int __init xgene_reboot_init(void)
-+{
-+	return platform_driver_register(&xgene_reboot_driver);
-+}
-+device_initcall(xgene_reboot_init);
+ 		serial0: serial at 1c020000 {
+ 			device_type = "serial";
+ 			compatible = "ns16550";
 -- 
 1.5.5
