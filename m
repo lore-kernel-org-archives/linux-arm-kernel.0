@@ -1,46 +1,61 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 2 Jul 2013 10:16:53 +0800
-Subject: [alsa-devel] [PATCH 1/4] ASoC: sgtl5000: give it a ramping time
- before writting
-In-Reply-To: <201307011943.27489.marex@denx.de>
-References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
- <20130701153327.GX13206@S2101-09.ap.freescale.net>
- <CAOMZO5B5jh1XciO4K1u3yBcHHDAgi8hA3GcywnJd11M7=aOPxA@mail.gmail.com>
- <201307011943.27489.marex@denx.de>
-Message-ID: <20130702021651.GY13206@S2101-09.ap.freescale.net>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Tue, 2 Jul 2013 02:24:56 +0000
+Subject: [v2 4/4] sata: imx: add ahci sata support on imx platforms
+In-Reply-To: <20130701152955.GW13206@S2101-09.ap.freescale.net>
+References: <1372672975-2997-1-git-send-email-r65037@freescale.com>
+ <1372672975-2997-5-git-send-email-r65037@freescale.com>
+ <20130701124445.GW516@pengutronix.de>
+ <20130701152955.GW13206@S2101-09.ap.freescale.net>
+Message-ID: <0E83723C55F66F43A6041464FE31119D30C5EF@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 07:43:27PM +0200, Marek Vasut wrote:
-> Dear Fabio Estevam,
-> 
-> > On Mon, Jul 1, 2013 at 12:33 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > > On Mon, Jul 01, 2013 at 12:11:58PM -0300, Fabio Estevam wrote:
-> > >> On Mon, Jul 1, 2013 at 11:34 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > >> > And also why we do not see the impact of i2c issue on sgtl5000 before
-> > >> > the offending commit af8ee11 (ASoC: sgtl5000: Fix driver probe after
-> > >> > reset)?
-> > >> 
-> > >> Probably because the mxs i2c was working before this commit.
-> > > 
-> > > Do you have a commit id at which mxs i2c is known good?  I would like to
-> > > find out it's a mxs i2c issue or sgtl5000 problem.
-> > 
-> > I don't have it, but I am adding Alexandre in case he knows.
-> > 
-> > Alexandre,
-> > 
-> > Do you happen to know a commit id which does not show the mxs i2c
-> > timeouts you have been observing?
-> 
-> I think you can just disable the PIO mode altogether (around line 500 ... if 
-> (msg->len < 8) ... replace this with if (0) ) and then the problem should not be 
-> there (if it's a PIO problem).
+Hi Shawn:
+Never mind, I misunderstand what you said.
 
-Ok, Fabio is right. With the change, sgtl5000 write works even without
-that msleep(50).
+Now, I know what your are expecting now, would prepare the Version3, and send them later.
 
-So, Mark, please disregard the patch, and we should fix mxs i2c driver
-instead.
+Best Regards
+Richard Zhu
+
+
+-----Original Message-----
+From: Shawn Guo [mailto:shawn.guo at linaro.org] 
+Sent: Monday, July 01, 2013 11:30 PM
+To: Sascha Hauer
+Cc: Richard Zhu; linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; avorontsov at ru.mvista.com; rob.herring at calxeda.com; linux-ide at vger.kernel.org; Zhu Richard-R65037
+Subject: Re: [v2 4/4] sata: imx: add ahci sata support on imx platforms
+
+On Mon, Jul 01, 2013 at 02:44:45PM +0200, Sascha Hauer wrote:
+> On Mon, Jul 01, 2013 at 06:02:55PM +0800, Richard Zhu wrote:
+> > imx6q contains one Synopsys AHCI SATA controller, But it can't 
+> > shares ahci_platform driver with other controllers.
+> > Because there are some misalignments of the bits definitions of the 
+> > HBA registers and the Vendor Specific registers
+> >  - CAP_SSS(bit20) of the HOST_CAP is writable, default  value is 
+> > '0', should be configured to be '1'
+> >  - bit0 (only one AHCI SATA port on imx6q) of the  HOST_PORTS_IMPL 
+> > should be set to be '1'.(default 0)
+> >  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)  should 
+> > be configured regarding to the frequency of AHB  bus clock.
+> > 
+> > Setup its own ahci sata driver, enable the imx6q ahci sata support, 
+> > and update the ahci sata binding document.
+> > 
+> > Signed-off-by: Richard Zhu <r65037@freescale.com>
+> 
+> Wait a minute. We suggested to add a i.MX specific ahci driver to put 
+> the i.MX speicific setup in there. Now you really post a separate i.MX 
+> driver, but instead of putting the setup in there, it's a nearly 
+> identical copy of the generic driver *without* the setup and the setup 
+> is still in arch/arm/. That doesn't make sense to me.
+
++1
+
+Richard,
+
+You could have confused by me with pointing you to the sata_highbank driver.  Sorry.  But Sascha posted his work [1] later in the same thread.  That's obviously the way we should go, and I thought you knew you should start your v2 based on that.  You missed that?
 
 Shawn
+
+[1] http://thread.gmane.org/gmane.linux.ide/54410/focus=54434
