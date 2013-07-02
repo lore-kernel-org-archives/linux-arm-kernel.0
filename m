@@ -1,32 +1,46 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 2 Jul 2013 18:43:13 +0800
-Subject: [PATCH 3/5] ARM: dts: imx6: rename the uart's compatible property
-In-Reply-To: <20130702095645.GD31358@e106331-lin.cambridge.arm.com>
-References: <1372746628-20092-1-git-send-email-b32955@freescale.com>
- <1372746628-20092-4-git-send-email-b32955@freescale.com>
- <20130702095645.GD31358@e106331-lin.cambridge.arm.com>
-Message-ID: <51D2AEC1.6030004@freescale.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue,  2 Jul 2013 12:54:11 +0200
+Subject: [PATCH 0/2] ARM: mvebu: fixes for v3.11
+Message-ID: <1372762453-12018-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?07?02? 17:56, Mark Rutland ??:
-> On Tue, Jul 02, 2013 at 07:30:26AM +0100, Huang Shijie wrote:
->> >  The imx6 uart can supports the DMA, imx uart driver has added a new
->> >  compatible property for the imx6 uart.
->> >  
->> >  In order to enable the DMA for some uart port in imx6, we rename the
->> >  uart's compatible property to "fsl,imx6-uart".
-> Doesn't this change break using these dts with an older kernel? You
-is it reasonable to use a new dts with an old kernel?
+This patch set comprises two unrelated fixes for Marvell SoCs based on
+what is currently in next-20130701. There may be fixes already pending
+for the issues.
 
+The first patch is a clean-up patch removing dmacap,memset from the
+device tree binding and users. DMA_MEMSET support has been removed from
+DMA API and mv_xor driver.
 
-> remove the "fsl,imx21-uart" string older kernels understand.
->
-> Given you already had "fsl,imx6q-uart" and "fsl,imx6sl-uart" strings,
-> would it not have made more sense to just add these to the driver?
-I think it's not a good idea.
+The second patch fixes compilation of orion5x edmini_v2 by adding a
+missing include.
 
-Shawn, what's your opinion about this?
+devicetree-discuss is added on Cc for completeness, this is all Marvell
+related and should go through Jason Cooper's branch if there are no
+objections.
 
-thanks
-Huang Shijie
+Sebastian Hesselbarth (2):
+  ARM: remove dmacap,memset from Device tree binding
+  ARM: orion5x: add missing mbus include
+
+ Documentation/devicetree/bindings/dma/mv-xor.txt |    2 --
+ arch/arm/boot/dts/armada-370.dtsi                |    2 --
+ arch/arm/boot/dts/armada-xp.dtsi                 |    2 --
+ arch/arm/boot/dts/dove.dtsi                      |    2 --
+ arch/arm/boot/dts/kirkwood.dtsi                  |    2 --
+ arch/arm/boot/dts/orion5x.dtsi                   |    1 -
+ arch/arm/mach-orion5x/edmini_v2-setup.c          |    1 +
+ 7 files changed, 1 insertions(+), 11 deletions(-)
+
+---
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+-- 
+1.7.2.5
