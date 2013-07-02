@@ -1,318 +1,323 @@
-From: ambresh@ti.com (Ambresh K)
-Date: Tue, 2 Jul 2013 17:53:41 +0530
-Subject: [3.10] [AM335x-EVMSK] BUG: spinlock bad magic on CPU#0
-Message-ID: <51D2C64D.5000500@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 2 Jul 2013 08:46:39 -0400
+Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
+In-Reply-To: <87fvvzfh70.fsf@natisbad.org>
+References: <87fvvzfh70.fsf@natisbad.org>
+Message-ID: <20130702124639.GI19937@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
-While booting 3.10 on AM355x-evmsk with following steps seeing race condition leading to SPIN BUG:
-Attached  log for reference.
+Arnaud,
 
-Config: omap2plus_defconfig. 
-make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- uImage -j 8 LOADADDR=0x80008000
-make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- am335x-evmsk.dtb
-cat arch/arm/boot/zImage arch/arm/boot/dts/am335x-evmsk.dtb > zImage
-mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 -n "Linux" -d zImage uImage  
+On Sun, Jun 30, 2013 at 10:59:31PM +0200, Arnaud Ebalard wrote:
+> Regarding the device, I put some information on the various hardware
+> parts here: http://natisbad.org/NAS2/ . I still have to update the
+> page now that almost everything is as it should.
 
+Nice!
 
-[    2.359689] cpsw: platform data missing
-[    2.364835] BUG: spinlock bad magic on CPU#0, swapper/0/1
-[    2.370537]  lock: 0xce11021c, .magic: 00000000, .owner: /0, .owner_cpu: 3
-[    2.377767] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-dirty #10
-[    2.384662] [<c001bf38>] (unwind_backtrace+0x0/0xf4) from [<c0018650>] (show_stack+0x10/0x14)
-[    2.393639] [<c0018650>] (show_stack+0x10/0x14) from [<c02ec380>] (do_raw_spin_lock+0x1b8/0x1f8)
-[    2.402896] [<c02ec380>] (do_raw_spin_lock+0x1b8/0x1f8) from [<c054e7a8>] (_raw_spin_lock_irqsave+0x4c/0x58)
-[    2.413243] [<c054e7a8>] (_raw_spin_lock_irqsave+0x4c/0x58) from [<c035d3d0>] (devres_remove+0x20/0x80)
-[    2.423125] [<c035d3d0>] (devres_remove+0x20/0x80) from [<c035d440>] (devres_release+0x10/0x38)
-[    2.432273] [<c035d440>] (devres_release+0x10/0x38) from [<c02fa718>] (devm_pinctrl_put+0x18/0x40)
-[    2.441699] [<c02fa718>] (devm_pinctrl_put+0x18/0x40) from [<c0370470>] (pinctrl_bind_pins+0x84/0xb8)
-[    2.451397] [<c0370470>] (pinctrl_bind_pins+0x84/0xb8) from [<c035a588>] (driver_probe_device+0x60/0x224)
-[    2.461462] [<c035a588>] (driver_probe_device+0x60/0x224) from [<c035a7e0>] (__driver_attach+0x94/0x98)
-[    2.471343] [<c035a7e0>] (__driver_attach+0x94/0x98) from [<c0358dd0>] (bus_for_each_dev+0x68/0x8c)
-[    2.480857] [<c0358dd0>] (bus_for_each_dev+0x68/0x8c) from [<c0359714>] (bus_add_driver+0x208/0x2a4)
-[    2.490462] [<c0359714>] (bus_add_driver+0x208/0x2a4) from [<c035adb4>] (driver_register+0x78/0x194)
-[    2.500067] [<c035adb4>] (driver_register+0x78/0x194) from [<c0008684>] (do_one_initcall+0x30/0x168)
-[    2.509682] [<c0008684>] (do_one_initcall+0x30/0x168) from [<c075c308>] (kernel_init_freeable+0xf4/0x1c0)
-[    2.519745] [<c075c308>] (kernel_init_freeable+0xf4/0x1c0) from [<c05454cc>] (kernel_init+0x8/0xe4)
-[    2.529268] [<c05454cc>] (kernel_init+0x8/0xe4) from [<c00142e8>] (ret_from_fork+0x14/0x2c)
-[   11.974206] BUG: spinlock lockup suspected on CPU#0, swapper/0/1
-[   11.980519]  lock: 0xce11021c, .magic: 00000000, .owner: /0, .owner_cpu: 3
-[   11.987744] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-dirty #10
-[   11.994612] [<c001bf38>] (unwind_backtrace+0x0/0xf4) from [<c0018650>] (show_stack+0x10/0x14)
-[   12.003577] [<c0018650>] (show_stack+0x10/0x14) from [<c02ec338>] (do_raw_spin_lock+0x170/0x1f8)
-[   12.012818] [<c02ec338>] (do_raw_spin_lock+0x170/0x1f8) from [<c054e7a8>] (_raw_spin_lock_irqsave+0x4c/0x58)
-[   12.023155] [<c054e7a8>] (_raw_spin_lock_irqsave+0x4c/0x58) from [<c035d3d0>] (devres_remove+0x20/0x80)
-[   12.033033] [<c035d3d0>] (devres_remove+0x20/0x80) from [<c035d440>] (devres_release+0x10/0x38)
-[   12.042179] [<c035d440>] (devres_release+0x10/0x38) from [<c02fa718>] (devm_pinctrl_put+0x18/0x40)
-[   12.051600] [<c02fa718>] (devm_pinctrl_put+0x18/0x40) from [<c0370470>] (pinctrl_bind_pins+0x84/0xb8)
-[   12.061294] [<c0370470>] (pinctrl_bind_pins+0x84/0xb8) from [<c035a588>] (driver_probe_device+0x60/0x224)
-[   12.071352] [<c035a588>] (driver_probe_device+0x60/0x224) from [<c035a7e0>] (__driver_attach+0x94/0x98)
-[   12.081228] [<c035a7e0>] (__driver_attach+0x94/0x98) from [<c0358dd0>] (bus_for_each_dev+0x68/0x8c)
-[   12.090738] [<c0358dd0>] (bus_for_each_dev+0x68/0x8c) from [<c0359714>] (bus_add_driver+0x208/0x2a4)
-[   12.100339] [<c0359714>] (bus_add_driver+0x208/0x2a4) from [<c035adb4>] (driver_register+0x78/0x194)
-[   12.109940] [<c035adb4>] (driver_register+0x78/0x194) from [<c0008684>] (do_one_initcall+0x30/0x168)
-[   12.119545] [<c0008684>] (do_one_initcall+0x30/0x168) from [<c075c308>] (kernel_init_freeable+0xf4/0x1c0)
-[   12.129602] [<c075c308>] (kernel_init_freeable+0xf4/0x1c0) from [<c05454cc>] (kernel_init+0x8/0xe4)
-[   12.139112] [<c05454cc>] (kernel_init+0x8/0xe4) from [<c00142e8>] (ret_from_fork+0x14/0x2c)
+> With the appended .dts file, all the various parts of the device work
+> as expected:
+> 
+>  - USB 3.0 rear ports via FL1009 XHCI controller connected to PCIe
+>    bus (eSATA not tested yet)
+>  - USB 2.0 front port
+>  - Gigabit Ethernet port (MAC needs to be set by the system at boot)
+>  - Backup, Power and Reset buttons
+>  - LEDS (most set to on but changeable). At the moment, I still have not
+>    found by which gpio the last one is controlled (activity led).
+>  - serial port at the rear
+> 
+>  - G762 PWM fan controller on I2C bus: it requires G762 driver which
+>    is *currently sitting in hwmon maintainer tree* and will be available
+>    in 3.11. Jason, as a side note I have a short patch for available for
+>    ReadyNAS Duo v2 .dts file (the device also has a G762). I can hold
+>    it until rc cycle if you prefer.
 
-Regards,
-Ambresh
--------------- next part --------------
-U-Boot 2012.10 (Jul 02 2013 - 10:41:19)
+Nope, post patches when you have them ready.  I am capable of holding
+them until -rc1 drops ;-)
 
-I2C:   ready
-DRAM:  256 MiB
-WARNING: Caches not enabled
-NAND:  No NAND device found!!!
-0 MiB
-MMC:   OMAP SD/MMC: 0, OMAP SD/MMC: 1
-*** Warning - readenv() failed, using default environment
+>  - Intersil ISL 12057 RTC on I2C bus: support for that one is *not
+>    available upstream yet* but I have an initial working patch which I
+>    intend to push upstream (same as for G762 driver).
+> 
+> In the end, the main missing part is the NAND but I guess this is the
+> same for all Aramda 370/XP boards and this is not a big issue as it is
+> still possible to interact w/ it via u-boot and install a set of
+> uImage/uInitramfs that way. 
 
-musb-hdrc: ConfigData=0xde (UTMI-8, dyn FIFOs, bulk combine, bulk split, HB-ISO Rx, HB-ISO Tx, SoftConn)
-musb-hdrc: MHDRC RTL version 2.0 
-musb-hdrc: setup fifo_mode 4
-musb-hdrc: 28/31 max ep, 16384/16384 memory
-USB Peripheral mode controller at 47401000 using PIO, IRQ 0
-musb-hdrc: ConfigData=0xde (UTMI-8, dyn FIFOs, bulk combine, bulk split, HB-ISO Rx, HB-ISO Tx, SoftConn)
-musb-hdrc: MHDRC RTL version 2.0 
-musb-hdrc: setup fifo_mode 4
-musb-hdrc: 28/31 max ep, 16384/16384 memory
-USB Host mode controller at 47401800 using PIO, IRQ 0
-Net:   cpsw, usb_ether
-Hit any key to stop autoboot:  0 
-U-Boot# 
-U-Boot# 
-U-Boot# 
-U-Boot# 
-U-Boot# setenv bootargs console=ttyO0,115200n8 root=/dev/ram0 rw ramdisk_size=64413 initrd=0x81600000,64M no_console_suspend
-U-Boot# fatload mmc 0 0x81600000 ramdisk-pm.gz; fatload mmc 0 0x80300000 uimage; bootm 0x80300000
-reading ramdisk-pm.gz
+What's the big blocker for this?  Once this is done, debian should be
+able to add support for this board.  After all, upgrading the kernel and
+initrd from userspace is a desirable option.
 
-2022580 bytes read
-reading uimage
+> Jason, the tests were done against your for-next branch (with all the
+> fixes which accumulated in Linux tree from rc7). I will work directly
+> against Linus tree as soon as the rc- cycle for 3.11 starts. 
 
-4390952 bytes read
-## Booting kernel from Legacy Image at 80300000 ...
-   Image Name:   Linux
-   Image Type:   ARM Linux Kernel Image (uncompressed)
-   Data Size:    4390888 Bytes = 4.2 MiB
-   Load Address: 80008000
-   Entry Point:  80008000
-   Verifying Checksum ... OK
-   Loading Kernel Image ... OK
-OK
+hmmm, my latest for-next (20130623) is based against v3.10-rc7, are you
+using that?
 
-Starting kernel ...
+> Additionally, I don't think this is a problem but my whole toolchain is
+> an arm-linux-gnueabi- one and the tests were done using a Debian (ho hfp
+> at all).
 
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 3.10.0-dirty (a0393775 at ula0393775) (gcc version 4.4.1 (Sourcery G++ Lite 2010q1-202) ) #10 SMP Tue Jul 2 17:19:30 IST 2013
-[    0.000000] CPU: ARMv7 Processor [413fc082] revision 2 (ARMv7), cr=10c53c7d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-[    0.000000] Machine: Generic AM33XX (Flattened Device Tree), model: TI AM335x EVM-SK
-[    0.000000] cma: CMA: reserved 16 MiB at 8e800000
-[    0.000000] Memory policy: ECC disabled, Data cache writeback
-[    0.000000] DT missing boot CPU MPIDR[23:0], fall back to default cpu_logical_map
-[    0.000000] CPU: All CPU(s) started in SVC mode.
-[    0.000000] AM335X ES2.1 (neon )
-[    0.000000] PERCPU: Embedded 9 pages/cpu @c0fc8000 s13632 r8192 d15040 u36864
-[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 64768
-[    0.000000] Kernel command line: console=ttyO0,115200n8 root=/dev/ram0 rw ramdisk_size=64413 initrd=0x81600000,64M no_console_suspend
-[    0.000000] PID hash table entries: 1024 (order: 0, 4096 bytes)
-[    0.000000] Dentry cache hash table entries: 32768 (order: 5, 131072 bytes)
-[    0.000000] Inode-cache hash table entries: 16384 (order: 4, 65536 bytes)
-[    0.000000] Memory: 255MB = 255MB total
-[    0.000000] Memory: 162768k/162768k available, 99376k reserved, 0K highmem
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-[    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-[    0.000000]     vmalloc : 0xd0800000 - 0xff000000   ( 744 MB)
-[    0.000000]     lowmem  : 0xc0000000 - 0xd0000000   ( 256 MB)
-[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-[    0.000000]       .text : 0xc0008000 - 0xc075b260   (7501 kB)
-[    0.000000]       .init : 0xc075c000 - 0xc07be540   ( 394 kB)
-[    0.000000]       .data : 0xc07c0000 - 0xc0856408   ( 602 kB)
-[    0.000000]        .bss : 0xc0856408 - 0xc0dba8e0   (5522 kB)
-[    0.000000] Hierarchical RCU implementation.
-[    0.000000] 	RCU restricting CPUs from NR_CPUS=2 to nr_cpu_ids=1.
-[    0.000000] NR_IRQS:16 nr_irqs:16 16
-[    0.000000] IRQ: Found an INTC at 0xfa200000 (revision 5.0) with 128 interrupts
-[    0.000000] Total of 128 interrupts on 1 active controller
-[    0.000000] OMAP clockevent source: timer2 at 24000000 Hz
-[    0.000000] sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956ms
-[    0.000000] OMAP clocksource: timer1 at 24000000 Hz
-[    0.000000] Console: colour dummy device 80x30
-[    0.000000] Lock dependency validator: Copyright (c) 2006 Red Hat, Inc., Ingo Molnar
-[    0.000000] ... MAX_LOCKDEP_SUBCLASSES:  8
-[    0.000000] ... MAX_LOCK_DEPTH:          48
-[    0.000000] ... MAX_LOCKDEP_KEYS:        8191
-[    0.000000] ... CLASSHASH_SIZE:          4096
-[    0.000000] ... MAX_LOCKDEP_ENTRIES:     16384
-[    0.000000] ... MAX_LOCKDEP_CHAINS:      32768
-[    0.000000] ... CHAINHASH_SIZE:          16384
-[    0.000000]  memory used by lock dependency info: 3695 kB
-[    0.000000]  per task-struct memory footprint: 1152 bytes
-[    0.001046] Calibrating delay loop... 476.77 BogoMIPS (lpj=2383872)
-[    0.119668] pid_max: default: 32768 minimum: 301
-[    0.120181] Security Framework initialized
-[    0.120341] Mount-cache hash table entries: 512
-[    0.131989] CPU: Testing write buffer coherency: ok
-[    0.133549] CPU0: thread -1, cpu 0, socket -1, mpidr 0
-[    0.133633] Setting up static identity map for 0xc0554688 - 0xc05546f8
-[    0.136755] Brought up 1 CPUs
-[    0.136780] SMP: Total of 1 processors activated (476.77 BogoMIPS).
-[    0.136792] CPU: All CPU(s) started in SVC mode.
-[    0.140055] devtmpfs: initialized
-[    0.214310] pinctrl core: initialized pinctrl subsystem
-[    0.218999] regulator-dummy: no parameters
-[    0.222983] NET: Registered protocol family 16
-[    0.231414] DMA: preallocated 256 KiB pool for atomic coherent allocations
-[    0.254858] OMAP GPIO hardware version 0.1
-[    0.279489] No ATAGs?
-[    0.279520] hw-breakpoint: debug architecture 0x4 unsupported.
-[    0.346184] bio: create slab <bio-0> at 0
-[    0.351901] vbat: 5000 mV 
-[    0.353124] lis3_reg: no parameters
-[    0.360906] SCSI subsystem initialized
-[    0.363224] usbcore: registered new interface driver usbfs
-[    0.363722] usbcore: registered new interface driver hub
-[    0.364567] usbcore: registered new device driver usb
-[    0.366632] omap_i2c 44e0b000.i2c: did not get pins for i2c error: -19
-[    0.368841] omap_i2c 44e0b000.i2c: bus 0 rev0.11 at 400 kHz
-[    0.371673] tps65910 0-002d: No interrupt support, no core IRQ
-[    0.377529] vrtc: 1800 mV 
-[    0.377955] vrtc: supplied by vbat
-[    0.381841] vio: at 1500 mV 
-[    0.382002] vio: supplied by vbat
-[    0.385095] vdd_mpu: 912 <--> 1312 mV at 1262 mV 
-[    0.385249] vdd_mpu: supplied by vbat
-[    0.388273] vdd_core: 912 <--> 1150 mV at 1137 mV 
-[    0.388420] vdd_core: supplied by vbat
-[    0.391229] vdd3: 5000 mV 
-[    0.393699] vdig1: at 1800 mV 
-[    0.393843] vdig1: supplied by vbat
-[    0.396566] vdig2: at 1800 mV 
-[    0.396705] vdig2: supplied by vbat
-[    0.399416] vpll: at 1800 mV 
-[    0.399553] vpll: supplied by vbat
-[    0.402455] vdac: at 1800 mV 
-[    0.402618] vdac: supplied by vbat
-[    0.405242] vaux1: at 1800 mV 
-[    0.405382] vaux1: supplied by vbat
-[    0.408105] vaux2: at 3300 mV 
-[    0.408271] vaux2: supplied by vbat
-[    0.411267] vaux33: at 3300 mV 
-[    0.411415] vaux33: supplied by vbat
-[    0.414092] vmmc: at 3300 mV 
-[    0.414254] vmmc: supplied by vbat
-[    0.426233] Switching to clocksource timer1
-[    0.568841] NET: Registered protocol family 2
-[    0.571034] TCP established hash table entries: 2048 (order: 2, 16384 bytes)
-[    0.571258] TCP bind hash table entries: 2048 (order: 4, 73728 bytes)
-[    0.572213] TCP: Hash tables configured (established 2048 bind 2048)
-[    0.572436] TCP: reno registered
-[    0.572475] UDP hash table entries: 256 (order: 2, 20480 bytes)
-[    0.572738] UDP-Lite hash table entries: 256 (order: 2, 20480 bytes)
-[    0.574107] NET: Registered protocol family 1
-[    0.575708] RPC: Registered named UNIX socket transport module.
-[    0.575733] RPC: Registered udp transport module.
-[    0.575746] RPC: Registered tcp transport module.
-[    0.575758] RPC: Registered tcp NFSv4.1 backchannel transport module.
-[    0.577019] Trying to unpack rootfs image as initramfs...
-[    0.579171] rootfs image is not initramfs (no cpio magic); looks like an initrd
-[    1.021655] Freeing initrd memory: 65536K (c1600000 - c5600000)
-[    1.021842] NetWinder Floating Point Emulator V0.97 (double precision)
-[    1.219409] VFS: Disk quotas dquot_6.5.2
-[    1.219665] Dquot-cache hash table entries: 1024 (order 0, 4096 bytes)
-[    1.222489] NFS: Registering the id_resolver key type
-[    1.222980] Key type id_resolver registered
-[    1.223003] Key type id_legacy registered
-[    1.223156] jffs2: version 2.2. (NAND) (SUMMARY)  ? 2001-2006 Red Hat, Inc.
-[    1.223756] msgmni has been set to 477
-[    1.227535] io scheduler noop registered
-[    1.227562] io scheduler deadline registered
-[    1.227666] io scheduler cfq registered (default)
-[    1.229234] pinctrl-single 44e10800.pinmux: 142 pins at pa f9e10800 size 568
-[    1.233961] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
-[    1.241344] omap_uart 44e09000.serial: did not get pins for uart0 error: -19
-[    1.242262] 44e09000.serial: ttyO0 at MMIO 0x44e09000 (irq = 88) is a OMAP UART0
-[    1.948967] console [ttyO0] enabled
-[    1.987501] brd: module loaded
-[    2.012066] loop: module loaded
-[    2.021427] mtdoops: mtd device (mtddev=name/number) must be supplied
-[    2.035971] usbcore: registered new interface driver asix
-[    2.042657] usbcore: registered new interface driver ax88179_178a
-[    2.051197] usbcore: registered new interface driver cdc_ether
-[    2.058131] usbcore: registered new interface driver smsc95xx
-[    2.064644] usbcore: registered new interface driver net1080
-[    2.071323] usbcore: registered new interface driver cdc_subset
-[    2.078228] usbcore: registered new interface driver zaurus
-[    2.084675] usbcore: registered new interface driver cdc_ncm
-[    2.093084] usbcore: registered new interface driver cdc_wdm
-[    2.099788] usbcore: registered new interface driver usb-storage
-[    2.106758] usbcore: registered new interface driver usbtest
-[    2.115100] mousedev: PS/2 mouse device common for all mice
-[    2.127933] omap_rtc 44e3e000.rtc: rtc core: registered 44e3e000.rtc as rtc0
-[    2.135460] 44e3e000.rtc: already running
-[    2.141107] i2c /dev entries driver
-[    2.147561] Driver for 1-wire Dallas network protocol.
-[    2.158055] omap_wdt: OMAP Watchdog Timer Rev 0x01: initial timeout 60 sec
-[    2.169434] leds-gpio leds.5: pins are not configured from the driver
-[    2.182533] ledtrig-cpu: registered to indicate activity on CPUs
-[    2.190918] usbcore: registered new interface driver usbhid
-[    2.196941] usbhid: USB HID core driver
-[    2.202582] oprofile: no performance counters
-[    2.209988] oprofile: using timer interrupt.
-[    2.215285] TCP: cubic registered
-[    2.218980] Initializing XFRM netlink socket
-[    2.223692] NET: Registered protocol family 17
-[    2.228531] NET: Registered protocol family 15
-[    2.233631] Key type dns_resolver registered
-[    2.238346] VFP support v0.3: implementor 41 architecture 3 part 30 variant c rev 3
-[    2.246518] ThumbEE CPU extension supported.
-[    2.316768] davinci_mdio 4a101000.mdio: davinci mdio revision 1.6
-[    2.323207] davinci_mdio 4a101000.mdio: detected phy mask fffffffc
-[    2.333722] libphy: 4a101000.mdio: probed
-[    2.338091] davinci_mdio 4a101000.mdio: phy[0]: device 4a101000.mdio:00, driver unknown
-[    2.346510] davinci_mdio 4a101000.mdio: phy[1]: device 4a101000.mdio:01, driver unknown
-[    2.355135] Missing slave[0] phy_id property
-[    2.359689] cpsw: platform data missing
-[    2.364835] BUG: spinlock bad magic on CPU#0, swapper/0/1
-[    2.370537]  lock: 0xce11021c, .magic: 00000000, .owner: /0, .owner_cpu: 3
-[    2.377767] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-dirty #10
-[    2.384662] [<c001bf38>] (unwind_backtrace+0x0/0xf4) from [<c0018650>] (show_stack+0x10/0x14)
-[    2.393639] [<c0018650>] (show_stack+0x10/0x14) from [<c02ec380>] (do_raw_spin_lock+0x1b8/0x1f8)
-[    2.402896] [<c02ec380>] (do_raw_spin_lock+0x1b8/0x1f8) from [<c054e7a8>] (_raw_spin_lock_irqsave+0x4c/0x58)
-[    2.413243] [<c054e7a8>] (_raw_spin_lock_irqsave+0x4c/0x58) from [<c035d3d0>] (devres_remove+0x20/0x80)
-[    2.423125] [<c035d3d0>] (devres_remove+0x20/0x80) from [<c035d440>] (devres_release+0x10/0x38)
-[    2.432273] [<c035d440>] (devres_release+0x10/0x38) from [<c02fa718>] (devm_pinctrl_put+0x18/0x40)
-[    2.441699] [<c02fa718>] (devm_pinctrl_put+0x18/0x40) from [<c0370470>] (pinctrl_bind_pins+0x84/0xb8)
-[    2.451397] [<c0370470>] (pinctrl_bind_pins+0x84/0xb8) from [<c035a588>] (driver_probe_device+0x60/0x224)
-[    2.461462] [<c035a588>] (driver_probe_device+0x60/0x224) from [<c035a7e0>] (__driver_attach+0x94/0x98)
-[    2.471343] [<c035a7e0>] (__driver_attach+0x94/0x98) from [<c0358dd0>] (bus_for_each_dev+0x68/0x8c)
-[    2.480857] [<c0358dd0>] (bus_for_each_dev+0x68/0x8c) from [<c0359714>] (bus_add_driver+0x208/0x2a4)
-[    2.490462] [<c0359714>] (bus_add_driver+0x208/0x2a4) from [<c035adb4>] (driver_register+0x78/0x194)
-[    2.500067] [<c035adb4>] (driver_register+0x78/0x194) from [<c0008684>] (do_one_initcall+0x30/0x168)
-[    2.509682] [<c0008684>] (do_one_initcall+0x30/0x168) from [<c075c308>] (kernel_init_freeable+0xf4/0x1c0)
-[    2.519745] [<c075c308>] (kernel_init_freeable+0xf4/0x1c0) from [<c05454cc>] (kernel_init+0x8/0xe4)
-[    2.529268] [<c05454cc>] (kernel_init+0x8/0xe4) from [<c00142e8>] (ret_from_fork+0x14/0x2c)
-[   11.974206] BUG: spinlock lockup suspected on CPU#0, swapper/0/1
-[   11.980519]  lock: 0xce11021c, .magic: 00000000, .owner: /0, .owner_cpu: 3
-[   11.987744] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-dirty #10
-[   11.994612] [<c001bf38>] (unwind_backtrace+0x0/0xf4) from [<c0018650>] (show_stack+0x10/0x14)
-[   12.003577] [<c0018650>] (show_stack+0x10/0x14) from [<c02ec338>] (do_raw_spin_lock+0x170/0x1f8)
-[   12.012818] [<c02ec338>] (do_raw_spin_lock+0x170/0x1f8) from [<c054e7a8>] (_raw_spin_lock_irqsave+0x4c/0x58)
-[   12.023155] [<c054e7a8>] (_raw_spin_lock_irqsave+0x4c/0x58) from [<c035d3d0>] (devres_remove+0x20/0x80)
-[   12.033033] [<c035d3d0>] (devres_remove+0x20/0x80) from [<c035d440>] (devres_release+0x10/0x38)
-[   12.042179] [<c035d440>] (devres_release+0x10/0x38) from [<c02fa718>] (devm_pinctrl_put+0x18/0x40)
-[   12.051600] [<c02fa718>] (devm_pinctrl_put+0x18/0x40) from [<c0370470>] (pinctrl_bind_pins+0x84/0xb8)
-[   12.061294] [<c0370470>] (pinctrl_bind_pins+0x84/0xb8) from [<c035a588>] (driver_probe_device+0x60/0x224)
-[   12.071352] [<c035a588>] (driver_probe_device+0x60/0x224) from [<c035a7e0>] (__driver_attach+0x94/0x98)
-[   12.081228] [<c035a7e0>] (__driver_attach+0x94/0x98) from [<c0358dd0>] (bus_for_each_dev+0x68/0x8c)
-[   12.090738] [<c0358dd0>] (bus_for_each_dev+0x68/0x8c) from [<c0359714>] (bus_add_driver+0x208/0x2a4)
-[   12.100339] [<c0359714>] (bus_add_driver+0x208/0x2a4) from [<c035adb4>] (driver_register+0x78/0x194)
-[   12.109940] [<c035adb4>] (driver_register+0x78/0x194) from [<c0008684>] (do_one_initcall+0x30/0x168)
-[   12.119545] [<c0008684>] (do_one_initcall+0x30/0x168) from [<c075c308>] (kernel_init_freeable+0xf4/0x1c0)
-[   12.129602] [<c075c308>] (kernel_init_freeable+0xf4/0x1c0) from [<c05454cc>] (kernel_init+0x8/0xe4)
-[   12.139112] [<c05454cc>] (kernel_init+0x8/0xe4) from [<c00142e8>] (ret_from_fork+0x14/0x2c)
+I do believe there is an active aversion to floating point within the
+kernel, you should be fine.  We also don't like C libraries, or
+hamsters, apparently.
+
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> ---
+>  arch/arm/boot/dts/Makefile                     |   1 +
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 215 +++++++++++++++++++++++++
+>  2 files changed, 216 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index ae7124c..076ff01 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -97,6 +97,7 @@ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+>  	msm8960-cdp.dtb
+>  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+>  	armada-370-mirabox.dtb \
+> +	armada-370-netgear-rn102.dtb \
+>  	armada-370-rd.dtb \
+>  	armada-xp-db.dtb \
+>  	armada-xp-gp.dtb \
+> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> new file mode 100644
+> index 0000000..5a9e129
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> @@ -0,0 +1,215 @@
+> +/*
+> + * Device Tree file for NETGEAR ReadyNAS 102
+> + *
+> + * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version
+> + * 2 of the License, or (at your option) any later version.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +/include/ "armada-370.dtsi"
+> +
+> +/ {
+> +	model = "NETGEAR ReadyNAS 102";
+> +	compatible = "netgear,readynas-102", "marvell,armada370", "marvell,armada-370-xp";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 earlyprintk";
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x20000000>; /* 512 MB */
+> +	};
+> +
+> +	soc {
+> +		internal-regs {
+> +			serial at 12000 {
+> +				clock-frequency = <200000000>;
+> +				status = "okay";
+> +			};
+> +
+> +			sata at a0000 {
+> +				nr-ports = <2>;
+> +				status = "okay";
+> +			};
+> +
+> +			pinctrl {
+> +				power_led_pin: power-led-pin {
+> +					marvell,pins = "mpp57";
+> +					marvell,function = "gpio";
+> +				};
+> +				sata1_led_pin: sata1-led-pin {
+> +					marvell,pins = "mpp15";
+> +					marvell,function = "gpio";
+> +				};
+> +
+> +				sata2_led_pin: sata2-led-pin {
+> +					marvell,pins = "mpp14";
+> +					marvell,function = "gpio";
+> +				};
+> +
+> +				backup_led_pin: backup-led-pin {
+> +					marvell,pins = "mpp56";
+> +					marvell,function = "gpio";
+> +				};
+> +			};
+> +
+> +			gpio_leds {
+> +				compatible = "gpio-leds";
+> +				pinctrl-0 = < &power_led_pin
+> +					      &sata1_led_pin
+> +					      &sata2_led_pin
+> +					      &backup_led_pin >;
+> +				pinctrl-names = "default";
+> +
+> +				blue_power_led {
+> +					label = "rn102:blue:pwr";
+> +					gpios = <&gpio1 25 1>;  /* GPIO 57 Active Low */
+> +					linux,default-trigger = "heartbeat";
+> +				};
+> +
+> +				green_sata1_led {
+> +					label = "rn102:green:sata1";
+> +					gpios = <&gpio0 15 1>;  /* GPIO 15 Active Low */
+> +					default-state = "on";
+> +				};
+> +
+> +				green_sata2_led {
+> +					label = "rn102:green:sata2";
+> +					gpios = <&gpio0 14 1>;   /* GPIO 14 Active Low */
+> +					default-state = "on";
+> +				};
+> +
+> +				green_backup_led {
+> +					label = "rn102:green:backup";
+> +					gpios = <&gpio1 24 1>;   /* GPIO 56 Active Low */
+> +					default-state = "on";
+> +				};
+> +			};
+> +
+> +			gpio_keys {
+> +				compatible = "gpio-keys";
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				button at 1 {
+> +					label = "Power Button";
+> +					linux,code = <116>;     /* KEY_POWER */
+> +					gpios = <&gpio1 30 1>;
+> +				};
+> +				button at 2 {
+> +					label = "Reset Button";
+> +					linux,code = <0x198>;   /* KEY_RESTART */
+> +					gpios = <&gpio0 6 1>;
+> +				};
+> +				button at 3 {
+> +					label = "Backup Button";
+> +					linux,code = <133>;     /* KEY_COPY */
+> +					gpios = <&gpio1 26 1>;
+> +				};
+> +			};
+> +
+> +			mdio {
+> +				phy0: ethernet-phy at 0 {
+> +					reg = <0>;
+> +				};
+> +			};
+> +
+> +			ethernet at 74000 {
+> +				status = "okay";
+> +				phy = <&phy0>;
+> +				phy-mode = "rgmii-id";
+> +			};
+> +
+> +			/* Waiting for NAND support to appear in armada-370.dtsi
+
+I would just leave this out until we get the driver sorted.
+
+thx,
+
+Jason.
+
+> +
+> +			nand at d0000 {
+> +				status = "okay";
+> +
+> +				partition at 0 {
+> +				   label = "u-boot";
+> +				   reg = <0x0000000 0x180000>;
+> +				   read-only;
+> +				};
+> +
+> +				partition at 180000 {
+> +				   label = "u-boot-env";
+> +				   reg = <0x180000 0x20000>;
+> +				};
+> +
+> +				partition at 200000 {
+> +				   label = "uImage";
+> +				   reg = <0x0200000 0x600000>;
+> +				};
+> +
+> +				partition at 800000 {
+> +				   label = "minirootfs";
+> +				   reg = <0x0800000 0x400000>;
+> +				};
+> +
+> +				partition at c00000 {
+> +				   label = "ubi";
+> +				   reg = <0x0c00000 0x7400000>;
+> +				};
+> +			};
+> +
+> +			*/
+> +
+> +			usb at 50000 {
+> +				status = "okay";
+> +			};
+> +
+> +			clocks {
+> +			       #address-cells = <1>;
+> +			       #size-cells = <0>;
+> +
+> +			       g762_clk: fixedclk {
+> +					 compatible = "fixed-clock";
+> +					 #clock-cells = <0>;
+> +					 clock-frequency = <8192>;
+> +			       };
+> +			};
+> +
+> +			i2c at 11000 {
+> +				compatible = "marvell,mv64xxx-i2c";
+> +				clock-frequency = <100000>;
+> +				status = "okay";
+> +
+> +				isl12057: isl12057 at 68 {
+> +					compatible = "isil,isl12057";
+> +					reg = <0x68>;
+> +					wakeup-source;
+> +				};
+> +
+> +				g762: g762 at 3e {
+> +					compatible = "gmt,g762";
+> +					reg = <0x3e>;
+> +					clocks = <&g762_clk>; /* input clock */
+> +					fan_gear_mode = <0>;
+> +					fan_startv = <1>;
+> +					pwm_polarity = <0>;
+> +				};
+> +			};
+> +
+> +			pcie-controller {
+> +				status = "okay";
+> +
+> +				/* Connected to Marvell SATA controller */
+> +				pcie at 1,0 {
+> +					/* Port 0, Lane 0 */
+> +					status = "okay";
+> +				};
+> +
+> +				/* Connected to FL1009 USB 3.0 controller */
+> +				pcie at 2,0 {
+> +					/* Port 1, Lane 0 */
+> +					status = "okay";
+> +				};
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
+> 1.8.3.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
