@@ -1,33 +1,101 @@
 From: coelho@ti.com (Luciano Coelho)
-Date: Tue, 2 Jul 2013 17:55:44 +0300
-Subject: [PATCH v2 5/9] wlcore: always use one-shot IRQ
+Date: Tue, 2 Jul 2013 17:55:47 +0300
+Subject: [PATCH v2 8/9] wlcore: sdio: get clocks from device tree
 In-Reply-To: <1372776948-24840-1-git-send-email-coelho@ti.com>
 References: <1372776948-24840-1-git-send-email-coelho@ti.com>
-Message-ID: <1372776948-24840-6-git-send-email-coelho@ti.com>
+Message-ID: <1372776948-24840-9-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we are now using threaded IRQs without the primary handler, we
-need to set IRQF_ONESHOT, otherwise our request will fail.
+Read the clock nodes from the device tree and use them to set the
+frequency for the refclock and the tcxo clock.
 
 Signed-off-by: Luciano Coelho <coelho@ti.com>
 ---
- drivers/net/wireless/ti/wlcore/main.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/net/wireless/ti/wlcore/sdio.c |   36 +++++++++++++++++++++++++++++++--
+ 1 file changed, 34 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/wireless/ti/wlcore/main.c b/drivers/net/wireless/ti/wlcore/main.c
-index d306cd5..bc1cff3 100644
---- a/drivers/net/wireless/ti/wlcore/main.c
-+++ b/drivers/net/wireless/ti/wlcore/main.c
-@@ -5927,7 +5927,8 @@ static void wlcore_nvs_cb(const struct firmware *fw, void *context)
+diff --git a/drivers/net/wireless/ti/wlcore/sdio.c b/drivers/net/wireless/ti/wlcore/sdio.c
+index 980bf3d..60fce49 100644
+--- a/drivers/net/wireless/ti/wlcore/sdio.c
++++ b/drivers/net/wireless/ti/wlcore/sdio.c
+@@ -53,6 +53,7 @@ static bool dump = false;
+ struct wl12xx_sdio_glue {
+ 	struct device *dev;
+ 	struct platform_device *core;
++	struct clk *refclock, *tcxoclock;
+ };
  
- 	wl->irq = platform_get_irq(pdev, 0);
- 	wl->if_ops = pdev_data->if_ops;
--	wl->irq_flags = pdata->irq_flags;
-+	/* Since we don't use the primary handler, we must set ONESHOT */
-+	wl->irq_flags = pdata->irq_flags | IRQF_ONESHOT;
+ static const struct sdio_device_id wl1271_devices[] = {
+@@ -224,6 +225,7 @@ static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
+ 	struct wl12xx_platform_data *pdata;
+ 	struct device_node *np = dev->of_node;
+ 	struct device_node *clock_node;
++	struct wl12xx_sdio_glue *glue = sdio_get_drvdata(dev_to_sdio_func(dev));
  
- 	ret = request_threaded_irq(wl->irq, NULL, wlcore_irq,
- 				   wl->irq_flags, pdev->name, wl);
+ 	if (!np) {
+ 		np = of_find_matching_node(NULL, dev->driver->of_match_table);
+@@ -250,6 +252,26 @@ static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
+ 	for_each_matching_node(clock_node, wlcore_sdio_of_clk_match_table)
+ 		of_fixed_clk_setup(clock_node);
+ 
++	/* TODO: make sure we have this when needed (ie. for WL6 and WL7) */
++	glue->refclock = of_clk_get_by_name(np, "refclock");
++	if (IS_ERR(glue->refclock)) {
++		dev_err(dev, "couldn't find refclock on the device tree\n");
++		glue->refclock = NULL;
++	} else {
++		clk_prepare_enable(glue->refclock);
++		pdata->ref_clock_freq = clk_get_rate(glue->refclock);
++	}
++
++	/* TODO: make sure we have this when needed (ie. for WL7) */
++	glue->tcxoclock = of_clk_get_by_name(np, "tcxoclock");
++	if (IS_ERR(glue->tcxoclock)) {
++		dev_err(dev, "couldn't find tcxoclock on the device tree\n");
++		glue->tcxoclock = NULL;
++	} else {
++		clk_prepare_enable(glue->tcxoclock);
++		pdata->ref_clock_freq = clk_get_rate(glue->tcxoclock);
++	}
++
+ 	goto out;
+ 
+ out_free:
+@@ -294,6 +316,8 @@ static int wl1271_probe(struct sdio_func *func,
+ 	/* Use block mode for transferring over one block size of data */
+ 	func->card->quirks |= MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
+ 
++	sdio_set_drvdata(func, glue);
++
+ 	/* The pdata allocated here is freed when the device is freed,
+ 	 * so we don't need an additional out label to free it in case
+ 	 * of error further on.
+@@ -319,8 +343,6 @@ static int wl1271_probe(struct sdio_func *func,
+ 	if (mmcflags & MMC_PM_KEEP_POWER)
+ 		pdev_data->pwr_in_suspend = true;
+ 
+-	sdio_set_drvdata(func, glue);
+-
+ 	/* Tell PM core that we don't need the card to be powered now */
+ 	pm_runtime_put_noidle(&func->dev);
+ 
+@@ -387,6 +409,16 @@ static void wl1271_remove(struct sdio_func *func)
+ {
+ 	struct wl12xx_sdio_glue *glue = sdio_get_drvdata(func);
+ 
++	if (glue->refclock) {
++		clk_disable_unprepare(glue->refclock);
++		clk_put(glue->refclock);
++	}
++
++	if (glue->tcxoclock) {
++		clk_disable_unprepare(glue->tcxoclock);
++		clk_put(glue->tcxoclock);
++	}
++
+ 	/* Undo decrement done above in wl1271_probe */
+ 	pm_runtime_get_noresume(&func->dev);
+ 
 -- 
 1.7.10.4
