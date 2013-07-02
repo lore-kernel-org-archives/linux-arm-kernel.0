@@ -1,49 +1,70 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 2 Jul 2013 09:15:50 -0500
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83ECCC435@DBDE04.ent.ti.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
- <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
- <51CAEB33.5010101@ti.com>
- <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
- <51CBBCD8.5030600@ti.com>
- <alpine.DEB.2.02.1306281844090.8767@utopia.booyaka.com>
- <alpine.DEB.2.02.1307010211580.3741@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83ECCC435@DBDE04.ent.ti.com>
-Message-ID: <51D2E096.5040700@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 2 Jul 2013 10:24:16 -0400
+Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
+In-Reply-To: <20130702134947.GC6740@1wt.eu>
+References: <87fvvzfh70.fsf@natisbad.org>
+ <20130702124639.GI19937@titan.lakedaemon.net>
+ <20130702151407.01680d21@skate>
+ <20130702133337.GA17110@titan.lakedaemon.net>
+ <20130702153825.139a93a5@skate>
+ <20130702134421.GC17110@titan.lakedaemon.net>
+ <20130702134947.GC6740@1wt.eu>
+Message-ID: <20130702142416.GD17110@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2013 11:29 PM, Hiremath, Vaibhav wrote:
->
->> -----Original Message-----
->> From: Paul Walmsley [mailto:paul at pwsan.com]
->> Sent: Monday, July 01, 2013 7:46 AM
->> To: Vutla, Lokesh
->> Cc: Nayak, Rajendra; Hiremath, Vaibhav; Kevin Hilman; Rini, Tom; linux-
->> omap at vger.kernel.org; Balbi, Felipe; linux-arm-
->> kernel at lists.infradead.org
->> Subject: Re: OMAP baseline test results for v3.10-rc6
->>
->> On Fri, 28 Jun 2013, Paul Walmsley wrote:
->>
->>> On Thu, 27 Jun 2013, Lokesh Vutla wrote:
->>>
->>>> Here is the catch..
->>>> Your dtb is generated in arch/arm/boot/dts/ folder(before V3.8 dtb
->> was
->>>> generated in arch/arm/boot).
->>>
->>> Ugh... that's probably it :-(
-to prevent this from happening again, Lokesh did post a patch:
-https://patchwork.kernel.org/patch/2796921/
+On Tue, Jul 02, 2013 at 03:49:47PM +0200, Willy Tarreau wrote:
+> On Tue, Jul 02, 2013 at 09:44:21AM -0400, Jason Cooper wrote:
+> > On Tue, Jul 02, 2013 at 03:38:25PM +0200, Thomas Petazzoni wrote:
+> > > Dear Jason Cooper,
+> > > 
+> > > On Tue, 2 Jul 2013 09:33:37 -0400, Jason Cooper wrote:
+> > > 
+> > > > > The big blocker is that no-one has written  the driver for it. It is
+> > > > > still on our (Free Electrons) TODO-list, but not as a top-priority item
+> > > > > for the moment.
+> > > > 
+> > > > Ok.
+> > > > 
+> > > > > Ezequiel had started to do some preliminary cleanup work on the
+> > > > > pxa3xx-nand driver, with the ultimate goal of making it support Armada
+> > > > > 370/XP (because the IP in the Armada 370/XP is apparently an evolution
+> > > > > of the PXA3xx NAND controller), but our priorities shifted to those
+> > > > > other topics. We will back on it some day, but I can't say when at the
+> > > > > moment.
+> > > > 
+> > > > Is this under contract?  If so, I don't want to take it from you.  If it
+> > > > isn't, perhaps Ezequiel and Arnaud could mind-meld?
+> > > 
+> > > The big problem is that the Armada 370 and Armada XP datasheets are
+> > > still only available under NDA, so it's quite hard for someone to step
+> > > up and do this, without access to those datasheets.
+> > 
+> > bummer.
+> > 
+> > > It used to be on our TODO-list, but isn't any longer, and I have no
+> > > informations about when it will re-appear on our TODO-list at this
+> > > point.
+> > 
+> > So, Arnaud, how do you feel about tackling the nand driver based on the
+> > sources you have and the pointers above?
+> 
+> BTW if that can help, I already have a working port of the driver that is
+> present in Marvell's kernel. The port is absolutely ugly, it's plain copy
+> paste of the HAL parts that I needed until it built and booted. It worked
+> on my mirabox with 3.8. I know it doesn't work since recently (I believe
+> since introduction of the mbus driver) though I haven't had time to check
+> why yet. The advantage of such an ugly work is that I'm sure that it will
+> never be merged into mainline :-)
 
-Will be good to ack it if we think it might prevent such scenarios in 
-the future.
+Could you post a branch somewhere for us to look at?  Or, just post it
+RFC in all it's ugly glory :)  Hopefully, there's enough hints in there
+to give us a good idea of what needs changed in pxa33xx-nand.
 
--- 
-Regards,
-Nishanth Menon
+thx,
+
+Jason.
+> 
+> Regards,
+> Willy
+> 
