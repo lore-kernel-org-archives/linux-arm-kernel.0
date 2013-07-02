@@ -1,29 +1,49 @@
-From: cb@sgoc.de (Christoph G. Baumann)
-Date: Tue, 2 Jul 2013 16:09:17 +0200 (CEST)
-Subject: [PATCHv2 2/3] ARM: mxs: cfa10049: Switch bus i2c1 to bitbanging
-In-Reply-To: <CAOMZO5AASS4sr08i4K-uSUuvG+x9cjfFUtheY9JatA4dWCB0ww@mail.gmail.com>
-References: <1371754675-12242-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1371754675-12242-3-git-send-email-alexandre.belloni@free-electrons.com>
- <1235070882.565234.1372771759233.open-xchange@email.1und1.de>
- <CAOMZO5AASS4sr08i4K-uSUuvG+x9cjfFUtheY9JatA4dWCB0ww@mail.gmail.com>
-Message-ID: <489238046.567779.1372774157223.open-xchange@email.1und1.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 2 Jul 2013 09:15:50 -0500
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83ECCC435@DBDE04.ent.ti.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+ <51CAEB33.5010101@ti.com>
+ <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
+ <51CBBCD8.5030600@ti.com>
+ <alpine.DEB.2.02.1306281844090.8767@utopia.booyaka.com>
+ <alpine.DEB.2.02.1307010211580.3741@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83ECCC435@DBDE04.ent.ti.com>
+Message-ID: <51D2E096.5040700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
+On 07/01/2013 11:29 PM, Hiremath, Vaibhav wrote:
 >
-> Differently than mx23, the mx28 reference manual states that ACK_MODE
-> bit has a default value of 1.
->
-> Thanks for pointing this out, as we need to take this into
-> consideration for supporting mx23 in the mxs i2c driver.
->
+>> -----Original Message-----
+>> From: Paul Walmsley [mailto:paul at pwsan.com]
+>> Sent: Monday, July 01, 2013 7:46 AM
+>> To: Vutla, Lokesh
+>> Cc: Nayak, Rajendra; Hiremath, Vaibhav; Kevin Hilman; Rini, Tom; linux-
+>> omap at vger.kernel.org; Balbi, Felipe; linux-arm-
+>> kernel at lists.infradead.org
+>> Subject: Re: OMAP baseline test results for v3.10-rc6
+>>
+>> On Fri, 28 Jun 2013, Paul Walmsley wrote:
+>>
+>>> On Thu, 27 Jun 2013, Lokesh Vutla wrote:
+>>>
+>>>> Here is the catch..
+>>>> Your dtb is generated in arch/arm/boot/dts/ folder(before V3.8 dtb
+>> was
+>>>> generated in arch/arm/boot).
+>>>
+>>> Ugh... that's probably it :-(
+to prevent this from happening again, Lokesh did post a patch:
+https://patchwork.kernel.org/patch/2796921/
 
-nevertheless the mx28 I2C controller seems to suffer from this error too, as
-SMbus doesn't work with it.
+Will be good to ack it if we think it might prevent such scenarios in 
+the future.
 
-
-
-Regards
-Christoph
+-- 
+Regards,
+Nishanth Menon
