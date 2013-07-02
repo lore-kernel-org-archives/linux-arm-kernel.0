@@ -1,30 +1,43 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 2 Jul 2013 18:35:26 +0300
-Subject: [PATCH v2 8/9] wlcore: sdio: get clocks from device tree
-In-Reply-To: <1372776948-24840-9-git-send-email-coelho@ti.com>
-References: <1372776948-24840-1-git-send-email-coelho@ti.com>
- <1372776948-24840-9-git-send-email-coelho@ti.com>
-Message-ID: <20130702153526.GI7013@arwen.pp.htv.fi>
+From: dserrg@gmail.com (Sergey Dyasly)
+Date: Tue,  2 Jul 2013 19:58:05 +0400
+Subject: [PATCH v2] ARM: LPAE: don't reject mapping /dev/mem above 4GB
+Message-ID: <1372780685-2528-1-git-send-email-dserrg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+With LPAE enabled, physical address space is larger than 4GB. Allow mapping any
+part of it via /dev/mem by utilizing the same check as in arm64.
 
-On Tue, Jul 02, 2013 at 05:55:47PM +0300, Luciano Coelho wrote:
-> @@ -294,6 +316,8 @@ static int wl1271_probe(struct sdio_func *func,
->  	/* Use block mode for transferring over one block size of data */
->  	func->card->quirks |= MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
->  
-> +	sdio_set_drvdata(func, glue);
+PHYS_MASK covers 40 bits with LPAE enabled and 32 bits otherwise.
 
-is this move really necessary ?
+Signed-off-by: Sergey Dyasly <dserrg@gmail.com>
+---
 
+v2:
+- Removed #ifdef and changed original function as suggested by Catalin Marinas
+
+ arch/arm/mm/mmap.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
+index 10062ce..09bab92 100644
+--- a/arch/arm/mm/mmap.c
++++ b/arch/arm/mm/mmap.c
+@@ -204,13 +204,11 @@ int valid_phys_addr_range(phys_addr_t addr, size_t size)
+ }
+ 
+ /*
+- * We don't use supersection mappings for mmap() on /dev/mem, which
+- * means that we can't map the memory area above the 4G barrier into
+- * userspace.
++ * Do not allow /dev/mem mappings beyond the supported physical range.
+  */
+ int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
+ {
+-	return !(pfn + (size >> PAGE_SHIFT) > 0x00100000);
++	return !(((pfn << PAGE_SHIFT) + size) & ~PHYS_MASK);
+ }
+ 
+ #ifdef CONFIG_STRICT_DEVMEM
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130702/a7cd1015/attachment.sig>
+1.8.1.2
