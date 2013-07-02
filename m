@@ -1,21 +1,72 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 2 Jul 2013 12:30:47 +0900
-Subject: [PATCH] ARM: shmobile: emev2 GIO3 resource fix
-In-Reply-To: <20130701114807.29137.43972.sendpatchset@w520>
-References: <20130701114807.29137.43972.sendpatchset@w520>
-Message-ID: <20130702033046.GC14567@verge.net.au>
+From: xobs@kosagi.com (Sean Cross)
+Date: Tue, 2 Jul 2013 11:46:04 +0800
+Subject: [PATCH 3/4] PCI: Add driver for i.MX6 PCI Express
+In-Reply-To: <51D15513.7020101@st.com>
+References: <1372662947-27160-1-git-send-email-xobs@kosagi.com>
+ <1372662947-27160-4-git-send-email-xobs@kosagi.com>
+ <51D15513.7020101@st.com>
+Message-ID: <2E3BDF14016345FA887E3BACAE05DADA@kosagi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 08:48:07PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+On Monday, July 1, 2013 at 6:08 PM, Pratyush Anand wrote:
+> On 7/1/2013 12:45 PM, Sean Cross wrote:
+> > This adds a PCI Express port driver for the on-chip PCI Express port
+> > present on the i.MX6 SoC. It is based on the PCI Express driver available
+> > in the Freescale BSP.
+> > 
+> > Signed-off-by: Sean Cross <xobs at kosagi.com (mailto:xobs@kosagi.com)>
+> > ---
 > 
-> Fix GIO3 base addresses for EMEV2.
 > 
-> This bug was introduced by 088efd9273b5076a0aead479aa31f1066d182b3e
-> ("mach-shmobile: Emma Mobile EV2 GPIO support V3") which was included in v3.5.
 > 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ...
+> 
+> > diff --git a/drivers/pci/pcie/pcie-imx.c b/drivers/pci/pcie/pcie-imx.c
+> > new file mode 100644
+> > index 0000000..664679e
+> > --- /dev/null
+> > +++ b/drivers/pci/pcie/pcie-imx.c
+> 
+> 
+> 
+> Should go to drivers/pci/host/
+I'll pull from arm-soc rather than from Linus' tree and place the driver there instead.
+ 
+> > @@ -0,0 +1,1049 @@
+> > +/*
+> > + * drivers/pci/pcie/pcie-imx.c
+> > + *
+> 
+> 
+> 
+> ...
+> 
+> 
+> > +#define ATU_R_BaseAddress 0x900
+> > +#define PCIE_PL_iATUVR (ATU_R_BaseAddress + 0x0)
+> > +#define PCIE_PL_iATURC1 (ATU_R_BaseAddress + 0x4)
+> > +#define PCIE_PL_iATURC2 (ATU_R_BaseAddress + 0x8)
+> > +#define PCIE_PL_iATURLBA (ATU_R_BaseAddress + 0xC)
+> > +#define PCIE_PL_iATURUBA (ATU_R_BaseAddress + 0x10)
+> > +#define PCIE_PL_iATURLA (ATU_R_BaseAddress + 0x14)
+> > +#define PCIE_PL_iATURLTA (ATU_R_BaseAddress + 0x18)
+> > +#define PCIE_PL_iATURUTA (ATU_R_BaseAddress + 0x1C)
+> 
+> 
+> 
+> I may be wrong, but from these offset it seems to me that it is SNPS 
+> controller. If yes, then please go through comments of
+> "[PATCH V1-10 0/4] PCIe support for Samsung Exynos5440 SoC"
 
-Thanks, I will try and get this included in v3.11 as a fix
-and then added to v3.9 and v3.10 stable.
+Exynos5440 appears to use the same port logic controller.  However, the PHYs are different.  I'm not exactly certain which comments you want me to notice in that series of patchsets, but I see references to splitting Exynos-specific code into its own project.  Based on that, it seems like the best approach would be to:
+
+    1) Move Exynos code into its own file, say, pcie-exynos.c.  This would leave only Synopsys-specific ATC code in pcie-designware.c
+    2) Rename generic exynos functions to reflect the fact that they're designware-generic functions.
+    3) Have pcie-imx.c reference this generic designware ATC code.
+
+I'll rework the patch and re-submit it following these three changes.
+
+
+--
+Sean Cross
