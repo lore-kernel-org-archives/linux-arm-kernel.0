@@ -1,76 +1,60 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 2 Jul 2013 18:26:57 +0300
-Subject: [PATCH v2 2/9] wlcore: use irq_flags in pdata instead of hiding
- it behind a quirk
-In-Reply-To: <1372776948-24840-3-git-send-email-coelho@ti.com>
-References: <1372776948-24840-1-git-send-email-coelho@ti.com>
- <1372776948-24840-3-git-send-email-coelho@ti.com>
-Message-ID: <20130702152657.GE7013@arwen.pp.htv.fi>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 02 Jul 2013 17:34:30 +0200
+Subject: [alsa-devel] [PATCH 2/2] ASoC: atmel-pcm: use generic dmaengine
+ framework
+In-Reply-To: <1372755849-19546-3-git-send-email-voice.shen@atmel.com>
+References: <1372755849-19546-1-git-send-email-voice.shen@atmel.com>
+ <1372755849-19546-3-git-send-email-voice.shen@atmel.com>
+Message-ID: <51D2F306.7040603@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 07/02/2013 11:04 AM, Bo Shen wrote:
+[...]
+> -/*--------------------------------------------------------------------------*\
+> - * DMAENGINE operations
+> -\*--------------------------------------------------------------------------*/
+> -static bool filter(struct dma_chan *chan, void *slave)
+> -{
+> -	struct at_dma_slave *sl = slave;
+> -
+> -	if (sl->dma_dev == chan->device->dev) {
+> -		chan->private = sl;
+> -		return true;
+> -	} else {
+> -		return false;
+> -	}
+> -}
 
-On Tue, Jul 02, 2013 at 05:55:41PM +0300, Luciano Coelho wrote:
-> The platform_quirk element in the platform data was used to change the
-> way the IRQ is triggered.  When set, the EDGE_IRQ quirk would change
-> the irqflags used and treat edge trigger differently from the rest.
-> 
-> Instead of hiding this irq flag setting behind the quirk, export the
-> whole irq_flags element and let the board file define what to use.
-> This will be more meaningful than driver-specific quirks when we
-> switch to DT.
-> 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Luciano Coelho <coelho@ti.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-davinci/board-da850-evm.c      |    2 +-
->  arch/arm/mach-omap2/board-4430sdp.c          |    1 +
->  arch/arm/mach-omap2/board-omap3evm.c         |    1 +
->  arch/arm/mach-omap2/board-omap4panda.c       |    1 +
->  arch/arm/mach-omap2/board-zoom-peripherals.c |    1 +
->  drivers/net/wireless/ti/wlcore/debugfs.c     |    2 +-
->  drivers/net/wireless/ti/wlcore/main.c        |   13 +++----------
->  drivers/net/wireless/ti/wlcore/wlcore.h      |    5 ++---
->  include/linux/wl12xx.h                       |    5 +----
->  9 files changed, 12 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index 8a24b6c..d2a2a98 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -1377,8 +1377,8 @@ static const short da850_wl12xx_pins[] __initconst = {
->  
->  static struct wl12xx_platform_data da850_wl12xx_wlan_data __initdata = {
->  	.irq			= -1,
-> +	.irq_flags		= IRQF_TRIGGER_RISING,
->  	.board_ref_clock	= WL12XX_REFCLOCK_38,
-> -	.platform_quirks	= WL12XX_PLATFORM_QUIRK_EDGE_IRQ,
->  };
->  
->  static __init int da850_wl12xx_init(void)
-> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-> index 56a9a4f..c2334aa 100644
-> --- a/arch/arm/mach-omap2/board-4430sdp.c
-> +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> @@ -693,6 +693,7 @@ static void __init omap4_sdp4430_wifi_mux_init(void)
+I'm wondering why is filtering no longer required?
+
+[...]
+> +		slave_config->dst_addr = (dma_addr_t)ssc->phybase + SSC_THR;
+[...]
+> +		slave_config->src_addr = (dma_addr_t)ssc->phybase + SSC_RHR;
+
+Change the type of phybase to dma_addr_t
+
+[...]
 >  }
 >  
->  static struct wl12xx_platform_data omap4_sdp4430_wlan_data __initdata = {
-> +	.irq_flags = IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
+> -static int atmel_pcm_dma_prepare(struct snd_pcm_substream *substream)
+> -{
+> -	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> -	struct atmel_pcm_dma_params *prtd;
+> -
+> -	prtd = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+> -
+> -	ssc_writex(prtd->ssc->regs, SSC_IER, prtd->mask->ssc_error);
+> -	ssc_writex(prtd->ssc->regs, SSC_CR, prtd->mask->ssc_enable);
 
-couldn't you just call irq_set_irq_type() from the board-file itself ?
-Then on your driver you can just pass IRQF_ONESHOT (to make sure heh) to
-your request_threaded_irq_handler()
+These writes are also completely lost
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130702/4de089c4/attachment.sig>
+> -
+> -	return 0;
+> -}
+
+I think it would also be good to get rid of any references to the ssc struct
+from the DMA driver and move them over to the DAI driver.
+
+- Lars
