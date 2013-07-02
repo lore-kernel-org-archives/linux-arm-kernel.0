@@ -1,23 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Jul 2013 22:19:36 +0200
-Subject: [PATCH v4] ARM: clocksource: add support for MOXA ART SoCs
-In-Reply-To: <1372687359-18235-1-git-send-email-jonas.jensen@gmail.com>
-References: <1372332203-30228-1-git-send-email-jonas.jensen@gmail.com>
- <1372687359-18235-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <CACRpkdbT3yiq79rCRK0kFe39Y6QkSZHJ+7kbcmKFH8esGEN3LQ@mail.gmail.com>
+From: coelho@ti.com (Luciano Coelho)
+Date: Tue, 2 Jul 2013 23:19:54 +0300
+Subject: [PATCH v2 8/9] wlcore: sdio: get clocks from device tree
+In-Reply-To: <20130702153526.GI7013@arwen.pp.htv.fi>
+References: <1372776948-24840-1-git-send-email-coelho@ti.com>
+ <1372776948-24840-9-git-send-email-coelho@ti.com>
+ <20130702153526.GI7013@arwen.pp.htv.fi>
+Message-ID: <1372796394.21065.89.camel@cumari.coelho.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 1, 2013 at 4:02 PM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+On Tue, 2013-07-02 at 18:35 +0300, Felipe Balbi wrote:
+> Hi,
+> 
+> On Tue, Jul 02, 2013 at 05:55:47PM +0300, Luciano Coelho wrote:
+> > @@ -294,6 +316,8 @@ static int wl1271_probe(struct sdio_func *func,
+> >  	/* Use block mode for transferring over one block size of data */
+> >  	func->card->quirks |= MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
+> >  
+> > +	sdio_set_drvdata(func, glue);
+> 
+> is this move really necessary ?
 
-> This patch adds an clocksource driver for the main timer(s)
-> found on MOXA ART SoCs.
->
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+It is, because I use the glue in wlcore_get_pdata_from_of(), so I need
+to call sdio_set_drvdata() earlier.  I reckoned it wouldn't hurt to move
+this, so I wouldn't have to pass the glue in the
+wlcore_get_pdata_from_of() call.
 
-I'm pretty happy with this version, tglx points out a possible optimization
-getting rid of some unnecessary reads in hotpath but anyway:
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+--
+Luca.
