@@ -1,128 +1,66 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 02 Jul 2013 17:42:49 +0900
-Subject: [PATCH V4 4/4] video: exynos_dp: Use the generic PHY driver
-Message-ID: <000d01ce7700$222a35a0$667ea0e0$@samsung.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 2 Jul 2013 16:52:00 +0800
+Subject: [PATCH 07/32] arm: delete __cpuinit/__CPUINIT usage from all
+ ARM users
+In-Reply-To: <1372102237-8757-8-git-send-email-paul.gortmaker@windriver.com>
+References: <1372102237-8757-1-git-send-email-paul.gortmaker@windriver.com>
+ <1372102237-8757-8-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1372755120.2874.18.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the generic PHY API instead of the platform callback to control
-the DP PHY.
+Adding linux-tegra in Cc.
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
----
- .../devicetree/bindings/video/exynos_dp.txt        |   23 +++++---------------
- drivers/video/exynos/exynos_dp_core.c              |   16 ++++++++++----
- drivers/video/exynos/exynos_dp_core.h              |    2 ++
- 3 files changed, 20 insertions(+), 21 deletions(-)
+On Tue, 2013-06-25 at 03:30 +0800, Paul Gortmaker wrote:
+> The __cpuinit type of throwaway sections might have made sense
+> some time ago when RAM was more constrained, but now the savings
+> do not offset the cost and complications.  For example, the fix in
+> commit 5e427ec2d0 ("x86: Fix bit corruption at CPU resume time")
+> is a good example of the nasty type of bugs that can be created
+> with improper use of the various __init prefixes.
+> 
+> After a discussion on LKML[1] it was decided that cpuinit should go
+> the way of devinit and be phased out.  Once all the users are gone,
+> we can then finally remove the macros themselves from linux/init.h.
+> 
+> Note that some harmless section mismatch warnings may result, since
+> notify_cpu_starting() and cpu_up() are arch independent (kernel/cpu.c)
+> and are flagged as __cpuinit  -- so if we remove the __cpuinit from
+> the arch specific callers, we will also get section mismatch warnings.
+> As an intermediate step, we intend to turn the linux/init.h cpuinit
+> related content into no-ops as early as possible, since that will get
+> rid of these warnings.  In any case, they are temporary and harmless.
+> 
+> This removes all the ARM uses of the __cpuinit macros from C code,
+> and all __CPUINIT from assembly code.  It also had two ".previous"
+> section statements that were paired off against __CPUINIT
+> (aka .section ".cpuinit.text") that also get removed here.
+> 
+> [1] https://lkml.org/lkml/2013/5/20/589
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> ---
+> 
+> [This commit is part of the __cpuinit removal work.  If you don't see
+>  any problems with it, then you don't have to do anything ; it will be
+>  submitted with all the rest of the __cpuinit removal work.  On the
+>  other hand, if you want to carry this patch in with your other pending
+>  changes so as to handle conflicts with other pending work yourself, then
+>  that is fine too, as the commits can largely be treated independently.
+>  For more information, please see: https://lkml.org/lkml/2013/6/20/513 ]
+> 
 
-diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt b/Documentation/devicetree/bindings/video/exynos_dp.txt
-index 84f10c1..022f4b6 100644
---- a/Documentation/devicetree/bindings/video/exynos_dp.txt
-+++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
-@@ -1,17 +1,6 @@
- The Exynos display port interface should be configured based on
- the type of panel connected to it.
- 
--We use two nodes:
--	-dp-controller node
--	-dptx-phy node(defined inside dp-controller node)
--
--For the DP-PHY initialization, we use the dptx-phy node.
--Required properties for dptx-phy:
--	-reg:
--		Base address of DP PHY register.
--	-samsung,enable-mask:
--		The bit-mask used to enable/disable DP PHY.
--
- For the Panel initialization, we read data from dp-controller node.
- Required properties for dp-controller:
- 	-compatible:
-@@ -25,6 +14,10 @@ Required properties for dp-controller:
- 		from common clock binding: handle to dp clock.
- 	-clock-names:
- 		from common clock binding: Shall be "dp".
-+	-phys:
-+		from general PHY binding: the phandle for the PHY device.
-+	-phy-names:
-+		from general PHY binding: Should be "dp".
- 	-interrupt-parent:
- 		phandle to Interrupt combiner node.
- 	-samsung,color-space:
-@@ -67,12 +60,8 @@ SOC specific portion:
- 		interrupt-parent = <&combiner>;
- 		clocks = <&clock 342>;
- 		clock-names = "dp";
--
--		dptx-phy {
--			reg = <0x10040720>;
--			samsung,enable-mask = <1>;
--		};
--
-+		phys = <&dp_phy>;
-+		phy-names = "dp";
- 	};
- 
- Board Specific portion:
-diff --git a/drivers/video/exynos/exynos_dp_core.c b/drivers/video/exynos/exynos_dp_core.c
-index 05fed7d..5e1a715 100644
---- a/drivers/video/exynos/exynos_dp_core.c
-+++ b/drivers/video/exynos/exynos_dp_core.c
-@@ -19,6 +19,7 @@
- #include <linux/interrupt.h>
- #include <linux/delay.h>
- #include <linux/of.h>
-+#include <linux/phy/phy.h>
- 
- #include "exynos_dp_core.h"
- 
-@@ -960,8 +961,11 @@ static int exynos_dp_dt_parse_phydata(struct exynos_dp_device *dp)
- 
- 	dp_phy_node = of_find_node_by_name(dp_phy_node, "dptx-phy");
- 	if (!dp_phy_node) {
--		dev_err(dp->dev, "could not find dptx-phy node\n");
--		return -ENODEV;
-+		dp->phy = devm_phy_get(dp->dev, "dp");
-+		if (IS_ERR(dp->phy))
-+			return PTR_ERR(dp->phy);
-+		else
-+			return 0;
- 	}
- 
- 	if (of_property_read_u32(dp_phy_node, "reg", &phy_base)) {
-@@ -992,7 +996,9 @@ err:
- 
- static void exynos_dp_phy_init(struct exynos_dp_device *dp)
- {
--	if (dp->phy_addr) {
-+	if (dp->phy) {
-+		phy_power_on(dp->phy);
-+	} else if (dp->phy_addr) {
- 		u32 reg;
- 
- 		reg = __raw_readl(dp->phy_addr);
-@@ -1003,7 +1009,9 @@ static void exynos_dp_phy_init(struct exynos_dp_device *dp)
- 
- static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
- {
--	if (dp->phy_addr) {
-+	if (dp->phy) {
-+		phy_power_off(dp->phy);
-+	} else if (dp->phy_addr) {
- 		u32 reg;
- 
- 		reg = __raw_readl(dp->phy_addr);
-diff --git a/drivers/video/exynos/exynos_dp_core.h b/drivers/video/exynos/exynos_dp_core.h
-index 56cfec8..87804b6 100644
---- a/drivers/video/exynos/exynos_dp_core.h
-+++ b/drivers/video/exynos/exynos_dp_core.h
-@@ -151,6 +151,8 @@ struct exynos_dp_device {
- 	struct video_info	*video_info;
- 	struct link_train	link_train;
- 	struct work_struct	hotplug_work;
-+
-+	struct phy		*phy;
- };
- 
- /* exynos_dp_reg.c */
--- 
-1.7.10.4
+Hi Paul,
+
+I just tested this series on Tegra platform. It looks broken CPU hotplug
+function for Tegra at least. The CPU can't plug-in after unplugging. And
+the system resume function also not working when "enable_nonboot_cpus".
+
+Both of the issue cause system hang up. Are we missing something for
+__cpuinit removal work?
+
+Thanks,
+Joseph
