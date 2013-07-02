@@ -1,63 +1,46 @@
-From: dsd@laptop.org (Daniel Drake)
-Date: Mon, 1 Jul 2013 19:57:04 -0600
-Subject: armada_drm clock selection - try 2
-In-Reply-To: <51D1F921.9050608@gmail.com>
-References: <20130701203009.633A8FAAD5@dev.laptop.org>
- <51D1F921.9050608@gmail.com>
-Message-ID: <CAMLZHHRrdazrJwujCWrfzo_fcudtd4GUgMEEN2YScOAZeZ-4vA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 2 Jul 2013 10:16:53 +0800
+Subject: [alsa-devel] [PATCH 1/4] ASoC: sgtl5000: give it a ramping time
+ before writting
+In-Reply-To: <201307011943.27489.marex@denx.de>
+References: <1372666571-17276-1-git-send-email-shawn.guo@linaro.org>
+ <20130701153327.GX13206@S2101-09.ap.freescale.net>
+ <CAOMZO5B5jh1XciO4K1u3yBcHHDAgi8hA3GcywnJd11M7=aOPxA@mail.gmail.com>
+ <201307011943.27489.marex@denx.de>
+Message-ID: <20130702021651.GY13206@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 1, 2013 at 3:48 PM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
-> I guess "extclk0" and "extclk1" should be sufficient for clock names.
-> Also, they are not dedicated as you can have CRTC0 and CRTC1 use e.g.
-> extclk0 simultaneously. See below for .is_dedicated in general.
+On Mon, Jul 01, 2013 at 07:43:27PM +0200, Marek Vasut wrote:
+> Dear Fabio Estevam,
+> 
+> > On Mon, Jul 1, 2013 at 12:33 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > > On Mon, Jul 01, 2013 at 12:11:58PM -0300, Fabio Estevam wrote:
+> > >> On Mon, Jul 1, 2013 at 11:34 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > >> > And also why we do not see the impact of i2c issue on sgtl5000 before
+> > >> > the offending commit af8ee11 (ASoC: sgtl5000: Fix driver probe after
+> > >> > reset)?
+> > >> 
+> > >> Probably because the mxs i2c was working before this commit.
+> > > 
+> > > Do you have a commit id at which mxs i2c is known good?  I would like to
+> > > find out it's a mxs i2c issue or sgtl5000 problem.
+> > 
+> > I don't have it, but I am adding Alexandre in case he knows.
+> > 
+> > Alexandre,
+> > 
+> > Do you happen to know a commit id which does not show the mxs i2c
+> > timeouts you have been observing?
+> 
+> I think you can just disable the PIO mode altogether (around line 500 ... if 
+> (msg->len < 8) ... replace this with if (0) ) and then the problem should not be 
+> there (if it's a PIO problem).
 
-Maybe we can find better terminology, or just document it a bit
-better, but having two CRTCs share the same clock falls within the
-scheme designed and implemented there. "Dedicated" simply means a
-clock that is dedicated to the display controller, it is not shared by
-other devices.
+Ok, Fabio is right. With the change, sgtl5000 write works even without
+that msleep(50).
 
->> +struct armada_clk_info {
->> +       struct clk *clk;
->> +
->> +       /* If this clock is dedicated to us, we can change its rate
->> without
->> +        * worrying about any other users in other parts of the system. */
->> +       bool is_dedicated;
->> +
->> +       /* However, we cannot share the same dedicated clock between two
->> CRTCs
->> +        * if each CRTC wants a different rate. Track the number of users.
->> */
->> +       int usage_count;
->
->
-> You can share the same clock between two CRTCs. Just consider CRTC1
-> using a mode with half pixel clock as CRTC0. Not that I think this will
-> ever happen, but it is possible.
+So, Mark, please disregard the patch, and we should fix mxs i2c driver
+instead.
 
-And my implementation already lets that happen - its just that I
-didn't document it in enough detail.
-
-> I prefer not to try to find the best clock (source) at all. Let the
-> user pass the clock name by e.g. platform_data (or DT) and just try to
-> get the requested pixclk or a integer multiple of it. You will never be
-> able to find the best clock for all use cases.
->
-> Just figure out, if integer division is sufficient to get requested
-> pixclk and clk_set_rate otherwise. This may be useful for current mode
-> running at 148.5MHz (1080p50) and new mode at 74.25MHz (1080i50, 720p).
-
-I am not opposed to this approach, it is nice and simple, but as
-Russell points out we do additionally need to distinguish between
-clocks that are "ours" to play with, vs those that are shared with
-other devices. It would be a bad idea to try call clk_set_rate() on
-the AXI bus clock, for example, changing the clock for a whole bunch
-of other devices. This is what the is_dedicated flag is about. However
-such a flag could be easily added to the DT/platform data definition
-that you propose.
-
-Daniel
+Shawn
