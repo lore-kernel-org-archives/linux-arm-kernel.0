@@ -1,103 +1,57 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 2 Jul 2013 10:22:28 +0900
-Subject: [PATCH v4 2/3] ARM: shmobile: lager: enable Ether
-In-Reply-To: <1870016.uXUUSHgrj5@avalon>
-References: <1372663234-13486-1-git-send-email-horms+renesas@verge.net.au>
- <1372663234-13486-3-git-send-email-horms+renesas@verge.net.au>
- <1870016.uXUUSHgrj5@avalon>
-Message-ID: <20130702012227.GA24086@verge.net.au>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Tue, 2 Jul 2013 10:28:19 +0900
+Subject: [RFC PATCH 5/6] ARM, mm: change meaning of max_low_pfn to
+ maximum pfn for nobootmem
+In-Reply-To: <51D18ED5.50103@ti.com>
+References: <1364184674-13798-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1364184674-13798-6-git-send-email-iamjoonsoo.kim@lge.com>
+ <51D18ED5.50103@ti.com>
+Message-ID: <20130702012819.GA31505@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 03:29:21PM +0200, Laurent Pinchart wrote:
-> Hi Simon,
+On Mon, Jul 01, 2013 at 10:14:45AM -0400, Santosh Shilimkar wrote:
+> Joonsoo,
 > 
-> On Monday 01 July 2013 16:20:33 Simon Horman wrote:
-> > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> On Monday 25 March 2013 12:11 AM, Joonsoo Kim wrote:
+> > nobootmem use max_low_pfn for computing boundary in free_all_bootmem()
+> > So we need proper value to max_low_pfn.
 > > 
-> > ---
+> > But, there is some difficulty related to max_low_pfn. max_low_pfn is used
+> > for two meanings in various architectures. One is for number of pages
+> > in lowmem and the other is for maximum lowmem pfn. Now, in ARM, it is used
+> > as number of pages in lowmem. You can get more information in below link.
+> > http://lwn.net/Articles/543408/
+> > http://lwn.net/Articles/543424/
 > > 
-> > This patch has a build-time dependency on "sh_eth: add support for gpio
-> > reset". This patch has a run-time dependency on "sh_eth: add support for
-> > r8a7790 SoC".
+> > As I investigated, architectures which use max_low_pfn as maximum pfn are
+> > more than others, so to change meaning of max_low_pfn to maximum pfn
+> > is preferable solution to me. This patch change max_low_pfn as maximum
+> > lowmem pfn in ARM. In addition, min_low_pfn, max_pfn is assigned according
+> > to this criteria.
 > > 
-> > v4
-> > * Annotate ether_platdata as __initdata
+> > There is no real user for max_low_pfn except block/blk-setting.c and
+> > blk-setting.c assume that max_low_pfn is maximum lowmem pfn,
+> > so this patch may not harm anything.
 > > 
-> > v3
-> > * Rebase
-> > 
-> > v2
-> > * As suggested by Laurent Pinchart
-> >   - Do not manipilate sh_eth reset GPIO directly,
-> >     rather, do so through newly proposed support for this in
-> >     the sh_eth driver.
-> > * A suggested by Sergei Shtylyov
-> >   - Move DTS portion into a separate patch
-> > ---
-> >  arch/arm/mach-shmobile/board-lager.c | 24 ++++++++++++++++++++++++
-> >  1 file changed, 24 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-shmobile/board-lager.c
-> > b/arch/arm/mach-shmobile/board-lager.c index 0b4a1f9..7d5db20 100644
-> > --- a/arch/arm/mach-shmobile/board-lager.c
-> > +++ b/arch/arm/mach-shmobile/board-lager.c
-> > @@ -71,6 +71,17 @@ static __initdata struct gpio_keys_platform_data
-> > lager_keys_pdata = { .nbuttons	= ARRAY_SIZE(gpio_buttons),
-> >  };
-> > 
-> > +/* Ether */
-> > +static struct sh_eth_plat_data ether_platdata __initdata = {
-> > +	.phy			= 0x1,
-> > +	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
-> > +	.register_type		= SH_ETH_REG_FAST_RCAR,
-> > +	.phy_interface		= PHY_INTERFACE_MODE_RMII,
-> > +	.ether_link_active_low	= 1,
-> > +	.needs_gpio_reset	= 1,
-> > +	.reset_gpio		= RCAR_GP_PIN(5, 31),
-> > +};
-> > +
-> >  static const struct pinctrl_map lager_pinctrl_map[] = {
-> >  	/* SCIF0 (CN19: DEBUG SERIAL0) */
-> >  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
-> > @@ -78,6 +89,17 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
-> >  	/* SCIF1 (CN20: DEBUG SERIAL1) */
-> >  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.7", "pfc-r8a7790",
-> >  				  "scif1_data", "scif1"),
-> > +	/* Ether */
-> > +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
-> > +				  "eth_link", "eth"),
-> > +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
-> > +				  "eth_magic", "eth"),
+> > Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> >
+> I have been also carrying similar patch as yours in an attempt
+> to make LPAE kernel work on ARM. Your patch carries better
+> description, so will your version and include in my series
+> which I plan to post on the list after some more testing.
+> Will copy you. The changes are very similar to your series.
+
+Okay!
+
+Thanks.
 > 
-> That pin isn't used on Lager, you can drop it.
-
-Thanks, I will drop that.
-
-> By the way, the latest R8A7790 datasheet errata renamed the eth_magic pin to 
-> eth_wol. What would you think about renaming it to eth_wol in 
-> drivers/pinctrl/sh-pfc/pfc-r8a7790.c ?
-
-I do not have a strong opinion but changing it sounds entirely reasonable
-to me.
-
-> > +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
-> > +				  "eth_mdio", "eth"),
-> > +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
-> > +				  "eth_rmii", "eth"),
-> > +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
-> > +				  "intc_irq0", "intc"),
-> >  };
-> > 
-> >  static void __init lager_add_standard_devices(void)
-> > @@ -89,6 +111,8 @@ static void __init lager_add_standard_devices(void)
-> >  	r8a7790_pinmux_init();
-> > 
-> >  	r8a7790_add_standard_devices();
-> > +	r8a7790_add_ether_device(&ether_platdata);
-> > +
-> >  	platform_device_register_data(&platform_bus, "leds-gpio", -1,
-> >  				      &lager_leds_pdata,
-> >  				      sizeof(lager_leds_pdata));
+> Regards,
+> Santosh
+>  
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
