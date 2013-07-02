@@ -1,49 +1,38 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 2 Jul 2013 04:29:20 +0000
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <alpine.DEB.2.02.1307010211580.3741@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
- <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
- <51CAEB33.5010101@ti.com>
- <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
- <51CBBCD8.5030600@ti.com>
- <alpine.DEB.2.02.1306281844090.8767@utopia.booyaka.com>
- <alpine.DEB.2.02.1307010211580.3741@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83ECCC435@DBDE04.ent.ti.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 02 Jul 2013 08:30:37 +0400
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCB2MyAyLzVdIEFSTTogZHRzOiBpbXgyNzogQWRkIGlt?=
+ =?UTF-8?B?eCBmcmFtZWJ1ZmZlciBkZXZpY2U=?=
+In-Reply-To: <20130701093032.GG13206@S2101-09.ap.freescale.net>
+References: <1372431037-13519-1-git-send-email-mpa@pengutronix.de>
+ <1372432206.785926201@f326.mail.ru>
+ <20130701093032.GG13206@S2101-09.ap.freescale.net>
+Message-ID: <1372739437.489198409@f348.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> -----Original Message-----
-> From: Paul Walmsley [mailto:paul at pwsan.com]
-> Sent: Monday, July 01, 2013 7:46 AM
-> To: Vutla, Lokesh
-> Cc: Nayak, Rajendra; Hiremath, Vaibhav; Kevin Hilman; Rini, Tom; linux-
-> omap at vger.kernel.org; Balbi, Felipe; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: OMAP baseline test results for v3.10-rc6
+> On Fri, Jun 28, 2013 at 07:10:06PM +0400, Alexander Shiyan wrote:
+> > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > > ---
+> > >  arch/arm/boot/dts/imx27.dtsi | 9 +++++++++
+> > >  1 file changed, 9 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> > > index 8603886..10dcbd3 100644
+> > > --- a/arch/arm/boot/dts/imx27.dtsi
+> > > +++ b/arch/arm/boot/dts/imx27.dtsi
+> > > @@ -342,6 +342,15 @@
+> > >  			reg = <0x10020000 0x20000>;
+> > >  			ranges;
+> > >  
+> > > +			imxfb: fb at 10021000 {
+> > 
+> > If it can be fixed while applying, it would be right to use just "fb" here.
+> > We now use a lot of devices without "imx"-prefix, so I do not see any need to use it here.
 > 
-> On Fri, 28 Jun 2013, Paul Walmsley wrote:
-> 
-> > On Thu, 27 Jun 2013, Lokesh Vutla wrote:
-> >
-> > > Here is the catch..
-> > > Your dtb is generated in arch/arm/boot/dts/ folder(before V3.8 dtb
-> was
-> > > generated in arch/arm/boot).
-> >
-> > Ugh... that's probably it :-(
-> 
-> Indeed, this was at least one major problem.  With this fixed, and with
-> CONFIG_MACH_OMAP_GENERIC=y in the v3.10-rc Kconfigs, the BeagleBone
-> white
-> boots here now with v3.10-rc7.  Will test the previous releases going
-> back
+> I actually prefer to use the block name if it's not a thing defined by
+> ePAPR.  In this case, it's "lcdc".  But since "fb" is already used in
+> compatible.  Okay, I fixed it up by dropping "imx" prefix.
 
-Surely it will boot. :)
+i.MX27 have a SLCDC module, so perhaps your proposed option (lcdc) is better.
 
-Thanks,
-Vaibhav
+---
