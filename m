@@ -1,39 +1,28 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 2 Jul 2013 17:11:03 +0800
-Subject: [RFC PATCH 01/13] misc: atmel_ssc: add device tree DMA support
-In-Reply-To: <CACQ1gAgcc=j3kmcpjp8bbdHhxr_k=h8jJs6R_paJbPUMv74uGg@mail.gmail.com>
-References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
- <1372667978-4718-2-git-send-email-richard.genoud@gmail.com>
- <51D24299.9050209@atmel.com>
- <CACQ1gAgcc=j3kmcpjp8bbdHhxr_k=h8jJs6R_paJbPUMv74uGg@mail.gmail.com>
-Message-ID: <51D29927.80900@atmel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 2 Jul 2013 10:25:07 +0100
+Subject: [PATCH 3/3] ARM: dts: Add WM1811A audio CODEC to Arndale bindings
+In-Reply-To: <51D26360.2080708@linaro.org>
+References: <1372714599-17588-1-git-send-email-broonie@kernel.org>
+ <1372714599-17588-3-git-send-email-broonie@kernel.org>
+ <51D26360.2080708@linaro.org>
+Message-ID: <20130702092507.GV27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+On Tue, Jul 02, 2013 at 10:51:36AM +0530, Tushar Behera wrote:
 
-On 7/2/2013 16:13, Richard Genoud wrote:
->> Please hold on of this, as to the ASoC dmaengine will deal with this. So, we
->> >not need do it manually.
->> >
->> >Now, I am working on it. And will send out the patch soon after testing OK.
-> Ok, I stay tuned !
+> Arndale board also comes with two other audio codec boards - ALC5631Q
+> and AK4678. Different audio codec boards came with different shipments.
 
-I think you can go on working with the two patches I send just now.
-[1]: ASoC: atmel_ssc_dai: move set dma data to startup callback
-https://patchwork.kernel.org/patch/2811241/
-
-[2]: ASoC: atmel-pcm: use generic dmaengine framework
-https://patchwork.kernel.org/patch/2811261/
-
-I use your patches 4 ~ 8 do a quick testing, it works. Please note the 
-name of asound.state under /etc in your rootfs should the same with 
-atmel,model in patch 6.
-
-> Thanks !
->
-> Best regards,
-> Richard
-
-Best Regards,
-Bo Shen
+This is the default though and since they didn't bother providing any
+way of identifying the modules we just have to put them all in the
+device tree and hope that the individual CODEC drivers can do runtime
+identification (the WM1811A can but I don't know about the other two,
+nobody supported them upstream).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130702/4a28b8a7/attachment-0001.sig>
