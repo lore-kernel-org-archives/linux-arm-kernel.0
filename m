@@ -1,45 +1,112 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 1 Jul 2013 21:53:04 -0700
-Subject: [GIT PULL] Initial OLPC XO-1.75/XO-4 support
-In-Reply-To: <20130702031244.B2D74FAAD2@dev.laptop.org>
-References: <20130702031244.B2D74FAAD2@dev.laptop.org>
-Message-ID: <20130702045304.GA27829@quad.lixom.net>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Tue, 2 Jul 2013 04:53:22 +0000
+Subject: [PATCH 3/4] PCI: Add driver for i.MX6 PCI Express
+In-Reply-To: <2E3BDF14016345FA887E3BACAE05DADA@kosagi.com>
+References: <1372662947-27160-1-git-send-email-xobs@kosagi.com>
+ <1372662947-27160-4-git-send-email-xobs@kosagi.com>
+ <51D15513.7020101@st.com> <2E3BDF14016345FA887E3BACAE05DADA@kosagi.com>
+Message-ID: <0E83723C55F66F43A6041464FE31119D30C672@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 11:12:44PM -0400, Daniel Drake wrote:
-> Hi,
+Hi Cross:
+First of all, Thanks for your efforts to summit the imx pcie support patches.
+I looked through your patch-set, and have some concerns:
+* PCIe driver used in the FSL linux-2.6.35 BSP, is not good enough,
+Based on the latest FSL BSP.
+* The PCIe switch/MSI features had been supported.
+* In order to support the 8MB memory space size, the mem layout had been updated as listed below,
+ otherwise, the memory space size required by PCIe EP device wouldn't larger than 4MB.
+        /*
+         * i.MX6 defines 16MB in the AXI address map for PCIe.
+         *
+         * That address space excepted the pcie registers is
+         * split and defined into different regions by iATU,
+         * with sizes and offsets as follows:
+         *
+         * RC:
+         * 0x0100_0000 --- 0x01DF_FFFF 14MB IORESOURCE_MEM
+         * 0x01E0_0000 --- 0x01EF_FFFF 1MB IORESOURCE_IO
+         * 0x01F0_0000 --- 0x01FF_FFFF 1MB Cfg + MSI + Registers
+         *
+         * EP (default value):
+         * 0x0100_0000 --- 0x01FF_C000 16MB - 16KB IORESOURCE_MEM
+         */
+
+* BTW, the PCIe EP mode had been verified too.
+
+Best Regards
+Richard Zhu
+
+
+-----Original Message-----
+From: linux-pci-owner@vger.kernel.org [mailto:linux-pci-owner at vger.kernel.org] On Behalf Of Sean Cross
+Sent: Tuesday, July 02, 2013 11:46 AM
+To: Pratyush Anand
+Cc: devicetree-discuss at lists.ozlabs.org; linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Arnd Bergmann; Mohit KUMAR
+Subject: Re: [PATCH 3/4] PCI: Add driver for i.MX6 PCI Express
+
+On Monday, July 1, 2013 at 6:08 PM, Pratyush Anand wrote:
+> On 7/1/2013 12:45 PM, Sean Cross wrote:
+> > This adds a PCI Express port driver for the on-chip PCI Express port 
+> > present on the i.MX6 SoC. It is based on the PCI Express driver 
+> > available in the Freescale BSP.
+> > 
+> > Signed-off-by: Sean Cross <xobs at kosagi.com (mailto:xobs@kosagi.com)>
+> > ---
 > 
-> These patches add support for booting OLPC XO-1.75 (Marvell MMP2) and OLPC
-> XO-4 (Marvell MMP3) which present device trees from OpenFirmware.
 > 
-> With the exception of the most recent patch, which has been acked (I think),
-> the other patches were posted about 2 weeks ago and haven't received
-> any comments from the MMP arch maintainers.
 > 
-> Please consider for the next available merge window (not sure if we're
-> now too late for 3.11, no big deal if so).
+> ...
+> 
+> > diff --git a/drivers/pci/pcie/pcie-imx.c 
+> > b/drivers/pci/pcie/pcie-imx.c new file mode 100644 index 
+> > 0000000..664679e
+> > --- /dev/null
+> > +++ b/drivers/pci/pcie/pcie-imx.c
+> 
+> 
+> 
+> Should go to drivers/pci/host/
+I'll pull from arm-soc rather than from Linus' tree and place the driver there instead.
+ 
+> > @@ -0,0 +1,1049 @@
+> > +/*
+> > + * drivers/pci/pcie/pcie-imx.c
+> > + *
+> 
+> 
+> 
+> ...
+> 
+> 
+> > +#define ATU_R_BaseAddress 0x900
+> > +#define PCIE_PL_iATUVR (ATU_R_BaseAddress + 0x0) #define 
+> > +PCIE_PL_iATURC1 (ATU_R_BaseAddress + 0x4) #define PCIE_PL_iATURC2 
+> > +(ATU_R_BaseAddress + 0x8) #define PCIE_PL_iATURLBA 
+> > +(ATU_R_BaseAddress + 0xC) #define PCIE_PL_iATURUBA 
+> > +(ATU_R_BaseAddress + 0x10) #define PCIE_PL_iATURLA 
+> > +(ATU_R_BaseAddress + 0x14) #define PCIE_PL_iATURLTA 
+> > +(ATU_R_BaseAddress + 0x18) #define PCIE_PL_iATURUTA 
+> > +(ATU_R_BaseAddress + 0x1C)
+> 
+> 
+> 
+> I may be wrong, but from these offset it seems to me that it is SNPS 
+> controller. If yes, then please go through comments of "[PATCH V1-10 
+> 0/4] PCIe support for Samsung Exynos5440 SoC"
 
-Daniel,
+Exynos5440 appears to use the same port logic controller.  However, the PHYs are different.  I'm not exactly certain which comments you want me to notice in that series of patchsets, but I see references to splitting Exynos-specific code into its own project.  Based on that, it seems like the best approach would be to:
 
-Unfortunately too late for 3.11 indeed, so this is 3.12 material at this point.
-Given that the merge window just opened, most maintainers will be too busy to
-look at much new patches at this time as well.
+    1) Move Exynos code into its own file, say, pcie-exynos.c.  This would leave only Synopsys-specific ATC code in pcie-designware.c
+    2) Rename generic exynos functions to reflect the fact that they're designware-generic functions.
+    3) Have pcie-imx.c reference this generic designware ATC code.
 
-Can I ask you to do a few things though?
-
-1) Please post the drivers/clk patches to mturquette. THey don't look dependent
-   on the rest of the patches, just general improvements and cleanups.
-2) I really wish there was a generic catch-all compat for the boards, so we
-   didn't have to modify mmp2-dt.c for every new board added -- it really
-   defies the purpose of only changing the data you pass into the kernel. This
-   is mostly something for Eric/Haojian to sort out though.
-3) Please post the patches as a series instead of a pull request, given that
-   they should probably take different paths up the tree (clk vs the platform,
-   etc). You should at least get review/acked-by of the clk pieces from Mike
-   Turquette.
-
-Beyond that I didn't look all that closely at the patches yet.
+I'll rework the patch and re-submit it following these three changes.
 
 
--Olof
+--
+Sean Cross
+
+--
+To unsubscribe from this list: send the line "unsubscribe linux-pci" in the body of a message to majordomo at vger.kernel.org More majordomo info at  http://vger.kernel.org/majordomo-info.html
