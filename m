@@ -1,49 +1,45 @@
-From: michael@ellerman.id.au (Michael Ellerman)
-Date: Tue, 2 Jul 2013 16:52:20 +1000
-Subject: [PATCHv4 02/11] pci: use weak functions for MSI arch-specific
- functions
-In-Reply-To: <20130702073037.55a53642@skate>
-References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1372686136-1370-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <1372726396.17904.1.camel@concordia>
- <20130702073037.55a53642@skate>
-Message-ID: <20130702065220.GA20521@concordia>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 2 Jul 2013 14:30:23 +0800
+Subject: [PATCH 0/5] serial: imx: add DMA support for imx6
+Message-ID: <1372746628-20092-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 02, 2013 at 07:30:37AM +0200, Thomas Petazzoni wrote:
-> Dear Michael Ellerman,
-> 
-> On Tue, 02 Jul 2013 10:53:16 +1000, Michael Ellerman wrote:
-> > On Mon, 2013-07-01 at 15:42 +0200, Thomas Petazzoni wrote:
-> > > Until now, the MSI architecture-specific functions could be overloaded
-> > > using a fairly complex set of #define and compile-time
-> > > conditionals. In order to prepare for the introduction of the msi_chip
-> > > infrastructure, it is desirable to switch all those functions to use
-> > > the 'weak' mechanism. This commit converts all the architectures that
-> > > were overidding those MSI functions to use the new strategy.
-> > 
-> > The MSI code used to use weak functions, until we discovered they were
-> > being miscompiled on some toolchains (11df1f0). I assume these days
-> > we're confident they work correctly.
-> 
-> Hum, interesting. I see from your commit that gcc 4.3.2 was apparently
-> affected, and gcc 4.3.x is not /that/ old. Bjorn, what's your point of
-> view on this?
+(1) This patch set adds the DMA support for the imx serial driver.
+    The uart with the dma support is usually used by the Bluetooth.
 
-Stop press.
+    For the firmware's limit, i only enable the DMA for imx6.
+    If we have proper firmware for imx53 (or other chips), we can also
+    enable the DMA for it.
 
-I went back and found the old threads on this, it's been a while. It
-looks like it was only gcc 4.1.[01] that miscompiled. The reference to
-gcc 4.3.2 was WRT ellision of the unused code, which is a separate
-issue.
+(2) We only enable the DMA support when the following are meet:
 
-The kernel blacklists gcc 4.1.[01] (see f9d1425), so weak should be
-safe to use.
+    [1] The uart port supports the hardware flow control(CTS/RTS).
+      (Some uart port does not support the CTS/RTS.)
 
-We merged the change to the PCI code anyway because we thought it was
-nicer and it also avoided any problems with weak.
+    [2] The application enables the CTS/RTS.
 
-So pretend I never said anything :)
+    [3] The Soc is imx6.
+      For the sdma's firmware limit, we do not support the DMA except
+      the imx6 platform.
 
-cheers
+    [4] The uart is not used as a console.
+
+
+(3) Tested this patch set by:
+	connecting a imx6q-arm2 board(DTE) with a imx53 board(DCE).
+
+
+Huang Shijie (5):
+  serial: imx: distinguish the imx6 uart from the others
+  serial: imx: add DMA support for imx6
+  ARM: dts: imx6: rename the uart's compatible property
+  ARM: dts: imx6: add dte pinctrl for uart2
+  ARM: dts: enable the uart2 for imx6q-arm2
+
+ arch/arm/boot/dts/imx6q-arm2.dts |   10 +
+ arch/arm/boot/dts/imx6q.dtsi     |    9 +
+ arch/arm/boot/dts/imx6qdl.dtsi   |   10 +-
+ arch/arm/boot/dts/imx6sl.dtsi    |   10 +-
+ drivers/tty/serial/imx.c         |  430 +++++++++++++++++++++++++++++++++++++-
+ 5 files changed, 452 insertions(+), 17 deletions(-)
