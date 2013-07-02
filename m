@@ -1,43 +1,49 @@
-From: dserrg@gmail.com (Sergey Dyasly)
-Date: Tue,  2 Jul 2013 19:58:05 +0400
-Subject: [PATCH v2] ARM: LPAE: don't reject mapping /dev/mem above 4GB
-Message-ID: <1372780685-2528-1-git-send-email-dserrg@gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue,  2 Jul 2013 20:02:24 +0400
+Subject: [PATCH 1/6] ARM: dts: i.MX27: Move IIM node under AIPI2 bus
+Message-ID: <1372780949-31897-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With LPAE enabled, physical address space is larger than 4GB. Allow mapping any
-part of it via /dev/mem by utilizing the same check as in arm64.
+This patch moves IIM node under AIPI2 bus, since this is proper
+location for this module.
 
-PHYS_MASK covers 40 bits with LPAE enabled and 32 bits otherwise.
-
-Signed-off-by: Sergey Dyasly <dserrg@gmail.com>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
+ arch/arm/boot/dts/imx27.dtsi | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-v2:
-- Removed #ifdef and changed original function as suggested by Catalin Marinas
-
- arch/arm/mm/mmap.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
-index 10062ce..09bab92 100644
---- a/arch/arm/mm/mmap.c
-+++ b/arch/arm/mm/mmap.c
-@@ -204,13 +204,11 @@ int valid_phys_addr_range(phys_addr_t addr, size_t size)
- }
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index a587294..516473c 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -375,13 +375,6 @@
+ 				clocks = <&clks 41>, <&clks 61>;
+ 				clock-names = "ipg", "per";
+ 			};
+-
+-			iim: iim at 10028000 {
+-				compatible = "fsl,imx27-iim";
+-				reg = <0x10028000 0x1000>;
+-				interrupts = <62>;
+-				clocks = <&clks 38>;
+-			};
+ 		};
  
- /*
-- * We don't use supersection mappings for mmap() on /dev/mem, which
-- * means that we can't map the memory area above the 4G barrier into
-- * userspace.
-+ * Do not allow /dev/mem mappings beyond the supported physical range.
-  */
- int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
- {
--	return !(pfn + (size >> PAGE_SHIFT) > 0x00100000);
-+	return !(((pfn << PAGE_SHIFT) + size) & ~PHYS_MASK);
- }
+ 		aipi at 10020000 { /* AIPI2 */
+@@ -423,6 +416,13 @@
+ 				#clock-cells = <1>;
+ 			};
  
- #ifdef CONFIG_STRICT_DEVMEM
++			iim: iim at 10028000 {
++				compatible = "fsl,imx27-iim";
++				reg = <0x10028000 0x1000>;
++				interrupts = <62>;
++				clocks = <&clks 38>;
++			};
++
+ 			fec: ethernet at 1002b000 {
+ 				compatible = "fsl,imx27-fec";
+ 				reg = <0x1002b000 0x4000>;
 -- 
-1.8.1.2
+1.8.1.5
