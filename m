@@ -1,19 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue,  2 Jul 2013 13:03:39 +0200
-Subject: [PATCH v4 3/7] ARM: orion5x: update intc device tree node to new reg
- layout
+Date: Tue,  2 Jul 2013 13:03:42 +0200
+Subject: [PATCH v4 6/7] ARM: kirkwood: remove obsolete SDIO clock gate
+ workaround
 In-Reply-To: <1372763023-12374-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1372763023-12374-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1372763023-12374-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1372763023-12374-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Future irqchip driver for Orion SoCs has a modified reg layout starting
-from CAUSE register. The former DT irq driver stub just used what the
-non-DT driver wants. Currently, orion5x is not ready for irqchip driver
-because of legacy timer and missing DT clk provider. To ease future
-conversion and just because orion-intc binding documentation already
-reflects new reg layout, we convert orion5x DT now.
+Kirkwood DT boards have been converted to DT SDIO already, we can now
+remove the legacy clock gate workaround for SDIO clock.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 --- 
@@ -25,27 +21,23 @@ Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/orion5x.dtsi |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-kirkwood/board-dt.c |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
-index 2d241fc..ede6c3b 100644
---- a/arch/arm/boot/dts/orion5x.dtsi
-+++ b/arch/arm/boot/dts/orion5x.dtsi
-@@ -16,11 +16,12 @@
- 	aliases {
- 		gpio0 = &gpio0;
- 	};
-+
- 	intc: interrupt-controller {
--		compatible = "marvell,orion-intc", "marvell,intc";
-+		compatible = "marvell,orion-intc";
- 		interrupt-controller;
- 		#interrupt-cells = <1>;
--		reg = <0xf1020204 0x04>;
-+		reg = <0xf1020200 0x08>;
- 	};
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 385244c..a2c8c20 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -52,10 +52,6 @@ static void __init kirkwood_legacy_clk_init(void)
+ 	orion_clkdev_add("1", "pcie",
+ 			 of_clk_get_from_provider(&clkspec));
  
- 	ocp at f1000000 {
+-	clkspec.args[0] = CGC_BIT_SDIO;
+-	orion_clkdev_add(NULL, "mvsdio",
+-			 of_clk_get_from_provider(&clkspec));
+-
+ 	/*
+ 	 * The ethernet interfaces forget the MAC address assigned by
+ 	 * u-boot if the clocks are turned off. Until proper DT support
 -- 
 1.7.2.5
