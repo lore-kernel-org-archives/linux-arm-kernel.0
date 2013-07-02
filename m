@@ -1,83 +1,60 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Tue, 2 Jul 2013 05:20:53 +0000
-Subject: [PATCH 3/4] rtc: omap: add rtc wakeup support to alarm events
-In-Reply-To: <871u7hom0q.fsf@linaro.org>
-References: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
- <1372412109-986-4-git-send-email-gururaja.hebbar@ti.com>
- <871u7hom0q.fsf@linaro.org>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EC4E6FE@DBDE04.ent.ti.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 02 Jul 2013 10:51:36 +0530
+Subject: [PATCH 3/3] ARM: dts: Add WM1811A audio CODEC to Arndale bindings
+In-Reply-To: <1372714599-17588-3-git-send-email-broonie@kernel.org>
+References: <1372714599-17588-1-git-send-email-broonie@kernel.org>
+ <1372714599-17588-3-git-send-email-broonie@kernel.org>
+Message-ID: <51D26360.2080708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 02, 2013 at 05:45:01, Kevin Hilman wrote:
-> Hebbar Gururaja <gururaja.hebbar@ti.com> writes:
+On 07/02/2013 03:06 AM, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
 > 
-> > On some platforms (like AM33xx), a special register (RTC_IRQWAKEEN)
-> > is available to enable Alarm Wakeup feature. This register needs to be
-> > properly handled for the rtcwake to work properly.
-> >
-> > Platforms using such IP should set "ti,am3352-rtc" in rtc device dt
-> > compatibility node.
-> >
-> > Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-> > Cc: Grant Likely <grant.likely@linaro.org>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Rob Landley <rob@landley.net>
-> > Cc: Sekhar Nori <nsekhar@ti.com>
-> > Cc: Kevin Hilman <khilman@linaro.org>
-> > Cc: Alessandro Zummo <a.zummo@towertech.it>
-> > Cc: rtc-linux at googlegroups.com
-> > Cc: devicetree-discuss at lists.ozlabs.org
-> > Cc: linux-doc at vger.kernel.org
-> 
-> Acked-by: Kevin Hilman <khilman@linaro.org>
-> 
-> ...with a minor nit below...
-> 
-> > ---
-> > :100644 100644 b47aa41... 5a0f02d... M	Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> > :100644 100644 761919d... 666b0c2... M	drivers/rtc/rtc-omap.c
-> >  Documentation/devicetree/bindings/rtc/rtc-omap.txt |    6 ++-
-> >  drivers/rtc/rtc-omap.c                             |   56 +++++++++++++++++---
-> >  2 files changed, 54 insertions(+), 8 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> > index b47aa41..5a0f02d 100644
-> > --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> > +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> > @@ -1,7 +1,11 @@
-> >  TI Real Time Clock
-> >  
-> >  Required properties:
-> > -- compatible: "ti,da830-rtc"
-> > +- compatible:
-> > +	- "ti,da830-rtc"  - for RTC IP used similar to that on DA8xx SoC family.
-> > +	- "ti,am3352-rtc" - for RTC IP used similar to that on AM335x SoC family.
-> > +			    This RTC IP has special WAKE-EN Register to enable
-> > +			    Wakeup generation for event Alarm.
-> >  - reg: Address range of rtc register set
-> >  - interrupts: rtc timer, alarm interrupts in order
-> >  - interrupt-parent: phandle for the interrupt controller
-> > diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-> > index 761919d..666b0c2 100644
-> > --- a/drivers/rtc/rtc-omap.c
-> > +++ b/drivers/rtc/rtc-omap.c
-> > @@ -72,6 +72,8 @@
-> >  #define OMAP_RTC_KICK0_REG		0x6c
-> >  #define OMAP_RTC_KICK1_REG		0x70
-> >  
-> > +#define OMAP_RTC_IRQWAKEEN		0x7C
-> > +
-> 
-> nit: letters in hex numbers are usually lower-case.
+> The default audio module for the Arndale has a WM811A on it. Add this to
 
-Thanks for the review. V2 will soon follow.
+typo: WM1811A
 
+Arndale board also comes with two other audio codec boards - ALC5631Q
+and AK4678. Different audio codec boards came with different shipments.
+
+> the device tree bindings.
 > 
+> Signed-off-by: Mark Brown <broonie@linaro.org>
+> ---
+>  arch/arm/boot/dts/exynos5250-arndale.dts | 17 ++++++++++++++++-
+>  1 file changed, 16 insertions(+), 1 deletion(-)
 > 
-> Kevin
+> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+> index 482f275..75c3065 100644
+> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
+> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+> @@ -325,7 +325,22 @@
+>  	};
+>  
+>  	i2c at 12C90000 {
+> -		status = "disabled";
+> +		wm1811a at 11 {
+> +			compatible = "wlf,wm1811";
+> +			reg = <0x1a>;
+> +
+> +			AVDD2-supply = <&main_dc_reg>;
+> +			CPVDD-supply = <&main_dc_reg>;
+> +			DBVDD1-supply = <&main_dc_reg>;
+> +			DBVDD2-supply = <&main_dc_reg>;
+> +			DBVDD3-supply = <&main_dc_reg>;
+> +			LDO1VDD-supply = <&main_dc_reg>;
+> +			SPKVDD1-supply = <&main_dc_reg>;
+> +			SPKVDD2-supply = <&main_dc_reg>;
+> +
+> +			wlf,ldo1ena = <&gpb0 0 0>;
+> +			wlf,ldo2ena = <&gpb0 1 0>;
+> +		};
+>  	};
+>  
+>  	i2c at 12CA0000 {
 > 
 
 
-Regards, 
-Gururaja
+-- 
+Tushar Behera
