@@ -1,64 +1,49 @@
-From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
-Date: Tue, 2 Jul 2013 04:17:46 +0000
-Subject: [PATCH v2] of: Specify initrd location using 64-bit
-References: <1372702835-5333-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <C2D7FE5348E1B147BCA15975FBA23075137087@IN01WEMBXA.internal.synopsys.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 2 Jul 2013 04:29:20 +0000
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <alpine.DEB.2.02.1307010211580.3741@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+ <51CAEB33.5010101@ti.com>
+ <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
+ <51CBBCD8.5030600@ti.com>
+ <alpine.DEB.2.02.1306281844090.8767@utopia.booyaka.com>
+ <alpine.DEB.2.02.1307010211580.3741@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83ECCC435@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2013 11:52 PM, Santosh Shilimkar wrote:
-> On some PAE architectures, the entire range of physical memory could reside
-> outside the 32-bit limit.  These systems need the ability to specify the
-> initrd location using 64-bit numbers.
->
-> This patch globally modifies the early_init_dt_setup_initrd_arch() function to
-> use 64-bit numbers instead of the current unsigned long.
->
-> There has been quite a bit of debate about whether to use u64 or phys_addr_t.
-> It was concluded to stick to u64 to be consistent with rest of the device
-> tree code. As summarized by Geert, "The address to load the initrd is decided
-> by the bootloader/user and set at that point later in time. The dtb should not
-> be tied to the kernel you are booting"
->
-> More details on the discussion can be found here:
-> https://lkml.org/lkml/2013/6/20/690
-> https://lkml.org/lkml/2012/9/13/544
->
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Vineet Gupta <vgupta@synopsys.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
-> Cc: James Hogan <james.hogan@imgtec.com>
-> Cc: Michal Simek <monstr@monstr.eu>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: Jonas Bonn <jonas@southpole.se>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: x86 at kernel.org
-> Cc: arm at kernel.org
-> Cc: Chris Zankel <chris@zankel.net>
-> Cc: Max Filippov <jcmvbkbc@gmail.com>
-> Cc: bigeasy at linutronix.de
-> Cc: robherring2 at gmail.com
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
->
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-c6x-dev at linux-c6x.org
-> Cc: linux-mips at linux-mips.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-xtensa at linux-xtensa.org
-> Cc: devicetree-discuss at lists.ozlabs.org
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
 
-Acked-by: Vineet Gupta <vgupta@synopsys.com>  [For arch/arc bits]
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Monday, July 01, 2013 7:46 AM
+> To: Vutla, Lokesh
+> Cc: Nayak, Rajendra; Hiremath, Vaibhav; Kevin Hilman; Rini, Tom; linux-
+> omap at vger.kernel.org; Balbi, Felipe; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: OMAP baseline test results for v3.10-rc6
+> 
+> On Fri, 28 Jun 2013, Paul Walmsley wrote:
+> 
+> > On Thu, 27 Jun 2013, Lokesh Vutla wrote:
+> >
+> > > Here is the catch..
+> > > Your dtb is generated in arch/arm/boot/dts/ folder(before V3.8 dtb
+> was
+> > > generated in arch/arm/boot).
+> >
+> > Ugh... that's probably it :-(
+> 
+> Indeed, this was at least one major problem.  With this fixed, and with
+> CONFIG_MACH_OMAP_GENERIC=y in the v3.10-rc Kconfigs, the BeagleBone
+> white
+> boots here now with v3.10-rc7.  Will test the previous releases going
+> back
 
--Vineet
+Surely it will boot. :)
+
+Thanks,
+Vaibhav
