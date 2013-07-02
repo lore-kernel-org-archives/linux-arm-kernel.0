@@ -1,36 +1,46 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 01 Jul 2013 17:18:54 -0700
-Subject: [PATCH 0/4] rtc: omap: handle rtc wakeup support in driver
-In-Reply-To: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com> (Hebbar
- Gururaja's message of "Fri, 28 Jun 2013 15:05:05 +0530")
-References: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <87sizxn79t.fsf@linaro.org>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 2 Jul 2013 08:49:48 +0800
+Subject: [PATCH V3 0/3] ARM: tegra114: cpuidle: add power down state
+In-Reply-To: <51D1BEAD.6060003@wwwdotorg.org>
+References: <1372152242-16373-1-git-send-email-josephl@nvidia.com>
+ <51D1BEAD.6060003@wwwdotorg.org>
+Message-ID: <1372726188.2874.6.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hebbar,
+On Tue, 2013-07-02 at 01:38 +0800, Stephen Warren wrote:
+> On 06/25/2013 03:23 AM, Joseph Lo wrote:
+> > This series introduce CPU core power down state for CPU idle. When CPU go
+> > into this state, it saves it's context and needs a proper configuration
+> > in flow controller to power gate the CPU when CPU runs into WFI
+> > instruction. And the CPU also needs to set the IRQ as CPU power down idle
+> > wake up event in flow controller.
+> > 
+> > To prevent race conditions and ensure proper interrupt routing on
+> > Cortex-A15 CPUs when they are power-gated, add a CPU PM notifier
+> > call-back to reprogram the GIC CPU interface on PM entry. The
+> > GIC CPU interface will be reset back to its normal state by
+> > the common GIC CPU PM exit callback when the CPU wakes up.
+> > 
+> > This series depends on the patch of "tick:  Fix
+> > tick_broadcast_pending_mask not cleared".
+> 
+> Joseph, I applied all 3 of your patches/series on top of next-20130701,
+> which does include dependency "tick:  Fix tick_broadcast_pending_mask
+> not cleared":
+> 
+> * ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag
+> * This series
+> * ARM: tegra114: add support for system suspend
+> 
+> I find that at least on on Tegra114/Dalmore, CPU hotplug doesn't work
+> correctly.
+> 
+Yes, it's due to the CPU hotplug function broken in next-20130701. The
+last working version was next-20130624 that I had tested and verified.
+It also breaks the resume function when enable non-boot CPUs. You can
+verify the suspend function by un-plug secondary CPUs first. I am
+checking what cause the CPU hotplug function broken on next-20130701.
 
-Hebbar Gururaja <gururaja.hebbar@ti.com> writes:
-
-> rtc-omap driver modules is used both by OMAP1/2, Davinci SoC platforms.
->
-> However, rtc wake support on OMAP1 is broken. Hence the
-> device_init_wakeup() was removed from rtc-omap driver and moved to
-> platform board files that supported it (DA850/OMAP-L138). [1]
->
-> However, recently [2] it was suggested that driver should always do a
-> device_init_wakeup(dev, true). Platforms that don't want/need
-> wakeup support can disable it from userspace via:
->
->     echo disabled > /sys/devices/.../power/wakeup
->
-> Also, with the new DT boot-up, board file doesn't exist and hence there
-> is no way to have device wakeup support rtc.
->
-> The fix for above issues, is to hard code device_init_wakeup() inside
-> driver and let platforms that don't need this, handle it through the
-> sysfs power entry.
-
-This series looks good now, thanks for your persistence.
-
-Kevin
+Thanks,
+Joseph
