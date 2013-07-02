@@ -1,73 +1,27 @@
-From: Baohua.Song@csr.com (Barry Song)
-Date: Tue, 2 Jul 2013 10:42:46 +0800
-Subject: [PATCH] sdhci:sirf:drop SDHCI_QUIRK_INVERTED_WRITE_PROTECT as only
- sd0 has inverted_wp
-Message-ID: <1372732966-9464-1-git-send-email-Baohua.Song@csr.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 1 Jul 2013 23:45:53 -0300
+Subject: [PATCHv3 2/3] ARM: mxs: cfa10049: Switch bus i2c1 to bitbanging
+In-Reply-To: <1372094699-3832-3-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1372094699-3832-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <CAOMZO5CLcT=OXYd=ggxpDzUqFxoXSaanqUPGugYLT2Og-VgzCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bin Shi <Bin.Shi@csr.com>
+Hi Alexandre,
 
-only sd0 has the issue that WP is inverted, so we drop the global set of
-SDHCI_QUIRK_INVERTED_WRITE_PROTECT and only enable the "wp-inverted" prop
-for sd0 in dts.
+On Mon, Jun 24, 2013 at 2:24 PM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> The ADCs connected to this bus have been experiencing some timeout
+> issues when using the iMX28 i2c controller. Switching back to bitbanging
+> solves this.
 
-Signed-off-by: Bin Shi <Bin.Shi@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/boot/dts/atlas6.dtsi | 1 +
- arch/arm/boot/dts/prima2.dtsi | 1 +
- drivers/mmc/host/sdhci-sirf.c | 2 +-
- 3 files changed, 3 insertions(+), 1 deletion(-)
+Are you able to use the mxs i2c controller instead of bitbang if you
+use this patch?
+http://www.spinics.net/lists/stable/msg13202.html
 
-diff --git a/arch/arm/boot/dts/atlas6.dtsi b/arch/arm/boot/dts/atlas6.dtsi
-index 7d1a279..d928b11 100644
---- a/arch/arm/boot/dts/atlas6.dtsi
-+++ b/arch/arm/boot/dts/atlas6.dtsi
-@@ -561,6 +561,7 @@
- 					interrupts = <38>;
- 					bus-width = <8>;
- 					clocks = <&clks 36>;
-+					wp-inverted;
- 				};
- 
- 				sd1: sdhci at 56100000 {
-diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
-index 3329719..36cb064 100644
---- a/arch/arm/boot/dts/prima2.dtsi
-+++ b/arch/arm/boot/dts/prima2.dtsi
-@@ -557,6 +557,7 @@
- 					compatible = "sirf,prima2-sdhc";
- 					reg = <0x56000000 0x100000>;
- 					interrupts = <38>;
-+					wp-inverted;
- 				};
- 
- 				sd1: sdhci at 56100000 {
-diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
-index 62a4a83..38e69f7 100644
---- a/drivers/mmc/host/sdhci-sirf.c
-+++ b/drivers/mmc/host/sdhci-sirf.c
-@@ -36,7 +36,6 @@ static struct sdhci_pltfm_data sdhci_sirf_pdata = {
- 	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
- 		SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
- 		SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
--		SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
- 		SDHCI_QUIRK_DELAY_AFTER_POWER,
- };
- 
-@@ -70,6 +69,7 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
- 	priv->gpio_cd = gpio_cd;
- 
- 	sdhci_get_of_property(pdev);
-+	mmc_of_parse(host->mmc);
- 
- 	ret = clk_prepare_enable(priv->clk);
- 	if (ret)
--- 
-1.8.2.3
+Regards,
 
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Fabio Estevam
