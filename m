@@ -1,117 +1,24 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue,  2 Jul 2013 13:00:17 +0200
-Subject: [PATCH v6 0/7] ARM: mvebu: switch to DT probed mv643xx_eth
-Message-ID: <1372762824-12202-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Tue,  2 Jul 2013 13:00:18 +0200
+Subject: [PATCH v6 1/7] ARM: dove: add gigabit ethernet and mvmdio device tree
+ nodes
+In-Reply-To: <1372762824-12202-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1372762824-12202-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1372762824-12202-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set converts Marvell Dove, Kirkwood, and Orion5x DT enabled
-boards to probe mv643xx_eth by DT. The corresponding DT support patches
-for mv643xx_eth driver have already been taked by David Miller and are
-available in next-20130701. This only contains the ARM part of
-mv643xx_eth DT support patches and therefore patch counting is
-continued as v6 with respect to the combined patch set.
+This patch adds orion-eth and mvmdio device tree nodes for DT enabled
+Dove boards. As there is only one ethernet controller on Dove, a default
+phy node is also added with a note to set its reg property on a per-board
+basis.
 
-The first three patches add nodes for ethernet-controller, mdio-bus,
-and ethernet PHYs found on the three SoCs and their boards.
-
-The last four patches convert DT boards for each SoC from platform_device
-registration to DT based probing by removing the corresponding calls.
-For Kirkwood this makes almost all DT board setup (except board-dnskw)
-obsolete. Therefore, patch 5 removes board setup files, Kconfig, Makefile,
-and defconfig entries for those boards.
-
-This patch set has been tested on Marvell Dove, and compile-tested for
-Kirkwood and Orion5x defconfig on top of next-20130701 with some fixes
-sent earlier applied (DMA_MEMSET fixes and missing include on edmini_v2).
-
-netdev is added on Cc for completeness, this is all Marvell related and
-should go through Jason Cooper's branch if there are no objections.
-
-Sebastian Hesselbarth (7):
-  ARM: dove: add gigabit ethernet and mvmdio device tree nodes
-  ARM: kirkwood: add gigabit ethernet and mvmdio device tree nodes
-  ARM: orion5x: add gigabit ethernet and mvmdio device tree nodes
-  ARM: dove: remove legacy mv643xx_eth setup
-  ARM: kirkwood: remove redundant DT board files
-  ARM: kirkwood: remove legacy clk alias for mv643xx_eth
-  ARM: orion5x: remove legacy mv643xx_eth board setup
-
- arch/arm/boot/dts/dove-cubox.dts                   |    7 +
- arch/arm/boot/dts/dove.dtsi                        |   35 +++++
- arch/arm/boot/dts/kirkwood-cloudbox.dts            |   16 ++
- arch/arm/boot/dts/kirkwood-db.dtsi                 |   16 ++
- arch/arm/boot/dts/kirkwood-dnskw.dtsi              |   16 ++
- arch/arm/boot/dts/kirkwood-dockstar.dts            |   17 ++
- arch/arm/boot/dts/kirkwood-dreamplug.dts           |   28 ++++
- arch/arm/boot/dts/kirkwood-goflexnet.dts           |   16 ++
- .../arm/boot/dts/kirkwood-guruplug-server-plus.dts |   30 ++++
- arch/arm/boot/dts/kirkwood-ib62x0.dts              |   16 ++
- arch/arm/boot/dts/kirkwood-iconnect.dts            |   16 ++
- arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts      |   24 +++
- arch/arm/boot/dts/kirkwood-is2.dts                 |    2 +
- arch/arm/boot/dts/kirkwood-km_kirkwood.dts         |   16 ++
- arch/arm/boot/dts/kirkwood-lsxl.dtsi               |   28 ++++
- arch/arm/boot/dts/kirkwood-mplcec4.dts             |   27 ++++
- .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  |   16 ++
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |   16 ++
- arch/arm/boot/dts/kirkwood-ns2.dts                 |    2 +
- arch/arm/boot/dts/kirkwood-ns2lite.dts             |    2 +
- arch/arm/boot/dts/kirkwood-ns2max.dts              |    2 +
- arch/arm/boot/dts/kirkwood-ns2mini.dts             |    2 +
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts       |   16 ++
- arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi  |   16 ++
- arch/arm/boot/dts/kirkwood-topkick.dts             |   16 ++
- arch/arm/boot/dts/kirkwood-ts219-6281.dts          |    4 +-
- arch/arm/boot/dts/kirkwood-ts219-6282.dts          |    4 +-
- arch/arm/boot/dts/kirkwood-ts219.dtsi              |   16 ++
- arch/arm/boot/dts/kirkwood.dtsi                    |   52 +++++++
- .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    |   17 ++
- arch/arm/boot/dts/orion5x.dtsi                     |   29 ++++
- arch/arm/configs/kirkwood_defconfig                |   22 ---
- arch/arm/mach-dove/board-dt.c                      |    9 -
- arch/arm/mach-kirkwood/Kconfig                     |  156 --------------------
- arch/arm/mach-kirkwood/Makefile                    |   23 +---
- arch/arm/mach-kirkwood/board-db88f628x-bp.c        |   24 ---
- arch/arm/mach-kirkwood/board-dnskw.c               |    7 -
- arch/arm/mach-kirkwood/board-dockstar.c            |   32 ----
- arch/arm/mach-kirkwood/board-dreamplug.c           |   35 -----
- arch/arm/mach-kirkwood/board-dt.c                  |   86 +-----------
- arch/arm/mach-kirkwood/board-goflexnet.c           |   34 -----
- arch/arm/mach-kirkwood/board-guruplug.c            |   33 ----
- arch/arm/mach-kirkwood/board-ib62x0.c              |   29 ----
- arch/arm/mach-kirkwood/board-iconnect.c            |   24 ---
- arch/arm/mach-kirkwood/board-iomega_ix2_200.c      |   34 -----
- arch/arm/mach-kirkwood/board-km_kirkwood.c         |   44 ------
- arch/arm/mach-kirkwood/board-lsxl.c                |   36 -----
- arch/arm/mach-kirkwood/board-mplcec4.c             |   35 -----
- arch/arm/mach-kirkwood/board-ns2.c                 |   35 -----
- arch/arm/mach-kirkwood/board-openblocks_a6.c       |   26 ----
- arch/arm/mach-kirkwood/board-readynas.c            |   27 ----
- arch/arm/mach-kirkwood/board-sheevaplug.c          |   27 ----
- arch/arm/mach-kirkwood/board-ts219.c               |   40 -----
- arch/arm/mach-kirkwood/board-usi_topkick.c         |   29 ----
- arch/arm/mach-orion5x/edmini_v2-setup.c            |   10 --
- 55 files changed, 520 insertions(+), 857 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/board-db88f628x-bp.c
- delete mode 100644 arch/arm/mach-kirkwood/board-dockstar.c
- delete mode 100644 arch/arm/mach-kirkwood/board-dreamplug.c
- delete mode 100644 arch/arm/mach-kirkwood/board-goflexnet.c
- delete mode 100644 arch/arm/mach-kirkwood/board-guruplug.c
- delete mode 100644 arch/arm/mach-kirkwood/board-ib62x0.c
- delete mode 100644 arch/arm/mach-kirkwood/board-iconnect.c
- delete mode 100644 arch/arm/mach-kirkwood/board-iomega_ix2_200.c
- delete mode 100644 arch/arm/mach-kirkwood/board-km_kirkwood.c
- delete mode 100644 arch/arm/mach-kirkwood/board-lsxl.c
- delete mode 100644 arch/arm/mach-kirkwood/board-mplcec4.c
- delete mode 100644 arch/arm/mach-kirkwood/board-ns2.c
- delete mode 100644 arch/arm/mach-kirkwood/board-openblocks_a6.c
- delete mode 100644 arch/arm/mach-kirkwood/board-readynas.c
- delete mode 100644 arch/arm/mach-kirkwood/board-sheevaplug.c
- delete mode 100644 arch/arm/mach-kirkwood/board-ts219.c
- delete mode 100644 arch/arm/mach-kirkwood/board-usi_topkick.c
-
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
+Changelog:
+v5->v6:
+- rebase for v3.11-rc1
+
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
@@ -120,5 +27,73 @@ Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Cc: netdev at vger.kernel.org
+---
+ arch/arm/boot/dts/dove-cubox.dts |    7 +++++++
+ arch/arm/boot/dts/dove.dtsi      |   35 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+index 5cae2ab..955188f 100644
+--- a/arch/arm/boot/dts/dove-cubox.dts
++++ b/arch/arm/boot/dts/dove-cubox.dts
+@@ -57,6 +57,13 @@
+ 
+ &uart0 { status = "okay"; };
+ &sata0 { status = "okay"; };
++&mdio { status = "okay"; };
++&eth { status = "okay"; };
++
++&ethphy {
++	compatible = "marvell,88e1310";
++	reg = <1>;
++};
+ 
+ &i2c0 {
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 2cef34f..5e394a6 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -256,5 +256,40 @@
+ 				dmacap,xor;
+ 			};
+ 		};
++
++		mdio: mdio-bus at 72004 {
++			compatible = "marvell,orion-mdio";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x72004 0x84>;
++			interrupts = <30>;
++			clocks = <&gate_clk 2>;
++			status = "disabled";
++
++			ethphy: ethernet-phy {
++				device-type = "ethernet-phy";
++				/* set phy address in board file */
++			};
++		};
++
++		eth: ethernet-controller at 72000 {
++			compatible = "marvell,orion-eth";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x72000 0x4000>;
++			clocks = <&gate_clk 2>;
++			marvell,tx-checksum-limit = <1600>;
++			status = "disabled";
++
++			ethernet-port at 0 {
++				device_type = "network";
++				compatible = "marvell,orion-eth-port";
++				reg = <0>;
++				interrupts = <29>;
++				/* overwrite MAC address in bootloader */
++				local-mac-address = [00 00 00 00 00 00];
++				phy-handle = <&ethphy>;
++			};
++		};
+ 	};
+ };
 -- 
 1.7.2.5
