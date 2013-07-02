@@ -1,41 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Jul 2013 13:35:53 +0900
-Subject: [PATCH 1/2] ARM: shmobile: r8a73a4: Fix resources for SCIFB0
+Date: Tue,  2 Jul 2013 13:35:54 +0900
+Subject: [PATCH 2/2] ARM: shmobile: emev2 GIO3 resource fix
 In-Reply-To: <cover.1372739438.git.horms+renesas@verge.net.au>
 References: <cover.1372739438.git.horms+renesas@verge.net.au>
-Message-ID: <f820b60582f75e73e83b8505d7e48fe59770f558.1372739438.git.horms+renesas@verge.net.au>
+Message-ID: <1eb14ea1e6bcd11d6d0ba937fc39808bb4d3453e.1372739438.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takanari Hayama <taki@igel.co.jp>
+From: Magnus Damm <damm@opensource.se>
 
-Fix base address and IRQ resources associated with SCIFB0.
+Fix GIO3 base addresses for EMEV2.
 
-This bug was introduced by e481a528901d0cd18b5b5fcbdc55207ea3b6ef68
-("ARM: shmobile: r8a73a4 SCIF support V3") which was included in v3.10.
+This bug was introduced by 088efd9273b5076a0aead479aa31f1066d182b3e
+("mach-shmobile: Emma Mobile EV2 GPIO support V3") which was included in v3.5.
 
-Signed-off-by: Takanari Hayama <taki@igel.co.jp>
-Acked-by: Magnus Damm <damm@opensource.se>
-[ horms+renesas at verge.net.au: Add information about commit and version
-  this bug was added in ]
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 Cc: stable at vger.kernel.org
 ---
- arch/arm/mach-shmobile/setup-r8a73a4.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/setup-emev2.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
-index c5a75a7..7f45c2e 100644
---- a/arch/arm/mach-shmobile/setup-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
-@@ -62,7 +62,7 @@ enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFB3 };
- static const struct plat_sci_port scif[] = {
- 	SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
- 	SCIFA_DATA(SCIFA1, 0xe6c50000, gic_spi(145)), /* SCIFA1 */
--	SCIFB_DATA(SCIFB0, 0xe6c50000, gic_spi(145)), /* SCIFB0 */
-+	SCIFB_DATA(SCIFB0, 0xe6c20000, gic_spi(148)), /* SCIFB0 */
- 	SCIFB_DATA(SCIFB1, 0xe6c30000, gic_spi(149)), /* SCIFB1 */
- 	SCIFB_DATA(SCIFB2, 0xe6ce0000, gic_spi(150)), /* SCIFB2 */
- 	SCIFB_DATA(SCIFB3, 0xe6cf0000, gic_spi(151)), /* SCIFB3 */
+diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
+index 899a86c..1ccddd2 100644
+--- a/arch/arm/mach-shmobile/setup-emev2.c
++++ b/arch/arm/mach-shmobile/setup-emev2.c
+@@ -287,14 +287,14 @@ static struct gpio_em_config gio3_config = {
+ static struct resource gio3_resources[] = {
+ 	[0] = {
+ 		.name	= "GIO_096",
+-		.start	= 0xe0050100,
+-		.end	= 0xe005012b,
++		.start	= 0xe0050180,
++		.end	= 0xe00501ab,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+ 		.name	= "GIO_096",
+-		.start	= 0xe0050140,
+-		.end	= 0xe005015f,
++		.start	= 0xe00501c0,
++		.end	= 0xe00501df,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[2] = {
 -- 
 1.8.2.1
