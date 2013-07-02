@@ -1,72 +1,64 @@
-From: xobs@kosagi.com (Sean Cross)
-Date: Tue, 2 Jul 2013 11:46:04 +0800
-Subject: [PATCH 3/4] PCI: Add driver for i.MX6 PCI Express
-In-Reply-To: <51D15513.7020101@st.com>
-References: <1372662947-27160-1-git-send-email-xobs@kosagi.com>
- <1372662947-27160-4-git-send-email-xobs@kosagi.com>
- <51D15513.7020101@st.com>
-Message-ID: <2E3BDF14016345FA887E3BACAE05DADA@kosagi.com>
+From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
+Date: Tue, 2 Jul 2013 04:17:46 +0000
+Subject: [PATCH v2] of: Specify initrd location using 64-bit
+References: <1372702835-5333-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <C2D7FE5348E1B147BCA15975FBA23075137087@IN01WEMBXA.internal.synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 1, 2013 at 6:08 PM, Pratyush Anand wrote:
-> On 7/1/2013 12:45 PM, Sean Cross wrote:
-> > This adds a PCI Express port driver for the on-chip PCI Express port
-> > present on the i.MX6 SoC. It is based on the PCI Express driver available
-> > in the Freescale BSP.
-> > 
-> > Signed-off-by: Sean Cross <xobs at kosagi.com (mailto:xobs@kosagi.com)>
-> > ---
-> 
-> 
-> 
-> ...
-> 
-> > diff --git a/drivers/pci/pcie/pcie-imx.c b/drivers/pci/pcie/pcie-imx.c
-> > new file mode 100644
-> > index 0000000..664679e
-> > --- /dev/null
-> > +++ b/drivers/pci/pcie/pcie-imx.c
-> 
-> 
-> 
-> Should go to drivers/pci/host/
-I'll pull from arm-soc rather than from Linus' tree and place the driver there instead.
- 
-> > @@ -0,0 +1,1049 @@
-> > +/*
-> > + * drivers/pci/pcie/pcie-imx.c
-> > + *
-> 
-> 
-> 
-> ...
-> 
-> 
-> > +#define ATU_R_BaseAddress 0x900
-> > +#define PCIE_PL_iATUVR (ATU_R_BaseAddress + 0x0)
-> > +#define PCIE_PL_iATURC1 (ATU_R_BaseAddress + 0x4)
-> > +#define PCIE_PL_iATURC2 (ATU_R_BaseAddress + 0x8)
-> > +#define PCIE_PL_iATURLBA (ATU_R_BaseAddress + 0xC)
-> > +#define PCIE_PL_iATURUBA (ATU_R_BaseAddress + 0x10)
-> > +#define PCIE_PL_iATURLA (ATU_R_BaseAddress + 0x14)
-> > +#define PCIE_PL_iATURLTA (ATU_R_BaseAddress + 0x18)
-> > +#define PCIE_PL_iATURUTA (ATU_R_BaseAddress + 0x1C)
-> 
-> 
-> 
-> I may be wrong, but from these offset it seems to me that it is SNPS 
-> controller. If yes, then please go through comments of
-> "[PATCH V1-10 0/4] PCIe support for Samsung Exynos5440 SoC"
+On 07/01/2013 11:52 PM, Santosh Shilimkar wrote:
+> On some PAE architectures, the entire range of physical memory could reside
+> outside the 32-bit limit.  These systems need the ability to specify the
+> initrd location using 64-bit numbers.
+>
+> This patch globally modifies the early_init_dt_setup_initrd_arch() function to
+> use 64-bit numbers instead of the current unsigned long.
+>
+> There has been quite a bit of debate about whether to use u64 or phys_addr_t.
+> It was concluded to stick to u64 to be consistent with rest of the device
+> tree code. As summarized by Geert, "The address to load the initrd is decided
+> by the bootloader/user and set at that point later in time. The dtb should not
+> be tied to the kernel you are booting"
+>
+> More details on the discussion can be found here:
+> https://lkml.org/lkml/2013/6/20/690
+> https://lkml.org/lkml/2012/9/13/544
+>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+> Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Vineet Gupta <vgupta@synopsys.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Salter <msalter@redhat.com>
+> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
+> Cc: James Hogan <james.hogan@imgtec.com>
+> Cc: Michal Simek <monstr@monstr.eu>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: Jonas Bonn <jonas@southpole.se>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: x86 at kernel.org
+> Cc: arm at kernel.org
+> Cc: Chris Zankel <chris@zankel.net>
+> Cc: Max Filippov <jcmvbkbc@gmail.com>
+> Cc: bigeasy at linutronix.de
+> Cc: robherring2 at gmail.com
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-c6x-dev at linux-c6x.org
+> Cc: linux-mips at linux-mips.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-xtensa at linux-xtensa.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
 
-Exynos5440 appears to use the same port logic controller.  However, the PHYs are different.  I'm not exactly certain which comments you want me to notice in that series of patchsets, but I see references to splitting Exynos-specific code into its own project.  Based on that, it seems like the best approach would be to:
+Acked-by: Vineet Gupta <vgupta@synopsys.com>  [For arch/arc bits]
 
-    1) Move Exynos code into its own file, say, pcie-exynos.c.  This would leave only Synopsys-specific ATC code in pcie-designware.c
-    2) Rename generic exynos functions to reflect the fact that they're designware-generic functions.
-    3) Have pcie-imx.c reference this generic designware ATC code.
-
-I'll rework the patch and re-submit it following these three changes.
-
-
---
-Sean Cross
+-Vineet
