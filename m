@@ -1,93 +1,50 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Tue, 2 Jul 2013 06:04:22 +0000
-Subject: [PATCH 3/4] rtc: omap: add rtc wakeup support to alarm events
-In-Reply-To: <51D26CFA.5090500@ti.com>
-References: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
- <1372412109-986-4-git-send-email-gururaja.hebbar@ti.com>
- <51D26CFA.5090500@ti.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EC4E7AB@DBDE04.ent.ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 1 Jul 2013 23:00:44 -0700
+Subject: linux-next: manual merge of the arm-soc tree with the l2-mtd tree
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73E9E3BF5@DBDE04.ent.ti.com>
+References: <20130702152954.f25bbf51c1a79aa4437e22ee@canb.auug.org.au>
+ <20980858CB6D3A4BAE95CA194937D5E73E9E3BF5@DBDE04.ent.ti.com>
+Message-ID: <CAOesGMgh=CLCrtohrNF59Sh40-weCorL1_yjFgFKr47qhVy+xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 02, 2013 at 11:32:34, Nori, Sekhar wrote:
-> On 6/28/2013 3:05 PM, Hebbar Gururaja wrote:
-> > On some platforms (like AM33xx), a special register (RTC_IRQWAKEEN)
-> > is available to enable Alarm Wakeup feature. This register needs to be
-> > properly handled for the rtcwake to work properly.
-> > 
-> > Platforms using such IP should set "ti,am3352-rtc" in rtc device dt
-> > compatibility node.
-> > 
-> > Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-> > Cc: Grant Likely <grant.likely@linaro.org>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Rob Landley <rob@landley.net>
-> > Cc: Sekhar Nori <nsekhar@ti.com>
-> > Cc: Kevin Hilman <khilman@linaro.org>
-> > Cc: Alessandro Zummo <a.zummo@towertech.it>
-> > Cc: rtc-linux at googlegroups.com
-> > Cc: devicetree-discuss at lists.ozlabs.org
-> > Cc: linux-doc at vger.kernel.org
-> > ---
-> 
-> [...]
-> 
-> > -#define	OMAP_RTC_DATA_DA830_IDX	1
-> > +#define	OMAP_RTC_DATA_DA830_IDX		1
-> > +#define	OMAP_RTC_DATA_AM335X_IDX	2
-> >  
-> >  static struct platform_device_id omap_rtc_devtype[] = {
-> >  	{
-> > @@ -309,6 +321,9 @@ static struct platform_device_id omap_rtc_devtype[] = {
-> >  	}, {
-> >  		.name	= "da830-rtc",
-> >  		.driver_data = OMAP_RTC_HAS_KICKER,
-> > +	}, {
-> > +		.name	= "am335x-rtc",
-> 
-> may be use am3352-rtc here just to keep the platform device name and of
-> compatible in sync.
+On Mon, Jul 1, 2013 at 10:44 PM, Gupta, Pekon <pekon@ti.com> wrote:
+>>
+>> Hi all,
+>>
+>> Today's linux-next merge of the arm-soc tree got a conflict in
+>> Documentation/devicetree/bindings/mtd/gpmc-nand.txt between commits
+>> 6c88058ef927 ("ARM: OMAP2+: cleaned-up DT support of various ECC
+>> schemes") and 212012138deb ("mtd: nand: omap2: updated support for
+>> BCH4
+>> ECC scheme") from the l2-mtd tree and commit 496c8a0bbb72 ("ARM:
+>> OMAP2+:
+>> Allow NAND transfer mode to be specified in DT") from the arm-soc tree.
+>>
+>> I fixed it up (maybe - see below) and can carry the fix as necessary (no
+>> action is required).
+>>
+>> --
+>> Cheers,
+>> Stephen Rothwell                    sfr at canb.auug.org.au
+>>
+> Yes following merge is correct. Apologies, as there were multiple OMAP2 NAND and GPMC updates and clean-up going into different trees, so these conflict came. Going forward you shouldn't find such issues, as code is more stable now. Thanks for help.
+>
+> with regards, pekon
 
-Correct. I will update the same in v2.
+Sigh. The new bindings seem to never have been reviewed by any device
+tree maintainers, and from the look of it, it might need some
+discussion. It wasn't even cc:d to devicetree-discuss.
 
-> 
-> > +		.driver_data = OMAP_RTC_HAS_KICKER | OMAP_RTC_HAS_IRQWAKEEN,
-> >  	},
-> >  	{},
-> 
-> It is better to use the index defined above in the static initialization
-> so they remain in sync.
+It's completely inappropriate to merge a patch like this at this time
+without any kind of acks from the people reviewing bindings. Can it
+please be dropped ASAP from the MTD tree? Thanks!
 
-Sorry. I didn?t get this.
+Or, if you want it in different wording: The mtd-tree patch is a
+strong NAK until this has been sorted out.
 
-> 
-> 	...
-> 	[OMAP_RTC_DATA_DA830_IDX] = {
-> 		.name	= "da830-rtc",
-> 		.driver_data = OMAP_RTC_HAS_KICKER,
-> 	},
-> 	...
-> 
-> >  };
-> > @@ -318,6 +333,9 @@ static const struct of_device_id omap_rtc_of_match[] = {
-> >  	{	.compatible	= "ti,da830-rtc",
-> >  		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_DA830_IDX],
-> >  	},
-> > +	{	.compatible	= "ti,am3352-rtc",
-> > +		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_AM335X_IDX],
-> > +	},
-> >  	{},
-> >  };
-> >  MODULE_DEVICE_TABLE(of, omap_rtc_of_match);
-> 
-> Apart from these minor issues, the patch looks good to me.
-> 
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
-> 
-> Thanks,
-> Sekhar
-> 
+It was also applied today, after the merge window opened. Don't merge
+it for 3.11. Artem?
 
 
-Regards, 
-Gururaja
+-Olof
