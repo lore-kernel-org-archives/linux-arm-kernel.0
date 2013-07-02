@@ -1,130 +1,49 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Tue, 2 Jul 2013 05:44:25 +0000
-Subject: linux-next: manual merge of the arm-soc tree with the l2-mtd tree
-In-Reply-To: <20130702152954.f25bbf51c1a79aa4437e22ee@canb.auug.org.au>
-References: <20130702152954.f25bbf51c1a79aa4437e22ee@canb.auug.org.au>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73E9E3BF5@DBDE04.ent.ti.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 2 Jul 2013 14:52:23 +0900
+Subject: [PATCH 00/03] ARM: 64-bit memory fixes, APE6EVM second memory bank
+In-Reply-To: <201306121441.35924.arnd@arndb.de>
+References: <20130605104427.1720.68752.sendpatchset@w520>
+ <201306051317.02284.arnd@arndb.de>
+ <CANqRtoSZXz5-z4pMTM_gpTf11qQCc870Vf35qLQ4jpoCPnq4KQ@mail.gmail.com>
+ <201306121441.35924.arnd@arndb.de>
+Message-ID: <CANqRtoR=oDnJc48CpvF2GZjL1bBByoaWno58fVAyP9GeqpFSfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> Hi all,
-> 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> Documentation/devicetree/bindings/mtd/gpmc-nand.txt between commits
-> 6c88058ef927 ("ARM: OMAP2+: cleaned-up DT support of various ECC
-> schemes") and 212012138deb ("mtd: nand: omap2: updated support for
-> BCH4
-> ECC scheme") from the l2-mtd tree and commit 496c8a0bbb72 ("ARM:
-> OMAP2+:
-> Allow NAND transfer mode to be specified in DT") from the arm-soc tree.
-> 
-> I fixed it up (maybe - see below) and can carry the fix as necessary (no
-> action is required).
-> 
-> --
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-Yes following merge is correct. Apologies, as there were multiple OMAP2 NAND and GPMC updates and clean-up going into different trees, so these conflict came. Going forward you shouldn't find such issues, as code is more stable now. Thanks for help.
+Hi Russel, Arnd, Stepan,
 
-with regards, pekon
+On Wed, Jun 12, 2013 at 9:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 12 June 2013, Magnus Damm wrote:
+>> On Wed, Jun 5, 2013 at 8:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Wednesday 05 June 2013, Magnus Damm wrote:
+>> >> ARM: 64-bit memory fixes, APE6EVM second memory bank
+>> >>
+>> >> [PATCH 01/03] ARM: Let arm_add_memory() always use 64-bit arguments
+>> >> [PATCH 02/03] ARM: Handle 64-bit memory in case of 32-bit phys_addr_t
+>> >> [PATCH 03/03] ARM: shmobile: Add second memory bank to DTS for APE6EVM
+>> >>
+>> >> This patch set contains two fixes and one mach-shmobile specific patch
+>> >> to add a second memory bank. The fixes attempt to improve the memory bank
+>> >> handling in the ARM kernel in case of 64-bit addresses.
+>> >
+>> > Please have a look at this patch that Stepan Moskovchenko posted:
+>> >
+>> > https://patchwork.kernel.org/patch/2639171/
+>> >
+>> > I think we are going to need only one of the two approaches.
+>>
+>> Thanks for pointing out this implementation. Is there anything I can
+>> do to move this forward?
+>
+> I'm fine with either solution. If Russell doesn't have a preference
+> one way or the other, I'd suggest you agree with Stepan on one of the
+> two and put that into the patch tracker.
 
-> diff --cc Documentation/devicetree/bindings/mtd/gpmc-nand.txt
-> index b3f23df,df338cb..0000000
-> --- a/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
-> +++ b/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
-> @@@ -17,59 -17,27 +17,66 @@@ Required properties
-> 
->   Optional properties:
-> 
->  - - nand-bus-width: 		Set this numeric value to 16 if the hardware
->  -				is wired that way. If not specified, a bus
->  -				width of 8 is assumed.
->  + - nand-bus-width: 		Determines data-width of the connected
-> device
->  +				x16 = "16"
->  +				x8  = "8" (default)
-> 
->  - - ti,nand-ecc-opt:		A string setting the ECC layout to use. One of:
-> 
->  -		"sw"		Software method (default)
->  -		"hw"		Hardware method
->  -		"hw-romcode"	gpmc hamming mode method & romcode
-> layout
->  -		"bch4"		4-bit BCH ecc code
->  -		"bch8"		8-bit BCH ecc code
->  + - ti,nand-ecc-opt:		Determines the ECC scheme used by driver.
->  +				It can be any of the following strings:
->  +
->  +	"hamming_code_sw"		1-bit Hamming ECC
->  +					- ECC calculation in software
->  +					- Error detection in software
->  +					- ECC layout compatible with S/W
-> scheme
->  +
->  +	"hamming_code_hw"		1-bit Hamming ECC
->  +					- ECC calculation in hardware
->  +					- Error detection in software
->  +					- ECC layout compatible with S/W
-> scheme
->  +
->  +	"hamming_code_hw_romcode"	1-bit Hamming ECC
->  +					- ECC calculation in hardware
->  +					- Error detection in software
->  +					- ECC layout compatible with ROM
-> code
->  +
->  +	"bch4_code_hw_detection_sw"	4-bit BCH ECC
->  +					- ECC calculation in hardware
->  +					- Error detection in software
->  +					- ECC layout compatible with S/W
-> scheme
->  +					* depends on
-> CONFIG_MTD_NAND_ECC_BCH
->  +
->  +	"bch4_code_hw"             	4-bit BCH ECC
->  +					- ECC calculation in hardware
->  +					- Error detection in hardware
->  +					- ECC layout compatible with ROM
-> code
->  +					* depends on
-> CONFIG_MTD_NAND_OMAP_BCH
->  +					* requires <elm_id> to be specified
->  +
->  +	"bch8_code_hw_detection_sw"	8-bit BCH ECC
->  +					- ECC calculation in hardware
->  +					- Error detection in software
->  +					- ECC layout compatible with S/W
-> scheme
->  +					* depends on
-> CONFIG_MTD_NAND_ECC_BCH
->  +
->  +	"bch8_code_hw"             	8-bit BCH ECC
->  +					- ECC calculation in hardware
->  +					- Error detection in hardware
->  +					- ECC layout compatible with ROM
-> code
->  +					* depends on
-> CONFIG_MTD_NAND_OMAP_BCH
->  +					* requires <elm_id> to be specified
-> 
-> +  - ti,nand-xfer-type:		A string setting the data transfer type. One
-> of:
-> +
-> + 		"prefetch-polled"	Prefetch polled mode (default)
-> + 		"polled"		Polled mode, without prefetch
-> + 		"prefetch-dma"		Prefetch enabled sDMA
-> mode
-> + 		"prefetch-irq"		Prefetch enabled irq mode
-> +
->  - - elm_id:	Specifies elm device node. This is required to support BCH
->  - 		error correction using ELM module.
->  +
->  + - elm_id:			Specifies elm device node. This is required to
->  +				support some BCH ECC schemes mentioned
-> above.
->  +
-> 
->   For inline partiton table parsing (optional):
-> 
+Thanks for your guidance, Arnd. After pinging Stepan I assume that he
+doesn't have any preference either.
+
+Russel, what is your opinion?
+
+Thanks,
+
+/ magnus
