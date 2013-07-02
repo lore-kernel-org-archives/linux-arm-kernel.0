@@ -1,105 +1,47 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue,  2 Jul 2013 20:02:29 +0400
-Subject: [PATCH 6/6] ARM: dts: imx27-phytec-phycore-som: Using labels for
- reusing UART, I2C and FEC
+Date: Tue,  2 Jul 2013 20:02:25 +0400
+Subject: [PATCH 2/6] ARM: dts: i.MX27: Add WEIM node
 In-Reply-To: <1372780949-31897-1-git-send-email-shc_work@mail.ru>
 References: <1372780949-31897-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1372780949-31897-6-git-send-email-shc_work@mail.ru>
+Message-ID: <1372780949-31897-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds the missing (Wireless External Interface Module) WEIM
+devicetree node for i.MX27 CPUs.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore-som.dts | 63 ++++++++++++--------------
- 1 file changed, 30 insertions(+), 33 deletions(-)
+ arch/arm/boot/dts/imx27.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-index bd7df2e..22d0d27 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-@@ -19,39 +19,6 @@
- 	memory {
- 		reg = <0xa0000000 0x08000000>;
- 	};
--
--	soc {
--		aipi at 10000000 { /* aipi1 */
--			serial at 1000a000 {
--				status = "okay";
--			};
--
--			i2c at 1001d000 {
--				clock-frequency = <400000>;
--				status = "okay";
--				at24 at 52 {
--					compatible = "at,24c32";
--					pagesize = <32>;
--					reg = <0x52>;
--				};
--				pcf8563 at 51 {
--					compatible = "nxp,pcf8563";
--					reg = <0x51>;
--				};
--				lm75 at 4a {
--					compatible = "national,lm75";
--					reg = <0x4a>;
--				};
--			};
--		};
--
--		aipi at 10020000 { /* aipi2 */
--			ethernet at 1002b000 {
--				phy-reset-gpios = <&gpio3 30 0>;
--				status = "okay";
--			};
--		};
--	};
- };
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 516473c..056e33b 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -443,6 +443,23 @@
+ 			status = "disabled";
+ 		};
  
- &cspi1 {
-@@ -163,12 +130,42 @@
- 	};
- };
- 
-+&fec {
-+	phy-reset-gpios = <&gpio3 30 0>;
-+	status = "okay";
-+};
++		weim: weim at d8002000 {
++			#address-cells = <2>;
++			#size-cells = <1>;
++			compatible = "fsl,imx27-weim";
++			reg = <0xd8002000 0x1000>;
++			clocks = <&clks 0>;
++			ranges = <
++				0 0 0xc0000000 0x08000000
++				1 0 0xc8000000 0x08000000
++				2 0 0xd0000000 0x02000000
++				3 0 0xd2000000 0x02000000
++				4 0 0xd4000000 0x02000000
++				5 0 0xd6000000 0x02000000
++			>;
++			status = "disabled";
++		};
 +
-+&i2c2 {
-+	clock-frequency = <400000>;
-+	status = "okay";
-+
-+	at24 at 52 {
-+		compatible = "at,24c32";
-+		pagesize = <32>;
-+		reg = <0x52>;
-+	};
-+
-+	pcf8563 at 51 {
-+		compatible = "nxp,pcf8563";
-+		reg = <0x51>;
-+	};
-+
-+	lm75 at 4a {
-+		compatible = "national,lm75";
-+		reg = <0x4a>;
-+	};
-+};
-+
- &nfc {
- 	nand-bus-width = <8>;
- 	nand-ecc-mode = "hw";
- 	status = "okay";
- };
- 
-+&uart1 {
-+	status = "okay";
-+};
-+
- &weim {
- 	status = "okay";
- 
+ 		iram: iram at ffff4c00 {
+ 			compatible = "mmio-sram";
+ 			reg = <0xffff4c00 0xb400>;
 -- 
 1.8.1.5
