@@ -1,54 +1,78 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 02 Jul 2013 20:27:49 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MyA1LzVdIEFSTTogZHRzOiBBZGQgZGV2aWNlIHRyZWUg?=
- =?UTF-8?B?c3VwcG9ydCBmb3IgcGh5Y2FyZCBwY2ExMDA=?=
-In-Reply-To: <1372431037-13519-6-git-send-email-mpa@pengutronix.de>
-References: <1372431037-13519-1-git-send-email-mpa@pengutronix.de>
- <1372431037-13519-6-git-send-email-mpa@pengutronix.de>
-Message-ID: <1372782469.486055292@f129.mail.ru>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 2 Jul 2013 18:33:04 +0200
+Subject: [PATCHv3 2/3] ARM: mxs: cfa10049: Switch bus i2c1 to bitbanging
+In-Reply-To: <51D2DE5B.9060309@free-electrons.com>
+References: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <51D2BEA1.6010206@free-electrons.com> <51D2DE5B.9060309@free-electrons.com>
+Message-ID: <201307021833.04282.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Board files for Phytec phyCARD-S "System on Module" and "Rapid
-> Development Kit".
-> 
-> Based on patches from:
-> 
-> Steffen Trumtrar <s.trumtrar@pengutronix.de>:
->  - Original patch
->  - ARM: dts: Set partition offsets for phycard
->  - ARM: dts: Use CSPI1 instead of CSPI2 on phycard pca100
->  - ARM: imx27-phytec-phycard-S.dts: resize nand partitions
-...
-> diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
-...
-> +&i2c1 {
-> +	status = "okay";
-> +
-> +	ioexpander at 41 {
-> +		compatible = "nxp,pca9536";
-> +		reg = <0x41>;
-> +	};
-> +
-> +	rtc at 51 {
-> +		compatible = "nxp,pcf8563";
-> +		reg = <0x51>;
-> +	};
-> +};
-> +
-> +&i2c2 {
-> +	status = "okay";
-> +
-> +	lm75 at 4a {
-> +		compatible = "national,lm75";
-> +		reg = <0x4a>;
-> +	};
-> +
-> +	rtc at 51 {
-> +		compatible = "nxp,pcf8563";
-> +		reg = <0x51>;
-> +	};
+Dear Alexandre Belloni,
 
-Really two identical RTC on I2C1 & I2C2 or it is typo?
+> On 02/07/2013 13:50, Alexandre Belloni wrote:
+> > On 02/07/2013 13:45, Fabio Estevam wrote:
+> >> Shouldn't this be
+> >> 
+> >>          i2c at 1 {
+> >>          
+> >>                  reg = <1>; ?
+> > 
+> > No, we have 4 devices on that mux and 2 pins to select the muxing.
+> 
+> OK, got it working.
+> 
+> So, the results:
+> 
+> bitbanging:
+> 
+> # time cat /sys/bus/iio/devices/iio\:device1/in_voltage0_raw
+> 2637
+> real	0m 0.09s
+> user	0m 0.01s
+> sys	0m 0.01s
+> 
+> 
+> i2c-mxs PIO mode:
+> 
+> # time cat /sys/bus/iio/devices/iio\:device1/in_voltage0_raw
+> [   35.007650] [sched_delayed] sched: RT throttling activated
+> 2627
+> real	0m 7.14s
+> user	0m 0.02s
+> sys	0m 0.01s
+> 
+> 
+> i2c-mxs PIO mode without LRADC:
+> 
+> # time cat /sys/bus/iio/devices/iio\:device1/in_voltage0_raw
+> [   18.007432] [sched_delayed] sched: RT throttling activated
+> 2629
+> real	0m 7.09s
+> user	0m 0.00s
+> sys	0m 0.03s
+> 
+> 
+> i2c-mxs DMA mode:
+> 
+> # time cat /sys/bus/iio/devices/iio\:device1/in_voltage0_raw
+> 2631
+> real	0m 0.12s
+> user	0m 0.01s
+> sys	0m 0.01s
+> 
+> 
+> It seems fine for me.
 
----
+I think I'm getting a little lost in these gazilions of i2c and lradc threads. 
+Can we not create one thread and keep the related stuff in there instead of 
+discussing it all around !?
+
+Only one question comes to mind with this email -- what do LRADC and I2C have to 
+do with each other here ?
+
+It'd be nice if someone could summarize on what I should focus and possibly 
+prepare a testcase.
+
+Best regards,
+Marek Vasut
