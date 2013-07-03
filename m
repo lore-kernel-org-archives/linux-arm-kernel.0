@@ -1,28 +1,45 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Wed,  3 Jul 2013 16:37:55 +0800
-Subject: [v2 0/5] ASoC: atmel-pcm: align with generic dmaengine framwork
-Message-ID: <1372840680-2253-1-git-send-email-voice.shen@atmel.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Wed,  3 Jul 2013 14:12:03 +0530
+Subject: [PATCH] arm64: KVM: Support Cortex-A57 guest CPU on APM X-Gene host
+Message-ID: <1372840923-12808-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set is based on linux next-20130701
+Update kvm_target_cpu() to allow Cortex-A57 guest CPU on APM X-Gene.
 
-mainly implement
-  - move set dma data from hw_params to startup callback to avoid memory leak
-  - align atmel pcm with generic dmaenigne framwork
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+---
+ arch/arm64/kvm/guest.c |   10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-Bo Shen (5):
-  ASoC: atmel_ssc_dai: move set dma data to startup callback
-  ASoC: atmel_ssc_dai: add error mask define
-  ASoC: atmel-pcm-dma: move prepare for dma to dai prepare
-  ARM: atmel-ssc: change phybase type to dma_addr_t
-  ASoC: atmel-pcm: use generic dmaengine framework
-
- include/linux/atmel-ssc.h       |    2 +-
- sound/soc/atmel/Kconfig         |    1 +
- sound/soc/atmel/atmel-pcm-dma.c |  118 ++++++---------------------------------
- sound/soc/atmel/atmel_ssc_dai.c |   36 ++++++------
- 4 files changed, 37 insertions(+), 120 deletions(-)
-
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 2c3ff67..765f56f 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -207,8 +207,13 @@ int __attribute_const__ kvm_target_cpu(void)
+ 	unsigned long implementor = read_cpuid_implementor();
+ 	unsigned long part_number = read_cpuid_part_number();
+ 
+-	if (implementor != ARM_CPU_IMP_ARM)
+-		return -EINVAL;
++	switch (implementor) {
++	case ARM_CPU_IMP_ARM:
++	case ARM_CPU_IMP_APM:
++		break;
++	default:
++ 		return -EINVAL;
++	}
+ 
+ 	switch (part_number) {
+ 	case ARM_CPU_PART_AEM_V8:
+@@ -216,6 +221,7 @@ int __attribute_const__ kvm_target_cpu(void)
+ 	case ARM_CPU_PART_FOUNDATION:
+ 		return KVM_ARM_TARGET_FOUNDATION_V8;
+ 	case ARM_CPU_PART_CORTEX_A57:
++	case APM_CPU_PART_POTENZA:
+ 		/* Currently handled by the generic backend */
+ 		return KVM_ARM_TARGET_CORTEX_A57;
+ 	default:
 -- 
 1.7.9.5
