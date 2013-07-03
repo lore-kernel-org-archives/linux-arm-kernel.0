@@ -1,41 +1,31 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 03 Jul 2013 10:11:51 -0400
-Subject: Proposal: mach-dt
-In-Reply-To: <51D430DE.3030609@arm.com>
-References: <1372839486.487159774@f54.mail.ru> <51D3ECD1.8030305@arm.com>
- <51D42F3C.3020805@codeaurora.org> <51D430DE.3030609@arm.com>
-Message-ID: <51D43127.6080206@codeaurora.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 3 Jul 2013 17:11:10 +0300
+Subject: [PATCH v3 1/8] wl1251: split wl251 platform data to a separate
+ structure
+In-Reply-To: <1372860209-3504-2-git-send-email-coelho@ti.com>
+References: <1372860209-3504-1-git-send-email-coelho@ti.com>
+ <1372860209-3504-2-git-send-email-coelho@ti.com>
+Message-ID: <20130703141110.GN15056@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2013 10:10 AM, Marc Zyngier wrote:
-> On 03/07/13 15:03, Christopher Covington wrote:
->> On 07/03/2013 05:20 AM, Marc Zyngier wrote:
->>> On 03/07/13 09:18, Alexander Shiyan wrote:
->>>
->>> Hi Alexander,
->>>
->>>> More and more platforms are now using devicetree.
->>>> Ideally the platform code contains only one function "of_platform_populate".
->>>> My idea is to make a generic architecture (mach-dt) with the call then add support
->>>> for compatible subarchitectures as they become available in "compatible"-property.
->>>> Your opinion?
->>>
->>> Well, my (admittedly partial) opinion is that mach-virt is an incredibly
->>> nicer sounding name, 'specially as you can mistype it as mach-triv.
->>
->> As mentioned before, I disagree and would love to see the the
->> virtualization-specific name replaced by something more suitably generic.
+On Wed, Jul 03, 2013 at 05:03:22PM +0300, Luciano Coelho wrote:
+> Move the wl1251 part of the wl12xx platform data structure into a new
+> structure specifically for wl1251.  Change the platform data built-in
+> block and board files accordingly.
 > 
-> I think you're missing the point. The right fix would to remove it
-> entirely and make it the basic default. There are patches for that already.
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Luciano Coelho <coelho@ti.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-Where?
-
-Thanks,
-Christopher
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130703/6b8a1695/attachment-0001.sig>
