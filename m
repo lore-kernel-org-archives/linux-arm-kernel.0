@@ -1,38 +1,66 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 03 Jul 2013 10:08:08 +0200
-Subject: [alsa-devel] [PATCH 2/2] ASoC: atmel-pcm: use generic dmaengine
- framework
-In-Reply-To: <51D3D969.1060308@atmel.com>
-References: <1372755849-19546-1-git-send-email-voice.shen@atmel.com>
- <1372755849-19546-3-git-send-email-voice.shen@atmel.com>
- <51D2F306.7040603@metafoo.de> <51D37F87.2010008@atmel.com>
- <51D3D482.1050100@metafoo.de> <51D3D969.1060308@atmel.com>
-Message-ID: <51D3DBE8.4090407@metafoo.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 3 Jul 2013 13:42:07 +0530
+Subject: [PATCH 4/4] ARM: dts: AM33XX: update rtc node compatibility
+In-Reply-To: <51D26F61.7080308@ti.com>
+References: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
+ <1372412109-986-5-git-send-email-gururaja.hebbar@ti.com>
+ <51D26F61.7080308@ti.com>
+Message-ID: <51D3DCD7.2010209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2013 09:57 AM, Bo Shen wrote:
-> Hi Lars,
-> 
-> On 7/3/2013 15:36, Lars-Peter Clausen wrote:
->>>>> +        slave_config->dst_addr = (dma_addr_t)ssc->phybase + SSC_THR;
->>>> >>[...]
->>>>> >>>+        slave_config->src_addr = (dma_addr_t)ssc->phybase + SSC_RHR;
->>>> >>
->>>> >>Change the type of phybase to dma_addr_t
->>> >
->>> >It should be:
->>> >slave_config->dst_addr = (dma_addr_t)(ssc->phybase + SSC_THR);
->>> >slave_config->src_addr = (dma_addr_t)(ssc->phybase + SSC_RHR);
->> The type of phybase in the ssc_device struct should be changed from
->> resource_size_t to dma_addr_t.
-> 
-> Actually, the phybase in ssc_device structure is resource_size_t which used to
-> access the ssc device register.
-> Here, we use ssc register as dma source address or destination address, so we
-> convert it to dma_addr_t type. So, not need to change, am I right?
+Gururaja,
 
-Isn't 'regs' used to access the registers? As far as I can see phybase is only
-used in the audio DMA driver.
+On 7/2/2013 11:42 AM, Sekhar Nori wrote:
+> Changing to Benoit's gmail id since he apparently wont access TI mail
+> anymore.
+> 
+> On 6/28/2013 3:05 PM, Hebbar Gururaja wrote:
+>> Since AM33xx  RTC IP has RTC_IRQWAKEEN to support Alarm Wake-up.
+>>
+>> Update the rtc compatible property to "ti,am3352-rtc" to enable handling
+>> of this feature inside rtc-omap driver.
+>>
+>> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> Cc: Kevin Hilman <khilman@linaro.org>
+>> Cc: b-cousson at ti.com
+>> ---
+>> :100644 100644 77aa1b0... dde180a... M	arch/arm/boot/dts/am33xx.dtsi
+>>  arch/arm/boot/dts/am33xx.dtsi |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+>> index 77aa1b0..dde180a 100644
+>> --- a/arch/arm/boot/dts/am33xx.dtsi
+>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>> @@ -297,7 +297,7 @@
+>>  		};
+>>  
+>>  		rtc at 44e3e000 {
+>> -			compatible = "ti,da830-rtc";
+>> +			compatible = "ti,am3352-rtc";
+> 
+> compatible is a list so you can instead do:
+> 	
+> 	compatible = "ti,am3352-rtc", "ti,da830-rtc";
+> 
+> That way the dts works irrespective of driver updates. When driver
+> supports enhanced features of hardware, they are available to the user
+> else the basic functionality still works.
 
-- Lars
+On doing some experiments myself, the of_device_id which gets selected
+during probe depends on the order in which its entry appears in the
+match table inside the driver rather than how the compatible string is
+written. I think this puts undue dependency on how the driver is
+written, so I am okay with providing a single compatible value like the
+way you have done ATM.
+
+I do think the string appearing first in the compatible list is what
+should be selected if a match is available but I am not sure if there
+are other considerations due to which of_match_device() is written the
+way it is written.
+
+Thanks,
+Sekhar
