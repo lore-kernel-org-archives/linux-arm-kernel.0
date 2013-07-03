@@ -1,38 +1,28 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 3 Jul 2013 17:21:10 +0900
-Subject: [PATCH v3] ARM: shmobile: lager: Add DT reference
-In-Reply-To: <1372838251-6314-1-git-send-email-horms+renesas@verge.net.au>
-References: <1372838251-6314-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CANqRtoTD3Bgm775DhFhs2kn1+sSLb-pX89mFRoHrc2x4sRT_RQ@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed,  3 Jul 2013 16:37:55 +0800
+Subject: [v2 0/5] ASoC: atmel-pcm: align with generic dmaengine framwork
+Message-ID: <1372840680-2253-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+This patch set is based on linux next-20130701
 
-On Wed, Jul 3, 2013 at 4:57 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> This is sufficient to allow boot of the Lager board with
-> a console without boards-lager.c compiled into the kernel.
-> This is an example of a minimal but still useful initialisation
-> of the board using DT as much as possible.
->
-> As such it is the same as the boot of Lager that can be achieved
-> without a board file. The intention of adding this file
-> is to facilitate further work to allow board specific devices to be
-> initialised via DT.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->
-> ---
->
-> v3
-> * Supply temporary machine_init call-back in lager-reference.c to
->   initialise clocks and bring up SCIF and CMT in C. Magnus
->   advised me that this is not desired in the SoC code.
-> * Add lager-reference to Makefile.boot
->
-> v2
-> * Use recently added r8a7790_init_delay()
+mainly implement
+  - move set dma data from hw_params to startup callback to avoid memory leak
+  - align atmel pcm with generic dmaenigne framwork
 
-This looks good to me, thanks!
+Bo Shen (5):
+  ASoC: atmel_ssc_dai: move set dma data to startup callback
+  ASoC: atmel_ssc_dai: add error mask define
+  ASoC: atmel-pcm-dma: move prepare for dma to dai prepare
+  ARM: atmel-ssc: change phybase type to dma_addr_t
+  ASoC: atmel-pcm: use generic dmaengine framework
 
-Acked-by: Magnus Damm <damm@opensource.se>
+ include/linux/atmel-ssc.h       |    2 +-
+ sound/soc/atmel/Kconfig         |    1 +
+ sound/soc/atmel/atmel-pcm-dma.c |  118 ++++++---------------------------------
+ sound/soc/atmel/atmel_ssc_dai.c |   36 ++++++------
+ 4 files changed, 37 insertions(+), 120 deletions(-)
+
+-- 
+1.7.9.5
