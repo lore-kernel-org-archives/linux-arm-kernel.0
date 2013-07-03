@@ -1,87 +1,115 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Wed, 3 Jul 2013 19:36:51 +0530
-Subject: [PATCH] arm64: KVM: Support Cortex-A57 guest CPU on APM X-Gene
- host
-In-Reply-To: <51D42E5C.6050209@arm.com>
-References: <1372840923-12808-1-git-send-email-anup.patel@linaro.org>
- <CAFEAcA_9mfYT6pPOT3dmqGoFAeJpQACO4FZp_971XUSowxoBaA@mail.gmail.com>
- <51D42E5C.6050209@arm.com>
-Message-ID: <CAAhSdy2O5_e5D2jGMtxtThsCaqHti9q7CEA59gCpL3urCaC49A@mail.gmail.com>
+From: coelho@ti.com (Luciano Coelho)
+Date: Wed, 3 Jul 2013 17:03:29 +0300
+Subject: [PATCH v3 8/8] wlcore/wl12xx: check if we got correct clock data from
+ DT
+In-Reply-To: <1372860209-3504-1-git-send-email-coelho@ti.com>
+References: <1372860209-3504-1-git-send-email-coelho@ti.com>
+Message-ID: <1372860209-3504-9-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 3, 2013 at 7:29 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 03/07/13 11:54, Peter Maydell wrote:
->> On 3 July 2013 09:42, Anup Patel <anup.patel@linaro.org> wrote:
->>> Update kvm_target_cpu() to allow Cortex-A57 guest CPU on APM X-Gene.
->>>
->>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>> ---
->>>  arch/arm64/kvm/guest.c |   10 ++++++++--
->>>  1 file changed, 8 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
->>> index 2c3ff67..765f56f 100644
->>> --- a/arch/arm64/kvm/guest.c
->>> +++ b/arch/arm64/kvm/guest.c
->>> @@ -207,8 +207,13 @@ int __attribute_const__ kvm_target_cpu(void)
->>>         unsigned long implementor = read_cpuid_implementor();
->>>         unsigned long part_number = read_cpuid_part_number();
->>>
->>> -       if (implementor != ARM_CPU_IMP_ARM)
->>> -               return -EINVAL;
->>> +       switch (implementor) {
->>> +       case ARM_CPU_IMP_ARM:
->>> +       case ARM_CPU_IMP_APM:
->>> +               break;
->>> +       default:
->>> +               return -EINVAL;
->>> +       }
->>
->> Doesn't this change mean we now accept the below part
->> numbers for all implementors? That doesn't look right.
->>
->>>         switch (part_number) {
->>>         case ARM_CPU_PART_AEM_V8:
->>> @@ -216,6 +221,7 @@ int __attribute_const__ kvm_target_cpu(void)
->>>         case ARM_CPU_PART_FOUNDATION:
->>>                 return KVM_ARM_TARGET_FOUNDATION_V8;
->>>         case ARM_CPU_PART_CORTEX_A57:
->>> +       case APM_CPU_PART_POTENZA:
->>>                 /* Currently handled by the generic backend */
->>>                 return KVM_ARM_TARGET_CORTEX_A57;
->>>         default:
->>
->> Do we really model all the system registers and so on correctly
->> sufficiently to be able to present the guest with an A57 vcpu
->> on an APM X-Gene host? (ie without accidentally leaking the
->> host ID registers/system registers/impdef registers to the
->> guest).
->
-> There is no such thing in the KVM/arm64 code. The guest sees the real
-> host, and I really don't lie the idea of lying to userspace by
-> pretending that we're going to emulate an A57.
->
-> Anup: I suggest you rework that patch to present a X-Gene vcpu. You can
-> implement it by declaring a new target and implementing it in terms of
-> the generic backend one if that's convenient. But just pretending this
-> is an A57 is not going to fly, sorry.
+The fref and the tcxo clocks settings are optional in some platforms.
+WiLink8 doesn't need either, so we don't check the values.  WiLink 6
+only needs the fref clock, so we check that it is valid or return with
+an error.  WiLink7 needs both clocks, if either is not available we
+return with an error.
 
-Sure, I will add separate target vcpu for X-Gene and try to re-use your
-generic backend.
+Signed-off-by: Luciano Coelho <coelho@ti.com>
+---
+ drivers/net/wireless/ti/wl12xx/main.c |   20 +++++++++++++++++---
+ drivers/net/wireless/ti/wlcore/sdio.c |    4 ----
+ 2 files changed, 17 insertions(+), 7 deletions(-)
 
->
-> Cheers,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
->
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
-
---Anup
+diff --git a/drivers/net/wireless/ti/wl12xx/main.c b/drivers/net/wireless/ti/wl12xx/main.c
+index 216c2fd..1be0b51 100644
+--- a/drivers/net/wireless/ti/wl12xx/main.c
++++ b/drivers/net/wireless/ti/wl12xx/main.c
+@@ -927,6 +927,11 @@ static int wl128x_boot_clk(struct wl1271 *wl, int *selected_clock)
+ 	u16 sys_clk_cfg;
+ 	int ret;
+ 
++	if ((priv->ref_clock < 0) || (priv->tcxo_clock < 0)) {
++		wl1271_error("Missing fref and/or tcxo clock settings\n");
++		return -EINVAL;
++	}
++
+ 	/* For XTAL-only modes, FREF will be used after switching from TCXO */
+ 	if (priv->ref_clock == WL12XX_REFCLOCK_26_XTAL ||
+ 	    priv->ref_clock == WL12XX_REFCLOCK_38_XTAL) {
+@@ -976,6 +981,11 @@ static int wl127x_boot_clk(struct wl1271 *wl)
+ 	u32 clk;
+ 	int ret;
+ 
++	if (priv->ref_clock < 0) {
++		wl1271_error("Missing fref clock settings\n");
++		return -EINVAL;
++	}
++
+ 	if (WL127X_PG_GET_MAJOR(wl->hw_pg_ver) < 3)
+ 		wl->quirks |= WLCORE_QUIRK_END_OF_TRANSACTION;
+ 
+@@ -1757,7 +1767,7 @@ static int wl12xx_setup(struct wl1271 *wl)
+ 	wlcore_set_ht_cap(wl, IEEE80211_BAND_5GHZ, &wl12xx_ht_cap);
+ 	wl12xx_conf_init(wl);
+ 
+-	if (!fref_param) {
++	if (!fref_param && (pdata->ref_clock_freq > 0)) {
+ 		priv->ref_clock = wl12xx_get_clock_idx(wl12xx_refclock_table,
+ 						       pdata->ref_clock_freq,
+ 						       pdata->ref_clock_xtal);
+@@ -1768,6 +1778,8 @@ static int wl12xx_setup(struct wl1271 *wl)
+ 
+ 			return priv->ref_clock;
+ 		}
++	} else if (!fref_param) {
++		priv->ref_clock = -EINVAL;
+ 	} else {
+ 		if (!strcmp(fref_param, "19.2"))
+ 			priv->ref_clock = WL12XX_REFCLOCK_19;
+@@ -1785,7 +1797,7 @@ static int wl12xx_setup(struct wl1271 *wl)
+ 			wl1271_error("Invalid fref parameter %s", fref_param);
+ 	}
+ 
+-	if (!tcxo_param) {
++	if (!fref_param && (pdata->tcxo_clock_freq > 0)) {
+ 		priv->tcxo_clock = wl12xx_get_clock_idx(wl12xx_tcxoclock_table,
+ 							pdata->tcxo_clock_freq,
+ 							true);
+@@ -1795,7 +1807,9 @@ static int wl12xx_setup(struct wl1271 *wl)
+ 
+ 			return priv->tcxo_clock;
+ 		}
+-	} else {
++	} else if (!fref_param) {
++		priv->tcxo_clock = -EINVAL;
++	}else {
+ 		if (!strcmp(tcxo_param, "19.2"))
+ 			priv->tcxo_clock = WL12XX_TCXOCLOCK_19_2;
+ 		else if (!strcmp(tcxo_param, "26"))
+diff --git a/drivers/net/wireless/ti/wlcore/sdio.c b/drivers/net/wireless/ti/wlcore/sdio.c
+index 60fce49..c76eb66 100644
+--- a/drivers/net/wireless/ti/wlcore/sdio.c
++++ b/drivers/net/wireless/ti/wlcore/sdio.c
+@@ -252,20 +252,16 @@ static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
+ 	for_each_matching_node(clock_node, wlcore_sdio_of_clk_match_table)
+ 		of_fixed_clk_setup(clock_node);
+ 
+-	/* TODO: make sure we have this when needed (ie. for WL6 and WL7) */
+ 	glue->refclock = of_clk_get_by_name(np, "refclock");
+ 	if (IS_ERR(glue->refclock)) {
+-		dev_err(dev, "couldn't find refclock on the device tree\n");
+ 		glue->refclock = NULL;
+ 	} else {
+ 		clk_prepare_enable(glue->refclock);
+ 		pdata->ref_clock_freq = clk_get_rate(glue->refclock);
+ 	}
+ 
+-	/* TODO: make sure we have this when needed (ie. for WL7) */
+ 	glue->tcxoclock = of_clk_get_by_name(np, "tcxoclock");
+ 	if (IS_ERR(glue->tcxoclock)) {
+-		dev_err(dev, "couldn't find tcxoclock on the device tree\n");
+ 		glue->tcxoclock = NULL;
+ 	} else {
+ 		clk_prepare_enable(glue->tcxoclock);
+-- 
+1.7.10.4
