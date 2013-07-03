@@ -1,28 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 3 Jul 2013 14:39:37 +0200
-Subject: [PATCH] ARM: tegra: fix VBUS regulator GPIO polarity in DT
-In-Reply-To: <1372712825-13757-1-git-send-email-swarren@wwwdotorg.org>
-References: <1372712825-13757-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <201307031439.38070.arnd@arndb.de>
+From: cb@sgoc.de (Christoph G. Baumann)
+Date: Wed,  3 Jul 2013 14:39:11 +0200
+Subject: [PATCH 0/3] Added support for On Chip OTP in i.MX23/28
+Message-ID: <1372855154-8422-1-git-send-email-cb@sgoc.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 July 2013, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Commit 4c94c8b "ARM: tegra: update device trees for USB binding rework"
-> added regulator definitions for GPIO-controlled USB VBUS. However, none
-> of these contained the essential DT property enable-active-high. Add
-> this so that the regulator definitions are correct.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> I'm sending this to arm-soc to be taken into v3.11-rc1. However, if it
-> won't get in until -rc2, let me know; I'd be tempted not to fix it in
-> 3.11 in that case, so I don't have to wait until v3.11-rc2 before
-> applying patches that use these new regulators, since they rely on this
-> fix going in first.
+From: "Christoph G. Baumann" <cb@sgoc.de>
 
-Applied to fixes branch, thanks!
+This patch contains the ported driver from Freescale for the On Chip OTP
+cells in the i.MX23 and i.MX28. The OTP cells can be read and written via
+files in /sys/fsl_otp.
 
-	Arnd
+Christoph G. Baumann (3):
+  Added support for On Chip OTP in i.MX23/28
+  Added support for On Chip OTP in i.MX23/28
+  Added support for On Chip OTP in i.MX23/28
+
+ arch/arm/boot/dts/imx28.dtsi                |    1 -
+ arch/arm/mach-mxs/include/mach/mx23-ocotp.h |  311 +++++++++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/mx28-ocotp.h |  239 ++++++++++++++++++++
+ drivers/clk/mxs/clk-imx23.c                 |    2 +
+ drivers/clk/mxs/clk-imx28.c                 |    1 +
+ drivers/misc/Kconfig                        |   14 ++
+ drivers/misc/Makefile                       |    1 +
+ drivers/misc/fsl_otp.c                      |  249 +++++++++++++++++++++
+ drivers/misc/fsl_otp.h                      |  201 +++++++++++++++++
+ 9 files changed, 1018 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-mxs/include/mach/mx23-ocotp.h
+ create mode 100644 arch/arm/mach-mxs/include/mach/mx28-ocotp.h
+ create mode 100644 drivers/misc/fsl_otp.c
+ create mode 100644 drivers/misc/fsl_otp.h
+
+-- 
+1.7.9.5
