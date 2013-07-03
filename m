@@ -1,58 +1,59 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 3 Jul 2013 10:30:30 -0400 (EDT)
-Subject: [RFC PATCH 4/6] USB: ehci-omap: Suspend the controller during
- bus suspend
-In-Reply-To: <20130703131513.GH15056@arwen.pp.htv.fi>
-Message-ID: <Pine.LNX.4.44L0.1307031023060.1241-100000@iolanthe.rowland.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 3 Jul 2013 16:51:04 +0200
+Subject: Proposal: mach-dt
+In-Reply-To: <51D437C6.9000909@arm.com>
+References: <1372839486.487159774@f54.mail.ru>
+ <51D43127.6080206@codeaurora.org> <51D437C6.9000909@arm.com>
+Message-ID: <201307031651.05181.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 3 Jul 2013, Felipe Balbi wrote:
-
-> On Wed, Jul 03, 2013 at 04:06:04PM +0300, Roger Quadros wrote:
-> > On 07/03/2013 03:57 PM, Felipe Balbi wrote:
-> > > Hi,
-> > > 
-> > > On Tue, Jul 02, 2013 at 01:17:58PM -0400, Alan Stern wrote:
-> > >> A PCI-based EHCI controller has two power sources: the core well (which
-> > >> is turned off during suspend) and the auxiliary well (which remains
-> > >> powered).  That's how remote wakeup works; it uses the auxiliary well.
-> > > 
-> > > This, kinda, matches what OMAP tries to do with pad wakeup. Just that
-> > > pad wakeup sits outside of the device itself. Perhaps we could look into
-> > > how PCI handles the aux well and take some inspiration from there.
-> > > 
-> > > Any pointers under drivers/pci/ would be great :-)
-> > > 
-> > From what I understood, auxiliary well is just a power source, and it keeps
-> > the EHCI controller powered even during suspend.
+On Wednesday 03 July 2013, Marc Zyngier wrote:
+> On 03/07/13 15:11, Christopher Covington wrote:
+> > On 07/03/2013 10:10 AM, Marc Zyngier wrote:
+> >> On 03/07/13 15:03, Christopher Covington wrote:
+> >>> On 07/03/2013 05:20 AM, Marc Zyngier wrote:
+> >>>> On 03/07/13 09:18, Alexander Shiyan wrote:
+> >>>>
+> >>>> Hi Alexander,
+> >>>>
+> >>>>> More and more platforms are now using devicetree.
+> >>>>> Ideally the platform code contains only one function "of_platform_populate".
+> >>>>> My idea is to make a generic architecture (mach-dt) with the call then add support
+> >>>>> for compatible subarchitectures as they become available in "compatible"-property.
+> >>>>> Your opinion?
+> >>>>
+> >>>> Well, my (admittedly partial) opinion is that mach-virt is an incredibly
+> >>>> nicer sounding name, 'specially as you can mistype it as mach-triv.
+> >>>
+> >>> As mentioned before, I disagree and would love to see the the
+> >>> virtualization-specific name replaced by something more suitably generic.
+> >>
+> >> I think you're missing the point. The right fix would to remove it
+> >> entirely and make it the basic default. There are patches for that already.
 > > 
-> > If that is true then it is different from our situation as we power down the
-> > EHCI controller completely.
+> > Where?
 > 
-> right but our "auxiliary well" keeps PRCM powered which can wake EHCI up
-> ;-)
+> There were patches from Arnd (CC-ed) a while ago, moving some of the
+> mach-virt SMP stuff to smp.c. Don't have the pointers handy, but surely
+> Arnd knows where they are.
 > 
-> What I'm saying is that from ehci-omap's perspective, there's very
-> little difference, specially since we route the wakeup through the same
-> IRQ line anyway. Perhaps we could take some inspiration from the PCI
-> land to make our hwmod/omap_device a little easier from driver
-> perspective.
-> 
-> Or maybe it doesn't make sense ;-)
+> Once SMP is done, the rest should be pretty trivial.
 
-This idea probably won't lead anywhere.  To the best of my knowledge 
-(and I'm not an expert on PCI), these different power wells are simply 
-part of the PCI bus.  The bus controller knows to turn off one of them 
-when the device (or maybe when all the devices on a bus segment) goes 
-into D3.
+In 3.11, mach-virt is basically empty. The SMP functions were moved out
+already and everything is optional, so you should not need to even build
+arch/arm/mach-virt/virt.c any more, except to get a particular platform
+name in /proc/cpuinfo.
 
-One big difference with respect to OMAP is the way PCI handles wakeup
-messages.  There's a separate bus signal, PME# (which stands for Power
-Management Event), that a device asserts when it wants to send a wakeup
-request.  When the ACPI driver sees the PME# signal, it searches
-through the entire PCI tree to find the device or devices which need to
-be resumed.  Or maybe when ACPI sees the signal, it tells the PCI core 
-to do this -- I'm not sure of the details.
+We have a couple of real (as opposed to virtual) platforms that are
+almost at the same point and only have one or two functions left in them.
 
-Alan Stern
+I'm definitely open for suggestions what to do about them. Putting all
+the trivial files into a shared directory would be one possibility,
+as would removing the files entirely by making the code more generic.
+
+Note that arm64 platforms by definition have no such machine specific
+code, and they should be able to boot a 32 bit kernel as well without
+needing it.
+
+	Arnd
