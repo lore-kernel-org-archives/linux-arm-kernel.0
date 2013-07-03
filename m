@@ -1,53 +1,45 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 3 Jul 2013 16:15:13 +0300
-Subject: [RFC PATCH 4/6] USB: ehci-omap: Suspend the controller during
- bus suspend
-In-Reply-To: <51D421BC.9050600@ti.com>
-References: <51D28DB9.704@ti.com>
- <Pine.LNX.4.44L0.1307021302430.1086-100000@iolanthe.rowland.org>
- <20130703125719.GD15056@arwen.pp.htv.fi> <51D421BC.9050600@ti.com>
-Message-ID: <20130703131513.GH15056@arwen.pp.htv.fi>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 03 Jul 2013 15:40:06 +0100
+Subject: Proposal: mach-dt
+In-Reply-To: <51D43127.6080206@codeaurora.org>
+References: <1372839486.487159774@f54.mail.ru> <51D3ECD1.8030305@arm.com>
+ <51D42F3C.3020805@codeaurora.org> <51D430DE.3030609@arm.com>
+ <51D43127.6080206@codeaurora.org>
+Message-ID: <51D437C6.9000909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 03, 2013 at 04:06:04PM +0300, Roger Quadros wrote:
-> On 07/03/2013 03:57 PM, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Tue, Jul 02, 2013 at 01:17:58PM -0400, Alan Stern wrote:
-> >> A PCI-based EHCI controller has two power sources: the core well (which
-> >> is turned off during suspend) and the auxiliary well (which remains
-> >> powered).  That's how remote wakeup works; it uses the auxiliary well.
-> > 
-> > This, kinda, matches what OMAP tries to do with pad wakeup. Just that
-> > pad wakeup sits outside of the device itself. Perhaps we could look into
-> > how PCI handles the aux well and take some inspiration from there.
-> > 
-> > Any pointers under drivers/pci/ would be great :-)
-> > 
-> From what I understood, auxiliary well is just a power source, and it keeps
-> the EHCI controller powered even during suspend.
+On 03/07/13 15:11, Christopher Covington wrote:
+> On 07/03/2013 10:10 AM, Marc Zyngier wrote:
+>> On 03/07/13 15:03, Christopher Covington wrote:
+>>> On 07/03/2013 05:20 AM, Marc Zyngier wrote:
+>>>> On 03/07/13 09:18, Alexander Shiyan wrote:
+>>>>
+>>>> Hi Alexander,
+>>>>
+>>>>> More and more platforms are now using devicetree.
+>>>>> Ideally the platform code contains only one function "of_platform_populate".
+>>>>> My idea is to make a generic architecture (mach-dt) with the call then add support
+>>>>> for compatible subarchitectures as they become available in "compatible"-property.
+>>>>> Your opinion?
+>>>>
+>>>> Well, my (admittedly partial) opinion is that mach-virt is an incredibly
+>>>> nicer sounding name, 'specially as you can mistype it as mach-triv.
+>>>
+>>> As mentioned before, I disagree and would love to see the the
+>>> virtualization-specific name replaced by something more suitably generic.
+>>
+>> I think you're missing the point. The right fix would to remove it
+>> entirely and make it the basic default. There are patches for that already.
 > 
-> If that is true then it is different from our situation as we power down the
-> EHCI controller completely.
+> Where?
 
-right but our "auxiliary well" keeps PRCM powered which can wake EHCI up
-;-)
+There were patches from Arnd (CC-ed) a while ago, moving some of the
+mach-virt SMP stuff to smp.c. Don't have the pointers handy, but surely
+Arnd knows where they are.
 
-What I'm saying is that from ehci-omap's perspective, there's very
-little difference, specially since we route the wakeup through the same
-IRQ line anyway. Perhaps we could take some inspiration from the PCI
-land to make our hwmod/omap_device a little easier from driver
-perspective.
+Once SMP is done, the rest should be pretty trivial.
 
-Or maybe it doesn't make sense ;-)
-
+	M.
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130703/22b54fc6/attachment.sig>
+Jazz is not dead. It just smells funny...
