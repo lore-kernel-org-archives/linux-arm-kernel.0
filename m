@@ -1,59 +1,56 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Wed, 3 Jul 2013 15:14:34 +0300
-Subject: [PATCH v2 4/9] wl12xx: use frequency instead of enumerations
- for pdata clocks
-In-Reply-To: <20130703113334.GY5523@atomide.com>
-References: <1372776948-24840-1-git-send-email-coelho@ti.com>
- <1372776948-24840-5-git-send-email-coelho@ti.com>
- <20130702150208.GA4233@kahuna> <1372796850.21065.93.camel@cumari.coelho.fi>
- <20130703113334.GY5523@atomide.com>
-Message-ID: <1372853674.21065.106.camel@cumari.coelho.fi>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Wed, 3 Jul 2013 14:18:26 +0200
+Subject: [PATCH] ARM: i.MX6Q: correct emi_sel clock muxing
+In-Reply-To: <1372836720-24660-1-git-send-email-shawn.guo@linaro.org>
+References: <1372836720-24660-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <51D41692.5090306@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-07-03 at 04:33 -0700, Tony Lindgren wrote:
-> * Luciano Coelho <coelho@ti.com> [130702 13:33]:
-> > On Tue, 2013-07-02 at 10:02 -0500, Nishanth Menon wrote:
-> > > On 17:55-20130702, Luciano Coelho wrote:
-> > > > Instead of defining an enumeration with the FW specific values for the
-> > > > different clock rates, use the actual frequency instead.  Also add a
-> > > > boolean to specify whether the clock is XTAL or not.
-> > > > 
-> > > > Change all board files to reflect this.
-> > > > 
-> > > > Cc: Tony Lindgren <tony@atomide.com>
-> > > > Cc: Sekhar Nori <nsekhar@ti.com>
-> > > > Signed-off-by: Luciano Coelho <coelho@ti.com>
-> > > > ---
-> > > >  arch/arm/mach-davinci/board-da850-evm.c      |    3 +-
-> > > >  arch/arm/mach-omap2/board-4430sdp.c          |    5 ++-
-> > > ^^
-> > > >  arch/arm/mach-omap2/board-omap3evm.c         |    3 +-
-> > > >  arch/arm/mach-omap2/board-omap4panda.c       |    3 +-
-> > > ^^
-> > > Please do not add more platform data to platforms that are DT only.
-> > 
-> > Ah, I hadn't realized that board_omap4panda.c and board-4430sdp.c had
-> > been removed in linux-next.  I base my tree on wireless-next and it
-> > doesn't contain these changes yet.  I would only have noticed this when
-> > I rebased my tree once the merge window is closed. ;)
-> > 
-> > Thanks for pointing out, I'll make sure these changes will not be there
-> > when I send the pull request.
-> 
-> Please separate out the minimal pdata and arch/arm/mach-omap2 changes int
-> a immutable branch on v3.11-rc1 that I can also pull in. For v3.12, we're
-> going to be making more boards device tree only, so these changes may
-> otherwise cause pointless merge conflicts.
+On 03.07.2013 09:32, Shawn Guo wrote:
+> From: Liu Ying <Ying.Liu@freescale.com>
+>
+> The correct muxing for emi_sel clock should be
+> 2b'00 - 396M PFD
+> 2b'01 - PLL3
+> 2b'10 - AXI clk root
+> 2b'11 - 352M PFD
+>
+> This patch corrects the muxing in the clock driver.
+>
+> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Okay.  I don't want to freeze my work, I'll continue using my
-wireless-based tree (which is based on 3.10) for now.  When the merge
-window closes, I'll reorganize all this before sending pull requests, so
-we can avoid conflicts.
+Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
 
-Please ignore my changes to board files that will disappear on 3.11 and
-keep reviewing the rest. ;)
+Thanks
 
---
-Cheers,
-Luca.
+Dirk
+
+> ---
+>   arch/arm/mach-imx/clk-imx6q.c |    5 +++--
+>   1 file changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index 4282e99f..86567d9 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -199,7 +199,8 @@ static const char *pcie_axi_sels[]	= { "axi", "ahb", };
+>   static const char *ssi_sels[]		= { "pll3_pfd2_508m", "pll3_pfd3_454m", "pll4_post_div", };
+>   static const char *usdhc_sels[]	= { "pll2_pfd2_396m", "pll2_pfd0_352m", };
+>   static const char *enfc_sels[]	= { "pll2_pfd0_352m", "pll2_bus", "pll3_usb_otg", "pll2_pfd2_396m", };
+> -static const char *emi_sels[]		= { "axi", "pll3_usb_otg", "pll2_pfd2_396m", "pll2_pfd0_352m", };
+> +static const char *emi_sels[]		= { "pll2_pfd2_396m", "pll3_usb_otg", "axi", "pll2_pfd0_352m", };
+> +static const char *emi_slow_sels[]      = { "axi", "pll3_usb_otg", "pll2_pfd2_396m", "pll2_pfd0_352m", };
+>   static const char *vdo_axi_sels[]	= { "axi", "ahb", };
+>   static const char *vpu_axi_sels[]	= { "axi", "pll2_pfd2_396m", "pll2_pfd0_352m", };
+>   static const char *cko1_sels[]	= { "pll3_usb_otg", "pll2_bus", "pll1_sys", "pll5_video_div",
+> @@ -392,7 +393,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+>   	clk[usdhc4_sel]       = imx_clk_mux("usdhc4_sel",       base + 0x1c, 19, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
+>   	clk[enfc_sel]         = imx_clk_mux("enfc_sel",         base + 0x2c, 16, 2, enfc_sels,         ARRAY_SIZE(enfc_sels));
+>   	clk[emi_sel]          = imx_clk_mux("emi_sel",          base + 0x1c, 27, 2, emi_sels,          ARRAY_SIZE(emi_sels));
+> -	clk[emi_slow_sel]     = imx_clk_mux("emi_slow_sel",     base + 0x1c, 29, 2, emi_sels,          ARRAY_SIZE(emi_sels));
+> +	clk[emi_slow_sel]     = imx_clk_mux("emi_slow_sel",     base + 0x1c, 29, 2, emi_slow_sels,     ARRAY_SIZE(emi_slow_sels));
+>   	clk[vdo_axi_sel]      = imx_clk_mux("vdo_axi_sel",      base + 0x18, 11, 1, vdo_axi_sels,      ARRAY_SIZE(vdo_axi_sels));
+>   	clk[vpu_axi_sel]      = imx_clk_mux("vpu_axi_sel",      base + 0x18, 14, 2, vpu_axi_sels,      ARRAY_SIZE(vpu_axi_sels));
+>   	clk[cko1_sel]         = imx_clk_mux("cko1_sel",         base + 0x60, 0,  4, cko1_sels,         ARRAY_SIZE(cko1_sels));
