@@ -1,37 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 3 Jul 2013 09:31:38 +0200
-Subject: [GIT PULL 3/7] ARM SoC specific changes
-In-Reply-To: <20130702231706.GF24642@n2100.arm.linux.org.uk>
-References: <201307022055.50717.arnd@arndb.de>
- <201307022104.01826.arnd@arndb.de>
- <20130702231706.GF24642@n2100.arm.linux.org.uk>
-Message-ID: <201307030931.39043.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 3 Jul 2013 15:32:00 +0800
+Subject: [PATCH] ARM: i.MX6Q: correct emi_sel clock muxing
+Message-ID: <1372836720-24660-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 July 2013, Russell King - ARM Linux wrote:
-> Please don't merge this yet.
-> 
-> Arnd has just done the worst possible thing - the arm-soc tree has taken
-> bits of my tree, merged them into their own tree, had the same conflicts
-> I've had, and then resolved them differently.
-> 
-> The result is that when these two trees now merge, they conflict on the
-> conflict resolutions.  This is utter madness.
+From: Liu Ying <Ying.Liu@freescale.com>
 
-I assume you mean the confict in arch/arm/include/asm/glue-proc.h, right?
+The correct muxing for emi_sel clock should be
+2b'00 - 396M PFD
+2b'01 - PLL3
+2b'10 - AXI clk root
+2b'11 - 352M PFD
 
-I'm sorry I did not realize that the conflict was between a commit
-from your tree and from v3.10, otherwise I would have waited for your
-pull request to come first.
+This patch corrects the muxing in the clock driver.
 
-I did the merge in my latest for-next branch, but not in the branches
-that I sent off to Linus, instead I describe the conflict and Linus
-picked one of the two possible resolutions. Unfortunately it was the
-one I had, not yours, so he will get the conflict between the merges
-again when he pulls your tree. I don't think there is any good way
-to avoid that now, but since Linus now knows about the conflict it
-at least won't be hard for him to figure out the solution, in this
-case by using your version of the file.
+Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/clk-imx6q.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 4282e99f..86567d9 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -199,7 +199,8 @@ static const char *pcie_axi_sels[]	= { "axi", "ahb", };
+ static const char *ssi_sels[]		= { "pll3_pfd2_508m", "pll3_pfd3_454m", "pll4_post_div", };
+ static const char *usdhc_sels[]	= { "pll2_pfd2_396m", "pll2_pfd0_352m", };
+ static const char *enfc_sels[]	= { "pll2_pfd0_352m", "pll2_bus", "pll3_usb_otg", "pll2_pfd2_396m", };
+-static const char *emi_sels[]		= { "axi", "pll3_usb_otg", "pll2_pfd2_396m", "pll2_pfd0_352m", };
++static const char *emi_sels[]		= { "pll2_pfd2_396m", "pll3_usb_otg", "axi", "pll2_pfd0_352m", };
++static const char *emi_slow_sels[]      = { "axi", "pll3_usb_otg", "pll2_pfd2_396m", "pll2_pfd0_352m", };
+ static const char *vdo_axi_sels[]	= { "axi", "ahb", };
+ static const char *vpu_axi_sels[]	= { "axi", "pll2_pfd2_396m", "pll2_pfd0_352m", };
+ static const char *cko1_sels[]	= { "pll3_usb_otg", "pll2_bus", "pll1_sys", "pll5_video_div",
+@@ -392,7 +393,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[usdhc4_sel]       = imx_clk_mux("usdhc4_sel",       base + 0x1c, 19, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
+ 	clk[enfc_sel]         = imx_clk_mux("enfc_sel",         base + 0x2c, 16, 2, enfc_sels,         ARRAY_SIZE(enfc_sels));
+ 	clk[emi_sel]          = imx_clk_mux("emi_sel",          base + 0x1c, 27, 2, emi_sels,          ARRAY_SIZE(emi_sels));
+-	clk[emi_slow_sel]     = imx_clk_mux("emi_slow_sel",     base + 0x1c, 29, 2, emi_sels,          ARRAY_SIZE(emi_sels));
++	clk[emi_slow_sel]     = imx_clk_mux("emi_slow_sel",     base + 0x1c, 29, 2, emi_slow_sels,     ARRAY_SIZE(emi_slow_sels));
+ 	clk[vdo_axi_sel]      = imx_clk_mux("vdo_axi_sel",      base + 0x18, 11, 1, vdo_axi_sels,      ARRAY_SIZE(vdo_axi_sels));
+ 	clk[vpu_axi_sel]      = imx_clk_mux("vpu_axi_sel",      base + 0x18, 14, 2, vpu_axi_sels,      ARRAY_SIZE(vpu_axi_sels));
+ 	clk[cko1_sel]         = imx_clk_mux("cko1_sel",         base + 0x60, 0,  4, cko1_sels,         ARRAY_SIZE(cko1_sels));
+-- 
+1.7.9.5
