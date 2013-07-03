@@ -1,9 +1,7 @@
 From: gururaja.hebbar@ti.com (Hebbar Gururaja)
-Date: Wed, 3 Jul 2013 14:17:02 +0530
-Subject: [Patch V2 1/4] rtc: omap: restore back (hard-code) wakeup support
-In-Reply-To: <1372841225-18813-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1372841225-18813-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1372841225-18813-2-git-send-email-gururaja.hebbar@ti.com>
+Date: Wed, 3 Jul 2013 14:17:01 +0530
+Subject: [Patch V2 0/4] rtc: omap: handle rtc wakeup support in driver
+Message-ID: <1372841225-18813-1-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,6 +24,9 @@ The fix for above issues, is to hard code device_init_wakeup() inside
 driver and let platforms that don't need this, handle it through the
 sysfs power entry.
 
+
+Also, update Davinci & AM335x files to above changes.
+
 [1]
 https://patchwork.kernel.org/patch/136731/
 
@@ -33,27 +34,29 @@ https://patchwork.kernel.org/patch/136731/
 http://www.mail-archive.com/davinci-linux-open-source at linux.
 davincidsp.com/msg26077.html
 
-Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-Acked-by: Kevin Hilman <khilman@linaro.org>
-Cc: Alessandro Zummo <a.zummo@towertech.it>
-Cc: rtc-linux at googlegroups.com
----
-:100644 100644 b0ba3fc... 761919d... M	drivers/rtc/rtc-omap.c
- drivers/rtc/rtc-omap.c |    2 ++
- 1 file changed, 2 insertions(+)
+Changes in V2:
+	- Coding style corrections (remove extra space, use lower case
+	  for hex numbers
+	- use prefix ARM: for commit subject keeping with arch/arm
+	  convention)
+	- use "[AM/am]3352" instead of "[AM/am]335x" to keep the all
+	  usages in sync.
+	- Use index defined for struct members so they remain in sync
+	- Add new compatible to existing one so that when driver
+	  supports enhanced features of hardware, they are available
+	  to the user else the basic functionality still works
 
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index b0ba3fc..761919d 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -423,6 +423,8 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 	 *    is write-only, and always reads as zero...)
- 	 */
- 
-+	device_init_wakeup(&pdev->dev, true);
-+
- 	if (new_ctrl & (u8) OMAP_RTC_CTRL_SPLIT)
- 		pr_info("%s: split power mode\n", pdev->name);
- 
+Hebbar Gururaja (4):
+  rtc: omap: restore back (hard-code) wakeup support
+  ARM: Davinci: da8xx/omap-l1: Remove hard coding of rtc device wakeup
+  rtc: omap: add rtc wakeup support to alarm events
+  ARM: dts: AM33XX: update rtc node compatibility
+
+ Documentation/devicetree/bindings/rtc/rtc-omap.txt |    6 +-
+ arch/arm/boot/dts/am33xx.dtsi                      |    2 +-
+ arch/arm/mach-davinci/devices-da8xx.c              |    9 +--
+ drivers/rtc/rtc-omap.c                             |   62 +++++++++++++++++---
+ 4 files changed, 61 insertions(+), 18 deletions(-)
+
 -- 
 1.7.9.5
