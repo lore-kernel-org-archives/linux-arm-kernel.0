@@ -1,50 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Jul 2013 04:33:34 -0700
-Subject: [PATCH v2 4/9] wl12xx: use frequency instead of enumerations
- for pdata clocks
-In-Reply-To: <1372796850.21065.93.camel@cumari.coelho.fi>
-References: <1372776948-24840-1-git-send-email-coelho@ti.com>
- <1372776948-24840-5-git-send-email-coelho@ti.com>
- <20130702150208.GA4233@kahuna>
- <1372796850.21065.93.camel@cumari.coelho.fi>
-Message-ID: <20130703113334.GY5523@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 3 Jul 2013 14:04:02 +0200
+Subject: [PATCH v5 00/12] MBus DT binding: A new hope
+In-Reply-To: <20130702195524.GA14547@obsidianresearch.com>
+References: <1372532655-20321-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130702195524.GA14547@obsidianresearch.com>
+Message-ID: <201307031404.02930.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Luciano Coelho <coelho@ti.com> [130702 13:33]:
-> On Tue, 2013-07-02 at 10:02 -0500, Nishanth Menon wrote:
-> > On 17:55-20130702, Luciano Coelho wrote:
-> > > Instead of defining an enumeration with the FW specific values for the
-> > > different clock rates, use the actual frequency instead.  Also add a
-> > > boolean to specify whether the clock is XTAL or not.
-> > > 
-> > > Change all board files to reflect this.
-> > > 
-> > > Cc: Tony Lindgren <tony@atomide.com>
-> > > Cc: Sekhar Nori <nsekhar@ti.com>
-> > > Signed-off-by: Luciano Coelho <coelho@ti.com>
-> > > ---
-> > >  arch/arm/mach-davinci/board-da850-evm.c      |    3 +-
-> > >  arch/arm/mach-omap2/board-4430sdp.c          |    5 ++-
-> > ^^
-> > >  arch/arm/mach-omap2/board-omap3evm.c         |    3 +-
-> > >  arch/arm/mach-omap2/board-omap4panda.c       |    3 +-
-> > ^^
-> > Please do not add more platform data to platforms that are DT only.
+On Tuesday 02 July 2013, Jason Gunthorpe wrote:
+> On Sat, Jun 29, 2013 at 04:04:03PM -0300, Ezequiel Garcia wrote:
+
+> > Personally, I can't see any disadvantage, and the binding looks much
+> > cleaner now. But of course I can be wrong, and I'm open to discussion.
+> > 
+> > There's another pending issue. Arnd Bergmann has required to add a
+> > property to specify the available space within the CPU address space
+> > for decoding windows. This property would allow to support fully
+> > dynamic mbus window allocation.
 > 
-> Ah, I hadn't realized that board_omap4panda.c and board-4430sdp.c had
-> been removed in linux-next.  I base my tree on wireless-next and it
-> doesn't contain these changes yet.  I would only have noticed this when
-> I rebased my tree once the merge window is closed. ;)
-> 
-> Thanks for pointing out, I'll make sure these changes will not be there
-> when I send the pull request.
+> I wonder if this range is implied - eg it is address space not covered
+> by the memory node or any mbus ranges? Is there a situation where that
+> is not sufficient?
 
-Please separate out the minimal pdata and arch/arm/mach-omap2 changes int
-a immutable branch on v3.11-rc1 that I can also pull in. For v3.12, we're
-going to be making more boards device tree only, so these changes may
-otherwise cause pointless merge conflicts.
+I think it's sufficient, yes. It feels odd to have the mbus code rely
+on the contents of the memory node for that, but it would work.
 
-Regards,
-
-Tony
+	Arnd
