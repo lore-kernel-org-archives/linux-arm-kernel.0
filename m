@@ -1,66 +1,74 @@
 From: coelho@ti.com (Luciano Coelho)
-Date: Wed, 3 Jul 2013 17:03:27 +0300
-Subject: [PATCH v3 6/8] wlcore: sdio: add wilink clock providers
+Date: Wed, 3 Jul 2013 17:03:24 +0300
+Subject: [PATCH v3 3/8] wlcore: remove pwr_in_suspend from platform data
 In-Reply-To: <1372860209-3504-1-git-send-email-coelho@ti.com>
 References: <1372860209-3504-1-git-send-email-coelho@ti.com>
-Message-ID: <1372860209-3504-7-git-send-email-coelho@ti.com>
+Message-ID: <1372860209-3504-4-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add refclock and tcxoclock as clock providers in WiLink.  These clocks
-are not accesible outside the WiLink module, but they are registered
-in the clock framework anyway.  Only the WiLink chip consumes these
-clocks.
-
-In theory, the WiLink chip could be connected to external clocks
-instead of using these internal clocks, so make the clock consumer
-code generic enough.  If external clocks are used, then the internal
-clock device tree nodes are not necessary, but the external ones must
-be specified.
+The pwr_in_suspend flag depends on the MMC settings which can be
+retrieved from the SDIO subsystem, so it doesn't need to be part of
+the platform data structure.  Move it to the platform device data that
+is passed from SDIO to wlcore.
 
 Signed-off-by: Luciano Coelho <coelho@ti.com>
-Reviewed-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/net/wireless/ti/wlcore/sdio.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/net/wireless/ti/wlcore/main.c     |    2 +-
+ drivers/net/wireless/ti/wlcore/sdio.c     |    2 +-
+ drivers/net/wireless/ti/wlcore/wlcore_i.h |    1 +
+ include/linux/wl12xx.h                    |    1 -
+ 4 files changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/net/wireless/ti/wlcore/main.c b/drivers/net/wireless/ti/wlcore/main.c
+index 7b5d0cc..aada037 100644
+--- a/drivers/net/wireless/ti/wlcore/main.c
++++ b/drivers/net/wireless/ti/wlcore/main.c
+@@ -5952,7 +5952,7 @@ static void wlcore_nvs_cb(const struct firmware *fw, void *context)
+ 	if (!ret) {
+ 		wl->irq_wake_enabled = true;
+ 		device_init_wakeup(wl->dev, 1);
+-		if (pdata->pwr_in_suspend)
++		if (pdev_data->pwr_in_suspend)
+ 			wl->hw->wiphy->wowlan = &wlcore_wowlan_support;
+ 	}
+ #endif
 diff --git a/drivers/net/wireless/ti/wlcore/sdio.c b/drivers/net/wireless/ti/wlcore/sdio.c
-index 9370d7e..980bf3d 100644
+index 29ef249..4c7e8ac 100644
 --- a/drivers/net/wireless/ti/wlcore/sdio.c
 +++ b/drivers/net/wireless/ti/wlcore/sdio.c
-@@ -34,6 +34,7 @@
- #include <linux/wl12xx.h>
- #include <linux/pm_runtime.h>
- #include <linux/printk.h>
-+#include <linux/clk-provider.h>
+@@ -260,7 +260,7 @@ static int wl1271_probe(struct sdio_func *func,
+ 	dev_dbg(glue->dev, "sdio PM caps = 0x%x\n", mmcflags);
  
- #include "wlcore.h"
- #include "wl12xx_80211.h"
-@@ -214,10 +215,15 @@ static struct wl1271_if_operations sdio_ops = {
- 	.set_block_size = wl1271_sdio_set_block_size,
+ 	if (mmcflags & MMC_PM_KEEP_POWER)
+-		pdev_data->pdata->pwr_in_suspend = true;
++		pdev_data->pwr_in_suspend = true;
+ 
+ 	sdio_set_drvdata(func, glue);
+ 
+diff --git a/drivers/net/wireless/ti/wlcore/wlcore_i.h b/drivers/net/wireless/ti/wlcore/wlcore_i.h
+index e5e1464..f2c4227 100644
+--- a/drivers/net/wireless/ti/wlcore/wlcore_i.h
++++ b/drivers/net/wireless/ti/wlcore/wlcore_i.h
+@@ -209,6 +209,7 @@ struct wl1271_if_operations {
+ struct wlcore_platdev_data {
+ 	struct wl12xx_platform_data *pdata;
+ 	struct wl1271_if_operations *if_ops;
++	bool pwr_in_suspend;
  };
  
-+static const struct of_device_id wlcore_sdio_of_clk_match_table[] = {
-+	{ .compatible = "ti,wilink-clock" },
-+};
-+
- static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
- {
- 	struct wl12xx_platform_data *pdata;
- 	struct device_node *np = dev->of_node;
-+	struct device_node *clock_node;
+ #define MAX_NUM_KEYS 14
+diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
+index 1bfcd19..ab90b1c 100644
+--- a/include/linux/wl12xx.h
++++ b/include/linux/wl12xx.h
+@@ -59,7 +59,6 @@ struct wl12xx_platform_data {
+ 	int irq;
+ 	int board_ref_clock;
+ 	int board_tcxo_clock;
+-	bool pwr_in_suspend;
+ };
  
- 	if (!np) {
- 		np = of_find_matching_node(NULL, dev->driver->of_match_table);
-@@ -241,6 +247,9 @@ static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
- 		goto out_free;
- 	}
- 
-+	for_each_matching_node(clock_node, wlcore_sdio_of_clk_match_table)
-+		of_fixed_clk_setup(clock_node);
-+
- 	goto out;
- 
- out_free:
+ #ifdef CONFIG_WILINK_PLATFORM_DATA
 -- 
 1.7.10.4
