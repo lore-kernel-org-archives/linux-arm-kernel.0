@@ -1,45 +1,99 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 03 Jul 2013 15:40:06 +0100
-Subject: Proposal: mach-dt
-In-Reply-To: <51D43127.6080206@codeaurora.org>
-References: <1372839486.487159774@f54.mail.ru> <51D3ECD1.8030305@arm.com>
- <51D42F3C.3020805@codeaurora.org> <51D430DE.3030609@arm.com>
- <51D43127.6080206@codeaurora.org>
-Message-ID: <51D437C6.9000909@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  3 Jul 2013 13:55:10 -0300
+Subject: [PATCH v2] ARM: mx6: Fix the number of reported cores
+Message-ID: <1372870510-14624-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/13 15:11, Christopher Covington wrote:
-> On 07/03/2013 10:10 AM, Marc Zyngier wrote:
->> On 03/07/13 15:03, Christopher Covington wrote:
->>> On 07/03/2013 05:20 AM, Marc Zyngier wrote:
->>>> On 03/07/13 09:18, Alexander Shiyan wrote:
->>>>
->>>> Hi Alexander,
->>>>
->>>>> More and more platforms are now using devicetree.
->>>>> Ideally the platform code contains only one function "of_platform_populate".
->>>>> My idea is to make a generic architecture (mach-dt) with the call then add support
->>>>> for compatible subarchitectures as they become available in "compatible"-property.
->>>>> Your opinion?
->>>>
->>>> Well, my (admittedly partial) opinion is that mach-virt is an incredibly
->>>> nicer sounding name, 'specially as you can mistype it as mach-triv.
->>>
->>> As mentioned before, I disagree and would love to see the the
->>> virtualization-specific name replaced by something more suitably generic.
->>
->> I think you're missing the point. The right fix would to remove it
->> entirely and make it the basic default. There are patches for that already.
-> 
-> Where?
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-There were patches from Arnd (CC-ed) a while ago, moving some of the
-mach-virt SMP stuff to smp.c. Don't have the pointers handy, but surely
-Arnd knows where they are.
+On a mx6 quad-core processor:
 
-Once SMP is done, the rest should be pretty trivial.
+$ cat /proc/cpuinfo                                             
+processor       : 0                                                             
+model name      : ARMv7 Processor rev 10 (v7l)                                  
+BogoMIPS        : 1581.05                                                       
+Features        : swp half thumb fastmult vfp edsp neon vfpv3 tls               
+CPU implementer : 0x41                                                          
+CPU architecture: 7                                                             
+CPU variant     : 0x2                                                           
+CPU part        : 0xc09                                                         
+CPU revision    : 10                                                            
 
-	M.
+,which incorrectly shows this is a single core device.
+
+Commit a0ae0240 (ARM: kernel: add device tree init map function) introduced the 
+following requirement according to Documentation/devicetree/bindings/arm/cpus.txt:
+"For the ARM architecture every CPU node must contain the following properties:
+
+- device_type:	must be "cpu" 
+
+Pass the 'device_type' property for each cpu node, so that we can have all the 
+four cores correctly reported again.
+
+Cc: <stable@vger.kernel.org> #3.10
+Reported-by: Mike Loebl <mloebl@gmail.com> 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Add missing ";" in the dual-lite .dtsi
+
+ arch/arm/boot/dts/imx6dl.dtsi | 2 ++
+ arch/arm/boot/dts/imx6q.dtsi  | 4 ++++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 5bcdf3a..62dc781 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -18,12 +18,14 @@
+ 
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <0>;
+ 			next-level-cache = <&L2>;
+ 		};
+ 
+ 		cpu at 1 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <1>;
+ 			next-level-cache = <&L2>;
+ 		};
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 21e6758..dc54a72 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -18,6 +18,7 @@
+ 
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <0>;
+ 			next-level-cache = <&L2>;
+ 			operating-points = <
+@@ -39,18 +40,21 @@
+ 
+ 		cpu@1 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <1>;
+ 			next-level-cache = <&L2>;
+ 		};
+ 
+ 		cpu at 2 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <2>;
+ 			next-level-cache = <&L2>;
+ 		};
+ 
+ 		cpu at 3 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <3>;
+ 			next-level-cache = <&L2>;
+ 		};
 -- 
-Jazz is not dead. It just smells funny...
+1.8.1.2
