@@ -1,33 +1,68 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 3 Jul 2013 20:43:03 +0100
-Subject: [RFC PATCH v4 2/2] drivers: mfd: vexpress: add Serial Power
- Controller (SPC) support
-In-Reply-To: <20130618102213.GA1564@e102568-lin.cambridge.arm.com>
-References: <1371484269-11743-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1371484269-11743-3-git-send-email-lorenzo.pieralisi@arm.com>
- <20130617174451.GF28497@quad.lixom.net>
- <20130618102213.GA1564@e102568-lin.cambridge.arm.com>
-Message-ID: <20130703194303.GG27646@sirena.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 3 Jul 2013 19:51:09 +0000 (UTC)
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <51D2E096.5040700@ti.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+ <51CAEB33.5010101@ti.com>
+ <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
+ <51CBBCD8.5030600@ti.com>
+ <alpine.DEB.2.02.1306281844090.8767@utopia.booyaka.com>
+ <alpine.DEB.2.02.1307010211580.3741@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83ECCC435@DBDE04.ent.ti.com>
+ <51D2E096.5040700@ti.com>
+Message-ID: <alpine.DEB.2.02.1307031944580.9618@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 11:22:13AM +0100, Lorenzo Pieralisi wrote:
-> On Mon, Jun 17, 2013 at 06:44:51PM +0100, Olof Johansson wrote:
+On Tue, 2 Jul 2013, Nishanth Menon wrote:
 
-> > That'll trim down the driver to a point where I think you'll find it much
-> > easier to get merged. :-)
+> On 07/01/2013 11:29 PM, Hiremath, Vaibhav wrote:
+> > 
+> > > -----Original Message-----
+> > > From: Paul Walmsley [mailto:paul at pwsan.com]
+> > > Sent: Monday, July 01, 2013 7:46 AM
+> > > To: Vutla, Lokesh
+> > > Cc: Nayak, Rajendra; Hiremath, Vaibhav; Kevin Hilman; Rini, Tom; linux-
+> > > omap at vger.kernel.org; Balbi, Felipe; linux-arm-
+> > > kernel at lists.infradead.org
+> > > Subject: Re: OMAP baseline test results for v3.10-rc6
+> > > 
+> > > On Fri, 28 Jun 2013, Paul Walmsley wrote:
+> > > 
+> > > > On Thu, 27 Jun 2013, Lokesh Vutla wrote:
+> > > > 
+> > > > > Here is the catch..
+> > > > > Your dtb is generated in arch/arm/boot/dts/ folder(before V3.8 dtb
+> > > was
+> > > > > generated in arch/arm/boot).
+> > > > 
+> > > > Ugh... that's probably it :-(
+> to prevent this from happening again, Lokesh did post a patch:
+> https://patchwork.kernel.org/patch/2796921/
+> 
+> Will be good to ack it if we think it might prevent such scenarios in the
+> future.
 
-> To start with I have to understand in which directory this code should
-> live. Moving the frequency settings in clk/CPUfreq drivers should be
-> feasible with extra DT complexity for their bindings.
+Thanks for the suggestion.  
 
-You shoudn't really need to change the DT bindings at all - MFD is a
-purely Linux construct, it doesn't affect how the hardware is
-constructed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130703/267f48d3/attachment.sig>
+Unfortunately it wouldn't have caught the problem, since, as I mentioned 
+in the E-mail you quoted, I build from a fresh tree each time.  So there 
+was no previous DTB.  This wasn't caught here because 'cat' was copying 
+over the kernel to its standard output, even though it was returning an 
+error, and I wasn't checking the 'cat' return value.  This is obviously 
+being remedied here.
+
+Also will modify the build scripts to output each command as it's being 
+run.
+
+As far as Lokesh's patch goes: it doesn't make sense to me to remove a 
+file during 'make clean' that the build process doesn't create.  So while 
+I understand the motivation for the patch, and don't mind if upstream 
+takes it, I personally wouldn't care to ack it.
+
+
+- Paul
