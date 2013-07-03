@@ -1,34 +1,87 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 03 Jul 2013 15:10:38 +0100
-Subject: Proposal: mach-dt
-In-Reply-To: <51D42F3C.3020805@codeaurora.org>
-References: <1372839486.487159774@f54.mail.ru> <51D3ECD1.8030305@arm.com>
- <51D42F3C.3020805@codeaurora.org>
-Message-ID: <51D430DE.3030609@arm.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Wed, 3 Jul 2013 19:36:51 +0530
+Subject: [PATCH] arm64: KVM: Support Cortex-A57 guest CPU on APM X-Gene
+ host
+In-Reply-To: <51D42E5C.6050209@arm.com>
+References: <1372840923-12808-1-git-send-email-anup.patel@linaro.org>
+ <CAFEAcA_9mfYT6pPOT3dmqGoFAeJpQACO4FZp_971XUSowxoBaA@mail.gmail.com>
+ <51D42E5C.6050209@arm.com>
+Message-ID: <CAAhSdy2O5_e5D2jGMtxtThsCaqHti9q7CEA59gCpL3urCaC49A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/13 15:03, Christopher Covington wrote:
-> On 07/03/2013 05:20 AM, Marc Zyngier wrote:
->> On 03/07/13 09:18, Alexander Shiyan wrote:
+On Wed, Jul 3, 2013 at 7:29 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 03/07/13 11:54, Peter Maydell wrote:
+>> On 3 July 2013 09:42, Anup Patel <anup.patel@linaro.org> wrote:
+>>> Update kvm_target_cpu() to allow Cortex-A57 guest CPU on APM X-Gene.
+>>>
+>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>> ---
+>>>  arch/arm64/kvm/guest.c |   10 ++++++++--
+>>>  1 file changed, 8 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+>>> index 2c3ff67..765f56f 100644
+>>> --- a/arch/arm64/kvm/guest.c
+>>> +++ b/arch/arm64/kvm/guest.c
+>>> @@ -207,8 +207,13 @@ int __attribute_const__ kvm_target_cpu(void)
+>>>         unsigned long implementor = read_cpuid_implementor();
+>>>         unsigned long part_number = read_cpuid_part_number();
+>>>
+>>> -       if (implementor != ARM_CPU_IMP_ARM)
+>>> -               return -EINVAL;
+>>> +       switch (implementor) {
+>>> +       case ARM_CPU_IMP_ARM:
+>>> +       case ARM_CPU_IMP_APM:
+>>> +               break;
+>>> +       default:
+>>> +               return -EINVAL;
+>>> +       }
 >>
->> Hi Alexander,
+>> Doesn't this change mean we now accept the below part
+>> numbers for all implementors? That doesn't look right.
 >>
->>> More and more platforms are now using devicetree.
->>> Ideally the platform code contains only one function "of_platform_populate".
->>> My idea is to make a generic architecture (mach-dt) with the call then add support
->>> for compatible subarchitectures as they become available in "compatible"-property.
->>> Your opinion?
+>>>         switch (part_number) {
+>>>         case ARM_CPU_PART_AEM_V8:
+>>> @@ -216,6 +221,7 @@ int __attribute_const__ kvm_target_cpu(void)
+>>>         case ARM_CPU_PART_FOUNDATION:
+>>>                 return KVM_ARM_TARGET_FOUNDATION_V8;
+>>>         case ARM_CPU_PART_CORTEX_A57:
+>>> +       case APM_CPU_PART_POTENZA:
+>>>                 /* Currently handled by the generic backend */
+>>>                 return KVM_ARM_TARGET_CORTEX_A57;
+>>>         default:
 >>
->> Well, my (admittedly partial) opinion is that mach-virt is an incredibly
->> nicer sounding name, 'specially as you can mistype it as mach-triv.
-> 
-> As mentioned before, I disagree and would love to see the the
-> virtualization-specific name replaced by something more suitably generic.
+>> Do we really model all the system registers and so on correctly
+>> sufficiently to be able to present the guest with an A57 vcpu
+>> on an APM X-Gene host? (ie without accidentally leaking the
+>> host ID registers/system registers/impdef registers to the
+>> guest).
+>
+> There is no such thing in the KVM/arm64 code. The guest sees the real
+> host, and I really don't lie the idea of lying to userspace by
+> pretending that we're going to emulate an A57.
+>
+> Anup: I suggest you rework that patch to present a X-Gene vcpu. You can
+> implement it by declaring a new target and implementing it in terms of
+> the generic backend one if that's convenient. But just pretending this
+> is an A57 is not going to fly, sorry.
 
-I think you're missing the point. The right fix would to remove it
-entirely and make it the basic default. There are patches for that already.
+Sure, I will add separate target vcpu for X-Gene and try to re-use your
+generic backend.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> Cheers,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
+>
+>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+
+--Anup
