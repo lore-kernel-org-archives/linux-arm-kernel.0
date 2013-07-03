@@ -1,15 +1,15 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 03 Jul 2013 14:59:56 +0100
+From: anup@brainfault.org (Anup Patel)
+Date: Wed, 3 Jul 2013 19:30:54 +0530
 Subject: [PATCH] arm64: KVM: Support Cortex-A57 guest CPU on APM X-Gene
  host
 In-Reply-To: <CAFEAcA_9mfYT6pPOT3dmqGoFAeJpQACO4FZp_971XUSowxoBaA@mail.gmail.com>
 References: <1372840923-12808-1-git-send-email-anup.patel@linaro.org>
  <CAFEAcA_9mfYT6pPOT3dmqGoFAeJpQACO4FZp_971XUSowxoBaA@mail.gmail.com>
-Message-ID: <51D42E5C.6050209@arm.com>
+Message-ID: <CAAhSdy1eVTk2ztzir3yZ_GZMC1+D9Co+J2UZAFWKMoZnpAg_+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/13 11:54, Peter Maydell wrote:
+On Wed, Jul 3, 2013 at 4:24 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
 > On 3 July 2013 09:42, Anup Patel <anup.patel@linaro.org> wrote:
 >> Update kvm_target_cpu() to allow Cortex-A57 guest CPU on APM X-Gene.
 >>
@@ -36,10 +36,14 @@ On 03/07/13 11:54, Peter Maydell wrote:
 >> +       default:
 >> +               return -EINVAL;
 >> +       }
-> 
+>
 > Doesn't this change mean we now accept the below part
 > numbers for all implementors? That doesn't look right.
-> 
+
+Sure, we can use nested switch case instead of two separate
+switch cases.
+
+>
 >>         switch (part_number) {
 >>         case ARM_CPU_PART_AEM_V8:
 >> @@ -216,6 +221,7 @@ int __attribute_const__ kvm_target_cpu(void)
@@ -50,24 +54,27 @@ On 03/07/13 11:54, Peter Maydell wrote:
 >>                 /* Currently handled by the generic backend */
 >>                 return KVM_ARM_TARGET_CORTEX_A57;
 >>         default:
-> 
+>
 > Do we really model all the system registers and so on correctly
 > sufficiently to be able to present the guest with an A57 vcpu
 > on an APM X-Gene host? (ie without accidentally leaking the
 > host ID registers/system registers/impdef registers to the
 > guest).
 
-There is no such thing in the KVM/arm64 code. The guest sees the real
-host, and I really don't lie the idea of lying to userspace by
-pretending that we're going to emulate an A57.
+Yes, there are very few APM impdef registers. For now A57 vcpu
+is not allowed to access these impdef registers.
 
-Anup: I suggest you rework that patch to present a X-Gene vcpu. You can
-implement it by declaring a new target and implementing it in terms of
-the generic backend one if that's convenient. But just pretending this
-is an A57 is not going to fly, sorry.
+For rest of the registers, A57 vcpu will see:
+1. MIDR and MPIDR as expected on a A57 vcpu.
+2. Cache configuration related registers will be same as that
+    of underlying host so that cache operations work fine in guest
 
-Cheers,
+>
+> thanks
+> -- PMM
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+--Anup
