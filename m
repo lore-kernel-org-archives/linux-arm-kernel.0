@@ -1,57 +1,94 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 4 Jul 2013 00:38:58 +0200
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Thu, 04 Jul 2013 00:58:10 +0200
 Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
-In-Reply-To: <20130703223323.GA21722@localhost>
-References: <20130702133337.GA17110@titan.lakedaemon.net>
- <20130702153825.139a93a5@skate> <20130702134421.GC17110@titan.lakedaemon.net>
- <87obakho6d.fsf@natisbad.org> <20130702174111.GF17110@titan.lakedaemon.net>
+In-Reply-To: <20130703222315.GK16785@1wt.eu> (Willy Tarreau's message of "Thu,
+ 4 Jul 2013 00:23:15 +0200")
+References: <20130702153825.139a93a5@skate>
+ <20130702134421.GC17110@titan.lakedaemon.net>
+ <87obakho6d.fsf@natisbad.org>
+ <20130702174111.GF17110@titan.lakedaemon.net>
  <87y59ows4n.fsf@natisbad.org> <20130702220936.GC10215@1wt.eu>
- <20130702232311.GA3949@localhost> <20130703043330.GF10215@1wt.eu>
- <20130703223323.GA21722@localhost>
-Message-ID: <20130703223858.GL16785@1wt.eu>
+ <20130703202105.GE27003@titan.lakedaemon.net>
+ <20130703203541.GI16785@1wt.eu>
+ <20130703204451.GF27003@titan.lakedaemon.net>
+ <20130703211450.GJ16785@1wt.eu> <20130703222315.GK16785@1wt.eu>
+Message-ID: <8761wrp7y5.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+Hi Willy,
 
-On Wed, Jul 03, 2013 at 07:33:24PM -0300, Ezequiel Garcia wrote:
-> Hi everyone,
-> 
-> On Wed, Jul 03, 2013 at 06:33:30AM +0200, Willy Tarreau wrote:
-> > 
-> > On Tue, Jul 02, 2013 at 08:23:12PM -0300, Ezequiel Garcia wrote:
-> > > > Yes and indeed I must say that when I read the driver I found some
-> > > > similarities with pxa3xx, though it was done differently. I initially
-> > > > wanted to try to merge them but of course without the spec it's a huge
-> > > > waste of time, especially considering that this is still in the roadmap
-> > > > of the Free Electrons guys even though low priority.
-> > > 
-> > > I wish I could say I'm going to work on this soon but, as Thomas said,
-> > > we have no idea when/if NAND will be prioritized.
-> > > 
-> > > On the other side if you look at the driver Willy just posted, merging
-> > > the juicy stuff into pxa3xx-nand driver is not for the faint of heart.
-> > > 
-> > > Without the spec, is only tougher.
-> > 
-> > Confirmed :-)
-> > 
-> 
-> Just a note on the (lack of) documentation issue.
-> 
-> If there's a brave soul reading this and longing to tackle this,
-> the pxa3xx SoC documentation *is* publicly available:
-> 
-> http://www.marvell.com/application-processors/pxa-family/assets/PXA3xx_Developers_Manual.zip
+Willy Tarreau <w@1wt.eu> writes:
+
+> The patch it too large (150kB), last time I received a warning from the ML
+> because of its size.
 >
-> The NAND specifications can be found in the "[...] Vol. II: Memory Controller" document,
-> inside the above zip file. IMHO, that's the reading entry point in order to
-> understand pxa3xx-nand driver better.
+> [snip]
+>
+> Feel free to host this driver anywhere if you like, I don't have the
+> time to maintain it, and I don't want to see it merged into the kernel,
+> we have enough crap and this one certainly qualifies as such.
 
-Yes I have this one as well, but initially since I was not really sure
-about the ressemblance of the two controllers, I did not spend too much
-time on it. Now probably it can be useful, especially if we use your
-existing work as a complement of information :-)
+;-)
 
-Best regards,
-Willy
+> Oh last important point, I found it in the 2.6.35.9-LSP-1.0.2_gw patch.
+> If someone finds a more recent one in a more recent kernel, it might be
+> worth comparing them.
+
+The version in Netgear kernel (a 3.0.56, 25/Apr/2012 KW40 LSP release
+3.1.0-NQ) is almost identical to the one in mirabox 2.6.35 kernel
+(24/Nov/2011, KW40 LSP release 1.0.2-NQ) if you remove the fixes for
+trailing spaces and tabs: 
+
+
+@@ -1618,7 +1618,9 @@
+ 		ret = -ENXIO;
+ 		goto fail_free_irq;
+ 	}
+-	if (mtd_has_partitions()) {
++
++
++#ifdef CONFIG_MTD_CMDLINE_PARTS
+ 		if (mtd_has_cmdlinepart()) {
+ 			static const char *probes[] = { "cmdlinepart", NULL };
+ 			struct mtd_partition *parts;
+@@ -1627,12 +1629,11 @@
+ 			nr_parts = parse_mtd_partitions(mtd, probes, &parts, 0);
+ 
+ 			if (nr_parts)
+-				return add_mtd_partitions(mtd, parts, nr_parts);
++				return mtd_device_register(mtd, parts, nr_parts);
+ 		}
+-		return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
+-	}
+-
+-	return add_mtd_device(mtd) == 1 ? -ENODEV : 0;
++		return mtd_device_register(mtd, pdata->parts, pdata->nr_parts);
++#endif
++		return (mtd_device_register(mtd, pdata->parts, pdata->nr_parts));
+ 
+ fail_free_irq:
+ 	free_irq(IRQ_AURORA_NFC, info);
+@@ -1661,10 +1662,6 @@
+ 
+ 	platform_set_drvdata(pdev, NULL);
+ 
+-	del_mtd_device(mtd);
+-#ifdef CONFIG_MTD_PARTITIONS
+-	del_mtd_partitions(mtd);
+-#endif
+ 	free_irq(IRQ_AURORA_NFC, info);
+ 	if (info->use_dma) {
+ 		dma_free_writecombine(&pdev->dev, info->data_buff_size,
+@@ -1675,7 +1672,10 @@
+ 	clk_disable(info->clk);
+ 	clk_put(info->clk);
+ #endif
+-	kfree(mtd);
++	if (mtd) {
++		mtd_device_unregister(mtd);
++		kfree(mtd);
++	}
+ 	return 0;
+ }
+ 
