@@ -1,32 +1,49 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 03 Jul 2013 20:07:33 +0200
-Subject: On common struct clk in clock framework.
-In-Reply-To: <CAM2a4uyrX0t-W8hXKROvZgJPSyCY+DaviV-eRVZOhyPx=WNBUw@mail.gmail.com>
-References: <CAM2a4uyrX0t-W8hXKROvZgJPSyCY+DaviV-eRVZOhyPx=WNBUw@mail.gmail.com>
-Message-ID: <16151917.X00PMOJFZ6@flatron>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed,  3 Jul 2013 12:12:54 -0600
+Subject: [PATCH V2] ARM: add missing __FINIT to head-common.S to match __INIT
+Message-ID: <1372875174-26812-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Stephen Warren <swarren@nvidia.com>
 
-On Wednesday 03 of July 2013 19:05:03 mind entropy wrote:
-> Hi,
-> 
->    I am reading through mini2440 code and trying to understand
-> clocking code. I am getting confused as to whether it uses the common
-> clocking framework. In
-> https://github.com/torvalds/linux/blob/master/arch/arm/plat-samsung/incl
-> ude/plat/clock.h#L42 they define a struct clk. Even in OMAP
-> (http://processors.wiki.ti.com/index.php/Clock_Framework_User_Guide#Soft
-> ware_Implementation) they have a separate struct clk definition. In the
-> common clocking framework shouldn't they be using the common struct clk
-> rather than have their own versions of struct clk?
+Macro __INIT is used to place various code in head-common.S into the init
+section. This should be matched by a closing __FINIT at the end of the
+code destined for the init section. Add this missing macro.
 
-The examples you pointed are not using Common Clock Framework. See 
-Documentation/clk.txt and drivers/clk/ for more information about CCF.
+This historically caused no problem, because macro __CPUINIT was used at
+the exact location where __FINIT was missing, which then placed following
+code into the cpuinit section. However, with commit 22f0a2736 "init.h:
+remove __cpuinit sections from the kernel" applied, __CPUINIT becomes a
+no-op, thus leaving all this code in the init section, rather than the
+regular text section. This caused issues such as secondary CPU boot
+failures or crashes.
 
-As for s3c24xx, CCF driver for the whole platform is already merged for 
-Linux 3.11.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+v2: Moved __FINIT after lookup_processor_type, to correctly match the
+location of __CPUINIT.
 
-Best regards,
-Tomasz
+Russell, I assume I should add this to the ARM patch tracker.
+
+This version is based on v3.10.
+---
+ arch/arm/kernel/head-common.S | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 5b391a6..1fb887d 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -133,6 +133,8 @@ ENTRY(lookup_processor_type)
+ 	ldmfd	sp!, {r4 - r6, r9, pc}
+ ENDPROC(lookup_processor_type)
+ 
++	__FINIT
++
+ /*
+  * Read processor ID register (CP#15, CR0), and look up in the linker-built
+  * supported processor list.  Note that we can't use the absolute addresses
+-- 
+1.8.1.5
