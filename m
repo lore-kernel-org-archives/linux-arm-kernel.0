@@ -1,47 +1,55 @@
-From: javier.picorel@epfl.ch (javier.picorel at epfl.ch)
-Date: Wed, 03 Jul 2013 22:32:55 +0200
-Subject: ARM Cortex A9: LL counters
-Message-ID: <20130703223255.15536gmsbwonw5fb@webmail.epfl.ch>
+From: w@1wt.eu (Willy Tarreau)
+Date: Wed, 3 Jul 2013 22:35:41 +0200
+Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
+In-Reply-To: <20130703202105.GE27003@titan.lakedaemon.net>
+References: <20130702124639.GI19937@titan.lakedaemon.net>
+ <20130702151407.01680d21@skate> <20130702133337.GA17110@titan.lakedaemon.net>
+ <20130702153825.139a93a5@skate> <20130702134421.GC17110@titan.lakedaemon.net>
+ <87obakho6d.fsf@natisbad.org> <20130702174111.GF17110@titan.lakedaemon.net>
+ <87y59ows4n.fsf@natisbad.org> <20130702220936.GC10215@1wt.eu>
+ <20130703202105.GE27003@titan.lakedaemon.net>
+Message-ID: <20130703203541.GI16785@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
+On Wed, Jul 03, 2013 at 04:21:05PM -0400, Jason Cooper wrote:
+> On Wed, Jul 03, 2013 at 12:09:36AM +0200, Willy Tarreau wrote:
+> > Hi,
+> > 
+> > On Tue, Jul 02, 2013 at 11:48:08PM +0200, Arnaud Ebalard wrote:
+> > > > more bummer.  Willy, mind posting what you have?
+> > 
+> > Attached. Usual warning "this will destroy your device etc..." comes
+> > with it.
+> 
+> Thanks Willy!
+> 
+> How much effort would it be to put this pig in drivers/staging?  iirc,
+> the only rule is that it has to compile...
 
-It seems that there is no mapping between any ARM Cortex A9 counter to  
-the L2 (Last Level) access or misses event.
+I think we should at least get it to work again. Otherwise it's pointless
+to pollute the kernel. No way to get any tester if all you get when you
+load it is :
 
-arch/arm/kernel/perf_event_v7.c
+  calling drivers/mtd/nand/armada_nand.c:3227 orion_nfc_probe
+  armada-nand nand.3: Initialize HAL based NFC in 8bit mode with DMA Disabled using BCH 4bit ECC
+  drivers/mtd/nand/armada_nand.c:3318:orion_nfc_probe irq=105
+  armada-nand: probe of nand.3 failed with error -12
 
-  [C(LL)] = {
-  293                [C(OP_READ)] = {
-  294                        [C(RESULT_ACCESS)]      = CACHE_OP_UNSUPPORTED,
-  295                        [C(RESULT_MISS)]        = CACHE_OP_UNSUPPORTED,
-  296                },
-  297                [C(OP_WRITE)] = {
-  298                        [C(RESULT_ACCESS)]      = CACHE_OP_UNSUPPORTED,
-  299                        [C(RESULT_MISS)]        = CACHE_OP_UNSUPPORTED,
-  300                },
-  301                [C(OP_PREFETCH)] = {
-  302                        [C(RESULT_ACCESS)]      = CACHE_OP_UNSUPPORTED,
-  303                        [C(RESULT_MISS)]        = CACHE_OP_UNSUPPORTED,
-  304                },
-  305        },
+Oh damn, I'm back in the code again trying to fix it now...
 
-Looking at ARM's reference manual and OProfile's event list on A9, I  
-see the following two counters:
+Also we must not put it into staging in its current shape as it
+patches drivers/mtd. We must first apply Ezequiel's explanation
+about the READID command to detect the ONFI flash. I don't know
+how long this could take. I remember having noticed this difference
+in later drivers that was not there without knowing what it was
+about.
 
-CO_LF_MISS: (counter: 1, 2, 3, 4, 5, 6)
-         Number of coherent linefill requests which miss in all other  
-CPUs, meaning that the request
-         is sent to external memory (min count: 500)
-CO_LF_HIT: (counter: 1, 2, 3, 4, 5, 6)
-         Number of coherent linefill requests which hit in another  
-CPU, meaning that the linefill
-         data is fetched directly from the relevant cache (min count: 500)
+What makes me uncomfortable is that we have guys who have started
+some clean work and in parallel we're doing some crap which will
+discourage Marvell from reprioritizing their work. I'd rather keep
+that as an out of tree patch so that nobody there claims that the
+NAND driver already exists in the kernel.
 
-It seems that the first counter refers to the L2 Misses and the second  
-one to the L2 Hits (Last Level Cache in this architecture). I'm not sure
-whether we should do something about this or nor. Thanks!
-
-Best Regards,
-Javier
+Best regards,
+Willy
