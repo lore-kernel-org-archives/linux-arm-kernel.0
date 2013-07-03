@@ -1,41 +1,75 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 3 Jul 2013 10:33:04 -0400
-Subject: [PATCH v6 5/7] ARM: kirkwood: remove redundant DT board files
-In-Reply-To: <51D40BA3.6000603@gmail.com>
-References: <1372762824-12202-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1372762824-12202-6-git-send-email-sebastian.hesselbarth@gmail.com>
- <87k3l8v9s1.fsf@natisbad.org> <51D40BA3.6000603@gmail.com>
-Message-ID: <20130703143304.GI17110@titan.lakedaemon.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 3 Jul 2013 17:23:11 +0300
+Subject: [PATCH v3 2/8] wlcore: set irq_flags in the board files instead
+ of hiding behind a quirk
+In-Reply-To: <1372861094.21065.118.camel@cumari.coelho.fi>
+References: <1372860209-3504-1-git-send-email-coelho@ti.com>
+ <1372860209-3504-3-git-send-email-coelho@ti.com>
+ <20130703141332.GO15056@arwen.pp.htv.fi>
+ <1372861094.21065.118.camel@cumari.coelho.fi>
+Message-ID: <20130703142310.GT15056@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 03, 2013 at 01:31:47PM +0200, Sebastian Hesselbarth wrote:
-> On 07/03/13 01:09, Arnaud Ebalard wrote:
-> >Hi Sebastian,
-> >
-> >Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> writes:
-> >
-> >>With DT support for mv643xx_eth board specific init for some boards now
-> >>is unneccessary. Remove those board files, Kconfig entries, and
-> >>corresponding entries in kirkwood_defconfig.
-> >
-> >Applying above your set an old quilt cleaning patch Jason asked at some
-> >point, it became empty except for arch/arm/mach_kirkwood/common.h in
-> >which some declarations were left behind. If this is correct, can you
-> >just merge the hunks below in your 5/7 in next round?
-> >
-> >AFAICT, only dnskw_init() remains, which matches the list of board-*.c
-> >files in arch/arm/mach_kirkwood/ (i.e. board-dt.c and board-dnskw.c).
+On Wed, Jul 03, 2013 at 05:18:14PM +0300, Luciano Coelho wrote:
+> On Wed, 2013-07-03 at 17:13 +0300, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Wed, Jul 03, 2013 at 05:03:23PM +0300, Luciano Coelho wrote:
+> > > diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+> > > index 56a9a4f..953f620 100644
+> > > --- a/arch/arm/mach-omap2/board-4430sdp.c
+> > > +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> > > @@ -703,12 +703,30 @@ static void __init omap4_sdp4430_wifi_init(void)
+> > >  
+> > >  	omap4_sdp4430_wifi_mux_init();
+> > >  	omap4_sdp4430_wlan_data.irq = gpio_to_irq(GPIO_WIFI_IRQ);
+> > > +
+> > > +	ret = gpio_request_one(GPIO_WIFI_IRQ, GPIOF_IN, "GPIO_WIFI_IRQ");
+> > > +	if (ret) {
+> > > +		pr_err("error requesting wl12xx gpio: %d\n", ret);
+> > > +		goto out;
+> > > +	}
+> > > +
+> > > +	ret = irq_set_irq_type(gpio_to_irq(GPIO_WIFI_IRQ), IRQ_TYPE_LEVEL_HIGH);
+> > > +	if (ret) {
+> > > +		pr_err("error setting wl12xx irq type: %d\n", ret);
+> > > +		goto free;
+> > > +	}
+> > > +
+> > >  	ret = wl12xx_set_platform_data(&omap4_sdp4430_wlan_data);
+> > >  	if (ret)
+> > >  		pr_err("Error setting wl12xx data: %d\n", ret);
+> > > +
+> > >  	ret = platform_device_register(&omap_vwlan_device);
+> > >  	if (ret)
+> > >  		pr_err("Error registering wl12xx device: %d\n", ret);
+> > > +out:
+> > > +	return;
+> > > +free:
+> > > +	gpio_free(GPIO_WIFI_IRQ);
+> > 
+> > actually, you should leave this GPIO requested in order to use it as
+> > IRQ.
+> > 
+> > ditto for all others
 > 
-> While updating the patch with yours, I stumbled upon MACH_TS219_DT that
-> also remains because it includes tsx1x-common.c.
-> 
-> I cannot recall if Jason or Andrew said something about removing it..
+> Actually, I don't need to use the GPIO if something goes wrong (ie.
+> setting the IRQ type or setting the platform data).  Notice that in the
+> normal cases (ie. without errors), I return before the gpio_free() is
+> called.
 
-board-ts219.c can be removed as well.  It needed a check for running on
-the 6282 variant in order to set the phy address properly.  This can now
-be handled in kirkwood-ts219-628[12].dts.
+hah, missed the 'return' call, my bad :-p
 
-thx,
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+Corrected-my-broken-eye-sight-by: Luciano Coelho <coelho@ti.com>
 
-Jason.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130703/4745be1a/attachment-0001.sig>
