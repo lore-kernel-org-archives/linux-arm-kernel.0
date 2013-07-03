@@ -1,31 +1,33 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Wed,  3 Jul 2013 11:36:38 -0700
-Subject: [PATCH 0/3] nohz/full: final Kconfig bits for ARM support
-Message-ID: <1372876601-23881-1-git-send-email-khilman@linaro.org>
+Date: Wed,  3 Jul 2013 11:36:39 -0700
+Subject: [PATCH 1/3] nohz: Kconfig: remove redundant 64-bit dependency
+In-Reply-To: <1372876601-23881-1-git-send-email-khilman@linaro.org>
+References: <1372876601-23881-1-git-send-email-khilman@linaro.org>
+Message-ID: <1372876601-23881-2-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of v3.10, the core ARM support is in mainline for NO_HZ_FULL.  The
-only remaining part is the removal of the hard-coded Kconfig
-requirement on 64-bit platforms, which I believe can now be removed
-after the nsec granularity cputime was made to work on non 64_BIT
-(c.f. commit 8c23b80e, cputime_nsecs: use math64.h for nsec
-resolution conversion helpers.)
+The current 64-bit dependency is on VIRT_CPU_ACCOUNTING_GEN, which already
+has its own dependency on 64-bit.  Remove it from NO_HZ_FULL.
 
-This series makes the final Kconfig changes to bring NO_HZ_FULL
-support to ARM.
-
-Series applies to v3.10.
-
-I will queue up the arch/arm patch for Russell separately once the
-generic changes are accepted.
-
-Kevin
-
- arch/arm/Kconfig    | 1 +
- init/Kconfig        | 2 +-
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
  kernel/time/Kconfig | 2 --
- 3 files changed, 2 insertions(+), 3 deletions(-)
+ 1 file changed, 2 deletions(-)
 
+diff --git a/kernel/time/Kconfig b/kernel/time/Kconfig
+index 70f27e8..b78760f 100644
+--- a/kernel/time/Kconfig
++++ b/kernel/time/Kconfig
+@@ -99,8 +99,6 @@ config NO_HZ_FULL
+ 	depends on SMP
+ 	# RCU_USER_QS dependency
+ 	depends on HAVE_CONTEXT_TRACKING
+-	# VIRT_CPU_ACCOUNTING_GEN dependency
+-	depends on 64BIT
+ 	select NO_HZ_COMMON
+ 	select RCU_USER_QS
+ 	select RCU_NOCB_CPU
 -- 
 1.8.3
