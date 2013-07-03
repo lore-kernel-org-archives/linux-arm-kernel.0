@@ -1,66 +1,46 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 3 Jul 2013 13:42:07 +0530
-Subject: [PATCH 4/4] ARM: dts: AM33XX: update rtc node compatibility
-In-Reply-To: <51D26F61.7080308@ti.com>
-References: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
- <1372412109-986-5-git-send-email-gururaja.hebbar@ti.com>
- <51D26F61.7080308@ti.com>
-Message-ID: <51D3DCD7.2010209@ti.com>
+From: vincent.stehle@freescale.com (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
+Date: Wed, 3 Jul 2013 10:12:59 +0200
+Subject: [PATCH linux-next 2/2] arm: multi_v7_defconfig: add support for NFS
+ root
+In-Reply-To: <1372839179-14542-1-git-send-email-vincent.stehle@freescale.com>
+References: <1372839179-14542-1-git-send-email-vincent.stehle@freescale.com>
+Message-ID: <1372839179-14542-3-git-send-email-vincent.stehle@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gururaja,
+Add the necessary config options, to allow booting with NFS root on an i.MX6
+sabre sd.
 
-On 7/2/2013 11:42 AM, Sekhar Nori wrote:
-> Changing to Benoit's gmail id since he apparently wont access TI mail
-> anymore.
-> 
-> On 6/28/2013 3:05 PM, Hebbar Gururaja wrote:
->> Since AM33xx  RTC IP has RTC_IRQWAKEEN to support Alarm Wake-up.
->>
->> Update the rtc compatible property to "ti,am3352-rtc" to enable handling
->> of this feature inside rtc-omap driver.
->>
->> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Kevin Hilman <khilman@linaro.org>
->> Cc: b-cousson at ti.com
->> ---
->> :100644 100644 77aa1b0... dde180a... M	arch/arm/boot/dts/am33xx.dtsi
->>  arch/arm/boot/dts/am33xx.dtsi |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->> index 77aa1b0..dde180a 100644
->> --- a/arch/arm/boot/dts/am33xx.dtsi
->> +++ b/arch/arm/boot/dts/am33xx.dtsi
->> @@ -297,7 +297,7 @@
->>  		};
->>  
->>  		rtc at 44e3e000 {
->> -			compatible = "ti,da830-rtc";
->> +			compatible = "ti,am3352-rtc";
-> 
-> compatible is a list so you can instead do:
-> 	
-> 	compatible = "ti,am3352-rtc", "ti,da830-rtc";
-> 
-> That way the dts works irrespective of driver updates. When driver
-> supports enhanced features of hardware, they are available to the user
-> else the basic functionality still works.
+Signed-off-by: Vincent Stehl? <vincent.stehle@freescale.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/configs/multi_v7_defconfig |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-On doing some experiments myself, the of_device_id which gets selected
-during probe depends on the order in which its entry appears in the
-match table inside the driver rather than how the compatible string is
-written. I think this puts undue dependency on how the driver is
-written, so I am okay with providing a single compatible value like the
-way you have done ATM.
-
-I do think the string appearing first in the compatible list is what
-should be selected if a match is available but I am not sure if there
-are other considerations due to which of_match_device() is written the
-way it is written.
-
-Thanks,
-Sekhar
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index cc8723a..81eac83 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -47,6 +47,8 @@ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_NET=y
+ CONFIG_UNIX=y
+ CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_BLK_DEV_SD=y
+@@ -149,6 +151,10 @@ CONFIG_PWM=y
+ CONFIG_PWM_VT8500=y
+ CONFIG_EXT4_FS=y
+ CONFIG_TMPFS=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_ROOT_NFS=y
+ CONFIG_PRINTK_TIME=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_DEBUG_KERNEL=y
+-- 
+1.7.10.4
