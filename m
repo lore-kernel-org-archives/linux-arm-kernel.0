@@ -1,85 +1,213 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 3 Jul 2013 06:33:30 +0200
-Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
-In-Reply-To: <20130702232311.GA3949@localhost>
-References: <20130702124639.GI19937@titan.lakedaemon.net>
- <20130702151407.01680d21@skate> <20130702133337.GA17110@titan.lakedaemon.net>
- <20130702153825.139a93a5@skate> <20130702134421.GC17110@titan.lakedaemon.net>
- <87obakho6d.fsf@natisbad.org> <20130702174111.GF17110@titan.lakedaemon.net>
- <87y59ows4n.fsf@natisbad.org> <20130702220936.GC10215@1wt.eu>
- <20130702232311.GA3949@localhost>
-Message-ID: <20130703043330.GF10215@1wt.eu>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Wed, 3 Jul 2013 05:03:05 +0000
+Subject: [PATCH 3/4] rtc: omap: add rtc wakeup support to alarm events
+References: <1372412109-986-1-git-send-email-gururaja.hebbar@ti.com>
+ <1372412109-986-4-git-send-email-gururaja.hebbar@ti.com>
+ <51D26CFA.5090500@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C33EC4E7AB@DBDE04.ent.ti.com>
+ <51D26E98.9040303@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C33EC4E7CC@DBDE04.ent.ti.com>
+ <51D27052.6080303@ti.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EC4F8CA@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+Hi all,
 
-On Tue, Jul 02, 2013 at 08:23:12PM -0300, Ezequiel Garcia wrote:
-> > Yes and indeed I must say that when I read the driver I found some
-> > similarities with pxa3xx, though it was done differently. I initially
-> > wanted to try to merge them but of course without the spec it's a huge
-> > waste of time, especially considering that this is still in the roadmap
-> > of the Free Electrons guys even though low priority.
-> 
-> I wish I could say I'm going to work on this soon but, as Thomas said,
-> we have no idea when/if NAND will be prioritized.
-> 
-> On the other side if you look at the driver Willy just posted, merging
-> the juicy stuff into pxa3xx-nand driver is not for the faint of heart.
-> 
-> Without the spec, is only tougher.
+Kindly ignore this message. It was sent in wrong format.
 
-Confirmed :-)
+Sorry for the noise
 
-> Just a quick hint. As far as I can recall, one of the first items in a
-> TODO list should be:
-> 
->  * adding bigger page support to pxa3xx (4 KiB, 8 KiB).
->    Willy's posted driver might be helpful to accomplish this;
->    provided your eyes don't melt when you look at it :-)
-> 
->  * once the above is done, bad block management can/should be added.
-> 
-> With these two we're almost there for R/W support.
+Regards, 
+Gururaja
 
-Since the driver I posted is poorly commented, I'm not even sure it
-will be easy to spot the relevant parts in it.
-
-> > Since I'm now flashing a rootfs from within u-boot, support for the
-> > NAND is of less importance to me than what it used to, but I have no
-> > problem with helping with my very limited time. I have 3 machines
-> > with this controller (mirabox, openblocks AX3, and an XP-GP, though
-> 
-> With my latest patches pxa3xx-nand should at least *detect* the NAND
-> device in XP-GP. Doesn't work for Mirabox, though.
-
-OK good to know!
-
-> > the AX3 only has NOR IIRC). I can do some tests if you manage to get
-> > the driver to work again.
+On Wed, Jul 03, 2013 at 10:26:57, Hebbar, Gururaja wrote:
+> Below is the code snippet I was referring to
+>  
+>  
+> From drivers/rtc/rtc-omap.c
+>  
+> static struct platform_device_id omap_rtc_devtype[] = {
+>       {
+>             .name = DRIVER_NAME,
+>       },
+>       [OMAP_RTC_DATA_AM3352_IDX] = {
+>             .name = "am3352-rtc",
+>             .driver_data = OMAP_RTC_HAS_KICKER | OMAP_RTC_HAS_IRQWAKEEN,
+>       },
+>       [OMAP_RTC_DATA_DA830_IDX] = {
+>             .name = "da830-rtc",
+>             .driver_data = OMAP_RTC_HAS_KICKER,
+>      },
+>       {},
+> };
+> MODULE_DEVICE_TABLE(platform, omap_rtc_devtype);
+>  
+> static const struct of_device_id omap_rtc_of_match[] = {
+>       {     .compatible = "ti,da830-rtc",
+>             .data       = &omap_rtc_devtype[OMAP_RTC_DATA_DA830_IDX],
+>       },
+>       {     .compatible = "ti,am3352-rtc",
+>             .data       = &omap_rtc_devtype[OMAP_RTC_DATA_AM3352_IDX],
+>       },
+>       {},
+> };
+> MODULE_DEVICE_TABLE(of, omap_rtc_of_match);
+>  
+>  
+> From arch/arm/boot/dts/am33xx.dtsi
+>  
+>             rtc at 44e3e000 {
+>                   compatible = "ti,da830-rtc", "ti,am3352-rtc";
+>                   reg = <0x44e3e000 0x1000>;
+>                   interrupts = <75
+>                               76>;
+>                   ti,hwmods = "rtc";
+>             };
+>  
+>  
+> As seen from above snippet, 2 compatible items are specified for
+> compatible dt property (ti,da830-rtc" & "ti,am3352-rtc?)
+> These are the same compatibles that are mentioned in the of_device_id
+> structure inside rtc-omap driver.
+>  
+> What I observed is, if we mention both compatible in the .dtsi file that
+> are under one single of_device_id structure, the first match from the
+> of_device_id structure is considered (ti,da830-rtc in above case)
+>  
+> To confirm, I switched the 2 compatible inside of_device_id structure as
+> below
+>  
+>  
+> static const struct of_device_id omap_rtc_of_match[] = {
+>       {     .compatible = "ti,am3352-rtc",
+>             .data       = &omap_rtc_devtype[OMAP_RTC_DATA_AM3352_IDX],
+>       },
+>       {     .compatible = "ti,da830-rtc",
+>             .data       = &omap_rtc_devtype[OMAP_RTC_DATA_DA830_IDX],
+>       },
+>       {},
+> };
+>  
+> In this case, the first match from compatible field was chosen
+> (ti,am3352-rtc now).
+>  
+>  
+> Hope this is clear.
+>  
+> Kindly let me know when you are free to discuss.
+>  
+>  
+> Regards
+> Gururaja
+>  
+> > -----Original Message-----
+> > From: Nori, Sekhar
+> > Sent: Tuesday, July 02, 2013 11:47 AM
+> > To: Hebbar, Gururaja
+> > Cc: khilman at linaro.org; tony at atomide.com; Cousson, Benoit; linux-
+> > omap at vger.kernel.org; devicetree-discuss at lists.ozlabs.org; linux-
+> > kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > davinci-linux-open-source at linux.davincidsp.com; Bedia, Vaibhav;
+> > Rajashekhara, Sudhakar; Grant Likely; Rob Herring; Rob Landley;
+> > Alessandro Zummo; rtc-linux at googlegroups.com; linux-
+> > doc at vger.kernel.org
+> > Subject: Re: [PATCH 3/4] rtc: omap: add rtc wakeup support to
+> > alarm events
 > > 
-> > Be very careful when playing with this, the driver expects the partition
-> > table to be passed from u-boot as "armada_nand", and if it uses the wrong
-> > partition layout, you can be certain that ubifs will destroy them at the
-> > first mount attempt. That's how I initially bricked my mirabox and did so
-> > repeatedly. Better keep a copy before booting the patched kernel!
 > > 
-> > Another point, I had to add a new entry for the Micro 8Gb flash of the
-> > mirabox, maybe you won't need it or maybe you'll need a different one.
+> > 
+> > On 7/2/2013 11:41 AM, Hebbar, Gururaja wrote:
+> > > On Tue, Jul 02, 2013 at 11:39:28, Nori, Sekhar wrote:
+> > >> On 7/2/2013 11:34 AM, Hebbar, Gururaja wrote:
+> > >>> On Tue, Jul 02, 2013 at 11:32:34, Nori, Sekhar wrote:
+> > >>>> On 6/28/2013 3:05 PM, Hebbar Gururaja wrote:
+> > >>>>> On some platforms (like AM33xx), a special register
+> > (RTC_IRQWAKEEN)
+> > >>>>> is available to enable Alarm Wakeup feature. This register
+> > needs to be
+> > >>>>> properly handled for the rtcwake to work properly.
+> > >>>>>
+> > >>>>> Platforms using such IP should set "ti,am3352-rtc" in rtc
+> > device dt
+> > >>>>> compatibility node.
+> > >>>>>
+> > >>>>> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com
+> <mailto:gururaja.hebbar@ti.com> >
+> > >>>>> Cc: Grant Likely <grant.likely@linaro.org
+> <mailto:grant.likely@linaro.org> >
+> > >>>>> Cc: Rob Herring <rob.herring@calxeda.com
+> <mailto:rob.herring@calxeda.com> >
+> > >>>>> Cc: Rob Landley <rob at landley.net <mailto:rob@landley.net> >
+> > >>>>> Cc: Sekhar Nori <nsekhar at ti.com <mailto:nsekhar@ti.com> >
+> > >>>>> Cc: Kevin Hilman <khilman at linaro.org <mailto:khilman@linaro.org>
+> >
+> > >>>>> Cc: Alessandro Zummo <a.zummo@towertech.it
+> <mailto:a.zummo@towertech.it> >
+> > >>>>> Cc: rtc-linux at googlegroups.com
+> <mailto:rtc-linux@googlegroups.com> 
+> > >>>>> Cc: devicetree-discuss at lists.ozlabs.org
+> <mailto:devicetree-discuss@lists.ozlabs.org> 
+> > >>>>> Cc: linux-doc at vger.kernel.org <mailto:linux-doc@vger.kernel.org>
+> > >>>>> ---
+> > >>>>
+> > >>>> [...]
+> > >>>>
+> > >>>>> -#define  OMAP_RTC_DATA_DA830_IDX 1
+> > >>>>> +#define  OMAP_RTC_DATA_DA830_IDX       1
+> > >>>>> +#define  OMAP_RTC_DATA_AM335X_IDX      2
+> > >>>>>
+> > >>>>>  static struct platform_device_id omap_rtc_devtype[] = {
+> > >>>>>     {
+> > >>>>> @@ -309,6 +321,9 @@ static struct platform_device_id
+> > omap_rtc_devtype[] = {
+> > >>>>>     }, {
+> > >>>>>           .name = "da830-rtc",
+> > >>>>>           .driver_data = OMAP_RTC_HAS_KICKER,
+> > >>>>> +   }, {
+> > >>>>> +         .name = "am335x-rtc",
+> > >>>>
+> > >>>> may be use am3352-rtc here just to keep the platform device
+> > name and of
+> > >>>> compatible in sync.
+> > >>>
+> > >>> Correct. I will update the same in v2.
+> > >>>
+> > >>>>
+> > >>>>> +         .driver_data = OMAP_RTC_HAS_KICKER |
+> > OMAP_RTC_HAS_IRQWAKEEN,
+> > >>>>>     },
+> > >>>>>     {},
+> > >>>>
+> > >>>> It is better to use the index defined above in the static
+> > initialization
+> > >>>> so they remain in sync.
+> > >>>
+> > >>> Sorry. I didn?t get this.
+> > >>>
+> > >>
+> > >> See example below I provided. If its still not clear, let me
+> > know what
+> > >> is not clear.
+> > >>
+> > >>>>      ...
+> > >>>>      [OMAP_RTC_DATA_DA830_IDX] = {
+> > >>>>            .name = "da830-rtc",
+> > >>>>            .driver_data = OMAP_RTC_HAS_KICKER,
+> > >>>>      },
+> > >
+> > > Thanks for the clarification. In this case will it ok if I
+> > update the previous
+> > > member also.
+> > 
+> > You dont really reference [0] in omap_rtc_of_match[] so even if
+> > you
+> > leave it as-is, that's fine with me. I am mostly concerned with
+> > the
+> > index definitions and initialization order being out of sync and
+> > that's
+> > really not an issue with [0].
+> > 
+> > Thanks,
+> > Sekhar
 > 
-> Just a note about this. You need that entry because your driver doesn't
-> support ONFI-detected flash devices. You could workaround that, by
-> adding support simple command. I did it for pxa3xx-nand recently:
-> 
-> "mtd: nand: pxa3xx: Add address support for READID command"
-> http://permalink.gmane.org/gmane.linux.drivers.mtd/46606
-
-I remember having seen your patches, I didn't know that it allowed
-to use such flashes and now it makes sense because I was surprized
-about having to add entries for all possible devices while we're
-not even certain that two consecutive versions of a board will use
-the same brand of NAND devices.
-
-Thanks for sharing these information, Ezequiel!
-
-Willy
