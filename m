@@ -1,56 +1,54 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Wed, 3 Jul 2013 14:18:26 +0200
-Subject: [PATCH] ARM: i.MX6Q: correct emi_sel clock muxing
-In-Reply-To: <1372836720-24660-1-git-send-email-shawn.guo@linaro.org>
-References: <1372836720-24660-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <51D41692.5090306@de.bosch.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 3 Jul 2013 14:21:06 +0200
+Subject: [RFC PATCH 01/13] misc: atmel_ssc: add device tree DMA support
+In-Reply-To: <51D29927.80900@atmel.com>
+References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
+ <1372667978-4718-2-git-send-email-richard.genoud@gmail.com>
+ <51D24299.9050209@atmel.com>
+ <CACQ1gAgcc=j3kmcpjp8bbdHhxr_k=h8jJs6R_paJbPUMv74uGg@mail.gmail.com>
+ <51D29927.80900@atmel.com>
+Message-ID: <CACQ1gAhnDk-qSt_5xrsMakXqGGDO5pEbA-9UDWCJG=AABDc+zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.07.2013 09:32, Shawn Guo wrote:
-> From: Liu Ying <Ying.Liu@freescale.com>
+2013/7/2 Bo Shen <voice.shen@atmel.com>:
+> Hi Richard,
 >
-> The correct muxing for emi_sel clock should be
-> 2b'00 - 396M PFD
-> 2b'01 - PLL3
-> 2b'10 - AXI clk root
-> 2b'11 - 352M PFD
 >
-> This patch corrects the muxing in the clock driver.
+> On 7/2/2013 16:13, Richard Genoud wrote:
+>>>
+>>> Please hold on of this, as to the ASoC dmaengine will deal with this. So,
+>>> we
+>>> >not need do it manually.
+>>> >
+>>> >Now, I am working on it. And will send out the patch soon after testing
+>>> > OK.
+>>
+>> Ok, I stay tuned !
 >
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-
-Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
-
-Thanks
-
-Dirk
-
-> ---
->   arch/arm/mach-imx/clk-imx6q.c |    5 +++--
->   1 file changed, 3 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index 4282e99f..86567d9 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -199,7 +199,8 @@ static const char *pcie_axi_sels[]	= { "axi", "ahb", };
->   static const char *ssi_sels[]		= { "pll3_pfd2_508m", "pll3_pfd3_454m", "pll4_post_div", };
->   static const char *usdhc_sels[]	= { "pll2_pfd2_396m", "pll2_pfd0_352m", };
->   static const char *enfc_sels[]	= { "pll2_pfd0_352m", "pll2_bus", "pll3_usb_otg", "pll2_pfd2_396m", };
-> -static const char *emi_sels[]		= { "axi", "pll3_usb_otg", "pll2_pfd2_396m", "pll2_pfd0_352m", };
-> +static const char *emi_sels[]		= { "pll2_pfd2_396m", "pll3_usb_otg", "axi", "pll2_pfd0_352m", };
-> +static const char *emi_slow_sels[]      = { "axi", "pll3_usb_otg", "pll2_pfd2_396m", "pll2_pfd0_352m", };
->   static const char *vdo_axi_sels[]	= { "axi", "ahb", };
->   static const char *vpu_axi_sels[]	= { "axi", "pll2_pfd2_396m", "pll2_pfd0_352m", };
->   static const char *cko1_sels[]	= { "pll3_usb_otg", "pll2_bus", "pll1_sys", "pll5_video_div",
-> @@ -392,7 +393,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->   	clk[usdhc4_sel]       = imx_clk_mux("usdhc4_sel",       base + 0x1c, 19, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
->   	clk[enfc_sel]         = imx_clk_mux("enfc_sel",         base + 0x2c, 16, 2, enfc_sels,         ARRAY_SIZE(enfc_sels));
->   	clk[emi_sel]          = imx_clk_mux("emi_sel",          base + 0x1c, 27, 2, emi_sels,          ARRAY_SIZE(emi_sels));
-> -	clk[emi_slow_sel]     = imx_clk_mux("emi_slow_sel",     base + 0x1c, 29, 2, emi_sels,          ARRAY_SIZE(emi_sels));
-> +	clk[emi_slow_sel]     = imx_clk_mux("emi_slow_sel",     base + 0x1c, 29, 2, emi_slow_sels,     ARRAY_SIZE(emi_slow_sels));
->   	clk[vdo_axi_sel]      = imx_clk_mux("vdo_axi_sel",      base + 0x18, 11, 1, vdo_axi_sels,      ARRAY_SIZE(vdo_axi_sels));
->   	clk[vpu_axi_sel]      = imx_clk_mux("vpu_axi_sel",      base + 0x18, 14, 2, vpu_axi_sels,      ARRAY_SIZE(vpu_axi_sels));
->   	clk[cko1_sel]         = imx_clk_mux("cko1_sel",         base + 0x60, 0,  4, cko1_sels,         ARRAY_SIZE(cko1_sels));
+> I think you can go on working with the two patches I send just now.
+> [1]: ASoC: atmel_ssc_dai: move set dma data to startup callback
+> https://patchwork.kernel.org/patch/2811241/
+>
+> [2]: ASoC: atmel-pcm: use generic dmaengine framework
+> https://patchwork.kernel.org/patch/2811261/
+>
+> I use your patches 4 ~ 8 do a quick testing, it works. Please note the name
+> of asound.state under /etc in your rootfs should the same with atmel,model
+> in patch 6.
+
+Thanks for testing !
+I was just doing the same test, it works with
+aplay  -Dplug:default  good_music.wav
+
+but there's a violent hang (kernel stops, no trace) when I try the record :
+arecord -v -V stereo -Dplug:default -f cd -t wav -c 2 /tmp/toto.wav
+last thing I see is :
+dma dma0chan3: atc_control (3)
+
+I'll try to trace that.
+
+
+Best regards,
+Richard.
