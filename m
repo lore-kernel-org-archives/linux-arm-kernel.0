@@ -1,40 +1,48 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 3 Jul 2013 17:56:19 +0800
-Subject: [PATCH] mtd: atmel_nand: fix pmecc selction for ecc requirement typo
-Message-ID: <1372845379-5958-1-git-send-email-josh.wu@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 Jul 2013 11:00:44 +0100
+Subject: [PATCH] ARM: move body of head-common.S back to text section
+In-Reply-To: <20130703051907.GA22702@windriver.com>
+References: <1372805629-18382-1-git-send-email-swarren@wwwdotorg.org>
+ <20130702232259.GH11625@codeaurora.org> <51D39004.9000907@wwwdotorg.org>
+ <20130703051907.GA22702@windriver.com>
+Message-ID: <20130703100044.GG24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Atmel PMECC support 2, 4, 8, 12, 24 bit error correction.
-So if the ecc requirement in ONFI is <= 2, 4, 8, 12, 24.
-We will use 2, 4, 8, 12, 24.
+On Wed, Jul 03, 2013 at 01:19:07AM -0400, Paul Gortmaker wrote:
+> As an aside, I'm now thinking any __INIT that implicitly rely on EOF for
+> closure are nasty traps waiting to happen and it might be worthwhile to
+> audit and explicitly __FINIT them before someone appends to the file...
 
-This patch fix the typo. Use '<=' replace '<'.
+That hides a different kind of bug though - I hate __FINIT for exactly
+that reason.  Consider this:
 
-Reported-by: Scott Wood <scottwood@freescale.com>
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
- drivers/mtd/nand/atmel_nand.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+	.text
+	blah blah blah
+	__INIT
+	lots of init stuff
+	__FINIT
+	more .text stuff
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 7e50ed8..2a42aa8 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -960,11 +960,11 @@ static int pmecc_choose_ecc(struct atmel_nand_host *host,
- 			host->pmecc_corr_cap = 2;
- 		else if (*cap <= 4)
- 			host->pmecc_corr_cap = 4;
--		else if (*cap < 8)
-+		else if (*cap <= 8)
- 			host->pmecc_corr_cap = 8;
--		else if (*cap < 12)
-+		else if (*cap <= 12)
- 			host->pmecc_corr_cap = 12;
--		else if (*cap < 24)
-+		else if (*cap <= 24)
- 			host->pmecc_corr_cap = 24;
- 		else
- 			return -EINVAL;
--- 
-1.7.9.5
+Now, someone comes along and modifies this to be:
+
+	.text
+	blah blah blah
+	.data
+	something else
+	__INIT
+	lots of init stuff
+	__FINIT
+	more .text stuff
+
+Now, what is the effect of that __FINIT now?  You get the following .text
+emitted into the .data section instead.  This is basically the same problem
+you've just encounted.
+
+Maybe:
+
+	__FINIT
+	.text
+
+is the safest solution - and __FINIT becomes just a no-op marker to avoid
+anyone relying on its properties.
