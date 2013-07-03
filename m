@@ -1,59 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 3 Jul 2013 16:51:04 +0200
-Subject: Proposal: mach-dt
-In-Reply-To: <51D437C6.9000909@arm.com>
-References: <1372839486.487159774@f54.mail.ru>
- <51D43127.6080206@codeaurora.org> <51D437C6.9000909@arm.com>
-Message-ID: <201307031651.05181.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 3 Jul 2013 10:40:24 -0400
+Subject: [PATCH v6 5/7] ARM: kirkwood: remove redundant DT board files
+In-Reply-To: <51D40BA3.6000603@gmail.com>
+References: <1372762824-12202-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1372762824-12202-6-git-send-email-sebastian.hesselbarth@gmail.com>
+ <87k3l8v9s1.fsf@natisbad.org> <51D40BA3.6000603@gmail.com>
+Message-ID: <20130703144024.GJ17110@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 July 2013, Marc Zyngier wrote:
-> On 03/07/13 15:11, Christopher Covington wrote:
-> > On 07/03/2013 10:10 AM, Marc Zyngier wrote:
-> >> On 03/07/13 15:03, Christopher Covington wrote:
-> >>> On 07/03/2013 05:20 AM, Marc Zyngier wrote:
-> >>>> On 03/07/13 09:18, Alexander Shiyan wrote:
-> >>>>
-> >>>> Hi Alexander,
-> >>>>
-> >>>>> More and more platforms are now using devicetree.
-> >>>>> Ideally the platform code contains only one function "of_platform_populate".
-> >>>>> My idea is to make a generic architecture (mach-dt) with the call then add support
-> >>>>> for compatible subarchitectures as they become available in "compatible"-property.
-> >>>>> Your opinion?
-> >>>>
-> >>>> Well, my (admittedly partial) opinion is that mach-virt is an incredibly
-> >>>> nicer sounding name, 'specially as you can mistype it as mach-triv.
-> >>>
-> >>> As mentioned before, I disagree and would love to see the the
-> >>> virtualization-specific name replaced by something more suitably generic.
-> >>
-> >> I think you're missing the point. The right fix would to remove it
-> >> entirely and make it the basic default. There are patches for that already.
-> > 
-> > Where?
+On Wed, Jul 03, 2013 at 01:31:47PM +0200, Sebastian Hesselbarth wrote:
+> On 07/03/13 01:09, Arnaud Ebalard wrote:
+> >Hi Sebastian,
+> >
+> >Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> writes:
+> >
+> >>With DT support for mv643xx_eth board specific init for some boards now
+> >>is unneccessary. Remove those board files, Kconfig entries, and
+> >>corresponding entries in kirkwood_defconfig.
+> >
+> >Applying above your set an old quilt cleaning patch Jason asked at some
+> >point, it became empty except for arch/arm/mach_kirkwood/common.h in
+> >which some declarations were left behind. If this is correct, can you
+> >just merge the hunks below in your 5/7 in next round?
+> >
+> >AFAICT, only dnskw_init() remains, which matches the list of board-*.c
+> >files in arch/arm/mach_kirkwood/ (i.e. board-dt.c and board-dnskw.c).
 > 
-> There were patches from Arnd (CC-ed) a while ago, moving some of the
-> mach-virt SMP stuff to smp.c. Don't have the pointers handy, but surely
-> Arnd knows where they are.
-> 
-> Once SMP is done, the rest should be pretty trivial.
+> While updating the patch with yours, I stumbled upon MACH_TS219_DT that
+> also remains because it includes tsx1x-common.c.
 
-In 3.11, mach-virt is basically empty. The SMP functions were moved out
-already and everything is optional, so you should not need to even build
-arch/arm/mach-virt/virt.c any more, except to get a particular platform
-name in /proc/cpuinfo.
+Oh yeah, that line can be removed as well.  It was originally included
+for qnap_tsx1x_power_off().  This was replaced by
 
-We have a couple of real (as opposed to virtual) platforms that are
-almost at the same point and only have one or two functions left in them.
+  e8fc721 power/reset: Add a new driver to turn QNAP board power off
 
-I'm definitely open for suggestions what to do about them. Putting all
-the trivial files into a shared directory would be one possibility,
-as would removing the files entirely by making the code more generic.
+thx,
 
-Note that arm64 platforms by definition have no such machine specific
-code, and they should be able to boot a 32 bit kernel as well without
-needing it.
-
-	Arnd
+Jason.
