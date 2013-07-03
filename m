@@ -1,25 +1,106 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 3 Jul 2013 17:07:47 +0100
-Subject: [PATCH v9 03/10] ASoC: fsl: Move soc_ac97_ops from imx-ssi to
- fsl_ssi
-In-Reply-To: <1371734429-6081-4-git-send-email-mpa@pengutronix.de>
-References: <1371734429-6081-1-git-send-email-mpa@pengutronix.de>
- <1371734429-6081-4-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130703160747.GR27646@sirena.org.uk>
+From: coelho@ti.com (Luciano Coelho)
+Date: Wed, 3 Jul 2013 17:03:28 +0300
+Subject: [PATCH v3 7/8] wlcore: sdio: get clocks from device tree
+In-Reply-To: <1372860209-3504-1-git-send-email-coelho@ti.com>
+References: <1372860209-3504-1-git-send-email-coelho@ti.com>
+Message-ID: <1372860209-3504-8-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 20, 2013 at 03:20:22PM +0200, Markus Pargmann wrote:
-> fsl_ssi and imx-ssi can be both enabled at the same time. To be able to
-> add AC97 support to fsl_ssi, soc_ac97_ops have to be available to both
-> drivers.
+Read the clock nodes from the device tree and use them to set the
+frequency for the refclock and the tcxo clock.
 
-This needs to be redone on top of the changes that went into v3.11 to
-support multiplatform AC'97 - it won't apply any more.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130703/fb7c3d28/attachment.sig>
+Also, call sdio_set_drvdata() earlier, so the glue is already set in
+the driver data when we call wlcore_get_pdata_from_of() and we don't
+need to pass it as a parameter.
+
+Signed-off-by: Luciano Coelho <coelho@ti.com>
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/net/wireless/ti/wlcore/sdio.c |   36 +++++++++++++++++++++++++++++++--
+ 1 file changed, 34 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/wireless/ti/wlcore/sdio.c b/drivers/net/wireless/ti/wlcore/sdio.c
+index 980bf3d..60fce49 100644
+--- a/drivers/net/wireless/ti/wlcore/sdio.c
++++ b/drivers/net/wireless/ti/wlcore/sdio.c
+@@ -53,6 +53,7 @@ static bool dump = false;
+ struct wl12xx_sdio_glue {
+ 	struct device *dev;
+ 	struct platform_device *core;
++	struct clk *refclock, *tcxoclock;
+ };
+ 
+ static const struct sdio_device_id wl1271_devices[] = {
+@@ -224,6 +225,7 @@ static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
+ 	struct wl12xx_platform_data *pdata;
+ 	struct device_node *np = dev->of_node;
+ 	struct device_node *clock_node;
++	struct wl12xx_sdio_glue *glue = sdio_get_drvdata(dev_to_sdio_func(dev));
+ 
+ 	if (!np) {
+ 		np = of_find_matching_node(NULL, dev->driver->of_match_table);
+@@ -250,6 +252,26 @@ static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
+ 	for_each_matching_node(clock_node, wlcore_sdio_of_clk_match_table)
+ 		of_fixed_clk_setup(clock_node);
+ 
++	/* TODO: make sure we have this when needed (ie. for WL6 and WL7) */
++	glue->refclock = of_clk_get_by_name(np, "refclock");
++	if (IS_ERR(glue->refclock)) {
++		dev_err(dev, "couldn't find refclock on the device tree\n");
++		glue->refclock = NULL;
++	} else {
++		clk_prepare_enable(glue->refclock);
++		pdata->ref_clock_freq = clk_get_rate(glue->refclock);
++	}
++
++	/* TODO: make sure we have this when needed (ie. for WL7) */
++	glue->tcxoclock = of_clk_get_by_name(np, "tcxoclock");
++	if (IS_ERR(glue->tcxoclock)) {
++		dev_err(dev, "couldn't find tcxoclock on the device tree\n");
++		glue->tcxoclock = NULL;
++	} else {
++		clk_prepare_enable(glue->tcxoclock);
++		pdata->ref_clock_freq = clk_get_rate(glue->tcxoclock);
++	}
++
+ 	goto out;
+ 
+ out_free:
+@@ -294,6 +316,8 @@ static int wl1271_probe(struct sdio_func *func,
+ 	/* Use block mode for transferring over one block size of data */
+ 	func->card->quirks |= MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
+ 
++	sdio_set_drvdata(func, glue);
++
+ 	/* The pdata allocated here is freed when the device is freed,
+ 	 * so we don't need an additional out label to free it in case
+ 	 * of error further on.
+@@ -319,8 +343,6 @@ static int wl1271_probe(struct sdio_func *func,
+ 	if (mmcflags & MMC_PM_KEEP_POWER)
+ 		pdev_data->pwr_in_suspend = true;
+ 
+-	sdio_set_drvdata(func, glue);
+-
+ 	/* Tell PM core that we don't need the card to be powered now */
+ 	pm_runtime_put_noidle(&func->dev);
+ 
+@@ -387,6 +409,16 @@ static void wl1271_remove(struct sdio_func *func)
+ {
+ 	struct wl12xx_sdio_glue *glue = sdio_get_drvdata(func);
+ 
++	if (glue->refclock) {
++		clk_disable_unprepare(glue->refclock);
++		clk_put(glue->refclock);
++	}
++
++	if (glue->tcxoclock) {
++		clk_disable_unprepare(glue->tcxoclock);
++		clk_put(glue->tcxoclock);
++	}
++
+ 	/* Undo decrement done above in wl1271_probe */
+ 	pm_runtime_get_noresume(&func->dev);
+ 
+-- 
+1.7.10.4
