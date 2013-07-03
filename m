@@ -1,34 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 3 Jul 2013 16:21:05 -0400
-Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
-In-Reply-To: <20130702220936.GC10215@1wt.eu>
-References: <87fvvzfh70.fsf@natisbad.org>
- <20130702124639.GI19937@titan.lakedaemon.net>
- <20130702151407.01680d21@skate>
- <20130702133337.GA17110@titan.lakedaemon.net>
- <20130702153825.139a93a5@skate>
- <20130702134421.GC17110@titan.lakedaemon.net>
- <87obakho6d.fsf@natisbad.org>
- <20130702174111.GF17110@titan.lakedaemon.net>
- <87y59ows4n.fsf@natisbad.org> <20130702220936.GC10215@1wt.eu>
-Message-ID: <20130703202105.GE27003@titan.lakedaemon.net>
+From: javier.picorel@epfl.ch (javier.picorel at epfl.ch)
+Date: Wed, 03 Jul 2013 22:32:55 +0200
+Subject: ARM Cortex A9: LL counters
+Message-ID: <20130703223255.15536gmsbwonw5fb@webmail.epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 03, 2013 at 12:09:36AM +0200, Willy Tarreau wrote:
-> Hi,
-> 
-> On Tue, Jul 02, 2013 at 11:48:08PM +0200, Arnaud Ebalard wrote:
-> > > more bummer.  Willy, mind posting what you have?
-> 
-> Attached. Usual warning "this will destroy your device etc..." comes
-> with it.
+Dear all,
 
-Thanks Willy!
+It seems that there is no mapping between any ARM Cortex A9 counter to  
+the L2 (Last Level) access or misses event.
 
-How much effort would it be to put this pig in drivers/staging?  iirc,
-the only rule is that it has to compile...
+arch/arm/kernel/perf_event_v7.c
 
-thx,
+  [C(LL)] = {
+  293                [C(OP_READ)] = {
+  294                        [C(RESULT_ACCESS)]      = CACHE_OP_UNSUPPORTED,
+  295                        [C(RESULT_MISS)]        = CACHE_OP_UNSUPPORTED,
+  296                },
+  297                [C(OP_WRITE)] = {
+  298                        [C(RESULT_ACCESS)]      = CACHE_OP_UNSUPPORTED,
+  299                        [C(RESULT_MISS)]        = CACHE_OP_UNSUPPORTED,
+  300                },
+  301                [C(OP_PREFETCH)] = {
+  302                        [C(RESULT_ACCESS)]      = CACHE_OP_UNSUPPORTED,
+  303                        [C(RESULT_MISS)]        = CACHE_OP_UNSUPPORTED,
+  304                },
+  305        },
 
-Jason.
+Looking at ARM's reference manual and OProfile's event list on A9, I  
+see the following two counters:
+
+CO_LF_MISS: (counter: 1, 2, 3, 4, 5, 6)
+         Number of coherent linefill requests which miss in all other  
+CPUs, meaning that the request
+         is sent to external memory (min count: 500)
+CO_LF_HIT: (counter: 1, 2, 3, 4, 5, 6)
+         Number of coherent linefill requests which hit in another  
+CPU, meaning that the linefill
+         data is fetched directly from the relevant cache (min count: 500)
+
+It seems that the first counter refers to the L2 Misses and the second  
+one to the L2 Hits (Last Level Cache in this architecture). I'm not sure
+whether we should do something about this or nor. Thanks!
+
+Best Regards,
+Javier
