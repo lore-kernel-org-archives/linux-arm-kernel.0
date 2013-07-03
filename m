@@ -1,35 +1,96 @@
-From: dserrg@gmail.com (Sergey Dyasly)
-Date: Wed, 3 Jul 2013 19:37:52 +0400
-Subject: [PATCH v2] ARM: LPAE: don't reject mapping /dev/mem above 4GB
-In-Reply-To: <20130702171530.GG24828@arm.com>
-References: <1372780685-2528-1-git-send-email-dserrg@gmail.com>
- <20130702171530.GG24828@arm.com>
-Message-ID: <20130703193752.f5b76b6f24bcebbdb7fec379@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  3 Jul 2013 12:40:06 -0300
+Subject: [PATCH] ARM: mx6: Fix the number of reported cores
+Message-ID: <1372866006-3892-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Jul 2013 18:15:31 +0100
-Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >  int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
-> >  {
-> > -	return !(pfn + (size >> PAGE_SHIFT) > 0x00100000);
-> > +	return !(((pfn << PAGE_SHIFT) + size) & ~PHYS_MASK);
-> 
-> I don't think that's what I suggested. For classic MMU ~PHYS_MASK is 0.
-> 
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Thanks for your comments!
+On a mx6 quad-core processor:
 
-Indeed, I did some testing today and v2 check doesn't work at all because of
-32-bit overflow in case of using '<<' operator. Also, it turned out that v1
-doesn't reject mappings > 40 bit in case of LPAE (the same overflow).
+$ cat /proc/cpuinfo                                             
+processor       : 0                                                             
+model name      : ARMv7 Processor rev 10 (v7l)                                  
+BogoMIPS        : 1581.05                                                       
+Features        : swp half thumb fastmult vfp edsp neon vfpv3 tls               
+CPU implementer : 0x41                                                          
+CPU architecture: 7                                                             
+CPU variant     : 0x2                                                           
+CPU part        : 0xc09                                                         
+CPU revision    : 10                                                            
 
-I didn't want to additionally define PHYS_MASK_SHIFT, so I came up with
-something like:
+,which incorrectly shows this is a single core device.
 
-	return (pfn + (size >> PAGE_SHIFT)) <= (1 + (PHYS_MASK >> PAGE_SHIFT))
+Commit a0ae0240 (ARM: kernel: add device tree init map function) introduced the 
+following requirement according to Documentation/devicetree/bindings/arm/cpus.txt:
+"For the ARM architecture every CPU node must contain the following properties:
 
-I will post v3 tomorrow.
+- device_type:	must be "cpu" 
 
-Best regards,
-Sergey Dyasly
+Pass the 'device_type' property for each cpu node, so that we can have all the 
+four cores correctly reported again.
+
+Cc: <stable@vger.kernel.org> #3.10
+Reported-by: Mike Loebl <mloebl@gmail.com> 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6dl.dtsi | 2 ++
+ arch/arm/boot/dts/imx6q.dtsi  | 4 ++++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 63fafe2..a4b3e1e 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -16,12 +16,14 @@
+ 
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu"
+ 			reg = <0>;
+ 			next-level-cache = <&L2>;
+ 		};
+ 
+ 		cpu at 1 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu"
+ 			reg = <1>;
+ 			next-level-cache = <&L2>;
+ 		};
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index cba021e..f4e9ebf 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -17,6 +17,7 @@
+ 
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <0>;
+ 			next-level-cache = <&L2>;
+ 			operating-points = <
+@@ -38,18 +39,21 @@
+ 
+ 		cpu@1 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <1>;
+ 			next-level-cache = <&L2>;
+ 		};
+ 
+ 		cpu at 2 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <2>;
+ 			next-level-cache = <&L2>;
+ 		};
+ 
+ 		cpu at 3 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <3>;
+ 			next-level-cache = <&L2>;
+ 		};
+-- 
+1.8.1.2
