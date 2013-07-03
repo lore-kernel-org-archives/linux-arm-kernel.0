@@ -1,55 +1,58 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 03 Jul 2013 09:36:34 +0200
-Subject: [alsa-devel] [PATCH 2/2] ASoC: atmel-pcm: use generic dmaengine
- framework
-In-Reply-To: <51D37F87.2010008@atmel.com>
-References: <1372755849-19546-1-git-send-email-voice.shen@atmel.com>
- <1372755849-19546-3-git-send-email-voice.shen@atmel.com>
- <51D2F306.7040603@metafoo.de> <51D37F87.2010008@atmel.com>
-Message-ID: <51D3D482.1050100@metafoo.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 3 Jul 2013 09:42:03 +0200
+Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
+In-Reply-To: <20130702232311.GA3949@localhost>
+References: <87fvvzfh70.fsf@natisbad.org>
+ <20130702124639.GI19937@titan.lakedaemon.net>
+ <20130702151407.01680d21@skate>
+ <20130702133337.GA17110@titan.lakedaemon.net>
+ <20130702153825.139a93a5@skate>
+ <20130702134421.GC17110@titan.lakedaemon.net>
+ <87obakho6d.fsf@natisbad.org>
+ <20130702174111.GF17110@titan.lakedaemon.net>
+ <87y59ows4n.fsf@natisbad.org> <20130702220936.GC10215@1wt.eu>
+ <20130702232311.GA3949@localhost>
+Message-ID: <20130703094203.37562f9c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2013 03:33 AM, Bo Shen wrote:
-> Hi Lars-Peter,
-> 
-> On 7/2/2013 23:34, Lars-Peter Clausen wrote:
->> On 07/02/2013 11:04 AM, Bo Shen wrote:
->> [...]
->>> -/*--------------------------------------------------------------------------*\
->>> - * DMAENGINE operations
->>> -\*--------------------------------------------------------------------------*/
->>> -static bool filter(struct dma_chan *chan, void *slave)
->>> -{
->>> -    struct at_dma_slave *sl = slave;
->>> -
->>> -    if (sl->dma_dev == chan->device->dev) {
->>> -        chan->private = sl;
->>> -        return true;
->>> -    } else {
->>> -        return false;
->>> -    }
->>> -}
->>
->> I'm wondering why is filtering no longer required?
-> 
-> Now this is handled by at_dma_filter in at_hdmac driver. More information, you
-> can reference: <driver/dma/at_hdmac.c> file
+Hello,
 
-Ok, so the DMA channel is now supplied via devicetree. This is really a change
-that should be listed in the changelog.
+On Tue, 2 Jul 2013 20:23:12 -0300, Ezequiel Garcia wrote:
 
+> I wish I could say I'm going to work on this soon but, as Thomas said,
+> we have no idea when/if NAND will be prioritized.
 > 
->> [...]
->>> +        slave_config->dst_addr = (dma_addr_t)ssc->phybase + SSC_THR;
->> [...]
->>> +        slave_config->src_addr = (dma_addr_t)ssc->phybase + SSC_RHR;
->>
->> Change the type of phybase to dma_addr_t
+> On the other side if you look at the driver Willy just posted, merging
+> the juicy stuff into pxa3xx-nand driver is not for the faint of heart.
 > 
-> It should be:
-> slave_config->dst_addr = (dma_addr_t)(ssc->phybase + SSC_THR);
-> slave_config->src_addr = (dma_addr_t)(ssc->phybase + SSC_RHR);
+> Without the spec, is only tougher.
+> 
+> Just a quick hint. As far as I can recall, one of the first items in a
+> TODO list should be:
+> 
+>  * adding bigger page support to pxa3xx (4 KiB, 8 KiB).
+>    Willy's posted driver might be helpful to accomplish this;
+>    provided your eyes don't melt when you look at it :-)
+> 
+>  * once the above is done, bad block management can/should be added.
+> 
+> With these two we're almost there for R/W support.
 
-The type of phybase in the ssc_device struct should be changed from
-resource_size_t to dma_addr_t.
+Wasn't also part of the TODO-list to make pxa3xx_nand divorce from the
+PXA-specific DMA API, and use instead the PXA dmaengine driver, through
+the DMA engine API? As far as I remember, this was one of the
+prerequisite to be able to re-use the driver in a non-PXA context.
+There is a patch that was floating around doing this conversion (I
+could dig the relevant link if needed), but of course it needs to be
+tested, and we don't have PXA3xx hardware, so making changes to this
+driver without breaking it is quite tedious.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
