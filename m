@@ -1,75 +1,58 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Wed, 3 Jul 2013 17:12:25 +0200
-Subject: [PATCH v3 2/8] wlcore: set irq_flags in the board files instead
- of hiding behind a quirk
-In-Reply-To: <1372860925.21065.115.camel@cumari.coelho.fi>
-References: <1372860209-3504-1-git-send-email-coelho@ti.com>
- <1372860209-3504-3-git-send-email-coelho@ti.com>
- <1372860925.21065.115.camel@cumari.coelho.fi>
-Message-ID: <CAAwP0s3xkqUGnGvojfpyQq97qUmKCqY3BD4RyK1_uuX=pNy91g@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 3 Jul 2013 10:30:30 -0400 (EDT)
+Subject: [RFC PATCH 4/6] USB: ehci-omap: Suspend the controller during
+ bus suspend
+In-Reply-To: <20130703131513.GH15056@arwen.pp.htv.fi>
+Message-ID: <Pine.LNX.4.44L0.1307031023060.1241-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 3, 2013 at 4:15 PM, Luciano Coelho <coelho@ti.com> wrote:
-> On Wed, 2013-07-03 at 17:03 +0300, Luciano Coelho wrote:
->> The platform_quirk element in the platform data was used to change the
->> way the IRQ is triggered.  When set, the EDGE_IRQ quirk would change
->> the irqflags used and treat edge trigger differently from the rest.
->>
->> Instead of hiding this irq flag setting behind the quirk, have the
->> board files set the flags during initialization.  This will be more
->> meaningful than driver-specific quirks when we switch to DT.
->>
->> Additionally, fix missing gpio_request() calls in the boarding files
->> (so that setting the flags actually works).
->>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Signed-off-by: Luciano Coelho <coelho@ti.com>
->> ---
->
-> [...]
->
->> @@ -5928,16 +5927,21 @@ static void wlcore_nvs_cb(const struct firmware *fw, void *context)
->>       wlcore_adjust_conf(wl);
->>
->>       wl->irq = platform_get_irq(pdev, 0);
->> -     wl->platform_quirks = pdata->platform_quirks;
->>       wl->if_ops = pdev_data->if_ops;
->>
->> -     if (wl->platform_quirks & WL12XX_PLATFORM_QUIRK_EDGE_IRQ)
->> -             irqflags = IRQF_TRIGGER_RISING;
->> -     else
->> -             irqflags = IRQF_TRIGGER_HIGH | IRQF_ONESHOT;
->> +     irq_data = irq_get_irq_data(wl->irq);
->> +     if (!irq_data) {
->> +             wl1271_error("couldn't get irq data for irq %d\n", wl->irq);
->> +             ret = -EINVAL;
->> +             goto out_free_nvs;
->> +     }
->> +
->> +     wl->irq_flags = irqd_get_trigger_type(irq_data);
->
-> BTW, there seems to be a patch on its way to make reading the flags
-> easier (ie. no need to get the irq_data first):
->
-> http://mid.gmane.org/1367945288-5625-1-git-send-email-javier at dowhile0.org
->
-> I'm not sure if this is going to be taken in, but if it does, it would
-> be nice to change the code here to use the new irq_get_trigger_type()
-> function.
->
-> --
-> Luca.
->
+On Wed, 3 Jul 2013, Felipe Balbi wrote:
 
-Hi Luca
+> On Wed, Jul 03, 2013 at 04:06:04PM +0300, Roger Quadros wrote:
+> > On 07/03/2013 03:57 PM, Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Tue, Jul 02, 2013 at 01:17:58PM -0400, Alan Stern wrote:
+> > >> A PCI-based EHCI controller has two power sources: the core well (which
+> > >> is turned off during suspend) and the auxiliary well (which remains
+> > >> powered).  That's how remote wakeup works; it uses the auxiliary well.
+> > > 
+> > > This, kinda, matches what OMAP tries to do with pad wakeup. Just that
+> > > pad wakeup sits outside of the device itself. Perhaps we could look into
+> > > how PCI handles the aux well and take some inspiration from there.
+> > > 
+> > > Any pointers under drivers/pci/ would be great :-)
+> > > 
+> > From what I understood, auxiliary well is just a power source, and it keeps
+> > the EHCI controller powered even during suspend.
+> > 
+> > If that is true then it is different from our situation as we power down the
+> > EHCI controller completely.
+> 
+> right but our "auxiliary well" keeps PRCM powered which can wake EHCI up
+> ;-)
+> 
+> What I'm saying is that from ehci-omap's perspective, there's very
+> little difference, specially since we route the wakeup through the same
+> IRQ line anyway. Perhaps we could take some inspiration from the PCI
+> land to make our hwmod/omap_device a little easier from driver
+> perspective.
+> 
+> Or maybe it doesn't make sense ;-)
 
-That patch has been already merged in Linus tree as commit 1f6236bf
-("genirq: Add irq_get_trigger_type() to get IRQ flags").
+This idea probably won't lead anywhere.  To the best of my knowledge 
+(and I'm not an expert on PCI), these different power wells are simply 
+part of the PCI bus.  The bus controller knows to turn off one of them 
+when the device (or maybe when all the devices on a bus segment) goes 
+into D3.
 
-So yes, it would be better if you can use irq_get_trigger_type()
-instead calling irq_get_irq_data() + irqd_get_trigger_type().
+One big difference with respect to OMAP is the way PCI handles wakeup
+messages.  There's a separate bus signal, PME# (which stands for Power
+Management Event), that a device asserts when it wants to send a wakeup
+request.  When the ACPI driver sees the PME# signal, it searches
+through the entire PCI tree to find the device or devices which need to
+be resumed.  Or maybe when ACPI sees the signal, it tells the PCI core 
+to do this -- I'm not sure of the details.
 
-Best regards,
-Javier
+Alan Stern
