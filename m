@@ -1,33 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 3 Jul 2013 14:29:41 +0200
-Subject: [PATCH 00/08] ARM: shmobile: EMEV2 and KZM9D update
-In-Reply-To: <20130702092725.32066.54861.sendpatchset@w520>
-References: <20130702092725.32066.54861.sendpatchset@w520>
-Message-ID: <201307031429.41711.arnd@arndb.de>
+Date: Wed, 3 Jul 2013 14:35:05 +0200
+Subject: [GIT PULL 0/2] Renesas ARM based SoC fixes for v3.11
+In-Reply-To: <cover.1372739438.git.horms+renesas@verge.net.au>
+References: <cover.1372739438.git.horms+renesas@verge.net.au>
+Message-ID: <201307031435.05949.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 July 2013, Magnus Damm wrote:
-> ARM: shmobile: EMEV2 and KZM9D update
+On Tuesday 02 July 2013, Simon Horman wrote:
+> --------------------------------------------------
+> Renesas ARM based SoC fixes for v3.11
 > 
-> [PATCH 01/08] ARM: shmobile: Remove unused EMEV2/KZM9D early console
-> [PATCH 02/08] ARM: shmobile: Update KZM9D dts command line
-> [PATCH 03/08] ARM: shmobile: Make EMEV2 platform devices more compact
-> [PATCH 04/08] ARM: shmobile: Add GIO to EMEV2 dtsi
-> [PATCH 05/08] ARM: shmobile: Use DT for GIC on EMEV2 and KZM9D
-> [PATCH 06/08] ARM: shmobile: Use DT for SMP on EMEV2 and KZM9D
-> [PATCH 07/08] ARM: shmobile: EMEV2 map_io update
-> [PATCH 08/08] ARM: shmobile: Disconnect EMEV2 SMP code from clocks
+> * Correct GIO3 base addresses for EMEV2 SoC
+>   - This bug bug added when GPIO support was added for the EMEV2 SoC
+>     in v3.5
 > 
-> Several minor updates for the EMEV2 SoC and the KZM9D board:
-> - Get rid of early console - the 8250-em driver does not support it
-> - Update command line in DTS and remove old cruft
-> - Make the EMEV2 platform devices more compact
-> - Add GIO device nodes to the EMEV2 dtsi
-> - Use DT for GIC and SMP for both regular KZM9D board code and DT
-> - Reduce the size of the EMEV2 map_io - SCU is still however needed
-> - Allow EMEV2 SMP to operate without legacy clock bits
+> * Correct SCIFB0 resources for r8a77a4 SoC
+>   - This was a bug was added when SCIF support was added for the r8a77a4 SoC
+>     in v3.10
+> 
 
-Looks all good to me,
+Pulled into the fixes branch, thanks!
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+	Arnd
