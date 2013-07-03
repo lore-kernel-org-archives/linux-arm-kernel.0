@@ -1,108 +1,85 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 3 Jul 2013 13:02:52 +0900
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7790: Initialise clocks and SCIF
- in r8a7790_add_dt_devices()
-In-Reply-To: <1372645120-27256-2-git-send-email-horms+renesas@verge.net.au>
-References: <1372645120-27256-1-git-send-email-horms+renesas@verge.net.au>
- <1372645120-27256-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CANqRtoRKzbgBNt=Ztise5eeqnbiFWCZZZkhAq0zCnjjoetGFkg@mail.gmail.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Wed, 3 Jul 2013 06:33:30 +0200
+Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
+In-Reply-To: <20130702232311.GA3949@localhost>
+References: <20130702124639.GI19937@titan.lakedaemon.net>
+ <20130702151407.01680d21@skate> <20130702133337.GA17110@titan.lakedaemon.net>
+ <20130702153825.139a93a5@skate> <20130702134421.GC17110@titan.lakedaemon.net>
+ <87obakho6d.fsf@natisbad.org> <20130702174111.GF17110@titan.lakedaemon.net>
+ <87y59ows4n.fsf@natisbad.org> <20130702220936.GC10215@1wt.eu>
+ <20130702232311.GA3949@localhost>
+Message-ID: <20130703043330.GF10215@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Ezequiel,
 
-On Mon, Jul 1, 2013 at 11:18 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> This is sufficient to allow boot of the Lager board with
-> a console without boards-lager.c compiled into the kernel.
-> This is an example of a minimal but still useful initialisation
-> of the board using DT as much as possible.
->
-> Also provide r8a7790_add_dt_device() in
-> r8a7790.h to allow it be used from a boards-lager-reference.c
-> file which will be added by a subsequent patch.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->
-> ---
->
-> v2
->
-> * Rebase
-> ---
->  arch/arm/mach-shmobile/include/mach/r8a7790.h |  1 +
->  arch/arm/mach-shmobile/setup-r8a7790.c        | 11 ++++++++++-
->  2 files changed, 11 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-> index 7851cc1..7a25138 100644
-> --- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
-> +++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-> @@ -2,6 +2,7 @@
->  #define __ASM_R8A7790_H__
->
->  void r8a7790_add_standard_devices(void);
-> +void r8a7790_add_standard_devices_dt(void);
->  void r8a7790_clock_init(void);
->  void r8a7790_pinmux_init(void);
->  void r8a7790_init_delay(void);
-> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-> index d89cd83..770109b 100644
-> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
-> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-> @@ -180,7 +180,7 @@ static struct resource cmt00_resources[] = {
->                                           &cmt##idx##_platform_data,    \
->                                           sizeof(struct sh_timer_config))
->
-> -void __init r8a7790_add_standard_devices(void)
-> +void __init r8a7790_add_dt_devices(void)
->  {
->         r8a7790_register_scif(SCIFA0);
->         r8a7790_register_scif(SCIFA1);
-> @@ -192,6 +192,11 @@ void __init r8a7790_add_standard_devices(void)
->         r8a7790_register_scif(SCIF1);
->         r8a7790_register_scif(HSCIF0);
->         r8a7790_register_scif(HSCIF1);
-> +}
-> +
-> +void __init r8a7790_add_standard_devices(void)
-> +{
-> +       r8a7790_add_dt_devices();
->         r8a7790_register_irqc(0);
->         r8a7790_register_thermal();
->         r8a7790_register_cmt(00);
-> @@ -219,6 +224,10 @@ void __init r8a7790_init_delay(void)
->  #ifdef CONFIG_USE_OF
->  void __init r8a7790_add_standard_devices_dt(void)
->  {
-> +       /* clocks are setup late during boot in the case of DT */
-> +       r8a7790_clock_init();
-> +
-> +       r8a7790_add_dt_devices();
->         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->  }
->
-> --
-> 1.8.2.1
+On Tue, Jul 02, 2013 at 08:23:12PM -0300, Ezequiel Garcia wrote:
+> > Yes and indeed I must say that when I read the driver I found some
+> > similarities with pxa3xx, though it was done differently. I initially
+> > wanted to try to merge them but of course without the spec it's a huge
+> > waste of time, especially considering that this is still in the roadmap
+> > of the Free Electrons guys even though low priority.
+> 
+> I wish I could say I'm going to work on this soon but, as Thomas said,
+> we have no idea when/if NAND will be prioritized.
+> 
+> On the other side if you look at the driver Willy just posted, merging
+> the juicy stuff into pxa3xx-nand driver is not for the faint of heart.
+> 
+> Without the spec, is only tougher.
 
-In this patch you modify r8a7790_add_standard_devices_dt() to include
-clocks. I prefer not to make this kind of modification to the generic
-r8a7790 DT code since it clashes with upcoming common clock framework
-changes. I would like to keep the generic per-SoC DT_MACHINE bits so
-they don't enable legacy clocks.
+Confirmed :-)
 
-Also, as you probably noticed, this patch conflicts with the idea to
-keep ->init_machine() set to NULL for modern platforms.
+> Just a quick hint. As far as I can recall, one of the first items in a
+> TODO list should be:
+> 
+>  * adding bigger page support to pxa3xx (4 KiB, 8 KiB).
+>    Willy's posted driver might be helpful to accomplish this;
+>    provided your eyes don't melt when you look at it :-)
+> 
+>  * once the above is done, bad block management can/should be added.
+> 
+> With these two we're almost there for R/W support.
 
-Despite what I said yesterday, I think it would be very useful to have
-Lager DT reference board code around even though SCIF can't do DT yet.
+Since the driver I posted is poorly commented, I'm not even sure it
+will be easy to spot the relevant parts in it.
 
-How about keeping the DT_MACHINE stuff for r8a7790 in setup-r8a7790.c
-as-is, but in your board-lager-reference.c you have a temporary
-version of ->init_machine() that enables clocks, adds SCIF (and CMT?)
-as platform devices, but does the rest via DT? Then when SCIF is ready
-we can drop the C code for the DT reference board support.
+> > Since I'm now flashing a rootfs from within u-boot, support for the
+> > NAND is of less importance to me than what it used to, but I have no
+> > problem with helping with my very limited time. I have 3 machines
+> > with this controller (mirabox, openblocks AX3, and an XP-GP, though
+> 
+> With my latest patches pxa3xx-nand should at least *detect* the NAND
+> device in XP-GP. Doesn't work for Mirabox, though.
 
-Cheers,
+OK good to know!
 
-/ magnus
+> > the AX3 only has NOR IIRC). I can do some tests if you manage to get
+> > the driver to work again.
+> > 
+> > Be very careful when playing with this, the driver expects the partition
+> > table to be passed from u-boot as "armada_nand", and if it uses the wrong
+> > partition layout, you can be certain that ubifs will destroy them at the
+> > first mount attempt. That's how I initially bricked my mirabox and did so
+> > repeatedly. Better keep a copy before booting the patched kernel!
+> > 
+> > Another point, I had to add a new entry for the Micro 8Gb flash of the
+> > mirabox, maybe you won't need it or maybe you'll need a different one.
+> 
+> Just a note about this. You need that entry because your driver doesn't
+> support ONFI-detected flash devices. You could workaround that, by
+> adding support simple command. I did it for pxa3xx-nand recently:
+> 
+> "mtd: nand: pxa3xx: Add address support for READID command"
+> http://permalink.gmane.org/gmane.linux.drivers.mtd/46606
+
+I remember having seen your patches, I didn't know that it allowed
+to use such flashes and now it makes sense because I was surprized
+about having to add entries for all possible devices while we're
+not even certain that two consecutive versions of a board will use
+the same brand of NAND devices.
+
+Thanks for sharing these information, Ezequiel!
+
+Willy
