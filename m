@@ -1,69 +1,108 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Tue,  2 Jul 2013 20:45:10 -0700
-Subject: [PATCH] ARM: Add kernel build # to build message
-Message-ID: <1372823110-18170-1-git-send-email-roy.franz@linaro.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 3 Jul 2013 13:02:52 +0900
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7790: Initialise clocks and SCIF
+ in r8a7790_add_dt_devices()
+In-Reply-To: <1372645120-27256-2-git-send-email-horms+renesas@verge.net.au>
+References: <1372645120-27256-1-git-send-email-horms+renesas@verge.net.au>
+ <1372645120-27256-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CANqRtoRKzbgBNt=Ztise5eeqnbiFWCZZZkhAq0zCnjjoetGFkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-from: Roy Franz <roy.franz@linaro.org>
+Hi Simon,
 
-Add the display of the incrementing kernel build number, similar
-to the x86 build.  Example output:
-Kernel: arch/arm/boot/zImage is ready  (#94)
+On Mon, Jul 1, 2013 at 11:18 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> This is sufficient to allow boot of the Lager board with
+> a console without boards-lager.c compiled into the kernel.
+> This is an example of a minimal but still useful initialisation
+> of the board using DT as much as possible.
+>
+> Also provide r8a7790_add_dt_device() in
+> r8a7790.h to allow it be used from a boards-lager-reference.c
+> file which will be added by a subsequent patch.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>
+> ---
+>
+> v2
+>
+> * Rebase
+> ---
+>  arch/arm/mach-shmobile/include/mach/r8a7790.h |  1 +
+>  arch/arm/mach-shmobile/setup-r8a7790.c        | 11 ++++++++++-
+>  2 files changed, 11 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> index 7851cc1..7a25138 100644
+> --- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> +++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> @@ -2,6 +2,7 @@
+>  #define __ASM_R8A7790_H__
+>
+>  void r8a7790_add_standard_devices(void);
+> +void r8a7790_add_standard_devices_dt(void);
+>  void r8a7790_clock_init(void);
+>  void r8a7790_pinmux_init(void);
+>  void r8a7790_init_delay(void);
+> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+> index d89cd83..770109b 100644
+> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
+> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+> @@ -180,7 +180,7 @@ static struct resource cmt00_resources[] = {
+>                                           &cmt##idx##_platform_data,    \
+>                                           sizeof(struct sh_timer_config))
+>
+> -void __init r8a7790_add_standard_devices(void)
+> +void __init r8a7790_add_dt_devices(void)
+>  {
+>         r8a7790_register_scif(SCIFA0);
+>         r8a7790_register_scif(SCIFA1);
+> @@ -192,6 +192,11 @@ void __init r8a7790_add_standard_devices(void)
+>         r8a7790_register_scif(SCIF1);
+>         r8a7790_register_scif(HSCIF0);
+>         r8a7790_register_scif(HSCIF1);
+> +}
+> +
+> +void __init r8a7790_add_standard_devices(void)
+> +{
+> +       r8a7790_add_dt_devices();
+>         r8a7790_register_irqc(0);
+>         r8a7790_register_thermal();
+>         r8a7790_register_cmt(00);
+> @@ -219,6 +224,10 @@ void __init r8a7790_init_delay(void)
+>  #ifdef CONFIG_USE_OF
+>  void __init r8a7790_add_standard_devices_dt(void)
+>  {
+> +       /* clocks are setup late during boot in the case of DT */
+> +       r8a7790_clock_init();
+> +
+> +       r8a7790_add_dt_devices();
+>         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  }
+>
+> --
+> 1.8.2.1
 
-Signed-off-by: Roy Franz <roy.franz@linaro.org>
+In this patch you modify r8a7790_add_standard_devices_dt() to include
+clocks. I prefer not to make this kind of modification to the generic
+r8a7790 DT code since it clashes with upcoming common clock framework
+changes. I would like to keep the generic per-SoC DT_MACHINE bits so
+they don't enable legacy clocks.
 
----
- arch/arm/boot/Makefile |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Also, as you probably noticed, this patch conflicts with the idea to
+keep ->init_machine() set to NULL for modern platforms.
 
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index 84aa2ca..f1192f5 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -31,7 +31,7 @@ ifeq ($(CONFIG_XIP_KERNEL),y)
- 
- $(obj)/xipImage: vmlinux FORCE
- 	$(call if_changed,objcopy)
--	@$(kecho) '  Kernel: $@ is ready (physical address: $(CONFIG_XIP_PHYS_ADDR))'
-+	@$(kecho) '  Kernel: $@ is ready (physical address: $(CONFIG_XIP_PHYS_ADDR))' ' (#'`cat .version`')'
- 
- $(obj)/Image $(obj)/zImage: FORCE
- 	@echo 'Kernel configured for XIP (CONFIG_XIP_KERNEL=y)'
-@@ -46,14 +46,14 @@ $(obj)/xipImage: FORCE
- 
- $(obj)/Image: vmlinux FORCE
- 	$(call if_changed,objcopy)
--	@$(kecho) '  Kernel: $@ is ready'
-+	@$(kecho) '  Kernel: $@ is ready' ' (#'`cat .version`')'
- 
- $(obj)/compressed/vmlinux: $(obj)/Image FORCE
- 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
- 
- $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
- 	$(call if_changed,objcopy)
--	@$(kecho) '  Kernel: $@ is ready'
-+	@$(kecho) '  Kernel: $@ is ready' ' (#'`cat .version`')'
- 
- endif
- 
-@@ -78,7 +78,7 @@ fi
- $(obj)/uImage:	$(obj)/zImage FORCE
- 	@$(check_for_multiple_loadaddr)
- 	$(call if_changed,uimage)
--	@$(kecho) '  Image $@ is ready'
-+	@$(kecho) '  Image $@ is ready' ' (#'`cat .version`')'
- 
- $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
- 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
-@@ -86,7 +86,7 @@ $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
- 
- $(obj)/bootpImage: $(obj)/bootp/bootp FORCE
- 	$(call if_changed,objcopy)
--	@$(kecho) '  Kernel: $@ is ready'
-+	@$(kecho) '  Kernel: $@ is ready' ' (#'`cat .version`')'
- 
- PHONY += initrd FORCE
- initrd:
--- 
-1.7.10.4
+Despite what I said yesterday, I think it would be very useful to have
+Lager DT reference board code around even though SCIF can't do DT yet.
+
+How about keeping the DT_MACHINE stuff for r8a7790 in setup-r8a7790.c
+as-is, but in your board-lager-reference.c you have a temporary
+version of ->init_machine() that enables clocks, adds SCIF (and CMT?)
+as platform devices, but does the rest via DT? Then when SCIF is ready
+we can drop the C code for the DT reference board support.
+
+Cheers,
+
+/ magnus
