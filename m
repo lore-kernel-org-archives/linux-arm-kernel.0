@@ -1,59 +1,41 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 3 Jul 2013 11:54:03 +0100
-Subject: [PATCH] arm64: KVM: Support Cortex-A57 guest CPU on APM X-Gene
- host
-In-Reply-To: <1372840923-12808-1-git-send-email-anup.patel@linaro.org>
-References: <1372840923-12808-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <CAFEAcA_9mfYT6pPOT3dmqGoFAeJpQACO4FZp_971XUSowxoBaA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 3 Jul 2013 13:00:50 +0200
+Subject: [PATCH] ARM: at91/DT: at91sam9x5ek: fix USB host property to enable
+ port C
+Message-ID: <1372849250-14715-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 July 2013 09:42, Anup Patel <anup.patel@linaro.org> wrote:
-> Update kvm_target_cpu() to allow Cortex-A57 guest CPU on APM X-Gene.
->
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  arch/arm64/kvm/guest.c |   10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> index 2c3ff67..765f56f 100644
-> --- a/arch/arm64/kvm/guest.c
-> +++ b/arch/arm64/kvm/guest.c
-> @@ -207,8 +207,13 @@ int __attribute_const__ kvm_target_cpu(void)
->         unsigned long implementor = read_cpuid_implementor();
->         unsigned long part_number = read_cpuid_part_number();
->
-> -       if (implementor != ARM_CPU_IMP_ARM)
-> -               return -EINVAL;
-> +       switch (implementor) {
-> +       case ARM_CPU_IMP_ARM:
-> +       case ARM_CPU_IMP_APM:
-> +               break;
-> +       default:
-> +               return -EINVAL;
-> +       }
+Device Tree "num-ports" property of USB host node has to be
+set to maximum number of ports available.
+The possibility to activate a particular port is done by specifying the proper
+gpio configuration for its vbus.
 
-Doesn't this change mean we now accept the below part
-numbers for all implementors? That doesn't look right.
+This patch fixes the USB host node by configuring the 3 ports available on the
+product and letting "port A" available for USB gadget usage.
 
->         switch (part_number) {
->         case ARM_CPU_PART_AEM_V8:
-> @@ -216,6 +221,7 @@ int __attribute_const__ kvm_target_cpu(void)
->         case ARM_CPU_PART_FOUNDATION:
->                 return KVM_ARM_TARGET_FOUNDATION_V8;
->         case ARM_CPU_PART_CORTEX_A57:
-> +       case APM_CPU_PART_POTENZA:
->                 /* Currently handled by the generic backend */
->                 return KVM_ARM_TARGET_CORTEX_A57;
->         default:
+Reported-by: Rodolfo Giometti <giometti@enneenne.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Bo Shen <voice.shen@atmel.com>
+---
+ arch/arm/boot/dts/at91sam9x5ek.dtsi | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Do we really model all the system registers and so on correctly
-sufficiently to be able to present the guest with an A57 vcpu
-on an APM X-Gene host? (ie without accidentally leaking the
-host ID registers/system registers/impdef registers to the
-guest).
-
-thanks
--- PMM
+diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+index b753855..49e3c45 100644
+--- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+@@ -94,8 +94,9 @@
+ 
+ 		usb0: ohci at 00600000 {
+ 			status = "okay";
+-			num-ports = <2>;
+-			atmel,vbus-gpio = <&pioD 19 GPIO_ACTIVE_LOW
++			num-ports = <3>;
++			atmel,vbus-gpio = <0 /* &pioD 18 GPIO_ACTIVE_LOW *//* Activate to have access to port A */
++					   &pioD 19 GPIO_ACTIVE_LOW
+ 					   &pioD 20 GPIO_ACTIVE_LOW
+ 					  >;
+ 		};
+-- 
+1.8.2.2
