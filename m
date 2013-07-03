@@ -1,168 +1,98 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 3 Jul 2013 13:20:20 +0800
-Subject: [PATCH 2/5] serial: imx: add DMA support for imx6
-In-Reply-To: <20130703033837.GE9145@S2101-09.ap.freescale.net>
-References: <1372746628-20092-1-git-send-email-b32955@freescale.com>
- <1372746628-20092-3-git-send-email-b32955@freescale.com>
- <20130703033837.GE9145@S2101-09.ap.freescale.net>
-Message-ID: <51D3B494.3090700@freescale.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 3 Jul 2013 01:19:07 -0400
+Subject: [PATCH] ARM: move body of head-common.S back to text section
+In-Reply-To: <51D39004.9000907@wwwdotorg.org>
+References: <1372805629-18382-1-git-send-email-swarren@wwwdotorg.org>
+ <20130702232259.GH11625@codeaurora.org>
+ <51D39004.9000907@wwwdotorg.org>
+Message-ID: <20130703051907.GA22702@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?07?03? 11:38, Shawn Guo ??:
->> static void imx_enable_dma(struct imx_port *sport)
->> >  +{
->> >  +	unsigned long temp;
->> >  +	struct tty_port *port =&sport->port.state->port;
->> >  +
->> >  +	port->low_latency = 1;
->> >  +	INIT_WORK(&sport->tsk_dma_tx, dma_tx_work);
->> >  +	INIT_WORK(&sport->tsk_dma_rx, dma_rx_work);
->> >  +	init_waitqueue_head(&sport->dma_wait);
-> I had a hard time to understand why these work and wait queue are
-> necessarily needed here.
-Blame it on the sdma driver.
+[Re: [PATCH] ARM: move body of head-common.S back to text section] On 02/07/2013 (Tue 20:44) Stephen Warren wrote:
 
-For example, we receive some data in the RXFIFO, normally , the 
-interrupt handler will
-arise a DMA to fetch the data. We will call the 
-dmaengine_prep_slave_sg() to prepare for the DMA,
-but sdma will call:
-->sdma_prep_slave_sg() -->sdma_load_context() --> sdma_run_channel0()
+> On 07/02/2013 05:22 PM, Stephen Boyd wrote:
+> > On 07/02, Stephen Warren wrote:
+> >> From: Stephen Warren <swarren@nvidia.com>
+> >>
+> >> Commit 281ecb7 "arm: delete __cpuinit/__CPUINIT usage from all ARM
 
-the sdma_run_channel0() will poll for 500us(we have found the 500us is 
-not long enough in some case),
-that's why i use the work queue:
-We should not delay such long in interrupt context.
+We shouldn't reference this commit since (a) the SHA is from linux-next
+and hence is transient, and (b) this commit really isn't the one that
+triggers the breakage.  It is the commit where we dummy out the macros
+that will reveal the missing __FINIT.
 
-The same reason for TX.
-> I haven't totally understand it.  But it looks like to me that the
-> implementation might be complexer than it needs to be.  Can you please
-> take a look at serial-tegra.c to see how the DMA is supported there?
-serial-tegra.c arises the dma in the interrupt context. maybe its 
-dmaengine is better then the imx-sdma.
-> It looks much neater than the changes we have here.
->
->> >  +
->> >  +	/* set UCR1 */
->> >  +	temp = readl(sport->port.membase + UCR1);
->> >  +	temp |= UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN |
->> >  +		/* wait for 4 idle frames and enable AGING Timer */
->> >  +		UCR1_ICD_REG(0);
->> >  +	writel(temp, sport->port.membase + UCR1);
->> >  +
->> >  +	/* set UCR4 */
->> >  +	temp = readl(sport->port.membase + UCR4);
->> >  +	temp |= UCR4_IDDMAEN;
->> >  +	writel(temp, sport->port.membase + UCR4);
->> >  +}
->> >  +
->> >  +static void imx_disable_dma(struct imx_port *sport)
->> >  +{
->> >  +	unsigned long temp;
->> >  +	struct tty_port *port =&sport->port.state->port;
->> >  +
->> >  +	/* clear UCR1 */
->> >  +	temp = readl(sport->port.membase + UCR1);
->> >  +	temp&= ~(UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN);
->> >  +	writel(temp, sport->port.membase + UCR1);
->> >  +
->> >  +	/* clear UCR2 */
->> >  +	temp = readl(sport->port.membase + UCR2);
->> >  +	temp&= ~(UCR2_CTSC | UCR2_CTS);
->> >  +	writel(temp, sport->port.membase + UCR2);
->> >  +
->> >  +	/* clear UCR4 */
->> >  +	temp = readl(sport->port.membase + UCR4);
->> >  +	temp&= ~UCR4_IDDMAEN;
->> >  +	writel(temp, sport->port.membase + UCR4);
->> >  +
->> >  +	sport->dma_is_enabled = 0;
->> >  +	sport->dma_is_inited = 0;
-> Shouldn't dma_is_inited be reset in imx_uart_dma_exit() for better?
-yes. it's ok to set there.
-> (I haven't looked at the necessity of these flags.  But please save
-> the use of them if we can.)
->
->> >  +
->> >  +	port->low_latency = 0;
->> >  +}
->> >  +
->> >    /* half the RX buffer size */
->> >    #define CTSTL 16
->> >  
->> >  @@ -870,6 +1250,14 @@ static void imx_shutdown(struct uart_port *port)
->> >    	unsigned long temp;
->> >    	unsigned long flags;
->> >  
->> >  +	if (sport->dma_is_enabled) {
->> >  +		/* We have to wait for the DMA to finish. */
->> >  +		wait_event(sport->dma_wait,
->> >  +			!sport->dma_is_rxing&&  !sport->dma_is_txing);
->> >  +		imx_stop_rx(port);
->> >  +		imx_uart_dma_exit(sport);
->> >  +	}
->> >  +
->> >    	spin_lock_irqsave(&sport->port.lock, flags);
->> >    	temp = readl(sport->port.membase + UCR2);
->> >    	temp&= ~(UCR2_TXEN);
->> >  @@ -910,6 +1298,10 @@ static void imx_shutdown(struct uart_port *port)
->> >    		temp&= ~(UCR1_IREN);
->> >  
->> >    	writel(temp, sport->port.membase + UCR1);
->> >  +
->> >  +	if (sport->dma_is_enabled)
->> >  +		imx_disable_dma(sport);
->> >  +
-> Shouldn't imx_disable_dma() be called before imx_uart_dma_exit()
-> logically?
->
-i think it's ok.
-I have forgotten why i puted it there. The dma support patch is kept in 
-my hand for a long time....
+So, assuming Linus takes my pull request here...
 
-I will try to put the imx_disable_dma() in the imx_uart_dma_exit().
->> >    	spin_unlock_irqrestore(&sport->port.lock, flags);
->> >  
->> >    	clk_disable_unprepare(sport->clk_per);
->> >  @@ -956,6 +1348,13 @@ imx_set_termios(struct uart_port *port, struct ktermios *termios,
->> >    		if (sport->have_rtscts) {
->> >    			ucr2&= ~UCR2_IRTS;
->> >    			ucr2 |= UCR2_CTSC;
->> >  +
->> >  +			/* Can we enable the DMA support? */
->> >  +			if (is_imx6_uart(sport)&&  !uart_console(port)
->> >  +				&&  !sport->dma_is_inited) {
->> >  +				if (!imx_uart_dma_init(sport))
->> >  +					sport->dma_is_inited = 1;
-> I think the setting of the flag can just be handled inside
-> imx_uart_dma_init().
->
-ok.
->> >  +			}
->> >    		} else {
->> >    			termios->c_cflag&= ~CRTSCTS;
->> >    		}
->> >  @@ -1069,6 +1468,10 @@ imx_set_termios(struct uart_port *port, struct ktermios *termios,
->> >    	if (UART_ENABLE_MS(&sport->port, termios->c_cflag))
->> >    		imx_enable_ms(&sport->port);
->> >  
->> >  +	if (sport->dma_is_inited&&  !sport->dma_is_enabled) {
->> >  +		imx_enable_dma(sport);
->> >  +		sport->dma_is_enabled = 1;
-> Ditto
->
->> >  +	}
-> I see imx_disable_dma() and imx_uart_dma_exit() are called in
-> imx_shutdown().  Why can not imx_uart_dma_init() and imx_enable_dma()
-> be called in imx_startup()?
-i intend to binding the DMA with the RTS/CTS together.
+https://lkml.org/lkml/2013/7/2/405
 
-The setting of rts/cts is not in imx_startup(), but in the 
-imx_set_termios().
+...for phase one of the __cpuinit purge, then the SHA you want to
+blame for triggering this hidden bug into life is:
 
+22f0a2736 "init.h: remove __cpuinit sections from the kernel" at:
 
+http://git.kernel.org/cgit/linux/kernel/git/paulg/linux.git/log/?h=cpuinit-delete
 
+After you update the commit log (and make the change below), it probably
+makes sense for this to go in via one of the ARM trees, since if I take
+it, it will go in at the very end of the merge window with the phase two
+commits.  If it goes in via an arm tree, the regression window within
+3.10 --> 3.11-rc1 will be minimized. (That and it is a pre-existing bug).
 
-thanks
-Huang Shijie
+> >> users" removed a __CPUINIT from head-common.S. However, the code
+> >> immediately before the removed tag was marked __INIT, and was missing
+> >> a match __FINIT. This caused code after the removed __CPUINIT to end
+> >> up in the init section rather than the main text section as desired.
+> >> This caused issues such as secondary CPU boot failures or crashes.
+> >> Add the missing __FINIT to solve this.
+> >>
+> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> >> ---
+> >>  arch/arm/kernel/head-common.S | 2 ++
+> >>  1 file changed, 2 insertions(+)
+> >>
+> >> diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+> >> index 529ce99..a9dc804 100644
+> >> --- a/arch/arm/kernel/head-common.S
+> >> +++ b/arch/arm/kernel/head-common.S
+> >> @@ -122,6 +122,8 @@ __mmap_switched_data:
+> >>  	.long	init_thread_union + THREAD_START_SP @ sp
+> >>  	.size	__mmap_switched_data, . - __mmap_switched_data
+> >>  
+> >> +	__FINIT
+> >> +
+> >>  /*
+> >>   * This provides a C-API version of __lookup_processor_type
+> >>   */
+> > 
+> > Shouldn't this come after lookup_processor_type()? Otherwise you
+> > just removed that function from the init section?
+> 
+> I think this is correct. Prior to "arm: delete __cpuinit/__CPUINIT usage
+> from all ARM users", lookup_processor_type() was in the cpuinit section.
+
+No, it was __lookup_processor_type that was in the cpuinit section.
+The non-underscore (C-API) version was __INIT, and if you look at the
+one and only calling function in C, it too is tagged __init.  So it
+appears to me that was a thought out and deliberate choice.
+
+> After that commit, it moved to the init section and hence got dumped
+> soon after boot. The change above moves lookup_processor_type() back
+> into the regular text section, which I believe was the intent of the
+> __cpuinit removal patch.
+
+Given the above, actually I think StephenB is right here.  The __FINIT
+can go exactly where the removed __CPUINIT was (plus or minus a blank
+line...)
+
+Thanks for testing, reporting and then tracking down where it was once
+you knew what it was that you were looking for (and to Russell for the
+quick and accurate diagnosis.)  You can add an Acked-by from me to the
+updated patch if you want.
+
+As an aside, I'm now thinking any __INIT that implicitly rely on EOF for
+closure are nasty traps waiting to happen and it might be worthwhile to
+audit and explicitly __FINIT them before someone appends to the file...
+
+Paul.
+--
