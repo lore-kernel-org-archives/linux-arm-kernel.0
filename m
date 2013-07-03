@@ -1,61 +1,33 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Wed, 3 Jul 2013 17:15:25 +0300
-Subject: [PATCH v3 2/8] wlcore: set irq_flags in the board files instead
- of hiding behind a quirk
-In-Reply-To: <1372860209-3504-3-git-send-email-coelho@ti.com>
-References: <1372860209-3504-1-git-send-email-coelho@ti.com>
- <1372860209-3504-3-git-send-email-coelho@ti.com>
-Message-ID: <1372860925.21065.115.camel@cumari.coelho.fi>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 3 Jul 2013 15:57:19 +0300
+Subject: [RFC PATCH 4/6] USB: ehci-omap: Suspend the controller during
+ bus suspend
+In-Reply-To: <Pine.LNX.4.44L0.1307021302430.1086-100000@iolanthe.rowland.org>
+References: <51D28DB9.704@ti.com>
+ <Pine.LNX.4.44L0.1307021302430.1086-100000@iolanthe.rowland.org>
+Message-ID: <20130703125719.GD15056@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-07-03 at 17:03 +0300, Luciano Coelho wrote:
-> The platform_quirk element in the platform data was used to change the
-> way the IRQ is triggered.  When set, the EDGE_IRQ quirk would change
-> the irqflags used and treat edge trigger differently from the rest.
-> 
-> Instead of hiding this irq flag setting behind the quirk, have the
-> board files set the flags during initialization.  This will be more
-> meaningful than driver-specific quirks when we switch to DT.
-> 
-> Additionally, fix missing gpio_request() calls in the boarding files
-> (so that setting the flags actually works).
-> 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Luciano Coelho <coelho@ti.com>
-> ---
+Hi,
 
-[...]
+On Tue, Jul 02, 2013 at 01:17:58PM -0400, Alan Stern wrote:
+> A PCI-based EHCI controller has two power sources: the core well (which
+> is turned off during suspend) and the auxiliary well (which remains
+> powered).  That's how remote wakeup works; it uses the auxiliary well.
 
-> @@ -5928,16 +5927,21 @@ static void wlcore_nvs_cb(const struct firmware *fw, void *context)
->  	wlcore_adjust_conf(wl);
->  
->  	wl->irq = platform_get_irq(pdev, 0);
-> -	wl->platform_quirks = pdata->platform_quirks;
->  	wl->if_ops = pdev_data->if_ops;
->  
-> -	if (wl->platform_quirks & WL12XX_PLATFORM_QUIRK_EDGE_IRQ)
-> -		irqflags = IRQF_TRIGGER_RISING;
-> -	else
-> -		irqflags = IRQF_TRIGGER_HIGH | IRQF_ONESHOT;
-> +	irq_data = irq_get_irq_data(wl->irq);
-> +	if (!irq_data) {
-> +		wl1271_error("couldn't get irq data for irq %d\n", wl->irq);
-> +		ret = -EINVAL;
-> +		goto out_free_nvs;
-> +	}
-> +
-> +	wl->irq_flags = irqd_get_trigger_type(irq_data);
+This, kinda, matches what OMAP tries to do with pad wakeup. Just that
+pad wakeup sits outside of the device itself. Perhaps we could look into
+how PCI handles the aux well and take some inspiration from there.
 
-BTW, there seems to be a patch on its way to make reading the flags
-easier (ie. no need to get the irq_data first):
+Any pointers under drivers/pci/ would be great :-)
 
-http://mid.gmane.org/1367945288-5625-1-git-send-email-javier at dowhile0.org
-
-I'm not sure if this is going to be taken in, but if it does, it would
-be nice to change the code here to use the new irq_get_trigger_type()
-function.
-
---
-Luca.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130703/3c404967/attachment.sig>
