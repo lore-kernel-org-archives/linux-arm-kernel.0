@@ -1,63 +1,79 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Wed, 3 Jul 2013 17:51:49 +0200
-Subject: [RFC PATCH 01/13] misc: atmel_ssc: add device tree DMA support
-In-Reply-To: <CACQ1gAhnDk-qSt_5xrsMakXqGGDO5pEbA-9UDWCJG=AABDc+zg@mail.gmail.com>
-References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
- <1372667978-4718-2-git-send-email-richard.genoud@gmail.com>
- <51D24299.9050209@atmel.com>
- <CACQ1gAgcc=j3kmcpjp8bbdHhxr_k=h8jJs6R_paJbPUMv74uGg@mail.gmail.com>
- <51D29927.80900@atmel.com>
- <CACQ1gAhnDk-qSt_5xrsMakXqGGDO5pEbA-9UDWCJG=AABDc+zg@mail.gmail.com>
-Message-ID: <CACQ1gAgPaRm3gxxJNgfj9bR565Q0+SNY3+EcjA_mrh1N+yPzSA@mail.gmail.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Wed, 3 Jul 2013 10:09:50 -0500
+Subject: socfpga: mmc problems
+In-Reply-To: <51D43CB0.4070104@communistcode.co.uk>
+References: <51D43CB0.4070104@communistcode.co.uk>
+Message-ID: <1372864190.9525.6.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/7/3 Richard Genoud <richard.genoud@gmail.com>:
-> 2013/7/2 Bo Shen <voice.shen@atmel.com>:
->> Hi Richard,
->>
->>
->> On 7/2/2013 16:13, Richard Genoud wrote:
->>>>
->>>> Please hold on of this, as to the ASoC dmaengine will deal with this. So,
->>>> we
->>>> >not need do it manually.
->>>> >
->>>> >Now, I am working on it. And will send out the patch soon after testing
->>>> > OK.
->>>
->>> Ok, I stay tuned !
->>
->>
->> I think you can go on working with the two patches I send just now.
->> [1]: ASoC: atmel_ssc_dai: move set dma data to startup callback
->> https://patchwork.kernel.org/patch/2811241/
->>
->> [2]: ASoC: atmel-pcm: use generic dmaengine framework
->> https://patchwork.kernel.org/patch/2811261/
->>
->> I use your patches 4 ~ 8 do a quick testing, it works. Please note the name
->> of asound.state under /etc in your rootfs should the same with atmel,model
->> in patch 6.
->
-> Thanks for testing !
-> I was just doing the same test, it works with
-> aplay  -Dplug:default  good_music.wav
->
-> but there's a violent hang (kernel stops, no trace) when I try the record :
-> arecord -v -V stereo -Dplug:default -f cd -t wav -c 2 /tmp/toto.wav
-> last thing I see is :
-> dma dma0chan3: atc_control (3)
->
-> I'll try to trace that.
-I think it's DMA related.
-the last thing done by the kernel is:
- i2c i2c-0: i2c_outb: 0x34 A
- i2c i2c-0: i2c_outb: 0x0c A
- i2c i2c-0: i2c_outb: 0x5a A
-meaning: enable power on, LINE IN, ADC, OSC, on the WM8731
-so, after that, data is comming from the codec to the SSC and then is
-handled by the DMA.
-there must be something nasty on the DMA bus to hang everything like that...
+Hi Jack,
 
-Richard.
+On Wed, 2013-07-03 at 16:01 +0100, Jack Mitchell wrote:
+> Having received one of the new Arrow SoCkit boards at a recent training 
+> day I set about seeing how far mainline was in successfully booting this 
+> board.
+> 
+> As I wanted to boot from mmc, I first checked out linux-next [1] in 
+> order to get the newly merged mmc driver, I then applied the device-tree 
+> enablement series [2] on top before finally attempting to boot. I then 
+> found that the standard socfpga_defconfig didn't enable the MMC drivers, 
+> which I also did (should this be part of the socfpga_defconfig...?).
+
+I was going to update this when I enable ethernet as well to avoid less
+churn on the defconfig.
+
+> 
+> However, the boot hangs at:
+> 
+> Synopsys Designware Multimedia Card Interface Driver
+> dwmmc_socfpga ff704000.dwmmc0: Using internal DMA controller.
+> dwmmc_socfpga ff704000.dwmmc0: DW MMC controller at irq 171, 32 bit host 
+> data width, 1024 deep fifo
+> 
+> To fix this I checked out the diff between the Altera vendor mmc driver 
+> and the mainline driver and found that if I added this small change:
+> 
+> 
+>    if (of_property_read_u32(dev->of_node, "pwr-en", &pwr_en)) {
+>      dev_info(dev, "couldn't determine pwr-en, assuming pwr-en = 0\n");
+>      pwr_en = 0;
+>    }
+> 
+>    /* Set PWREN bit */
+>    mci_writel(host, PWREN, pwr_en);
+
+I tested this on my devkit, which was not made by Arrow, but is _almost_
+the same. I'll try to see if I can get my hands on an Arrow board to
+reproduce.
+
+> 
+> In the dw_mci_socfpga_priv_init function, the board would boot.
+> 
+> Synopsys Designware Multimedia Card Interface Driver
+> dwmmc_socfpga ff704000.dwmmc0: couldn't determine pwr-en, assuming 
+> pwr-en = 0
+> dwmmc_socfpga ff704000.dwmmc0: Using internal DMA controller.
+> dwmmc_socfpga ff704000.dwmmc0: DW MMC controller at irq 171, 32 bit host 
+> data width, 1024 deep fifo
+> mmc_host mmc0: Bus speed (slot 0) = 100000000Hz (slot req 400000Hz, 
+> actual 400000HZ div = 125)
+> dwmmc_socfpga ff704000.dwmmc0: 1 slots initialized
+> dwmmc_socfpga ff704000.dwmmc0: Version ID is 240a
+> .....
+> .....
+> .....
+> 
+> 
+> Has this been overlooked, or are there some other changes elsewhere that 
+> I haven't yet come across which addresses this?
+
+I'm not aware of any other changes.
+
+Dinh
+> 
+> Cheers,
+> 
+> [1] fa1383200d289afdff2f5678eb89483daa537465
+> [2] http://comments.gmane.org/gmane.linux.ports.arm.kernel/243529
+> 
