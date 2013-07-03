@@ -1,46 +1,49 @@
-From: vincent.stehle@freescale.com (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
-Date: Wed, 3 Jul 2013 10:12:59 +0200
-Subject: [PATCH linux-next 2/2] arm: multi_v7_defconfig: add support for NFS
- root
-In-Reply-To: <1372839179-14542-1-git-send-email-vincent.stehle@freescale.com>
-References: <1372839179-14542-1-git-send-email-vincent.stehle@freescale.com>
-Message-ID: <1372839179-14542-3-git-send-email-vincent.stehle@freescale.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed, 3 Jul 2013 16:13:28 +0800
+Subject: [alsa-devel] [PATCH 2/2] ASoC: atmel-pcm: use generic dmaengine
+ framework
+In-Reply-To: <51D3DBE8.4090407@metafoo.de>
+References: <1372755849-19546-1-git-send-email-voice.shen@atmel.com>
+ <1372755849-19546-3-git-send-email-voice.shen@atmel.com>
+ <51D2F306.7040603@metafoo.de> <51D37F87.2010008@atmel.com>
+ <51D3D482.1050100@metafoo.de> <51D3D969.1060308@atmel.com>
+ <51D3DBE8.4090407@metafoo.de>
+Message-ID: <51D3DD28.8050900@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary config options, to allow booting with NFS root on an i.MX6
-sabre sd.
+Hi Lars,
 
-Signed-off-by: Vincent Stehl? <vincent.stehle@freescale.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Olof Johansson <olof@lixom.net>
----
- arch/arm/configs/multi_v7_defconfig |    6 ++++++
- 1 file changed, 6 insertions(+)
+On 7/3/2013 16:08, Lars-Peter Clausen wrote:
+> On 07/03/2013 09:57 AM, Bo Shen wrote:
+>> Hi Lars,
+>>
+>> On 7/3/2013 15:36, Lars-Peter Clausen wrote:
+>>>>>> +        slave_config->dst_addr = (dma_addr_t)ssc->phybase + SSC_THR;
+>>>>>>> [...]
+>>>>>>>>> +        slave_config->src_addr = (dma_addr_t)ssc->phybase + SSC_RHR;
+>>>>>>>
+>>>>>>> Change the type of phybase to dma_addr_t
+>>>>>
+>>>>> It should be:
+>>>>> slave_config->dst_addr = (dma_addr_t)(ssc->phybase + SSC_THR);
+>>>>> slave_config->src_addr = (dma_addr_t)(ssc->phybase + SSC_RHR);
+>>> The type of phybase in the ssc_device struct should be changed from
+>>> resource_size_t to dma_addr_t.
+>>
+>> Actually, the phybase in ssc_device structure is resource_size_t which used to
+>> access the ssc device register.
+>> Here, we use ssc register as dma source address or destination address, so we
+>> convert it to dma_addr_t type. So, not need to change, am I right?
+>
+> Isn't 'regs' used to access the registers? As far as I can see phybase is only
+> used in the audio DMA driver.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index cc8723a..81eac83 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -47,6 +47,8 @@ CONFIG_ARM_APPENDED_DTB=y
- CONFIG_NET=y
- CONFIG_UNIX=y
- CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_BLK_DEV_SD=y
-@@ -149,6 +151,10 @@ CONFIG_PWM=y
- CONFIG_PWM_VT8500=y
- CONFIG_EXT4_FS=y
- CONFIG_TMPFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_ROOT_NFS=y
- CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_FS=y
- CONFIG_DEBUG_KERNEL=y
--- 
-1.7.10.4
+Thanks for point out this. I will change the phybase type from 
+resource_size_t to dma_addr_t.
+
+> - Lars
+>
+
+Best Regards,
+Bo Shen
