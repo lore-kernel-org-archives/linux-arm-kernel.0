@@ -1,81 +1,66 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Wed, 3 Jul 2013 09:33:59 +0800
-Subject: [alsa-devel] [PATCH 2/2] ASoC: atmel-pcm: use generic dmaengine
- framework
-In-Reply-To: <51D2F306.7040603@metafoo.de>
-References: <1372755849-19546-1-git-send-email-voice.shen@atmel.com>
- <1372755849-19546-3-git-send-email-voice.shen@atmel.com>
- <51D2F306.7040603@metafoo.de>
-Message-ID: <51D37F87.2010008@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 3 Jul 2013 09:46:24 +0800
+Subject: [PATCH 3/5] ARM: dts: imx6: rename the uart's compatible property
+In-Reply-To: <51D2AEC1.6030004@freescale.com>
+References: <1372746628-20092-1-git-send-email-b32955@freescale.com>
+ <1372746628-20092-4-git-send-email-b32955@freescale.com>
+ <20130702095645.GD31358@e106331-lin.cambridge.arm.com>
+ <51D2AEC1.6030004@freescale.com>
+Message-ID: <20130703014623.GB9145@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lars-Peter,
+On Tue, Jul 02, 2013 at 06:43:13PM +0800, Huang Shijie wrote:
+> ? 2013?07?02? 17:56, Mark Rutland ??:
+> >On Tue, Jul 02, 2013 at 07:30:26AM +0100, Huang Shijie wrote:
+> >>>  The imx6 uart can supports the DMA, imx uart driver has added a new
+> >>>  compatible property for the imx6 uart.
+> >>>  >  In order to enable the DMA for some uart port in imx6, we
+> >>rename the
+> >>>  uart's compatible property to "fsl,imx6-uart".
+> >Doesn't this change break using these dts with an older kernel? You
+> is it reasonable to use a new dts with an old kernel?
+> 
+> 
+> >remove the "fsl,imx21-uart" string older kernels understand.
+> >
+> >Given you already had "fsl,imx6q-uart" and "fsl,imx6sl-uart" strings,
+> >would it not have made more sense to just add these to the driver?
+> I think it's not a good idea.
+> 
+> Shawn, what's your opinion about this?
 
-On 7/2/2013 23:34, Lars-Peter Clausen wrote:
-> On 07/02/2013 11:04 AM, Bo Shen wrote:
-> [...]
->> -/*--------------------------------------------------------------------------*\
->> - * DMAENGINE operations
->> -\*--------------------------------------------------------------------------*/
->> -static bool filter(struct dma_chan *chan, void *slave)
->> -{
->> -	struct at_dma_slave *sl = slave;
->> -
->> -	if (sl->dma_dev == chan->device->dev) {
->> -		chan->private = sl;
->> -		return true;
->> -	} else {
->> -		return false;
->> -	}
->> -}
->
-> I'm wondering why is filtering no longer required?
+I agree with Mark.  I think all we need is to add "fsl,imx6q-uart"
+into both driver matching table and imx6sl uart compatible property,
+something like the below.
 
-Now this is handled by at_dma_filter in at_hdmac driver. More 
-information, you can reference: <driver/dma/at_hdmac.c> file
+Shawn
 
-> [...]
->> +		slave_config->dst_addr = (dma_addr_t)ssc->phybase + SSC_THR;
-> [...]
->> +		slave_config->src_addr = (dma_addr_t)ssc->phybase + SSC_RHR;
->
-> Change the type of phybase to dma_addr_t
+---8<-------
 
-It should be:
-slave_config->dst_addr = (dma_addr_t)(ssc->phybase + SSC_THR);
-slave_config->src_addr = (dma_addr_t)(ssc->phybase + SSC_RHR);
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index c5e5da0..078dfc7 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -152,7 +152,8 @@
+                                };
 
-> [...]
->>   }
->>
->> -static int atmel_pcm_dma_prepare(struct snd_pcm_substream *substream)
->> -{
->> -	struct snd_soc_pcm_runtime *rtd = substream->private_data;
->> -	struct atmel_pcm_dma_params *prtd;
->> -
->> -	prtd = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
->> -
->> -	ssc_writex(prtd->ssc->regs, SSC_IER, prtd->mask->ssc_error);
->> -	ssc_writex(prtd->ssc->regs, SSC_CR, prtd->mask->ssc_enable);
->
-> These writes are also completely lost
-
-This will be moved to DAI driver startup callback function.
-
->> -
->> -	return 0;
->> -}
->
-> I think it would also be good to get rid of any references to the ssc struct
-> from the DMA driver and move them over to the DAI driver.
-
-I will try to implement this in next version patch.
-
-Thanks.
-
-> - Lars
->
-
-Best Regards,
-Bo Shen
+                                uart5: serial@02018000 {
+-                                       compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
++                                       compatible = "fsl,imx6sl-uart", "fsl,imx6q-uart",
++                                                    "fsl,imx21-uart";
+                                        reg = <0x02018000 0x4000>;
+                                        interrupts = <0 30 0x04>;
+                                        clocks = <&clks IMX6SL_CLK_UART>,
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 8cdfbd3..457984d 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -249,6 +249,7 @@ MODULE_DEVICE_TABLE(platform, imx_uart_devtype);
+ static struct of_device_id imx_uart_dt_ids[] = {
+        { .compatible = "fsl,imx1-uart", .data = &imx_uart_devdata[IMX1_UART], },
+        { .compatible = "fsl,imx21-uart", .data = &imx_uart_devdata[IMX21_UART], },
++       { .compatible = "fsl,imx6q-uart", .data = &imx_uart_devdata[IMX6Q_UART], },
+        { /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, imx_uart_dt_ids);
