@@ -1,39 +1,52 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 3 Jul 2013 17:42:36 +0800
-Subject: [PATCH v2 4/5] ARM: dts: imx6q: add dte pinctrl for uart2
-In-Reply-To: <1372844557-3078-1-git-send-email-b32955@freescale.com>
-References: <1372844557-3078-1-git-send-email-b32955@freescale.com>
-Message-ID: <1372844557-3078-5-git-send-email-b32955@freescale.com>
+Date: Wed, 3 Jul 2013 17:42:32 +0800
+Subject: [PATCH v2 0/5] serial: imx: add DMA support for imx6
+Message-ID: <1372844557-3078-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In imx6q-arm2 board, the UART2 works in the dte mode.
-So add a pinctrl for it.
+(1) This patch set adds the DMA support for the imx serial driver.
+    The uart with the dma support is usually used by the Bluetooth.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/boot/dts/imx6q.dtsi |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+    For the firmware's limit, i only enable the DMA for imx6 serials.
+    If we have proper firmware for imx53 (or other chips), we can also
+    enable the DMA for it.
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 9a69891..8a518c6 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -266,6 +266,15 @@
- 							MX6Q_PAD_EIM_D27__UART2_RX_DATA 0x1b0b1
- 						>;
- 					};
-+
-+					pinctrl_uart2_dte: uart2grp-2 {
-+						fsl,pins = <
-+							MX6Q_PAD_EIM_D26__UART2_RX_DATA 0x1b0b1
-+							MX6Q_PAD_EIM_D27__UART2_TX_DATA 0x1b0b1
-+							MX6Q_PAD_EIM_D28__UART2_CTS_B	0x1b0b1
-+							MX6Q_PAD_EIM_D29__UART2_CTS_B	0x1b0b1
-+						>;
-+					};
- 				};
- 
- 				uart4 {
--- 
-1.7.1
+(2) We only enable the DMA support when the following are meet:
+
+    [1] The uart port supports the hardware flow control(CTS/RTS).
+      (Some uart port does not support the CTS/RTS.)
+
+    [2] The application enables the CTS/RTS.
+
+    [3] The Soc is imx6 serials.
+      For the sdma's firmware limit, we do not support the DMA except
+      the imx6 platform.
+
+    [4] The uart is not used as a console.
+
+
+(3) Tested this patch set by:
+	connecting a imx6q-arm2 board(DTE) with a imx53 board(DCE).
+
+v1 --> v2:
+	[0] use the "fsl,imx6q-uart" as the new compatible value.
+	[1] move dma_is_inited to imx_uart_dma_init();
+	    move dma_is_enabled to imx_enable_dma();
+	[2] move imx_disable_dma() to the front place of the imx_shutdown(),
+	    just before calls the imx_uart_dma_exit().
+	[3] misc    
+	
+
+Huang Shijie (5):
+  serial: imx: distinguish the imx6q uart from the others
+  serial: imx: add DMA support for imx6q
+  ARM: dts: imx6sl: add "fsl,imx6q-uart" for uart compatible
+  ARM: dts: imx6q: add dte pinctrl for uart2
+  ARM: dts: enable the uart2 for imx6q-arm2
+
+ arch/arm/boot/dts/imx6q-arm2.dts |   10 +
+ arch/arm/boot/dts/imx6q.dtsi     |    9 +
+ arch/arm/boot/dts/imx6sl.dtsi    |   15 +-
+ drivers/tty/serial/imx.c         |  422 +++++++++++++++++++++++++++++++++++++-
+ 4 files changed, 444 insertions(+), 12 deletions(-)
