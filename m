@@ -1,72 +1,44 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 3 Jul 2013 17:50:44 +0800
-Subject: [PATCH V2 08/11] clk: tegra114: add suspend/resume function for
- tegra_cpu_car_ops
+Date: Wed, 3 Jul 2013 17:50:46 +0800
+Subject: [PATCH V2 10/11] ARM: dts: tegra114: dalmore: add GPIO power key
+ support
 In-Reply-To: <1372845047-25147-1-git-send-email-josephl@nvidia.com>
 References: <1372845047-25147-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1372845047-25147-9-git-send-email-josephl@nvidia.com>
+Message-ID: <1372845047-25147-11-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding suspend/resume function for tegra_cpu_car_ops. We only save and
-restore the setting of the clock of CoreSight. Other clocks still need
-to be taken care by clock driver.
+Adding the GPIO power key and enabling the wake up function.
 
-Cc: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V2:
-* fix the coding style
+* no change
 ---
- drivers/clk/tegra/clk-tegra114.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/boot/dts/tegra114-dalmore.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-index 9839e86..0908fcd 100644
---- a/drivers/clk/tegra/clk-tegra114.c
-+++ b/drivers/clk/tegra/clk-tegra114.c
-@@ -290,6 +290,12 @@
- #define PMC_PLLM_WB0_OVERRIDE 0x1dc
- #define PMC_PLLM_WB0_OVERRIDE_2 0x2b0
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index cb640eb..b97a8cc 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -883,6 +883,17 @@
+ 		};
+ 	};
  
-+#ifdef CONFIG_PM_SLEEP
-+static struct cpu_clk_suspend_context {
-+	u32 clk_csite_src;
-+} tegra114_cpu_clk_sctx;
-+#endif
++	gpio-keys {
++		compatible = "gpio-keys";
 +
- static int periph_clk_enb_refcnt[CLK_OUT_ENB_NUM * 32];
- 
- static void __iomem *clk_base;
-@@ -2142,9 +2148,29 @@ static void tegra114_disable_cpu_clock(u32 cpu)
- 	/* flow controller would take care in the power sequence. */
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static void tegra114_cpu_clock_suspend(void)
-+{
-+	/* switch coresite to clk_m, save off original source */
-+	tegra114_cpu_clk_sctx.clk_csite_src =
-+				readl(clk_base + CLK_SOURCE_CSITE);
-+	writel(3 << 30, clk_base + CLK_SOURCE_CSITE);
-+}
++		power {
++			label = "Power";
++			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
++			linux,code = <116>; /* KEY_POWER */
++			gpio-key,wakeup;
++		};
++	};
 +
-+static void tegra114_cpu_clock_resume(void)
-+{
-+	writel(tegra114_cpu_clk_sctx.clk_csite_src,
-+					clk_base + CLK_SOURCE_CSITE);
-+}
-+#endif
-+
- static struct tegra_cpu_car_ops tegra114_cpu_car_ops = {
- 	.wait_for_reset	= tegra114_wait_cpu_in_reset,
- 	.disable_clock	= tegra114_disable_cpu_clock,
-+#ifdef CONFIG_PM_SLEEP
-+	.suspend	= tegra114_cpu_clock_suspend,
-+	.resume		= tegra114_cpu_clock_resume,
-+#endif
- };
- 
- static const struct of_device_id pmc_match[] __initconst = {
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
 -- 
 1.8.3.2
