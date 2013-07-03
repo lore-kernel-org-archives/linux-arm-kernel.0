@@ -1,34 +1,50 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 03 Jul 2013 13:31:47 +0200
-Subject: [PATCH v6 5/7] ARM: kirkwood: remove redundant DT board files
-In-Reply-To: <87k3l8v9s1.fsf@natisbad.org>
-References: <1372762824-12202-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1372762824-12202-6-git-send-email-sebastian.hesselbarth@gmail.com>
- <87k3l8v9s1.fsf@natisbad.org>
-Message-ID: <51D40BA3.6000603@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 3 Jul 2013 04:33:34 -0700
+Subject: [PATCH v2 4/9] wl12xx: use frequency instead of enumerations
+ for pdata clocks
+In-Reply-To: <1372796850.21065.93.camel@cumari.coelho.fi>
+References: <1372776948-24840-1-git-send-email-coelho@ti.com>
+ <1372776948-24840-5-git-send-email-coelho@ti.com>
+ <20130702150208.GA4233@kahuna>
+ <1372796850.21065.93.camel@cumari.coelho.fi>
+Message-ID: <20130703113334.GY5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/13 01:09, Arnaud Ebalard wrote:
-> Hi Sebastian,
->
-> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> writes:
->
->> With DT support for mv643xx_eth board specific init for some boards now
->> is unneccessary. Remove those board files, Kconfig entries, and
->> corresponding entries in kirkwood_defconfig.
->
-> Applying above your set an old quilt cleaning patch Jason asked at some
-> point, it became empty except for arch/arm/mach_kirkwood/common.h in
-> which some declarations were left behind. If this is correct, can you
-> just merge the hunks below in your 5/7 in next round?
->
-> AFAICT, only dnskw_init() remains, which matches the list of board-*.c
-> files in arch/arm/mach_kirkwood/ (i.e. board-dt.c and board-dnskw.c).
+* Luciano Coelho <coelho@ti.com> [130702 13:33]:
+> On Tue, 2013-07-02 at 10:02 -0500, Nishanth Menon wrote:
+> > On 17:55-20130702, Luciano Coelho wrote:
+> > > Instead of defining an enumeration with the FW specific values for the
+> > > different clock rates, use the actual frequency instead.  Also add a
+> > > boolean to specify whether the clock is XTAL or not.
+> > > 
+> > > Change all board files to reflect this.
+> > > 
+> > > Cc: Tony Lindgren <tony@atomide.com>
+> > > Cc: Sekhar Nori <nsekhar@ti.com>
+> > > Signed-off-by: Luciano Coelho <coelho@ti.com>
+> > > ---
+> > >  arch/arm/mach-davinci/board-da850-evm.c      |    3 +-
+> > >  arch/arm/mach-omap2/board-4430sdp.c          |    5 ++-
+> > ^^
+> > >  arch/arm/mach-omap2/board-omap3evm.c         |    3 +-
+> > >  arch/arm/mach-omap2/board-omap4panda.c       |    3 +-
+> > ^^
+> > Please do not add more platform data to platforms that are DT only.
+> 
+> Ah, I hadn't realized that board_omap4panda.c and board-4430sdp.c had
+> been removed in linux-next.  I base my tree on wireless-next and it
+> doesn't contain these changes yet.  I would only have noticed this when
+> I rebased my tree once the merge window is closed. ;)
+> 
+> Thanks for pointing out, I'll make sure these changes will not be there
+> when I send the pull request.
 
-While updating the patch with yours, I stumbled upon MACH_TS219_DT that
-also remains because it includes tsx1x-common.c.
+Please separate out the minimal pdata and arch/arm/mach-omap2 changes int
+a immutable branch on v3.11-rc1 that I can also pull in. For v3.12, we're
+going to be making more boards device tree only, so these changes may
+otherwise cause pointless merge conflicts.
 
-I cannot recall if Jason or Andrew said something about removing it..
+Regards,
 
-Sebastian
+Tony
