@@ -1,45 +1,59 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Wed,  3 Jul 2013 14:12:03 +0530
-Subject: [PATCH] arm64: KVM: Support Cortex-A57 guest CPU on APM X-Gene host
-Message-ID: <1372840923-12808-1-git-send-email-anup.patel@linaro.org>
+From: gururaja.hebbar@ti.com (Hebbar Gururaja)
+Date: Wed, 3 Jul 2013 14:17:02 +0530
+Subject: [Patch V2 1/4] rtc: omap: restore back (hard-code) wakeup support
+In-Reply-To: <1372841225-18813-1-git-send-email-gururaja.hebbar@ti.com>
+References: <1372841225-18813-1-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <1372841225-18813-2-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update kvm_target_cpu() to allow Cortex-A57 guest CPU on APM X-Gene.
+rtc-omap driver modules is used both by OMAP1/2, Davinci SoC platforms.
 
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+However, rtc wake support on OMAP1 is broken. Hence the
+device_init_wakeup() was removed from rtc-omap driver and moved to
+platform board files that supported it (DA850/OMAP-L138). [1]
+
+However, recently [2] it was suggested that driver should always do a
+device_init_wakeup(dev, true). Platforms that don't want/need
+wakeup support can disable it from userspace via:
+
+    echo disabled > /sys/devices/.../power/wakeup
+
+Also, with the new DT boot-up, board file doesn't exist and hence there
+is no way to have device wakeup support rtc.
+
+The fix for above issues, is to hard code device_init_wakeup() inside
+driver and let platforms that don't need this, handle it through the
+sysfs power entry.
+
+[1]
+https://patchwork.kernel.org/patch/136731/
+
+[2]
+http://www.mail-archive.com/davinci-linux-open-source at linux.
+davincidsp.com/msg26077.html
+
+Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+Acked-by: Kevin Hilman <khilman@linaro.org>
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: rtc-linux at googlegroups.com
 ---
- arch/arm64/kvm/guest.c |   10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+:100644 100644 b0ba3fc... 761919d... M	drivers/rtc/rtc-omap.c
+ drivers/rtc/rtc-omap.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 2c3ff67..765f56f 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -207,8 +207,13 @@ int __attribute_const__ kvm_target_cpu(void)
- 	unsigned long implementor = read_cpuid_implementor();
- 	unsigned long part_number = read_cpuid_part_number();
+diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+index b0ba3fc..761919d 100644
+--- a/drivers/rtc/rtc-omap.c
++++ b/drivers/rtc/rtc-omap.c
+@@ -423,6 +423,8 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 	 *    is write-only, and always reads as zero...)
+ 	 */
  
--	if (implementor != ARM_CPU_IMP_ARM)
--		return -EINVAL;
-+	switch (implementor) {
-+	case ARM_CPU_IMP_ARM:
-+	case ARM_CPU_IMP_APM:
-+		break;
-+	default:
-+ 		return -EINVAL;
-+	}
++	device_init_wakeup(&pdev->dev, true);
++
+ 	if (new_ctrl & (u8) OMAP_RTC_CTRL_SPLIT)
+ 		pr_info("%s: split power mode\n", pdev->name);
  
- 	switch (part_number) {
- 	case ARM_CPU_PART_AEM_V8:
-@@ -216,6 +221,7 @@ int __attribute_const__ kvm_target_cpu(void)
- 	case ARM_CPU_PART_FOUNDATION:
- 		return KVM_ARM_TARGET_FOUNDATION_V8;
- 	case ARM_CPU_PART_CORTEX_A57:
-+	case APM_CPU_PART_POTENZA:
- 		/* Currently handled by the generic backend */
- 		return KVM_ARM_TARGET_CORTEX_A57;
- 	default:
 -- 
 1.7.9.5
