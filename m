@@ -1,68 +1,31 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 3 Jul 2013 17:04:57 +0100
-Subject: [Xen-devel] [PATCH RFC] xen/arm: domain kernel: Small fixes for
- making suspendable for arm
-In-Reply-To: <alpine.DEB.2.02.1307031440350.5067@kaball.uk.xensource.com>
-References: <1372842988-27547-1-git-send-email-jaeyong.yoo@samsung.com>
- <alpine.DEB.2.02.1307031440350.5067@kaball.uk.xensource.com>
-Message-ID: <1372867497.27768.282.camel@zakaz.uk.xensource.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 3 Jul 2013 17:19:48 +0300
+Subject: [PATCH v3 8/8] wlcore/wl12xx: check if we got correct clock data
+ from DT
+In-Reply-To: <1372860209-3504-9-git-send-email-coelho@ti.com>
+References: <1372860209-3504-1-git-send-email-coelho@ti.com>
+ <1372860209-3504-9-git-send-email-coelho@ti.com>
+Message-ID: <20130703141948.GS15056@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-07-03 at 16:59 +0100, Stefano Stabellini wrote:
-
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 2c3bdce..77309f7 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1469,6 +1469,9 @@ config ARCH_NO_VIRT_TO_BUS
-> >  config ISA_DMA_API
-> >  	bool
-> >  
-> > +config ARCH_HIBERNATION_POSSIBLE
-> > +        def_bool y
-> > +
+On Wed, Jul 03, 2013 at 05:03:29PM +0300, Luciano Coelho wrote:
+> The fref and the tcxo clocks settings are optional in some platforms.
+> WiLink8 doesn't need either, so we don't check the values.  WiLink 6
+> only needs the fref clock, so we check that it is valid or return with
+> an error.  WiLink7 needs both clocks, if either is not available we
+> return with an error.
 > 
-> This could be an issue because if you introduce this symbol you allow
-> users to compile hibernation code on all arm platforms.
-> At the very least it should have "depends on XEN".
-> 
-[...]
-> > +void save_processor_state(void)
-> > +{
-> > +	printk(KERN_ERR"%s: function not implemented\n", __func__);
-> > +}
-> > +
-> > +void restore_processor_state(void)
-> > +{
-> > +	printk(KERN_ERR"%s: function not implemented\n", __func__);
-> > +}
-> > +
-> > +int swsusp_arch_suspend(void)
-> > +{
-> > +	printk(KERN_ERR"%s: function not implemented\n", __func__);
-> > +	return 0;
-> > +}
-> > +
-> > +int swsusp_arch_resume(void)
-> > +{
-> > +	printk(KERN_ERR"%s: function not implemented\n", __func__);
-> > +	return 0;
-> > +}
-> > +
-> > +int pfn_is_nosave(unsigned long pfn)
-> > +{
-> > +	printk(KERN_ERR"%s: function not implemented\n", __func__);
-> > +	return 0;
-> > +}
-> 
-> These functions are not Xen specific, they should not be under
-> arch/arm/xen.
-> Maybe we could put them under arch/arm/power or drivers/xen?
+> Signed-off-by: Luciano Coelho <coelho@ti.com>
 
-Together with the spurious config symbol this suggests that perhaps the
-hibernation interface is not the right one to be using for Xen on ARM.
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-How does this work on native ARM I wonder?
-
-Ian.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130703/e00fbc09/attachment.sig>
