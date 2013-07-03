@@ -1,44 +1,37 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 3 Jul 2013 17:50:46 +0800
-Subject: [PATCH V2 10/11] ARM: dts: tegra114: dalmore: add GPIO power key
- support
+Date: Wed, 3 Jul 2013 17:50:45 +0800
+Subject: [PATCH V2 09/11] ARM: tegra: remove the limitation that Tegra114
+ can't support suspend
 In-Reply-To: <1372845047-25147-1-git-send-email-josephl@nvidia.com>
 References: <1372845047-25147-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1372845047-25147-11-git-send-email-josephl@nvidia.com>
+Message-ID: <1372845047-25147-10-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the GPIO power key and enabling the wake up function.
+The Tegra114 can support suspend function now, removing the limitation.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V2:
 * no change
 ---
- arch/arm/boot/dts/tegra114-dalmore.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/mach-tegra/pm.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-index cb640eb..b97a8cc 100644
---- a/arch/arm/boot/dts/tegra114-dalmore.dts
-+++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-@@ -883,6 +883,17 @@
- 		};
- 	};
- 
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		power {
-+			label = "Power";
-+			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
-+			linux,code = <116>; /* KEY_POWER */
-+			gpio-key,wakeup;
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
+diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+index 3d07cd5..5792872 100644
+--- a/arch/arm/mach-tegra/pm.c
++++ b/arch/arm/mach-tegra/pm.c
+@@ -173,10 +173,6 @@ void tegra_idle_lp2_last(void)
+ enum tegra_suspend_mode tegra_pm_validate_suspend_mode(
+ 				enum tegra_suspend_mode mode)
+ {
+-	/* Tegra114 didn't support any suspending mode yet. */
+-	if (tegra_chip_id == TEGRA114)
+-		return TEGRA_SUSPEND_NONE;
+-
+ 	/*
+ 	 * The Tegra devices only support suspending to LP2 currently.
+ 	 */
 -- 
 1.8.3.2
