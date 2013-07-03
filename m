@@ -1,96 +1,63 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  3 Jul 2013 12:40:06 -0300
-Subject: [PATCH] ARM: mx6: Fix the number of reported cores
-Message-ID: <1372866006-3892-1-git-send-email-festevam@gmail.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 3 Jul 2013 17:51:49 +0200
+Subject: [RFC PATCH 01/13] misc: atmel_ssc: add device tree DMA support
+In-Reply-To: <CACQ1gAhnDk-qSt_5xrsMakXqGGDO5pEbA-9UDWCJG=AABDc+zg@mail.gmail.com>
+References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
+ <1372667978-4718-2-git-send-email-richard.genoud@gmail.com>
+ <51D24299.9050209@atmel.com>
+ <CACQ1gAgcc=j3kmcpjp8bbdHhxr_k=h8jJs6R_paJbPUMv74uGg@mail.gmail.com>
+ <51D29927.80900@atmel.com>
+ <CACQ1gAhnDk-qSt_5xrsMakXqGGDO5pEbA-9UDWCJG=AABDc+zg@mail.gmail.com>
+Message-ID: <CACQ1gAgPaRm3gxxJNgfj9bR565Q0+SNY3+EcjA_mrh1N+yPzSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+2013/7/3 Richard Genoud <richard.genoud@gmail.com>:
+> 2013/7/2 Bo Shen <voice.shen@atmel.com>:
+>> Hi Richard,
+>>
+>>
+>> On 7/2/2013 16:13, Richard Genoud wrote:
+>>>>
+>>>> Please hold on of this, as to the ASoC dmaengine will deal with this. So,
+>>>> we
+>>>> >not need do it manually.
+>>>> >
+>>>> >Now, I am working on it. And will send out the patch soon after testing
+>>>> > OK.
+>>>
+>>> Ok, I stay tuned !
+>>
+>>
+>> I think you can go on working with the two patches I send just now.
+>> [1]: ASoC: atmel_ssc_dai: move set dma data to startup callback
+>> https://patchwork.kernel.org/patch/2811241/
+>>
+>> [2]: ASoC: atmel-pcm: use generic dmaengine framework
+>> https://patchwork.kernel.org/patch/2811261/
+>>
+>> I use your patches 4 ~ 8 do a quick testing, it works. Please note the name
+>> of asound.state under /etc in your rootfs should the same with atmel,model
+>> in patch 6.
+>
+> Thanks for testing !
+> I was just doing the same test, it works with
+> aplay  -Dplug:default  good_music.wav
+>
+> but there's a violent hang (kernel stops, no trace) when I try the record :
+> arecord -v -V stereo -Dplug:default -f cd -t wav -c 2 /tmp/toto.wav
+> last thing I see is :
+> dma dma0chan3: atc_control (3)
+>
+> I'll try to trace that.
+I think it's DMA related.
+the last thing done by the kernel is:
+ i2c i2c-0: i2c_outb: 0x34 A
+ i2c i2c-0: i2c_outb: 0x0c A
+ i2c i2c-0: i2c_outb: 0x5a A
+meaning: enable power on, LINE IN, ADC, OSC, on the WM8731
+so, after that, data is comming from the codec to the SSC and then is
+handled by the DMA.
+there must be something nasty on the DMA bus to hang everything like that...
 
-On a mx6 quad-core processor:
-
-$ cat /proc/cpuinfo                                             
-processor       : 0                                                             
-model name      : ARMv7 Processor rev 10 (v7l)                                  
-BogoMIPS        : 1581.05                                                       
-Features        : swp half thumb fastmult vfp edsp neon vfpv3 tls               
-CPU implementer : 0x41                                                          
-CPU architecture: 7                                                             
-CPU variant     : 0x2                                                           
-CPU part        : 0xc09                                                         
-CPU revision    : 10                                                            
-
-,which incorrectly shows this is a single core device.
-
-Commit a0ae0240 (ARM: kernel: add device tree init map function) introduced the 
-following requirement according to Documentation/devicetree/bindings/arm/cpus.txt:
-"For the ARM architecture every CPU node must contain the following properties:
-
-- device_type:	must be "cpu" 
-
-Pass the 'device_type' property for each cpu node, so that we can have all the 
-four cores correctly reported again.
-
-Cc: <stable@vger.kernel.org> #3.10
-Reported-by: Mike Loebl <mloebl@gmail.com> 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6dl.dtsi | 2 ++
- arch/arm/boot/dts/imx6q.dtsi  | 4 ++++
- 2 files changed, 6 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 63fafe2..a4b3e1e 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -16,12 +16,14 @@
- 
- 		cpu at 0 {
- 			compatible = "arm,cortex-a9";
-+			device_type = "cpu"
- 			reg = <0>;
- 			next-level-cache = <&L2>;
- 		};
- 
- 		cpu at 1 {
- 			compatible = "arm,cortex-a9";
-+			device_type = "cpu"
- 			reg = <1>;
- 			next-level-cache = <&L2>;
- 		};
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index cba021e..f4e9ebf 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -17,6 +17,7 @@
- 
- 		cpu at 0 {
- 			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
- 			reg = <0>;
- 			next-level-cache = <&L2>;
- 			operating-points = <
-@@ -38,18 +39,21 @@
- 
- 		cpu@1 {
- 			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
- 			reg = <1>;
- 			next-level-cache = <&L2>;
- 		};
- 
- 		cpu at 2 {
- 			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
- 			reg = <2>;
- 			next-level-cache = <&L2>;
- 		};
- 
- 		cpu at 3 {
- 			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
- 			reg = <3>;
- 			next-level-cache = <&L2>;
- 		};
--- 
-1.8.1.2
+Richard.
