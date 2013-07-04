@@ -1,40 +1,23 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 4 Jul 2013 13:33:03 -0400
-Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
-In-Reply-To: <20130704155951.268ebada@skate>
-References: <20130702151407.01680d21@skate>
- <20130702133337.GA17110@titan.lakedaemon.net>
- <20130702153825.139a93a5@skate>
- <20130702134421.GC17110@titan.lakedaemon.net>
- <87obakho6d.fsf@natisbad.org>
- <20130702174111.GF17110@titan.lakedaemon.net>
- <87y59ows4n.fsf@natisbad.org> <20130702220936.GC10215@1wt.eu>
- <20130702232311.GA3949@localhost> <20130704155951.268ebada@skate>
-Message-ID: <20130704173303.GA2569@titan.lakedaemon.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 4 Jul 2013 17:39:48 +0000 (UTC)
+Subject: OMAP baseline test results for v3.10-rc7
+In-Reply-To: <alpine.DEB.2.02.1307041650170.6258@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1307011946180.4358@utopia.booyaka.com>
+ <20130701204236.GA805@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1307041650170.6258@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1307041738550.6258@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 04, 2013 at 03:59:51PM +0200, Thomas Petazzoni wrote:
-> Hello guys,
-> 
-> On Tue, 2 Jul 2013 20:23:12 -0300, Ezequiel Garcia wrote:
-> 
-> > > Yes and indeed I must say that when I read the driver I found some
-> > > similarities with pxa3xx, though it was done differently. I initially
-> > > wanted to try to merge them but of course without the spec it's a huge
-> > > waste of time, especially considering that this is still in the roadmap
-> > > of the Free Electrons guys even though low priority.
-> > > 
-> > 
-> > I wish I could say I'm going to work on this soon but, as Thomas said,
-> > we have no idea when/if NAND will be prioritized.
-> 
-> We've got some news. NAND is back into the list of priorities, Ezequiel
-> should restart working on NAND support relatively soon.
+On Thu, 4 Jul 2013, Paul Walmsley wrote:
 
-Whew!  Thanks for addressing this so quickly Thomas!  Please extend our
-thanks to the folks at Marvell as well.
+> So that's good, will switch to am335x-bone.dtb for the testing restate 
+> jobs to be run for BeagleBone-white, and let's see what previous kernels 
+> it boots with now...
 
-thx,
+Sorry, this was unclear.  To rephrase, I will add 
+BeagleBone-black boot retest runs, using am335x-bone.dtb, to the testing 
+restate jobs that were planned for BeagleBone-white.
 
-Jason.
+
+- Paul
