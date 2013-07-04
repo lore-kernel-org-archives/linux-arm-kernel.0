@@ -1,67 +1,53 @@
-From: m.weisser.m@gmail.com (=?UTF-8?Q?Matthias_Wei=C3=9Fer?=)
-Date: Thu, 4 Jul 2013 17:03:21 +0200
-Subject: imx25: How to get frame buffer device in a system using device tree
-Message-ID: <CAO8h3eFq9WhvZYbbeFfWgVEXViR8MAcGaztsvvaLpFSW-W6CfA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 4 Jul 2013 23:14:00 +0800
+Subject: [PATCH] ASoC: wm8962: fix NULL pdata pointer
+Message-ID: <1372950840-13393-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+There is an error in merge commit 384b834 on conflict resolution which
+causes the following NULL pdata pointer bug.
 
-I am currently try to get Linux running on a custom imx25 hardware
-using device tree. So far I am quite successfull and have the system
-up using current mainline kernel and a NFS root file system. Now I
-would like to have the framebuffer driver to get something on the LCD.
+wm8962 0-001a: customer id 0 revision D
+Unable to handle kernel NULL pointer dereference at virtual address 00000004
+pgd = 80004000
+[00000004] *pgd=00000000
+Internal error: Oops: 5 [#1] SMP ARM
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0+ #1
+task: bf870000 ti: bf874000 task.ti: bf874000
+PC is at wm8962_probe+0x134/0x6c8
+LR is at regmap_unlock_mutex+0x10/0x14
+pc : [<80452100>]    lr : [<80304cf4>]    psr: a0000113
+sp : bf875c98  ip : 00000000  fp : bf875cd4
+r10: 00000000  r9 : bfb1830c  r8 : 80779bc4
+r7 : 00000000  r6 : 00000001  r5 : bfbac010  r4 : bfb33e00
+r3 : 80304ce4  r2 : 00000000  r1 : 00000001  r0 : fffffffb
+Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+Control: 10c53c7d  Table: 1000404a  DAC: 00000017
+Process swapper/0 (pid: 1, stack limit = 0xbf874238)
+Stack: (0xbf875c98 to 0xbf876000)
+...
 
-My dts file looks like this:
+Fix the error by assigning pdata a correct pointer.
 
-/dts-v1/;
-#include "imx25.dtsi"
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ sound/soc/codecs/wm8962.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-/ {
-  model = "Graf-Syteco zmx25";
-  compatible = "graf,imx25-zmx25", "fsl,imx25";
-
-  memory {
-    reg = <0x80000000 0x4000000>;
-  };
-
-  soc {
-    aips at 53f00000 { /* AIPS2 */
-      lcdc at 53fbc000 {
-        status = "okay";
-      };
-    };
-  };
-};
-
-&uart1 {
-  status = "okay";
-};
-
-&uart2 {
-  status = "okay";
-};
-
-&fec {
-  phy-mode = "rmii";
-  status = "okay";
-};
-
-I also added the compatibility entry in the imx25.dtsi
-
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -378,6 +378,7 @@
-                        };
-
-                        lcdc at 53fbc000 {
-+                               compatible = "fsl,imx27-fb", "fsl,imx21-fb";
-                                reg = <0x53fbc000 0x4000>;
-                                interrupts = <39>;
-                                clocks = <&clks 103>, <&clks 66>, <&clks 49>;
-
-But still I didn't get /dev/fb so I think I am doing something wrong.
-Any hints for docs I can study on how to do the right things?
-
-Regards
-Matthias
+diff --git a/sound/soc/codecs/wm8962.c b/sound/soc/codecs/wm8962.c
+index b1dc7d4..e2de9ec 100644
+--- a/sound/soc/codecs/wm8962.c
++++ b/sound/soc/codecs/wm8962.c
+@@ -3377,7 +3377,7 @@ static int wm8962_probe(struct snd_soc_codec *codec)
+ {
+ 	int ret;
+ 	struct wm8962_priv *wm8962 = snd_soc_codec_get_drvdata(codec);
+-	struct wm8962_pdata *pdata = dev_get_platdata(codec->dev);
++	struct wm8962_pdata *pdata = &wm8962->pdata;
+ 	int i, trigger, irq_pol;
+ 	bool dmicclk, dmicdat;
+ 
+-- 
+1.7.9.5
