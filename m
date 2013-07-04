@@ -1,40 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 4 Jul 2013 14:29:14 +0800
-Subject: ASoC: wm8962: NULL pdata pointer
-Message-ID: <20130704062913.GC14617@S2101-09.ap.freescale.net>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 4 Jul 2013 14:39:01 +0800
+Subject: mx6q boot on linux-next 20130703
+In-Reply-To: <CAOMZO5DgAu2-cknESp4a675KP5gDrJxM2A_FqUgAZav83Db=fw@mail.gmail.com>
+References: <CAOMZO5DgAu2-cknESp4a675KP5gDrJxM2A_FqUgAZav83Db=fw@mail.gmail.com>
+Message-ID: <51D51885.3080102@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+? 2013?07?04? 07:52, Fabio Estevam ??:
+> Hi,
+>
+> I am running linux-next 20130703 on a mx6q board, and seeing a strange
+> behaviour.
+>
+> Only if I enable DEBUG_LL + earlyprintk and disable
+> CONFIG_SERIAL_FSL_LPUART (serial driver for the FSL Vybrid SoC), I am
+> able to boot the kernel until the prompt.
+>
+> Does anyone have any suggestion?
 
-I'm running next-20130703 and seeing the following NULL pointer bug.
+I tested the linux-next-0625, the boot is ok.
 
-Unable to handle kernel NULL pointer dereference at virtual address 00000004
-pgd = 80004000
-[00000004] *pgd=00000000
-Internal error: Oops: 5 [#1] SMP ARM
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-next-20130703 #6
-task: bf870000 ti: bf874000 task.ti: bf874000
-PC is at wm8962_probe+0x140/0x6b4
-...
+I think this issue is caused by the common code, not the imx code.
 
-It seems to me that it's caused by a merge error in 384b834.  And the
-change below can remove the problem.
-
-Shawn
-
----8<----
-
-diff --git a/sound/soc/codecs/wm8962.c b/sound/soc/codecs/wm8962.c
-index b1dc7d4..e2de9ec 100644
---- a/sound/soc/codecs/wm8962.c
-+++ b/sound/soc/codecs/wm8962.c
-@@ -3377,7 +3377,7 @@ static int wm8962_probe(struct snd_soc_codec *codec)
- {
-        int ret;
-        struct wm8962_priv *wm8962 = snd_soc_codec_get_drvdata(codec);
--       struct wm8962_pdata *pdata = dev_get_platdata(codec->dev);
-+       struct wm8962_pdata *pdata = &wm8962->pdata;
-        int i, trigger, irq_pol;
-        bool dmicclk, dmicdat;
+thanks
+Huang Shijie
