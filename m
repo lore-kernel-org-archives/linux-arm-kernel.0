@@ -1,35 +1,23 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 4 Jul 2013 10:45:16 +0100
-Subject: ARM Cortex A9: LL counters
-In-Reply-To: <BFCB49997E59134AAAF17FFE77F8FF06673738BC@REXMD.intranet.epfl.ch>
-References: <BFCB49997E59134AAAF17FFE77F8FF06673738BC@REXMD.intranet.epfl.ch>
-Message-ID: <20130704094516.GC8782@mudshark.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 4 Jul 2013 10:45:07 +0100
+Subject: [alsa-devel] ASoC: wm8962: NULL pdata pointer
+In-Reply-To: <20130704062913.GC14617@S2101-09.ap.freescale.net>
+References: <20130704062913.GC14617@S2101-09.ap.freescale.net>
+Message-ID: <20130704094507.GN27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 03, 2013 at 07:59:14PM +0100, Javier Picorel wrote:
-> Dear all,
-
-Hello Javier,
-
-> It seems that there is no mapping between any ARM Cortex A9 counter to the L2 (Last Level) access or misses event.
-
-The L2 cache on Cortex-A9 is external to the CPU core and has its own set of
-memory-mapped performance counters. Mark Rutland [CC'd] had something
-working for this, but I haven't seen a refresh of the patches for a while.
-
-> Looking at ARM's reference manual and OProfile's event list on A9, I see the following two counters:
+On Thu, Jul 04, 2013 at 02:29:14PM +0800, Shawn Guo wrote:
+> Mark,
 > 
-> CO_LF_MISS: (counter: 1, 2, 3, 4, 5, 6)
->         Number of coherent linefill requests which miss in all other CPUs, meaning that the request
->         is sent to external memory (min count: 500)
-> CO_LF_HIT: (counter: 1, 2, 3, 4, 5, 6)
->         Number of coherent linefill requests which hit in another CPU, meaning that the linefill
->         data is fetched directly from the relevant cache (min count: 500)
-> 
-> It seems that the first counter refers to the L2 Misses and the second one to the L2 Hits (Last Level Cache in this architecture). I'm not sure
-> whether we should do something about this or nor. Thanks!
+> I'm running next-20130703 and seeing the following NULL pointer bug.
 
-No, these are all for L1. `sent to external memory' means sent to L2.
-
-Will
+Please send a patch, and please send mail to this address which is the
+one that's advertised and consistently used...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130704/328f0857/attachment.sig>
