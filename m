@@ -1,36 +1,25 @@
 From: wni@nvidia.com (Wei Ni)
-Date: Thu, 4 Jul 2013 17:09:39 +0800
-Subject: [PATCH 2/2] ARM: dt: t114 dalmore: add dt entry for lm90
-In-Reply-To: <1372928979-26938-1-git-send-email-wni@nvidia.com>
-References: <1372928979-26938-1-git-send-email-wni@nvidia.com>
-Message-ID: <1372928979-26938-3-git-send-email-wni@nvidia.com>
+Date: Thu, 4 Jul 2013 17:09:37 +0800
+Subject: [PATCH 0/2] Enable lm90 in Tegra30 and Tegra114.
+Message-ID: <1372928979-26938-1-git-send-email-wni@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable thermal sensor lm90 for t114 dalmore.
+Enable thermal sensor lm90 for Tegra30 Cardhu and Tegra114 Dalmore.
 
-Signed-off-by: Wei Ni <wni@nvidia.com>
----
+This series is v1, based on [RFC 1/9] submitted here:
+http://thread.gmane.org/gmane.linux.power-management.general/31056
+
+Changes from RFC:
+1. Enable it for Tegra114 Dalmore.
+
+Wei Ni (2):
+  ARM: dt: t30 cardhu: add dt entry for lm90
+  ARM: dt: t114 dalmore: add dt entry for lm90
+
  arch/arm/boot/dts/tegra114-dalmore.dts |    7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/tegra30-cardhu.dtsi  |    7 +++++++
+ 2 files changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-index cb640eb..8325797 100644
---- a/arch/arm/boot/dts/tegra114-dalmore.dts
-+++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-@@ -738,6 +738,13 @@
- 			realtek,ldo1-en-gpios =
- 				<&gpio TEGRA_GPIO(V, 3) GPIO_ACTIVE_HIGH>;
- 		};
-+
-+		nct1008: nct1008 {
-+			compatible = "lm90,nct1008";
-+			reg = <0x4c>;
-+			interrupt-parent = <&gpio>;
-+			interrupts = <TEGRA_GPIO(O, 4) IRQ_TYPE_LEVEL_LOW>;
-+		};
- 	};
- 
- 	i2c at 7000d000 {
 -- 
 1.7.9.5
