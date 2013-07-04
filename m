@@ -1,23 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 04 Jul 2013 13:42:14 +0100
-Subject: [PATCH] arm64: KVM: Kconfig integration
-In-Reply-To: <51D56D57.6000108@redhat.com>
-References: <1372939377-24657-1-git-send-email-marc.zyngier@arm.com>
- <51D5682F.8040706@redhat.com> <51D56CDE.2010409@arm.com>
- <51D56D57.6000108@redhat.com>
-Message-ID: <51D56DA6.603@arm.com>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Thu, 4 Jul 2013 15:00:17 +0200
+Subject: SPI: DUAL/QUAD support
+In-Reply-To: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>
+References: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>
+Message-ID: <20130704130017.GA25997@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/13 13:40, Paolo Bonzini wrote:
-> Il 04/07/2013 14:38, Marc Zyngier ha scritto:
->> Sent v2 with fixes. If you're pleased with it, do you want another pull
->> request? Or will you just pick that patch?
+On Thu, Jul 04, 2013 at 07:36:48PM +0800, yuhang wang wrote:
 > 
-> Since it would be a fast forward, I can (and did) just pick that patch.
+> I have added the kerneldoc into the patch below to explain the "DUAL"
+> and "QUAD" modes.
+> Hope for your suggestions.
+> 
+> Documentation/spi/spi-dual_quad |  102 +++++++++++++++++++++++++++++++++++++++
+>  drivers/mtd/devices/m25p80.c    |    2 +
+>  drivers/spi/spi.c               |    2 +
+>  include/linux/spi/spi.h         |    8 +++
+
+I think what Mark meant is to add new fields to the /** comments
+in include/linux/spi/spi.h, then documentation could be generated
+(but it seems only outdated copies are online, everyone prefers
+to look at the code):
+https://www.kernel.org/doc/htmldocs/device-drivers/
+
+> --- a/drivers/mtd/devices/m25p80.c
+> +++ b/drivers/mtd/devices/m25p80.c
+> @@ -354,6 +354,7 @@ static int m25p80_read(struct mtd_info *mtd,
+> loff_t from, size_t len,
+> 
+>         t[1].rx_buf = buf;
+>         t[1].len = len;
+> +       t[1].bitwidth = flash->spi->rx_bitwidth;
+>         spi_message_add_tail(&t[1], &m);
+> 
+>         mutex_lock(&flash->lock);
+> @@ -409,6 +410,7 @@ static int m25p80_write(struct mtd_info *mtd,
+> loff_t to, size_t len,
+>         spi_message_add_tail(&t[0], &m);
+> 
+>         t[1].tx_buf = buf;
+> +       t[1].bitwidth = flash->spi->tx_bitwidth;
+>         spi_message_add_tail(&t[1], &m);
+> 
+>         mutex_lock(&flash->lock);
+
+Doesn't m25p80 need to use different commands (OPCODEs)
+for 2x and 4x speed?  It seems this change is incomplete.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Johannes
