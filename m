@@ -1,35 +1,52 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 4 Jul 2013 18:12:16 +0000 (UTC)
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <alpine.DEB.2.02.1307031944580.9618@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
- <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
- <51CAEB33.5010101@ti.com>
- <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
- <51CBBCD8.5030600@ti.com>
- <alpine.DEB.2.02.1306281844090.8767@utopia.booyaka.com>
- <alpine.DEB.2.02.1307010211580.3741@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83ECCC435@DBDE04.ent.ti.com>
- <51D2E096.5040700@ti.com>
- <alpine.DEB.2.02.1307031944580.9618@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1307041810410.6258@utopia.booyaka.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 04 Jul 2013 14:27:41 -0400 (EDT)
+Subject: Appended DTB files for multi-machine kernels
+In-Reply-To: <51D5B7A1.60609@gmail.com>
+References: <51D5A938.30607@gmail.com>
+ <alpine.LFD.2.03.1307041322070.18597@syhkavp.arg> <51D5B7A1.60609@gmail.com>
+Message-ID: <alpine.LFD.2.03.1307041419070.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 3 Jul 2013, Paul Walmsley wrote:
+On Thu, 4 Jul 2013, Daniel Mack wrote:
 
-> As far as Lokesh's patch goes: it doesn't make sense to me to remove a 
-> file during 'make clean' that the build process doesn't create.  So while 
-> I understand the motivation for the patch, and don't mind if upstream 
-> takes it, I personally wouldn't care to ack it.
+> Hi Nicolas,
+> 
+> On 04.07.2013 19:28, Nicolas Pitre wrote:
+> > On Thu, 4 Jul 2013, Daniel Mack wrote:
+> >> I'm open to opinion and sugesstions :)
+> > 
+> > What you describe above more or less fits the definition of what I 
+> > called the "impedance matcher".  However it doesn't need to be part of 
+> > the kernel at all.  But you should make it into a separate binary.
+> > 
+> > Please have a look at the bottom of this post for a more comprehensive 
+> > description: http://article.gmane.org/gmane.linux.ports.arm.kernel/242929
+> 
+> Thanks for the link. Interesting read indeed.
+> 
+> The only thing I'm pondering about is that we already have generic
+> loader code in Linux and a build system that supports a wide range of
+> platforms. I don't know whether it's worth opening that can of worms
+> again and re-implement all details about load addresses, compiler flags,
+> device-tree parsing code yet once again. At least in terms of LOCs, we
+> would certainly be better off doing it inside the kernel.
 
-Incidentally, if there's any patch that would improve the current 
-situation with appended DTBs by going upstream, it would be a patch like 
-Grant's "HACK" patch to add appended DTB building into the kernel build 
-system.  Maybe folks can push to something similar to that one upstream?
+That is still code with relatively low value that has to be carried and 
+maintained.
+
+And if you do it for your own device outside of the kernel then you can 
+literally hack it the way you want quickly and forget about it once it 
+works.  Since this is useful for legacy setups only, you do not have to 
+care about maintaining it in the future.
+
+> But I generally second your opinion about pushing vendors to do it
+> right, so I might give that approach a shot soon; there is no code yet
+> anywhere I take it?
+
+Not that I'm aware of, besides parts of libfdt and atags_to_fdt.c from 
+the kernel tree that can be lifted and modified according to your needs.  
+I don't imagine you'd need much more than that anyway.
 
 
-- Paul
+Nicolas
