@@ -1,113 +1,53 @@
-From: ml@communistcode.co.uk (Jack Mitchell)
-Date: Thu, 04 Jul 2013 09:31:14 +0100
-Subject: socfpga: mmc problems
-In-Reply-To: <1372864190.9525.6.camel@linux-builds1>
-References: <51D43CB0.4070104@communistcode.co.uk>
- <1372864190.9525.6.camel@linux-builds1>
-Message-ID: <51D532D2.1030709@communistcode.co.uk>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 4 Jul 2013 16:42:39 +0800
+Subject: [PATCH v2 4/5] ARM: dts: imx6q: add dte pinctrl for uart2
+In-Reply-To: <20130704072344.GB11046@S2101-09.ap.freescale.net>
+References: <1372844557-3078-1-git-send-email-b32955@freescale.com>
+ <1372844557-3078-5-git-send-email-b32955@freescale.com>
+ <20130704072344.GB11046@S2101-09.ap.freescale.net>
+Message-ID: <51D5357F.8040609@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Morning Dinh,
-
-On 03/07/13 16:09, Dinh Nguyen wrote:
-> Hi Jack,
+? 2013?07?04? 15:23, Shawn Guo ??:
+> On Wed, Jul 03, 2013 at 05:42:36PM +0800, Huang Shijie wrote:
+>> In imx6q-arm2 board, the UART2 works in the dte mode.
+>> So add a pinctrl for it.
+>>
+>> Signed-off-by: Huang Shijie<b32955@freescale.com>
+>> ---
+>>   arch/arm/boot/dts/imx6q.dtsi |    9 +++++++++
+>>   1 files changed, 9 insertions(+), 0 deletions(-)
+> Since imx6q and imx6dl are pin-to-pin compatible, from now on I would
+> require the same pin group be added for these two SoC together, so that
+> we can enforce the same label name.
 >
-> On Wed, 2013-07-03 at 16:01 +0100, Jack Mitchell wrote:
->> Having received one of the new Arrow SoCkit boards at a recent training
->> day I set about seeing how far mainline was in successfully booting this
->> board.
->>
->> As I wanted to boot from mmc, I first checked out linux-next [1] in
->> order to get the newly merged mmc driver, I then applied the device-tree
->> enablement series [2] on top before finally attempting to boot. I then
->> found that the standard socfpga_defconfig didn't enable the MMC drivers,
->> which I also did (should this be part of the socfpga_defconfig...?).
->
-> I was going to update this when I enable ethernet as well to avoid less
-> churn on the defconfig.
+I knew it.
 
-That's great!
+But this pinctrl is only used in imx6q-arm2 board which uses a big 
+armdillo board,
+so i did not add the same label to imx6dl.
 
->
->>
->> However, the boot hangs at:
->>
->> Synopsys Designware Multimedia Card Interface Driver
->> dwmmc_socfpga ff704000.dwmmc0: Using internal DMA controller.
->> dwmmc_socfpga ff704000.dwmmc0: DW MMC controller at irq 171, 32 bit host
->> data width, 1024 deep fifo
->>
->> To fix this I checked out the diff between the Altera vendor mmc driver
->> and the mainline driver and found that if I added this small change:
->>
->>
->>     if (of_property_read_u32(dev->of_node, "pwr-en", &pwr_en)) {
->>       dev_info(dev, "couldn't determine pwr-en, assuming pwr-en = 0\n");
->>       pwr_en = 0;
->>     }
->>
->>     /* Set PWREN bit */
->>     mci_writel(host, PWREN, pwr_en);
->
-> I tested this on my devkit, which was not made by Arrow, but is _almost_
-> the same. I'll try to see if I can get my hands on an Arrow board to
-> reproduce.
-
-Now, I think I made a _slight_ mistake, in that I accidentally copied 
-the Altera vendor kernel onto the sdcard instead of the linux-next 
-kernel. Re-testing this morning with a fresh mind, I checked the config 
-again and now I find the Arrow board still won't boot from MMC, even 
-with the above change, with the code hanging at the same place.
-
-I know you don't have an Arrow board, but if you have a tree which I 
-could pull from with your amalgamated changes; that would rule out me 
-missing any patches and it actually being a board problem. I can't seem 
-to see if the V8 device tree patches were pulled into anyones tree, 
-otherwise I would just wait till they appeared in 3.11-rc1...?
-
-Sorry for the confusion!
-
->
->>
->> In the dw_mci_socfpga_priv_init function, the board would boot.
->>
->> Synopsys Designware Multimedia Card Interface Driver
->> dwmmc_socfpga ff704000.dwmmc0: couldn't determine pwr-en, assuming
->> pwr-en = 0
->> dwmmc_socfpga ff704000.dwmmc0: Using internal DMA controller.
->> dwmmc_socfpga ff704000.dwmmc0: DW MMC controller at irq 171, 32 bit host
->> data width, 1024 deep fifo
->> mmc_host mmc0: Bus speed (slot 0) = 100000000Hz (slot req 400000Hz,
->> actual 400000HZ div = 125)
->> dwmmc_socfpga ff704000.dwmmc0: 1 slots initialized
->> dwmmc_socfpga ff704000.dwmmc0: Version ID is 240a
->> .....
->> .....
->> .....
->>
->>
->> Has this been overlooked, or are there some other changes elsewhere that
->> I haven't yet come across which addresses this?
->
-> I'm not aware of any other changes.
->
-> Dinh
->>
->> Cheers,
->>
->> [1] fa1383200d289afdff2f5678eb89483daa537465
->> [2] http://comments.gmane.org/gmane.linux.ports.arm.kernel/243529
->>
->
->
->
+Do we have a imx6dl-arm2 board? if we have , i can add it.
 
 
--- 
+>> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+>> index 9a69891..8a518c6 100644
+>> --- a/arch/arm/boot/dts/imx6q.dtsi
+>> +++ b/arch/arm/boot/dts/imx6q.dtsi
+>> @@ -266,6 +266,15 @@
+>>   							MX6Q_PAD_EIM_D27__UART2_RX_DATA 0x1b0b1
+>>   						>;
+>>   					};
+>> +
+>> +					pinctrl_uart2_dte: uart2grp-2 {
+>> +						fsl,pins =<
+>> +							MX6Q_PAD_EIM_D26__UART2_RX_DATA 0x1b0b1
+>> +							MX6Q_PAD_EIM_D27__UART2_TX_DATA 0x1b0b1
+>> +							MX6Q_PAD_EIM_D28__UART2_CTS_B	0x1b0b1
+>> +							MX6Q_PAD_EIM_D29__UART2_CTS_B	0x1b0b1
+> Why do you have two pads mux-ed on one function?
+I think the name of the PAD is wrong.
 
-   Jack Mitchell (jack at embed.me.uk)
-   Embedded Systems Engineer
-   http://www.embed.me.uk
-
---
+thanks
+Huang Shijie
