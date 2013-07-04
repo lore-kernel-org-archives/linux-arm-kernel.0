@@ -1,131 +1,42 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Thu,  4 Jul 2013 15:08:12 +0200
-Subject: [PATCH v2] clk: add MOXA ART SoCs clock driver
-In-Reply-To: <1372341834-6557-1-git-send-email-jonas.jensen@gmail.com>
-References: <1372341834-6557-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1372943292-6960-1-git-send-email-jonas.jensen@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 4 Jul 2013 14:16:41 +0100
+Subject: Oops on 'cat /dev/kmem'
+In-Reply-To: <ly8v1m5zl9.fsf@ensc-virt.intern.sigma-chemnitz.de>
+References: <ly8v1m5zl9.fsf@ensc-virt.intern.sigma-chemnitz.de>
+Message-ID: <20130704131641.GJ24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds MOXA ART SoCs clock driver support.
+On Thu, Jul 04, 2013 at 01:33:38PM +0200, Enrico Scholz wrote:
+> Hi,
+> 
+> read access on /dev/kmem oopses here on pxa168 and omap3 platforms
+> (kernel 3.4 and 3.2):
+> 
+> ~ # cat /dev/kmem 
+> [ 2925.599453] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> [ 2925.649173] pgd = c7a7c000
+> [ 2925.657282] [00000000] *pgd=071a0831, *pte=00000000, *ppte=00000000
+> [ 2925.697821] Internal error: Oops: 17 [#1] PREEMPT ARM
+> [ 2925.712938] Modules linked in: ...
+> [ 2925.825207] CPU: 0    Not tainted  (3.4.52.ipan7 #1)
+> [ 2925.840083] PC is at __copy_to_user_std+0x4c/0x3a8
+> [ 2925.854431] LR is at read_kmem+0xa0/0x1d4
+> [ 2925.866438] pc : [<c01e768c>]    lr : [<c02304bc>]    psr: 20000013
+> 
+> 
+> What would be the correct fix? Defining '__ARCH_HAS_NO_PAGE_ZERO_MAPPED'
+> also for ARM?
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+That will just solve the "problem" for the first page.
 
-Notes:
-    of_clk_init(NULL) is now called from moxart machine descriptor
-    .init_time hook. clocksource now depend on this to be loaded first.
-    
-    Applies to next-20130703
-    
-    Changes since v1:
-    1. rewritten to register one fixed rate clock "clkapb"
-    2. use CLK_OF_DECLARE
+It looks to me that cat'ing /dev/kmem on x86 will also lead to similar
+effects, as it will end up trying to read from the virtual address
+given by the file position.
 
- drivers/clk/Makefile     |  1 +
- drivers/clk/clk-moxart.c | 82 ++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 83 insertions(+)
- create mode 100644 drivers/clk/clk-moxart.c
+I think this is a case of "don't do that then" - in much the same way
+that on x86, if you configure a serial port at an address where another
+device may be, you can end up killing the machine.
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 4038c2b..933622f 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -11,6 +11,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
- 
- # SoCs specific
- obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
-+obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
- obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
- obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
- obj-$(CONFIG_ARCH_NSPIRE)	+= clk-nspire.o
-diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
-new file mode 100644
-index 0000000..d61e305
---- /dev/null
-+++ b/drivers/clk/clk-moxart.c
-@@ -0,0 +1,82 @@
-+/*
-+ * MOXA ART SoCs clock driver.
-+ *
-+ * Copyright (C) 2013 Jonas Jensen
-+ *
-+ * Jonas Jensen <jonas.jensen@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/slab.h>
-+#include <linux/delay.h>
-+#include <linux/module.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/clkdev.h>
-+
-+static const struct of_device_id moxart_tclk_match[] = {
-+	{ .compatible = "moxa,moxart-apb-clock" },
-+	{ }
-+};
-+
-+void __init moxart_of_clk_init(struct device_node *node)
-+{
-+	static void __iomem *base;
-+	struct device_node *clk_node;
-+	struct clk *clk;
-+	unsigned long rate;
-+	unsigned int mul, val, div;
-+
-+	base = of_iomap(node, 0);
-+	if (IS_ERR(base))
-+		panic("%s: of_iomap failed\n", node->full_name);
-+
-+	clk_node = of_find_matching_node(NULL, moxart_tclk_match);
-+	if (!clk_node)
-+		panic("%s: can't find clock DT node\n", node->full_name);
-+
-+	mul = (readl(base + 0x30) >> 3) & 0x1ff;
-+	val = (readl(base + 0x0c) >> 4) & 0x7;
-+
-+	switch (val) {
-+	case 1:
-+		div = 3;
-+		break;
-+	case 2:
-+		div = 4;
-+		break;
-+	case 3:
-+		div = 6;
-+		break;
-+	case 4:
-+		div = 8;
-+		break;
-+	default:
-+		div = 2;
-+		break;
-+	}
-+
-+	/*
-+	 * the rate calculation below is only tested and proven
-+	 * to be true for UC-7112-LX
-+	 *
-+	 * UC-7112-LX: mul=80 val=0
-+	 *
-+	 * to support other moxart SoC hardware, this may need
-+	 * a change, though it's possible it works there too
-+	 */
-+	rate = (mul * 1200000 / div);
-+
-+	clk = clk_register_fixed_rate(NULL, "clkapb", NULL, CLK_IS_ROOT, rate);
-+	clk_register_clkdev(clk, NULL, "clkapb");
-+	of_clk_add_provider(clk_node, of_clk_src_simple_get, clk);
-+
-+	iounmap(base);
-+}
-+CLK_OF_DECLARE(moxart_core_clock, "moxa,moxart-core-clock", moxart_of_clk_init);
--- 
-1.8.2.1
+You have to be root to access /dev/kmem, and root is expected to know
+what they're doing.
