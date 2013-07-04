@@ -1,52 +1,131 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Thu, 4 Jul 2013 15:00:17 +0200
-Subject: SPI: DUAL/QUAD support
-In-Reply-To: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>
-References: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>
-Message-ID: <20130704130017.GA25997@sig21.net>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Thu,  4 Jul 2013 15:08:12 +0200
+Subject: [PATCH v2] clk: add MOXA ART SoCs clock driver
+In-Reply-To: <1372341834-6557-1-git-send-email-jonas.jensen@gmail.com>
+References: <1372341834-6557-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1372943292-6960-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 04, 2013 at 07:36:48PM +0800, yuhang wang wrote:
-> 
-> I have added the kerneldoc into the patch below to explain the "DUAL"
-> and "QUAD" modes.
-> Hope for your suggestions.
-> 
-> Documentation/spi/spi-dual_quad |  102 +++++++++++++++++++++++++++++++++++++++
->  drivers/mtd/devices/m25p80.c    |    2 +
->  drivers/spi/spi.c               |    2 +
->  include/linux/spi/spi.h         |    8 +++
+This patch adds MOXA ART SoCs clock driver support.
 
-I think what Mark meant is to add new fields to the /** comments
-in include/linux/spi/spi.h, then documentation could be generated
-(but it seems only outdated copies are online, everyone prefers
-to look at the code):
-https://www.kernel.org/doc/htmldocs/device-drivers/
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-> --- a/drivers/mtd/devices/m25p80.c
-> +++ b/drivers/mtd/devices/m25p80.c
-> @@ -354,6 +354,7 @@ static int m25p80_read(struct mtd_info *mtd,
-> loff_t from, size_t len,
-> 
->         t[1].rx_buf = buf;
->         t[1].len = len;
-> +       t[1].bitwidth = flash->spi->rx_bitwidth;
->         spi_message_add_tail(&t[1], &m);
-> 
->         mutex_lock(&flash->lock);
-> @@ -409,6 +410,7 @@ static int m25p80_write(struct mtd_info *mtd,
-> loff_t to, size_t len,
->         spi_message_add_tail(&t[0], &m);
-> 
->         t[1].tx_buf = buf;
-> +       t[1].bitwidth = flash->spi->tx_bitwidth;
->         spi_message_add_tail(&t[1], &m);
-> 
->         mutex_lock(&flash->lock);
+Notes:
+    of_clk_init(NULL) is now called from moxart machine descriptor
+    .init_time hook. clocksource now depend on this to be loaded first.
+    
+    Applies to next-20130703
+    
+    Changes since v1:
+    1. rewritten to register one fixed rate clock "clkapb"
+    2. use CLK_OF_DECLARE
 
-Doesn't m25p80 need to use different commands (OPCODEs)
-for 2x and 4x speed?  It seems this change is incomplete.
+ drivers/clk/Makefile     |  1 +
+ drivers/clk/clk-moxart.c | 82 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 83 insertions(+)
+ create mode 100644 drivers/clk/clk-moxart.c
 
-Thanks,
-Johannes
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 4038c2b..933622f 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -11,6 +11,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
+ 
+ # SoCs specific
+ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
++obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
+ obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+ obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+ obj-$(CONFIG_ARCH_NSPIRE)	+= clk-nspire.o
+diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
+new file mode 100644
+index 0000000..d61e305
+--- /dev/null
++++ b/drivers/clk/clk-moxart.c
+@@ -0,0 +1,82 @@
++/*
++ * MOXA ART SoCs clock driver.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/platform_device.h>
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++#include <linux/module.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include <linux/clkdev.h>
++
++static const struct of_device_id moxart_tclk_match[] = {
++	{ .compatible = "moxa,moxart-apb-clock" },
++	{ }
++};
++
++void __init moxart_of_clk_init(struct device_node *node)
++{
++	static void __iomem *base;
++	struct device_node *clk_node;
++	struct clk *clk;
++	unsigned long rate;
++	unsigned int mul, val, div;
++
++	base = of_iomap(node, 0);
++	if (IS_ERR(base))
++		panic("%s: of_iomap failed\n", node->full_name);
++
++	clk_node = of_find_matching_node(NULL, moxart_tclk_match);
++	if (!clk_node)
++		panic("%s: can't find clock DT node\n", node->full_name);
++
++	mul = (readl(base + 0x30) >> 3) & 0x1ff;
++	val = (readl(base + 0x0c) >> 4) & 0x7;
++
++	switch (val) {
++	case 1:
++		div = 3;
++		break;
++	case 2:
++		div = 4;
++		break;
++	case 3:
++		div = 6;
++		break;
++	case 4:
++		div = 8;
++		break;
++	default:
++		div = 2;
++		break;
++	}
++
++	/*
++	 * the rate calculation below is only tested and proven
++	 * to be true for UC-7112-LX
++	 *
++	 * UC-7112-LX: mul=80 val=0
++	 *
++	 * to support other moxart SoC hardware, this may need
++	 * a change, though it's possible it works there too
++	 */
++	rate = (mul * 1200000 / div);
++
++	clk = clk_register_fixed_rate(NULL, "clkapb", NULL, CLK_IS_ROOT, rate);
++	clk_register_clkdev(clk, NULL, "clkapb");
++	of_clk_add_provider(clk_node, of_clk_src_simple_get, clk);
++
++	iounmap(base);
++}
++CLK_OF_DECLARE(moxart_core_clock, "moxa,moxart-core-clock", moxart_of_clk_init);
+-- 
+1.8.2.1
