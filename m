@@ -1,53 +1,58 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 4 Jul 2013 23:14:00 +0800
-Subject: [PATCH] ASoC: wm8962: fix NULL pdata pointer
-Message-ID: <1372950840-13393-1-git-send-email-shawn.guo@linaro.org>
+From: mpfj-list@newflow.co.uk (Mark Jackson)
+Date: Thu, 04 Jul 2013 16:14:14 +0100
+Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
+In-Reply-To: <51D577E6.5010507@newflow.co.uk>
+References: <51D577E6.5010507@newflow.co.uk>
+Message-ID: <51D59146.3070002@newflow.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an error in merge commit 384b834 on conflict resolution which
-causes the following NULL pdata pointer bug.
+On 04/07/13 14:25, Mark Jackson wrote:
+> Our custom AM335x board has been booting just fine under 3.10.0-rc4.
+> 
+> I've just done a git pull to update to 3.10 (now that it's released)
+> and the board now hangs.
+> 
+> Before I start trying to bisect the issue, does anyone have an clues ?
 
-wm8962 0-001a: customer id 0 revision D
-Unable to handle kernel NULL pointer dereference at virtual address 00000004
-pgd = 80004000
-[00000004] *pgd=00000000
-Internal error: Oops: 5 [#1] SMP ARM
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0+ #1
-task: bf870000 ti: bf874000 task.ti: bf874000
-PC is at wm8962_probe+0x134/0x6c8
-LR is at regmap_unlock_mutex+0x10/0x14
-pc : [<80452100>]    lr : [<80304cf4>]    psr: a0000113
-sp : bf875c98  ip : 00000000  fp : bf875cd4
-r10: 00000000  r9 : bfb1830c  r8 : 80779bc4
-r7 : 00000000  r6 : 00000001  r5 : bfbac010  r4 : bfb33e00
-r3 : 80304ce4  r2 : 00000000  r1 : 00000001  r0 : fffffffb
-Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 10c53c7d  Table: 1000404a  DAC: 00000017
-Process swapper/0 (pid: 1, stack limit = 0xbf874238)
-Stack: (0xbf875c98 to 0xbf876000)
-...
+Okay ... I've now bisected it to:-
 
-Fix the error by assigning pdata a correct pointer.
+a630fbfbb1beeffc5bbe542a7986bf2068874633 is the first bad commit
+commit a630fbfbb1beeffc5bbe542a7986bf2068874633
+Author: Tony Lindgren <tony@atomide.com>
+Date:   Mon Jun 10 07:39:09 2013 -0700
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- sound/soc/codecs/wm8962.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+    serial: omap: Fix device tree based PM runtime
+    
+    In the runtime_suspend function pdata is not being used, and
+    also blocks the function in device tree based booting. Fix it
+    by removing the unused pdata from the runtime_suspend function.
+    
+    Further, context loss count is not being passed in pdata, so
+    let's just reinitialize the port every time for those case.
+    This can be further optimized later on for the device tree
+    case by adding detection for the hardware state and possibly
+    by adding a driver specific autosuspend timeout.
+    
+    And doing this, we can then make the related dev_err into a
+    dev_dbg message instead of an error.
+    
+    In order for the wake-up events to work, we also need to set
+    autosuspend_timeout to -1 if 0, and also device_init_wakeup()
+    as that's not being done by the platform init code for the
+    device tree case.
+    
+    Note that this does not affect legacy booting, and in fact
+    might make it work for the cases where the context loss info
+    is not being passed in pdata.
+    
+    Thanks to Kevin Hilman <khilman@linaro.org> for debugging
+    and suggesting fixes for the autosuspend_timeout and
+    device_init_wakeup() related initializiation.
+    
+    Reviewed-by: Kevin Hilman <khilman@linaro.org>
+    Tested-by: Kevin Hilman <khilman@linaro.org>
+    Signed-off-by: Tony Lindgren <tony@atomide.com>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-diff --git a/sound/soc/codecs/wm8962.c b/sound/soc/codecs/wm8962.c
-index b1dc7d4..e2de9ec 100644
---- a/sound/soc/codecs/wm8962.c
-+++ b/sound/soc/codecs/wm8962.c
-@@ -3377,7 +3377,7 @@ static int wm8962_probe(struct snd_soc_codec *codec)
- {
- 	int ret;
- 	struct wm8962_priv *wm8962 = snd_soc_codec_get_drvdata(codec);
--	struct wm8962_pdata *pdata = dev_get_platdata(codec->dev);
-+	struct wm8962_pdata *pdata = &wm8962->pdata;
- 	int i, trigger, irq_pol;
- 	bool dmicclk, dmicdat;
- 
--- 
-1.7.9.5
+:040000 040000 38900a5a2ed6dfeb812d93bf1918725021298884 a38d37777dcd46276dc27b87157fd0b1e292804c M	drivers
