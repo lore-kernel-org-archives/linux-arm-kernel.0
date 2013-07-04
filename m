@@ -1,156 +1,22 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 4 Jul 2013 15:44:21 +0200
-Subject: [RFC PATCH 01/13] misc: atmel_ssc: add device tree DMA support
-In-Reply-To: <51D4CC94.3020908@atmel.com>
-References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
- <1372667978-4718-2-git-send-email-richard.genoud@gmail.com>
- <51D24299.9050209@atmel.com>
- <CACQ1gAgcc=j3kmcpjp8bbdHhxr_k=h8jJs6R_paJbPUMv74uGg@mail.gmail.com>
- <51D29927.80900@atmel.com>
- <CACQ1gAhnDk-qSt_5xrsMakXqGGDO5pEbA-9UDWCJG=AABDc+zg@mail.gmail.com>
- <CACQ1gAgPaRm3gxxJNgfj9bR565Q0+SNY3+EcjA_mrh1N+yPzSA@mail.gmail.com>
- <51D4CC94.3020908@atmel.com>
-Message-ID: <CACQ1gAio0ekQMgyfrLjTHmMPGJQoKoe61GreFQDN-iLjxbLQ0w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 4 Jul 2013 21:49:32 +0800
+Subject: Mainline crashes in wm8962_probe() on i.MX6
+In-Reply-To: <F7C43F8B2814514CA05F3436BC68046EF3A272@039-SN2MPN1-011.039d.mgd.msft.net>
+References: <F7C43F8B2814514CA05F3436BC68046EF3A272@039-SN2MPN1-011.039d.mgd.msft.net>
+Message-ID: <20130704134930.GC11046@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/7/4 Bo Shen <voice.shen@atmel.com>:
-> Hi Richard,
->
->
-> On 7/3/2013 23:51, Richard Genoud wrote:
->>>
->>> >but there's a violent hang (kernel stops, no trace) when I try the
->>> > record :
->>> >arecord -v -V stereo -Dplug:default -f cd -t wav -c 2 /tmp/toto.wav
->>> >last thing I see is :
->>> >dma dma0chan3: atc_control (3)
->
->
-> I don't meet this issue. Playback and recording works well on my side on
-> at91sam9g35ek board.
->
->
->>> >I'll try to trace that.
->>
->> I think it's DMA related.
->> the last thing done by the kernel is:
->>   i2c i2c-0: i2c_outb: 0x34 A
->>   i2c i2c-0: i2c_outb: 0x0c A
->>   i2c i2c-0: i2c_outb: 0x5a A
->> meaning: enable power on, LINE IN, ADC, OSC, on the WM8731
->> so, after that, data is comming from the codec to the SSC and then is
->> handled by the DMA.
->> there must be something nasty on the DMA bus to hang everything like
->> that...
->
->
-> Will you try i2c without DMA support to test this issue?
+On Thu, Jul 04, 2013 at 10:44:11AM +0000, Stehle Vincent-B46079 wrote:
+> Hi,
+> 
+> Mainline of today* will not boot anymore on i.MX6 with ARM config imx_v6_v7_defconfig. It crashes in wm8962_probe() (see log below).
+> 
+> Bisecting points at merge commit 1286da8bc009cb2aee7f285e94623fc974c0c983, but its two "parents" commits do not crash.
 
-Ok, I nailed it !
+Yeah, I just ran into it with linux-next and reported it there [1].  I
+will send a formal patch for it soon.
 
-To be sure we are on the same base, here is what I have done:
-onto next-20130704:
-- your 5 patches:
-ASoC: atmel_ssc_dai: move set dma data to startup callback
-ASoC: atmel_ssc_dai: add error mask define
-ASoC: atmel-pcm-dma: move prepare for dma to dai prepare
-ARM: atmel-ssc: change phybase type to dma_addr_t
-ASoC: atmel-pcm: use generic dmaengine framework
-- my patches 4-8:
-ARM: at91: DTS: sam9x5: add SSC DMA parameters
-ARM: AT91: DTS: sam9x5ek: add WM8731 codec
-ARM: AT91: DTS: sam9x5ek: add sound configuration
-ARM: AT91: DTS: sam9x5ek: enable SSC
-sound: sam9x5_wm8731: machine driver for at91sam9x5 wm8731 boards
+Shawn
 
-To be sure that dma-I2c doesn't disturb something, I use i2c gpio bitbang:
-diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-index 6684d4b..53a991e 100644
---- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-@@ -57,15 +57,6 @@
- 				status = "okay";
- 			};
-
--			i2c0: i2c at f8010000 {
--				status = "okay";
--
--				wm8731: wm8731 at 1a {
--					compatible = "wm8731";
--					reg = <0x1a>;
--				};
--			};
--
- 			pinctrl at fffff400 {
- 				mmc0 {
- 					pinctrl_board_mmc0: mmc0-board {
-@@ -114,6 +105,15 @@
- 		};
- 	};
-
-+	i2c at 0 {
-+		status = "okay";
-+
-+		wm8731: wm8731 at 1a {
-+			compatible = "wm8731";
-+			reg = <0x1a>;
-+		};
-+	};
-+
- 	sound {
- 		compatible = "atmel,sam9x5-audio-wm8731";
-
-with that configuration, it hangs when I do a:
-arecord -v -V stereo -Dplug:default -f cd -t wav -c 2 /tmp/toto.wav
-
-Now, if I remove the overrun error on ssc in rx_mask:
-diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-index 0ecf356..c04e825 100644
---- a/sound/soc/atmel/atmel_ssc_dai.c
-+++ b/sound/soc/atmel/atmel_ssc_dai.c
-@@ -83,7 +83,6 @@ static struct atmel_ssc_mask ssc_rx_mask = {
- 	.ssc_disable	= SSC_BIT(CR_RXDIS),
- 	.ssc_endx	= SSC_BIT(SR_ENDRX),
- 	.ssc_endbuf	= SSC_BIT(SR_RXBUFF),
--	.ssc_error	= SSC_BIT(SR_OVRUN),
- 	.pdc_enable	= ATMEL_PDC_RXTEN,
- 	.pdc_disable	= ATMEL_PDC_RXTDIS,
- };
-
-It doesn't hang any more doing a simple record.
-BUT it still hangs if we do record and play at the same time.
-
-Removing the overrun on tx_mask prevent the hang:
-diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-index 0ecf356..41e15c2 100644
---- a/sound/soc/atmel/atmel_ssc_dai.c
-+++ b/sound/soc/atmel/atmel_ssc_dai.c
-@@ -73,7 +73,6 @@ static struct atmel_ssc_mask ssc_tx_mask = {
- 	.ssc_disable	= SSC_BIT(CR_TXDIS),
- 	.ssc_endx	= SSC_BIT(SR_ENDTX),
- 	.ssc_endbuf	= SSC_BIT(SR_TXBUFE),
--	.ssc_error	= SSC_BIT(SR_OVRUN),
- 	.pdc_enable	= ATMEL_PDC_TXTEN,
- 	.pdc_disable	= ATMEL_PDC_TXTDIS,
- };
-
-i.e. when I revert "ASoC: atmel_ssc_dai: add error mask define", I
-don't see any hang.
-
-Could you test and confirm that behaviour please ?
-
-I attached a the (simple) .config I used for the tests.
-
-PS: I hope the patches won't be mangled by gmail...
-
-Best regards,
-Richard.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: snd_9x5_defconfig
-Type: application/octet-stream
-Size: 3939 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130704/0e273121/attachment.obj>
+[1] http://thread.gmane.org/gmane.linux.alsa.devel/109844
