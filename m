@@ -1,53 +1,47 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 4 Jul 2013 16:42:39 +0800
-Subject: [PATCH v2 4/5] ARM: dts: imx6q: add dte pinctrl for uart2
-In-Reply-To: <20130704072344.GB11046@S2101-09.ap.freescale.net>
-References: <1372844557-3078-1-git-send-email-b32955@freescale.com>
- <1372844557-3078-5-git-send-email-b32955@freescale.com>
- <20130704072344.GB11046@S2101-09.ap.freescale.net>
-Message-ID: <51D5357F.8040609@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 4 Jul 2013 09:35:20 +0100
+Subject: [PATCH V2] ARM: add missing __FINIT to head-common.S to match
+ __INIT
+In-Reply-To: <1372875174-26812-1-git-send-email-swarren@wwwdotorg.org>
+References: <1372875174-26812-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130704083520.GI24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?07?04? 15:23, Shawn Guo ??:
-> On Wed, Jul 03, 2013 at 05:42:36PM +0800, Huang Shijie wrote:
->> In imx6q-arm2 board, the UART2 works in the dte mode.
->> So add a pinctrl for it.
->>
->> Signed-off-by: Huang Shijie<b32955@freescale.com>
->> ---
->>   arch/arm/boot/dts/imx6q.dtsi |    9 +++++++++
->>   1 files changed, 9 insertions(+), 0 deletions(-)
-> Since imx6q and imx6dl are pin-to-pin compatible, from now on I would
-> require the same pin group be added for these two SoC together, so that
-> we can enforce the same label name.
->
-I knew it.
+On Wed, Jul 03, 2013 at 12:12:54PM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Macro __INIT is used to place various code in head-common.S into the init
+> section. This should be matched by a closing __FINIT at the end of the
+> code destined for the init section. Add this missing macro.
+> 
+> This historically caused no problem, because macro __CPUINIT was used at
+> the exact location where __FINIT was missing, which then placed following
+> code into the cpuinit section. However, with commit 22f0a2736 "init.h:
+> remove __cpuinit sections from the kernel" applied, __CPUINIT becomes a
+> no-op, thus leaving all this code in the init section, rather than the
+> regular text section. This caused issues such as secondary CPU boot
+> failures or crashes.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Acked-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> ---
+> v2: Moved __FINIT after lookup_processor_type, to correctly match the
+> location of __CPUINIT.
+> 
+> Russell, I assume I should add this to the ARM patch tracker.
 
-But this pinctrl is only used in imx6q-arm2 board which uses a big 
-armdillo board,
-so i did not add the same label to imx6dl.
+See the discussion I've had with Paul on this.  I disagree that adding
+__FINIT "solves" the problem.  It just _changes_ the possibilities for
+getting it wrong to a different set of possibilities.
 
-Do we have a imx6dl-arm2 board? if we have , i can add it.
+__FINIT just swaps the current section with the one which was last in
+use, which might be a fair way back up the file.  The problem is what
+happens if someone changes the section before the __INIT without
+checking the following code.
 
-
->> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
->> index 9a69891..8a518c6 100644
->> --- a/arch/arm/boot/dts/imx6q.dtsi
->> +++ b/arch/arm/boot/dts/imx6q.dtsi
->> @@ -266,6 +266,15 @@
->>   							MX6Q_PAD_EIM_D27__UART2_RX_DATA 0x1b0b1
->>   						>;
->>   					};
->> +
->> +					pinctrl_uart2_dte: uart2grp-2 {
->> +						fsl,pins =<
->> +							MX6Q_PAD_EIM_D26__UART2_RX_DATA 0x1b0b1
->> +							MX6Q_PAD_EIM_D27__UART2_TX_DATA 0x1b0b1
->> +							MX6Q_PAD_EIM_D28__UART2_CTS_B	0x1b0b1
->> +							MX6Q_PAD_EIM_D29__UART2_CTS_B	0x1b0b1
-> Why do you have two pads mux-ed on one function?
-I think the name of the PAD is wrong.
-
-thanks
-Huang Shijie
+If we want to mark the end of the .init.text section, then __FINIT is
+a good way to do that, but follow it with an explicit statement about
+what section you want the following code to be in to ensure that it
+is placed into the intended section irrespective of what future changes
+occur.
