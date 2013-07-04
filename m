@@ -1,50 +1,39 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Thu, 4 Jul 2013 23:32:56 +0300
-Subject: [PATCH] N900: add device tree
-In-Reply-To: <20130704202145.GB10752@amd.pavel.ucw.cz>
-References: <20130613145724.GH8164@atomide.com>
- <20130613155240.GB3775@amd.pavel.ucw.cz>
- <20130613161418.GJ8164@atomide.com>
- <20130613230808.GA14876@amd.pavel.ucw.cz>
- <20130614055629.GM8164@atomide.com>
- <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
- <20130617111031.GQ20992@atomide.com>
- <20130701211753.GC15318@amd.pavel.ucw.cz>
- <20130704171939.GA27374@blackmetal.musicnaut.iki.fi>
- <20130704202145.GB10752@amd.pavel.ucw.cz>
-Message-ID: <20130704203256.GB27374@blackmetal.musicnaut.iki.fi>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 4 Jul 2013 16:36:46 -0400 (EDT)
+Subject: [PATCH 2/2] USB: OHCI: make ohci-pxa27x a separate driver
+In-Reply-To: <1372958187-4039-3-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1307041633370.26847-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 4 Jul 2013, Manjunath Goudar wrote:
 
-On Thu, Jul 04, 2013 at 10:21:45PM +0200, Pavel Machek wrote:
-> > > This adds device tree with neccessary support to boot with functional
-> > > video (on both emulator and real N900 device).
-> > 
-> > Is this really correct? You have commented out the USB, so there is no
-> > way for a developer to interact with the device.
-> 
-> Well... I do not have USB & SDcard set up, so my testing was "does it
-> show failed to mount root message on screen". 
-> 
-> Now, if I do quick test of enabling it on 3.9, I get:
-> 
->   DTC     arch/arm/boot/dts/omap3-n900.dtb
-> Error: arch/arm/boot/dts/omap3-n900.dts:92.2-3 label or path,
-> 'usb_otg_hs', not found
-> FATAL ERROR: Syntax error parsing input tree
-> make[1]: *** [arch/arm/boot/dts/omap3-n900.dtb] Error 1
-> make: *** [dtbs] Error 2
+> Separate the  OHCI pxa27x/pxa3xx host controller driver from
+> ohci-hcd host code so that it can be built as a separate driver
+> module. This work is part of enabling multi-platform kernels on
+> ARM.
 
-You need 3.10. It was added in ad871c10b55654910ba97af00a00e65725da5e40
-(ARM: dts: OMAP: Add usb_otg and glue data to OMAP3+ boards).
+> +config USB_OHCI_HCD_PXA27X
+> +	tristate "Support for PXA27X/PXA3XX on-chip OHCI USB controller"
+> +	depends on USB_OHCI_HCD && ARCH_PXA
 
-3.9 is very old. :-)
+Shouldn't the ARCH_PXA part be the same as ...
 
-> If you could test the patches with the USB support uncommented, that
-> would be very good...
+> @@ -1184,11 +1184,6 @@ MODULE_LICENSE ("GPL");
+>  #define SA1111_DRIVER		ohci_hcd_sa1111_driver
+>  #endif
+>  
+> -#if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
 
-I can do that, but not before next week.
+... this?
 
-A.
+> diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
+> index 5fb91f1..791e2b5 100644
+> --- a/drivers/usb/host/ohci-pxa27x.c
+> +++ b/drivers/usb/host/ohci-pxa27x.c
+
+Several aspects of this are strange.  For example, consider how you 
+used the private part of the ohci_hcd structure and how the variable 
+names are inconsistent with the other OHCI glue drivers.
+
+Alan Stern
