@@ -1,18 +1,17 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 4 Jul 2013 14:56:59 +0800
-Subject: [PATCH 1/6] ARM: dts: i.MX27: Move IIM node under AIPI2 bus
-In-Reply-To: <1372780949-31897-1-git-send-email-shc_work@mail.ru>
-References: <1372780949-31897-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20130704065658.GG14617@S2101-09.ap.freescale.net>
+Date: Thu, 4 Jul 2013 15:05:55 +0800
+Subject: [PATCH] ARM: imx_v4_v5_defconfig: Select CONFIG_MACH_IMX25_DT
+In-Reply-To: <1372855377-19884-1-git-send-email-festevam@gmail.com>
+References: <1372855377-19884-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130704070553.GA11046@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 02, 2013 at 08:02:24PM +0400, Alexander Shiyan wrote:
-> This patch moves IIM node under AIPI2 bus, since this is proper
-> location for this module.
+On Wed, Jul 03, 2013 at 09:42:57AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> Allow booting a mx25 dt kernel by default.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-All applied, thanks.
-
-Shawn
+Applied, thanks.
