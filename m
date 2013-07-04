@@ -1,93 +1,43 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 3 Jul 2013 20:22:35 -0400
-Subject: [PATCH] ARM: move body of head-common.S back to text section
-In-Reply-To: <20130703172001.GH24642@n2100.arm.linux.org.uk>
-References: <1372805629-18382-1-git-send-email-swarren@wwwdotorg.org>
- <20130702232259.GH11625@codeaurora.org>
- <51D39004.9000907@wwwdotorg.org>
- <20130703051907.GA22702@windriver.com>
- <20130703100044.GG24642@n2100.arm.linux.org.uk>
- <20130703153012.GK22702@windriver.com>
- <20130703172001.GH24642@n2100.arm.linux.org.uk>
-Message-ID: <20130704002235.GL22702@windriver.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 4 Jul 2013 09:15:00 +0800
+Subject: [RFC PATCH 01/13] misc: atmel_ssc: add device tree DMA support
+In-Reply-To: <CACQ1gAgPaRm3gxxJNgfj9bR565Q0+SNY3+EcjA_mrh1N+yPzSA@mail.gmail.com>
+References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
+ <1372667978-4718-2-git-send-email-richard.genoud@gmail.com>
+ <51D24299.9050209@atmel.com>
+ <CACQ1gAgcc=j3kmcpjp8bbdHhxr_k=h8jJs6R_paJbPUMv74uGg@mail.gmail.com>
+ <51D29927.80900@atmel.com>
+ <CACQ1gAhnDk-qSt_5xrsMakXqGGDO5pEbA-9UDWCJG=AABDc+zg@mail.gmail.com>
+ <CACQ1gAgPaRm3gxxJNgfj9bR565Q0+SNY3+EcjA_mrh1N+yPzSA@mail.gmail.com>
+Message-ID: <51D4CC94.3020908@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH] ARM: move body of head-common.S back to text section] On 03/07/2013 (Wed 18:20) Russell King - ARM Linux wrote:
+Hi Richard,
 
-> On Wed, Jul 03, 2013 at 11:30:12AM -0400, Paul Gortmaker wrote:
-> > [Re: [PATCH] ARM: move body of head-common.S back to text section] On 03/07/2013 (Wed 11:00) Russell King - ARM Linux wrote:
-> > 
-> > > On Wed, Jul 03, 2013 at 01:19:07AM -0400, Paul Gortmaker wrote:
-> > > > As an aside, I'm now thinking any __INIT that implicitly rely on EOF for
-> > > > closure are nasty traps waiting to happen and it might be worthwhile to
-> > > > audit and explicitly __FINIT them before someone appends to the file...
-> > > 
-> > > That hides a different kind of bug though - I hate __FINIT for exactly
-> > > that reason.  Consider this:
-> > 
-> > Agreed - perhaps masking that it is a ".previous" just hides the fact
-> > that it is more like a pop operation vs. an on/off operation, or per
-> > function as we have in C.
-> 
-> I read the info pages, because I thought it was a pop operation too.
-> I was concerned that .section didn't push the previous section onto the
-> stack.
-> 
-> However, .popsection is the pseudio-op which pops.  .previous just toggles
-> the current section with the section immediately before it.
-> 
-> So:
-> 
-> 	.text
-> 	.data
-> 	.previous
-> 	/* this is .text */
-> 	.previous
-> 	/* this is .data */
-> 	.previous
-> 	/* this is .text */
-> 	.previous
-> 	/* this is .data */
+On 7/3/2013 23:51, Richard Genoud wrote:
+>> >but there's a violent hang (kernel stops, no trace) when I try the record :
+>> >arecord -v -V stereo -Dplug:default -f cd -t wav -c 2 /tmp/toto.wav
+>> >last thing I see is :
+>> >dma dma0chan3: atc_control (3)
 
-Cool -- I bet we weren't the only ones thinking it was a pop.  Thanks.
+I don't meet this issue. Playback and recording works well on my side on 
+at91sam9g35ek board.
 
-Does that make __FINIT less evil than we previously assumed?  I think
-your example was the following pseudo-patch:
+>> >I'll try to trace that.
+> I think it's DMA related.
+> the last thing done by the kernel is:
+>   i2c i2c-0: i2c_outb: 0x34 A
+>   i2c i2c-0: i2c_outb: 0x0c A
+>   i2c i2c-0: i2c_outb: 0x5a A
+> meaning: enable power on, LINE IN, ADC, OSC, on the WM8731
+> so, after that, data is comming from the codec to the SSC and then is
+> handled by the DMA.
+> there must be something nasty on the DMA bus to hang everything like that...
 
+Will you try i2c without DMA support to test this issue?
 
-	.text
-	<some text>
-+	.data
-+ 	<some data>
-	__INIT
-	<big hunk of init>
-	__FINIT
-	/* this below used to be text */
-	<more stuff that was originally meant for text>
+> Richard.
 
-Even if it is a toggle (vs. pop), the end text will now become data,
-so the no-op __FINIT with an explicit section called out just below
-it may still be the most unambiguous way to indicate what is going on.
-
-> 
-> > That seems reasonable to me.  I can't think of any self auditing that is
-> > reasonably simple to implement.  One downside of __FINIT as a no-op vs.
-> > what it is today, is that a dangling __FINIT in a file with no other
-> > previous sections will emit a warning.  But that is a small low value
-> > corner case I think.
-> 
-> That warning from __FINIT will only happen if there has been no section
-> or .text or .data statement in the file at all.  As soon as you have any
-> statement setting any kind of section, .previous doesn't warn.
-> 
-> So:
-> 
-> 	.text
-> 	...
-> 	__FINIT
-> 
-> produces no warning.o
-
-Yep -- we are both saying the same thing here - hence why I called it a
-small low value corner case.
+Best Regards,
+Bo Shen
