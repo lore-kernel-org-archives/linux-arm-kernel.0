@@ -1,85 +1,128 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Thu, 04 Jul 2013 20:36:05 +0200
-Subject: Appended DTB files for multi-machine kernels
-In-Reply-To: <51D5A938.30607@gmail.com>
-References: <51D5A938.30607@gmail.com>
-Message-ID: <51D5C095.4070909@gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 4 Jul 2013 15:55:06 -0300
+Subject: [PATCH] ARM: dts: imx6dl-wandboard: Add audio support
+Message-ID: <1372964106-27928-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 04.07.2013 18:56, schrieb Daniel Mack:
-> Hi,
->
-> I'm facing a problem with a transition from legacy board-file driven ARM
-> machines to DTB, and I'm under the impression that a solution for it
-> could be of broader interest.
->
-> In short, devices that have been deployed in quantities come in three
-> hardware variants, which all boot with a unique machine-id. We ship
-> kernel images that have board support for all three machine types, and
-> do minor fixups to platform data of some drivers at runtime, depending
-> on the board revision number (passed in via ATAGs).
->
-> The built-in support for attaching a DTB to the zImage does not suffice
-> here, because we have one image for all models, and also, we couldn't do
-> a 'per-board-revision' selection that way either.
->
-> Unless I missed some recent discussion, this case is not easy to handle.
-> Yes, I know that these kind of things should be handled by a
-> next-generation bootloader, but in our case, we want to avoid a loader
-> update of already shipped hardware by all means.
->
-> As a solution, I'm thinking of a small framework that could for example
-> work as follows.
->
-> a) A small mechanism allows storing multiple DTB binary files inside the
-> kernel binary at compile time, and a simple function can extract them
-> again by name at runtime (something like what the firmware framework
-> does, but I don't know if that one can be used at such an early stage in
-> the boot process).
->
-> b) A DT_MACHINE_START-like macro takes both the machine ID and the name
-> of a DTB file that is compiled in. When matched, generic functions would
-> load the given file, populate the device tree and then conduct a generic
-> DT boot for the specified platform.
->
-> c) Allow users to open-code the DTB lookup depending on whatever kind of
-> runtime information (be it the board_revision or anything else).
->
->
-> Of course, everything has to be an opt-in that stubs itself out at zero
-> costs if not needed.
->
->
-> I'm open to opinion and sugesstions :)
+Wandboard has a sgtl5000 codec. 
 
-Depending on how different the board support for all your three 
-machine types is, there might be an (of course unimplemented) option
+Add audio support.
 
-d) have only one DTB file which contains all the information for your 
-three machine types and then have a mechanism which selects 
-("activates") the entries valid for the board you boot based on some 
-external information, e.g. the machine ID. I.e. you have one DTB file 
-which contains alternative entries for the different boards. And which 
-entry is used/activated is selected at (early) kernel runtime by the 
-machine ID.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6dl-wandboard.dts | 73 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6dl.dtsi          |  7 ++++
+ 2 files changed, 80 insertions(+)
 
-What I'm thinking about here is an extended version of the device tree 
-overlays used (invented?) by the Beagle board community. They have a 
-base device tree file and for their add on boards (capes) they load 
-device tree overlay files based on an EEPROM ID read.
-
-http://elinux.org/BeagleBone_and_the_3.8_Kernel#Cape_Manager_and_Device_Tree_Overlays
-
-With this, they extend the device tree at runtime based on the 
-attached extension boards.
-
-Going one step further, having the alternative plugin/overlay 
-definitions already in the initial DTB file and being able to 
-select/activate single plugin/overlay definitions already in the early 
-boot stage should give a general mechanism to support several, similar 
-boards with slightly different configurations with one DTB.
-
-Best regards
-
-Dirk
+diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dts b/arch/arm/boot/dts/imx6dl-wandboard.dts
+index bfc59c3..ab6a053 100644
+--- a/arch/arm/boot/dts/imx6dl-wandboard.dts
++++ b/arch/arm/boot/dts/imx6dl-wandboard.dts
+@@ -18,6 +18,74 @@
+ 	memory {
+ 		reg = <0x10000000 0x40000000>;
+ 	};
++
++	regulators {
++		compatible = "simple-bus";
++
++		reg_2p5v: 2p5v {
++			compatible = "regulator-fixed";
++			regulator-name = "2P5V";
++			regulator-min-microvolt = <2500000>;
++			regulator-max-microvolt = <2500000>;
++			regulator-always-on;
++		};
++
++		reg_3p3v: 3p3v {
++			compatible = "regulator-fixed";
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++	};
++
++	sound {
++		compatible = "fsl,imx6dl-wandboard-sgtl5000",
++			     "fsl,imx-audio-sgtl5000";
++		model = "imx6dl-wandboard-sgtl5000";
++		ssi-controller = <&ssi1>;
++		audio-codec = <&codec>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++		mux-int-port = <1>;
++		mux-ext-port = <3>;
++	};
++};
++
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux_2>;
++	status = "okay";
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2_2>;
++	status = "okay";
++
++	codec: sgtl5000 at 0a {
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		clocks = <&clks 169>;
++		VDDA-supply = <&reg_2p5v>;
++		VDDIO-supply = <&reg_3p3v>;
++	};
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog>;
++
++	hog {
++		pinctrl_hog: hoggrp {
++			fsl,pins = <
++				MX6DL_PAD_GPIO_0__CCM_CLKO1    0x130b0
++			>;
++		};
++	};
+ };
+ 
+ &fec {
+@@ -27,6 +95,11 @@
+ 	status = "okay";
+ };
+ 
++&ssi1 {
++	fsl,mode = "i2s-slave";
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1_1>;
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 2b5628d..4505109 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -196,6 +196,13 @@
+ 							MX6DL_PAD_EIM_D16__I2C2_SDA 0x4001b8b1
+ 						>;
+ 					};
++
++					pinctrl_i2c2_2: i2c2grp-2 {
++						fsl,pins = <
++							MX6DL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
++							MX6DL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
++						>;
++					};
+ 				};
+ 
+ 				i2c3 {
+-- 
+1.8.1.2
