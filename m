@@ -1,66 +1,55 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 4 Jul 2013 17:40:25 +0530
-Subject: [PATCH 1/4] arm: omap: Add phy binding info for musb in plat data
-In-Reply-To: <20130704114439.GA5523@atomide.com>
-References: <1371631951-369-1-git-send-email-kishon@ti.com>
- <1371631951-369-2-git-send-email-kishon@ti.com>
- <20130704114439.GA5523@atomide.com>
-Message-ID: <51D56631.2010901@ti.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 4 Jul 2013 13:11:17 +0100
+Subject: [PATCH] arm64: KVM: Kconfig integration
+In-Reply-To: <1372939377-24657-1-git-send-email-marc.zyngier@arm.com>
+References: <1372939377-24657-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAFEAcA-LCenzvJSyyGBMAxraiJx-4OT2dnMsnCGzWJ-ESEkAiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thursday 04 July 2013 05:14 PM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [130619 01:58]:
->> In order for controllers to get PHY in case of non dt boot, the phy
->> binding information (phy label) should be added in the platform
->> data of the controller.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> Acked-by: Felipe Balbi <balbi@ti.com>
->> Tested-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
->> ---
->>   arch/arm/mach-omap2/usb-musb.c |    6 +++++-
->>   include/linux/usb/musb.h       |    3 +++
->>   2 files changed, 8 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
->> index 3242a55..5ddbe39 100644
->> --- a/arch/arm/mach-omap2/usb-musb.c
->> +++ b/arch/arm/mach-omap2/usb-musb.c
->> @@ -85,8 +85,12 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
->>   	musb_plat.mode = board_data->mode;
->>   	musb_plat.extvbus = board_data->extvbus;
->>
->> -	if (cpu_is_omap44xx())
->> +	if (cpu_is_omap44xx()) {
->>   		musb_plat.has_mailbox = true;
->> +		musb_plat.phy_name = "omap-usb2";
->> +	} else if (cpu_is_omap34xx()) {
->> +		musb_plat.phy_name = "twl4030";
->> +	}
->>
->>   	if (soc_is_am35xx()) {
->>   		oh_name = "am35x_otg_hs";
+On 4 July 2013 13:02, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Finally plug KVM/arm64 into the config system, making it possible
+> to enable KVM support on AArch64 CPUs.
 >
-> Care to refresh this patch against the current mainline tree?
+> +config KVM
+> +       bool "Kernel-based Virtual Machine (KVM) support"
+> +       select MMU_NOTIFIER
+> +       select PREEMPT_NOTIFIERS
+> +       select ANON_INODES
+> +       select KVM_MMIO
+> +       select KVM_ARM_HOST
+> +       select KVM_ARM_VGIC
+> +       select KVM_ARM_TIMER
+> +       ---help---
+> +         Support hosting virtualized guest machines.
+> +
+> +         This module provides access to the hardware capabilities through
+> +         a character device node named /dev/kvm.
 
-I'll do that on monday as I'm not in office and I dont have any boards
-to test at my disposal now.
-> Now omap4 is DT only, so this part won't apply. Mostly I'm wondering
-> what the phy_name should be for am35xx that's not covered by this
-> patch.
+"This module" ? I didn't think we supported KVM-as-a-module on ARM...
 
-am35xx doesn't have a separate PHY driver yet (I guess the programming
-is done in the controller code now). So this binding is not needed for
-am35xx.
->
-> Also let me know if the last patch is safe to queue alone as a fix
-> or if it depends on the driver related changes in this series.
+> +
+> +         If unsure, say N.
+> +
+> +config KVM_ARM_HOST
+> +       bool
+> +       ---help---
+> +         Provides host support for ARM processors.
+> +
+> +config KVM_ARM_VGIC
+> +        bool
+> +       depends on KVM_ARM_HOST && OF
+> +       select HAVE_KVM_IRQCHIP
+> +       ---help---
+> +         Adds support for a hardware assisted, in-kernel GIC emulation.
+> +
+> +config KVM_ARM_TIMER
+> +        bool
+> +       depends on KVM_ARM_VGIC
+> +       ---help---
+> +         Adds support for the Architected Timers in virtual machines
 
-No. The last patch is kind-of cleanup needed after applying the first
-3 patches. It's better it's applied along with the other patches.
+Trailing '.' would be consistent with the other config options.
 
-Thanks
-Kishon
+thanks
+-- PMM
