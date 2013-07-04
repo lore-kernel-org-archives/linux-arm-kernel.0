@@ -1,32 +1,43 @@
 From: Baohua.Song@csr.com (Barry Song)
-Date: Thu, 4 Jul 2013 15:54:52 +0800
-Subject: [PATCH 0/5] a bundle of minor fixes for CSR SiRF pinctrl drivers
-Message-ID: <1372924492-5477-1-git-send-email-Baohua.Song@csr.com>
+Date: Thu, 4 Jul 2013 15:55:25 +0800
+Subject: [PATCH 1/5] pinctrl: sirf: fix the pin number and mux bit for usp0
+Message-ID: <1372924529-5519-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-this patchset is againest for-next branch of your tree. i guess there will
-be no conflict in 3.11-rc.
+From: Qipan Li <Qipan.Li@csr.com>
 
-Barry Song (2):
-  arm/dts: sirf: fix the pingroup name mismatch between drivers and dts
-  pinctrl: sirf: add freeze and restore entries for hibernation support
+we missed a pin and related mux bit for usp pin group, this
+patch fixes it.
 
-Qipan Li (2):
-  pinctrl: sirf: fix the pin number and mux bit for usp0
-  pinctrl: sirf: add usp0_uart_nostreamctrl pin group for usp-uart
-    without flowctrl
+Signed-off-by: Qipan Li <Qipan.Li@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/pinctrl/sirf/pinctrl-atlas6.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Rongjun Ying (1):
-  pinctrl: sirf: fix the checkpatch issue about indentation
-
- arch/arm/boot/dts/atlas6.dtsi         | 22 ++++++++++++++--------
- arch/arm/boot/dts/prima2.dtsi         | 16 ++++++++--------
- drivers/pinctrl/sirf/pinctrl-atlas6.c | 24 ++++++++++++++++++++++--
- drivers/pinctrl/sirf/pinctrl-sirf.c   |  8 +++++---
- 4 files changed, 49 insertions(+), 21 deletions(-)
-
+diff --git a/drivers/pinctrl/sirf/pinctrl-atlas6.c b/drivers/pinctrl/sirf/pinctrl-atlas6.c
+index 1fa39a4..c641be9 100644
+--- a/drivers/pinctrl/sirf/pinctrl-atlas6.c
++++ b/drivers/pinctrl/sirf/pinctrl-atlas6.c
+@@ -496,7 +496,7 @@ static const unsigned sdmmc5_pins[] = { 24, 25, 26 };
+ static const struct sirfsoc_muxmask usp0_muxmask[] = {
+ 	{
+ 		.group = 1,
+-		.mask = BIT(19) | BIT(20) | BIT(21) | BIT(22),
++		.mask = BIT(19) | BIT(20) | BIT(21) | BIT(22) | BIT(23),
+ 	},
+ };
+ 
+@@ -507,7 +507,7 @@ static const struct sirfsoc_padmux usp0_padmux = {
+ 	.funcval = 0,
+ };
+ 
+-static const unsigned usp0_pins[] = { 51, 52, 53, 54 };
++static const unsigned usp0_pins[] = { 51, 52, 53, 54, 55 };
+ 
+ static const struct sirfsoc_muxmask usp1_muxmask[] = {
+ 	{
 -- 
 1.8.2.3
 
