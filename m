@@ -1,39 +1,28 @@
-From: mpfj-list@newflow.co.uk (Mark Jackson)
-Date: Thu, 04 Jul 2013 17:00:14 +0100
-Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
-In-Reply-To: <51D59146.3070002@newflow.co.uk>
-References: <51D577E6.5010507@newflow.co.uk> <51D59146.3070002@newflow.co.uk>
-Message-ID: <51D59C0E.8080003@newflow.co.uk>
+From: Thomas.Betker@rohde-schwarz.com (Thomas.Betker at rohde-schwarz.com)
+Date: Thu, 4 Jul 2013 18:04:14 +0200
+Subject: SPI: DUAL/QUAD support
+In-Reply-To: <20130704154927.GE27646@sirena.org.uk>
+References: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>
+ <20130704130017.GA25997@sig21.net>
+ <OFA0D5839D.0594EA10-ONC1257B9E.004A7347-C1257B9E.00524BA5@rohde-schwarz.com>
+ <20130704154927.GE27646@sirena.org.uk>
+Message-ID: <OFAD729A05.8C915625-ONC1257B9E.00576B25-C1257B9E.0058477D@rohde-schwarz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/13 16:14, Mark Jackson wrote:
-> On 04/07/13 14:25, Mark Jackson wrote:
->> Our custom AM335x board has been booting just fine under 3.10.0-rc4.
->>
->> I've just done a git pull to update to 3.10 (now that it's released)
->> and the board now hangs.
->>
->> Before I start trying to bisect the issue, does anyone have an clues ?
-> 
-> Okay ... I've now bisected it to:-
-> 
-> a630fbfbb1beeffc5bbe542a7986bf2068874633 is the first bad commit
-> commit a630fbfbb1beeffc5bbe542a7986bf2068874633
-> Author: Tony Lindgren <tony@atomide.com>
-> Date:   Mon Jun 10 07:39:09 2013 -0700
-> 
->     serial: omap: Fix device tree based PM runtime
+Hello Mark:
 
-However, reverting the commit does *not* fix the issue, weird !!
+> Well, there's two bits here.  One is the support in the client drivers
+> for using the extra data lines and the other is the support in the SPI
+> core for telling controllers to do this.  We need that second bit in
+> place before the first one can be implemented.
 
-But I have now tested:-
+I am not sure if we do. In the system I am working on, the QSPI controller 
+recognizes the quad mode commands from the Tx data and automatically 
+switches modes; no manual intervention by the flash driver is needed.
 
-v3.10-rc4     -> works
-v3.10-rc5     -> works
-v3.10-rc6     -> works
-v3.10-rc7     -> works
-v3.10         -> works
-origin/master -> hangs
+I agree that this may not be the case for all SPI controllers. Yuhang, can 
+you tell us what your controller will do?
 
-Any ideas ?
+Best regards,
+Thomas
