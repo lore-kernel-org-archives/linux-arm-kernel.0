@@ -1,54 +1,96 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 4 Jul 2013 23:42:36 +0200 (CEST)
-Subject: [PATCH v5] ARM: clocksource: add support for MOXA ART SoCs
-In-Reply-To: <1372940383-5957-1-git-send-email-jonas.jensen@gmail.com>
-References: <1372687359-18235-1-git-send-email-jonas.jensen@gmail.com>
- <1372940383-5957-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <alpine.DEB.2.02.1307042211420.11637@ionos.tec.linutronix.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 04 Jul 2013 15:25:38 -0700
+Subject: [RFC] clk: add flags to distinguish xtal clocks
+In-Reply-To: <1372971912-10877-1-git-send-email-coelho@ti.com>
+References: <1372971912-10877-1-git-send-email-coelho@ti.com>
+Message-ID: <20130704222538.10823.2559@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 4 Jul 2013, Jonas Jensen wrote:
-
-> This patch adds an clocksource driver for the main timer(s)
-> found on MOXA ART SoCs.
+Quoting Luciano Coelho (2013-07-04 14:05:12)
+> Add a flag that indicate whether the clock is a crystal or not.  Since
+> no clocks set this flag right now, include an additional flag that
+> indicates whether the type is set or not.  If the CLK_IS_TYPE_DEFINED
+> flag is not set, the value of the CLK_IS_TYPE_XTAL flag is undefined.
+> This ensures backwards compatibility.
 > 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> Additionally, parse a new device tree binding in clk-fixed-rate to set
+> this flag.
+> 
+> Signed-off-by: Luciano Coelho <coelho@ti.com>
 > ---
 > 
-> Notes:
->     Applies to next-20130703
->     
->     Changes since v4:
->     
->     1. add general cache for TIMER_CR register
+> I'm not  familiar with the common clock framework and I'm not
+> entirely sure the flags can be used in such a way, but to me it looks
+> reasonable, since some clock consumers may need to know what type of
+> clock is being provided.
+> 
+> Specifically, the wl12xx firmware needs to know if the clock is XTAL
+> or not to handle the stabilization and boosts properly.
 
-What you implemented is not a register cache. A register cache is
-caching the current value and not some initial constant.
- 
-> +static void moxart_clkevt_mode(enum clock_event_mode mode,
-> +			       struct clock_event_device *clk)
-> +{
-> +	switch (mode) {
-> +	case CLOCK_EVT_MODE_RESUME:
-> +	case CLOCK_EVT_MODE_ONESHOT:
-> +		writel(timereg_cache & ~TIMEREG_CR_1_ENABLE, base + TIMER_CR);
+Hi Luciano,
 
-You just modify bits on the "cache" variable. though you are not
-caching it. As it seems to work it looks like this register simply can
-be written with constants.
+I'd like clarification on one point. Is the same clock input signal used
+on the wifi chip? What I mean is, are there multiple clock inputs and
+XTAL is one, and not-XTAL is another?
 
-> +	timereg_cache = readl(base + TIMER_CR) | TIMEREG_CR_2_ENABLE;
+Or is it the same clock input and basically the problem is that you need
+to know what kind of waveform to expect (e.g. square versus sine)?
 
-Why are you reading that back? You know excactly which of the timers
-you are using and none of those should be enabled before you reach
-that code. If it one of them is enabled by the boot loader you better
-disable it in this init function. 
+Regards,
+Mike
 
-Now if you disable all of those timers and just use a known set, then
-you can do without a pseudo cache variable and just write constants
-into the control register, right ?
-
-Thanks,
-
-	tglx
+> 
+> My main idea is that I need to pass this information in the device
+> tree definition of the clocks, so that the driver can pass this
+> information on to the firmware.
+> 
+> Please let me know if this looks ok or not.  If not, please let me
+> know if you have any other ideas on how to solve my problem (of
+> knowing whether the clock attached to the WiLink chip is XTAL or not).
+> 
+> 
+> 
+> 
+>  drivers/clk/clk-fixed-rate.c |    6 +++++-
+>  include/linux/clk-provider.h |    2 ++
+>  2 files changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
+> index dc58fbd..4003a82 100644
+> --- a/drivers/clk/clk-fixed-rate.c
+> +++ b/drivers/clk/clk-fixed-rate.c
+> @@ -90,13 +90,17 @@ void of_fixed_clk_setup(struct device_node *node)
+>         struct clk *clk;
+>         const char *clk_name = node->name;
+>         u32 rate;
+> +       unsigned long flags = CLK_IS_ROOT;
+>  
+>         if (of_property_read_u32(node, "clock-frequency", &rate))
+>                 return;
+>  
+> +       if (of_property_read_bool(node, "clock-xtal"))
+> +               flags |= CLK_IS_TYPE_DEFINED | CLK_IS_TYPE_XTAL;
+> +
+>         of_property_read_string(node, "clock-output-names", &clk_name);
+>  
+> -       clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
+> +       clk = clk_register_fixed_rate(NULL, clk_name, NULL, flags, rate);
+>         if (!IS_ERR(clk))
+>                 of_clk_add_provider(node, of_clk_src_simple_get, clk);
+>  }
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 1186098..034320b 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -27,6 +27,8 @@
+>  #define CLK_IS_ROOT            BIT(4) /* root clk, has no parent */
+>  #define CLK_IS_BASIC           BIT(5) /* Basic clk, can't do a to_clk_foo() */
+>  #define CLK_GET_RATE_NOCACHE   BIT(6) /* do not use the cached clk rate */
+> +#define CLK_IS_TYPE_DEFINED    BIT(7) /* the clock type is defined */
+> +#define CLK_IS_TYPE_XTAL       BIT(8) /* this is a crystal clock */
+>  
+>  struct clk_hw;
+>  
+> -- 
+> 1.7.10.4
