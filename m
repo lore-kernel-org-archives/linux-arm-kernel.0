@@ -1,58 +1,31 @@
-From: mpfj-list@newflow.co.uk (Mark Jackson)
-Date: Thu, 04 Jul 2013 16:14:14 +0100
-Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
-In-Reply-To: <51D577E6.5010507@newflow.co.uk>
-References: <51D577E6.5010507@newflow.co.uk>
-Message-ID: <51D59146.3070002@newflow.co.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 4 Jul 2013 12:16:36 -0300
+Subject: imx25: How to get frame buffer device in a system using device
+ tree
+In-Reply-To: <CAO8h3eFq9WhvZYbbeFfWgVEXViR8MAcGaztsvvaLpFSW-W6CfA@mail.gmail.com>
+References: <CAO8h3eFq9WhvZYbbeFfWgVEXViR8MAcGaztsvvaLpFSW-W6CfA@mail.gmail.com>
+Message-ID: <CAOMZO5Aat-iAN_TJ6BXEopB+WCkKgLjWh67sCXg0jd1DtzmKSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/13 14:25, Mark Jackson wrote:
-> Our custom AM335x board has been booting just fine under 3.10.0-rc4.
-> 
-> I've just done a git pull to update to 3.10 (now that it's released)
-> and the board now hangs.
-> 
-> Before I start trying to bisect the issue, does anyone have an clues ?
+Hi Matthias,
 
-Okay ... I've now bisected it to:-
+On Thu, Jul 4, 2013 at 12:03 PM, Matthias Wei?er <m.weisser.m@gmail.com> wrote:
+> Hi
+>
+> I am currently try to get Linux running on a custom imx25 hardware
+> using device tree. So far I am quite successfull and have the system
+> up using current mainline kernel and a NFS root file system. Now I
+> would like to have the framebuffer driver to get something on the LCD.
+>
+> My dts file looks like this:
 
-a630fbfbb1beeffc5bbe542a7986bf2068874633 is the first bad commit
-commit a630fbfbb1beeffc5bbe542a7986bf2068874633
-Author: Tony Lindgren <tony@atomide.com>
-Date:   Mon Jun 10 07:39:09 2013 -0700
+These mx27 examples can help you to implement the support for mx25:
 
-    serial: omap: Fix device tree based PM runtime
-    
-    In the runtime_suspend function pdata is not being used, and
-    also blocks the function in device tree based booting. Fix it
-    by removing the unused pdata from the runtime_suspend function.
-    
-    Further, context loss count is not being passed in pdata, so
-    let's just reinitialize the port every time for those case.
-    This can be further optimized later on for the device tree
-    case by adding detection for the hardware state and possibly
-    by adding a driver specific autosuspend timeout.
-    
-    And doing this, we can then make the related dev_err into a
-    dev_dbg message instead of an error.
-    
-    In order for the wake-up events to work, we also need to set
-    autosuspend_timeout to -1 if 0, and also device_init_wakeup()
-    as that's not being done by the platform init code for the
-    device tree case.
-    
-    Note that this does not affect legacy booting, and in fact
-    might make it work for the cases where the context loss info
-    is not being passed in pdata.
-    
-    Thanks to Kevin Hilman <khilman@linaro.org> for debugging
-    and suggesting fixes for the autosuspend_timeout and
-    device_init_wakeup() related initializiation.
-    
-    Reviewed-by: Kevin Hilman <khilman@linaro.org>
-    Tested-by: Kevin Hilman <khilman@linaro.org>
-    Signed-off-by: Tony Lindgren <tony@atomide.com>
-    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+https://git.linaro.org/gitweb?p=people/shawnguo/linux-2.6.git;a=commitdiff;h=dcd23b848ed2e35f968a10984e255527b4dde3d5;hp=807f38ec8aae50626d5b4705a0a0f5c585275867
 
-:040000 040000 38900a5a2ed6dfeb812d93bf1918725021298884 a38d37777dcd46276dc27b87157fd0b1e292804c M	drivers
+https://git.linaro.org/gitweb?p=people/shawnguo/linux-2.6.git;a=blob;f=arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts;h=390d8f2f84d120bace022322c6319d82cf7e5a47;hb=refs/heads/for-next
+
+Regards,
+
+Fabio Estevam
