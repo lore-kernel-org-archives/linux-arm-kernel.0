@@ -1,62 +1,32 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 4 Jul 2013 04:47:56 -0700
-Subject: [PATCH] N900: enable N900-specific drivers even if device tree
- is enabled
-In-Reply-To: <20130701211504.GB15318@amd.pavel.ucw.cz>
-References: <20130613141001.GF8164@atomide.com>
- <20130613142809.GA3775@amd.pavel.ucw.cz>
- <20130613145724.GH8164@atomide.com>
- <20130613155240.GB3775@amd.pavel.ucw.cz>
- <20130613161418.GJ8164@atomide.com>
- <20130613230808.GA14876@amd.pavel.ucw.cz>
- <20130614055629.GM8164@atomide.com>
- <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
- <20130617111031.GQ20992@atomide.com>
- <20130701211504.GB15318@amd.pavel.ucw.cz>
-Message-ID: <20130704114755.GE5523@atomide.com>
+Date: Thu, 4 Jul 2013 04:48:11 -0700
+Subject: [PATCHv3 5/6] arm: omap2plus_defconfig: enable TI bandgap driver
+In-Reply-To: <51C0C2A8.4020707@ti.com>
+References: <1370637968-23299-1-git-send-email-eduardo.valentin@ti.com>
+ <1370637968-23299-6-git-send-email-eduardo.valentin@ti.com>
+ <51C0C2A8.4020707@ti.com>
+Message-ID: <20130704114811.GG5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [130701 14:21]:
+* Eduardo Valentin <eduardo.valentin@ti.com> [130618 13:33]:
+> Tony,
 > 
-> We still need video & sound drivers with device tree enabled.
+> On 07-06-2013 16:46, Eduardo Valentin wrote:
+> > Enable the bandgap driver for TI SoCs thermal support.
+> > 
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> > Cc: AnilKumar Ch <anilkumar@ti.com>
+> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-kernel at vger.kernel.org
+> > Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
 > 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> Is it possible for you to queue this one and patch 6 for 3.11?
 
-Thanks, applying this into omap-for-v3.11/fixes. Benoit should
-queue the .dts related changes.
+Yes thanks applying into omap-for-v3.11/fixes.
 
 Tony
-
-> 
-> ---
-> 
-> Patch against 3.10.
-> 
-> --- linux-delme-clean//arch/arm/mach-omap2/board-rx51-video.c	2013-07-01 21:51:07.000000000 +0200
-> +++ linux-delme/arch/arm/mach-omap2/board-rx51-video.c	2013-07-01 22:50:27.000000000 +0200
-> @@ -61,7 +61,7 @@
->  
->  static int __init rx51_video_init(void)
->  {
-> -	if (!machine_is_nokia_rx51())
-> +	if (!machine_is_nokia_rx51() && !of_machine_is_compatible("nokia,omap3-n900"))
->  		return 0;
->  
->  	if (omap_mux_init_gpio(RX51_LCD_RESET_GPIO, OMAP_PIN_OUTPUT)) {
-> diff -urN linux-delme-clean//sound/soc/omap/rx51.c linux-delme/sound/soc/omap/rx51.c
-> --- linux-delme-clean//sound/soc/omap/rx51.c	2013-07-01 21:54:49.000000000 +0200
-> +++ linux-delme/sound/soc/omap/rx51.c	2013-07-01 22:50:27.000000000 +0200
-> @@ -396,7 +396,7 @@
->  {
->  	int err;
->  
-> -	if (!machine_is_nokia_rx51())
-> +	if (!machine_is_nokia_rx51() && !of_machine_is_compatible("nokia,omap3-n900"))
->  		return -ENODEV;
->  
->  	err = gpio_request_one(RX51_TVOUT_SEL_GPIO,
-> 
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
