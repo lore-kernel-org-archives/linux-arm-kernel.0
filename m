@@ -1,46 +1,41 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 4 Jul 2013 17:11:33 +0000 (UTC)
-Subject: OMAP baseline test results for v3.10-rc7
-In-Reply-To: <20130701204236.GA805@arwen.pp.htv.fi>
-References: <alpine.DEB.2.02.1307011946180.4358@utopia.booyaka.com>
- <20130701204236.GA805@arwen.pp.htv.fi>
-Message-ID: <alpine.DEB.2.02.1307041650170.6258@utopia.booyaka.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 4 Jul 2013 18:11:48 +0100
+Subject: Appended DTB files for multi-machine kernels
+In-Reply-To: <51D5A938.30607@gmail.com>
+References: <51D5A938.30607@gmail.com>
+Message-ID: <20130704171148.GJ27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Thu, Jul 04, 2013 at 06:56:24PM +0200, Daniel Mack wrote:
 
-On Mon, 1 Jul 2013, Felipe Balbi wrote:
+> Unless I missed some recent discussion, this case is not easy to handle.
+> Yes, I know that these kind of things should be handled by a
+> next-generation bootloader, but in our case, we want to avoid a loader
+> update of already shipped hardware by all means.
 
-> On Mon, Jul 01, 2013 at 07:48:50PM +0000, Paul Walmsley wrote:
-> > Boot to userspace:
-> >     FAIL ( 2/12): 37xxevm, am335xbonelt
-> 
-> <quoting part of [1]>
-> | U-Boot# tftp 0x82000000 am335x-boneblack.dtb
-> | link up on port 0, speed 100, full duplex
-> | Using cpsw device
-> | TFTP from server 192.168.57.1; our IP address is 192.168.57.138
-> | Filename 'am335x-boneblack.dtb'.
-> 
-> Where are you taking am335x-boneblack.dtb from ? It's not in mainline
-> v3.10-rc7 kernel:
+There was some discussion about appending multiple DTBs recently.  I
+can't actually recall anything about it though so that's not an entirely
+helpful thing...
 
-As mentioned in my earlier reply:
+> As a solution, I'm thinking of a small framework that could for example
+> work as follows.
 
-http://www.spinics.net/lists/arm-kernel/msg255055.html
+> a) A small mechanism allows storing multiple DTB binary files inside the
+> kernel binary at compile time, and a simple function can extract them
+> again by name at runtime (something like what the firmware framework
+> does, but I don't know if that one can be used at such an early stage in
+> the boot process).
 
-my earlier test boots were with the am335x-boneblack.dtb from the 
-ti-linux-3.8.y tree from Vaibhav's github, since that was the only DTB 
-that I was able to get any kernel to boot with.
-
-The am33xx_only/appended DTB issues don't apply to this board since it's 
-booted with detached DTB and omap2plus_defconfig.
-
-Anyway, just retried it with the mainline am335x-bone.dtb file with v3.10, 
-and the board comes up now.  So that's good, will switch to 
-am335x-bone.dtb for the testing restate jobs to be run for 
-BeagleBone-white, and let's see what previous kernels it boots with now...
-
-
-- Paul
+Another way of skinning this would be for either the kernel to contain
+a set of machine ID to compatible string mappings or for the device
+trees for the boards to have an additional properties giving the machine
+IDs that the boards match.  The kernel could then look for multiple DTBs
+appended to the image and try to pick one based on ATAGs.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130704/ecc19fcd/attachment.sig>
