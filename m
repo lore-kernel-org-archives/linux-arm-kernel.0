@@ -1,127 +1,84 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 4 Jul 2013 10:47:53 +0530
-Subject: [PATCH v9 0/8] Generic PHY Framework
-In-Reply-To: <20130703132038.GI15056@arwen.pp.htv.fi>
-References: <1372247257-30186-1-git-send-email-kishon@ti.com>
- <780E789C2E067A4BB8F69D0BB9EC4F253E975B5E@DBDE04.ent.ti.com>
- <51D3F773.9000209@ti.com> <20130703132038.GI15056@arwen.pp.htv.fi>
-Message-ID: <51D50581.1000800@ti.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Thu, 4 Jul 2013 08:15:30 +0200
+Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
+In-Reply-To: <8761wrp7y5.fsf@natisbad.org>
+References: <87obakho6d.fsf@natisbad.org>
+ <20130702174111.GF17110@titan.lakedaemon.net> <87y59ows4n.fsf@natisbad.org>
+ <20130702220936.GC10215@1wt.eu> <20130703202105.GE27003@titan.lakedaemon.net>
+ <20130703203541.GI16785@1wt.eu> <20130703204451.GF27003@titan.lakedaemon.net>
+ <20130703211450.GJ16785@1wt.eu> <20130703222315.GK16785@1wt.eu>
+ <8761wrp7y5.fsf@natisbad.org>
+Message-ID: <20130704061530.GM16785@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnaud,
 
-On Wednesday 03 July 2013 06:50 PM, Felipe Balbi wrote:
-> Hi,
->
-> On Wed, Jul 03, 2013 at 03:35:39PM +0530, Kishon Vijay Abraham I wrote:
->> On Wednesday 03 July 2013 03:02 PM, Patel, Satish wrote:
->>> Hi Kishon,
->>>
->>>> -----Original Message-----
->>>> From: ABRAHAM, KISHON VIJAY
->>>> Sent: Wednesday, June 26, 2013 5:17 PM
->>>> To: grant.likely at linaro.org; tony at atomide.com; Balbi, Felipe; ABRAHAM,
->>>> KISHON VIJAY; arnd at arndb.de; swarren at nvidia.com;
->>>> sylvester.nawrocki at gmail.com; linux-kernel at vger.kernel.org; linux-
->>>> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->>>> usb at vger.kernel.org; gregkh at linuxfoundation.org; akpm at linux-
->>>> foundation.org
->>>> Cc: rob.herring at calxeda.com; rob at landley.net; linux at arm.linux.org.uk;
->>>> benoit.cousson at linaro.org; mchehab at redhat.com; cesarb at cesarb.net;
->>>> davem at davemloft.net; Nayak, Rajendra; shawn.guo at linaro.org; Shilimkar,
->>>> Santosh; devicetree-discuss at lists.ozlabs.org; linux-
->>>> doc at vger.kernel.org; Nori, Sekhar; Krishnamoorthy, Balaji T; Cherian,
->>>> George
->>>> Subject: [PATCH v9 0/8] Generic PHY Framework
->>>>
->>>> Added a generic PHY framework that provides a set of APIs for the PHY
->>>> drivers
->>>> to create/destroy a PHY and APIs for the PHY users to obtain a
->>>> reference to
->>>> the PHY with or without using phandle.
->>>>
->>>> This framework will be of use only to devices that uses external PHY
->>>> (PHY
->>>> functionality is not embedded within the controller).
->>>>
->>>> The intention of creating this framework is to bring the phy drivers
->>>> spread
->>>> all over the Linux kernel to drivers/phy to increase code re-use and
->>>> to
->>>> increase code maintainability.
->>>
->>> I would like to use this framework for a smart-card controller connected to a
->>> smart-card phy. I have some questions and would like to get feedback on the same.
->>
->> glad to know that :-)
->>>
->>> I am using ?TDA8026" Smartcard PHY from NXP. Here is the link for datasheet
->>> and app note for the same. The smart card controller is inside the TI SoC
->>> I am working with.
->>>
->>> Datasheet :
->>> www.nxp.com/documents/data_sheet/TDA8026.pdf?
->>>
->>> Appnote :
->>> http://www.nxp.com/documents/application_note/AN10724.pdf
->>>
->>> The TI SoC details are not public (yet). I can provide details to you offline.
->>>
->>> Brief about operation:
->>> -	The controller can work with and without a PHY
->>> -	When not using PHY, it is limited to talking to a single
->>> 	smart card. There is also a need to put external de-activation logic
->>> 	on card removal for this case.
->>> -	With a PHY you can use more than one smart card.
->>> -	Phy has 5 slots :  1 for smart card (credit/debit/other card with chip)
->>>        and others for SAM ? SIM like modules
->>> - 	Once the PHY is initialized, there are some operations that the controller
->>> 	can request of the PHY like:
->>> 	- Card configurations  - set voltage
->>> 	- Activation of card
->>> 	- ATR ? Answer to reset
->>> 	- Warm reset
->>> 	- ADPU exchange
->>> 	- Deactivation ( Normal/Emergency)
->>
->> hmm.. We should think about extending the phy_ops to include these
->> operations (something like phy_smart_card_ops so that other
->> smart_card PHYs will also be able to use it).
->
-> let's try to avoid use-case specific additions. set_voltage sounds like
-> a regulator thing, but the regulator is controlled through the PHY. I
-> guess it makes sense to have a generic phy_set_voltage() call since even
-> USB can make use of that.
->
-> For card activation, it sounds like phy_init()/phy_shutdown() would
-> cover it.
->
-> For warm reset perhaps a phy_reset() callback ? Although that could,
-> easily, get abused.
->
-> For deactivation, that's phy_shutdown().
->
-> ATR and ADPU needs more thought, I guess.
->
->>> - 	In the mode when smartcard controller talks directly to the card without the need
->>> 	for a PHY, all the above operations will be carried out by the controller itself
->>>
->>> My current thought process is to make the controller driver provide the user interface
->>> and talk to the PHY using the generic PHY framework you proposed. In the case where there
->>> is no PHY, my idea is to create a "dummy" PHY which uses the controller functionality itself.
->>
->> right. And in the case where you actually have a PHY, create a PHY
->> driver and implement the phy_smart_card_ops and register with the PHY
->> framework.
->
-> I would try to avoid that. Otherwise we will have phy_usb_ops,
-> phy_sata_ops, phy_network_ops, phy_pci_ops, etc etc etc. It would easily
-> blow up.
+On Thu, Jul 04, 2013 at 12:58:10AM +0200, Arnaud Ebalard wrote:
+> > Oh last important point, I found it in the 2.6.35.9-LSP-1.0.2_gw patch.
+> > If someone finds a more recent one in a more recent kernel, it might be
+> > worth comparing them.
+> 
+> The version in Netgear kernel (a 3.0.56, 25/Apr/2012 KW40 LSP release
+> 3.1.0-NQ) is almost identical to the one in mirabox 2.6.35 kernel
+> (24/Nov/2011, KW40 LSP release 1.0.2-NQ) if you remove the fixes for
+> trailing spaces and tabs: 
+> 
+> 
+> @@ -1618,7 +1618,9 @@
+>  		ret = -ENXIO;
+>  		goto fail_free_irq;
+>  	}
+> -	if (mtd_has_partitions()) {
+> +
+> +
+> +#ifdef CONFIG_MTD_CMDLINE_PARTS
+>  		if (mtd_has_cmdlinepart()) {
+>  			static const char *probes[] = { "cmdlinepart", NULL };
+>  			struct mtd_partition *parts;
+> @@ -1627,12 +1629,11 @@
+>  			nr_parts = parse_mtd_partitions(mtd, probes, &parts, 0);
+>  
+>  			if (nr_parts)
+> -				return add_mtd_partitions(mtd, parts, nr_parts);
+> +				return mtd_device_register(mtd, parts, nr_parts);
+>  		}
+> -		return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
+> -	}
+> -
+> -	return add_mtd_device(mtd) == 1 ? -ENODEV : 0;
+> +		return mtd_device_register(mtd, pdata->parts, pdata->nr_parts);
+> +#endif
+> +		return (mtd_device_register(mtd, pdata->parts, pdata->nr_parts));
+>  
+>  fail_free_irq:
+>  	free_irq(IRQ_AURORA_NFC, info);
+> @@ -1661,10 +1662,6 @@
+>  
+>  	platform_set_drvdata(pdev, NULL);
+>  
+> -	del_mtd_device(mtd);
+> -#ifdef CONFIG_MTD_PARTITIONS
+> -	del_mtd_partitions(mtd);
+> -#endif
+>  	free_irq(IRQ_AURORA_NFC, info);
+>  	if (info->use_dma) {
+>  		dma_free_writecombine(&pdev->dev, info->data_buff_size,
+> @@ -1675,7 +1672,10 @@
+>  	clk_disable(info->clk);
+>  	clk_put(info->clk);
+>  #endif
+> -	kfree(mtd);
+> +	if (mtd) {
+> +		mtd_device_unregister(mtd);
+> +		kfree(mtd);
+> +	}
+>  	return 0;
+>  }
+ 
+I had found a 3.5.x version somewhere (don't remember where, maybe an
+ubuntu repository) which had the same changes. I had merged the last
+hunk above, and other ones were not needed.
 
-true. But it's certainly going to be difficult to map certain function
-specific ops to the generic ops (just like ATR and ADPU in smart card
-case or set pixel for hdmi).
-
-Thanks
-Kishon
+Thanks,
+Willy
