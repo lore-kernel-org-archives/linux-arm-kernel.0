@@ -1,34 +1,43 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Thu, 4 Jul 2013 21:51:31 +0800
-Subject: [PATCH] ARM: u300: fix return value check in __u300_init_boardpower()
-Message-ID: <CAPgLHd9cUJtF7WXmY4Sy+53MxjKJRe8RVNNtbfdYLzh6OwbNzg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 4 Jul 2013 15:59:51 +0200
+Subject: [RFC] Add .dts file for Netgear ReadyNAS 102
+In-Reply-To: <20130702232311.GA3949@localhost>
+References: <87fvvzfh70.fsf@natisbad.org>
+ <20130702124639.GI19937@titan.lakedaemon.net>
+ <20130702151407.01680d21@skate>
+ <20130702133337.GA17110@titan.lakedaemon.net>
+ <20130702153825.139a93a5@skate>
+ <20130702134421.GC17110@titan.lakedaemon.net>
+ <87obakho6d.fsf@natisbad.org>
+ <20130702174111.GF17110@titan.lakedaemon.net>
+ <87y59ows4n.fsf@natisbad.org> <20130702220936.GC10215@1wt.eu>
+ <20130702232311.GA3949@localhost>
+Message-ID: <20130704155951.268ebada@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Hello guys,
 
-In case of error, the function syscon_node_to_regmap() returns ERR_PTR()
-and never returns NULL. The NULL test in the return value check should
-be replaced with IS_ERR().
+On Tue, 2 Jul 2013 20:23:12 -0300, Ezequiel Garcia wrote:
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- arch/arm/mach-u300/regulator.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> > Yes and indeed I must say that when I read the driver I found some
+> > similarities with pxa3xx, though it was done differently. I initially
+> > wanted to try to merge them but of course without the spec it's a huge
+> > waste of time, especially considering that this is still in the roadmap
+> > of the Free Electrons guys even though low priority.
+> > 
+> 
+> I wish I could say I'm going to work on this soon but, as Thomas said,
+> we have no idea when/if NAND will be prioritized.
 
-diff --git a/arch/arm/mach-u300/regulator.c b/arch/arm/mach-u300/regulator.c
-index bf40cd4..0493a84 100644
---- a/arch/arm/mach-u300/regulator.c
-+++ b/arch/arm/mach-u300/regulator.c
-@@ -69,9 +69,9 @@ static int __init __u300_init_boardpower(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 	regmap = syscon_node_to_regmap(syscon_np);
--	if (!regmap) {
-+	if (IS_ERR(regmap)) {
- 		pr_crit("U300: could not locate syscon regmap\n");
--		return -ENODEV;
-+		return PTR_ERR(regmap);
- 	}
- 
- 	main_power_15 = regulator_get(&pdev->dev, "vana15");
+We've got some news. NAND is back into the list of priorities, Ezequiel
+should restart working on NAND support relatively soon.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
