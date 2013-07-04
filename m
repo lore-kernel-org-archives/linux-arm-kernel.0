@@ -1,41 +1,32 @@
 From: Baohua.Song@csr.com (Barry Song)
-Date: Thu, 4 Jul 2013 15:55:28 +0800
-Subject: [PATCH 4/5] pinctrl: sirf: fix the checkpatch issue about indentation
-In-Reply-To: <1372924529-5519-1-git-send-email-Baohua.Song@csr.com>
-References: <1372924529-5519-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <1372924529-5519-4-git-send-email-Baohua.Song@csr.com>
+Date: Thu, 4 Jul 2013 15:59:53 +0800
+Subject: [PATCH 5/5] pinctrl: sirf: add freeze and restore entries for
+ hibernation support
+Message-ID: <1372924793-5579-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rongjun Ying <Rongjun.Ying@csr.com>
+this patch adds hibernation entries so that the sirf platform can
+support suspend-to-disk.
 
-Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- drivers/pinctrl/sirf/pinctrl-sirf.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/pinctrl/sirf/pinctrl-sirf.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/pinctrl/sirf/pinctrl-sirf.c b/drivers/pinctrl/sirf/pinctrl-sirf.c
-index 0677e19..7186b46 100644
+index 7186b46..0792e8d 100644
 --- a/drivers/pinctrl/sirf/pinctrl-sirf.c
 +++ b/drivers/pinctrl/sirf/pinctrl-sirf.c
-@@ -306,13 +306,13 @@ static int sirfsoc_gpio_of_xlate(struct gpio_chip *gc,
-        u32 *flags)
- {
-        if (gpiospec->args[0] > SIRFSOC_GPIO_NO_OF_BANKS * SIRFSOC_GPIO_BANK_SIZE)
--               return -EINVAL;
-+		return -EINVAL;
+@@ -440,6 +440,8 @@ static int sirfsoc_pinmux_resume_noirq(struct device *dev)
+ static const struct dev_pm_ops sirfsoc_pinmux_pm_ops = {
+ 	.suspend_noirq = sirfsoc_pinmux_suspend_noirq,
+ 	.resume_noirq = sirfsoc_pinmux_resume_noirq,
++	.freeze_noirq = sirfsoc_pinmux_suspend_noirq,
++	.restore_noirq = sirfsoc_pinmux_resume_noirq,
+ };
+ #endif
  
-        if (gc != &sgpio_bank[gpiospec->args[0] / SIRFSOC_GPIO_BANK_SIZE].chip.gc)
--               return -EINVAL;
-+		return -EINVAL;
- 
-        if (flags)
--               *flags = gpiospec->args[1];
-+		*flags = gpiospec->args[1];
- 
-        return gpiospec->args[0] % SIRFSOC_GPIO_BANK_SIZE;
- }
 -- 
 1.8.2.3
 
