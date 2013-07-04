@@ -1,62 +1,35 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Thu, 4 Jul 2013 20:06:56 +0200
-Subject: SPI: DUAL/QUAD support
-In-Reply-To: <20130704143645.GA27646@sirena.org.uk>
-References: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>
- <20130704143645.GA27646@sirena.org.uk>
-Message-ID: <20130704180656.GA1974@sig21.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 4 Jul 2013 18:12:16 +0000 (UTC)
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <alpine.DEB.2.02.1307031944580.9618@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+ <51CAEB33.5010101@ti.com>
+ <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
+ <51CBBCD8.5030600@ti.com>
+ <alpine.DEB.2.02.1306281844090.8767@utopia.booyaka.com>
+ <alpine.DEB.2.02.1307010211580.3741@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83ECCC435@DBDE04.ent.ti.com>
+ <51D2E096.5040700@ti.com>
+ <alpine.DEB.2.02.1307031944580.9618@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1307041810410.6258@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 04, 2013 at 03:36:45PM +0100, Mark Brown wrote:
-> On Thu, Jul 04, 2013 at 07:36:48PM +0800, yuhang wang wrote:
-> > +Description
-> > +----------------------
-> > +DUAL/QUAD means spi can transfer in 2bits/4bits at the same time.
-> > +These spi controllers provide 8 data lines(4-tx and 4-rx). User can
-> > +choose tranfer mode(SINGLE/DUAL/QUAD) by setting the certain register.
-> > +Though SPI is a serial interface, some spi controllers can support
-> > +transmitting and receiving in DUAL and QUAD modes aimed to improve
-> > +the performance. Also as spi slave lots of flashes do support this attribute,
-> > +such as serial-norflash in spansion company.
-> 
-> OK, so all this is about is devices that have extra data lines.  Please
-> don't invent terms like "DUAL" and "QUAD", it makes things much less
-> clear.  Just describe it as support for multiple data lines.
+On Wed, 3 Jul 2013, Paul Walmsley wrote:
 
-Flash data sheets use the terms Dual and Quad I/O Mode,
-e.g. for MX25L25635E
-http://www.macronix.com/QuickPlace/hq/PageLibrary4825740B00298A3B.nsf/h_Index/6F878CF760C559BD482576E00022E6CC/?OpenDocument&EPN=MX25L25635E
+> As far as Lokesh's patch goes: it doesn't make sense to me to remove a 
+> file during 'make clean' that the build process doesn't create.  So while 
+> I understand the motivation for the patch, and don't mind if upstream 
+> takes it, I personally wouldn't care to ack it.
 
-> > +struct spi_transfer {
-> > ++       u8     bitwidth;
-> > ++#define        SPI_BITWIDTH_SINGLE     0x01; /* 1bit transfer */
-> > ++#define        SPI_BITWIDTH_DUAL       0x02; /* 2bits transfer */
-> > ++#define        SPI_BITWIDTH_QUAD       0x03; /* 4bits transfer */
-> 
-> Calling this "bandwidth" is really unclear - I would expect a bandwidth
-> to be expressed in bits per second or similar.  This would be much
-> clearer if it was just the number of data signals.
-
-"bitwidth" != "bandwidth", but maybe the name could be improved,
-how about xfer_width?  The mmc susbsysem has something similar
-and calls it bus_width.
-
-> > +       t[0].rx_buf = buf;
-> > +       t[0].len = len;
-> > +       t[0].bitwidth = spi->rx_bitwidth/spi->tx_bitwidth;
-> > +       spi_message_add_tail(&t[0], &m);
-> 
-> This interface won't work for bidirectional transfers with asymmetric
-> numbers of data lines - we need separate fields for rx and rx.
-
-I'm not aware that bidirectional transfers are supported in
-dual or quad IO mode.  I think only flash supports it and
-uses all available IO lines as either input (flash write
-command) or output (flash read command).  I.e. for MX25L25635E flash
-it means at least the command, but usually also the address,
-are transferred in single IO mode, only then do the flash
-and controller switch to parallel IO for the data transfer.
+Incidentally, if there's any patch that would improve the current 
+situation with appended DTBs by going upstream, it would be a patch like 
+Grant's "HACK" patch to add appended DTB building into the kernel build 
+system.  Maybe folks can push to something similar to that one upstream?
 
 
-Johannes
+- Paul
