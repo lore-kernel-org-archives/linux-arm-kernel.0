@@ -1,35 +1,36 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 04 Jul 2013 11:08:02 +0200
-Subject: [PATCHv3 1/3] iio: Add Nuvoton NAU7802 ADC driver
-In-Reply-To: <1372094699-3832-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1372094699-3832-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <51D53B72.6020309@metafoo.de>
+From: wni@nvidia.com (Wei Ni)
+Date: Thu, 4 Jul 2013 17:09:39 +0800
+Subject: [PATCH 2/2] ARM: dt: t114 dalmore: add dt entry for lm90
+In-Reply-To: <1372928979-26938-1-git-send-email-wni@nvidia.com>
+References: <1372928979-26938-1-git-send-email-wni@nvidia.com>
+Message-ID: <1372928979-26938-3-git-send-email-wni@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2013 07:24 PM, Alexandre Belloni wrote:
-> The Nuvoton NAU7802 ADC is a 24-bit 2-channels I2C ADC, with adjustable
-> gain and sampling rates.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Enable thermal sensor lm90 for t114 dalmore.
 
-Reviewed-by: Lars-Peter Clausen <lars@metafoo.de>
+Signed-off-by: Wei Ni <wni@nvidia.com>
+---
+ arch/arm/boot/dts/tegra114-dalmore.dts |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-One remark though. Multiline comments should be like
-
-/*
- * foo
- * bar
- */
-
-not
-
-/* foo
- * bar
- */
-
-But not need to resend the patch just for this
-
-- Lars
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index cb640eb..8325797 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -738,6 +738,13 @@
+ 			realtek,ldo1-en-gpios =
+ 				<&gpio TEGRA_GPIO(V, 3) GPIO_ACTIVE_HIGH>;
+ 		};
++
++		nct1008: nct1008 {
++			compatible = "lm90,nct1008";
++			reg = <0x4c>;
++			interrupt-parent = <&gpio>;
++			interrupts = <TEGRA_GPIO(O, 4) IRQ_TYPE_LEVEL_LOW>;
++		};
+ 	};
+ 
+ 	i2c at 7000d000 {
+-- 
+1.7.9.5
