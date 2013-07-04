@@ -1,39 +1,51 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 4 Jul 2013 16:36:46 -0400 (EDT)
-Subject: [PATCH 2/2] USB: OHCI: make ohci-pxa27x a separate driver
-In-Reply-To: <1372958187-4039-3-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1307041633370.26847-100000@netrider.rowland.org>
+From: coelho@ti.com (Luciano Coelho)
+Date: Thu, 4 Jul 2013 23:45:27 +0300
+Subject: [PATCH RESEND] clk: export __clk_get_flags for modular clock
+ providers
+In-Reply-To: <1366009186-32199-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1366009186-32199-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <51D5DEE7.2070400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 4 Jul 2013, Manjunath Goudar wrote:
+Hi,
 
-> Separate the  OHCI pxa27x/pxa3xx host controller driver from
-> ohci-hcd host code so that it can be built as a separate driver
-> module. This work is part of enabling multi-platform kernels on
-> ARM.
+On 04/15/2013 09:59 AM, Sebastian Hesselbarth wrote:
+> The common clock api provides some helpers for clk-providers but does
+> not export these helpers. This hinders clk-providers to be built as modules.
+> This patch adds __clk_get_flags() to the list of exported symbols.
+>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>   drivers/clk/clk.c |    1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index ed87b24..3e478b8 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -450,6 +450,7 @@ unsigned long __clk_get_flags(struct clk *clk)
+>   {
+>   	return !clk ? 0 : clk->flags;
+>   }
+> +EXPORT_SYMBOL_GPL(__clk_get_flags);
+>
+>   bool __clk_is_enabled(struct clk *clk)
+>   {
+>
 
-> +config USB_OHCI_HCD_PXA27X
-> +	tristate "Support for PXA27X/PXA3XX on-chip OHCI USB controller"
-> +	depends on USB_OHCI_HCD && ARCH_PXA
+I think this got merged slightly wrong.  The EXPORT_SYMBOL_GPL macro 
+came under clk_unprepare_unused_subtree() instead of under 
+__clk_get_flags():
 
-Shouldn't the ARCH_PXA part be the same as ...
 
-> @@ -1184,11 +1184,6 @@ MODULE_LICENSE ("GPL");
->  #define SA1111_DRIVER		ohci_hcd_sa1111_driver
->  #endif
->  
-> -#if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
+Of course this is not that important, but it's a bit confusing when you 
+look at the code.
 
-... this?
-
-> diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
-> index 5fb91f1..791e2b5 100644
-> --- a/drivers/usb/host/ohci-pxa27x.c
-> +++ b/drivers/usb/host/ohci-pxa27x.c
-
-Several aspects of this are strange.  For example, consider how you 
-used the private part of the ohci_hcd structure and how the variable 
-names are inconsistent with the other OHCI glue drivers.
-
-Alan Stern
+--
+Cheers,
+Luca.
