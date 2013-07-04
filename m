@@ -1,59 +1,32 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Thu, 4 Jul 2013 21:35:00 +0800
-Subject: [PATCH] drm/exynos: exynos_drm_ipp: fix return value check
-Message-ID: <CAPgLHd9yE7YES-yDFSWfHOKbbay2yLS_VrvF5-QyJumnNFitQw@mail.gmail.com>
+Date: Thu, 4 Jul 2013 21:42:34 +0800
+Subject: [PATCH] ARM: OMAP: fix return value check in
+ omap_device_build_from_dt()
+Message-ID: <CAPgLHd_E8wht4q5c9=TjUTwXxysjbbX+HnZyYe2KJU=w79cK4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-In case of error, the function ipp_find_obj() returns ERR_PTR()
+In case of error, the function omap_device_alloc() returns ERR_PTR()
 and never returns NULL. The NULL test in the return value check
 should be replaced with IS_ERR().
 
 Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- drivers/gpu/drm/exynos/exynos_drm_ipp.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/omap_device.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_ipp.c b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-index b1ef8e7..0eb8538 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-@@ -342,10 +342,10 @@ int exynos_drm_ipp_get_property(struct drm_device *drm_dev, void *data,
- 		 */
- 		ippdrv = ipp_find_obj(&ctx->ipp_idr, &ctx->ipp_lock,
- 						prop_list->ipp_id);
--		if (!ippdrv) {
-+		if (IS_ERR(ippdrv)) {
- 			DRM_ERROR("not found ipp%d driver.\n",
- 					prop_list->ipp_id);
--			return -EINVAL;
-+			return PTR_ERR(ippdrv);
- 		}
- 
- 		prop_list = ippdrv->prop_list;
-@@ -970,9 +970,9 @@ int exynos_drm_ipp_queue_buf(struct drm_device *drm_dev, void *data,
- 	/* find command node */
- 	c_node = ipp_find_obj(&ctx->prop_idr, &ctx->prop_lock,
- 		qbuf->prop_id);
--	if (!c_node) {
-+	if (IS_ERR(c_node)) {
- 		DRM_ERROR("failed to get command node.\n");
--		return -EFAULT;
-+		return PTR_ERR(c_node);
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index 5cc9287..28e70c0 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -155,7 +155,7 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
  	}
  
- 	/* buffer control */
-@@ -1106,9 +1106,9 @@ int exynos_drm_ipp_cmd_ctrl(struct drm_device *drm_dev, void *data,
- 
- 	c_node = ipp_find_obj(&ctx->prop_idr, &ctx->prop_lock,
- 		cmd_ctrl->prop_id);
--	if (!c_node) {
-+	if (IS_ERR(c_node)) {
- 		DRM_ERROR("invalid command node list.\n");
--		return -EINVAL;
-+		return PTR_ERR(c_node);
- 	}
- 
- 	if (!exynos_drm_ipp_check_valid(ippdrv->dev, cmd_ctrl->ctrl,
+ 	od = omap_device_alloc(pdev, hwmods, oh_cnt);
+-	if (!od) {
++	if (IS_ERR(od)) {
+ 		dev_err(&pdev->dev, "Cannot allocate omap_device for :%s\n",
+ 			oh_name);
+ 		ret = PTR_ERR(od);
