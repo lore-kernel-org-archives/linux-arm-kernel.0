@@ -1,55 +1,46 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 04 Jul 2013 18:56:24 +0200
-Subject: Appended DTB files for multi-machine kernels
-Message-ID: <51D5A938.30607@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 4 Jul 2013 17:11:33 +0000 (UTC)
+Subject: OMAP baseline test results for v3.10-rc7
+In-Reply-To: <20130701204236.GA805@arwen.pp.htv.fi>
+References: <alpine.DEB.2.02.1307011946180.4358@utopia.booyaka.com>
+ <20130701204236.GA805@arwen.pp.htv.fi>
+Message-ID: <alpine.DEB.2.02.1307041650170.6258@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi
 
-I'm facing a problem with a transition from legacy board-file driven ARM
-machines to DTB, and I'm under the impression that a solution for it
-could be of broader interest.
+On Mon, 1 Jul 2013, Felipe Balbi wrote:
 
-In short, devices that have been deployed in quantities come in three
-hardware variants, which all boot with a unique machine-id. We ship
-kernel images that have board support for all three machine types, and
-do minor fixups to platform data of some drivers at runtime, depending
-on the board revision number (passed in via ATAGs).
+> On Mon, Jul 01, 2013 at 07:48:50PM +0000, Paul Walmsley wrote:
+> > Boot to userspace:
+> >     FAIL ( 2/12): 37xxevm, am335xbonelt
+> 
+> <quoting part of [1]>
+> | U-Boot# tftp 0x82000000 am335x-boneblack.dtb
+> | link up on port 0, speed 100, full duplex
+> | Using cpsw device
+> | TFTP from server 192.168.57.1; our IP address is 192.168.57.138
+> | Filename 'am335x-boneblack.dtb'.
+> 
+> Where are you taking am335x-boneblack.dtb from ? It's not in mainline
+> v3.10-rc7 kernel:
 
-The built-in support for attaching a DTB to the zImage does not suffice
-here, because we have one image for all models, and also, we couldn't do
-a 'per-board-revision' selection that way either.
+As mentioned in my earlier reply:
 
-Unless I missed some recent discussion, this case is not easy to handle.
-Yes, I know that these kind of things should be handled by a
-next-generation bootloader, but in our case, we want to avoid a loader
-update of already shipped hardware by all means.
+http://www.spinics.net/lists/arm-kernel/msg255055.html
 
-As a solution, I'm thinking of a small framework that could for example
-work as follows.
+my earlier test boots were with the am335x-boneblack.dtb from the 
+ti-linux-3.8.y tree from Vaibhav's github, since that was the only DTB 
+that I was able to get any kernel to boot with.
 
-a) A small mechanism allows storing multiple DTB binary files inside the
-kernel binary at compile time, and a simple function can extract them
-again by name at runtime (something like what the firmware framework
-does, but I don't know if that one can be used at such an early stage in
-the boot process).
+The am33xx_only/appended DTB issues don't apply to this board since it's 
+booted with detached DTB and omap2plus_defconfig.
 
-b) A DT_MACHINE_START-like macro takes both the machine ID and the name
-of a DTB file that is compiled in. When matched, generic functions would
-load the given file, populate the device tree and then conduct a generic
-DT boot for the specified platform.
-
-c) Allow users to open-code the DTB lookup depending on whatever kind of
-runtime information (be it the board_revision or anything else).
+Anyway, just retried it with the mainline am335x-bone.dtb file with v3.10, 
+and the board comes up now.  So that's good, will switch to 
+am335x-bone.dtb for the testing restate jobs to be run for 
+BeagleBone-white, and let's see what previous kernels it boots with now...
 
 
-Of course, everything has to be an opt-in that stubs itself out at zero
-costs if not needed.
-
-
-I'm open to opinion and sugesstions :)
-
-
-Thanks,
-Daniel
+- Paul
