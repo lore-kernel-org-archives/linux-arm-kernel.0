@@ -1,35 +1,53 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Thu,  4 Jul 2013 15:16:42 +0800
-Subject: [PATCH 4/4] arm: atmel: sam9n12: enable kernel uncompress info output
-In-Reply-To: <1372922202-28606-1-git-send-email-voice.shen@atmel.com>
-References: <1372922202-28606-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1372922202-28606-5-git-send-email-voice.shen@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 4 Jul 2013 15:23:45 +0800
+Subject: [PATCH v2 4/5] ARM: dts: imx6q: add dte pinctrl for uart2
+In-Reply-To: <1372844557-3078-5-git-send-email-b32955@freescale.com>
+References: <1372844557-3078-1-git-send-email-b32955@freescale.com>
+ <1372844557-3078-5-git-send-email-b32955@freescale.com>
+Message-ID: <20130704072344.GB11046@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the sam9n12 use the same array usart as sam9x5, add it which will
-enable output kernel uncompress info:
----8>---
-Uncompressing Linux... done, booting the kernel.
----<8---
+On Wed, Jul 03, 2013 at 05:42:36PM +0800, Huang Shijie wrote:
+> In imx6q-arm2 board, the UART2 works in the dte mode.
+> So add a pinctrl for it.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi |    9 +++++++++
+>  1 files changed, 9 insertions(+), 0 deletions(-)
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
+Since imx6q and imx6dl are pin-to-pin compatible, from now on I would
+require the same pin group be added for these two SoC together, so that
+we can enforce the same label name.
 
----
- arch/arm/mach-at91/include/mach/uncompress.h |    1 +
- 1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 9a69891..8a518c6 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -266,6 +266,15 @@
+>  							MX6Q_PAD_EIM_D27__UART2_RX_DATA 0x1b0b1
+>  						>;
+>  					};
+> +
+> +					pinctrl_uart2_dte: uart2grp-2 {
+> +						fsl,pins = <
+> +							MX6Q_PAD_EIM_D26__UART2_RX_DATA 0x1b0b1
+> +							MX6Q_PAD_EIM_D27__UART2_TX_DATA 0x1b0b1
+> +							MX6Q_PAD_EIM_D28__UART2_CTS_B	0x1b0b1
+> +							MX6Q_PAD_EIM_D29__UART2_CTS_B	0x1b0b1
 
-diff --git a/arch/arm/mach-at91/include/mach/uncompress.h b/arch/arm/mach-at91/include/mach/uncompress.h
-index fe097e6..4bb644f 100644
---- a/arch/arm/mach-at91/include/mach/uncompress.h
-+++ b/arch/arm/mach-at91/include/mach/uncompress.h
-@@ -130,6 +130,7 @@ static inline const u32* decomp_soc_detect(void __iomem *dbgu_base)
- 	case ARCH_ID_AT91SAM9RL64:
- 		return uarts_sam9rl;
- 
-+	case ARCH_ID_AT91SAM9N12:
- 	case ARCH_ID_AT91SAM9X5:
- 		return uarts_sam9x5;
- 
--- 
-1.7.9.5
+Why do you have two pads mux-ed on one function?
+
+Shawn
+
+> +						>;
+> +					};
+>  				};
+>  
+>  				uart4 {
+> -- 
+> 1.7.1
+> 
+> 
