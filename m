@@ -1,126 +1,26 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 6 Jul 2013 01:45:09 +0200 (CEST)
-Subject: [PATCH 3/9] clocksource: dw_apb_timer: quirk for variants with
- 64bit counter
-In-Reply-To: <201307060053.10182.heiko@sntech.de>
-References: <201307060051.09716.heiko@sntech.de>
- <201307060053.10182.heiko@sntech.de>
-Message-ID: <alpine.DEB.2.02.1307060129340.32106@ionos.tec.linutronix.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 06 Jul 2013 01:45:48 +0200
+Subject: [PATCH] drm/exynos: exynos_drm_ipp: fix return value check
+In-Reply-To: <CAPgLHd9yE7YES-yDFSWfHOKbbay2yLS_VrvF5-QyJumnNFitQw@mail.gmail.com>
+References: <CAPgLHd9yE7YES-yDFSWfHOKbbay2yLS_VrvF5-QyJumnNFitQw@mail.gmail.com>
+Message-ID: <1543220.nCniYjBE9B@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 6 Jul 2013, Heiko St?bner wrote:
-
-> This adds a quirk for IP variants containing two load_count and value
-> registers that are used to provide 64bit accuracy on 32bit systems.
+On Thursday 04 of July 2013 21:35:00 Wei Yongjun wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > 
-> The added accuracy is currently not used, the driver is only adapted to
-> handle the different register layout and make it work on affected devices.
+> In case of error, the function ipp_find_obj() returns ERR_PTR()
+> and never returns NULL. The NULL test in the return value check
+> should be replaced with IS_ERR().
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > ---
->  drivers/clocksource/dw_apb_timer.c |   27 +++++++++++++++++++++++++++
->  include/linux/dw_apb_timer.h       |    6 ++++++
->  2 files changed, 33 insertions(+)
+>  drivers/gpu/drm/exynos/exynos_drm_ipp.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-> index f5e7be8..bd45351 100644
-> --- a/drivers/clocksource/dw_apb_timer.c
-> +++ b/drivers/clocksource/dw_apb_timer.c
-> @@ -56,6 +56,17 @@ static void apbt_init_regs(struct dw_apb_timer *timer, int quirks)
->  	timer->reg_control = APBTMR_N_CONTROL;
->  	timer->reg_eoi = APBTMR_N_EOI;
->  	timer->reg_int_status = APBTMR_N_INT_STATUS;
-> +
-> +	/*
-> +	 * On variants with 64bit counters some registers are
-> +	 * moved further down.
-> +	 */
-> +	if (quirks & APBTMR_QUIRK_64BIT_COUNTER) {
-> +		timer->reg_current_value += 0x4;
-> +		timer->reg_control += 0x8;
-> +		timer->reg_eoi += 0x8;
-> +		timer->reg_int_status += 0x8;
-> +	}
->  }
 
-Oh, no. this is not how we handle these things.
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-1) We want proper constants for this 64bit IP block 
-
-2) This is not a quirk, it's a property of that particular IP block
-
-You already made the register offsets a part of the timer structure,
-so why don't you supply a proper structure filled with that values to
-the init function?
-
-That's what we do all over the place. Either we instantiate those
-structs at compile time or runtime fed by device tree or any other
-configuration mechanism.
-  
->  static unsigned long apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
-> @@ -145,6 +156,10 @@ static void apbt_set_mode(enum clock_event_mode mode,
->  		udelay(1);
->  		pr_debug("Setting clock period %lu for HZ %d\n", period, HZ);
->  		apbt_writel(timer, period, timer->reg_load_count);
-> +
-> +		if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
-> +			apbt_writel(timer, 0, timer->reg_load_count + 0x4);
-> +
-
-No. We are not adding such conditional constructs when we can deal
-with them just by providing a proper set of function pointers. And
-definitely not with hardcoded magic 0x4 constants involved.
-
-     timer->load_count(timer, value);
-
-Provide a 32 bit and a 64 bit version of that function and be done
-with it.
-
->  		ctrl |= APBTMR_CONTROL_ENABLE;
->  		apbt_writel(timer, ctrl, timer->reg_control);
->  		break;
-> @@ -168,6 +183,10 @@ static void apbt_set_mode(enum clock_event_mode mode,
->  		 * running mode.
->  		 */
->  		apbt_writel(timer, ~0, timer->reg_load_count);
-> +
-> +		if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
-> +			apbt_writel(timer, 0, timer->reg_load_count + 0x4);
-> +
-
-Makes this copy go away.
-
->  		ctrl &= ~APBTMR_CONTROL_INT;
->  		ctrl |= APBTMR_CONTROL_ENABLE;
->  		apbt_writel(timer, ctrl, timer->reg_control);
-> @@ -199,6 +218,10 @@ static int apbt_next_event(unsigned long delta,
->  	apbt_writel(timer, ctrl, timer->reg_control);
->  	/* write new count */
->  	apbt_writel(timer, delta, timer->reg_load_count);
-> +
-> +	if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
-> +		apbt_writel(timer, 0, timer->reg_load_count + 0x4);
-> +
-
-And this one as well.
-
->  	ctrl |= APBTMR_CONTROL_ENABLE;
->  	apbt_writel(timer, ctrl, timer->reg_control);
->  
-> @@ -325,6 +348,10 @@ void dw_apb_clocksource_start(struct dw_apb_clocksource *dw_cs)
->  	ctrl &= ~APBTMR_CONTROL_ENABLE;
->  	apbt_writel(timer, ctrl, timer->reg_control);
->  	apbt_writel(timer, ~0, timer->reg_load_count);
-> +
-> +	if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
-> +		apbt_writel(timer, 0, timer->reg_load_count + 0x4);
-> +
-
-Copy and paste is a conveniant thing, right? It just should have a pop
-up window assigned which asks at the second instance of copying the
-same thing whether you really thought about it.
-
-Thanks,
-
-	tglx
+Best regards,
+Tomasz
