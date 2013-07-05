@@ -1,159 +1,384 @@
 From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Fri, 05 Jul 2013 21:29:33 +0900
-Subject: [PATCH v7 6/9] clk: exynos5250: add gate clock descriptions of System
- MMU
-Message-ID: <002e01ce797b$4dc46d20$e94d4760$@samsung.com>
+Date: Fri, 05 Jul 2013 21:29:39 +0900
+Subject: [PATCH v7 8/9] iommu/exynos: support for device tree
+Message-ID: <003001ce797b$51a8d340$f4fa79c0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds gate clocks of all System MMUs and their master IPs
-that are not apeared in clk-exynos5250.c
+This commit adds device tree support for System MMU.
+This also include the following changes and enhancements:
+
+* use managed device helper functions.
+Simplyfies System MMU device driver.
+
+* use only a single clock descriptor.
+System MMU device descriptor is seperate if it is imposible to make
+a single clock descriptor to make a device descriptor for a group of
+System MMUs.
+
+* removed dbgname member from sysmmu_drvdata structure.
+debugging kernel message for a System MMU is distinguisheable with the
+name of device descroptors.
 
 Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-CC: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- .../devicetree/bindings/clock/exynos5250-clock.txt |   28 +++++++++-
- drivers/clk/samsung/clk-exynos5250.c               |   57 ++++++++++++++++---
- 2 files changed, 75 insertions(+), 10 deletions(-)
+ drivers/iommu/Kconfig        |    5 +-
+ drivers/iommu/exynos-iommu.c |  192 ++++++++++++++++++------------------------
+ 2 files changed, 83 insertions(+), 114 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-index 781a627..df49694 100644
---- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-@@ -154,7 +154,33 @@ clock which they consume.
-   dsim0			341
-   dp			342
-   mixer			343
--  hdmi			345
-+  hdmi			344
-+  camif_top		345
-+  smmu_fimc_lite0	346
-+  smmu_fimc_lite1	347
-+  smmu_fimc_lite2	348
-+  smmu_tv		349
-+  smmu_fimd1		350
-+  smmu_2d		351
-+  fimc_isp		352
-+  fimc_drc		353
-+  fimc_fd		354
-+  fimc_scc		355
-+  fimc_scp		356
-+  fimc_mcuctl		357
-+  fimc_odc		358
-+  fimc_dis		359
-+  fimc_3dnr		360
-+  smmu_fimc_isp		361
-+  smmu_fimc_drc		362
-+  smmu_fimc_fd		363
-+  smmu_fimc_scc		364
-+  smmu_fimc_scp		365
-+  smmu_fimc_mcuctl	366
-+  smmu_fimc_odc		367
-+  smmu_fimc_dis0	368
-+  smmu_fimc_dis1	369
-+  smmu_fimc_3dnr	370
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index c332fb9..d45f3c9 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -168,16 +168,15 @@ config TEGRA_IOMMU_SMMU
  
- Example 1: An example of a clock controller node is listed below.
+ config EXYNOS_IOMMU
+ 	bool "Exynos IOMMU Support"
+-	depends on ARCH_EXYNOS && EXYNOS_DEV_SYSMMU
++	depends on ARCH_EXYNOS
+ 	select IOMMU_API
++	default n
+ 	help
+ 	  Support for the IOMMU(System MMU) of Samsung Exynos application
+ 	  processor family. This enables H/W multimedia accellerators to see
+ 	  non-linear physical memory chunks as a linear memory in their
+ 	  address spaces
  
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index 22d7699..1921d6c 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -53,12 +53,15 @@
- #define DIV_PERIC3		0x10564
- #define DIV_PERIC4		0x10568
- #define DIV_PERIC5		0x1056c
-+#define GATE_IP_ISP0		0x0C800
-+#define GATE_IP_ISP1		0x0C800
- #define GATE_IP_GSCL		0x10920
- #define GATE_IP_MFC		0x1092c
- #define GATE_IP_GEN		0x10934
- #define GATE_IP_FSYS		0x10944
- #define GATE_IP_PERIC		0x10950
- #define GATE_IP_PERIS		0x10960
-+#define GATE_IP_ACP		0x18800
- #define SRC_CDREX		0x20200
- #define PLL_DIV2_SEL		0x20a24
- #define GATE_IP_DISP1		0x10928
-@@ -100,6 +103,14 @@ enum exynos5250_clks {
- 	tzpc2, tzpc3, tzpc4, tzpc5, tzpc6, tzpc7, tzpc8, tzpc9, hdmi_cec, mct,
- 	wdt, rtc, tmu, fimd1, mie1, dsim0, dp, mixer, hdmi,
+-	  If unsure, say N here.
+-
+ config EXYNOS_IOMMU_DEBUG
+ 	bool "Debugging log for Exynos IOMMU"
+ 	depends on EXYNOS_IOMMU
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 6793661..b151e51 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -26,6 +26,7 @@
+ #include <linux/list.h>
+ #include <linux/memblock.h>
+ #include <linux/export.h>
++#include <linux/of.h>
  
-+	camif_top, smmu_fimc_lite0, smmu_fimc_lite1, smmu_fimc_lite2,
-+	smmu_tv, smmu_fimd1, smmu_2d,
-+	fimc_isp, fimc_drc, fimc_fd, fimc_scc, fimc_scp, fimc_mcuctl, fimc_odc,
-+	fimc_dis, fimc_3dnr,
-+	smmu_fimc_isp, smmu_fimc_drc, smmu_fimc_fd, smmu_fimc_scc,
-+	smmu_fimc_scp, smmu_fimc_mcuctl, smmu_fimc_odc, smmu_fimc_dis0,
-+	smmu_fimc_dis1, smmu_fimc_3dnr,
-+
- 	nr_clks,
+ #include <asm/cacheflush.h>
+ #include <asm/pgtable.h>
+@@ -170,15 +171,14 @@ struct sysmmu_drvdata {
+ 	struct list_head node; /* entry of exynos_iommu_domain.clients */
+ 	struct device *sysmmu;	/* System MMU's device descriptor */
+ 	struct device *dev;	/* Owner of system MMU */
+-	char *dbgname;
+ 	int nsfrs;
+-	void __iomem **sfrbases;
+-	struct clk *clk[2];
++	struct clk *clk;
+ 	int activations;
+ 	spinlock_t lock;
+ 	struct iommu_domain *domain;
+ 	sysmmu_fault_handler_t fault_handler;
+ 	unsigned long pgtable;
++	void __iomem *sfrbases[0];
  };
  
-@@ -320,19 +331,26 @@ struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
- 	GATE(gscl3, "gscl3", "aclk266", GATE_IP_GSCL, 3, 0, 0),
- 	GATE(gscl_wa, "gscl_wa", "div_gscl_wa", GATE_IP_GSCL, 5, 0, 0),
- 	GATE(gscl_wb, "gscl_wb", "div_gscl_wb", GATE_IP_GSCL, 6, 0, 0),
--	GATE(smmu_gscl0, "smmu_gscl0", "aclk266", GATE_IP_GSCL, 7, 0, 0),
--	GATE(smmu_gscl1, "smmu_gscl1", "aclk266", GATE_IP_GSCL, 8, 0, 0),
--	GATE(smmu_gscl2, "smmu_gscl2", "aclk266", GATE_IP_GSCL, 9, 0, 0),
--	GATE(smmu_gscl3, "smmu_gscl3", "aclk266", GATE_IP_GSCL, 10, 0, 0),
-+	GATE(smmu_gscl0, "smmu_gscl0", "gscl0", GATE_IP_GSCL, 7, 0, 0),
-+	GATE(smmu_gscl1, "smmu_gscl1", "gscl1", GATE_IP_GSCL, 8, 0, 0),
-+	GATE(smmu_gscl2, "smmu_gscl2", "gscl2", GATE_IP_GSCL, 9, 0, 0),
-+	GATE(smmu_gscl3, "smmu_gscl3", "gscl3", GATE_IP_GSCL, 10, 0, 0),
-+	GATE(camif_top, "camif_top", "aclk266", GATE_IP_GSCL, 4, 0, 0),
-+	GATE(smmu_fimc_lite0, "smmu_fimc_lite0", "camif_top",
-+						GATE_IP_GSCL, 12, 0, 0),
-+	GATE(smmu_fimc_lite1, "smmu_fimc_lite1", "camif_top",
-+						GATE_IP_GSCL, 13, 0, 0),
-+	GATE(smmu_fimc_lite2, "smmu_fimc_lite2", "camif_top",
-+						GATE_IP_GSCL, 14, 0, 0),
- 	GATE(mfc, "mfc", "aclk333", GATE_IP_MFC, 0, 0, 0),
--	GATE(smmu_mfcl, "smmu_mfcl", "aclk333", GATE_IP_MFC, 1, 0, 0),
--	GATE(smmu_mfcr, "smmu_mfcr", "aclk333", GATE_IP_MFC, 2, 0, 0),
-+	GATE(smmu_mfcl, "smmu_mfcl", "mfc", GATE_IP_MFC, 1, 0, 0),
-+	GATE(smmu_mfcr, "smmu_mfcr", "mfc", GATE_IP_MFC, 2, 0, 0),
- 	GATE(rotator, "rotator", "aclk266", GATE_IP_GEN, 1, 0, 0),
- 	GATE(jpeg, "jpeg", "aclk166", GATE_IP_GEN, 2, 0, 0),
- 	GATE(mdma1, "mdma1", "aclk266", GATE_IP_GEN, 4, 0, 0),
--	GATE(smmu_rotator, "smmu_rotator", "aclk266", GATE_IP_GEN, 6, 0, 0),
--	GATE(smmu_jpeg, "smmu_jpeg", "aclk166", GATE_IP_GEN, 7, 0, 0),
--	GATE(smmu_mdma1, "smmu_mdma1", "aclk266", GATE_IP_GEN, 9, 0, 0),
-+	GATE(smmu_rotator, "smmu_rotator", "none", GATE_IP_GEN, 6, 0, 0),
-+	GATE(smmu_jpeg, "smmu_jpeg", "jpeg", GATE_IP_GEN, 7, 0, 0),
-+	GATE(smmu_mdma1, "smmu_mdma1", "none", GATE_IP_GEN, 9, 0, 0),
- 	GATE(pdma0, "pdma0", "aclk200", GATE_IP_FSYS, 1, 0, 0),
- 	GATE(pdma1, "pdma1", "aclk200", GATE_IP_FSYS, 2, 0, 0),
- 	GATE(sata, "sata", "aclk200", GATE_IP_FSYS, 6, 0, 0),
-@@ -462,6 +480,27 @@ struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
- 	GATE(dp, "dp", "aclk200", GATE_IP_DISP1, 4, 0, 0),
- 	GATE(mixer, "mixer", "aclk200", GATE_IP_DISP1, 5, 0, 0),
- 	GATE(hdmi, "hdmi", "aclk200", GATE_IP_DISP1, 6, 0, 0),
-+	GATE(smmu_tv, "smmu_tv", "none", GATE_IP_DISP1, 2, 0, 0),
-+	GATE(smmu_fimd1, "smmu_fimd1", "none", GATE_IP_DISP1, 8, 0, 0),
+ static bool set_sysmmu_active(struct sysmmu_drvdata *data)
+@@ -385,8 +385,8 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+ 	if (!ret && (itype != SYSMMU_FAULT_UNKNOWN))
+ 		__raw_writel(1 << itype, data->sfrbases[i] + REG_INT_CLEAR);
+ 	else
+-		dev_dbg(data->sysmmu, "(%s) %s is not handled.\n",
+-				data->dbgname, sysmmu_fault_name[itype]);
++		dev_dbg(data->sysmmu, "%s is not handled.\n",
++				sysmmu_fault_name[itype]);
+ 
+ 	if (itype != SYSMMU_FAULT_UNKNOWN)
+ 		sysmmu_unblock(data->sfrbases[i]);
+@@ -410,10 +410,8 @@ static bool __exynos_sysmmu_disable(struct sysmmu_drvdata *data)
+ 	for (i = 0; i < data->nsfrs; i++)
+ 		__raw_writel(CTRL_DISABLE, data->sfrbases[i] + REG_MMU_CTRL);
+ 
+-	if (data->clk[1])
+-		clk_disable(data->clk[1]);
+-	if (data->clk[0])
+-		clk_disable(data->clk[0]);
++	if (data->clk)
++		clk_disable(data->clk);
+ 
+ 	disabled = true;
+ 	data->pgtable = 0;
+@@ -422,10 +420,10 @@ finish:
+ 	spin_unlock_irqrestore(&data->lock, flags);
+ 
+ 	if (disabled)
+-		dev_dbg(data->sysmmu, "(%s) Disabled\n", data->dbgname);
++		dev_dbg(data->sysmmu, "Disabled\n");
+ 	else
+-		dev_dbg(data->sysmmu, "(%s) %d times left to be disabled\n",
+-					data->dbgname, data->activations);
++		dev_dbg(data->sysmmu, "%d times left to be disabled\n",
++					data->activations);
+ 
+ 	return disabled;
+ }
+@@ -452,14 +450,12 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
+ 			ret = 1;
+ 		}
+ 
+-		dev_dbg(data->sysmmu, "(%s) Already enabled\n", data->dbgname);
++		dev_dbg(data->sysmmu, "Already enabled\n");
+ 		goto finish;
+ 	}
+ 
+-	if (data->clk[0])
+-		clk_enable(data->clk[0]);
+-	if (data->clk[1])
+-		clk_enable(data->clk[1]);
++	if (data->clk)
++		clk_enable(data->clk);
+ 
+ 	data->pgtable = pgtable;
+ 
+@@ -479,7 +475,7 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
+ 
+ 	data->domain = domain;
+ 
+-	dev_dbg(data->sysmmu, "(%s) Enabled\n", data->dbgname);
++	dev_dbg(data->sysmmu, "Enabled\n");
+ finish:
+ 	spin_unlock_irqrestore(&data->lock, flags);
+ 
+@@ -495,7 +491,7 @@ int exynos_sysmmu_enable(struct device *dev, unsigned long pgtable)
+ 
+ 	ret = pm_runtime_get_sync(data->sysmmu);
+ 	if (ret < 0) {
+-		dev_dbg(data->sysmmu, "(%s) Failed to enable\n", data->dbgname);
++		dev_dbg(data->sysmmu, "Failed to enable\n");
+ 		return ret;
+ 	}
+ 
+@@ -503,8 +499,8 @@ int exynos_sysmmu_enable(struct device *dev, unsigned long pgtable)
+ 	if (WARN_ON(ret < 0)) {
+ 		pm_runtime_put(data->sysmmu);
+ 		dev_err(data->sysmmu,
+-			"(%s) Already enabled with page table %#lx\n",
+-			data->dbgname, data->pgtable);
++			"Already enabled with page table %#lx\n",
++			data->pgtable);
+ 	} else {
+ 		data->dev = dev;
+ 	}
+@@ -540,9 +536,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova)
+ 			}
+ 		}
+ 	} else {
+-		dev_dbg(data->sysmmu,
+-			"(%s) Disabled. Skipping invalidating TLB.\n",
+-			data->dbgname);
++		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating TLB.\n");
+ 	}
+ 
+ 	spin_unlock_irqrestore(&data->lock, flags);
+@@ -564,141 +558,117 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
+ 			}
+ 		}
+ 	} else {
+-		dev_dbg(data->sysmmu,
+-			"(%s) Disabled. Skipping invalidating TLB.\n",
+-			data->dbgname);
++		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating TLB.\n");
+ 	}
+ 
+ 	spin_unlock_irqrestore(&data->lock, flags);
+ }
+ 
+-static int exynos_sysmmu_probe(struct platform_device *pdev)
++static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ {
+ 	int i, ret;
+-	struct device *dev;
++	struct device *dev = &pdev->dev;
+ 	struct sysmmu_drvdata *data;
+ 
+-	dev = &pdev->dev;
+-
+-	data = kzalloc(sizeof(*data), GFP_KERNEL);
+-	if (!data) {
+-		dev_dbg(dev, "Not enough memory\n");
+-		ret = -ENOMEM;
+-		goto err_alloc;
++	if (pdev->num_resources == 0) {
++		dev_err(dev, "No System MMU resource defined\n");
++		return -ENODEV;
+ 	}
+ 
+-	ret = dev_set_drvdata(dev, data);
+-	if (ret) {
+-		dev_dbg(dev, "Unabled to initialize driver data\n");
+-		goto err_init;
++	data = devm_kzalloc(dev,
++			sizeof(*data) +
++			sizeof(*data->sfrbases) * (pdev->num_resources / 2),
++			GFP_KERNEL);
++	if (!data) {
++		dev_err(dev, "Not enough memory for initialization\n");
++		return -ENOMEM;
+ 	}
+ 
+ 	data->nsfrs = pdev->num_resources / 2;
+-	data->sfrbases = kmalloc(sizeof(*data->sfrbases) * data->nsfrs,
+-								GFP_KERNEL);
+-	if (data->sfrbases == NULL) {
+-		dev_dbg(dev, "Not enough memory\n");
+-		ret = -ENOMEM;
+-		goto err_init;
+-	}
+ 
+ 	for (i = 0; i < data->nsfrs; i++) {
+ 		struct resource *res;
 +
-+	GATE(smmu_fimc_isp, "smmu_fimc_isp", "none", GATE_IP_ISP0, 8, 0, 0),
-+	GATE(smmu_fimc_drc, "smmu_fimc_drc", "none", GATE_IP_ISP0, 9, 0, 0),
-+	GATE(smmu_fimc_fd, "smmu_fimc_fd", "none", GATE_IP_ISP0, 10, 0, 0),
-+	GATE(smmu_fimc_scc, "smmu_fimc_scc", "none",
-+							GATE_IP_ISP0, 11, 0, 0),
-+	GATE(smmu_fimc_scp, "smmu_fimc_scp", "none",
-+							GATE_IP_ISP0, 12, 0, 0),
-+	GATE(smmu_fimc_mcuctl, "smmu_fimc_mcuctl", "none",
-+							GATE_IP_ISP0, 13, 0, 0),
-+	GATE(smmu_fimc_odc, "smmu_fimc_odc", "none", GATE_IP_ISP1, 4, 0, 0),
-+	GATE(smmu_fimc_dis0, "smmu_fimc_dis0", "none",
-+							GATE_IP_ISP1, 5, 0, 0),
-+	GATE(smmu_fimc_dis1, "smmu_fimc_dis1", "none",
-+							GATE_IP_ISP1, 6, 0, 0),
-+	GATE(smmu_fimc_3dnr, "smmu_fimc_3dnr", "none",
-+							GATE_IP_ISP1, 7, 0, 0),
+ 		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
+ 		if (!res) {
+-			dev_dbg(dev, "Unable to find IOMEM region\n");
+-			ret = -ENOENT;
+-			goto err_res;
++			dev_err(dev, "Unable to find IOMEM region\n");
++			return -ENOENT;
+ 		}
+ 
+-		data->sfrbases[i] = ioremap(res->start, resource_size(res));
++		data->sfrbases[i] = devm_request_and_ioremap(dev, res);
+ 		if (!data->sfrbases[i]) {
+-			dev_dbg(dev, "Unable to map IOMEM @ PA:%#x\n",
+-							res->start);
+-			ret = -ENOENT;
+-			goto err_res;
++			dev_err(dev, "Unable to map IOMEM @ %#x\n", res->start);
++			return -EBUSY;
+ 		}
+ 	}
+ 
+ 	for (i = 0; i < data->nsfrs; i++) {
+-		ret = platform_get_irq(pdev, i);
+-		if (ret <= 0) {
+-			dev_dbg(dev, "Unable to find IRQ resource\n");
+-			goto err_irq;
++		int irq;
 +
-+	GATE(smmu_2d, "smmu_2d", "none", GATE_IP_ACP, 7, 0, 0),
++		irq = platform_get_irq(pdev, i);
++		if (irq <= 0) {
++			dev_err(dev, "Unable to find IRQ resource\n");
++			return -ENOENT;
+ 		}
+ 
+-		ret = request_irq(ret, exynos_sysmmu_irq, 0,
+-					dev_name(dev), data);
++		ret = devm_request_irq(dev, irq, exynos_sysmmu_irq,
++					0, dev_name(dev), data);
+ 		if (ret) {
+-			dev_dbg(dev, "Unabled to register interrupt handler\n");
+-			goto err_irq;
++			dev_err(dev, "Unable to register handler to irq %d\n",
++				irq);
++			return ret;
+ 		}
+ 	}
+ 
+-	if (dev_get_platdata(dev)) {
+-		char *deli, *beg;
+-		struct sysmmu_platform_data *platdata = dev_get_platdata(dev);
+-
+-		beg = platdata->clockname;
+-
+-		for (deli = beg; (*deli != '\0') && (*deli != ','); deli++)
+-			/* NOTHING */;
++	pm_runtime_enable(dev);
+ 
+-		if (*deli == '\0')
+-			deli = NULL;
+-		else
+-			*deli = '\0';
++	__set_fault_handler(data, &default_fault_handler);
+ 
+-		data->clk[0] = clk_get(dev, beg);
+-		if (IS_ERR(data->clk[0])) {
+-			data->clk[0] = NULL;
+-			dev_dbg(dev, "No clock descriptor registered\n");
++	data->sysmmu = dev;
++	data->clk = devm_clk_get(dev, "sysmmu");
++	if (IS_ERR(data->clk)) {
++		dev_info(dev, "No gate clock found!\n");
++		data->clk = NULL;
++	} else {
++		struct clk *parent;
++		ret = clk_prepare(data->clk);
++		if (ret) {
++			dev_err(dev, "Failed to prepare gate clock!\n");
++			return ret;
+ 		}
+ 
+-		if (data->clk[0] && deli) {
+-			*deli = ',';
+-			data->clk[1] = clk_get(dev, deli + 1);
+-			if (IS_ERR(data->clk[1]))
+-				data->clk[1] = NULL;
++		parent = devm_clk_get(dev, "master");
++		if (!IS_ERR(parent)) {
++			ret = clk_set_parent(data->clk, parent);
++			if (ret) {
++				dev_err(dev, "Failed to set parent clock!\n");
++				return ret;
++			}
+ 		}
+-
+-		data->dbgname = platdata->dbgname;
+ 	}
+ 
+-	data->sysmmu = dev;
+ 	spin_lock_init(&data->lock);
+ 	INIT_LIST_HEAD(&data->node);
+ 
+-	__set_fault_handler(data, &default_fault_handler);
+-
+-	if (dev->parent)
+-		pm_runtime_enable(dev);
++	platform_set_drvdata(pdev, data);
++	dev_dbg(dev, "Probed and initialized\n");
+ 
+-	dev_dbg(dev, "(%s) Initialized\n", data->dbgname);
+-	return 0;
+-err_irq:
+-	while (i-- > 0) {
+-		int irq;
+-
+-		irq = platform_get_irq(pdev, i);
+-		free_irq(irq, data);
+-	}
+-err_res:
+-	while (data->nsfrs-- > 0)
+-		iounmap(data->sfrbases[data->nsfrs]);
+-	kfree(data->sfrbases);
+-err_init:
+-	kfree(data);
+-err_alloc:
+-	dev_err(dev, "Failed to initialize\n");
+ 	return ret;
+ }
+ 
+-static struct platform_driver exynos_sysmmu_driver = {
+-	.probe		= exynos_sysmmu_probe,
+-	.driver		= {
++#ifdef CONFIG_OF
++static struct of_device_id sysmmu_of_match[] __initconst = {
++	{ .compatible	= "samsung,exynos4210-sysmmu", },
++	{ },
++};
++#endif
++
++static struct platform_driver exynos_sysmmu_driver __refdata = {
++	.probe	= exynos_sysmmu_probe,
++	.driver	= {
+ 		.owner		= THIS_MODULE,
+ 		.name		= "exynos-sysmmu",
++		.of_match_table	= of_match_ptr(sysmmu_of_match),
+ 	}
  };
  
- static __initdata struct of_device_id ext_clk_match[] = {
 -- 
 1.7.2.5
