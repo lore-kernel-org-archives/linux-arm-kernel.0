@@ -1,36 +1,40 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 05 Jul 2013 12:36:11 -0600
-Subject: Appended DTB files for multi-machine kernels
-In-Reply-To: <51D5A938.30607@gmail.com>
-References: <51D5A938.30607@gmail.com>
-Message-ID: <51D7121B.50704@wwwdotorg.org>
+Date: Fri, 05 Jul 2013 12:43:05 -0600
+Subject: [PATCH] ARM: tegra: enable gpio-keys on dalmore
+In-Reply-To: <1373028111-24246-1-git-send-email-ldewangan@nvidia.com>
+References: <1373028111-24246-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <51D713B9.40205@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/2013 10:56 AM, Daniel Mack wrote:
-...
-> The built-in support for attaching a DTB to the zImage does not suffice
-> here, because we have one image for all models, and also, we couldn't do
-> a 'per-board-revision' selection that way either.
-...
-> As a solution, I'm thinking of a small framework that could for example
-> work as follows.
+On 07/05/2013 06:41 AM, Laxman Dewangan wrote:
+> Dalmore have the keys mounted on board which are connected
+> to different pins of Tegra.
 > 
-> a) A small mechanism allows storing multiple DTB binary files inside the
-> kernel binary at compile time...
-...
-> c) Allow users to open-code the DTB lookup depending on whatever kind of
-> runtime information (be it the board_revision or anything else).
+> Add the keys entry in DTS file to enable key functionality.
+> This will enable KEY_POWER, KEY_HOME, KEY_VOLUMEUP and
+> KEY_VOLUMEDOWN.
 
-The problem with (c) is that in general it probably requires a lot of
-infra-structure to be working to implement it. On Tegra, the board
-revision is in an EEPROM attached to an I2C bus. You'd need to have
-parsed DT and started instantiating devices already before you could
-access the ID EEPROM to know which board revision you're running on.
-That's a bit of a chicked-and-egg problem. Even with a much simpler
-scheme such as board ID encoded into GPIOs, you'll still likely run into
-similar problems; pinmux and GPIO controller drivers are needed just to
-read the GPIOs, which then requires DT to instantiate those drivers.
+> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
 
-So, the suggestion of Nicolas's that you mentioned does solve that
-rather neatly.
+>  			 <&tegra_car TEGRA114_CLK_EXTERN1>;
+>  		clock-names = "pll_a", "pll_a_out0", "mclk";
+>  	};
+> +
+> +	gpio-keys {
+
+The node above is "sound". This node should be before that node so
+they're alphabetically sorted.
+
+> +		compatible = "gpio-keys";
+> +
+> +		power {
+> +			label = "Power";
+> +			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
+> +			linux,code = <116>; /* KEY_POWER */
+> +			gpio-key,wakeup;
+> +		};
+> +
+> +		home {
+
+Similarly, the nodes inside gpio-keys should also be sorted alphabetically.
