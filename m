@@ -1,43 +1,45 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 5 Jul 2013 11:13:04 +0530
-Subject: [RFC 0/4] Cleanup PRM and CM regbit headers
-In-Reply-To: <alpine.DEB.2.02.1307041627540.6258@utopia.booyaka.com>
-References: <1372076143-12955-1-git-send-email-rnayak@ti.com>
- <20130625071428.GC5523@atomide.com> <51C95839.6050307@ti.com>
- <20130704115819.GJ5523@atomide.com> <51D56743.9080800@ti.com>
- <alpine.DEB.2.02.1307041627540.6258@utopia.booyaka.com>
-Message-ID: <51D65CE8.4050004@ti.com>
+Date: Fri, 5 Jul 2013 11:18:44 +0530
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <alpine.DEB.2.02.1307041810410.6258@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
+ <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
+ <51CAEB33.5010101@ti.com>
+ <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
+ <51CBBCD8.5030600@ti.com>
+ <alpine.DEB.2.02.1306281844090.8767@utopia.booyaka.com>
+ <alpine.DEB.2.02.1307010211580.3741@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83ECCC435@DBDE04.ent.ti.com>
+ <51D2E096.5040700@ti.com>
+ <alpine.DEB.2.02.1307031944580.9618@utopia.booyaka.com>
+ <alpine.DEB.2.02.1307041810410.6258@utopia.booyaka.com>
+Message-ID: <51D65E3C.1070202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 July 2013 10:14 PM, Paul Walmsley wrote:
-> You mentioned that these patches were generated with some kind of awk/grep 
-> scripting.  Can you integrate that in an automated way into the 
-> autogeneration flow?  If the answer is yes, then keep the header.  If the 
-> answer is no, then the header should be dropped.  Beno?t, maybe you have 
-> an opinion too?
+On Thursday 04 July 2013 11:42 PM, Paul Walmsley wrote:
+> On Wed, 3 Jul 2013, Paul Walmsley wrote:
+> 
+>> As far as Lokesh's patch goes: it doesn't make sense to me to remove a 
+>> file during 'make clean' that the build process doesn't create.  So while 
+>> I understand the motivation for the patch, and don't mind if upstream 
+>> takes it, I personally wouldn't care to ack it.
+> 
+> Incidentally, if there's any patch that would improve the current 
+> situation with appended DTBs by going upstream, it would be a patch like 
+> Grant's "HACK" patch to add appended DTB building into the kernel build 
+> system.  Maybe folks can push to something similar to that one upstream?
 
-Ok, I'll try and integrate those scripts so all this can be done in an
-automated way even for newer SoCs.
+Grant already made it clear when he posted that patch that neither that nor
+anything similar would be taken up mainline because the appended dtb was only
+meant for folks stuck with legacy bootloaders and have no way to upgrade.
+Anyone who uses a bootloader capable of passing the dtb should *not* use the
+appended dtb way.
 
 > 
-> As far as whether this should go in -rcX or not, my view is that, as a 
-> matter of policy, large changes like this should wait until v3.12.  Now, 
-> having written that, I also was under the impression that the OMAP5 
-> changes weren't going to be sent upstream unless the total diffstat would 
-> be balanced to roughly zero or negative lines.  As far as I know, that 
-> didn't happen.  So I guess, v3.11-rc it is...  kernel development by 
-> diffstat :-(
-
-I don't mind these going in -rcX or 3.12, either way is fine.
- 
 > 
-> Finally, please repost the whole series once you're done with your 
-> changes, as a non-RFC, along with your pull request (if you plan to send 
-> one).  I guess I should be the one to take these, since I wound up taking 
-> the OMAP5 addition...
-
-:) I thought so too that you should be the one sending the pull.
-I will post these out as non-RFC after I do a clean integration into
-the autogen scripts, and then you can take a call on sending the pull for
-either -rcX or 3.12
+> - Paul
+> 
