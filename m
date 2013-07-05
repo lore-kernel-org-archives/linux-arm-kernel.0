@@ -1,79 +1,72 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Fri, 5 Jul 2013 16:22:05 +0300
-Subject: [RFC] clk: add flags to distinguish xtal clocks
-In-Reply-To: <CAAG0J98UL5sLTmRx1o8XnbK8qWv_qNi9+zwuyPBbbYExPSbw8g@mail.gmail.com>
-References: <1372971912-10877-1-git-send-email-coelho@ti.com>
- <CAAG0J98UL5sLTmRx1o8XnbK8qWv_qNi9+zwuyPBbbYExPSbw8g@mail.gmail.com>
-Message-ID: <1373030525.21065.172.camel@cumari.coelho.fi>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Fri, 5 Jul 2013 13:31:08 +0000
+Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
+References: <51D577E6.5010507@newflow.co.uk>
+ <51D59146.3070002@newflow.co.uk> <51D59C0E.8080003@newflow.co.uk>
+ <B5906170F1614E41A8A28DE3B8D121433EE93C23@DBDE04.ent.ti.com>
+ <20130705115959.GQ5523@atomide.com>
+ <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-07-05 at 14:12 +0100, James Hogan wrote:
-> On 4 July 2013 22:05, Luciano Coelho <coelho@ti.com> wrote:
-> > Add a flag that indicate whether the clock is a crystal or not.  Since
-> > no clocks set this flag right now, include an additional flag that
-> > indicates whether the type is set or not.  If the CLK_IS_TYPE_DEFINED
-> > flag is not set, the value of the CLK_IS_TYPE_XTAL flag is undefined.
-> > This ensures backwards compatibility.
-> >
-> > Additionally, parse a new device tree binding in clk-fixed-rate to set
-> > this flag.
-> >
-> > Signed-off-by: Luciano Coelho <coelho@ti.com>
-> > ---
-> >
-> > I'm not  familiar with the common clock framework and I'm not
-> > entirely sure the flags can be used in such a way, but to me it looks
-> > reasonable, since some clock consumers may need to know what type of
-> > clock is being provided.
-> >
-> > Specifically, the wl12xx firmware needs to know if the clock is XTAL
-> > or not to handle the stabilization and boosts properly.
-> >
-> > My main idea is that I need to pass this information in the device
-> > tree definition of the clocks, so that the driver can pass this
-> > information on to the firmware.
-> >
-> > Please let me know if this looks ok or not.  If not, please let me
-> > know if you have any other ideas on how to solve my problem (of
-> > knowing whether the clock attached to the WiLink chip is XTAL or not).
+On Fri, Jul 05, 2013 at 18:50:10, Bedia, Vaibhav wrote:
+> Hi Tony,
 > 
-> The TZ1090 SoC has something that sounds possibly similar, where some
-> of the XTAL pads have a bypass bit, which according to the hardware
-> engineer I asked should be enabled when you want to use the
-> corresponding XTAL pads as a clock input pad rather than an
-> oscillator.
+> On Fri, Jul 05, 2013 at 17:29:59, Tony Lindgren wrote:
+> > * Bedia, Vaibhav <vaibhav.bedia@ti.com> [130705 01:17]:
+> > > 
+> > > I just checked the behavior on my AM335x-EVM. Current mainline boots fine
+> > > provided I don't use earlyprintk.  The offending patch [1] in this case is the one
+> > > that tries to get rid of omap_serial_early_init() for DT boot. This change inadvertently
+> > > also results in the console UART getting reset and idled during bootup and that's where
+> > > the boot stops for you. I think if you skip earlyprintk from the bootargs you should see
+> > > the system booting fine. 
+> > > 
+> > > I guess we need to retain the NO_IDLE and NO_RESET aspect for the console UART in
+> > > omap_serial_early_init() to get earlyprintk working again.
+> > 
+> > Hmm nothing should get idled while earlyprintk is running, and then when the
+> > serial driver kicks in it should not idle anything by default. And for DT based
+> > booting we should not have mach-omap2/serial.c initialize anything.
+> > 
+> 
+> If I add in the HWMOD flags without any reverts I get to the point where the serial driver
+> comes up but the boot eventually stops [1]. Without the flags the boot stops much earlier [2]
+> just like Mark reported.
+> 
 
-Cool, good to know that I'm not alone here. ;)
+Err.. the log with HWMOD flags added is [2] and without flags is [1]. Sorry for the confusion.
 
-
->  I was considering extending clk-fixed-rate (via a wrapper
-> driver) to parse a custom DT property and a register address / bit
-> number and set the bypass bit as appropriate itself.
-
-I thought about this too.  I actually have a "driver" for my clocks,
-because normally they're not part of the main board, but part of the
-module that contains the WiLink chip.  In those cases, I don't want my
-clocks to be used as a generic clk-fixed-rate by the clock framework.
-But the only difference in my "wrapper" is that it matches
-"ti,wilink-clock" instead of "fixed-clock".
-
-
-> So I was wondering, is there a particular reason you don't have a DT
-> property on the node for the device that needs to know what type of
-> clock it is, rather than the clock node itself? That way you're not
-> depending directly on the generic common clock framework to be able to
-> tell you such electrical details.
-
-I think this is a detail of the clock itself, not of the user of the
-clock.  Of course, the user of the clock needs to know what to do if the
-clock is XTAL.  But the information of whether it is a XTAL or not
-should be in the clock data.
-
-I tried to make a generic solution that everyone could use.  For
-instance, you. :) You could use the same bit that I implemented and, in
-your driver, convert that bit into the action you need to take.
-
-
---
-Luca.
+> > I wonder if this is because the timeouts get now initialized to 0 instead
+> > of -1 for the serial driver?
+> > 
+> 
+> You meant initialized to -1, right? There's an additional check for timeout being 0. Unless i
+> am missing something DT-boot will start off with timeout set to 0 and then get forced to -1.
+> 
+> Regards,
+> Vaibhav
+> 
+> ===
+> [1]
+> 
+> [    0.000000] Booting Linux on physical CPU 0x0
+> <...>
+> [    0.190107] SMP: Total of 1 processors activated (363.72 BogoMIPS).
+> [    0.196711] CPU: All CPU(s) started in SVC mode.
+> [    0.205580] devtmpfs: initialized
+> <stops here if booted with earlyprintk>
+> 
+> [2]
+> [    0.000000] Booting Linux on physical CPU 0x0
+> <...>
+> [    1.453364] pinctrl-single 44e10800.pinmux: 142 pins at pa f9e10800 size 568
+> [    1.467121] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+> <stops here if booted with earlyprintk>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
