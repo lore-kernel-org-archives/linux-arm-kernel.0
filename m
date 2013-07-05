@@ -1,38 +1,87 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 5 Jul 2013 23:40:34 +0200
-Subject: [PATCHv4 02/11] pci: use weak functions for MSI arch-specific
- functions
-In-Reply-To: <CAErSpo4HoofGhN8VumRnN0sN_+gWJ9gVQJVMiePnDBUKwh74ag@mail.gmail.com>
-References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1372686136-1370-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo5uCpQftDmsMYEsFMtt_LP3kZPQ3Y4zz4VT7GdpcFq+1w@mail.gmail.com>
- <CAErSpo4HoofGhN8VumRnN0sN_+gWJ9gVQJVMiePnDBUKwh74ag@mail.gmail.com>
-Message-ID: <20130705234034.6c57cd43@skate>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri,  5 Jul 2013 18:39:18 -0300
+Subject: [PATCH v6 07/21] bus: mvebu-mbus: Factor out initialization details
+In-Reply-To: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1373060372-32357-8-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn Helgaas,
+We introduce a common initialization function mvebu_mbus_common_init()
+that will be used by both legacy and device-tree initialization code.
+This patch is an intermediate step, which will allow to introduce the
+DT binding for this driver in a less intrusive way.
 
-On Fri, 5 Jul 2013 15:34:10 -0600, Bjorn Helgaas wrote:
-> On Fri, Jul 5, 2013 at 3:32 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> 
-> > Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> But please update your subject line to use consistent capitalization, e.g.,
-> 
-> PCI: Use weak ...
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/bus/mvebu-mbus.c | 47 ++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 30 insertions(+), 17 deletions(-)
 
-Sure, will do.
-
-Would it be possible to get Tested-by and/or Acked-by from the
-different architecture maintainers affected by PATCH 02/11 and PATCH
-03/11 ?
-
-Thanks,
-
-Thomas
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index 827468a..1b17954 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -847,26 +847,14 @@ static __init int mvebu_mbus_debugfs_init(void)
+ }
+ fs_initcall(mvebu_mbus_debugfs_init);
+ 
+-int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+-			   size_t mbuswins_size,
+-			   phys_addr_t sdramwins_phys_base,
+-			   size_t sdramwins_size)
++static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
++					 phys_addr_t mbuswins_phys_base,
++					 size_t mbuswins_size,
++					 phys_addr_t sdramwins_phys_base,
++					 size_t sdramwins_size)
+ {
+-	struct mvebu_mbus_state *mbus = &mbus_state;
+-	const struct of_device_id *of_id;
+ 	int win;
+ 
+-	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
+-		if (!strcmp(of_id->compatible, soc))
+-			break;
+-
+-	if (!of_id->compatible) {
+-		pr_err("could not find a matching SoC family\n");
+-		return -ENODEV;
+-	}
+-
+-	mbus->soc = of_id->data;
+-
+ 	mbus->mbuswins_base = ioremap(mbuswins_phys_base, mbuswins_size);
+ 	if (!mbus->mbuswins_base)
+ 		return -ENOMEM;
+@@ -887,3 +875,28 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+ 
+ 	return 0;
+ }
++
++int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
++			   size_t mbuswins_size,
++			   phys_addr_t sdramwins_phys_base,
++			   size_t sdramwins_size)
++{
++	const struct of_device_id *of_id;
++
++	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
++		if (!strcmp(of_id->compatible, soc))
++			break;
++
++	if (!of_id->compatible) {
++		pr_err("could not find a matching SoC family\n");
++		return -ENODEV;
++	}
++
++	mbus_state.soc = of_id->data;
++
++	return mvebu_mbus_common_init(&mbus_state,
++			mbuswins_phys_base,
++			mbuswins_size,
++			sdramwins_phys_base,
++			sdramwins_size);
++}
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.1.5
