@@ -1,37 +1,40 @@
 From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Fri, 05 Jul 2013 21:29:09 +0900
-Subject: [PATCH v7 1/9] iommu/exynos: do not include removed header
-Message-ID: <002901ce797b$3fce5c30$bf6b1490$@samsung.com>
+Date: Fri, 05 Jul 2013 21:29:13 +0900
+Subject: [PATCH v7 2/9] iommu/exynos: add missing cache flush for removed page
+ table entries
+Message-ID: <002a01ce797b$421b5970$c6520c50$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit remove <mach/sysmmu.h> which is removed.
+This commit adds cache flush for removed small and large page entries
+in exynos_iommu_unmap(). Missing cache flush of removed page table
+entries can cause missing page fault interrupt when a master IP
+accesses an unmapped area.
 
 Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ drivers/iommu/exynos-iommu.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 3f32d64..233f382 100644
+index 233f382..e3be3e5 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -12,6 +12,7 @@
- #define DEBUG
- #endif
+@@ -1002,6 +1002,7 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
+ 	if (lv2ent_small(ent)) {
+ 		*ent = 0;
+ 		size = SPAGE_SIZE;
++		pgtable_flush(ent, ent +1);
+ 		priv->lv2entcnt[lv1ent_offset(iova)] += 1;
+ 		goto done;
+ 	}
+@@ -1010,6 +1011,7 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
+ 	BUG_ON(size < LPAGE_SIZE);
  
-+#include <linux/kernel.h>
- #include <linux/io.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
-@@ -29,8 +30,6 @@
- #include <asm/cacheflush.h>
- #include <asm/pgtable.h>
+ 	memset(ent, 0, sizeof(*ent) * SPAGES_PER_LPAGE);
++	pgtable_flush(ent, ent + SPAGES_PER_LPAGE);
  
--#include <mach/sysmmu.h>
--
- /* We does not consider super section mapping (16MB) */
- #define SECT_ORDER 20
- #define LPAGE_ORDER 16
+ 	size = LPAGE_SIZE;
+ 	priv->lv2entcnt[lv1ent_offset(iova)] += SPAGES_PER_LPAGE;
 -- 
 1.7.2.5
