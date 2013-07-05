@@ -1,10 +1,11 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Sat, 6 Jul 2013 00:58:34 +0200
-Subject: [PATCH 6/9] clocksource: dw_apb_timer: quirk for inverted int mask
-In-Reply-To: <201307060054.35996.heiko@sntech.de>
+Date: Sat, 6 Jul 2013 00:58:51 +0200
+Subject: [PATCH 5/9] clocksource: dw_apb_timer: quirk for variants without
+ EOI register
+In-Reply-To: <201307060054.07784.heiko@sntech.de>
 References: <201307060051.09716.heiko@sntech.de>
- <201307060054.35996.heiko@sntech.de>
-Message-ID: <201307060058.34736.heiko@sntech.de>
+ <201307060054.07784.heiko@sntech.de>
+Message-ID: <201307060058.52177.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,85 +15,56 @@ From: Ulrich Prinz <ulrich.prinz@googlemail.com>
 
 sorry for the mistake
 
-Am Samstag, 6. Juli 2013, 00:54:35 schrieb Heiko St?bner:
-> Some timer variants use an inverted setting to mask the timer interrupt.
-> Therefore add a quirk to handle these variants.
+Am Samstag, 6. Juli 2013, 00:54:07 schrieb Heiko St?bner:
+> Some variants of the dw_apb_timer don't have an eoi register but instead
+> expect a one to be written to the int_status register at eoi time.
 > 
 > Signed-off-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
 > ---
->  drivers/clocksource/dw_apb_timer.c |   23 ++++++++++++++++++-----
->  include/linux/dw_apb_timer.h       |    6 ++++++
->  2 files changed, 24 insertions(+), 5 deletions(-)
+>  drivers/clocksource/dw_apb_timer.c |   10 +++++++++-
+>  include/linux/dw_apb_timer.h       |    5 +++++
+>  2 files changed, 14 insertions(+), 1 deletion(-)
 > 
 > diff --git a/drivers/clocksource/dw_apb_timer.c
-> b/drivers/clocksource/dw_apb_timer.c index 23cd7c6..7705d13 100644
+> b/drivers/clocksource/dw_apb_timer.c index 5f80a30..23cd7c6 100644
 > --- a/drivers/clocksource/dw_apb_timer.c
 > +++ b/drivers/clocksource/dw_apb_timer.c
-> @@ -84,7 +84,10 @@ static void apbt_disable_int(struct dw_apb_timer *timer)
+> @@ -104,6 +104,11 @@ static void apbt_eoi(struct dw_apb_timer *timer)
+>  	apbt_readl(timer, timer->reg_eoi);
+>  }
+> 
+> +static void apbt_eoi_int_status(struct dw_apb_timer *timer)
+> +{
+> +	apbt_writel(timer, 1, timer->reg_int_status);
+> +}
+> +
+>  static irqreturn_t dw_apb_clockevent_irq(int irq, void *data)
 >  {
->  	unsigned long ctrl = apbt_readl(timer, timer->reg_control);
+>  	struct clock_event_device *evt = data;
+> @@ -286,7 +291,10 @@ dw_apb_clockevent_init(int cpu, const char *name,
+> unsigned rating, IRQF_NOBALANCING |
+>  					  IRQF_DISABLED;
 > 
-> -	ctrl |= APBTMR_CONTROL_INT;
-> +	if (timer->quirks & APBTMR_QUIRK_INVERSE_INTMASK)
-> +		ctrl &= ~APBTMR_CONTROL_INT;
+> -	dw_ced->eoi = apbt_eoi;
+> +	if (quirks & APBTMR_QUIRK_NO_EOI)
+> +		dw_ced->eoi = apbt_eoi_int_status;
 > +	else
-> +		ctrl |= APBTMR_CONTROL_INT;
->  	apbt_writel(timer, ctrl, timer->reg_control);
->  }
-> 
-> @@ -134,7 +137,10 @@ static void apbt_enable_int(struct
-> dw_apb_clock_event_device *dw_ced) /* clear pending intr */
->  	if (dw_ced->eoi)
->  		dw_ced->eoi(timer);
-> -	ctrl &= ~APBTMR_CONTROL_INT;
-> +	if (timer->quirks & APBTMR_QUIRK_INVERSE_INTMASK)
-> +		ctrl |= APBTMR_CONTROL_INT;
-> +	else
-> +		ctrl &= ~APBTMR_CONTROL_INT;
->  	apbt_writel(timer, ctrl, timer->reg_control);
->  }
-> 
-> @@ -195,7 +201,10 @@ static void apbt_set_mode(enum clock_event_mode mode,
->  		if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
->  			apbt_writel(timer, 0, timer->reg_load_count + 0x4);
-> 
-> -		ctrl &= ~APBTMR_CONTROL_INT;
-> +		if (timer->quirks & APBTMR_QUIRK_INVERSE_INTMASK)
-> +			ctrl |= APBTMR_CONTROL_INT;
-> +		else
-> +			ctrl &= ~APBTMR_CONTROL_INT;
->  		ctrl |= APBTMR_CONTROL_ENABLE;
->  		apbt_writel(timer, ctrl, timer->reg_control);
->  		break;
-> @@ -363,9 +372,13 @@ void dw_apb_clocksource_start(struct
-> dw_apb_clocksource *dw_cs) if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
->  		apbt_writel(timer, 0, timer->reg_load_count + 0x4);
-> 
-> -	/* enable, mask interrupt */
-> +	/* set periodic, mask interrupt, enable timer */
->  	ctrl &= ~APBTMR_CONTROL_MODE_PERIODIC;
-> -	ctrl |= (APBTMR_CONTROL_ENABLE | APBTMR_CONTROL_INT);
-> +	if (timer->quirks & APBTMR_QUIRK_INVERSE_INTMASK)
-> +		ctrl &= ~APBTMR_CONTROL_INT;
-> +	else
-> +		ctrl |= APBTMR_CONTROL_INT;
-> +	ctrl |= APBTMR_CONTROL_ENABLE;
->  	apbt_writel(timer, ctrl, timer->reg_control);
->  	/* read it once to get cached counter value initialized */
->  	dw_apb_clocksource_read(dw_cs);
+> +		dw_ced->eoi = apbt_eoi;
+>  	err = setup_irq(irq, &dw_ced->irqaction);
+>  	if (err) {
+>  		pr_err("failed to request timer irq\n");
 > diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
-> index fbe4c6b..7d36d91 100644
+> index 80f6686..fbe4c6b 100644
 > --- a/include/linux/dw_apb_timer.h
 > +++ b/include/linux/dw_apb_timer.h
-> @@ -30,6 +30,12 @@
+> @@ -25,6 +25,11 @@
 >   */
->  #define APBTMR_QUIRK_NO_EOI		BIT(1)
+>  #define APBTMR_QUIRK_64BIT_COUNTER	BIT(0)
 > 
-> +/* The IP uses an inverted interrupt-mask bit.
-> + * Instead of activating interrupts clearing a maks bit, it needs an
-> enable + * bit to be set 1.
+> +/* The IP does not provide a end-of-interrupt register to clear pending
+> + * interrupts, but requires to write a 1 to the interrupt-status register.
 > + */
-> +#define APBTMR_QUIRK_INVERSE_INTMASK	BIT(2)
+> +#define APBTMR_QUIRK_NO_EOI		BIT(1)
 > +
 >  struct dw_apb_timer {
 >  	void __iomem				*base;
