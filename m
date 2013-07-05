@@ -1,143 +1,73 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri,  5 Jul 2013 18:39:30 -0300
-Subject: [PATCH v6 19/21] ARM: mvebu: Add BootROM to Armada 370/XP device tree
+Date: Fri,  5 Jul 2013 18:39:27 -0300
+Subject: [PATCH v6 16/21] ARM: mvebu: Initialize MBus using the DT binding
 In-Reply-To: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1373060372-32357-20-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1373060372-32357-17-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to access the SoC BootROM, we need to declare a mapping
-(through a ranges property). The mbus driver will use this property
-to allocate a suitable address decoding window.
+Now that the mbus device tree binding has been introduced, we can
+switch over to it.
+
+Also, and since the initialization of the mbus driver is quite
+fundamental for the system to work properly, this patch adds a BUG()
+in case mbus fails to initialize.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-db.dts              | 3 ++-
- arch/arm/boot/dts/armada-370-mirabox.dts         | 3 ++-
- arch/arm/boot/dts/armada-370-rd.dts              | 3 ++-
- arch/arm/boot/dts/armada-370.dtsi                | 5 +++++
- arch/arm/boot/dts/armada-xp-db.dts               | 3 ++-
- arch/arm/boot/dts/armada-xp-gp.dts               | 3 ++-
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 3 ++-
- arch/arm/boot/dts/armada-xp.dtsi                 | 5 +++++
- 8 files changed, 22 insertions(+), 6 deletions(-)
+ arch/arm/mach-mvebu/armada-370-xp.c | 34 +---------------------------------
+ 1 file changed, 1 insertion(+), 33 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 5920b4e..90ce29d 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -30,7 +30,8 @@
- 	};
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+index 97cbb80..829b573 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.c
++++ b/arch/arm/mach-mvebu/armada-370-xp.c
+@@ -34,44 +34,12 @@ static void __init armada_370_xp_map_io(void)
+ 	debug_ll_io_init();
+ }
  
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index a4202b6..19341d2 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -25,7 +25,8 @@
- 	};
- 
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-index dd0ba01..0b3acf3 100644
---- a/arch/arm/boot/dts/armada-370-rd.dts
-+++ b/arch/arm/boot/dts/armada-370-rd.dts
-@@ -28,7 +28,8 @@
- 	};
- 
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 4b54e51..bd21d49 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -31,6 +31,11 @@
- 	soc {
- 		compatible = "marvell,armada370-mbus", "simple-bus";
- 
-+		bootrom {
-+			compatible = "marvell,bootrom";
-+			reg = <MBUS_ID(0x01, 0xe0) 0 0x100000>;
-+		};
-+
- 		internal-regs {
- 			system-controller at 18200 {
- 				compatible = "marvell,armada-370-xp-system-controller";
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index 0d4ce54..857f272 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -30,7 +30,8 @@
- 	};
- 
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index 2fa9209..934dc46 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -39,7 +39,8 @@
- 	};
- 
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index a3e3a12..1700f6f 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -27,7 +27,8 @@
- 	};
- 
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 8033824..7ba99ce 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -29,6 +29,11 @@
- 	soc {
- 		compatible = "marvell,armadaxp-mbus", "simple-bus";
- 
-+		bootrom {
-+			compatible = "marvell,bootrom";
-+			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
-+		};
-+
- 		internal-regs {
- 			L2: l2-cache {
- 				compatible = "marvell,aurora-system-cache";
+-/*
+- * This initialization will be replaced by a DT-based
+- * initialization once the mvebu-mbus driver gains DT support.
+- */
+-
+-#define ARMADA_370_XP_MBUS_WINS_OFFS   0x20000
+-#define ARMADA_370_XP_MBUS_WINS_SIZE   0x100
+-#define ARMADA_370_XP_SDRAM_WINS_OFFS  0x20180
+-#define ARMADA_370_XP_SDRAM_WINS_SIZE  0x20
+-
+-static void __init armada_370_xp_mbus_init(void)
+-{
+-	char *mbus_soc_name;
+-	struct device_node *dn;
+-	const __be32 mbus_wins_offs = cpu_to_be32(ARMADA_370_XP_MBUS_WINS_OFFS);
+-	const __be32 sdram_wins_offs = cpu_to_be32(ARMADA_370_XP_SDRAM_WINS_OFFS);
+-
+-	if (of_machine_is_compatible("marvell,armada370"))
+-		mbus_soc_name = "marvell,armada370-mbus";
+-	else
+-		mbus_soc_name = "marvell,armadaxp-mbus";
+-
+-	dn = of_find_node_by_name(NULL, "internal-regs");
+-	BUG_ON(!dn);
+-
+-	mvebu_mbus_init(mbus_soc_name,
+-			of_translate_address(dn, &mbus_wins_offs),
+-			ARMADA_370_XP_MBUS_WINS_SIZE,
+-			of_translate_address(dn, &sdram_wins_offs),
+-			ARMADA_370_XP_SDRAM_WINS_SIZE);
+-}
+-
+ static void __init armada_370_xp_timer_and_clk_init(void)
+ {
+ 	of_clk_init(NULL);
+ 	armada_370_xp_timer_init();
+ 	coherency_init();
+-	armada_370_xp_mbus_init();
++	BUG_ON(mvebu_mbus_dt_init());
+ #ifdef CONFIG_CACHE_L2X0
+ 	l2x0_of_init(0, ~0UL);
+ #endif
 -- 
 1.8.1.5
