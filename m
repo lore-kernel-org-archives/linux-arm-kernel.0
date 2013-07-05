@@ -1,46 +1,26 @@
-From: b18965@freescale.com (Alison Wang)
-Date: Fri, 5 Jul 2013 15:51:40 +0800
-Subject: [PATCH 2/4] ARM: dts: vf610-twr: Enable DCU and TCON devices
-In-Reply-To: <1373010702-9244-1-git-send-email-b18965@freescale.com>
-References: <1373010702-9244-1-git-send-email-b18965@freescale.com>
-Message-ID: <1373010702-9244-3-git-send-email-b18965@freescale.com>
+From: minggr@gmail.com (Lin Ming)
+Date: Fri, 5 Jul 2013 16:44:12 +0800
+Subject: kernel decompressor problem for ARMv7
+Message-ID: <CAF1ivSakn8-HiAf+4_cLRWUUTDP9QBKpAt+hVQoMyAmKZ2-dJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables DCU and TCON devices for Vybrid VF610 TOWER board.
+Hi all,
 
-Signed-off-by: Alison Wang <b18965@freescale.com>
----
- arch/arm/boot/dts/vf610-twr.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+I'm porting BSP code from v2.6.36 to v3.10 kernel. It's ARMv7 processor.
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index b3905f5..605fb04 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -36,6 +36,12 @@
- 
- };
- 
-+&dcu0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_dcu0_1>;
-+	status = "okay";
-+};
-+
- &fec0 {
- 	phy-mode = "rmii";
- 	pinctrl-names = "default";
-@@ -50,6 +56,10 @@
- 	status = "okay";
- };
- 
-+&tcon0 {
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1_1>;
--- 
-1.8.0
+But decompressor doesn't work. With a lot of debug, I finally find
+below 2 commits related.
+Kernel uncompress OK with these commits reverted.
+
+dbece45: ARM: 7501/1: decompressor: reset ttbcr for VMSA ARMv7 cores
+(Introduced in v3.6-rc6)
+
+5010192: ARM: 7583/1: decompressor: Enable unaligned memory access for
+v6 and above
+(Introduced in v3.7-rc8)
+
+Any hint to fix it?
+
+Thanks,
+Lin Ming
