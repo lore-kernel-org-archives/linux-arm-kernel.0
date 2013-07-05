@@ -1,49 +1,206 @@
-From: javier.picorel@epfl.ch (Javier Picorel)
-Date: Thu, 4 Jul 2013 23:44:58 +0000
-Subject: ARM Cortex A9: LL counters
-In-Reply-To: <20130704094516.GC8782@mudshark.cambridge.arm.com>
-References: <BFCB49997E59134AAAF17FFE77F8FF06673738BC@REXMD.intranet.epfl.ch>,
- <20130704094516.GC8782@mudshark.cambridge.arm.com>
-Message-ID: <BFCB49997E59134AAAF17FFE77F8FF06673759E9@REXMD.intranet.epfl.ch>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Fri, 05 Jul 2013 09:09:31 +0800
+Subject: [PATCH v3] arch/*/asm/include/bitops.h: api issue, find_*_bit()
+ defination are different with each other
+In-Reply-To: <51BFD51E.3040202@asianux.com>
+References: <51AE8FEF.1020809@asianux.com> <51AE903C.6010806@asianux.com>
+ <51AE909D.9080006@asianux.com> <20130605071915.GK23140@pengutronix.de>
+ <51AF225A.5020703@asianux.com> <51B05865.30305@asianux.com>
+ <51BFD51E.3040202@asianux.com>
+Message-ID: <51D61CCB.40409@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Will,
+Hello Maintainers:
 
-Thanks for the clarification! However, correct me if I'm wrong but, doesn't this mean that the "CO_LF_MISS" counter refers to L2 accesses? Thanks!
+Please help check this patch whether OK, when you have time.
 
-Regards,
-Javier
-________________________________________
-From: Will Deacon [will.deacon at arm.com]
-Sent: 04 July 2013 11:45
-To: Javier Picorel
-Cc: linux-arm-kernel at lists.infradead.org; mark.rutland at arm.com
-Subject: Re: ARM Cortex A9: LL counters
+Thanks.
 
-On Wed, Jul 03, 2013 at 07:59:14PM +0100, Javier Picorel wrote:
-> Dear all,
+On 06/18/2013 11:33 AM, Chen Gang wrote:
+> Hello related Maintainers:
+> 
+> Please help check this patch when you have time.
+> 
+> Thanks.
+> 
+> On 06/06/2013 05:37 PM, Chen Gang wrote:
+>>
+>> For arm and m68k, they customize find_*_bit(), but the API is different
+>> with 'generic'.
+>>
+>> avr32, s390, and unicore32 also customize find_*_bit(), but the API is
+>> the same with 'generic', and the left architectures all use 'generic'.
+>>
+>> So need change arm and m68k related API to match the 'generic', then
+>> all another modules can face same public API for various architectures.
+>>
+>> Also beautify code and comments to pass "./scripts/checkpatch.pl"
+>>
+>>
+>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>> ---
+>>  arch/arm/include/asm/bitops.h  |   26 ++++++++++++++++++--------
+>>  arch/arm/lib/findbit.S         |   14 ++++++++++----
+>>  arch/m68k/include/asm/bitops.h |   25 ++++++++++++++-----------
+>>  3 files changed, 42 insertions(+), 23 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+>> index e691ec9..83e4d3a 100644
+>> --- a/arch/arm/include/asm/bitops.h
+>> +++ b/arch/arm/include/asm/bitops.h
+>> @@ -161,18 +161,28 @@ extern int _test_and_change_bit(int nr, volatile unsigned long * p);
+>>  /*
+>>   * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
+>>   */
+>> -extern int _find_first_zero_bit_le(const void * p, unsigned size);
+>> -extern int _find_next_zero_bit_le(const void * p, int size, int offset);
+>> -extern int _find_first_bit_le(const unsigned long *p, unsigned size);
+>> -extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
+>> +extern unsigned long _find_first_zero_bit_le(const void *p,
+>> +						unsigned long size);
+>> +extern unsigned long _find_next_zero_bit_le(const void *p, unsigned long size,
+>> +						unsigned long offset);
+>> +extern unsigned long _find_first_bit_le(const unsigned long *p,
+>> +						unsigned long size);
+>> +extern unsigned long _find_next_bit_le(const unsigned long *p,
+>> +						unsigned long size,
+>> +						unsigned long offset);
+>>  
+>>  /*
+>>   * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
+>>   */
+>> -extern int _find_first_zero_bit_be(const void * p, unsigned size);
+>> -extern int _find_next_zero_bit_be(const void * p, int size, int offset);
+>> -extern int _find_first_bit_be(const unsigned long *p, unsigned size);
+>> -extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
+>> +extern unsigned long _find_first_zero_bit_be(const void *p,
+>> +						unsigned long size);
+>> +extern unsigned long _find_next_zero_bit_be(const void *p, unsigned long size,
+>> +						unsigned long offset);
+>> +extern unsigned long _find_first_bit_be(const unsigned long *p,
+>> +						unsigned long size);
+>> +extern unsigned long _find_next_bit_be(const unsigned long *p,
+>> +						unsigned long size,
+>> +						unsigned long offset);
+>>  
+>>  #ifndef CONFIG_SMP
+>>  /*
+>> diff --git a/arch/arm/lib/findbit.S b/arch/arm/lib/findbit.S
+>> index 64f6bc1..817dd70 100644
+>> --- a/arch/arm/lib/findbit.S
+>> +++ b/arch/arm/lib/findbit.S
+>> @@ -19,7 +19,8 @@
+>>  
+>>  /*
+>>   * Purpose  : Find a 'zero' bit
+>> - * Prototype: int find_first_zero_bit(void *addr, unsigned int maxbit);
+>> + * Prototype: unsigned long find_first_zero_bit(const void *p,
+>> + *						unsigned long size);
+>>   */
+>>  ENTRY(_find_first_zero_bit_le)
+>>  		teq	r1, #0	
+>> @@ -40,7 +41,9 @@ ENDPROC(_find_first_zero_bit_le)
+>>  
+>>  /*
+>>   * Purpose  : Find next 'zero' bit
+>> - * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
+>> + * Prototype: unsigned long find_next_zero_bit(const void *p,
+>> + *						unsigned long size,
+>> + *						unsigned long offset);
+>>   */
+>>  ENTRY(_find_next_zero_bit_le)
+>>  		teq	r1, #0
+>> @@ -60,7 +63,8 @@ ENDPROC(_find_next_zero_bit_le)
+>>  
+>>  /*
+>>   * Purpose  : Find a 'one' bit
+>> - * Prototype: int find_first_bit(const unsigned long *addr, unsigned int maxbit);
+>> + * Prototype: unsigned long find_first_bit(const unsigned long *p,
+>> + *					unsigned long size);
+>>   */
+>>  ENTRY(_find_first_bit_le)
+>>  		teq	r1, #0	
+>> @@ -81,7 +85,9 @@ ENDPROC(_find_first_bit_le)
+>>  
+>>  /*
+>>   * Purpose  : Find next 'one' bit
+>> - * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
+>> + * Prototype: unsigned long find_next_bit(const unsigned long *p,
+>> + *					unsigned long size,
+>> + *					unsigned long offset);
+>>   */
+>>  ENTRY(_find_next_bit_le)
+>>  		teq	r1, #0
+>> diff --git a/arch/m68k/include/asm/bitops.h b/arch/m68k/include/asm/bitops.h
+>> index c6baa91..b1d8752 100644
+>> --- a/arch/m68k/include/asm/bitops.h
+>> +++ b/arch/m68k/include/asm/bitops.h
+>> @@ -320,11 +320,11 @@ static inline int bfchg_mem_test_and_change_bit(int nr,
+>>  #include <asm-generic/bitops/ffz.h>
+>>  #else
+>>  
+>> -static inline int find_first_zero_bit(const unsigned long *vaddr,
+>> -				      unsigned size)
+>> +static inline unsigned long find_first_zero_bit(const unsigned long *vaddr,
+>> +				      unsigned long size)
+>>  {
+>>  	const unsigned long *p = vaddr;
+>> -	int res = 32;
+>> +	unsigned int res = 32;
+>>  	unsigned int words;
+>>  	unsigned long num;
+>>  
+>> @@ -346,11 +346,12 @@ out:
+>>  }
+>>  #define find_first_zero_bit find_first_zero_bit
+>>  
+>> -static inline int find_next_zero_bit(const unsigned long *vaddr, int size,
+>> -				     int offset)
+>> +static inline unsigned long find_next_zero_bit(const unsigned long *vaddr,
+>> +						unsigned long size,
+>> +						unsigned long offset)
+>>  {
+>>  	const unsigned long *p = vaddr + (offset >> 5);
+>> -	int bit = offset & 31UL, res;
+>> +	unsigned int bit = offset & 31UL, res;
+>>  
+>>  	if (offset >= size)
+>>  		return size;
+>> @@ -376,10 +377,11 @@ static inline int find_next_zero_bit(const unsigned long *vaddr, int size,
+>>  }
+>>  #define find_next_zero_bit find_next_zero_bit
+>>  
+>> -static inline int find_first_bit(const unsigned long *vaddr, unsigned size)
+>> +static inline unsigned long find_first_bit(const unsigned long *vaddr,
+>> +						unsigned long size)
+>>  {
+>>  	const unsigned long *p = vaddr;
+>> -	int res = 32;
+>> +	unsigned int res = 32;
+>>  	unsigned int words;
+>>  	unsigned long num;
+>>  
+>> @@ -401,11 +403,12 @@ out:
+>>  }
+>>  #define find_first_bit find_first_bit
+>>  
+>> -static inline int find_next_bit(const unsigned long *vaddr, int size,
+>> -				int offset)
+>> +static inline unsigned long find_next_bit(const unsigned long *vaddr,
+>> +						unsigned long size,
+>> +						unsigned long offset)
+>>  {
+>>  	const unsigned long *p = vaddr + (offset >> 5);
+>> -	int bit = offset & 31UL, res;
+>> +	unsigned int bit = offset & 31UL, res;
+>>  
+>>  	if (offset >= size)
+>>  		return size;
+>>
+> 
+> 
 
-Hello Javier,
 
-> It seems that there is no mapping between any ARM Cortex A9 counter to the L2 (Last Level) access or misses event.
-
-The L2 cache on Cortex-A9 is external to the CPU core and has its own set of
-memory-mapped performance counters. Mark Rutland [CC'd] had something
-working for this, but I haven't seen a refresh of the patches for a while.
-
-> Looking at ARM's reference manual and OProfile's event list on A9, I see the following two counters:
->
-> CO_LF_MISS: (counter: 1, 2, 3, 4, 5, 6)
->         Number of coherent linefill requests which miss in all other CPUs, meaning that the request
->         is sent to external memory (min count: 500)
-> CO_LF_HIT: (counter: 1, 2, 3, 4, 5, 6)
->         Number of coherent linefill requests which hit in another CPU, meaning that the linefill
->         data is fetched directly from the relevant cache (min count: 500)
->
-> It seems that the first counter refers to the L2 Misses and the second one to the L2 Hits (Last Level Cache in this architecture). I'm not sure
-> whether we should do something about this or nor. Thanks!
-
-No, these are all for L1. `sent to external memory' means sent to L2.
-
-Will
+-- 
+Chen Gang
