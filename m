@@ -1,54 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 5 Jul 2013 09:55:40 -0300
-Subject: [PATCH v3 2/6] misc: sram: add ability to mark sram sections as
- reserved
-In-Reply-To: <201307051441.27605.heiko@sntech.de>
-References: <201307051440.19428.heiko@sntech.de>
- <201307051441.27605.heiko@sntech.de>
-Message-ID: <CAOMZO5AHX0UpeKQh+faPT=MfCf53eo=kXigtOZd7iuKrz-sFeA@mail.gmail.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Fri, 5 Jul 2013 14:12:08 +0100
+Subject: [RFC] clk: add flags to distinguish xtal clocks
+In-Reply-To: <1372971912-10877-1-git-send-email-coelho@ti.com>
+References: <1372971912-10877-1-git-send-email-coelho@ti.com>
+Message-ID: <CAAG0J98UL5sLTmRx1o8XnbK8qWv_qNi9+zwuyPBbbYExPSbw8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 5, 2013 at 9:41 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> Some SoCs need parts of their sram for special purposes. So while being part
-> of the periphal, it should not be part of the genpool controlling the sram.
+On 4 July 2013 22:05, Luciano Coelho <coelho@ti.com> wrote:
+> Add a flag that indicate whether the clock is a crystal or not.  Since
+> no clocks set this flag right now, include an additional flag that
+> indicates whether the type is set or not.  If the CLK_IS_TYPE_DEFINED
+> flag is not set, the value of the CLK_IS_TYPE_XTAL flag is undefined.
+> This ensures backwards compatibility.
 >
-> Threfore add an option mmio-sram-reserved to keep arbitary portions of the
-> sram from being part of the pool.
+> Additionally, parse a new device tree binding in clk-fixed-rate to set
+> this flag.
 >
-> Suggested-by: Rob Herring <robherring2@gmail.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+> Signed-off-by: Luciano Coelho <coelho@ti.com>
 > ---
->  Documentation/devicetree/bindings/misc/sram.txt |    8 +++
->  drivers/misc/sram.c                             |   80 +++++++++++++++++++++--
->  2 files changed, 82 insertions(+), 6 deletions(-)
 >
-> diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
-> index 4d0a00e..eae080e 100644
-> --- a/Documentation/devicetree/bindings/misc/sram.txt
-> +++ b/Documentation/devicetree/bindings/misc/sram.txt
-> @@ -8,9 +8,17 @@ Required properties:
+> I'm not  familiar with the common clock framework and I'm not
+> entirely sure the flags can be used in such a way, but to me it looks
+> reasonable, since some clock consumers may need to know what type of
+> clock is being provided.
 >
->  - reg : SRAM iomem address range
+> Specifically, the wl12xx firmware needs to know if the clock is XTAL
+> or not to handle the stabilization and boosts properly.
 >
-> +Optional properties:
-> +
-> +- mmio-sram-reserved: ordered list of reserved chunks inside the sram that
-> +  should not become part of the genalloc pool.
-> +  Format is <base size>, <base size>, ...; with base being relative to the
-> +  reg property base.
+> My main idea is that I need to pass this information in the device
+> tree definition of the clocks, so that the driver can pass this
+> information on to the firmware.
+>
+> Please let me know if this looks ok or not.  If not, please let me
+> know if you have any other ideas on how to solve my problem (of
+> knowing whether the clock attached to the WiLink chip is XTAL or not).
 
-Isn't it a typo?
+The TZ1090 SoC has something that sounds possibly similar, where some
+of the XTAL pads have a bypass bit, which according to the hardware
+engineer I asked should be enabled when you want to use the
+corresponding XTAL pads as a clock input pad rather than an
+oscillator. I was considering extending clk-fixed-rate (via a wrapper
+driver) to parse a custom DT property and a register address / bit
+number and set the bypass bit as appropriate itself.
 
-I think you meant:
-Format is <base start>, <reserved size>,
+So I was wondering, is there a particular reason you don't have a DT
+property on the node for the device that needs to know what type of
+clock it is, rather than the clock node itself? That way you're not
+depending directly on the generic common clock framework to be able to
+tell you such electrical details.
 
-> +
->  Example:
->
->  sram: sram at 5c000000 {
->         compatible = "mmio-sram";
->         reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
-> +       mmio-sram-reserved = <0x0 0x100>; /* reserve 0x5c000000-0x5c000100 */
->  };
+Cheers
+James
