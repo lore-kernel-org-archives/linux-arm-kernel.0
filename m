@@ -1,58 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Jul 2013 17:41:38 +0200
-Subject: [PATCH, re-send] drm: always provide debugfs function prototypes
-Message-ID: <201307051741.38496.arnd@arndb.de>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 5 Jul 2013 08:43:11 -0700
+Subject: [PATCH] clocksource/cadence_ttc: Reuse clocksource as sched_clock
+In-Reply-To: <alpine.DEB.2.02.1307050819000.11637@ionos.tec.linutronix.de>
+References: <1372888216-10726-1-git-send-email-soren.brinkmann@xilinx.com>
+ <alpine.DEB.2.02.1307050819000.11637@ionos.tec.linutronix.de>
+Message-ID: <fbeb6f36-f07a-4518-b6f2-0b8e36028fe9@CH1EHSMHS012.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is generally considered bad style to enclose function prototypes
-in header files in #ifdef. This case illustrates why that is:
-The tegra host1x driver calls into the debugfs functions if
-CONFIG_DEBUG_FS is enabled, but that code is otherwise already
-discarded by the compiler, so leaving the prototype in place
-actually makes everything work.
+On Fri, Jul 05, 2013 at 08:30:47AM +0200, Thomas Gleixner wrote:
+> On Wed, 3 Jul 2013, Soren Brinkmann wrote:
+> 
+> > Reuse the TTC clocksource timer as sched clock, too. Since only a single
+> > sched clock is supported in Linux, this feature optional and can be
+> > selected through Kconfig.
+> 
+> This changelog doesn't make sense.
+> 
+> There can be only one active sched_clock, but that does no mean, that
+> you cannot have different implementations compiled in.
+> 
+> So if you disable this config which sched_clock is your kernel using?
+Jiffies
 
-drivers/gpu/host1x/drm/dc.c: In function 'tegra_dc_debugfs_init':
-drivers/gpu/host1x/drm/dc.c:1004:2: error: implicit declaration of function 'drm_debugfs_create_files' [-Werror=implicit-function-declaration]
-drivers/gpu/host1x/drm/dc.c: In function 'tegra_dc_debugfs_exit': drivers/gpu/host1x/drm/dc.c:1026:2: error: implicit declaration of function 'drm_debugfs_remove_files' [-Werror=implicit-function-declaration]
+> And if you enable it, how is guaranteed that you end up with the ttc
+> sched_clock as the active one? Just due to initcall ordering?
+I assumed so. Is there a different mechanism?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Reviewed-by: Thierry Reding <thierry.reding@>
-Cc: Ben Gamari <bgamari@gmail.com>
-Cc: Dave Airlie <airlied@redhat.com>
-
-diff --git a/include/drm/drmP.h b/include/drm/drmP.h
-index 63d17ee..8bc105e 100644
---- a/include/drm/drmP.h
-+++ b/include/drm/drmP.h
-@@ -1551,7 +1551,7 @@ extern int drm_proc_init(struct drm_minor *minor, struct proc_dir_entry *root);
- extern int drm_proc_cleanup(struct drm_minor *minor, struct proc_dir_entry *root);
- 
- 				/* Debugfs support */
--#if defined(CONFIG_DEBUG_FS)
-+
- extern int drm_debugfs_init(struct drm_minor *minor, int minor_id,
- 			    struct dentry *root);
- extern int drm_debugfs_create_files(struct drm_info_list *files, int count,
-@@ -1559,7 +1559,6 @@ extern int drm_debugfs_create_files(struct drm_info_list *files, int count,
- extern int drm_debugfs_remove_files(struct drm_info_list *files, int count,
-                                     struct drm_minor *minor);
- extern int drm_debugfs_cleanup(struct drm_minor *minor);
--#endif
- 
- 				/* Info file support */
- extern int drm_name_info(struct seq_file *m, void *data);
-diff --git a/include/drm/drm_mm.h b/include/drm/drm_mm.h
-index 88591ef..4a7759a 100644
---- a/include/drm/drm_mm.h
-+++ b/include/drm/drm_mm.h
-@@ -37,9 +37,7 @@
-  * Generic range manager structs
-  */
- #include <linux/list.h>
--#ifdef CONFIG_DEBUG_FS
- #include <linux/seq_file.h>
--#endif
- 
- struct drm_mm_node {
- 	struct list_head node_list;
+	S?ren
