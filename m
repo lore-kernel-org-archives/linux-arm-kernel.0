@@ -1,136 +1,212 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 05 Jul 2013 13:19:38 +0200
-Subject: [PATCH v3] ARM: shmobile: lager: Add DT reference
-In-Reply-To: <CANqRtoRzBAxeirMyKRqb-PrufFPGDQOqCnkKDEkx1pNsJqXPJA@mail.gmail.com>
-References: <1372838251-6314-1-git-send-email-horms+renesas@verge.net.au>
- <1438555.HIWtKGAp3v@avalon>
- <CANqRtoRzBAxeirMyKRqb-PrufFPGDQOqCnkKDEkx1pNsJqXPJA@mail.gmail.com>
-Message-ID: <1631144.is6NKUrafF@avalon>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Fri,  5 Jul 2013 13:46:13 +0200
+Subject: [PATCH v7] ARM: clocksource: add support for MOXA ART SoCs
+In-Reply-To: <1373018653-18421-1-git-send-email-jonas.jensen@gmail.com>
+References: <1373018653-18421-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1373024773-24574-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+This patch adds an clocksource driver for the main timer(s)
+found on MOXA ART SoCs.
 
-On Friday 05 July 2013 01:25:18 Magnus Damm wrote:
-> On Fri, Jul 5, 2013 at 12:02 AM, Laurent Pinchart wrote:
-> > On Wednesday 03 July 2013 16:57:31 Simon Horman wrote:
-> >> This is sufficient to allow boot of the Lager board with a console
-> >> without boards-lager.c compiled into the kernel. This is an example of a
-> >> minimal but still useful initialisation of the board using DT as much as
-> >> possible.
-> >> 
-> >> As such it is the same as the boot of Lager that can be achieved without
-> >> a board file. The intention of adding this file is to facilitate further
-> >> work to allow board specific devices to be initialised via DT.
-> > 
-> > At some (hopefully not too distant) point we should stop adding both
-> > traditional and DT board files. DT is supposed to lower the number of
-> > board files, not multiply it by two.
-> 
-> Well, mr-multiply-by-two: While I dislike code duplication I can't recall
-> when the number of files actually decreased with DT.
->
-> I realize that when we can use DT fully to describe a board then a single
-> DTS file is enough to describe board specific hardware together with per-SoC
-> C code. I can't however see how that would reduce the number of files, but
-> whatever. I always thought the goal was to reduce the memory footprint of
-> the kernel and that the source would not come with that many limitations,
-> but it seems that I got that all wrong...
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-I meant board files, sorry. The total number of files hasn't decreased much, 
-if at all.
+Notes:
+    Applies to next-20130703
+    
+    Changes since v6:
+    
+    1. remove TIMER_CR read back
+    2. set TIMER_CR from constants
 
-> Anyway, the current split on mach-shmobile is intentional:
-> 
-> 1) The C version of board support (board-xxx.c)
-> 
-> This is where platform devices are used (with power domains in some cases)
-> and where out-of-tree people can experiment with things. This code is using
-> legacy SH clock code and is not targeted for multiplatform. These should go
-> away, the sooner the better.
-> 
-> 2) The DT reference support (board-xxx-reference.c)
-> 
-> This file contains whatever bits of C code needed to get the DT support
-> going. All the board specific devices should be described via DT. The DT
-> reference board support is where we build incremental support to catch up
-> with 1) board-xxx.c. Ideally we wouldn't need the board-xxx-reference.c file
-> and instead only go with .dts, but in some cases we need some extra glue and
-> until pinctrl DT is done we also need those written in C. The DT reference
-> support will use common clocks as soon as they are available.
-> 
-> 3) SoC DT support (setup-xxx.c)
-> 
-> This is what will be used when 2) is caught up with 1). Common clocks and
-> multiplatform, one SoC at a time.
+ drivers/clocksource/Makefile       |   1 +
+ drivers/clocksource/moxart_timer.c | 164 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 165 insertions(+)
+ create mode 100644 drivers/clocksource/moxart_timer.c
 
-Thanks for the clarification.
-
-> > Work is still needed in order to achieve this, as we lack DT bindings for
-> > core (and non core) devices. That's something we need to work on. As a
-> > first step, do we have a roadmap with a list of devices that lack DT
-> > support ? At the very least I see more work needed on
-> > 
-> > - Common clock framework
-> 
-> Yes, I agree. Please see below for more about that.
-> 
-> > - SCI
-> 
-> Indeed, someone needs to continue earlier efforts for the SCIF driver.
-
-It shouldn't be too difficult, Bastian has already layed out a plan, but the 
-dependency on DT clock bindings has prevented the patches from going upstream.
-
-> Fortunately, with EMEV2 our UART driver already supports DT, so we can
-> implement DT-only multiplatform support on EMEV2 regardless of the state of
-> SCIF.
-> 
-> > - Timers
-> 
-> We can use DT-only with Arch timer, but unfortunately another clock evenit
-> is needed unconditionally for high resolution timer support, search for
-> clock event and the C3STOP flag if you want to see me moan about that.
-> 
-> Regardless I believe someone took a couple of first steps towards DT support
-> for our timers some time ago. But as we discussed face to face about a month
-> ago, it makes sense to describe the hardware via DT but in case of timers
-> and clock event / clock sources it does not make sense to associate 87 timer
-> channels for operating system time keeping. So we need some user space
-> configuration interface to associate different kind of timer applications
-> (operating system timer, PWM, clock generation, etc) to different channels.
-
-I agree that we need an API for this. It might make sense to restrict the API 
-to in-kernel usage to start with, but we need an API nonetheless. Has this 
-topic been discussed with clocks/timers people ? It might be worth bringing it 
-up for LPC or KS.
-
-> Since you mention it: =)
-> - PINCTRL DT and GPIO DT
->
-> I'd like to start picking up the remaining PINCTRL and GPIO bits for
-> v3.12 merge. Can you please rebase and resend on top of the latest
-> renesas-next tag?
-
-Patches for v3.12 have been sent yesterday :-)
-
-> > We shouldn't delay CCF much longer, v3.12 seems an achievable target to
-> > me. Who will work on that ?
-> 
-> So I am currently preparing EMEV2 for multiplatform, will most likely have
-> patches posted for that next week. And yes, I intend to send a new DT
-> reference board support file.
-> 
-> In parallel Kuribayashi-san is taking a stab at moving to common clocks for
-> EMEV2 as a first step.
-
-That's great news. I'm looking forward to reviewing the patches :-)
-
-> I expect the above to be in order for v3.12, but not much more that that.
-
-That sounds like a reasonable time frame to me.
-
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 9ba8b4d..56257f6 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -17,6 +17,7 @@ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
+ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
+ obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
+ obj-$(CONFIG_ARCH_MARCO)	+= timer-marco.o
++obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
+ obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
+ obj-$(CONFIG_ARCH_PRIMA2)	+= timer-prima2.o
+ obj-$(CONFIG_SUN4I_TIMER)	+= sun4i_timer.o
+diff --git a/drivers/clocksource/moxart_timer.c b/drivers/clocksource/moxart_timer.c
+new file mode 100644
+index 0000000..5743853
+--- /dev/null
++++ b/drivers/clocksource/moxart_timer.c
+@@ -0,0 +1,164 @@
++/*
++ * MOXA ART SoCs timer handling.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk.h>
++#include <linux/clockchips.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/irqreturn.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/io.h>
++#include <linux/clocksource.h>
++
++#define TIMER1_BASE		0x00
++#define TIMER2_BASE		0x10
++#define TIMER3_BASE		0x20
++
++#define REG_COUNT		0x0 /* writable */
++#define REG_LOAD		0x4
++#define REG_MATCH1		0x8
++#define REG_MATCH2		0xC
++
++#define TIMER_CR		0x30
++#define TIMER_INTR_STATE	0x34
++#define TIMER_INTR_MASK		0x38
++
++/*
++ * TIMER_CR flags:
++ *
++ * TIMEREG_CR_*_CLOCK	0: PCLK, 1: EXT1CLK
++ * TIMEREG_CR_*_INT	overflow interrupt enable bit
++ */
++#define TIMEREG_CR_1_ENABLE	(1 << 0)
++#define TIMEREG_CR_1_CLOCK	(1 << 1)
++#define TIMEREG_CR_1_INT	(1 << 2)
++#define TIMEREG_CR_2_ENABLE	(1 << 3)
++#define TIMEREG_CR_2_CLOCK	(1 << 4)
++#define TIMEREG_CR_2_INT	(1 << 5)
++#define TIMEREG_CR_3_ENABLE	(1 << 6)
++#define TIMEREG_CR_3_CLOCK	(1 << 7)
++#define TIMEREG_CR_3_INT	(1 << 8)
++#define TIMEREG_CR_COUNT_UP	(1 << 9)
++#define TIMEREG_CR_COUNT_DOWN	(0 << 9)
++
++#define TIMER1_ENABLE		(TIMEREG_CR_2_ENABLE | TIMEREG_CR_1_ENABLE)
++#define TIMER1_DISABLE		(TIMEREG_CR_2_ENABLE)
++
++static void __iomem *base;
++static unsigned int clock_count_per_tick;
++
++static void moxart_clkevt_mode(enum clock_event_mode mode,
++			       struct clock_event_device *clk)
++{
++	switch (mode) {
++	case CLOCK_EVT_MODE_RESUME:
++	case CLOCK_EVT_MODE_ONESHOT:
++		writel(TIMER1_DISABLE, base + TIMER_CR);
++		writel(~0, base + TIMER1_BASE + REG_LOAD);
++		break;
++	case CLOCK_EVT_MODE_PERIODIC:
++		writel(clock_count_per_tick, base + TIMER1_BASE + REG_LOAD);
++		writel(TIMER1_ENABLE, base + TIMER_CR);
++		break;
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	default:
++		writel(TIMER1_DISABLE, base + TIMER_CR);
++		break;
++	}
++}
++
++static int moxart_clkevt_next_event(unsigned long cycles,
++				    struct clock_event_device *unused)
++{
++	u32 u;
++
++	writel(TIMER1_DISABLE, base + TIMER_CR);
++
++	u = readl(base + TIMER1_BASE + REG_COUNT) - cycles;
++	writel(u, base + TIMER1_BASE + REG_MATCH1);
++
++	writel(TIMER1_ENABLE, base + TIMER_CR);
++
++	return 0;
++}
++
++static struct clock_event_device moxart_clockevent = {
++	.name		= "moxart_timer",
++	.rating		= 200,
++	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_mode	= moxart_clkevt_mode,
++	.set_next_event	= moxart_clkevt_next_event,
++};
++
++static irqreturn_t moxart_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++	evt->event_handler(evt);
++	return IRQ_HANDLED;
++}
++
++static struct irqaction moxart_timer_irq = {
++	.name		= "moxart-timer",
++	.flags		= IRQF_TIMER,
++	.handler	= moxart_timer_interrupt,
++	.dev_id		= &moxart_clockevent,
++};
++
++static void __init moxart_timer_init(struct device_node *node)
++{
++	int ret, irq;
++	unsigned long pclk;
++	struct clk *clk;
++
++	base = of_iomap(node, 0);
++	if (!base)
++		panic("%s: of_iomap failed\n", node->full_name);
++
++	irq = irq_of_parse_and_map(node, 0);
++	if (irq <= 0)
++		panic("%s: irq_of_parse_and_map failed\n", node->full_name);
++
++	ret = setup_irq(irq, &moxart_timer_irq);
++	if (ret)
++		panic("%s: setup_irq failed\n", node->full_name);
++
++	clk = of_clk_get(node, 0);
++	if (IS_ERR(clk))
++		panic("%s: of_clk_get failed\n", node->full_name);
++
++	pclk = clk_get_rate(clk);
++
++	if (clocksource_mmio_init(base + TIMER2_BASE + REG_COUNT,
++				  "moxart_timer", pclk, 200, 32,
++				  clocksource_mmio_readl_down))
++		panic("%s: clocksource_mmio_init failed\n", node->full_name);
++
++	clock_count_per_tick = DIV_ROUND_CLOSEST(pclk, HZ);
++
++	writel(~0, base + TIMER2_BASE + REG_LOAD);
++	writel(TIMEREG_CR_2_ENABLE, base + TIMER_CR);
++
++	moxart_clockevent.cpumask = cpumask_of(0);
++
++	/*
++	 * documentation is not publicly available:
++	 * min_delta / max_delta obtained by trial-and-error,
++	 * max_delta 0xfffffffe should be ok because count
++	 * register size is u32
++	 */
++	clockevents_config_and_register(&moxart_clockevent, pclk,
++					0x4, 0xfffffffe);
++}
++CLOCKSOURCE_OF_DECLARE(moxart, "moxa,moxart-timer", moxart_timer_init);
 -- 
-Cheers,
-
-Laurent Pinchart
+1.8.2.1
