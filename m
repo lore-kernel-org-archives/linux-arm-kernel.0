@@ -1,54 +1,39 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 5 Jul 2013 13:44:43 +0300
-Subject: [PATCH v2 08/22] ARM: dt: tegra114: Add "nvidia,memory-client"
+Date: Fri, 5 Jul 2013 13:44:42 +0300
+Subject: [PATCH v2 07/22] ARM: dt: tegra114: iommu: Add "nvidia,swgroups"
 In-Reply-To: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
 References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1373021097-32420-9-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1373021097-32420-8-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "nvidia,memory-client" to identify which swgroup ID a device
-belongs to.
+This is a bitmap that indicates which HardWare Accelerators(HWA) are
+supported on Tegra114 SoC.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- arch/arm/boot/dts/tegra114.dtsi |    4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/tegra114.dtsi |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 9e231eb..df6767f 100644
+index 1f45cf5..9e231eb 100644
 --- a/arch/arm/boot/dts/tegra114.dtsi
 +++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -404,6 +404,7 @@
- 		reg = <0x78000000 0x200>;
- 		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car TEGRA114_CLK_SDMMC1>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
- 		status = "disable";
- 	};
+@@ -1,6 +1,7 @@
+ #include <dt-bindings/clock/tegra114-car.h>
+ #include <dt-bindings/gpio/tegra-gpio.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/memory/tegra-swgroup.h>
  
-@@ -412,6 +413,7 @@
- 		reg = <0x78000200 0x200>;
- 		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car TEGRA114_CLK_SDMMC2>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
- 		status = "disable";
- 	};
+ #include "skeleton.dtsi"
  
-@@ -420,6 +422,7 @@
- 		reg = <0x78000400 0x200>;
- 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car TEGRA114_CLK_SDMMC3>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
- 		status = "disable";
- 	};
- 
-@@ -428,6 +431,7 @@
- 		reg = <0x78000600 0x200>;
- 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car TEGRA114_CLK_SDMMC4>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
- 		status = "disable";
+@@ -323,7 +324,7 @@
+ 		       0x70019228 0x074>;
+ 		nvidia,#asids = <4>;
+ 		dma-window = <0 0x40000000>;
+-		nvidia,swgroups = <0x18659fe>;
++		nvidia,swgroups = TEGRA114_SWGROUP_ALL;
+ 		nvidia,ahb = <&ahb>;
  	};
  
 -- 
