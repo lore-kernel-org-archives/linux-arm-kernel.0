@@ -1,68 +1,53 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat,  6 Jul 2013 00:18:41 +0200
-Subject: [PATCHv4 06/10] clocksource: sun4i: Fix the next event code
+Date: Sat,  6 Jul 2013 00:18:44 +0200
+Subject: [PATCHv4 09/10] clocksource: sun4i: Cleanup parent clock setup
 In-Reply-To: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1373062725-19625-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1373062725-19625-10-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The next_event logic was setting the next interval to fire in the
-current timer value instead of the interval value register, which is
-obviously wrong.
-
-Plus, the logic to set the actual value was wrong as well: the interval
-register can only be modified when the timer is disabled, and then
-enable it back, otherwise, it'll have no effect. Fix this logic as well
-since that code couldn't possibly work.
+The current bring-up code for the timer was overly complicated. The only
+thing we need is actually which clock we want to use as source and
+that's pretty much all. Let's keep it that way.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clocksource/sun4i_timer.c | 25 ++++++++++++++++++++++---
- 1 file changed, 22 insertions(+), 3 deletions(-)
+ drivers/clocksource/sun4i_timer.c | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 8e9c651..7123f65 100644
+index 3217adc..2fadb3b 100644
 --- a/drivers/clocksource/sun4i_timer.c
 +++ b/drivers/clocksource/sun4i_timer.c
-@@ -38,6 +38,20 @@
+@@ -30,6 +30,9 @@
+ #define TIMER_CTL_REG(val)	(0x10 * val + 0x10)
+ #define TIMER_CTL_ENABLE		BIT(0)
+ #define TIMER_CTL_RELOAD		BIT(1)
++#define TIMER_CTL_CLK_SRC(val)		(((val) & 0x3) << 2)
++#define TIMER_CTL_CLK_SRC_OSC24M		(1)
++#define TIMER_CTL_CLK_PRES(val)		(((val) & 0x7) << 4)
+ #define TIMER_CTL_ONESHOT		BIT(7)
+ #define TIMER_INTVAL_REG(val)	(0x10 * (val) + 0x14)
+ #define TIMER_CNTVAL_REG(val)	(0x10 * (val) + 0x18)
+@@ -168,16 +171,8 @@ static void __init sun4i_timer_init(struct device_node *node)
  
- static void __iomem *timer_base;
+ 	writel(rate / HZ, timer_base + TIMER_INTVAL_REG(0));
  
-+/*
-+ * When we disable a timer, we need to wait at least for 2 cycles of
-+ * the timer source clock. We will use for that the clocksource timer
-+ * that is already setup and runs at the same frequency than the other
-+ * timers, and we never will be disabled.
-+ */
-+static void sun4i_clkevt_sync(void)
-+{
-+	u32 old = readl(timer_base + TIMER_CNTVAL_REG(1));
-+
-+	while ((old - readl(timer_base + TIMER_CNTVAL_REG(1))) < 3)
-+		cpu_relax();
-+}
-+
- static void sun4i_clkevt_mode(enum clock_event_mode mode,
- 			      struct clock_event_device *clk)
- {
-@@ -63,9 +77,14 @@ static void sun4i_clkevt_mode(enum clock_event_mode mode,
- static int sun4i_clkevt_next_event(unsigned long evt,
- 				   struct clock_event_device *unused)
- {
--	u32 u = readl(timer_base + TIMER_CTL_REG(0));
--	writel(evt, timer_base + TIMER_CNTVAL_REG(0));
--	writel(u | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
-+	u32 val = readl(timer_base + TIMER_CTL_REG(0));
-+	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
-+	sun4i_clkevt_sync();
-+
-+	writel(evt, timer_base + TIMER_INTVAL_REG(0));
-+
-+	val = readl(timer_base + TIMER_CTL_REG(0));
-+	writel(val | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
- 	       timer_base + TIMER_CTL_REG(0));
+-	/* set clock source to HOSC, 16 pre-division */
+-	val = readl(timer_base + TIMER_CTL_REG(0));
+-	val &= ~(0x07 << 4);
+-	val &= ~(0x03 << 2);
+-	val |= (4 << 4) | (1 << 2);
+-	writel(val, timer_base + TIMER_CTL_REG(0));
+-
+-	/* set mode to auto reload */
+-	val = readl(timer_base + TIMER_CTL_REG(0));
+-	writel(val | TIMER_CTL_RELOAD, timer_base + TIMER_CTL_REG(0));
++	writel(TIMER_CTL_CLK_SRC(TIMER_CTL_CLK_SRC_OSC24M) | TIMER_CTL_RELOAD,
++	       timer_base + TIMER_CTL_REG(0));
  
- 	return 0;
+ 	ret = setup_irq(irq, &sun4i_timer_irq);
+ 	if (ret)
 -- 
 1.8.3.2
