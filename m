@@ -1,57 +1,126 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 5 Jul 2013 16:43:54 -0700
-Subject: [PATCH] ARM: Make multi_v7_defconfig usable on hardware
-In-Reply-To: <CAGa+x85dmDg9a2B8rAPw5wQTYuGDu0Nva=XEgonKgA1+=JAhCw@mail.gmail.com>
-References: <1372210565-22962-1-git-send-email-olof@lixom.net>
- <CAOesGMg2du8PsOGy1kdePT4vMsWie1N8hmjCxRqr-LS6RAC07g@mail.gmail.com>
- <20130626225714.GB911@quad.lixom.net>
- <CAGa+x85dmDg9a2B8rAPw5wQTYuGDu0Nva=XEgonKgA1+=JAhCw@mail.gmail.com>
-Message-ID: <CAOesGMhbcbNTG7666O8Ux9vo1FR1K+MseOY5bUeewF+bRNftkQ@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sat, 6 Jul 2013 01:45:09 +0200 (CEST)
+Subject: [PATCH 3/9] clocksource: dw_apb_timer: quirk for variants with
+ 64bit counter
+In-Reply-To: <201307060053.10182.heiko@sntech.de>
+References: <201307060051.09716.heiko@sntech.de>
+ <201307060053.10182.heiko@sntech.de>
+Message-ID: <alpine.DEB.2.02.1307060129340.32106@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 5, 2013 at 4:40 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> On Wed, Jun 26, 2013 at 3:57 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Tue, Jun 25, 2013 at 06:38:21PM -0700, Olof Johansson wrote:
->>> On Tue, Jun 25, 2013 at 6:36 PM, Olof Johansson <olof@lixom.net> wrote:
->>>
->>> > +CONFIG_DEBUG_LL=y
->>> > +CONFIG_DEBUG_OMAP2PLUS_UART=y
->>> > +CONFIG_DEBUG_OMAP4UART3=y
->>>
->>> Clearly not supposed to be there for the posted version, my bad --
->>> will take those out before committing.
->>>
->>> (this will go on top of next/late, btw).
->>
->> Actually, this doesn't go nicely on top of any branch right now since
->> multi_v7_defconfig is modified in several of the branches.
->>
->> So, I've applied this on top of for-next (which is unorthodox and unusual), and
->> we'll move it over to what will likely be the first, pre-rc1 fixes pull request
->> that we send up, once all the other contents has been merged.
->
-> Hopefully this can be carefully rebuilt on top of -rc1 with inspection
-> for any deletions.  For example, I just noticed that this undoes some
-> of the additions to multi_v7_defconfig which add the network support
-> for Allwinner/sun4, and so broke network-enabled kernels for my
-> cubieboard.
->
-> [1]
-> commit fb1c60288a886a28dc7c055449fd1936140fe891
-> Author: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Date:   Sun Jun 9 18:13:53 2013 +0200
->
->     ARM: multi_v7: Enable Allwinner EMAC in multi_v7_defconfig
->
->     Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Sat, 6 Jul 2013, Heiko St?bner wrote:
 
-Grmbl. Yeah, because the driver wasn't in the tree by the time the
-defconfig was generated. So technically it wasn't in arm-soc by the
-time we picked up the patch either.
+> This adds a quirk for IP variants containing two load_count and value
+> registers that are used to provide 64bit accuracy on 32bit systems.
+> 
+> The added accuracy is currently not used, the driver is only adapted to
+> handle the different register layout and make it work on affected devices.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/clocksource/dw_apb_timer.c |   27 +++++++++++++++++++++++++++
+>  include/linux/dw_apb_timer.h       |    6 ++++++
+>  2 files changed, 33 insertions(+)
+> 
+> diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
+> index f5e7be8..bd45351 100644
+> --- a/drivers/clocksource/dw_apb_timer.c
+> +++ b/drivers/clocksource/dw_apb_timer.c
+> @@ -56,6 +56,17 @@ static void apbt_init_regs(struct dw_apb_timer *timer, int quirks)
+>  	timer->reg_control = APBTMR_N_CONTROL;
+>  	timer->reg_eoi = APBTMR_N_EOI;
+>  	timer->reg_int_status = APBTMR_N_INT_STATUS;
+> +
+> +	/*
+> +	 * On variants with 64bit counters some registers are
+> +	 * moved further down.
+> +	 */
+> +	if (quirks & APBTMR_QUIRK_64BIT_COUNTER) {
+> +		timer->reg_current_value += 0x4;
+> +		timer->reg_control += 0x8;
+> +		timer->reg_eoi += 0x8;
+> +		timer->reg_int_status += 0x8;
+> +	}
+>  }
 
-Let's sort this out early next week when we're in Dublin. By then
-davem's main pull request might be in-tree and that'll make it easier.
+Oh, no. this is not how we handle these things.
 
+1) We want proper constants for this 64bit IP block 
 
--Olof
+2) This is not a quirk, it's a property of that particular IP block
+
+You already made the register offsets a part of the timer structure,
+so why don't you supply a proper structure filled with that values to
+the init function?
+
+That's what we do all over the place. Either we instantiate those
+structs at compile time or runtime fed by device tree or any other
+configuration mechanism.
+  
+>  static unsigned long apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
+> @@ -145,6 +156,10 @@ static void apbt_set_mode(enum clock_event_mode mode,
+>  		udelay(1);
+>  		pr_debug("Setting clock period %lu for HZ %d\n", period, HZ);
+>  		apbt_writel(timer, period, timer->reg_load_count);
+> +
+> +		if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
+> +			apbt_writel(timer, 0, timer->reg_load_count + 0x4);
+> +
+
+No. We are not adding such conditional constructs when we can deal
+with them just by providing a proper set of function pointers. And
+definitely not with hardcoded magic 0x4 constants involved.
+
+     timer->load_count(timer, value);
+
+Provide a 32 bit and a 64 bit version of that function and be done
+with it.
+
+>  		ctrl |= APBTMR_CONTROL_ENABLE;
+>  		apbt_writel(timer, ctrl, timer->reg_control);
+>  		break;
+> @@ -168,6 +183,10 @@ static void apbt_set_mode(enum clock_event_mode mode,
+>  		 * running mode.
+>  		 */
+>  		apbt_writel(timer, ~0, timer->reg_load_count);
+> +
+> +		if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
+> +			apbt_writel(timer, 0, timer->reg_load_count + 0x4);
+> +
+
+Makes this copy go away.
+
+>  		ctrl &= ~APBTMR_CONTROL_INT;
+>  		ctrl |= APBTMR_CONTROL_ENABLE;
+>  		apbt_writel(timer, ctrl, timer->reg_control);
+> @@ -199,6 +218,10 @@ static int apbt_next_event(unsigned long delta,
+>  	apbt_writel(timer, ctrl, timer->reg_control);
+>  	/* write new count */
+>  	apbt_writel(timer, delta, timer->reg_load_count);
+> +
+> +	if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
+> +		apbt_writel(timer, 0, timer->reg_load_count + 0x4);
+> +
+
+And this one as well.
+
+>  	ctrl |= APBTMR_CONTROL_ENABLE;
+>  	apbt_writel(timer, ctrl, timer->reg_control);
+>  
+> @@ -325,6 +348,10 @@ void dw_apb_clocksource_start(struct dw_apb_clocksource *dw_cs)
+>  	ctrl &= ~APBTMR_CONTROL_ENABLE;
+>  	apbt_writel(timer, ctrl, timer->reg_control);
+>  	apbt_writel(timer, ~0, timer->reg_load_count);
+> +
+> +	if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
+> +		apbt_writel(timer, 0, timer->reg_load_count + 0x4);
+> +
+
+Copy and paste is a conveniant thing, right? It just should have a pop
+up window assigned which asks at the second instance of copying the
+same thing whether you really thought about it.
+
+Thanks,
+
+	tglx
