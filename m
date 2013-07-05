@@ -1,88 +1,63 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 5 Jul 2013 16:43:38 +0800
-Subject: [PATCH] of: match the compatible in the order set by the dts file
-Message-ID: <1373013818-11365-1-git-send-email-b32955@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 5 Jul 2013 17:14:51 +0800
+Subject: [PATCH v4] tty: serial: add Freescale lpuart driver support
+In-Reply-To: <1369733161-19168-1-git-send-email-b35083@freescale.com>
+References: <1369733161-19168-1-git-send-email-b35083@freescale.com>
+Message-ID: <20130705091449.GA20040@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we set the uart compatible in the dts file like this:
-   ------------------------------------------------------
-    compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
-   ------------------------------------------------------
+Jingchang,
 
-and we set the uart compatible in the uart driver like this:
-   ------------------------------------------------------
-	{ .compatible = "fsl,imx1-uart", ... },
-	{ .compatible = "fsl,imx21-uart", ... },
-	{ .compatible = "fsl,imx6q-uart", ... },
-	{ /* sentinel */ }
-   ------------------------------------------------------
+On Tue, May 28, 2013 at 05:26:01PM +0800, Jingchang Lu wrote:
+> +static void lpuart_setup_watermark(struct lpuart_port *sport)
+> +{
+> +	unsigned char val, old_cr2, cr2;
+> +
+> +	/* set receiver/transmitter trigger level. */
+> +	old_cr2 = cr2 = readb(sport->port.membase + UARTCR2);
+> +	cr2 &= ~(UARTCR2_TIE | UARTCR2_TCIE | UARTCR2_TE |
+> +			UARTCR2_RIE | UARTCR2_RE);
+> +	writeb(cr2, sport->port.membase + UARTCR2);
+> +
+> +	writeb(2, sport->port.membase + UARTTWFIFO);
+> +	writeb(1, sport->port.membase + UARTRWFIFO);
+> +
+> +	/* determine FIFO size and enable */
+> +	val = readb(sport->port.membase + UARTPFIFO);
+> +
+> +	sport->tx_fifo_size = 0x1 << (((val >> UARTPFIFO_TXSIZE_OFF) &
+> +		UARTPFIFO_FIFOSIZE_MASK) + 1);
+> +
+> +	sport->rx_fifo_size = 0x1 << (((val >> UARTPFIFO_RXSIZE_OFF) &
+> +		UARTPFIFO_FIFOSIZE_MASK) + 1);
+> +
+> +	writeb(val | UARTPFIFO_TXFE | UARTPFIFO_RXFE,
+> +			sport->port.membase + UARTPFIFO);
+> +
+> +	/* Flush the Tx and Rx FIFO to a known state */
+> +	writeb(UARTCFIFO_TXFLUSH | UARTCFIFO_RXFLUSH,
+> +			sport->port.membase + UARTCFIFO);
+> +
+> +	/* restore CR2 */
+> +	writeb(old_cr2, sport->port.membase + UARTCR2);
 
-the current code will match the "fsl,imx21-uart" in the end.
+I just noticed that you dropped this CR2 restore since v5 of the patch.
+I have a patch enabling low-level debug support for Vybrid.  It works
+with v4 of your patch but has problem with the v5.  The console stops
+working as below.
 
-Of course, this is not what we want. We want it to match the "fsl,imx6q-uart".
+Serial: IMX driver
+serial: Freescale lpuart driver
+40028000.serial: ttyLP1 at MMIO 0x40028000 (irq = 94) is a FSL_LPUART
+console [ttyLP1] enabled, bootconsole disabled
 
-This patch rewrites the match code, and make it to check the compatible
-in the order set by the DTS file.
+If I have above CR2 restore code added back.  The low-level debug
+support will just work fine with console.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/of/base.c |   29 +++++++++++++++++++++++++----
- 1 files changed, 25 insertions(+), 4 deletions(-)
+Is it an accident you removed the code?
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 0d61fc5..b13846b 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -622,10 +622,14 @@ static
- const struct of_device_id *__of_match_node(const struct of_device_id *matches,
- 					   const struct device_node *node)
- {
-+	struct of_device_id *old = (struct of_device_id *)matches;
-+	const char *cp;
-+	int cplen, l;
-+
- 	if (!matches)
- 		return NULL;
- 
--	while (matches->name[0] || matches->type[0] || matches->compatible[0]) {
-+	while (matches->name[0] || matches->type[0]) {
- 		int match = 1;
- 		if (matches->name[0])
- 			match &= node->name
-@@ -633,13 +637,30 @@ const struct of_device_id *__of_match_node(const struct of_device_id *matches,
- 		if (matches->type[0])
- 			match &= node->type
- 				&& !strcmp(matches->type, node->type);
--		if (matches->compatible[0])
--			match &= __of_device_is_compatible(node,
--							   matches->compatible);
- 		if (match)
- 			return matches;
- 		matches++;
- 	}
-+
-+	/* Check the compatible in the order set by the DTS file. */
-+	cp = __of_get_property(node, "compatible", &cplen);
-+	if (!cp)
-+		return NULL;
-+
-+	while (cplen > 0) {
-+		matches = old;
-+
-+		while (matches->compatible[0]) {
-+			if (!of_compat_cmp(cp, matches->compatible,
-+						strlen(matches->compatible)))
-+				return matches;
-+			matches++;
-+		}
-+
-+		l = strlen(cp) + 1;
-+		cp += l;
-+		cplen -= l;
-+	}
- 	return NULL;
- }
- 
--- 
-1.7.1
+Shawn
+
+> +
+> +}
