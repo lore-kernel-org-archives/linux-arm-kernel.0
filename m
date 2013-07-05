@@ -1,15 +1,16 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat,  6 Jul 2013 00:18:37 +0200
-Subject: [PATCHv4 02/10] clocksource: sun4i: Wrap macros arguments in
- parenthesis
+Date: Sat,  6 Jul 2013 00:18:38 +0200
+Subject: [PATCHv4 03/10] clocksource: sun4i: rename AUTORELOAD define to RELOAD
 In-Reply-To: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1373062725-19625-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1373062725-19625-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The macros were not using parenthesis to escape the arguments passed to
-them. It is pretty unsafe, so add those parenthesis.
+The name AUTORELOAD was actually pretty bad since it doesn't make the
+register reload the previous interval when it expires, but setting this
+value pushes the new programmed interval to the internal timer counter.
+Rename it to RELOAD instead.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
@@ -17,19 +18,26 @@ Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index bdf34d9..34ab658 100644
+index 34ab658..f5e227b 100644
 --- a/drivers/clocksource/sun4i_timer.c
 +++ b/drivers/clocksource/sun4i_timer.c
-@@ -30,8 +30,8 @@
+@@ -28,7 +28,7 @@
+ #define TIMER_IRQ_ST_REG	0x04
+ #define TIMER_CTL_REG(val)	(0x10 * val + 0x10)
  #define TIMER_CTL_ENABLE		BIT(0)
- #define TIMER_CTL_AUTORELOAD		BIT(1)
+-#define TIMER_CTL_AUTORELOAD		BIT(1)
++#define TIMER_CTL_RELOAD		BIT(1)
  #define TIMER_CTL_ONESHOT		BIT(7)
--#define TIMER_INTVAL_REG(val)	(0x10 * val + 0x14)
--#define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
-+#define TIMER_INTVAL_REG(val)	(0x10 * (val) + 0x14)
-+#define TIMER_CNTVAL_REG(val)	(0x10 * (val) + 0x18)
+ #define TIMER_INTVAL_REG(val)	(0x10 * (val) + 0x14)
+ #define TIMER_CNTVAL_REG(val)	(0x10 * (val) + 0x18)
+@@ -129,7 +129,7 @@ static void __init sun4i_timer_init(struct device_node *node)
  
- #define TIMER_SCAL		16
+ 	/* set mode to auto reload */
+ 	val = readl(timer_base + TIMER_CTL_REG(0));
+-	writel(val | TIMER_CTL_AUTORELOAD, timer_base + TIMER_CTL_REG(0));
++	writel(val | TIMER_CTL_RELOAD, timer_base + TIMER_CTL_REG(0));
  
+ 	ret = setup_irq(irq, &sun4i_timer_irq);
+ 	if (ret)
 -- 
 1.8.3.2
