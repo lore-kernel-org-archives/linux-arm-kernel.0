@@ -1,73 +1,128 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 06 Jul 2013 01:27:36 +0200
-Subject: [PATCH v3 00/13] ARM: dts: Add camera and magnetometer support
- for TRATS(2) board
-In-Reply-To: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
-References: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <7005891.8tx3m8lCx1@flatron>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 6 Jul 2013 01:34:56 +0200
+Subject: scripts/kallsyms: Avoid ARM veneer symbols
+In-Reply-To: <20130705172659.GJ2932@localhost.localdomain>
+References: <2983817.Xe2505Drlj@wuerfel> <201307051842.44721.arnd@arndb.de>
+ <20130705172659.GJ2932@localhost.localdomain>
+Message-ID: <201307060134.56933.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On Friday 05 July 2013, Dave P Martin wrote:
+> On Fri, Jul 05, 2013 at 05:42:44PM +0100, Arnd Bergmann wrote:
+> > On Friday 05 July 2013, Dave P Martin wrote:
+> > > On Wed, Jul 03, 2013 at 06:03:04PM +0200, Arnd Bergmann wrote:
+> 
+> I think there are a small number of patterns to check for.
+> 
+> __*_veneer, __*_from_arm and __*_from_thumb should cover most cases.
 
-On Monday 01 of July 2013 17:22:22 Sylwester Nawrocki wrote:
-> This patch series includes some fixes and extensions to the Exynos dts
-> files to add the camera and magnetometer sensor support for the TRATS
-> and TRATS2 board. It depends on a patch from Tomasz adding initial
-> TRATS2 board dts file [1].
-> 
-> Comparing to the previous version of this patch set I've added a few
-> more patches, for the Exynos4210 based TRATS board and a patch adding
-> MIPI CSIS/DSIM PHY provider nodes and related properties to the PHY
-> consumer nodes.
-> 
-> This series has been tested with the S5K6A3/FIMC-IS and S5K5BAFX
-> (front facing) cameras on top of next-20130627 tag. It can be found
-> also at:
-> http://git.linuxtv.org/snawrocki/samsung.git/next-20130627-dts-trats-v3
-> 
-> Detailed changes since v2 are listed in each patch.
-> 
-> Changes since v1:
->  - enabled pull down in cam-port-{a, b}-clk-idle nodes (1/8)
->  - added node alias for i2c-gpio at 0 I2C controller node (7/8).
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg253184.html
-> 
-> Andrzej Hajda (2):
->   ARM: dts: Add Exynos4210 SoC camera port pinctrl nodes
->   ARM: dts: Add S5K5BA sensor regulator definitions for Trats board
-> 
-> Jacek Anaszewski (1):
->   ARM: dts: Add AK8975 device node for Exynos4412 TRATS2 board
-> 
-> Sylwester Nawrocki (10):
->   ARM: dts: Correct camera pinctrl nodes for Exynos4x12 SoCs
->   ARM: dts: Add pinctrl entries for Exynos4x12 FIMC-IS peripherals
->   ARM: dts: Add ISP power domain node for Exynos4x12
->   ARM: dts: Use generic DMA bindings for Exynos4 SPI devices
->   ARM: dts: Add camera subsystem device nodes to exynos4.dtsi
->   ARM: dts: Add camera subsystem nodes to exynos4x12.dtsi
->   ARM: dts: Add camera device nodes for Exynos4412 TRATS2 board
->   ARM: dts: Add camera device nodes for Exynos4210 SoCs
->   ARM: dts: Add FIMC nodes for Exynos4210 Trats board
->   ARM: dts: Add MIPI PHY node to exynos4.dtsi
-> 
->  arch/arm/boot/dts/exynos4.dtsi            |  102
-> ++++++++++++++++++++++++-- arch/arm/boot/dts/exynos4210-pinctrl.dtsi | 
->  23 ++++++
->  arch/arm/boot/dts/exynos4210-trats.dts    |  103
-> ++++++++++++++++++++++----- arch/arm/boot/dts/exynos4210.dtsi         |
->   30 ++++++++
->  arch/arm/boot/dts/exynos4412-trats2.dts   |  110
-> +++++++++++++++++++++++++++++ arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-> |   61 ++++++++++++++-- arch/arm/boot/dts/exynos4x12.dtsi         | 
-> 103 +++++++++++++++++++++++++++ 7 files changed, 503 insertions(+), 29
-> deletions(-)
+Ok.
 
-For all the patches I haven't commented on:
+> > * There are actually symbols without a name on ARM, which screws up the
+> >   kallsyms.c parser. These also seem to be veneers, but attached to some
+> >   random function:
+> 
+> Hmmm, I don't what those are.  By default, we should probably ignore those
+> too.  Maybe they have something to do with link-time relocation processing.
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Definitely link-time. It only shows up after the final link, and only
+with ld.bfd not with ld.gold as I found out now.
 
-Best regards,
-Tomasz
+> > $ nm obj-tmp/.tmp_vmlinux1 | head
+> > c09e8db1 t 
+> > c09e8db5 t 
+> > c09e8db9 t    # <==========
+> > c09e8dbd t 
+> > c0abfc29 t 
+> > c0008000 t $a
+> > c0f7b640 t $a
+> > 
+> > $ objdump -Dr obj-tmp/.tmp_vmlinux1 | grep -C 30 c09e8db.
+> > c0851fcc <wlc_phy_edcrs_lock>:
+> > c0851fcc:       b538            push    {r3, r4, r5, lr}
+> > c0851fce:       b500            push    {lr}
+> > c0851fd0:       f7bb d8dc       bl      c000d18c <__gnu_mcount_nc>
+> > c0851fd4:       f240 456b       movw    r5, #1131       ; 0x46b
+> > c0851fd8:       4604            mov     r4, r0
+> > c0851fda:       f880 14d5       strb.w  r1, [r0, #1237] ; 0x4d5
+> > c0851fde:       462a            mov     r2, r5
+> > c0851fe0:       f44f 710b       mov.w   r1, #556        ; 0x22c
+> > c0851fe4:       f7ff fe6d       bl      c0851cc2 <write_phy_reg>
+> > c0851fe8:       4620            mov     r0, r4
+> > c0851fea:       462a            mov     r2, r5
+> > c0851fec:       f240 212d       movw    r1, #557        ; 0x22d
+> > c0851ff0:       f7ff fe67       bl      c0851cc2 <write_phy_reg>
+> > c0851ff4:       4620            mov     r0, r4
+> > c0851ff6:       f240 212e       movw    r1, #558        ; 0x22e
+> > c0851ffa:       f44f 7270       mov.w   r2, #960        ; 0x3c0
+> > c0851ffe:       f196 fedb       bl      c09e8db8 <tpci200_free_irq+0x78>  # <===========
+> > c0852002:       4620            mov     r0, r4
+> > c0852004:       f240 212f       movw    r1, #559        ; 0x22f
+> > c0852008:       f44f 7270       mov.w   r2, #960        ; 0x3c0
+> > c085200c:       e8bd 4038       ldmia.w sp!, {r3, r4, r5, lr}
+> > c0852010:       f7ff be57       b.w     c0851cc2 <write_phy_reg>
+> > 
+> > 
+> > ... # in tpci200_free_irq:
+> > c09e8d9e:       e003            b.n     c09e8da8 <tpci200_free_irq+0x68>
+> > c09e8da0:       f06f 0415       mvn.w   r4, #21
+> > c09e8da4:       e000            b.n     c09e8da8 <tpci200_free_irq+0x68>
+> > c09e8da6:       4c01            ldr     r4, [pc, #4]    ; (c09e8dac <tpci200_free_irq+0x6c>)
+> > c09e8da8:       4620            mov     r0, r4
+> > c09e8daa:       bdf8            pop     {r3, r4, r5, r6, r7, pc}
+> > c09e8dac:       fffffe00                        ; <UNDEFINED> instruction: 0xfffffe00
+> > c09e8db0:       f4cf b814       b.w     c06b7ddc <bna_enet_sm_chld_stop_wait_entry>
+> > c09e8db4:       f53e bed8       b.w     c0727b68 <gem_do_stop>
+> > c09e8db8:       f668 bf83       b.w     c0851cc2 <write_phy_reg>           # <==========
+> > c09e8dbc:       d101            bne.n   c09e8dc2 <tpci200_free_irq+0x82>
+> > c09e8dbe:       f435 b920       b.w     c061e002 <twl_reset_sequence+0x34c>
+> > 
+> > It makes no sense to me at all that a function in one driver can just call
+> > write_phy_reg a couple of times, but need a veneer in the middle, and put
+> > that veneer in a totally unrelated function in another driver!
+> 
+> I think that if ld inserts a veneer for a function anywhere, branches
+> from any object in the link to that target symbol can reuse the same
+> veneer as a trampoline, effectively appearing to branch through an
+> unrelated location to reach the destination.
+
+That part makes sense, but it doesn't explain why ld would do that just
+for the third out of four identical function calls in the example above.
+
+> ld inserts veneers between individual input sections, but I don't
+> think they have to go next to the same section the branch originates
+> from.  In the above code, it looks like that series of unconditional
+> branches after the end of tpci200_free_irq might be a common veneer pool
+> for many different destinations.
+
+Yes, exactly. In this build I had six of these nameless symbols, and five
+of them were in this one function.
+
+> LTO may also make the expected compilation unit boundaries disappear
+> completely.  Anything could end up almost anywhere in that case.
+> Files could get intermingled, inlined and generally spread all over the
+> place.
+
+I'm not sure we actually want to enable that in the kernel ;-)
+
+In particular in combination with kallsyms, it would make the kallsyms
+information rather useless when we can no longer infer a function name
+from an address.
+
+> Even so, veneers shouldn't be needed in the common case where we're not
+> jumping across .rodata.
+> 
+> > 
+> > If this is a binutils bug or gcc bug, we should probably just fix it, but it
+> > might be easier to work around it by changing kallsyms.c some more.
+> 
+> I haven't found a trivial way to reproduce those nameless symbols.
+> I don't know whether they're a bug or not...
+> 
+> Making kallsyms robust against this might be a good idea anyway.
+
+Maybe we can find a binutils expert next week at Linaro connect to take a
+look at the data. I can prepare a test case.
+
+	Arnd
