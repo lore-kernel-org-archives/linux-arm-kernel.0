@@ -1,128 +1,228 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 6 Jul 2013 01:34:56 +0200
-Subject: scripts/kallsyms: Avoid ARM veneer symbols
-In-Reply-To: <20130705172659.GJ2932@localhost.localdomain>
-References: <2983817.Xe2505Drlj@wuerfel> <201307051842.44721.arnd@arndb.de>
- <20130705172659.GJ2932@localhost.localdomain>
-Message-ID: <201307060134.56933.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 6 Jul 2013 01:35:47 +0200
+Subject: [PATCH v6 00/21] MBus DT binding: PCIe strikes back
+In-Reply-To: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130706013547.3ce7280b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 July 2013, Dave P Martin wrote:
-> On Fri, Jul 05, 2013 at 05:42:44PM +0100, Arnd Bergmann wrote:
-> > On Friday 05 July 2013, Dave P Martin wrote:
-> > > On Wed, Jul 03, 2013 at 06:03:04PM +0200, Arnd Bergmann wrote:
+Jason, Arnd,
+
+On Fri,  5 Jul 2013 18:39:11 -0300, Ezequiel Garcia wrote:
+> See the previous version of this patchset for further context:
 > 
-> I think there are a small number of patterns to check for.
+> http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg35753.html
 > 
-> __*_veneer, __*_from_arm and __*_from_thumb should cover most cases.
-
-Ok.
-
-> > * There are actually symbols without a name on ARM, which screws up the
-> >   kallsyms.c parser. These also seem to be veneers, but attached to some
-> >   random function:
+> This new proposal is an attempt to address some issues raised about the PCIe
+> 'fake' windows mapping present in the previous version.
 > 
-> Hmmm, I don't what those are.  By default, we should probably ignore those
-> too.  Maybe they have something to do with link-time relocation processing.
-
-Definitely link-time. It only shows up after the final link, and only
-with ld.bfd not with ld.gold as I found out now.
-
-> > $ nm obj-tmp/.tmp_vmlinux1 | head
-> > c09e8db1 t 
-> > c09e8db5 t 
-> > c09e8db9 t    # <==========
-> > c09e8dbd t 
-> > c0abfc29 t 
-> > c0008000 t $a
-> > c0f7b640 t $a
-> > 
-> > $ objdump -Dr obj-tmp/.tmp_vmlinux1 | grep -C 30 c09e8db.
-> > c0851fcc <wlc_phy_edcrs_lock>:
-> > c0851fcc:       b538            push    {r3, r4, r5, lr}
-> > c0851fce:       b500            push    {lr}
-> > c0851fd0:       f7bb d8dc       bl      c000d18c <__gnu_mcount_nc>
-> > c0851fd4:       f240 456b       movw    r5, #1131       ; 0x46b
-> > c0851fd8:       4604            mov     r4, r0
-> > c0851fda:       f880 14d5       strb.w  r1, [r0, #1237] ; 0x4d5
-> > c0851fde:       462a            mov     r2, r5
-> > c0851fe0:       f44f 710b       mov.w   r1, #556        ; 0x22c
-> > c0851fe4:       f7ff fe6d       bl      c0851cc2 <write_phy_reg>
-> > c0851fe8:       4620            mov     r0, r4
-> > c0851fea:       462a            mov     r2, r5
-> > c0851fec:       f240 212d       movw    r1, #557        ; 0x22d
-> > c0851ff0:       f7ff fe67       bl      c0851cc2 <write_phy_reg>
-> > c0851ff4:       4620            mov     r0, r4
-> > c0851ff6:       f240 212e       movw    r1, #558        ; 0x22e
-> > c0851ffa:       f44f 7270       mov.w   r2, #960        ; 0x3c0
-> > c0851ffe:       f196 fedb       bl      c09e8db8 <tpci200_free_irq+0x78>  # <===========
-> > c0852002:       4620            mov     r0, r4
-> > c0852004:       f240 212f       movw    r1, #559        ; 0x22f
-> > c0852008:       f44f 7270       mov.w   r2, #960        ; 0x3c0
-> > c085200c:       e8bd 4038       ldmia.w sp!, {r3, r4, r5, lr}
-> > c0852010:       f7ff be57       b.w     c0851cc2 <write_phy_reg>
-> > 
-> > 
-> > ... # in tpci200_free_irq:
-> > c09e8d9e:       e003            b.n     c09e8da8 <tpci200_free_irq+0x68>
-> > c09e8da0:       f06f 0415       mvn.w   r4, #21
-> > c09e8da4:       e000            b.n     c09e8da8 <tpci200_free_irq+0x68>
-> > c09e8da6:       4c01            ldr     r4, [pc, #4]    ; (c09e8dac <tpci200_free_irq+0x6c>)
-> > c09e8da8:       4620            mov     r0, r4
-> > c09e8daa:       bdf8            pop     {r3, r4, r5, r6, r7, pc}
-> > c09e8dac:       fffffe00                        ; <UNDEFINED> instruction: 0xfffffe00
-> > c09e8db0:       f4cf b814       b.w     c06b7ddc <bna_enet_sm_chld_stop_wait_entry>
-> > c09e8db4:       f53e bed8       b.w     c0727b68 <gem_do_stop>
-> > c09e8db8:       f668 bf83       b.w     c0851cc2 <write_phy_reg>           # <==========
-> > c09e8dbc:       d101            bne.n   c09e8dc2 <tpci200_free_irq+0x82>
-> > c09e8dbe:       f435 b920       b.w     c061e002 <twl_reset_sequence+0x34c>
-> > 
-> > It makes no sense to me at all that a function in one driver can just call
-> > write_phy_reg a couple of times, but need a veneer in the middle, and put
-> > that veneer in a totally unrelated function in another driver!
+> Instead of defining a 'fake' MBUS_ID(0xf0, 0x02) region for the whole
+> PCIe memory and IO space, we use real target ID and attribute for the windows.
 > 
-> I think that if ld inserts a veneer for a function anywhere, branches
-> from any object in the link to that target symbol can reuse the same
-> veneer as a trampoline, effectively appearing to branch through an
-> unrelated location to reach the destination.
-
-That part makes sense, but it doesn't explain why ld would do that just
-for the third out of four identical function calls in the example above.
-
-> ld inserts veneers between individual input sections, but I don't
-> think they have to go next to the same section the branch originates
-> from.  In the above code, it looks like that series of unconditional
-> branches after the end of tpci200_free_irq might be a common veneer pool
-> for many different destinations.
-
-Yes, exactly. In this build I had six of these nameless symbols, and five
-of them were in this one function.
-
-> LTO may also make the expected compilation unit boundaries disappear
-> completely.  Anything could end up almost anywhere in that case.
-> Files could get intermingled, inlined and generally spread all over the
-> place.
-
-I'm not sure we actually want to enable that in the kernel ;-)
-
-In particular in combination with kallsyms, it would make the kallsyms
-information rather useless when we can no longer infer a function name
-from an address.
-
-> Even so, veneers shouldn't be needed in the common case where we're not
-> jumping across .rodata.
+> See the example below, where a somewhat complete device tree extract is shown:
 > 
-> > 
-> > If this is a binutils bug or gcc bug, we should probably just fix it, but it
-> > might be easier to work around it by changing kallsyms.c some more.
+> 	soc {
+> 		compatible = "marvell,armadaxp-mbus", "simple-bus";
+> 		controller = <&mbusc>;
 > 
-> I haven't found a trivial way to reproduce those nameless symbols.
-> I don't know whether they're a bug or not...
+> 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000   /* internal-regs */
+> 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+> 			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
 > 
-> Making kallsyms robust against this might be a good idea anyway.
+> 		bootrom {
+> 			compatible = "marvell,bootrom";
+> 			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
+> 		};
+> 
+> 		devbus-bootcs {
+> 			status = "okay";
+> 			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0x8000000>;
+> 
+> 			/* NOR */
+> 			nor {
+> 				compatible = "cfi-flash";
+> 				reg = <0 0x8000000>;
+> 				bank-width = <2>;
+> 			};
+> 		};
+> 
+> 		pcie-controller {
+> 			compatible = "marvell,armada-xp-pcie";
+> 			status = "okay";
+> 			device_type = "pci";
+> 
+> 			#address-cells = <3>;
+> 			#size-cells = <2>;
+> 
+> 			ranges =
+> 			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
+> 				0x82000000 0 0x42000 MBUS_ID(0xf0, 0x01) 0x42000 0 0x00002000   /* Port 2.0 registers */
+> 				0x82000000 0 0x44000 MBUS_ID(0xf0, 0x01) 0x44000 0 0x00002000   /* Port 0.1 registers */
+> 				0x82000000 0 0x48000 MBUS_ID(0xf0, 0x01) 0x48000 0 0x00002000   /* Port 0.2 registers */
+> 				0x82000000 0 0x4c000 MBUS_ID(0xf0, 0x01) 0x4c000 0 0x00002000   /* Port 0.3 registers */
+> 				0x82000800 0 0xe0000000 MBUS_ID(0x04, 0xe8) 0xe0000000 0 0x08000000 /* Port 0.0 MEM */
+> 				0x81000800 0 0          MBUS_ID(0x04, 0xe0) 0xe8000000 0 0x00100000 /* Port 0.0 IO */>;
+> 
+> 
+> 			pcie at 1,0 {
+> 				/* Port 0, Lane 0 */
+> 				status = "okay";
+> 			};
+> 		};
+> 
+> 		internal-regs {
+> 			compatible = "simple-bus";
+> 			#address-cells = <1>;
+> 			#size-cells = <1>;
+> 			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
+> 
+> 			mbusc: mbus-controller at 20000 {
+> 				reg = <0x20000 0x100>, <0x20180 0x20>;
+> 			};
+> 
+> 			interrupt-controller at 20000 {
+> 			      reg = <0x20a00 0x2d0>, <0x21070 0x58>;
+> 			};
+> 		};
+> 	};
 
-Maybe we can find a binutils expert next week at Linaro connect to take a
-look at the data. I can prepare a test case.
+After a discussion with Arnd on IRC, here is the new DT layout we came
+up with:
 
-	Arnd
+	soc {
+		compatible = "marvell,armadaxp-mbus", "simple-bus";
+		controller = <&mbusc>;
+
+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000   /* internal-regs */
+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
+		pcie-mem-aperture = <0xe0000000 0x8000000>;
+                pcie-io-aperture  = <0xe8000000 0x100000>;
+
+		bootrom {
+			compatible = "marvell,bootrom";
+			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
+		};
+
+		devbus-bootcs {
+			status = "okay";
+			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0x8000000>;
+
+			/* NOR */
+			nor {
+				compatible = "cfi-flash";
+				reg = <0 0x8000000>;
+				bank-width = <2>;
+			};
+		};
+
+		pcie-controller {
+			compatible = "marvell,armada-xp-pcie";
+			status = "okay";
+			device_type = "pci";
+
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			ranges =
+			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
+				0x82000000 0 0x42000 MBUS_ID(0xf0, 0x01) 0x42000 0 0x00002000   /* Port 2.0 registers */
+				0x82000000 0 0x44000 MBUS_ID(0xf0, 0x01) 0x44000 0 0x00002000   /* Port 0.1 registers */
+				0x82000000 0 0x48000 MBUS_ID(0xf0, 0x01) 0x48000 0 0x00002000   /* Port 0.2 registers */
+				0x82000000 0 0x4c000 MBUS_ID(0xf0, 0x01) 0x4c000 0 0x00002000   /* Port 0.3 registers */
+				0x82000000 1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
+				0x81000000 1 0       MBUS_ID(0x04, 0xe0) 0 1 0 /* Port 0.0 IO */
+                                0x82000000 2 0       MBUS_ID(0x08, 0xe8) 0 1 0 /* Port 1.0 MEM */
+                                0x81000000 2 0       MBUS_ID(0x08, 0xe0) 0 1 0 /* Port 1.0 IO */>;
+
+
+                        pcie at 1,0 {
+                                device_type = "pci";
+                                assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
+                                reg = <0x0800 0 0 0 0>;
+                                #address-cells = <3>;
+                                #size-cells = <2>;
+                                #interrupt-cells = <1>;
+                                ranges = <0x82000000 0 0 0x82000000 1 0 1 0
+                                          0x81000000 0 0 0x81000000 1 0 1 0>;
+                                interrupt-map-mask = <0 0 0 0>;
+                                interrupt-map = <0 0 0 0 &mpic 58>;
+                                marvell,pcie-port = <0>;
+                                marvell,pcie-lane = <0>;
+                                clocks = <&gateclk 5>;
+                                status = "disabled";
+                        };
+
+                        pcie at 2,0 {
+                                device_type = "pci";
+                                assigned-addresses = <0x82002800 0 0x80000 0 0x2000>;
+                                reg = <0x1000 0 0 0 0>;
+                                #address-cells = <3>;
+                                #size-cells = <2>;
+                                #interrupt-cells = <1>;
+                                ranges = <0x82000000 0 0 0x82000000 2 0 1 0
+                                          0x81000000 0 0 0x81000000 2 0 1 0>;
+                                interrupt-map-mask = <0 0 0 0>;
+                                interrupt-map = <0 0 0 0 &mpic 62>;
+                                marvell,pcie-port = <1>;
+                                marvell,pcie-lane = <0>;
+                                clocks = <&gateclk 9>;
+                                status = "disabled";
+                        };
+		};
+
+		internal-regs {
+			compatible = "simple-bus";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
+
+			mbusc: mbus-controller at 20000 {
+				reg = <0x20000 0x100>, <0x20180 0x20>;
+			};
+
+			interrupt-controller at 20000 {
+			      reg = <0x20a00 0x2d0>, <0x21070 0x58>;
+			};
+		};
+	};
+
+I.e, the changes are :
+
+ (1) The main soc {} node gains two new additional DT properties:
+     pcie-mem-aperture and pcie-io-aperture. The mvebu-mbus reads those
+     informations, and provides an API
+     mvebu_mbus_alloc_pcie_{mem,io}_aperture(phys_addr_t *base, size_t
+     *size) that allows the PCIe driver to get the mem and I/O
+     apertures for PCIe. In the future, the mvebu-mbus driver may
+     decide to allocate those apertures dynamically rather than have
+     values hardcoded in the DT: this is the private business of
+     mvebu-mbus. For now, the mvebu-mbus driver will use those static
+     values from the DT, as we don't want to do a full dynamic window
+     base address allocation for now. This makes sense, as mvebu-mbus
+     is the "gake keeper" of what gets mapped in terms of mbus windows.
+
+ (2) The ranges property of the main pcie-controller {} node is changed
+     to use 0x82000000 and 0x81000000 for all PCIe interfaces, as requested
+     by the OF spec. The second 32 bits word of the child address is used
+     to encode the port number (in our example 1 for the first MEM and I/O
+     ranges, and 2 for the next MEM and I/O ranges).
+
+ (3) A non-empty range property is added in the child pcie at x,y nodes to
+     translate back into regular PCIe addresses the child addresses
+     described in the ranges property in pcie-controller. I.e, it
+     simply translate (0x82000000 0 0) into (0x8200000 <port> 0).
+
+Arnd, Jason, if you could confirm that you both agree with this DT
+binding soon, Ezequiel and I would quickly adapt the code accordingly,
+and hopefully converge towards a final patch set.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
