@@ -1,188 +1,145 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Fri, 5 Jul 2013 18:26:59 +0100
-Subject: scripts/kallsyms: Avoid ARM veneer symbols
-In-Reply-To: <201307051842.44721.arnd@arndb.de>
-References: <2983817.Xe2505Drlj@wuerfel> <201307031803.04501.arnd@arndb.de>
- <20130705145100.GE2932@localhost.localdomain>
- <201307051842.44721.arnd@arndb.de>
-Message-ID: <20130705172659.GJ2932@localhost.localdomain>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 5 Jul 2013 12:33:10 -0500
+Subject: [RFC PATCH V2 1/8] regulator: Introduce OMAP regulator to control
+ PMIC over VC/VP
+In-Reply-To: <20130705165235.GC27646@sirena.org.uk>
+References: <1371849949-12649-1-git-send-email-nm@ti.com>
+ <1371849949-12649-2-git-send-email-nm@ti.com>
+ <20130704154105.GD27646@sirena.org.uk> <20130705135507.GA17439@kahuna>
+ <20130705140828.GA27646@sirena.org.uk> <51D6DD3A.1030002@ti.com>
+ <20130705165235.GC27646@sirena.org.uk>
+Message-ID: <51D70356.30707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 05, 2013 at 05:42:44PM +0100, Arnd Bergmann wrote:
-> On Friday 05 July 2013, Dave P Martin wrote:
-> > On Wed, Jul 03, 2013 at 06:03:04PM +0200, Arnd Bergmann wrote:
-> > > On Tuesday 25 June 2013, Dave Martin wrote:
-> > > suggest would significantly increase the build time since the
-> > > kallsyms+linker stage cannot be done in parallel or sped up
-> > > using ccache.
-> > > 
-> > > > But including the veneer symbols in kallsyms is arguably not all
-> > > > that useful.
-> > > > 
-> > > > The main potential effect is that profiling might occasionally
-> > > > sample the PC as being in a completely bogus function which it
-> > > > never passed through at all, because of the way kallsyms tracks
-> > > > only symbol locations and not sizes (if I remember right) --
-> > > > so a veneer will actually get accounted against some arbitrary
-> > > > adjacent function.
-> > > > 
-> > > > I don't know how much this matters.
-> > > 
-> > > Interesting point. No idea how often that happens. All the veneers
-> > > for one section are in one place though, so we could in theory
-> > > add a kallsyms entry for that section as long as can identify
-> > > it.
-> > 
-> > We could collapse any contiguous sequence of __veneer_* symbols down
-> > to a single symbol to mark those holes.
-> > 
-> > However, many kallsyms passes could still be needed: each pass might add
-> > extra veneer blocks, unless the size of kallsyms data is identical to
-> > that in the previous pass.  The expected convergence rate is faster,
-> > though.
-> 
-> Right, it wouldn't guarantee to converge after two passes, just make
-> it very likely.
-> 
-> > > > > The easiest solution is to skip veneers in kallsyms in the
-> > > > > same way we already skip a couple of other symbols.
-> > 
-> > Your suggestion of omitting the symbols completely seems to be the only
-> > way to ensure convergence in 2 passes, so far as I can see.
-> > 
-> > 
-> > Adding size information to every entry in kallsyms would make it possible
-> > to identify the "holes" without potentially requiring many kallsyms passes,
-> > but it would bloat the table.  The extra info would be interesting only
-> > for a tiny subset of the symbols.  I expect people aren't going to like
-> > that much.
-> > 
-> > So I guess your original suggestion may be the best thing to do for now,
-> > after all...
-> > 
-> > There is no proper reserved symbol namespace for linker-generated symbols,
-> > so a real symbol could have the name __*_veneer, at which point things
-> > start to get really confusing.  But hopefully that won't happen much.
-> > I don't see any such symbol right now, and hopefully nobody will be so
-> > silly as to add one...
-> > 
-> > If we eventually need to fix the bogus symbol resolution problem, I can't
-> > see an alternative to adding size info to every symbol.  But we should
-> > leave that for now.  It doesn't sound like a serious problem.
-> 
-> Unfortunately I have run into additional problems now after doing a few
-> hundred more builds:
-> 
-> * not all veneers end in _veneer, some also end in _from_arm or _from_thumb.
->   This is easy enough to check for in the same way I did for _veneer.
+On 07/05/2013 11:52 AM, Mark Brown wrote:
+> On Fri, Jul 05, 2013 at 09:50:34AM -0500, Nishanth Menon wrote:
+>> On 07/05/2013 09:08 AM, Mark Brown wrote:
+>
+>>>> option 1) we just bypass get_voltage/set_voltage to point through to
+>>>> this function. result will be something similar to what we got here[1]
+>
+>>> I don't really know what you mean when you say "bypass get_voltage/set_voltage
+>>> so it's kind of hard to comment...  the link you posted appears to be a
+>>> link to the code I'm reviewing so it's not terribly enlightening.
+>
+>> :) it is similar, yes. by bypass get/set_voltage, I mean something like [1]
+>
+> No, that's not a good idea.
 
-I think there are a small number of patterns to check for.
+I agree.
 
-__*_veneer, __*_from_arm and __*_from_thumb should cover most cases.
+>
+>>> What makes you think that the existing regulator drivers need to be
+>>> modified?
+>
+>> data path difference - Almost all standard regulators use i2c
+>> (standard i2c APIs) for every other SMPS/LDO except for the ones
+>> controlled by OMAP custom i2c path(vc/vp), the
+>> set_voltage/get_voltage needs a different implementation when it
+>> comes to using the vc/vp path.
+>
+>>> They already have all the data exported to the core (or
+>>> should do)...
+>
+>> I see that twl-regulator does not indeed do it, but, assuming the
+>> regulators have all the data exported to the core, the data is
+>> hidden in struct regulator_desc which is private to the device and
+>> driver. lets go through these:
+>
+> That's just a simple matter of programming to fix, and any regulator
+> which can work with this sort of table based stuff you're looking at
+> here must also be able to be converted to work with the equivalent code
+> in the regulator core so open coding is a deficiency in the driver.
 
-> * There are actually symbols without a name on ARM, which screws up the
->   kallsyms.c parser. These also seem to be veneers, but attached to some
->   random function:
+OK, conceptually, I am a bit lost here (may be I thinking about "how the 
+heck am I supposed to implement this?") - Hoping for your patience in 
+trying to get through to my thick skull :)
 
-Hmmm, I don't what those are.  By default, we should probably ignore those
-too.  Maybe they have something to do with link-time relocation processing.
+Taking an example of twl-regulator and omap_pmic, are you suggesting 
+omap_pmic to be a user twl-regulator using 
+include/linux/regulator/consumer.h? or are you suggesting that omap_pmic 
+should not be a regulator at all?
 
-> 
-> $ nm obj-tmp/.tmp_vmlinux1 | head
-> c09e8db1 t 
-> c09e8db5 t 
-> c09e8db9 t    # <==========
-> c09e8dbd t 
-> c0abfc29 t 
-> c0008000 t $a
-> c0f7b640 t $a
-> 
-> $ objdump -Dr obj-tmp/.tmp_vmlinux1 | grep -C 30 c09e8db.
-> c0851fcc <wlc_phy_edcrs_lock>:
-> c0851fcc:       b538            push    {r3, r4, r5, lr}
-> c0851fce:       b500            push    {lr}
-> c0851fd0:       f7bb d8dc       bl      c000d18c <__gnu_mcount_nc>
-> c0851fd4:       f240 456b       movw    r5, #1131       ; 0x46b
-> c0851fd8:       4604            mov     r4, r0
-> c0851fda:       f880 14d5       strb.w  r1, [r0, #1237] ; 0x4d5
-> c0851fde:       462a            mov     r2, r5
-> c0851fe0:       f44f 710b       mov.w   r1, #556        ; 0x22c
-> c0851fe4:       f7ff fe6d       bl      c0851cc2 <write_phy_reg>
-> c0851fe8:       4620            mov     r0, r4
-> c0851fea:       462a            mov     r2, r5
-> c0851fec:       f240 212d       movw    r1, #557        ; 0x22d
-> c0851ff0:       f7ff fe67       bl      c0851cc2 <write_phy_reg>
-> c0851ff4:       4620            mov     r0, r4
-> c0851ff6:       f240 212e       movw    r1, #558        ; 0x22e
-> c0851ffa:       f44f 7270       mov.w   r2, #960        ; 0x3c0
-> c0851ffe:       f196 fedb       bl      c09e8db8 <tpci200_free_irq+0x78>  # <===========
-> c0852002:       4620            mov     r0, r4
-> c0852004:       f240 212f       movw    r1, #559        ; 0x22f
-> c0852008:       f44f 7270       mov.w   r2, #960        ; 0x3c0
-> c085200c:       e8bd 4038       ldmia.w sp!, {r3, r4, r5, lr}
-> c0852010:       f7ff be57       b.w     c0851cc2 <write_phy_reg>
-> 
-> 
-> ... # in tpci200_free_irq:
-> c09e8d9e:       e003            b.n     c09e8da8 <tpci200_free_irq+0x68>
-> c09e8da0:       f06f 0415       mvn.w   r4, #21
-> c09e8da4:       e000            b.n     c09e8da8 <tpci200_free_irq+0x68>
-> c09e8da6:       4c01            ldr     r4, [pc, #4]    ; (c09e8dac <tpci200_free_irq+0x6c>)
-> c09e8da8:       4620            mov     r0, r4
-> c09e8daa:       bdf8            pop     {r3, r4, r5, r6, r7, pc}
-> c09e8dac:       fffffe00                        ; <UNDEFINED> instruction: 0xfffffe00
-> c09e8db0:       f4cf b814       b.w     c06b7ddc <bna_enet_sm_chld_stop_wait_entry>
-> c09e8db4:       f53e bed8       b.w     c0727b68 <gem_do_stop>
-> c09e8db8:       f668 bf83       b.w     c0851cc2 <write_phy_reg>           # <==========
-> c09e8dbc:       d101            bne.n   c09e8dc2 <tpci200_free_irq+0x82>
-> c09e8dbe:       f435 b920       b.w     c061e002 <twl_reset_sequence+0x34c>
-> 
-> It makes no sense to me at all that a function in one driver can just call
-> write_phy_reg a couple of times, but need a veneer in the middle, and put
-> that veneer in a totally unrelated function in another driver!
+Could you suggest what you have in your mind here, I can see how we can 
+make that happen. I am not averse to writing new code ofcourse.
 
-I think that if ld inserts a veneer for a function anywhere, branches
-from any object in the link to that target symbol can reuse the same
-veneer as a trampoline, effectively appearing to branch through an
-unrelated location to reach the destination.
+>
+>>> +	.cmd_reg_addr = 0x00,
+>
+>> command register is used for sending low power state commands -
+>> which is not the same as voltage register or vsel_reg as used in
+>> depicted in regulator_desc.	
+>
+> There's no information about how to use this register in your
+> bindings...  but anyway, can't be too hard to add this if it's actually
+> used.
 
-ld inserts veneers between individual input sections, but I don't
-think they have to go next to the same section the branch originates
-from.  In the above code, it looks like that series of unconditional
-branches after the end of tpci200_free_irq might be a common veneer pool
-for many different destinations.
+Yes it is, and also happens to be how OMAPs achieve maximum power 
+savings - when low power modes are achieved in OMAP(automatic hardware 
+assisted commands are send to the specific command registers in PMIC and 
+viceversa on wakeup) - but this also happens to be very specific to OMAP 
+way of handling things. I can refer to the Reference Manual as to how it 
+actually works, but that'd be an overkill, I will try to expand on the 
+bindings a little more, I guess.
 
-LTO may also make the expected compilation unit boundaries disappear
-completely.  Anything could end up almost anywhere in that case.
-Files could get intermingled, inlined and generally spread all over the
-place.
+>
+>>> +	.i2c_timeout_us = 200,
+>
+>> yep, does not match up.
+>
+> Like I say I just don't see why this is even specified per device.
+>
+>>> +	.max_uV = 1450000,
+>
+>> can be used with constraints, but most regulator drivers seem to
+>> store this internally.
+>
+> Or just trivially calculate it as we do currently.
+>
+>>> +	.voltage_selector_offset = 0,
+>>> +	.voltage_selector_mask = 0x7F,
+>>> +	.voltage_selector_setbits = 0x0,
+>>> +	.voltage_selector_zero = false,
+>
+>> to an extent we can map these to vsel_mask, linear_min_sel etc.
+>> (again assuming the regulator driver has populated it - most that
+>> implement custom set_voltage, get_voltage do not do that.
+>
+> Anything that implements a custom set_voltage() won't work with your
+> data structure either...
 
-Even so, veneers shouldn't be needed in the common case where we're not
-jumping across .rodata.
+It would not work with OMAP either ;). But that said, drivers do freely 
+implement custom set_voltage/get_voltage primarily because there are 
+ranges in supported voltages that are non-linear and try to be generic 
+to work on non-OMAP platforms as well. However, within the supported 
+range, only the linear ranges are used with OMAP.
 
-> 
-> If this is a binutils bug or gcc bug, we should probably just fix it, but it
-> might be easier to work around it by changing kallsyms.c some more.
+>
+>> Other option is to make rdev available to omap_pmic regulator -
+>> which again implies change in existing regulator driver?
+>
+> Why would any of the drivers need to change to do this?  They're already
+> exporting the information.
+I am thinking here: two regulator drivers, using same rdev/desc for 
+getting the data. probably makes no sense, I agree.
 
-I haven't found a trivial way to reproduce those nameless symbols.
-I don't know whether they're a bug or not...
+>
+>>> the only thing that's missing is the timeouts and it's
+>>> not at all obvious why those need to be tuned per device.
+>
+>> OMAP VC hardware has no idea about how long to wait before giving up
+>> on an ongoing i2c transaction. This may depend on PMIC and what it
+>> does before acking on i2c.
+>
+> So pick a high number (it's only for error cases...)?
+>
+from hardware perspective yeah, if it does not lockup (based on erratas 
+on specific devices ;) ). it also controls in part, the latency of 
+response to Voltage processor from Voltage controller also needed for 
+computing SmartReflex latencies (as it should consider worst case 
+conditions)
 
-Making kallsyms robust against this might be a good idea anyway.
-
-> > > > > -/*
-> > > > > - * This ignores the intensely annoying "mapping symbols" found
-> > > > > - * in ARM ELF files: $a, $t and $d.
-> > > > > - */
-> > > > >  static inline int is_arm_mapping_symbol(const char *str)
-> > > > 
-> > > > The function's name is now wrong.  Should it be renamed or split up?
-> > > 
-> > > Sure I can rename it. Any suggestions?
-> > 
-> > Maybe just something more generic like is_arm_special_symbol()?
-> 
-> Ok, I can do that.
-
-Cheers
----Dave
+-- 
+Regards,
+Nishanth Menon
