@@ -1,49 +1,36 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri,  5 Jul 2013 12:10:55 -0600
-Subject: [PATCH V3] ARM: add missing linker section markup to head-common.S
-Message-ID: <1373047855-24145-1-git-send-email-swarren@wwwdotorg.org>
+Date: Fri, 05 Jul 2013 12:36:11 -0600
+Subject: Appended DTB files for multi-machine kernels
+In-Reply-To: <51D5A938.30607@gmail.com>
+References: <51D5A938.30607@gmail.com>
+Message-ID: <51D7121B.50704@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 07/04/2013 10:56 AM, Daniel Mack wrote:
+...
+> The built-in support for attaching a DTB to the zImage does not suffice
+> here, because we have one image for all models, and also, we couldn't do
+> a 'per-board-revision' selection that way either.
+...
+> As a solution, I'm thinking of a small framework that could for example
+> work as follows.
+> 
+> a) A small mechanism allows storing multiple DTB binary files inside the
+> kernel binary at compile time...
+...
+> c) Allow users to open-code the DTB lookup depending on whatever kind of
+> runtime information (be it the board_revision or anything else).
 
-Macro __INIT is used to place various code in head-common.S into the init
-section. This should be matched by a closing __FINIT. Also, add an
-explicit ".text" to ensure subsequent code is placed into the correct
-section; __FINIT is simply a closing marker to match __INIT and doesn't
-guarantee to revert to .text.
+The problem with (c) is that in general it probably requires a lot of
+infra-structure to be working to implement it. On Tegra, the board
+revision is in an EEPROM attached to an I2C bus. You'd need to have
+parsed DT and started instantiating devices already before you could
+access the ID EEPROM to know which board revision you're running on.
+That's a bit of a chicked-and-egg problem. Even with a much simpler
+scheme such as board ID encoded into GPIOs, you'll still likely run into
+similar problems; pinmux and GPIO controller drivers are needed just to
+read the GPIOs, which then requires DT to instantiate those drivers.
 
-This historically caused no problem, because macro __CPUINIT was used at
-the exact location where __FINIT was missing, which then placed following
-code into the cpuinit section. However, with commit 22f0a2736 "init.h:
-remove __cpuinit sections from the kernel" applied, __CPUINIT becomes a
-no-op, thus leaving all this code in the init section, rather than the
-regular text section. This caused issues such as secondary CPU boot
-failures or crashes.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
-Acked-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
-v3: Added .text after __FINIT to force the correct section.
-v2: Moved __FINIT after lookup_processor_type, to correctly match the
-location of __CPUINIT.
----
- arch/arm/kernel/head-common.S | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-index 529ce99..47cd974 100644
---- a/arch/arm/kernel/head-common.S
-+++ b/arch/arm/kernel/head-common.S
-@@ -133,6 +133,9 @@ ENTRY(lookup_processor_type)
- 	ldmfd	sp!, {r4 - r6, r9, pc}
- ENDPROC(lookup_processor_type)
- 
-+	__FINIT
-+	.text
-+
- /*
-  * Read processor ID register (CP#15, CR0), and look up in the linker-built
-  * supported processor list.  Note that we can't use the absolute addresses
--- 
-1.8.1.5
+So, the suggestion of Nicolas's that you mentioned does solve that
+rather neatly.
