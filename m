@@ -1,40 +1,36 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 5 Jul 2013 14:12:32 +0800
-Subject: [PATCH v3 6/6] ARM: dts: enable the uart2 for imx6q-arm2
-In-Reply-To: <1373004752-21302-1-git-send-email-b32955@freescale.com>
-References: <1373004752-21302-1-git-send-email-b32955@freescale.com>
-Message-ID: <1373004752-21302-7-git-send-email-b32955@freescale.com>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Fri, 5 Jul 2013 06:45:01 +0000
+Subject: SPI: DUAL/QUAD support
+In-Reply-To: <CAHSAbzOg+uHndydSC43moF7pijc67pqzB2rPnY69ynXHEzw79g@mail.gmail.com>
+References: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>
+ <20130704130017.GA25997@sig21.net>
+ <OFA0D5839D.0594EA10-ONC1257B9E.004A7347-C1257B9E.00524BA5@rohde-schwarz.com>
+ <20130704154927.GE27646@sirena.org.uk>
+ <OFAD729A05.8C915625-ONC1257B9E.00576B25-C1257B9E.0058477D@rohde-schwarz.com>
+ <CAHSAbzOg+uHndydSC43moF7pijc67pqzB2rPnY69ynXHEzw79g@mail.gmail.com>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73E9E4C2E@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable the uart2 for imx6q-arm2 board.
-The uart2 works in the DTE mode, with the RTS/CTS and DMA enabled.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/boot/dts/imx6q-arm2.dts |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+> Just as Johannes said. In my patch m25p80's changes is incomplete.
+> Because my inicial aim is to add the transfer width member to tell controller
+> the mode flash in. And I will attach new patch about m25p80 later.
+> Also you are right. There are really series of flashes do not support dual/quad
+> transfer. So I don't know whether there are any standard for serial-flash just
+> like the CFI for parallel-flash. Personally, to make a general standard and
+> a general code for serial-flash is necessary. So that we do not need to add
+> special function in m25p80.c.
+> 
+[Pekon]: Does below generic framework for spianand, suit your driver?
+http://lists.infradead.org/pipermail/linux-mtd/2013-July/047434.html
 
-diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
-index 4e54fde..e7e3b56 100644
---- a/arch/arm/boot/dts/imx6q-arm2.dts
-+++ b/arch/arm/boot/dts/imx6q-arm2.dts
-@@ -97,6 +97,16 @@
- 	status = "okay";
- };
- 
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2_2>;
-+	fsl,dte-mode;
-+	fsl,uart-has-rtscts;
-+	dma-names = "rx", "tx";
-+	dmas = <&sdma 27 4 0>, <&sdma 28 4 0>;
-+	status = "okay";
-+};
-+
- &uart4 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart4_1>;
--- 
-1.7.1
+you should be able to extend the generic spinand API for all
+serial modes (SPI, Dual-SPI, Quad-SPI).
+As QSPI and Dual-SPI devices should implicitly support SPI (MISO/MOSI)
+So, you can do device probing using default SPI mode. And then based on
+DT inputs and device support upgrade to QSPI / Dual-SPI mode.
+And going forward extend it for direct memory-mapped device for XIP.
+
+
+with regards, pekon
