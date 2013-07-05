@@ -1,145 +1,99 @@
-From: shuah.kh@samsung.com (Shuah Khan)
-Date: Fri,  5 Jul 2013 16:57:35 -0600
-Subject: [PATCH] arm: Convert sa1111 platform and bus legacy pm_ops to
- dev_pm_ops
-Message-ID: <1373065055-13887-1-git-send-email-shuah.kh@samsung.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Sat, 6 Jul 2013 00:58:34 +0200
+Subject: [PATCH 6/9] clocksource: dw_apb_timer: quirk for inverted int mask
+In-Reply-To: <201307060054.35996.heiko@sntech.de>
+References: <201307060051.09716.heiko@sntech.de>
+ <201307060054.35996.heiko@sntech.de>
+Message-ID: <201307060058.34736.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert arch/arm/common/sa1111 platform and bus legacy pm_ops to dev_pm_ops.
-This change also updates the use of COMFIG_PM to CONFIG_PM_SLEEP as this
-platform and bus code implements PM_SLEEP ops and not the PM_RUNTIME ops.
-Compile tested.
+this patch should have had a
 
-Signed-off-by: Shuah Khan <shuah.kh@samsung.com>
----
- arch/arm/common/sa1111.c |   39 ++++++++++++++++++++++-----------------
- 1 file changed, 22 insertions(+), 17 deletions(-)
+From: Ulrich Prinz <ulrich.prinz@googlemail.com>
 
-diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index e57d7e5..95594f0 100644
---- a/arch/arm/common/sa1111.c
-+++ b/arch/arm/common/sa1111.c
-@@ -107,7 +107,7 @@ struct sa1111 {
- 	spinlock_t	lock;
- 	void __iomem	*base;
- 	struct sa1111_platform_data *pdata;
--#ifdef CONFIG_PM
-+#ifdef CONFIG_PM_SLEEP
- 	void		*saved_state;
- #endif
- };
-@@ -870,11 +870,11 @@ struct sa1111_save_data {
- 	unsigned int	wakeen1;
- };
- 
--#ifdef CONFIG_PM
-+#ifdef CONFIG_PM_SLEEP
- 
--static int sa1111_suspend(struct platform_device *dev, pm_message_t state)
-+static int sa1111_suspend(struct device *dev)
- {
--	struct sa1111 *sachip = platform_get_drvdata(dev);
-+	struct sa1111 *sachip = platform_get_drvdata(to_platform_device(dev));
- 	struct sa1111_save_data *save;
- 	unsigned long flags;
- 	unsigned int val;
-@@ -937,9 +937,10 @@ static int sa1111_suspend(struct platform_device *dev, pm_message_t state)
-  *	restored by their respective drivers, and must be called
-  *	via LDM after this function.
-  */
--static int sa1111_resume(struct platform_device *dev)
-+static int sa1111_resume(struct device *dev)
- {
--	struct sa1111 *sachip = platform_get_drvdata(dev);
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct sa1111 *sachip = platform_get_drvdata(pdev);
- 	struct sa1111_save_data *save;
- 	unsigned long flags, id;
- 	void __iomem *base;
-@@ -955,7 +956,7 @@ static int sa1111_resume(struct platform_device *dev)
- 	id = sa1111_readl(sachip->base + SA1111_SKID);
- 	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
- 		__sa1111_remove(sachip);
--		platform_set_drvdata(dev, NULL);
-+		platform_set_drvdata(pdev, NULL);
- 		kfree(save);
- 		return 0;
- 	}
-@@ -1005,9 +1006,7 @@ static int sa1111_resume(struct platform_device *dev)
- 	return 0;
- }
- 
--#else
--#define sa1111_suspend NULL
--#define sa1111_resume  NULL
-+static SIMPLE_DEV_PM_OPS(sa1111_dev_pm_ops, sa1111_suspend, sa1111_resume);
- #endif
- 
- static int sa1111_probe(struct platform_device *pdev)
-@@ -1030,7 +1029,7 @@ static int sa1111_remove(struct platform_device *pdev)
- 	struct sa1111 *sachip = platform_get_drvdata(pdev);
- 
- 	if (sachip) {
--#ifdef CONFIG_PM
-+#ifdef CONFIG_PM_SLEEP
- 		kfree(sachip->saved_state);
- 		sachip->saved_state = NULL;
- #endif
-@@ -1053,11 +1052,12 @@ static int sa1111_remove(struct platform_device *pdev)
- static struct platform_driver sa1111_device_driver = {
- 	.probe		= sa1111_probe,
- 	.remove		= sa1111_remove,
--	.suspend	= sa1111_suspend,
--	.resume		= sa1111_resume,
- 	.driver		= {
- 		.name	= "sa1111",
- 		.owner	= THIS_MODULE,
-+#ifdef CONFIG_PM_SLEEP
-+		.pm = &sa1111_dev_pm_ops,
-+#endif
- 	},
- };
- 
-@@ -1297,14 +1297,15 @@ static int sa1111_match(struct device *_dev, struct device_driver *_drv)
- 	return dev->devid & drv->devid;
- }
- 
--static int sa1111_bus_suspend(struct device *dev, pm_message_t state)
-+#ifdef CONFIG_PM_SLEEP
-+static int sa1111_bus_suspend(struct device *dev)
- {
- 	struct sa1111_dev *sadev = SA1111_DEV(dev);
- 	struct sa1111_driver *drv = SA1111_DRV(dev->driver);
- 	int ret = 0;
- 
- 	if (drv && drv->suspend)
--		ret = drv->suspend(sadev, state);
-+		ret = drv->suspend(sadev, PMSG_SUSPEND);
- 	return ret;
- }
- 
-@@ -1318,6 +1319,9 @@ static int sa1111_bus_resume(struct device *dev)
- 		ret = drv->resume(sadev);
- 	return ret;
- }
-+static SIMPLE_DEV_PM_OPS(sa1111_bus_dev_pm_ops, sa1111_bus_suspend,
-+			 sa1111_bus_resume);
-+#endif
- 
- static void sa1111_bus_shutdown(struct device *dev)
- {
-@@ -1354,8 +1358,9 @@ struct bus_type sa1111_bus_type = {
- 	.match		= sa1111_match,
- 	.probe		= sa1111_bus_probe,
- 	.remove		= sa1111_bus_remove,
--	.suspend	= sa1111_bus_suspend,
--	.resume		= sa1111_bus_resume,
-+#ifdef CONFIG_PM_SLEEP
-+	.pm		= &sa1111_bus_dev_pm_ops,
-+#endif
- 	.shutdown	= sa1111_bus_shutdown,
- };
- EXPORT_SYMBOL(sa1111_bus_type);
--- 
-1.7.10.4
+sorry for the mistake
+
+Am Samstag, 6. Juli 2013, 00:54:35 schrieb Heiko St?bner:
+> Some timer variants use an inverted setting to mask the timer interrupt.
+> Therefore add a quirk to handle these variants.
+> 
+> Signed-off-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+> ---
+>  drivers/clocksource/dw_apb_timer.c |   23 ++++++++++++++++++-----
+>  include/linux/dw_apb_timer.h       |    6 ++++++
+>  2 files changed, 24 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/clocksource/dw_apb_timer.c
+> b/drivers/clocksource/dw_apb_timer.c index 23cd7c6..7705d13 100644
+> --- a/drivers/clocksource/dw_apb_timer.c
+> +++ b/drivers/clocksource/dw_apb_timer.c
+> @@ -84,7 +84,10 @@ static void apbt_disable_int(struct dw_apb_timer *timer)
+>  {
+>  	unsigned long ctrl = apbt_readl(timer, timer->reg_control);
+> 
+> -	ctrl |= APBTMR_CONTROL_INT;
+> +	if (timer->quirks & APBTMR_QUIRK_INVERSE_INTMASK)
+> +		ctrl &= ~APBTMR_CONTROL_INT;
+> +	else
+> +		ctrl |= APBTMR_CONTROL_INT;
+>  	apbt_writel(timer, ctrl, timer->reg_control);
+>  }
+> 
+> @@ -134,7 +137,10 @@ static void apbt_enable_int(struct
+> dw_apb_clock_event_device *dw_ced) /* clear pending intr */
+>  	if (dw_ced->eoi)
+>  		dw_ced->eoi(timer);
+> -	ctrl &= ~APBTMR_CONTROL_INT;
+> +	if (timer->quirks & APBTMR_QUIRK_INVERSE_INTMASK)
+> +		ctrl |= APBTMR_CONTROL_INT;
+> +	else
+> +		ctrl &= ~APBTMR_CONTROL_INT;
+>  	apbt_writel(timer, ctrl, timer->reg_control);
+>  }
+> 
+> @@ -195,7 +201,10 @@ static void apbt_set_mode(enum clock_event_mode mode,
+>  		if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
+>  			apbt_writel(timer, 0, timer->reg_load_count + 0x4);
+> 
+> -		ctrl &= ~APBTMR_CONTROL_INT;
+> +		if (timer->quirks & APBTMR_QUIRK_INVERSE_INTMASK)
+> +			ctrl |= APBTMR_CONTROL_INT;
+> +		else
+> +			ctrl &= ~APBTMR_CONTROL_INT;
+>  		ctrl |= APBTMR_CONTROL_ENABLE;
+>  		apbt_writel(timer, ctrl, timer->reg_control);
+>  		break;
+> @@ -363,9 +372,13 @@ void dw_apb_clocksource_start(struct
+> dw_apb_clocksource *dw_cs) if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
+>  		apbt_writel(timer, 0, timer->reg_load_count + 0x4);
+> 
+> -	/* enable, mask interrupt */
+> +	/* set periodic, mask interrupt, enable timer */
+>  	ctrl &= ~APBTMR_CONTROL_MODE_PERIODIC;
+> -	ctrl |= (APBTMR_CONTROL_ENABLE | APBTMR_CONTROL_INT);
+> +	if (timer->quirks & APBTMR_QUIRK_INVERSE_INTMASK)
+> +		ctrl &= ~APBTMR_CONTROL_INT;
+> +	else
+> +		ctrl |= APBTMR_CONTROL_INT;
+> +	ctrl |= APBTMR_CONTROL_ENABLE;
+>  	apbt_writel(timer, ctrl, timer->reg_control);
+>  	/* read it once to get cached counter value initialized */
+>  	dw_apb_clocksource_read(dw_cs);
+> diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
+> index fbe4c6b..7d36d91 100644
+> --- a/include/linux/dw_apb_timer.h
+> +++ b/include/linux/dw_apb_timer.h
+> @@ -30,6 +30,12 @@
+>   */
+>  #define APBTMR_QUIRK_NO_EOI		BIT(1)
+> 
+> +/* The IP uses an inverted interrupt-mask bit.
+> + * Instead of activating interrupts clearing a maks bit, it needs an
+> enable + * bit to be set 1.
+> + */
+> +#define APBTMR_QUIRK_INVERSE_INTMASK	BIT(2)
+> +
+>  struct dw_apb_timer {
+>  	void __iomem				*base;
+>  	unsigned long				freq;
