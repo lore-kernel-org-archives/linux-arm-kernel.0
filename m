@@ -1,40 +1,38 @@
-From: richard.zhuhongxing@gmail.com (Richard Zhu)
-Date: Fri,  5 Jul 2013 17:52:19 +0800
-Subject: [PATCH v3 0/3] ahci: enable ahci sata support on imx6q
-Message-ID: <1373017942-12583-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 5 Jul 2013 10:57:57 +0100
+Subject: kernel decompressor problem for ARMv7
+In-Reply-To: <CAF1ivSakn8-HiAf+4_cLRWUUTDP9QBKpAt+hVQoMyAmKZ2-dJA@mail.gmail.com>
+References: <CAF1ivSakn8-HiAf+4_cLRWUUTDP9QBKpAt+hVQoMyAmKZ2-dJA@mail.gmail.com>
+Message-ID: <20130705095757.GA13063@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v3: add imx6q specific ahci sata support
-  - Keep arch/arm and ahci_platform driver clean.
-  - Add the sata_imx standalone driver contained all the
-  specific setup
-  - Add the release function, support the loadable module
-  driver.
-  - Tested on imx6q sd board.
+On Fri, Jul 05, 2013 at 09:44:12AM +0100, Lin Ming wrote:
+> Hi all,
 
-v2: http://www.spinics.net/lists/linux-ide/msg45666.html 
- - Setup standalone imx ahci sata driver, because of
- the misalignments of the bits definition of the HBA register.
- - Replace the node by the label in the board dts.
- - 
+Hello,
 
-v1: http://www.spinics.net/lists/linux-ide/msg45581.html
- - add imx6q specific ahci sata support to arch/arm/mach-imx/mach-imx6q.c
+> I'm porting BSP code from v2.6.36 to v3.10 kernel. It's ARMv7 processor.
 
-These patches is based on imx/dt branch of
-"http://git.linaro.org/git-ro/people/shawnguo/linux-2.6.git"
+Which specific processor/SoC?
 
-[v3 1/3] ARM: dtsi: enable ahci sata on imx6q platforms
-[v3 2/3] ARM: imx6q: update the sata bits definitions of gpr13
-[v3 3/3] sata: imx: add ahci sata support on imx platforms
+> But decompressor doesn't work. With a lot of debug, I finally find
+> below 2 commits related.
+> Kernel uncompress OK with these commits reverted.
+> 
+> dbece45: ARM: 7501/1: decompressor: reset ttbcr for VMSA ARMv7 cores
+> (Introduced in v3.6-rc6)
+> 
+> 5010192: ARM: 7583/1: decompressor: Enable unaligned memory access for
+> v6 and above
+> (Introduced in v3.7-rc8)
+> 
+> Any hint to fix it?
 
-arch/arm/boot/dts/imx6q-sabreauto.dts       |    4 +
-arch/arm/boot/dts/imx6q-sabrelite.dts       |    4 +
-arch/arm/boot/dts/imx6q-sabresd.dts         |    4 +
-arch/arm/boot/dts/imx6q.dtsi                |    9 +
-drivers/ata/Kconfig                         |    9 +
-drivers/ata/Makefile                        |    1 +
-drivers/ata/sata_imx.c                      |  221 +++++++++++++++++++++++++++
-include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  121 ++++++++++-----
-8 files changed, 336 insertions(+), 37 deletions(-)
+There's not really enough information to go on here. What specifically
+fails? Also, do you have to revert *both* of the above changes to get things
+working again?
+
+Cheers,
+
+Will
