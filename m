@@ -1,64 +1,43 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 5 Jul 2013 10:23:50 +0530
-Subject: [PATCH] dmaengine: shdma: fix a build failure on platforms
- with no DMA support
-In-Reply-To: <Pine.LNX.4.64.1306192125480.12502@axis700.grange>
-References: <Pine.LNX.4.64.1305301650290.29171@axis700.grange>
- <51A77CF1.7040105@ti.com> <20130531024438.GB32564@verge.net.au>
- <CAGa+x8413povhYWx+BSj=TdzQDAuYFXmjF4A2kXvQt+=n+380w@mail.gmail.com>
- <Pine.LNX.4.64.1306192125480.12502@axis700.grange>
-Message-ID: <20130705045350.GA10947@intel.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 5 Jul 2013 11:13:04 +0530
+Subject: [RFC 0/4] Cleanup PRM and CM regbit headers
+In-Reply-To: <alpine.DEB.2.02.1307041627540.6258@utopia.booyaka.com>
+References: <1372076143-12955-1-git-send-email-rnayak@ti.com>
+ <20130625071428.GC5523@atomide.com> <51C95839.6050307@ti.com>
+ <20130704115819.GJ5523@atomide.com> <51D56743.9080800@ti.com>
+ <alpine.DEB.2.02.1307041627540.6258@utopia.booyaka.com>
+Message-ID: <51D65CE8.4050004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 19, 2013 at 09:32:18PM +0200, Guennadi Liakhovetski wrote:
-> Hi Vinod
-> 
-> On Wed, 19 Jun 2013, Kevin Hilman wrote:
-> 
-> > On Thu, May 30, 2013 at 7:44 PM, Simon Horman <horms@verge.net.au> wrote:
-> > 
-> > [...]
-> > 
-> > > thanks for this. I will wait for a refresh (as we discussed earlier today).
-> > > Can I confirm that this is a fix for v3.10? If so, could ou note
-> > > that when you post your revised patch?
-> > 
-> > Any progress on this patch?
-> > 
-> > The SH-mobile defconfigs are still all failing in linux-next.
-> 
-> In
-> 
-> https://patchwork.kernel.org/patch/2640061/
-And you havent CC maintainers on this patch, so I dont have it!
-> 
-> I proposed a simple immediate fix for this problem. Arnd at the same time 
-> developed an alternative solution:
-> 
-> https://patchwork.kernel.org/patch/2644121/
-> https://patchwork.kernel.org/patch/2644111/
-Reading these patches I agree with Arnd that client drivers should not depend on
-dma slave drivers. Existing issue need to be fixed
+On Thursday 04 July 2013 10:14 PM, Paul Walmsley wrote:
+> You mentioned that these patches were generated with some kind of awk/grep 
+> scripting.  Can you integrate that in an automated way into the 
+> autogeneration flow?  If the answer is yes, then keep the header.  If the 
+> answer is no, then the header should be dropped.  Beno?t, maybe you have 
+> an opinion too?
 
-Arnd, Have you merged these changes?
+Ok, I'll try and integrate those scripts so all this can be done in an
+automated way even for newer SoCs.
 
---
-~Vinod
 > 
-> Which, I think, is a much larger change and isn't suitable as a bug-fix 
-> this late in the release cycle. Instead those patches address other issues 
-> with the shdma drivers, which might need to be carefully studied and 
-> solutions have to be found, which, however, would require more work and 
-> need a longer time. What is your opinion on this? Would you agree to apply 
-> v2 of this patch, as referenced above or would you prefer a different 
-> solution?
-> 
-> Thanks
-> Guennadi
-> ---
-> Guennadi Liakhovetski, Ph.D.
-> Freelance Open-Source Software Developer
-> http://www.open-technology.de/
+> As far as whether this should go in -rcX or not, my view is that, as a 
+> matter of policy, large changes like this should wait until v3.12.  Now, 
+> having written that, I also was under the impression that the OMAP5 
+> changes weren't going to be sent upstream unless the total diffstat would 
+> be balanced to roughly zero or negative lines.  As far as I know, that 
+> didn't happen.  So I guess, v3.11-rc it is...  kernel development by 
+> diffstat :-(
 
--- 
+I don't mind these going in -rcX or 3.12, either way is fine.
+ 
+> 
+> Finally, please repost the whole series once you're done with your 
+> changes, as a non-RFC, along with your pull request (if you plan to send 
+> one).  I guess I should be the one to take these, since I wound up taking 
+> the OMAP5 addition...
+
+:) I thought so too that you should be the one sending the pull.
+I will post these out as non-RFC after I do a clean integration into
+the autogen scripts, and then you can take a call on sending the pull for
+either -rcX or 3.12
