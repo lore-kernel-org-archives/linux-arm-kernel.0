@@ -1,56 +1,118 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Fri, 5 Jul 2013 08:11:00 +0000
-Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
-In-Reply-To: <51D59C0E.8080003@newflow.co.uk>
-References: <51D577E6.5010507@newflow.co.uk>
- <51D59146.3070002@newflow.co.uk> <51D59C0E.8080003@newflow.co.uk>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EE93C23@DBDE04.ent.ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 5 Jul 2013 10:14:05 +0200
+Subject: [PATCH 3/3] Added support for On Chip OTP in i.MX23/28
+In-Reply-To: <1372855154-8422-4-git-send-email-cb@sgoc.de>
+References: <1372855154-8422-1-git-send-email-cb@sgoc.de>
+ <1372855154-8422-4-git-send-email-cb@sgoc.de>
+Message-ID: <20130705081405.GH2959@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 04, 2013 at 21:30:14, Mark Jackson wrote:
-> On 04/07/13 16:14, Mark Jackson wrote:
-> > On 04/07/13 14:25, Mark Jackson wrote:
-> >> Our custom AM335x board has been booting just fine under 3.10.0-rc4.
-> >>
-> >> I've just done a git pull to update to 3.10 (now that it's released)
-> >> and the board now hangs.
-> >>
-> >> Before I start trying to bisect the issue, does anyone have an clues ?
-> > 
-> > Okay ... I've now bisected it to:-
-> > 
-> > a630fbfbb1beeffc5bbe542a7986bf2068874633 is the first bad commit
-> > commit a630fbfbb1beeffc5bbe542a7986bf2068874633
-> > Author: Tony Lindgren <tony@atomide.com>
-> > Date:   Mon Jun 10 07:39:09 2013 -0700
-> > 
-> >     serial: omap: Fix device tree based PM runtime
-> 
-> However, reverting the commit does *not* fix the issue, weird !!
-> 
-> But I have now tested:-
-> 
-> v3.10-rc4     -> works
-> v3.10-rc5     -> works
-> v3.10-rc6     -> works
-> v3.10-rc7     -> works
-> v3.10         -> works
-> origin/master -> hangs
-> 
-> Any ideas ?
+Hi Christoph,
 
-I just checked the behavior on my AM335x-EVM. Current mainline boots fine
-provided I don't use earlyprintk.  The offending patch [1] in this case is the one
-that tries to get rid of omap_serial_early_init() for DT boot. This change inadvertently
-also results in the console UART getting reset and idled during bootup and that's where
-the boot stops for you. I think if you skip earlyprintk from the bootargs you should see
-the system booting fine. 
+On Wed, Jul 03, 2013 at 02:39:14PM +0200, Christoph G. Baumann wrote:
+> From: "Christoph G. Baumann" <cb@sgoc.de>
+> 
+> Signed-off-by: Christoph G. Baumann <cb@sgoc.de>
+> ---
+>  arch/arm/boot/dts/imx28.dtsi |    1 -
+>  drivers/clk/mxs/clk-imx23.c  |    2 ++
+>  drivers/clk/mxs/clk-imx28.c  |    1 +
+>  drivers/misc/Kconfig         |   14 ++++++++++++++
+>  drivers/misc/Makefile        |    1 +
+>  5 files changed, 18 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 600f7cb..e9de86b 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -711,7 +711,6 @@
+>  			ocotp at 8002c000 {
+>  				compatible = "fsl,ocotp";
+>  				reg = <0x8002c000 0x2000>;
+> -				status = "disabled";
+>  			};
 
-I guess we need to retain the NO_IDLE and NO_RESET aspect for the console UART in
-omap_serial_early_init() to get earlyprintk working again.
+Why do you enable it only for imx28?
 
-Regards,
-Vaibhav B.
+>  			axi-ahb at 8002e000 {
+> diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
+> index f6a7487..ec76d00 100644
+> --- a/drivers/clk/mxs/clk-imx23.c
+> +++ b/drivers/clk/mxs/clk-imx23.c
+> @@ -168,6 +168,8 @@ int __init mx23_clocks_init(void)
+>  	clk_data.clk_num = ARRAY_SIZE(clks);
+>  	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+>  
+> +	clk_register_clkdev(clks[hbus], NULL, "hbus");
+> +
+>  	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+>  		clk_prepare_enable(clks[clks_init_on[i]]);
+>  
+> diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+> index 4faf0af..792fcaf 100644
+> --- a/drivers/clk/mxs/clk-imx28.c
+> +++ b/drivers/clk/mxs/clk-imx28.c
+> @@ -247,6 +247,7 @@ int __init mx28_clocks_init(void)
+>  	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+>  
+>  	clk_register_clkdev(clks[enet_out], NULL, "enet_out");
+> +	clk_register_clkdev(clks[hbus], NULL, "hbus");
+>  
+>  	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+>  		clk_prepare_enable(clks[clks_init_on[i]]);
 
-[1] http://www.spinics.net/lists/linux-omap/msg91825.html
+These two should go in a separate patch (with details on why it's
+needed).
+
+> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+> index c002d86..b44ef48 100644
+> --- a/drivers/misc/Kconfig
+> +++ b/drivers/misc/Kconfig
+> @@ -527,6 +527,20 @@ config SRAM
+>  	  the genalloc API. It is supposed to be used for small on-chip SRAM
+>  	  areas found on many SoCs.
+>  
+> +config FSL_OTP
+> +	tristate "Freescale On-Chip OTP Memory Support"
+> +	depends on SOC_IMX23 || SOC_IMX28
+> +	default n
+> +	help
+> +		If you say Y here, you will get support for a SysFS interface for
+> +		the One Time Programmable memory pages that are stored on the
+> +		iMX23/28 processor.
+> +
+> +	  To compile this driver as a module, choose M here: the module
+> +	  will be called fsl_otp.
+> +
+> +	  If unsure, it is safe to say N.
+> +
+>  source "drivers/misc/c2port/Kconfig"
+>  source "drivers/misc/eeprom/Kconfig"
+>  source "drivers/misc/cb710/Kconfig"
+> diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+> index c235d5b..e622e01 100644
+> --- a/drivers/misc/Makefile
+> +++ b/drivers/misc/Makefile
+> @@ -53,3 +53,4 @@ obj-$(CONFIG_INTEL_MEI)		+= mei/
+>  obj-$(CONFIG_VMWARE_VMCI)	+= vmw_vmci/
+>  obj-$(CONFIG_LATTICE_ECP3_CONFIG)	+= lattice-ecp3-config.o
+>  obj-$(CONFIG_SRAM)		+= sram.o
+> +obj-$(CONFIG_FSL_OTP)           += fsl_otp.o
+
+And this should be merged with the first patch.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130705/b1828b3d/attachment.sig>
