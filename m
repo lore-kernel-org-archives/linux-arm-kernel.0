@@ -1,77 +1,73 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 5 Jul 2013 11:19:46 +0100
-Subject: [PATCH 0/2] ARM: sunxi: Convert DTSI to new CPU bindings
-In-Reply-To: <20130630094846.GA27559@e102568-lin.cambridge.arm.com>
-References: <1372437844-16325-1-git-send-email-maxime.ripard@free-electrons.com>
- <20130628171532.GD30603@e102568-lin.cambridge.arm.com>
- <20130628200333.GA2756@lukather>
- <CAOesGMgsD+tK4+ywvLzsWd+mngrP7zGgSFn0naWjSsQLGaUn2Q@mail.gmail.com>
- <20130629193819.GD3353@n2100.arm.linux.org.uk>
- <20130630094846.GA27559@e102568-lin.cambridge.arm.com>
-Message-ID: <20130705101946.GA5584@e102568-lin.cambridge.arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 5 Jul 2013 12:21:07 +0200 (CEST)
+Subject: [PATCH v5] ARM: clocksource: add support for MOXA ART SoCs
+In-Reply-To: <CACmBeS03Xfo7DyyYUbpBaO8TeR3g8BTPzcoOzQayk40k1soFzA@mail.gmail.com>
+References: <1372687359-18235-1-git-send-email-jonas.jensen@gmail.com>
+ <1372940383-5957-1-git-send-email-jonas.jensen@gmail.com>
+ <alpine.DEB.2.02.1307042211420.11637@ionos.tec.linutronix.de>
+ <CACmBeS03Xfo7DyyYUbpBaO8TeR3g8BTPzcoOzQayk40k1soFzA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1307051213080.11637@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 30, 2013 at 10:48:46AM +0100, Lorenzo Pieralisi wrote:
-> On Sat, Jun 29, 2013 at 08:38:19PM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Jun 28, 2013 at 01:05:42PM -0700, Olof Johansson wrote:
-> > > On Fri, Jun 28, 2013 at 1:03 PM, Maxime Ripard
-> > > <maxime.ripard@free-electrons.com> wrote:
-> > > > On Fri, Jun 28, 2013 at 06:15:32PM +0100, Lorenzo Pieralisi wrote:
-> > > >> The patch above should already be queued in next/dt right ?
-> > > >
-> > > > Indeed.
-> > > >
-> > > > Then why the latest patch of your patchset got in 3.10, while the
-> > > > patches actually fixing the DT it would have impacted were delayed to
-> > > > 3.11?
-> > > >
-> > > > (And why was it merged so late in the development cycle?)
-> > > 
-> > > This. So now we have to scramble because some device trees will
-> > > produce warnings at boot.
-> > > 
-> > > Russell, the alternative is to revert Lorenzo's patch for 3.10 (and
-> > > re-introduce it for 3.11). Do you have a preference?
-> > 
-> > Sorry but I really don't understand what all the fuss in this thread
-> > is about.
-> > 
-> > This thread seems to be saying that two development patches were
-> > merged, which were 7762/1 and 7763/1, and that 7764/1 is a fix?
-> > Are you sure about that, because that's not how they're described,
-> > and not how they look either.
+On Fri, 5 Jul 2013, Jonas Jensen wrote:
+
+> On 4 July 2013 23:42, Thomas Gleixner <tglx@linutronix.de> wrote:
+> > You just modify bits on the "cache" variable. though you are not
+> > caching it. As it seems to work it looks like this register simply can
+> > be written with constants.
 > 
-> As Olof's warning downgrade is being merged (thanks for that and apologies for
-> failing to explain patches dependencies properly and stable related issues),
-> 7764/1 won't apply cleanly anymore. Can you please drop it from the patch
-> system, I will update it and test it first thing tomorrow and send a
-> final version to the patch system.
+> I agree, the global "cache" variable wasn't very good. The only good thing, that
+> it eliminated all TIMER_CR reads in moxart_clkevt_next_event.
 
-Patch 7779/1, replacing 7764/1 is in the patch system now, and is ready
-to get merged.
+Well, you can use a global cache variable. But that wants to be
+implemented as a real cache, i.e. it always contains the current state
+of the register.
 
-Unfortunately cpu/cpus bindings documentation updates, following:
+   cache = 0;
 
-https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/036735.html
-https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-May/033779.html
+   cache |= T2_ENABLE;
+   write(cache, CR);
+   ....
+ 
+> Yes it could be written with constants, and it wouldn't be so bad, because in
+> this case so few need to be set. If more constants were set from init
+> the benefit
+> would be more clear.
+>
+> >> +     timereg_cache = readl(base + TIMER_CR) | TIMEREG_CR_2_ENABLE;
+> >
+> > Why are you reading that back? You know excactly which of the timers
+> > you are using and none of those should be enabled before you reach
+> > that code. If it one of them is enabled by the boot loader you better
+> > disable it in this init function.
+> 
+> Removed. All timers except TIMER2 should be disabled in init.
+> 
+> > Now if you disable all of those timers and just use a known set, then
+> > you can do without a pseudo cache variable and just write constants
+> > into the control register, right ?
+> 
+> Yes, please take a look at v6.
 
-were not pulled in the kernel. This is an issue since this means that
-we still have no reference in the kernel or wherever it has to be, to
-the final cpus/cpu bindings for ARM and ARM64 provided in the pull
-request link above (that has been reviewed to death and acknowledged).
+You are still reading from the control register.
 
-It is a significant overhaul of cpu/cpus bindings standard for ARM/ARM64,
-covering all CPUs harking back to arm926 and beyond, and should be final.
+What's wrong with:
 
-dts updates following that standard have already been pulled into 3.11
-through arm-soc.
+#define T1_ENABLE	(TIMEREG_CR_2_ENABLE | TIMEREG_CR_1_ENABLE)
+#define T1_DISABLE	(TIMEREG_CR_2_ENABLE)
 
-IMHO the bindings contained in pull request above must be merged in the
-kernel asap, I would like to ask you please what should I do to get them in
-please. If we want to move bindings documentation elsewhere let's do it,
-as long as there is a published standard I am happy and will stop annoying
-you with this stuff.
+Because you need to preserve the CR2 enable bit so your clocksource
+does not get switched off.
 
-Thank you very much,
-Lorenzo
+Then the set_mode/next_event functions simply do:
+
+     write(T1_DISABLE)
+     write(data)
+     write(T1_ENABLE)
+
+Hmm?
+
+Thanks,
+
+	tglx
