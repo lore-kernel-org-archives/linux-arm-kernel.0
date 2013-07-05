@@ -1,27 +1,43 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Fri, 5 Jul 2013 13:48:44 +0200
-Subject: [PATCH v5] ARM: clocksource: add support for MOXA ART SoCs
-In-Reply-To: <alpine.DEB.2.02.1307051213080.11637@ionos.tec.linutronix.de>
-References: <1372687359-18235-1-git-send-email-jonas.jensen@gmail.com>
- <1372940383-5957-1-git-send-email-jonas.jensen@gmail.com>
- <alpine.DEB.2.02.1307042211420.11637@ionos.tec.linutronix.de>
- <CACmBeS03Xfo7DyyYUbpBaO8TeR3g8BTPzcoOzQayk40k1soFzA@mail.gmail.com>
- <alpine.DEB.2.02.1307051213080.11637@ionos.tec.linutronix.de>
-Message-ID: <CACmBeS1djCBWeXwCQROtvyodCfunusr-3=CKOk294P+FF-h6wA@mail.gmail.com>
+From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
+Date: Fri, 05 Jul 2013 20:50:24 +0900
+Subject: hrtimer: one more expiry time overflow check in hrtimer_interrupt
+In-Reply-To: <alpine.DEB.2.02.1306281416080.4013@ionos.tec.linutronix.de>
+References: <51B6D4C4.9080400@renesas.com>
+ <alpine.DEB.2.02.1306281416080.4013@ionos.tec.linutronix.de>
+Message-ID: <51D6B300.20804@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the replies Thomas.
+On 6/28/2013 9:22 PM, Thomas Gleixner wrote:
+>> On the other hand, we have another call site of tick_program_event() at
+>> the bottom of hrtimer_interrupt().  The warning this time is triggered
+>> there, so we need to apply the same fix to it.
+> 
+> Well, the problem is that you are just papering over the underlying
+> issue of 32bit systems not being prepared for the year 2038 issue.
+> 
+> Just blindly silencing the warning is not going to make the system
+> survive 2038 in any sane way. All timespec/val related time functions
+> dealing with the clock realtime domain are simply broken in 2038 on
+> 32bit, so it does not matter whether a warning triggers or not.
 
-On 5 July 2013 12:21, Thomas Gleixner <tglx@linutronix.de> wrote:
-> Because you need to preserve the CR2 enable bit so your clocksource
-> does not get switched off.
+You're right.  With this patch applied, the hrtimer_interrupt /looks/
+back to normal, but /proc/timer_list still show that "expires at [in
+negative range]":
 
-Yes, that was my main concern. The possibility of more flags being added.
-I was experimenting with TIMEREG_CR_COUNT_UP but could never get REG_MATCH1
-to work right for oneshot mode.
+    active timers:
+     #0: tick_cpu_sched, tick_sched_timer, S:01
+     # expires at 50812500000-50812500000 nsecs [in -165398341280 to -165398341280 nsecs]
 
-Please take a look at v7.
+This shouldn't happen and something weird is still going on.
 
-Best regards,
-Jonas
+> We really need to tackle the underlying problem and not bandaiding a
+> known to be broken system.
+
+Agreed, but a little bit hard task for me.  This is 100% reproducible,
+so I can help debug / verification.  Please let me know, if necessary.
+
+Thanks for your comments,
+--
+Shinya Kuribayashi
+Renesas Electronics
