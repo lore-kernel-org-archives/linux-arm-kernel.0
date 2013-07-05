@@ -1,43 +1,37 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat,  6 Jul 2013 00:18:38 +0200
-Subject: [PATCHv4 03/10] clocksource: sun4i: rename AUTORELOAD define to RELOAD
+Date: Sat,  6 Jul 2013 00:18:36 +0200
+Subject: [PATCHv4 01/10] clocksource: sun4i: Use the BIT macros where possible
 In-Reply-To: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1373062725-19625-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1373062725-19625-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The name AUTORELOAD was actually pretty bad since it doesn't make the
-register reload the previous interval when it expires, but setting this
-value pushes the new programmed interval to the internal timer counter.
-Rename it to RELOAD instead.
-
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clocksource/sun4i_timer.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clocksource/sun4i_timer.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 34ab658..f5e227b 100644
+index d4674e7..bdf34d9 100644
 --- a/drivers/clocksource/sun4i_timer.c
 +++ b/drivers/clocksource/sun4i_timer.c
-@@ -28,7 +28,7 @@
+@@ -24,12 +24,12 @@
+ #include <linux/of_irq.h>
+ 
+ #define TIMER_IRQ_EN_REG	0x00
+-#define TIMER_IRQ_EN(val)		(1 << val)
++#define TIMER_IRQ_EN(val)		BIT(val)
  #define TIMER_IRQ_ST_REG	0x04
  #define TIMER_CTL_REG(val)	(0x10 * val + 0x10)
- #define TIMER_CTL_ENABLE		BIT(0)
--#define TIMER_CTL_AUTORELOAD		BIT(1)
-+#define TIMER_CTL_RELOAD		BIT(1)
- #define TIMER_CTL_ONESHOT		BIT(7)
- #define TIMER_INTVAL_REG(val)	(0x10 * (val) + 0x14)
- #define TIMER_CNTVAL_REG(val)	(0x10 * (val) + 0x18)
-@@ -129,7 +129,7 @@ static void __init sun4i_timer_init(struct device_node *node)
+-#define TIMER_CTL_ENABLE		(1 << 0)
+-#define TIMER_CTL_AUTORELOAD		(1 << 1)
+-#define TIMER_CTL_ONESHOT		(1 << 7)
++#define TIMER_CTL_ENABLE		BIT(0)
++#define TIMER_CTL_AUTORELOAD		BIT(1)
++#define TIMER_CTL_ONESHOT		BIT(7)
+ #define TIMER_INTVAL_REG(val)	(0x10 * val + 0x14)
+ #define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
  
- 	/* set mode to auto reload */
- 	val = readl(timer_base + TIMER_CTL_REG(0));
--	writel(val | TIMER_CTL_AUTORELOAD, timer_base + TIMER_CTL_REG(0));
-+	writel(val | TIMER_CTL_RELOAD, timer_base + TIMER_CTL_REG(0));
- 
- 	ret = setup_irq(irq, &sun4i_timer_irq);
- 	if (ret)
 -- 
 1.8.3.2
