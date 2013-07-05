@@ -1,35 +1,185 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Jul 2013 22:32:15 +0100
-Subject: [PATCH V3] ARM: add missing linker section markup to head-common.S
-In-Reply-To: <1373047855-24145-1-git-send-email-swarren@wwwdotorg.org>
-References: <1373047855-24145-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130705213214.GK24642@n2100.arm.linux.org.uk>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 5 Jul 2013 15:37:33 -0600
+Subject: [PATCHv4 03/11] pci: remove ARCH_SUPPORTS_MSI kconfig option
+In-Reply-To: <1372686136-1370-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1372686136-1370-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAErSpo73iSBg+SYwZLea0qdXD1uVc3+Vacd8Tg4CU92vLG=2AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 05, 2013 at 12:10:55PM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Macro __INIT is used to place various code in head-common.S into the init
-> section. This should be matched by a closing __FINIT. Also, add an
-> explicit ".text" to ensure subsequent code is placed into the correct
-> section; __FINIT is simply a closing marker to match __INIT and doesn't
-> guarantee to revert to .text.
-> 
-> This historically caused no problem, because macro __CPUINIT was used at
-> the exact location where __FINIT was missing, which then placed following
-> code into the cpuinit section. However, with commit 22f0a2736 "init.h:
-> remove __cpuinit sections from the kernel" applied, __CPUINIT becomes a
-> no-op, thus leaving all this code in the init section, rather than the
-> regular text section. This caused issues such as secondary CPU boot
-> failures or crashes.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> Acked-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> ---
-> v3: Added .text after __FINIT to force the correct section.
-> v2: Moved __FINIT after lookup_processor_type, to correctly match the
-> location of __CPUINIT.
+On Mon, Jul 1, 2013 at 7:42 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Now that we have weak versions for each of the PCI MSI architecture
+> functions, we can actually build the MSI support for all platforms,
+> regardless of whether they provide or not architecture-specific
+> versions of those functions. For this reason, the ARCH_SUPPORTS_MSI
+> hidden kconfig boolean becomes useless, and this patch gets rid of it.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+> Cc: linux390 at de.ibm.com
+> Cc: linux-s390 at vger.kernel.org
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: H. Peter Anvin <hpa@zytor.com>
+> Cc: x86 at kernel.org
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Tony Luck <tony.luck@intel.com>
+> Cc: Fenghua Yu <fenghua.yu@intel.com>
+> Cc: linux-ia64 at vger.kernel.org
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: linux-mips at linux-mips.org
+> Cc: David S. Miller <davem@davemloft.net>
+> Cc: sparclinux at vger.kernel.org
+> Cc: Chris Metcalf <cmetcalf@tilera.com>
 
-Much better, thanks.  Please put it in the patch system and I'll send it
-along, thanks.
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+
+Again, please update the subject line to "PCI: Remove ..."
+
+I doubt that you'll get explicit acks from all the arches you touched,
+but I think it's reasonable to put at least patches 2 & 3 in -next
+soon after v3.11-rc1, so we should have time to shake out issues.
+
+> ---
+>  arch/arm/Kconfig     | 1 -
+>  arch/ia64/Kconfig    | 1 -
+>  arch/mips/Kconfig    | 2 --
+>  arch/powerpc/Kconfig | 1 -
+>  arch/s390/Kconfig    | 1 -
+>  arch/sparc/Kconfig   | 1 -
+>  arch/tile/Kconfig    | 1 -
+>  arch/x86/Kconfig     | 1 -
+>  drivers/pci/Kconfig  | 4 ----
+>  9 files changed, 13 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 8ab5962..3413679 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -435,7 +435,6 @@ config ARCH_NETX
+>  config ARCH_IOP13XX
+>         bool "IOP13xx-based"
+>         depends on MMU
+> -       select ARCH_SUPPORTS_MSI
+>         select CPU_XSC3
+>         select NEED_MACH_MEMORY_H
+>         select NEED_RET_TO_USER
+> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+> index 1a2b774..943d425 100644
+> --- a/arch/ia64/Kconfig
+> +++ b/arch/ia64/Kconfig
+> @@ -9,7 +9,6 @@ config IA64
+>         select PCI if (!IA64_HP_SIM)
+>         select ACPI if (!IA64_HP_SIM)
+>         select PM if (!IA64_HP_SIM)
+> -       select ARCH_SUPPORTS_MSI
+>         select HAVE_UNSTABLE_SCHED_CLOCK
+>         select HAVE_IDE
+>         select HAVE_OPROFILE
+> diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+> index 7a58ab9..96c1225 100644
+> --- a/arch/mips/Kconfig
+> +++ b/arch/mips/Kconfig
+> @@ -763,7 +763,6 @@ config CAVIUM_OCTEON_REFERENCE_BOARD
+>         select SYS_HAS_CPU_CAVIUM_OCTEON
+>         select SWAP_IO_SPACE
+>         select HW_HAS_PCI
+> -       select ARCH_SUPPORTS_MSI
+>         select ZONE_DMA32
+>         select USB_ARCH_HAS_OHCI
+>         select USB_ARCH_HAS_EHCI
+> @@ -799,7 +798,6 @@ config NLM_XLR_BOARD
+>         select CEVT_R4K
+>         select CSRC_R4K
+>         select IRQ_CPU
+> -       select ARCH_SUPPORTS_MSI
+>         select ZONE_DMA32 if 64BIT
+>         select SYNC_R4K
+>         select SYS_HAS_EARLY_PRINTK
+> diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+> index c33e3ad..f9d9d8e 100644
+> --- a/arch/powerpc/Kconfig
+> +++ b/arch/powerpc/Kconfig
+> @@ -734,7 +734,6 @@ config PCI
+>         default y if !40x && !CPM2 && !8xx && !PPC_83xx \
+>                 && !PPC_85xx && !PPC_86xx && !GAMECUBE_COMMON
+>         default PCI_QSPAN if !4xx && !CPM2 && 8xx
+> -       select ARCH_SUPPORTS_MSI
+>         select GENERIC_PCI_IOMAP
+>         help
+>           Find out whether your system includes a PCI bus. PCI is the name of
+> diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+> index da183c5..9a6225b 100644
+> --- a/arch/s390/Kconfig
+> +++ b/arch/s390/Kconfig
+> @@ -429,7 +429,6 @@ menuconfig PCI
+>         bool "PCI support"
+>         default n
+>         depends on 64BIT
+> -       select ARCH_SUPPORTS_MSI
+>         select PCI_MSI
+>         help
+>           Enable PCI support.
+> diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
+> index 9ac9f16..822e1a1 100644
+> --- a/arch/sparc/Kconfig
+> +++ b/arch/sparc/Kconfig
+> @@ -52,7 +52,6 @@ config SPARC32
+>
+>  config SPARC64
+>         def_bool 64BIT
+> -       select ARCH_SUPPORTS_MSI
+>         select HAVE_FUNCTION_TRACER
+>         select HAVE_FUNCTION_GRAPH_TRACER
+>         select HAVE_FUNCTION_GRAPH_FP_TEST
+> diff --git a/arch/tile/Kconfig b/arch/tile/Kconfig
+> index 3aa3766..d2d519c 100644
+> --- a/arch/tile/Kconfig
+> +++ b/arch/tile/Kconfig
+> @@ -379,7 +379,6 @@ config PCI
+>         select PCI_DOMAINS
+>         select GENERIC_PCI_IOMAP
+>         select TILE_GXIO_TRIO if TILEGX
+> -       select ARCH_SUPPORTS_MSI if TILEGX
+>         select PCI_MSI if TILEGX
+>         ---help---
+>           Enable PCI root complex support, so PCIe endpoint devices can
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index 685692c..4229ce0 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -1999,7 +1999,6 @@ menu "Bus options (PCI etc.)"
+>  config PCI
+>         bool "PCI support"
+>         default y
+> -       select ARCH_SUPPORTS_MSI if (X86_LOCAL_APIC && X86_IO_APIC)
+>         ---help---
+>           Find out whether you have a PCI motherboard. PCI is the name of a
+>           bus system, i.e. the way the CPU talks to the other stuff inside
+> diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+> index ac45398..3d4c061 100644
+> --- a/drivers/pci/Kconfig
+> +++ b/drivers/pci/Kconfig
+> @@ -1,13 +1,9 @@
+>  #
+>  # PCI configuration
+>  #
+> -config ARCH_SUPPORTS_MSI
+> -       bool
+> -
+>  config PCI_MSI
+>         bool "Message Signaled Interrupts (MSI and MSI-X)"
+>         depends on PCI
+> -       depends on ARCH_SUPPORTS_MSI
+>         help
+>            This allows device drivers to enable MSI (Message Signaled
+>            Interrupts).  Message Signaled Interrupts enable a device to
+> --
+> 1.8.1.2
+>
