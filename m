@@ -1,66 +1,96 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat,  6 Jul 2013 00:18:45 +0200
-Subject: [PATCHv4 10/10] clocksource: sun4i: Fix bug when switching from
- periodic to oneshot modes
+Date: Sat,  6 Jul 2013 00:18:42 +0200
+Subject: [PATCHv4 07/10] clocksource: sun4i: Factor out some timer code
 In-Reply-To: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1373062725-19625-11-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1373062725-19625-8-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The interval was firing at was set up at probe time, and only changed in
-the set_next_event, and never changed back, which is not really what is
-expected.
-
-When enabling the periodic mode, now set an interval to tick every
-jiffy.
+The set_next_event and set_mode callbacks share a lot of common code we
+can easily factor to avoid duplication and mistakes.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clocksource/sun4i_timer.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ drivers/clocksource/sun4i_timer.c | 48 ++++++++++++++++++++++++++-------------
+ 1 file changed, 32 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 2fadb3b..d00d50a 100644
+index 7123f65..dd78b63 100644
 --- a/drivers/clocksource/sun4i_timer.c
 +++ b/drivers/clocksource/sun4i_timer.c
-@@ -38,6 +38,7 @@
- #define TIMER_CNTVAL_REG(val)	(0x10 * (val) + 0x18)
- 
- static void __iomem *timer_base;
-+static u32 ticks_per_jiffy;
- 
- /*
-  * When we disable a timer, we need to wait at least for 2 cycles of
-@@ -74,7 +75,8 @@ static void sun4i_clkevt_time_start(u8 timer, bool periodic)
- 	else
- 		val |= TIMER_CTL_ONESHOT;
- 
--	writel(val | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(timer));
-+	writel(val | TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
-+	       timer_base + TIMER_CTL_REG(timer));
+@@ -52,24 +52,46 @@ static void sun4i_clkevt_sync(void)
+ 		cpu_relax();
  }
  
++static void sun4i_clkevt_time_stop(u8 timer)
++{
++	u32 val = readl(timer_base + TIMER_CTL_REG(timer));
++	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(timer));
++	sun4i_clkevt_sync();
++}
++
++static void sun4i_clkevt_time_setup(u8 timer, unsigned long delay)
++{
++	writel(delay, timer_base + TIMER_INTVAL_REG(timer));
++}
++
++static void sun4i_clkevt_time_start(u8 timer, bool periodic)
++{
++	u32 val = readl(timer_base + TIMER_CTL_REG(timer));
++
++	if (periodic)
++		val &= ~TIMER_CTL_ONESHOT;
++	else
++		val |= TIMER_CTL_ONESHOT;
++
++	writel(val | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(timer));
++}
++
  static void sun4i_clkevt_mode(enum clock_event_mode mode,
-@@ -83,6 +85,7 @@ static void sun4i_clkevt_mode(enum clock_event_mode mode,
+ 			      struct clock_event_device *clk)
+ {
+-	u32 u = readl(timer_base + TIMER_CTL_REG(0));
+-
  	switch (mode) {
  	case CLOCK_EVT_MODE_PERIODIC:
- 		sun4i_clkevt_time_stop(0);
-+		sun4i_clkevt_time_setup(0, ticks_per_jiffy);
- 		sun4i_clkevt_time_start(0, true);
+-		u &= ~(TIMER_CTL_ONESHOT);
+-		writel(u | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
++		sun4i_clkevt_time_stop(0);
++		sun4i_clkevt_time_start(0, true);
  		break;
+-
  	case CLOCK_EVT_MODE_ONESHOT:
-@@ -169,9 +172,9 @@ static void __init sun4i_timer_init(struct device_node *node)
- 	clocksource_mmio_init(timer_base + TIMER_CNTVAL_REG(1), node->name,
- 			      rate, 300, 32, clocksource_mmio_readl_down);
+-		writel(u | TIMER_CTL_ONESHOT, timer_base + TIMER_CTL_REG(0));
++		sun4i_clkevt_time_stop(0);
++		sun4i_clkevt_time_start(0, false);
+ 		break;
+ 	case CLOCK_EVT_MODE_UNUSED:
+ 	case CLOCK_EVT_MODE_SHUTDOWN:
+ 	default:
+-		writel(u & ~(TIMER_CTL_ENABLE), timer_base + TIMER_CTL_REG(0));
++		sun4i_clkevt_time_stop(0);
+ 		break;
+ 	}
+ }
+@@ -77,15 +99,9 @@ static void sun4i_clkevt_mode(enum clock_event_mode mode,
+ static int sun4i_clkevt_next_event(unsigned long evt,
+ 				   struct clock_event_device *unused)
+ {
+-	u32 val = readl(timer_base + TIMER_CTL_REG(0));
+-	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
+-	sun4i_clkevt_sync();
+-
+-	writel(evt, timer_base + TIMER_INTVAL_REG(0));
+-
+-	val = readl(timer_base + TIMER_CTL_REG(0));
+-	writel(val | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
+-	       timer_base + TIMER_CTL_REG(0));
++	sun4i_clkevt_time_stop(0);
++	sun4i_clkevt_time_setup(0, evt);
++	sun4i_clkevt_time_start(0, false);
  
--	writel(rate / HZ, timer_base + TIMER_INTVAL_REG(0));
-+	ticks_per_jiffy = DIV_ROUND_UP(clk_get_rate(clk), HZ);
- 
--	writel(TIMER_CTL_CLK_SRC(TIMER_CTL_CLK_SRC_OSC24M) | TIMER_CTL_RELOAD,
-+	writel(TIMER_CTL_CLK_SRC(TIMER_CTL_CLK_SRC_OSC24M),
- 	       timer_base + TIMER_CTL_REG(0));
- 
- 	ret = setup_irq(irq, &sun4i_timer_irq);
+ 	return 0;
+ }
 -- 
 1.8.3.2
