@@ -1,54 +1,66 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat,  6 Jul 2013 00:18:43 +0200
-Subject: [PATCHv4 08/10] clocksource: sun4i: Remove TIMER_SCAL variable
+Date: Sat,  6 Jul 2013 00:18:45 +0200
+Subject: [PATCHv4 10/10] clocksource: sun4i: Fix bug when switching from
+ periodic to oneshot modes
 In-Reply-To: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1373062725-19625-9-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1373062725-19625-11-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The prescaler is only used when using the internal low frequency
-oscillator (at 32kHz). Since we're using the higher frequency oscillator
-at 24MHz, we can just remove it.
+The interval was firing at was set up at probe time, and only changed in
+the set_next_event, and never changed back, which is not really what is
+expected.
+
+When enabling the periodic mode, now set an interval to tick every
+jiffy.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clocksource/sun4i_timer.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+ drivers/clocksource/sun4i_timer.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index dd78b63..3217adc 100644
+index 2fadb3b..d00d50a 100644
 --- a/drivers/clocksource/sun4i_timer.c
 +++ b/drivers/clocksource/sun4i_timer.c
-@@ -34,8 +34,6 @@
- #define TIMER_INTVAL_REG(val)	(0x10 * (val) + 0x14)
+@@ -38,6 +38,7 @@
  #define TIMER_CNTVAL_REG(val)	(0x10 * (val) + 0x18)
  
--#define TIMER_SCAL		16
--
  static void __iomem *timer_base;
++static u32 ticks_per_jiffy;
  
  /*
-@@ -168,8 +166,7 @@ static void __init sun4i_timer_init(struct device_node *node)
+  * When we disable a timer, we need to wait at least for 2 cycles of
+@@ -74,7 +75,8 @@ static void sun4i_clkevt_time_start(u8 timer, bool periodic)
+ 	else
+ 		val |= TIMER_CTL_ONESHOT;
+ 
+-	writel(val | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(timer));
++	writel(val | TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
++	       timer_base + TIMER_CTL_REG(timer));
+ }
+ 
+ static void sun4i_clkevt_mode(enum clock_event_mode mode,
+@@ -83,6 +85,7 @@ static void sun4i_clkevt_mode(enum clock_event_mode mode,
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_PERIODIC:
+ 		sun4i_clkevt_time_stop(0);
++		sun4i_clkevt_time_setup(0, ticks_per_jiffy);
+ 		sun4i_clkevt_time_start(0, true);
+ 		break;
+ 	case CLOCK_EVT_MODE_ONESHOT:
+@@ -169,9 +172,9 @@ static void __init sun4i_timer_init(struct device_node *node)
  	clocksource_mmio_init(timer_base + TIMER_CNTVAL_REG(1), node->name,
  			      rate, 300, 32, clocksource_mmio_readl_down);
  
--	writel(rate / (TIMER_SCAL * HZ),
--	       timer_base + TIMER_INTVAL_REG(0));
-+	writel(rate / HZ, timer_base + TIMER_INTVAL_REG(0));
+-	writel(rate / HZ, timer_base + TIMER_INTVAL_REG(0));
++	ticks_per_jiffy = DIV_ROUND_UP(clk_get_rate(clk), HZ);
  
- 	/* set clock source to HOSC, 16 pre-division */
- 	val = readl(timer_base + TIMER_CTL_REG(0));
-@@ -192,8 +189,8 @@ static void __init sun4i_timer_init(struct device_node *node)
+-	writel(TIMER_CTL_CLK_SRC(TIMER_CTL_CLK_SRC_OSC24M) | TIMER_CTL_RELOAD,
++	writel(TIMER_CTL_CLK_SRC(TIMER_CTL_CLK_SRC_OSC24M),
+ 	       timer_base + TIMER_CTL_REG(0));
  
- 	sun4i_clockevent.cpumask = cpumask_of(0);
- 
--	clockevents_config_and_register(&sun4i_clockevent, rate / TIMER_SCAL,
--					0x1, 0xff);
-+	clockevents_config_and_register(&sun4i_clockevent, rate, 0x1,
-+					0xffffffff);
- }
- CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-timer",
- 		       sun4i_timer_init);
+ 	ret = setup_irq(irq, &sun4i_timer_irq);
 -- 
 1.8.3.2
