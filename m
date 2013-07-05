@@ -1,98 +1,103 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 6 Jul 2013 00:37:32 +0200
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 6 Jul 2013 00:40:26 +0200
 Subject: [PATCH v6 00/21] MBus DT binding: PCIe strikes back
-In-Reply-To: <20130705220820.GA11787@obsidianresearch.com>
+In-Reply-To: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130705220820.GA11787@obsidianresearch.com>
-Message-ID: <20130706003732.2013fd8e@skate>
+Message-ID: <201307060040.27208.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
-
-Thanks for your quick feedback!
-
-On Fri, 5 Jul 2013 16:08:20 -0600, Jason Gunthorpe wrote:
-> On Fri, Jul 05, 2013 at 06:39:11PM -0300, Ezequiel Garcia wrote:
->  
-> > 			ranges =
-> > 			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
-> > 				0x82000000 0 0x42000 MBUS_ID(0xf0, 0x01) 0x42000 0 0x00002000   /* Port 2.0 registers */
-> > 				0x82000000 0 0x44000 MBUS_ID(0xf0, 0x01) 0x44000 0 0x00002000   /* Port 0.1 registers */
-> > 				0x82000000 0 0x48000 MBUS_ID(0xf0, 0x01) 0x48000 0 0x00002000   /* Port 0.2 registers */
-> > 				0x82000000 0 0x4c000 MBUS_ID(0xf0, 0x01) 0x4c000 0 0x00002000   /* Port 0.3 registers */
-> > 				0x82000800 0 0xe0000000 MBUS_ID(0x04, 0xe8) 0xe0000000 0 0x08000000 /* Port 0.0 MEM */
-> > 				0x81000800 0 0          MBUS_ID(0x04, 0xe0) 0xe8000000 0 0x00100000 /* Port 0.0 IO */>;
+On Friday 05 July 2013, Ezequiel Garcia wrote:
+> See the previous version of this patchset for further context:
 > 
-> This is a good try, but this coding doesn't work...
+> http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg35753.html
 > 
-> Recall the long discussion that came up during the original
-> development of this binding. The OF spec says this:
+> This new proposal is an attempt to address some issues raised about the PCIe
+> 'fake' windows mapping present in the previous version.
 > 
->  In particular, the phys.hi fields of the child address spaces in the
->  "ranges" property for PCI does not contain
->  the same information as "reg" property entries within PCI nodes. The
->  only information that is present in
->  "ranges" phys.hi entries are the non-relocatable, prefetchable and
->  the PCI address space bits for which the en-
->  try applies. I.e., only the n, p and ss bits are present; the
->  bbbbbbbb, ddddd, fff and rrrrrrrr fields are 0.
+> Instead of defining a 'fake' MBUS_ID(0xf0, 0x02) region for the whole
+> PCIe memory and IO space, we use real target ID and attribute for the windows.
+
+Hi Ezequiel,
+
+This looks really nice, and I is getting very close to where I think it
+needs to be headed. I'll have to do a more thorough review, but for now there
+is only one detail that I think you should change (we can argue about that):
+
+> 		pcie-controller {
+> 			compatible = "marvell,armada-xp-pcie";
+> 			status = "okay";
+> 			device_type = "pci";
 > 
->  When an address is to be mapped through a PCI bus bridge node, the
->  phys.hi value of the address to be mapped
->  and the child field of a "ranges" entry should be masked so that only
->  the ss bits are compared. I.e., the only
->  portion of phys.hi that should participate in the range determination
->  is the address space indicator (the ss bits).
+> 			#address-cells = <3>;
+> 			#size-cells = <2>;
 > 
-> Which forbids (0x82000800 .. ..) from being in a ranges
+> 			ranges =
+> 			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
+> 				0x82000000 0 0x42000 MBUS_ID(0xf0, 0x01) 0x42000 0 0x00002000   /* Port 2.0 registers */
+> 				0x82000000 0 0x44000 MBUS_ID(0xf0, 0x01) 0x44000 0 0x00002000   /* Port 0.1 registers */
+> 				0x82000000 0 0x48000 MBUS_ID(0xf0, 0x01) 0x48000 0 0x00002000   /* Port 0.2 registers */
+> 				0x82000000 0 0x4c000 MBUS_ID(0xf0, 0x01) 0x4c000 0 0x00002000   /* Port 0.3 registers */
+> 				0x82000800 0 0xe0000000 MBUS_ID(0x04, 0xe8) 0xe0000000 0 0x08000000 /* Port 0.0 MEM */
+> 				0x81000800 0 0          MBUS_ID(0x04, 0xe0) 0xe8000000 0 0x00100000 /* Port 0.0 IO */>;
 
-Ah, right, I missed this part of the OF specification. Indeed, having
-the ddddd bits non-zero was critical here to allow the PCIe driver to
-find which MBUS_ID(x, y) to use for a particular PCIe interface.
+>From all I can tell, this is a correct representation of the
+translation windows. The one change you made from what I suggested
+(either intentionally or because I didn't make myself clear enough)
+is that you keep encoding the aperture in the ranges property of
+the pcie node.
 
-> I don't have an idea how to encode MBUS_ID in the PCI-E ranges :(
-> 
-> Arnd? Didn't you have some idea?
-> 
-> FWIW, I like removing the string tables from the driver, you could
-> keep the fake MBUS-ID and retain that change by adding a
-> marvell,target-id type property to the bridges...
+	0x82000800 0 0xe0000000 MBUS_ID(0x04, 0xe8) 0xe0000000 0 0x08000000 /* Port 0.0 MEM */
+			^^^^				^^^^		^^^
 
-The problem we were trying to address here is that apparently the fake
-MBUS-ID was not seen by Arnd as a correct solution, if we understood
-correctly what Arnd said in
-http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg34650.html:
+This describes the intended setting of the aperture in the mbus, not
+the translation that is performed by the pcie-controller as I suggested.
+That would look like
 
-"""
-Using 0xffff0002 as a placeholder for the pcie translation is definitely
-better than 0xffff0000 as you had before, but let me ask again in case
-you missed it the last time (and sorry if I missed the answer):
+	0x82000800 0 0 MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
 
-Why not just put the actual translation here the way it happens for each
-of the PCIe ports? With the definition here, the PCIe driver actually
-has no way to figure out what settings the windows need to use!
-"""
+iow the first 4GB of the 0x82000800 memory space get translated to 4GB
+at MBUS_ID(0x04, 0xe8), and the aperture is applied by translating a
+small section of that into host mmio space.
 
-We're not sure how to handle this comment properly in terms of DT
-binding. What the PCIe driver needs is:
+The advantage of your approach is that you can keep the existing code
+that extracts the aperture (0xe0000000-0xe8000000) from the 
+pcie-controller node, and you don't have to find out the aperture
+from separate DT property or from looking at the remaining available
+address space in mbus.
 
- *) One global range of addresses for PCIe memory regions and one global
-    range of addresses for PCIe I/O regions. Those were until the v5 of
-    this patch set expressed using a fake MBUS_ID(0xf0, 0x02). Those
-    are global to all PCIe interfaces.
+The disadvantage is that you have mbus policy spread out between the
+ranges properties of the mbus node and the pcie node, rather than
+having the pcie-controller node just describe the hardware capabilities.
 
- *) The target and attribute values for MEM and I/O windows, that are
-    per-PCIe interface.
+This is actually more of a problem for the I/O space, which is still not
+correctly represented:
 
-As long as we can get those two informations from the DT, I believe
-we're open to all your suggestions on how to encode them.
+	0x81000800 0 0 MBUS_ID(0x04, 0xe0) 0xe8000000 0 0x00100000
 
-Thanks!
+is not what the hardware does, the hardware probably has something
+like 
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	0x81000800 0 0 MBUS_ID(0x04, 0xe0) 0 1 0
+
+i.e. the PIO registers are at the start of the 4GB MBUS window and
+you want them to get mapped at 0xe8000000, but that is no business
+of the PCIe node. Since the addresses for I/O space are fixed (unlike
+memory space, which is sized dynamically per port), it would be
+straightforward to put the mappings into the mbus node:
+
+	MBUS_ID(0x04, 0xe0) 0x00000 0xe8000000 0x10000 
+	MBUS_ID(0x04, 0xe1) 0x10000 0xe8010000 0x10000
+	MBUS_ID(0x04, 0xe2) 0x20000 0xe8020000 0x10000
+
+Unfortunately, the number of mapping windows in mbus is very limited
+on Armada XP, so you'd run out of windows too fast by mapping them
+all at boot time. The options here are to either put them into the
+ranges property anyway but get the mbus driver to not map them by
+default, or to encode the policy in a different way. Note that the
+physical addresses do not actually have to be contiguous any more now,
+so one option would be for mbus to just fill the holes whenever
+the pcie driver needs an I/O space window, but there we get close
+to the "fully dynamic" model again.
+
+	Arnd
