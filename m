@@ -1,45 +1,55 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 5 Jul 2013 11:18:44 +0530
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <alpine.DEB.2.02.1307041810410.6258@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
- <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
- <51CAEB33.5010101@ti.com>
- <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
- <51CBBCD8.5030600@ti.com>
- <alpine.DEB.2.02.1306281844090.8767@utopia.booyaka.com>
- <alpine.DEB.2.02.1307010211580.3741@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83ECCC435@DBDE04.ent.ti.com>
- <51D2E096.5040700@ti.com>
- <alpine.DEB.2.02.1307031944580.9618@utopia.booyaka.com>
- <alpine.DEB.2.02.1307041810410.6258@utopia.booyaka.com>
-Message-ID: <51D65E3C.1070202@ti.com>
+From: wangyuhang2014@gmail.com (yuhang wang)
+Date: Fri, 5 Jul 2013 14:25:09 +0800
+Subject: SPI: DUAL/QUAD support
+In-Reply-To: <OFAD729A05.8C915625-ONC1257B9E.00576B25-C1257B9E.0058477D@rohde-schwarz.com>
+References: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>
+ <20130704130017.GA25997@sig21.net>
+ <OFA0D5839D.0594EA10-ONC1257B9E.004A7347-C1257B9E.00524BA5@rohde-schwarz.com>
+ <20130704154927.GE27646@sirena.org.uk>
+ <OFAD729A05.8C915625-ONC1257B9E.00576B25-C1257B9E.0058477D@rohde-schwarz.com>
+Message-ID: <CAHSAbzOg+uHndydSC43moF7pijc67pqzB2rPnY69ynXHEzw79g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 July 2013 11:42 PM, Paul Walmsley wrote:
-> On Wed, 3 Jul 2013, Paul Walmsley wrote:
-> 
->> As far as Lokesh's patch goes: it doesn't make sense to me to remove a 
->> file during 'make clean' that the build process doesn't create.  So while 
->> I understand the motivation for the patch, and don't mind if upstream 
->> takes it, I personally wouldn't care to ack it.
-> 
-> Incidentally, if there's any patch that would improve the current 
-> situation with appended DTBs by going upstream, it would be a patch like 
-> Grant's "HACK" patch to add appended DTB building into the kernel build 
-> system.  Maybe folks can push to something similar to that one upstream?
+Hi Thomas:
 
-Grant already made it clear when he posted that patch that neither that nor
-anything similar would be taken up mainline because the appended dtb was only
-meant for folks stuck with legacy bootloaders and have no way to upgrade.
-Anyone who uses a bootloader capable of passing the dtb should *not* use the
-appended dtb way.
+>> Well, there's two bits here.  One is the support in the client drivers
+>> for using the extra data lines and the other is the support in the SPI
+>> core for telling controllers to do this.  We need that second bit in
+>> place before the first one can be implemented.
+>
+> I am not sure if we do. In the system I am working on, the QSPI controller
+> recognizes the quad mode commands from the Tx data and automatically
+> switches modes; no manual intervention by the flash driver is needed.
+>
+> I agree that this may not be the case for all SPI controllers. Yuhang, can
+> you tell us what your controller will do?
 
-> 
-> 
-> - Paul
-> 
+OK, well my spi controller just sets the certain transfer mode in the register
+to make it in that mode(single,dual,quad). Then it will send and receive datas
+with the specific lines. As master, it should be told the transfer lines by the
+slave. Thus I need some members to deliver the information.
+
+But what you said "QSPI controller recognizes the quad mode commands
+from the Tx data and automatically switches modes;"  I can not figure out.
+The communication is launched by SPI master, so how can the controller
+recognizes the Tx data in the first transmission.
+
+>Yes, there are usually different opcodes, and as far as I know, they are
+>not supported by the m25p80 driver. It seems we are missing some
+>background info here.
+>My guess is that the flash chip in question is configured to treat single
+>mode opcodes as dual or quad mode commands (some chips support this), and
+>that the SPI controller needs to be told, for each transfer, which mode to
+>use.
+Just as Johannes said. In my patch m25p80's changes is incomplete.
+Because my inicial aim is to add the transfer width member to tell controller
+the mode flash in. And I will attach new patch about m25p80 later.
+Also you are right. There are really series of flashes do not support dual/quad
+transfer. So I don't know whether there are any standard for serial-flash just
+like the CFI for parallel-flash. Personally, to make a general standard and
+a general code for serial-flash is necessary. So that we do not need to add
+special function in m25p80.c.
+
+Thanks,
+yuhang
