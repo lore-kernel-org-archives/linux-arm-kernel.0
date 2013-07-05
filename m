@@ -1,53 +1,50 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Fri, 5 Jul 2013 09:35:50 +0200
-Subject: SPI: DUAL/QUAD support
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73E9E4C2E@DBDE04.ent.ti.com>
-References: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>
- <20130704130017.GA25997@sig21.net>
- <OFA0D5839D.0594EA10-ONC1257B9E.004A7347-C1257B9E.00524BA5@rohde-schwarz.com>
- <20130704154927.GE27646@sirena.org.uk>
- <OFAD729A05.8C915625-ONC1257B9E.00576B25-C1257B9E.0058477D@rohde-schwarz.com>
- <CAHSAbzOg+uHndydSC43moF7pijc67pqzB2rPnY69ynXHEzw79g@mail.gmail.com>
- <20980858CB6D3A4BAE95CA194937D5E73E9E4C2E@DBDE04.ent.ti.com>
-Message-ID: <20130705073550.GA24258@sig21.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 5 Jul 2013 09:38:07 +0200
+Subject: [PATCH 0/3] Added support for On Chip OTP in i.MX23/28
+In-Reply-To: <1372855154-8422-1-git-send-email-cb@sgoc.de>
+References: <1372855154-8422-1-git-send-email-cb@sgoc.de>
+Message-ID: <20130705073807.GE2959@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 05, 2013 at 06:45:01AM +0000, Gupta, Pekon wrote:
+Hi Christoph,
+
+On Wed, Jul 03, 2013 at 02:39:11PM +0200, Christoph G. Baumann wrote:
+> From: "Christoph G. Baumann" <cb@sgoc.de>
 > 
-> > Just as Johannes said. In my patch m25p80's changes is incomplete.
-> > Because my inicial aim is to add the transfer width member to tell controller
-> > the mode flash in. And I will attach new patch about m25p80 later.
-> > Also you are right. There are really series of flashes do not support dual/quad
-> > transfer. So I don't know whether there are any standard for serial-flash just
-> > like the CFI for parallel-flash. Personally, to make a general standard and
-> > a general code for serial-flash is necessary. So that we do not need to add
-> > special function in m25p80.c.
-> > 
-> [Pekon]: Does below generic framework for spianand, suit your driver?
-> http://lists.infradead.org/pipermail/linux-mtd/2013-July/047434.html
+> This patch contains the ported driver from Freescale for the On Chip OTP
+> cells in the i.MX23 and i.MX28. The OTP cells can be read and written via
+> files in /sys/fsl_otp.
 > 
-> you should be able to extend the generic spinand API for all
-> serial modes (SPI, Dual-SPI, Quad-SPI).
-> As QSPI and Dual-SPI devices should implicitly support SPI (MISO/MOSI)
-> So, you can do device probing using default SPI mode. And then based on
-> DT inputs and device support upgrade to QSPI / Dual-SPI mode.
-> And going forward extend it for direct memory-mapped device for XIP.
+> Christoph G. Baumann (3):
+>   Added support for On Chip OTP in i.MX23/28
+>   Added support for On Chip OTP in i.MX23/28
+>   Added support for On Chip OTP in i.MX23/28
 
-Not sure what you have in mind since NAND and NOR flash work very
-differently, and SPI vs. memory-mapped is also very different.
+You should use better commit logs here. There's no way to get what each
+patch actually does from only looking at those lines.
 
-But to add to the spinand review comments two things caught
-my eye on quick glance over the code:
+You should probably have something like:
+  misc: Add Freescale mxs On Chip OTP driver
+  ARM: mxs: dt: Enable the OTP in the DTSI
+  ...
 
-> +#define mu_spi_nand_driver_version "Beagle-MTD_01.00_Linux2.6.33_20100507"
+This has two advantages: the review is easier since the reviewer
+actually knows what each patch is doing and what to review, and most of
+all, you get a cleaner and more complete history, so that in a few
+month/years, you can get (ideally) all the context of this patch and
+what it's actually doing without having to look into the code.
 
-seems like an unused leftover?  if the version number is
-important then maybe better put it in commit message?
+Maxime
 
-> +/bin/bash: 4: command not found
-
-how did this get in there?
-
-
-Johannes
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130705/bf3a310e/attachment.sig>
