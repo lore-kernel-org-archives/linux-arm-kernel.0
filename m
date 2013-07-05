@@ -1,168 +1,46 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 5 Jul 2013 13:44:40 +0300
-Subject: [PATCH v2 05/22] ARM: dt: tegra30: iommu: Add "nvidia,memory-client"
+Date: Fri, 5 Jul 2013 13:44:46 +0300
+Subject: [PATCH v2 11/22] iommu/tegra: smmu: Add Tegra 114 support
 In-Reply-To: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
 References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1373021097-32420-6-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1373021097-32420-12-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "nvidia,memory-client" to identify which swgroup ID a device
-belongs to.
+Tegra 114 SMMU uses the almost same logic as one in Tegra 30 except
+that they have different HaredWare Accelerators(HWA). Those difference
+is provided from DT.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- arch/arm/boot/dts/tegra30.dtsi |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ .../bindings/iommu/nvidia,tegra30-smmu.txt         |    2 +-
+ drivers/iommu/tegra-smmu.c                         |    1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 4a9594e..4aa5b4a 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -23,6 +23,7 @@
- 		interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>, /* syncpt */
- 			     <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>; /* general */
- 		clocks = <&tegra_car TEGRA30_CLK_HOST1X>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_HC>;
+diff --git a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
+index 89fb543..ce5c43e 100644
+--- a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
++++ b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
+@@ -1,7 +1,7 @@
+ NVIDIA Tegra 30 IOMMU H/W, SMMU (System Memory Management Unit)
  
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -34,6 +35,7 @@
- 			reg = <0x54040000 0x00040000>;
- 			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car TEGRA30_CLK_MPE>;
-+			nvidia,memory-client = <TEGRA_SWGROUP_MPE>;
- 		};
+ Required properties:
+-- compatible : "nvidia,tegra30-smmu"
++- compatible : "nvidia,tegra114-smmu", "nvidia,tegra30-smmu"
+ - reg : Should contain 3 register banks(address and length) for each
+   of the SMMU register blocks.
+ - interrupts : Should contain MC General interrupt.
+diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+index 4c16c90..3e03c69 100644
+--- a/drivers/iommu/tegra-smmu.c
++++ b/drivers/iommu/tegra-smmu.c
+@@ -1262,6 +1262,7 @@ const struct dev_pm_ops tegra_smmu_pm_ops = {
+ };
  
- 		vi {
-@@ -41,6 +43,7 @@
- 			reg = <0x54080000 0x00040000>;
- 			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car TEGRA30_CLK_VI>;
-+			nvidia,memory-client = <TEGRA_SWGROUP_VI>;
- 		};
- 
- 		epp {
-@@ -48,6 +51,7 @@
- 			reg = <0x540c0000 0x00040000>;
- 			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car TEGRA30_CLK_EPP>;
-+			nvidia,memory-client = <TEGRA_SWGROUP_EPP>;
- 		};
- 
- 		isp {
-@@ -55,6 +59,7 @@
- 			reg = <0x54100000 0x00040000>;
- 			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car TEGRA30_CLK_ISP>;
-+			nvidia,memory-client = <TEGRA_SWGROUP_ISP>;
- 		};
- 
- 		gr2d {
-@@ -62,6 +67,7 @@
- 			reg = <0x54140000 0x00040000>;
- 			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car TEGRA30_CLK_GR2D>;
-+			nvidia,memory-client = <TEGRA_SWGROUP_G2>;
- 		};
- 
- 		gr3d {
-@@ -69,6 +75,8 @@
- 			reg = <0x54180000 0x00040000>;
- 			clocks = <&tegra_car 24 &tegra_car 98>;
- 			clock-names = "3d", "3d2";
-+			nvidia,memory-client = <TEGRA_SWGROUP_NV
-+						TEGRA_SWGROUP_NV2>;
- 		};
- 
- 		dc at 54200000 {
-@@ -78,6 +86,7 @@
- 			clocks = <&tegra_car TEGRA30_CLK_DISP1>,
- 				 <&tegra_car TEGRA30_CLK_PLL_P>;
- 			clock-names = "disp1", "parent";
-+			nvidia,memory-client = <TEGRA_SWGROUP_DC>;
- 
- 			rgb {
- 				status = "disabled";
-@@ -91,6 +100,7 @@
- 			clocks = <&tegra_car TEGRA30_CLK_DISP2>,
- 				 <&tegra_car TEGRA30_CLK_PLL_P>;
- 			clock-names = "disp2", "parent";
-+			nvidia,memory-client = <TEGRA_SWGROUP_DCB>;
- 
- 			rgb {
- 				status = "disabled";
-@@ -247,6 +257,7 @@
- 		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 8>;
- 		clocks = <&tegra_car TEGRA30_CLK_UARTA>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
- 		status = "disabled";
- 	};
- 
-@@ -257,6 +268,7 @@
- 		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 9>;
- 		clocks = <&tegra_car TEGRA30_CLK_UARTB>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
- 		status = "disabled";
- 	};
- 
-@@ -267,6 +279,7 @@
- 		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 10>;
- 		clocks = <&tegra_car TEGRA30_CLK_UARTC>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
- 		status = "disabled";
- 	};
- 
-@@ -277,6 +290,7 @@
- 		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 19>;
- 		clocks = <&tegra_car TEGRA30_CLK_UARTD>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
- 		status = "disabled";
- 	};
- 
-@@ -287,6 +301,7 @@
- 		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 20>;
- 		clocks = <&tegra_car TEGRA30_CLK_UARTE>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
- 		status = "disabled";
- 	};
- 
-@@ -536,6 +551,7 @@
- 		reg = <0x78000000 0x200>;
- 		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car TEGRA30_CLK_SDMMC1>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
- 		status = "disabled";
- 	};
- 
-@@ -544,6 +560,7 @@
- 		reg = <0x78000200 0x200>;
- 		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car TEGRA30_CLK_SDMMC2>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
- 		status = "disabled";
- 	};
- 
-@@ -552,6 +569,7 @@
- 		reg = <0x78000400 0x200>;
- 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car TEGRA30_CLK_SDMMC3>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
- 		status = "disabled";
- 	};
- 
-@@ -560,6 +578,7 @@
- 		reg = <0x78000600 0x200>;
- 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car TEGRA30_CLK_SDMMC4>;
-+		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
- 		status = "disabled";
- 	};
- 
+ static struct of_device_id tegra_smmu_of_match[] = {
++	{ .compatible = "nvidia,tegra114-smmu", },
+ 	{ .compatible = "nvidia,tegra30-smmu", },
+ 	{ },
+ };
 -- 
 1.7.9.5
