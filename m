@@ -1,41 +1,51 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  5 Jul 2013 21:34:30 +0200
-Subject: [PATCHv3 03/10] clocksource: sun4i: rename AUTORELOAD define to RELOAD
+Date: Fri,  5 Jul 2013 21:34:36 +0200
+Subject: [PATCHv3 09/10] clocksource: sun4i: Cleanup parent clock setup
 In-Reply-To: <1373052877-29366-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1373052877-29366-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1373052877-29366-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1373052877-29366-10-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The name AUTORELOAD was actually pretty bad since it doesn't make the
-register reload the previous interval when it expires, but setting this
-value pushes the new programmed interval to the internal timer counter.
-Rename it to RELOAD instead.
+The current bring-up code for the timer was overly complicated. The only
+thing we need is actually which clock we want to use as source and
+that's pretty much all. Let's keep it that way.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clocksource/sun4i_timer.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clocksource/sun4i_timer.c | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 34ab658..f5e227b 100644
+index 2f84075..581e903 100644
 --- a/drivers/clocksource/sun4i_timer.c
 +++ b/drivers/clocksource/sun4i_timer.c
-@@ -28,7 +28,7 @@
- #define TIMER_IRQ_ST_REG	0x04
+@@ -30,6 +30,9 @@
  #define TIMER_CTL_REG(val)	(0x10 * val + 0x10)
  #define TIMER_CTL_ENABLE		BIT(0)
--#define TIMER_CTL_AUTORELOAD		BIT(1)
-+#define TIMER_CTL_RELOAD		BIT(1)
+ #define TIMER_CTL_RELOAD		BIT(1)
++#define TIMER_CTL_CLK_SRC(val)		(((val) & 0x3) << 2)
++#define TIMER_CTL_CLK_SRC_OSC24M		(1)
++#define TIMER_CTL_CLK_PRES(val)		(((val) & 0x7) << 4)
  #define TIMER_CTL_ONESHOT		BIT(7)
  #define TIMER_INTVAL_REG(val)	(0x10 * (val) + 0x14)
  #define TIMER_CNTVAL_REG(val)	(0x10 * (val) + 0x18)
-@@ -129,7 +129,7 @@ static void __init sun4i_timer_init(struct device_node *node)
+@@ -167,16 +170,8 @@ static void __init sun4i_timer_init(struct device_node *node)
+ 	writel(clk_get_rate(clk) / HZ,
+ 	       timer_base + TIMER_INTVAL_REG(0));
  
- 	/* set mode to auto reload */
- 	val = readl(timer_base + TIMER_CTL_REG(0));
--	writel(val | TIMER_CTL_AUTORELOAD, timer_base + TIMER_CTL_REG(0));
-+	writel(val | TIMER_CTL_RELOAD, timer_base + TIMER_CTL_REG(0));
+-	/* set clock source to HOSC, 16 pre-division */
+-	val = readl(timer_base + TIMER_CTL_REG(0));
+-	val &= ~(0x07 << 4);
+-	val &= ~(0x03 << 2);
+-	val |= (4 << 4) | (1 << 2);
+-	writel(val, timer_base + TIMER_CTL_REG(0));
+-
+-	/* set mode to auto reload */
+-	val = readl(timer_base + TIMER_CTL_REG(0));
+-	writel(val | TIMER_CTL_RELOAD, timer_base + TIMER_CTL_REG(0));
++	writel(TIMER_CTL_CLK_SRC(TIMER_CTL_CLK_SRC_OSC24M) | TIMER_CTL_RELOAD,
++	       timer_base + TIMER_CTL_REG(0));
  
  	ret = setup_irq(irq, &sun4i_timer_irq);
  	if (ret)
