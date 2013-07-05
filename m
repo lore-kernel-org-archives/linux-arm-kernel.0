@@ -1,95 +1,74 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 5 Jul 2013 14:12:27 +0800
-Subject: [PATCH v3 1/6] serial: imx: distinguish the imx6q uart from the others
+Date: Fri, 5 Jul 2013 14:12:29 +0800
+Subject: [PATCH v3 3/6] ARM: dts: imx6sl: add "fsl,
+ imx6q-uart" for uart compatible
 In-Reply-To: <1373004752-21302-1-git-send-email-b32955@freescale.com>
 References: <1373004752-21302-1-git-send-email-b32955@freescale.com>
-Message-ID: <1373004752-21302-2-git-send-email-b32955@freescale.com>
+Message-ID: <1373004752-21302-4-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We will add the DMA support for the imx uart. For the firmware's limit,
-only the imx6 serial chips (including the imx6q, imx6dl, imx6sl) can
-support the DMA.
-
-This patch adds the necessary macro and helper to distinguish the
-imx6q uart from the other imx uart. Other chips can use the "fsl,imx6q-uart"
-to enable the DMA support.
-
-This patch also replaces the check "is_imx21_uart()" with "!is_imx1_uart()".
+In order to enable the DMA for some uart port in imx6sl, we add the
+"fsl,imx6q-uart" to the uart's compatible property.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/tty/serial/imx.c |   17 +++++++++++++++--
- 1 files changed, 15 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx6sl.dtsi |   15 ++++++++++-----
+ 1 files changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 48bace0..a9643ef 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -187,6 +187,7 @@
- enum imx_uart_type {
- 	IMX1_UART,
- 	IMX21_UART,
-+	IMX6Q_UART,
- };
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 9138c67..0a297af 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -152,7 +152,8 @@
+ 				};
  
- /* device type dependent stuff */
-@@ -232,6 +233,10 @@ static struct imx_uart_data imx_uart_devdata[] = {
- 		.uts_reg = IMX21_UTS,
- 		.devtype = IMX21_UART,
- 	},
-+	[IMX6Q_UART] = {
-+		.uts_reg = IMX21_UTS,
-+		.devtype = IMX6Q_UART,
-+	},
- };
+ 				uart5: serial at 02018000 {
+-					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
++					compatible = "fsl,imx6sl-uart",
++						   "fsl,imx6q-uart", "fsl,imx21-uart";
+ 					reg = <0x02018000 0x4000>;
+ 					interrupts = <0 30 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_UART>,
+@@ -162,7 +163,8 @@
+ 				};
  
- static struct platform_device_id imx_uart_devtype[] = {
-@@ -242,12 +247,16 @@ static struct platform_device_id imx_uart_devtype[] = {
- 		.name = "imx21-uart",
- 		.driver_data = (kernel_ulong_t) &imx_uart_devdata[IMX21_UART],
- 	}, {
-+		.name = "imx6q-uart",
-+		.driver_data = (kernel_ulong_t) &imx_uart_devdata[IMX6Q_UART],
-+	}, {
- 		/* sentinel */
- 	}
- };
- MODULE_DEVICE_TABLE(platform, imx_uart_devtype);
+ 				uart1: serial at 02020000 {
+-					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
++					compatible = "fsl,imx6sl-uart",
++						   "fsl,imx6q-uart", "fsl,imx21-uart";
+ 					reg = <0x02020000 0x4000>;
+ 					interrupts = <0 26 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_UART>,
+@@ -172,7 +174,8 @@
+ 				};
  
- static struct of_device_id imx_uart_dt_ids[] = {
-+	{ .compatible = "fsl,imx6q-uart", .data = &imx_uart_devdata[IMX6Q_UART], },
- 	{ .compatible = "fsl,imx1-uart", .data = &imx_uart_devdata[IMX1_UART], },
- 	{ .compatible = "fsl,imx21-uart", .data = &imx_uart_devdata[IMX21_UART], },
- 	{ /* sentinel */ }
-@@ -269,6 +278,10 @@ static inline int is_imx21_uart(struct imx_port *sport)
- 	return sport->devdata->devtype == IMX21_UART;
- }
+ 				uart2: serial at 02024000 {
+-					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
++					compatible = "fsl,imx6sl-uart",
++						   "fsl,imx6q-uart", "fsl,imx21-uart";
+ 					reg = <0x02024000 0x4000>;
+ 					interrupts = <0 27 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_UART>,
+@@ -209,7 +212,8 @@
+ 				};
  
-+static inline int is_imx6q_uart(struct imx_port *sport)
-+{
-+	return sport->devdata->devtype == IMX6Q_UART;
-+}
- /*
-  * Save and restore functions for UCR1, UCR2 and UCR3 registers
-  */
-@@ -801,7 +814,7 @@ static int imx_startup(struct uart_port *port)
- 		}
- 	}
+ 				uart3: serial at 02034000 {
+-					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
++					compatible = "fsl,imx6sl-uart",
++						   "fsl,imx6q-uart", "fsl,imx21-uart";
+ 					reg = <0x02034000 0x4000>;
+ 					interrupts = <0 28 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_UART>,
+@@ -219,7 +223,8 @@
+ 				};
  
--	if (is_imx21_uart(sport)) {
-+	if (!is_imx1_uart(sport)) {
- 		temp = readl(sport->port.membase + UCR3);
- 		temp |= IMX21_UCR3_RXDMUXSEL;
- 		writel(temp, sport->port.membase + UCR3);
-@@ -1044,7 +1057,7 @@ imx_set_termios(struct uart_port *port, struct ktermios *termios,
- 	writel(num, sport->port.membase + UBIR);
- 	writel(denom, sport->port.membase + UBMR);
- 
--	if (is_imx21_uart(sport))
-+	if (!is_imx1_uart(sport))
- 		writel(sport->port.uartclk / div / 1000,
- 				sport->port.membase + IMX21_ONEMS);
- 
+ 				uart4: serial at 02038000 {
+-					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
++					compatible = "fsl,imx6sl-uart",
++						   "fsl,imx6q-uart", "fsl,imx21-uart";
+ 					reg = <0x02038000 0x4000>;
+ 					interrupts = <0 29 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_UART>,
 -- 
 1.7.1
