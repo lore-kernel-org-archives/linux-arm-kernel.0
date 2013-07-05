@@ -1,143 +1,142 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 06 Jul 2013 01:23:10 +0200
-Subject: [PATCH v3 08/13] ARM: dts: Add camera device nodes for Exynos4412
- TRATS2 board
-In-Reply-To: <1372692155-17653-9-git-send-email-s.nawrocki@samsung.com>
+Date: Sat, 06 Jul 2013 01:26:03 +0200
+Subject: [PATCH v3 12/13] ARM: dts: Add S5K5BA sensor regulator
+ definitions for Trats board
+In-Reply-To: <1372692155-17653-13-git-send-email-s.nawrocki@samsung.com>
 References: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
- <1372692155-17653-9-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1996184.tcirO0Du7j@flatron>
+ <1372692155-17653-13-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <11736061.3CXfgF4Q9h@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Hi Sylwester, Andrzej,
 
-On Monday 01 of July 2013 17:22:30 Sylwester Nawrocki wrote:
-> This patch enables the front camera using the internal
-> camera ISP (FIMC-IS).
+On Monday 01 of July 2013 17:22:34 Sylwester Nawrocki wrote:
+> From: Andrzej Hajda <a.hajda@samsung.com>
 > 
+> Add MAX8998 LDO12 and fixed voltage regulator nodes. While at it,
+> all fixed voltage regulator nodes are grouped in a 'regulators' node.
+> 
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/boot/dts/exynos4412-trats2.dts |   91
-> +++++++++++++++++++++++++++++++ 1 file changed, 91 insertions(+)
+>  arch/arm/boot/dts/exynos4210-trats.dts |   80
+> +++++++++++++++++++++++++------- 1 file changed, 64 insertions(+), 16
+> deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts
-> b/arch/arm/boot/dts/exynos4412-trats2.dts index b9de3b5..e9fb3de 100644
-> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
-> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-> @@ -62,6 +62,15 @@
->  			enable-active-high;
->  		};
+> diff --git a/arch/arm/boot/dts/exynos4210-trats.dts
+> b/arch/arm/boot/dts/exynos4210-trats.dts index 6b1568e..f62e299 100644
+> --- a/arch/arm/boot/dts/exynos4210-trats.dts
+> +++ b/arch/arm/boot/dts/exynos4210-trats.dts
+> @@ -30,13 +30,64 @@
+>  		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 
+rootwait
+> earlyprintk panic=5"; };
 > 
-> +		cam_io_reg: voltage-regulator at 3 {
+> -	vemmc_reg: voltage-regulator at 0 {
+> -	        compatible = "regulator-fixed";
+> -		regulator-name = "VMEM_VDD_2.8V";
+> -		regulator-min-microvolt = <2800000>;
+> -		regulator-max-microvolt = <2800000>;
+> -		gpio = <&gpk0 2 0>;
+> -		enable-active-high;
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
 
-Same comment here as for patch 7/13. This is not an address of this 
-regulator, so I would rather use -3 prefix.
-
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "CAM_SENSOR_A";
-> +			regulator-min-microvolt = <2800000>;
-> +			regulator-max-microvolt = <2800000>;
-> +			gpio = <&gpm0 2 0>;
-> +			enable-active-high;
-> +		};
-> +
->  		/* More to come */
->  	};
-> 
-> @@ -472,4 +481,86 @@
->  			gpios = <&gpj0 7 0>;
->  		};
->  	};
-> +
-> +	camera {
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&cam_port_b_clk_active>;
-> +		status = "okay";
-> +
-> +		fimc_0: fimc at 11800000 {
-> +			clock-frequency = <160000000>;
-> +			status = "okay";
-> +		};
-> +
-> +		fimc_1: fimc at 11810000 {
-> +			clock-frequency = <160000000>;
-> +			status = "okay";
-> +		};
-> +
-> +		fimc_2: fimc at 11820000 {
-> +			clock-frequency = <160000000>;
-> +			status = "okay";
-> +		};
-> +
-> +		fimc_3: fimc at 11830000 {
-> +			clock-frequency = <160000000>;
-> +			status = "okay";
-> +		};
-> +
-> +		csis_1: csis at 11890000 {
-> +			vddcore-supply = <&ldo8_reg>;
-> +			vddio-supply = <&ldo10_reg>;
-> +			clock-frequency = <160000000>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-
-Hmm. Couldn't the two #properties above be moved to exynos4.dtsi instead?
+I don't think any addressing is needed for these regulators, so I'd 
+suggest removing those #properties and replacing @N with -N suffix.
 
 Otherwise looks good.
 
 Best regards,
 Tomasz
 
-> +			status = "okay";
 > +
-> +			/* Camera D (4) MIPI CSI-2 (CSIS1) */
-> +			port at 4 {
-> +				reg = <4>;
-> +				csis1_ep: endpoint {
-> +					remote-endpoint = <&is_s5k6a3_ep>;
-> +					data-lanes = <1>;
-> +					samsung,csis-hs-settle = <18>;
-> +					samsung,csis-wclk;
+> +		vemmc_reg: regulator at 0 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "VMEM_VDD_2.8V";
+> +			regulator-min-microvolt = <2800000>;
+> +			regulator-max-microvolt = <2800000>;
+> +			gpio = <&gpk0 2 0>;
+> +			enable-active-high;
+> +		};
+> +
+> +		tsp_reg: regulator at 1 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "TSP_FIXED_VOLTAGES";
+> +			regulator-min-microvolt = <2800000>;
+> +			regulator-max-microvolt = <2800000>;
+> +			gpio = <&gpl0 3 0>;
+> +			enable-active-high;
+> +		};
+> +
+> +		cam_af_28v_reg: regulator at 2 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "8M_AF_2.8V_EN";
+> +			regulator-min-microvolt = <2800000>;
+> +			regulator-max-microvolt = <2800000>;
+> +			gpio = <&gpk1 1 0>;
+> +			enable-active-high;
+> +		};
+> +
+> +		cam_io_en_reg: regulator at 3 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "CAM_IO_EN";
+> +			regulator-min-microvolt = <2800000>;
+> +			regulator-max-microvolt = <2800000>;
+> +			gpio = <&gpe2 1 0>;
+> +			enable-active-high;
+> +		};
+> +
+> +		cam_io_12v_reg: regulator at 4 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "8M_1.2V_EN";
+> +			regulator-min-microvolt = <1200000>;
+> +			regulator-max-microvolt = <1200000>;
+> +			gpio = <&gpe2 5 0>;
+> +			enable-active-high;
+> +		};
+> +
+> +		vt_core_15v_reg: regulator at 5 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "VT_CORE_1.5V";
+> +			regulator-min-microvolt = <1500000>;
+> +			regulator-max-microvolt = <1500000>;
+> +			gpio = <&gpe2 2 0>;
+> +			enable-active-high;
+> +		};
+>  	};
+> 
+>  	sdhci_emmc: sdhci at 12510000 {
+> @@ -97,15 +148,6 @@
+>  		};
+>  	};
+> 
+> -	tsp_reg: voltage-regulator {
+> -		compatible = "regulator-fixed";
+> -		regulator-name = "TSP_FIXED_VOLTAGES";
+> -		regulator-min-microvolt = <2800000>;
+> -		regulator-max-microvolt = <2800000>;
+> -		gpio = <&gpl0 3 0>;
+> -		enable-active-high;
+> -	};
+> -
+>  	i2c at 13890000 {
+>  		samsung,i2c-sda-delay = <100>;
+>  		samsung,i2c-slave-addr = <0x10>;
+> @@ -218,6 +260,12 @@
+>  				     regulator-always-on;
+>  				};
+> 
+> +				vtcam_reg: LDO12 {
+> +				     regulator-name = "VT_CAM_1.8V";
+> +				     regulator-min-microvolt = <1800000>;
+> +				     regulator-max-microvolt = <1800000>;
 > +				};
-> +			};
-> +		};
 > +
-> +		fimc_lite_0: fimc-lite at 12390000 {
-> +			status = "okay";
-> +		};
-> +
-> +		fimc_lite_1: fimc-lite at 123A0000 {
-> +			status = "okay";
-> +		};
-> +
-> +		fimc-is at 12000000 {
-> +			pinctrl-0 = <&fimc_is_uart>;
-> +			pinctrl-names = "default";
-> +			status = "okay";
-> +
-> +			i2c1_isp: i2c-isp at 12140000 {
-> +				pinctrl-0 = <&fimc_is_i2c1>;
-> +				pinctrl-names = "default";
-> +
-> +				s5k6a3 at 10 {
-> +					compatible = "samsung,s5k6a3";
-> +					reg = <0x10>;
-> +					svdda-supply = <&cam_io_reg>;
-> +					svddio-supply = <&ldo19_reg>;
-> +					clock-frequency = <24000000>;
-> +					samsung,camclk-out = <1>;
-> +					gpios = <&gpm1 6 0>;
-> +
-> +					port {
-> +						is_s5k6a3_ep: endpoint {
-> +							remote-endpoint = 
-<&csis1_ep>;
-> +							data-lanes = <1>;
-> +						};
-> +					};
-> +				};
-> +			};
-> +		};
-> +	};
->  };
+>  				vcclcd_reg: LDO13 {
+>  				     regulator-name = "VCC_3.3V_LCD";
+>  				     regulator-min-microvolt = <3300000>;
