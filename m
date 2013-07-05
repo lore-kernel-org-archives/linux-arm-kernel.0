@@ -1,31 +1,31 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 5 Jul 2013 10:43:05 -0700
-Subject: [v3 3/3] sata: imx: add ahci sata support on imx platforms
-In-Reply-To: <1373017942-12583-4-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1373017942-12583-1-git-send-email-Hong-Xing.Zhu@freescale.com>
- <1373017942-12583-4-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20130705174305.GA28088@mtj.dyndns.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 5 Jul 2013 19:06:03 +0100
+Subject: [RFC PATCH 08/13] sound: sam9x5_wm8731: machine driver for
+ at91sam9x5 wm8731 boards
+In-Reply-To: <CACQ1gAji8KkjXee8o=9jt8O38611LBJ95yXimxbfn1qLaLOcnA@mail.gmail.com>
+References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
+ <1372667978-4718-9-git-send-email-richard.genoud@gmail.com>
+ <51D2472B.2010407@atmel.com>
+ <CACQ1gAji8KkjXee8o=9jt8O38611LBJ95yXimxbfn1qLaLOcnA@mail.gmail.com>
+Message-ID: <20130705180603.GG27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Jul 05, 2013 at 05:15:05PM +0200, Richard Genoud wrote:
+> 2013/7/2 Bo Shen <voice.shen@atmel.com>:
 
-On Fri, Jul 05, 2013 at 05:52:22PM +0800, Richard Zhu wrote:
->  - CAP_SSS(bit20) of the HOST_CAP is writable, default
->  value is '0', should be configured to be '1'
->  - bit0 (only one AHCI SATA port on imx6q) of the
->  HOST_PORTS_IMPL should be set to be '1'.(default 0)
->  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)
->  should be configured regarding to the frequency of AHB
->  bus clock.
->  - Configurations of the AHCI PHY clock, and the signal
->  parameters of the GPR13
+> >> From: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >>
+> >> Description of the Asoc machine driver for an at91sam9x5 based board
+> >> with a wm8731 audio DAC. Wm8731 is clocked by a crystal and used as a
+> >> master on the SSC/I2S interface. Its connections are a headphone jack
+> >> and an Line input jack.
 
-Can't you just add a platform specific init callback to ahci_platform?
-I don't see how these small differences in init sequence justify a
-separate driver.
-
-Thanks.
-
--- 
-tejun
+Always CC relevant maintainers and mailing lists on patches...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130705/fb98e36e/attachment.sig>
