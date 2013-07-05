@@ -1,72 +1,44 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Fri, 5 Jul 2013 13:31:08 +0000
-Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
-References: <51D577E6.5010507@newflow.co.uk>
- <51D59146.3070002@newflow.co.uk> <51D59C0E.8080003@newflow.co.uk>
- <B5906170F1614E41A8A28DE3B8D121433EE93C23@DBDE04.ent.ti.com>
- <20130705115959.GQ5523@atomide.com>
- <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri,  5 Jul 2013 15:45:09 +0200
+Subject: [PATCH] ARM: dts: imx27 phyCARD-S remove wrong I2C RTC
+In-Reply-To: <1372782469.486055292@f129.mail.ru>
+References: <1372782469.486055292@f129.mail.ru>
+Message-ID: <1373031909-16178-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 05, 2013 at 18:50:10, Bedia, Vaibhav wrote:
-> Hi Tony,
-> 
-> On Fri, Jul 05, 2013 at 17:29:59, Tony Lindgren wrote:
-> > * Bedia, Vaibhav <vaibhav.bedia@ti.com> [130705 01:17]:
-> > > 
-> > > I just checked the behavior on my AM335x-EVM. Current mainline boots fine
-> > > provided I don't use earlyprintk.  The offending patch [1] in this case is the one
-> > > that tries to get rid of omap_serial_early_init() for DT boot. This change inadvertently
-> > > also results in the console UART getting reset and idled during bootup and that's where
-> > > the boot stops for you. I think if you skip earlyprintk from the bootargs you should see
-> > > the system booting fine. 
-> > > 
-> > > I guess we need to retain the NO_IDLE and NO_RESET aspect for the console UART in
-> > > omap_serial_early_init() to get earlyprintk working again.
-> > 
-> > Hmm nothing should get idled while earlyprintk is running, and then when the
-> > serial driver kicks in it should not idle anything by default. And for DT based
-> > booting we should not have mach-omap2/serial.c initialize anything.
-> > 
-> 
-> If I add in the HWMOD flags without any reverts I get to the point where the serial driver
-> comes up but the boot eventually stops [1]. Without the flags the boot stops much earlier [2]
-> just like Mark reported.
-> 
+Fixup of commit 7874d595b78e431f0f661d2fe47625649308a52e
+"ARM: dts: Add device tree support for phycard pca100".
 
-Err.. the log with HWMOD flags added is [2] and without flags is [1]. Sorry for the confusion.
+Remove wrong I2C RTC node.
 
-> > I wonder if this is because the timeouts get now initialized to 0 instead
-> > of -1 for the serial driver?
-> > 
-> 
-> You meant initialized to -1, right? There's an additional check for timeout being 0. Unless i
-> am missing something DT-boot will start off with timeout set to 0 and then get forced to -1.
-> 
-> Regards,
-> Vaibhav
-> 
-> ===
-> [1]
-> 
-> [    0.000000] Booting Linux on physical CPU 0x0
-> <...>
-> [    0.190107] SMP: Total of 1 processors activated (363.72 BogoMIPS).
-> [    0.196711] CPU: All CPU(s) started in SVC mode.
-> [    0.205580] devtmpfs: initialized
-> <stops here if booted with earlyprintk>
-> 
-> [2]
-> [    0.000000] Booting Linux on physical CPU 0x0
-> <...>
-> [    1.453364] pinctrl-single 44e10800.pinmux: 142 pins at pa f9e10800 size 568
-> [    1.467121] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
-> <stops here if booted with earlyprintk>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+
+Thanks, Alexander, you are right. I2C2 has no RTC.
+
+Regards,
+
+Markus
+
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+index ec52b6d..01ee807 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+@@ -55,11 +55,6 @@
+ 		reg = <0x4a>;
+ 	};
+ 
+-	rtc at 51 {
+-		compatible = "nxp,pcf8563";
+-		reg = <0x51>;
+-	};
+-
+ 	at24 at 52 {
+ 		compatible = "at,24c32";
+ 		pagesize = <32>;
+-- 
+1.8.2.1
