@@ -1,140 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Jul 2013 17:38:35 +0200
-Subject: [PATCH, re-send] Always trap on BUG()
-Message-ID: <201307051738.35930.arnd@arndb.de>
+From: wangyuhang2014@gmail.com (yuhang wang)
+Date: Fri, 5 Jul 2013 23:41:08 +0800
+Subject: SPI: DUAL/QUAD support
+In-Reply-To: <20130705143452.GA7738@sig21.net>
+References: <OFAD729A05.8C915625-ONC1257B9E.00576B25-C1257B9E.0058477D@rohde-schwarz.com>
+ <CAHSAbzOg+uHndydSC43moF7pijc67pqzB2rPnY69ynXHEzw79g@mail.gmail.com>
+ <51D67851.8020402@ti.com>
+ <CAHSAbzNvMo_oeaqtzO8-xDm-L-f8wVccVqfuVqbR=OwqWJhVwg@mail.gmail.com>
+ <51D689F3.3070605@ti.com>
+ <CAHSAbzM1PGoMXFNOmB7guDsVWYnRoRy89-bufHYpPz5+odnd8w@mail.gmail.com>
+ <51D68D14.7090606@ti.com>
+ <CAHSAbzMfvfdDtTh=3zeBni4fNMAHEMdTJLJU-Oc13HJUqCUj0A@mail.gmail.com>
+ <51D69197.7060802@ti.com>
+ <CAHSAbzP1-RVot+hhtY_DcBK=u5n2234eb9WOKLESwvUNax7+pA@mail.gmail.com>
+ <20130705143452.GA7738@sig21.net>
+Message-ID: <CAHSAbzPiy1TVypP6xvHkBrhMozjifDdVSuErZY-av4RMbT1MTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've run some size analyis using the ARM 'multi_v7_defconfig'
-and gcc-4.8, using various definitions for BUG() and BUG_ON(), to
-see how big the size improvement actually gets
+2013/7/5 Johannes Stezenbach <js@sig21.net>:
+> On Fri, Jul 05, 2013 at 06:24:40PM +0800, yuhang wang wrote:
+>>
+>> 2 Questions here:
+>> 1.In m25p80.c probe, the kmalloc below I feel very strange.
+>>       flash->command = kmalloc(MAX_CMD_SIZE + (flash->fast_read ? 1 : 0),
+>>                                       GFP_KERNEL);
+>>
+>>  (flash->fast_read ? 1 : 0) must be 0! So why do it like that.
+>
+> Maybe just increase MAX_CMD_SIZE by 1 unconditonally?
+> Yeah, looks like a bug in m25p80.c, flash->fast_read
+> is initialized too late.
+>
+>> +#define        OPCODE_DOR              0x3B    /* Dual Output Read */
+>> +#define        OPCODE_QOR              0x6B    /* Quad Output Read */
+>> +#define        OPCODE_QPP              0x32    /* Quad Page Programming */
+>> +#define        OPCODE_QEN              0x02 /* Quad Mode Enable Flag */
+>
+> Which flash chip are these for?  The OPCODE_DOR and OPCODE_QOR
+> match MX25L25635E, but OPCODE_QPP not (Macronix uses 0x38).
+>
+Thanks for the review. And I have said that it is not a general code to support
+dual and quad, it is just a situation to fit my system. Perhaps it is very hard
+to provide a general code before a serial-norflash standard comes out.
 
-1. Baseline: normal bug plus CONFIG_BUG_VERBOSE
-   text    data     bss     dec     hex filename
-3743196  224396  206812 4174404  3fb244 vmlinux-bugverbose
+>> +#ifdef CONFIG_M25PXX_USE_FAST_READ
+>> +#define OPCODE_READ    OPCODE_FAST_READ
+>> +#define FAST_READ_DUMMY_BYTE 1
+>> +#else
+>> +#define OPCODE_READ    OPCODE_NORM_READ
+>> +#define FAST_READ_DUMMY_BYTE 0
+>> +#endif
+>
+> this doesn't work with the flash->fast_read setting from DT
+>
+> BTW, if we add "bitwidths" to spi_board_info, wouldn't
+> it make sense to also add "use_fast_read" and remove the
+> CONFIG_M25PXX_USE_FAST_READ option?
+>
 
-2. disabling CONFIG_BUG_VERBOSE, saving 0.6%
-3716920  224380  206812 4148112  3f4b90 vmlinux-nobugverbose
-
-3. #define BUG() panic(__func__), #define BUG_ON(c) if(c) BUG(), saving 1.0%
-3701076  224384  206812 4132272  3f0db0 vmlinux-bug-panicfunc
-
-3. #define BUG() panic(__func__), #define BUG_ON(c) if(c) BUG(), saving 1.5%
-3678884  224400  206812 4110096  3eb710 vmlinux-bug-panic
-
-4. #define BUG() unreachable(), saving 2.1%
-3652636  224384  206812 4083832  3e5078 vmlinux-bug-unreachable
-
-5. as 4, plus #define BUG_ON(c) if(c) unreachable(), saving 2.2%
-3651108  224380  206812 4082300  3e4a7c vmlinux-bugon-unreachable
-
-6. #define BUG() do{}while(0), saving 2.1%
-3654264  224380  206812 4085456  3e56d0 vmlinux-nobug
-
-7. as 6, plus #define BUG_ON if(0 && (c)) unreachable, saving 2.2%
-3648392  223996  206748 4079136  3e3e20 vmlinux-no-bugon
-
-8. my patch below, saving 1.8%
-3666532  224380  206812 4097724  3e86bc obj-tmp/vmlinux
-
-The gain of doing unreachable and letting the code run off whereever
-is minimal compared to the current state of doing nothing, but it
-avoids the warnings.
-
-Same test using x86_defconfig:
-
-1. CONFIG_BUG=y, CONFIG_BUGVERBOSE=n
-10797859        1395648 1175552 13369059         cbfee3 vmlinux-x86-bug
-
-2. CONFIG_BUG=n, saves 1.0%
-10658553        1395584 1175552 13229689         c9de79 vmlinux-x86-nobug
-
-3. with my patch, saves 0.8%
-10684186        1395584 1175552 13255322         ca429a vmlinux-x86-archbug
-
-Getting 1-2% savings in kernel size seems absolutely worth keeping the
-option, but 0.2-0.4% left for getting reproducible behavior also seems
-worthwhile. The result in the patch below.
-
-This basically loses any of the BUG() reporting, but leaves the
-logic to trap and kill the task in place when CONFIG_BUG is disabled.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-arch at vger.kernel.org
-Cc: Chen Gang <gang.chen@asianux.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: "Eric W. Biederman" <ebiederm@xmission.com>
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-
-diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-index 7af5c6c..4a5b85d 100644
---- a/arch/arm/include/asm/bug.h
-+++ b/arch/arm/include/asm/bug.h
-@@ -3,8 +3,6 @@
- 
- #include <linux/linkage.h>
- 
--#ifdef CONFIG_BUG
--
- /*
-  * Use a suitable undefined instruction to use for ARM/Thumb2 bug handling.
-  * We need to be careful not to conflict with those used by other modules and
-@@ -54,7 +52,6 @@ do {								\
- #endif  /* CONFIG_DEBUG_BUGVERBOSE */
- 
- #define HAVE_ARCH_BUG
--#endif  /* CONFIG_BUG */
- 
- #include <asm-generic/bug.h>
- 
-diff --git a/arch/x86/include/asm/bug.h b/arch/x86/include/asm/bug.h
-index 2f03ff0..ba38ebb 100644
---- a/arch/x86/include/asm/bug.h
-+++ b/arch/x86/include/asm/bug.h
-@@ -1,7 +1,6 @@
- #ifndef _ASM_X86_BUG_H
- #define _ASM_X86_BUG_H
- 
--#ifdef CONFIG_BUG
- #define HAVE_ARCH_BUG
- 
- #ifdef CONFIG_DEBUG_BUGVERBOSE
-@@ -33,8 +32,6 @@ do {								\
- } while (0)
- #endif
- 
--#endif /* !CONFIG_BUG */
--
- #include <asm-generic/bug.h>
- 
- #endif /* _ASM_X86_BUG_H */
-diff --git a/include/asm-generic/bug.h b/include/asm-generic/bug.h
-index 7d10f96..bbd2872 100644
---- a/include/asm-generic/bug.h
-+++ b/include/asm-generic/bug.h
-@@ -112,12 +112,13 @@ extern void warn_slowpath_null(const char *file, const int line);
- #endif
- 
- #ifndef HAVE_ARCH_BUG_ON
--#define BUG_ON(condition) do { if (condition) ; } while(0)
-+#define BUG_ON(condition) do { if (unlikely(condition)) BUG(); } while(0)
- #endif
- 
- #ifndef HAVE_ARCH_WARN_ON
- #define WARN_ON(condition) ({						\
- 	int __ret_warn_on = !!(condition);				\
-+	(void)__ret_warn_on;						\
- 	unlikely(__ret_warn_on);					\
- })
- #endif
-@@ -125,6 +126,8 @@ extern void warn_slowpath_null(const char *file, const int line);
- #ifndef WARN
- #define WARN(condition, format...) ({					\
- 	int __ret_warn_on = !!(condition);				\
-+	if (0 && (__ret_warn_on))					\
-+		printk(format);						\
- 	unlikely(__ret_warn_on);					\
- })
- #endif
+Well, I think we should make sure that whether all spi slave has the "fast read"
+feature before we add "use_fast_read" into the  spi_board_info.
+There should be some other flash or slaves do not support this
+feature. So in my opinion, Fast read still supported as a M25p config
+should be more suitable.
+>> +/*
+>> + * Write configuration register 2 byte
+>> + * Returns negative if error occurred.
+>> + */
+>> +static int write_cr(struct m25p *flash, u16 val)
+>> +{
+>> +       flash->command[0] = OPCODE_WRSR;
+>> +       flash->command[1] = val >> 8;
+>> +       flash->command[2] = val;
+>> +
+>> +       return spi_write(flash->spi, flash->command, 3);
+>> +}
+>
+>> +       if ((flash->spi->rx_bitwidth == SPI_BITWIDTH_QUAD) ||
+>> +               (flash->spi->tx_bitwidth == SPI_BITWIDTH_QUAD)) {
+>> +               write_enable(flash);
+>> +               write_cr(flash, OPCODE_QEN);
+>> +       }
+>
+> MX25L25635E doesn't have a cr, instead a bit needs to be set in the sr
+>
+> Maybe we need to add some fields to m25p_ids[] to manage variation
+> between flash devices.
+>
+similar to the first answer. Also a standard is the solution to these questions.
+Thanks a lot.
