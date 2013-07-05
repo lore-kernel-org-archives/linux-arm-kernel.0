@@ -1,80 +1,47 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 5 Jul 2013 08:55:07 -0500
-Subject: [RFC PATCH V2 1/8] regulator: Introduce OMAP regulator to
- control PMIC over VC/VP
-In-Reply-To: <20130704154105.GD27646@sirena.org.uk>
-References: <1371849949-12649-1-git-send-email-nm@ti.com>
- <1371849949-12649-2-git-send-email-nm@ti.com>
- <20130704154105.GD27646@sirena.org.uk>
-Message-ID: <20130705135507.GA17439@kahuna>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 5 Jul 2013 15:56:32 +0200
+Subject: [PATCH v9 01/10] ASoC: imx-pcm-dma: DT support
+In-Reply-To: <51C7351D.9080004@tabi.org>
+References: <1371734429-6081-1-git-send-email-mpa@pengutronix.de>
+ <1371734429-6081-2-git-send-email-mpa@pengutronix.de>
+ <51C7351D.9080004@tabi.org>
+Message-ID: <20130705135632.GE16871@s25.your-server.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:41-20130704, Mark Brown wrote:
-> On Fri, Jun 21, 2013 at 04:25:42PM -0500, Nishanth Menon wrote:
+On Sun, Jun 23, 2013 at 12:49:17PM -0500, Timur Tabi wrote:
+> Markus Pargmann wrote:
+> > This patch removes the NO_DT flag. The pdev pointer may have a proper
+> > of_node with the dmas property, so we can use it to request DMA
+> > channels.
+> >
+> > Signed-off-by: Markus Pargmann<mpa@pengutronix.de>
+> > Tested-by: Shawn Guo<shawn.guo@linaro.org>
+> > ---
 > 
-> > +static const struct omap_pmic_info omap_twl4030_vdd1 = {
-> > +	.slave_addr = 0x12,
-> > +	.voltage_reg_addr = 0x00,
-> > +	.cmd_reg_addr = 0x00,
-> > +	.i2c_timeout_us = 200,
-> > +	.slew_rate_uV = 4000,
-> > +	.step_size_uV = 12500,
-> > +	.min_uV = 600000,
-> > +	.max_uV = 1450000,
-> > +	.voltage_selector_offset = 0,
-> > +	.voltage_selector_mask = 0x7F,
-> > +	.voltage_selector_setbits = 0x0,
-> > +	.voltage_selector_zero = false,
-> > +};
+> I won't have access to functioning hardware for another month or two, so I 
+> can't test to see if this patchset breaks PowerPC, but at least it does 
+> compile.  I'm a little worried that the DMA changes won't actually run on 
+> PowerPC, but I can't test that now.
+
+The DMA channels should end up to be NULL on PowerPC within the generic
+dmaengine pcm, so it should fall back to NO_DT automatically.
+
 > 
-> So, this still has the thing where all the data about the PMIC is
-> replicated (but now in this driver).  It should be possible to pull all
-> the above information except possibly the I2C timeout and perhaps the
-> I2C address (if there's a separate control interface) from the standard
-> regulator core data structures for the PMIC.  This would allow the
-> driver to Just Work with any PMIC without needing to add it in two
-> places.
+> So for the time being:
 > 
-> Other than that this looks good, the only issue I see is where the
-> driver is getting the data from.
-I like the idea and had tried to implement it as well..lets get down to
-the details: If I understand what you are stating,
-regulators such as twl-regulator has the same/similar data that is
-represented here. twl-regulator uses standard i2c path, it cannot
-send voltage over so called "SR path". Alrite, so, lets say we reuse
-definition of VDD1,
-option 1) we just bypass get_voltage/set_voltage to point through to
-this function. result will be something similar to what we got here[1]
-Again, based on this discussion, it is wrong - and we already did implement
-the *wrong* way in OMAP and the new code is supposed to throw away the
-old code once all relevant platforms are converted to DT.
-- now, we could improve this by passing rdev and slurp out required
- data from regulator structures, but obviously, as you pointed out, it wont
- be sufficient.
-- In this solution, we will have existing regulator drivers supporting
-additional data path. *but* that also means that existing regulator
-drivers will need to be modified to handle multiple data path and "Just
-Work" wont happen - so not really good other than screw up existing
-regulator drivers with handling OMAP specific APIs in them.
+> Acked-by: Timur Tabi <timur@tabi.org>
+> 
+> -- 
+> Timur Tabi
+> 
 
-option 2) make omap_pmic regulator use twl_regulator - regulator
-chaining.
- - we already agreed that this is conceptually wrong[2](regulator
-   talking to another regulator). So wont debate more here.
- - but here, you'd have omap_pmic regulator "using twl/existing
- regulators" to pick up data about slew, conversion information etc..
+Thanks,
 
-This series attempts to keep omap pmic delta simplified to just the
-additional PMIC data, no replication of code or "OMAP specific
-infection" of existing generic regulators.
+Markus
 
-Is there any other suggestions how to pick up the data from an existing
-regulator and avoid few bytes of data replication?
-
-[1]
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/mach-omap2/omap_twl.c#n142
-[2] http://marc.info/?t=136513865200005&r=1&w=2
 -- 
-Regards,
-Nishanth Menon
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
