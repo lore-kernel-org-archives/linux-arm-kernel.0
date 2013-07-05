@@ -1,21 +1,20 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 5 Jul 2013 18:33:21 +0100
-Subject: [PATCH] ASoC: Allow imx-pcm-{dma,fiq}.c to be modules
-In-Reply-To: <201307051745.16140.arnd@arndb.de>
-References: <201307051745.16140.arnd@arndb.de>
-Message-ID: <20130705173321.GE27646@sirena.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 05 Jul 2013 11:38:11 -0600
+Subject: [PATCH 1/2] ARM: dt: t30 cardhu: add dt entry for lm90
+In-Reply-To: <1372928979-26938-2-git-send-email-wni@nvidia.com>
+References: <1372928979-26938-1-git-send-email-wni@nvidia.com>
+ <1372928979-26938-2-git-send-email-wni@nvidia.com>
+Message-ID: <51D70483.70203@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 05, 2013 at 05:45:15PM +0200, Arnd Bergmann wrote:
-> This is required so we can build the imx sound support
-> when ALSA itself is a loadable module.
+On 07/04/2013 03:09 AM, Wei Ni wrote:
+> Enable thermal sensor lm90 for t30 cardhu.
 
-Is this actually OK with the FIQ APIs?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130705/e530bf92/attachment.sig>
+> diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+
+> +		nct1008: nct1008 {
+> +			compatible = "lm90,nct1008";
+
+"lm90" isn't a valid vendor prefix. I believe the value you want is
+"onnn,nct1008". Same comment for patch 2/2.
