@@ -1,126 +1,37 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Fri, 5 Jul 2013 16:10:02 +0100
-Subject: [PATCH] ARM: move body of head-common.S back to text section
-In-Reply-To: <20130704002235.GL22702@windriver.com>
-References: <1372805629-18382-1-git-send-email-swarren@wwwdotorg.org>
- <20130702232259.GH11625@codeaurora.org>
- <51D39004.9000907@wwwdotorg.org>
- <20130703051907.GA22702@windriver.com>
- <20130703100044.GG24642@n2100.arm.linux.org.uk>
- <20130703153012.GK22702@windriver.com>
- <20130703172001.GH24642@n2100.arm.linux.org.uk>
- <20130704002235.GL22702@windriver.com>
-Message-ID: <20130705151001.GF2932@localhost.localdomain>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Fri, 5 Jul 2013 20:43:17 +0530
+Subject: [PATCH 2/2] ARM: OMAP2+: hwmod: AM335x: fix cpgmac address space
+In-Reply-To: <4bb04ee7bcb8ca73d5fc43049ba029471b9cdda3.1373036932.git.afzal@ti.com>
+References: <4bb04ee7bcb8ca73d5fc43049ba029471b9cdda3.1373036932.git.afzal@ti.com>
+Message-ID: <84d9a3ae9ab7a47924eb54934dcad91339543d63.1373036932.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 03, 2013 at 08:22:35PM -0400, Paul Gortmaker wrote:
-> [Re: [PATCH] ARM: move body of head-common.S back to text section] On 03/07/2013 (Wed 18:20) Russell King - ARM Linux wrote:
-> 
-> > On Wed, Jul 03, 2013 at 11:30:12AM -0400, Paul Gortmaker wrote:
-> > > [Re: [PATCH] ARM: move body of head-common.S back to text section] On 03/07/2013 (Wed 11:00) Russell King - ARM Linux wrote:
-> > > 
-> > > > On Wed, Jul 03, 2013 at 01:19:07AM -0400, Paul Gortmaker wrote:
-> > > > > As an aside, I'm now thinking any __INIT that implicitly rely on EOF for
-> > > > > closure are nasty traps waiting to happen and it might be worthwhile to
-> > > > > audit and explicitly __FINIT them before someone appends to the file...
-> > > > 
-> > > > That hides a different kind of bug though - I hate __FINIT for exactly
-> > > > that reason.  Consider this:
-> > > 
-> > > Agreed - perhaps masking that it is a ".previous" just hides the fact
-> > > that it is more like a pop operation vs. an on/off operation, or per
-> > > function as we have in C.
-> > 
-> > I read the info pages, because I thought it was a pop operation too.
-> > I was concerned that .section didn't push the previous section onto the
-> > stack.
-> > 
-> > However, .popsection is the pseudio-op which pops.  .previous just toggles
-> > the current section with the section immediately before it.
-> > 
-> > So:
-> > 
-> > 	.text
-> > 	.data
-> > 	.previous
-> > 	/* this is .text */
-> > 	.previous
-> > 	/* this is .data */
-> > 	.previous
-> > 	/* this is .text */
-> > 	.previous
-> > 	/* this is .data */
-> 
-> Cool -- I bet we weren't the only ones thinking it was a pop.  Thanks.
-> 
-> Does that make __FINIT less evil than we previously assumed?  I think
-> your example was the following pseudo-patch:
-> 
-> 
-> 	.text
-> 	<some text>
-> +	.data
-> + 	<some data>
-> 	__INIT
-> 	<big hunk of init>
-> 	__FINIT
-> 	/* this below used to be text */
-> 	<more stuff that was originally meant for text>
-> 
-> Even if it is a toggle (vs. pop), the end text will now become data,
-> so the no-op __FINIT with an explicit section called out just below
-> it may still be the most unambiguous way to indicate what is going on.
-> 
-> > 
-> > > That seems reasonable to me.  I can't think of any self auditing that is
-> > > reasonably simple to implement.  One downside of __FINIT as a no-op vs.
-> > > what it is today, is that a dangling __FINIT in a file with no other
-> > > previous sections will emit a warning.  But that is a small low value
-> > > corner case I think.
-> > 
-> > That warning from __FINIT will only happen if there has been no section
-> > or .text or .data statement in the file at all.  As soon as you have any
-> > statement setting any kind of section, .previous doesn't warn.
-> > 
-> > So:
-> > 
-> > 	.text
-> > 	...
-> > 	__FINIT
-> > 
-> > produces no warning.o
-> 
-> Yep -- we are both saying the same thing here - hence why I called it a
-> small low value corner case.
+Register target address to be used for cpgmac is the second device
+address space. By default, hwmod picks first address space (0th index)
+for register target.
 
-Note that .previous has another important gotcha.  Consider:
+With removal of address space from hwmod and using DT instead, cpgmac
+is getting wrong address space for register target.
 
-	__INIT
-	/* now in .text.init */
-	ALT_UP(...)
-	/* now in .text.init */
-	__FINIT
+Fix it by indicating the address space to be used for register target.
 
-	/* now in .alt.smp.text! */
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-.previous (or macros containing a dangling .previous) shouldn't be used
-unless you're absolutely certain what the previous section was.
-
-In general:
-
-	label:
-		<stuff>
-
-		.previous
-
-restores to the section which was current at label, only if there are
-no section directives in <stuff>, nor anything which could contain a
-section directive after macro expansion.
-
-The same goes for the hidden, dangling .previous embedded in __FINIT
-and friends.
-
-Cheers
----Dave
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index 28bbd56..7a9b492 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -562,6 +562,7 @@ static struct omap_hwmod am33xx_cpgmac0_hwmod = {
+ 	.clkdm_name	= "cpsw_125mhz_clkdm",
+ 	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
+ 	.main_clk	= "cpsw_125mhz_gclk",
++	.mpu_rt_idx	= 1,
+ 	.prcm		= {
+ 		.omap4	= {
+ 			.clkctrl_offs	= AM33XX_CM_PER_CPGMAC0_CLKCTRL_OFFSET,
+-- 
+1.8.3.1
