@@ -1,106 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 5 Jul 2013 17:52:35 +0100
-Subject: [RFC PATCH V2 1/8] regulator: Introduce OMAP regulator to
- control PMIC over VC/VP
-In-Reply-To: <51D6DD3A.1030002@ti.com>
-References: <1371849949-12649-1-git-send-email-nm@ti.com>
- <1371849949-12649-2-git-send-email-nm@ti.com>
- <20130704154105.GD27646@sirena.org.uk>
- <20130705135507.GA17439@kahuna>
- <20130705140828.GA27646@sirena.org.uk> <51D6DD3A.1030002@ti.com>
-Message-ID: <20130705165235.GC27646@sirena.org.uk>
+From: minggr@gmail.com (Lin Ming)
+Date: Sat, 6 Jul 2013 00:58:06 +0800
+Subject: kernel decompressor problem for ARMv7
+In-Reply-To: <alpine.LFD.2.03.1307051225240.18597@syhkavp.arg>
+References: <CAF1ivSakn8-HiAf+4_cLRWUUTDP9QBKpAt+hVQoMyAmKZ2-dJA@mail.gmail.com>
+ <20130705095757.GA13063@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1307051225240.18597@syhkavp.arg>
+Message-ID: <CAF1ivSbOXknHyDMH3RdmSGK2n5o2wVeR5oohCQnZ2gJrgvo=Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 05, 2013 at 09:50:34AM -0500, Nishanth Menon wrote:
-> On 07/05/2013 09:08 AM, Mark Brown wrote:
+On Sat, Jul 6, 2013 at 12:30 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Fri, 5 Jul 2013, Will Deacon wrote:
+>
+>> On Fri, Jul 05, 2013 at 09:44:12AM +0100, Lin Ming wrote:
+>> > Hi all,
+>>
+>> Hello,
+>>
+>> > I'm porting BSP code from v2.6.36 to v3.10 kernel. It's ARMv7 processor.
+>>
+>> Which specific processor/SoC?
+>>
+>> > But decompressor doesn't work. With a lot of debug, I finally find
+>> > below 2 commits related.
+>> > Kernel uncompress OK with these commits reverted.
+>> >
+>> > dbece45: ARM: 7501/1: decompressor: reset ttbcr for VMSA ARMv7 cores
+>> > (Introduced in v3.6-rc6)
+>> >
+>> > 5010192: ARM: 7583/1: decompressor: Enable unaligned memory access for
+>> > v6 and above
+>> > (Introduced in v3.7-rc8)
+>> >
+>> > Any hint to fix it?
+>>
+>> There's not really enough information to go on here. What specifically
+>> fails? Also, do you have to revert *both* of the above changes to get things
+>> working again?
+>
+> Also, what is the bootloader used here?
 
-> >>option 1) we just bypass get_voltage/set_voltage to point through to
-> >>this function. result will be something similar to what we got here[1]
+uboot.
 
-> >I don't really know what you mean when you say "bypass get_voltage/set_voltage
-> >so it's kind of hard to comment...  the link you posted appears to be a
-> >link to the code I'm reviewing so it's not terribly enlightening.
+>
+> Does the bootloader call the kernel with the MMU off as documented in
+> Documentation/arm/Booting?
 
-> :) it is similar, yes. by bypass get/set_voltage, I mean something like [1]
+How to check this?
 
-No, that's not a good idea.
+I'll check uboot code or add debug code in boot/compressed/head.S to
+check it next Monday.
 
-> >What makes you think that the existing regulator drivers need to be
-> >modified?
-
-> data path difference - Almost all standard regulators use i2c
-> (standard i2c APIs) for every other SMPS/LDO except for the ones
-> controlled by OMAP custom i2c path(vc/vp), the
-> set_voltage/get_voltage needs a different implementation when it
-> comes to using the vc/vp path.
-
-> > They already have all the data exported to the core (or
-> > should do)...
-
-> I see that twl-regulator does not indeed do it, but, assuming the
-> regulators have all the data exported to the core, the data is
-> hidden in struct regulator_desc which is private to the device and
-> driver. lets go through these:
-
-That's just a simple matter of programming to fix, and any regulator
-which can work with this sort of table based stuff you're looking at
-here must also be able to be converted to work with the equivalent code
-in the regulator core so open coding is a deficiency in the driver.
-
-> > +	.cmd_reg_addr = 0x00,
-
-> command register is used for sending low power state commands -
-> which is not the same as voltage register or vsel_reg as used in
-> depicted in regulator_desc.	
-
-There's no information about how to use this register in your
-bindings...  but anyway, can't be too hard to add this if it's actually
-used.
-
-> > +	.i2c_timeout_us = 200,
-
-> yep, does not match up.
-
-Like I say I just don't see why this is even specified per device.
-
-> > +	.max_uV = 1450000,
-
-> can be used with constraints, but most regulator drivers seem to
-> store this internally.
-
-Or just trivially calculate it as we do currently.
-
-> > +	.voltage_selector_offset = 0,
-> > +	.voltage_selector_mask = 0x7F,
-> > +	.voltage_selector_setbits = 0x0,
-> > +	.voltage_selector_zero = false,
-
-> to an extent we can map these to vsel_mask, linear_min_sel etc.
-> (again assuming the regulator driver has populated it - most that
-> implement custom set_voltage, get_voltage do not do that.
-
-Anything that implements a custom set_voltage() won't work with your
-data structure either...
-
-> Other option is to make rdev available to omap_pmic regulator -
-> which again implies change in existing regulator driver?
-
-Why would any of the drivers need to change to do this?  They're already
-exporting the information.
-
-> >the only thing that's missing is the timeouts and it's
-> >not at all obvious why those need to be tuned per device.
-
-> OMAP VC hardware has no idea about how long to wait before giving up
-> on an ongoing i2c transaction. This may depend on PMIC and what it
-> does before acking on i2c.
-
-So pick a high number (it's only for error cases...)?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130705/b856fb33/attachment.sig>
+>
+> Nicolas
