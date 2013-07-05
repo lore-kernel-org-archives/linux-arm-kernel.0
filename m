@@ -1,33 +1,43 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Fri,  5 Jul 2013 13:48:01 +0530
-Subject: [PATCH 1/1] of/documentation: Fix a typo in exynos5250-clock.txt
-Message-ID: <1373012281-26433-1-git-send-email-sachin.kamat@linaro.org>
+From: b18965@freescale.com (Alison Wang)
+Date: Fri, 5 Jul 2013 15:51:38 +0800
+Subject: [PATCH 0/4] ARM: vf610: Add DCU framebuffer driver for Vybrid VF610
+ platform
+Message-ID: <1373010702-9244-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clocks should be numbered sequentially as they are represented as
-enum values in the clock driver.
+This series contain DCU framebuffer driver for Freescale Vybrid VF610 platform.
 
-Typo introduced by commit 17d4caccef ("clk: exynos5250: register
-display block gate clocks to common clock framework")
+The Display Controller Unit (DCU) module is a system master that
+fetches graphics stored in internal or external memory and displays
+them on a TFT LCD panel. A wide range of panel sizes is supported
+and the timing of the interface signals is highly configurable.
+Graphics are read directly from memory and then blended in real-time,
+which allows for dynamic content creation with minimal CPU intervention.
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
- .../devicetree/bindings/clock/exynos5250-clock.txt |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The features:
 
-diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-index 781a627..1a05761 100644
---- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-@@ -154,7 +154,7 @@ clock which they consume.
-   dsim0			341
-   dp			342
-   mixer			343
--  hdmi			345
-+  hdmi			344
- 
- Example 1: An example of a clock controller node is listed below.
- 
--- 
-1.7.9.5
+(1) Full RGB888 output to TFT LCD panel.
+(2) For the current LCD panel, WQVGA "480x272" is supported.
+(3) Blending of each pixel using up to 4 source layers dependent on size of panel.
+(4) Each graphic layer can be placed with one pixel resolution in either axis.
+(5) Each graphic layer support RGB565 and RGB888 direct colors without alpha channel
+and BGRA8888 direct colors with an alpha channel.
+(6) Each graphic layer support alpha blending with 8-bit resolution.
+
+----------------------------------------------------------------
+Alison Wang (4):
+      ARM: dts: vf610: Add DCU and TCON nodes
+      ARM: dts: vf610-twr: Enable DCU and TCON devices
+      ARM: clk: vf610: Add DCU and TCON clock support
+      fb: Add DCU framebuffer driver for Vybrid VF610 platform
+
+ arch/arm/boot/dts/vf610-twr.dts         |   10 +
+ arch/arm/boot/dts/vf610.dtsi            |   18 ++
+ arch/arm/mach-imx/clk-vf610.c           |    5 +
+ drivers/video/Kconfig                   |    9 +
+ drivers/video/Makefile                  |    1 +
+ drivers/video/fsl-dcu-fb.c              | 1091 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/vf610-clock.h |    3 +-
+ 7 files changed, 1136 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/video/fsl-dcu-fb.c
