@@ -1,43 +1,55 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 5 Jul 2013 15:44:32 +0000 (UTC)
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <51D65E3C.1070202@ti.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <51C9F0A8.1050607@ti.com> <87fvw6t136.fsf@linaro.org>
- <79CD15C6BA57404B839C016229A409A83ECC952D@DBDE04.ent.ti.com>
- <51CAEB33.5010101@ti.com>
- <alpine.DEB.2.02.1306261722520.6135@utopia.booyaka.com>
- <51CBBCD8.5030600@ti.com>
- <alpine.DEB.2.02.1306281844090.8767@utopia.booyaka.com>
- <alpine.DEB.2.02.1307010211580.3741@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83ECCC435@DBDE04.ent.ti.com>
- <51D2E096.5040700@ti.com>
- <alpine.DEB.2.02.1307031944580.9618@utopia.booyaka.com>
- <alpine.DEB.2.02.1307041810410.6258@utopia.booyaka.com>
- <51D65E3C.1070202@ti.com>
-Message-ID: <alpine.DEB.2.02.1307051530290.8573@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Jul 2013 17:45:15 +0200
+Subject: [PATCH] ASoC: Allow imx-pcm-{dma,fiq}.c to be modules
+Message-ID: <201307051745.16140.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Jul 2013, Rajendra Nayak wrote:
+This is required so we can build the imx sound support
+when ALSA itself is a loadable module.
 
-> Grant already made it clear when he posted that patch that neither that nor
-> anything similar would be taken up mainline because the appended dtb was only
-> meant for folks stuck with legacy bootloaders and have no way to upgrade.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: alsa-devel at alsa-project.org
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
 
-He's not the final arbiter of what goes into the mainline kernel :-)
-
-> Anyone who uses a bootloader capable of passing the dtb should *not* use
-> the appended dtb way.
-
-Look, either the kernel should support appended DTB booting, or it 
-shouldn't.  If it shouldn't, then that code should be ripped out of the 
-kernel completely, and we tell people 'tough luck'. If it should, then it 
-makes sense to help the millions of folks out there with locked 
-bootloaders to build and boot new kernels. This half-support that's in the 
-kernel now is not good.
-
-
-- Paul
+diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
+index aa43854..805b83e 100644
+--- a/sound/soc/fsl/Kconfig
++++ b/sound/soc/fsl/Kconfig
+@@ -109,11 +109,11 @@ config SND_SOC_IMX_SSI
+ 	tristate
+ 
+ config SND_SOC_IMX_PCM_FIQ
+-	bool
++	tristate
+ 	select FIQ
+ 
+ config SND_SOC_IMX_PCM_DMA
+-	bool
++	tristate
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 
+ config SND_SOC_IMX_AUDMUX
+diff --git a/sound/soc/fsl/imx-pcm.h b/sound/soc/fsl/imx-pcm.h
+index 67f656c..0e3619e 100644
+--- a/sound/soc/fsl/imx-pcm.h
++++ b/sound/soc/fsl/imx-pcm.h
+@@ -32,7 +32,7 @@ imx_pcm_dma_params_init_data(struct imx_dma_data *dma_data,
+ 		dma_data->peripheral_type = IMX_DMATYPE_SSI;
+ }
+ 
+-#ifdef CONFIG_SND_SOC_IMX_PCM_DMA
++#if IS_ENABLED(CONFIG_SND_SOC_IMX_PCM_DMA)
+ int imx_pcm_dma_init(struct platform_device *pdev);
+ void imx_pcm_dma_exit(struct platform_device *pdev);
+ #else
+@@ -46,7 +46,7 @@ static inline void imx_pcm_dma_exit(struct platform_device *pdev)
+ }
+ #endif
+ 
+-#ifdef CONFIG_SND_SOC_IMX_PCM_FIQ
++#if IS_ENABLED(CONFIG_SND_SOC_IMX_PCM_FIQ)
+ int imx_pcm_fiq_init(struct platform_device *pdev);
+ void imx_pcm_fiq_exit(struct platform_device *pdev);
+ #else
