@@ -1,81 +1,77 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 5 Jul 2013 13:44:38 +0300
-Subject: [PATCH v2 03/22] ARM: tegra: Create a DT header defining swgroups ID
-In-Reply-To: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
-References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1373021097-32420-4-git-send-email-hdoyu@nvidia.com>
+Date: Fri, 5 Jul 2013 13:44:35 +0300
+Subject: [PATCH v2 00/22] Unified SMMU driver among Tegra SoCs
+Message-ID: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a header file to define the swgroup IDs used by the IOMMU(SMMU)
-binding. "swgroup" is a group of H/W clients in Tegra SoC from S/W POV.
+Hi,
 
-This will allow the same header to be used by both device tree files,
-and drivers implementing this binding, which guarantees that the two
-stay in sync. This also makes device trees more readable by using names
-instead of magic numbers.
+This series provides:
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- include/dt-bindings/memory/tegra-swgroup.h |   50 ++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+(1) Unified SMMU driver among Tegra SoCs
+(2) Multiple Address Space support(MASID) in IOMMU(SMMMU)
+(3) Tegra IOMMU'able devices, most of platform devices are IOMMU'able.
+
+There's some discussion[1] about device population order, which can
+solve the following patches.
+
+  [HACK] of: dev_node has struct device pointer
+  ARM: tegra: Populate AHB/IOMMU earlier than others
+
+Also "ARM: dma-mapping: Drop GFP_COMP for DMA memory allocations" may
+not be necessary by [2]
+
+Tested IOMMU functionality with T30 SD/MMC. Any further testing with
+T114 and/or other devices would be really appreciated.
+
+v2:
+Updated based on Thierry Reding's and Stephen Warren's feedback
+
+v1:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/180267.html
+
+Hiroshi Doyu (22):
+  [HACK] of: dev_node has struct device pointer
+  ARM: tegra: Populate AHB/IOMMU earlier than others
+  ARM: tegra: Create a DT header defining swgroups ID
+  ARM: dt: tegra30: iommu: Add "nvidia,swgroup"
+  ARM: dt: tegra30: iommu: Add "nvidia,memory-client"
+  ARM: dt: tegra114: iommu: Fix IOMMU register address
+  ARM: dt: tegra114: iommu: Add "nvidia,swgroups"
+  ARM: dt: tegra114: Add "nvidia,memory-client"
+  amba: Move AHB to core_initcall
+  iommu/tegra: smmu: Move IOMMU to core_initcall
+  iommu/tegra: smmu: Add Tegra 114 support
+  iommu/tegra: smmu: Select ARM_DMA_USE_IOMMU in Kconfig
+  iommu/tegra: smmu: Create default IOVA maps
+  iommu/tegra: smmu: Register platform_device to IOMMU dynamically
+  iommu/tegra: smmu: Calculate ASID register offset by ID
+  iommu/tegra: smmu: Get "nvidia,swgroup" from DT
+  iommu/tegra: smmu: Unfied driver for Tegra SoCs
+  iommu/tegra: smmu: Use dt-bindings MACRO
+  iommu/tegra: smmu: Workaround PCIe IOMMU'able
+  iommu/tegra: smmu: Get "nvidia,memory-client" from DT
+  iommu/tegra: smmu: Support Multiple ASID
+  ARM: dma-mapping: Drop GFP_COMP for DMA memory allocations
+
+ .../bindings/iommu/nvidia,tegra30-smmu.txt         |   20 +-
+ arch/arm/boot/dts/tegra114.dtsi                    |   13 +-
+ arch/arm/boot/dts/tegra30.dtsi                     |   21 ++
+ arch/arm/mach-tegra/tegra.c                        |   22 ++
+ arch/arm/mm/dma-mapping.c                          |    7 +
+ drivers/amba/tegra-ahb.c                           |    7 +-
+ drivers/iommu/Kconfig                              |    1 +
+ drivers/iommu/tegra-smmu.c                         |  211 +++++++++++---------
+ drivers/of/base.c                                  |   23 +++
+ drivers/of/platform.c                              |    8 +
+ include/dt-bindings/memory/tegra-swgroup.h         |   50 +++++
+ include/linux/of.h                                 |   16 ++
+ 12 files changed, 296 insertions(+), 103 deletions(-)
  create mode 100644 include/dt-bindings/memory/tegra-swgroup.h
 
-diff --git a/include/dt-bindings/memory/tegra-swgroup.h b/include/dt-bindings/memory/tegra-swgroup.h
-new file mode 100644
-index 0000000..4cfa769
---- /dev/null
-+++ b/include/dt-bindings/memory/tegra-swgroup.h
-@@ -0,0 +1,50 @@
-+/*
-+ * This header provides constants for binding nvidia,swgroup ID
-+ */
-+
-+#ifndef _DT_BINDINGS_MEMORY_TEGRA_SWGROUP_H
-+#define _DT_BINDINGS_MEMORY_TEGRA_SWGROUP_H
-+
-+#define TEGRA_SWGROUP_AFI 0
-+#define TEGRA_SWGROUP_AVPC 1
-+#define TEGRA_SWGROUP_DC 2
-+#define TEGRA_SWGROUP_DCB 3
-+#define TEGRA_SWGROUP_EPP 4
-+#define TEGRA_SWGROUP_G2 5
-+#define TEGRA_SWGROUP_HC 6
-+#define TEGRA_SWGROUP_HDA 7
-+#define TEGRA_SWGROUP_ISP 8
-+#define TEGRA_SWGROUP_ISP2 SWGID_ISP
-+/* UNUSED: 9 */
-+/* UNUSED: 10 */
-+#define TEGRA_SWGROUP_MPE 11
-+#define TEGRA_SWGROUP_MSENC SWGID_MPE
-+#define TEGRA_SWGROUP_NV 12
-+#define TEGRA_SWGROUP_NV2 13
-+#define TEGRA_SWGROUP_PPCS 14
-+#define TEGRA_SWGROUP_SATA2 15
-+#define TEGRA_SWGROUP_SATA 16
-+#define TEGRA_SWGROUP_VDE 17
-+#define TEGRA_SWGROUP_VI 18
-+#define TEGRA_SWGROUP_VIC 19
-+#define TEGRA_SWGROUP_XUSB_HOST 20
-+#define TEGRA_SWGROUP_XUSB_DEV 21
-+#define TEGRA_SWGROUP_A9AVP 22
-+#define TEGRA_SWGROUP_TSEC 23
-+#define TEGRA_SWGROUP_PPCS1 24
-+/* UNUSED: 25 */
-+/* UNUSED: 26 */
-+/* UNUSED: 27 */
-+/* UNUSED: 28 */
-+/* UNUSED: 29 */
-+/* UNUSED: 30 */
-+/* UNUSED: 31 */
-+
-+/* Reserved: 32-63 */
-+
-+#define TEGRA_SWGROUP_BIT(x)	(1ULL << TEGRA_SWGROUP_##x)
-+
-+#define TEGRA30_SWGROUP_ALL	<0x00000000 0x000779ff>
-+#define TEGRA114_SWGROUP_ALL	<0x00000000 0x01b659fe>
-+
-+#endif /* _DT_BINDINGS_MEMORY_TEGRA_SWGROUP_H */
 -- 
 1.7.9.5
+
+[1] https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/thread.html#36542
+[2] http://marc.info/?l=linux-tegra&m=137173895620957&w=1
