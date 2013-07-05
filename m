@@ -1,46 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  5 Jul 2013 16:39:33 -0700
-Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if UP system
-Message-ID: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 5 Jul 2013 16:40:48 -0700
+Subject: [PATCH] ARM: Make multi_v7_defconfig usable on hardware
+In-Reply-To: <20130626225714.GB911@quad.lixom.net>
+References: <1372210565-22962-1-git-send-email-olof@lixom.net>
+ <CAOesGMg2du8PsOGy1kdePT4vMsWie1N8hmjCxRqr-LS6RAC07g@mail.gmail.com>
+ <20130626225714.GB911@quad.lixom.net>
+Message-ID: <CAGa+x85dmDg9a2B8rAPw5wQTYuGDu0Nva=XEgonKgA1+=JAhCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a uniprocessor implementation the interrupt processor targets
-registers are read-as-zero/write-ignored (RAZ/WI). Unfortunately
-gic_get_cpumask() will print a critical message saying
+On Wed, Jun 26, 2013 at 3:57 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Jun 25, 2013 at 06:38:21PM -0700, Olof Johansson wrote:
+>> On Tue, Jun 25, 2013 at 6:36 PM, Olof Johansson <olof@lixom.net> wrote:
+>>
+>> > +CONFIG_DEBUG_LL=y
+>> > +CONFIG_DEBUG_OMAP2PLUS_UART=y
+>> > +CONFIG_DEBUG_OMAP4UART3=y
+>>
+>> Clearly not supposed to be there for the posted version, my bad --
+>> will take those out before committing.
+>>
+>> (this will go on top of next/late, btw).
+>
+> Actually, this doesn't go nicely on top of any branch right now since
+> multi_v7_defconfig is modified in several of the branches.
+>
+> So, I've applied this on top of for-next (which is unorthodox and unusual), and
+> we'll move it over to what will likely be the first, pre-rc1 fixes pull request
+> that we send up, once all the other contents has been merged.
 
- GIC CPU mask not found - kernel will fail to boot.
+Hopefully this can be carefully rebuilt on top of -rc1 with inspection
+for any deletions.  For example, I just noticed that this undoes some
+of the additions to multi_v7_defconfig which add the network support
+for Allwinner/sun4, and so broke network-enabled kernels for my
+cubieboard.
 
-if these registers all read as zero, but there won't actually be
-a problem on uniprocessor systems and the kernel will boot just
-fine. Skip this check if we're running a UP kernel or if we
-detect that the hardware only supports a single processor.
+[1]
+commit fb1c60288a886a28dc7c055449fd1936140fe891
+Author: Maxime Ripard <maxime.ripard@free-electrons.com>
+Date:   Sun Jun 9 18:13:53 2013 +0200
 
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+    ARM: multi_v7: Enable Allwinner EMAC in multi_v7_defconfig
 
-Maybe we should just drop the check entirely? It looks like it may
-just be debug code that won't ever trigger in practice, even on the
-11MPCore that caused this code to be introduced.
-
- drivers/irqchip/irq-gic.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 19ceaa6..589c760 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -368,7 +368,7 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
- 			break;
- 	}
- 
--	if (!mask)
-+	if (!mask && num_possible_cpus() > 1)
- 		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
- 
- 	return mask;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+    Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
