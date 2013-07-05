@@ -1,37 +1,27 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Fri,  5 Jul 2013 14:12:29 +0530
-Subject: [PATCH 3/3] ARM: EXYNOS: Add G2D support to exynos5250
-In-Reply-To: <1373013749-14530-1-git-send-email-sachin.kamat@linaro.org>
-References: <1373013749-14530-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1373013749-14530-3-git-send-email-sachin.kamat@linaro.org>
+From: wangyuhang2014@gmail.com (yuhang wang)
+Date: Fri, 5 Jul 2013 17:07:06 +0800
+Subject: SPI: DUAL/QUAD support
+In-Reply-To: <51D689F3.3070605@ti.com>
+References: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>
+ <20130704130017.GA25997@sig21.net>
+ <OFA0D5839D.0594EA10-ONC1257B9E.004A7347-C1257B9E.00524BA5@rohde-schwarz.com>
+ <20130704154927.GE27646@sirena.org.uk>
+ <OFAD729A05.8C915625-ONC1257B9E.00576B25-C1257B9E.0058477D@rohde-schwarz.com>
+ <CAHSAbzOg+uHndydSC43moF7pijc67pqzB2rPnY69ynXHEzw79g@mail.gmail.com>
+ <51D67851.8020402@ti.com>
+ <CAHSAbzNvMo_oeaqtzO8-xDm-L-f8wVccVqfuVqbR=OwqWJhVwg@mail.gmail.com>
+ <51D689F3.3070605@ti.com>
+Message-ID: <CAHSAbzM1PGoMXFNOmB7guDsVWYnRoRy89-bufHYpPz5+odnd8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds G2D node to exynos5250 DT file.
+>                     if (!quad_mode)
+>                             dra7xxx_writel(qspi, qspi->cmd | QSPI_RD_SNGL,
+>                                             QSPI_SPI_CMD_REG);
+>                     else
+>                             dra7xxx_writel(qspi, qspi->cmd | QSPI_RD_QUAD,
+>                                             QSPI_SPI_CMD_REG);
+>                  .......
+>                 }
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
- arch/arm/boot/dts/exynos5250.dtsi |    8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index ef57277..6f356ce 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -163,6 +163,14 @@
- 		clock-names = "watchdog";
- 	};
- 
-+	g2d at 10850000 {
-+		compatible = "samsung,exynos5250-g2d";
-+		reg = <0x10850000 0x1000>;
-+		interrupts = <0 91 0>;
-+		clocks = <&clock 345>;
-+		clock-names = "fimg2d";
-+	};
-+
- 	codec at 11000000 {
- 		compatible = "samsung,mfc-v6";
- 		reg = <0x11000000 0x10000>;
--- 
-1.7.9.5
+So what do you based on to set variable quad_mode.
