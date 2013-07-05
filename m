@@ -1,82 +1,111 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Fri, 5 Jul 2013 16:34:52 +0200
-Subject: SPI: DUAL/QUAD support
-In-Reply-To: <CAHSAbzP1-RVot+hhtY_DcBK=u5n2234eb9WOKLESwvUNax7+pA@mail.gmail.com>
-References: <OFAD729A05.8C915625-ONC1257B9E.00576B25-C1257B9E.0058477D@rohde-schwarz.com>
- <CAHSAbzOg+uHndydSC43moF7pijc67pqzB2rPnY69ynXHEzw79g@mail.gmail.com>
- <51D67851.8020402@ti.com>
- <CAHSAbzNvMo_oeaqtzO8-xDm-L-f8wVccVqfuVqbR=OwqWJhVwg@mail.gmail.com>
- <51D689F3.3070605@ti.com>
- <CAHSAbzM1PGoMXFNOmB7guDsVWYnRoRy89-bufHYpPz5+odnd8w@mail.gmail.com>
- <51D68D14.7090606@ti.com>
- <CAHSAbzMfvfdDtTh=3zeBni4fNMAHEMdTJLJU-Oc13HJUqCUj0A@mail.gmail.com>
- <51D69197.7060802@ti.com>
- <CAHSAbzP1-RVot+hhtY_DcBK=u5n2234eb9WOKLESwvUNax7+pA@mail.gmail.com>
-Message-ID: <20130705143452.GA7738@sig21.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 05 Jul 2013 15:44:28 +0100
+Subject: [PATCH v2] ARM/KVM: save and restore generic timer registers
+In-Reply-To: <51D6D377.70708@linaro.org>
+References: <1370963819-26165-1-git-send-email-andre.przywara@linaro.org>
+ <51C2D528.90805@arm.com> <51D6D377.70708@linaro.org>
+Message-ID: <51D6DBCC.9040807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 05, 2013 at 06:24:40PM +0800, yuhang wang wrote:
+On 05/07/13 15:08, Andre Przywara wrote:
+> Hi Marc,
 > 
-> 2 Questions here:
-> 1.In m25p80.c probe, the kmalloc below I feel very strange.
->       flash->command = kmalloc(MAX_CMD_SIZE + (flash->fast_read ? 1 : 0),
->                                       GFP_KERNEL);
+>  >> ...
+>>>
+>>> +int kvm_arm_num_timer_regs(void)
+>>> +{
+>>> +	return 3;
+>>> +}
+>>> +
+>>> +int kvm_arm_copy_timer_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+>>> +{
+>>> +	if (put_user(KVM_REG_ARM_TIMER_CTL, uindices))
+>>> +		return -EFAULT;
+>>> +	uindices++;
+>>> +	if (put_user(KVM_REG_ARM_TIMER_CNT, uindices))
+>>> +		return -EFAULT;
+>>> +	uindices++;
+>>> +	if (put_user(KVM_REG_ARM_TIMER_CVAL, uindices))
+>>> +		return -EFAULT;
+>>
+>> So these macros are going to break arm64. Any chance you could introduce
+>> them at the same time on both platforms? The rest of the work can be
+>> delayed, but you shouldn't break arm64 (you'd expect me to say that,
+>> wouldn't you? ;-).
 > 
->  (flash->fast_read ? 1 : 0) must be 0! So why do it like that.
+> Is that just due to KVM_REG_ARM instead of KVM_REG_ARM64?
+> Or do you expect the numbering to be completely different since there is 
+> no mrc/mcr anymore (IIRC)?
 
-Maybe just increase MAX_CMD_SIZE by 1 unconditonally?
-Yeah, looks like a bug in m25p80.c, flash->fast_read
-is initialized too late.
+Both. The encoding is different (32bit is encoded CRn/CRm/Op1/Op2, and
+64bit is Op0/Op1/CRn/CRm/Op2), and the KVM_REG_ARM64 is different too.
 
-> +#define        OPCODE_DOR              0x3B    /* Dual Output Read */
-> +#define        OPCODE_QOR              0x6B    /* Quad Output Read */
-> +#define        OPCODE_QPP              0x32    /* Quad Page Programming */
-> +#define        OPCODE_QEN              0x02 /* Quad Mode Enable Flag */
+> Is put_user an issue here (should not, right?)
 
-Which flash chip are these for?  The OPCODE_DOR and OPCODE_QOR
-match MX25L25635E, but OPCODE_QPP not (Macronix uses 0x38).
+No, except for the reason outlined below.
 
+> Is there already a document describing arch timer access on AARCH64?
 
+No, but it is strikingly similar to the AArch32. Have a look at
+arch/arm64/include/asm/arch_timer.h and arch/arm64/kvm/hyp.S for details.
 
-> +#ifdef CONFIG_M25PXX_USE_FAST_READ
-> +#define OPCODE_READ    OPCODE_FAST_READ
-> +#define FAST_READ_DUMMY_BYTE 1
-> +#else
-> +#define OPCODE_READ    OPCODE_NORM_READ
-> +#define FAST_READ_DUMMY_BYTE 0
-> +#endif
+> If I am thinking in a totally wrong direction, please bear with me and 
+> feel free to point me to the right one ;-)
+> /me is now looking at getting a cross compiler to see what you mean...
 
-this doesn't work with the flash->fast_read setting from DT
+That'd be a good thing! ;-)
 
-BTW, if we add "bitwidths" to spi_board_info, wouldn't
-it make sense to also add "use_fast_read" and remove the
-CONFIG_M25PXX_USE_FAST_READ option?
+>> Also, I'd like to keep userspace access out of the timer code itself.
+>> Low level code shouldn't have to know about that. Can you create proper
+>> accessors instead, and move whole userspace access to coproc.c?
+> 
+> IIRC Christoffer recommended to keep this code completely out of 
+> coproc.c ;-) This also helps to keep coproc.c clean of ARCH_TIMER ifdefs 
+> in coproc.c (which I completely forgot in this version, btw, but that's 
+> already fixed).
 
-> +/*
-> + * Write configuration register 2 byte
-> + * Returns negative if error occurred.
-> + */
-> +static int write_cr(struct m25p *flash, u16 val)
-> +{
-> +       flash->command[0] = OPCODE_WRSR;
-> +       flash->command[1] = val >> 8;
-> +       flash->command[2] = val;
-> +
-> +       return spi_write(flash->spi, flash->command, 3);
-> +}
+I thought we agreed on moving the userspace access out of the timer
+code. In a reply to the email you just quoted, Christoffer says:
+"I'm fine with this, coproc.c or guest.c - either way.".
 
-> +       if ((flash->spi->rx_bitwidth == SPI_BITWIDTH_QUAD) ||
-> +               (flash->spi->tx_bitwidth == SPI_BITWIDTH_QUAD)) {
-> +               write_enable(flash);
-> +               write_cr(flash, OPCODE_QEN);
-> +       }
+The man has spoken! ;-)
 
-MX25L25635E doesn't have a cr, instead a bit needs to be set in the sr
+>>
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>>> +{
+>>> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>>> +	void __user *uaddr = (void __user *)(long)reg->addr;
+>>> +	u64 val;
+>>> +	int ret;
+>>> +
+>>> +	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
+>>> +	if (ret != 0)
+>>> +		return ret;
+>>> +
+>>> +	switch (reg->id) {
+>>> +	case KVM_REG_ARM_TIMER_CTL:
+>>> +		timer->cntv_ctl = val;
+>>> +		break;
+>>> +	case KVM_REG_ARM_TIMER_CNT:
+>>> +		vcpu->kvm->arch.timer.cntvoff = kvm_phys_timer_read() - val;
+>>
+>> I just realized what bothers me here: You're computing cntvoff on a per
+>> vcpu basis, while this is a VM property. Which means that as you're
+>> restoring vcpus, you'll be changing cntvoff - sounds like a bad idea to me.
+>>
+>> The counter is really global. Do we have a way to handle VM-wide
+>> registers? I think Christoffer was trying to some a similar thing with
+>> the GIC...
+> 
+> So the consensus of this discussion was just to block writing when the 
+> VCPU is running, right? Or is there something else?
 
-Maybe we need to add some fields to m25p_ids[] to manage variation
-between flash devices.
+Yup. No update while vcpus are running.
 
-
-Thanks,
-Johannes
+	M.
+-- 
+Jazz is not dead. It just smells funny...
