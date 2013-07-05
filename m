@@ -1,45 +1,33 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 5 Jul 2013 17:32:40 +0900
-Subject: Appended DTB files for multi-machine kernels
-In-Reply-To: <201307042334.37161.arnd@arndb.de>
-References: <51D5A938.30607@gmail.com> <20130704171148.GJ27646@sirena.org.uk>
- <201307042334.37161.arnd@arndb.de>
-Message-ID: <CANqRtoT+=CJrU2AjFwN67vrypQ1WR-8JeMyn1-mzb+tXWeAp2g@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri,  5 Jul 2013 13:48:01 +0530
+Subject: [PATCH 1/1] of/documentation: Fix a typo in exynos5250-clock.txt
+Message-ID: <1373012281-26433-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+The clocks should be numbered sequentially as they are represented as
+enum values in the clock driver.
 
-On Fri, Jul 5, 2013 at 6:34 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 04 July 2013, Mark Brown wrote:
->> On Thu, Jul 04, 2013 at 06:56:24PM +0200, Daniel Mack wrote:
->>
->> > Unless I missed some recent discussion, this case is not easy to handle.
->> > Yes, I know that these kind of things should be handled by a
->> > next-generation bootloader, but in our case, we want to avoid a loader
->> > update of already shipped hardware by all means.
->>
->> There was some discussion about appending multiple DTBs recently.  I
->> can't actually recall anything about it though so that's not an entirely
->> helpful thing...
->
-> Yes, it keeps coming up, I think by now everybody agreed it's a good
-> idea to extend the ATAGS compat mode, but so far nobody has implemented
-> it. Magnus Damm was very interested in this feature last year and
-> was planning to work on it, but I don't know how far he got.
+Typo introduced by commit 17d4caccef ("clk: exynos5250: register
+display block gate clocks to common clock framework")
 
-Correct, I was and still am a bit interested in it. I did however
-never get around to write any code. My apologies if that stalled
-anyone.
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ .../devicetree/bindings/clock/exynos5250-clock.txt |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-With mach-shmobile we're now getting to a point where most of our
-boards are using DT_MACHINE and appended DTB instead of the MACHINE
-and mach-type. Because of that I feel that the moment has sort of
-passed for me.
-
-Regardless of this nearly all our boot loaders pass mach-type so it
-would be nice to match on that instead of the appended DTB.
-
-Thanks,
-
-/ magnus
+diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+index 781a627..1a05761 100644
+--- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
++++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+@@ -154,7 +154,7 @@ clock which they consume.
+   dsim0			341
+   dp			342
+   mixer			343
+-  hdmi			345
++  hdmi			344
+ 
+ Example 1: An example of a clock controller node is listed below.
+ 
+-- 
+1.7.9.5
