@@ -1,14 +1,14 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 5 Jul 2013 16:21:07 +0300
+From: coelho@ti.com (Luciano Coelho)
+Date: Fri, 5 Jul 2013 16:22:05 +0300
 Subject: [RFC] clk: add flags to distinguish xtal clocks
 In-Reply-To: <CAAG0J98UL5sLTmRx1o8XnbK8qWv_qNi9+zwuyPBbbYExPSbw8g@mail.gmail.com>
 References: <1372971912-10877-1-git-send-email-coelho@ti.com>
  <CAAG0J98UL5sLTmRx1o8XnbK8qWv_qNi9+zwuyPBbbYExPSbw8g@mail.gmail.com>
-Message-ID: <20130705132107.GL19262@arwen.pp.htv.fi>
+Message-ID: <1373030525.21065.172.camel@cumari.coelho.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 05, 2013 at 02:12:08PM +0100, James Hogan wrote:
+On Fri, 2013-07-05 at 14:12 +0100, James Hogan wrote:
 > On 4 July 2013 22:05, Luciano Coelho <coelho@ti.com> wrote:
 > > Add a flag that indicate whether the clock is a crystal or not.  Since
 > > no clocks set this flag right now, include an additional flag that
@@ -42,60 +42,38 @@ On Fri, Jul 05, 2013 at 02:12:08PM +0100, James Hogan wrote:
 > of the XTAL pads have a bypass bit, which according to the hardware
 > engineer I asked should be enabled when you want to use the
 > corresponding XTAL pads as a clock input pad rather than an
-> oscillator. I was considering extending clk-fixed-rate (via a wrapper
+> oscillator.
+
+Cool, good to know that I'm not alone here. ;)
+
+
+>  I was considering extending clk-fixed-rate (via a wrapper
 > driver) to parse a custom DT property and a register address / bit
 > number and set the bypass bit as appropriate itself.
-> 
+
+I thought about this too.  I actually have a "driver" for my clocks,
+because normally they're not part of the main board, but part of the
+module that contains the WiLink chip.  In those cases, I don't want my
+clocks to be used as a generic clk-fixed-rate by the clock framework.
+But the only difference in my "wrapper" is that it matches
+"ti,wilink-clock" instead of "fixed-clock".
+
+
 > So I was wondering, is there a particular reason you don't have a DT
 > property on the node for the device that needs to know what type of
 > clock it is, rather than the clock node itself? That way you're not
 > depending directly on the generic common clock framework to be able to
 > tell you such electrical details.
 
-three things here:
+I think this is a detail of the clock itself, not of the user of the
+clock.  Of course, the user of the clock needs to know what to do if the
+clock is XTAL.  But the information of whether it is a XTAL or not
+should be in the clock data.
 
-1) you end up with several devices implementing the clock type
-attribute.
+I tried to make a generic solution that everyone could use.  For
+instance, you. :) You could use the same bit that I implemented and, in
+your driver, convert that bit into the action you need to take.
 
-2) the type is a property of the clock itself
 
-3) At least WiLink, can work with both types of clocks.
-
-considering those, I really think this should belong to the clock node.
-Otherwise Imagine how your DT would look like:
-
-clock {
-	compatible = "fixed-rate";
-	...
-};
-
-wilink {
-	clocks = &clock;
-	wilink,btw-this-time-we-are-using-xtal;
-	...
-};
-
-where you could:
-
-clock {
-	compatible = "fixed-rate";
-	clock-type = "xtal";
-	...
-};
-
-wilink {
-	clocks = &clock;
-	...
-};
-
-second option looks a lot cleaner to me.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130705/64e53508/attachment.sig>
+--
+Luca.
