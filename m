@@ -1,17 +1,51 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 6 Jul 2013 01:51:54 +0200 (CEST)
-Subject: [PATCH 6/9] clocksource: dw_apb_timer: quirk for inverted int mask
-In-Reply-To: <201307060054.35996.heiko@sntech.de>
-References: <201307060051.09716.heiko@sntech.de>
- <201307060054.35996.heiko@sntech.de>
-Message-ID: <alpine.DEB.2.02.1307060150030.32106@ionos.tec.linutronix.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 06 Jul 2013 01:52:48 +0200
+Subject: [PATCH 2/3] of/documentation: Update G2D documentation
+In-Reply-To: <1373013749-14530-2-git-send-email-sachin.kamat@linaro.org>
+References: <1373013749-14530-1-git-send-email-sachin.kamat@linaro.org>
+ <1373013749-14530-2-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <4264635.Hmig5l0VLj@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 6 Jul 2013, Heiko St?bner wrote:
+Hi Sachin,
 
-> Some timer variants use an inverted setting to mask the timer interrupt.
-> Therefore add a quirk to handle these variants.
+On Friday 05 of July 2013 14:12:28 Sachin Kamat wrote:
+> Exynos5250 G2D IP requires only the gate clock. Update the
+> binding documentation accordingly.
+> 
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Inki Dae <inki.dae@samsung.com>
+> ---
+>  .../devicetree/bindings/gpu/samsung-g2d.txt        |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/gpu/samsung-g2d.txt
+> b/Documentation/devicetree/bindings/gpu/samsung-g2d.txt index
+> 3f454ff..60ca631 100644
+> --- a/Documentation/devicetree/bindings/gpu/samsung-g2d.txt
+> +++ b/Documentation/devicetree/bindings/gpu/samsung-g2d.txt
+> @@ -12,7 +12,9 @@ Required properties:
+>    - interrupts : G2D interrupt number to the CPU.
+>    - clocks : from common clock binding: handle to G2D clocks.
+>    - clock-names : from common clock binding: must contain "sclk_fimg2d"
+> and -		  "fimg2d", corresponding to entries in the clocks 
+property. +		
+>  "fimg2d" for S5PV210 & Exynos4 based SoCs and "fimg2d" for +		 
+> Exynos5250 SoC, corresponding to entries in the clocks
+> +		  property.
 
-And by that add even more pointless conditionals into critical code
-pathes.
+I think this needs to be rephrased, because I can't get any sense from 
+this sentence.
+
+Maybe something like:
+
+- clock-names : names of clocks listed in clocks property, in the same 
+order, depending on SoC type:
+    - for S5PV210 and Exynos4 based SoCs : "fimg2d" and "sclk_fimg2d"
+    - for Exynos5250 SoC : "fimg2d".
+
+What do you think?
+
+Best regards,
+Tomasz
