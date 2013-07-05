@@ -1,52 +1,62 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 5 Jul 2013 15:19:57 +0200 (CEST)
-Subject: hrtimer: one more expiry time overflow check in hrtimer_interrupt
-In-Reply-To: <51D6B300.20804@renesas.com>
-References: <51B6D4C4.9080400@renesas.com>
- <alpine.DEB.2.02.1306281416080.4013@ionos.tec.linutronix.de>
- <51D6B300.20804@renesas.com>
-Message-ID: <alpine.DEB.2.02.1307051516050.32106@ionos.tec.linutronix.de>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Fri, 5 Jul 2013 13:20:10 +0000
+Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
+In-Reply-To: <20130705115959.GQ5523@atomide.com>
+References: <51D577E6.5010507@newflow.co.uk>
+ <51D59146.3070002@newflow.co.uk> <51D59C0E.8080003@newflow.co.uk>
+ <B5906170F1614E41A8A28DE3B8D121433EE93C23@DBDE04.ent.ti.com>
+ <20130705115959.GQ5523@atomide.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Jul 2013, Shinya Kuribayashi wrote:
-> On 6/28/2013 9:22 PM, Thomas Gleixner wrote:
-> >> On the other hand, we have another call site of tick_program_event() at
-> >> the bottom of hrtimer_interrupt().  The warning this time is triggered
-> >> there, so we need to apply the same fix to it.
+Hi Tony,
+
+On Fri, Jul 05, 2013 at 17:29:59, Tony Lindgren wrote:
+> * Bedia, Vaibhav <vaibhav.bedia@ti.com> [130705 01:17]:
 > > 
-> > Well, the problem is that you are just papering over the underlying
-> > issue of 32bit systems not being prepared for the year 2038 issue.
+> > I just checked the behavior on my AM335x-EVM. Current mainline boots fine
+> > provided I don't use earlyprintk.  The offending patch [1] in this case is the one
+> > that tries to get rid of omap_serial_early_init() for DT boot. This change inadvertently
+> > also results in the console UART getting reset and idled during bootup and that's where
+> > the boot stops for you. I think if you skip earlyprintk from the bootargs you should see
+> > the system booting fine. 
 > > 
-> > Just blindly silencing the warning is not going to make the system
-> > survive 2038 in any sane way. All timespec/val related time functions
-> > dealing with the clock realtime domain are simply broken in 2038 on
-> > 32bit, so it does not matter whether a warning triggers or not.
+> > I guess we need to retain the NO_IDLE and NO_RESET aspect for the console UART in
+> > omap_serial_early_init() to get earlyprintk working again.
 > 
-> You're right.  With this patch applied, the hrtimer_interrupt /looks/
-> back to normal, but /proc/timer_list still show that "expires at [in
-> negative range]":
+> Hmm nothing should get idled while earlyprintk is running, and then when the
+> serial driver kicks in it should not idle anything by default. And for DT based
+> booting we should not have mach-omap2/serial.c initialize anything.
 > 
->     active timers:
->      #0: tick_cpu_sched, tick_sched_timer, S:01
->      # expires at 50812500000-50812500000 nsecs [in -165398341280 to -165398341280 nsecs]
+
+If I add in the HWMOD flags without any reverts I get to the point where the serial driver
+comes up but the boot eventually stops [1]. Without the flags the boot stops much earlier [2]
+just like Mark reported.
+
+> I wonder if this is because the timeouts get now initialized to 0 instead
+> of -1 for the serial driver?
 > 
-> This shouldn't happen and something weird is still going on.
 
-I told you :)
- 
-> > We really need to tackle the underlying problem and not bandaiding a
-> > known to be broken system.
-> 
-> Agreed, but a little bit hard task for me.  This is 100% reproducible,
-> so I can help debug / verification.  Please let me know, if necessary.
+You meant initialized to -1, right? There's an additional check for timeout being 0. Unless i
+am missing something DT-boot will start off with timeout set to 0 and then get forced to -1.
 
-That will take some time. It's quite a huge change all over the
-place. We are aware of that fact and we have ideas how to fix it, but
-that won't happen in the near future as we need to discuss the user
-space visible changes as well. But we have started to discuss possible
-solutions, so this will be solved way before 1.1.2038 :)
+Regards,
+Vaibhav
 
-Thanks,
+===
+[1]
 
-	tglx
+[    0.000000] Booting Linux on physical CPU 0x0
+<...>
+[    0.190107] SMP: Total of 1 processors activated (363.72 BogoMIPS).
+[    0.196711] CPU: All CPU(s) started in SVC mode.
+[    0.205580] devtmpfs: initialized
+<stops here if booted with earlyprintk>
+
+[2]
+[    0.000000] Booting Linux on physical CPU 0x0
+<...>
+[    1.453364] pinctrl-single 44e10800.pinmux: 142 pins at pa f9e10800 size 568
+[    1.467121] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+<stops here if booted with earlyprintk>
