@@ -1,80 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Jul 2013 23:02:40 +0200
-Subject: MTD EEPROM support and driver integration
-In-Reply-To: <20130705201118.GM2959@lukather>
-References: <20130705201118.GM2959@lukather>
-Message-ID: <201307052302.40588.arnd@arndb.de>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 5 Jul 2013 14:10:04 -0700
+Subject: [PATCH] clocksource/cadence_ttc: Reuse clocksource as sched_clock
+In-Reply-To: <alpine.DEB.2.02.1307052259090.32106@ionos.tec.linutronix.de>
+References: <1372888216-10726-1-git-send-email-soren.brinkmann@xilinx.com>
+ <20130704033026.GX4288@tarshish>
+ <0030b826-0eb1-4bb8-a0de-1d8dc68bd81a@TX2EHSMHS017.ehs.local>
+ <alpine.DEB.2.02.1307052238170.32106@ionos.tec.linutronix.de>
+ <4fab6223-45c5-453e-9972-1c12aa79a312@CO1EHSMHS008.ehs.local>
+ <alpine.DEB.2.02.1307052259090.32106@ionos.tec.linutronix.de>
+Message-ID: <db965b9f-740b-4ea6-9219-09ece1fc9220@CO9EHSMHS013.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 July 2013, Maxime Ripard wrote:
-> Hi everyone,
+On Fri, Jul 05, 2013 at 10:59:53PM +0200, Thomas Gleixner wrote:
+> On Fri, 5 Jul 2013, S?ren Brinkmann wrote:
+> > On Fri, Jul 05, 2013 at 10:42:03PM +0200, Thomas Gleixner wrote:
+> > > We have a mechanism for that in place, if stuff goes cross trees. One
+> > > of the trees provides a set of commit for the other tree to pull, so
+> > > we do not end up with merge dependencies and conflicts.
+> > > 
+> > > Why is clocksource stuff going through armsoc unless it contains
+> > > related modifications in arch/arm/
+> > We overhauled Zynq's common clock code and migrated all Zynq drivers to
+> > it - the TTC being one. I'm pretty sure you were on the CC list for that
+> > change.
+> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=30e1e28598c2674c133148d8aec6d431d7acd314
+> > 
 > 
-> In the last weeks, we've drivers coming up both about mostly some very
-> simple drivers that expose to the userspace a few bytes of memory-mapped
-> IO. Both will probably live under drivers/misc/eeprom, where there's
-> support already for other kind of what could be assimilated as eeproms
-> (AT24, AT25, etc.).
-> 
-> Now, besides the code duplication every driver has to make to register
-> the sysfs attributes, it wouldn't cause much of a problem.
-> 
-> Except that these EEPROMs could store values useful for other drivers in
-> Linux. For example:
->   - imx28 OCOTP (the latest of the two EEPROM drivers recently submitted)
->     use it most of the time to store its MAC addresses
->   - Allwinner SoCs SID (the other latest driver submitted) use it
->     sometime to store a MAC address, and also the SoC ID, which could be
->     useful to implement a SoC bus driver.
->   - Some Allwinner boards (and presumably others) use an AT24 to store
->     the MAC address in it.
-> 
-> For now, everyone comes up with a different solution:
->   - imx28 has a hook in mach-mxs to patch the device tree at runtime and
->     add the values retrieved from the OCOTP to it.
->   - AT24 seem to have some function exported (at24_macc_(read|write)) so
->     that other part of the kernel can use them to retrieve values from
->     such an EEPROM.
->   - Allwinner SoCs have, well, basically nothing for now, which is why I
->     send this email.
-> 
-> The current way of working has several flaws imho:
->   - The code is heavily duplicated: the sysfs registering is common to
->     every driver, and at the end of the day, every driver should only
->     give a read/write callback, and that's it.
->   - The "consumer" drivers should not have to worry at all about the
->     EEPROM type it should retrieve the needed value from, let alone
->     dealing with the number of instances of such an EEPROM.
-> 
-> To solve this issues, I think I have some solution. Would merging this
-> drivers into MTD make some sense? It seems like there is already some
-> EEPROM drivers into drivers/mtd (such as an AT25 one, which also have a
-> drivers under drivers/misc/eeprom), so I guess it does, but I'd like to
-> have your opinion on this.
+> That's fine as it has no dependencies on any of the clocksource core
+> changes AFAICT.
+Right, shouldn't be a big deal. Just for this patch, I currently have the
+choice of working with the old TTC but the new clocksource core or the
+other way around. But since everything is going to meet in Linus' tree
+soon, I just wait a bit until tip/timers is merged.
 
-I always felt that we should eventually move the eeprom drivers out of
-drivers/misc into their own subsystem. Moving them under drivers/mtd
-also seems reasonable.
-
-Having a common API sounds like a good idea, and we should probably
-spend some time comparing the options.
- 
-> If so, would some kind of MTD in-kernel API to retrieve values from MTD
-> devices would be acceptable to you? I mostly have DT in mind, so I'm
-> thinking of having DT bindings to that API such as
-> 
->   mac-storage = <&phandle 0xoffset 0xsize>
-> 
-> to describe which device to get a value from, and where in that device.
-> 
-> That would allow consumer drivers to only have to call a function like
-> of_mtd_get_value and let the MTD subsystem do the hard work.
-> 
-> What's your feeling on this?
-
-My first thought is that it should be more generic than that and not
-have the mac address hardcoded as the purpose. We could possibly use
-regmap as the in-kernel interface, and come up with a more generic
-way of referring to registers in another device node.
-
-	Arnd
+	S?ren
