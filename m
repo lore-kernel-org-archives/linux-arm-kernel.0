@@ -1,29 +1,40 @@
-From: wangyuhang2014@gmail.com (yuhang wang)
-Date: Fri, 5 Jul 2013 17:41:57 +0800
-Subject: SPI: DUAL/QUAD support
-In-Reply-To: <20130704191216.GK27646@sirena.org.uk>
-References: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>
- <20130704143645.GA27646@sirena.org.uk>
- <20130704180656.GA1974@sig21.net>
- <20130704191216.GK27646@sirena.org.uk>
-Message-ID: <CAHSAbzNBkZPFOfGHqFxZH_id=PFj=BmZ4Q302zGKeM-0yJBtHg@mail.gmail.com>
+From: richard.zhuhongxing@gmail.com (Richard Zhu)
+Date: Fri,  5 Jul 2013 17:52:19 +0800
+Subject: [PATCH v3 0/3] ahci: enable ahci sata support on imx6q
+Message-ID: <1373017942-12583-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Flash data sheets use the terms Dual and Quad I/O Mode,
->> e.g. for MX25L25635E
->> http://www.macronix.com/QuickPlace/hq/PageLibrary4825740B00298A3B.nsf/h_Index/6F878CF760C559BD482576E00022E6CC/?OpenDocument&EPN=MX25L25635E
->
-> OK, but this is not a flash specific feature but rather something at the
-> SPI level and even with flash are they typically written in all caps?
-> This really needs to be described at the SPI level for the SPI subsystem,
-> not in terms of the specific application.
->
+v3: add imx6q specific ahci sata support
+  - Keep arch/arm and ahci_platform driver clean.
+  - Add the sata_imx standalone driver contained all the
+  specific setup
+  - Add the release function, support the loadable module
+  driver.
+  - Tested on imx6q sd board.
 
-Yes. I agree with you. This should be described in SPI level.
-So to SPI controller, if it has the ability to transfer in 2x or 4x, but
-what a pity no device can tell this info to it. No matter what the slave
-is and no matter whether they will use the spi transfer width member,
-firstly SPI controller should provide these members. If the slave do
-not set the member, that means the slave wants to communicate
-in 1 line traditionally.
+v2: http://www.spinics.net/lists/linux-ide/msg45666.html 
+ - Setup standalone imx ahci sata driver, because of
+ the misalignments of the bits definition of the HBA register.
+ - Replace the node by the label in the board dts.
+ - 
+
+v1: http://www.spinics.net/lists/linux-ide/msg45581.html
+ - add imx6q specific ahci sata support to arch/arm/mach-imx/mach-imx6q.c
+
+These patches is based on imx/dt branch of
+"http://git.linaro.org/git-ro/people/shawnguo/linux-2.6.git"
+
+[v3 1/3] ARM: dtsi: enable ahci sata on imx6q platforms
+[v3 2/3] ARM: imx6q: update the sata bits definitions of gpr13
+[v3 3/3] sata: imx: add ahci sata support on imx platforms
+
+arch/arm/boot/dts/imx6q-sabreauto.dts       |    4 +
+arch/arm/boot/dts/imx6q-sabrelite.dts       |    4 +
+arch/arm/boot/dts/imx6q-sabresd.dts         |    4 +
+arch/arm/boot/dts/imx6q.dtsi                |    9 +
+drivers/ata/Kconfig                         |    9 +
+drivers/ata/Makefile                        |    1 +
+drivers/ata/sata_imx.c                      |  221 +++++++++++++++++++++++++++
+include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  121 ++++++++++-----
+8 files changed, 336 insertions(+), 37 deletions(-)
