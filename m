@@ -1,63 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 5 Jul 2013 17:14:51 +0800
-Subject: [PATCH v4] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <1369733161-19168-1-git-send-email-b35083@freescale.com>
-References: <1369733161-19168-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130705091449.GA20040@S2101-09.ap.freescale.net>
+From: wangyuhang2014@gmail.com (yuhang wang)
+Date: Fri, 5 Jul 2013 17:17:41 +0800
+Subject: SPI: DUAL/QUAD support
+In-Reply-To: <51D68D14.7090606@ti.com>
+References: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>
+ <20130704130017.GA25997@sig21.net>
+ <OFA0D5839D.0594EA10-ONC1257B9E.004A7347-C1257B9E.00524BA5@rohde-schwarz.com>
+ <20130704154927.GE27646@sirena.org.uk>
+ <OFAD729A05.8C915625-ONC1257B9E.00576B25-C1257B9E.0058477D@rohde-schwarz.com>
+ <CAHSAbzOg+uHndydSC43moF7pijc67pqzB2rPnY69ynXHEzw79g@mail.gmail.com>
+ <51D67851.8020402@ti.com>
+ <CAHSAbzNvMo_oeaqtzO8-xDm-L-f8wVccVqfuVqbR=OwqWJhVwg@mail.gmail.com>
+ <51D689F3.3070605@ti.com>
+ <CAHSAbzM1PGoMXFNOmB7guDsVWYnRoRy89-bufHYpPz5+odnd8w@mail.gmail.com>
+ <51D68D14.7090606@ti.com>
+Message-ID: <CAHSAbzMfvfdDtTh=3zeBni4fNMAHEMdTJLJU-Oc13HJUqCUj0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jingchang,
+2013/7/5 Sourav Poddar <sourav.poddar@ti.com>:
+> On Friday 05 July 2013 02:37 PM, yuhang wang wrote:
+>>>
+>>>                      if (!quad_mode)
+>>>                              dra7xxx_writel(qspi, qspi->cmd |
+>>> QSPI_RD_SNGL,
+>>>                                              QSPI_SPI_CMD_REG);
+>>>                      else
+>>>                              dra7xxx_writel(qspi, qspi->cmd |
+>>> QSPI_RD_QUAD,
+>>>                                              QSPI_SPI_CMD_REG);
+>>>                   .......
+>>>                  }
+>>
+>> So what do you based on to set variable quad_mode.
+>
+> Best way should be to check for flash device id and manufacture data. Based
+> on which you
+> can decide whether your flash supports quad bits or not.
 
-On Tue, May 28, 2013 at 05:26:01PM +0800, Jingchang Lu wrote:
-> +static void lpuart_setup_watermark(struct lpuart_port *sport)
-> +{
-> +	unsigned char val, old_cr2, cr2;
-> +
-> +	/* set receiver/transmitter trigger level. */
-> +	old_cr2 = cr2 = readb(sport->port.membase + UARTCR2);
-> +	cr2 &= ~(UARTCR2_TIE | UARTCR2_TCIE | UARTCR2_TE |
-> +			UARTCR2_RIE | UARTCR2_RE);
-> +	writeb(cr2, sport->port.membase + UARTCR2);
-> +
-> +	writeb(2, sport->port.membase + UARTTWFIFO);
-> +	writeb(1, sport->port.membase + UARTRWFIFO);
-> +
-> +	/* determine FIFO size and enable */
-> +	val = readb(sport->port.membase + UARTPFIFO);
-> +
-> +	sport->tx_fifo_size = 0x1 << (((val >> UARTPFIFO_TXSIZE_OFF) &
-> +		UARTPFIFO_FIFOSIZE_MASK) + 1);
-> +
-> +	sport->rx_fifo_size = 0x1 << (((val >> UARTPFIFO_RXSIZE_OFF) &
-> +		UARTPFIFO_FIFOSIZE_MASK) + 1);
-> +
-> +	writeb(val | UARTPFIFO_TXFE | UARTPFIFO_RXFE,
-> +			sport->port.membase + UARTPFIFO);
-> +
-> +	/* Flush the Tx and Rx FIFO to a known state */
-> +	writeb(UARTCFIFO_TXFLUSH | UARTCFIFO_RXFLUSH,
-> +			sport->port.membase + UARTCFIFO);
-> +
-> +	/* restore CR2 */
-> +	writeb(old_cr2, sport->port.membase + UARTCR2);
-
-I just noticed that you dropped this CR2 restore since v5 of the patch.
-I have a patch enabling low-level debug support for Vybrid.  It works
-with v4 of your patch but has problem with the v5.  The console stops
-working as below.
-
-Serial: IMX driver
-serial: Freescale lpuart driver
-40028000.serial: ttyLP1 at MMIO 0x40028000 (irq = 94) is a FSL_LPUART
-console [ttyLP1] enabled, bootconsole disabled
-
-If I have above CR2 restore code added back.  The low-level debug
-support will just work fine with console.
-
-Is it an accident you removed the code?
-
-Shawn
-
-> +
-> +}
+Perhaps I did not said it clearly. Your flash supports quad and you
+set it into quad
+mode. But how can your controller driver notice that. In other word,
+In which way
+provide this information from flash to spi controller.
