@@ -1,212 +1,27 @@
 From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Fri,  5 Jul 2013 13:46:13 +0200
-Subject: [PATCH v7] ARM: clocksource: add support for MOXA ART SoCs
-In-Reply-To: <1373018653-18421-1-git-send-email-jonas.jensen@gmail.com>
-References: <1373018653-18421-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1373024773-24574-1-git-send-email-jonas.jensen@gmail.com>
+Date: Fri, 5 Jul 2013 13:48:44 +0200
+Subject: [PATCH v5] ARM: clocksource: add support for MOXA ART SoCs
+In-Reply-To: <alpine.DEB.2.02.1307051213080.11637@ionos.tec.linutronix.de>
+References: <1372687359-18235-1-git-send-email-jonas.jensen@gmail.com>
+ <1372940383-5957-1-git-send-email-jonas.jensen@gmail.com>
+ <alpine.DEB.2.02.1307042211420.11637@ionos.tec.linutronix.de>
+ <CACmBeS03Xfo7DyyYUbpBaO8TeR3g8BTPzcoOzQayk40k1soFzA@mail.gmail.com>
+ <alpine.DEB.2.02.1307051213080.11637@ionos.tec.linutronix.de>
+Message-ID: <CACmBeS1djCBWeXwCQROtvyodCfunusr-3=CKOk294P+FF-h6wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an clocksource driver for the main timer(s)
-found on MOXA ART SoCs.
+Thanks for the replies Thomas.
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+On 5 July 2013 12:21, Thomas Gleixner <tglx@linutronix.de> wrote:
+> Because you need to preserve the CR2 enable bit so your clocksource
+> does not get switched off.
 
-Notes:
-    Applies to next-20130703
-    
-    Changes since v6:
-    
-    1. remove TIMER_CR read back
-    2. set TIMER_CR from constants
+Yes, that was my main concern. The possibility of more flags being added.
+I was experimenting with TIMEREG_CR_COUNT_UP but could never get REG_MATCH1
+to work right for oneshot mode.
 
- drivers/clocksource/Makefile       |   1 +
- drivers/clocksource/moxart_timer.c | 164 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 165 insertions(+)
- create mode 100644 drivers/clocksource/moxart_timer.c
+Please take a look at v7.
 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 9ba8b4d..56257f6 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -17,6 +17,7 @@ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
- obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
- obj-$(CONFIG_ARCH_MARCO)	+= timer-marco.o
-+obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
- obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
- obj-$(CONFIG_ARCH_PRIMA2)	+= timer-prima2.o
- obj-$(CONFIG_SUN4I_TIMER)	+= sun4i_timer.o
-diff --git a/drivers/clocksource/moxart_timer.c b/drivers/clocksource/moxart_timer.c
-new file mode 100644
-index 0000000..5743853
---- /dev/null
-+++ b/drivers/clocksource/moxart_timer.c
-@@ -0,0 +1,164 @@
-+/*
-+ * MOXA ART SoCs timer handling.
-+ *
-+ * Copyright (C) 2013 Jonas Jensen
-+ *
-+ * Jonas Jensen <jonas.jensen@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/irqreturn.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/io.h>
-+#include <linux/clocksource.h>
-+
-+#define TIMER1_BASE		0x00
-+#define TIMER2_BASE		0x10
-+#define TIMER3_BASE		0x20
-+
-+#define REG_COUNT		0x0 /* writable */
-+#define REG_LOAD		0x4
-+#define REG_MATCH1		0x8
-+#define REG_MATCH2		0xC
-+
-+#define TIMER_CR		0x30
-+#define TIMER_INTR_STATE	0x34
-+#define TIMER_INTR_MASK		0x38
-+
-+/*
-+ * TIMER_CR flags:
-+ *
-+ * TIMEREG_CR_*_CLOCK	0: PCLK, 1: EXT1CLK
-+ * TIMEREG_CR_*_INT	overflow interrupt enable bit
-+ */
-+#define TIMEREG_CR_1_ENABLE	(1 << 0)
-+#define TIMEREG_CR_1_CLOCK	(1 << 1)
-+#define TIMEREG_CR_1_INT	(1 << 2)
-+#define TIMEREG_CR_2_ENABLE	(1 << 3)
-+#define TIMEREG_CR_2_CLOCK	(1 << 4)
-+#define TIMEREG_CR_2_INT	(1 << 5)
-+#define TIMEREG_CR_3_ENABLE	(1 << 6)
-+#define TIMEREG_CR_3_CLOCK	(1 << 7)
-+#define TIMEREG_CR_3_INT	(1 << 8)
-+#define TIMEREG_CR_COUNT_UP	(1 << 9)
-+#define TIMEREG_CR_COUNT_DOWN	(0 << 9)
-+
-+#define TIMER1_ENABLE		(TIMEREG_CR_2_ENABLE | TIMEREG_CR_1_ENABLE)
-+#define TIMER1_DISABLE		(TIMEREG_CR_2_ENABLE)
-+
-+static void __iomem *base;
-+static unsigned int clock_count_per_tick;
-+
-+static void moxart_clkevt_mode(enum clock_event_mode mode,
-+			       struct clock_event_device *clk)
-+{
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_RESUME:
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		writel(TIMER1_DISABLE, base + TIMER_CR);
-+		writel(~0, base + TIMER1_BASE + REG_LOAD);
-+		break;
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		writel(clock_count_per_tick, base + TIMER1_BASE + REG_LOAD);
-+		writel(TIMER1_ENABLE, base + TIMER_CR);
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	default:
-+		writel(TIMER1_DISABLE, base + TIMER_CR);
-+		break;
-+	}
-+}
-+
-+static int moxart_clkevt_next_event(unsigned long cycles,
-+				    struct clock_event_device *unused)
-+{
-+	u32 u;
-+
-+	writel(TIMER1_DISABLE, base + TIMER_CR);
-+
-+	u = readl(base + TIMER1_BASE + REG_COUNT) - cycles;
-+	writel(u, base + TIMER1_BASE + REG_MATCH1);
-+
-+	writel(TIMER1_ENABLE, base + TIMER_CR);
-+
-+	return 0;
-+}
-+
-+static struct clock_event_device moxart_clockevent = {
-+	.name		= "moxart_timer",
-+	.rating		= 200,
-+	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_mode	= moxart_clkevt_mode,
-+	.set_next_event	= moxart_clkevt_next_event,
-+};
-+
-+static irqreturn_t moxart_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = dev_id;
-+	evt->event_handler(evt);
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction moxart_timer_irq = {
-+	.name		= "moxart-timer",
-+	.flags		= IRQF_TIMER,
-+	.handler	= moxart_timer_interrupt,
-+	.dev_id		= &moxart_clockevent,
-+};
-+
-+static void __init moxart_timer_init(struct device_node *node)
-+{
-+	int ret, irq;
-+	unsigned long pclk;
-+	struct clk *clk;
-+
-+	base = of_iomap(node, 0);
-+	if (!base)
-+		panic("%s: of_iomap failed\n", node->full_name);
-+
-+	irq = irq_of_parse_and_map(node, 0);
-+	if (irq <= 0)
-+		panic("%s: irq_of_parse_and_map failed\n", node->full_name);
-+
-+	ret = setup_irq(irq, &moxart_timer_irq);
-+	if (ret)
-+		panic("%s: setup_irq failed\n", node->full_name);
-+
-+	clk = of_clk_get(node, 0);
-+	if (IS_ERR(clk))
-+		panic("%s: of_clk_get failed\n", node->full_name);
-+
-+	pclk = clk_get_rate(clk);
-+
-+	if (clocksource_mmio_init(base + TIMER2_BASE + REG_COUNT,
-+				  "moxart_timer", pclk, 200, 32,
-+				  clocksource_mmio_readl_down))
-+		panic("%s: clocksource_mmio_init failed\n", node->full_name);
-+
-+	clock_count_per_tick = DIV_ROUND_CLOSEST(pclk, HZ);
-+
-+	writel(~0, base + TIMER2_BASE + REG_LOAD);
-+	writel(TIMEREG_CR_2_ENABLE, base + TIMER_CR);
-+
-+	moxart_clockevent.cpumask = cpumask_of(0);
-+
-+	/*
-+	 * documentation is not publicly available:
-+	 * min_delta / max_delta obtained by trial-and-error,
-+	 * max_delta 0xfffffffe should be ok because count
-+	 * register size is u32
-+	 */
-+	clockevents_config_and_register(&moxart_clockevent, pclk,
-+					0x4, 0xfffffffe);
-+}
-+CLOCKSOURCE_OF_DECLARE(moxart, "moxa,moxart-timer", moxart_timer_init);
--- 
-1.8.2.1
+Best regards,
+Jonas
