@@ -1,58 +1,70 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Fri, 5 Jul 2013 14:25:15 +0530
-Subject: SPI: DUAL/QUAD support
-In-Reply-To: <CAHSAbzNvMo_oeaqtzO8-xDm-L-f8wVccVqfuVqbR=OwqWJhVwg@mail.gmail.com>
-References: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>	<20130704130017.GA25997@sig21.net>	<OFA0D5839D.0594EA10-ONC1257B9E.004A7347-C1257B9E.00524BA5@rohde-schwarz.com>	<20130704154927.GE27646@sirena.org.uk>	<OFAD729A05.8C915625-ONC1257B9E.00576B25-C1257B9E.0058477D@rohde-schwarz.com>	<CAHSAbzOg+uHndydSC43moF7pijc67pqzB2rPnY69ynXHEzw79g@mail.gmail.com>	<51D67851.8020402@ti.com>
- <CAHSAbzNvMo_oeaqtzO8-xDm-L-f8wVccVqfuVqbR=OwqWJhVwg@mail.gmail.com>
-Message-ID: <51D689F3.3070605@ti.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri,  5 Jul 2013 14:12:27 +0530
+Subject: [PATCH 1/3] clk: exynos5250: Add G2D gate clock
+Message-ID: <1373013749-14530-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 July 2013 02:18 PM, yuhang wang wrote:
->> To add to all the discussion going on,
->> I am using a qspi controller with a spansion flash device.
->> I tried using quad read mode bit, and what is required to change in
->> my case is the following:
->>
->> 1. enable quad mode in flash configuration register.
->> 2. change my read opcode to QUAD READ opcode according to flash datasheet.
->> 3. Configure my qspi controller cmd reg to use 6 PIN whenever quad mode is
->> used.
->>
-> Sorry, to the third point I am still not very clear. The first time,
-> spi controller should send
-> QUAD READ opcode to your spansion flash with 1 line, then receive datas from
-> flash with 4 lines. So how does your controller master this process
-> automatically.
->
-> Please give me some details.
->
-Its like, you pass txbuf and rxbuf from the spi core to your controller
-driver. So, if your txbuf is not null then configure the controller
-cmd register with WRITE_SINGLE and if rxbuf is not null then
-configure the controller cmd register with READ_QUAD.
+Adds gate clock for G2D IP for Exynos5250 SoC.
 
-Something like this,
-                 if (txbuf) {
-                         dra7xxx_writel_data(qspi, *txbuf++,
-                                 QSPI_SPI_DATA_REG, wlen);
-                         dra7xxx_writel(qspi, qspi->dc, QSPI_SPI_DC_REG);
-                         dra7xxx_writel(qspi, qspi->cmd | QSPI_WR_SNGL,
-                                         QSPI_SPI_CMD_REG);
-                         wait_for_completion(&qspi->word_complete);
-                 }
-                 if (rxbuf) {
-                         printk("rx cmd %08x dc %08x\n",
-                                 qspi->cmd | QSPI_RD_QUAD, qspi->dc);
-                         dra7xxx_writel(qspi, INT_EN, 
-QSPI_INTR_ENABLE_SET_REG);
-                         dra7xxx_writel(qspi, qspi->dc, QSPI_SPI_DC_REG);
-                     if (!quad_mode)
-                             dra7xxx_writel(qspi, qspi->cmd | QSPI_RD_SNGL,
-                                             QSPI_SPI_CMD_REG);
-                     else
-                             dra7xxx_writel(qspi, qspi->cmd | QSPI_RD_QUAD,
-                                             QSPI_SPI_CMD_REG);
-                  .......
-                 }
-> Thanks
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+Cc: Mike Turquette <mturquette@linaro.org>
+---
+This patch depends on the following patch:
+http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20581
+---
+ .../devicetree/bindings/clock/exynos5250-clock.txt |    1 +
+ drivers/clk/samsung/clk-exynos5250.c               |    5 ++++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+index 1a05761..7e88242 100644
+--- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
++++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+@@ -155,6 +155,7 @@ clock which they consume.
+   dp			342
+   mixer			343
+   hdmi			344
++  g2d			345
+ 
+ Example 1: An example of a clock controller node is listed below.
+ 
+diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+index 6f767c5..3da0bdf 100644
+--- a/drivers/clk/samsung/clk-exynos5250.c
++++ b/drivers/clk/samsung/clk-exynos5250.c
+@@ -62,6 +62,7 @@
+ #define SRC_CDREX		0x20200
+ #define PLL_DIV2_SEL		0x20a24
+ #define GATE_IP_DISP1		0x10928
++#define GATE_IP_ACP		0x10000
+ 
+ /*
+  * Let each supported clock get a unique id. This id is used to lookup the clock
+@@ -99,7 +100,7 @@ enum exynos5250_clks {
+ 	spi2, i2s1, i2s2, pcm1, pcm2, pwm, spdif, ac97, hsi2c0, hsi2c1, hsi2c2,
+ 	hsi2c3, chipid, sysreg, pmu, cmu_top, cmu_core, cmu_mem, tzpc0, tzpc1,
+ 	tzpc2, tzpc3, tzpc4, tzpc5, tzpc6, tzpc7, tzpc8, tzpc9, hdmi_cec, mct,
+-	wdt, rtc, tmu, fimd1, mie1, dsim0, dp, mixer, hdmi,
++	wdt, rtc, tmu, fimd1, mie1, dsim0, dp, mixer, hdmi, g2d,
+ 
+ 	nr_clks,
+ };
+@@ -152,6 +153,7 @@ static __initdata unsigned long exynos5250_clk_regs[] = {
+ 	SRC_CDREX,
+ 	PLL_DIV2_SEL,
+ 	GATE_IP_DISP1,
++	GATE_IP_ACP,
+ };
+ 
+ /* list of all parent clock list */
+@@ -463,6 +465,7 @@ struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
+ 	GATE(dp, "dp", "aclk200", GATE_IP_DISP1, 4, 0, 0),
+ 	GATE(mixer, "mixer", "aclk200", GATE_IP_DISP1, 5, 0, 0),
+ 	GATE(hdmi, "hdmi", "aclk200", GATE_IP_DISP1, 6, 0, 0),
++	GATE(g2d, "g2d", "aclk200", GATE_IP_ACP, 3, 0, 0),
+ };
+ 
+ static __initdata struct of_device_id ext_clk_match[] = {
+-- 
+1.7.9.5
