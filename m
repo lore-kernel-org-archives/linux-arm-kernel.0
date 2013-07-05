@@ -1,37 +1,25 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 05 Jul 2013 16:11:02 -0700 (PDT)
-Subject: [PATCH V4 3/4] video: exynos_dp: remove non-DT support for Exynos
- Display Port
-In-Reply-To: <000c01ce76ff$fffa39d0$ffeead70$@samsung.com>
-References: <000c01ce76ff$fffa39d0$ffeead70$@samsung.com>
-Message-ID: <2149220.dCp7esoXHa@flatron>
+Date: Sat, 06 Jul 2013 01:12:05 +0200
+Subject: [PATCH V4 2/4] phy: Add driver for Exynos DP PHY
+In-Reply-To: <000b01ce76ff$cf9fd6a0$6edf83e0$@samsung.com>
+References: <000b01ce76ff$cf9fd6a0$6edf83e0$@samsung.com>
+Message-ID: <1543218.1F6S8MDx2p@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jingoo,
-
-On Tuesday 02 of July 2013 17:41:52 Jingoo Han wrote:
-> Exynos Display Port can be used only for Exynos SoCs. In addition,
-> non-DT for EXYNOS SoCs is be supported from v3.11; thus, there is
-> no need to support non-DT for Exynos Display Port.
-> 
-> The 'include/video/exynos_dp.h' file has been used for non-DT
-> support and the content of file include/video/exynos_dp.h is moved
-> to drivers/video/exynos/exynos_dp_core.h. Thus, the 'exynos_dp.h'
-> file is removed. Also, 'struct exynos_dp_platdata' is removed,
-> because it is not used any more.
+On Tuesday 02 of July 2013 17:40:31 Jingoo Han wrote:
+> Add a PHY provider driver for the Samsung Exynos SoC DP PHY.
 > 
 > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
 > ---
->  drivers/video/exynos/Kconfig          |    2 +-
->  drivers/video/exynos/exynos_dp_core.c |  116
-> +++++++---------------------- drivers/video/exynos/exynos_dp_core.h | 
-> 109 +++++++++++++++++++++++++++ drivers/video/exynos/exynos_dp_reg.c  |
->    2 -
->  include/video/exynos_dp.h             |  131
-> --------------------------------- 5 files changed, 135 insertions(+),
-> 225 deletions(-)
->  delete mode 100644 include/video/exynos_dp.h
+>  .../devicetree/bindings/phy/samsung-phy.txt        |    8 ++
+>  drivers/phy/Kconfig                                |    6 ++
+>  drivers/phy/Makefile                               |    1 +
+>  drivers/phy/phy-exynos-dp-video.c                  |  111
+> ++++++++++++++++++++ 4 files changed, 126 insertions(+)
+>  create mode 100644 drivers/phy/phy-exynos-dp-video.c
 
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
