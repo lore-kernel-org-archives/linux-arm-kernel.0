@@ -1,56 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 5 Jul 2013 00:03:48 -0700
-Subject: [RFC 0/4] Cleanup PRM and CM regbit headers
-In-Reply-To: <51D65CE8.4050004@ti.com>
-References: <1372076143-12955-1-git-send-email-rnayak@ti.com>
- <20130625071428.GC5523@atomide.com> <51C95839.6050307@ti.com>
- <20130704115819.GJ5523@atomide.com> <51D56743.9080800@ti.com>
- <alpine.DEB.2.02.1307041627540.6258@utopia.booyaka.com>
- <51D65CE8.4050004@ti.com>
-Message-ID: <20130705070347.GP5523@atomide.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 5 Jul 2013 09:16:30 +0200
+Subject: [RFC PATCH 01/13] misc: atmel_ssc: add device tree DMA support
+In-Reply-To: <51D62074.9070303@atmel.com>
+References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
+ <1372667978-4718-2-git-send-email-richard.genoud@gmail.com>
+ <51D24299.9050209@atmel.com>
+ <CACQ1gAgcc=j3kmcpjp8bbdHhxr_k=h8jJs6R_paJbPUMv74uGg@mail.gmail.com>
+ <51D29927.80900@atmel.com>
+ <CACQ1gAhnDk-qSt_5xrsMakXqGGDO5pEbA-9UDWCJG=AABDc+zg@mail.gmail.com>
+ <CACQ1gAgPaRm3gxxJNgfj9bR565Q0+SNY3+EcjA_mrh1N+yPzSA@mail.gmail.com>
+ <51D4CC94.3020908@atmel.com>
+ <CACQ1gAio0ekQMgyfrLjTHmMPGJQoKoe61GreFQDN-iLjxbLQ0w@mail.gmail.com>
+ <51D62074.9070303@atmel.com>
+Message-ID: <CACQ1gAjNGsAWMwyL_9zEobKz=MEzgiA7Gqt=p4anuGhq2dLd_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [130704 22:49]:
-> On Thursday 04 July 2013 10:14 PM, Paul Walmsley wrote:
-> > You mentioned that these patches were generated with some kind of awk/grep 
-> > scripting.  Can you integrate that in an automated way into the 
-> > autogeneration flow?  If the answer is yes, then keep the header.  If the 
-> > answer is no, then the header should be dropped.  Beno?t, maybe you have 
-> > an opinion too?
-> 
-> Ok, I'll try and integrate those scripts so all this can be done in an
-> automated way even for newer SoCs.
-> 
-> > 
-> > As far as whether this should go in -rcX or not, my view is that, as a 
-> > matter of policy, large changes like this should wait until v3.12.  Now, 
-> > having written that, I also was under the impression that the OMAP5 
-> > changes weren't going to be sent upstream unless the total diffstat would 
-> > be balanced to roughly zero or negative lines.  As far as I know, that 
-> > didn't happen.  So I guess, v3.11-rc it is...  kernel development by 
-> > diffstat :-(
-> 
-> I don't mind these going in -rcX or 3.12, either way is fine.
+2013/7/5 Bo Shen <voice.shen@atmel.com>:
+> Yes, I aware this issue.
+> Actually the system not hang, the resource all are occupied by the
+> interrupt. This because, we enable the interrupt, when once interrupt occur,
+> I try many methods to clear it, however we can not clear it. So, it
+> generates the interrupt all the time. It seems the system hang.
+>
+> Temp solution: not enable the interrupt. use the following patch to disable
+> the interrupt.
+> ---8>---
+> diff --git a/sound/soc/atmel/atmel_ssc_dai.c
+> b/sound/soc/atmel/atmel_ssc_dai.c
+> index 0ecf356..bb53dea 100644
+> --- a/sound/soc/atmel/atmel_ssc_dai.c
+> +++ b/sound/soc/atmel/atmel_ssc_dai.c
+> @@ -649,7 +649,7 @@ static int atmel_ssc_prepare(struct snd_pcm_substream
+> *substream,
+>         dma_params = ssc_p->dma_params[dir];
+>
+>         ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_enable);
+> -       ssc_writel(ssc_p->ssc->regs, IER, dma_params->mask->ssc_error);
+> +       ssc_writel(ssc_p->ssc->regs, IDR, dma_params->mask->ssc_error);
+>
+>         pr_debug("%s enabled SSC_SR=0x%08x\n",
+>                         dir ? "receive" : "transmit",
+> ---<8---
+>
+> BTW, I am checking this with our IP team, if find the real solution, I will
+> fix it.
 
-Removal of unused code should be OK for the early -rc. I doubt that
-anybody would object it especially considering that's it's a huge
-pile of unused defines that most likely won't ever be needed for
-DT based booting.
- 
-> > Finally, please repost the whole series once you're done with your 
-> > changes, as a non-RFC, along with your pull request (if you plan to send 
-> > one).  I guess I should be the one to take these, since I wound up taking 
-> > the OMAP5 addition...
-> 
-> :) I thought so too that you should be the one sending the pull.
-> I will post these out as non-RFC after I do a clean integration into
-> the autogen scripts, and then you can take a call on sending the pull for
-> either -rcX or 3.12
+ok, I'll rebase my patches on that.
 
-I'd prefer to have it done now for the early -rc series. But if it
-drags on, we should not merge it during the -rc series.
+Thanks !
 
-Regards,
-
-Tony
+Best Regards,
+Richard
