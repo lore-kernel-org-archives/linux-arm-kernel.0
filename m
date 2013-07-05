@@ -1,71 +1,107 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Jul 2013 23:19:27 +0100
-Subject: [PATCH V3] of: Set the DMA mask to 64 bits when dma_addr_t is
- 64-bits
-In-Reply-To: <CACVXFVPfkqP+UyoGd-+QFRzndSam_DtU=utrBPYCPjQCGQ_F6g@mail.gmail.com>
-References: <1367008266-1431-1-git-send-email-lauraa@codeaurora.org>
- <517AF270.8040106@gmail.com>
- <CACVXFVPfkqP+UyoGd-+QFRzndSam_DtU=utrBPYCPjQCGQ_F6g@mail.gmail.com>
-Message-ID: <20130705221927.GL24642@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 6 Jul 2013 00:23:42 +0200
+Subject: MTD EEPROM support and driver integration
+In-Reply-To: <201307052302.40588.arnd@arndb.de>
+References: <20130705201118.GM2959@lukather> <201307052302.40588.arnd@arndb.de>
+Message-ID: <20130705222342.GP2959@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 03, 2013 at 10:15:50PM +0800, Ming Lei wrote:
+Hi Arnd,
+
+On Fri, Jul 05, 2013 at 11:02:40PM +0200, Arnd Bergmann wrote:
+> On Friday 05 July 2013, Maxime Ripard wrote:
+> > Hi everyone,
+> > 
+> > In the last weeks, we've drivers coming up both about mostly some very
+> > simple drivers that expose to the userspace a few bytes of memory-mapped
+> > IO. Both will probably live under drivers/misc/eeprom, where there's
+> > support already for other kind of what could be assimilated as eeproms
+> > (AT24, AT25, etc.).
+> > 
+> > Now, besides the code duplication every driver has to make to register
+> > the sysfs attributes, it wouldn't cause much of a problem.
+> > 
+> > Except that these EEPROMs could store values useful for other drivers in
+> > Linux. For example:
+> >   - imx28 OCOTP (the latest of the two EEPROM drivers recently submitted)
+> >     use it most of the time to store its MAC addresses
+> >   - Allwinner SoCs SID (the other latest driver submitted) use it
+> >     sometime to store a MAC address, and also the SoC ID, which could be
+> >     useful to implement a SoC bus driver.
+> >   - Some Allwinner boards (and presumably others) use an AT24 to store
+> >     the MAC address in it.
+> > 
+> > For now, everyone comes up with a different solution:
+> >   - imx28 has a hook in mach-mxs to patch the device tree at runtime and
+> >     add the values retrieved from the OCOTP to it.
+> >   - AT24 seem to have some function exported (at24_macc_(read|write)) so
+> >     that other part of the kernel can use them to retrieve values from
+> >     such an EEPROM.
+> >   - Allwinner SoCs have, well, basically nothing for now, which is why I
+> >     send this email.
+> > 
+> > The current way of working has several flaws imho:
+> >   - The code is heavily duplicated: the sysfs registering is common to
+> >     every driver, and at the end of the day, every driver should only
+> >     give a read/write callback, and that's it.
+> >   - The "consumer" drivers should not have to worry at all about the
+> >     EEPROM type it should retrieve the needed value from, let alone
+> >     dealing with the number of instances of such an EEPROM.
+> > 
+> > To solve this issues, I think I have some solution. Would merging this
+> > drivers into MTD make some sense? It seems like there is already some
+> > EEPROM drivers into drivers/mtd (such as an AT25 one, which also have a
+> > drivers under drivers/misc/eeprom), so I guess it does, but I'd like to
+> > have your opinion on this.
 > 
-> Without the patch, LPAE enabled board may not boot at all, but looks
-> it still isn't in -next tree.
+> I always felt that we should eventually move the eeprom drivers out of
+> drivers/misc into their own subsystem. Moving them under drivers/mtd
+> also seems reasonable.
 > 
-> But I am wondering if it is a correct approach, because enabling LPAE
-> doesn't mean the I/O devices can support DMA to/from 64bit address, and
-> it is very probably devices can't do it at all.
+> Having a common API sounds like a good idea, and we should probably
+> spend some time comparing the options.
+
+Great :)
+
+> > If so, would some kind of MTD in-kernel API to retrieve values from MTD
+> > devices would be acceptable to you? I mostly have DT in mind, so I'm
+> > thinking of having DT bindings to that API such as
+> > 
+> >   mac-storage = <&phandle 0xoffset 0xsize>
+> > 
+> > to describe which device to get a value from, and where in that device.
+> > 
+> > That would allow consumer drivers to only have to call a function like
+> > of_mtd_get_value and let the MTD subsystem do the hard work.
+> > 
+> > What's your feeling on this?
 > 
-> Another way is to always set arm_dma_limit as 0xFFFFFFFF when
-> CONFIG_ZONE_DMA is unset, and let driver override device's dma
-> mask if the device supports 64bit DMA.
+> My first thought is that it should be more generic than that and not
+> have the mac address hardcoded as the purpose. We could possibly use
+> regmap as the in-kernel interface, and come up with a more generic
+> way of referring to registers in another device node.
 
-Okay, here's a teach-in on DMA masks, this is how it's supposed to work:
+Hmm, I maybe wasn't as clear as I wanted. Here mac-storage was just an
+example. It should indeed be completely generic, and a device could have
+several "storage source" defined, each driver knowing what property it
+would need, pretty much like what's done currently for the regulators
+for example.
 
-1. The bus code which creates the devices sets a default mask appropriate
-   for the bus type.  For PCI, this is 32-bit, for ISA, it's 24-bit.
+We will have such a use case anyway for the Allwinner stuff, since the
+fuses can be used for several thing, including storing the SoC ID,
+serial numbers, and so on.
 
-2. Before performing DMA, drivers should query the capabilities of the
-   platform using dma_set_mask() for streaming transfers, and
-   dma_set_coherent_mask() for coherent transfers.  Note: the DMA API
-   specifies that a mask accepted by dma_set_mask() will also be
-   accepted by dma_set_coherent_mask() - in other words, it is
-   permissible _not_ to check the return value of dma_set_coherent_mask()
-   iff that same mask is currently in use via dma_set_mask().
+Maxime
 
-   (Side note: I have a patch in my tree which introduces
-   dma_set_mask_and_coherent() which sets both.)
-
-3. Drivers should attempt to set a mask appropriate for the device.
-   If the device can drive 32-bit addresses, it requests a 32-bit
-   mask.  If only 24-bit, a 24-bit mask.  If it wants to do more
-   than 32-bit, it should set a larger mask.
-
-   (See the "DMA addressing limitations" section of
-    Documentation/DMA-API-HOWTO.txt).
-
-4. PCI drivers use this as part of a negotiation with the rest of the
-   system; you can plug a 64-bit capable PCI card into a 32-bit only
-   capable host, and it should work - the driver should try to
-   request the 64-bit mask first, if that succeeds then it can use
-   DMA to 64-bit addresses.  If it fails, then it should then try to
-   set a 32-bit mask.
-
-So, that's more or less what's currently "known" of DMA masks.  What a lot
-of ARM drivers do is totally ignore (3) and just assume that the platform
-code set the mask up appropriately.  This is an incorrect assumption, and
-it's something I'm slowly fixing where I have the knowledge.
-
-What we shouldn't be relying upon is the default DMA mask being correct.
-
-Last point is - the device actually doing DMA should be the one which the
-DMA mask counts for above; if the device is just a user of DMA, then its
-DMA mask should not matter (if it does, it's likely because of x86/PCI
-assumptions made in the subsystem code) and actually should _not_ be set.
-In other words, the DMA engine probe function should set the DMA mask on
-the DMA controller, and you should do DMA mappings against the DMA
-controller's struct device, not against the IO peripheral's struct
-device.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130706/1ba30a45/attachment.sig>
