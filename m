@@ -1,58 +1,45 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 5 Jul 2013 15:50:55 +0800
-Subject: [PATCH] dma: imx-sdma: remove the unused completion
-Message-ID: <1373010655-3800-1-git-send-email-b32955@freescale.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 5 Jul 2013 17:32:40 +0900
+Subject: Appended DTB files for multi-machine kernels
+In-Reply-To: <201307042334.37161.arnd@arndb.de>
+References: <51D5A938.30607@gmail.com> <20130704171148.GJ27646@sirena.org.uk>
+ <201307042334.37161.arnd@arndb.de>
+Message-ID: <CANqRtoT+=CJrU2AjFwN67vrypQ1WR-8JeMyn1-mzb+tXWeAp2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the patch: "2ccaef0 dma: imx-sdma: make channel0 operations atomic",
-the "done" completion is not used any more.
+Hi Arnd,
 
-Just remove it.
+On Fri, Jul 5, 2013 at 6:34 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 04 July 2013, Mark Brown wrote:
+>> On Thu, Jul 04, 2013 at 06:56:24PM +0200, Daniel Mack wrote:
+>>
+>> > Unless I missed some recent discussion, this case is not easy to handle.
+>> > Yes, I know that these kind of things should be handled by a
+>> > next-generation bootloader, but in our case, we want to avoid a loader
+>> > update of already shipped hardware by all means.
+>>
+>> There was some discussion about appending multiple DTBs recently.  I
+>> can't actually recall anything about it though so that's not an entirely
+>> helpful thing...
+>
+> Yes, it keeps coming up, I think by now everybody agreed it's a good
+> idea to extend the ATAGS compat mode, but so far nobody has implemented
+> it. Magnus Damm was very interested in this feature last year and
+> was planning to work on it, but I don't know how far he got.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/dma/imx-sdma.c |    7 -------
- 1 files changed, 0 insertions(+), 7 deletions(-)
+Correct, I was and still am a bit interested in it. I did however
+never get around to write any code. My apologies if that stalled
+anyone.
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 1e44b8c..2c02a9d 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -243,7 +243,6 @@ struct sdma_engine;
-  * @event_id1		for channels that use 2 events
-  * @word_size		peripheral access size
-  * @buf_tail		ID of the buffer that was processed
-- * @done		channel completion
-  * @num_bd		max NUM_BD. number of descriptors currently handling
-  */
- struct sdma_channel {
-@@ -255,7 +254,6 @@ struct sdma_channel {
- 	unsigned int			event_id1;
- 	enum dma_slave_buswidth		word_size;
- 	unsigned int			buf_tail;
--	struct completion		done;
- 	unsigned int			num_bd;
- 	struct sdma_buffer_descriptor	*bd;
- 	dma_addr_t			bd_phys;
-@@ -547,8 +545,6 @@ static void sdma_tasklet(unsigned long data)
- {
- 	struct sdma_channel *sdmac = (struct sdma_channel *) data;
- 
--	complete(&sdmac->done);
--
- 	if (sdmac->flags & IMX_DMA_SG_LOOP)
- 		sdma_handle_channel_loop(sdmac);
- 	else
-@@ -812,9 +808,6 @@ static int sdma_request_channel(struct sdma_channel *sdmac)
- 	sdma->channel_control[channel].current_bd_ptr = sdmac->bd_phys;
- 
- 	sdma_set_channel_priority(sdmac, MXC_SDMA_DEFAULT_PRIORITY);
--
--	init_completion(&sdmac->done);
--
- 	return 0;
- out:
- 
--- 
-1.7.1
+With mach-shmobile we're now getting to a point where most of our
+boards are using DT_MACHINE and appended DTB instead of the MACHINE
+and mach-type. Because of that I feel that the moment has sort of
+passed for me.
+
+Regardless of this nearly all our boot loaders pass mach-type so it
+would be nice to match on that instead of the appended DTB.
+
+Thanks,
+
+/ magnus
