@@ -1,36 +1,151 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 5 Jul 2013 23:45:01 +0200
-Subject: [PATCHv4 03/11] pci: remove ARCH_SUPPORTS_MSI kconfig option
-In-Reply-To: <CAErSpo73iSBg+SYwZLea0qdXD1uVc3+Vacd8Tg4CU92vLG=2AQ@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 5 Jul 2013 15:51:10 -0600
+Subject: [PATCHv4 04/11] PCI: Introduce new MSI chip infrastructure
+In-Reply-To: <1372686136-1370-5-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1372686136-1370-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo73iSBg+SYwZLea0qdXD1uVc3+Vacd8Tg4CU92vLG=2AQ@mail.gmail.com>
-Message-ID: <20130705234501.1341f52e@skate>
+ <1372686136-1370-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAErSpo4aodspFnC0uR87yYAgswQQdmU48uoX5NA43UZjbCpOuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn Helgaas,
+On Mon, Jul 1, 2013 at 7:42 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> From: Thierry Reding <thierry.reding@avionic-design.de>
+>
+> The new struct msi_chip is used to associated an MSI controller with a
+> PCI bus. It is automatically handed down from the root to its children
+> during bus enumeration.
+>
+> This patch provides default (weak) implementations for the architecture-
+> specific MSI functions (arch_setup_msi_irq(), arch_teardown_msi_irq()
+> and arch_msi_check_device()) which check if a PCI device's bus has an
+> attached MSI chip and forward the call appropriately.
+>
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-On Fri, 5 Jul 2013 15:37:33 -0600, Bjorn Helgaas wrote:
+I'm OK with this patch in principle, but I do have a couple comments below.
 
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> Again, please update the subject line to "PCI: Remove ..."
-> 
-> I doubt that you'll get explicit acks from all the arches you touched,
-> but I think it's reasonable to put at least patches 2 & 3 in -next
-> soon after v3.11-rc1, so we should have time to shake out issues.
+> ---
+>  drivers/pci/msi.c   | 22 ++++++++++++++++++++++
+>  drivers/pci/probe.c |  1 +
+>  include/linux/msi.h | 11 +++++++++++
+>  include/linux/pci.h |  1 +
+>  4 files changed, 35 insertions(+)
+>
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index 289fbfd..62eb3d5 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -32,15 +32,37 @@ static int pci_msi_enable = 1;
+>
+>  int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+>  {
+> +       struct msi_chip *chip = dev->bus->msi;
+> +
+> +       if (chip && chip->setup_irq) {
+> +               int err;
+> +
+> +               err = chip->setup_irq(chip, dev, desc);
+> +               if (err < 0)
+> +                       return err;
+> +
+> +               irq_set_chip_data(desc->irq, chip);
+> +               return err;
+> +       }
+> +
+>         return -EINVAL;
 
-Sure. Which merge strategy do you suggest for this patch series, which
-touches a number of different areas, and has some build-time
-dependencies between the patches (if needed, I can detail those build
-time dependencies to help figuring out the best strategy).
+It's sub-optimal to indent the whole body of a function like this.  I
+think this is a bit more readable:
 
-Thanks,
+    if (!chip || !chip->setup_irq)
+        return -EINVAL
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+    err = chip->setup_irq(...);
+    ...
+    return err;
+
+The return value of ->setup_irq() (and hence of arch_setup_msi_irq())
+is a bit unclear.  Apparently it can return negative values (errors)
+or positive values (not sure what they mean), or zero (again, not
+sure).  A comment would clear this up.
+
+It might even be worth introducing a no-op chip with pointers to no-op
+functions so we don't have to do these checks ("if (chip &&
+chip->xxx)" everywhere.  I'm not sure if there's a Linux consensus on
+that -- certainly there are many examples of code that *does* make
+these checks everywhere -- so I'll ack it either way.
+
+>  }
+>
+>  void __weak arch_teardown_msi_irq(unsigned int irq)
+>  {
+> +       struct msi_chip *chip = irq_get_chip_data(irq);
+> +
+> +       if (chip && chip->teardown_irq)
+> +               chip->teardown_irq(chip, irq);
+>  }
+>
+>  int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
+>  {
+> +       struct msi_chip *chip = dev->bus->msi;
+> +
+> +       if (chip && chip->check_device)
+> +               return chip->check_device(chip, dev, nvec, type);
+> +
+
+These functions are poorly named.  They give no clue what
+"check_device" means.  Are we checking that it exists, that it
+supports some property, that it's enabled, ... ?
+
+>         return 0;
+>  }
+>
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 70f10fa..c8591e4 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -634,6 +634,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+>
+>         child->parent = parent;
+>         child->ops = parent->ops;
+> +       child->msi = parent->msi;
+>         child->sysdata = parent->sysdata;
+>         child->bus_flags = parent->bus_flags;
+>
+> diff --git a/include/linux/msi.h b/include/linux/msi.h
+> index c82ff8d..5b357d92 100644
+> --- a/include/linux/msi.h
+> +++ b/include/linux/msi.h
+> @@ -63,4 +63,15 @@ void arch_restore_msi_irqs(struct pci_dev *dev, int irq);
+>
+>  void default_teardown_msi_irqs(struct pci_dev *dev);
+>
+> +struct msi_chip {
+> +       struct module *owner;
+> +       struct device *dev;
+> +
+> +       int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
+> +                        struct msi_desc *desc);
+> +       void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
+> +       int (*check_device)(struct msi_chip *chip, struct pci_dev *dev,
+> +                           int nvec, int type);
+> +};
+> +
+>  #endif /* LINUX_MSI_H */
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 3a24e4f..7ffc012 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -432,6 +432,7 @@ struct pci_bus {
+>         struct resource busn_res;       /* bus numbers routed to this bus */
+>
+>         struct pci_ops  *ops;           /* configuration access functions */
+> +       struct msi_chip *msi;           /* MSI controller */
+>         void            *sysdata;       /* hook for sys-specific extension */
+>         struct proc_dir_entry *procdir; /* directory entry in /proc/bus/pci */
+>
+> --
+> 1.8.1.2
+>
