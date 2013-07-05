@@ -1,93 +1,67 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Sat, 6 Jul 2013 00:54:35 +0200
-Subject: [PATCH 6/9] clocksource: dw_apb_timer: quirk for inverted int mask
-In-Reply-To: <201307060051.09716.heiko@sntech.de>
-References: <201307060051.09716.heiko@sntech.de>
-Message-ID: <201307060054.35996.heiko@sntech.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 6 Jul 2013 00:54:22 +0200
+Subject: [PATCH v6 00/21] MBus DT binding: PCIe strikes back
+In-Reply-To: <20130705220820.GA11787@obsidianresearch.com>
+References: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130705220820.GA11787@obsidianresearch.com>
+Message-ID: <201307060054.23086.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some timer variants use an inverted setting to mask the timer interrupt.
-Therefore add a quirk to handle these variants.
+On Saturday 06 July 2013, Jason Gunthorpe wrote:
+> This is a good try, but this coding doesn't work...
+> 
+> Recall the long discussion that came up during the original
+> development of this binding. The OF spec says this:
+> 
+>  In particular, the phys.hi fields of the child address spaces in the
+>  "ranges" property for PCI does not contain
+>  the same information as "reg" property entries within PCI nodes. The
+>  only information that is present in
+>  "ranges" phys.hi entries are the non-relocatable, prefetchable and
+>  the PCI address space bits for which the en-
+>  try applies. I.e., only the n, p and ss bits are present; the
+>  bbbbbbbb, ddddd, fff and rrrrrrrr fields are 0.
+> 
+>  When an address is to be mapped through a PCI bus bridge node, the
+>  phys.hi value of the address to be mapped
+>  and the child field of a "ranges" entry should be masked so that only
+>  the ss bits are compared. I.e., the only
+>  portion of phys.hi that should participate in the range determination
+>  is the address space indicator (the ss bits).
+> 
+> Which forbids (0x82000800 .. ..) from being in a ranges
 
-Signed-off-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
----
- drivers/clocksource/dw_apb_timer.c |   23 ++++++++++++++++++-----
- include/linux/dw_apb_timer.h       |    6 ++++++
- 2 files changed, 24 insertions(+), 5 deletions(-)
+ah, and I thought Ezequiel was being more clever than what I had suggested
 
-diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-index 23cd7c6..7705d13 100644
---- a/drivers/clocksource/dw_apb_timer.c
-+++ b/drivers/clocksource/dw_apb_timer.c
-@@ -84,7 +84,10 @@ static void apbt_disable_int(struct dw_apb_timer *timer)
- {
- 	unsigned long ctrl = apbt_readl(timer, timer->reg_control);
- 
--	ctrl |= APBTMR_CONTROL_INT;
-+	if (timer->quirks & APBTMR_QUIRK_INVERSE_INTMASK)
-+		ctrl &= ~APBTMR_CONTROL_INT;
-+	else
-+		ctrl |= APBTMR_CONTROL_INT;
- 	apbt_writel(timer, ctrl, timer->reg_control);
- }
- 
-@@ -134,7 +137,10 @@ static void apbt_enable_int(struct dw_apb_clock_event_device *dw_ced)
- 	/* clear pending intr */
- 	if (dw_ced->eoi)
- 		dw_ced->eoi(timer);
--	ctrl &= ~APBTMR_CONTROL_INT;
-+	if (timer->quirks & APBTMR_QUIRK_INVERSE_INTMASK)
-+		ctrl |= APBTMR_CONTROL_INT;
-+	else
-+		ctrl &= ~APBTMR_CONTROL_INT;
- 	apbt_writel(timer, ctrl, timer->reg_control);
- }
- 
-@@ -195,7 +201,10 @@ static void apbt_set_mode(enum clock_event_mode mode,
- 		if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
- 			apbt_writel(timer, 0, timer->reg_load_count + 0x4);
- 
--		ctrl &= ~APBTMR_CONTROL_INT;
-+		if (timer->quirks & APBTMR_QUIRK_INVERSE_INTMASK)
-+			ctrl |= APBTMR_CONTROL_INT;
-+		else
-+			ctrl &= ~APBTMR_CONTROL_INT;
- 		ctrl |= APBTMR_CONTROL_ENABLE;
- 		apbt_writel(timer, ctrl, timer->reg_control);
- 		break;
-@@ -363,9 +372,13 @@ void dw_apb_clocksource_start(struct dw_apb_clocksource *dw_cs)
- 	if (timer->quirks & APBTMR_QUIRK_64BIT_COUNTER)
- 		apbt_writel(timer, 0, timer->reg_load_count + 0x4);
- 
--	/* enable, mask interrupt */
-+	/* set periodic, mask interrupt, enable timer */
- 	ctrl &= ~APBTMR_CONTROL_MODE_PERIODIC;
--	ctrl |= (APBTMR_CONTROL_ENABLE | APBTMR_CONTROL_INT);
-+	if (timer->quirks & APBTMR_QUIRK_INVERSE_INTMASK)
-+		ctrl &= ~APBTMR_CONTROL_INT;
-+	else
-+		ctrl |= APBTMR_CONTROL_INT;
-+	ctrl |= APBTMR_CONTROL_ENABLE;
- 	apbt_writel(timer, ctrl, timer->reg_control);
- 	/* read it once to get cached counter value initialized */
- 	dw_apb_clocksource_read(dw_cs);
-diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
-index fbe4c6b..7d36d91 100644
---- a/include/linux/dw_apb_timer.h
-+++ b/include/linux/dw_apb_timer.h
-@@ -30,6 +30,12 @@
-  */
- #define APBTMR_QUIRK_NO_EOI		BIT(1)
- 
-+/* The IP uses an inverted interrupt-mask bit.
-+ * Instead of activating interrupts clearing a maks bit, it needs an enable
-+ * bit to be set 1.
-+ */
-+#define APBTMR_QUIRK_INVERSE_INTMASK	BIT(2)
-+
- struct dw_apb_timer {
- 	void __iomem				*base;
- 	unsigned long				freq;
--- 
-1.7.10.4
+> I don't have an idea how to encode MBUS_ID in the PCI-E ranges :(
+> 
+> Arnd? Didn't you have some idea?
+
+The way I described it during the last review, I suggested using
+the middle cell of the PCI address here. Since the PCIe port
+is 32 bit only, it's otherwise unused. We can do one of two things
+here:
+
+a) put the port number in the second cell
+
+   0x82000000 1 0xe0000000 MBUS_ID(0x04, 0xe8) 0xe0000000 0 0x08000000 /* Port 0.0 MEM */
+   0x82000000 2 0xe0000000 MBUS_ID(0x04, 0xe9) 0xe0000000 0 0x08000000 /* Port 1.0 MEM */
+
+b) translate the entire MBUS space here
+
+   0x82000000 0 0 0 0 0x1000000 0 /* all MBUS_IDs */
+
+In both cases, the individual ports would have another non-empty
+ranges property
+
+a) 
+   0x82000000 1 0xe0000000 0x82000000 0 0xe0000000 0x08000000 /* ranges for port 0.0 */
+
+b)
+   0x82000000 MBUS_ID(0x04, 0xe8) 0xe0000000 0x82000000 0 0xe0000000 0 0x08000000
+
+I left out the change I suggested in my other reply to not describe
+the aperture in this node but translate the entire 4GB space.
+
+	Arnd
