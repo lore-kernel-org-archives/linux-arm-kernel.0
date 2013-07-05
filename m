@@ -1,100 +1,123 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri,  5 Jul 2013 18:39:13 -0300
-Subject: [PATCH v6 02/21] bus: mvebu-mbus: Add new API for window creation
+Date: Fri,  5 Jul 2013 18:39:14 -0300
+Subject: [PATCH v6 03/21] ARM: kirkwood: Move to ID based MBus window creation
 In-Reply-To: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1373060372-32357-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1373060372-32357-4-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-We add an API to create MBus address decoding windows from the target
-ID and attribute. This function will be used later and deprecate the
-current name based scheme.
+With the introduction of the ID based MBus API, it's better
+to switch to use it instead of the current name based scheme.
+
+This will allow to deprecate the name based API, once every
+user is removed.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/bus/mvebu-mbus.c | 33 +++++++++++++++++++++++++--------
- include/linux/mbus.h     |  6 ++++++
- 2 files changed, 31 insertions(+), 8 deletions(-)
+ arch/arm/mach-kirkwood/common.c | 18 ++++++++++++++----
+ arch/arm/mach-kirkwood/pcie.c   | 40 ++++++++++++++++++++++++----------------
+ 2 files changed, 38 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 33c6947..827468a 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -748,6 +748,22 @@ static const struct of_device_id of_mvebu_mbus_ids[] = {
- /*
-  * Public API of the driver
-  */
-+int mvebu_mbus_add_window_remap_by_id(unsigned int target,
-+				      unsigned int attribute,
-+				      phys_addr_t base, size_t size,
-+				      phys_addr_t remap)
-+{
-+	struct mvebu_mbus_state *s = &mbus_state;
-+
-+	if (!mvebu_mbus_window_conflicts(s, base, size, target, attribute)) {
-+		pr_err("cannot add window '%x:%x', conflicts with another window\n",
-+		       target, attribute);
-+		return -EINVAL;
-+	}
-+
-+	return mvebu_mbus_alloc_window(s, base, size, remap, target, attribute);
-+}
-+
- int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
- 				      size_t size, phys_addr_t remap,
- 				      unsigned int flags)
-@@ -776,14 +792,8 @@ int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
- 	else if (flags == MVEBU_MBUS_PCI_WA)
- 		attr |= 0x28;
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index e9238b5..165e751 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -37,6 +37,12 @@
+ #include <linux/platform_data/dma-mv_xor.h>
+ #include "common.h"
  
--	if (!mvebu_mbus_window_conflicts(s, base, size, target, attr)) {
--		pr_err("cannot add window '%s', conflicts with another window\n",
--		       devname);
--		return -EINVAL;
--	}
--
--	return mvebu_mbus_alloc_window(s, base, size, remap, target, attr);
--
-+	return mvebu_mbus_add_window_remap_by_id(target, attr, base,
-+						 size, remap);
- }
- 
- int mvebu_mbus_add_window(const char *devname, phys_addr_t base, size_t size)
-@@ -792,6 +802,13 @@ int mvebu_mbus_add_window(const char *devname, phys_addr_t base, size_t size)
- 						 MVEBU_MBUS_NO_REMAP, 0);
- }
- 
-+int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
-+				phys_addr_t base, size_t size)
-+{
-+	return mvebu_mbus_add_window_remap_by_id(target, attribute, base,
-+						 size, MVEBU_MBUS_NO_REMAP);
-+}
++/* These can go away once Kirkwood uses the mvebu-mbus DT binding */
++#define KIRKWOOD_MBUS_NAND_TARGET 0x01
++#define KIRKWOOD_MBUS_NAND_ATTR   0x2f
++#define KIRKWOOD_MBUS_SRAM_TARGET 0x03
++#define KIRKWOOD_MBUS_SRAM_ATTR   0x01
 +
- int mvebu_mbus_del_window(phys_addr_t base, size_t size)
+ /*****************************************************************************
+  * I/O Address Mapping
+  ****************************************************************************/
+@@ -672,10 +678,14 @@ char * __init kirkwood_id(void)
+ 
+ void __init kirkwood_setup_wins(void)
  {
- 	int win;
-diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index dba482e..9245b66 100644
---- a/include/linux/mbus.h
-+++ b/include/linux/mbus.h
-@@ -62,8 +62,14 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
- int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
- 				      size_t size, phys_addr_t remap,
- 				      unsigned int flags);
-+int mvebu_mbus_add_window_remap_by_id(unsigned int target,
-+				      unsigned int attribute,
-+				      phys_addr_t base, size_t size,
-+				      phys_addr_t remap);
- int mvebu_mbus_add_window(const char *devname, phys_addr_t base,
- 			  size_t size);
-+int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
-+				phys_addr_t base, size_t size);
- int mvebu_mbus_del_window(phys_addr_t base, size_t size);
- int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
- 		    size_t mbus_size, phys_addr_t sdram_phys_base,
+-	mvebu_mbus_add_window("nand", KIRKWOOD_NAND_MEM_PHYS_BASE,
+-			      KIRKWOOD_NAND_MEM_SIZE);
+-	mvebu_mbus_add_window("sram", KIRKWOOD_SRAM_PHYS_BASE,
+-			      KIRKWOOD_SRAM_SIZE);
++	mvebu_mbus_add_window_by_id(KIRKWOOD_MBUS_NAND_TARGET,
++				    KIRKWOOD_MBUS_NAND_ATTR,
++				    KIRKWOOD_NAND_MEM_PHYS_BASE,
++				    KIRKWOOD_NAND_MEM_SIZE);
++	mvebu_mbus_add_window_by_id(KIRKWOOD_MBUS_SRAM_TARGET,
++				    KIRKWOOD_MBUS_SRAM_ATTR,
++				    KIRKWOOD_SRAM_PHYS_BASE,
++				    KIRKWOOD_SRAM_SIZE);
+ }
+ 
+ void __init kirkwood_l2_init(void)
+diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
+index ddcb09f..12d86f3 100644
+--- a/arch/arm/mach-kirkwood/pcie.c
++++ b/arch/arm/mach-kirkwood/pcie.c
+@@ -20,6 +20,16 @@
+ #include <mach/bridge-regs.h>
+ #include "common.h"
+ 
++/* These can go away once Kirkwood uses the mvebu-mbus DT binding */
++#define KIRKWOOD_MBUS_PCIE0_MEM_TARGET    0x4
++#define KIRKWOOD_MBUS_PCIE0_MEM_ATTR      0xe8
++#define KIRKWOOD_MBUS_PCIE0_IO_TARGET     0x4
++#define KIRKWOOD_MBUS_PCIE0_IO_ATTR       0xe0
++#define KIRKWOOD_MBUS_PCIE1_MEM_TARGET    0x4
++#define KIRKWOOD_MBUS_PCIE1_MEM_ATTR      0xd8
++#define KIRKWOOD_MBUS_PCIE1_IO_TARGET     0x4
++#define KIRKWOOD_MBUS_PCIE1_IO_ATTR       0xd0
++
+ static void kirkwood_enable_pcie_clk(const char *port)
+ {
+ 	struct clk *clk;
+@@ -254,26 +264,24 @@ static void __init add_pcie_port(int index, void __iomem *base)
+ 
+ void __init kirkwood_pcie_init(unsigned int portmask)
+ {
+-	mvebu_mbus_add_window_remap_flags("pcie0.0",
++	mvebu_mbus_add_window_remap_by_id(KIRKWOOD_MBUS_PCIE0_IO_TARGET,
++					  KIRKWOOD_MBUS_PCIE0_IO_ATTR,
+ 					  KIRKWOOD_PCIE_IO_PHYS_BASE,
+ 					  KIRKWOOD_PCIE_IO_SIZE,
+-					  KIRKWOOD_PCIE_IO_BUS_BASE,
+-					  MVEBU_MBUS_PCI_IO);
+-	mvebu_mbus_add_window_remap_flags("pcie0.0",
+-					  KIRKWOOD_PCIE_MEM_PHYS_BASE,
+-					  KIRKWOOD_PCIE_MEM_SIZE,
+-					  MVEBU_MBUS_NO_REMAP,
+-					  MVEBU_MBUS_PCI_MEM);
+-	mvebu_mbus_add_window_remap_flags("pcie1.0",
++					  KIRKWOOD_PCIE_IO_BUS_BASE);
++	mvebu_mbus_add_window_by_id(KIRKWOOD_MBUS_PCIE0_MEM_TARGET,
++				    KIRKWOOD_MBUS_PCIE0_MEM_ATTR,
++				    KIRKWOOD_PCIE_MEM_PHYS_BASE,
++				    KIRKWOOD_PCIE_MEM_SIZE);
++	mvebu_mbus_add_window_remap_by_id(KIRKWOOD_MBUS_PCIE1_IO_TARGET,
++					  KIRKWOOD_MBUS_PCIE1_IO_ATTR,
+ 					  KIRKWOOD_PCIE1_IO_PHYS_BASE,
+ 					  KIRKWOOD_PCIE1_IO_SIZE,
+-					  KIRKWOOD_PCIE1_IO_BUS_BASE,
+-					  MVEBU_MBUS_PCI_IO);
+-	mvebu_mbus_add_window_remap_flags("pcie1.0",
+-					  KIRKWOOD_PCIE1_MEM_PHYS_BASE,
+-					  KIRKWOOD_PCIE1_MEM_SIZE,
+-					  MVEBU_MBUS_NO_REMAP,
+-					  MVEBU_MBUS_PCI_MEM);
++					  KIRKWOOD_PCIE1_IO_BUS_BASE);
++	mvebu_mbus_add_window_by_id(KIRKWOOD_MBUS_PCIE1_MEM_TARGET,
++				    KIRKWOOD_MBUS_PCIE1_MEM_ATTR,
++				    KIRKWOOD_PCIE1_MEM_PHYS_BASE,
++				    KIRKWOOD_PCIE1_MEM_SIZE);
+ 
+ 	vga_base = KIRKWOOD_PCIE_MEM_PHYS_BASE;
+ 
 -- 
 1.8.1.5
