@@ -1,36 +1,126 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 5 Jul 2013 11:55:19 -0300
-Subject: [PATCH v3 6/6] ARM: rockchip: add smp bringup code
-In-Reply-To: <201307051443.27172.heiko@sntech.de>
-References: <201307051440.19428.heiko@sntech.de>
- <201307051443.27172.heiko@sntech.de>
-Message-ID: <CAOMZO5Af=iSZMLEQOrxGfMCSTbfs2K=7QoCvEpkHNMna1V0FfQ@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Fri, 5 Jul 2013 16:10:02 +0100
+Subject: [PATCH] ARM: move body of head-common.S back to text section
+In-Reply-To: <20130704002235.GL22702@windriver.com>
+References: <1372805629-18382-1-git-send-email-swarren@wwwdotorg.org>
+ <20130702232259.GH11625@codeaurora.org>
+ <51D39004.9000907@wwwdotorg.org>
+ <20130703051907.GA22702@windriver.com>
+ <20130703100044.GG24642@n2100.arm.linux.org.uk>
+ <20130703153012.GK22702@windriver.com>
+ <20130703172001.GH24642@n2100.arm.linux.org.uk>
+ <20130704002235.GL22702@windriver.com>
+Message-ID: <20130705151001.GF2932@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 5, 2013 at 9:43 AM, Heiko St?bner <heiko@sntech.de> wrote:
+On Wed, Jul 03, 2013 at 08:22:35PM -0400, Paul Gortmaker wrote:
+> [Re: [PATCH] ARM: move body of head-common.S back to text section] On 03/07/2013 (Wed 18:20) Russell King - ARM Linux wrote:
+> 
+> > On Wed, Jul 03, 2013 at 11:30:12AM -0400, Paul Gortmaker wrote:
+> > > [Re: [PATCH] ARM: move body of head-common.S back to text section] On 03/07/2013 (Wed 11:00) Russell King - ARM Linux wrote:
+> > > 
+> > > > On Wed, Jul 03, 2013 at 01:19:07AM -0400, Paul Gortmaker wrote:
+> > > > > As an aside, I'm now thinking any __INIT that implicitly rely on EOF for
+> > > > > closure are nasty traps waiting to happen and it might be worthwhile to
+> > > > > audit and explicitly __FINIT them before someone appends to the file...
+> > > > 
+> > > > That hides a different kind of bug though - I hate __FINIT for exactly
+> > > > that reason.  Consider this:
+> > > 
+> > > Agreed - perhaps masking that it is a ".previous" just hides the fact
+> > > that it is more like a pop operation vs. an on/off operation, or per
+> > > function as we have in C.
+> > 
+> > I read the info pages, because I thought it was a pop operation too.
+> > I was concerned that .section didn't push the previous section onto the
+> > stack.
+> > 
+> > However, .popsection is the pseudio-op which pops.  .previous just toggles
+> > the current section with the section immediately before it.
+> > 
+> > So:
+> > 
+> > 	.text
+> > 	.data
+> > 	.previous
+> > 	/* this is .text */
+> > 	.previous
+> > 	/* this is .data */
+> > 	.previous
+> > 	/* this is .text */
+> > 	.previous
+> > 	/* this is .data */
+> 
+> Cool -- I bet we weren't the only ones thinking it was a pop.  Thanks.
+> 
+> Does that make __FINIT less evil than we previously assumed?  I think
+> your example was the following pseudo-patch:
+> 
+> 
+> 	.text
+> 	<some text>
+> +	.data
+> + 	<some data>
+> 	__INIT
+> 	<big hunk of init>
+> 	__FINIT
+> 	/* this below used to be text */
+> 	<more stuff that was originally meant for text>
+> 
+> Even if it is a toggle (vs. pop), the end text will now become data,
+> so the no-op __FINIT with an explicit section called out just below
+> it may still be the most unambiguous way to indicate what is going on.
+> 
+> > 
+> > > That seems reasonable to me.  I can't think of any self auditing that is
+> > > reasonably simple to implement.  One downside of __FINIT as a no-op vs.
+> > > what it is today, is that a dangling __FINIT in a file with no other
+> > > previous sections will emit a warning.  But that is a small low value
+> > > corner case I think.
+> > 
+> > That warning from __FINIT will only happen if there has been no section
+> > or .text or .data statement in the file at all.  As soon as you have any
+> > statement setting any kind of section, .previous doesn't warn.
+> > 
+> > So:
+> > 
+> > 	.text
+> > 	...
+> > 	__FINIT
+> > 
+> > produces no warning.o
+> 
+> Yep -- we are both saying the same thing here - hence why I called it a
+> small low value corner case.
 
-> --- /dev/null
-> +++ b/arch/arm/mach-rockchip/headsmp.S
-> @@ -0,0 +1,32 @@
-> +/*
-> + * Copyright (c) 2013 MundoReader S.L.
-> + * Author: Heiko Stuebner <heiko@sntech.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#include <linux/linkage.h>
-> +#include <linux/init.h>
-> +
-> +       __CPUINIT
+Note that .previous has another important gotcha.  Consider:
 
-This should go away after this commit:
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next-history.git/commit/arch/arm/common/mcpm_platsmp.c?id=c508abae89c3fa861c806ec00366d3b2f8d394cb
+	__INIT
+	/* now in .text.init */
+	ALT_UP(...)
+	/* now in .text.init */
+	__FINIT
+
+	/* now in .alt.smp.text! */
+
+
+.previous (or macros containing a dangling .previous) shouldn't be used
+unless you're absolutely certain what the previous section was.
+
+In general:
+
+	label:
+		<stuff>
+
+		.previous
+
+restores to the section which was current at label, only if there are
+no section directives in <stuff>, nor anything which could contain a
+section directive after macro expansion.
+
+The same goes for the hidden, dangling .previous embedded in __FINIT
+and friends.
+
+Cheers
+---Dave
