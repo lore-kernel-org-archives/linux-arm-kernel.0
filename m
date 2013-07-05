@@ -1,47 +1,29 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Fri, 5 Jul 2013 09:39:03 +0000
-Subject: [PATCH v4] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <20130705091449.GA20040@S2101-09.ap.freescale.net>
-References: <1369733161-19168-1-git-send-email-b35083@freescale.com>
- <20130705091449.GA20040@S2101-09.ap.freescale.net>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E851E5AFC@039-SN1MPN1-005.039d.mgd.msft.net>
+From: wangyuhang2014@gmail.com (yuhang wang)
+Date: Fri, 5 Jul 2013 17:41:57 +0800
+Subject: SPI: DUAL/QUAD support
+In-Reply-To: <20130704191216.GK27646@sirena.org.uk>
+References: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>
+ <20130704143645.GA27646@sirena.org.uk>
+ <20130704180656.GA1974@sig21.net>
+ <20130704191216.GK27646@sirena.org.uk>
+Message-ID: <CAHSAbzNBkZPFOfGHqFxZH_id=PFj=BmZ4Q302zGKeM-0yJBtHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
->-----Original Message-----
->From: Shawn Guo [mailto:shawn.guo at linaro.org]
->Sent: Friday, July 05, 2013 5:15 PM
->To: Lu Jingchang-B35083
->Cc: linux-serial at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->gregkh at linuxfoundation.org; s.hauer at pengutronix.de
->Subject: Re: [PATCH v4] tty: serial: add Freescale lpuart driver support
-
->> +	/* restore CR2 */
->> +	writeb(old_cr2, sport->port.membase + UARTCR2);
+>> Flash data sheets use the terms Dual and Quad I/O Mode,
+>> e.g. for MX25L25635E
+>> http://www.macronix.com/QuickPlace/hq/PageLibrary4825740B00298A3B.nsf/h_Index/6F878CF760C559BD482576E00022E6CC/?OpenDocument&EPN=MX25L25635E
 >
->I just noticed that you dropped this CR2 restore since v5 of the patch.
->I have a patch enabling low-level debug support for Vybrid.  It works with
->v4 of your patch but has problem with the v5.  The console stops working
->as below.
+> OK, but this is not a flash specific feature but rather something at the
+> SPI level and even with flash are they typically written in all caps?
+> This really needs to be described at the SPI level for the SPI subsystem,
+> not in terms of the specific application.
 >
->Serial: IMX driver
->serial: Freescale lpuart driver
->40028000.serial: ttyLP1 at MMIO 0x40028000 (irq = 94) is a FSL_LPUART
->console [ttyLP1] enabled, bootconsole disabled
->
->If I have above CR2 restore code added back.  The low-level debug support
->will just work fine with console.
->
->Is it an accident you removed the code?
-[Lu Jingchang-B35083] 
-I explicitly removed the cr2 restore code on cleaning up the redundant code, and find it work well on normal operation.
-Low level debug is not supported on Vybrid so I didn't notice that problem.
-Will you fixing it? Or I submit a fix on it?
-Thanks.
 
-
-
-Best Regards,
-Jingchang 
+Yes. I agree with you. This should be described in SPI level.
+So to SPI controller, if it has the ability to transfer in 2x or 4x, but
+what a pity no device can tell this info to it. No matter what the slave
+is and no matter whether they will use the spi transfer width member,
+firstly SPI controller should provide these members. If the slave do
+not set the member, that means the slave wants to communicate
+in 1 line traditionally.
