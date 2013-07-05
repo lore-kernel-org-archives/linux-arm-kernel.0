@@ -1,62 +1,76 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 6 Jul 2013 01:17:41 +0200 (CEST)
-Subject: [PATCHv4 08/10] clocksource: sun4i: Remove TIMER_SCAL variable
-In-Reply-To: <1373062725-19625-9-git-send-email-maxime.ripard@free-electrons.com>
-References: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
- <1373062725-19625-9-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <alpine.DEB.2.02.1307060031030.32106@ionos.tec.linutronix.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 06 Jul 2013 01:18:46 +0200
+Subject: [PATCH v3 07/13] ARM: dts: Add AK8975 device node for Exynos4412
+ TRATS2 board
+In-Reply-To: <1372692155-17653-8-git-send-email-s.nawrocki@samsung.com>
+References: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
+ <1372692155-17653-8-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1491290.c836bFtNe2@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime,
+Hi Sylwester, Jacek,
 
-On Sat, 6 Jul 2013, Maxime Ripard wrote:
-> @@ -168,8 +166,7 @@ static void __init sun4i_timer_init(struct device_node *node)
->  	clocksource_mmio_init(timer_base + TIMER_CNTVAL_REG(1), node->name,
->  			      rate, 300, 32, clocksource_mmio_readl_down);
->  
-> -	writel(rate / (TIMER_SCAL * HZ),
-> -	       timer_base + TIMER_INTVAL_REG(0));
-> +	writel(rate / HZ, timer_base + TIMER_INTVAL_REG(0));
->  
->  	/* set clock source to HOSC, 16 pre-division */
->  	val = readl(timer_base + TIMER_CTL_REG(0));
-> @@ -192,8 +189,8 @@ static void __init sun4i_timer_init(struct device_node *node)
->  
->  	sun4i_clockevent.cpumask = cpumask_of(0);
->  
-> -	clockevents_config_and_register(&sun4i_clockevent, rate / TIMER_SCAL,
-> -					0x1, 0xff);
-> +	clockevents_config_and_register(&sun4i_clockevent, rate, 0x1,
-> +					0xffffffff);
+On Monday 01 of July 2013 17:22:29 Sylwester Nawrocki wrote:
+> From: Jacek Anaszewski <j.anaszewski@samsung.com>
+> 
+> This patch adds AK8975 magnetometer node and corresponding
+> i2c-gpio bus node for TRATS2 board.
+> 
+> Signed-off-by: Jacek Anaszewski <j.anaszewski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4412-trats2.dts |   19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts
+> b/arch/arm/boot/dts/exynos4412-trats2.dts index 056b835..b9de3b5 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -19,6 +19,10 @@
+>  	model = "Samsung Trats 2 based on Exynos4412";
+>  	compatible = "samsung,trats2", "samsung,exynos4412";
+> 
+> +	aliases {
+> +		i2c8 = &i2c_ak8975;
+> +	};
+> +
+>  	memory {
+>  		reg =  <0x40000000 0x40000000>;
+>  	};
+> @@ -453,4 +457,19 @@
+>  	serial at 13830000 {
+>  		status = "okay";
+>  	};
+> +
+> +	i2c_ak8975: i2c-gpio at 0 {
 
-I really recommend that you go out for lots of beer/wine NOW and
-resume reading this mail when you recovered from that.
+I think this @0 is slightly incorrect here, as it seems like there is no 
+reg property present inside the node and so the device isn't located at 
+any address.
 
-I definitely appreciate your responsivness to feedback, but please go
-back and read my reply to the previous version of this patch
-carefully. You might eventually find out that I pointed you to another
-redundant clk_get_rate() call in that code.
+For logical indices like in this case I would rather use i2c-gpio-0 
+instead.
 
-After you did this, please go through the other patches in that series
-and check how many new instances of clk_get_rate() calls you add down
-the road. I did not even bother to look whether you cleaned it up
-between v3 and v4, but I'm quite sure you did not. If I'm wrong, I owe
-you a beer at the next conference.
+> +		compatible = "i2c-gpio";
+> +		gpios = <&gpy2 4 0>, <&gpy2 5 0>;
+> +		i2c-gpio,delay-us = <2>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		status = "okay";
+> +
+> +		ak8975 at 0c {
+> +			compatible = "asahi-kasei,ak8975";
+> +			reg = <0x0c>;
+> +			gpios = <&gpj0 7 0>;
+> +		};
+> +	};
+>  };
 
-Please take your time to address all concerns and look over the whole
-thing carefullly before resending. This is not a speed coding contest!
+Otherwise looks good.
 
-Taking time and reconsidering whether a comment for patch N/M might
-apply to other parts of the code or other parts of the patch series is
-not optional. Review comments are mostly hints. So it's up to you to
-check whether such a comment might apply to more than the particular
-patch line which was commented.
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-Taking time and being careful actually spares time on both and aside
-of that it spares a lot of pointless wasted electrons sent through the
-intertubes.
-
-Have a good weekend!
-
-     tglx
+Best regards,
+Tomasz
