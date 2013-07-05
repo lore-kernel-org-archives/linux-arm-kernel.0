@@ -1,92 +1,91 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri,  5 Jul 2013 18:39:22 -0300
-Subject: [PATCH v6 11/21] bus: mvebu-mbus: Remove the no longer used
- name-based API
+Date: Fri,  5 Jul 2013 18:39:19 -0300
+Subject: [PATCH v6 08/21] bus: mvebu-mbus: Introduce device tree binding
 In-Reply-To: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1373060372-32357-12-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1373060372-32357-9-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Now that every user of the deprecated name-based API has been
-converted to using the ID-based API, let's remove the former one.
+This patch adds the most fundamental device-tree initialization.
+We only introduce what's required to be able to probe the mvebu-mbus
+driver from the DT. Follow-up patches will extend the device tree binding,
+allowing to describe static address decoding windows.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/bus/mvebu-mbus.c | 38 --------------------------------------
- include/linux/mbus.h     |  5 -----
- 2 files changed, 43 deletions(-)
+ drivers/bus/mvebu-mbus.c | 49 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mbus.h     |  1 +
+ 2 files changed, 50 insertions(+)
 
 diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 8aa3b45..db68436 100644
+index 1b17954..44a07c4 100644
 --- a/drivers/bus/mvebu-mbus.c
 +++ b/drivers/bus/mvebu-mbus.c
-@@ -764,44 +764,6 @@ int mvebu_mbus_add_window_remap_by_id(unsigned int target,
- 	return mvebu_mbus_alloc_window(s, base, size, remap, target, attribute);
+@@ -900,3 +900,52 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+ 			sdramwins_phys_base,
+ 			sdramwins_size);
  }
- 
--int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
--				      size_t size, phys_addr_t remap,
--				      unsigned int flags)
--{
--	struct mvebu_mbus_state *s = &mbus_state;
--	u8 target, attr;
--	int i;
--
--	if (!s->soc->map)
--		return -ENODEV;
--
--	for (i = 0; s->soc->map[i].name; i++)
--		if (!strcmp(s->soc->map[i].name, devname))
--			break;
--
--	if (!s->soc->map[i].name) {
--		pr_err("unknown device '%s'\n", devname);
--		return -ENODEV;
--	}
--
--	target = s->soc->map[i].target;
--	attr   = s->soc->map[i].attr;
--
--	if (flags == MVEBU_MBUS_PCI_MEM)
--		attr |= 0x8;
--	else if (flags == MVEBU_MBUS_PCI_WA)
--		attr |= 0x28;
--
--	return mvebu_mbus_add_window_remap_by_id(target, attr, base,
--						 size, remap);
--}
--
--int mvebu_mbus_add_window(const char *devname, phys_addr_t base, size_t size)
--{
--	return mvebu_mbus_add_window_remap_flags(devname, base, size,
--						 MVEBU_MBUS_NO_REMAP, 0);
--}
--
- int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
- 				phys_addr_t base, size_t size)
- {
++
++#ifdef CONFIG_OF
++int __init mvebu_mbus_dt_init(void)
++{
++	struct resource mbuswins_res, sdramwins_res;
++	struct device_node *np, *controller;
++	const struct of_device_id *of_id;
++	const __be32 *prop;
++	int ret;
++
++	np = of_find_matching_node(NULL, of_mvebu_mbus_ids);
++	if (!np) {
++		pr_err("could not find a matching SoC family\n");
++		return -ENODEV;
++	}
++
++	of_id = of_match_node(of_mvebu_mbus_ids, np);
++	mbus_state.soc = of_id->data;
++
++	prop = of_get_property(np, "controller", NULL);
++	if (!prop) {
++		pr_err("required 'controller' property missing\n");
++		return -EINVAL;
++	}
++
++	controller = of_find_node_by_phandle(be32_to_cpup(prop));
++	if (!controller) {
++		pr_err("could not find an 'mbus-controller' node\n");
++		return -ENODEV;
++	}
++
++	if (of_address_to_resource(controller, 0, &mbuswins_res)) {
++		pr_err("cannot get MBUS register address\n");
++		return -EINVAL;
++	}
++
++	if (of_address_to_resource(controller, 1, &sdramwins_res)) {
++		pr_err("cannot get SDRAM register address\n");
++		return -EINVAL;
++	}
++
++	ret = mvebu_mbus_common_init(&mbus_state,
++				     mbuswins_res.start,
++				     resource_size(&mbuswins_res),
++				     sdramwins_res.start,
++				     resource_size(&sdramwins_res));
++	return ret;
++}
++#endif
 diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index eadefd6..fa84dcb 100644
+index 9245b66..eadefd6 100644
 --- a/include/linux/mbus.h
 +++ b/include/linux/mbus.h
-@@ -59,15 +59,10 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
- }
- #endif
+@@ -74,5 +74,6 @@ int mvebu_mbus_del_window(phys_addr_t base, size_t size);
+ int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
+ 		    size_t mbus_size, phys_addr_t sdram_phys_base,
+ 		    size_t sdram_size);
++int mvebu_mbus_dt_init(void);
  
--int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
--				      size_t size, phys_addr_t remap,
--				      unsigned int flags);
- int mvebu_mbus_add_window_remap_by_id(unsigned int target,
- 				      unsigned int attribute,
- 				      phys_addr_t base, size_t size,
- 				      phys_addr_t remap);
--int mvebu_mbus_add_window(const char *devname, phys_addr_t base,
--			  size_t size);
- int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
- 				phys_addr_t base, size_t size);
- int mvebu_mbus_del_window(phys_addr_t base, size_t size);
+ #endif /* __LINUX_MBUS_H */
 -- 
 1.8.1.5
