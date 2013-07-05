@@ -1,18 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 6 Jul 2013 01:38:35 +0200
-Subject: [PATCH v6 00/21] MBus DT binding: PCIe strikes back
-In-Reply-To: <20130706013547.3ce7280b@skate>
-References: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130706013547.3ce7280b@skate>
-Message-ID: <201307060138.36191.arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri,  5 Jul 2013 16:39:33 -0700
+Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if UP system
+Message-ID: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 06 July 2013, Thomas Petazzoni wrote:
-> Arnd, Jason, if you could confirm that you both agree with this DT
-> binding soon, Ezequiel and I would quickly adapt the code accordingly,
-> and hopefully converge towards a final patch set.
+In a uniprocessor implementation the interrupt processor targets
+registers are read-as-zero/write-ignored (RAZ/WI). Unfortunately
+gic_get_cpumask() will print a critical message saying
 
-Looks all good from what I can tell.
+ GIC CPU mask not found - kernel will fail to boot.
 
-	Arnd
+if these registers all read as zero, but there won't actually be
+a problem on uniprocessor systems and the kernel will boot just
+fine. Skip this check if we're running a UP kernel or if we
+detect that the hardware only supports a single processor.
+
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+
+Maybe we should just drop the check entirely? It looks like it may
+just be debug code that won't ever trigger in practice, even on the
+11MPCore that caused this code to be introduced.
+
+ drivers/irqchip/irq-gic.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 19ceaa6..589c760 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -368,7 +368,7 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
+ 			break;
+ 	}
+ 
+-	if (!mask)
++	if (!mask && num_possible_cpus() > 1)
+ 		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
+ 
+ 	return mask;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
