@@ -1,79 +1,35 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri, 05 Jul 2013 12:33:21 -0700
-Subject: [PATCH V3] of: Set the DMA mask to 64 bits when dma_addr_t is
- 64-bits
-In-Reply-To: <CACVXFVPfkqP+UyoGd-+QFRzndSam_DtU=utrBPYCPjQCGQ_F6g@mail.gmail.com>
-References: <1367008266-1431-1-git-send-email-lauraa@codeaurora.org>
- <517AF270.8040106@gmail.com>
- <CACVXFVPfkqP+UyoGd-+QFRzndSam_DtU=utrBPYCPjQCGQ_F6g@mail.gmail.com>
-Message-ID: <51D71F81.5090503@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri,  5 Jul 2013 21:34:29 +0200
+Subject: [PATCHv3 02/10] clocksource: sun4i: Wrap macros arguments in
+ parenthesis
+In-Reply-To: <1373052877-29366-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1373052877-29366-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1373052877-29366-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/3/2013 7:15 AM, Ming Lei wrote:
-> On Sat, Apr 27, 2013 at 5:32 AM, Rob Herring <robherring2@gmail.com> wrote:
->> On 04/26/2013 03:31 PM, Laura Abbott wrote:
->>> Currently, of_platform_device_create_pdata always sets the
->>> coherent DMA mask to 32 bits. On ARM systems without CONFIG_ZONE_DMA,
->>> arm_dma_limit gets set to ~0 or 0xFFFFFFFFFFFFFFFF on LPAE based
->>> systems. Since arm_dma_limit represents the smallest dma_mask
->>> on the system, the default of 32 bits prevents any dma_coherent
->>> allocation from succeeding unless clients manually set the
->>> dma mask first. Rather than make every client on an LPAE system set
->>> the mask manually, account for the size of dma_addr_t when setting
->>> the coherent mask.
->>>
->>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->>> ---
->>>   drivers/of/platform.c |    2 +-
->>>   1 files changed, 1 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
->>> index 0970505..5f0ba94 100644
->>> --- a/drivers/of/platform.c
->>> +++ b/drivers/of/platform.c
->>> @@ -214,7 +214,7 @@ struct platform_device *of_platform_device_create_pdata(
->>>   #if defined(CONFIG_MICROBLAZE)
->>>        dev->archdata.dma_mask = 0xffffffffUL;
->>>   #endif
->>> -     dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
->>> +     dev->dev.coherent_dma_mask = DMA_BIT_MASK(sizeof(dma_addr_t) * 8);
->>
->> This is going to change the mask from 32 to 64 bits on 64-bit powerpc
->> and others possibly. Maybe it doesn't matter. I think it doesn't, but
->> I'm not sure enough to apply for 3.10. So I'll queue it for 3.11.
->
-> Without the patch, LPAE enabled board may not boot at all, but looks
-> it still isn't in -next tree.
->
-> But I am wondering if it is a correct approach, because enabling LPAE
-> doesn't mean the I/O devices can support DMA to/from 64bit address, and
-> it is very probably devices can't do it at all.
->
+The macros were not using parenthesis to escape the arguments passed to
+them. It is pretty unsafe, so add those parenthesis.
 
-The problem is the way the arm_dma_limit is set up, all dma allocations 
-are currently broken regardless of if the actual device supports 64-bit 
-addresses or not.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clocksource/sun4i_timer.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> Another way is to always set arm_dma_limit as 0xFFFFFFFF when
-> CONFIG_ZONE_DMA is unset, and let driver override device's dma
-> mask if the device supports 64bit DMA.
->
-
-I previously asked about the arm_dma_limit and was told that the current 
-behavior is the correct approach (see 
-https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-April/032729.html 
-and 
-https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-April/032690.html) 
-
-
-The point here is to set the mask to something reasonable such that 
-allocations can succeed by default. If devices can't use part of the 
-memory space they can adjust the limit accordingly.
-
-Thanks,
-Laura
-
+diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
+index bdf34d9..34ab658 100644
+--- a/drivers/clocksource/sun4i_timer.c
++++ b/drivers/clocksource/sun4i_timer.c
+@@ -30,8 +30,8 @@
+ #define TIMER_CTL_ENABLE		BIT(0)
+ #define TIMER_CTL_AUTORELOAD		BIT(1)
+ #define TIMER_CTL_ONESHOT		BIT(7)
+-#define TIMER_INTVAL_REG(val)	(0x10 * val + 0x14)
+-#define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
++#define TIMER_INTVAL_REG(val)	(0x10 * (val) + 0x14)
++#define TIMER_CNTVAL_REG(val)	(0x10 * (val) + 0x18)
+ 
+ #define TIMER_SCAL		16
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.3.2
