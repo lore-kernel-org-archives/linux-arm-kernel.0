@@ -1,74 +1,60 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 5 Jul 2013 14:12:29 +0800
-Subject: [PATCH v3 3/6] ARM: dts: imx6sl: add "fsl,
- imx6q-uart" for uart compatible
+Date: Fri, 5 Jul 2013 14:12:31 +0800
+Subject: [PATCH v3 5/6] ARM: dts: imx6q{dl}: add a DTE uart pinctrl for uart2
 In-Reply-To: <1373004752-21302-1-git-send-email-b32955@freescale.com>
 References: <1373004752-21302-1-git-send-email-b32955@freescale.com>
-Message-ID: <1373004752-21302-4-git-send-email-b32955@freescale.com>
+Message-ID: <1373004752-21302-6-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to enable the DMA for some uart port in imx6sl, we add the
-"fsl,imx6q-uart" to the uart's compatible property.
+In the arm2 board, the UART2 works in the dte mode.
+So add a pinctrl for both the imx6q{dl} boards.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- arch/arm/boot/dts/imx6sl.dtsi |   15 ++++++++++-----
- 1 files changed, 10 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/imx6dl.dtsi |    9 +++++++++
+ arch/arm/boot/dts/imx6q.dtsi  |    9 +++++++++
+ 2 files changed, 18 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 9138c67..0a297af 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -152,7 +152,8 @@
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 2b5628d..5f61722 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -223,6 +223,15 @@
+ 							MX6DL_PAD_EIM_D27__UART2_RX_DATA 0x1b0b1
+ 						>;
+ 					};
++
++					pinctrl_uart2_2: uart2grp-2 { /* DTE mode */
++						fsl,pins = <
++							MX6DL_PAD_EIM_D26__UART2_RX_DATA 0x1b0b1
++							MX6DL_PAD_EIM_D27__UART2_TX_DATA 0x1b0b1
++							MX6DL_PAD_EIM_D28__UART2_CTS_B   0x1b0b1
++							MX6DL_PAD_EIM_D29__UART2_RTS_B	 0x1b0b1
++						>;
++					};
  				};
  
- 				uart5: serial at 02018000 {
--					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
-+					compatible = "fsl,imx6sl-uart",
-+						   "fsl,imx6q-uart", "fsl,imx21-uart";
- 					reg = <0x02018000 0x4000>;
- 					interrupts = <0 30 0x04>;
- 					clocks = <&clks IMX6SL_CLK_UART>,
-@@ -162,7 +163,8 @@
+ 				uart4 {
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 6f4d6ab..4ac3df5 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -266,6 +266,15 @@
+ 							MX6Q_PAD_EIM_D27__UART2_RX_DATA 0x1b0b1
+ 						>;
+ 					};
++
++					pinctrl_uart2_2: uart2grp-2 { /* DTE mode */
++						fsl,pins = <
++							MX6Q_PAD_EIM_D26__UART2_RX_DATA 0x1b0b1
++							MX6Q_PAD_EIM_D27__UART2_TX_DATA 0x1b0b1
++							MX6Q_PAD_EIM_D28__UART2_CTS_B	0x1b0b1
++							MX6Q_PAD_EIM_D29__UART2_RTS_B	0x1b0b1
++						>;
++					};
  				};
  
- 				uart1: serial at 02020000 {
--					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
-+					compatible = "fsl,imx6sl-uart",
-+						   "fsl,imx6q-uart", "fsl,imx21-uart";
- 					reg = <0x02020000 0x4000>;
- 					interrupts = <0 26 0x04>;
- 					clocks = <&clks IMX6SL_CLK_UART>,
-@@ -172,7 +174,8 @@
- 				};
- 
- 				uart2: serial at 02024000 {
--					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
-+					compatible = "fsl,imx6sl-uart",
-+						   "fsl,imx6q-uart", "fsl,imx21-uart";
- 					reg = <0x02024000 0x4000>;
- 					interrupts = <0 27 0x04>;
- 					clocks = <&clks IMX6SL_CLK_UART>,
-@@ -209,7 +212,8 @@
- 				};
- 
- 				uart3: serial at 02034000 {
--					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
-+					compatible = "fsl,imx6sl-uart",
-+						   "fsl,imx6q-uart", "fsl,imx21-uart";
- 					reg = <0x02034000 0x4000>;
- 					interrupts = <0 28 0x04>;
- 					clocks = <&clks IMX6SL_CLK_UART>,
-@@ -219,7 +223,8 @@
- 				};
- 
- 				uart4: serial at 02038000 {
--					compatible = "fsl,imx6sl-uart", "fsl,imx21-uart";
-+					compatible = "fsl,imx6sl-uart",
-+						   "fsl,imx6q-uart", "fsl,imx21-uart";
- 					reg = <0x02038000 0x4000>;
- 					interrupts = <0 29 0x04>;
- 					clocks = <&clks IMX6SL_CLK_UART>,
+ 				uart4 {
 -- 
 1.7.1
