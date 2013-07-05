@@ -1,24 +1,37 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 5 Jul 2013 13:08:36 +0200
-Subject: [PATCH v2 00/22] Unified SMMU driver among Tegra SoCs
-In-Reply-To: <4999563.JlU6BysXQl@fb07-iapwap2.physik.uni-giessen.de>
-References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com><4999563.JlU6BysXQl@fb07-iapwap2.physik.uni-giessen.de>
-Message-ID: <20130705.140836.1744157186948281659.hdoyu@nvidia.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 5 Jul 2013 12:17:43 +0100
+Subject: [GIT PULL] Xen ARM update for 3.11
+Message-ID: <alpine.DEB.2.02.1307041229140.5067@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Linus,
+just one commit this time: the implementation of the tmem hypercall for
+arm and arm64.
 
-Marc Dietrich <marvin24@gmx.de> wrote @ Fri, 5 Jul 2013 13:03:58 +0200:
+NOTE: because this change depends on xen support for arm64 that has been
+sent to you by Catalin (we agreed that being the very first xen for arm64
+set of patches, it should go via the arm64 maintainers), I based this
+branch on Catalin's arm64-upstream (see his pull request here
+http://marc.info/?l=linux-arm-kernel&m=137269947606106&w=2).
 
-> Am Freitag, 5. Juli 2013, 13:44:35 schrieb Hiroshi Doyu:
-> > Hi,
-> > 
-> > This series provides:
-> > 
-> > (1) Unified SMMU driver among Tegra SoCs
-> 
-> does this affect tegra2 in any way?
+- Stefano
 
-No, at all for Tegra 20.
-This driver should work with Tegra 30, 114 and 148.
+
+
+The following changes since commit aa729dccb5e8dfbc78e2e235b8754d6acccee731:
+
+  Merge branch 'for-next/hugepages' of git://git.linaro.org/people/stevecapper/linux into upstream-hugepages (2013-07-01 11:20:58 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git xenarm-for-3.11-tag
+
+Stefano Stabellini (1):
+      xen/arm and xen/arm64: implement HYPERVISOR_tmem_op
+
+ arch/arm/include/asm/xen/hypercall.h |    1 +
+ arch/arm/xen/enlighten.c             |    1 +
+ arch/arm/xen/hypercall.S             |    1 +
+ arch/arm64/xen/hypercall.S           |    1 +
+ 4 files changed, 4 insertions(+), 0 deletions(-)
