@@ -1,63 +1,55 @@
 From: b18965@freescale.com (Alison Wang)
-Date: Fri, 5 Jul 2013 15:51:39 +0800
-Subject: [PATCH 1/4] ARM: dts: vf610: Add DCU and TCON nodes
+Date: Fri, 5 Jul 2013 15:51:41 +0800
+Subject: [PATCH 3/4] ARM: clk: vf610: Add DCU and TCON clock support
 In-Reply-To: <1373010702-9244-1-git-send-email-b18965@freescale.com>
 References: <1373010702-9244-1-git-send-email-b18965@freescale.com>
-Message-ID: <1373010702-9244-2-git-send-email-b18965@freescale.com>
+Message-ID: <1373010702-9244-4-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DCU and TCON nodes in SoC level DTS for Freescale
-Vybrid VF610. It also removes useless pin for DCU0 pinctrl.
+This patch adds DCU and TCON clock support for Vybrid VF610 platform.
 
 Signed-off-by: Alison Wang <b18965@freescale.com>
 ---
- arch/arm/boot/dts/vf610.dtsi | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ arch/arm/mach-imx/clk-vf610.c           | 5 +++++
+ include/dt-bindings/clock/vf610-clock.h | 3 ++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index e1eb7da..037e8f1 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -140,6 +140,14 @@
- 				clock-names = "pit";
- 			};
+diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+index d617c0b..c4dbe32 100644
+--- a/arch/arm/mach-imx/clk-vf610.c
++++ b/arch/arm/mach-imx/clk-vf610.c
+@@ -245,6 +245,8 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 	clk[VF610_CLK_DCU1_DIV] = imx_clk_divider("dcu1_div", "dcu1_en", CCM_CSCDR3, 20, 3);
+ 	clk[VF610_CLK_DCU1] = imx_clk_gate2("dcu1", "dcu1_div", CCM_CCGR9, CCM_CCGRx_CGn(8));
  
-+			tcon0: tcon at 4003d000 {
-+				compatible = "fsl,vf610-tcon";
-+				reg = <0x4003d000 0x1000>;
-+				clocks = <&clks VF610_CLK_TCON0>;
-+				clock-names = "tcon";
-+				status = "disabled";
-+			};
++	clk[VF610_CLK_TCON0] = imx_clk_gate2("tcon0", "platform_bus", CCM_CCGR1, CCM_CCGRx_CGn(13));
 +
- 			wdog at 4003e000 {
- 				compatible = "fsl,vf610-wdt", "fsl,imx21-wdt";
- 				reg = <0x4003e000 0x1000>;
-@@ -169,7 +177,6 @@
- 				dcu0 {
- 					pinctrl_dcu0_1: dcu0grp_1 {
- 						fsl,pins = <
--						VF610_PAD_PTB8__GPIO_30		0x42
- 						VF610_PAD_PTE0__DCU0_HSYNC	0x42
- 						VF610_PAD_PTE1__DCU0_VSYNC	0x42
- 						VF610_PAD_PTE2__DCU0_PCLK	0x42
-@@ -395,6 +402,16 @@
- 				reg = <0x40050000 0x1000>;
- 			};
+ 	clk[VF610_CLK_ESAI_SEL] = imx_clk_mux("esai_sel", CCM_CSCMR1, 20, 2, esai_sels, 4);
+ 	clk[VF610_CLK_ESAI_EN] = imx_clk_gate("esai_en", "esai_sel", CCM_CSCDR2, 30);
+ 	clk[VF610_CLK_ESAI_DIV] = imx_clk_divider("esai_div", "esai_en", CCM_CSCDR2, 24, 4);
+@@ -311,6 +313,9 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 	clk_set_parent(clk[VF610_CLK_SAI2_SEL], clk[VF610_CLK_AUDIO_EXT]);
+ 	clk_set_parent(clk[VF610_CLK_SAI3_SEL], clk[VF610_CLK_AUDIO_EXT]);
  
-+			dcu0: dcu at 40058000 {
-+				compatible = "fsl,vf610-dcu";
-+				reg = <0x40058000 0x1200>;
-+				interrupts = <0 30 0x04>;
-+				clocks = <&clks VF610_CLK_DCU0>;
-+				clock-names = "dcu";
-+				tcon-controller = <&tcon0>;
-+				status = "disabled";
-+			};
++	clk_set_parent(clk[VF610_CLK_DCU0_SEL], clk[VF610_CLK_PLL1_PFD2]);
++	clk_set_rate(clk[VF610_CLK_DCU0_DIV], 113200000);
 +
- 			i2c0: i2c at 40066000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
+ 	/* Add the clocks to provider list */
+ 	clk_data.clks = clk;
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
+index 15e997f..a2fc6d9 100644
+--- a/include/dt-bindings/clock/vf610-clock.h
++++ b/include/dt-bindings/clock/vf610-clock.h
+@@ -158,6 +158,7 @@
+ #define VF610_CLK_GPU_SEL		145
+ #define VF610_CLK_GPU_EN		146
+ #define VF610_CLK_GPU2D			147
+-#define VF610_CLK_END			148
++#define VF610_CLK_TCON0			148
++#define VF610_CLK_END			149
+ 
+ #endif /* __DT_BINDINGS_CLOCK_VF610_H */
 -- 
 1.8.0
