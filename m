@@ -1,23 +1,88 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Fri, 5 Jul 2013 14:38:36 +0530
-Subject: SPI: DUAL/QUAD support
-In-Reply-To: <CAHSAbzM1PGoMXFNOmB7guDsVWYnRoRy89-bufHYpPz5+odnd8w@mail.gmail.com>
-References: <CAHSAbzPNDSr_6N79fh0DTWSEg8buRRPyiw8SPodtKLPjzWXJsg@mail.gmail.com>	<20130704130017.GA25997@sig21.net>	<OFA0D5839D.0594EA10-ONC1257B9E.004A7347-C1257B9E.00524BA5@rohde-schwarz.com>	<20130704154927.GE27646@sirena.org.uk>	<OFAD729A05.8C915625-ONC1257B9E.00576B25-C1257B9E.0058477D@rohde-schwarz.com>	<CAHSAbzOg+uHndydSC43moF7pijc67pqzB2rPnY69ynXHEzw79g@mail.gmail.com>	<51D67851.8020402@ti.com>	<CAHSAbzNvMo_oeaqtzO8-xDm-L-f8wVccVqfuVqbR=OwqWJhVwg@mail.gmail.com>	<51D689F3.3070605@ti.com>
- <CAHSAbzM1PGoMXFNOmB7guDsVWYnRoRy89-bufHYpPz5+odnd8w@mail.gmail.com>
-Message-ID: <51D68D14.7090606@ti.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 5 Jul 2013 16:43:38 +0800
+Subject: [PATCH] of: match the compatible in the order set by the dts file
+Message-ID: <1373013818-11365-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 July 2013 02:37 PM, yuhang wang wrote:
->>                      if (!quad_mode)
->>                              dra7xxx_writel(qspi, qspi->cmd | QSPI_RD_SNGL,
->>                                              QSPI_SPI_CMD_REG);
->>                      else
->>                              dra7xxx_writel(qspi, qspi->cmd | QSPI_RD_QUAD,
->>                                              QSPI_SPI_CMD_REG);
->>                   .......
->>                  }
-> So what do you based on to set variable quad_mode.
-Best way should be to check for flash device id and manufacture data. 
-Based on which you
-can decide whether your flash supports quad bits or not.
+If we set the uart compatible in the dts file like this:
+   ------------------------------------------------------
+    compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+   ------------------------------------------------------
+
+and we set the uart compatible in the uart driver like this:
+   ------------------------------------------------------
+	{ .compatible = "fsl,imx1-uart", ... },
+	{ .compatible = "fsl,imx21-uart", ... },
+	{ .compatible = "fsl,imx6q-uart", ... },
+	{ /* sentinel */ }
+   ------------------------------------------------------
+
+the current code will match the "fsl,imx21-uart" in the end.
+
+Of course, this is not what we want. We want it to match the "fsl,imx6q-uart".
+
+This patch rewrites the match code, and make it to check the compatible
+in the order set by the DTS file.
+
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ drivers/of/base.c |   29 +++++++++++++++++++++++++----
+ 1 files changed, 25 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 0d61fc5..b13846b 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -622,10 +622,14 @@ static
+ const struct of_device_id *__of_match_node(const struct of_device_id *matches,
+ 					   const struct device_node *node)
+ {
++	struct of_device_id *old = (struct of_device_id *)matches;
++	const char *cp;
++	int cplen, l;
++
+ 	if (!matches)
+ 		return NULL;
+ 
+-	while (matches->name[0] || matches->type[0] || matches->compatible[0]) {
++	while (matches->name[0] || matches->type[0]) {
+ 		int match = 1;
+ 		if (matches->name[0])
+ 			match &= node->name
+@@ -633,13 +637,30 @@ const struct of_device_id *__of_match_node(const struct of_device_id *matches,
+ 		if (matches->type[0])
+ 			match &= node->type
+ 				&& !strcmp(matches->type, node->type);
+-		if (matches->compatible[0])
+-			match &= __of_device_is_compatible(node,
+-							   matches->compatible);
+ 		if (match)
+ 			return matches;
+ 		matches++;
+ 	}
++
++	/* Check the compatible in the order set by the DTS file. */
++	cp = __of_get_property(node, "compatible", &cplen);
++	if (!cp)
++		return NULL;
++
++	while (cplen > 0) {
++		matches = old;
++
++		while (matches->compatible[0]) {
++			if (!of_compat_cmp(cp, matches->compatible,
++						strlen(matches->compatible)))
++				return matches;
++			matches++;
++		}
++
++		l = strlen(cp) + 1;
++		cp += l;
++		cplen -= l;
++	}
+ 	return NULL;
+ }
+ 
+-- 
+1.7.1
