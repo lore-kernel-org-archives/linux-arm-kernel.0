@@ -1,128 +1,168 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 5 Jul 2013 13:44:36 +0300
-Subject: [PATCH v2 01/22] [HACK] of: dev_node has struct device pointer
+Date: Fri, 5 Jul 2013 13:44:40 +0300
+Subject: [PATCH v2 05/22] ARM: dt: tegra30: iommu: Add "nvidia,memory-client"
 In-Reply-To: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
 References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1373021097-32420-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1373021097-32420-6-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prevent of_platform_populate() from trying to populate duplicate
-devices if a device has been already populated.
+Add "nvidia,memory-client" to identify which swgroup ID a device
+belongs to.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
-Need to take care of early_platform_devices, or alternative solution.
----
- drivers/of/base.c     |   23 +++++++++++++++++++++++
- drivers/of/platform.c |    8 ++++++++
- include/linux/of.h    |   16 ++++++++++++++++
- 3 files changed, 47 insertions(+)
+ arch/arm/boot/dts/tegra30.dtsi |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 5c54279..99062dd 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -230,6 +230,29 @@ const void *of_get_property(const struct device_node *np, const char *name,
- }
- EXPORT_SYMBOL(of_get_property);
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 4a9594e..4aa5b4a 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -23,6 +23,7 @@
+ 		interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>, /* syncpt */
+ 			     <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>; /* general */
+ 		clocks = <&tegra_car TEGRA30_CLK_HOST1X>;
++		nvidia,memory-client = <TEGRA_SWGROUP_HC>;
  
-+struct device *of_get_device(const struct device_node *node)
-+{
-+	struct device *dev;
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&devtree_lock, flags);
-+	dev = node->dev;
-+	raw_spin_unlock_irqrestore(&devtree_lock, flags);
-+
-+	return dev;
-+}
-+EXPORT_SYMBOL(of_get_device);
-+
-+void of_set_device(struct device_node *node, struct device *dev)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&devtree_lock, flags);
-+	node->dev = dev;
-+	raw_spin_unlock_irqrestore(&devtree_lock, flags);
-+}
-+EXPORT_SYMBOL(of_set_device);
-+
- /** Checks if the given "compat" string matches one of the strings in
-  * the device's "compatible" property
-  */
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index e0a6514..a8f6b09 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -203,10 +203,17 @@ struct platform_device *of_platform_device_create_pdata(
- 					struct device *parent)
- {
- 	struct platform_device *dev;
-+	struct device *tmp;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -34,6 +35,7 @@
+ 			reg = <0x54040000 0x00040000>;
+ 			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&tegra_car TEGRA30_CLK_MPE>;
++			nvidia,memory-client = <TEGRA_SWGROUP_MPE>;
+ 		};
  
- 	if (!of_device_is_available(np))
- 		return NULL;
+ 		vi {
+@@ -41,6 +43,7 @@
+ 			reg = <0x54080000 0x00040000>;
+ 			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&tegra_car TEGRA30_CLK_VI>;
++			nvidia,memory-client = <TEGRA_SWGROUP_VI>;
+ 		};
  
-+	tmp = of_get_device(np);
-+	if (tmp) {
-+		dev_info(tmp, "Already populated\n");
-+		return to_platform_device(tmp);
-+	}
-+
- 	dev = of_device_alloc(np, bus_id, parent);
- 	if (!dev)
- 		return NULL;
-@@ -228,6 +235,7 @@ struct platform_device *of_platform_device_create_pdata(
- 		return NULL;
- 	}
+ 		epp {
+@@ -48,6 +51,7 @@
+ 			reg = <0x540c0000 0x00040000>;
+ 			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&tegra_car TEGRA30_CLK_EPP>;
++			nvidia,memory-client = <TEGRA_SWGROUP_EPP>;
+ 		};
  
-+	of_set_device(np, &dev->dev);
- 	return dev;
- }
+ 		isp {
+@@ -55,6 +59,7 @@
+ 			reg = <0x54100000 0x00040000>;
+ 			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&tegra_car TEGRA30_CLK_ISP>;
++			nvidia,memory-client = <TEGRA_SWGROUP_ISP>;
+ 		};
  
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 1fd08ca..b548522 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -60,6 +60,9 @@ struct device_node {
- 	struct	kref kref;
- 	unsigned long _flags;
- 	void	*data;
-+
-+	struct device *dev;		/* Set only after populated */
-+
- #if defined(CONFIG_SPARC)
- 	const char *path_component_name;
- 	unsigned int unique_id;
-@@ -268,6 +271,8 @@ extern const void *of_get_property(const struct device_node *node,
- 				int *lenp);
- #define for_each_property_of_node(dn, pp) \
- 	for (pp = dn->properties; pp != NULL; pp = pp->next)
-+extern struct device *of_get_device(const struct device_node *node);
-+extern void of_set_device(struct device_node *node, struct device *dev);
+ 		gr2d {
+@@ -62,6 +67,7 @@
+ 			reg = <0x54140000 0x00040000>;
+ 			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&tegra_car TEGRA30_CLK_GR2D>;
++			nvidia,memory-client = <TEGRA_SWGROUP_G2>;
+ 		};
  
- extern int of_n_addr_cells(struct device_node *np);
- extern int of_n_size_cells(struct device_node *np);
-@@ -459,6 +464,17 @@ static inline const void *of_get_property(const struct device_node *node,
- 	return NULL;
- }
+ 		gr3d {
+@@ -69,6 +75,8 @@
+ 			reg = <0x54180000 0x00040000>;
+ 			clocks = <&tegra_car 24 &tegra_car 98>;
+ 			clock-names = "3d", "3d2";
++			nvidia,memory-client = <TEGRA_SWGROUP_NV
++						TEGRA_SWGROUP_NV2>;
+ 		};
  
-+static inline struct device *of_get_device(const struct device_node *node)
-+{
-+	return NULL;
-+}
-+
-+static inline void of_set_device(const struct device_node *node,
-+				 struct device *dev);
-+{
-+	return -ENOSYS;
-+}
-+
- static inline int of_property_read_u64(const struct device_node *np,
- 				       const char *propname, u64 *out_value)
- {
+ 		dc at 54200000 {
+@@ -78,6 +86,7 @@
+ 			clocks = <&tegra_car TEGRA30_CLK_DISP1>,
+ 				 <&tegra_car TEGRA30_CLK_PLL_P>;
+ 			clock-names = "disp1", "parent";
++			nvidia,memory-client = <TEGRA_SWGROUP_DC>;
+ 
+ 			rgb {
+ 				status = "disabled";
+@@ -91,6 +100,7 @@
+ 			clocks = <&tegra_car TEGRA30_CLK_DISP2>,
+ 				 <&tegra_car TEGRA30_CLK_PLL_P>;
+ 			clock-names = "disp2", "parent";
++			nvidia,memory-client = <TEGRA_SWGROUP_DCB>;
+ 
+ 			rgb {
+ 				status = "disabled";
+@@ -247,6 +257,7 @@
+ 		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+ 		nvidia,dma-request-selector = <&apbdma 8>;
+ 		clocks = <&tegra_car TEGRA30_CLK_UARTA>;
++		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -257,6 +268,7 @@
+ 		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+ 		nvidia,dma-request-selector = <&apbdma 9>;
+ 		clocks = <&tegra_car TEGRA30_CLK_UARTB>;
++		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -267,6 +279,7 @@
+ 		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+ 		nvidia,dma-request-selector = <&apbdma 10>;
+ 		clocks = <&tegra_car TEGRA30_CLK_UARTC>;
++		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -277,6 +290,7 @@
+ 		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
+ 		nvidia,dma-request-selector = <&apbdma 19>;
+ 		clocks = <&tegra_car TEGRA30_CLK_UARTD>;
++		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -287,6 +301,7 @@
+ 		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+ 		nvidia,dma-request-selector = <&apbdma 20>;
+ 		clocks = <&tegra_car TEGRA30_CLK_UARTE>;
++		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -536,6 +551,7 @@
+ 		reg = <0x78000000 0x200>;
+ 		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&tegra_car TEGRA30_CLK_SDMMC1>;
++		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -544,6 +560,7 @@
+ 		reg = <0x78000200 0x200>;
+ 		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&tegra_car TEGRA30_CLK_SDMMC2>;
++		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -552,6 +569,7 @@
+ 		reg = <0x78000400 0x200>;
+ 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&tegra_car TEGRA30_CLK_SDMMC3>;
++		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -560,6 +578,7 @@
+ 		reg = <0x78000600 0x200>;
+ 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&tegra_car TEGRA30_CLK_SDMMC4>;
++		nvidia,memory-client = <TEGRA_SWGROUP_PPCS>;
+ 		status = "disabled";
+ 	};
+ 
 -- 
 1.7.9.5
