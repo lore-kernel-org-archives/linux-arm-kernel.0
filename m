@@ -1,75 +1,41 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Fri, 5 Jul 2013 16:23:33 +0200
-Subject: [PATCH v3 2/6] misc: sram: add ability to mark sram sections as
- reserved
-In-Reply-To: <CAOMZO5AHX0UpeKQh+faPT=MfCf53eo=kXigtOZd7iuKrz-sFeA@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 05 Jul 2013 16:23:23 +0200
+Subject: [PATCH v3 1/6] misc: sram: fix error path in sram_probe
+In-Reply-To: <201307051440.53993.heiko@sntech.de>
 References: <201307051440.19428.heiko@sntech.de>
- <201307051441.27605.heiko@sntech.de>
- <CAOMZO5AHX0UpeKQh+faPT=MfCf53eo=kXigtOZd7iuKrz-sFeA@mail.gmail.com>
-Message-ID: <201307051623.33991.heiko@sntech.de>
+ <201307051440.53993.heiko@sntech.de>
+Message-ID: <1373034203.3935.31.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 5. Juli 2013, 14:55:40 schrieb Fabio Estevam:
-> On Fri, Jul 5, 2013 at 9:41 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > Some SoCs need parts of their sram for special purposes. So while being
-> > part of the periphal, it should not be part of the genpool controlling
-> > the sram.
-> > 
-> > Threfore add an option mmio-sram-reserved to keep arbitary portions of
-> > the sram from being part of the pool.
-> > 
-> > Suggested-by: Rob Herring <robherring2@gmail.com>
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
-> > ---
-> > 
-> >  Documentation/devicetree/bindings/misc/sram.txt |    8 +++
-> >  drivers/misc/sram.c                             |   80
-> >  +++++++++++++++++++++-- 2 files changed, 82 insertions(+), 6
-> >  deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/misc/sram.txt
-> > b/Documentation/devicetree/bindings/misc/sram.txt index 4d0a00e..eae080e
-> > 100644
-> > --- a/Documentation/devicetree/bindings/misc/sram.txt
-> > +++ b/Documentation/devicetree/bindings/misc/sram.txt
-> > 
-> > @@ -8,9 +8,17 @@ Required properties:
-> >  - reg : SRAM iomem address range
-> > 
-> > +Optional properties:
-> > +
-> > +- mmio-sram-reserved: ordered list of reserved chunks inside the sram
-> > that +  should not become part of the genalloc pool.
-> > +  Format is <base size>, <base size>, ...; with base being relative to
-> > the +  reg property base.
+Am Freitag, den 05.07.2013, 14:40 +0200 schrieb Heiko St?bner:
+> The pool is created thru devm_gen_pool_create, so the call to
+> gen_pool_destroy is not necessary.
+> Instead the sram-clock must be turned off again if it exists.
 > 
-> Isn't it a typo?
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+> ---
+>  drivers/misc/sram.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> I think you meant:
-> Format is <base start>, <reserved size>,
+> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+> index d87cc91..afe66571 100644
+> --- a/drivers/misc/sram.c
+> +++ b/drivers/misc/sram.c
+> @@ -68,7 +68,8 @@ static int sram_probe(struct platform_device *pdev)
+>  	ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
+>  				res->start, size, -1);
+>  	if (ret < 0) {
+> -		gen_pool_destroy(sram->pool);
+> +		if (sram->clk)
+> +			clk_disable_unprepare(sram->clk);
+>  		return ret;
+>  	}
+>  
 
-no, the intended format is like
-
-<0x0 0x100>, <0x1000 0x100>, ...
-
-base + size, base + size, and so on
-
-
-> 
-> > +
-> > 
-> >  Example:
-> >  
-> >  sram: sram at 5c000000 {
-> >  
-> >         compatible = "mmio-sram";
-> >         reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000
-> >         */
-> > 
-> > +       mmio-sram-reserved = <0x0 0x100>; /* reserve
-> > 0x5c000000-0x5c000100 */
->
-> > 
-> >  };
+regards
+Philipp
