@@ -1,44 +1,33 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 6 Jul 2013 18:33:41 +0200
-Subject: [PATCHv4 03/11] pci: remove ARCH_SUPPORTS_MSI kconfig option
-In-Reply-To: <20130706161743.GM2569@titan.lakedaemon.net>
-References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1372686136-1370-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo73iSBg+SYwZLea0qdXD1uVc3+Vacd8Tg4CU92vLG=2AQ@mail.gmail.com>
- <20130705234501.1341f52e@skate>
- <20130706135433.GL2569@titan.lakedaemon.net>
- <CAErSpo4uN2MifYHbFiUfQ+6TE-hBkbWYdnAvabj8jCTOd5g+1A@mail.gmail.com>
- <20130706161743.GM2569@titan.lakedaemon.net>
-Message-ID: <20130706183341.379d2fea@skate>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 6 Jul 2013 18:37:02 +0200
+Subject: [PATCH v5] ARM: sunxi: New watchdog driver for Allwinner A10/A13
+In-Reply-To: <80d67226-1d83-475a-a94c-cfecc1cd277e@googlegroups.com>
+References: <1370547265-24854-1-git-send-email-carlo.caione@gmail.com>
+ <80d67226-1d83-475a-a94c-cfecc1cd277e@googlegroups.com>
+Message-ID: <20130706163702.GA11243@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
-
-On Sat, 6 Jul 2013 12:17:43 -0400, Jason Cooper wrote:
-
-> > > If we end up handling this the same as the of/pci & mvebu-pcie series
-> > > (whole series through mvebu -> arm-soc) I can have it up in -next within
-> > > a few days of -rc1.  Just let me know.
-> > 
-> > That sounds fine with me.  I don't think it's worth trying to split
-> > out the drivers/pci stuff and trying to coordinate it going through
-> > different trees.
+On Sat, Jul 06, 2013 at 07:39:13AM -0700, viniciusfre at gmail.com wrote:
+> Hi Carlo,
 > 
-> Ok, will do.
-> 
-> Thomas, I assume there will be one more version to address Bjorn's last
-> comments?
+> It is not possible to enable this driver because there is no
+> 'ARCH_SUNXI' in default .config. What you intended to use,
+> 'ARCH_SUNXI' or 'ARCH_SUN4I'? RTC driver presents the same issue.
 
-Yes, indeed. I was waiting to see if Thierry Redding would give some
-additional feedback on Bjorn's comment, but if he doesn't, I'll resend
-an updated version, most likely next week.
+This driver is intended for the mainline Linux Kernel, where ARCH_SUN4i
+doesn't exist, and ARCH_SUNXI actually does.
 
-Thanks!
+Maxime
 
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130706/cc645530/attachment.sig>
