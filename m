@@ -1,67 +1,87 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 6 Jul 2013 14:01:12 +0200
-Subject: MTD EEPROM support and driver integration
-In-Reply-To: <5811519.oHVuMujf0I@wuerfel>
-References: <20130705201118.GM2959@lukather> <201307060033.13259.arnd@arndb.de>
- <20130706082804.GZ2959@lukather> <5811519.oHVuMujf0I@wuerfel>
-Message-ID: <20130706120112.GA11069@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 6 Jul 2013 14:10:57 +0100
+Subject: [PATCH 1/6] ARM: OMAP2+: Remove board-4430sdp.c
+In-Reply-To: <20130520095447.GR21614@n2100.arm.linux.org.uk>
+References: <20130517191304.468.73487.stgit@localhost>
+ <20130517191751.468.89202.stgit@localhost>
+ <20130520095447.GR21614@n2100.arm.linux.org.uk>
+Message-ID: <20130706131057.GU21614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-I'm not exactly sure on what happened to the previous mail that has been
-sent empty, but anyway:
-
-On Sat, Jul 06, 2013 at 11:18:00AM +0200, Arnd Bergmann wrote:
-> On Saturday 06 July 2013 10:28:04 Maxime Ripard wrote:
-> > > a) like interrupts, regs, dmas, clocks, pinctrl, reset, pwm: fixed property names
-> > > 
-> > >       regmap = <&at25 0xstart 0xlen>;
-> > >       regmap-names = "mac-address";
-> > > 
-> > > b) like gpio, regulator: variable property names
-> > > 
-> > >       mac-storage = <&at25 0xstart 0xlen>;
-> > > 
-> > > It's unfortunate that we already have examples of both. They are largely
-> > > equivalent, but the tendency is towards the first.
+On Mon, May 20, 2013 at 10:54:47AM +0100, Russell King - ARM Linux wrote:
+> On Fri, May 17, 2013 at 12:17:51PM -0700, Tony Lindgren wrote:
+> > We can now boot with device tree. If you don't want to update u-boot,
+> > you can boot with appended DTB with the following instructions:
 > > 
-> > I don't have a strong feeling for one against another, so whatever works
-> > best. Both solutions will be a huge improvement anyway 
+> > 1. Make sure you have the appended DTB support in .config
 > > 
-> > Just out of curiosity, is there any advantages besides having a fixed
-> > property name to the first solution?
+> >    CONFIG_ARM_APPENDED_DTB=y
+> >    CONFIG_ARM_ATAG_DTB_COMPAT=y
+> >    CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
+> > 
+> > 2. Build the zImage
+> > 
+> >    $ ARCH=arm CROSS_COMPILE=... make zImage
+> > 
+> > 3. Build the device tree blobs
+> > 
+> >    $ ARCH=arm CROSS_COMPILE=... make dtbs
+> > 
+> > 4. Append the dtb to zImage
+> > 
+> >    $ cat arch/arm/boot/zImage arch/arm/boot/dts/omap4-sdp.dtb > /tmp/appended
+> > 
+> > 5. Use mkimage to produce the appended device tree uImage
+> > 
+> >    $ mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 \
+> >      -n "Linux" -d /tmp/appended /tmp/uImage
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> I think it's mostly for consistency: trying to get most subsystems to
-> do it the same way to make it easier for people to write dts files.
-> 
-> A lesser point is that it simplifies the driver code if you don't
-> have to pass a name.
+> Okay, I'm removing the 4430SDP from the boot test system once this goes
+> in, because this will mean rewriting the build system to cope with this
+> stuff.
 
-So that leave us with mainly one path to achieve this goal:
-  - Add a regmap-mtd backend
-  - Add DT parsing code for regmap
-  - Move the EEPROM drivers from misc to mtd
+Well, this doesn't work.  I've tried several things, and I think I'm
+generating a correct image, but it doesn't boot.
 
-What other option would we have?
+This could be that the current Linus tip plus my stuff plus arm-soc
+is broken, but as it boots on the 3430LDP I suspect that isn't the
+case.
 
-I also thought about writing an EEPROM framework of its own, but the
-line is really thin between a large EEPROM and say a small SPI
-dataflash, which would make it pretty hard to choose between such a
-framework and MTD.
+I've tried with omap4-sdp.dtb and the other omap4-sdp DTB file with no
+improvement.  No idea how to even begin to debug this, as there's no
+way for the decompressor to produce output, and I've no idea which
+OMAP uart to use for debug output (because that information has been
+removed from the kernel source.)
 
-Thanks,
-Maxime
+And... WTF is the OMAP debug uart selection in its own separate menu
+from the main "choice" statement?  This is totally unnecessary complexity
+and is just making things more complicated for the hell of it.  Look at
+what every other platform does - they put their stuff in the main choice
+statement even if they have multiple UARTs.  The hint there is that these
+depend on the appropriate support being selected, so in the case of a
+kernel only targetting OMAP, as things stand you'll end up with a menu
+which lists the OMAP2PLUS, none, icedcc, and semihosting entries followed
+by another menu to select which OMAP port you want.  That's utterly
+rediculous and broken.  And just think about the two titles for the
+menus:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130706/cc19dacb/attachment.sig>
+        prompt "Kernel low-level debugging port"
+vs
+        prompt "Low-level debug console UART"
+
+Oh wait, why don't I get to choose my "debug console UART" on an AT91?
+Maybe AT91 should move their debug uart selection into this menu as well,
+and maybe the Versatile Express options too, because they're all to do
+with selecting the UART to be used.  Please... some sane *thought* would
+be *really* good here.
+
+Oh my god, you're not the only ones.  Arnd/Olof, who started this madness
+and _why_ haven't you already stepped on it?  Right, I'm fixing this in
+this merge window.  Everything is moving under the original choice menu
+as it was intended to be.
+
+The attempts are all on the builder website against the (disabled)
+omap4430-sdp entry.
