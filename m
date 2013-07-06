@@ -1,51 +1,51 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 06 Jul 2013 01:52:48 +0200
-Subject: [PATCH 2/3] of/documentation: Update G2D documentation
-In-Reply-To: <1373013749-14530-2-git-send-email-sachin.kamat@linaro.org>
-References: <1373013749-14530-1-git-send-email-sachin.kamat@linaro.org>
- <1373013749-14530-2-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <4264635.Hmig5l0VLj@flatron>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sat, 6 Jul 2013 02:12:24 +0200 (CEST)
+Subject: [PATCH 9/9] clocksource: dw_apb_timer: special variant for
+ rockchip rk3188 timers
+In-Reply-To: <201307060056.29370.heiko@sntech.de>
+References: <201307060051.09716.heiko@sntech.de>
+ <201307060056.29370.heiko@sntech.de>
+Message-ID: <alpine.DEB.2.02.1307060153110.32106@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+On Sat, 6 Jul 2013, Heiko St?bner wrote:
+> +	if (of_device_is_compatible(np, "rockchip,rk3188-dw-apb-timer-osc"))
+> +		*quirks |= APBTMR_QUIRK_64BIT_COUNTER | APBTMR_QUIRK_NO_EOI |
+> +			   APBTMR_QUIRK_INVERSE_INTMASK |
+> +			   APBTMR_QUIRK_INVERSE_PERIODIC;
 
-On Friday 05 of July 2013 14:12:28 Sachin Kamat wrote:
-> Exynos5250 G2D IP requires only the gate clock. Update the
-> binding documentation accordingly.
-> 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Inki Dae <inki.dae@samsung.com>
-> ---
->  .../devicetree/bindings/gpu/samsung-g2d.txt        |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/gpu/samsung-g2d.txt
-> b/Documentation/devicetree/bindings/gpu/samsung-g2d.txt index
-> 3f454ff..60ca631 100644
-> --- a/Documentation/devicetree/bindings/gpu/samsung-g2d.txt
-> +++ b/Documentation/devicetree/bindings/gpu/samsung-g2d.txt
-> @@ -12,7 +12,9 @@ Required properties:
->    - interrupts : G2D interrupt number to the CPU.
->    - clocks : from common clock binding: handle to G2D clocks.
->    - clock-names : from common clock binding: must contain "sclk_fimg2d"
-> and -		  "fimg2d", corresponding to entries in the clocks 
-property. +		
->  "fimg2d" for S5PV210 & Exynos4 based SoCs and "fimg2d" for +		 
-> Exynos5250 SoC, corresponding to entries in the clocks
-> +		  property.
+Brilliant. Next time we add
 
-I think this needs to be rephrased, because I can't get any sense from 
-this sentence.
+> +	if (of_device_is_compatible(np, "rockchip,rk3188-dw-apb-timer-osc2"))
+> +		*quirks |= APBTMR_QUIRK_64BIT_COUNTER | APBTMR_QUIRK_NO_EOI |
+> +			   APBTMR_QUIRK_INVERSE_INTMASK |
+> +			   APBTMR_QUIRK_INVERSE_PERIODIC | MORE_NONSENSE;
 
-Maybe something like:
+Plus the extra conditionals all over the place
 
-- clock-names : names of clocks listed in clocks property, in the same 
-order, depending on SoC type:
-    - for S5PV210 and Exynos4 based SoCs : "fimg2d" and "sclk_fimg2d"
-    - for Exynos5250 SoC : "fimg2d".
+and a week later
 
-What do you think?
+> +	if (of_device_is_compatible(np, "rockchip,rk3188-dw-apb-timer-osc3"))
+> +		*quirks |= ALLNONSENSE;
 
-Best regards,
-Tomasz
+
+This has nothing to do with QUIRKS at all. QUIRKS are our last resort
+when we cannot deal with the problem in a sane way.
+
+In this case this is simply the wrong aproach.
+
+We can deal with it in a sane way as I pointed out before and handle
+it as simple properties of the IP block. We have all mechanisms in
+place to handle such properties, device tree, platform data, static
+init structures. It's all there and we really do not need to plaster
+the code with random QUIRK conditionals.
+
+Did you ever consider the runtime penalty of this? Probably not,
+otherwise you would have spent time on speeding up that code by
+caching frequently accessed registers instead of reading them back
+over and over for no reason.
+
+Thanks,
+
+	tglx
