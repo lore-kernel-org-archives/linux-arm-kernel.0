@@ -1,116 +1,42 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Sat,  6 Jul 2013 08:03:17 +0200
-Subject: [PATCH] ARM: imx: remove IRQF_DISABLED
-Message-ID: <1373090597-20571-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 6 Jul 2013 14:04:55 +0800
+Subject: [PATCH 4/4] fb: Add DCU framebuffer driver for Vybrid VF610
+ platform
+In-Reply-To: <1373010702-9244-5-git-send-email-b18965@freescale.com>
+References: <1373010702-9244-1-git-send-email-b18965@freescale.com>
+ <1373010702-9244-5-git-send-email-b18965@freescale.com>
+Message-ID: <20130706060453.GE30164@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This flag is a NOOP since 2.6.35 and can be removed.
+On Fri, Jul 05, 2013 at 03:51:42PM +0800, Alison Wang wrote:
+> The Display Controller Unit (DCU) module is a system master that
+> fetches graphics stored in internal or external memory and displays
+> them on a TFT LCD panel. A wide range of panel sizes is supported
+> and the timing of the interface signals is highly configurable.
+> Graphics are read directly from memory and then blended in real-time,
+> which allows for dynamic content creation with minimal CPU intervention.
+> 
+> The features:
+> 
+> (1) Full RGB888 output to TFT LCD panel.
+> (2) For the current LCD panel, WQVGA "480x272" is supported.
+> (3) Blending of each pixel using up to 4 source layers dependent on size of panel.
+> (4) Each graphic layer can be placed with one pixel resolution in either axis.
+> (5) Each graphic layer support RGB565 and RGB888 direct colors without alpha channel
+> and BGRA8888 direct colors with an alpha channel.
+> (6) Each graphic layer support alpha blending with 8-bit resolution.
+> 
+> This driver has been tested on Vybrid VF610 TOWER board.
+> 
+> Signed-off-by: Alison Wang <b18965@freescale.com>
+> ---
+>  drivers/video/Kconfig      |    9 +
+>  drivers/video/Makefile     |    1 +
+>  drivers/video/fsl-dcu-fb.c | 1091 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 1101 insertions(+)
+>  create mode 100644 drivers/video/fsl-dcu-fb.c
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- arch/arm/mach-imx/Kconfig             | 2 +-
- arch/arm/mach-imx/epit.c              | 2 +-
- arch/arm/mach-imx/mach-armadillo5x0.c | 3 +--
- arch/arm/mach-imx/mach-mx31_3ds.c     | 2 +-
- arch/arm/mach-imx/mach-pcm037.c       | 3 +--
- arch/arm/mach-imx/mx31lilly-db.c      | 3 +--
- arch/arm/mach-imx/time.c              | 2 +-
- 7 files changed, 7 insertions(+), 10 deletions(-)
+You should have a document under Documentation/devicetree/bindings/fb/.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 60661a4..05920fe 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -22,7 +22,7 @@ config MXC_IRQ_PRIOR
- 	help
- 	  Select this if you want to use prioritized IRQ handling.
- 	  This feature prevents higher priority ISR to be interrupted
--	  by lower priority IRQ even IRQF_DISABLED flag is not set.
-+	  by lower priority IRQ.
- 	  This may be useful in embedded applications, where are strong
- 	  requirements for timing.
- 	  Say N here, unless you have a specialized requirement.
-diff --git a/arch/arm/mach-imx/epit.c b/arch/arm/mach-imx/epit.c
-index e02de18..074b1a8 100644
---- a/arch/arm/mach-imx/epit.c
-+++ b/arch/arm/mach-imx/epit.c
-@@ -171,7 +171,7 @@ static irqreturn_t epit_timer_interrupt(int irq, void *dev_id)
- 
- static struct irqaction epit_timer_irq = {
- 	.name		= "i.MX EPIT Timer Tick",
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
- 	.handler	= epit_timer_interrupt,
- };
- 
-diff --git a/arch/arm/mach-imx/mach-armadillo5x0.c b/arch/arm/mach-imx/mach-armadillo5x0.c
-index 368a6e3..58b864a 100644
---- a/arch/arm/mach-imx/mach-armadillo5x0.c
-+++ b/arch/arm/mach-imx/mach-armadillo5x0.c
-@@ -404,8 +404,7 @@ static int armadillo5x0_sdhc1_init(struct device *dev,
- 
- 	/* When supported the trigger type have to be BOTH */
- 	ret = request_irq(gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_ATA_DMACK)),
--			  detect_irq,
--			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
-+			  detect_irq, IRQF_TRIGGER_FALLING,
- 			  "sdhc-detect", data);
- 
- 	if (ret)
-diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-index 1ed9161..50044a2 100644
---- a/arch/arm/mach-imx/mach-mx31_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-@@ -311,7 +311,7 @@ static int mx31_3ds_sdhc1_init(struct device *dev,
- 	}
- 
- 	ret = request_irq(gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO3_1)),
--			  detect_irq, IRQF_DISABLED |
-+			  detect_irq,
- 			  IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
- 			  "sdhc1-detect", data);
- 	if (ret) {
-diff --git a/arch/arm/mach-imx/mach-pcm037.c b/arch/arm/mach-imx/mach-pcm037.c
-index bc0261e..45303bd6 100644
---- a/arch/arm/mach-imx/mach-pcm037.c
-+++ b/arch/arm/mach-imx/mach-pcm037.c
-@@ -371,8 +371,7 @@ static int pcm970_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
- #endif
- 
- 	ret = request_irq(gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_SCK6)), detect_irq,
--			IRQF_DISABLED | IRQF_TRIGGER_FALLING,
--				"sdhc-detect", data);
-+			IRQF_TRIGGER_FALLING, "sdhc-detect", data);
- 	if (ret)
- 		goto err_gpio_free_2;
- 
-diff --git a/arch/arm/mach-imx/mx31lilly-db.c b/arch/arm/mach-imx/mx31lilly-db.c
-index d4361b8..649fe49 100644
---- a/arch/arm/mach-imx/mx31lilly-db.c
-+++ b/arch/arm/mach-imx/mx31lilly-db.c
-@@ -130,8 +130,7 @@ static int mxc_mmc1_init(struct device *dev,
- 	gpio_direction_input(gpio_wp);
- 
- 	ret = request_irq(gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1)),
--			  detect_irq,
--			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
-+			  detect_irq, IRQF_TRIGGER_FALLING,
- 			  "MMC detect", data);
- 	if (ret)
- 		goto exit_free_wp;
-diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index fea9131..a1cd831 100644
---- a/arch/arm/mach-imx/time.c
-+++ b/arch/arm/mach-imx/time.c
-@@ -250,7 +250,7 @@ static irqreturn_t mxc_timer_interrupt(int irq, void *dev_id)
- 
- static struct irqaction mxc_timer_irq = {
- 	.name		= "i.MX Timer Tick",
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
- 	.handler	= mxc_timer_interrupt,
- };
- 
--- 
-1.8.1.2
+Shawn
