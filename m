@@ -1,71 +1,26 @@
-From: jogo@openwrt.org (Jonas Gorski)
-Date: Sat, 6 Jul 2013 21:54:26 +0200
-Subject: Second ethernet on kirkwood does not work when probed through DT
-Message-ID: <20130706215426.6e666d6af0dc6c9ea5fe32cd@openwrt.org>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Sat, 6 Jul 2013 21:55:26 +0200
+Subject: MTD EEPROM support and driver integration
+In-Reply-To: <8997501.Dchyii8uWX@wuerfel>
+References: <20130705201118.GM2959@lukather> <5811519.oHVuMujf0I@wuerfel>
+ <20130706120112.GA11069@lukather> <8997501.Dchyii8uWX@wuerfel>
+Message-ID: <20130706215526.7fc3e191@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sebastian,
+On Sat, 06 Jul 2013 21:06:49 +0200, Arnd Bergmann wrote:
+> On Saturday 06 July 2013 14:01:12 Maxime Ripard wrote:
+> > So that leave us with mainly one path to achieve this goal:
+> >   - Add a regmap-mtd backend
+> >   - Add DT parsing code for regmap
+> >   - Move the EEPROM drivers from misc to mtd
+> 
+> Yes, I think that would be good. For the last step, we definitely need
+> buy-in from Wolfgand and Jean, as they are maintaining the current eeprom
+> drivers.
 
-using your DT patches[1] (on top of 3.10) I can't get the second ethernet to work on my kirkwood board.
+I am maintaining the legacy eeprom driver, which nobody should be using
+in conjunction with DT. So you don't need my approval for anything.
 
-in my dts file I use:
-
-&mdio {
-        status = "okay";
-};
-
-&eth0 {
-        status = "okay";
-        ethernet0-port at 0 {
-                speed = <1000>;
-                duplex = <1>;
-        };
-};
-
-&eth1 {
-        status = "okay";
-        ethernet1-port at 1 {
-                speed = <1000>;
-                duplex = <1>;
-        };
-};
-
-(Both macs are connected to a switch, so use a fixed link, and no phy).
-
-Eth1 gets probed fine, but never gets a link when brought up, and trying to bring it down again hangs the board hard.
-
-Using Florian's older patches, it is brought up fine and works (after adapting the node names of course).
-
-Also I noticed that you named eth1's ethernet1-port node wrongly in (at least) your kirkwood conversion patch[2]; you used
-
-&eth1 {
-	status = "okay";
-	ethernet1-port at 0 {
-           must be @1--^
-		phy-handle = <&ethphy1>;
-	};
-};
-
-which results in a null pointer access on boot:
-
-...
-[   12.627136] mv643xx_eth_port mv643xx_eth_port.0 eth0: port 0 with MAC address ...
-[   12.635955] Unable to handle kernel NULL pointer dereference at virtual address 00000000
-[   12.644100] pgd = c0004000
-[   12.646821] [00000000] *pgd=00000000
-[   12.650418] Internal error: Oops: 5 [#1] ARM
-[   12.654702] Modules linked in:
-[   12.657778] CPU: 0 PID: 1 Comm: swapper Not tainted 3.10.0 #10
-[   12.663634] task: c7827d60 ti: c782e000 task.ti: c782e000
-[   12.669073] PC is at mv643xx_eth_probe+0x98/0x708
-...
-
-
-Regards
-Jonas
-
-P.S: I'm not on any ML you posted these patches to, so I could not reply directly.
-
-[1] https://patchwork.kernel.org/patch/2632571/ etc
-[2] https://patchwork.kernel.org/patch/2811861/
+-- 
+Jean Delvare
