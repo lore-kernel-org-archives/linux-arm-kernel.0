@@ -1,45 +1,52 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  6 Jul 2013 11:02:22 +0400
-Subject: [PATCH] ARM: dts: i.MX51: Add WEIM node
-Message-ID: <1373094142-24173-1-git-send-email-shc_work@mail.ru>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 6 Jul 2013 10:10:45 +0200
+Subject: [PATCHv4 08/10] clocksource: sun4i: Remove TIMER_SCAL variable
+In-Reply-To: <alpine.DEB.2.02.1307060031030.32106@ionos.tec.linutronix.de>
+References: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1373062725-19625-9-git-send-email-maxime.ripard@free-electrons.com>
+ <alpine.DEB.2.02.1307060031030.32106@ionos.tec.linutronix.de>
+Message-ID: <20130706081045.GY2959@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the missing (Wireless External Interface Module) WEIM
-devicetree node for i.MX51 CPUs.
+On Sat, Jul 06, 2013 at 01:17:41AM +0200, Thomas Gleixner wrote:
+> I really recommend that you go out for lots of beer/wine NOW and
+> resume reading this mail when you recovered from that.
+> 
+> I definitely appreciate your responsivness to feedback, but please go
+> back and read my reply to the previous version of this patch
+> carefully. You might eventually find out that I pointed you to another
+> redundant clk_get_rate() call in that code.
+> 
+> After you did this, please go through the other patches in that series
+> and check how many new instances of clk_get_rate() calls you add down
+> the road. I did not even bother to look whether you cleaned it up
+> between v3 and v4, but I'm quite sure you did not. If I'm wrong, I owe
+> you a beer at the next conference.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx51.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Wow, you really want me to drink, do you? :)
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 0ca62be..e71976e4 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -745,6 +745,23 @@
- 				status = "disabled";
- 			};
- 
-+			weim: weim at 83fda000 {
-+				#address-cells = <2>;
-+				#size-cells = <1>;
-+				compatible = "fsl,imx51-weim";
-+				reg = <0x83fda000 0x1000>;
-+				clocks = <&clks 0>;
-+				ranges = <
-+					0 0 0xb0000000 0x08000000
-+					1 0 0xb8000000 0x08000000
-+					2 0 0xc0000000 0x08000000
-+					3 0 0xc8000000 0x04000000
-+					4 0 0xcc000000 0x02000000
-+					5 0 0xce000000 0x02000000
-+				>;
-+				status = "disabled";
-+			};
-+
- 			nfc: nand at 83fdb000 {
- 				compatible = "fsl,imx51-nand";
- 				reg = <0x83fdb000 0x1000 0xcfff0000 0x10000>;
+Actually, I did clean up. The other user you spotted that was previously
+introduced in the patch 4/10, and if you take a look at it, you'll see
+that it actually uses the rate variable like you suggested.
+
+Now, your mail made me realize that patch 10 introduced a direct
+clk_get_rate call, that I forgot to cleanup. After applying these
+patches, it's the only user left.
+
+I'll send a v5. Do you have any additionnal comments on those patches to
+avoid wasting more electrons?
+
+Maxime
+
 -- 
-1.8.1.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130706/6af8767a/attachment.sig>
