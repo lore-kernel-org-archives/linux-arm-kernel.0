@@ -1,65 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 06 Jul 2013 21:06:49 +0200
-Subject: MTD EEPROM support and driver integration
-In-Reply-To: <20130706120112.GA11069@lukather>
-References: <20130705201118.GM2959@lukather> <5811519.oHVuMujf0I@wuerfel>
- <20130706120112.GA11069@lukather>
-Message-ID: <8997501.Dchyii8uWX@wuerfel>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sat, 6 Jul 2013 12:36:46 -0700
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <51D674BF.9030207@schinagl.nl>
+References: <20130617225847.GA9494@kroah.com> <20130624092942.GG26008@lukather>
+ <20130624160440.GA15201@kroah.com> <51C87DC7.50005@schinagl.nl>
+ <20130624181509.GA8847@kroah.com> <51C8B84C.3020200@schinagl.nl>
+ <20130624214615.GA17604@kroah.com> <51CAA709.4060801@schinagl.nl>
+ <20130626175144.GC2222@kroah.com> <51D674BF.9030207@schinagl.nl>
+Message-ID: <20130706193646.GB9778@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 06 July 2013 14:01:12 Maxime Ripard wrote:
-> I'm not exactly sure on what happened to the previous mail that has been
-> sent empty, but anyway:
+On Fri, Jul 05, 2013 at 09:24:47AM +0200, Oliver Schinagl wrote:
+> The other 'broken' drivers that where linked earlier, also use the
+> BINARY attributes.
 > 
-> On Sat, Jul 06, 2013 at 11:18:00AM +0200, Arnd Bergmann wrote:
-> > On Saturday 06 July 2013 10:28:04 Maxime Ripard wrote:
-> > > > a) like interrupts, regs, dmas, clocks, pinctrl, reset, pwm: fixed property names
-> > > > 
-> > > >       regmap = <&at25 0xstart 0xlen>;
-> > > >       regmap-names = "mac-address";
-> > > > 
-> > > > b) like gpio, regulator: variable property names
-> > > > 
-> > > >       mac-storage = <&at25 0xstart 0xlen>;
-> > > > 
-> > > > It's unfortunate that we already have examples of both. They are largely
-> > > > equivalent, but the tendency is towards the first.
-> > > 
-> > > I don't have a strong feeling for one against another, so whatever works
-> > > best. Both solutions will be a huge improvement anyway 
-> > > 
-> > > Just out of curiosity, is there any advantages besides having a fixed
-> > > property name to the first solution?
-> > 
-> > I think it's mostly for consistency: trying to get most subsystems to
-> > do it the same way to make it easier for people to write dts files.
-> > 
-> > A lesser point is that it simplifies the driver code if you don't
-> > have to pass a name.
-> 
-> So that leave us with mainly one path to achieve this goal:
->   - Add a regmap-mtd backend
->   - Add DT parsing code for regmap
->   - Move the EEPROM drivers from misc to mtd
+> So Greg, if you could be so kind and give me an example how to
+> implement this properly, I am at loss and don't know :(
 
-Yes, I think that would be good. For the last step, we definitely need
-buy-in from Wolfgand and Jean, as they are maintaining the current eeprom
-drivers.
+Ah crap, devices don't have a binary attribute group, like struct class
+does.  I'll go add that on Monday and send you the patch to see if that
+helps you out.  I'll also go through and fix up all of the binary
+attribute drivers to keep them from doing that...
 
-> What other option would we have?
-> 
-> I also thought about writing an EEPROM framework of its own, but the
-> line is really thin between a large EEPROM and say a small SPI
-> dataflash, which would make it pretty hard to choose between such a
-> framework and MTD.
+Sorry, I missed that earlier, but thanks for trying and pointing out my
+mistake.
 
-Isn't flash by definition block based, while EEPROM can be written
-in byte or word units? I think that is a significant difference, although
-it doesn't necessarily mean that we can't use MTD for both.
-
-We also have a bunch of OTP drivers spread around the kernel, it probably
-makes sense to consolidate them at the same time, at least on the DT binding
-side if not the device drivers.
-
-	Arnd
+greg k-h
