@@ -1,59 +1,70 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sat, 06 Jul 2013 11:00:34 +0200
-Subject: [PATCHv1] arm: armada: Add .dts file for Netgear ReadyNAS 102
-In-Reply-To: <20130705142951.GE2569@titan.lakedaemon.net> (Jason Cooper's
- message of "Fri, 5 Jul 2013 10:29:51 -0400")
-References: <878v1mgh4x.fsf@natisbad.org>
- <20130705142951.GE2569@titan.lakedaemon.net>
-Message-ID: <87a9m0dpvx.fsf@natisbad.org>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Sat, 6 Jul 2013 14:44:29 +0530
+Subject: [PATCH V2] ARM: tegra: enable gpio-keys on dalmore
+Message-ID: <1373102069-5641-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dalmore have the keys mounted on board which are connected
+to different pins of Tegra.
 
-Jason Cooper <jason@lakedaemon.net> writes:
+Add the keys entry in DTS file to enable key functionality.
+This will enable KEY_POWER, KEY_HOME, KEY_VOLUMEUP and
+KEY_VOLUMEDOWN.
 
-> On Thu, Jul 04, 2013 at 11:16:46PM +0200, Arnaud Ebalard wrote:
->> 
->> All hardware parts of the (Armada 370 based) NETGEAR ReadyNAS 102 are
->> supported by mainline kernel (USB 3.0 rear ports, USB 2.0 front port,
->> Gigabit controller and PHY, serial port, leds, buttons, SATA ports,
->> G762 fan controller) except for:
->> 
->>  - the Intersil ISL12057 I2C RTC Chip,
->>  - the Armada NAND controller.
->> 
->> Support for both of those is currently work in progress and does not
->> prevent boot.
->> 
->> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
->> ---
->> Hi Jason and Andrew,
->> 
->> As requested
->> 
->>  - this version is tested against current head of linus tree (+ I2C
->>    fixes for a race condition; for details, see message #94 of
->>    http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622325).
->>  - nand layout entry and ISL12057 entry have been removed until support
->>    is available in mainline kernel for eahc of those
->>  - clock, gpio led and keys have been made siblings of soc, memory and
->>    chosen (reported by Sebastian).
->> 
->> Is it still acceptable for current merge window or am I too late?
->
-> Unfortunately, it's too late for v3.11.  The arm-soc cutoff is typically
-> -rc6 or so.  Which usually means we need to see it on lakml by -rc5.
-> So, you're ahead of schedule for v3.12 :-P
->
-> However, with any luck, maybe Ezequiel will have something ready for the
-> nand driver in time as well...
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+Changes from V1:
+- Reorder the nodes.
 
-ok, no problem. That may be better in the end. And regarding the
-addition of G762 entries to ReadyNAS Duo v2 .dts file you queued a few
-days ago? I was unable to find it in one of your branches and just
-wonder where it went and hide. 
+ arch/arm/boot/dts/tegra114-dalmore.dts |   30 ++++++++++++++++++++++++++++++
+ 1 files changed, 30 insertions(+), 0 deletions(-)
 
-Cheers,
-
-a+
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index cb640eb..259b517 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -883,6 +883,35 @@
+ 		};
+ 	};
+ 
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		home {
++			label = "Home";
++			gpios = <&gpio TEGRA_GPIO(I, 5) GPIO_ACTIVE_LOW>;
++			linux,code = <102>; /* KEY_HOME */
++		};
++
++		power {
++			label = "Power";
++			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
++			linux,code = <116>; /* KEY_POWER */
++			gpio-key,wakeup;
++		};
++
++		volume_down {
++			label = "VolumeDown";
++			gpios = <&gpio TEGRA_GPIO(R, 1) GPIO_ACTIVE_LOW>;
++			linux,code = <114>; /* KEY_VOLUMEDOWN */
++		};
++
++		volume_up {
++			label = "VolumeUp";
++			gpios = <&gpio TEGRA_GPIO(R, 2) GPIO_ACTIVE_LOW>;
++			linux,code = <115>; /* KEY_VOLUMEUP */
++		};
++	};
++
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -976,4 +1005,5 @@
+ 			 <&tegra_car TEGRA114_CLK_EXTERN1>;
+ 		clock-names = "pll_a", "pll_a_out0", "mclk";
+ 	};
++
+ };
+-- 
+1.7.1.1
