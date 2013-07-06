@@ -1,78 +1,34 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 06 Jul 2013 23:22:22 +0200
-Subject: Second ethernet on kirkwood does not work when probed through DT
-In-Reply-To: <20130706215426.6e666d6af0dc6c9ea5fe32cd@openwrt.org>
-References: <20130706215426.6e666d6af0dc6c9ea5fe32cd@openwrt.org>
-Message-ID: <51D88A8E.1060104@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 6 Jul 2013 23:36:48 +0200
+Subject: [PATCH 1/6] ARM: OMAP2+: Remove board-4430sdp.c
+In-Reply-To: <20130706131057.GU21614@n2100.arm.linux.org.uk>
+References: <20130517191304.468.73487.stgit@localhost>
+ <20130520095447.GR21614@n2100.arm.linux.org.uk>
+ <20130706131057.GU21614@n2100.arm.linux.org.uk>
+Message-ID: <201307062336.49066.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2013 09:54 PM, Jonas Gorski wrote:
-> Hello Sebastian,
->
-> using your DT patches[1] (on top of 3.10) I can't get the second
-> ethernet to work on my kirkwood board.
+On Saturday 06 July 2013, Russell King - ARM Linux wrote:
+> Oh wait, why don't I get to choose my "debug console UART" on an AT91?
+> Maybe AT91 should move their debug uart selection into this menu as well,
+> and maybe the Versatile Express options too, because they're all to do
+> with selecting the UART to be used.  Please... some sane thought would
+> be really good here.
+> 
+> Oh my god, you're not the only ones.  Arnd/Olof, who started this madness
+> and why haven't you already stepped on it?  Right, I'm fixing this in
+> this merge window.  Everything is moving under the original choice menu
+> as it was intended to be.
 
-Hi Jonas,
+Sorry, I missed that this was going on, and I absolutely agree with your
+sentiment. From what I can tell from the git log, Tegra was the first
+to have the separate choice statement, after it just move its
+options from mach-tegra/Kconfig into the Kconfig.debug. OMAP followed
+with the same method and I think from there people just copied it.
 
-next time please name your board, because there are plenty of it.
-Kirkwood is just the SoC used on them.
+I can understand why one wants to have some more structure in the list,
+given that i.MX alone has 37 options for UART addresses, but we first
+need to have a consistent method of configuring the addresses.
 
-> in my dts file I use:
->
-> &mdio { status = "okay"; };
->
-> &eth0 { status = "okay"; ethernet0-port at 0 { speed =<1000>; duplex
-> =<1>; }; };
->
-
-I guess you are using Iomega IX2 200?
-
-> &eth1 { status = "okay"; ethernet1-port at 1 { speed =<1000>; duplex
-> =<1>; }; };
->
-> (Both macs are connected to a switch, so use a fixed link, and no
-> phy).
->
-> Eth1 gets probed fine, but never gets a link when brought up, and
-> trying to bring it down again hangs the board hard.
->
-> Using Florian's older patches, it is brought up fine and works (after
-> adapting the node names of course).
->
-> Also I noticed that you named eth1's ethernet1-port node wrongly in
-> (at least) your kirkwood conversion patch[2]; you used
->
-> &eth1 { status = "okay"; ethernet1-port at 0 { must be @1--^ phy-handle
-> =<&ethphy1>; }; };
-
-Can you please try to leave ethernet1-port at 0 and match
-the one in kirkwood.dtsi?
-
-Both "ports" need reg = <0> as there is two controllers
-with one port at 0 on Kirkwood.
-
-If that works, please address a mail to ARM mailing list
-where you describe the issue and propose the patch.
-
-Sebastian
-
-> which results in a null pointer access on boot:
->
-> ... [   12.627136] mv643xx_eth_port mv643xx_eth_port.0 eth0: port 0
-> with MAC address ... [   12.635955] Unable to handle kernel NULL
-> pointer dereference at virtual address 00000000 [   12.644100] pgd =
-> c0004000 [   12.646821] [00000000] *pgd=00000000 [   12.650418]
-> Internal error: Oops: 5 [#1] ARM [   12.654702] Modules linked in: [
-> 12.657778] CPU: 0 PID: 1 Comm: swapper Not tainted 3.10.0 #10 [
-> 12.663634] task: c7827d60 ti: c782e000 task.ti: c782e000 [
-> 12.669073] PC is at mv643xx_eth_probe+0x98/0x708 ...
->
->
-> Regards Jonas
->
-> P.S: I'm not on any ML you posted these patches to, so I could not
-> reply directly.
->
-> [1] https://patchwork.kernel.org/patch/2632571/ etc [2]
-> https://patchwork.kernel.org/patch/2811861/
+	Arnd
