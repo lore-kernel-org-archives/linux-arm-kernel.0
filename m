@@ -1,22 +1,16 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 06 Jul 2013 12:56:56 +0200
-Subject: [linux-sunxi] Re: [PATCHv4 08/10] clocksource: sun4i: Remove
- TIMER_SCAL variable
-In-Reply-To: <51D7E083.1090109@schinagl.nl>
-References: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
- <20130706081045.GY2959@lukather> <51D7E083.1090109@schinagl.nl>
-Message-ID: <13255064.lFze3iqNa0@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 6 Jul 2013 13:43:10 +0200
+Subject: MTD EEPROM support and driver integration
+In-Reply-To: <5811519.oHVuMujf0I@wuerfel>
+References: <20130705201118.GM2959@lukather> <201307060033.13259.arnd@arndb.de>
+ <20130706082804.GZ2959@lukather> <5811519.oHVuMujf0I@wuerfel>
+Message-ID: <20130706114310.GA2959@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 06 July 2013 11:16:51 Oliver Schinagl wrote:
-> On 06-07-13 10:10, Maxime Ripard wrote:
-> >
-> > I'll send a v5. Do you have any additionnal comments on those patches to
-> > avoid wasting more electrons?
->
-> Pff, we all know Maxime's electrons are free
-
-Only free as in Drude-Sommerfeld, not free as in beer.
-
-	Arnd
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130706/a08f2c8e/attachment.sig>
