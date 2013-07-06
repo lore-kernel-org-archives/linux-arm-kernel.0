@@ -1,66 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 6 Jul 2013 14:36:27 +0100
-Subject: [PATCH 1/6] ARM: OMAP2+: Remove board-4430sdp.c
-In-Reply-To: <20130706131057.GU21614@n2100.arm.linux.org.uk>
-References: <20130517191304.468.73487.stgit@localhost>
- <20130517191751.468.89202.stgit@localhost>
- <20130520095447.GR21614@n2100.arm.linux.org.uk>
- <20130706131057.GU21614@n2100.arm.linux.org.uk>
-Message-ID: <20130706133627.GV21614@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 6 Jul 2013 09:38:48 -0400
+Subject: [PATCHv1] arm: armada: Add .dts file for Netgear ReadyNAS 102
+In-Reply-To: <87a9m0dpvx.fsf@natisbad.org>
+References: <878v1mgh4x.fsf@natisbad.org>
+ <20130705142951.GE2569@titan.lakedaemon.net>
+ <87a9m0dpvx.fsf@natisbad.org>
+Message-ID: <20130706133848.GK2569@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 06, 2013 at 02:10:57PM +0100, Russell King - ARM Linux wrote:
-> Well, this doesn't work.  I've tried several things, and I think I'm
-> generating a correct image, but it doesn't boot.
+On Sat, Jul 06, 2013 at 11:00:34AM +0200, Arnaud Ebalard wrote:
+> Hi,
 > 
-> This could be that the current Linus tip plus my stuff plus arm-soc
-> is broken, but as it boots on the 3430LDP I suspect that isn't the
-> case.
+> Jason Cooper <jason@lakedaemon.net> writes:
 > 
-> I've tried with omap4-sdp.dtb and the other omap4-sdp DTB file with no
-> improvement.  No idea how to even begin to debug this, as there's no
-> way for the decompressor to produce output, and I've no idea which
-> OMAP uart to use for debug output (because that information has been
-> removed from the kernel source.)
+> > On Thu, Jul 04, 2013 at 11:16:46PM +0200, Arnaud Ebalard wrote:
+> >> 
+> >> All hardware parts of the (Armada 370 based) NETGEAR ReadyNAS 102 are
+> >> supported by mainline kernel (USB 3.0 rear ports, USB 2.0 front port,
+> >> Gigabit controller and PHY, serial port, leds, buttons, SATA ports,
+> >> G762 fan controller) except for:
+> >> 
+> >>  - the Intersil ISL12057 I2C RTC Chip,
+> >>  - the Armada NAND controller.
+> >> 
+> >> Support for both of those is currently work in progress and does not
+> >> prevent boot.
+> >> 
+> >> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> >> ---
+> >> Hi Jason and Andrew,
+> >> 
+> >> As requested
+> >> 
+> >>  - this version is tested against current head of linus tree (+ I2C
+> >>    fixes for a race condition; for details, see message #94 of
+> >>    http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622325).
+> >>  - nand layout entry and ISL12057 entry have been removed until support
+> >>    is available in mainline kernel for eahc of those
+> >>  - clock, gpio led and keys have been made siblings of soc, memory and
+> >>    chosen (reported by Sebastian).
+> >> 
+> >> Is it still acceptable for current merge window or am I too late?
+> >
+> > Unfortunately, it's too late for v3.11.  The arm-soc cutoff is typically
+> > -rc6 or so.  Which usually means we need to see it on lakml by -rc5.
+> > So, you're ahead of schedule for v3.12 :-P
+> >
+> > However, with any luck, maybe Ezequiel will have something ready for the
+> > nand driver in time as well...
 > 
-> And... WTF is the OMAP debug uart selection in its own separate menu
-> from the main "choice" statement?  This is totally unnecessary complexity
-> and is just making things more complicated for the hell of it.  Look at
-> what every other platform does - they put their stuff in the main choice
-> statement even if they have multiple UARTs.  The hint there is that these
-> depend on the appropriate support being selected, so in the case of a
-> kernel only targetting OMAP, as things stand you'll end up with a menu
-> which lists the OMAP2PLUS, none, icedcc, and semihosting entries followed
-> by another menu to select which OMAP port you want.  That's utterly
-> rediculous and broken.  And just think about the two titles for the
-> menus:
-> 
->         prompt "Kernel low-level debugging port"
-> vs
->         prompt "Low-level debug console UART"
-> 
-> Oh wait, why don't I get to choose my "debug console UART" on an AT91?
-> Maybe AT91 should move their debug uart selection into this menu as well,
-> and maybe the Versatile Express options too, because they're all to do
-> with selecting the UART to be used.  Please... some sane *thought* would
-> be *really* good here.
-> 
-> Oh my god, you're not the only ones.  Arnd/Olof, who started this madness
-> and _why_ haven't you already stepped on it?  Right, I'm fixing this in
-> this merge window.  Everything is moving under the original choice menu
-> as it was intended to be.
-> 
-> The attempts are all on the builder website against the (disabled)
-> omap4430-sdp entry.
+> ok, no problem. That may be better in the end. And regarding the
+> addition of G762 entries to ReadyNAS Duo v2 .dts file you queued a few
+> days ago? I was unable to find it in one of your branches and just
+> wonder where it went and hide. 
 
-Okay, I guessed that the OMAP4430SDP was "blaze" (it's not obvious to
-use internal codenames for boards when they're known as "SDP" etc -
-especially when they have stickers on them saying that they're "SDP".)
+It's hiding in ~/.maildir/.TODO.linux-next/ :-)  atm, there's really
+nothing stable to base a branch off of.  Once -rc1 lands, I'll create
+new branches with all the stuff I have so far for v3.12.  I'll also
+rebuild for-next with that same material.
 
-With that worked out, throwing my standard printascii() hack into the
-kernel results in boot messages... up to the point where the timer is
-calibrated.  So, it looks like either interrupts, clocks, or the OMAP
-timers are non-functional with DT based kernels on the SDP board.
+hth,
 
-Any ideas?
+Jason.
