@@ -1,42 +1,52 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 6 Jul 2013 10:10:45 +0200
-Subject: [PATCHv4 08/10] clocksource: sun4i: Remove TIMER_SCAL variable
-In-Reply-To: <alpine.DEB.2.02.1307060031030.32106@ionos.tec.linutronix.de>
-References: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
- <1373062725-19625-9-git-send-email-maxime.ripard@free-electrons.com>
- <alpine.DEB.2.02.1307060031030.32106@ionos.tec.linutronix.de>
-Message-ID: <20130706081045.GY2959@lukather>
+Date: Sat, 6 Jul 2013 10:28:04 +0200
+Subject: MTD EEPROM support and driver integration
+In-Reply-To: <201307060033.13259.arnd@arndb.de>
+References: <20130705201118.GM2959@lukather> <201307052302.40588.arnd@arndb.de>
+ <20130705222342.GP2959@lukather> <201307060033.13259.arnd@arndb.de>
+Message-ID: <20130706082804.GZ2959@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 06, 2013 at 01:17:41AM +0200, Thomas Gleixner wrote:
-> I really recommend that you go out for lots of beer/wine NOW and
-> resume reading this mail when you recovered from that.
+On Sat, Jul 06, 2013 at 12:33:13AM +0200, Arnd Bergmann wrote:
+> On Saturday 06 July 2013, Maxime Ripard wrote:
+> > > My first thought is that it should be more generic than that and not
+> > > have the mac address hardcoded as the purpose. We could possibly use
+> > > regmap as the in-kernel interface, and come up with a more generic
+> > > way of referring to registers in another device node.
+> > 
+> > Hmm, I maybe wasn't as clear as I wanted. Here mac-storage was just an
+> > example. It should indeed be completely generic, and a device could have
+> > several "storage source" defined, each driver knowing what property it
+> > would need, pretty much like what's done currently for the regulators
+> > for example.
+> > 
+> > We will have such a use case anyway for the Allwinner stuff, since the
+> > fuses can be used for several thing, including storing the SoC ID,
+> > serial numbers, and so on.
 > 
-> I definitely appreciate your responsivness to feedback, but please go
-> back and read my reply to the previous version of this patch
-> carefully. You might eventually find out that I pointed you to another
-> redundant clk_get_rate() call in that code.
+> Ah, I see. In general, we have two ways of expressing the same thing
+> here:
 > 
-> After you did this, please go through the other patches in that series
-> and check how many new instances of clk_get_rate() calls you add down
-> the road. I did not even bother to look whether you cleaned it up
-> between v3 and v4, but I'm quite sure you did not. If I'm wrong, I owe
-> you a beer at the next conference.
+> a) like interrupts, regs, dmas, clocks, pinctrl, reset, pwm: fixed property names
+> 
+> 	regmap = <&at25 0xstart 0xlen>;
+> 	regmap-names = "mac-address";
+> 
+> b) like gpio, regulator: variable property names
+> 
+> 	mac-storage = <&at25 0xstart 0xlen>;
+> 
+> It's unfortunate that we already have examples of both. They are largely
+> equivalent, but the tendency is towards the first.
 
-Wow, you really want me to drink, do you? :)
+I don't have a strong feeling for one against another, so whatever works
+best. Both solutions will be a huge improvement anyway :)
 
-Actually, I did clean up. The other user you spotted that was previously
-introduced in the patch 4/10, and if you take a look at it, you'll see
-that it actually uses the rate variable like you suggested.
+Just out of curiosity, is there any advantages besides having a fixed
+property name to the first solution?
 
-Now, your mail made me realize that patch 10 introduced a direct
-clk_get_rate call, that I forgot to cleanup. After applying these
-patches, it's the only user left.
-
-I'll send a v5. Do you have any additionnal comments on those patches to
-avoid wasting more electrons?
-
+Thanks,
 Maxime
 
 -- 
@@ -49,4 +59,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130706/6af8767a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130706/6293084e/attachment.sig>
