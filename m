@@ -1,163 +1,22 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 06 Jul 2013 11:26:46 +0100
-Subject: [PATCHv3 2/3] ARM: mxs: cfa10049: Switch bus i2c1 to bitbanging
-In-Reply-To: <1372094699-3832-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1372094699-3832-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <51D7F0E6.2000008@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 06 Jul 2013 12:56:56 +0200
+Subject: [linux-sunxi] Re: [PATCHv4 08/10] clocksource: sun4i: Remove
+ TIMER_SCAL variable
+In-Reply-To: <51D7E083.1090109@schinagl.nl>
+References: <1373062725-19625-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20130706081045.GY2959@lukather> <51D7E083.1090109@schinagl.nl>
+Message-ID: <13255064.lFze3iqNa0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2013 06:24 PM, Alexandre Belloni wrote:
-> From: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> The ADCs connected to this bus have been experiencing some timeout
-> issues when using the iMX28 i2c controller. Switching back to bitbanging
-> solves this.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Saturday 06 July 2013 11:16:51 Oliver Schinagl wrote:
+> On 06-07-13 10:10, Maxime Ripard wrote:
+> >
+> > I'll send a v5. Do you have any additionnal comments on those patches to
+> > avoid wasting more electrons?
+>
+> Pff, we all know Maxime's electrons are free
 
-As there are no disadvantages in taking the driver through IIO and these changes
-through the appropriate arch trees, I'd not propose to take these through IIO
-(even when the discussion is done) unless specifically asked to.
+Only free as in Drude-Sommerfeld, not free as in beer.
 
-Jonathan
-> ---
->  arch/arm/boot/dts/imx28-cfa10049.dts | 108 +++++++++++++++++++++--------------
->  1 file changed, 65 insertions(+), 43 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-> index 05ae549..d3758c2 100644
-> --- a/arch/arm/boot/dts/imx28-cfa10049.dts
-> +++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-> @@ -139,6 +139,17 @@
->  					fsl,pull-up = <0>; /* 0 will enable the keeper */
->  				};
->  
-> +				i2c1_pins_cfa10049: i2c1 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						0x3103 /* MX28_PAD_PWM0__GPIO */
-> +						0x3113 /* MX28_PAD_PWM1__I2C1_SDA */
-> +					>;
-> +					fsl,drive-strength = <1>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <1>;
-> +				};
-> +
->  				fiq_pins_cfa10049: fiq at 0 {
->  					reg = <0>;
->  					fsl,pinmux-ids = <
-> @@ -199,49 +210,6 @@
->  				status = "okay";
->  			};
->  
-> -			i2c1: i2c at 8005a000 {
-> -				pinctrl-names = "default";
-> -				pinctrl-0 = <&i2c1_pins_a>;
-> -				status = "okay";
-> -			};
-> -
-> -			i2cmux {
-> -				compatible = "i2c-mux-gpio";
-> -				#address-cells = <1>;
-> -				#size-cells = <0>;
-> -				mux-gpios = <&gpio1 22 0 &gpio1 23 0>;
-> -				i2c-parent = <&i2c1>;
-> -
-> -				i2c at 0 {
-> -					reg = <0>;
-> -				};
-> -
-> -				i2c at 1 {
-> -					reg = <1>;
-> -				};
-> -
-> -				i2c at 2 {
-> -					reg = <2>;
-> -				};
-> -
-> -				i2c at 3 {
-> -					reg = <3>;
-> -					#address-cells = <1>;
-> -					#size-cells = <0>;
-> -
-> -					pca9555: pca9555 at 20 {
-> -						compatible = "nxp,pca9555";
-> -						interrupt-parent = <&gpio2>;
-> -						interrupts = <19 0x2>;
-> -						gpio-controller;
-> -						#gpio-cells = <2>;
-> -						interrupt-controller;
-> -						#interrupt-cells = <2>;
-> -						reg = <0x20>;
-> -					};
-> -				};
-> -			};
-> -
->  			usbphy1: usbphy at 8007e000 {
->  				status = "okay";
->  			};
-> @@ -366,6 +334,60 @@
->  		rotary-encoder,relative-axis;
->  	};
->  
-> +	i2c1gpio: i2c at 0 {
-> +		compatible = "i2c-gpio";
-> +		pinctrl-0 = <&i2c1_pins_cfa10049>;
-> +		pinctrl-names = "default";
-> +		gpios = <
-> +			&gpio3 17 0 /* sda */
-> +			&gpio3 16 0 /* scl */
-> +			 >;
-> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> +	};
-> +
-> +	i2cmux {
-> +		compatible = "i2c-mux-gpio";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		mux-gpios = <&gpio1 22 0 &gpio1 23 0>;
-> +		i2c-parent = <&i2c1gpio>;
-> +
-> +		i2c at 0 {
-> +			reg = <0>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +		};
-> +
-> +		i2c at 1 {
-> +			reg = <1>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +		};
-> +
-> +		i2c at 2 {
-> +			reg = <2>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +		};
-> +
-> +		i2c at 3 {
-> +			reg = <3>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			pca9555: pca9555 at 20 {
-> +				compatible = "nxp,pca9555";
-> +				interrupt-parent = <&gpio2>;
-> +				interrupts = <19 0x2>;
-> +				gpio-controller;
-> +				#gpio-cells = <2>;
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
-> +				reg = <0x20>;
-> +			};
-> +		};
-> +	};
-> +
->  	backlight {
->  		compatible = "pwm-backlight";
->  		pwms = <&pwm 3 5000000>;
-> 
+	Arnd
