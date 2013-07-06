@@ -1,51 +1,163 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 06 Jul 2013 11:24:04 +0100
-Subject: [PATCHv3 1/3] iio: Add Nuvoton NAU7802 ADC driver
-In-Reply-To: <51D53B72.6020309@metafoo.de>
+Date: Sat, 06 Jul 2013 11:26:46 +0100
+Subject: [PATCHv3 2/3] ARM: mxs: cfa10049: Switch bus i2c1 to bitbanging
+In-Reply-To: <1372094699-3832-3-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1372094699-3832-2-git-send-email-alexandre.belloni@free-electrons.com>
- <51D53B72.6020309@metafoo.de>
-Message-ID: <51D7F044.9040205@kernel.org>
+ <1372094699-3832-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <51D7F0E6.2000008@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/2013 10:08 AM, Lars-Peter Clausen wrote:
-> On 06/24/2013 07:24 PM, Alexandre Belloni wrote:
->> The Nuvoton NAU7802 ADC is a 24-bit 2-channels I2C ADC, with adjustable
->> gain and sampling rates.
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On 06/24/2013 06:24 PM, Alexandre Belloni wrote:
+> From: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> Reviewed-by: Lars-Peter Clausen <lars@metafoo.de>
+> The ADCs connected to this bus have been experiencing some timeout
+> issues when using the iMX28 i2c controller. Switching back to bitbanging
+> solves this.
 > 
-Applied to the togreg branch of iio.git (with a few little tweaks).
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-There was some fuzz that required manual fixing because of another driver merge so
-please check I didn't foul anything up with this or the other bits below.
+As there are no disadvantages in taking the driver through IIO and these changes
+through the appropriate arch trees, I'd not propose to take these through IIO
+(even when the discussion is done) unless specifically asked to.
 
-There were two trivial missing unlocks on error paths in the read_raw function that
-I've fixed up (Coccinelle found these for me - if you can I would always advise
-running sparse, coccicheck and ideally smatch before submitting patches).
-
-I fixed up the comments because if there is one thing I hate bothering
-with it is delightful patches that just fix this stuff. Much better
-to do it now given it took 20 secs ;)
-
-> One remark though. Multiline comments should be like
+Jonathan
+> ---
+>  arch/arm/boot/dts/imx28-cfa10049.dts | 108 +++++++++++++++++++++--------------
+>  1 file changed, 65 insertions(+), 43 deletions(-)
 > 
-> /*
->  * foo
->  * bar
->  */
-> 
-> not
-> 
-> /* foo
->  * bar
->  */
-> 
-> But not need to resend the patch just for this
-> 
-> - Lars
+> diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+> index 05ae549..d3758c2 100644
+> --- a/arch/arm/boot/dts/imx28-cfa10049.dts
+> +++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+> @@ -139,6 +139,17 @@
+>  					fsl,pull-up = <0>; /* 0 will enable the keeper */
+>  				};
+>  
+> +				i2c1_pins_cfa10049: i2c1 at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <
+> +						0x3103 /* MX28_PAD_PWM0__GPIO */
+> +						0x3113 /* MX28_PAD_PWM1__I2C1_SDA */
+> +					>;
+> +					fsl,drive-strength = <1>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <1>;
+> +				};
+> +
+>  				fiq_pins_cfa10049: fiq at 0 {
+>  					reg = <0>;
+>  					fsl,pinmux-ids = <
+> @@ -199,49 +210,6 @@
+>  				status = "okay";
+>  			};
+>  
+> -			i2c1: i2c at 8005a000 {
+> -				pinctrl-names = "default";
+> -				pinctrl-0 = <&i2c1_pins_a>;
+> -				status = "okay";
+> -			};
+> -
+> -			i2cmux {
+> -				compatible = "i2c-mux-gpio";
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> -				mux-gpios = <&gpio1 22 0 &gpio1 23 0>;
+> -				i2c-parent = <&i2c1>;
+> -
+> -				i2c at 0 {
+> -					reg = <0>;
+> -				};
+> -
+> -				i2c at 1 {
+> -					reg = <1>;
+> -				};
+> -
+> -				i2c at 2 {
+> -					reg = <2>;
+> -				};
+> -
+> -				i2c at 3 {
+> -					reg = <3>;
+> -					#address-cells = <1>;
+> -					#size-cells = <0>;
+> -
+> -					pca9555: pca9555 at 20 {
+> -						compatible = "nxp,pca9555";
+> -						interrupt-parent = <&gpio2>;
+> -						interrupts = <19 0x2>;
+> -						gpio-controller;
+> -						#gpio-cells = <2>;
+> -						interrupt-controller;
+> -						#interrupt-cells = <2>;
+> -						reg = <0x20>;
+> -					};
+> -				};
+> -			};
+> -
+>  			usbphy1: usbphy at 8007e000 {
+>  				status = "okay";
+>  			};
+> @@ -366,6 +334,60 @@
+>  		rotary-encoder,relative-axis;
+>  	};
+>  
+> +	i2c1gpio: i2c at 0 {
+> +		compatible = "i2c-gpio";
+> +		pinctrl-0 = <&i2c1_pins_cfa10049>;
+> +		pinctrl-names = "default";
+> +		gpios = <
+> +			&gpio3 17 0 /* sda */
+> +			&gpio3 16 0 /* scl */
+> +			 >;
+> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+> +	};
+> +
+> +	i2cmux {
+> +		compatible = "i2c-mux-gpio";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		mux-gpios = <&gpio1 22 0 &gpio1 23 0>;
+> +		i2c-parent = <&i2c1gpio>;
+> +
+> +		i2c at 0 {
+> +			reg = <0>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+> +
+> +		i2c at 1 {
+> +			reg = <1>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+> +
+> +		i2c at 2 {
+> +			reg = <2>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+> +
+> +		i2c at 3 {
+> +			reg = <3>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			pca9555: pca9555 at 20 {
+> +				compatible = "nxp,pca9555";
+> +				interrupt-parent = <&gpio2>;
+> +				interrupts = <19 0x2>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +				reg = <0x20>;
+> +			};
+> +		};
+> +	};
+> +
+>  	backlight {
+>  		compatible = "pwm-backlight";
+>  		pwms = <&pwm 3 5000000>;
 > 
