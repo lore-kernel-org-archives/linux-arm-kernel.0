@@ -1,54 +1,41 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 7 Jul 2013 10:46:45 -0400
-Subject: [GIT PULL] clockevents/clocksource: Add Marvell Orion SoC timer
-In-Reply-To: <alpine.DEB.2.02.1307071508030.32106@ionos.tec.linutronix.de>
-References: <51B8D310.4050404@linaro.org> <51D9548B.9040907@gmail.com>
- <alpine.DEB.2.02.1307071508030.32106@ionos.tec.linutronix.de>
-Message-ID: <20130707144645.GA11908@titan.lakedaemon.net>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun,  7 Jul 2013 18:51:02 +0400
+Subject: [RFC] ARM: dts: imx27: Add core voltages
+Message-ID: <1373208662-7350-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+This patch adds core voltages for i.MX27 CPUs. Only 266 and 400 MHz modes
+is documented in the datasheet, we add a 266 MHz frequency for conform this.
+For 133 MHz CPU frequency minimal voltage is used (1.2V).
 
-On Sun, Jul 07, 2013 at 03:10:25PM +0200, Thomas Gleixner wrote:
-> On Sun, 7 Jul 2013, Sebastian Hesselbarth wrote:
-> > > ----------------------------------------------------------------
-> > > Sebastian Hesselbarth (1):
-> > >        clocksource: Add Marvell Orion SoC timer
-> > 
-> > with tip timers/core PR sent, I realized that the above did not make it
-> > in. As we have a whole bunch of cleanup and DT conversion patches for
-> 
-> Opps. Fell through the cracks.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/boot/dts/imx27.dtsi | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-No problem.
-
-> > v3.11-rc1 depending on it, would it be ok for you to let Jason Cooper
-> > take it through his ARM sub-branch?
-> 
-> > If you are fine with it, I will resend the patch and note that Daniel
-> > can drop it and Jason will take it.
-> 
-> Nah, Jason can just pull it from Daniels tree and be done with it.
-
-Sure, but to be clear, Daniel, please drop this patch from your tree.  I
-have no desire to create an out-of-tree dependency if we can avoid it.
-It has a habit of going horribly wrong [1].
-
-I'll cherry-pick
-
-  0c1dcfd clocksource: Add Marvell Orion SoC timer
-
-from dlezcano/timers/clockevents to get the Signed-off-by's Tested-by's,
-etc.  If I could get an Acked-by from Daniel or Thomas on this, I'd
-appreciate it.
-
-Daniel, it looks like you only have cpuidle work going into linux-next.
-If you do decide to include timers/clockevents, please drop the patch
-before hand.
-
-thx,
-
-Jason.
-
-[1] https://lkml.org/lkml/2013/2/28/725
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index a587294..c9bacca 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -57,13 +57,15 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,arm926ej-s";
+ 			operating-points = <
+-				/* kHz  uV (No regulator support) */
+-				133000  0
+-				399000  0
++				/* kHz uV */
++				133000 1200000
++				266000 1300000
++				399000 1450000
+ 			>;
+ 			clock-latency = <61036>; /* two CLK32 periods */
+ 			clocks = <&clks 18>;
+ 			clock-names = "cpu";
++			voltage-tolerance = <1>;
+ 		};
+ 	};
+ 
+-- 
+1.8.1.5
