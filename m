@@ -1,60 +1,88 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 7 Jul 2013 09:15:01 +0200
-Subject: MTD EEPROM support and driver integration
-In-Reply-To: <8997501.Dchyii8uWX@wuerfel>
-References: <20130705201118.GM2959@lukather> <5811519.oHVuMujf0I@wuerfel>
- <20130706120112.GA11069@lukather> <8997501.Dchyii8uWX@wuerfel>
-Message-ID: <20130707071501.GD11243@lukather>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sun, 7 Jul 2013 09:19:49 +0200
+Subject: [PATCH v9 08/10] ASoC: Add phycore-ac97-dt driver
+In-Reply-To: <20130703161727.GS27646@sirena.org.uk>
+References: <1371734429-6081-1-git-send-email-mpa@pengutronix.de>
+ <1371734429-6081-9-git-send-email-mpa@pengutronix.de>
+ <20130703161727.GS27646@sirena.org.uk>
+Message-ID: <20130707071949.GH16871@s25.your-server.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 06, 2013 at 09:06:49PM +0200, Arnd Bergmann wrote:
-> On Saturday 06 July 2013 14:01:12 Maxime Ripard wrote:
-> > What other option would we have?
-> > 
-> > I also thought about writing an EEPROM framework of its own, but the
-> > line is really thin between a large EEPROM and say a small SPI
-> > dataflash, which would make it pretty hard to choose between such a
-> > framework and MTD.
+On Wed, Jul 03, 2013 at 05:17:27PM +0100, Mark Brown wrote:
+> On Thu, Jun 20, 2013 at 03:20:27PM +0200, Markus Pargmann wrote:
 > 
-> Isn't flash by definition block based, while EEPROM can be written
-> in byte or word units? I think that is a significant difference, although
-> it doesn't necessarily mean that we can't use MTD for both.
+> > Notes:
+> >     Changes in v9:
+> >      - Fix blank line at end of file.
+> >     
+> 
+> Please don't include enormous changelogs like this, they're just noise.
+> 
+> > +config SND_SOC_PHYCORE_AC97_DT
+> > +	bool "SoC Audio support for Phytec phyCORE (and phyCARD) boards (devicetree only)"
+> > +	depends on MACH_PCA100 || MACH_PCM043
+> 
+> Is there an actual dependency on the machine type?  This seems wrong for
+> a DT driver.
 
-Ah, right.
+No, there is no dependency. Fixed.
 
-> We also have a bunch of OTP drivers spread around the kernel, it probably
-> makes sense to consolidate them at the same time, at least on the DT binding
-> side if not the device drivers.
+> 
+> > +static struct snd_soc_ops imx_phycore_hifi_ops = {
+> > +};
+> > +
+> 
+> You shouldn't have this if there's nothing in it.
 
->From a quick grep, the only one I've seen so far are:
-  - imx6q, that has a hook at machine start to poke into its OCOTP to
-    retrieve some frequency scaling parameters it seems. I'm not sure
-    how the current solution could improve the situation for this
-    use-case, but the DT bindings of the OCOTP is just a DT node, with
-    no clients, so we have nothing to worry about here.
-  - imx28, that has a hook at machine start to look up the MAC address
-    values and patch the ethernet controller nodes to add the right
-    local-mac-address property. This one could benefit from the new
-    bindings, but we already mentionned it, and I intended to develop
-    with an imx28 board anyway.
-  - picoxcell-pc3x3 DTSI has a node for a OTP device, but they don't
-    seem to be doing anything with it, nor do they seem to have a driver
-    for it. So I guess we don't care about migrating for this one
-    either.
+Removed.
 
-Did you have other cases in mind?
+> 
+> > +static struct platform_device *imx_phycore_snd_device;
+> 
+> This shouldn't be a global, it should be in driver data.
 
-Maxime
+Moved to driver data.
+
+> 
+> > +/*
+> > + * Pointer to AC97 reset functions for specific boards
+> > + */
+> > +#if IS_ENABLED(CONFIG_MACH_PCA100)
+> > +extern void pca100_ac97_cold_reset(struct snd_ac97 *ac97);
+> > +extern void pca100_ac97_warm_reset(struct snd_ac97 *ac97);
+> > +#else
+> > +static void pca100_ac97_cold_reset(struct snd_ac97 *ac97) { }
+> > +static void pca100_ac97_warm_reset(struct snd_ac97 *ac97) { }
+> > +#endif
+> 
+> > +	if (of_machine_is_compatible("phytec,imx27-pca100")) {
+> > +		phycore_ac97_reset = pca100_ac97_cold_reset;
+> > +		phycore_ac97_warm_reset = pca100_ac97_warm_reset;
+> > +	} else if (of_machine_is_compatible("phytec,imx35-pcm043")) {
+> > +		phycore_ac97_reset = pcm043_ac97_cold_reset;
+> > +		phycore_ac97_warm_reset = pcm043_ac97_warm_reset;
+> > +	} else {
+> > +		dev_err(&pdev->dev, "Failed to set AC97 reset functions, unknown board.\n");
+> > +		return -EINVAL;
+> > +	}
+> 
+> These functions have no reason to be anywhere except in the driver and
+> really you should just be specifying which pins to use there - ideally
+> via pinctrl but I don't think i.MX has adopted that yet.
+
+There are no pinctrl driver for imx27(pca100) or imx35(pcm043). The
+iomux/pad configure functions are defined inside mach-imx/ including
+their headers. Both reset functions have to configure iomux/pad before
+and after using gpio. So I think it's not possible to make the reset
+based on the gpio pins without the necessary iomux/pad configuration.
+
+Thanks,
+
+Markus
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130707/43d6a3f5/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
