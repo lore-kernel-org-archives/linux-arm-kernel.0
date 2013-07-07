@@ -1,24 +1,23 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun,  7 Jul 2013 15:13:28 +0200
-Subject: [PATCH 0/3] ARM: dts: imx27 phyCARD-S I2C devices
-Message-ID: <1373202811-13825-1-git-send-email-mpa@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 7 Jul 2013 10:16:30 -0300
+Subject: [alsa-devel] [PATCH v9 08/10] ASoC: Add phycore-ac97-dt driver
+In-Reply-To: <20130707071949.GH16871@s25.your-server.de>
+References: <1371734429-6081-1-git-send-email-mpa@pengutronix.de>
+ <1371734429-6081-9-git-send-email-mpa@pengutronix.de>
+ <20130703161727.GS27646@sirena.org.uk>
+ <20130707071949.GH16871@s25.your-server.de>
+Message-ID: <CAOMZO5CLWfoQE-9srT8e2kLn3A=iHhk-TbXytV+pdZVaaHwoNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Markus,
 
-here are some I2C device patches for phyCARD-S.
+On Sun, Jul 7, 2013 at 4:19 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+
+> There are no pinctrl driver for imx27(pca100) or imx35(pcm043). The
+
+For mx35 pinctrl driver is at drivers/pinctrl/pinctrl-imx35.c
 
 Regards,
 
-Markus
-
-
-Markus Pargmann (3):
-      ARM: dts: imx27 phyCARD-S SOM remove wrong i2c sensor
-      ARM: dts: imx27 phyCARD-S, move i2c1 and owire to rdk
-      ARM: dts: imx27 phyCARD-S, i2c ADC device node
-
- arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts | 31 ++++++++++++++++++++++++
- arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts | 23 ------------------
- 2 files changed, 31 insertions(+), 23 deletions(-)
+Fabio Estevam
