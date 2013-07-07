@@ -1,40 +1,44 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Sun, 7 Jul 2013 13:51:14 +0200
-Subject: [PATCH v3 4/6] ARM: dts: imx6q{dl}: fix the wrong RTS/CTS pad name
-In-Reply-To: <20130706050803.GC30164@S2101-09.ap.freescale.net>
-References: <1373004752-21302-1-git-send-email-b32955@freescale.com>
- <1373004752-21302-5-git-send-email-b32955@freescale.com>
- <20130706050803.GC30164@S2101-09.ap.freescale.net>
-Message-ID: <20953.22066.706534.773272@ipc1.ka-ro>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 7 Jul 2013 13:32:40 +0100
+Subject: amba-pl08x and 'get_signal' namespace collision/build error
+In-Reply-To: <20130705061802.GB10947@intel.com>
+References: <51C97F40.5030101@arm.com>
+ <20130625184539.GB2718@n2100.arm.linux.org.uk>
+ <20130626044842.GR23141@intel.com>
+ <20130626081909.GD2718@n2100.arm.linux.org.uk>
+ <20130626103930.GS23141@intel.com>
+ <20130627094650.GC4283@n2100.arm.linux.org.uk>
+ <CAOesGMgSPNggnBm=E3B774m7Ad_QMXdqvcGqRMxhap6dtpNtCg@mail.gmail.com>
+ <20130705061802.GB10947@intel.com>
+Message-ID: <20130707123240.GO24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Shawn Guo writes:
-> On Fri, Jul 05, 2013 at 02:12:30PM +0800, Huang Shijie wrote:
-> > There is something wrong with the RTS/CTS pads:
-> >   The RTS pad is assigned with the CTS's value;
-> >   while the CTS pad is assigned with the RTS's value.
+On Fri, Jul 05, 2013 at 11:48:02AM +0530, Vinod Koul wrote:
+> On Wed, Jul 03, 2013 at 11:27:12AM -0700, Olof Johansson wrote:
+> > This has now hit the mainline kernel, and several defconfigs (nhk815,
+> > lpc32xx and the spear ones) are broken there.
 > > 
-> 
-> So basically, you are saying that select_input should be set up for CTS
-> rather than RTS.  It seems that the people who generated the macro got
-> the wrong input from developer.
-> 
-programming 'select_input' only makes sense for inputs, not outputs.
-Since CTS is an output signal, select_input only makes sense for the
-RTS function of the pads.
+> > Vinod, when are you sending up your pull request with the fix? It'd be
+> > good to see it go in soon.
+> It should be on its way by the weekend
 
+It still isn't in the tree.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Personally, I think that the fix should have come via my tree, because
+the breakage was caused my the changes in my tree - and for the last week
+or more I've not been able to build any of these ARM Ltd devel platforms
+because of this bug.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+It also means that I'm not able to build test a load of changes I'm
+currently working on against a recent kernel (or indeed any v3.10 kernel.)
+In other words, the lack of this patch being merged is stopping me from
+doing my job properly.  (Consider from your perspective: if I were to
+break something you relied upon for a couple of weeks, how would you
+feel about it?)
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Please get this fix into mainline ASAP - even if you have to send it as a
+patch separately to Linus rather than putting it as part of your normal
+pull request.
+
+Thanks.
