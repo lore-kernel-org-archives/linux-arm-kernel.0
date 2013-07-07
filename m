@@ -1,94 +1,42 @@
-From: pmeerw@pmeerw.net (Peter Meerwald)
-Date: Sun,  7 Jul 2013 19:16:39 +0200
-Subject: [PATCH] clk: fix typos
-Message-ID: <1373217399-1541-1-git-send-email-pmeerw@pmeerw.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun,  7 Jul 2013 11:05:55 -0700
+Subject: [PATCH] dma: iop: fix new warnings
+Message-ID: <1373220355-26712-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Peter Meerwald <pmeerw@pmeerw.net>
----
- drivers/clk/Kconfig |  2 +-
- drivers/clk/clk.c   | 13 +++++++------
- 2 files changed, 8 insertions(+), 7 deletions(-)
+The recent "drivers/dma: remove unused support for MEMSET operations"
+change has fallout from lack of build testing by the author. This fixes:
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 51380d6..cd49096 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -27,7 +27,7 @@ config COMMON_CLK_DEBUG
- 	bool "DebugFS representation of clock tree"
- 	select DEBUG_FS
- 	---help---
--	  Creates a directory hierchy in debugfs for visualizing the clk
-+	  Creates a directory hierarchy in debugfs for visualizing the clk
- 	  tree structure.  Each directory contains read-only members
- 	  that export information specific to that clk node: clk_rate,
- 	  clk_flags, clk_prepare_count, clk_enable_count &
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 54a191c..56a00db 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -702,7 +702,7 @@ void __clk_unprepare(struct clk *clk)
+drivers/dma/iop-adma.c:1020:13: warning: unused variable 'dma_addr' [-Wunused-variable]
+drivers/dma/iop-adma.c:1519:2: warning: format '%s' expects a matching 'char *' argument [-Wformat=]
+
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ drivers/dma/iop-adma.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/dma/iop-adma.c b/drivers/dma/iop-adma.c
+index c9cc08c..cc727ec 100644
+--- a/drivers/dma/iop-adma.c
++++ b/drivers/dma/iop-adma.c
+@@ -1017,7 +1017,7 @@ iop_adma_xor_val_self_test(struct iop_adma_device *device)
+ 	struct page *xor_srcs[IOP_ADMA_NUM_SRC_TEST];
+ 	struct page *zero_sum_srcs[IOP_ADMA_NUM_SRC_TEST + 1];
+ 	dma_addr_t dma_srcs[IOP_ADMA_NUM_SRC_TEST + 1];
+-	dma_addr_t dma_addr, dest_dma;
++	dma_addr_t dest_dma;
+ 	struct dma_async_tx_descriptor *tx;
+ 	struct dma_chan *dma_chan;
+ 	dma_cookie_t cookie;
+@@ -1516,7 +1516,7 @@ static int iop_adma_probe(struct platform_device *pdev)
+ 			goto err_free_iop_chan;
+ 	}
  
- /**
-  * clk_unprepare - undo preparation of a clock source
-- * @clk: the clk being unprepare
-+ * @clk: the clk being unprepared
-  *
-  * clk_unprepare may sleep, which differentiates it from clk_disable.  In a
-  * simple case, clk_unprepare can be used instead of clk_disable to gate a clk
-@@ -869,6 +869,7 @@ EXPORT_SYMBOL_GPL(clk_enable);
- /**
-  * __clk_round_rate - round the given rate for a clk
-  * @clk: round the rate of this clock
-+ * @rate: the rate which is to be rounded
-  *
-  * Caller must hold prepare_lock.  Useful for clk_ops such as .set_rate
-  */
-@@ -956,7 +957,7 @@ static int __clk_notify(struct clk *clk, unsigned long msg,
-  *
-  * Walks the subtree of clks starting with clk and recalculates rates as it
-  * goes.  Note that if a clk does not implement the .recalc_rate callback then
-- * it is assumed that the clock will take on the rate of it's parent.
-+ * it is assumed that the clock will take on the rate of its parent.
-  *
-  * clk_recalc_rates also propagates the POST_RATE_CHANGE notification,
-  * if necessary.
-@@ -1026,7 +1027,7 @@ EXPORT_SYMBOL_GPL(clk_get_rate);
-  * pre-rate change notifications and returns early if no clks in the
-  * subtree have subscribed to the notifications.  Note that if a clk does not
-  * implement the .recalc_rate callback then it is assumed that the clock will
-- * take on the rate of it's parent.
-+ * take on the rate of its parent.
-  *
-  * Caller must hold prepare_lock.
-  */
-@@ -1198,7 +1199,7 @@ static void clk_change_rate(struct clk *clk)
-  * outcome of clk's .round_rate implementation.  If *parent_rate is unchanged
-  * after calling .round_rate then upstream parent propagation is ignored.  If
-  * *parent_rate comes back with a new rate for clk's parent then we propagate
-- * up to clk's parent and set it's rate.  Upward propagation will continue
-+ * up to clk's parent and set its rate.  Upward propagation will continue
-  * until either a clk does not support the CLK_SET_RATE_PARENT flag or
-  * .round_rate stops requesting changes to clk's parent_rate.
-  *
-@@ -1648,7 +1649,7 @@ int __clk_init(struct device *dev, struct clk *clk)
- 	 * The .init callback is not used by any of the basic clock types, but
- 	 * exists for weird hardware that must perform initialization magic.
- 	 * Please consider other ways of solving initialization problems before
--	 * using this callback, as it's use is discouraged.
-+	 * using this callback, as its use is discouraged.
- 	 */
- 	if (clk->ops->init)
- 		clk->ops->init(clk->hw);
-@@ -1675,7 +1676,7 @@ out:
-  * very large numbers of clocks that need to be statically initialized.  It is
-  * a layering violation to include clk-private.h from any code which implements
-  * a clock's .ops; as such any statically initialized clock data MUST be in a
-- * separate C file from the logic that implements it's operations.  Returns 0
-+ * separate C file from the logic that implements its operations.  Returns 0
-  * on success, otherwise an error code.
-  */
- struct clk *__clk_register(struct device *dev, struct clk_hw *hw)
+-	dev_info(&pdev->dev, "Intel(R) IOP: ( %s%s%s%s%s%s%s)\n",
++	dev_info(&pdev->dev, "Intel(R) IOP: ( %s%s%s%s%s%s)\n",
+ 		 dma_has_cap(DMA_PQ, dma_dev->cap_mask) ? "pq " : "",
+ 		 dma_has_cap(DMA_PQ_VAL, dma_dev->cap_mask) ? "pq_val " : "",
+ 		 dma_has_cap(DMA_XOR, dma_dev->cap_mask) ? "xor " : "",
 -- 
-1.8.3.2
+1.7.10.4
