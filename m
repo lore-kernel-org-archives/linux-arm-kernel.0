@@ -1,43 +1,40 @@
-From: jogo@openwrt.org (Jonas Gorski)
-Date: Sun, 7 Jul 2013 13:48:53 +0200
-Subject: Second ethernet on kirkwood does not work when probed through DT
-In-Reply-To: <51D952D3.8070401@gmail.com>
-References: <20130706215426.6e666d6af0dc6c9ea5fe32cd@openwrt.org>
- <51D88A8E.1060104@gmail.com> <20130706233912.00004044@unknown>
- <51D94884.4000204@gmail.com> <20130707132607.00007188@unknown>
- <51D952D3.8070401@gmail.com>
-Message-ID: <20130707134853.00003b9d@unknown>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Sun, 7 Jul 2013 13:51:14 +0200
+Subject: [PATCH v3 4/6] ARM: dts: imx6q{dl}: fix the wrong RTS/CTS pad name
+In-Reply-To: <20130706050803.GC30164@S2101-09.ap.freescale.net>
+References: <1373004752-21302-1-git-send-email-b32955@freescale.com>
+ <1373004752-21302-5-git-send-email-b32955@freescale.com>
+ <20130706050803.GC30164@S2101-09.ap.freescale.net>
+Message-ID: <20953.22066.706534.773272@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 07 Jul 2013 13:36:51 +0200
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+Hi,
 
-> On 07/07/2013 01:26 PM, Jonas Gorski wrote:
-> > On Sun, 07 Jul 2013 12:52:52 +0200
-> > Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>  wrote:
-> >> Anyway, can you please try to have both ports reg properties set
-> >> to<0>, with nodes named ethernet0-port at 0 and ethernet1-port at 0,
-> >> and the platform_device_alloc in mv643xx_eth modified?
-> >
-> > In addition I added a static counter for the allocated devs (to not
-> > overwrite the pointers in port_platdev[]).
+Shawn Guo writes:
+> On Fri, Jul 05, 2013 at 02:12:30PM +0800, Huang Shijie wrote:
+> > There is something wrong with the RTS/CTS pads:
+> >   The RTS pad is assigned with the CTS's value;
+> >   while the CTS pad is assigned with the RTS's value.
+> > 
 > 
-> Ok, but that is not required to make it work, is it? IMHO we should
-> honor what is passed by reg property, even it will be always zero
-> for KW and the other Orion SoCs. Otherwise, we would implicitly put
-> the numbering in the order of port nodes.
-
-No, picking the next free "slot" should work, too - it was just the
-easiest to fix the name for the alloc to what seems to be expected by
-other parts.
-
-> > That seems to work, as now eth1 comes up and works (successfully got a
-> > IP through DHCP).
+> So basically, you are saying that select_input should be set up for CTS
+> rather than RTS.  It seems that the people who generated the macro got
+> the wrong input from developer.
 > 
-> Ok, great. Will prepare a fix for mv643xx_eth on top of net-next. And
-> an update of the kirkwood conversion patches.
+programming 'select_input' only makes sense for inputs, not outputs.
+Since CTS is an output signal, select_input only makes sense for the
+RTS function of the pads.
 
 
-Thanks,
-Jonas
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
