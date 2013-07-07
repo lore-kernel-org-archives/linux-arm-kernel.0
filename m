@@ -1,52 +1,40 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Sun, 7 Jul 2013 11:35:58 +0300
-Subject: [PATCH] arm: dts: AM43x: Add usb_otg_hs node
-In-Reply-To: <1372401887-19422-1-git-send-email-george.cherian@ti.com>
-References: <1372401887-19422-1-git-send-email-george.cherian@ti.com>
-Message-ID: <20130707083558.GA12992@arwen.pp.htv.fi>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 07 Jul 2013 10:47:21 +0200
+Subject: [PATCHv3 2/3] ARM: mxs: cfa10049: Switch bus i2c1 to bitbanging
+In-Reply-To: <51D7F0E6.2000008@kernel.org>
+References: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1372094699-3832-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <51D7F0E6.2000008@kernel.org>
+Message-ID: <51D92B19.8000706@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/07/2013 12:26, Jonathan Cameron wrote:
+> On 06/24/2013 06:24 PM, Alexandre Belloni wrote:
+>> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>
+>> The ADCs connected to this bus have been experiencing some timeout
+>> issues when using the iMX28 i2c controller. Switching back to bitbanging
+>> solves this.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> As there are no disadvantages in taking the driver through IIO and these changes
+> through the appropriate arch trees, I'd not propose to take these through IIO
+> (even when the discussion is done) unless specifically asked to.
+> 
 
-On Fri, Jun 28, 2013 at 12:14:47PM +0530, George Cherian wrote:
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index ddc1df7..e4f5eb8 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -64,5 +64,24 @@
->  			compatible = "ti,am4372-counter32k","ti,omap-counter32k";
->  			reg = <0x44e86000 0x40>;
->  		};
-> +
-> +		usb_otg_hs1: am4372_dwc3 at 48380000 {
-> +			compatible = "ti,am437x-dwc3";
-> +			reg = <0x48380000 0x1ff>;
-> +			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			utmi-mode = <1>;
-> +			ranges;
-> +
-> +			dwc3 at 48390000 {
-> +				compatible = "synopsys,dwc3";
+Sure, especially since, we may finally not move to i2c bitbanging. I'll
+probably resend a new version of those patches separately.
 
-let's us snps,dwc3. I recently posted a patch converting synopsys to
-snps like all other DesignWare drivers. Support for synopsys,dwc3 is
-still there, but shouldn't be used.
+Shawn, please wait for the i2c-mxs PIO/DMA mode discussion to end before
+applying. If possible, I would prefer not using bitbanging.
 
-> +				reg = <0x48390000 0xcfff>;
-> +				interrupts = <GIC_SPI  168 IRQ_TYPE_LEVEL_HIGH>;
-> +				tx-fifo-resize;
+Regards,
 
-is this flag *really* necessary, I asked you and didn't get an answer.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130707/cc0b9525/attachment-0001.sig>
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
