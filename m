@@ -1,44 +1,134 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 7 Jul 2013 13:32:40 +0100
-Subject: amba-pl08x and 'get_signal' namespace collision/build error
-In-Reply-To: <20130705061802.GB10947@intel.com>
-References: <51C97F40.5030101@arm.com>
- <20130625184539.GB2718@n2100.arm.linux.org.uk>
- <20130626044842.GR23141@intel.com>
- <20130626081909.GD2718@n2100.arm.linux.org.uk>
- <20130626103930.GS23141@intel.com>
- <20130627094650.GC4283@n2100.arm.linux.org.uk>
- <CAOesGMgSPNggnBm=E3B774m7Ad_QMXdqvcGqRMxhap6dtpNtCg@mail.gmail.com>
- <20130705061802.GB10947@intel.com>
-Message-ID: <20130707123240.GO24642@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 7 Jul 2013 20:35:11 +0800
+Subject: [PATCH for linux-3.10.y] ARM: dts: imx: cpus/cpu nodes dts updates
+Message-ID: <1373200511-18917-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 05, 2013 at 11:48:02AM +0530, Vinod Koul wrote:
-> On Wed, Jul 03, 2013 at 11:27:12AM -0700, Olof Johansson wrote:
-> > This has now hit the mainline kernel, and several defconfigs (nhk815,
-> > lpc32xx and the spear ones) are broken there.
-> > 
-> > Vinod, when are you sending up your pull request with the fix? It'd be
-> > good to see it go in soon.
-> It should be on its way by the weekend
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-It still isn't in the tree.
+commit 7925e89f54fc49bcd1e73f0a65c4a3eb35b9cfb1 upstream.
 
-Personally, I think that the fix should have come via my tree, because
-the breakage was caused my the changes in my tree - and for the last week
-or more I've not been able to build any of these ARM Ltd devel platforms
-because of this bug.
+Commit 1ba9bf0 (ARM: 7762/1: kernel: fix arm_dt_init_cpu_maps() to skip
+non-cpu nodes) goes into v3.10 with leaving the dts cpu node update to
+the next release (v3.11).  This unfortunately causes a regression on
+multi-core system, e.g. i.MX6 Quad, that is only one cpu core will be
+brought up by kernel.
 
-It also means that I'm not able to build test a load of changes I'm
-currently working on against a recent kernel (or indeed any v3.10 kernel.)
-In other words, the lack of this patch being merged is stopping me from
-doing my job properly.  (Consider from your perspective: if I were to
-break something you relied upon for a couple of weeks, how would you
-feel about it?)
+CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+Setting up static identity map for 0x80538c18 - 0x80538c88
+Brought up 1 CPUs
+SMP: Total of 1 processors activated (1581.05 BogoMIPS).
 
-Please get this fix into mainline ASAP - even if you have to send it as a
-patch separately to Linus rather than putting it as part of your normal
-pull request.
+Fix the regression by applying the necessary dts updates.
 
-Thanks.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Greg,
+
+This is a fix for 3.10 stable kernel.  This is my first time to forward
+a patch that is already on mainline to stable kernel.  Please let me
+know the correct process if what I'm doing here is wrong.
+
+Shawn
+
+ arch/arm/boot/dts/imx23.dtsi  |    8 ++++++--
+ arch/arm/boot/dts/imx28.dtsi  |    8 ++++++--
+ arch/arm/boot/dts/imx6dl.dtsi |    2 ++
+ arch/arm/boot/dts/imx6q.dtsi  |    4 ++++
+ 4 files changed, 18 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 73fd7d0..587ceef 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -23,8 +23,12 @@
+ 	};
+ 
+ 	cpus {
+-		cpu at 0 {
+-			compatible = "arm,arm926ejs";
++		#address-cells = <0>;
++		#size-cells = <0>;
++
++		cpu {
++			compatible = "arm,arm926ej-s";
++			device_type = "cpu";
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 600f7cb..4c10a19 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -32,8 +32,12 @@
+ 	};
+ 
+ 	cpus {
+-		cpu at 0 {
+-			compatible = "arm,arm926ejs";
++		#address-cells = <0>;
++		#size-cells = <0>;
++
++		cpu {
++			compatible = "arm,arm926ej-s";
++			device_type = "cpu";
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 5bcdf3a..62dc781 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -18,12 +18,14 @@
+ 
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <0>;
+ 			next-level-cache = <&L2>;
+ 		};
+ 
+ 		cpu at 1 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <1>;
+ 			next-level-cache = <&L2>;
+ 		};
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 21e6758..dc54a72 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -18,6 +18,7 @@
+ 
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <0>;
+ 			next-level-cache = <&L2>;
+ 			operating-points = <
+@@ -39,18 +40,21 @@
+ 
+ 		cpu@1 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <1>;
+ 			next-level-cache = <&L2>;
+ 		};
+ 
+ 		cpu at 2 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <2>;
+ 			next-level-cache = <&L2>;
+ 		};
+ 
+ 		cpu at 3 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <3>;
+ 			next-level-cache = <&L2>;
+ 		};
+-- 
+1.7.9.5
