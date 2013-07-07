@@ -1,88 +1,52 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 7 Jul 2013 09:19:49 +0200
-Subject: [PATCH v9 08/10] ASoC: Add phycore-ac97-dt driver
-In-Reply-To: <20130703161727.GS27646@sirena.org.uk>
-References: <1371734429-6081-1-git-send-email-mpa@pengutronix.de>
- <1371734429-6081-9-git-send-email-mpa@pengutronix.de>
- <20130703161727.GS27646@sirena.org.uk>
-Message-ID: <20130707071949.GH16871@s25.your-server.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Sun, 7 Jul 2013 11:35:58 +0300
+Subject: [PATCH] arm: dts: AM43x: Add usb_otg_hs node
+In-Reply-To: <1372401887-19422-1-git-send-email-george.cherian@ti.com>
+References: <1372401887-19422-1-git-send-email-george.cherian@ti.com>
+Message-ID: <20130707083558.GA12992@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 03, 2013 at 05:17:27PM +0100, Mark Brown wrote:
-> On Thu, Jun 20, 2013 at 03:20:27PM +0200, Markus Pargmann wrote:
-> 
-> > Notes:
-> >     Changes in v9:
-> >      - Fix blank line at end of file.
-> >     
-> 
-> Please don't include enormous changelogs like this, they're just noise.
-> 
-> > +config SND_SOC_PHYCORE_AC97_DT
-> > +	bool "SoC Audio support for Phytec phyCORE (and phyCARD) boards (devicetree only)"
-> > +	depends on MACH_PCA100 || MACH_PCM043
-> 
-> Is there an actual dependency on the machine type?  This seems wrong for
-> a DT driver.
+Hi,
 
-No, there is no dependency. Fixed.
+On Fri, Jun 28, 2013 at 12:14:47PM +0530, George Cherian wrote:
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index ddc1df7..e4f5eb8 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -64,5 +64,24 @@
+>  			compatible = "ti,am4372-counter32k","ti,omap-counter32k";
+>  			reg = <0x44e86000 0x40>;
+>  		};
+> +
+> +		usb_otg_hs1: am4372_dwc3 at 48380000 {
+> +			compatible = "ti,am437x-dwc3";
+> +			reg = <0x48380000 0x1ff>;
+> +			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			utmi-mode = <1>;
+> +			ranges;
+> +
+> +			dwc3 at 48390000 {
+> +				compatible = "synopsys,dwc3";
 
-> 
-> > +static struct snd_soc_ops imx_phycore_hifi_ops = {
-> > +};
-> > +
-> 
-> You shouldn't have this if there's nothing in it.
+let's us snps,dwc3. I recently posted a patch converting synopsys to
+snps like all other DesignWare drivers. Support for synopsys,dwc3 is
+still there, but shouldn't be used.
 
-Removed.
+> +				reg = <0x48390000 0xcfff>;
+> +				interrupts = <GIC_SPI  168 IRQ_TYPE_LEVEL_HIGH>;
+> +				tx-fifo-resize;
 
-> 
-> > +static struct platform_device *imx_phycore_snd_device;
-> 
-> This shouldn't be a global, it should be in driver data.
-
-Moved to driver data.
-
-> 
-> > +/*
-> > + * Pointer to AC97 reset functions for specific boards
-> > + */
-> > +#if IS_ENABLED(CONFIG_MACH_PCA100)
-> > +extern void pca100_ac97_cold_reset(struct snd_ac97 *ac97);
-> > +extern void pca100_ac97_warm_reset(struct snd_ac97 *ac97);
-> > +#else
-> > +static void pca100_ac97_cold_reset(struct snd_ac97 *ac97) { }
-> > +static void pca100_ac97_warm_reset(struct snd_ac97 *ac97) { }
-> > +#endif
-> 
-> > +	if (of_machine_is_compatible("phytec,imx27-pca100")) {
-> > +		phycore_ac97_reset = pca100_ac97_cold_reset;
-> > +		phycore_ac97_warm_reset = pca100_ac97_warm_reset;
-> > +	} else if (of_machine_is_compatible("phytec,imx35-pcm043")) {
-> > +		phycore_ac97_reset = pcm043_ac97_cold_reset;
-> > +		phycore_ac97_warm_reset = pcm043_ac97_warm_reset;
-> > +	} else {
-> > +		dev_err(&pdev->dev, "Failed to set AC97 reset functions, unknown board.\n");
-> > +		return -EINVAL;
-> > +	}
-> 
-> These functions have no reason to be anywhere except in the driver and
-> really you should just be specifying which pins to use there - ideally
-> via pinctrl but I don't think i.MX has adopted that yet.
-
-There are no pinctrl driver for imx27(pca100) or imx35(pcm043). The
-iomux/pad configure functions are defined inside mach-imx/ including
-their headers. Both reset functions have to configure iomux/pad before
-and after using gpio. So I think it's not possible to make the reset
-based on the gpio pins without the necessary iomux/pad configuration.
-
-Thanks,
-
-Markus
+is this flag *really* necessary, I asked you and didn't get an answer.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130707/cc0b9525/attachment-0001.sig>
