@@ -1,51 +1,43 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 07 Jul 2013 13:44:11 +0200
-Subject: [GIT PULL] clockevents/clocksource: Add Marvell Orion SoC timer
-In-Reply-To: <51B8D310.4050404@linaro.org>
-References: <51B8D310.4050404@linaro.org>
-Message-ID: <51D9548B.9040907@gmail.com>
+From: jogo@openwrt.org (Jonas Gorski)
+Date: Sun, 7 Jul 2013 13:48:53 +0200
+Subject: Second ethernet on kirkwood does not work when probed through DT
+In-Reply-To: <51D952D3.8070401@gmail.com>
+References: <20130706215426.6e666d6af0dc6c9ea5fe32cd@openwrt.org>
+ <51D88A8E.1060104@gmail.com> <20130706233912.00004044@unknown>
+ <51D94884.4000204@gmail.com> <20130707132607.00007188@unknown>
+ <51D952D3.8070401@gmail.com>
+Message-ID: <20130707134853.00003b9d@unknown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2013 09:59 PM, Daniel Lezcano wrote:
->
-> The following changes since commit 762cf9695d714d312ef7369bed1b9f9467c9e64e:
->
->    Merge branch 'timers/clockevents' of
-> git://git.linaro.org/people/dlezcano/clockevents into timers/core
-> (2013-06-08 22:58:27 +0200)
->
-> are available in the git repository at:
->
->
->    git://git.linaro.org/people/dlezcano/clockevents.git timers/clockevents
->
-> for you to fetch changes up to fbb3cb01505e7365c70a7fe680e10ffff3175160:
->
->    clocksource: Add Marvell Orion SoC timer (2013-06-11 14:41:01 +0200)
->
-> ----------------------------------------------------------------
-> Sebastian Hesselbarth (1):
->        clocksource: Add Marvell Orion SoC timer
+On Sun, 07 Jul 2013 13:36:51 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-Thomas, John,
+> On 07/07/2013 01:26 PM, Jonas Gorski wrote:
+> > On Sun, 07 Jul 2013 12:52:52 +0200
+> > Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>  wrote:
+> >> Anyway, can you please try to have both ports reg properties set
+> >> to<0>, with nodes named ethernet0-port at 0 and ethernet1-port at 0,
+> >> and the platform_device_alloc in mv643xx_eth modified?
+> >
+> > In addition I added a static counter for the allocated devs (to not
+> > overwrite the pointers in port_platdev[]).
+> 
+> Ok, but that is not required to make it work, is it? IMHO we should
+> honor what is passed by reg property, even it will be always zero
+> for KW and the other Orion SoCs. Otherwise, we would implicitly put
+> the numbering in the order of port nodes.
 
-with tip timers/core PR sent, I realized that the above did not make it
-in. As we have a whole bunch of cleanup and DT conversion patches for
-v3.11-rc1 depending on it, would it be ok for you to let Jason Cooper
-take it through his ARM sub-branch?
+No, picking the next free "slot" should work, too - it was just the
+easiest to fix the name for the alloc to what seems to be expected by
+other parts.
 
-If you are fine with it, I will resend the patch and note that Daniel
-can drop it and Jason will take it.
+> > That seems to work, as now eth1 comes up and works (successfully got a
+> > IP through DHCP).
+> 
+> Ok, great. Will prepare a fix for mv643xx_eth on top of net-next. And
+> an update of the kirkwood conversion patches.
 
-Sebastian
 
->   .../bindings/timer/marvell,orion-timer.txt         |   17 +++
->   drivers/clocksource/Kconfig                        |    5 +
->   drivers/clocksource/Makefile                       |    1 +
->   drivers/clocksource/time-orion.c                   |  150
-> ++++++++++++++++++++
->   4 files changed, 173 insertions(+)
->   create mode 100644
-> Documentation/devicetree/bindings/timer/marvell,orion-timer.txt
->   create mode 100644 drivers/clocksource/time-orion.c
+Thanks,
+Jonas
