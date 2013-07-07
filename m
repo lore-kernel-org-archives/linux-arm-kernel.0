@@ -1,26 +1,40 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 7 Jul 2013 15:01:24 -0500
-Subject: [PATCH RFC 9/9] ARM: debug: move PL01X debug include into
- arch/arm/include/debug/
-In-Reply-To: <E1UvoS8-0006IF-TE@rmk-PC.arm.linux.org.uk>
-References: <20130707124326.GP24642@n2100.arm.linux.org.uk>
- <E1UvoS8-0006IF-TE@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAL_JsqJ_rKOKo=KoAu+bWeX3U+4jeiawQ7xBDbF18XO3_J23Uw@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun,  7 Jul 2013 22:33:51 +0200
+Subject: [PATCH] net: mv643xx_eth: fix DT port device name
+Message-ID: <1373229231-8838-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 7, 2013 at 7:52 AM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> Now that the PL01X debug include can mostly stand alone without
-> requiring platforms to provide any macros, move it into the debug
-> directory so it can be directly included.  This allows us to get rid of
-> a lot of debug-macros include files.
->
-> The autodetect case for Versatile Express and the ux500 are left alone;
-> these are more complicated implementations.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Device tree support added to Marvell MV643xx ethernet driver registers
+port devices from port device nodes found on the corresponding controller
+node. The current port device name will cause the second controller to
+fail on registration because of two identical device names. This fixes
+the issue by taking the device node's name also as port device name.
 
-Certainly a move in the right direction. For highbank:
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Reported-by: Jonas Gorski <jogo@openwrt.org>
+---
+Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+Cc: Jonas Gorski <jogo@openwrt.org>
+Cc: netdev at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 6495bea..1f3a03d 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -2521,7 +2521,7 @@ static int mv643xx_eth_shared_of_add_port(struct platform_device *pdev,
+ 		of_property_read_u32(pnp, "duplex", &ppd.duplex);
+ 	}
+ 
+-	ppdev = platform_device_alloc(MV643XX_ETH_NAME, ppd.port_number);
++	ppdev = platform_device_alloc(pnp->name, ppd.port_number);
+ 	if (!ppdev)
+ 		return -ENOMEM;
+ 	ppdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+-- 
+1.7.10.4
