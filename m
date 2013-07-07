@@ -1,39 +1,51 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Sun,  7 Jul 2013 18:31:55 -0300
-Subject: [PATCH 0/4] A10S-OLinuXino-Micro I2C support
-Message-ID: <1373232719-13050-1-git-send-email-emilio@elopez.com.ar>
+Date: Sun,  7 Jul 2013 18:31:56 -0300
+Subject: [PATCH 1/4] ARM: sun5i: dt: Add I2C muxings for sun5i A10S
+In-Reply-To: <1373232719-13050-1-git-send-email-emilio@elopez.com.ar>
+References: <1373232719-13050-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1373232719-13050-2-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The information has been extracted from the A10S-OLinuXino-Micro
+schematics, as we do not have a user manual for A10S yet.
 
-This patchset adds the required DT nodes to get I2C supported and 
-working on the OLIMEX A10S-OLinuXino-Micro board.
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-Patch 1 adds the muxings as seen on the board's schematics. Patch 2 adds 
-the DT nodes, based on other sunxi dts, as we don't have an A10S user 
-manual so far. Patch 3 enables the controllers, and patch 4 adds a node 
-for the AT24 EEPROM found on the board.
-
-I have tested and can see the PMU on I2C-0 using i2cdetect, and can read 
-the EEPROM contents on I2C-1. I have not tested I2C-2, but i2cdetect 
-reports no devices so I suppose it's working okay too.
-
-Any testing or review will be appreciated :)
-
-Thanks,
-
-Emilio
-
-Emilio L?pez (4):
-  ARM: sun5i: dt: Add I2C muxings for sun5i A10S
-  ARM: sun5i: dt: Add I2C controller nodes to the A10S dtsi
-  ARM: sun5i: dt: Enable I2C controllers on A10S-OLinuXino-Micro
-  ARM: sun5i: dt: Add AT24 device on A10S-OLinuXino-Micro
-
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 25 +++++++++++
- arch/arm/boot/dts/sun5i-a10s.dtsi                | 54 ++++++++++++++++++++++++
- 2 files changed, 79 insertions(+)
-
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index 2307ce8..7c9f88f 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -229,6 +229,27 @@
+ 				allwinner,drive = <0>;
+ 				allwinner,pull = <0>;
+ 			};
++
++			i2c0_pins_a: i2c0 at 0 {
++				allwinner,pins = "PB0", "PB1";
++				allwinner,function = "i2c0";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			i2c1_pins_a: i2c1 at 0 {
++				allwinner,pins = "PB15", "PB16";
++				allwinner,function = "i2c1";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			i2c2_pins_a: i2c2 at 0 {
++				allwinner,pins = "PB17", "PB18";
++				allwinner,function = "i2c2";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
+ 		};
+ 
+ 		timer at 01c20c00 {
 -- 
 1.8.3.2
