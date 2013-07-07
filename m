@@ -1,37 +1,78 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Sun,  7 Jul 2013 18:31:59 -0300
-Subject: [PATCH 4/4] ARM: sun5i: dt: Add AT24 device on A10S-OLinuXino-Micro
-In-Reply-To: <1373232719-13050-1-git-send-email-emilio@elopez.com.ar>
-References: <1373232719-13050-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1373232719-13050-5-git-send-email-emilio@elopez.com.ar>
+From: jogo@openwrt.org (Jonas Gorski)
+Date: Sun, 7 Jul 2013 23:43:41 +0200
+Subject: [PATCH] net: mv643xx_eth: fix DT port device name
+In-Reply-To: <1373229231-8838-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1373229231-8838-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130707234341.0000721b@unknown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This OLIMEX board has a AT24C16BN-SH EEPROM holding the MAC address.
-This patch adds the corresponding device tree node to reflect this.
+On Sun,  7 Jul 2013 22:33:51 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+> Device tree support added to Marvell MV643xx ethernet driver registers
+> port devices from port device nodes found on the corresponding controller
+> node. The current port device name will cause the second controller to
+> fail on registration because of two identical device names. This fixes
+> the issue by taking the device node's name also as port device name.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Reported-by: Jonas Gorski <jogo@openwrt.org>
+> ---
+> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+> Cc: Jonas Gorski <jogo@openwrt.org>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+> index 6495bea..1f3a03d 100644
+> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
+> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+> @@ -2521,7 +2521,7 @@ static int mv643xx_eth_shared_of_add_port(struct platform_device *pdev,
+>  		of_property_read_u32(pnp, "duplex", &ppd.duplex);
+>  	}
+>  
+> -	ppdev = platform_device_alloc(MV643XX_ETH_NAME, ppd.port_number);
+> +	ppdev = platform_device_alloc(pnp->name, ppd.port_number);
+>  	if (!ppdev)
+>  		return -ENOMEM;
+>  	ppdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-index 2a69ddf..8ce7951 100644
---- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-@@ -71,6 +71,13 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c1_pins_a>;
- 			status = "okay";
-+
-+			at24 at 50 {
-+				compatible = "at,24c16";
-+				pagesize = <16>;
-+				reg = <0x50>;
-+				read-only;
-+			};
- 		};
- 
- 		i2c2: i2c at 01c2b400 {
--- 
-1.8.3.2
+This breaks ethernet completely, as there is no platform driver
+registered for pnp->name ("ethernetX-port"), only for MV643XX_ETH_NAME.
+
+Also since I didn't see a patch for it and no mentioning of it:
+
+There's still one further issue from having two ethernet-ports with
+port_number 0, it causes a device leak:
+
+static struct platform_device *port_platdev[3];
+
+mv643xx_eth_shared_of_add_port()
+{
+	...
+	port_platdev[ppd.port_number] = ppdev;
+	...
+}
+
+The second port at 0 will overwrite the first and thus will never be
+deleted in
+
+mv643xx_eth_shared_of_remove()
+{
+	...
+	for (n = 0; n < 3; n++) {
+		platform_device_del(port_platdev[n]);
+		port_platdev[n] = NULL;
+	}
+}
+
+I doubt a insmod-rmmod-insmod will go well in that case ;-)
+
+
+Regards
+Jonas
