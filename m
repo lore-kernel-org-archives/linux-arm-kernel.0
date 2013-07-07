@@ -1,31 +1,105 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 7 Jul 2013 15:10:25 +0200 (CEST)
-Subject: [GIT PULL] clockevents/clocksource: Add Marvell Orion SoC
- timer
-In-Reply-To: <51D9548B.9040907@gmail.com>
-References: <51B8D310.4050404@linaro.org> <51D9548B.9040907@gmail.com>
-Message-ID: <alpine.DEB.2.02.1307071508030.32106@ionos.tec.linutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun,  7 Jul 2013 10:12:30 -0300
+Subject: [PATCH] ARM: dts: imx: Add the missing cpus node
+Message-ID: <1373202750-10298-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 7 Jul 2013, Sebastian Hesselbarth wrote:
-> > ----------------------------------------------------------------
-> > Sebastian Hesselbarth (1):
-> >        clocksource: Add Marvell Orion SoC timer
-> 
-> with tip timers/core PR sent, I realized that the above did not make it
-> in. As we have a whole bunch of cleanup and DT conversion patches for
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Opps. Fell through the cracks.
+To make it consistent with the other i.mx SoCs, let's add the cpus nodes.
 
-> v3.11-rc1 depending on it, would it be ok for you to let Jason Cooper
-> take it through his ARM sub-branch?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx25.dtsi | 10 ++++++++++
+ arch/arm/boot/dts/imx27.dtsi | 10 ++++++++++
+ arch/arm/boot/dts/imx31.dtsi | 10 ++++++++++
+ arch/arm/boot/dts/imx53.dtsi | 10 ++++++++++
+ 4 files changed, 40 insertions(+)
 
-> If you are fine with it, I will resend the patch and note that Daniel
-> can drop it and Jason will take it.
-
-Nah, Jason can just pull it from Daniels tree and be done with it.
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index f590484..1bb9615 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -32,6 +32,16 @@
+ 		usb1 = &usbhost1;
+ 	};
+ 
++	cpus {
++		#address-cells = <0>;
++		#size-cells = <0>;
++
++		cpu {
++			compatible = "arm,arm926ej-s";
++			device_type = "cpu";
++		};
++	};
++
+ 	asic: asic-interrupt-controller at 68000000 {
+ 		compatible = "fsl,imx25-asic", "fsl,avic";
+ 		interrupt-controller;
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index a587294..cca29ea 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -32,6 +32,16 @@
+ 		spi2 = &cspi3;
+ 	};
+ 
++	cpus {
++		#address-cells = <0>;
++		#size-cells = <0>;
++
++		cpu {
++			compatible = "arm,arm926ej-s";
++			device_type = "cpu";
++		};
++	};
++
+ 	aitc: aitc-interrupt-controller at e0000000 {
+ 		compatible = "fsl,imx27-aitc", "fsl,avic";
+ 		interrupt-controller;
+diff --git a/arch/arm/boot/dts/imx31.dtsi b/arch/arm/boot/dts/imx31.dtsi
+index 8116778..c34f825 100644
+--- a/arch/arm/boot/dts/imx31.dtsi
++++ b/arch/arm/boot/dts/imx31.dtsi
+@@ -20,6 +20,16 @@
+ 		serial4 = &uart5;
+ 	};
+ 
++	cpus {
++		#address-cells = <0>;
++		#size-cells = <0>;
++
++		cpu {
++			compatible = "arm,arm1136";
++			device_type = "cpu";
++		};
++	};
++
+ 	avic: avic-interrupt-controller at 60000000 {
+ 		compatible = "fsl,imx31-avic", "fsl,avic";
+ 		interrupt-controller;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index eb21034..34b7266 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -35,6 +35,16 @@
+ 		spi2 = &cspi;
+ 	};
+ 
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a8";
++			reg = <0x0>;
++		};
++	};
++
+ 	tzic: tz-interrupt-controller at 0fffc000 {
+ 		compatible = "fsl,imx53-tzic", "fsl,tzic";
+ 		interrupt-controller;
+-- 
+1.8.1.2
