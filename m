@@ -1,41 +1,37 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun,  7 Jul 2013 18:51:02 +0400
-Subject: [RFC] ARM: dts: imx27: Add core voltages
-Message-ID: <1373208662-7350-1-git-send-email-shc_work@mail.ru>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sun, 7 Jul 2013 17:30:31 +0200 (CEST)
+Subject: [GIT PULL] clockevents/clocksource: Add Marvell Orion SoC
+ timer
+In-Reply-To: <20130707144645.GA11908@titan.lakedaemon.net>
+References: <51B8D310.4050404@linaro.org> <51D9548B.9040907@gmail.com>
+ <alpine.DEB.2.02.1307071508030.32106@ionos.tec.linutronix.de>
+ <20130707144645.GA11908@titan.lakedaemon.net>
+Message-ID: <alpine.DEB.2.02.1307071723220.32106@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds core voltages for i.MX27 CPUs. Only 266 and 400 MHz modes
-is documented in the datasheet, we add a 266 MHz frequency for conform this.
-For 133 MHz CPU frequency minimal voltage is used (1.2V).
+On Sun, 7 Jul 2013, Jason Cooper wrote:
+> Sure, but to be clear, Daniel, please drop this patch from your tree.  I
+> have no desire to create an out-of-tree dependency if we can avoid it.
+> It has a habit of going horribly wrong [1].
+> 
+> I'll cherry-pick
+> 
+>   0c1dcfd clocksource: Add Marvell Orion SoC timer
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx27.dtsi | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+Don't do that. Do a git fetch on that branch and then git merge
+0c1dcfd. The patches before that Marvel commit are already in Linus
+tree. That way it does not matter who sends first or not.
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index a587294..c9bacca 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -57,13 +57,15 @@
- 			device_type = "cpu";
- 			compatible = "arm,arm926ej-s";
- 			operating-points = <
--				/* kHz  uV (No regulator support) */
--				133000  0
--				399000  0
-+				/* kHz uV */
-+				133000 1200000
-+				266000 1300000
-+				399000 1450000
- 			>;
- 			clock-latency = <61036>; /* two CLK32 periods */
- 			clocks = <&clks 18>;
- 			clock-names = "cpu";
-+			voltage-tolerance = <1>;
- 		};
- 	};
- 
--- 
-1.8.1.5
+We don't force others to drop stuff and cherry picking is a nuisance
+as well as you end up with two different commits doing the same thing.
+
+Also for the next merge window: Can we please let everything under
+drivers/clocksoure go through Daniels and my trees?
+
+I'm starting to be grumpy about anyone thinking that this directory is
+a public dump ground with no rules.
+
+Thanks,
+
+	tglx
