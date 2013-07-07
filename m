@@ -1,84 +1,116 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 7 Jul 2013 00:37:08 +0100
-Subject: debugging options (was: Re: [PATCH 1/6] ARM: OMAP2+: Remove
- board-4430sdp.c)
-In-Reply-To: <201307062336.49066.arnd@arndb.de>
-References: <20130517191304.468.73487.stgit@localhost>
- <20130520095447.GR21614@n2100.arm.linux.org.uk>
- <20130706131057.GU21614@n2100.arm.linux.org.uk>
- <201307062336.49066.arnd@arndb.de>
-Message-ID: <20130706233708.GW21614@n2100.arm.linux.org.uk>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sat, 6 Jul 2013 17:17:58 -0700
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <20130706193646.GB9778@kroah.com>
+References: <20130624092942.GG26008@lukather>
+ <20130624160440.GA15201@kroah.com> <51C87DC7.50005@schinagl.nl>
+ <20130624181509.GA8847@kroah.com> <51C8B84C.3020200@schinagl.nl>
+ <20130624214615.GA17604@kroah.com> <51CAA709.4060801@schinagl.nl>
+ <20130626175144.GC2222@kroah.com> <51D674BF.9030207@schinagl.nl>
+ <20130706193646.GB9778@kroah.com>
+Message-ID: <20130707001758.GA15335@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apologies for the topic hijack.
-
-On Sat, Jul 06, 2013 at 11:36:48PM +0200, Arnd Bergmann wrote:
-> Sorry, I missed that this was going on, and I absolutely agree with your
-> sentiment. From what I can tell from the git log, Tegra was the first
-> to have the separate choice statement, after it just move its
-> options from mach-tegra/Kconfig into the Kconfig.debug. OMAP followed
-> with the same method and I think from there people just copied it.
+On Sat, Jul 06, 2013 at 12:36:46PM -0700, Greg KH wrote:
+> On Fri, Jul 05, 2013 at 09:24:47AM +0200, Oliver Schinagl wrote:
+> > The other 'broken' drivers that where linked earlier, also use the
+> > BINARY attributes.
+> > 
+> > So Greg, if you could be so kind and give me an example how to
+> > implement this properly, I am at loss and don't know :(
 > 
-> I can understand why one wants to have some more structure in the list,
-> given that i.MX alone has 37 options for UART addresses, but we first
-> need to have a consistent method of configuring the addresses.
+> Ah crap, devices don't have a binary attribute group, like struct class
+> does.  I'll go add that on Monday and send you the patch to see if that
+> helps you out.  I'll also go through and fix up all of the binary
+> attribute drivers to keep them from doing that...
+> 
+> Sorry, I missed that earlier, but thanks for trying and pointing out my
+> mistake.
 
-I don't have an option with an option after the choice or a set of
-options afterwards asking for details about the selected option -
-that is logical.
+Can you try this patch out, with your driver, and see if it works for
+you?
 
-For example, if we were to reduce the 8250-uart based stuff down to
-a single "8250-compatible uart" option, and then ask for the address,
-register shift and register access size.
+thanks,
 
-... and of course by this time I now have a patch set which does
-exactly that... and it can do more by getting rid of that 8250_32.S
-file as well with another config option.  The patch below tries
-hard not to break anything or lose information as to the details of
-the 8250 UART in any platform which they're already known to the
-kernel, but they can be trivially overridden.  Eventually (maybe
-tomorrow), I expect a load of the choice config statements in
-arch/arm/Kconfig.debug to go away, replaced just with a generic
-"Kernel low-level debugging messages via 8250 UART" option.
+greg k-h
 
- arch/arm/Kconfig.debug                             |   92 ++++++++++++++++++--
- arch/arm/include/asm/hardware/debug-8250.S         |   29 ------
- arch/arm/include/debug/8250.S                      |   36 ++++++++
- arch/arm/include/debug/mvebu.S                     |   30 -------
- arch/arm/include/debug/nspire.S                    |    9 +--
- arch/arm/include/debug/pxa.S                       |   33 -------
- arch/arm/include/debug/rockchip.S                  |   42 ---------
- arch/arm/include/debug/sunxi.S                     |   27 ------
- arch/arm/mach-dove/include/mach/debug-macro.S      |   19 ----
- arch/arm/mach-ebsa110/include/mach/debug-macro.S   |   22 -----
- .../arm/mach-footbridge/include/mach/debug-macro.S |   15 ---
- arch/arm/mach-gemini/include/mach/debug-macro.S    |   21 -----
- arch/arm/mach-iop13xx/include/mach/debug-macro.S   |   24 -----
- arch/arm/mach-iop32x/include/mach/debug-macro.S    |   21 -----
- arch/arm/mach-iop33x/include/mach/debug-macro.S    |   22 -----
- arch/arm/mach-ixp4xx/include/mach/debug-macro.S    |   26 ------
- arch/arm/mach-kirkwood/include/mach/debug-macro.S  |   19 ----
- arch/arm/mach-lpc32xx/include/mach/debug-macro.S   |   29 ------
- arch/arm/mach-mv78xx0/include/mach/debug-macro.S   |   19 ----
- arch/arm/mach-orion5x/include/mach/debug-macro.S   |   21 -----
- arch/arm/mach-rpc/include/mach/debug-macro.S       |   23 -----
- 21 files changed, 121 insertions(+), 458 deletions(-)
- delete mode 100644 arch/arm/include/asm/hardware/debug-8250.S
- create mode 100644 arch/arm/include/debug/8250.S
- delete mode 100644 arch/arm/include/debug/mvebu.S
- delete mode 100644 arch/arm/include/debug/pxa.S
- delete mode 100644 arch/arm/include/debug/rockchip.S
- delete mode 100644 arch/arm/include/debug/sunxi.S
- delete mode 100644 arch/arm/mach-dove/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-ebsa110/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-gemini/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-iop13xx/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-iop32x/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-iop33x/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-kirkwood/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-lpc32xx/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-mv78xx0/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-orion5x/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-rpc/include/mach/debug-macro.S
+------------------
+
+Subject: driver core: add binary attributes to struct device
+
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+This lets a device provide a set of default binary attributes, like
+normal attributes, that are initialized and torn down by the driver core
+at the proper times, so that there are no races with userspace.
+
+Reported-by: : Oliver Schinagl <oliver+list@schinagl.nl>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+
+diff --git a/drivers/base/core.c b/drivers/base/core.c
+index 2499cef..4040191 100644
+--- a/drivers/base/core.c
++++ b/drivers/base/core.c
+@@ -433,7 +433,7 @@ static void device_remove_attributes(struct device *dev,
+ }
+ 
+ static int device_add_bin_attributes(struct device *dev,
+-				     struct bin_attribute *attrs)
++				     const struct bin_attribute *attrs)
+ {
+ 	int error = 0;
+ 	int i;
+@@ -452,7 +452,7 @@ static int device_add_bin_attributes(struct device *dev,
+ }
+ 
+ static void device_remove_bin_attributes(struct device *dev,
+-					 struct bin_attribute *attrs)
++					 const struct bin_attribute *attrs)
+ {
+ 	int i;
+ 
+@@ -516,8 +516,14 @@ static int device_add_attrs(struct device *dev)
+ 	if (error)
+ 		goto err_remove_type_groups;
+ 
++	error = device_add_bin_attributes(dev, dev->bin_attrs);
++	if (error)
++		goto err_remove_groups;
+ 	return 0;
+ 
++ err_remove_groups:
++	device_remove_groups(dev, dev->groups);
++
+  err_remove_type_groups:
+ 	if (type)
+ 		device_remove_groups(dev, type->groups);
+@@ -537,6 +543,7 @@ static void device_remove_attrs(struct device *dev)
+ 	const struct device_type *type = dev->type;
+ 
+ 	device_remove_groups(dev, dev->groups);
++	device_remove_bin_attributes(dev, dev->bin_attrs);
+ 
+ 	if (type)
+ 		device_remove_groups(dev, type->groups);
+diff --git a/include/linux/device.h b/include/linux/device.h
+index c0a1261..6620ad8 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -645,6 +645,7 @@ struct acpi_dev_node {
+  * @knode_class: The node used to add the device to the class list.
+  * @class:	The class of the device.
+  * @groups:	Optional attribute groups.
++ * @bin_attrs:	Optional binary attributes for this device.
+  * @release:	Callback to free the device after all references have
+  * 		gone away. This should be set by the allocator of the
+  * 		device (i.e. the bus driver that discovered the device).
+@@ -717,6 +718,7 @@ struct device {
+ 	struct klist_node	knode_class;
+ 	struct class		*class;
+ 	const struct attribute_group **groups;	/* optional groups */
++	const struct bin_attribute *bin_attrs;
+ 
+ 	void	(*release)(struct device *dev);
+ 	struct iommu_group	*iommu_group;
