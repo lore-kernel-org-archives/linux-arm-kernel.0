@@ -1,105 +1,77 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun,  7 Jul 2013 10:12:30 -0300
-Subject: [PATCH] ARM: dts: imx: Add the missing cpus node
-Message-ID: <1373202750-10298-1-git-send-email-festevam@gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sun,  7 Jul 2013 15:13:30 +0200
+Subject: [PATCH 2/3] ARM: dts: imx27 phyCARD-S, move i2c1 and owire to rdk
+In-Reply-To: <1373202811-13825-1-git-send-email-mpa@pengutronix.de>
+References: <1373202811-13825-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1373202811-13825-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Both buses are not used on the phyCARD-S module. This patch moves them
+to the rdk file. Remove ioexpander.
 
-To make it consistent with the other i.mx SoCs, let's add the cpus nodes.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm/boot/dts/imx25.dtsi | 10 ++++++++++
- arch/arm/boot/dts/imx27.dtsi | 10 ++++++++++
- arch/arm/boot/dts/imx31.dtsi | 10 ++++++++++
- arch/arm/boot/dts/imx53.dtsi | 10 ++++++++++
- 4 files changed, 40 insertions(+)
+ arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts | 13 +++++++++++++
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts | 18 ------------------
+ 2 files changed, 13 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index f590484..1bb9615 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -32,6 +32,16 @@
- 		usb1 = &usbhost1;
- 	};
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
+index 390d8f2..0514b0a 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
+@@ -41,6 +41,19 @@
+ 	status = "okay";
+ };
  
-+	cpus {
-+		#address-cells = <0>;
-+		#size-cells = <0>;
++&i2c1 {
++	status = "okay";
 +
-+		cpu {
-+			compatible = "arm,arm926ej-s";
-+			device_type = "cpu";
-+		};
++	rtc at 51 {
++		compatible = "nxp,pcf8563";
++		reg = <0x51>;
 +	};
++};
 +
- 	asic: asic-interrupt-controller at 68000000 {
- 		compatible = "fsl,imx25-asic", "fsl,avic";
- 		interrupt-controller;
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index a587294..cca29ea 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -32,6 +32,16 @@
- 		spi2 = &cspi3;
- 	};
++&owire {
++	status = "okay";
++};
++
+ &sdhci2 {
+ 	cd-gpios = <&gpio3 29 0>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+index cdff8c7..c8d57d1 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+@@ -33,20 +33,6 @@
+ 	status = "okay";
+ };
  
-+	cpus {
-+		#address-cells = <0>;
-+		#size-cells = <0>;
-+
-+		cpu {
-+			compatible = "arm,arm926ej-s";
-+			device_type = "cpu";
-+		};
-+	};
-+
- 	aitc: aitc-interrupt-controller at e0000000 {
- 		compatible = "fsl,imx27-aitc", "fsl,avic";
- 		interrupt-controller;
-diff --git a/arch/arm/boot/dts/imx31.dtsi b/arch/arm/boot/dts/imx31.dtsi
-index 8116778..c34f825 100644
---- a/arch/arm/boot/dts/imx31.dtsi
-+++ b/arch/arm/boot/dts/imx31.dtsi
-@@ -20,6 +20,16 @@
- 		serial4 = &uart5;
- 	};
+-&i2c1 {
+-	status = "okay";
+-
+-	ioexpander at 41 {
+-		compatible = "nxp,pca9536";
+-		reg = <0x41>;
+-	};
+-
+-	rtc at 51 {
+-		compatible = "nxp,pcf8563";
+-		reg = <0x51>;
+-	};
+-};
+-
+ &i2c2 {
+ 	status = "okay";
  
-+	cpus {
-+		#address-cells = <0>;
-+		#size-cells = <0>;
-+
-+		cpu {
-+			compatible = "arm,arm1136";
-+			device_type = "cpu";
-+		};
-+	};
-+
- 	avic: avic-interrupt-controller at 60000000 {
- 		compatible = "fsl,imx31-avic", "fsl,avic";
- 		interrupt-controller;
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index eb21034..34b7266 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -35,6 +35,16 @@
- 		spi2 = &cspi;
+@@ -56,7 +42,3 @@
+ 		reg = <0x52>;
  	};
- 
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a8";
-+			reg = <0x0>;
-+		};
-+	};
-+
- 	tzic: tz-interrupt-controller at 0fffc000 {
- 		compatible = "fsl,imx53-tzic", "fsl,tzic";
- 		interrupt-controller;
+ };
+-
+-&owire {
+-	status = "okay";
+-};
 -- 
-1.8.1.2
+1.8.2.1
