@@ -1,41 +1,45 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 8 Jul 2013 09:06:22 +0100
-Subject: [PATCH v9 08/10] ASoC: Add phycore-ac97-dt driver
-In-Reply-To: <20130707071949.GH16871@s25.your-server.de>
+Date: Mon, 8 Jul 2013 09:04:37 +0100
+Subject: [PATCH v9 04/10] ASoC: fsl-ssi: Add support for imx-pcm-fiq
+In-Reply-To: <20130706171323.GG16871@s25.your-server.de>
 References: <1371734429-6081-1-git-send-email-mpa@pengutronix.de>
- <1371734429-6081-9-git-send-email-mpa@pengutronix.de>
- <20130703161727.GS27646@sirena.org.uk>
- <20130707071949.GH16871@s25.your-server.de>
-Message-ID: <20130708080622.GN27646@sirena.org.uk>
+ <1371734429-6081-5-git-send-email-mpa@pengutronix.de>
+ <20130703160637.GQ27646@sirena.org.uk>
+ <20130706171323.GG16871@s25.your-server.de>
+Message-ID: <20130708080437.GM27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 07, 2013 at 09:19:49AM +0200, Markus Pargmann wrote:
-> On Wed, Jul 03, 2013 at 05:17:27PM +0100, Mark Brown wrote:
+On Sat, Jul 06, 2013 at 07:13:23PM +0200, Markus Pargmann wrote:
+> On Wed, Jul 03, 2013 at 05:06:37PM +0100, Mark Brown wrote:
+> > On Thu, Jun 20, 2013 at 03:20:23PM +0200, Markus Pargmann wrote:
 
-> > > +extern void pca100_ac97_cold_reset(struct snd_ac97 *ac97);
-> > > +extern void pca100_ac97_warm_reset(struct snd_ac97 *ac97);
-> > > +#else
-> > > +static void pca100_ac97_cold_reset(struct snd_ac97 *ac97) { }
-> > > +static void pca100_ac97_warm_reset(struct snd_ac97 *ac97) { }
+> > > +	ssi_private->use_dma = !of_property_read_bool(np, "fsl,imx-fiq");
 
-> > These functions have no reason to be anywhere except in the driver and
-> > really you should just be specifying which pins to use there - ideally
-> > via pinctrl but I don't think i.MX has adopted that yet.
+> > This binding should be documented.  I'm not sure it really needs to be
+> > a binding, though - is it not possible for the driver to just figure out
+> > that DMA won't work automatically (for example by looking at the CODEC
+> > in use)?  I'm not sure this is a good name either, it should be saying
+> > why the FIQ is needed rather than saying that we should use the FIQ.
 
-> There are no pinctrl driver for imx27(pca100) or imx35(pcm043). The
-> iomux/pad configure functions are defined inside mach-imx/ including
-> their headers. Both reset functions have to configure iomux/pad before
-> and after using gpio. So I think it's not possible to make the reset
-> based on the gpio pins without the necessary iomux/pad configuration.
+> I think fsl_ssi_startup is the first function in which we know which
+> codec is connected to fsl-ssi. There we have access to the pcm runtime,
+> which stores the codec used. But that is too late for the ssi setup.
 
-That all sounds fixable - either make pinctrl available or make the
-headers usefully visible.  You can see the arch headers in the build
-of the entire kernel...
+> I could use of_find_compatible_node to search for the wm9712 codec, but
+> that would assume that there is only one codec attached to the system.
+
+If the SSI is doing anything it will be connected to a CODEC.  If it's
+not connected to a CODEC then it doesn't need to be configured at all so
+it doesn't really matter.
+
+> Perhaps "fsl,fiq-filter-codec-stream" is a better name for the binding?
+
+Possibly.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130708/f61f4aec/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130708/45225acd/attachment.sig>
