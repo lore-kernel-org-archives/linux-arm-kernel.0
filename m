@@ -1,54 +1,42 @@
 From: b44548@freescale.com (Chao Fu)
-Date: Mon, 8 Jul 2013 16:37:02 +0800
-Subject: [PATCH 3/3] ARM:dts:vf610-twr:Enable DSPI0 devices and Flash
- at26df081a
+Date: Mon, 8 Jul 2013 16:37:01 +0800
+Subject: [PATCH 2/3] ARM:dts: vf610: Add DSPI nodes
 In-Reply-To: <1373272622-29064-1-git-send-email-b44548@freescale.com>
 References: <1373272622-29064-1-git-send-email-b44548@freescale.com>
-Message-ID: <1373272622-29064-3-git-send-email-b44548@freescale.com>
+Message-ID: <1373272622-29064-2-git-send-email-b44548@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chao Fu <B44548@freescale.com>
 
-This patch enables DSPI0 and at26df081a flash device for Vybrid VF610 TOWER board.
+Add Freescale DSPI node into vf610 dts.
 
 Signed-off-by: Chao Fu <b44548@freescale.com>
 ---
- arch/arm/boot/dts/vf610-twr.dts | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/vf610.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index b3905f5..bc5bf9d 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -36,6 +36,28 @@
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index e1eb7da..fc80f4a 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -87,6 +87,17 @@
+ 				arm,tag-latency = <2 2 2>;
+ 			};
  
- };
- 
-+&dspi0 {
-+	spi-num-chipselects = <1>;
-+	bus-num = <0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_dspi0_1>;
-+	status = "okay";
++			dspi0: dspi0 at 4002c000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,vf610-dspi";
++				reg = <0x4002c000 0x1000>;
++				interrupts = <0 67 0x04>;
++				clocks = <&clks VF610_CLK_DSPI0>;
++				clock-names = "dspi";
++				status = "disabled";
++			};
 +
-+	sflash: at26df081a at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "atmel,at26df081a";
-+		spi-max-frequency = <16000000>;
-+		spi-cpol;
-+		spi-cpha;
-+		dspi,ctar-dbr = <0>;
-+		dspi,ctar-pbr = <0>;
-+		reg = <0>;
-+		linux,modalias = "m25p80";
-+		modal = "at26df081a";
-+	};
-+};
-+
- &fec0 {
- 	phy-mode = "rmii";
- 	pinctrl-names = "default";
+ 			uart0: serial at 40027000 {
+ 				compatible = "fsl,vf610-lpuart";
+ 				reg = <0x40027000 0x1000>;
 -- 
 1.8.0
