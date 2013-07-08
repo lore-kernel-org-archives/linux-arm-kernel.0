@@ -1,62 +1,73 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 8 Jul 2013 10:13:49 +0200 (CEST)
-Subject: [PATCH] dmaengine: shdma: fix a build failure on platforms with
- no DMA support
-In-Reply-To: <20130705045350.GA10947@intel.com>
-References: <Pine.LNX.4.64.1305301650290.29171@axis700.grange>
- <51A77CF1.7040105@ti.com> <20130531024438.GB32564@verge.net.au>
- <CAGa+x8413povhYWx+BSj=TdzQDAuYFXmjF4A2kXvQt+=n+380w@mail.gmail.com>
- <Pine.LNX.4.64.1306192125480.12502@axis700.grange>
- <20130705045350.GA10947@intel.com>
-Message-ID: <Pine.LNX.4.64.1307081004190.19819@axis700.grange>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Mon,  8 Jul 2013 09:17:54 +0100
+Subject: [PATCH v1 1/4] ARM: dts: STi: Fix pinconf setup for STiH416 serial2
+In-Reply-To: <1373271301-11060-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1373271301-11060-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1373271474-11587-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Jul 2013, Vinod Koul wrote:
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-> On Wed, Jun 19, 2013 at 09:32:18PM +0200, Guennadi Liakhovetski wrote:
-> > Hi Vinod
-> > 
-> > On Wed, 19 Jun 2013, Kevin Hilman wrote:
-> > 
-> > > On Thu, May 30, 2013 at 7:44 PM, Simon Horman <horms@verge.net.au> wrote:
-> > > 
-> > > [...]
-> > > 
-> > > > thanks for this. I will wait for a refresh (as we discussed earlier today).
-> > > > Can I confirm that this is a fix for v3.10? If so, could ou note
-> > > > that when you post your revised patch?
-> > > 
-> > > Any progress on this patch?
-> > > 
-> > > The SH-mobile defconfigs are still all failing in linux-next.
-> > 
-> > In
-> > 
-> > https://patchwork.kernel.org/patch/2640061/
-> And you havent CC maintainers on this patch, so I dont have it!
+This patch fixes a bug in pinctrl setup of serial2 device, Some of the
+pins in the pinctrl node of serial2 do not belong to that
+pin-controller. This patch divides them in the pins into there
+respective pin controller nodes.
 
-Ouch, sorry, no idea how I managed not to CC you, my apologies!
+Without this patch serial on StiH416-B2000 Board will not work as it
+fails with:
 
-> > I proposed a simple immediate fix for this problem. Arnd at the same time 
-> > developed an alternative solution:
-> > 
-> > https://patchwork.kernel.org/patch/2644121/
-> > https://patchwork.kernel.org/patch/2644111/
-> Reading these patches I agree with Arnd that client drivers should not depend on
-> dma slave drivers. Existing issue need to be fixed
+"st-pinctrl pin-controller-rear.3: failed to get pin(99) name
+st-pinctrl pin-controller-rear.3: maps: function serial2 group serial2-0
+num 4
+pinconfig core: failed to register map default (3): no group/pin given"
 
-I'm not arguing against that. My point is the following: also Arnd's 
-patches have to deal with the fact, that the filter function has to be in 
-files, which will be compiled with SHDMA enabled or disabled in .config. 
-He solves this problem by adding #ifdef's to each .c file. Whereas I think 
-it's better to add just one such #ifdef to the header. The actual issue of 
-DMA client driver dependency on a specific dmaengine controller driver is 
-a different (though related) problem and should be addressed separately.
-
-Thanks
-Guennadi
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 ---
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+ arch/arm/boot/dts/stih416-pinctrl.dtsi |   10 +++++++++-
+ arch/arm/boot/dts/stih416.dtsi         |    2 +-
+ 2 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+index 957b21a..0f246c9 100644
+--- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+@@ -166,6 +166,15 @@
+ 				reg		= <0x9000 0x100>;
+ 				st,bank-name	= "PIO31";
+ 			};
++
++			serial2-oe {
++				pinctrl_serial2_oe: serial2-1 {
++					st,pins {
++						output-enable	= <&PIO11 3 ALT2 OUT>;
++					};
++				};
++			};
++
+ 		};
+ 
+ 		pin-controller-rear {
+@@ -218,7 +227,6 @@
+ 					st,pins {
+ 						tx	= <&PIO17 4 ALT2 OUT>;
+ 						rx	= <&PIO17 5 ALT2 IN>;
+-						output-enable	= <&PIO11 3 ALT2 OUT>;
+ 					};
+ 				};
+ 			};
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index 3cecd96..1a0326e 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -79,7 +79,7 @@
+ 			interrupts	= <0 197 0>;
+ 			clocks          = <&CLK_S_ICN_REG_0>;
+ 			pinctrl-names 	= "default";
+-			pinctrl-0 	= <&pinctrl_serial2>;
++			pinctrl-0 	= <&pinctrl_serial2 &pinctrl_serial2_oe>;
+ 		};
+ 
+ 		/* SBC_UART1 */
+-- 
+1.7.6.5
