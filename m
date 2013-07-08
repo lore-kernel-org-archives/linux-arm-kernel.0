@@ -1,58 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 8 Jul 2013 23:04:52 +0200
-Subject: MTD EEPROM support and driver integration
-In-Reply-To: <20130708083614.GP27646@sirena.org.uk>
-References: <20130705201118.GM2959@lukather> <5811519.oHVuMujf0I@wuerfel>
- <20130706120112.GA11069@lukather> <8997501.Dchyii8uWX@wuerfel>
- <20130707071501.GD11243@lukather>
- <20130708083614.GP27646@sirena.org.uk>
-Message-ID: <20130708210452.GL11243@lukather>
+From: w@1wt.eu (Willy Tarreau)
+Date: Mon, 8 Jul 2013 23:10:40 +0200
+Subject: Handling ARM_ERRATA_364296 when CONFIG_SMP=y
+In-Reply-To: <CAOMZO5AeqO_AmLp1=BwrMxOd4sh-omN6vG-R5f4EgpmzqCfhrg@mail.gmail.com>
+References: <CAOMZO5AVpQ6DUja=usBCDzRH0NyNqbXsHNNOJSAY=8OvgHHTmA@mail.gmail.com>
+ <20130708182212.GF3621@1wt.eu>
+ <CAOMZO5AeqO_AmLp1=BwrMxOd4sh-omN6vG-R5f4EgpmzqCfhrg@mail.gmail.com>
+Message-ID: <20130708211040.GG3621@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 08, 2013 at 09:36:14AM +0100, Mark Brown wrote:
-> On Sun, Jul 07, 2013 at 09:15:01AM +0200, Maxime Ripard wrote:
-> > On Sat, Jul 06, 2013 at 09:06:49PM +0200, Arnd Bergmann wrote:
-> 
-> > > We also have a bunch of OTP drivers spread around the kernel, it probably
-> > > makes sense to consolidate them at the same time, at least on the DT binding
-> > > side if not the device drivers.
-> 
-> > From a quick grep, the only one I've seen so far are:
-> >   - imx6q, that has a hook at machine start to poke into its OCOTP to
-> >     retrieve some frequency scaling parameters it seems. I'm not sure
-> >     how the current solution could improve the situation for this
-> >     use-case, but the DT bindings of the OCOTP is just a DT node, with
-> >     no clients, so we have nothing to worry about here.
-> >   - imx28, that has a hook at machine start to look up the MAC address
-> >     values and patch the ethernet controller nodes to add the right
-> >     local-mac-address property. This one could benefit from the new
-> >     bindings, but we already mentionned it, and I intended to develop
-> >     with an imx28 board anyway.
-> >   - picoxcell-pc3x3 DTSI has a node for a OTP device, but they don't
-> >     seem to be doing anything with it, nor do they seem to have a driver
-> >     for it. So I guess we don't care about migrating for this one
-> >     either.
-> 
-> > Did you have other cases in mind?
-> 
-> We have some OTP support in the ab8500 and wm831x MFD drivers too but
-> they just expose the data.
+Hi Fabio,
 
-I guess you mean ab8100, right?
+On Mon, Jul 08, 2013 at 05:29:34PM -0300, Fabio Estevam wrote:
+> Hi Willy,
+> 
+> On Mon, Jul 8, 2013 at 3:22 PM, Willy Tarreau <w@1wt.eu> wrote:
+> 
+> > Or maybe fix the config so that it does not force SMP on a CPU which
+> > only exists as a single core ?
+> 
+> The original config is imx_v6_v7_defconfig and it selects by default
+> both mx6 (quad core) and other single core CPUs.
+> 
+> That's the reason why CONFIG_SMP=y for this config by default.
 
-Anyway, thanks for pointing this out
+OK, so if it's just a default, it's not really a problem, I understand
+better now. So probably your solution to make the workaround not depend
+on !SMP makes sense.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130708/9dd335e5/attachment.sig>
+Regards,
+Willy
