@@ -1,128 +1,64 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 8 Jul 2013 10:29:28 +0300
-Subject: [PATCH 4/4] ARM: DRA7: clockdomain data: add init file for dra7
-In-Reply-To: <20130628210430.14831.99127@quantum>
-References: <1372322299-25046-1-git-send-email-t-kristo@ti.com>
- <1372322299-25046-5-git-send-email-t-kristo@ti.com>
- <20130628210430.14831.99127@quantum>
-Message-ID: <51DA6A58.3080008@ti.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 8 Jul 2013 09:32:16 +0200
+Subject: [PATCH v3 4/6] ARM: dts: imx6q{dl}: fix the wrong RTS/CTS pad name
+In-Reply-To: <51DA5CA7.1050305@freescale.com>
+References: <1373004752-21302-1-git-send-email-b32955@freescale.com>
+ <1373004752-21302-5-git-send-email-b32955@freescale.com>
+ <20130706050803.GC30164@S2101-09.ap.freescale.net>
+ <20953.22066.706534.773272@ipc1.ka-ro>
+ <51DA5CA7.1050305@freescale.com>
+Message-ID: <20954.27392.875173.755391@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/2013 12:04 AM, Mike Turquette wrote:
-> Quoting Tero Kristo (2013-06-27 01:38:19)
->> cclock7xx_data.c now contains only init function and the clkdev mapping
->> that is still needed by some drivers. Eventually most of this file can
->> be removed, once a common location for the clk init can be found, and
->> the clkdev mapping is no longer needed.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->>   arch/arm/mach-omap2/cclock7xx_data.c |   93 ++++++++++++++++++++++++++++++++++
->>   1 file changed, 93 insertions(+)
->>   create mode 100644 arch/arm/mach-omap2/cclock7xx_data.c
->
-> Why not drivers/clk/omap/clk-dra7xx.c?
+Hi,
 
-Hi Mike,
+Huang Shijie writes:
+> ? 2013?07?07? 19:51, Lothar Wa?mann ??:
+> > Hi,
+> >
+> > Shawn Guo writes:
+> >> On Fri, Jul 05, 2013 at 02:12:30PM +0800, Huang Shijie wrote:
+> >>> There is something wrong with the RTS/CTS pads:
+> >>>    The RTS pad is assigned with the CTS's value;
+> >>>    while the CTS pad is assigned with the RTS's value.
+> >>>
+> >> So basically, you are saying that select_input should be set up for CTS
+> >> rather than RTS.  It seems that the people who generated the macro got
+> >> the wrong input from developer.
+> >>
+> > programming 'select_input' only makes sense for inputs, not outputs.
+> > Since CTS is an output signal, select_input only makes sense for the
+> > RTS function of the pads.
+> Hi Lothar:
+> 
+> In our imx6 Soc, the CTS is used as a input signal, not as a output signal.
+> 
+> I checked two boards, one is imx6q ARM2 armidillo board, one is 
+> imx6-sabreauto board,
+> both the boards use the CTS as a input signal.
+> 
+that's the problem with the DTE/DCE mode. Depending on the DCEDTE bit
+in the UARTx_UFCR we would need different pad configurations for
+RTS/CTS because in DCE mode CTS is an output and in DTE mode it's an
+input.
+Thus the correct pad config value would need the input_sel on the CTS
+pad definition for DTE mode and on the RTS pad definition for DCE
+mode. Maybe something like:
+#define MX6Q_PAD_EIM_D19__UART1_DCE_CTS_B             0x09c 0x3b0 0x000 0x4 0x0
+#define MX6Q_PAD_EIM_D19__UART1_DCE_RTS_B             0x09c 0x3b0 0x91c 0x4 0x0
+#define MX6Q_PAD_EIM_D19__UART1_DTE_CTS_B             0x09c 0x3b0 0x91c 0x4 0x0
+#define MX6Q_PAD_EIM_D19__UART1_DTE_RTS_B             0x09c 0x3b0 0x000 0x4 0x0
 
-Same as O5, I can move this over in next rev.
 
--Tero
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
->
-> Regards,
-> Mike
->
->>
->> diff --git a/arch/arm/mach-omap2/cclock7xx_data.c b/arch/arm/mach-omap2/cclock7xx_data.c
->> new file mode 100644
->> index 0000000..dba528a
->> --- /dev/null
->> +++ b/arch/arm/mach-omap2/cclock7xx_data.c
->> @@ -0,0 +1,83 @@
->> +/*
->> + * DRA7xx Clock data
->> + *
->> + * Copyright (C) 2013 Texas Instruments, Inc.
->> + *
->> + * Paul Walmsley (paul at pwsan.com)
->> + * Rajendra Nayak (rnayak at ti.com)
->> + * Benoit Cousson (b-cousson at ti.com)
->> + * Mike Turquette (mturquette at linaro.org)
->> + * Tero Kristo (t-kristo at ti.com)
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/list.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/clkdev.h>
->> +#include <linux/io.h>
->> +#include <linux/clk/omap.h>
->> +
->> +#include "soc.h"
->> +#include "clock.h"
->> +
->> +#define DRA7_DPLL_ABE_DEFFREQ                  361267200
->> +#define DRA7_DPLL_GMAC_DEFFREQ                 1000000000
->> +
->> +/*
->> + * clkdev
->> + */
->> +
->> +static struct omap_dt_clk dra7xx_clks[] = {
->> +       DT_CLK(NULL,    "timer_32k_ck",         "sys_32k_ck"),
->> +       DT_CLK("4ae18000.timer",        "timer_sys_ck",         "sys_clkin2"),
->> +       DT_CLK("48032000.timer",        "timer_sys_ck",         "sys_clkin2"),
->> +       DT_CLK("48034000.timer",        "timer_sys_ck",         "sys_clkin2"),
->> +       DT_CLK("48036000.timer",        "timer_sys_ck",         "sys_clkin2"),
->> +       DT_CLK("4803e000.timer",        "timer_sys_ck",         "sys_clkin2"),
->> +       DT_CLK("48086000.timer",        "timer_sys_ck",         "sys_clkin2"),
->> +       DT_CLK("48088000.timer",        "timer_sys_ck",         "sys_clkin2"),
->> +       DT_CLK("48820000.timer",        "timer_sys_ck",         "timer_sys_clk_div"),
->> +       DT_CLK("48822000.timer",        "timer_sys_ck",         "timer_sys_clk_div"),
->> +       DT_CLK("48824000.timer",        "timer_sys_ck",         "timer_sys_clk_div"),
->> +       DT_CLK("48826000.timer",        "timer_sys_ck",         "timer_sys_clk_div"),
->> +       DT_CLK(NULL,       "sys_clkin",                    "sys_clkin1"),
->> +};
->> +
->> +int __init dra7xx_clk_init(void)
->> +{
->> +       struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck;
->> +       int rc;
->> +       /*
->> +        * Must stay commented until all OMAP SoC drivers are
->> +        * converted to runtime PM, or drivers may start crashing
->> +        *
->> +        * omap2_clk_disable_clkdm_control();
->> +        */
->> +
->> +       dt_omap_clk_init();
->> +
->> +       omap_dt_clocks_register(dra7xx_clks, ARRAY_SIZE(dra7xx_clks));
->> +
->> +       omap2_clk_disable_autoidle_all();
->> +
->> +       abe_dpll_mux = clk_get_sys(NULL, "abe_dpll_sys_clk_mux");
->> +       sys_clkin2 = clk_get_sys(NULL, "sys_clkin2");
->> +       dpll_ck = clk_get_sys(NULL, "dpll_abe_ck");
->> +
->> +       rc = clk_set_parent(abe_dpll_mux, sys_clkin2);
->> +       if (!rc)
->> +               rc = clk_set_rate(dpll_ck, DRA7_DPLL_ABE_DEFFREQ);
->> +       if (rc)
->> +               pr_err("%s: failed to configure ABE DPLL!\n", __func__);
->> +
->> +       dpll_ck = clk_get_sys(NULL, "dpll_gmac_ck");
->> +       rc = clk_set_rate(dpll_ck, DRA7_DPLL_GMAC_DEFFREQ);
->> +       if (rc)
->> +               pr_err("%s: failed to configure GMAC DPLL!\n", __func__);
->> +
->> +       return 0;
->> +}
->> --
->> 1.7.9.5
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
