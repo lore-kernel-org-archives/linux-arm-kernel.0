@@ -1,101 +1,118 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  8 Jul 2013 12:14:43 -0300
-Subject: [PATCH 1/2] ARM: dts: imx6dl-wandboard: Add SDHC1 and SDHC2 ports
-Message-ID: <1373296484-29847-1-git-send-email-festevam@gmail.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Mon, 8 Jul 2013 10:22:10 -0500
+Subject: socfpga: mmc problems
+In-Reply-To: <51D532D2.1030709@communistcode.co.uk>
+References: <51D43CB0.4070104@communistcode.co.uk>
+ <1372864190.9525.6.camel@linux-builds1>
+ <51D532D2.1030709@communistcode.co.uk>
+Message-ID: <1373296930.22692.2.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Jack,
 
-Wandboard has a SD card slot on the baseboard connected to SDHC1 and a
-BCM4329 (Wifi + Bluetooth chip) connected to SDHC2.
+On Thu, 2013-07-04 at 09:31 +0100, Jack Mitchell wrote:
+> Morning Dinh,
+> 
+> On 03/07/13 16:09, Dinh Nguyen wrote:
+> > Hi Jack,
+> >
+> > On Wed, 2013-07-03 at 16:01 +0100, Jack Mitchell wrote:
+> >> Having received one of the new Arrow SoCkit boards at a recent training
+> >> day I set about seeing how far mainline was in successfully booting this
+> >> board.
+> >>
+> >> As I wanted to boot from mmc, I first checked out linux-next [1] in
+> >> order to get the newly merged mmc driver, I then applied the device-tree
+> >> enablement series [2] on top before finally attempting to boot. I then
+> >> found that the standard socfpga_defconfig didn't enable the MMC drivers,
+> >> which I also did (should this be part of the socfpga_defconfig...?).
+> >
+> > I was going to update this when I enable ethernet as well to avoid less
+> > churn on the defconfig.
+> 
+> That's great!
+> 
+> >
+> >>
+> >> However, the boot hangs at:
+> >>
+> >> Synopsys Designware Multimedia Card Interface Driver
+> >> dwmmc_socfpga ff704000.dwmmc0: Using internal DMA controller.
+> >> dwmmc_socfpga ff704000.dwmmc0: DW MMC controller at irq 171, 32 bit host
+> >> data width, 1024 deep fifo
+> >>
+> >> To fix this I checked out the diff between the Altera vendor mmc driver
+> >> and the mainline driver and found that if I added this small change:
+> >>
+> >>
+> >>     if (of_property_read_u32(dev->of_node, "pwr-en", &pwr_en)) {
+> >>       dev_info(dev, "couldn't determine pwr-en, assuming pwr-en = 0\n");
+> >>       pwr_en = 0;
+> >>     }
+> >>
+> >>     /* Set PWREN bit */
+> >>     mci_writel(host, PWREN, pwr_en);
+> >
+> > I tested this on my devkit, which was not made by Arrow, but is _almost_
+> > the same. I'll try to see if I can get my hands on an Arrow board to
+> > reproduce.
+> 
+> Now, I think I made a _slight_ mistake, in that I accidentally copied 
+> the Altera vendor kernel onto the sdcard instead of the linux-next 
+> kernel. Re-testing this morning with a fresh mind, I checked the config 
+> again and now I find the Arrow board still won't boot from MMC, even 
+> with the above change, with the code hanging at the same place.
+> 
+> I know you don't have an Arrow board, but if you have a tree which I 
+> could pull from with your amalgamated changes; that would rule out me 
+> missing any patches and it actually being a board problem. I can't seem 
+> to see if the V8 device tree patches were pulled into anyones tree, 
+> otherwise I would just wait till they appeared in 3.11-rc1...?
 
-Add support for these ports.
+Unfortunately, the device tree bindings for the SD/MMC did not make it
+into the arm-soc tree for 3.11, only the sd/mmc platform driver. Will
+try for 3.12.
 
-While at it, provide the card detect gpio on SDHC3.
+I'm sure you have seen git.rocketboards.org?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6dl-wandboard.dts | 17 +++++++++++++++++
- arch/arm/boot/dts/imx6dl.dtsi          | 29 +++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dts b/arch/arm/boot/dts/imx6dl-wandboard.dts
-index ab6a053..027ece5 100644
---- a/arch/arm/boot/dts/imx6dl-wandboard.dts
-+++ b/arch/arm/boot/dts/imx6dl-wandboard.dts
-@@ -83,6 +83,8 @@
- 		pinctrl_hog: hoggrp {
- 			fsl,pins = <
- 				MX6DL_PAD_GPIO_0__CCM_CLKO1    0x130b0
-+				MX6DL_PAD_GPIO_2__GPIO1_IO02	0x80000000
-+				MX6DL_PAD_EIM_DA9__GPIO3_IO09	0x80000000
- 			>;
- 		};
- 	};
-@@ -110,8 +112,23 @@
- 	status = "okay";
- };
- 
-+&usdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc1_2>;
-+	cd-gpios = <&gpio1 2 0>;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2_2>;
-+	non-removable;
-+	status = "okay";
-+};
-+
- &usdhc3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc3_2>;
-+	cd-gpios = <&gpio3 9 0>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 4505109..e08c54c 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -255,6 +255,35 @@
- 					};
- 				};
- 
-+				usdhc1 {
-+					pinctrl_usdhc1_1: usdhc1grp-1 {
-+						fsl,pins = <
-+							MX6DL_PAD_SD1_CMD__SD1_CMD    0x17059
-+							MX6DL_PAD_SD1_CLK__SD1_CLK    0x10059
-+							MX6DL_PAD_SD1_DAT0__SD1_DATA0 0x17059
-+							MX6DL_PAD_SD1_DAT1__SD1_DATA1 0x17059
-+							MX6DL_PAD_SD1_DAT2__SD1_DATA2 0x17059
-+							MX6DL_PAD_SD1_DAT3__SD1_DATA3 0x17059
-+							MX6DL_PAD_NANDF_D0__SD1_DATA4 0x17059
-+							MX6DL_PAD_NANDF_D1__SD1_DATA5 0x17059
-+							MX6DL_PAD_NANDF_D2__SD1_DATA6 0x17059
-+							MX6DL_PAD_NANDF_D3__SD1_DATA7 0x17059
-+						>;
-+					};
-+
-+					pinctrl_usdhc1_2: usdhc1grp-2 {
-+						fsl,pins = <
-+							MX6DL_PAD_SD1_CMD__SD1_CMD    0x17059
-+							MX6DL_PAD_SD1_CLK__SD1_CLK    0x10059
-+							MX6DL_PAD_SD1_DAT0__SD1_DATA0 0x17059
-+							MX6DL_PAD_SD1_DAT1__SD1_DATA1 0x17059
-+							MX6DL_PAD_SD1_DAT2__SD1_DATA2 0x17059
-+							MX6DL_PAD_SD1_DAT3__SD1_DATA3 0x17059
-+						>;
-+					};
-+				};
-+
-+
- 				usdhc2 {
- 					pinctrl_usdhc2_1: usdhc2grp-1 {
- 						fsl,pins = <
--- 
-1.8.1.2
+Dinh
+> 
+> Sorry for the confusion!
+> 
+> >
+> >>
+> >> In the dw_mci_socfpga_priv_init function, the board would boot.
+> >>
+> >> Synopsys Designware Multimedia Card Interface Driver
+> >> dwmmc_socfpga ff704000.dwmmc0: couldn't determine pwr-en, assuming
+> >> pwr-en = 0
+> >> dwmmc_socfpga ff704000.dwmmc0: Using internal DMA controller.
+> >> dwmmc_socfpga ff704000.dwmmc0: DW MMC controller at irq 171, 32 bit host
+> >> data width, 1024 deep fifo
+> >> mmc_host mmc0: Bus speed (slot 0) = 100000000Hz (slot req 400000Hz,
+> >> actual 400000HZ div = 125)
+> >> dwmmc_socfpga ff704000.dwmmc0: 1 slots initialized
+> >> dwmmc_socfpga ff704000.dwmmc0: Version ID is 240a
+> >> .....
+> >> .....
+> >> .....
+> >>
+> >>
+> >> Has this been overlooked, or are there some other changes elsewhere that
+> >> I haven't yet come across which addresses this?
+> >
+> > I'm not aware of any other changes.
+> >
+> > Dinh
+> >>
+> >> Cheers,
+> >>
+> >> [1] fa1383200d289afdff2f5678eb89483daa537465
+> >> [2] http://comments.gmane.org/gmane.linux.ports.arm.kernel/243529
+> >>
+> >
+> >
+> >
+> 
+> 
