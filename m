@@ -1,28 +1,214 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 8 Jul 2013 09:27:31 +0800
-Subject: [PATCH] ARM: dts: imx: Add the missing cpus node
-In-Reply-To: <1373203228.792969663@f375.mail.ru>
-References: <1373202750-10298-1-git-send-email-festevam@gmail.com>
- <1373203228.792969663@f375.mail.ru>
-Message-ID: <20130708012729.GA21594@S2101-09.ap.freescale.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun,  7 Jul 2013 18:44:26 -0700
+Subject: [PATCH RFC 1/3] clk: notifier handler for dynamic voltage scaling
+In-Reply-To: <1373247868-21444-1-git-send-email-mturquette@linaro.org>
+References: <1373247868-21444-1-git-send-email-mturquette@linaro.org>
+Message-ID: <1373247868-21444-2-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 07, 2013 at 05:20:28PM +0400, Alexander Shiyan wrote:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > To make it consistent with the other i.mx SoCs, let's add the cpus nodes.
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/imx25.dtsi | 10 ++++++++++
-> >  arch/arm/boot/dts/imx27.dtsi | 10 ++++++++++
-> >  arch/arm/boot/dts/imx31.dtsi | 10 ++++++++++
-> >  arch/arm/boot/dts/imx53.dtsi | 10 ++++++++++
-> >  4 files changed, 40 insertions(+)
-> 
-> i.MX27 have a CPU node already.
+This patch provides helper functions for drivers that wish to scale
+voltage through the clock rate-change notifiers. The approach taken is
+that the driver does not care about the details of the OPP table, nor
+does it care about handling the voltage regulator directly. The driver
+only has a pointer to the struct clk object; the other details are
+hidden in the helper functions.
 
-Applied with imx27.dtsi changes left out.
+The assumptions about DT structure mostly come from the cpufreq-cpu0
+binding. Since this is a helper function it does not have a binding
+document of its own.
 
-Shawn
+A similar patch using platform data instead of DT was proposed in
+February[1].
+
+[1] http://patches.linaro.org/15128/
+
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+---
+ drivers/clk/Makefile               |   1 +
+ drivers/clk/clk-voltage-notifier.c | 135 +++++++++++++++++++++++++++++++++++++
+ include/linux/clk.h                |   7 +-
+ 3 files changed, 142 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/clk-voltage-notifier.c
+
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index d3c3733..beb39f1 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -8,6 +8,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
++obj-$(CONFIG_COMMON_CLK)	+= clk-voltage-notifier.o
+ 
+ # SoCs specific
+ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+diff --git a/drivers/clk/clk-voltage-notifier.c b/drivers/clk/clk-voltage-notifier.c
+new file mode 100644
+index 0000000..cb6b85f
+--- /dev/null
++++ b/drivers/clk/clk-voltage-notifier.c
+@@ -0,0 +1,135 @@
++/*
++ * Copyright (C) 2013 Linaro Ltd <mturquette@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Helper functions for registering clock rate-change notifier handlers
++ * that scale voltage when a clock changes its output frequency.
++ */
++
++#include <linux/clk.h>
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/notifier.h>
++#include <linux/of.h>
++#include <linux/opp.h>
++#include <linux/regulator/consumer.h>
++#include <linux/slab.h>
++
++struct volt_scale_data {
++	struct device *dev;
++	struct clk *clk;
++	struct regulator *reg;
++	int tol;
++	struct notifier_block nb;
++};
++
++#define to_volt_scale_data(_nb) container_of(_nb, \
++		struct volt_scale_data, nb)
++
++static int clk_volt_notifier_handler(struct notifier_block *nb,
++		unsigned long flags, void *data)
++{
++	struct clk_notifier_data *cnd = data;
++	struct volt_scale_data *vsd = to_volt_scale_data(nb);
++	int ret, new_volt, old_volt, tol;
++	struct opp *opp;
++	unsigned long old_rate = cnd->old_rate;
++	unsigned long new_rate = cnd->new_rate;
++
++	rcu_read_lock();
++	opp = opp_find_freq_ceil(vsd->dev, &new_rate);
++	if (IS_ERR(opp)) {
++		rcu_read_unlock();
++		dev_err(vsd->dev, "%s: failed to find OPP for %lu\n",
++				__func__, new_rate);
++		return notifier_from_errno(PTR_ERR(opp));
++	}
++	new_volt = opp_get_voltage(opp);
++	rcu_read_unlock();
++
++	tol = new_volt * vsd->tol / 100;
++	old_volt = regulator_get_voltage(vsd->reg);
++
++	/* scaling up? scale voltage before frequency */
++	if (new_rate > old_rate) {
++		ret = regulator_set_voltage_tol(vsd->reg, new_volt, tol);
++		if (ret) {
++			dev_err(vsd->dev, "%s: failed to scale voltage up: %d\n",
++					__func__, ret);
++			return notifier_from_errno(ret);
++		}
++	}
++
++	/* scaling down? scale voltage after frequency */
++	if (new_rate < old_rate) {
++		ret = regulator_set_voltage_tol(vsd->reg, new_volt, tol);
++		if (ret) {
++			dev_err(vsd->dev, "%s: failed to scale voltage down: %d\n",
++					__func__, ret);
++			return notifier_from_errno(ret);
++		}
++	}
++
++	return NOTIFY_OK;
++}
++
++/**
++ * of_clk_volt_notifier_register - register clock notifier to scale voltage
++ * @dev: device that scales clock and voltage regulator
++ * @np: pointer to DeviceTree node
++ * @supply: regulator id string
++ */
++struct notifier_block *of_clk_volt_notifier_register(struct device *dev,
++		struct device_node *np, struct clk *clk, const char *supply,
++		int *voltage_latency)
++{
++	struct volt_scale_data *vsd;
++	int ret;
++
++	vsd = kzalloc(sizeof(struct volt_scale_data), GFP_KERNEL);
++	if (!vsd)
++		return ERR_PTR(-ENOMEM);
++
++	vsd->dev = dev;
++	vsd->clk = clk;
++	vsd->nb.notifier_call = clk_volt_notifier_handler;
++
++	vsd->reg = devm_regulator_get(dev, supply);
++	if (IS_ERR(vsd->reg)) {
++		ret = PTR_ERR(vsd->reg);
++		goto err_free_vsd;
++	}
++
++	of_property_read_u32(np, "voltage-tolerance", &vsd->tol);
++
++	ret = of_init_opp_table(dev);
++	if (ret) {
++		pr_err("%s: failed to init OPP table: %d\n", __func__, ret);
++		goto err_free_vsd;
++	}
++
++	ret = clk_notifier_register(clk, &vsd->nb);
++
++	if (ret)
++		goto err_free_vsd;
++
++	return &vsd->nb;
++
++err_free_vsd:
++	kfree(vsd);
++	return ERR_PTR(ret);
++}
++EXPORT_SYMBOL_GPL(of_clk_volt_notifier_register);
++
++void of_clk_volt_notifier_unregister(struct notifier_block *nb)
++{
++	struct volt_scale_data *vsd = to_volt_scale_data(nb);
++	struct clk *clk = vsd->clk;
++
++	clk_notifier_unregister(clk, nb);
++	kfree(vsd);
++}
++EXPORT_SYMBOL_GPL(of_clk_volt_notifier_unregister);
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 9a6d045..85ea520 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -15,6 +15,8 @@
+ #include <linux/err.h>
+ #include <linux/kernel.h>
+ #include <linux/notifier.h>
++#include <linux/cpufreq.h>
++#include <linux/device.h>
+ 
+ struct device;
+ 
+@@ -79,8 +81,11 @@ struct clk_notifier_data {
+ };
+ 
+ int clk_notifier_register(struct clk *clk, struct notifier_block *nb);
+-
+ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
++struct notifier_block *of_clk_volt_notifier_register(struct device *dev,
++		struct device_node *np, struct clk *clk, const char *supply,
++		int *voltage_latency);
++void of_clk_volt_notifier_unregister(struct notifier_block *nb);
+ 
+ #endif
+ 
+-- 
+1.8.1.2
