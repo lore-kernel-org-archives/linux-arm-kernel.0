@@ -1,48 +1,51 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 08 Jul 2013 12:10:00 +0100
-Subject: v3.10 - big endian core support
-In-Reply-To: <51DA8E6F.60507@gmail.com>
-References: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
- <51DA5089.5080109@gmail.com> <51DA8D36.7010006@codethink.co.uk>
- <51DA8E6F.60507@gmail.com>
-Message-ID: <51DA9E08.2030707@codethink.co.uk>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 8 Jul 2013 16:44:14 +0530
+Subject: [PATCH v2 1/4] arm: omap: Add phy binding info for musb in plat data
+In-Reply-To: <1373282057-20181-1-git-send-email-kishon@ti.com>
+References: <1373282057-20181-1-git-send-email-kishon@ti.com>
+Message-ID: <1373282057-20181-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/13 11:03, jgq516 at gmail.com wrote:
-> On 07/08/2013 05:58 PM, Ben Dooks wrote:
->> On 08/07/13 06:39, jgq516 at gmail.com wrote:
->>> On 07/01/2013 07:03 PM, Ben Dooks wrote:
->>>> The latest big-endian changes, now on:
->>>>
->>>> git://git.baserock.org/delta/linux baserock/311/be/core
->>>>
->>>> This has a minor fix from the last version where a rebase missed a
->>>> change
->>>> in the smp_scu code.
->>>>
->>> Hello Ben,
->>>
->>> Thanks for you patches at first. I can boot BE kernel on vexpress a15
->>> tc2
->>> board with LPAE disabled.
->>>
->>> However if enable LPAE, kernel seems hang after turn on mmu on since
->>> printascii can't output any character in __mmap_switched.
->>> Did you happen to try BE kernel with LPAE enabled before? or am I missed
->>> something?
->>
->> I thought I did try the vexpress with LPAE, however it may have been
->> with a previous revision of the patches.
->>
-> Which revision? does it also existed in your tree? I want to give it a
-> try :)
+In order for controllers to get PHY in case of non dt boot, the phy
+binding information (phy label) should be added in the platform
+data of the controller.
 
-My notes show I did a custom 3.5 backport for a customer's kernel
-so was not testing with the latest. I think I tried 3.9 with LPAE
-but cannot find confirmation in my notes that this actually happened.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Tested-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/mach-omap2/usb-musb.c |    3 +++
+ include/linux/usb/musb.h       |    3 +++
+ 2 files changed, 6 insertions(+)
 
-
+diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
+index 8c4de27..20b42de 100644
+--- a/arch/arm/mach-omap2/usb-musb.c
++++ b/arch/arm/mach-omap2/usb-musb.c
+@@ -85,6 +85,9 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
+ 	musb_plat.mode = board_data->mode;
+ 	musb_plat.extvbus = board_data->extvbus;
+ 
++	if (cpu_is_omap34xx())
++		musb_plat.phy_name = "twl4030";
++
+ 	if (soc_is_am35xx()) {
+ 		oh_name = "am35x_otg_hs";
+ 		name = "musb-am35x";
+diff --git a/include/linux/usb/musb.h b/include/linux/usb/musb.h
+index 053c268..c05d46d 100644
+--- a/include/linux/usb/musb.h
++++ b/include/linux/usb/musb.h
+@@ -104,6 +104,9 @@ struct musb_hdrc_platform_data {
+ 	/* for clk_get() */
+ 	const char	*clock;
+ 
++	/* phy device label */
++	const char	*phy_name;
++
+ 	/* (HOST or OTG) switch VBUS on/off */
+ 	int		(*set_vbus)(struct device *dev, int is_on);
+ 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+1.7.10.4
