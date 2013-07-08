@@ -1,42 +1,68 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 08 Jul 2013 08:29:43 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSF0gQVJNOiBkdHM6IGkuTVg1MTogQWRkIFdFSU0gbm9k?=
- =?UTF-8?B?ZQ==?=
-In-Reply-To: <20130708023304.GA22636@S2101-09.ap.freescale.net>
-References: <1373094142-24173-1-git-send-email-shc_work@mail.ru>
- <20130708023304.GA22636@S2101-09.ap.freescale.net>
-Message-ID: <1373257783.211316847@f137.mail.ru>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 8 Jul 2013 10:05:48 +0530
+Subject: [PATCH] ARM: pxa: propagate errors from regulator_enable() to
+ pxamci
+In-Reply-To: <201307051751.20729.arnd@arndb.de>
+References: <201307051751.20729.arnd@arndb.de>
+Message-ID: <CAK9yfHzVtQR1=cCiE3Se0FUUF68GEK5UeYE2gtOLZpaXaODVvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Sat, Jul 06, 2013 at 11:02:22AM +0400, Alexander Shiyan wrote:
-> > This patch adds the missing (Wireless External Interface Module) WEIM
-> > devicetree node for i.MX51 CPUs.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
-> >  arch/arm/boot/dts/imx51.dtsi | 17 +++++++++++++++++
-> >  1 file changed, 17 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> > index 0ca62be..e71976e4 100644
-> > --- a/arch/arm/boot/dts/imx51.dtsi
-> > +++ b/arch/arm/boot/dts/imx51.dtsi
-> > @@ -745,6 +745,23 @@
-> >  				status = "disabled";
-> >  			};
-> >  
-> > +			weim: weim at 83fda000 {
-> > +				#address-cells = <2>;
-> > +				#size-cells = <1>;
-> > +				compatible = "fsl,imx51-weim";
-> > +				reg = <0x83fda000 0x1000>;
-> > +				clocks = <&clks 0>;
-> 
-> Is it correct?  I think there should be a physical clock for weim.
+On 5 July 2013 21:21, Arnd Bergmann <arnd@arndb.de> wrote:
+> The em_x270_mci_setpower() and em_x270_usb_hub_init() functions
+> call regulator_enable(), which may return an error that must
+> be checked.
+>
+> This changes the em_x270_usb_hub_init() function to bail out
+> if it fails, and changes the pxamci_platform_data->setpower
+> callback so that the a failed em_x270_mci_setpower call
+> can be propagated by the pxamci driver into the mmc core.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Mike Rapoport <mike@compulab.co.il>
+> Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Chris Ball <cjb@laptop.org>
+>
+> diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
+> index f6726bb..f8062e4 100644
+> --- a/arch/arm/mach-pxa/em-x270.c
+> +++ b/arch/arm/mach-pxa/em-x270.c
+> @@ -477,16 +477,24 @@ static int em_x270_usb_hub_init(void)
+>         /* USB Hub power-on and reset */
+>         gpio_direction_output(usb_hub_reset, 1);
+>         gpio_direction_output(GPIO9_USB_VBUS_EN, 0);
+> -       regulator_enable(em_x270_usb_ldo);
+> +       err = regulator_enable(em_x270_usb_ldo);
+> +       if (err)
+> +               goto err_free_rst_gpio;
+> +
+>         gpio_set_value(usb_hub_reset, 0);
+>         gpio_set_value(usb_hub_reset, 1);
+>         regulator_disable(em_x270_usb_ldo);
+> -       regulator_enable(em_x270_usb_ldo);
+> +       if (err)
+> +               goto err_free_rst_gpio;
 
-Yes, but properly clock for weim is missing in the clk subsystem,
-so I think at this point it is OK. Adding a properly clock should be a separate patch.
-Thanks.
+Shouldn't this check be after the below (regulator_enable) statement?
 
----
+> +
+> +       err = regulator_enable(em_x270_usb_ldo);
+>         gpio_set_value(usb_hub_reset, 0);
+>         gpio_set_value(GPIO9_USB_VBUS_EN, 1);
+>
+>         return 0;
+>
+> +err_free_rst_gpio:
+> +       gpio_free(usb_hub_reset);
+>  err_free_vbus_gpio:
+>         gpio_free(GPIO9_USB_VBUS_EN);
+>  err_free_usb_ldo:
+> @@ -592,7 +600,7 @@ err_irq:
+>         return err;
+>  }
+
+-- 
+With warm regards,
+Sachin
