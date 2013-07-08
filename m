@@ -1,33 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 8 Jul 2013 10:42:15 +0800
-Subject: [PATCH v3 4/6] ARM: dts: imx6q{dl}: fix the wrong RTS/CTS pad name
-In-Reply-To: <20953.22066.706534.773272@ipc1.ka-ro>
-References: <1373004752-21302-1-git-send-email-b32955@freescale.com>
- <1373004752-21302-5-git-send-email-b32955@freescale.com>
- <20130706050803.GC30164@S2101-09.ap.freescale.net>
- <20953.22066.706534.773272@ipc1.ka-ro>
-Message-ID: <20130708024214.GB22636@S2101-09.ap.freescale.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Jul 2013 07:34:02 +0530
+Subject: amba-pl08x and 'get_signal' namespace collision/build error
+In-Reply-To: <20130707133453.GC16653@intel.com>
+References: <51C97F40.5030101@arm.com>
+ <20130625184539.GB2718@n2100.arm.linux.org.uk>
+ <20130626044842.GR23141@intel.com>
+ <20130626081909.GD2718@n2100.arm.linux.org.uk>
+ <20130626103930.GS23141@intel.com>
+ <20130627094650.GC4283@n2100.arm.linux.org.uk>
+ <CAOesGMgSPNggnBm=E3B774m7Ad_QMXdqvcGqRMxhap6dtpNtCg@mail.gmail.com>
+ <20130705061802.GB10947@intel.com>
+ <20130707123240.GO24642@n2100.arm.linux.org.uk>
+ <20130707133453.GC16653@intel.com>
+Message-ID: <20130708020402.GE16653@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 07, 2013 at 01:51:14PM +0200, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Shawn Guo writes:
-> > On Fri, Jul 05, 2013 at 02:12:30PM +0800, Huang Shijie wrote:
-> > > There is something wrong with the RTS/CTS pads:
-> > >   The RTS pad is assigned with the CTS's value;
-> > >   while the CTS pad is assigned with the RTS's value.
-> > > 
+On Sun, Jul 07, 2013 at 07:04:53PM +0530, Vinod Koul wrote:
+> On Sun, Jul 07, 2013 at 01:32:40PM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Jul 05, 2013 at 11:48:02AM +0530, Vinod Koul wrote:
+> > > On Wed, Jul 03, 2013 at 11:27:12AM -0700, Olof Johansson wrote:
+> > > > This has now hit the mainline kernel, and several defconfigs (nhk815,
+> > > > lpc32xx and the spear ones) are broken there.
+> > > > 
+> > > > Vinod, when are you sending up your pull request with the fix? It'd be
+> > > > good to see it go in soon.
+> > > It should be on its way by the weekend
 > > 
-> > So basically, you are saying that select_input should be set up for CTS
-> > rather than RTS.  It seems that the people who generated the macro got
-> > the wrong input from developer.
-> > 
-> programming 'select_input' only makes sense for inputs, not outputs.
-> Since CTS is an output signal, select_input only makes sense for the
-> RTS function of the pads.
+> > It still isn't in the tree.
+> I sent this morning, depends on how soon can linus merge this
+Linus has merged this, so please merge the linus's tree and you should be happy
+:)
 
-I'm disregarding the patch, as it looks wrong.
-
-Shawn
+~Vinod
