@@ -1,76 +1,230 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 8 Jul 2013 16:26:34 +0300
-Subject: [PATCH v9 0/8] Generic PHY Framework
-In-Reply-To: <780E789C2E067A4BB8F69D0BB9EC4F253E9764D5@DBDE04.ent.ti.com>
-References: <1372247257-30186-1-git-send-email-kishon@ti.com>
- <780E789C2E067A4BB8F69D0BB9EC4F253E975B5E@DBDE04.ent.ti.com>
- <51D3F773.9000209@ti.com> <20130703132038.GI15056@arwen.pp.htv.fi>
- <780E789C2E067A4BB8F69D0BB9EC4F253E975D6E@DBDE04.ent.ti.com>
- <51D54694.20203@ti.com> <20130704101216.GD4830@arwen.pp.htv.fi>
- <780E789C2E067A4BB8F69D0BB9EC4F253E9764D5@DBDE04.ent.ti.com>
-Message-ID: <20130708132634.GC31221@arwen.pp.htv.fi>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Mon, 8 Jul 2013 19:08:08 +0530
+Subject: [PATCH] ARM: tegra: enable palmas device for dalmore
+Message-ID: <1373290688-2257-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Make the entry of Dalmore Power Management Unit device TPS65913
+in dalmore DTS file. The Palma driver support this device.
 
-On Mon, Jul 08, 2013 at 01:24:49PM +0200, Patel, Satish wrote:
+Enable following submodule of the TPS65913:
+- GPIO driver
+- RTC driver.
+- Power regulator driver.
 
-[ big snip ]
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ arch/arm/boot/dts/tegra114-dalmore.dts |  183 +++++++++++++++++++++++++++++++-
+ 1 files changed, 182 insertions(+), 1 deletions(-)
 
-> We have two options over here
-> 
-> Option 1: 
-> 
-> Defining generic api to which can be mapped over multiple phys
-> For smartcard case, I have can thought of following mapping with new 
-> generic apis as suggested.
-> 
-> Smartcard_poweron -> power_on
-> Smartcard_powerdown -> power_off
-> Smartcard_set_voltage -> phy_set_voltage
-
-these three are generic enough
-
-> Smartcard_activate_card -> phy_activate_slot
-> Smartcard_deactivate_card -> phy_deactivate_slot
-
-this looks unnecessary, why can't you always activate the card when you
-phy_poweron ?
-
-> Smartcard_set_c4/c8/rst/io -> phy_set_pin
-
-why do you want to control each pin separately ? looks like something we
-don't want to allow, in order to prevent users fiddling with the HW
-directly.
-
-> Smartcard_warm_reset -> phy_warmreset
-
-phy_reset()
-
-> Smartcard_set_clkdiv -> phy_set_clock
-> Smartcard_get_clkdiv -> phy_get_clock
-
-why do you need to control the clock like that ? That should be
-something in the clock framework and, hey, it already exists:
-
-clk_set_rate()
-clk_get_rate()
-
-> Smartcard_set_atr_mute_timeout -> ??
-> Smartcard_set_atr_early_timeout -> ??	
-> Smartcard_get_isr_status -> phy_get_status
-> Smartcard_get_version -> phy_get_version
-
-these look unnecessary. Why does any other entity need to know about the
-PHY version and Interrupt status ?
-
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index 886b66d..53f30c0 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -791,7 +791,7 @@
+ 					regulator-boot-on;
+ 				};
+ 
+-				dcdc3 {
++				tps65090_dcdc3_reg: dcdc3 {
+ 					regulator-name = "vdd-ao";
+ 					regulator-always-on;
+ 					regulator-boot-on;
+@@ -836,6 +836,177 @@
+ 				};
+ 			};
+ 		};
++
++		palmas: tps65913 at 58 {
++			compatible = "ti,palmas";
++			reg = <0x58>;
++			interrupts = <0 86 0x4>;
++
++			#interrupt-cells = <2>;
++			interrupt-controller;
++
++			palmas_gpio: palmas_gpio {
++				compatible = "ti,palmas-gpio";
++				gpio-controller;
++				#gpio-cells = <2>;
++			};
++
++			palmas_rtc {
++				compatible = "ti,palmas-rtc";
++				interrupt-parent = <&palmas>;
++				interrupts = <8 0>;
++			};
++
++			palmas_pmic {
++			    compatible = "ti,tps65913-pmic", "ti,palmas-pmic";
++			    smps1-in-supply = <&tps65090_dcdc3_reg>;
++			    smps3-in-supply = <&tps65090_dcdc3_reg>;
++			    smps4-in-supply = <&tps65090_dcdc2_reg>;
++			    smps7-in-supply = <&tps65090_dcdc2_reg>;
++			    smps8-in-supply = <&tps65090_dcdc2_reg>;
++			    smps9-in-supply = <&tps65090_dcdc2_reg>;
++			    ldo1-in-supply = <&tps65090_dcdc2_reg>;
++			    ldo2-in-supply = <&tps65090_dcdc2_reg>;
++			    ldo3-in-supply = <&palmas_smps3_reg>;
++			    ldo4-in-supply = <&tps65090_dcdc2_reg>;
++			    ldo5-in-supply = <&vdd_ac_bat_reg>;
++			    ldo6-in-supply = <&tps65090_dcdc2_reg>;
++			    ldo7-in-supply = <&tps65090_dcdc2_reg>;
++			    ldo8-in-supply = <&tps65090_dcdc3_reg>;
++			    ldo9-in-supply = <&palmas_smps9_reg>;
++			    ldoln-in-supply = <&tps65090_dcdc1_reg>;
++			    ldousb-in-supply = <&tps65090_dcdc1_reg>;
++			    regulators {
++				smps12 {
++					regulator-name = "vddio-ddr";
++					regulator-min-microvolt = <1350000>;
++					regulator-max-microvolt = <1350000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				palmas_smps3_reg: smps3 {
++					regulator-name = "vddio-1v8";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				smps45 {
++					regulator-name = "vdd-core";
++					regulator-min-microvolt = <900000>;
++					regulator-max-microvolt = <1400000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				smps457 {
++					regulator-name = "vdd-core";
++					regulator-min-microvolt = <900000>;
++					regulator-max-microvolt = <1400000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				smps8 {
++					regulator-name = "avdd-pll";
++					regulator-min-microvolt = <1050000>;
++					regulator-max-microvolt = <1050000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				palmas_smps9_reg: smps9 {
++					regulator-name = "sdhci-vdd-sd-slot";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					regulator-always-on;
++				};
++
++				ldo1 {
++					regulator-name = "avdd-cam1";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++				};
++
++				ldo2 {
++					regulator-name = "avdd-cam2";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++				};
++
++				ldo3 {
++					regulator-name = "avdd-dsi-csi";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo4 {
++					regulator-name = "vpp-fuse";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
++				ldo6 {
++					regulator-name = "vdd-sensor-2v85";
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
++				};
++
++				ldo7 {
++					regulator-name = "vdd-af-cam1";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++				};
++
++				ldo8 {
++					regulator-name = "vdd-rtc";
++					regulator-min-microvolt = <900000>;
++					regulator-max-microvolt = <900000>;
++					regulator-always-on;
++					regulator-boot-on;
++					ti,enable-ldo8-tracking;
++				};
++
++				ldo9 {
++					regulator-name = "vddio-sdmmc-2";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <3300000>;
++				};
++
++				ldoln {
++					regulator-name = "hvdd-usb";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++				};
++
++				ldousb {
++					regulator-name = "avdd-usb";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				regen1 {
++					regulator-name = "rail-3v3";
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				regen2 {
++					regulator-name = "rail-5v0";
++					regulator-max-microvolt = <5000000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++			    };
++			};
++		};
+ 	};
+ 
+ 	spi at 7000da00 {
+@@ -951,6 +1122,16 @@
+ 			gpio = <&gpio TEGRA_GPIO(K, 1) GPIO_ACTIVE_HIGH>;
+ 			vin-supply = <&tps65090_dcdc1_reg>;
+ 		};
++
++		vdd_cam_1v8_reg: regulator at 6 {
++			compatible = "regulator-fixed";
++			reg = <6>;
++			regulator-name = "vdd_cam_1v8_reg";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			enable-active-high;
++			gpio = <&palmas_gpio 6 0>; /* Palmas GPIO6 */
++		};
+ 	};
+ 
+ 	sound {
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130708/f80e2ded/attachment.sig>
+1.7.1.1
