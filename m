@@ -1,56 +1,115 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 8 Jul 2013 10:01:25 +0800
-Subject: [RFC PATCH 08/13] sound: sam9x5_wm8731: machine driver for
- at91sam9x5 wm8731 boards
-In-Reply-To: <CACQ1gAji8KkjXee8o=9jt8O38611LBJ95yXimxbfn1qLaLOcnA@mail.gmail.com>
-References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
- <1372667978-4718-9-git-send-email-richard.genoud@gmail.com>
- <51D2472B.2010407@atmel.com>
- <CACQ1gAji8KkjXee8o=9jt8O38611LBJ95yXimxbfn1qLaLOcnA@mail.gmail.com>
-Message-ID: <51DA1D75.2010503@atmel.com>
+From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
+Date: Mon, 08 Jul 2013 11:24:25 +0900
+Subject: [PATCH] ARM: shmobile: r8a7790 SMP prototype v3
+In-Reply-To: <20130701061340.22064.93012.sendpatchset@w520>
+References: <20130701061340.22064.93012.sendpatchset@w520>
+Message-ID: <51DA22D9.10703@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+Magnus,
 
-On 7/5/2013 23:15, Richard Genoud wrote:
->>> +       card->dev = &pdev->dev;
->>> >>+       card->owner = THIS_MODULE;
->>> >>+       card->dai_link = dai;
->>> >>+       card->num_links = 1;
->>> >>+       dai->name = "WM8731";
->>> >>+       dai->stream_name = "WM8731 PCM";
->>> >>+       dai->codec_dai_name = "wm8731-hifi";
->>> >>+       dai->init = at91sam9x5ek_wm8731_init;
->>> >>+       card->dapm_widgets = at91sam9x5ek_dapm_widgets;
->>> >>+       card->num_dapm_widgets = ARRAY_SIZE(at91sam9x5ek_dapm_widgets);
->> >
->> >
->> >Will keep these as snd_soc_card and snd_soc_dai_link structure separately?
-> I don't really understand what you mean here.
-> do you mean that something like that will more explicit ? :
-> +       card->dai_link[0].name = "WM8731";
-> +       card->dai_link[0].stream_name = "WM8731 PCM";
-> +       card->dai_link[0].codec_dai_name = "wm8731-hifi";
-> +       card->dai_link[0].init = at91sam9x5ek_wm8731_init;
->
+Thanks for the patch, see my comments below.
 
-I mean using structure to define snd_soc_card and snd_soc_dai_link, look 
-like:
-struct snd_soc_dai_link dai_link_name = {
-	.name = xxx,
-	.stream_name = xxx,
-	...
-};
+On 7/1/2013 3:13 PM, Magnus Damm wrote:
+> --- /dev/null
+> +++ work/arch/arm/mach-shmobile/smp-r8a7790.c	2013-07-01 13:41:32.000000000 +0900
+> @@ -0,0 +1,187 @@
 
-struct snd_soc_card card_name = {
-	.name = xxxx
-	.ower = THIS_MODULE,
-	.dai_link = &dai_link_name,
-	...
-};
+> +#define SYSC	0xe6180000
+> +#define SYSCSR  0x0000
+> +
+> +#define RST	0xe6160000
+> +#define CA15BAR	0x6020
 
-In this way, I think it will be more clear than put them in code.
+CA15BAR and CA15BAR2 addresses in the datasheet v0.5 are simply wrong;
+they should be 0x0020 and 0x0024, respectively.
 
-Best Regards,
-Bo Shen
+You could confirm it in the documentation errata for v0.5 or in the
+latest datasheet v0.6 release.
+
+I believe that this is not related to an uncertain arch_timer issue you
+mentioned in the commit log, but we should use proper addresses at least.
+
+> +#define CA15RESCNT 0x0040
+> +#define CA7BAR	0x4030
+
+The same applies for CA7BAR and CA7BAR2 as well.
+
+> +#define CA7RESCNT 0x0044
+> +#define RESCNT	0x0050
+> +
+> +#define APMU	0xe6150000
+> +#define CA15WUPCR 0x2010
+> +#define CA7WUPCR 0x1010
+> +
+> +#define MERAM	0xe8080000
+> +
+> +enum { R8A7790_CLST_CA15, R8A7790_CLST_CA7, R8A7790_CLST_NR };
+> +
+> +static struct {
+> +	unsigned int cabar;
+> +	unsigned int carescnt;
+> +	unsigned int carescnt_magic;
+> +	unsigned int rescnt_bit;
+> +	unsigned int use_count;
+> +} r8a7790_clst[R8A7790_CLST_NR] = {
+> +	[R8A7790_CLST_CA15] = {
+> +		.cabar = CA15BAR,
+> +		.carescnt = CA15RESCNT,
+> +		.carescnt_magic = 0xa5a50000,
+> +		.rescnt_bit = 1,
+> +	},
+> +	[R8A7790_CLST_CA7] = {
+> +		.cabar = CA7BAR,
+> +		.carescnt = CA7RESCNT,
+> +		.carescnt_magic = 0x5a5a0000,
+> +		.rescnt_bit = 0,
+> +	},
+> +};
+> +
+> +#define r8a7790_clst_id(cpu) (cpu_logical_map((cpu)) >> 8)
+> +#define r8a7790_cpu_id(cpu) (cpu_logical_map((cpu)) & 0xff)
+> +
+> +static void r8a7790_deassert_reset(unsigned int cpu)
+> +{
+> +	void __iomem *p, *carescnt;
+> +	u32 bar, mask, magic;
+> +	unsigned int clst_id = r8a7790_clst_id(cpu);
+> +
+> +	/* setup reset vectors */
+> +	p = ioremap_nocache(RST, 0x7000);
+
+Therefore ioremap size for RST should be updated accordingly.
+
+> +	bar = (MERAM >> 8) & 0xfffffc00;
+> +	__raw_writel(bar, p + r8a7790_clst[clst_id].cabar);
+> +	__raw_writel(bar | 0x10, p + r8a7790_clst[clst_id].cabar);
+> +
+> +	/* enable clocks for cluster */
+> +	if (r8a7790_clst[clst_id].use_count++ == 0) {
+> +		mask = 1 << r8a7790_clst[clst_id].rescnt_bit;
+> +		__raw_writel(__raw_readl(p + RESCNT) & ~mask, p + RESCNT);
+> +	}
+> +
+> +	/* enable per-core clocks */
+> +	mask = BIT(3 - r8a7790_cpu_id(cpu));
+> +	magic = r8a7790_clst[clst_id].carescnt_magic;
+> +	carescnt = p + r8a7790_clst[clst_id].carescnt;
+> +	__raw_writel((__raw_readl(carescnt) & ~mask) | magic, carescnt);
+> +
+> +	iounmap(p);
+> +}
+> +
+> +static void r8a7790_assert_reset(unsigned int cpu)
+> +{
+> +	void __iomem *p, *carescnt;
+> +	u32 mask, magic;
+> +	unsigned int clst_id = r8a7790_clst_id(cpu);
+> +
+> +	p = ioremap_nocache(RST, 0x7000);
+
+Ditto.
+--
+Shinya Kuribayashi
+Renesas Electronics
