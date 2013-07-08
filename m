@@ -1,22 +1,30 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 8 Jul 2013 10:42:25 -0600
-Subject: [PATCH v6 00/21] MBus DT binding: PCIe strikes back
-In-Reply-To: <201307060138.36191.arnd@arndb.de>
-References: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130706013547.3ce7280b@skate> <201307060138.36191.arnd@arndb.de>
-Message-ID: <20130708164225.GA26618@obsidianresearch.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Mon,  8 Jul 2013 09:51:37 -0700
+Subject: [PATCH v2 1/2] clocksource/cadence_ttc: Remove unused header
+In-Reply-To: <1373302298-27957-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1373302298-27957-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1373302298-27957-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 06, 2013 at 01:38:35AM +0200, Arnd Bergmann wrote:
-> On Saturday 06 July 2013, Thomas Petazzoni wrote:
-> > Arnd, Jason, if you could confirm that you both agree with this DT
-> > binding soon, Ezequiel and I would quickly adapt the code accordingly,
-> > and hopefully converge towards a final patch set.
-> 
-> Looks all good from what I can tell.
+The clk-provider.h header is not required by this driver.
 
-It also looks fine to me.
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ drivers/clocksource/cadence_ttc_timer.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Regards,
-Jsaon
+diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
+index 4cbe28c..0eefc8d 100644
+--- a/drivers/clocksource/cadence_ttc_timer.c
++++ b/drivers/clocksource/cadence_ttc_timer.c
+@@ -21,7 +21,6 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/slab.h>
+-#include <linux/clk-provider.h>
+ 
+ /*
+  * This driver configures the 2 16-bit count-up timers as follows:
+-- 
+1.8.3.2
