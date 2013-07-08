@@ -1,40 +1,77 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 8 Jul 2013 22:23:02 +0800
-Subject: [PATCH 2/2] ARM: imx: use imx specific L2 init function on imx6sl
-In-Reply-To: <1373293383-15128-1-git-send-email-shawn.guo@linaro.org>
-References: <1373293383-15128-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1373293383-15128-3-git-send-email-shawn.guo@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 8 Jul 2013 15:21:03 +0100
+Subject: [PATCH 1/6] ARM: OMAP2+: Remove board-4430sdp.c
+In-Reply-To: <20130708093410.GT5523@atomide.com>
+References: <20130517191304.468.73487.stgit@localhost>
+ <20130517191751.468.89202.stgit@localhost>
+ <20130520095447.GR21614@n2100.arm.linux.org.uk>
+ <20130706131057.GU21614@n2100.arm.linux.org.uk>
+ <20130706133627.GV21614@n2100.arm.linux.org.uk>
+ <20130708093410.GT5523@atomide.com>
+Message-ID: <20130708142103.GX21614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The optimized L2 prefect and power setting done in imx_init_l2cache()
-can also benefit imx6sl, so let's call the function on imx6sl as well.
+On Mon, Jul 08, 2013 at 02:34:11AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [130706 06:42]:
+> > 
+> > Okay, I guessed that the OMAP4430SDP was "blaze" (it's not obvious to
+> > use internal codenames for boards when they're known as "SDP" etc -
+> > especially when they have stickers on them saying that they're "SDP".)
+> 
+> Agreed, let's update that.
+>  
+> > With that worked out, throwing my standard printascii() hack into the
+> > kernel results in boot messages... up to the point where the timer is
+> > calibrated.  So, it looks like either interrupts, clocks, or the OMAP
+> > timers are non-functional with DT based kernels on the SDP board.
+> 
+> Hey the good news is that you've updated your build system to support
+> also appended dtb images, thanks for doing that!
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/mach-imx6sl.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+It was far from trivial - there's many places in the build process
+which do things quite differently depending on whether it's a DTB
+build or not.
 
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index 132db260..0d75dc5 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -11,7 +11,6 @@
- #include <linux/irqchip.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
--#include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
-@@ -26,7 +25,7 @@ static void __init imx6sl_init_machine(void)
- 
- static void __init imx6sl_init_irq(void)
- {
--	l2x0_of_init(0, ~0UL);
-+	imx_init_l2cache();
- 	imx_src_init();
- 	imx_gpc_init();
- 	irqchip_init();
--- 
-1.7.9.5
+> > Any ideas?
+> 
+> Looks like you need some things updated and added to your .config.
+> 
+> -# CONFIG_OMAP_MUX is not set
+> +CONFIG_MACH_OMAP_GENERIC=y
+> 
+> That we should nowadays always select though.
+> 
+> CONFIG_REGULATOR_FIXED_VOLTAGE=y
+> 
+> This you will need for Ethernet.
+> 
+> CONFIG_PINCTRL_SINGLE=y
+> 
+> This is good to have, will be needed especially for for UART
+> wake-up events with deeper idle modes enabled once the pending
+> pinctrl patches are merged.
+
+That probably explains why there was no output.
+
+> Then there's a pending patch to change drivers/i2c/busses/i2c-omap.c
+> to use just a regular module_init, that should remove the i2c timeout
+> errors as then deferred probe will work properly.
+
+It seems that - yet again - the mmc devices have swapped themselves.
+Also looks like the nonfunctional video stuff is even more nonfunctional
+than usual:
+
+omapdss DSI error: can't get VDDS_DSI regulator
+omapdss HDMI error: can't get VDDA_HDMI_DAC regulator
+
+ASoC looks dead too:
+
+omap-abe-twl6040 sound.10: ASoC: CPU DAI (null) not registered
+omap-abe-twl6040 sound.10: snd_soc_register_card() failed: -517
+
+> BTW, maybe add a link to your build system to www.arm.linux.org.uk
+> developer page too? At least I could not find a link to it.
+
+Hmm, I thought I had, but it looks like I never pushed the change to
+the main site.  I'll do that at some point.
