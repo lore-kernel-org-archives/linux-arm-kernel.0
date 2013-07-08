@@ -1,30 +1,32 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Mon,  8 Jul 2013 09:51:36 -0700
-Subject: [PATCH v2 0/2] clocksource/cadence_ttc: Add sched_clock functionality
-Message-ID: <1373302298-27957-1-git-send-email-soren.brinkmann@xilinx.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 8 Jul 2013 18:03:53 +0100
+Subject: v3.10 - big endian core support
+In-Reply-To: <20130708110202.GD22057@mudshark.cambridge.arm.com>
+References: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
+ <51DA5089.5080109@gmail.com>
+ <20130708084911.GA22057@mudshark.cambridge.arm.com>
+ <51DA8BBF.7080104@gmail.com>
+ <20130708110202.GD22057@mudshark.cambridge.arm.com>
+Message-ID: <20130708170352.GA24361@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I updated the original patch according to the discussion with Thomas and Baruch.
-Furthermore, I noticed that the driver includes the clk-provider header for no
-apparent reason and removed it.
+On Mon, Jul 08, 2013 at 12:02:02PM +0100, Will Deacon wrote:
+> On Mon, Jul 08, 2013 at 10:51:59AM +0100, jgq516 at gmail.com wrote:
+> > The printascii can output before "b __enable_mmu", after move it to
+> > __mmap_switched, nothing can be printed. But if disable LPAE, printascii
+> > works again in __mmap_switched.
+> 
+> Ok, so the page tables are broken. The code is there to swap the two words,
+> but perhaps something ends up being off-by-4 or the like. I'll try and take
+> a look.
 
-	S?ren
+Right, I managed to have a quick play with a 3.10 kernel and the good news
+is that the page tables are fine. The bad part is that using
+CONFIG_ARM_ATAG_DTB_COMPAT to get my command-line from ATAGs into the FDT
+results in a NULL command line, so I don't see any output. If I hardcode the
+command line in the kernel image, things work fine.
 
-v2:
- - adding patch to remove unused header to the series
- - #include linux/sched_clock.h instead of asm/sched_clock.h
- - remove Kconfig options and #ifdefs around sched_clock related code
-    The reasons for having those are obsolete, since ARM deprecated its
-    custom sched_clock framework and migrated to the common one.
+What kernel are you using, and how are you passing your command line?
 
-
-Soren Brinkmann (2):
-  clocksource/cadence_ttc: Remove unused header
-  clocksource/cadence_ttc: Reuse clocksource as sched_clock
-
- drivers/clocksource/cadence_ttc_timer.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
-
--- 
-1.8.3.2
+Will
