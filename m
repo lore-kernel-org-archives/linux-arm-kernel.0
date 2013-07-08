@@ -1,71 +1,160 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 8 Jul 2013 15:53:43 +0200
-Subject: [PATCH v2 0/5] Sound support for at91sam9x5-wm8731 based boards
-In-Reply-To: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
-References: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <51DAC467.8060504@atmel.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 08 Jul 2013 16:12:56 +0200
+Subject: [PATCH v3 12/13] ARM: dts: Add S5K5BA sensor regulator definitions
+ for Trats board
+In-Reply-To: <11736061.3CXfgF4Q9h@flatron>
+References: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
+ <1372692155-17653-13-git-send-email-s.nawrocki@samsung.com>
+ <11736061.3CXfgF4Q9h@flatron>
+Message-ID: <51DAC8E8.2070405@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2013 15:29, Richard Genoud :
-> Hi,
->
-> This patchset add sound on the at91sam9x5ek board.
-> It's based on Nicolas Ferre's work in the 2.6.39 atmel patch for sam9x5:
-> https://github.com/linux4sam/linux-at91/commit/0aa157c9e71ccccf3abc30fa37eb5c95b392978d
->
-> It needs Bo Chen's patchset on the generic dmaengine (topic/atmel branch
-> on Mark's sound tree) and the SSC interrupts disabled (cf
-> http://www.spinics.net/lists/arm-kernel/msg256901.html)
->
->
-> Tested on at91sam9g35ek.
->
-> patches applies on next-20130708
->
-> [I let the original signed-off from Nicolas and Uwe in place, I don't
-> know if I should replace them by something like "originaly-signed-off-by"
-> since the code has been changed.]
+Hi,
 
-I am happy to give my "signed-off" to this patch. I guess that Uwe's one 
-was more an integration signed-off when he imported the code to his git 
-tree.
+On 07/06/2013 01:26 AM, Tomasz Figa wrote:
+> On Monday 01 of July 2013 17:22:34 Sylwester Nawrocki wrote:
+>> From: Andrzej Hajda <a.hajda@samsung.com>
+>>
+>> Add MAX8998 LDO12 and fixed voltage regulator nodes. While at it,
+>> all fixed voltage regulator nodes are grouped in a 'regulators' node.
+>>
+>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos4210-trats.dts |   80
+>> +++++++++++++++++++++++++------- 1 file changed, 64 insertions(+), 16
+>> deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos4210-trats.dts
+>> b/arch/arm/boot/dts/exynos4210-trats.dts index 6b1568e..f62e299 100644
+>> --- a/arch/arm/boot/dts/exynos4210-trats.dts
+>> +++ b/arch/arm/boot/dts/exynos4210-trats.dts
+>> @@ -30,13 +30,64 @@
+>>  		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 
+> rootwait
+>> earlyprintk panic=5"; };
+>>
+>> -	vemmc_reg: voltage-regulator at 0 {
+>> -	        compatible = "regulator-fixed";
+>> -		regulator-name = "VMEM_VDD_2.8V";
+>> -		regulator-min-microvolt = <2800000>;
+>> -		regulator-max-microvolt = <2800000>;
+>> -		gpio = <&gpk0 2 0>;
+>> -		enable-active-high;
+>> +	regulators {
+>> +		compatible = "simple-bus";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+> 
+> I don't think any addressing is needed for these regulators, so I'd 
+> suggest removing those #properties and replacing @N with -N suffix.
 
-> [Sorry if it's too late for 3.11]
+Originally there were also 'reg' properties in the individual regulator
+nodes, but these were unused and I've removed them before posting. Just
+missed to get rid of #size/address-cells as well. Please note you
+similarly use such properties in patch [1].
 
-Do not be sorry. Good work is always appreciated at any time!
+I suppose it is correct to have something like:
 
-> Changes from V1-RFC:
->   * drop patches on SSC since Bo Chen already did the work
->   * reorder patches to have the machine driver first
->   * drop code already handled by the ASoC framework
->   * drop unneeded SND_ATMEL_SOC_PDC config selection
->   * use static snd_soc_card and  snd_soc_dai_link structures.
->
+regulators {
+	compatible = "simple-bus";
+	regulator-0 {
+		...
+	};
+
+	regulator-1 {
+		...
+	};
+	...
+};
+
+rather than:
+
+regulators {
+	compatible = "simple-bus";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	regulator at 0 {
+		reg = <...>;
+		...
+	};
+
+	regulator at 1 {
+		reg = <...>;
+		...
+	};
+};
+
+Both patterns seem to be used in existing *.dts files.
+
+I'm going to use the first option in the next iteration, unless
+someone suggest otherwise.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg253184.html
+
+> Otherwise looks good.
+> 
 > Best regards,
-> Richard.
->
-> Nicolas Ferre (1):
->    sound: sam9x5_wm8731: machine driver for at91sam9x5 wm8731 boards
->
-> Richard Genoud (4):
->    ARM: AT91: DTS: sam9x5: add SSC DMA parameters
->    ARM: AT91: DTS: sam9x5ek: add WM8731 codec
->    ARM: AT91: DTS: sam9x5ek: add sound configuration
->    ARM: AT91: DTS: sam9x5ek: enable SSC
+> Tomasz
+> 
+>> +
+>> +		vemmc_reg: regulator at 0 {
+>> +			compatible = "regulator-fixed";
+>> +			regulator-name = "VMEM_VDD_2.8V";
+>> +			regulator-min-microvolt = <2800000>;
+>> +			regulator-max-microvolt = <2800000>;
+>> +			gpio = <&gpk0 2 0>;
+>> +			enable-active-high;
+>> +		};
+>> +
+>> +		tsp_reg: regulator at 1 {
+>> +			compatible = "regulator-fixed";
+>> +			regulator-name = "TSP_FIXED_VOLTAGES";
+>> +			regulator-min-microvolt = <2800000>;
+>> +			regulator-max-microvolt = <2800000>;
+>> +			gpio = <&gpl0 3 0>;
+>> +			enable-active-high;
+>> +		};
+>> +
+>> +		cam_af_28v_reg: regulator at 2 {
+>> +			compatible = "regulator-fixed";
+>> +			regulator-name = "8M_AF_2.8V_EN";
+>> +			regulator-min-microvolt = <2800000>;
+>> +			regulator-max-microvolt = <2800000>;
+>> +			gpio = <&gpk1 1 0>;
+>> +			enable-active-high;
+>> +		};
+>> +
+>> +		cam_io_en_reg: regulator at 3 {
+>> +			compatible = "regulator-fixed";
+>> +			regulator-name = "CAM_IO_EN";
+>> +			regulator-min-microvolt = <2800000>;
+>> +			regulator-max-microvolt = <2800000>;
+>> +			gpio = <&gpe2 1 0>;
+>> +			enable-active-high;
+>> +		};
+>> +
+>> +		cam_io_12v_reg: regulator at 4 {
+>> +			compatible = "regulator-fixed";
+>> +			regulator-name = "8M_1.2V_EN";
+>> +			regulator-min-microvolt = <1200000>;
+>> +			regulator-max-microvolt = <1200000>;
+>> +			gpio = <&gpe2 5 0>;
+>> +			enable-active-high;
+>> +		};
+>> +
+>> +		vt_core_15v_reg: regulator at 5 {
+>> +			compatible = "regulator-fixed";
+>> +			regulator-name = "VT_CORE_1.5V";
+>> +			regulator-min-microvolt = <1500000>;
+>> +			regulator-max-microvolt = <1500000>;
+>> +			gpio = <&gpe2 2 0>;
+>> +			enable-active-high;
+>> +		};
+>>  	};
 
-Maybe we will have to split the series and let these DT patches go with 
-arm-soc.
-
->   arch/arm/boot/dts/at91sam9x5.dtsi   |    3 +
->   arch/arm/boot/dts/at91sam9x5ek.dtsi |   27 +++++
->   sound/soc/atmel/Kconfig             |   10 ++
->   sound/soc/atmel/Makefile            |    2 +
->   sound/soc/atmel/sam9x5_wm8731.c     |  206 +++++++++++++++++++++++++++++++++++
->   5 files changed, 248 insertions(+)
->   create mode 100644 sound/soc/atmel/sam9x5_wm8731.c
->
-
-Thanks, bye,
--- 
-Nicolas Ferre
+Thanks,
+Sylwester
