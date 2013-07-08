@@ -1,42 +1,66 @@
-From: b44548@freescale.com (Chao Fu)
-Date: Mon, 8 Jul 2013 16:37:01 +0800
-Subject: [PATCH 2/3] ARM:dts: vf610: Add DSPI nodes
-In-Reply-To: <1373272622-29064-1-git-send-email-b44548@freescale.com>
-References: <1373272622-29064-1-git-send-email-b44548@freescale.com>
-Message-ID: <1373272622-29064-2-git-send-email-b44548@freescale.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Jul 2013 02:34:11 -0700
+Subject: [PATCH 1/6] ARM: OMAP2+: Remove board-4430sdp.c
+In-Reply-To: <20130706133627.GV21614@n2100.arm.linux.org.uk>
+References: <20130517191304.468.73487.stgit@localhost>
+ <20130517191751.468.89202.stgit@localhost>
+ <20130520095447.GR21614@n2100.arm.linux.org.uk>
+ <20130706131057.GU21614@n2100.arm.linux.org.uk>
+ <20130706133627.GV21614@n2100.arm.linux.org.uk>
+Message-ID: <20130708093410.GT5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Fu <B44548@freescale.com>
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [130706 06:42]:
+> 
+> Okay, I guessed that the OMAP4430SDP was "blaze" (it's not obvious to
+> use internal codenames for boards when they're known as "SDP" etc -
+> especially when they have stickers on them saying that they're "SDP".)
 
-Add Freescale DSPI node into vf610 dts.
-
-Signed-off-by: Chao Fu <b44548@freescale.com>
----
- arch/arm/boot/dts/vf610.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index e1eb7da..fc80f4a 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -87,6 +87,17 @@
- 				arm,tag-latency = <2 2 2>;
- 			};
+Agreed, let's update that.
  
-+			dspi0: dspi0 at 4002c000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,vf610-dspi";
-+				reg = <0x4002c000 0x1000>;
-+				interrupts = <0 67 0x04>;
-+				clocks = <&clks VF610_CLK_DSPI0>;
-+				clock-names = "dspi";
-+				status = "disabled";
-+			};
-+
- 			uart0: serial at 40027000 {
- 				compatible = "fsl,vf610-lpuart";
- 				reg = <0x40027000 0x1000>;
--- 
-1.8.0
+> With that worked out, throwing my standard printascii() hack into the
+> kernel results in boot messages... up to the point where the timer is
+> calibrated.  So, it looks like either interrupts, clocks, or the OMAP
+> timers are non-functional with DT based kernels on the SDP board.
+
+Hey the good news is that you've updated your build system to support
+also appended dtb images, thanks for doing that!
+ 
+> Any ideas?
+
+Looks like you need some things updated and added to your .config.
+
+-# CONFIG_OMAP_MUX is not set
++CONFIG_MACH_OMAP_GENERIC=y
+
+That we should nowadays always select though.
+
+CONFIG_REGULATOR_FIXED_VOLTAGE=y
+
+This you will need for Ethernet.
+
+CONFIG_PINCTRL_SINGLE=y
+
+This is good to have, will be needed especially for for UART
+wake-up events with deeper idle modes enabled once the pending
+pinctrl patches are merged.
+
+Also, can you please add these for NFSroot:
+
+CONFIG_IP_PNP=y
+CONFIG_IP_PNP_DHCP=y
+CONFIG_ROOT_NFS=y
+
+That way I can also boot test your .config on regular basis ;)
+
+Then there's a pending patch to change drivers/i2c/busses/i2c-omap.c
+to use just a regular module_init, that should remove the i2c timeout
+errors as then deferred probe will work properly.
+
+BTW, maybe add a link to your build system to www.arm.linux.org.uk
+developer page too? At least I could not find a link to it.
+
+Regards,
+
+Tony
