@@ -1,31 +1,56 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Mon, 8 Jul 2013 14:09:10 +0200
-Subject: [PATCH v3 4/4] ARM: reinsert ARCH_MULTI_V4 Kconfig option
-In-Reply-To: <1372949142-8260-1-git-send-email-jonas.jensen@gmail.com>
-References: <1372949142-8260-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <CACmBeS3Ges44HxOGZns+G=jQhSmGjVmZBir2_ZBXT1i2nrNQwg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Jul 2013 05:16:36 -0700
+Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
+In-Reply-To: <20130708112553.GU5523@atomide.com>
+References: <51D577E6.5010507@newflow.co.uk> <51D59146.3070002@newflow.co.uk>
+ <51D59C0E.8080003@newflow.co.uk>
+ <B5906170F1614E41A8A28DE3B8D121433EE93C23@DBDE04.ent.ti.com>
+ <20130705115959.GQ5523@atomide.com>
+ <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
+ <20130708112553.GU5523@atomide.com>
+Message-ID: <20130708121635.GZ5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd suggested removing one (or many) of the options:
+* Tony Lindgren <tony@atomide.com> [130708 04:32]:
+> * Bedia, Vaibhav <vaibhav.bedia@ti.com> [130705 06:37]:
+> > On Fri, Jul 05, 2013 at 18:50:10, Bedia, Vaibhav wrote:
+> > > Hi Tony,
+> > > 
+> > > On Fri, Jul 05, 2013 at 17:29:59, Tony Lindgren wrote:
+> > > > * Bedia, Vaibhav <vaibhav.bedia@ti.com> [130705 01:17]:
+> > > > > 
+> > > > > I just checked the behavior on my AM335x-EVM. Current mainline boots fine
+> > > > > provided I don't use earlyprintk.  The offending patch [1] in this case is the one
+> > > > > that tries to get rid of omap_serial_early_init() for DT boot. This change inadvertently
+> > > > > also results in the console UART getting reset and idled during bootup and that's where
+> > > > > the boot stops for you. I think if you skip earlyprintk from the bootargs you should see
+> > > > > the system booting fine. 
+> > > > > 
+> > > > > I guess we need to retain the NO_IDLE and NO_RESET aspect for the console UART in
+> > > > > omap_serial_early_init() to get earlyprintk working again.
+> > > > 
+> > > > Hmm nothing should get idled while earlyprintk is running, and then when the
+> > > > serial driver kicks in it should not idle anything by default. And for DT based
+> > > > booting we should not have mach-omap2/serial.c initialize anything.
+> > > > 
+> > > 
+> > > If I add in the HWMOD flags without any reverts I get to the point where the serial driver
+> > > comes up but the boot eventually stops [1]. Without the flags the boot stops much earlier [2]
+> > > just like Mark reported.
+> > > 
+> > 
+> > Err.. the log with HWMOD flags added is [2] and without flags is [1]. Sorry for the confusion.
+> 
+> It sounds like something needs to be fixed for am33xx as omap3 and omap4
+> won't hang with earlyprintk. Almost certainly mach-omap2/serial.c should not
+> be needed at all for am33xx, and the bug is somewhere else.
 
-CPU_ABRT_EV4T
-CPU_CACHE_V4WT
-CPU_COPY_V4WB
-CPU_TLB_V4WBI
+Oops, sorry correction: I'm seeing it, I did not have console=ttyO
+earlier in my cmdline. It seems that omap-serial.c console suspends
+the hardware while earlyprintk is still trying to access it?
 
-However boot is still broken after removing all including CPU_32v4T.
+Regards,
 
-Selecting CPU_SA1100 instead, it boots normally and init works.
-
-The idea is, If you can help figure out what exactly breaks boot, the
-patch can be dropped.
-
->From these tests, I have created two branches ( arch/arm/mm have
-replacements for calls to no longer compiled in ):
-
-http://code.google.com/p/linux-next-20130703-moxart/source/detail?r=a88f33ad22d3f9a31fe126f1c95568e5b2e8f32d&name=multi_V4_test_arm920t
-http://code.google.com/p/linux-next-20130703-moxart/source/detail?r=9f4c21f1123a122c51792cd374217ce6e426e74a&name=multi_V4_test_sa1100
-
-Best regards,
-Jonas
+Tony
