@@ -1,118 +1,56 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Mon, 8 Jul 2013 10:22:10 -0500
-Subject: socfpga: mmc problems
-In-Reply-To: <51D532D2.1030709@communistcode.co.uk>
-References: <51D43CB0.4070104@communistcode.co.uk>
- <1372864190.9525.6.camel@linux-builds1>
- <51D532D2.1030709@communistcode.co.uk>
-Message-ID: <1373296930.22692.2.camel@linux-builds1>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 8 Jul 2013 11:28:05 -0400
+Subject: managing out-of-tree deps for arm-soc in a single window was: Re:
+ [GIT PULL] clockevents/clocksource: Add Marvell Orion SoC timer
+In-Reply-To: <alpine.DEB.2.02.1307081041290.32106@ionos.tec.linutronix.de>
+References: <51B8D310.4050404@linaro.org> <51D9548B.9040907@gmail.com>
+ <alpine.DEB.2.02.1307071508030.32106@ionos.tec.linutronix.de>
+ <20130707144645.GA11908@titan.lakedaemon.net>
+ <alpine.DEB.2.02.1307071723220.32106@ionos.tec.linutronix.de>
+ <20130707235819.GB11908@titan.lakedaemon.net>
+ <alpine.DEB.2.02.1307081041290.32106@ionos.tec.linutronix.de>
+Message-ID: <20130708152805.GD11908@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jack,
+On Mon, Jul 08, 2013 at 10:45:47AM +0200, Thomas Gleixner wrote:
+> On Sun, 7 Jul 2013, Jason Cooper wrote:
+> > On Sun, Jul 07, 2013 at 05:30:31PM +0200, Thomas Gleixner wrote:
+> > I don't mind delaying half of a series so the drivers/ portion can land
+> > in mainline, and the rest can land in the next cycle.  But when things
+> > don't go according to that plan, I'd like a little consideration /
+> > flexibility about solving the problem.  Especially considering I'm
+> > *trying* to do the right thing by pushing to appropriate maintainers
+> > first.
+> > 
+> > Of course, this is a moot point since, as you clarified above, this
+> > dependency doesn't have the hazards typically associated with
+> > out-of-tree dependencies.
+> 
+> There is a very simple procedure for stuff like this.
+> 
+> Series has parts which go through tree A and B and another larger part
+> for tree C which depends on the A and B parts.
+> 
+> So ask the maintainers of A and B to apply this to separate branches,
+> which are based on some commit in Linus tree. These branches can be
+> pulled into C and C can apply the depending stuff on top.
+> 
+> Now the maintainers of A and B merge these branches into their main
+> devel branch, can do further fixups and stuff on top. And the whole
+> thing just works without glitches during the merge window.
+> 
+> We do this all the time.
 
-On Thu, 2013-07-04 at 09:31 +0100, Jack Mitchell wrote:
-> Morning Dinh,
-> 
-> On 03/07/13 16:09, Dinh Nguyen wrote:
-> > Hi Jack,
-> >
-> > On Wed, 2013-07-03 at 16:01 +0100, Jack Mitchell wrote:
-> >> Having received one of the new Arrow SoCkit boards at a recent training
-> >> day I set about seeing how far mainline was in successfully booting this
-> >> board.
-> >>
-> >> As I wanted to boot from mmc, I first checked out linux-next [1] in
-> >> order to get the newly merged mmc driver, I then applied the device-tree
-> >> enablement series [2] on top before finally attempting to boot. I then
-> >> found that the standard socfpga_defconfig didn't enable the MMC drivers,
-> >> which I also did (should this be part of the socfpga_defconfig...?).
-> >
-> > I was going to update this when I enable ethernet as well to avoid less
-> > churn on the defconfig.
-> 
-> That's great!
-> 
-> >
-> >>
-> >> However, the boot hangs at:
-> >>
-> >> Synopsys Designware Multimedia Card Interface Driver
-> >> dwmmc_socfpga ff704000.dwmmc0: Using internal DMA controller.
-> >> dwmmc_socfpga ff704000.dwmmc0: DW MMC controller at irq 171, 32 bit host
-> >> data width, 1024 deep fifo
-> >>
-> >> To fix this I checked out the diff between the Altera vendor mmc driver
-> >> and the mainline driver and found that if I added this small change:
-> >>
-> >>
-> >>     if (of_property_read_u32(dev->of_node, "pwr-en", &pwr_en)) {
-> >>       dev_info(dev, "couldn't determine pwr-en, assuming pwr-en = 0\n");
-> >>       pwr_en = 0;
-> >>     }
-> >>
-> >>     /* Set PWREN bit */
-> >>     mci_writel(host, PWREN, pwr_en);
-> >
-> > I tested this on my devkit, which was not made by Arrow, but is _almost_
-> > the same. I'll try to see if I can get my hands on an Arrow board to
-> > reproduce.
-> 
-> Now, I think I made a _slight_ mistake, in that I accidentally copied 
-> the Altera vendor kernel onto the sdcard instead of the linux-next 
-> kernel. Re-testing this morning with a fresh mind, I checked the config 
-> again and now I find the Arrow board still won't boot from MMC, even 
-> with the above change, with the code hanging at the same place.
-> 
-> I know you don't have an Arrow board, but if you have a tree which I 
-> could pull from with your amalgamated changes; that would rule out me 
-> missing any patches and it actually being a board problem. I can't seem 
-> to see if the V8 device tree patches were pulled into anyones tree, 
-> otherwise I would just wait till they appeared in 3.11-rc1...?
+Wow, I wish I had known this (or thought of it) months ago!  Thanks for
+taking the time to explain it to me.
 
-Unfortunately, the device tree bindings for the SD/MMC did not make it
-into the arm-soc tree for 3.11, only the sd/mmc platform driver. Will
-try for 3.12.
+Arnd, Olof,
 
-I'm sure you have seen git.rocketboards.org?
+Does this address your concerns about out of tree dependencies?  I think
+it does, but I'm not the one who has to manage it after I set it up and
+send the PR...
 
-Dinh
-> 
-> Sorry for the confusion!
-> 
-> >
-> >>
-> >> In the dw_mci_socfpga_priv_init function, the board would boot.
-> >>
-> >> Synopsys Designware Multimedia Card Interface Driver
-> >> dwmmc_socfpga ff704000.dwmmc0: couldn't determine pwr-en, assuming
-> >> pwr-en = 0
-> >> dwmmc_socfpga ff704000.dwmmc0: Using internal DMA controller.
-> >> dwmmc_socfpga ff704000.dwmmc0: DW MMC controller at irq 171, 32 bit host
-> >> data width, 1024 deep fifo
-> >> mmc_host mmc0: Bus speed (slot 0) = 100000000Hz (slot req 400000Hz,
-> >> actual 400000HZ div = 125)
-> >> dwmmc_socfpga ff704000.dwmmc0: 1 slots initialized
-> >> dwmmc_socfpga ff704000.dwmmc0: Version ID is 240a
-> >> .....
-> >> .....
-> >> .....
-> >>
-> >>
-> >> Has this been overlooked, or are there some other changes elsewhere that
-> >> I haven't yet come across which addresses this?
-> >
-> > I'm not aware of any other changes.
-> >
-> > Dinh
-> >>
-> >> Cheers,
-> >>
-> >> [1] fa1383200d289afdff2f5678eb89483daa537465
-> >> [2] http://comments.gmane.org/gmane.linux.ports.arm.kernel/243529
-> >>
-> >
-> >
-> >
-> 
-> 
+thx,
+
+Jason.
