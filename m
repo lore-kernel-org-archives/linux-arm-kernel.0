@@ -1,38 +1,39 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 8 Jul 2013 14:31:03 +0800
-Subject: [PATCH v3 4/6] ARM: dts: imx6q{dl}: fix the wrong RTS/CTS pad name
-In-Reply-To: <20953.22066.706534.773272@ipc1.ka-ro>
-References: <1373004752-21302-1-git-send-email-b32955@freescale.com>	<1373004752-21302-5-git-send-email-b32955@freescale.com>	<20130706050803.GC30164@S2101-09.ap.freescale.net>
- <20953.22066.706534.773272@ipc1.ka-ro>
-Message-ID: <51DA5CA7.1050305@freescale.com>
+From: m.weisser.m@gmail.com (=?UTF-8?Q?Matthias_Wei=C3=9Fer?=)
+Date: Mon, 8 Jul 2013 08:31:01 +0200
+Subject: imx25: How to get frame buffer device in a system using device
+ tree
+In-Reply-To: <CAOMZO5CgAs+hR41=WdJ=jxS5gZf=opOrCXufixBh_CMP0n2TFA@mail.gmail.com>
+References: <CAO8h3eFq9WhvZYbbeFfWgVEXViR8MAcGaztsvvaLpFSW-W6CfA@mail.gmail.com>
+ <CAOMZO5Aat-iAN_TJ6BXEopB+WCkKgLjWh67sCXg0jd1DtzmKSQ@mail.gmail.com>
+ <CAO8h3eHAfV808izZzvpPc+z6iQPr14q8OmryNs5sC+VcNk+iLg@mail.gmail.com>
+ <CAOMZO5CgAs+hR41=WdJ=jxS5gZf=opOrCXufixBh_CMP0n2TFA@mail.gmail.com>
+Message-ID: <CAO8h3eGhF8DRO73W9GkepUKAF-6v1EmWdMS_Gq+dA_2v5mJ2aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?07?07? 19:51, Lothar Wa?mann ??:
-> Hi,
+Hi Fabio
+
+2013/7/5 Fabio Estevam <festevam@gmail.com>:
+> Hi Matthias,
 >
-> Shawn Guo writes:
->> On Fri, Jul 05, 2013 at 02:12:30PM +0800, Huang Shijie wrote:
->>> There is something wrong with the RTS/CTS pads:
->>>    The RTS pad is assigned with the CTS's value;
->>>    while the CTS pad is assigned with the RTS's value.
->>>
->> So basically, you are saying that select_input should be set up for CTS
->> rather than RTS.  It seems that the people who generated the macro got
->> the wrong input from developer.
->>
-> programming 'select_input' only makes sense for inputs, not outputs.
-> Since CTS is an output signal, select_input only makes sense for the
-> RTS function of the pads.
-Hi Lothar:
+> On Fri, Jul 5, 2013 at 4:37 AM, Matthias Wei?er <m.weisser.m@gmail.com> wrote:
+>
+>> Thanks for the links. That made some things clearer for me. But I am
+>> still a bit confused about the driver (imxfb.c) itself. From what I
+>> can see it is not dt aware as there is no of_device_id structure with
+>> the compatible entries. I think I have to add dt support to the
+>> framebuffer driver. Am I right?
+>
+> Yes, you need to apply this one:
+> http://marc.info/?l=linux-fbdev&m=136956466617736&w=2
 
-In our imx6 Soc, the CTS is used as a input signal, not as a output signal.
+OK. Done that and it works like a charm. Thanks a lot.
 
-I checked two boards, one is imx6q ARM2 armidillo board, one is 
-imx6-sabreauto board,
-both the boards use the CTS as a input signal.
+> I thought it has already been applied, but it has not reached mainline yet.
+>
+> Regards,
+>
+> Fabio Estevam
 
-
-
-thanks
-Huang Shijie
+Regards
+Matthias
