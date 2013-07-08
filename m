@@ -1,35 +1,28 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 8 Jul 2013 08:35:29 -0700
-Subject: [GIT PULL] Remove ARM local timer API
-In-Reply-To: <20130628000853.GB11547@quad.lixom.net>
-References: <20130625200211.GA11625@codeaurora.org>
- <20130628000853.GB11547@quad.lixom.net>
-Message-ID: <20130708153528.GB830@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 08 Jul 2013 09:51:08 -0600
+Subject: [PATCH V2] ARM: tegra: enable gpio-keys on dalmore
+In-Reply-To: <1373102069-5641-1-git-send-email-ldewangan@nvidia.com>
+References: <1373102069-5641-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <51DADFEC.1050901@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27, Olof Johansson wrote:
-> On Tue, Jun 25, 2013 at 01:02:12PM -0700, Stephen Boyd wrote:
-> > Olof/Arnd,
-> > 
-> > These patches remove the ARM local timer API. The ARM architected
-> > timers have already moved away from this API so this series
-> > migrates the rest of the users allowing us to remove the API
-> > entirely. Thomas has been kind enough to take the first two
-> > patches into timers/core in the tip tree (thanks Thomas!) so I've
-> > merged that into v3.10-rc1 and then applied the rest of the
-> > patches on top. Let me know if this is acceptable.
+On 07/06/2013 03:14 AM, Laxman Dewangan wrote:
+> Dalmore have the keys mounted on board which are connected
+> to different pins of Tegra.
 > 
-> We need guarantees from Thomas that the branch is stable and will never be
-> rebased before it hit Linus tree, or we'll be in a world of pain for
-> dependencies like these.
-> 
-> Thomas, is this branch stable or do you anticipate a rebase?
-> 
+> Add the keys entry in DTS file to enable key functionality.
+> This will enable KEY_POWER, KEY_HOME, KEY_VOLUMEUP and
+> KEY_VOLUMEDOWN.
 
-This branch has merged into Linus' tree. Can this go through the
-arm-soc tree now?
+> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> @@ -976,4 +1005,5 @@
+>  			 <&tegra_car TEGRA114_CLK_EXTERN1>;
+>  		clock-names = "pll_a", "pll_a_out0", "mclk";
+>  	};
+> +
+>  };
+
+What's that? I'll try to remember to fix this up when applying, but
+proof-reading would help.
