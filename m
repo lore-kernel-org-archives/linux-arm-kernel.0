@@ -1,26 +1,42 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 8 Jul 2013 09:40:54 +0530
-Subject: [PATCH RFC 3/3] cpufreq: cpufreq-cpu0: clk rate-change notifiers
-In-Reply-To: <1373247868-21444-4-git-send-email-mturquette@linaro.org>
-References: <1373247868-21444-1-git-send-email-mturquette@linaro.org>
- <1373247868-21444-4-git-send-email-mturquette@linaro.org>
-Message-ID: <CAOh2x=kAM98Qta5RquVVByR8jJ3=t+6fNZ4o4WSroVCCZi+0Cg@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 08 Jul 2013 08:29:43 +0400
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSF0gQVJNOiBkdHM6IGkuTVg1MTogQWRkIFdFSU0gbm9k?=
+ =?UTF-8?B?ZQ==?=
+In-Reply-To: <20130708023304.GA22636@S2101-09.ap.freescale.net>
+References: <1373094142-24173-1-git-send-email-shc_work@mail.ru>
+ <20130708023304.GA22636@S2101-09.ap.freescale.net>
+Message-ID: <1373257783.211316847@f137.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 8, 2013 at 7:14 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> Removes direct handling of OPP tables and voltage regulators by calling
-> of_clk_cpufreq_notifier_handler, introduced by commit "clk: cpufreq
-> helper for voltage scaling".
->
-> In the future this can help consolidate code found across similar
-> CPUfreq drivers.
->
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> ---
->  drivers/cpufreq/cpufreq-cpu0.c | 125 ++++++++---------------------------------
->  1 file changed, 22 insertions(+), 103 deletions(-)
+> On Sat, Jul 06, 2013 at 11:02:22AM +0400, Alexander Shiyan wrote:
+> > This patch adds the missing (Wireless External Interface Module) WEIM
+> > devicetree node for i.MX51 CPUs.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+> >  arch/arm/boot/dts/imx51.dtsi | 17 +++++++++++++++++
+> >  1 file changed, 17 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+> > index 0ca62be..e71976e4 100644
+> > --- a/arch/arm/boot/dts/imx51.dtsi
+> > +++ b/arch/arm/boot/dts/imx51.dtsi
+> > @@ -745,6 +745,23 @@
+> >  				status = "disabled";
+> >  			};
+> >  
+> > +			weim: weim at 83fda000 {
+> > +				#address-cells = <2>;
+> > +				#size-cells = <1>;
+> > +				compatible = "fsl,imx51-weim";
+> > +				reg = <0x83fda000 0x1000>;
+> > +				clocks = <&clks 0>;
+> 
+> Is it correct?  I think there should be a physical clock for weim.
 
-Good patch, really gets lots of stuff out from cpufreq drivers.
+Yes, but properly clock for weim is missing in the clk subsystem,
+so I think at this point it is OK. Adding a properly clock should be a separate patch.
+Thanks.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
