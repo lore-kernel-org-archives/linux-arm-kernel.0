@@ -1,32 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 8 Jul 2013 18:03:53 +0100
-Subject: v3.10 - big endian core support
-In-Reply-To: <20130708110202.GD22057@mudshark.cambridge.arm.com>
-References: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
- <51DA5089.5080109@gmail.com>
- <20130708084911.GA22057@mudshark.cambridge.arm.com>
- <51DA8BBF.7080104@gmail.com>
- <20130708110202.GD22057@mudshark.cambridge.arm.com>
-Message-ID: <20130708170352.GA24361@mudshark.cambridge.arm.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Mon, 8 Jul 2013 22:42:46 +0530
+Subject: [PATCH V2] ARM: tegra: enable gpio-keys on dalmore
+In-Reply-To: <51DADFEC.1050901@wwwdotorg.org>
+References: <1373102069-5641-1-git-send-email-ldewangan@nvidia.com>
+ <51DADFEC.1050901@wwwdotorg.org>
+Message-ID: <51DAF30E.9000101@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 08, 2013 at 12:02:02PM +0100, Will Deacon wrote:
-> On Mon, Jul 08, 2013 at 10:51:59AM +0100, jgq516 at gmail.com wrote:
-> > The printascii can output before "b __enable_mmu", after move it to
-> > __mmap_switched, nothing can be printed. But if disable LPAE, printascii
-> > works again in __mmap_switched.
-> 
-> Ok, so the page tables are broken. The code is there to swap the two words,
-> but perhaps something ends up being off-by-4 or the like. I'll try and take
-> a look.
+On Monday 08 July 2013 09:21 PM, Stephen Warren wrote:
+> On 07/06/2013 03:14 AM, Laxman Dewangan wrote:
+>
+>> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+>> @@ -976,4 +1005,5 @@
+>>   			 <&tegra_car TEGRA114_CLK_EXTERN1>;
+>>   		clock-names = "pll_a", "pll_a_out0", "mclk";
+>>   	};
+>> +
+>>   };
+> What's that? I'll try to remember to fix this up when applying, but
+> proof-reading would help.
 
-Right, I managed to have a quick play with a 3.10 kernel and the good news
-is that the page tables are fine. The bad part is that using
-CONFIG_ARM_ATAG_DTB_COMPAT to get my command-line from ATAGs into the FDT
-results in a NULL command line, so I don't see any output. If I hardcode the
-command line in the kernel image, things work fine.
+Oops.. My bad.. Did not see the bottom when doing patch review.
 
-What kernel are you using, and how are you passing your command line?
-
-Will
+Let me know if I need to send V4 if it is easy for you to handle?
