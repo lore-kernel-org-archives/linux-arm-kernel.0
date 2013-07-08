@@ -1,48 +1,119 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 08 Jul 2013 16:39:17 +0200
-Subject: [alsa-devel] [PATCH v2 1/5] sound: sam9x5_wm8731: machine driver
- for at91sam9x5 wm8731 boards
-In-Reply-To: <1373290193-25300-2-git-send-email-richard.genoud@gmail.com>
-References: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
- <1373290193-25300-2-git-send-email-richard.genoud@gmail.com>
-Message-ID: <51DACF15.9080303@metafoo.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 8 Jul 2013 16:51:49 +0200
+Subject: [PATCHv4 04/11] PCI: Introduce new MSI chip infrastructure
+In-Reply-To: <CAErSpo4aodspFnC0uR87yYAgswQQdmU48uoX5NA43UZjbCpOuw@mail.gmail.com>
+References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1372686136-1370-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo4aodspFnC0uR87yYAgswQQdmU48uoX5NA43UZjbCpOuw@mail.gmail.com>
+Message-ID: <20130708165149.55499b8e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2013 03:29 PM, Richard Genoud wrote:
-[...]
-> +/*
-> + * Logic for a wm8731 as connected on a at91sam9x5 based board.
-> + */
-> +static int at91sam9x5ek_wm8731_init(struct snd_soc_pcm_runtime *rtd)
-> +{
-[...]
-> +	codec_dai->driver->playback.rates &= SNDRV_PCM_RATE_8000 |
-> +		SNDRV_PCM_RATE_32000 |
-> +		SNDRV_PCM_RATE_48000 |
-> +		SNDRV_PCM_RATE_96000;
-> +	codec_dai->driver->capture.rates &= SNDRV_PCM_RATE_8000 |
-> +		SNDRV_PCM_RATE_32000 |
-> +		SNDRV_PCM_RATE_48000 |
-> +		SNDRV_PCM_RATE_96000;
+Dear Bjorn Helgaas,
 
-That's not right. The driver structure is shared between all instances of
-the codec, a single instance should not modify it. If you need to constrain
-the list of supported rates use snd_pcm_hw_constraint_list().
+On Fri, 5 Jul 2013 15:51:10 -0600, Bjorn Helgaas wrote:
 
-> +
-> +	/* set the codec system clock for DAC and ADC */
-> +	ret = snd_soc_dai_set_sysclk(codec_dai, WM8731_SYSCLK_XTAL,
-> +				     MCLK_RATE, SND_SOC_CLOCK_IN);
-> +	if (ret < 0) {
-> +		dev_err(dev, "ASoC: Failed to set WM8731 SYSCLK: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	/* signal a DAPM event */
-> +	snd_soc_dapm_sync(dapm);
+> >  int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+> >  {
+> > +       struct msi_chip *chip = dev->bus->msi;
+> > +
+> > +       if (chip && chip->setup_irq) {
+> > +               int err;
+> > +
+> > +               err = chip->setup_irq(chip, dev, desc);
+> > +               if (err < 0)
+> > +                       return err;
+> > +
+> > +               irq_set_chip_data(desc->irq, chip);
+> > +               return err;
+> > +       }
+> > +
+> >         return -EINVAL;
+> 
+> It's sub-optimal to indent the whole body of a function like this.  I
+> think this is a bit more readable:
+> 
+>     if (!chip || !chip->setup_irq)
+>         return -EINVAL
+> 
+>     err = chip->setup_irq(...);
+>     ...
+>     return err;
+> 
+> The return value of ->setup_irq() (and hence of arch_setup_msi_irq())
+> is a bit unclear.  Apparently it can return negative values (errors)
+> or positive values (not sure what they mean), or zero (again, not
+> sure).  A comment would clear this up.
 
-This should not be necessary.
+I've changed ->setup_irq() to simply return 0 on success, and a
+negative error code on failure.
 
-> +	return 0;
-> +}
+Apparently, according to the default implementation
+of arch_msi_setup_irqs(), the arch_msi_setup_irq() hook is supposed to
+return:
+ * A negative value on error, the value being an error code that is
+   propagated to the caller.
+ * A positive value on some other errors, in which case the -ENOSPC
+   error value is returned. To me, it doesn't make a lot of sense, as
+   arch_msi_setup_irq() could just as well return -ENOSPC directly.
+ * A 0 value on success.
+
+> It might even be worth introducing a no-op chip with pointers to no-op
+> functions so we don't have to do these checks ("if (chip &&
+> chip->xxx)" everywhere.  I'm not sure if there's a Linux consensus on
+> that -- certainly there are many examples of code that *does* make
+> these checks everywhere -- so I'll ack it either way.
+
+The problem with this is that I'm not sure where in the PCI code this
+association to the default implementation should be done. And there are
+also two levels to take into account here:
+
+ * The PCI driver may not specify any msi_chip structure for a
+   particular pci_bus. This would have to be detected by the PCI core
+   when the bus is registered, and bus->msi would be set to the special
+   no-op msi_chip.
+
+ * The PCI driver may specify an msi_chip structure, but without
+   necessarily implementation all the methods. This could be solved by
+   offering a pci_msi_chip_assign(struct pci_bus *, struct msi_chip *)
+   function to be used by PCI drivers to assign their msi_chip to a
+   given pci_bus, and this function would fill in the missing msi_chip
+   operations with the default implementation.
+
+I am not sure it is really worth doing at this point, but I'm open to
+suggestions on this.
+
+> >  int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
+> >  {
+> > +       struct msi_chip *chip = dev->bus->msi;
+> > +
+> > +       if (chip && chip->check_device)
+> > +               return chip->check_device(chip, dev, nvec, type);
+> > +
+> 
+> These functions are poorly named.  They give no clue what
+> "check_device" means.  Are we checking that it exists, that it
+> supports some property, that it's enabled, ... ?
+
+Well the naming clearly doesn't come from this commit. The
+arch_msi_check_device() hook was around before this commit, and the
+reason the operation is named ->check_device() is just because it used
+the same terminology as the existing arch_msi_check_device() call.
+
+This hook is only used in one place, the PowerPC architecture, in
+arch/powerpc/kernel/msi.c, to actually check whether the given device
+supports MSI.
+
+I can rename if to arch_msi_device_supports_msi() and
+->device_supports_msi(), or arch_msi_device_has_msi() and
+->device_has_msi(), but that a change that relatively unrelated to this
+commit, I'd say.
+
+Here as well, I'm open to suggestions,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
