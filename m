@@ -1,51 +1,45 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 8 Jul 2013 22:56:38 +0200
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803F28763@039-SN2MPN1-021.039d.mgd.msft.net>
-References: <51A5A808.2070803@digi.com> <201307070310.00973.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803F28763@039-SN2MPN1-021.039d.mgd.msft.net>
-Message-ID: <201307082256.38642.marex@denx.de>
+From: javier.picorel@epfl.ch (javier.picorel at epfl.ch)
+Date: Mon, 08 Jul 2013 23:02:30 +0200
+Subject: ARM Cortex A9: User/Kernel filter events
+Message-ID: <20130708230230.23643s488884h59i@webmail.epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Dear all,
 
-> > -----Original Message-----
-> > From: Marek Vasut [mailto:marex at denx.de]
-> > Sent: Sunday, July 07, 2013 9:10 AM
-> > To: Chen Peter-B29397
-> > Cc: shawn.guo at linaro.org; Michael Grzeschik; maxime.ripard at free-
-> > electrons.com; Hector Palacios; linux-usb at vger.kernel.org;
-> > s.hauer at pengutronix.de; alexander.shishkin at linux.intel.com; Estevam
-> > Fabio-R49496; Marc Kleine-Budde; m.grzeschik at pengutronix.de; linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: Re: Chipidea usb otg support for IMX/MXS (device functionality)
-> > 
-> > Hi Peter,
-> > 
-> > > > Where can I measure this?
-> > > > 
-> > > > > Two possible reasons:
-> > > > > 
-> > > > > 1. You have not gpio control for vbus toggle when role switches.
-> > > > 
-> > > > This works well.
-> > > > 
-> > > > > 2. Your hardware has some problems that the vbus can't lower than
-> > 
-> > 0.8v.
-> > 
-> > > > How can I check that?
-> > > 
-> > > Just measure the voltage of your otg vbus pin.
-> > 
-> > It's 2.5 volt for me. What am I supposed to observe happening there?
-> 
-> http://marc.info/?l=linux-usb&m=137242465920952&w=2
+Is there any reason why ARM Cortex A9 cannot filter user/kernel events?
 
-Dang, must have missed that one, sorry.
+arch/arm/kernel/perf_event_v7.c
 
-The VBUS is slowly discharging from around 5V to 2.5V , what does that tell me?
+1144/*
+1145 * Add an event filter to a given event. This will only work for  
+PMUv2 PMUs.
+1146 */
+1147static int armv7pmu_set_event_filter(struct hw_perf_event *event,
+1148                                     struct perf_event_attr *attr)
+1149{
+1150        unsigned long config_base = 0;
+1151
+1152        if (attr->exclude_idle)
+1153                return -EPERM;
+1154        if (attr->exclude_user)
+1155                config_base |= ARMV7_EXCLUDE_USER;
+1156        if (attr->exclude_kernel)
+1157                config_base |= ARMV7_EXCLUDE_PL1;
+1158        if (!attr->exclude_hv)
+1159                config_base |= ARMV7_INCLUDE_HYP;
+1160
+1161        /*
+1162         * Install the filter into config_base as this is used to
+1163         * construct the event type.
+1164         */
+1165        event->config_base = config_base;
+1166
+1167        return 0;
+1168}
 
-Best regards,
-Marek Vasut
+It seems that only A15 and A7 are able to do it. Is it a limitation  
+A9's PMU? Thank you!
+
+Best Regards,
+Javier
