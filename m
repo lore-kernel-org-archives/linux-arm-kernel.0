@@ -1,26 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 8 Jul 2013 15:36:20 +0100
-Subject: [alsa-devel] [PATCH v2 3/5] ARM: AT91: DTS: sam9x5ek: add WM8731
- codec
-In-Reply-To: <1373290193-25300-4-git-send-email-richard.genoud@gmail.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 08 Jul 2013 16:39:17 +0200
+Subject: [alsa-devel] [PATCH v2 1/5] sound: sam9x5_wm8731: machine driver
+ for at91sam9x5 wm8731 boards
+In-Reply-To: <1373290193-25300-2-git-send-email-richard.genoud@gmail.com>
 References: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
- <1373290193-25300-4-git-send-email-richard.genoud@gmail.com>
-Message-ID: <20130708143620.GF27646@sirena.org.uk>
+ <1373290193-25300-2-git-send-email-richard.genoud@gmail.com>
+Message-ID: <51DACF15.9080303@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 08, 2013 at 03:29:51PM +0200, Richard Genoud wrote:
-> The WM8731 codec on sam9x5ek board is on i2c, address 1A
-> 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+On 07/08/2013 03:29 PM, Richard Genoud wrote:
+[...]
+> +/*
+> + * Logic for a wm8731 as connected on a at91sam9x5 based board.
+> + */
+> +static int at91sam9x5ek_wm8731_init(struct snd_soc_pcm_runtime *rtd)
+> +{
+[...]
+> +	codec_dai->driver->playback.rates &= SNDRV_PCM_RATE_8000 |
+> +		SNDRV_PCM_RATE_32000 |
+> +		SNDRV_PCM_RATE_48000 |
+> +		SNDRV_PCM_RATE_96000;
+> +	codec_dai->driver->capture.rates &= SNDRV_PCM_RATE_8000 |
+> +		SNDRV_PCM_RATE_32000 |
+> +		SNDRV_PCM_RATE_48000 |
+> +		SNDRV_PCM_RATE_96000;
 
-Acked-by: Mark Brown <broonie@linaro.org>
+That's not right. The driver structure is shared between all instances of
+the codec, a single instance should not modify it. If you need to constrain
+the list of supported rates use snd_pcm_hw_constraint_list().
 
-This should go via arm-soc.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130708/77e2db73/attachment.sig>
+> +
+> +	/* set the codec system clock for DAC and ADC */
+> +	ret = snd_soc_dai_set_sysclk(codec_dai, WM8731_SYSCLK_XTAL,
+> +				     MCLK_RATE, SND_SOC_CLOCK_IN);
+> +	if (ret < 0) {
+> +		dev_err(dev, "ASoC: Failed to set WM8731 SYSCLK: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	/* signal a DAPM event */
+> +	snd_soc_dapm_sync(dapm);
+
+This should not be necessary.
+
+> +	return 0;
+> +}
