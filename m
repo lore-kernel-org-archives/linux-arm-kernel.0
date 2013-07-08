@@ -1,64 +1,33 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Mon, 8 Jul 2013 09:32:16 +0200
-Subject: [PATCH v3 4/6] ARM: dts: imx6q{dl}: fix the wrong RTS/CTS pad name
-In-Reply-To: <51DA5CA7.1050305@freescale.com>
-References: <1373004752-21302-1-git-send-email-b32955@freescale.com>
- <1373004752-21302-5-git-send-email-b32955@freescale.com>
- <20130706050803.GC30164@S2101-09.ap.freescale.net>
- <20953.22066.706534.773272@ipc1.ka-ro>
- <51DA5CA7.1050305@freescale.com>
-Message-ID: <20954.27392.875173.755391@ipc1.ka-ro>
+From: wni@nvidia.com (Wei Ni)
+Date: Mon, 8 Jul 2013 15:35:48 +0800
+Subject: [PATCH 1/2] ARM: dt: t30 cardhu: add dt entry for lm90
+In-Reply-To: <51D70483.70203@wwwdotorg.org>
+References: <1372928979-26938-1-git-send-email-wni@nvidia.com>
+ <1372928979-26938-2-git-send-email-wni@nvidia.com>
+ <51D70483.70203@wwwdotorg.org>
+Message-ID: <51DA6BD4.1040300@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Huang Shijie writes:
-> ? 2013?07?07? 19:51, Lothar Wa?mann ??:
-> > Hi,
-> >
-> > Shawn Guo writes:
-> >> On Fri, Jul 05, 2013 at 02:12:30PM +0800, Huang Shijie wrote:
-> >>> There is something wrong with the RTS/CTS pads:
-> >>>    The RTS pad is assigned with the CTS's value;
-> >>>    while the CTS pad is assigned with the RTS's value.
-> >>>
-> >> So basically, you are saying that select_input should be set up for CTS
-> >> rather than RTS.  It seems that the people who generated the macro got
-> >> the wrong input from developer.
-> >>
-> > programming 'select_input' only makes sense for inputs, not outputs.
-> > Since CTS is an output signal, select_input only makes sense for the
-> > RTS function of the pads.
-> Hi Lothar:
+On 07/06/2013 01:38 AM, Stephen Warren wrote:
+> On 07/04/2013 03:09 AM, Wei Ni wrote:
+>> Enable thermal sensor lm90 for t30 cardhu.
 > 
-> In our imx6 Soc, the CTS is used as a input signal, not as a output signal.
+>> diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
 > 
-> I checked two boards, one is imx6q ARM2 armidillo board, one is 
-> imx6-sabreauto board,
-> both the boards use the CTS as a input signal.
+>> +		nct1008: nct1008 {
+>> +			compatible = "lm90,nct1008";
 > 
-that's the problem with the DTE/DCE mode. Depending on the DCEDTE bit
-in the UARTx_UFCR we would need different pad configurations for
-RTS/CTS because in DCE mode CTS is an output and in DTE mode it's an
-input.
-Thus the correct pad config value would need the input_sel on the CTS
-pad definition for DTE mode and on the RTS pad definition for DCE
-mode. Maybe something like:
-#define MX6Q_PAD_EIM_D19__UART1_DCE_CTS_B             0x09c 0x3b0 0x000 0x4 0x0
-#define MX6Q_PAD_EIM_D19__UART1_DCE_RTS_B             0x09c 0x3b0 0x91c 0x4 0x0
-#define MX6Q_PAD_EIM_D19__UART1_DTE_CTS_B             0x09c 0x3b0 0x91c 0x4 0x0
-#define MX6Q_PAD_EIM_D19__UART1_DTE_RTS_B             0x09c 0x3b0 0x000 0x4 0x0
+> "lm90" isn't a valid vendor prefix. I believe the value you want is
+> "onnn,nct1008". Same comment for patch 2/2.
+> 
+The lm90 doesn't support device tree very well. In the DT, we need to
+named as "lm90" so that the lm90 driver can be loaded, and we also need
+to add "nct1008" to indicate this is the nct1008 device, so that the
+lm90 driver can be loaded with the right i2c_device_id->driver_data.
 
+I set the " compatible = "lm90,nct1008" ", this is the simplest way, and
+we doesn't need to change the lm90.c.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Thanks.
+Wei.
