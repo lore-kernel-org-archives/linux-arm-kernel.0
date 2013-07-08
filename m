@@ -1,45 +1,58 @@
-From: javier.picorel@epfl.ch (javier.picorel at epfl.ch)
-Date: Mon, 08 Jul 2013 23:02:30 +0200
-Subject: ARM Cortex A9: User/Kernel filter events
-Message-ID: <20130708230230.23643s488884h59i@webmail.epfl.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 8 Jul 2013 23:04:52 +0200
+Subject: MTD EEPROM support and driver integration
+In-Reply-To: <20130708083614.GP27646@sirena.org.uk>
+References: <20130705201118.GM2959@lukather> <5811519.oHVuMujf0I@wuerfel>
+ <20130706120112.GA11069@lukather> <8997501.Dchyii8uWX@wuerfel>
+ <20130707071501.GD11243@lukather>
+ <20130708083614.GP27646@sirena.org.uk>
+Message-ID: <20130708210452.GL11243@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
+On Mon, Jul 08, 2013 at 09:36:14AM +0100, Mark Brown wrote:
+> On Sun, Jul 07, 2013 at 09:15:01AM +0200, Maxime Ripard wrote:
+> > On Sat, Jul 06, 2013 at 09:06:49PM +0200, Arnd Bergmann wrote:
+> 
+> > > We also have a bunch of OTP drivers spread around the kernel, it probably
+> > > makes sense to consolidate them at the same time, at least on the DT binding
+> > > side if not the device drivers.
+> 
+> > From a quick grep, the only one I've seen so far are:
+> >   - imx6q, that has a hook at machine start to poke into its OCOTP to
+> >     retrieve some frequency scaling parameters it seems. I'm not sure
+> >     how the current solution could improve the situation for this
+> >     use-case, but the DT bindings of the OCOTP is just a DT node, with
+> >     no clients, so we have nothing to worry about here.
+> >   - imx28, that has a hook at machine start to look up the MAC address
+> >     values and patch the ethernet controller nodes to add the right
+> >     local-mac-address property. This one could benefit from the new
+> >     bindings, but we already mentionned it, and I intended to develop
+> >     with an imx28 board anyway.
+> >   - picoxcell-pc3x3 DTSI has a node for a OTP device, but they don't
+> >     seem to be doing anything with it, nor do they seem to have a driver
+> >     for it. So I guess we don't care about migrating for this one
+> >     either.
+> 
+> > Did you have other cases in mind?
+> 
+> We have some OTP support in the ab8500 and wm831x MFD drivers too but
+> they just expose the data.
 
-Is there any reason why ARM Cortex A9 cannot filter user/kernel events?
+I guess you mean ab8100, right?
 
-arch/arm/kernel/perf_event_v7.c
+Anyway, thanks for pointing this out
 
-1144/*
-1145 * Add an event filter to a given event. This will only work for  
-PMUv2 PMUs.
-1146 */
-1147static int armv7pmu_set_event_filter(struct hw_perf_event *event,
-1148                                     struct perf_event_attr *attr)
-1149{
-1150        unsigned long config_base = 0;
-1151
-1152        if (attr->exclude_idle)
-1153                return -EPERM;
-1154        if (attr->exclude_user)
-1155                config_base |= ARMV7_EXCLUDE_USER;
-1156        if (attr->exclude_kernel)
-1157                config_base |= ARMV7_EXCLUDE_PL1;
-1158        if (!attr->exclude_hv)
-1159                config_base |= ARMV7_INCLUDE_HYP;
-1160
-1161        /*
-1162         * Install the filter into config_base as this is used to
-1163         * construct the event type.
-1164         */
-1165        event->config_base = config_base;
-1166
-1167        return 0;
-1168}
+Maxime
 
-It seems that only A15 and A7 are able to do it. Is it a limitation  
-A9's PMU? Thank you!
-
-Best Regards,
-Javier
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130708/9dd335e5/attachment.sig>
