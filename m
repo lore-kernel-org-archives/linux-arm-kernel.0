@@ -1,25 +1,52 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 8 Jul 2013 19:36:45 -0300
-Subject: mx6q boot on linux-next 20130703
-In-Reply-To: <20130704064149.GD14617@S2101-09.ap.freescale.net>
-References: <CAOMZO5DgAu2-cknESp4a675KP5gDrJxM2A_FqUgAZav83Db=fw@mail.gmail.com>
- <CAOMZO5AvXJJHmoEu3BMN=EYCxS4O1-2ivsSzS2eCuyPeiw_brQ@mail.gmail.com>
- <20130704064149.GD14617@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5ALV-cMaMfcgy6QD2=nA=R8xAGMmd=jbm1uWVFsvs-0vA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon,  8 Jul 2013 16:44:55 -0600
+Subject: [PATCH] ARM: mm: restrict early_alloc_aligned to legal area
+Message-ID: <1373323495-10087-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 4, 2013 at 3:41 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Thu, Jul 04, 2013 at 01:08:13AM -0300, Fabio Estevam wrote:
->> On Wed, Jul 3, 2013 at 8:52 PM, Fabio Estevam <festevam@gmail.com> wrote:
->> > Hi,
->> >
->> > I am running linux-next 20130703 on a mx6q board, and seeing a strange
->> > behaviour.
->> >
->> > Only if I enable DEBUG_LL + earlyprintk and disable
->
-> Yes, I see the issue here too, and turning on earlyprintk can remove the
-> issue.
+From: Stephen Warren <swarren@nvidia.com>
 
-linux-next 20130708 does not have this issue anymore.
+When early_alloc_aligned() is called, it appears that only memory in the
+first memory bank is mapped for CPU access. However, memblock_alloc() is
+called to allocate the RAM, and that can return RAM that is part of any
+valid memory bank, which hence could be inaccessible to the CPU. If this
+happens, the subsequent memset() will hang or crash.
+
+Solve this by calling memblock_alloc_base() instead of memblock_alloc().
+This function takes an explicit max address. Use the end of the first
+memory bank as the address.
+
+As an example, this issue can be triggered as follows:
+
+* Total of 512MB system RAM, so it is all lowmem not highmem. Without this,
+  subsequent banks may be ignored by map_lowmem() due to being highmem.
+* RAM is split into multiple banks, due to some RAM somewhere in the
+  middle having been allocated for purposes other than Linux, e.g. an LCD
+  frame-buffer of for a co-processor.
+* Some bank is not section-aligned, so that alloc_init_pte() is called
+  rather than __map_init_section().
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mm/mmu.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index d7229d2..0849741 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -585,7 +585,10 @@ EXPORT_SYMBOL(phys_mem_access_prot);
+ 
+ static void __init *early_alloc_aligned(unsigned long sz, unsigned long align)
+ {
+-	void *ptr = __va(memblock_alloc(sz, align));
++	phys_addr_t max_pa = memblock.memory.regions[0].base +
++				memblock.memory.regions[0].size;
++	phys_addr_t pa = memblock_alloc_base(sz, align, max_pa);
++	void *ptr = __va(pa);
+ 	memset(ptr, 0, sz);
+ 	return ptr;
+ }
+-- 
+1.8.1.5
