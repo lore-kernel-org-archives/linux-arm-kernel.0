@@ -1,145 +1,23 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 8 Jul 2013 22:23:01 +0800
-Subject: [PATCH 1/2] ARM: imx: let L2 initialization be a common function
-In-Reply-To: <1373293383-15128-1-git-send-email-shawn.guo@linaro.org>
-References: <1373293383-15128-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1373293383-15128-2-git-send-email-shawn.guo@linaro.org>
+Date: Mon, 8 Jul 2013 22:23:00 +0800
+Subject: [PATCH 0/2] Optimize L2 setting on imx6sl
+Message-ID: <1373293383-15128-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move imx6q L2 initialization function imx6q_init_l2cache() into
-system.c, and rename it imx_init_l2cache(), so that other platforms
-other than imx6q can also use the function.
+The series leverages the L2 optimization done on imx6q/dl for imx6sl,
+by moving imx6q_init_l2cache() out from mach-imx6q.c into system.c and
+renaming it imx_init_l2cache().
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/common.h     |    6 ++++++
- arch/arm/mach-imx/mach-imx6q.c |   37 +------------------------------------
- arch/arm/mach-imx/system.c     |   33 +++++++++++++++++++++++++++++++++
- 3 files changed, 40 insertions(+), 36 deletions(-)
+Shawn Guo (2):
+  ARM: imx: let L2 initialization be a common function
+  ARM: imx: use imx specific L2 init function on imx6sl
 
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index ee78847..32c751d 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -159,6 +159,12 @@ extern int mx51_neon_fixup(void);
- static inline int mx51_neon_fixup(void) { return 0; }
- #endif
- 
-+#ifdef CONFIG_CACHE_L2X0
-+extern void imx_init_l2cache(void);
-+#else
-+static inline void imx_init_l2cache(void) {}
-+#endif
-+
- extern struct smp_operations imx_smp_ops;
- 
- #endif
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 5d3f76b..400e66b 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -31,7 +31,6 @@
- #include <linux/micrel_phy.h>
- #include <linux/mfd/syscon.h>
- #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
--#include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/system_misc.h>
-@@ -351,44 +350,10 @@ static void __init imx6q_map_io(void)
- 	imx_scu_map_io();
- }
- 
--#ifdef CONFIG_CACHE_L2X0
--static void __init imx6q_init_l2cache(void)
--{
--	void __iomem *l2x0_base;
--	struct device_node *np;
--	unsigned int val;
--
--	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
--	if (!np)
--		goto out;
--
--	l2x0_base = of_iomap(np, 0);
--	if (!l2x0_base) {
--		of_node_put(np);
--		goto out;
--	}
--
--	/* Configure the L2 PREFETCH and POWER registers */
--	val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
--	val |= 0x70800000;
--	writel_relaxed(val, l2x0_base + L2X0_PREFETCH_CTRL);
--	val = L2X0_DYNAMIC_CLK_GATING_EN | L2X0_STNDBY_MODE_EN;
--	writel_relaxed(val, l2x0_base + L2X0_POWER_CTRL);
--
--	iounmap(l2x0_base);
--	of_node_put(np);
--
--out:
--	l2x0_of_init(0, ~0UL);
--}
--#else
--static inline void imx6q_init_l2cache(void) {}
--#endif
--
- static void __init imx6q_init_irq(void)
- {
- 	imx6q_init_revision();
--	imx6q_init_l2cache();
-+	imx_init_l2cache();
- 	imx_src_init();
- 	imx_gpc_init();
- 	irqchip_init();
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index 7cdc79a..f8211f5 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -27,6 +27,7 @@
- #include <asm/system_misc.h>
- #include <asm/proc-fns.h>
- #include <asm/mach-types.h>
-+#include <asm/hardware/cache-l2x0.h>
- 
- #include "common.h"
- #include "hardware.h"
-@@ -95,3 +96,35 @@ void __init mxc_arch_reset_init_dt(void)
- 
- 	clk_prepare(wdog_clk);
- }
-+
-+#ifdef CONFIG_CACHE_L2X0
-+static void __init imx_init_l2cache(void)
-+{
-+	void __iomem *l2x0_base;
-+	struct device_node *np;
-+	unsigned int val;
-+
-+	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
-+	if (!np)
-+		goto out;
-+
-+	l2x0_base = of_iomap(np, 0);
-+	if (!l2x0_base) {
-+		of_node_put(np);
-+		goto out;
-+	}
-+
-+	/* Configure the L2 PREFETCH and POWER registers */
-+	val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
-+	val |= 0x70800000;
-+	writel_relaxed(val, l2x0_base + L2X0_PREFETCH_CTRL);
-+	val = L2X0_DYNAMIC_CLK_GATING_EN | L2X0_STNDBY_MODE_EN;
-+	writel_relaxed(val, l2x0_base + L2X0_POWER_CTRL);
-+
-+	iounmap(l2x0_base);
-+	of_node_put(np);
-+
-+out:
-+	l2x0_of_init(0, ~0UL);
-+}
-+#endif
+ arch/arm/mach-imx/common.h      |    6 ++++++
+ arch/arm/mach-imx/mach-imx6q.c  |   37 +------------------------------------
+ arch/arm/mach-imx/mach-imx6sl.c |    3 +--
+ arch/arm/mach-imx/system.c      |   33 +++++++++++++++++++++++++++++++++
+ 4 files changed, 41 insertions(+), 38 deletions(-)
+
 -- 
 1.7.9.5
