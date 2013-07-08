@@ -1,16 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 8 Jul 2013 09:54:20 +0800
-Subject: [PATCH 0/3] ARM: dts: imx27 phyCARD-S I2C devices
-In-Reply-To: <1373202811-13825-1-git-send-email-mpa@pengutronix.de>
-References: <1373202811-13825-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130708015419.GC21594@S2101-09.ap.freescale.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 08 Jul 2013 11:04:06 +0900
+Subject: [PATCH V4 4/4] video: exynos_dp: Use the generic PHY driver
+In-Reply-To: <1441230.DzaqAQ9HHT@flatron>
+References: <000d01ce7700$222a35a0$667ea0e0$@samsung.com>
+ <1441230.DzaqAQ9HHT@flatron>
+Message-ID: <001a01ce7b7f$6d7bdc60$48739520$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 07, 2013 at 03:13:28PM +0200, Markus Pargmann wrote:
-> Markus Pargmann (3):
->       ARM: dts: imx27 phyCARD-S SOM remove wrong i2c sensor
->       ARM: dts: imx27 phyCARD-S, move i2c1 and owire to rdk
->       ARM: dts: imx27 phyCARD-S, i2c ADC device node
+On Saturday, July 06, 2013 8:04 AM, Tomasz Figa wrote:
+> 
+> Hi Jingoo,
+> 
+> On Tuesday 02 of July 2013 17:42:49 Jingoo Han wrote:
+> > Use the generic PHY API instead of the platform callback to control
+> > the DP PHY.
+> >
+> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> > ---
+> >  .../devicetree/bindings/video/exynos_dp.txt        |   23
+> > +++++--------------- drivers/video/exynos/exynos_dp_core.c
+> > |   16 ++++++++++---- drivers/video/exynos/exynos_dp_core.h
+> >  |    2 ++
+> >  3 files changed, 20 insertions(+), 21 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt
+> > b/Documentation/devicetree/bindings/video/exynos_dp.txt index
+> > 84f10c1..022f4b6 100644
+> > --- a/Documentation/devicetree/bindings/video/exynos_dp.txt
+> > +++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
+> > @@ -1,17 +1,6 @@
+> >  The Exynos display port interface should be configured based on
+> >  the type of panel connected to it.
+> >
+> > -We use two nodes:
+> > -	-dp-controller node
+> > -	-dptx-phy node(defined inside dp-controller node)
+> > -
+> > -For the DP-PHY initialization, we use the dptx-phy node.
+> > -Required properties for dptx-phy:
+> > -	-reg:
+> > -		Base address of DP PHY register.
+> > -	-samsung,enable-mask:
+> > -		The bit-mask used to enable/disable DP PHY.
+> > -
+> 
+> I wonder if this part shouldn't stay here, just marked as deprecated,
+> because compatibility with old dtbs must be preserved (and rest of the
+> patch looks like it is).
 
-All applied, thanks.
+I would like to remove these properties from Documentation.
+But, I will mark it as deprecated as you suggested..
+
+
+Best regards,
+Jingoo Han
