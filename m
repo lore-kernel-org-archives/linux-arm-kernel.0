@@ -1,36 +1,31 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 08 Jul 2013 15:16:46 +0900
-Subject: [PATCH] ARM: shmobile: Minor update for the Lager DT reference code
-Message-ID: <20130708061646.25516.97272.sendpatchset@w520>
+Date: Mon, 08 Jul 2013 15:20:05 +0900
+Subject: [PATCH] ARM: shmobile: Fix EMEV2 clock comment typo
+Message-ID: <20130708062005.25694.62165.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Update the Lager DT reference code to get rid of the redundant
-irqchip header and also make lager_add_standard_devices() static.
+Update the STI timer frequency comment to 32.768 kHz to
+fix 37 kHz typo.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
  Written against "renesas-next-20130704v2"
 
- arch/arm/mach-shmobile/board-lager-reference.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/mach-shmobile/clock-emev2.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
---- 0001/arch/arm/mach-shmobile/board-lager-reference.c
-+++ work/arch/arm/mach-shmobile/board-lager-reference.c	2013-07-08 15:10:21.000000000 +0900
-@@ -19,12 +19,11 @@
-  */
+--- 0001/arch/arm/mach-shmobile/clock-emev2.c
++++ work/arch/arm/mach-shmobile/clock-emev2.c	2013-07-08 15:05:16.000000000 +0900
+@@ -203,7 +203,7 @@ void __init emev2_clock_init(void)
+ 	smu_base = ioremap(EMEV2_SMU_BASE, PAGE_SIZE);
+ 	BUG_ON(!smu_base);
  
- #include <linux/init.h>
--#include <linux/irqchip.h>
- #include <linux/of_platform.h>
- #include <mach/r8a7790.h>
- #include <asm/mach/arch.h>
+-	/* setup STI timer to run on 37.768 kHz and deassert reset */
++	/* setup STI timer to run on 32.768 kHz and deassert reset */
+ 	emev2_smu_write(0, STI_CLKSEL);
+ 	emev2_smu_write(1, STI_RSTCTRL);
  
--void __init lager_add_standard_devices(void)
-+static void __init lager_add_standard_devices(void)
- {
- 	/* clocks are setup late during boot in the case of DT */
- 	r8a7790_clock_init();
