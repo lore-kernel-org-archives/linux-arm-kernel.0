@@ -1,95 +1,54 @@
-From: minggr@gmail.com (Lin Ming)
-Date: Mon, 08 Jul 2013 10:27:15 +0800
-Subject: kernel decompressor problem for ARMv7
-In-Reply-To: <CAF1ivSbOXknHyDMH3RdmSGK2n5o2wVeR5oohCQnZ2gJrgvo=Hw@mail.gmail.com>
-References: <CAF1ivSakn8-HiAf+4_cLRWUUTDP9QBKpAt+hVQoMyAmKZ2-dJA@mail.gmail.com>
- <20130705095757.GA13063@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1307051225240.18597@syhkavp.arg>
- <CAF1ivSbOXknHyDMH3RdmSGK2n5o2wVeR5oohCQnZ2gJrgvo=Hw@mail.gmail.com>
-Message-ID: <1373250435.824.6.camel@minggr>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 8 Jul 2013 10:33:06 +0800
+Subject: [PATCH] ARM: dts: i.MX51: Add WEIM node
+In-Reply-To: <1373094142-24173-1-git-send-email-shc_work@mail.ru>
+References: <1373094142-24173-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20130708023304.GA22636@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2013-07-06 at 00:58 +0800, Lin Ming wrote:
-> On Sat, Jul 6, 2013 at 12:30 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Fri, 5 Jul 2013, Will Deacon wrote:
-> >
-> >> On Fri, Jul 05, 2013 at 09:44:12AM +0100, Lin Ming wrote:
-> >> > Hi all,
-> >>
-> >> Hello,
-> >>
-> >> > I'm porting BSP code from v2.6.36 to v3.10 kernel. It's ARMv7 processor.
-> >>
-> >> Which specific processor/SoC?
-> >>
-> >> > But decompressor doesn't work. With a lot of debug, I finally find
-> >> > below 2 commits related.
-> >> > Kernel uncompress OK with these commits reverted.
-> >> >
-> >> > dbece45: ARM: 7501/1: decompressor: reset ttbcr for VMSA ARMv7 cores
-> >> > (Introduced in v3.6-rc6)
-> >> >
-> >> > 5010192: ARM: 7583/1: decompressor: Enable unaligned memory access for
-> >> > v6 and above
-> >> > (Introduced in v3.7-rc8)
-> >> >
-> >> > Any hint to fix it?
-> >>
-> >> There's not really enough information to go on here. What specifically
-> >> fails? Also, do you have to revert *both* of the above changes to get things
-> >> working again?
-> >
-> > Also, what is the bootloader used here?
+On Sat, Jul 06, 2013 at 11:02:22AM +0400, Alexander Shiyan wrote:
+> This patch adds the missing (Wireless External Interface Module) WEIM
+> devicetree node for i.MX51 CPUs.
 > 
-> uboot.
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/boot/dts/imx51.dtsi | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
 > 
-> >
-> > Does the bootloader call the kernel with the MMU off as documented in
-> > Documentation/arm/Booting?
+> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+> index 0ca62be..e71976e4 100644
+> --- a/arch/arm/boot/dts/imx51.dtsi
+> +++ b/arch/arm/boot/dts/imx51.dtsi
+> @@ -745,6 +745,23 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			weim: weim at 83fda000 {
+> +				#address-cells = <2>;
+> +				#size-cells = <1>;
+> +				compatible = "fsl,imx51-weim";
+> +				reg = <0x83fda000 0x1000>;
+> +				clocks = <&clks 0>;
+
+Is it correct?  I think there should be a physical clock for weim.
+
+Shawn
+
+> +				ranges = <
+> +					0 0 0xb0000000 0x08000000
+> +					1 0 0xb8000000 0x08000000
+> +					2 0 0xc0000000 0x08000000
+> +					3 0 0xc8000000 0x04000000
+> +					4 0 0xcc000000 0x02000000
+> +					5 0 0xce000000 0x02000000
+> +				>;
+> +				status = "disabled";
+> +			};
+> +
+>  			nfc: nand at 83fdb000 {
+>  				compatible = "fsl,imx51-nand";
+>  				reg = <0x83fdb000 0x1000 0xcfff0000 0x10000>;
+> -- 
+> 1.8.1.5
 > 
-> How to check this?
-> 
-> I'll check uboot code or add debug code in boot/compressed/head.S to
-> check it next Monday.
-
-I added below debug code to print the control reg from lowest 4bits to
-highest 4bits.
-
-It prints "B7805C". So the control reg is 0x00c5087b.
-Seems bootloader calls the kernel with MMU enabled and Alignment fault
-checking enabled.
-
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 32337ff..9434720 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -125,6 +125,23 @@
- 		.rept	7
- 		mov	r0, r0
- 		.endr
-+
-+		/* Dirty debug code to print control reg from lowest 4bits to highest 4bits */
-+		ldr     r2, =0xf0070120		@ UART
-+		mrc     p15, 0, r0, c1, c0, 0   @ read control reg
-+	1:
-+		cmp     r0, #0
-+		beq	2f
-+		and     r1, r0, #15
-+		cmp	r1, #9
-+		addgt	r1, r1, #7
-+		add	r1, r1, #48
-+		str     r1, [r2]
-+		asr     r0, r0, #4
-+		b	1b
-+	2:
-+
-+
-    ARM(		mov	r0, r0		)
-    ARM(		b	1f		)
-  THUMB(		adr	r12, BSYM(1f)	)
-
-
-> 
-> >
-> > Nicolas
