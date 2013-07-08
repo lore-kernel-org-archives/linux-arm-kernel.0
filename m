@@ -1,49 +1,28 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Mon, 8 Jul 2013 01:21:53 +0000
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <201307070310.00973.marex@denx.de>
-References: <51A5A808.2070803@digi.com> <201306281142.51676.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803EFF551@039-SN2MPN1-023.039d.mgd.msft.net>
- <201307070310.00973.marex@denx.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803F28763@039-SN2MPN1-021.039d.mgd.msft.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 8 Jul 2013 09:27:31 +0800
+Subject: [PATCH] ARM: dts: imx: Add the missing cpus node
+In-Reply-To: <1373203228.792969663@f375.mail.ru>
+References: <1373202750-10298-1-git-send-email-festevam@gmail.com>
+ <1373203228.792969663@f375.mail.ru>
+Message-ID: <20130708012729.GA21594@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-
-> -----Original Message-----
-> From: Marek Vasut [mailto:marex at denx.de]
-> Sent: Sunday, July 07, 2013 9:10 AM
-> To: Chen Peter-B29397
-> Cc: shawn.guo at linaro.org; Michael Grzeschik; maxime.ripard at free-
-> electrons.com; Hector Palacios; linux-usb at vger.kernel.org;
-> s.hauer at pengutronix.de; alexander.shishkin at linux.intel.com; Estevam
-> Fabio-R49496; Marc Kleine-Budde; m.grzeschik at pengutronix.de; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: Chipidea usb otg support for IMX/MXS (device functionality)
+On Sun, Jul 07, 2013 at 05:20:28PM +0400, Alexander Shiyan wrote:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > To make it consistent with the other i.mx SoCs, let's add the cpus nodes.
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/imx25.dtsi | 10 ++++++++++
+> >  arch/arm/boot/dts/imx27.dtsi | 10 ++++++++++
+> >  arch/arm/boot/dts/imx31.dtsi | 10 ++++++++++
+> >  arch/arm/boot/dts/imx53.dtsi | 10 ++++++++++
+> >  4 files changed, 40 insertions(+)
 > 
-> Hi Peter,
-> 
-> > > Where can I measure this?
-> > >
-> > > > Two possible reasons:
-> > > >
-> > > > 1. You have not gpio control for vbus toggle when role switches.
-> > >
-> > > This works well.
-> > >
-> > > > 2. Your hardware has some problems that the vbus can't lower than
-> 0.8v.
-> > >
-> > > How can I check that?
-> >
-> > Just measure the voltage of your otg vbus pin.
-> 
-> It's 2.5 volt for me. What am I supposed to observe happening there?
-> 
+> i.MX27 have a CPU node already.
 
-http://marc.info/?l=linux-usb&m=137242465920952&w=2
+Applied with imx27.dtsi changes left out.
 
-
-Best regards,
-Peter
+Shawn
