@@ -1,78 +1,38 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 8 Jul 2013 09:27:40 -0700
-Subject: [PATCH] clocksource/cadence_ttc: Reuse clocksource as sched_clock
-In-Reply-To: <alpine.DEB.2.02.1307051819530.32106@ionos.tec.linutronix.de>
-References: <1372888216-10726-1-git-send-email-soren.brinkmann@xilinx.com>
- <alpine.DEB.2.02.1307050819000.11637@ionos.tec.linutronix.de>
- <fbeb6f36-f07a-4518-b6f2-0b8e36028fe9@CH1EHSMHS012.ehs.local>
- <alpine.DEB.2.02.1307051802560.32106@ionos.tec.linutronix.de>
- <e55e70b7-7e63-4718-ad48-f5d4479b5326@DB9EHSMHS006.ehs.local>
- <alpine.DEB.2.02.1307051819530.32106@ionos.tec.linutronix.de>
-Message-ID: <ad28a9ee-541e-4b28-8b4e-9ebb2e1c4283@TX2EHSMHS015.ehs.local>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Mon, 08 Jul 2013 09:34:23 -0700
+Subject: [PATCH v2 2/3] iommu: add support for ARM Ltd. System MMU
+ architecture
+In-Reply-To: <1372095086-15681-3-git-send-email-will.deacon@arm.com>
+References: <1372095086-15681-1-git-send-email-will.deacon@arm.com>
+ <1372095086-15681-3-git-send-email-will.deacon@arm.com>
+Message-ID: <51DAEA0F.2030808@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 05, 2013 at 06:23:19PM +0200, Thomas Gleixner wrote:
-> On Fri, 5 Jul 2013, S?ren Brinkmann wrote:
-> > On Fri, Jul 05, 2013 at 06:05:14PM +0200, Thomas Gleixner wrote:
-> > > On Fri, 5 Jul 2013, S?ren Brinkmann wrote:
-> > > > On Fri, Jul 05, 2013 at 08:30:47AM +0200, Thomas Gleixner wrote:
-> > > > > On Wed, 3 Jul 2013, Soren Brinkmann wrote:
-> > > > > 
-> > > > > > Reuse the TTC clocksource timer as sched clock, too. Since only a single
-> > > > > > sched clock is supported in Linux, this feature optional and can be
-> > > > > > selected through Kconfig.
-> > > > > 
-> > > > > This changelog doesn't make sense.
-> > > > > 
-> > > > > There can be only one active sched_clock, but that does no mean, that
-> > > > > you cannot have different implementations compiled in.
-> > > > > 
-> > > > > So if you disable this config which sched_clock is your kernel using?
-> > > > Jiffies
-> > > > 
-> > > > > And if you enable it, how is guaranteed that you end up with the ttc
-> > > > > sched_clock as the active one? Just due to initcall ordering?
-> > > > I assumed so. Is there a different mechanism?
-> > > 
-> > > jiffies is the default one. If you setup an explicit sched clock then
-> > > this is used. initcall ordering only matters if you have two possible
-> > > sched clocks which might replace jiffies. The one which gets
-> > > registered last wins.
-> > > 
-> > > So the question is, why you want to disable your sched clock at
-> > > compile time.
-> > The timer drivers I have seen unconditionally register themselves as
-> > sched_clock. There does not seem to be a runtime mechanism to choose the
-> > best one - I might miss it though.
-> > I was thinking about this due to the arm_global_timer driver which has
-> > been dicussed on lkml recently, which seemed to do it this way too. And since
-> > that timer would be an alternative sched_clock for Zynq too, I thought I
-> > follow the same approach for the TTC.
+On 6/24/2013 10:31 AM, Will Deacon wrote:
+> This patch adds support for SMMUs implementing the ARM System MMU
+> architecture versions 1 or 2. Both arm and arm64 are supported, although
+> the v7s descriptor format is not used.
 > 
-> Hmm, ok. So there is a generic one as well. If we end up with multiple
-> choices for that sched_clock, then there should be a mechanism to
-> avoid that #ifdeffery and have it runtime selected.
-> 
-> Having a setup call with a rating argument would be a first step. So
-> the one with the highest rating wins. If people want to have it
-> selectable from the kernel commandline, it would need some string
-> matching as well.
-I revisited the code:
-My original reason for adding the Kconfig option was that I hit this
-warning when I had multiple sched_clock providers:
-	arch/arm/kernel/sched_clock.c:setup_sched_clock():
-		WARN_ON(read_sched_clock != jiffy_sched_clock_read);
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> Cc: Olav Haugan <ohaugan@codeaurora.org>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> +/* Maximum number of stream IDs assigned to a single device */
+> +#define MAX_MASTER_STREAMIDS		8
+> +
 
-That code is gone in the lates Linux tree.
+Hi Will,
 
-Furthermore the now used setup_sched_clock routine, only updates the
-sched clock provider, if the new one is faster than the old one:
-	if (cd.rate > rate)                                                      
-                return;
+We have designs that require more than 8 Stream IDs. Instead of hard
+coding it to max of 8 can you make this dynamic?
 
-Which is good enough in terms of a rating mechanism, at least for this case.
+Thanks,
 
-So, I'll remove all the #ifdefs and Kconfig stuff and send a v2.
+Olav Haugan
 
-	S?ren
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
