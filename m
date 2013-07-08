@@ -1,50 +1,49 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 7 Jul 2013 20:04:01 -0400
-Subject: [GIT PULL] clockevents/clocksource: Add Marvell Orion SoC timer
-In-Reply-To: <51D99B1B.7050106@linaro.org>
-References: <51B8D310.4050404@linaro.org> <51D9548B.9040907@gmail.com>
- <alpine.DEB.2.02.1307071508030.32106@ionos.tec.linutronix.de>
- <20130707144645.GA11908@titan.lakedaemon.net>
- <alpine.DEB.2.02.1307071723220.32106@ionos.tec.linutronix.de>
- <51D99B1B.7050106@linaro.org>
-Message-ID: <20130708000401.GC11908@titan.lakedaemon.net>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Mon, 8 Jul 2013 01:21:53 +0000
+Subject: Chipidea usb otg support for IMX/MXS (device functionality)
+In-Reply-To: <201307070310.00973.marex@denx.de>
+References: <51A5A808.2070803@digi.com> <201306281142.51676.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803EFF551@039-SN2MPN1-023.039d.mgd.msft.net>
+ <201307070310.00973.marex@denx.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803F28763@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 07, 2013 at 06:45:15PM +0200, Daniel Lezcano wrote:
-> On 07/07/2013 05:30 PM, Thomas Gleixner wrote:
-> > On Sun, 7 Jul 2013, Jason Cooper wrote:
-> >> Sure, but to be clear, Daniel, please drop this patch from your tree.  I
-> >> have no desire to create an out-of-tree dependency if we can avoid it.
-> >> It has a habit of going horribly wrong [1].
-> >>
-> >> I'll cherry-pick
-> >>
-> >>   0c1dcfd clocksource: Add Marvell Orion SoC timer
-> > 
-> > Don't do that. Do a git fetch on that branch and then git merge
-> > 0c1dcfd. The patches before that Marvel commit are already in Linus
-> > tree. That way it does not matter who sends first or not.
-> > 
-> > We don't force others to drop stuff and cherry picking is a nuisance
-> > as well as you end up with two different commits doing the same thing.
-> > 
-> > Also for the next merge window: Can we please let everything under
-> > drivers/clocksoure go through Daniels and my trees?
-> > 
-> > I'm starting to be grumpy about anyone thinking that this directory is
-> > a public dump ground with no rules.
+ 
+
+> -----Original Message-----
+> From: Marek Vasut [mailto:marex at denx.de]
+> Sent: Sunday, July 07, 2013 9:10 AM
+> To: Chen Peter-B29397
+> Cc: shawn.guo at linaro.org; Michael Grzeschik; maxime.ripard at free-
+> electrons.com; Hector Palacios; linux-usb at vger.kernel.org;
+> s.hauer at pengutronix.de; alexander.shishkin at linux.intel.com; Estevam
+> Fabio-R49496; Marc Kleine-Budde; m.grzeschik at pengutronix.de; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: Chipidea usb otg support for IMX/MXS (device functionality)
 > 
-> Yes I agree. I will meet John this week and we will sort out this and
-> define a clear set of rules to prevent that to happen again.
+> Hi Peter,
+> 
+> > > Where can I measure this?
+> > >
+> > > > Two possible reasons:
+> > > >
+> > > > 1. You have not gpio control for vbus toggle when role switches.
+> > >
+> > > This works well.
+> > >
+> > > > 2. Your hardware has some problems that the vbus can't lower than
+> 0.8v.
+> > >
+> > > How can I check that?
+> >
+> > Just measure the voltage of your otg vbus pin.
+> 
+> It's 2.5 volt for me. What am I supposed to observe happening there?
+> 
 
-Oh god no!  The rules we have are fine.  "Defer to the appropriate
-maintainer first."  Which I did (that's why the patch is in your tree
-;-) ).  A mistake happened, and we're working together to find the best
-solution.
+http://marc.info/?l=linux-usb&m=137242465920952&w=2
 
-The last thing we need is more bureaucratic crap.
 
-thx,
-
-Jason.
+Best regards,
+Peter
