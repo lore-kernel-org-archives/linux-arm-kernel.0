@@ -1,23 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Jul 2013 04:54:06 -0700
-Subject: [PATCH RFC 2/9] ARM: debug: clean up low level kernel
- debugging selection
-In-Reply-To: <E1UvoLJ-0006He-RH@rmk-PC.arm.linux.org.uk>
-References: <20130707124326.GP24642@n2100.arm.linux.org.uk>
- <E1UvoLJ-0006He-RH@rmk-PC.arm.linux.org.uk>
-Message-ID: <20130708115406.GV5523@atomide.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 8 Jul 2013 14:04:43 +0200
+Subject: pali's n900 tree: fix compilation
+Message-ID: <20130708120443.GA2158@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King <rmk+kernel@arm.linux.org.uk> [130707 05:57]:
-> It is silly to bury UART selection under multiple levels of choice
-> statements, where the top level choice statement will only list
-> about four entries when a single SoC is selected.  Move the UART
-> selection up into the top level choice statement as it was always
-> intended to be.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Hi!
 
-Nice, works for me:
+This fixes compilation w/o CONFIG_TWL4030_MADC.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Please apply :-).
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+diff --git a/arch/arm/mach-omap2/board-rx51-compat.c b/arch/arm/mach-omap2/board-rx51-compat.c
+index ceabe8b..f3a82a3 100644
+--- a/arch/arm/mach-omap2/board-rx51-compat.c
++++ b/arch/arm/mach-omap2/board-rx51-compat.c
+@@ -125,6 +125,7 @@ static long twl4030_madc_ioctl(struct file *filp, unsigned int cmd,
+ 	}
+ 
+ 	switch (cmd) {
++#ifdef CONFIG_TWL4030_MADC
+ 	case TWL4030_MADC_IOCX_ADC_RAW_READ: {
+ 		struct twl4030_madc_request req;
+ 		if (par.channel >= TWL4030_MADC_MAX_CHANNELS)
+@@ -148,6 +149,7 @@ static long twl4030_madc_ioctl(struct file *filp, unsigned int cmd,
+ 		}
+ 		break;
+ 	}
++#endif
+ 	default:
+ 		return -EINVAL;
+ 	}
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
