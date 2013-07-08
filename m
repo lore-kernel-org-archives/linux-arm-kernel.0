@@ -1,239 +1,121 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 8 Jul 2013 10:21:09 +0300
-Subject: [PATCH v3 4/4] USB: OMAP1: Tahvo USB transceiver driver
-In-Reply-To: <1371575221-360-5-git-send-email-aaro.koskinen@iki.fi>
-References: <1371575221-360-1-git-send-email-aaro.koskinen@iki.fi>
- <1371575221-360-5-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <20130708072109.GA16635@arwen.pp.htv.fi>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 8 Jul 2013 10:28:56 +0300
+Subject: [PATCH 2/4] ARM: OMAP5: clockdomain data: add init file for
+ omap54xx
+In-Reply-To: <20130628210351.14831.19618@quantum>
+References: <1372322299-25046-1-git-send-email-t-kristo@ti.com>
+ <1372322299-25046-3-git-send-email-t-kristo@ti.com>
+ <20130628210351.14831.19618@quantum>
+Message-ID: <51DA6A38.8010503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/29/2013 12:03 AM, Mike Turquette wrote:
+> Quoting Tero Kristo (2013-06-27 01:38:17)
+>> cclock54xx_data.c now contains only init function and the clkdev mapping
+>> that is still needed by some drivers. Eventually most of this file can
+>> be removed, once a common location for the clk init can be found, and
+>> the clkdev mapping is no longer needed.
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/cclock54xx_data.c |   80 +++++++++++++++++++++++++++++++++
+>>   1 file changed, 80 insertions(+)
+>>   create mode 100644 arch/arm/mach-omap2/cclock54xx_data.c
+>>
+>> diff --git a/arch/arm/mach-omap2/cclock54xx_data.c b/arch/arm/mach-omap2/cclock54xx_data.c
+>> new file mode 100644
+>
+> Why not drivers/clk/omap/clk-omap54xx.c?
 
-On Tue, Jun 18, 2013 at 08:07:01PM +0300, Aaro Koskinen wrote:
-> +static ssize_t vbus_state_show(struct device *device,
-> +			       struct device_attribute *attr, char *buf)
-> +{
-> +	struct tahvo_usb *tu = dev_get_drvdata(device);
-> +	return sprintf(buf, "%d\n", tu->vbus_state);
-> +}
-> +static DEVICE_ATTR(vbus_state, 0444, vbus_state_show, NULL);
+Hey Mike,
 
-VBUS status sounds generic enough, also, you should be printing on/off
-here instead of tahvo-specific values. Some users might not have access
-to the docs, or even the kernel sources, to understand what that integer
-means.
+I can move this over in the next rev. I can do the same for the 
+cclock44xx_data.c file in the O4 series.
 
-> +static void tahvo_usb_become_host(struct tahvo_usb *tu)
-> +{
-> +	struct retu_dev *rdev = dev_get_drvdata(tu->pt_dev->dev.parent);
-> +
-> +	extcon_set_cable_state(&tu->extcon, "USB-HOST", true);
-> +
-> +	/* Power up the transceiver in USB host mode */
-> +	retu_write(rdev, TAHVO_REG_USBR, USBR_REGOUT | USBR_NSUSPEND |
-> +		   USBR_MASTER_SW2 | USBR_MASTER_SW1);
-> +	tu->phy.state = OTG_STATE_A_IDLE;
-> +
-> +	check_vbus_state(tu);
-> +}
-> +
-> +static void tahvo_usb_stop_host(struct tahvo_usb *tu)
-> +{
-> +	tu->phy.state = OTG_STATE_A_IDLE;
+-Tero
 
-shouldn't you undo tahvo_usb_become_host() here ? I mean, set the
-transceiver to SLAVE ?
-
-> +static int tahvo_usb_set_host(struct usb_otg *otg, struct usb_bus *host)
-> +{
-> +	struct tahvo_usb *tu = container_of(otg->phy, struct tahvo_usb, phy);
-> +
-> +	dev_dbg(&tu->pt_dev->dev, "%s %p\n", __func__, host);
-> +
-> +	if (otg == NULL)
-> +		return -ENODEV;
-> +
-> +	mutex_lock(&tu->serialize);
-> +
-> +	if (host == NULL) {
-> +		if (tu->tahvo_mode == TAHVO_MODE_HOST)
-> +			tahvo_usb_power_off(tu);
-> +		otg->host = NULL;
-> +		mutex_unlock(&tu->serialize);
-> +		return 0;
-> +	}
-> +
-> +	if (tu->tahvo_mode == TAHVO_MODE_HOST) {
-> +		otg->host = NULL;
-> +		tahvo_usb_become_host(tu);
-> +	}
-> +
-> +	otg->host = host;
-> +
-> +	mutex_unlock(&tu->serialize);
-> +
-> +	return 0;
-> +}
-> +
-> +static int tahvo_usb_set_peripheral(struct usb_otg *otg,
-> +				    struct usb_gadget *gadget)
-
-I want to get rid of the extra 'gadget' and 'host' parameters on
-->set_host() and ->set_peripheral(). Nobody really uses them other than:
-
-my_phy->phy.otg->{gadget,host} = {gadget,host};
-
-For that, I need all other PHYs to stop relying on those parameters and
-I'll cook patches for that for v3.12 merge window.
-
-> +static ssize_t otg_mode_store(struct device *device,
-> +			      struct device_attribute *attr,
-> +			      const char *buf, size_t count)
-> +{
-> +	struct tahvo_usb *tu = dev_get_drvdata(device);
-> +	int r;
-> +
-> +	mutex_lock(&tu->serialize);
-> +	if (count >= 4 && strncmp(buf, "host", 4) == 0) {
-> +		if (tu->tahvo_mode == TAHVO_MODE_PERIPHERAL)
-> +			tahvo_usb_stop_peripheral(tu);
-> +		tu->tahvo_mode = TAHVO_MODE_HOST;
-> +		if (tu->phy.otg->host) {
-> +			dev_info(device, "HOST mode: host controller present\n");
-> +			tahvo_usb_become_host(tu);
-> +		} else {
-> +			dev_info(device, "HOST mode: no host controller, powering off\n");
-> +			tahvo_usb_power_off(tu);
-> +		}
-> +		r = strlen(buf);
-> +	} else if (count >= 10 && strncmp(buf, "peripheral", 10) == 0) {
-> +		if (tu->tahvo_mode == TAHVO_MODE_HOST)
-> +			tahvo_usb_stop_host(tu);
-> +		tu->tahvo_mode = TAHVO_MODE_PERIPHERAL;
-> +		if (tu->phy.otg->gadget) {
-> +			dev_info(device, "PERIPHERAL mode: gadget driver present\n");
-> +			tahvo_usb_become_peripheral(tu);
-> +		} else {
-> +			dev_info(device, "PERIPHERAL mode: no gadget driver, powering off\n");
-> +			tahvo_usb_power_off(tu);
-> +		}
-> +		r = strlen(buf);
-> +	} else {
-> +		r = -EINVAL;
-> +	}
-> +	mutex_unlock(&tu->serialize);
-> +
-> +	return r;
-> +}
-> +
-> +static DEVICE_ATTR(otg_mode, 0644, otg_mode_show, otg_mode_store);
-
-this looks like something which would be very nice if implemented
-generically. Since you, anyway miss the documentation in
-Documentation/ABI/ and need to respin the patch, how about making this
-generic ?
-
-> +static int tahvo_usb_probe(struct platform_device *pdev)
-> +{
-> +	struct retu_dev *rdev = dev_get_drvdata(pdev->dev.parent);
-> +	struct tahvo_usb *tu;
-> +	int ret;
-> +
-> +	tu = devm_kzalloc(&pdev->dev, sizeof(*tu), GFP_KERNEL);
-> +	if (!tu)
-> +		return -ENOMEM;
-> +
-> +	tu->phy.otg = devm_kzalloc(&pdev->dev, sizeof(*tu->phy.otg),
-> +				   GFP_KERNEL);
-> +	if (!tu->phy.otg)
-> +		return -ENOMEM;
-> +
-> +	tu->pt_dev = pdev;
-> +
-> +	/* Default mode */
-> +#ifdef CONFIG_TAHVO_USB_HOST_BY_DEFAULT
-> +	tu->tahvo_mode = TAHVO_MODE_HOST;
-> +#else
-> +	tu->tahvo_mode = TAHVO_MODE_PERIPHERAL;
-> +#endif
-
-should you call become_host()/become_peripheral() here ?
-
-> +	mutex_init(&tu->serialize);
-> +
-> +	tu->ick = devm_clk_get(&pdev->dev, "usb_l4_ick");
-> +	if (!IS_ERR(tu->ick))
-> +		clk_enable(tu->ick);
-> +
-> +	/*
-> +	 * Set initial state, so that we generate kevents only on state changes.
-> +	 */
-> +	tu->vbus_state = retu_read(rdev, TAHVO_REG_IDSR) & TAHVO_STAT_VBUS;
-> +
-> +	tu->extcon.name = DRIVER_NAME;
-> +	tu->extcon.supported_cable = tahvo_cable;
-> +	ret = extcon_dev_register(&tu->extcon, &pdev->dev);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "could not register extcon device: %d\n",
-> +			ret);
-> +		return ret;
-> +	}
-> +
-> +	/* Set the initial cable state. */
-> +	extcon_set_cable_state(&tu->extcon, "USB-HOST",
-> +			       tu->tahvo_mode == TAHVO_MODE_HOST);
-> +	extcon_set_cable_state(&tu->extcon, "USB", tu->vbus_state);
-> +
-> +	tu->irq = platform_get_irq(pdev, 0);
-> +	ret = request_threaded_irq(tu->irq, NULL, tahvo_usb_vbus_interrupt, 0,
-> +				   "tahvo-vbus", tu);
-
-since your hardirq handler is NULL, you *must* pass IRQF_ONESHOT. /Could
-also use devm_request_threaded_irq()
-
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "could not register tahvo-vbus irq: %d\n",
-> +			ret);
-> +		goto err_disable_clk;
-> +	}
-> +
-> +	/* Attributes */
-> +	ret = device_create_file(&pdev->dev, &dev_attr_vbus_state);
-> +	ret |= device_create_file(&pdev->dev, &dev_attr_otg_mode);
-
-heh, Greg wrote a very interesting article recently (look at his blog)
-discussing kernel/userland races wrt creation of sysfs files.
-
-> +	/* Create OTG interface */
-> +	tahvo_usb_power_off(tu);
-> +	tu->phy.dev = &pdev->dev;
-> +	tu->phy.state = OTG_STATE_UNDEFINED;
-> +	tu->phy.label = DRIVER_NAME;
-> +	tu->phy.set_suspend = tahvo_usb_set_suspend;
-> +
-> +	tu->phy.otg->phy = &tu->phy;
-> +	tu->phy.otg->set_host = tahvo_usb_set_host;
-> +	tu->phy.otg->set_peripheral = tahvo_usb_set_peripheral;
-> +
-> +	ret = usb_add_phy(&tu->phy, USB_PHY_TYPE_USB2);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "cannot register USB transceiver: %d\n",
-> +			ret);
-> +		goto err_free_irq;
-> +	}
-> +
-> +	dev_set_drvdata(&pdev->dev, tu);
-
-what if someone accesses the sysfs file you've already created before
-you call dev_set_drvdata? (not sure  if it's possible).
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130708/fbd977f2/attachment.sig>
+>
+> Regards,
+> Mike
+>
+>> index 0000000..f23f44e
+>> --- /dev/null
+>> +++ b/arch/arm/mach-omap2/cclock54xx_data.c
+>> @@ -0,0 +1,74 @@
+>> +/*
+>> + * OMAP54xx Clock data
+>> + *
+>> + * Copyright (C) 2013 Texas Instruments, Inc.
+>> + *
+>> + * Paul Walmsley (paul at pwsan.com)
+>> + * Rajendra Nayak (rnayak at ti.com)
+>> + * Benoit Cousson (b-cousson at ti.com)
+>> + * Mike Turquette (mturquette at linaro.org)
+>> + * Tero Kristo (t-kristo at ti.com)
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/list.h>
+>> +#include <linux/clkdev.h>
+>> +#include <linux/io.h>
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/clk/omap.h>
+>> +
+>> +#include "soc.h"
+>> +#include "clock.h"
+>> +
+>> +#define OMAP5_DPLL_ABE_DEFFREQ                         98304000
+>> +
+>> +/*
+>> + * clkdev
+>> + */
+>> +static struct omap_dt_clk omap54xx_clks[] = {
+>> +       DT_CLK(NULL,    "timer_32k_ck", "sys_32k_ck"),
+>> +       DT_CLK("omap_timer.1",  "sys_ck",               "sys_clkin"),
+>> +       DT_CLK("omap_timer.2",  "sys_ck",               "sys_clkin"),
+>> +       DT_CLK("omap_timer.3",  "sys_ck",               "sys_clkin"),
+>> +       DT_CLK("omap_timer.4",  "sys_ck",               "sys_clkin"),
+>> +       DT_CLK("omap_timer.9",  "sys_ck",               "sys_clkin"),
+>> +       DT_CLK("omap_timer.10", "sys_ck",               "sys_clkin"),
+>> +       DT_CLK("omap_timer.11", "sys_ck",               "sys_clkin"),
+>> +       DT_CLK("omap_timer.5",  "sys_ck",               "dss_syc_gfclk_div"),
+>> +       DT_CLK("omap_timer.6",  "sys_ck",               "dss_syc_gfclk_div"),
+>> +       DT_CLK("omap_timer.7",  "sys_ck",               "dss_syc_gfclk_div"),
+>> +       DT_CLK("omap_timer.8",  "sys_ck",               "dss_syc_gfclk_div"),
+>> +};
+>> +
+>> +int __init omap5xxx_clk_init(void)
+>> +{
+>> +       struct clk *abe_dpll_ref, *sys_32k_ck, *abe_dpll;
+>> +       int rc;
+>> +
+>> +       /*
+>> +        * Must stay commented until all OMAP SoC drivers are
+>> +        * converted to runtime PM, or drivers may start crashing
+>> +        *
+>> +        * omap2_clk_disable_clkdm_control();
+>> +        */
+>> +       dt_omap_clk_init();
+>> +
+>> +       omap_dt_clocks_register(omap54xx_clks, ARRAY_SIZE(omap54xx_clks));
+>> +
+>> +       omap2_clk_disable_autoidle_all();
+>> +
+>> +       abe_dpll_ref = clk_get_sys(NULL, "abe_dpll_clk_mux");
+>> +       sys_32k_ck = clk_get_sys(NULL, "sys_32k_ck");
+>> +       rc = clk_set_parent(abe_dpll_ref, sys_32k_ck);
+>> +       abe_dpll = clk_get_sys(NULL, "dpll_abe_ck");
+>> +       if (!rc)
+>> +               rc = clk_set_rate(abe_dpll, OMAP5_DPLL_ABE_DEFFREQ);
+>> +       if (rc)
+>> +               pr_err("%s: failed to configure ABE DPLL!\n", __func__);
+>> +
+>> +       return 0;
+>> +}
+>> --
+>> 1.7.9.5
