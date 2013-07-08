@@ -1,38 +1,22 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Mon, 08 Jul 2013 09:34:23 -0700
-Subject: [PATCH v2 2/3] iommu: add support for ARM Ltd. System MMU
- architecture
-In-Reply-To: <1372095086-15681-3-git-send-email-will.deacon@arm.com>
-References: <1372095086-15681-1-git-send-email-will.deacon@arm.com>
- <1372095086-15681-3-git-send-email-will.deacon@arm.com>
-Message-ID: <51DAEA0F.2030808@codeaurora.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 8 Jul 2013 10:42:25 -0600
+Subject: [PATCH v6 00/21] MBus DT binding: PCIe strikes back
+In-Reply-To: <201307060138.36191.arnd@arndb.de>
+References: <1373060372-32357-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130706013547.3ce7280b@skate> <201307060138.36191.arnd@arndb.de>
+Message-ID: <20130708164225.GA26618@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/24/2013 10:31 AM, Will Deacon wrote:
-> This patch adds support for SMMUs implementing the ARM System MMU
-> architecture versions 1 or 2. Both arm and arm64 are supported, although
-> the v7s descriptor format is not used.
+On Sat, Jul 06, 2013 at 01:38:35AM +0200, Arnd Bergmann wrote:
+> On Saturday 06 July 2013, Thomas Petazzoni wrote:
+> > Arnd, Jason, if you could confirm that you both agree with this DT
+> > binding soon, Ezequiel and I would quickly adapt the code accordingly,
+> > and hopefully converge towards a final patch set.
 > 
-> Cc: Rob Herring <robherring2@gmail.com>
-> Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> Cc: Olav Haugan <ohaugan@codeaurora.org>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> +/* Maximum number of stream IDs assigned to a single device */
-> +#define MAX_MASTER_STREAMIDS		8
-> +
+> Looks all good from what I can tell.
 
-Hi Will,
+It also looks fine to me.
 
-We have designs that require more than 8 Stream IDs. Instead of hard
-coding it to max of 8 can you make this dynamic?
-
-Thanks,
-
-Olav Haugan
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Jsaon
