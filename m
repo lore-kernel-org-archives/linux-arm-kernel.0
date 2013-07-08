@@ -1,39 +1,31 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 8 Jul 2013 14:04:43 +0200
-Subject: pali's n900 tree: fix compilation
-Message-ID: <20130708120443.GA2158@amd.pavel.ucw.cz>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Mon, 8 Jul 2013 14:09:10 +0200
+Subject: [PATCH v3 4/4] ARM: reinsert ARCH_MULTI_V4 Kconfig option
+In-Reply-To: <1372949142-8260-1-git-send-email-jonas.jensen@gmail.com>
+References: <1372949142-8260-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <CACmBeS3Ges44HxOGZns+G=jQhSmGjVmZBir2_ZBXT1i2nrNQwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Arnd suggested removing one (or many) of the options:
 
-This fixes compilation w/o CONFIG_TWL4030_MADC.
+CPU_ABRT_EV4T
+CPU_CACHE_V4WT
+CPU_COPY_V4WB
+CPU_TLB_V4WBI
 
-Please apply :-).
+However boot is still broken after removing all including CPU_32v4T.
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+Selecting CPU_SA1100 instead, it boots normally and init works.
 
-diff --git a/arch/arm/mach-omap2/board-rx51-compat.c b/arch/arm/mach-omap2/board-rx51-compat.c
-index ceabe8b..f3a82a3 100644
---- a/arch/arm/mach-omap2/board-rx51-compat.c
-+++ b/arch/arm/mach-omap2/board-rx51-compat.c
-@@ -125,6 +125,7 @@ static long twl4030_madc_ioctl(struct file *filp, unsigned int cmd,
- 	}
- 
- 	switch (cmd) {
-+#ifdef CONFIG_TWL4030_MADC
- 	case TWL4030_MADC_IOCX_ADC_RAW_READ: {
- 		struct twl4030_madc_request req;
- 		if (par.channel >= TWL4030_MADC_MAX_CHANNELS)
-@@ -148,6 +149,7 @@ static long twl4030_madc_ioctl(struct file *filp, unsigned int cmd,
- 		}
- 		break;
- 	}
-+#endif
- 	default:
- 		return -EINVAL;
- 	}
+The idea is, If you can help figure out what exactly breaks boot, the
+patch can be dropped.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+>From these tests, I have created two branches ( arch/arm/mm have
+replacements for calls to no longer compiled in ):
+
+http://code.google.com/p/linux-next-20130703-moxart/source/detail?r=a88f33ad22d3f9a31fe126f1c95568e5b2e8f32d&name=multi_V4_test_arm920t
+http://code.google.com/p/linux-next-20130703-moxart/source/detail?r=9f4c21f1123a122c51792cd374217ce6e426e74a&name=multi_V4_test_sa1100
+
+Best regards,
+Jonas
