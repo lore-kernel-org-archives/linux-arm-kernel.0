@@ -1,25 +1,51 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 8 Jul 2013 17:29:34 -0300
-Subject: Handling ARM_ERRATA_364296 when CONFIG_SMP=y
-In-Reply-To: <20130708182212.GF3621@1wt.eu>
-References: <CAOMZO5AVpQ6DUja=usBCDzRH0NyNqbXsHNNOJSAY=8OvgHHTmA@mail.gmail.com>
- <20130708182212.GF3621@1wt.eu>
-Message-ID: <CAOMZO5AeqO_AmLp1=BwrMxOd4sh-omN6vG-R5f4EgpmzqCfhrg@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 8 Jul 2013 22:56:38 +0200
+Subject: Chipidea usb otg support for IMX/MXS (device functionality)
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803F28763@039-SN2MPN1-021.039d.mgd.msft.net>
+References: <51A5A808.2070803@digi.com> <201307070310.00973.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803F28763@039-SN2MPN1-021.039d.mgd.msft.net>
+Message-ID: <201307082256.38642.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Willy,
+Hi Peter,
 
-On Mon, Jul 8, 2013 at 3:22 PM, Willy Tarreau <w@1wt.eu> wrote:
+> > -----Original Message-----
+> > From: Marek Vasut [mailto:marex at denx.de]
+> > Sent: Sunday, July 07, 2013 9:10 AM
+> > To: Chen Peter-B29397
+> > Cc: shawn.guo at linaro.org; Michael Grzeschik; maxime.ripard at free-
+> > electrons.com; Hector Palacios; linux-usb at vger.kernel.org;
+> > s.hauer at pengutronix.de; alexander.shishkin at linux.intel.com; Estevam
+> > Fabio-R49496; Marc Kleine-Budde; m.grzeschik at pengutronix.de; linux-arm-
+> > kernel at lists.infradead.org
+> > Subject: Re: Chipidea usb otg support for IMX/MXS (device functionality)
+> > 
+> > Hi Peter,
+> > 
+> > > > Where can I measure this?
+> > > > 
+> > > > > Two possible reasons:
+> > > > > 
+> > > > > 1. You have not gpio control for vbus toggle when role switches.
+> > > > 
+> > > > This works well.
+> > > > 
+> > > > > 2. Your hardware has some problems that the vbus can't lower than
+> > 
+> > 0.8v.
+> > 
+> > > > How can I check that?
+> > > 
+> > > Just measure the voltage of your otg vbus pin.
+> > 
+> > It's 2.5 volt for me. What am I supposed to observe happening there?
+> 
+> http://marc.info/?l=linux-usb&m=137242465920952&w=2
 
-> Or maybe fix the config so that it does not force SMP on a CPU which
-> only exists as a single core ?
+Dang, must have missed that one, sorry.
 
-The original config is imx_v6_v7_defconfig and it selects by default
-both mx6 (quad core) and other single core CPUs.
+The VBUS is slowly discharging from around 5V to 2.5V , what does that tell me?
 
-That's the reason why CONFIG_SMP=y for this config by default.
-
-Regards,
-
-Fabio Estevam
+Best regards,
+Marek Vasut
