@@ -1,30 +1,47 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon,  8 Jul 2013 15:29:50 +0200
-Subject: [PATCH v2 2/5] ARM: AT91: DTS: sam9x5: add SSC DMA parameters
+Date: Mon,  8 Jul 2013 15:29:52 +0200
+Subject: [PATCH v2 4/5] ARM: AT91: DTS: sam9x5ek: add sound configuration
 In-Reply-To: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
 References: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1373290193-25300-3-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1373290193-25300-5-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The sam9x5ek board has 2 jacks:
+headphone wired on RHPOUT/LHPOUT of the wm8731
+line in wired on LLINEIN/RLINEIN of the wm8731
+
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 ---
- arch/arm/boot/dts/at91sam9x5.dtsi |    3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/at91sam9x5ek.dtsi |   18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 57d45f5..cf78ac0 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -542,6 +542,9 @@
- 				compatible = "atmel,at91sam9g45-ssc";
- 				reg = <0xf0010000 0x4000>;
- 				interrupts = <28 IRQ_TYPE_LEVEL_HIGH 5>;
-+				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(13)>,
-+				       <&dma0 1 AT91_DMA_CFG_PER_ID(14)>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
- 				status = "disabled";
+diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+index e6fb309..bd0f7b8 100644
+--- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+@@ -109,4 +109,22 @@
+ 			status = "okay";
+ 		};
+ 	};
++
++	sound {
++		compatible = "atmel,sam9x5-audio-wm8731";
++
++		atmel,model = "wm8731 @ AT91SAM9X5EK";
++
++		atmel,audio-routing =
++			"Headphone Jack", "RHPOUT",
++			"Headphone Jack", "LHPOUT",
++			"LLINEIN", "Line In Jack",
++			"RLINEIN", "Line In Jack";
++
++		atmel,ssc-controller = <&ssc0>;
++		atmel,audio-codec = <&wm8731>;
++		atmel,format = "i2s";
++		atmel,bitclock-master;
++		atmel,frame-master;
++	};
+ };
 -- 
 1.7.10.4
