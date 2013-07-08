@@ -1,52 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon,  8 Jul 2013 16:44:55 -0600
-Subject: [PATCH] ARM: mm: restrict early_alloc_aligned to legal area
-Message-ID: <1373323495-10087-1-git-send-email-swarren@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Jul 2013 01:03:27 +0200
+Subject: [PATCH v3 4/4] ARM: reinsert ARCH_MULTI_V4 Kconfig option
+In-Reply-To: <CACmBeS3Ges44HxOGZns+G=jQhSmGjVmZBir2_ZBXT1i2nrNQwg@mail.gmail.com>
+References: <1372949142-8260-1-git-send-email-jonas.jensen@gmail.com>
+ <CACmBeS3Ges44HxOGZns+G=jQhSmGjVmZBir2_ZBXT1i2nrNQwg@mail.gmail.com>
+Message-ID: <201307090103.27296.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Monday 08 July 2013, Jonas Jensen wrote:
+> Arnd suggested removing one (or many) of the options:
+> 
+> CPU_ABRT_EV4T
+> CPU_CACHE_V4WT
+> CPU_COPY_V4WB
+> CPU_TLB_V4WBI
+> 
+> However boot is still broken after removing all including CPU_32v4T.
+> 
+> Selecting CPU_SA1100 instead, it boots normally and init works.
+> 
+> The idea is, If you can help figure out what exactly breaks boot, the
+> patch can be dropped.
+> 
+> From these tests, I have created two branches ( arch/arm/mm have
+> replacements for calls to no longer compiled in ):
+> 
+> http://code.google.com/p/linux-next-20130703-moxart/source/detail?r=a88f33ad22d3f9a31fe126f1c95568e5b2e8f32d&name=multi_V4_test_arm920t
+> http://code.google.com/p/linux-next-20130703-moxart/source/detail?r=9f4c21f1123a122c51792cd374217ce6e426e74a&name=multi_V4_test_sa1100
 
-When early_alloc_aligned() is called, it appears that only memory in the
-first memory bank is mapped for CPU access. However, memblock_alloc() is
-called to allocate the RAM, and that can return RAM that is part of any
-valid memory bank, which hence could be inaccessible to the CPU. If this
-happens, the subsequent memset() will hang or crash.
+It looks like you select CPU_ARM926T but change the entry for CPU_ARM920T
+instead, which would have no effect then.
 
-Solve this by calling memblock_alloc_base() instead of memblock_alloc().
-This function takes an explicit max address. Use the end of the first
-memory bank as the address.
-
-As an example, this issue can be triggered as follows:
-
-* Total of 512MB system RAM, so it is all lowmem not highmem. Without this,
-  subsequent banks may be ignored by map_lowmem() due to being highmem.
-* RAM is split into multiple banks, due to some RAM somewhere in the
-  middle having been allocated for purposes other than Linux, e.g. an LCD
-  frame-buffer of for a co-processor.
-* Some bank is not section-aligned, so that alloc_init_pte() is called
-  rather than __map_init_section().
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mm/mmu.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index d7229d2..0849741 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -585,7 +585,10 @@ EXPORT_SYMBOL(phys_mem_access_prot);
- 
- static void __init *early_alloc_aligned(unsigned long sz, unsigned long align)
- {
--	void *ptr = __va(memblock_alloc(sz, align));
-+	phys_addr_t max_pa = memblock.memory.regions[0].base +
-+				memblock.memory.regions[0].size;
-+	phys_addr_t pa = memblock_alloc_base(sz, align, max_pa);
-+	void *ptr = __va(pa);
- 	memset(ptr, 0, sz);
- 	return ptr;
- }
--- 
-1.8.1.5
+	Arnd
