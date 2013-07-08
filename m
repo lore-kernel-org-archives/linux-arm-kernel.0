@@ -1,45 +1,41 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 8 Jul 2013 09:36:14 +0100
-Subject: MTD EEPROM support and driver integration
-In-Reply-To: <20130707071501.GD11243@lukather>
-References: <20130705201118.GM2959@lukather> <5811519.oHVuMujf0I@wuerfel>
- <20130706120112.GA11069@lukather> <8997501.Dchyii8uWX@wuerfel>
- <20130707071501.GD11243@lukather>
-Message-ID: <20130708083614.GP27646@sirena.org.uk>
+Date: Mon, 8 Jul 2013 09:06:22 +0100
+Subject: [PATCH v9 08/10] ASoC: Add phycore-ac97-dt driver
+In-Reply-To: <20130707071949.GH16871@s25.your-server.de>
+References: <1371734429-6081-1-git-send-email-mpa@pengutronix.de>
+ <1371734429-6081-9-git-send-email-mpa@pengutronix.de>
+ <20130703161727.GS27646@sirena.org.uk>
+ <20130707071949.GH16871@s25.your-server.de>
+Message-ID: <20130708080622.GN27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 07, 2013 at 09:15:01AM +0200, Maxime Ripard wrote:
-> On Sat, Jul 06, 2013 at 09:06:49PM +0200, Arnd Bergmann wrote:
+On Sun, Jul 07, 2013 at 09:19:49AM +0200, Markus Pargmann wrote:
+> On Wed, Jul 03, 2013 at 05:17:27PM +0100, Mark Brown wrote:
 
-> > We also have a bunch of OTP drivers spread around the kernel, it probably
-> > makes sense to consolidate them at the same time, at least on the DT binding
-> > side if not the device drivers.
+> > > +extern void pca100_ac97_cold_reset(struct snd_ac97 *ac97);
+> > > +extern void pca100_ac97_warm_reset(struct snd_ac97 *ac97);
+> > > +#else
+> > > +static void pca100_ac97_cold_reset(struct snd_ac97 *ac97) { }
+> > > +static void pca100_ac97_warm_reset(struct snd_ac97 *ac97) { }
 
-> From a quick grep, the only one I've seen so far are:
->   - imx6q, that has a hook at machine start to poke into its OCOTP to
->     retrieve some frequency scaling parameters it seems. I'm not sure
->     how the current solution could improve the situation for this
->     use-case, but the DT bindings of the OCOTP is just a DT node, with
->     no clients, so we have nothing to worry about here.
->   - imx28, that has a hook at machine start to look up the MAC address
->     values and patch the ethernet controller nodes to add the right
->     local-mac-address property. This one could benefit from the new
->     bindings, but we already mentionned it, and I intended to develop
->     with an imx28 board anyway.
->   - picoxcell-pc3x3 DTSI has a node for a OTP device, but they don't
->     seem to be doing anything with it, nor do they seem to have a driver
->     for it. So I guess we don't care about migrating for this one
->     either.
+> > These functions have no reason to be anywhere except in the driver and
+> > really you should just be specifying which pins to use there - ideally
+> > via pinctrl but I don't think i.MX has adopted that yet.
 
-> Did you have other cases in mind?
+> There are no pinctrl driver for imx27(pca100) or imx35(pcm043). The
+> iomux/pad configure functions are defined inside mach-imx/ including
+> their headers. Both reset functions have to configure iomux/pad before
+> and after using gpio. So I think it's not possible to make the reset
+> based on the gpio pins without the necessary iomux/pad configuration.
 
-We have some OTP support in the ab8500 and wm831x MFD drivers too but
-they just expose the data.
+That all sounds fixable - either make pinctrl available or make the
+headers usefully visible.  You can see the arch headers in the build
+of the entire kernel...
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130708/fa862ec8/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130708/f61f4aec/attachment.sig>
