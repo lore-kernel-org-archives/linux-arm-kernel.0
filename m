@@ -1,60 +1,40 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 8 Jul 2013 17:14:21 +0800
-Subject: [PATCH v4 5/6] ARM: dts: imx6q{dl}: add a DTE uart pinctrl for uart2
+Date: Mon, 8 Jul 2013 17:14:22 +0800
+Subject: [PATCH v4 6/6] ARM: dts: enable the uart2 for imx6q-arm2
 In-Reply-To: <1373274862-2695-1-git-send-email-b32955@freescale.com>
 References: <1373274862-2695-1-git-send-email-b32955@freescale.com>
-Message-ID: <1373274862-2695-6-git-send-email-b32955@freescale.com>
+Message-ID: <1373274862-2695-7-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the arm2 board, the UART2 works in the dte mode.
-So add a pinctrl for both the imx6q{dl} boards.
+enable the uart2 for imx6q-arm2 board.
+The uart2 works in the DTE mode, with the RTS/CTS and DMA enabled.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- arch/arm/boot/dts/imx6dl.dtsi |    9 +++++++++
- arch/arm/boot/dts/imx6q.dtsi  |    9 +++++++++
- 2 files changed, 18 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6q-arm2.dts |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 2b5628d..a1302ed 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -223,6 +223,15 @@
- 							MX6DL_PAD_EIM_D27__UART2_RX_DATA 0x1b0b1
- 						>;
- 					};
-+
-+					pinctrl_uart2_2: uart2grp-2 { /* DTE mode */
-+						fsl,pins = <
-+							MX6DL_PAD_EIM_D26__UART2_RX_DATA   0x1b0b1
-+							MX6DL_PAD_EIM_D27__UART2_TX_DATA   0x1b0b1
-+							MX6DL_PAD_EIM_D28__UART2_DTE_CTS_B 0x1b0b1
-+							MX6DL_PAD_EIM_D29__UART2_DTE_RTS_B 0x1b0b1
-+						>;
-+					};
- 				};
+diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+index 4e54fde..e7e3b56 100644
+--- a/arch/arm/boot/dts/imx6q-arm2.dts
++++ b/arch/arm/boot/dts/imx6q-arm2.dts
+@@ -97,6 +97,16 @@
+ 	status = "okay";
+ };
  
- 				uart4 {
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 6f4d6ab..e0b7bad 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -266,6 +266,15 @@
- 							MX6Q_PAD_EIM_D27__UART2_RX_DATA 0x1b0b1
- 						>;
- 					};
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2_2>;
++	fsl,dte-mode;
++	fsl,uart-has-rtscts;
++	dma-names = "rx", "tx";
++	dmas = <&sdma 27 4 0>, <&sdma 28 4 0>;
++	status = "okay";
++};
 +
-+					pinctrl_uart2_2: uart2grp-2 { /* DTE mode */
-+						fsl,pins = <
-+							MX6Q_PAD_EIM_D26__UART2_RX_DATA   0x1b0b1
-+							MX6Q_PAD_EIM_D27__UART2_TX_DATA   0x1b0b1
-+							MX6Q_PAD_EIM_D28__UART2_DTE_CTS_B 0x1b0b1
-+							MX6Q_PAD_EIM_D29__UART2_DTE_RTS_B 0x1b0b1
-+						>;
-+					};
- 				};
- 
- 				uart4 {
+ &uart4 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart4_1>;
 -- 
 1.7.1
