@@ -1,115 +1,95 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Mon, 08 Jul 2013 11:24:25 +0900
-Subject: [PATCH] ARM: shmobile: r8a7790 SMP prototype v3
-In-Reply-To: <20130701061340.22064.93012.sendpatchset@w520>
-References: <20130701061340.22064.93012.sendpatchset@w520>
-Message-ID: <51DA22D9.10703@renesas.com>
+From: minggr@gmail.com (Lin Ming)
+Date: Mon, 08 Jul 2013 10:27:15 +0800
+Subject: kernel decompressor problem for ARMv7
+In-Reply-To: <CAF1ivSbOXknHyDMH3RdmSGK2n5o2wVeR5oohCQnZ2gJrgvo=Hw@mail.gmail.com>
+References: <CAF1ivSakn8-HiAf+4_cLRWUUTDP9QBKpAt+hVQoMyAmKZ2-dJA@mail.gmail.com>
+ <20130705095757.GA13063@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1307051225240.18597@syhkavp.arg>
+ <CAF1ivSbOXknHyDMH3RdmSGK2n5o2wVeR5oohCQnZ2gJrgvo=Hw@mail.gmail.com>
+Message-ID: <1373250435.824.6.camel@minggr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Magnus,
+On Sat, 2013-07-06 at 00:58 +0800, Lin Ming wrote:
+> On Sat, Jul 6, 2013 at 12:30 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Fri, 5 Jul 2013, Will Deacon wrote:
+> >
+> >> On Fri, Jul 05, 2013 at 09:44:12AM +0100, Lin Ming wrote:
+> >> > Hi all,
+> >>
+> >> Hello,
+> >>
+> >> > I'm porting BSP code from v2.6.36 to v3.10 kernel. It's ARMv7 processor.
+> >>
+> >> Which specific processor/SoC?
+> >>
+> >> > But decompressor doesn't work. With a lot of debug, I finally find
+> >> > below 2 commits related.
+> >> > Kernel uncompress OK with these commits reverted.
+> >> >
+> >> > dbece45: ARM: 7501/1: decompressor: reset ttbcr for VMSA ARMv7 cores
+> >> > (Introduced in v3.6-rc6)
+> >> >
+> >> > 5010192: ARM: 7583/1: decompressor: Enable unaligned memory access for
+> >> > v6 and above
+> >> > (Introduced in v3.7-rc8)
+> >> >
+> >> > Any hint to fix it?
+> >>
+> >> There's not really enough information to go on here. What specifically
+> >> fails? Also, do you have to revert *both* of the above changes to get things
+> >> working again?
+> >
+> > Also, what is the bootloader used here?
+> 
+> uboot.
+> 
+> >
+> > Does the bootloader call the kernel with the MMU off as documented in
+> > Documentation/arm/Booting?
+> 
+> How to check this?
+> 
+> I'll check uboot code or add debug code in boot/compressed/head.S to
+> check it next Monday.
 
-Thanks for the patch, see my comments below.
+I added below debug code to print the control reg from lowest 4bits to
+highest 4bits.
 
-On 7/1/2013 3:13 PM, Magnus Damm wrote:
-> --- /dev/null
-> +++ work/arch/arm/mach-shmobile/smp-r8a7790.c	2013-07-01 13:41:32.000000000 +0900
-> @@ -0,0 +1,187 @@
+It prints "B7805C". So the control reg is 0x00c5087b.
+Seems bootloader calls the kernel with MMU enabled and Alignment fault
+checking enabled.
 
-> +#define SYSC	0xe6180000
-> +#define SYSCSR  0x0000
-> +
-> +#define RST	0xe6160000
-> +#define CA15BAR	0x6020
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 32337ff..9434720 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -125,6 +125,23 @@
+ 		.rept	7
+ 		mov	r0, r0
+ 		.endr
++
++		/* Dirty debug code to print control reg from lowest 4bits to highest 4bits */
++		ldr     r2, =0xf0070120		@ UART
++		mrc     p15, 0, r0, c1, c0, 0   @ read control reg
++	1:
++		cmp     r0, #0
++		beq	2f
++		and     r1, r0, #15
++		cmp	r1, #9
++		addgt	r1, r1, #7
++		add	r1, r1, #48
++		str     r1, [r2]
++		asr     r0, r0, #4
++		b	1b
++	2:
++
++
+    ARM(		mov	r0, r0		)
+    ARM(		b	1f		)
+  THUMB(		adr	r12, BSYM(1f)	)
 
-CA15BAR and CA15BAR2 addresses in the datasheet v0.5 are simply wrong;
-they should be 0x0020 and 0x0024, respectively.
 
-You could confirm it in the documentation errata for v0.5 or in the
-latest datasheet v0.6 release.
-
-I believe that this is not related to an uncertain arch_timer issue you
-mentioned in the commit log, but we should use proper addresses at least.
-
-> +#define CA15RESCNT 0x0040
-> +#define CA7BAR	0x4030
-
-The same applies for CA7BAR and CA7BAR2 as well.
-
-> +#define CA7RESCNT 0x0044
-> +#define RESCNT	0x0050
-> +
-> +#define APMU	0xe6150000
-> +#define CA15WUPCR 0x2010
-> +#define CA7WUPCR 0x1010
-> +
-> +#define MERAM	0xe8080000
-> +
-> +enum { R8A7790_CLST_CA15, R8A7790_CLST_CA7, R8A7790_CLST_NR };
-> +
-> +static struct {
-> +	unsigned int cabar;
-> +	unsigned int carescnt;
-> +	unsigned int carescnt_magic;
-> +	unsigned int rescnt_bit;
-> +	unsigned int use_count;
-> +} r8a7790_clst[R8A7790_CLST_NR] = {
-> +	[R8A7790_CLST_CA15] = {
-> +		.cabar = CA15BAR,
-> +		.carescnt = CA15RESCNT,
-> +		.carescnt_magic = 0xa5a50000,
-> +		.rescnt_bit = 1,
-> +	},
-> +	[R8A7790_CLST_CA7] = {
-> +		.cabar = CA7BAR,
-> +		.carescnt = CA7RESCNT,
-> +		.carescnt_magic = 0x5a5a0000,
-> +		.rescnt_bit = 0,
-> +	},
-> +};
-> +
-> +#define r8a7790_clst_id(cpu) (cpu_logical_map((cpu)) >> 8)
-> +#define r8a7790_cpu_id(cpu) (cpu_logical_map((cpu)) & 0xff)
-> +
-> +static void r8a7790_deassert_reset(unsigned int cpu)
-> +{
-> +	void __iomem *p, *carescnt;
-> +	u32 bar, mask, magic;
-> +	unsigned int clst_id = r8a7790_clst_id(cpu);
-> +
-> +	/* setup reset vectors */
-> +	p = ioremap_nocache(RST, 0x7000);
-
-Therefore ioremap size for RST should be updated accordingly.
-
-> +	bar = (MERAM >> 8) & 0xfffffc00;
-> +	__raw_writel(bar, p + r8a7790_clst[clst_id].cabar);
-> +	__raw_writel(bar | 0x10, p + r8a7790_clst[clst_id].cabar);
-> +
-> +	/* enable clocks for cluster */
-> +	if (r8a7790_clst[clst_id].use_count++ == 0) {
-> +		mask = 1 << r8a7790_clst[clst_id].rescnt_bit;
-> +		__raw_writel(__raw_readl(p + RESCNT) & ~mask, p + RESCNT);
-> +	}
-> +
-> +	/* enable per-core clocks */
-> +	mask = BIT(3 - r8a7790_cpu_id(cpu));
-> +	magic = r8a7790_clst[clst_id].carescnt_magic;
-> +	carescnt = p + r8a7790_clst[clst_id].carescnt;
-> +	__raw_writel((__raw_readl(carescnt) & ~mask) | magic, carescnt);
-> +
-> +	iounmap(p);
-> +}
-> +
-> +static void r8a7790_assert_reset(unsigned int cpu)
-> +{
-> +	void __iomem *p, *carescnt;
-> +	u32 mask, magic;
-> +	unsigned int clst_id = r8a7790_clst_id(cpu);
-> +
-> +	p = ioremap_nocache(RST, 0x7000);
-
-Ditto.
---
-Shinya Kuribayashi
-Renesas Electronics
+> 
+> >
+> > Nicolas
