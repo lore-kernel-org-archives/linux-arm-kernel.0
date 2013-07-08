@@ -1,54 +1,33 @@
-From: B18965@freescale.com (Wang Huan-B18965)
-Date: Mon, 8 Jul 2013 02:39:00 +0000
-Subject: [PATCH 4/4] fb: Add DCU framebuffer driver for Vybrid VF610
- platform
-In-Reply-To: <20130706060453.GE30164@S2101-09.ap.freescale.net>
-References: <1373010702-9244-1-git-send-email-b18965@freescale.com>
- <1373010702-9244-5-git-send-email-b18965@freescale.com>
- <20130706060453.GE30164@S2101-09.ap.freescale.net>
-Message-ID: <81BA6E5E0BC2344391CABCEE22D1B6D8393343@039-SN1MPN1-002.039d.mgd.msft.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 8 Jul 2013 10:42:15 +0800
+Subject: [PATCH v3 4/6] ARM: dts: imx6q{dl}: fix the wrong RTS/CTS pad name
+In-Reply-To: <20953.22066.706534.773272@ipc1.ka-ro>
+References: <1373004752-21302-1-git-send-email-b32955@freescale.com>
+ <1373004752-21302-5-git-send-email-b32955@freescale.com>
+ <20130706050803.GC30164@S2101-09.ap.freescale.net>
+ <20953.22066.706534.773272@ipc1.ka-ro>
+Message-ID: <20130708024214.GB22636@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Shawn,
-
-> On Fri, Jul 05, 2013 at 03:51:42PM +0800, Alison Wang wrote:
-> > The Display Controller Unit (DCU) module is a system master that
-> > fetches graphics stored in internal or external memory and displays
-> > them on a TFT LCD panel. A wide range of panel sizes is supported and
-> > the timing of the interface signals is highly configurable.
-> > Graphics are read directly from memory and then blended in real-time,
-> > which allows for dynamic content creation with minimal CPU
-> intervention.
-> >
-> > The features:
-> >
-> > (1) Full RGB888 output to TFT LCD panel.
-> > (2) For the current LCD panel, WQVGA "480x272" is supported.
-> > (3) Blending of each pixel using up to 4 source layers dependent on
-> size of panel.
-> > (4) Each graphic layer can be placed with one pixel resolution in
-> either axis.
-> > (5) Each graphic layer support RGB565 and RGB888 direct colors
-> without
-> > alpha channel and BGRA8888 direct colors with an alpha channel.
-> > (6) Each graphic layer support alpha blending with 8-bit resolution.
-> >
-> > This driver has been tested on Vybrid VF610 TOWER board.
-> >
-> > Signed-off-by: Alison Wang <b18965@freescale.com>
-> > ---
-> >  drivers/video/Kconfig      |    9 +
-> >  drivers/video/Makefile     |    1 +
-> >  drivers/video/fsl-dcu-fb.c | 1091
-> > ++++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 1101 insertions(+)
-> >  create mode 100644 drivers/video/fsl-dcu-fb.c
+On Sun, Jul 07, 2013 at 01:51:14PM +0200, Lothar Wa?mann wrote:
+> Hi,
 > 
-> You should have a document under Documentation/devicetree/bindings/fb/.
-> 
-[Alison Wang] Ok, I will add a document in the next version. Thanks!
+> Shawn Guo writes:
+> > On Fri, Jul 05, 2013 at 02:12:30PM +0800, Huang Shijie wrote:
+> > > There is something wrong with the RTS/CTS pads:
+> > >   The RTS pad is assigned with the CTS's value;
+> > >   while the CTS pad is assigned with the RTS's value.
+> > > 
+> > 
+> > So basically, you are saying that select_input should be set up for CTS
+> > rather than RTS.  It seems that the people who generated the macro got
+> > the wrong input from developer.
+> > 
+> programming 'select_input' only makes sense for inputs, not outputs.
+> Since CTS is an output signal, select_input only makes sense for the
+> RTS function of the pads.
 
+I'm disregarding the patch, as it looks wrong.
 
-Best Regards,
-Alison Wang
+Shawn
