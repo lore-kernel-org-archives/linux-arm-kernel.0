@@ -1,230 +1,57 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 8 Jul 2013 19:08:08 +0530
-Subject: [PATCH] ARM: tegra: enable palmas device for dalmore
-Message-ID: <1373290688-2257-1-git-send-email-ldewangan@nvidia.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon,  8 Jul 2013 15:29:48 +0200
+Subject: [PATCH v2 0/5] Sound support for at91sam9x5-wm8731 based boards
+Message-ID: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the entry of Dalmore Power Management Unit device TPS65913
-in dalmore DTS file. The Palma driver support this device.
+Hi,
 
-Enable following submodule of the TPS65913:
-- GPIO driver
-- RTC driver.
-- Power regulator driver.
+This patchset add sound on the at91sam9x5ek board.
+It's based on Nicolas Ferre's work in the 2.6.39 atmel patch for sam9x5:
+https://github.com/linux4sam/linux-at91/commit/0aa157c9e71ccccf3abc30fa37eb5c95b392978d
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
- arch/arm/boot/dts/tegra114-dalmore.dts |  183 +++++++++++++++++++++++++++++++-
- 1 files changed, 182 insertions(+), 1 deletions(-)
+It needs Bo Chen's patchset on the generic dmaengine (topic/atmel branch
+on Mark's sound tree) and the SSC interrupts disabled (cf
+http://www.spinics.net/lists/arm-kernel/msg256901.html)
 
-diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-index 886b66d..53f30c0 100644
---- a/arch/arm/boot/dts/tegra114-dalmore.dts
-+++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-@@ -791,7 +791,7 @@
- 					regulator-boot-on;
- 				};
- 
--				dcdc3 {
-+				tps65090_dcdc3_reg: dcdc3 {
- 					regulator-name = "vdd-ao";
- 					regulator-always-on;
- 					regulator-boot-on;
-@@ -836,6 +836,177 @@
- 				};
- 			};
- 		};
-+
-+		palmas: tps65913 at 58 {
-+			compatible = "ti,palmas";
-+			reg = <0x58>;
-+			interrupts = <0 86 0x4>;
-+
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+
-+			palmas_gpio: palmas_gpio {
-+				compatible = "ti,palmas-gpio";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+			};
-+
-+			palmas_rtc {
-+				compatible = "ti,palmas-rtc";
-+				interrupt-parent = <&palmas>;
-+				interrupts = <8 0>;
-+			};
-+
-+			palmas_pmic {
-+			    compatible = "ti,tps65913-pmic", "ti,palmas-pmic";
-+			    smps1-in-supply = <&tps65090_dcdc3_reg>;
-+			    smps3-in-supply = <&tps65090_dcdc3_reg>;
-+			    smps4-in-supply = <&tps65090_dcdc2_reg>;
-+			    smps7-in-supply = <&tps65090_dcdc2_reg>;
-+			    smps8-in-supply = <&tps65090_dcdc2_reg>;
-+			    smps9-in-supply = <&tps65090_dcdc2_reg>;
-+			    ldo1-in-supply = <&tps65090_dcdc2_reg>;
-+			    ldo2-in-supply = <&tps65090_dcdc2_reg>;
-+			    ldo3-in-supply = <&palmas_smps3_reg>;
-+			    ldo4-in-supply = <&tps65090_dcdc2_reg>;
-+			    ldo5-in-supply = <&vdd_ac_bat_reg>;
-+			    ldo6-in-supply = <&tps65090_dcdc2_reg>;
-+			    ldo7-in-supply = <&tps65090_dcdc2_reg>;
-+			    ldo8-in-supply = <&tps65090_dcdc3_reg>;
-+			    ldo9-in-supply = <&palmas_smps9_reg>;
-+			    ldoln-in-supply = <&tps65090_dcdc1_reg>;
-+			    ldousb-in-supply = <&tps65090_dcdc1_reg>;
-+			    regulators {
-+				smps12 {
-+					regulator-name = "vddio-ddr";
-+					regulator-min-microvolt = <1350000>;
-+					regulator-max-microvolt = <1350000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				palmas_smps3_reg: smps3 {
-+					regulator-name = "vddio-1v8";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				smps45 {
-+					regulator-name = "vdd-core";
-+					regulator-min-microvolt = <900000>;
-+					regulator-max-microvolt = <1400000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				smps457 {
-+					regulator-name = "vdd-core";
-+					regulator-min-microvolt = <900000>;
-+					regulator-max-microvolt = <1400000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				smps8 {
-+					regulator-name = "avdd-pll";
-+					regulator-min-microvolt = <1050000>;
-+					regulator-max-microvolt = <1050000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				palmas_smps9_reg: smps9 {
-+					regulator-name = "sdhci-vdd-sd-slot";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo1 {
-+					regulator-name = "avdd-cam1";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+				};
-+
-+				ldo2 {
-+					regulator-name = "avdd-cam2";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+				};
-+
-+				ldo3 {
-+					regulator-name = "avdd-dsi-csi";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				ldo4 {
-+					regulator-name = "vpp-fuse";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+				};
-+
-+				ldo6 {
-+					regulator-name = "vdd-sensor-2v85";
-+					regulator-min-microvolt = <2850000>;
-+					regulator-max-microvolt = <2850000>;
-+				};
-+
-+				ldo7 {
-+					regulator-name = "vdd-af-cam1";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+				};
-+
-+				ldo8 {
-+					regulator-name = "vdd-rtc";
-+					regulator-min-microvolt = <900000>;
-+					regulator-max-microvolt = <900000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+					ti,enable-ldo8-tracking;
-+				};
-+
-+				ldo9 {
-+					regulator-name = "vddio-sdmmc-2";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <3300000>;
-+				};
-+
-+				ldoln {
-+					regulator-name = "hvdd-usb";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+				};
-+
-+				ldousb {
-+					regulator-name = "avdd-usb";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				regen1 {
-+					regulator-name = "rail-3v3";
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				regen2 {
-+					regulator-name = "rail-5v0";
-+					regulator-max-microvolt = <5000000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+			    };
-+			};
-+		};
- 	};
- 
- 	spi at 7000da00 {
-@@ -951,6 +1122,16 @@
- 			gpio = <&gpio TEGRA_GPIO(K, 1) GPIO_ACTIVE_HIGH>;
- 			vin-supply = <&tps65090_dcdc1_reg>;
- 		};
-+
-+		vdd_cam_1v8_reg: regulator at 6 {
-+			compatible = "regulator-fixed";
-+			reg = <6>;
-+			regulator-name = "vdd_cam_1v8_reg";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			enable-active-high;
-+			gpio = <&palmas_gpio 6 0>; /* Palmas GPIO6 */
-+		};
- 	};
- 
- 	sound {
+
+Tested on at91sam9g35ek.
+
+patches applies on next-20130708
+
+[I let the original signed-off from Nicolas and Uwe in place, I don't
+know if I should replace them by something like "originaly-signed-off-by"
+since the code has been changed.]
+
+[Sorry if it's too late for 3.11]
+
+Changes from V1-RFC:
+ * drop patches on SSC since Bo Chen already did the work
+ * reorder patches to have the machine driver first
+ * drop code already handled by the ASoC framework
+ * drop unneeded SND_ATMEL_SOC_PDC config selection
+ * use static snd_soc_card and  snd_soc_dai_link structures.
+
+Best regards,
+Richard.
+
+Nicolas Ferre (1):
+  sound: sam9x5_wm8731: machine driver for at91sam9x5 wm8731 boards
+
+Richard Genoud (4):
+  ARM: AT91: DTS: sam9x5: add SSC DMA parameters
+  ARM: AT91: DTS: sam9x5ek: add WM8731 codec
+  ARM: AT91: DTS: sam9x5ek: add sound configuration
+  ARM: AT91: DTS: sam9x5ek: enable SSC
+
+ arch/arm/boot/dts/at91sam9x5.dtsi   |    3 +
+ arch/arm/boot/dts/at91sam9x5ek.dtsi |   27 +++++
+ sound/soc/atmel/Kconfig             |   10 ++
+ sound/soc/atmel/Makefile            |    2 +
+ sound/soc/atmel/sam9x5_wm8731.c     |  206 +++++++++++++++++++++++++++++++++++
+ 5 files changed, 248 insertions(+)
+ create mode 100644 sound/soc/atmel/sam9x5_wm8731.c
+
 -- 
-1.7.1.1
+1.7.10.4
