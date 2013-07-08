@@ -1,38 +1,48 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 8 Jul 2013 15:16:03 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: enable WEIM driver
-Message-ID: <1373267763-28440-1-git-send-email-b32955@freescale.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Mon, 8 Jul 2013 09:50:24 +0200
+Subject: [lm-sensors] [PATCH 1/2] ARM: dt: t30 cardhu: add dt entry for
+ lm90
+In-Reply-To: <51DA6BD4.1040300@nvidia.com>
+References: <1372928979-26938-1-git-send-email-wni@nvidia.com>
+ <1372928979-26938-2-git-send-email-wni@nvidia.com>
+ <51D70483.70203@wwwdotorg.org> <51DA6BD4.1040300@nvidia.com>
+Message-ID: <20130708095024.041a6d57@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable the weim driver.
-Since the NOR is connected to the WEIM for imx6q{dl}-sabreauto,
-we also enable the MTD_PHYSMAP_OF module.
+On Mon, 8 Jul 2013 15:35:48 +0800, Wei Ni wrote:
+> On 07/06/2013 01:38 AM, Stephen Warren wrote:
+> > On 07/04/2013 03:09 AM, Wei Ni wrote:
+> >> Enable thermal sensor lm90 for t30 cardhu.
+> > 
+> >> diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+> > 
+> >> +		nct1008: nct1008 {
+> >> +			compatible = "lm90,nct1008";
+> > 
+> > "lm90" isn't a valid vendor prefix. I believe the value you want is
+> > "onnn,nct1008". Same comment for patch 2/2.
+> 
+> The lm90 doesn't support device tree very well.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+I doubt it, but if this is the case, then please fix it, instead of
+working the problem around in a different place.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index f64b6a2..f1662d3 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -68,6 +68,7 @@ CONFIG_NETFILTER=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
-+CONFIG_IMX_WEIM=y
- CONFIG_CONNECTOR=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
-@@ -78,6 +79,7 @@ CONFIG_MTD_JEDECPROBE=y
- CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_CFI_AMDSTD=y
- CONFIG_MTD_CFI_STAA=y
-+CONFIG_MTD_PHYSMAP_OF=y
- CONFIG_MTD_DATAFLASH=y
- CONFIG_MTD_M25P80=y
- CONFIG_MTD_SST25L=y
+> In the DT, we need to
+> named as "lm90" so that the lm90 driver can be loaded,
+
+Not that I am an expert with regards to DT, but this doesn't make any
+sense to me. AFAIK DT is about devices, not which drivers handle them.
+
+> and we also need
+> to add "nct1008" to indicate this is the nct1008 device, so that the
+> lm90 driver can be loaded with the right i2c_device_id->driver_data.
+> 
+> I set the " compatible = "lm90,nct1008" ", this is the simplest way, and
+> we doesn't need to change the lm90.c.
+
+There's no problem with changing the lm90 driver, if this is the right
+thing to do.
+
 -- 
-1.7.1
+Jean Delvare
