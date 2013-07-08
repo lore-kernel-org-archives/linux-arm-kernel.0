@@ -1,68 +1,101 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  8 Jul 2013 12:14:44 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6dl-wandboard: Add support for UART3
-In-Reply-To: <1373296484-29847-1-git-send-email-festevam@gmail.com>
-References: <1373296484-29847-1-git-send-email-festevam@gmail.com>
-Message-ID: <1373296484-29847-2-git-send-email-festevam@gmail.com>
+Date: Mon,  8 Jul 2013 12:14:43 -0300
+Subject: [PATCH 1/2] ARM: dts: imx6dl-wandboard: Add SDHC1 and SDHC2 ports
+Message-ID: <1373296484-29847-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Wandboard has a bluetooth device connected to UART3, so add support for it.
+Wandboard has a SD card slot on the baseboard connected to SDHC1 and a
+BCM4329 (Wifi + Bluetooth chip) connected to SDHC2.
+
+Add support for these ports.
+
+While at it, provide the card detect gpio on SDHC3.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx6dl-wandboard.dts |  7 +++++++
- arch/arm/boot/dts/imx6dl.dtsi          | 18 ++++++++++++++++++
- 2 files changed, 25 insertions(+)
+ arch/arm/boot/dts/imx6dl-wandboard.dts | 17 +++++++++++++++++
+ arch/arm/boot/dts/imx6dl.dtsi          | 29 +++++++++++++++++++++++++++++
+ 2 files changed, 46 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dts b/arch/arm/boot/dts/imx6dl-wandboard.dts
-index 027ece5..2654b32 100644
+index ab6a053..027ece5 100644
 --- a/arch/arm/boot/dts/imx6dl-wandboard.dts
 +++ b/arch/arm/boot/dts/imx6dl-wandboard.dts
-@@ -108,6 +108,13 @@
+@@ -83,6 +83,8 @@
+ 		pinctrl_hog: hoggrp {
+ 			fsl,pins = <
+ 				MX6DL_PAD_GPIO_0__CCM_CLKO1    0x130b0
++				MX6DL_PAD_GPIO_2__GPIO1_IO02	0x80000000
++				MX6DL_PAD_EIM_DA9__GPIO3_IO09	0x80000000
+ 			>;
+ 		};
+ 	};
+@@ -110,8 +112,23 @@
  	status = "okay";
  };
  
-+&uart3 {
++&usdhc1 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3_2>;
-+	fsl,uart-has-rtscts;
++	pinctrl-0 = <&pinctrl_usdhc1_2>;
++	cd-gpios = <&gpio1 2 0>;
 +	status = "okay";
 +};
 +
- &usbh1 {
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2_2>;
++	non-removable;
++	status = "okay";
++};
++
+ &usdhc3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usdhc3_2>;
++	cd-gpios = <&gpio3 9 0>;
  	status = "okay";
  };
 diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index e08c54c..c9850fc 100644
+index 4505109..e08c54c 100644
 --- a/arch/arm/boot/dts/imx6dl.dtsi
 +++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -232,6 +232,24 @@
+@@ -255,6 +255,35 @@
  					};
  				};
  
-+				uart3 {
-+					pinctrl_uart3_1: uart3grp-1 {
++				usdhc1 {
++					pinctrl_usdhc1_1: usdhc1grp-1 {
 +						fsl,pins = <
-+							MX6DL_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
-+							MX6DL_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
++							MX6DL_PAD_SD1_CMD__SD1_CMD    0x17059
++							MX6DL_PAD_SD1_CLK__SD1_CLK    0x10059
++							MX6DL_PAD_SD1_DAT0__SD1_DATA0 0x17059
++							MX6DL_PAD_SD1_DAT1__SD1_DATA1 0x17059
++							MX6DL_PAD_SD1_DAT2__SD1_DATA2 0x17059
++							MX6DL_PAD_SD1_DAT3__SD1_DATA3 0x17059
++							MX6DL_PAD_NANDF_D0__SD1_DATA4 0x17059
++							MX6DL_PAD_NANDF_D1__SD1_DATA5 0x17059
++							MX6DL_PAD_NANDF_D2__SD1_DATA6 0x17059
++							MX6DL_PAD_NANDF_D3__SD1_DATA7 0x17059
 +						>;
 +					};
 +
-+					pinctrl_uart3_2: uart3grp-2 {
++					pinctrl_usdhc1_2: usdhc1grp-2 {
 +						fsl,pins = <
-+							MX6DL_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
-+							MX6DL_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
-+							MX6DL_PAD_EIM_D23__UART3_CTS_B 0x1b0b1
-+							MX6DL_PAD_EIM_EB3__UART3_RTS_B 0x1b0b1
++							MX6DL_PAD_SD1_CMD__SD1_CMD    0x17059
++							MX6DL_PAD_SD1_CLK__SD1_CLK    0x10059
++							MX6DL_PAD_SD1_DAT0__SD1_DATA0 0x17059
++							MX6DL_PAD_SD1_DAT1__SD1_DATA1 0x17059
++							MX6DL_PAD_SD1_DAT2__SD1_DATA2 0x17059
++							MX6DL_PAD_SD1_DAT3__SD1_DATA3 0x17059
 +						>;
 +					};
 +				};
 +
- 				uart4 {
- 					pinctrl_uart4_1: uart4grp-1 {
++
+ 				usdhc2 {
+ 					pinctrl_usdhc2_1: usdhc2grp-1 {
  						fsl,pins = <
 -- 
 1.8.1.2
