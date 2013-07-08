@@ -1,39 +1,81 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Mon, 8 Jul 2013 02:51:30 +0000
-Subject: [PATCH v4] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <20130705123541.GB20040@S2101-09.ap.freescale.net>
-References: <1369733161-19168-1-git-send-email-b35083@freescale.com>
- <20130705091449.GA20040@S2101-09.ap.freescale.net>
- <B56CDBE15CE27145A4B77D2D24263E851E5AFC@039-SN1MPN1-005.039d.mgd.msft.net>
- <20130705123541.GB20040@S2101-09.ap.freescale.net>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E851EA368@039-SN1MPN1-005.039d.mgd.msft.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 08 Jul 2013 11:54:48 +0900
+Subject: [PATCH V5 0/4] Generic PHY driver for the Exynos SoC DP PHY
+Message-ID: <001b01ce7b86$828743e0$8795cba0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Shawn Guo [mailto:shawn.guo at linaro.org]
->Sent: Friday, July 05, 2013 8:36 PM
->To: Lu Jingchang-B35083
->Cc: linux-serial at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->gregkh at linuxfoundation.org; s.hauer at pengutronix.de
->Subject: Re: [PATCH v4] tty: serial: add Freescale lpuart driver support
->
->On Fri, Jul 05, 2013 at 09:39:03AM +0000, Lu Jingchang-B35083 wrote:
->> I explicitly removed the cr2 restore code on cleaning up the redundant
->code, and find it work well on normal operation.
->> Low level debug is not supported on Vybrid so I didn't notice that
->problem.
->> Will you fixing it? Or I submit a fix on it?
->
->I can send a fix for that.  But before doing that, I would need your help
->to understand why we need to clear those UARTCR2 bits for setting up FIFO
->stuff at all.  From my quick testing, at least console still works fine
->after removing all those UARTCR2 operations from lpuart_setup_watermark().
-[Lu Jingchang-B35083] 
-The FIFO registers description in the RM says "This register must be written only when C2[RE] and
-C2[TE] are cleared/not set and when the data buffer/FIFO is empty." So the code is added.
+This patch series adds a simple driver for the Samsung Exynos SoC
+series DP transmitter PHY, using the generic PHY framework [1].
+Previously the DP PHY used an internal DT node to control the PHY
+power enable bit.
 
+These patches was tested on Exynos5250.
 
+This PATCH v5 follows:
+ * PATCH v4, sent on July, 2nd 2013
+ * PATCH v3, sent on July, 1st 2013
+ * PATCH v2, sent on June, 28th 2013
+ * PATCH v1, sent on June, 28th 2013
 
-Best Regards,
-Jingchang
+Changes between v4 and v5:
+  * Marked original bindings as deprecated in 'exynos_dp.txt'
+  * Fixed typo of commit message.
+  * Added Tomasz Figa's Reviewed-by.
+
+Changes between v3 and v4:
+  * Added OF dependancy.
+  * Removed redundant local variable 'void __iomem *addr'.
+  * Removed unnecessary dev_set_drvdata().
+  * Added a patch that remove non-DT support for Exynos
+    Display Port driver.
+  * Removed unnecessary 'struct exynos_dp_platdata'.
+  * Kept supporting the original bindings for DT compatibility.
+
+Changes between v2 and v3:
+  * Removed redundant spinlock
+  * Removed 'struct phy' from 'struct exynos_dp_video_phy'
+  * Updated 'samsung-phy.txt', instead of creating
+    'samsung,exynos5250-dp-video-phy.txt'.
+  * Removed unnecessary additional specifier from 'phys'
+    DT property.
+  * Added 'phys', 'phy-names' properties to 'exynos_dp.txt' file.
+  * Added Felipe Balbi's Acked-by.
+
+Changes between v1 and v2:
+  * Replaced exynos_dp_video_phy_xlate() with of_phy_simple_xlate(),
+    as Kishon Vijay Abraham I guided.
+  * Set the value of phy-cells as 0, because the phy_provider implements
+    only one PHY.
+  * Removed unnecessary header include.
+  * Added '#ifdef CONFIG_OF' and of_match_ptr macro.
+
+This series depends on the generic PHY framework [1]. These patches
+refer to Sylwester Nawrocki's patches about Exynos MIPI [2].
+
+[1] https://lkml.org/lkml/2013/6/26/259
+[2] http://www.spinics.net/lists/linux-samsung-soc/msg20098.html
+
+Jingoo Han (4):
+  ARM: dts: Add DP PHY node to exynos5250.dtsi
+  phy: Add driver for Exynos DP PHY
+  video: exynos_dp: remove non-DT support for Exynos Display Port
+  video: exynos_dp: Use the generic PHY driver
+
+ .../devicetree/bindings/phy/samsung-phy.txt        |    8 ++
+ .../devicetree/bindings/video/exynos_dp.txt        |   18 +++++++++---------
+ arch/arm/boot/dts/exynos5250.dtsi                  |   13 ++++++++-----
+ drivers/phy/Kconfig                                |    6 ++
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-exynos-dp-video.c                  |  111 ++++++++++++++++++++
+ drivers/video/exynos/Kconfig                       |    2 +-
+ drivers/video/exynos/exynos_dp_core.c              |  132 +++++++----------------------
+ drivers/video/exynos/exynos_dp_core.h              |  110 +++++++++++++++++++++++++++
+ drivers/video/exynos/exynos_dp_reg.c               |    2 -
+ include/video/exynos_dp.h                          |  131 ---------------------------------
+ 11 files changed, 291 insertions(+), 243 deletions(-) 
+ create mode 100644 drivers/phy/phy-exynos-dp-video.c
+ delete mode 100644 include/video/exynos_dp.h
+
+--
+1.7.10.4
