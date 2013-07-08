@@ -1,54 +1,65 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Mon, 8 Jul 2013 17:36:05 +0800
-Subject: [lm-sensors] [PATCH 1/2] ARM: dt: t30 cardhu: add dt entry for
- lm90
-In-Reply-To: <20130708095024.041a6d57@endymion.delvare>
-References: <1372928979-26938-1-git-send-email-wni@nvidia.com>
- <1372928979-26938-2-git-send-email-wni@nvidia.com>
- <51D70483.70203@wwwdotorg.org>	<51DA6BD4.1040300@nvidia.com>
- <20130708095024.041a6d57@endymion.delvare>
-Message-ID: <51DA8805.50709@nvidia.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 8 Jul 2013 17:14:16 +0800
+Subject: [PATCH v4 0/6] serial: imx: add DMA support for imx6
+Message-ID: <1373274862-2695-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2013 03:50 PM, Jean Delvare wrote:
-> On Mon, 8 Jul 2013 15:35:48 +0800, Wei Ni wrote:
->> On 07/06/2013 01:38 AM, Stephen Warren wrote:
->>> On 07/04/2013 03:09 AM, Wei Ni wrote:
->>>> Enable thermal sensor lm90 for t30 cardhu.
->>>
->>>> diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
->>>
->>>> +		nct1008: nct1008 {
->>>> +			compatible = "lm90,nct1008";
->>>
->>> "lm90" isn't a valid vendor prefix. I believe the value you want is
->>> "onnn,nct1008". Same comment for patch 2/2.
->>
->> The lm90 doesn't support device tree very well.
-> 
-> I doubt it, but if this is the case, then please fix it, instead of
-> working the problem around in a different place.
-> 
->> In the DT, we need to
->> named as "lm90" so that the lm90 driver can be loaded,
-> 
-> Not that I am an expert with regards to DT, but this doesn't make any
-> sense to me. AFAIK DT is about devices, not which drivers handle them.
-> 
->> and we also need
->> to add "nct1008" to indicate this is the nct1008 device, so that the
->> lm90 driver can be loaded with the right i2c_device_id->driver_data.
->>
->> I set the " compatible = "lm90,nct1008" ", this is the simplest way, and
->> we doesn't need to change the lm90.c.
-> 
-> There's no problem with changing the lm90 driver, if this is the right
-> thing to do.
+(1) This patch set adds the DMA support for the imx serial driver.
+    The uart with the dma support is usually used by the Bluetooth.
 
-Ok, I will add DT support in the lm90.c in my next version patch.
+    For the firmware's limit, i only enable the DMA for imx6 serials.
+    If we have proper firmware for imx53 (or other chips), we can also
+    enable the DMA for it.
 
-Thanks.
-Wei.
+(2) We only enable the DMA support when the following are meet:
 
-> 
+    [1] The uart port supports the hardware flow control(CTS/RTS).
+      (Some uart port does not support the CTS/RTS.)
+
+    [2] The application enables the CTS/RTS.
+
+    [3] The Soc is imx6 serials.
+      For the sdma's firmware limit, we do not support the DMA except
+      the imx6 platform.
+
+    [4] The uart is not used as a console.
+
+
+(3) Tested this patch set by:
+	connecting a imx6q-arm2 board(DTE) with a imx53 board(DCE).
+
+v3 --> v4:
+	[0] add DTE pad for uart2
+
+v2 --> v3:
+	[0] add a new patch to fix the RTS/CTS pad name issue.
+	[1] rename the uart DTE pinctrl, remove the "dte" from the pinctrl.
+	[2] add a similar UART DTE pinctrl for IMX6DL.
+	[3] move the "fsl,imx6q-uart" to the first of the compatible table.
+
+v1 --> v2:
+	[0] use the "fsl,imx6q-uart" as the new compatible value.
+	[1] move dma_is_inited to imx_uart_dma_init();
+	    move dma_is_enabled to imx_enable_dma();
+	[2] move imx_disable_dma() to the front place of the imx_shutdown(),
+	    just before calls the imx_uart_dma_exit().
+	[3] misc    
+	
+
+Huang Shijie (6):
+  serial: imx: distinguish the imx6q uart from the others
+  serial: imx: add DMA support for imx6q
+  ARM: dts: imx6sl: add "fsl,imx6q-uart" for uart compatible
+  ARM: dts: imx6q{dl}: add DTE pads for uart
+  ARM: dts: imx6q{dl}: add a DTE uart pinctrl for uart2
+  ARM: dts: enable the uart2 for imx6q-arm2
+
+ arch/arm/boot/dts/imx6dl-pinfunc.h |    4 +
+ arch/arm/boot/dts/imx6dl.dtsi      |    9 +
+ arch/arm/boot/dts/imx6q-arm2.dts   |   10 +
+ arch/arm/boot/dts/imx6q-pinfunc.h  |    4 +
+ arch/arm/boot/dts/imx6q.dtsi       |    9 +
+ arch/arm/boot/dts/imx6sl.dtsi      |   15 +-
+ drivers/tty/serial/imx.c           |  422 +++++++++++++++++++++++++++++++++++-
+ 7 files changed, 461 insertions(+), 12 deletions(-)
