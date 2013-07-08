@@ -1,45 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 8 Jul 2013 09:04:37 +0100
-Subject: [PATCH v9 04/10] ASoC: fsl-ssi: Add support for imx-pcm-fiq
-In-Reply-To: <20130706171323.GG16871@s25.your-server.de>
-References: <1371734429-6081-1-git-send-email-mpa@pengutronix.de>
- <1371734429-6081-5-git-send-email-mpa@pengutronix.de>
- <20130703160637.GQ27646@sirena.org.uk>
- <20130706171323.GG16871@s25.your-server.de>
-Message-ID: <20130708080437.GM27646@sirena.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 8 Jul 2013 12:02:54 +0300
+Subject: [PATCH 2/4] mmc: omap_hsmmc: Enable SDIO IRQ using a GPIO in
+ idle mode
+In-Reply-To: <20130607214952.18581.90049.stgit@localhost>
+References: <20130607214557.18581.75288.stgit@localhost>
+ <20130607214952.18581.90049.stgit@localhost>
+Message-ID: <20130708090254.GH29100@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 06, 2013 at 07:13:23PM +0200, Markus Pargmann wrote:
-> On Wed, Jul 03, 2013 at 05:06:37PM +0100, Mark Brown wrote:
-> > On Thu, Jun 20, 2013 at 03:20:23PM +0200, Markus Pargmann wrote:
+On Fri, Jun 07, 2013 at 02:49:52PM -0700, Tony Lindgren wrote:
+> From: Andreas Fenkart <andreas.fenkart@streamunlimited.com>
+> 
+> Without functional clock the omap_hsmmc module can't forward SDIO IRQs to
+> the system. This patch reconfigures dat1 line as a gpio while the fclk is
+> off. When the fclk is present it uses the standard SDIO IRQ detection of
+> the module.
+> 
+> The gpio irq is managed via the 'disable_depth' ref counter of the irq
+> subsystem, this driver simply calls enable_irq/disable_irq when needed.
+> 
+>                       sdio irq    sdio irq
+>                       unmasked     masked
+>    -----------------------------------------
+>     runtime default  |    1     |   2
+>     runtime suspend  |    0     |   1
+> 
+>                   irq disable depth
+> 
+> 
+> only when sdio irq is enabled AND the module is idle, the reference
+> count drops to zero and the gpio irq is effectively armed.
+> 
+> Patch was tested on AM335x/Stream800. Test setup was two modules
+> with sdio wifi cards. Modules where connected to a dual-band AP, each
+> module using a different band. One of module was running iperf as server
+> the other as client connecting to the server in a while true loop. Test
+> was running for 4+ weeks. There were about 60 Mio. suspend/resume
+> transitions. Test was shut down regularly.
+> 
+> Cc: Andreas Fenkart <afenkart@gmail.com>
+> Cc: Balaji T K <balajitk@ti.com>
+> Signed-off-by: Andreas Fenkart <andreas.fenkart@streamunlimited.com>
+> Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
+> [tony at atomide.com: updated and separated out pin muxing]
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-> > > +	ssi_private->use_dma = !of_property_read_bool(np, "fsl,imx-fiq");
+right, as I discussed before the gpio part should also be split to a
+separate patch. That's a workaround for broken HW anyway.
 
-> > This binding should be documented.  I'm not sure it really needs to be
-> > a binding, though - is it not possible for the driver to just figure out
-> > that DMA won't work automatically (for example by looking at the CODEC
-> > in use)?  I'm not sure this is a good name either, it should be saying
-> > why the FIQ is needed rather than saying that we should use the FIQ.
-
-> I think fsl_ssi_startup is the first function in which we know which
-> codec is connected to fsl-ssi. There we have access to the pcm runtime,
-> which stores the codec used. But that is too late for the ssi setup.
-
-> I could use of_find_compatible_node to search for the wm9712 codec, but
-> that would assume that there is only one codec attached to the system.
-
-If the SSI is doing anything it will be connected to a CODEC.  If it's
-not connected to a CODEC then it doesn't need to be configured at all so
-it doesn't really matter.
-
-> Perhaps "fsl,fiq-filter-codec-stream" is a better name for the binding?
-
-Possibly.
+-- 
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130708/45225acd/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130708/faf18bc1/attachment.sig>
