@@ -1,35 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 8 Jul 2013 08:50:04 +0100
-Subject: [PATCH v3 4/6] ARM: dts: imx6q{dl}: fix the wrong RTS/CTS pad name
-In-Reply-To: <20953.22066.706534.773272@ipc1.ka-ro>
-References: <1373004752-21302-1-git-send-email-b32955@freescale.com>
- <1373004752-21302-5-git-send-email-b32955@freescale.com>
- <20130706050803.GC30164@S2101-09.ap.freescale.net>
- <20953.22066.706534.773272@ipc1.ka-ro>
-Message-ID: <20130708075004.GR24642@n2100.arm.linux.org.uk>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 8 Jul 2013 09:55:48 +0200
+Subject: [RFC PATCH 08/13] sound: sam9x5_wm8731: machine driver for
+ at91sam9x5 wm8731 boards
+In-Reply-To: <51DA1D75.2010503@atmel.com>
+References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
+ <1372667978-4718-9-git-send-email-richard.genoud@gmail.com>
+ <51D2472B.2010407@atmel.com>
+ <CACQ1gAji8KkjXee8o=9jt8O38611LBJ95yXimxbfn1qLaLOcnA@mail.gmail.com>
+ <51DA1D75.2010503@atmel.com>
+Message-ID: <CACQ1gAjYOutkdn1J=HSY3i95TNU-WyJzTZPcb6QLykT53O3a2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 07, 2013 at 01:51:14PM +0200, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Shawn Guo writes:
-> > On Fri, Jul 05, 2013 at 02:12:30PM +0800, Huang Shijie wrote:
-> > > There is something wrong with the RTS/CTS pads:
-> > >   The RTS pad is assigned with the CTS's value;
-> > >   while the CTS pad is assigned with the RTS's value.
-> > > 
-> > 
-> > So basically, you are saying that select_input should be set up for CTS
-> > rather than RTS.  It seems that the people who generated the macro got
-> > the wrong input from developer.
-> > 
-> programming 'select_input' only makes sense for inputs, not outputs.
-> Since CTS is an output signal, select_input only makes sense for the
-> RTS function of the pads.
+2013/7/8 Bo Shen <voice.shen@atmel.com>:
+> Hi Richard,
+>
+>
+> On 7/5/2013 23:15, Richard Genoud wrote:
+>>>>
+>>>> +       card->dev = &pdev->dev;
+>>>> >>+       card->owner = THIS_MODULE;
+>>>> >>+       card->dai_link = dai;
+>>>> >>+       card->num_links = 1;
+>>>> >>+       dai->name = "WM8731";
+>>>> >>+       dai->stream_name = "WM8731 PCM";
+>>>> >>+       dai->codec_dai_name = "wm8731-hifi";
+>>>> >>+       dai->init = at91sam9x5ek_wm8731_init;
+>>>> >>+       card->dapm_widgets = at91sam9x5ek_dapm_widgets;
+>>>> >>+       card->num_dapm_widgets =
+>>>> >> ARRAY_SIZE(at91sam9x5ek_dapm_widgets);
+>>>
+>>> >
+>>> >
+>>> >Will keep these as snd_soc_card and snd_soc_dai_link structure
+>>> > separately?
+>>
+>> I don't really understand what you mean here.
+>> do you mean that something like that will more explicit ? :
+>> +       card->dai_link[0].name = "WM8731";
+>> +       card->dai_link[0].stream_name = "WM8731 PCM";
+>> +       card->dai_link[0].codec_dai_name = "wm8731-hifi";
+>> +       card->dai_link[0].init = at91sam9x5ek_wm8731_init;
+>>
+>
+> I mean using structure to define snd_soc_card and snd_soc_dai_link, look
+> like:
+> struct snd_soc_dai_link dai_link_name = {
+>         .name = xxx,
+>         .stream_name = xxx,
+>         ...
+> };
+>
+> struct snd_soc_card card_name = {
+>         .name = xxxx
+>         .ower = THIS_MODULE,
+>         .dai_link = &dai_link_name,
+>         ...
+> };
+>
+> In this way, I think it will be more clear than put them in code.
 
-Note: If you are a DTE, then RTS is an output, CTS is an input.  If you
-are a DCE, then RTS is an input and CTS is an output (normally on a
-standard UART, you just swap the wiring for RTS and CTS but really that's
-all that is going on.)  So swapping them in software should be acceptable
-too, provided you're not having to disable any auto flow control facilities.
+ok, got it !
+
+Thanks !
+
+Richard.
