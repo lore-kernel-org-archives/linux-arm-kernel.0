@@ -1,56 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 8 Jul 2013 00:52:16 -0700
-Subject: [PATCH] dmaengine: shdma: fix a build failure on platforms with
- no DMA support
-In-Reply-To: <20130705045350.GA10947@intel.com>
-References: <Pine.LNX.4.64.1305301650290.29171@axis700.grange>
- <51A77CF1.7040105@ti.com> <20130531024438.GB32564@verge.net.au>
- <CAGa+x8413povhYWx+BSj=TdzQDAuYFXmjF4A2kXvQt+=n+380w@mail.gmail.com>
- <Pine.LNX.4.64.1306192125480.12502@axis700.grange>
- <20130705045350.GA10947@intel.com>
-Message-ID: <CAOesGMjp4Ort89z8ZhQT9xAPNyG-0uU-kz9G2f_GzRFF-Y2MxA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 8 Jul 2013 08:50:04 +0100
+Subject: [PATCH v3 4/6] ARM: dts: imx6q{dl}: fix the wrong RTS/CTS pad name
+In-Reply-To: <20953.22066.706534.773272@ipc1.ka-ro>
+References: <1373004752-21302-1-git-send-email-b32955@freescale.com>
+ <1373004752-21302-5-git-send-email-b32955@freescale.com>
+ <20130706050803.GC30164@S2101-09.ap.freescale.net>
+ <20953.22066.706534.773272@ipc1.ka-ro>
+Message-ID: <20130708075004.GR24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 4, 2013 at 9:53 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Wed, Jun 19, 2013 at 09:32:18PM +0200, Guennadi Liakhovetski wrote:
->> Hi Vinod
->>
->> On Wed, 19 Jun 2013, Kevin Hilman wrote:
->>
->> > On Thu, May 30, 2013 at 7:44 PM, Simon Horman <horms@verge.net.au> wrote:
->> >
->> > [...]
->> >
->> > > thanks for this. I will wait for a refresh (as we discussed earlier today).
->> > > Can I confirm that this is a fix for v3.10? If so, could ou note
->> > > that when you post your revised patch?
->> >
->> > Any progress on this patch?
->> >
->> > The SH-mobile defconfigs are still all failing in linux-next.
->>
->> In
->>
->> https://patchwork.kernel.org/patch/2640061/
-> And you havent CC maintainers on this patch, so I dont have it!
->>
->> I proposed a simple immediate fix for this problem. Arnd at the same time
->> developed an alternative solution:
->>
->> https://patchwork.kernel.org/patch/2644121/
->> https://patchwork.kernel.org/patch/2644111/
-> Reading these patches I agree with Arnd that client drivers should not depend on
-> dma slave drivers. Existing issue need to be fixed
->
-> Arnd, Have you merged these changes?
+On Sun, Jul 07, 2013 at 01:51:14PM +0200, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Shawn Guo writes:
+> > On Fri, Jul 05, 2013 at 02:12:30PM +0800, Huang Shijie wrote:
+> > > There is something wrong with the RTS/CTS pads:
+> > >   The RTS pad is assigned with the CTS's value;
+> > >   while the CTS pad is assigned with the RTS's value.
+> > > 
+> > 
+> > So basically, you are saying that select_input should be set up for CTS
+> > rather than RTS.  It seems that the people who generated the macro got
+> > the wrong input from developer.
+> > 
+> programming 'select_input' only makes sense for inputs, not outputs.
+> Since CTS is an output signal, select_input only makes sense for the
+> RTS function of the pads.
 
-Looks like we now have breakage in linux-next for this again (new
-breakage due to the header file move being applied by you on Friday,
-Vinod? Are you planning on sending the code in for 3.11? If not, you
-shouldn't apply patches right now).
-
-bockw_defconfig, kota2_defconfig, marzen_defconfig and others are
-currently broken.
-
--Olof
+Note: If you are a DTE, then RTS is an output, CTS is an input.  If you
+are a DCE, then RTS is an input and CTS is an output (normally on a
+standard UART, you just swap the wiring for RTS and CTS but really that's
+all that is going on.)  So swapping them in software should be acceptable
+too, provided you're not having to disable any auto flow control facilities.
