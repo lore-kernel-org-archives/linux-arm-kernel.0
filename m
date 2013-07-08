@@ -1,67 +1,60 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 8 Jul 2013 09:55:48 +0200
-Subject: [RFC PATCH 08/13] sound: sam9x5_wm8731: machine driver for
- at91sam9x5 wm8731 boards
-In-Reply-To: <51DA1D75.2010503@atmel.com>
-References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
- <1372667978-4718-9-git-send-email-richard.genoud@gmail.com>
- <51D2472B.2010407@atmel.com>
- <CACQ1gAji8KkjXee8o=9jt8O38611LBJ95yXimxbfn1qLaLOcnA@mail.gmail.com>
- <51DA1D75.2010503@atmel.com>
-Message-ID: <CACQ1gAjYOutkdn1J=HSY3i95TNU-WyJzTZPcb6QLykT53O3a2w@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Jul 2013 12:51:14 +0530
+Subject: [PATCH] dmaengine: shdma: fix a build failure on platforms
+ with no DMA support
+In-Reply-To: <CAOesGMjp4Ort89z8ZhQT9xAPNyG-0uU-kz9G2f_GzRFF-Y2MxA@mail.gmail.com>
+References: <Pine.LNX.4.64.1305301650290.29171@axis700.grange>
+ <51A77CF1.7040105@ti.com> <20130531024438.GB32564@verge.net.au>
+ <CAGa+x8413povhYWx+BSj=TdzQDAuYFXmjF4A2kXvQt+=n+380w@mail.gmail.com>
+ <Pine.LNX.4.64.1306192125480.12502@axis700.grange>
+ <20130705045350.GA10947@intel.com>
+ <CAOesGMjp4Ort89z8ZhQT9xAPNyG-0uU-kz9G2f_GzRFF-Y2MxA@mail.gmail.com>
+Message-ID: <20130708072114.GF16653@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/7/8 Bo Shen <voice.shen@atmel.com>:
-> Hi Richard,
->
->
-> On 7/5/2013 23:15, Richard Genoud wrote:
->>>>
->>>> +       card->dev = &pdev->dev;
->>>> >>+       card->owner = THIS_MODULE;
->>>> >>+       card->dai_link = dai;
->>>> >>+       card->num_links = 1;
->>>> >>+       dai->name = "WM8731";
->>>> >>+       dai->stream_name = "WM8731 PCM";
->>>> >>+       dai->codec_dai_name = "wm8731-hifi";
->>>> >>+       dai->init = at91sam9x5ek_wm8731_init;
->>>> >>+       card->dapm_widgets = at91sam9x5ek_dapm_widgets;
->>>> >>+       card->num_dapm_widgets =
->>>> >> ARRAY_SIZE(at91sam9x5ek_dapm_widgets);
->>>
->>> >
->>> >
->>> >Will keep these as snd_soc_card and snd_soc_dai_link structure
->>> > separately?
->>
->> I don't really understand what you mean here.
->> do you mean that something like that will more explicit ? :
->> +       card->dai_link[0].name = "WM8731";
->> +       card->dai_link[0].stream_name = "WM8731 PCM";
->> +       card->dai_link[0].codec_dai_name = "wm8731-hifi";
->> +       card->dai_link[0].init = at91sam9x5ek_wm8731_init;
->>
->
-> I mean using structure to define snd_soc_card and snd_soc_dai_link, look
-> like:
-> struct snd_soc_dai_link dai_link_name = {
->         .name = xxx,
->         .stream_name = xxx,
->         ...
-> };
->
-> struct snd_soc_card card_name = {
->         .name = xxxx
->         .ower = THIS_MODULE,
->         .dai_link = &dai_link_name,
->         ...
-> };
->
-> In this way, I think it will be more clear than put them in code.
+On Mon, Jul 08, 2013 at 12:52:16AM -0700, Olof Johansson wrote:
+> On Thu, Jul 4, 2013 at 9:53 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> > On Wed, Jun 19, 2013 at 09:32:18PM +0200, Guennadi Liakhovetski wrote:
+> >> Hi Vinod
+> >>
+> >> On Wed, 19 Jun 2013, Kevin Hilman wrote:
+> >>
+> >> > On Thu, May 30, 2013 at 7:44 PM, Simon Horman <horms@verge.net.au> wrote:
+> >> >
+> >> > [...]
+> >> >
+> >> > > thanks for this. I will wait for a refresh (as we discussed earlier today).
+> >> > > Can I confirm that this is a fix for v3.10? If so, could ou note
+> >> > > that when you post your revised patch?
+> >> >
+> >> > Any progress on this patch?
+> >> >
+> >> > The SH-mobile defconfigs are still all failing in linux-next.
+> >>
+> >> In
+> >>
+> >> https://patchwork.kernel.org/patch/2640061/
+> > And you havent CC maintainers on this patch, so I dont have it!
+> >>
+> >> I proposed a simple immediate fix for this problem. Arnd at the same time
+> >> developed an alternative solution:
+> >>
+> >> https://patchwork.kernel.org/patch/2644121/
+> >> https://patchwork.kernel.org/patch/2644111/
+> > Reading these patches I agree with Arnd that client drivers should not depend on
+> > dma slave drivers. Existing issue need to be fixed
+> >
+> > Arnd, Have you merged these changes?
+> 
+> Looks like we now have breakage in linux-next for this again (new
+> breakage due to the header file move being applied by you on Friday,
+> Vinod? Are you planning on sending the code in for 3.11? If not, you
+> shouldn't apply patches right now).
+Well they were already in my tree since 18th June. (tree was rebased to fixup for
+pull on friday) and now these are in Linus's tree.
 
-ok, got it !
+Can we have a fix for breakage for now sent to linus for now and then address the
+proper way to do this?
 
-Thanks !
-
-Richard.
+~Vinod
