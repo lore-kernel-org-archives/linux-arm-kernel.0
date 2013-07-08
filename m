@@ -1,57 +1,56 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 08 Jul 2013 11:04:06 +0900
-Subject: [PATCH V4 4/4] video: exynos_dp: Use the generic PHY driver
-In-Reply-To: <1441230.DzaqAQ9HHT@flatron>
-References: <000d01ce7700$222a35a0$667ea0e0$@samsung.com>
- <1441230.DzaqAQ9HHT@flatron>
-Message-ID: <001a01ce7b7f$6d7bdc60$48739520$@samsung.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 8 Jul 2013 10:01:25 +0800
+Subject: [RFC PATCH 08/13] sound: sam9x5_wm8731: machine driver for
+ at91sam9x5 wm8731 boards
+In-Reply-To: <CACQ1gAji8KkjXee8o=9jt8O38611LBJ95yXimxbfn1qLaLOcnA@mail.gmail.com>
+References: <1372667978-4718-1-git-send-email-richard.genoud@gmail.com>
+ <1372667978-4718-9-git-send-email-richard.genoud@gmail.com>
+ <51D2472B.2010407@atmel.com>
+ <CACQ1gAji8KkjXee8o=9jt8O38611LBJ95yXimxbfn1qLaLOcnA@mail.gmail.com>
+Message-ID: <51DA1D75.2010503@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, July 06, 2013 8:04 AM, Tomasz Figa wrote:
-> 
-> Hi Jingoo,
-> 
-> On Tuesday 02 of July 2013 17:42:49 Jingoo Han wrote:
-> > Use the generic PHY API instead of the platform callback to control
-> > the DP PHY.
-> >
-> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> > ---
-> >  .../devicetree/bindings/video/exynos_dp.txt        |   23
-> > +++++--------------- drivers/video/exynos/exynos_dp_core.c
-> > |   16 ++++++++++---- drivers/video/exynos/exynos_dp_core.h
-> >  |    2 ++
-> >  3 files changed, 20 insertions(+), 21 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt
-> > b/Documentation/devicetree/bindings/video/exynos_dp.txt index
-> > 84f10c1..022f4b6 100644
-> > --- a/Documentation/devicetree/bindings/video/exynos_dp.txt
-> > +++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
-> > @@ -1,17 +1,6 @@
-> >  The Exynos display port interface should be configured based on
-> >  the type of panel connected to it.
-> >
-> > -We use two nodes:
-> > -	-dp-controller node
-> > -	-dptx-phy node(defined inside dp-controller node)
-> > -
-> > -For the DP-PHY initialization, we use the dptx-phy node.
-> > -Required properties for dptx-phy:
-> > -	-reg:
-> > -		Base address of DP PHY register.
-> > -	-samsung,enable-mask:
-> > -		The bit-mask used to enable/disable DP PHY.
-> > -
-> 
-> I wonder if this part shouldn't stay here, just marked as deprecated,
-> because compatibility with old dtbs must be preserved (and rest of the
-> patch looks like it is).
+Hi Richard,
 
-I would like to remove these properties from Documentation.
-But, I will mark it as deprecated as you suggested..
+On 7/5/2013 23:15, Richard Genoud wrote:
+>>> +       card->dev = &pdev->dev;
+>>> >>+       card->owner = THIS_MODULE;
+>>> >>+       card->dai_link = dai;
+>>> >>+       card->num_links = 1;
+>>> >>+       dai->name = "WM8731";
+>>> >>+       dai->stream_name = "WM8731 PCM";
+>>> >>+       dai->codec_dai_name = "wm8731-hifi";
+>>> >>+       dai->init = at91sam9x5ek_wm8731_init;
+>>> >>+       card->dapm_widgets = at91sam9x5ek_dapm_widgets;
+>>> >>+       card->num_dapm_widgets = ARRAY_SIZE(at91sam9x5ek_dapm_widgets);
+>> >
+>> >
+>> >Will keep these as snd_soc_card and snd_soc_dai_link structure separately?
+> I don't really understand what you mean here.
+> do you mean that something like that will more explicit ? :
+> +       card->dai_link[0].name = "WM8731";
+> +       card->dai_link[0].stream_name = "WM8731 PCM";
+> +       card->dai_link[0].codec_dai_name = "wm8731-hifi";
+> +       card->dai_link[0].init = at91sam9x5ek_wm8731_init;
+>
 
+I mean using structure to define snd_soc_card and snd_soc_dai_link, look 
+like:
+struct snd_soc_dai_link dai_link_name = {
+	.name = xxx,
+	.stream_name = xxx,
+	...
+};
 
-Best regards,
-Jingoo Han
+struct snd_soc_card card_name = {
+	.name = xxxx
+	.ower = THIS_MODULE,
+	.dai_link = &dai_link_name,
+	...
+};
+
+In this way, I think it will be more clear than put them in code.
+
+Best Regards,
+Bo Shen
