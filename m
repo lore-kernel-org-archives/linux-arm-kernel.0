@@ -1,171 +1,45 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Mon,  8 Jul 2013 09:18:20 +0100
-Subject: [PATCH v1 4/4] ARM: STi: Add STiH416 ethernet support.
-In-Reply-To: <1373271301-11060-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1373271301-11060-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1373271500-11715-1-git-send-email-srinivas.kandagatla@st.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 8 Jul 2013 10:45:47 +0200 (CEST)
+Subject: [GIT PULL] clockevents/clocksource: Add Marvell Orion SoC
+ timer
+In-Reply-To: <20130707235819.GB11908@titan.lakedaemon.net>
+References: <51B8D310.4050404@linaro.org> <51D9548B.9040907@gmail.com>
+ <alpine.DEB.2.02.1307071508030.32106@ionos.tec.linutronix.de>
+ <20130707144645.GA11908@titan.lakedaemon.net>
+ <alpine.DEB.2.02.1307071723220.32106@ionos.tec.linutronix.de>
+ <20130707235819.GB11908@titan.lakedaemon.net>
+Message-ID: <alpine.DEB.2.02.1307081041290.32106@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+On Sun, 7 Jul 2013, Jason Cooper wrote:
+> On Sun, Jul 07, 2013 at 05:30:31PM +0200, Thomas Gleixner wrote:
+> I don't mind delaying half of a series so the drivers/ portion can land
+> in mainline, and the rest can land in the next cycle.  But when things
+> don't go according to that plan, I'd like a little consideration /
+> flexibility about solving the problem.  Especially considering I'm
+> *trying* to do the right thing by pushing to appropriate maintainers
+> first.
+> 
+> Of course, this is a moot point since, as you clarified above, this
+> dependency doesn't have the hazards typically associated with
+> out-of-tree dependencies.
 
-This patch adds support to STiH416 SOC, which has two ethernet
-snps,dwmac controllers version 3.710. With this patch B2000 and B2020
-boards can boot with ethernet in MII and RGMII modes.
+There is a very simple procedure for stuff like this.
 
-Tested on both B2020 and B2000.
+Series has parts which go through tree A and B and another larger part
+for tree C which depends on the A and B parts.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
----
- arch/arm/boot/dts/stih416-pinctrl.dtsi |   82 ++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stih416.dtsi         |   36 ++++++++++++++
- 2 files changed, 118 insertions(+), 0 deletions(-)
+So ask the maintainers of A and B to apply this to separate branches,
+which are based on some commit in Linus tree. These branches can be
+pulled into C and C can apply the depending stuff on top.
 
-diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-index 0f246c9..c7bbde7 100644
---- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-@@ -97,6 +97,59 @@
- 					};
- 				};
- 			};
-+
-+			gmac1 {
-+				pinctrl_mii1: mii1 {
-+					st,pins {
-+						txd0 = <&PIO0 0 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txd1 = <&PIO0 1 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txd2 = <&PIO0 2 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txd3 = <&PIO0 3 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txer = <&PIO0 4 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txen = <&PIO0 5 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txclk = <&PIO0 6 ALT1 IN NICLK 0 CLK_A>;
-+						col =   <&PIO0 7 ALT1 IN BYPASS 1000>;
-+
-+						mdio =  <&PIO1 0 ALT1 OUT BYPASS 1500>;
-+						mdc =   <&PIO1 1 ALT1 OUT NICLK 0 CLK_A>;
-+						crs =   <&PIO1 2 ALT1 IN BYPASS 1000>;
-+						mdint = <&PIO1 3 ALT1 IN BYPASS 0>;
-+						rxd0 =  <&PIO1 4 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						rxd1 =  <&PIO1 5 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						rxd2 =  <&PIO1 6 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						rxd3 =  <&PIO1 7 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+
-+						rxdv =  <&PIO2 0 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						rx_er = <&PIO2 1 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						rxclk = <&PIO2 2 ALT1 IN NICLK 0 CLK_A>;
-+					 	phyclk = <&PIO2 3 ALT1 OUT NICLK 0 CLK_A>;
-+					};
-+				};
-+				pinctrl_rgmii1: rgmii1-0 {
-+					st,pins {
-+						txd0 =  <&PIO0 0 ALT1 OUT DE_IO 500 CLK_A>;
-+						txd1 =  <&PIO0 1 ALT1 OUT DE_IO 500 CLK_A>;
-+						txd2 =  <&PIO0 2 ALT1 OUT DE_IO 500 CLK_A>;
-+						txd3 =  <&PIO0 3 ALT1 OUT DE_IO 500 CLK_A>;
-+						txen =  <&PIO0 5 ALT1 OUT DE_IO 0   CLK_A>;
-+						txclk = <&PIO0 6 ALT1 IN  NICLK 0   CLK_A>;
-+
-+						mdio = <&PIO1 0 ALT1 OUT BYPASS 0>;
-+						mdc  = <&PIO1 1 ALT1 OUT NICLK  0 CLK_A>;
-+						rxd0 = <&PIO1 4 ALT1 IN DE_IO 500 CLK_A>;
-+						rxd1 = <&PIO1 5 ALT1 IN DE_IO 500 CLK_A>;
-+						rxd2 = <&PIO1 6 ALT1 IN DE_IO 500 CLK_A>;
-+						rxd3 = <&PIO1 7 ALT1 IN DE_IO 500 CLK_A>;
-+
-+						rxdv   = <&PIO2 0 ALT1 IN  DE_IO 500 CLK_A>;
-+						rxclk  = <&PIO2 2 ALT1 IN  NICLK 0   CLK_A>;
-+						phyclk = <&PIO2 3 ALT4 OUT NICLK 0   CLK_B>;
-+
-+						clk125= <&PIO3 7 ALT4 IN NICLK 0 CLK_A>;
-+					};
-+				};
-+			};
-+
- 		};
- 
- 		pin-controller-front {
-@@ -230,6 +283,35 @@
- 					};
- 				};
- 			};
-+
-+			gmac0 {
-+				pinctrl_mii0: mii0 {
-+					st,pins {
-+						mdint = <&PIO13 6 ALT2 IN  BYPASS      0>;
-+						txen =  <&PIO13 7 ALT2 OUT SE_NICLK_IO 0 CLK_A>;
-+						txd0 =  <&PIO14 0 ALT2 OUT SE_NICLK_IO 0 CLK_A>;
-+						txd1 =  <&PIO14 1 ALT2 OUT SE_NICLK_IO 0 CLK_A>;
-+						txd2 =  <&PIO14 2 ALT2 OUT SE_NICLK_IO 0 CLK_B>;
-+						txd3 =  <&PIO14 3 ALT2 OUT SE_NICLK_IO 0 CLK_B>;
-+
-+						txclk = <&PIO15 0 ALT2 IN  NICLK       0 CLK_A>;
-+						txer =  <&PIO15 1 ALT2 OUT SE_NICLK_IO 0 CLK_A>;
-+						crs = <&PIO15 2 ALT2 IN  BYPASS 1000>;
-+						col = <&PIO15 3 ALT2 IN  BYPASS 1000>;
-+						mdio= <&PIO15 4 ALT2 OUT BYPASS 1500>;
-+						mdc = <&PIO15 5 ALT2 OUT NICLK  0    CLK_B>;
-+
-+						rxd0 =  <&PIO16 0 ALT2 IN SE_NICLK_IO 0 CLK_A>;
-+						rxd1 =  <&PIO16 1 ALT2 IN SE_NICLK_IO 0 CLK_A>;
-+						rxd2 =  <&PIO16 2 ALT2 IN SE_NICLK_IO 0 CLK_A>;
-+						rxd3 =  <&PIO16 3 ALT2 IN SE_NICLK_IO 0 CLK_A>;
-+						rxdv =  <&PIO15 6 ALT2 IN SE_NICLK_IO 0 CLK_A>;
-+						rx_er = <&PIO15 7 ALT2 IN SE_NICLK_IO 0 CLK_A>;
-+						rxclk = <&PIO17 0 ALT2 IN NICLK 0 CLK_A>;
-+					 	phyclk = <&PIO13 5 ALT2 OUT NICLK 0 CLK_B>;
-+					};
-+				};
-+			};
- 		};
- 
- 		pin-controller-fvdp-fe {
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 1a0326e..f43035b 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -92,5 +92,41 @@
- 			pinctrl-0 	= <&pinctrl_sbc_serial1>;
- 			clocks          = <&CLK_SYSIN>;
- 		};
-+
-+		ethernet0: ethernet at fe810000{
-+			device_type 	= "network";
-+			compatible	= "snps,dwmac", "snps,dwmac-3.610";
-+			status 		= "disabled";
-+			reg 		= <0xfe810000 0x8000>;
-+
-+			interrupts = <0 133 0>, <0 134 0>, <0 135 0>;
-+			interrupt-names = "macirq", "eth_wake_irq", "eth_lpi";
-+
-+			snps,pbl 	= <32>;
-+			snps,mixed-burst;
-+
-+			pinctrl-names 	= "default";
-+			pinctrl-0	= <&pinctrl_mii0>;
-+			clock-names	= "stmmaceth";
-+			clocks		= <&CLK_S_ICN_REG_0>;
-+		};
-+
-+		ethernet1: ethernet at fef08000 {
-+			device_type = "network";
-+			compatible	= "snps,dwmac", "snps,dwmac-3.610";
-+			status 		= "disabled";
-+			reg		= <0xfef08000 0x8000>;
-+			interrupts = <0 136 0>, <0 137 0>, <0 138 0>;
-+			interrupt-names = "macirq", "eth_wake_irq", "eth_lpi";
-+
-+			snps,pbl	= <32>;
-+			snps,mixed-burst;
-+
-+			pinctrl-names 	= "default";
-+			pinctrl-0	= <&pinctrl_mii1>;
-+			clock-names	= "stmmaceth";
-+			clocks		= <&CLK_S_ICN_REG_0>;
-+		};
-+
- 	};
- };
--- 
-1.7.6.5
+Now the maintainers of A and B merge these branches into their main
+devel branch, can do further fixups and stuff on top. And the whole
+thing just works without glitches during the merge window.
+
+We do this all the time.
+
+Thanks,
+
+	tglx
