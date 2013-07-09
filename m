@@ -1,27 +1,42 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 09 Jul 2013 19:39:44 +0900
-Subject: [PATCH 00/04] ARM: shmobile: Random header and makefile cleanups
-Message-ID: <20130709103944.1891.67462.sendpatchset@w520>
+Date: Tue, 09 Jul 2013 19:39:52 +0900
+Subject: [PATCH 01/04] ARM: shmobile: No need to use INTC header on r8a7779
+In-Reply-To: <20130709103944.1891.67462.sendpatchset@w520>
+References: <20130709103944.1891.67462.sendpatchset@w520>
+Message-ID: <20130709103952.1891.92697.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: shmobile: Random header and makefile cleanups
+From: Magnus Damm <damm@opensource.se>
 
-[PATCH 01/04] ARM: shmobile: No need to use INTC header on r8a7779
-[PATCH 02/04] ARM: shmobile: Use pm-rmobile on sh7372 and r8a7740 only
-[PATCH 03/04] ARM: shmobile: No need to use INTC demux on r8a7740
-[PATCH 04/04] ARM: shmobile: Remove unused mach/dma.h
-
-Remove pointless header files and unnecessary use of header files,
-and only link in bits that are actually needed.
+Now when the intc-irqpin driver is used for external
+IRQ pins on r8a7779 it possible to get rid of unused
+INTC headers mach/intc.h and linux/sh_intc.h.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- Built on top of renesas-next-20130704v2
+ arch/arm/mach-shmobile/intc-r8a7779.c  |    1 -
+ arch/arm/mach-shmobile/setup-r8a7779.c |    1 -
+ 2 files changed, 2 deletions(-)
 
- arch/arm/mach-shmobile/Makefile           |    8 +++-----
- arch/arm/mach-shmobile/include/mach/dma.h |    1 -
- arch/arm/mach-shmobile/intc-r8a7779.c     |    1 -
- arch/arm/mach-shmobile/setup-r8a7779.c    |    1 -
- 4 files changed, 3 insertions(+), 8 deletions(-)
+--- 0001/arch/arm/mach-shmobile/intc-r8a7779.c
++++ work/arch/arm/mach-shmobile/intc-r8a7779.c	2013-07-09 18:42:08.000000000 +0900
+@@ -27,7 +27,6 @@
+ #include <linux/platform_data/irq-renesas-intc-irqpin.h>
+ #include <linux/irqchip.h>
+ #include <mach/common.h>
+-#include <mach/intc.h>
+ #include <mach/irqs.h>
+ #include <mach/r8a7779.h>
+ #include <asm/mach-types.h>
+--- 0001/arch/arm/mach-shmobile/setup-r8a7779.c
++++ work/arch/arm/mach-shmobile/setup-r8a7779.c	2013-07-09 18:42:25.000000000 +0900
+@@ -29,7 +29,6 @@
+ #include <linux/input.h>
+ #include <linux/io.h>
+ #include <linux/serial_sci.h>
+-#include <linux/sh_intc.h>
+ #include <linux/sh_timer.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/usb/otg.h>
