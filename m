@@ -1,33 +1,52 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 9 Jul 2013 12:57:48 +0530
-Subject: [PATCH 3/8] ARM: DRA7: hwmod: Reuse the soc_ops used for OMAP4/5
+Date: Tue, 9 Jul 2013 12:57:47 +0530
+Subject: [PATCH 2/8] ARM: DRA7: Update SRAM details
 In-Reply-To: <1373354873-12359-1-git-send-email-rnayak@ti.com>
 References: <1373354873-12359-1-git-send-email-rnayak@ti.com>
-Message-ID: <1373354873-12359-4-git-send-email-rnayak@ti.com>
+Message-ID: <1373354873-12359-3-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The soc_ops for dra7xx devices can be completed reused
-from the ones used for omap4 and omap5 devices.
+DRA7xx devices have 512K of SRAM for both secure and non-secure
+devices.
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: R Sricharan <r.sricharan@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-omap2/sram.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 7341eff..f6eb29b 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -4113,7 +4113,7 @@ void __init omap_hwmod_init(void)
- 		soc_ops.assert_hardreset = _omap2_assert_hardreset;
- 		soc_ops.deassert_hardreset = _omap2_deassert_hardreset;
- 		soc_ops.is_hardreset_asserted = _omap2_is_hardreset_asserted;
--	} else if (cpu_is_omap44xx() || soc_is_omap54xx()) {
-+	} else if (cpu_is_omap44xx() || soc_is_omap54xx() || soc_is_dra7xx()) {
- 		soc_ops.enable_module = _omap4_enable_module;
- 		soc_ops.disable_module = _omap4_disable_module;
- 		soc_ops.wait_target_ready = _omap4_wait_target_ready;
+diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
+index 4bd0968..67d4277 100644
+--- a/arch/arm/mach-omap2/sram.c
++++ b/arch/arm/mach-omap2/sram.c
+@@ -38,6 +38,7 @@
+ #define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
+ #endif
+ #define OMAP5_SRAM_PA		0x40300000
++#define DRA7_SRAM_PA		OMAP4_SRAM_PA
+ 
+ #define SRAM_BOOTLOADER_SZ	0x00
+ 
+@@ -111,6 +112,9 @@ static void __init omap_detect_sram(void)
+ 		} else if (soc_is_omap54xx()) {
+ 			omap_sram_start = OMAP5_SRAM_PA;
+ 			omap_sram_size = SZ_128K; /* 128KB */
++		} else if (soc_is_dra7xx()) {
++			omap_sram_start = DRA7_SRAM_PA;
++			omap_sram_size = SZ_512K; /* 512KB */
+ 		} else {
+ 			omap_sram_start = OMAP2_SRAM_PUB_PA;
+ 			omap_sram_size = 0x800; /* 2K */
+@@ -131,6 +135,9 @@ static void __init omap_detect_sram(void)
+ 		} else if (soc_is_omap54xx()) {
+ 			omap_sram_start = OMAP5_SRAM_PA;
+ 			omap_sram_size = SZ_128K; /* 128KB */
++		} else if (soc_is_dra7xx()) {
++			omap_sram_start = DRA7_SRAM_PA;
++			omap_sram_size = SZ_512K; /* 512KB */
+ 		} else {
+ 			omap_sram_start = OMAP2_SRAM_PA;
+ 			if (cpu_is_omap242x())
 -- 
 1.7.9.5
