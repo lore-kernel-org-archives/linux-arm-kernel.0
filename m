@@ -1,51 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 9 Jul 2013 01:23:04 -0700
-Subject: [PATCH 1/6] ARM: OMAP2+: Remove board-4430sdp.c
-In-Reply-To: <20130708142103.GX21614@n2100.arm.linux.org.uk>
-References: <20130517191304.468.73487.stgit@localhost>
- <20130517191751.468.89202.stgit@localhost>
- <20130520095447.GR21614@n2100.arm.linux.org.uk>
- <20130706131057.GU21614@n2100.arm.linux.org.uk>
- <20130706133627.GV21614@n2100.arm.linux.org.uk>
- <20130708093410.GT5523@atomide.com>
- <20130708142103.GX21614@n2100.arm.linux.org.uk>
-Message-ID: <20130709082304.GB5523@atomide.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 9 Jul 2013 10:27:53 +0200
+Subject: [PATCH v2 2/5] ARM: AT91: DTS: sam9x5: add SSC DMA parameters
+In-Reply-To: <20130708150756.GL27646@sirena.org.uk>
+References: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
+ <1373290193-25300-3-git-send-email-richard.genoud@gmail.com>
+ <20130708150756.GL27646@sirena.org.uk>
+Message-ID: <CACQ1gAgnRBr6Eu7sgbzNF2kmm18-zn_dGKZN45RaxXGd1kwL-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [130708 07:27]:
-> On Mon, Jul 08, 2013 at 02:34:11AM -0700, Tony Lindgren wrote:
-> > 
-> > Hey the good news is that you've updated your build system to support
-> > also appended dtb images, thanks for doing that!
-> 
-> It was far from trivial - there's many places in the build process
-> which do things quite differently depending on whether it's a DTB
-> build or not.
+2013/7/8 Mark Brown <broonie@kernel.org>:
+> On Mon, Jul 08, 2013 at 03:29:50PM +0200, Richard Genoud wrote:
+>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/at91sam9x5.dtsi |    3 +++
+>
+> There was no binding document in your first patch - there should be one
+> for any new DT bindings.
+The dma binding is documented here
+Documentation/devicetree/bindings/dma/atmel-dma.txt
+But you're right, I shoud update
+Documentation/devicetree/bindings/misc/atmel-ssc.txt.
 
-Yes that's too bad. We can make it slightly easier to update from custom
-.config files by always building in support for board-generic.c.
- 
-> It seems that - yet again - the mmc devices have swapped themselves.
+Thanks
 
-Hmm they also seem to swap depending if there's a card plugged in.
 
-> Also looks like the nonfunctional video stuff is even more nonfunctional
-> than usual:
-> 
-> omapdss DSI error: can't get VDDS_DSI regulator
-> omapdss HDMI error: can't get VDDA_HDMI_DAC regulator
 
-Tomi?
- 
-> ASoC looks dead too:
-> 
-> omap-abe-twl6040 sound.10: ASoC: CPU DAI (null) not registered
-> omap-abe-twl6040 sound.10: snd_soc_register_card() failed: -517
-
-Peter, I think you've had audio working with devicetree for at least
-a year or something?
-
-Regards,
-
-Tony
+-- 
+for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
