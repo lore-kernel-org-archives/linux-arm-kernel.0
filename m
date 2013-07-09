@@ -1,24 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Jul 2013 09:56:02 +0200
-Subject: [PATCH v1 0/4] ARM: STi fixes and ethernet support
-In-Reply-To: <51DBB629.1050000@st.com>
-References: <1373271301-11060-1-git-send-email-srinivas.kandagatla@st.com>
- <201307090118.06715.arnd@arndb.de> <51DBB629.1050000@st.com>
-Message-ID: <201307090956.03191.arnd@arndb.de>
+From: elen.song@atmel.com (elen.song)
+Date: Tue, 9 Jul 2013 15:57:02 +0800
+Subject: [PATCH 1/7] serial: at91: correct definition from DMA to PDC
+In-Reply-To: <20130709073155.GB4013@ludovic.desroches@atmel.com>
+References: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
+ <1373351626-30143-2-git-send-email-elen.song@atmel.com>
+ <20130709073155.GB4013@ludovic.desroches@atmel.com>
+Message-ID: <51DBC24E.9060601@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 July 2013, Srinivas KANDAGATLA wrote:
-> stmmac (aka "dwmac" a synopsis IP) driver is integrated in to kernel
-> sometime in 2.6 series I think :-), and Is used by more than 4 platforms
-> in 3.10 kernel. The driver is more generic than it sounds.
-> So adding properties/hooks specific to STiH41x SOCs in driver seemed to
-> incorrect. Instead doing platform specific bits in the mach via
-> callbacks was the only choice I had.
+On 7/9/2013 3:31 PM, Ludovic Desroches wrote:
+> Hi Elen,
+>
+> One comment below:
+>
+> On Tue, Jul 09, 2013 at 02:33:40PM +0800, Elen Song wrote:
+>
+> [...]
+>
+>> diff --git a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+>> index a49d9a1..82f45ec 100644
+>> --- a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+>> +++ b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+>> @@ -8,8 +8,8 @@ Required properties:
+>>   - interrupts: Should contain interrupt
+>>   
+>>   Optional properties:
+>> -- atmel,use-dma-rx: use of PDC or DMA for receiving data
+>> -- atmel,use-dma-tx: use of PDC or DMA for transmitting data
+>> +- atmel,use-pdc-rx: use of PDC for receiving data
+>> +- atmel,use-pdc-tx: use of PDC for transmitting data
+>>   
+>>   <chip> compatible description:
+>>   - at91rm9200:  legacy USART support
+>> @@ -19,9 +19,9 @@ Example:
+>>   
+>>   	usart0: serial at fff8c000 {
+>>   		compatible = "atmel,at91sam9260-usart";
+>> -		reg = <0xfff8c000 0x4000>;
+>> -		interrupts = <7>;
+>> -		atmel,use-dma-rx;
+>> -		atmel,use-dma-tx;
+>> +		reg = <0xfff8c000 0x200>;
+>> +		interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+> Maybe put these changes into an other patch since it is not in relation with
+> the purpose of your patch.
+>
+> Moreover, I am not sure that macros should be used in the documentation. From
+> the top of my head, there was a discussion about that and the status was to not
+> use macros in documentation since it is Linux dependant.
 
-No, you should be using generic interfaces to do the things you need.
-
-I believe what you are missing is an ethernet phy driver that is specific
-to your SoC.
-
-	Arnd
+Ok, I will not involve the macros in the document now.
+So I will move all the document changes into the last patch, right?
+>
+>> +		atmel,use-pdc-rx;
+>> +		atmel,use-pdc-tx;
+>>   	};
+>>   
+> [...]
