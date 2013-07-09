@@ -1,44 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Jul 2013 09:45:36 +0200
-Subject: [PATCH 00/04] ARM: shmobile: ARCH_MULTIPLATFORM for EMEV2 and
- KZM9D
-In-Reply-To: <20130709054331.14007.66068.sendpatchset@w520>
-References: <20130709054331.14007.66068.sendpatchset@w520>
-Message-ID: <201307090945.36314.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Jul 2013 08:45:54 +0100
+Subject: v3.10 - big endian core support
+In-Reply-To: <51DB84D5.3000700@gmail.com>
+References: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
+ <51DA5089.5080109@gmail.com>
+ <20130708084911.GA22057@mudshark.cambridge.arm.com>
+ <51DA8BBF.7080104@gmail.com>
+ <20130708110202.GD22057@mudshark.cambridge.arm.com>
+ <20130708170352.GA24361@mudshark.cambridge.arm.com>
+ <51DB64FB.8030208@gmail.com> <51DB84D5.3000700@gmail.com>
+Message-ID: <20130709074553.GA25885@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 July 2013, Magnus Damm wrote:
-> ARM: shmobile: ARCH_MULTIPLATFORM for EMEV2 and KZM9D
+On Tue, Jul 09, 2013 at 04:34:45AM +0100, jgq516 at gmail.com wrote:
+> On 07/09/2013 09:18 AM, jgq516 at gmail.com wrote:
+> > On 07/09/2013 01:03 AM, Will Deacon wrote:
+> >> On Mon, Jul 08, 2013 at 12:02:02PM +0100, Will Deacon wrote:
+> >>> On Mon, Jul 08, 2013 at 10:51:59AM +0100, jgq516 at gmail.com wrote:
+> >>>> The printascii can output before "b __enable_mmu", after move it to
+> >>>> __mmap_switched, nothing can be printed. But if disable LPAE, 
+> >>>> printascii
+> >>>> works again in __mmap_switched.
+> >>> Ok, so the page tables are broken. The code is there to swap the two 
+> >>> words,
+> >>> but perhaps something ends up being off-by-4 or the like. I'll try 
+> >>> and take
+> >>> a look.
+> >> Right, I managed to have a quick play with a 3.10 kernel and the good 
+> >> news
+> >> is that the page tables are fine. The bad part is that using
+> >> CONFIG_ARM_ATAG_DTB_COMPAT to get my command-line from ATAGs into the 
+> >> FDT
+> >> results in a NULL command line, so I don't see any output. If I 
+> >> hardcode the
+> >> command line in the kernel image, things work fine.
+> >>
+> Hi Will,
 > 
-> [PATCH 01/04] ARM: shmobile: Only build clocks when COMMON_CLK=n
-> [PATCH 02/04] ARM: shmobile: Introduce ARCH_SHMOBILE_MULTI
-> [PATCH 03/04] ARM: shmobile: Add EMEV2 and KZM9D to ARCH_SHMOBILE_MULTI
-> [PATCH 04/04] ARM: shmobile: Allow ARCH_SHMOBILE_MULTI timer configuration
-> 
-> This patch set extends mach-shmobile to allow a subset of SoCs and
-> boards to be built for ARCH_MULTIPLATFORM. With this series applied
-> the EMEV2 SoC and the KZM9D board can be built in two ways - either
-> as good old ARCH_SHMOBILE or new ARCH_SHMOBILE_MULTI. The latter
-> requires common clock framework for proper run time operation.
-> 
-> The goal is to over time move all DT reference implementations from
-> ARCH_SHMOBILE to ARCH_SHMOBILE_MULTI. Until CCF is available for a
-> certain SoC it is to me acceptable for a DT reference board to allow
-> build in both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI. The reason for
-> this is to allow incremental development and easy testing during
-> development of CCF for a certain SoC. The KZM9D board is now in this
-> state while it is waiting for common clocks to become ready.
-> 
-> In the near future a prototype hack will be posted that comments
-> out the clock framework bits on EMEV2 and will allow boot of KZM9D
-> in the case of ARCH_SHMOBILE_MULTI even though CCF is not yet
-> available.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+> Which kernel tree are you used? I tried latest mainline kernel (used 
+> vexpress_defconfig
+> and vexpress-v2p-ca15_a7.dtb) without any modification, but it hangs as 
+> follows.
 
-Great stuff, very glad you got this far!
+Just try 3.10 at the moment -- we're currently in the middle of the merge
+window and I know that there is some timer breakage that people have been
+talking about.
 
-I have two small style comments, nothing important.
-
-	Arnd
+Will
