@@ -1,41 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 9 Jul 2013 16:05:43 +0100
-Subject: [PATCH v4 3/7] Documentation: DT: update atmel SSC with DMA
- binding
-In-Reply-To: <1373379933-32749-4-git-send-email-richard.genoud@gmail.com>
-References: <1373372929-17800-1-git-send-email-richard.genoud@gmail.com>
- <1373379933-32749-1-git-send-email-richard.genoud@gmail.com>
- <1373379933-32749-4-git-send-email-richard.genoud@gmail.com>
-Message-ID: <20130709150543.GE27646@sirena.org.uk>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 9 Jul 2013 17:07:03 +0200
+Subject: Chipidea usb otg support for IMX/MXS (device functionality)
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803EFB072@039-SN2MPN1-023.039d.mgd.msft.net>
+References: <51A5A808.2070803@digi.com> <201306221529.53043.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803EFB072@039-SN2MPN1-023.039d.mgd.msft.net>
+Message-ID: <201307091707.03749.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 09, 2013 at 04:25:29PM +0200, Richard Genoud wrote:
+Hi Peter,
 
->  - reg: Should contain SSC registers location and length
->  - interrupts: Should contain SSC interrupt
-> +For dma transfer:
-> +- dmas: DMA specifier, consisting of a phandle to DMA controller node,
-> +  the memory interface and SSC DMA channel ID (for tx and rx).
-> +  See Documentation/devicetree/bindings/dma/atmel-dma.txt for details.
-> +- dma-names: Must be "tx", "rx".
+> > Hi Peter,
+> > 
+> > > > Peter, I dunno if you are already aware of it, but the USB peripheral
+> > > > mode hangs
+> > > > on MX233. It's easy to replicate for example if you try to run CDC
+> > > > ethernet over
+> > > > the USB peripheral mode, then telnet into the board and run "dmesg" .
+> > > > This will
+> > > > trigger a "larger" data transfer which will make the UDC driver hang.
+> > > > This
+> > > > doesn't happen on MX28 so it must be some MX233-specific thing.
+> > > 
+> > > Marek, Have you tried below?
+> > > 
+> > > http://marc.info/?l=linux-usb&m=136537318510847&w=2
+> > > 
+> > > It may not the USB itself problem, the mx23's usb is almost
+> > > the same with mx28's.
+> > 
+> > This also happens on a different MX23-based board for me. This other
+> > board I
+> > tried has mDDR DRAM and the DRAM is operating correctly. The 96MHz thing
+> > people
+> > complained about in the Olimex forum is resolved now.
+> 
+> Add shawn.
+> 
+> Marek, have you tried mx23 evk?
 
-This is added as a required property so...
+Ok, I just tried the MX23EVK. Running "dmesg" via telnet connection resulted in 
+a hang of the USB driver (likely), but since I have serial connection to the 
+board, I was able to verify the board itself didn't crash. I can still operate 
+the board via serial console, it's only the USB in peripheral mode ethernet that 
+is hung.
 
-> -Example:
-> +Examples:
->  ssc0: ssc at fffbc000 {
->  	compatible = "atmel,at91rm9200-ssc";
->  	reg = <0xfffbc000 0x4000>;
->  	interrupts = <14 4 5>;
->  };
+> Shawn, marek reported the udc function at mx23 works abnormal, but it works
+> good at mx28. Have you tried mx23 udc recently?
+> 
+> Best regards,
+> Peter
 
-...this first example is now invalid and should probably just be being
-extended with the new required properties.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/614c2105/attachment.sig>
+Best regards,
+Marek Vasut
