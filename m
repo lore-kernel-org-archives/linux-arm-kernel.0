@@ -1,37 +1,46 @@
-From: jgq516@gmail.com (jgq516 at gmail.com)
-Date: Tue, 09 Jul 2013 09:18:51 +0800
-Subject: v3.10 - big endian core support
-In-Reply-To: <20130708170352.GA24361@mudshark.cambridge.arm.com>
-References: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
- <51DA5089.5080109@gmail.com>
- <20130708084911.GA22057@mudshark.cambridge.arm.com>
- <51DA8BBF.7080104@gmail.com>
- <20130708110202.GD22057@mudshark.cambridge.arm.com>
- <20130708170352.GA24361@mudshark.cambridge.arm.com>
-Message-ID: <51DB64FB.8030208@gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 9 Jul 2013 10:29:14 +0900
+Subject: [PATCH] ARM: shmobile: r8a7790 SMP prototype v2
+In-Reply-To: <201307090121.50685.arnd@arndb.de>
+References: <20130626235837.11576.86389.sendpatchset@w520>
+ <201306271401.13198.arnd@arndb.de>
+ <CANqRtoRR-pyCpXYwKXRYSfVOewv+dXf=ntofJJsKQ0defF5-MQ@mail.gmail.com>
+ <201307090121.50685.arnd@arndb.de>
+Message-ID: <CANqRtoR5tgHBg_kgb7-jde6VLwXyCe5XhPs-v_PDtO12GqGM-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2013 01:03 AM, Will Deacon wrote:
-> On Mon, Jul 08, 2013 at 12:02:02PM +0100, Will Deacon wrote:
->> On Mon, Jul 08, 2013 at 10:51:59AM +0100, jgq516 at gmail.com wrote:
->>> The printascii can output before "b __enable_mmu", after move it to
->>> __mmap_switched, nothing can be printed. But if disable LPAE, printascii
->>> works again in __mmap_switched.
->> Ok, so the page tables are broken. The code is there to swap the two words,
->> but perhaps something ends up being off-by-4 or the like. I'll try and take
->> a look.
-> Right, I managed to have a quick play with a 3.10 kernel and the good news
-> is that the page tables are fine. The bad part is that using
-> CONFIG_ARM_ATAG_DTB_COMPAT to get my command-line from ATAGs into the FDT
-> results in a NULL command line, so I don't see any output. If I hardcode the
-> command line in the kernel image, things work fine.
+On Tue, Jul 9, 2013 at 8:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 08 July 2013, Magnus Damm wrote:
+>> >> +static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
+>> >> +{
+>> >> +     void __iomem *p;
+>> >> +     unsigned int k;
+>> >> +
+>> >> +     shmobile_boot_fn = virt_to_phys(shmobile_invalidate_start);
+>> >> +
+>> >> +     /* MERAM for jump stub, because BAR requires 256KB aligned address */
+>> >> +     p = ioremap_nocache(MERAM, 16);
+>> >> +     memcpy(p, shmobile_boot_vector, 16);
+>> >> +     iounmap(p);
+>> >
+>> > On the other hand here you have to use __raw_writel() or
+>> > memcpy_toio() because memcpy cannot operate on __iomem tokens.
+>> >
+>> > Also, if this is actually memory, you probably want to use ioremap_cached
+>> > or ioremap_writecombine.
+>>
+>> Yeah, I realize this may be a bit of a mess. So say that I used
+>> ioremap_cached() here, I think I still need to flush the cache to make
+>> sure the secondary processors have valid code available then they
+>> boot. I suppose you're fine with that?
 >
-> What kernel are you using, and how are you passing your command line?
-3.4 kernel and command line is passed from uboot, I will try 3.10 
-kernel, then cherry pick
-some related patches from 3.10 if 3.10 works.
+> Is that required to get the data from dcache to icache? If so, that
+> sounds right.
+
+Good point. I sort of assumed that the secondary CPU cores booted with
+cache disabled, but I may be wrong.
 
 Thanks,
-Xiao
-> Will
+
+/ magnus
