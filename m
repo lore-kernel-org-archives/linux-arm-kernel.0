@@ -1,39 +1,24 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Tue, 9 Jul 2013 09:55:25 +0200
-Subject: [lm-sensors] [PATCH 1/2] ARM: dt: t30 cardhu: add dt entry for
- lm90
-In-Reply-To: <51DBC058.2040904@nvidia.com>
-References: <1372928979-26938-1-git-send-email-wni@nvidia.com>
- <1372928979-26938-2-git-send-email-wni@nvidia.com>
- <51D70483.70203@wwwdotorg.org> <51DA6BD4.1040300@nvidia.com>
- <20130708095024.041a6d57@endymion.delvare>
- <51DA8805.50709@nvidia.com> <20130708131421.GB21638@roeck-us.net>
- <20130709062112.GC17499@mithrandir> <51DBC058.2040904@nvidia.com>
-Message-ID: <20130709095525.5158a0a5@endymion.delvare>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Jul 2013 09:56:02 +0200
+Subject: [PATCH v1 0/4] ARM: STi fixes and ethernet support
+In-Reply-To: <51DBB629.1050000@st.com>
+References: <1373271301-11060-1-git-send-email-srinivas.kandagatla@st.com>
+ <201307090118.06715.arnd@arndb.de> <51DBB629.1050000@st.com>
+Message-ID: <201307090956.03191.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 9 Jul 2013 15:48:40 +0800, Wei Ni wrote:
-> On 07/09/2013 02:21 PM, Thierry Reding wrote:
-> > It should work out of the box. As a matter of fact the same chip is used
-> > on Tamonten and the DTS files use "onnn,nct1008". That used to work. If
-> > it no longer does then that's a regression.
-> 
-> I synced the linux-next from:
-> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
-> and use the tag v3.10-rc7, but in the lm90.c it doesn't have DT support,
-> such as "onnn,nct1008".
-> I googled it and found there has patch:
-> [PATCH] hwmon: (lm90) Add device tree support , which is in:
-> http://lists.lm-sensors.org/pipermail/lm-sensors/2013-February/038099.html
-> , but it didn't be merged into the linux-next.
+On Tuesday 09 July 2013, Srinivas KANDAGATLA wrote:
+> stmmac (aka "dwmac" a synopsis IP) driver is integrated in to kernel
+> sometime in 2.6 series I think :-), and Is used by more than 4 platforms
+> in 3.10 kernel. The driver is more generic than it sounds.
+> So adding properties/hooks specific to STiH41x SOCs in driver seemed to
+> incorrect. Instead doing platform specific bits in the mach via
+> callbacks was the only choice I had.
 
-It was not, because of the next reply in the same thread:
-http://lists.lm-sensors.org/pipermail/lm-sensors/2013-February/038100.html
+No, you should be using generic interfaces to do the things you need.
 
-> which git repository and branch should I use ?
+I believe what you are missing is an ethernet phy driver that is specific
+to your SoC.
 
-It is supposed to just work. What doesn't work for you exactly?
-
--- 
-Jean Delvare
+	Arnd
