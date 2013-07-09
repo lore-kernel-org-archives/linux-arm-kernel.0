@@ -1,83 +1,42 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 9 Jul 2013 16:58:42 +0300
-Subject: [RFC PATCH 4/6] USB: ehci-omap: Suspend the controller during
- bus suspend
-In-Reply-To: <Pine.LNX.4.44L0.1306281346430.1047-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1306281346430.1047-100000@iolanthe.rowland.org>
-Message-ID: <51DC1712.30401@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 9 Jul 2013 16:01:32 +0200
+Subject: [PATCHv4 05/11] of: pci: add registry of MSI chips
+In-Reply-To: <CAL_Jsq+h=y5SNo4qO5-5u_w8rW++9MKDZK8rASNjhtVcjh-iyQ@mail.gmail.com>
+References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1372686136-1370-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAL_Jsq+h=y5SNo4qO5-5u_w8rW++9MKDZK8rASNjhtVcjh-iyQ@mail.gmail.com>
+Message-ID: <20130709160132.7f5e7a8e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2013 10:06 PM, Alan Stern wrote:
-> On Fri, 28 Jun 2013, Roger Quadros wrote:
-> 
->>> That's not what I meant.  Never mind the pinctrl; I was asking about
->>> the EHCI controller itself.  Under what circumstances does the
->>> controller assert its wakeup signal?  And how do you tell it to stop
->>> asserting that signal?
->>
->> I believe this would be through the EHCI Interrupt enable register (USBINTR).
->> I'm not aware of any other mechanism.
-> 
-> That's strange, because ehci_suspend() sets the intr_enable register to 
-> 0.  So how do you ever get any wakeup interrupts at all?
-> 
->> Right. It seems the external hub has signaled remote wakeup but the kernel doesn't
->> resume the root hub's port it is connected to.
->>
->> By observing the detailed logs below you can see that the root hub does not generate
->> an INTerrupt transaction to notify the port status change event. I've captured the pstatus
->> and GetPortStatus info as well.
-> 
-> We don't need an interrupt.  The driver is supposed to detect the
-> remote wakeup sent by the external hub all by itself.
-> 
->> Failing case
->> ------------
->>
->> [   16.108032] usb usb1: usb auto-resume
->> [   16.108062] ehci-omap 48064800.ehci: resume root hub
->> [   16.108154] hub 1-0:1.0: hub_resume
->> [   16.108398] ehci_hub_control GetPortStatus, port 1 temp = 0x1000
->> [   16.108459] ehci_hub_control GetPortStatus, port 2 temp = 0x14c5
-> 
-> Here's where we should detect it.  Look at the GetPortStatus case in
-> ehci_hub_control(); the PORT_RESUME bit (0x0040) is set in temp, so the
-> "Remote Wakeup received?" code should run.  In particular, these lines
-> should run:
-> 
-> 			/* resume signaling for 20 msec */
-> 			ehci->reset_done[wIndex] = jiffies
-> 					+ msecs_to_jiffies(20);
-> 			usb_hcd_start_port_resume(&hcd->self, wIndex);
-> 			/* check the port again */
-> 			mod_timer(&ehci_to_hcd(ehci)->rh_timer,
-> 					ehci->reset_done[wIndex]);
-> 
-> Therefore 20 ms later, around timestamp 16.128459,
-> ehci_hub_status_data() should have been called.  At that time, the
-> root-hub port should have been fully resumed.
-> 
->> [   16.108551] hub 1-0:1.0: port 2: status 0507 change 0000
->> [   16.108612] ehci_hub_control GetPortStatus, port 3 temp = 0x1000
->> [   16.108642] hub 1-0:1.0: hub_activate submitting urb
->> [   16.109222] ehci_irq port 3 pstatus 0x1000
->> [   16.109222] ehci_irq port 2 pstatus 0x14c5
->> [   16.109252] ehci_irq port 1 pstatus 0x1000
->> [   16.109374] hub 1-0:1.0: state 7 ports 3 chg 0000 evt 0000
-> 
-> But apparently nothing happened.  Why not?  Did the rh_timer get reset?  
-> Maybe you can find out what went wrong.
-> 
-> (Hmmm, we seem to be missing a
-> 
-> 			set_bit(wIndex, &ehci->resuming_ports);
-> 
-> line in there...)
-> 
+Rob,
 
-Right. This is indeed the problem. I've cooked up a patch for that and will send
-it separately in a moment.
+On Tue, 9 Jul 2013 08:43:36 -0500, Rob Herring wrote:
 
-cheers,
--roger
+> > +int of_msi_chip_add(struct msi_chip *chip)
+> 
+> Perhaps of_pci_msi_chip_add instead.
+
+Sure, makes sense.
+
+> > +{
+> > +       struct msi_chip *c;
+> > +       list_for_each_entry(c, &msi_chip_list, list) {
+> 
+> Need the safe variant here?
+
+As suggested by Bjorn, I've changed this function to grab the
+msi_chip_mutex while traversing the list.
+
+Does your e-mail implies that the general approach seems ok? If so,
+I'll resend an updated v5 version taking into account the comments
+that I have received on this v4.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
