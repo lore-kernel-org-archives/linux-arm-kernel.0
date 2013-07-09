@@ -1,123 +1,73 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 09 Jul 2013 17:05:48 +0900
-Subject: [PATCH V6 4/4] video: exynos_dp: Use the generic PHY driver
-Message-ID: <004101ce7c7b$1f306510$5d912f30$@samsung.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Tue,  9 Jul 2013 08:26:24 +0100
+Subject: [PATCH v2 1/2] ARM: dts: STi: Fix pinconf setup for STiH416 serial2
+In-Reply-To: <1373354752-26292-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1373354752-26292-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1373354784-26357-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the generic PHY API to control the DP PHY.
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+This patch fixes a bug in pinctrl setup of serial2 device, Some of the
+pins in the pinctrl node of serial2 do not belong to that
+pin-controller. This patch divides them in the pins into there
+respective pin controller nodes.
+
+Without this patch serial on StiH416-B2000 Board will not work as it
+fails with:
+
+"st-pinctrl pin-controller-rear.3: failed to get pin(99) name
+st-pinctrl pin-controller-rear.3: maps: function serial2 group serial2-0
+num 4
+pinconfig core: failed to register map default (3): no group/pin given"
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 ---
- .../devicetree/bindings/video/exynos_dp.txt          |   18 +++++++++---------
- drivers/video/exynos/exynos_dp_core.c                |   16 ++++++++++++----
- drivers/video/exynos/exynos_dp_core.h                |    1 +
- 3 files changed, 22 insertions(+), 13 deletions(-)
+ arch/arm/boot/dts/stih416-pinctrl.dtsi |   10 +++++++++-
+ arch/arm/boot/dts/stih416.dtsi         |    2 +-
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt b/Documentation/devicetree/bindings/video/exynos_dp.txt
-index c60da67..e2874ae 100644
---- a/Documentation/devicetree/bindings/video/exynos_dp.txt
-+++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
-@@ -6,10 +6,10 @@ We use two nodes:
- 	-dptx-phy node(defined inside dp-controller node)
+diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+index 957b21a..0f246c9 100644
+--- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+@@ -166,6 +166,15 @@
+ 				reg		= <0x9000 0x100>;
+ 				st,bank-name	= "PIO31";
+ 			};
++
++			serial2-oe {
++				pinctrl_serial2_oe: serial2-1 {
++					st,pins {
++						output-enable	= <&PIO11 3 ALT2 OUT>;
++					};
++				};
++			};
++
+ 		};
  
- For the DP-PHY initialization, we use the dptx-phy node.
--Required properties for dptx-phy:
--	-reg:
-+Required properties for dptx-phy: deprecated, use phys and phy-names
-+	-reg: deprecated
- 		Base address of DP PHY register.
--	-samsung,enable-mask:
-+	-samsung,enable-mask: deprecated
- 		The bit-mask used to enable/disable DP PHY.
+ 		pin-controller-rear {
+@@ -218,7 +227,6 @@
+ 					st,pins {
+ 						tx	= <&PIO17 4 ALT2 OUT>;
+ 						rx	= <&PIO17 5 ALT2 IN>;
+-						output-enable	= <&PIO11 3 ALT2 OUT>;
+ 					};
+ 				};
+ 			};
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index 3cecd96..1a0326e 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -79,7 +79,7 @@
+ 			interrupts	= <0 197 0>;
+ 			clocks          = <&CLK_S_ICN_REG_0>;
+ 			pinctrl-names 	= "default";
+-			pinctrl-0 	= <&pinctrl_serial2>;
++			pinctrl-0 	= <&pinctrl_serial2 &pinctrl_serial2_oe>;
+ 		};
  
- For the Panel initialization, we read data from dp-controller node.
-@@ -21,6 +21,10 @@ Required properties for dp-controller:
- 		of memory mapped region.
- 	-interrupts:
- 		interrupt combiner values.
-+	-phys:
-+		from general PHY binding: the phandle for the PHY device.
-+	-phy-names:
-+		from general PHY binding: Should be "dp".
- 	-interrupt-parent:
- 		phandle to Interrupt combiner node.
- 	-samsung,color-space:
-@@ -61,12 +65,8 @@ SOC specific portion:
- 		reg = <0x145b0000 0x10000>;
- 		interrupts = <10 3>;
- 		interrupt-parent = <&combiner>;
--
--		dptx-phy {
--			reg = <0x10040720>;
--			samsung,enable-mask = <1>;
--		};
--
-+		phys = <&dp_phy>;
-+		phy-names = "dp";
- 	};
- 
- Board Specific portion:
-diff --git a/drivers/video/exynos/exynos_dp_core.c b/drivers/video/exynos/exynos_dp_core.c
-index 05fed7d..5e1a715 100644
---- a/drivers/video/exynos/exynos_dp_core.c
-+++ b/drivers/video/exynos/exynos_dp_core.c
-@@ -19,6 +19,7 @@
- #include <linux/interrupt.h>
- #include <linux/delay.h>
- #include <linux/of.h>
-+#include <linux/phy/phy.h>
- 
- #include "exynos_dp_core.h"
- 
-@@ -960,8 +961,11 @@ static int exynos_dp_dt_parse_phydata(struct exynos_dp_device *dp)
- 
- 	dp_phy_node = of_find_node_by_name(dp_phy_node, "dptx-phy");
- 	if (!dp_phy_node) {
--		dev_err(dp->dev, "could not find dptx-phy node\n");
--		return -ENODEV;
-+		dp->phy = devm_phy_get(dp->dev, "dp");
-+		if (IS_ERR(dp->phy))
-+			return PTR_ERR(dp->phy);
-+		else
-+			return 0;
- 	}
- 
- 	if (of_property_read_u32(dp_phy_node, "reg", &phy_base)) {
-@@ -992,7 +996,9 @@ err:
- 
- static void exynos_dp_phy_init(struct exynos_dp_device *dp)
- {
--	if (dp->phy_addr) {
-+	if (dp->phy) {
-+		phy_power_on(dp->phy);
-+	} else if (dp->phy_addr) {
- 		u32 reg;
- 
- 		reg = __raw_readl(dp->phy_addr);
-@@ -1003,7 +1009,9 @@ static void exynos_dp_phy_init(struct exynos_dp_device *dp)
- 
- static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
- {
--	if (dp->phy_addr) {
-+	if (dp->phy) {
-+		phy_power_off(dp->phy);
-+	} else if (dp->phy_addr) {
- 		u32 reg;
- 
- 		reg = __raw_readl(dp->phy_addr);
-diff --git a/drivers/video/exynos/exynos_dp_core.h b/drivers/video/exynos/exynos_dp_core.h
-index 56cfec8..607e36d 100644
---- a/drivers/video/exynos/exynos_dp_core.h
-+++ b/drivers/video/exynos/exynos_dp_core.h
-@@ -151,6 +151,7 @@ struct exynos_dp_device {
- 	struct video_info	*video_info;
- 	struct link_train	link_train;
- 	struct work_struct	hotplug_work;
-+	struct phy		*phy;
- };
- 
- /* exynos_dp_reg.c */
+ 		/* SBC_UART1 */
 -- 
-1.7.10.4
+1.7.6.5
