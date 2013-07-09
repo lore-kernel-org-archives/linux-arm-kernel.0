@@ -1,85 +1,54 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 09 Jul 2013 17:03:35 +0900
-Subject: [PATCH V6 0/4] Generic PHY driver for the Exynos SoC DP PHY
-Message-ID: <003d01ce7c7a$d04043d0$70c0cb70$@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Jul 2013 09:03:54 +0100
+Subject: ARM Cortex A9: User/Kernel filter events
+In-Reply-To: <BFCB49997E59134AAAF17FFE77F8FF0667378D28@REXMD.intranet.epfl.ch>
+References: <BFCB49997E59134AAAF17FFE77F8FF0667378D28@REXMD.intranet.epfl.ch>
+Message-ID: <20130709080354.GA26169@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds a simple driver for the Samsung Exynos SoC
-series DP transmitter PHY, using the generic PHY framework [1].
-Previously the DP PHY used an internal DT node to control the PHY
-power enable bit.
+On Mon, Jul 08, 2013 at 09:58:17PM +0100, Javier Picorel wrote:
+> Dear all,
+> 
+> Is there any reason why ARM Cortex A9 cannot filter user/kernel events?
+> 
+> arch/arm/kernel/perf_event_v7.c
+> 
+> 1144/*
+> 1145 * Add an event filter to a given event. This will only work for PMUv2 PMUs.
+> 1146 */
+> 1147static int armv7pmu_set_event_filter(struct hw_perf_event *event,
+> 1148                                     struct perf_event_attr *attr)
+> 1149{
+> 1150        unsigned long config_base = 0;
+> 1151
+> 1152        if (attr->exclude_idle)
+> 1153                return -EPERM;
+> 1154        if (attr->exclude_user)
+> 1155                config_base |= ARMV7_EXCLUDE_USER;
+> 1156        if (attr->exclude_kernel)
+> 1157                config_base |= ARMV7_EXCLUDE_PL1;
+> 1158        if (!attr->exclude_hv)
+> 1159                config_base |= ARMV7_INCLUDE_HYP;
+> 1160
+> 1161        /*
+> 1162         * Install the filter into config_base as this is used to
+> 1163         * construct the event type.
+> 1164         */
+> 1165        event->config_base = config_base;
+> 1166
+> 1167        return 0;
+> 1168}
+> 
+> It seems that only A15 and A7 are able to do it. Is it a limitation A9's PMU? Thank you!
 
-These patches was tested on Exynos5250.
+Event filtering requires hardware support in the PMU, as described in the
+comment above ("This will only work for PMUv2 PMUs"). A9 doesn't support
+this feature.
 
-This PATCH v6 follows:
- * PATCH v5, sent on July, 8th 2013
- * PATCH v4, sent on July, 2nd 2013
- * PATCH v3, sent on July, 1st 2013
- * PATCH v2, sent on June, 28th 2013
- * PATCH v1, sent on June, 28th 2013
+One interesting thing would be to see if we can plumb into the new
+context-tracking stuff from Kevin, which does keep track of transitions
+between user and kernel space. That would allow a `poor man's' event
+filtering for hardware that doesn't support it.
 
-Changes between v5 and v6:
-  * Re-based on git://gitorious.org/linuxphy/linuxphy.git
-
-Changes between v4 and v5:
-  * Marked original bindings as deprecated in 'exynos_dp.txt'
-  * Fixed typo of commit message.
-  * Added Tomasz Figa's Reviewed-by.
-
-Changes between v3 and v4:
-  * Added OF dependancy.
-  * Removed redundant local variable 'void __iomem *addr'.
-  * Removed unnecessary dev_set_drvdata().
-  * Added a patch that remove non-DT support for Exynos
-    Display Port driver.
-  * Removed unnecessary 'struct exynos_dp_platdata'.
-  * Kept supporting the original bindings for DT compatibility.
-
-Changes between v2 and v3:
-  * Removed redundant spinlock
-  * Removed 'struct phy' from 'struct exynos_dp_video_phy'
-  * Updated 'samsung-phy.txt', instead of creating
-    'samsung,exynos5250-dp-video-phy.txt'.
-  * Removed unnecessary additional specifier from 'phys'
-    DT property.
-  * Added 'phys', 'phy-names' properties to 'exynos_dp.txt' file.
-  * Added Felipe Balbi's Acked-by.
-
-Changes between v1 and v2:
-  * Replaced exynos_dp_video_phy_xlate() with of_phy_simple_xlate(),
-    as Kishon Vijay Abraham I guided.
-  * Set the value of phy-cells as 0, because the phy_provider implements
-    only one PHY.
-  * Removed unnecessary header include.
-  * Added '#ifdef CONFIG_OF' and of_match_ptr macro.
-
-This series depends on the generic PHY framework [1]. These patches
-refer to Sylwester Nawrocki's patches about Exynos MIPI [2].
-
-[1] https://lkml.org/lkml/2013/6/26/259
-[2] http://www.spinics.net/lists/linux-samsung-soc/msg20098.html
-
-Jingoo Han (4):
-  ARM: dts: Add DP PHY node to exynos5250.dtsi
-  phy: Add driver for Exynos DP PHY
-  video: exynos_dp: remove non-DT support for Exynos Display Port
-  video: exynos_dp: Use the generic PHY driver
-
- .../devicetree/bindings/phy/samsung-phy.txt        |    8 ++
- .../devicetree/bindings/video/exynos_dp.txt        |   18 +++++++++---------
- arch/arm/boot/dts/exynos5250.dtsi                  |   13 ++++++++-----
- drivers/phy/Kconfig                                |    6 ++
- drivers/phy/Makefile                               |    1 +
- drivers/phy/phy-exynos-dp-video.c                  |  111 ++++++++++++++++++++
- drivers/video/exynos/Kconfig                       |    2 +-
- drivers/video/exynos/exynos_dp_core.c              |  132 +++++++----------------------
- drivers/video/exynos/exynos_dp_core.h              |  110 +++++++++++++++++++++++++++
- drivers/video/exynos/exynos_dp_reg.c               |    2 -
- include/video/exynos_dp.h                          |  131 ---------------------------------
- 11 files changed, 291 insertions(+), 243 deletions(-) 
- create mode 100644 drivers/phy/phy-exynos-dp-video.c
- delete mode 100644 include/video/exynos_dp.h
-
---
-1.7.10.4
+Will
