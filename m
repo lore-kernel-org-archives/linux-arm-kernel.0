@@ -1,136 +1,50 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 9 Jul 2013 14:44:16 +0300
-Subject: [PATCH v9 0/8] Generic PHY Framework
-In-Reply-To: <780E789C2E067A4BB8F69D0BB9EC4F253E976575@DBDE04.ent.ti.com>
-References: <1372247257-30186-1-git-send-email-kishon@ti.com>
- <780E789C2E067A4BB8F69D0BB9EC4F253E975B5E@DBDE04.ent.ti.com>
- <51D3F773.9000209@ti.com> <20130703132038.GI15056@arwen.pp.htv.fi>
- <780E789C2E067A4BB8F69D0BB9EC4F253E975D6E@DBDE04.ent.ti.com>
- <51D54694.20203@ti.com> <20130704101216.GD4830@arwen.pp.htv.fi>
- <780E789C2E067A4BB8F69D0BB9EC4F253E9764D5@DBDE04.ent.ti.com>
- <51DAADD1.3060302@ti.com>
- <780E789C2E067A4BB8F69D0BB9EC4F253E976575@DBDE04.ent.ti.com>
-Message-ID: <20130709114416.GL5552@arwen.pp.htv.fi>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 09 Jul 2013 15:45:17 +0400
+Subject: [PATCH] ARM: shmobile: Add SMSC ethernet chip to KZM9D DT
+ reference
+In-Reply-To: <20130709042654.13658.20164.sendpatchset@w520>
+References: <20130709042654.13658.20164.sendpatchset@w520>
+Message-ID: <51DBF7CD.8040009@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-On Tue, Jul 09, 2013 at 04:23:29AM +0200, Patel, Satish wrote:
-> > > We have two options over here
-> > >
-> > > Option 1:
-> > >
-> > > Defining generic api to which can be mapped over multiple phys
-> > > For smartcard case, I have can thought of following mapping with new
-> > > generic apis as suggested.
-> > >
-> > > Smartcard_poweron -> power_on
-> > > Smartcard_powerdown -> power_off
-> > > Smartcard_set_voltage -> phy_set_voltage
-> > > Smartcard_activate_card -> phy_activate_slot
-> > > Smartcard_deactivate_card -> phy_deactivate_slot
-> > 
-> > how is activate/deactivate different from poweron/poweroff in this
-> > use case?
-> 
-> power on/off normal power sequence. While activate/de-activate will be 
-> called during card transaction.
+On 09-07-2013 8:26, Magnus Damm wrote:
 
-why can't you implement activate/deactivate with suspend/resume ?
+> From: Magnus Damm <damm@opensource.se>
 
-> Brief on how it works:
-> - when system start, execute power on for phy
-> - smartcard controller and phy is connected through i2c, clock lines and 
-> i/o lines
-> - clock will be supplied by controller to phy to get data sync on i/o lines
+> Add support for the SMSC ethernet controller found
+> on the KZM9D board to the KZM9D DT Reference code.
 
-fair enough.
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
 
-> Operation:
->
-> Once the card gets inserted into the slot, user application can
-> initiate activate sequence anytime, it is not mandatory that
-> activation has to be called Immediately. It all depends whether other
-> connections ( network, printer) are proper.  User application can do
-> some checks and then dynamically activate the card
+>   Built on top of renesas-next-20130704v2 and
+>   [PATCH] ARM: shmobile: KZM9D DT reference implementation
 
-The card or the phy ? Who actually activates ? Is the activation
-handling part of the PHY or part of the smartcard controller ?
+>   arch/arm/boot/dts/emev2-kzm9d-reference.dts |   31 +++++++++++++++++++++++++++
+>   1 file changed, 31 insertions(+)
 
-> There are 2 sequence of activation - normal activation and warm reset.
-> If first fails then warm reset should be executed, if card does not
-> response to both then deactivation will be carried out
+> --- 0002/arch/arm/boot/dts/emev2-kzm9d-reference.dts
+> +++ work/arch/arm/boot/dts/emev2-kzm9d-reference.dts	2013-07-09 13:06:47.000000000 +0900
+> @@ -23,4 +23,35 @@
+[...]
+> +	lan9220 at 20000000 {
 
-ret = phy_resume(phy);
-if (ret == -EINVAL) { /* perhaps there's a better error code */
-	ret = phy_reset(phy);
-	if (ret)
-		phy_suspend(phy);
-}
+    Shouldn't all the Ethernet nodes be called "ethernet"?
 
-????
+> +		compatible = "smsc,lan9220", "smsc,lan9115";
+> +		reg = <0x20000000 0x10000>;
+> +		phy-mode = "mii";
+> +		interrupt-parent = <&gpio0>;
+> +		interrupts = <1 1>;	/* active high */
+> +		reg-io-width = <4>;
+> +		smsc,irq-active-high;
+> +		smsc,irq-push-pull;
+> +		vddvario-supply = <&reg_1p8v>;
+> +		vdd33a-supply = <&reg_3p3v>;
+> +	};
+>   };
 
-> - For activation there are some timing parameters ( called ATR -
-> Answer to reset timings) Has to be set to the phy
-
-does that change in runtime or is it something which is set during probe
-and never touched again ?
-
-> - on activation card will respond with some initial characters (ATR),
-> which will be verified by application, in case of error user
-> application will de-activate the card not the phy module
-> 
-> - After activation, use application initiate normal tx/rx
-> 
-> - Once tx/rx is done, it will initiate deactivation of card not the
-> phy module.
-
-then that has nothing to do with the PHY framework, right ?
-
-> > > Smartcard_set_c4/c8/rst/io -> phy_set_pin
-> > 
-> > Whats should be exactly done here? Looks to me like it should be
-> > part of init. Does these pin settings need to be changed dynamically?
-> 
-> These are all phy pins which will be physically come in contact with
-> smart card When inserted. In case of synchronous card, these pins will
-> be toggled manually by s/w bit bang algorithm
-
-is that a requirement or just something that everybody does ?
-
-In any case, you can hide that under some gpio calls, or something
-similar.
-
-> > Why? Is it like the detection of an external event? Then the PHY
-> > driver should use *extcon* for event detection and passing.
-> >
-> 
-> Smartcard controller need a way to ready isr status ( like card presence,
-> Card inserted in to which slot, removed from which slot ) to maintain its
-> Internal state machine.
-
-register an interrupt handler with devm_request_threaded_irq(), what's
-the problem ?
-
-> > > Smartcard_get_version -> phy_get_version
-> > 
-> > Again why? Why would the smartcard need the version of the PHY?
-> > 
-> 
-> Can be omitted. This is for the test suite reference.
-
-if it's for testsuite, it sounds like something that should be done
-through userland and, as such, should be implemented by a set of debugfs
-files which expose the necessary information. That has nothing to do
-with the PHY framework.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/b8472db6/attachment-0001.sig>
+WBR, Sergei
