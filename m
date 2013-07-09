@@ -1,55 +1,69 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 9 Jul 2013 17:07:03 +0200
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803EFB072@039-SN2MPN1-023.039d.mgd.msft.net>
-References: <51A5A808.2070803@digi.com> <201306221529.53043.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803EFB072@039-SN2MPN1-023.039d.mgd.msft.net>
-Message-ID: <201307091707.03749.marex@denx.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 9 Jul 2013 16:29:54 +0100
+Subject: [RFC PATCH V2 1/8] regulator: Introduce OMAP regulator to
+ control PMIC over VC/VP
+In-Reply-To: <51DAF55C.5040502@ti.com>
+References: <1371849949-12649-1-git-send-email-nm@ti.com>
+ <1371849949-12649-2-git-send-email-nm@ti.com>
+ <20130704154105.GD27646@sirena.org.uk>
+ <20130705135507.GA17439@kahuna>
+ <20130705140828.GA27646@sirena.org.uk> <51D6DD3A.1030002@ti.com>
+ <20130705165235.GC27646@sirena.org.uk> <51D70356.30707@ti.com>
+ <20130705174727.GF27646@sirena.org.uk> <51DAF55C.5040502@ti.com>
+Message-ID: <20130709152954.GF27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Mon, Jul 08, 2013 at 12:22:36PM -0500, Nishanth Menon wrote:
 
-> > Hi Peter,
-> > 
-> > > > Peter, I dunno if you are already aware of it, but the USB peripheral
-> > > > mode hangs
-> > > > on MX233. It's easy to replicate for example if you try to run CDC
-> > > > ethernet over
-> > > > the USB peripheral mode, then telnet into the board and run "dmesg" .
-> > > > This will
-> > > > trigger a "larger" data transfer which will make the UDC driver hang.
-> > > > This
-> > > > doesn't happen on MX28 so it must be some MX233-specific thing.
-> > > 
-> > > Marek, Have you tried below?
-> > > 
-> > > http://marc.info/?l=linux-usb&m=136537318510847&w=2
-> > > 
-> > > It may not the USB itself problem, the mx23's usb is almost
-> > > the same with mx28's.
-> > 
-> > This also happens on a different MX23-based board for me. This other
-> > board I
-> > tried has mDDR DRAM and the DRAM is operating correctly. The 96MHz thing
-> > people
-> > complained about in the Olimex forum is resolved now.
-> 
-> Add shawn.
-> 
-> Marek, have you tried mx23 evk?
+> case #1 - TPS62361 has a single SMPS and a single generic i2c bus,
+> one can talk on. In this case, you'd associate the regulator device
+> in one place - i2cX or on custom SoC hardware interface.
 
-Ok, I just tried the MX23EVK. Running "dmesg" via telnet connection resulted in 
-a hang of the USB driver (likely), but since I have serial connection to the 
-board, I was able to verify the board itself didn't crash. I can still operate 
-the board via serial console, it's only the USB in peripheral mode ethernet that 
-is hung.
+> When used with custom SoC hardware interface, generic tps62361
+> regulator which talks regular i2c wont even probe for omap_pmic to
+> get the regulator data from tps62361 regulator driver. Even if we
+> were to define the generic TPS62361 in dts nodes, it will fail probe
+> as it cant access any of it's registers using generic i2c.
 
-> Shawn, marek reported the udc function at mx23 works abnormal, but it works
-> good at mx28. Have you tried mx23 udc recently?
-> 
-> Best regards,
-> Peter
+This seems like something we should be able to cope with by for example
+adding a bus for the custom PMIC interface or otherwise finding a way to
+get to the data at runtime based on the compatible string.  This would
+need some custom code in the regulators but would have the advantage of
+keeping the data the same at least.  Hrm.
 
-Best regards,
-Marek Vasut
+> >Another option is for the drivers to provide the data and use the
+> >helpers for their linear ranges as part of a more complex
+> >implementation.
+
+> Having looked at a few regulator driver implementations, there seems
+> to be the following combinations:
+> a) drivers which have n ranges of linear voltages for incremental selector
+> b) drivers with 1 range of linear voltages only for all ranges of selectors
+> c) drivers with 1 range of linear voltages and nonlinear voltage
+> values for other vsels.
+
+Everything else is just a special case of option a - either there's just
+a single range or there's a bunch of ranges each with a single value.  I
+suspect that ranges will be the most useful thing for any hardware which
+can practically be used by these regulators anyway.
+
+> >OK, that's a bit more fun but I think the kernel wants that information
+> >in general anyway since a software cpufreq driver or something might
+> >want to make the same latency decisions.  This is what set_voltage_time()
+> >is for in part.  But to a first approximation is there really much
+> >variation in the numbers?
+
+> between PMICs? yep, twl4030 does 4mV/uSec, 6030 can do 6mV/uSec,
+> TPS62361 can do 32mV/uSec, TWL6035/37 does 0.220mV/uSec
+
+Those are ramp rates, they're not I2C I/O limits.  Ramp rates we already
+know about.  I think what you're saying here is that this latency value
+is actually about worst case ramp times?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/3dbf5b82/attachment.sig>
