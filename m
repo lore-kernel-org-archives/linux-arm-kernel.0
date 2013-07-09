@@ -1,42 +1,38 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 09 Jul 2013 19:39:52 +0900
-Subject: [PATCH 01/04] ARM: shmobile: No need to use INTC header on r8a7779
+Date: Tue, 09 Jul 2013 19:40:01 +0900
+Subject: [PATCH 02/04] ARM: shmobile: Use pm-rmobile on sh7372 and r8a7740 only
 In-Reply-To: <20130709103944.1891.67462.sendpatchset@w520>
 References: <20130709103944.1891.67462.sendpatchset@w520>
-Message-ID: <20130709103952.1891.92697.sendpatchset@w520>
+Message-ID: <20130709104001.1891.16375.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Now when the intc-irqpin driver is used for external
-IRQ pins on r8a7779 it possible to get rid of unused
-INTC headers mach/intc.h and linux/sh_intc.h.
+The functions in pm-rmobile.c are only used on sh7372 and
+r8a7740, so adjust the Makefile to only link in that file
+in case those SoCs are selected.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/intc-r8a7779.c  |    1 -
- arch/arm/mach-shmobile/setup-r8a7779.c |    1 -
- 2 files changed, 2 deletions(-)
+ arch/arm/mach-shmobile/Makefile |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
---- 0001/arch/arm/mach-shmobile/intc-r8a7779.c
-+++ work/arch/arm/mach-shmobile/intc-r8a7779.c	2013-07-09 18:42:08.000000000 +0900
-@@ -27,7 +27,6 @@
- #include <linux/platform_data/irq-renesas-intc-irqpin.h>
- #include <linux/irqchip.h>
- #include <mach/common.h>
--#include <mach/intc.h>
- #include <mach/irqs.h>
- #include <mach/r8a7779.h>
- #include <asm/mach-types.h>
---- 0001/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7779.c	2013-07-09 18:42:25.000000000 +0900
-@@ -29,7 +29,6 @@
- #include <linux/input.h>
- #include <linux/io.h>
- #include <linux/serial_sci.h>
--#include <linux/sh_intc.h>
- #include <linux/sh_timer.h>
- #include <linux/dma-mapping.h>
- #include <linux/usb/otg.h>
+--- 0001/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2013-07-09 18:50:08.000000000 +0900
+@@ -28,11 +28,10 @@ obj-$(CONFIG_ARCH_R8A7740)	+= entry-intc
+ # PM objects
+ obj-$(CONFIG_SUSPEND)		+= suspend.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+-obj-$(CONFIG_ARCH_SHMOBILE)	+= pm-rmobile.o
+-obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o
+-obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o
+-obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
++obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o pm-rmobile.o
+ obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
++obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o pm-rmobile.o
++obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
+ 
+ # Board objects
+ obj-$(CONFIG_MACH_AG5EVM)	+= board-ag5evm.o
