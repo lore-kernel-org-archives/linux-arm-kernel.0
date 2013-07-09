@@ -1,45 +1,65 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 9 Jul 2013 17:36:06 +0200
-Subject: v3.10 - big endian core support
-In-Reply-To: <20130708170352.GA24361@mudshark.cambridge.arm.com>
-References: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
- <51DA5089.5080109@gmail.com>
- <20130708084911.GA22057@mudshark.cambridge.arm.com>
- <51DA8BBF.7080104@gmail.com>
- <20130708110202.GD22057@mudshark.cambridge.arm.com>
- <20130708170352.GA24361@mudshark.cambridge.arm.com>
-Message-ID: <20130709173606.488fe85b@skate>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue,  9 Jul 2013 08:36:57 -0700
+Subject: [PATCH] ARM: Fix deadlock scenario with smp_send_stop()
+Message-ID: <1373384217-26307-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Will Deacon,
+If one process calls sys_reboot and that process then stops other
+CPUs while those CPUs are within a spin_lock() region we can
+potentially encounter a deadlock scenario like below.
 
-On Mon, 8 Jul 2013 18:03:53 +0100, Will Deacon wrote:
-> On Mon, Jul 08, 2013 at 12:02:02PM +0100, Will Deacon wrote:
-> > On Mon, Jul 08, 2013 at 10:51:59AM +0100, jgq516 at gmail.com wrote:
-> > > The printascii can output before "b __enable_mmu", after move it to
-> > > __mmap_switched, nothing can be printed. But if disable LPAE, printascii
-> > > works again in __mmap_switched.
-> > 
-> > Ok, so the page tables are broken. The code is there to swap the two words,
-> > but perhaps something ends up being off-by-4 or the like. I'll try and take
-> > a look.
-> 
-> Right, I managed to have a quick play with a 3.10 kernel and the good news
-> is that the page tables are fine. The bad part is that using
-> CONFIG_ARM_ATAG_DTB_COMPAT to get my command-line from ATAGs into the FDT
-> results in a NULL command line, so I don't see any output. If I hardcode the
-> command line in the kernel image, things work fine.
+CPU 0                   CPU 1
+-----                   -----
+                        spin_lock(my_lock)
+smp_send_stop()
+ <send IPI>             handle_IPI()
+                         disable_preemption/irqs
+                          while(1);
+ <PREEMPT>
+spin_lock(my_lock) <--- Waits forever
 
-Ben Dooks has a separate branch on top of this base branch for
-big-endian support, that adds atags compat code to convert the ATAGs
-data from LE to BE. See the baserock/311/be/atags branch in
-git://git.baserock.org/delta/linux. Or
-http://git.baserock.org/cgi-bin/cgit.cgi/delta/linux.git/log/?h=baserock/311/be/atags.
+We shouldn't attempt to run any other tasks after we send a stop
+IPI to a CPU so disable preemption so that this task runs to
+completion.
 
-Thomas
+Reported-by: Sundarajan Srinivasan <sundaraj@codeaurora.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+
+Resending this patch now that the context has changed.
+
+ arch/arm/kernel/process.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 7f1efcd..8bc12d7 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -206,6 +206,7 @@ void machine_shutdown(void)
+  */
+ void machine_halt(void)
+ {
++	preempt_disable();
+ 	smp_send_stop();
+ 
+ 	local_irq_disable();
+@@ -220,6 +221,7 @@ void machine_halt(void)
+  */
+ void machine_power_off(void)
+ {
++	preempt_disable();
+ 	smp_send_stop();
+ 
+ 	if (pm_power_off)
+@@ -239,6 +241,7 @@ void machine_power_off(void)
+  */
+ void machine_restart(char *cmd)
+ {
++	preempt_disable();
+ 	smp_send_stop();
+ 
+ 	arm_pm_restart(reboot_mode, cmd);
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
