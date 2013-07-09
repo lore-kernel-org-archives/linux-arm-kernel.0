@@ -1,75 +1,131 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 9 Jul 2013 15:20:38 +0200
-Subject: [PATCH v3 3/7] Documentation: DT: update atmel SSC with DMA
- binding
-In-Reply-To: <CACQ1gAg8WQTaz4XkXJCH+-bNU_U3s_1pgmQYoQR3v-KHOzzBTA@mail.gmail.com>
-References: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
- <1373372929-17800-1-git-send-email-richard.genoud@gmail.com>
- <1373372929-17800-4-git-send-email-richard.genoud@gmail.com>
- <CACQ1gAg8WQTaz4XkXJCH+-bNU_U3s_1pgmQYoQR3v-KHOzzBTA@mail.gmail.com>
-Message-ID: <51DC0E26.7080508@atmel.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 9 Jul 2013 15:26:10 +0200
+Subject: [PATCH 4/7] serial: at91: make DBGU support dma and pdc transfers
+In-Reply-To: <1373351626-30143-5-git-send-email-elen.song@atmel.com>
+References: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
+ <1373351626-30143-5-git-send-email-elen.song@atmel.com>
+Message-ID: <20130709132610.GD18012@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2013 15:19, Richard Genoud :
-> 2013/7/9 Richard Genoud <richard.genoud@gmail.com>:
->> As atmel-ssc can be used with DMA, the documentation should be updated.
->> Also, a configuration DMA example is given.
->>
->> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->> ---
->>   .../devicetree/bindings/misc/atmel-ssc.txt         |   24 ++++++++++++++++++--
->>   1 file changed, 22 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/misc/atmel-ssc.txt b/Documentation/devicetree/bindings/misc/atmel-ssc.txt
->> index 38e51ad..96958ca 100644
->> --- a/Documentation/devicetree/bindings/misc/atmel-ssc.txt
->> +++ b/Documentation/devicetree/bindings/misc/atmel-ssc.txt
->> @@ -6,10 +6,30 @@ Required properties:
->>          - atmel,at91sam9g45-ssc: support dma transfer
->>   - reg: Should contain SSC registers location and length
->>   - interrupts: Should contain SSC interrupt
->> +For dma transfer:
->> +- dmas: DMA specifier, consisting of a phandle to DMA controller node,
->> +  the memory interface and SSC DMA channel ID (for tx and rx).
->> +  See Documentation/devicetree/bindings/dma/atmel-dma.txt for details.
->> +- dma-names: Must be "tx", "rx".
->>
->> -Example:
->> +
->> +Examples:
->>   ssc0: ssc at fffbc000 {
->>          compatible = "atmel,at91rm9200-ssc";
->>          reg = <0xfffbc000 0x4000>;
->> -       interrupts = <14 4 5>;
->> +       interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
-> maybe I should not use macro in the documentation (not sure if I should or not).
+On 14:33 Tue 09 Jul     , Elen Song wrote:
+> Because the DBGU lack of receive timeout register, so we use a timer to trigger
+> data receive.
+> 
+> Signed-off-by: Elen Song <elen.song@atmel.com>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>  drivers/tty/serial/atmel_serial.c |   51 ++++++++++++++++++++++++++++++-------
+>  1 file changed, 42 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index a425ff2..52beb7e 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -41,6 +41,7 @@
+>  #include <linux/uaccess.h>
+>  #include <linux/pinctrl/consumer.h>
+>  #include <linux/platform_data/atmel.h>
+> +#include <linux/timer.h>
+>  
+>  #include <asm/io.h>
+>  #include <asm/ioctls.h>
+> @@ -167,6 +168,7 @@ struct atmel_uart_port {
+>  
+>  	struct serial_rs485	rs485;		/* rs485 settings */
+>  	unsigned int		tx_done_mask;
+> +	struct timer_list 	uart_timer;	/* dbgu timer */
+>  };
+>  
+>  static struct atmel_uart_port atmel_ports[ATMEL_MAX_UART];
+> @@ -968,6 +970,15 @@ err_dma:
+>  	return -EINVAL;
+>  }
+>  
+> +static void atmel_uart_timer_callback(unsigned long data)
+> +{
+> +	struct uart_port *port = (void *)data;
+> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+> +
+> +	tasklet_schedule(&atmel_port->tasklet);
+> +	mod_timer(&atmel_port->uart_timer, jiffies + uart_poll_timeout(port));
+> +}
+> +
+>  /*
+>   * receive interrupt handler.
+>   */
+> @@ -1424,18 +1435,34 @@ static int atmel_startup(struct uart_port *port)
+>  
+>  	if (atmel_use_pdc_rx(port)) {
+>  		/* set UART timeout */
+> -		UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
+> -		UART_PUT_CR(port, ATMEL_US_STTTO);
+> -
+> -		UART_PUT_IER(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT);
+> +		if (port->line == 0) {
+> +			setup_timer(&atmel_port->uart_timer,
+> +				    atmel_uart_timer_callback,
+> +				    (unsigned long)port);
+> +			mod_timer(&atmel_port->uart_timer,
+> +				  jiffies + uart_poll_timeout(port));
+> +		} else {
+> +			UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
+> +			UART_PUT_CR(port, ATMEL_US_STTTO);
+> +
+> +			UART_PUT_IER(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT);
+> +		}
+>  		/* enable PDC controller */
+>  		UART_PUT_PTCR(port, ATMEL_PDC_RXTEN);
+>  	} else if (atmel_use_dma_rx(port)) {
+>  		/* set UART timeout */
+> -		UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
+> -		UART_PUT_CR(port, ATMEL_US_STTTO);
+> -
+> -		UART_PUT_IER(port, ATMEL_US_TIMEOUT);
+> +		if (port->line == 0) {
+> +			setup_timer(&atmel_port->uart_timer,
+> +				    atmel_uart_timer_callback,
+> +				    (unsigned long)port);
+> +			mod_timer(&atmel_port->uart_timer,
+> +				  jiffies + uart_poll_timeout(port));
+> +		} else {
+> +			UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
+> +			UART_PUT_CR(port, ATMEL_US_STTTO);
+> +
+> +			UART_PUT_IER(port, ATMEL_US_TIMEOUT);
+> +		}
+>  	} else {
+>  		/* enable receive only */
+>  		UART_PUT_IER(port, ATMEL_US_RXRDY);
+> @@ -1471,6 +1498,9 @@ static void atmel_shutdown(struct uart_port *port)
+>  					 DMA_FROM_DEVICE);
+>  			kfree(pdc->buf);
+>  		}
+> +
+> +		if (port->line == 0)
+> +			del_timer_sync(&atmel_port->uart_timer);
+>  	}
+>  	if (atmel_use_pdc_tx(port)) {
+>  		struct atmel_dma_buffer *pdc = &atmel_port->pdc_tx;
+> @@ -1484,8 +1514,11 @@ static void atmel_shutdown(struct uart_port *port)
+>  	if (atmel_use_dma_tx(port))
+>  		atmel_tx_dma_release(atmel_port);
+>  
+> -	if (atmel_use_dma_rx(port))
+> +	if (atmel_use_dma_rx(port)) {
+>  		atmel_rx_dma_release(atmel_port);
+> +		if (port->line == 0)
+> +			del_timer_sync(&atmel_port->uart_timer);
+> +	}
 
-absolutely.
+use function pointer to seperate the code this will simplify the code and
+easier the maintainance by droping all of those if(xx) else
 
->>   };
->> +
->> +
->> +ssc0: ssc at f0010000 {
->> +      compatible = "atmel,at91sam9g45-ssc";
->> +      reg = <0xf0010000 0x4000>;
->> +      interrupts = <28 IRQ_TYPE_LEVEL_HIGH 5>;
->> +      dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(13)>,
->> +            <&dma0 1 AT91_DMA_CFG_PER_ID(14)>;
-> same here
->> +      dma-names = "tx", "rx";
->> +      pinctrl-names = "default";
->> +      pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
->> +      status = "disabled";
->> +};
->> +
->> --
->> 1.7.10.4
->>
->
->
->
-
-
--- 
-Nicolas Ferre
+Best Regards,
+J.
+>  
+>  	/*
+>  	 * Disable all interrupts, port and break condition.
+> -- 
+> 1.7.9.5
+> 
