@@ -1,28 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Jul 2013 09:37:29 +0200
-Subject: [PATCH 03/04] ARM: shmobile: Add EMEV2 and KZM9D to
- ARCH_SHMOBILE_MULTI
-In-Reply-To: <20130709054359.14007.23619.sendpatchset@w520>
-References: <20130709054331.14007.66068.sendpatchset@w520>
- <20130709054359.14007.23619.sendpatchset@w520>
-Message-ID: <201307090937.29805.arnd@arndb.de>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 9 Jul 2013 09:37:31 +0200
+Subject: [alsa-devel] [PATCH v2 1/5] sound: sam9x5_wm8731: machine driver
+ for at91sam9x5 wm8731 boards
+In-Reply-To: <51DACF15.9080303@metafoo.de>
+References: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
+ <1373290193-25300-2-git-send-email-richard.genoud@gmail.com>
+ <51DACF15.9080303@metafoo.de>
+Message-ID: <CACQ1gAh2Cy8VTx4Mgdv2NdrjdX1M7m-5M+8LqY6ncz3kS16O6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 July 2013, Magnus Damm wrote:
-> +void __init __weak emev2_clock_init(void)
-> +{
-> +       /* in case legacy clocks are disabled then do nothing */
-> +}
+2013/7/8 Lars-Peter Clausen <lars@metafoo.de>:
+> On 07/08/2013 03:29 PM, Richard Genoud wrote:
+> [...]
+>> +/*
+>> + * Logic for a wm8731 as connected on a at91sam9x5 based board.
+>> + */
+>> +static int at91sam9x5ek_wm8731_init(struct snd_soc_pcm_runtime *rtd)
+>> +{
+> [...]
+>> +     codec_dai->driver->playback.rates &= SNDRV_PCM_RATE_8000 |
+>> +             SNDRV_PCM_RATE_32000 |
+>> +             SNDRV_PCM_RATE_48000 |
+>> +             SNDRV_PCM_RATE_96000;
+>> +     codec_dai->driver->capture.rates &= SNDRV_PCM_RATE_8000 |
+>> +             SNDRV_PCM_RATE_32000 |
+>> +             SNDRV_PCM_RATE_48000 |
+>> +             SNDRV_PCM_RATE_96000;
+>
+> That's not right. The driver structure is shared between all instances of
+> the codec, a single instance should not modify it. If you need to constrain
+> the list of supported rates use snd_pcm_hw_constraint_list().
+Ok, I'll do that.
 
-Nitpicking:
+>
+>> +
+>> +     /* set the codec system clock for DAC and ADC */
+>> +     ret = snd_soc_dai_set_sysclk(codec_dai, WM8731_SYSCLK_XTAL,
+>> +                                  MCLK_RATE, SND_SOC_CLOCK_IN);
+>> +     if (ret < 0) {
+>> +             dev_err(dev, "ASoC: Failed to set WM8731 SYSCLK: %d\n", ret);
+>> +             return ret;
+>> +     }
+>> +
+>> +     /* signal a DAPM event */
+>> +     snd_soc_dapm_sync(dapm);
+>
+> This should not be necessary.
+ok
+>
+>> +     return 0;
+>> +}
+>
 
-I don't like the __weak symbols too much, in general I prefer
-doing either
+Thanks !
 
-	if (IS_ENABLED(CONFIG_SHMOBILE_CLOCKS)
-		emev2_clock_init()
-
-or using an inline alternative in the header file.
-
-	Arnd
+-- 
+for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
