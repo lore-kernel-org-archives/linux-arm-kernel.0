@@ -1,71 +1,59 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Tue, 9 Jul 2013 14:42:43 +0800
-Subject: [PATCH V3 0/3] bring up pxa988 with DT
-Message-ID: <1373352166-10064-1-git-send-email-zhangwm@marvell.com>
+From: elen.song@atmel.com (Elen Song)
+Date: Tue, 9 Jul 2013 14:33:46 +0800
+Subject: [PATCH 7/7] serial: at91: add dma support in usart binding
+ descriptions
+In-Reply-To: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
+References: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
+Message-ID: <1373351626-30143-8-git-send-email-elen.song@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is supposed to bring up pxa988 SMP.
+Signed-off-by: Elen Song <elen.song@atmel.com>
+---
+ .../devicetree/bindings/tty/serial/atmel-usart.txt |   21 +++++++++++++++++---
+ 1 file changed, 18 insertions(+), 3 deletions(-)
 
-ChangeLog
-V3:
-1. change all Marvell prefix to 'marvell'
-2. Support CLOCKSOURCE for mmp timer
-3. Modify the bring up patch according to Arnd's comments.
-
-V2:
-1. use early_init call for handler init.
-2. Add sanity check for maximum core count.
-
-Neil Zhang (3):
-  dts: change Marvell prefix to 'marvell'
-  clocksource: mmp: support CLOCKSOURCE OF DECLARE
-  ARM: mmp: bring up pxa988 with device tree support
-
- .../devicetree/bindings/arm/mrvl/intc.txt          |   16 +-
- .../devicetree/bindings/arm/mrvl/mrvl.txt          |    6 +-
- .../devicetree/bindings/arm/mrvl/timer.txt         |    4 +-
- Documentation/devicetree/bindings/i2c/i2c-pxa.txt  |   14 +-
- .../devicetree/bindings/mmc/sdhci-pxa.txt          |    8 +-
- .../devicetree/bindings/rtc/sa1100-rtc.txt         |    4 +-
- .../devicetree/bindings/serial/mrvl-serial.txt     |    2 +-
- arch/arm/boot/dts/mmp2-brownstone.dts              |    2 +-
- arch/arm/boot/dts/mmp2.dtsi                        |   56 +++---
- arch/arm/boot/dts/pxa168-aspenite.dts              |    2 +-
- arch/arm/boot/dts/pxa168.dtsi                      |   24 ++--
- arch/arm/boot/dts/pxa2xx.dtsi                      |   16 +-
- arch/arm/boot/dts/pxa3xx.dtsi                      |    2 +-
- arch/arm/boot/dts/pxa910-dkb.dts                   |    2 +-
- arch/arm/boot/dts/pxa910.dtsi                      |   27 ++--
- .../dts/{pxa168-aspenite.dts => pxa988-dkb.dts}    |   12 +-
- arch/arm/boot/dts/pxa988.dtsi                      |  190 ++++++++++++++++++++
- arch/arm/mach-mmp/Kconfig                          |   18 ++
- arch/arm/mach-mmp/Makefile                         |    1 +
- arch/arm/mach-mmp/common.c                         |   11 +-
- arch/arm/mach-mmp/common.h                         |    2 +
- arch/arm/mach-mmp/headsmp.S                        |  104 +++++++++++
- arch/arm/mach-mmp/include/mach/addr-map.h          |    6 +
- arch/arm/mach-mmp/irq.c                            |   16 +-
- arch/arm/mach-mmp/mmp-dt.c                         |   33 ++--
- arch/arm/mach-mmp/mmp2-dt.c                        |   60 +++++-
- arch/arm/mach-mmp/platsmp.c                        |  167 +++++++++++++++++
- arch/arm/mach-mmp/reset.c                          |   66 +++++++
- arch/arm/mach-mmp/reset.h                          |   29 +++
- arch/arm/mach-mmp/time.c                           |   15 +--
- arch/arm/mach-pxa/pxa-dt.c                         |   14 +-
- drivers/clk/mmp/Makefile                           |    1 +
- drivers/i2c/busses/i2c-pxa.c                       |   10 +-
- drivers/mmc/host/sdhci-pxav2.c                     |    4 +-
- drivers/mmc/host/sdhci-pxav3.c                     |    4 +-
- drivers/rtc/rtc-sa1100.c                           |    4 +-
- drivers/tty/serial/pxa.c                           |    4 +-
- 37 files changed, 788 insertions(+), 168 deletions(-)
- copy arch/arm/boot/dts/{pxa168-aspenite.dts => pxa988-dkb.dts} (74%)
- create mode 100644 arch/arm/boot/dts/pxa988.dtsi
- create mode 100644 arch/arm/mach-mmp/headsmp.S
- create mode 100644 arch/arm/mach-mmp/platsmp.c
- create mode 100644 arch/arm/mach-mmp/reset.c
- create mode 100644 arch/arm/mach-mmp/reset.h
-
+diff --git a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+index 82f45ec..fb50023 100644
+--- a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
++++ b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+@@ -8,15 +8,21 @@ Required properties:
+ - interrupts: Should contain interrupt
+ 
+ Optional properties:
+-- atmel,use-pdc-rx: use of PDC for receiving data
+-- atmel,use-pdc-tx: use of PDC for transmitting data
++- for those only support PDC transfer socs:
++	- atmel,use-pdc-rx: use of PDC for receiving data
++	- atmel,use-pdc-tx: use of PDC for transmitting data
++- for those only support DMA transfer socs:
++	- dmas: DMA specifier, consisting of a phandle to DMA controller node,
++	  memory peripheral interface and USART DMA channel ID, FIFO configuration.
++	  Refer to dma.txt and atmel-dma.txt for details.
++	- dma-names: "rx" for RX channel, "tx" for TX channel.
+ 
+ <chip> compatible description:
+ - at91rm9200:  legacy USART support
+ - at91sam9260: generic USART implementation for SAM9 SoCs
+ 
+ Example:
+-
++- use PDC:
+ 	usart0: serial at fff8c000 {
+ 		compatible = "atmel,at91sam9260-usart";
+ 		reg = <0xfff8c000 0x200>;
+@@ -25,3 +31,12 @@ Example:
+ 		atmel,use-pdc-tx;
+ 	};
+ 
++- use DMA:
++	usart0: serial at f001c000 {
++		compatible = "atmel,at91sam9260-usart";
++		reg = <0xf001c000 0x100>;
++		interrupts = <12 IRQ_TYPE_LEVEL_HIGH 5>;
++		dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(3)>,
++		       <&dma0 2 (AT91_DMA_CFG_PER_ID(4) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
++		dma-names = "tx", "rx";
++	};
 -- 
-1.7.4.1
+1.7.9.5
