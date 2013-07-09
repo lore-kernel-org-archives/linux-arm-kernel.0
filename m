@@ -1,44 +1,68 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 9 Jul 2013 16:01:14 +0100
-Subject: [PATCH v4 2/7] Documentation: DT: add sam9x5ek-wm8731 machine
- driver
-In-Reply-To: <1373379933-32749-3-git-send-email-richard.genoud@gmail.com>
-References: <1373372929-17800-1-git-send-email-richard.genoud@gmail.com>
- <1373379933-32749-1-git-send-email-richard.genoud@gmail.com>
- <1373379933-32749-3-git-send-email-richard.genoud@gmail.com>
-Message-ID: <20130709150114.GB27646@sirena.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 09 Jul 2013 19:01:23 +0400
+Subject: [PATCH v2] arm: dts: AM43x: Add usb_otg_hs node
+In-Reply-To: <51DC1937.9080302@cogentembedded.com>
+References: <1373361446-30050-1-git-send-email-george.cherian@ti.com>
+ <51DC1937.9080302@cogentembedded.com>
+Message-ID: <51DC25C3.6000901@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 09, 2013 at 04:25:28PM +0200, Richard Genoud wrote:
-> This add the sound DT binding for sam9x5ek-wm8731 machine driver
-> 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> ---
->  .../bindings/sound/atmel-sam9x5-wm8731-audio.txt   |   30 ++++++++++++++++++++
+Hello.
 
-Put new binding documents in the same patch that reads them, this makes
-review easier.
+On 07/09/2013 06:07 PM, Sergei Shtylyov wrote:
 
-> +  - atmel,audio-routing: A list of the connections between audio components.
+>> Adds device node for HS USB Host module for AM437x
 
-This needs to be more specific and list the available board specific
-nodes for routing.  For the CODEC you can just refer to the CODEC
-binding documentation.
+>> changes from v1
 
-> +  - atmel,format: DAI format. Must be "i2s"
+>> renamed synopsis to snps
+>> removed flag tx-fifo-resize
 
-So why not just omit this then?
+>> Signed-off-by: George Cherian <george.cherian@ti.com>
+>> ---
+>>   arch/arm/boot/dts/am4372.dtsi | 18 ++++++++++++++++++
+>>   1 file changed, 18 insertions(+)
 
-> +  - atmel,bitclock-master:  DAI clock master
-> +  - atmel,frame-master: DAI frame master
+>> diff --git a/arch/arm/boot/dts/am4372.dtsi
+>> b/arch/arm/boot/dts/am4372.dtsi
+>> index ddc1df7..c9e0da8 100644
+>> --- a/arch/arm/boot/dts/am4372.dtsi
+>> +++ b/arch/arm/boot/dts/am4372.dtsi
+>> @@ -64,5 +64,23 @@
+>>               compatible = "ti,am4372-counter32k","ti,omap-counter32k";
+>>               reg = <0x44e86000 0x40>;
+>>           };
+>> +
+>> +        usb_otg_hs1: am4372_dwc3 at 48380000 {
+>
+>     See http://www.devicetree.org/Device_Tree_Usage, "Node Names" section.
+>
+>> +            compatible = "ti,am437x-dwc3";
+>> +            reg = <0x48380000 0x1ff>;
 
-The driver isn't handling these and there's no information on how to set
-them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/dcbf9701/attachment.sig>
+    And I bet this should be 0x200, not 0x1ff. This is length, not upper 
+limit.
+
+>> +            interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
+>> +            #address-cells = <1>;
+>> +            #size-cells = <1>;
+>> +            utmi-mode = <1>;
+>> +            ranges;
+>> +
+>> +            dwc3 at 48390000 {
+
+>     The same comment.
+
+>> +                compatible = "snps,dwc3";
+>> +                reg = <0x48390000 0xcfff>;
+
+    The same, this should be 0xd000, not 0xcfff.
+
+>> +                interrupts = <GIC_SPI  168 IRQ_TYPE_LEVEL_HIGH>;
+>> +            };
+>> +
+>> +        };
+>> +
+
+WBR, Sergei
