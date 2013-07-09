@@ -1,54 +1,47 @@
-From: elen.song@atmel.com (elen.song)
-Date: Tue, 9 Jul 2013 18:24:44 +0800
-Subject: [PATCH 2/7] serial: at91: add tx dma support
-In-Reply-To: <20130709095704.GE4013@ludovic.desroches@atmel.com>
-References: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
- <1373351626-30143-3-git-send-email-elen.song@atmel.com>
- <20130709095704.GE4013@ludovic.desroches@atmel.com>
-Message-ID: <51DBE4EC.9090701@atmel.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 9 Jul 2013 12:27:41 +0200
+Subject: [PATCH v2 1/5] sound: sam9x5_wm8731: machine driver for
+ at91sam9x5 wm8731 boards
+In-Reply-To: <20130709092917.GO27646@sirena.org.uk>
+References: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
+ <1373290193-25300-2-git-send-email-richard.genoud@gmail.com>
+ <20130708150721.GK27646@sirena.org.uk>
+ <CACQ1gAgJyTSdxAKK7uwG-ybE2ddC90podM3+tOAqQwZUspsU8Q@mail.gmail.com>
+ <20130709092917.GO27646@sirena.org.uk>
+Message-ID: <CACQ1gAi6C8A-=sONar7jiXWbJM9_x_MGkFh--wD9fH97bV+YJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/9/2013 5:57 PM, Ludovic Desroches wrote:
-> On Tue, Jul 09, 2013 at 02:33:41PM +0800, Elen Song wrote:
+2013/7/9 Mark Brown <broonie@kernel.org>:
+> On Tue, Jul 09, 2013 at 10:19:45AM +0200, Richard Genoud wrote:
+>> 2013/7/8 Mark Brown <broonie@kernel.org>:
 >
-> [...]
->    
->> @@ -977,6 +1172,8 @@ static int atmel_startup(struct uart_port *port)
->>   		pdc->ofs = 0;
->>   	}
->>   
->> +	atmel_tx_request_dma(atmel_port);
->> +
->>   	/*
->>   	 * If there is a specific "open" function (to register
->>   	 * control line interrupts)
-> Here we can have both use_pdc_tx and use_dma_tx set to true. To avoid this, we
-> can do:
+>> > The obvious question here is of course if we can use the same driver for
+>> > both of them.
 >
-> if (atmel_use_pdc_tx(port)) {
+>> I haven't got a g20 to test that, but that's the goal.
 >
-> } else {
-> 	atmel_tx_request_dma(atmel_port);
-> }
+> I think I do somewhere.
 >
-> or force use_pdc_tx to 0 in atmel_tx_request_dma function when we set
-> use_dma_tx to 1.
+>> For now, g20 is still non-DT, so I think it's best to have a DT-only
+>> driver like this one for the 9x5 family (9g15, 9g25, 9x25, 9g35,
+>> 9x25).
+>> When the g20 will move to DT completely, we can drop sam9g20_wm8731.c
+>> and adjust sam9x5_wm8731.c (mainly master clock and widgets it seems)
+>> By the way, maybe g45 could use that also (and SAMA5 ?)
 >
-> I prefer the second one since using dma has a higher priority than using pdc
-> contrary to the first one.
->
+> If this is the goal then this driver needs a more generic name.
+Hum. I guess we could call it atmel-ssc-sound.c, since the ultimate
+goal would be to make it codec agnostic, but there's quite some work
+to achieve that (handle the widgets, mclk and rates by DT).
+But I really don't know if it's better to keep this name as long as
+g20 is not supported, and change it after or have a name that is not
+reflecting what the machine driver is doing right now.
+Maybe Bo or Nicolas can give their feeling on that (since I'm not
+Atmel, I don't know every SoC or what their Big Plan is for sound
+machine drivers)
 
-Well ,yes, I have a better idea:
+Richard.
 
-In atmel_startup:
-Move "atmel_tx_request_dma" forward, just before "if 
-(atmel_use_pdc_rx(port))",
-meanwhile, force use_pdc_tx to 0  when request a dma channel.
-
-In this case, we will not go into "if (atmel_use_pdc_rx(port))" when dma 
-and pdc both enable and
-dma have higher priority.
-> Regards
->
-> Ludovic
+-- 
+for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
