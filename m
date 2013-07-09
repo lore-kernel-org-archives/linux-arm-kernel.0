@@ -1,104 +1,68 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  9 Jul 2013 14:18:12 +0100
-Subject: [PATCH v2] arm64: add support for kernel mode NEON
-Message-ID: <1373375892-25390-1-git-send-email-ard.biesheuvel@linaro.org>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 9 Jul 2013 15:19:09 +0200
+Subject: [PATCH v3 3/7] Documentation: DT: update atmel SSC with DMA
+ binding
+In-Reply-To: <1373372929-17800-4-git-send-email-richard.genoud@gmail.com>
+References: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
+ <1373372929-17800-1-git-send-email-richard.genoud@gmail.com>
+ <1373372929-17800-4-git-send-email-richard.genoud@gmail.com>
+Message-ID: <CACQ1gAg8WQTaz4XkXJCH+-bNU_U3s_1pgmQYoQR3v-KHOzzBTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add <asm/neon.h> containing kernel_neon_begin/kernel_neon_end function
-declarations and corresponding definitions in fpsimd.c
+2013/7/9 Richard Genoud <richard.genoud@gmail.com>:
+> As atmel-ssc can be used with DMA, the documentation should be updated.
+> Also, a configuration DMA example is given.
+>
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+>  .../devicetree/bindings/misc/atmel-ssc.txt         |   24 ++++++++++++++++++--
+>  1 file changed, 22 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/misc/atmel-ssc.txt b/Documentation/devicetree/bindings/misc/atmel-ssc.txt
+> index 38e51ad..96958ca 100644
+> --- a/Documentation/devicetree/bindings/misc/atmel-ssc.txt
+> +++ b/Documentation/devicetree/bindings/misc/atmel-ssc.txt
+> @@ -6,10 +6,30 @@ Required properties:
+>         - atmel,at91sam9g45-ssc: support dma transfer
+>  - reg: Should contain SSC registers location and length
+>  - interrupts: Should contain SSC interrupt
+> +For dma transfer:
+> +- dmas: DMA specifier, consisting of a phandle to DMA controller node,
+> +  the memory interface and SSC DMA channel ID (for tx and rx).
+> +  See Documentation/devicetree/bindings/dma/atmel-dma.txt for details.
+> +- dma-names: Must be "tx", "rx".
+>
+> -Example:
+> +
+> +Examples:
+>  ssc0: ssc at fffbc000 {
+>         compatible = "atmel,at91rm9200-ssc";
+>         reg = <0xfffbc000 0x4000>;
+> -       interrupts = <14 4 5>;
+> +       interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
+maybe I should not use macro in the documentation (not sure if I should or not).
+>  };
+> +
+> +
+> +ssc0: ssc at f0010000 {
+> +      compatible = "atmel,at91sam9g45-ssc";
+> +      reg = <0xf0010000 0x4000>;
+> +      interrupts = <28 IRQ_TYPE_LEVEL_HIGH 5>;
+> +      dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(13)>,
+> +            <&dma0 1 AT91_DMA_CFG_PER_ID(14)>;
+same here
+> +      dma-names = "tx", "rx";
+> +      pinctrl-names = "default";
+> +      pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+> +      status = "disabled";
+> +};
+> +
+> --
+> 1.7.10.4
+>
 
-These are needed to wrap uses of NEON in kernel mode. The names are
-identical to the ones used in arm/ so code using intrinsics or
-vectorized by GCC can be shared between arm and arm64.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Kconfig            |  3 +++
- arch/arm64/include/asm/neon.h | 14 ++++++++++++++
- arch/arm64/kernel/fpsimd.c    | 28 ++++++++++++++++++++++++++++
- 3 files changed, 45 insertions(+)
- create mode 100644 arch/arm64/include/asm/neon.h
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 56b3f6d..46ba680 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -95,6 +95,9 @@ config SWIOTLB
- config IOMMU_HELPER
- 	def_bool SWIOTLB
- 
-+config KERNEL_MODE_NEON
-+	def_bool y
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
-new file mode 100644
-index 0000000..b0cc58a9
---- /dev/null
-+++ b/arch/arm64/include/asm/neon.h
-@@ -0,0 +1,14 @@
-+/*
-+ * linux/arch/arm64/include/asm/neon.h
-+ *
-+ * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#define cpu_has_neon()		(1)
-+
-+void kernel_neon_begin(void);
-+void kernel_neon_end(void);
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index e8b8357..1f2e4d5 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -21,6 +21,7 @@
- #include <linux/init.h>
- #include <linux/sched.h>
- #include <linux/signal.h>
-+#include <linux/hardirq.h>
- 
- #include <asm/fpsimd.h>
- #include <asm/cputype.h>
-@@ -83,6 +84,33 @@ void fpsimd_flush_thread(void)
- 	fpsimd_load_state(&current->thread.fpsimd_state);
- }
- 
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+
-+/*
-+ * Kernel-side NEON support functions
-+ */
-+void kernel_neon_begin(void)
-+{
-+	/* Avoid using the NEON in interrupt context */
-+	BUG_ON(in_interrupt());
-+	preempt_disable();
-+
-+	if (current->mm)
-+		fpsimd_save_state(&current->thread.fpsimd_state);
-+}
-+EXPORT_SYMBOL(kernel_neon_begin);
-+
-+void kernel_neon_end(void)
-+{
-+	if (current->mm)
-+		fpsimd_load_state(&current->thread.fpsimd_state);
-+
-+	preempt_enable();
-+}
-+EXPORT_SYMBOL(kernel_neon_end);
-+
-+#endif /* CONFIG_KERNEL_MODE_NEON */
-+
- /*
-  * FP/SIMD support code initialisation.
-  */
 -- 
-1.8.1.2
+for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
