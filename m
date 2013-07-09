@@ -1,68 +1,16 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 9 Jul 2013 08:04:49 +0200
-Subject: [PATCH V2] ARM: tegra: enable gpio-keys on dalmore
-In-Reply-To: <1373102069-5641-1-git-send-email-ldewangan@nvidia.com>
-References: <1373102069-5641-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20130709060447.GA17499@mithrandir>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 9 Jul 2013 14:12:21 +0800
+Subject: [PATCH v4 0/6] serial: imx: add DMA support for imx6
+In-Reply-To: <1373274862-2695-1-git-send-email-b32955@freescale.com>
+References: <1373274862-2695-1-git-send-email-b32955@freescale.com>
+Message-ID: <20130709061219.GE16656@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 06, 2013 at 02:44:29PM +0530, Laxman Dewangan wrote:
-> Dalmore have the keys mounted on board which are connected
-> to different pins of Tegra.
-> 
-> Add the keys entry in DTS file to enable key functionality.
-> This will enable KEY_POWER, KEY_HOME, KEY_VOLUMEUP and
-> KEY_VOLUMEDOWN.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> ---
-> Changes from V1:
-> - Reorder the nodes.
-> 
->  arch/arm/boot/dts/tegra114-dalmore.dts |   30 ++++++++++++++++++++++++++++++
->  1 files changed, 30 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-> index cb640eb..259b517 100644
-> --- a/arch/arm/boot/dts/tegra114-dalmore.dts
-> +++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-> @@ -883,6 +883,35 @@
->  		};
->  	};
->  
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +
-> +		home {
-> +			label = "Home";
-> +			gpios = <&gpio TEGRA_GPIO(I, 5) GPIO_ACTIVE_LOW>;
-> +			linux,code = <102>; /* KEY_HOME */
+On Mon, Jul 08, 2013 at 05:14:16PM +0800, Huang Shijie wrote:
+>   ARM: dts: imx6sl: add "fsl,imx6q-uart" for uart compatible
+>   ARM: dts: imx6q{dl}: add DTE pads for uart
+>   ARM: dts: imx6q{dl}: add a DTE uart pinctrl for uart2
+>   ARM: dts: enable the uart2 for imx6q-arm2
 
-I wonder if these should maybe go into a header file as well so that
-symbolic names can be used. That'll make the value self-descriptive and
-allow the comment to be dropped.
-
-> +		volume_down {
-> +			label = "VolumeDown";
-> +			gpios = <&gpio TEGRA_GPIO(R, 1) GPIO_ACTIVE_LOW>;
-> +			linux,code = <114>; /* KEY_VOLUMEDOWN */
-> +		};
-> +
-> +		volume_up {
-> +			label = "VolumeUp";
-> +			gpios = <&gpio TEGRA_GPIO(R, 2) GPIO_ACTIVE_LOW>;
-> +			linux,code = <115>; /* KEY_VOLUMEUP */
-> +		};
-> +	};
-
-Nit: Perhaps the labels should be "Volume Down" and "Volume Up" here?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/75068339/attachment.sig>
+Applied these 4, thanks.
