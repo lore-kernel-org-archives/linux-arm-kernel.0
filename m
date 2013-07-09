@@ -1,100 +1,115 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue,  9 Jul 2013 13:41:04 -0300
-Subject: [PATCH v7 02/22] bus: mvebu-mbus: Add new API for window creation
+Date: Tue,  9 Jul 2013 13:41:03 -0300
+Subject: [PATCH v7 01/22] memory: mvebu-devbus: Remove address decoding window
+ workaround
 In-Reply-To: <1373388084-29520-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1373388084-29520-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1373388084-29520-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1373388084-29520-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Now that mbus device tree binding has been introduced, remove the address
+decoding window management from this driver.
+A suitable 'ranges' entry should be added to the devbus-compatible node in
+the device tree, as described by the mbus binding documentation.
 
-We add an API to create MBus address decoding windows from the target
-ID and attribute. This function will be used later and deprecate the
-current name based scheme.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/bus/mvebu-mbus.c | 33 +++++++++++++++++++++++++--------
- include/linux/mbus.h     |  6 ++++++
- 2 files changed, 31 insertions(+), 8 deletions(-)
+ drivers/memory/mvebu-devbus.c | 64 ++-----------------------------------------
+ 1 file changed, 2 insertions(+), 62 deletions(-)
 
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 33c6947..827468a 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -748,6 +748,22 @@ static const struct of_device_id of_mvebu_mbus_ids[] = {
- /*
-  * Public API of the driver
-  */
-+int mvebu_mbus_add_window_remap_by_id(unsigned int target,
-+				      unsigned int attribute,
-+				      phys_addr_t base, size_t size,
-+				      phys_addr_t remap)
-+{
-+	struct mvebu_mbus_state *s = &mbus_state;
-+
-+	if (!mvebu_mbus_window_conflicts(s, base, size, target, attribute)) {
-+		pr_err("cannot add window '%x:%x', conflicts with another window\n",
-+		       target, attribute);
-+		return -EINVAL;
-+	}
-+
-+	return mvebu_mbus_alloc_window(s, base, size, remap, target, attribute);
-+}
-+
- int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
- 				      size_t size, phys_addr_t remap,
- 				      unsigned int flags)
-@@ -776,14 +792,8 @@ int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
- 	else if (flags == MVEBU_MBUS_PCI_WA)
- 		attr |= 0x28;
- 
--	if (!mvebu_mbus_window_conflicts(s, base, size, target, attr)) {
--		pr_err("cannot add window '%s', conflicts with another window\n",
--		       devname);
--		return -EINVAL;
--	}
--
--	return mvebu_mbus_alloc_window(s, base, size, remap, target, attr);
--
-+	return mvebu_mbus_add_window_remap_by_id(target, attr, base,
-+						 size, remap);
- }
- 
- int mvebu_mbus_add_window(const char *devname, phys_addr_t base, size_t size)
-@@ -792,6 +802,13 @@ int mvebu_mbus_add_window(const char *devname, phys_addr_t base, size_t size)
- 						 MVEBU_MBUS_NO_REMAP, 0);
- }
- 
-+int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
-+				phys_addr_t base, size_t size)
-+{
-+	return mvebu_mbus_add_window_remap_by_id(target, attribute, base,
-+						 size, MVEBU_MBUS_NO_REMAP);
-+}
-+
- int mvebu_mbus_del_window(phys_addr_t base, size_t size)
+diff --git a/drivers/memory/mvebu-devbus.c b/drivers/memory/mvebu-devbus.c
+index 978e8e3..94c9248 100644
+--- a/drivers/memory/mvebu-devbus.c
++++ b/drivers/memory/mvebu-devbus.c
+@@ -208,16 +208,11 @@ static int mvebu_devbus_probe(struct platform_device *pdev)
  {
- 	int win;
-diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index dba482e..9245b66 100644
---- a/include/linux/mbus.h
-+++ b/include/linux/mbus.h
-@@ -62,8 +62,14 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
- int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
- 				      size_t size, phys_addr_t remap,
- 				      unsigned int flags);
-+int mvebu_mbus_add_window_remap_by_id(unsigned int target,
-+				      unsigned int attribute,
-+				      phys_addr_t base, size_t size,
-+				      phys_addr_t remap);
- int mvebu_mbus_add_window(const char *devname, phys_addr_t base,
- 			  size_t size);
-+int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
-+				phys_addr_t base, size_t size);
- int mvebu_mbus_del_window(phys_addr_t base, size_t size);
- int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
- 		    size_t mbus_size, phys_addr_t sdram_phys_base,
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *node = pdev->dev.of_node;
+-	struct device_node *parent;
+ 	struct devbus *devbus;
+ 	struct resource *res;
+ 	struct clk *clk;
+ 	unsigned long rate;
+-	const __be32 *ranges;
+-	int err, cs;
+-	int addr_cells, p_addr_cells, size_cells;
+-	int ranges_len, tuple_len;
+-	u32 base, size;
++	int err;
+ 
+ 	devbus = devm_kzalloc(&pdev->dev, sizeof(struct devbus), GFP_KERNEL);
+ 	if (!devbus)
+@@ -248,68 +243,13 @@ static int mvebu_devbus_probe(struct platform_device *pdev)
+ 		return err;
+ 
+ 	/*
+-	 * Allocate an address window for this device.
+-	 * If the device probing fails, then we won't be able to
+-	 * remove the allocated address decoding window.
+-	 *
+-	 * FIXME: This is only a temporary hack! We need to do this here
+-	 * because we still don't have device tree bindings for mbus.
+-	 * Once that support is added, we will declare these address windows
+-	 * statically in the device tree, and remove the window configuration
+-	 * from here.
+-	 */
+-
+-	/*
+-	 * Get the CS to choose the window string.
+-	 * This is a bit hacky, but it will be removed once the
+-	 * address windows are declared in the device tree.
+-	 */
+-	cs = (((unsigned long)devbus->base) % 0x400) / 8;
+-
+-	/*
+-	 * Parse 'ranges' property to obtain a (base,size) window tuple.
+-	 * This will be removed once the address windows
+-	 * are declared in the device tree.
+-	 */
+-	parent = of_get_parent(node);
+-	if (!parent)
+-		return -EINVAL;
+-
+-	p_addr_cells = of_n_addr_cells(parent);
+-	of_node_put(parent);
+-
+-	addr_cells = of_n_addr_cells(node);
+-	size_cells = of_n_size_cells(node);
+-	tuple_len = (p_addr_cells + addr_cells + size_cells) * sizeof(__be32);
+-
+-	ranges = of_get_property(node, "ranges", &ranges_len);
+-	if (ranges == NULL || ranges_len != tuple_len)
+-		return -EINVAL;
+-
+-	base = of_translate_address(node, ranges + addr_cells);
+-	if (base == OF_BAD_ADDR)
+-		return -EINVAL;
+-	size = of_read_number(ranges + addr_cells + p_addr_cells, size_cells);
+-
+-	/*
+-	 * Create an mbus address windows.
+-	 * FIXME: Remove this, together with the above code, once the
+-	 * address windows are declared in the device tree.
+-	 */
+-	err = mvebu_mbus_add_window(devbus_wins[cs], base, size);
+-	if (err < 0)
+-		return err;
+-
+-	/*
+ 	 * We need to create a child device explicitly from here to
+ 	 * guarantee that the child will be probed after the timing
+ 	 * parameters for the bus are written.
+ 	 */
+ 	err = of_platform_populate(node, NULL, NULL, dev);
+-	if (err < 0) {
+-		mvebu_mbus_del_window(base, size);
++	if (err < 0)
+ 		return err;
+-	}
+ 
+ 	return 0;
+ }
 -- 
 1.8.1.5
