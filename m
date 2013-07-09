@@ -1,67 +1,41 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 9 Jul 2013 08:21:14 +0200
-Subject: [lm-sensors] [PATCH 1/2] ARM: dt: t30 cardhu: add dt entry for
- lm90
-In-Reply-To: <20130708131421.GB21638@roeck-us.net>
-References: <1372928979-26938-1-git-send-email-wni@nvidia.com>
- <1372928979-26938-2-git-send-email-wni@nvidia.com>
- <51D70483.70203@wwwdotorg.org> <51DA6BD4.1040300@nvidia.com>
- <20130708095024.041a6d57@endymion.delvare>
- <51DA8805.50709@nvidia.com> <20130708131421.GB21638@roeck-us.net>
-Message-ID: <20130709062112.GC17499@mithrandir>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 9 Jul 2013 14:24:15 +0800
+Subject: [PATCH 3/3] ARM: imx: mm-imx3: Free l2x0_base
+In-Reply-To: <1373306318-15604-3-git-send-email-festevam@gmail.com>
+References: <1373306318-15604-1-git-send-email-festevam@gmail.com>
+ <1373306318-15604-3-git-send-email-festevam@gmail.com>
+Message-ID: <20130709062414.GG16656@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 08, 2013 at 06:14:21AM -0700, Guenter Roeck wrote:
-> On Mon, Jul 08, 2013 at 05:36:05PM +0800, Wei Ni wrote:
-> > On 07/08/2013 03:50 PM, Jean Delvare wrote:
-> > > On Mon, 8 Jul 2013 15:35:48 +0800, Wei Ni wrote:
-> > >> On 07/06/2013 01:38 AM, Stephen Warren wrote:
-> > >>> On 07/04/2013 03:09 AM, Wei Ni wrote:
-> > >>>> Enable thermal sensor lm90 for t30 cardhu.
-> > >>>
-> > >>>> diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-> > >>>
-> > >>>> +		nct1008: nct1008 {
-> > >>>> +			compatible = "lm90,nct1008";
-> > >>>
-> > >>> "lm90" isn't a valid vendor prefix. I believe the value you want is
-> > >>> "onnn,nct1008". Same comment for patch 2/2.
-> > >>
-> > >> The lm90 doesn't support device tree very well.
-> > > 
-> > > I doubt it, but if this is the case, then please fix it, instead of
-> > > working the problem around in a different place.
-> > > 
-> > >> In the DT, we need to
-> > >> named as "lm90" so that the lm90 driver can be loaded,
-> > > 
-> > > Not that I am an expert with regards to DT, but this doesn't make any
-> > > sense to me. AFAIK DT is about devices, not which drivers handle them.
-> > > 
-> > >> and we also need
-> > >> to add "nct1008" to indicate this is the nct1008 device, so that the
-> > >> lm90 driver can be loaded with the right i2c_device_id->driver_data.
-> > >>
-> > >> I set the " compatible = "lm90,nct1008" ", this is the simplest way, and
-> > >> we doesn't need to change the lm90.c.
-> > > 
-> > > There's no problem with changing the lm90 driver, if this is the right
-> > > thing to do.
-> > 
-> > Ok, I will add DT support in the lm90.c in my next version patch.
-> > 
-> Only if you can show that it is necessary.
+On Mon, Jul 08, 2013 at 02:58:38PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> After l2x0_base has been used, we should free it.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/mm-imx3.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+> index 0884ca9..3143f5e 100644
+> --- a/arch/arm/mach-imx/mm-imx3.c
+> +++ b/arch/arm/mach-imx/mm-imx3.c
+> @@ -113,6 +113,7 @@ static void __init imx3_init_l2x0(void)
+>  	}
+>  
+>  	l2x0_init(l2x0_base, 0x00030024, 0x00000000);
+> +	iounmap(l2x0_base);
 
-It should work out of the box. As a matter of fact the same chip is used
-on Tamonten and the DTS files use "onnn,nct1008". That used to work. If
-it no longer does then that's a regression.
+Are you sure?  I think cache-l2x0 driver still needs the mapping after
+that.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/e5ffac6e/attachment.sig>
+Shawn
+
+>  #endif
+>  }
+>  
+> -- 
+> 1.8.1.2
+> 
