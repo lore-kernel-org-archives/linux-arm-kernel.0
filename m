@@ -1,118 +1,45 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 9 Jul 2013 11:03:54 +0530
-Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
-In-Reply-To: <20130708133512.GD31221@arwen.pp.htv.fi>
-References: <51D59146.3070002@newflow.co.uk> <51D59C0E.8080003@newflow.co.uk>
- <B5906170F1614E41A8A28DE3B8D121433EE93C23@DBDE04.ent.ti.com>
- <20130705115959.GQ5523@atomide.com>
- <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
- <20130708112553.GU5523@atomide.com> <51DAB394.3050104@ti.com>
- <20130708131033.GA5523@atomide.com> <51DABC81.3080409@ti.com>
- <20130708133512.GD31221@arwen.pp.htv.fi>
-Message-ID: <51DBA0C2.6030003@ti.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 09 Jul 2013 14:43:31 +0900
+Subject: [PATCH 00/04] ARM: shmobile: ARCH_MULTIPLATFORM for EMEV2 and KZM9D
+Message-ID: <20130709054331.14007.66068.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 July 2013 07:05 PM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Mon, Jul 08, 2013 at 06:50:01PM +0530, Rajendra Nayak wrote:
->>>>>>>> I wonder if this is because the timeouts get now initialized to 0 instead
->>>>>>>> of -1 for the serial driver?
->>>>>>>>
->>>>>>>
->>>>>>> You meant initialized to -1, right? There's an additional check for timeout being 0. Unless i
->>>>>>> am missing something DT-boot will start off with timeout set to 0 and then get forced to -1.
->>>>>
->>>>> OK
->>>>
->>>> Issue 2: Causing boot to stop when serial driver is initialized.
->>>> (After Issue 1 is fixed)
->>>>
->>>> I could narrow this down to the change done to return -EINVAL
->>>> instead of 0 in serial_omap_get_context_loss_count() as part of
->>>> commit 'a630fbfbb1beeffc5bbe542a7986bf2068874633' "serial: omap:
->>>> Fix device tree based PM runtime"
->>>>
->>>> What this change in turn seems to do is cause a
->>>> serial_omap_restore_context() to get called as part of
->>>> serial_omap_runtime_resume() which was not the case when
->>>> serial_omap_get_context_loss_count() returned 0
->>>>
->>>> from serial_omap_runtime_resume():
->>>> -----
->>>>         int loss_cnt = serial_omap_get_context_loss_count(up);
->>>>
->>>>         if (loss_cnt < 0) {
->>>>                 dev_dbg(dev, "serial_omap_get_context_loss_count failed : %d\n",
->>>>                         loss_cnt);
->>>>                 serial_omap_restore_context(up);
->>>>         } else if (up->context_loss_cnt != loss_cnt) {
->>>>                 serial_omap_restore_context(up);
->>>>         }
->>>> -----
->>>>
->>>> I am still working on why a serial_omap_restore_context() could
->>>> have caused console to die. I will work with Sourav on this and
->>>> post the fixes for both issue 1 and issue2 once its clear on whats
->>>> really causing issue 2.
->>>
->>> That's because we don't have the omap specific pdata callbacks for
->>> context loss any longer. We may be able to detect when the context
->>> was really lost in the serial driver, and only then call the
->>> serial_omap_restore_context().
->>
->> Right, but calling serial_omap_restore_context() even when the context
->> is not lost, should not ideally cause an issue.
-> 
-> it does in one condition. If context hasn't been saved before. And that
-> can happen in the case of wrong pm runtime status for that device.
-> 
-> Imagine the device is marked as suspended even though it's fully enabled
-> (it hasn't been suspended by hwmod due to NO_IDLE flag). In that case
-> your context structure is all zeroes (context has never been saved
-> before) then when you call pm_runtime_get_sync() on probe() your
-> ->runtime_resume() will get called, which will restore context,
-> essentially undoing anything which was configured by u-boot.
+ARM: shmobile: ARCH_MULTIPLATFORM for EMEV2 and KZM9D
 
-This could be a problem for drivers which do a save context in ->runtime_suspend()
-but from what I see with omap serial, there is no save context done as part of
-->runtime_suspend.
+[PATCH 01/04] ARM: shmobile: Only build clocks when COMMON_CLK=n
+[PATCH 02/04] ARM: shmobile: Introduce ARCH_SHMOBILE_MULTI
+[PATCH 03/04] ARM: shmobile: Add EMEV2 and KZM9D to ARCH_SHMOBILE_MULTI
+[PATCH 04/04] ARM: shmobile: Allow ARCH_SHMOBILE_MULTI timer configuration
 
-> 
-> Am I missing something ?
-> 
->>>> Let me know if the fix I listed for Issue 1: makes sense.
->>>
->>> Yes makes sense as a fix, but IMHO we should not need any workarounds
->>> like that. Is the hwmod code idling the the uarts early? If so, then
->>> it should only do that in a late_initcall if no drivers are registered.
->>
->> hwmod as part of its setup (early) enables/resets and idles all modules.
->> These flags are used to tell hwmod to avoid a reset and idle and leave the
->> module enabled (in this case console uart)
-> 
-> then it needs to call pm_runtime_set_active() for those devices which
-> have that flag set, right ?
-> 
-> (completely untested, didn't even try to compile, just to illustrate)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 7341eff..d8dca68 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -2559,6 +2559,12 @@ static void __init _setup_postsetup(struct omap_hwmod *oh)
->  	    (postsetup_state == _HWMOD_STATE_IDLE)) {
->  		oh->_int_flags |= _HWMOD_SKIP_ENABLE;
->  		postsetup_state = _HWMOD_STATE_ENABLED;
-> +
-> +		/* tell pm_runtime this device is already active */
-> +		pm_runtime_set_active(&oh->od->pdev->dev);
-> +	} else {
-> +		/* tell pm_runtime this device is trully suspended */
-> +		pm_runtime_set_suspended(&oh->od->pdev->dev);
->  	}
->  
->  	if (postsetup_state == _HWMOD_STATE_IDLE)
-> 
+This patch set extends mach-shmobile to allow a subset of SoCs and
+boards to be built for ARCH_MULTIPLATFORM. With this series applied
+the EMEV2 SoC and the KZM9D board can be built in two ways - either
+as good old ARCH_SHMOBILE or new ARCH_SHMOBILE_MULTI. The latter
+requires common clock framework for proper run time operation.
+
+The goal is to over time move all DT reference implementations from
+ARCH_SHMOBILE to ARCH_SHMOBILE_MULTI. Until CCF is available for a
+certain SoC it is to me acceptable for a DT reference board to allow
+build in both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI. The reason for
+this is to allow incremental development and easy testing during
+development of CCF for a certain SoC. The KZM9D board is now in this
+state while it is waiting for common clocks to become ready.
+
+In the near future a prototype hack will be posted that comments
+out the clock framework bits on EMEV2 and will allow boot of KZM9D
+in the case of ARCH_SHMOBILE_MULTI even though CCF is not yet
+available.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Built on top of renesas-next-20130704v2 and
+ [PATCH] ARM: shmobile: KZM9D DT reference implementation
+
+ arch/arm/Makefile                    |    1 
+ arch/arm/boot/dts/Makefile           |    1 
+ arch/arm/mach-shmobile/Kconfig       |   52 ++++++++++++++++++++++++++++++----
+ arch/arm/mach-shmobile/Makefile      |   32 +++++++++++++++-----
+ arch/arm/mach-shmobile/setup-emev2.c |    5 +++
+ 5 files changed, 77 insertions(+), 14 deletions(-)
