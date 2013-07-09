@@ -1,198 +1,83 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 09 Jul 2013 06:58:08 -0700
-Subject: [PATCH v3 3/5] clk: dt: binding for basic multiplexer clock
-In-Reply-To: <20130626084058.GA10833@e106331-lin.cambridge.arm.com>
-References: <1371795256-16703-1-git-send-email-mturquette@linaro.org>
- <1371795256-16703-4-git-send-email-mturquette@linaro.org>
- <20130626084058.GA10833@e106331-lin.cambridge.arm.com>
-Message-ID: <20130709135808.10823.84545@quantum>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 9 Jul 2013 16:58:42 +0300
+Subject: [RFC PATCH 4/6] USB: ehci-omap: Suspend the controller during
+ bus suspend
+In-Reply-To: <Pine.LNX.4.44L0.1306281346430.1047-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1306281346430.1047-100000@iolanthe.rowland.org>
+Message-ID: <51DC1712.30401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mark Rutland (2013-06-26 01:40:58)
-> Hi,
+On 06/28/2013 10:06 PM, Alan Stern wrote:
+> On Fri, 28 Jun 2013, Roger Quadros wrote:
 > 
-> I have a couple of minor comments.
+>>> That's not what I meant.  Never mind the pinctrl; I was asking about
+>>> the EHCI controller itself.  Under what circumstances does the
+>>> controller assert its wakeup signal?  And how do you tell it to stop
+>>> asserting that signal?
+>>
+>> I believe this would be through the EHCI Interrupt enable register (USBINTR).
+>> I'm not aware of any other mechanism.
 > 
-> On Fri, Jun 21, 2013 at 07:14:14AM +0100, Mike Turquette wrote:
-> > Device Tree binding for the basic clock multiplexer, plus the setup
-> > function to register the clock.  Based on the existing fixed-clock
-> > binding.
-> > 
-> > Includes minor beautification of clk-provider.h where some whitespace is
-> > added and of_fixed_factor_clock_setup is relocated to maintain a
-> > consistent style.
-> > 
-> > Tero Kristo contributed helpful bug fixes to this patch.
-> > 
-> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> > ---
-> > Changes since v2:
-> > * added hiword-mask property to the binding
-> > * changed bit-shift property from u8 to u32 in the dt binding
-> > 
-> > Changes since v1:
-> > * pass shift value into clk_register_mux_table
-> > * s/multiplexor/multiplexer/
-> > * removed debug prints
-> > * mask is u32, shift is u8
-> > * DT property names use dashes instead of underscores
-> > * DT property names are more verbose
-> > * shift property is optional in binding and can be auto-generated from a
-> >   full 32-bit mask
-> > 
-> >  .../devicetree/bindings/clock/mux-clock.txt        | 79 ++++++++++++++++++++++
-> >  drivers/clk/clk-mux.c                              | 65 +++++++++++++++++-
-> >  include/linux/clk-provider.h                       |  5 +-
-> >  3 files changed, 147 insertions(+), 2 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/clock/mux-clock.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/clock/mux-clock.txt b/Documentation/devicetree/bindings/clock/mux-clock.txt
-> > new file mode 100644
-> > index 0000000..54cb8d1
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/mux-clock.txt
-> > @@ -0,0 +1,79 @@
-> > +Binding for simple mux clock.
-> > +
-> > +This binding uses the common clock binding[1].  It assumes a
-> > +register-mapped multiplexer with multiple input clock signals or
-> > +parents, one of which can be selected as output.  This clock does not
-> > +gate or adjust the parent rate via a divider or multiplier.
-> > +
-> > +By default the "clocks" property lists the parents in the same order
-> > +as they are programmed into the regster.  E.g:
-> > +
-> > +     clocks = <&foo_clock>, <&bar_clock>, <&baz_clock>;
-> > +
-> > +results in programming the register as follows:
-> > +
-> > +register value               selected parent clock
-> > +0                    foo_clock
-> > +1                    bar_clock
-> > +2                    baz_clock
-> > +
-> > +Some clock controller IPs do not allow a value of zero to be programmed
-> > +into the register, instead indexing begins at 1.  The optional property
-> > +"index_one" modified the scheme as follows:
+> That's strange, because ehci_suspend() sets the intr_enable register to 
+> 0.  So how do you ever get any wakeup interrupts at all?
 > 
-> I assume this is meant to be "index-starts-at-one", given the code and
-> changelog?
+>> Right. It seems the external hub has signaled remote wakeup but the kernel doesn't
+>> resume the root hub's port it is connected to.
+>>
+>> By observing the detailed logs below you can see that the root hub does not generate
+>> an INTerrupt transaction to notify the port status change event. I've captured the pstatus
+>> and GetPortStatus info as well.
 > 
-> > +
-> > +register value               selected clock parent
-> > +1                    foo_clock
-> > +2                    bar_clock
-> > +3                    baz_clock
-> > +
-> > +Additionally an optional table of bit and parent pairs may be supplied
-> > +like so:
-> > +
-> > +     table = <&foo_clock 0x0>, <&bar_clock, 0x2>, <&baz_clock, 0x4>;
-> > +
-> > +where the first value in the pair is the parent clock and the second
-> > +value is the bitfield to be programmed into the register.
-> > +
-> > +The binding must provide the register to control the mux and the mask
-> > +for the corresponding control bits.  Optionally the number of bits to
-> > +shift that mask if necessary.  If the shift value is missing it is the
-> > +same as supplying a zero shift.
-> > +
-> > +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +
-> > +Required properties:
-> > +- compatible : shall be "mux-clock".
-> > +- #clock-cells : from common clock binding; shall be set to 0.
-> > +- clocks : link phandles of parent clocks
-> > +- reg : base address for register controlling adjustable mux
-> > +- bit-mask : arbitrary bitmask for programming the adjustable mux
-> > +
-> > +Optional properties:
-> > +- clock-output-names : From common clock binding.
-> > +- table : array of integer pairs defining parents & bitfield values
-> > +- bit-shift : number of bits to shift the bit-mask, defaults to
-> > +  (ffs(mask) - 1) if not present
-> > +- index-starts-at-one : valid input select programming starts at 1, not
-> > +  zero
-> > +- hiword-mask : lower half of the register programs the mux, upper half
-> > +  of the register indicates bits that were updated in the lower half
-> > +
-> > +Examples:
-> > +     clock: clock at 4a008100 {
-> > +             compatible = "mux-clock";
-> > +             #clock-cells = <0>;
-> > +             clocks = <&clock_foo>, <&clock_bar>, <&clock_baz>;
-> > +             reg = <0x4a008100 0x4>
-> > +             mask = <0x3>;
-> > +             index_one;
+> We don't need an interrupt.  The driver is supposed to detect the
+> remote wakeup sent by the external hub all by itself.
 > 
-> And here too?
+>> Failing case
+>> ------------
+>>
+>> [   16.108032] usb usb1: usb auto-resume
+>> [   16.108062] ehci-omap 48064800.ehci: resume root hub
+>> [   16.108154] hub 1-0:1.0: hub_resume
+>> [   16.108398] ehci_hub_control GetPortStatus, port 1 temp = 0x1000
+>> [   16.108459] ehci_hub_control GetPortStatus, port 2 temp = 0x14c5
 > 
-> [...]
+> Here's where we should detect it.  Look at the GetPortStatus case in
+> ehci_hub_control(); the PORT_RESUME bit (0x0040) is set in temp, so the
+> "Remote Wakeup received?" code should run.  In particular, these lines
+> should run:
 > 
-> > +/**
-> > + * of_mux_clk_setup() - Setup function for simple mux rate clock
-> > + */
-> > +void of_mux_clk_setup(struct device_node *node)
-> > +{
-> > +     struct clk *clk;
-> > +     const char *clk_name = node->name;
-> > +     void __iomem *reg;
-> > +     int num_parents;
-> > +     const char **parent_names;
-> > +     int i;
-> > +     u8 clk_mux_flags = 0;
-> > +     u32 mask = 0;
-> > +     u32 shift = 0;
-> > +
-> > +     of_property_read_string(node, "clock-output-names", &clk_name);
-> > +
-> > +     num_parents = of_clk_get_parent_count(node);
-> > +     if (num_parents < 1) {
-> > +             pr_err("%s: mux-clock %s must have parent(s)\n",
-> > +                             __func__, node->name);
-> > +             return;
-> > +     }
-> > +
-> > +     parent_names = kzalloc((sizeof(char*) * num_parents),
-> > +                     GFP_KERNEL);
-> > +
-> > +     for (i = 0; i < num_parents; i++)
-> > +             parent_names[i] = of_clk_get_parent_name(node, i);
-> > +
-> > +     reg = of_iomap(node, 0);
+> 			/* resume signaling for 20 msec */
+> 			ehci->reset_done[wIndex] = jiffies
+> 					+ msecs_to_jiffies(20);
+> 			usb_hcd_start_port_resume(&hcd->self, wIndex);
+> 			/* check the port again */
+> 			mod_timer(&ehci_to_hcd(ehci)->rh_timer,
+> 					ehci->reset_done[wIndex]);
 > 
-> Would it not be a good idea to check this isn't NULL before we pass it
-> to clk_register_mux_table later?
+> Therefore 20 ms later, around timestamp 16.128459,
+> ehci_hub_status_data() should have been called.  At that time, the
+> root-hub port should have been fully resumed.
 > 
-> > +
-> > +     if (of_property_read_u32(node, "bit-mask", &mask)) {
-> > +             pr_err("%s: missing bit-mask property for %s\n", __func__, node->name);
-> > +             return;
-> > +     }
-> > +
-> > +     if (of_property_read_u32(node, "bit-shift", &shift)) {
-> > +             shift = __ffs(mask);
-> > +             pr_debug("%s: bit-shift property defaults to 0x%x for %s\n",
-> > +                             __func__, shift, node->name);
-> > +     }
-> > +
-> > +     if (of_property_read_bool(node, "index-starts-at-one"))
-> > +             clk_mux_flags |= CLK_MUX_INDEX_ONE;
-> > +
-> > +     if (of_property_read_bool(node, "hiword-mask"))
-> > +             clk_mux_flags |= CLK_MUX_HIWORD_MASK;
-> > +
-> > +     clk = clk_register_mux_table(NULL, clk_name, parent_names, num_parents,
-> > +                     0, reg, (u8) shift, mask, clk_mux_flags,
-> > +                     NULL, NULL);
+>> [   16.108551] hub 1-0:1.0: port 2: status 0507 change 0000
+>> [   16.108612] ehci_hub_control GetPortStatus, port 3 temp = 0x1000
+>> [   16.108642] hub 1-0:1.0: hub_activate submitting urb
+>> [   16.109222] ehci_irq port 3 pstatus 0x1000
+>> [   16.109222] ehci_irq port 2 pstatus 0x14c5
+>> [   16.109252] ehci_irq port 1 pstatus 0x1000
+>> [   16.109374] hub 1-0:1.0: state 7 ports 3 chg 0000 evt 0000
 > 
-> Why do you need the (u8) cast on shift? Isn't that implicit?
+> But apparently nothing happened.  Why not?  Did the rh_timer get reset?  
+> Maybe you can find out what went wrong.
+> 
+> (Hmmm, we seem to be missing a
+> 
+> 			set_bit(wIndex, &ehci->resuming_ports);
+> 
+> line in there...)
+> 
 
-All of your suggestions are good. I'll roll them into the next version.
+Right. This is indeed the problem. I've cooked up a patch for that and will send
+it separately in a moment.
 
-Regards,
-Mike
-> 
-> Thanks,
-> Mark.
+cheers,
+-roger
