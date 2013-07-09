@@ -1,45 +1,133 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 9 Jul 2013 14:27:51 +0300
-Subject: [PATCH v2] arm: dts: AM43x: Add usb_otg_hs node
-In-Reply-To: <51DBF23F.20103@ti.com>
-References: <1373361446-30050-1-git-send-email-george.cherian@ti.com>
- <20130709102022.GH5552@arwen.pp.htv.fi> <51DBF23F.20103@ti.com>
-Message-ID: <20130709112751.GI5552@arwen.pp.htv.fi>
+Date: Tue, 9 Jul 2013 14:34:14 +0300
+Subject: [PATCH v3 4/4] USB: OMAP1: Tahvo USB transceiver driver
+In-Reply-To: <20130708194402.GA8516@blackmetal.musicnaut.iki.fi>
+References: <1371575221-360-1-git-send-email-aaro.koskinen@iki.fi>
+ <1371575221-360-5-git-send-email-aaro.koskinen@iki.fi>
+ <20130708072109.GA16635@arwen.pp.htv.fi>
+ <20130708194402.GA8516@blackmetal.musicnaut.iki.fi>
+Message-ID: <20130709113414.GK5552@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Jul 09, 2013 at 04:51:35PM +0530, George Cherian wrote:
-> >>+				compatible = "snps,dwc3";
-> >>+				reg = <0x48390000 0xcfff>;
-> >weird size, shouldn't this be 0xd000 then the size would be exactly
-> >52KiB
+On Mon, Jul 08, 2013 at 10:44:02PM +0300, Aaro Koskinen wrote:
+> > > +static void tahvo_usb_become_host(struct tahvo_usb *tu)
+> > > +{
+> > > +	struct retu_dev *rdev = dev_get_drvdata(tu->pt_dev->dev.parent);
+> > > +
+> > > +	extcon_set_cable_state(&tu->extcon, "USB-HOST", true);
+> > > +
+> > > +	/* Power up the transceiver in USB host mode */
+> > > +	retu_write(rdev, TAHVO_REG_USBR, USBR_REGOUT | USBR_NSUSPEND |
+> > > +		   USBR_MASTER_SW2 | USBR_MASTER_SW1);
+> > > +	tu->phy.state = OTG_STATE_A_IDLE;
+> > > +
+> > > +	check_vbus_state(tu);
+> > > +}
+> > > +
+> > > +static void tahvo_usb_stop_host(struct tahvo_usb *tu)
+> > > +{
+> > > +	tu->phy.state = OTG_STATE_A_IDLE;
+> > 
+> > shouldn't you undo tahvo_usb_become_host() here ? I mean, set the
+> > transceiver to SLAVE ?
 > 
-> okay
+> tahvo_usb_become_peripheral() (or power_off) is always called after this
+> function. Actually, these stop functions can be eliminated altogether
+> as they are only called from a single place...
 
-btw, the reason here is that when you call devm_ioremap_resource(), that
-will call resource_size() which does:
+alright, I guess GCC is already inlining them anyway, your choice.
 
-	size = res->end - res->start - 1;
-
-so you need this extra 1 on the size when passing it via DT.
-
-> >Another thing: am437x has 4 instances of this IP, why are you adding
-> >only one ?
+> > > +static int tahvo_usb_set_host(struct usb_otg *otg, struct usb_bus *host)
+> > > +{
+> > > +	struct tahvo_usb *tu = container_of(otg->phy, struct tahvo_usb, phy);
+> > > +
+> > > +	dev_dbg(&tu->pt_dev->dev, "%s %p\n", __func__, host);
+> > > +
+> > > +	if (otg == NULL)
+> > > +		return -ENODEV;
+> > > +
+> > > +	mutex_lock(&tu->serialize);
+> > > +
+> > > +	if (host == NULL) {
+> > > +		if (tu->tahvo_mode == TAHVO_MODE_HOST)
+> > > +			tahvo_usb_power_off(tu);
+> > > +		otg->host = NULL;
+> > > +		mutex_unlock(&tu->serialize);
+> > > +		return 0;
+> > > +	}
+> > > +
+> > > +	if (tu->tahvo_mode == TAHVO_MODE_HOST) {
+> > > +		otg->host = NULL;
+> > > +		tahvo_usb_become_host(tu);
+> > > +	}
+> > > +
+> > > +	otg->host = host;
+> > > +
+> > > +	mutex_unlock(&tu->serialize);
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +static int tahvo_usb_set_peripheral(struct usb_otg *otg,
+> > > +				    struct usb_gadget *gadget)
+> > 
+> > I want to get rid of the extra 'gadget' and 'host' parameters on
+> > ->set_host() and ->set_peripheral(). Nobody really uses them other than:
+> > 
+> > my_phy->phy.otg->{gadget,host} = {gadget,host};
+> > 
+> > For that, I need all other PHYs to stop relying on those parameters and
+> > I'll cook patches for that for v3.12 merge window.
 > 
-> AM437x has got only 2 instances. I have verified only one on HAPS so
-> adding only one.
+> How will the PHY know if there is a host/gadget driver present? I guess
+> I will need to wait for those patches...
 
-weird, on my TRM I see for dwc3 but 2 PHYs.
+It won't. We're assuming that if the link asks to become a host, it
+should already know that there is a host side available :-)
 
-> >And why aren't you pasing the PHY nodes here ? The device
-> >won't work without its PHYs.
+> > > +static int tahvo_usb_probe(struct platform_device *pdev)
+> > > +{
+> > > +	struct retu_dev *rdev = dev_get_drvdata(pdev->dev.parent);
+> > > +	struct tahvo_usb *tu;
+> > > +	int ret;
+> > > +
+> > > +	tu = devm_kzalloc(&pdev->dev, sizeof(*tu), GFP_KERNEL);
+> > > +	if (!tu)
+> > > +		return -ENOMEM;
+> > > +
+> > > +	tu->phy.otg = devm_kzalloc(&pdev->dev, sizeof(*tu->phy.otg),
+> > > +				   GFP_KERNEL);
+> > > +	if (!tu->phy.otg)
+> > > +		return -ENOMEM;
+> > > +
+> > > +	tu->pt_dev = pdev;
+> > > +
+> > > +	/* Default mode */
+> > > +#ifdef CONFIG_TAHVO_USB_HOST_BY_DEFAULT
+> > > +	tu->tahvo_mode = TAHVO_MODE_HOST;
+> > > +#else
+> > > +	tu->tahvo_mode = TAHVO_MODE_PERIPHERAL;
+> > > +#endif
+> > 
+> > should you call become_host()/become_peripheral() here ?
 > 
-> Yes true, again in HAPS I  didnt have any PHY configuration to be done.
+> Not needed. Once the PHY is registered, the framework will call set_host /
+> set_peripheral and the HW gets set to correct state.
 
-alright, but we should still pass the PHY right ? once silicon comes,
-we want this to work without any further changers.
+ok good, thanks
+
+> > /Could also use devm_request_threaded_irq()
+> 
+> Does not really help much, since the IRQ has to be freed manually anyway
+> (to ensure it's disabled before usb_remove_phy(); also looks like it's
+> currently enabled too early...).
+
+you miss a free() in the error path. Switching to
+devm_request_threaded_irq() would save you the trouble of having to call
+that explicitly.
 
 -- 
 balbi
@@ -49,4 +137,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/0b64e433/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/213b3138/attachment.sig>
