@@ -1,79 +1,72 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 9 Jul 2013 08:39:30 +0100 (IST)
-Subject: kernel decompressor problem for ARMv7
-In-Reply-To: <CAF1ivSbk70UnNc-09C2w-CdgaFBXe_k6K6n8Qr3L-jCLiTGqow@mail.gmail.com>
-References: <CAF1ivSakn8-HiAf+4_cLRWUUTDP9QBKpAt+hVQoMyAmKZ2-dJA@mail.gmail.com>
- <20130705095757.GA13063@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1307051225240.18597@syhkavp.arg>
- <CAF1ivSbOXknHyDMH3RdmSGK2n5o2wVeR5oohCQnZ2gJrgvo=Hw@mail.gmail.com>
- <1373250435.824.6.camel@minggr>
- <CAF1ivSbk70UnNc-09C2w-CdgaFBXe_k6K6n8Qr3L-jCLiTGqow@mail.gmail.com>
-Message-ID: <alpine.LFD.2.03.1307090837230.28525@syhkavp.arg>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 9 Jul 2013 10:40:05 +0300
+Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
+In-Reply-To: <51DBB96E.90600@ti.com>
+References: <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
+ <20130708112553.GU5523@atomide.com> <51DAB394.3050104@ti.com>
+ <20130708131033.GA5523@atomide.com> <51DABC81.3080409@ti.com>
+ <20130708133512.GD31221@arwen.pp.htv.fi> <51DBA0C2.6030003@ti.com>
+ <20130709064212.GB5552@arwen.pp.htv.fi> <51DBB96E.90600@ti.com>
+Message-ID: <20130709074005.GG5552@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 9 Jul 2013, Lin Ming wrote:
+Hi,
 
-> On Mon, Jul 8, 2013 at 10:27 AM, Lin Ming <minggr@gmail.com> wrote:
-> > On Sat, 2013-07-06 at 00:58 +0800, Lin Ming wrote:
-> >> On Sat, Jul 6, 2013 at 12:30 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> >> > On Fri, 5 Jul 2013, Will Deacon wrote:
-> >> >
-> >> >> On Fri, Jul 05, 2013 at 09:44:12AM +0100, Lin Ming wrote:
-> >> >> > Hi all,
-> >> >>
-> >> >> Hello,
-> >> >>
-> >> >> > I'm porting BSP code from v2.6.36 to v3.10 kernel. It's ARMv7 processor.
-> >> >>
-> >> >> Which specific processor/SoC?
-> >> >>
-> >> >> > But decompressor doesn't work. With a lot of debug, I finally find
-> >> >> > below 2 commits related.
-> >> >> > Kernel uncompress OK with these commits reverted.
-> >> >> >
-> >> >> > dbece45: ARM: 7501/1: decompressor: reset ttbcr for VMSA ARMv7 cores
-> >> >> > (Introduced in v3.6-rc6)
-> >> >> >
-> >> >> > 5010192: ARM: 7583/1: decompressor: Enable unaligned memory access for
-> >> >> > v6 and above
-> >> >> > (Introduced in v3.7-rc8)
-> >> >> >
-> >> >> > Any hint to fix it?
-> >> >>
-> >> >> There's not really enough information to go on here. What specifically
-> >> >> fails? Also, do you have to revert *both* of the above changes to get things
-> >> >> working again?
-> >> >
-> >> > Also, what is the bootloader used here?
+On Tue, Jul 09, 2013 at 12:49:10PM +0530, Rajendra Nayak wrote:
+> >>>> Right, but calling serial_omap_restore_context() even when the context
+> >>>> is not lost, should not ideally cause an issue.
+> >>>
+> >>> it does in one condition. If context hasn't been saved before. And that
+> >>> can happen in the case of wrong pm runtime status for that device.
+> >>>
+> >>> Imagine the device is marked as suspended even though it's fully enabled
+> >>> (it hasn't been suspended by hwmod due to NO_IDLE flag). In that case
+> >>> your context structure is all zeroes (context has never been saved
+> >>> before) then when you call pm_runtime_get_sync() on probe() your
+> >>> ->runtime_resume() will get called, which will restore context,
+> >>> essentially undoing anything which was configured by u-boot.
 > >>
-> >> uboot.
-> >>
-> >> >
-> >> > Does the bootloader call the kernel with the MMU off as documented in
-> >> > Documentation/arm/Booting?
-> >>
-> >> How to check this?
-> >>
-> >> I'll check uboot code or add debug code in boot/compressed/head.S to
-> >> check it next Monday.
-> >
-> > I added below debug code to print the control reg from lowest 4bits to
-> > highest 4bits.
-> >
-> > It prints "B7805C". So the control reg is 0x00c5087b.
-> > Seems bootloader calls the kernel with MMU enabled and Alignment fault
-> > checking enabled.
+> >> This could be a problem for drivers which do a save context in ->runtime_suspend()
+> >> but from what I see with omap serial, there is no save context done as part of
+> >> ->runtime_suspend.
+> > 
+> > right, because context is "saved" in set_termios. probe() will get
+> > called much before set_termios() has a chance to run, right ?
+> > 
+> > Same problem will trigger in that case.
+> > 
+> > I still think patch below is necessary
 > 
-> Hi Nicolas,
-> 
-> Is this information useful?
-> Or any other information needed for further debug?
+> Right, I'll try some on those lines. Looks like a
+> pm_runtime_set_active() is done for the console in the non DT case in
+> omap_serial_init_port(). It seems to be missing in the DT case.
 
-No more info needed.  The kernel has to be booted with the MMU disabled 
-as per the booting protocol documentation. You therefore have to fix 
-your 
-bootloader.
+yeah, based on conversation I had with Alan Stern a while back,
+pm_runtime_set_*() is best called by the underlying 'bus' and I tend to
+agree with him on that.
 
+Our HWMOD being our 'bus' (not really, but still), is the entity which
+knows if the device is powered or not and should make sure to call
+pm_runtime_set_*() for all devices.
 
-Nicolas
+> Although I feel this should fix the issue we have right now, I wonder
+> if there could ever be a case with uart being suspended and having to
+> resume again before a set_termios? What I mean to ask is, if the omap
+> serial driver assuming a resume to happen only post a set_termios is
+> always valid.
+
+Meaning, probe() -> suspend() -> resume() ? I don't think that would
+ever happen. ->set_termios() would always get called and that's actually
+what triggers the resume.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/b1c30c1f/attachment.sig>
