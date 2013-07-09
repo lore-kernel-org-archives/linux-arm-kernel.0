@@ -1,60 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 9 Jul 2013 01:36:14 -0700
-Subject: [PATCH 2/8] ARM: DRA7: Update SRAM details
-In-Reply-To: <1373354873-12359-3-git-send-email-rnayak@ti.com>
-References: <1373354873-12359-1-git-send-email-rnayak@ti.com>
- <1373354873-12359-3-git-send-email-rnayak@ti.com>
-Message-ID: <20130709083613.GD5523@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Jul 2013 09:37:13 +0100
+Subject: [PATCH] ARM: Kconfig: Let ARM_ERRATA_364296 not depend on
+ CONFIG_SMP
+In-Reply-To: <20130708215320.GU24642@n2100.arm.linux.org.uk>
+References: <1373319489-9467-1-git-send-email-festevam@gmail.com>
+ <20130708215320.GU24642@n2100.arm.linux.org.uk>
+Message-ID: <20130709083713.GA26895@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [130709 00:34]:
-> DRA7xx devices have 512K of SRAM for both secure and non-secure
-> devices.
+On Mon, Jul 08, 2013 at 10:53:20PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 08, 2013 at 06:38:09PM -0300, Fabio Estevam wrote:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > imx_v6_v7_defconfig handles both multi-core and single-core SoCs, and it has 
+> > CONFIG_SMP=y selected by default.
+> > 
+> > With such config we cannot select ARM_ERRATA_364296, as it depends on !SMP.
+> > 
+> > Let ARM_ERRATA_364296 be undependent on CONFIG_SMP, so that we can select
+> > this erratum for the ARM1136 SoCs, even if CONFIG_SMP=y is enabled.
 > 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: R Sricharan <r.sricharan@ti.com>
-> ---
->  arch/arm/mach-omap2/sram.c |    7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
-> index 4bd0968..67d4277 100644
-> --- a/arch/arm/mach-omap2/sram.c
-> +++ b/arch/arm/mach-omap2/sram.c
-> @@ -38,6 +38,7 @@
->  #define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
->  #endif
->  #define OMAP5_SRAM_PA		0x40300000
-> +#define DRA7_SRAM_PA		OMAP4_SRAM_PA
->  
->  #define SRAM_BOOTLOADER_SZ	0x00
->  
-> @@ -111,6 +112,9 @@ static void __init omap_detect_sram(void)
->  		} else if (soc_is_omap54xx()) {
->  			omap_sram_start = OMAP5_SRAM_PA;
->  			omap_sram_size = SZ_128K; /* 128KB */
-> +		} else if (soc_is_dra7xx()) {
-> +			omap_sram_start = DRA7_SRAM_PA;
-> +			omap_sram_size = SZ_512K; /* 512KB */
->  		} else {
->  			omap_sram_start = OMAP2_SRAM_PUB_PA;
->  			omap_sram_size = 0x800; /* 2K */
-> @@ -131,6 +135,9 @@ static void __init omap_detect_sram(void)
->  		} else if (soc_is_omap54xx()) {
->  			omap_sram_start = OMAP5_SRAM_PA;
->  			omap_sram_size = SZ_128K; /* 128KB */
-> +		} else if (soc_is_dra7xx()) {
-> +			omap_sram_start = DRA7_SRAM_PA;
-> +			omap_sram_size = SZ_512K; /* 512KB */
->  		} else {
->  			omap_sram_start = OMAP2_SRAM_PA;
->  			if (cpu_is_omap242x())
+> I'll wait for ARM Ltd folk to comment on this (they're at Linaro Connect
+> at the moment which has extremely poor 'net connectivity from what I've
+> been hearing).  We might need to bypass the workaround code in the non-SMP
+> case.
 
-This again reminds me that we should move omaps to use
-drivers/misc/sram.c. Other than that, this set looks good
-to me.
+The workaround (in proc-v6.S) checks the midr specifically for 1136 r0p2, so
+it should be fine to remove the CONFIG_SMP dependency given that the 1136 is
+UP only.
 
-Regards,
-
-Tony
+Will
