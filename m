@@ -1,26 +1,28 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Tue,  9 Jul 2013 08:25:52 +0100
-Subject: [PATCH v2 0/2] ARM: STi Fixes
-Message-ID: <1373354752-26292-1-git-send-email-srinivas.kandagatla@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Jul 2013 09:37:29 +0200
+Subject: [PATCH 03/04] ARM: shmobile: Add EMEV2 and KZM9D to
+ ARCH_SHMOBILE_MULTI
+In-Reply-To: <20130709054359.14007.23619.sendpatchset@w520>
+References: <20130709054331.14007.66068.sendpatchset@w520>
+ <20130709054359.14007.23619.sendpatchset@w520>
+Message-ID: <201307090937.29805.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+On Tuesday 09 July 2013, Magnus Damm wrote:
+> +void __init __weak emev2_clock_init(void)
+> +{
+> +       /* in case legacy clocks are disabled then do nothing */
+> +}
 
-This patch series fixes 2 configuration issues related to serial
-setup on STiH416 and ARM ERRATA selection.
+Nitpicking:
 
-Changes since v1:
-	- Split out fixes in seperate patch set.
+I don't like the __weak symbols too much, in general I prefer
+doing either
 
-Srinivas Kandagatla (2):
-  ARM: dts: STi: Fix pinconf setup for STiH416 serial2
-  ARM: STi: Set correct ARM ERRATAs.
+	if (IS_ENABLED(CONFIG_SHMOBILE_CLOCKS)
+		emev2_clock_init()
 
- arch/arm/boot/dts/stih416-pinctrl.dtsi |   10 +++++++++-
- arch/arm/boot/dts/stih416.dtsi         |    2 +-
- arch/arm/mach-sti/Kconfig              |    3 ++-
- 3 files changed, 12 insertions(+), 3 deletions(-)
+or using an inline alternative in the header file.
 
--- 
-1.7.6.5
+	Arnd
