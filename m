@@ -1,53 +1,117 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Jul 2013 23:15:05 +0200
-Subject: [PATCH v1 0/4] ARM: STi fixes and ethernet support
-In-Reply-To: <51DBE718.2080007@st.com>
-References: <1373271301-11060-1-git-send-email-srinivas.kandagatla@st.com>
- <201307090956.03191.arnd@arndb.de> <51DBE718.2080007@st.com>
-Message-ID: <201307092315.06131.arnd@arndb.de>
+Date: Wed, 10 Jul 2013 00:05:21 +0200
+Subject: [PATCH V3 3/3] ARM: mmp: bring up pxa988 with device tree support
+In-Reply-To: <1373352166-10064-4-git-send-email-zhangwm@marvell.com>
+References: <1373352166-10064-1-git-send-email-zhangwm@marvell.com>
+ <1373352166-10064-4-git-send-email-zhangwm@marvell.com>
+Message-ID: <201307100005.21769.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 July 2013, Srinivas KANDAGATLA wrote:
-> On 09/07/13 08:56, Arnd Bergmann wrote:
-> > No, you should be using generic interfaces to do the things you need.
-> > 
-> > I believe what you are missing is an ethernet phy driver that is specific
-> > to your SoC.
-> It looks interesting way to solve the issue.
-> 
-> Did you mean "Ethernet PHY"?
-> 
-> Ethernet PHY is not integrated in the STiH41x SoC, We use an external
-> ICPLUS phy ( drivers/net/phy/icplus.c) for both B2000 and B2020 boards.
-> As we can't have  two Ethernet phy drivers at the same time, I think the
-> suggestion might not work in this case.
-> 
-> The callbacks in the mach level are setting up two SOC specific System
-> Configuration registers which configures the MAC (like PHY interface
-> selection, which is sampled during MAC reset assertion).
+On Tuesday 09 July 2013, Neil Zhang wrote:
+> +	soc {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		interrupt-parent = <&gic>;
+> +		ranges;
+> +
+> +		gic: interrupt-controller at d1dfe100 {
+> +			compatible = "arm,cortex-a9-gic";
+> +			#interrupt-cells = <3>;
+> +			#address-cells = <1>;
+> +			interrupt-controller;
+> +			reg = <0xd1dff000 0x1000>,
+> +			      <0xd1dfe100 0x0100>;
+> +		};
+> +
+> +		L2: l2-cache-controller at d1dfb000 {
+> +			compatible = "arm,pl310-cache";
+> +			reg = <0xd1dfb000 0x1000>;
+> +			arm,data-latency = <2 1 1>;
+> +			arm,tag-latency = <2 1 1>;
+> +			arm,pwr-dynamic-clk-gating;
+> +			arm,pwr-standby-mode;
+> +			cache-unified;
+> +			cache-level = <2>;
+> +		};
+> +
+> +		local-timer at d1dfe600 {
+> +			compatible = "arm,cortex-a9-twd-timer";
+> +			reg = <0xd1dfe600 0x20>;
+> +			interrupts = <1 13 0x304>;
+> +		};
+> +
+> +		axi at d4200000 {	/* AXI */
+> +			compatible = "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0xd4200000 0xd4200000 0x00200000>;
+> +
+> +			intc: wakeupgen at d4282000 {
+> +				compatible = "marvell,mmp-intc";
+> +				reg = <0xd4282000 0x1000>;
+> +				marvell,intc-wakeup = <0x114 0x3
+> +						    0x144 0x3>;
+> +			};
+> +		};
 
-Ah, right.
+I am guessing that the structure does not actually reflect the hardware.
 
-> MAC used in STiH41x supports multiple PHY interfaces, so the PHY
-> interface selection is driven by external signals wired up to System
-> Configuration registers. The MAC driver is not aware of these System
-> Configuration registers. So for non-DT case, stmmac driver provided
-> callbacks to do things like this.
-> 
-> For DT case, At the moment I think callbacks at MACH level is one
-> possible solution. But am open for any discussions.
+Shouldn't AXI be the top-level bus, with the other stuff under it?
 
-Ok, so a PHY driver might not be the best place to put this, but it's
-one option, since the PHY driver already has to know about the
-interface speed you are setting.
+> +
+> +
+> +			uart1: uart at d4017000 {
+> +				compatible = "marvell,mmp-uart";
+> +				reg = <0xd4017000 0x1000>;
+> +				interrupts = <0 27 0x4>;
+> +				status = "disabled";
+> +			};
 
-Having a global "*_setup_ethernet" callback is definitely not the
-right way to go. Please describe what the function actually does
-so we can come up with the right subsystem to move that functionality
-to. If you are setting clocks, you should use the clock subsystem,
-for taking the device out of reset, you should use the reset controller
-subsystem and for setting up the phy, you should use the phy subsystem,
-etc.
+The uart node should be called "serial at d4017000" instead of "uart at d4017000".
+
+> diff --git a/arch/arm/mach-mmp/reset.c b/arch/arm/mach-mmp/reset.c
+> new file mode 100644
+> index 0000000..b90ec54
+> --- /dev/null
+> +++ b/arch/arm/mach-mmp/reset.c
+> @@ -0,0 +1,66 @@
+> +/*
+> + * linux/arch/arm/mach-mmp/reset.c
+
+I think this could just be part of the smp.c file.
+
+> + *
+> + * Author:	Neil Zhang <zhangwm@marvell.com>
+> + * Copyright:	(C) 2012 Marvell International Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/smp.h>
+> +
+> +#include <asm/io.h>
+> +#include <asm/cacheflush.h>
+> +#include <asm/mach/map.h>
+> +
+> +#include <mach/addr-map.h>
+> +
+> +#include "reset.h"
+> +
+> +#define PMU_CC2_AP			APMU_REG(0x0100)
+> +#define CIU_CA9_WARM_RESET_VECTOR	CIU_REG(0x00d8)
+
+You should not hardcode the addresses here, better find them from the device tree.
+> +
+> +#define CPU_CORE_RST(n)	(1 << ((n) * 4 + 16))
+> +#define CPU_DBG_RST(n)	(1 << ((n) * 4 + 18))
+> +#define CPU_WDOG_RST(n)	(1 << ((n) * 4 + 19))
+
+This should probably go into a reset controller driver, in drivers/reset/
 
 	Arnd
