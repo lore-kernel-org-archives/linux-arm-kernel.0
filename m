@@ -1,41 +1,29 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 9 Jul 2013 09:40:59 +0200
-Subject: [PATCH 7/7] serial: at91: add dma support in usart binding
- descriptions
-In-Reply-To: <1373351626-30143-8-git-send-email-elen.song@atmel.com>
-References: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
- <1373351626-30143-8-git-send-email-elen.song@atmel.com>
-Message-ID: <20130709074059.GC4013@ludovic.desroches@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Jul 2013 09:43:07 +0200
+Subject: [PATCH 01/04] ARM: shmobile: Only build clocks when COMMON_CLK=n
+In-Reply-To: <20130709054341.14007.99736.sendpatchset@w520>
+References: <20130709054331.14007.66068.sendpatchset@w520>
+ <20130709054341.14007.99736.sendpatchset@w520>
+Message-ID: <201307090943.07898.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 09, 2013 at 02:33:46PM +0800, Elen Song wrote:
+On Tuesday 09 July 2013, Magnus Damm wrote:
+> +obj-y                          += $(clk-y$(CONFIG_COMMON_CLK))
 
-[...]
+It took me a bit to understand the Makefile trick you are using here.
+I assume other readers will have the same problem. How about just
+doing
 
->  Example:
-> -
-> +- use PDC:
->  	usart0: serial at fff8c000 {
->  		compatible = "atmel,at91sam9260-usart";
->  		reg = <0xfff8c000 0x200>;
-> @@ -25,3 +31,12 @@ Example:
->  		atmel,use-pdc-tx;
->  	};
->  
-> +- use DMA:
-> +	usart0: serial at f001c000 {
-> +		compatible = "atmel,at91sam9260-usart";
-> +		reg = <0xf001c000 0x100>;
-> +		interrupts = <12 IRQ_TYPE_LEVEL_HIGH 5>;
-> +		dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(3)>,
-> +		       <&dma0 2 (AT91_DMA_CFG_PER_ID(4) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
++ifndef CONFIG_COMMON_CLK
+ obj-$(CONFIG_ARCH_SH7372)      += setup-sh7372.o intc-sh7372.o
+ obj-$(CONFIG_ARCH_SH73A0)      += setup-sh73a0.o intc-sh73a0.o
+ obj-$(CONFIG_ARCH_R8A73A4)     += setup-r8a73a4.o
+ obj-$(CONFIG_ARCH_R8A7740)     += setup-r8a7740.o intc-r8a7740.o
+ obj-$(CONFIG_ARCH_R8A7778)     += setup-r8a7778.o
+ obj-$(CONFIG_ARCH_R8A7779)     += setup-r8a7779.o intc-r8a7779.o
+ obj-$(CONFIG_ARCH_R8A7790)     += setup-r8a7790.o
+ obj-$(CONFIG_ARCH_EMEV2)       += setup-emev2.o
++endif
 
-Same comment than patch 1/7. Maybe wait for confirmation by someone else before
-correcting it.
-
-> +		dma-names = "tx", "rx";
-> +	};
-> -- 
-> 1.7.9.5
-> 
+	Arnd
