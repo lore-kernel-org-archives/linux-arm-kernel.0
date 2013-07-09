@@ -1,60 +1,85 @@
-From: elen.song@atmel.com (elen.song)
-Date: Tue, 9 Jul 2013 15:57:02 +0800
-Subject: [PATCH 1/7] serial: at91: correct definition from DMA to PDC
-In-Reply-To: <20130709073155.GB4013@ludovic.desroches@atmel.com>
-References: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
- <1373351626-30143-2-git-send-email-elen.song@atmel.com>
- <20130709073155.GB4013@ludovic.desroches@atmel.com>
-Message-ID: <51DBC24E.9060601@atmel.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 09 Jul 2013 17:03:35 +0900
+Subject: [PATCH V6 0/4] Generic PHY driver for the Exynos SoC DP PHY
+Message-ID: <003d01ce7c7a$d04043d0$70c0cb70$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/9/2013 3:31 PM, Ludovic Desroches wrote:
-> Hi Elen,
->
-> One comment below:
->
-> On Tue, Jul 09, 2013 at 02:33:40PM +0800, Elen Song wrote:
->
-> [...]
->
->> diff --git a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
->> index a49d9a1..82f45ec 100644
->> --- a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
->> +++ b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
->> @@ -8,8 +8,8 @@ Required properties:
->>   - interrupts: Should contain interrupt
->>   
->>   Optional properties:
->> -- atmel,use-dma-rx: use of PDC or DMA for receiving data
->> -- atmel,use-dma-tx: use of PDC or DMA for transmitting data
->> +- atmel,use-pdc-rx: use of PDC for receiving data
->> +- atmel,use-pdc-tx: use of PDC for transmitting data
->>   
->>   <chip> compatible description:
->>   - at91rm9200:  legacy USART support
->> @@ -19,9 +19,9 @@ Example:
->>   
->>   	usart0: serial at fff8c000 {
->>   		compatible = "atmel,at91sam9260-usart";
->> -		reg = <0xfff8c000 0x4000>;
->> -		interrupts = <7>;
->> -		atmel,use-dma-rx;
->> -		atmel,use-dma-tx;
->> +		reg = <0xfff8c000 0x200>;
->> +		interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
-> Maybe put these changes into an other patch since it is not in relation with
-> the purpose of your patch.
->
-> Moreover, I am not sure that macros should be used in the documentation. From
-> the top of my head, there was a discussion about that and the status was to not
-> use macros in documentation since it is Linux dependant.
+This patch series adds a simple driver for the Samsung Exynos SoC
+series DP transmitter PHY, using the generic PHY framework [1].
+Previously the DP PHY used an internal DT node to control the PHY
+power enable bit.
 
-Ok, I will not involve the macros in the document now.
-So I will move all the document changes into the last patch, right?
->
->> +		atmel,use-pdc-rx;
->> +		atmel,use-pdc-tx;
->>   	};
->>   
-> [...]
+These patches was tested on Exynos5250.
+
+This PATCH v6 follows:
+ * PATCH v5, sent on July, 8th 2013
+ * PATCH v4, sent on July, 2nd 2013
+ * PATCH v3, sent on July, 1st 2013
+ * PATCH v2, sent on June, 28th 2013
+ * PATCH v1, sent on June, 28th 2013
+
+Changes between v5 and v6:
+  * Re-based on git://gitorious.org/linuxphy/linuxphy.git
+
+Changes between v4 and v5:
+  * Marked original bindings as deprecated in 'exynos_dp.txt'
+  * Fixed typo of commit message.
+  * Added Tomasz Figa's Reviewed-by.
+
+Changes between v3 and v4:
+  * Added OF dependancy.
+  * Removed redundant local variable 'void __iomem *addr'.
+  * Removed unnecessary dev_set_drvdata().
+  * Added a patch that remove non-DT support for Exynos
+    Display Port driver.
+  * Removed unnecessary 'struct exynos_dp_platdata'.
+  * Kept supporting the original bindings for DT compatibility.
+
+Changes between v2 and v3:
+  * Removed redundant spinlock
+  * Removed 'struct phy' from 'struct exynos_dp_video_phy'
+  * Updated 'samsung-phy.txt', instead of creating
+    'samsung,exynos5250-dp-video-phy.txt'.
+  * Removed unnecessary additional specifier from 'phys'
+    DT property.
+  * Added 'phys', 'phy-names' properties to 'exynos_dp.txt' file.
+  * Added Felipe Balbi's Acked-by.
+
+Changes between v1 and v2:
+  * Replaced exynos_dp_video_phy_xlate() with of_phy_simple_xlate(),
+    as Kishon Vijay Abraham I guided.
+  * Set the value of phy-cells as 0, because the phy_provider implements
+    only one PHY.
+  * Removed unnecessary header include.
+  * Added '#ifdef CONFIG_OF' and of_match_ptr macro.
+
+This series depends on the generic PHY framework [1]. These patches
+refer to Sylwester Nawrocki's patches about Exynos MIPI [2].
+
+[1] https://lkml.org/lkml/2013/6/26/259
+[2] http://www.spinics.net/lists/linux-samsung-soc/msg20098.html
+
+Jingoo Han (4):
+  ARM: dts: Add DP PHY node to exynos5250.dtsi
+  phy: Add driver for Exynos DP PHY
+  video: exynos_dp: remove non-DT support for Exynos Display Port
+  video: exynos_dp: Use the generic PHY driver
+
+ .../devicetree/bindings/phy/samsung-phy.txt        |    8 ++
+ .../devicetree/bindings/video/exynos_dp.txt        |   18 +++++++++---------
+ arch/arm/boot/dts/exynos5250.dtsi                  |   13 ++++++++-----
+ drivers/phy/Kconfig                                |    6 ++
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-exynos-dp-video.c                  |  111 ++++++++++++++++++++
+ drivers/video/exynos/Kconfig                       |    2 +-
+ drivers/video/exynos/exynos_dp_core.c              |  132 +++++++----------------------
+ drivers/video/exynos/exynos_dp_core.h              |  110 +++++++++++++++++++++++++++
+ drivers/video/exynos/exynos_dp_reg.c               |    2 -
+ include/video/exynos_dp.h                          |  131 ---------------------------------
+ 11 files changed, 291 insertions(+), 243 deletions(-) 
+ create mode 100644 drivers/phy/phy-exynos-dp-video.c
+ delete mode 100644 include/video/exynos_dp.h
+
+--
+1.7.10.4
