@@ -1,67 +1,44 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 9 Jul 2013 07:03:14 -0500
-Subject: [PATCH] of: match the compatible in the order set by the dts file
-In-Reply-To: <51DBC58D.90002@freescale.com>
-References: <1373013818-11365-1-git-send-email-b32955@freescale.com>
- <20130709070541.GQ516@pengutronix.de>
- <51DBBFDA.70302@freescale.com>
- <20130709075124.GR516@pengutronix.de>
- <51DBC58D.90002@freescale.com>
-Message-ID: <CAL_JsqL4ABJCQXveSAMZKOiHwJi=w8zFYjg3DV7kqEEcCXQJcw@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 9 Jul 2013 15:03:54 +0300
+Subject: [PATCH v2] arm: dts: AM43x: Add usb_otg_hs node
+In-Reply-To: <51DBF98B.1050104@ti.com>
+References: <1373361446-30050-1-git-send-email-george.cherian@ti.com>
+ <20130709102022.GH5552@arwen.pp.htv.fi> <51DBF23F.20103@ti.com>
+ <20130709112751.GI5552@arwen.pp.htv.fi> <51DBF98B.1050104@ti.com>
+Message-ID: <20130709120354.GP5552@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 9, 2013 at 3:10 AM, Huang Shijie <b32955@freescale.com> wrote:
-> ? 2013?07?09? 15:51, Sascha Hauer ??:
->
->> On Tue, Jul 09, 2013 at 03:46:34PM +0800, Huang Shijie wrote:
->>>
->>> ? 2013?07?09? 15:05, Sascha Hauer ??:
->>>>
->>>> Why don't you set the matching order in the driver the way you want it
->>>> to be, i.e.:
->>>>
->>>>         { .compatible = "fsl,imx6q-uart", ... },
->>>>         { .compatible = "fsl,imx21-uart", ... },
->>>>         { .compatible = "fsl,imx1-uart", ... },
->>>>
->>> yes. i can set it like this.
->>>
->>> but this method looks like a ugly workaround.
->>
->> If a driver has different ways of supporting a single device, then
->> putting the preferred or most feature rich on top doesn't look very ugly
->> to me.
->
-> this method makes it much _coupled_ between the driver and the dts file.
->
-> IMHO, it's an unnecessary _burden_ to the driver programmer:
->    he should puts the most feature compatible on the top.
->
-> it's much graceful if we let the driver programmer be transparent about
-> this.
+Hi,
 
-The dts requires compatible strings to be most specific to least
-specific. There is no reason that driver match tables should not be
-the same and that is the assumption. Matching is not just based on
-compatible properties and your patch does not handle the other cases.
+On Tue, Jul 09, 2013 at 05:22:43PM +0530, George Cherian wrote:
+> >>>Another thing: am437x has 4 instances of this IP, why are you adding
+> >>>only one ?
+> >>AM437x has got only 2 instances. I have verified only one on HAPS so
+> >>adding only one.
+> >weird, on my TRM I see for dwc3 but 2 PHYs.
+> 
+> Please confirm whether you are looking at am437x TRM or dra7x TRM?
+> dra7x has 4 dwc3 and 2 internal  phys and 2 external phys
 
-Rob
+guilty as charged :-)
 
+> >>>And why aren't you pasing the PHY nodes here ? The device
+> >>>won't work without its PHYs.
+> >>Yes true, again in HAPS I  didnt have any PHY configuration to be done.
+> >alright, but we should still pass the PHY right ? once silicon comes,
+> >we want this to work without any further changers.
+> 
+> okay will add phy nodes and 2 instances of dwc3.
 
+thanks
 
->
->
-> thanks
-> Huang Shijie
->
->
->
->
->
->
->
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/1efa2643/attachment.sig>
