@@ -1,140 +1,90 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Wed, 10 Jul 2013 00:57:47 +0200
-Subject: [PATCH v2 1/6] clk: samsung: move common plls registration into
- separate function
+Date: Wed, 10 Jul 2013 00:58:13 +0200
+Subject: [PATCH v2 2/6] clk: samsung: fix error handling in pll register
+ functions
 In-Reply-To: <201307100057.06061.heiko@sntech.de>
 References: <201307100057.06061.heiko@sntech.de>
-Message-ID: <201307100057.48265.heiko@sntech.de>
+Message-ID: <201307100058.13941.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All Samsung PLLs use similar code to register the clocks and clkdev lookups.
-Therefore move these into a separate function to reduce code duplication.
+kmalloc has its own error reporting when the allocation fails and
+the register functions also should return the correct ERR_PTR(-ENOMEM)
+when it happens.
 
-Suggested-by: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/clk/samsung/clk-pll.c |   68 +++++++++++++++++------------------------
- 1 file changed, 28 insertions(+), 40 deletions(-)
+ drivers/clk/samsung/clk-pll.c |   30 ++++++++++--------------------
+ 1 file changed, 10 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
-index 362f12d..9153e46 100644
+index 9153e46..0afaec6 100644
 --- a/drivers/clk/samsung/clk-pll.c
 +++ b/drivers/clk/samsung/clk-pll.c
-@@ -13,6 +13,24 @@
- #include "clk.h"
- #include "clk-pll.h"
+@@ -79,10 +79,8 @@ struct clk * __init samsung_clk_register_pll35xx(const char *name,
+ 	struct clk_init_data init;
  
-+static inline struct clk *samsung_register_pll(struct clk_hw *hw)
-+{
-+	struct clk *clk;
-+	const char *name = hw->init->name;
-+
-+	clk = clk_register(NULL, hw);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: failed to register pll clock %s\n", __func__,
-+				name);
-+		return clk;
-+	}
-+
-+	if (clk_register_clkdev(clk, name, NULL))
-+		pr_err("%s: failed to register lookup for %s", __func__, name);
-+
-+	return clk;
-+}
-+
- /*
-  * PLL35xx Clock Type
-  */
-@@ -75,15 +93,9 @@ struct clk * __init samsung_clk_register_pll35xx(const char *name,
- 	pll->hw.init = &init;
- 	pll->con_reg = con_reg;
- 
--	clk = clk_register(NULL, &pll->hw);
--	if (IS_ERR(clk)) {
--		pr_err("%s: failed to register pll clock %s\n", __func__,
--				name);
-+	clk = samsung_register_pll(&pll->hw);
-+	if (IS_ERR(clk))
- 		kfree(pll);
+ 	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+-	if (!pll) {
+-		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
+-		return NULL;
 -	}
--
--	if (clk_register_clkdev(clk, name, NULL))
--		pr_err("%s: failed to register lookup for %s", __func__, name);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
  
- 	return clk;
- }
-@@ -155,15 +167,9 @@ struct clk * __init samsung_clk_register_pll36xx(const char *name,
- 	pll->hw.init = &init;
- 	pll->con_reg = con_reg;
+ 	init.name = name;
+ 	init.ops = &samsung_pll35xx_clk_ops;
+@@ -153,10 +151,8 @@ struct clk * __init samsung_clk_register_pll36xx(const char *name,
+ 	struct clk_init_data init;
  
--	clk = clk_register(NULL, &pll->hw);
--	if (IS_ERR(clk)) {
--		pr_err("%s: failed to register pll clock %s\n", __func__,
--				name);
-+	clk = samsung_register_pll(&pll->hw);
-+	if (IS_ERR(clk))
- 		kfree(pll);
+ 	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+-	if (!pll) {
+-		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
+-		return NULL;
 -	}
--
--	if (clk_register_clkdev(clk, name, NULL))
--		pr_err("%s: failed to register lookup for %s", __func__, name);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
  
- 	return clk;
- }
-@@ -236,15 +242,9 @@ struct clk * __init samsung_clk_register_pll45xx(const char *name,
- 	pll->con_reg = con_reg;
- 	pll->type = type;
+ 	init.name = name;
+ 	init.ops = &samsung_pll36xx_clk_ops;
+@@ -227,10 +223,8 @@ struct clk * __init samsung_clk_register_pll45xx(const char *name,
+ 	struct clk_init_data init;
  
--	clk = clk_register(NULL, &pll->hw);
--	if (IS_ERR(clk)) {
--		pr_err("%s: failed to register pll clock %s\n", __func__,
--				name);
-+	clk = samsung_register_pll(&pll->hw);
-+	if (IS_ERR(clk))
- 		kfree(pll);
+ 	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+-	if (!pll) {
+-		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
+-		return NULL;
 -	}
--
--	if (clk_register_clkdev(clk, name, NULL))
--		pr_err("%s: failed to register lookup for %s", __func__, name);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
  
- 	return clk;
- }
-@@ -323,15 +323,9 @@ struct clk * __init samsung_clk_register_pll46xx(const char *name,
- 	pll->con_reg = con_reg;
- 	pll->type = type;
+ 	init.name = name;
+ 	init.ops = &samsung_pll45xx_clk_ops;
+@@ -308,10 +302,8 @@ struct clk * __init samsung_clk_register_pll46xx(const char *name,
+ 	struct clk_init_data init;
  
--	clk = clk_register(NULL, &pll->hw);
--	if (IS_ERR(clk)) {
--		pr_err("%s: failed to register pll clock %s\n", __func__,
--				name);
-+	clk = samsung_register_pll(&pll->hw);
-+	if (IS_ERR(clk))
- 		kfree(pll);
+ 	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+-	if (!pll) {
+-		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
+-		return NULL;
 -	}
--
--	if (clk_register_clkdev(clk, name, NULL))
--		pr_err("%s: failed to register lookup for %s", __func__, name);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
  
- 	return clk;
- }
-@@ -406,15 +400,9 @@ struct clk * __init samsung_clk_register_pll2550x(const char *name,
- 	pll->reg_base = reg_base;
- 	pll->offset = offset;
+ 	init.name = name;
+ 	init.ops = &samsung_pll46xx_clk_ops;
+@@ -385,10 +377,8 @@ struct clk * __init samsung_clk_register_pll2550x(const char *name,
+ 	struct clk_init_data init;
  
--	clk = clk_register(NULL, &pll->hw);
--	if (IS_ERR(clk)) {
--		pr_err("%s: failed to register pll clock %s\n", __func__,
--				name);
-+	clk = samsung_register_pll(&pll->hw);
-+	if (IS_ERR(clk))
- 		kfree(pll);
+ 	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+-	if (!pll) {
+-		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
+-		return NULL;
 -	}
--
--	if (clk_register_clkdev(clk, name, NULL))
--		pr_err("%s: failed to register lookup for %s", __func__, name);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
  
- 	return clk;
- }
+ 	init.name = name;
+ 	init.ops = &samsung_pll2550x_clk_ops;
 -- 
 1.7.10.4
