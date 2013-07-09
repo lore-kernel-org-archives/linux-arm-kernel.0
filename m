@@ -1,50 +1,61 @@
-From: sr@denx.de (Stefan Roese)
-Date: Tue, 09 Jul 2013 15:02:31 +0200
-Subject: [PATCH] ARM: OMAP3: Beagle: Fix USB Host on beagle xM Ax/Bx
-In-Reply-To: <1366024808-4691-1-git-send-email-rogerq@ti.com>
-References: <1366024808-4691-1-git-send-email-rogerq@ti.com>
-Message-ID: <51DC09E7.1070302@denx.de>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 9 Jul 2013 22:03:19 +0900
+Subject: [PATCH] ARM: shmobile: Add SMSC ethernet chip to KZM9D DT
+ reference
+In-Reply-To: <51DBF7CD.8040009@cogentembedded.com>
+References: <20130709042654.13658.20164.sendpatchset@w520>
+ <51DBF7CD.8040009@cogentembedded.com>
+Message-ID: <CANqRtoQfkk9KFggw5dadqih-kqNTCGC+kVCKkOUO8G=1w+kh6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Roger,
+Hi Sergei,
 
-On 04/15/2013 01:20 PM, Roger Quadros wrote:
-> On Beagle xM Rev. Ax/Bx, the USB power enable GPIO logic is
-> reversed when compared to other revisions i.e. it is
-> active high instead of active low.
-> 
-> Use the beagle_config.usb_pwr_level flag correctly so that
-> the power regulator can be configured at runtime.
-> 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+On Tue, Jul 9, 2013 at 8:45 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Hello.
+>
+>
+> On 09-07-2013 8:26, Magnus Damm wrote:
+>
+>> From: Magnus Damm <damm@opensource.se>
+>
+>
+>> Add support for the SMSC ethernet controller found
+>> on the KZM9D board to the KZM9D DT Reference code.
+>
+>
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> ---
+>
+>
+>>   Built on top of renesas-next-20130704v2 and
+>>   [PATCH] ARM: shmobile: KZM9D DT reference implementation
+>
+>
+>>   arch/arm/boot/dts/emev2-kzm9d-reference.dts |   31
+>> +++++++++++++++++++++++++++
+>>   1 file changed, 31 insertions(+)
+>
+>
+>> --- 0002/arch/arm/boot/dts/emev2-kzm9d-reference.dts
+>> +++ work/arch/arm/boot/dts/emev2-kzm9d-reference.dts    2013-07-09
+>> 13:06:47.000000000 +0900
+>> @@ -23,4 +23,35 @@
+>
+> [...]
+>>
+>> +       lan9220 at 20000000 {
+>
+>
+>    Shouldn't all the Ethernet nodes be called "ethernet"?
 
-I'm currently trying to use an SMSC95xx USB ethernet adapter on the
-OMAP3 Beagleboard (old one "Beagle Rev C1/C2/C3") via the OMAP EHCI
-controller. And am testing this by trying to mount the rootfs via NFS.
-What I see is that the NFS mounting stalls/hangs most of the time quite
-early in the mount process:
+Good question. Grepping in arch/arm/boot/dts shows various ways to
+name the Ethernet nodes. Exactly what is correct or not I can't really
+say.
 
-[    6.425689] VFS: Mounted root (nfs filesystem) on device 0:12.
-[    6.435485] devtmpfs: mounted
-[    6.440002] Freeing unused kernel memory: 384K (c077a000 - c07da000)
-INIT: version 2.88 booting
-Starting udev
-[  188.311309] nfs: server 10.0.0.152 not responding, still trying
-[  188.317687] nfs: server 10.0.0.152 not responding, still trying
-...
+Thanks for your feedback.
 
-Only very seldom the rootfs can be mounted successfully to the prompt.
+Cheers,
 
-I'm using latest kernel.org for this (git ID d2b4a646 also tested with
-v3.10 release). This is with DT-enabled booting and without-DT (same
-problem). I also tested some older Linux kernel versions and it fails
-there as well. Only v3.2.40 seems to be able to mount this rootfs via
-NFS reliably (approx. 10 times success).
-
-Is this a known issue on the Beagleboard? Do you have any ideas what
-might cause such an issue (unreliable USB connection, hangup of NFS
-mounting)? Any hints/links appretiated.
-
-Thanks,
-Stefan
+/ magnus
