@@ -1,54 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Jul 2013 09:03:54 +0100
-Subject: ARM Cortex A9: User/Kernel filter events
-In-Reply-To: <BFCB49997E59134AAAF17FFE77F8FF0667378D28@REXMD.intranet.epfl.ch>
-References: <BFCB49997E59134AAAF17FFE77F8FF0667378D28@REXMD.intranet.epfl.ch>
-Message-ID: <20130709080354.GA26169@mudshark.cambridge.arm.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 09 Jul 2013 17:04:10 +0900
+Subject: [PATCH V6 1/4] ARM: dts: Add DP PHY node to exynos5250.dtsi
+Message-ID: <003e01ce7c7a$e519a300$af4ce900$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 08, 2013 at 09:58:17PM +0100, Javier Picorel wrote:
-> Dear all,
-> 
-> Is there any reason why ARM Cortex A9 cannot filter user/kernel events?
-> 
-> arch/arm/kernel/perf_event_v7.c
-> 
-> 1144/*
-> 1145 * Add an event filter to a given event. This will only work for PMUv2 PMUs.
-> 1146 */
-> 1147static int armv7pmu_set_event_filter(struct hw_perf_event *event,
-> 1148                                     struct perf_event_attr *attr)
-> 1149{
-> 1150        unsigned long config_base = 0;
-> 1151
-> 1152        if (attr->exclude_idle)
-> 1153                return -EPERM;
-> 1154        if (attr->exclude_user)
-> 1155                config_base |= ARMV7_EXCLUDE_USER;
-> 1156        if (attr->exclude_kernel)
-> 1157                config_base |= ARMV7_EXCLUDE_PL1;
-> 1158        if (!attr->exclude_hv)
-> 1159                config_base |= ARMV7_INCLUDE_HYP;
-> 1160
-> 1161        /*
-> 1162         * Install the filter into config_base as this is used to
-> 1163         * construct the event type.
-> 1164         */
-> 1165        event->config_base = config_base;
-> 1166
-> 1167        return 0;
-> 1168}
-> 
-> It seems that only A15 and A7 are able to do it. Is it a limitation A9's PMU? Thank you!
+Add PHY provider node for the DP PHY.
 
-Event filtering requires hardware support in the PMU, as described in the
-comment above ("This will only work for PMUv2 PMUs"). A9 doesn't support
-this feature.
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/boot/dts/exynos5250.dtsi |   13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-One interesting thing would be to see if we can plumb into the new
-context-tracking stuff from Kevin, which does keep track of transitions
-between user and kernel space. That would allow a `poor man's' event
-filtering for hardware that doesn't support it.
-
-Will
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index fc9fb3d..c326c06 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -616,6 +616,12 @@
+ 		interrupts = <0 94 0>;
+ 	};
+ 
++	dp_phy: video-phy at 10040720 {
++		compatible = "samsung,exynos5250-dp-video-phy";
++		reg = <0x10040720 4>;
++		#phy-cells = <0>;
++	};
++
+ 	dp-controller {
+ 		compatible = "samsung,exynos5-dp";
+ 		reg = <0x145b0000 0x1000>;
+@@ -623,11 +629,8 @@
+ 		interrupt-parent = <&combiner>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-
+-		dptx-phy {
+-			reg = <0x10040720>;
+-			samsung,enable-mask = <1>;
+-		};
++		phys = <&dp_phy>;
++		phy-names = "dp";
+ 	};
+ 
+ 	fimd {
+-- 
+1.7.10.4
