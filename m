@@ -1,48 +1,48 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Tue, 9 Jul 2013 16:58:51 +0800
-Subject: [lm-sensors] [PATCH 1/2] ARM: dt: t30 cardhu: add dt entry for
- lm90
-In-Reply-To: <20130709095525.5158a0a5@endymion.delvare>
-References: <1372928979-26938-1-git-send-email-wni@nvidia.com>
- <1372928979-26938-2-git-send-email-wni@nvidia.com>
- <51D70483.70203@wwwdotorg.org>	<51DA6BD4.1040300@nvidia.com>
- <20130708095024.041a6d57@endymion.delvare>	<51DA8805.50709@nvidia.com>
- <20130708131421.GB21638@roeck-us.net>	<20130709062112.GC17499@mithrandir>
- <51DBC058.2040904@nvidia.com> <20130709095525.5158a0a5@endymion.delvare>
-Message-ID: <51DBD0CB.2000504@nvidia.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 9 Jul 2013 18:09:22 +0900
+Subject: [PATCH 01/04] ARM: shmobile: Only build clocks when COMMON_CLK=n
+In-Reply-To: <1774541.9WRl3VrJqz@avalon>
+References: <20130709054331.14007.66068.sendpatchset@w520>
+ <20130709054341.14007.99736.sendpatchset@w520>
+ <201307090943.07898.arnd@arndb.de> <1774541.9WRl3VrJqz@avalon>
+Message-ID: <CANqRtoRJhrbT4NMv4e7NwvXj0JoO001ShtjSwdquv7x-7dxKeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2013 03:55 PM, Jean Delvare wrote:
-> On Tue, 9 Jul 2013 15:48:40 +0800, Wei Ni wrote:
->> On 07/09/2013 02:21 PM, Thierry Reding wrote:
->>> It should work out of the box. As a matter of fact the same chip is used
->>> on Tamonten and the DTS files use "onnn,nct1008". That used to work. If
->>> it no longer does then that's a regression.
+Hi Laurent and Arnd,
+
+On Tue, Jul 9, 2013 at 4:45 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Arnd and Magnus,
+>
+> On Tuesday 09 July 2013 09:43:07 Arnd Bergmann wrote:
+>> On Tuesday 09 July 2013, Magnus Damm wrote:
+>> > +obj-y                          += $(clk-y$(CONFIG_COMMON_CLK))
 >>
->> I synced the linux-next from:
->> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
->> and use the tag v3.10-rc7, but in the lm90.c it doesn't have DT support,
->> such as "onnn,nct1008".
->> I googled it and found there has patch:
->> [PATCH] hwmon: (lm90) Add device tree support , which is in:
->> http://lists.lm-sensors.org/pipermail/lm-sensors/2013-February/038099.html
->> , but it didn't be merged into the linux-next.
-> 
-> It was not, because of the next reply in the same thread:
-> http://lists.lm-sensors.org/pipermail/lm-sensors/2013-February/038100.html
-> 
->> which git repository and branch should I use ?
-> 
-> It is supposed to just work. What doesn't work for you exactly?
-> 
+>> It took me a bit to understand the Makefile trick you are using here.
+>> I assume other readers will have the same problem. How about just
+>> doing
+>>
+>> +ifndef CONFIG_COMMON_CLK
+>>  obj-$(CONFIG_ARCH_SH7372)      += setup-sh7372.o intc-sh7372.o
+>>  obj-$(CONFIG_ARCH_SH73A0)      += setup-sh73a0.o intc-sh73a0.o
+>>  obj-$(CONFIG_ARCH_R8A73A4)     += setup-r8a73a4.o
+>>  obj-$(CONFIG_ARCH_R8A7740)     += setup-r8a7740.o intc-r8a7740.o
+>>  obj-$(CONFIG_ARCH_R8A7778)     += setup-r8a7778.o
+>>  obj-$(CONFIG_ARCH_R8A7779)     += setup-r8a7779.o intc-r8a7779.o
+>>  obj-$(CONFIG_ARCH_R8A7790)     += setup-r8a7790.o
+>>  obj-$(CONFIG_ARCH_EMEV2)       += setup-emev2.o
+>> +endif
+>
+> I was about to mention the same, so I think that would be a good idea.
 
-Oh, yes, the "onnn,nct1008" can work. I read the i2c driver and the
-of_i2c.c carefully, I understand why the lm90 can be loaded by setting
-"onnn,nct1008". Indeed, we can set the vendor string to anything, even
-"xxx,nct1008", the lm90 also can be loaded correctly.
+Sure, that may be a more common way to handle this. =)
 
-Anyway, I will use the "onnn,nct1008" in my next version.
+To be clear, I assume you wanted that ifndef to cover the clock-xxx.c
+files instead of setup-xxx.c. So I will do that in next version.
 
-Thanks for your comments.
-Wei.
+Thanks for your comments!
+
+Cheers,
+
+/ magnus
