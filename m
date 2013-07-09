@@ -1,28 +1,27 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 9 Jul 2013 12:38:44 +0200
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803F39B98@039-SN2MPN1-022.039d.mgd.msft.net>
-References: <51A5A808.2070803@digi.com> <201307082256.38642.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803F39B98@039-SN2MPN1-022.039d.mgd.msft.net>
-Message-ID: <201307091238.45019.marex@denx.de>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 09 Jul 2013 19:39:44 +0900
+Subject: [PATCH 00/04] ARM: shmobile: Random header and makefile cleanups
+Message-ID: <20130709103944.1891.67462.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-[...]
+ARM: shmobile: Random header and makefile cleanups
 
-> 
-> It needs to check your hardware, it is probably there is a high capacitance
-> at vbus pin. Besides, the vbus should be lower than 0.8v if it is
-> disconnected from pc.
+[PATCH 01/04] ARM: shmobile: No need to use INTC header on r8a7779
+[PATCH 02/04] ARM: shmobile: Use pm-rmobile on sh7372 and r8a7740 only
+[PATCH 03/04] ARM: shmobile: No need to use INTC demux on r8a7740
+[PATCH 04/04] ARM: shmobile: Remove unused mach/dma.h
 
-I just wonder why I can no longer use device mode only after I plug in the 
-adaptor for host device. Before that, I can plug in the device mode cable from 
-PC all I want and this works. Then I plug in the host adaptor, that works as 
-well , but if I plug in the device cable, this works no longer.
+Remove pointless header files and unnecessary use of header files,
+and only link in bits that are actually needed.
 
-I rather suspect it might be something going on in the driver that's not right. 
-I will check the hardware too, thanks.
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-Best regards,
-Marek Vasut
+ Built on top of renesas-next-20130704v2
+
+ arch/arm/mach-shmobile/Makefile           |    8 +++-----
+ arch/arm/mach-shmobile/include/mach/dma.h |    1 -
+ arch/arm/mach-shmobile/intc-r8a7779.c     |    1 -
+ arch/arm/mach-shmobile/setup-r8a7779.c    |    1 -
+ 4 files changed, 3 insertions(+), 8 deletions(-)
