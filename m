@@ -1,69 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 9 Jul 2013 16:29:54 +0100
-Subject: [RFC PATCH V2 1/8] regulator: Introduce OMAP regulator to
- control PMIC over VC/VP
-In-Reply-To: <51DAF55C.5040502@ti.com>
-References: <1371849949-12649-1-git-send-email-nm@ti.com>
- <1371849949-12649-2-git-send-email-nm@ti.com>
- <20130704154105.GD27646@sirena.org.uk>
- <20130705135507.GA17439@kahuna>
- <20130705140828.GA27646@sirena.org.uk> <51D6DD3A.1030002@ti.com>
- <20130705165235.GC27646@sirena.org.uk> <51D70356.30707@ti.com>
- <20130705174727.GF27646@sirena.org.uk> <51DAF55C.5040502@ti.com>
-Message-ID: <20130709152954.GF27646@sirena.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 9 Jul 2013 17:36:06 +0200
+Subject: v3.10 - big endian core support
+In-Reply-To: <20130708170352.GA24361@mudshark.cambridge.arm.com>
+References: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
+ <51DA5089.5080109@gmail.com>
+ <20130708084911.GA22057@mudshark.cambridge.arm.com>
+ <51DA8BBF.7080104@gmail.com>
+ <20130708110202.GD22057@mudshark.cambridge.arm.com>
+ <20130708170352.GA24361@mudshark.cambridge.arm.com>
+Message-ID: <20130709173606.488fe85b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 08, 2013 at 12:22:36PM -0500, Nishanth Menon wrote:
+Dear Will Deacon,
 
-> case #1 - TPS62361 has a single SMPS and a single generic i2c bus,
-> one can talk on. In this case, you'd associate the regulator device
-> in one place - i2cX or on custom SoC hardware interface.
+On Mon, 8 Jul 2013 18:03:53 +0100, Will Deacon wrote:
+> On Mon, Jul 08, 2013 at 12:02:02PM +0100, Will Deacon wrote:
+> > On Mon, Jul 08, 2013 at 10:51:59AM +0100, jgq516 at gmail.com wrote:
+> > > The printascii can output before "b __enable_mmu", after move it to
+> > > __mmap_switched, nothing can be printed. But if disable LPAE, printascii
+> > > works again in __mmap_switched.
+> > 
+> > Ok, so the page tables are broken. The code is there to swap the two words,
+> > but perhaps something ends up being off-by-4 or the like. I'll try and take
+> > a look.
+> 
+> Right, I managed to have a quick play with a 3.10 kernel and the good news
+> is that the page tables are fine. The bad part is that using
+> CONFIG_ARM_ATAG_DTB_COMPAT to get my command-line from ATAGs into the FDT
+> results in a NULL command line, so I don't see any output. If I hardcode the
+> command line in the kernel image, things work fine.
 
-> When used with custom SoC hardware interface, generic tps62361
-> regulator which talks regular i2c wont even probe for omap_pmic to
-> get the regulator data from tps62361 regulator driver. Even if we
-> were to define the generic TPS62361 in dts nodes, it will fail probe
-> as it cant access any of it's registers using generic i2c.
+Ben Dooks has a separate branch on top of this base branch for
+big-endian support, that adds atags compat code to convert the ATAGs
+data from LE to BE. See the baserock/311/be/atags branch in
+git://git.baserock.org/delta/linux. Or
+http://git.baserock.org/cgi-bin/cgit.cgi/delta/linux.git/log/?h=baserock/311/be/atags.
 
-This seems like something we should be able to cope with by for example
-adding a bus for the custom PMIC interface or otherwise finding a way to
-get to the data at runtime based on the compatible string.  This would
-need some custom code in the regulators but would have the advantage of
-keeping the data the same at least.  Hrm.
-
-> >Another option is for the drivers to provide the data and use the
-> >helpers for their linear ranges as part of a more complex
-> >implementation.
-
-> Having looked at a few regulator driver implementations, there seems
-> to be the following combinations:
-> a) drivers which have n ranges of linear voltages for incremental selector
-> b) drivers with 1 range of linear voltages only for all ranges of selectors
-> c) drivers with 1 range of linear voltages and nonlinear voltage
-> values for other vsels.
-
-Everything else is just a special case of option a - either there's just
-a single range or there's a bunch of ranges each with a single value.  I
-suspect that ranges will be the most useful thing for any hardware which
-can practically be used by these regulators anyway.
-
-> >OK, that's a bit more fun but I think the kernel wants that information
-> >in general anyway since a software cpufreq driver or something might
-> >want to make the same latency decisions.  This is what set_voltage_time()
-> >is for in part.  But to a first approximation is there really much
-> >variation in the numbers?
-
-> between PMICs? yep, twl4030 does 4mV/uSec, 6030 can do 6mV/uSec,
-> TPS62361 can do 32mV/uSec, TWL6035/37 does 0.220mV/uSec
-
-Those are ramp rates, they're not I2C I/O limits.  Ramp rates we already
-know about.  I think what you're saying here is that this latency value
-is actually about worst case ramp times?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/3dbf5b82/attachment.sig>
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
