@@ -1,27 +1,21 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 9 Jul 2013 11:46:03 +0200
-Subject: [PATCH v2 2/5] ARM: AT91: DTS: sam9x5: add SSC DMA parameters
-In-Reply-To: <20130709093254.GP27646@sirena.org.uk>
-References: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
- <1373290193-25300-3-git-send-email-richard.genoud@gmail.com>
- <20130708150756.GL27646@sirena.org.uk>
- <CACQ1gAgnRBr6Eu7sgbzNF2kmm18-zn_dGKZN45RaxXGd1kwL-Q@mail.gmail.com>
- <20130709093254.GP27646@sirena.org.uk>
-Message-ID: <CACQ1gAhNAnyfaDSCxqAv11KZA2bGTdcfgcBjprAu3Ecw1y02mg@mail.gmail.com>
+From: jgq516@gmail.com (jgq516 at gmail.com)
+Date: Tue, 09 Jul 2013 17:53:11 +0800
+Subject: v3.10 - big endian core support
+In-Reply-To: <51DA9E08.2030707@codethink.co.uk>
+References: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
+ <51DA5089.5080109@gmail.com> <51DA8D36.7010006@codethink.co.uk>
+ <51DA8E6F.60507@gmail.com> <51DA9E08.2030707@codethink.co.uk>
+Message-ID: <51DBDD87.6030902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/7/9 Mark Brown <broonie@kernel.org>:
-> On Tue, Jul 09, 2013 at 10:27:53AM +0200, Richard Genoud wrote:
->
->> The dma binding is documented here
->> Documentation/devicetree/bindings/dma/atmel-dma.txt
->> But you're right, I shoud update
->> Documentation/devicetree/bindings/misc/atmel-ssc.txt.
->
-> No, you need to write a binding for this machine driver - the DMA and
-> SSC need to be documented as well but so too does the audio driver that
-> pulls them together with the CODEC.
-Ok, I understand !
 
-Richard.
+> My notes show I did a custom 3.5 backport for a customer's kernel
+> so was not testing with the latest. I think I tried 3.9 with LPAE
+> but cannot find confirmation in my notes that this actually happened.
+>
+>
+Thanks for your feedback, it give me more confidence to make it work with
+3.4 kernel, actually it works now :)
+
+Xiao
