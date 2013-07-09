@@ -1,39 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue,  9 Jul 2013 01:37:34 -0700
-Subject: [PATCH] ARM: omap2: add select of TI_PRIV_EDMA
-Message-ID: <1373359054-5007-1-git-send-email-olof@lixom.net>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 09 Jul 2013 10:50:26 +0200
+Subject: [PATCH V6 0/4] Generic PHY driver for the Exynos SoC DP PHY
+In-Reply-To: <003d01ce7c7a$d04043d0$70c0cb70$@samsung.com>
+References: <003d01ce7c7a$d04043d0$70c0cb70$@samsung.com>
+Message-ID: <51DBCED2.7010102@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"ARM: OMAP: build mach-omap code only if needed" moved around the
-ARCH_OMAP2PLUS stanza, but accidentally dropped the seleciton of
-TI_PRIV_EDMA in the process. Add it back.
+On 07/09/2013 10:03 AM, Jingoo Han wrote:
+> This patch series adds a simple driver for the Samsung Exynos SoC
+> series DP transmitter PHY, using the generic PHY framework [1].
+> Previously the DP PHY used an internal DT node to control the PHY
+> power enable bit.
+> 
+> These patches was tested on Exynos5250.
+> 
+> This PATCH v6 follows:
+>  * PATCH v5, sent on July, 8th 2013
+>  * PATCH v4, sent on July, 2nd 2013
+>  * PATCH v3, sent on July, 1st 2013
+>  * PATCH v2, sent on June, 28th 2013
+>  * PATCH v1, sent on June, 28th 2013
+> 
+> Changes between v5 and v6:
+>   * Re-based on git://gitorious.org/linuxphy/linuxphy.git
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Olof Johansson <olof@lixom.net>
+I'm not sure if we really need to keep the documentation of the
+original binding. Anyway, for the whole series, please feel free
+to ad my
 
----
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-I noticed the original patch was a bit down in the fixes branch, so
-instead of rebasing I checked this in on top.
-
--Olof
-
- arch/arm/mach-omap2/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 5c14051..58152b1 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -99,6 +99,7 @@ config ARCH_OMAP2PLUS
- 	select PROC_DEVICETREE if PROC_FS
- 	select SOC_BUS
- 	select SPARSE_IRQ
-+	select TI_PRIV_EDMA
- 	select USE_OF
- 	help
- 	  Systems based on OMAP2, OMAP3, OMAP4 or OMAP5
--- 
-1.8.1.192.gc4361b8
+--
+Thanks,
+Sylwester
