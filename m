@@ -1,73 +1,74 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 09 Jul 2013 14:43:50 +0900
-Subject: [PATCH 02/04] ARM: shmobile: Introduce ARCH_SHMOBILE_MULTI
+Date: Tue, 09 Jul 2013 14:43:59 +0900
+Subject: [PATCH 03/04] ARM: shmobile: Add EMEV2 and KZM9D to
+ ARCH_SHMOBILE_MULTI
 In-Reply-To: <20130709054331.14007.66068.sendpatchset@w520>
 References: <20130709054331.14007.66068.sendpatchset@w520>
-Message-ID: <20130709054350.14007.24354.sendpatchset@w520>
+Message-ID: <20130709054359.14007.23619.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add ARCH_SHMOBILE_MULTI to mach-shmobile that can be used
-to enable ARCH_MULTIPLATFORM on selected SoCs and boards.
+Enable build of EMEV2 and KZM9D DT Reference in
+case of ARCH_MULTIPLATFORM and ARCH_SHMOBILE_MULTI.
 
-The headers stay under arch/arm/mach-shmobile/include/mach/
-for now, they can and will be migrated independently over time.
+A weak symbol covers the case when the clock-emev2.c
+file is not built when COMMON_CLK=y.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/Makefile               |    1 +
- arch/arm/mach-shmobile/Kconfig  |   21 +++++++++++++++++++++
- arch/arm/mach-shmobile/Makefile |    2 ++
- 3 files changed, 24 insertions(+)
+ arch/arm/boot/dts/Makefile           |    1 +
+ arch/arm/mach-shmobile/Kconfig       |   15 +++++++++++++++
+ arch/arm/mach-shmobile/setup-emev2.c |    5 +++++
+ 3 files changed, 21 insertions(+)
 
---- 0001/arch/arm/Makefile
-+++ work/arch/arm/Makefile	2013-07-08 19:17:00.000000000 +0900
-@@ -181,6 +181,7 @@ machine-$(CONFIG_ARCH_EXYNOS)		+= exynos
- machine-$(CONFIG_ARCH_SA1100)		+= sa1100
- machine-$(CONFIG_ARCH_SHARK)		+= shark
- machine-$(CONFIG_ARCH_SHMOBILE) 	+= shmobile
-+machine-$(CONFIG_ARCH_SHMOBILE_MULTI) 	+= shmobile
- machine-$(CONFIG_ARCH_TEGRA)		+= tegra
- machine-$(CONFIG_ARCH_U300)		+= u300
- machine-$(CONFIG_ARCH_U8500)		+= ux500
---- 0002/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2013-07-08 19:19:21.000000000 +0900
-@@ -1,3 +1,24 @@
-+config ARCH_SHMOBILE_MULTI
-+	bool "SH-Mobile Series" if ARCH_MULTI_V7
-+	depends on MMU
-+	select CPU_V7
-+	select GENERIC_CLOCKEVENTS
-+	select HAVE_ARM_SCU if SMP
-+	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_SMP
-+	select ARM_GIC
-+	select MIGHT_HAVE_CACHE_L2X0
-+	select NO_IOPORT
-+	select PINCTRL
-+	select ARCH_REQUIRE_GPIOLIB
-+	select CLKDEV_LOOKUP
-+
-+if ARCH_SHMOBILE_MULTI
-+
-+comment "SH-Mobile System Type"
-+
-+endif
-+
- if ARCH_SHMOBILE
+--- 0002/arch/arm/boot/dts/Makefile
++++ work/arch/arm/boot/dts/Makefile	2013-07-09 13:10:52.000000000 +0900
+@@ -171,6 +171,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm
+ 	sh73a0-kzm9g-reference.dtb \
+ 	r8a73a4-ape6evm.dtb \
+ 	sh7372-mackerel.dtb
++dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d-reference.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5.dtb \
+ 	socfpga_vt.dtb
+ dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
+--- 0004/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2013-07-09 13:03:45.000000000 +0900
+@@ -17,6 +17,21 @@ if ARCH_SHMOBILE_MULTI
  
  comment "SH-Mobile System Type"
---- 0003/arch/arm/mach-shmobile/Makefile
-+++ work/arch/arm/mach-shmobile/Makefile	2013-07-08 19:18:20.000000000 +0900
-@@ -2,6 +2,8 @@
- # Makefile for the linux kernel.
- #
  
-+ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/arch/arm/mach-shmobile/include
++config ARCH_EMEV2
++	bool "Emma Mobile EV2"
 +
- # Common objects
- obj-y				:= timer.o console.o
++comment "SH-Mobile Board Type"
++
++config MACH_KZM9D_REFERENCE
++	bool "KZM9D board - Reference Device Tree Implementation"
++	depends on ARCH_EMEV2
++	select REGULATOR_FIXED_VOLTAGE if REGULATOR
++	---help---
++	   Use reference implementation of KZM9D board support
++	   which makes a greater use of device tree at the expense
++	   of not supporting a number of devices.
++
++	   This is intended to aid developers
+ endif
  
+ if ARCH_SHMOBILE
+--- 0001/arch/arm/mach-shmobile/setup-emev2.c
++++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-07-09 13:03:45.000000000 +0900
+@@ -190,6 +190,11 @@ void __init emev2_add_standard_devices(v
+ 	emev2_register_pmu();
+ }
+ 
++void __init __weak emev2_clock_init(void)
++{
++	/* in case legacy clocks are disabled then do nothing */
++}
++
+ void __init emev2_init_delay(void)
+ {
+ 	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
