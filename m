@@ -1,38 +1,48 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue,  9 Jul 2013 11:42:44 +0530
-Subject: [PATCH v2 3/3] of/documentation: Update G2D documentation
-Message-ID: <1373350364-2952-1-git-send-email-sachin.kamat@linaro.org>
+From: elen.song@atmel.com (Elen Song)
+Date: Tue, 9 Jul 2013 14:33:39 +0800
+Subject: [PATCH 0/7] serial: at91: make usart and uart support dma transfer
+Message-ID: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5250 G2D IP requires only the gate clock. Update the
-binding documentation accordingly.
+After at91sam9g45 socs, the usart only support dma transfer.
+This patch serial focus on:
+1) distinguish pdc and dma transfer
+2) support usart dma rx and tx transfer
+3) distinguish usart and uart
+4) support uart dma rx and tx transfer
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-Cc: Inki Dae <inki.dae@samsung.com>
----
-Updated the description of clock-names as suggested by Tomasz Figa.
----
- .../devicetree/bindings/gpu/samsung-g2d.txt        |    7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+For those only support PDC transfer socs, we use "atmel,use-pdc-rx", "atmel,use-pdc-tx" to establish a PDC transfer.
+So we switch the name from "use-dma" to "use-pdc" to state more clearly.
+For those only support DMA transfer socs, we use dma binding to establish a DMA transfer, detail see the last patch.
+We also distinguish usart and uart by read ip name, the dbgu is regard as a uart.
+Because uart lack timeout function, we use software timer to trigger rx.
 
-diff --git a/Documentation/devicetree/bindings/gpu/samsung-g2d.txt b/Documentation/devicetree/bindings/gpu/samsung-g2d.txt
-index 3f454ff..c4f358d 100644
---- a/Documentation/devicetree/bindings/gpu/samsung-g2d.txt
-+++ b/Documentation/devicetree/bindings/gpu/samsung-g2d.txt
-@@ -11,8 +11,11 @@ Required properties:
- 
-   - interrupts : G2D interrupt number to the CPU.
-   - clocks : from common clock binding: handle to G2D clocks.
--  - clock-names : from common clock binding: must contain "sclk_fimg2d" and
--		  "fimg2d", corresponding to entries in the clocks property.
-+  - clock-names : names of clocks listed in clocks property, in the same
-+		  order, depending on SoC type:
-+		  - for S5PV210 and Exynos4 based SoCs: "fimg2d" and
-+		    "sclk_fimg2d"
-+		  - for Exynos5250 SoC: "fimg2d".
- 
- Example:
- 	g2d at 12800000 {
+Elen Song (7):
+  serial: at91: correct definition from DMA to PDC
+  serial: at91: add tx dma support
+  serial: at91: add rx dma support
+  serial: at91: make DBGU support dma and pdc transfers
+  serial: at91: distinguish usart and uart
+  serial: at91: modify UART to use software timer to trigger rx
+  serial: at91: add dma support in usart binding descriptions
+
+ Documentation/devicetree/bindings/serial/rs485.txt |    4 +-
+ .../devicetree/bindings/tty/serial/atmel-usart.txt |   29 +-
+ arch/arm/boot/dts/at91rm9200.dtsi                  |   16 +-
+ arch/arm/boot/dts/at91sam9260.dtsi                 |   24 +-
+ arch/arm/boot/dts/at91sam9263.dtsi                 |   12 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |   16 +-
+ arch/arm/mach-at91/at91rm9200_devices.c            |   20 +-
+ arch/arm/mach-at91/at91sam9260_devices.c           |   28 +-
+ arch/arm/mach-at91/at91sam9261_devices.c           |   16 +-
+ arch/arm/mach-at91/at91sam9263_devices.c           |   16 +-
+ arch/arm/mach-at91/at91sam9g45_devices.c           |   20 +-
+ arch/arm/mach-at91/at91sam9rl_devices.c            |   20 +-
+ drivers/tty/serial/atmel_serial.c                  |  582 ++++++++++++++++++--
+ include/linux/atmel_serial.h                       |    2 +
+ include/linux/platform_data/atmel.h                |    2 +
+ 15 files changed, 665 insertions(+), 142 deletions(-)
+
 -- 
 1.7.9.5
