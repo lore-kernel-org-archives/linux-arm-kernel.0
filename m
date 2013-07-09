@@ -1,62 +1,37 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 9 Jul 2013 12:57:52 +0530
-Subject: [PATCH 7/8] ARM: DRA7: board-generic: Add basic DT support
+Date: Tue, 9 Jul 2013 12:57:53 +0530
+Subject: [PATCH 8/8] ARM: DRA7: Kconfig: Increase the default gpio count
 In-Reply-To: <1373354873-12359-1-git-send-email-rnayak@ti.com>
 References: <1373354873-12359-1-git-send-email-rnayak@ti.com>
-Message-ID: <1373354873-12359-8-git-send-email-rnayak@ti.com>
+Message-ID: <1373354873-12359-9-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: R Sricharan <r.sricharan@ti.com>
 
-Describe minimal DT boot machine details for DRA7xx based SoC's. DRA7xx
-family is based on dual core ARM CORTEX A15 using GIC as the interrupt controller.
-The PRCM and timer infrastructure is reused from OMAP5 and so are the io
-descriptor tables.
+DRA7xx has 8 GPIO banks so that there are 32x8 = 256 GPIOs.
+In order for the gpiolib to detect and initialize these
+additional GPIOs and other TWL GPIOs, ARCH_NR_GPIO is set
+to 512 instead of present 256.
 
 Signed-off-by: R Sricharan <r.sricharan@ti.com>
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- .../devicetree/bindings/arm/omap/omap.txt          |    3 +++
- arch/arm/mach-omap2/board-generic.c                |   18 ++++++++++++++++++
- 2 files changed, 21 insertions(+)
+ arch/arm/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-index 6d498c7..91b7049 100644
---- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-@@ -59,3 +59,6 @@ Boards:
- 
- - AM43x EPOS EVM
-   compatible = "ti,am43x-epos-evm", "ti,am4372", "ti,am43"
-+
-+- DRA7 EVM:  Software Developement Board for DRA7XX
-+  compatible = "ti,dra7-evm", "ti,dra7"
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index e5fbfed..92f8dd3 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -201,3 +201,21 @@ DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
- 	.dt_compat	= am43_boards_compat,
- MACHINE_END
- #endif
-+
-+#ifdef CONFIG_SOC_DRA7XX
-+static const char *dra7xx_boards_compat[] __initdata = {
-+	"ti,dra7",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
-+	.reserve	= omap_reserve,
-+	.smp		= smp_ops(omap4_smp_ops),
-+	.map_io		= omap5_map_io,
-+	.init_early	= dra7xx_init_early,
-+	.init_irq	= omap_gic_of_init,
-+	.init_machine	= omap_generic_init,
-+	.init_time	= omap5_realtime_timer_init,
-+	.dt_compat	= dra7xx_boards_compat,
-+MACHINE_END
-+#endif
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5ef7af0..9faed52 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1599,7 +1599,7 @@ config LOCAL_TIMERS
+ config ARCH_NR_GPIO
+ 	int
+ 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+-	default 512 if SOC_OMAP5
++	default 512 if SOC_OMAP5 || SOC_DRA7XX
+ 	default 512 if ARCH_KEYSTONE
+ 	default 392 if ARCH_U8500
+ 	default 352 if ARCH_VT8500
 -- 
 1.7.9.5
