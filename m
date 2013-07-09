@@ -1,42 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 9 Jul 2013 16:01:32 +0200
-Subject: [PATCHv4 05/11] of: pci: add registry of MSI chips
-In-Reply-To: <CAL_Jsq+h=y5SNo4qO5-5u_w8rW++9MKDZK8rASNjhtVcjh-iyQ@mail.gmail.com>
-References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1372686136-1370-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAL_Jsq+h=y5SNo4qO5-5u_w8rW++9MKDZK8rASNjhtVcjh-iyQ@mail.gmail.com>
-Message-ID: <20130709160132.7f5e7a8e@skate>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 09 Jul 2013 16:04:08 +0200
+Subject: [PATCHv3 1/3] iio: Add Nuvoton NAU7802 ADC driver
+In-Reply-To: <51D7F044.9040205@kernel.org>
+References: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1372094699-3832-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <51D53B72.6020309@metafoo.de> <51D7F044.9040205@kernel.org>
+Message-ID: <51DC1858.8010008@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+Hi Jonathan,
 
-On Tue, 9 Jul 2013 08:43:36 -0500, Rob Herring wrote:
+I don't actually see it in iio.git on kernel.org, am I doing something
+wrong ?
 
-> > +int of_msi_chip_add(struct msi_chip *chip)
-> 
-> Perhaps of_pci_msi_chip_add instead.
+On 06/07/2013 12:24, Jonathan Cameron wrote:
+> On 07/04/2013 10:08 AM, Lars-Peter Clausen wrote:
+>> On 06/24/2013 07:24 PM, Alexandre Belloni wrote:
+>>> The Nuvoton NAU7802 ADC is a 24-bit 2-channels I2C ADC, with adjustable
+>>> gain and sampling rates.
+>>>
+>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> Reviewed-by: Lars-Peter Clausen <lars@metafoo.de>
+>>
+> Applied to the togreg branch of iio.git (with a few little tweaks).
+>
+> There was some fuzz that required manual fixing because of another driver merge so
+> please check I didn't foul anything up with this or the other bits below.
+>
+> There were two trivial missing unlocks on error paths in the read_raw function that
+> I've fixed up (Coccinelle found these for me - if you can I would always advise
+> running sparse, coccicheck and ideally smatch before submitting patches).
+>
+> I fixed up the comments because if there is one thing I hate bothering
+> with it is delightful patches that just fix this stuff. Much better
+> to do it now given it took 20 secs ;)
+>
+>> One remark though. Multiline comments should be like
+>>
+>> /*
+>>  * foo
+>>  * bar
+>>  */
+>>
+>> not
+>>
+>> /* foo
+>>  * bar
+>>  */
+>>
+>> But not need to resend the patch just for this
+>>
+>> - Lars
+>>
 
-Sure, makes sense.
 
-> > +{
-> > +       struct msi_chip *c;
-> > +       list_for_each_entry(c, &msi_chip_list, list) {
-> 
-> Need the safe variant here?
-
-As suggested by Bjorn, I've changed this function to grab the
-msi_chip_mutex while traversing the list.
-
-Does your e-mail implies that the general approach seems ok? If so,
-I'll resend an updated v5 version taking into account the comments
-that I have received on this v4.
-
-Thanks!
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
