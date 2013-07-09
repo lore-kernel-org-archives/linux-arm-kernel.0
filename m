@@ -1,44 +1,32 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 9 Jul 2013 15:39:18 +0200
-Subject: [V3 0/7] Enhance mmp display driver
-In-Reply-To: <1372332473-6584-1-git-send-email-jtzhou@marvell.com>
-References: <1372332473-6584-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <20130709133918.GC18477@ns203013.ovh.net>
+Date: Tue, 9 Jul 2013 15:41:49 +0200
+Subject: [PATCH v6] video: imxfb: Add DT support
+In-Reply-To: <CAOMZO5A-1gacTOSrpZ4HKfwq13mug+uNCS3m4gyFp1WT21_JeQ@mail.gmail.com>
+References: <1369564538-21835-1-git-send-email-mpa@pengutronix.de>
+ <20130528110927.GA23653@game.jcrosoft.org>
+ <CAOMZO5A-1gacTOSrpZ4HKfwq13mug+uNCS3m4gyFp1WT21_JeQ@mail.gmail.com>
+Message-ID: <20130709134149.GE18477@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
-
-	please rebase on the for-next branch as it does not apply
+On 09:09 Fri 05 Jul     , Fabio Estevam wrote:
+> Hi Jean-Christophe,
+> 
+> On Tue, May 28, 2013 at 8:09 AM, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
+> > On 12:35 Sun 26 May     , Markus Pargmann wrote:
+> >> Add devicetree support for imx framebuffer driver. It uses the generic
+> >> display bindings and helper functions.
+> >>
+> >> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> >> Cc: Fabio Estevam <festevam@gmail.com>
+> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> >
+> > Applied thanks
+> 
+> Still don't see this patch in linux-next. Could you please check?
+in the pull to Linus
 
 Best Regards,
 J.
-On 19:27 Thu 27 Jun     , Jett.Zhou wrote:
-> Changelog:
-> 1 Add more comments for the mmp_display rbswap usage 
-> according to Daniel's comments;
-> 2 Add fix patch for ttc_dkb on rbswap;
-> 3 Add more comments on the pitch usage and definition;
-> 4 Combine the modification on pitch of graphic and video layer
-> in one patch.
-> 
-> Guoqing Li (2):
->   video: mmp: rb swap setting update for mmp display
->   video: mmp: optimize some register setting code
-> 
-> Jett.Zhou (1):
->   ARM: mmp: remove the legacy rbswap setting for ttc_dkb platform
-> 
-> Jing Xiang (4):
->   video: mmp: fix graphics/video layer enable/mask issue
->   video: mmp: fix memcpy wrong size for mmp_addr issue
->   video: mmp: calculate pitch value when fb set win
->   video: mmp: add pitch info in mmp_win structure
-> 
->  arch/arm/mach-mmp/ttc_dkb.c     |    4 +-
->  drivers/video/mmp/fb/mmpfb.c    |   34 +++++++++++------
->  drivers/video/mmp/hw/mmp_ctrl.c |   79 ++++++++++++++++++++++-----------------
->  drivers/video/mmp/hw/mmp_ctrl.h |    5 ++
->  include/video/mmp_disp.h        |    6 +++
->  5 files changed, 79 insertions(+), 49 deletions(-)
-> 
