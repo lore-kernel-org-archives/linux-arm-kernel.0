@@ -1,43 +1,28 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 9 Jul 2013 11:57:04 +0200
-Subject: [PATCH 2/7] serial: at91: add tx dma support
-In-Reply-To: <1373351626-30143-3-git-send-email-elen.song@atmel.com>
-References: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
- <1373351626-30143-3-git-send-email-elen.song@atmel.com>
-Message-ID: <20130709095704.GE4013@ludovic.desroches@atmel.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 09 Jul 2013 10:59:33 +0100
+Subject: v3.10 - big endian core support
+In-Reply-To: <51DBDD87.6030902@gmail.com>
+References: <1372676648-9254-1-git-send-email-ben.dooks@codethink.co.uk>
+ <51DA5089.5080109@gmail.com> <51DA8D36.7010006@codethink.co.uk>
+ <51DA8E6F.60507@gmail.com> <51DA9E08.2030707@codethink.co.uk>
+ <51DBDD87.6030902@gmail.com>
+Message-ID: <51DBDF05.3060700@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 09, 2013 at 02:33:41PM +0800, Elen Song wrote:
+On 09/07/13 10:53, jgq516 at gmail.com wrote:
+>
+>> My notes show I did a custom 3.5 backport for a customer's kernel
+>> so was not testing with the latest. I think I tried 3.9 with LPAE
+>> but cannot find confirmation in my notes that this actually happened.
+>>
+>>
+> Thanks for your feedback, it give me more confidence to make it work with
+> 3.4 kernel, actually it works now :)
 
-[...]
-  
-> @@ -977,6 +1172,8 @@ static int atmel_startup(struct uart_port *port)
->  		pdc->ofs = 0;
->  	}
->  
-> +	atmel_tx_request_dma(atmel_port);
-> +
->  	/*
->  	 * If there is a specific "open" function (to register
->  	 * control line interrupts)
+There where several fixes done pre v3.10 which sorted out some kernel
+bugs where endian-ness was assumed.
 
-Here we can have both use_pdc_tx and use_dma_tx set to true. To avoid this, we
-can do:
-
-if (atmel_use_pdc_tx(port)) {
-
-} else {
-	atmel_tx_request_dma(atmel_port);
-}
-
-or force use_pdc_tx to 0 in atmel_tx_request_dma function when we set
-use_dma_tx to 1.
-
-I prefer the second one since using dma has a higher priority than using pdc
-contrary to the first one.
-
-
-Regards
-
-Ludovic
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
