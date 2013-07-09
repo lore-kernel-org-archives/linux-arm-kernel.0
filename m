@@ -1,56 +1,57 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue,  9 Jul 2013 14:28:44 +0200
-Subject: [PATCH v3 2/7] Documentation: DT: add sam9x5ek-wm8731 machine driver
+Date: Tue,  9 Jul 2013 14:28:45 +0200
+Subject: [PATCH v3 3/7] Documentation: DT: update atmel SSC with DMA binding
 In-Reply-To: <1373372929-17800-1-git-send-email-richard.genoud@gmail.com>
 References: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
  <1373372929-17800-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1373372929-17800-3-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1373372929-17800-4-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add the sound DT binding for sam9x5ek-wm8731 machine driver
+As atmel-ssc can be used with DMA, the documentation should be updated.
+Also, a configuration DMA example is given.
 
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 ---
- .../bindings/sound/atmel-sam9x5-wm8731-audio.txt   |   30 ++++++++++++++++++++
- 1 file changed, 30 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt
+ .../devicetree/bindings/misc/atmel-ssc.txt         |   24 ++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt b/Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt
-new file mode 100644
-index 0000000..fd03dfd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt
-@@ -0,0 +1,30 @@
-+* Atmel at91sam9x5ek wm8731 audio complex
+diff --git a/Documentation/devicetree/bindings/misc/atmel-ssc.txt b/Documentation/devicetree/bindings/misc/atmel-ssc.txt
+index 38e51ad..96958ca 100644
+--- a/Documentation/devicetree/bindings/misc/atmel-ssc.txt
++++ b/Documentation/devicetree/bindings/misc/atmel-ssc.txt
+@@ -6,10 +6,30 @@ Required properties:
+ 	- atmel,at91sam9g45-ssc: support dma transfer
+ - reg: Should contain SSC registers location and length
+ - interrupts: Should contain SSC interrupt
++For dma transfer:
++- dmas: DMA specifier, consisting of a phandle to DMA controller node,
++  the memory interface and SSC DMA channel ID (for tx and rx).
++  See Documentation/devicetree/bindings/dma/atmel-dma.txt for details.
++- dma-names: Must be "tx", "rx".
+ 
+-Example:
 +
-+Required properties:
-+  - compatible: "atmel,at91sam9x5ek-wm8731-audio"
-+  - atmel,model: The user-visible name of this sound complex.
-+  - atmel,audio-routing: A list of the connections between audio components.
-+  - atmel,ssc-controller: The phandle of the SSC controller
-+  - atmel,audio-codec: The phandle of the WM8731 audio codec
-+  - atmel,format: DAI format. Must be "i2s"
-+  - atmel,bitclock-master:  DAI clock master
-+  - atmel,frame-master: DAI frame master
++Examples:
+ ssc0: ssc at fffbc000 {
+ 	compatible = "atmel,at91rm9200-ssc";
+ 	reg = <0xfffbc000 0x4000>;
+-	interrupts = <14 4 5>;
++	interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
+ };
 +
-+Example:
-+sound {
-+	compatible = "atmel,sam9x5-wm8731-audio";
 +
-+	atmel,model = "wm8731 @ AT91SAM9X5EK";
-+
-+	atmel,audio-routing =
-+		"Headphone Jack", "RHPOUT",
-+		"Headphone Jack", "LHPOUT",
-+		"LLINEIN", "Line In Jack",
-+		"RLINEIN", "Line In Jack";
-+
-+	atmel,ssc-controller = <&ssc0>;
-+	atmel,audio-codec = <&wm8731>;
-+	atmel,format = "i2s";
-+	atmel,bitclock-master;
-+	atmel,frame-master;
++ssc0: ssc at f0010000 {
++      compatible = "atmel,at91sam9g45-ssc";
++      reg = <0xf0010000 0x4000>;
++      interrupts = <28 IRQ_TYPE_LEVEL_HIGH 5>;
++      dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(13)>,
++	     <&dma0 1 AT91_DMA_CFG_PER_ID(14)>;
++      dma-names = "tx", "rx";
++      pinctrl-names = "default";
++      pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
++      status = "disabled";
 +};
++
 -- 
 1.7.10.4
