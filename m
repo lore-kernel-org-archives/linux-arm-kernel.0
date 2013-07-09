@@ -1,65 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 9 Jul 2013 15:59:17 +0100
-Subject: [PATCH v4 1/7] sound: sam9x5_wm8731: machine driver for
- at91sam9x5 wm8731 boards
-In-Reply-To: <1373379933-32749-2-git-send-email-richard.genoud@gmail.com>
-References: <1373372929-17800-1-git-send-email-richard.genoud@gmail.com>
- <1373379933-32749-1-git-send-email-richard.genoud@gmail.com>
- <1373379933-32749-2-git-send-email-richard.genoud@gmail.com>
-Message-ID: <20130709145917.GA27646@sirena.org.uk>
+From: sbabic@denx.de (Stefano Babic)
+Date: Tue, 09 Jul 2013 16:59:57 +0200
+Subject: [PATCH] ARM: dts: imx: add tempmon node for imx6q thermal support
+In-Reply-To: <1370330226-6030-1-git-send-email-shawn.guo@linaro.org>
+References: <1370330008-5982-1-git-send-email-shawn.guo@linaro.org>
+ <1370330226-6030-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <51DC256D.6040204@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 09, 2013 at 04:25:27PM +0200, Richard Genoud wrote:
+Hi Shawn,
 
-> +/*
-> + * Authorized rates are:
-> + * Rate = MCLK_RATE / (n * 2)
-> + * Where n is in [1..4095]
-> + * (cf register SSC_CMR)
-> + */
-> +static unsigned int rates[] = {
-> +	8000,
-> +	16000,
-> +	32000,
-> +	48000,
-> +	64000,
-> +	96000,
-> +};
+On 04/06/2013 09:17, Shawn Guo wrote:
+> Mark ocotp as a syscon node and add tempmon for imx6q thermal support.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx6qdl.dtsi |   11 +++++++++--
+>  1 file changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index 9e8296e..13e1d7f 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -489,6 +489,13 @@
+>  				};
+>  			};
+>  
+> +			tempmon: tempmon {
+> +				compatible = "fsl,imx6q-tempmon";
+> +				interrupts = <0 49 0x04>;
+> +				fsl,tempmon = <&anatop>;
+> +				fsl,tempmon-data = <&ocotp>;
+> +			};
+> +
+>  			usbphy1: usbphy at 020c9000 {
+>  				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+>  				reg = <0x020c9000 0x1000>;
+> @@ -747,8 +754,8 @@
+>  				interrupts = <0 14 0x04>;
+>  			};
+>  
+> -			ocotp at 021bc000 {
+> -				compatible = "fsl,imx6q-ocotp";
+> +			ocotp: ocotp at 021bc000 {
+> +				compatible = "fsl,imx6q-ocotp", "syscon";
+>  				reg = <0x021bc000 0x4000>;
 
-Shouldn't the SSC driver be enforcing this constraint if it comes from
-the SSC hardware?  If the clock is reprogrammable the usual convention
-for drivers is to not constrain if the clock is set to zero so a machine
-driver could remove the constraint.
+Sorry to check this very late - is ocotp at 021bc000 the right address for
+the thermal data ? According to User Manual (Table 62.3), the start
+address is 0x20C8180. Using your patch, by loading the driver I get :
 
-> +	ret = atmel_ssc_set_audio(0);
-> +	if (ret != 0) {
-> +		dev_err(&pdev->dev,
-> +			"ASoC: Failed to set SSC 0 for audio: %d\n", ret);
-> +		return ret;
-> +	}
+imx_thermal tempmon.7: invalid sensor calibration data
+imx_thermal tempmon.7: failed to get sensor data
+imx_thermal: probe of tempmon.7 failed with error -22
 
-Shouldn't this be a parameter in the DT too?
+The driver is loaded successfully if I changed the tempdata to point to
+020C8180. Not sure if I get the right values from temp1_crit and
+temp1_input, but no error at the initialisation. Am I missing something ?
 
-> +	cpu_np = of_parse_phandle(np, "atmel,ssc-controller", 0);
-> +	if (!cpu_np) {
-> +		dev_err(&pdev->dev, "ssc controller node missing\n");
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
-> +	at91sam9x5ek_dai.cpu_of_node = cpu_np;
-> +	at91sam9x5ek_dai.platform_of_node = cpu_np;
+Best regards,
+Stefano
 
-After all we're looking things up in the DT...
-
-> +	at91sam9x5ek_dai.dai_fmt = snd_soc_of_parse_daifmt(np, "atmel,");
-
-Is this really something that machines would want to reconfigure?  If so
-why?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/8c5f9fd6/attachment.sig>
+-- 
+=====================================================================
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-53 Fax: +49-8142-66989-80 Email: sbabic at denx.de
+=====================================================================
