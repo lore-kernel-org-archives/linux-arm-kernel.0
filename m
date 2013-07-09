@@ -1,31 +1,56 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 9 Jul 2013 18:14:34 +0200
-Subject: [PATCH V3 2/3] clocksource: mmp: support CLOCKSOURCE OF DECLARE
-In-Reply-To: <1373352166-10064-3-git-send-email-zhangwm@marvell.com>
-References: <1373352166-10064-1-git-send-email-zhangwm@marvell.com>
- <1373352166-10064-3-git-send-email-zhangwm@marvell.com>
-Message-ID: <20130709181434.76f6216d@skate>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 9 Jul 2013 17:29:56 +0100
+Subject: [PATCH 1/3] arm: hyp: fix macro parameterisation
+In-Reply-To: <1373379366-15689-2-git-send-email-mark.rutland@arm.com>
+References: <1373379366-15689-1-git-send-email-mark.rutland@arm.com>
+ <1373379366-15689-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <20130709162956.GB2911@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Neil Zhang,
-
-On Tue, 9 Jul 2013 14:42:45 +0800, Neil Zhang wrote:
-> support CLOCKSOURCE OF DECLARE for mmp timer.
+On Tue, Jul 09, 2013 at 03:16:04PM +0100, Mark Rutland wrote:
+> Currently, compare_cpu_mode_with_primary uses a mixture of macro
+> arguments and hardcoded registers, and does so incorrectly, as it
+> stores (__boot_cpu_mode_offset | BOOT_CPU_MODE_MISMATCH) to
+> (__boot_cpu_mode + &__boot_cpu_mode_offset), which could corrupt an
+> arbitrary portion of memory.
 > 
-> Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+> This patch fixes up compare_cpu_mode_with_primary to use the macro
+> arguments, correctly updating __boot_cpu_mode.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Dave Martin <dave.martin@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@cs.columbia.edu>
+
+May bad originally my the looks of it.  Thanks for spotting this.
+
+Acked-by: Dave Martin <Dave.Martin@arm.com>
+
 > ---
->  arch/arm/mach-mmp/mmp-dt.c  |    5 ++---
->  arch/arm/mach-mmp/mmp2-dt.c |    3 +--
->  arch/arm/mach-mmp/time.c    |   15 ++-------------
->  3 files changed, 5 insertions(+), 18 deletions(-)
-
-Maybe it would be good to take this opportunity to move
-arch/arm/mach-mmp/time.c into drivers/clocksource/.
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>  arch/arm/kernel/hyp-stub.S | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+> index 1315c4c..bda76ce 100644
+> --- a/arch/arm/kernel/hyp-stub.S
+> +++ b/arch/arm/kernel/hyp-stub.S
+> @@ -56,8 +56,8 @@ ENTRY(__boot_cpu_mode)
+>  	ldr	\reg3, [\reg2]
+>  	ldr	\reg1, [\reg2, \reg3]
+>  	cmp	\mode, \reg1		@ matches primary CPU boot mode?
+> -	orrne	r7, r7, #BOOT_CPU_MODE_MISMATCH
+> -	strne	r7, [r5, r6]		@ record what happened and give up
+> +	orrne	\reg1, \reg1, #BOOT_CPU_MODE_MISMATCH
+> +	strne	\reg1, [\reg2, \reg3]	@ record what happened and give up
+>  	.endm
+>  
+>  #else	/* ZIMAGE */
+> -- 
+> 1.8.1.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
