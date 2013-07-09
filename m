@@ -1,37 +1,26 @@
 From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Tue,  9 Jul 2013 08:26:33 +0100
-Subject: [PATCH v2 2/2] ARM: STi: Set correct ARM ERRATAs.
-In-Reply-To: <1373354752-26292-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1373354752-26292-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1373354793-26400-1-git-send-email-srinivas.kandagatla@st.com>
+Date: Tue,  9 Jul 2013 08:25:52 +0100
+Subject: [PATCH v2 0/2] ARM: STi Fixes
+Message-ID: <1373354752-26292-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-Some of the ARM_ERRATA selection is not done in the initial SOC support
-patches. This patch selects 2 new ARM_ERRATA's and removes one which was
-actually fixed.
+This patch series fixes 2 configuration issues related to serial
+setup on STiH416 and ARM ERRATA selection.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
----
- arch/arm/mach-sti/Kconfig |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Changes since v1:
+	- Split out fixes in seperate patch set.
 
-diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-index d04e3bf..c216094 100644
---- a/arch/arm/mach-sti/Kconfig
-+++ b/arch/arm/mach-sti/Kconfig
-@@ -11,8 +11,9 @@ menuconfig ARCH_STI
- 	select HAVE_SMP
- 	select HAVE_ARM_SCU if SMP
- 	select ARCH_REQUIRE_GPIOLIB
--	select ARM_ERRATA_720789
- 	select ARM_ERRATA_754322
-+	select ARM_ERRATA_775420
-+	select ARM_ERRATA_764369
- 	select PL310_ERRATA_753970 if CACHE_PL310
- 	select PL310_ERRATA_769419 if CACHE_PL310
- 	help
+Srinivas Kandagatla (2):
+  ARM: dts: STi: Fix pinconf setup for STiH416 serial2
+  ARM: STi: Set correct ARM ERRATAs.
+
+ arch/arm/boot/dts/stih416-pinctrl.dtsi |   10 +++++++++-
+ arch/arm/boot/dts/stih416.dtsi         |    2 +-
+ arch/arm/mach-sti/Kconfig              |    3 ++-
+ 3 files changed, 12 insertions(+), 3 deletions(-)
+
 -- 
 1.7.6.5
