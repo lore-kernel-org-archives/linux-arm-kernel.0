@@ -1,38 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Jul 2013 08:48:37 +0100
-Subject: [PATCH v2 2/3] iommu: add support for ARM Ltd. System MMU
- architecture
-In-Reply-To: <51DAEA0F.2030808@codeaurora.org>
-References: <1372095086-15681-1-git-send-email-will.deacon@arm.com>
- <1372095086-15681-3-git-send-email-will.deacon@arm.com>
- <51DAEA0F.2030808@codeaurora.org>
-Message-ID: <20130709074837.GB25885@mudshark.cambridge.arm.com>
+From: wni@nvidia.com (Wei Ni)
+Date: Tue, 9 Jul 2013 15:48:40 +0800
+Subject: [lm-sensors] [PATCH 1/2] ARM: dt: t30 cardhu: add dt entry for
+ lm90
+In-Reply-To: <20130709062112.GC17499@mithrandir>
+References: <1372928979-26938-1-git-send-email-wni@nvidia.com>
+ <1372928979-26938-2-git-send-email-wni@nvidia.com>
+ <51D70483.70203@wwwdotorg.org> <51DA6BD4.1040300@nvidia.com>
+ <20130708095024.041a6d57@endymion.delvare> <51DA8805.50709@nvidia.com>
+ <20130708131421.GB21638@roeck-us.net> <20130709062112.GC17499@mithrandir>
+Message-ID: <51DBC058.2040904@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 08, 2013 at 05:34:23PM +0100, Olav Haugan wrote:
-> On 6/24/2013 10:31 AM, Will Deacon wrote:
-> > This patch adds support for SMMUs implementing the ARM System MMU
-> > architecture versions 1 or 2. Both arm and arm64 are supported, although
-> > the v7s descriptor format is not used.
-> > 
-> > Cc: Rob Herring <robherring2@gmail.com>
-> > Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> > Cc: Olav Haugan <ohaugan@codeaurora.org>
-> > Cc: Joerg Roedel <joro@8bytes.org>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> > +/* Maximum number of stream IDs assigned to a single device */
-> > +#define MAX_MASTER_STREAMIDS		8
-> > +
+On 07/09/2013 02:21 PM, Thierry Reding wrote:
+> * PGP Signed by an unknown key
 > 
-> Hi Will,
+> On Mon, Jul 08, 2013 at 06:14:21AM -0700, Guenter Roeck wrote:
+>> On Mon, Jul 08, 2013 at 05:36:05PM +0800, Wei Ni wrote:
+>>> On 07/08/2013 03:50 PM, Jean Delvare wrote:
+>>>> On Mon, 8 Jul 2013 15:35:48 +0800, Wei Ni wrote:
+>>>>> On 07/06/2013 01:38 AM, Stephen Warren wrote:
+>>>>>> On 07/04/2013 03:09 AM, Wei Ni wrote:
+>>>>>>> Enable thermal sensor lm90 for t30 cardhu.
+>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+>>>>>>
+>>>>>>> +		nct1008: nct1008 {
+>>>>>>> +			compatible = "lm90,nct1008";
+>>>>>>
+>>>>>> "lm90" isn't a valid vendor prefix. I believe the value you want is
+>>>>>> "onnn,nct1008". Same comment for patch 2/2.
+>>>>>
+>>>>> The lm90 doesn't support device tree very well.
+>>>>
+>>>> I doubt it, but if this is the case, then please fix it, instead of
+>>>> working the problem around in a different place.
+>>>>
+>>>>> In the DT, we need to
+>>>>> named as "lm90" so that the lm90 driver can be loaded,
+>>>>
+>>>> Not that I am an expert with regards to DT, but this doesn't make any
+>>>> sense to me. AFAIK DT is about devices, not which drivers handle them.
+>>>>
+>>>>> and we also need
+>>>>> to add "nct1008" to indicate this is the nct1008 device, so that the
+>>>>> lm90 driver can be loaded with the right i2c_device_id->driver_data.
+>>>>>
+>>>>> I set the " compatible = "lm90,nct1008" ", this is the simplest way, and
+>>>>> we doesn't need to change the lm90.c.
+>>>>
+>>>> There's no problem with changing the lm90 driver, if this is the right
+>>>> thing to do.
+>>>
+>>> Ok, I will add DT support in the lm90.c in my next version patch.
+>>>
+>> Only if you can show that it is necessary.
+> 
+> It should work out of the box. As a matter of fact the same chip is used
+> on Tamonten and the DTS files use "onnn,nct1008". That used to work. If
+> it no longer does then that's a regression.
 
-Hi Olav,
+I synced the linux-next from:
+git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+and use the tag v3.10-rc7, but in the lm90.c it doesn't have DT support,
+such as "onnn,nct1008".
+I googled it and found there has patch:
+[PATCH] hwmon: (lm90) Add device tree support , which is in:
+http://lists.lm-sensors.org/pipermail/lm-sensors/2013-February/038099.html
+, but it didn't be merged into the linux-next.
 
-> We have designs that require more than 8 Stream IDs. Instead of hard
-> coding it to max of 8 can you make this dynamic?
+which git repository and branch should I use ?
 
-Sure, we can change this if necessary. Care to send a patch? ;)
+Thanks.
+Wei.
 
-Will
+> 
+> Thierry
+> 
+> * Unknown Key
+> * 0x7F3EB3A1
+> 
