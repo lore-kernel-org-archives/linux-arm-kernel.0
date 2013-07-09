@@ -1,16 +1,112 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 9 Jul 2013 14:12:21 +0800
-Subject: [PATCH v4 0/6] serial: imx: add DMA support for imx6
-In-Reply-To: <1373274862-2695-1-git-send-email-b32955@freescale.com>
-References: <1373274862-2695-1-git-send-email-b32955@freescale.com>
-Message-ID: <20130709061219.GE16656@S2101-09.ap.freescale.net>
+Date: Tue, 9 Jul 2013 14:17:44 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6dl-wandboard: Add SDHC1 and SDHC2 ports
+In-Reply-To: <1373296484-29847-1-git-send-email-festevam@gmail.com>
+References: <1373296484-29847-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130709061742.GF16656@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 08, 2013 at 05:14:16PM +0800, Huang Shijie wrote:
->   ARM: dts: imx6sl: add "fsl,imx6q-uart" for uart compatible
->   ARM: dts: imx6q{dl}: add DTE pads for uart
->   ARM: dts: imx6q{dl}: add a DTE uart pinctrl for uart2
->   ARM: dts: enable the uart2 for imx6q-arm2
+On Mon, Jul 08, 2013 at 12:14:43PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Wandboard has a SD card slot on the baseboard connected to SDHC1 and a
+> BCM4329 (Wifi + Bluetooth chip) connected to SDHC2.
+> 
+> Add support for these ports.
+> 
+> While at it, provide the card detect gpio on SDHC3.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6dl-wandboard.dts | 17 +++++++++++++++++
+>  arch/arm/boot/dts/imx6dl.dtsi          | 29 +++++++++++++++++++++++++++++
+>  2 files changed, 46 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dts b/arch/arm/boot/dts/imx6dl-wandboard.dts
+> index ab6a053..027ece5 100644
+> --- a/arch/arm/boot/dts/imx6dl-wandboard.dts
+> +++ b/arch/arm/boot/dts/imx6dl-wandboard.dts
+> @@ -83,6 +83,8 @@
+>  		pinctrl_hog: hoggrp {
+>  			fsl,pins = <
+>  				MX6DL_PAD_GPIO_0__CCM_CLKO1    0x130b0
+> +				MX6DL_PAD_GPIO_2__GPIO1_IO02	0x80000000
+> +				MX6DL_PAD_EIM_DA9__GPIO3_IO09	0x80000000
+>  			>;
+>  		};
+>  	};
+> @@ -110,8 +112,23 @@
+>  	status = "okay";
+>  };
+>  
+> +&usdhc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc1_2>;
+> +	cd-gpios = <&gpio1 2 0>;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc2_2>;
+> +	non-removable;
+> +	status = "okay";
+> +};
+> +
+>  &usdhc3 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_usdhc3_2>;
+> +	cd-gpios = <&gpio3 9 0>;
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+> index 4505109..e08c54c 100644
+> --- a/arch/arm/boot/dts/imx6dl.dtsi
+> +++ b/arch/arm/boot/dts/imx6dl.dtsi
+> @@ -255,6 +255,35 @@
+>  					};
+>  				};
+>  
+> +				usdhc1 {
+> +					pinctrl_usdhc1_1: usdhc1grp-1 {
+> +						fsl,pins = <
+> +							MX6DL_PAD_SD1_CMD__SD1_CMD    0x17059
+> +							MX6DL_PAD_SD1_CLK__SD1_CLK    0x10059
+> +							MX6DL_PAD_SD1_DAT0__SD1_DATA0 0x17059
+> +							MX6DL_PAD_SD1_DAT1__SD1_DATA1 0x17059
+> +							MX6DL_PAD_SD1_DAT2__SD1_DATA2 0x17059
+> +							MX6DL_PAD_SD1_DAT3__SD1_DATA3 0x17059
+> +							MX6DL_PAD_NANDF_D0__SD1_DATA4 0x17059
+> +							MX6DL_PAD_NANDF_D1__SD1_DATA5 0x17059
+> +							MX6DL_PAD_NANDF_D2__SD1_DATA6 0x17059
+> +							MX6DL_PAD_NANDF_D3__SD1_DATA7 0x17059
+> +						>;
+> +					};
+> +
+> +					pinctrl_usdhc1_2: usdhc1grp-2 {
+> +						fsl,pins = <
+> +							MX6DL_PAD_SD1_CMD__SD1_CMD    0x17059
+> +							MX6DL_PAD_SD1_CLK__SD1_CLK    0x10059
+> +							MX6DL_PAD_SD1_DAT0__SD1_DATA0 0x17059
+> +							MX6DL_PAD_SD1_DAT1__SD1_DATA1 0x17059
+> +							MX6DL_PAD_SD1_DAT2__SD1_DATA2 0x17059
+> +							MX6DL_PAD_SD1_DAT3__SD1_DATA3 0x17059
+> +						>;
+> +					};
+> +				};
+> +
+> +
 
-Applied these 4, thanks.
+Because imx6q and imx6dl are pin-to-pin compatible, from now on, I would
+require that any pin function group addition for either imx6q or imx6dl
+be added as a couple for both, with the same label name.
+
+Shawn
+
+>  				usdhc2 {
+>  					pinctrl_usdhc2_1: usdhc2grp-1 {
+>  						fsl,pins = <
+> -- 
+> 1.8.1.2
+> 
