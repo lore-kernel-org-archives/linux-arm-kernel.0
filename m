@@ -1,120 +1,71 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 9 Jul 2013 09:42:12 +0300
-Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
-In-Reply-To: <51DBA0C2.6030003@ti.com>
-References: <B5906170F1614E41A8A28DE3B8D121433EE93C23@DBDE04.ent.ti.com>
- <20130705115959.GQ5523@atomide.com>
- <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
- <20130708112553.GU5523@atomide.com> <51DAB394.3050104@ti.com>
- <20130708131033.GA5523@atomide.com> <51DABC81.3080409@ti.com>
- <20130708133512.GD31221@arwen.pp.htv.fi> <51DBA0C2.6030003@ti.com>
-Message-ID: <20130709064212.GB5552@arwen.pp.htv.fi>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Tue, 9 Jul 2013 14:42:43 +0800
+Subject: [PATCH V3 0/3] bring up pxa988 with DT
+Message-ID: <1373352166-10064-1-git-send-email-zhangwm@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch is supposed to bring up pxa988 SMP.
 
-On Tue, Jul 09, 2013 at 11:03:54AM +0530, Rajendra Nayak wrote:
-> On Monday 08 July 2013 07:05 PM, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Mon, Jul 08, 2013 at 06:50:01PM +0530, Rajendra Nayak wrote:
-> >>>>>>>> I wonder if this is because the timeouts get now initialized to 0 instead
-> >>>>>>>> of -1 for the serial driver?
-> >>>>>>>>
-> >>>>>>>
-> >>>>>>> You meant initialized to -1, right? There's an additional check for timeout being 0. Unless i
-> >>>>>>> am missing something DT-boot will start off with timeout set to 0 and then get forced to -1.
-> >>>>>
-> >>>>> OK
-> >>>>
-> >>>> Issue 2: Causing boot to stop when serial driver is initialized.
-> >>>> (After Issue 1 is fixed)
-> >>>>
-> >>>> I could narrow this down to the change done to return -EINVAL
-> >>>> instead of 0 in serial_omap_get_context_loss_count() as part of
-> >>>> commit 'a630fbfbb1beeffc5bbe542a7986bf2068874633' "serial: omap:
-> >>>> Fix device tree based PM runtime"
-> >>>>
-> >>>> What this change in turn seems to do is cause a
-> >>>> serial_omap_restore_context() to get called as part of
-> >>>> serial_omap_runtime_resume() which was not the case when
-> >>>> serial_omap_get_context_loss_count() returned 0
-> >>>>
-> >>>> from serial_omap_runtime_resume():
-> >>>> -----
-> >>>>         int loss_cnt = serial_omap_get_context_loss_count(up);
-> >>>>
-> >>>>         if (loss_cnt < 0) {
-> >>>>                 dev_dbg(dev, "serial_omap_get_context_loss_count failed : %d\n",
-> >>>>                         loss_cnt);
-> >>>>                 serial_omap_restore_context(up);
-> >>>>         } else if (up->context_loss_cnt != loss_cnt) {
-> >>>>                 serial_omap_restore_context(up);
-> >>>>         }
-> >>>> -----
-> >>>>
-> >>>> I am still working on why a serial_omap_restore_context() could
-> >>>> have caused console to die. I will work with Sourav on this and
-> >>>> post the fixes for both issue 1 and issue2 once its clear on whats
-> >>>> really causing issue 2.
-> >>>
-> >>> That's because we don't have the omap specific pdata callbacks for
-> >>> context loss any longer. We may be able to detect when the context
-> >>> was really lost in the serial driver, and only then call the
-> >>> serial_omap_restore_context().
-> >>
-> >> Right, but calling serial_omap_restore_context() even when the context
-> >> is not lost, should not ideally cause an issue.
-> > 
-> > it does in one condition. If context hasn't been saved before. And that
-> > can happen in the case of wrong pm runtime status for that device.
-> > 
-> > Imagine the device is marked as suspended even though it's fully enabled
-> > (it hasn't been suspended by hwmod due to NO_IDLE flag). In that case
-> > your context structure is all zeroes (context has never been saved
-> > before) then when you call pm_runtime_get_sync() on probe() your
-> > ->runtime_resume() will get called, which will restore context,
-> > essentially undoing anything which was configured by u-boot.
-> 
-> This could be a problem for drivers which do a save context in ->runtime_suspend()
-> but from what I see with omap serial, there is no save context done as part of
-> ->runtime_suspend.
+ChangeLog
+V3:
+1. change all Marvell prefix to 'marvell'
+2. Support CLOCKSOURCE for mmp timer
+3. Modify the bring up patch according to Arnd's comments.
 
-right, because context is "saved" in set_termios. probe() will get
-called much before set_termios() has a chance to run, right ?
+V2:
+1. use early_init call for handler init.
+2. Add sanity check for maximum core count.
 
-Same problem will trigger in that case.
+Neil Zhang (3):
+  dts: change Marvell prefix to 'marvell'
+  clocksource: mmp: support CLOCKSOURCE OF DECLARE
+  ARM: mmp: bring up pxa988 with device tree support
 
-I still think patch below is necessary
-
-> > (completely untested, didn't even try to compile, just to illustrate)
-> > 
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> > index 7341eff..d8dca68 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> > @@ -2559,6 +2559,12 @@ static void __init _setup_postsetup(struct omap_hwmod *oh)
-> >  	    (postsetup_state == _HWMOD_STATE_IDLE)) {
-> >  		oh->_int_flags |= _HWMOD_SKIP_ENABLE;
-> >  		postsetup_state = _HWMOD_STATE_ENABLED;
-> > +
-> > +		/* tell pm_runtime this device is already active */
-> > +		pm_runtime_set_active(&oh->od->pdev->dev);
-> > +	} else {
-> > +		/* tell pm_runtime this device is trully suspended */
-> > +		pm_runtime_set_suspended(&oh->od->pdev->dev);
-> >  	}
-> >  
-> >  	if (postsetup_state == _HWMOD_STATE_IDLE)
+ .../devicetree/bindings/arm/mrvl/intc.txt          |   16 +-
+ .../devicetree/bindings/arm/mrvl/mrvl.txt          |    6 +-
+ .../devicetree/bindings/arm/mrvl/timer.txt         |    4 +-
+ Documentation/devicetree/bindings/i2c/i2c-pxa.txt  |   14 +-
+ .../devicetree/bindings/mmc/sdhci-pxa.txt          |    8 +-
+ .../devicetree/bindings/rtc/sa1100-rtc.txt         |    4 +-
+ .../devicetree/bindings/serial/mrvl-serial.txt     |    2 +-
+ arch/arm/boot/dts/mmp2-brownstone.dts              |    2 +-
+ arch/arm/boot/dts/mmp2.dtsi                        |   56 +++---
+ arch/arm/boot/dts/pxa168-aspenite.dts              |    2 +-
+ arch/arm/boot/dts/pxa168.dtsi                      |   24 ++--
+ arch/arm/boot/dts/pxa2xx.dtsi                      |   16 +-
+ arch/arm/boot/dts/pxa3xx.dtsi                      |    2 +-
+ arch/arm/boot/dts/pxa910-dkb.dts                   |    2 +-
+ arch/arm/boot/dts/pxa910.dtsi                      |   27 ++--
+ .../dts/{pxa168-aspenite.dts => pxa988-dkb.dts}    |   12 +-
+ arch/arm/boot/dts/pxa988.dtsi                      |  190 ++++++++++++++++++++
+ arch/arm/mach-mmp/Kconfig                          |   18 ++
+ arch/arm/mach-mmp/Makefile                         |    1 +
+ arch/arm/mach-mmp/common.c                         |   11 +-
+ arch/arm/mach-mmp/common.h                         |    2 +
+ arch/arm/mach-mmp/headsmp.S                        |  104 +++++++++++
+ arch/arm/mach-mmp/include/mach/addr-map.h          |    6 +
+ arch/arm/mach-mmp/irq.c                            |   16 +-
+ arch/arm/mach-mmp/mmp-dt.c                         |   33 ++--
+ arch/arm/mach-mmp/mmp2-dt.c                        |   60 +++++-
+ arch/arm/mach-mmp/platsmp.c                        |  167 +++++++++++++++++
+ arch/arm/mach-mmp/reset.c                          |   66 +++++++
+ arch/arm/mach-mmp/reset.h                          |   29 +++
+ arch/arm/mach-mmp/time.c                           |   15 +--
+ arch/arm/mach-pxa/pxa-dt.c                         |   14 +-
+ drivers/clk/mmp/Makefile                           |    1 +
+ drivers/i2c/busses/i2c-pxa.c                       |   10 +-
+ drivers/mmc/host/sdhci-pxav2.c                     |    4 +-
+ drivers/mmc/host/sdhci-pxav3.c                     |    4 +-
+ drivers/rtc/rtc-sa1100.c                           |    4 +-
+ drivers/tty/serial/pxa.c                           |    4 +-
+ 37 files changed, 788 insertions(+), 168 deletions(-)
+ copy arch/arm/boot/dts/{pxa168-aspenite.dts => pxa988-dkb.dts} (74%)
+ create mode 100644 arch/arm/boot/dts/pxa988.dtsi
+ create mode 100644 arch/arm/mach-mmp/headsmp.S
+ create mode 100644 arch/arm/mach-mmp/platsmp.c
+ create mode 100644 arch/arm/mach-mmp/reset.c
+ create mode 100644 arch/arm/mach-mmp/reset.h
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/1fb8a557/attachment.sig>
+1.7.4.1
