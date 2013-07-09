@@ -1,37 +1,57 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 9 Jul 2013 12:57:53 +0530
-Subject: [PATCH 8/8] ARM: DRA7: Kconfig: Increase the default gpio count
-In-Reply-To: <1373354873-12359-1-git-send-email-rnayak@ti.com>
-References: <1373354873-12359-1-git-send-email-rnayak@ti.com>
-Message-ID: <1373354873-12359-9-git-send-email-rnayak@ti.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 9 Jul 2013 09:31:55 +0200
+Subject: [PATCH 1/7] serial: at91: correct definition from DMA to PDC
+In-Reply-To: <1373351626-30143-2-git-send-email-elen.song@atmel.com>
+References: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
+ <1373351626-30143-2-git-send-email-elen.song@atmel.com>
+Message-ID: <20130709073155.GB4013@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: R Sricharan <r.sricharan@ti.com>
+Hi Elen,
 
-DRA7xx has 8 GPIO banks so that there are 32x8 = 256 GPIOs.
-In order for the gpiolib to detect and initialize these
-additional GPIOs and other TWL GPIOs, ARCH_NR_GPIO is set
-to 512 instead of present 256.
+One comment below:
 
-Signed-off-by: R Sricharan <r.sricharan@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Tue, Jul 09, 2013 at 02:33:40PM +0800, Elen Song wrote:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5ef7af0..9faed52 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1599,7 +1599,7 @@ config LOCAL_TIMERS
- config ARCH_NR_GPIO
- 	int
- 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
--	default 512 if SOC_OMAP5
-+	default 512 if SOC_OMAP5 || SOC_DRA7XX
- 	default 512 if ARCH_KEYSTONE
- 	default 392 if ARCH_U8500
- 	default 352 if ARCH_VT8500
--- 
-1.7.9.5
+[...]
+
+> diff --git a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+> index a49d9a1..82f45ec 100644
+> --- a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+> +++ b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+> @@ -8,8 +8,8 @@ Required properties:
+>  - interrupts: Should contain interrupt
+>  
+>  Optional properties:
+> -- atmel,use-dma-rx: use of PDC or DMA for receiving data
+> -- atmel,use-dma-tx: use of PDC or DMA for transmitting data
+> +- atmel,use-pdc-rx: use of PDC for receiving data
+> +- atmel,use-pdc-tx: use of PDC for transmitting data
+>  
+>  <chip> compatible description:
+>  - at91rm9200:  legacy USART support
+> @@ -19,9 +19,9 @@ Example:
+>  
+>  	usart0: serial at fff8c000 {
+>  		compatible = "atmel,at91sam9260-usart";
+> -		reg = <0xfff8c000 0x4000>;
+> -		interrupts = <7>;
+> -		atmel,use-dma-rx;
+> -		atmel,use-dma-tx;
+> +		reg = <0xfff8c000 0x200>;
+> +		interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+
+Maybe put these changes into an other patch since it is not in relation with
+the purpose of your patch.
+
+Moreover, I am not sure that macros should be used in the documentation. From
+the top of my head, there was a discussion about that and the status was to not
+use macros in documentation since it is Linux dependant.
+
+> +		atmel,use-pdc-rx;
+> +		atmel,use-pdc-tx;
+>  	};
+>  
+
+[...]
