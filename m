@@ -1,32 +1,134 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 9 Jul 2013 15:41:49 +0200
-Subject: [PATCH v6] video: imxfb: Add DT support
-In-Reply-To: <CAOMZO5A-1gacTOSrpZ4HKfwq13mug+uNCS3m4gyFp1WT21_JeQ@mail.gmail.com>
-References: <1369564538-21835-1-git-send-email-mpa@pengutronix.de>
- <20130528110927.GA23653@game.jcrosoft.org>
- <CAOMZO5A-1gacTOSrpZ4HKfwq13mug+uNCS3m4gyFp1WT21_JeQ@mail.gmail.com>
-Message-ID: <20130709134149.GE18477@ns203013.ovh.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 9 Jul 2013 08:43:36 -0500
+Subject: [PATCHv4 05/11] of: pci: add registry of MSI chips
+In-Reply-To: <1372686136-1370-6-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1372686136-1370-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAL_Jsq+h=y5SNo4qO5-5u_w8rW++9MKDZK8rASNjhtVcjh-iyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:09 Fri 05 Jul     , Fabio Estevam wrote:
-> Hi Jean-Christophe,
-> 
-> On Tue, May 28, 2013 at 8:09 AM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > On 12:35 Sun 26 May     , Markus Pargmann wrote:
-> >> Add devicetree support for imx framebuffer driver. It uses the generic
-> >> display bindings and helper functions.
-> >>
-> >> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> >> Cc: Fabio Estevam <festevam@gmail.com>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >
-> > Applied thanks
-> 
-> Still don't see this patch in linux-next. Could you please check?
-in the pull to Linus
+On Mon, Jul 1, 2013 at 8:42 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> This commit adds a very basic registry of msi_chip structures, so that
+> an IRQ controller driver can register an msi_chip, and a PCIe host
+> controller can find it, based on a 'struct device_node'.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/of/of_pci.c    | 40 ++++++++++++++++++++++++++++++++++++++++
+>  include/linux/msi.h    |  2 ++
+>  include/linux/of_pci.h | 12 ++++++++++++
+>  3 files changed, 54 insertions(+)
+>
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index 42c687a..f516632 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -89,3 +89,43 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
+>         return 0;
+>  }
+>  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
+> +
+> +#ifdef CONFIG_PCI_MSI
+> +
+> +static LIST_HEAD(msi_chip_list);
+> +static DEFINE_MUTEX(msi_chip_mutex);
+> +
+> +int of_msi_chip_add(struct msi_chip *chip)
 
-Best Regards,
-J.
+Perhaps of_pci_msi_chip_add instead.
+
+> +{
+> +       if (! of_property_read_bool(chip->of_node, "msi-controller"))
+> +               return -EINVAL;
+> +
+> +       mutex_lock(&msi_chip_mutex);
+> +       list_add(&chip->list, &msi_chip_list);
+> +       mutex_unlock(&msi_chip_mutex);
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(of_msi_chip_add);
+> +
+> +void of_msi_chip_remove(struct msi_chip *chip)
+
+ditto
+
+> +{
+> +       mutex_lock(&msi_chip_mutex);
+> +       list_del(&chip->list);
+> +       mutex_unlock(&msi_chip_mutex);
+> +}
+> +EXPORT_SYMBOL_GPL(of_msi_chip_remove);
+> +
+> +struct msi_chip *of_find_msi_chip_by_node(struct device_node *of_node)
+
+ditto.
+
+> +{
+> +       struct msi_chip *c;
+> +       list_for_each_entry(c, &msi_chip_list, list) {
+
+Need the safe variant here?
+
+Rob
+
+> +               if (c->of_node == of_node)
+> +                       return c;
+> +       }
+> +
+> +       return NULL;
+> +}
+> +EXPORT_SYMBOL_GPL(of_find_msi_chip_by_node);
+> +
+> +#endif /* CONFIG_PCI_MSI */
+> diff --git a/include/linux/msi.h b/include/linux/msi.h
+> index 5b357d92..9e1a44b 100644
+> --- a/include/linux/msi.h
+> +++ b/include/linux/msi.h
+> @@ -66,6 +66,8 @@ void default_teardown_msi_irqs(struct pci_dev *dev);
+>  struct msi_chip {
+>         struct module *owner;
+>         struct device *dev;
+> +       struct device_node *of_node;
+> +       struct list_head list;
+>
+>         int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
+>                          struct msi_desc *desc);
+> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+> index 7a04826..99e4361 100644
+> --- a/include/linux/of_pci.h
+> +++ b/include/linux/of_pci.h
+> @@ -2,6 +2,7 @@
+>  #define __OF_PCI_H
+>
+>  #include <linux/pci.h>
+> +#include <linux/msi.h>
+>
+>  struct pci_dev;
+>  struct of_irq;
+> @@ -13,4 +14,15 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
+>  int of_pci_get_devfn(struct device_node *np);
+>  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+>
+> +#if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
+> +int of_msi_chip_add(struct msi_chip *chip);
+> +void of_msi_chip_remove(struct msi_chip *chip);
+> +struct msi_chip *of_find_msi_chip_by_node(struct device_node *of_node);
+> +#else
+> +static inline int of_msi_chip_add(struct msi_chip *chip) { return -EINVAL; }
+> +static inline void of_msi_chip_remove(struct msi_chip *chip) { }
+> +static inline struct msi_chip *
+> +of_find_msi_chip_by_node(struct device_node *of_node) { return NULL };
+> +#endif
+> +
+>  #endif
+> --
+> 1.8.1.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
