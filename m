@@ -1,35 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 9 Jul 2013 23:02:04 +0800
-Subject: [PATCH 3/3] ARM:dts:vf610-twr:Enable DSPI0 devices and Flash
- at26df081a
-In-Reply-To: <20130709144425.GX27646@sirena.org.uk>
-References: <1373272622-29064-1-git-send-email-b44548@freescale.com>
- <1373272622-29064-3-git-send-email-b44548@freescale.com>
- <20130708113600.GU27646@sirena.org.uk>
- <20130709052925.GD16656@S2101-09.ap.freescale.net>
- <20130709100723.GS27646@sirena.org.uk>
- <20130709125239.GA2813@S2101-09.ap.freescale.net>
- <20130709144425.GX27646@sirena.org.uk>
-Message-ID: <20130709150202.GB2813@S2101-09.ap.freescale.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 9 Jul 2013 16:01:14 +0100
+Subject: [PATCH v4 2/7] Documentation: DT: add sam9x5ek-wm8731 machine
+ driver
+In-Reply-To: <1373379933-32749-3-git-send-email-richard.genoud@gmail.com>
+References: <1373372929-17800-1-git-send-email-richard.genoud@gmail.com>
+ <1373379933-32749-1-git-send-email-richard.genoud@gmail.com>
+ <1373379933-32749-3-git-send-email-richard.genoud@gmail.com>
+Message-ID: <20130709150114.GB27646@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 09, 2013 at 03:44:25PM +0100, Mark Brown wrote:
-> On Tue, Jul 09, 2013 at 08:52:41PM +0800, Shawn Guo wrote:
-> > On Tue, Jul 09, 2013 at 11:07:23AM +0100, Mark Brown wrote:
+On Tue, Jul 09, 2013 at 04:25:28PM +0200, Richard Genoud wrote:
+> This add the sound DT binding for sam9x5ek-wm8731 machine driver
 > 
-> > > The bindings are all totally generic ones for a SPI controller, there's
-> > > nothing controversial or even device specific about them so I'm happy to
-> > > say the bindings are fine as-is.
-> 
-> > Am I missing something?  I do not even see a bindings doc in patch #1.
-> > How can I think the bindings are fine?
-> 
-> Hrm, I was sure I was seeing one...  though in any case there's nothing
-> here except for interrupt and DMA hookup so any additional properties
-> aren't going to affect this patch.
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+>  .../bindings/sound/atmel-sam9x5-wm8731-audio.txt   |   30 ++++++++++++++++++++
 
-You are probably talking about patch #2.  But this patch does add two
-properties "spi-num-chipselects" and "bus-num".
+Put new binding documents in the same patch that reads them, this makes
+review easier.
 
-Shawn
+> +  - atmel,audio-routing: A list of the connections between audio components.
+
+This needs to be more specific and list the available board specific
+nodes for routing.  For the CODEC you can just refer to the CODEC
+binding documentation.
+
+> +  - atmel,format: DAI format. Must be "i2s"
+
+So why not just omit this then?
+
+> +  - atmel,bitclock-master:  DAI clock master
+> +  - atmel,frame-master: DAI frame master
+
+The driver isn't handling these and there's no information on how to set
+them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/dcbf9701/attachment.sig>
