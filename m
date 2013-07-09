@@ -1,63 +1,37 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Tue, 09 Jul 2013 18:43:16 +0100
-Subject: [PATCHv3 1/3] iio: Add Nuvoton NAU7802 ADC driver
-In-Reply-To: <51DC1858.8010008@free-electrons.com>
-References: <1372094699-3832-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1372094699-3832-2-git-send-email-alexandre.belloni@free-electrons.com>
- <51D53B72.6020309@metafoo.de> <51D7F044.9040205@kernel.org>
- <51DC1858.8010008@free-electrons.com>
-Message-ID: <51DC4BB4.6060506@kernel.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 9 Jul 2013 15:16:00 -0300
+Subject: [PATCH 3/3] ARM: imx: mm-imx3: Free l2x0_base
+In-Reply-To: <20130709062414.GG16656@S2101-09.ap.freescale.net>
+References: <1373306318-15604-1-git-send-email-festevam@gmail.com>
+ <1373306318-15604-3-git-send-email-festevam@gmail.com>
+ <20130709062414.GG16656@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5D4ivbqYovVA2CpXEemrAq8Nyn5By8-iL3SAnw=mpJ+og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, looks like I forgot to push the tree out.
-Anyhow should be there shortly.
+On Tue, Jul 9, 2013 at 3:24 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Mon, Jul 08, 2013 at 02:58:38PM -0300, Fabio Estevam wrote:
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>> After l2x0_base has been used, we should free it.
+>>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> ---
+>>  arch/arm/mach-imx/mm-imx3.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+>> index 0884ca9..3143f5e 100644
+>> --- a/arch/arm/mach-imx/mm-imx3.c
+>> +++ b/arch/arm/mach-imx/mm-imx3.c
+>> @@ -113,6 +113,7 @@ static void __init imx3_init_l2x0(void)
+>>       }
+>>
+>>       l2x0_init(l2x0_base, 0x00030024, 0x00000000);
+>> +     iounmap(l2x0_base);
+>
+> Are you sure?  I think cache-l2x0 driver still needs the mapping after
+> that.
 
-On 07/09/2013 03:04 PM, Alexandre Belloni wrote:
-> Hi Jonathan,
-> 
-> I don't actually see it in iio.git on kernel.org, am I doing something
-> wrong ?
-> 
-> On 06/07/2013 12:24, Jonathan Cameron wrote:
->> On 07/04/2013 10:08 AM, Lars-Peter Clausen wrote:
->>> On 06/24/2013 07:24 PM, Alexandre Belloni wrote:
->>>> The Nuvoton NAU7802 ADC is a 24-bit 2-channels I2C ADC, with adjustable
->>>> gain and sampling rates.
->>>>
->>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>> Reviewed-by: Lars-Peter Clausen <lars@metafoo.de>
->>>
->> Applied to the togreg branch of iio.git (with a few little tweaks).
->>
->> There was some fuzz that required manual fixing because of another driver merge so
->> please check I didn't foul anything up with this or the other bits below.
->>
->> There were two trivial missing unlocks on error paths in the read_raw function that
->> I've fixed up (Coccinelle found these for me - if you can I would always advise
->> running sparse, coccicheck and ideally smatch before submitting patches).
->>
->> I fixed up the comments because if there is one thing I hate bothering
->> with it is delightful patches that just fix this stuff. Much better
->> to do it now given it took 20 secs ;)
->>
->>> One remark though. Multiline comments should be like
->>>
->>> /*
->>>  * foo
->>>  * bar
->>>  */
->>>
->>> not
->>>
->>> /* foo
->>>  * bar
->>>  */
->>>
->>> But not need to resend the patch just for this
->>>
->>> - Lars
->>>
-> 
-> 
+l2x0_base is a local variable of the static imx3_init_l2x0() function,
+so we should iounmap it.
