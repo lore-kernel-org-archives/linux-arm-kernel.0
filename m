@@ -1,61 +1,108 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Tue, 9 Jul 2013 01:05:31 +0000
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <201307082256.38642.marex@denx.de>
-References: <51A5A808.2070803@digi.com> <201307070310.00973.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803F28763@039-SN2MPN1-021.039d.mgd.msft.net>
- <201307082256.38642.marex@denx.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803F39B98@039-SN2MPN1-022.039d.mgd.msft.net>
+From: minggr@gmail.com (Lin Ming)
+Date: Tue, 9 Jul 2013 09:09:13 +0800
+Subject: kernel decompressor problem for ARMv7
+In-Reply-To: <1373250435.824.6.camel@minggr>
+References: <CAF1ivSakn8-HiAf+4_cLRWUUTDP9QBKpAt+hVQoMyAmKZ2-dJA@mail.gmail.com>
+ <20130705095757.GA13063@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1307051225240.18597@syhkavp.arg>
+ <CAF1ivSbOXknHyDMH3RdmSGK2n5o2wVeR5oohCQnZ2gJrgvo=Hw@mail.gmail.com>
+ <1373250435.824.6.camel@minggr>
+Message-ID: <CAF1ivSbk70UnNc-09C2w-CdgaFBXe_k6K6n8Qr3L-jCLiTGqow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> 
-> > > -----Original Message-----
-> > > From: Marek Vasut [mailto:marex at denx.de]
-> > > Sent: Sunday, July 07, 2013 9:10 AM
-> > > To: Chen Peter-B29397
-> > > Cc: shawn.guo at linaro.org; Michael Grzeschik; maxime.ripard at free-
-> > > electrons.com; Hector Palacios; linux-usb at vger.kernel.org;
-> > > s.hauer at pengutronix.de; alexander.shishkin at linux.intel.com; Estevam
-> > > Fabio-R49496; Marc Kleine-Budde; m.grzeschik at pengutronix.de; linux-
-> arm-
-> > > kernel at lists.infradead.org
-> > > Subject: Re: Chipidea usb otg support for IMX/MXS (device
-> functionality)
-> > >
-> > > Hi Peter,
-> > >
-> > > > > Where can I measure this?
-> > > > >
-> > > > > > Two possible reasons:
-> > > > > >
-> > > > > > 1. You have not gpio control for vbus toggle when role switches.
-> > > > >
-> > > > > This works well.
-> > > > >
-> > > > > > 2. Your hardware has some problems that the vbus can't lower
-> than
-> > >
-> > > 0.8v.
-> > >
-> > > > > How can I check that?
-> > > >
-> > > > Just measure the voltage of your otg vbus pin.
-> > >
-> > > It's 2.5 volt for me. What am I supposed to observe happening there?
-> >
-> > http://marc.info/?l=linux-usb&m=137242465920952&w=2
-> 
-> Dang, must have missed that one, sorry.
-> 
-> The VBUS is slowly discharging from around 5V to 2.5V , what does that
-> tell me?
-> 
+On Mon, Jul 8, 2013 at 10:27 AM, Lin Ming <minggr@gmail.com> wrote:
+> On Sat, 2013-07-06 at 00:58 +0800, Lin Ming wrote:
+>> On Sat, Jul 6, 2013 at 12:30 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> > On Fri, 5 Jul 2013, Will Deacon wrote:
+>> >
+>> >> On Fri, Jul 05, 2013 at 09:44:12AM +0100, Lin Ming wrote:
+>> >> > Hi all,
+>> >>
+>> >> Hello,
+>> >>
+>> >> > I'm porting BSP code from v2.6.36 to v3.10 kernel. It's ARMv7 processor.
+>> >>
+>> >> Which specific processor/SoC?
+>> >>
+>> >> > But decompressor doesn't work. With a lot of debug, I finally find
+>> >> > below 2 commits related.
+>> >> > Kernel uncompress OK with these commits reverted.
+>> >> >
+>> >> > dbece45: ARM: 7501/1: decompressor: reset ttbcr for VMSA ARMv7 cores
+>> >> > (Introduced in v3.6-rc6)
+>> >> >
+>> >> > 5010192: ARM: 7583/1: decompressor: Enable unaligned memory access for
+>> >> > v6 and above
+>> >> > (Introduced in v3.7-rc8)
+>> >> >
+>> >> > Any hint to fix it?
+>> >>
+>> >> There's not really enough information to go on here. What specifically
+>> >> fails? Also, do you have to revert *both* of the above changes to get things
+>> >> working again?
+>> >
+>> > Also, what is the bootloader used here?
+>>
+>> uboot.
+>>
+>> >
+>> > Does the bootloader call the kernel with the MMU off as documented in
+>> > Documentation/arm/Booting?
+>>
+>> How to check this?
+>>
+>> I'll check uboot code or add debug code in boot/compressed/head.S to
+>> check it next Monday.
+>
+> I added below debug code to print the control reg from lowest 4bits to
+> highest 4bits.
+>
+> It prints "B7805C". So the control reg is 0x00c5087b.
+> Seems bootloader calls the kernel with MMU enabled and Alignment fault
+> checking enabled.
 
-It needs to check your hardware, it is probably there is a high capacitance at
-vbus pin. Besides, the vbus should be lower than 0.8v if it is disconnected from
-pc.
+Hi Nicolas,
 
-Best regards,
-Peter
+Is this information useful?
+Or any other information needed for further debug?
+
+Thanks,
+Lin Ming
+
+>
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 32337ff..9434720 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -125,6 +125,23 @@
+>                 .rept   7
+>                 mov     r0, r0
+>                 .endr
+> +
+> +               /* Dirty debug code to print control reg from lowest 4bits to highest 4bits */
+> +               ldr     r2, =0xf0070120         @ UART
+> +               mrc     p15, 0, r0, c1, c0, 0   @ read control reg
+> +       1:
+> +               cmp     r0, #0
+> +               beq     2f
+> +               and     r1, r0, #15
+> +               cmp     r1, #9
+> +               addgt   r1, r1, #7
+> +               add     r1, r1, #48
+> +               str     r1, [r2]
+> +               asr     r0, r0, #4
+> +               b       1b
+> +       2:
+> +
+> +
+>     ARM(                mov     r0, r0          )
+>     ARM(                b       1f              )
+>   THUMB(                adr     r12, BSYM(1f)   )
+>
+>
+>>
+>> >
+>> > Nicolas
+>
+>
