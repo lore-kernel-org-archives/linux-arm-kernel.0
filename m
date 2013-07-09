@@ -1,903 +1,287 @@
 From: elen.song@atmel.com (Elen Song)
-Date: Tue, 9 Jul 2013 14:33:40 +0800
-Subject: [PATCH 1/7] serial: at91: correct definition from DMA to PDC
+Date: Tue, 9 Jul 2013 14:33:41 +0800
+Subject: [PATCH 2/7] serial: at91: add tx dma support
 In-Reply-To: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
 References: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
-Message-ID: <1373351626-30143-2-git-send-email-elen.song@atmel.com>
+Message-ID: <1373351626-30143-3-git-send-email-elen.song@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA is available since at91sam9x5 socs, before that, we use PDC.
+Request a slave dma channel for tx dma use. Tx dma will setup a single transfer,
+when transfer complete, it will call atmel_dma_tx_complete to do finish stuff.
 
 Signed-off-by: Elen Song <elen.song@atmel.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- Documentation/devicetree/bindings/serial/rs485.txt |    4 +-
- .../devicetree/bindings/tty/serial/atmel-usart.txt |   12 ++--
- arch/arm/boot/dts/at91rm9200.dtsi                  |   16 ++---
- arch/arm/boot/dts/at91sam9260.dtsi                 |   24 +++----
- arch/arm/boot/dts/at91sam9263.dtsi                 |   12 ++--
- arch/arm/boot/dts/at91sam9g45.dtsi                 |   16 ++---
- arch/arm/mach-at91/at91rm9200_devices.c            |   20 +++---
- arch/arm/mach-at91/at91sam9260_devices.c           |   28 ++++----
- arch/arm/mach-at91/at91sam9261_devices.c           |   16 ++---
- arch/arm/mach-at91/at91sam9263_devices.c           |   16 ++---
- arch/arm/mach-at91/at91sam9g45_devices.c           |   20 +++---
- arch/arm/mach-at91/at91sam9rl_devices.c            |   20 +++---
- drivers/tty/serial/atmel_serial.c                  |   74 ++++++++++----------
- include/linux/platform_data/atmel.h                |    4 +-
- 14 files changed, 141 insertions(+), 141 deletions(-)
+ drivers/tty/serial/atmel_serial.c   |  200 +++++++++++++++++++++++++++++++++++
+ include/linux/platform_data/atmel.h |    1 +
+ 2 files changed, 201 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/serial/rs485.txt b/Documentation/devicetree/bindings/serial/rs485.txt
-index 1e753c6..7c8581e 100644
---- a/Documentation/devicetree/bindings/serial/rs485.txt
-+++ b/Documentation/devicetree/bindings/serial/rs485.txt
-@@ -23,8 +23,8 @@ RS485 example for Atmel USART:
- 		compatible = "atmel,at91sam9260-usart";
- 		reg = <0xfff8c000 0x4000>;
- 		interrupts = <7>;
--		atmel,use-dma-rx;
--		atmel,use-dma-tx;
-+		atmel,use-pdc-rx;
-+		atmel,use-pdc-tx;
- 		linux,rs485-enabled-at-boot-time;
- 		rs485-rts-delay = <0 200>;		// in milliseconds
- 	};
-diff --git a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
-index a49d9a1..82f45ec 100644
---- a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
-+++ b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
-@@ -8,8 +8,8 @@ Required properties:
- - interrupts: Should contain interrupt
- 
- Optional properties:
--- atmel,use-dma-rx: use of PDC or DMA for receiving data
--- atmel,use-dma-tx: use of PDC or DMA for transmitting data
-+- atmel,use-pdc-rx: use of PDC for receiving data
-+- atmel,use-pdc-tx: use of PDC for transmitting data
- 
- <chip> compatible description:
- - at91rm9200:  legacy USART support
-@@ -19,9 +19,9 @@ Example:
- 
- 	usart0: serial at fff8c000 {
- 		compatible = "atmel,at91sam9260-usart";
--		reg = <0xfff8c000 0x4000>;
--		interrupts = <7>;
--		atmel,use-dma-rx;
--		atmel,use-dma-tx;
-+		reg = <0xfff8c000 0x200>;
-+		interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
-+		atmel,use-pdc-rx;
-+		atmel,use-pdc-tx;
- 	};
- 
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-index 1fc645e..2dcef27 100644
---- a/arch/arm/boot/dts/at91rm9200.dtsi
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -537,8 +537,8 @@
- 				compatible = "atmel,at91rm9200-usart";
- 				reg = <0xfffc0000 0x200>;
- 				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_uart0>;
- 				status = "disabled";
-@@ -548,8 +548,8 @@
- 				compatible = "atmel,at91rm9200-usart";
- 				reg = <0xfffc4000 0x200>;
- 				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_uart1>;
- 				status = "disabled";
-@@ -559,8 +559,8 @@
- 				compatible = "atmel,at91rm9200-usart";
- 				reg = <0xfffc8000 0x200>;
- 				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_uart2>;
- 				status = "disabled";
-@@ -570,8 +570,8 @@
- 				compatible = "atmel,at91rm9200-usart";
- 				reg = <0xfffcc000 0x200>;
- 				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_uart3>;
- 				status = "disabled";
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index 899a7cf..1fcf6f6 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -475,8 +475,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffb0000 0x200>;
- 				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart0>;
- 				status = "disabled";
-@@ -486,8 +486,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffb4000 0x200>;
- 				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart1>;
- 				status = "disabled";
-@@ -497,8 +497,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffb8000 0x200>;
- 				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart2>;
- 				status = "disabled";
-@@ -508,8 +508,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffd0000 0x200>;
- 				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart3>;
- 				status = "disabled";
-@@ -519,8 +519,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffd4000 0x200>;
- 				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_uart0>;
- 				status = "disabled";
-@@ -530,8 +530,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffd8000 0x200>;
- 				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_uart1>;
- 				status = "disabled";
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index ff63811..eb1dac2 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -426,8 +426,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfff8c000 0x200>;
- 				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart0>;
- 				status = "disabled";
-@@ -437,8 +437,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfff90000 0x200>;
- 				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart1>;
- 				status = "disabled";
-@@ -448,8 +448,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfff94000 0x200>;
- 				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart2>;
- 				status = "disabled";
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index cb44bbb..13c7682 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -485,8 +485,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfff8c000 0x200>;
- 				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart0>;
- 				status = "disabled";
-@@ -496,8 +496,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfff90000 0x200>;
- 				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart1>;
- 				status = "disabled";
-@@ -507,8 +507,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfff94000 0x200>;
- 				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart2>;
- 				status = "disabled";
-@@ -518,8 +518,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfff98000 0x200>;
- 				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
-+				atmel,use-pdc-rx;
-+				atmel,use-pdc-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart3>;
- 				status = "disabled";
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 3ebc979..6766d17 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -920,8 +920,8 @@ static struct resource dbgu_resources[] = {
- };
- 
- static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
-+	.use_pdc_tx	= 0,
-+	.use_pdc_rx	= 0,		/* DBGU not capable of receive PDC */
- };
- 
- static u64 dbgu_dmamask = DMA_BIT_MASK(32);
-@@ -958,8 +958,8 @@ static struct resource uart0_resources[] = {
- };
- 
- static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart0_dmamask = DMA_BIT_MASK(32);
-@@ -1007,8 +1007,8 @@ static struct resource uart1_resources[] = {
- };
- 
- static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart1_dmamask = DMA_BIT_MASK(32);
-@@ -1058,8 +1058,8 @@ static struct resource uart2_resources[] = {
- };
- 
- static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart2_dmamask = DMA_BIT_MASK(32);
-@@ -1101,8 +1101,8 @@ static struct resource uart3_resources[] = {
- };
- 
- static struct atmel_uart_data uart3_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart3_dmamask = DMA_BIT_MASK(32);
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index eda8d16..0a087a7c 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -817,8 +817,8 @@ static struct resource dbgu_resources[] = {
- };
- 
- static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
-+	.use_pdc_tx	= 0,
-+	.use_pdc_rx	= 0,		/* DBGU not capable of receive PDC */
- };
- 
- static u64 dbgu_dmamask = DMA_BIT_MASK(32);
-@@ -855,8 +855,8 @@ static struct resource uart0_resources[] = {
- };
- 
- static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart0_dmamask = DMA_BIT_MASK(32);
-@@ -906,8 +906,8 @@ static struct resource uart1_resources[] = {
- };
- 
- static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart1_dmamask = DMA_BIT_MASK(32);
-@@ -949,8 +949,8 @@ static struct resource uart2_resources[] = {
- };
- 
- static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart2_dmamask = DMA_BIT_MASK(32);
-@@ -992,8 +992,8 @@ static struct resource uart3_resources[] = {
- };
- 
- static struct atmel_uart_data uart3_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart3_dmamask = DMA_BIT_MASK(32);
-@@ -1035,8 +1035,8 @@ static struct resource uart4_resources[] = {
- };
- 
- static struct atmel_uart_data uart4_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart4_dmamask = DMA_BIT_MASK(32);
-@@ -1073,8 +1073,8 @@ static struct resource uart5_resources[] = {
- };
- 
- static struct atmel_uart_data uart5_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart5_dmamask = DMA_BIT_MASK(32);
-diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index 629ea5f..fcaae28 100644
---- a/arch/arm/mach-at91/at91sam9261_devices.c
-+++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -878,8 +878,8 @@ static struct resource dbgu_resources[] = {
- };
- 
- static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
-+	.use_pdc_tx	= 0,
-+	.use_pdc_rx	= 0,		/* DBGU not capable of receive PDC */
- };
- 
- static u64 dbgu_dmamask = DMA_BIT_MASK(32);
-@@ -916,8 +916,8 @@ static struct resource uart0_resources[] = {
- };
- 
- static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart0_dmamask = DMA_BIT_MASK(32);
-@@ -959,8 +959,8 @@ static struct resource uart1_resources[] = {
- };
- 
- static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart1_dmamask = DMA_BIT_MASK(32);
-@@ -1002,8 +1002,8 @@ static struct resource uart2_resources[] = {
- };
- 
- static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart2_dmamask = DMA_BIT_MASK(32);
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 858c8aa..a62216b 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -1322,8 +1322,8 @@ static struct resource dbgu_resources[] = {
- };
- 
- static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
-+	.use_pdc_tx	= 0,
-+	.use_pdc_rx	= 0,		/* DBGU not capable of receive PDC */
- };
- 
- static u64 dbgu_dmamask = DMA_BIT_MASK(32);
-@@ -1360,8 +1360,8 @@ static struct resource uart0_resources[] = {
- };
- 
- static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart0_dmamask = DMA_BIT_MASK(32);
-@@ -1403,8 +1403,8 @@ static struct resource uart1_resources[] = {
- };
- 
- static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart1_dmamask = DMA_BIT_MASK(32);
-@@ -1446,8 +1446,8 @@ static struct resource uart2_resources[] = {
- };
- 
- static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart2_dmamask = DMA_BIT_MASK(32);
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index acb703e..4c81fd1 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -1585,8 +1585,8 @@ static struct resource dbgu_resources[] = {
- };
- 
- static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,
-+	.use_pdc_tx	= 0,
-+	.use_pdc_rx	= 0,
- };
- 
- static u64 dbgu_dmamask = DMA_BIT_MASK(32);
-@@ -1623,8 +1623,8 @@ static struct resource uart0_resources[] = {
- };
- 
- static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart0_dmamask = DMA_BIT_MASK(32);
-@@ -1666,8 +1666,8 @@ static struct resource uart1_resources[] = {
- };
- 
- static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart1_dmamask = DMA_BIT_MASK(32);
-@@ -1709,8 +1709,8 @@ static struct resource uart2_resources[] = {
- };
- 
- static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart2_dmamask = DMA_BIT_MASK(32);
-@@ -1752,8 +1752,8 @@ static struct resource uart3_resources[] = {
- };
- 
- static struct atmel_uart_data uart3_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart3_dmamask = DMA_BIT_MASK(32);
-diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index 352468f..5cd8c76 100644
---- a/arch/arm/mach-at91/at91sam9rl_devices.c
-+++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -954,8 +954,8 @@ static struct resource dbgu_resources[] = {
- };
- 
- static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
-+	.use_pdc_tx	= 0,
-+	.use_pdc_rx	= 0,		/* DBGU not capable of receive PDC */
- };
- 
- static u64 dbgu_dmamask = DMA_BIT_MASK(32);
-@@ -992,8 +992,8 @@ static struct resource uart0_resources[] = {
- };
- 
- static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart0_dmamask = DMA_BIT_MASK(32);
-@@ -1043,8 +1043,8 @@ static struct resource uart1_resources[] = {
- };
- 
- static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart1_dmamask = DMA_BIT_MASK(32);
-@@ -1086,8 +1086,8 @@ static struct resource uart2_resources[] = {
- };
- 
- static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart2_dmamask = DMA_BIT_MASK(32);
-@@ -1129,8 +1129,8 @@ static struct resource uart3_resources[] = {
- };
- 
- static struct atmel_uart_data uart3_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.use_pdc_tx	= 1,
-+	.use_pdc_rx	= 1,
- };
- 
- static u64 uart3_dmamask = DMA_BIT_MASK(32);
 diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 3467462..ab9de8a 100644
+index ab9de8a..c20312d 100644
 --- a/drivers/tty/serial/atmel_serial.c
 +++ b/drivers/tty/serial/atmel_serial.c
-@@ -140,11 +140,11 @@ struct atmel_uart_port {
- 	u32			backup_imr;	/* IMR saved during suspend */
- 	int			break_active;	/* break being received */
- 
--	short			use_dma_rx;	/* enable PDC receiver */
-+	short			use_pdc_rx;	/* enable PDC receiver */
+@@ -144,9 +144,15 @@ struct atmel_uart_port {
  	short			pdc_rx_idx;	/* current PDC RX buffer */
  	struct atmel_dma_buffer	pdc_rx[2];	/* PDC receier */
  
--	short			use_dma_tx;	/* enable PDC transmitter */
-+	short			use_pdc_tx;	/* enable PDC transmitter */
++	short                   use_dma_tx;     /* enable DMA transmitter */
+ 	short			use_pdc_tx;	/* enable PDC transmitter */
  	struct atmel_dma_buffer	pdc_tx;		/* PDC transmitter */
  
++	spinlock_t			lock_tx;	/* port lock */
++	struct dma_chan			*chan_tx;
++	struct dma_async_tx_descriptor	*desc_tx;
++	dma_cookie_t			cookie_tx;
++	struct scatterlist		sg_tx;
  	struct tasklet_struct	tasklet;
-@@ -181,26 +181,26 @@ to_atmel_uart_port(struct uart_port *uart)
+ 	unsigned int		irq_status;
+ 	unsigned int		irq_status_prev;
+@@ -206,6 +212,13 @@ static bool atmel_use_pdc_tx(struct uart_port *port)
+ }
+ #endif
+ 
++static bool atmel_use_dma_tx(struct uart_port *port)
++{
++	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
++
++	return atmel_port->use_dma_tx;
++}
++
+ /* Enable or disable the rs485 support */
+ void atmel_config_rs485(struct uart_port *port, struct serial_rs485 *rs485conf)
+ {
+@@ -564,6 +577,186 @@ static void atmel_tx_chars(struct uart_port *port)
+ 		UART_PUT_IER(port, atmel_port->tx_done_mask);
  }
  
- #ifdef CONFIG_SERIAL_ATMEL_PDC
--static bool atmel_use_dma_rx(struct uart_port *port)
-+static bool atmel_use_pdc_rx(struct uart_port *port)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 
--	return atmel_port->use_dma_rx;
-+	return atmel_port->use_pdc_rx;
- }
- 
--static bool atmel_use_dma_tx(struct uart_port *port)
-+static bool atmel_use_pdc_tx(struct uart_port *port)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 
--	return atmel_port->use_dma_tx;
-+	return atmel_port->use_pdc_tx;
- }
- #else
--static bool atmel_use_dma_rx(struct uart_port *port)
-+static bool atmel_use_pdc_rx(struct uart_port *port)
- {
- 	return false;
- }
- 
--static bool atmel_use_dma_tx(struct uart_port *port)
-+static bool atmel_use_pdc_tx(struct uart_port *port)
- {
- 	return false;
- }
-@@ -233,7 +233,7 @@ void atmel_config_rs485(struct uart_port *port, struct serial_rs485 *rs485conf)
- 		mode |= ATMEL_US_USMODE_RS485;
- 	} else {
- 		dev_dbg(port->dev, "Setting UART to RS232\n");
--		if (atmel_use_dma_tx(port))
-+		if (atmel_use_pdc_tx(port))
- 			atmel_port->tx_done_mask = ATMEL_US_ENDTX |
- 				ATMEL_US_TXBUFE;
- 		else
-@@ -345,7 +345,7 @@ static void atmel_stop_tx(struct uart_port *port)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 
--	if (atmel_use_dma_tx(port)) {
-+	if (atmel_use_pdc_tx(port)) {
- 		/* disable PDC transmit */
- 		UART_PUT_PTCR(port, ATMEL_PDC_TXTDIS);
- 	}
-@@ -364,7 +364,7 @@ static void atmel_start_tx(struct uart_port *port)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 
--	if (atmel_use_dma_tx(port)) {
-+	if (atmel_use_pdc_tx(port)) {
- 		if (UART_GET_PTSR(port) & ATMEL_PDC_TXTEN)
- 			/* The transmitter is already running.  Yes, we
- 			   really need this.*/
-@@ -390,7 +390,7 @@ static void atmel_start_rx(struct uart_port *port)
- 
- 	UART_PUT_CR(port, ATMEL_US_RXEN);
- 
--	if (atmel_use_dma_rx(port)) {
-+	if (atmel_use_pdc_rx(port)) {
- 		/* enable PDC controller */
- 		UART_PUT_IER(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT |
- 			port->read_status_mask);
-@@ -407,7 +407,7 @@ static void atmel_stop_rx(struct uart_port *port)
- {
- 	UART_PUT_CR(port, ATMEL_US_RXDIS);
- 
--	if (atmel_use_dma_rx(port)) {
-+	if (atmel_use_pdc_rx(port)) {
- 		/* disable PDC receive */
- 		UART_PUT_PTCR(port, ATMEL_PDC_RXTDIS);
- 		UART_PUT_IDR(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT |
-@@ -572,7 +572,7 @@ atmel_handle_receive(struct uart_port *port, unsigned int pending)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 
--	if (atmel_use_dma_rx(port)) {
-+	if (atmel_use_pdc_rx(port)) {
- 		/*
- 		 * PDC receive. Just schedule the tasklet and let it
- 		 * figure out the details.
-@@ -661,7 +661,7 @@ static irqreturn_t atmel_interrupt(int irq, void *dev_id)
++static void atmel_dma_tx_complete(void *arg)
++{
++	struct atmel_uart_port *atmel_port = arg;
++	struct uart_port *port = &atmel_port->uart;
++	struct circ_buf *xmit = &port->state->xmit;
++	struct dma_chan *chan = atmel_port->chan_tx;
++	unsigned long flags;
++
++	spin_lock_irqsave(&port->lock, flags);
++
++	if (chan)
++		dmaengine_terminate_all(chan);
++	xmit->tail += sg_dma_len(&atmel_port->sg_tx);
++	xmit->tail &= UART_XMIT_SIZE - 1;
++
++	port->icount.tx += sg_dma_len(&atmel_port->sg_tx);
++
++	spin_lock_irq(&atmel_port->lock_tx);
++	async_tx_ack(atmel_port->desc_tx);
++	atmel_port->cookie_tx = -EINVAL;
++	atmel_port->desc_tx = NULL;
++	spin_unlock_irq(&atmel_port->lock_tx);
++
++	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
++		uart_write_wakeup(port);
++
++	/* Do we really need this? */
++	if (!uart_circ_empty(xmit))
++		tasklet_schedule(&atmel_port->tasklet);
++
++	spin_unlock_irqrestore(&port->lock, flags);
++}
++
++static void atmel_tx_dma_release(struct atmel_uart_port *atmel_port)
++{
++	struct dma_chan *chan = atmel_port->chan_tx;
++	struct uart_port *port = &(atmel_port->uart);
++
++	if (chan) {
++		dmaengine_terminate_all(chan);
++		dma_release_channel(chan);
++		dma_unmap_sg(port->dev, &atmel_port->sg_tx, 1,
++				DMA_MEM_TO_DEV);
++	}
++
++	atmel_port->desc_tx = NULL;
++	atmel_port->chan_tx = NULL;
++	atmel_port->cookie_tx = -EINVAL;
++}
++
++/*
++ * Called from tasklet with TXRDY interrupt is disabled.
++ */
++static void atmel_tx_dma(struct uart_port *port)
++{
++	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
++	struct circ_buf *xmit = &port->state->xmit;
++	struct dma_chan *chan = atmel_port->chan_tx;
++	struct dma_async_tx_descriptor *desc;
++	struct scatterlist *sg = &atmel_port->sg_tx;
++
++	/* Make sure we have an idle channel */
++	if (atmel_port->desc_tx != NULL)
++		return;
++
++	if (!uart_circ_empty(xmit) && !uart_tx_stopped(port)) {
++		/*
++		 * DMA is idle now.
++		 * Port xmit buffer is already mapped,
++		 * and it is one page... Just adjust
++		 * offsets and lengths. Since it is a circular buffer,
++		 * we have to transmit till the end, and then the rest.
++		 * Take the port lock to get a
++		 * consistent xmit buffer state.
++		 */
++		sg->offset = xmit->tail & (UART_XMIT_SIZE - 1);
++		sg_dma_address(sg) = (sg_dma_address(sg) &
++					~(UART_XMIT_SIZE - 1))
++					+ sg->offset;
++		sg_dma_len(sg) = CIRC_CNT_TO_END(xmit->head,
++						xmit->tail,
++						UART_XMIT_SIZE);
++		BUG_ON(!sg_dma_len(sg));
++
++		desc = dmaengine_prep_slave_sg(chan,
++						sg,
++						1,
++						DMA_MEM_TO_DEV,
++						DMA_PREP_INTERRUPT |
++						DMA_CTRL_ACK);
++		if (!desc) {
++			dev_err(port->dev, "Failed to send via dma!\n");
++			return;
++		}
++
++		dma_sync_sg_for_device(port->dev, sg, 1, DMA_MEM_TO_DEV);
++
++		atmel_port->desc_tx = desc;
++		desc->callback = atmel_dma_tx_complete;
++		desc->callback_param = atmel_port;
++		atmel_port->cookie_tx = dmaengine_submit(desc);
++
++	} else {
++		if (atmel_port->rs485.flags & SER_RS485_ENABLED) {
++			/* DMA done, stop TX, start RX for RS485 */
++			atmel_start_rx(port);
++		}
++	}
++
++	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
++		uart_write_wakeup(port);
++}
++
++static void atmel_tx_request_dma(struct atmel_uart_port *atmel_port)
++{
++	struct uart_port	*port;
++	dma_cap_mask_t		mask;
++	struct dma_slave_config config;
++	int ret, nent;
++
++	if (atmel_port == NULL)
++		return;
++
++	port = &(atmel_port->uart);
++
++	dma_cap_zero(mask);
++	dma_cap_set(DMA_SLAVE, mask);
++
++	atmel_port->chan_tx = dma_request_slave_channel(port->dev, "tx");
++	if (atmel_port->chan_tx == NULL)
++		goto chan_err;
++	dev_info(port->dev, "using %s for tx DMA transfers\n",
++		dma_chan_name(atmel_port->chan_tx));
++	atmel_port->use_dma_tx = 1;
++
++	spin_lock_init(&atmel_port->lock_tx);
++	sg_init_table(&atmel_port->sg_tx, 1);
++	/* UART circular tx buffer is an aligned page. */
++	BUG_ON((int)port->state->xmit.buf & ~PAGE_MASK);
++	sg_set_page(&atmel_port->sg_tx,
++			virt_to_page(port->state->xmit.buf),
++			UART_XMIT_SIZE,
++			(int)port->state->xmit.buf & ~PAGE_MASK);
++			nent = dma_map_sg(port->dev,
++					&atmel_port->sg_tx,
++					1,
++					DMA_MEM_TO_DEV);
++
++	if (!nent)
++		dev_dbg(port->dev, "need to release resource of dma\n");
++	else
++		dev_dbg(port->dev, "%s: mapped %d@%p to %x\n", __func__,
++			sg_dma_len(&atmel_port->sg_tx),
++			port->state->xmit.buf,
++			sg_dma_address(&atmel_port->sg_tx));
++
++	/* Configure the slave DMA */
++	memset(&config, 0, sizeof(config));
++	config.direction = DMA_MEM_TO_DEV;
++	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++	config.dst_addr = port->mapbase + ATMEL_US_THR;
++
++	ret = dmaengine_device_control(atmel_port->chan_tx,
++					DMA_SLAVE_CONFIG,
++					(unsigned long)&config);
++	if (ret) {
++		dev_err(port->dev, "DMA tx slave configuration failed\n");
++		goto chan_err;
++	}
++
++	return;
++
++chan_err:
++	dev_err(port->dev, "TX channel not available, switch to pio\n");
++	atmel_port->use_dma_tx = 0;
++	if (atmel_port->chan_tx)
++		atmel_tx_dma_release(atmel_port);
++	return;
++}
++
  /*
-  * Called from tasklet with ENDTX and TXBUFE interrupts disabled.
+  * receive interrupt handler.
   */
--static void atmel_tx_dma(struct uart_port *port)
-+static void atmel_tx_pdc(struct uart_port *port)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 	struct circ_buf *xmit = &port->state->xmit;
-@@ -778,7 +778,7 @@ static void atmel_rx_from_ring(struct uart_port *port)
- 	spin_lock(&port->lock);
- }
+@@ -870,6 +1063,8 @@ static void atmel_tasklet_func(unsigned long data)
  
--static void atmel_rx_from_dma(struct uart_port *port)
-+static void atmel_rx_from_pdc(struct uart_port *port)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 	struct tty_port *tport = &port->state->port;
-@@ -868,8 +868,8 @@ static void atmel_tasklet_func(unsigned long data)
- 	/* The interrupt handler does not take the lock */
- 	spin_lock(&port->lock);
- 
--	if (atmel_use_dma_tx(port))
--		atmel_tx_dma(port);
-+	if (atmel_use_pdc_tx(port))
-+		atmel_tx_pdc(port);
+ 	if (atmel_use_pdc_tx(port))
+ 		atmel_tx_pdc(port);
++	else if (atmel_use_dma_tx(port))
++		atmel_tx_dma(port);
  	else
  		atmel_tx_chars(port);
  
-@@ -893,8 +893,8 @@ static void atmel_tasklet_func(unsigned long data)
- 		atmel_port->irq_status_prev = status;
+@@ -977,6 +1172,8 @@ static int atmel_startup(struct uart_port *port)
+ 		pdc->ofs = 0;
  	}
  
--	if (atmel_use_dma_rx(port))
--		atmel_rx_from_dma(port);
-+	if (atmel_use_pdc_rx(port))
-+		atmel_rx_from_pdc(port);
- 	else
- 		atmel_rx_from_ring(port);
- 
-@@ -930,7 +930,7 @@ static int atmel_startup(struct uart_port *port)
++	atmel_tx_request_dma(atmel_port);
++
  	/*
- 	 * Initialize DMA (if necessary)
- 	 */
--	if (atmel_use_dma_rx(port)) {
-+	if (atmel_use_pdc_rx(port)) {
- 		int i;
- 
- 		for (i = 0; i < 2; i++) {
-@@ -964,7 +964,7 @@ static int atmel_startup(struct uart_port *port)
- 		UART_PUT_RNPR(port, atmel_port->pdc_rx[1].dma_addr);
- 		UART_PUT_RNCR(port, PDC_BUFFER_SIZE);
+ 	 * If there is a specific "open" function (to register
+ 	 * control line interrupts)
+@@ -1053,6 +1250,8 @@ static void atmel_shutdown(struct uart_port *port)
+ 				 DMA_TO_DEVICE);
  	}
--	if (atmel_use_dma_tx(port)) {
-+	if (atmel_use_pdc_tx(port)) {
- 		struct atmel_dma_buffer *pdc = &atmel_port->pdc_tx;
- 		struct circ_buf *xmit = &port->state->xmit;
  
-@@ -1000,7 +1000,7 @@ static int atmel_startup(struct uart_port *port)
- 	/* enable xmit & rcvr */
- 	UART_PUT_CR(port, ATMEL_US_TXEN | ATMEL_US_RXEN);
- 
--	if (atmel_use_dma_rx(port)) {
-+	if (atmel_use_pdc_rx(port)) {
- 		/* set UART timeout */
- 		UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
- 		UART_PUT_CR(port, ATMEL_US_STTTO);
-@@ -1031,7 +1031,7 @@ static void atmel_shutdown(struct uart_port *port)
++	if (atmel_use_dma_tx(port))
++		atmel_tx_dma_release(atmel_port);
  	/*
- 	 * Shut-down the DMA.
+ 	 * Disable all interrupts, port and break condition.
  	 */
--	if (atmel_use_dma_rx(port)) {
-+	if (atmel_use_pdc_rx(port)) {
- 		int i;
- 
- 		for (i = 0; i < 2; i++) {
-@@ -1044,7 +1044,7 @@ static void atmel_shutdown(struct uart_port *port)
- 			kfree(pdc->buf);
- 		}
- 	}
--	if (atmel_use_dma_tx(port)) {
-+	if (atmel_use_pdc_tx(port)) {
- 		struct atmel_dma_buffer *pdc = &atmel_port->pdc_tx;
- 
- 		dma_unmap_single(port->dev,
-@@ -1080,7 +1080,7 @@ static void atmel_flush_buffer(struct uart_port *port)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 
--	if (atmel_use_dma_tx(port)) {
-+	if (atmel_use_pdc_tx(port)) {
- 		UART_PUT_TCR(port, 0);
- 		atmel_port->pdc_tx.ofs = 0;
- 	}
-@@ -1193,7 +1193,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
- 	if (termios->c_iflag & (BRKINT | PARMRK))
- 		port->read_status_mask |= ATMEL_US_RXBRK;
- 
--	if (atmel_use_dma_rx(port))
-+	if (atmel_use_pdc_rx(port))
- 		/* need to enable error interrupts */
- 		UART_PUT_IER(port, port->read_status_mask);
- 
-@@ -1429,14 +1429,14 @@ static void atmel_of_init_port(struct atmel_uart_port *atmel_port,
- 	u32 rs485_delay[2];
- 
- 	/* DMA/PDC usage specification */
--	if (of_get_property(np, "atmel,use-dma-rx", NULL))
--		atmel_port->use_dma_rx	= 1;
-+	if (of_get_property(np, "atmel,use-pdc-rx", NULL))
-+		atmel_port->use_pdc_rx	= 1;
- 	else
--		atmel_port->use_dma_rx	= 0;
--	if (of_get_property(np, "atmel,use-dma-tx", NULL))
--		atmel_port->use_dma_tx	= 1;
-+		atmel_port->use_pdc_rx	= 0;
-+	if (of_get_property(np, "atmel,use-pdc-tx", NULL))
-+		atmel_port->use_pdc_tx	= 1;
- 	else
--		atmel_port->use_dma_tx	= 0;
-+		atmel_port->use_pdc_tx	= 0;
- 
- 	/* rs485 properties */
- 	if (of_property_read_u32_array(np, "rs485-rts-delay",
-@@ -1467,8 +1467,8 @@ static void atmel_init_port(struct atmel_uart_port *atmel_port,
- 	if (pdev->dev.of_node) {
- 		atmel_of_init_port(atmel_port, pdev->dev.of_node);
+@@ -1469,6 +1668,7 @@ static void atmel_init_port(struct atmel_uart_port *atmel_port,
  	} else {
--		atmel_port->use_dma_rx	= pdata->use_dma_rx;
--		atmel_port->use_dma_tx	= pdata->use_dma_tx;
-+		atmel_port->use_pdc_rx	= pdata->use_pdc_rx;
-+		atmel_port->use_pdc_tx	= pdata->use_pdc_tx;
+ 		atmel_port->use_pdc_rx	= pdata->use_pdc_rx;
+ 		atmel_port->use_pdc_tx	= pdata->use_pdc_tx;
++		atmel_port->use_dma_tx	= 0;
  		atmel_port->rs485	= pdata->rs485;
  	}
  
-@@ -1505,7 +1505,7 @@ static void atmel_init_port(struct atmel_uart_port *atmel_port,
- 	/* Use TXEMPTY for interrupt when rs485 else TXRDY or ENDTX|TXBUFE */
- 	if (atmel_port->rs485.flags & SER_RS485_ENABLED)
- 		atmel_port->tx_done_mask = ATMEL_US_TXEMPTY;
--	else if (atmel_use_dma_tx(port)) {
-+	else if (atmel_use_pdc_tx(port)) {
- 		port->fifosize = PDC_BUFFER_SIZE;
- 		atmel_port->tx_done_mask = ATMEL_US_ENDTX | ATMEL_US_TXBUFE;
- 	} else {
-@@ -1794,7 +1794,7 @@ static int atmel_serial_probe(struct platform_device *pdev)
- 		goto err;
- 	}
- 
--	if (!atmel_use_dma_rx(&port->uart)) {
-+	if (!atmel_use_pdc_rx(&port->uart)) {
- 		ret = -ENOMEM;
- 		data = kmalloc(sizeof(struct atmel_uart_char)
- 				* ATMEL_SERIAL_RINGSIZE, GFP_KERNEL);
 diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
-index 6a293b7..8965fed 100644
+index 8965fed..6f5a7c6 100644
 --- a/include/linux/platform_data/atmel.h
 +++ b/include/linux/platform_data/atmel.h
-@@ -76,8 +76,8 @@ struct atmel_nand_data {
-  /* Serial */
- struct atmel_uart_data {
+@@ -78,6 +78,7 @@ struct atmel_uart_data {
  	int			num;		/* port num */
--	short			use_dma_tx;	/* use transmit DMA? */
--	short			use_dma_rx;	/* use receive DMA? */
-+	short			use_pdc_tx;	/* use transmit PDC? */
-+	short			use_pdc_rx;	/* use receive PDC? */
+ 	short			use_pdc_tx;	/* use transmit PDC? */
+ 	short			use_pdc_rx;	/* use receive PDC? */
++	short			use_dma_tx;	/* use transmit DMA? */
  	void __iomem		*regs;		/* virt. base address, if any */
  	struct serial_rs485	rs485;		/* rs485 settings */
  };
