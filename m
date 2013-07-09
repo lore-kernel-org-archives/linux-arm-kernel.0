@@ -1,52 +1,80 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 9 Jul 2013 15:44:58 +0530
-Subject: [PATCH 09/12] ARM: DRA7: hwmod: Create initial DRA7XX SoC data
-In-Reply-To: <20130709083152.GC5523@atomide.com>
-References: <1373355139-12487-1-git-send-email-rnayak@ti.com>
- <1373355139-12487-10-git-send-email-rnayak@ti.com>
- <20130709083152.GC5523@atomide.com>
-Message-ID: <51DBE2A2.2040403@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 9 Jul 2013 13:20:22 +0300
+Subject: [PATCH v2] arm: dts: AM43x: Add usb_otg_hs node
+In-Reply-To: <1373361446-30050-1-git-send-email-george.cherian@ti.com>
+References: <1373361446-30050-1-git-send-email-george.cherian@ti.com>
+Message-ID: <20130709102022.GH5552@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 July 2013 02:01 PM, Tony Lindgren wrote:
-> * Rajendra Nayak <rnayak@ti.com> [130709 00:39]:
->> From: Ambresh K <ambresh@ti.com>
+On Tue, Jul 09, 2013 at 02:47:26PM +0530, George Cherian wrote:
+> Adds device node for HS USB Host module for AM437x
 > 
->> --- /dev/null
->> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> ...
+> changes from v1
 > 
->> +/* dma_system */
->> +static struct omap_hwmod_irq_info dra7xx_dma_system_irqs[] = {
->> +	{ .name = "0", .irq = 12 + DRA7XX_IRQ_GIC_START },
->> +	{ .name = "1", .irq = 13 + DRA7XX_IRQ_GIC_START },
->> +	{ .name = "2", .irq = 14 + DRA7XX_IRQ_GIC_START },
->> +	{ .name = "3", .irq = 15 + DRA7XX_IRQ_GIC_START },
->> +	{ .irq = -1 }
->> +};
-> 
-> I think these should no longer be needed?
+> renamed synopsis to snps
+> removed flag tx-fifo-resize
 
-These are needed only for dma because mach-omap2/dma.c still creates
-devices from hmwod and which are used by plat/dma.c.
-These irqs for sdma exist even in the cleaned up omap4 and omap5 hmwod files.
-I'll try and get rid of that dependency of plat/dma on mach/dma to create devices.
+the patch revision changes don't need to go to the commit log,
+they should be placed after the tearline (---) and before the diffstat.
 
+> Signed-off-by: George Cherian <george.cherian@ti.com>
+> ---
+>  arch/arm/boot/dts/am4372.dtsi | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
 > 
-> In general, we must move the hwmod stuff to drivers/bus and start
-> parsing the data from device tree along the lines Tero is doing
-> for the clock data.
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index ddc1df7..c9e0da8 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -64,5 +64,23 @@
+>  			compatible = "ti,am4372-counter32k","ti,omap-counter32k";
+>  			reg = <0x44e86000 0x40>;
+>  		};
+> +
+> +		usb_otg_hs1: am4372_dwc3 at 48380000 {
 
-We already have irq/dma and iospace moved to DT (some iospace info still
-exists because of non-DT drivers). With Teros patches to move clock data we
-should be able to pass the main_clk and all interface level clock info too
-from DT.
+dtsi should always have status = "disabled"; no ?
 
-> 
-> What's the plan for doing that?
-> 
-> Regards,
-> 
-> Tony
-> 
+> +			compatible = "ti,am437x-dwc3";
+> +			reg = <0x48380000 0x1ff>;
+
+weird size, shouldn't this be 0x200 ?
+
+> +			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			utmi-mode = <1>;
+> +			ranges;
+> +
+> +			dwc3 at 48390000 {
+
+dtsi should always have status = "disabled"; no ?
+
+> +				compatible = "snps,dwc3";
+> +				reg = <0x48390000 0xcfff>;
+
+weird size, shouldn't this be 0xd000 then the size would be exactly
+52KiB
+
+> +				interrupts = <GIC_SPI  168 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +		};
+> +		
+
+there two trailing tabs on this line.
+
+Another thing: am437x has 4 instances of this IP, why are you adding
+only one ? And why aren't you pasing the PHY nodes here ? The device
+won't work without its PHYs.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/29ec9e9f/attachment.sig>
