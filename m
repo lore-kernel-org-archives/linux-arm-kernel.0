@@ -1,61 +1,56 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 9 Jul 2013 22:03:19 +0900
-Subject: [PATCH] ARM: shmobile: Add SMSC ethernet chip to KZM9D DT
- reference
-In-Reply-To: <51DBF7CD.8040009@cogentembedded.com>
-References: <20130709042654.13658.20164.sendpatchset@w520>
- <51DBF7CD.8040009@cogentembedded.com>
-Message-ID: <CANqRtoQfkk9KFggw5dadqih-kqNTCGC+kVCKkOUO8G=1w+kh6g@mail.gmail.com>
+Date: Tue, 9 Jul 2013 22:05:15 +0900
+Subject: [PATCH 01/02] ARM: shmobile: Introduce r8a7790_read_mode_pins()
+In-Reply-To: <51DC08A5.2080705@cogentembedded.com>
+References: <20130709125007.4388.15701.sendpatchset@w520>
+ <20130709125016.4388.47414.sendpatchset@w520>
+ <51DC08A5.2080705@cogentembedded.com>
+Message-ID: <CANqRtoTvSGvNWwBQ9XD43CtdJNJCebzC2xtXUQcFSXxATkuNpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sergei,
 
-On Tue, Jul 9, 2013 at 8:45 PM, Sergei Shtylyov
+On Tue, Jul 9, 2013 at 9:57 PM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
 > Hello.
 >
 >
-> On 09-07-2013 8:26, Magnus Damm wrote:
+> On 09-07-2013 16:50, Magnus Damm wrote:
 >
 >> From: Magnus Damm <damm@opensource.se>
 >
 >
->> Add support for the SMSC ethernet controller found
->> on the KZM9D board to the KZM9D DT Reference code.
+>> Break out the r8a7790 boot mode code into a separate
+>> function so it can be shared by multiple users.
 >
 >
 >> Signed-off-by: Magnus Damm <damm@opensource.se>
 >> ---
 >
 >
->>   Built on top of renesas-next-20130704v2 and
->>   [PATCH] ARM: shmobile: KZM9D DT reference implementation
->
->
->>   arch/arm/boot/dts/emev2-kzm9d-reference.dts |   31
->> +++++++++++++++++++++++++++
->>   1 file changed, 31 insertions(+)
->
->
->> --- 0002/arch/arm/boot/dts/emev2-kzm9d-reference.dts
->> +++ work/arch/arm/boot/dts/emev2-kzm9d-reference.dts    2013-07-09
->> 13:06:47.000000000 +0900
->> @@ -23,4 +23,35 @@
->
 > [...]
+>
+>
+>> --- 0001/arch/arm/mach-shmobile/setup-r8a7790.c
+>> +++ work/arch/arm/mach-shmobile/setup-r8a7790.c 2013-07-09
+>> 19:59:37.000000000 +0900
+>> @@ -201,6 +201,20 @@ void __init r8a7790_add_standard_devices
+>>         r8a7790_register_thermal();
+>>   }
 >>
->> +       lan9220 at 20000000 {
+>> +#define MODEMR 0xe6160060
+>> +
+>> +u32 __init r8a7790_read_mode_pins(void)
+>> +{
+>> +       void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
 >
 >
->    Shouldn't all the Ethernet nodes be called "ethernet"?
+>    Why ioremap the whole page if you only need 4 bytes, and the address is
+> not aligned to page?
 
-Good question. Grepping in arch/arm/boot/dts shows various ways to
-name the Ethernet nodes. Exactly what is correct or not I can't really
-say.
+Because the original code did so. =)
 
-Thanks for your feedback.
-
-Cheers,
+But yes, indeed, using two pages seems kind of pointless.
 
 / magnus
