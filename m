@@ -1,43 +1,56 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue,  9 Jul 2013 13:41:16 -0300
-Subject: [PATCH v7 14/22] bus: mvebu-mbus: Update main description
+Date: Tue,  9 Jul 2013 13:41:17 -0300
+Subject: [PATCH v7 15/22] bus: mvebu-mbus: Factorize Armada 370/XP data
+ structures
 In-Reply-To: <1373388084-29520-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1373388084-29520-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1373388084-29520-15-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1373388084-29520-16-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-After replacing the MBus name-based by the new ID-based API
-let's fix the general description of the driver at the beginning
-of the file.
+These structures were only different in the mapping tables.
+Now that those tables have been removed, it doesn't make any sense
+to keep different structures.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/bus/mvebu-mbus.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ drivers/bus/mvebu-mbus.c | 14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index e13d475..f6e9192 100644
+index f6e9192..d0a61ce 100644
 --- a/drivers/bus/mvebu-mbus.c
 +++ b/drivers/bus/mvebu-mbus.c
-@@ -35,13 +35,9 @@
-  *
-  * - Provides an API for platform code or device drivers to
-  *   dynamically add or remove address decoding windows for the CPU ->
-- *   device accesses. This API is mvebu_mbus_add_window(),
-- *   mvebu_mbus_add_window_remap_flags() and
-- *   mvebu_mbus_del_window(). Since the (target, attribute) values
-- *   differ from one SoC family to another, the API uses a 'const char
-- *   *' string to identify devices, and this driver is responsible for
-- *   knowing the mapping between the name of a device and its
-- *   corresponding (target, attribute) in the current SoC family.
-+ *   device accesses. This API is mvebu_mbus_add_window_by_id(),
-+ *   mvebu_mbus_add_window_remap_by_id() and
-+ *   mvebu_mbus_del_window().
-  *
-  * - Provides a debugfs interface in /sys/kernel/debug/mvebu-mbus/ to
-  *   see the list of CPU -> SDRAM windows and their configuration
+@@ -536,15 +536,7 @@ mvebu_mbus_dove_setup_cpu_target(struct mvebu_mbus_state *mbus)
+ 	mvebu_mbus_dram_info.num_cs = cs;
+ }
+ 
+-static const struct mvebu_mbus_soc_data armada_370_mbus_data = {
+-	.num_wins            = 20,
+-	.num_remappable_wins = 8,
+-	.win_cfg_offset      = armada_370_xp_mbus_win_offset,
+-	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
+-	.show_cpu_target     = mvebu_sdram_debug_show_orion,
+-};
+-
+-static const struct mvebu_mbus_soc_data armada_xp_mbus_data = {
++static const struct mvebu_mbus_soc_data armada_370_xp_mbus_data = {
+ 	.num_wins            = 20,
+ 	.num_remappable_wins = 8,
+ 	.win_cfg_offset      = armada_370_xp_mbus_win_offset,
+@@ -604,9 +596,9 @@ static const struct mvebu_mbus_soc_data mv78xx0_mbus_data = {
+  */
+ static const struct of_device_id of_mvebu_mbus_ids[] = {
+ 	{ .compatible = "marvell,armada370-mbus",
+-	  .data = &armada_370_mbus_data, },
++	  .data = &armada_370_xp_mbus_data, },
+ 	{ .compatible = "marvell,armadaxp-mbus",
+-	  .data = &armada_xp_mbus_data, },
++	  .data = &armada_370_xp_mbus_data, },
+ 	{ .compatible = "marvell,kirkwood-mbus",
+ 	  .data = &kirkwood_mbus_data, },
+ 	{ .compatible = "marvell,dove-mbus",
 -- 
 1.8.1.5
