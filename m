@@ -1,33 +1,50 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 9 Jul 2013 20:52:41 +0800
-Subject: [PATCH 3/3] ARM:dts:vf610-twr:Enable DSPI0 devices and Flash
- at26df081a
-In-Reply-To: <20130709100723.GS27646@sirena.org.uk>
-References: <1373272622-29064-1-git-send-email-b44548@freescale.com>
- <1373272622-29064-3-git-send-email-b44548@freescale.com>
- <20130708113600.GU27646@sirena.org.uk>
- <20130709052925.GD16656@S2101-09.ap.freescale.net>
- <20130709100723.GS27646@sirena.org.uk>
-Message-ID: <20130709125239.GA2813@S2101-09.ap.freescale.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 09 Jul 2013 16:57:09 +0400
+Subject: [PATCH 01/02] ARM: shmobile: Introduce r8a7790_read_mode_pins()
+In-Reply-To: <20130709125016.4388.47414.sendpatchset@w520>
+References: <20130709125007.4388.15701.sendpatchset@w520>
+ <20130709125016.4388.47414.sendpatchset@w520>
+Message-ID: <51DC08A5.2080705@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 09, 2013 at 11:07:23AM +0100, Mark Brown wrote:
-> On Tue, Jul 09, 2013 at 01:29:27PM +0800, Shawn Guo wrote:
-> > On Mon, Jul 08, 2013 at 12:36:01PM +0100, Mark Brown wrote:
-> 
-> > > This should be fine to merge via arm-soc, it's no real dependency on the
-> > > actual SPI driver.
-> 
-> > It has dependency on the actual SPI driver where the DT bindings are
-> > defined, so I would only take the patches after the driver parts gets
-> > accepted.
-> 
-> The bindings are all totally generic ones for a SPI controller, there's
-> nothing controversial or even device specific about them so I'm happy to
-> say the bindings are fine as-is.
+Hello.
 
-Am I missing something?  I do not even see a bindings doc in patch #1.
-How can I think the bindings are fine?
+On 09-07-2013 16:50, Magnus Damm wrote:
 
-Shawn
+> From: Magnus Damm <damm@opensource.se>
+
+> Break out the r8a7790 boot mode code into a separate
+> function so it can be shared by multiple users.
+
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+
+[...]
+
+> --- 0001/arch/arm/mach-shmobile/setup-r8a7790.c
+> +++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-07-09 19:59:37.000000000 +0900
+> @@ -201,6 +201,20 @@ void __init r8a7790_add_standard_devices
+>   	r8a7790_register_thermal();
+>   }
+>
+> +#define MODEMR 0xe6160060
+> +
+> +u32 __init r8a7790_read_mode_pins(void)
+> +{
+> +	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
+
+    Why ioremap the whole page if you only need 4 bytes, and the address 
+is not aligned to page?
+
+> +	u32 mode;
+> +
+> +	BUG_ON(!modemr);
+> +	mode = ioread32(modemr);
+> +	iounmap(modemr);
+> +
+> +	return mode;
+> +}
+> +
+
+WBR, Sergei
