@@ -1,45 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 9 Jul 2013 09:05:41 +0200
-Subject: [PATCH] of: match the compatible in the order set by the dts file
-In-Reply-To: <1373013818-11365-1-git-send-email-b32955@freescale.com>
-References: <1373013818-11365-1-git-send-email-b32955@freescale.com>
-Message-ID: <20130709070541.GQ516@pengutronix.de>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Tue, 09 Jul 2013 08:05:13 +0100
+Subject: [PATCH v1 0/4] ARM: STi fixes and ethernet support
+In-Reply-To: <201307090118.06715.arnd@arndb.de>
+References: <1373271301-11060-1-git-send-email-srinivas.kandagatla@st.com>
+ <201307090118.06715.arnd@arndb.de>
+Message-ID: <51DBB629.1050000@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 05, 2013 at 04:43:38PM +0800, Huang Shijie wrote:
-> If we set the uart compatible in the dts file like this:
->    ------------------------------------------------------
->     compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
->    ------------------------------------------------------
+Thanks Arnd,
+On 09/07/13 00:18, Arnd Bergmann wrote:
+> On Monday 08 July 2013, Srinivas KANDAGATLA wrote:
+>> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>>
+>> This patch series fixes 2 configuration issues and adds ethernet support to
+>> STiH415, STiH416 based B2000, B2020 boards.
 > 
-> and we set the uart compatible in the uart driver like this:
->    ------------------------------------------------------
-> 	{ .compatible = "fsl,imx1-uart", ... },
-> 	{ .compatible = "fsl,imx21-uart", ... },
-> 	{ .compatible = "fsl,imx6q-uart", ... },
-> 	{ /* sentinel */ }
->    ------------------------------------------------------
+> Hi Srini,
 > 
-> the current code will match the "fsl,imx21-uart" in the end.
+> You really have to send those things separately, as the bug fixes should
+> probably go into 3.11, while the rest is new features and needs to be
+> reviewed for merging into 3.12.
+Yes, I will resend the fixes separately.
 > 
-> Of course, this is not what we want. We want it to match the "fsl,imx6q-uart".
+> I'm also puzzled by the fact that you add auxdata and callback
+> functions for the ether part in the platform code. Those should
+> probably all be properties added to the stmmac binding.
+
+stmmac (aka "dwmac" a synopsis IP) driver is integrated in to kernel
+sometime in 2.6 series I think :-), and Is used by more than 4 platforms
+in 3.10 kernel. The driver is more generic than it sounds.
+So adding properties/hooks specific to STiH41x SOCs in driver seemed to
+incorrect. Instead doing platform specific bits in the mach via
+callbacks was the only choice I had.
+
+Thanks,
+srini
+
 > 
-> This patch rewrites the match code, and make it to check the compatible
-> in the order set by the DTS file.
-
-Why don't you set the matching order in the driver the way you want it
-to be, i.e.:
-
-	{ .compatible = "fsl,imx6q-uart", ... },
-	{ .compatible = "fsl,imx21-uart", ... },
-	{ .compatible = "fsl,imx1-uart", ... },
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 	Arnd
+> 
