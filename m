@@ -1,103 +1,52 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 9 Jul 2013 13:25:00 +0200
-Subject: [PATCH 5/7] serial: at91: distinguish usart and uart
-In-Reply-To: <1373351626-30143-6-git-send-email-elen.song@atmel.com>
-References: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
- <1373351626-30143-6-git-send-email-elen.song@atmel.com>
-Message-ID: <20130709112500.GC18012@ns203013.ovh.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 9 Jul 2013 14:27:51 +0300
+Subject: [PATCH v2] arm: dts: AM43x: Add usb_otg_hs node
+In-Reply-To: <51DBF23F.20103@ti.com>
+References: <1373361446-30050-1-git-send-email-george.cherian@ti.com>
+ <20130709102022.GH5552@arwen.pp.htv.fi> <51DBF23F.20103@ti.com>
+Message-ID: <20130709112751.GI5552@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:33 Tue 09 Jul     , Elen Song wrote:
-> Distinguish usart and uart by read ip name register,
-> dbgu regards as uart.
-> 
-> Signed-off-by: Elen Song <elen.song@atmel.com>
-> ---
->  drivers/tty/serial/atmel_serial.c |   35 +++++++++++++++++++++++++++++++++++
->  include/linux/atmel_serial.h      |    2 ++
->  2 files changed, 37 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 52beb7e..5762244 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -99,6 +99,7 @@ static void atmel_stop_rx(struct uart_port *port);
->  #define UART_PUT_BRGR(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_BRGR)
->  #define UART_PUT_RTOR(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_RTOR)
->  #define UART_PUT_TTGR(port, v)	__raw_writel(v, (port)->membase + ATMEL_US_TTGR)
-> +#define UART_GET_IP_NAME(port)	__raw_readl((port)->membase + ATMEL_US_NAME)
->  
->   /* PDC registers */
->  #define UART_PUT_PTCR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_PTCR)
-> @@ -169,6 +170,7 @@ struct atmel_uart_port {
->  	struct serial_rs485	rs485;		/* rs485 settings */
->  	unsigned int		tx_done_mask;
->  	struct timer_list 	uart_timer;	/* dbgu timer */
-> +	bool			is_usart;	/* usart or uart */
->  };
->  
->  static struct atmel_uart_port atmel_ports[ATMEL_MAX_UART];
-> @@ -1328,6 +1330,34 @@ static void atmel_tasklet_func(unsigned long data)
->  }
->  
->  /*
-> + * Get ip name usart or uart
-> + */
-> +static inline unsigned int atmel_get_ip_name(struct uart_port *port)
-> +{
-> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-> +	unsigned int name = cpu_to_be32(UART_GET_IP_NAME(port));
-> +	char *ip_name = (char *)&name;
-> +	char *usart = "USAR";
-> +	char *uart = "DBGU";
-> +
-> +	atmel_port->is_usart = false;
-> +
-> +	/* USAR is regards as usart, DBGU is regards as uart */
-> +	if (!strncmp(ip_name, usart, 4)) {
-> +		dev_dbg(port->dev, "This is usart\n");
-> +		atmel_port->is_usart = true;
-> +	} else if (!strncmp(ip_name, uart, 4)) {
-> +		dev_dbg(port->dev, "This is uart\n");
-> +		atmel_port->is_usart = false;
-do not use string just value
-> +	} else {
-> +		dev_err(port->dev, "Not supported ip name, set to uart\n");
-> +		return -EINVAL;
-> +	}
+Hi,
 
-> +
-> +	return 0;
-> +}
-> +
-> +/*
->   * Perform initialization and enable port for reception
->   */
->  static int atmel_startup(struct uart_port *port)
-> @@ -1354,6 +1384,11 @@ static int atmel_startup(struct uart_port *port)
->  	}
->  
->  	/*
-> +	 * Get port name of usart or uart
-> +	 */
-> +	atmel_get_ip_name(port);
-> +
-> +	/*
->  	 * Initialize DMA (if necessary)
->  	 */
->  	if (atmel_use_pdc_rx(port)) {
-> diff --git a/include/linux/atmel_serial.h b/include/linux/atmel_serial.h
-> index fd68337..be201ca 100644
-> --- a/include/linux/atmel_serial.h
-> +++ b/include/linux/atmel_serial.h
-> @@ -124,4 +124,6 @@
->  #define ATMEL_US_NER		0x44			/* Number of Errors Register */
->  #define ATMEL_US_IF		0x4c			/* IrDA Filter Register */
->  
-> +#define ATMEL_US_NAME		0xf0			/* Ip Name */
-> +
->  #endif
-> -- 
-> 1.7.9.5
+On Tue, Jul 09, 2013 at 04:51:35PM +0530, George Cherian wrote:
+> >>+				compatible = "snps,dwc3";
+> >>+				reg = <0x48390000 0xcfff>;
+> >weird size, shouldn't this be 0xd000 then the size would be exactly
+> >52KiB
 > 
+> okay
+
+btw, the reason here is that when you call devm_ioremap_resource(), that
+will call resource_size() which does:
+
+	size = res->end - res->start - 1;
+
+so you need this extra 1 on the size when passing it via DT.
+
+> >Another thing: am437x has 4 instances of this IP, why are you adding
+> >only one ?
+> 
+> AM437x has got only 2 instances. I have verified only one on HAPS so
+> adding only one.
+
+weird, on my TRM I see for dwc3 but 2 PHYs.
+
+> >And why aren't you pasing the PHY nodes here ? The device
+> >won't work without its PHYs.
+> 
+> Yes true, again in HAPS I  didnt have any PHY configuration to be done.
+
+alright, but we should still pass the PHY right ? once silicon comes,
+we want this to work without any further changers.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/0b64e433/attachment.sig>
