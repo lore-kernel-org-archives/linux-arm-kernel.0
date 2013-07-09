@@ -1,134 +1,67 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 9 Jul 2013 08:43:36 -0500
-Subject: [PATCHv4 05/11] of: pci: add registry of MSI chips
-In-Reply-To: <1372686136-1370-6-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1372686136-1370-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CAL_Jsq+h=y5SNo4qO5-5u_w8rW++9MKDZK8rASNjhtVcjh-iyQ@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 9 Jul 2013 16:55:23 +0300
+Subject: [PATCH] ARM: OMAP3: Beagle: Fix USB Host on beagle xM Ax/Bx
+In-Reply-To: <51DC09E7.1070302@denx.de>
+References: <1366024808-4691-1-git-send-email-rogerq@ti.com>
+ <51DC09E7.1070302@denx.de>
+Message-ID: <51DC164B.5010608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 1, 2013 at 8:42 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> This commit adds a very basic registry of msi_chip structures, so that
-> an IRQ controller driver can register an msi_chip, and a PCIe host
-> controller can find it, based on a 'struct device_node'.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/of/of_pci.c    | 40 ++++++++++++++++++++++++++++++++++++++++
->  include/linux/msi.h    |  2 ++
->  include/linux/of_pci.h | 12 ++++++++++++
->  3 files changed, 54 insertions(+)
->
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 42c687a..f516632 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -89,3 +89,43 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
->         return 0;
->  }
->  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
-> +
-> +#ifdef CONFIG_PCI_MSI
-> +
-> +static LIST_HEAD(msi_chip_list);
-> +static DEFINE_MUTEX(msi_chip_mutex);
-> +
-> +int of_msi_chip_add(struct msi_chip *chip)
+Hi Stefan,
 
-Perhaps of_pci_msi_chip_add instead.
+On 07/09/2013 04:02 PM, Stefan Roese wrote:
+> Roger,
+> 
+> On 04/15/2013 01:20 PM, Roger Quadros wrote:
+>> On Beagle xM Rev. Ax/Bx, the USB power enable GPIO logic is
+>> reversed when compared to other revisions i.e. it is
+>> active high instead of active low.
+>>
+>> Use the beagle_config.usb_pwr_level flag correctly so that
+>> the power regulator can be configured at runtime.
+>>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> 
+> I'm currently trying to use an SMSC95xx USB ethernet adapter on the
+> OMAP3 Beagleboard (old one "Beagle Rev C1/C2/C3") via the OMAP EHCI
+> controller. And am testing this by trying to mount the rootfs via NFS.
+> What I see is that the NFS mounting stalls/hangs most of the time quite
+> early in the mount process:
+> 
+> [    6.425689] VFS: Mounted root (nfs filesystem) on device 0:12.
+> [    6.435485] devtmpfs: mounted
+> [    6.440002] Freeing unused kernel memory: 384K (c077a000 - c07da000)
+> INIT: version 2.88 booting
+> Starting udev
+> [  188.311309] nfs: server 10.0.0.152 not responding, still trying
+> [  188.317687] nfs: server 10.0.0.152 not responding, still trying
+> ...
+> 
+> Only very seldom the rootfs can be mounted successfully to the prompt.
+> 
+> I'm using latest kernel.org for this (git ID d2b4a646 also tested with
+> v3.10 release). This is with DT-enabled booting and without-DT (same
+> problem). I also tested some older Linux kernel versions and it fails
+> there as well. Only v3.2.40 seems to be able to mount this rootfs via
+> NFS reliably (approx. 10 times success).
 
-> +{
-> +       if (! of_property_read_bool(chip->of_node, "msi-controller"))
-> +               return -EINVAL;
-> +
-> +       mutex_lock(&msi_chip_mutex);
-> +       list_add(&chip->list, &msi_chip_list);
-> +       mutex_unlock(&msi_chip_mutex);
-> +
-> +       return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(of_msi_chip_add);
-> +
-> +void of_msi_chip_remove(struct msi_chip *chip)
+I can't really tell at the moment where the problem is.
 
-ditto
+Did you compile in all the necessary drivers required for NFS booting?
+In the beagle case that would mean NOP_USB_XCEIV, USB_EHCI_HCD, USB_EHCI_HCD_OMAP
+and the smsc95xx driver.
 
-> +{
-> +       mutex_lock(&msi_chip_mutex);
-> +       list_del(&chip->list);
-> +       mutex_unlock(&msi_chip_mutex);
-> +}
-> +EXPORT_SYMBOL_GPL(of_msi_chip_remove);
-> +
-> +struct msi_chip *of_find_msi_chip_by_node(struct device_node *of_node)
+If you can paste your full kernel boot log we can check if all these show up
+before the kernel tries to look up for the NFS server.
+> 
+> Is this a known issue on the Beagleboard? Do you have any ideas what
+> might cause such an issue (unreliable USB connection, hangup of NFS
+> mounting)? Any hints/links appretiated.
+> 
 
-ditto.
+I have been too lazy to setup NFS :). But I will give it a shot soon to see what's going
+wrong.
 
-> +{
-> +       struct msi_chip *c;
-> +       list_for_each_entry(c, &msi_chip_list, list) {
-
-Need the safe variant here?
-
-Rob
-
-> +               if (c->of_node == of_node)
-> +                       return c;
-> +       }
-> +
-> +       return NULL;
-> +}
-> +EXPORT_SYMBOL_GPL(of_find_msi_chip_by_node);
-> +
-> +#endif /* CONFIG_PCI_MSI */
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index 5b357d92..9e1a44b 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -66,6 +66,8 @@ void default_teardown_msi_irqs(struct pci_dev *dev);
->  struct msi_chip {
->         struct module *owner;
->         struct device *dev;
-> +       struct device_node *of_node;
-> +       struct list_head list;
->
->         int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
->                          struct msi_desc *desc);
-> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> index 7a04826..99e4361 100644
-> --- a/include/linux/of_pci.h
-> +++ b/include/linux/of_pci.h
-> @@ -2,6 +2,7 @@
->  #define __OF_PCI_H
->
->  #include <linux/pci.h>
-> +#include <linux/msi.h>
->
->  struct pci_dev;
->  struct of_irq;
-> @@ -13,4 +14,15 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
->  int of_pci_get_devfn(struct device_node *np);
->  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
->
-> +#if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-> +int of_msi_chip_add(struct msi_chip *chip);
-> +void of_msi_chip_remove(struct msi_chip *chip);
-> +struct msi_chip *of_find_msi_chip_by_node(struct device_node *of_node);
-> +#else
-> +static inline int of_msi_chip_add(struct msi_chip *chip) { return -EINVAL; }
-> +static inline void of_msi_chip_remove(struct msi_chip *chip) { }
-> +static inline struct msi_chip *
-> +of_find_msi_chip_by_node(struct device_node *of_node) { return NULL };
-> +#endif
-> +
->  #endif
-> --
-> 1.8.1.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+cheers,
+-roger
