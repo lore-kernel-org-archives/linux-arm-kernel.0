@@ -1,69 +1,35 @@
-From: sbabic@denx.de (Stefano Babic)
-Date: Tue, 09 Jul 2013 16:59:57 +0200
-Subject: [PATCH] ARM: dts: imx: add tempmon node for imx6q thermal support
-In-Reply-To: <1370330226-6030-1-git-send-email-shawn.guo@linaro.org>
-References: <1370330008-5982-1-git-send-email-shawn.guo@linaro.org>
- <1370330226-6030-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <51DC256D.6040204@denx.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 9 Jul 2013 23:02:04 +0800
+Subject: [PATCH 3/3] ARM:dts:vf610-twr:Enable DSPI0 devices and Flash
+ at26df081a
+In-Reply-To: <20130709144425.GX27646@sirena.org.uk>
+References: <1373272622-29064-1-git-send-email-b44548@freescale.com>
+ <1373272622-29064-3-git-send-email-b44548@freescale.com>
+ <20130708113600.GU27646@sirena.org.uk>
+ <20130709052925.GD16656@S2101-09.ap.freescale.net>
+ <20130709100723.GS27646@sirena.org.uk>
+ <20130709125239.GA2813@S2101-09.ap.freescale.net>
+ <20130709144425.GX27646@sirena.org.uk>
+Message-ID: <20130709150202.GB2813@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-On 04/06/2013 09:17, Shawn Guo wrote:
-> Mark ocotp as a syscon node and add tempmon for imx6q thermal support.
+On Tue, Jul 09, 2013 at 03:44:25PM +0100, Mark Brown wrote:
+> On Tue, Jul 09, 2013 at 08:52:41PM +0800, Shawn Guo wrote:
+> > On Tue, Jul 09, 2013 at 11:07:23AM +0100, Mark Brown wrote:
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/boot/dts/imx6qdl.dtsi |   11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
+> > > The bindings are all totally generic ones for a SPI controller, there's
+> > > nothing controversial or even device specific about them so I'm happy to
+> > > say the bindings are fine as-is.
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 9e8296e..13e1d7f 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -489,6 +489,13 @@
->  				};
->  			};
->  
-> +			tempmon: tempmon {
-> +				compatible = "fsl,imx6q-tempmon";
-> +				interrupts = <0 49 0x04>;
-> +				fsl,tempmon = <&anatop>;
-> +				fsl,tempmon-data = <&ocotp>;
-> +			};
-> +
->  			usbphy1: usbphy at 020c9000 {
->  				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
->  				reg = <0x020c9000 0x1000>;
-> @@ -747,8 +754,8 @@
->  				interrupts = <0 14 0x04>;
->  			};
->  
-> -			ocotp at 021bc000 {
-> -				compatible = "fsl,imx6q-ocotp";
-> +			ocotp: ocotp at 021bc000 {
-> +				compatible = "fsl,imx6q-ocotp", "syscon";
->  				reg = <0x021bc000 0x4000>;
+> > Am I missing something?  I do not even see a bindings doc in patch #1.
+> > How can I think the bindings are fine?
+> 
+> Hrm, I was sure I was seeing one...  though in any case there's nothing
+> here except for interrupt and DMA hookup so any additional properties
+> aren't going to affect this patch.
 
-Sorry to check this very late - is ocotp at 021bc000 the right address for
-the thermal data ? According to User Manual (Table 62.3), the start
-address is 0x20C8180. Using your patch, by loading the driver I get :
+You are probably talking about patch #2.  But this patch does add two
+properties "spi-num-chipselects" and "bus-num".
 
-imx_thermal tempmon.7: invalid sensor calibration data
-imx_thermal tempmon.7: failed to get sensor data
-imx_thermal: probe of tempmon.7 failed with error -22
-
-The driver is loaded successfully if I changed the tempdata to point to
-020C8180. Not sure if I get the right values from temp1_crit and
-temp1_input, but no error at the initialisation. Am I missing something ?
-
-Best regards,
-Stefano
-
--- 
-=====================================================================
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-53 Fax: +49-8142-66989-80 Email: sbabic at denx.de
-=====================================================================
+Shawn
