@@ -1,9 +1,9 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue,  9 Jul 2013 15:16:05 +0100
-Subject: [PATCH 2/3] arm: virt: ensure visibility of __boot_cpu_mode
+Date: Tue,  9 Jul 2013 15:16:06 +0100
+Subject: [PATCH 3/3] arm64: virt: ensure visibility of __boot_cpu_mode
 In-Reply-To: <1373379366-15689-1-git-send-email-mark.rutland@arm.com>
 References: <1373379366-15689-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1373379366-15689-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1373379366-15689-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,29 +15,28 @@ This patch adds flushing to ensure that writes by secondaries to
 __boot_cpu_mode are made visible before we test against it.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Christoffer Dall <cdall@cs.columbia.edu>
 ---
- arch/arm/include/asm/virt.h | 12 ++++++++++++
- arch/arm/kernel/setup.c     |  2 ++
- 2 files changed, 14 insertions(+)
+ arch/arm64/include/asm/virt.h | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index 50af92b..4371f45 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -29,6 +29,7 @@
- #define BOOT_CPU_MODE_MISMATCH	PSR_N_BIT
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 4398272..24f0ae9 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -21,6 +21,7 @@
+ #define BOOT_CPU_MODE_EL2	(0x0e12b007)
  
  #ifndef __ASSEMBLY__
 +#include <asm/cacheflush.h>
  
- #ifdef CONFIG_ARM_VIRT_EXT
  /*
-@@ -41,10 +42,21 @@
-  */
- extern int __boot_cpu_mode;
+  * __boot_cpu_mode records what mode CPUs were booted in.
+@@ -36,9 +37,20 @@ extern u32 __boot_cpu_mode[2];
+ void __hyp_set_vectors(phys_addr_t phys_vector_base);
+ phys_addr_t __hyp_get_vectors(void);
  
 +static inline void sync_boot_mode(void)
 +{
@@ -46,29 +45,23 @@ index 50af92b..4371f45 100644
 +	 * must flush the corresponding cache entries to ensure the visibility
 +	 * of their writes.
 +	 */
-+	sync_cache_r(&__boot_cpu_mode);
++	__flush_dcache_area(__boot_cpu_mode, sizeof(__boot_cpu_mode));
 +}
 +
- void __hyp_set_vectors(unsigned long phys_vector_base);
- unsigned long __hyp_get_vectors(void);
- #else
- #define __boot_cpu_mode	(SVC_MODE)
-+#define sync_boot_mode()
- #endif
- 
- #ifndef ZIMAGE
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index b4b1d39..4af9b38 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -744,6 +744,8 @@ static int __init meminfo_cmp(const void *_a, const void *_b)
- void __init hyp_mode_check(void)
+ /* Reports the availability of HYP mode */
+ static inline bool is_hyp_mode_available(void)
  {
- #ifdef CONFIG_ARM_VIRT_EXT
 +	sync_boot_mode();
-+
- 	if (is_hyp_mode_available()) {
- 		pr_info("CPU: All CPU(s) started in HYP mode.\n");
- 		pr_info("CPU: Virtualization extensions available.\n");
+ 	return (__boot_cpu_mode[0] == BOOT_CPU_MODE_EL2 &&
+ 		__boot_cpu_mode[1] == BOOT_CPU_MODE_EL2);
+ }
+@@ -46,6 +58,7 @@ static inline bool is_hyp_mode_available(void)
+ /* Check if the bootloader has booted CPUs in different modes */
+ static inline bool is_hyp_mode_mismatched(void)
+ {
++	sync_boot_mode();
+ 	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
+ }
+ 
 -- 
 1.8.1.1
