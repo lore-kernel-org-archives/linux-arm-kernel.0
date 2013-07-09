@@ -1,56 +1,30 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 9 Jul 2013 17:29:56 +0100
-Subject: [PATCH 1/3] arm: hyp: fix macro parameterisation
-In-Reply-To: <1373379366-15689-2-git-send-email-mark.rutland@arm.com>
-References: <1373379366-15689-1-git-send-email-mark.rutland@arm.com>
- <1373379366-15689-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <20130709162956.GB2911@localhost.localdomain>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 9 Jul 2013 10:30:42 -0600
+Subject: [PATCHv4 05/11] of: pci: add registry of MSI chips
+In-Reply-To: <20130709160132.7f5e7a8e@skate>
+References: <1372686136-1370-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1372686136-1370-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAL_Jsq+h=y5SNo4qO5-5u_w8rW++9MKDZK8rASNjhtVcjh-iyQ@mail.gmail.com>
+ <20130709160132.7f5e7a8e@skate>
+Message-ID: <CAErSpo6cnHbE3RSu8HFn09SY66tOZZG95JEvKFmzHieXYV0NYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 09, 2013 at 03:16:04PM +0100, Mark Rutland wrote:
-> Currently, compare_cpu_mode_with_primary uses a mixture of macro
-> arguments and hardcoded registers, and does so incorrectly, as it
-> stores (__boot_cpu_mode_offset | BOOT_CPU_MODE_MISMATCH) to
-> (__boot_cpu_mode + &__boot_cpu_mode_offset), which could corrupt an
-> arbitrary portion of memory.
-> 
-> This patch fixes up compare_cpu_mode_with_primary to use the macro
-> arguments, correctly updating __boot_cpu_mode.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Dave Martin <dave.martin@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <cdall@cs.columbia.edu>
+On Tue, Jul 9, 2013 at 8:01 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> On Tue, 9 Jul 2013 08:43:36 -0500, Rob Herring wrote:
+>> > +{
+>> > +       struct msi_chip *c;
+>> > +       list_for_each_entry(c, &msi_chip_list, list) {
+>>
+>> Need the safe variant here?
+>
+> As suggested by Bjorn, I've changed this function to grab the
+> msi_chip_mutex while traversing the list.
 
-May bad originally my the looks of it.  Thanks for spotting this.
+The "safe" list functions don't do any mutual exclusion.  The only
+safety they provide is that we won't go in the weeds if the body of
+the loop deletes the current list entry.  This loop doesn't delete
+entries, so we don't need the safe variant.
 
-Acked-by: Dave Martin <Dave.Martin@arm.com>
-
-> ---
->  arch/arm/kernel/hyp-stub.S | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-> index 1315c4c..bda76ce 100644
-> --- a/arch/arm/kernel/hyp-stub.S
-> +++ b/arch/arm/kernel/hyp-stub.S
-> @@ -56,8 +56,8 @@ ENTRY(__boot_cpu_mode)
->  	ldr	\reg3, [\reg2]
->  	ldr	\reg1, [\reg2, \reg3]
->  	cmp	\mode, \reg1		@ matches primary CPU boot mode?
-> -	orrne	r7, r7, #BOOT_CPU_MODE_MISMATCH
-> -	strne	r7, [r5, r6]		@ record what happened and give up
-> +	orrne	\reg1, \reg1, #BOOT_CPU_MODE_MISMATCH
-> +	strne	\reg1, [\reg2, \reg3]	@ record what happened and give up
->  	.endm
->  
->  #else	/* ZIMAGE */
-> -- 
-> 1.8.1.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Bjorn
