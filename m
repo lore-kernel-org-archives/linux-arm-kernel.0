@@ -1,57 +1,78 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 9 Jul 2013 09:31:55 +0200
-Subject: [PATCH 1/7] serial: at91: correct definition from DMA to PDC
-In-Reply-To: <1373351626-30143-2-git-send-email-elen.song@atmel.com>
-References: <1373351626-30143-1-git-send-email-elen.song@atmel.com>
- <1373351626-30143-2-git-send-email-elen.song@atmel.com>
-Message-ID: <20130709073155.GB4013@ludovic.desroches@atmel.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 9 Jul 2013 13:02:07 +0530
+Subject: [PATCH 00/12] DRA7xx PRCM, hwmod and DT data 
+Message-ID: <1373355139-12487-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elen,
+This series adds the data files for DRA7xx devices for
+PRCM, hwmod and DT. This is dependent on the core support [1]
+patches for DRA7xx and leaves out the clock data since its
+on its way to DT [2]
 
-One comment below:
+The regbit headers for prm and cm are cleaned up post the
+autogeneration as 95% was seen to be currently unused
+(prm-regbits-7xx.h was 100% unused and hence removed)
 
-On Tue, Jul 09, 2013 at 02:33:40PM +0800, Elen Song wrote:
+These patches along with the core support patches are available at:
+git://github.com/rrnayak/linux.git for-3.12/dra-core-data
 
-[...]
+[1] http://marc.info/?l=linux-omap&m=137335492102004&w=2
 
-> diff --git a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
-> index a49d9a1..82f45ec 100644
-> --- a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
-> +++ b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
-> @@ -8,8 +8,8 @@ Required properties:
->  - interrupts: Should contain interrupt
->  
->  Optional properties:
-> -- atmel,use-dma-rx: use of PDC or DMA for receiving data
-> -- atmel,use-dma-tx: use of PDC or DMA for transmitting data
-> +- atmel,use-pdc-rx: use of PDC for receiving data
-> +- atmel,use-pdc-tx: use of PDC for transmitting data
->  
->  <chip> compatible description:
->  - at91rm9200:  legacy USART support
-> @@ -19,9 +19,9 @@ Example:
->  
->  	usart0: serial at fff8c000 {
->  		compatible = "atmel,at91sam9260-usart";
-> -		reg = <0xfff8c000 0x4000>;
-> -		interrupts = <7>;
-> -		atmel,use-dma-rx;
-> -		atmel,use-dma-tx;
-> +		reg = <0xfff8c000 0x200>;
-> +		interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+[2] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg91318.html
 
-Maybe put these changes into an other patch since it is not in relation with
-the purpose of your patch.
+Ambresh K (7):
+  ARM: DRA7: PRM: Add DRA7XX register definitions
+  ARM: DRA7: CM: Add DRA7XX register defines
+  ARM: DRA7: PRCM: Add DRA7XX local MPU PRCM regsiters
+  ARM: DRA7: clockdomain: Add DRA7XX data and update header
+  ARM: DRA7: powerdomain: Add DRA7XX data and update header
+  ARM: DRA7: hwmod: Create initial DRA7XX SoC data
+  ARM: DRA7: Enable PM framework initializations
 
-Moreover, I am not sure that macros should be used in the documentation. From
-the top of my head, there was a discussion about that and the status was to not
-use macros in documentation since it is Linux dependant.
+R Sricharan (2):
+  ARM: DRA7: Add the build support in omap2plus
+  ARM: DRA7: dts: Add the dts files for dra7 SoC and dra7-evm board
 
-> +		atmel,use-pdc-rx;
-> +		atmel,use-pdc-tx;
->  	};
->  
+Rajendra Nayak (3):
+  ARM: DRA7: CM: Add minimal regbit shifts
+  ARM: DRA7: powerdomain: Handle missing vc/vp
+  ARM: DRA7: Reuse the omap44xx_restart and fix the device instance
 
-[...]
+ arch/arm/boot/dts/Makefile                 |    3 +-
+ arch/arm/boot/dts/dra7-evm.dts             |   20 +
+ arch/arm/boot/dts/dra7.dtsi                |  488 +++++
+ arch/arm/configs/omap2plus_defconfig       |    1 +
+ arch/arm/mach-omap2/Kconfig                |   10 +-
+ arch/arm/mach-omap2/Makefile               |    4 +
+ arch/arm/mach-omap2/board-generic.c        |    1 +
+ arch/arm/mach-omap2/clockdomain.h          |    1 +
+ arch/arm/mach-omap2/clockdomains7xx_data.c |  739 ++++++++
+ arch/arm/mach-omap2/cm-regbits-7xx.h       |   50 +
+ arch/arm/mach-omap2/cm1_7xx.h              |  323 ++++
+ arch/arm/mach-omap2/cm2_7xx.h              |  512 ++++++
+ arch/arm/mach-omap2/io.c                   |    5 +
+ arch/arm/mach-omap2/omap_hwmod.h           |    1 +
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 2724 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/powerdomain.h          |    1 +
+ arch/arm/mach-omap2/powerdomains7xx_data.c |  453 +++++
+ arch/arm/mach-omap2/prcm44xx.h             |    5 +
+ arch/arm/mach-omap2/prcm_mpu7xx.h          |   77 +
+ arch/arm/mach-omap2/prm44xx.c              |   12 +-
+ arch/arm/mach-omap2/prm7xx.h               |  677 +++++++
+ arch/arm/mach-omap2/prminst44xx.c          |   20 +-
+ arch/arm/plat-omap/Kconfig                 |    2 +-
+ 23 files changed, 6121 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/boot/dts/dra7-evm.dts
+ create mode 100644 arch/arm/boot/dts/dra7.dtsi
+ create mode 100644 arch/arm/mach-omap2/clockdomains7xx_data.c
+ create mode 100644 arch/arm/mach-omap2/cm-regbits-7xx.h
+ create mode 100644 arch/arm/mach-omap2/cm1_7xx.h
+ create mode 100644 arch/arm/mach-omap2/cm2_7xx.h
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+ create mode 100644 arch/arm/mach-omap2/powerdomains7xx_data.c
+ create mode 100644 arch/arm/mach-omap2/prcm_mpu7xx.h
+ create mode 100644 arch/arm/mach-omap2/prm7xx.h
+
+-- 
+1.7.9.5
