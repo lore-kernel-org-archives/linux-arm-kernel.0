@@ -1,61 +1,68 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 09 Jul 2013 14:44:09 +0900
-Subject: [PATCH 04/04] ARM: shmobile: Allow ARCH_SHMOBILE_MULTI timer
- configuration
-In-Reply-To: <20130709054331.14007.66068.sendpatchset@w520>
-References: <20130709054331.14007.66068.sendpatchset@w520>
-Message-ID: <20130709054409.14007.23571.sendpatchset@w520>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 9 Jul 2013 08:04:49 +0200
+Subject: [PATCH V2] ARM: tegra: enable gpio-keys on dalmore
+In-Reply-To: <1373102069-5641-1-git-send-email-ldewangan@nvidia.com>
+References: <1373102069-5641-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <20130709060447.GA17499@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Sat, Jul 06, 2013 at 02:44:29PM +0530, Laxman Dewangan wrote:
+> Dalmore have the keys mounted on board which are connected
+> to different pins of Tegra.
+> 
+> Add the keys entry in DTS file to enable key functionality.
+> This will enable KEY_POWER, KEY_HOME, KEY_VOLUMEUP and
+> KEY_VOLUMEDOWN.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> ---
+> Changes from V1:
+> - Reorder the nodes.
+> 
+>  arch/arm/boot/dts/tegra114-dalmore.dts |   30 ++++++++++++++++++++++++++++++
+>  1 files changed, 30 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+> index cb640eb..259b517 100644
+> --- a/arch/arm/boot/dts/tegra114-dalmore.dts
+> +++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+> @@ -883,6 +883,35 @@
+>  		};
+>  	};
+>  
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +
+> +		home {
+> +			label = "Home";
+> +			gpios = <&gpio TEGRA_GPIO(I, 5) GPIO_ACTIVE_LOW>;
+> +			linux,code = <102>; /* KEY_HOME */
 
-Move the timer configuration bits to allow use in
-case of ARCH_SHMOBILE or ARCH_SHMOBILE_MULTI.
+I wonder if these should maybe go into a header file as well so that
+symbolic names can be used. That'll make the value self-descriptive and
+allow the comment to be dropped.
 
-The timers all make use of the regular driver model
-so they are safe to enable for ARCH_MULTIPLATFORM.
+> +		volume_down {
+> +			label = "VolumeDown";
+> +			gpios = <&gpio TEGRA_GPIO(R, 1) GPIO_ACTIVE_LOW>;
+> +			linux,code = <114>; /* KEY_VOLUMEDOWN */
+> +		};
+> +
+> +		volume_up {
+> +			label = "VolumeUp";
+> +			gpios = <&gpio TEGRA_GPIO(R, 2) GPIO_ACTIVE_LOW>;
+> +			linux,code = <115>; /* KEY_VOLUMEUP */
+> +		};
+> +	};
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+Nit: Perhaps the labels should be "Volume Down" and "Volume Up" here?
 
- arch/arm/mach-shmobile/Kconfig |   16 +++++++++++-----
- 1 file changed, 11 insertions(+), 5 deletions(-)
-
---- 0005/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2013-07-09 12:07:23.000000000 +0900
-@@ -30,6 +30,8 @@ config MACH_KZM9D_REFERENCE
- 	   of not supporting a number of devices.
- 
- 	   This is intended to aid developers
-+
-+comment "SH-Mobile System Configuration"
- endif
- 
- if ARCH_SHMOBILE
-@@ -243,6 +245,15 @@ config CPU_HAS_INTEVT
-         bool
- 	default y
- 
-+config SH_CLK_CPG
-+	bool
-+
-+source "drivers/sh/Kconfig"
-+
-+endif
-+
-+if ARCH_SHMOBILE || ARCH_SHMOBILE_MULTI
-+
- menu "Timer and clock configuration"
- 
- config SHMOBILE_TIMER_HZ
-@@ -277,9 +288,4 @@ config EM_TIMER_STI
- 
- endmenu
- 
--config SH_CLK_CPG
--	bool
--
--source "drivers/sh/Kconfig"
--
- endif
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130709/75068339/attachment.sig>
