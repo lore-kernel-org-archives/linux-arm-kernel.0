@@ -1,50 +1,43 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 9 Jul 2013 10:19:45 +0200
-Subject: [PATCH v2 1/5] sound: sam9x5_wm8731: machine driver for
- at91sam9x5 wm8731 boards
-In-Reply-To: <20130708150721.GK27646@sirena.org.uk>
-References: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
- <1373290193-25300-2-git-send-email-richard.genoud@gmail.com>
- <20130708150721.GK27646@sirena.org.uk>
-Message-ID: <CACQ1gAgJyTSdxAKK7uwG-ybE2ddC90podM3+tOAqQwZUspsU8Q@mail.gmail.com>
+From: minggr@gmail.com (Lin Ming)
+Date: Tue, 9 Jul 2013 16:21:49 +0800
+Subject: kernel decompressor problem for ARMv7
+In-Reply-To: <20130709080524.GB26169@mudshark.cambridge.arm.com>
+References: <CAF1ivSakn8-HiAf+4_cLRWUUTDP9QBKpAt+hVQoMyAmKZ2-dJA@mail.gmail.com>
+ <20130705095757.GA13063@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1307051225240.18597@syhkavp.arg>
+ <CAF1ivSbOXknHyDMH3RdmSGK2n5o2wVeR5oohCQnZ2gJrgvo=Hw@mail.gmail.com>
+ <1373250435.824.6.camel@minggr>
+ <CAF1ivSbk70UnNc-09C2w-CdgaFBXe_k6K6n8Qr3L-jCLiTGqow@mail.gmail.com>
+ <alpine.LFD.2.03.1307090837230.28525@syhkavp.arg>
+ <CAF1ivSZK8c4zSz5E-=P4032jFJxFrmwHForbCjLTVcJs4xOWkg@mail.gmail.com>
+ <20130709080524.GB26169@mudshark.cambridge.arm.com>
+Message-ID: <CAF1ivSZxC=QtgK0k+5gpOWuVQjCf1W8j2mBoT11BQuatDgwnrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/7/8 Mark Brown <broonie@kernel.org>:
-> On Mon, Jul 08, 2013 at 03:29:49PM +0200, Richard Genoud wrote:
+On Tue, Jul 9, 2013 at 4:05 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jul 09, 2013 at 08:53:05AM +0100, Lin Ming wrote:
+>> On Tue, Jul 9, 2013 at 3:39 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> > No more info needed.  The kernel has to be booted with the MMU disabled
+>> > as per the booting protocol documentation. You therefore have to fix
+>> > your
+>> > bootloader.
+>>
+>> OK.
+>>
+>> But I have to also revert below commit to make decompressor work.
+>>
+>> commit 5010192:
+>> ARM: 7583/1: decompressor: Enable unaligned memory access for v6 and above
+>>
+>> It seems like caused by bootloader has Alignment fault checking enabled.
+>> Any suggestion how to fix it?
 >
->> + *             Nicolas Ferre <nicolas.ferre@atmel.com>
->> + *
->> + * Based on sam9g20_wm8731.c by:
->> + * Sedji Gaouaou <sedji.gaouaou@atmel.com>
->
-> The obvious question here is of course if we can use the same driver for
-> both of them.
-I haven't got a g20 to test that, but that's the goal.
-For now, g20 is still non-DT, so I think it's best to have a DT-only
-driver like this one for the 9x5 family (9g15, 9g25, 9x25, 9g35,
-9x25).
-When the g20 will move to DT completely, we can drop sam9g20_wm8731.c
-and adjust sam9x5_wm8731.c (mainly master clock and widgets it seems)
-By the way, maybe g45 could use that also (and SAMA5 ?)
+> Well step 1 is to disable the MMU. Once you've done that, you really don't
+> want to be issuing unaligned accesses (since memory will be treated as
+> strongly-ordered), so the value of the alignment trap bit is irrelevant.
+
+Thanks. Will try it.
 
 >
->> +     codec_dai->driver->playback.rates &= SNDRV_PCM_RATE_8000 |
->> +             SNDRV_PCM_RATE_32000 |
->> +             SNDRV_PCM_RATE_48000 |
->> +             SNDRV_PCM_RATE_96000;
->> +     codec_dai->driver->capture.rates &= SNDRV_PCM_RATE_8000 |
->> +             SNDRV_PCM_RATE_32000 |
->> +             SNDRV_PCM_RATE_48000 |
->> +             SNDRV_PCM_RATE_96000;
->
-> You definitely shouldn't be fiddling with a driver's constant static
-> data.  You want to be using snd_pcm_hw_constraint() APIs to set
-> additional constraints intead.
-Ok, I'll change that.
-
-
-Thanks !
-
--- 
-for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
+> Will
