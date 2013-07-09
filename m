@@ -1,73 +1,37 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Tue,  9 Jul 2013 08:26:24 +0100
-Subject: [PATCH v2 1/2] ARM: dts: STi: Fix pinconf setup for STiH416 serial2
-In-Reply-To: <1373354752-26292-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1373354752-26292-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1373354784-26357-1-git-send-email-srinivas.kandagatla@st.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 9 Jul 2013 16:10:53 +0800
+Subject: [PATCH] of: match the compatible in the order set by the dts file
+In-Reply-To: <20130709075124.GR516@pengutronix.de>
+References: <1373013818-11365-1-git-send-email-b32955@freescale.com>
+ <20130709070541.GQ516@pengutronix.de> <51DBBFDA.70302@freescale.com>
+ <20130709075124.GR516@pengutronix.de>
+Message-ID: <51DBC58D.90002@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+? 2013?07?09? 15:51, Sascha Hauer ??:
+> On Tue, Jul 09, 2013 at 03:46:34PM +0800, Huang Shijie wrote:
+>> ? 2013?07?09? 15:05, Sascha Hauer ??:
+>>> Why don't you set the matching order in the driver the way you want it
+>>> to be, i.e.:
+>>>
+>>> 	{ .compatible = "fsl,imx6q-uart", ... },
+>>> 	{ .compatible = "fsl,imx21-uart", ... },
+>>> 	{ .compatible = "fsl,imx1-uart", ... },
+>>>
+>> yes. i can set it like this.
+>>
+>> but this method looks like a ugly workaround.
+> If a driver has different ways of supporting a single device, then
+> putting the preferred or most feature rich on top doesn't look very ugly
+> to me.
+this method makes it much _coupled_ between the driver and the dts file.
 
-This patch fixes a bug in pinctrl setup of serial2 device, Some of the
-pins in the pinctrl node of serial2 do not belong to that
-pin-controller. This patch divides them in the pins into there
-respective pin controller nodes.
+IMHO, it's an unnecessary _burden_ to the driver programmer:
+    he should puts the most feature compatible on the top.
 
-Without this patch serial on StiH416-B2000 Board will not work as it
-fails with:
+it's much graceful if we let the driver programmer be transparent about 
+this.
 
-"st-pinctrl pin-controller-rear.3: failed to get pin(99) name
-st-pinctrl pin-controller-rear.3: maps: function serial2 group serial2-0
-num 4
-pinconfig core: failed to register map default (3): no group/pin given"
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
----
- arch/arm/boot/dts/stih416-pinctrl.dtsi |   10 +++++++++-
- arch/arm/boot/dts/stih416.dtsi         |    2 +-
- 2 files changed, 10 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-index 957b21a..0f246c9 100644
---- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-@@ -166,6 +166,15 @@
- 				reg		= <0x9000 0x100>;
- 				st,bank-name	= "PIO31";
- 			};
-+
-+			serial2-oe {
-+				pinctrl_serial2_oe: serial2-1 {
-+					st,pins {
-+						output-enable	= <&PIO11 3 ALT2 OUT>;
-+					};
-+				};
-+			};
-+
- 		};
- 
- 		pin-controller-rear {
-@@ -218,7 +227,6 @@
- 					st,pins {
- 						tx	= <&PIO17 4 ALT2 OUT>;
- 						rx	= <&PIO17 5 ALT2 IN>;
--						output-enable	= <&PIO11 3 ALT2 OUT>;
- 					};
- 				};
- 			};
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 3cecd96..1a0326e 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -79,7 +79,7 @@
- 			interrupts	= <0 197 0>;
- 			clocks          = <&CLK_S_ICN_REG_0>;
- 			pinctrl-names 	= "default";
--			pinctrl-0 	= <&pinctrl_serial2>;
-+			pinctrl-0 	= <&pinctrl_serial2 &pinctrl_serial2_oe>;
- 		};
- 
- 		/* SBC_UART1 */
--- 
-1.7.6.5
+thanks
+Huang Shijie
