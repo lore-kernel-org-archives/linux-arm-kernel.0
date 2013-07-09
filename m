@@ -1,38 +1,123 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Jul 2013 09:05:24 +0100
-Subject: kernel decompressor problem for ARMv7
-In-Reply-To: <CAF1ivSZK8c4zSz5E-=P4032jFJxFrmwHForbCjLTVcJs4xOWkg@mail.gmail.com>
-References: <CAF1ivSakn8-HiAf+4_cLRWUUTDP9QBKpAt+hVQoMyAmKZ2-dJA@mail.gmail.com>
- <20130705095757.GA13063@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1307051225240.18597@syhkavp.arg>
- <CAF1ivSbOXknHyDMH3RdmSGK2n5o2wVeR5oohCQnZ2gJrgvo=Hw@mail.gmail.com>
- <1373250435.824.6.camel@minggr>
- <CAF1ivSbk70UnNc-09C2w-CdgaFBXe_k6K6n8Qr3L-jCLiTGqow@mail.gmail.com>
- <alpine.LFD.2.03.1307090837230.28525@syhkavp.arg>
- <CAF1ivSZK8c4zSz5E-=P4032jFJxFrmwHForbCjLTVcJs4xOWkg@mail.gmail.com>
-Message-ID: <20130709080524.GB26169@mudshark.cambridge.arm.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 09 Jul 2013 17:05:48 +0900
+Subject: [PATCH V6 4/4] video: exynos_dp: Use the generic PHY driver
+Message-ID: <004101ce7c7b$1f306510$5d912f30$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 09, 2013 at 08:53:05AM +0100, Lin Ming wrote:
-> On Tue, Jul 9, 2013 at 3:39 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > No more info needed.  The kernel has to be booted with the MMU disabled
-> > as per the booting protocol documentation. You therefore have to fix
-> > your
-> > bootloader.
-> 
-> OK.
-> 
-> But I have to also revert below commit to make decompressor work.
-> 
-> commit 5010192:
-> ARM: 7583/1: decompressor: Enable unaligned memory access for v6 and above
-> 
-> It seems like caused by bootloader has Alignment fault checking enabled.
-> Any suggestion how to fix it?
+Use the generic PHY API to control the DP PHY.
 
-Well step 1 is to disable the MMU. Once you've done that, you really don't
-want to be issuing unaligned accesses (since memory will be treated as
-strongly-ordered), so the value of the alignment trap bit is irrelevant.
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+---
+ .../devicetree/bindings/video/exynos_dp.txt          |   18 +++++++++---------
+ drivers/video/exynos/exynos_dp_core.c                |   16 ++++++++++++----
+ drivers/video/exynos/exynos_dp_core.h                |    1 +
+ 3 files changed, 22 insertions(+), 13 deletions(-)
 
-Will
+diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt b/Documentation/devicetree/bindings/video/exynos_dp.txt
+index c60da67..e2874ae 100644
+--- a/Documentation/devicetree/bindings/video/exynos_dp.txt
++++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
+@@ -6,10 +6,10 @@ We use two nodes:
+ 	-dptx-phy node(defined inside dp-controller node)
+ 
+ For the DP-PHY initialization, we use the dptx-phy node.
+-Required properties for dptx-phy:
+-	-reg:
++Required properties for dptx-phy: deprecated, use phys and phy-names
++	-reg: deprecated
+ 		Base address of DP PHY register.
+-	-samsung,enable-mask:
++	-samsung,enable-mask: deprecated
+ 		The bit-mask used to enable/disable DP PHY.
+ 
+ For the Panel initialization, we read data from dp-controller node.
+@@ -21,6 +21,10 @@ Required properties for dp-controller:
+ 		of memory mapped region.
+ 	-interrupts:
+ 		interrupt combiner values.
++	-phys:
++		from general PHY binding: the phandle for the PHY device.
++	-phy-names:
++		from general PHY binding: Should be "dp".
+ 	-interrupt-parent:
+ 		phandle to Interrupt combiner node.
+ 	-samsung,color-space:
+@@ -61,12 +65,8 @@ SOC specific portion:
+ 		reg = <0x145b0000 0x10000>;
+ 		interrupts = <10 3>;
+ 		interrupt-parent = <&combiner>;
+-
+-		dptx-phy {
+-			reg = <0x10040720>;
+-			samsung,enable-mask = <1>;
+-		};
+-
++		phys = <&dp_phy>;
++		phy-names = "dp";
+ 	};
+ 
+ Board Specific portion:
+diff --git a/drivers/video/exynos/exynos_dp_core.c b/drivers/video/exynos/exynos_dp_core.c
+index 05fed7d..5e1a715 100644
+--- a/drivers/video/exynos/exynos_dp_core.c
++++ b/drivers/video/exynos/exynos_dp_core.c
+@@ -19,6 +19,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/delay.h>
+ #include <linux/of.h>
++#include <linux/phy/phy.h>
+ 
+ #include "exynos_dp_core.h"
+ 
+@@ -960,8 +961,11 @@ static int exynos_dp_dt_parse_phydata(struct exynos_dp_device *dp)
+ 
+ 	dp_phy_node = of_find_node_by_name(dp_phy_node, "dptx-phy");
+ 	if (!dp_phy_node) {
+-		dev_err(dp->dev, "could not find dptx-phy node\n");
+-		return -ENODEV;
++		dp->phy = devm_phy_get(dp->dev, "dp");
++		if (IS_ERR(dp->phy))
++			return PTR_ERR(dp->phy);
++		else
++			return 0;
+ 	}
+ 
+ 	if (of_property_read_u32(dp_phy_node, "reg", &phy_base)) {
+@@ -992,7 +996,9 @@ err:
+ 
+ static void exynos_dp_phy_init(struct exynos_dp_device *dp)
+ {
+-	if (dp->phy_addr) {
++	if (dp->phy) {
++		phy_power_on(dp->phy);
++	} else if (dp->phy_addr) {
+ 		u32 reg;
+ 
+ 		reg = __raw_readl(dp->phy_addr);
+@@ -1003,7 +1009,9 @@ static void exynos_dp_phy_init(struct exynos_dp_device *dp)
+ 
+ static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
+ {
+-	if (dp->phy_addr) {
++	if (dp->phy) {
++		phy_power_off(dp->phy);
++	} else if (dp->phy_addr) {
+ 		u32 reg;
+ 
+ 		reg = __raw_readl(dp->phy_addr);
+diff --git a/drivers/video/exynos/exynos_dp_core.h b/drivers/video/exynos/exynos_dp_core.h
+index 56cfec8..607e36d 100644
+--- a/drivers/video/exynos/exynos_dp_core.h
++++ b/drivers/video/exynos/exynos_dp_core.h
+@@ -151,6 +151,7 @@ struct exynos_dp_device {
+ 	struct video_info	*video_info;
+ 	struct link_train	link_train;
+ 	struct work_struct	hotplug_work;
++	struct phy		*phy;
+ };
+ 
+ /* exynos_dp_reg.c */
+-- 
+1.7.10.4
