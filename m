@@ -1,70 +1,59 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Tue,  9 Jul 2013 06:18:10 +0200
-Subject: [PATCH] ARM: footbridge: remove obsolete IRQF_DISABLED
-Message-ID: <1373343490-4658-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 09 Jul 2013 13:26:54 +0900
+Subject: [PATCH] ARM: shmobile: Add SMSC ethernet chip to KZM9D DT reference
+Message-ID: <20130709042654.13658.20164.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch proposes to remove the IRQF_DISABLED flag from footbridge
-code. It's a NOOP since 2.6.35.
+From: Magnus Damm <damm@opensource.se>
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+Add support for the SMSC ethernet controller found
+on the KZM9D board to the KZM9D DT Reference code.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
- arch/arm/mach-footbridge/dc21285-timer.c |  2 +-
- arch/arm/mach-footbridge/dc21285.c       | 10 +++++-----
- arch/arm/mach-footbridge/isa-timer.c     |  2 +-
- 3 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-footbridge/dc21285-timer.c b/arch/arm/mach-footbridge/dc21285-timer.c
-index 9ee78f7..892d550 100644
---- a/arch/arm/mach-footbridge/dc21285-timer.c
-+++ b/arch/arm/mach-footbridge/dc21285-timer.c
-@@ -86,7 +86,7 @@ static irqreturn_t timer1_interrupt(int irq, void *dev_id)
- static struct irqaction footbridge_timer_irq = {
- 	.name		= "dc21285_timer1",
- 	.handler	= timer1_interrupt,
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
- 	.dev_id		= &ckevt_dc21285,
+ Built on top of renesas-next-20130704v2 and
+ [PATCH] ARM: shmobile: KZM9D DT reference implementation
+
+ arch/arm/boot/dts/emev2-kzm9d-reference.dts |   31 +++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+
+--- 0002/arch/arm/boot/dts/emev2-kzm9d-reference.dts
++++ work/arch/arm/boot/dts/emev2-kzm9d-reference.dts	2013-07-09 13:06:47.000000000 +0900
+@@ -23,4 +23,35 @@
+ 	chosen {
+ 		bootargs = "console=ttyS1,115200n81 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096";
+ 	};
++
++	reg_1p8v: regulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-1.8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
++	reg_3p3v: regulator at 1 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
++	lan9220 at 20000000 {
++		compatible = "smsc,lan9220", "smsc,lan9115";
++		reg = <0x20000000 0x10000>;
++		phy-mode = "mii";
++		interrupt-parent = <&gpio0>;
++		interrupts = <1 1>;	/* active high */
++		reg-io-width = <4>;
++		smsc,irq-active-high;
++		smsc,irq-push-pull;
++		vddvario-supply = <&reg_1p8v>;
++		vdd33a-supply = <&reg_3p3v>;
++	};
  };
- 
-diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
-index a7cd2cf..d5ad2aa 100644
---- a/arch/arm/mach-footbridge/dc21285.c
-+++ b/arch/arm/mach-footbridge/dc21285.c
-@@ -338,15 +338,15 @@ void __init dc21285_preinit(void)
- 	/*
- 	 * We don't care if these fail.
- 	 */
--	dc21285_request_irq(IRQ_PCI_SERR, dc21285_serr_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_PCI_SERR, dc21285_serr_irq, 0,
- 			    "PCI system error", &serr_timer);
--	dc21285_request_irq(IRQ_PCI_PERR, dc21285_parity_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_PCI_PERR, dc21285_parity_irq, 0,
- 			    "PCI parity error", &perr_timer);
--	dc21285_request_irq(IRQ_PCI_ABORT, dc21285_abort_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_PCI_ABORT, dc21285_abort_irq, 0,
- 			    "PCI abort", NULL);
--	dc21285_request_irq(IRQ_DISCARD_TIMER, dc21285_discard_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_DISCARD_TIMER, dc21285_discard_irq, 0,
- 			    "Discard timer", NULL);
--	dc21285_request_irq(IRQ_PCI_DPERR, dc21285_dparity_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_PCI_DPERR, dc21285_dparity_irq, 0,
- 			    "PCI data parity", NULL);
- 
- 	if (cfn_mode) {
-diff --git a/arch/arm/mach-footbridge/isa-timer.c b/arch/arm/mach-footbridge/isa-timer.c
-index d9301dd..b73f52e 100644
---- a/arch/arm/mach-footbridge/isa-timer.c
-+++ b/arch/arm/mach-footbridge/isa-timer.c
-@@ -27,7 +27,7 @@ static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
- static struct irqaction pit_timer_irq = {
- 	.name		= "pit",
- 	.handler	= pit_timer_interrupt,
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
- 	.dev_id		= &i8253_clockevent,
- };
- 
--- 
-1.8.1.2
