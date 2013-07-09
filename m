@@ -1,59 +1,28 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 09 Jul 2013 18:07:51 +0400
-Subject: [PATCH v2] arm: dts: AM43x: Add usb_otg_hs node
-In-Reply-To: <1373361446-30050-1-git-send-email-george.cherian@ti.com>
-References: <1373361446-30050-1-git-send-email-george.cherian@ti.com>
-Message-ID: <51DC1937.9080302@cogentembedded.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue,  9 Jul 2013 15:16:03 +0100
+Subject: [PATCH 0/3] arm/arm64: a trio of boot mode detection fixes
+Message-ID: <1373379366-15689-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+The following patches fix a couple of issues in the boot mode detection
+code where in the case of mismatched boot modes we can corrupt a small
+portion of memory or fail to detect the fact we've booted CPUs with
+mismatched modes due to the boot mode being logged incoherently.
 
-On 09-07-2013 13:17, George Cherian wrote:
+Thanks,
+Mark.
 
-> Adds device node for HS USB Host module for AM437x
+Mark Rutland (3):
+  arm: hyp: fix macro parameterisation
+  arm: virt: ensure visibility of __boot_cpu_mode
+  arm64: virt: ensure visibility of __boot_cpu_mode
 
-> changes from v1
+ arch/arm/include/asm/virt.h   | 12 ++++++++++++
+ arch/arm/kernel/hyp-stub.S    |  4 ++--
+ arch/arm/kernel/setup.c       |  2 ++
+ arch/arm64/include/asm/virt.h | 13 +++++++++++++
+ 4 files changed, 29 insertions(+), 2 deletions(-)
 
-> renamed synopsis to snps
-> removed flag tx-fifo-resize
-
-> Signed-off-by: George Cherian <george.cherian@ti.com>
-> ---
->   arch/arm/boot/dts/am4372.dtsi | 18 ++++++++++++++++++
->   1 file changed, 18 insertions(+)
-
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index ddc1df7..c9e0da8 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -64,5 +64,23 @@
->   			compatible = "ti,am4372-counter32k","ti,omap-counter32k";
->   			reg = <0x44e86000 0x40>;
->   		};
-> +
-> +		usb_otg_hs1: am4372_dwc3 at 48380000 {
-
-    See http://www.devicetree.org/Device_Tree_Usage, "Node Names" section.
-
-> +			compatible = "ti,am437x-dwc3";
-> +			reg = <0x48380000 0x1ff>;
-> +			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			utmi-mode = <1>;
-> +			ranges;
-> +
-> +			dwc3 at 48390000 {
-
-    The same comment.
-
-> +				compatible = "snps,dwc3";
-> +				reg = <0x48390000 0xcfff>;
-> +				interrupts = <GIC_SPI  168 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +		};
-> +		
-
-WBR, Sergei
+-- 
+1.8.1.1
