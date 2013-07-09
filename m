@@ -1,201 +1,34 @@
-From: satish.patel@ti.com (Patel, Satish)
-Date: Tue, 9 Jul 2013 12:33:58 +0000
-Subject: [PATCH v9 0/8] Generic PHY Framework
-In-Reply-To: <20130709114416.GL5552@arwen.pp.htv.fi>
-References: <1372247257-30186-1-git-send-email-kishon@ti.com>
- <780E789C2E067A4BB8F69D0BB9EC4F253E975B5E@DBDE04.ent.ti.com>
- <51D3F773.9000209@ti.com> <20130703132038.GI15056@arwen.pp.htv.fi>
- <780E789C2E067A4BB8F69D0BB9EC4F253E975D6E@DBDE04.ent.ti.com>
- <51D54694.20203@ti.com> <20130704101216.GD4830@arwen.pp.htv.fi>
- <780E789C2E067A4BB8F69D0BB9EC4F253E9764D5@DBDE04.ent.ti.com>
- <51DAADD1.3060302@ti.com>
- <780E789C2E067A4BB8F69D0BB9EC4F253E976575@DBDE04.ent.ti.com>
- <20130709114416.GL5552@arwen.pp.htv.fi>
-Message-ID: <780E789C2E067A4BB8F69D0BB9EC4F253E97670D@DBDE04.ent.ti.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue,  9 Jul 2013 14:28:49 +0200
+Subject: [PATCH v3 7/7] ARM: AT91: DTS: sam9x5ek: enable SSC
+In-Reply-To: <1373372929-17800-1-git-send-email-richard.genoud@gmail.com>
+References: <1373290193-25300-1-git-send-email-richard.genoud@gmail.com>
+ <1373372929-17800-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1373372929-17800-8-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Enable the SSC needed for the WM8731 codec
 
-> -----Original Message-----
-> From: Balbi, Felipe
-> Sent: Tuesday, July 09, 2013 5:14 PM
-> To: Patel, Satish
-> Cc: ABRAHAM, KISHON VIJAY; Balbi, Felipe; grant.likely at linaro.org;
-> tony at atomide.com; arnd at arndb.de; swarren at nvidia.com;
-> sylvester.nawrocki at gmail.com; linux-kernel at vger.kernel.org; linux-
-> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> usb at vger.kernel.org; gregkh at linuxfoundation.org; akpm at linux-
-> foundation.org; rob.herring at calxeda.com; rob at landley.net;
-> linux at arm.linux.org.uk; benoit.cousson at linaro.org; mchehab at redhat.com;
-> cesarb at cesarb.net; davem at davemloft.net; Nayak, Rajendra;
-> shawn.guo at linaro.org; Shilimkar, Santosh; devicetree-
-> discuss at lists.ozlabs.org; linux-doc at vger.kernel.org; Nori, Sekhar;
-> Krishnamoorthy, Balaji T; Cherian, George; Mankad, Maulik Ojas;
-> Srinivasan, Nageswari; Sundareson, Prabindh
-> Subject: Re: [PATCH v9 0/8] Generic PHY Framework
-> 
-> Hi,
-> 
-> On Tue, Jul 09, 2013 at 04:23:29AM +0200, Patel, Satish wrote:
-> > > > We have two options over here
-> > > >
-> > > > Option 1:
-> > > >
-> > > > Defining generic api to which can be mapped over multiple phys
-> > > > For smartcard case, I have can thought of following mapping with
-> new
-> > > > generic apis as suggested.
-> > > >
-> > > > Smartcard_poweron -> power_on
-> > > > Smartcard_powerdown -> power_off
-> > > > Smartcard_set_voltage -> phy_set_voltage
-> > > > Smartcard_activate_card -> phy_activate_slot
-> > > > Smartcard_deactivate_card -> phy_deactivate_slot
-> > >
-> > > how is activate/deactivate different from poweron/poweroff in this
-> > > use case?
-> >
-> > power on/off normal power sequence. While activate/de-activate will
-> be
-> > called during card transaction.
-> 
-> why can't you implement activate/deactivate with suspend/resume ?
-> 
-> > Brief on how it works:
-> > - when system start, execute power on for phy
-> > - smartcard controller and phy is connected through i2c, clock lines
-> and
-> > i/o lines
-> > - clock will be supplied by controller to phy to get data sync on
-> i/o lines
-> 
-> fair enough.
-> 
-> > Operation:
-> >
-> > Once the card gets inserted into the slot, user application can
-> > initiate activate sequence anytime, it is not mandatory that
-> > activation has to be called Immediately. It all depends whether
-> other
-> > connections ( network, printer) are proper.  User application can do
-> > some checks and then dynamically activate the card
-> 
-> The card or the phy ? Who actually activates ? Is the activation
-> handling part of the PHY or part of the smartcard controller ?
-> 
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+ arch/arm/boot/dts/at91sam9x5ek.dtsi |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-It?s a activation of smart card which is inserted into the phy slot. 
-Smart card activation will by done phy but initiated by user application
-Handling of activation should be done at both the side - controller as well
-As phy. Phy will raise certain signals and check timeout while activation
-, while controller will store data coming from smart card to FIFO. Its
-Controller which will give command to phy to initiate activation sequence when it
-is ready. 
-
-Which means, both controller and phy has role to play while activation.
-Also it is applicable while deactivation.
-
-
-> > There are 2 sequence of activation - normal activation and warm
-> reset.
-> > If first fails then warm reset should be executed, if card does not
-> > response to both then deactivation will be carried out
-> 
-> ret = phy_resume(phy);
-> if (ret == -EINVAL) { /* perhaps there's a better error code */
-> 	ret = phy_reset(phy);
-> 	if (ret)
-> 		phy_suspend(phy);
-> }
->
-
-Its not like this. There are the cases, when during normal activation card respond
-With some characters, but they might not be valid or error prone - This check will be 
-done by user application as only application knows how to decode characters as per protocol.
-
-It there is any error in characters/timeout paratmeters, user application will ask to initiate
-Warm reset.
+diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+index 2bf51cc..0534c58 100644
+--- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+@@ -95,6 +95,10 @@
+ 			watchdog at fffffe40 {
+ 				status = "okay";
+ 			};
++
++			ssc0: ssc at f0010000 {
++				status = "okay";
++			};
+ 		};
  
-> ????
-> 
-> > - For activation there are some timing parameters ( called ATR -
-> > Answer to reset timings) Has to be set to the phy
-> 
-> does that change in runtime or is it something which is set during
-> probe
-> and never touched again ?
-> 
-> > - on activation card will respond with some initial characters
-> (ATR),
-> > which will be verified by application, in case of error user
-> > application will de-activate the card not the phy module
-> >
-> > - After activation, use application initiate normal tx/rx
-> >
-> > - Once tx/rx is done, it will initiate deactivation of card not the
-> > phy module.
-> 
-> then that has nothing to do with the PHY framework, right ?
-
-But all such sequence will be initiated by PHY by raising certain signals
-and only controller can give the push when to start.
-> 
-> > > > Smartcard_set_c4/c8/rst/io -> phy_set_pin
-> > >
-> > > Whats should be exactly done here? Looks to me like it should be
-> > > part of init. Does these pin settings need to be changed
-> dynamically?
-> >
-> > These are all phy pins which will be physically come in contact with
-> > smart card When inserted. In case of synchronous card, these pins
-> will
-> > be toggled manually by s/w bit bang algorithm
-> 
-> is that a requirement or just something that everybody does ?
->
-
-Its requirement for synchronous card. At present there is no open driver
-Which does this thing.
- 
-> In any case, you can hide that under some gpio calls, or something
-> similar.
-
-Can't be done using GPIO as pin can be toggled only which i2c read/write
-to the phy.
-> 
-> > > Why? Is it like the detection of an external event? Then the PHY
-> > > driver should use *extcon* for event detection and passing.
-> > >
-> >
-> > Smartcard controller need a way to ready isr status ( like card
-> presence,
-> > Card inserted in to which slot, removed from which slot ) to
-> maintain its
-> > Internal state machine.
-> 
-> register an interrupt handler with devm_request_threaded_irq(), what's
-> the problem ?
-> 
-> > > > Smartcard_get_version -> phy_get_version
-> > >
-> > > Again why? Why would the smartcard need the version of the PHY?
-> > >
-> >
-> > Can be omitted. This is for the test suite reference.
-> 
-> if it's for testsuite, it sounds like something that should be done
-> through userland and, as such, should be implemented by a set of
-> debugfs
-> files which expose the necessary information. That has nothing to do
-> with the PHY framework.
-> 
-Agree.. can be omitted.
-
-
-I am ok to give internal webex presentation (TI team) to brief 
-on phy and smart card controller interface.
-
-
-> --
-> balbi
+ 		usb0: ohci at 00600000 {
+-- 
+1.7.10.4
