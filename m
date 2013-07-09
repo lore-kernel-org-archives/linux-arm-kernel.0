@@ -1,42 +1,32 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 08 Jul 2013 19:38:58 -0700
-Subject: [PATCH V3] of: Set the DMA mask to 64 bits when dma_addr_t is
- 64-bits
-In-Reply-To: <20130708104254.GS24642@n2100.arm.linux.org.uk>
-References: <1367008266-1431-1-git-send-email-lauraa@codeaurora.org>
- <517AF270.8040106@gmail.com>
- <CACVXFVPfkqP+UyoGd-+QFRzndSam_DtU=utrBPYCPjQCGQ_F6g@mail.gmail.com>
- <51D71F81.5090503@codeaurora.org>
- <20130708104254.GS24642@n2100.arm.linux.org.uk>
-Message-ID: <51DB77C2.4060705@codeaurora.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 9 Jul 2013 11:27:33 +0800
+Subject: [PATCH] ARM: dts: i.MX51: Add WEIM node
+In-Reply-To: <1373257783.211316847@f137.mail.ru>
+References: <1373094142-24173-1-git-send-email-shc_work@mail.ru>
+ <20130708023304.GA22636@S2101-09.ap.freescale.net>
+ <1373257783.211316847@f137.mail.ru>
+Message-ID: <20130709032731.GA16656@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/8/2013 3:42 AM, Russell King - ARM Linux wrote:
->>
->> The problem is the way the arm_dma_limit is set up, all dma allocations
->> are currently broken regardless of if the actual device supports 64-bit
->> addresses or not.
->
-> Please explain this statement.
->
+On Mon, Jul 08, 2013 at 08:29:43AM +0400, Alexander Shiyan wrote:
+> > > @@ -745,6 +745,23 @@
+> > >  				status = "disabled";
+> > >  			};
+> > >  
+> > > +			weim: weim at 83fda000 {
+> > > +				#address-cells = <2>;
+> > > +				#size-cells = <1>;
+> > > +				compatible = "fsl,imx51-weim";
+> > > +				reg = <0x83fda000 0x1000>;
+> > > +				clocks = <&clks 0>;
+> > 
+> > Is it correct?  I think there should be a physical clock for weim.
+> 
+> Yes, but properly clock for weim is missing in the clk subsystem,
+> so I think at this point it is OK. Adding a properly clock should be a separate patch.
 
-The statement was a bit shortsighted given recent discussions. My point 
-was that on LPAE systems right now without ZONE_DMA, the allocation 
-fails by default (i.e. no call to set_mask) even if the device could 
-support 64-bit physical memory. Based on this thread though, drivers 
-should stop assuming the dma_mask will be set up properly and always set 
-the mask appropriately.
+I've seen emi_slow and emi_fast clocks implemented in clk-imx51-imx53.c.
+Neither is the clock for weim?
 
-The conclusion also seems to be that if devices on an LPAE system can't 
-handle > 32-bit addresses and want to limit via mask, ZONE_DMA must be 
-set up.
-
-Please correct me if I misunderstood anything.
-
-Thanks,
-Laura
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Shawn
