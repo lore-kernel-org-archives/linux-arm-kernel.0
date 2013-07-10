@@ -1,49 +1,45 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 10 Jul 2013 17:29:26 +0200
-Subject: [PATCH V2 01/12] spi/mxs: Always set LOCK_CS
-In-Reply-To: <CAOMZO5AEU3D3o-8fKLQJvsRSwBMNn0jfwZFC6R93TKaUpxffSw@mail.gmail.com>
-References: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
- <201304030118.42976.marex@denx.de>
- <CAOMZO5AEU3D3o-8fKLQJvsRSwBMNn0jfwZFC6R93TKaUpxffSw@mail.gmail.com>
-Message-ID: <20957.32214.721252.361301@ipc1.ka-ro>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 10 Jul 2013 18:29:44 +0300
+Subject: [GIT PULL] remoteproc fixes
+In-Reply-To: <CAK=WgbbJesp2Yg0mXOyxzhnQxwvoNLdt7GsY5v2yN+SAc2=WZQ@mail.gmail.com>
+References: <CAK=WgbbJesp2Yg0mXOyxzhnQxwvoNLdt7GsY5v2yN+SAc2=WZQ@mail.gmail.com>
+Message-ID: <CAK=WgbYHzYdSsuFa0K=q8iUS3ykXy-5=XifxweCx8Uqrg-CYAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+With the lists this time
 
-Fabio Estevam writes:
-> On Tue, Apr 2, 2013 at 8:18 PM, Marek Vasut <marex@denx.de> wrote:
-> > Dear Trent Piepho,
-> >
-> >> There are two bits which control the CS line in the CTRL0 register:
-> >> LOCK_CS and IGNORE_CRC.  The latter would be better named DEASSERT_CS
-> >> in SPI mode.
-> >>
-> >> LOCK_CS keeps CS asserted though the entire transfer.  This should
-> >> always be set.  The DMA code will always set it, explicitly on the
-> >> first segment of the first transfer, and then implicitly on all the
-> >> rest by never clearing the bit from the value read from the ctrl0
-> >> register.
-> >>
-> >> The only reason to not set LOCK_CS would be to attempt an altered
-> >> protocol where CS pulses between each word.  Though don't get your
-> >> hopes up if you want to do this, as the hardware doesn't appear to do
-> >> this in any sane manner.
-> >
-> > Can you please elaborate on this part above? The description is very vague.
-> >
->From my experience the HW deasserts CS whenever the output fifo runs
-empty.
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+On Wed, Jul 10, 2013 at 6:17 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> The following changes since commit 9e895ace5d82df8929b16f58e9f515f6d54ab82d:
+>
+>   Linux 3.10-rc7 (2013-06-22 09:47:31 -1000)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
+> tags/remoteproc-3.11-fixes
+>
+> for you to fetch changes up to 95cee62cb4776a65229a6b6d5969be56589d95c1:
+>
+>   remoteproc: Cocci spatch "memdup.spatch" (2013-07-01 17:23:58 +0300)
+>
+> ----------------------------------------------------------------
+> Trivial remoteproc fixes by Suman Anna, Wei Yongjun and Thomas Meyer.
+>
+> ----------------------------------------------------------------
+> Suman Anna (3):
+>       remoteproc: fix checkpatch errors in remoteproc code
+>       remoteproc/omap: fix a sparse warning
+>       remoteproc: free carveout memories only after unmapping them
+>
+> Thomas Meyer (1):
+>       remoteproc: Cocci spatch "memdup.spatch"
+>
+> Wei Yongjun (1):
+>       remoteproc: fix error return code in rproc_fw_boot()
+>
+>  drivers/remoteproc/remoteproc_core.c          | 24 ++++++++++++------------
+>  drivers/remoteproc/remoteproc_debugfs.c       |  3 +--
+>  drivers/remoteproc/remoteproc_internal.h      |  4 ++--
+>  include/linux/platform_data/remoteproc-omap.h |  2 +-
+>  4 files changed, 16 insertions(+), 17 deletions(-)
