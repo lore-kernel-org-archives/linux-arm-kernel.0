@@ -1,174 +1,78 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Wed, 10 Jul 2013 18:15:32 +0200
-Subject: pci-mvebu driver on km_kirkwood
-Message-ID: <51DD88A4.1030506@keymile.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 10 Jul 2013 19:17:55 +0300
+Subject: [PATCH 0/6] USB: Implement runtime idling and remote wakeup for OMAP
+ EHCI controller
+Message-ID: <1373473081-27181-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi,
 
-I am trying to use the pci-mvebu driver on one of our km_kirkwood 
-boards. The board is based on Marvell's 98dx4122, which should 
-essentially be 6281 compatible.
+This series implements suspend/resume for the OMAP EHCI host controller during
+runtime idle. This will cause its parent, the OMAP USB Host Module as well
+as the USB TLL Module to be put in suspend and hence allow the USB power domain
+to be put in a lower power state. Then we no longer prevent the rest of the OMAP
+SoC from entering lower power states like RETention or OFF mode when
+USB (or system) is suspended. This was one of the main reason why EHCI_OMAP
+is still not enabled in OMAP2 defconfig.
 
-So I copied the following block from kirkwood-6281.dtsi into
-kirkwood-98dx4122.dtsi:
+In order for remote wakeup or hub events (connect/disconnect) to be detected
+while in suspend, we need to rely on the IO daisy chaining mechanism on OMAP.
+This is nothing but configuring a pin to be wakeup capable and triggering an
+interrupt on any pin activity while the hardware module or the entire SoC is
+in sleep state. For this to work, we rely on the wakeup feature added to the
+omap-pinctrl-single driver in [1]. This takes care of routing IO pad wakeup
+interrupt to the right driver's interrupt handler (i.e. ehci_irq in our case).
 
-		pcie-controller {
-			compatible = "marvell,kirkwood-pcie";
-			status = "disabled";
-			device_type = "pci";
+The pin state information for DEFAULT and IDLE is specified for the omap3beagle-xm
+board in patch 2. So this is tested only on omap3beagle-xm board.
 
-			#address-cells = <3>;
-			#size-cells = <2>;
+Patch 4 takes care of switching the pin states between DEFAULT and IDLE during
+idle/active mode using the pinctrl framework.
 
-			bus-range = <0x00 0xff>;
+Patch 5 takes care of handling the wakeup IRQ when the USB controller is suspended
+and Hardware is not accessible.
 
-			ranges = <0x82000000 0 0x00040000 0x00040000 0 0x00002000   /* Port 
-0.0 registers */
-				  0x82000000 0 0xe0000000 0xe0000000 0 0x08000000   /* 
-non-prefetchable memory */
-			          0x81000000 0 0          0xe8000000 0 0x00100000>; /* 
-downstream I/O */
+Patch 6 implements runtime and system suspend/resume for the OMAP EHCI controller
 
-			pcie at 1,0 {
-				device_type = "pci";
-				assigned-addresses = <0x82000800 0 0x00040000 0 0x2000>;
-				reg = <0x0800 0 0 0 0>;
-				#address-cells = <3>;
-				#size-cells = <2>;
-				#interrupt-cells = <1>;
-				ranges;
-				interrupt-map-mask = <0 0 0 0>;
-				interrupt-map = <0 0 0 0 &intc 9>;
-				marvell,pcie-port = <0>;
-				marvell,pcie-lane = <0>;
-				clocks = <&gate_clk 2>;
-				status = "disabled";
-			};
-		};
+Changelog:
+v1:
+- addressed review comments on RFC patchset
+- Special case handling of controllers that can generate wakeup IRQ when
+suspended is done in HCD core instead of ehci-hcd.
+- Patches based on linus/master commit 496322bc91e35007ed754184dcd447a02b6dd685
+with the following patches on top
 
-And added the following block to kirkwood-km_kirkwood.dts:
+[1] - OMAP pinctrl wakeup support
+http://thread.gmane.org/gmane.linux.ports.arm.omap/99010/focus=99041
+This does not apply cleanly though. Tony has agreed to post a revision anytime soon.
 
-		pcie-controller {
-			status = "okay";
+[2] - [PATCH v5 0/2] ARM: dts: Add USB host support for Beagle-xm
+http://thread.gmane.org/gmane.linux.drivers.devicetree/39291
 
-			pcie at 1,0 {
-				status = "okay";
-			};
-		};
+[3] - USB-EHCI-Fix-resume-signalling-on-remote-wakeup.patch
+http://thread.gmane.org/gmane.linux.usb.general/89608
 
-The code I took from jcooper's repo:
+cheers,
+-roger
 
-   http://git.infradead.org/users/jcooper/linux.git
+---
+Roger Quadros (6):
+  ARM: OMAP3: Enable Hardware Save and Restore for USB Host
+  ARM: dts: omap3beagle-xm: Add idle state pins for USB host
+  mfd: omap-usb-host: move initialization to module_init()
+  mfd: omap-usb-host: Put pins in IDLE state on suspend
+  USB: Support wakeup IRQ for suspended controllers
+  USB: ehci-omap: Implement suspend/resume
 
-I took the tag
+ arch/arm/boot/dts/omap3-beagle-xm.dts       |   29 ++++++++++---
+ arch/arm/mach-omap2/powerdomains3xxx_data.c |    8 +---
+ drivers/mfd/omap-usb-host.c                 |   45 ++++++++++--------
+ drivers/mfd/omap-usb-tll.c                  |   20 +--------
+ drivers/usb/core/hcd.c                      |   21 ++++++++-
+ drivers/usb/host/ehci-omap.c                |   64 ++++++++++++++++++++++++++-
+ include/linux/usb/hcd.h                     |    3 +
+ 7 files changed, 136 insertions(+), 54 deletions(-)
 
-   dt-3.11-6
-
-on top of which I merged:
-
-   mvebu/pcie
-   mvebu/pcie_bridge
-   mvebu/pcie_kirkwood
-
-Only with the latest merge did I get some conflict on
-kirkwood.dtsi:
-
-<<<<<<< HEAD
-		ranges = <0x00000000 0xf1000000 0x0100000		
-		          0xf4000000 0xf4000000 0x0000400
-=======
-		ranges = <0x00000000 0xf1000000 0x4000000
-		          0xe0000000 0xe0000000 0x8100000
- >>>>>>> jcooper/mvebu/pcie_kirkwood
-
-tried both variants, (almost) the same result:
-
-<<<<<<< HEAD
-Kirkwood: MV88F6281-A0, TCLK=200000000.
-Feroceon L2: Cache support initialised, in WT override mode.
-mvebu-pcie pcie-controller.1: PCIe0.0: link up
-mvebu-pcie pcie-controller.1: PCI host bridge to bus 0000:00
-pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
-pci_bus 0000:00: root bus resource [mem 0xffffffff-0x07fffffe]
-pci_bus 0000:00: root bus resource [bus 00-ff]
-pci 0000:00:01.0: [11ab:7846] type 01 class 0x060400
-PCI: bus0: Fast back to back transfers disabled
-pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-pci 0000:01:00.0: [10ee:0008] type 00 class 0x050000
-pci 0000:01:00.0: reg 10: [mem 0x00000000-0x00000fff]
-pci 0000:01:00.0: reg 14: [mem 0x00000000-0x07ffffff]
-pci 0000:01:00.0: reg 18: [mem 0x00000000-0x00000fff]
-pci 0000:01:00.0: reg 1c: [mem 0x00000000-0x007fffff]
-pci 0000:01:00.0: reg 20: [mem 0x00000000-0x00001fff]
-pci 0000:01:00.0: reg 24: [mem 0x00000000-0x00000fff]
-pci 0000:01:00.0: supports D1 D2
-pci 0000:01:00.0: PME# supported from D0 D1 D2 D3hot
-PCI: bus1: Fast back to back transfers disabled
-pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
-pci 0000:00:01.0: BAR 8: can't assign mem (size 0xc000000)
-pci 0000:01:00.0: BAR 1: can't assign mem (size 0x8000000)
-pci 0000:01:00.0: BAR 3: can't assign mem (size 0x800000)
-pci 0000:01:00.0: BAR 4: can't assign mem (size 0x2000)
-pci 0000:01:00.0: BAR 0: can't assign mem (size 0x1000)
-pci 0000:01:00.0: BAR 2: can't assign mem (size 0x1000)
-pci 0000:01:00.0: BAR 5: can't assign mem (size 0x1000)
-pci 0000:00:01.0: PCI bridge to [bus 01]
-=======
-Kirkwood: MV88F6281-A0, TCLK=200000000.
-Feroceon L2: Cache support initialised, in WT override mode.
-mvebu-pcie pcie-controller.2: PCIe0.0: link up
-mvebu-pcie pcie-controller.2: PCI host bridge to bus 0000:00
-pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
-pci_bus 0000:00: root bus resource [mem 0xe0000000-0xe7ffffff]
-pci_bus 0000:00: root bus resource [bus 00-ff]
-pci 0000:00:01.0: [11ab:7846] type 01 class 0x060400
-PCI: bus0: Fast back to back transfers disabled
-pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-pci 0000:01:00.0: [10ee:0008] type 00 class 0x050000
-pci 0000:01:00.0: reg 10: [mem 0x00000000-0x00000fff]
-pci 0000:01:00.0: reg 14: [mem 0x00000000-0x07ffffff]
-pci 0000:01:00.0: reg 18: [mem 0x00000000-0x00000fff]
-pci 0000:01:00.0: reg 1c: [mem 0x00000000-0x007fffff]
-pci 0000:01:00.0: reg 20: [mem 0x00000000-0x00001fff]
-pci 0000:01:00.0: reg 24: [mem 0x00000000-0x00000fff]
-pci 0000:01:00.0: supports D1 D2
-pci 0000:01:00.0: PME# supported from D0 D1 D2 D3hot
-PCI: bus1: Fast back to back transfers disabled
-pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
-pci 0000:00:01.0: BAR 8: can't assign mem (size 0xc000000)
-pci 0000:01:00.0: BAR 1: can't assign mem (size 0x8000000)
-pci 0000:01:00.0: BAR 3: can't assign mem (size 0x800000)
-pci 0000:01:00.0: BAR 4: can't assign mem (size 0x2000)
-pci 0000:01:00.0: BAR 0: can't assign mem (size 0x1000)
-pci 0000:01:00.0: BAR 2: can't assign mem (size 0x1000)
-pci 0000:01:00.0: BAR 5: can't assign mem (size 0x1000)
-pci 0000:00:01.0: PCI bridge to [bus 01]
-
- >>>>>>> jcooper/mvebu/pcie_kirkwood
-
-Compared to a working configuration, here I see a spurious
-
-   pci 0000:00:01.0: BAR 8: can't assign mem (size 0xc000000)
-
-which I don't understand, plus all others which are failing.
-
-It's weird how with the second configuration:
-
-   mvebu-pcie pcie-controller.2: PCIe0.0: link up
-   mvebu-pcie pcie-controller.2: PCI host bridge to bus 0000:00
-   pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
-   pci_bus 0000:00: root bus resource [mem 0xe0000000-0xe7ffffff]
-
-I get a second mvebu-pcie pcie-controller.2, although with a more 
-reasonable memory range.
-
-Needless to say, I did try several other combinations of your recent and 
-not-so-recent patches (from May 23rd onwards), with essentially the same 
-results.
-
-It *must* be something trivial. Any hints?
-
-Thanks a lot!
-Gerlando
+-- 
+1.7.4.1
