@@ -1,30 +1,23 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 10 Jul 2013 22:20:54 +0900
-Subject: [PATCH 1/3] ARM: shmobile: fix compile error when
- CONFIG_THUMB2_KERNEL=y
-In-Reply-To: <1373421397-1786-2-git-send-email-koba@kmckk.co.jp>
+Date: Wed, 10 Jul 2013 22:20:59 +0900
+Subject: [PATCH 2/3] ARM: shmobile: Force ARM mode to compile reset
+ vector for secondary CPUs
+In-Reply-To: <1373421397-1786-3-git-send-email-koba@kmckk.co.jp>
 References: <1373421397-1786-1-git-send-email-koba@kmckk.co.jp>
- <1373421397-1786-2-git-send-email-koba@kmckk.co.jp>
-Message-ID: <20130710132054.GB13716@verge.net.au>
+ <1373421397-1786-3-git-send-email-koba@kmckk.co.jp>
+Message-ID: <20130710132059.GC13716@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 10:56:35AM +0900, Tetsuyuki Kobayashi wrote:
-> On KZM-A9-GT board (SMP), when CONFIG_THUMB2_KERNEL=y it fails to compile
->  
->   AS      arch/arm/mach-shmobile/headsmp-scu.o
-> /proj/koba/kernel/arm-soc/arch/arm/mach-shmobile/headsmp-scu.S: Assembler messages:
-> /proj/koba/kernel/arm-soc/arch/arm/mach-shmobile/headsmp-scu.S:41: Error: shift must be constant -- `bic r2,r2,r3,lsl r1'
-> make[2]: *** [arch/arm/mach-shmobile/headsmp-scu.o] Error 1
-> make[1]: *** [arch/arm/mach-shmobile] Error 2
-> make: *** [sub-make] Error 2
-> 
-> Instruction `bic r2,r2,r3,lsl r1' is not supported in thumb mode. This patch split it into 2 instructions.
+On Wed, Jul 10, 2013 at 10:56:36AM +0900, Tetsuyuki Kobayashi wrote:
+> Instructions start from boot vector must be ARM mode.
+> This patch specify ARM mode explicitly and use 'bx' instruction to be
+> able to change to Thumb mode.
 > 
 > Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 > ---
->  arch/arm/mach-shmobile/headsmp-scu.S |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  arch/arm/mach-shmobile/headsmp.S |    5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 
 Thanks, I have queued this up with Magnus's ack in the thumb-fixes
 branch of my renesas tree on kernel.org. It should be
