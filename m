@@ -1,78 +1,63 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 10 Jul 2013 19:09:28 +0100
-Subject: Seg fault occurs when running statically compiled binary from
- kernel using call_usermodehelper
-In-Reply-To: <20130710163410.GA30514@mudshark.cambridge.arm.com>
-References: <CAOiN93mGTu9w9rVNCrbbH1sccXY9VJhaCmg+dS7Rk9mMgKHBaA@mail.gmail.com>
- <CAOiN93=Nx77RkbNuEJMV617MjV5+GmorF0G3vyLy1SwQcuCs+g@mail.gmail.com>
- <CAOiN93nH9fyHoz4yrZmJ-OKCy6ogdt5bYartXCBgP5eHMUBPdw@mail.gmail.com>
- <20130710163410.GA30514@mudshark.cambridge.arm.com>
-Message-ID: <20130710180928.GB2872@localhost.localdomain>
+From: markus@trippelsdorf.de (Markus Trippelsdorf)
+Date: Wed, 10 Jul 2013 20:28:15 +0200
+Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
+ streaming format
+In-Reply-To: <20130710093642.GC14873@pd.tnic>
+References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+ <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
+ <20130506095124.GA22041@pd.tnic>
+ <CAMuHMdWH9w5fj6HRXi+9QcBJym4dukAFsPVGZVqSSk3yTZJUcA@mail.gmail.com>
+ <20130710093642.GC14873@pd.tnic>
+Message-ID: <20130710182815.GA362@x4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 05:34:11PM +0100, Will Deacon wrote:
-> On Wed, Jul 10, 2013 at 11:42:25AM +0100, Ashish Sangwan wrote:
-> > Any heads up on this?
+On 2013.07.10 at 11:36 +0200, Borislav Petkov wrote:
+> On Wed, Jul 10, 2013 at 10:12:46AM +0200, Geert Uytterhoeven wrote:
+> > >> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+> > >> index a0ab6d7..c9bfbb0 100644
+> > >> --- a/scripts/Makefile.lib
+> > >> +++ b/scripts/Makefile.lib
+> > >> @@ -313,7 +313,7 @@ cmd_lzo = (cat $(filter-out FORCE,$^) | \
+> > >>
+> > >>  quiet_cmd_lz4 = LZ4     $@
+> > >>  cmd_lz4 = (cat $(filter-out FORCE,$^) | \
+> > >> -     lz4demo -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
+> > >> +     lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
+> > >
+> > > You probably want to check for the presence of lz4c on the system and
+> > > bail with an informative message if absent.
 > > 
-> > or could someone just advice what can we do to debug this?
+> > Yep, x86_64-randconfig
+> > (http://kisskb.ellerman.id.au/kisskb/buildresult/9110794/):
 > > 
-> > The ret_from_fork currently looks like following:
-> > /*
-> >  * This is how we return from a fork.
-> >  */
-> > ENTRY(ret_from_fork)
-> >         bl      schedule_tail
-> >         cmp     r5, #0
-> >         movne   r0, r4
-> >         adrne   lr, BSYM(1f)
-> >         movne   pc, r5
-> > 1:      get_thread_info tsk
-> >         b       ret_slow_syscall
-> > ENDPROC(ret_from_fork)
-> > 
-> > Is this a real issue? Because we are getting this just for static binaries.
+> >   LZ4     arch/x86/boot/compressed/vmlinux.bin.lz4
+> > /bin/sh: lz4c: command not found
 > 
-> Ok, I've finally got to the bottom of this, but I'm not sure on the best way
-> to fix it. The issue is that libc expects r0 to contain a function pointer
-> to be invoked at exit (rtld_fini), to clean up after a dynamic linker. If
-> this pointer is NULL, then it is ignored. We actually zero this pointer in
-> our ELF_PLAT_INIT macro.
-> 
-> At the same time, we have this strange code called next from the ARM ELF
-> loader:
-> 
-> 	regs->ARM_r2 = stack[2];	/* r2 (envp) */			\
-> 	regs->ARM_r1 = stack[1];	/* r1 (argv) */			\
-> 	regs->ARM_r0 = stack[0];	/* r0 (argc) */			\
-> 
-> which puts argc into r0. Usually this gets overwritten by the return value
-> of execve (0), so everything hangs together. With kernel threads this is
-> different since we do the exec from ____call_usermodehelper on the stack and
-> then return to the new application via ret_from_fork, which takes the
-> slowpath; popping r0 from pt_regs and making argc visible to the library.
-> 
-> When the application exits and libc starts running its exit functions, we
-> jump to hyperspace.
-> 
-> My inclination would be to remove the stack popping above (patch below),
-> but it's a user-visible change and I'm not sure if something like OABI
-> requires it.
+> Sure, it had to be 2 months and to hit upstream for there still to be no
+> fix. Geez...
 
-It looks like populating r0-r2 is already broken -- libc must be getting
-at least argc from the stack and not r0, otherwise it couldn't be
-(ab)using r0 for some other purpose before _start.
+Well, there's also no hand-holding when lzop is missing for LZO.
+And the error message is clear enough. No?
 
-Do I conclude correctly that the real problem here is a bug in the libc
-startup code, which makes incorrect assumptions about the initial r0 in
-the statically linked case?
+BTW speaking of introductory-level patches, what about the following
+one:
 
-At the ELF entry point, initial r0 is zero, but apparently only by
-accident, since there is a clear intent in the kernel for r0=argc, even
-if userspace can't have been using this any time recently since it is
-normally clobbered with zero.  It seems incorrect for userspace to rely on
-either -- but I guess there is no choice but to retain that behaviour now,
-since it may break existing binaries which contain that libc bug.
+Now that lz4 kernel compression is available, add *.lz4 to .gitignore
 
-Cheers
----Dave
+diff --git a/.gitignore b/.gitignore
+index 3b8b9b3..7e9932e 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -29,6 +29,7 @@ modules.builtin
+ *.bz2
+ *.lzma
+ *.xz
++*.lz4
+ *.lzo
+ *.patch
+ *.gcno
+
+
+-- 
+Markus
