@@ -1,144 +1,69 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 10 Jul 2013 17:50:18 -0300
-Subject: [PATCH v2 1/2] ARM: dts: imx6dl-wandboard: Add SDHC1 and SDHC2 ports
-Message-ID: <1373489419-20893-1-git-send-email-festevam@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 10 Jul 2013 23:04:14 +0200
+Subject: [v4 3/3] sata: imx: add ahci sata support on imx platforms
+In-Reply-To: <1373445355-11453-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1373445355-11453-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1373445355-11453-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <20130710210414.GK516@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Jul 10, 2013 at 04:35:55PM +0800, Richard Zhu wrote:
+> From: Richard Zhu <r65037@freescale.com>
+> 
+> imx6q contains one Synopsys AHCI SATA controller,
+> But it can't shares ahci_platform driver with other
+> controllers.
+> Because there are some misalignments of the generic
+> AHCI controller.
+> The bits definitions of the HBA registers, the Vendor
+> Specific registers, and the AHCI PHY clock.
+>  - CAP_SSS(bit20) of the HOST_CAP is writable, default
+>  value is '0', should be configured to be '1'
+>  - bit0 (only one AHCI SATA port on imx6q) of the
+>  HOST_PORTS_IMPL should be set to be '1'.(default 0)
+>  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)
+>  should be configured regarding to the frequency of AHB
+>  bus clock.
+>  - Configurations of the AHCI PHY clock, and the signal
+>  parameters of the GPR13
+> 
+> Setup its own ahci sata driver, contained the imx6q specific
+> initialized codes, and re-use the generic ahci_platform drier,
+> 
+> Signed-off-by: Richard Zhu <r65037@freescale.com>
+> ---
+>  drivers/ata/Kconfig    |    9 ++
+>  drivers/ata/Makefile   |    1 +
+>  drivers/ata/sata_imx.c |  237 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 247 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/ata/sata_imx.c
+> 
 
-Wandboard has a SD card slot on the baseboard connected to SDHC1 and a
-BCM4329 (Wifi + Bluetooth chip) connected to SDHC2.
+[...]
 
-Add support for these ports.
+> +
+> +/* imx6q ahci module initialization. */
+> +static int imx6q_sata_init(struct device *dev, void __iomem *mmio)
+> +{
+> +	int ret = 0;
+> +	unsigned int rc;
+> +	struct regmap *gpr;
+> +	struct clk *ahb_clk;
+> +	struct imx_ahci_priv *imxpriv = (struct imx_ahci_priv *)dev->p;
 
-While at it, provide the card detect gpio on SDHC3.
+Just because a pointer points to valid memory doesn't mean that it's
+free to use for your purposes. If you look closer maybe you realize that
+the imxpriv pointer you use here is another one than the one you
+allocate below in your probe function.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Also add the usdhc pinmux groups to mx6q
+I give up here. Maybe I'll write a driver for this when I find time for
+it.
 
- arch/arm/boot/dts/imx6dl-wandboard.dts | 17 +++++++++++++++++
- arch/arm/boot/dts/imx6dl.dtsi          | 29 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6q.dtsi           | 28 ++++++++++++++++++++++++++++
- 3 files changed, 74 insertions(+)
+Sascha
 
-diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dts b/arch/arm/boot/dts/imx6dl-wandboard.dts
-index ab6a053..027ece5 100644
---- a/arch/arm/boot/dts/imx6dl-wandboard.dts
-+++ b/arch/arm/boot/dts/imx6dl-wandboard.dts
-@@ -83,6 +83,8 @@
- 		pinctrl_hog: hoggrp {
- 			fsl,pins = <
- 				MX6DL_PAD_GPIO_0__CCM_CLKO1    0x130b0
-+				MX6DL_PAD_GPIO_2__GPIO1_IO02	0x80000000
-+				MX6DL_PAD_EIM_DA9__GPIO3_IO09	0x80000000
- 			>;
- 		};
- 	};
-@@ -110,8 +112,23 @@
- 	status = "okay";
- };
- 
-+&usdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc1_2>;
-+	cd-gpios = <&gpio1 2 0>;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2_2>;
-+	non-removable;
-+	status = "okay";
-+};
-+
- &usdhc3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc3_2>;
-+	cd-gpios = <&gpio3 9 0>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index d75e32c..49ac931 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -264,6 +264,35 @@
- 					};
- 				};
- 
-+				usdhc1 {
-+					pinctrl_usdhc1_1: usdhc1grp-1 {
-+						fsl,pins = <
-+							MX6DL_PAD_SD1_CMD__SD1_CMD    0x17059
-+							MX6DL_PAD_SD1_CLK__SD1_CLK    0x10059
-+							MX6DL_PAD_SD1_DAT0__SD1_DATA0 0x17059
-+							MX6DL_PAD_SD1_DAT1__SD1_DATA1 0x17059
-+							MX6DL_PAD_SD1_DAT2__SD1_DATA2 0x17059
-+							MX6DL_PAD_SD1_DAT3__SD1_DATA3 0x17059
-+							MX6DL_PAD_NANDF_D0__SD1_DATA4 0x17059
-+							MX6DL_PAD_NANDF_D1__SD1_DATA5 0x17059
-+							MX6DL_PAD_NANDF_D2__SD1_DATA6 0x17059
-+							MX6DL_PAD_NANDF_D3__SD1_DATA7 0x17059
-+						>;
-+					};
-+
-+					pinctrl_usdhc1_2: usdhc1grp-2 {
-+						fsl,pins = <
-+							MX6DL_PAD_SD1_CMD__SD1_CMD    0x17059
-+							MX6DL_PAD_SD1_CLK__SD1_CLK    0x10059
-+							MX6DL_PAD_SD1_DAT0__SD1_DATA0 0x17059
-+							MX6DL_PAD_SD1_DAT1__SD1_DATA1 0x17059
-+							MX6DL_PAD_SD1_DAT2__SD1_DATA2 0x17059
-+							MX6DL_PAD_SD1_DAT3__SD1_DATA3 0x17059
-+						>;
-+					};
-+				};
-+
-+
- 				usdhc2 {
- 					pinctrl_usdhc2_1: usdhc2grp-1 {
- 						fsl,pins = <
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index e0b7bad..f039a25 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -300,6 +300,34 @@
- 					};
- 				};
- 
-+				usdhc1 {
-+					pinctrl_usdhc1_1: usdhc1grp-1 {
-+						fsl,pins = <
-+							MX6Q_PAD_SD1_CMD__SD1_CMD    0x17059
-+							MX6Q_PAD_SD1_CLK__SD1_CLK    0x10059
-+							MX6Q_PAD_SD1_DAT0__SD1_DATA0 0x17059
-+							MX6Q_PAD_SD1_DAT1__SD1_DATA1 0x17059
-+							MX6Q_PAD_SD1_DAT2__SD1_DATA2 0x17059
-+							MX6Q_PAD_SD1_DAT3__SD1_DATA3 0x17059
-+							MX6Q_PAD_NANDF_D0__SD1_DATA4 0x17059
-+							MX6Q_PAD_NANDF_D1__SD1_DATA5 0x17059
-+							MX6Q_PAD_NANDF_D2__SD1_DATA6 0x17059
-+							MX6Q_PAD_NANDF_D3__SD1_DATA7 0x17059
-+						>;
-+					};
-+
-+					pinctrl_usdhc1_2: usdhc1grp-2 {
-+						fsl,pins = <
-+							MX6Q_PAD_SD1_CMD__SD1_CMD    0x17059
-+							MX6Q_PAD_SD1_CLK__SD1_CLK    0x10059
-+							MX6Q_PAD_SD1_DAT0__SD1_DATA0 0x17059
-+							MX6Q_PAD_SD1_DAT1__SD1_DATA1 0x17059
-+							MX6Q_PAD_SD1_DAT2__SD1_DATA2 0x17059
-+							MX6Q_PAD_SD1_DAT3__SD1_DATA3 0x17059
-+						>;
-+					};
-+				};
-+
- 				usdhc2 {
- 					pinctrl_usdhc2_1: usdhc2grp-1 {
- 						fsl,pins = <
 -- 
-1.8.1.2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
