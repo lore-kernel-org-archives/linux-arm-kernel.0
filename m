@@ -1,50 +1,41 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 10 Jul 2013 12:44:26 +0900
-Subject: [PATCH 0/3] ARM: shmobile: enable SMP Thumb2 kernel
-In-Reply-To: <1373421397-1786-1-git-send-email-koba@kmckk.co.jp>
-References: <1373421397-1786-1-git-send-email-koba@kmckk.co.jp>
-Message-ID: <CANqRtoSK9WoJJ2LOB-dRCjz5fQy8b5Cm+B+Fz9Mv3E5P6oFLQw@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 10 Jul 2013 13:58:39 +0800
+Subject: [PATCH V3 2/3] clocksource: mmp: support CLOCKSOURCE OF DECLARE
+In-Reply-To: <201307092316.20905.arnd@arndb.de>
+References: <1373352166-10064-1-git-send-email-zhangwm@marvell.com>
+ <1373352166-10064-3-git-send-email-zhangwm@marvell.com>
+ <20130709181434.76f6216d@skate> <201307092316.20905.arnd@arndb.de>
+Message-ID: <CAN1soZyFztVR1XSw9bDS5JexK0Mdbpr6yevatVf+MnBohwCj1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kobayashi-san,
+On Wed, Jul 10, 2013 at 5:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 09 July 2013, Thomas Petazzoni wrote:
+>> Dear Neil Zhang,
+>>
+>> On Tue, 9 Jul 2013 14:42:45 +0800, Neil Zhang wrote:
+>> > support CLOCKSOURCE OF DECLARE for mmp timer.
+>> >
+>> > Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+>> > ---
+>> >  arch/arm/mach-mmp/mmp-dt.c  |    5 ++---
+>> >  arch/arm/mach-mmp/mmp2-dt.c |    3 +--
+>> >  arch/arm/mach-mmp/time.c    |   15 ++-------------
+>> >  3 files changed, 5 insertions(+), 18 deletions(-)
+>>
+>> Maybe it would be good to take this opportunity to move
+>> arch/arm/mach-mmp/time.c into drivers/clocksource/.
+>
+> +1
+>
+> Or we might want to have a more coordinated move of all clocksource
+> drivers in arch/arm to drivers/clocksource now, as we have done for some
+> other subsystems.
+>
+>         Arnd
 
-Your patch series looks fine to me. Thanks for your contribution.
+I already sent some patches on this. But I didn't get response yet. I'll rebase
+them and send them again. I hope that they could be merged in this cycle.
 
-Acked-by: Magnus Damm <damm@opensource.se>
-
-On Wed, Jul 10, 2013 at 10:56 AM, Tetsuyuki Kobayashi <koba@kmckk.co.jp> wrote:
-> Hello,
->
-> I try to build SMP kernel for KZM-A9-GT board in CONFIG_THUMB2_KERNEL=y.
-> After some modification it successully boots in Thumb2 kernel.
-> In my case, Thumb2 kernel is 23% smaller than usual ARM kernel.
->
->    text    data     bss     dec     hex filename
-> 4763561  251580  196164 5211305  4f84a9 out.kzm9g/vmlinux
->
->    text    data     bss     dec     hex filename
-> 3595265  251668  196164 4043097  3db159 out.kzm9g_thumb/vmlinux
->
->
-> Useful info for Thumb2 kernel
-> https://wiki.linaro.org/WorkingGroups/KernelArchived/Thumb2Guide
->
-> This patch set is based on arm-soc git repositry,
-> remotes/origin/renesas/soc-cleanup branch
-> 53332005bfde9d2e3c9a66030c0e8c2598eaa1d5 ARM: shmobile: Remove Bonito board support
->
-> Tetsuyuki Kobayashi (3):
->   ARM: shmobile: fix compile error when CONFIG_THUMB2_KERNEL=y
->   ARM: shmobile: Force ARM mode to compile reset vector for secondary
->     CPUs
->   ARM: shmobile: Insert align directives before 4 bytes data
->
->  arch/arm/mach-shmobile/headsmp-scu.S  |    4 +++-
->  arch/arm/mach-shmobile/headsmp.S      |    6 +++++-
->  arch/arm/mach-shmobile/sleep-sh7372.S |    2 ++
->  3 files changed, 10 insertions(+), 2 deletions(-)
->
-> --
-> 1.7.9.5
->
+Regards
+Haojian
