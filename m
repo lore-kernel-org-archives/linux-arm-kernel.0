@@ -1,63 +1,32 @@
-From: tibor@harsszegi.com (Tibor Harsszegi)
-Date: Wed, 10 Jul 2013 19:29:12 +0200
-Subject: NSA310 + DT
-In-Reply-To: <20130710172358.GB31692@lunn.ch>
-References: <51DC564A.8050002@harsszegi.com> <20130709193605.GC26223@lunn.ch>
- <20130709202143.GD26223@lunn.ch>
- <2544f179ed4349545a25aa60d52a664a@harsszegi.com>
- <20130710134119.GA30885@lunn.ch> <51DD8E8B.2040505@harsszegi.com>
- <20130710165342.GA31692@lunn.ch> <51DD926C.1010205@harsszegi.com>
- <51DD964C.7020200@harsszegi.com> <51DD96B9.8030900@harsszegi.com>
- <20130710172358.GB31692@lunn.ch>
-Message-ID: <51DD99E8.4090507@harsszegi.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 10 Jul 2013 14:29:25 -0300
+Subject: [PATCH 3/3] ARM: imx: mm-imx3: Free l2x0_base
+In-Reply-To: <CAOMZO5AeJVRL3VhLdYPtAq7-9+Dh3o=ntwhqYOrZZeR7TbBDyQ@mail.gmail.com>
+References: <1373306318-15604-1-git-send-email-festevam@gmail.com>
+ <1373306318-15604-3-git-send-email-festevam@gmail.com>
+ <20130709062414.GG16656@S2101-09.ap.freescale.net>
+ <CAOMZO5D4ivbqYovVA2CpXEemrAq8Nyn5By8-iL3SAnw=mpJ+og@mail.gmail.com>
+ <20130709182046.GD516@pengutronix.de>
+ <CAOMZO5AeJVRL3VhLdYPtAq7-9+Dh3o=ntwhqYOrZZeR7TbBDyQ@mail.gmail.com>
+Message-ID: <CAOMZO5DF2bu7CyehQHe671D34DuzuM1uktxbGn+Pw0s5BuQdcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-> root at qnap:/sys# find . -name *gpio*
-root at nsa310:/sys# find . -name *gpio*
-./bus/platform/devices/gpio_keys.1
-./bus/platform/devices/f1010140.gpio
-./bus/platform/devices/gpio-leds.2
-./bus/platform/devices/f1010100.gpio
-./bus/platform/devices/gpio_poweroff.3
-./bus/platform/drivers/leds-gpio
-./bus/platform/drivers/mvebu-gpio
-./bus/platform/drivers/mvebu-gpio/f1010140.gpio
-./bus/platform/drivers/mvebu-gpio/f1010100.gpio
-./bus/platform/drivers/poweroff-gpio
-./bus/platform/drivers/gpio-keys
-./bus/platform/drivers/basic-mmio-gpio
-./devices/gpio_keys.1
-./devices/ocp.0/f1010140.gpio
-./devices/ocp.0/f1010140.gpio/gpio
-./devices/ocp.0/f1010140.gpio/gpio/gpiochip32
-./devices/ocp.0/f1010140.gpio/gpio/gpiochip32/ngpio
-./devices/ocp.0/f1010100.gpio
-./devices/ocp.0/f1010100.gpio/gpio
-./devices/ocp.0/f1010100.gpio/gpio/gpiochip0
-./devices/ocp.0/f1010100.gpio/gpio/gpiochip0/ngpio
-./devices/gpio-leds.2
-./devices/gpio_poweroff.3
-./class/gpio
-./class/gpio/gpiochip32
-./class/gpio/gpiochip0
-
-> I have no LEDs on this box, but you should should see entries in
+On Wed, Jul 10, 2013 at 1:53 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Sascha,
 >
-> /sys/class/leds
+> On Tue, Jul 9, 2013 at 3:20 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 >
-No, I don't.
-
-root at nsa310:/sys# ls -la /sys/class/leds/
-total 0
-drwxr-xr-x 2 root root 0 j??l 10 19:24 .
-drwxr-xr-x 34 root root 0 j??l 10 19:24 ..
-
-Cheers,
-t.
-
-> What you probably see in the kernel logs is lots of warnings from gpio
-> about deferred, but then they get repeated later and are successful.
+>> l2x0_base is passed to l2x0_init which uses it for the outer cache
+>> maintenance operations. I wonder this doesn't crash your kernel.
 >
-> 	Andrew
+> l2x0_init() is called from arch/arm/mach-imx/mm-imx3.c first and then
+> from arch/arm/mm/cache-l2x0.c
+> later.
+>
+> Why do we need to call it twice?
+
+Understood now, actually l2x0_init() is only called in
+arch/arm/mm/cache-l2x0.c for the dt case.
+
+So all is fine with the current code.
