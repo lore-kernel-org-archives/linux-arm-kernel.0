@@ -1,86 +1,78 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 10 Jul 2013 18:45:26 +0100
-Subject: [PATCH v2 1/2] ARM: OMAP: Add secure function omap_smc3() which
- calling instruction smc #1
-In-Reply-To: <1373461145-9812-2-git-send-email-pali.rohar@gmail.com>
-References: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
- <1373461145-9812-1-git-send-email-pali.rohar@gmail.com>
- <1373461145-9812-2-git-send-email-pali.rohar@gmail.com>
-Message-ID: <20130710174521.GA2872@localhost.localdomain>
+Date: Wed, 10 Jul 2013 19:09:28 +0100
+Subject: Seg fault occurs when running statically compiled binary from
+ kernel using call_usermodehelper
+In-Reply-To: <20130710163410.GA30514@mudshark.cambridge.arm.com>
+References: <CAOiN93mGTu9w9rVNCrbbH1sccXY9VJhaCmg+dS7Rk9mMgKHBaA@mail.gmail.com>
+ <CAOiN93=Nx77RkbNuEJMV617MjV5+GmorF0G3vyLy1SwQcuCs+g@mail.gmail.com>
+ <CAOiN93nH9fyHoz4yrZmJ-OKCy6ogdt5bYartXCBgP5eHMUBPdw@mail.gmail.com>
+ <20130710163410.GA30514@mudshark.cambridge.arm.com>
+Message-ID: <20130710180928.GB2872@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 02:59:04PM +0200, Pali Roh?r wrote:
-> Other secure functions omap_smc1() and omap_smc2() calling instruction smc #0
-> but Nokia RX-51 board needs to call smc #1 for PPA access.
+On Wed, Jul 10, 2013 at 05:34:11PM +0100, Will Deacon wrote:
+> On Wed, Jul 10, 2013 at 11:42:25AM +0100, Ashish Sangwan wrote:
+> > Any heads up on this?
+> > 
+> > or could someone just advice what can we do to debug this?
+> > 
+> > The ret_from_fork currently looks like following:
+> > /*
+> >  * This is how we return from a fork.
+> >  */
+> > ENTRY(ret_from_fork)
+> >         bl      schedule_tail
+> >         cmp     r5, #0
+> >         movne   r0, r4
+> >         adrne   lr, BSYM(1f)
+> >         movne   pc, r5
+> > 1:      get_thread_info tsk
+> >         b       ret_slow_syscall
+> > ENDPROC(ret_from_fork)
+> > 
+> > Is this a real issue? Because we are getting this just for static binaries.
 > 
-> Signed-off-by: Ivaylo Dimitrov <freemangordon@abv.bg>
-> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> ---
->  arch/arm/mach-omap2/omap-secure.h |    1 +
->  arch/arm/mach-omap2/omap-smc.S    |   22 +++++++++++++++++++++-
->  2 files changed, 22 insertions(+), 1 deletion(-)
+> Ok, I've finally got to the bottom of this, but I'm not sure on the best way
+> to fix it. The issue is that libc expects r0 to contain a function pointer
+> to be invoked at exit (rtld_fini), to clean up after a dynamic linker. If
+> this pointer is NULL, then it is ignored. We actually zero this pointer in
+> our ELF_PLAT_INIT macro.
 > 
-> diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
-> index 0e72917..c4586f4 100644
-> --- a/arch/arm/mach-omap2/omap-secure.h
-> +++ b/arch/arm/mach-omap2/omap-secure.h
-> @@ -51,6 +51,7 @@
->  extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
->  				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
->  extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
-> +extern u32 omap_smc3(u32 id, u32 process, u32 flag, u32 pargs);
->  extern phys_addr_t omap_secure_ram_mempool_base(void);
->  extern int omap_secure_ram_reserve_memblock(void);
->  
-> diff --git a/arch/arm/mach-omap2/omap-smc.S b/arch/arm/mach-omap2/omap-smc.S
-> index f6441c1..5c02b8d 100644
-> --- a/arch/arm/mach-omap2/omap-smc.S
-> +++ b/arch/arm/mach-omap2/omap-smc.S
-> @@ -1,9 +1,11 @@
->  /*
-> - * OMAP44xx secure APIs file.
-> + * OMAP34xx and OMAP44xx secure APIs file.
->   *
->   * Copyright (C) 2010 Texas Instruments, Inc.
->   * Written by Santosh Shilimkar <santosh.shilimkar@ti.com>
->   *
-> + * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
-> + * Copyright (C) 2013 Pali Roh?r <pali.rohar@gmail.com>
->   *
->   * This program is free software,you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
-> @@ -54,6 +56,24 @@ ENTRY(omap_smc2)
->  	ldmfd   sp!, {r4-r12, pc}
->  ENDPROC(omap_smc2)
->  
-> +/**
-> + * u32 omap_smc3(u32 service_id, u32 process_id, u32 flag, u32 pargs)
-> + * Low level common routine for secure HAL and PPA APIs via smc #1
-> + * r0 - @service_id: Secure Service ID
-> + * r1 - @process_id: Process ID
-> + * r2 - @flag: Flag to indicate the criticality of operation
-> + * r3 - @pargs: Physical address of parameter list
-> + */
-> +ENTRY(omap_smc3)
-> +	stmfd	sp!, {r4-r12, lr}
+> At the same time, we have this strange code called next from the ARM ELF
+> loader:
+> 
+> 	regs->ARM_r2 = stack[2];	/* r2 (envp) */			\
+> 	regs->ARM_r1 = stack[1];	/* r1 (argv) */			\
+> 	regs->ARM_r0 = stack[0];	/* r0 (argc) */			\
+> 
+> which puts argc into r0. Usually this gets overwritten by the return value
+> of execve (0), so everything hangs together. With kernel threads this is
+> different since we do the exec from ____call_usermodehelper on the stack and
+> then return to the new application via ret_from_fork, which takes the
+> slowpath; popping r0 from pt_regs and making argc visible to the library.
+> 
+> When the application exits and libc starts running its exit functions, we
+> jump to hyperspace.
+> 
+> My inclination would be to remove the stack popping above (patch below),
+> but it's a user-visible change and I'm not sure if something like OABI
+> requires it.
 
-You don't need to save/restore r12.  The ABI allows it to be clobbered
-across function calls.
+It looks like populating r0-r2 is already broken -- libc must be getting
+at least argc from the stack and not r0, otherwise it couldn't be
+(ab)using r0 for some other purpose before _start.
 
-> +	mov	r12, r0		@ Copy the secure service ID
-> +	mov	r6, #0xff	@ Indicate new Task call
-> +	dsb
-> +	dmb
+Do I conclude correctly that the real problem here is a bug in the libc
+startup code, which makes incorrect assumptions about the initial r0 in
+the statically linked case?
 
-dsb synchronises a superset of what dmb synchronises, so the dmb here is
-not useful.
-
-In any case, any code calling this must flush the region addressed by
-r3 beforehand anyway, which will include a dsb as part of its semantics
--- this is how you call it from rx51_secure_dispatcher().
-
-So I think the dsb may not be needed here (?)
+At the ELF entry point, initial r0 is zero, but apparently only by
+accident, since there is a clear intent in the kernel for r0=argc, even
+if userspace can't have been using this any time recently since it is
+normally clobbered with zero.  It seems incorrect for userspace to rely on
+either -- but I guess there is no choice but to retain that behaviour now,
+since it may break existing binaries which contain that libc bug.
 
 Cheers
 ---Dave
