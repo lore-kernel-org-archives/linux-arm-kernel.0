@@ -1,18 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 10 Jul 2013 23:37:06 +0800
-Subject: [PATCH v3] ARM: imx: Select MIGHT_HAVE_CACHE_L2X0
-In-Reply-To: <1373470216-12996-1-git-send-email-fabio.estevam@freescale.com>
-References: <1373470216-12996-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20130710153704.GD24654@S2101-09.ap.freescale.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 10 Jul 2013 08:42:01 -0700
+Subject: [PATCH v3 0/5] mmc: dw_mmc: fixes for suspend/resume on exynos
+In-Reply-To: <1373411961-23812-1-git-send-email-dianders@chromium.org>
+References: <1373411961-23812-1-git-send-email-dianders@chromium.org>
+Message-ID: <1373470926-19314-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 12:30:16PM -0300, Fabio Estevam wrote:
-> Select MIGHT_HAVE_CACHE_L2X0 for armv6 and armv7 i.MX SoCs.
-> 
-> By selecting MIGHT_HAVE_CACHE_L2X0, the user still has the possibility to 
-> disable CACHE_L2X0 selection via menuconfig.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+This series of patches addresses some suspend/resume problems with
+dw_mmc on exynos platforms.  Since suspend/resume is not fully working
+on ToT Linux (3.10) on exynos5250-snow, this series was tested against
+the current ToT ChromeOS 3.8 tree.  I have confirmed basic booting
+and eMMC / SD card usage (and compiling, honest!) against ToT Linux.
 
-Applied, thanks.
+Changes in v3:
+- Add freeze/thaw and poweroff/restore noirq entries.
+
+Changes in v2:
+- Fix typo (some -> come)
+- Use ~0 instead of 0xFFFFFFFF; add comment about value
+- Use suspend_noirq as per James Hogan.
+
+Doug Anderson (5):
+  mmc: dw_mmc: Invalidate cache of current_speed after suspend/resume
+  mmc: dw_mmc: Add suspend_noirq/resume_noirq callbacks for dw_mmc-pltfm
+  mmc: dw_mmc: Add exynos resume_noirq callback to clear WAKEUP_INT
+  mmc: dw_mmc: Always setup the bus after suspend/resume
+  mmc: dw_mmc: Set timeout to max upon resume
+
+ drivers/mmc/host/dw_mmc-exynos.c | 23 ++++++++++++++++++++++
+ drivers/mmc/host/dw_mmc-pltfm.c  | 41 +++++++++++++++++++++++++++++++++++++---
+ drivers/mmc/host/dw_mmc.c        | 15 +++++++++++----
+ drivers/mmc/host/dw_mmc.h        |  4 ++++
+ 4 files changed, 76 insertions(+), 7 deletions(-)
+
+-- 
+1.8.3
