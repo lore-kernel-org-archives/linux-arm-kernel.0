@@ -1,55 +1,46 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 10 Jul 2013 13:53:01 -0300
-Subject: [PATCH 3/3] ARM: imx: mm-imx3: Free l2x0_base
-In-Reply-To: <20130709182046.GD516@pengutronix.de>
-References: <1373306318-15604-1-git-send-email-festevam@gmail.com>
- <1373306318-15604-3-git-send-email-festevam@gmail.com>
- <20130709062414.GG16656@S2101-09.ap.freescale.net>
- <CAOMZO5D4ivbqYovVA2CpXEemrAq8Nyn5By8-iL3SAnw=mpJ+og@mail.gmail.com>
- <20130709182046.GD516@pengutronix.de>
-Message-ID: <CAOMZO5AeJVRL3VhLdYPtAq7-9+Dh3o=ntwhqYOrZZeR7TbBDyQ@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 10 Jul 2013 18:53:42 +0200
+Subject: NSA310 + DT
+In-Reply-To: <51DD8E8B.2040505@harsszegi.com>
+References: <51DC564A.8050002@harsszegi.com> <20130709193605.GC26223@lunn.ch>
+ <20130709202143.GD26223@lunn.ch>
+ <2544f179ed4349545a25aa60d52a664a@harsszegi.com>
+ <20130710134119.GA30885@lunn.ch> <51DD8E8B.2040505@harsszegi.com>
+Message-ID: <20130710165342.GA31692@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Wed, Jul 10, 2013 at 06:40:43PM +0200, Tibor Harsszegi wrote:
+> Hello Andrew,
+> 
+> I did a:
+> 
+> ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make clean
+> ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make kirkwood_defconfig
+> ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make zImage
+> ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make dtbs
+> cat arch/arm/boot/zImage arch/arm/boot/dts/kirkwood-nsa310-tdc.dtb > /tmp/X
+> mv /tmp/X arch/arm/boot/zImage
+> ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make uImage
+> ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make modules
+> 
+> [attached .config]
+> 
+> copied the uImage over the NSA310, rebooted.
+> Good news: console is back
 
-On Tue, Jul 9, 2013 at 3:20 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+Great. Probably was OF_SERIAL_PLATFORM
 
-> l2x0_base is passed to l2x0_init which uses it for the outer cache
-> maintenance operations. I wonder this doesn't crash your kernel.
+> Bad news: LEDs still don't work (all green), kernel stops (tried
+> forcing rootfstype=ext4, didn't help)
 
-l2x0_init() is called from arch/arm/mach-imx/mm-imx3.c first and then
-from arch/arm/mm/cache-l2x0.c
-later.
+Ah, O.k. EXT4 is not part of kirkwood_defconfig. Hence it cannot mount
+the root fs.
 
-Why do we need to call it twice?
+Please could you use make menuconfig and include it into the kernel
+image. I will also update the patch later.
 
-Can't we just do:
+LEDs are not working because the GPIO driver is not loading.
+I will see if i can spot an obvious typo etc.
 
-diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-index 0884ca9..94f3b4f 100644
---- a/arch/arm/mach-imx/mm-imx3.c
-+++ b/arch/arm/mach-imx/mm-imx3.c
-@@ -85,7 +85,6 @@ static void __iomem *imx3_ioremap_caller(phys_addr_t
-phys_addr, size_t size,
- static void __init imx3_init_l2x0(void)
- {
- #ifdef CONFIG_CACHE_L2X0
--	void __iomem *l2x0_base;
- 	void __iomem *clkctl_base;
-
- /*
-@@ -105,14 +104,6 @@ static void __init imx3_init_l2x0(void)
- 	} else {
- 		pr_err("L2 cache: Cannot fix timing. Trying to continue without\n");
- 	}
--
--	l2x0_base = ioremap(MX3x_L2CC_BASE_ADDR, 4096);
--	if (!l2x0_base) {
--		printk(KERN_ERR "remapping L2 cache area failed\n");
--		return;
--	}
--
--	l2x0_init(l2x0_base, 0x00030024, 0x00000000);
- #endif
- }
+  Andrew
