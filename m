@@ -1,30 +1,41 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 10 Jul 2013 21:57:16 +0200
-Subject: [PATCH 04/12] drivers/mmc/host: don't use
- devm_pinctrl_get_select_default() in probe
-In-Reply-To: <1373471889-18107-4-git-send-email-wsa@the-dreams.de>
-References: <1373471889-18107-1-git-send-email-wsa@the-dreams.de>
- <1373471889-18107-4-git-send-email-wsa@the-dreams.de>
-Message-ID: <201307102157.16419.marex@denx.de>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 10 Jul 2013 22:01:39 +0200
+Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
+ streaming format
+In-Reply-To: <20130710182815.GA362@x4>
+References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+ <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
+ <20130506095124.GA22041@pd.tnic>
+ <CAMuHMdWH9w5fj6HRXi+9QcBJym4dukAFsPVGZVqSSk3yTZJUcA@mail.gmail.com>
+ <20130710093642.GC14873@pd.tnic> <20130710182815.GA362@x4>
+Message-ID: <20130710200139.GC9140@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
+On Wed, Jul 10, 2013 at 08:28:15PM +0200, Markus Trippelsdorf wrote:
+> Well, there's also no hand-holding when lzop is missing for LZO. And
+> the error message is clear enough. No?
 
-> Since commit ab78029 (drivers/pinctrl: grab default handles from device
-> core), we can rely on device core for setting the default pins. Compile
-> tested only.
+Actually, we should error out more gracefully than that. Maybe check for
+the presence of the executable first and if not, exit out of the build
+with an informational message that lz4c is not present on the system.
+Ditto for lzop.
+
+Currently, you wait for the whole build to complete just to see that
+there's no executable at the end. Not nice.
+
+> BTW speaking of introductory-level patches, what about the following
+> one:
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org> (personally at LCE13)
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> Now that lz4 kernel compression is available, add *.lz4 to .gitignore
 
-Something like that is already in -next:
+Yep. That makes sense.
 
-    mmc: mxs-mmc: Let device core handle pinctrl
+Thanks.
 
-Otherwise
+-- 
+Regards/Gruss,
+    Boris.
 
-Tested-by: Marek Vasut <marex@denx.de>
-
-Best regards,
-Marek Vasut
+Sent from a fat crate under my desk. Formatting is fine.
+--
