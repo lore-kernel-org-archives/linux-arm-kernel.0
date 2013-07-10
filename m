@@ -1,85 +1,71 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 10 Jul 2013 17:50:41 -0400
-Subject: [PATCH V3 1/3] dts: change Marvell prefix to 'marvell'
-In-Reply-To: <CAN1soZzMvront1-jcBW6-uRKNs0OZNGnmiOjKGZSM28bViB_8A@mail.gmail.com>
-References: <1373352166-10064-1-git-send-email-zhangwm@marvell.com>
- <1373352166-10064-2-git-send-email-zhangwm@marvell.com>
- <20130709124900.GG11908@titan.lakedaemon.net>
- <CAN1soZxiOh6TpbUOCUzK8gNwmvjbT3ihkUWaw8tuZ7md+NVA2g@mail.gmail.com>
- <20130710122433.GO11908@titan.lakedaemon.net>
- <CAN1soZzMvront1-jcBW6-uRKNs0OZNGnmiOjKGZSM28bViB_8A@mail.gmail.com>
-Message-ID: <20130710215041.GR11908@titan.lakedaemon.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 10 Jul 2013 23:11:14 +0100
+Subject: [RFC PATCH 0/5] arm64: initial CPU_HOTPLUG support
+Message-ID: <1373494279-24712-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 10:08:50PM +0800, Haojian Zhuang wrote:
-> On Wed, Jul 10, 2013 at 8:24 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > On Wed, Jul 10, 2013 at 04:19:46PM +0800, Haojian Zhuang wrote:
-> >> On Tue, Jul 9, 2013 at 8:49 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> >> > Neil,
-> >> >
-> >> > On Tue, Jul 09, 2013 at 02:42:44PM +0800, Neil Zhang wrote:
-> >> >> The documented vendor prefix for Marvell is 'marvell', not 'mrvl', so
-> >> >> let's change it.
-> >> >>
-> >> >> Signed-off-by: Neil Zhang <zhangwm@marvell.com>
-> >> >> ---
-> >> >>  .../devicetree/bindings/arm/mrvl/intc.txt          |   16 +++---
-> >> >>  .../devicetree/bindings/arm/mrvl/mrvl.txt          |    6 +-
-> >> >>  .../devicetree/bindings/arm/mrvl/timer.txt         |    4 +-
-> >> >>  Documentation/devicetree/bindings/i2c/i2c-pxa.txt  |   14 +++---
-> >> >>  .../devicetree/bindings/mmc/sdhci-pxa.txt          |    8 ++--
-> >> >>  .../devicetree/bindings/rtc/sa1100-rtc.txt         |    4 +-
-> >> >>  .../devicetree/bindings/serial/mrvl-serial.txt     |    2 +-
-> >> >>  arch/arm/boot/dts/mmp2-brownstone.dts              |    2 +-
-> >> >>  arch/arm/boot/dts/mmp2.dtsi                        |   56 ++++++++++----------
-> >> >>  arch/arm/boot/dts/pxa168-aspenite.dts              |    2 +-
-> >> >>  arch/arm/boot/dts/pxa168.dtsi                      |   24 ++++----
-> >> >>  arch/arm/boot/dts/pxa2xx.dtsi                      |   16 +++---
-> >> >>  arch/arm/boot/dts/pxa3xx.dtsi                      |    2 +-
-> >> >>  arch/arm/boot/dts/pxa910-dkb.dts                   |    2 +-
-> >> >>  arch/arm/boot/dts/pxa910.dtsi                      |   27 +++++-----
-> >> >>  arch/arm/mach-mmp/irq.c                            |   16 +++---
-> >> >>  arch/arm/mach-mmp/mmp-dt.c                         |   28 +++++-----
-> >> >>  arch/arm/mach-mmp/mmp2-dt.c                        |   16 +++---
-> >> >>  arch/arm/mach-mmp/time.c                           |    2 +-
-> >> >>  arch/arm/mach-pxa/pxa-dt.c                         |   14 +++---
-> >> >>  drivers/i2c/busses/i2c-pxa.c                       |   10 ++--
-> >> >>  drivers/mmc/host/sdhci-pxav2.c                     |    4 +-
-> >> >>  drivers/mmc/host/sdhci-pxav3.c                     |    4 +-
-> >> >>  drivers/rtc/rtc-sa1100.c                           |    4 +-
-> >> >>  drivers/tty/serial/pxa.c                           |    4 +-
-> >> >>  25 files changed, 144 insertions(+), 143 deletions(-)
-> >> >
-> >> > I agree with the need to change, however, this has been in the binding
-> >> > documentation since v3.5.  I wish we had caught this when we decided
-> >> > against using stock ticker symbols (not all stock markets use
-> >> > alphabetical abbreviated names, not all companies are listed on any
-> >> > stock exchange).
-> >> >
-> >> > To do this properly, the drivers are going to have to be compatible with
-> >> > the old and the new names, and the binding docs updated to reflect the
-> >> > legacy name and the preferred name.
-> >> >
-> >>
-> >> It's better to only use the new names.
-> >
-> > In the dts{i}, yes.  But we don't want to break systems in the field
-> > with "mrvl,..." compatible strings.  Therefore, at least the drivers
-> > need an extra compatible string to support "mrvl,...".
-> >
-> > If it had just been since v3.9, it'd be different/simpler.  However,
-> > several vendors have opted to use kernels newer than v3.5, which makes
-> > this scenario a real possibility.
-> >
-> > thx,
-> >
-> > Jason.
-> 
-> Is there any vendor using DT for this Marvell chip? I think the answer is no.
+The following patches add basic CPU_HOTPLUG support to arm64, which
+combined with appropriate firmware (e.g. [1]) can be used to power CPUs
+up and down dynamically. From discussions at connect it seemed that
+several people were interested in working in this area, so I thought I'd
+make my current implementation public now that I've managed to regain
+access to my inbox.
 
-Well, Daniel Drake spoke up for OLPC.  Does that count?
+I've tested this series with the bootwrapper PSCI implementation I've
+placed on linux-arm.org [1] and a modified foundation model dts with a
+psci node and each CPU's enable-method set to "psci", using a shell
+while repeatedly cycling all cpus off and on:
 
-thx,
+for C in $(seq 0 3); do
+	./cyclichotplug.sh $C >/dev/null 2>&1 &
+done
 
-Jason.
+---->8----
+#!/bin/sh
+# cyclichotplug.sh
+
+CPU=$1;
+
+if [ -z "$CPU" ]; then
+	printf "Usage: $0 <cpu id>\n";
+	exit 1;
+fi
+
+ONLINEFILE=/sys/devices/system/cpu/cpu$CPU/online;
+
+while true; do
+	echo 0 > $ONLINEFILE;
+	echo 1 > $ONLINEFILE;
+done
+---->8----
+
+Patches are based on v3.10.
+
+Thanks,
+Mark.
+
+[1] http://linux-arm.org/git?p=boot-wrapper-aarch64.git;a=shortlog;h=refs/tags/simple-psci
+
+Mark Rutland (5):
+  arm64: reorganise smp_enable_ops
+  arm64: factor out spin-table boot method
+  arm64: read enable-method for CPU0
+  arm64: add CPU_HOTPLUG infrastructure
+  arm64: add PSCI CPU_OFF-based hotplug support
+
+ arch/arm64/Kconfig                 |    7 ++
+ arch/arm64/include/asm/irq.h       |    1 +
+ arch/arm64/include/asm/smp.h       |   37 +++++--
+ arch/arm64/kernel/cputable.c       |    2 +-
+ arch/arm64/kernel/head.S           |   12 +-
+ arch/arm64/kernel/irq.c            |   61 ++++++++++
+ arch/arm64/kernel/process.c        |    7 ++
+ arch/arm64/kernel/smp.c            |  215 ++++++++++++++++++++++--------------
+ arch/arm64/kernel/smp_psci.c       |   54 +++++++--
+ arch/arm64/kernel/smp_spin_table.c |   85 +++++++++++++-
+ arch/arm64/kernel/vmlinux.lds.S    |    1 -
+ 11 files changed, 375 insertions(+), 107 deletions(-)
+
+-- 
+1.7.9.5
