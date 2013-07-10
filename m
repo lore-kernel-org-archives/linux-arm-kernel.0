@@ -1,56 +1,101 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Wed, 10 Jul 2013 15:50:10 -0500
-Subject: [PATCH V3 1/3] dts: change Marvell prefix to 'marvell'
-In-Reply-To: <20130709124900.GG11908@titan.lakedaemon.net>
-References: <1373352166-10064-1-git-send-email-zhangwm@marvell.com>
- <1373352166-10064-2-git-send-email-zhangwm@marvell.com>
- <20130709124900.GG11908@titan.lakedaemon.net>
-Message-ID: <CAHCPf3u=Zu2-4RsWzi17rB_FmStwcf-Pt_7oRzAEnxN_w=a7cA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 10 Jul 2013 17:50:19 -0300
+Subject: [PATCH v2 2/2] ARM: dts: imx6dl-wandboard: Add support for UART3
+In-Reply-To: <1373489419-20893-1-git-send-email-festevam@gmail.com>
+References: <1373489419-20893-1-git-send-email-festevam@gmail.com>
+Message-ID: <1373489419-20893-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 9, 2013 at 7:49 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> Neil,
->
-> I agree with the need to change, however, this has been in the binding
-> documentation since v3.5.  I wish we had caught this when we decided
-> against using stock ticker symbols (not all stock markets use
-> alphabetical abbreviated names, not all companies are listed on any
-> stock exchange).
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Who decided that?
+Wandboard has a bluetooth device connected to UART3, so add support for it.
 
-You can't just "stop using stock ticker symbols" - FDT is inherently
-based on the original OpenFirmware device tree and therefore any
-existing bindings which are done on real OpenFirmware solutions where
-using stock ticker symbols is entirely appropriate (although, these
-days, not useful) is counter-productive.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Also add the usdhc pinmux groups to mx6q
 
-If Marvell had originally had mrvl as their ticker, and used this in
-OF DTs (and it is..), then mrvl it stays. In the case where new
-devices are added with marvell, this is in this case wrong. You should
-keep using the old one. A good example of this; Freescale. Nobody is
-saying everyone should move to "freescale,imx-this" or
-"freescale,vybrid-that" - it's fsl and it stays fsl for
-backwards/forwards compatibility because things exist already.
+ arch/arm/boot/dts/imx6dl-wandboard.dts |  7 +++++++
+ arch/arm/boot/dts/imx6dl.dtsi          | 18 ++++++++++++++++++
+ arch/arm/boot/dts/imx6q.dtsi           | 18 ++++++++++++++++++
+ 3 files changed, 43 insertions(+)
 
-Any new companies can have a long, descriptive name; a privilege of
-being late to the party, you might say :)
-
-Having an odd mix of mrvl and marvell or moving to marvell is just
-completely obtuse, whether they had that stock ticker, will have it in
-the future, it is how they're defined and you can't in good conscience
-change the binding after devices ship with it.
-
-> To do this properly, the drivers are going to have to be compatible with
-> the old and the new names, and the binding docs updated to reflect the
-> legacy name and the preferred name.
-
-Properly would be as above. You can stop using stock tickers for new
-company names, but anything that has been defined in a device tree
-before has to stay that way, and all the manufacturer prefixes to
-device names should be the same. What you're proposing is purely
-driver bloat and increasing the size of kernel.
-
---
-Matt Sealey <neko@bakuhatsu.net>
+diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dts b/arch/arm/boot/dts/imx6dl-wandboard.dts
+index 027ece5..2654b32 100644
+--- a/arch/arm/boot/dts/imx6dl-wandboard.dts
++++ b/arch/arm/boot/dts/imx6dl-wandboard.dts
+@@ -108,6 +108,13 @@
+ 	status = "okay";
+ };
+ 
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3_2>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
++
+ &usbh1 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 49ac931..58a7dbc 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -241,6 +241,24 @@
+ 					};
+ 				};
+ 
++				uart3 {
++					pinctrl_uart3_1: uart3grp-1 {
++						fsl,pins = <
++							MX6DL_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
++							MX6DL_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
++						>;
++					};
++
++					pinctrl_uart3_2: uart3grp-2 {
++						fsl,pins = <
++							MX6DL_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
++							MX6DL_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
++							MX6DL_PAD_EIM_D23__UART3_CTS_B 0x1b0b1
++							MX6DL_PAD_EIM_EB3__UART3_RTS_B 0x1b0b1
++						>;
++					};
++				};
++
+ 				uart4 {
+ 					pinctrl_uart4_1: uart4grp-1 {
+ 						fsl,pins = <
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index f039a25..a0e17a5 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -277,6 +277,24 @@
+ 					};
+ 				};
+ 
++				uart3 {
++					pinctrl_uart3_1: uart3grp-1 {
++						fsl,pins = <
++							MX6Q_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
++							MX6Q_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
++						>;
++					};
++
++					pinctrl_uart3_2: uart3grp-2 {
++						fsl,pins = <
++							MX6Q_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
++							MX6Q_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
++							MX6Q_PAD_EIM_D23__UART3_CTS_B 0x1b0b1
++							MX6Q_PAD_EIM_EB3__UART3_RTS_B 0x1b0b1
++						>;
++					};
++				};
++
+ 				uart4 {
+ 					pinctrl_uart4_1: uart4grp-1 {
+ 						fsl,pins = <
+-- 
+1.8.1.2
