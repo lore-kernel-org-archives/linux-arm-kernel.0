@@ -1,36 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 10 Jul 2013 14:06:49 -0300
-Subject: imx25: How to get frame buffer device in a system using device
- tree
-In-Reply-To: <CAO8h3eGhF8DRO73W9GkepUKAF-6v1EmWdMS_Gq+dA_2v5mJ2aQ@mail.gmail.com>
-References: <CAO8h3eFq9WhvZYbbeFfWgVEXViR8MAcGaztsvvaLpFSW-W6CfA@mail.gmail.com>
- <CAOMZO5Aat-iAN_TJ6BXEopB+WCkKgLjWh67sCXg0jd1DtzmKSQ@mail.gmail.com>
- <CAO8h3eHAfV808izZzvpPc+z6iQPr14q8OmryNs5sC+VcNk+iLg@mail.gmail.com>
- <CAOMZO5CgAs+hR41=WdJ=jxS5gZf=opOrCXufixBh_CMP0n2TFA@mail.gmail.com>
- <CAO8h3eGhF8DRO73W9GkepUKAF-6v1EmWdMS_Gq+dA_2v5mJ2aQ@mail.gmail.com>
-Message-ID: <CAOMZO5CrZjDZjqaaQTX4=ZGO_6chFMr9qAHhqyVGBdxBvimYSw@mail.gmail.com>
+From: tibor@harsszegi.com (Tibor Harsszegi)
+Date: Wed, 10 Jul 2013 19:13:48 +0200
+Subject: NSA310 + DT
+In-Reply-To: <51DD926C.1010205@harsszegi.com>
+References: <51DC564A.8050002@harsszegi.com> <20130709193605.GC26223@lunn.ch>
+ <20130709202143.GD26223@lunn.ch>
+ <2544f179ed4349545a25aa60d52a664a@harsszegi.com>
+ <20130710134119.GA30885@lunn.ch> <51DD8E8B.2040505@harsszegi.com>
+ <20130710165342.GA31692@lunn.ch> <51DD926C.1010205@harsszegi.com>
+Message-ID: <51DD964C.7020200@harsszegi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+WTF. Andrew. It works COMPLETELY.
+The memory mapped GPIO was working from the .config (don't ask me how).
 
-On Mon, Jul 8, 2013 at 3:31 AM, Matthias Wei?er <m.weisser.m@gmail.com> wrote:
-> Hi Fabio
->
-> 2013/7/5 Fabio Estevam <festevam@gmail.com>:
->> Hi Matthias,
->>
->> On Fri, Jul 5, 2013 at 4:37 AM, Matthias Wei?er <m.weisser.m@gmail.com> wrote:
->>
->>> Thanks for the links. That made some things clearer for me. But I am
->>> still a bit confused about the driver (imxfb.c) itself. From what I
->>> can see it is not dt aware as there is no of_device_id structure with
->>> the compatible entries. I think I have to add dt support to the
->>> framebuffer driver. Am I right?
->>
->> Yes, you need to apply this one:
->> http://marc.info/?l=linux-fbdev&m=136956466617736&w=2
->
-> OK. Done that and it works like a charm. Thanks a lot.
+* sensors
+* LEDs
+* bootup works
 
-Great, care to submit patches for adding mx25 fb support?
+Awesome work thanks a lot!!!!
+> Cool, keep you posted.
+>> On Wed, Jul 10, 2013 at 06:40:43PM +0200, Tibor Harsszegi wrote:
+>>> Hello Andrew,
+>>>
+>>> I did a:
+>>>
+>>> ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make clean
+>>> ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make kirkwood_defconfig
+>>> ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make zImage
+>>> ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make dtbs
+>>> cat arch/arm/boot/zImage arch/arm/boot/dts/kirkwood-nsa310-tdc.dtb > 
+>>> /tmp/X
+>>> mv /tmp/X arch/arm/boot/zImage
+>>> ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make uImage
+>>> ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make modules
+>>>
+>>> [attached .config]
+>>>
+>>> copied the uImage over the NSA310, rebooted.
+>>> Good news: console is back
+>> Great. Probably was OF_SERIAL_PLATFORM
+>>
+>>> Bad news: LEDs still don't work (all green), kernel stops (tried
+>>> forcing rootfstype=ext4, didn't help)
+>> Ah, O.k. EXT4 is not part of kirkwood_defconfig. Hence it cannot mount
+>> the root fs.
+>>
+>> Please could you use make menuconfig and include it into the kernel
+>> image. I will also update the patch later.
+>>
+>> LEDs are not working because the GPIO driver is not loading.
+>> I will see if i can spot an obvious typo etc.
+>>
+>>    Andrew
+>
