@@ -1,42 +1,65 @@
 From: koba@kmckk.co.jp (Tetsuyuki Kobayashi)
-Date: Wed, 10 Jul 2013 10:56:35 +0900
-Subject: [PATCH 1/3] ARM: shmobile: fix compile error when
- CONFIG_THUMB2_KERNEL=y
+Date: Wed, 10 Jul 2013 10:56:37 +0900
+Subject: [PATCH 3/3] ARM: shmobile: Insert align directives before 4 bytes data
 In-Reply-To: <1373421397-1786-1-git-send-email-koba@kmckk.co.jp>
 References: <1373421397-1786-1-git-send-email-koba@kmckk.co.jp>
-Message-ID: <1373421397-1786-2-git-send-email-koba@kmckk.co.jp>
+Message-ID: <1373421397-1786-4-git-send-email-koba@kmckk.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On KZM-A9-GT board (SMP), when CONFIG_THUMB2_KERNEL=y it fails to compile
- 
-  AS      arch/arm/mach-shmobile/headsmp-scu.o
-/proj/koba/kernel/arm-soc/arch/arm/mach-shmobile/headsmp-scu.S: Assembler messages:
-/proj/koba/kernel/arm-soc/arch/arm/mach-shmobile/headsmp-scu.S:41: Error: shift must be constant -- `bic r2,r2,r3,lsl r1'
-make[2]: *** [arch/arm/mach-shmobile/headsmp-scu.o] Error 1
-make[1]: *** [arch/arm/mach-shmobile] Error 2
-make: *** [sub-make] Error 2
-
-Instruction `bic r2,r2,r3,lsl r1' is not supported in thumb mode. This patch split it into 2 instructions.
+In thumb2 mode instructions are not align to 4 byte. This patch insert
+align directives before putting 4 byte data.
 
 Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 ---
- arch/arm/mach-shmobile/headsmp-scu.S |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/headsmp-scu.S  |    1 +
+ arch/arm/mach-shmobile/headsmp.S      |    1 +
+ arch/arm/mach-shmobile/sleep-sh7372.S |    2 ++
+ 3 files changed, 4 insertions(+)
 
 diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
-index 6f98654..5ce416c 100644
+index 5ce416c..0a77488 100644
 --- a/arch/arm/mach-shmobile/headsmp-scu.S
 +++ b/arch/arm/mach-shmobile/headsmp-scu.S
-@@ -38,7 +38,8 @@ ENTRY(shmobile_boot_scu)
- 	lsl	r1, r1, #3		@ we will shift by cpu_id * 8 bits
- 	ldr	r2, [r0, #8]		@ SCU Power Status Register
- 	mov	r3, #3
--	bic	r2, r2, r3, lsl r1	@ Clear bits of our CPU (Run Mode)
-+	lsl	r3, r3, r1
-+	bic	r2, r2, r3		@ Clear bits of our CPU (Run Mode)
- 	str	r2, [r0, #8]		@ write back
+@@ -46,6 +46,7 @@ ENTRY(shmobile_boot_scu)
+ ENDPROC(shmobile_boot_scu)
  
- 	b	shmobile_invalidate_start
+ 	.text
++	.align	2
+ 	.globl	shmobile_scu_base
+ shmobile_scu_base:
+ 	.space	4
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index afed58e..dfb41df 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -35,6 +35,7 @@ ENTRY(shmobile_boot_vector)
+ 
+ ENDPROC(shmobile_boot_vector)
+ 
++	.align	2
+ 	.globl	shmobile_boot_fn
+ shmobile_boot_fn:
+ 1:	.space	4
+diff --git a/arch/arm/mach-shmobile/sleep-sh7372.S b/arch/arm/mach-shmobile/sleep-sh7372.S
+index 53f4840..9782862 100644
+--- a/arch/arm/mach-shmobile/sleep-sh7372.S
++++ b/arch/arm/mach-shmobile/sleep-sh7372.S
+@@ -41,6 +41,7 @@
+ sh7372_resume_core_standby_sysc:
+ 	ldr     pc, 1f
+ 
++	.align	2
+ 	.globl	sh7372_cpu_resume
+ sh7372_cpu_resume:
+ 1:	.space	4
+@@ -96,6 +97,7 @@ sh7372_do_idle_sysc:
+ 1:
+ 	b      1b
+ 
++	.align	2
+ kernel_flush:
+ 	.word v7_flush_dcache_all
+ #endif
 -- 
 1.7.9.5
