@@ -1,64 +1,36 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 10 Jul 2013 17:44:09 +0530
-Subject: [PATCH 2/2] ARM: dts: Add DMA controller node info on Exynos5420.
-In-Reply-To: <1373458449-19039-1-git-send-email-padma.v@samsung.com>
-References: <1373458449-19039-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1373458449-19039-3-git-send-email-padma.v@samsung.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 10 Jul 2013 15:10:24 +0300
+Subject: [PATCH 0/4] pinctrl single support for SoC specific features
+In-Reply-To: <20130607203936.16513.57494.stgit@localhost>
+References: <20130607203936.16513.57494.stgit@localhost>
+Message-ID: <51DD4F30.7050603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5420 has one separate DMA controller for I2S0 and PCM0. This patch
-adds the same node on exynos5420 dtsi and adds the DMA clk info for the
-remaining DMA controllers.
+Hi Tony,
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- arch/arm/boot/dts/exynos5420.dtsi |   33 +++++++++++++++++++++++++++++++++
- 1 files changed, 33 insertions(+), 0 deletions(-)
+On 06/07/2013 11:50 PM, Tony Lindgren wrote:
+> Hi all,
+> 
+> Here are few patches to add support for SoC specific features
+> to pinctrl-single. This is needed at least for omaps to support
+> IO chain wake-up events from deeper idle states.
+> 
+> With this patch series, device drivers can request named pinctrl
+> states like active and idle from the PM runtime suspend and resume
+> calls to set the wake enable bits for selected pins. Further
+> the device driver can toggle the wake-up feature as needed based on
+> the device_may_wakeup() state set by the standard sysfs
+> power/wakeup entry.
+> 
+> This is implemented in a separate pinctrl-single-omap driver that
+> works together with pinctrl-single. This way the SoC specific
+> are separated from the common pinctrl-single, and allows a relatively
+> easy way to implement SoC specific things like wake-up events,
+> pin interrupts, and GPIO.
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index a84f5f1..7035a4b 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -137,6 +137,39 @@
- 		interrupts = <0 47 0>;
- 	};
- 
-+	amba {
-+		pdma0: pdma at 121A0000 {
-+			clocks = <&clock 362>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		pdma1: pdma at 121B0000 {
-+			clocks = <&clock 363>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		mdma0: mdma at 10800000 {
-+			clocks = <&clock 473>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		mdma1: mdma at 11C10000 {
-+			clocks = <&clock 442>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		adma: adma at 03880000 {
-+			compatible = "arm,pl330", "arm,primecell";
-+			reg = <0x03880000 0x1000>;
-+			interrupts = <0 110 0>;
-+			clocks = <&clock_audss EXYNOS_ADMA>;
-+			clock-names = "apb_pclk";
-+			#dma-cells = <1>;
-+			#dma-channels = <6>;
-+			#dma-requests = <16>;
-+		};
-+	};
-+
- 	serial at 12C00000 {
- 		clocks = <&clock 257>, <&clock 128>;
- 		clock-names = "uart", "clk_uart_baud0";
--- 
-1.7.4.4
+What's the status of this? Would be nice to get it in 3.12. I'm basing
+the OMAP USB host wakeup support on this.
+
+cheers,
+-roger
