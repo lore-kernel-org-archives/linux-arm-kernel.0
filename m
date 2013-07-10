@@ -1,25 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 10 Jul 2013 22:21:04 +0900
-Subject: [PATCH 3/3] ARM: shmobile: Insert align directives before 4
- bytes data
-In-Reply-To: <1373421397-1786-4-git-send-email-koba@kmckk.co.jp>
-References: <1373421397-1786-1-git-send-email-koba@kmckk.co.jp>
- <1373421397-1786-4-git-send-email-koba@kmckk.co.jp>
-Message-ID: <20130710132104.GD13716@verge.net.au>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 10 Jul 2013 15:41:19 +0200
+Subject: NSA310 + DT
+In-Reply-To: <2544f179ed4349545a25aa60d52a664a@harsszegi.com>
+References: <51DC564A.8050002@harsszegi.com> <20130709193605.GC26223@lunn.ch>
+ <20130709202143.GD26223@lunn.ch>
+ <2544f179ed4349545a25aa60d52a664a@harsszegi.com>
+Message-ID: <20130710134119.GA30885@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 10:56:37AM +0900, Tetsuyuki Kobayashi wrote:
-> In thumb2 mode instructions are not align to 4 byte. This patch insert
-> align directives before putting 4 byte data.
-> 
-> Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
-> ---
->  arch/arm/mach-shmobile/headsmp-scu.S  |    1 +
->  arch/arm/mach-shmobile/headsmp.S      |    1 +
->  arch/arm/mach-shmobile/sleep-sh7372.S |    2 ++
->  3 files changed, 4 insertions(+)
+Hi Tibor
 
-Thanks, I have queued this up with Magnus's ack in the thumb-fixes
-branch of my renesas tree on kernel.org. It should be
-included in the renesas-next-20130710v2 tag.
+I created a DTS file based on the tree you gave me.
+
+Please could you try
+
+https://github.com/lunn/linux.git branch v3.10-nsa310-tdc
+
+and the DTS file arch/arm/boot/dts/kirkwood-nsa310-tdc.dts
+
+Please use 
+
+make kirkwood_defconfig
+make
+
+and it should have the lm85 built in.
+
+The two different NSA310 are mostly similar, just a few different gpio
+LEDs and buttons, so i might actually refactor the two dts files with
+what is shared. But lets get your box working first.
+
+     Andrew
