@@ -1,54 +1,39 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 10 Jul 2013 22:30:53 +0800
-Subject: [PATCH linux-next] ARM: imx: fix imx_init_l2cache storage class
-In-Reply-To: <1373449546-1040-1-git-send-email-vincent.stehle@freescale.com>
-References: <1373449546-1040-1-git-send-email-vincent.stehle@freescale.com>
-Message-ID: <20130710143051.GA24654@S2101-09.ap.freescale.net>
+Date: Wed, 10 Jul 2013 22:35:01 +0800
+Subject: [PATCH v2 1/2] ARM: imx: system: Do not declare
+ imx_init_l2cache() as static
+In-Reply-To: <1373461814-8844-1-git-send-email-fabio.estevam@freescale.com>
+References: <1373461814-8844-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130710143459.GB24654@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vincent,
-
-Sorry.  I was not aware of that imx_v6_v7_defconfig does not have
-CACHE_L2X0 enabled, so I did not catch it with my testing.  Thanks for
-fixing it.
-
-On Wed, Jul 10, 2013 at 11:45:46AM +0200, Vincent Stehl? wrote:
-> Commit 879ec1ceeac21285d62606c1e96520887efcd9bc makes imx_init_l2cache a common
-> function and updates the header declaration accordingly. Fix function storage
-> class, too.
+On Wed, Jul 10, 2013 at 10:10:13AM -0300, Fabio Estevam wrote:
+> commit 879ec1cee (ARM: imx: let L2 initialization be a common function) breaks 
+> the build when CONFIG_CACHE_L2X0=y:
 > 
-The commit ID is not stable, and I dropped it and applied the patch.
+> arch/arm/mach-imx/system.c:101:20: error: static declaration of 'imx_init_l2cache' follows non-static declaration
+> In file included from arch/arm/mach-imx/system.c:32:0:
+> arch/arm/mach-imx/common.h:165:13: note: previous declaration of 'imx_init_l2cache' was here
+> arch/arm/mach-imx/system.c:101:20: warning: 'imx_init_l2cache' defined but not used [-Wunused-function]
+> 
+> imx_init_l2cache() is a common function now, so it cannot be declared as static 
+> anymore.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+Thanks for the fixing.  I just applied a fix [1] from Vincent.
 
 Shawn
 
-> This fixes the following compilation error:
-> 
->   arch/arm/mach-imx/system.c:101:123: error: static declaration of ?imx_init_l2cache? follows non-static declaration
->   In file included from arch/arm/mach-imx/system.c:32:0:
->   arch/arm/mach-imx/common.h:165:13: note: previous declaration of ?imx_init_l2cache? was here
->   arch/arm/mach-imx/system.c:101:123: warning: ?imx_init_l2cache? defined but not used [-Wunused-function]
-> 
-> Signed-off-by: Vincent Stehl? <vincent.stehle@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: trivial at kernel.org
+[1]
+http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg465491.html
+
 > ---
+> Changes since v1:
+> - Newly introduced in this series
 > 
-> 
-> Hi,
-> 
-> Linux next-20130710 breaks compilation of ARM multi_v7_defconfig. This patch fixes it.
-> 
-> (Note: this patch is necessary for the link, too: http://www.spinics.net/lists/kernel/msg1563777.html)
-> 
-> Best regards,
-> 
-> V.
-> 
-> 
->  arch/arm/mach-imx/system.c |    2 +-
+>  arch/arm/mach-imx/system.c | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
 > diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
@@ -65,7 +50,6 @@ Shawn
 >  	void __iomem *l2x0_base;
 >  	struct device_node *np;
 > -- 
-> 1.7.10.4
-> 
+> 1.8.1.2
 > 
 > 
