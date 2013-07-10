@@ -1,89 +1,98 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 10 Jul 2013 10:12:46 +0200
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <20130506095124.GA22041@pd.tnic>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
- <20130506095124.GA22041@pd.tnic>
-Message-ID: <CAMuHMdWH9w5fj6HRXi+9QcBJym4dukAFsPVGZVqSSk3yTZJUcA@mail.gmail.com>
+From: george.cherian@ti.com (George Cherian)
+Date: Wed, 10 Jul 2013 13:44:42 +0530
+Subject: [PATCH v3] arm: dts: AM43x: Add usb DT nodes for AM4372
+Message-ID: <1373444082-4169-1-git-send-email-george.cherian@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 6, 2013 at 11:51 AM, Borislav Petkov <bp@alien8.de> wrote:
-> On Mon, May 06, 2013 at 05:42:55PM +0900, Kyungsik Lee wrote:
->> LZ4 has been updated with LZ4 Streaming Format specification(v1.3).
->> lz4demo is replaced by lz4c. lz4c supports both the new streaming and
->> legacy format with -l option.
->>
->> This patch makes use of lz4c to support legacy format which is
->> used for LZ4 De/compression in the linux kernel.
->>
->> Link: https://code.google.com/p/lz4/source/checkout
->> Signed-off-by: Kyungsik Lee <kyungsik.lee@lge.com>
->> Cc: "H. Peter Anvin" <hpa@zytor.com>
->> Cc: Ingo Molnar <mingo@elte.hu>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Russell King <rmk@arm.linux.org.uk>
->> Cc: Borislav Petkov <bp@alien8.de>
->> Cc: Florian Fainelli <florian@openwrt.org>
->> Cc: Yann Collet <yann.collet.73@gmail.com>
->> Cc: Chanho Min <chanho.min@lge.com>
->> ---
->>  scripts/Makefile.lib | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
->> index a0ab6d7..c9bfbb0 100644
->> --- a/scripts/Makefile.lib
->> +++ b/scripts/Makefile.lib
->> @@ -313,7 +313,7 @@ cmd_lzo = (cat $(filter-out FORCE,$^) | \
->>
->>  quiet_cmd_lz4 = LZ4     $@
->>  cmd_lz4 = (cat $(filter-out FORCE,$^) | \
->> -     lz4demo -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
->> +     lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
->
-> You probably want to check for the presence of lz4c on the system and
-> bail with an informative message if absent.
+This patch adds
+	- HS USB nodes
+	- phy nodes
+	- usb control module nodes.
 
-Yep, x86_64-randconfig
-(http://kisskb.ellerman.id.au/kisskb/buildresult/9110794/):
+Signed-off-by: George Cherian <george.cherian@ti.com>
+---
 
-  LZ4     arch/x86/boot/compressed/vmlinux.bin.lz4
-/bin/sh: lz4c: command not found
+changes from v2
+change synopsis to snps 
+use simple node names
+add both USB and PHY instances
+add usbctrl node 
 
-Also, several of the blackfin builds started failing due to a
-compression-related
-issue, e.g. http://kisskb.ellerman.id.au/kisskb/buildresult/9101322/:
+changes from v1
+renamed synopsis to snps
+removed flag tx-fifo-resize
 
-  UIMAGE  arch/blackfin/boot/uImage.lzma
+ arch/arm/boot/dts/am4372.dtsi | 58 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
-Invalid Compression Type - valid names are: none, bzip2, gzip
-Usage: /usr/local/bin/mkimage -l image
-          -l ==> list image header information
-       /usr/local/bin/mkimage [-x] -A arch -O os -T type -C comp -a
-addr -e ep -n name -d data_file[:data_file...] image
-          -A ==> set architecture to 'arch'
-          -O ==> set operating system to 'os'
-          -T ==> set image type to 'type'
-          -C ==> set compression type 'comp'
-          -a ==> set load address to 'addr' (hex)
-          -e ==> set entry point to 'ep' (hex)
-          -n ==> set image name to 'name'
-          -d ==> use image data from 'datafile'
-          -x ==> set XIP (execute in place)
-make[2]: *** [arch/blackfin/boot/uImage.lzma] Error 1
-
-May be unrelated, though.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index ddc1df7..37f196f 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -64,5 +64,63 @@
+ 			compatible = "ti,am4372-counter32k","ti,omap-counter32k";
+ 			reg = <0x44e86000 0x40>;
+ 		};
++
++		phy1: usbphy1 {
++			compatible = "ti,am4372-usb2";
++			#phy-cells = <0>;
++			id = <0>;
++			status = "disabled";
++		};
++
++		phy2: usbphy2 {
++			compatible = "ti,am4372-usb2";
++			#phy-cells = <0>;
++			id = <1>;
++			status = "disabled";
++		};
++
++		usbctrl: omap-control-usb at 44e10620 {
++			compatible = "ti,omap-control-usb";
++			reg = <0x44e10620 0x10>;
++			reg-names = "control_dev_conf";
++			ti,type = <3>;
++			status = "disabled";
++		};
++
++		usb1: am4372_dwc3 at 48380000 {
++			status = "disabled";
++			compatible = "ti,am4372-dwc3";
++			reg = <0x48380000 0x200>;
++			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			utmi-mode = <1>;
++			ranges;
++			dwc3 at 48390000 {
++				compatible = "snps,dwc3";
++				reg = <0x48390000 0xd000>;
++				interrupts = <GIC_SPI  168 IRQ_TYPE_LEVEL_HIGH>;
++				phys = <&phy1>;
++				phy-names = "am4372-usb1";
++			};
++		};
++
++		usb2: am4372_dwc3 at 483c0000 {
++			status = "disabled";
++			compatible = "ti,am4372-dwc3";
++			reg = <0x483c0000 0x200>;
++			interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			utmi-mode = <1>;
++			ranges;
++			dwc3 at 483d0000 {
++				compatible = "snps,dwc3";
++				reg = <0x483d0000 0xd000>;
++				interrupts = <GIC_SPI  174 IRQ_TYPE_LEVEL_HIGH>;
++				phys = <&phy2>;
++				phy-names = "am4372-usb2";
++			};
++		};
+ 	};
+ };
+-- 
+1.8.1.4
