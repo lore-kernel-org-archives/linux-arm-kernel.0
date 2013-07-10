@@ -1,340 +1,185 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 10 Jul 2013 19:41:51 +0900
-Subject: [PATCH] ARM: shmobile: r8a7790 SMP prototype v4
-Message-ID: <20130710104151.20742.56398.sendpatchset@w520>
+From: ashishsangwan2@gmail.com (Ashish Sangwan)
+Date: Wed, 10 Jul 2013 19:42:25 +0900
+Subject: Seg fault occurs when running statically compiled binary from
+ kernel using call_usermodehelper
+In-Reply-To: <CAOiN93=Nx77RkbNuEJMV617MjV5+GmorF0G3vyLy1SwQcuCs+g@mail.gmail.com>
+References: <CAOiN93mGTu9w9rVNCrbbH1sccXY9VJhaCmg+dS7Rk9mMgKHBaA@mail.gmail.com>
+ <CAOiN93=Nx77RkbNuEJMV617MjV5+GmorF0G3vyLy1SwQcuCs+g@mail.gmail.com>
+Message-ID: <CAOiN93nH9fyHoz4yrZmJ-OKCy6ogdt5bYartXCBgP5eHMUBPdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Any heads up on this?
 
-Add SMP prototype support for r8a7790 by enabling
-one cluster of either 4 x Cortex-A7 or 4 x Cortex-A15.
+or could someone just advice what can we do to debug this?
 
-This patch only adds support for booting, at this point
-no CPU Hotplug is included. In v4 both the big and the
-LITTLE clusters are working with either architected timers
-(in physical mode only for CA7) or CMT and broadcast timer.
+The ret_from_fork currently looks like following:
+/*
+ * This is how we return from a fork.
+ */
+ENTRY(ret_from_fork)
+        bl      schedule_tail
+        cmp     r5, #0
+        movne   r0, r4
+        adrne   lr, BSYM(1f)
+        movne   pc, r5
+1:      get_thread_info tsk
+        b       ret_slow_syscall
+ENDPROC(ret_from_fork)
 
-On r8a7790 the MD6 pin control boot processor, and on the
-Lager board SW8.7 can be used to select big or LITTLE.
+Is this a real issue? Because we are getting this just for static binaries.
 
-In big boot mode the CPU cores will be configured as:
- - CPU0, CPU1, CPU2, CPU3: enabled (CA15)
- - CPU4, CPU5, CPU6, CPU7: disabled (CA7)
-
-In LITTLE boot mode the CPU cores will be configured as:
- - CPU0, CPU5, CPU6, CPU7: enabled (CA7)
- - CPU1, CPU2, CPU3, CPU4: disabled (CA15)
-
-Base addresses for RST and APMU are still hard coded
-but DT will be used for them in future versions.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- Changes since v3:
- - Use linux/io.h and clean up headers in general - thanks RMK!
- - Use readl/writel_relaxed() and memcpy_toio() - thanks Arnd!
- - Instead of cached memory and cache flush use uncached ioremap for MERAM.
- - Use correct addr for CABAR7/15, adjust RST size - thanks Kuribayashi-san!
- - Remove SYSC as it apparently does not need to be polled after all.
- - Add SMP ops for Lager DT Reference
-
- Written against kernel.org renesas git tag renesas-next-20130710
-
- arch/arm/boot/dts/r8a7790.dtsi                 |   49 +++++++
- arch/arm/mach-shmobile/Makefile                |    1 
- arch/arm/mach-shmobile/board-lager-reference.c |    1 
- arch/arm/mach-shmobile/board-lager.c           |    1 
- arch/arm/mach-shmobile/include/mach/common.h   |    1 
- arch/arm/mach-shmobile/include/mach/r8a7790.h  |    1 
- arch/arm/mach-shmobile/setup-r8a7790.c         |    1 
- arch/arm/mach-shmobile/smp-r8a7790.c           |  166 ++++++++++++++++++++++++
- 8 files changed, 221 insertions(+)
-
---- 0001/arch/arm/boot/dts/r8a7790.dtsi
-+++ work/arch/arm/boot/dts/r8a7790.dtsi	2013-07-10 19:18:36.000000000 +0900
-@@ -24,6 +24,55 @@
- 			reg = <0>;
- 			clock-frequency = <1300000000>;
- 		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+			clock-frequency = <1300000000>;
-+		};
-+
-+		cpu2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <2>;
-+			clock-frequency = <1300000000>;
-+		};
-+
-+		cpu3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <3>;
-+			clock-frequency = <1300000000>;
-+		};
-+
-+		cpu4: cpu at 4 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x100>;
-+			clock-frequency = <780000000>;
-+		};
-+
-+		cpu5: cpu at 5 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x101>;
-+			clock-frequency = <780000000>;
-+		};
-+
-+		cpu6: cpu at 6 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x102>;
-+			clock-frequency = <780000000>;
-+		};
-+
-+		cpu7: cpu at 7 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x103>;
-+			clock-frequency = <780000000>;
-+		};
- 	};
- 
- 	gic: interrupt-controller at f1001000 {
---- 0001/arch/arm/mach-shmobile/Makefile
-+++ work/arch/arm/mach-shmobile/Makefile	2013-07-10 19:18:36.000000000 +0900
-@@ -19,6 +19,7 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.
- smp-y				:= platsmp.o headsmp.o
- smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o
-+smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o
- smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o
- 
- # IRQ objects
---- 0001/arch/arm/mach-shmobile/board-lager-reference.c
-+++ work/arch/arm/mach-shmobile/board-lager-reference.c	2013-07-10 19:18:36.000000000 +0900
-@@ -38,6 +38,7 @@ static const char *lager_boards_compat_d
- };
- 
- DT_MACHINE_START(LAGER_DT, "lager")
-+	.smp		= smp_ops(r8a7790_smp_ops),
- 	.init_early	= r8a7790_init_delay,
- 	.init_machine	= lager_add_standard_devices,
- 	.init_time	= r8a7790_timer_init,
---- 0001/arch/arm/mach-shmobile/board-lager.c
-+++ work/arch/arm/mach-shmobile/board-lager.c	2013-07-10 19:18:36.000000000 +0900
-@@ -133,6 +133,7 @@ static const char *lager_boards_compat_d
- };
- 
- DT_MACHINE_START(LAGER_DT, "lager")
-+	.smp		= smp_ops(r8a7790_smp_ops),
- 	.init_early	= r8a7790_init_delay,
- 	.init_time	= r8a7790_timer_init,
- 	.init_machine	= lager_add_standard_devices,
---- 0001/arch/arm/mach-shmobile/include/mach/common.h
-+++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-07-10 19:18:36.000000000 +0900
-@@ -11,6 +11,7 @@ extern void shmobile_boot_vector(void);
- extern unsigned long shmobile_boot_fn;
- extern unsigned long shmobile_boot_arg;
- extern void shmobile_boot_scu(void);
-+extern void shmobile_invalidate_start(void);
- struct clk;
- extern int shmobile_clk_init(void);
- extern void shmobile_handle_irq_intc(struct pt_regs *);
---- 0001/arch/arm/mach-shmobile/include/mach/r8a7790.h
-+++ work/arch/arm/mach-shmobile/include/mach/r8a7790.h	2013-07-10 19:18:36.000000000 +0900
-@@ -7,5 +7,6 @@ void r8a7790_clock_init(void);
- void r8a7790_pinmux_init(void);
- void r8a7790_init_delay(void);
- void r8a7790_timer_init(void);
-+extern struct smp_operations r8a7790_smp_ops;
- 
- #endif /* __ASM_R8A7790_H__ */
---- 0001/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-07-10 19:18:36.000000000 +0900
-@@ -228,6 +228,7 @@ static const char *r8a7790_boards_compat
- };
- 
- DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
-+	.smp		= smp_ops(r8a7790_smp_ops),
- 	.init_early	= r8a7790_init_delay,
- 	.init_time	= r8a7790_timer_init,
- 	.dt_compat	= r8a7790_boards_compat_dt,
---- /dev/null
-+++ work/arch/arm/mach-shmobile/smp-r8a7790.c	2013-07-10 19:20:50.000000000 +0900
-@@ -0,0 +1,166 @@
-+/*
-+ * SMP support for r8a7790
-+ *
-+ * Copyright (C) 2012-2013 Renesas Solutions Corp.
-+ * Copyright (C) 2012 Takashi Yoshii <takashi.yoshii.ze@renesas.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/smp.h>
-+#include <linux/io.h>
-+#include <asm/smp_plat.h>
-+#include <mach/common.h>
-+
-+#define RST	0xe6160000
-+#define CA15BAR	0x0020
-+#define CA7BAR	0x0030
-+#define CA15RESCNT 0x0040
-+#define CA7RESCNT 0x0044
-+#define RESCNT	0x0050
-+
-+#define APMU	0xe6150000
-+#define CA15WUPCR 0x2010
-+#define CA7WUPCR 0x1010
-+
-+#define MERAM	0xe8080000
-+
-+enum { R8A7790_CLST_CA15, R8A7790_CLST_CA7, R8A7790_CLST_NR };
-+
-+static struct {
-+	unsigned int cabar;
-+	unsigned int carescnt;
-+	unsigned int carescnt_magic;
-+	unsigned int rescnt_bit;
-+	unsigned int use_count;
-+} r8a7790_clst[R8A7790_CLST_NR] = {
-+	[R8A7790_CLST_CA15] = {
-+		.cabar = CA15BAR,
-+		.carescnt = CA15RESCNT,
-+		.carescnt_magic = 0xa5a50000,
-+		.rescnt_bit = 1,
-+	},
-+	[R8A7790_CLST_CA7] = {
-+		.cabar = CA7BAR,
-+		.carescnt = CA7RESCNT,
-+		.carescnt_magic = 0x5a5a0000,
-+		.rescnt_bit = 0,
-+	},
-+};
-+
-+#define r8a7790_clst_id(cpu) (cpu_logical_map((cpu)) >> 8)
-+#define r8a7790_cpu_id(cpu) (cpu_logical_map((cpu)) & 0xff)
-+
-+static void r8a7790_deassert_reset(unsigned int cpu)
-+{
-+	void __iomem *p, *carescnt;
-+	u32 bar, mask, magic;
-+	unsigned int clst_id = r8a7790_clst_id(cpu);
-+
-+	/* setup reset vectors */
-+	p = ioremap_nocache(RST, 0x63);
-+	bar = (MERAM >> 8) & 0xfffffc00;
-+	writel_relaxed(bar, p + r8a7790_clst[clst_id].cabar);
-+	writel_relaxed(bar | 0x10, p + r8a7790_clst[clst_id].cabar);
-+
-+	/* enable clocks for cluster */
-+	if (r8a7790_clst[clst_id].use_count++ == 0) {
-+		mask = 1 << r8a7790_clst[clst_id].rescnt_bit;
-+		writel_relaxed(readl_relaxed(p + RESCNT) & ~mask, p + RESCNT);
-+	}
-+
-+	/* enable per-core clocks */
-+	mask = BIT(3 - r8a7790_cpu_id(cpu));
-+	magic = r8a7790_clst[clst_id].carescnt_magic;
-+	carescnt = p + r8a7790_clst[clst_id].carescnt;
-+	writel_relaxed((readl_relaxed(carescnt) & ~mask) | magic, carescnt);
-+
-+	iounmap(p);
-+}
-+
-+static void r8a7790_assert_reset(unsigned int cpu)
-+{
-+	void __iomem *p, *carescnt;
-+	u32 mask, magic;
-+	unsigned int clst_id = r8a7790_clst_id(cpu);
-+
-+	p = ioremap_nocache(RST, 0x63);
-+
-+	/* disable per-core clocks */
-+	mask = BIT(3 - r8a7790_cpu_id(cpu));
-+	magic = r8a7790_clst[clst_id].carescnt_magic;
-+	carescnt = p + r8a7790_clst[clst_id].carescnt;
-+	writel_relaxed((readl_relaxed(carescnt) | mask) | magic, carescnt);
-+
-+	/* disable clocks for cluster */
-+	if (r8a7790_clst[clst_id].use_count == 1) {
-+		mask = 1 << r8a7790_clst[clst_id].rescnt_bit;
-+		writel_relaxed(readl_relaxed(p + RESCNT) | mask, p + RESCNT);
-+	}
-+
-+	if (r8a7790_clst[clst_id].use_count > 0)
-+		r8a7790_clst[clst_id].use_count--;
-+
-+	iounmap(p);
-+}
-+
-+static void r8a7790_power_on(unsigned int cpu)
-+{
-+	void __iomem *p, *cawupcr;
-+
-+	/* wake up CPU core via APMU */
-+	p = ioremap_nocache(APMU, 0x3000);
-+	cawupcr = p + (r8a7790_clst_id(cpu) ? CA7WUPCR : CA15WUPCR);
-+	writel_relaxed(BIT(r8a7790_cpu_id(cpu)), cawupcr);
-+
-+	/* wait for APMU to finish */
-+	while (readl_relaxed(cawupcr) != 0)
-+		;
-+
-+	iounmap(p);
-+}
-+
-+static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	void __iomem *p;
-+	unsigned int k;
-+
-+	shmobile_boot_fn = virt_to_phys(shmobile_invalidate_start);
-+
-+	/* MERAM for jump stub, because BAR requires 256KB aligned address */
-+	p = ioremap_nocache(MERAM, 16);
-+	memcpy_toio(p, shmobile_boot_vector, 16);
-+	iounmap(p);
-+
-+	/* keep secondary CPU cores in reset, but powered on */
-+	for (k = 1; k < 8; k++) {
-+		r8a7790_assert_reset(k);
-+		r8a7790_power_on(k);
-+	}
-+
-+	r8a7790_deassert_reset(0);
-+}
-+
-+static int __cpuinit r8a7790_boot_secondary(unsigned int cpu,
-+					    struct task_struct *idle)
-+{
-+	/* only allow a single cluster for now */
-+	if (r8a7790_clst_id(cpu) != r8a7790_clst_id(0))
-+		return -ENOTSUPP;
-+
-+	r8a7790_deassert_reset(cpu);
-+	return 0;
-+}
-+
-+struct smp_operations r8a7790_smp_ops __initdata = {
-+	.smp_prepare_cpus	= r8a7790_smp_prepare_cpus,
-+	.smp_boot_secondary	= r8a7790_boot_secondary,
-+};
+On Mon, Jul 8, 2013 at 10:46 AM, Ashish Sangwan
+<ashishsangwan2@gmail.com> wrote:
+> Forget to mention, we are using ARM
+>
+> On Mon, Jul 8, 2013 at 10:45 AM, Ashish Sangwan
+> <ashishsangwan2@gmail.com> wrote:
+>> On kernel version 3.8.13, when we try to execute a statically compiled
+>> binary from kernel, it is giving segfault:
+>>
+>> insmod /mnt/module2.ko
+>> [   35.560000] sample.static: unhandled page fault (11) at 0x00000000,
+>> code 0x80000007
+>> [   36.440000] Pid: 257, comm:        sample.static
+>> [   36.444000] CPU: 3    Tainted: G        W  O  (3.8.13+ #35)
+>> [   36.448000] PC is at 0x0
+>> [   36.452000] LR is at 0xa420
+>> [   36.456000] pc : [<00000000>]    lr : [<0000a420>]    psr: 60000030
+>> [   36.456000] sp : beb30d70  ip : 00000004  fp : 00000000
+>> [   36.464000] r10: 0000a004  r9 : 0000a0a4  r8 : 00000001
+>> [   36.472000] r7 : 00000001  r6 : 0008be5c  r5 : 00000000  r4 : 0008ce80
+>> [   36.476000] r3 : 00000001  r2 : 00000001  r1 : 00000000  r0 : 00000000
+>> [   36.484000] Flags: nZCv  IRQs on  FIQs on  Mode USER_32  ISA Thumb
+>> Segment user
+>> [   36.492000] Control: 10c53c7d  Table: 7b1f806a  DAC: 00000015
+>> [   36.496000] Backtrace:
+>> [   36.500000] [<c00171f8>] (dump_backtrace+0x0/0x11c) from
+>> [<c03e8a54>] (dump_stack+0x20/0x24)
+>> [   36.508000]  r6:e514dd80 r5:00000000 r4:e5175fb0 r3:271ae511
+>> [   36.516000] [<c03e8a34>] (dump_stack+0x0/0x24) from [<c0014174>]
+>> (show_regs+0x58/0x5c)
+>> [   36.524000] [<c001411c>] (show_regs+0x0/0x5c) from [<c001794c>]
+>> (show_info+0xe0/0x14c)
+>> [   36.532000]  r4:00000000 r3:00000000
+>> [   36.532000] [<c001786c>] (show_info+0x0/0x14c) from [<c001dfb4>]
+>> (__do_user_fault+0x78/0xc8)
+>> [   36.540000]  r7:80000007 r6:0000000b r5:00000000 r4:e514dd80
+>> [   36.548000] [<c001df3c>] (__do_user_fault+0x0/0xc8) from
+>> [<c03f4574>] (do_page_fault+0x360/0x3d4)
+>> [   36.556000] [<c03f4214>] (do_page_fault+0x0/0x3d4) from
+>> [<c0008470>] (do_PrefetchAbort+0x44/0xa8)
+>> [   36.564000] [<c000842c>] (do_PrefetchAbort+0x0/0xa8) from
+>> [<c03f2bbc>] (ret_from_exception+0x0/0x10)
+>> [   36.572000] Exception stack(0xe5175fb0 to 0xe5175ff8)
+>> [   36.960000] do_init_module: 'module2'->init suspiciously returned
+>> 11, it should follow 0/-E convention
+>> [   36.960000] do_init_module: loading module anyway...
+>> [   36.964000] Backtrace:
+>> [   36.968000] [<c00171f8>] (dump_backtrace+0x0/0x11c) from
+>> [<c03e8a54>] (dump_stack+0x20/0x24)
+>> [   36.972000]  r6:bf000090 r5:bf00009c r4:e51d7f48 r3:00000000
+>> [   36.980000] [<c03e8a34>] (dump_stack+0x0/0x24) from [<c008ae88>]
+>> (load_module+0x1a90/0x1eb4)
+>> [   36.984000] [<c00893f8>] (load_module+0x0/0x1eb4) from [<c008b3b0>]
+>> (sys_init_module+0xe8/0xf8)
+>> [   36.988000] [<c008b2c8>] (sys_init_module+0x0/0xf8) from
+>> [<c0012dc0>] (ret_fast_syscall+0x0/0x48)
+>> [   36.992000]  r6:bea51a14 r5:bea51b7c r4:00006ee4
+>> [   36.996000] module2 mod ld
+>>
+>> module2.c =>
+>> #include <linux/module.h>
+>> #include <linux/init.h>
+>> #include <linux/kmod.h>
+>> MODULE_LICENSE( "GPL" );
+>> static int test( void )
+>> {
+>>   char *argv[] = { "/mnt/sample.static", NULL };
+>>   static char *envp[] = {
+>>         "HOME=/",
+>>         "TERM=linux",
+>>         "PATH=/sbin:/bin:/usr/sbin:/usr/bin", NULL };
+>>   return call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC );
+>> }
+>> static int __init mod_entry_func( void )
+>> {
+>>   return test();
+>> }
+>>
+>> static void __exit mod_exit_func( void )
+>> {
+>>   return;
+>> }
+>> module_init( mod_entry_func );
+>> module_exit( mod_exit_func );
+>>
+>>
+>> sample.static is a simple "Hello_world" program.
+>>
+>> However, there is no problem in executing dynamically compiled binaries.
+>>
+>> When we revert commit 9fff2fa0db911b0b75ec1f9bec72460c0a676ef5 (arm:
+>> switch to saner kernel_execve() semantics), there is no problem.
+>>
+>> OR
+>>
+>> for kernel 3.8.13 (which is just a plain revert when arch specific
+>> kernel_execve was present), then also no problem =>
+>>
+>> diff --git a/kernel/kmod.c b/kernel/kmod.c
+>> index 0023a87..9cf6e15 100644
+>> --- a/kernel/kmod.c
+>> +++ b/kernel/kmod.c
+>> @@ -184,6 +184,10 @@ static int ____call_usermodehelper(void *data)
+>>         struct subprocess_info *sub_info = data;
+>>         struct cred *new;
+>>         int retval;
+>> +#ifdef ARM
+>> +       struct pt_regs regs;
+>> +       struct pt_regs *curr_ptr;
+>> +#endif
+>>         spin_lock_irq(&current->sighand->siglock);
+>>         flush_signal_handlers(current, 1);
+>> @@ -222,6 +226,36 @@ static int ____call_usermodehelper(void *data)
+>>         retval = do_execve(sub_info->path,
+>>                            (const char __user *const __user *)sub_info->argv,
+>>                            (const char __user *const __user *)sub_info->envp);
+>> +
+>> +#ifdef ARM
+>> +       if (retval)
+>> +               goto fail;
+>> +       curr_ptr = current_pt_regs();
+>> +       memcpy(&regs, curr_ptr, sizeof(struct pt_regs));
+>> +       /*
+>> +        * Save argc to the register structure for userspace.
+>> +        */
+>> +       regs.ARM_r0 = retval;
+>> +
+>> +       /*
+>> +        * We were successful.  We won't be returning to our caller, but
+>> +        * instead to user space by manipulating the kernel stack.
+>> +        */
+>> +       asm(    "add    r0, %0, %1\n\t"
+>> +               "mov    r1, %2\n\t"
+>> +               "mov    r2, %3\n\t"
+>> +               "bl     memmove\n\t"    /* copy regs to top of stack */
+>> +               "mov    r8, #0\n\t"     /* not a syscall */
+>> +               "mov    r9, %0\n\t"     /* thread structure */
+>> +               "mov    sp, r0\n\t"     /* reposition stack pointer */
+>> +               "b      ret_to_user"
+>> +               :
+>> +               : "r" (current_thread_info()),
+>> +                 "Ir" (THREAD_START_SP - sizeof(regs)),
+>> +                 "r" (&regs),
+>> +                 "Ir" (sizeof(regs))
+>> +               : "r0", "r1", "r2", "r3", "r8", "r9", "ip", "lr", "memory");
+>> +#endif
+>>         if (!retval)
+>>                 return 0;
+>> --
+>>
+>> Please suggest a proper solution.
+>>
+>> Regards,
+>> Ashish
