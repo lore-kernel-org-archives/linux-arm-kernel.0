@@ -1,32 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 10 Jul 2013 10:23:47 +0900
-Subject: [PATCH 00/02] ARM: shmobile: r8a7790 arch timer frequency update
-In-Reply-To: <20130709125007.4388.15701.sendpatchset@w520>
-References: <20130709125007.4388.15701.sendpatchset@w520>
-Message-ID: <20130710012346.GT32603@verge.net.au>
+From: koba@kmckk.co.jp (Tetsuyuki Kobayashi)
+Date: Wed, 10 Jul 2013 10:56:36 +0900
+Subject: [PATCH 2/3] ARM: shmobile: Force ARM mode to compile reset vector for
+ secondary CPUs
+In-Reply-To: <1373421397-1786-1-git-send-email-koba@kmckk.co.jp>
+References: <1373421397-1786-1-git-send-email-koba@kmckk.co.jp>
+Message-ID: <1373421397-1786-3-git-send-email-koba@kmckk.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 09, 2013 at 09:50:07PM +0900, Magnus Damm wrote:
-> ARM: shmobile: r8a7790 arch timer frequency update
-> 
-> [PATCH 01/02] ARM: shmobile: Introduce r8a7790_read_mode_pins()
-> [PATCH 02/02] ARM: shmobile: Setup r8a7790 arch timer based on MD pins
-> 
-> Add code to setup r8a7790 arch timer frequency dynamically at boot time
-> based on the EXTAL frequency pointed out by the boot mode pins.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  Built on top of renesas-next-20130704v2
-> 
->  arch/arm/mach-shmobile/clock-r8a7790.c        |   11 ----
->  arch/arm/mach-shmobile/include/mach/r8a7790.h |    3 +
->  arch/arm/mach-shmobile/setup-r8a7790.c        |   63 +++++++++++++++++++++++--
->  3 files changed, 63 insertions(+), 14 deletions(-)
+Instructions start from boot vector must be ARM mode.
+This patch specify ARM mode explicitly and use 'bx' instruction to be
+able to change to Thumb mode.
 
-Hi Magnus,
+Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+---
+ arch/arm/mach-shmobile/headsmp.S |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-could you please let me know if/when these patches are ready to queue-up
-for v3.12?
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index 559d1ce..afed58e 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -26,10 +26,13 @@ ENDPROC(shmobile_invalidate_start)
+  * This will be mapped at address 0 by SBAR register.
+  * We need _long_ jump to the physical address.
+  */
++	.arm
+ 	.align  12
+ ENTRY(shmobile_boot_vector)
+ 	ldr     r0, 2f
+-	ldr     pc, 1f
++	ldr     r1, 1f
++	bx	r1
++
+ ENDPROC(shmobile_boot_vector)
+ 
+ 	.globl	shmobile_boot_fn
+-- 
+1.7.9.5
