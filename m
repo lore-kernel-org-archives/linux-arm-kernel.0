@@ -1,60 +1,59 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 10 Jul 2013 14:45:02 -0400 (EDT)
-Subject: [PATCH 5/6] USB: Support wakeup IRQ for suspended controllers
-In-Reply-To: <1373473393-27552-1-git-send-email-rogerq@ti.com>
-Message-ID: <Pine.LNX.4.44L0.1307101440140.1215-100000@iolanthe.rowland.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Jul 2013 19:52:00 +0100
+Subject: Seg fault occurs when running statically compiled binary from
+ kernel using call_usermodehelper
+In-Reply-To: <20130710163410.GA30514@mudshark.cambridge.arm.com>
+References: <CAOiN93mGTu9w9rVNCrbbH1sccXY9VJhaCmg+dS7Rk9mMgKHBaA@mail.gmail.com>
+ <CAOiN93=Nx77RkbNuEJMV617MjV5+GmorF0G3vyLy1SwQcuCs+g@mail.gmail.com>
+ <CAOiN93nH9fyHoz4yrZmJ-OKCy6ogdt5bYartXCBgP5eHMUBPdw@mail.gmail.com>
+ <20130710163410.GA30514@mudshark.cambridge.arm.com>
+Message-ID: <20130710185200.GX24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Jul 2013, Roger Quadros wrote:
+On Wed, Jul 10, 2013 at 05:34:11PM +0100, Will Deacon wrote:
+> Ok, I've finally got to the bottom of this, but I'm not sure on the best way
+> to fix it.
 
-> Some platforms e.g. ehci-omap can generate an interrupt
-> (i.e. remote wakeup) even when the controller is suspended i.e.
-> HW_ACCESSIBLE is cleared.
+I don't think you have!  You need to look back at the older ARM kernels
+to really get to the bottom of this...
+
+> The issue is that libc expects r0 to contain a function pointer
+> to be invoked at exit (rtld_fini), to clean up after a dynamic linker. If
+> this pointer is NULL, then it is ignored. We actually zero this pointer in
+> our ELF_PLAT_INIT macro.
 > 
-> Introduce a flag "has_wakeup_irq" in struct usb_hcd to indicate
-> such cases.
+> At the same time, we have this strange code called next from the ARM ELF
+> loader:
 > 
-> We tackle this case by disabling the IRQ, scheduling a
-> hub resume and enabling back the IRQ after the controller has
-> resumed. This ensures that the IRQ handler runs only after the
-> controller is accessible.
+> 	regs->ARM_r2 = stack[2];	/* r2 (envp) */			\
+> 	regs->ARM_r1 = stack[1];	/* r1 (argv) */			\
+> 	regs->ARM_r0 = stack[0];	/* r0 (argc) */			\
+> 
+> which puts argc into r0.
 
-> @@ -2248,7 +2253,21 @@ irqreturn_t usb_hcd_irq (int irq, void *__hcd)
->  	 */
->  	local_irq_save(flags);
->  
-> -	if (unlikely(HCD_DEAD(hcd) || !HCD_HW_ACCESSIBLE(hcd)))
-> +	if (unlikely(HCD_DEAD(hcd)))
-> +		rc = IRQ_NONE;
-> +	else if (unlikely(!HCD_HW_ACCESSIBLE(hcd) && hcd->has_wakeup_irq)) {
-> +		/*
-> +		 * We got a wakeup interrupt while the controller was
-> +		 * suspending or suspended.  We can't handle it now, so
-> +		 * disable the IRQ and resume the root hub (and hence
-> +		 * the controller too).
-> +		 */
-> +		disable_irq_nosync(hcd->irq);
-> +		set_bit(HCD_FLAG_IRQ_DISABLED, &hcd->flags);
-> +		usb_hcd_resume_root_hub(hcd);
-> +
-> +		rc = IRQ_HANDLED;
-> +	} else if (unlikely(!HCD_HW_ACCESSIBLE(hcd)))
->  		rc = IRQ_NONE;
+You're sort of right.  It dates from the days when we had a.out binaries,
+those required argc, argv and envp in r0/r1/r2 - and ARM kernels carried
+this hack in  binfmt_aout.c to make it work in conjunction with the above:
 
-In the interest of minimizing the amount of work needed in the most 
-common case, this should be written as:
+static int load_aout_binary(struct linux_binprm * bprm)
+{
+...
+        start_thread(regs, ex.a_entry, current->mm->start_stack);
+#ifndef __arm__
+        return 0;
+#else
+        return regs->ARM_r0;
+#endif
+}
 
-	else if (unlikely(!HCD_HW_ACCESSIBLE(hcd))) {
-		if (hcd->has_wakeup_irq) {
-			...
-		} else
-			rc = IRQ_NONE;
+ELF, on the other hand, never had that hack - ELF has always been zero
+in r0, and it's always retrieved the argc/argv/envp off the stack.
 
->  	else if (hcd->driver->irq(hcd) == IRQ_NONE)
->  		rc = IRQ_NONE;
+As the above hack got dropped from the kernel (I don't think it ever made
+it into mainline), I think we should be safe getting rid of this
+initialization of regs->ARM_r0 to r2, leaving them all as zeros.
 
-Apart from that, the patch is okay.  When you rearrange the logic, you 
-can add my Acked-by.
-
-Alan Stern
+We should probably also remove the selection of HAVE_AOUT from
+arch/arm/Kconfig too as this definitely won't work with any recent
+kernel (certainly not without binfmt_aout.c hacked in the above way.)
