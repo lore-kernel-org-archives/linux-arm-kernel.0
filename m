@@ -1,91 +1,82 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Wed, 10 Jul 2013 12:29:07 +0200
-Subject: [PATCH] net: mv643xx_eth: fix DT port device name
-In-Reply-To: <20130708000540.00004b37@unknown>
-References: <1373229231-8838-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130707234341.0000721b@unknown> <20130708000540.00004b37@unknown>
-Message-ID: <51DD3773.1050408@keymile.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Wed, 10 Jul 2013 11:27:24 +0100
+Subject: [PATCH v1 0/4] ARM: STi fixes and ethernet support
+In-Reply-To: <201307092315.06131.arnd@arndb.de>
+References: <1373271301-11060-1-git-send-email-srinivas.kandagatla@st.com>
+ <201307090956.03191.arnd@arndb.de> <51DBE718.2080007@st.com>
+ <201307092315.06131.arnd@arndb.de>
+Message-ID: <51DD370C.20902@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian, Jonas,
+Hi Arnd,
+On 09/07/13 22:15, Arnd Bergmann wrote:
+>> For DT case, At the moment I think callbacks at MACH level is one
+>> > possible solution. But am open for any discussions.
+> Ok, so a PHY driver might not be the best place to put this, but it's
+> one option, since the PHY driver already has to know about the
+> interface speed you are setting.
+> 
+> Having a global "*_setup_ethernet" callback is definitely not the
+> right way to go. Please describe what the function actually does
+> so we can come up with the right subsystem to move that functionality
+> to. If you are setting clocks, you should use the clock subsystem,
+> for taking the device out of reset, you should use the reset controller
+> subsystem and for setting up the phy, you should use the phy subsystem,
+> etc.
 
-first of all thank you for your HUGE efforts in this area.
+The purpose of this callback is to do three things.
 
-On 07/08/2013 12:05 AM, Jonas Gorski wrote:
-> On Sun, 7 Jul 2013 23:43:41 +0200
-> Jonas Gorski <jogo@openwrt.org> wrote:
->
->> On Sun,  7 Jul 2013 22:33:51 +0200
->> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
->>
->>> Device tree support added to Marvell MV643xx ethernet driver registers
->>> port devices from port device nodes found on the corresponding controller
->>> node. The current port device name will cause the second controller to
->>> fail on registration because of two identical device names. This fixes
->>> the issue by taking the device node's name also as port device name.
->>>
->>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>> Reported-by: Jonas Gorski <jogo@openwrt.org>
->>> ---
->>> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
->>> Cc: Jonas Gorski <jogo@openwrt.org>
->>> Cc: netdev at vger.kernel.org
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: linux-kernel at vger.kernel.org
->>> ---
->>>   drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
->>> index 6495bea..1f3a03d 100644
->>> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
->>> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
->>> @@ -2521,7 +2521,7 @@ static int mv643xx_eth_shared_of_add_port(struct platform_device *pdev,
->>>   		of_property_read_u32(pnp, "duplex", &ppd.duplex);
->>>   	}
->>>
->>> -	ppdev = platform_device_alloc(MV643XX_ETH_NAME, ppd.port_number);
->>> +	ppdev = platform_device_alloc(pnp->name, ppd.port_number);
->>>   	if (!ppdev)
->>>   		return -ENOMEM;
->>>   	ppdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
->>
->> This breaks ethernet completely, as there is no platform driver
->> registered for pnp->name ("ethernetX-port"), only for MV643XX_ETH_NAME.
->
-> Looking back at our conversation, this is my fault.
-> I actually did not change this part as you asked, but I saw the
-> alloc/del issue with port 0, then added the counter and also only
-> replaced the ppd.port_number in the alloc with it. I had completely
-> forgotten at that time to replace the device name; else I would
-> have caught it back then.
->
-> I only caught it now because I tried your patch and wondered why there
-> wasn't anything registered, not because I saw the problem by review.
->
+	1> Configuring the MAC signals to select particular PHY interface mode.
+MAC signals(wires) are wired up to this Ethernet Configuration register.
 
-The way I understand it, you are "manually" creating platform devices 
-off the port subnodes (which, incidentally, have a compatible = 
-"marvell,kirkwood-eth-port" property), but matching with the driver is 
-indeed performed by device name.
-Hence Sebastian's first patch breaks everything and Jonas' latest one 
-fixes it. Is that correct? Is there any more work ongoing in this area?
+	2> Select synchronisation clock for data lines retiming. On High speed
+interfaces track length/layouts on the boards can directly influence the
+signal quality and introduce bit shifts or other errors. So SoC has
+additional logic to retime these signals and improve the data
+reliability. As there is possibility of multiple clock sources (MAC,
+PHY) a correct choice of synchronization clock is made in Ethernet
+configuration register. For 125 Mhz clock in Gbit mode, reference clock
+is provided by the PHY in other case like 100bit and 10bit, 50MHz, 25MHz
+clocks is provide by the MAC.
+So this bits depend/driven based on the PHYMODEs and Link Speed.
 
-One more question: if my understanding above is correct, what's the 
-reason for NOT having an of_device_id[] table, which looks like was 
-present in Florian Fainelli's first proposal [1]?
+	3> Ethernet Soft reset in Ethernet control register.
+		Which can probably go into via reset controller driver.
 
-I'm also willing to help testing your present/future kirkwood patches if 
-you like. Please just put me on Cc:
 
-Thank you,
-Gerlando
+For point 1 and 2, there is no subsystem in the kernel which can
+accommodate these kind of SOC specific bits setup. Am not sure if other
+platforms have similar SoC setup use cases?
 
-[1] http://lists.openwall.net/netdev/2013/04/04/42
+For point 3, I can go for reset controller API.
 
-> Sorry for that.
->
-> Regards
-> Jonas
->
+Just for your reference (Sorry and Please ignore if Its too detailed),
+Ethernet configuration register looks like:
+Bit to configure signals connected to MAC.
+	[5] ENMII1: when 1, MII mode
+		when 0, Reverse MII mode
+	[4:2] MII1_PHY_SEL:
+		000: GMII/MII (default)
+		001: RGMII
+		010: SGMII
+		100: RMII
+
+Bit to configure retiming clock for retiming data lines:
+	[8] ETH1_SEL_TX_RETIMING_CLK: Selection of the clock used to retime TX data
+		0: clock selected by ETH1_SEL_TXCLK_NOT_CLK125 bit
+		1: clock fed to or provided by MII_PHYCLK depending
+		on eth1_sel_internal_notext_phyclk setting
+	[7] ETH1_SEL_INTERNAL_NOTEXT_PHYCLK: Selection of internal clock or
+external clock from MII_PHYCLK for retiming in RMII mode
+		0: external clock (Beware that eth1_sel_tx_retiming_clk
+		bit must also be programmed).
+		1: internal clock (from clockgenA)
+	[6] ETH1_SEL_TXCLK_NOT_CLK125: Selection of the clock used to
+	retime TX data
+		0: MII1_CLK_125 (beware that eth1_sel_tx_retiming_clk bit must also be
+programmed)
+		1: MII1_TXCLK
+
+Thanks,
+srini
