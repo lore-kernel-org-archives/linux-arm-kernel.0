@@ -1,100 +1,132 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Jul 2013 05:10:37 -0700
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 10 Jul 2013 15:16:54 +0300
 Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
-In-Reply-To: <87mwpuakod.fsf@linaro.org>
-References: <B5906170F1614E41A8A28DE3B8D121433EE93C23@DBDE04.ent.ti.com>
- <20130705115959.GQ5523@atomide.com>
- <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
+In-Reply-To: <20130709194131.GA12523@arwen.pp.htv.fi>
+References: <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
  <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
  <20130708112553.GU5523@atomide.com> <51DAB394.3050104@ti.com>
  <20130708131033.GA5523@atomide.com> <51DABC81.3080409@ti.com>
- <20130708133512.GD31221@arwen.pp.htv.fi>
- <87mwpuakod.fsf@linaro.org>
-Message-ID: <20130710121037.GS5523@atomide.com>
+ <20130708133512.GD31221@arwen.pp.htv.fi> <51DBA0C2.6030003@ti.com>
+ <20130709064212.GB5552@arwen.pp.htv.fi> <51DC5D90.1010603@ti.com>
+ <20130709194131.GA12523@arwen.pp.htv.fi>
+Message-ID: <51DD50B6.5030604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@linaro.org> [130710 01:29]:
-> Felipe Balbi <balbi@ti.com> writes:
-> 
-> > Hi,
-> >
-> > On Mon, Jul 08, 2013 at 06:50:01PM +0530, Rajendra Nayak wrote:
-> >> >>>>>> I wonder if this is because the timeouts get now initialized to 0 instead
-> >> >>>>>> of -1 for the serial driver?
-> >> >>>>>>
-> >> >>>>>
-> >> >>>>> You meant initialized to -1, right? There's an additional check for timeout being 0. Unless i
-> >> >>>>> am missing something DT-boot will start off with timeout set to 0 and then get forced to -1.
-> >> >>>
-> >> >>> OK
-> >> >>
-> >> >> Issue 2: Causing boot to stop when serial driver is initialized.
-> >> >> (After Issue 1 is fixed)
-> >> >>
-> >> >> I could narrow this down to the change done to return -EINVAL
-> >> >> instead of 0 in serial_omap_get_context_loss_count() as part of
-> >> >> commit 'a630fbfbb1beeffc5bbe542a7986bf2068874633' "serial: omap:
-> >> >> Fix device tree based PM runtime"
-> >> >>
-> >> >> What this change in turn seems to do is cause a
-> >> >> serial_omap_restore_context() to get called as part of
-> >> >> serial_omap_runtime_resume() which was not the case when
-> >> >> serial_omap_get_context_loss_count() returned 0
-> >> >>
-> >> >> from serial_omap_runtime_resume():
-> >> >> -----
-> >> >>         int loss_cnt = serial_omap_get_context_loss_count(up);
-> >> >>
-> >> >>         if (loss_cnt < 0) {
-> >> >>                 dev_dbg(dev, "serial_omap_get_context_loss_count failed : %d\n",
-> >> >>                         loss_cnt);
-> >> >>                 serial_omap_restore_context(up);
-> >> >>         } else if (up->context_loss_cnt != loss_cnt) {
-> >> >>                 serial_omap_restore_context(up);
-> >> >>         }
-> >> >> -----
-> >> >>
-> >> >> I am still working on why a serial_omap_restore_context() could
-> >> >> have caused console to die. I will work with Sourav on this and
-> >> >> post the fixes for both issue 1 and issue2 once its clear on whats
-> >> >> really causing issue 2.
-> >> > 
-> >> > That's because we don't have the omap specific pdata callbacks for
-> >> > context loss any longer. We may be able to detect when the context
-> >> > was really lost in the serial driver, and only then call the
-> >> > serial_omap_restore_context().
-> >> 
-> >> Right, but calling serial_omap_restore_context() even when the context
-> >> is not lost, should not ideally cause an issue.
-> >
-> > it does in one condition. If context hasn't been saved before. And that
-> > can happen in the case of wrong pm runtime status for that device.
-> >
-> > Imagine the device is marked as suspended even though it's fully enabled
-> > (it hasn't been suspended by hwmod due to NO_IDLE flag). In that case
-> > your context structure is all zeroes (context has never been saved
-> > before) then when you call pm_runtime_get_sync() on probe() your
-> > ->runtime_resume() will get called, which will restore context,
-> > essentially undoing anything which was configured by u-boot.
-> >
-> > Am I missing something ?
-> 
-> You're right, the _set_active() is crucial in the case when we prevent
-> the console UART from idling during boot (though that shouldn't be
-> happening in mainline unless the fix for "Issue 1" is done.)
+On 07/09/2013 10:41 PM, Felipe Balbi wrote:
+> Hi,
+>
+> On Tue, Jul 09, 2013 at 09:59:28PM +0300, Grygorii Strashko wrote:
+>>>>> Imagine the device is marked as suspended even though it's fully enabled
+>>>>> (it hasn't been suspended by hwmod due to NO_IDLE flag). In that case
+>>>>> your context structure is all zeroes (context has never been saved
+>>>>> before) then when you call pm_runtime_get_sync() on probe() your
+>>>>> ->runtime_resume() will get called, which will restore context,
+>>>>> essentially undoing anything which was configured by u-boot.
+>>>>
+>>>> This could be a problem for drivers which do a save context in ->runtime_suspend()
+>>>> but from what I see with omap serial, there is no save context done as part of
+>>>> ->runtime_suspend.
+>>>
+>>> right, because context is "saved" in set_termios. probe() will get
+>>> called much before set_termios() has a chance to run, right ?
+>>>
+>>> Same problem will trigger in that case.
+>>>
+>>> I still think patch below is necessary
+>>>
+>>>>> (completely untested, didn't even try to compile, just to illustrate)
+>>>>>
+>>>>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+>>>>> index 7341eff..d8dca68 100644
+>>>>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>>>>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>>>>> @@ -2559,6 +2559,12 @@ static void __init _setup_postsetup(struct omap_hwmod *oh)
+>>>>>   	    (postsetup_state == _HWMOD_STATE_IDLE)) {
+>>>>>   		oh->_int_flags |= _HWMOD_SKIP_ENABLE;
+>>>>>   		postsetup_state = _HWMOD_STATE_ENABLED;
+>>>>> +
+>>>>> +		/* tell pm_runtime this device is already active */
+>>>>> +		pm_runtime_set_active(&oh->od->pdev->dev);
+>>>>> +	} else {
+>>>>> +		/* tell pm_runtime this device is trully suspended */
+>>>>> +		pm_runtime_set_suspended(&oh->od->pdev->dev);
+>>>>>   	}
+>>>>>
+>>>>>   	if (postsetup_state == _HWMOD_STATE_IDLE)
+>>>
+>>
+>> This will not work - _setup_postsetup() is called from core_initcall
+>> level and OMAP devices have not been created at this moment yet
+>> (of_platform_populate() is called from
+>> customize_machine->init_machine->omap_generic_init() at arch_initcall time)
+>
+> fair enough, but something *like* that needs to be done. If pm_runtime
+> doesn't know the state of the device by the time pm_runtime_enable() is
+> called, the wrong assumptions might be made and we will forever have
+> such problems as our ->runtime_resume() callback being called when it
+> shouldn't.
+>
+>> More over, I don't recommend to depend on hwmod->od field - it's been
+>> created to support OPPs and it's obsolete now in case of DT use.
+>
+> that's alright, but still we need something similar.
+>
+> But in any case, if on DT boot that's not used, than *what* uses
+> HWMOD_INIT_NO_IDLE during DT boot ?
+>
+> There's a single place in kernel source which checks if
+> HWMOD_INIT_NO_IDLE is set, and that's the place which I patched.
+>
+> We, certainly, need a way to tell pm_runtime if the device is active or
+> suspended by the time we reach our probe() function. Either we assume
+> *all* devices are active and we blindly call pm_runtime_set_active() for
+> all devices, or we assume *all* devices are suspended as we call
+> pm_runtime_set_suspend() for all devices, or we figure out which ones
+> are active and which are not and call pm_runtime_set_{active,suspend}()
+> conditionally.
+>
+>> Seems, This issue need to be handled in driver for DT boot use case,
+>> possibly cmdline need to be parsed in the same way as it's done in
+>> omap_serial_early_init().
+>
+> so you want *every* single driver to parse their own cmdline ? How big
+> would the cmdline become ? This makes no sense.
+>
 
-OK so how should we fix this?
+Agree here. Seems there two similar issues:
+- this one with omap_serial
+- GPIO reset issue http://www.spinics.net/lists/linux-omap/msg84186.html
+   (similar issue is observed on OMAP4460+TPS6236x)
 
-If the problem is hwmod automatically resetting things early while
-earlycon is running, then the reset should happen later.
+And I think, that HWMOD_INIT_NO_IDLE and HWMOD_INIT_NO_RESET flags can't 
+be treated as
+SoC (IP) specific parameters any more - they should be board specific.
 
-If the problem is omap-serial.c idling things while earlycon is
-running, then omap-serial.c should be fixed.
+I think, some kind of board_layout {} DT definition need to be created 
+to solve these issues (just an idea). For example:
 
-In any case we want mach-omap2/serial.c out of the way completely
-for DT based booting.
+Board DTS file:
+board_layout {
+  ti,hwmods-init-no-reset = "gpio1", "uart3";
+  ti,hwmods-init-no-idle = "uart3";
+}
+
+Then above DT parameters can be used in omap_hwmod_setup_all()->_setup()
+and omap_device_build_from_dt().
+- omap_hwmod_setup_all()->_setup() will configure hwmod's flags
+- omap_device_build_from_dt() will check for HWMOD_INIT_NO_IDLE and
+   call pm_runtime_set_active() if needed (this is the valid place for that)
+
+NOTE. "ti,hwmods-init-no-reset" and "ti,hwmods-init-no-idle" can't be 
+defined per device, because HWMOD framework will work 
+(init/reset/setup/idle) with IP even if corresponding IP is not defined 
+in DT.
+
+More over, board_layout{} section can be used to define some common for 
+OMAP2+ boards properties or enable/disable PM features, like:
+- Setup clksetup/clkshoutdown time for oscillator
+- enable/disable OFF-mode
 
 Regards,
-
-Tony
+-grygorii
