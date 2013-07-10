@@ -1,65 +1,49 @@
-From: koba@kmckk.co.jp (Tetsuyuki Kobayashi)
-Date: Wed, 10 Jul 2013 10:56:37 +0900
-Subject: [PATCH 3/3] ARM: shmobile: Insert align directives before 4 bytes data
-In-Reply-To: <1373421397-1786-1-git-send-email-koba@kmckk.co.jp>
-References: <1373421397-1786-1-git-send-email-koba@kmckk.co.jp>
-Message-ID: <1373421397-1786-4-git-send-email-koba@kmckk.co.jp>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 10 Jul 2013 11:09:12 +0900
+Subject: [PATCH] dmaengine: shdma: fix a build failure on platforms with no
+ DMA support
+Message-ID: <1373422152-29976-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In thumb2 mode instructions are not align to 4 byte. This patch insert
-align directives before putting 4 byte data.
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+On platforms with no support for the shdma dmaengine driver build is
+currently failing with
+
+drivers/built-in.o: In function `sh_mobile_sdhi_probe':
+drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
+
+Fix the breakage by defining shdma_chan_filter to NULL in such
+configurations.
+
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+[horms+renesas at verge.net.au: Apply change to shdma-base.h instead of sh_dma.h]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/headsmp-scu.S  |    1 +
- arch/arm/mach-shmobile/headsmp.S      |    1 +
- arch/arm/mach-shmobile/sleep-sh7372.S |    2 ++
- 3 files changed, 4 insertions(+)
+ include/linux/shdma-base.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
-index 5ce416c..0a77488 100644
---- a/arch/arm/mach-shmobile/headsmp-scu.S
-+++ b/arch/arm/mach-shmobile/headsmp-scu.S
-@@ -46,6 +46,7 @@ ENTRY(shmobile_boot_scu)
- ENDPROC(shmobile_boot_scu)
+Hi Vinod,
+
+please consider this fix from Guennadi for v3.11 which I have rebased on top of
+next-20130709. It fixes a build problem on a number of shmobile defconfigs
+including bockw.
+
+diff --git a/include/linux/shdma-base.h b/include/linux/shdma-base.h
+index 382cf71..5b1c984 100644
+--- a/include/linux/shdma-base.h
++++ b/include/linux/shdma-base.h
+@@ -124,6 +124,10 @@ void shdma_chan_remove(struct shdma_chan *schan);
+ int shdma_init(struct device *dev, struct shdma_dev *sdev,
+ 		    int chan_num);
+ void shdma_cleanup(struct shdma_dev *sdev);
++#if IS_ENABLED(CONFIG_SH_DMAE_BASE)
+ bool shdma_chan_filter(struct dma_chan *chan, void *arg);
++#else
++#define shdma_chan_filter NULL
++#endif
  
- 	.text
-+	.align	2
- 	.globl	shmobile_scu_base
- shmobile_scu_base:
- 	.space	4
-diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
-index afed58e..dfb41df 100644
---- a/arch/arm/mach-shmobile/headsmp.S
-+++ b/arch/arm/mach-shmobile/headsmp.S
-@@ -35,6 +35,7 @@ ENTRY(shmobile_boot_vector)
- 
- ENDPROC(shmobile_boot_vector)
- 
-+	.align	2
- 	.globl	shmobile_boot_fn
- shmobile_boot_fn:
- 1:	.space	4
-diff --git a/arch/arm/mach-shmobile/sleep-sh7372.S b/arch/arm/mach-shmobile/sleep-sh7372.S
-index 53f4840..9782862 100644
---- a/arch/arm/mach-shmobile/sleep-sh7372.S
-+++ b/arch/arm/mach-shmobile/sleep-sh7372.S
-@@ -41,6 +41,7 @@
- sh7372_resume_core_standby_sysc:
- 	ldr     pc, 1f
- 
-+	.align	2
- 	.globl	sh7372_cpu_resume
- sh7372_cpu_resume:
- 1:	.space	4
-@@ -96,6 +97,7 @@ sh7372_do_idle_sysc:
- 1:
- 	b      1b
- 
-+	.align	2
- kernel_flush:
- 	.word v7_flush_dcache_all
  #endif
 -- 
-1.7.9.5
+1.8.2.1
