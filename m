@@ -1,78 +1,29 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Wed, 10 Jul 2013 20:58:47 +0900
-Subject: [RFC PATCH v1 2/2] dma-buf: add lock callback for fcntl system call.
-In-Reply-To: <1373457527-28263-1-git-send-email-inki.dae@samsung.com>
-References: <1373457527-28263-1-git-send-email-inki.dae@samsung.com>
-Message-ID: <1373457527-28263-3-git-send-email-inki.dae@samsung.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Wed, 10 Jul 2013 17:41:49 +0530
+Subject: [PATCH 0/4] clk: Samsung: audss: Add support for Exynos5420
+Message-ID: <1373458313-18970-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds lock callback to dma buf file operations,
-and this callback will be called by fcntl system call.
+This patch set adds support for audio subsystem clks on Exynos5420. Exynos5420
+audio subsystem has a gate bit for ADMA controller and the some of parent clks
+for mout_i2s are also different from Exynos5250. So this patch adds provision
+for supporting both the platforms by passing the parent clk names through
+device tree.
 
-With this patch, fcntl system call can be used for buffer
-synchronization between CPU and CPU, and CPU and DMA in user mode.
+Andrew Bresticker (3):
+  clk: exynos-audss: add support for Exynos 5420
+  clk: exynos-audss: allow input clocks to be specified in device tree
+  ARM: dts: exynos5420: add audio clock controller
 
-Signed-off-by: Inki Dae <inki.dae@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/base/dma-buf.c |   34 ++++++++++++++++++++++++++++++++++
- 1 files changed, 34 insertions(+), 0 deletions(-)
+Padmavathi Venna (1):
+  ARM: dts: Correct the /include entry on exynos5420 dtsi file
 
-diff --git a/drivers/base/dma-buf.c b/drivers/base/dma-buf.c
-index fe39120..cd71447 100644
---- a/drivers/base/dma-buf.c
-+++ b/drivers/base/dma-buf.c
-@@ -31,6 +31,7 @@
- #include <linux/debugfs.h>
- #include <linux/seq_file.h>
- #include <linux/reservation.h>
-+#include <linux/dmabuf-sync.h>
- 
- static inline int is_dma_buf_file(struct file *);
- 
-@@ -82,9 +83,42 @@ static int dma_buf_mmap_internal(struct file *file, struct vm_area_struct *vma)
- 	return dmabuf->ops->mmap(dmabuf, vma);
- }
- 
-+static int dma_buf_lock(struct file *file, int cmd, struct file_lock *fl)
-+{
-+	struct dma_buf *dmabuf;
-+	unsigned int type;
-+	bool wait = false;
-+
-+	if (!is_dma_buf_file(file))
-+		return -EINVAL;
-+
-+	dmabuf = file->private_data;
-+
-+	if ((fl->fl_type & F_UNLCK) == F_UNLCK) {
-+		dmabuf_sync_single_unlock(dmabuf);
-+		return 0;
-+	}
-+
-+	/* convert flock type to dmabuf sync type. */
-+	if ((fl->fl_type & F_WRLCK) == F_WRLCK)
-+		type = DMA_BUF_ACCESS_W;
-+	else if ((fl->fl_type & F_RDLCK) == F_RDLCK)
-+		type = DMA_BUF_ACCESS_R;
-+	else
-+		return -EINVAL;
-+
-+	if (fl->fl_flags & FL_SLEEP)
-+		wait = true;
-+
-+	/* TODO. the locking to certain region should also be considered. */
-+
-+	return dmabuf_sync_single_lock(dmabuf, type, wait);
-+}
-+
- static const struct file_operations dma_buf_fops = {
- 	.release	= dma_buf_release,
- 	.mmap		= dma_buf_mmap_internal,
-+	.lock		= dma_buf_lock,
- };
- 
- /*
+ .../devicetree/bindings/clock/clk-exynos-audss.txt |   38 +++++++++++++++++--
+ arch/arm/boot/dts/exynos5420.dtsi                  |   13 ++++++-
+ drivers/clk/samsung/clk-exynos-audss.c             |   36 ++++++++++++++++--
+ include/dt-bindings/clk/exynos-audss-clk.h         |    3 +-
+ 4 files changed, 80 insertions(+), 10 deletions(-)
+
 -- 
-1.7.5.4
+1.7.4.4
