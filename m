@@ -1,69 +1,79 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 10 Jul 2013 23:04:14 +0200
-Subject: [v4 3/3] sata: imx: add ahci sata support on imx platforms
-In-Reply-To: <1373445355-11453-4-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1373445355-11453-1-git-send-email-Hong-Xing.Zhu@freescale.com>
- <1373445355-11453-4-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20130710210414.GK516@pengutronix.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 10 Jul 2013 17:49:22 -0400
+Subject: [PATCH V3 1/3] dts: change Marvell prefix to 'marvell'
+In-Reply-To: <CAHCPf3u=Zu2-4RsWzi17rB_FmStwcf-Pt_7oRzAEnxN_w=a7cA@mail.gmail.com>
+References: <1373352166-10064-1-git-send-email-zhangwm@marvell.com>
+ <1373352166-10064-2-git-send-email-zhangwm@marvell.com>
+ <20130709124900.GG11908@titan.lakedaemon.net>
+ <CAHCPf3u=Zu2-4RsWzi17rB_FmStwcf-Pt_7oRzAEnxN_w=a7cA@mail.gmail.com>
+Message-ID: <20130710214922.GQ11908@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 04:35:55PM +0800, Richard Zhu wrote:
-> From: Richard Zhu <r65037@freescale.com>
+On Wed, Jul 10, 2013 at 03:50:10PM -0500, Matt Sealey wrote:
+> On Tue, Jul 9, 2013 at 7:49 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > Neil,
+> >
+> > I agree with the need to change, however, this has been in the binding
+> > documentation since v3.5.  I wish we had caught this when we decided
+> > against using stock ticker symbols (not all stock markets use
+> > alphabetical abbreviated names, not all companies are listed on any
+> > stock exchange).
 > 
-> imx6q contains one Synopsys AHCI SATA controller,
-> But it can't shares ahci_platform driver with other
-> controllers.
-> Because there are some misalignments of the generic
-> AHCI controller.
-> The bits definitions of the HBA registers, the Vendor
-> Specific registers, and the AHCI PHY clock.
->  - CAP_SSS(bit20) of the HOST_CAP is writable, default
->  value is '0', should be configured to be '1'
->  - bit0 (only one AHCI SATA port on imx6q) of the
->  HOST_PORTS_IMPL should be set to be '1'.(default 0)
->  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)
->  should be configured regarding to the frequency of AHB
->  bus clock.
->  - Configurations of the AHCI PHY clock, and the signal
->  parameters of the GPR13
+> Who decided that?
+
+Now you're going to make me dig ;-)  iirc, we were going the stock
+ticker route, but then noticed that powerpc dts files had been using
+"marvell,..." for a _long_ time.  How long?  I'll leave that as an
+exercise for the reader. :-P  Because we shared at least the ethernet
+driver with them, we decided to conform with what was already present in
+the kernel and use "marvell,..." for all of the dt bindings we were
+creating for kirkwood/dove/mvebu (and eventually orion5x, mv78xx0).
+
+As for who is 'we'?
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/101337.html
+
+> You can't just "stop using stock ticker symbols" - FDT is inherently
+> based on the original OpenFirmware device tree and therefore any
+> existing bindings which are done on real OpenFirmware solutions where
+> using stock ticker symbols is entirely appropriate (although, these
+> days, not useful) is counter-productive.
 > 
-> Setup its own ahci sata driver, contained the imx6q specific
-> initialized codes, and re-use the generic ahci_platform drier,
+> If Marvell had originally had mrvl as their ticker, and used this in
+> OF DTs (and it is..), then mrvl it stays. In the case where new
+> devices are added with marvell, this is in this case wrong. You should
+> keep using the old one. A good example of this; Freescale. Nobody is
+> saying everyone should move to "freescale,imx-this" or
+> "freescale,vybrid-that" - it's fsl and it stays fsl for
+> backwards/forwards compatibility because things exist already.
+
+I agree, that's why I'm arguing for *maintaining* backwards
+compatibility.
+
+> Any new companies can have a long, descriptive name; a privilege of
+> being late to the party, you might say :)
 > 
-> Signed-off-by: Richard Zhu <r65037@freescale.com>
-> ---
->  drivers/ata/Kconfig    |    9 ++
->  drivers/ata/Makefile   |    1 +
->  drivers/ata/sata_imx.c |  237 ++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 247 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/ata/sata_imx.c
+> Having an odd mix of mrvl and marvell or moving to marvell is just
+> completely obtuse, whether they had that stock ticker, will have it in
+> the future, it is how they're defined and you can't in good conscience
+> change the binding after devices ship with it.
+
+See above regarding the marvell ethernet driver and powerpc...
+
+> > To do this properly, the drivers are going to have to be compatible with
+> > the old and the new names, and the binding docs updated to reflect the
+> > legacy name and the preferred name.
 > 
+> Properly would be as above. You can stop using stock tickers for new
+> company names, but anything that has been defined in a device tree
+> before has to stay that way, and all the manufacturer prefixes to
+> device names should be the same. What you're proposing is purely
+> driver bloat and increasing the size of kernel.
 
-[...]
+*I'm* not proposing to change the name, Neil is.  I'm proposing that
+*iff* they chose to do that, don't break sh*t along the way.
 
-> +
-> +/* imx6q ahci module initialization. */
-> +static int imx6q_sata_init(struct device *dev, void __iomem *mmio)
-> +{
-> +	int ret = 0;
-> +	unsigned int rc;
-> +	struct regmap *gpr;
-> +	struct clk *ahb_clk;
-> +	struct imx_ahci_priv *imxpriv = (struct imx_ahci_priv *)dev->p;
+thx,
 
-Just because a pointer points to valid memory doesn't mean that it's
-free to use for your purposes. If you look closer maybe you realize that
-the imxpriv pointer you use here is another one than the one you
-allocate below in your probe function.
-
-I give up here. Maybe I'll write a driver for this when I find time for
-it.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Jason.
