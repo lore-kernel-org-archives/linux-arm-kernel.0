@@ -1,68 +1,49 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 10 Jul 2013 11:09:47 +0900
-Subject: [PATCH] dmaengine: shdma: fix a build failure on platforms with
- no DMA support
-In-Reply-To: <20130708072114.GF16653@intel.com>
-References: <Pine.LNX.4.64.1305301650290.29171@axis700.grange>
- <51A77CF1.7040105@ti.com> <20130531024438.GB32564@verge.net.au>
- <CAGa+x8413povhYWx+BSj=TdzQDAuYFXmjF4A2kXvQt+=n+380w@mail.gmail.com>
- <Pine.LNX.4.64.1306192125480.12502@axis700.grange>
- <20130705045350.GA10947@intel.com>
- <CAOesGMjp4Ort89z8ZhQT9xAPNyG-0uU-kz9G2f_GzRFF-Y2MxA@mail.gmail.com>
- <20130708072114.GF16653@intel.com>
-Message-ID: <20130710020947.GP32603@verge.net.au>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 10 Jul 2013 11:12:25 +0900
+Subject: [PATCH 00/02] ARM: shmobile: r8a7790 arch timer frequency update
+In-Reply-To: <20130710012346.GT32603@verge.net.au>
+References: <20130709125007.4388.15701.sendpatchset@w520>
+ <20130710012346.GT32603@verge.net.au>
+Message-ID: <CANqRtoSHk_LJ6AyFqHYPy6w-As3XN=3Peku08gDMoEcz5MoRHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 08, 2013 at 12:51:14PM +0530, Vinod Koul wrote:
-> On Mon, Jul 08, 2013 at 12:52:16AM -0700, Olof Johansson wrote:
-> > On Thu, Jul 4, 2013 at 9:53 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> > > On Wed, Jun 19, 2013 at 09:32:18PM +0200, Guennadi Liakhovetski wrote:
-> > >> Hi Vinod
-> > >>
-> > >> On Wed, 19 Jun 2013, Kevin Hilman wrote:
-> > >>
-> > >> > On Thu, May 30, 2013 at 7:44 PM, Simon Horman <horms@verge.net.au> wrote:
-> > >> >
-> > >> > [...]
-> > >> >
-> > >> > > thanks for this. I will wait for a refresh (as we discussed earlier today).
-> > >> > > Can I confirm that this is a fix for v3.10? If so, could ou note
-> > >> > > that when you post your revised patch?
-> > >> >
-> > >> > Any progress on this patch?
-> > >> >
-> > >> > The SH-mobile defconfigs are still all failing in linux-next.
-> > >>
-> > >> In
-> > >>
-> > >> https://patchwork.kernel.org/patch/2640061/
-> > > And you havent CC maintainers on this patch, so I dont have it!
-> > >>
-> > >> I proposed a simple immediate fix for this problem. Arnd at the same time
-> > >> developed an alternative solution:
-> > >>
-> > >> https://patchwork.kernel.org/patch/2644121/
-> > >> https://patchwork.kernel.org/patch/2644111/
-> > > Reading these patches I agree with Arnd that client drivers should not depend on
-> > > dma slave drivers. Existing issue need to be fixed
-> > >
-> > > Arnd, Have you merged these changes?
-> > 
-> > Looks like we now have breakage in linux-next for this again (new
-> > breakage due to the header file move being applied by you on Friday,
-> > Vinod? Are you planning on sending the code in for 3.11? If not, you
-> > shouldn't apply patches right now).
-> Well they were already in my tree since 18th June. (tree was rebased to fixup for
-> pull on friday) and now these are in Linus's tree.
-> 
-> Can we have a fix for breakage for now sent to linus for now and then address the
-> proper way to do this?
+On Wed, Jul 10, 2013 at 10:23 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Tue, Jul 09, 2013 at 09:50:07PM +0900, Magnus Damm wrote:
+>> ARM: shmobile: r8a7790 arch timer frequency update
+>>
+>> [PATCH 01/02] ARM: shmobile: Introduce r8a7790_read_mode_pins()
+>> [PATCH 02/02] ARM: shmobile: Setup r8a7790 arch timer based on MD pins
+>>
+>> Add code to setup r8a7790 arch timer frequency dynamically at boot time
+>> based on the EXTAL frequency pointed out by the boot mode pins.
+>>
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> ---
+>>
+>>  Built on top of renesas-next-20130704v2
+>>
+>>  arch/arm/mach-shmobile/clock-r8a7790.c        |   11 ----
+>>  arch/arm/mach-shmobile/include/mach/r8a7790.h |    3 +
+>>  arch/arm/mach-shmobile/setup-r8a7790.c        |   63 +++++++++++++++++++++++--
+>>  3 files changed, 63 insertions(+), 14 deletions(-)
+>
+> Hi Magnus,
 
-That is my preferred approach.
+Hi Simon,
 
-I will repost the patch at the link
-https://patchwork.kernel.org/patch/2640061/ above, rebased for the header
-file rename.
+Thanks for your help picking up patches.
 
-Vinod, can you take things from there?
+> could you please let me know if/when these patches are ready to queue-up
+> for v3.12?
+
+There are two things to consider:
+1) Patch 1/2 needs to be updated to handle feedback from Sergei.
+2) I'd like the series to be tested by Ulrich to see if they actually help!
+
+I can resend 1/2 today or tomorrow and I think Ulrich can most likely
+help us with testing sometime this week.
+
+Cheers,
+
+/ magnus
