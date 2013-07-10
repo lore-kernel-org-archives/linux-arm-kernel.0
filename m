@@ -1,41 +1,37 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 10 Jul 2013 22:01:39 +0200
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <20130710182815.GA362@x4>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
- <20130506095124.GA22041@pd.tnic>
- <CAMuHMdWH9w5fj6HRXi+9QcBJym4dukAFsPVGZVqSSk3yTZJUcA@mail.gmail.com>
- <20130710093642.GC14873@pd.tnic> <20130710182815.GA362@x4>
-Message-ID: <20130710200139.GC9140@pd.tnic>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Jul 2013 22:36:28 +0200
+Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
+In-Reply-To: <51CC45D3.2000305@ti.com>
+References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
+ <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
+ <20130625065811.GZ5523@atomide.com> <51CAEA90.90200@ti.com>
+ <CACRpkdbKgEcfF67oO9HrczvDp4Po3Xt1hFajJ1vO8kEvsZH4jA@mail.gmail.com>
+ <51CC45D3.2000305@ti.com>
+Message-ID: <CACRpkdYU13bhPaL2ZG9CT9JRv9sKQ+1N3zCUPizk571+LQqB4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 08:28:15PM +0200, Markus Trippelsdorf wrote:
-> Well, there's also no hand-holding when lzop is missing for LZO. And
-> the error message is clear enough. No?
+On Thu, Jun 27, 2013 at 4:01 PM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
 
-Actually, we should error out more gracefully than that. Maybe check for
-the presence of the executable first and if not, exit out of the build
-with an informational message that lz4c is not present on the system.
-Ditto for lzop.
+> I think, In the future the OMAP pinctrl configurations would be manged in
+> more flexible way then now (thanks to "pinctrl PM helpers" and you;))
+> - "Idle" state will be splitted to "Idle"/"sleep"
+> - "default" state will be splitted to "default"/"active"
 
-Currently, you wait for the whole build to complete just to see that
-there's no executable at the end. Not nice.
+OK so the first ones we already have so the discussion is now down
+to adding the "active" state (and pinctrl_pm* helper function).
 
-> BTW speaking of introductory-level patches, what about the following
-> one:
-> 
-> Now that lz4 kernel compression is available, add *.lz4 to .gitignore
+I guess we need a patch set prepared which adds the "active" state
+and helper function as the first patch, i.e. this:
+http://marc.info/?l=linux-kernel&m=137094012703340&w=2
+Can I have your ACK on this patch?
 
-Yep. That makes sense.
+I do not want to add the state unless there is a clear consumer,
+so it needs to go in with the first patch to a device driver that uses
+pinctrl_pm_select_active_state() which will be a good demonstration
+on its use and utility. (And a point to object and suggest other ways
+to do the same thing...)
 
-Thanks.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+Yours,
+Linus Walleij
