@@ -1,65 +1,103 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 10 Jul 2013 23:16:00 +0100
-Subject: [RFC PATCH 5/5] arm64: add PSCI CPU_OFF-based hotplug support
-In-Reply-To: <1373494279-24712-1-git-send-email-mark.rutland@arm.com>
-References: <1373494279-24712-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1373494560-25011-1-git-send-email-mark.rutland@arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 11 Jul 2013 00:59:35 +0200
+Subject: [PATCH] net: mv643xx_eth: fix DT port device name
+In-Reply-To: <51DD3773.1050408@keymile.com>
+References: <1373229231-8838-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130707234341.0000721b@unknown> <20130708000540.00004b37@unknown>
+ <51DD3773.1050408@keymile.com>
+Message-ID: <51DDE757.2080103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for using PSCI CPU_OFF calls for CPU hotplug.
-With this code it is possible to hot unplug CPUs with "psci" as their
-boot-method, as long as there's an appropriate cpu_off function id
-specified in the psci node.
+On 07/10/2013 12:29 PM, Gerlando Falauto wrote:
+> Hi Sebastian, Jonas,
+>
+> first of all thank you for your HUGE efforts in this area.
+>
+> On 07/08/2013 12:05 AM, Jonas Gorski wrote:
+>> On Sun, 7 Jul 2013 23:43:41 +0200
+>> Jonas Gorski <jogo@openwrt.org> wrote:
+>>
+>>> On Sun,  7 Jul 2013 22:33:51 +0200
+>>> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+>>>
+>>>> Device tree support added to Marvell MV643xx ethernet driver registers
+>>>> port devices from port device nodes found on the corresponding
+>>>> controller
+>>>> node. The current port device name will cause the second controller to
+>>>> fail on registration because of two identical device names. This fixes
+>>>> the issue by taking the device node's name also as port device name.
+>>>>
+>>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>>> Reported-by: Jonas Gorski <jogo@openwrt.org>
+>>>> ---
+>>>> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+>>>> Cc: Jonas Gorski <jogo@openwrt.org>
+>>>> Cc: netdev at vger.kernel.org
+>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>> Cc: linux-kernel at vger.kernel.org
+>>>> ---
+>>>>   drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
+>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c
+>>>> b/drivers/net/ethernet/marvell/mv643xx_eth.c
+>>>> index 6495bea..1f3a03d 100644
+>>>> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
+>>>> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+>>>> @@ -2521,7 +2521,7 @@ static int
+>>>> mv643xx_eth_shared_of_add_port(struct platform_device *pdev,
+>>>>           of_property_read_u32(pnp, "duplex", &ppd.duplex);
+>>>>       }
+>>>>
+>>>> -    ppdev = platform_device_alloc(MV643XX_ETH_NAME, ppd.port_number);
+>>>> +    ppdev = platform_device_alloc(pnp->name, ppd.port_number);
+>>>>       if (!ppdev)
+>>>>           return -ENOMEM;
+>>>>       ppdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+>>>
+>>> This breaks ethernet completely, as there is no platform driver
+>>> registered for pnp->name ("ethernetX-port"), only for MV643XX_ETH_NAME.
+>>
+>> Looking back at our conversation, this is my fault.
+>> I actually did not change this part as you asked, but I saw the
+>> alloc/del issue with port 0, then added the counter and also only
+>> replaced the ppd.port_number in the alloc with it. I had completely
+>> forgotten at that time to replace the device name; else I would
+>> have caught it back then.
+>>
+>> I only caught it now because I tried your patch and wondered why there
+>> wasn't anything registered, not because I saw the problem by review.
+>>
+>
+> The way I understand it, you are "manually" creating platform devices
+> off the port subnodes (which, incidentally, have a compatible =
+> "marvell,kirkwood-eth-port" property), but matching with the driver is
+> indeed performed by device name.
+> Hence Sebastian's first patch breaks everything and Jonas' latest one
+> fixes it. Is that correct? Is there any more work ongoing in this area?
+>
+> One more question: if my understanding above is correct, what's the
+> reason for NOT having an of_device_id[] table, which looks like was
+> present in Florian Fainelli's first proposal [1]?
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/kernel/smp_psci.c |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+Gerlando,
 
-diff --git a/arch/arm64/kernel/smp_psci.c b/arch/arm64/kernel/smp_psci.c
-index 24dbad9..d536f3e 100644
---- a/arch/arm64/kernel/smp_psci.c
-+++ b/arch/arm64/kernel/smp_psci.c
-@@ -47,9 +47,39 @@ static int __cpuinit smp_psci_cpu_boot(unsigned int cpu)
- 	return err;
- }
- 
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int __cpuinit smp_psci_cpu_disable(unsigned int cpu)
-+{
-+	/* Fail early if we don't have CPU_OFF support */
-+	if (!psci_ops.cpu_off)
-+		return -EOPNOTSUPP;
-+	return 0;
-+}
-+
-+static void __cpuinit smp_psci_cpu_die(unsigned int cpu)
-+{
-+	int ret;
-+	/*
-+	 * There are no known implementations of PSCI actually using the
-+	 * power state field, pass a sensible default for now.
-+	 */
-+	struct psci_power_state state = {
-+		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-+	};
-+
-+	ret = psci_ops.cpu_off(state);
-+
-+	pr_warn("psci: unable to power off CPU%u (%d)", cpu, ret);
-+}
-+#endif
-+
- const struct smp_operations smp_psci_ops __cpuinitconst = {
- 	.name		= "psci",
- 	.cpu_init	= smp_psci_cpu_init,
- 	.cpu_prepare	= smp_psci_cpu_prepare,
- 	.cpu_boot	= smp_psci_cpu_boot,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_disable	= smp_psci_cpu_disable,
-+	.cpu_die	= smp_psci_cpu_die,
-+#endif
- };
--- 
-1.7.9.5
+for the long run, I plan to break with controller/port device
+separation. I haven't looked into netdev internals, but I guess
+you can have more than one netdev per platform_device.
+
+Using one device per controller will remove some temporal dependencies
+of when which driver gets loaded (there will be only one) and also the
+root cause of the issue fixed by Jonas.
+
+But it is not on my top priority list, but after fixing MAC address
+obliviousness, suspend/resume and initial port setup.
+
+> I'm also willing to help testing your present/future kirkwood patches if
+> you like. Please just put me on Cc:
+
+I once put too many people on Cc and that caused ML rejects, but if I
+remember it I will keep you posted.
+
+Sebastian
