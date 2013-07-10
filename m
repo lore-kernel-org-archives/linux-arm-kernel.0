@@ -1,42 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Jul 2013 00:51:47 +0100
-Subject: [PATCH] kexec: return error of machine_kexec() fails
-In-Reply-To: <87txk2cfkm.fsf@xmission.com>
-References: <1373421296-6112-1-git-send-email-horms@verge.net.au>
- <87obaaiiry.fsf@xmission.com> <51DDB159.2080003@wwwdotorg.org>
- <87txk2cfkm.fsf@xmission.com>
-Message-ID: <20130710235147.GZ24642@n2100.arm.linux.org.uk>
+Date: Thu, 11 Jul 2013 00:59:38 +0100
+Subject: [RFC PATCH 4/5] arm64: add CPU_HOTPLUG infrastructure
+In-Reply-To: <1373494549-24972-1-git-send-email-mark.rutland@arm.com>
+References: <1373494279-24712-1-git-send-email-mark.rutland@arm.com>
+ <1373494549-24972-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20130710235938.GA24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 01:42:17PM -0700, Eric W. Biederman wrote:
-> I meant code not hardware architecture.  We keep having code thrown in
-> the the shutdown paths because ARM only supports cpu shutdown via cpu
-> hotunplug and cpu hotunplug is not universally available.
-> 
-> That is a software architecture BUG with the ARM kernels.
+On Wed, Jul 10, 2013 at 11:15:49PM +0100, Mark Rutland wrote:
+> +	/*
+> +	 * actual CPU shutdown procedure is at least platform (if not
+> +	 * CPU) specific.
+> +	 */
+> +	if (smp_ops[cpu]->cpu_die)
+> +		smp_ops[cpu]->cpu_die(cpu);
+> +
+> +	/*
+> +	 * Do not return to the idle loop - jump back to the secondary
+> +	 * cpu initialisation.  There's some initialisation which needs
+> +	 * to be repeated to undo the effects of taking the CPU offline.
+> +	 */
+> +	__asm__("mov	sp, %0\n"
+> +	"	mov	x29, #0\n"
+> +	"	b	secondary_start_kernel"
+> +		:
+> +		: "r" (task_stack_page(current) + THREAD_START_SP));
 
-There are many problems here:
+Don't make that same mistake as on AArch32 - this will result in some
+people thinking its acceptable for them to return from cpu_die().  Hot
+unplug is supposed to take the CPU offline so it can be restarted as if
+it was never booted in the first place.
 
-1) if you can't place a CPU individually into reset, what do you do with
-it over a kexec?
-
-Once woken it executes code.  It will never stop executing code.  If you
-place it inside an infinite loop in the existing kernel, and then
-overwrite it, it will then start executing the instructions there when
-the new kernel broadcasts the cache flushes, and it will start executing
-whatever code is there.
-
-2) if the CPU itself needs to execute code to shut itself down, how do
-you get it to do that on a crash-based kexec when IPI broadcasts may not
-work?
-
-3) what about situations where you need the requestor to also do something
-to shut down the secondary CPU?
-
-Taking CPUs offline is not an easy thing to do when every platform plays
-their own games with doing that, and then you have security crap that
-gets in the way too, with the security crap having platform specific
-interfaces.
-
-CPU hotplug is by far the best solution we have to this mess.
+The above "hack" in AArch32 is only there because of the sillyness of
+the 32-bit ARM evaluation boards not having a way to place the
+secondary CPUs back into reset or power the secondary CPUs off.
