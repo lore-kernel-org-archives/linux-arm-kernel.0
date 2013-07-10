@@ -1,74 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Jul 2013 01:02:41 -0700
-Subject: [GIT PULL] omap fixes for v3.11 merge window
-Message-ID: <20130710080241.GN5523@atomide.com>
+From: sbabic@denx.de (Stefano Babic)
+Date: Wed, 10 Jul 2013 10:10:00 +0200
+Subject: [PATCH] ARM: dts: imx: add tempmon node for imx6q thermal support
+In-Reply-To: <20130710070915.GA12605@S2101-09.ap.freescale.net>
+References: <1370330008-5982-1-git-send-email-shawn.guo@linaro.org>
+ <1370330226-6030-1-git-send-email-shawn.guo@linaro.org>
+ <51DC256D.6040204@denx.de> <20130710070915.GA12605@S2101-09.ap.freescale.net>
+Message-ID: <51DD16D8.8070803@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ddcf6600b133697adbafd96e080818bdc0dfd028:
+Hi Shawn,
 
-  Merge tag 'hwmon-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/groeck/linux-staging (2013-07-03 19:56:35 -0700)
+On 10/07/2013 09:09, Shawn Guo wrote:
 
-are available in the git repository at:
+> Address 0x20C8180 is where TEMPMON control registers are - they are
+> embedded in ANATOP block, while calibration data is stored in OCOTP fuse
+> block.
+> 
 
+Thanks, it is clear now.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/fixes-for-merge-window
+>> imx_thermal tempmon.7: invalid sensor calibration data
+>> imx_thermal tempmon.7: failed to get sensor data
+>> imx_thermal: probe of tempmon.7 failed with error -22
+> 
+> What's your chip revision?  Early revisions may not have the calibration
+> data.  TO1.2 should have, I think.
 
-for you to fetch changes up to c24a6ae18abde53b048372b066b93b71b1b91154:
+That is the point - on the board I tested there is a T01.0 running.
 
-  ARM: OMAP2+: omap2plus_defconfig: Enable appended DTB support (2013-07-04 05:11:57 -0700)
+> 
+>> The driver is loaded successfully if I changed the tempdata to point to
+>> 020C8180. Not sure if I get the right values from temp1_crit and
+>> temp1_input, but no error at the initialisation. Am I missing something ?
+> 
+> It reads some data but that's not calibration data, so it should not work.
+> 
+> Also, you need a cpu_cooling fix [1], if you want to play the thermal
+> patches on imx6q.
 
-----------------------------------------------------------------
-Omap fixes and minor defconfig updates that would be good to
-get in before -rc1.
+Understood, thanks.
 
-----------------------------------------------------------------
-Afzal Mohammed (1):
-      ARM: OMAP2+: timer: initialize before using oh_name
+Stefano
 
-Eduardo Valentin (2):
-      ARM: OMAP2+: omap2plus_defconfig: enable TI bandgap driver
-      ARM: OMAP2+: omap2plus_defconfig: enable DRA752 thermal support by default
-
-Enric Balletbo i Serra (1):
-      ARM: OMAP3: igep0020: Set DSS pins in correct mux mode.
-
-Joel Fernandes (1):
-      ARM: OMAP2+: Enable TI_EDMA in omap2plus_defconfig
-
-Nishanth Menon (2):
-      ARM: OMAP4: sleep: build OMAP4 specific functions only for OMAP4
-      ARM: scu: provide inline dummy functions when SCU is not present
-
-Paul Bolle (1):
-      ARM: OMAP2+: Remove obsolete Makefile line
-
-Pavel Machek (1):
-      ARM: OMAP2+: N900: enable N900-specific drivers even if device tree is enabled
-
-Santosh Shilimkar (1):
-      ARM: OMAP5: Enable Cortex A15 errata 798181
-
-Thomas Meyer (1):
-      ARM: OMAP2+: Cocci spatch "ptr_ret.spatch"
-
-Tom Rini (1):
-      ARM: OMAP2+: omap2plus_defconfig: Enable appended DTB support
-
-Wei Yongjun (1):
-      ARM: OMAP2+: devices: remove duplicated include from devices.c
-
- arch/arm/configs/omap2plus_defconfig   | 15 +++++++++++++++
- arch/arm/include/asm/smp_scu.h         | 13 ++++++++++++-
- arch/arm/mach-omap2/Kconfig            |  1 +
- arch/arm/mach-omap2/Makefile           |  4 ----
- arch/arm/mach-omap2/board-igep0020.c   | 31 +++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/board-rx51-video.c |  2 +-
- arch/arm/mach-omap2/devices.c          |  5 ++---
- arch/arm/mach-omap2/fb.c               |  5 +----
- arch/arm/mach-omap2/gpmc.c             |  2 +-
- arch/arm/mach-omap2/pmu.c              |  5 +----
- arch/arm/mach-omap2/sleep44xx.S        |  6 +++++-
- arch/arm/mach-omap2/timer.c            |  2 +-
- sound/soc/omap/rx51.c                  |  2 +-
- 13 files changed, 72 insertions(+), 21 deletions(-)
+-- 
+=====================================================================
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-53 Fax: +49-8142-66989-80 Email: sbabic at denx.de
+=====================================================================
