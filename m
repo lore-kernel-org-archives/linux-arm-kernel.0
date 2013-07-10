@@ -1,82 +1,80 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 10 Jul 2013 22:08:50 +0800
-Subject: [PATCH V3 1/3] dts: change Marvell prefix to 'marvell'
-In-Reply-To: <20130710122433.GO11908@titan.lakedaemon.net>
-References: <1373352166-10064-1-git-send-email-zhangwm@marvell.com>
- <1373352166-10064-2-git-send-email-zhangwm@marvell.com>
- <20130709124900.GG11908@titan.lakedaemon.net>
- <CAN1soZxiOh6TpbUOCUzK8gNwmvjbT3ihkUWaw8tuZ7md+NVA2g@mail.gmail.com>
- <20130710122433.GO11908@titan.lakedaemon.net>
-Message-ID: <CAN1soZzMvront1-jcBW6-uRKNs0OZNGnmiOjKGZSM28bViB_8A@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Jul 2013 07:26:34 -0700
+Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
+In-Reply-To: <87mwpuakod.fsf@linaro.org>
+References: <B5906170F1614E41A8A28DE3B8D121433EE93C23@DBDE04.ent.ti.com>
+ <20130705115959.GQ5523@atomide.com>
+ <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
+ <20130708112553.GU5523@atomide.com> <51DAB394.3050104@ti.com>
+ <20130708131033.GA5523@atomide.com> <51DABC81.3080409@ti.com>
+ <20130708133512.GD31221@arwen.pp.htv.fi>
+ <87mwpuakod.fsf@linaro.org>
+Message-ID: <20130710142633.GV5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 8:24 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Wed, Jul 10, 2013 at 04:19:46PM +0800, Haojian Zhuang wrote:
->> On Tue, Jul 9, 2013 at 8:49 PM, Jason Cooper <jason@lakedaemon.net> wrote:
->> > Neil,
->> >
->> > On Tue, Jul 09, 2013 at 02:42:44PM +0800, Neil Zhang wrote:
->> >> The documented vendor prefix for Marvell is 'marvell', not 'mrvl', so
->> >> let's change it.
->> >>
->> >> Signed-off-by: Neil Zhang <zhangwm@marvell.com>
->> >> ---
->> >>  .../devicetree/bindings/arm/mrvl/intc.txt          |   16 +++---
->> >>  .../devicetree/bindings/arm/mrvl/mrvl.txt          |    6 +-
->> >>  .../devicetree/bindings/arm/mrvl/timer.txt         |    4 +-
->> >>  Documentation/devicetree/bindings/i2c/i2c-pxa.txt  |   14 +++---
->> >>  .../devicetree/bindings/mmc/sdhci-pxa.txt          |    8 ++--
->> >>  .../devicetree/bindings/rtc/sa1100-rtc.txt         |    4 +-
->> >>  .../devicetree/bindings/serial/mrvl-serial.txt     |    2 +-
->> >>  arch/arm/boot/dts/mmp2-brownstone.dts              |    2 +-
->> >>  arch/arm/boot/dts/mmp2.dtsi                        |   56 ++++++++++----------
->> >>  arch/arm/boot/dts/pxa168-aspenite.dts              |    2 +-
->> >>  arch/arm/boot/dts/pxa168.dtsi                      |   24 ++++----
->> >>  arch/arm/boot/dts/pxa2xx.dtsi                      |   16 +++---
->> >>  arch/arm/boot/dts/pxa3xx.dtsi                      |    2 +-
->> >>  arch/arm/boot/dts/pxa910-dkb.dts                   |    2 +-
->> >>  arch/arm/boot/dts/pxa910.dtsi                      |   27 +++++-----
->> >>  arch/arm/mach-mmp/irq.c                            |   16 +++---
->> >>  arch/arm/mach-mmp/mmp-dt.c                         |   28 +++++-----
->> >>  arch/arm/mach-mmp/mmp2-dt.c                        |   16 +++---
->> >>  arch/arm/mach-mmp/time.c                           |    2 +-
->> >>  arch/arm/mach-pxa/pxa-dt.c                         |   14 +++---
->> >>  drivers/i2c/busses/i2c-pxa.c                       |   10 ++--
->> >>  drivers/mmc/host/sdhci-pxav2.c                     |    4 +-
->> >>  drivers/mmc/host/sdhci-pxav3.c                     |    4 +-
->> >>  drivers/rtc/rtc-sa1100.c                           |    4 +-
->> >>  drivers/tty/serial/pxa.c                           |    4 +-
->> >>  25 files changed, 144 insertions(+), 143 deletions(-)
->> >
->> > I agree with the need to change, however, this has been in the binding
->> > documentation since v3.5.  I wish we had caught this when we decided
->> > against using stock ticker symbols (not all stock markets use
->> > alphabetical abbreviated names, not all companies are listed on any
->> > stock exchange).
->> >
->> > To do this properly, the drivers are going to have to be compatible with
->> > the old and the new names, and the binding docs updated to reflect the
->> > legacy name and the preferred name.
->> >
->>
->> It's better to only use the new names.
->
-> In the dts{i}, yes.  But we don't want to break systems in the field
-> with "mrvl,..." compatible strings.  Therefore, at least the drivers
-> need an extra compatible string to support "mrvl,...".
->
-> If it had just been since v3.9, it'd be different/simpler.  However,
-> several vendors have opted to use kernels newer than v3.5, which makes
-> this scenario a real possibility.
->
-> thx,
->
-> Jason.
+* Kevin Hilman <khilman@linaro.org> [130710 01:29]:
+> Felipe Balbi <balbi@ti.com> writes:
+> >> 
+> >> Right, but calling serial_omap_restore_context() even when the context
+> >> is not lost, should not ideally cause an issue.
+> >
+> > it does in one condition. If context hasn't been saved before. And that
+> > can happen in the case of wrong pm runtime status for that device.
+> >
+> > Imagine the device is marked as suspended even though it's fully enabled
+> > (it hasn't been suspended by hwmod due to NO_IDLE flag). In that case
+> > your context structure is all zeroes (context has never been saved
+> > before) then when you call pm_runtime_get_sync() on probe() your
+> > ->runtime_resume() will get called, which will restore context,
+> > essentially undoing anything which was configured by u-boot.
+> >
+> > Am I missing something ?
+> 
+> You're right, the _set_active() is crucial in the case when we prevent
+> the console UART from idling during boot (though that shouldn't be
+> happening in mainline unless the fix for "Issue 1" is done.)
 
-Is there any vendor using DT for this Marvell chip? I think the answer is no.
-Only Marvell guys are still moving to DT. They didn't deliver their kernel
-as reference. So there's no problem on this.
+Felipe is right, looks like all we need is to check if context is
+initialized or not. So no need for mach-omap2/serial.c or hwmod tinkering.
 
-Regards
-Haojian
+After that having DEBUG_LL and cmdline with earlyprintk console=ttyO..
+works for me. We could also check for some combination of the context
+save registers being NULL if somebody has a good idea which ones
+should never be 0.
+
+Regards,
+
+Tony
+
+
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -161,6 +161,7 @@ struct uart_omap_port {
+ 	u32			calc_latency;
+ 	struct work_struct	qos_work;
+ 	struct pinctrl		*pins;
++	bool			initialized;
+ 	bool			is_suspending;
+ };
+ 
+@@ -1523,6 +1524,8 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 
+ 	pm_runtime_mark_last_busy(up->dev);
+ 	pm_runtime_put_autosuspend(up->dev);
++	up->initialized = true;
++
+ 	return 0;
+ 
+ err_add_port:
+@@ -1584,6 +1587,9 @@ static void serial_omap_mdr1_errataset(struct uart_omap_port *up, u8 mdr1)
+ #ifdef CONFIG_PM_RUNTIME
+ static void serial_omap_restore_context(struct uart_omap_port *up)
+ {
++	if (!up->initialized)
++		return;
++
+ 	if (up->errata & UART_ERRATA_i202_MDR1_ACCESS)
+ 		serial_omap_mdr1_errataset(up, UART_OMAP_MDR1_DISABLE);
+ 	else
