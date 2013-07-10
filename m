@@ -1,59 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Jul 2013 19:52:00 +0100
-Subject: Seg fault occurs when running statically compiled binary from
- kernel using call_usermodehelper
-In-Reply-To: <20130710163410.GA30514@mudshark.cambridge.arm.com>
-References: <CAOiN93mGTu9w9rVNCrbbH1sccXY9VJhaCmg+dS7Rk9mMgKHBaA@mail.gmail.com>
- <CAOiN93=Nx77RkbNuEJMV617MjV5+GmorF0G3vyLy1SwQcuCs+g@mail.gmail.com>
- <CAOiN93nH9fyHoz4yrZmJ-OKCy6ogdt5bYartXCBgP5eHMUBPdw@mail.gmail.com>
- <20130710163410.GA30514@mudshark.cambridge.arm.com>
-Message-ID: <20130710185200.GX24642@n2100.arm.linux.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 10 Jul 2013 15:04:08 -0400 (EDT)
+Subject: [PATCH 6/6] USB: ehci-omap: Implement suspend/resume
+In-Reply-To: <1373473405-27589-1-git-send-email-rogerq@ti.com>
+Message-ID: <Pine.LNX.4.44L0.1307101446270.1215-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 05:34:11PM +0100, Will Deacon wrote:
-> Ok, I've finally got to the bottom of this, but I'm not sure on the best way
-> to fix it.
+On Wed, 10 Jul 2013, Roger Quadros wrote:
 
-I don't think you have!  You need to look back at the older ARM kernels
-to really get to the bottom of this...
-
-> The issue is that libc expects r0 to contain a function pointer
-> to be invoked at exit (rtld_fini), to clean up after a dynamic linker. If
-> this pointer is NULL, then it is ignored. We actually zero this pointer in
-> our ELF_PLAT_INIT macro.
+> Call ehci_suspend/resume() during runtime suspend/resume
+> as well as system suspend/resume.
 > 
-> At the same time, we have this strange code called next from the ARM ELF
-> loader:
+> Use a flag "bound" to indicate that the HCD structures are valid.
+> This is only true between usb_add_hcd() and usb_remove_hcd() calls.
 > 
-> 	regs->ARM_r2 = stack[2];	/* r2 (envp) */			\
-> 	regs->ARM_r1 = stack[1];	/* r1 (argv) */			\
-> 	regs->ARM_r0 = stack[0];	/* r0 (argc) */			\
-> 
-> which puts argc into r0.
+> The flag can be used by omap_ehci_runtime_suspend/resume() handlers
+> to avoid calling ehci_suspend/resume() when we are no longer bound
+> to the HCD e.g. during probe() and remove();
 
-You're sort of right.  It dates from the days when we had a.out binaries,
-those required argc, argv and envp in r0/r1/r2 - and ARM kernels carried
-this hack in  binfmt_aout.c to make it work in conjunction with the above:
+> @@ -293,15 +301,67 @@ static const struct of_device_id omap_ehci_dt_ids[] = {
+>  
+>  MODULE_DEVICE_TABLE(of, omap_ehci_dt_ids);
+>  
+> +static int omap_ehci_suspend(struct device *dev)
+> +{
+> +	struct usb_hcd *hcd = dev_get_drvdata(dev);
+> +
+> +	dev_dbg(dev, "%s\n", __func__);
+> +
+> +	return ehci_suspend(hcd, true);
+> +}
+> +
+> +static int omap_ehci_resume(struct device *dev)
+> +{
+> +	struct usb_hcd *hcd = dev_get_drvdata(dev);
+> +
+> +	dev_dbg(dev, "%s\n", __func__);
+> +
+> +	return ehci_resume(hcd, false);
+> +}
 
-static int load_aout_binary(struct linux_binprm * bprm)
-{
-...
-        start_thread(regs, ex.a_entry, current->mm->start_stack);
-#ifndef __arm__
-        return 0;
-#else
-        return regs->ARM_r0;
-#endif
-}
+There are three problems here.  The first is very simple: the wakeup 
+settings are messed up.  Wakeup is supposed to be enabled always for
+runtime suspend, whereas it is controlled by device_may_wakeup() for
+system suspend.  You reversed them.
 
-ELF, on the other hand, never had that hack - ELF has always been zero
-in r0, and it's always retrieved the argc/argv/envp off the stack.
+The other two problems are both related to the interaction between
+system PM and runtime PM.  Suppose the controller is already runtime
+suspended when the system goes to sleep.  Because it is runtime
+suspended, it is enabled for wakeup.  But device_may_wakeup() could
+return false; if this happens then you have to do a runtime-resume in
+omap_ehci_suspend() before calling ehci_suspend(), so that the
+controller can be suspended again with wakeups disabled.  (Or you could
+choose an alternative method for accomplishing the same result, such as
+disabling the wakeup signal from the pad without going through a whole
+EHCI resume/suspend cycle.)  Conversely, if device_may_wakeup() returns
+true then you shouldn't do anything at all, because the controller is
+already suspended with the correct wakeup setting.
 
-As the above hack got dropped from the kernel (I don't think it ever made
-it into mainline), I think we should be safe getting rid of this
-initialization of regs->ARM_r0 to r2, leaving them all as zeros.
+For the third problem, suppose the controller was runtime suspended
+when the system went to sleep.  When the system wakes up, the
+controller will become active, so you have to inform the runtime PM
+core about its change of state.  Basically, if omap_ehci_resume() sees
+that ehci_resume() returned 0 then it must do:
 
-We should probably also remove the selection of HAVE_AOUT from
-arch/arm/Kconfig too as this definitely won't work with any recent
-kernel (certainly not without binfmt_aout.c hacked in the above way.)
+	pm_runtime_disable(dev);
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
+
+All of these issues are discussed (among lots of other material) in 
+Documentation/power/runtime_pm.txt.
+
+Alan Stern
