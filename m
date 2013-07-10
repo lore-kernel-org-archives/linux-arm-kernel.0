@@ -1,28 +1,36 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Wed, 10 Jul 2013 22:29:13 +0530
-Subject: [PATCH v2 1/6] clk: samsung: move common plls registration into
- separate function
-In-Reply-To: <201307100057.48265.heiko@sntech.de>
-References: <201307100057.06061.heiko@sntech.de>
- <201307100057.48265.heiko@sntech.de>
-Message-ID: <CAKew6eUPBUZj4TuhNAjp6NitFUaeFBZscr_jqU3Y_wLi1m7Ekg@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 10 Jul 2013 14:06:49 -0300
+Subject: imx25: How to get frame buffer device in a system using device
+ tree
+In-Reply-To: <CAO8h3eGhF8DRO73W9GkepUKAF-6v1EmWdMS_Gq+dA_2v5mJ2aQ@mail.gmail.com>
+References: <CAO8h3eFq9WhvZYbbeFfWgVEXViR8MAcGaztsvvaLpFSW-W6CfA@mail.gmail.com>
+ <CAOMZO5Aat-iAN_TJ6BXEopB+WCkKgLjWh67sCXg0jd1DtzmKSQ@mail.gmail.com>
+ <CAO8h3eHAfV808izZzvpPc+z6iQPr14q8OmryNs5sC+VcNk+iLg@mail.gmail.com>
+ <CAOMZO5CgAs+hR41=WdJ=jxS5gZf=opOrCXufixBh_CMP0n2TFA@mail.gmail.com>
+ <CAO8h3eGhF8DRO73W9GkepUKAF-6v1EmWdMS_Gq+dA_2v5mJ2aQ@mail.gmail.com>
+Message-ID: <CAOMZO5CrZjDZjqaaQTX4=ZGO_6chFMr9qAHhqyVGBdxBvimYSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hi Matthias,
 
-On Wed, Jul 10, 2013 at 4:27 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> All Samsung PLLs use similar code to register the clocks and clkdev lookups.
-> Therefore move these into a separate function to reduce code duplication.
+On Mon, Jul 8, 2013 at 3:31 AM, Matthias Wei?er <m.weisser.m@gmail.com> wrote:
+> Hi Fabio
 >
-> Suggested-by: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
+> 2013/7/5 Fabio Estevam <festevam@gmail.com>:
+>> Hi Matthias,
+>>
+>> On Fri, Jul 5, 2013 at 4:37 AM, Matthias Wei?er <m.weisser.m@gmail.com> wrote:
+>>
+>>> Thanks for the links. That made some things clearer for me. But I am
+>>> still a bit confused about the driver (imxfb.c) itself. From what I
+>>> can see it is not dt aware as there is no of_device_id structure with
+>>> the compatible entries. I think I have to add dt support to the
+>>> framebuffer driver. Am I right?
+>>
+>> Yes, you need to apply this one:
+>> http://marc.info/?l=linux-fbdev&m=136956466617736&w=2
+>
+> OK. Done that and it works like a charm. Thanks a lot.
 
-I have posted patch for adding common pll registration function
-which some how missed to get merged. I hope will get merged after rc1.
-Please give a look at that :
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg19543.html
-
-Regards,
-Yadwinder
+Great, care to submit patches for adding mx25 fb support?
