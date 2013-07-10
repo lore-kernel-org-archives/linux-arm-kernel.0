@@ -1,78 +1,46 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 10 Jul 2013 10:10:14 -0300
-Subject: [PATCH v2 2/2] ARM: imx: Select MIGHT_HAVE_CACHE_L2X0
-In-Reply-To: <1373461814-8844-1-git-send-email-fabio.estevam@freescale.com>
-References: <1373461814-8844-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1373461814-8844-2-git-send-email-fabio.estevam@freescale.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 10 Jul 2013 16:14:21 +0300
+Subject: [PATCH 0/4] pinctrl single support for SoC specific features
+In-Reply-To: <20130710122417.GT5523@atomide.com>
+References: <20130607203936.16513.57494.stgit@localhost>
+ <51DD4F30.7050603@ti.com> <20130710122417.GT5523@atomide.com>
+Message-ID: <51DD5E2D.50504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select MIGHT_HAVE_CACHE_L2X0 for mx31/35/51/53/6q/6sl/vf610
+On 07/10/2013 03:24 PM, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [130710 05:16]:
+>> Hi Tony,
+>>
+>> On 06/07/2013 11:50 PM, Tony Lindgren wrote:
+>>> Hi all,
+>>>
+>>> Here are few patches to add support for SoC specific features
+>>> to pinctrl-single. This is needed at least for omaps to support
+>>> IO chain wake-up events from deeper idle states.
+>>>
+>>> With this patch series, device drivers can request named pinctrl
+>>> states like active and idle from the PM runtime suspend and resume
+>>> calls to set the wake enable bits for selected pins. Further
+>>> the device driver can toggle the wake-up feature as needed based on
+>>> the device_may_wakeup() state set by the standard sysfs
+>>> power/wakeup entry.
+>>>
+>>> This is implemented in a separate pinctrl-single-omap driver that
+>>> works together with pinctrl-single. This way the SoC specific
+>>> are separated from the common pinctrl-single, and allows a relatively
+>>> easy way to implement SoC specific things like wake-up events,
+>>> pin interrupts, and GPIO.
+>>
+>> What's the status of this? Would be nice to get it in 3.12. I'm basing
+>> the OMAP USB host wakeup support on this.
+> 
+> How about I'll push an immutable branch against v3.11-rc1 when it's
+> tagged and send a pull request to Linus W for the first three patches?
+> 
+> That way we can base other branches on this if needed.
 
-By selecting MIGHT_HAVE_CACHE_L2X0, the user still has the possibility to 
-disable CACHE_L2X0 selection via menuconfig.
+Looks good to me. Thanks.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Use MIGHT_HAVE_CACHE_L2X0 instead of CACHE_L2X0, to allow users to still
-disable L2 cache via menuconfig if they want to
-- Also select L2 cache for vf610
-
- arch/arm/mach-imx/Kconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index f546560..cc6961d 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -125,6 +125,7 @@ config SOC_IMX31
- 	select COMMON_CLK
- 	select CPU_V6
- 	select IMX_HAVE_PLATFORM_MXC_RNGA
-+	select MIGHT_HAVE_CACHE_L2X0
- 	select MXC_AVIC
- 	select SMP_ON_UP if SMP
- 
-@@ -134,6 +135,7 @@ config SOC_IMX35
- 	select COMMON_CLK
- 	select CPU_V6K
- 	select HAVE_EPIT
-+	select MIGHT_HAVE_CACHE_L2X0
- 	select MXC_AVIC
- 	select SMP_ON_UP if SMP
- 
-@@ -144,6 +146,7 @@ config SOC_IMX5
- 	select ARCH_MXC_IOMUX_V3
- 	select COMMON_CLK
- 	select CPU_V7
-+	select MIGHT_HAVE_CACHE_L2X0
- 	select MXC_TZIC
- 
- config	SOC_IMX51
-@@ -799,6 +802,7 @@ config SOC_IMX6Q
- 	select HAVE_IMX_MMDC
- 	select HAVE_IMX_SRC
- 	select HAVE_SMP
-+	select MIGHT_HAVE_CACHE_L2X0
- 	select MFD_SYSCON
- 	select PINCTRL
- 	select PINCTRL_IMX6Q
-@@ -820,6 +824,7 @@ config SOC_IMX6SL
- 	select HAVE_IMX_GPC
- 	select HAVE_IMX_MMDC
- 	select HAVE_IMX_SRC
-+	select MIGHT_HAVE_CACHE_L2X0
- 	select MFD_SYSCON
- 	select PINCTRL
- 	select PINCTRL_IMX6SL
-@@ -835,6 +840,7 @@ config SOC_VF610
- 	select CPU_V7
- 	select ARM_GIC
- 	select CLKSRC_OF
-+	select MIGHT_HAVE_CACHE_L2X0
- 	select PINCTRL
- 	select PINCTRL_VF610
- 	select VF_PIT_TIMER
--- 
-1.8.1.2
+cheers,
+-roger
