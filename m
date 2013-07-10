@@ -1,168 +1,195 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 10 Jul 2013 23:22:02 +0800
-Subject: [PATCH 3/3] ARM: imx6: change some clocks to fixup clocks
+Date: Wed, 10 Jul 2013 23:22:00 +0800
+Subject: [PATCH 1/3] ARM: imx: add common clock support for fixup div
 In-Reply-To: <1373469722-32514-1-git-send-email-shawn.guo@linaro.org>
 References: <1373469722-32514-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1373469722-32514-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1373469722-32514-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Liu Ying <Ying.Liu@freescale.com>
 
-All the clocks controlled by the register 'CCM Serial Clock
-Multiplexer Register 1' should be fixup clocks. This patch
-changes those clocks from basic multiplexer or divider clocks
-to fixup clocks.
+One register may have several fields to control some clocks. It
+is possible that the read/write values of some fields may map to
+different real functional values, so writing to the other fields
+in the same register may break a working clock tree. A real case
+is the aclk_podf field in the register 'CCM Serial Clock Multiplexer
+Register 1' of i.MX6Q/SDL SoC. This patch introduces a fixup hook
+for divider clock which is called before writing a value to clock
+registers to support this kind of divider clocks.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/clk-imx6q.c  |   24 ++++++++++++------------
- arch/arm/mach-imx/clk-imx6sl.c |   20 ++++++++++----------
- arch/arm/mach-imx/clk.c        |   26 ++++++++++++++++++++++++++
- arch/arm/mach-imx/clk.h        |    2 ++
- 4 files changed, 50 insertions(+), 22 deletions(-)
+ arch/arm/mach-imx/Makefile        |    3 +-
+ arch/arm/mach-imx/clk-fixup-div.c |  129 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/clk.h           |    4 ++
+ 3 files changed, 135 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-imx/clk-fixup-div.c
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 82a85ce..db9f8f5 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -384,16 +384,16 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[ipu2_di1_sel]     = imx_clk_mux("ipu2_di1_sel",     base + 0x38, 9,  3, ipu2_di1_sels,     ARRAY_SIZE(ipu2_di1_sels));
- 	clk[hsi_tx_sel]       = imx_clk_mux("hsi_tx_sel",       base + 0x30, 28, 1, hsi_tx_sels,       ARRAY_SIZE(hsi_tx_sels));
- 	clk[pcie_axi_sel]     = imx_clk_mux("pcie_axi_sel",     base + 0x18, 10, 1, pcie_axi_sels,     ARRAY_SIZE(pcie_axi_sels));
--	clk[ssi1_sel]         = imx_clk_mux("ssi1_sel",         base + 0x1c, 10, 2, ssi_sels,          ARRAY_SIZE(ssi_sels));
--	clk[ssi2_sel]         = imx_clk_mux("ssi2_sel",         base + 0x1c, 12, 2, ssi_sels,          ARRAY_SIZE(ssi_sels));
--	clk[ssi3_sel]         = imx_clk_mux("ssi3_sel",         base + 0x1c, 14, 2, ssi_sels,          ARRAY_SIZE(ssi_sels));
--	clk[usdhc1_sel]       = imx_clk_mux("usdhc1_sel",       base + 0x1c, 16, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
--	clk[usdhc2_sel]       = imx_clk_mux("usdhc2_sel",       base + 0x1c, 17, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
--	clk[usdhc3_sel]       = imx_clk_mux("usdhc3_sel",       base + 0x1c, 18, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
--	clk[usdhc4_sel]       = imx_clk_mux("usdhc4_sel",       base + 0x1c, 19, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
-+	clk[ssi1_sel]         = imx_clk_fixup_mux("ssi1_sel",   base + 0x1c, 10, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),          imx_cscmr1_fixup);
-+	clk[ssi2_sel]         = imx_clk_fixup_mux("ssi2_sel",   base + 0x1c, 12, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),          imx_cscmr1_fixup);
-+	clk[ssi3_sel]         = imx_clk_fixup_mux("ssi3_sel",   base + 0x1c, 14, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),          imx_cscmr1_fixup);
-+	clk[usdhc1_sel]       = imx_clk_fixup_mux("usdhc1_sel", base + 0x1c, 16, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels),        imx_cscmr1_fixup);
-+	clk[usdhc2_sel]       = imx_clk_fixup_mux("usdhc2_sel", base + 0x1c, 17, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels),        imx_cscmr1_fixup);
-+	clk[usdhc3_sel]       = imx_clk_fixup_mux("usdhc3_sel", base + 0x1c, 18, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels),        imx_cscmr1_fixup);
-+	clk[usdhc4_sel]       = imx_clk_fixup_mux("usdhc4_sel", base + 0x1c, 19, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels),        imx_cscmr1_fixup);
- 	clk[enfc_sel]         = imx_clk_mux("enfc_sel",         base + 0x2c, 16, 2, enfc_sels,         ARRAY_SIZE(enfc_sels));
--	clk[emi_sel]          = imx_clk_mux("emi_sel",          base + 0x1c, 27, 2, emi_sels,          ARRAY_SIZE(emi_sels));
--	clk[emi_slow_sel]     = imx_clk_mux("emi_slow_sel",     base + 0x1c, 29, 2, emi_slow_sels,     ARRAY_SIZE(emi_slow_sels));
-+	clk[emi_sel]          = imx_clk_fixup_mux("emi_sel",      base + 0x1c, 27, 2, emi_sels,        ARRAY_SIZE(emi_sels),          imx_cscmr1_fixup);
-+	clk[emi_slow_sel]     = imx_clk_fixup_mux("emi_slow_sel", base + 0x1c, 29, 2, emi_slow_sels,   ARRAY_SIZE(emi_slow_sels),     imx_cscmr1_fixup);
- 	clk[vdo_axi_sel]      = imx_clk_mux("vdo_axi_sel",      base + 0x18, 11, 1, vdo_axi_sels,      ARRAY_SIZE(vdo_axi_sels));
- 	clk[vpu_axi_sel]      = imx_clk_mux("vpu_axi_sel",      base + 0x18, 14, 2, vpu_axi_sels,      ARRAY_SIZE(vpu_axi_sels));
- 	clk[cko1_sel]         = imx_clk_mux("cko1_sel",         base + 0x60, 0,  4, cko1_sels,         ARRAY_SIZE(cko1_sels));
-@@ -406,7 +406,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[periph_clk2]      = imx_clk_divider("periph_clk2",      "periph_clk2_sel",   base + 0x14, 27, 3);
- 	clk[periph2_clk2]     = imx_clk_divider("periph2_clk2",     "periph2_clk2_sel",  base + 0x14, 0,  3);
- 	clk[ipg]              = imx_clk_divider("ipg",              "ahb",               base + 0x14, 8,  2);
--	clk[ipg_per]          = imx_clk_divider("ipg_per",          "ipg",               base + 0x1c, 0,  6);
-+	clk[ipg_per]          = imx_clk_fixup_divider("ipg_per",    "ipg",               base + 0x1c, 0,  6, imx_cscmr1_fixup);
- 	clk[esai_pred]        = imx_clk_divider("esai_pred",        "esai_sel",          base + 0x28, 9,  3);
- 	clk[esai_podf]        = imx_clk_divider("esai_podf",        "esai_pred",         base + 0x28, 25, 3);
- 	clk[asrc_pred]        = imx_clk_divider("asrc_pred",        "asrc_sel",          base + 0x30, 12, 3);
-@@ -442,8 +442,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[usdhc4_podf]      = imx_clk_divider("usdhc4_podf",      "usdhc4_sel",        base + 0x24, 22, 3);
- 	clk[enfc_pred]        = imx_clk_divider("enfc_pred",        "enfc_sel",          base + 0x2c, 18, 3);
- 	clk[enfc_podf]        = imx_clk_divider("enfc_podf",        "enfc_pred",         base + 0x2c, 21, 6);
--	clk[emi_podf]         = imx_clk_divider("emi_podf",         "emi_sel",           base + 0x1c, 20, 3);
--	clk[emi_slow_podf]    = imx_clk_divider("emi_slow_podf",    "emi_slow_sel",      base + 0x1c, 23, 3);
-+	clk[emi_podf]         = imx_clk_fixup_divider("emi_podf",   "emi_sel",           base + 0x1c, 20, 3, imx_cscmr1_fixup);
-+	clk[emi_slow_podf]    = imx_clk_fixup_divider("emi_slow_podf", "emi_slow_sel",   base + 0x1c, 23, 3, imx_cscmr1_fixup);
- 	clk[vpu_axi_podf]     = imx_clk_divider("vpu_axi_podf",     "vpu_axi_sel",       base + 0x24, 25, 3);
- 	clk[cko1_podf]        = imx_clk_divider("cko1_podf",        "cko1_sel",          base + 0x60, 4,  3);
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index e20f22d..92b91a2 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -15,7 +15,8 @@ imx5-pm-$(CONFIG_PM) += pm-imx5.o
+ obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clk-imx51-imx53.o ehci-imx5.o $(imx5-pm-y)
  
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index a307ac2..a5c3c5d 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -138,14 +138,14 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SL_CLK_PERIPH_CLK2_SEL]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 2, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
- 	clks[IMX6SL_CLK_CSI_SEL]          = imx_clk_mux("csi_sel",          base + 0x3c, 9,  2, csi_lcdif_sels,    ARRAY_SIZE(csi_lcdif_sels));
- 	clks[IMX6SL_CLK_LCDIF_AXI_SEL]    = imx_clk_mux("lcdif_axi_sel",    base + 0x3c, 14, 2, csi_lcdif_sels,    ARRAY_SIZE(csi_lcdif_sels));
--	clks[IMX6SL_CLK_USDHC1_SEL]       = imx_clk_mux("usdhc1_sel",       base + 0x1c, 16, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
--	clks[IMX6SL_CLK_USDHC2_SEL]       = imx_clk_mux("usdhc2_sel",       base + 0x1c, 17, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
--	clks[IMX6SL_CLK_USDHC3_SEL]       = imx_clk_mux("usdhc3_sel",       base + 0x1c, 18, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
--	clks[IMX6SL_CLK_USDHC4_SEL]       = imx_clk_mux("usdhc4_sel",       base + 0x1c, 19, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
--	clks[IMX6SL_CLK_SSI1_SEL]         = imx_clk_mux("ssi1_sel",         base + 0x1c, 10, 2, ssi_sels,          ARRAY_SIZE(ssi_sels));
--	clks[IMX6SL_CLK_SSI2_SEL]         = imx_clk_mux("ssi2_sel",         base + 0x1c, 12, 2, ssi_sels,          ARRAY_SIZE(ssi_sels));
--	clks[IMX6SL_CLK_SSI3_SEL]         = imx_clk_mux("ssi3_sel",         base + 0x1c, 14, 2, ssi_sels,          ARRAY_SIZE(ssi_sels));
--	clks[IMX6SL_CLK_PERCLK_SEL]       = imx_clk_mux("perclk_sel",       base + 0x1c, 6,  1, perclk_sels,       ARRAY_SIZE(perclk_sels));
-+	clks[IMX6SL_CLK_USDHC1_SEL]       = imx_clk_fixup_mux("usdhc1_sel", base + 0x1c, 16, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels),  imx_cscmr1_fixup);
-+	clks[IMX6SL_CLK_USDHC2_SEL]       = imx_clk_fixup_mux("usdhc2_sel", base + 0x1c, 17, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels),  imx_cscmr1_fixup);
-+	clks[IMX6SL_CLK_USDHC3_SEL]       = imx_clk_fixup_mux("usdhc3_sel", base + 0x1c, 18, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels),  imx_cscmr1_fixup);
-+	clks[IMX6SL_CLK_USDHC4_SEL]       = imx_clk_fixup_mux("usdhc4_sel", base + 0x1c, 19, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels),  imx_cscmr1_fixup);
-+	clks[IMX6SL_CLK_SSI1_SEL]         = imx_clk_fixup_mux("ssi1_sel",   base + 0x1c, 10, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),    imx_cscmr1_fixup);
-+	clks[IMX6SL_CLK_SSI2_SEL]         = imx_clk_fixup_mux("ssi2_sel",   base + 0x1c, 12, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),    imx_cscmr1_fixup);
-+	clks[IMX6SL_CLK_SSI3_SEL]         = imx_clk_fixup_mux("ssi3_sel",   base + 0x1c, 14, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),    imx_cscmr1_fixup);
-+	clks[IMX6SL_CLK_PERCLK_SEL]       = imx_clk_fixup_mux("perclk_sel", base + 0x1c, 6,  1, perclk_sels,       ARRAY_SIZE(perclk_sels), imx_cscmr1_fixup);
- 	clks[IMX6SL_CLK_PXP_AXI_SEL]      = imx_clk_mux("pxp_axi_sel",      base + 0x34, 6,  3, epdc_pxp_sels,     ARRAY_SIZE(epdc_pxp_sels));
- 	clks[IMX6SL_CLK_EPDC_AXI_SEL]     = imx_clk_mux("epdc_axi_sel",     base + 0x34, 15, 3, epdc_pxp_sels,     ARRAY_SIZE(epdc_pxp_sels));
- 	clks[IMX6SL_CLK_GPU2D_OVG_SEL]    = imx_clk_mux("gpu2d_ovg_sel",    base + 0x18, 4,  2, gpu2d_ovg_sels,    ARRAY_SIZE(gpu2d_ovg_sels));
-@@ -179,14 +179,14 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SL_CLK_SSI2_PODF]         = imx_clk_divider("ssi2_podf",         "ssi2_pred",         base + 0x2c, 0,  6);
- 	clks[IMX6SL_CLK_SSI3_PRED]         = imx_clk_divider("ssi3_pred",         "ssi3_sel",          base + 0x28, 22, 3);
- 	clks[IMX6SL_CLK_SSI3_PODF]         = imx_clk_divider("ssi3_podf",         "ssi3_pred",         base + 0x28, 16, 6);
--	clks[IMX6SL_CLK_PERCLK]            = imx_clk_divider("perclk",            "perclk_sel",        base + 0x1c, 0,  6);
-+	clks[IMX6SL_CLK_PERCLK]            = imx_clk_fixup_divider("perclk",      "perclk_sel",        base + 0x1c, 0,  6, imx_cscmr1_fixup);
- 	clks[IMX6SL_CLK_PXP_AXI_PODF]      = imx_clk_divider("pxp_axi_podf",      "pxp_axi_sel",       base + 0x34, 3,  3);
- 	clks[IMX6SL_CLK_EPDC_AXI_PODF]     = imx_clk_divider("epdc_axi_podf",     "epdc_axi_sel",      base + 0x34, 12, 3);
- 	clks[IMX6SL_CLK_GPU2D_OVG_PODF]    = imx_clk_divider("gpu2d_ovg_podf",    "gpu2d_ovg_sel",     base + 0x18, 26, 3);
- 	clks[IMX6SL_CLK_GPU2D_PODF]        = imx_clk_divider("gpu2d_podf",        "gpu2d_sel",         base + 0x18, 29, 3);
- 	clks[IMX6SL_CLK_LCDIF_PIX_PRED]    = imx_clk_divider("lcdif_pix_pred",    "lcdif_pix_sel",     base + 0x38, 3,  3);
- 	clks[IMX6SL_CLK_EPDC_PIX_PRED]     = imx_clk_divider("epdc_pix_pred",     "epdc_pix_sel",      base + 0x38, 12, 3);
--	clks[IMX6SL_CLK_LCDIF_PIX_PODF]    = imx_clk_divider("lcdif_pix_podf",    "lcdif_pix_pred",    base + 0x1c, 20, 3);
-+	clks[IMX6SL_CLK_LCDIF_PIX_PODF]    = imx_clk_fixup_divider("lcdif_pix_podf", "lcdif_pix_pred", base + 0x1c, 20, 3, imx_cscmr1_fixup);
- 	clks[IMX6SL_CLK_EPDC_PIX_PODF]     = imx_clk_divider("epdc_pix_podf",     "epdc_pix_pred",     base + 0x18, 23, 3);
- 	clks[IMX6SL_CLK_SPDIF0_PRED]       = imx_clk_divider("spdif0_pred",       "spdif0_sel",        base + 0x30, 25, 3);
- 	clks[IMX6SL_CLK_SPDIF0_PODF]       = imx_clk_divider("spdif0_podf",       "spdif0_pred",       base + 0x30, 22, 3);
-diff --git a/arch/arm/mach-imx/clk.c b/arch/arm/mach-imx/clk.c
-index 55bc80a..edc35df 100644
---- a/arch/arm/mach-imx/clk.c
-+++ b/arch/arm/mach-imx/clk.c
-@@ -37,3 +37,29 @@ struct clk * __init imx_obtain_fixed_clock(
- 		clk = imx_clk_fixed(name, rate);
- 	return clk;
- }
-+
+ obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
+-			    clk-pfd.o clk-busy.o clk.o
++			    clk-pfd.o clk-busy.o clk.o \
++			    clk-fixup-div.o
+ 
+ obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
+ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
+diff --git a/arch/arm/mach-imx/clk-fixup-div.c b/arch/arm/mach-imx/clk-fixup-div.c
+new file mode 100644
+index 0000000..21db020
+--- /dev/null
++++ b/arch/arm/mach-imx/clk-fixup-div.c
+@@ -0,0 +1,129 @@
 +/*
-+ * This fixups the register CCM_CSCMR1 write value.
-+ * The write/read/divider values of the aclk_podf field
-+ * of that register have the relationship described by
-+ * the following table:
++ * Copyright (C) 2013 Freescale Semiconductor, Inc.
 + *
-+ * write value       read value        divider
-+ * 3b'000            3b'110            7
-+ * 3b'001            3b'111            8
-+ * 3b'010            3b'100            5
-+ * 3b'011            3b'101            6
-+ * 3b'100            3b'010            3
-+ * 3b'101            3b'011            4
-+ * 3b'110            3b'000            1
-+ * 3b'111            3b'001            2(default)
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
 + *
-+ * That's why we do the xor operation below.
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
 + */
-+#define CSCMR1_FIXUP	0x00600000
 +
-+void imx_cscmr1_fixup(u32 *val)
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include "clk.h"
++
++#define to_clk_div(_hw) container_of(_hw, struct clk_divider, hw)
++#define div_mask(d)	((1 << (d->width)) - 1)
++
++/**
++ * struct clk_fixup_div - imx integer fixup divider clock
++ * @divider: the parent class
++ * @ops: pointer to clk_ops of parent class
++ * @fixup: a hook to fixup the write value
++ *
++ * The imx fixup divider clock is a subclass of basic clk_divider
++ * with an addtional fixup hook.
++ */
++struct clk_fixup_div {
++	struct clk_divider divider;
++	const struct clk_ops *ops;
++	void (*fixup)(u32 *val);
++};
++
++static inline struct clk_fixup_div *to_clk_fixup_div(struct clk_hw *hw)
 +{
-+	*val ^= CSCMR1_FIXUP;
-+	return;
++	struct clk_divider *divider = to_clk_div(hw);
++
++	return container_of(divider, struct clk_fixup_div, divider);
++}
++
++static unsigned long clk_fixup_div_recalc_rate(struct clk_hw *hw,
++					 unsigned long parent_rate)
++{
++	struct clk_fixup_div *fixup_div = to_clk_fixup_div(hw);
++
++	return fixup_div->ops->recalc_rate(&fixup_div->divider.hw, parent_rate);
++}
++
++static long clk_fixup_div_round_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long *prate)
++{
++	struct clk_fixup_div *fixup_div = to_clk_fixup_div(hw);
++
++	return fixup_div->ops->round_rate(&fixup_div->divider.hw, rate, prate);
++}
++
++static int clk_fixup_div_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	struct clk_fixup_div *fixup_div = to_clk_fixup_div(hw);
++	struct clk_divider *div = to_clk_div(hw);
++	unsigned int divider, value;
++	unsigned long flags = 0;
++	u32 val;
++
++	divider = parent_rate / rate;
++
++	/* Zero based divider */
++	value = divider - 1;
++
++	if (value > div_mask(div))
++		value = div_mask(div);
++
++	spin_lock_irqsave(div->lock, flags);
++
++	val = readl(div->reg);
++	val &= ~(div_mask(div) << div->shift);
++	val |= value << div->shift;
++	fixup_div->fixup(&val);
++	writel(val, div->reg);
++
++	spin_unlock_irqrestore(div->lock, flags);
++
++	return 0;
++}
++
++static const struct clk_ops clk_fixup_div_ops = {
++	.recalc_rate = clk_fixup_div_recalc_rate,
++	.round_rate = clk_fixup_div_round_rate,
++	.set_rate = clk_fixup_div_set_rate,
++};
++
++struct clk *imx_clk_fixup_divider(const char *name, const char *parent,
++				  void __iomem *reg, u8 shift, u8 width,
++				  void (*fixup)(u32 *val))
++{
++	struct clk_fixup_div *fixup_div;
++	struct clk *clk;
++	struct clk_init_data init;
++
++	if (!fixup)
++		return ERR_PTR(-EINVAL);
++
++	fixup_div = kzalloc(sizeof(*fixup_div), GFP_KERNEL);
++	if (!fixup_div)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.ops = &clk_fixup_div_ops;
++	init.flags = CLK_SET_RATE_PARENT;
++	init.parent_names = parent ? &parent : NULL;
++	init.num_parents = parent ? 1 : 0;
++
++	fixup_div->divider.reg = reg;
++	fixup_div->divider.shift = shift;
++	fixup_div->divider.width = width;
++	fixup_div->divider.lock = &imx_ccm_lock;
++	fixup_div->divider.hw.init = &init;
++	fixup_div->ops = &clk_divider_ops;
++	fixup_div->fixup = fixup;
++
++	clk = clk_register(NULL, &fixup_div->divider.hw);
++	if (IS_ERR(clk))
++		kfree(fixup_div);
++
++	return clk;
 +}
 diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index 2534359..3451f1f 100644
+index 0e4e8bb..51eb3853 100644
 --- a/arch/arm/mach-imx/clk.h
 +++ b/arch/arm/mach-imx/clk.h
-@@ -6,6 +6,8 @@
+@@ -49,6 +49,10 @@ struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
+ 			     u8 width, void __iomem *busy_reg, u8 busy_shift,
+ 			     const char **parent_names, int num_parents);
  
- extern spinlock_t imx_ccm_lock;
- 
-+extern void imx_cscmr1_fixup(u32 *val);
++struct clk *imx_clk_fixup_divider(const char *name, const char *parent,
++				  void __iomem *reg, u8 shift, u8 width,
++				  void (*fixup)(u32 *val));
 +
- struct clk *imx_clk_pllv1(const char *name, const char *parent,
- 		void __iomem *base);
- 
+ static inline struct clk *imx_clk_fixed(const char *name, int rate)
+ {
+ 	return clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
 -- 
 1.7.9.5
