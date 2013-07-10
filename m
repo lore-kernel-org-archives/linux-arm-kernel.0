@@ -1,227 +1,86 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Wed, 10 Jul 2013 19:31:56 +0200
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <20130710185706.72b124a4@skate>
-References: <51DD88A4.1030506@keymile.com> <20130710185706.72b124a4@skate>
-Message-ID: <51DD9A8C.10608@keymile.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 10 Jul 2013 18:45:26 +0100
+Subject: [PATCH v2 1/2] ARM: OMAP: Add secure function omap_smc3() which
+ calling instruction smc #1
+In-Reply-To: <1373461145-9812-2-git-send-email-pali.rohar@gmail.com>
+References: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
+ <1373461145-9812-1-git-send-email-pali.rohar@gmail.com>
+ <1373461145-9812-2-git-send-email-pali.rohar@gmail.com>
+Message-ID: <20130710174521.GA2872@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Wed, Jul 10, 2013 at 02:59:04PM +0200, Pali Roh?r wrote:
+> Other secure functions omap_smc1() and omap_smc2() calling instruction smc #0
+> but Nokia RX-51 board needs to call smc #1 for PPA access.
+> 
+> Signed-off-by: Ivaylo Dimitrov <freemangordon@abv.bg>
+> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+> ---
+>  arch/arm/mach-omap2/omap-secure.h |    1 +
+>  arch/arm/mach-omap2/omap-smc.S    |   22 +++++++++++++++++++++-
+>  2 files changed, 22 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
+> index 0e72917..c4586f4 100644
+> --- a/arch/arm/mach-omap2/omap-secure.h
+> +++ b/arch/arm/mach-omap2/omap-secure.h
+> @@ -51,6 +51,7 @@
+>  extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
+>  				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
+>  extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
+> +extern u32 omap_smc3(u32 id, u32 process, u32 flag, u32 pargs);
+>  extern phys_addr_t omap_secure_ram_mempool_base(void);
+>  extern int omap_secure_ram_reserve_memblock(void);
+>  
+> diff --git a/arch/arm/mach-omap2/omap-smc.S b/arch/arm/mach-omap2/omap-smc.S
+> index f6441c1..5c02b8d 100644
+> --- a/arch/arm/mach-omap2/omap-smc.S
+> +++ b/arch/arm/mach-omap2/omap-smc.S
+> @@ -1,9 +1,11 @@
+>  /*
+> - * OMAP44xx secure APIs file.
+> + * OMAP34xx and OMAP44xx secure APIs file.
+>   *
+>   * Copyright (C) 2010 Texas Instruments, Inc.
+>   * Written by Santosh Shilimkar <santosh.shilimkar@ti.com>
+>   *
+> + * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
+> + * Copyright (C) 2013 Pali Roh?r <pali.rohar@gmail.com>
+>   *
+>   * This program is free software,you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> @@ -54,6 +56,24 @@ ENTRY(omap_smc2)
+>  	ldmfd   sp!, {r4-r12, pc}
+>  ENDPROC(omap_smc2)
+>  
+> +/**
+> + * u32 omap_smc3(u32 service_id, u32 process_id, u32 flag, u32 pargs)
+> + * Low level common routine for secure HAL and PPA APIs via smc #1
+> + * r0 - @service_id: Secure Service ID
+> + * r1 - @process_id: Process ID
+> + * r2 - @flag: Flag to indicate the criticality of operation
+> + * r3 - @pargs: Physical address of parameter list
+> + */
+> +ENTRY(omap_smc3)
+> +	stmfd	sp!, {r4-r12, lr}
 
-first of all thanks for your quick feedback.
+You don't need to save/restore r12.  The ABI allows it to be clobbered
+across function calls.
 
-On 07/10/2013 06:57 PM, Thomas Petazzoni wrote:
-> Gerlando,
->
-> On Wed, 10 Jul 2013 18:15:32 +0200, Gerlando Falauto wrote:
->
->> I am trying to use the pci-mvebu driver on one of our km_kirkwood
->> boards. The board is based on Marvell's 98dx4122, which should
->> essentially be 6281 compatible.
->
-> Was this platform working with the old PCIe driver in mach-kirkwood/ ?
+> +	mov	r12, r0		@ Copy the secure service ID
+> +	mov	r6, #0xff	@ Indicate new Task call
+> +	dsb
+> +	dmb
 
-Yes, though we had to trick it a little bit to get both the internal 
-switch and this PCIe device working:
+dsb synchronises a superset of what dmb synchronises, so the dmb here is
+not useful.
 
-- this PCIe device requires to map 256M of memory as opposed to just 128
-- we need a virtual PCIe device to connect to the internal switch, which 
-must be mapped at 0xf4000000 (normally used for the NAND which must then 
-move to 0xff000000)
+In any case, any code calling this must flush the region addressed by
+r3 beforehand anyway, which will include a dsb as part of its semantics
+-- this is how you call it from rx51_secure_dispatcher().
 
-But apart from the huge BAR (0x07ffffff aka 128M) for the PCIe device 
-not being mappable, the rest was normally working just fine even without 
-the above changes (i.e. the other BARs were mapped fine).
+So I think the dsb may not be needed here (?)
 
->
->> The code I took from jcooper's repo:
->>
->>     http://git.infradead.org/users/jcooper/linux.git
->>
->> I took the tag
->>
->>     dt-3.11-6
->>
->> on top of which I merged:
->>
->>     mvebu/pcie
->>     mvebu/pcie_bridge
->>     mvebu/pcie_kirkwood
->
-> Could you instead use the latest master from Linus tree? That would
-> avoid merge conflicts, and ensure you have all the necessary pieces.
-
-Oops, I had no idea all this had gotten merged already.
-Quite honestly, I have no idea how to track this kind of stuff (i.e. did 
-a given patch ever got merged and where?) but that's a different topic.
-
->> Only with the latest merge did I get some conflict on
->> kirkwood.dtsi:
->>
->> <<<<<<< HEAD
->> 		ranges = <0x00000000 0xf1000000 0x0100000		
->> 		          0xf4000000 0xf4000000 0x0000400
->> =======
->> 		ranges = <0x00000000 0xf1000000 0x4000000
->> 		          0xe0000000 0xe0000000 0x8100000
->
-> The first cannot work, because it lacks the range for the PCIe. The
-> second should work. The correct merge should be:
->
->   		ranges = <0x00000000 0xf1000000 0x0100000		
->   		          0xf4000000 0xf4000000 0x0000400
->   		          0xe0000000 0xe0000000 0x8100000>;
->
-> i.e, we've added the PCIe range (last line) and splitted the SRAM into
-> its own range (or something like that, don't remember the details, but
-> Ezequiel can confirm).
-
-OK that's a good starting point.
-
->> <<<<<<< HEAD
->> Kirkwood: MV88F6281-A0, TCLK=200000000.
->> Feroceon L2: Cache support initialised, in WT override mode.
->> mvebu-pcie pcie-controller.1: PCIe0.0: link up
->> mvebu-pcie pcie-controller.1: PCI host bridge to bus 0000:00
->> pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
->> pci_bus 0000:00: root bus resource [mem 0xffffffff-0x07fffffe]
->> pci_bus 0000:00: root bus resource [bus 00-ff]
->> pci 0000:00:01.0: [11ab:7846] type 01 class 0x060400
->> PCI: bus0: Fast back to back transfers disabled
->> pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
->> pci 0000:01:00.0: [10ee:0008] type 00 class 0x050000
->> pci 0000:01:00.0: reg 10: [mem 0x00000000-0x00000fff]
->> pci 0000:01:00.0: reg 14: [mem 0x00000000-0x07ffffff]
->> pci 0000:01:00.0: reg 18: [mem 0x00000000-0x00000fff]
->> pci 0000:01:00.0: reg 1c: [mem 0x00000000-0x007fffff]
->> pci 0000:01:00.0: reg 20: [mem 0x00000000-0x00001fff]
->> pci 0000:01:00.0: reg 24: [mem 0x00000000-0x00000fff]
->> pci 0000:01:00.0: supports D1 D2
->> pci 0000:01:00.0: PME# supported from D0 D1 D2 D3hot
->> PCI: bus1: Fast back to back transfers disabled
->> pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
->> pci 0000:00:01.0: BAR 8: can't assign mem (size 0xc000000)
->> pci 0000:01:00.0: BAR 1: can't assign mem (size 0x8000000)
->> pci 0000:01:00.0: BAR 3: can't assign mem (size 0x800000)
->> pci 0000:01:00.0: BAR 4: can't assign mem (size 0x2000)
->> pci 0000:01:00.0: BAR 0: can't assign mem (size 0x1000)
->> pci 0000:01:00.0: BAR 2: can't assign mem (size 0x1000)
->> pci 0000:01:00.0: BAR 5: can't assign mem (size 0x1000)
->> pci 0000:00:01.0: PCI bridge to [bus 01]
->
-> The first test you did cannot work at all, due to the incorrect ranges.
->
-> If you have the PCIe working with the old driver, can you pastebin
-> somewhere the complete boot log, as well as the output of "lspci
-> -vvv" ?
-
-OK, I will.
-In the meantime, what I got to establish is that by manually disabling 
-the two biggest resources
-
- >> pci 0000:00:01.0: BAR 8: can't assign mem (size 0xc000000)
- >> pci 0000:01:00.0: BAR 1: can't assign mem (size 0x8000000)
-
-i.e. something like:
-
--281,6 +282,10 @@ static void assign_requested_resources_sorted(struct 
-list_head *head,
-         list_for_each_entry(dev_res, head, list) {
-                 res = dev_res->res;
-                 idx = res - &dev_res->dev->resource[0];
-+
-+               if (resource_size(res) < 0x8000000)
-+               {
-+
-
-at least I can get the following ones to be assigned correctly:
-
-mvebu-pcie pcie-controller.2: PCIe0.0: link up
-mvebu-pcie pcie-controller.2: PCI host bridge to bus 0000:00
-pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
-pci_bus 0000:00: root bus resource [mem 0xe0000000-0xe7ffffff]
-pci_bus 0000:00: root bus resource [bus 00-ff]
-pci 0000:00:01.0: [11ab:7846] type 01 class 0x060400
-PCI: bus0: Fast back to back transfers disabled
-pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-pci 0000:01:00.0: [10ee:0008] type 00 class 0x050000
-pci 0000:01:00.0: reg 10: [mem 0x00000000-0x00000fff]
-pci 0000:01:00.0: reg 14: [mem 0x00000000-0x07ffffff]
-pci 0000:01:00.0: reg 18: [mem 0x00000000-0x00000fff]
-pci 0000:01:00.0: reg 1c: [mem 0x00000000-0x007fffff]
-pci 0000:01:00.0: reg 20: [mem 0x00000000-0x00001fff]
-pci 0000:01:00.0: reg 24: [mem 0x00000000-0x00000fff]
-pci 0000:01:00.0: supports D1 D2
-pci 0000:01:00.0: PME# supported from D0 D1 D2 D3hot
-PCI: bus1: Fast back to back transfers disabled
-pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
-pci 0000:01:00.0: BAR 3: assigned [mem 0x04000000-0x047fffff]
-pci 0000:01:00.0: BAR 3: set to [mem 0x04000000-0x047fffff] (PCI address 
-[0x4000000-0x47fffff])
-pci 0000:01:00.0: BAR 4: assigned [mem 0x04800000-0x04801fff]
-pci 0000:01:00.0: BAR 4: set to [mem 0x04800000-0x04801fff] (PCI address 
-[0x4800000-0x4801fff])
-pci 0000:01:00.0: BAR 0: assigned [mem 0x04802000-0x04802fff]
-pci 0000:01:00.0: BAR 0: set to [mem 0x04802000-0x04802fff] (PCI address 
-[0x4802000-0x4802fff])
-pci 0000:01:00.0: BAR 2: assigned [mem 0x04803000-0x04803fff]
-pci 0000:01:00.0: BAR 2: set to [mem 0x04803000-0x04803fff] (PCI address 
-[0x4803000-0x4803fff])
-pci 0000:01:00.0: BAR 5: assigned [mem 0x04804000-0x04804fff]
-pci 0000:01:00.0: BAR 5: set to [mem 0x04804000-0x04804fff] (PCI address 
-[0x4804000-0x4804fff])
-pci 0000:00:01.0: PCI bridge to [bus 01]
-pci 0000:00:01.0:   bridge window [mem 0x04000000-0x0fffffff]
-PCI: enabling device 0000:00:01.0 (0140 -> 0143)
-
-
-Which is a bit weird because in the past these huge assignments would 
-just fail but the following ones would work just fine.
-
->
->> Compared to a working configuration, here I see a spurious
->>
-
-I assume the
-
->>     pci 0000:00:01.0: BAR 8: can't assign mem (size 0xc000000)
->>
-
-comes from the switch but I have no idea how to find it out.
-I'm quite sure this is the first time I'm seeing BAR 8.
-
->> which I don't understand, plus all others which are failing.
->>
->> It's weird how with the second configuration:
->>
->>     mvebu-pcie pcie-controller.2: PCIe0.0: link up
->>     mvebu-pcie pcie-controller.2: PCI host bridge to bus 0000:00
->>     pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
->>     pci_bus 0000:00: root bus resource [mem 0xe0000000-0xe7ffffff]
->>
->> I get a second mvebu-pcie pcie-controller.2, although with a more
->> reasonable memory range.
->
-> A second mvebu-pcie controller? Is your Device Tree correct?
-
-Whoops, my fault. There's just one pcie-controller.2, it's just that 
-with the correct ranges the nand.1 node gets created as well, and these 
-(platform?) devices are numbered sequentially, regardless of their type.
-
->
-> I'm not really sure to understand what's going on here. Can you post
-> the complete boot log, and test with the latest Linus git tree, where
-> all the PCIe support got merged?
-
-I sure will.
-Thanks for the heads-up.
-
-Thanks a lot!
-Gerlando
-
->
-> Thanks!
->
-> Thomas
->
+Cheers
+---Dave
