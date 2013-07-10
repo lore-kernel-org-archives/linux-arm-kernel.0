@@ -1,172 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 10 Jul 2013 23:22:01 +0800
-Subject: [PATCH 2/3] ARM: imx: add common clock support for fixup mux
-In-Reply-To: <1373469722-32514-1-git-send-email-shawn.guo@linaro.org>
-References: <1373469722-32514-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1373469722-32514-3-git-send-email-shawn.guo@linaro.org>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 10 Jul 2013 17:29:26 +0200
+Subject: [PATCH V2 01/12] spi/mxs: Always set LOCK_CS
+In-Reply-To: <CAOMZO5AEU3D3o-8fKLQJvsRSwBMNn0jfwZFC6R93TKaUpxffSw@mail.gmail.com>
+References: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
+ <201304030118.42976.marex@denx.de>
+ <CAOMZO5AEU3D3o-8fKLQJvsRSwBMNn0jfwZFC6R93TKaUpxffSw@mail.gmail.com>
+Message-ID: <20957.32214.721252.361301@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Liu Ying <Ying.Liu@freescale.com>
+Hi,
 
-One register may have several fields to control some clocks. It
-is possible that the read/write values of some fields may map to
-different real functional values, so writing to the other fields
-in the same register may break a working clock tree. A real case
-is the aclk_podf field in the register 'CCM Serial Clock Multiplexer
-Register 1' of i.MX6Q/SDL SoC. This patch introduces a fixup hook
-for multiplexer clock which is called before writing a value to
-clock registers to support this kind of multiplexer clocks.
+Fabio Estevam writes:
+> On Tue, Apr 2, 2013 at 8:18 PM, Marek Vasut <marex@denx.de> wrote:
+> > Dear Trent Piepho,
+> >
+> >> There are two bits which control the CS line in the CTRL0 register:
+> >> LOCK_CS and IGNORE_CRC.  The latter would be better named DEASSERT_CS
+> >> in SPI mode.
+> >>
+> >> LOCK_CS keeps CS asserted though the entire transfer.  This should
+> >> always be set.  The DMA code will always set it, explicitly on the
+> >> first segment of the first transfer, and then implicitly on all the
+> >> rest by never clearing the bit from the value read from the ctrl0
+> >> register.
+> >>
+> >> The only reason to not set LOCK_CS would be to attempt an altered
+> >> protocol where CS pulses between each word.  Though don't get your
+> >> hopes up if you want to do this, as the hardware doesn't appear to do
+> >> this in any sane manner.
+> >
+> > Can you please elaborate on this part above? The description is very vague.
+> >
+>From my experience the HW deasserts CS whenever the output fifo runs
+empty.
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/Makefile        |    2 +-
- arch/arm/mach-imx/clk-fixup-mux.c |  107 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/clk.h           |    4 ++
- 3 files changed, 112 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-imx/clk-fixup-mux.c
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 92b91a2..5383c58 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -16,7 +16,7 @@ obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clk-imx51-imx53.o ehci-imx5.o $(i
- 
- obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
- 			    clk-pfd.o clk-busy.o clk.o \
--			    clk-fixup-div.o
-+			    clk-fixup-div.o clk-fixup-mux.o
- 
- obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
- obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
-diff --git a/arch/arm/mach-imx/clk-fixup-mux.c b/arch/arm/mach-imx/clk-fixup-mux.c
-new file mode 100644
-index 0000000..deb4b80
---- /dev/null
-+++ b/arch/arm/mach-imx/clk-fixup-mux.c
-@@ -0,0 +1,107 @@
-+/*
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include "clk.h"
-+
-+#define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
-+
-+/**
-+ * struct clk_fixup_mux - imx integer fixup multiplexer clock
-+ * @mux: the parent class
-+ * @ops: pointer to clk_ops of parent class
-+ * @fixup: a hook to fixup the write value
-+ *
-+ * The imx fixup multiplexer clock is a subclass of basic clk_mux
-+ * with an addtional fixup hook.
-+ */
-+struct clk_fixup_mux {
-+	struct clk_mux mux;
-+	const struct clk_ops *ops;
-+	void (*fixup)(u32 *val);
-+};
-+
-+static inline struct clk_fixup_mux *to_clk_fixup_mux(struct clk_hw *hw)
-+{
-+	struct clk_mux *mux = to_clk_mux(hw);
-+
-+	return container_of(mux, struct clk_fixup_mux, mux);
-+}
-+
-+static u8 clk_fixup_mux_get_parent(struct clk_hw *hw)
-+{
-+	struct clk_fixup_mux *fixup_mux = to_clk_fixup_mux(hw);
-+
-+	return fixup_mux->ops->get_parent(&fixup_mux->mux.hw);
-+}
-+
-+static int clk_fixup_mux_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct clk_fixup_mux *fixup_mux = to_clk_fixup_mux(hw);
-+	struct clk_mux *mux = to_clk_mux(hw);
-+	unsigned long flags = 0;
-+	u32 val;
-+
-+	spin_lock_irqsave(mux->lock, flags);
-+
-+	val = readl(mux->reg);
-+	val &= ~(mux->mask << mux->shift);
-+	val |= index << mux->shift;
-+	fixup_mux->fixup(&val);
-+	writel(val, mux->reg);
-+
-+	spin_unlock_irqrestore(mux->lock, flags);
-+
-+	return 0;
-+}
-+
-+static const struct clk_ops clk_fixup_mux_ops = {
-+	.get_parent = clk_fixup_mux_get_parent,
-+	.set_parent = clk_fixup_mux_set_parent,
-+};
-+
-+struct clk *imx_clk_fixup_mux(const char *name, void __iomem *reg,
-+			      u8 shift, u8 width, const char **parents,
-+			      int num_parents, void (*fixup)(u32 *val))
-+{
-+	struct clk_fixup_mux *fixup_mux;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+
-+	if (!fixup)
-+		return ERR_PTR(-EINVAL);
-+
-+	fixup_mux = kzalloc(sizeof(*fixup_mux), GFP_KERNEL);
-+	if (!fixup_mux)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &clk_fixup_mux_ops;
-+	init.parent_names = parents;
-+	init.num_parents = num_parents;
-+
-+	fixup_mux->mux.reg = reg;
-+	fixup_mux->mux.shift = shift;
-+	fixup_mux->mux.mask = BIT(width) - 1;
-+	fixup_mux->mux.lock = &imx_ccm_lock;
-+	fixup_mux->mux.hw.init = &init;
-+	fixup_mux->ops = &clk_mux_ops;
-+	fixup_mux->fixup = fixup;
-+
-+	clk = clk_register(NULL, &fixup_mux->mux.hw);
-+	if (IS_ERR(clk))
-+		kfree(fixup_mux);
-+
-+	return clk;
-+}
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index 51eb3853..2534359 100644
---- a/arch/arm/mach-imx/clk.h
-+++ b/arch/arm/mach-imx/clk.h
-@@ -53,6 +53,10 @@ struct clk *imx_clk_fixup_divider(const char *name, const char *parent,
- 				  void __iomem *reg, u8 shift, u8 width,
- 				  void (*fixup)(u32 *val));
- 
-+struct clk *imx_clk_fixup_mux(const char *name, void __iomem *reg,
-+			      u8 shift, u8 width, const char **parents,
-+			      int num_parents, void (*fixup)(u32 *val));
-+
- static inline struct clk *imx_clk_fixed(const char *name, int rate)
- {
- 	return clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
+Lothar Wa?mann
 -- 
-1.7.9.5
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
