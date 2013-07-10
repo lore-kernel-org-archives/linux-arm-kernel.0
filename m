@@ -1,49 +1,39 @@
-From: richard.zhuhongxing@gmail.com (Richard Zhu)
-Date: Wed, 10 Jul 2013 16:35:52 +0800
-Subject: [PATCH v4 0/3] ahci: enable ahci sata support on imx6q
-Message-ID: <1373445355-11453-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: tibor@harsszegi.com (tibor at harsszegi.com)
+Date: Wed, 10 Jul 2013 10:42:52 +0200
+Subject: NSA310 + DT
+In-Reply-To: <20130710062333.GE26223@lunn.ch>
+References: <51DC564A.8050002@harsszegi.com>
+ <20130709193605.GC26223@lunn.ch> <20130709202143.GD26223@lunn.ch>
+ <2544f179ed4349545a25aa60d52a664a@harsszegi.com>
+ <20130710062333.GE26223@lunn.ch>
+Message-ID: <b8ae2a5db1f12269d523e4f2d0356e67@harsszegi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V4: add imx6q specific ahci sata support
-  Thanks for the review comments provided by Sascha, and Alexander.
-  - Use the private data and keep a pointer to the PHY clock.
-  - Don't use the global platform device variable, because that
-  it would make the driver broken for mutiple instances.
-  - Don't do the "writel" with assignment.
-  - Other minor changes, such as print the error code when printing
-  error message, use a u32 type to store readl results, and so on.
+Hello,
 
-v3: http://www.spinics.net/lists/linux-ide/msg45688.html
-  - Keep arch/arm and ahci_platform driver clean.
-  - Add the sata_imx standalone driver contained all the
-  specific setup
-  - Add the release function, support the loadable module
-  driver.
-  - Tested on imx6q sd board.
+> Hello guys,
+> 
+> >Hi Tibor
+> >
+> >Which NSA310 do you actually have? Apparently there are actually two
+> >variants:
+> >
+> >http://zyxel.nas-central.org/wiki/Category:NSA-310
+> >
+> >It could be yours is actually the rebranded TDC Homedisk. If so, we
+> >should add a new .dts file for it.
+> >
+> >Andrew
+> 
+> Well that's a good one. Hohestly have zero idea :(
+> 
+> Hi Tibor
+> 
+> How does it compare to the pictures on the website?
+> 
 
-v2: http://www.spinics.net/lists/linux-ide/msg45666.html 
- - Setup standalone imx ahci sata driver, because of
- the misalignments of the bits definition of the HBA register.
- - Replace the node by the label in the board dts.
- - 
+I have the one on the topmost picture, not the one labelled as "TDC".
+Cheers,
 
-v1: http://www.spinics.net/lists/linux-ide/msg45581.html
- - add imx6q specific ahci sata support to arch/arm/mach-imx/mach-imx6q.c
-
-These patches is based on imx/dt branch of
-"http://git.linaro.org/git-ro/people/shawnguo/linux-2.6.git"
-
-[v4 1/3] ARM: dtsi: enable ahci sata on imx6q platforms
-[v4 2/3] ARM: imx6q: update the sata bits definitions of gpr13
-[v4 3/3] sata: imx: add ahci sata support on imx platforms
-
-arch/arm/boot/dts/imx6q-sabreauto.dts       |    4 +
-arch/arm/boot/dts/imx6q-sabrelite.dts       |    4 +
-arch/arm/boot/dts/imx6q-sabresd.dts         |    4 +
-arch/arm/boot/dts/imx6q.dtsi                |    9 +
-drivers/ata/Kconfig                         |    9 +
-drivers/ata/Makefile                        |    1 +
-drivers/ata/sata_imx.c                      |  237 +++++++++++++++++++++++++++
-include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  121 ++++++++++----
-8 files changed, 352 insertions(+), 37 deletions(-)
+Tibor
