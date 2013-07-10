@@ -1,45 +1,89 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 10 Jul 2013 20:11:34 +0530
-Subject: [PATCH] ARM: omap2: add select of TI_PRIV_EDMA
-In-Reply-To: <201307101636.57623.arnd@arndb.de>
-References: <1373359054-5007-1-git-send-email-olof@lixom.net>
- <20130710075017.GM5523@atomide.com> <51DD6FA9.8080908@ti.com>
- <201307101636.57623.arnd@arndb.de>
-Message-ID: <51DD729E.9060402@ti.com>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Wed, 10 Jul 2013 23:54:47 +0900
+Subject: [PATCH v2 3/5] mmc: dw_mmc: Add exynos resume_noirq callback to
+ clear WAKEUP_INT
+In-Reply-To: <1373411961-23812-4-git-send-email-dianders@chromium.org>
+References: <1373391071-6312-1-git-send-email-dianders@chromium.org>
+ <1373411961-23812-1-git-send-email-dianders@chromium.org>
+ <1373411961-23812-4-git-send-email-dianders@chromium.org>
+Message-ID: <002a01ce7d7d$6bd9e870$438db950$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/10/2013 8:06 PM, Arnd Bergmann wrote:
-> On Wednesday 10 July 2013, Sekhar Nori wrote:
->> On 7/10/2013 1:20 PM, Tony Lindgren wrote:
->>> * Olof Johansson <olof@lixom.net> [130709 01:44]:
->>>> "ARM: OMAP: build mach-omap code only if needed" moved around the
->>>> ARCH_OMAP2PLUS stanza, but accidentally dropped the seleciton of
->>>> TI_PRIV_EDMA in the process. Add it back.
->>>>
->>>> Cc: Arnd Bergmann <arnd@arndb.de>
->>>
->>> Acked-by: Tony Lindgren <tony@atomide.com>
->>>
->>>> Signed-off-by: Olof Johansson <olof@lixom.net>
->>
->> Thinking more, I do not think we should be selecting TI_PRIV_EDMA for
->> OMAP2PLUS. There is no part of mach-omap2 that depends directly on
->> TI_PRIV_EDMA being enabled.
->>
->> Instead, TI_PRIV_EDMA should be selected by the DMA engine driver as
->> done in the patch here:
->>
->> http://www.spinics.net/lists/kernel/msg1563777.html
->>
->> Its the DMA engine driver which makes the private DMA calls so this
->> patch is better.
+On Wed, July 10, 2013, Doug Anderson wrote:
+> If the WAKEUP_INT is asserted at wakeup and not cleared, we'll end up
+> looping around forever.  This has been seen to happen on exynos5420
+> silicon despite the fact that we haven't enabled any wakeup events.
 > 
-> I would have done 'depends on TI_PRIV_EDMA' instead, but any of the three
-> solutions is fine with me.
-
-TI_PRIV_EDMA is not a user selectable option so if 'depends on' is used,
-then the select in mach-omap2 is needed as well.
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> Changes in v2:
+> - Use suspend_noirq as per James Hogan.
+> 
+>  drivers/mmc/host/dw_mmc-exynos.c | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+> index f013e7e..36b9620 100644
+> --- a/drivers/mmc/host/dw_mmc-exynos.c
+> +++ b/drivers/mmc/host/dw_mmc-exynos.c
+> @@ -30,6 +30,7 @@
+>  #define SDMMC_CLKSEL_TIMING(x, y, z)	(SDMMC_CLKSEL_CCLK_SAMPLE(x) |	\
+>  					SDMMC_CLKSEL_CCLK_DRIVE(y) |	\
+>  					SDMMC_CLKSEL_CCLK_DIVIDER(z))
+> +#define SDMMC_CLKSEL_WAKEUP_INT		BIT(11)
+> 
+>  #define SDMMC_CMD_USE_HOLD_REG		BIT(29)
+> 
+> @@ -102,6 +103,27 @@ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
+>  	return 0;
+>  }
+> 
+> +/**
+> + * dw_mci_exynos_resume_noirq - Exynos-specific resume code
+> + *
+> + * We have seen cases (at least on the exynos5420) where turning off the INT
+> + * power rail during suspend will leave the WAKEUP_INT bit in the CLKSEL
+> + * register asserted.  This bit is 1 to indicate that it fired and we can
+> + * clear it by writing a 1 back.  Clear it to prevent interrupts from going off
+> + * constantly.
+> + */
+As I know this bit is auto-cleared.
+Did you find the cause of this problem?
+How about your GPIO setting in sleep?
+Currently, we don't know why the problem is happened.
+At least, we should make it clear.
 
 Thanks,
-Sekhar
+Seungwon Jeon
+
+> +
+> +static int dw_mci_exynos_resume_noirq(struct dw_mci *host)
+> +{
+> +	u32 clksel;
+> +
+> +	clksel = mci_readl(host, CLKSEL);
+> +	if (clksel & SDMMC_CLKSEL_WAKEUP_INT)
+> +		mci_writel(host, CLKSEL, clksel);
+> +
+> +	return 0;
+> +}
+> +
+>  static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
+>  {
+>  	/*
+> @@ -165,6 +187,7 @@ static const struct dw_mci_drv_data exynos_drv_data = {
+>  	.caps			= exynos_dwmmc_caps,
+>  	.init			= dw_mci_exynos_priv_init,
+>  	.setup_clock		= dw_mci_exynos_setup_clock,
+> +	.resume_noirq		= dw_mci_exynos_resume_noirq,
+>  	.prepare_command	= dw_mci_exynos_prepare_command,
+>  	.set_ios		= dw_mci_exynos_set_ios,
+>  	.parse_dt		= dw_mci_exynos_parse_dt,
+> --
+> 1.8.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
