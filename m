@@ -1,30 +1,47 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 10 Jul 2013 12:33:51 +0530
-Subject: [PATCH V2] ARM: tegra: enable gpio-keys on dalmore
-In-Reply-To: <20130709060447.GA17499@mithrandir>
-References: <1373102069-5641-1-git-send-email-ldewangan@nvidia.com>
- <20130709060447.GA17499@mithrandir>
-Message-ID: <51DD0757.8060406@nvidia.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 10 Jul 2013 15:09:17 +0800
+Subject: [PATCH] ARM: dts: imx: add tempmon node for imx6q thermal support
+In-Reply-To: <51DC256D.6040204@denx.de>
+References: <1370330008-5982-1-git-send-email-shawn.guo@linaro.org>
+ <1370330226-6030-1-git-send-email-shawn.guo@linaro.org>
+ <51DC256D.6040204@denx.de>
+Message-ID: <20130710070915.GA12605@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 July 2013 11:34 AM, Thierry Reding wrote:
-> * PGP Signed by an unknown key
->
-> On Sat, Jul 06, 2013 at 02:44:29PM +0530, Laxman Dewangan wrote:
->> D
->> +
->> +		home {
->> +			label = "Home";
->> +			gpios = <&gpio TEGRA_GPIO(I, 5) GPIO_ACTIVE_LOW>;
->> +			linux,code = <102>; /* KEY_HOME */
-> I wonder if these should maybe go into a header file as well so that
-> symbolic names can be used. That'll make the value self-descriptive and
-> allow the comment to be dropped.
->
-Currently there is no header for input.h in dt-binding include. We need 
-to add them first and then use it.
-Probably it can be done along with all cleanups on dts file atleast for 
-Tegra.
-I can start this if no one faster than me for this activity but for this 
-patch, I like to go on legacy way.
+Hi Stefano,
+
+On Tue, Jul 09, 2013 at 04:59:57PM +0200, Stefano Babic wrote:
+> > -			ocotp at 021bc000 {
+> > -				compatible = "fsl,imx6q-ocotp";
+> > +			ocotp: ocotp at 021bc000 {
+> > +				compatible = "fsl,imx6q-ocotp", "syscon";
+> >  				reg = <0x021bc000 0x4000>;
+> 
+> Sorry to check this very late - is ocotp at 021bc000 the right address for
+> the thermal data ? According to User Manual (Table 62.3), the start
+> address is 0x20C8180. Using your patch, by loading the driver I get :
+
+Address 0x20C8180 is where TEMPMON control registers are - they are
+embedded in ANATOP block, while calibration data is stored in OCOTP fuse
+block.
+
+> imx_thermal tempmon.7: invalid sensor calibration data
+> imx_thermal tempmon.7: failed to get sensor data
+> imx_thermal: probe of tempmon.7 failed with error -22
+
+What's your chip revision?  Early revisions may not have the calibration
+data.  TO1.2 should have, I think.
+
+> The driver is loaded successfully if I changed the tempdata to point to
+> 020C8180. Not sure if I get the right values from temp1_crit and
+> temp1_input, but no error at the initialisation. Am I missing something ?
+
+It reads some data but that's not calibration data, so it should not work.
+
+Also, you need a cpu_cooling fix [1], if you want to play the thermal
+patches on imx6q.
+
+Shawn
+
+[1] http://thread.gmane.org/gmane.linux.power-management.general/34389
