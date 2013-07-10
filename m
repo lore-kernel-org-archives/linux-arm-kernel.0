@@ -1,80 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Jul 2013 07:26:34 -0700
-Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
-In-Reply-To: <87mwpuakod.fsf@linaro.org>
-References: <B5906170F1614E41A8A28DE3B8D121433EE93C23@DBDE04.ent.ti.com>
- <20130705115959.GQ5523@atomide.com>
- <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
- <20130708112553.GU5523@atomide.com> <51DAB394.3050104@ti.com>
- <20130708131033.GA5523@atomide.com> <51DABC81.3080409@ti.com>
- <20130708133512.GD31221@arwen.pp.htv.fi>
- <87mwpuakod.fsf@linaro.org>
-Message-ID: <20130710142633.GV5523@atomide.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 10 Jul 2013 19:58:57 +0530
+Subject: [PATCH] ARM: omap2: add select of TI_PRIV_EDMA
+In-Reply-To: <20130710075017.GM5523@atomide.com>
+References: <1373359054-5007-1-git-send-email-olof@lixom.net>
+ <20130710075017.GM5523@atomide.com>
+Message-ID: <51DD6FA9.8080908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@linaro.org> [130710 01:29]:
-> Felipe Balbi <balbi@ti.com> writes:
-> >> 
-> >> Right, but calling serial_omap_restore_context() even when the context
-> >> is not lost, should not ideally cause an issue.
-> >
-> > it does in one condition. If context hasn't been saved before. And that
-> > can happen in the case of wrong pm runtime status for that device.
-> >
-> > Imagine the device is marked as suspended even though it's fully enabled
-> > (it hasn't been suspended by hwmod due to NO_IDLE flag). In that case
-> > your context structure is all zeroes (context has never been saved
-> > before) then when you call pm_runtime_get_sync() on probe() your
-> > ->runtime_resume() will get called, which will restore context,
-> > essentially undoing anything which was configured by u-boot.
-> >
-> > Am I missing something ?
+On 7/10/2013 1:20 PM, Tony Lindgren wrote:
+> * Olof Johansson <olof@lixom.net> [130709 01:44]:
+>> "ARM: OMAP: build mach-omap code only if needed" moved around the
+>> ARCH_OMAP2PLUS stanza, but accidentally dropped the seleciton of
+>> TI_PRIV_EDMA in the process. Add it back.
+>>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
 > 
-> You're right, the _set_active() is crucial in the case when we prevent
-> the console UART from idling during boot (though that shouldn't be
-> happening in mainline unless the fix for "Issue 1" is done.)
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> 
+>> Signed-off-by: Olof Johansson <olof@lixom.net>
 
-Felipe is right, looks like all we need is to check if context is
-initialized or not. So no need for mach-omap2/serial.c or hwmod tinkering.
+Thinking more, I do not think we should be selecting TI_PRIV_EDMA for
+OMAP2PLUS. There is no part of mach-omap2 that depends directly on
+TI_PRIV_EDMA being enabled.
 
-After that having DEBUG_LL and cmdline with earlyprintk console=ttyO..
-works for me. We could also check for some combination of the context
-save registers being NULL if somebody has a good idea which ones
-should never be 0.
+Instead, TI_PRIV_EDMA should be selected by the DMA engine driver as
+done in the patch here:
 
-Regards,
+http://www.spinics.net/lists/kernel/msg1563777.html
 
-Tony
+Its the DMA engine driver which makes the private DMA calls so this
+patch is better.
 
+Thanks,
+Sekhar
 
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -161,6 +161,7 @@ struct uart_omap_port {
- 	u32			calc_latency;
- 	struct work_struct	qos_work;
- 	struct pinctrl		*pins;
-+	bool			initialized;
- 	bool			is_suspending;
- };
- 
-@@ -1523,6 +1524,8 @@ static int serial_omap_probe(struct platform_device *pdev)
- 
- 	pm_runtime_mark_last_busy(up->dev);
- 	pm_runtime_put_autosuspend(up->dev);
-+	up->initialized = true;
-+
- 	return 0;
- 
- err_add_port:
-@@ -1584,6 +1587,9 @@ static void serial_omap_mdr1_errataset(struct uart_omap_port *up, u8 mdr1)
- #ifdef CONFIG_PM_RUNTIME
- static void serial_omap_restore_context(struct uart_omap_port *up)
- {
-+	if (!up->initialized)
-+		return;
-+
- 	if (up->errata & UART_ERRATA_i202_MDR1_ACCESS)
- 		serial_omap_mdr1_errataset(up, UART_OMAP_MDR1_DISABLE);
- 	else
+>>
+>> ---
+>>
+>> I noticed the original patch was a bit down in the fixes branch, so
+>> instead of rebasing I checked this in on top.
+>>
+>> -Olof
+>>
+>>  arch/arm/mach-omap2/Kconfig | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+>> index 5c14051..58152b1 100644
+>> --- a/arch/arm/mach-omap2/Kconfig
+>> +++ b/arch/arm/mach-omap2/Kconfig
+>> @@ -99,6 +99,7 @@ config ARCH_OMAP2PLUS
+>>  	select PROC_DEVICETREE if PROC_FS
+>>  	select SOC_BUS
+>>  	select SPARSE_IRQ
+>> +	select TI_PRIV_EDMA
+>>  	select USE_OF
+>>  	help
+>>  	  Systems based on OMAP2, OMAP3, OMAP4 or OMAP5
+>> -- 
+>> 1.8.1.192.gc4361b8
+>>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
