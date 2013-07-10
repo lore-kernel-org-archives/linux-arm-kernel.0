@@ -1,144 +1,85 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 10 Jul 2013 19:23:25 +0300
-Subject: [PATCH 6/6] USB: ehci-omap: Implement suspend/resume
-In-Reply-To: <1373473081-27181-1-git-send-email-rogerq@ti.com>
-References: <1373473081-27181-1-git-send-email-rogerq@ti.com>
-Message-ID: <1373473405-27589-1-git-send-email-rogerq@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Jul 2013 17:34:11 +0100
+Subject: Seg fault occurs when running statically compiled binary from
+ kernel using call_usermodehelper
+In-Reply-To: <CAOiN93nH9fyHoz4yrZmJ-OKCy6ogdt5bYartXCBgP5eHMUBPdw@mail.gmail.com>
+References: <CAOiN93mGTu9w9rVNCrbbH1sccXY9VJhaCmg+dS7Rk9mMgKHBaA@mail.gmail.com>
+ <CAOiN93=Nx77RkbNuEJMV617MjV5+GmorF0G3vyLy1SwQcuCs+g@mail.gmail.com>
+ <CAOiN93nH9fyHoz4yrZmJ-OKCy6ogdt5bYartXCBgP5eHMUBPdw@mail.gmail.com>
+Message-ID: <20130710163410.GA30514@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call ehci_suspend/resume() during runtime suspend/resume
-as well as system suspend/resume.
+On Wed, Jul 10, 2013 at 11:42:25AM +0100, Ashish Sangwan wrote:
+> Any heads up on this?
+> 
+> or could someone just advice what can we do to debug this?
+> 
+> The ret_from_fork currently looks like following:
+> /*
+>  * This is how we return from a fork.
+>  */
+> ENTRY(ret_from_fork)
+>         bl      schedule_tail
+>         cmp     r5, #0
+>         movne   r0, r4
+>         adrne   lr, BSYM(1f)
+>         movne   pc, r5
+> 1:      get_thread_info tsk
+>         b       ret_slow_syscall
+> ENDPROC(ret_from_fork)
+> 
+> Is this a real issue? Because we are getting this just for static binaries.
 
-Use a flag "bound" to indicate that the HCD structures are valid.
-This is only true between usb_add_hcd() and usb_remove_hcd() calls.
+Ok, I've finally got to the bottom of this, but I'm not sure on the best way
+to fix it. The issue is that libc expects r0 to contain a function pointer
+to be invoked at exit (rtld_fini), to clean up after a dynamic linker. If
+this pointer is NULL, then it is ignored. We actually zero this pointer in
+our ELF_PLAT_INIT macro.
 
-The flag can be used by omap_ehci_runtime_suspend/resume() handlers
-to avoid calling ehci_suspend/resume() when we are no longer bound
-to the HCD e.g. during probe() and remove();
+At the same time, we have this strange code called next from the ARM ELF
+loader:
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- drivers/usb/host/ehci-omap.c |   64 ++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 62 insertions(+), 2 deletions(-)
+	regs->ARM_r2 = stack[2];	/* r2 (envp) */			\
+	regs->ARM_r1 = stack[1];	/* r1 (argv) */			\
+	regs->ARM_r0 = stack[0];	/* r0 (argc) */			\
 
-diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-index 9bd7dfe..6d1fde97 100644
---- a/drivers/usb/host/ehci-omap.c
-+++ b/drivers/usb/host/ehci-omap.c
-@@ -69,6 +69,7 @@ static const char hcd_name[] = "ehci-omap";
- struct omap_hcd {
- 	struct usb_phy *phy[OMAP3_HS_USB_PORTS]; /* one PHY for each port */
- 	int nports;
-+	bool bound;	/* HCD structures are valid */
- };
+which puts argc into r0. Usually this gets overwritten by the return value
+of execve (0), so everything hangs together. With kernel threads this is
+different since we do the exec from ____call_usermodehelper on the stack and
+then return to the new application via ret_from_fork, which takes the
+slowpath; popping r0 from pt_regs and making argc visible to the library.
+
+When the application exits and libc starts running its exit functions, we
+jump to hyperspace.
+
+My inclination would be to remove the stack popping above (patch below),
+but it's a user-visible change and I'm not sure if something like OABI
+requires it.
+
+Will
+
+--->8
+
+diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+index 06e7d50..413f387 100644
+--- a/arch/arm/include/asm/processor.h
++++ b/arch/arm/include/asm/processor.h
+@@ -54,7 +54,6 @@ struct thread_struct {
  
- static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
-@@ -159,6 +160,7 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
- 	hcd->rsrc_start = res->start;
- 	hcd->rsrc_len = resource_size(res);
- 	hcd->regs = regs;
-+	hcd->has_wakeup_irq = true;
- 	hcd_to_ehci(hcd)->caps = regs;
+ #define start_thread(regs,pc,sp)                                       \
+ ({                                                                     \
+-       unsigned long *stack = (unsigned long *)sp;                     \
+        memset(regs->uregs, 0, sizeof(regs->uregs));                    \
+        if (current->personality & ADDR_LIMIT_32BIT)                    \
+                regs->ARM_cpsr = USR_MODE;                              \
+@@ -65,9 +64,6 @@ struct thread_struct {
+        regs->ARM_cpsr |= PSR_ENDSTATE;                                 \
+        regs->ARM_pc = pc & ~1;         /* pc */                        \
+        regs->ARM_sp = sp;              /* sp */                        \
+-       regs->ARM_r2 = stack[2];        /* r2 (envp) */                 \
+-       regs->ARM_r1 = stack[1];        /* r1 (argv) */                 \
+-       regs->ARM_r0 = stack[0];        /* r0 (argc) */                 \
+        nommu_start_thread(regs);                                       \
+ })
  
- 	omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
-@@ -216,6 +218,8 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
- 		goto err_pm_runtime;
- 	}
- 
-+	omap->bound = true;
-+
- 	/*
- 	 * Bring PHYs out of reset for non PHY modes.
- 	 * Even though HSIC mode is a PHY-less mode, the reset
-@@ -232,6 +236,8 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
- 		usb_phy_set_suspend(omap->phy[i], 0);
- 	}
- 
-+	pm_runtime_put_sync(dev);
-+
- 	return 0;
- 
- err_pm_runtime:
-@@ -264,7 +270,9 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
- 	struct omap_hcd *omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
- 	int i;
- 
-+	pm_runtime_get_sync(dev);
- 	usb_remove_hcd(hcd);
-+	omap->bound = false;
- 
- 	for (i = 0; i < omap->nports; i++) {
- 		if (omap->phy[i])
-@@ -293,15 +301,67 @@ static const struct of_device_id omap_ehci_dt_ids[] = {
- 
- MODULE_DEVICE_TABLE(of, omap_ehci_dt_ids);
- 
-+static int omap_ehci_suspend(struct device *dev)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+
-+	dev_dbg(dev, "%s\n", __func__);
-+
-+	return ehci_suspend(hcd, true);
-+}
-+
-+static int omap_ehci_resume(struct device *dev)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+
-+	dev_dbg(dev, "%s\n", __func__);
-+
-+	return ehci_resume(hcd, false);
-+}
-+
-+static int omap_ehci_runtime_suspend(struct device *dev)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct omap_hcd *omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
-+	bool do_wakeup = device_may_wakeup(dev);
-+
-+	dev_dbg(dev, "%s\n", __func__);
-+
-+	if (omap->bound)
-+		ehci_suspend(hcd, do_wakeup);
-+
-+	return 0;
-+}
-+
-+static int omap_ehci_runtime_resume(struct device *dev)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct omap_hcd *omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
-+
-+	dev_dbg(dev, "%s\n", __func__);
-+
-+	if (omap->bound)
-+		ehci_resume(hcd, false);
-+
-+	return 0;
-+}
-+
-+
-+static const struct dev_pm_ops omap_ehci_pm_ops = {
-+	.suspend = omap_ehci_suspend,
-+	.resume = omap_ehci_resume,
-+	.runtime_suspend = omap_ehci_runtime_suspend,
-+	.runtime_resume = omap_ehci_runtime_resume,
-+};
-+
- static struct platform_driver ehci_hcd_omap_driver = {
- 	.probe			= ehci_hcd_omap_probe,
- 	.remove			= ehci_hcd_omap_remove,
- 	.shutdown		= ehci_hcd_omap_shutdown,
--	/*.suspend		= ehci_hcd_omap_suspend, */
--	/*.resume		= ehci_hcd_omap_resume, */
- 	.driver = {
- 		.name		= hcd_name,
- 		.of_match_table = omap_ehci_dt_ids,
-+		.pm		= &omap_ehci_pm_ops,
- 	}
- };
- 
--- 
-1.7.4.1
