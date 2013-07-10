@@ -1,39 +1,81 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 10 Jul 2013 19:17:56 +0300
-Subject: [PATCH 1/6] ARM: OMAP3: Enable Hardware Save and Restore for USB Host
+Date: Wed, 10 Jul 2013 19:22:18 +0300
+Subject: [PATCH 2/6] ARM: dts: omap3beagle-xm: Add idle state pins for USB host
 In-Reply-To: <1373473081-27181-1-git-send-email-rogerq@ti.com>
 References: <1373473081-27181-1-git-send-email-rogerq@ti.com>
-Message-ID: <1373473081-27181-2-git-send-email-rogerq@ti.com>
+Message-ID: <1373473338-27433-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To ensure hardware context is restored while resuming from
-OFF mode we need to enable the Hardware SAR bit for the
-USB Host power domain.
+Add the Idle state pins for USB host and enable WAKEUP on
+DIR, DAT0-3, so that the PHY can wakeup the OMAP SoC from
+sleep on any USB activity (e.g. remote wakeup or connect/disconnect).
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/mach-omap2/powerdomains3xxx_data.c |    8 +-------
- 1 files changed, 1 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/omap3-beagle-xm.dts |   29 +++++++++++++++++++++++------
+ 1 files changed, 23 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
-index e2d4bd8..7b44d1f 100644
---- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
-+++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
-@@ -289,13 +289,7 @@ static struct powerdomain usbhost_pwrdm = {
- 	.prcm_offs	  = OMAP3430ES2_USBHOST_MOD,
- 	.pwrsts		  = PWRSTS_OFF_RET_ON,
- 	.pwrsts_logic_ret = PWRSTS_RET,
--	/*
--	 * REVISIT: Enabling usb host save and restore mechanism seems to
--	 * leave the usb host domain permanently in ACTIVE mode after
--	 * changing the usb host power domain state from OFF to active once.
--	 * Disabling for now.
--	 */
--	/*.flags	  = PWRDM_HAS_HDWR_SAR,*/ /* for USBHOST ctrlr only */
-+	.flags		  = PWRDM_HAS_HDWR_SAR, /* for USBHOST ctrlr only */
- 	.banks		  = 1,
- 	.pwrsts_mem_ret	  = {
- 		[0] = PWRSTS_RET, /* MEMRETSTATE */
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 371b1e2..91d19fa 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -113,11 +113,6 @@
+ };
+ 
+ &omap3_pmx_core {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <
+-			&hsusbb2_pins
+-	>;
+-
+ 	uart3_pins: pinmux_uart3_pins {
+ 		pinctrl-single,pins = <
+ 			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
+@@ -125,7 +120,7 @@
+ 		>;
+ 	};
+ 
+-	hsusbb2_pins: pinmux_hsusbb2_pins {
++	hsusb2_pins: pinmux_hsusb2_pins {
+ 		pinctrl-single,pins = <
+ 			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
+ 			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
+@@ -141,6 +136,25 @@
+ 			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
+ 		>;
+ 	};
++
++	/* WAKEUP enabled on DIR, DAT0-3 */
++	hsusb2_idle_pins: pinmux_hsusb2_idle_pins {
++		pinctrl-single,pins = <
++			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
++			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
++			0x5c4 (PIN_INPUT_PULLDOWN | WAKEUP_EN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
++			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)			/* etk_d13.hsusb2_nxt */
++			0x5c8 (PIN_INPUT_PULLDOWN | WAKEUP_EN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
++			0x5cA (PIN_INPUT_PULLDOWN | WAKEUP_EN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
++			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
++			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
++			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
++			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
++			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
++			0x1ae (PIN_INPUT_PULLDOWN | WAKEUP_EN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
++		>;
++		interrupts = <77>; /* route padconf wakeup to EHCI IRQ */
++	};
+ };
+ 
+ &i2c1 {
+@@ -223,6 +237,9 @@
+ };
+ 
+ &usbhshost {
++	pinctrl-names = "default", "idle";
++	pinctrl-0 = <&hsusb2_pins>;
++	pinctrl-1 = <&hsusb2_idle_pins>;
+ 	port2-mode = "ehci-phy";
+ };
+ 
 -- 
 1.7.4.1
