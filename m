@@ -1,49 +1,27 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 10 Jul 2013 11:21:04 +0900
-Subject: [PATCH 00/02] ARM: shmobile: r8a7790 arch timer frequency update
-In-Reply-To: <CANqRtoSHk_LJ6AyFqHYPy6w-As3XN=3Peku08gDMoEcz5MoRHQ@mail.gmail.com>
-References: <20130709125007.4388.15701.sendpatchset@w520>
- <20130710012346.GT32603@verge.net.au>
- <CANqRtoSHk_LJ6AyFqHYPy6w-As3XN=3Peku08gDMoEcz5MoRHQ@mail.gmail.com>
-Message-ID: <20130710022103.GR32603@verge.net.au>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 10 Jul 2013 10:58:26 +0800
+Subject: [PATCH] of: match the compatible in the order set by the dts file
+In-Reply-To: <CAL_JsqL4ABJCQXveSAMZKOiHwJi=w8zFYjg3DV7kqEEcCXQJcw@mail.gmail.com>
+References: <1373013818-11365-1-git-send-email-b32955@freescale.com>	<20130709070541.GQ516@pengutronix.de>	<51DBBFDA.70302@freescale.com>	<20130709075124.GR516@pengutronix.de>	<51DBC58D.90002@freescale.com>
+ <CAL_JsqL4ABJCQXveSAMZKOiHwJi=w8zFYjg3DV7kqEEcCXQJcw@mail.gmail.com>
+Message-ID: <51DCCDD2.707@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 11:12:25AM +0900, Magnus Damm wrote:
-> On Wed, Jul 10, 2013 at 10:23 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Tue, Jul 09, 2013 at 09:50:07PM +0900, Magnus Damm wrote:
-> >> ARM: shmobile: r8a7790 arch timer frequency update
-> >>
-> >> [PATCH 01/02] ARM: shmobile: Introduce r8a7790_read_mode_pins()
-> >> [PATCH 02/02] ARM: shmobile: Setup r8a7790 arch timer based on MD pins
-> >>
-> >> Add code to setup r8a7790 arch timer frequency dynamically at boot time
-> >> based on the EXTAL frequency pointed out by the boot mode pins.
-> >>
-> >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> >> ---
-> >>
-> >>  Built on top of renesas-next-20130704v2
-> >>
-> >>  arch/arm/mach-shmobile/clock-r8a7790.c        |   11 ----
-> >>  arch/arm/mach-shmobile/include/mach/r8a7790.h |    3 +
-> >>  arch/arm/mach-shmobile/setup-r8a7790.c        |   63 +++++++++++++++++++++++--
-> >>  3 files changed, 63 insertions(+), 14 deletions(-)
-> >
-> > Hi Magnus,
-> 
-> Hi Simon,
-> 
-> Thanks for your help picking up patches.
-> 
-> > could you please let me know if/when these patches are ready to queue-up
-> > for v3.12?
-> 
-> There are two things to consider:
-> 1) Patch 1/2 needs to be updated to handle feedback from Sergei.
-> 2) I'd like the series to be tested by Ulrich to see if they actually help!
-> 
-> I can resend 1/2 today or tomorrow and I think Ulrich can most likely
-> help us with testing sometime this week.
+? 2013?07?09? 20:03, Rob Herring ??:
+> the same and that is the assumption. Matching is not just based on
+> compatible properties and your patch does not handle the other cases.
+Could you show a example of "the other cases"?
 
-Thanks, I'll wait for your repost and feedback from Ulrich.
+After this patch,
+
+[1] the matching will first check the @match->type and @match->name,
+if we can match the @match->type or @match->name, return the match
+immediately.
+
+[2] If [1] fails, we will check the compatible properties.
+
+
+
+thanks
+Huang Shijie
