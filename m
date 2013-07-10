@@ -1,27 +1,50 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 10 Jul 2013 10:58:26 +0800
-Subject: [PATCH] of: match the compatible in the order set by the dts file
-In-Reply-To: <CAL_JsqL4ABJCQXveSAMZKOiHwJi=w8zFYjg3DV7kqEEcCXQJcw@mail.gmail.com>
-References: <1373013818-11365-1-git-send-email-b32955@freescale.com>	<20130709070541.GQ516@pengutronix.de>	<51DBBFDA.70302@freescale.com>	<20130709075124.GR516@pengutronix.de>	<51DBC58D.90002@freescale.com>
- <CAL_JsqL4ABJCQXveSAMZKOiHwJi=w8zFYjg3DV7kqEEcCXQJcw@mail.gmail.com>
-Message-ID: <51DCCDD2.707@freescale.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 10 Jul 2013 12:44:26 +0900
+Subject: [PATCH 0/3] ARM: shmobile: enable SMP Thumb2 kernel
+In-Reply-To: <1373421397-1786-1-git-send-email-koba@kmckk.co.jp>
+References: <1373421397-1786-1-git-send-email-koba@kmckk.co.jp>
+Message-ID: <CANqRtoSK9WoJJ2LOB-dRCjz5fQy8b5Cm+B+Fz9Mv3E5P6oFLQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?07?09? 20:03, Rob Herring ??:
-> the same and that is the assumption. Matching is not just based on
-> compatible properties and your patch does not handle the other cases.
-Could you show a example of "the other cases"?
+Hi Kobayashi-san,
 
-After this patch,
+Your patch series looks fine to me. Thanks for your contribution.
 
-[1] the matching will first check the @match->type and @match->name,
-if we can match the @match->type or @match->name, return the match
-immediately.
+Acked-by: Magnus Damm <damm@opensource.se>
 
-[2] If [1] fails, we will check the compatible properties.
-
-
-
-thanks
-Huang Shijie
+On Wed, Jul 10, 2013 at 10:56 AM, Tetsuyuki Kobayashi <koba@kmckk.co.jp> wrote:
+> Hello,
+>
+> I try to build SMP kernel for KZM-A9-GT board in CONFIG_THUMB2_KERNEL=y.
+> After some modification it successully boots in Thumb2 kernel.
+> In my case, Thumb2 kernel is 23% smaller than usual ARM kernel.
+>
+>    text    data     bss     dec     hex filename
+> 4763561  251580  196164 5211305  4f84a9 out.kzm9g/vmlinux
+>
+>    text    data     bss     dec     hex filename
+> 3595265  251668  196164 4043097  3db159 out.kzm9g_thumb/vmlinux
+>
+>
+> Useful info for Thumb2 kernel
+> https://wiki.linaro.org/WorkingGroups/KernelArchived/Thumb2Guide
+>
+> This patch set is based on arm-soc git repositry,
+> remotes/origin/renesas/soc-cleanup branch
+> 53332005bfde9d2e3c9a66030c0e8c2598eaa1d5 ARM: shmobile: Remove Bonito board support
+>
+> Tetsuyuki Kobayashi (3):
+>   ARM: shmobile: fix compile error when CONFIG_THUMB2_KERNEL=y
+>   ARM: shmobile: Force ARM mode to compile reset vector for secondary
+>     CPUs
+>   ARM: shmobile: Insert align directives before 4 bytes data
+>
+>  arch/arm/mach-shmobile/headsmp-scu.S  |    4 +++-
+>  arch/arm/mach-shmobile/headsmp.S      |    6 +++++-
+>  arch/arm/mach-shmobile/sleep-sh7372.S |    2 ++
+>  3 files changed, 10 insertions(+), 2 deletions(-)
+>
+> --
+> 1.7.9.5
+>
