@@ -1,54 +1,55 @@
 From: tibor@harsszegi.com (tibor at harsszegi.com)
-Date: Wed, 10 Jul 2013 02:53:44 +0200
+Date: Wed, 10 Jul 2013 03:01:22 +0200
 Subject: NSA310 + DT
-In-Reply-To: <20130709202143.GD26223@lunn.ch>
-References: <51DC564A.8050002@harsszegi.com>
- <20130709193605.GC26223@lunn.ch> <20130709202143.GD26223@lunn.ch>
-Message-ID: <2544f179ed4349545a25aa60d52a664a@harsszegi.com>
+In-Reply-To: <20130709193605.GC26223@lunn.ch>
+References: <51DC564A.8050002@harsszegi.com> <20130709193605.GC26223@lunn.ch>
+Message-ID: <1a9bcb9094ae695c6707c4835417dd5b@harsszegi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello guys,
 
-> Hi Tibor
+> A basic question to start with. Are you using the default kernel
+> configuration for kirkwood? Which kernel version are you using?
 > 
-> Which NSA310 do you actually have? Apparently there are actually two
-> variants:
+
+standard kernels, have been trying 3.9.8,3.9.9 and 3.10
+
+> Do you know what address it is using on the i2c bus? It looks like it
+> would be one of: 0x2c, 0x2d, 0x2e. Does you board also have the
+> adt7476?
+
+The address is the same as the adt ones' but it is
+recognized as a lm85. Sorry was a bit misleading. I could
+make my sensors work via simply changing the type
+from adt7476 to lm85
+
+> b.) uart0 is not recognized at all during boot, I cannot see that
+> 8250 would recognize the UART at the mmaped area, however the .DTS
+> config seems fine
 > 
-> http://zyxel.nas-central.org/wiki/Category:NSA-310
+> Do you see anything like:
 > 
-> It could be yours is actually the rebranded TDC Homedisk. If so, we
-> should add a new .dts file for it.
+> Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
+> f1012000.serial: ttyS0 at MMIO 0xf1012000 (irq = 33) is a 16550A
+> console [ttyS0] enabled
+> f1012100.serial: ttyS1 at MMIO 0xf1012100 (irq = 34) is a 16550A
 > 
-> Andrew
 
-Well that's a good one. Hohestly have zero idea :(
-Here is lspci and cpuinfo.
+None at all. I only see the first "Serial:" line, then
+nothing else, seems like the UART0 is stucked, badly mapped/initialized
+at that time.
 
-root at nsa310:~# lspci
-00:00.0 Host bridge: Marvell Technology Group Ltd. 88F6281 [Kirkwood] 
-ARM SoC (rev 03)
-00:01.0 Ethernet controller: Realtek Semiconductor Co., Ltd. 
-RTL8111/8168B PCI Express Gigabit Ethernet controller (rev 03)
-root at nsa310:~# cat /proc/cpuinfo
-processor       : 0
-model name      : Feroceon 88FR131 rev 1 (v5l)
-BogoMIPS        : 1196.85
-Features        : swp half thumb fastmult edsp
-CPU implementer : 0x56
-CPU architecture: 5TE
-CPU variant     : 0x2
-CPU part        : 0x131
-CPU revision    : 1
-
-Hardware        : Marvell Kirkwood (Flattened Device Tree)
-Revision        : 0000
-Serial          : 0000000000000000
-
-I was using the patches from here, they worked
-flawlessly (until pre DT kernels)
-
-https://github.com/peeter123/NSA310-320-debian
+> c.) LEDs are also not working, this is also strange, as the .DTS
+> seems to be just fine as well.
+> 
+> How do you mean not working? Is /sys/class/leds/ empty? Or when you
+> change the brightness value, nothing happens?
+> 
+Sorry lame me, wasn't clear again :)
+All the LEDs remain "uninitialized", all
+remains green after bootup, haven't tried setting
+them yet :(
 
 Cheers,
 Tibor
