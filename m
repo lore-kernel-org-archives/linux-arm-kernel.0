@@ -1,37 +1,54 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Jul 2013 22:36:28 +0200
+Date: Wed, 10 Jul 2013 22:42:05 +0200
 Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
-In-Reply-To: <51CC45D3.2000305@ti.com>
+In-Reply-To: <20130627144535.GK5523@atomide.com>
 References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
  <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
  <20130625065811.GZ5523@atomide.com> <51CAEA90.90200@ti.com>
  <CACRpkdbKgEcfF67oO9HrczvDp4Po3Xt1hFajJ1vO8kEvsZH4jA@mail.gmail.com>
- <51CC45D3.2000305@ti.com>
-Message-ID: <CACRpkdYU13bhPaL2ZG9CT9JRv9sKQ+1N3zCUPizk571+LQqB4A@mail.gmail.com>
+ <51CC45D3.2000305@ti.com> <20130627144535.GK5523@atomide.com>
+Message-ID: <CACRpkdYdJ0u+J1dbrWpGMyX6K9hi49uzFn4K78m3Xu7uNTAQpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 4:01 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
+On Thu, Jun 27, 2013 at 4:45 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-> I think, In the future the OMAP pinctrl configurations would be manged in
-> more flexible way then now (thanks to "pinctrl PM helpers" and you;))
-> - "Idle" state will be splitted to "Idle"/"sleep"
-> - "default" state will be splitted to "default"/"active"
+> The off mode bits can be enabled continuously, the mux hardware
+> automatically sets them. So sounds like you don't need any
+> separate "idle" "sleep" and "off" states, the following should
+> do:
+>
+> "default" (or "static") static pins that don't need to be touched
+>                         after consumer driver probe
 
-OK so the first ones we already have so the discussion is now down
-to adding the "active" state (and pinctrl_pm* helper function).
+Please use "default" for this. We cannot shoehorn OMAP lingo
+into the core kernel and expect everyone to accept that...
 
-I guess we need a patch set prepared which adds the "active" state
-and helper function as the first patch, i.e. this:
-http://marc.info/?l=linux-kernel&m=137094012703340&w=2
-Can I have your ACK on this patch?
+> "active"                dynamic pins that are not a subset of
+>                         "default" needed for runtime; these pins
+>                         are the same as "idle" below, but with
+>                         different muxing or pinconf device
+>                         runtime
+>
+> "idle"                  dynamic pins that are not a subset of
+>                         "default" needed for various idle modes;
+>                         these pins are the same as "active" above,
+>                         but with different muxing or pinconf for
+>                         various idle states
 
-I do not want to add the state unless there is a clear consumer,
-so it needs to go in with the first patch to a device driver that uses
-pinctrl_pm_select_active_state() which will be a good demonstration
-on its use and utility. (And a point to object and suggest other ways
-to do the same thing...)
+The misunderstanding earlier was that it was assumed that
+"active" == "default", just with another name.
+
+If the above is true with an actual driver patch calling
+*both* pinctrl_pm_select_default_state() *and*
+pinctrl_pm_select_active_state() in different runpaths I
+see no reason to reject it.
+
+But if it turns out that the drivers always use either "default"
+or "active" and never both I consider it a pure naming
+convention and will not accept the "active" state.
+
+Now it's time for patches :-)
 
 Yours,
 Linus Walleij
