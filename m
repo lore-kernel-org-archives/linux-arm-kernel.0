@@ -1,39 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 10 Jul 2013 11:01:50 +0100
-Subject: [PATCH v4 3/7] Documentation: DT: update atmel SSC with DMA
- binding
-In-Reply-To: <CACQ1gAhK2yN2uhewq8XGOidLCDfOhgRvzE1o0b1krK1DjYj-dA@mail.gmail.com>
-References: <1373372929-17800-1-git-send-email-richard.genoud@gmail.com>
- <1373379933-32749-1-git-send-email-richard.genoud@gmail.com>
- <1373379933-32749-4-git-send-email-richard.genoud@gmail.com>
- <20130709150543.GE27646@sirena.org.uk>
- <CACQ1gAhK2yN2uhewq8XGOidLCDfOhgRvzE1o0b1krK1DjYj-dA@mail.gmail.com>
-Message-ID: <20130710100150.GB24508@sirena.org.uk>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 10 Jul 2013 17:40:26 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6q{dl}: add a new pinctrl for uart3
+Message-ID: <1373449227-11740-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 11:48:27AM +0200, Richard Genoud wrote:
-> 2013/7/9 Mark Brown <broonie@kernel.org>:
+Add the a new pinctrl for uart3. In the imx6q{dl}-sabreauto boards,
+the uart3 is used for Bluetooth.
 
-> > ...this first example is now invalid and should probably just be being
-> > extended with the new required properties.
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ arch/arm/boot/dts/imx6dl.dtsi |   11 +++++++++++
+ arch/arm/boot/dts/imx6q.dtsi  |   11 +++++++++++
+ 2 files changed, 22 insertions(+), 0 deletions(-)
 
-> Well, I have to rewrite that to make it clearer.
-> The thing is:
-> with "atmel,at91rm9200-ssc" the SSC doesn't work with DMA.
-> with "atmel,at91sam9g45-ssc", the SSC work ONLY with DMA.
-
-> So the dmas/dma-names properties are only required for g45-ssc, and
-> useless for rm9200-ssc
-
-> Maybe the best will be to write a paragraph for g45-ssc and another
-> for rm9200-ssc, even if there's some identical lines between them.
-
-OK, or just write a section "Required for devices with compatible X".
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130710/2065b88d/attachment.sig>
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index a1302ed..d818ced 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -234,6 +234,17 @@
+ 					};
+ 				};
+ 
++				uart3 {
++					pinctrl_uart3_1: uart3grp-1 {
++						fsl,pins = <
++							MX6DL_PAD_SD4_CLK__UART3_RX_DATA 0x1b0b1
++							MX6DL_PAD_SD4_CMD__UART3_TX_DATA 0x1b0b1
++							MX6DL_PAD_EIM_D30__UART3_CTS_B   0x1b0b1
++							MX6DL_PAD_EIM_EB3__UART3_RTS_B   0x1b0b1
++						>;
++					};
++				};
++
+ 				uart4 {
+ 					pinctrl_uart4_1: uart4grp-1 {
+ 						fsl,pins = <
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index e0b7bad..1984ca4 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -277,6 +277,17 @@
+ 					};
+ 				};
+ 
++				uart3 {
++					pinctrl_uart3_1: uart3grp-1 {
++						fsl,pins = <
++							MX6Q_PAD_SD4_CLK__UART3_RX_DATA 0x1b0b1
++							MX6Q_PAD_SD4_CMD__UART3_TX_DATA 0x1b0b1
++							MX6Q_PAD_EIM_D30__UART3_CTS_B   0x1b0b1
++							MX6Q_PAD_EIM_EB3__UART3_RTS_B   0x1b0b1
++						>;
++					};
++				};
++
+ 				uart4 {
+ 					pinctrl_uart4_1: uart4grp-1 {
+ 						fsl,pins = <
+-- 
+1.7.1
