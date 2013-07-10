@@ -1,9 +1,9 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 10 Jul 2013 23:22:00 +0800
-Subject: [PATCH 1/3] ARM: imx: add common clock support for fixup div
+Date: Wed, 10 Jul 2013 23:22:01 +0800
+Subject: [PATCH 2/3] ARM: imx: add common clock support for fixup mux
 In-Reply-To: <1373469722-32514-1-git-send-email-shawn.guo@linaro.org>
 References: <1373469722-32514-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1373469722-32514-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1373469722-32514-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,38 +15,37 @@ different real functional values, so writing to the other fields
 in the same register may break a working clock tree. A real case
 is the aclk_podf field in the register 'CCM Serial Clock Multiplexer
 Register 1' of i.MX6Q/SDL SoC. This patch introduces a fixup hook
-for divider clock which is called before writing a value to clock
-registers to support this kind of divider clocks.
+for multiplexer clock which is called before writing a value to
+clock registers to support this kind of multiplexer clocks.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/Makefile        |    3 +-
- arch/arm/mach-imx/clk-fixup-div.c |  129 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/Makefile        |    2 +-
+ arch/arm/mach-imx/clk-fixup-mux.c |  107 +++++++++++++++++++++++++++++++++++++
  arch/arm/mach-imx/clk.h           |    4 ++
- 3 files changed, 135 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-imx/clk-fixup-div.c
+ 3 files changed, 112 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-imx/clk-fixup-mux.c
 
 diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index e20f22d..92b91a2 100644
+index 92b91a2..5383c58 100644
 --- a/arch/arm/mach-imx/Makefile
 +++ b/arch/arm/mach-imx/Makefile
-@@ -15,7 +15,8 @@ imx5-pm-$(CONFIG_PM) += pm-imx5.o
- obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clk-imx51-imx53.o ehci-imx5.o $(imx5-pm-y)
+@@ -16,7 +16,7 @@ obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clk-imx51-imx53.o ehci-imx5.o $(i
  
  obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
--			    clk-pfd.o clk-busy.o clk.o
-+			    clk-pfd.o clk-busy.o clk.o \
-+			    clk-fixup-div.o
+ 			    clk-pfd.o clk-busy.o clk.o \
+-			    clk-fixup-div.o
++			    clk-fixup-div.o clk-fixup-mux.o
  
  obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
  obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
-diff --git a/arch/arm/mach-imx/clk-fixup-div.c b/arch/arm/mach-imx/clk-fixup-div.c
+diff --git a/arch/arm/mach-imx/clk-fixup-mux.c b/arch/arm/mach-imx/clk-fixup-mux.c
 new file mode 100644
-index 0000000..21db020
+index 0000000..deb4b80
 --- /dev/null
-+++ b/arch/arm/mach-imx/clk-fixup-div.c
-@@ -0,0 +1,129 @@
++++ b/arch/arm/mach-imx/clk-fixup-mux.c
+@@ -0,0 +1,107 @@
 +/*
 + * Copyright (C) 2013 Freescale Semiconductor, Inc.
 + *
@@ -64,129 +63,107 @@ index 0000000..21db020
 +#include <linux/slab.h>
 +#include "clk.h"
 +
-+#define to_clk_div(_hw) container_of(_hw, struct clk_divider, hw)
-+#define div_mask(d)	((1 << (d->width)) - 1)
++#define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
 +
 +/**
-+ * struct clk_fixup_div - imx integer fixup divider clock
-+ * @divider: the parent class
++ * struct clk_fixup_mux - imx integer fixup multiplexer clock
++ * @mux: the parent class
 + * @ops: pointer to clk_ops of parent class
 + * @fixup: a hook to fixup the write value
 + *
-+ * The imx fixup divider clock is a subclass of basic clk_divider
++ * The imx fixup multiplexer clock is a subclass of basic clk_mux
 + * with an addtional fixup hook.
 + */
-+struct clk_fixup_div {
-+	struct clk_divider divider;
++struct clk_fixup_mux {
++	struct clk_mux mux;
 +	const struct clk_ops *ops;
 +	void (*fixup)(u32 *val);
 +};
 +
-+static inline struct clk_fixup_div *to_clk_fixup_div(struct clk_hw *hw)
++static inline struct clk_fixup_mux *to_clk_fixup_mux(struct clk_hw *hw)
 +{
-+	struct clk_divider *divider = to_clk_div(hw);
++	struct clk_mux *mux = to_clk_mux(hw);
 +
-+	return container_of(divider, struct clk_fixup_div, divider);
++	return container_of(mux, struct clk_fixup_mux, mux);
 +}
 +
-+static unsigned long clk_fixup_div_recalc_rate(struct clk_hw *hw,
-+					 unsigned long parent_rate)
++static u8 clk_fixup_mux_get_parent(struct clk_hw *hw)
 +{
-+	struct clk_fixup_div *fixup_div = to_clk_fixup_div(hw);
++	struct clk_fixup_mux *fixup_mux = to_clk_fixup_mux(hw);
 +
-+	return fixup_div->ops->recalc_rate(&fixup_div->divider.hw, parent_rate);
++	return fixup_mux->ops->get_parent(&fixup_mux->mux.hw);
 +}
 +
-+static long clk_fixup_div_round_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long *prate)
++static int clk_fixup_mux_set_parent(struct clk_hw *hw, u8 index)
 +{
-+	struct clk_fixup_div *fixup_div = to_clk_fixup_div(hw);
-+
-+	return fixup_div->ops->round_rate(&fixup_div->divider.hw, rate, prate);
-+}
-+
-+static int clk_fixup_div_set_rate(struct clk_hw *hw, unsigned long rate,
-+			    unsigned long parent_rate)
-+{
-+	struct clk_fixup_div *fixup_div = to_clk_fixup_div(hw);
-+	struct clk_divider *div = to_clk_div(hw);
-+	unsigned int divider, value;
++	struct clk_fixup_mux *fixup_mux = to_clk_fixup_mux(hw);
++	struct clk_mux *mux = to_clk_mux(hw);
 +	unsigned long flags = 0;
 +	u32 val;
 +
-+	divider = parent_rate / rate;
++	spin_lock_irqsave(mux->lock, flags);
 +
-+	/* Zero based divider */
-+	value = divider - 1;
++	val = readl(mux->reg);
++	val &= ~(mux->mask << mux->shift);
++	val |= index << mux->shift;
++	fixup_mux->fixup(&val);
++	writel(val, mux->reg);
 +
-+	if (value > div_mask(div))
-+		value = div_mask(div);
-+
-+	spin_lock_irqsave(div->lock, flags);
-+
-+	val = readl(div->reg);
-+	val &= ~(div_mask(div) << div->shift);
-+	val |= value << div->shift;
-+	fixup_div->fixup(&val);
-+	writel(val, div->reg);
-+
-+	spin_unlock_irqrestore(div->lock, flags);
++	spin_unlock_irqrestore(mux->lock, flags);
 +
 +	return 0;
 +}
 +
-+static const struct clk_ops clk_fixup_div_ops = {
-+	.recalc_rate = clk_fixup_div_recalc_rate,
-+	.round_rate = clk_fixup_div_round_rate,
-+	.set_rate = clk_fixup_div_set_rate,
++static const struct clk_ops clk_fixup_mux_ops = {
++	.get_parent = clk_fixup_mux_get_parent,
++	.set_parent = clk_fixup_mux_set_parent,
 +};
 +
-+struct clk *imx_clk_fixup_divider(const char *name, const char *parent,
-+				  void __iomem *reg, u8 shift, u8 width,
-+				  void (*fixup)(u32 *val))
++struct clk *imx_clk_fixup_mux(const char *name, void __iomem *reg,
++			      u8 shift, u8 width, const char **parents,
++			      int num_parents, void (*fixup)(u32 *val))
 +{
-+	struct clk_fixup_div *fixup_div;
++	struct clk_fixup_mux *fixup_mux;
 +	struct clk *clk;
 +	struct clk_init_data init;
 +
 +	if (!fixup)
 +		return ERR_PTR(-EINVAL);
 +
-+	fixup_div = kzalloc(sizeof(*fixup_div), GFP_KERNEL);
-+	if (!fixup_div)
++	fixup_mux = kzalloc(sizeof(*fixup_mux), GFP_KERNEL);
++	if (!fixup_mux)
 +		return ERR_PTR(-ENOMEM);
 +
 +	init.name = name;
-+	init.ops = &clk_fixup_div_ops;
-+	init.flags = CLK_SET_RATE_PARENT;
-+	init.parent_names = parent ? &parent : NULL;
-+	init.num_parents = parent ? 1 : 0;
++	init.ops = &clk_fixup_mux_ops;
++	init.parent_names = parents;
++	init.num_parents = num_parents;
 +
-+	fixup_div->divider.reg = reg;
-+	fixup_div->divider.shift = shift;
-+	fixup_div->divider.width = width;
-+	fixup_div->divider.lock = &imx_ccm_lock;
-+	fixup_div->divider.hw.init = &init;
-+	fixup_div->ops = &clk_divider_ops;
-+	fixup_div->fixup = fixup;
++	fixup_mux->mux.reg = reg;
++	fixup_mux->mux.shift = shift;
++	fixup_mux->mux.mask = BIT(width) - 1;
++	fixup_mux->mux.lock = &imx_ccm_lock;
++	fixup_mux->mux.hw.init = &init;
++	fixup_mux->ops = &clk_mux_ops;
++	fixup_mux->fixup = fixup;
 +
-+	clk = clk_register(NULL, &fixup_div->divider.hw);
++	clk = clk_register(NULL, &fixup_mux->mux.hw);
 +	if (IS_ERR(clk))
-+		kfree(fixup_div);
++		kfree(fixup_mux);
 +
 +	return clk;
 +}
 diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index 0e4e8bb..51eb3853 100644
+index 51eb3853..2534359 100644
 --- a/arch/arm/mach-imx/clk.h
 +++ b/arch/arm/mach-imx/clk.h
-@@ -49,6 +49,10 @@ struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
- 			     u8 width, void __iomem *busy_reg, u8 busy_shift,
- 			     const char **parent_names, int num_parents);
+@@ -53,6 +53,10 @@ struct clk *imx_clk_fixup_divider(const char *name, const char *parent,
+ 				  void __iomem *reg, u8 shift, u8 width,
+ 				  void (*fixup)(u32 *val));
  
-+struct clk *imx_clk_fixup_divider(const char *name, const char *parent,
-+				  void __iomem *reg, u8 shift, u8 width,
-+				  void (*fixup)(u32 *val));
++struct clk *imx_clk_fixup_mux(const char *name, void __iomem *reg,
++			      u8 shift, u8 width, const char **parents,
++			      int num_parents, void (*fixup)(u32 *val));
 +
  static inline struct clk *imx_clk_fixed(const char *name, int rate)
  {
