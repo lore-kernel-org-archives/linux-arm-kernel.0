@@ -1,68 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 11 Jul 2013 18:31:18 +0200
-Subject: [PATCHv5 06/10] clocksource: sun4i: Fix the next event code
-In-Reply-To: <1373560282-15184-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1373560282-15184-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1373560282-15184-7-git-send-email-maxime.ripard@free-electrons.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 11 Jul 2013 11:35:03 -0500
+Subject: [PATCH] ARM: OMAP2+: twl-common: Remove code for twl6030 and
+ twl6040 setup for legacy boot
+In-Reply-To: <51DED333.9080609@ti.com>
+References: <1373552638-13930-1-git-send-email-peter.ujfalusi@ti.com>
+ <20130711145916.GA6138@kahuna> <51DED333.9080609@ti.com>
+Message-ID: <20130711163503.GA6611@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The next_event logic was setting the next interval to fire in the
-current timer value instead of the interval value register, which is
-obviously wrong.
+On 17:45-20130711, Peter Ujfalusi wrote:
+> On 07/11/2013 04:59 PM, Nishanth Menon wrote:
+> > On 16:23-20130711, Peter Ujfalusi wrote:
+> >> OMAP4 no longer boots in legacy mode so the code here is no longer used.
+> >>
+> >> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> >> ---
+> >>  arch/arm/mach-omap2/twl-common.c | 332 ++-------------------------------------
+> >>  arch/arm/mach-omap2/twl-common.h |   8 -
+> >>  2 files changed, 12 insertions(+), 328 deletions(-)
+> > Could we modify the Makefile and build twl-common.o only for
+> > CONFIG_ARCH_OMAP3?
+> > 
+> > We could get rid of all the #ifdef from the code that way. OMAP3 is the
+> > only platform that still depends on this - Further, with this change,
+> 
+> Yep, I can do that. I'll send a separate patch to do this.
+> 
+> > commit 34a38440689b06a515104d668494e0ff8a4e1537
+> > (regulator: twl6030: add support for vdd1, vdd2 and vdd3 regulators)
+> > will need a relook as well. currently part of the discussion with Mark
+> > in [1]
+> > 
+> > [1] http://marc.info/?t=137185016300003&r=1&w=2
+> 
+> I don't see anything touching twl-common.c/h in the series.
+> But at the end we should get rid of the legacy support in all of the drivers
+> aimed for OMAP4+ gradually since it is pointless to keep dead code. Emphasis
+> on gradually ;)
+right - now that we removed the set_voltage/get_voltage custom code,
+there are no longer any way the code introduced in the commit can be
+exercised.
 
-Plus, the logic to set the actual value was wrong as well: the interval
-register can only be modified when the timer is disabled, and then
-enable it back, otherwise, it'll have no effect. Fix this logic as well
-since that code couldn't possibly work.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clocksource/sun4i_timer.c | 25 ++++++++++++++++++++++---
- 1 file changed, 22 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 8e9c651..7123f65 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -38,6 +38,20 @@
- 
- static void __iomem *timer_base;
- 
-+/*
-+ * When we disable a timer, we need to wait at least for 2 cycles of
-+ * the timer source clock. We will use for that the clocksource timer
-+ * that is already setup and runs at the same frequency than the other
-+ * timers, and we never will be disabled.
-+ */
-+static void sun4i_clkevt_sync(void)
-+{
-+	u32 old = readl(timer_base + TIMER_CNTVAL_REG(1));
-+
-+	while ((old - readl(timer_base + TIMER_CNTVAL_REG(1))) < 3)
-+		cpu_relax();
-+}
-+
- static void sun4i_clkevt_mode(enum clock_event_mode mode,
- 			      struct clock_event_device *clk)
- {
-@@ -63,9 +77,14 @@ static void sun4i_clkevt_mode(enum clock_event_mode mode,
- static int sun4i_clkevt_next_event(unsigned long evt,
- 				   struct clock_event_device *unused)
- {
--	u32 u = readl(timer_base + TIMER_CTL_REG(0));
--	writel(evt, timer_base + TIMER_CNTVAL_REG(0));
--	writel(u | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
-+	u32 val = readl(timer_base + TIMER_CTL_REG(0));
-+	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
-+	sun4i_clkevt_sync();
-+
-+	writel(evt, timer_base + TIMER_INTVAL_REG(0));
-+
-+	val = readl(timer_base + TIMER_CTL_REG(0));
-+	writel(val | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
- 	       timer_base + TIMER_CTL_REG(0));
- 
- 	return 0;
 -- 
-1.8.3.2
+Regards,
+Nishanth Menon
