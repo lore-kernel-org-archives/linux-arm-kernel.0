@@ -1,58 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Jul 2013 16:32:20 +0200
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <51DD9A8C.10608@keymile.com>
-References: <51DD88A4.1030506@keymile.com> <20130710185706.72b124a4@skate>
- <51DD9A8C.10608@keymile.com>
-Message-ID: <20130711163220.2b3adf38@skate>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 11 Jul 2013 17:35:58 +0300
+Subject: [PATCH] ARM: OMAP3: Beagle: Fix USB Host on beagle xM Ax/Bx
+In-Reply-To: <51DEA7F1.1050902@denx.de>
+References: <1366024808-4691-1-git-send-email-rogerq@ti.com>
+ <51DC09E7.1070302@denx.de> <51DC164B.5010608@ti.com>
+ <51DC1B47.7070504@denx.de> <51DE87D3.5030600@ti.com>
+ <51DEA7F1.1050902@denx.de>
+Message-ID: <51DEC2CE.70400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gerlando Falauto,
-
-On Wed, 10 Jul 2013 19:31:56 +0200, Gerlando Falauto wrote:
-
-> Yes, though we had to trick it a little bit to get both the internal 
-> switch and this PCIe device working:
+On 07/11/2013 03:41 PM, Stefan Roese wrote:
+> On 07/11/2013 12:24 PM, Roger Quadros wrote:
+>> My u-boot script is below and boot log is attached.
 > 
-> - this PCIe device requires to map 256M of memory as opposed to just 128
-> - we need a virtual PCIe device to connect to the internal switch, which 
-> must be mapped at 0xf4000000 (normally used for the NAND which must then 
-> move to 0xff000000)
+> BTW: I noticed a git ID (8e1cacd) in your kernel that I can't identify.
+> Do you have any patches locally applied to the kernel.org version that
+> might be helpful with this USB issue I'm seeing?
 
-Aah, if you need 256 MB, then you need to adjust the ranges, because
-by default there is only 128 MB for PCIe memory. So, you would need
-something like:
+Yes I had tested it on a more recent kernel with some local patches applied
+that I've recently sent for review.
 
-So, within the pcie-controller node, you should do something like:
+But to cross check with your setup I've retested it with commit d2b4a646 
+with the 2 below patches on top
 
-			ranges = <0x82000000 0 0x00040000 0x00040000 0 0x00002000   /* Port 0.0 registers */
-				  0x82000000 0 0xe0000000 0xe0000000 0 0x10000000   /* non-prefetchable memory */
-			          0x81000000 0 0          0xf0000000 0 0x00100000>; /* downstream I/O */
+https://lkml.org/lkml/2013/6/20/327
+https://lkml.org/lkml/2013/6/20/339
 
-and in the ranges property at the ocp { } level, you should do something like:
+I've tried it again with the ELDK 5.3 root but still can't get it to fail.
 
+I think we should match our u-boot as well. Could you please let me know
+your u-boot commit and uEnv.txt?
 
-		ranges = <0x00000000 0xf1000000 0x0100000
-		          0xe0000000 0xe0000000 0x10100000 /* PCIE */
-		          0xf4000000 0xf4000000 0x0000400
-		          0xf5000000 0xf5000000 0x0000400>;
+My network setup is pretty simple, beagle-xm is connected directly to my laptop's
+ethernet port. No network switch in between.
 
-Basically, before the change the configuration was:
+When you get the problem do you cold boot the board or warm boot it?
+I've been always cold booting it.
 
- * 128 MB of PCIe memory at 0xe0000000
- * 1 MB of PCIe I/O at 0xe8000000
-
-After the change, you have:
-
- * 256 MB of PCIe memory at 0xe0000000
- * 1 MB of PCIe I/O at 0xf0000000
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+cheers,
+-roger
