@@ -1,315 +1,131 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 11 Jul 2013 11:25:47 +0200
-Subject: [PATCH v2 3/6] clk: samsung: add plls used in s3c2416 and s3c2443
-In-Reply-To: <201307111050.39878.heiko@sntech.de>
-References: <201307100057.06061.heiko@sntech.de> <1525015.XUBJYYqnvA@thinkpad>
- <201307111050.39878.heiko@sntech.de>
-Message-ID: <10485562.994mEYPTEH@thinkpad>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 11 Jul 2013 12:26:12 +0300
+Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
+In-Reply-To: <51DE780C.2070701@ti.com>
+References: <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
+ <20130708112553.GU5523@atomide.com> <51DAB394.3050104@ti.com>
+ <20130708131033.GA5523@atomide.com> <51DABC81.3080409@ti.com>
+ <20130708133512.GD31221@arwen.pp.htv.fi>
+ <87mwpuakod.fsf@linaro.org> <20130710142633.GV5523@atomide.com>
+ <20130710160704.GH18966@arwen.pp.htv.fi> <51DE780C.2070701@ti.com>
+Message-ID: <20130711092612.GG23892@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 of July 2013 10:50:39 Heiko St?bner wrote:
-> Am Donnerstag, 11. Juli 2013, 10:16:41 schrieb Tomasz Figa:
-> > Hi Heiko,
-> > 
-> > On Wednesday 10 of July 2013 00:59:08 Heiko St?bner wrote:
-> > > This adds support for pll2126x, pll3000x, pll6552x and pll6553x.
-> > > 
-> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > ---
-> > > 
-> > >  drivers/clk/samsung/clk-pll.c |  280
-> > > 
-> > > +++++++++++++++++++++++++++++++++++++++++ drivers/clk/samsung/clk-pll.h
-> > > |
-> > > 
-> > >  8 ++
-> > >  2 files changed, 288 insertions(+)
-> > 
-> > Generally the patch looks good, but I have some comments to the part
-> > related to 655xx PLLs.
-> > 
-> > I had a patch adding support for them too, but we can go with yours, since
-> > the way of registration has been changed by Yadwinder's patches and mine
-> > would have to be updated anyway.
-> > 
-> > > diff --git a/drivers/clk/samsung/clk-pll.c
-> > > b/drivers/clk/samsung/clk-pll.c index 0afaec6..35c15a1 100644
-> > > --- a/drivers/clk/samsung/clk-pll.c
-> > > +++ b/drivers/clk/samsung/clk-pll.c
-> > > @@ -323,6 +323,73 @@ struct clk * __init
-> > > samsung_clk_register_pll46xx(const char *name, }
-> > > 
-> > >  /*
-> > > 
-> > > + * PLL2126x Clock Type
-> > > + */
-> > > +
-> > > +#define PLL2126X_MDIV_MASK	(0xFF)
-> > > +#define PLL2126X_PDIV_MASK	(0x3)
-> > > +#define PLL2126X_SDIV_MASK	(0x3)
-> > > +#define PLL2126X_MDIV_SHIFT	(16)
-> > > +#define PLL2126X_PDIV_SHIFT	(8)
-> > > +#define PLL2126X_SDIV_SHIFT	(0)
-> 
-> +#define PLL2126X_PDIV_MASK	(0x3F)
-> 
-> is the correct value.
-> 
-> > > +
-> > > +struct samsung_clk_pll2126x {
-> > > +	struct clk_hw		hw;
-> > > +	const void __iomem	*con_reg;
-> > > +};
-> > > +
-> > > +#define to_clk_pll2126x(_hw) container_of(_hw, struct
-> > > samsung_clk_pll2126x, hw) +
-> > > +static unsigned long samsung_pll2126x_recalc_rate(struct clk_hw *hw,
-> > > +				unsigned long parent_rate)
-> > > +{
-> > > +	struct samsung_clk_pll2126x *pll = to_clk_pll2126x(hw);
-> > > +	u32 pll_con, mdiv, pdiv, sdiv;
-> > > +	u64 fvco = parent_rate;
-> > > +
-> > > +	pll_con = __raw_readl(pll->con_reg);
-> > > +	mdiv = (pll_con >> PLL2126X_MDIV_SHIFT) & PLL2126X_MDIV_MASK;
-> > > +	pdiv = (pll_con >> PLL2126X_PDIV_SHIFT) & PLL2126X_PDIV_MASK;
-> > > +	sdiv = (pll_con >> PLL2126X_SDIV_SHIFT) & PLL2126X_SDIV_MASK;
-> > > +
-> > > +	fvco *= (mdiv + 8);
-> > > +	do_div(fvco, (pdiv + 2) << sdiv);
-> > > +
-> > > +	return (unsigned long)fvco;
-> > > +}
-> > > +
-> > > +static const struct clk_ops samsung_pll2126x_clk_ops = {
-> > > +	.recalc_rate = samsung_pll2126x_recalc_rate,
-> > > +};
-> > > +
-> > > +struct clk * __init samsung_clk_register_pll2126x(const char *name,
-> > > +			const char *pname, const void __iomem *con_reg)
-> > > +{
-> > > +	struct samsung_clk_pll2126x *pll;
-> > > +	struct clk *clk;
-> > > +	struct clk_init_data init;
-> > > +
-> > > +	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
-> > > +	if (!pll)
-> > > +		return ERR_PTR(-ENOMEM);
-> > > +
-> > > +	init.name = name;
-> > > +	init.ops = &samsung_pll2126x_clk_ops;
-> > > +	init.flags = CLK_GET_RATE_NOCACHE;
-> > > +	init.parent_names = &pname;
-> > > +	init.num_parents = 1;
-> > > +
-> > > +	pll->hw.init = &init;
-> > > +	pll->con_reg = con_reg;
-> > > +
-> > > +	clk = samsung_register_pll(&pll->hw);
-> > > +	if (IS_ERR(clk))
-> > > +		kfree(pll);
-> > > +
-> > > +	return clk;
-> > > +}
-> > > +
-> > > +/*
-> > > 
-> > >   * PLL2550x Clock Type
-> > >   */
-> > > 
-> > > @@ -396,3 +463,216 @@ struct clk * __init
-> > > samsung_clk_register_pll2550x(const char *name,
-> > > 
-> > >  	return clk;
-> > >  
-> > >  }
-> > > 
-> > > +
-> > > +/*
-> > > + * PLL3000x Clock Type
-> > > + */
-> > > +
-> > > +#define PLL3000X_MDIV_MASK	(0xFF)
-> > > +#define PLL3000X_PDIV_MASK	(0x3)
-> > > +#define PLL3000X_SDIV_MASK	(0x3)
-> > > +#define PLL3000X_MDIV_SHIFT	(16)
-> > > +#define PLL3000X_PDIV_SHIFT	(8)
-> > > +#define PLL3000X_SDIV_SHIFT	(0)
-> 
-> these are correct.
-> 
-> > > +
-> > > +struct samsung_clk_pll3000x {
-> > > +	struct clk_hw		hw;
-> > > +	const void __iomem	*con_reg;
-> > > +};
-> > > +
-> > > +#define to_clk_pll3000x(_hw) container_of(_hw, struct
-> > > samsung_clk_pll3000x, hw) +
-> > > +static unsigned long samsung_pll3000x_recalc_rate(struct clk_hw *hw,
-> > > +				unsigned long parent_rate)
-> > > +{
-> > > +	struct samsung_clk_pll3000x *pll = to_clk_pll3000x(hw);
-> > > +	u32 pll_con, mdiv, pdiv, sdiv;
-> > > +	u64 fvco = parent_rate;
-> > > +
-> > > +	pll_con = __raw_readl(pll->con_reg);
-> > > +	mdiv = (pll_con >> PLL3000X_MDIV_SHIFT) & PLL3000X_MDIV_MASK;
-> > > +	pdiv = (pll_con >> PLL3000X_PDIV_SHIFT) & PLL3000X_PDIV_MASK;
-> > > +	sdiv = (pll_con >> PLL3000X_SDIV_SHIFT) & PLL3000X_SDIV_MASK;
-> > > +
-> > > +	fvco *= (2 * (mdiv + 8));
-> > > +	do_div(fvco, pdiv << sdiv);
-> > > +
-> > > +	return (unsigned long)fvco;
-> > > +}
-> > > +
-> > > +static const struct clk_ops samsung_pll3000x_clk_ops = {
-> > > +	.recalc_rate = samsung_pll3000x_recalc_rate,
-> > > +};
-> > > +
-> > > +struct clk * __init samsung_clk_register_pll3000x(const char *name,
-> > > +			const char *pname, const void __iomem *con_reg)
-> > > +{
-> > > +	struct samsung_clk_pll3000x *pll;
-> > > +	struct clk *clk;
-> > > +	struct clk_init_data init;
-> > > +
-> > > +	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
-> > > +	if (!pll)
-> > > +		return ERR_PTR(-ENOMEM);
-> > > +
-> > > +	init.name = name;
-> > > +	init.ops = &samsung_pll3000x_clk_ops;
-> > > +	init.flags = CLK_GET_RATE_NOCACHE;
-> > > +	init.parent_names = &pname;
-> > > +	init.num_parents = 1;
-> > > +
-> > > +	pll->hw.init = &init;
-> > > +	pll->con_reg = con_reg;
-> > > +
-> > > +	clk = samsung_register_pll(&pll->hw);
-> > > +	if (IS_ERR(clk))
-> > > +		kfree(pll);
-> > > +
-> > > +	return clk;
-> > > +}
-> > > +
-> > > +/*
-> > > + * PLL6552x Clock Type
-> > > + */
-> > > +
-> > > +#define PLL6552X_MDIV_MASK	(0x3FF)
-> > > +#define PLL6552X_PDIV_MASK	(0x3F)
-> > > +#define PLL6552X_SDIV_MASK	(0x7)
-> > > +#define PLL6552X_MDIV_SHIFT	(14)
-> > > +#define PLL6552X_PDIV_SHIFT	(5)
-> > > +#define PLL6552X_SDIV_SHIFT	(0)
-> > 
-> > Are you sure about those bitfields?
-> > 
-> > In S3C6410 User's Manual they are different. You can look at my patch for
-> > a
-> > comparison:
-> > 
-> > http://thread.gmane.org/gmane.linux.usb.general/87571/focus=88344
-> 
-> The numbers where taken from the previous pll code, but I now again checked
-> them against the datasheet of the s3c2416 and the s3c2450.
-> 
-> When comparing with your patch, it really seems that the bit offsets in the
-> register are different for the pdiv and mdiv - the above values are correct
-> according the the datasheet (and also produce the expected results in the
-> clock tree).
+Hi,
 
-> > > +struct samsung_clk_pll6552x {
-> > > +	struct clk_hw		hw;
-> > > +	const void __iomem	*con_reg;
-> > > +};
-> > > +
-> > > +#define to_clk_pll6552x(_hw) container_of(_hw, struct
-> > > samsung_clk_pll6552x, hw) +
-> > > +static unsigned long samsung_pll6552x_recalc_rate(struct clk_hw *hw,
-> > > +				unsigned long parent_rate)
-> > > +{
-> > > +	struct samsung_clk_pll6552x *pll = to_clk_pll6552x(hw);
-> > > +	u32 pll_con, mdiv, pdiv, sdiv;
-> > > +	u64 fvco = parent_rate;
-> > > +
-> > > +	pll_con = __raw_readl(pll->con_reg);
-> > > +	mdiv = (pll_con >> PLL6552X_MDIV_SHIFT) & PLL6552X_MDIV_MASK;
-> > > +	pdiv = (pll_con >> PLL6552X_PDIV_SHIFT) & PLL6552X_PDIV_MASK;
-> > > +	sdiv = (pll_con >> PLL6552X_SDIV_SHIFT) & PLL6552X_SDIV_MASK;
-> > > +
-> > > +	fvco *= mdiv;
-> > > +	do_div(fvco, (pdiv << sdiv));
-> > > +
-> > > +	return (unsigned long)fvco;
-> > > +}
-> > > +
-> > > +static const struct clk_ops samsung_pll6552x_clk_ops = {
-> > > +	.recalc_rate = samsung_pll6552x_recalc_rate,
-> > > +};
-> > > +
-> > > +struct clk * __init samsung_clk_register_pll6552x(const char *name,
-> > > +			const char *pname, const void __iomem *con_reg)
-> > > +{
-> > > +	struct samsung_clk_pll6552x *pll;
-> > > +	struct clk *clk;
-> > > +	struct clk_init_data init;
-> > > +
-> > > +	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
-> > > +	if (!pll)
-> > > +		return ERR_PTR(-ENOMEM);
-> > > +
-> > > +	init.name = name;
-> > > +	init.ops = &samsung_pll6552x_clk_ops;
-> > > +	init.flags = CLK_GET_RATE_NOCACHE;
-> > > +	init.parent_names = &pname;
-> > > +	init.num_parents = 1;
-> > > +
-> > > +	pll->hw.init = &init;
-> > > +	pll->con_reg = con_reg;
-> > > +
-> > > +	clk = samsung_register_pll(&pll->hw);
-> > > +	if (IS_ERR(clk))
-> > > +		kfree(pll);
-> > > +
-> > > +	return clk;
-> > > +}
-> > > +
-> > > +/*
-> > > + * PLL6553x Clock Type
-> > > + */
-> > > +
-> > > +#define PLL6553X_MDIV_MASK	(0x7F)
-> > > +#define PLL6553X_PDIV_MASK	(0x1F)
-> > > +#define PLL6553X_SDIV_MASK	(0x3)
-> > > +#define PLL6553X_KDIV_MASK	(0xFFFF)
-> > > +#define PLL6553X_MDIV_SHIFT	(16)
-> > > +#define PLL6553X_PDIV_SHIFT	(8)
-> > > +#define PLL6553X_SDIV_SHIFT	(0)
+On Thu, Jul 11, 2013 at 02:47:00PM +0530, Rajendra Nayak wrote:
+> On Wednesday 10 July 2013 09:37 PM, Felipe Balbi wrote:
+> > how about something like below ? It makes omap_device/hwmod and
+> > pm_runtime agree on the initial state of the device and will prevent
+> > ->runtime_resume() from being called on first pm_runtime_get*() done
+> > during probe.
 > > 
-> > Same about those bitfields. They seem to be different on S3C64xx.
+> > This is similar to what PCI bus does (if you look at pci_pm_init()).
 > 
-> Here it seems the values were off in the original code. According to the
-> datasheet the values in your patch are correct. Thanks for the catch.
+> I tried something similar [1] but what I found is that the serial
+> runtime resume was called despite it being marked as active using
+> pm_runtime_set_active().
 > 
-> +#define PLL6553X_MDIV_MASK	(0xFF)
-> +#define PLL6553X_PDIV_MASK	(0x3F)
-> +#define PLL6553X_SDIV_MASK	(0x7)
+> That seems to be because of the pm_runtime_set_autosuspend_delay()
+> because we have the autosuspend_delay = -1
 > 
+> -----
+> static void update_autosuspend(struct device *dev, int old_delay, int old_use)
+> {
+>         int delay = dev->power.autosuspend_delay;
 > 
-> This leaves the problem on what to do with the 6552X and its different bit
-> offsets. Is the pll in question really a 6552X? In the s3c2416 manual its
-> name is explicitly stated.
+>         /* Should runtime suspend be prevented now? */
+>         if (dev->power.use_autosuspend && delay < 0) {
+> 
+>                 /* If it used to be allowed then prevent it. */
+>                 if (!old_use || old_delay >= 0) {
+>                         atomic_inc(&dev->power.usage_count);
+>                         rpm_resume(dev, 0); <------------------------------- calls serial runtime resume.
+>                 }
+>         }
+> -----
+> 
+> So we end up with the same issue with serial resume being called before set_termios()
 
-So is it in S3C6410 User's Manual.
+yeah, that part I figured out after I started testing today. It seems
+like my latest version is getting closer but I still see problems, diff
+below:
 
-If you look at the old plat/pll.h header, you can see that none of S3C2416_PLL 
-(which I believe corresponds to your 6552X) and S3C6400_PLL (which is the 
-PLL6552x that can be found on S3C64xx) is labelled as PLL6552x explicitly.
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index e6d2307..0cc2da9 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -181,6 +181,26 @@ odbfd_exit:
+ 	return ret;
+ }
+ 
++static void omap_device_pm_init(struct platform_device *pdev)
++{
++	omap_device_enable(pdev);
++	pm_runtime_forbid(&pdev->dev);
++	pm_runtime_set_active(&pdev->dev);
++	device_enable_async_suspend(&pdev->dev);
++}
++
++static void omap_device_pm_allow(struct platform_device *pdev)
++{
++	pm_runtime_allow(&pdev->dev);
++}
++
++static void omap_device_pm_exit(struct platform_device *pdev)
++{
++	device_disable_async_suspend(&pdev->dev);
++	pm_runtime_set_suspended(&pdev->dev);
++	omap_device_idle(pdev);
++}
++
+ static int _omap_device_notifier_call(struct notifier_block *nb,
+ 				      unsigned long event, void *dev)
+ {
+@@ -192,16 +212,31 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
+ 		if (pdev->archdata.od)
+ 			omap_device_delete(pdev->archdata.od);
+ 		break;
++	case BUS_NOTIFY_BIND_DRIVER:
++		if (pdev->archdata.od)
++			omap_device_pm_init(pdev);
++		break;
++	case BUS_NOTIFY_BOUND_DRIVER:
++		if (pdev->archdata.od)
++			omap_device_pm_allow(pdev);
++		break;
++	case BUS_NOTIFY_UNBOUND_DRIVER:
++		if (pdev->archdata.od)
++			omap_device_pm_exit(pdev);
++		break;
+ 	case BUS_NOTIFY_ADD_DEVICE:
+ 		if (pdev->dev.of_node)
+ 			omap_device_build_from_dt(pdev);
+-		/* fall through */
++		break;
+ 	default:
+-		od = to_omap_device(pdev);
+-		if (od)
+-			od->_driver_status = event;
++		/* nothing */
++		break;
+ 	}
+ 
++	od = to_omap_device(pdev);
++	if (od)
++		od->_driver_status = event;
++
+ 	return NOTIFY_DONE;
+ }
+ 
 
-Best regards,
-Tomasz
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130711/01d3f194/attachment.sig>
