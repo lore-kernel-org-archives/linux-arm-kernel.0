@@ -1,122 +1,212 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 11 Jul 2013 13:16:28 +0300
-Subject: [PATCH] arm: omap2plus: unidle devices which are about to probe
-In-Reply-To: <20130711092612.GG23892@arwen.pp.htv.fi>
-References: <20130711092612.GG23892@arwen.pp.htv.fi>
-Message-ID: <1373537788-30413-1-git-send-email-balbi@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 11 Jul 2013 12:19:26 +0200
+Subject: [PATCH] clk: samsung: add set_rate and round_rate callbacks for
+ pll45xx
+In-Reply-To: <1373534869-12034-1-git-send-email-thomas.abraham@linaro.org>
+References: <1373534869-12034-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1395018.H3ijo3R2Tj@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-in order to make HWMOD and pm_runtime agree on the
-initial state of the device, we will unidle the device
-and call pm_runtime_set_active() to tell pm_runtime
-that the device is really active.
+Hi Thomas,
 
-By the time driver's probe() is reached, a call to
-pm_runtime_get_sync() will not cause driver's
-->runtime_resume() method to be called at first, only
-after a successful ->runtime_suspend().
+On Thursday 11 of July 2013 14:57:49 Thomas Abraham wrote:
+> Add support for set_rate and round_rate callbacks for pll45xx pll. This
+> allows configuring pll45xx to generate a desired clock output.
+> 
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+> 
+> The set_rate and round_rate callbacks in this patch for pll45xx are handled
+> slightly differently from the way it is done in the (not yet merged) patch
+> series from Yadwinder
+> (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg19540.html
+> )
 
-Note that we must prevent pm_runtime transitions while
-driver is probing otherwise drivers would be suspended
-as soon as they call pm_runtime_use_autosuspend(). By
-calling pm_runtime_forbid() before probe() and
-pm_runtime_allow() after probe() we 'fix' that detail.
+I think this series should be considered as already merged. All the patches 
+have been already acked and are just waiting to be picked up after 3.11-rc1 
+gets released.
 
-Note that this patch was inspired by PCI's pci_pm_init().
+> 
+> In this patch, the pll lookup table is kept as part of the pll configuration
+> code itself, since the pll is just a hardware block which takes an input
+> frequency and configuration values to genertate a output clock frequency.
+> Given a set of inputs, a pll of a given type will generate the same output
+> regardless of the SoC it is used in.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
+Are you sure about this? I've seen different sets of PMS(K) settings across 
+different SoCs with the same PLL blocks.
 
-boot tested on top of today's Linus master
-6d128e1e72bf082542e85f72e6b7ddd704193588 with OMAP4
-panda. Reached console prompt and, after setting a
-proper autosuspend delay, consoles autosuspend just
-fine.
+> So instead of supplying the pll lookup
+> table from per-soc clock driver code (as done in the Yadwinder's patch
+> series), the pll lookup table can be coupled with the pll code itself,
+> saving duplication of pll lookup table for every SoC the pll is used with.
 
-It needs to be tested on other platforms.
+Yes, that would be nice to have, but we already discussed this problem a lot 
+and found out that this has to be specified on per-SoC basis.
 
-ps: note that we also call pm_runtime_set_suspended(dev)
-from our late_initcall() to disable devices so that pm_runtime
-and HWMOD continue to aggree on device's state.
+>  drivers/clk/samsung/clk-pll.c |   88
+> +++++++++++++++++++++++++++++++++++++++++ drivers/clk/samsung/clk-pll.h |  
+> 15 +++++++
+>  2 files changed, 103 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+> index 362f12d..4940936 100644
+> --- a/drivers/clk/samsung/clk-pll.c
+> +++ b/drivers/clk/samsung/clk-pll.c
+> @@ -172,6 +172,8 @@ struct clk * __init samsung_clk_register_pll36xx(const
+> char *name, * PLL45xx Clock Type
+>   */
+> 
+> +#define PLL45XX_EN_MASK		(1 << 31)
+> +#define PLL45XX_LOCK_MASK	(1 << 29)
+>  #define PLL45XX_MDIV_MASK	(0x3FF)
+>  #define PLL45XX_PDIV_MASK	(0x3F)
+>  #define PLL45XX_SDIV_MASK	(0x7)
+> @@ -187,6 +189,90 @@ struct samsung_clk_pll45xx {
+> 
+>  #define to_clk_pll45xx(_hw) container_of(_hw, struct samsung_clk_pll45xx,
+> hw)
+> 
+> +/* a sorted table of freq supported by pll45xx with 24mhz parent clock */
+> +static struct pll45xx_freq_lookup pll45xx_freq_lookup_24mhz[] = {
+> +	PLL45XX_PMS(1000000000, 6, 250, 1),
+> +	PLL45XX_PMS(800000000, 6, 200, 1),
+> +	PLL45XX_PMS(500000000, 6, 250, 2),
+> +	PLL45XX_PMS(400000000, 6, 200, 2),
+> +	PLL45XX_PMS(200000000, 6, 200, 3),
+> +};
+> +
+> +static int samsung_pll45xx_set_rate(struct clk_hw *hw, unsigned long rate,
+> +					unsigned long prate)
+> +{
+> +	struct samsung_clk_pll45xx *pll = to_clk_pll45xx(hw);
+> +	struct pll45xx_freq_lookup *f;
+> +	unsigned long timeout, pll_con, cnt, idx;
+> +
+> +	/* select a lookup table based on parent clock frequency */
+> +	switch (prate) {
+> +	case 24000000:
+> +		f = pll45xx_freq_lookup_24mhz;
+> +		cnt = ARRAY_SIZE(pll45xx_freq_lookup_24mhz);
+> +		break;
 
- arch/arm/mach-omap2/omap_device.c | 44 +++++++++++++++++++++++++++++++++++----
- 1 file changed, 40 insertions(+), 4 deletions(-)
+Do you really need to check the input frequency every time? I think you could 
+just set up appropriate rate table in register function, like it is done in 
+Yadwinder's patches.
 
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index 5cc9287..cb1fc1d 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -178,6 +178,26 @@ odbfd_exit:
- 	return ret;
- }
- 
-+static void omap_device_pm_init(struct platform_device *pdev)
-+{
-+	omap_device_enable(pdev);
-+	pm_runtime_forbid(&pdev->dev);
-+	pm_runtime_set_active(&pdev->dev);
-+	device_enable_async_suspend(&pdev->dev);
-+}
-+
-+static void omap_device_pm_allow(struct platform_device *pdev)
-+{
-+	pm_runtime_allow(&pdev->dev);
-+}
-+
-+static void omap_device_pm_exit(struct platform_device *pdev)
-+{
-+	device_disable_async_suspend(&pdev->dev);
-+	pm_runtime_set_suspended(&pdev->dev);
-+	omap_device_idle(pdev);
-+}
-+
- static int _omap_device_notifier_call(struct notifier_block *nb,
- 				      unsigned long event, void *dev)
- {
-@@ -189,16 +209,31 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
- 		if (pdev->archdata.od)
- 			omap_device_delete(pdev->archdata.od);
- 		break;
-+	case BUS_NOTIFY_BIND_DRIVER:
-+		if (pdev->archdata.od)
-+			omap_device_pm_init(pdev);
-+		break;
-+	case BUS_NOTIFY_BOUND_DRIVER:
-+		if (pdev->archdata.od)
-+			omap_device_pm_allow(pdev);
-+		break;
-+	case BUS_NOTIFY_UNBOUND_DRIVER:
-+		if (pdev->archdata.od)
-+			omap_device_pm_exit(pdev);
-+		break;
- 	case BUS_NOTIFY_ADD_DEVICE:
- 		if (pdev->dev.of_node)
- 			omap_device_build_from_dt(pdev);
--		/* fall through */
-+		break;
- 	default:
--		od = to_omap_device(pdev);
--		if (od)
--			od->_driver_status = event;
-+		/* nothing */
-+		break;
- 	}
- 
-+	od = to_omap_device(pdev);
-+	if (od)
-+		od->_driver_status = event;
-+
- 	return NOTIFY_DONE;
- }
- 
-@@ -855,6 +890,7 @@ static int __init omap_device_late_idle(struct device *dev, void *data)
- 			dev_warn(dev, "%s: enabled but no driver.  Idling\n",
- 				 __func__);
- 			omap_device_idle(pdev);
-+			pm_runtime_set_suspended(dev);
- 		}
- 	}
- 
--- 
-1.8.2.1
+> +	default:
+> +		pr_err("%s: unsupported parent clock rate, failed to set rate",
+> +					__func__);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* check if the requested freq is in the list of supported freq */
+> +	for (idx = 0; idx < cnt; idx++, f++)
+> +		if (f->target_freq == rate)
+> +			break;
+
+You don't have to check all the entries if you keep the PMS table sorted. You 
+just have to look for first entry that has frequency less or equal to requested 
+one.
+
+> +
+> +	if (idx == cnt) {
+> +		pr_err("%s: unspported clock speed %ld requested\n",
+> +				__func__, rate);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* first, disable the output of the pll */
+> +	writel(readl(pll->con_reg) & ~PLL45XX_EN_MASK, (void *)pll->con_reg);
+> +
+> +	/* write the new pll configuration values */
+> +	pll_con = (f->pdiv << PLL45XX_PDIV_SHIFT) |
+> +			(f->mdiv << PLL45XX_MDIV_SHIFT) |
+> +			(f->sdiv << PLL45XX_SDIV_SHIFT);
+> +	writel(pll_con, (void *)pll->con_reg);
+> +
+> +	/* enable the pll and wait for it to stabilize */
+> +	writel(pll_con | PLL45XX_EN_MASK, (void *)pll->con_reg);
+> +	timeout = jiffies + msecs_to_jiffies(20);
+> +	while (time_before(jiffies, timeout))
+> +		if (readl(pll->con_reg) & PLL45XX_LOCK_MASK)
+> +			return 0;
+> +	return -EBUSY;
+> +}
+> +
+> +static long samsung_pll45xx_round_rate(struct clk_hw *hw, unsigned long
+> rate, +						unsigned long *prate)
+> +{
+> +	struct pll45xx_freq_lookup *f;
+> +	unsigned long cnt;
+> +
+> +	/* select a lookup table based on parent clock frequency */
+> +	switch (*prate) {
+> +	case 24000000:
+> +		f = pll45xx_freq_lookup_24mhz;
+> +		cnt = ARRAY_SIZE(pll45xx_freq_lookup_24mhz);
+> +		break;
+> +	default:
+> +		pr_err("%s: unsupported parent clock rate", __func__);
+> +		return *prate;
+> +	}
+
+Again, PMS table can be set in register function and just used here.
+
+> +	/* find the nearest possible clock output that can be supported */
+> +	while (cnt-- > 0) {
+> +		if (rate >= f->target_freq)
+> +			return f->target_freq;
+> +		f++;
+> +	}
+> +
+> +	return (--f)->target_freq;
+> +}
+> +
+>  static unsigned long samsung_pll45xx_recalc_rate(struct clk_hw *hw,
+>  				unsigned long parent_rate)
+>  {
+> @@ -209,6 +295,8 @@ static unsigned long samsung_pll45xx_recalc_rate(struct
+> clk_hw *hw, }
+> 
+>  static const struct clk_ops samsung_pll45xx_clk_ops = {
+> +	.set_rate = samsung_pll45xx_set_rate,
+> +	.round_rate = samsung_pll45xx_round_rate,
+>  	.recalc_rate = samsung_pll45xx_recalc_rate,
+>  };
+> 
+> diff --git a/drivers/clk/samsung/clk-pll.h b/drivers/clk/samsung/clk-pll.h
+> index f33786e..fb687ec 100644
+> --- a/drivers/clk/samsung/clk-pll.h
+> +++ b/drivers/clk/samsung/clk-pll.h
+> @@ -18,6 +18,21 @@ enum pll45xx_type {
+>  	pll_4508
+>  };
+> 
+> +struct pll45xx_freq_lookup {
+> +	unsigned long	target_freq;
+> +	unsigned long	pdiv;
+> +	unsigned long	mdiv;
+> +	unsigned long	sdiv;
+> +};
+> +
+> +#define PLL45XX_PMS(f, p, m, s)		\
+> +	{					\
+> +		.target_freq	= f,		\
+> +		.pdiv		= p,		\
+> +		.mdiv		= m,		\
+> +		.sdiv		= s,		\
+> +	}
+> +
+>  enum pll46xx_type {
+>  	pll_4600,
+>  	pll_4650,
+
+Basically, I would prefer the way introduced by Yadwinder's and Vikas' patches 
+to be used. We already discussed all the aspects during all the 7 versions of 
+those patches and decided to go with that solution, so for the case of 
+consistency, same should be used for remaining PLLs.
+
+Best regards,
+Tomasz
