@@ -1,42 +1,32 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 11 Jul 2013 17:35:58 +0300
-Subject: [PATCH] ARM: OMAP3: Beagle: Fix USB Host on beagle xM Ax/Bx
-In-Reply-To: <51DEA7F1.1050902@denx.de>
-References: <1366024808-4691-1-git-send-email-rogerq@ti.com>
- <51DC09E7.1070302@denx.de> <51DC164B.5010608@ti.com>
- <51DC1B47.7070504@denx.de> <51DE87D3.5030600@ti.com>
- <51DEA7F1.1050902@denx.de>
-Message-ID: <51DEC2CE.70400@ti.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 11 Jul 2013 16:37:47 +0200
+Subject: [PATCH 1/2] ARM i.MX53: mba53: Fix PWM backlight DT node
+In-Reply-To: <1373553468-6564-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1373553468-6564-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1373553468-6564-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2013 03:41 PM, Stefan Roese wrote:
-> On 07/11/2013 12:24 PM, Roger Quadros wrote:
->> My u-boot script is below and boot log is attached.
-> 
-> BTW: I noticed a git ID (8e1cacd) in your kernel that I can't identify.
-> Do you have any patches locally applied to the kernel.org version that
-> might be helpful with this USB issue I'm seeing?
+The i.MX53 PWM controller uses two cells to describe the PWM specifier.
+Remove the extra unused values from the backlight DT node pwms property.
 
-Yes I had tested it on a more recent kernel with some local patches applied
-that I've recently sent for review.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ arch/arm/boot/dts/imx53-mba53.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-But to cross check with your setup I've retested it with commit d2b4a646 
-with the 2 below patches on top
-
-https://lkml.org/lkml/2013/6/20/327
-https://lkml.org/lkml/2013/6/20/339
-
-I've tried it again with the ELDK 5.3 root but still can't get it to fail.
-
-I think we should match our u-boot as well. Could you please let me know
-your u-boot commit and uEnv.txt?
-
-My network setup is pretty simple, beagle-xm is connected directly to my laptop's
-ethernet port. No network switch in between.
-
-When you get the problem do you cold boot the board or warm boot it?
-I've been always cold booting it.
-
-cheers,
--roger
+diff --git a/arch/arm/boot/dts/imx53-mba53.dts b/arch/arm/boot/dts/imx53-mba53.dts
+index aaa33bc..a630902 100644
+--- a/arch/arm/boot/dts/imx53-mba53.dts
++++ b/arch/arm/boot/dts/imx53-mba53.dts
+@@ -27,7 +27,7 @@
+ 
+ 	backlight {
+ 		compatible = "pwm-backlight";
+-		pwms = <&pwm2 0 50000 0 0>;
++		pwms = <&pwm2 0 50000>;
+ 		brightness-levels = <0 24 28 32 36 40 44 48 52 56 60 64 68 72 76 80 84 88 92 96 100>;
+ 		default-brightness-level = <10>;
+ 		enable-gpios = <&gpio7 7 0>;
+-- 
+1.8.1.5
