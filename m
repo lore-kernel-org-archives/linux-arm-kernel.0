@@ -1,44 +1,52 @@
-From: tibor@harsszegi.com (Tibor Harsszegi)
-Date: Thu, 11 Jul 2013 20:32:42 +0200
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 11 Jul 2013 14:37:37 -0400
 Subject: gpio_blink_set + Kirkwood
-In-Reply-To: <20130711164456.GA3095@lunn.ch>
+In-Reply-To: <51DEFA4A.6010303@harsszegi.com>
 References: <51DC564A.8050002@harsszegi.com> <20130709193605.GC26223@lunn.ch>
  <1a9bcb9094ae695c6707c4835417dd5b@harsszegi.com>
  <20130710073706.GA28212@lunn.ch> <51DEDB32.4080101@harsszegi.com>
- <20130711164456.GA3095@lunn.ch>
-Message-ID: <51DEFA4A.6010303@harsszegi.com>
+ <20130711164456.GA3095@lunn.ch> <51DEFA4A.6010303@harsszegi.com>
+Message-ID: <20130711183737.GX11908@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Jul 11, 2013 at 06:20:02PM +0200, Tibor Harsszegi wrote:
->> Hello guys,
->>
->> can anyone explain me how does the gpio_blink_set member gets filled
->> in leds-gpio through platform_get_drvdata()?
->> I can't seem to follow how the specific function pointer can be set
->> to orion_gpio_set_blink() for example.
->> Sorry for the dumb question :(
-> Hi Tibor
->
-> For DT based board, hardware blinking is not supported, as far as i
-> remember.
->
-> 	Andrew
+On Thu, Jul 11, 2013 at 08:32:42PM +0200, Tibor Harsszegi wrote:
+> >On Thu, Jul 11, 2013 at 06:20:02PM +0200, Tibor Harsszegi wrote:
+> >>Hello guys,
+> >>
+> >>can anyone explain me how does the gpio_blink_set member gets filled
+> >>in leds-gpio through platform_get_drvdata()?
+> >>I can't seem to follow how the specific function pointer can be set
+> >>to orion_gpio_set_blink() for example.
+> >>Sorry for the dumb question :(
+> >Hi Tibor
+> >
+> >For DT based board, hardware blinking is not supported, as far as i
+> >remember.
+> >
+> >	Andrew
+> 
+> Hello Andrew,
+> 
+> is there an example for "mixed machine setup" (if there is anything
+> like that) ?
+> I'm thinking about:
+> 
+> * DT based initialization starts
+> * then if supported board based "after-DT-init-board-code" executes
+> 
+> similar what we have in board-*.c files just that it would be
+> executed after kirkwood has initialized the board
+> based upon the .DTB
+> [I'm thinking about getting rid of the LED setup from the .DTB and
+> move it back to .C land - at least for a trial]
 
-Hello Andrew,
+As a testing hack, just add the following to board-dt.c:
 
-is there an example for "mixed machine setup" (if there is anything like 
-that) ?
-I'm thinking about:
+	if (of_machine_is_compatible("keymile,whizbang-board")) {
+		/* GPIO hackery here */
+	}
 
-* DT based initialization starts
-* then if supported board based "after-DT-init-board-code" executes
+hth,
 
-similar what we have in board-*.c files just that it would be executed 
-after kirkwood has initialized the board
-based upon the .DTB
-[I'm thinking about getting rid of the LED setup from the .DTB and move 
-it back to .C land - at least for a trial]
-
-Thanks,
-Tibor
+Jason.
