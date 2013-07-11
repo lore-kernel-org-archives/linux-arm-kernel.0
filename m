@@ -1,32 +1,53 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 11 Jul 2013 14:32:14 +0530
-Subject: [PATCH 6/6] clk: exynos-audss: Staticize exynos_audss_clk_init
-In-Reply-To: <1373533334-5169-1-git-send-email-sachin.kamat@linaro.org>
-References: <1373533334-5169-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1373533334-5169-7-git-send-email-sachin.kamat@linaro.org>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 11 Jul 2013 17:25:36 +0800
+Subject: [PATCH v12 10/13] usb: chipidea: add wait vbus lower than
+ OTGSC_BSV before role starts
+In-Reply-To: <51DE5DC8.8020605@pengutronix.de>
+References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
+ <1373524041-10482-11-git-send-email-peter.chen@freescale.com>
+ <51DE5DC8.8020605@pengutronix.de>
+Message-ID: <20130711092535.GA11728@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-exynos_audss_clk_init() is used only in this file. Make it
-static.
+On Thu, Jul 11, 2013 at 09:24:56AM +0200, Marc Kleine-Budde wrote:
+> On 07/11/2013 08:27 AM, Peter Chen wrote:
+> > When the gadget role starts, we need to make sure the vbus is lower
+> > than OTGSC_BSV, or there will be an vbus interrupt since we use
+> > B_SESSION_VALID as vbus interrupt to indicate connect and disconnect.
+> > When the host role starts, it may not be useful to wait vbus to lower
+> > than OTGSC_BSV, but it can indicate some hardware problems like the
+> > vbus is still higher than OTGSC_BSV after we disconnect to host some
+> > time later (500 jiffies currently), which is obvious not correct.
+> 
+> Jiffies ist not constant. I think you have to specify the timeout in
+> fractions of HZ. The system ticks with HZ jiffies per second. So a
+> timeout of 500ms is "HZ / 2".
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
- drivers/clk/samsung/clk-exynos-audss.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks, I will use msecs_to_jiffies.
 
-diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
-index 9b1bbd5..51b48da 100644
---- a/drivers/clk/samsung/clk-exynos-audss.c
-+++ b/drivers/clk/samsung/clk-exynos-audss.c
-@@ -62,7 +62,7 @@ static struct syscore_ops exynos_audss_clk_syscore_ops = {
- #endif /* CONFIG_PM_SLEEP */
- 
- /* register exynos_audss clocks */
--void __init exynos_audss_clk_init(struct device_node *np)
-+static void __init exynos_audss_clk_init(struct device_node *np)
- {
- 	reg_base = of_iomap(np, 0);
- 	if (!reg_base) {
+> > +/**
+> > + * hw_wait_reg: wait the register value
+> > + *
+> > + * Sometimes, it needs to wait register value before going on.
+> > + * Eg, when switch to device mode, the vbus value should be lower
+> > + * than OTGSC_BSV before connects to host.
+> > + *
+> > + * @ci: the controller
+> > + * @reg: register index
+> > + * @mask: mast bit
+> > + * @value: the bit value to wait
+> > + * @timeout: timeout to indicate an error
+>                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 
+> Better: timeout in jiffies
+> 
+
+As I will use msecs_to_jiffies, @timeout: timeout in millisecond.
+
+Thanks.
+
 -- 
-1.7.9.5
+
+Best Regards,
+Peter Chen
