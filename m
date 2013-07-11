@@ -1,29 +1,73 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 11 Jul 2013 12:11:44 +0100
-Subject: [PATCH] ASoC: Samsung: Set RFS and BFS in slave mode
-In-Reply-To: <1373526505-27115-2-git-send-email-padma.v@samsung.com>
-References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
- <1373526505-27115-2-git-send-email-padma.v@samsung.com>
-Message-ID: <20130711111144.GL24508@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Jul 2013 12:13:00 +0100
+Subject: [PATCH] arm64: use common reboot infrastructure
+Message-ID: <1373541180-7452-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 11, 2013 at 12:38:25PM +0530, Padmavathi Venna wrote:
-> As per the User Manual, the RFS and BFS should be set in slave mode
-> for correct operation.
+Commit 7b6d864b48d9 (reboot: arm: change reboot_mode to use enum
+reboot_mode) changed the way reboot is handled on arm, which has a
+direct impact on arm64 as we share the reset driver on the VE platform.
 
-Applied, thanks.  Since this is a fix it should have been the first
-patch in the series - this allows fixes to be sent to 
+The obvious fix is to move arm64 to use the same infrastructure.
 
-> Reviewed-on: https://gerrit-int.chromium.org/37841
+Cc: Robin Holt <holt@sgi.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/system_misc.h | 3 ++-
+ arch/arm64/kernel/process.c          | 2 +-
+ kernel/reboot.c                      | 2 +-
+ 3 files changed, 4 insertions(+), 3 deletions(-)
 
-Including things like this isn't terribly helpful - this is the Chromium
-internal system and nobody in the community can view the review.  A link
-to a public system might be useful but a private one should be omitted.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130711/486b9d13/attachment.sig>
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index a6e1750..7a18fab 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -23,6 +23,7 @@
+ #include <linux/compiler.h>
+ #include <linux/linkage.h>
+ #include <linux/irqflags.h>
++#include <linux/reboot.h>
+ 
+ struct pt_regs;
+ 
+@@ -41,7 +42,7 @@ extern void show_pte(struct mm_struct *mm, unsigned long addr);
+ extern void __show_regs(struct pt_regs *);
+ 
+ void soft_restart(unsigned long);
+-extern void (*arm_pm_restart)(char str, const char *cmd);
++extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+ 
+ #define UDBG_UNDEFINED	(1 << 0)
+ #define UDBG_SYSCALL	(1 << 1)
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 46f02c3..1788bf6 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -132,7 +132,7 @@ void machine_restart(char *cmd)
+ 
+ 	/* Now call the architecture specific reboot code. */
+ 	if (arm_pm_restart)
+-		arm_pm_restart('h', cmd);
++		arm_pm_restart(reboot_mode, cmd);
+ 
+ 	/*
+ 	 * Whoops - the architecture was unable to reboot.
+diff --git a/kernel/reboot.c b/kernel/reboot.c
+index 269ed93..9aaeb58 100644
+--- a/kernel/reboot.c
++++ b/kernel/reboot.c
+@@ -25,7 +25,7 @@ int C_A_D = 1;
+ struct pid *cad_pid;
+ EXPORT_SYMBOL(cad_pid);
+ 
+-#if defined(CONFIG_ARM) || defined(CONFIG_UNICORE32)
++#if defined(CONFIG_ARM) || defined(CONFIG_ARM64) || defined(CONFIG_UNICORE32)
+ #define DEFAULT_REBOOT_MODE		= REBOOT_HARD
+ #else
+ #define DEFAULT_REBOOT_MODE
+-- 
+1.8.1.5
