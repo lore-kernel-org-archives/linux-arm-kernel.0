@@ -1,42 +1,56 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 11 Jul 2013 11:26:22 -0300
-Subject: [PATCH v2] ARM: imx: Kconfig: Select ARM1136 related errata
-Message-ID: <1373552782-14196-1-git-send-email-fabio.estevam@freescale.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Jul 2013 15:30:36 +0100
+Subject: [PATCH] arm64: compat: fix compilation when using 64kB pages
+Message-ID: <1373553036-5418-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_ARM_ERRATA_411920 and CONFIG_ARM_ERRATA_364296 should be selected for
-ARM1136 SoCs.
+When compiling for 64kB pages, we end-up having conflicting
+implementations for aarch32_break_handler().
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Wrap the 4kB page implementation with a CONFIG_COMPAT guard and change
+the !CONFIG_COMPAT implementation to be static inline instead of simply static.
+
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-Changes since v1:
-- Select the errata via Kconfig
+ arch/arm64/include/asm/debug-monitors.h | 2 +-
+ arch/arm64/kernel/debug-monitors.c      | 2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
- arch/arm/mach-imx/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index f7a5ad1..1d15d5c 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -123,6 +123,8 @@ config SOC_IMX27
+diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+index ef8235c..7c962f3 100644
+--- a/arch/arm64/include/asm/debug-monitors.h
++++ b/arch/arm64/include/asm/debug-monitors.h
+@@ -86,7 +86,7 @@ static inline int reinstall_suspended_bps(struct pt_regs *regs)
+ #ifdef CONFIG_COMPAT
+ int aarch32_break_handler(struct pt_regs *regs);
+ #else
+-static int aarch32_break_handler(struct pt_regs *regs)
++static inline int aarch32_break_handler(struct pt_regs *regs)
+ {
+ 	return -EFAULT;
+ }
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index 08018e3..ceedcd7 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -246,6 +246,7 @@ static int brk_handler(unsigned long addr, unsigned int esr,
+ 	return 0;
+ }
  
- config SOC_IMX31
- 	bool
-+	select ARM_ERRATA_364296
-+	select ARM_ERRATA_411920
- 	select COMMON_CLK
- 	select CPU_V6
- 	select IMX_HAVE_PLATFORM_MXC_RNGA
-@@ -132,6 +134,8 @@ config SOC_IMX31
- config SOC_IMX35
- 	bool
- 	select ARCH_MXC_IOMUX_V3
-+	select ARM_ERRATA_364296
-+	select ARM_ERRATA_411920
- 	select COMMON_CLK
- 	select CPU_V6K
- 	select HAVE_EPIT
++#ifdef CONFIG_COMPAT
+ int aarch32_break_handler(struct pt_regs *regs)
+ {
+ 	siginfo_t info;
+@@ -285,6 +286,7 @@ int aarch32_break_handler(struct pt_regs *regs)
+ 	force_sig_info(SIGTRAP, &info, current);
+ 	return 0;
+ }
++#endif
+ 
+ static int __init debug_traps_init(void)
+ {
 -- 
-1.8.1.2
+1.8.1.5
