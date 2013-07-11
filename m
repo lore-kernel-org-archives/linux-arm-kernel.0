@@ -1,80 +1,99 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Thu, 11 Jul 2013 07:50:50 +0000
-Subject: [v4 3/3] sata: imx: add ahci sata support on imx platforms
-In-Reply-To: <20130710210414.GK516@pengutronix.de>
-References: <1373445355-11453-1-git-send-email-Hong-Xing.Zhu@freescale.com>
- <1373445355-11453-4-git-send-email-Hong-Xing.Zhu@freescale.com>
- <20130710210414.GK516@pengutronix.de>
-Message-ID: <0E83723C55F66F43A6041464FE31119D32AE6B@039-SN2MPN1-013.039d.mgd.msft.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 11 Jul 2013 09:50:16 +0200
+Subject: [PATCH v2 2/6] clk: samsung: fix error handling in pll register
+ functions
+In-Reply-To: <201307100058.13941.heiko@sntech.de>
+References: <201307100057.06061.heiko@sntech.de>
+ <201307100058.13941.heiko@sntech.de>
+Message-ID: <1418034.CJ7vtBLiog@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha:
-Sorry to make a mess on the usage of the private data.
-The private data of "imx_ahci_pdev" platform device would be used to store ata_host point.
-I shouldn't set imxpriv to the private data of "imx_ahci_pdev", so do the wrong assignment of
-The private pointer of device.
+Hi Heiko,
 
-Best Regards
-Richard Zhu
-
-
------Original Message-----
-From: Sascha Hauer [mailto:s.hauer at pengutronix.de] 
-Sent: Thursday, July 11, 2013 5:04 AM
-To: Richard Zhu
-Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; tj at kernel.org; rob.herring at calxeda.com; linux-ide at vger.kernel.org; Zhu Richard-R65037
-Subject: Re: [v4 3/3] sata: imx: add ahci sata support on imx platforms
-
-On Wed, Jul 10, 2013 at 04:35:55PM +0800, Richard Zhu wrote:
-> From: Richard Zhu <r65037@freescale.com>
+On Wednesday 10 of July 2013 00:58:13 Heiko St?bner wrote:
+> kmalloc has its own error reporting when the allocation fails and
+> the register functions also should return the correct ERR_PTR(-ENOMEM)
+> when it happens.
 > 
-> imx6q contains one Synopsys AHCI SATA controller, But it can't shares 
-> ahci_platform driver with other controllers.
-> Because there are some misalignments of the generic AHCI controller.
-> The bits definitions of the HBA registers, the Vendor Specific 
-> registers, and the AHCI PHY clock.
->  - CAP_SSS(bit20) of the HOST_CAP is writable, default  value is '0', 
-> should be configured to be '1'
->  - bit0 (only one AHCI SATA port on imx6q) of the  HOST_PORTS_IMPL 
-> should be set to be '1'.(default 0)
->  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)  should be 
-> configured regarding to the frequency of AHB  bus clock.
->  - Configurations of the AHCI PHY clock, and the signal  parameters of 
-> the GPR13
-> 
-> Setup its own ahci sata driver, contained the imx6q specific 
-> initialized codes, and re-use the generic ahci_platform drier,
-> 
-> Signed-off-by: Richard Zhu <r65037@freescale.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->  drivers/ata/Kconfig    |    9 ++
->  drivers/ata/Makefile   |    1 +
->  drivers/ata/sata_imx.c |  237 
-> ++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 247 insertions(+), 0 deletions(-)  create mode 
-> 100644 drivers/ata/sata_imx.c
+>  drivers/clk/samsung/clk-pll.c |   30 ++++++++++--------------------
+>  1 file changed, 10 insertions(+), 20 deletions(-)
+
+This patch looks pretty good, but I'm not sure if this problem still exists 
+after applying Yadwinder's patches that completely changes the way of PLL 
+registration.
+
+Best regards,
+Tomasz
+
+> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+> index 9153e46..0afaec6 100644
+> --- a/drivers/clk/samsung/clk-pll.c
+> +++ b/drivers/clk/samsung/clk-pll.c
+> @@ -79,10 +79,8 @@ struct clk * __init samsung_clk_register_pll35xx(const
+> char *name, struct clk_init_data init;
 > 
-
-[...]
-
-> +
-> +/* imx6q ahci module initialization. */ static int 
-> +imx6q_sata_init(struct device *dev, void __iomem *mmio) {
-> +	int ret = 0;
-> +	unsigned int rc;
-> +	struct regmap *gpr;
-> +	struct clk *ahb_clk;
-> +	struct imx_ahci_priv *imxpriv = (struct imx_ahci_priv *)dev->p;
-
-Just because a pointer points to valid memory doesn't mean that it's free to use for your purposes. If you look closer maybe you realize that the imxpriv pointer you use here is another one than the one you allocate below in your probe function.
-
-I give up here. Maybe I'll write a driver for this when I find time for it.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>  	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+> -	if (!pll) {
+> -		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
+> -		return NULL;
+> -	}
+> +	if (!pll)
+> +		return ERR_PTR(-ENOMEM);
+> 
+>  	init.name = name;
+>  	init.ops = &samsung_pll35xx_clk_ops;
+> @@ -153,10 +151,8 @@ struct clk * __init samsung_clk_register_pll36xx(const
+> char *name, struct clk_init_data init;
+> 
+>  	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+> -	if (!pll) {
+> -		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
+> -		return NULL;
+> -	}
+> +	if (!pll)
+> +		return ERR_PTR(-ENOMEM);
+> 
+>  	init.name = name;
+>  	init.ops = &samsung_pll36xx_clk_ops;
+> @@ -227,10 +223,8 @@ struct clk * __init samsung_clk_register_pll45xx(const
+> char *name, struct clk_init_data init;
+> 
+>  	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+> -	if (!pll) {
+> -		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
+> -		return NULL;
+> -	}
+> +	if (!pll)
+> +		return ERR_PTR(-ENOMEM);
+> 
+>  	init.name = name;
+>  	init.ops = &samsung_pll45xx_clk_ops;
+> @@ -308,10 +302,8 @@ struct clk * __init samsung_clk_register_pll46xx(const
+> char *name, struct clk_init_data init;
+> 
+>  	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+> -	if (!pll) {
+> -		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
+> -		return NULL;
+> -	}
+> +	if (!pll)
+> +		return ERR_PTR(-ENOMEM);
+> 
+>  	init.name = name;
+>  	init.ops = &samsung_pll46xx_clk_ops;
+> @@ -385,10 +377,8 @@ struct clk * __init samsung_clk_register_pll2550x(const
+> char *name, struct clk_init_data init;
+> 
+>  	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+> -	if (!pll) {
+> -		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
+> -		return NULL;
+> -	}
+> +	if (!pll)
+> +		return ERR_PTR(-ENOMEM);
+> 
+>  	init.name = name;
+>  	init.ops = &samsung_pll2550x_clk_ops;
