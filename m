@@ -1,56 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Jul 2013 15:30:36 +0100
-Subject: [PATCH] arm64: compat: fix compilation when using 64kB pages
-Message-ID: <1373553036-5418-1-git-send-email-marc.zyngier@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 11 Jul 2013 16:32:20 +0200
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <51DD9A8C.10608@keymile.com>
+References: <51DD88A4.1030506@keymile.com> <20130710185706.72b124a4@skate>
+ <51DD9A8C.10608@keymile.com>
+Message-ID: <20130711163220.2b3adf38@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When compiling for 64kB pages, we end-up having conflicting
-implementations for aarch32_break_handler().
+Dear Gerlando Falauto,
 
-Wrap the 4kB page implementation with a CONFIG_COMPAT guard and change
-the !CONFIG_COMPAT implementation to be static inline instead of simply static.
+On Wed, 10 Jul 2013 19:31:56 +0200, Gerlando Falauto wrote:
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/debug-monitors.h | 2 +-
- arch/arm64/kernel/debug-monitors.c      | 2 ++
- 2 files changed, 3 insertions(+), 1 deletion(-)
+> Yes, though we had to trick it a little bit to get both the internal 
+> switch and this PCIe device working:
+> 
+> - this PCIe device requires to map 256M of memory as opposed to just 128
+> - we need a virtual PCIe device to connect to the internal switch, which 
+> must be mapped at 0xf4000000 (normally used for the NAND which must then 
+> move to 0xff000000)
 
-diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index ef8235c..7c962f3 100644
---- a/arch/arm64/include/asm/debug-monitors.h
-+++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -86,7 +86,7 @@ static inline int reinstall_suspended_bps(struct pt_regs *regs)
- #ifdef CONFIG_COMPAT
- int aarch32_break_handler(struct pt_regs *regs);
- #else
--static int aarch32_break_handler(struct pt_regs *regs)
-+static inline int aarch32_break_handler(struct pt_regs *regs)
- {
- 	return -EFAULT;
- }
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index 08018e3..ceedcd7 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -246,6 +246,7 @@ static int brk_handler(unsigned long addr, unsigned int esr,
- 	return 0;
- }
- 
-+#ifdef CONFIG_COMPAT
- int aarch32_break_handler(struct pt_regs *regs)
- {
- 	siginfo_t info;
-@@ -285,6 +286,7 @@ int aarch32_break_handler(struct pt_regs *regs)
- 	force_sig_info(SIGTRAP, &info, current);
- 	return 0;
- }
-+#endif
- 
- static int __init debug_traps_init(void)
- {
+Aah, if you need 256 MB, then you need to adjust the ranges, because
+by default there is only 128 MB for PCIe memory. So, you would need
+something like:
+
+So, within the pcie-controller node, you should do something like:
+
+			ranges = <0x82000000 0 0x00040000 0x00040000 0 0x00002000   /* Port 0.0 registers */
+				  0x82000000 0 0xe0000000 0xe0000000 0 0x10000000   /* non-prefetchable memory */
+			          0x81000000 0 0          0xf0000000 0 0x00100000>; /* downstream I/O */
+
+and in the ranges property at the ocp { } level, you should do something like:
+
+
+		ranges = <0x00000000 0xf1000000 0x0100000
+		          0xe0000000 0xe0000000 0x10100000 /* PCIE */
+		          0xf4000000 0xf4000000 0x0000400
+		          0xf5000000 0xf5000000 0x0000400>;
+
+Basically, before the change the configuration was:
+
+ * 128 MB of PCIe memory at 0xe0000000
+ * 1 MB of PCIe I/O at 0xe8000000
+
+After the change, you have:
+
+ * 256 MB of PCIe memory at 0xe0000000
+ * 1 MB of PCIe I/O at 0xf0000000
+
+Best regards,
+
+Thomas
 -- 
-1.8.1.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
