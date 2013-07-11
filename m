@@ -1,51 +1,112 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Jul 2013 23:24:41 -0700
-Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
-In-Reply-To: <51DE4E3F.6030503@ti.com>
-References: <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
- <20130708112553.GU5523@atomide.com> <51DAB394.3050104@ti.com>
- <20130708131033.GA5523@atomide.com> <51DABC81.3080409@ti.com>
- <20130708133512.GD31221@arwen.pp.htv.fi>
- <87mwpuakod.fsf@linaro.org> <20130710142633.GV5523@atomide.com>
- <51DE4E3F.6030503@ti.com>
-Message-ID: <20130711062440.GY5523@atomide.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 11 Jul 2013 14:27:08 +0800
+Subject: [PATCH v12 00/13] Add tested id switch and vbus connect detect
+ support for Chipidea
+Message-ID: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [130710 23:25]:
-> On Wednesday 10 July 2013 07:56 PM, Tony Lindgren wrote:
-> > 
-> > Felipe is right, looks like all we need is to check if context is
-> > initialized or not. So no need for mach-omap2/serial.c or hwmod tinkering.
-> > 
-> > After that having DEBUG_LL and cmdline with earlyprintk console=ttyO..
-> > works for me.
-> 
-> On what platform? Like I said there are flags set statically in hmwod
-> data for OMAP4 and OMAP5, which make it work without any hwmod tinkering
-> in mach-omap2/serial.c. But it won't work for am33xx.
+This patchset adds tested otg id switch function and
+vbus connect and disconnect detection for chipidea driver.
+And fix kinds of bugs found at chipidea drivers after enabling
+id and vbus detection.
 
-For me omap4 sdp hangs during ttyO2 probe if earlyprintk is enabled for
-that port and console is enabled for that port. That's because we attempt
-to restore uninitialized context.
+This patch is fully tested at imx6 sabresd platform.
+My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
 
-It's possible that we have more than one bug here though.
- 
-> > @@ -1523,6 +1524,8 @@ static int serial_omap_probe(struct platform_device *pdev)
-> >  
-> >  	pm_runtime_mark_last_busy(up->dev);
-> >  	pm_runtime_put_autosuspend(up->dev);
-> > +	up->initialized = true;
-> 
-> This won't help as the context save for serial happens as part of set_termios() and not
-> when the device is probed.
+Changes for v12:
+- Rebased greg's usb-next tree (3.10.0-rc7+)
+- Split more small patches for single function and fix.
 
-The issue is that in serial probe we currently restore NULL context to
-the port which kills earlyprintk output until set_termios() is called.
+Changes for v11:
+- mark ci_handle_vbus_change as static as it is only used at core.c
+[3/9]
+- Move the vbus operation for platform code to host code, as vbus
+operation is common operation, and host is the only user for vbus.
+When it is host mode, we need to open vbus, when it is out of host
+mode, we need to close vbus. [6/9] [8/9]
+- Delete the delayed work at core.c as it is not needed. [7/9]
 
-But as discussed, there are better ways for fixing this issue.
+Changes for v10:
+- Delete [8/9] at v9, ci core's drvdata must be set for further operation.
+[8/8]
 
-Regards,
+Changes for v9:
+- Some small comments from Alex like: variable comment for otg event
+additional newline. [3/9]
+- Import function tell show if the controller has otg capable, if
+the controller supports both host and device, we think it is otg
+capable, and can read OTGSC. [3/9]
+- Merge two otg patches [v8 3/8] and [v8 4/8] to one [v9 3/9]. [3/9]
+- Add inline to ci_hdrc_gadget_destroy if CONFIG_USB_CHIPIDEA_UDC
+is not defined, it can fix one build warning "defined but not used"
+[3/9]
+- One comment from Felipe about changing calling gadget disconnect
+API at chipidea's udc driver. I move calling ci->driver->disconnect
+from _gadget_stop_activity to which calls _gadget_stop_activity except
+ci13xxx_stop, as udc core will call disconnect when do rmmod gadget. [7/9]
+- Add ci core probe's return value to ci's platform_data, we do this
+for getting core's probe's result at platform layer, and quit it
+if the core's probe fails. [8/9] [9/9]
 
-Tony
+Changes for v8:
+- Add ci_supports_gadget helper to know if the controller
+supports gadget, if the controller supports gadget, it
+needs to read otgsc to know the vbus value, basically,
+if the controller supports gadget, it will support host
+as well [3/8]
+- At ci_hdrc_probe, it needs to add free memory at error path
+[3/8]
+- Cosolidate ci->driver = NULL at ci13xxx_stop
+[8/8]
+
+Changes for v7:
+For Patch 8/8, we only need to set ci->driver to NULL when usb cable
+is not connected, for other changes, it will case some runtime pm
+unmatch and un-align with udc-core & composite driver problems.
+
+Changes for v6:
+- Add Alex comments for init/destroy function [3/8] [4/8]
+- Remove memset(&ci->gadget, 0, sizeof(ci->gadget)) at destory function [4/8]
+- Add Kishon's comment: Change the format of struct usb_otg otg at drivers/usb/chipidea/ci.h
+[1/8]
+- Add comments for CI_VBUS_STABLE_TIMEOUT [3/8]
+- Change the otg_set_peripheral return value check as the fully
+chipidea driver users don't need it. [4/8]
+- Fix one bug that the oops when re-plug in usb cable after
+rmmod gadget [8/8]
+
+Peter Chen (13):
+  usb: chipidea: add vbus regulator control
+  usb: chipidea: imx: remove vbus regulator operation
+  usb: chipidea: udc: otg_set_peripheral is useless for some chipidea
+    users
+  usb: chipidea: otg: Add otg file used to access otgsc
+  usb: chipidea: Add role init and destory APIs
+  usb: chipidea: add otg_cap attribute for otg capable
+  usb: chipidea: disable all interrupts and clear all interrupts status
+  usb: chipidea: move otg relate things to otg file
+  usb: chipidea: add vbus interrupt handler
+  usb: chipidea: add wait vbus lower than OTGSC_BSV before role starts
+  usb: chipidea: udc: misuse flag CI_HDRC_REGS_SHARED and
+    CI_HDRC_PULLUP_ON_VBUS
+  usb: chipidea: udc: .pullup is valid when vbus is on at
+    CI_HDRC_PULLUP_ON_VBUS
+  usb: chipidea: udc: fix the oops when plugs in usb cable after rmmod
+    gadget
+
+ drivers/usb/chipidea/Makefile      |    2 +-
+ drivers/usb/chipidea/bits.h        |   10 +++
+ drivers/usb/chipidea/ci.h          |    8 ++
+ drivers/usb/chipidea/ci_hdrc_imx.c |   30 ++-----
+ drivers/usb/chipidea/core.c        |  158 +++++++++++++++++++++++------------
+ drivers/usb/chipidea/host.c        |   30 +++++++-
+ drivers/usb/chipidea/host.h        |    6 ++
+ drivers/usb/chipidea/otg.c         |  135 ++++++++++++++++++++++++++++++
+ drivers/usb/chipidea/otg.h         |   22 +++++
+ drivers/usb/chipidea/udc.c         |   72 +++++++++++++----
+ drivers/usb/chipidea/udc.h         |    6 ++
+ include/linux/usb/chipidea.h       |   14 +++
+ 12 files changed, 397 insertions(+), 96 deletions(-)
+ create mode 100644 drivers/usb/chipidea/otg.c
+ create mode 100644 drivers/usb/chipidea/otg.h
