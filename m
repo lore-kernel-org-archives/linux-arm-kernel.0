@@ -1,60 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 11 Jul 2013 18:38:59 +0200
-Subject: [PATCH 0/4] A10S-OLinuXino-Micro I2C support
-In-Reply-To: <1373232719-13050-1-git-send-email-emilio@elopez.com.ar>
-References: <1373232719-13050-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20130711163859.GX11243@lukather>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 11 Jul 2013 18:44:56 +0200
+Subject: gpio_blink_set + Kirkwood
+In-Reply-To: <51DEDB32.4080101@harsszegi.com>
+References: <51DC564A.8050002@harsszegi.com> <20130709193605.GC26223@lunn.ch>
+ <1a9bcb9094ae695c6707c4835417dd5b@harsszegi.com>
+ <20130710073706.GA28212@lunn.ch> <51DEDB32.4080101@harsszegi.com>
+Message-ID: <20130711164456.GA3095@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emilio,
+On Thu, Jul 11, 2013 at 06:20:02PM +0200, Tibor Harsszegi wrote:
+> Hello guys,
+> 
+> can anyone explain me how does the gpio_blink_set member gets filled
+> in leds-gpio through platform_get_drvdata()?
+> I can't seem to follow how the specific function pointer can be set
+> to orion_gpio_set_blink() for example.
+> Sorry for the dumb question :(
 
-On Sun, Jul 07, 2013 at 06:31:55PM -0300, Emilio L?pez wrote:
-> Hi,
-> 
-> This patchset adds the required DT nodes to get I2C supported and 
-> working on the OLIMEX A10S-OLinuXino-Micro board.
-> 
-> Patch 1 adds the muxings as seen on the board's schematics. Patch 2 adds 
-> the DT nodes, based on other sunxi dts, as we don't have an A10S user 
-> manual so far. Patch 3 enables the controllers, and patch 4 adds a node 
-> for the AT24 EEPROM found on the board.
-> 
-> I have tested and can see the PMU on I2C-0 using i2cdetect, and can read 
-> the EEPROM contents on I2C-1. I have not tested I2C-2, but i2cdetect 
-> reports no devices so I suppose it's working okay too.
-> 
-> Any testing or review will be appreciated :)
-> 
-> Thanks,
-> 
-> Emilio
-> 
-> Emilio L?pez (4):
->   ARM: sun5i: dt: Add I2C muxings for sun5i A10S
->   ARM: sun5i: dt: Add I2C controller nodes to the A10S dtsi
->   ARM: sun5i: dt: Enable I2C controllers on A10S-OLinuXino-Micro
->   ARM: sun5i: dt: Add AT24 device on A10S-OLinuXino-Micro
-> 
->  arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 25 +++++++++++
->  arch/arm/boot/dts/sun5i-a10s.dtsi                | 54 ++++++++++++++++++++++++
->  2 files changed, 79 insertions(+)
+Hi Tibor
 
-Thanks for doing this!
+For DT based board, hardware blinking is not supported, as far as i
+remember.
 
-Overall, this patchset looks fine. I'll apply it as soon as 3.11-rc1 is
-out.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130711/93271d83/attachment.sig>
+	Andrew
