@@ -1,89 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 10 Jul 2013 16:47:12 +0100
-Subject: [PATCH] rtc: Add MOXA ART RTC driver
-In-Reply-To: <1373464848-28146-1-git-send-email-jonas.jensen@gmail.com>
-References: <1373464848-28146-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <20130710154712.GG24508@sirena.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 11 Jul 2013 13:07:13 +0200
+Subject: [PATCH] ASoC: Samsung: Modify the I2S driver to support I2S on
+ Exynos5420
+In-Reply-To: <20130711104804.GK24508@sirena.org.uk>
+References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
+ <20130711104804.GK24508@sirena.org.uk>
+Message-ID: <10406176.2lc5qJ8Oq7@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 04:00:48PM +0200, Jonas Jensen wrote:
+On Thursday 11 of July 2013 11:48:04 Mark Brown wrote:
+> On Thu, Jul 11, 2013 at 12:38:24PM +0530, Padmavathi Venna wrote:
+> > -#define MOD_LR_LLOW		(0 << 7)
+> > -#define MOD_LR_RLOW		(1 << 7)
+> > -#define MOD_SDF_IIS		(0 << 5)
+> > -#define MOD_SDF_MSB		(1 << 5)
+> > -#define MOD_SDF_LSB		(2 << 5)
+> > -#define MOD_SDF_MASK		(3 << 5)
+> > 
+> > +#define MOD_LR_LLOW		0
+> > +#define MOD_LR_RLOW		1
+> > +#define MOD_SDF_SHIFT		5
+> > +#define MOD_SDF_IIS		0
+> > +#define MOD_SDF_MSB		1
+> > +#define MOD_SDF_LSB		2
+> > +#define MOD_SDF_MASK		3
+> 
+> This patch has an awful lot of coding style changes like this which
+> are just coding style changes and not implementing TDM support.  These
+> should be done separately, not as part of the same patch, in order to
+> make the code easier to review.
+> 
+> >  	case 768:
+> > -		mod |= MOD_RCLK_768FS;
+> > +		mod |= (MOD_RCLK_768FS << rfs_shift);
+> > 
+> >  		break;
+> 
+> This stuff is another example.
+> 
+> I think the change itself should be fine but I'm not 100% sure I'm
+> correctly identifying what's a stylistic change and what's a functional
+> change.
 
-> +++ b/drivers/rtc/Makefile
-> @@ -77,6 +77,7 @@ obj-$(CONFIG_RTC_DRV_MAX6902)	+= rtc-max6902.o
->  obj-$(CONFIG_RTC_DRV_MAX77686)	+= rtc-max77686.o
->  obj-$(CONFIG_RTC_DRV_MC13XXX)	+= rtc-mc13xxx.o
->  obj-$(CONFIG_RTC_DRV_MSM6242)	+= rtc-msm6242.o
-> +obj-$(CONFIG_RTC_DRV_MOXART)	+= rtc-moxart.o
->  obj-$(CONFIG_RTC_DRV_MPC5121)	+= rtc-mpc5121.o
+Right. This could be split into two patches, first reworking the style to give 
+more flexibility with operations on registers and another one adding TDM 
+specific changes, like new bitfield definitions and conditional handling of 
+register accesses to account for new bitfield locations.
 
-It'd be good to keep this sorted.
-
-> +struct rtc_plat_data {
-
-This is a bit confusing - normally platform data is data passed in by
-the platform as part of device registration, not runtime data.
-
-> +	struct rtc_device *rtc;
-> +};
-> +
-> +static spinlock_t rtc_lock;
-
-Why is this global not part of the runtime data?  Not that anyone is
-likely to have two RTCs in the one system but still...
-
-> +u8 moxart_rtc_read_byte(void)
-> +{
-> +	int i;
-> +	u8 data = 0;
-> +
-> +	for (i = 0; i < 8; i++) {
-> +		gpio_set_value(GPIO_RTC_SCLK, GPIO_EM1240_LOW);
-> +		udelay(GPIO_RTC_DELAY_TIME);
-> +		gpio_set_value(GPIO_RTC_SCLK, GPIO_EM1240_HIGH);
-> +		if (gpio_get_value(GPIO_RTC_DATA))
-> +			data |= (1 << i);
-> +		udelay(GPIO_RTC_DELAY_TIME);
-
-This looks wrong, although I expect it's probably fine - you're reading
-the value with no delay after setting the GPIO high.  I assume the
-hardware actually strobes the data out on the the high to low transition
-but in that case I'd expect the get to be before the raise.  Either that
-or some delay after the raise just to make sure.
-
-It's also very odd seeing the constants for _LOW and _HIGH, these should
-just be booleans.
-
-> +static int moxart_rtc_ioctl(struct device *dev, unsigned int cmd,
-> +	unsigned long arg)
-> +{
-> +	switch (cmd) {
-> +	default:
-> +		return -ENOIOCTLCMD;
-> +	}
-> +
-> +	return 0;
-> +}
-
-Why not just remove this function?
-
-> + out:
-> +	if (pdata->rtc)
-> +		rtc_device_unregister(pdata->rtc);
-> +	devm_kfree(&pdev->dev, pdata);
-
-devm_kfree() isn't needed, the main point of devm_ is to avoid having to
-explicitly free things.
-
-> +	gpio_free(GPIO_RTC_DATA);
-> +	gpio_free(GPIO_RTC_SCLK);
-> +	gpio_free(GPIO_RTC_RESET);
-
-Use devm_gpio_request().
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130710/be4d14ac/attachment.sig>
+Best regards,
+Tomasz
