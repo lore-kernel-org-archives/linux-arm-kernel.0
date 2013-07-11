@@ -1,96 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 11 Jul 2013 14:06:44 -0600
-Subject: [PATCH 2/2] pwm: Add PWM polarity flag macros for DT
-In-Reply-To: <20130711193245.GB17212@dhcp-172-17-186-34.nvidia.com>
-References: <1373553468-6564-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1373553468-6564-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20130711153559.GB2198@dhcp-172-17-186-34.nvidia.com>
- <51DEF078.1010408@wwwdotorg.org>
- <20130711193245.GB17212@dhcp-172-17-186-34.nvidia.com>
-Message-ID: <51DF1054.9000207@wwwdotorg.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 12 Jul 2013 00:11:56 +0200
+Subject: Armada 510 display controller
+In-Reply-To: <CAMLZHHRNjbQy7zfw=bD1kC+pKh946rOBWKyFOyhzyoLkdkE0PA@mail.gmail.com>
+References: <CAMLZHHRNjbQy7zfw=bD1kC+pKh946rOBWKyFOyhzyoLkdkE0PA@mail.gmail.com>
+Message-ID: <51DF2DAC.3080605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2013 01:32 PM, Thierry Reding wrote:
-> On Thu, Jul 11, 2013 at 11:50:48AM -0600, Stephen Warren wrote:
->> On 07/11/2013 09:36 AM, Thierry Reding wrote:
->>> On Thu, Jul 11, 2013 at 04:37:48PM +0200, Laurent Pinchart
->>> wrote: [...]
->>>> diff --git 
->>>> a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt 
->>>> b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
->>>> index de0eaed..be09be4 100644 --- 
->>>> a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
->>>> +++ b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
->>>> @@ -4,9 +4,9 @@ Required properties: - compatible: should be 
->>>> "atmel,tcb-pwm" - #pwm-cells: Should be 3.  The first cell 
->>>> specifies the per-chip index of the PWM to use, the second
->>>> cell is the period in nanoseconds and -  bit 0 in the third
->>>> cell is used to encode the polarity of PWM output. -  Set bit
->>>> 0 of the third cell in PWM specifier to 1 for inverse
->>>> polarity & -  set to 0 for normal polarity. +  the third cell
->>>> is used to encode the polarity of PWM output. Set the +
->>>> PWM_POLARITY_NORMAL flag for normal polarity or the
->>>> PWM_POLARITY_INVERSED +  flag for inverted polarity. PWM
->>>> flags are defined in <dt-bindings/pwm/pwm.h>. - tc-block: The
->>>> Timer Counter block to use as a PWM chip.
->>>> 
->>>> Example:
->>> 
->>> I'd prefer for the original text to stay in place and the
->>> reference to the dt-bindings/pwm/pwm.h file to go below that
->>> block.
->> 
->> I disagree here. The whole point of creating header files for
->> the constants in binding definitions was so that you wouldn't
->> have to duplicate all the values into the binding definitions.
->> Rather, you'd simply say "see <dt-bindings/xxx.h>".
-> 
-> But that's not something that this patch solves.
+On 07/11/2013 09:59 PM, Daniel Drake wrote:
+> We seem to have reached an initial conclusion from the "Best practice
+> device tree design for display subsystems/DRM". Thanks for the
+> discussion. I am trying to come up with a binding + implementation.
+>
+> I am a bit stuck though, because I don't fully understand what the
+> DCON on the Armada 510 does.
 
-Well, if the comments I made on the patch re: that <linux/pwm.h>
-should simply #include <dt-bindings/pwm/pwm.h> instead of duplicating
-the constants, then yet this patch will solve that. There will be a
-single place where the constants are defined.
+Daniel,
 
-> And it could be solved even in the absence of the header file
-> defining the symbolic constants. If all the standard flags that
-> dt-bindings/pwm/pwm.txt now specifies were to be listed in pwm.txt
-> (they actually are) then referring to that document as the
-> canonical source works equally well.
+just ignore DCON for now. Its reset state allows us to use Dove
+DRM in the only way we plan to already. Later if somebody comes
+up with a board that has both LCD0 and LCD1 connected, we propose
+the DT binding.
 
-If that's all the happens, then there will still be duplication
-between pwm.txt and <linux/pwm.h>.
+> In that thread, the ascii art suggests that it receives the output
+> from the two LCD controllers. From there it can send the image to a
+> VGA output or a parallel bus (where the HDMI encoder lies). Does it
+> let you choose which LCD controller input goes to which output? Can
+> you clone one input onto both outputs?
 
-> If we can take both of the above for granted, then sure, let's
-> refer to the header from within the generic pwm.txt file and add a
-> reference to that in bindings for drivers that use the standard
-> flags.
-> 
->>> Another issue might be that people without access to recent 
->>> versions of DTC won't be able to use the new #include feature,
->>> so keeping the documentation backwards compatible seems like a
->>> good idea.
->> 
->> The dtc source tree is duplicated into the kernel source tree, so
->> that isn't an issue for now.
->> 
->> Besides, the dtc version is an entirely unrelated issue to how
->> the documentation is written.
-> 
-> Well, not really. If the documentation specifies the binding in a
-> way that the DTC can't handle that's still a problem. People will
-> end up with a DTS that their DTC can't compile. I guess that can be
-> resolved by adding a note to the upstream device tree repository
-> about the minimum required version of DTC.
+You can clone LCD0 to VGA but not the other way round. I guess it
+use kind of useless anyway. Or you want to clone HDMI to analog VGA? ;)
+ From a DT point-of-view DCON it completely independent.
 
-Yes, the separate repository would obviously require a version of dtc
-that's able to compile the files there; i.e. a version equivalent to
-what's already in the kernel tree (upstream 1.4.0 specifically).
+> If it plays such an integral role in the "get an image from Cubox onto
+> my TV" path, as suggested in the diagram, why can't I see any code in
+> the armada_drm driver that configures it?
 
-Again, right now, all of the binding docs, the *.dts files, and the
-dtc required to use them are part of the kernel; a single package, so
-there's no scope for issues re: using dtc features that aren't
-supported. If those components get separated later, obviously there
-will be a requirement to install a specific version of dtc to use with
-the separated *.dts and binding files.
+It does, but currently reset state is sufficient for us.
+
+> We also have a naming conflict that might be annoying. The MMP2 and
+> MMP3 can effectively drive 3 different video outputs (2 panels + 1
+> HDMI), but the documentation and register layout does not treat it as
+> 3 different devices. Rather it is just 1 device, annoyingly named
+> "display controller". Comparing MMP to Armada 510, the MMP "display
+> controller" seems to act like the 510's LCD controllers and display
+> controller combined, i.e. it coordinates both the reading of image
+> data from memory *and* sending it to a configurable selection of
+> output devices.
+
+That is also the case for A510. LCD0 reads from memory and drives
+dumb RGB connected to HDMI controller. LCD1 can also read from memory
+and drive VGA. DCON allows you to clone video from LCD0 to VGA instead
+of LCD1.
+
+> That might produce a challenge for writing good documentation that
+> covers all the target hardware. That will become apparent once I'm
+> clearer on what the Armada 510 DCON is and how to document it's
+> possible involvement in the DT. If necessary, maybe we could refer to
+> the Armada 510 DCON as "output controller" or "output selector" or
+> something like that, to avoid the name conflict.
+
+I don't recall if DCON really is named "display controller" in the
+public datasheet. It was the most likely name, so I called it display
+controller. For the documentation, name it output multiplexer/selector.
+Both LCD controller and Display controller are not very helpful for the
+function anyway.
+
+Sebastian
