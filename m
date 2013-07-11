@@ -1,76 +1,57 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 11 Jul 2013 20:54:51 +0530
-Subject: [PATCH] clk: samsung: add set_rate and round_rate callbacks for
- pll45xx
-In-Reply-To: <CAKew6eV0QP31gJNB2waeSRB5DN5Vs+mXO5bwaD5TiHYZvrANQA@mail.gmail.com>
-References: <1373534869-12034-1-git-send-email-thomas.abraham@linaro.org>
- <CAKew6eV0QP31gJNB2waeSRB5DN5Vs+mXO5bwaD5TiHYZvrANQA@mail.gmail.com>
-Message-ID: <CAJuYYwSSQ49Tp17Kja9sZgnibYR7UDrvSpoyPUs0i6GC6j2qeA@mail.gmail.com>
+From: sr@denx.de (Stefan Roese)
+Date: Thu, 11 Jul 2013 17:34:14 +0200
+Subject: [PATCH] ARM: OMAP3: Beagle: Fix USB Host on beagle xM Ax/Bx
+In-Reply-To: <51DEC2CE.70400@ti.com>
+References: <1366024808-4691-1-git-send-email-rogerq@ti.com>
+ <51DC09E7.1070302@denx.de> <51DC164B.5010608@ti.com>
+ <51DC1B47.7070504@denx.de> <51DE87D3.5030600@ti.com>
+ <51DEA7F1.1050902@denx.de> <51DEC2CE.70400@ti.com>
+Message-ID: <51DED076.3040000@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yadwinder,
+On 07/11/2013 04:35 PM, Roger Quadros wrote:
+>> BTW: I noticed a git ID (8e1cacd) in your kernel that I can't identify.
+>> Do you have any patches locally applied to the kernel.org version that
+>> might be helpful with this USB issue I'm seeing?
+> 
+> Yes I had tested it on a more recent kernel with some local patches applied
+> that I've recently sent for review.
+> 
+> But to cross check with your setup I've retested it with commit d2b4a646 
+> with the 2 below patches on top
+> 
+> https://lkml.org/lkml/2013/6/20/327
+> https://lkml.org/lkml/2013/6/20/339
 
-Thanks for your comments.
+Thanks. I have exactly those 2 patches applies as well. But on a
+different git commit. And with some local (unrelated) patches as well.
+I'll revert to exactly your version tomorrow and test again.
 
-On 11 July 2013 16:14, Yadwinder Singh Brar <yadi.brar01@gmail.com> wrote:
-> Hi Thomas,
->
-> On Thu, Jul 11, 2013 at 2:57 PM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
->> Add support for set_rate and round_rate callbacks for pll45xx pll. This allows
->> configuring pll45xx to generate a desired clock output.
->>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> ---
->>
->> The set_rate and round_rate callbacks in this patch for pll45xx are handled
->> slightly differently from the way it is done in the (not yet merged) patch
->> series from Yadwinder
->> (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg19540.html)
->>
->> In this patch, the pll lookup table is kept as part of the pll configuration
->> code itself, since the pll is just a hardware block which takes an input
->> frequency and configuration values to genertate a output clock frequency.
->> Given a set of inputs, a pll of a given type will generate the same output
->> regardless of the SoC it is used in. So instead of supplying the pll lookup
->
-> Tomasz also raised similar point earlier in discussion on that series.
-> That time a question which remained unanswered for which we were waiting
-> (as requested from hardware guys also) was that :
-> Whether we need to stick to recommended values only or we can drive a
-> particular output frequency with a given input frequency with any possible
-> set of (P, M, S) values ?
+> I've tried it again with the ELDK 5.3 root but still can't get it to fail.
+> 
+> I think we should match our u-boot as well. Could you please let me know
+> your u-boot commit and uEnv.txt?
 
-The default lookup table could list all the possible target frequency
-and its associated PMS values. Having a bigger list of PMS lookup
-values should not matter since the CPUFreq driver would have a smaller
-subset of frequency which can be selected on a particular SoC.
+Good idea. I'm currently using a "dirty" local version. I'll try to
+switch to an officially available version tomorrow. And send you the
+version/git id.
 
->
-> Theoretically it seems possible but from manual its seems to prefer
-> recommended values.
-> Also I am not sure whether same values are always recommended in user manuals
-> for different SoCs using same PLL type.
->
->> table from per-soc clock driver code (as done in the Yadwinder's patch series),
->> the pll lookup table can be coupled with the pll code itself, saving duplication
->> of pll lookup table for every SoC the pll is used with.
->
-> If we don't need to stick to recommended table, definitely it will
-> save lot of duplication.
-> In-fact then we can use same pll lookup table for other PLLs also
-> which have same calculation
-> equation for output frequency.
+> My network setup is pretty simple, beagle-xm is connected directly to my laptop's
+> ethernet port. No network switch in between.
 
-Ok.
+I have a switch in between the target and my PC. But this network setup
+is also quite "simple" and works with all other boards as well. So this
+shouldn't be a problem.
 
->
->
-> Regards,
-> Yadwinder
+> When you get the problem do you cold boot the board or warm boot it?
+> I've been always cold booting it.
+
+I'm usually warm booting (pushbutton reset).
+
+As mentioned above, I have some "homework" now to move to a
+setup/configuration (official git commits) that you can reproduce on
+your version C2 beagleboard as well. Stay tuned... ;)
 
 Thanks,
-Thomas.
-
-[...]
+Stefan
