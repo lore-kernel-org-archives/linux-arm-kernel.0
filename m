@@ -1,37 +1,80 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 11 Jul 2013 09:46:53 +0200
-Subject: [PATCH v2 1/6] clk: samsung: move common plls registration into
- separate function
-In-Reply-To: <CAKew6eUPBUZj4TuhNAjp6NitFUaeFBZscr_jqU3Y_wLi1m7Ekg@mail.gmail.com>
-References: <201307100057.06061.heiko@sntech.de>
- <201307100057.48265.heiko@sntech.de>
- <CAKew6eUPBUZj4TuhNAjp6NitFUaeFBZscr_jqU3Y_wLi1m7Ekg@mail.gmail.com>
-Message-ID: <1874409.iWz7oWBuYA@thinkpad>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Thu, 11 Jul 2013 07:50:50 +0000
+Subject: [v4 3/3] sata: imx: add ahci sata support on imx platforms
+In-Reply-To: <20130710210414.GK516@pengutronix.de>
+References: <1373445355-11453-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1373445355-11453-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <20130710210414.GK516@pengutronix.de>
+Message-ID: <0E83723C55F66F43A6041464FE31119D32AE6B@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sascha:
+Sorry to make a mess on the usage of the private data.
+The private data of "imx_ahci_pdev" platform device would be used to store ata_host point.
+I shouldn't set imxpriv to the private data of "imx_ahci_pdev", so do the wrong assignment of
+The private pointer of device.
 
-On Wednesday 10 of July 2013 22:29:13 Yadwinder Singh Brar wrote:
-> Hi Heiko,
+Best Regards
+Richard Zhu
+
+
+-----Original Message-----
+From: Sascha Hauer [mailto:s.hauer at pengutronix.de] 
+Sent: Thursday, July 11, 2013 5:04 AM
+To: Richard Zhu
+Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; tj at kernel.org; rob.herring at calxeda.com; linux-ide at vger.kernel.org; Zhu Richard-R65037
+Subject: Re: [v4 3/3] sata: imx: add ahci sata support on imx platforms
+
+On Wed, Jul 10, 2013 at 04:35:55PM +0800, Richard Zhu wrote:
+> From: Richard Zhu <r65037@freescale.com>
 > 
-> On Wed, Jul 10, 2013 at 4:27 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > All Samsung PLLs use similar code to register the clocks and clkdev
-> > lookups. Therefore move these into a separate function to reduce code
-> > duplication.
-> > 
-> > Suggested-by: Russell King <linux@arm.linux.org.uk>
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
+> imx6q contains one Synopsys AHCI SATA controller, But it can't shares 
+> ahci_platform driver with other controllers.
+> Because there are some misalignments of the generic AHCI controller.
+> The bits definitions of the HBA registers, the Vendor Specific 
+> registers, and the AHCI PHY clock.
+>  - CAP_SSS(bit20) of the HOST_CAP is writable, default  value is '0', 
+> should be configured to be '1'
+>  - bit0 (only one AHCI SATA port on imx6q) of the  HOST_PORTS_IMPL 
+> should be set to be '1'.(default 0)
+>  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)  should be 
+> configured regarding to the frequency of AHB  bus clock.
+>  - Configurations of the AHCI PHY clock, and the signal  parameters of 
+> the GPR13
 > 
-> I have posted patch for adding common pll registration function
-> which some how missed to get merged. I hope will get merged after rc1.
-> Please give a look at that :
-> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg19543.html
+> Setup its own ahci sata driver, contained the imx6q specific 
+> initialized codes, and re-use the generic ahci_platform drier,
+> 
+> Signed-off-by: Richard Zhu <r65037@freescale.com>
+> ---
+>  drivers/ata/Kconfig    |    9 ++
+>  drivers/ata/Makefile   |    1 +
+>  drivers/ata/sata_imx.c |  237 
+> ++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 247 insertions(+), 0 deletions(-)  create mode 
+> 100644 drivers/ata/sata_imx.c
+> 
 
-Yeah, I was going to post a link to it, but I couldn't find it on any mailing 
-list archive. I think we should go with the way of registration introduced by 
-Yadwinder.
+[...]
 
-Best regards,
-Tomasz
+> +
+> +/* imx6q ahci module initialization. */ static int 
+> +imx6q_sata_init(struct device *dev, void __iomem *mmio) {
+> +	int ret = 0;
+> +	unsigned int rc;
+> +	struct regmap *gpr;
+> +	struct clk *ahb_clk;
+> +	struct imx_ahci_priv *imxpriv = (struct imx_ahci_priv *)dev->p;
+
+Just because a pointer points to valid memory doesn't mean that it's free to use for your purposes. If you look closer maybe you realize that the imxpriv pointer you use here is another one than the one you allocate below in your probe function.
+
+I give up here. Maybe I'll write a driver for this when I find time for it.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
