@@ -1,28 +1,35 @@
 From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 11 Jul 2013 11:30:43 +0800
-Subject: [PATCH v2 0/3] arm: atmel: at91sam9n12: add i2c pinctrl and qt1070
- support
-Message-ID: <1373513446-18215-1-git-send-email-voice.shen@atmel.com>
+Date: Thu, 11 Jul 2013 11:30:46 +0800
+Subject: [PATCH v2 3/3] arm: atmel: at91sam9n12: correct pin number of gpio-key
+In-Reply-To: <1373513446-18215-1-git-send-email-voice.shen@atmel.com>
+References: <1373513446-18215-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <1373513446-18215-4-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch is based on linux master branch, implementation as following:
-  - add the i2c pinctrl which needed for using at91sam9n12 TWI
-  - enable qt1070
-  - trival fix for the gpio-key pin number
+correct pin number of gpio-key for at91sam9n12ek board
+the pioB4 is connect to LED, the pioB3 use as gpio-key
 
-Changes in v2:
-  - remove comments as use micro
-  - using micro for interrupt trigger mode
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
 
-Bo Shen (3):
-  arm: atmel: at91sam9n12: add pinctrl of TWI
-  arm: atmel: at91sam9n12: add qt1070 support
-  arm: atmel: at91sam9n12: correct pin number of gpio-key
+---
+Changes in v2: None
 
- arch/arm/boot/dts/at91sam9n12.dtsi  |   20 ++++++++++++++++++++
- arch/arm/boot/dts/at91sam9n12ek.dts |   18 +++++++++++++++++-
- 2 files changed, 37 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/at91sam9n12ek.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
+index 7a95a28..3e86b05 100644
+--- a/arch/arm/boot/dts/at91sam9n12ek.dts
++++ b/arch/arm/boot/dts/at91sam9n12ek.dts
+@@ -137,7 +137,7 @@
+ 
+ 		enter {
+ 			label = "Enter";
+-			gpios = <&pioB 4 GPIO_ACTIVE_LOW>;
++			gpios = <&pioB 3 GPIO_ACTIVE_LOW>;
+ 			linux,code = <28>;
+ 			gpio-key,wakeup;
+ 		};
 -- 
 1.7.9.5
