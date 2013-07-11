@@ -1,54 +1,32 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 11 Jul 2013 15:00:34 +0300
-Subject: [PATCH] ARM: OMAP3: Beagle: Fix USB Host on beagle xM Ax/Bx
-In-Reply-To: <51DE8CBB.4000709@denx.de>
-References: <1366024808-4691-1-git-send-email-rogerq@ti.com>
- <51DC09E7.1070302@denx.de> <51DC164B.5010608@ti.com>
- <51DC1B47.7070504@denx.de> <51DE87D3.5030600@ti.com>
- <51DE8CBB.4000709@denx.de>
-Message-ID: <51DE9E62.9080406@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 11 Jul 2013 09:14:30 -0300
+Subject: imx25: How to get frame buffer device in a system using device
+ tree
+In-Reply-To: <CAO8h3eHiXroFWy2na-05MeHgfSg9LGuxMF4wkf4VwFsV57xDnw@mail.gmail.com>
+References: <CAO8h3eFq9WhvZYbbeFfWgVEXViR8MAcGaztsvvaLpFSW-W6CfA@mail.gmail.com>
+ <CAOMZO5Aat-iAN_TJ6BXEopB+WCkKgLjWh67sCXg0jd1DtzmKSQ@mail.gmail.com>
+ <CAO8h3eHAfV808izZzvpPc+z6iQPr14q8OmryNs5sC+VcNk+iLg@mail.gmail.com>
+ <CAOMZO5CgAs+hR41=WdJ=jxS5gZf=opOrCXufixBh_CMP0n2TFA@mail.gmail.com>
+ <CAO8h3eGhF8DRO73W9GkepUKAF-6v1EmWdMS_Gq+dA_2v5mJ2aQ@mail.gmail.com>
+ <CAOMZO5CrZjDZjqaaQTX4=ZGO_6chFMr9qAHhqyVGBdxBvimYSw@mail.gmail.com>
+ <CAO8h3eHiXroFWy2na-05MeHgfSg9LGuxMF4wkf4VwFsV57xDnw@mail.gmail.com>
+Message-ID: <CAOMZO5C9-o=E_jBub-YAYJ+j8ienE_-krykOm-KcjSuzq_BioQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2013 01:45 PM, Stefan Roese wrote:
-> Hi Roger,
-> 
-> On 07/11/2013 12:24 PM, Roger Quadros wrote:
->> Stefan,
->>
->> I tried it out today and it worked 5/5 times. I used a bare bones
->> debian root filesystem for
->> the NFS root.
-> 
-> Thanks for testing.
-> 
->> Could it be possible that the boot scripts on your filesystem are
->> somehow shutting down
->> the ethernet interface? Might be worth checking on a fresh filesystem.
-> 
-> I'm pretty sure that its not a problem with the filesystem. I'm using
-> exactly this filesystem for multiple other ARM based boards as well.
-> And all other boards (most of them with buildin ethernet controller
-> instead of USB connected) have no problem mounting/booting from it.
+On Thu, Jul 11, 2013 at 3:28 AM, Matthias Wei?er <m.weisser.m@gmail.com> wrote:
 
-OK, then it might be something to do with beagle.
-Is pandaboard working fine for you?
+>> Great, care to submit patches for adding mx25 fb support?
+>
+> I can. But I think the only thing is the slightly changed
+> arch/arm/boot/dts/imx25.dtsi. Patch to this mailing list? Patch
+> against mainline kernel is OK?
 
-> 
-> BTW: The filesystem is from the ELDK 5.3 [1][2]. You could download/install
-> it yourself.
+Yes, you should generate the patch against Shawn's for-next branch:
+http://git.linaro.org/gitweb?p=people/shawnguo/linux-2.6.git;a=shortlog;h=refs/heads/for-next
 
-OK. Will give it a try.
-> 
-> From your log I can see, that you are using a slightly different board
-> than I am ("Beagle xM Rev C" vs. "Beagle Rev C1/C2/C3"). So its a
+Then send the patch to him with the linux-arm-kernel list on Cc.
 
-My board is a C2.
+Regards,
 
-> different OMAP variant. Could this perhaps make a difference? Do you
-> by chance have the "old" Beagleboard (non-xM) at hand for another test?
-
-Sure. I have the old beagleboard with me. Let me know what to test.
-
-cheers,
--roger
+Fabio Estevam
