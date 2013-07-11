@@ -1,111 +1,46 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 11 Jul 2013 15:54:34 -0400
-Subject: [PATCH v2 1/2] ARM: OMAP: Add secure function omap_smc3() which
- calling instruction smc #1
-In-Reply-To: <531356997.66774.1373571839852.JavaMail.apache@mail81.abv.bg>
-References: <531356997.66774.1373571839852.JavaMail.apache@mail81.abv.bg>
-Message-ID: <51DF0D7A.4090008@ti.com>
+From: dsd@laptop.org (Daniel Drake)
+Date: Thu, 11 Jul 2013 13:59:50 -0600
+Subject: Armada 510 display controller
+Message-ID: <CAMLZHHRNjbQy7zfw=bD1kC+pKh946rOBWKyFOyhzyoLkdkE0PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 July 2013 03:43 PM, ?????? ???????? wrote:
->  
-> 
-> 
-> 
-> 
->  >-------- ?????????? ????? --------
->  >??:  Dave Martin 
->  >???????: Re: [PATCH v2 1/2] ARM: OMAP: Add secure function omap_smc3() which
->  calling instruction smc #1
->  >??: Pali Roh?r 
->  >????????? ??: ?????, 2013, ??? 10 20:45:26 EEST
->  >
->  >
->  >On Wed, Jul 10, 2013 at 02:59:04PM +0200, Pali Roh?r wrote:
->  >> Other secure functions omap_smc1() and omap_smc2() calling instruction smc #0
->  >> but Nokia RX-51 board needs to call smc #1 for PPA access.
->  >> 
->  >> Signed-off-by: Ivaylo Dimitrov 
->  >> Signed-off-by: Pali Roh?r 
->  >> ---
->  >>  arch/arm/mach-omap2/omap-secure.h |    1 +
->  >>  arch/arm/mach-omap2/omap-smc.S    |   22 +++++++++++++++++++++-
->  >>  2 files changed, 22 insertions(+), 1 deletion(-)
->  >> 
->  >> diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
->  >> index 0e72917..c4586f4 100644
->  >> --- a/arch/arm/mach-omap2/omap-secure.h
->  >> +++ b/arch/arm/mach-omap2/omap-secure.h
->  >> @@ -51,6 +51,7 @@
->  >>  extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
->  >>  				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
->  >>  extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
->  >> +extern u32 omap_smc3(u32 id, u32 process, u32 flag, u32 pargs);
->  >>  extern phys_addr_t omap_secure_ram_mempool_base(void);
->  >>  extern int omap_secure_ram_reserve_memblock(void);
->  >>  
->  >> diff --git a/arch/arm/mach-omap2/omap-smc.S b/arch/arm/mach-omap2/omap-smc.S
->  >> index f6441c1..5c02b8d 100644
->  >> --- a/arch/arm/mach-omap2/omap-smc.S
->  >> +++ b/arch/arm/mach-omap2/omap-smc.S
->  >> @@ -1,9 +1,11 @@
->  >>  /*
->  >> - * OMAP44xx secure APIs file.
->  >> + * OMAP34xx and OMAP44xx secure APIs file.
->  >>   *
->  >>   * Copyright (C) 2010 Texas Instruments, Inc.
->  >>   * Written by Santosh Shilimkar 
->  >>   *
->  >> + * Copyright (C) 2012 Ivaylo Dimitrov 
->  >> + * Copyright (C) 2013 Pali Roh?r 
->  >>   *
->  >>   * This program is free software,you can redistribute it and/or modify
->  >>   * it under the terms of the GNU General Public License version 2 as
->  >> @@ -54,6 +56,24 @@ ENTRY(omap_smc2)
->  >>  	ldmfd   sp!, {r4-r12, pc}
->  >>  ENDPROC(omap_smc2)
->  >>  
->  >> +/**
->  >> + * u32 omap_smc3(u32 service_id, u32 process_id, u32 flag, u32 pargs)
->  >> + * Low level common routine for secure HAL and PPA APIs via smc #1
->  >> + * r0 - @service_id: Secure Service ID
->  >> + * r1 - @process_id: Process ID
->  >> + * r2 - @flag: Flag to indicate the criticality of operation
->  >> + * r3 - @pargs: Physical address of parameter list
->  >> + */
->  >> +ENTRY(omap_smc3)
->  >> +	stmfd	sp!, {r4-r12, lr}
->  >
->  >You don't need to save/restore r12.  The ABI allows it to be clobbered
->  >across function calls.
->  >
->  >> +	mov	r12, r0		@ Copy the secure service ID
->  >> +	mov	r6, #0xff	@ Indicate new Task call
->  >> +	dsb
->  >> +	dmb
->  >
->  >dsb synchronises a superset of what dmb synchronises, so the dmb here is
->  >not useful.
->  >
->  >In any case, any code calling this must flush the region addressed by
->  >r3 beforehand anyway, which will include a dsb as part of its semantics
->  >-- this is how you call it from rx51_secure_dispatcher().
->  >
->  >So I think the dsb may not be needed here (?)
->  >
->  >Cheers
->  >---Dave
->  >
->  >
-> 
-> Could be, but I wonder why almost all the kernel code(I am aware of) that uses SMC and is written by TI, is storing r12 and is using both DSB and DMB. See arch/arm/mach-omap2/sleep34xx.S or arch/arm/mach-omap2/omap-smc.S for examples. I'd rather play it safe and leave it that way, unless someone confirms the other code using SMC has extra DSB/DMB instructions too. I wouldn't risk passing invalid/stale data to the Secure Monitor to just save 8 bytes and barriers in a performance non-critical code which will be called only a couple of times during the boot-up process. r12 save/restore is a legacy from omap_smc2 in omap-smc.S, so I guess it can go away without much of a trouble.
-> 
-Dave pointed out about the dsb and r12 to me in another thread. R12 can be easily removed
-but the DSB's were needed on OMAP for power sequencing. Without those, we have seen
-many issues. So you can leave the dsb's to be consistent with rest of the code.
+Hi,
 
-Regards
-Santosh
-P.S: Please sensibly wrap your message while replying. You reply apears like
-one single line and I needed to keep scrolling to read it.
+We seem to have reached an initial conclusion from the "Best practice
+device tree design for display subsystems/DRM". Thanks for the
+discussion. I am trying to come up with a binding + implementation.
+
+I am a bit stuck though, because I don't fully understand what the
+DCON on the Armada 510 does.
+
+In that thread, the ascii art suggests that it receives the output
+from the two LCD controllers. From there it can send the image to a
+VGA output or a parallel bus (where the HDMI encoder lies). Does it
+let you choose which LCD controller input goes to which output? Can
+you clone one input onto both outputs?
+
+If it plays such an integral role in the "get an image from Cubox onto
+my TV" path, as suggested in the diagram, why can't I see any code in
+the armada_drm driver that configures it?
+
+
+We also have a naming conflict that might be annoying. The MMP2 and
+MMP3 can effectively drive 3 different video outputs (2 panels + 1
+HDMI), but the documentation and register layout does not treat it as
+3 different devices. Rather it is just 1 device, annoyingly named
+"display controller". Comparing MMP to Armada 510, the MMP "display
+controller" seems to act like the 510's LCD controllers and display
+controller combined, i.e. it coordinates both the reading of image
+data from memory *and* sending it to a configurable selection of
+output devices.
+
+That might produce a challenge for writing good documentation that
+covers all the target hardware. That will become apparent once I'm
+clearer on what the Armada 510 DCON is and how to document it's
+possible involvement in the DT. If necessary, maybe we could refer to
+the Armada 510 DCON as "output controller" or "output selector" or
+something like that, to avoid the name conflict.
+
+Thanks
+Daniel
