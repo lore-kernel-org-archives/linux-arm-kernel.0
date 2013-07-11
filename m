@@ -1,124 +1,55 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 11 Jul 2013 18:15:53 +0200
-Subject: [PATCH v5 1/7] sound: codec: wm8731: add rates constraints
+Date: Thu, 11 Jul 2013 18:15:55 +0200
+Subject: [PATCH v5 3/7] Documentation: DT: update atmel SSC with DMA binding
 In-Reply-To: <1373559359-31607-1-git-send-email-richard.genoud@gmail.com>
 References: <1373559359-31607-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1373559359-31607-2-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1373559359-31607-4-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Depending on the mclk (or crystal) selected, the wm8731 codec have some
-constraints on its data sampling rates:
-e.g. with a 12.288MHz or 18.432MHz crystal, the authorized rates are
-8KHz, 32KHz, 48KHz and 96KHz.
+As atmel-ssc can be used with DMA, the documentation should be updated.
+Also, a configuration DMA example is given.
 
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 ---
- sound/soc/codecs/wm8731.c |   57 ++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 54 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/misc/atmel-ssc.txt         |   23 +++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
-diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
-index 5276062..fc031ed 100644
---- a/sound/soc/codecs/wm8731.c
-+++ b/sound/soc/codecs/wm8731.c
-@@ -45,6 +45,7 @@ static const char *wm8731_supply_names[WM8731_NUM_SUPPLIES] = {
- struct wm8731_priv {
- 	struct regmap *regmap;
- 	struct regulator_bulk_data supplies[WM8731_NUM_SUPPLIES];
-+	const struct snd_pcm_hw_constraint_list *constraints;
- 	unsigned int sysclk;
- 	int sysclk_type;
- 	int playback_fs;
-@@ -290,6 +291,36 @@ static const struct _coeff_div coeff_div[] = {
- 	{12000000, 88200, 136, 0xf, 0x1, 0x1},
+diff --git a/Documentation/devicetree/bindings/misc/atmel-ssc.txt b/Documentation/devicetree/bindings/misc/atmel-ssc.txt
+index 38e51ad..a45ae08 100644
+--- a/Documentation/devicetree/bindings/misc/atmel-ssc.txt
++++ b/Documentation/devicetree/bindings/misc/atmel-ssc.txt
+@@ -7,9 +7,30 @@ Required properties:
+ - reg: Should contain SSC registers location and length
+ - interrupts: Should contain SSC interrupt
+ 
+-Example:
++
++Required properties for devices compatible with "atmel,at91sam9g45-ssc":
++- dmas: DMA specifier, consisting of a phandle to DMA controller node,
++  the memory interface and SSC DMA channel ID (for tx and rx).
++  See Documentation/devicetree/bindings/dma/atmel-dma.txt for details.
++- dma-names: Must be "tx", "rx".
++
++Examples:
++- PDC transfer:
+ ssc0: ssc at fffbc000 {
+ 	compatible = "atmel,at91rm9200-ssc";
+ 	reg = <0xfffbc000 0x4000>;
+ 	interrupts = <14 4 5>;
  };
- 
-+/* rates constraints */
-+static const unsigned int wm8731_rates_12000000[] = {
-+	8000, 32000, 44100, 48000, 96000, 88200,
++
++- DMA transfer:
++ssc0: ssc at f0010000 {
++      compatible = "atmel,at91sam9g45-ssc";
++      reg = <0xf0010000 0x4000>;
++      interrupts = <28 4 5>;
++      dmas = <&dma0 1 13>,
++	     <&dma0 1 14>;
++      dma-names = "tx", "rx";
++      pinctrl-names = "default";
++      pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
++      status = "disabled";
 +};
-+
-+static const unsigned int wm8731_rates_12288000_18432000[] = {
-+	8000, 32000, 48000, 96000,
-+};
-+
-+static const unsigned int wm8731_rates_11289600_16934400[] = {
-+	8000, 44100, 88200,
-+};
-+
-+static const struct snd_pcm_hw_constraint_list wm8731_constraints_12000000 = {
-+	.list = wm8731_rates_12000000,
-+	.count = ARRAY_SIZE(wm8731_rates_12000000),
-+};
-+
-+static const
-+struct snd_pcm_hw_constraint_list wm8731_constraints_12288000_18432000 = {
-+	.list = wm8731_rates_12288000_18432000,
-+	.count = ARRAY_SIZE(wm8731_rates_12288000_18432000),
-+};
-+
-+static const
-+struct snd_pcm_hw_constraint_list wm8731_constraints_11289600_16934400 = {
-+	.list = wm8731_rates_11289600_16934400,
-+	.count = ARRAY_SIZE(wm8731_rates_11289600_16934400),
-+};
-+
- static inline int get_coeff(int mclk, int rate)
- {
- 	int i;
-@@ -362,17 +393,23 @@ static int wm8731_set_dai_sysclk(struct snd_soc_dai *codec_dai,
- 	}
- 
- 	switch (freq) {
--	case 11289600:
- 	case 12000000:
-+		wm8731->constraints = &wm8731_constraints_12000000;
-+		break;
- 	case 12288000:
--	case 16934400:
- 	case 18432000:
--		wm8731->sysclk = freq;
-+		wm8731->constraints = &wm8731_constraints_12288000_18432000;
-+		break;
-+	case 16934400:
-+	case 11289600:
-+		wm8731->constraints = &wm8731_constraints_11289600_16934400;
- 		break;
- 	default:
- 		return -EINVAL;
- 	}
- 
-+	wm8731->sysclk = freq;
-+
- 	snd_soc_dapm_sync(&codec->dapm);
- 
- 	return 0;
-@@ -475,12 +512,26 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
- 	return 0;
- }
- 
-+static int wm8731_startup(struct snd_pcm_substream *substream,
-+	struct snd_soc_dai *dai)
-+{
-+	struct wm8731_priv *wm8731 = snd_soc_codec_get_drvdata(dai->codec);
-+
-+	if (wm8731->constraints)
-+		snd_pcm_hw_constraint_list(substream->runtime, 0,
-+					   SNDRV_PCM_HW_PARAM_RATE,
-+					   wm8731->constraints);
-+
-+	return 0;
-+}
-+
- #define WM8731_RATES SNDRV_PCM_RATE_8000_96000
- 
- #define WM8731_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE |\
- 	SNDRV_PCM_FMTBIT_S24_LE)
- 
- static const struct snd_soc_dai_ops wm8731_dai_ops = {
-+	.startup	= wm8731_startup,
- 	.hw_params	= wm8731_hw_params,
- 	.digital_mute	= wm8731_mute,
- 	.set_sysclk	= wm8731_set_dai_sysclk,
 -- 
 1.7.10.4
