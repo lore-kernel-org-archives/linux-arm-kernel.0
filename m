@@ -1,78 +1,44 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 11 Jul 2013 19:57:19 +0200
-Subject: [PATCH v12 00/13] Add tested id switch and vbus connect detect
- support for Chipidea
-In-Reply-To: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
-References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <201307111957.19537.marex@denx.de>
+From: tibor@harsszegi.com (Tibor Harsszegi)
+Date: Thu, 11 Jul 2013 20:32:42 +0200
+Subject: gpio_blink_set + Kirkwood
+In-Reply-To: <20130711164456.GA3095@lunn.ch>
+References: <51DC564A.8050002@harsszegi.com> <20130709193605.GC26223@lunn.ch>
+ <1a9bcb9094ae695c6707c4835417dd5b@harsszegi.com>
+ <20130710073706.GA28212@lunn.ch> <51DEDB32.4080101@harsszegi.com>
+ <20130711164456.GA3095@lunn.ch>
+Message-ID: <51DEFA4A.6010303@harsszegi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+> On Thu, Jul 11, 2013 at 06:20:02PM +0200, Tibor Harsszegi wrote:
+>> Hello guys,
+>>
+>> can anyone explain me how does the gpio_blink_set member gets filled
+>> in leds-gpio through platform_get_drvdata()?
+>> I can't seem to follow how the specific function pointer can be set
+>> to orion_gpio_set_blink() for example.
+>> Sorry for the dumb question :(
+> Hi Tibor
+>
+> For DT based board, hardware blinking is not supported, as far as i
+> remember.
+>
+> 	Andrew
 
-> This patchset adds tested otg id switch function and
-> vbus connect and disconnect detection for chipidea driver.
-> And fix kinds of bugs found at chipidea drivers after enabling
-> id and vbus detection.
-> 
-> This patch is fully tested at imx6 sabresd platform.
-> My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
-> 
-> Changes for v12:
-> - Rebased greg's usb-next tree (3.10.0-rc7+)
-> - Split more small patches for single function and fix.
+Hello Andrew,
 
-I tested the patchset. Here are the results:
+is there an example for "mixed machine setup" (if there is anything like 
+that) ?
+I'm thinking about:
 
-- VBUS switching
+* DT based initialization starts
+* then if supported board based "after-DT-init-board-code" executes
 
-I'm no longer getting any ID interrupts at all when I apply the patch below. The 
-board stays in HOST mode all the time. If I configure it as peripheral, it works 
-as peripheral. Note with [1], I was able to switch from Peripheral->Host , not 
-the other way around.
+similar what we have in board-*.c files just that it would be executed 
+after kirkwood has initialized the board
+based upon the .DTB
+[I'm thinking about getting rid of the LED setup from the .DTB and move 
+it back to .C land - at least for a trial]
 
---- a/arch/arm/boot/dts/imx28-m28evk.dts
-+++ b/arch/arm/boot/dts/imx28-m28evk.dts
-@@ -240,6 +240,8 @@
- 
-        ahb at 80080000 {
-                usb0: usb at 80080000 {
-+                       dr_mode = "otg";
-+                       phy_mode = "utmi";
-                        vbus-supply = <&reg_usb0_vbus>;
-                        pinctrl-names = "default";
-                        pinctrl-0 = <&usbphy0_pins_a>;
-
----------------------------
-
-- MX23 UDC issue
-
-I found a workaround. Now running 'dmesg' via telnet through USB CDC link no 
-longer hangs the USB driver, but works as expected. I applied this small patch 
-that enables the streaming mode. Works on MX23EVK. It's surprising this issue 
-doesn't manifest on MX28, maybe MX28 contains a new revision of the controller. 
-I remember there was some discussion about the streaming mode on MXS some time 
-ago.
-
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c 
-b/drivers/usb/chipidea/ci_hdrc_imx.c
-index d06355e..bba8e25 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -92,8 +92,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
-                .name           = "ci_hdrc_imx",
-                .capoffset      = DEF_CAPOFFSET,
-                .flags          = CI_HDRC_REQUIRE_TRANSCEIVER |
--                                 CI_HDRC_PULLUP_ON_VBUS |
--                                 CI_HDRC_DISABLE_STREAMING,
-+                                 CI_HDRC_PULLUP_ON_VBUS,
-        };
-        struct resource *res;
-        int ret;
-
-[1] 
-http://git.pengutronix.de/?p=mgr/linux.git;a=shortlog;h=refs/heads/v3.10/topic/usb-
-peterchen
-
-Best regards,
-Marek Vasut
+Thanks,
+Tibor
