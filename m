@@ -1,99 +1,34 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 11 Jul 2013 09:50:16 +0200
-Subject: [PATCH v2 2/6] clk: samsung: fix error handling in pll register
- functions
-In-Reply-To: <201307100058.13941.heiko@sntech.de>
-References: <201307100057.06061.heiko@sntech.de>
- <201307100058.13941.heiko@sntech.de>
-Message-ID: <1418034.CJ7vtBLiog@thinkpad>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 11 Jul 2013 09:55:43 +0200
+Subject: [v4 3/3] sata: imx: add ahci sata support on imx platforms
+In-Reply-To: <0E83723C55F66F43A6041464FE31119D32AE6B@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <1373445355-11453-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1373445355-11453-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <20130710210414.GK516@pengutronix.de>
+ <0E83723C55F66F43A6041464FE31119D32AE6B@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <20130711075543.GG14452@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hi Richard,
 
-On Wednesday 10 of July 2013 00:58:13 Heiko St?bner wrote:
-> kmalloc has its own error reporting when the allocation fails and
-> the register functions also should return the correct ERR_PTR(-ENOMEM)
-> when it happens.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/clk/samsung/clk-pll.c |   30 ++++++++++--------------------
->  1 file changed, 10 insertions(+), 20 deletions(-)
+On Thu, Jul 11, 2013 at 07:50:50AM +0000, Zhu Richard-R65037 wrote:
+> Hi Sascha:
+> Sorry to make a mess on the usage of the private data.
+> The private data of "imx_ahci_pdev" platform device would be used to store ata_host point.
+> I shouldn't set imxpriv to the private data of "imx_ahci_pdev", so do the wrong assignment of
+> The private pointer of device.
 
-This patch looks pretty good, but I'm not sure if this problem still exists 
-after applying Yadwinder's patches that completely changes the way of PLL 
-registration.
+Please allocate your private data along with the platform_device in the
+probe function, then in the init callback you can use container_of() to
+get a pointer to the data.
+Also I would recommend you to request the necessary resources (clocks,
+regmap) in the probe function and not in the init callback.
 
-Best regards,
-Tomasz
+Sascha
 
-> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
-> index 9153e46..0afaec6 100644
-> --- a/drivers/clk/samsung/clk-pll.c
-> +++ b/drivers/clk/samsung/clk-pll.c
-> @@ -79,10 +79,8 @@ struct clk * __init samsung_clk_register_pll35xx(const
-> char *name, struct clk_init_data init;
-> 
->  	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
-> -	if (!pll) {
-> -		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
-> -		return NULL;
-> -	}
-> +	if (!pll)
-> +		return ERR_PTR(-ENOMEM);
-> 
->  	init.name = name;
->  	init.ops = &samsung_pll35xx_clk_ops;
-> @@ -153,10 +151,8 @@ struct clk * __init samsung_clk_register_pll36xx(const
-> char *name, struct clk_init_data init;
-> 
->  	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
-> -	if (!pll) {
-> -		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
-> -		return NULL;
-> -	}
-> +	if (!pll)
-> +		return ERR_PTR(-ENOMEM);
-> 
->  	init.name = name;
->  	init.ops = &samsung_pll36xx_clk_ops;
-> @@ -227,10 +223,8 @@ struct clk * __init samsung_clk_register_pll45xx(const
-> char *name, struct clk_init_data init;
-> 
->  	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
-> -	if (!pll) {
-> -		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
-> -		return NULL;
-> -	}
-> +	if (!pll)
-> +		return ERR_PTR(-ENOMEM);
-> 
->  	init.name = name;
->  	init.ops = &samsung_pll45xx_clk_ops;
-> @@ -308,10 +302,8 @@ struct clk * __init samsung_clk_register_pll46xx(const
-> char *name, struct clk_init_data init;
-> 
->  	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
-> -	if (!pll) {
-> -		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
-> -		return NULL;
-> -	}
-> +	if (!pll)
-> +		return ERR_PTR(-ENOMEM);
-> 
->  	init.name = name;
->  	init.ops = &samsung_pll46xx_clk_ops;
-> @@ -385,10 +377,8 @@ struct clk * __init samsung_clk_register_pll2550x(const
-> char *name, struct clk_init_data init;
-> 
->  	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
-> -	if (!pll) {
-> -		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
-> -		return NULL;
-> -	}
-> +	if (!pll)
-> +		return ERR_PTR(-ENOMEM);
-> 
->  	init.name = name;
->  	init.ops = &samsung_pll2550x_clk_ops;
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
