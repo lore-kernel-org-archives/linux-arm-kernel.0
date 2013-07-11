@@ -1,44 +1,27 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 11 Jul 2013 18:15:59 +0200
-Subject: [PATCH v5 7/7] ARM: AT91: DTS: sam9x5ek: add sound configuration
-In-Reply-To: <1373559359-31607-1-git-send-email-richard.genoud@gmail.com>
-References: <1373559359-31607-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1373559359-31607-8-git-send-email-richard.genoud@gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 12 Jul 2013 01:22:09 +0900
+Subject: [PATCH v2 00/02] ARM: shmobile: r8a7790 arch timer frequency update
+Message-ID: <20130711162209.933.47610.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sam9x5ek board has 2 jacks:
-headphone wired on RHPOUT/LHPOUT of the wm8731
-line in wired on LLINEIN/RLINEIN of the wm8731
+ARM: shmobile: r8a7790 arch timer frequency update (v2)
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+[PATCH v2 01/02] ARM: shmobile: Introduce r8a7790_read_mode_pins()
+[PATCH 02/02] ARM: shmobile: Setup r8a7790 arch timer based on MD pins
+
+Add code to setup r8a7790 arch timer frequency dynamically at boot time
+based on the EXTAL frequency pointed out by the boot mode pins.
+
+Patch 1/2 has been updated with a ioremap() fix.
+Patch 2/2 now has reported-by and tested-by.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
- arch/arm/boot/dts/at91sam9x5ek.dtsi |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-index f3e83f7..9afe15b 100644
---- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-@@ -113,4 +113,19 @@
- 			status = "okay";
- 		};
- 	};
-+
-+	sound {
-+		compatible = "atmel,sam9x5-wm8731-audio";
-+
-+		atmel,model = "wm8731 @ AT91SAM9X5EK";
-+
-+		atmel,audio-routing =
-+			"Headphone Jack", "RHPOUT",
-+			"Headphone Jack", "LHPOUT",
-+			"LLINEIN", "Line In Jack",
-+			"RLINEIN", "Line In Jack";
-+
-+		atmel,ssc-controller = <&ssc0>;
-+		atmel,audio-codec = <&wm8731>;
-+	};
- };
--- 
-1.7.10.4
+ Built on top of renesas-next-20130711
+
+ arch/arm/mach-shmobile/clock-r8a7790.c        |   11 ----
+ arch/arm/mach-shmobile/include/mach/r8a7790.h |    3 +
+ arch/arm/mach-shmobile/setup-r8a7790.c        |   63 +++++++++++++++++++++++--
+ 3 files changed, 63 insertions(+), 14 deletions(-)
