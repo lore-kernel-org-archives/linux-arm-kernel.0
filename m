@@ -1,349 +1,204 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 11 Jul 2013 12:43:22 +0200
-Subject: [PATCH] ASoC: Samsung: Modify the I2S driver to support I2S on
- Exynos5420
-In-Reply-To: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
-References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
-Message-ID: <29860116.IF545KsGYb@thinkpad>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Thu, 11 Jul 2013 16:14:26 +0530
+Subject: [PATCH] clk: samsung: add set_rate and round_rate callbacks for
+ pll45xx
+In-Reply-To: <1373534869-12034-1-git-send-email-thomas.abraham@linaro.org>
+References: <1373534869-12034-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CAKew6eV0QP31gJNB2waeSRB5DN5Vs+mXO5bwaD5TiHYZvrANQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Padmavathi,
+Hi Thomas,
 
-On Thursday 11 of July 2013 12:38:24 Padmavathi Venna wrote:
-> Exynos5420 added support for I2S TDM mode. For this, there are some
-> register changes in the I2S controller. This patch adds the relevant
-> register changes to support I2S in normal mode. This patch adds a
-> quirk for TDM mode and if TDM mode is present all the relevent changes
-> will be applied.
-> 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> [abrestic: style cleanup and documentation]
-> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> Reviewed-on: https://gerrit-int.chromium.org/37840
-> Reviewed-by: Simon Glass <sjg@google.com>
+On Thu, Jul 11, 2013 at 2:57 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> Add support for set_rate and round_rate callbacks for pll45xx pll. This allows
+> configuring pll45xx to generate a desired clock output.
+>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 > ---
->  .../devicetree/bindings/sound/samsung-i2s.txt      |    2 +
->  include/linux/platform_data/asoc-s3c.h             |    1 +
->  sound/soc/samsung/i2s-regs.h                       |   51 ++++++---
->  sound/soc/samsung/i2s.c                            |  117
-> ++++++++++++++++---- 4 files changed, 132 insertions(+), 39 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-> b/Documentation/devicetree/bindings/sound/samsung-i2s.txt index
-> 025e66b..b8593d5 100644
-> --- a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-> +++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-> @@ -28,6 +28,8 @@ Optional SoC Specific Properties:
->    enabled or disabled based on need.
->  - samsung,supports-secdai:If I2S block has a secondary FIFO and internal
-> DMA, then this flag is enabled.
-> +- samsung,supports-tdm: If the I2S controller supports TDM, then this flag
-> +  must be enabled.
+>
+> The set_rate and round_rate callbacks in this patch for pll45xx are handled
+> slightly differently from the way it is done in the (not yet merged) patch
+> series from Yadwinder
+> (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg19540.html)
+>
+> In this patch, the pll lookup table is kept as part of the pll configuration
+> code itself, since the pll is just a hardware block which takes an input
+> frequency and configuration values to genertate a output clock frequency.
+> Given a set of inputs, a pll of a given type will generate the same output
+> regardless of the SoC it is used in. So instead of supplying the pll lookup
 
-I think this should be rather handled by a different compatible value, not a 
-flag. Also a word about what this TDM mode is would be nice.
+Tomasz also raised similar point earlier in discussion on that series.
+That time a question which remained unanswered for which we were waiting
+(as requested from hardware guys also) was that :
+Whether we need to stick to recommended values only or we can drive a
+particular output frequency with a given input frequency with any possible
+set of (P, M, S) values ?
 
-Best regards,
-Tomasz
+Theoretically it seems possible but from manual its seems to prefer
+recommended values.
+Also I am not sure whether same values are always recommended in user manuals
+for different SoCs using same PLL type.
 
->  - samsung,idma-addr: Internal DMA register base address of the audio
->    sub system(used in secondary sound source).
->  - pinctrl-0: Should specify pin control groups used for this controller.
-> diff --git a/include/linux/platform_data/asoc-s3c.h
-> b/include/linux/platform_data/asoc-s3c.h index 8827259..9efc04d 100644
-> --- a/include/linux/platform_data/asoc-s3c.h
-> +++ b/include/linux/platform_data/asoc-s3c.h
-> @@ -36,6 +36,7 @@ struct samsung_i2s {
+> table from per-soc clock driver code (as done in the Yadwinder's patch series),
+> the pll lookup table can be coupled with the pll code itself, saving duplication
+> of pll lookup table for every SoC the pll is used with.
+
+If we don't need to stick to recommended table, definitely it will
+save lot of duplication.
+In-fact then we can use same pll lookup table for other PLLs also
+which have same calculation
+equation for output frequency.
+
+
+Regards,
+Yadwinder
+
+>
+>  drivers/clk/samsung/clk-pll.c |   88 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/samsung/clk-pll.h |   15 +++++++
+>  2 files changed, 103 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+> index 362f12d..4940936 100644
+> --- a/drivers/clk/samsung/clk-pll.c
+> +++ b/drivers/clk/samsung/clk-pll.c
+> @@ -172,6 +172,8 @@ struct clk * __init samsung_clk_register_pll36xx(const char *name,
+>   * PLL45xx Clock Type
 >   */
->  #define QUIRK_NO_MUXPSR		(1 << 2)
->  #define QUIRK_NEED_RSTCLR	(1 << 3)
-> +#define QUIRK_SUPPORTS_TDM	(1 << 4)
->  	/* Quirks of the I2S controller */
->  	u32 quirks;
->  	dma_addr_t idma_addr;
-> diff --git a/sound/soc/samsung/i2s-regs.h b/sound/soc/samsung/i2s-regs.h
-> index c0e6d9a..821a502 100644
-> --- a/sound/soc/samsung/i2s-regs.h
-> +++ b/sound/soc/samsung/i2s-regs.h
-> @@ -31,6 +31,10 @@
->  #define I2SLVL1ADDR	0x34
->  #define I2SLVL2ADDR	0x38
->  #define I2SLVL3ADDR	0x3c
-> +#define I2SSTR1		0x40
-> +#define I2SVER		0x44
-> +#define I2SFIC2		0x48
-> +#define I2STDM		0x4c
-> 
->  #define CON_RSTCLR		(1 << 31)
->  #define CON_FRXOFSTATUS		(1 << 26)
-> @@ -95,24 +99,39 @@
->  #define MOD_RXONLY		(1 << 8)
->  #define MOD_TXRX		(2 << 8)
->  #define MOD_MASK		(3 << 8)
-> -#define MOD_LR_LLOW		(0 << 7)
-> -#define MOD_LR_RLOW		(1 << 7)
-> -#define MOD_SDF_IIS		(0 << 5)
-> -#define MOD_SDF_MSB		(1 << 5)
-> -#define MOD_SDF_LSB		(2 << 5)
-> -#define MOD_SDF_MASK		(3 << 5)
-> -#define MOD_RCLK_256FS		(0 << 3)
-> -#define MOD_RCLK_512FS		(1 << 3)
-> -#define MOD_RCLK_384FS		(2 << 3)
-> -#define MOD_RCLK_768FS		(3 << 3)
-> -#define MOD_RCLK_MASK		(3 << 3)
-> -#define MOD_BCLK_32FS		(0 << 1)
-> -#define MOD_BCLK_48FS		(1 << 1)
-> -#define MOD_BCLK_16FS		(2 << 1)
-> -#define MOD_BCLK_24FS		(3 << 1)
-> -#define MOD_BCLK_MASK		(3 << 1)
-> +#define MOD_LRP_SHIFT		7
-> +#define MOD_LR_LLOW		0
-> +#define MOD_LR_RLOW		1
-> +#define MOD_SDF_SHIFT		5
-> +#define MOD_SDF_IIS		0
-> +#define MOD_SDF_MSB		1
-> +#define MOD_SDF_LSB		2
-> +#define MOD_SDF_MASK		3
-> +#define MOD_RCLK_SHIFT		3
-> +#define MOD_RCLK_256FS		0
-> +#define MOD_RCLK_512FS		1
-> +#define MOD_RCLK_384FS		2
-> +#define MOD_RCLK_768FS		3
-> +#define MOD_RCLK_MASK		3
-> +#define MOD_BCLK_SHIFT		1
-> +#define MOD_BCLK_32FS		0
-> +#define MOD_BCLK_48FS		1
-> +#define MOD_BCLK_16FS		2
-> +#define MOD_BCLK_24FS		3
-> +#define MOD_BCLK_MASK		3
->  #define MOD_8BIT		(1 << 0)
-> 
-> +#define EXYNOS5420_MOD_LRP_SHIFT	15
-> +#define EXYNOS5420_MOD_SDF_SHIFT	6
-> +#define EXYNOS5420_MOD_RCLK_SHIFT	4
-> +#define EXYNOS5420_MOD_BCLK_SHIFT	0
-> +#define EXYNOS5420_MOD_BCLK_64FS	4
-> +#define EXYNOS5420_MOD_BCLK_96FS	5
-> +#define EXYNOS5420_MOD_BCLK_128FS	6
-> +#define EXYNOS5420_MOD_BCLK_192FS	7
-> +#define EXYNOS5420_MOD_BCLK_256FS	8
-> +#define EXYNOS5420_MOD_BCLK_MASK	0xf
+>
+> +#define PLL45XX_EN_MASK                (1 << 31)
+> +#define PLL45XX_LOCK_MASK      (1 << 29)
+>  #define PLL45XX_MDIV_MASK      (0x3FF)
+>  #define PLL45XX_PDIV_MASK      (0x3F)
+>  #define PLL45XX_SDIV_MASK      (0x7)
+> @@ -187,6 +189,90 @@ struct samsung_clk_pll45xx {
+>
+>  #define to_clk_pll45xx(_hw) container_of(_hw, struct samsung_clk_pll45xx, hw)
+>
+> +/* a sorted table of freq supported by pll45xx with 24mhz parent clock */
+> +static struct pll45xx_freq_lookup pll45xx_freq_lookup_24mhz[] = {
+> +       PLL45XX_PMS(1000000000, 6, 250, 1),
+> +       PLL45XX_PMS(800000000, 6, 200, 1),
+> +       PLL45XX_PMS(500000000, 6, 250, 2),
+> +       PLL45XX_PMS(400000000, 6, 200, 2),
+> +       PLL45XX_PMS(200000000, 6, 200, 3),
+> +};
 > +
->  #define MOD_CDCLKCON		(1 << 12)
-> 
->  #define PSR_PSREN		(1 << 15)
-> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-> index 3fcf8d7..398f8db 100644
-> --- a/sound/soc/samsung/i2s.c
-> +++ b/sound/soc/samsung/i2s.c
-> @@ -198,7 +198,13 @@ static inline bool is_manager(struct i2s_dai *i2s)
->  /* Read RCLK of I2S (in multiples of LRCLK) */
->  static inline unsigned get_rfs(struct i2s_dai *i2s)
+> +static int samsung_pll45xx_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                                       unsigned long prate)
+> +{
+> +       struct samsung_clk_pll45xx *pll = to_clk_pll45xx(hw);
+> +       struct pll45xx_freq_lookup *f;
+> +       unsigned long timeout, pll_con, cnt, idx;
+> +
+> +       /* select a lookup table based on parent clock frequency */
+> +       switch (prate) {
+> +       case 24000000:
+> +               f = pll45xx_freq_lookup_24mhz;
+> +               cnt = ARRAY_SIZE(pll45xx_freq_lookup_24mhz);
+> +               break;
+> +       default:
+> +               pr_err("%s: unsupported parent clock rate, failed to set rate",
+> +                                       __func__);
+> +               return -EINVAL;
+> +       }
+> +
+> +       /* check if the requested freq is in the list of supported freq */
+> +       for (idx = 0; idx < cnt; idx++, f++)
+> +               if (f->target_freq == rate)
+> +                       break;
+> +
+> +       if (idx == cnt) {
+> +               pr_err("%s: unspported clock speed %ld requested\n",
+> +                               __func__, rate);
+> +               return -EINVAL;
+> +       }
+> +
+> +       /* first, disable the output of the pll */
+> +       writel(readl(pll->con_reg) & ~PLL45XX_EN_MASK, (void *)pll->con_reg);
+> +
+> +       /* write the new pll configuration values */
+> +       pll_con = (f->pdiv << PLL45XX_PDIV_SHIFT) |
+> +                       (f->mdiv << PLL45XX_MDIV_SHIFT) |
+> +                       (f->sdiv << PLL45XX_SDIV_SHIFT);
+> +       writel(pll_con, (void *)pll->con_reg);
+> +
+> +       /* enable the pll and wait for it to stabilize */
+> +       writel(pll_con | PLL45XX_EN_MASK, (void *)pll->con_reg);
+> +       timeout = jiffies + msecs_to_jiffies(20);
+> +       while (time_before(jiffies, timeout))
+> +               if (readl(pll->con_reg) & PLL45XX_LOCK_MASK)
+> +                       return 0;
+> +       return -EBUSY;
+> +}
+> +
+> +static long samsung_pll45xx_round_rate(struct clk_hw *hw, unsigned long rate,
+> +                                               unsigned long *prate)
+> +{
+> +       struct pll45xx_freq_lookup *f;
+> +       unsigned long cnt;
+> +
+> +       /* select a lookup table based on parent clock frequency */
+> +       switch (*prate) {
+> +       case 24000000:
+> +               f = pll45xx_freq_lookup_24mhz;
+> +               cnt = ARRAY_SIZE(pll45xx_freq_lookup_24mhz);
+> +               break;
+> +       default:
+> +               pr_err("%s: unsupported parent clock rate", __func__);
+> +               return *prate;
+> +       }
+> +
+> +       /* find the nearest possible clock output that can be supported */
+> +       while (cnt-- > 0) {
+> +               if (rate >= f->target_freq)
+> +                       return f->target_freq;
+> +               f++;
+> +       }
+> +
+> +       return (--f)->target_freq;
+> +}
+> +
+>  static unsigned long samsung_pll45xx_recalc_rate(struct clk_hw *hw,
+>                                 unsigned long parent_rate)
 >  {
-> -	u32 rfs = (readl(i2s->addr + I2SMOD) >> 3) & 0x3;
-> +	u32 rfs;
+> @@ -209,6 +295,8 @@ static unsigned long samsung_pll45xx_recalc_rate(struct clk_hw *hw,
+>  }
+>
+>  static const struct clk_ops samsung_pll45xx_clk_ops = {
+> +       .set_rate = samsung_pll45xx_set_rate,
+> +       .round_rate = samsung_pll45xx_round_rate,
+>         .recalc_rate = samsung_pll45xx_recalc_rate,
+>  };
+>
+> diff --git a/drivers/clk/samsung/clk-pll.h b/drivers/clk/samsung/clk-pll.h
+> index f33786e..fb687ec 100644
+> --- a/drivers/clk/samsung/clk-pll.h
+> +++ b/drivers/clk/samsung/clk-pll.h
+> @@ -18,6 +18,21 @@ enum pll45xx_type {
+>         pll_4508
+>  };
+>
+> +struct pll45xx_freq_lookup {
+> +       unsigned long   target_freq;
+> +       unsigned long   pdiv;
+> +       unsigned long   mdiv;
+> +       unsigned long   sdiv;
+> +};
 > +
-> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM)
-> +		rfs = readl(i2s->addr + I2SMOD) >> EXYNOS5420_MOD_RCLK_SHIFT;
-> +	else
-> +		rfs = readl(i2s->addr + I2SMOD) >> MOD_RCLK_SHIFT;
-> +	rfs &= MOD_RCLK_MASK;
-> 
->  	switch (rfs) {
->  	case 3:	return 768;
-> @@ -212,21 +218,26 @@ static inline unsigned get_rfs(struct i2s_dai *i2s)
->  static inline void set_rfs(struct i2s_dai *i2s, unsigned rfs)
->  {
->  	u32 mod = readl(i2s->addr + I2SMOD);
-> +	int rfs_shift;
-> 
-> -	mod &= ~MOD_RCLK_MASK;
-> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM)
-> +		rfs_shift = EXYNOS5420_MOD_RCLK_SHIFT;
-> +	else
-> +		rfs_shift = MOD_RCLK_SHIFT;
-> +	mod &= ~(MOD_RCLK_MASK << rfs_shift);
-> 
->  	switch (rfs) {
->  	case 768:
-> -		mod |= MOD_RCLK_768FS;
-> +		mod |= (MOD_RCLK_768FS << rfs_shift);
->  		break;
->  	case 512:
-> -		mod |= MOD_RCLK_512FS;
-> +		mod |= (MOD_RCLK_512FS << rfs_shift);
->  		break;
->  	case 384:
-> -		mod |= MOD_RCLK_384FS;
-> +		mod |= (MOD_RCLK_384FS << rfs_shift);
->  		break;
->  	default:
-> -		mod |= MOD_RCLK_256FS;
-> +		mod |= (MOD_RCLK_256FS << rfs_shift);
->  		break;
->  	}
-> 
-> @@ -236,9 +247,22 @@ static inline void set_rfs(struct i2s_dai *i2s,
-> unsigned rfs) /* Read Bit-Clock of I2S (in multiples of LRCLK) */
->  static inline unsigned get_bfs(struct i2s_dai *i2s)
->  {
-> -	u32 bfs = (readl(i2s->addr + I2SMOD) >> 1) & 0x3;
-> +	u32 bfs;
+> +#define PLL45XX_PMS(f, p, m, s)                \
+> +       {                                       \
+> +               .target_freq    = f,            \
+> +               .pdiv           = p,            \
+> +               .mdiv           = m,            \
+> +               .sdiv           = s,            \
+> +       }
 > +
-> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM) {
-> +		bfs = readl(i2s->addr + I2SMOD) >> EXYNOS5420_MOD_BCLK_SHIFT;
-> +		bfs &= EXYNOS5420_MOD_BCLK_MASK;
-> +	} else {
-> +		bfs = readl(i2s->addr + I2SMOD) >> MOD_BCLK_SHIFT;
-> +		bfs &= MOD_BCLK_MASK;
-> +	}
-> 
->  	switch (bfs) {
-> +	case 8: return 256;
-> +	case 7: return 192;
-> +	case 6: return 128;
-> +	case 5: return 96;
-> +	case 4: return 64;
->  	case 3: return 24;
->  	case 2: return 16;
->  	case 1:	return 48;
-> @@ -250,21 +274,50 @@ static inline unsigned get_bfs(struct i2s_dai *i2s)
->  static inline void set_bfs(struct i2s_dai *i2s, unsigned bfs)
->  {
->  	u32 mod = readl(i2s->addr + I2SMOD);
-> +	int bfs_shift;
-> +	int tdm = i2s->quirks & QUIRK_SUPPORTS_TDM;
-> 
-> -	mod &= ~MOD_BCLK_MASK;
-> +	if (tdm) {
-> +		bfs_shift = EXYNOS5420_MOD_BCLK_SHIFT;
-> +		mod &= ~(EXYNOS5420_MOD_BCLK_MASK << bfs_shift);
-> +	} else {
-> +		bfs_shift = MOD_BCLK_SHIFT;
-> +		mod &= ~(MOD_BCLK_MASK << bfs_shift);
-> +	}
-> +
-> +	/* Non-TDM I2S controllers do not support BCLK > 48 * FS */
-> +	if (!tdm && bfs > 48) {
-> +		dev_err(&i2s->pdev->dev, "Unsupported BCLK divider\n");
-> +		return;
-> +	}
-> 
->  	switch (bfs) {
->  	case 48:
-> -		mod |= MOD_BCLK_48FS;
-> +		mod |= (MOD_BCLK_48FS << bfs_shift);
->  		break;
->  	case 32:
-> -		mod |= MOD_BCLK_32FS;
-> +		mod |= (MOD_BCLK_32FS << bfs_shift);
->  		break;
->  	case 24:
-> -		mod |= MOD_BCLK_24FS;
-> +		mod |= (MOD_BCLK_24FS << bfs_shift);
->  		break;
->  	case 16:
-> -		mod |= MOD_BCLK_16FS;
-> +		mod |= (MOD_BCLK_16FS << bfs_shift);
-> +		break;
-> +	case 64:
-> +		mod |= (EXYNOS5420_MOD_BCLK_64FS << bfs_shift);
-> +		break;
-> +	case 96:
-> +		mod |= (EXYNOS5420_MOD_BCLK_96FS << bfs_shift);
-> +		break;
-> +	case 128:
-> +		mod |= (EXYNOS5420_MOD_BCLK_128FS << bfs_shift);
-> +		break;
-> +	case 192:
-> +		mod |= (EXYNOS5420_MOD_BCLK_192FS << bfs_shift);
-> +		break;
-> +	case 256:
-> +		mod |= (EXYNOS5420_MOD_BCLK_256FS << bfs_shift);
->  		break;
->  	default:
->  		dev_err(&i2s->pdev->dev, "Wrong BCLK Divider!\n");
-> @@ -492,19 +545,31 @@ static int i2s_set_fmt(struct snd_soc_dai *dai,
->  	struct i2s_dai *i2s = to_info(dai);
->  	u32 mod = readl(i2s->addr + I2SMOD);
->  	u32 tmp = 0;
-> +	int lrp_shift, sdf_shift, sdf_mask, lrp_rlow;
-> +
-> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM) {
-> +		lrp_shift = EXYNOS5420_MOD_LRP_SHIFT;
-> +		sdf_shift = EXYNOS5420_MOD_SDF_SHIFT;
-> +	} else {
-> +		lrp_shift = MOD_LRP_SHIFT;
-> +		sdf_shift = MOD_SDF_SHIFT;
-> +	}
-> +
-> +	sdf_mask = MOD_SDF_MASK << sdf_shift;
-> +	lrp_rlow = MOD_LR_RLOW << lrp_shift;
-> 
->  	/* Format is priority */
->  	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
->  	case SND_SOC_DAIFMT_RIGHT_J:
-> -		tmp |= MOD_LR_RLOW;
-> -		tmp |= MOD_SDF_MSB;
-> +		tmp |= lrp_rlow;
-> +		tmp |= (MOD_SDF_MSB << sdf_shift);
->  		break;
->  	case SND_SOC_DAIFMT_LEFT_J:
-> -		tmp |= MOD_LR_RLOW;
-> -		tmp |= MOD_SDF_LSB;
-> +		tmp |= lrp_rlow;
-> +		tmp |= (MOD_SDF_LSB << sdf_shift);
->  		break;
->  	case SND_SOC_DAIFMT_I2S:
-> -		tmp |= MOD_SDF_IIS;
-> +		tmp |= (MOD_SDF_IIS << sdf_shift);
->  		break;
->  	default:
->  		dev_err(&i2s->pdev->dev, "Format not supported\n");
-> @@ -519,10 +584,10 @@ static int i2s_set_fmt(struct snd_soc_dai *dai,
->  	case SND_SOC_DAIFMT_NB_NF:
->  		break;
->  	case SND_SOC_DAIFMT_NB_IF:
-> -		if (tmp & MOD_LR_RLOW)
-> -			tmp &= ~MOD_LR_RLOW;
-> +		if (tmp & lrp_rlow)
-> +			tmp &= ~lrp_rlow;
->  		else
-> -			tmp |= MOD_LR_RLOW;
-> +			tmp |= lrp_rlow;
->  		break;
->  	default:
->  		dev_err(&i2s->pdev->dev, "Polarity not supported\n");
-> @@ -544,15 +609,18 @@ static int i2s_set_fmt(struct snd_soc_dai *dai,
->  		return -EINVAL;
->  	}
-> 
-> +	/*
-> +	 * Don't change the I2S mode if any controller is active on this
-> +	 * channel.
-> +	 */
->  	if (any_active(i2s) &&
-> -			((mod & (MOD_SDF_MASK | MOD_LR_RLOW
-> -				| MOD_SLAVE)) != tmp)) {
-> +	    ((mod & (sdf_mask | lrp_rlow | MOD_SLAVE)) != tmp)) {
->  		dev_err(&i2s->pdev->dev,
->  				"%s:%d Other DAI busy\n", __func__, __LINE__);
->  		return -EAGAIN;
->  	}
-> 
-> -	mod &= ~(MOD_SDF_MASK | MOD_LR_RLOW | MOD_SLAVE);
-> +	mod &= ~(sdf_mask | lrp_rlow | MOD_SLAVE);
->  	mod |= tmp;
->  	writel(mod, i2s->addr + I2SMOD);
-> 
-> @@ -1170,6 +1238,9 @@ static int samsung_i2s_probe(struct platform_device
-> *pdev) if (of_find_property(np, "samsung,supports-rstclr", NULL))
->  			quirks |= QUIRK_NEED_RSTCLR;
-> 
-> +		if (of_find_property(np, "samsung,supports-tdm", NULL))
-> +			quirks |= QUIRK_SUPPORTS_TDM;
-> +
->  		if (of_property_read_u32(np, "samsung,idma-addr",
->  					 &idma_addr)) {
->  			if (quirks & QUIRK_SEC_DAI) {
+>  enum pll46xx_type {
+>         pll_4600,
+>         pll_4650,
+> --
+> 1.7.5.4
+>
