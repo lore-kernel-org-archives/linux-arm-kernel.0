@@ -1,49 +1,56 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Thu, 11 Jul 2013 09:07:36 +0000
-Subject: [v4 3/3] sata: imx: add ahci sata support on imx platforms
-In-Reply-To: <20130711075543.GG14452@pengutronix.de>
-References: <1373445355-11453-1-git-send-email-Hong-Xing.Zhu@freescale.com>
- <1373445355-11453-4-git-send-email-Hong-Xing.Zhu@freescale.com>
- <20130710210414.GK516@pengutronix.de>
- <0E83723C55F66F43A6041464FE31119D32AE6B@039-SN2MPN1-013.039d.mgd.msft.net>
- <20130711075543.GG14452@pengutronix.de>
-Message-ID: <0E83723C55F66F43A6041464FE31119D32AF10@039-SN2MPN1-013.039d.mgd.msft.net>
+From: richard.zhuhongxing@gmail.com (Richard Zhu)
+Date: Thu, 11 Jul 2013 17:10:28 +0800
+Subject: [PATCH v5 0/3] ahci: enable ahci sata support on imx6q
+Message-ID: <1373533831-9500-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha:
-Thanks for your comments.
-Yes, it is.
-That's is what I done in the V5 patch-set. The patch-set is almost done, would send out a moment later.
+V5: add imx6q specific ahci sata support
+  - Fix the wrong referrence usage of the private data.
+  - Use the private data to contain the poninter of the PHY
+  signals adjustment window(gpr)
+  - Tested on imx6q sd board.
+  - 
 
-Best Regards
-Richard Zhu
+v4: http://www.spinics.net/lists/linux-ide/msg45699.html
+  Thanks for the review comments provided by Sascha, and Alexander.
+  - Use the private data and keep a pointer to the PHY clock.
+  - Don't use the global platform device variable, because that
+  it would make the driver broken for mutiple instances.
+  - Don't do the "writel" with assignment.
+  - Other minor changes, such as print the error code when printing
+  error message, use a u32 type to store readl results, and so on.
 
+v3: http://www.spinics.net/lists/linux-ide/msg45688.html
+  - Keep arch/arm and ahci_platform driver clean.
+  - Add the sata_imx standalone driver contained all the
+  specific setup
+  - Add the release function, support the loadable module
+  driver.
+  - Tested on imx6q sd board.
 
------Original Message-----
-From: Sascha Hauer [mailto:s.hauer at pengutronix.de] 
-Sent: Thursday, July 11, 2013 3:56 PM
-To: Zhu Richard-R65037
-Cc: Richard Zhu; shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; tj at kernel.org; rob.herring at calxeda.com; linux-ide at vger.kernel.org
-Subject: Re: [v4 3/3] sata: imx: add ahci sata support on imx platforms
+v2: http://www.spinics.net/lists/linux-ide/msg45666.html 
+ - Setup standalone imx ahci sata driver, because of
+ the misalignments of the bits definition of the HBA register.
+ - Replace the node by the label in the board dts.
+ - 
 
-Hi Richard,
+v1: http://www.spinics.net/lists/linux-ide/msg45581.html
+ - add imx6q specific ahci sata support to arch/arm/mach-imx/mach-imx6q.c
 
-On Thu, Jul 11, 2013 at 07:50:50AM +0000, Zhu Richard-R65037 wrote:
-> Hi Sascha:
-> Sorry to make a mess on the usage of the private data.
-> The private data of "imx_ahci_pdev" platform device would be used to store ata_host point.
-> I shouldn't set imxpriv to the private data of "imx_ahci_pdev", so do 
-> the wrong assignment of The private pointer of device.
+These patches is based on imx/dt branch of
+"http://git.linaro.org/git-ro/people/shawnguo/linux-2.6.git"
 
-Please allocate your private data along with the platform_device in the probe function, then in the init callback you can use container_of() to get a pointer to the data.
-Also I would recommend you to request the necessary resources (clocks,
-regmap) in the probe function and not in the init callback.
+[v5 1/3] ARM: dtsi: enable ahci sata on imx6q platforms
+[v5 2/3] ARM: imx6q: update the sata bits definitions of gpr13
+[v5 3/3] sata: imx: add ahci sata support on imx platforms
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+arch/arm/boot/dts/imx6q-sabreauto.dts       |    4 +
+arch/arm/boot/dts/imx6q-sabrelite.dts       |    4 +
+arch/arm/boot/dts/imx6q-sabresd.dts         |    4 +
+arch/arm/boot/dts/imx6q.dtsi                |    9 +
+drivers/ata/Kconfig                         |    9 +
+drivers/ata/Makefile                        |    1 +
+drivers/ata/sata_imx.c                      |  233 +++++++++++++++++++++++++++
+include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  121 ++++++++++-----
+8 files changed, 348 insertions(+), 37 deletions(-)
