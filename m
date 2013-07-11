@@ -1,72 +1,108 @@
-From: ulrich.prinz@googlemail.com (Ulrich Prinz)
-Date: Fri, 12 Jul 2013 00:44:29 +0200
-Subject: [PATCH 9/9] clocksource: dw_apb_timer: special variant for
- rockchip rk3188 timers
-In-Reply-To: <alpine.DEB.2.02.1307062233480.32106@ionos.tec.linutronix.de>
-References: <201307060051.09716.heiko@sntech.de>
- <201307060056.29370.heiko@sntech.de>
- <alpine.DEB.2.02.1307060153110.32106@ionos.tec.linutronix.de>
- <51D87E04.3060704@googlemail.com>
- <alpine.DEB.2.02.1307062233480.32106@ionos.tec.linutronix.de>
-Message-ID: <51DF354D.6050401@googlemail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 11 Jul 2013 16:48:51 -0600
+Subject: [PATCH] ARM: kexec: validate CPU hotplug support
+Message-ID: <1373582931-11956-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey guys,
+From: Stephen Warren <swarren@nvidia.com>
 
-according the dw_apb_timer I need your statement...
+Architectures should fully validate whether kexec is possible as part of
+machine_kexec_prepare(), so that user-space's kexec_load() operation can
+report any problems. Performing validation in machine_kexec() itself is
+too late, since it is not allowed to return.
 
-Am 06.07.2013 23:00, schrieb Thomas Gleixner:
-> Ulrich,
-> 
-> On Sat, 6 Jul 2013, Ulrich Prinz wrote:
-> 
->> I got the message. With modifying the existing driver to support more
->> function pointers in its system struct and assigning them at the
->> beginning, and using them on runtime, these quirks are obsolete.
-> 
-> Correct.
->  
->>
->> Adding more function pointers to a system relevant structure, doubling
->> the number of functions and such didn't look non-invasive to me.
-> 
-> Well, it always depends. If there is a single place to deal with some
-> oddball hardware, a flag is often the simplest way to go.
-> 
-> If you have to add 10 conditionals in several functions then in a
-> first step converting the existing implementation into function
-> pointer calls and then in the next step providing new implementations
-> for your hardware is most of the time simpler and cleaner.
-> 
->> But, I totally agree with your argumentation and I even wanted to do it
->> in the way you explained in your replies. Just the courage was missing I
->> guess :)
-> 
-> Gut feelings are often a better guidance than our self-doubting
-> intellect. :)
+Prior to this patch, ARM's machine_kexec() was testing after-the-fact
+whether machine_kexec_prepare() was able to disable all but one CPU.
+Instead, modify machine_kexec_prepare() to validate all conditions
+necessary for machine_kexec_prepare()'s to succeed. BUG if the validation
+succeeded, yet disabling the CPUs didn't actually work.
 
-You can look at my github repo for the new driver, rewriting the
-interface as discussed above:
-https://github.com/Astralix/linux-rockchip/blob/wip/dw_timer64/drivers/clocksource/dw_apb_timer.c
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Russell, does it make sense for this to be cc: stable as a follow-up to
+19ab428 "ARM: 7759/1: decouple CPU offlining from reboot/shutdown"?
 
-Summary: It is a 90% rewrite of the complete dw_apb_timer.c and
-modifications of dw_apb_timer_of.c and dw_apb_timer.h and the related
-x86 drivers are needed.
-And after that the 64bit functionality is still not given as the
-existing structures do not take it. But for now scheduler doesn't
-support 64bit either, I guess.
+ arch/arm/include/asm/smp_plat.h |  3 +++
+ arch/arm/kernel/machine_kexec.c | 20 ++++++++++++++++----
+ arch/arm/kernel/smp.c           |  8 ++++++++
+ 3 files changed, 27 insertions(+), 4 deletions(-)
 
-The drivers local struct stays, but instead of carrying pointers to
-registers it now consists of function pointers. This could be used to
-fit almost any kind of timer.
-
-I would really appreciate your comments. Sure I need to clean up a bit,
-but we're still testing. But before investing more time into that code I
-need you comment if I should continue or split to a separate driver for
-these kind of timers.
-
-Thanks for any comments
-
-Regards
-	Ulrich
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index 6462a72..a252c0b 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -88,4 +88,7 @@ static inline u32 mpidr_hash_size(void)
+ {
+ 	return 1 << mpidr_hash.bits;
+ }
++
++extern int platform_can_cpu_hotplug(void);
++
+ #endif
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index 4fb074c..d7c82df 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -15,6 +15,7 @@
+ #include <asm/mmu_context.h>
+ #include <asm/cacheflush.h>
+ #include <asm/mach-types.h>
++#include <asm/smp_plat.h>
+ #include <asm/system_misc.h>
+ 
+ extern const unsigned char relocate_new_kernel[];
+@@ -39,6 +40,14 @@ int machine_kexec_prepare(struct kimage *image)
+ 	int i, err;
+ 
+ 	/*
++	 * Validate that if the current HW supports SMP, then the SW supports
++	 * and implements CPU hotplug for the current HW. If not, we won't be
++	 * able to kexec reliably, so fail the prepare operation.
++	 */
++	if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
++		return -EINVAL;
++
++	/*
+ 	 * No segment at default ATAGs address. try to locate
+ 	 * a dtb using magic.
+ 	 */
+@@ -134,10 +143,13 @@ void machine_kexec(struct kimage *image)
+ 	unsigned long reboot_code_buffer_phys;
+ 	void *reboot_code_buffer;
+ 
+-	if (num_online_cpus() > 1) {
+-		pr_err("kexec: error: multiple CPUs still online\n");
+-		return;
+-	}
++	/*
++	 * This can only happen if machine_shutdown() failed to disable some
++	 * CPU, and that can only happen if the checks in
++	 * machine_kexec_prepare() were not correct. If this fails, we can't
++	 * reliably kexec anyway, so BUG_ON is appropriate.
++	 */
++	BUG_ON(num_online_cpus() > 1);
+ 
+ 	page_list = image->head & PAGE_MASK;
+ 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index c2b4f8f..5b9e501 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -145,6 +145,14 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	return -ENOSYS;
+ }
+ 
++int platform_can_cpu_hotplug(void)
++{
++	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU) || !smp_ops.cpu_kill)
++		return 0;
++
++	return 1;
++}
++
+ #ifdef CONFIG_HOTPLUG_CPU
+ static void percpu_timer_stop(void);
+ 
+-- 
+1.8.1.5
