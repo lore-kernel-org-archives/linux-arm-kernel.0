@@ -1,77 +1,32 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 11 Jul 2013 11:14:29 -0400 (EDT)
-Subject: [PATCH 6/6] USB: ehci-omap: Implement suspend/resume
-In-Reply-To: <51DE71F3.1040101@ti.com>
-Message-ID: <Pine.LNX.4.44L0.1307111106090.1276-100000@iolanthe.rowland.org>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 11 Jul 2013 17:17:52 +0200
+Subject: [PATCH 0/5] Assorted patches for pxa-gpio
+Message-ID: <1373555877-29887-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Jul 2013, Roger Quadros wrote:
+Hi Eric,
+Hi Haojian,
 
-> > The other two problems are both related to the interaction between
-> > system PM and runtime PM.  Suppose the controller is already runtime
-> > suspended when the system goes to sleep.  Because it is runtime
-> > suspended, it is enabled for wakeup.  But device_may_wakeup() could
-> > return false; if this happens then you have to do a runtime-resume in
-> > omap_ehci_suspend() before calling ehci_suspend(), so that the
-> > controller can be suspended again with wakeups disabled.  (Or you could
-> > choose an alternative method for accomplishing the same result, such as
-> > disabling the wakeup signal from the pad without going through a whole
-> > EHCI resume/suspend cycle.)  Conversely, if device_may_wakeup() returns
-> > true then you shouldn't do anything at all, because the controller is
-> > already suspended with the correct wakeup setting.
-> 
-> I think this case is taken care of by the Runtime PM core at least for the OMAP
-> platform according to the documentation
-> 
-> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/power/runtime_pm.txt#n647
+here are some patches for gpio-pxa and its bindings. They fix some
+flaws I came across while trying to boot a PXA3xx board with v3.10+.
 
-No; that section refers only to races, not to wakeup settings.
 
-> At the end of this mail is the log during system suspend/resume
-> 
-> You can notice the following sequence
-> 
-> -ehci runtime suspends
-> -system suspend triggered
-> -ehci runtime resumes
-> -ehci suspends (uses new wakeup settings)
-> -system wakeup triggered
-> -ehci resumes
-> -ehci runtime suspends
+Best regards,
+Daniel
 
-This is because the root hub was runtime suspended with the wrong
-wakeup setting.  The USB core, which is careful about these things,
-resumed and re-suspended it with the proper wakeup setting.  In the 
-process, the controller had to be runtime resumed as well.
+Daniel Mack (5):
+  gpio: pxa: remove dead code
+  gpio: pxa: fix Documentation of interrupt-names property
+  gpio: pxa: Documentation: provide example bindings for PXA3xx
+  ARM: pxa: fix DT auxdata for pxa3xx-gpio
+  ARM: pxa: DTS: override gpio node in pxa3xx.dtsi
 
-Try doing the test over again, but this time with the root hub enabled 
-for wakeup and the controller disabled.  (I know this is a bizarre 
-combination, but try it anyway.)  Also, after the system wakes up, see 
-whether the root hub and controller get runtime suspended.
+ .../devicetree/bindings/gpio/mrvl-gpio.txt         | 22 ++++++++++++++++++----
+ arch/arm/boot/dts/pxa3xx.dtsi                      | 11 +++++++++++
+ arch/arm/mach-pxa/pxa-dt.c                         |  2 +-
+ drivers/gpio/gpio-pxa.c                            | 13 +++----------
+ 4 files changed, 33 insertions(+), 15 deletions(-)
 
-> > For the third problem, suppose the controller was runtime suspended
-> > when the system went to sleep.  When the system wakes up, the
-> > controller will become active, so you have to inform the runtime PM
-> > core about its change of state.  Basically, if omap_ehci_resume() sees
-> > that ehci_resume() returned 0 then it must do:
-> > 
-> > 	pm_runtime_disable(dev);
-> > 	pm_runtime_set_active(dev);
-> > 	pm_runtime_enable(dev);
-> > 
-> > All of these issues are discussed (among lots of other material) in 
-> > Documentation/power/runtime_pm.txt.
-> 
-> Is this still applicable? Documentation claims
-> 
->    "During system resume it calls pm_runtime_enable() and pm_runtime_put_sync()
->     for every device right after executing the subsystem-level .resume_early()
->     callback and right after executing the subsystem-level .resume() callback
->     for it, respectively."
-
-Yes, this is applicable, but it is irrelevant to the problem I 
-described.  You still have to tell the runtime PM core that the device 
-is now active.
-
-Alan Stern
+-- 
+1.8.1.4
