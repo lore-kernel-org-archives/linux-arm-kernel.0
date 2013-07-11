@@ -1,61 +1,152 @@
 From: zhangwm@marvell.com (Neil Zhang)
-Date: Thu, 11 Jul 2013 04:23:10 -0700
-Subject: [PATCH V3 2/3] clocksource: mmp: support CLOCKSOURCE OF DECLARE
-In-Reply-To: <CAN1soZyFztVR1XSw9bDS5JexK0Mdbpr6yevatVf+MnBohwCj1Q@mail.gmail.com>
+Date: Thu, 11 Jul 2013 04:35:16 -0700
+Subject: [PATCH V3 3/3] ARM: mmp: bring up pxa988 with device tree support
+In-Reply-To: <201307100005.21769.arnd@arndb.de>
 References: <1373352166-10064-1-git-send-email-zhangwm@marvell.com>
- <1373352166-10064-3-git-send-email-zhangwm@marvell.com>
- <20130709181434.76f6216d@skate>	<201307092316.20905.arnd@arndb.de>
- <CAN1soZyFztVR1XSw9bDS5JexK0Mdbpr6yevatVf+MnBohwCj1Q@mail.gmail.com>
-Message-ID: <175CCF5F49938B4D99B2E3EF7F558EBE3DBC97FDFF@SC-VEXCH4.marvell.com>
+ <1373352166-10064-4-git-send-email-zhangwm@marvell.com>
+ <201307100005.21769.arnd@arndb.de>
+Message-ID: <175CCF5F49938B4D99B2E3EF7F558EBE3DBC97FE11@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian,
+Arnd,
+
 
 
 > -----Original Message-----
-> From: Haojian Zhuang [mailto:haojian.zhuang at gmail.com]
-> Sent: 2013?7?10? 13:59
-> To: Arnd Bergmann
-> Cc: Thomas Petazzoni; Neil Zhang; Grant Likely;
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 2013?7?10? 6:05
+> To: Neil Zhang
+> Cc: grant.likely at linaro.org; haojian.zhuang at gmail.com;
 > devicetree-discuss at lists.ozlabs.org; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH V3 2/3] clocksource: mmp: support CLOCKSOURCE OF
-> DECLARE
+> linux-arm-kernel at lists.infradead.org; Chao Xie
+> Subject: Re: [PATCH V3 3/3] ARM: mmp: bring up pxa988 with device tree
+> support
 > 
-> On Wed, Jul 10, 2013 at 5:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 09 July 2013, Thomas Petazzoni wrote:
-> >> Dear Neil Zhang,
-> >>
-> >> On Tue, 9 Jul 2013 14:42:45 +0800, Neil Zhang wrote:
-> >> > support CLOCKSOURCE OF DECLARE for mmp timer.
-> >> >
-> >> > Signed-off-by: Neil Zhang <zhangwm@marvell.com>
-> >> > ---
-> >> >  arch/arm/mach-mmp/mmp-dt.c  |    5 ++---
-> >> >  arch/arm/mach-mmp/mmp2-dt.c |    3 +--
-> >> >  arch/arm/mach-mmp/time.c    |   15 ++-------------
-> >> >  3 files changed, 5 insertions(+), 18 deletions(-)
-> >>
-> >> Maybe it would be good to take this opportunity to move
-> >> arch/arm/mach-mmp/time.c into drivers/clocksource/.
-> >
-> > +1
-> >
-> > Or we might want to have a more coordinated move of all clocksource
-> > drivers in arch/arm to drivers/clocksource now, as we have done for
-> > some other subsystems.
-> >
-> >         Arnd
+> On Tuesday 09 July 2013, Neil Zhang wrote:
+> > +	soc {
+> > +		compatible = "simple-bus";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		interrupt-parent = <&gic>;
+> > +		ranges;
+> > +
+> > +		gic: interrupt-controller at d1dfe100 {
+> > +			compatible = "arm,cortex-a9-gic";
+> > +			#interrupt-cells = <3>;
+> > +			#address-cells = <1>;
+> > +			interrupt-controller;
+> > +			reg = <0xd1dff000 0x1000>,
+> > +			      <0xd1dfe100 0x0100>;
+> > +		};
+> > +
+> > +		L2: l2-cache-controller at d1dfb000 {
+> > +			compatible = "arm,pl310-cache";
+> > +			reg = <0xd1dfb000 0x1000>;
+> > +			arm,data-latency = <2 1 1>;
+> > +			arm,tag-latency = <2 1 1>;
+> > +			arm,pwr-dynamic-clk-gating;
+> > +			arm,pwr-standby-mode;
+> > +			cache-unified;
+> > +			cache-level = <2>;
+> > +		};
+> > +
+> > +		local-timer at d1dfe600 {
+> > +			compatible = "arm,cortex-a9-twd-timer";
+> > +			reg = <0xd1dfe600 0x20>;
+> > +			interrupts = <1 13 0x304>;
+> > +		};
+> > +
+> > +		axi at d4200000 {	/* AXI */
+> > +			compatible = "simple-bus";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +			ranges = <0xd4200000 0xd4200000 0x00200000>;
+> > +
+> > +			intc: wakeupgen at d4282000 {
+> > +				compatible = "marvell,mmp-intc";
+> > +				reg = <0xd4282000 0x1000>;
+> > +				marvell,intc-wakeup = <0x114 0x3
+> > +						    0x144 0x3>;
+> > +			};
+> > +		};
 > 
-> I already sent some patches on this. But I didn't get response yet. I'll rebase
-> them and send them again. I hope that they could be merged in this cycle.
+> I am guessing that the structure does not actually reflect the hardware.
 > 
-> Regards
-> Haojian
+> Shouldn't AXI be the top-level bus, with the other stuff under it?
+> 
+> > +
+> > +
+> > +			uart1: uart at d4017000 {
+> > +				compatible = "marvell,mmp-uart";
+> > +				reg = <0xd4017000 0x1000>;
+> > +				interrupts = <0 27 0x4>;
+> > +				status = "disabled";
+> > +			};
+> 
+> The uart node should be called "serial at d4017000" instead of
+> "uart at d4017000".
 
-Will you submit a patch to move it by yourself or let me update the patch to 
-move it to drivers/clocksource in next version?
+Thanks for the catch!
+
+> 
+> > diff --git a/arch/arm/mach-mmp/reset.c b/arch/arm/mach-mmp/reset.c
+> new
+> > file mode 100644 index 0000000..b90ec54
+> > --- /dev/null
+> > +++ b/arch/arm/mach-mmp/reset.c
+> > @@ -0,0 +1,66 @@
+> > +/*
+> > + * linux/arch/arm/mach-mmp/reset.c
+> 
+> I think this could just be part of the smp.c file.
+
+Sorry, but which smp.c do you mean?
+
+> 
+> > + *
+> > + * Author:	Neil Zhang <zhangwm@marvell.com>
+> > + * Copyright:	(C) 2012 Marvell International Ltd.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + modify
+> > + * it under the terms of the GNU General Public License as published
+> > + by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + */
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/smp.h>
+> > +
+> > +#include <asm/io.h>
+> > +#include <asm/cacheflush.h>
+> > +#include <asm/mach/map.h>
+> > +
+> > +#include <mach/addr-map.h>
+> > +
+> > +#include "reset.h"
+> > +
+> > +#define PMU_CC2_AP			APMU_REG(0x0100)
+> > +#define CIU_CA9_WARM_RESET_VECTOR	CIU_REG(0x00d8)
+> 
+> You should not hardcode the addresses here, better find them from the
+> device tree.
+
+Thanks for your suggestion, we will consider it.
+
+> > +
+> > +#define CPU_CORE_RST(n)	(1 << ((n) * 4 + 16))
+> > +#define CPU_DBG_RST(n)	(1 << ((n) * 4 + 18))
+> > +#define CPU_WDOG_RST(n)	(1 << ((n) * 4 + 19))
+> 
+> This should probably go into a reset controller driver, in drivers/reset/
+> 
+
+It should not related to drivers/reset/.
+What this file does is to set reset handler for core bootup or reset from power down (suspend or C2 power down).
+
+> 	Arnd
 
 Best Regards,
 Neil Zhang
