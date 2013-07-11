@@ -1,46 +1,42 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 11 Jul 2013 17:36:10 +0200
-Subject: [PATCH v12 06/13] usb: chipidea: add otg_cap attribute for otg
- capable
-In-Reply-To: <1373524041-10482-7-git-send-email-peter.chen@freescale.com>
-References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
- <1373524041-10482-7-git-send-email-peter.chen@freescale.com>
-Message-ID: <201307111736.11065.marex@denx.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 11 Jul 2013 17:45:55 +0200
+Subject: [PATCH] ARM: OMAP2+: twl-common: Remove code for twl6030 and
+ twl6040 setup for legacy boot
+In-Reply-To: <20130711145916.GA6138@kahuna>
+References: <1373552638-13930-1-git-send-email-peter.ujfalusi@ti.com>
+ <20130711145916.GA6138@kahuna>
+Message-ID: <51DED333.9080609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Peter Chen,
-
-> Since we need otgsc to know vbus's status at some chipidea
-> controllers even it is peripheral-only mode. Besides, some
-> SoCs (eg, AR9331 SoC) don't have otgsc register even
-> the DCCPARAMS_DC and DCCPARAMS_HC are both 1 at CAP_DCCPARAMS.
-> We inroduce otg_cap attribute to indicate if the controller
-> is otg capable, defaultly, we follow the rule that if DCCPARAMS_DC
-> and DCCPARAMS_HC are both 1 at CAP_DCCPARAMS are otg capable, but if there
-> is exception, the platform can override it by device tree or platform data.
+On 07/11/2013 04:59 PM, Nishanth Menon wrote:
+> On 16:23-20130711, Peter Ujfalusi wrote:
+>> OMAP4 no longer boots in legacy mode so the code here is no longer used.
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/twl-common.c | 332 ++-------------------------------------
+>>  arch/arm/mach-omap2/twl-common.h |   8 -
+>>  2 files changed, 12 insertions(+), 328 deletions(-)
+> Could we modify the Makefile and build twl-common.o only for
+> CONFIG_ARCH_OMAP3?
 > 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/chipidea/core.c  |   35 ++++++++++++++++++++++++++++-------
->  include/linux/usb/chipidea.h |   13 +++++++++++++
->  2 files changed, 41 insertions(+), 7 deletions(-)
+> We could get rid of all the #ifdef from the code that way. OMAP3 is the
+> only platform that still depends on this - Further, with this change,
+
+Yep, I can do that. I'll send a separate patch to do this.
+
+> commit 34a38440689b06a515104d668494e0ff8a4e1537
+> (regulator: twl6030: add support for vdd1, vdd2 and vdd3 regulators)
+> will need a relook as well. currently part of the discussion with Mark
+> in [1]
 > 
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index 93961ff..e8ceb04 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -405,6 +405,18 @@ static inline void ci_role_destroy(struct ci_hdrc *ci)
->  	ci_hdrc_host_destroy(ci);
->  }
-> 
-> +static void ci_get_otg_capable(struct ci_hdrc *ci)
-> +{
-> +	if (ci->platdata->otg_cap != OTG_CAP_ATTR_IS_NOT_EXISTED)
+> [1] http://marc.info/?t=137185016300003&r=1&w=2
 
-IS_NONEXISTENT , no?
+I don't see anything touching twl-common.c/h in the series.
+But at the end we should get rid of the legacy support in all of the drivers
+aimed for OMAP4+ gradually since it is pointless to keep dead code. Emphasis
+on gradually ;)
 
-[..]
-
-Best regards,
-Marek Vasut
+-- 
+P?ter
