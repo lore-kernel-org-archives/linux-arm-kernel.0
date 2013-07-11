@@ -1,50 +1,80 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 11 Jul 2013 16:23:05 +0530
-Subject: [PATCH 2/2] ARM: OMAP4+: Get rid of the HWMOD_INIT_NO_IDLE and
- HWMOD_INIT_NO_RESET flags for uart
-In-Reply-To: <1373539986-27272-1-git-send-email-rnayak@ti.com>
-References: <1373539986-27272-1-git-send-email-rnayak@ti.com>
-Message-ID: <1373539986-27272-3-git-send-email-rnayak@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Jul 2013 11:54:44 +0100
+Subject: Seg fault occurs when running statically compiled binary from
+ kernel using call_usermodehelper
+In-Reply-To: <20130710185200.GX24642@n2100.arm.linux.org.uk>
+References: <CAOiN93mGTu9w9rVNCrbbH1sccXY9VJhaCmg+dS7Rk9mMgKHBaA@mail.gmail.com>
+ <CAOiN93=Nx77RkbNuEJMV617MjV5+GmorF0G3vyLy1SwQcuCs+g@mail.gmail.com>
+ <CAOiN93nH9fyHoz4yrZmJ-OKCy6ogdt5bYartXCBgP5eHMUBPdw@mail.gmail.com>
+ <20130710163410.GA30514@mudshark.cambridge.arm.com>
+ <20130710185200.GX24642@n2100.arm.linux.org.uk>
+Message-ID: <20130711105443.GE32197@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HWMOD_INIT_NO_IDLE and HWMOD_INIT_NO_RESET flags don't belong in the
-SoC data but instead need to be set runtime based on the uart thats used
-for debug console, so hwmod avoids doing a reset followed by a idling of
-the device. This is already happening as part of the omap_serial_early_init()
-so remove these flags from the static SoC data.
+On Wed, Jul 10, 2013 at 07:52:00PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 10, 2013 at 05:34:11PM +0100, Will Deacon wrote:
+> > Ok, I've finally got to the bottom of this, but I'm not sure on the best way
+> > to fix it.
+> 
+> I don't think you have!  You need to look back at the older ARM kernels
+> to really get to the bottom of this...
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 +--
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c |    1 -
- 2 files changed, 1 insertion(+), 3 deletions(-)
+It's hard enough looking at the current kernel with the internet connection
+I'm currently on! Anyway, what I meant was that I can see why the
+application is falling over.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index d04b5e6..f80f120 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -2858,8 +2858,7 @@ static struct omap_hwmod omap44xx_uart3_hwmod = {
- 	.name		= "uart3",
- 	.class		= &omap44xx_uart_hwmod_class,
- 	.clkdm_name	= "l4_per_clkdm",
--	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET |
--				HWMOD_SWSUP_SIDLE_ACT,
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
-diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-index f37ae96..e816edd 100644
---- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-@@ -1375,7 +1375,6 @@ static struct omap_hwmod omap54xx_uart3_hwmod = {
- 	.name		= "uart3",
- 	.class		= &omap54xx_uart_hwmod_class,
- 	.clkdm_name	= "l4per_clkdm",
--	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
--- 
-1.7.9.5
+> > The issue is that libc expects r0 to contain a function pointer
+> > to be invoked at exit (rtld_fini), to clean up after a dynamic linker. If
+> > this pointer is NULL, then it is ignored. We actually zero this pointer in
+> > our ELF_PLAT_INIT macro.
+> > 
+> > At the same time, we have this strange code called next from the ARM ELF
+> > loader:
+> > 
+> > 	regs->ARM_r2 = stack[2];	/* r2 (envp) */			\
+> > 	regs->ARM_r1 = stack[1];	/* r1 (argv) */			\
+> > 	regs->ARM_r0 = stack[0];	/* r0 (argc) */			\
+> > 
+> > which puts argc into r0.
+> 
+> You're sort of right.  It dates from the days when we had a.out binaries,
+> those required argc, argv and envp in r0/r1/r2 - and ARM kernels carried
+> this hack in  binfmt_aout.c to make it work in conjunction with the above:
+> 
+> static int load_aout_binary(struct linux_binprm * bprm)
+> {
+> ...
+>         start_thread(regs, ex.a_entry, current->mm->start_stack);
+> #ifndef __arm__
+>         return 0;
+> #else
+>         return regs->ARM_r0;
+> #endif
+> }
+> 
+> ELF, on the other hand, never had that hack - ELF has always been zero
+> in r0, and it's always retrieved the argc/argv/envp off the stack.
+
+Aha, I was missing the a.out part, thanks. The ELF loader does call:
+
+	ELF_PLAT_INIT(regs, reloc_func_desc);
+	start_thread(regs, elf_entry, bprm->p);
+
+back-to-back, which zeroes ARM_r0 and then promptly sticks argc there
+straight away. libc uses the stack for everything (ARM_r0 gets clobbered
+again with the return value of execve anyway), so we just have to assume
+that nobody is using argv and/or envp from r1 and r2. I think that's a
+sensible assumption.
+
+> As the above hack got dropped from the kernel (I don't think it ever made
+> it into mainline), I think we should be safe getting rid of this
+> initialization of regs->ARM_r0 to r2, leaving them all as zeros.
+> 
+> We should probably also remove the selection of HAVE_AOUT from
+> arch/arm/Kconfig too as this definitely won't work with any recent
+> kernel (certainly not without binfmt_aout.c hacked in the above way.)
+
+Sounds like a good idea, I'll write a patch...
+
+Will
