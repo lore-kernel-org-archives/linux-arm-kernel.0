@@ -1,108 +1,71 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 11 Jul 2013 16:48:51 -0600
-Subject: [PATCH] ARM: kexec: validate CPU hotplug support
-Message-ID: <1373582931-11956-1-git-send-email-swarren@wwwdotorg.org>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 12 Jul 2013 07:51:41 +0800
+Subject: [PATCH V3 2/3] clocksource: mmp: support CLOCKSOURCE OF DECLARE
+In-Reply-To: <175CCF5F49938B4D99B2E3EF7F558EBE3DBC97FDFF@SC-VEXCH4.marvell.com>
+References: <1373352166-10064-1-git-send-email-zhangwm@marvell.com>
+ <1373352166-10064-3-git-send-email-zhangwm@marvell.com>
+ <20130709181434.76f6216d@skate> <201307092316.20905.arnd@arndb.de>
+ <CAN1soZyFztVR1XSw9bDS5JexK0Mdbpr6yevatVf+MnBohwCj1Q@mail.gmail.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE3DBC97FDFF@SC-VEXCH4.marvell.com>
+Message-ID: <CAN1soZzkycTDc-U4h43LC6hSYS1v+UkG+C4k-+dYMxRL=t7Zbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Thu, Jul 11, 2013 at 7:23 PM, Neil Zhang <zhangwm@marvell.com> wrote:
+> Haojian,
+>
+>
+>> -----Original Message-----
+>> From: Haojian Zhuang [mailto:haojian.zhuang at gmail.com]
+>> Sent: 2013?7?10? 13:59
+>> To: Arnd Bergmann
+>> Cc: Thomas Petazzoni; Neil Zhang; Grant Likely;
+>> devicetree-discuss at lists.ozlabs.org; linux-kernel at vger.kernel.org;
+>> linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [PATCH V3 2/3] clocksource: mmp: support CLOCKSOURCE OF
+>> DECLARE
+>>
+>> On Wed, Jul 10, 2013 at 5:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Tuesday 09 July 2013, Thomas Petazzoni wrote:
+>> >> Dear Neil Zhang,
+>> >>
+>> >> On Tue, 9 Jul 2013 14:42:45 +0800, Neil Zhang wrote:
+>> >> > support CLOCKSOURCE OF DECLARE for mmp timer.
+>> >> >
+>> >> > Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+>> >> > ---
+>> >> >  arch/arm/mach-mmp/mmp-dt.c  |    5 ++---
+>> >> >  arch/arm/mach-mmp/mmp2-dt.c |    3 +--
+>> >> >  arch/arm/mach-mmp/time.c    |   15 ++-------------
+>> >> >  3 files changed, 5 insertions(+), 18 deletions(-)
+>> >>
+>> >> Maybe it would be good to take this opportunity to move
+>> >> arch/arm/mach-mmp/time.c into drivers/clocksource/.
+>> >
+>> > +1
+>> >
+>> > Or we might want to have a more coordinated move of all clocksource
+>> > drivers in arch/arm to drivers/clocksource now, as we have done for
+>> > some other subsystems.
+>> >
+>> >         Arnd
+>>
+>> I already sent some patches on this. But I didn't get response yet. I'll rebase
+>> them and send them again. I hope that they could be merged in this cycle.
+>>
+>> Regards
+>> Haojian
+>
+> Will you submit a patch to move it by yourself or let me update the patch to
+> move it to drivers/clocksource in next version?
+>
+> Best Regards,
+> Neil Zhang
 
-Architectures should fully validate whether kexec is possible as part of
-machine_kexec_prepare(), so that user-space's kexec_load() operation can
-report any problems. Performing validation in machine_kexec() itself is
-too late, since it is not allowed to return.
+Not one patch. There're a couples of patches. They are depandant each other.
 
-Prior to this patch, ARM's machine_kexec() was testing after-the-fact
-whether machine_kexec_prepare() was able to disable all but one CPU.
-Instead, modify machine_kexec_prepare() to validate all conditions
-necessary for machine_kexec_prepare()'s to succeed. BUG if the validation
-succeeded, yet disabling the CPUs didn't actually work.
+I don't have time to rebase them in these two weeks. Go ahead to rebase all
+your patches on mine.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-Russell, does it make sense for this to be cc: stable as a follow-up to
-19ab428 "ARM: 7759/1: decouple CPU offlining from reboot/shutdown"?
-
- arch/arm/include/asm/smp_plat.h |  3 +++
- arch/arm/kernel/machine_kexec.c | 20 ++++++++++++++++----
- arch/arm/kernel/smp.c           |  8 ++++++++
- 3 files changed, 27 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index 6462a72..a252c0b 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -88,4 +88,7 @@ static inline u32 mpidr_hash_size(void)
- {
- 	return 1 << mpidr_hash.bits;
- }
-+
-+extern int platform_can_cpu_hotplug(void);
-+
- #endif
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 4fb074c..d7c82df 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -15,6 +15,7 @@
- #include <asm/mmu_context.h>
- #include <asm/cacheflush.h>
- #include <asm/mach-types.h>
-+#include <asm/smp_plat.h>
- #include <asm/system_misc.h>
- 
- extern const unsigned char relocate_new_kernel[];
-@@ -39,6 +40,14 @@ int machine_kexec_prepare(struct kimage *image)
- 	int i, err;
- 
- 	/*
-+	 * Validate that if the current HW supports SMP, then the SW supports
-+	 * and implements CPU hotplug for the current HW. If not, we won't be
-+	 * able to kexec reliably, so fail the prepare operation.
-+	 */
-+	if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
-+		return -EINVAL;
-+
-+	/*
- 	 * No segment at default ATAGs address. try to locate
- 	 * a dtb using magic.
- 	 */
-@@ -134,10 +143,13 @@ void machine_kexec(struct kimage *image)
- 	unsigned long reboot_code_buffer_phys;
- 	void *reboot_code_buffer;
- 
--	if (num_online_cpus() > 1) {
--		pr_err("kexec: error: multiple CPUs still online\n");
--		return;
--	}
-+	/*
-+	 * This can only happen if machine_shutdown() failed to disable some
-+	 * CPU, and that can only happen if the checks in
-+	 * machine_kexec_prepare() were not correct. If this fails, we can't
-+	 * reliably kexec anyway, so BUG_ON is appropriate.
-+	 */
-+	BUG_ON(num_online_cpus() > 1);
- 
- 	page_list = image->head & PAGE_MASK;
- 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index c2b4f8f..5b9e501 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -145,6 +145,14 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	return -ENOSYS;
- }
- 
-+int platform_can_cpu_hotplug(void)
-+{
-+	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU) || !smp_ops.cpu_kill)
-+		return 0;
-+
-+	return 1;
-+}
-+
- #ifdef CONFIG_HOTPLUG_CPU
- static void percpu_timer_stop(void);
- 
--- 
-1.8.1.5
+Regards
+Haojian
