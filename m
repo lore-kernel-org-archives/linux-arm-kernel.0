@@ -1,52 +1,31 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 11 Jul 2013 13:07:13 +0200
-Subject: [PATCH] ASoC: Samsung: Modify the I2S driver to support I2S on
- Exynos5420
-In-Reply-To: <20130711104804.GK24508@sirena.org.uk>
-References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
- <20130711104804.GK24508@sirena.org.uk>
-Message-ID: <10406176.2lc5qJ8Oq7@thinkpad>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 11 Jul 2013 12:10:04 +0100
+Subject: [RFC PATCH 4/5] arm64: add CPU_HOTPLUG infrastructure
+In-Reply-To: <20130711093359.GF830@codeaurora.org>
+References: <1373494279-24712-1-git-send-email-mark.rutland@arm.com>
+ <1373494549-24972-1-git-send-email-mark.rutland@arm.com>
+ <20130711093359.GF830@codeaurora.org>
+Message-ID: <20130711111003.GB13035@kartoffel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 of July 2013 11:48:04 Mark Brown wrote:
-> On Thu, Jul 11, 2013 at 12:38:24PM +0530, Padmavathi Venna wrote:
-> > -#define MOD_LR_LLOW		(0 << 7)
-> > -#define MOD_LR_RLOW		(1 << 7)
-> > -#define MOD_SDF_IIS		(0 << 5)
-> > -#define MOD_SDF_MSB		(1 << 5)
-> > -#define MOD_SDF_LSB		(2 << 5)
-> > -#define MOD_SDF_MASK		(3 << 5)
-> > 
-> > +#define MOD_LR_LLOW		0
-> > +#define MOD_LR_RLOW		1
-> > +#define MOD_SDF_SHIFT		5
-> > +#define MOD_SDF_IIS		0
-> > +#define MOD_SDF_MSB		1
-> > +#define MOD_SDF_LSB		2
-> > +#define MOD_SDF_MASK		3
+On Thu, Jul 11, 2013 at 10:33:59AM +0100, Stephen Boyd wrote:
+> On 07/10, Mark Rutland wrote:
+> > +void __ref cpu_die(void)
+> > +{
+> > +	unsigned int cpu = smp_processor_id();
+> > +
+> > +	idle_task_exit();
+> > +
+> > +	local_irq_disable();
+> > +	mb();
+> > +
+> > +	/* Tell __cpu_die() that this CPU is now safe to dispose of */
+> > +	RCU_NONIDLE(complete(&cpu_died));
 > 
-> This patch has an awful lot of coding style changes like this which
-> are just coding style changes and not implementing TDM support.  These
-> should be done separately, not as part of the same patch, in order to
-> make the code easier to review.
-> 
-> >  	case 768:
-> > -		mod |= MOD_RCLK_768FS;
-> > +		mod |= (MOD_RCLK_768FS << rfs_shift);
-> > 
-> >  		break;
-> 
-> This stuff is another example.
-> 
-> I think the change itself should be fine but I'm not 100% sure I'm
-> correctly identifying what's a stylistic change and what's a functional
-> change.
+> This isn't true anymore.
 
-Right. This could be split into two patches, first reworking the style to give 
-more flexibility with operations on registers and another one adding TDM 
-specific changes, like new bitfield definitions and conditional handling of 
-register accesses to account for new bitfield locations.
+Ah. I'd missed the RCU_NONIDLE while rebasing the series. I'll fix that up.
 
-Best regards,
-Tomasz
+Thanks,
+Mark.
