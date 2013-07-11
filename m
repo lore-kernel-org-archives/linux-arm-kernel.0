@@ -1,42 +1,86 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 11 Jul 2013 17:45:55 +0200
-Subject: [PATCH] ARM: OMAP2+: twl-common: Remove code for twl6030 and
- twl6040 setup for legacy boot
-In-Reply-To: <20130711145916.GA6138@kahuna>
-References: <1373552638-13930-1-git-send-email-peter.ujfalusi@ti.com>
- <20130711145916.GA6138@kahuna>
-Message-ID: <51DED333.9080609@ti.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Thu, 11 Jul 2013 18:15:52 +0200
+Subject: [PATCH v5 0/7] Sound support for at91sam9x5-wm8731 based boards
+Message-ID: <1373559359-31607-1-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2013 04:59 PM, Nishanth Menon wrote:
-> On 16:23-20130711, Peter Ujfalusi wrote:
->> OMAP4 no longer boots in legacy mode so the code here is no longer used.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->>  arch/arm/mach-omap2/twl-common.c | 332 ++-------------------------------------
->>  arch/arm/mach-omap2/twl-common.h |   8 -
->>  2 files changed, 12 insertions(+), 328 deletions(-)
-> Could we modify the Makefile and build twl-common.o only for
-> CONFIG_ARCH_OMAP3?
-> 
-> We could get rid of all the #ifdef from the code that way. OMAP3 is the
-> only platform that still depends on this - Further, with this change,
+Hi,
 
-Yep, I can do that. I'll send a separate patch to do this.
+This patchset add sound on the at91sam9x5ek board.
+It's based on Nicolas Ferre's work in the 2.6.39 atmel patch for sam9x5:
+https://github.com/linux4sam/linux-at91/commit/0aa157c9e71ccccf3abc30fa37eb5c95b392978d
 
-> commit 34a38440689b06a515104d668494e0ff8a4e1537
-> (regulator: twl6030: add support for vdd1, vdd2 and vdd3 regulators)
-> will need a relook as well. currently part of the discussion with Mark
-> in [1]
-> 
-> [1] http://marc.info/?t=137185016300003&r=1&w=2
+It needs Bo Chen's patchset on the generic dmaengine (topic/atmel branch
+on Mark's sound tree) and the SSC interrupts disabled (cf
+http://www.spinics.net/lists/arm-kernel/msg256901.html)
 
-I don't see anything touching twl-common.c/h in the series.
-But at the end we should get rid of the legacy support in all of the drivers
-aimed for OMAP4+ gradually since it is pointless to keep dead code. Emphasis
-on gradually ;)
+Outstanding issue:
+If this machine driver will support more SoCs maybe we should name it differently.
+
+
+It has been tested on at91sam9g35ek, and should work on g15, g25, x25 and x35 also.
+
+patches applies on next-20130711
+
+[I let the original signed-off from Nicolas and Uwe in place, I don't
+know if I should replace them by something like "originaly-signed-off-by"
+since the code has been changed.]
+
+Changes from v4:
+ * Move the rates constraints into the codec
+ * Hard code the DAI format since it cannot be changed anyway (and
+remove the DT bindings accordingly)
+ * Add some consistency in the functions naming (sam9x5ek/at91sam9x5ek/sam9x5)
+ * Retrieve the SSC id from the SSC controller phandle
+ * Clarify the atmel-ssc.txt documentation
+ * Develop audio-routing documentation
+ * Tidy up the includes in the machine driver
+
+Changes from v3:
+ * Remove the use of macros in device tree documentation.
+
+Changes from v2:
+ * Change atmel,sam9x5-audio-wm8731 to atmel,sam9x5-wm8731-audio for
+consistency with sam9g20 machine driver.
+ * Use the snd_pcm_hw_constraint() API as suggested by Mark and Lars-Peter.
+ * Remove the unnecessary snd_soc_dapm_sync() call as Lars-Peter suggested.
+ * Add documentation for machine driver DT binding.
+ * Update atmel-ssc DT binding documentation.
+ * Add GPL license instead of just the "GPL" word (hope that's ok !)
+
+Changes from v1-RFC:
+ * drop patches on SSC since Bo Chen already did the work
+ * reorder patches to have the machine driver first
+ * drop code already handled by the ASoC framework
+ * drop unneeded SND_ATMEL_SOC_PDC config selection
+ * use static snd_soc_card and  snd_soc_dai_link structures.
+
+Best regards,
+Richard.
+
+Nicolas Ferre (1):
+  sound: sam9x5_wm8731: machine driver for at91sam9x5 wm8731 boards
+
+Richard Genoud (6):
+  sound: codec: wm8731: add rates constraints
+  Documentation: DT: update atmel SSC with DMA binding
+  ARM: AT91: DTS: sam9x5: add SSC DMA parameters
+  ARM: AT91: DTS: sam9x5ek: add WM8731 codec
+  ARM: AT91: DTS: sam9x5ek: enable SSC
+  ARM: AT91: DTS: sam9x5ek: add sound configuration
+
+ .../devicetree/bindings/misc/atmel-ssc.txt         |   23 ++-
+ .../bindings/sound/atmel-sam9x5-wm8731-audio.txt   |   41 ++++
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |    3 +
+ arch/arm/boot/dts/at91sam9x5ek.dtsi                |   24 +++
+ sound/soc/atmel/Kconfig                            |   10 +
+ sound/soc/atmel/Makefile                           |    2 +
+ sound/soc/atmel/sam9x5_wm8731.c                    |  207 ++++++++++++++++++++
+ sound/soc/codecs/wm8731.c                          |   57 +++++-
+ 8 files changed, 363 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt
+ create mode 100644 sound/soc/atmel/sam9x5_wm8731.c
 
 -- 
-P?ter
+1.7.10.4
