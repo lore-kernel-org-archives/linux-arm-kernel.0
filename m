@@ -1,32 +1,48 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 11 Jul 2013 17:17:52 +0200
-Subject: [PATCH 0/5] Assorted patches for pxa-gpio
-Message-ID: <1373555877-29887-1-git-send-email-zonque@gmail.com>
+Date: Thu, 11 Jul 2013 17:17:54 +0200
+Subject: [PATCH 2/5] gpio: pxa: fix Documentation of interrupt-names property
+In-Reply-To: <1373555877-29887-1-git-send-email-zonque@gmail.com>
+References: <1373555877-29887-1-git-send-email-zonque@gmail.com>
+Message-ID: <1373555877-29887-3-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-Hi Haojian,
+The property name to pass names for interrupt resources is called
+"interrupt-names", not "interrupt-name". Fix it to avoid further
+confusion.
 
-here are some patches for gpio-pxa and its bindings. They fix some
-flaws I came across while trying to boot a PXA3xx board with v3.10+.
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+---
+ Documentation/devicetree/bindings/gpio/mrvl-gpio.txt | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-
-Best regards,
-Daniel
-
-Daniel Mack (5):
-  gpio: pxa: remove dead code
-  gpio: pxa: fix Documentation of interrupt-names property
-  gpio: pxa: Documentation: provide example bindings for PXA3xx
-  ARM: pxa: fix DT auxdata for pxa3xx-gpio
-  ARM: pxa: DTS: override gpio node in pxa3xx.dtsi
-
- .../devicetree/bindings/gpio/mrvl-gpio.txt         | 22 ++++++++++++++++++----
- arch/arm/boot/dts/pxa3xx.dtsi                      | 11 +++++++++++
- arch/arm/mach-pxa/pxa-dt.c                         |  2 +-
- drivers/gpio/gpio-pxa.c                            | 13 +++----------
- 4 files changed, 33 insertions(+), 15 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+index 9b3f1d4..6641626 100644
+--- a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
++++ b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+@@ -10,8 +10,9 @@ Required properties:
+   There're three gpio interrupts in arch-pxa, and they're gpio0,
+   gpio1 and gpio_mux. There're only one gpio interrupt in arch-mmp,
+   gpio_mux.
+-- interrupt-name : Should be the name of irq resource. Each interrupt
+-  binds its interrupt-name.
++- interrupt-names : Should be the names of irq resources. Each interrupt
++  uses its own interrupt name, so there should be as many interrupt names
++  as referenced interrups.
+ - interrupt-controller : Identifies the node as an interrupt controller.
+ - #interrupt-cells: Specifies the number of cells needed to encode an
+   interrupt source.
+@@ -24,7 +25,7 @@ Example:
+ 		compatible = "marvell,mmp-gpio";
+ 		reg = <0xd4019000 0x1000>;
+ 		interrupts = <49>;
+-		interrupt-name = "gpio_mux";
++		interrupt-names = "gpio_mux";
+ 		gpio-controller;
+ 		#gpio-cells = <1>;
+ 		interrupt-controller;
 -- 
 1.8.1.4
