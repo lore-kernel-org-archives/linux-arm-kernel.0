@@ -1,37 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Jul 2013 00:59:38 +0100
-Subject: [RFC PATCH 4/5] arm64: add CPU_HOTPLUG infrastructure
-In-Reply-To: <1373494549-24972-1-git-send-email-mark.rutland@arm.com>
-References: <1373494279-24712-1-git-send-email-mark.rutland@arm.com>
- <1373494549-24972-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20130710235938.GA24642@n2100.arm.linux.org.uk>
+From: grundler@chromium.org (Grant Grundler)
+Date: Wed, 10 Jul 2013 17:43:58 -0700
+Subject: [PATCH 3/5] mmc: dw_mmc: Add exynos resume callback to clear
+ WAKEUP_INT
+In-Reply-To: <CAD=FV=XLp_2t83JfUBryaSvqLZr5OHEZeFZDRmQ1T=XA1MRkHg@mail.gmail.com>
+References: <1373391071-6312-1-git-send-email-dianders@chromium.org>
+ <1373391071-6312-4-git-send-email-dianders@chromium.org>
+ <CAD=FV=XLp_2t83JfUBryaSvqLZr5OHEZeFZDRmQ1T=XA1MRkHg@mail.gmail.com>
+Message-ID: <CANEJEGt4r==VD1gUrTGr=uooFQ-_Odayr3Yv=6i3dwDpf1Y+cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 11:15:49PM +0100, Mark Rutland wrote:
-> +	/*
-> +	 * actual CPU shutdown procedure is at least platform (if not
-> +	 * CPU) specific.
-> +	 */
-> +	if (smp_ops[cpu]->cpu_die)
-> +		smp_ops[cpu]->cpu_die(cpu);
-> +
-> +	/*
-> +	 * Do not return to the idle loop - jump back to the secondary
-> +	 * cpu initialisation.  There's some initialisation which needs
-> +	 * to be repeated to undo the effects of taking the CPU offline.
-> +	 */
-> +	__asm__("mov	sp, %0\n"
-> +	"	mov	x29, #0\n"
-> +	"	b	secondary_start_kernel"
-> +		:
-> +		: "r" (task_stack_page(current) + THREAD_START_SP));
+On Tue, Jul 9, 2013 at 12:09 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Hi,
+>
+> On Tue, Jul 9, 2013 at 10:31 AM, Doug Anderson <dianders@chromium.org> wrote:
+>> If the WAKEUP_INT is asserted at wakeup and not cleared, we'll end up
+>> looping around forever.
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> ---
+>>  drivers/mmc/host/dw_mmc-exynos.c | 23 +++++++++++++++++++++++
+>>  1 file changed, 23 insertions(+)
+>
+> Grant just pointed out that the WAKEUP_INT is supposed to only be
+> enabled if bits 8, 9, or 10 are 1.  Our driver never sets those so we
+> _should_ never get a WAKEUP_INT.  Bits 8-10 are marked as RESERVED on
+> the exynos5420 manual, so the current guess is that they're broken on
+> that silicon but that sometimes the interrupt fires anyway.
+>
+> In any case, it is still a reasonable thing to clear this interrupt at
+> wakeup if it has fired, even if we're on an exynos device without any
+> problems.
 
-Don't make that same mistake as on AArch32 - this will result in some
-people thinking its acceptable for them to return from cpu_die().  Hot
-unplug is supposed to take the CPU offline so it can be restarted as if
-it was never booted in the first place.
+I agree. Can add:
+  Reviewed-by: Grant Grundler <grundler@chromium.org>
 
-The above "hack" in AArch32 is only there because of the sillyness of
-the 32-bit ARM evaluation boards not having a way to place the
-secondary CPUs back into reset or power the secondary CPUs off.
+thanks,
+grant
+
+>
+> -Doug
