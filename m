@@ -1,40 +1,37 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 11 Jul 2013 10:30:35 +0300
-Subject: [PATCH 5/6] USB: Support wakeup IRQ for suspended controllers
-In-Reply-To: <Pine.LNX.4.44L0.1307101504220.1215-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1307101504220.1215-100000@iolanthe.rowland.org>
-Message-ID: <51DE5F1B.8080201@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 11 Jul 2013 09:46:53 +0200
+Subject: [PATCH v2 1/6] clk: samsung: move common plls registration into
+ separate function
+In-Reply-To: <CAKew6eUPBUZj4TuhNAjp6NitFUaeFBZscr_jqU3Y_wLi1m7Ekg@mail.gmail.com>
+References: <201307100057.06061.heiko@sntech.de>
+ <201307100057.48265.heiko@sntech.de>
+ <CAKew6eUPBUZj4TuhNAjp6NitFUaeFBZscr_jqU3Y_wLi1m7Ekg@mail.gmail.com>
+Message-ID: <1874409.iWz7oWBuYA@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2013 10:08 PM, Alan Stern wrote:
-> On Wed, 10 Jul 2013, Roger Quadros wrote:
-> 
->> Some platforms e.g. ehci-omap can generate an interrupt
->> (i.e. remote wakeup) even when the controller is suspended i.e.
->> HW_ACCESSIBLE is cleared.
->>
->> Introduce a flag "has_wakeup_irq" in struct usb_hcd to indicate
->> such cases.
->>
->> We tackle this case by disabling the IRQ, scheduling a
->> hub resume and enabling back the IRQ after the controller has
->> resumed. This ensures that the IRQ handler runs only after the
->> controller is accessible.
-> 
-> Oh yes, one more thing...
-> 
->> @@ -132,6 +134,7 @@ struct usb_hcd {
->>  	unsigned		wireless:1;	/* Wireless USB HCD */
->>  	unsigned		authorized_default:1;
->>  	unsigned		has_tt:1;	/* Integrated TT in root hub */
->> +	unsigned		has_wakeup_irq:1; /* Can IRQ when suspended */
-> 
-> Please add a highly visible comment here, warning that has_wakeup_irq
-> should never be set on systems with shared IRQs.  Having both would ...
-> well, it would indicate a really bad system design.
-> 
-OK, will do.
+Hi,
 
-cheers,
--roger
+On Wednesday 10 of July 2013 22:29:13 Yadwinder Singh Brar wrote:
+> Hi Heiko,
+> 
+> On Wed, Jul 10, 2013 at 4:27 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> > All Samsung PLLs use similar code to register the clocks and clkdev
+> > lookups. Therefore move these into a separate function to reduce code
+> > duplication.
+> > 
+> > Suggested-by: Russell King <linux@arm.linux.org.uk>
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> 
+> I have posted patch for adding common pll registration function
+> which some how missed to get merged. I hope will get merged after rc1.
+> Please give a look at that :
+> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg19543.html
+
+Yeah, I was going to post a link to it, but I couldn't find it on any mailing 
+list archive. I think we should go with the way of registration introduced by 
+Yadwinder.
+
+Best regards,
+Tomasz
