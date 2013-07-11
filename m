@@ -1,165 +1,124 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 11 Jul 2013 14:27:12 +0800
-Subject: [PATCH v12 04/13] usb: chipidea: otg: Add otg file used to access
- otgsc
+Date: Thu, 11 Jul 2013 14:27:14 +0800
+Subject: [PATCH v12 06/13] usb: chipidea: add otg_cap attribute for otg capable
 In-Reply-To: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
 References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1373524041-10482-5-git-send-email-peter.chen@freescale.com>
+Message-ID: <1373524041-10482-7-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This file is mainly used to access otgsc currently, it may
-add otg related things in the future.
+Since we need otgsc to know vbus's status at some chipidea
+controllers even it is peripheral-only mode. Besides, some
+SoCs (eg, AR9331 SoC) don't have otgsc register even
+the DCCPARAMS_DC and DCCPARAMS_HC are both 1 at CAP_DCCPARAMS.
+We inroduce otg_cap attribute to indicate if the controller
+is otg capable, defaultly, we follow the rule that if DCCPARAMS_DC
+and DCCPARAMS_HC are both 1 at CAP_DCCPARAMS are otg capable, but if there
+is exception, the platform can override it by device tree or platform data.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/Makefile |    2 +-
- drivers/usb/chipidea/bits.h   |   10 ++++++++
- drivers/usb/chipidea/core.c   |    3 +-
- drivers/usb/chipidea/otg.c    |   50 +++++++++++++++++++++++++++++++++++++++++
- drivers/usb/chipidea/otg.h    |   19 +++++++++++++++
- 5 files changed, 82 insertions(+), 2 deletions(-)
+ drivers/usb/chipidea/core.c  |   35 ++++++++++++++++++++++++++++-------
+ include/linux/usb/chipidea.h |   13 +++++++++++++
+ 2 files changed, 41 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-index 3bbbcba..9d0e288 100644
---- a/drivers/usb/chipidea/Makefile
-+++ b/drivers/usb/chipidea/Makefile
-@@ -2,7 +2,7 @@ ccflags-$(CONFIG_USB_CHIPIDEA_DEBUG) := -DDEBUG
- 
- obj-$(CONFIG_USB_CHIPIDEA)		+= ci_hdrc.o
- 
--ci_hdrc-y				:= core.o
-+ci_hdrc-y				:= core.o otg.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
-diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-index aefa026..dd0cf9e 100644
---- a/drivers/usb/chipidea/bits.h
-+++ b/drivers/usb/chipidea/bits.h
-@@ -79,11 +79,21 @@
- #define OTGSC_ASVIS	      BIT(18)
- #define OTGSC_BSVIS	      BIT(19)
- #define OTGSC_BSEIS	      BIT(20)
-+#define OTGSC_1MSIS	      BIT(21)
-+#define OTGSC_DPIS	      BIT(22)
- #define OTGSC_IDIE	      BIT(24)
- #define OTGSC_AVVIE	      BIT(25)
- #define OTGSC_ASVIE	      BIT(26)
- #define OTGSC_BSVIE	      BIT(27)
- #define OTGSC_BSEIE	      BIT(28)
-+#define OTGSC_1MSIE	      BIT(29)
-+#define OTGSC_DPIE	      BIT(30)
-+#define OTGSC_INT_EN_BITS	(OTGSC_IDIE | OTGSC_AVVIE | OTGSC_ASVIE \
-+				| OTGSC_BSVIE | OTGSC_BSEIE | OTGSC_1MSIE \
-+				| OTGSC_DPIE)
-+#define OTGSC_INT_STATUS_BITS	(OTGSC_IDIS | OTGSC_AVVIS | OTGSC_ASVIS	\
-+				| OTGSC_BSVIS | OTGSC_BSEIS | OTGSC_1MSIS \
-+				| OTGSC_DPIS)
- 
- /* USBMODE */
- #define USBMODE_CM            (0x03UL <<  0)
 diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index a5df24c..761f7e8 100644
+index 93961ff..e8ceb04 100644
 --- a/drivers/usb/chipidea/core.c
 +++ b/drivers/usb/chipidea/core.c
-@@ -71,6 +71,7 @@
- #include "bits.h"
- #include "host.h"
- #include "debug.h"
-+#include "otg.h"
+@@ -405,6 +405,18 @@ static inline void ci_role_destroy(struct ci_hdrc *ci)
+ 	ci_hdrc_host_destroy(ci);
+ }
  
- /* Controller register map */
- static uintptr_t ci_regs_nolpm[] = {
-@@ -508,7 +509,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
++static void ci_get_otg_capable(struct ci_hdrc *ci)
++{
++	if (ci->platdata->otg_cap != OTG_CAP_ATTR_IS_NOT_EXISTED)
++		ci->is_otg = (ci->platdata->otg_cap == OTG_CAP_ATTR_IS_TRUE);
++	else
++		ci->is_otg = (hw_read(ci, CAP_DCCPARAMS,
++				DCCPARAMS_DC | DCCPARAMS_HC)
++					== (DCCPARAMS_DC | DCCPARAMS_HC));
++	if (ci->is_otg)
++		dev_dbg(ci->dev, "It is OTG capable controller\n");
++}
++
+ static int ci_hdrc_probe(struct platform_device *pdev)
+ {
+ 	struct device	*dev = &pdev->dev;
+@@ -461,6 +473,9 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
++	/* To know if controller is OTG capable or not */
++	ci_get_otg_capable(ci);
++
+ 	if (!ci->platdata->phy_mode)
+ 		ci->platdata->phy_mode = of_usb_get_phy_mode(dev->of_node);
+ 
+@@ -491,10 +506,19 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
+-		ci->is_otg = true;
+-		/* ID pin needs 1ms debouce time, we delay 2ms for safe */
+-		mdelay(2);
+-		ci->role = ci_otg_role(ci);
++		if (ci->is_otg) {
++			/* ID pin needs 1ms debouce time, we delay 2ms for safe */
++			mdelay(2);
++			ci->role = ci_otg_role(ci);
++			ci_hdrc_otg_init(ci);
++		} else {
++			/*
++			 * If the controller is not OTG capable, but support
++			 * role switch, the defalt role is gadget, and the
++			 * user can switch it through debugfs (proc in future?)
++			 */
++			ci->role = CI_ROLE_GADGET;
++		}
+ 	} else {
+ 		ci->role = ci->roles[CI_ROLE_HOST]
+ 			? CI_ROLE_HOST
+@@ -514,9 +538,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	if (ret)
  		goto stop;
  
- 	if (ci->is_otg)
--		hw_write(ci, OP_OTGSC, OTGSC_IDIE, OTGSC_IDIE);
-+		ci_hdrc_otg_init(ci);
- 
+-	if (ci->is_otg)
+-		ci_hdrc_otg_init(ci);
+-
  	ret = dbg_create_files(ci);
  	if (!ret)
-diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-new file mode 100644
-index 0000000..abefb4d
---- /dev/null
-+++ b/drivers/usb/chipidea/otg.c
-@@ -0,0 +1,50 @@
-+/*
-+ * otg.c - ChipIdea USB IP core OTG driver
-+ *
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Peter Chen
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+ 		return 0;
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 118bf66..0a906b4 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -7,6 +7,12 @@
+ 
+ #include <linux/usb/otg.h>
+ 
++enum usb_otg_cap {
++	OTG_CAP_ATTR_IS_NOT_EXISTED = 0,
++	OTG_CAP_ATTR_IS_TRUE,
++	OTG_CAP_ATTR_IS_FALSE,
++};
 +
-+/*
-+ * This file mainly handles otgsc register, it may include OTG operation
-+ * in the future.
-+ */
-+
-+#include <linux/usb/otg.h>
-+#include <linux/usb/gadget.h>
-+#include <linux/usb/chipidea.h>
-+
-+#include "ci.h"
-+#include "bits.h"
-+
-+void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-+{
-+	/* Only clear request bits */
-+	hw_write(ci, OP_OTGSC, OTGSC_INT_STATUS_BITS, bits);
-+}
-+
-+void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-+{
-+	hw_write(ci, OP_OTGSC, bits, bits);
-+}
-+
-+void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-+{
-+	hw_write(ci, OP_OTGSC, bits, 0);
-+}
-+
-+/**
-+ * ci_hdrc_otg_init - initialize otgsc bits
-+ * ci: the controller
-+ */
-+int ci_hdrc_otg_init(struct ci_hdrc *ci)
-+{
-+	ci_enable_otg_interrupt(ci, OTGSC_IDIE);
-+
-+	return 0;
-+}
-diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
-new file mode 100644
-index 0000000..f24ec37
---- /dev/null
-+++ b/drivers/usb/chipidea/otg.h
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Peter Chen
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __DRIVERS_USB_CHIPIDEA_OTG_H
-+#define __DRIVERS_USB_CHIPIDEA_OTG_H
-+
-+int ci_hdrc_otg_init(struct ci_hdrc *ci);
-+void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits);
-+void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
-+void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
-+
-+#endif /* __DRIVERS_USB_CHIPIDEA_OTG_H */
+ struct ci_hdrc;
+ struct ci_hdrc_platform_data {
+ 	const char	*name;
+@@ -25,6 +31,13 @@ struct ci_hdrc_platform_data {
+ #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
+ 	void	(*notify_event) (struct ci_hdrc *ci, unsigned event);
+ 	struct regulator *reg_vbus;
++	/*
++	 * Please only set otg_cap when the otg capability can't be
++	 * judged by CAP_DCCPARAMS, eg, the DCCPARAMS_DC and DCCPARAMS_HC
++	 * are both 1 at CAP_DCCPARAMS, but the controller doesn't have
++	 * OTGSC register (eg, AR9331 SoC).
++	 */
++	enum usb_otg_cap otg_cap;
+ };
+ 
+ /* Default offset of capability registers */
 -- 
 1.7.0.4
