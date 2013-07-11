@@ -1,37 +1,60 @@
-From: kyungsik.lee@lge.com (Kyungsik Lee)
-Date: Thu, 11 Jul 2013 13:34:33 +0900
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <20130710182815.GA362@x4>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
- <20130506095124.GA22041@pd.tnic>
- <CAMuHMdWH9w5fj6HRXi+9QcBJym4dukAFsPVGZVqSSk3yTZJUcA@mail.gmail.com>
- <20130710093642.GC14873@pd.tnic> <20130710182815.GA362@x4>
-Message-ID: <20130711043433.GA29245@hulk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Jul 2013 23:17:58 -0700
+Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
+In-Reply-To: <CACRpkdYU13bhPaL2ZG9CT9JRv9sKQ+1N3zCUPizk571+LQqB4A@mail.gmail.com>
+References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
+ <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
+ <20130625065811.GZ5523@atomide.com> <51CAEA90.90200@ti.com>
+ <CACRpkdbKgEcfF67oO9HrczvDp4Po3Xt1hFajJ1vO8kEvsZH4jA@mail.gmail.com>
+ <51CC45D3.2000305@ti.com>
+ <CACRpkdYU13bhPaL2ZG9CT9JRv9sKQ+1N3zCUPizk571+LQqB4A@mail.gmail.com>
+Message-ID: <20130711061757.GX5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Linus Walleij <linus.walleij@linaro.org> [130710 13:42]:
+> On Thu, Jun 27, 2013 at 4:01 PM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
 > 
-> BTW speaking of introductory-level patches, what about the following
-> one:
+> > I think, In the future the OMAP pinctrl configurations would be manged in
+> > more flexible way then now (thanks to "pinctrl PM helpers" and you;))
+> > - "Idle" state will be splitted to "Idle"/"sleep"
+> > - "default" state will be splitted to "default"/"active"
 > 
-> Now that lz4 kernel compression is available, add *.lz4 to .gitignore
-> 
-> diff --git a/.gitignore b/.gitignore
-> index 3b8b9b3..7e9932e 100644
-> --- a/.gitignore
-> +++ b/.gitignore
-> @@ -29,6 +29,7 @@ modules.builtin
->  *.bz2
->  *.lzma
->  *.xz
-> +*.lz4
->  *.lzo
->  *.patch
->  *.gcno
-> 
-Acked-by: Kyungsik Lee <kyungsik.lee@lge.com>
+> OK so the first ones we already have so the discussion is now down
+> to adding the "active" state (and pinctrl_pm* helper function).
 
-Thanks,
-Kyungsik
+I think I have a patchset ready for pinctrl to allow multiple simulaneous
+states as discussed, need to test it first though. Should be able to
+post it on Friday hopefully.
+ 
+> I guess we need a patch set prepared which adds the "active" state
+> and helper function as the first patch, i.e. this:
+> http://marc.info/?l=linux-kernel&m=137094012703340&w=2
+> Can I have your ACK on this patch?
+
+Hmm I have gone a bit further with the drivers/base/pinctrl.c in my
+set where if active state is defined then sleep and idle states must
+match active state for the pingroups to avoid constantly checking
+those sets during runtime.
+
+Then the pinctrl_pm_select_active_state() does not actually have
+anything to do with PM in the rx/tx case, so we should rename that.
+
+It's pretty close, but before we can apply that we need the changes
+I have to allow multiple simultaneous states. I suggest wait just
+few days on that patch.
+ 
+> I do not want to add the state unless there is a clear consumer,
+> so it needs to go in with the first patch to a device driver that uses
+> pinctrl_pm_select_active_state() which will be a good demonstration
+> on its use and utility. (And a point to object and suggest other ways
+> to do the same thing...)
+
+Right, we have quite a few consumers with omaps for that as am33xx
+requires remuxing wake-up events for all drivers AFAIK. The MMC SDIO
+pin remuxing is probably closest one ready.
+
+Regards,
+
+Tony
