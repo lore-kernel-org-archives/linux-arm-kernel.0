@@ -1,76 +1,40 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 11 Jul 2013 16:04:48 +0200
-Subject: [PATCH] ARM: OMAP2+: Remove legacy device creation for McPDM and DMIC
-Message-ID: <1373551488-3816-1-git-send-email-peter.ujfalusi@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 11 Jul 2013 22:10:23 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select ARM1136 related errata
+In-Reply-To: <1373472712-22295-1-git-send-email-fabio.estevam@freescale.com>
+References: <1373472712-22295-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130711141021.GB3361@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-McPDM and DMIC only available on OMAP4/5 which no longer boots in legacy
-mode.
-The code to create the devices in legacy mode can be removed.
+On Wed, Jul 10, 2013 at 01:11:52PM -0300, Fabio Estevam wrote:
+> CONFIG_ARM_ERRATA_411920 and CONFIG_ARM_ERRATA_364296 should be selected for
+> ARM1136 SoCs.
+> 
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-omap2/devices.c | 40 ----------------------------------------
- 1 file changed, 40 deletions(-)
+Should errata be selected in Kconfig rather than defconfig?
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index aef96e4..dbcadcc 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -328,44 +328,6 @@ static void omap_init_audio(void)
- static inline void omap_init_audio(void) {}
- #endif
- 
--#if defined(CONFIG_SND_OMAP_SOC_MCPDM) || \
--		defined(CONFIG_SND_OMAP_SOC_MCPDM_MODULE)
--
--static void __init omap_init_mcpdm(void)
--{
--	struct omap_hwmod *oh;
--	struct platform_device *pdev;
--
--	oh = omap_hwmod_lookup("mcpdm");
--	if (!oh)
--		return;
--
--	pdev = omap_device_build("omap-mcpdm", -1, oh, NULL, 0);
--	WARN(IS_ERR(pdev), "Can't build omap_device for omap-mcpdm.\n");
--}
--#else
--static inline void omap_init_mcpdm(void) {}
--#endif
--
--#if defined(CONFIG_SND_OMAP_SOC_DMIC) || \
--		defined(CONFIG_SND_OMAP_SOC_DMIC_MODULE)
--
--static void __init omap_init_dmic(void)
--{
--	struct omap_hwmod *oh;
--	struct platform_device *pdev;
--
--	oh = omap_hwmod_lookup("dmic");
--	if (!oh)
--		return;
--
--	pdev = omap_device_build("omap-dmic", -1, oh, NULL, 0);
--	WARN(IS_ERR(pdev), "Can't build omap_device for omap-dmic.\n");
--}
--#else
--static inline void omap_init_dmic(void) {}
--#endif
--
- #if defined(CONFIG_SND_OMAP_SOC_OMAP_HDMI) || \
- 		defined(CONFIG_SND_OMAP_SOC_OMAP_HDMI_MODULE)
- 
-@@ -566,8 +528,6 @@ static int __init omap2_init_devices(void)
- 	omap_init_mbox();
- 	/* If dtb is there, the devices will be created dynamically */
- 	if (!of_have_populated_dt()) {
--		omap_init_dmic();
--		omap_init_mcpdm();
- 		omap_init_mcspi();
- 		omap_init_sham();
- 		omap_init_aes();
--- 
-1.8.2.1
+Shawn
+
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/configs/imx_v6_v7_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> index f1662d3..ee84e82 100644
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -40,6 +40,8 @@ CONFIG_SOC_IMX6Q=y
+>  CONFIG_SOC_IMX6SL=y
+>  CONFIG_SOC_VF610=y
+>  CONFIG_MXC_PWM=y
+> +CONFIG_ARM_ERRATA_411920=y
+> +CONFIG_ARM_ERRATA_364296=y
+>  CONFIG_SMP=y
+>  CONFIG_VMSPLIT_2G=y
+>  CONFIG_PREEMPT_VOLUNTARY=y
+> -- 
+> 1.8.1.2
+> 
+> 
