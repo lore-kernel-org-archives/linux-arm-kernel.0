@@ -1,48 +1,52 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 11 Jul 2013 17:17:54 +0200
-Subject: [PATCH 2/5] gpio: pxa: fix Documentation of interrupt-names property
+Date: Thu, 11 Jul 2013 17:17:55 +0200
+Subject: [PATCH 3/5] gpio: pxa: Documentation: provide example bindings for
+ PXA3xx
 In-Reply-To: <1373555877-29887-1-git-send-email-zonque@gmail.com>
 References: <1373555877-29887-1-git-send-email-zonque@gmail.com>
-Message-ID: <1373555877-29887-3-git-send-email-zonque@gmail.com>
+Message-ID: <1373555877-29887-4-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The property name to pass names for interrupt resources is called
-"interrupt-names", not "interrupt-name". Fix it to avoid further
-confusion.
+Add another example to describe bindings that work for PXA3xx boards.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
 ---
- Documentation/devicetree/bindings/gpio/mrvl-gpio.txt | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/gpio/mrvl-gpio.txt | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
 diff --git a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
-index 9b3f1d4..6641626 100644
+index 6641626..b2afdb2 100644
 --- a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
 +++ b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
-@@ -10,8 +10,9 @@ Required properties:
-   There're three gpio interrupts in arch-pxa, and they're gpio0,
-   gpio1 and gpio_mux. There're only one gpio interrupt in arch-mmp,
-   gpio_mux.
--- interrupt-name : Should be the name of irq resource. Each interrupt
--  binds its interrupt-name.
-+- interrupt-names : Should be the names of irq resources. Each interrupt
-+  uses its own interrupt name, so there should be as many interrupt names
-+  as referenced interrups.
- - interrupt-controller : Identifies the node as an interrupt controller.
- - #interrupt-cells: Specifies the number of cells needed to encode an
-   interrupt source.
-@@ -24,7 +25,7 @@ Example:
+@@ -19,7 +19,7 @@ Required properties:
+ - gpio-controller : Marks the device node as a gpio controller.
+ - #gpio-cells : Should be one.  It is the pin number.
+ 
+-Example:
++Example for a MMP platform:
+ 
+ 	gpio: gpio at d4019000 {
  		compatible = "marvell,mmp-gpio";
- 		reg = <0xd4019000 0x1000>;
- 		interrupts = <49>;
--		interrupt-name = "gpio_mux";
-+		interrupt-names = "gpio_mux";
- 		gpio-controller;
- 		#gpio-cells = <1>;
- 		interrupt-controller;
+@@ -32,6 +32,19 @@ Example:
+ 		#interrupt-cells = <1>;
+       };
+ 
++Example for a PXA3xx platform:
++
++	gpio: gpio at 40e00000 {
++		compatible = "intel,pxa3xx-gpio";
++		reg = <0x40e00000 0x10000>;
++		interrupt-names = "gpio0", "gpio1", "gpio_mux";
++		interrupts = <8 9 10>;
++		gpio-controller;
++		#gpio-cells = <0x2>;
++		interrupt-controller;
++		#interrupt-cells = <0x2>;
++	};
++
+ * Marvell Orion GPIO Controller
+ 
+ Required properties:
 -- 
 1.8.1.4
