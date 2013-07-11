@@ -1,67 +1,37 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 11 Jul 2013 11:30:44 +0800
-Subject: [PATCH v2 1/3] arm: atmel: at91sam9n12: add pinctrl of TWI
-In-Reply-To: <1373513446-18215-1-git-send-email-voice.shen@atmel.com>
-References: <1373513446-18215-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1373513446-18215-2-git-send-email-voice.shen@atmel.com>
+From: kyungsik.lee@lge.com (Kyungsik Lee)
+Date: Thu, 11 Jul 2013 13:34:33 +0900
+Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
+ streaming format
+In-Reply-To: <20130710182815.GA362@x4>
+References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+ <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
+ <20130506095124.GA22041@pd.tnic>
+ <CAMuHMdWH9w5fj6HRXi+9QcBJym4dukAFsPVGZVqSSk3yTZJUcA@mail.gmail.com>
+ <20130710093642.GC14873@pd.tnic> <20130710182815.GA362@x4>
+Message-ID: <20130711043433.GA29245@hulk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add pinctrl of TWI for at91sam9n12 SoC
+> 
+> BTW speaking of introductory-level patches, what about the following
+> one:
+> 
+> Now that lz4 kernel compression is available, add *.lz4 to .gitignore
+> 
+> diff --git a/.gitignore b/.gitignore
+> index 3b8b9b3..7e9932e 100644
+> --- a/.gitignore
+> +++ b/.gitignore
+> @@ -29,6 +29,7 @@ modules.builtin
+>  *.bz2
+>  *.lzma
+>  *.xz
+> +*.lz4
+>  *.lzo
+>  *.patch
+>  *.gcno
+> 
+Acked-by: Kyungsik Lee <kyungsik.lee@lge.com>
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
-
----
-Changes in v2:
-  - remove comments as use micro
-
- arch/arm/boot/dts/at91sam9n12.dtsi |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index bb7f564..9fb7ffd 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -291,6 +291,22 @@
- 					};
- 				};
- 
-+				i2c0 {
-+					pinctrl_i2c0: i2c0-0 {
-+						atmel,pins =
-+							<AT91_PIOA 30 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOA 31 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+				};
-+
-+				i2c1 {
-+					pinctrl_i2c1: i2c1-0 {
-+						atmel,pins =
-+							<AT91_PIOC 0 AT91_PERIPH_C AT91_PINCTRL_NONE
-+							 AT91_PIOC 1 AT91_PERIPH_C AT91_PINCTRL_NONE>;
-+					};
-+				};
-+
- 				tcb0 {
- 					pinctrl_tcb0_tclk0: tcb0_tclk0-0 {
- 						atmel,pins = <AT91_PIOA 24 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-@@ -471,6 +487,8 @@
- 				dma-names = "tx", "rx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_i2c0>;
- 				status = "disabled";
- 			};
- 
-@@ -483,6 +501,8 @@
- 				dma-names = "tx", "rx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_i2c1>;
- 				status = "disabled";
- 			};
- 
--- 
-1.7.9.5
+Thanks,
+Kyungsik
