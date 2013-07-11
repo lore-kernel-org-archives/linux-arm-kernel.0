@@ -1,28 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 11 Jul 2013 02:33:59 -0700
-Subject: [RFC PATCH 4/5] arm64: add CPU_HOTPLUG infrastructure
-In-Reply-To: <1373494549-24972-1-git-send-email-mark.rutland@arm.com>
-References: <1373494279-24712-1-git-send-email-mark.rutland@arm.com>
- <1373494549-24972-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20130711093359.GF830@codeaurora.org>
+From: markus@trippelsdorf.de (Markus Trippelsdorf)
+Date: Thu, 11 Jul 2013 11:46:40 +0200
+Subject: [PATCH] .gitignore: ignore *.lz4 files
+In-Reply-To: <20130711043433.GA29245@hulk>
+References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+ <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
+ <20130506095124.GA22041@pd.tnic>
+ <CAMuHMdWH9w5fj6HRXi+9QcBJym4dukAFsPVGZVqSSk3yTZJUcA@mail.gmail.com>
+ <20130710093642.GC14873@pd.tnic> <20130710182815.GA362@x4>
+ <20130711043433.GA29245@hulk>
+Message-ID: <20130711094640.GA358@x4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10, Mark Rutland wrote:
-> +void __ref cpu_die(void)
-> +{
-> +	unsigned int cpu = smp_processor_id();
-> +
-> +	idle_task_exit();
-> +
-> +	local_irq_disable();
-> +	mb();
-> +
-> +	/* Tell __cpu_die() that this CPU is now safe to dispose of */
-> +	RCU_NONIDLE(complete(&cpu_died));
+Now that lz4 kernel compression is available, add *.lz4 to .gitignore.
 
-This isn't true anymore.
+Signed-off-by: Markus Trippelsdorf <markus@trippelsdorf.de>
+Acked-by: Kyungsik Lee <kyungsik.lee@lge.com>
 
+diff --git a/.gitignore b/.gitignore
+index 3b8b9b3..7e9932e 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -29,6 +29,7 @@ modules.builtin
+ *.bz2
+ *.lzma
+ *.xz
++*.lz4
+ *.lzo
+ *.patch
+ *.gcno
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Markus
