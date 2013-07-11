@@ -1,98 +1,98 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 11 Jul 2013 14:27:09 +0800
-Subject: [PATCH v12 01/13] usb: chipidea: add vbus regulator control
+Date: Thu, 11 Jul 2013 14:27:10 +0800
+Subject: [PATCH v12 02/13] usb: chipidea: imx: remove vbus regulator operation
 In-Reply-To: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
 References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1373524041-10482-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <1373524041-10482-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For boards which have board level vbus control (eg, through gpio), we
-need to vbus operation according to below rules:
-- For host, we need open vbus before start hcd, and close it
-after remove hcd.
-- For otg, the vbus needs to be on/off when usb role switches.
-When the host roles begins, it opens vbus; when the host role
-finishes, it closes vbus.
-
-We put vbus operation to host as host is the only vbus user,
-When we are at host mode, the vbus is on, when we are not at
-host mode, vbus should be off.
+Since we have added vbus reguatlor operation at common
+host file (chipidea/host.c), the glue layer vbus operation
+isn't needed any more.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/host.c  |   23 ++++++++++++++++++++++-
- include/linux/usb/chipidea.h |    1 +
- 2 files changed, 23 insertions(+), 1 deletions(-)
+ drivers/usb/chipidea/ci_hdrc_imx.c |   30 +++++++-----------------------
+ 1 files changed, 7 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-index 40d0fda..e94e52b 100644
---- a/drivers/usb/chipidea/host.c
-+++ b/drivers/usb/chipidea/host.c
-@@ -24,6 +24,7 @@
- #include <linux/usb.h>
- #include <linux/usb/hcd.h>
- #include <linux/usb/chipidea.h>
-+#include <linux/regulator/consumer.h>
- 
- #include "../host/ehci.h"
- 
-@@ -64,9 +65,19 @@ static int host_start(struct ci_hdrc *ci)
- 	ehci->caps = ci->hw_bank.cap;
- 	ehci->has_hostpc = ci->hw_bank.lpm;
- 
-+	if (ci->platdata->reg_vbus) {
-+		ret = regulator_enable(ci->platdata->reg_vbus);
-+		if (ret) {
-+			dev_err(ci->dev,
-+				"Failed to enable vbus regulator, ret=%d\n",
-+				ret);
-+			goto put_hcd;
-+		}
-+	}
-+
- 	ret = usb_add_hcd(hcd, 0, 0);
- 	if (ret)
--		usb_put_hcd(hcd);
-+		goto disable_reg;
- 	else
- 		ci->hcd = hcd;
- 
-@@ -74,6 +85,14 @@ static int host_start(struct ci_hdrc *ci)
- 		hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS, USBMODE_CI_SDIS);
- 
- 	return ret;
-+
-+disable_reg:
-+	regulator_disable(ci->platdata->reg_vbus);
-+
-+put_hcd:
-+	usb_put_hcd(hcd);
-+
-+	return ret;
- }
- 
- static void host_stop(struct ci_hdrc *ci)
-@@ -82,6 +101,8 @@ static void host_stop(struct ci_hdrc *ci)
- 
- 	usb_remove_hcd(hcd);
- 	usb_put_hcd(hcd);
-+	if (ci->platdata->reg_vbus)
-+		regulator_disable(ci->platdata->reg_vbus);
- }
- 
- int ci_hdrc_host_init(struct ci_hdrc *ci)
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 2562994..118bf66 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -24,6 +24,7 @@ struct ci_hdrc_platform_data {
- #define CI_HDRC_CONTROLLER_RESET_EVENT		0
- #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
- 	void	(*notify_event) (struct ci_hdrc *ci, unsigned event);
-+	struct regulator *reg_vbus;
+diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+index 14362c0..d06355e 100644
+--- a/drivers/usb/chipidea/ci_hdrc_imx.c
++++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+@@ -31,7 +31,6 @@ struct ci_hdrc_imx_data {
+ 	struct usb_phy *phy;
+ 	struct platform_device *ci_pdev;
+ 	struct clk *clk;
+-	struct regulator *reg_vbus;
  };
  
- /* Default offset of capability registers */
+ static const struct usbmisc_ops *usbmisc_ops;
+@@ -141,22 +140,13 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 		goto err_clk;
+ 	}
+ 
+-	/* we only support host now, so enable vbus here */
+-	data->reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
+-	if (!IS_ERR(data->reg_vbus)) {
+-		ret = regulator_enable(data->reg_vbus);
+-		if (ret) {
+-			dev_err(&pdev->dev,
+-				"Failed to enable vbus regulator, err=%d\n",
+-				ret);
+-			goto err_clk;
+-		}
+-	} else {
+-		data->reg_vbus = NULL;
+-	}
+-
+ 	pdata.phy = data->phy;
+ 
++	/* Get the vbus regulator */
++	pdata.reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
++	if (IS_ERR(pdata.reg_vbus))
++		pdata.reg_vbus = NULL;
++
+ 	if (!pdev->dev.dma_mask)
+ 		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+ 	if (!pdev->dev.coherent_dma_mask)
+@@ -167,7 +157,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 		if (ret) {
+ 			dev_err(&pdev->dev,
+ 				"usbmisc init failed, ret=%d\n", ret);
+-			goto err;
++			goto err_clk;
+ 		}
+ 	}
+ 
+@@ -179,7 +169,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev,
+ 			"Can't register ci_hdrc platform device, err=%d\n",
+ 			ret);
+-		goto err;
++		goto err_clk;
+ 	}
+ 
+ 	if (usbmisc_ops && usbmisc_ops->post) {
+@@ -200,9 +190,6 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 
+ disable_device:
+ 	ci_hdrc_remove_device(data->ci_pdev);
+-err:
+-	if (data->reg_vbus)
+-		regulator_disable(data->reg_vbus);
+ err_clk:
+ 	clk_disable_unprepare(data->clk);
+ 	return ret;
+@@ -215,9 +202,6 @@ static int ci_hdrc_imx_remove(struct platform_device *pdev)
+ 	pm_runtime_disable(&pdev->dev);
+ 	ci_hdrc_remove_device(data->ci_pdev);
+ 
+-	if (data->reg_vbus)
+-		regulator_disable(data->reg_vbus);
+-
+ 	if (data->phy) {
+ 		usb_phy_shutdown(data->phy);
+ 		module_put(data->phy->dev->driver->owner);
 -- 
 1.7.0.4
