@@ -1,150 +1,47 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 11 Jul 2013 19:37:47 +0200
-Subject: [PATCH v7 3/9] iommu/exynos: fix page table maintenance
-In-Reply-To: <002b01ce797b$44d4ad10$ce7e0730$@samsung.com>
-References: <002b01ce797b$44d4ad10$ce7e0730$@samsung.com>
-Message-ID: <1933986.4vddYccClk@amdc1032>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 11 Jul 2013 11:40:37 -0600
+Subject: [PATCH 2/2] pwm: Add PWM polarity flag macros for DT
+In-Reply-To: <1373553468-6564-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1373553468-6564-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1373553468-6564-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <51DEEE15.7040801@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07/11/2013 08:37 AM, Laurent Pinchart wrote:
+> Define PWM_POLARITY_NORMAL and PWM_POLARITY_INVERTED macros in
+> include/dt-bindings/pwm/pwm.h to be used by device tree sources.
 
-Hi,
+>  Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt |  6 +++---
+>  Documentation/devicetree/bindings/pwm/pwm-samsung.txt   |  5 +++--
+>  Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt  |  5 +++--
+>  Documentation/devicetree/bindings/pwm/pwm.txt           |  8 +++++---
+>  Documentation/devicetree/bindings/pwm/vt8500-pwm.txt    |  5 +++--
+>  arch/arm/boot/dts/am335x-evm.dts                        |  3 ++-
+>  arch/arm/boot/dts/am335x-evmsk.dts                      |  3 ++-
+>  arch/arm/boot/dts/wm8850-w70v2.dts                      |  3 ++-
+>  include/dt-bindings/pwm/pwm.h                           | 15 +++++++++++++++
+>  include/linux/pwm.h                                     |  4 ++--
 
-Some minor nitpicks below.
+I think this needs to be separate patches; at least the new pwm.h should
+be introduced separately to the board-specific *.dts edits, and perhaps
+further split up?
 
-On Friday, July 05, 2013 09:29:18 PM Cho KyongHo wrote:
-> This prevents allocating lv2 page table for the lv1 page table entry
-> that already has 1MB page mapping. In addition some BUG_ON() is
-> changed to WARN_ON().
-> 
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> ---
->  drivers/iommu/exynos-iommu.c |   34 ++++++++++++++++++++++++++--------
->  1 files changed, 26 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index e3be3e5..2bfe9fa 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -862,12 +862,14 @@ static unsigned long *alloc_lv2entry(unsigned long *sent, unsigned long iova,
->  		pent = kzalloc(LV2TABLE_SIZE, GFP_ATOMIC);
->  		BUG_ON((unsigned long)pent & (LV2TABLE_SIZE - 1));
->  		if (!pent)
-> -			return NULL;
-> +			return ERR_PTR(-ENOMEM);
->  
->  		*sent = mk_lv1ent_page(__pa(pent));
->  		*pgcounter = NUM_LV2ENTRIES;
->  		pgtable_flush(pent, pent + NUM_LV2ENTRIES);
->  		pgtable_flush(sent, sent + 1);
-> +	} else if (lv1ent_section(sent)) {
-> +		return ERR_PTR(-EADDRINUSE);
->  	}
->  
->  	return page_entry(sent, iova);
-> @@ -944,16 +946,16 @@ static int exynos_iommu_map(struct iommu_domain *domain, unsigned long iova,
->  		pent = alloc_lv2entry(entry, iova,
->  					&priv->lv2entcnt[lv1ent_offset(iova)]);
->  
-> -		if (!pent)
-> -			ret = -ENOMEM;
-> +		if (IS_ERR(pent))
-> +			ret = PTR_ERR(pent);
->  		else
->  			ret = lv2set_page(pent, paddr, size,
->  					&priv->lv2entcnt[lv1ent_offset(iova)]);
->  	}
->  
->  	if (ret) {
-> -		pr_debug("%s: Failed to map iova 0x%lx/0x%x bytes\n",
-> -							__func__, iova, size);
-> +		pr_err("%s: Failed(%d) to map iova 0x%#x bytes @ %#lx\n",
-> +						__func__, ret, size, iova);
->  	}
+That way, the one patch that introduces <dt-bindings/pwm.h> would be
+available to be merged into any other tree that wanted to take patches
+to use the new defines.
 
-Intendation is a bit weird, it should be more like:
+> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
 
-		pr_err("%s: Failed(%d) to map iova 0x%#x bytes @ %#lx\n",
-			__func__, ret, size, iova);
+>  enum pwm_polarity {
+> -	PWM_POLARITY_NORMAL,
+> -	PWM_POLARITY_INVERSED,
+> +	PWM_POLARITY_NORMAL = 0,
+> +	PWM_POLARITY_INVERSED = 1,
+>  };
 
-to be consistent with the rest of the driver.
-
-You could have also removed superfluous braces while at it.
-
->  	spin_unlock_irqrestore(&priv->pgtablelock, flags);
-> @@ -968,6 +970,7 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
->  	struct sysmmu_drvdata *data;
->  	unsigned long flags;
->  	unsigned long *ent;
-> +	size_t err_page;
->  
->  	BUG_ON(priv->pgtable == NULL);
->  
-> @@ -976,7 +979,8 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
->  	ent = section_entry(priv->pgtable, iova);
->  
->  	if (lv1ent_section(ent)) {
-> -		BUG_ON(size < SECT_SIZE);
-> +		if (WARN_ON(size < SECT_SIZE))
-> +			goto err;
->  
->  		*ent = 0;
->  		pgtable_flush(ent, ent + 1);
-> @@ -1008,7 +1012,8 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
->  	}
->  
->  	/* lv1ent_large(ent) == true here */
-> -	BUG_ON(size < LPAGE_SIZE);
-> +	if (WARN_ON(size < LPAGE_SIZE))
-> +		goto err;
->  
->  	memset(ent, 0, sizeof(*ent) * SPAGES_PER_LPAGE);
->  	pgtable_flush(ent, ent + SPAGES_PER_LPAGE);
-> @@ -1023,8 +1028,21 @@ done:
->  		sysmmu_tlb_invalidate_entry(data->dev, iova);
->  	spin_unlock_irqrestore(&priv->lock, flags);
->  
-> -
->  	return size;
-> +err:
-> +	spin_unlock_irqrestore(&priv->pgtablelock, flags);
-> +
-> +	err_page = (
-> +		((unsigned long)ent - (unsigned long)priv->pgtable)
-> +			< (NUM_LV1ENTRIES * sizeof(long))
-
-Maybe you could add LV1TABLE_SIZE define and use it here (there is
-already a LV2TABLE_SIZE define)?
-
-> +			   ) ?  SECT_SIZE : LPAGE_SIZE;
-
-It also seems that err_page should be of unsigned long type, no need
-to make it size_t one.
-
-The above code is quite ugly currently, it could be rewritten into
-something prettier, i.e.:
-
-	err_page = (unsigned long)ent - (unsigned long)priv->pgtable;
-	err_page = (err_page < LV1TABLE_SIZE) ? SECT_SIZE : LPAGE_SIZE;
-
-> +	pr_err("%s: Failed due to size(%#lx) @ %#x is"\
-> +		" smaller than page size %#x\n",
-> +		__func__, iova, size, err_page);
-
-Aren't iova and size arguments interchanged here?
-
-> +
-> +	       return 0;
-
-There is an intendation issue here (extra whitespaces).
-
-> +
->  }
->  
->  static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Rather than manually editing that to ensure the enum matches the DT
+bindings header, the whole point of making a separate <dt-bindings/...>
+directory was that drivers could include the binding header files
+directly to avoid having to duplicate the constant definitions. Can't
+<linux/pwm.h> include <dt-bindings/pwm.h> and remove that enum?
