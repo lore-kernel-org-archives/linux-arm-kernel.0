@@ -1,49 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 11 Jul 2013 11:48:04 +0100
-Subject: [PATCH] ASoC: Samsung: Modify the I2S driver to support I2S on
- Exynos5420
-In-Reply-To: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
-References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
-Message-ID: <20130711104804.GK24508@sirena.org.uk>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 11 Jul 2013 16:23:03 +0530
+Subject: [PATCH 0/2] Fix omap serial early crash during hwmod _setup()
+Message-ID: <1373539986-27272-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 11, 2013 at 12:38:24PM +0530, Padmavathi Venna wrote:
+This series should fix the issue with the early serial crash seen
+during hwmod _setup() as reported by [1]
 
-> -#define MOD_LR_LLOW		(0 << 7)
-> -#define MOD_LR_RLOW		(1 << 7)
-> -#define MOD_SDF_IIS		(0 << 5)
-> -#define MOD_SDF_MSB		(1 << 5)
-> -#define MOD_SDF_LSB		(2 << 5)
-> -#define MOD_SDF_MASK		(3 << 5)
+The issue was reported on a am33xx device and was not seen on omap4
+or omap5 devices as the hwmod data for both omap4 and omap5 had
+statically defined HWMOD_INIT_NO_IDLE and HWMOD_INIT_NO_RESET for
+uart3 which happens to be the debug console used on omap4 panda and
+omap5 uevm boards.
 
-> +#define MOD_LR_LLOW		0
-> +#define MOD_LR_RLOW		1
-> +#define MOD_SDF_SHIFT		5
-> +#define MOD_SDF_IIS		0
-> +#define MOD_SDF_MSB		1
-> +#define MOD_SDF_LSB		2
-> +#define MOD_SDF_MASK		3
+The series reverts the patch which stubbed out omap_serial_early_init()
+for DT boot and gets rid of the static flags in omap4 and omap5 hwmod
+data.
 
-This patch has an awful lot of coding style changes like this which
-are just coding style changes and not implementing TDM support.  These
-should be done separately, not as part of the same patch, in order to
-make the code easier to review.
+This series along with the patch posted by Felipe [2] should fix the
+issue reported by [1] completely and boot to prompt on a am33xx device
+with LL_DEBUG enabled.
 
->  	case 768:
-> -		mod |= MOD_RCLK_768FS;
-> +		mod |= (MOD_RCLK_768FS << rfs_shift);
->  		break;
+I have boot tested this series (along with [2]) on a omap4 panda es and
+a am335x boneblack.
 
-This stuff is another example.
+[1] http://comments.gmane.org/gmane.linux.ports.arm.omap/100628
 
-I think the change itself should be fine but I'm not 100% sure I'm
-correctly identifying what's a stylistic change and what's a functional
-change.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130711/2aad456e/attachment.sig>
+[2] http://marc.info/?l=linux-omap&m=137353783912736&w=2
+
+Rajendra Nayak (2):
+  Revert "ARM: OMAP2+: Fix serial init for device tree based booting"
+  ARM: OMAP4+: Get rid of the HWMOD_INIT_NO_IDLE and
+    HWMOD_INIT_NO_RESET flags for uart
+
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 +--
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c |    1 -
+ arch/arm/mach-omap2/serial.c               |    3 ---
+ 3 files changed, 1 insertion(+), 6 deletions(-)
+
+-- 
+1.7.9.5
