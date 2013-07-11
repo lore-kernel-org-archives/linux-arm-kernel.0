@@ -1,124 +1,66 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 11 Jul 2013 12:32:46 -0700
-Subject: [PATCH 2/2] pwm: Add PWM polarity flag macros for DT
-In-Reply-To: <51DEF078.1010408@wwwdotorg.org>
-References: <1373553468-6564-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1373553468-6564-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20130711153559.GB2198@dhcp-172-17-186-34.nvidia.com>
- <51DEF078.1010408@wwwdotorg.org>
-Message-ID: <20130711193245.GB17212@dhcp-172-17-186-34.nvidia.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 11 Jul 2013 15:44:01 -0400
+Subject: gpio_blink_set + Kirkwood
+In-Reply-To: <51DEFED8.4050402@harsszegi.com>
+References: <51DC564A.8050002@harsszegi.com> <20130709193605.GC26223@lunn.ch>
+ <1a9bcb9094ae695c6707c4835417dd5b@harsszegi.com>
+ <20130710073706.GA28212@lunn.ch> <51DEDB32.4080101@harsszegi.com>
+ <20130711164456.GA3095@lunn.ch> <51DEFA4A.6010303@harsszegi.com>
+ <20130711183737.GX11908@titan.lakedaemon.net>
+ <51DEFED8.4050402@harsszegi.com>
+Message-ID: <20130711194401.GY11908@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 11, 2013 at 11:50:48AM -0600, Stephen Warren wrote:
-> On 07/11/2013 09:36 AM, Thierry Reding wrote:
-> > On Thu, Jul 11, 2013 at 04:37:48PM +0200, Laurent Pinchart wrote: 
-> > [...]
-> >> diff --git
-> >> a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-> >> b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt index
-> >> de0eaed..be09be4 100644 ---
-> >> a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt +++
-> >> b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt @@ -4,9
-> >> +4,9 @@ Required properties: - compatible: should be
-> >> "atmel,tcb-pwm" - #pwm-cells: Should be 3.  The first cell
-> >> specifies the per-chip index of the PWM to use, the second cell
-> >> is the period in nanoseconds and -  bit 0 in the third cell is
-> >> used to encode the polarity of PWM output. -  Set bit 0 of the
-> >> third cell in PWM specifier to 1 for inverse polarity & -  set to
-> >> 0 for normal polarity. +  the third cell is used to encode the
-> >> polarity of PWM output. Set the +  PWM_POLARITY_NORMAL flag for
-> >> normal polarity or the PWM_POLARITY_INVERSED +  flag for inverted
-> >> polarity. PWM flags are defined in <dt-bindings/pwm/pwm.h>. -
-> >> tc-block: The Timer Counter block to use as a PWM chip.
-> >> 
-> >> Example:
-> > 
-> > I'd prefer for the original text to stay in place and the reference
-> > to the dt-bindings/pwm/pwm.h file to go below that block.
-> 
-> I disagree here. The whole point of creating header files for the
-> constants in binding definitions was so that you wouldn't have to
-> duplicate all the values into the binding definitions. Rather, you'd
-> simply say "see <dt-bindings/xxx.h>".
+On Thu, Jul 11, 2013 at 08:52:08PM +0200, Tibor Harsszegi wrote:
+> On 2013-07-11 20:37, Jason Cooper wrote:
+> >On Thu, Jul 11, 2013 at 08:32:42PM +0200, Tibor Harsszegi wrote:
+> >>>On Thu, Jul 11, 2013 at 06:20:02PM +0200, Tibor Harsszegi wrote:
+> >>>>Hello guys,
+> >>>>
+> >>>>can anyone explain me how does the gpio_blink_set member gets filled
+> >>>>in leds-gpio through platform_get_drvdata()?
+> >>>>I can't seem to follow how the specific function pointer can be set
+> >>>>to orion_gpio_set_blink() for example.
+> >>>>Sorry for the dumb question :(
+> >>>Hi Tibor
+> >>>
+> >>>For DT based board, hardware blinking is not supported, as far as i
+> >>>remember.
+> >>>
+> >>>	Andrew
+> >>Hello Andrew,
+> >>
+> >>is there an example for "mixed machine setup" (if there is anything
+> >>like that) ?
+> >>I'm thinking about:
+> >>
+> >>* DT based initialization starts
+> >>* then if supported board based "after-DT-init-board-code" executes
+> >>
+> >>similar what we have in board-*.c files just that it would be
+> >>executed after kirkwood has initialized the board
+> >>based upon the .DTB
+> >>[I'm thinking about getting rid of the LED setup from the .DTB and
+> >>move it back to .C land - at least for a trial]
+> >As a testing hack, just add the following to board-dt.c:
+> >
+> >	if (of_machine_is_compatible("keymile,whizbang-board")) {
+> >		/* GPIO hackery here */
+> >	}
+> >
+> >hth,
+> >
+> >Jason.
+> Ok, but isn't board-dt.c is the very first thing (kinda) which is
+> executed prior the .DTB is parsed
+> and executed?
+> E.g. if I add the GPIO hack there, I assume that kirkwood and orion
+> is already initialized.
+> Or is the board-dt.c executed after the .DTB is loaded/parsed?
 
-But that's not something that this patch solves. And it could be solved
-even in the absence of the header file defining the symbolic constants.
-If all the standard flags that dt-bindings/pwm/pwm.txt now specifies
-were to be listed in pwm.txt (they actually are) then referring to that
-document as the canonical source works equally well.
+The last line parses the dtb.  Perhaps late_initcall()?
 
-> > The reason is that perhaps somebody will look at an older version
-> > of a given DT (with the numerical value) and not have access to the
-> > include and therefore not know which flag was being set by just
-> > looking at the documentation.
-> 
-> It's pretty trivial to find the header that defines the values; just
-> grab the latest source. If you're looking at an old version of the
-> .dts file, it's almost certain that's within the context of an old
-> Linux kernel soruce tree, in which case you trivially have access to
-> the old version of the binding document that spelled out the values.
-> 
-> > I'm also not sure about what the plans are with respect to
-> > shipping device trees in a separate repository and if they are,
-> > whether that repository would ship the includes as well.
-> 
-> It would have to. That separate repository would be upstream for
-> <dt-bindings/> files, which would be imported into the kernel
-> periodically as drivers wanted to make use of any new headers/values
-> defined there.
+hth,
 
-If we can take both of the above for granted, then sure, let's refer to
-the header from within the generic pwm.txt file and add a reference to
-that in bindings for drivers that use the standard flags.
-
-> > Another issue might be that people without access to recent
-> > versions of DTC won't be able to use the new #include feature, so
-> > keeping the documentation backwards compatible seems like a good
-> > idea.
-> 
-> The dtc source tree is duplicated into the kernel source tree, so that
-> isn't an issue for now.
-> 
-> Besides, the dtc version is an entirely unrelated issue to how the
-> documentation is written.
-
-Well, not really. If the documentation specifies the binding in a way
-that the DTC can't handle that's still a problem. People will end up
-with a DTS that their DTC can't compile. I guess that can be resolved
-by adding a note to the upstream device tree repository about the
-minimum required version of DTC.
-
-> > Perhaps the include file should even only be mentioned in the
-> > general PWM binding documentation.
-> 
-> I wondered about that too. It's slightly indirect in that you'd read
-> foo-pwm.txt which would say something like:
-> 
-> -----
-> the third cell encodes standard PWM flags, as defined by the core PWM
-> binding in pwm.txt in this directory.
-> -----
-> 
-> and pwm.txt would say:
-> 
-> -----
-> The PWM specifier should include a flags cell to contain standard PWM
-> flags. Values for that cell are defined in <dt-bindings/pwm/pwm.h>.
-> -----
-> 
-> Which is somewhat like following a lot of symlinks. Still, I agree
-> that's arguably the correct thing to do.
-
-Yes, I like this a whole lot better than the current situation. It gets
-us almost automatic consistency, which is harder to do with the current
-approach.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130711/d9a1e836/attachment.sig>
+Jason.
