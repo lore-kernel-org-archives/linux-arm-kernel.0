@@ -1,131 +1,173 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 11 Jul 2013 12:26:12 +0300
-Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
-In-Reply-To: <51DE780C.2070701@ti.com>
-References: <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
- <20130708112553.GU5523@atomide.com> <51DAB394.3050104@ti.com>
- <20130708131033.GA5523@atomide.com> <51DABC81.3080409@ti.com>
- <20130708133512.GD31221@arwen.pp.htv.fi>
- <87mwpuakod.fsf@linaro.org> <20130710142633.GV5523@atomide.com>
- <20130710160704.GH18966@arwen.pp.htv.fi> <51DE780C.2070701@ti.com>
-Message-ID: <20130711092612.GG23892@arwen.pp.htv.fi>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 11 Jul 2013 14:57:49 +0530
+Subject: [PATCH] clk: samsung: add set_rate and round_rate callbacks for
+ pll45xx
+Message-ID: <1373534869-12034-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add support for set_rate and round_rate callbacks for pll45xx pll. This allows
+configuring pll45xx to generate a desired clock output.
 
-On Thu, Jul 11, 2013 at 02:47:00PM +0530, Rajendra Nayak wrote:
-> On Wednesday 10 July 2013 09:37 PM, Felipe Balbi wrote:
-> > how about something like below ? It makes omap_device/hwmod and
-> > pm_runtime agree on the initial state of the device and will prevent
-> > ->runtime_resume() from being called on first pm_runtime_get*() done
-> > during probe.
-> > 
-> > This is similar to what PCI bus does (if you look at pci_pm_init()).
-> 
-> I tried something similar [1] but what I found is that the serial
-> runtime resume was called despite it being marked as active using
-> pm_runtime_set_active().
-> 
-> That seems to be because of the pm_runtime_set_autosuspend_delay()
-> because we have the autosuspend_delay = -1
-> 
-> -----
-> static void update_autosuspend(struct device *dev, int old_delay, int old_use)
-> {
->         int delay = dev->power.autosuspend_delay;
-> 
->         /* Should runtime suspend be prevented now? */
->         if (dev->power.use_autosuspend && delay < 0) {
-> 
->                 /* If it used to be allowed then prevent it. */
->                 if (!old_use || old_delay >= 0) {
->                         atomic_inc(&dev->power.usage_count);
->                         rpm_resume(dev, 0); <------------------------------- calls serial runtime resume.
->                 }
->         }
-> -----
-> 
-> So we end up with the same issue with serial resume being called before set_termios()
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
 
-yeah, that part I figured out after I started testing today. It seems
-like my latest version is getting closer but I still see problems, diff
-below:
+The set_rate and round_rate callbacks in this patch for pll45xx are handled
+slightly differently from the way it is done in the (not yet merged) patch
+series from Yadwinder
+(http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg19540.html)
 
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index e6d2307..0cc2da9 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -181,6 +181,26 @@ odbfd_exit:
- 	return ret;
- }
+In this patch, the pll lookup table is kept as part of the pll configuration
+code itself, since the pll is just a hardware block which takes an input
+frequency and configuration values to genertate a output clock frequency.
+Given a set of inputs, a pll of a given type will generate the same output
+regardless of the SoC it is used in. So instead of supplying the pll lookup
+table from per-soc clock driver code (as done in the Yadwinder's patch series),
+the pll lookup table can be coupled with the pll code itself, saving duplication
+of pll lookup table for every SoC the pll is used with.
+
+ drivers/clk/samsung/clk-pll.c |   88 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/samsung/clk-pll.h |   15 +++++++
+ 2 files changed, 103 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+index 362f12d..4940936 100644
+--- a/drivers/clk/samsung/clk-pll.c
++++ b/drivers/clk/samsung/clk-pll.c
+@@ -172,6 +172,8 @@ struct clk * __init samsung_clk_register_pll36xx(const char *name,
+  * PLL45xx Clock Type
+  */
  
-+static void omap_device_pm_init(struct platform_device *pdev)
++#define PLL45XX_EN_MASK		(1 << 31)
++#define PLL45XX_LOCK_MASK	(1 << 29)
+ #define PLL45XX_MDIV_MASK	(0x3FF)
+ #define PLL45XX_PDIV_MASK	(0x3F)
+ #define PLL45XX_SDIV_MASK	(0x7)
+@@ -187,6 +189,90 @@ struct samsung_clk_pll45xx {
+ 
+ #define to_clk_pll45xx(_hw) container_of(_hw, struct samsung_clk_pll45xx, hw)
+ 
++/* a sorted table of freq supported by pll45xx with 24mhz parent clock */
++static struct pll45xx_freq_lookup pll45xx_freq_lookup_24mhz[] = {
++	PLL45XX_PMS(1000000000, 6, 250, 1),
++	PLL45XX_PMS(800000000, 6, 200, 1),
++	PLL45XX_PMS(500000000, 6, 250, 2),
++	PLL45XX_PMS(400000000, 6, 200, 2),
++	PLL45XX_PMS(200000000, 6, 200, 3),
++};
++
++static int samsung_pll45xx_set_rate(struct clk_hw *hw, unsigned long rate,
++					unsigned long prate)
 +{
-+	omap_device_enable(pdev);
-+	pm_runtime_forbid(&pdev->dev);
-+	pm_runtime_set_active(&pdev->dev);
-+	device_enable_async_suspend(&pdev->dev);
++	struct samsung_clk_pll45xx *pll = to_clk_pll45xx(hw);
++	struct pll45xx_freq_lookup *f;
++	unsigned long timeout, pll_con, cnt, idx;
++
++	/* select a lookup table based on parent clock frequency */
++	switch (prate) {
++	case 24000000:
++		f = pll45xx_freq_lookup_24mhz;
++		cnt = ARRAY_SIZE(pll45xx_freq_lookup_24mhz);
++		break;
++	default:
++		pr_err("%s: unsupported parent clock rate, failed to set rate",
++					__func__);
++		return -EINVAL;
++	}
++
++	/* check if the requested freq is in the list of supported freq */
++	for (idx = 0; idx < cnt; idx++, f++)
++		if (f->target_freq == rate)
++			break;
++
++	if (idx == cnt) {
++		pr_err("%s: unspported clock speed %ld requested\n",
++				__func__, rate);
++		return -EINVAL;
++	}
++
++	/* first, disable the output of the pll */
++	writel(readl(pll->con_reg) & ~PLL45XX_EN_MASK, (void *)pll->con_reg);
++
++	/* write the new pll configuration values */
++	pll_con = (f->pdiv << PLL45XX_PDIV_SHIFT) |
++			(f->mdiv << PLL45XX_MDIV_SHIFT) |
++			(f->sdiv << PLL45XX_SDIV_SHIFT);
++	writel(pll_con, (void *)pll->con_reg);
++
++	/* enable the pll and wait for it to stabilize */
++	writel(pll_con | PLL45XX_EN_MASK, (void *)pll->con_reg);
++	timeout = jiffies + msecs_to_jiffies(20);
++	while (time_before(jiffies, timeout))
++		if (readl(pll->con_reg) & PLL45XX_LOCK_MASK)
++			return 0;
++	return -EBUSY;
 +}
 +
-+static void omap_device_pm_allow(struct platform_device *pdev)
++static long samsung_pll45xx_round_rate(struct clk_hw *hw, unsigned long rate,
++						unsigned long *prate)
 +{
-+	pm_runtime_allow(&pdev->dev);
++	struct pll45xx_freq_lookup *f;
++	unsigned long cnt;
++
++	/* select a lookup table based on parent clock frequency */
++	switch (*prate) {
++	case 24000000:
++		f = pll45xx_freq_lookup_24mhz;
++		cnt = ARRAY_SIZE(pll45xx_freq_lookup_24mhz);
++		break;
++	default:
++		pr_err("%s: unsupported parent clock rate", __func__);
++		return *prate;
++	}
++
++	/* find the nearest possible clock output that can be supported */
++	while (cnt-- > 0) {
++		if (rate >= f->target_freq)
++			return f->target_freq;
++		f++;
++	}
++
++	return (--f)->target_freq;
 +}
 +
-+static void omap_device_pm_exit(struct platform_device *pdev)
-+{
-+	device_disable_async_suspend(&pdev->dev);
-+	pm_runtime_set_suspended(&pdev->dev);
-+	omap_device_idle(pdev);
-+}
-+
- static int _omap_device_notifier_call(struct notifier_block *nb,
- 				      unsigned long event, void *dev)
+ static unsigned long samsung_pll45xx_recalc_rate(struct clk_hw *hw,
+ 				unsigned long parent_rate)
  {
-@@ -192,16 +212,31 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
- 		if (pdev->archdata.od)
- 			omap_device_delete(pdev->archdata.od);
- 		break;
-+	case BUS_NOTIFY_BIND_DRIVER:
-+		if (pdev->archdata.od)
-+			omap_device_pm_init(pdev);
-+		break;
-+	case BUS_NOTIFY_BOUND_DRIVER:
-+		if (pdev->archdata.od)
-+			omap_device_pm_allow(pdev);
-+		break;
-+	case BUS_NOTIFY_UNBOUND_DRIVER:
-+		if (pdev->archdata.od)
-+			omap_device_pm_exit(pdev);
-+		break;
- 	case BUS_NOTIFY_ADD_DEVICE:
- 		if (pdev->dev.of_node)
- 			omap_device_build_from_dt(pdev);
--		/* fall through */
-+		break;
- 	default:
--		od = to_omap_device(pdev);
--		if (od)
--			od->_driver_status = event;
-+		/* nothing */
-+		break;
- 	}
- 
-+	od = to_omap_device(pdev);
-+	if (od)
-+		od->_driver_status = event;
-+
- 	return NOTIFY_DONE;
+@@ -209,6 +295,8 @@ static unsigned long samsung_pll45xx_recalc_rate(struct clk_hw *hw,
  }
  
-
+ static const struct clk_ops samsung_pll45xx_clk_ops = {
++	.set_rate = samsung_pll45xx_set_rate,
++	.round_rate = samsung_pll45xx_round_rate,
+ 	.recalc_rate = samsung_pll45xx_recalc_rate,
+ };
+ 
+diff --git a/drivers/clk/samsung/clk-pll.h b/drivers/clk/samsung/clk-pll.h
+index f33786e..fb687ec 100644
+--- a/drivers/clk/samsung/clk-pll.h
++++ b/drivers/clk/samsung/clk-pll.h
+@@ -18,6 +18,21 @@ enum pll45xx_type {
+ 	pll_4508
+ };
+ 
++struct pll45xx_freq_lookup {
++	unsigned long	target_freq;
++	unsigned long	pdiv;
++	unsigned long	mdiv;
++	unsigned long	sdiv;
++};
++
++#define PLL45XX_PMS(f, p, m, s)		\
++	{					\
++		.target_freq	= f,		\
++		.pdiv		= p,		\
++		.mdiv		= m,		\
++		.sdiv		= s,		\
++	}
++
+ enum pll46xx_type {
+ 	pll_4600,
+ 	pll_4650,
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130711/01d3f194/attachment.sig>
+1.7.5.4
