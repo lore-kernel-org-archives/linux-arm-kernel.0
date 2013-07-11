@@ -1,47 +1,44 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 11 Jul 2013 14:55:38 +0800
-Subject: [PATCH v12 02/13] usb: chipidea: imx: remove vbus regulator
- operation
-In-Reply-To: <20130711063719.GE14452@pengutronix.de>
-References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
- <1373524041-10482-3-git-send-email-peter.chen@freescale.com>
- <20130711063719.GE14452@pengutronix.de>
-Message-ID: <20130711065537.GA10551@nchen-desktop>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Thu, 11 Jul 2013 12:38:25 +0530
+Subject: [PATCH] ASoC: Samsung: Set RFS and BFS in slave mode
+In-Reply-To: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
+References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
+Message-ID: <1373526505-27115-2-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 11, 2013 at 08:37:19AM +0200, Sascha Hauer wrote:
-> >  
-> > -	/* we only support host now, so enable vbus here */
-> > -	data->reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
-> > -	if (!IS_ERR(data->reg_vbus)) {
-> > -		ret = regulator_enable(data->reg_vbus);
-> > -		if (ret) {
-> > -			dev_err(&pdev->dev,
-> > -				"Failed to enable vbus regulator, err=%d\n",
-> > -				ret);
-> > -			goto err_clk;
-> > -		}
-> > -	} else {
-> > -		data->reg_vbus = NULL;
-> > -	}
-> > -
-> >  	pdata.phy = data->phy;
-> >  
-> > +	/* Get the vbus regulator */
-> > +	pdata.reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
-> > +	if (IS_ERR(pdata.reg_vbus))
-> > +		pdata.reg_vbus = NULL;
-> 
-> I think you should bail out at least in the -EPROBE_DEFER case.
-> 
+As per the User Manual, the RFS and BFS should be set in slave mode
+for correct operation.
 
-Oh, correct. I will add another patch behind this for fix.
-In fact, I met this problem at FSL mx6-auto board which uses
-gpio-expendor chip max7310 as regulator-gpio for enable vbus
-output.
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+Reviewed-on: https://gerrit-int.chromium.org/37841
+Reviewed-by: Simon Glass <sjg@google.com>
+---
+ sound/soc/samsung/i2s.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index 82ebb1a..3fcf8d7 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -742,13 +742,13 @@ static int config_setup(struct i2s_dai *i2s)
+ 		return -EAGAIN;
+ 	}
+ 
+-	/* Don't bother RFS, BFS & PSR in Slave mode */
+-	if (is_slave(i2s))
+-		return 0;
+-
+ 	set_bfs(i2s, bfs);
+ 	set_rfs(i2s, rfs);
+ 
++	/* Don't bother with PSR in Slave mode */
++	if (is_slave(i2s))
++		return 0;
++
+ 	if (!(i2s->quirks & QUIRK_NO_MUXPSR)) {
+ 		psr = i2s->rclk_srcrate / i2s->frmclk / rfs;
+ 		writel(((psr - 1) << 8) | PSR_PSREN, i2s->addr + I2SPSR);
 -- 
-
-Best Regards,
-Peter Chen
+1.7.4.4
