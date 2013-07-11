@@ -1,252 +1,54 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Thu, 11 Jul 2013 14:29:46 +0200
-Subject: [PATCH] watchdog: Add MOXA ART watchdog driver
-Message-ID: <1373545786-7151-1-git-send-email-jonas.jensen@gmail.com>
+From: sr@denx.de (Stefan Roese)
+Date: Thu, 11 Jul 2013 14:33:23 +0200
+Subject: [PATCH] ARM: OMAP3: Beagle: Fix USB Host on beagle xM Ax/Bx
+In-Reply-To: <51DE9E62.9080406@ti.com>
+References: <1366024808-4691-1-git-send-email-rogerq@ti.com>
+ <51DC09E7.1070302@denx.de> <51DC164B.5010608@ti.com>
+ <51DC1B47.7070504@denx.de> <51DE87D3.5030600@ti.com>
+ <51DE8CBB.4000709@denx.de> <51DE9E62.9080406@ti.com>
+Message-ID: <51DEA613.3010209@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add watchdog driver for MOXA ART SoCs.
+On 07/11/2013 02:00 PM, Roger Quadros wrote:
+>>> Could it be possible that the boot scripts on your filesystem are
+>>> somehow shutting down
+>>> the ethernet interface? Might be worth checking on a fresh filesystem.
+>>
+>> I'm pretty sure that its not a problem with the filesystem. I'm using
+>> exactly this filesystem for multiple other ARM based boards as well.
+>> And all other boards (most of them with buildin ethernet controller
+>> instead of USB connected) have no problem mounting/booting from it.
+> 
+> OK, then it might be something to do with beagle.
+> Is pandaboard working fine for you?
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+I don't have a pandaboard here. Sorry. Only a another OMAP3530-based
+board which also fails to boot via NFS.
 
-Notes:
-    Applies to next-20130711
+>> BTW: The filesystem is from the ELDK 5.3 [1][2]. You could download/install
+>> it yourself.
+> 
+> OK. Will give it a try.
+>>
+>> From your log I can see, that you are using a slightly different board
+>> than I am ("Beagle xM Rev C" vs. "Beagle Rev C1/C2/C3"). So its a
+> 
+> My board is a C2.
 
- drivers/watchdog/Kconfig      |  10 +++
- drivers/watchdog/Makefile     |   1 +
- drivers/watchdog/moxart_wdt.c | 190 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 201 insertions(+)
- create mode 100644 drivers/watchdog/moxart_wdt.c
+Mine too.
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 362085d..6883aab 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -382,6 +382,16 @@ config RETU_WATCHDOG
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called retu_wdt.
- 
-+config MOXART_WDT
-+	tristate "MOXART watchdog"
-+	depends on ARCH_MOXART
-+	help
-+	  Say Y here to include Watchdog timer support for the watchdog
-+	  existing on the MOXA ART SoC series platforms.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called moxart_wdt.
-+
- # AVR32 Architecture
- 
- config AT32AP700X_WDT
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 2f26a0b..7cab53a 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -54,6 +54,7 @@ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
- obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
- obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
- obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
-+obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
- 
- # AVR32 Architecture
- obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-diff --git a/drivers/watchdog/moxart_wdt.c b/drivers/watchdog/moxart_wdt.c
-new file mode 100644
-index 0000000..c6c00bf
---- /dev/null
-+++ b/drivers/watchdog/moxart_wdt.c
-@@ -0,0 +1,190 @@
-+/*
-+ * MOXA ART SoCs watchdog driver.
-+ *
-+ * Copyright (C) 2013 Jonas Jensen
-+ *
-+ * Jonas Jensen <jonas.jensen@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/types.h>
-+#include <linux/watchdog.h>
-+
-+#include <asm/system_misc.h>
-+
-+#define REG_COUNT			0x4
-+#define REG_MODE			0x8
-+#define REG_ENABLE			0xC
-+
-+struct moxart_wdt_dev {
-+	struct watchdog_device wdt_dev;
-+	void __iomem *wdt_base;
-+};
-+
-+static struct moxart_wdt_dev *moxart_wdt;
-+static bool nowayout = WATCHDOG_NOWAYOUT;
-+static int heartbeat;
-+static unsigned int clock_frequency;
-+static unsigned int max_timeout;
-+
-+static void moxart_wdt_restart(enum reboot_mode reboot_mode, const char *cmd)
-+{
-+	writel(1, moxart_wdt->wdt_base + REG_COUNT);
-+	writel(0x5ab9, moxart_wdt->wdt_base + REG_MODE);
-+	writel(0x03, moxart_wdt->wdt_base + REG_ENABLE);
-+}
-+
-+static int moxart_wdt_stop(struct watchdog_device *wdt_dev)
-+{
-+	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-+	void __iomem *wdt_base = moxart_wdt->wdt_base;
-+
-+	writel(0, wdt_base + REG_ENABLE);
-+
-+	return 0;
-+}
-+
-+static int moxart_wdt_start(struct watchdog_device *wdt_dev)
-+{
-+	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-+	void __iomem *wdt_base = moxart_wdt->wdt_base;
-+
-+	writel(clock_frequency * moxart_wdt->wdt_dev.timeout,
-+	       wdt_base + REG_COUNT);
-+	writel(0x5ab9, wdt_base + REG_MODE);
-+	writel(0x03, wdt_base + REG_ENABLE);
-+
-+	return 0;
-+}
-+
-+static int moxart_wdt_ping(struct watchdog_device *wdt_dev)
-+{
-+	moxart_wdt_start(wdt_dev);
-+	return 0;
-+}
-+
-+static int moxart_wdt_set_timeout(struct watchdog_device *wdt_dev,
-+				  unsigned int timeout)
-+{
-+	dev_dbg(wdt_dev->dev, "%s: timeout=%u\n", __func__, timeout);
-+
-+	if (timeout > max_timeout)
-+		return -EINVAL;
-+
-+	moxart_wdt->wdt_dev.timeout = timeout;
-+
-+	return 0;
-+}
-+
-+static const struct watchdog_info moxart_wdt_info = {
-+	.identity       = "moxart-wdt",
-+	.options        = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
-+			  WDIOF_MAGICCLOSE,
-+};
-+
-+static const struct watchdog_ops moxart_wdt_ops = {
-+	.owner          = THIS_MODULE,
-+	.start          = moxart_wdt_start,
-+	.stop           = moxart_wdt_stop,
-+	.ping           = moxart_wdt_ping,
-+	.set_timeout    = moxart_wdt_set_timeout,
-+};
-+
-+static int moxart_wdt_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *node = dev->of_node;
-+	struct resource *res;
-+	struct clk *clk;
-+	int err;
-+
-+	moxart_wdt = devm_kzalloc(&pdev->dev, sizeof(*moxart_wdt), GFP_KERNEL);
-+	if (!moxart_wdt)
-+		return -EINVAL;
-+
-+	platform_set_drvdata(pdev, moxart_wdt);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	moxart_wdt->wdt_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(moxart_wdt->wdt_base))
-+		return PTR_ERR(moxart_wdt->wdt_base);
-+
-+	arm_pm_restart = moxart_wdt_restart;
-+
-+	clk = of_clk_get(node, 0);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: of_clk_get failed\n", __func__);
-+		return PTR_ERR(clk);
-+	}
-+
-+	clock_frequency = clk_get_rate(clk);
-+
-+	max_timeout = UINT_MAX / clock_frequency;
-+
-+	moxart_wdt->wdt_dev.info = &moxart_wdt_info;
-+	moxart_wdt->wdt_dev.ops = &moxart_wdt_ops;
-+	moxart_wdt->wdt_dev.timeout = max_timeout;
-+	moxart_wdt->wdt_dev.min_timeout = 1;
-+	moxart_wdt->wdt_dev.max_timeout = max_timeout;
-+	moxart_wdt->wdt_dev.parent = &pdev->dev;
-+
-+	watchdog_init_timeout(&moxart_wdt->wdt_dev, heartbeat, &pdev->dev);
-+	watchdog_set_nowayout(&moxart_wdt->wdt_dev, nowayout);
-+
-+	watchdog_set_drvdata(&moxart_wdt->wdt_dev, moxart_wdt);
-+
-+	err = watchdog_register_device(&moxart_wdt->wdt_dev);
-+	if (unlikely(err))
-+		return err;
-+
-+	dev_dbg(dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)\n",
-+		 moxart_wdt->wdt_dev.timeout, nowayout);
-+
-+	return 0;
-+}
-+
-+static int moxart_wdt_remove(struct platform_device *pdev)
-+{
-+	struct moxart_wdt_dev *moxart_wdt = platform_get_drvdata(pdev);
-+
-+	watchdog_unregister_device(&moxart_wdt->wdt_dev);
-+	watchdog_set_drvdata(&moxart_wdt->wdt_dev, NULL);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id moxart_watchdog_match[] = {
-+	{ .compatible = "moxa,moxart-watchdog" },
-+	{ },
-+};
-+
-+static struct platform_driver moxart_wdt_driver = {
-+	.probe      = moxart_wdt_probe,
-+	.remove     = moxart_wdt_remove,
-+	.driver     = {
-+		.name		= "moxart-watchdog",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= moxart_watchdog_match,
-+	},
-+};
-+module_platform_driver(moxart_wdt_driver);
-+
-+module_param(heartbeat, int, 0);
-+MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds");
-+
-+MODULE_DESCRIPTION("MOXART watchdog driver");
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
--- 
-1.8.2.1
+>> different OMAP variant. Could this perhaps make a difference? Do you
+>> by chance have the "old" Beagleboard (non-xM) at hand for another test?
+> 
+> Sure. I have the old beagleboard with me. Let me know what to test.
+
+Either your debian rootfs via NFS or the ELDK one. As you have done with
+the Beagle-xM. And then please repeat the NFS booting (if successful)
+again for at least 5 times. Or even better, setup the bootcmd to
+autoboot via NFS and tune your NFS rootfs to reboot automatically. So a
+hangup in NFS booting would be noticed after some time with this board
+automatically rebooting.
+
+Thanks,
+Stefan
