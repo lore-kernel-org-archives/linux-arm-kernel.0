@@ -1,56 +1,65 @@
-From: richard.zhuhongxing@gmail.com (Richard Zhu)
-Date: Thu, 11 Jul 2013 17:10:28 +0800
-Subject: [PATCH v5 0/3] ahci: enable ahci sata support on imx6q
-Message-ID: <1373533831-9500-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 11 Jul 2013 14:41:11 +0530
+Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
+In-Reply-To: <20130711062440.GY5523@atomide.com>
+References: <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
+ <20130708112553.GU5523@atomide.com> <51DAB394.3050104@ti.com>
+ <20130708131033.GA5523@atomide.com> <51DABC81.3080409@ti.com>
+ <20130708133512.GD31221@arwen.pp.htv.fi> <87mwpuakod.fsf@linaro.org>
+ <20130710142633.GV5523@atomide.com> <51DE4E3F.6030503@ti.com>
+ <20130711062440.GY5523@atomide.com>
+Message-ID: <51DE76AF.8030402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V5: add imx6q specific ahci sata support
-  - Fix the wrong referrence usage of the private data.
-  - Use the private data to contain the poninter of the PHY
-  signals adjustment window(gpr)
-  - Tested on imx6q sd board.
-  - 
+On Thursday 11 July 2013 11:54 AM, Tony Lindgren wrote:
+> * Rajendra Nayak <rnayak@ti.com> [130710 23:25]:
+>> On Wednesday 10 July 2013 07:56 PM, Tony Lindgren wrote:
+>>>
+>>> Felipe is right, looks like all we need is to check if context is
+>>> initialized or not. So no need for mach-omap2/serial.c or hwmod tinkering.
+>>>
+>>> After that having DEBUG_LL and cmdline with earlyprintk console=ttyO..
+>>> works for me.
+>>
+>> On what platform? Like I said there are flags set statically in hmwod
+>> data for OMAP4 and OMAP5, which make it work without any hwmod tinkering
+>> in mach-omap2/serial.c. But it won't work for am33xx.
+> 
+> For me omap4 sdp hangs during ttyO2 probe if earlyprintk is enabled for
+> that port and console is enabled for that port. That's because we attempt
+> to restore uninitialized context.
 
-v4: http://www.spinics.net/lists/linux-ide/msg45699.html
-  Thanks for the review comments provided by Sascha, and Alexander.
-  - Use the private data and keep a pointer to the PHY clock.
-  - Don't use the global platform device variable, because that
-  it would make the driver broken for mutiple instances.
-  - Don't do the "writel" with assignment.
-  - Other minor changes, such as print the error code when printing
-  error message, use a u32 type to store readl results, and so on.
+Right, so thats the Issue 2: that you see on the omap4 sdp. You never hit
+Issue 1: despite not doing any hwmod tinkering because of the static flags
+set for uart3 in hwmod data.
 
-v3: http://www.spinics.net/lists/linux-ide/msg45688.html
-  - Keep arch/arm and ahci_platform driver clean.
-  - Add the sata_imx standalone driver contained all the
-  specific setup
-  - Add the release function, support the loadable module
-  driver.
-  - Tested on imx6q sd board.
+> 
+> It's possible that we have more than one bug here though.
 
-v2: http://www.spinics.net/lists/linux-ide/msg45666.html 
- - Setup standalone imx ahci sata driver, because of
- the misalignments of the bits definition of the HBA register.
- - Replace the node by the label in the board dts.
- - 
+Right, we have 2 issues like I said earlier. Issue 1: is when hwmod _setup()
+does a console UART reset (Not seen if the flags are set either runtime or
+statically)
 
-v1: http://www.spinics.net/lists/linux-ide/msg45581.html
- - add imx6q specific ahci sata support to arch/arm/mach-imx/mach-imx6q.c
+Issue 2: Is when omap serial does a runtime resume before set_termios().
 
-These patches is based on imx/dt branch of
-"http://git.linaro.org/git-ro/people/shawnguo/linux-2.6.git"
-
-[v5 1/3] ARM: dtsi: enable ahci sata on imx6q platforms
-[v5 2/3] ARM: imx6q: update the sata bits definitions of gpr13
-[v5 3/3] sata: imx: add ahci sata support on imx platforms
-
-arch/arm/boot/dts/imx6q-sabreauto.dts       |    4 +
-arch/arm/boot/dts/imx6q-sabrelite.dts       |    4 +
-arch/arm/boot/dts/imx6q-sabresd.dts         |    4 +
-arch/arm/boot/dts/imx6q.dtsi                |    9 +
-drivers/ata/Kconfig                         |    9 +
-drivers/ata/Makefile                        |    1 +
-drivers/ata/sata_imx.c                      |  233 +++++++++++++++++++++++++++
-include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  121 ++++++++++-----
-8 files changed, 348 insertions(+), 37 deletions(-)
+>  
+>>> @@ -1523,6 +1524,8 @@ static int serial_omap_probe(struct platform_device *pdev)
+>>>  
+>>>  	pm_runtime_mark_last_busy(up->dev);
+>>>  	pm_runtime_put_autosuspend(up->dev);
+>>> +	up->initialized = true;
+>>
+>> This won't help as the context save for serial happens as part of set_termios() and not
+>> when the device is probed.
+> 
+> The issue is that in serial probe we currently restore NULL context to
+> the port which kills earlyprintk output until set_termios() is called.
+> 
+> But as discussed, there are better ways for fixing this issue.
+> 
+> Regards,
+> 
+> Tony
+> 
