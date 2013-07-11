@@ -1,42 +1,72 @@
-From: grundler@chromium.org (Grant Grundler)
-Date: Wed, 10 Jul 2013 17:43:58 -0700
-Subject: [PATCH 3/5] mmc: dw_mmc: Add exynos resume callback to clear
- WAKEUP_INT
-In-Reply-To: <CAD=FV=XLp_2t83JfUBryaSvqLZr5OHEZeFZDRmQ1T=XA1MRkHg@mail.gmail.com>
-References: <1373391071-6312-1-git-send-email-dianders@chromium.org>
- <1373391071-6312-4-git-send-email-dianders@chromium.org>
- <CAD=FV=XLp_2t83JfUBryaSvqLZr5OHEZeFZDRmQ1T=XA1MRkHg@mail.gmail.com>
-Message-ID: <CANEJEGt4r==VD1gUrTGr=uooFQ-_Odayr3Yv=6i3dwDpf1Y+cg@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 11 Jul 2013 09:17:13 +0800
+Subject: [PATCH 2/3] arm: atmel: at91sam9n12: add qt1070 support
+In-Reply-To: <20130710143835.GG18012@ns203013.ovh.net>
+References: <1373449869-5083-1-git-send-email-voice.shen@atmel.com>
+ <1373449869-5083-3-git-send-email-voice.shen@atmel.com>
+ <20130710143835.GG18012@ns203013.ovh.net>
+Message-ID: <51DE0799.1090905@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 9, 2013 at 12:09 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Hi,
->
-> On Tue, Jul 9, 2013 at 10:31 AM, Doug Anderson <dianders@chromium.org> wrote:
->> If the WAKEUP_INT is asserted at wakeup and not cleared, we'll end up
->> looping around forever.
+Hi J,
+
+On 7/10/2013 22:38, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 17:51 Wed 10 Jul     , Bo Shen wrote:
+>> add qt1070 support on at91sam9n12ek board
 >>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
 >> ---
->>  drivers/mmc/host/dw_mmc-exynos.c | 23 +++++++++++++++++++++++
->>  1 file changed, 23 insertions(+)
->
-> Grant just pointed out that the WAKEUP_INT is supposed to only be
-> enabled if bits 8, 9, or 10 are 1.  Our driver never sets those so we
-> _should_ never get a WAKEUP_INT.  Bits 8-10 are marked as RESERVED on
-> the exynos5420 manual, so the current guess is that they're broken on
-> that silicon but that sometimes the interrupt fires anyway.
->
-> In any case, it is still a reasonable thing to clear this interrupt at
-> wakeup if it has fired, even if we're on an exynos device without any
-> problems.
+>>   arch/arm/boot/dts/at91sam9n12ek.dts |   16 ++++++++++++++++
+>>   1 file changed, 16 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
+>> index d59b70c..3acac62 100644
+>> --- a/arch/arm/boot/dts/at91sam9n12ek.dts
+>> +++ b/arch/arm/boot/dts/at91sam9n12ek.dts
+>> @@ -40,6 +40,15 @@
+>>
+>>   			i2c0: i2c at f8010000 {
+>>   				status = "okay";
+>> +
+>> +				qt1070: keyboard at 1b {
+>> +					compatible = "qt1070";
+>> +					reg = <0x1b>;
+>> +					interrupt-parent = <&pioA>;
+>> +					interrupts = <2 0x0>;
+> use the macro
 
-I agree. Can add:
-  Reviewed-by: Grant Grundler <grundler@chromium.org>
+Thanks, I will use macro here.
 
-thanks,
-grant
+>> +					pinctrl-names = "default";
+>> +					pinctrl-0 = <&pinctrl_qt1070_irq>;
+>> +				};
+>>   			};
+>>
+>>   			i2c1: i2c at f8014000 {
+>> @@ -66,6 +75,13 @@
+>>   							<AT91_PIOA 7 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;	/* PA7 gpio CD pin pull up and deglitch */
+>>   					};
+>>   				};
+>> +
+>> +				qt1070 {
+>> +					pinctrl_qt1070_irq: qt1070_irq {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 2 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>; /* PA2 GPIO with pull up deglith */
+> drop the comment as we use macro
 
+OK, I will drop the comment
+
+>> +					};
+>> +				};
+>>   			};
+>>
+>>   			spi0: spi at f0000000 {
+>> --
 >
-> -Doug
+> Best Regards,
+> J.
+>
+
+Best Regards,
+Bo Shen
