@@ -1,30 +1,39 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 12 Jul 2013 04:18:10 -0700
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <20130712102326.GE24008@pd.tnic>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
- <20130712075602.GA4002@gmail.com> <20130712080145.GC24008@pd.tnic>
- <20130712101319.GA13421@gmail.com> <20130712102326.GE24008@pd.tnic>
-Message-ID: <20130712041810.53c86e5f.akpm@linux-foundation.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 12 Jul 2013 12:18:38 +0100
+Subject: [PATCH] ASoC: Samsung: Modify the I2S driver to support I2S on
+ Exynos5420
+In-Reply-To: <2463181.bQfIDO6XJk@thinkpad>
+References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
+ <2214161.FSfscAvpna@thinkpad>
+ <20130711130139.GQ24508@sirena.org.uk>
+ <2463181.bQfIDO6XJk@thinkpad>
+Message-ID: <20130712111838.GZ24508@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Jul 2013 12:23:26 +0200 Borislav Petkov <bp@alien8.de> wrote:
+On Fri, Jul 12, 2013 at 12:13:17PM +0200, Tomasz Figa wrote:
+> On Thursday 11 of July 2013 14:01:39 Mark Brown wrote:
 
-> On Fri, Jul 12, 2013 at 12:13:19PM +0200, Ingo Molnar wrote:
-> > and now it is upstream already, via -mm:
-> > 
-> >    e76e1fdfa8f8 lib: add support for LZ4-compressed kernel
-> 
-> Sure. Let's see if it manages to get released b0rked like it is right
-> now.
+> > Well, it *should* be samsung,i2s-vN where N is the version number of the
+> > IP but documentation on the versioning has been patchy hence this whole
+> > thinng.
 
-Well y'know, if whining fixed bugs then there would be no problem here
-at all.
+> Oh, the binding for samsung-i2s uses IP versions. Isn't that slightly broken?
 
-This problem came up briefly and I thought it had been adequately
-addressed.  Now a month or two later we find out who are the people who
-can't be bothered testing -next, but think it terribly important that
-others do so.
+> At least with Samsung bindings, I think we happened to agree on a single 
+> convention of naming compatible values after the first SoC in which such block 
+> first appeared.
+
+> I wonder what happened with this i2s binding that made it end up outside this 
+> convention.
+
+I think it predates that convention, plus it's been quite common to put
+two different I2S blocks in the same SoC (for totally sensible reasons)
+so it's not always been clear that the SoC name is sufficiently unique.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130712/1898d978/attachment.sig>
