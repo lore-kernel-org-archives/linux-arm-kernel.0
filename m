@@ -1,119 +1,57 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 12 Jul 2013 17:48:13 -0400
-Subject: [RFC/RFT PATCH 4/5] ARM: mm: change max*pfn to include the physical
- offset of memory
-In-Reply-To: <1373665694-7580-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1373665694-7580-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1373665694-7580-5-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 12 Jul 2013 17:48:09 -0400
+Subject: [RFC/RFT PATCH 0/5] mm: ARM nobootmem and few dma_mask fixes
+Message-ID: <1373665694-7580-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the kernel code assumes that max*pfn is maximum pfns because
-the physical start of memory is expected to be PFN0. Since this
-assumption is not true on ARM architectures, the meaning of max*pfn
-is number of memory pages. This is done to keep drivers happy which
-are making use of of these variable to calculate the dma bounce limit
-using dma_mask.
+The series is an attempt to move ARM port to NO_BOOTMEM. As discussed
+on list NO_BOOTMEM move needed updates to max*pfn meaning to be maximum
+PFNs but that breaks the dma_mask for few block layer drivers since
+ARM start of physical memory is not PFN0 unlike most of the architectures.
+Some more read on it is here:
+	http://lwn.net/Articles/543408/
+	http://lwn.net/Articles/543424/
 
-Now since we have a architecture override possibility for DMAable
-maximum pfns, lets make meaning of max*pfns as maximum pnfs on ARM
-as well.
+To address this issue, we introduce generic dma_max_pfn() helper which
+can be overridden from the architectures.
+	
+Another intention behind move to nobootmem is also to convert ARM to
+switch to memblock and getting rid of bootmem allocator dependency which
+don't work for LPAE machines which has physical memory starting beyond
+4 GB boundary. It needs changes to core kernel and also a new memblock
+API. More on this can be found here:
+	https://lkml.org/lkml/2013/6/29/77
 
-In the patch, the dma_to_pfn/pfn_to_dma() pair is hacked to take care of
-the physical memory offset. It is done this way just to enable testing
-since its understood that it can come in way of single zImage.
+I have been trying to cook up these patches with kind help from Russell
+and we know series don't solve all the dma_mask bad assumptions. But at
+least I am hoping that it can get the ball rolling.	
+
+Comments/testing help is welcome !!
 
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Tejun Heo <tj@kernel.org>
+Cc: Jens Axboe <axboe@kernel.dk>
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/include/asm/dma-mapping.h |   16 ++++++++++++----
- arch/arm/mm/init.c                 |   10 ++++------
- 2 files changed, 16 insertions(+), 10 deletions(-)
+Santosh Shilimkar (5):
+  block: Rename parameter dma_mask to max_addr for
+    blk_queue_bounce_limit()
+  mm: dma-mapping: Add dma_max_pfn(dev) helper function
+  scsi: Use dma_max_pfn(dev) helper for bounce_limit calculations
+  ARM: mm: change max*pfn to include the physical offset of memory
+  ARM: mm: Remove bootmem code and switch to NO_BOOTMEM
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 5b579b9..b2d5937 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -47,12 +47,12 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
- #ifndef __arch_pfn_to_dma
- static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
- {
--	return (dma_addr_t)__pfn_to_bus(pfn);
-+	return (dma_addr_t)__pfn_to_bus(pfn + PHYS_PFN_OFFSET);
- }
- 
- static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
- {
--	return __bus_to_pfn(addr);
-+	return __bus_to_pfn(addr) - PHYS_PFN_OFFSET;
- }
- 
- static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
-@@ -64,15 +64,16 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
- {
- 	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
- }
-+
- #else
- static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
- {
--	return __arch_pfn_to_dma(dev, pfn);
-+	return __arch_pfn_to_dma(dev, pfn + PHYS_PFN_OFFSET);
- }
- 
- static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
- {
--	return __arch_dma_to_pfn(dev, addr);
-+	return __arch_dma_to_pfn(dev, addr) - PHYS_PFN_OFFSET;
- }
- 
- static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
-@@ -86,6 +87,13 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
- }
- #endif
- 
-+/* The ARM override for dma_max_pfn() */
-+static inline unsigned long dma_max_pfn(struct device *dev)
-+{
-+	return dma_to_pfn(dev, *dev->dma_mask);
-+}
-+#define dma_max_pfn(dev) dma_max_pfn(dev)
-+
- /*
-  * DMA errors are defined by all-bits-set in the DMA address.
-  */
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 6833cbe..588a2c1 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -420,12 +420,10 @@ void __init bootmem_init(void)
- 	 * This doesn't seem to be used by the Linux memory manager any
- 	 * more, but is used by ll_rw_block.  If we can get rid of it, we
- 	 * also get rid of some of the stuff above as well.
--	 *
--	 * Note: max_low_pfn and max_pfn reflect the number of _pages_ in
--	 * the system, not the maximum PFN.
- 	 */
--	max_low_pfn = max_low - PHYS_PFN_OFFSET;
--	max_pfn = max_high - PHYS_PFN_OFFSET;
-+	min_low_pfn = min;
-+	max_low_pfn = max_low;
-+	max_pfn = max_high;
- }
- 
- /*
-@@ -531,7 +529,7 @@ static inline void free_area_high(unsigned long pfn, unsigned long end)
- static void __init free_highpages(void)
- {
- #ifdef CONFIG_HIGHMEM
--	unsigned long max_low = max_low_pfn + PHYS_PFN_OFFSET;
-+	unsigned long max_low = max_low_pfn;
- 	struct memblock_region *mem, *res;
- 
- 	/* set highmem page free */
+ arch/arm/Kconfig                   |    1 +
+ arch/arm/include/asm/dma-mapping.h |   16 ++++++---
+ arch/arm/kernel/setup.c            |    2 +-
+ arch/arm/mm/init.c                 |   68 ++++--------------------------------
+ block/blk-settings.c               |    8 ++---
+ drivers/scsi/scsi_lib.c            |    2 +-
+ include/linux/dma-mapping.h        |    7 ++++
+ 7 files changed, 32 insertions(+), 72 deletions(-)
+
 -- 
 1.7.9.5
