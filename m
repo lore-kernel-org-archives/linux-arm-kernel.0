@@ -1,48 +1,49 @@
 From: b18965@freescale.com (Alison Wang)
-Date: Fri, 12 Jul 2013 14:07:53 +0800
-Subject: [PATCH 2/5] ARM: dts: vf610-twr: Enable DCU and TCON devices
-In-Reply-To: <1373609276-14566-1-git-send-email-b18965@freescale.com>
-References: <1373609276-14566-1-git-send-email-b18965@freescale.com>
-Message-ID: <1373609276-14566-3-git-send-email-b18965@freescale.com>
+Date: Fri, 12 Jul 2013 14:07:51 +0800
+Subject: [PATCH v2 0/5] ARM: vf610: Add DCU framebuffer driver for Vybrid
+ VF610 platform
+Message-ID: <1373609276-14566-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables DCU and TCON devices for Vybrid VF610 TOWER board.
+This series contain DCU framebuffer driver for Freescale Vybrid VF610 platform.
 
-Signed-off-by: Alison Wang <b18965@freescale.com>
----
-Changes in v2: None
+The Display Controller Unit (DCU) module is a system master that
+fetches graphics stored in internal or external memory and displays
+them on a TFT LCD panel. A wide range of panel sizes is supported
+and the timing of the interface signals is highly configurable.
+Graphics are read directly from memory and then blended in real-time,
+which allows for dynamic content creation with minimal CPU intervention.
 
- arch/arm/boot/dts/vf610-twr.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+The features:
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index b3905f5..605fb04 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -36,6 +36,12 @@
- 
- };
- 
-+&dcu0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_dcu0_1>;
-+	status = "okay";
-+};
-+
- &fec0 {
- 	phy-mode = "rmii";
- 	pinctrl-names = "default";
-@@ -50,6 +56,10 @@
- 	status = "okay";
- };
- 
-+&tcon0 {
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1_1>;
--- 
-1.8.0
+(1) Full RGB888 output to TFT LCD panel.
+(2) For the current LCD panel, WQVGA "480x272" is tested.
+(3) Blending of each pixel using up to 4 source layers dependent on size of panel.
+(4) Each graphic layer can be placed with one pixel resolution in either axis.
+(5) Each graphic layer support RGB565 and RGB888 direct colors without alpha channel
+and BGRA8888 direct colors with an alpha channel.
+(6) Each graphic layer support alpha blending with 8-bit resolution.
+
+Changes in v2:
+- Add a document for DCU framebuffer driver under Documentation/devicetree/bindings/fb/.
+
+----------------------------------------------------------------
+Alison Wang (5):
+      ARM: dts: vf610: Add DCU and TCON nodes
+      ARM: dts: vf610-twr: Enable DCU and TCON devices
+      ARM: clk: vf610: Add DCU and TCON clock support
+      fb: Add DCU framebuffer driver for Vybrid VF610 platform
+      Documentation: DT: Add DCU framebuffer driver
+
+ Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt |   36 ++++
+ arch/arm/boot/dts/vf610-twr.dts                     |   10 +
+ arch/arm/boot/dts/vf610.dtsi                        |   19 +-
+ arch/arm/mach-imx/clk-vf610.c                       |    5 +
+ drivers/video/Kconfig                               |    9 +
+ drivers/video/Makefile                              |    1 +
+ drivers/video/fsl-dcu-fb.c                          | 1091 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/vf610-clock.h             |    3 +-
+ 8 files changed, 1172 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt
+ create mode 100644 drivers/video/fsl-dcu-fb.c
