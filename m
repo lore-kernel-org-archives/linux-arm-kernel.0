@@ -1,46 +1,65 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 12 Jul 2013 12:21:20 +0530
-Subject: [PATCH v3 0/6] ARM: davinci: da850: add ethernet driver DT support
-In-Reply-To: <CA+V-a8t-sTPAK+D5869X0_ZCdrmK0B+eRaowk9hMYwXMw09NqA@mail.gmail.com>
-References: <1371999607-6483-1-git-send-email-prabhakar.csengg@gmail.com>
- <CA+V-a8t-sTPAK+D5869X0_ZCdrmK0B+eRaowk9hMYwXMw09NqA@mail.gmail.com>
-Message-ID: <51DFA768.9090703@ti.com>
+From: b18965@freescale.com (Alison Wang)
+Date: Fri, 12 Jul 2013 14:07:52 +0800
+Subject: [PATCH 1/5] ARM: dts: vf610: Add DCU and TCON nodes
+In-Reply-To: <1373609276-14566-1-git-send-email-b18965@freescale.com>
+References: <1373609276-14566-1-git-send-email-b18965@freescale.com>
+Message-ID: <1373609276-14566-2-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/11/2013 10:42 PM, Prabhakar Lad wrote:
-> Hi Sekhar,
-> 
-> On Sun, Jun 23, 2013 at 8:30 PM, Prabhakar Lad
-> <prabhakar.csengg@gmail.com> wrote:
->> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
->>
->> This patch set enables Ethernet support through device tree model.
->> This patch set enables mii interface only and is being tested to boot via
->> rootfs. The rmii phy is present on the i2c gpio expander chip (UI board)
->> for which yet support needs to be added, once the DT support for the chip
->> is enabled, enabling rmii will be subsequnet patch.
->>
->> Changes for v2:
->> 1: Enabled mdio device.
->> 2: Fixed clock lookup.
->>
->> Changes for v3:
->> 1: Fixed review comments pointed out by Sekhar.
->>
->> Lad, Prabhakar (6):
->>   ARM: davinci: da8xx: fix clock lookup for mdio device
->>   ARM: davinci: da850: add DT node for mdio device
->>   ARM: davinci: da850: add OF_DEV_AUXDATA entry for mdio.
->>   ARM: davinci: da850: add DT node for eth0.
->>   ARM: davinci: da850: add OF_DEV_AUXDATA entry for eth0.
->>   ARM: davinci: da850: configure system configuration chip(CFGCHIP3)
->>     for emac
->>
-> gentle ping..
+This patch adds DCU and TCON nodes in SoC level DTS for Freescale
+Vybrid VF610. It also removes useless pin for DCU0 pinctrl.
 
-I haven't been able to get to reviewing patches meant for v3.12 yet.
-Most probably will happen next week.
+Signed-off-by: Alison Wang <b18965@freescale.com>
+---
+Changes in v2: None
 
-Thanks,
-Sekhar
+ arch/arm/boot/dts/vf610.dtsi | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index e1eb7da..037e8f1 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -140,6 +140,14 @@
+ 				clock-names = "pit";
+ 			};
+ 
++			tcon0: tcon at 4003d000 {
++				compatible = "fsl,vf610-tcon";
++				reg = <0x4003d000 0x1000>;
++				clocks = <&clks VF610_CLK_TCON0>;
++				clock-names = "tcon";
++				status = "disabled";
++			};
++
+ 			wdog at 4003e000 {
+ 				compatible = "fsl,vf610-wdt", "fsl,imx21-wdt";
+ 				reg = <0x4003e000 0x1000>;
+@@ -169,7 +177,6 @@
+ 				dcu0 {
+ 					pinctrl_dcu0_1: dcu0grp_1 {
+ 						fsl,pins = <
+-						VF610_PAD_PTB8__GPIO_30		0x42
+ 						VF610_PAD_PTE0__DCU0_HSYNC	0x42
+ 						VF610_PAD_PTE1__DCU0_VSYNC	0x42
+ 						VF610_PAD_PTE2__DCU0_PCLK	0x42
+@@ -395,6 +402,16 @@
+ 				reg = <0x40050000 0x1000>;
+ 			};
+ 
++			dcu0: dcu at 40058000 {
++				compatible = "fsl,vf610-dcu";
++				reg = <0x40058000 0x1200>;
++				interrupts = <0 30 0x04>;
++				clocks = <&clks VF610_CLK_DCU0>;
++				clock-names = "dcu";
++				tcon-controller = <&tcon0>;
++				status = "disabled";
++			};
++
+ 			i2c0: i2c at 40066000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-- 
+1.8.0
