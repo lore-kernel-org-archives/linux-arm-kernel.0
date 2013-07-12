@@ -1,55 +1,40 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 12 Jul 2013 17:48:10 -0400
-Subject: [RFC/RFT PATCH 1/5] block: Rename parameter dma_mask to max_addr for
- blk_queue_bounce_limit()
+Date: Fri, 12 Jul 2013 17:48:12 -0400
+Subject: [RFC/RFT PATCH 3/5] scsi: Use dma_max_pfn(dev) helper for
+ bounce_limit calculations
 In-Reply-To: <1373665694-7580-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1373665694-7580-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1373665694-7580-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1373665694-7580-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The blk_queue_bounce_limit() API parameter 'dma_mask' is actually the
-maximum address the device can handle rather than a dma_mask. Rename
-it accordingly to avoid it being interpreted as dma_mask.
+DMA bounce limit is the maximum direct DMA'able memory beyond which
+bounce buffers has to be used to perform dma operations. SCSI driver
+relies on dma_mask but its calculation is based on max_*pfn which
+don't have uniform meaning across architectures. So make use of
+dma_max_pfn() which is expected to return the DMAable maximum pfn
+value across architectures.
 
-No functional change.
-
-The idea is to fix the bad assumptions about dma_mask wherever it could
-be miss-interpreted.
-
-Cc: Russell King <rmk@arm.linux.org.uk>
-Cc: Jens Axboe <axboe@kernel.dk>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-scsi at vger.kernel.org
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- block/blk-settings.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/scsi/scsi_lib.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/block/blk-settings.c b/block/blk-settings.c
-index c50ecf0..026c151 100644
---- a/block/blk-settings.c
-+++ b/block/blk-settings.c
-@@ -195,17 +195,17 @@ EXPORT_SYMBOL(blk_queue_make_request);
- /**
-  * blk_queue_bounce_limit - set bounce buffer limit for queue
-  * @q: the request queue for the device
-- * @dma_mask: the maximum address the device can handle
-+ * @max_addr: the maximum address the device can handle
-  *
-  * Description:
-  *    Different hardware can have different requirements as to what pages
-  *    it can do I/O directly to. A low level driver can call
-  *    blk_queue_bounce_limit to have lower memory pages allocated as bounce
-- *    buffers for doing I/O to pages residing above @dma_mask.
-+ *    buffers for doing I/O to pages residing above @max_addr.
-  **/
--void blk_queue_bounce_limit(struct request_queue *q, u64 dma_mask)
-+void blk_queue_bounce_limit(struct request_queue *q, u64 max_addr)
- {
--	unsigned long b_pfn = dma_mask >> PAGE_SHIFT;
-+	unsigned long b_pfn = max_addr >> PAGE_SHIFT;
- 	int dma = 0;
+diff --git a/drivers/scsi/scsi_lib.c b/drivers/scsi/scsi_lib.c
+index 86d5220..e8275fa 100644
+--- a/drivers/scsi/scsi_lib.c
++++ b/drivers/scsi/scsi_lib.c
+@@ -1668,7 +1668,7 @@ u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
  
- 	q->bounce_gfp = GFP_NOIO;
+ 	host_dev = scsi_get_device(shost);
+ 	if (host_dev && host_dev->dma_mask)
+-		bounce_limit = *host_dev->dma_mask;
++		bounce_limit = dma_max_pfn(host_dev) << PAGE_SHIFT;
+ 
+ 	return bounce_limit;
+ }
 -- 
 1.7.9.5
