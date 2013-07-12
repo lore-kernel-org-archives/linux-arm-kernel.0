@@ -1,24 +1,47 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 12 Jul 2013 18:07:04 +0530
-Subject: [PATCH] arm: omap5: dts: fix reg property size
-In-Reply-To: <1373630285-17389-1-git-send-email-balbi@ti.com>
-References: <1373630285-17389-1-git-send-email-balbi@ti.com>
-Message-ID: <51DFF870.5060507@ti.com>
+From: samuel.thibault@ens-lyon.org (Samuel Thibault)
+Date: Fri, 12 Jul 2013 14:42:42 +0200
+Subject: [PATCH] Route kbd LEDs through the generic LEDs layer
+In-Reply-To: <20130712113655.GA4227@amd.pavel.ucw.cz>
+References: <201011112205.oABM5KVJ005298@imap1.linux-foundation.org>
+ <201011111440.07882.dmitry.torokhov@gmail.com>
+ <20110102090935.GV32469@atrey.karlin.mff.cuni.cz>
+ <20110102103210.GA25662@core.coreip.homeip.net>
+ <20110102225741.GX5480@const.famille.thibault.fr>
+ <20110112182702.GA9168@core.coreip.homeip.net>
+ <20111114040613.GA4992@type.famille.thibault.fr>
+ <20121221003449.GA6999@type.youpi.perso.aquilenet.fr>
+ <20130707101028.GD5651@type.youpi.perso.aquilenet.fr>
+ <20130712113655.GA4227@amd.pavel.ucw.cz>
+Message-ID: <20130712124242.GA5876@type>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 July 2013 05:28 PM, Felipe Balbi wrote:
-> USB3 block has a 64KiB space, another 64KiB is
-> used for the wrapper.
+Pavel Machek, le Fri 12 Jul 2013 13:36:56 +0200, a ?crit :
+> > This permits to reassign keyboard LEDs to something else than keyboard "leds"
+> > state, by adding keyboard led and modifier triggers connected to a series
+> > of VT input LEDs, themselves connected to VT input triggers, which
+> > per-input device LEDs use by default.  Userland can thus easily change the LED
+> > behavior of (a priori) all input devices, or of particular input devices.
 > 
-> Without this change, resource_size() will get
-> confused and driver won't probe because size
-> will be negative.
+> Nice! Leds now have proper /sys interface.
 > 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
-> 
-> does anybody know Benoit's knew email address ?
-benoit.cousson at linaro.org
+> But... I boot up, switch from X to console, press capslock, and no
+> reaction anywhere.
 
--Kishon
+Is it working without the patch?  Console-setup for instance is known to
+have broken the capslock LED, which is precisely one of the reasons for
+this patch, which will provide console-setup with a way to bring back
+caps lock working properly.
+
+At any rate, please provide way more information about your keyboard
+and LED configuration (output of dumpkeys, dmesg, content of
+/sys/class/leds/*/trigger, etc.), as things are just working fine for me
+(just like it has been for the past two years).
+
+> Note that this is notebook with usb keyboard plugged in (and two
+> monitors), but I believe this worked before...
+
+Things work fine with my USB keyboard too, is this perhaps using an odd
+driver which would not expose LEDs in a standard way?
+
+Samuel
