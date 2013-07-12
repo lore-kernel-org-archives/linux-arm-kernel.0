@@ -1,25 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 12 Jul 2013 08:03:48 -0300
-Subject: [PATCH v2] ARM: imx: Kconfig: Select ARM1136 related errata
-In-Reply-To: <20130712074946.GD25501@S2101-09.ap.freescale.net>
-References: <1373552782-14196-1-git-send-email-fabio.estevam@freescale.com>
- <20130712074946.GD25501@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5DhyXp5arkLTHO+MZaA3hrMX4q6Y3OH3LeVfUiizytoAQ@mail.gmail.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Fri, 12 Jul 2013 12:13:22 +0100
+Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if UP
+ system
+In-Reply-To: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
+References: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130712111322.GC3213@e102654-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 12, 2013 at 4:49 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Thu, Jul 11, 2013 at 11:26:22AM -0300, Fabio Estevam wrote:
->> CONFIG_ARM_ERRATA_411920 and CONFIG_ARM_ERRATA_364296 should be selected for
->> ARM1136 SoCs.
->>
-> Per help text of the erratums, 364296 affects ARM1136 r0p2, and 411920
-> affects ARM1136 before r1p4.  Do you know the revisions used on imx31
-> and imx35?  Or do you see that enabling the workaround help fix some
-> real issues?
+On Sat, Jul 06, 2013 at 12:39:33AM +0100, Stephen Boyd wrote:
+> In a uniprocessor implementation the interrupt processor targets
+> registers are read-as-zero/write-ignored (RAZ/WI). Unfortunately
+> gic_get_cpumask() will print a critical message saying
+> 
+>  GIC CPU mask not found - kernel will fail to boot.
+> 
+> if these registers all read as zero, but there won't actually be
+> a problem on uniprocessor systems and the kernel will boot just
+> fine. Skip this check if we're running a UP kernel or if we
+> detect that the hardware only supports a single processor.
+> 
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+> 
+> Maybe we should just drop the check entirely? It looks like it may
+> just be debug code that won't ever trigger in practice, even on the
+> 11MPCore that caused this code to be introduced.
 
-I haven't checked the exact revisions of mx31/mx35.
-
-The reason I selected these two errata was due to comparison with the
-FSL BSP defconfig for mx31:
-http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/arch/arm/configs/imx31_3stack_defconfig?h=imx_2.6.31
+I agree, we should drop the check.  It's annoying in uniprocessors and
+unlikely to be found in the real world unless your gic entry in the dt
+is wrong.
