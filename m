@@ -1,33 +1,34 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 12 Jul 2013 11:09:51 +0200
-Subject: [PATCH 1/6] ARM: OMAP2+: Remove board-4430sdp.c
-In-Reply-To: <20130709082304.GB5523@atomide.com>
-References: <20130517191304.468.73487.stgit@localhost>
- <20130517191751.468.89202.stgit@localhost>
- <20130520095447.GR21614@n2100.arm.linux.org.uk>
- <20130706131057.GU21614@n2100.arm.linux.org.uk>
- <20130706133627.GV21614@n2100.arm.linux.org.uk>
- <20130708093410.GT5523@atomide.com>
- <20130708142103.GX21614@n2100.arm.linux.org.uk>
- <20130709082304.GB5523@atomide.com>
-Message-ID: <51DFC7DF.7050806@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 12 Jul 2013 09:49:32 +0100
+Subject: [PATCH] ASoC: Samsung: Modify the I2S driver to support I2S on
+ Exynos5420
+In-Reply-To: <CAAgF-BdM4jw0o4+ELVo_N029tbgMJBBqJxU91e=TgBNiiREyaA@mail.gmail.com>
+References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
+ <29860116.IF545KsGYb@thinkpad>
+ <20130711112023.GM24508@sirena.org.uk>
+ <2214161.FSfscAvpna@thinkpad>
+ <20130711130139.GQ24508@sirena.org.uk>
+ <CAAgF-BdM4jw0o4+ELVo_N029tbgMJBBqJxU91e=TgBNiiREyaA@mail.gmail.com>
+Message-ID: <20130712084932.GY24508@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2013 10:23 AM, Tony Lindgren wrote:
->> ASoC looks dead too:
->>
->> omap-abe-twl6040 sound.10: ASoC: CPU DAI (null) not registered
->> omap-abe-twl6040 sound.10: snd_soc_register_card() failed: -517
-> 
-> Peter, I think you've had audio working with devicetree for at least
-> a year or something?
+On Fri, Jul 12, 2013 at 10:07:22AM +0530, Padma Venkat wrote:
 
-Yes it has been working and going to work soon again:
-http://mailman.alsa-project.org/pipermail/alsa-devel/2013-July/063909.html
+> A new version number is added when a there was some change in the IP
+> like adding a internal mux to the IP, adding multi channel support,
+> adding reset control bit. This was done in the older code with
+> platform device.
+> Same thing is followed here. So as previously done, adding a new
+> compatible name like "samsung,i2s-v6" with new quirk
+> "samsung,supports-tdm" is okey?
 
-With the DMA devicetree bindings platform_get_resource_byname() stopped
-working for DMA (it works for MEM resources) -> dai drivers were not probing.
-
--- 
-P?ter
+Yes, this is good but the quirk should just be found by software based
+on the compatible string rather than in the DT.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130712/957b5b54/attachment.sig>
