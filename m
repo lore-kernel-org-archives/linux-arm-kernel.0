@@ -1,173 +1,55 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 12 Jul 2013 17:30:33 +0200
-Subject: [PATCH v7 5/9] iommu/exynos: change rwlock to spinlock
-In-Reply-To: <002d01ce797b$49c441a0$dd4cc4e0$@samsung.com>
-References: <002d01ce797b$49c441a0$dd4cc4e0$@samsung.com>
-Message-ID: <13890783.WKk2X4EVm4@amdc1032>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 12 Jul 2013 18:36:30 +0300
+Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
+In-Reply-To: <CACRpkdYU13bhPaL2ZG9CT9JRv9sKQ+1N3zCUPizk571+LQqB4A@mail.gmail.com>
+References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
+ <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
+ <20130625065811.GZ5523@atomide.com> <51CAEA90.90200@ti.com>
+ <CACRpkdbKgEcfF67oO9HrczvDp4Po3Xt1hFajJ1vO8kEvsZH4jA@mail.gmail.com>
+ <51CC45D3.2000305@ti.com>
+ <CACRpkdYU13bhPaL2ZG9CT9JRv9sKQ+1N3zCUPizk571+LQqB4A@mail.gmail.com>
+Message-ID: <51E0227E.2000008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Linus,
 
-Hi,
+On 07/10/2013 11:36 PM, Linus Walleij wrote:
+> On Thu, Jun 27, 2013 at 4:01 PM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
+>
+>> I think, In the future the OMAP pinctrl configurations would be manged in
+>> more flexible way then now (thanks to "pinctrl PM helpers" and you;))
+>> - "Idle" state will be splitted to "Idle"/"sleep"
+>> - "default" state will be splitted to "default"/"active"
+>
+> OK so the first ones we already have so the discussion is now down
+> to adding the "active" state (and pinctrl_pm* helper function).
+>
+> I guess we need a patch set prepared which adds the "active" state
+> and helper function as the first patch, i.e. this:
+> http://marc.info/?l=linux-kernel&m=137094012703340&w=2
+> Can I have your ACK on this patch?
+I've verified combination of
+[PATCH] drivers: pinctrl: add active state to core
+[RFC] ARM: OMAP2+: omap_device: add pinctrl handling
+on OMAP4 SDP board+UARTs and going to send patches on Monday.
 
-On Friday, July 05, 2013 09:29:26 PM Cho KyongHo wrote:
-> Since acquiring read_lock is not more frequent than write_lock, it is
-> not beneficial to use rwlock, this commit changes rwlock to spinlock.
+So, Acked/Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
+(I can't reply directly to thread - not signed to those lists :))
 
-This change is not of a "fix type" and is not required to make the driver
-work so it would probably be best to move it to the end of a patch series
-(IOW just making it the last patch in the series).
+What is the best branch to base my patches on?
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+>
+> I do not want to add the state unless there is a clear consumer,
+> so it needs to go in with the first patch to a device driver that uses
+> pinctrl_pm_select_active_state() which will be a good demonstration
+> on its use and utility. (And a point to object and suggest other ways
+> to do the same thing...)
+>
+> Yours,
+> Linus Walleij
+>
 
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> ---
->  drivers/iommu/exynos-iommu.c |   32 ++++++++++++++++----------------
->  1 files changed, 16 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 390f8b7..6793661 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -175,7 +175,7 @@ struct sysmmu_drvdata {
->  	void __iomem **sfrbases;
->  	struct clk *clk[2];
->  	int activations;
-> -	rwlock_t lock;
-> +	spinlock_t lock;
->  	struct iommu_domain *domain;
->  	sysmmu_fault_handler_t fault_handler;
->  	unsigned long pgtable;
-> @@ -259,7 +259,7 @@ void exynos_sysmmu_set_prefbuf(struct device *dev,
->  	BUG_ON((base0 + size0) <= base0);
->  	BUG_ON((size1 > 0) && ((base1 + size1) <= base1));
->  
-> -	read_lock_irqsave(&data->lock, flags);
-> +	spin_lock_irqsave(&data->lock, flags);
->  	if (!is_sysmmu_active(data))
->  		goto finish;
->  
-> @@ -289,7 +289,7 @@ void exynos_sysmmu_set_prefbuf(struct device *dev,
->  		}
->  	}
->  finish:
-> -	read_unlock_irqrestore(&data->lock, flags);
-> +	spin_unlock_irqrestore(&data->lock, flags);
->  }
->  
->  static void __set_fault_handler(struct sysmmu_drvdata *data,
-> @@ -297,9 +297,9 @@ static void __set_fault_handler(struct sysmmu_drvdata *data,
->  {
->  	unsigned long flags;
->  
-> -	write_lock_irqsave(&data->lock, flags);
-> +	spin_lock_irqsave(&data->lock, flags);
->  	data->fault_handler = handler;
-> -	write_unlock_irqrestore(&data->lock, flags);
-> +	spin_unlock_irqrestore(&data->lock, flags);
->  }
->  
->  void exynos_sysmmu_set_fault_handler(struct device *dev,
-> @@ -347,7 +347,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
->  
->  	int i, ret = -ENOSYS;
->  
-> -	read_lock(&data->lock);
-> +	spin_lock(&data->lock);
->  
->  	WARN_ON(!is_sysmmu_active(data));
->  
-> @@ -391,7 +391,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
->  	if (itype != SYSMMU_FAULT_UNKNOWN)
->  		sysmmu_unblock(data->sfrbases[i]);
->  
-> -	read_unlock(&data->lock);
-> +	spin_unlock(&data->lock);
->  
->  	return IRQ_HANDLED;
->  }
-> @@ -402,7 +402,7 @@ static bool __exynos_sysmmu_disable(struct sysmmu_drvdata *data)
->  	bool disabled = false;
->  	int i;
->  
-> -	write_lock_irqsave(&data->lock, flags);
-> +	spin_lock_irqsave(&data->lock, flags);
->  
->  	if (!set_sysmmu_inactive(data))
->  		goto finish;
-> @@ -419,7 +419,7 @@ static bool __exynos_sysmmu_disable(struct sysmmu_drvdata *data)
->  	data->pgtable = 0;
->  	data->domain = NULL;
->  finish:
-> -	write_unlock_irqrestore(&data->lock, flags);
-> +	spin_unlock_irqrestore(&data->lock, flags);
->  
->  	if (disabled)
->  		dev_dbg(data->sysmmu, "(%s) Disabled\n", data->dbgname);
-> @@ -442,7 +442,7 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
->  	int i, ret = 0;
->  	unsigned long flags;
->  
-> -	write_lock_irqsave(&data->lock, flags);
-> +	spin_lock_irqsave(&data->lock, flags);
->  
->  	if (!set_sysmmu_active(data)) {
->  		if (WARN_ON(pgtable != data->pgtable)) {
-> @@ -481,7 +481,7 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
->  
->  	dev_dbg(data->sysmmu, "(%s) Enabled\n", data->dbgname);
->  finish:
-> -	write_unlock_irqrestore(&data->lock, flags);
-> +	spin_unlock_irqrestore(&data->lock, flags);
->  
->  	return ret;
->  }
-> @@ -528,7 +528,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova)
->  	unsigned long flags;
->  	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
->  
-> -	read_lock_irqsave(&data->lock, flags);
-> +	spin_lock_irqsave(&data->lock, flags);
->  
->  	if (is_sysmmu_active(data)) {
->  		int i;
-> @@ -545,7 +545,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova)
->  			data->dbgname);
->  	}
->  
-> -	read_unlock_irqrestore(&data->lock, flags);
-> +	spin_unlock_irqrestore(&data->lock, flags);
->  }
->  
->  void exynos_sysmmu_tlb_invalidate(struct device *dev)
-> @@ -553,7 +553,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
->  	unsigned long flags;
->  	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
->  
-> -	read_lock_irqsave(&data->lock, flags);
-> +	spin_lock_irqsave(&data->lock, flags);
->  
->  	if (is_sysmmu_active(data)) {
->  		int i;
-> @@ -569,7 +569,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
->  			data->dbgname);
->  	}
->  
-> -	read_unlock_irqrestore(&data->lock, flags);
-> +	spin_unlock_irqrestore(&data->lock, flags);
->  }
->  
->  static int exynos_sysmmu_probe(struct platform_device *pdev)
-> @@ -666,7 +666,7 @@ static int exynos_sysmmu_probe(struct platform_device *pdev)
->  	}
->  
->  	data->sysmmu = dev;
-> -	rwlock_init(&data->lock);
-> +	spin_lock_init(&data->lock);
->  	INIT_LIST_HEAD(&data->node);
->  
->  	__set_fault_handler(data, &default_fault_handler);
+Regards,
+-grygorii
