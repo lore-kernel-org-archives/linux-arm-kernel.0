@@ -1,80 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Jul 2013 01:32:28 -0700
-Subject: [PATCH] ARM: OMAP2+: twl-common: Remove code for twl6030 and
- twl6040 setup for legacy boot
-In-Reply-To: <51DFBAC0.5070806@ti.com>
-References: <1373552638-13930-1-git-send-email-peter.ujfalusi@ti.com>
- <20130712072650.GC7656@atomide.com> <51DFBAC0.5070806@ti.com>
-Message-ID: <20130712083227.GF7656@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 12 Jul 2013 16:33:13 +0800
+Subject: [PATCH] ARM: dts: imx: share pad macro names between imx6q and
+ imx6dl
+In-Reply-To: <20130712064957.GH14452@pengutronix.de>
+References: <1373522316-12319-1-git-send-email-shawn.guo@linaro.org>
+ <20130712064957.GH14452@pengutronix.de>
+Message-ID: <20130712083311.GF25501@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [130712 01:20]:
-> On 07/12/2013 09:26 AM, Tony Lindgren wrote:
-> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [130711 07:30]:
-> >> OMAP4 no longer boots in legacy mode so the code here is no longer used.
-> >>
-> >> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> >> ---
-> >>  arch/arm/mach-omap2/twl-common.c | 332 ++-------------------------------------
-> >>  arch/arm/mach-omap2/twl-common.h |   8 -
-> >>  2 files changed, 12 insertions(+), 328 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-> >> index c05898f..932dea7 100644
-> >> --- a/arch/arm/mach-omap2/twl-common.c
-> >> +++ b/arch/arm/mach-omap2/twl-common.c
-> >> @@ -38,20 +38,6 @@ static struct i2c_board_info __initdata pmic_i2c_board_info = {
-> >>  	.flags		= I2C_CLIENT_WAKE,
-> >>  };
-> >>  
-> >> -#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-> >> -static int twl_set_voltage(void *data, int target_uV)
-> >> -{
-> >> -	struct voltagedomain *voltdm = (struct voltagedomain *)data;
-> >> -	return voltdm_scale(voltdm, target_uV);
-> >> -}
-> >> -
-> >> -static int twl_get_voltage(void *data)
-> >> -{
-> >> -	struct voltagedomain *voltdm = (struct voltagedomain *)data;
-> >> -	return voltdm_get_voltage(voltdm);
-> >> -}
-> >> -#endif
+On Fri, Jul 12, 2013 at 08:49:57AM +0200, Sascha Hauer wrote:
+> Hi Shawn,
+> 
+> Nice patch.
+> 
+> On Thu, Jul 11, 2013 at 01:58:36PM +0800, Shawn Guo wrote:
+> > The imx6q and imx6dl are two pin-to-pin compatible SoCs.  The same board
+> > design can work with either chip plugged into the socket, e.g. sabresd
+> > and sabreauto boards.
 > > 
-> > Looks like the code above is also needed for omap3 based on the
-> > if defined?
+> > We currently define pin groups in imx6q.dtsi and imx6dl.dtsi
+> > respectively because the pad macro names are different between two
+> > chips.  This brings a maintenance burden on having the same label point
+> > to the same pin group defined in two places.
+> > 
+> > The patch drops prefix MX6Q_ and MX6DL_ from those pad macro names.
 > 
-> Yes it is still needed for OMAP3 when booting in legacy. I have moved these
-> two function down within the #if defined(CONFIG_ARCH_OMAP3) :
+> Can we use another prefix instead of removing it completely? Maybe
+> MX6QDL_?
 > 
->  #if defined(CONFIG_ARCH_OMAP3)
-> @@ -189,6 +160,18 @@ static struct regulator_init_data omap3_vdd2 = {
->  	.consumer_supplies		= omap3_vdd2_supply,
->  };
-> 
-> +static int twl_set_voltage(void *data, int target_uV)
-> +{
-> +	struct voltagedomain *voltdm = (struct voltagedomain *)data;
-> +	return voltdm_scale(voltdm, target_uV);
-> +}
-> +
-> +static int twl_get_voltage(void *data)
-> +{
-> +	struct voltagedomain *voltdm = (struct voltagedomain *)data;
-> +	return voltdm_get_voltage(voltdm);
-> +}
-> +
->  static struct twl_regulator_driver_data omap3_vdd1_drvdata = {
->  	.get_voltage = twl_get_voltage,
->  	.set_voltage = twl_set_voltage,
-> @@ -235,297 +218,6 @@ void __init omap3_pmic_get_config(struct
-> twl4030_platform_data *pmic_data,
->  }
->  #endif /* CONFIG_ARCH_OMAP3 */
+Sounds good.  I changed it on my branch, and will not resend due to the
+patch size.
 
-Oh OK sorry I missed that while glancing over it.
-
-Regards,
-
-Tony
+Shawn
