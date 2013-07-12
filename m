@@ -1,117 +1,99 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 12 Jul 2013 15:10:31 +0300
-Subject: [PATCH] arm: omap2plus: unidle devices which are about to probe
-In-Reply-To: <51DFEF59.1010509@ti.com>
-References: <20130711092612.GG23892@arwen.pp.htv.fi>
- <1373537788-30413-1-git-send-email-balbi@ti.com>
- <51DFEF59.1010509@ti.com>
-Message-ID: <20130712121031.GB17053@arwen.pp.htv.fi>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 12 Jul 2013 17:42:04 +0530
+Subject: [PATCH 1/2] Revert "ARM: OMAP2+: Fix serial init for device tree
+ based booting"
+In-Reply-To: <20130712091827.GH7656@atomide.com>
+References: <1373539986-27272-1-git-send-email-rnayak@ti.com>
+ <1373539986-27272-2-git-send-email-rnayak@ti.com>
+ <20130712072051.GA7656@atomide.com> <51DFB0E4.6040007@ti.com>
+ <20130712080305.GD7656@atomide.com> <51DFC58C.7030105@ti.com>
+ <20130712091827.GH7656@atomide.com>
+Message-ID: <51DFF294.9080501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 12, 2013 at 02:58:17PM +0300, Grygorii Strashko wrote:
-> On 07/11/2013 01:16 PM, Felipe Balbi wrote:
-> >in order to make HWMOD and pm_runtime agree on the
-> >initial state of the device, we will unidle the device
-> >and call pm_runtime_set_active() to tell pm_runtime
-> >that the device is really active.
-> >
-> >By the time driver's probe() is reached, a call to
-> >pm_runtime_get_sync() will not cause driver's
-> >->runtime_resume() method to be called at first, only
-> >after a successful ->runtime_suspend().
-> >
-> >Note that we must prevent pm_runtime transitions while
-> >driver is probing otherwise drivers would be suspended
-> >as soon as they call pm_runtime_use_autosuspend(). By
-> >calling pm_runtime_forbid() before probe() and
-> >pm_runtime_allow() after probe() we 'fix' that detail.
-> >
-> >Note that this patch was inspired by PCI's pci_pm_init().
+On Friday 12 July 2013 02:48 PM, Tony Lindgren wrote:
+> * Rajendra Nayak <rnayak@ti.com> [130712 02:06]:
+>> On Friday 12 July 2013 01:33 PM, Tony Lindgren wrote:
+>>>
+>>> OK, so that's only for earlyprintk then?
+>>
+>> yes,
+>>
+>>>
+>>> If so, it seems the right fix is to set the NO_IDLE and NO_RESET
+>>> flags based on ifdef CONFIG_DEBUG_OMAP4UART3 etc as that is selected
+>>> in the Kconfig now.
+>>
+>> ok makes sense. It seems like the static data in hwmod can be populated
+>> based on these defines? something like
+>>
+>> /* uart3 */
+>> static struct omap_hwmod omap44xx_uart3_hwmod = {
+>>         .name           = "uart3",
+>>         .class          = &omap44xx_uart_hwmod_class,
+>>         .clkdm_name     = "l4_per_clkdm",
+>> #ifdef CONFIG_DEBUG_OMAP4UART3
+>>         .flags          = HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET |
+>>                                 HWMOD_SWSUP_SIDLE_ACT,
+>> #else
+>>         .flags          = HWMOD_SWSUP_SIDLE_ACT,
+>> #endif
+>>         .main_clk       = "func_48m_fclk",
+>>         .prcm = {
+>>                 .omap4 = {
+>>                         .clkctrl_offs = OMAP4_CM_L4PER_UART3_CLKCTRL_OFFSET,
+>>                         .context_offs = OMAP4_RM_L4PER_UART3_CONTEXT_OFFSET,
+>>                         .modulemode   = MODULEMODE_SWCTRL,
+>>                 },
+>>         },
+>> };
+>>
+>> And same way for others? That way the cmdline parsing can be done away
+>> with even for the non-DT case.
 > 
-> NAK. This is a hack.
-
-hack is your flag to check if the driver is "initialized". pff
-
-> In addition to what I've mentioned in
-> http://www.spinics.net/lists/arm-kernel/msg258061.html there are
-> following issues:
-> 1) this patch disables call to PM runtime callbacks for all
-
-no, it does not. It forbids pm runtime transitions during probe.
-
-> OMAP drivers which is wrong - I've found, for example, that
-> omap-usb-host.c driver enables TLL in some configurations in its
-> .runtime_resume():
+> Yes we can do it that way. How about add a common macro for it if
+> it's always the same? Then the .flags line would be just:
 > 
-> usbhs_runtime_resume()
-> |-omap_tll_enable()
+> #define HWMOD_OMAP_UART_FLAGS(soc, port)
+> ...
+> 
+> 	.flags		= HWMOD_OMAP_UART_FLAGS(4, 3),
 
-which is wrong. PM runtime callbacks are supposed to be use for,
-surprise, PM!
+I started doing this and ended up with equal number of #ifdefs in the
+header :( Was the intention of doing this to reduce the #ifdefs? in which
+case maybe I am doing something wrong.
 
-> 2) even with this fix the restore context issue will not be fixed for
-> *non* console UARTs. Just try:
-> #echo 0xDEAD > dev/ttyO3 // checked on OMAP4 SDP
-
-that I have not checked, but then again, with that you're not calling
-set_termios() anyway.
-
-> 3) I've checked most of OMAP drivers and all of them solve such kind
-> of problem internally (SPI, MMC, I2C, etc.)
-
-and you see no problem with that ? Repeating the same thing over and
-over again ?
-
-> 4) See inline
-> >
-> >Signed-off-by: Felipe Balbi <balbi@ti.com>
-> >---
-> >
-> >boot tested on top of today's Linus master
-> >6d128e1e72bf082542e85f72e6b7ddd704193588 with OMAP4
-> >panda. Reached console prompt and, after setting a
-> >proper autosuspend delay, consoles autosuspend just
-> >fine.
-> >
-> >It needs to be tested on other platforms.
-> >
-> >ps: note that we also call pm_runtime_set_suspended(dev)
-> >from our late_initcall() to disable devices so that pm_runtime
-> >and HWMOD continue to aggree on device's state.
-> >
-> >  arch/arm/mach-omap2/omap_device.c | 44 +++++++++++++++++++++++++++++++++++----
-> >  1 file changed, 40 insertions(+), 4 deletions(-)
-> >
-> >diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> >index 5cc9287..cb1fc1d 100644
-> >--- a/arch/arm/mach-omap2/omap_device.c
-> >+++ b/arch/arm/mach-omap2/omap_device.c
-> >@@ -178,6 +178,26 @@ odbfd_exit:
-> >  	return ret;
-> >  }
-> >
-> >+static void omap_device_pm_init(struct platform_device *pdev)
-> >+{
-> >+	omap_device_enable(pdev);
-> >+	pm_runtime_forbid(&pdev->dev);
-> It's wrong to use pm_runtime_forbid() - pm_runtime_get_noresume()
-> should be used instead.
-
-how come ? What makes you think pm_runtime_get_noresume() is the right
-thing here ? 
-
-> pm_runtime_forbid()
-> |-rpm_resume()
-
-so what ? flags is zero.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130712/316a3665/attachment.sig>
+> 
+>>> The current code in mach-omap2/serial.c is wrong, and is a hack
+>>> needed for the pdata based booting. What's broken is that
+>>> omap_serial_early_init() parses the cmdline for console, which
+>>> itself is pretty nasty, and it won't work the right way as
+>>> there's nothing stopping from having the earlycon in a different
+>>> UART from the serial console. So we just want to get rid of the
+>>> whole mach-omap2/serial.c once we're all DT.
+>>>
+>>> So to summarize, we have two bugs:
+>>>
+>>> 1. Omap hwmod code can reset UART while earlycon may be using
+>>>    it. The fix to this is to use NO_IDLE and NO_RESET flags in
+>>>    the hwmod code if CONFIG_DEBUG_OMAPxUARTy is specified.
+>>>
+>>> 2. A bug in drivers/tty/serial/omap-serial.c where the
+>>>    missing context loss count can cause NULL context to be
+>>>    initialized during driver probe causing port to hang for
+>>>    earlycon. The fix for that is what Felipe has suggested or
+>>>    fix it in the driver by removing the context loss count usage
+>>>    and detect the need for context restore based on the UART
+>>>    state.
+>>>
+>>> Or am I still missing something?
+>>
+>> No, thats pretty much the 2 issues we have.
+> 
+> OK thanks good to hear it's limited to earlycon issues.
+> 
+> Regards,
+> 
+> Tony
+> 
