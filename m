@@ -1,39 +1,25 @@
-From: weisserm@arcor.de (=?ISO-8859-1?Q?Matthias_Wei=DFer?=)
-Date: Fri, 12 Jul 2013 11:43:20 +0200
-Subject: [PATCH] ARM: dts: imx25: Make lcdc compatible to imx27/imx21
- fb
-In-Reply-To: <20130712084516.GI25501@S2101-09.ap.freescale.net>
-References: <1373614495-21717-1-git-send-email-weisserm@arcor.de>
- <20130712084516.GI25501@S2101-09.ap.freescale.net>
-Message-ID: <51DFCFB8.5050303@arcor.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 12 Jul 2013 02:46:31 -0700
+Subject: [PATCH 1/2] Revert "ARM: OMAP2+: Fix serial init for device
+ tree based booting"
+In-Reply-To: <51DFCAF3.7040503@ti.com>
+References: <1373539986-27272-1-git-send-email-rnayak@ti.com>
+ <1373539986-27272-2-git-send-email-rnayak@ti.com>
+ <20130712072051.GA7656@atomide.com> <51DFB0E4.6040007@ti.com>
+ <20130712080305.GD7656@atomide.com> <51DFC58C.7030105@ti.com>
+ <20130712091827.GH7656@atomide.com> <51DFCAF3.7040503@ti.com>
+Message-ID: <20130712094631.GI7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 12.07.2013 10:45, schrieb Shawn Guo:
-> On Fri, Jul 12, 2013 at 09:34:54AM +0200, Matthias Weisser wrote:
->> ARM: dts: imx25: Make lcdc compatible to imx27/imx21 fb
->>
->> Signed-off-by: Matthias Weisser <weisserm@arcor.de>
->> ---
->>  arch/arm/boot/dts/imx25.dtsi |    3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
->> index d2550e0..83532b6 100644
->> --- a/arch/arm/boot/dts/imx25.dtsi
->> +++ b/arch/arm/boot/dts/imx25.dtsi
->> @@ -377,7 +377,8 @@
->>  				status = "disabled";
->>  			};
->>
->> -			lcdc at 53fbc000 {
->> +			lcdc: lcdc at 53fbc000 {
->> +				compatible = "fsl,imx27-fb", "fsl,imx21-fb";
+* Rajendra Nayak <rnayak@ti.com> [130712 02:29]:
 >
-> It makes more sense to have it be:
->
-> 	compatible = "fsl,imx25-fb", "fsl,imx21-fb";
+> Right, that seems much cleaner. I will send a patch out for it and get rid
+> of all the cmdline parsing in serial.c
 
-Should I send a v2?
+Oh that's right, then it should not be needed for legacy pdata based
+booting either :)
 
-Matthias
+Regards,
+
+Tony
