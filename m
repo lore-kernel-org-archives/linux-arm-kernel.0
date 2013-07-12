@@ -1,39 +1,39 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Fri, 12 Jul 2013 16:15:15 +0800
-Subject: [PATCH] clk: sunxi: Fix checking return value of
- clk_register_[composite|factors]
-Message-ID: <1373616915.24328.1.camel@phoenix>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 12 Jul 2013 15:56:11 +0800
+Subject: [PATCH rebased 1/2] ARM: dts: imx6qdl: add a new pinctrl for uart3
+Message-ID: <1373615772-30665-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_register_composite() and clk_register_factors() return ERR_PTR on error.
+Add the a new pinctrl for uart3. In the imx6q{dl}-sabreauto boards,
+the uart3 is used for Bluetooth.
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
+Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 412912b..02e440b 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -64,7 +64,7 @@ static void __init sunxi_osc_clk_setup(struct device_node *node)
- 			&gate->hw, &clk_gate_ops,
- 			CLK_IS_ROOT);
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 5ca82bf..a050865 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1028,6 +1028,17 @@
+ 					};
+ 				};
  
--	if (clk) {
-+	if (!IS_ERR(clk)) {
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
- 		clk_register_clkdev(clk, clk_name, NULL);
- 	}
-@@ -221,7 +221,7 @@ static void __init sunxi_factors_clk_setup(struct device_node *node,
- 	clk = clk_register_factors(NULL, clk_name, parent, 0, reg,
- 				   data->table, data->getter, &clk_lock);
- 
--	if (clk) {
-+	if (!IS_ERR(clk)) {
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
- 		clk_register_clkdev(clk, clk_name, NULL);
- 	}
++				uart3 {
++					pinctrl_uart3_1: uart3grp-1 {
++						fsl,pins = <
++							PAD_SD4_CLK__UART3_RX_DATA 0x1b0b1
++							PAD_SD4_CMD__UART3_TX_DATA 0x1b0b1
++							PAD_EIM_D30__UART3_CTS_B   0x1b0b1
++							PAD_EIM_EB3__UART3_RTS_B   0x1b0b1
++						>;
++					};
++				};
++
+ 				uart4 {
+ 					pinctrl_uart4_1: uart4grp-1 {
+ 						fsl,pins = <
 -- 
-1.8.1.2
+1.7.1
