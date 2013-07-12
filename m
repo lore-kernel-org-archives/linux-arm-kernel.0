@@ -1,41 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 12 Jul 2013 16:45:18 +0800
-Subject: [PATCH] ARM: dts: imx25: Make lcdc compatible to imx27/imx21 fb
-In-Reply-To: <1373614495-21717-1-git-send-email-weisserm@arcor.de>
-References: <1373614495-21717-1-git-send-email-weisserm@arcor.de>
-Message-ID: <20130712084516.GI25501@S2101-09.ap.freescale.net>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 12 Jul 2013 16:50:58 +0800
+Subject: [PATCH rebased 2/2] ARM: dts: imx6qdl-sabreauto: add a DT node
+ for uart3
+In-Reply-To: <20130712084025.GH25501@S2101-09.ap.freescale.net>
+References: <1373615772-30665-1-git-send-email-b32955@freescale.com>
+ <1373615772-30665-2-git-send-email-b32955@freescale.com>
+ <20130712084025.GH25501@S2101-09.ap.freescale.net>
+Message-ID: <51DFC372.2020309@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 12, 2013 at 09:34:54AM +0200, Matthias Weisser wrote:
-> ARM: dts: imx25: Make lcdc compatible to imx27/imx21 fb
-> 
-> Signed-off-by: Matthias Weisser <weisserm@arcor.de>
-> ---
->  arch/arm/boot/dts/imx25.dtsi |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> index d2550e0..83532b6 100644
-> --- a/arch/arm/boot/dts/imx25.dtsi
-> +++ b/arch/arm/boot/dts/imx25.dtsi
-> @@ -377,7 +377,8 @@
->  				status = "disabled";
->  			};
->  
-> -			lcdc at 53fbc000 {
-> +			lcdc: lcdc at 53fbc000 {
-> +				compatible = "fsl,imx27-fb", "fsl,imx21-fb";
+? 2013?07?12? 16:40, Shawn Guo ??:
+>> >  +&uart3 {
+>> >  +	pinctrl-names = "default";
+>> >  +	pinctrl-0 =<&pinctrl_uart3_1>;
+>> >  +	fsl,uart-has-rtscts;
+>> >  +	dma-names = "rx", "tx";
+>> >  +	dmas =<&sdma 29 4 0>,<&sdma 30 4 0>;
+> These two properties should be added in imx6qdl.dtsi
+the uart3 may does _not_ have the RTS/CTS pins except in the 
+imx6q{dl}-sabreauto boards.
 
-It makes more sense to have it be:
+Is it proper to add the dma property in the imx6qdl.dtsi?
 
-	compatible = "fsl,imx25-fb", "fsl,imx21-fb";
 
-Shawn
-
->  				reg = <0x53fbc000 0x4000>;
->  				interrupts = <39>;
->  				clocks = <&clks 103>, <&clks 66>, <&clks 49>;
-> -- 
-> 1.7.9.5
-> 
+thanks
+Huang Shijie
