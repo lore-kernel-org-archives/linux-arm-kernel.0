@@ -1,39 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 12 Jul 2013 12:18:38 +0100
-Subject: [PATCH] ASoC: Samsung: Modify the I2S driver to support I2S on
- Exynos5420
-In-Reply-To: <2463181.bQfIDO6XJk@thinkpad>
-References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
- <2214161.FSfscAvpna@thinkpad>
- <20130711130139.GQ24508@sirena.org.uk>
- <2463181.bQfIDO6XJk@thinkpad>
-Message-ID: <20130712111838.GZ24508@sirena.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 12 Jul 2013 16:49:17 +0530
+Subject: [PATCH] ARM: davinci: make file local variables static
+Message-ID: <1373627957-12979-1-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 12, 2013 at 12:13:17PM +0200, Tomasz Figa wrote:
-> On Thursday 11 of July 2013 14:01:39 Mark Brown wrote:
+Make file local variables static in mach-davinci.
+This fixes sparse warnings of the form:
 
-> > Well, it *should* be samsung,i2s-vN where N is the version number of the
-> > IP but documentation on the versioning has been patchy hence this whole
-> > thinng.
+arch/arm/mach-davinci/dm355.c:863:27: warning: symbol 'dm355_venc_pdata' was not declared. Should it be static?
 
-> Oh, the binding for samsung-i2s uses IP versions. Isn't that slightly broken?
+Cc: Prabhakar Lad <prabhakar.csengg@gmail.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/mach-davinci/board-dm365-evm.c |    2 +-
+ arch/arm/mach-davinci/dm355.c           |    2 +-
+ arch/arm/mach-davinci/dm365.c           |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-> At least with Samsung bindings, I think we happened to agree on a single 
-> convention of naming compatible values after the first SoC in which such block 
-> first appeared.
-
-> I wonder what happened with this i2s binding that made it end up outside this 
-> convention.
-
-I think it predates that convention, plus it's been quite common to put
-two different I2S blocks in the same SoC (for totally sensible reasons)
-so it's not always been clear that the SoC name is sufficiently unique.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130712/1898d978/attachment.sig>
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index fd38c8d..7e4e32f 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -505,7 +505,7 @@ static struct vpbe_output dm365evm_vpbe_outputs[] = {
+ /*
+  * Amplifiers on the board
+  */
+-struct ths7303_platform_data ths7303_pdata = {
++static struct ths7303_platform_data ths7303_pdata = {
+ 	.ch_1 = 3,
+ 	.ch_2 = 3,
+ 	.ch_3 = 3,
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index 42ef53f..86100d1 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -860,7 +860,7 @@ static struct platform_device dm355_vpbe_display = {
+ 	},
+ };
+ 
+-struct venc_platform_data dm355_venc_pdata = {
++static struct venc_platform_data dm355_venc_pdata = {
+ 	.setup_pinmux	= dm355_vpbe_setup_pinmux,
+ 	.setup_clock	= dm355_venc_setup_clock,
+ };
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index fa7af5e..dad2802 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -1349,7 +1349,7 @@ static struct platform_device dm365_vpbe_display = {
+ 	},
+ };
+ 
+-struct venc_platform_data dm365_venc_pdata = {
++static struct venc_platform_data dm365_venc_pdata = {
+ 	.setup_pinmux	= dm365_vpbe_setup_pinmux,
+ 	.setup_clock	= dm365_venc_setup_clock,
+ };
+-- 
+1.7.10.1
