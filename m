@@ -1,65 +1,48 @@
 From: b18965@freescale.com (Alison Wang)
-Date: Fri, 12 Jul 2013 14:07:52 +0800
-Subject: [PATCH 1/5] ARM: dts: vf610: Add DCU and TCON nodes
+Date: Fri, 12 Jul 2013 14:07:53 +0800
+Subject: [PATCH 2/5] ARM: dts: vf610-twr: Enable DCU and TCON devices
 In-Reply-To: <1373609276-14566-1-git-send-email-b18965@freescale.com>
 References: <1373609276-14566-1-git-send-email-b18965@freescale.com>
-Message-ID: <1373609276-14566-2-git-send-email-b18965@freescale.com>
+Message-ID: <1373609276-14566-3-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DCU and TCON nodes in SoC level DTS for Freescale
-Vybrid VF610. It also removes useless pin for DCU0 pinctrl.
+This patch enables DCU and TCON devices for Vybrid VF610 TOWER board.
 
 Signed-off-by: Alison Wang <b18965@freescale.com>
 ---
 Changes in v2: None
 
- arch/arm/boot/dts/vf610.dtsi | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/vf610-twr.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index e1eb7da..037e8f1 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -140,6 +140,14 @@
- 				clock-names = "pit";
- 			};
+diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+index b3905f5..605fb04 100644
+--- a/arch/arm/boot/dts/vf610-twr.dts
++++ b/arch/arm/boot/dts/vf610-twr.dts
+@@ -36,6 +36,12 @@
  
-+			tcon0: tcon at 4003d000 {
-+				compatible = "fsl,vf610-tcon";
-+				reg = <0x4003d000 0x1000>;
-+				clocks = <&clks VF610_CLK_TCON0>;
-+				clock-names = "tcon";
-+				status = "disabled";
-+			};
-+
- 			wdog at 4003e000 {
- 				compatible = "fsl,vf610-wdt", "fsl,imx21-wdt";
- 				reg = <0x4003e000 0x1000>;
-@@ -169,7 +177,6 @@
- 				dcu0 {
- 					pinctrl_dcu0_1: dcu0grp_1 {
- 						fsl,pins = <
--						VF610_PAD_PTB8__GPIO_30		0x42
- 						VF610_PAD_PTE0__DCU0_HSYNC	0x42
- 						VF610_PAD_PTE1__DCU0_VSYNC	0x42
- 						VF610_PAD_PTE2__DCU0_PCLK	0x42
-@@ -395,6 +402,16 @@
- 				reg = <0x40050000 0x1000>;
- 			};
+ };
  
-+			dcu0: dcu at 40058000 {
-+				compatible = "fsl,vf610-dcu";
-+				reg = <0x40058000 0x1200>;
-+				interrupts = <0 30 0x04>;
-+				clocks = <&clks VF610_CLK_DCU0>;
-+				clock-names = "dcu";
-+				tcon-controller = <&tcon0>;
-+				status = "disabled";
-+			};
++&dcu0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_dcu0_1>;
++	status = "okay";
++};
 +
- 			i2c0: i2c at 40066000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
+ &fec0 {
+ 	phy-mode = "rmii";
+ 	pinctrl-names = "default";
+@@ -50,6 +56,10 @@
+ 	status = "okay";
+ };
+ 
++&tcon0 {
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1_1>;
 -- 
 1.8.0
