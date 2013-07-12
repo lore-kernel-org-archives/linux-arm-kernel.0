@@ -1,32 +1,44 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 12 Jul 2013 12:13:19 +0200
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <20130712080145.GC24008@pd.tnic>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
- <20130712075602.GA4002@gmail.com> <20130712080145.GC24008@pd.tnic>
-Message-ID: <20130712101319.GA13421@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 12 Jul 2013 12:13:17 +0200
+Subject: [PATCH] ASoC: Samsung: Modify the I2S driver to support I2S on
+ Exynos5420
+In-Reply-To: <20130711130139.GQ24508@sirena.org.uk>
+References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
+ <2214161.FSfscAvpna@thinkpad> <20130711130139.GQ24508@sirena.org.uk>
+Message-ID: <2463181.bQfIDO6XJk@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday 11 of July 2013 14:01:39 Mark Brown wrote:
+> On Thu, Jul 11, 2013 at 01:41:40PM +0200, Tomasz Figa wrote:
+> > On Thursday 11 of July 2013 12:20:23 Mark Brown wrote:
+> > > This is a bit of a larger project sadly, there was resistance to doing
+> > > the DT bindings based on compatible strings using the IP version :(
+> > 
+> > I'm not sure if this case is related to this problem in any way. I just
+> > suggested introducing a new include like samsung,exynos5420-i2s, a opposed
+> > to using samsung,exynos5250-i2s and adding flags, since the I2S in
+> > Exynos5420 is
+> Well, it *should* be samsung,i2s-vN where N is the version number of the
+> IP but documentation on the versioning has been patchy hence this whole
+> thinng.
 
-* Borislav Petkov <bp@alien8.de> wrote:
+Oh, the binding for samsung-i2s uses IP versions. Isn't that slightly broken?
 
-> On Fri, Jul 12, 2013 at 09:56:02AM +0200, Ingo Molnar wrote:
-> >
-> > If a utility is not widely available yet and if the utility is not in 
-> > the kernel proper, could you please at least make sure that randconfig 
-> > does not stumble over non-buildable kernels?
+At least with Samsung bindings, I think we happened to agree on a single 
+convention of naming compatible values after the first SoC in which such block 
+first appeared.
+
+I wonder what happened with this i2s binding that made it end up outside this 
+convention.
+
+> > the first one to have this TDM or whatever mode. (I'd still like to hear
+> > what it is...)
 > 
-> Two months ago I've complained about this and other people have burned 
-> themselves too in the meantime...
+> What it *should* be is the option to send more than one audio stream
+> down a link using time division multiplexing.
 
-and now it is upstream already, via -mm:
+OK.
 
-   e76e1fdfa8f8 lib: add support for LZ4-compressed kernel
-
-
-Thanks,
-
-	Ingo
+Best regards,
+Tomasz
