@@ -1,25 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Jul 2013 02:46:31 -0700
-Subject: [PATCH 1/2] Revert "ARM: OMAP2+: Fix serial init for device
- tree based booting"
-In-Reply-To: <51DFCAF3.7040503@ti.com>
-References: <1373539986-27272-1-git-send-email-rnayak@ti.com>
- <1373539986-27272-2-git-send-email-rnayak@ti.com>
- <20130712072051.GA7656@atomide.com> <51DFB0E4.6040007@ti.com>
- <20130712080305.GD7656@atomide.com> <51DFC58C.7030105@ti.com>
- <20130712091827.GH7656@atomide.com> <51DFCAF3.7040503@ti.com>
-Message-ID: <20130712094631.GI7656@atomide.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Fri, 12 Jul 2013 12:13:19 +0200
+Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
+ streaming format
+In-Reply-To: <20130712080145.GC24008@pd.tnic>
+References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+ <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
+ <20130712075602.GA4002@gmail.com> <20130712080145.GC24008@pd.tnic>
+Message-ID: <20130712101319.GA13421@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [130712 02:29]:
->
-> Right, that seems much cleaner. I will send a patch out for it and get rid
-> of all the cmdline parsing in serial.c
 
-Oh that's right, then it should not be needed for legacy pdata based
-booting either :)
+* Borislav Petkov <bp@alien8.de> wrote:
 
-Regards,
+> On Fri, Jul 12, 2013 at 09:56:02AM +0200, Ingo Molnar wrote:
+> >
+> > If a utility is not widely available yet and if the utility is not in 
+> > the kernel proper, could you please at least make sure that randconfig 
+> > does not stumble over non-buildable kernels?
+> 
+> Two months ago I've complained about this and other people have burned 
+> themselves too in the meantime...
 
-Tony
+and now it is upstream already, via -mm:
+
+   e76e1fdfa8f8 lib: add support for LZ4-compressed kernel
+
+
+Thanks,
+
+	Ingo
