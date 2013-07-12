@@ -1,39 +1,45 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 12 Jul 2013 13:36:56 +0200
-Subject: [PATCH] Route kbd LEDs through the generic LEDs layer
-In-Reply-To: <20130707101028.GD5651@type.youpi.perso.aquilenet.fr>
-References: <201011112205.oABM5KVJ005298@imap1.linux-foundation.org>
- <201011111440.07882.dmitry.torokhov@gmail.com>
- <20110102090935.GV32469@atrey.karlin.mff.cuni.cz>
- <20110102103210.GA25662@core.coreip.homeip.net>
- <20110102225741.GX5480@const.famille.thibault.fr>
- <20110112182702.GA9168@core.coreip.homeip.net>
- <20111114040613.GA4992@type.famille.thibault.fr>
- <20121221003449.GA6999@type.youpi.perso.aquilenet.fr>
- <20130707101028.GD5651@type.youpi.perso.aquilenet.fr>
-Message-ID: <20130712113655.GA4227@amd.pavel.ucw.cz>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 12 Jul 2013 12:45:51 +0100
+Subject: [PATCH v5 1/7] sound: codec: wm8731: add rates constraints
+In-Reply-To: <1373559359-31607-2-git-send-email-richard.genoud@gmail.com>
+References: <1373559359-31607-1-git-send-email-richard.genoud@gmail.com>
+ <1373559359-31607-2-git-send-email-richard.genoud@gmail.com>
+Message-ID: <20130712114551.GD24508@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Thu, Jul 11, 2013 at 06:15:53PM +0200, Richard Genoud wrote:
 
-> This permits to reassign keyboard LEDs to something else than keyboard "leds"
-> state, by adding keyboard led and modifier triggers connected to a series
-> of VT input LEDs, themselves connected to VT input triggers, which
-> per-input device LEDs use by default.  Userland can thus easily change the LED
-> behavior of (a priori) all input devices, or of particular input devices.
+Please always try to use commit logs that look like normal commit logs
+for the subsystem.
 
-Nice! Leds now have proper /sys interface.
+>  	switch (freq) {
+> -	case 11289600:
+>  	case 12000000:
+> +		wm8731->constraints = &wm8731_constraints_12000000;
+> +		break;
+>  	case 12288000:
+> -	case 16934400:
+>  	case 18432000:
+> -		wm8731->sysclk = freq;
+> +		wm8731->constraints = &wm8731_constraints_12288000_18432000;
+> +		break;
+> +	case 16934400:
+> +	case 11289600:
+> +		wm8731->constraints = &wm8731_constraints_11289600_16934400;
+>  		break;
+>  	default:
+>  		return -EINVAL;
+>  	}
 
-But... I boot up, switch from X to console, press capslock, and no
-reaction anywhere.
-
-Note that this is notebook with usb keyboard plugged in (and two
-monitors), but I believe this worked before...
-
-Thanks,
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+This isn't going to work with systems which have a variable clock as the
+input to the CODEC.  If it's imposing constraints the driver needs to
+allow setting the clock to zero as a way of removing constraints (and
+any existing drivers should be updated to do this if needed).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130712/f6b906da/attachment.sig>
