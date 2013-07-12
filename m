@@ -1,118 +1,38 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 12 Jul 2013 18:14:26 +0300
-Subject: [PATCH] arm: omap5: hwmod: add missing ocp2scp hwmod data
-Message-ID: <1373642066-5235-1-git-send-email-balbi@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 12 Jul 2013 16:14:35 +0100
+Subject: Handling ARM_ERRATA_364296 when CONFIG_SMP=y
+In-Reply-To: <CAOMZO5AVpQ6DUja=usBCDzRH0NyNqbXsHNNOJSAY=8OvgHHTmA@mail.gmail.com>
+References: <CAOMZO5AVpQ6DUja=usBCDzRH0NyNqbXsHNNOJSAY=8OvgHHTmA@mail.gmail.com>
+Message-ID: <20130712151434.GF28271@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benoit Cousson <benoit.cousson@linaro.org>
+On Mon, Jul 08, 2013 at 07:16:34PM +0100, Fabio Estevam wrote:
+> On commit 145e10e1 (ARM: 7015/1: ARM errata: Possible cache data
+> corruption with hit-under-miss enabled) you added support for
+> ARM_ERRATA_364296 option:
+> 
+> +config ARM_ERRATA_364296
+> +       bool "ARM errata: Possible cache data corruption with
+> hit-under-miss enabled"
+> +       depends on CPU_V6 && !SMP
+> +       help
+> 
+> As this erratum affects mx31/mx35, I would like to enable it, but I am
+> not allowed to do it because mx31/mx35 share the same config file as
+> mx6 (imx_v6_v7_defconfig), which has SMP turned on.
+> 
+> What would be the correct approach for applying this erratum?
+> 
+> Is it safe to do "depends on CPU_V6" only or should this erratum be
+> handled in the bootloader?
 
-without that hwmod data, USB3 will not in OMAP5 boards.
+I think you can just remove the !SMP case. The workaround (setting an
+undocumented bit) already checks for the right CPU Id. The only problem
+issue is that oldconfig will ask whether to enable it or not.
 
-While at that, also fix DTS data to pass reg property,
-otherwise driver won't probe.
+Bootloader would be even better but it's pretty late to enforce this on
+ARMv6.
 
-Signed-off-by: Benoit Cousson <benoit.cousson@linaro.org>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
-
-tested on OMAP5 uEVM. Gets rid of a data abort when USB3
-is enabled. There still some other patches missing to get
-USB3 working out of the box, but that's on Palmas and will
-come as soon as I get those ready.
-
-This is already on step forward.
-
- arch/arm/boot/dts/omap5.dtsi               |  3 +-
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 45 ++++++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index da41d70..a0de586 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -654,10 +654,11 @@
- 			};
- 		};
- 
--		ocp2scp {
-+		ocp2scp at 4a080000 {
- 			compatible = "ti,omap-ocp2scp";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-+			reg = <0x4a080000 0x20>;
- 			ranges;
- 			ti,hwmods = "ocp2scp1";
- 			usb2_phy: usb2phy at 4a084000 {
-diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-index 2435109..d9118a1 100644
---- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-@@ -1105,6 +1105,42 @@ static struct omap_hwmod omap54xx_mpu_hwmod = {
- };
- 
- /*
-+ * 'ocp2scp' class
-+ * bridge to transform ocp interface protocol to scp (serial control port)
-+ * protocol
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap54xx_ocp2scp_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.syss_offs	= 0x0014,
-+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE |
-+			SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class omap54xx_ocp2scp_hwmod_class = {
-+	.name	= "ocp2scp",
-+	.sysc	= &omap54xx_ocp2scp_sysc,
-+};
-+
-+/* ocp2scp1 */
-+static struct omap_hwmod omap54xx_ocp2scp1_hwmod = {
-+	.name		= "ocp2scp1",
-+	.class		= &omap54xx_ocp2scp_hwmod_class,
-+	.clkdm_name	= "l3init_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP54XX_CM_L3INIT_OCP2SCP1_CLKCTRL_OFFSET,
-+			.context_offs = OMAP54XX_RM_L3INIT_OCP2SCP1_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_HWCTRL,
-+		},
-+	},
-+};
-+
-+/*
-  * 'timer' class
-  * general purpose timer module with accurate 1ms tick
-  * This class contains several variants: ['timer_1ms', 'timer']
-@@ -1900,6 +1936,14 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__mpu = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* l4_cfg -> ocp2scp1 */
-+static struct omap_hwmod_ocp_if omap54xx_l4_cfg__ocp2scp1 = {
-+	.master		= &omap54xx_l4_cfg_hwmod,
-+	.slave		= &omap54xx_ocp2scp1_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* l4_wkup -> timer1 */
- static struct omap_hwmod_ocp_if omap54xx_l4_wkup__timer1 = {
- 	.master		= &omap54xx_l4_wkup_hwmod,
-@@ -2102,6 +2146,7 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap54xx_l4_per__mmc4,
- 	&omap54xx_l4_per__mmc5,
- 	&omap54xx_l4_cfg__mpu,
-+	&omap54xx_l4_cfg__ocp2scp1,
- 	&omap54xx_l4_wkup__timer1,
- 	&omap54xx_l4_per__timer2,
- 	&omap54xx_l4_per__timer3,
 -- 
-1.8.2.1
+Catalin
