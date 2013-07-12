@@ -1,86 +1,117 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 12 Jul 2013 05:10:23 -0700
-Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if
- UP system
-In-Reply-To: <20130712111322.GC3213@e102654-lin.cambridge.arm.com>
-References: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
- <20130712111322.GC3213@e102654-lin.cambridge.arm.com>
-Message-ID: <20130712121023.GB27430@codeaurora.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 12 Jul 2013 15:10:31 +0300
+Subject: [PATCH] arm: omap2plus: unidle devices which are about to probe
+In-Reply-To: <51DFEF59.1010509@ti.com>
+References: <20130711092612.GG23892@arwen.pp.htv.fi>
+ <1373537788-30413-1-git-send-email-balbi@ti.com>
+ <51DFEF59.1010509@ti.com>
+Message-ID: <20130712121031.GB17053@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12, Javi Merino wrote:
-> On Sat, Jul 06, 2013 at 12:39:33AM +0100, Stephen Boyd wrote:
-> > In a uniprocessor implementation the interrupt processor targets
-> > registers are read-as-zero/write-ignored (RAZ/WI). Unfortunately
-> > gic_get_cpumask() will print a critical message saying
-> > 
-> >  GIC CPU mask not found - kernel will fail to boot.
-> > 
-> > if these registers all read as zero, but there won't actually be
-> > a problem on uniprocessor systems and the kernel will boot just
-> > fine. Skip this check if we're running a UP kernel or if we
-> > detect that the hardware only supports a single processor.
-> > 
-> > Cc: Nicolas Pitre <nico@linaro.org>
-> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
-> > 
-> > Maybe we should just drop the check entirely? It looks like it may
-> > just be debug code that won't ever trigger in practice, even on the
-> > 11MPCore that caused this code to be introduced.
+On Fri, Jul 12, 2013 at 02:58:17PM +0300, Grygorii Strashko wrote:
+> On 07/11/2013 01:16 PM, Felipe Balbi wrote:
+> >in order to make HWMOD and pm_runtime agree on the
+> >initial state of the device, we will unidle the device
+> >and call pm_runtime_set_active() to tell pm_runtime
+> >that the device is really active.
+> >
+> >By the time driver's probe() is reached, a call to
+> >pm_runtime_get_sync() will not cause driver's
+> >->runtime_resume() method to be called at first, only
+> >after a successful ->runtime_suspend().
+> >
+> >Note that we must prevent pm_runtime transitions while
+> >driver is probing otherwise drivers would be suspended
+> >as soon as they call pm_runtime_use_autosuspend(). By
+> >calling pm_runtime_forbid() before probe() and
+> >pm_runtime_allow() after probe() we 'fix' that detail.
+> >
+> >Note that this patch was inspired by PCI's pci_pm_init().
 > 
-> I agree, we should drop the check.  It's annoying in uniprocessors and
-> unlikely to be found in the real world unless your gic entry in the dt
-> is wrong.
+> NAK. This is a hack.
+
+hack is your flag to check if the driver is "initialized". pff
+
+> In addition to what I've mentioned in
+> http://www.spinics.net/lists/arm-kernel/msg258061.html there are
+> following issues:
+> 1) this patch disables call to PM runtime callbacks for all
+
+no, it does not. It forbids pm runtime transitions during probe.
+
+> OMAP drivers which is wrong - I've found, for example, that
+> omap-usb-host.c driver enables TLL in some configurations in its
+> .runtime_resume():
 > 
+> usbhs_runtime_resume()
+> |-omap_tll_enable()
 
-Ok. How about this?
+which is wrong. PM runtime callbacks are supposed to be use for,
+surprise, PM!
 
-----8<-----
-Subject: [PATCH v2] irqchip: gic: Don't complain in gic_get_cpumask()
+> 2) even with this fix the restore context issue will not be fixed for
+> *non* console UARTs. Just try:
+> #echo 0xDEAD > dev/ttyO3 // checked on OMAP4 SDP
 
-In a uniprocessor implementation the interrupt processor targets
-registers are read-as-zero/write-ignored (RAZ/WI). Unfortunately
-gic_get_cpumask() will print a critical message saying
+that I have not checked, but then again, with that you're not calling
+set_termios() anyway.
 
- GIC CPU mask not found - kernel will fail to boot.
+> 3) I've checked most of OMAP drivers and all of them solve such kind
+> of problem internally (SPI, MMC, I2C, etc.)
 
-if these registers all read as zero, but there won't actually be
-a problem on uniprocessor systems and the kernel will boot just
-fine. Remove this check because if you're on a multiprocessor
-system it's unlikely to be printed unless your DT is wrong or
-your hardware is broken.
+and you see no problem with that ? Repeating the same thing over and
+over again ?
 
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Javi Merino <javi.merino@arm.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/irqchip/irq-gic.c | 3 ---
- 1 file changed, 3 deletions(-)
+> 4) See inline
+> >
+> >Signed-off-by: Felipe Balbi <balbi@ti.com>
+> >---
+> >
+> >boot tested on top of today's Linus master
+> >6d128e1e72bf082542e85f72e6b7ddd704193588 with OMAP4
+> >panda. Reached console prompt and, after setting a
+> >proper autosuspend delay, consoles autosuspend just
+> >fine.
+> >
+> >It needs to be tested on other platforms.
+> >
+> >ps: note that we also call pm_runtime_set_suspended(dev)
+> >from our late_initcall() to disable devices so that pm_runtime
+> >and HWMOD continue to aggree on device's state.
+> >
+> >  arch/arm/mach-omap2/omap_device.c | 44 +++++++++++++++++++++++++++++++++++----
+> >  1 file changed, 40 insertions(+), 4 deletions(-)
+> >
+> >diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+> >index 5cc9287..cb1fc1d 100644
+> >--- a/arch/arm/mach-omap2/omap_device.c
+> >+++ b/arch/arm/mach-omap2/omap_device.c
+> >@@ -178,6 +178,26 @@ odbfd_exit:
+> >  	return ret;
+> >  }
+> >
+> >+static void omap_device_pm_init(struct platform_device *pdev)
+> >+{
+> >+	omap_device_enable(pdev);
+> >+	pm_runtime_forbid(&pdev->dev);
+> It's wrong to use pm_runtime_forbid() - pm_runtime_get_noresume()
+> should be used instead.
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 19ceaa60..4fbcea9 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -368,9 +368,6 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
- 			break;
- 	}
- 
--	if (!mask)
--		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
--
- 	return mask;
- }
- 
+how come ? What makes you think pm_runtime_get_noresume() is the right
+thing here ? 
+
+> pm_runtime_forbid()
+> |-rpm_resume()
+
+so what ? flags is zero.
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
-
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130712/316a3665/attachment.sig>
