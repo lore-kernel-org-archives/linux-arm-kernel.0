@@ -1,49 +1,77 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 12 Jul 2013 11:12:01 +0300
-Subject: [PATCH v12 06/13] usb: chipidea: add otg_cap attribute for otg
- capable
-In-Reply-To: <1373524041-10482-7-git-send-email-peter.chen@freescale.com>
-References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
- <1373524041-10482-7-git-send-email-peter.chen@freescale.com>
-Message-ID: <871u742o4u.fsf@ashishki-desk.ger.corp.intel.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 12 Jul 2013 10:13:52 +0200
+Subject: [PATCH] ARM: OMAP2+: twl-common: Remove code for twl6030 and
+ twl6040 setup for legacy boot
+In-Reply-To: <20130712072650.GC7656@atomide.com>
+References: <1373552638-13930-1-git-send-email-peter.ujfalusi@ti.com>
+ <20130712072650.GC7656@atomide.com>
+Message-ID: <51DFBAC0.5070806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Chen <peter.chen@freescale.com> writes:
+On 07/12/2013 09:26 AM, Tony Lindgren wrote:
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [130711 07:30]:
+>> OMAP4 no longer boots in legacy mode so the code here is no longer used.
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/twl-common.c | 332 ++-------------------------------------
+>>  arch/arm/mach-omap2/twl-common.h |   8 -
+>>  2 files changed, 12 insertions(+), 328 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+>> index c05898f..932dea7 100644
+>> --- a/arch/arm/mach-omap2/twl-common.c
+>> +++ b/arch/arm/mach-omap2/twl-common.c
+>> @@ -38,20 +38,6 @@ static struct i2c_board_info __initdata pmic_i2c_board_info = {
+>>  	.flags		= I2C_CLIENT_WAKE,
+>>  };
+>>  
+>> -#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
+>> -static int twl_set_voltage(void *data, int target_uV)
+>> -{
+>> -	struct voltagedomain *voltdm = (struct voltagedomain *)data;
+>> -	return voltdm_scale(voltdm, target_uV);
+>> -}
+>> -
+>> -static int twl_get_voltage(void *data)
+>> -{
+>> -	struct voltagedomain *voltdm = (struct voltagedomain *)data;
+>> -	return voltdm_get_voltage(voltdm);
+>> -}
+>> -#endif
+> 
+> Looks like the code above is also needed for omap3 based on the
+> if defined?
 
-> Since we need otgsc to know vbus's status at some chipidea
-> controllers even it is peripheral-only mode. Besides, some
-> SoCs (eg, AR9331 SoC) don't have otgsc register even
-> the DCCPARAMS_DC and DCCPARAMS_HC are both 1 at CAP_DCCPARAMS.
-> We inroduce otg_cap attribute to indicate if the controller
-> is otg capable, defaultly, we follow the rule that if DCCPARAMS_DC
-> and DCCPARAMS_HC are both 1 at CAP_DCCPARAMS are otg capable, but if there
-> is exception, the platform can override it by device tree or platform data.
->
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
+Yes it is still needed for OMAP3 when booting in legacy. I have moved these
+two function down within the #if defined(CONFIG_ARCH_OMAP3) :
 
-[...]
+ #if defined(CONFIG_ARCH_OMAP3)
+@@ -189,6 +160,18 @@ static struct regulator_init_data omap3_vdd2 = {
+ 	.consumer_supplies		= omap3_vdd2_supply,
+ };
 
-> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-> index 118bf66..0a906b4 100644
-> --- a/include/linux/usb/chipidea.h
-> +++ b/include/linux/usb/chipidea.h
-> @@ -7,6 +7,12 @@
->  
->  #include <linux/usb/otg.h>
->  
-> +enum usb_otg_cap {
-> +	OTG_CAP_ATTR_IS_NOT_EXISTED = 0,
-> +	OTG_CAP_ATTR_IS_TRUE,
-> +	OTG_CAP_ATTR_IS_FALSE,
-> +};
++static int twl_set_voltage(void *data, int target_uV)
++{
++	struct voltagedomain *voltdm = (struct voltagedomain *)data;
++	return voltdm_scale(voltdm, target_uV);
++}
++
++static int twl_get_voltage(void *data)
++{
++	struct voltagedomain *voltdm = (struct voltagedomain *)data;
++	return voltdm_get_voltage(voltdm);
++}
++
+ static struct twl_regulator_driver_data omap3_vdd1_drvdata = {
+ 	.get_voltage = twl_get_voltage,
+ 	.set_voltage = twl_set_voltage,
+@@ -235,297 +218,6 @@ void __init omap3_pmic_get_config(struct
+twl4030_platform_data *pmic_data,
+ }
+ #endif /* CONFIG_ARCH_OMAP3 */
 
-We don't really need all three, do we? We only need to know if the
-controller *can't* do otg. The rest we can infer from dr_mode and
-DCCPARAMS. So it can be another bit in flags rather than a separate
-field in platdata.
 
-Regards,
---
-Alex
+-- 
+P?ter
