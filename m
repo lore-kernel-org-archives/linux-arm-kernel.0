@@ -1,65 +1,46 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Fri, 12 Jul 2013 17:26:59 +0530
-Subject: v3.10 - big endian core support
-In-Reply-To: <20130712134726.0a909165@skate>
-References: <CALicx6u89THSiRa4FzGZrcoG8q+o_BD8qVEC4CYXEjPUVK_fJw@mail.gmail.com>
- <20130712134726.0a909165@skate>
-Message-ID: <CALicx6sr=OXYAdSS-RXPCjSp4f_yLQyw6jJsQ2KyhgQ9fRtXag@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 12 Jul 2013 14:58:05 +0300
+Subject: [PATCH] arm: omap5: dts: fix reg property size
+Message-ID: <1373630285-17389-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 12, 2013 at 5:17 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Dear Vijay Kilari,
->
-> On Fri, 12 Jul 2013 17:09:12 +0530, Vijay Kilari wrote:
->
->> > Ben Dooks has a separate branch on top of this base branch for
->> > big-endian support, that adds atags compat code to convert the ATAGs
->> > data from LE to BE. See the baserock/311/be/atags branch in
->> > git://git.baserock.org/delta/linux. Or
->> > http://git.baserock.org/cgi-bin/cgit.cgi/delta/linux.git/log/?h=baserock/311/be/atags.
->>
->>  ARM VE TC2 board, enabling CONFIG_THUMB2_KERNEL failed to boot in BE mode
->> It hangs at very early stage of boot
->
-> Yeah, the Thumb2 code is not supported by Ben Dooks patches, it's part
-> of the TODO-list. I think Ben said he would probably not have much time
-> to work on this. I might be able to spare some time on this, so just
-> let me know if I should start working on this. If I remember correctly,
-> it's mainly the fixup_pv_table code that needed some Thumb2/BE love.
+USB3 block has a 64KiB space, another 64KiB is
+used for the wrapper.
 
-In fact, I tried with below changes.. still it fails
+Without this change, resource_size() will get
+confused and driver won't probe because size
+will be negative.
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 2de1114..7df64c7 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -592,8 +592,14 @@ __fixup_a_pv_table:
-        b       2f
- 1:     add     r7, r3
-        ldrh    ip, [r7, #2]
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+       rev     ip, ip
-+#endif
-        and     ip, 0x8f00
-        orr     ip, r6  @ mask in offset bits 31-24
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+       rev     ip, ip
-+#endif
-        strh    ip, [r7, #2]
- 2:     cmp     r4, r5
-        ldrcc   r7, [r4], #4    @ use branch for delay slot
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
 
->
-> Will, is getting Thumb2 working a requirement to get the BE support
-> merged, or can we for now make the BE option depends on !THUMB2_KERNEL ?
->
-> Thanks!
->
-> Thomas
-> --
-> Thomas Petazzoni, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+does anybody know Benoit's knew email address ?
+
+ arch/arm/boot/dts/omap5.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index e643620..5c99f19 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -637,7 +637,7 @@
+ 		omap_dwc3 at 4a020000 {
+ 			compatible = "ti,dwc3";
+ 			ti,hwmods = "usb_otg_ss";
+-			reg = <0x4a020000 0x1000>;
++			reg = <0x4a020000 0x10000>;
+ 			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+@@ -645,7 +645,7 @@
+ 			ranges;
+ 			dwc3 at 4a030000 {
+ 				compatible = "synopsys,dwc3";
+-				reg = <0x4a030000 0x1000>;
++				reg = <0x4a030000 0x10000>;
+ 				interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
+ 				usb-phy = <&usb2_phy>, <&usb3_phy>;
+ 				tx-fifo-resize;
+-- 
+1.8.2.1
