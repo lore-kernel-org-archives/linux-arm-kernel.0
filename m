@@ -1,73 +1,31 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 12 Jul 2013 13:28:35 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6q{dl}: add a new pinctrl for uart3
-In-Reply-To: <1373449227-11740-1-git-send-email-b32955@freescale.com>
-References: <1373449227-11740-1-git-send-email-b32955@freescale.com>
-Message-ID: <20130712052833.GA25501@S2101-09.ap.freescale.net>
+Date: Fri, 12 Jul 2013 13:34:38 +0800
+Subject: [PATCH v2 1/2] ARM: dts: imx6dl-wandboard: Add SDHC1 and SDHC2
+ ports
+In-Reply-To: <1373489419-20893-1-git-send-email-festevam@gmail.com>
+References: <1373489419-20893-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130712053436.GB25501@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 10, 2013 at 05:40:26PM +0800, Huang Shijie wrote:
-> Add the a new pinctrl for uart3. In the imx6q{dl}-sabreauto boards,
-> the uart3 is used for Bluetooth.
+On Wed, Jul 10, 2013 at 05:50:18PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> Wandboard has a SD card slot on the baseboard connected to SDHC1 and a
+> BCM4329 (Wifi + Bluetooth chip) connected to SDHC2.
+> 
+> Add support for these ports.
+> 
+> While at it, provide the card detect gpio on SDHC3.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-We have some pin groups tweaking happening in DTS files.  Can you please
-rebase your patches on the latest imx/dt branch?
+Fabio,
+
+I did some tweaking on pin groups definition in DTS, so that we do not
+have too much maintenance burden to keep the groups aligned between
+imx6q and imx6dl.  Can you please rebase your patch on the latest imx/dt
+branch?  Also please separate soc changes and board changes into
+different patches.
 
 Shawn
-
-> ---
->  arch/arm/boot/dts/imx6dl.dtsi |   11 +++++++++++
->  arch/arm/boot/dts/imx6q.dtsi  |   11 +++++++++++
->  2 files changed, 22 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-> index a1302ed..d818ced 100644
-> --- a/arch/arm/boot/dts/imx6dl.dtsi
-> +++ b/arch/arm/boot/dts/imx6dl.dtsi
-> @@ -234,6 +234,17 @@
->  					};
->  				};
->  
-> +				uart3 {
-> +					pinctrl_uart3_1: uart3grp-1 {
-> +						fsl,pins = <
-> +							MX6DL_PAD_SD4_CLK__UART3_RX_DATA 0x1b0b1
-> +							MX6DL_PAD_SD4_CMD__UART3_TX_DATA 0x1b0b1
-> +							MX6DL_PAD_EIM_D30__UART3_CTS_B   0x1b0b1
-> +							MX6DL_PAD_EIM_EB3__UART3_RTS_B   0x1b0b1
-> +						>;
-> +					};
-> +				};
-> +
->  				uart4 {
->  					pinctrl_uart4_1: uart4grp-1 {
->  						fsl,pins = <
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index e0b7bad..1984ca4 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -277,6 +277,17 @@
->  					};
->  				};
->  
-> +				uart3 {
-> +					pinctrl_uart3_1: uart3grp-1 {
-> +						fsl,pins = <
-> +							MX6Q_PAD_SD4_CLK__UART3_RX_DATA 0x1b0b1
-> +							MX6Q_PAD_SD4_CMD__UART3_TX_DATA 0x1b0b1
-> +							MX6Q_PAD_EIM_D30__UART3_CTS_B   0x1b0b1
-> +							MX6Q_PAD_EIM_EB3__UART3_RTS_B   0x1b0b1
-> +						>;
-> +					};
-> +				};
-> +
->  				uart4 {
->  					pinctrl_uart4_1: uart4grp-1 {
->  						fsl,pins = <
-> -- 
-> 1.7.1
-> 
-> 
