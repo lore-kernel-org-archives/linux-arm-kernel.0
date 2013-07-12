@@ -1,38 +1,26 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 Jul 2013 16:14:35 +0100
-Subject: Handling ARM_ERRATA_364296 when CONFIG_SMP=y
-In-Reply-To: <CAOMZO5AVpQ6DUja=usBCDzRH0NyNqbXsHNNOJSAY=8OvgHHTmA@mail.gmail.com>
-References: <CAOMZO5AVpQ6DUja=usBCDzRH0NyNqbXsHNNOJSAY=8OvgHHTmA@mail.gmail.com>
-Message-ID: <20130712151434.GF28271@arm.com>
+Date: Fri, 12 Jul 2013 16:15:40 +0100
+Subject: [PATCH] ARM: Kconfig: Let ARM_ERRATA_364296 not depend on
+ CONFIG_SMP
+In-Reply-To: <1373319489-9467-1-git-send-email-festevam@gmail.com>
+References: <1373319489-9467-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130712151540.GG28271@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 08, 2013 at 07:16:34PM +0100, Fabio Estevam wrote:
-> On commit 145e10e1 (ARM: 7015/1: ARM errata: Possible cache data
-> corruption with hit-under-miss enabled) you added support for
-> ARM_ERRATA_364296 option:
+On Mon, Jul 08, 2013 at 10:38:09PM +0100, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> +config ARM_ERRATA_364296
-> +       bool "ARM errata: Possible cache data corruption with
-> hit-under-miss enabled"
-> +       depends on CPU_V6 && !SMP
-> +       help
+> imx_v6_v7_defconfig handles both multi-core and single-core SoCs, and it has 
+> CONFIG_SMP=y selected by default.
 > 
-> As this erratum affects mx31/mx35, I would like to enable it, but I am
-> not allowed to do it because mx31/mx35 share the same config file as
-> mx6 (imx_v6_v7_defconfig), which has SMP turned on.
+> With such config we cannot select ARM_ERRATA_364296, as it depends on !SMP.
 > 
-> What would be the correct approach for applying this erratum?
+> Let ARM_ERRATA_364296 be undependent on CONFIG_SMP, so that we can select
+> this erratum for the ARM1136 SoCs, even if CONFIG_SMP=y is enabled.
 > 
-> Is it safe to do "depends on CPU_V6" only or should this erratum be
-> handled in the bootloader?
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-I think you can just remove the !SMP case. The workaround (setting an
-undocumented bit) already checks for the right CPU Id. The only problem
-issue is that oldconfig will ask whether to enable it or not.
+I've just seen the patch (long email backlog).
 
-Bootloader would be even better but it's pretty late to enforce this on
-ARMv6.
-
--- 
-Catalin
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
