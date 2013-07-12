@@ -1,51 +1,73 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 12 Jul 2013 10:58:34 +0800
-Subject: [PATCH v12 06/13] usb: chipidea: add otg_cap attribute for otg
- capable
-In-Reply-To: <201307111736.11065.marex@denx.de>
+Date: Fri, 12 Jul 2013 11:12:01 +0800
+Subject: [PATCH v12 00/13] Add tested id switch and vbus connect detect
+ support for Chipidea
+In-Reply-To: <201307111957.19537.marex@denx.de>
 References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
- <1373524041-10482-7-git-send-email-peter.chen@freescale.com>
- <201307111736.11065.marex@denx.de>
-Message-ID: <20130712025833.GA14793@nchen-desktop>
+ <201307111957.19537.marex@denx.de>
+Message-ID: <20130712031200.GB14793@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 11, 2013 at 05:36:10PM +0200, Marek Vasut wrote:
-> Dear Peter Chen,
+On Thu, Jul 11, 2013 at 07:57:19PM +0200, Marek Vasut wrote:
+> Hi Peter,
 > 
-> > Since we need otgsc to know vbus's status at some chipidea
-> > controllers even it is peripheral-only mode. Besides, some
-> > SoCs (eg, AR9331 SoC) don't have otgsc register even
-> > the DCCPARAMS_DC and DCCPARAMS_HC are both 1 at CAP_DCCPARAMS.
-> > We inroduce otg_cap attribute to indicate if the controller
-> > is otg capable, defaultly, we follow the rule that if DCCPARAMS_DC
-> > and DCCPARAMS_HC are both 1 at CAP_DCCPARAMS are otg capable, but if there
-> > is exception, the platform can override it by device tree or platform data.
+> > This patchset adds tested otg id switch function and
+> > vbus connect and disconnect detection for chipidea driver.
+> > And fix kinds of bugs found at chipidea drivers after enabling
+> > id and vbus detection.
 > > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/chipidea/core.c  |   35 ++++++++++++++++++++++++++++-------
-> >  include/linux/usb/chipidea.h |   13 +++++++++++++
-> >  2 files changed, 41 insertions(+), 7 deletions(-)
+> > This patch is fully tested at imx6 sabresd platform.
+> > My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
 > > 
-> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> > index 93961ff..e8ceb04 100644
-> > --- a/drivers/usb/chipidea/core.c
-> > +++ b/drivers/usb/chipidea/core.c
-> > @@ -405,6 +405,18 @@ static inline void ci_role_destroy(struct ci_hdrc *ci)
-> >  	ci_hdrc_host_destroy(ci);
-> >  }
-> > 
-> > +static void ci_get_otg_capable(struct ci_hdrc *ci)
-> > +{
-> > +	if (ci->platdata->otg_cap != OTG_CAP_ATTR_IS_NOT_EXISTED)
+> > Changes for v12:
+> > - Rebased greg's usb-next tree (3.10.0-rc7+)
+> > - Split more small patches for single function and fix.
 > 
-> IS_NONEXISTENT , no?
+> I tested the patchset. Here are the results:
 > 
+> - VBUS switching
+> 
+> I'm no longer getting any ID interrupts at all when I apply the patch below. The 
+> board stays in HOST mode all the time. If I configure it as peripheral, it works 
+> as peripheral. Note with [1], I was able to switch from Peripheral->Host , not 
+> the other way around.
 
-You mean the English for this string? ok, I can change.
-It means if the "otg_cap" is not existed at platform data,
-then, the "otg_cap" can be determined by DCCPARAMS
+Thanks for your testing. But first, can you have me check
+if your ID wakeup is enabled?
+
+I can have a test at mx28evk.
+Is it current upstream kernel can boot mx28evk run?
+I have a RevC board, I would like to know if
+any patches needed.
+> 
+> --- a/arch/arm/boot/dts/imx28-m28evk.dts
+> +++ b/arch/arm/boot/dts/imx28-m28evk.dts
+> @@ -240,6 +240,8 @@
+>  
+>         ahb at 80080000 {
+>                 usb0: usb at 80080000 {
+> +                       dr_mode = "otg";
+> +                       phy_mode = "utmi";
+>                         vbus-supply = <&reg_usb0_vbus>;
+>                         pinctrl-names = "default";
+>                         pinctrl-0 = <&usbphy0_pins_a>;
+> 
+> ---------------------------
+> 
+> - MX23 UDC issue
+> 
+> I found a workaround. Now running 'dmesg' via telnet through USB CDC link no 
+> longer hangs the USB driver, but works as expected. I applied this small patch 
+> that enables the streaming mode. Works on MX23EVK. It's surprising this issue 
+> doesn't manifest on MX28, maybe MX28 contains a new revision of the controller. 
+> I remember there was some discussion about the streaming mode on MXS some time 
+> ago.
+
+It seems not reasonable, the same question for mx23evk,
+it can run well with current kernel? I have no board on hand,
+let me see if I can find one.
+  
 
 -- 
 
