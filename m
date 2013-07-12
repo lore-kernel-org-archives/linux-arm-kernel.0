@@ -1,115 +1,76 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 12 Jul 2013 11:30:51 +0100
-Subject: [PATCH 02/02] ARM: shmobile: Setup r8a7790 arch timer based on
- MD pins
-In-Reply-To: <20130711162229.933.53924.sendpatchset@w520>
-References: <20130711162209.933.47610.sendpatchset@w520>
- <20130711162229.933.53924.sendpatchset@w520>
-Message-ID: <20130712103051.GA4144@kartoffel>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 12 Jul 2013 12:41:57 +0200
+Subject: [PATCH 2/2] pwm: Add PWM polarity flag macros for DT
+In-Reply-To: <51DEEE15.7040801@wwwdotorg.org>
+References: <1373553468-6564-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1373553468-6564-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <51DEEE15.7040801@wwwdotorg.org>
+Message-ID: <3211864.2dENa1E110@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 11, 2013 at 05:22:29PM +0100, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> Update the r8a7790 arch timer setup code to configure the
-> frequency dynamically at boot time. This means that the arch
-> timer driver will be able to detect a timer frequency that
-> has been calculated based on the MD pins instead of a fixed
-> and potentially incorrect 13 MHz.
-> 
-> With this patch applied the Linux kernel will correctly
-> support the r8a7790 Lager board that uses a 20 Mhz EXTAL.
-> The arch timer will operate on 10 MHz and the Linux arch
-> timer driver will be correctly configured to use 10 MHz.
-> 
-> Without this patch the 20 MHz EXTAL will be used to drive
-> the arch timer at 10 MHz, but the Linux arch timer driver
-> will believe it is counting at 13 Mhz.
+Hi Stephen,
 
-This seems scary to me. The bootloader should be doing this before jumping to
-Linux. As CNTCR is only writeable from the secure side, you won't be able to
-use KVM unless the bootloader has done this.
+On Thursday 11 July 2013 11:40:37 Stephen Warren wrote:
+> On 07/11/2013 08:37 AM, Laurent Pinchart wrote:
+> > Define PWM_POLARITY_NORMAL and PWM_POLARITY_INVERTED macros in
+> > include/dt-bindings/pwm/pwm.h to be used by device tree sources.
+> > 
+> >  Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt |  6 +++---
+> >  Documentation/devicetree/bindings/pwm/pwm-samsung.txt   |  5 +++--
+> >  Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt  |  5 +++--
+> >  Documentation/devicetree/bindings/pwm/pwm.txt           |  8 +++++---
+> >  Documentation/devicetree/bindings/pwm/vt8500-pwm.txt    |  5 +++--
+> >  arch/arm/boot/dts/am335x-evm.dts                        |  3 ++-
+> >  arch/arm/boot/dts/am335x-evmsk.dts                      |  3 ++-
+> >  arch/arm/boot/dts/wm8850-w70v2.dts                      |  3 ++-
+> >  include/dt-bindings/pwm/pwm.h                           | 15 ++++++++++++
+> >  include/linux/pwm.h                                     |  4 ++--
+> 
+> I think this needs to be separate patches; at least the new pwm.h should
+> be introduced separately to the board-specific *.dts edits, and perhaps
+> further split up?
 
-Additionally, if you didn't do this in Linux, as far as I can see you wouldn't
-need an init_time callback at all...
+What about splitting it in three patches that
 
-Thanks,
-Mark.
+- add the include/dt-bindings/pwm/pwm.h header, and update include/linux/pwm.h 
+and Documentation/devicetree/bindings/pwm/pwm.txt
 
+- update the rest of the documentation
+
+- update the .dts files
+
+> That way, the one patch that introduces <dt-bindings/pwm.h> would be
+> available to be merged into any other tree that wanted to take patches
+> to use the new defines.
 > 
-> Reported-by: Ulrich Hecht <ulrich.hecht@gmail.com>
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> Tested-by: Ulrich Hecht <ulrich.hecht@gmail.com>
-> ---
+> > diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+> > 
+> >  enum pwm_polarity {
+> > 
+> > -	PWM_POLARITY_NORMAL,
+> > -	PWM_POLARITY_INVERSED,
+> > +	PWM_POLARITY_NORMAL = 0,
+> > +	PWM_POLARITY_INVERSED = 1,
+> > 
+> >  };
 > 
->  arch/arm/mach-shmobile/setup-r8a7790.c |   49 ++++++++++++++++++++++++++++----
->  1 file changed, 44 insertions(+), 5 deletions(-)
-> 
-> --- 0006/arch/arm/mach-shmobile/setup-r8a7790.c
-> +++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-07-09 21:29:18.000000000 +0900
-> @@ -215,14 +215,53 @@ u32 __init r8a7790_read_mode_pins(void)
->  	return mode;
->  }
->  
-> +#define CNTCR 0
-> +#define CNTFID0 0x20
-> +
->  void __init r8a7790_timer_init(void)
->  {
-> -	void __iomem *cntcr;
-> +#ifdef CONFIG_ARM_ARCH_TIMER
-> +	u32 mode = r8a7790_read_mode_pins();
-> +	void __iomem *base;
-> +	int extal_mhz = 0;
-> +	u32 freq;
-> +
-> +	/* At Linux boot time the r8a7790 arch timer comes up
-> +	 * with the counter disabled. Moreover, it may also report
-> +	 * a potentially incorrect fixed 13 MHz frequency. To be
-> +	 * correct these registers need to be updated to use the
-> +	 * frequency EXTAL / 2 which can be determined by the MD pins.
-> +	 */
-> +
-> +	switch (mode & (MD(14) | MD(13))) {
-> +	case 0:
-> +		extal_mhz = 15;
-> +		break;
-> +	case MD(13):
-> +		extal_mhz = 20;
-> +		break;
-> +	case MD(14):
-> +		extal_mhz = 26;
-> +		break;
-> +	case MD(13) | MD(14):
-> +		extal_mhz = 30;
-> +		break;
-> +	}
-> +
-> +	/* The arch timer frequency equals EXTAL / 2 */
-> +	freq = extal_mhz * (1000000 / 2);
-> +
-> +	/* Remap "armgcnt address map" space */
-> +	base = ioremap(0xe6080000, PAGE_SIZE);
-> +
-> +	/* Update registers with correct frequency */
-> +	iowrite32(freq, base + CNTFID0);
-> +	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
->  
-> -	/* make sure arch timer is started by setting bit 0 of CNTCT */
-> -	cntcr = ioremap(0xe6080000, PAGE_SIZE);
-> -	iowrite32(1, cntcr);
-> -	iounmap(cntcr);
-> +	/* make sure arch timer is started by setting bit 0 of CNTCR */
-> +	iowrite32(1, base + CNTCR);
-> +	iounmap(base);
-> +#endif /* CONFIG_ARM_ARCH_TIMER */
->  
->  	shmobile_timer_init();
->  }
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Rather than manually editing that to ensure the enum matches the DT bindings
+> header, the whole point of making a separate <dt-bindings/...> directory was
+> that drivers could include the binding header files directly to avoid having
+> to duplicate the constant definitions. Can't <linux/pwm.h> include <dt-
+> bindings/pwm.h> and remove that enum?
+
+We could do that, but we would then need to modify all drivers to replace 
+enum_pwm_polarity with unsigned int. Thierry, what's your opinion on this ?
+
+Replying to a comment from another e-mail, I know that the above change to 
+include/linux/pwm.h is not strictly needed as the enum values are already 
+correct. The point of specifying the enum values explicitly was to hint that 
+the values matter and should not be changed. A comment in the source would 
+probably be more appropriate though.
+
+-- 
+Regards,
+
+Laurent Pinchart
