@@ -1,34 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 12 Jul 2013 11:04:20 -0700
-Subject: [PATCH linux-next] arm: multi_v7_defconfig: add fsl lpuart
- serial console
-In-Reply-To: <1373392491-32056-1-git-send-email-vincent.stehle@freescale.com>
-References: <1373392491-32056-1-git-send-email-vincent.stehle@freescale.com>
-Message-ID: <20130712180420.GA28285@quad.lixom.net>
+Date: Fri, 12 Jul 2013 11:06:35 -0700
+Subject: [GIT PULL] ux500 defconfig updates
+In-Reply-To: <CACRpkdaczQWVv2S48bxRT+0NoMvmjgj5_Tf7cxOC-8xj+TnuTw@mail.gmail.com>
+References: <CACRpkdaczQWVv2S48bxRT+0NoMvmjgj5_Tf7cxOC-8xj+TnuTw@mail.gmail.com>
+Message-ID: <20130712180635.GB28285@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 09, 2013 at 07:54:51PM +0200, Vincent Stehl? wrote:
-> Add Freescale LPUART serial console support. This gives us the boot messages on
-> UART on e.g. the Vybrid VF610 Tower board.
+On Thu, Jul 11, 2013 at 11:05:33AM +0200, Linus Walleij wrote:
+> Hi ARM SoC folks,
 > 
-> Signed-off-by: Vincent Stehl? <vincent.stehle@freescale.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> ---
+> these are some defconfig patches that can be pulled in now that all the new
+> stuff from various trees has percolated up to Torvalds.
+> 
+> Please pull them in!
+> 
+> Yours,
+> Linus Walleij
 > 
 > 
-> Hi,
+> The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
 > 
-> Would you please consider adding LPUART for ARM multi_v7_defconfig, please?
+>   Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
 > 
-> (This patch is built on top of the following patches:
-> http://comments.gmane.org/gmane.linux.kernel/1519712)
+> are available in the git repository at:
 > 
-> Best regards,
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/ux500-defconfig-for-arm-soc
 
-Thanks, applied to fixes. Note that I squashed together the three patches to
-one though.
+Thanks, pulled.
 
 
 -Olof
