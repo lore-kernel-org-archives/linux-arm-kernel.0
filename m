@@ -1,44 +1,74 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 12 Jul 2013 12:13:17 +0200
-Subject: [PATCH] ASoC: Samsung: Modify the I2S driver to support I2S on
- Exynos5420
-In-Reply-To: <20130711130139.GQ24508@sirena.org.uk>
-References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
- <2214161.FSfscAvpna@thinkpad> <20130711130139.GQ24508@sirena.org.uk>
-Message-ID: <2463181.bQfIDO6XJk@thinkpad>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Fri, 12 Jul 2013 12:15:25 +0200
+Subject: [PATCH, re-send] Always trap on BUG()
+In-Reply-To: <201307051738.35930.arnd@arndb.de>
+References: <201307051738.35930.arnd@arndb.de>
+Message-ID: <20130712101525.GA13552@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 of July 2013 14:01:39 Mark Brown wrote:
-> On Thu, Jul 11, 2013 at 01:41:40PM +0200, Tomasz Figa wrote:
-> > On Thursday 11 of July 2013 12:20:23 Mark Brown wrote:
-> > > This is a bit of a larger project sadly, there was resistance to doing
-> > > the DT bindings based on compatible strings using the IP version :(
-> > 
-> > I'm not sure if this case is related to this problem in any way. I just
-> > suggested introducing a new include like samsung,exynos5420-i2s, a opposed
-> > to using samsung,exynos5250-i2s and adding flags, since the I2S in
-> > Exynos5420 is
-> Well, it *should* be samsung,i2s-vN where N is the version number of the
-> IP but documentation on the versioning has been patchy hence this whole
-> thinng.
 
-Oh, the binding for samsung-i2s uses IP versions. Isn't that slightly broken?
+* Arnd Bergmann <arnd@arndb.de> wrote:
 
-At least with Samsung bindings, I think we happened to agree on a single 
-convention of naming compatible values after the first SoC in which such block 
-first appeared.
-
-I wonder what happened with this i2s binding that made it end up outside this 
-convention.
-
-> > the first one to have this TDM or whatever mode. (I'd still like to hear
-> > what it is...)
+> I've run some size analyis using the ARM 'multi_v7_defconfig'
+> and gcc-4.8, using various definitions for BUG() and BUG_ON(), to
+> see how big the size improvement actually gets
 > 
-> What it *should* be is the option to send more than one audio stream
-> down a link using time division multiplexing.
+> 1. Baseline: normal bug plus CONFIG_BUG_VERBOSE
+>    text    data     bss     dec     hex filename
+> 3743196  224396  206812 4174404  3fb244 vmlinux-bugverbose
+> 
+> 2. disabling CONFIG_BUG_VERBOSE, saving 0.6%
+> 3716920  224380  206812 4148112  3f4b90 vmlinux-nobugverbose
+> 
+> 3. #define BUG() panic(__func__), #define BUG_ON(c) if(c) BUG(), saving 1.0%
+> 3701076  224384  206812 4132272  3f0db0 vmlinux-bug-panicfunc
+> 
+> 3. #define BUG() panic(__func__), #define BUG_ON(c) if(c) BUG(), saving 1.5%
+> 3678884  224400  206812 4110096  3eb710 vmlinux-bug-panic
+> 
+> 4. #define BUG() unreachable(), saving 2.1%
+> 3652636  224384  206812 4083832  3e5078 vmlinux-bug-unreachable
+> 
+> 5. as 4, plus #define BUG_ON(c) if(c) unreachable(), saving 2.2%
+> 3651108  224380  206812 4082300  3e4a7c vmlinux-bugon-unreachable
+> 
+> 6. #define BUG() do{}while(0), saving 2.1%
+> 3654264  224380  206812 4085456  3e56d0 vmlinux-nobug
+> 
+> 7. as 6, plus #define BUG_ON if(0 && (c)) unreachable, saving 2.2%
+> 3648392  223996  206748 4079136  3e3e20 vmlinux-no-bugon
+> 
+> 8. my patch below, saving 1.8%
+> 3666532  224380  206812 4097724  3e86bc obj-tmp/vmlinux
+> 
+> The gain of doing unreachable and letting the code run off whereever
+> is minimal compared to the current state of doing nothing, but it
+> avoids the warnings.
+> 
+> Same test using x86_defconfig:
+> 
+> 1. CONFIG_BUG=y, CONFIG_BUGVERBOSE=n
+> 10797859        1395648 1175552 13369059         cbfee3 vmlinux-x86-bug
+> 
+> 2. CONFIG_BUG=n, saves 1.0%
+> 10658553        1395584 1175552 13229689         c9de79 vmlinux-x86-nobug
+> 
+> 3. with my patch, saves 0.8%
+> 10684186        1395584 1175552 13255322         ca429a vmlinux-x86-archbug
+> 
+> Getting 1-2% savings in kernel size seems absolutely worth keeping the
+> option, but 0.2-0.4% left for getting reproducible behavior also seems
+> worthwhile. The result in the patch below.
+> 
+> This basically loses any of the BUG() reporting, but leaves the
+> logic to trap and kill the task in place when CONFIG_BUG is disabled.
 
-OK.
+This also kills a boatload of compiler warnings when CONFIG_BUG is 
+disabled.
 
-Best regards,
-Tomasz
+Acked-by: Ingo Molnar <mingo@kernel.org>
+
+Thanks,
+
+	Ingo
