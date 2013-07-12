@@ -1,132 +1,115 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 12 Jul 2013 18:02:09 +0800
-Subject: [PATCH] ARM: dts: imx6qdl/imx6sl: add the dma property for uart
-Message-ID: <1373623329-18204-1-git-send-email-b32955@freescale.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 12 Jul 2013 11:30:51 +0100
+Subject: [PATCH 02/02] ARM: shmobile: Setup r8a7790 arch timer based on
+ MD pins
+In-Reply-To: <20130711162229.933.53924.sendpatchset@w520>
+References: <20130711162209.933.47610.sendpatchset@w520>
+ <20130711162229.933.53924.sendpatchset@w520>
+Message-ID: <20130712103051.GA4144@kartoffel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the dma property for all the uart.
+On Thu, Jul 11, 2013 at 05:22:29PM +0100, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Update the r8a7790 arch timer setup code to configure the
+> frequency dynamically at boot time. This means that the arch
+> timer driver will be able to detect a timer frequency that
+> has been calculated based on the MD pins instead of a fixed
+> and potentially incorrect 13 MHz.
+> 
+> With this patch applied the Linux kernel will correctly
+> support the r8a7790 Lager board that uses a 20 Mhz EXTAL.
+> The arch timer will operate on 10 MHz and the Linux arch
+> timer driver will be correctly configured to use 10 MHz.
+> 
+> Without this patch the 20 MHz EXTAL will be used to drive
+> the arch timer at 10 MHz, but the Linux arch timer driver
+> will believe it is counting at 13 Mhz.
 
-Note: Add the dma property does not mean we enable the dma for this
-uart.
+This seems scary to me. The bootloader should be doing this before jumping to
+Linux. As CNTCR is only writeable from the secure side, you won't be able to
+use KVM unless the bootloader has done this.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/boot/dts/imx6q-arm2.dts |    2 --
- arch/arm/boot/dts/imx6qdl.dtsi   |   10 ++++++++++
- arch/arm/boot/dts/imx6sl.dtsi    |   10 ++++++++++
- 3 files changed, 20 insertions(+), 2 deletions(-)
+Additionally, if you didn't do this in Linux, as far as I can see you wouldn't
+need an init_time callback at all...
 
-diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
-index 9b17393..edf1bd9 100644
---- a/arch/arm/boot/dts/imx6q-arm2.dts
-+++ b/arch/arm/boot/dts/imx6q-arm2.dts
-@@ -102,8 +102,6 @@
- 	pinctrl-0 = <&pinctrl_uart2_2>;
- 	fsl,dte-mode;
- 	fsl,uart-has-rtscts;
--	dma-names = "rx", "tx";
--	dmas = <&sdma 27 4 0>, <&sdma 28 4 0>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 72a28d6..34ffc2e 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -197,6 +197,8 @@
- 					interrupts = <0 26 0x04>;
- 					clocks = <&clks 160>, <&clks 161>;
- 					clock-names = "ipg", "per";
-+					dma-names = "rx", "tx";
-+					dmas = <&sdma 25 4 0>, <&sdma 26 4 0>;
- 					status = "disabled";
- 				};
- 
-@@ -1479,6 +1481,8 @@
- 				interrupts = <0 27 0x04>;
- 				clocks = <&clks 160>, <&clks 161>;
- 				clock-names = "ipg", "per";
-+				dma-names = "rx", "tx";
-+				dmas = <&sdma 27 4 0>, <&sdma 28 4 0>;
- 				status = "disabled";
- 			};
- 
-@@ -1488,6 +1492,8 @@
- 				interrupts = <0 28 0x04>;
- 				clocks = <&clks 160>, <&clks 161>;
- 				clock-names = "ipg", "per";
-+				dma-names = "rx", "tx";
-+				dmas = <&sdma 29 4 0>, <&sdma 30 4 0>;
- 				status = "disabled";
- 			};
- 
-@@ -1497,6 +1503,8 @@
- 				interrupts = <0 29 0x04>;
- 				clocks = <&clks 160>, <&clks 161>;
- 				clock-names = "ipg", "per";
-+				dma-names = "rx", "tx";
-+				dmas = <&sdma 31 4 0>, <&sdma 32 4 0>;
- 				status = "disabled";
- 			};
- 
-@@ -1506,6 +1514,8 @@
- 				interrupts = <0 30 0x04>;
- 				clocks = <&clks 160>, <&clks 161>;
- 				clock-names = "ipg", "per";
-+				dma-names = "rx", "tx";
-+				dmas = <&sdma 33 4 0>, <&sdma 34 4 0>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 0a297af..230ee86 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -159,6 +159,8 @@
- 					clocks = <&clks IMX6SL_CLK_UART>,
- 						 <&clks IMX6SL_CLK_UART_SERIAL>;
- 					clock-names = "ipg", "per";
-+					dma-names = "rx", "tx";
-+					dmas = <&sdma 33 4 0>, <&sdma 34 4 0>;
- 					status = "disabled";
- 				};
- 
-@@ -170,6 +172,8 @@
- 					clocks = <&clks IMX6SL_CLK_UART>,
- 						 <&clks IMX6SL_CLK_UART_SERIAL>;
- 					clock-names = "ipg", "per";
-+					dma-names = "rx", "tx";
-+					dmas = <&sdma 25 4 0>, <&sdma 26 4 0>;
- 					status = "disabled";
- 				};
- 
-@@ -181,6 +185,8 @@
- 					clocks = <&clks IMX6SL_CLK_UART>,
- 						 <&clks IMX6SL_CLK_UART_SERIAL>;
- 					clock-names = "ipg", "per";
-+					dma-names = "rx", "tx";
-+					dmas = <&sdma 27 4 0>, <&sdma 28 4 0>;
- 					status = "disabled";
- 				};
- 
-@@ -219,6 +225,8 @@
- 					clocks = <&clks IMX6SL_CLK_UART>,
- 						 <&clks IMX6SL_CLK_UART_SERIAL>;
- 					clock-names = "ipg", "per";
-+					dma-names = "rx", "tx";
-+					dmas = <&sdma 29 4 0>, <&sdma 30 4 0>;
- 					status = "disabled";
- 				};
- 
-@@ -230,6 +238,8 @@
- 					clocks = <&clks IMX6SL_CLK_UART>,
- 						 <&clks IMX6SL_CLK_UART_SERIAL>;
- 					clock-names = "ipg", "per";
-+					dma-names = "rx", "tx";
-+					dmas = <&sdma 31 4 0>, <&sdma 32 4 0>;
- 					status = "disabled";
- 				};
- 			};
--- 
-1.7.1
+Thanks,
+Mark.
+
+> 
+> Reported-by: Ulrich Hecht <ulrich.hecht@gmail.com>
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> Tested-by: Ulrich Hecht <ulrich.hecht@gmail.com>
+> ---
+> 
+>  arch/arm/mach-shmobile/setup-r8a7790.c |   49 ++++++++++++++++++++++++++++----
+>  1 file changed, 44 insertions(+), 5 deletions(-)
+> 
+> --- 0006/arch/arm/mach-shmobile/setup-r8a7790.c
+> +++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-07-09 21:29:18.000000000 +0900
+> @@ -215,14 +215,53 @@ u32 __init r8a7790_read_mode_pins(void)
+>  	return mode;
+>  }
+>  
+> +#define CNTCR 0
+> +#define CNTFID0 0x20
+> +
+>  void __init r8a7790_timer_init(void)
+>  {
+> -	void __iomem *cntcr;
+> +#ifdef CONFIG_ARM_ARCH_TIMER
+> +	u32 mode = r8a7790_read_mode_pins();
+> +	void __iomem *base;
+> +	int extal_mhz = 0;
+> +	u32 freq;
+> +
+> +	/* At Linux boot time the r8a7790 arch timer comes up
+> +	 * with the counter disabled. Moreover, it may also report
+> +	 * a potentially incorrect fixed 13 MHz frequency. To be
+> +	 * correct these registers need to be updated to use the
+> +	 * frequency EXTAL / 2 which can be determined by the MD pins.
+> +	 */
+> +
+> +	switch (mode & (MD(14) | MD(13))) {
+> +	case 0:
+> +		extal_mhz = 15;
+> +		break;
+> +	case MD(13):
+> +		extal_mhz = 20;
+> +		break;
+> +	case MD(14):
+> +		extal_mhz = 26;
+> +		break;
+> +	case MD(13) | MD(14):
+> +		extal_mhz = 30;
+> +		break;
+> +	}
+> +
+> +	/* The arch timer frequency equals EXTAL / 2 */
+> +	freq = extal_mhz * (1000000 / 2);
+> +
+> +	/* Remap "armgcnt address map" space */
+> +	base = ioremap(0xe6080000, PAGE_SIZE);
+> +
+> +	/* Update registers with correct frequency */
+> +	iowrite32(freq, base + CNTFID0);
+> +	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
+>  
+> -	/* make sure arch timer is started by setting bit 0 of CNTCT */
+> -	cntcr = ioremap(0xe6080000, PAGE_SIZE);
+> -	iowrite32(1, cntcr);
+> -	iounmap(cntcr);
+> +	/* make sure arch timer is started by setting bit 0 of CNTCR */
+> +	iowrite32(1, base + CNTCR);
+> +	iounmap(base);
+> +#endif /* CONFIG_ARM_ARCH_TIMER */
+>  
+>  	shmobile_timer_init();
+>  }
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
