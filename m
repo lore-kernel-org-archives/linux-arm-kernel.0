@@ -1,98 +1,70 @@
 From: inki.dae@samsung.com (Inki Dae)
-Date: Fri, 12 Jul 2013 15:12:44 +0900
-Subject: [RFC PATCH 0/2 v5] Introduce buffer synchronization framework
-Message-ID: <1373609566-10784-1-git-send-email-inki.dae@samsung.com>
+Date: Fri, 12 Jul 2013 15:12:46 +0900
+Subject: [RFC PATCH v1 2/2] dma-buf: add lock callback for fcntl system call
+In-Reply-To: <1373609566-10784-1-git-send-email-inki.dae@samsung.com>
+References: <1373609566-10784-1-git-send-email-inki.dae@samsung.com>
+Message-ID: <1373609566-10784-3-git-send-email-inki.dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patch adds lock callback to dma buf file operations,
+and this callback will be called by fcntl system call.
 
-This patch set introduces a buffer synchronization framework based
-on DMA BUF[1] and based on ww-mutexes[2] for lock mechanism.
+With this patch, fcntl system call can be used for buffer
+synchronization between CPU and CPU, and CPU and DMA in user mode.
 
-The purpose of this framework is to provide not only buffer access
-control to CPU and CPU, and CPU and DMA, and DMA and DMA but also
-easy-to-use interfaces for device drivers and user application.
-In addtion, this patch set suggests a way for enhancing performance.
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/base/dma-buf.c |   33 +++++++++++++++++++++++++++++++++
+ 1 files changed, 33 insertions(+), 0 deletions(-)
 
-For generic user mode interface, we have used fcntl system call[3].
-As you know, user application sees a buffer object as a dma-buf file
-descriptor. So fcntl() call with the file descriptor means to lock
-some buffer region being managed by the dma-buf object.
-For more detail, you can refer to the dma-buf-sync.txt in Documentation/
-
-Moreover, we had tried to find how we could utilize limited hardware
-resources more using buffer synchronization mechanism. And finally,
-we have realized that it could enhance performance using multi threads
-with this buffer synchronization mechanism: DMA and CPU works individually
-so CPU could perform other works while DMA is performing some works,
-and vise versa.
-
-However, in the conventional way, that is not easy to do so because DMA
-operation is depend on CPU operation, and vice versa.
-
-Conventional way:
-        User                                     Kernel
-        ---------------------------------------------------------------------
-        CPU writes something to src
-        send the src to driver------------------------->
-                                                 update DMA register
-        request DMA start(1)--------------------------->
-                                                 DMA start
-                <---------completion signal(2)----------
-        CPU accesses dst
-
-        (1) Request DMA start after the CPU access to src buffer is completed.
-        (2) Access dst buffer after DMA access to the dst buffer is completed.
-
-On the other hand, if there is something to control buffer access between CPU
-and DMA? The below shows that:
-
-        User(thread a)          User(thread b)            Kernel
-        ---------------------------------------------------------------------
-        send a src to driver---------------------------------->
-                                                          update DMA register
-        lock the src
-                                request DMA start(1)---------->
-        CPU acccess to src
-        unlock the src                                    lock src and dst
-                                                          DMA start
-                <-------------completion signal(2)-------------
-        lock dst                                          DMA completion
-        CPU access to dst                                 unlock src and dst
-        unlock DST
-
-        (1) Try to start DMA operation while CPU is accessing the src buffer.
-        (2) Try CPU access to dst buffer while DMA is accessing the dst buffer.
-
-	This means that CPU or DMA could do more works.
-
-	In the same way, we could reduce hand shaking overhead between
-	two processes when those processes need to share a shared buffer.
-	There may be other cases that we could reduce overhead as well.
-
-
-References:
-[1] http://lwn.net/Articles/470339/
-[2] https://patchwork.kernel.org/patch/2625361/
-[3] http://linux.die.net/man/2/fcntl
-
-
-Inki Dae (2):
-  [RFC PATCH v5 1/2] dmabuf-sync: Introduce buffer synchronization framework
-  [RFC PATCH v1 2/2] dma-buf: add lock callback for fcntl system call
-
- Documentation/dma-buf-sync.txt |  290 +++++++++++++++++
- drivers/base/Kconfig           |    7 +
- drivers/base/Makefile          |    1 +
- drivers/base/dma-buf.c         |   37 +++
- drivers/base/dmabuf-sync.c     |  674 ++++++++++++++++++++++++++++++++++++++++
- include/linux/dma-buf.h        |   16 +
- include/linux/dmabuf-sync.h    |  178 +++++++++++
- 7 files changed, 1203 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/dma-buf-sync.txt
- create mode 100644 drivers/base/dmabuf-sync.c
- create mode 100644 include/linux/dmabuf-sync.h
-
+diff --git a/drivers/base/dma-buf.c b/drivers/base/dma-buf.c
+index 9a26981..e1b8583 100644
+--- a/drivers/base/dma-buf.c
++++ b/drivers/base/dma-buf.c
+@@ -80,9 +80,42 @@ static int dma_buf_mmap_internal(struct file *file, struct vm_area_struct *vma)
+ 	return dmabuf->ops->mmap(dmabuf, vma);
+ }
+ 
++static int dma_buf_lock(struct file *file, int cmd, struct file_lock *fl)
++{
++	struct dma_buf *dmabuf;
++	unsigned int type;
++	bool wait = false;
++
++	if (!is_dma_buf_file(file))
++		return -EINVAL;
++
++	dmabuf = file->private_data;
++
++	if ((fl->fl_type & F_UNLCK) == F_UNLCK) {
++		dmabuf_sync_single_unlock(dmabuf);
++		return 0;
++	}
++
++	/* convert flock type to dmabuf sync type. */
++	if ((fl->fl_type & F_WRLCK) == F_WRLCK)
++		type = DMA_BUF_ACCESS_W;
++	else if ((fl->fl_type & F_RDLCK) == F_RDLCK)
++		type = DMA_BUF_ACCESS_R;
++	else
++		return -EINVAL;
++
++	if (fl->fl_flags & FL_SLEEP)
++		wait = true;
++
++	/* TODO. the locking to certain region should also be considered. */
++
++	return dmabuf_sync_single_lock(dmabuf, type, wait);
++}
++
+ static const struct file_operations dma_buf_fops = {
+ 	.release	= dma_buf_release,
+ 	.mmap		= dma_buf_mmap_internal,
++	.lock		= dma_buf_lock,
+ };
+ 
+ /*
 -- 
 1.7.5.4
