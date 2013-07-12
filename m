@@ -1,30 +1,49 @@
-From: weisserm@arcor.de (Matthias Weisser)
-Date: Fri, 12 Jul 2013 09:34:54 +0200
-Subject: [PATCH] ARM: dts: imx25: Make lcdc compatible to imx27/imx21 fb
-Message-ID: <1373614495-21717-1-git-send-email-weisserm@arcor.de>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 12 Jul 2013 11:12:01 +0300
+Subject: [PATCH v12 06/13] usb: chipidea: add otg_cap attribute for otg
+ capable
+In-Reply-To: <1373524041-10482-7-git-send-email-peter.chen@freescale.com>
+References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
+ <1373524041-10482-7-git-send-email-peter.chen@freescale.com>
+Message-ID: <871u742o4u.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: dts: imx25: Make lcdc compatible to imx27/imx21 fb
+Peter Chen <peter.chen@freescale.com> writes:
 
-Signed-off-by: Matthias Weisser <weisserm@arcor.de>
----
- arch/arm/boot/dts/imx25.dtsi |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> Since we need otgsc to know vbus's status at some chipidea
+> controllers even it is peripheral-only mode. Besides, some
+> SoCs (eg, AR9331 SoC) don't have otgsc register even
+> the DCCPARAMS_DC and DCCPARAMS_HC are both 1 at CAP_DCCPARAMS.
+> We inroduce otg_cap attribute to indicate if the controller
+> is otg capable, defaultly, we follow the rule that if DCCPARAMS_DC
+> and DCCPARAMS_HC are both 1 at CAP_DCCPARAMS are otg capable, but if there
+> is exception, the platform can override it by device tree or platform data.
+>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index d2550e0..83532b6 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -377,7 +377,8 @@
- 				status = "disabled";
- 			};
- 
--			lcdc at 53fbc000 {
-+			lcdc: lcdc at 53fbc000 {
-+				compatible = "fsl,imx27-fb", "fsl,imx21-fb";
- 				reg = <0x53fbc000 0x4000>;
- 				interrupts = <39>;
- 				clocks = <&clks 103>, <&clks 66>, <&clks 49>;
--- 
-1.7.9.5
+[...]
+
+> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+> index 118bf66..0a906b4 100644
+> --- a/include/linux/usb/chipidea.h
+> +++ b/include/linux/usb/chipidea.h
+> @@ -7,6 +7,12 @@
+>  
+>  #include <linux/usb/otg.h>
+>  
+> +enum usb_otg_cap {
+> +	OTG_CAP_ATTR_IS_NOT_EXISTED = 0,
+> +	OTG_CAP_ATTR_IS_TRUE,
+> +	OTG_CAP_ATTR_IS_FALSE,
+> +};
+
+We don't really need all three, do we? We only need to know if the
+controller *can't* do otg. The rest we can infer from dr_mode and
+DCCPARAMS. So it can be another bit in flags rather than a separate
+field in platdata.
+
+Regards,
+--
+Alex
