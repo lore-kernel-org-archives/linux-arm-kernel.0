@@ -1,45 +1,46 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 12 Jul 2013 14:06:13 +0200
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <20130712041810.53c86e5f.akpm@linux-foundation.org>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
- <20130712075602.GA4002@gmail.com> <20130712080145.GC24008@pd.tnic>
- <20130712101319.GA13421@gmail.com> <20130712102326.GE24008@pd.tnic>
- <20130712041810.53c86e5f.akpm@linux-foundation.org>
-Message-ID: <20130712120613.GA21313@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 12 Jul 2013 14:06:43 +0200
+Subject: v3.10 - big endian core support
+In-Reply-To: <51DFEF75.8080600@codethink.co.uk>
+References: <CALicx6u89THSiRa4FzGZrcoG8q+o_BD8qVEC4CYXEjPUVK_fJw@mail.gmail.com>
+ <20130712134726.0a909165@skate> <51DFEF75.8080600@codethink.co.uk>
+Message-ID: <20130712140643.2a3f1c68@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Ben Dooks,
 
-* Andrew Morton <akpm@linux-foundation.org> wrote:
+On Fri, 12 Jul 2013 12:58:45 +0100, Ben Dooks wrote:
 
-> On Fri, 12 Jul 2013 12:23:26 +0200 Borislav Petkov <bp@alien8.de> wrote:
+> > Yeah, the Thumb2 code is not supported by Ben Dooks patches, it's part
+> > of the TODO-list. I think Ben said he would probably not have much time
+> > to work on this. I might be able to spare some time on this, so just
+> > let me know if I should start working on this. If I remember correctly,
+> > it's mainly the fixup_pv_table code that needed some Thumb2/BE love.
+> >
+> > Will, is getting Thumb2 working a requirement to get the BE support
+> > merged, or can we for now make the BE option depends on !THUMB2_KERNEL ?
 > 
-> > On Fri, Jul 12, 2013 at 12:13:19PM +0200, Ingo Molnar wrote:
-> > > and now it is upstream already, via -mm:
-> > > 
-> > >    e76e1fdfa8f8 lib: add support for LZ4-compressed kernel
-> > 
-> > Sure. Let's see if it manages to get released b0rked like it is right
-> > now.
-> 
-> Well y'know, if whining fixed bugs then there would be no problem here 
-> at all.
-> 
-> This problem came up briefly and I thought it had been adequately 
-> addressed.  Now a month or two later we find out who are the people who 
-> can't be bothered testing -next, but think it terribly important that 
-> others do so.
+> I would like to sort out getting this code merged as it seems to have
+> been tested by several people now outside Codethink.
 
-At least with my limited resources -next is unusable for my randconfig 
-testing. I can randconfig test the fresh new bugs I introduce plus the 
-bugs that slip upstream - which naturally peak during the merge window.
+I briefly talked with Will this week at LCE, and apparently he was
+generally ok with the patches. He only mentioned that the series should
+be split between core ARM stuff (that goes through Russell's tree), and
+the platform-specific changes, that go through the different
+maintainers tree.
 
-Anyway, I hacked it around locally, sh*t happens, it should be easy enough 
-to fix.
+> I could try doing the THUMB2 support, but I do not have a lot of
+> experience with building THUMB2 kernels.
 
-Thanks,
+Ok. Let me know if you need some help. I'd really like to see this BE
+work make it into 3.12.
 
-	Ingo
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
