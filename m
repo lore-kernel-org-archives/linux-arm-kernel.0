@@ -1,55 +1,73 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 12 Jul 2013 13:33:27 +0100
-Subject: v3.10 - big endian core support
-In-Reply-To: <20130712140643.2a3f1c68@skate>
-References: <CALicx6u89THSiRa4FzGZrcoG8q+o_BD8qVEC4CYXEjPUVK_fJw@mail.gmail.com>
- <20130712134726.0a909165@skate> <51DFEF75.8080600@codethink.co.uk>
- <20130712140643.2a3f1c68@skate>
-Message-ID: <51DFF797.8080100@codethink.co.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 12 Jul 2013 05:33:31 -0700
+Subject: [PATCH 1/2] Revert "ARM: OMAP2+: Fix serial init for device
+ tree based booting"
+In-Reply-To: <51DFF294.9080501@ti.com>
+References: <1373539986-27272-1-git-send-email-rnayak@ti.com>
+ <1373539986-27272-2-git-send-email-rnayak@ti.com>
+ <20130712072051.GA7656@atomide.com> <51DFB0E4.6040007@ti.com>
+ <20130712080305.GD7656@atomide.com> <51DFC58C.7030105@ti.com>
+ <20130712091827.GH7656@atomide.com> <51DFF294.9080501@ti.com>
+Message-ID: <20130712123331.GJ7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/13 13:06, Thomas Petazzoni wrote:
-> Dear Ben Dooks,
->
-> On Fri, 12 Jul 2013 12:58:45 +0100, Ben Dooks wrote:
->
->>> Yeah, the Thumb2 code is not supported by Ben Dooks patches, it's part
->>> of the TODO-list. I think Ben said he would probably not have much time
->>> to work on this. I might be able to spare some time on this, so just
->>> let me know if I should start working on this. If I remember correctly,
->>> it's mainly the fixup_pv_table code that needed some Thumb2/BE love.
->>>
->>> Will, is getting Thumb2 working a requirement to get the BE support
->>> merged, or can we for now make the BE option depends on !THUMB2_KERNEL ?
->>
->> I would like to sort out getting this code merged as it seems to have
->> been tested by several people now outside Codethink.
->
-> I briefly talked with Will this week at LCE, and apparently he was
-> generally ok with the patches. He only mentioned that the series should
-> be split between core ARM stuff (that goes through Russell's tree), and
-> the platform-specific changes, that go through the different
-> maintainers tree.
+* Rajendra Nayak <rnayak@ti.com> [130712 05:18]:
+> On Friday 12 July 2013 02:48 PM, Tony Lindgren wrote:
+> > * Rajendra Nayak <rnayak@ti.com> [130712 02:06]:
+> >> On Friday 12 July 2013 01:33 PM, Tony Lindgren wrote:
+> >>>
+> >>> OK, so that's only for earlyprintk then?
+> >>
+> >> yes,
+> >>
+> >>>
+> >>> If so, it seems the right fix is to set the NO_IDLE and NO_RESET
+> >>> flags based on ifdef CONFIG_DEBUG_OMAP4UART3 etc as that is selected
+> >>> in the Kconfig now.
+> >>
+> >> ok makes sense. It seems like the static data in hwmod can be populated
+> >> based on these defines? something like
+> >>
+> >> /* uart3 */
+> >> static struct omap_hwmod omap44xx_uart3_hwmod = {
+> >>         .name           = "uart3",
+> >>         .class          = &omap44xx_uart_hwmod_class,
+> >>         .clkdm_name     = "l4_per_clkdm",
+> >> #ifdef CONFIG_DEBUG_OMAP4UART3
+> >>         .flags          = HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET |
+> >>                                 HWMOD_SWSUP_SIDLE_ACT,
+> >> #else
+> >>         .flags          = HWMOD_SWSUP_SIDLE_ACT,
+> >> #endif
+> >>         .main_clk       = "func_48m_fclk",
+> >>         .prcm = {
+> >>                 .omap4 = {
+> >>                         .clkctrl_offs = OMAP4_CM_L4PER_UART3_CLKCTRL_OFFSET,
+> >>                         .context_offs = OMAP4_RM_L4PER_UART3_CONTEXT_OFFSET,
+> >>                         .modulemode   = MODULEMODE_SWCTRL,
+> >>                 },
+> >>         },
+> >> };
+> >>
+> >> And same way for others? That way the cmdline parsing can be done away
+> >> with even for the non-DT case.
+> > 
+> > Yes we can do it that way. How about add a common macro for it if
+> > it's always the same? Then the .flags line would be just:
+> > 
+> > #define HWMOD_OMAP_UART_FLAGS(soc, port)
+> > ...
+> > 
+> > 	.flags		= HWMOD_OMAP_UART_FLAGS(4, 3),
+> 
+> I started doing this and ended up with equal number of #ifdefs in the
+> header :( Was the intention of doing this to reduce the #ifdefs? in which
+> case maybe I am doing something wrong.
 
-The 311/be/core series which was the first posted has a few machine
-specific bits in it (vexpress, highbank and mvebu) but is mainly the
-ARM core code and bits of peripheral specific support which still live
-under arch/arm.
+Hmm can't you use ## for substition in the macro to reduce the ifdefs
+and have just one macro instead one for every debug port?
 
-I left there there as they're fairly small patches and would tend to get
-lost. I can remove these before asking RMK to pull the core support and
-possibly the atag/boot-endian patches.
+Regards,
 
->> I could try doing the THUMB2 support, but I do not have a lot of
->> experience with building THUMB2 kernels.
->
-> Ok. Let me know if you need some help. I'd really like to see this BE
-> work make it into 3.12.
-
-Thanks for the testing. I'll see if I can get some time in early next
-week to re-test and send against 3.11-rc series.
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Tony
