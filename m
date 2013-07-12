@@ -1,75 +1,29 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 12 Jul 2013 11:12:01 +0800
-Subject: [PATCH v12 00/13] Add tested id switch and vbus connect detect
- support for Chipidea
-In-Reply-To: <201307111957.19537.marex@denx.de>
-References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
- <201307111957.19537.marex@denx.de>
-Message-ID: <20130712031200.GB14793@nchen-desktop>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 12 Jul 2013 11:39:46 +0800
+Subject: [PATCH 04/12] drivers/mmc/host: don't use
+ devm_pinctrl_get_select_default() in probe
+In-Reply-To: <1373471889-18107-4-git-send-email-wsa@the-dreams.de>
+References: <1373471889-18107-1-git-send-email-wsa@the-dreams.de>
+ <1373471889-18107-4-git-send-email-wsa@the-dreams.de>
+Message-ID: <CAGsJ_4ygnSs_MLHOsoOo5VK=dLL4m0-o-mFR21oKwZ=LY35jXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 11, 2013 at 07:57:19PM +0200, Marek Vasut wrote:
-> Hi Peter,
-> 
-> > This patchset adds tested otg id switch function and
-> > vbus connect and disconnect detection for chipidea driver.
-> > And fix kinds of bugs found at chipidea drivers after enabling
-> > id and vbus detection.
-> > 
-> > This patch is fully tested at imx6 sabresd platform.
-> > My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
-> > 
-> > Changes for v12:
-> > - Rebased greg's usb-next tree (3.10.0-rc7+)
-> > - Split more small patches for single function and fix.
-> 
-> I tested the patchset. Here are the results:
-> 
-> - VBUS switching
-> 
-> I'm no longer getting any ID interrupts at all when I apply the patch below. The 
-> board stays in HOST mode all the time. If I configure it as peripheral, it works 
-> as peripheral. Note with [1], I was able to switch from Peripheral->Host , not 
-> the other way around.
+2013/7/10 Wolfram Sang <wsa@the-dreams.de>:
+> Since commit ab78029 (drivers/pinctrl: grab default handles from device core),
+> we can rely on device core for setting the default pins. Compile tested only.
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org> (personally at LCE13)
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> ---
+>  drivers/mmc/host/mvsdio.c          |    6 ------
+>  drivers/mmc/host/mxs-mmc.c         |    8 --------
+>  drivers/mmc/host/omap_hsmmc.c      |    7 -------
+>  drivers/mmc/host/sdhci-esdhc-imx.c |    8 --------
+>  drivers/mmc/host/sdhci-sirf.c      |    8 --------
 
-Thanks for your testing. But first, can you have me check
-if your ID wakeup is enabled?
+Wolfram, this has been done for sirf, which version are you based on?
 
-I can have a test at mx28evk.
-Is it current upstream kernel can boot mx28evk run?
-I have a RevC board, I would like to know if
-any patches needed.
-> 
-> --- a/arch/arm/boot/dts/imx28-m28evk.dts
-> +++ b/arch/arm/boot/dts/imx28-m28evk.dts
-> @@ -240,6 +240,8 @@
->  
->         ahb at 80080000 {
->                 usb0: usb at 80080000 {
-> +                       dr_mode = "otg";
-> +                       phy_mode = "utmi";
->                         vbus-supply = <&reg_usb0_vbus>;
->                         pinctrl-names = "default";
->                         pinctrl-0 = <&usbphy0_pins_a>;
-> 
-> ---------------------------
-> 
-> - MX23 UDC issue
-> 
-> I found a workaround. Now running 'dmesg' via telnet through USB CDC link no 
-> longer hangs the USB driver, but works as expected. I applied this small patch 
-> that enables the streaming mode. Works on MX23EVK. It's surprising this issue 
-> doesn't manifest on MX28, maybe MX28 contains a new revision of the controller. 
-> I remember there was some discussion about the streaming mode on MXS some time 
-> ago.
+>  5 files changed, 37 deletions(-)
 
-It seems not reasonable, the same question for mx23evk,
-it can run well with current kernel? I have no board on hand,
-let me see if I can find one.
-  
-
--- 
-
-Best Regards,
-Peter Chen
+-barry
