@@ -1,43 +1,26 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 12 Jul 2013 14:13:54 +0200
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <20130712041810.53c86e5f.akpm@linux-foundation.org>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
- <20130712075602.GA4002@gmail.com> <20130712080145.GC24008@pd.tnic>
- <20130712101319.GA13421@gmail.com> <20130712102326.GE24008@pd.tnic>
- <20130712041810.53c86e5f.akpm@linux-foundation.org>
-Message-ID: <20130712121354.GG24008@pd.tnic>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 12 Jul 2013 17:57:51 +0530
+Subject: [PATCH] arm: omap2plus: unidle devices which are about to probe
+In-Reply-To: <20130712121031.GB17053@arwen.pp.htv.fi>
+References: <20130711092612.GG23892@arwen.pp.htv.fi>
+ <1373537788-30413-1-git-send-email-balbi@ti.com> <51DFEF59.1010509@ti.com>
+ <20130712121031.GB17053@arwen.pp.htv.fi>
+Message-ID: <51DFF647.6030709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 12, 2013 at 04:18:10AM -0700, Andrew Morton wrote:
-> Well y'know, if whining fixed bugs then there would be no problem here
-> at all.
+On Friday 12 July 2013 05:40 PM, Felipe Balbi wrote:
+>> 3) I've checked most of OMAP drivers and all of them solve such kind
+>> > of problem internally (SPI, MMC, I2C, etc.)
+> and you see no problem with that ? Repeating the same thing over and
+> over again ?
+> 
 
-I know. I decided to whine this time and not try to fix it because
-attempting to fix every fallout I'm seeing in the tree with randconfigs
-is a full-time job and the *actual* job doesn't see any progress.
+I agree with Felipe that this is best handled at the bus/omap-device level
+to avoid all drivers having to repeat the same thing over.
+Having said that I dont know whats the best way to do this for OMAP and the
+patch we have currently does seem to have atleast issues handling processor
+IPs as Suman mentioned.
 
-And in all fairness, if someone were reporting an issue against my code,
-I'll try to do my very best to fix it as quickly aas possible, instead
-of ignoring it.
-
-So actually, the right thing to do in such cases is back out half-cooked
-stuff from the tree until it gets fixed. That'll give the authors the
-right incentive. But this is just me.
-
-> This problem came up briefly and I thought it had been adequately
-> addressed. Now a month or two later we find out who are the people who
-> can't be bothered testing -next, but think it terribly important that
-> others do so.
-
-Yeah, if everyone would put their money where their mouth is...
-
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+regards,
+Rajendra
