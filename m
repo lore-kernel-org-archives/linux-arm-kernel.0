@@ -1,41 +1,76 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 12 Jul 2013 12:58:45 +0100
+Date: Fri, 12 Jul 2013 13:00:25 +0100
 Subject: v3.10 - big endian core support
-In-Reply-To: <20130712134726.0a909165@skate>
+In-Reply-To: <CALicx6sr=OXYAdSS-RXPCjSp4f_yLQyw6jJsQ2KyhgQ9fRtXag@mail.gmail.com>
 References: <CALicx6u89THSiRa4FzGZrcoG8q+o_BD8qVEC4CYXEjPUVK_fJw@mail.gmail.com>
  <20130712134726.0a909165@skate>
-Message-ID: <51DFEF75.8080600@codethink.co.uk>
+ <CALicx6sr=OXYAdSS-RXPCjSp4f_yLQyw6jJsQ2KyhgQ9fRtXag@mail.gmail.com>
+Message-ID: <51DFEFD9.2060509@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/13 12:47, Thomas Petazzoni wrote:
-> Dear Vijay Kilari,
->
-> On Fri, 12 Jul 2013 17:09:12 +0530, Vijay Kilari wrote:
->
->>> Ben Dooks has a separate branch on top of this base branch for
->>> big-endian support, that adds atags compat code to convert the ATAGs
->>> data from LE to BE. See the baserock/311/be/atags branch in
->>> git://git.baserock.org/delta/linux. Or
->>> http://git.baserock.org/cgi-bin/cgit.cgi/delta/linux.git/log/?h=baserock/311/be/atags.
+On 12/07/13 12:56, Vijay Kilari wrote:
+> On Fri, Jul 12, 2013 at 5:17 PM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com>  wrote:
+>> Dear Vijay Kilari,
 >>
->>   ARM VE TC2 board, enabling CONFIG_THUMB2_KERNEL failed to boot in BE mode
->> It hangs at very early stage of boot
+>> On Fri, 12 Jul 2013 17:09:12 +0530, Vijay Kilari wrote:
+>>
+>>>> Ben Dooks has a separate branch on top of this base branch for
+>>>> big-endian support, that adds atags compat code to convert the ATAGs
+>>>> data from LE to BE. See the baserock/311/be/atags branch in
+>>>> git://git.baserock.org/delta/linux. Or
+>>>> http://git.baserock.org/cgi-bin/cgit.cgi/delta/linux.git/log/?h=baserock/311/be/atags.
+>>>
+>>>   ARM VE TC2 board, enabling CONFIG_THUMB2_KERNEL failed to boot in BE mode
+>>> It hangs at very early stage of boot
+>>
+>> Yeah, the Thumb2 code is not supported by Ben Dooks patches, it's part
+>> of the TODO-list. I think Ben said he would probably not have much time
+>> to work on this. I might be able to spare some time on this, so just
+>> let me know if I should start working on this. If I remember correctly,
+>> it's mainly the fixup_pv_table code that needed some Thumb2/BE love.
 >
-> Yeah, the Thumb2 code is not supported by Ben Dooks patches, it's part
-> of the TODO-list. I think Ben said he would probably not have much time
-> to work on this. I might be able to spare some time on this, so just
-> let me know if I should start working on this. If I remember correctly,
-> it's mainly the fixup_pv_table code that needed some Thumb2/BE love.
+> In fact, I tried with below changes.. still it fails
 >
-> Will, is getting Thumb2 working a requirement to get the BE support
-> merged, or can we for now make the BE option depends on !THUMB2_KERNEL ?
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index 2de1114..7df64c7 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -592,8 +592,14 @@ __fixup_a_pv_table:
+>          b       2f
+>   1:     add     r7, r3
+>          ldrh    ip, [r7, #2]
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +       rev     ip, ip
+> +#endif
 
-I would like to sort out getting this code merged as it seems to have
-been tested by several people now outside Codethink.
+Do you need a rev16 here? I think you may have tried
+reversing the full 32 bits here instead of just the
+16bits of instruction that was loaded.
 
-I could try doing the THUMB2 support, but I do not have a lot of
-experience with building THUMB2 kernels.
+>          and     ip, 0x8f00
+>          orr     ip, r6  @ mask in offset bits 31-24
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +       rev     ip, ip
+> +#endif
+>          strh    ip, [r7, #2]
+>   2:     cmp     r4, r5
+>          ldrcc   r7, [r4], #4    @ use branch for delay slot
+>
+>>
+>> Will, is getting Thumb2 working a requirement to get the BE support
+>> merged, or can we for now make the BE option depends on !THUMB2_KERNEL ?
+>>
+>> Thanks!
+>>
+>> Thomas
+>> --
+>> Thomas Petazzoni, Free Electrons
+>> Kernel, drivers, real-time and embedded Linux
+>> development, consulting, training and support.
+>> http://free-electrons.com
+
 
 -- 
 Ben Dooks				http://www.codethink.co.uk/
