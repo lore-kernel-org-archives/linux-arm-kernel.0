@@ -1,90 +1,181 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 12 Jul 2013 08:42:41 -0600
-Subject: [PATCH 2/2] pwm: Add PWM polarity flag macros for DT
-In-Reply-To: <2172485.AZTjvkLGcM@avalon>
-References: <1373553468-6564-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20130711193245.GB17212@dhcp-172-17-186-34.nvidia.com>
- <51DF1054.9000207@wwwdotorg.org> <2172485.AZTjvkLGcM@avalon>
-Message-ID: <51E015E1.2090906@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 12 Jul 2013 09:47:17 -0500
+Subject: [RFC PATCH v4 03/18] Documentation: devicetree: arm: cpus/cpu
+ nodes bindings updates
+In-Reply-To: <1368804061-4421-4-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1368804061-4421-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1368804061-4421-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <CAL_JsqLANi5UoVyRMsa6XoQ+_KnmTQDfTz++shEh-dZ3FQGZaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/2013 05:01 AM, Laurent Pinchart wrote:
-> Hi,
-> 
-> On Thursday 11 July 2013 14:06:44 Stephen Warren wrote:
->> On 07/11/2013 01:32 PM, Thierry Reding wrote:
->>> On Thu, Jul 11, 2013 at 11:50:48AM -0600, Stephen Warren wrote:
->>>> On 07/11/2013 09:36 AM, Thierry Reding wrote:
->>>>> On Thu, Jul 11, 2013 at 04:37:48PM +0200, Laurent Pinchart
->>>>> wrote: [...]
->>>>>
->>>>>> diff --git
->>>>>> a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
->>>>>> b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
->>>>>> index de0eaed..be09be4 100644 ---
->>>>>> a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
->>>>>> +++ b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
->>>>>> @@ -4,9 +4,9 @@ Required properties: - compatible: should be
->>>>>> "atmel,tcb-pwm" - #pwm-cells: Should be 3.  The first cell
->>>>>> specifies the per-chip index of the PWM to use, the second
->>>>>> cell is the period in nanoseconds and -  bit 0 in the third
->>>>>> cell is used to encode the polarity of PWM output. -  Set bit
->>>>>> 0 of the third cell in PWM specifier to 1 for inverse
->>>>>> polarity & -  set to 0 for normal polarity. +  the third cell
->>>>>> is used to encode the polarity of PWM output. Set the +
->>>>>> PWM_POLARITY_NORMAL flag for normal polarity or the
->>>>>> PWM_POLARITY_INVERSED +  flag for inverted polarity. PWM
->>>>>> flags are defined in <dt-bindings/pwm/pwm.h>. - tc-block: The
->>>>>> Timer Counter block to use as a PWM chip.
->>>>>
->>>>>> Example:
->>>>> I'd prefer for the original text to stay in place and the reference to
->>>>> the dt-bindings/pwm/pwm.h file to go below that block.
->>>>
->>>> I disagree here. The whole point of creating header files for the
->>>> constants in binding definitions was so that you wouldn't have to
->>>> duplicate all the values into the binding definitions. Rather, you'd
->>>> simply say "see <dt-bindings/xxx.h>".
->>>
->>> But that's not something that this patch solves.
->>
->> Well, if the comments I made on the patch re: that <linux/pwm.h> should
->> simply #include <dt-bindings/pwm/pwm.h> instead of duplicating the
->> constants, then yet this patch will solve that. There will be a single place
->> where the constants are defined.
-> 
-> As explained in another reply, this would require replacing the enum with an 
-> unsigned int. I can write a patch if we agree on this.
-> 
->>> And it could be solved even in the absence of the header file defining the
->>> symbolic constants. If all the standard flags that dt-bindings/pwm/pwm.txt
->>> now specifies were to be listed in pwm.txt (they actually are) then
->>> referring to that document as the canonical source works equally well.
->>
->> If that's all the happens, then there will still be duplication
->> between pwm.txt and <linux/pwm.h>.
-> 
-> I've explicitly mentioned the flags in individual DT bindings to ease adding 
-> new flags in the future. At the moment the defined flags are either all 
-> supported or not used at all by drivers. If we later add a new flag supported 
-> by a subset of drivers only the driver bindings should list supported flags 
-> for each driver.
-> 
-> I'm fine with removing the explicit mentions of individual flags right now and 
-> adding it back when needed if you think that's better.
+On Fri, May 17, 2013 at 10:20 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> In order to extend the current cpu nodes bindings to newer CPUs
+> inclusive of AArch64 and to update support for older ARM CPUs this
+> patch updates device tree documentation for the cpu nodes bindings.
 
-I think the values for any common system-wide flags should be defined
-once in some system-wide place, and the values for any HW-specific
-values should be defined only in the documentation for that specific HW.
-You could try and avoid conflicts by either:
+Sorry for the long delay on this, but I'm still not happy with the binding here.
 
-a) Allocating system-wide flags from bit 0 up, and HW-specific flags
-from bit 31 down.
+> Main changes:
+>     - adds 64-bit bindings
+>     - define usage of #address-cells
+>     - define 32/64 dts compatibility settings
+>     - defines behaviour on pre and post v7 uniprocessor systems
+>     - adds ARM 11MPcore specific reg property definition
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/cpus.txt | 459 ++++++++++++++++++++++---
+>  1 file changed, 412 insertions(+), 47 deletions(-)
 
-or:
+[snip]
 
-b) Using 1 cell for standard flags, and a separate cell for any
-HW-specific flags. Drivers can quite easily adapt to adding extra cells
-to #pwm-cells, thus making adding a HW-specific cell later
-backwards-compatible.
+> +                       # On ARM v8 64-bit systems, where the reg property
+> +                         size can be 1 or 2 cells (as defined by cpus node's
+> +                         #address-cells property), this property is
+> +                         required and matches:
+> +
+> +                         - On systems running the OS in AArch32:
+
+The DTS cannot change based on 32-bit or 64-bit OS.
+
+> +
+> +                           * If the cpus node's #address-cells value is 2:
+> +
+> +                             The first reg cell must be set to 0.
+> +
+> +                             The second reg cell bits [23:0] must be set to
+> +                             bits [23:0] of MPIDR_EL1.
+> +
+> +                             All other bits in the reg cells must be set to 0.
+> +
+> +                           * If the cpus node's #address-cells value is 1:
+> +
+> +                             Bits [23:0] in the reg cell must be set to
+> +                             bits [23:0] in MPIDR_EL1.
+> +
+> +                             All other bits in the reg cell must be 0.
+> +
+> +                         - On systems running the OS in AArch64:
+> +
+> +                           * If the cpus node's #address-cells value is 2:
+> +
+> +                             The first reg cell bits [7:0] must be set to
+> +                             bits [39:32] of MPIDR_EL1.
+> +
+> +                             The second reg cell bits [23:0] must be set to
+> +                             bits [23:0] of MPIDR_EL1.
+> +
+> +                             All other bits in the reg cells must be set to 0.
+> +
+> +                           * If the cpus node's #address-cells value is 1:
+> +
+> +                             MPIDR_EL1[63:32] is 0 on all processors in the
+> +                             system.
+
+Your logic is backwards here. If the MPIDR_EL1[63:32] is 0, then
+#address-cells can be 1. You could say the upper bits are ignored and
+treated as 0. However, you should simplify all this and just mandate
+that #address-cells must be 2 for ARMv8 or more generally must match
+the size of the MPIDR. If we want to boot a 32-bit kernel, then the
+kernel will have to adapt to support this.
+
+> +
+> +                             The reg cell bits [23:0] must be set to
+> +                             bits [23:0] of MPIDR_EL1.
+> +
+> +                             All other bits in the reg cell must be set to 0.
+> +
+> +       - compatible:
+> +               Usage: required
+> +               Value type: <string>
+> +               Definition: should be one of:
+> +                           "arm,arm710t"
+> +                           "arm,arm720t"
+> +                           "arm,arm740t"
+> +                           "arm,arm7ej-s"
+> +                           "arm,arm7tdmi"
+> +                           "arm,arm7tdmi-s"
+> +                           "arm,arm9es"
+> +                           "arm,arm9ej-s"
+> +                           "arm,arm920t"
+> +                           "arm,arm922t"
+> +                           "arm,arm925"
+> +                           "arm,arm926e-s"
+> +                           "arm,arm926ej-s"
+> +                           "arm,arm940t"
+> +                           "arm,arm946e-s"
+> +                           "arm,arm966e-s"
+> +                           "arm,arm968e-s"
+> +                           "arm,arm9tdmi"
+> +                           "arm,arm1020e"
+> +                           "arm,arm1020t"
+> +                           "arm,arm1022e"
+> +                           "arm,arm1026ej-s"
+> +                           "arm,arm1136j-s"
+> +                           "arm,arm1136jf-s"
+> +                           "arm,arm1156t2-s"
+> +                           "arm,arm1156t2f-s"
+> +                           "arm,arm1176jzf"
+> +                           "arm,arm1176jz-s"
+> +                           "arm,arm1176jzf-s"
+> +                           "arm,arm11mpcore"
+> +                           "arm,cortex-a5"
+> +                           "arm,cortex-a7"
+> +                           "arm,cortex-a8"
+> +                           "arm,cortex-a9"
+> +                           "arm,cortex-a15"
+> +                           "arm,cortex-a53"
+> +                           "arm,cortex-a57"
+> +                           "arm,cortex-m0"
+> +                           "arm,cortex-m0+"
+> +                           "arm,cortex-m1"
+> +                           "arm,cortex-m3"
+> +                           "arm,cortex-m4"
+> +                           "arm,cortex-r4"
+> +                           "arm,cortex-r5"
+> +                           "arm,cortex-r7"
+> +                           "faraday,fa526"
+> +                           "intel,sa110"
+> +                           "intel,sa1100"
+> +                           "marvell,feroceon"
+> +                           "marvell,mohawk"
+> +                           "marvell,pj4"
+> +                           "marvell,sheeva-v7"
+> +                           "marvell,xsc3"
+> +                           "marvell,xscale"
+> +                           "qcom,krait"
+> +                           "qcom,scorpion"
+> +       - enable-method
+> +               Value type: <stringlist>
+> +               Usage and definition depend on ARM architecture version and
+> +               configuration:
+> +                       # On ARM v8 64-bit systems running the OS in AArch64,
+
+Again, the DTS can't depend on the OS type.
+
+> +                         this property is required and must be one of:
+> +                            "spin-table"
+> +                            "psci"
+> +                       # On ARM 32-bit systems or ARM v8 systems running
+> +                         the OS in AArch32 this property is prohibited.
+
+I still don't get the distinction between 32 and 64 bit here. On
+32-bit, you have 3 choices: psci, spin-table, or SoC specific. So make
+this property optional for 32-bit and mandatory for 64-bit.
+
+> +
+> +       - cpu-release-addr
+> +               Usage: required for systems that have an "enable-method"
+> +                      property value of "spin-table".
+> +               Value type: <prop-encoded-array>
+> +               Definition:
+> +                       # On ARM v8 64-bit systems must be a two cell
+> +                         property identifying a 64-bit zero-initialised
+> +                         memory location.
+
+As I mentioned previously, isn't some wake-up method needed? Most
+systems will be in wfi or wfe rather than continuously spinning.
+
+Rob
