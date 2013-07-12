@@ -1,43 +1,39 @@
-From: jjo.braun@gmail.com (Johannes Braun)
-Date: Fri, 12 Jul 2013 10:19:16 +0200
-Subject: Freescale i.MX351: Poor framebuffer performance with 7 inch display
-Message-ID: <CADwvPCsm4UEGLH_mfpeoZ7L-wSTqTgicYXd6+_YuFSxGy57o2Q@mail.gmail.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Fri, 12 Jul 2013 16:15:15 +0800
+Subject: [PATCH] clk: sunxi: Fix checking return value of
+ clk_register_[composite|factors]
+Message-ID: <1373616915.24328.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear mailing list,
+clk_register_composite() and clk_register_factors() return ERR_PTR on error.
 
-our current board design is based on a freescale i.MX35 processor.
-First some information to the used arm processor. It is an i.MX351 and
-its core is clocked to 523Mhz. We have connected a 7 inch display with
-a resolution of 800x480 pixels directly to the arm. The display is
-working but the performance with qt embedded is very poor. When the
-complete display content changes, e.g. from red to green or from blue
-to black, there is a bad "wipe effect". The new display content wipes
-from the top down to the bottom of the display.
-
-To test the performance without qt embedded I wrote a small c program
-which writes a color array directly to the framebuffer device
-(/dev/fb0). This program updates the complete framebuffer content
-every second. From red to green, from green to blue, from blue to
-black and so on. The "wipe effect" is also visible. But less
-pronounced than with qt embedded. Shure qt embedded decreases the
-performance, but I don`t think this is the core issue for my
-performance problems.
-
-There is another point I noticed. The defaut bpp (bit per pixel) value
-in the driver is 16. Changing the drivers bpp up to 32 decreases the
-performance rapidly. To change the bpp I used the kernel parameter
-video=mx3fb:bpp=32.
-
-So I think the core issue is either the performace of the arm itself,
-the ram throughput or the driver mx3fb.c. Maybe someone who uses a
-similar design could share some information about the performance of
-this design. Also I will be gratefull for hints to increase my
-performance or to find the bottleneck.
-
-Thanks.
-
-
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
 ---
-Johannes
+ drivers/clk/sunxi/clk-sunxi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 412912b..02e440b 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -64,7 +64,7 @@ static void __init sunxi_osc_clk_setup(struct device_node *node)
+ 			&gate->hw, &clk_gate_ops,
+ 			CLK_IS_ROOT);
+ 
+-	if (clk) {
++	if (!IS_ERR(clk)) {
+ 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+ 		clk_register_clkdev(clk, clk_name, NULL);
+ 	}
+@@ -221,7 +221,7 @@ static void __init sunxi_factors_clk_setup(struct device_node *node,
+ 	clk = clk_register_factors(NULL, clk_name, parent, 0, reg,
+ 				   data->table, data->getter, &clk_lock);
+ 
+-	if (clk) {
++	if (!IS_ERR(clk)) {
+ 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+ 		clk_register_clkdev(clk, clk_name, NULL);
+ 	}
+-- 
+1.8.1.2
