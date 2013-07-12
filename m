@@ -1,154 +1,42 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 12 Jul 2013 14:58:17 +0300
-Subject: [PATCH] arm: omap2plus: unidle devices which are about to probe
-In-Reply-To: <1373537788-30413-1-git-send-email-balbi@ti.com>
-References: <20130711092612.GG23892@arwen.pp.htv.fi>
- <1373537788-30413-1-git-send-email-balbi@ti.com>
-Message-ID: <51DFEF59.1010509@ti.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 12 Jul 2013 12:58:45 +0100
+Subject: v3.10 - big endian core support
+In-Reply-To: <20130712134726.0a909165@skate>
+References: <CALicx6u89THSiRa4FzGZrcoG8q+o_BD8qVEC4CYXEjPUVK_fJw@mail.gmail.com>
+ <20130712134726.0a909165@skate>
+Message-ID: <51DFEF75.8080600@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2013 01:16 PM, Felipe Balbi wrote:
-> in order to make HWMOD and pm_runtime agree on the
-> initial state of the device, we will unidle the device
-> and call pm_runtime_set_active() to tell pm_runtime
-> that the device is really active.
+On 12/07/13 12:47, Thomas Petazzoni wrote:
+> Dear Vijay Kilari,
 >
-> By the time driver's probe() is reached, a call to
-> pm_runtime_get_sync() will not cause driver's
-> ->runtime_resume() method to be called at first, only
-> after a successful ->runtime_suspend().
+> On Fri, 12 Jul 2013 17:09:12 +0530, Vijay Kilari wrote:
 >
-> Note that we must prevent pm_runtime transitions while
-> driver is probing otherwise drivers would be suspended
-> as soon as they call pm_runtime_use_autosuspend(). By
-> calling pm_runtime_forbid() before probe() and
-> pm_runtime_allow() after probe() we 'fix' that detail.
+>>> Ben Dooks has a separate branch on top of this base branch for
+>>> big-endian support, that adds atags compat code to convert the ATAGs
+>>> data from LE to BE. See the baserock/311/be/atags branch in
+>>> git://git.baserock.org/delta/linux. Or
+>>> http://git.baserock.org/cgi-bin/cgit.cgi/delta/linux.git/log/?h=baserock/311/be/atags.
+>>
+>>   ARM VE TC2 board, enabling CONFIG_THUMB2_KERNEL failed to boot in BE mode
+>> It hangs at very early stage of boot
 >
-> Note that this patch was inspired by PCI's pci_pm_init().
+> Yeah, the Thumb2 code is not supported by Ben Dooks patches, it's part
+> of the TODO-list. I think Ben said he would probably not have much time
+> to work on this. I might be able to spare some time on this, so just
+> let me know if I should start working on this. If I remember correctly,
+> it's mainly the fixup_pv_table code that needed some Thumb2/BE love.
+>
+> Will, is getting Thumb2 working a requirement to get the BE support
+> merged, or can we for now make the BE option depends on !THUMB2_KERNEL ?
 
-NAK. This is a hack.
-In addition to what I've mentioned in
-http://www.spinics.net/lists/arm-kernel/msg258061.html there are 
-following issues:
-1) this patch disables call to PM runtime callbacks for all
-OMAP drivers which is wrong - I've found, for example, that
-omap-usb-host.c driver enables TLL in some configurations in its
-.runtime_resume():
+I would like to sort out getting this code merged as it seems to have
+been tested by several people now outside Codethink.
 
-usbhs_runtime_resume()
-|-omap_tll_enable()
+I could try doing the THUMB2 support, but I do not have a lot of
+experience with building THUMB2 kernels.
 
-
-2) even with this fix the restore context issue will not be fixed for 
-*non* console UARTs. Just try:
-#echo 0xDEAD > dev/ttyO3 // checked on OMAP4 SDP
-
-3) I've checked most of OMAP drivers and all of them solve such kind of 
-problem internally (SPI, MMC, I2C, etc.)
-
-4) See inline
->
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->
-> boot tested on top of today's Linus master
-> 6d128e1e72bf082542e85f72e6b7ddd704193588 with OMAP4
-> panda. Reached console prompt and, after setting a
-> proper autosuspend delay, consoles autosuspend just
-> fine.
->
-> It needs to be tested on other platforms.
->
-> ps: note that we also call pm_runtime_set_suspended(dev)
-> from our late_initcall() to disable devices so that pm_runtime
-> and HWMOD continue to aggree on device's state.
->
->   arch/arm/mach-omap2/omap_device.c | 44 +++++++++++++++++++++++++++++++++++----
->   1 file changed, 40 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> index 5cc9287..cb1fc1d 100644
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -178,6 +178,26 @@ odbfd_exit:
->   	return ret;
->   }
->
-> +static void omap_device_pm_init(struct platform_device *pdev)
-> +{
-> +	omap_device_enable(pdev);
-> +	pm_runtime_forbid(&pdev->dev);
-It's wrong to use pm_runtime_forbid() - pm_runtime_get_noresume() should 
-be used instead.
-pm_runtime_forbid()
-|-rpm_resume()
-
-
-> +	pm_runtime_set_active(&pdev->dev);
-> +	device_enable_async_suspend(&pdev->dev);
-why did you use device_enable_async_suspend() - it would enable async 
-suspend for devices - this is not related to the current issue and topic 
-for discussion (currently is used by usb/scsi/pci/ata drivers only).
-> +}
-> +
-> +static void omap_device_pm_allow(struct platform_device *pdev)
-> +{
-> +	pm_runtime_allow(&pdev->dev);
-> +}
-> +
-> +static void omap_device_pm_exit(struct platform_device *pdev)
-> +{
-> +	device_disable_async_suspend(&pdev->dev);
-> +	pm_runtime_set_suspended(&pdev->dev);
-> +	omap_device_idle(pdev);
-> +}
-> +
->   static int _omap_device_notifier_call(struct notifier_block *nb,
->   				      unsigned long event, void *dev)
->   {
-> @@ -189,16 +209,31 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
->   		if (pdev->archdata.od)
->   			omap_device_delete(pdev->archdata.od);
->   		break;
-> +	case BUS_NOTIFY_BIND_DRIVER:
-> +		if (pdev->archdata.od)
-> +			omap_device_pm_init(pdev);
-> +		break;
-> +	case BUS_NOTIFY_BOUND_DRIVER:
-> +		if (pdev->archdata.od)
-> +			omap_device_pm_allow(pdev);
-> +		break;
-> +	case BUS_NOTIFY_UNBOUND_DRIVER:
-> +		if (pdev->archdata.od)
-> +			omap_device_pm_exit(pdev);
-> +		break;
->   	case BUS_NOTIFY_ADD_DEVICE:
->   		if (pdev->dev.of_node)
->   			omap_device_build_from_dt(pdev);
-> -		/* fall through */
-> +		break;
->   	default:
-> -		od = to_omap_device(pdev);
-> -		if (od)
-> -			od->_driver_status = event;
-> +		/* nothing */
-> +		break;
->   	}
->
-> +	od = to_omap_device(pdev);
-> +	if (od)
-> +		od->_driver_status = event;
-> +
->   	return NOTIFY_DONE;
->   }
->
-> @@ -855,6 +890,7 @@ static int __init omap_device_late_idle(struct device *dev, void *data)
->   			dev_warn(dev, "%s: enabled but no driver.  Idling\n",
->   				 __func__);
->   			omap_device_idle(pdev);
-> +			pm_runtime_set_suspended(dev);
->   		}
->   	}
->
->
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
