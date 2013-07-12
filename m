@@ -1,103 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 12 Jul 2013 11:37:20 +0200
-Subject: [PATCH 0/2] ARM: sunxi: Convert DTSI to new CPU bindings
-In-Reply-To: <20130705101946.GA5584@e102568-lin.cambridge.arm.com>
-References: <1372437844-16325-1-git-send-email-maxime.ripard@free-electrons.com>
- <20130628171532.GD30603@e102568-lin.cambridge.arm.com>
- <20130628200333.GA2756@lukather>
- <CAOesGMgsD+tK4+ywvLzsWd+mngrP7zGgSFn0naWjSsQLGaUn2Q@mail.gmail.com>
- <20130629193819.GD3353@n2100.arm.linux.org.uk>
- <20130630094846.GA27559@e102568-lin.cambridge.arm.com>
- <20130705101946.GA5584@e102568-lin.cambridge.arm.com>
-Message-ID: <20130712093720.GE24370@lukather>
+From: richard.zhuhongxing@gmail.com (Richard Zhu)
+Date: Fri, 12 Jul 2013 17:41:15 +0800
+Subject: [PATCH v6 0/3] ahci: enable ahci sata support on imx6q
+Message-ID: <1373622078-18723-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+v6: add imx6q specific ahci sata support
+  Thanks for Shawn's comments.
+  - Speicify the ahb clock in the sata related dts changes.
+  - Move the initialization of the sata PHY clock of the private
+  data to the probe function.
+  - Remove the empty device release function.
+  - In order to be more readable, rename the imx_dev/imx_ahci_pdev
+  to be ahci_dev/ahci_pdev, and do some other changes, such as typo
+  error, more readable name of the variable.
+  - Tested on imx6q sd board.
+  - 
 
-On Fri, Jul 05, 2013 at 11:19:46AM +0100, Lorenzo Pieralisi wrote:
-> On Sun, Jun 30, 2013 at 10:48:46AM +0100, Lorenzo Pieralisi wrote:
-> > On Sat, Jun 29, 2013 at 08:38:19PM +0100, Russell King - ARM Linux wrote:
-> > > On Fri, Jun 28, 2013 at 01:05:42PM -0700, Olof Johansson wrote:
-> > > > On Fri, Jun 28, 2013 at 1:03 PM, Maxime Ripard
-> > > > <maxime.ripard@free-electrons.com> wrote:
-> > > > > On Fri, Jun 28, 2013 at 06:15:32PM +0100, Lorenzo Pieralisi wrote:
-> > > > >> The patch above should already be queued in next/dt right ?
-> > > > >
-> > > > > Indeed.
-> > > > >
-> > > > > Then why the latest patch of your patchset got in 3.10, while the
-> > > > > patches actually fixing the DT it would have impacted were delayed to
-> > > > > 3.11?
-> > > > >
-> > > > > (And why was it merged so late in the development cycle?)
-> > > > 
-> > > > This. So now we have to scramble because some device trees will
-> > > > produce warnings at boot.
-> > > > 
-> > > > Russell, the alternative is to revert Lorenzo's patch for 3.10 (and
-> > > > re-introduce it for 3.11). Do you have a preference?
-> > > 
-> > > Sorry but I really don't understand what all the fuss in this thread
-> > > is about.
-> > > 
-> > > This thread seems to be saying that two development patches were
-> > > merged, which were 7762/1 and 7763/1, and that 7764/1 is a fix?
-> > > Are you sure about that, because that's not how they're described,
-> > > and not how they look either.
-> > 
-> > As Olof's warning downgrade is being merged (thanks for that and apologies for
-> > failing to explain patches dependencies properly and stable related issues),
-> > 7764/1 won't apply cleanly anymore. Can you please drop it from the patch
-> > system, I will update it and test it first thing tomorrow and send a
-> > final version to the patch system.
-> 
-> Patch 7779/1, replacing 7764/1 is in the patch system now, and is ready
-> to get merged.
-> 
-> Unfortunately cpu/cpus bindings documentation updates, following:
-> 
-> https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/036735.html
-> https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-May/033779.html
-> 
-> were not pulled in the kernel. This is an issue since this means that
-> we still have no reference in the kernel or wherever it has to be, to
-> the final cpus/cpu bindings for ARM and ARM64 provided in the pull
-> request link above (that has been reviewed to death and acknowledged).
-> 
-> It is a significant overhaul of cpu/cpus bindings standard for ARM/ARM64,
-> covering all CPUs harking back to arm926 and beyond, and should be final.
-> 
-> dts updates following that standard have already been pulled into 3.11
-> through arm-soc.
-> 
-> IMHO the bindings contained in pull request above must be merged in the
-> kernel asap, I would like to ask you please what should I do to get them in
-> please. If we want to move bindings documentation elsewhere let's do it,
-> as long as there is a published standard I am happy and will stop annoying
-> you with this stuff.
+v5: http://www.spinics.net/lists/linux-ide/msg45712.html
+  - Fix the wrong referrence usage of the private data.
+  - Use the private data to contain the poninter of the PHY
+  signals adjustment window(gpr)
+  - Tested on imx6q sd board.
+  - 
 
-Just to be clear, I had no problems with the patches themselves, but
-just the way it was merged.
+v4: http://www.spinics.net/lists/linux-ide/msg45699.html
+  Thanks for the review comments provided by Sascha, and Alexander.
+  - Use the private data and keep a pointer to the PHY clock.
+  - Don't use the global platform device variable, because that
+  it would make the driver broken for mutiple instances.
+  - Don't do the "writel" with assignment.
+  - Other minor changes, such as print the error code when printing
+  error message, use a u32 type to store readl results, and so on.
 
-That being said, I think every DTS patch you did should be merged by
-now, only the second patch of this serie for the A10S hasn't.
+v3: http://www.spinics.net/lists/linux-ide/msg45688.html
+  - Keep arch/arm and ahci_platform driver clean.
+  - Add the sata_imx standalone driver contained all the
+  specific setup
+  - Add the release function, support the loadable module
+  driver.
+  - Tested on imx6q sd board.
 
-Arnd, Olof, could you just apply the patch 2 for a 3.11-rc*? It's the
-only rc patch for the sunxi platform for now, so I don't think a pull
-request would be worth it, but I can send one anyway if you prefer.
+v2: http://www.spinics.net/lists/linux-ide/msg45666.html 
+ - Setup standalone imx ahci sata driver, because of
+ the misalignments of the bits definition of the HBA register.
+ - Replace the node by the label in the board dts.
+ - 
 
-Thanks!
-Maxime
+v1: http://www.spinics.net/lists/linux-ide/msg45581.html
+ - add imx6q specific ahci sata support to arch/arm/mach-imx/mach-imx6q.c
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130712/cb1d3c36/attachment.sig>
+These patches is based on imx/dt branch of
+"http://git.linaro.org/git-ro/people/shawnguo/linux-2.6.git"
+
+[v6 1/3] ARM: dtsi: enable ahci sata on imx6q platforms
+[v6 2/3] ARM: imx6q: update the sata bits definitions of gpr13
+[v6 3/3] sata: imx: add ahci sata support on imx platforms
+
+arch/arm/boot/dts/imx6q-sabreauto.dts       |    4 +
+arch/arm/boot/dts/imx6q-sabrelite.dts       |    4 +
+arch/arm/boot/dts/imx6q-sabresd.dts         |    4 +
+arch/arm/boot/dts/imx6q.dtsi                |    9 +
+drivers/ata/Kconfig                         |    9 +
+drivers/ata/Makefile                        |    1 +
+drivers/ata/sata_imx.c                      |  241 +++++++++++++++++++++++++++
+include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  121 +++++++++----
+8 files changed, 356 insertions(+), 37 deletions(-)
