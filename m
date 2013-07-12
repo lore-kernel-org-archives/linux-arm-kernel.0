@@ -1,99 +1,43 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 12 Jul 2013 17:42:04 +0530
-Subject: [PATCH 1/2] Revert "ARM: OMAP2+: Fix serial init for device tree
- based booting"
-In-Reply-To: <20130712091827.GH7656@atomide.com>
-References: <1373539986-27272-1-git-send-email-rnayak@ti.com>
- <1373539986-27272-2-git-send-email-rnayak@ti.com>
- <20130712072051.GA7656@atomide.com> <51DFB0E4.6040007@ti.com>
- <20130712080305.GD7656@atomide.com> <51DFC58C.7030105@ti.com>
- <20130712091827.GH7656@atomide.com>
-Message-ID: <51DFF294.9080501@ti.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 12 Jul 2013 14:13:54 +0200
+Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
+ streaming format
+In-Reply-To: <20130712041810.53c86e5f.akpm@linux-foundation.org>
+References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+ <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
+ <20130712075602.GA4002@gmail.com> <20130712080145.GC24008@pd.tnic>
+ <20130712101319.GA13421@gmail.com> <20130712102326.GE24008@pd.tnic>
+ <20130712041810.53c86e5f.akpm@linux-foundation.org>
+Message-ID: <20130712121354.GG24008@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 July 2013 02:48 PM, Tony Lindgren wrote:
-> * Rajendra Nayak <rnayak@ti.com> [130712 02:06]:
->> On Friday 12 July 2013 01:33 PM, Tony Lindgren wrote:
->>>
->>> OK, so that's only for earlyprintk then?
->>
->> yes,
->>
->>>
->>> If so, it seems the right fix is to set the NO_IDLE and NO_RESET
->>> flags based on ifdef CONFIG_DEBUG_OMAP4UART3 etc as that is selected
->>> in the Kconfig now.
->>
->> ok makes sense. It seems like the static data in hwmod can be populated
->> based on these defines? something like
->>
->> /* uart3 */
->> static struct omap_hwmod omap44xx_uart3_hwmod = {
->>         .name           = "uart3",
->>         .class          = &omap44xx_uart_hwmod_class,
->>         .clkdm_name     = "l4_per_clkdm",
->> #ifdef CONFIG_DEBUG_OMAP4UART3
->>         .flags          = HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET |
->>                                 HWMOD_SWSUP_SIDLE_ACT,
->> #else
->>         .flags          = HWMOD_SWSUP_SIDLE_ACT,
->> #endif
->>         .main_clk       = "func_48m_fclk",
->>         .prcm = {
->>                 .omap4 = {
->>                         .clkctrl_offs = OMAP4_CM_L4PER_UART3_CLKCTRL_OFFSET,
->>                         .context_offs = OMAP4_RM_L4PER_UART3_CONTEXT_OFFSET,
->>                         .modulemode   = MODULEMODE_SWCTRL,
->>                 },
->>         },
->> };
->>
->> And same way for others? That way the cmdline parsing can be done away
->> with even for the non-DT case.
-> 
-> Yes we can do it that way. How about add a common macro for it if
-> it's always the same? Then the .flags line would be just:
-> 
-> #define HWMOD_OMAP_UART_FLAGS(soc, port)
-> ...
-> 
-> 	.flags		= HWMOD_OMAP_UART_FLAGS(4, 3),
+On Fri, Jul 12, 2013 at 04:18:10AM -0700, Andrew Morton wrote:
+> Well y'know, if whining fixed bugs then there would be no problem here
+> at all.
 
-I started doing this and ended up with equal number of #ifdefs in the
-header :( Was the intention of doing this to reduce the #ifdefs? in which
-case maybe I am doing something wrong.
+I know. I decided to whine this time and not try to fix it because
+attempting to fix every fallout I'm seeing in the tree with randconfigs
+is a full-time job and the *actual* job doesn't see any progress.
 
-> 
->>> The current code in mach-omap2/serial.c is wrong, and is a hack
->>> needed for the pdata based booting. What's broken is that
->>> omap_serial_early_init() parses the cmdline for console, which
->>> itself is pretty nasty, and it won't work the right way as
->>> there's nothing stopping from having the earlycon in a different
->>> UART from the serial console. So we just want to get rid of the
->>> whole mach-omap2/serial.c once we're all DT.
->>>
->>> So to summarize, we have two bugs:
->>>
->>> 1. Omap hwmod code can reset UART while earlycon may be using
->>>    it. The fix to this is to use NO_IDLE and NO_RESET flags in
->>>    the hwmod code if CONFIG_DEBUG_OMAPxUARTy is specified.
->>>
->>> 2. A bug in drivers/tty/serial/omap-serial.c where the
->>>    missing context loss count can cause NULL context to be
->>>    initialized during driver probe causing port to hang for
->>>    earlycon. The fix for that is what Felipe has suggested or
->>>    fix it in the driver by removing the context loss count usage
->>>    and detect the need for context restore based on the UART
->>>    state.
->>>
->>> Or am I still missing something?
->>
->> No, thats pretty much the 2 issues we have.
-> 
-> OK thanks good to hear it's limited to earlycon issues.
-> 
-> Regards,
-> 
-> Tony
-> 
+And in all fairness, if someone were reporting an issue against my code,
+I'll try to do my very best to fix it as quickly aas possible, instead
+of ignoring it.
+
+So actually, the right thing to do in such cases is back out half-cooked
+stuff from the tree until it gets fixed. That'll give the authors the
+right incentive. But this is just me.
+
+> This problem came up briefly and I thought it had been adequately
+> addressed. Now a month or two later we find out who are the people who
+> can't be bothered testing -next, but think it terribly important that
+> others do so.
+
+Yeah, if everyone would put their money where their mouth is...
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
