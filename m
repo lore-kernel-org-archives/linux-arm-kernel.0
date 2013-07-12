@@ -1,74 +1,90 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 12 Jul 2013 12:15:25 +0200
-Subject: [PATCH, re-send] Always trap on BUG()
-In-Reply-To: <201307051738.35930.arnd@arndb.de>
-References: <201307051738.35930.arnd@arndb.de>
-Message-ID: <20130712101525.GA13552@gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 12 Jul 2013 18:16:57 +0800
+Subject: [PATCH v12 06/13] usb: chipidea: add otg_cap attribute for otg
+ capable
+In-Reply-To: <87r4f4dsi5.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
+ <1373524041-10482-7-git-send-email-peter.chen@freescale.com>
+ <871u742o4u.fsf@ashishki-desk.ger.corp.intel.com>
+ <20130712082500.GA16202@nchen-desktop>
+ <87r4f4dsi5.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20130712101656.GD16202@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jul 12, 2013 at 12:42:10PM +0300, Alexander Shishkin wrote:
+> Peter Chen <peter.chen@freescale.com> writes:
+> 
+> > On Fri, Jul 12, 2013 at 11:12:01AM +0300, Alexander Shishkin wrote:
+> >> Peter Chen <peter.chen@freescale.com> writes:
+> >> 
+> >> > Since we need otgsc to know vbus's status at some chipidea
+> >> > controllers even it is peripheral-only mode. Besides, some
+> >> > SoCs (eg, AR9331 SoC) don't have otgsc register even
+> >> > the DCCPARAMS_DC and DCCPARAMS_HC are both 1 at CAP_DCCPARAMS.
+> >> > We inroduce otg_cap attribute to indicate if the controller
+> >> > is otg capable, defaultly, we follow the rule that if DCCPARAMS_DC
+> >> > and DCCPARAMS_HC are both 1 at CAP_DCCPARAMS are otg capable, but if there
+> >> > is exception, the platform can override it by device tree or platform data.
+> >> >
+> >> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> >> > ---
+> >> 
+> >> [...]
+> >> 
+> >> > diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+> >> > index 118bf66..0a906b4 100644
+> >> > --- a/include/linux/usb/chipidea.h
+> >> > +++ b/include/linux/usb/chipidea.h
+> >> > @@ -7,6 +7,12 @@
+> >> >  
+> >> >  #include <linux/usb/otg.h>
+> >> >  
+> >> > +enum usb_otg_cap {
+> >> > +	OTG_CAP_ATTR_IS_NOT_EXISTED = 0,
+> >> > +	OTG_CAP_ATTR_IS_TRUE,
+> >> > +	OTG_CAP_ATTR_IS_FALSE,
+> >> > +};
+> >> 
+> >> We don't really need all three, do we? We only need to know if the
+> >> controller *can't* do otg. The rest we can infer from dr_mode and
+> >> DCCPARAMS. So it can be another bit in flags rather than a separate
+> >> field in platdata.
+> >> 
+> >
+> > In order to cover below two cases, I have no other idea.
+> >
+> > 1. For mips Soc (ARxxx), if dr_mode = otg and it is 1 for both
+> > mode at DCCPARAMS,  It can switch role through proc or whatever,
+> > but NO otgsc register, it is NOT otg-capable.
+> 
+> For this case, platform should set
+> 
+> platdata->flags &= CI_HDRC_NO_OTG
+> 
+> , which will set ci->is_otg = false. No ci->is_otg => no touching
+> OTGSC.
+> 
+> > 2. For peripheral-only case at most chipidea controllers,
+> > the dr_mode = peripheral and it is 1 for both modes at DCCPARAMS,
+> > the otgsc can be visited, it is otg-capable.
+> 
+> Then platform *doesn't* set CI_HDRC_NO_OTG and ci->is_otg is set to
+> true, because DCCPARAMS.DC==1 and DCCPARAMS.HC==1, but we only have one
+> role initialized, because of dr_mode==peripheral, so no role switching
+> happens, but OTGSC accesses are fine.
+> 
+> Makes sense?
+> 
 
-* Arnd Bergmann <arnd@arndb.de> wrote:
+Agree, I will add the define of CI_HDRC_NO_OTG to
+struct ci_hdrc_platform_data, and add below comments
 
-> I've run some size analyis using the ARM 'multi_v7_defconfig'
-> and gcc-4.8, using various definitions for BUG() and BUG_ON(), to
-> see how big the size improvement actually gets
-> 
-> 1. Baseline: normal bug plus CONFIG_BUG_VERBOSE
->    text    data     bss     dec     hex filename
-> 3743196  224396  206812 4174404  3fb244 vmlinux-bugverbose
-> 
-> 2. disabling CONFIG_BUG_VERBOSE, saving 0.6%
-> 3716920  224380  206812 4148112  3f4b90 vmlinux-nobugverbose
-> 
-> 3. #define BUG() panic(__func__), #define BUG_ON(c) if(c) BUG(), saving 1.0%
-> 3701076  224384  206812 4132272  3f0db0 vmlinux-bug-panicfunc
-> 
-> 3. #define BUG() panic(__func__), #define BUG_ON(c) if(c) BUG(), saving 1.5%
-> 3678884  224400  206812 4110096  3eb710 vmlinux-bug-panic
-> 
-> 4. #define BUG() unreachable(), saving 2.1%
-> 3652636  224384  206812 4083832  3e5078 vmlinux-bug-unreachable
-> 
-> 5. as 4, plus #define BUG_ON(c) if(c) unreachable(), saving 2.2%
-> 3651108  224380  206812 4082300  3e4a7c vmlinux-bugon-unreachable
-> 
-> 6. #define BUG() do{}while(0), saving 2.1%
-> 3654264  224380  206812 4085456  3e56d0 vmlinux-nobug
-> 
-> 7. as 6, plus #define BUG_ON if(0 && (c)) unreachable, saving 2.2%
-> 3648392  223996  206748 4079136  3e3e20 vmlinux-no-bugon
-> 
-> 8. my patch below, saving 1.8%
-> 3666532  224380  206812 4097724  3e86bc obj-tmp/vmlinux
-> 
-> The gain of doing unreachable and letting the code run off whereever
-> is minimal compared to the current state of doing nothing, but it
-> avoids the warnings.
-> 
-> Same test using x86_defconfig:
-> 
-> 1. CONFIG_BUG=y, CONFIG_BUGVERBOSE=n
-> 10797859        1395648 1175552 13369059         cbfee3 vmlinux-x86-bug
-> 
-> 2. CONFIG_BUG=n, saves 1.0%
-> 10658553        1395584 1175552 13229689         c9de79 vmlinux-x86-nobug
-> 
-> 3. with my patch, saves 0.8%
-> 10684186        1395584 1175552 13255322         ca429a vmlinux-x86-archbug
-> 
-> Getting 1-2% savings in kernel size seems absolutely worth keeping the
-> option, but 0.2-0.4% left for getting reproducible behavior also seems
-> worthwhile. The result in the patch below.
-> 
-> This basically loses any of the BUG() reporting, but leaves the
-> logic to trap and kill the task in place when CONFIG_BUG is disabled.
+/* Only set it when DCCPARAMS.DC==1 and DCCPARAMS.HC==1,
+ * but otg is not supported (no register otgsc).
+ */
 
-This also kills a boatload of compiler warnings when CONFIG_BUG is 
-disabled.
+-- 
 
-Acked-by: Ingo Molnar <mingo@kernel.org>
-
-Thanks,
-
-	Ingo
+Best Regards,
+Peter Chen
