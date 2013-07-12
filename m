@@ -1,40 +1,79 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 12 Jul 2013 21:20:23 +0800
-Subject: [PATCH] video: nuc900fb: fix to pass correct device identity to
- free_irq()
-Message-ID: <CAPgLHd_mMOOeMecVJbTQjiK+xJD+-8jvgH6oAFqTHK_uSpWOJw@mail.gmail.com>
+From: mpfj-list@newflow.co.uk (Mark Jackson)
+Date: Fri, 12 Jul 2013 14:57:03 +0100
+Subject: [PATCH] remove vlan tags in CPSW dual emac mode
+In-Reply-To: <5176C4FE.4080305@ti.com>
+References: <4699400.vD3TdgH1nR@localhost> <5176C4FE.4080305@ti.com>
+Message-ID: <51E00B2F.6050406@newflow.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On 23/04/13 18:29, Mugunthan V N wrote:
+> On 4/23/2013 9:48 PM, Markus Brunner wrote:
+>> If operating in dual emac mode all packets sent by the CPSW contain vlan headers with the reserved VID 0,
+>> which gets stripped away by all somewhat recent Linux versions. Operating systems without that behaviour will fail to communicate.
+>> This patch fixes that behaviour by disabling the VLAN_AWARE mode as already described by the comment above.
+>>
+>> Signed-off-by: Markus Brunner <systemprogrammierung.brunner@gmail.com>
+>> Tested-by: Mark Jackson <mpfj@newflow.co.uk>
+>>
+>> ---
+>> --- linux-3.9-rc8.orig/drivers/net/ethernet/ti/cpsw.c    2013-04-23 17:26:11.000000000 +0200
+>> +++ linux-3.9-rc8/drivers/net/ethernet/ti/cpsw.c    2013-04-23 17:36:25.000000000 +0200
+>> @@ -751,9 +751,9 @@ static void cpsw_init_host_port(struct c
+>>       /* switch to vlan unaware mode */
+>>       cpsw_ale_control_set(priv->ale, priv->host_port, ALE_VLAN_AWARE,
+>>                    CPSW_ALE_VLAN_AWARE);
+>>       control_reg = readl(&priv->regs->control);
+>> -    control_reg |= CPSW_VLAN_AWARE;
+>> +    control_reg &= ~CPSW_VLAN_AWARE;
+>>       writel(control_reg, &priv->regs->control);
+>>       fifo_mode = (priv->data.dual_emac) ? CPSW_FIFO_DUAL_MAC_MODE :
+>>                CPSW_FIFO_NORMAL_MODE;
+>>       writel(fifo_mode, &priv->host_port_regs->tx_in_ctl);
+> Disabling VLAN aware mode will enable switching mode and the feature of
+> separating the two down stream port is lost with this patch
+> Please check TRM for more info in *14.3.2.10.2 Dual Mac Mode* chapter
 
-free_irq() expects the same device identity that was passed to
-corresponding request_irq(), otherwise the IRQ is not freed.
+Just to update this (old) thread ...
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/video/nuc900fb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I can still confirm that *without* the above patch, I am *unable* to use both network
+ports on our AM335x board.
 
-diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
-index 8c527e5..ebd5501 100644
---- a/drivers/video/nuc900fb.c
-+++ b/drivers/video/nuc900fb.c
-@@ -661,7 +661,7 @@ release_clock:
- 	clk_disable(fbi->clk);
- 	clk_put(fbi->clk);
- release_irq:
--	free_irq(irq, fbi);
-+	free_irq(irq, fbinfo);
- release_regs:
- 	iounmap(fbi->io);
- release_mem_region:
-@@ -702,7 +702,7 @@ static int nuc900fb_remove(struct platform_device *pdev)
- 	iounmap(fbi->io);
- 
- 	irq = platform_get_irq(pdev, 0);
--	free_irq(irq, fbi);
-+	free_irq(irq, fbinfo);
- 
- 	release_resource(fbi->mem);
- 	kfree(fbi->mem);
+My .dts file contains:-
+
+mac: ethernet at 4a100000 {
+	dual_emac = <1>;
+
+	cpsw_emac0: slave at 4a100200 {
+		dual_emac_res_vlan = <1>;
+	};
+
+	cpsw_emac1: slave at 4a100300 {
+		dual_emac_res_vlan = <2>;
+	};
+};
+
+&cpsw_emac0 {
+	phy_id = <&davinci_mdio>, <0>;
+};
+
+&cpsw_emac1 {
+	phy_id = <&davinci_mdio>, <1>;
+};
+
+My /etc/network/interfaces file is:-
+
+auto lo eth0 eth1
+iface lo inet loopback
+iface eth0 inet static
+address 10.0.101.3
+netmask 255.255.0.0
+gateway 10.0.0.1
+iface eth1 inet static
+address 10.1.101.3
+netmask 255.255.0.0
+
+So I'm not sure what's wrong, but it's *definitely* not correct.
+
+Cheers
+Mark J.
