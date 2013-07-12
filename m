@@ -1,37 +1,46 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 12 Jul 2013 08:49:57 +0200
-Subject: [PATCH] ARM: dts: imx: share pad macro names between imx6q and
- imx6dl
-In-Reply-To: <1373522316-12319-1-git-send-email-shawn.guo@linaro.org>
-References: <1373522316-12319-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130712064957.GH14452@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 12 Jul 2013 12:21:20 +0530
+Subject: [PATCH v3 0/6] ARM: davinci: da850: add ethernet driver DT support
+In-Reply-To: <CA+V-a8t-sTPAK+D5869X0_ZCdrmK0B+eRaowk9hMYwXMw09NqA@mail.gmail.com>
+References: <1371999607-6483-1-git-send-email-prabhakar.csengg@gmail.com>
+ <CA+V-a8t-sTPAK+D5869X0_ZCdrmK0B+eRaowk9hMYwXMw09NqA@mail.gmail.com>
+Message-ID: <51DFA768.9090703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-Nice patch.
-
-On Thu, Jul 11, 2013 at 01:58:36PM +0800, Shawn Guo wrote:
-> The imx6q and imx6dl are two pin-to-pin compatible SoCs.  The same board
-> design can work with either chip plugged into the socket, e.g. sabresd
-> and sabreauto boards.
+On 7/11/2013 10:42 PM, Prabhakar Lad wrote:
+> Hi Sekhar,
 > 
-> We currently define pin groups in imx6q.dtsi and imx6dl.dtsi
-> respectively because the pad macro names are different between two
-> chips.  This brings a maintenance burden on having the same label point
-> to the same pin group defined in two places.
-> 
-> The patch drops prefix MX6Q_ and MX6DL_ from those pad macro names.
+> On Sun, Jun 23, 2013 at 8:30 PM, Prabhakar Lad
+> <prabhakar.csengg@gmail.com> wrote:
+>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>>
+>> This patch set enables Ethernet support through device tree model.
+>> This patch set enables mii interface only and is being tested to boot via
+>> rootfs. The rmii phy is present on the i2c gpio expander chip (UI board)
+>> for which yet support needs to be added, once the DT support for the chip
+>> is enabled, enabling rmii will be subsequnet patch.
+>>
+>> Changes for v2:
+>> 1: Enabled mdio device.
+>> 2: Fixed clock lookup.
+>>
+>> Changes for v3:
+>> 1: Fixed review comments pointed out by Sekhar.
+>>
+>> Lad, Prabhakar (6):
+>>   ARM: davinci: da8xx: fix clock lookup for mdio device
+>>   ARM: davinci: da850: add DT node for mdio device
+>>   ARM: davinci: da850: add OF_DEV_AUXDATA entry for mdio.
+>>   ARM: davinci: da850: add DT node for eth0.
+>>   ARM: davinci: da850: add OF_DEV_AUXDATA entry for eth0.
+>>   ARM: davinci: da850: configure system configuration chip(CFGCHIP3)
+>>     for emac
+>>
+> gentle ping..
 
-Can we use another prefix instead of removing it completely? Maybe
-MX6QDL_?
+I haven't been able to get to reviewing patches meant for v3.12 yet.
+Most probably will happen next week.
 
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Sekhar
