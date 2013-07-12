@@ -1,77 +1,45 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 12 Jul 2013 13:00:25 +0100
-Subject: v3.10 - big endian core support
-In-Reply-To: <CALicx6sr=OXYAdSS-RXPCjSp4f_yLQyw6jJsQ2KyhgQ9fRtXag@mail.gmail.com>
-References: <CALicx6u89THSiRa4FzGZrcoG8q+o_BD8qVEC4CYXEjPUVK_fJw@mail.gmail.com>
- <20130712134726.0a909165@skate>
- <CALicx6sr=OXYAdSS-RXPCjSp4f_yLQyw6jJsQ2KyhgQ9fRtXag@mail.gmail.com>
-Message-ID: <51DFEFD9.2060509@codethink.co.uk>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Fri, 12 Jul 2013 14:06:13 +0200
+Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
+ streaming format
+In-Reply-To: <20130712041810.53c86e5f.akpm@linux-foundation.org>
+References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+ <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
+ <20130712075602.GA4002@gmail.com> <20130712080145.GC24008@pd.tnic>
+ <20130712101319.GA13421@gmail.com> <20130712102326.GE24008@pd.tnic>
+ <20130712041810.53c86e5f.akpm@linux-foundation.org>
+Message-ID: <20130712120613.GA21313@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/13 12:56, Vijay Kilari wrote:
-> On Fri, Jul 12, 2013 at 5:17 PM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com>  wrote:
->> Dear Vijay Kilari,
->>
->> On Fri, 12 Jul 2013 17:09:12 +0530, Vijay Kilari wrote:
->>
->>>> Ben Dooks has a separate branch on top of this base branch for
->>>> big-endian support, that adds atags compat code to convert the ATAGs
->>>> data from LE to BE. See the baserock/311/be/atags branch in
->>>> git://git.baserock.org/delta/linux. Or
->>>> http://git.baserock.org/cgi-bin/cgit.cgi/delta/linux.git/log/?h=baserock/311/be/atags.
->>>
->>>   ARM VE TC2 board, enabling CONFIG_THUMB2_KERNEL failed to boot in BE mode
->>> It hangs at very early stage of boot
->>
->> Yeah, the Thumb2 code is not supported by Ben Dooks patches, it's part
->> of the TODO-list. I think Ben said he would probably not have much time
->> to work on this. I might be able to spare some time on this, so just
->> let me know if I should start working on this. If I remember correctly,
->> it's mainly the fixup_pv_table code that needed some Thumb2/BE love.
->
-> In fact, I tried with below changes.. still it fails
->
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 2de1114..7df64c7 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -592,8 +592,14 @@ __fixup_a_pv_table:
->          b       2f
->   1:     add     r7, r3
->          ldrh    ip, [r7, #2]
-> +#ifdef CONFIG_CPU_ENDIAN_BE8
-> +       rev     ip, ip
-> +#endif
 
-Do you need a rev16 here? I think you may have tried
-reversing the full 32 bits here instead of just the
-16bits of instruction that was loaded.
+* Andrew Morton <akpm@linux-foundation.org> wrote:
 
->          and     ip, 0x8f00
->          orr     ip, r6  @ mask in offset bits 31-24
-> +#ifdef CONFIG_CPU_ENDIAN_BE8
-> +       rev     ip, ip
-> +#endif
->          strh    ip, [r7, #2]
->   2:     cmp     r4, r5
->          ldrcc   r7, [r4], #4    @ use branch for delay slot
->
->>
->> Will, is getting Thumb2 working a requirement to get the BE support
->> merged, or can we for now make the BE option depends on !THUMB2_KERNEL ?
->>
->> Thanks!
->>
->> Thomas
->> --
->> Thomas Petazzoni, Free Electrons
->> Kernel, drivers, real-time and embedded Linux
->> development, consulting, training and support.
->> http://free-electrons.com
+> On Fri, 12 Jul 2013 12:23:26 +0200 Borislav Petkov <bp@alien8.de> wrote:
+> 
+> > On Fri, Jul 12, 2013 at 12:13:19PM +0200, Ingo Molnar wrote:
+> > > and now it is upstream already, via -mm:
+> > > 
+> > >    e76e1fdfa8f8 lib: add support for LZ4-compressed kernel
+> > 
+> > Sure. Let's see if it manages to get released b0rked like it is right
+> > now.
+> 
+> Well y'know, if whining fixed bugs then there would be no problem here 
+> at all.
+> 
+> This problem came up briefly and I thought it had been adequately 
+> addressed.  Now a month or two later we find out who are the people who 
+> can't be bothered testing -next, but think it terribly important that 
+> others do so.
 
+At least with my limited resources -next is unusable for my randconfig 
+testing. I can randconfig test the fresh new bugs I introduce plus the 
+bugs that slip upstream - which naturally peak during the merge window.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Anyway, I hacked it around locally, sh*t happens, it should be easy enough 
+to fix.
+
+Thanks,
+
+	Ingo
