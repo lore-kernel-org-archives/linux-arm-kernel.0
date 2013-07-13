@@ -1,260 +1,110 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sat, 13 Jul 2013 12:56:50 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 13 Jul 2013 12:12:39 +0100
 Subject: DT binding review for Armada display subsystem
-In-Reply-To: <20130713103516.38a55b0b@armhf>
+In-Reply-To: <51E13272.5040903@gmail.com>
 References: <20130712164428.AC3D2FAAE9@dev.laptop.org>
  <20130712203952.6b7aa927@armhf>
  <CAMLZHHT1oAvOLe3JgQqMqLNXEr0NGrdtgELtF_djbqLFceHtiQ@mail.gmail.com>
- <20130713103516.38a55b0b@armhf>
-Message-ID: <51E13272.5040903@gmail.com>
+ <20130713103516.38a55b0b@armhf> <51E13272.5040903@gmail.com>
+Message-ID: <20130713111239.GM24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2013 10:35 AM, Jean-Francois Moine wrote:
-> On Fri, 12 Jul 2013 13:00:23 -0600 Daniel Drake<dsd@laptop.org>  wrote:
->> On Fri, Jul 12, 2013 at 12:39 PM, Jean-Francois Moine<moinejf@free.fr>  wrote:
-
->>> - the phandles to the clocks does not tell how the clock may be set by
->>>    the driver (it is an array index in the 510).
->>
->> In the other threads on clock selection, we decided that that exact
->> information on how to select a clock (i.e. register bits/values) must
->> be in the driver, not in the DT. What was suggested there is a
->> well-documented scheme for clock naming, so the driver knows which
->> clock is which. That is defined in the proposed DT binding though the
->> "valid clock names" part. For an example driver implementation of this
->> you can see my patch "armada_drm clock selection - try 2".
+On Sat, Jul 13, 2013 at 12:56:50PM +0200, Sylwester Nawrocki wrote:
+> On 07/13/2013 10:35 AM, Jean-Francois Moine wrote:
+>> On Fri, 12 Jul 2013 13:00:23 -0600 Daniel Drake<dsd@laptop.org>  wrote:
+>>> On Fri, Jul 12, 2013 at 12:39 PM, Jean-Francois Moine<moinejf@free.fr>  wrote:
 >
-> OK.
->
-> Sorry to go back to this thread.
->
-> I use my Cubox for daily jobs as a desktop computer. My kernel is a DT
-> driven 3.10.0. The dove-drm, tda998x and si5351 (clock) are kernel
-> modules. I set 3 clocks in the DT for the LCD0: lcdclk, axi and extclk0
-
-Hmm, a bit off topic question, does it work when the si5351 module gets
-removed ? I can't see anything preventing clock provider module from being
-removed why any of its clocks is used and clk_unregister() function is
-currently unimplemented.
-
-> (si5351). Normally, the external clock is used, but, sometimes, the
-> si5351 module is not yet initialized when the drm driver starts. So,
-> for 1920x1080p, it uses the lcdclk which sets the LCD clock to 133333
-> (400000/3) instead of 148500. As a result, display and sound still work
-> correctly on my TV set thru HDMI.
->
-> So, it would be nice to have 2 usable clocks per LCD, until we find a
-> good way to initialize the modules in the right order at startup time.
-
-Doesn't deferred probing help here ?
-
->>> - I don't see the use of the phandles in the leaves (dcon and tda998x).
->>
->> That is defined by the video interfaces common binding. I'm not
->> immediately aware of the use, but the ability to easily traverse the
->> graph in both directions seems like a requirement that could easily
->> emerge from somewhere.
->
-> OK, but I am not convinced...
->
->>> Well, here is how I feel the DTs:
+>>>> - the phandles to the clocks does not tell how the clock may be set by
+>>>>    the driver (it is an array index in the 510).
 >>>
->>> - for the Cubox (one LCD, the DCON is not used, TDA998x for HDMI/DVI
->>>    output):
+>>> In the other threads on clock selection, we decided that that exact
+>>> information on how to select a clock (i.e. register bits/values) must
+>>> be in the driver, not in the DT. What was suggested there is a
+>>> well-documented scheme for clock naming, so the driver knows which
+>>> clock is which. That is defined in the proposed DT binding though the
+>>> "valid clock names" part. For an example driver implementation of this
+>>> you can see my patch "armada_drm clock selection - try 2".
 >>
->> That is the same as my proposal except you have decided to use direct
->> phandle properties instead of using the common video interfaces
->> binding (which is just a slightly more detailed way of describing such
->> links). In the "best practices" thread, the suggestion was raised
->> multiple times of doing what v4l2 does, so thats why I decided to
->> explore this here.
+>> OK.
 >>
->>> - for some tablet based on the Armada 510 with a LCD and a VGA connector:
->>>
->>>          video {
->>>                  compatible = "marvell,armada-video";
->>>                  marvell,video-devices =<&lcd0>,<&lcd1>,<&dcon>
->>>          };
+>> Sorry to go back to this thread.
 >>
->> This proposal is slightly different because it does not describe the
->> relationship between the LCD controllers and the DCON. Focusing
->> specifically on LCD1, which would be connected to a DAC via a phandle
->> property in your proposal. The interconnectivity between the
->> components represented as a graph (and in the v4l2 way, which includes
->> my proposal) would be:
+>> I use my Cubox for daily jobs as a desktop computer. My kernel is a DT
+>> driven 3.10.0. The dove-drm, tda998x and si5351 (clock) are kernel
+>> modules. I set 3 clocks in the DT for the LCD0: lcdclk, axi and extclk0
+>
+> Hmm, a bit off topic question, does it work when the si5351 module gets
+> removed ? I can't see anything preventing clock provider module from being
+> removed why any of its clocks is used and clk_unregister() function is
+> currently unimplemented.
+
+When I designed the clk API, I arranged for things like clk_get() to
+take a reference on the module if the clock was supplied by a module.
+You'll see some evidence of that by looking back in the git history
+for arch/arm/mach-integrator/include/mach/clkdev.h.
+
+If the common clk API has been designed without any thought to clocks
+supplied by modules and making sure that in-use clocks don't go away,
+then it's going to be a real pain to sort that out.  I don't think
+refcounting clocks makes sense (what do you do with an enabled clock
+that you then remove the module for but it's still being used?  Do you
+just shut it down anyway?  Do you leave it running?  What about
+subsequent calls?).
+
+I think this is one case where taking a reference on the module supplying
+it makes total sense.
+
+>> (si5351). Normally, the external clock is used, but, sometimes, the
+>> si5351 module is not yet initialized when the drm driver starts. So,
+>> for 1920x1080p, it uses the lcdclk which sets the LCD clock to 133333
+>> (400000/3) instead of 148500. As a result, display and sound still work
+>> correctly on my TV set thru HDMI.
 >>
->> LCD1 --- DCON --- DAC
+>> So, it would be nice to have 2 usable clocks per LCD, until we find a
+>> good way to initialize the modules in the right order at startup time.
+>
+> Doesn't deferred probing help here ?
+
+Indeed it does.  Just because one TV works with such a wrong clock does not
+mean that all TVs and HDMI compatible monitors will do.  It's 11% out.
+
+The reason that audio works is because of the way the HDMI transmitter works
+- it can calculate the CTS value to send (by measuring it) and it sends that
+value over the link so the TV can regenerate the correct audio clock from
+the HDMI clock.
+
+Whether that's going to be universally true, I don't know - it depends on
+how much audio data gets sent via each frame.  As the HDMI clock is slower,
+there would need to be more audio data sent.
+
+>> 	lcd0: lcd-controller at 820000 {
+>> 		compatible = "marvell,dove-lcd0";
+> [...]
+>> 	};
 >>
->> However your phandle properties would "suggest" that LCD1 is directly
->> connected to the DAC. The driver would have to have special knowledge
->> that the DCON sits right in the middle. Maybe that is not an issue, as
->> it is obviously OK for the driver to have *some* knowledge about how
->> the hardware works :)
->>
->> I don't think we have a full consensus on whether we want to go the
->> "v4l2 way" here. But I figured that would be a good thing to propose
->> in a first iteration to have a clearer idea of what the result would
->> look like. It sounds like you are not overly keen on it, I would be
->> interested to hear exactly why.
+>> 	lcd1: lcd-controller at 810000 {
+>> 		compatible = "marvell,dove-lcd1";
+> [...]
+>> 	};
 >
-> I think this is because I was focused on the software and not on the
-> hardware.
+> Using different compatible strings to indicate multiple instances of same
+> hardware doesn't seem right. Unless LCD0, LCD1 are really different pieces
+
+They aren't.  They're 100% identical in the Armada 510.
+
+> of hardware incompatible with each other I think it would be more correct
+> to use same compatible property and DT node aliases, similarly as is now
+> done with e.g. I2C busses:
 >
-> Back to the specific case of the Cubox with new ideas.
->
-> The Cubox is based on the Armada 510 (Dove), so, all the hardware must
-> be described in dove.dtsi. This includes the LCDs and DCON/IRE, the
-> possible clocks and the (static) v4l2 links:
->
-> 	lcd0: lcd-controller at 820000 {
-> 		compatible = "marvell,dove-lcd0";
-[...]
+> 	aliases {
+> 		lcd0 = &lcd_0;	
+> 		lcd1 = &lcd_1;	
 > 	};
 >
-> 	lcd1: lcd-controller at 810000 {
-> 		compatible = "marvell,dove-lcd1";
-[...]
-> 	};
+>  	lcd_0: lcd-controller at 820000 {
+>  		compatible = "marvell,dove-lcd";
 
-Using different compatible strings to indicate multiple instances of same
-hardware doesn't seem right. Unless LCD0, LCD1 are really different pieces
-of hardware incompatible with each other I think it would be more correct
-to use same compatible property and DT node aliases, similarly as is now
-done with e.g. I2C busses:
-
-	aliases {
-		lcd0 = &lcd_0;	
-		lcd1 = &lcd_1;	
-	};
-
-  	lcd_0: lcd-controller at 820000 {
-  		compatible = "marvell,dove-lcd";
-		...
-  	};
-
-
-  	lcd_1: lcd-controller at 820000 {
-  		compatible = "marvell,dove-lcd";
-		...
-  	};
-
-
-> 	/* display controller and image rotation engine */
-> 	dcon: display-controller at 830000 {
-> 		compatible = "marvell,dove-dcon";
-> 		reg =<0x830000 0xc4>,			/* DCON */
-> 		<0x831000 0x8c>;			/* IRE */
-> 		interrupts =<45>;
-> 		marvell-input =<&lcd0>,<&lcd1>;
-> 		status = "disabled";
-> 	};
->
-> The specific Cubox hardware (tda998x and si5351) is described in
-> dove-cubox.dts, with the new clocks and the v4l2 link dcon0<-->  tda998x.
->
-> 	&i2c0 {
-> 		si5351: clock-generator {
-> 			...
-> 		};
-> 		tda998x: hdmi-encoder {
-> 			compatible = "nxp,tda998x";
-> 			reg =<0x70>;
-> 			interrupt-parent =<&gpio0>;
-> 			interrupts =<27 2>;		/* falling edge */
-> 			marvell-input =<&dcon 0>;
-> 		};
-> 	};
-> 	&lcd0 {
-> 		status = "okay";
-> 		clocks =<&si5351 0>;
-> 		clock-names = "extclk0";
-> 	};
-> 	&dcon {
-> 		status = "okay";
-> 		marvell-output =<&tda998x>, 0;		/* no connector on port B */
-
-Hmm, was this custom binding intended or did you mean rather something
-like:
-
-  	&i2c0 {
-  		si5351: clock-generator {
-  			...
-  		};
-  		tda998x: hdmi-encoder {
-  			compatible = "nxp,tda998x";
-  			reg =<0x70>;
-  			interrupt-parent =<&gpio0>;
-  			interrupts =<27 2>;		/* falling edge */
-  			marvell-input =<&dcon 0>;
-
-			port at I {
-				reg = <I>; /* input (or reg omitted completely) */
-				endpoint {
-					remote-endpoint = <&dcon>;
-				};
-			}
-  		};
-  	};
-  	&lcd0 {
-  		status = "okay";
-  		clocks =<&si5351 0>;
-  		clock-names = "extclk0";
-  	};
-  	&dcon {
-  		status = "okay";
-			
-		port at A {
-			reg = <A>; /* port A */
-			endpoint {
-				remote-endpoint = <&tda998x>;
-			};
-		}
-		/* no connector on port B */
-  	};
-
-I think it should be tried to use common binding for common problems,
-then a common parser library could be used, instead of repeating similar
-code in each driver.
-
-> 	};
->
-> Then, about the software, the drm driver may not need to know anything
-> more (it scans the DT for the LCDs and gets all the subdevices thanks
-> to the v4l2 links):
->
-> 	video {
-> 		compatible = "marvell,armada-video";
-> 	};
->
-> For some boards / other SoCs, there may be independant drm devices. In
-> this case, there would be descriptions as:
->
-> 	video0 {
-> 		compatible = "marvell,armada-video0";
-> 		marvell,video-devices =<&lcd0>;
-> 	};
-> 	video1 {
-> 		compatible = "marvell,armada-video1";
-> 		marvell,video-devices =<&lcd1>;
-> 	};
->
-> About the LCD clocks, the drm driver may choose itself one of the
-> clocks declared in the DT. If a clock should not be used, if should be
-> zeroed in the board specific DT:
->
-> 	&lcd0 {
-> 		status = "okay";
-> 		clocks = 0, 0,<&si5351 0>;
-> 		clock-names = "axi", "lcdclk", "extclk0";
-> 	};
-
-Hmm, not sure how that could work. IIUC there should be same number
-of cells used in the clocks property for each clock specifier (clocks
-provider's node #clock-cells), so &si5351 cell would need to be at
-offset 4. Maybe there is some convention to specify null phandles but
-I'm not aware of it.
-
---
-Regards,
-Sylwester
+I'd much prefer marvell,armada-510-lcd rather than using the codenames for
+the devices.  Otherwise we're going to run into totally different things
+being used for different devices (eg, armada-xp...)
