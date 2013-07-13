@@ -1,43 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 13 Jul 2013 22:02:36 +0100
-Subject: DT binding review for Armada display subsystem
-In-Reply-To: <51E1BBF1.1020009@gmail.com>
-References: <20130712164428.AC3D2FAAE9@dev.laptop.org>
- <20130712203952.6b7aa927@armhf>
- <CAMLZHHT1oAvOLe3JgQqMqLNXEr0NGrdtgELtF_djbqLFceHtiQ@mail.gmail.com>
- <20130713103516.38a55b0b@armhf> <51E13272.5040903@gmail.com>
- <20130713111239.GM24642@n2100.arm.linux.org.uk> <51E1921A.3070207@gmail.com>
- <51E1BBF1.1020009@gmail.com>
-Message-ID: <20130713210236.GP24642@n2100.arm.linux.org.uk>
+From: fgenfb@yahoo.com (Harm Hanemaaijer)
+Date: Sat, 13 Jul 2013 21:13:12 +0000 (UTC)
+Subject: Call for testing/opinions: Optimized memset/memcpy
+References: <loom.20130713T172357-560@post.gmane.org>
+ <20130713164840.GC28473@gallifrey>
+Message-ID: <loom.20130713T225129-903@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 13, 2013 at 10:43:29PM +0200, Sylwester Nawrocki wrote:
-> I wasn't aware of it, thanks. I've seen a patch from Jiada Wang, it seems
-> they're working on v4 with clock object reference counting. Presumably we
-> need both clk_get() to be taking reference on the module and reference
-> counted clk free, e.g. in cases where clock provider is a hot-pluggable
-> device. It might be too paranoid though, I haven't seen hardware
-> configurations where a clock source could be unplugged safely when whole
-> system is running.
+Dr. David Alan Gilbert <gilbertd <at> treblig.org> writes:
 
-I'm not going to accept refcounting being thrown into clk_get().  The
-clkdev API already has refcounting, as much as it needs to.  It just
-needs people to use the hooks that I provided back in 2008 when I
-created the clkdev API for doing _precisely_ this job.
+> 
+> You might like to compare with some of the routines at:
+> https://launchpad.net/cortex-strings
+> and some of the numbers at:
+> https://wiki.linaro.org/WorkingGroups/ToolChain/Benchmarks/
 
-Have a read through these commits, which backup my statement above:
+That's interesting. I had looked at cortex-strings before but didn't
+dig into it, also because its benchmark program seemed to be limited in
+scope. From the Linaro numbers it seems NEON isn't always a win
+especially on newer Cortex platforms, with large variability across
+different platforms/cores.
 
-0318e693d3a56836632bf1a2cfdafb7f34bcc703 - initial commit of the clkdev API
-d72fbdf01fc77628c0b837d0dd2fd564fa26ede6 - converting Integrator to clkdev API
+> 
+>
+http://ssvb.github.io/2013/06/27/fullhd-x11-desktop-performance-of-the-allwinner-a10.html
+> 
+> is an interesting article on one machine being screwed over by
+> video bandwidth.
 
-and it will show you how to do refcounting.  The common clk API just
-needs to stop defining __clk_get() and __clk_put() to be an empty
-function and implement them appropriately for it's clk implementation,
-like they were always meant to be.
+I have the same type of device (the Cortex A8 which I've tested on),
+when running a 1920x1080 screen at 32bpp that does indeed cost a lot
+bandwidth (it's 500MB/s of scanout bandwidth), I think this applies to
+most devices except higher-end ones with a 64-bit DRAM interface.
 
-__clk_get() and __clk_put() are the clk-implementation specific parts
-of the clkdev API, because the clkdev API is utterly divorsed from the
-internals of what a 'struct clk' actually is.  clkdev just treats a
-'struct clk' as a completely opaque type and never bothers poking
-about inside it.
+> I've only had a brief scan through your code, one thing I remember
+> from a couple of years ago was a theory that ldrd/strd was supposed
+> to be faster on A15's (but I never had a chance to try it out).
+
+I briefly experimented with ldrd/strd, it seemed to be fast but
+highly dependent on the proper (64-bit) alignment. In my current code
+it is only used in Thumb2 mode in one spot.
+
+> Maybe neon is worth a try these days (although be careful of platforms
+> like Tegra 2 that doens't have it); there was a recent patch that enabled
+> use in the kernel (I think for some RAID use). The downside is it's
+> supposed to be quite power hungry.
+
+Although I don't have experience with NEON, there seems to be a lot of
+variability across platforms/cores when using it for memcpy, and it may
+have extra overhead when used in the kernel. I will look at it in more
+detail, but not using NEON does make things easier (not having to detect
+NEON, being compatible with older platforms etc).
+
+Thanks for the comments.
