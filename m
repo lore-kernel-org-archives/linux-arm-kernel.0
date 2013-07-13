@@ -1,87 +1,86 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Sat, 13 Jul 2013 00:51:04 -0300
-Subject: [PATCH] arm: multi_v7_defconfig: Tweaks for omap and sunxi
-In-Reply-To: <1373685174-7918-1-git-send-email-olof@lixom.net>
-References: <1373685174-7918-1-git-send-email-olof@lixom.net>
-Message-ID: <51E0CEA8.2040201@elopez.com.ar>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 13 Jul 2013 08:25:50 +0400
+Subject: [PATCH v2 2/3] input: mc13783: Add MC13892 support
+In-Reply-To: <1373689551-24375-1-git-send-email-shc_work@mail.ru>
+References: <1373689551-24375-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1373689551-24375-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
 
-El 13/07/13 00:12, Olof Johansson escribi?:
-> OMAP recently changed how the platforms are configured, so OMAP2/3/4 SoC
-> support is no longer enabled by default. Add them back.
-> 
-> Enable new ethernet driver for sunxi.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ drivers/input/misc/Kconfig             |  6 +++---
+ drivers/input/misc/mc13783-pwrbutton.c | 10 +++++++++-
+ include/linux/mfd/mc13892.h            |  4 ++++
+ 3 files changed, 16 insertions(+), 4 deletions(-)
 
-"ARM: multi_v7: Enable Allwinner EMAC in multi_v7_defconfig" by Maxime
-already does this, and is on Linus Torvalds' tree:
-
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=fb1c60288a886a28dc7c055449fd1936140fe891
-
-> 
-> The i.MX console options moved due to resorting, no functional change.
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
-> 
-> The OMAP changes are needed to deal with the dependency flip from OMAP2PLUS
-> being on and defaulting the SoCs accordingly, to the SoC options selecting
-> OMAP2PLUS. See the "ARM: OMAP2+: Remove board-4430sdp.c" for background.
-> 
->  arch/arm/configs/multi_v7_defconfig | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 80aacc6..fcd2b9b 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -15,8 +15,10 @@ CONFIG_SOC_IMX53=y
->  CONFIG_SOC_IMX6Q=y
->  CONFIG_SOC_IMX6SL=y
->  CONFIG_SOC_VF610=y
-> -CONFIG_ARCH_OMAP2PLUS=y
-> +CONFIG_ARCH_OMAP3=y
-> +CONFIG_ARCH_OMAP4=y
->  CONFIG_SOC_OMAP5=y
-> +CONFIG_SOC_AM33XX=y
->  CONFIG_SOC_AM43XX=y
->  CONFIG_ARCH_ROCKCHIP=y
->  CONFIG_ARCH_SOCFPGA=y
-> @@ -57,6 +59,7 @@ CONFIG_SATA_AHCI_PLATFORM=y
->  CONFIG_SATA_HIGHBANK=y
->  CONFIG_SATA_MV=y
->  CONFIG_NETDEVICES=y
-> +CONFIG_SUN4I_EMAC=y
-
-Additionally, this patch is missing CONFIG_MDIO_SUN4I=y, which I think
-would be needed to make CONFIG_SUN4I_EMAC=y of any use. Maybe a Kconfig
-select would be a good idea here?
-
->  CONFIG_NET_CALXEDA_XGMAC=y
->  CONFIG_SMSC911X=y
->  CONFIG_STMMAC_ETH=y
-> @@ -70,6 +73,8 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
->  CONFIG_SERIAL_SIRFSOC=y
->  CONFIG_SERIAL_SIRFSOC_CONSOLE=y
->  CONFIG_SERIAL_TEGRA=y
-> +CONFIG_SERIAL_IMX=y
-> +CONFIG_SERIAL_IMX_CONSOLE=y
->  CONFIG_SERIAL_VT8500=y
->  CONFIG_SERIAL_VT8500_CONSOLE=y
->  CONFIG_SERIAL_OF_PLATFORM=y
-> @@ -77,8 +82,6 @@ CONFIG_SERIAL_OMAP=y
->  CONFIG_SERIAL_OMAP_CONSOLE=y
->  CONFIG_SERIAL_XILINX_PS_UART=y
->  CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
-> -CONFIG_SERIAL_IMX=y
-> -CONFIG_SERIAL_IMX_CONSOLE=y
->  CONFIG_SERIAL_FSL_LPUART=y
->  CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
->  CONFIG_I2C_DESIGNWARE_PLATFORM=y
-> 
-
-Cheers,
-
-Emilio
+diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+index 0b541cd..0d83653 100644
+--- a/drivers/input/misc/Kconfig
++++ b/drivers/input/misc/Kconfig
+@@ -167,10 +167,10 @@ config INPUT_MAX8997_HAPTIC
+ 	  module will be called max8997-haptic.
+ 
+ config INPUT_MC13783_PWRBUTTON
+-	tristate "MC13783 ON buttons"
+-	depends on MFD_MC13783
++	tristate "MC13783/MC13892 ON buttons"
++	depends on MFD_MC13XXX
+ 	help
+-	  Support the ON buttons of MC13783 PMIC as an input device
++	  Support the ON buttons of MC13783/MC13892 PMIC as an input device
+ 	  reporting power button status.
+ 
+ 	  To compile this driver as a module, choose M here: the module
+diff --git a/drivers/input/misc/mc13783-pwrbutton.c b/drivers/input/misc/mc13783-pwrbutton.c
+index 33613ca..855d576 100644
+--- a/drivers/input/misc/mc13783-pwrbutton.c
++++ b/drivers/input/misc/mc13783-pwrbutton.c
+@@ -26,6 +26,7 @@
+ #include <linux/input.h>
+ #include <linux/platform_device.h>
+ #include <linux/mfd/mc13783.h>
++#include <linux/mfd/mc13892.h>
+ 
+ struct mc13xxx_button_def {
+ 	unsigned int	irq;
+@@ -194,8 +195,15 @@ static const struct mc13xxx_pwrb_devtype mc13783_pwrb_devtype = {
+ 	.btn_def[2] = { MC13783_IRQ_ONOFD3, BIT(5) }
+ };
+ 
++static const struct mc13xxx_pwrb_devtype mc13892_pwrb_devtype = {
++	.btn_def[0] = { MC13892_IRQ_ONOFD1, BIT(3) },
++	.btn_def[1] = { MC13892_IRQ_ONOFD2, BIT(4) },
++	.btn_def[2] = { MC13892_IRQ_ONOFD3, BIT(2) }
++};
++
+ static const struct platform_device_id mc13xxx_pwrbutton_id_table[] = {
+ 	{ "mc13783-pwrbutton", (kernel_ulong_t)&mc13783_pwrb_devtype },
++	{ "mc13892-pwrbutton", (kernel_ulong_t)&mc13892_pwrb_devtype },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(platform, mc13xxx_pwrbutton_id_table);
+@@ -209,6 +217,6 @@ static struct platform_driver mc13xxx_pwrbutton_driver = {
+ };
+ module_platform_driver_probe(mc13xxx_pwrbutton_driver, mc13xxx_pwrbutton_probe);
+ 
+-MODULE_DESCRIPTION("MC13783 Power Button");
++MODULE_DESCRIPTION("MC13XXX Power Button");
+ MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR("Philippe Retornaz");
+diff --git a/include/linux/mfd/mc13892.h b/include/linux/mfd/mc13892.h
+index a00f2be..bdc3baf 100644
+--- a/include/linux/mfd/mc13892.h
++++ b/include/linux/mfd/mc13892.h
+@@ -36,4 +36,8 @@
+ #define MC13892_PWGT2SPI	22
+ #define MC13892_VCOINCELL	23
+ 
++#define MC13892_IRQ_ONOFD3	26
++#define MC13892_IRQ_ONOFD1	27
++#define MC13892_IRQ_ONOFD2	28
++
+ #endif
+-- 
+1.8.1.5
