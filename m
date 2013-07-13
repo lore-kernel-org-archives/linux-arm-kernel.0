@@ -1,143 +1,194 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 13 Jul 2013 14:17:09 +0200
-Subject: [PATCH v2] N900: add device tree
-In-Reply-To: <20130704203256.GB27374@blackmetal.musicnaut.iki.fi>
-References: <20130613155240.GB3775@amd.pavel.ucw.cz>
- <20130613161418.GJ8164@atomide.com>
- <20130613230808.GA14876@amd.pavel.ucw.cz>
- <20130614055629.GM8164@atomide.com>
- <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
- <20130617111031.GQ20992@atomide.com>
- <20130701211753.GC15318@amd.pavel.ucw.cz>
- <20130704171939.GA27374@blackmetal.musicnaut.iki.fi>
- <20130704202145.GB10752@amd.pavel.ucw.cz>
- <20130704203256.GB27374@blackmetal.musicnaut.iki.fi>
-Message-ID: <20130713121709.GC16473@amd.pavel.ucw.cz>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 13 Jul 2013 18:11:57 +0400
+Subject: [RFC] ARM: imx clk: Implement pllv1 set_rate
+Message-ID: <1373724717-3473-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch implements frequency change for i.MX clk v1 PLL.
+Selection of the values of the registers is not optimal, since is
+made by simple enumeration of all possible values.
+Comments are welcome.
 
-This adds device tree with neccessary support to boot with functional
-video (on both emulator and real N900 device).
-
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
+ arch/arm/mach-imx/clk-imx27.c |   2 +-
+ arch/arm/mach-imx/clk-pllv1.c | 109 ++++++++++++++++++++++++++++++++++--------
+ arch/arm/mach-imx/mx27.h      |   4 +-
+ 3 files changed, 94 insertions(+), 21 deletions(-)
 
->From v1: Aaro wants just GPLv2, so I did that. I re-enabled parts that
-can be enabled on 3.10, and tested it on that kernel.
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f0895c5..1950aed 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -141,6 +141,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-devkit8000.dtb \
- 	omap3-beagle-xm.dtb \
- 	omap3-evm.dtb \
-+	omap3-n900.dtb \
- 	omap3-tobi.dtb \
- 	omap3-igep0020.dtb \
- 	omap3-igep0030.dtb \
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-new file mode 100644
-index 0000000..fb461bf
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -0,0 +1,92 @@
-+/*
-+ * Copyright (C) 2013 Pavel Machek <pavel@ucw.cz>
-+ * Copyright 2013 Aaro Koskinen <aaro.koskinen@iki.fi>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index c3cfa41..2b363d9 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -125,7 +125,7 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk[vpu_sel] = imx_clk_mux("vpu_sel", CCM_CSCR, 21, 1, vpu_sel_clks, ARRAY_SIZE(vpu_sel_clks));
+ 	clk[vpu_div] = imx_clk_divider("vpu_div", "vpu_sel", CCM_PCDR0, 10, 6);
+ 	clk[usb_div] = imx_clk_divider("usb_div", "spll_gate", CCM_CSCR, 28, 3);
+-	clk[cpu_sel] = imx_clk_mux("cpu_sel", CCM_CSCR, 15, 1, cpu_sel_clks, ARRAY_SIZE(cpu_sel_clks));
++	clk[cpu_sel] = imx_clk_mux_flags("cpu_sel", CCM_CSCR, 15, 1, cpu_sel_clks, ARRAY_SIZE(cpu_sel_clks), CLK_SET_RATE_PARENT);
+ 	clk[clko_sel] = imx_clk_mux("clko_sel", CCM_CCSR, 0, 5, clko_sel_clks, ARRAY_SIZE(clko_sel_clks));
+ 	if (mx27_revision() >= IMX_CHIP_REVISION_2_0)
+ 		clk[cpu_div] = imx_clk_divider("cpu_div", "cpu_sel", CCM_CSCR, 12, 2);
+diff --git a/arch/arm/mach-imx/clk-pllv1.c b/arch/arm/mach-imx/clk-pllv1.c
+index c1eaee3..1a80abf 100644
+--- a/arch/arm/mach-imx/clk-pllv1.c
++++ b/arch/arm/mach-imx/clk-pllv1.c
+@@ -9,6 +9,8 @@
+ #include "common.h"
+ #include "hardware.h"
+ 
++#include "mx27.h"
 +
-+/dts-v1/;
+ /**
+  * pll v1
+  *
+@@ -25,17 +27,13 @@ struct clk_pllv1 {
+ 
+ #define to_clk_pllv1(clk) (container_of(clk, struct clk_pllv1, clk))
+ 
+-static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+-		unsigned long parent_rate)
++static unsigned long _clk_pllv1_recalc_rate(unsigned int mfi, unsigned int mfn,
++					    unsigned int mfd, unsigned int pd,
++					    unsigned long parent_rate)
+ {
+-	struct clk_pllv1 *pll = to_clk_pllv1(hw);
+-	long long ll;
+-	int mfn_abs;
+-	unsigned int mfi, mfn, mfd, pd;
+-	u32 reg;
+ 	unsigned long rate;
+-
+-	reg = readl(pll->base);
++	int mfn_abs = mfn;
++	long long ll;
+ 
+ 	/*
+ 	 * Get the resulting clock rate from a PLL register value and the input
+@@ -47,15 +45,6 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+ 	 *                        pd + 1
+ 	 */
+ 
+-	mfi = (reg >> 10) & 0xf;
+-	mfn = reg & 0x3ff;
+-	mfd = (reg >> 16) & 0x3ff;
+-	pd =  (reg >> 26) & 0xf;
+-
+-	mfi = mfi <= 5 ? 5 : mfi;
+-
+-	mfn_abs = mfn;
+-
+ 	/*
+ 	 * On all i.MXs except i.MX1 and i.MX21 mfn is a 10bit
+ 	 * 2's complements number
+@@ -78,8 +67,90 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+ 	return ll;
+ }
+ 
++static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct clk_pllv1 *pll = to_clk_pllv1(hw);
++	unsigned int mfi, mfn, mfd, pd;
++	u32 reg = readl(pll->base);
 +
-+/include/ "omap34xx.dtsi"
++	/* Avoid i.MX27 TO2 SPCTL0 bug */
++	if (cpu_is_mx27() && (mx27_revision() == IMX_CHIP_REVISION_2_0))
++		writel(reg, pll->base);
 +
-+/ {
-+	model = "Nokia N900";
-+	compatible = "nokia,omap3-n900", "ti,omap3";
++	mfi = (reg >> 10) & 0xf;
++	mfn = reg & 0x3ff;
++	mfd = (reg >> 16) & 0x3ff;
++	pd =  (reg >> 26) & 0xf;
 +
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&vcc>;
-+		};
-+	};
++	mfi = mfi <= 5 ? 5 : mfi;
 +
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>; /* 256 MB */
-+	};
++	return _clk_pllv1_recalc_rate(mfi, mfn, mfd, pd, parent_rate);
++}
 +
-+};
++static void _clk_pllv1_set_rate(unsigned long rate, unsigned long parent_rate,
++				unsigned int *reg)
++{
++	unsigned int pd, mfi, mfn, mfd;
++	long res, best = 0;
 +
-+&i2c1 {
-+	clock-frequency = <2200000>;
++	pd = (parent_rate * 2 * 5) / rate;
++	if (pd > 15)
++		pd = 15;
++	mfi = rate / (parent_rate * 2 * (pd + 1));
++	if (mfi < 5)
++		mfi = 5;
++	else if (mfi > 15)
++		mfi = 15;
 +
-+	twl: twl at 48 {
-+		reg = <0x48>;
-+		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-+		interrupt-parent = <&intc>;
-+	};
-+};
++	for (mfd = 1; mfd < 0x400; mfd++)
++		for (mfn = 0; mfn < mfd; mfn++) {
++			res = _clk_pllv1_recalc_rate(mfi, mfn, mfd, pd,
++						     parent_rate);
++			if (!best || (abs(rate - res) < abs(rate - best))) {
++				*reg = mfn;
++				*reg |= mfi << 10;
++				*reg |= mfd << 16;
++				*reg |= pd << 26;
++				if (res == rate)
++					return;
++				best = res;
++			}
++		}
++}
 +
-+/include/ "twl4030.dtsi"
++static int clk_pllv1_set_rate(struct clk_hw *hw, unsigned long rate,
++			      unsigned long parent_rate)
++{
++	struct clk_pllv1 *pll = to_clk_pllv1(hw);
++	u32 reg;
 +
-+&twl_gpio {
-+	ti,pullups	= <0x0>;
-+	ti,pulldowns	= <0x03ff3f>; /* BIT(0..5) | BIT(8..17) */
-+};
++	_clk_pllv1_set_rate(rate, parent_rate, &reg);
++	writel(reg, pll->base);
 +
-+&i2c2 {
-+	clock-frequency = <400000>;
-+};
++	return 0;
++}
 +
-+&i2c3 {
-+	clock-frequency = <100000>;
-+};
++static long clk_pllv1_round_rate(struct clk_hw *hw, unsigned long rate,
++				 unsigned long *prate)
++{
++	unsigned int pd, mfi, mfn, mfd;
++	u32 reg;
 +
-+&mmc1 {
-+	status = "disabled";
-+};
++	_clk_pllv1_set_rate(rate, *prate, &reg);
 +
-+&mmc2 {
-+	status = "disabled";
-+};
++	mfi = (reg >> 10) & 0xf;
++	mfn = reg & 0x3ff;
++	mfd = (reg >> 16) & 0x3ff;
++	pd =  (reg >> 26) & 0xf;
 +
-+&mmc3 {
-+	status = "disabled";
-+};
++	return _clk_pllv1_recalc_rate(mfi, mfn, mfd, pd, *prate);
++}
 +
-+&mcspi1 {
-+	// For some reason, touchscreen is neccessary for screen to work at 
-+	// all on real hw. It works well without it on emulator.
-+	//
-+	// Also... order in the device tree actually matters here.
-+	tsc2005 at 0 {
-+		compatible = "tsc2005";
-+		spi-max-frequency = <6000000>;
-+		reg = <0>;
-+	};
-+	mipid at 2 {
-+		compatible = "acx565akm";
-+		spi-max-frequency = <6000000>;
-+		reg = <2>;
-+		// turbo_mode = 0,
-+		// cs_per_word = 0
-+	};
-+};
-+
-+&usb_otg_hs {
-+	interface-type = <0>;
-+	usb-phy = <&usb2_phy>;
-+	mode = <2>;
-+	power = <50>;
-+};
-
+ static struct clk_ops clk_pllv1_ops = {
+-	.recalc_rate = clk_pllv1_recalc_rate,
++	.recalc_rate	= clk_pllv1_recalc_rate,
++	.round_rate	= clk_pllv1_round_rate,
++	.set_rate	= clk_pllv1_set_rate,
+ };
+ 
+ struct clk *imx_clk_pllv1(const char *name, const char *parent,
+diff --git a/arch/arm/mach-imx/mx27.h b/arch/arm/mach-imx/mx27.h
+index 8a65f19..6835e23 100644
+--- a/arch/arm/mach-imx/mx27.h
++++ b/arch/arm/mach-imx/mx27.h
+@@ -231,8 +231,10 @@
+ #define MX27_DMA_REQ_SDHC3	36
+ #define MX27_DMA_REQ_NFC	37
+ 
+-#ifndef __ASSEMBLY__
++#ifdef CONFIG_SOC_IMX27
+ extern int mx27_revision(void);
++#else
++static int mx27_revision(void) { }
+ #endif
+ 
+ #endif /* ifndef __MACH_MX27_H__ */
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.8.1.5
