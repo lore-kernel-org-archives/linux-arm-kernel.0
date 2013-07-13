@@ -1,31 +1,72 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 12 Jul 2013 23:46:38 -0700
-Subject: [PATCH v2 1/3] input: mc13783: Prepare driver to support MC13892
- and OF
-In-Reply-To: <1373689551-24375-1-git-send-email-shc_work@mail.ru>
-References: <1373689551-24375-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20130713064638.GB20979@core.coreip.homeip.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 12 Jul 2013 23:46:58 -0700
+Subject: [PATCH] arm: multi_v7_defconfig: Tweaks for omap and sunxi
+In-Reply-To: <51E0CEA8.2040201@elopez.com.ar>
+References: <1373685174-7918-1-git-send-email-olof@lixom.net>
+ <51E0CEA8.2040201@elopez.com.ar>
+Message-ID: <CAOesGMjzhfQwhxDQv7ETAqu_fzE7WLzy-ydoxFWjLpcFpPeajw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+On Fri, Jul 12, 2013 at 8:51 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+> Hi Olof,
+>
+> El 13/07/13 00:12, Olof Johansson escribi?:
+>> OMAP recently changed how the platforms are configured, so OMAP2/3/4 SoC
+>> support is no longer enabled by default. Add them back.
+>>
+>> Enable new ethernet driver for sunxi.
+>
+> "ARM: multi_v7: Enable Allwinner EMAC in multi_v7_defconfig" by Maxime
+> already does this, and is on Linus Torvalds' tree:
+>
+> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=fb1c60288a886a28dc7c055449fd1936140fe891
 
-On Sat, Jul 13, 2013 at 08:25:49AM +0400, Alexander Shiyan wrote:
-> +
-> +	for (i = 0; i < MAX13XXX_NUM_BUTTONS; i++)
-> +		if (priv->enabled & BIT(i)) {
-> +			ret = mc13xxx_irq_request(priv->mc13xxx,
-> +						  priv->devtype->btn_def[i].irq,
-> +						  mc13xxx_pwrbutton_irq, NULL,
-> +						  priv);
-> +			if (!ret)
-> +				continue;
+No, it's been effectively reverted due to the driver not being in the
+tree by the time the patch was merged, so if anyone ran savedefconfig
+inbetween (which I did), the option was removed.
 
-I'd rather we continued requesting interrupts in probe() as opposed to
-open(). I believe the driver should acquire all resources it needs when
-binding, instead of later.
+>> The i.MX console options moved due to resorting, no functional change.
+>>
+>> Signed-off-by: Olof Johansson <olof@lixom.net>
+>> ---
+>>
+>> The OMAP changes are needed to deal with the dependency flip from OMAP2PLUS
+>> being on and defaulting the SoCs accordingly, to the SoC options selecting
+>> OMAP2PLUS. See the "ARM: OMAP2+: Remove board-4430sdp.c" for background.
+>>
+>>  arch/arm/configs/multi_v7_defconfig | 9 ++++++---
+>>  1 file changed, 6 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+>> index 80aacc6..fcd2b9b 100644
+>> --- a/arch/arm/configs/multi_v7_defconfig
+>> +++ b/arch/arm/configs/multi_v7_defconfig
+>> @@ -15,8 +15,10 @@ CONFIG_SOC_IMX53=y
+>>  CONFIG_SOC_IMX6Q=y
+>>  CONFIG_SOC_IMX6SL=y
+>>  CONFIG_SOC_VF610=y
+>> -CONFIG_ARCH_OMAP2PLUS=y
+>> +CONFIG_ARCH_OMAP3=y
+>> +CONFIG_ARCH_OMAP4=y
+>>  CONFIG_SOC_OMAP5=y
+>> +CONFIG_SOC_AM33XX=y
+>>  CONFIG_SOC_AM43XX=y
+>>  CONFIG_ARCH_ROCKCHIP=y
+>>  CONFIG_ARCH_SOCFPGA=y
+>> @@ -57,6 +59,7 @@ CONFIG_SATA_AHCI_PLATFORM=y
+>>  CONFIG_SATA_HIGHBANK=y
+>>  CONFIG_SATA_MV=y
+>>  CONFIG_NETDEVICES=y
+>> +CONFIG_SUN4I_EMAC=y
+>
+> Additionally, this patch is missing CONFIG_MDIO_SUN4I=y, which I think
+> would be needed to make CONFIG_SUN4I_EMAC=y of any use. Maybe a Kconfig
+> select would be a good idea here?
 
-Thanks.
+Yes, likely. I can turn it on in the defconfig (I'll revise the
+patch), but independent of that there should probably be a select for
+the future.
 
--- 
-Dmitry
+
+-Olof
