@@ -1,219 +1,87 @@
-From: jld@mozilla.com (Jed Davis)
-Date: Fri, 12 Jul 2013 20:18:20 -0700
-Subject: [PATCH] ARM: Fix r7/r11 confusion when CONFIG_THUMB2_KERNEL=y
-Message-ID: <1373685501-1620-1-git-send-email-jld@mozilla.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Sat, 13 Jul 2013 00:51:04 -0300
+Subject: [PATCH] arm: multi_v7_defconfig: Tweaks for omap and sunxi
+In-Reply-To: <1373685174-7918-1-git-send-email-olof@lixom.net>
+References: <1373685174-7918-1-git-send-email-olof@lixom.net>
+Message-ID: <51E0CEA8.2040201@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is currently some inconsistency about the "frame pointer" on ARM.
-r11 is the register with assemblers recognize and disassemblers often
-print as "fp", and which is sufficient for stack unwinding when using
-the APCS frame pointer option; but when unwinding with the Exception
-Handling ABI, the register GCC uses when a constant offset won't suffice
-(or when -fno-omit-frame-pointer is used; see kernel/sched/Makefile in
-particular) is r11 on ARM and r7 on Thumb.
+Hi Olof,
 
-Correspondingly, arch/arm/include/uapi/arm/ptrace.h defines ARM_fp to
-refer to r11, but arch/arm/kernel/unwind.c uses "FP" to mean either r11
-or r7 depending on Thumbness, and it is unclear what other cases such as
-the "fp" in struct stackframe should be doing.
+El 13/07/13 00:12, Olof Johansson escribi?:
+> OMAP recently changed how the platforms are configured, so OMAP2/3/4 SoC
+> support is no longer enabled by default. Add them back.
+> 
+> Enable new ethernet driver for sunxi.
 
-Effects of this are probably limited to failure of EHABI unwinding when
-starting from a function that uses r7 to restore its stack pointer, but
-the possibility for further breakage (which would be invisible on
-non-Thumb kernels) is worrying.
+"ARM: multi_v7: Enable Allwinner EMAC in multi_v7_defconfig" by Maxime
+already does this, and is on Linus Torvalds' tree:
 
-With this change, it is hoped, r7 is consistently referred to as "r7",
-and "fp" always means r11; this costs a few extra ifdefs, but it should
-help prevent future issues.
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=fb1c60288a886a28dc7c055449fd1936140fe891
 
-Signed-off-by: Jed Davis <jld@mozilla.com>
----
- arch/arm/include/asm/stacktrace.h  |    4 ++++
- arch/arm/include/asm/thread_info.h |    2 ++
- arch/arm/kernel/perf_event.c       |    4 ++++
- arch/arm/kernel/process.c          |    4 ++++
- arch/arm/kernel/time.c             |    4 ++++
- arch/arm/kernel/unwind.c           |   27 ++++++++++++++++++++++++++-
- arch/arm/oprofile/common.c         |    4 ++++
- 7 files changed, 48 insertions(+), 1 deletion(-)
+> 
+> The i.MX console options moved due to resorting, no functional change.
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+> 
+> The OMAP changes are needed to deal with the dependency flip from OMAP2PLUS
+> being on and defaulting the SoCs accordingly, to the SoC options selecting
+> OMAP2PLUS. See the "ARM: OMAP2+: Remove board-4430sdp.c" for background.
+> 
+>  arch/arm/configs/multi_v7_defconfig | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 80aacc6..fcd2b9b 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -15,8 +15,10 @@ CONFIG_SOC_IMX53=y
+>  CONFIG_SOC_IMX6Q=y
+>  CONFIG_SOC_IMX6SL=y
+>  CONFIG_SOC_VF610=y
+> -CONFIG_ARCH_OMAP2PLUS=y
+> +CONFIG_ARCH_OMAP3=y
+> +CONFIG_ARCH_OMAP4=y
+>  CONFIG_SOC_OMAP5=y
+> +CONFIG_SOC_AM33XX=y
+>  CONFIG_SOC_AM43XX=y
+>  CONFIG_ARCH_ROCKCHIP=y
+>  CONFIG_ARCH_SOCFPGA=y
+> @@ -57,6 +59,7 @@ CONFIG_SATA_AHCI_PLATFORM=y
+>  CONFIG_SATA_HIGHBANK=y
+>  CONFIG_SATA_MV=y
+>  CONFIG_NETDEVICES=y
+> +CONFIG_SUN4I_EMAC=y
 
-diff --git a/arch/arm/include/asm/stacktrace.h b/arch/arm/include/asm/stacktrace.h
-index 4d0a164..5e546bf 100644
---- a/arch/arm/include/asm/stacktrace.h
-+++ b/arch/arm/include/asm/stacktrace.h
-@@ -2,7 +2,11 @@
- #define __ASM_STACKTRACE_H
- 
- struct stackframe {
-+#ifdef CONFIG_THUMB2_KERNEL
-+	unsigned long r7;
-+#else
- 	unsigned long fp;
-+#endif
- 	unsigned long sp;
- 	unsigned long lr;
- 	unsigned long pc;
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index 214d415..ae3cd81 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -105,6 +105,8 @@ static inline struct thread_info *current_thread_info(void)
- 	((unsigned long)(task_thread_info(tsk)->cpu_context.sp))
- #define thread_saved_fp(tsk)	\
- 	((unsigned long)(task_thread_info(tsk)->cpu_context.fp))
-+#define thread_saved_r7(tsk)	\
-+	((unsigned long)(task_thread_info(tsk)->cpu_context.r7))
- 
- extern void crunch_task_disable(struct thread_info *);
- extern void crunch_task_copy(struct thread_info *, void *);
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index d9f5cd4..55776d6 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -601,7 +601,11 @@ perf_callchain_kernel(struct perf_callchain_entry *entry, struct pt_regs *regs)
- 		return;
- 	}
- 
-+#ifdef CONFIG_THUMB2_KERNEL
-+	fr.r7 = regs->ARM_r7;
-+#else
- 	fr.fp = regs->ARM_fp;
-+#endif
- 	fr.sp = regs->ARM_sp;
- 	fr.lr = regs->ARM_lr;
- 	fr.pc = regs->ARM_pc;
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index d3ca4f6..aeb4c28 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -405,7 +405,11 @@ unsigned long get_wchan(struct task_struct *p)
- 	if (!p || p == current || p->state == TASK_RUNNING)
- 		return 0;
- 
-+#ifdef CONFIG_THUMB2_KERNEL
-+	frame.r7 = thread_saved_r7(p);
-+#else
- 	frame.fp = thread_saved_fp(p);
-+#endif
- 	frame.sp = thread_saved_sp(p);
- 	frame.lr = 0;			/* recovered from the stack */
- 	frame.pc = thread_saved_pc(p);
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index 98aee32..80410d3 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -49,7 +49,11 @@ unsigned long profile_pc(struct pt_regs *regs)
- 	if (!in_lock_functions(regs->ARM_pc))
- 		return regs->ARM_pc;
- 
-+#ifdef CONFIG_THUMB2_KERNEL
-+	frame.r7 = regs->ARM_r7;
-+#else
- 	frame.fp = regs->ARM_fp;
-+#endif
- 	frame.sp = regs->ARM_sp;
- 	frame.lr = regs->ARM_lr;
- 	frame.pc = regs->ARM_pc;
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index 00df012..dec03ae 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -74,7 +74,7 @@ struct unwind_ctrl_block {
- 
- enum regs {
- #ifdef CONFIG_THUMB2_KERNEL
--	FP = 7,
-+	R7 = 7,
- #else
- 	FP = 11,
- #endif
-@@ -317,8 +317,13 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
- 		return -URC_FAILURE;
- 	}
- 
-+#ifdef CONFIG_THUMB2_KERNEL
-+	pr_debug("%s: r7 = %08lx sp = %08lx lr = %08lx pc = %08lx\n", __func__,
-+		 ctrl->vrs[R7], ctrl->vrs[SP], ctrl->vrs[LR], ctrl->vrs[PC]);
-+#else
- 	pr_debug("%s: fp = %08lx sp = %08lx lr = %08lx pc = %08lx\n", __func__,
- 		 ctrl->vrs[FP], ctrl->vrs[SP], ctrl->vrs[LR], ctrl->vrs[PC]);
-+#endif
- 
- 	return URC_OK;
- }
-@@ -349,7 +354,11 @@ int unwind_frame(struct stackframe *frame)
- 		return -URC_FAILURE;
- 	}
- 
-+#ifdef CONFIG_THUMB2_KERNEL
-+	ctrl.vrs[R7] = frame->r7;
-+#else
- 	ctrl.vrs[FP] = frame->fp;
-+#endif
- 	ctrl.vrs[SP] = frame->sp;
- 	ctrl.vrs[LR] = frame->lr;
- 	ctrl.vrs[PC] = 0;
-@@ -397,7 +406,11 @@ int unwind_frame(struct stackframe *frame)
- 	if (frame->pc == ctrl.vrs[PC])
- 		return -URC_FAILURE;
- 
-+#ifdef CONFIG_THUMB2_KERNEL
-+	frame->r7 = ctrl.vrs[R7];
-+#else
- 	frame->fp = ctrl.vrs[FP];
-+#endif
- 	frame->sp = ctrl.vrs[SP];
- 	frame->lr = ctrl.vrs[LR];
- 	frame->pc = ctrl.vrs[PC];
-@@ -416,20 +429,32 @@ void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 		tsk = current;
- 
- 	if (regs) {
-+#ifdef CONFIG_THUMB2_KERNEL
-+		frame.r7 = regs->ARM_r7;
-+#else
- 		frame.fp = regs->ARM_fp;
-+#endif
- 		frame.sp = regs->ARM_sp;
- 		frame.lr = regs->ARM_lr;
- 		/* PC might be corrupted, use LR in that case. */
- 		frame.pc = kernel_text_address(regs->ARM_pc)
- 			 ? regs->ARM_pc : regs->ARM_lr;
- 	} else if (tsk == current) {
-+#ifdef CONFIG_THUMB2_KERNEL
-+		frame.r7 = (unsigned long)__builtin_frame_address(0);
-+#else
- 		frame.fp = (unsigned long)__builtin_frame_address(0);
-+#endif
- 		frame.sp = current_sp;
- 		frame.lr = (unsigned long)__builtin_return_address(0);
- 		frame.pc = (unsigned long)unwind_backtrace;
- 	} else {
- 		/* task blocked in __switch_to */
-+#ifdef CONFIG_THUMB2_KERNEL
-+		frame.r7 = thread_saved_r7(tsk);
-+#else
- 		frame.fp = thread_saved_fp(tsk);
-+#endif
- 		frame.sp = thread_saved_sp(tsk);
- 		/*
- 		 * The function calling __switch_to cannot be a leaf function
-diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-index 99c63d4b..38cbfff 100644
---- a/arch/arm/oprofile/common.c
-+++ b/arch/arm/oprofile/common.c
-@@ -107,7 +107,11 @@ static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
- 
- 	if (!user_mode(regs)) {
- 		struct stackframe frame;
-+#ifdef CONFIG_THUMB2_KERNEL
-+		frame.r7 = regs->ARM_r7;
-+#else
- 		frame.fp = regs->ARM_fp;
-+#endif
- 		frame.sp = regs->ARM_sp;
- 		frame.lr = regs->ARM_lr;
- 		frame.pc = regs->ARM_pc;
--- 
-1.7.10.4
+Additionally, this patch is missing CONFIG_MDIO_SUN4I=y, which I think
+would be needed to make CONFIG_SUN4I_EMAC=y of any use. Maybe a Kconfig
+select would be a good idea here?
+
+>  CONFIG_NET_CALXEDA_XGMAC=y
+>  CONFIG_SMSC911X=y
+>  CONFIG_STMMAC_ETH=y
+> @@ -70,6 +73,8 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+>  CONFIG_SERIAL_SIRFSOC=y
+>  CONFIG_SERIAL_SIRFSOC_CONSOLE=y
+>  CONFIG_SERIAL_TEGRA=y
+> +CONFIG_SERIAL_IMX=y
+> +CONFIG_SERIAL_IMX_CONSOLE=y
+>  CONFIG_SERIAL_VT8500=y
+>  CONFIG_SERIAL_VT8500_CONSOLE=y
+>  CONFIG_SERIAL_OF_PLATFORM=y
+> @@ -77,8 +82,6 @@ CONFIG_SERIAL_OMAP=y
+>  CONFIG_SERIAL_OMAP_CONSOLE=y
+>  CONFIG_SERIAL_XILINX_PS_UART=y
+>  CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
+> -CONFIG_SERIAL_IMX=y
+> -CONFIG_SERIAL_IMX_CONSOLE=y
+>  CONFIG_SERIAL_FSL_LPUART=y
+>  CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
+>  CONFIG_I2C_DESIGNWARE_PLATFORM=y
+> 
+
+Cheers,
+
+Emilio
