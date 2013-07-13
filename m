@@ -1,82 +1,79 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Sat, 13 Jul 2013 23:21:29 +0100
-Subject: [PATCH] arm: omap2plus: unidle devices which are about to probe
-In-Reply-To: <1373537788-30413-1-git-send-email-balbi@ti.com> (Felipe Balbi's
- message of "Thu, 11 Jul 2013 13:16:28 +0300")
-References: <20130711092612.GG23892@arwen.pp.htv.fi>
- <1373537788-30413-1-git-send-email-balbi@ti.com>
-Message-ID: <8738rije3a.fsf@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 14 Jul 2013 00:09:55 +0100
+Subject: DT binding review for Armada display subsystem
+In-Reply-To: <51E1D1DA.8080102@gmail.com>
+References: <20130712164428.AC3D2FAAE9@dev.laptop.org>
+ <20130712203952.6b7aa927@armhf>
+ <CAMLZHHT1oAvOLe3JgQqMqLNXEr0NGrdtgELtF_djbqLFceHtiQ@mail.gmail.com>
+ <20130713103516.38a55b0b@armhf> <51E13272.5040903@gmail.com>
+ <20130713111239.GM24642@n2100.arm.linux.org.uk> <51E1921A.3070207@gmail.com>
+ <51E1BBF1.1020009@gmail.com> <20130713210236.GP24642@n2100.arm.linux.org.uk>
+ <51E1D1DA.8080102@gmail.com>
+Message-ID: <20130713230955.GQ24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe Balbi <balbi@ti.com> writes:
-
-> in order to make HWMOD and pm_runtime agree on the
-> initial state of the device, we will unidle the device
-> and call pm_runtime_set_active() to tell pm_runtime
-> that the device is really active.
+On Sun, Jul 14, 2013 at 12:16:58AM +0200, Sylwester Nawrocki wrote:
+> On 07/13/2013 11:02 PM, Russell King - ARM Linux wrote:
+>> On Sat, Jul 13, 2013 at 10:43:29PM +0200, Sylwester Nawrocki wrote:
+>>> I wasn't aware of it, thanks. I've seen a patch from Jiada Wang, it seems
+>>> they're working on v4 with clock object reference counting. Presumably we
+>>> need both clk_get() to be taking reference on the module and reference
+>>> counted clk free, e.g. in cases where clock provider is a hot-pluggable
+>>> device. It might be too paranoid though, I haven't seen hardware
+>>> configurations where a clock source could be unplugged safely when whole
+>>> system is running.
+>>
+>> I'm not going to accept refcounting being thrown into clk_get().  The
+>> clkdev API already has refcounting, as much as it needs to.  It just
+>> needs people to use the hooks that I provided back in 2008 when I
+>> created the clkdev API for doing _precisely_ this job.
+>>
+>> Have a read through these commits, which backup my statement above:
+>>
+>> 0318e693d3a56836632bf1a2cfdafb7f34bcc703 - initial commit of the clkdev API
+>> d72fbdf01fc77628c0b837d0dd2fd564fa26ede6 - converting Integrator to clkdev API
+>>
+>> and it will show you how to do refcounting.  The common clk API just
+>> needs to stop defining __clk_get() and __clk_put() to be an empty
+>> function and implement them appropriately for it's clk implementation,
+>> like they were always meant to be.
 >
-> By the time driver's probe() is reached, a call to
-> pm_runtime_get_sync() will not cause driver's
-> ->runtime_resume() method to be called at first, only
-> after a successful ->runtime_suspend().
+> Sure, I've already seen the above commits. This is how I understood it
+> as well - __clk_get(), __clk_put() need to be defined by the common clk
+> API, since it is going to replace all the arch specific implementations.
 >
-> Note that we must prevent pm_runtime transitions while
-> driver is probing otherwise drivers would be suspended
-> as soon as they call pm_runtime_use_autosuspend(). By
-> calling pm_runtime_forbid() before probe() and
-> pm_runtime_allow() after probe() we 'fix' that detail.
-
-This part sounds a bit strange to me, and sounds more like a driver bug.
-Looking at omap-serial, this probably happens because the driver calls
-_use_autosuspend() after it has called _enable() but before has done its
-_get_sync().
-
-> Note that this patch was inspired by PCI's pci_pm_init().
+>> __clk_get() and __clk_put() are the clk-implementation specific parts
+>> of the clkdev API, because the clkdev API is utterly divorsed from the
+>> internals of what a 'struct clk' actually is.  clkdev just treats a
+>> 'struct clk' as a completely opaque type and never bothers poking
+>> about inside it.
 >
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->
-> boot tested on top of today's Linus master
-> 6d128e1e72bf082542e85f72e6b7ddd704193588 with OMAP4
-> panda. Reached console prompt and, after setting a
-> proper autosuspend delay, consoles autosuspend just
-> fine.
->
-> It needs to be tested on other platforms.
->
-> ps: note that we also call pm_runtime_set_suspended(dev)
-> from our late_initcall() to disable devices so that pm_runtime
-> and HWMOD continue to aggree on device's state.
+> OK, but at the clock's implementation side we may need, e.g. to use kref
+> to keep track of the clock's state, and free it only when it is unprepared,
+> all its children are unregistered, etc. ? Is it not what you stated in
+> your comment to patch [1] ?
 
-Excellent.
+If you want to do refcounting on a clock (which you run into problems
+as I highlighted earlier in this thread) then yes, you need to use a
+kref, and take a reference in __clk_get() and drop it in __clk_put()
+to make things safe.
 
-I like this approach, but agree it needs more testing like you
-mentioned.
+Whether you also take a reference on the module supplying the clock or
+not depends whether you need to keep the code around to manipulate that
+clock while there are users of it.
 
->  arch/arm/mach-omap2/omap_device.c | 44 +++++++++++++++++++++++++++++++++++----
->  1 file changed, 40 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> index 5cc9287..cb1fc1d 100644
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -178,6 +178,26 @@ odbfd_exit:
->  	return ret;
->  }
->  
-> +static void omap_device_pm_init(struct platform_device *pdev)
-> +{
-> +	omap_device_enable(pdev);
-> +	pm_runtime_forbid(&pdev->dev);
-> +	pm_runtime_set_active(&pdev->dev);
-> +	device_enable_async_suspend(&pdev->dev);
+As I've already said - consider the possibilities with this scenario.
+Here's one:
 
-You don't comment in the changelog about what this is for.  I think we
-probably want this, but I suspect it belongs in a follow-up patch with
-its own changelog.
+  A clock consumer is using a clock, but the clock supplier has been
+  removed.  The clock consumer wants to change the state of the clock
+  in some way - eg, system is suspending.  clk_disable() doesn't fail,
+  but on resume, clk_enable() does... (and how many people assume that
+  clk_enable() never fails?)  And who knows what rate the clock is now
+  producing or whether it's even producing anything...
 
-Also Like PCI, I think we also want the device_set_wakeup_capable() here
-also, but that should have its own patch+changelog also.
-
-Kevin
+I'm not saying don't do the refcounting thing I mentioned back in June.
+I'm merely pointing out the issues that there are.  There isn't a one
+right answer here because each has their own advantages and disadvantages
+(and problems.)
