@@ -1,68 +1,83 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 12 Jul 2013 20:12:54 -0700
-Subject: [PATCH] arm: multi_v7_defconfig: Tweaks for omap and sunxi
-Message-ID: <1373685174-7918-1-git-send-email-olof@lixom.net>
+From: jld@mozilla.com (Jed Davis)
+Date: Fri, 12 Jul 2013 20:17:14 -0700
+Subject: [PATCH] ARM: perf: Implement perf_arch_fetch_caller_regs
+Message-ID: <1373685434-1581-1-git-send-email-jld@mozilla.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP recently changed how the platforms are configured, so OMAP2/3/4 SoC
-support is no longer enabled by default. Add them back.
+We need a perf_arch_fetch_caller_regs for at least some software events
+to be able to get a callchain; even user stacks won't work without
+at least the CPSR bits for non-user-mode (see perf_callchain).  In
+particular, profiling context switches needs this.
 
-Enable new ethernet driver for sunxi.
+This records the state of the point at which perf_arch_fetch_caller_regs
+is expanded, instead of that function activation's call site, because we
+need SP and PC to be consistent for EHABI unwinding; hopefully nothing
+will be inconvenienced by the extra stack frame.
 
-The i.MX console options moved due to resorting, no functional change.
-
-Signed-off-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Jed Davis <jld@mozilla.com>
 ---
+ arch/arm/include/asm/perf_event.h |   43 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-The OMAP changes are needed to deal with the dependency flip from OMAP2PLUS
-being on and defaulting the SoCs accordingly, to the SoC options selecting
-OMAP2PLUS. See the "ARM: OMAP2+: Remove board-4430sdp.c" for background.
-
- arch/arm/configs/multi_v7_defconfig | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 80aacc6..fcd2b9b 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -15,8 +15,10 @@ CONFIG_SOC_IMX53=y
- CONFIG_SOC_IMX6Q=y
- CONFIG_SOC_IMX6SL=y
- CONFIG_SOC_VF610=y
--CONFIG_ARCH_OMAP2PLUS=y
-+CONFIG_ARCH_OMAP3=y
-+CONFIG_ARCH_OMAP4=y
- CONFIG_SOC_OMAP5=y
-+CONFIG_SOC_AM33XX=y
- CONFIG_SOC_AM43XX=y
- CONFIG_ARCH_ROCKCHIP=y
- CONFIG_ARCH_SOCFPGA=y
-@@ -57,6 +59,7 @@ CONFIG_SATA_AHCI_PLATFORM=y
- CONFIG_SATA_HIGHBANK=y
- CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
-+CONFIG_SUN4I_EMAC=y
- CONFIG_NET_CALXEDA_XGMAC=y
- CONFIG_SMSC911X=y
- CONFIG_STMMAC_ETH=y
-@@ -70,6 +73,8 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- CONFIG_SERIAL_SIRFSOC=y
- CONFIG_SERIAL_SIRFSOC_CONSOLE=y
- CONFIG_SERIAL_TEGRA=y
-+CONFIG_SERIAL_IMX=y
-+CONFIG_SERIAL_IMX_CONSOLE=y
- CONFIG_SERIAL_VT8500=y
- CONFIG_SERIAL_VT8500_CONSOLE=y
- CONFIG_SERIAL_OF_PLATFORM=y
-@@ -77,8 +82,6 @@ CONFIG_SERIAL_OMAP=y
- CONFIG_SERIAL_OMAP_CONSOLE=y
- CONFIG_SERIAL_XILINX_PS_UART=y
- CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
--CONFIG_SERIAL_IMX=y
--CONFIG_SERIAL_IMX_CONSOLE=y
- CONFIG_SERIAL_FSL_LPUART=y
- CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
+diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
+index 7558775..2cc7255 100644
+--- a/arch/arm/include/asm/perf_event.h
++++ b/arch/arm/include/asm/perf_event.h
+@@ -12,6 +12,8 @@
+ #ifndef __ARM_PERF_EVENT_H__
+ #define __ARM_PERF_EVENT_H__
+ 
++#include <asm/ptrace.h>
++
+ /*
+  * The ARMv7 CPU PMU supports up to 32 event counters.
+  */
+@@ -28,4 +30,45 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
+ #define perf_misc_flags(regs)	perf_misc_flags(regs)
+ #endif
+ 
++/*
++ * We can't actually get the caller's registers here; the saved PC and
++ * SP values have to be consistent or else EHABI unwinding won't work,
++ * and the only way to find the matching SP for the return address is
++ * to unwind the current function.  So we save the current state
++ * instead.
++ *
++ * Note that the ARM Exception Handling ABI allows unwinding to depend
++ * on the contents of any core register, but our unwinder is limited
++ * to the ones in struct stackframe (which are the only ones we expect
++ * GCC to need for kernel code), so we just record those.
++ */
++#ifdef CONFIG_THUMB2_KERNEL
++#define perf_arch_fetch_caller_regs(regs, ip)				\
++	do {								\
++		__u32 _cpsr, _pc;					\
++		__asm__ __volatile__("str r7, [%[_regs], #(7 * 4)]\n\t" \
++				     "str r13, [%[_regs], #(13 * 4)]\n\t" \
++				     "str r14, [%[_regs], #(14 * 4)]\n\t" \
++				     "mov %[_pc],  r15\n\t"		\
++				     "mrs %[_cpsr], cpsr\n\t"		\
++				     : [_cpsr] "=r" (_cpsr),		\
++				       [_pc] "=r" (_pc)			\
++				     : [_regs] "r" (&(regs)->uregs)	\
++				     : "memory");			\
++		(regs)->ARM_pc = _pc;					\
++		(regs)->ARM_cpsr = _cpsr;				\
++	} while (0)
++#else
++#define perf_arch_fetch_caller_regs(regs, ip)				\
++	do {								\
++		__u32 _cpsr;						\
++		__asm__ __volatile__("stmia %[_regs11], {r11 - r15}\n\t" \
++				     "mrs %[_cpsr], cpsr\n\t"		\
++				     : [_cpsr] "=r" (_cpsr)		\
++				     : [_regs11] "r" (&(regs)->uregs[11]) \
++				     : "memory");			\
++		(regs)->ARM_cpsr = _cpsr;				\
++	} while (0)
++#endif
++
+ #endif /* __ARM_PERF_EVENT_H__ */
 -- 
-1.8.1.192.gc4361b8
+1.7.10.4
