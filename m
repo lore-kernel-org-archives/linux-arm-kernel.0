@@ -1,149 +1,54 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 13 Jul 2013 08:38:36 -0700
-Subject: [GIT PULL] ARM: SoC fixes for -rc1
-Message-ID: <20130713153836.GA13431@quad.lixom.net>
+From: fgenfb@yahoo.com (Harm Hanemaaijer)
+Date: Sat, 13 Jul 2013 15:51:07 +0000 (UTC)
+Subject: Call for testing/opinions: Optimized memset/memcpy
+Message-ID: <loom.20130713T172357-560@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hello,
 
-Here's the first set of fixes for SoC platforms. You'll see a trivial
-merge conflict due to the same bug being fixed through our tree and
-another (with a newline difference), but it was near the bottom of the
-branch and I didn't think it was worth rebasing away.
+I've been doing some work on optimizing the memset/memcpy family of
+functions for modern ARM platforms, including copy_page, memset,
+memzero, memcpy, copy_from_user and copy_to_user. It appears that
+there is room for improvement, especially with regard to using an
+optimal preload strategy for armv6/v7 architectures as well as
+aligning the write target. For example, on an armv6-based platform
+(RPi) I am seeing a 80% speed-up in copy_page and large sized
+memcpy. Gains in the range 10-25% are seen on a Cortex A8 device.
+These optimizations use the regular register file, like the
+previous implementation, and do not use any NEON or vfp registers.
 
+To properly benchmark and test these new implementations, I've
+created a userspace testing utility that can be used to compare
+and validate exact copies of the original and optimized kernel
+versions of the functions in userspace. The repository is
+available at https://github.com/hglm/test-arm-kernel-memcpy.git.
+It would be useful to compare the results on different
+platforms and to check whether changes in the prefetch distance
+or write alignment result in optimized performance.
 
--Olof
+I've created a preliminary patch set that replaces the copy_page,
+memset and memzero functions for all ARM platforms. Features
+include use of a configurable prefetch distance in copy_page,
+translation to 16-bit Thumb2 instructions whenever possible,
+optimization for the common word-aligned case in memset/memzero,
+and application of a predefined write alignment in memset/memzero.
+In order to safely use unified ARM assembler syntax, which appears
+to be desirable going forward, the first patch in the set renames
+all references of the "push" macro so that it no longer conflicts
+with the "push" instruction defined in unified syntax. The new
+memset/memzero functions use the unified syntax. The patch set
+is available at
+https://github.com/hglm/patches/tree/master/arm-mem-funcs.
 
-The following changes since commit ddcf6600b133697adbafd96e080818bdc0dfd028:
+Optimization of memcpy/copy_from_user/copy_to_user is more
+complicated, and although I've created optimized versions that
+provide better results in benchmarks, we have to be careful that
+increased code size and branch prediction burden does not result
+in lower performance in real-world use, especially on older
+platforms. Therefore it might be desirable to only enable them
+on newer platforms like armv6/v7.
 
-  Merge tag 'hwmon-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/groeck/linux-staging (2013-07-03 19:56:35 -0700)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to d4e1c7ef46e9b02dbf691da0c84d653f88670213:
-
-  arm: multi_v7_defconfig: Tweaks for omap and sunxi (2013-07-12 23:45:33 -0700)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 3.11-rc
-
-This is our first set of fixes from arm-soc for 3.11.
- - A handful of build and warning fixes from Arnd
- - A collection of OMAP fixes
- - defconfig updates to make the default configs more useful for real use
-   (and testing) out of the box on hardware.
-
-And a couple of other small fixes. Some of these have been recently
-applied but it's normally how we deal with fixes, with less bake time
-in -next needed.
-
-----------------------------------------------------------------
-Afzal Mohammed (1):
-      ARM: OMAP2+: timer: initialize before using oh_name
-
-Arnd Bergmann (8):
-      Merge tag 'renesas-fixes-for-v3.11' of git://git.kernel.org/.../horms/renesas into fixes
-      ARM: omap5: omap5 has SCU and TWD
-      ARM: zynq: use DT_MACHINE_START
-      ARM: OMAP: build mach-omap code only if needed
-      ARM: sti: move DEBUG_STI_UART into alphabetical order
-      ARM: OMAP: omap_common_late_init may be unused
-      ARM: ixp4xx: avoid circular header dependency
-      ARM: exynos: select PM_GENERIC_DOMAINS only when used
-
-Eduardo Valentin (2):
-      ARM: OMAP2+: omap2plus_defconfig: enable TI bandgap driver
-      ARM: OMAP2+: omap2plus_defconfig: enable DRA752 thermal support by default
-
-Enric Balletbo i Serra (1):
-      ARM: OMAP3: igep0020: Set DSS pins in correct mux mode.
-
-Fabio Baltieri (2):
-      ARM: ux500: select WATCHDOG and MUSB for ux500
-      ARM: ux500: select SND_SOC_UX500 for ux500
-
-Joel Fernandes (1):
-      ARM: OMAP2+: Enable TI_EDMA in omap2plus_defconfig
-
-Lee Jones (1):
-      ARM: ux500: Enable HIGHMEM in the u8500 defconfig
-
-Linus Walleij (1):
-      ARM: ux500: update defconfig base
-
-Magnus Damm (1):
-      ARM: shmobile: emev2 GIO3 resource fix
-
-Nishanth Menon (2):
-      ARM: OMAP4: sleep: build OMAP4 specific functions only for OMAP4
-      ARM: scu: provide inline dummy functions when SCU is not present
-
-Olof Johansson (5):
-      ARM: Make multi_v7_defconfig usable on hardware
-      ARM: omap2: add select of TI_PRIV_EDMA
-      Merge tag 'omap-for-v3.11/fixes-for-merge-window' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'ux500-defconfig-for-arm-soc' of git://git.kernel.org/.../linusw/linux-stericsson into fixes
-      arm: multi_v7_defconfig: Tweaks for omap and sunxi
-
-Paul Bolle (1):
-      ARM: OMAP2+: Remove obsolete Makefile line
-
-Pavel Machek (1):
-      ARM: OMAP2+: N900: enable N900-specific drivers even if device tree is enabled
-
-Santosh Shilimkar (1):
-      ARM: OMAP5: Enable Cortex A15 errata 798181
-
-Stephen Warren (1):
-      ARM: tegra: fix VBUS regulator GPIO polarity in DT
-
-Takanari Hayama (1):
-      ARM: shmobile: r8a73a4: Fix resources for SCIFB0
-
-Thomas Meyer (1):
-      ARM: OMAP2+: Cocci spatch "ptr_ret.spatch"
-
-Tom Rini (1):
-      ARM: OMAP2+: omap2plus_defconfig: Enable appended DTB support
-
-Ulf Hansson (1):
-      ARM: ux500: Update MMC configs for u8500 defconfig
-
-Vincent Stehl? (1):
-      arm: multi_v7_defconfig: add i.MX options and NFS root
-
-Wei Yongjun (1):
-      ARM: OMAP2+: devices: remove duplicated include from devices.c
-
- arch/arm/Kconfig.debug                    |  20 ++--
- arch/arm/boot/dts/tegra20-seaboard.dts    |   1 +
- arch/arm/boot/dts/tegra20-trimslice.dts   |   1 +
- arch/arm/boot/dts/tegra20-whistler.dts    |   2 +
- arch/arm/configs/multi_v7_defconfig       | 133 ++++++++++++++++++++------
- arch/arm/configs/omap2plus_defconfig      |  19 ++++
- arch/arm/configs/u8500_defconfig          |  44 +++++----
- arch/arm/include/asm/smp_scu.h            |  13 ++-
- arch/arm/mach-exynos/Kconfig              |   2 +-
- arch/arm/mach-ixp4xx/dsmg600-setup.c      |   2 +
- arch/arm/mach-ixp4xx/include/mach/timex.h |   2 +-
- arch/arm/mach-ixp4xx/omixp-setup.c        |   2 +
- arch/arm/mach-omap2/Kconfig               | 153 +++++++++++++++---------------
- arch/arm/mach-omap2/Makefile              |   4 -
- arch/arm/mach-omap2/board-igep0020.c      |  31 ++++++
- arch/arm/mach-omap2/board-rx51-video.c    |   2 +-
- arch/arm/mach-omap2/devices.c             |   5 +-
- arch/arm/mach-omap2/fb.c                  |   5 +-
- arch/arm/mach-omap2/gpmc.c                |   2 +-
- arch/arm/mach-omap2/io.c                  |   2 +-
- arch/arm/mach-omap2/pmu.c                 |   5 +-
- arch/arm/mach-omap2/sleep44xx.S           |   6 +-
- arch/arm/mach-omap2/timer.c               |   2 +-
- arch/arm/mach-shmobile/setup-emev2.c      |   8 +-
- arch/arm/mach-shmobile/setup-r8a73a4.c    |   2 +-
- arch/arm/mach-zynq/common.c               |   2 +-
- sound/soc/omap/rx51.c                     |   2 +-
- 27 files changed, 311 insertions(+), 161 deletions(-)
+So in short, I am looking for opinions, and test results especially
+from the userspace benchmark, to see the relative merit of these
+optimizations on different platforms.
