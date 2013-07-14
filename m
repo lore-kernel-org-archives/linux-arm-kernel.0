@@ -1,57 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 14 Jul 2013 20:33:47 +0200
-Subject: [PATCH 1/1] ARM: imx: clk-pllv3: move the timeout just before
- the comparison
-In-Reply-To: <1373763528-20792-1-git-send-email-peter.chen@freescale.com>
-References: <1373763528-20792-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <20130714183347.GJ12139@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 14 Jul 2013 21:29:43 +0200
+Subject: [PATCH V3 1/3] dts: change Marvell prefix to 'marvell'
+In-Reply-To: <175CCF5F49938B4D99B2E3EF7F558EBE3DBC97FDFA@SC-VEXCH4.marvell.com>
+References: <1373352166-10064-1-git-send-email-zhangwm@marvell.com>
+ <20130710214922.GQ11908@titan.lakedaemon.net>
+ <175CCF5F49938B4D99B2E3EF7F558EBE3DBC97FDFA@SC-VEXCH4.marvell.com>
+Message-ID: <201307142129.43271.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 14, 2013 at 08:58:48AM +0800, Peter Chen wrote:
-> It can let the timeout value be more precise.
+On Thursday 11 July 2013, Neil Zhang wrote:
+> > > > To do this properly, the drivers are going to have to be compatible
+> > > > with the old and the new names, and the binding docs updated to
+> > > > reflect the legacy name and the preferred name.
+> > >
+> > > Properly would be as above. You can stop using stock tickers for new
+> > > company names, but anything that has been defined in a device tree
+> > > before has to stay that way, and all the manufacturer prefixes to
+> > > device names should be the same. What you're proposing is purely
+> > > driver bloat and increasing the size of kernel.
+> > 
+> > *I'm* not proposing to change the name, Neil is.  I'm proposing that
+> > iff they chose to do that, don't break sh*t along the way.
+> > 
 > 
-> Suggested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Whoever applies this patch, can you make the ? an ? (or at least "oe")?
+> What's your opinion?
 
-Peter, does this fix anything for you? Would be nice to mention that in
-the commit log.
+We discussed the topic of fixing bad bindings vs. keeping backwards
+compatibility during last week's Linaro Connect.
 
-Best regards
-Uwe
+The main outcome was that we need to have a better review for new bindings
+getting merged to avoid this situation in the future, but the general
+consensus seems that bindings that are already in use but were never
+reviewed properly (which should have caught this) should be changed.
+We will likely establish an annotation in the binding soon to mark those
+that can not be changed as opposed to those that are not considered stable
+yet.
 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  arch/arm/mach-imx/clk-pllv3.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
-> index a9fad5f..e2c026f 100644
-> --- a/arch/arm/mach-imx/clk-pllv3.c
-> +++ b/arch/arm/mach-imx/clk-pllv3.c
-> @@ -48,7 +48,7 @@ struct clk_pllv3 {
->  static int clk_pllv3_prepare(struct clk_hw *hw)
->  {
->  	struct clk_pllv3 *pll = to_clk_pllv3(hw);
-> -	unsigned long timeout = jiffies + msecs_to_jiffies(10);
-> +	unsigned long timeout;
->  	u32 val;
->  
->  	val = readl_relaxed(pll->base);
-> @@ -59,6 +59,7 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
->  		val &= ~BM_PLL_POWER;
->  	writel_relaxed(val, pll->base);
->  
-> +	timeout = jiffies + msecs_to_jiffies(10);
->  	/* Wait for PLL to lock */
->  	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK))
->  		if (time_after(jiffies, timeout))
-> -- 
-> 1.7.0.4
-> 
-> 
-> 
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+	Arnd
