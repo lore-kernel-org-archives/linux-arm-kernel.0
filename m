@@ -1,64 +1,72 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Sun, 14 Jul 2013 16:04:28 +0800
-Subject: [PATCH 4/5] iio: at91: add an optional dt property for for adc clock
- hz.
+Date: Sun, 14 Jul 2013 16:04:27 +0800
+Subject: [PATCH 3/5] iio: at91: ADC start-up time calculation changed since
+ at91sam9x5
 In-Reply-To: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
 References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1373789069-11604-5-git-send-email-josh.wu@atmel.com>
+Message-ID: <1373789069-11604-4-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since in at91sam9x5, sama5d3x chip. the start up time calucation is changed.
+And these two chips also have TSMR, so we check whether ADC has TSMR, then
+choose different start up time calculation formula.
+
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
- Documentation/devicetree/bindings/arm/atmel-adc.txt |    2 ++
- drivers/iio/adc/at91_adc.c                          |    8 +++++++-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ drivers/iio/adc/at91_adc.c |   40 +++++++++++++++++++++++++++++++++-------
+ 1 file changed, 33 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-index 16769d9..0db2945 100644
---- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-@@ -27,6 +27,8 @@ Optional properties:
- 		       resolution will be used.
-   - atmel,adc-sleep-mode: Boolean to enable sleep mode when no conversion
-   - atmel,adc-sample-hold-time: Sample and Hold Time in microseconds
-+  - atmel,adc-clock-rate: ADC clock rate. If not specified, use the default
-+			  adc_op_clk.
-  
- Optional trigger Nodes:
-   - Required properties:
 diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-index e93a075..8f1386f 100644
+index 14e99ba..e93a075 100644
 --- a/drivers/iio/adc/at91_adc.c
 +++ b/drivers/iio/adc/at91_adc.c
-@@ -47,6 +47,7 @@ struct at91_adc_caps {
+@@ -733,13 +733,39 @@ static int at91_adc_probe(struct platform_device *pdev)
+ 		goto error_disable_adc_clk;
+ 	}
  
- struct at91_adc_state {
- 	struct clk		*adc_clk;
-+	u32			adc_clk_rate;
- 	u16			*buffer;
- 	unsigned long		channels_mask;
- 	struct clk		*clk;
-@@ -448,6 +449,10 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
- 	if (!node)
- 		return -EINVAL;
- 
-+	prop = 0;
-+	of_property_read_u32(node, "atmel,adc-clock-rate", &prop);
-+	st->adc_clk_rate = prop;
+-	/*
+-	 * Number of ticks needed to cover the startup time of the ADC as
+-	 * defined in the electrical characteristics of the board, divided by 8.
+-	 * The formula thus is : Startup Time = (ticks + 1) * 8 / ADC Clock
+-	 */
+-	ticks = round_up((st->startup_time * adc_clk_khz /
+-			  1000) - 1, 8) / 8;
++	if (!st->caps.has_tsmr) {
++		/*
++		 * Number of ticks needed to cover the startup time of the ADC
++		 * as defined in the electrical characteristics of the board,
++		 * divided by 8. The formula thus is :
++		 *   Startup Time = (ticks + 1) * 8 / ADC Clock
++		 */
++		ticks = round_up((st->startup_time * adc_clk_khz /
++				  1000) - 1, 8) / 8;
++	} else {
++		/*
++		 * For sama5d3x and at91sam9x5, the formula changes to:
++		 * Startup Time = <lookup_table_value> / ADC Clock
++		 */
++		const int startup_lookup[] = {
++			0  , 8  , 16 , 24 ,
++			64 , 80 , 96 , 112,
++			512, 576, 640, 704,
++			768, 832, 896, 960
++			};
 +
- 	st->use_external = of_property_read_bool(node, "atmel,adc-use-external-triggers");
- 
- 	if (of_property_read_u32(node, "atmel,adc-channels-used", &prop)) {
-@@ -723,7 +728,8 @@ static int at91_adc_probe(struct platform_device *pdev)
- 	 * specified by the electrical characteristics of the board.
- 	 */
- 	mstrclk = clk_get_rate(st->clk);
--	adc_clk = clk_get_rate(st->adc_clk);
-+	adc_clk = st->adc_clk_rate ?
-+		st->adc_clk_rate : clk_get_rate(st->adc_clk);
- 	adc_clk_khz = adc_clk / 1000;
- 	prsc = (mstrclk / (2 * adc_clk)) - 1;
- 
++		int i, size = ARRAY_SIZE(startup_lookup);
++		ticks = st->startup_time * adc_clk_khz / 1000;
++		for (i = 0; i < size; i++)
++			if (ticks < startup_lookup[i])
++				break;
++
++		ticks = i;
++		if (ticks == size)
++			/* Reach the end of lookup table */
++			ticks = size - 1;
++	}
++
+ 	/*
+ 	 * a minimal Sample and Hold Time is necessary for the ADC to guarantee
+ 	 * the best converted final value between two channels selection
 -- 
 1.7.10
