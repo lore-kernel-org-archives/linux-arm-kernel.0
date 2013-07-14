@@ -1,53 +1,57 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Sun, 14 Jul 2013 18:21:33 +0300
-Subject: Call for testing/opinions: Optimized memset/memcpy
-In-Reply-To: <loom.20130714T124137-382@post.gmane.org>
-References: <loom.20130713T172357-560@post.gmane.org>
- <20130713172445.GL32054@1wt.eu>
- <loom.20130713T232124-511@post.gmane.org>
- <20130714061354.GS32054@1wt.eu>
- <loom.20130714T124137-382@post.gmane.org>
-Message-ID: <20130714182133.7971180d@i7>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 14 Jul 2013 20:33:47 +0200
+Subject: [PATCH 1/1] ARM: imx: clk-pllv3: move the timeout just before
+ the comparison
+In-Reply-To: <1373763528-20792-1-git-send-email-peter.chen@freescale.com>
+References: <1373763528-20792-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130714183347.GJ12139@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 14 Jul 2013 11:00:50 +0000 (UTC)
-Harm Hanemaaijer <fgenfb@yahoo.com> wrote:
-
-> Willy Tarreau <w <at> 1wt.eu> writes:
+On Sun, Jul 14, 2013 at 08:58:48AM +0800, Peter Chen wrote:
+> It can let the timeout value be more precise.
 > 
-> > 
-> > Please find the results attached. It seems that memcpy improved by 0.8%
-> > though that's not even certain.
-> > 
+> Suggested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Whoever applies this patch, can you make the ? an ? (or at least "oe")?
+
+Peter, does this fix anything for you? Would be nice to mention that in
+the commit log.
+
+Best regards
+Uwe
+
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  arch/arm/mach-imx/clk-pllv3.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
 > 
-> What is interesting is that
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388f/Caccifbd.html,
-> and several other sources (such as other
-> optimized memcpy implementations) document the cache line size of the Cortex
-> A9 as 32 bytes, which is an anomaly in the armv7 family.
-
-Yes, the cache line size is 32 bytes in Cortex-A9. However in order to
-mitigate poor memory memory bandwidth utilization, the L2 cache
-controller implements 'double linefill' feature:
-
-    http://infocenter.arm.com/help/topic/com.arm.doc.ddi0246h/CHDHIECI.html
-
-But 'double linefill' only first appeared in r3p0 revision of L2C-310
-L2 cache controller (also known as PL310) and was a bit buggy in the
-revisions older than r3p2 according to the errata list:
-
-    http://infocenter.arm.com/help/topic/com.arm.doc.uan0013b/index.html
-
-Which only makes double linefill usable in modern Cortex-A9 based SoCs
-such as Exynos4412, but unfortunately not in the older Cortex-A9 based
-systems.
-
-When double linefill is enabled, two cache lines are allocated at once
-in L2, so for the memcpy alike workloads it looks somewhat similar to
-real 64 byte cache line size. Welcome to the diverse world of ARM
-hardware :)
+> diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
+> index a9fad5f..e2c026f 100644
+> --- a/arch/arm/mach-imx/clk-pllv3.c
+> +++ b/arch/arm/mach-imx/clk-pllv3.c
+> @@ -48,7 +48,7 @@ struct clk_pllv3 {
+>  static int clk_pllv3_prepare(struct clk_hw *hw)
+>  {
+>  	struct clk_pllv3 *pll = to_clk_pllv3(hw);
+> -	unsigned long timeout = jiffies + msecs_to_jiffies(10);
+> +	unsigned long timeout;
+>  	u32 val;
+>  
+>  	val = readl_relaxed(pll->base);
+> @@ -59,6 +59,7 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+>  		val &= ~BM_PLL_POWER;
+>  	writel_relaxed(val, pll->base);
+>  
+> +	timeout = jiffies + msecs_to_jiffies(10);
+>  	/* Wait for PLL to lock */
+>  	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK))
+>  		if (time_after(jiffies, timeout))
+> -- 
+> 1.7.0.4
+> 
+> 
+> 
 
 -- 
-Best regards,
-Siarhei Siamashka
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
