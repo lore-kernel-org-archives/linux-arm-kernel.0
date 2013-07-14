@@ -1,25 +1,64 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Sun, 14 Jul 2013 16:04:24 +0800
-Subject: [PATCH 0/5] iio: at91: Add touch screen support in at91 adc
-Message-ID: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
+Date: Sun, 14 Jul 2013 16:04:28 +0800
+Subject: [PATCH 4/5] iio: at91: add an optional dt property for for adc clock
+ hz.
+In-Reply-To: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
+References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1373789069-11604-5-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series will add touch screen support for at91 adc driver.
-To enable touch screen you need add the touch screen related dt properties.
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+ Documentation/devicetree/bindings/arm/atmel-adc.txt |    2 ++
+ drivers/iio/adc/at91_adc.c                          |    8 +++++++-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-Josh Wu (5):
-  iio: at91: use adc_clk_khz to make the calculation not easy to large
-    than u32.
-  iio: at91: Use different prescal, startup mask in MR for different IP
-  iio: at91: ADC start-up time calculation changed since at91sam9x5
-  iio: at91: add an optional dt property for for adc clock hz.
-  iio: at91: introduce touch screen support in iio adc driver
-
- .../devicetree/bindings/arm/atmel-adc.txt          |   15 +
- arch/arm/mach-at91/include/mach/at91_adc.h         |   43 +-
- drivers/iio/adc/at91_adc.c                         |  492 ++++++++++++++++++--
- 3 files changed, 511 insertions(+), 39 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+index 16769d9..0db2945 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+@@ -27,6 +27,8 @@ Optional properties:
+ 		       resolution will be used.
+   - atmel,adc-sleep-mode: Boolean to enable sleep mode when no conversion
+   - atmel,adc-sample-hold-time: Sample and Hold Time in microseconds
++  - atmel,adc-clock-rate: ADC clock rate. If not specified, use the default
++			  adc_op_clk.
+  
+ Optional trigger Nodes:
+   - Required properties:
+diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+index e93a075..8f1386f 100644
+--- a/drivers/iio/adc/at91_adc.c
++++ b/drivers/iio/adc/at91_adc.c
+@@ -47,6 +47,7 @@ struct at91_adc_caps {
+ 
+ struct at91_adc_state {
+ 	struct clk		*adc_clk;
++	u32			adc_clk_rate;
+ 	u16			*buffer;
+ 	unsigned long		channels_mask;
+ 	struct clk		*clk;
+@@ -448,6 +449,10 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
+ 	if (!node)
+ 		return -EINVAL;
+ 
++	prop = 0;
++	of_property_read_u32(node, "atmel,adc-clock-rate", &prop);
++	st->adc_clk_rate = prop;
++
+ 	st->use_external = of_property_read_bool(node, "atmel,adc-use-external-triggers");
+ 
+ 	if (of_property_read_u32(node, "atmel,adc-channels-used", &prop)) {
+@@ -723,7 +728,8 @@ static int at91_adc_probe(struct platform_device *pdev)
+ 	 * specified by the electrical characteristics of the board.
+ 	 */
+ 	mstrclk = clk_get_rate(st->clk);
+-	adc_clk = clk_get_rate(st->adc_clk);
++	adc_clk = st->adc_clk_rate ?
++		st->adc_clk_rate : clk_get_rate(st->adc_clk);
+ 	adc_clk_khz = adc_clk / 1000;
+ 	prsc = (mstrclk / (2 * adc_clk)) - 1;
+ 
 -- 
 1.7.10
