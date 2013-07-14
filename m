@@ -1,31 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 14 Jul 2013 10:34:42 +0200
-Subject: [PATCH] ARM: multiplatform: remove reference to ARCH_MULTI_V4
-In-Reply-To: <1373746191.1359.37.camel@x61.thuisdomein>
-References: <1373746191.1359.37.camel@x61.thuisdomein>
-Message-ID: <201307141034.42868.arnd@arndb.de>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Sun, 14 Jul 2013 12:38:05 +0200
+Subject: [PATCH] ARM: keystone: drop "select HAVE_SCHED_CLOCK"
+Message-ID: <1373798285.1370.2.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 13 July 2013, Paul Bolle wrote:
-> The Kconfig symbol ARCH_MULTI_V4 was removed in commit 24e860fbfd
-> ("ARM: multiplatform: always pick one CPU type"). Remove the last
-> reference to it too.
-> 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> 0) Untested.
-> 
-> 1) Commit 24e860fbfd is silent on the reason to drop ARCH_MULTI_V4. And
-> the ARM section of the Kconfig files is rather complicated for people,
-> like me, that aren't familiar with the way the ARM universe is divided
-> in architectures, machines, platforms, etc. That makes it hard to say
-> whether ARCH_MULTI_V4 was dropped on purpose or by accident.
+The Kconfig symbol HAVE_SCHED_CLOCK got removed in v3.4,
+with commit 6905a65879b5 ("ARM: Make the sched_clock
+framework mandatory"). But a select statement for it popped up again
+through commit 828989ad87af ("ARM: keystone: Add minimal TI Keystone
+platform support"). Drop that statement, as it is useless.
 
-It was dropped on purpose because it is unused in 3.11 but it will
-be used again in 3.12, so I wouldn't bother with your patch.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Not tested.
 
-Thanks anyway for looking into unused symbols, I think checking for
-unused code like this is very useful in general.
+ arch/arm/mach-keystone/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-	Arnd
+diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
+index 51a50e9..366d1a3 100644
+--- a/arch/arm/mach-keystone/Kconfig
++++ b/arch/arm/mach-keystone/Kconfig
+@@ -7,7 +7,6 @@ config ARCH_KEYSTONE
+ 	select HAVE_SMP
+ 	select CLKSRC_MMIO
+ 	select GENERIC_CLOCKEVENTS
+-	select HAVE_SCHED_CLOCK
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_ERRATA_798181 if SMP
+ 	help
+-- 
+1.8.1.4
