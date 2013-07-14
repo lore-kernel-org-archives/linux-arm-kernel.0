@@ -1,39 +1,62 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Sun, 14 Jul 2013 08:58:48 +0800
-Subject: [PATCH 1/1] ARM: imx: clk-pllv3: move the timeout just before the
- comparison
-Message-ID: <1373763528-20792-1-git-send-email-peter.chen@freescale.com>
+From: jett.zhou@gmail.com (jett zhou)
+Date: Sun, 14 Jul 2013 11:00:25 +0800
+Subject: [V3 0/7] Enhance mmp display driver
+In-Reply-To: <20130709133918.GC18477@ns203013.ovh.net>
+References: <1372332473-6584-1-git-send-email-jtzhou@marvell.com>
+ <20130709133918.GC18477@ns203013.ovh.net>
+Message-ID: <CACDDiy8OwYHbmYGwc0FV2NLVfu1BiUL9GYCmA2QEVVB5isFJGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It can let the timeout value be more precise.
+Hi Jean
+     As I checked the for-next branch, found patch4 and patch5 are
+already applied.
+     As checked on my side,  only apply patch1~patch3 and
+patch6~patch7 is ok, so think you can apply them except for patch4/5.
+     If there is still problem, please let me know, I will check it then.
+Thanks
 
-Suggested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- arch/arm/mach-imx/clk-pllv3.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+2013/7/9 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> HI,
+>
+>         please rebase on the for-next branch as it does not apply
+>
+> Best Regards,
+> J.
+> On 19:27 Thu 27 Jun     , Jett.Zhou wrote:
+>> Changelog:
+>> 1 Add more comments for the mmp_display rbswap usage
+>> according to Daniel's comments;
+>> 2 Add fix patch for ttc_dkb on rbswap;
+>> 3 Add more comments on the pitch usage and definition;
+>> 4 Combine the modification on pitch of graphic and video layer
+>> in one patch.
+>>
+>> Guoqing Li (2):
+>>   video: mmp: rb swap setting update for mmp display
+>>   video: mmp: optimize some register setting code
+>>
+>> Jett.Zhou (1):
+>>   ARM: mmp: remove the legacy rbswap setting for ttc_dkb platform
+>>
+>> Jing Xiang (4):
+>>   video: mmp: fix graphics/video layer enable/mask issue
+>>   video: mmp: fix memcpy wrong size for mmp_addr issue
+>>   video: mmp: calculate pitch value when fb set win
+>>   video: mmp: add pitch info in mmp_win structure
+>>
+>>  arch/arm/mach-mmp/ttc_dkb.c     |    4 +-
+>>  drivers/video/mmp/fb/mmpfb.c    |   34 +++++++++++------
+>>  drivers/video/mmp/hw/mmp_ctrl.c |   79 ++++++++++++++++++++++-----------------
+>>  drivers/video/mmp/hw/mmp_ctrl.h |    5 ++
+>>  include/video/mmp_disp.h        |    6 +++
+>>  5 files changed, 79 insertions(+), 49 deletions(-)
+>>
 
-diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
-index a9fad5f..e2c026f 100644
---- a/arch/arm/mach-imx/clk-pllv3.c
-+++ b/arch/arm/mach-imx/clk-pllv3.c
-@@ -48,7 +48,7 @@ struct clk_pllv3 {
- static int clk_pllv3_prepare(struct clk_hw *hw)
- {
- 	struct clk_pllv3 *pll = to_clk_pllv3(hw);
--	unsigned long timeout = jiffies + msecs_to_jiffies(10);
-+	unsigned long timeout;
- 	u32 val;
- 
- 	val = readl_relaxed(pll->base);
-@@ -59,6 +59,7 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
- 		val &= ~BM_PLL_POWER;
- 	writel_relaxed(val, pll->base);
- 
-+	timeout = jiffies + msecs_to_jiffies(10);
- 	/* Wait for PLL to lock */
- 	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK))
- 		if (time_after(jiffies, timeout))
--- 
-1.7.0.4
+
+
+--
+
+----------------------------------
+Best Regards
+Jett Zhou
