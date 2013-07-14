@@ -1,34 +1,34 @@
 From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sun, 14 Jul 2013 14:02:19 +0200
-Subject: [PATCH] cpufreq: s3c24xx: fix typo "ARM_S3C24XX"
-Message-ID: <1373803339.1370.18.camel@x61.thuisdomein>
+Date: Sun, 14 Jul 2013 14:26:52 +0200
+Subject: [PATCH] ARM: EXYNOS: remove references to non-DT SoCs
+Message-ID: <1373804812.1370.23.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kconfig symbol S3C24XX_PLL depends on ARM_S3C24XX. But that symbol
-doesn't exist. Commit f023f8dd59bf ("cpufreq: s3c24xx: move cpufreq
-driver to drivers/cpufreq"), which added this typo, makes clear that
-ARM_S3C24XX_CPUFREQ was intended here.
+Commit 383ffda2fa ("ARM: EXYNOS: no more support non-DT for EXYNOS
+SoCs") removed the Kconfig symbols MACH_SMDKV310 and MACH_SMDKC210.
+Now remove the references to both of these symbols from the Kconfig
+entry for SND_SOC_SAMSUNG_SMDK_WM9713. They're not needed anymore.
 
 Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 ---
-Untested!
+Untested.
 
- arch/arm/mach-s3c24xx/Kconfig | 2 +-
+ sound/soc/samsung/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index 6d9252e..7791ac7 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -208,7 +208,7 @@ config S3C24XX_GPIO_EXTRA128
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index 9855dfc..3d76659 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -136,7 +136,7 @@ config SND_SOC_SAMSUNG_RX1950_UDA1380
  
- config S3C24XX_PLL
- 	bool "Support CPUfreq changing of PLL frequency (EXPERIMENTAL)"
--	depends on ARM_S3C24XX
-+	depends on ARM_S3C24XX_CPUFREQ
+ config SND_SOC_SAMSUNG_SMDK_WM9713
+ 	tristate "SoC AC97 Audio support for SMDK with WM9713"
+-	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310 || MACH_SMDKC210)
++	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110)
+ 	select SND_SOC_WM9713
+ 	select SND_SAMSUNG_AC97
  	help
- 	  Compile in support for changing the PLL frequency from the
- 	  S3C24XX series CPUfreq driver. The PLL takes time to settle
 -- 
 1.8.1.4
