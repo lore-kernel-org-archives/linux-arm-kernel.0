@@ -1,49 +1,155 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 14 Jul 2013 22:53:25 +0100
-Subject: v3.10 - big endian core support
-In-Reply-To: <51DFEF75.8080600@codethink.co.uk>
-References: <CALicx6u89THSiRa4FzGZrcoG8q+o_BD8qVEC4CYXEjPUVK_fJw@mail.gmail.com>
- <20130712134726.0a909165@skate> <51DFEF75.8080600@codethink.co.uk>
-Message-ID: <20130714215325.GB7382@mudshark.cambridge.arm.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Mon, 15 Jul 2013 01:28:19 +0300
+Subject: [PATCH v2] N900: add device tree
+In-Reply-To: <20130713121709.GC16473@amd.pavel.ucw.cz>
+References: <20130613161418.GJ8164@atomide.com>
+ <20130613230808.GA14876@amd.pavel.ucw.cz>
+ <20130614055629.GM8164@atomide.com>
+ <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
+ <20130617111031.GQ20992@atomide.com>
+ <20130701211753.GC15318@amd.pavel.ucw.cz>
+ <20130704171939.GA27374@blackmetal.musicnaut.iki.fi>
+ <20130704202145.GB10752@amd.pavel.ucw.cz>
+ <20130704203256.GB27374@blackmetal.musicnaut.iki.fi>
+ <20130713121709.GC16473@amd.pavel.ucw.cz>
+Message-ID: <20130714222819.GB3296@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 12, 2013 at 12:58:45PM +0100, Ben Dooks wrote:
-> On 12/07/13 12:47, Thomas Petazzoni wrote:
-> > Dear Vijay Kilari,
-> >
-> > On Fri, 12 Jul 2013 17:09:12 +0530, Vijay Kilari wrote:
-> >
-> >>> Ben Dooks has a separate branch on top of this base branch for
-> >>> big-endian support, that adds atags compat code to convert the ATAGs
-> >>> data from LE to BE. See the baserock/311/be/atags branch in
-> >>> git://git.baserock.org/delta/linux. Or
-> >>> http://git.baserock.org/cgi-bin/cgit.cgi/delta/linux.git/log/?h=baserock/311/be/atags.
-> >>
-> >>   ARM VE TC2 board, enabling CONFIG_THUMB2_KERNEL failed to boot in BE mode
-> >> It hangs at very early stage of boot
-> >
-> > Yeah, the Thumb2 code is not supported by Ben Dooks patches, it's part
-> > of the TODO-list. I think Ben said he would probably not have much time
-> > to work on this. I might be able to spare some time on this, so just
-> > let me know if I should start working on this. If I remember correctly,
-> > it's mainly the fixup_pv_table code that needed some Thumb2/BE love.
-> >
-> > Will, is getting Thumb2 working a requirement to get the BE support
-> > merged, or can we for now make the BE option depends on !THUMB2_KERNEL ?
+Hi,
+
+On Sat, Jul 13, 2013 at 02:17:09PM +0200, Pavel Machek wrote:
 > 
-> I would like to sort out getting this code merged as it seems to have
-> been tested by several people now outside Codethink.
+> This adds device tree with neccessary support to boot with functional
+> video (on both emulator and real N900 device).
 > 
-> I could try doing the THUMB2 support, but I do not have a lot of
-> experience with building THUMB2 kernels.
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-I think we should try and get Thumb-2 supported before merging this as there
-isn't any real reason why the instruction set should cause endianness
-issues. We're also only almost at -rc1, so there's still time to fix this
-properly for 3.12 instead of adding a fake Kconfig dependency.
+You can also add:
 
-As for building a Thumb-2 kernel; just enable the option in menuconfig and
-you're done. The compiler should "do the right thing".
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 
-Will
+Thanks,
+
+A.
+
+> 
+> ---
+> 
+> From v1: Aaro wants just GPLv2, so I did that. I re-enabled parts that
+> can be enabled on 3.10, and tested it on that kernel.
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index f0895c5..1950aed 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -141,6 +141,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+>  	omap3-devkit8000.dtb \
+>  	omap3-beagle-xm.dtb \
+>  	omap3-evm.dtb \
+> +	omap3-n900.dtb \
+>  	omap3-tobi.dtb \
+>  	omap3-igep0020.dtb \
+>  	omap3-igep0030.dtb \
+> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+> new file mode 100644
+> index 0000000..fb461bf
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap3-n900.dts
+> @@ -0,0 +1,92 @@
+> +/*
+> + * Copyright (C) 2013 Pavel Machek <pavel@ucw.cz>
+> + * Copyright 2013 Aaro Koskinen <aaro.koskinen@iki.fi>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +/include/ "omap34xx.dtsi"
+> +
+> +/ {
+> +	model = "Nokia N900";
+> +	compatible = "nokia,omap3-n900", "ti,omap3";
+> +
+> +	cpus {
+> +		cpu at 0 {
+> +			cpu0-supply = <&vcc>;
+> +		};
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x80000000 0x10000000>; /* 256 MB */
+> +	};
+> +
+> +};
+> +
+> +&i2c1 {
+> +	clock-frequency = <2200000>;
+> +
+> +	twl: twl at 48 {
+> +		reg = <0x48>;
+> +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+> +		interrupt-parent = <&intc>;
+> +	};
+> +};
+> +
+> +/include/ "twl4030.dtsi"
+> +
+> +&twl_gpio {
+> +	ti,pullups	= <0x0>;
+> +	ti,pulldowns	= <0x03ff3f>; /* BIT(0..5) | BIT(8..17) */
+> +};
+> +
+> +&i2c2 {
+> +	clock-frequency = <400000>;
+> +};
+> +
+> +&i2c3 {
+> +	clock-frequency = <100000>;
+> +};
+> +
+> +&mmc1 {
+> +	status = "disabled";
+> +};
+> +
+> +&mmc2 {
+> +	status = "disabled";
+> +};
+> +
+> +&mmc3 {
+> +	status = "disabled";
+> +};
+> +
+> +&mcspi1 {
+> +	// For some reason, touchscreen is neccessary for screen to work at 
+> +	// all on real hw. It works well without it on emulator.
+> +	//
+> +	// Also... order in the device tree actually matters here.
+> +	tsc2005 at 0 {
+> +		compatible = "tsc2005";
+> +		spi-max-frequency = <6000000>;
+> +		reg = <0>;
+> +	};
+> +	mipid at 2 {
+> +		compatible = "acx565akm";
+> +		spi-max-frequency = <6000000>;
+> +		reg = <2>;
+> +		// turbo_mode = 0,
+> +		// cs_per_word = 0
+> +	};
+> +};
+> +
+> +&usb_otg_hs {
+> +	interface-type = <0>;
+> +	usb-phy = <&usb2_phy>;
+> +	mode = <2>;
+> +	power = <50>;
+> +};
+> 
+> -- 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
