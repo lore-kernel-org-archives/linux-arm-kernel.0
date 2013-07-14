@@ -1,40 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 14 Jul 2013 21:29:43 +0200
-Subject: [PATCH V3 1/3] dts: change Marvell prefix to 'marvell'
-In-Reply-To: <175CCF5F49938B4D99B2E3EF7F558EBE3DBC97FDFA@SC-VEXCH4.marvell.com>
-References: <1373352166-10064-1-git-send-email-zhangwm@marvell.com>
- <20130710214922.GQ11908@titan.lakedaemon.net>
- <175CCF5F49938B4D99B2E3EF7F558EBE3DBC97FDFA@SC-VEXCH4.marvell.com>
-Message-ID: <201307142129.43271.arnd@arndb.de>
+Date: Sun, 14 Jul 2013 21:58:43 +0200
+Subject: [PATCH v2] rtc: Add MOXA ART RTC driver
+In-Reply-To: <1373550711-18828-1-git-send-email-jonas.jensen@gmail.com>
+References: <1373464848-28146-1-git-send-email-jonas.jensen@gmail.com>
+ <1373550711-18828-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <201307142158.44027.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 July 2013, Neil Zhang wrote:
-> > > > To do this properly, the drivers are going to have to be compatible
-> > > > with the old and the new names, and the binding docs updated to
-> > > > reflect the legacy name and the preferred name.
-> > >
-> > > Properly would be as above. You can stop using stock tickers for new
-> > > company names, but anything that has been defined in a device tree
-> > > before has to stay that way, and all the manufacturer prefixes to
-> > > device names should be the same. What you're proposing is purely
-> > > driver bloat and increasing the size of kernel.
-> > 
-> > *I'm* not proposing to change the name, Neil is.  I'm proposing that
-> > iff they chose to do that, don't break sh*t along the way.
-> > 
-> 
-> What's your opinion?
+On Thursday 11 July 2013, Jonas Jensen wrote:
+> Add RTC driver for MOXA ART SoCs.
+> +
+> +#define GPIO_EM1240_OUTPUT			1
+> +#define GPIO_EM1240_INPUT			0
+> +
+> +#define GPIO_RTC_SCLK				(5)
+> +#define GPIO_RTC_DATA				(6)
+> +#define GPIO_RTC_RESET				(7)
 
-We discussed the topic of fixing bad bindings vs. keeping backwards
-compatibility during last week's Linaro Connect.
+Since this is a DT-only platform, you should not really have hardcoded GPIO
+numbers.
 
-The main outcome was that we need to have a better review for new bindings
-getting merged to avoid this situation in the future, but the general
-consensus seems that bindings that are already in use but were never
-reviewed properly (which should have caught this) should be changed.
-We will likely establish an annotation in the binding soon to mark those
-that can not be changed as opposed to those that are not considered stable
-yet.
+> +	devm_gpio_request(&pdev->dev, GPIO_RTC_DATA, "rtc_data");
+> +	devm_gpio_request(&pdev->dev, GPIO_RTC_SCLK, "rtc_sclk");
+> +	devm_gpio_request(&pdev->dev, GPIO_RTC_RESET, "rtc_reset");
+
+Instead, you should use of_get_named_gpio() here, and add a binding document
+that describes the names.
 
 	Arnd
