@@ -1,53 +1,44 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 14 Jul 2013 14:09:50 +0100
+Date: Sun, 14 Jul 2013 14:13:21 +0100
 Subject: Call for testing/opinions: Optimized memset/memcpy
-In-Reply-To: <loom.20130714T124137-382@post.gmane.org>
+In-Reply-To: <CAKv+Gu-fUNSZaNMgZekoCX2kOGEFDLKY1yFtKq1=yp9xQN3rOA@mail.gmail.com>
 References: <loom.20130713T172357-560@post.gmane.org>
- <20130713172445.GL32054@1wt.eu> <loom.20130713T232124-511@post.gmane.org>
- <20130714061354.GS32054@1wt.eu> <loom.20130714T124137-382@post.gmane.org>
-Message-ID: <20130714130949.GR24642@n2100.arm.linux.org.uk>
+ <20130713164840.GC28473@gallifrey> <loom.20130714T130546-799@post.gmane.org>
+ <CAKv+Gu-fUNSZaNMgZekoCX2kOGEFDLKY1yFtKq1=yp9xQN3rOA@mail.gmail.com>
+Message-ID: <20130714131320.GS24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 14, 2013 at 11:00:50AM +0000, Harm Hanemaaijer wrote:
-> What is interesting is that
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388f/Caccifbd.html,
-> and several other sources (such as other
-> optimized memcpy implementations) document the cache line size of the Cortex
-> A9 as 32 bytes, which is an anomaly in the armv7 family. However, it looks
-> like the kernel is defining L1_CACHE_BYTES as 64 (L1_CACHE_SHIFT == 6) for
-> all armv7 platforms, which looks like a serious configuring error for Cortex
-> A9.
+On Sun, Jul 14, 2013 at 01:37:44PM +0200, Ard Biesheuvel wrote:
+> On 14 July 2013 13:19, Harm Hanemaaijer <fgenfb@yahoo.com> wrote:
+> > Dr. David Alan Gilbert <gilbertd <at> treblig.org> writes:
+> >>
+> >> Maybe neon is worth a try these days (although be careful of platforms
+> >> like Tegra 2 that doens't have it); there was a recent patch that enabled
+> >> use in the kernel (I think for some RAID use). The downside is it's
+> >> supposed to be quite power hungry.
+> >>
+> >
+> > As it turns out, NEON isn't too hard to implement. I have added NEON support
+> > to copy_page, memset, memzero, and memcpy (both for the aligned and unaligned
+> > case) in my userspace testing environment. It gives a nice boost (ranging
+> > from 10% for copy_page to >30% for unaligned memcpy on a Cortex A8), which
+> > can potentially be more on other cores. Although I have not tested a live
+> > kernel yet, it looks like NEON can be used fairly transparently #ifdefed on
+> > the CONFIG_NEON kernel definition as long as only the lower end of the
+> > NEON/vfp register file is clobbered (although this needs verification).
+> >
+> 
+> You will clobber the userland NEON contents of the register file if
+> you don't preserve them properly. Also, kernel preemption (if enabled)
+> may put your task to sleep at any time, and the context switching
+> machinery is totally oblivious of NEON being used in the kernel, so
+> the kernel side will get corrupted as well in this case.
 
-You're making wrong assumptions about what L1_CACHE_BYTES is.
+The other issue is - not every ARMv7 core has Neon, so this is going
+to have to be something that is selected at runtime - which means
+indirecting every memcpy/memset through a function pointer.
 
-Firstly, L1_CACHE_BYTES is not dynamic - it's a build time constant.
-You have to make a decision what value it is to be set to when you
-build the kernel.  This is because it gets used to determine the
-alignment of structures built into the kernel image, amongst other
-things, and we can't dynamically relink the kernel at boot time.
-
-So please, get out of your mind any idea that L1_CACHE_BYTES somehow
-relates to the exact CPU you're running on.  It doesn't.
-
-What it relates to is the *maximum* cache line size of *any* CPU that
-we will run on.
-
-Take a moment to think about why given the above.  If you're booting on
-a 32 byte cache line CPU, will a structure aligned for a 64 byte cache
-line also be aligned for a 32-byte cache line?  How about the reverse
-case?
-
-Now, there are various ARMv7 Cortex CPUs that have 64 byte cache lines
-out there in the wild - Cortex A8 and Cortex A15 are two examples, both
-of them are ARMv7 CPUs.
-
-As we can't distinguish at run time between these, and we are working for
-a single zImage kernel, we have to assume that ARMv7 means a 64 byte cache
-line as far as the L1_CACHE_* constants are concerned.  Yes, we used to
-set it for OMAP3 and some Samsung SoC too, but then others came along and
-single zImage too - and that all makes trying to reduce it down to the
-minimum rather pointless.
-
-So, no, this is *not* a "serious configuring error" at all.  It is totally
-intended to be this way.
+The final point is, don't forget that gcc will generate implicit calls
+to memset/memcpy, and neon won't be available early in the kernel boot,
+so you can't optimize those function pointers away.
