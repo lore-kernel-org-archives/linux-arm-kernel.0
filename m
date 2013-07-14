@@ -1,47 +1,29 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sun, 14 Jul 2013 14:27:38 +0000
-Subject: [PATCH] ARM: keystone: drop "select HAVE_SCHED_CLOCK"
-In-Reply-To: <1373798285.1370.2.camel@x61.thuisdomein>
-References: <1373798285.1370.2.camel@x61.thuisdomein>
-Message-ID: <448912EABC71F84BBCADFD3C67C4BE52826E9F@DBDE04.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 14 Jul 2013 15:32:07 +0100
+Subject: Call for testing/opinions: Optimized memset/memcpy
+In-Reply-To: <CAKv+Gu8JcQUH6d1mWh+sGcMXU6rPW7yk8P16PgqnF1Zdfn3OkA@mail.gmail.com>
+References: <loom.20130713T172357-560@post.gmane.org>
+ <20130713164840.GC28473@gallifrey> <loom.20130714T130546-799@post.gmane.org>
+ <CAKv+Gu-fUNSZaNMgZekoCX2kOGEFDLKY1yFtKq1=yp9xQN3rOA@mail.gmail.com>
+ <loom.20130714T152342-120@post.gmane.org>
+ <CAKv+Gu8JcQUH6d1mWh+sGcMXU6rPW7yk8P16PgqnF1Zdfn3OkA@mail.gmail.com>
+Message-ID: <20130714143207.GT24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for top posting. Thanks for the patch. I will pick this up.
+On Sun, Jul 14, 2013 at 04:09:20PM +0200, Ard Biesheuvel wrote:
+> Well, the whole lazy preserve/restore mechanism is based on the
+> premise that preserve/restore is only required when multiple users are
+> contending for the NEON (or in the SMP case, when a task gets migrated
+> to another CPU). As we will not be allowing NEON in interrupt context
+> nor in a preemptible section, the burden of the more costly context
+> switches should not grow disproportionately, even if tasks may be
+> contending for the NEON with themselves in a way (userland vs kernel).
+> However, it also means that a NEON based memcpy() is going to be
+> problematic, not only for the reasons pointed out by Russell, also
+> because you will need a fallback to use from interrupt context.
 
-Regards,
-Santosh
-________________________________________
-From: Paul Bolle [pebolle at tiscali.nl]
-Sent: Sunday, July 14, 2013 6:38 AM
-To: Russell King
-Cc: Olof Johansson; Shilimkar, Santosh; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-Subject: [PATCH] ARM: keystone: drop "select HAVE_SCHED_CLOCK"
-
-The Kconfig symbol HAVE_SCHED_CLOCK got removed in v3.4,
-with commit 6905a65879b5 ("ARM: Make the sched_clock
-framework mandatory"). But a select statement for it popped up again
-through commit 828989ad87af ("ARM: keystone: Add minimal TI Keystone
-platform support"). Drop that statement, as it is useless.
-
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Not tested.
-
- arch/arm/mach-keystone/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index 51a50e9..366d1a3 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -7,7 +7,6 @@ config ARCH_KEYSTONE
-        select HAVE_SMP
-        select CLKSRC_MMIO
-        select GENERIC_CLOCKEVENTS
--       select HAVE_SCHED_CLOCK
-        select ARCH_WANT_OPTIONAL_GPIOLIB
-        select ARM_ERRATA_798181 if SMP
-        help
---
-1.8.1.4
+There's another reason too: it would make memcpy() et.al., non-preemptible
+also - that's probably fine for very small copies, but not for larger ones.
+The acceptability threshold depends on how RT orientated you are and what
+your application demands in terms of accuracy from the RT implementation.
