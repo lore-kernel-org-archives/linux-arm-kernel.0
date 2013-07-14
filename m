@@ -1,35 +1,43 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Sun, 14 Jul 2013 14:22:11 +0100
-Subject: [PATCH 4/6] mfd: omap-usb-host: Put pins in IDLE state on suspend
-In-Reply-To: <1373473380-27515-1-git-send-email-rogerq@ti.com>
-References: <1373473081-27181-1-git-send-email-rogerq@ti.com>
- <1373473380-27515-1-git-send-email-rogerq@ti.com>
-Message-ID: <51E2A603.1000805@linaro.org>
+Date: Sun, 14 Jul 2013 13:07:30 +0100
+Subject: [PATCH 8/8] ARM: DRA7: Kconfig: Increase the default gpio count
+In-Reply-To: <1373354873-12359-9-git-send-email-rnayak@ti.com>
+References: <1373354873-12359-1-git-send-email-rnayak@ti.com>
+ <1373354873-12359-9-git-send-email-rnayak@ti.com>
+Message-ID: <51E29482.7060208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2013 05:23 PM, Roger Quadros wrote:
-> In order to support wake up from suspend use the pinctrl
-> framework to put the USB host pins in IDLE state during suspend.
+On 07/09/2013 08:27 AM, Rajendra Nayak wrote:
+> From: R Sricharan <r.sricharan@ti.com>
 > 
-> CC: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> DRA7xx has 8 GPIO banks so that there are 32x8 = 256 GPIOs.
+> In order for the gpiolib to detect and initialize these
+> additional GPIOs and other TWL GPIOs, ARCH_NR_GPIO is set
+> to 512 instead of present 256.
 
-[...]
-
-> @@ -608,6 +618,14 @@ static int usbhs_omap_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  	}
->  
-> +	if (!dev->pins || !dev->pins->idle_state) {
-> +		/* If IDLE pins are not available, we can't remote wakeup,
-> +		 * so prevent idling in that case.
-> +		 */
-
-nit: multi-line comment style
-
-Also, if there are no pins, aren't the pinctrl ops nops anyways?  IOW,
-not sure the need
-for this is clear, and it's not mentioned in the changelog.
+nit: the patch itself doesn't change 256 to 512, but just adds another
+Kconfig default.
 
 Kevin
+
+> Signed-off-by: R Sricharan <r.sricharan@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  arch/arm/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 5ef7af0..9faed52 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1599,7 +1599,7 @@ config LOCAL_TIMERS
+>  config ARCH_NR_GPIO
+>  	int
+>  	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+> -	default 512 if SOC_OMAP5
+> +	default 512 if SOC_OMAP5 || SOC_DRA7XX
+>  	default 512 if ARCH_KEYSTONE
+>  	default 392 if ARCH_U8500
+>  	default 352 if ARCH_VT8500
+> 
