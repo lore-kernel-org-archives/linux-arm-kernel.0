@@ -1,36 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 14 Jul 2013 13:45:38 +0100
-Subject: [PATCH] ARM: EXYNOS: remove references to non-DT SoCs
-In-Reply-To: <1373804812.1370.23.camel@x61.thuisdomein>
-References: <1373804812.1370.23.camel@x61.thuisdomein>
-Message-ID: <20130714124538.GA11538@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 14 Jul 2013 14:09:50 +0100
+Subject: Call for testing/opinions: Optimized memset/memcpy
+In-Reply-To: <loom.20130714T124137-382@post.gmane.org>
+References: <loom.20130713T172357-560@post.gmane.org>
+ <20130713172445.GL32054@1wt.eu> <loom.20130713T232124-511@post.gmane.org>
+ <20130714061354.GS32054@1wt.eu> <loom.20130714T124137-382@post.gmane.org>
+Message-ID: <20130714130949.GR24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 14, 2013 at 02:26:52PM +0200, Paul Bolle wrote:
-> Commit 383ffda2fa ("ARM: EXYNOS: no more support non-DT for EXYNOS
-> SoCs") removed the Kconfig symbols MACH_SMDKV310 and MACH_SMDKC210.
-> Now remove the references to both of these symbols from the Kconfig
-> entry for SND_SOC_SAMSUNG_SMDK_WM9713. They're not needed anymore.
+On Sun, Jul 14, 2013 at 11:00:50AM +0000, Harm Hanemaaijer wrote:
+> What is interesting is that
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388f/Caccifbd.html,
+> and several other sources (such as other
+> optimized memcpy implementations) document the cache line size of the Cortex
+> A9 as 32 bytes, which is an anomaly in the armv7 family. However, it looks
+> like the kernel is defining L1_CACHE_BYTES as 64 (L1_CACHE_SHIFT == 6) for
+> all armv7 platforms, which looks like a serious configuring error for Cortex
+> A9.
 
-Look at the code you are editing here:
+You're making wrong assumptions about what L1_CACHE_BYTES is.
 
-> -       depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310 || MACH_SMDKC210)
-> +       depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110)
+Firstly, L1_CACHE_BYTES is not dynamic - it's a build time constant.
+You have to make a decision what value it is to be set to when you
+build the kernel.  This is because it gets used to determine the
+alignment of structures built into the kernel image, amongst other
+things, and we can't dynamically relink the kernel at boot time.
 
-Simply removing the dependencies is not going to give the clearly
-intended effect here.  The dependency on the DT only machine needs to be
-replaced with something, not just deleted, otherwise the driver can't be
-enabled in Kconfig.
+So please, get out of your mind any idea that L1_CACHE_BYTES somehow
+relates to the exact CPU you're running on.  It doesn't.
 
-Also let me again remind you to submit patches with subject lines that
-are appropriate for the subsystem you're updating.  I very nearly
-deleted this unread since it looks like a patch for arch/arm with no
-relationship with audio but in fact it doesn't touch arch/arm at all.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130714/5cfbc8a3/attachment.sig>
+What it relates to is the *maximum* cache line size of *any* CPU that
+we will run on.
+
+Take a moment to think about why given the above.  If you're booting on
+a 32 byte cache line CPU, will a structure aligned for a 64 byte cache
+line also be aligned for a 32-byte cache line?  How about the reverse
+case?
+
+Now, there are various ARMv7 Cortex CPUs that have 64 byte cache lines
+out there in the wild - Cortex A8 and Cortex A15 are two examples, both
+of them are ARMv7 CPUs.
+
+As we can't distinguish at run time between these, and we are working for
+a single zImage kernel, we have to assume that ARMv7 means a 64 byte cache
+line as far as the L1_CACHE_* constants are concerned.  Yes, we used to
+set it for OMAP3 and some Samsung SoC too, but then others came along and
+single zImage too - and that all makes trying to reduce it down to the
+minimum rather pointless.
+
+So, no, this is *not* a "serious configuring error" at all.  It is totally
+intended to be this way.
