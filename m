@@ -1,72 +1,63 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Sun, 14 Jul 2013 16:04:27 +0800
-Subject: [PATCH 3/5] iio: at91: ADC start-up time calculation changed since
- at91sam9x5
+Date: Sun, 14 Jul 2013 16:04:25 +0800
+Subject: [PATCH 1/5] iio: at91: use adc_clk_khz to make the calculation not
+ easy to large than u32.
 In-Reply-To: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
 References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1373789069-11604-4-git-send-email-josh.wu@atmel.com>
+Message-ID: <1373789069-11604-2-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since in at91sam9x5, sama5d3x chip. the start up time calucation is changed.
-And these two chips also have TSMR, so we check whether ADC has TSMR, then
-choose different start up time calculation formula.
+for example, if adc_clk is 20Mhz and start-up time set as larger than 215us.
+then the calculation "st->startup_time * adc_clk_khz" will out of u32.
+
+In this patch, it will use khz unit for adc_clk, that avoids above problem.
 
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
- drivers/iio/adc/at91_adc.c |   40 +++++++++++++++++++++++++++++++++-------
- 1 file changed, 33 insertions(+), 7 deletions(-)
+ drivers/iio/adc/at91_adc.c |   11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-index 14e99ba..e93a075 100644
+index e5b88d5..18bd54f 100644
 --- a/drivers/iio/adc/at91_adc.c
 +++ b/drivers/iio/adc/at91_adc.c
-@@ -733,13 +733,39 @@ static int at91_adc_probe(struct platform_device *pdev)
- 		goto error_disable_adc_clk;
- 	}
+@@ -582,7 +582,7 @@ static const struct iio_info at91_adc_info = {
  
--	/*
--	 * Number of ticks needed to cover the startup time of the ADC as
--	 * defined in the electrical characteristics of the board, divided by 8.
--	 * The formula thus is : Startup Time = (ticks + 1) * 8 / ADC Clock
--	 */
--	ticks = round_up((st->startup_time * adc_clk_khz /
--			  1000) - 1, 8) / 8;
-+	if (!st->caps.has_tsmr) {
-+		/*
-+		 * Number of ticks needed to cover the startup time of the ADC
-+		 * as defined in the electrical characteristics of the board,
-+		 * divided by 8. The formula thus is :
-+		 *   Startup Time = (ticks + 1) * 8 / ADC Clock
-+		 */
-+		ticks = round_up((st->startup_time * adc_clk_khz /
-+				  1000) - 1, 8) / 8;
-+	} else {
-+		/*
-+		 * For sama5d3x and at91sam9x5, the formula changes to:
-+		 * Startup Time = <lookup_table_value> / ADC Clock
-+		 */
-+		const int startup_lookup[] = {
-+			0  , 8  , 16 , 24 ,
-+			64 , 80 , 96 , 112,
-+			512, 576, 640, 704,
-+			768, 832, 896, 960
-+			};
-+
-+		int i, size = ARRAY_SIZE(startup_lookup);
-+		ticks = st->startup_time * adc_clk_khz / 1000;
-+		for (i = 0; i < size; i++)
-+			if (ticks < startup_lookup[i])
-+				break;
-+
-+		ticks = i;
-+		if (ticks == size)
-+			/* Reach the end of lookup table */
-+			ticks = size - 1;
-+	}
-+
+ static int at91_adc_probe(struct platform_device *pdev)
+ {
+-	unsigned int prsc, mstrclk, ticks, adc_clk, shtim;
++	unsigned int prsc, mstrclk, ticks, adc_clk, adc_clk_khz, shtim;
+ 	int ret;
+ 	struct iio_dev *idev;
+ 	struct at91_adc_state *st;
+@@ -680,6 +680,7 @@ static int at91_adc_probe(struct platform_device *pdev)
+ 	 */
+ 	mstrclk = clk_get_rate(st->clk);
+ 	adc_clk = clk_get_rate(st->adc_clk);
++	adc_clk_khz = adc_clk / 1000;
+ 	prsc = (mstrclk / (2 * adc_clk)) - 1;
+ 
+ 	if (!st->startup_time) {
+@@ -693,15 +694,15 @@ static int at91_adc_probe(struct platform_device *pdev)
+ 	 * defined in the electrical characteristics of the board, divided by 8.
+ 	 * The formula thus is : Startup Time = (ticks + 1) * 8 / ADC Clock
+ 	 */
+-	ticks = round_up((st->startup_time * adc_clk /
+-			  1000000) - 1, 8) / 8;
++	ticks = round_up((st->startup_time * adc_clk_khz /
++			  1000) - 1, 8) / 8;
  	/*
  	 * a minimal Sample and Hold Time is necessary for the ADC to guarantee
  	 * the best converted final value between two channels selection
+ 	 * The formula thus is : Sample and Hold Time = (shtim + 1) / ADCClock
+ 	 */
+-	shtim = round_up((st->sample_hold_time * adc_clk /
+-			  1000000) - 1, 1);
++	shtim = round_up((st->sample_hold_time * adc_clk_khz /
++			  1000) - 1, 1);
+ 
+ 	reg = AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL;
+ 	reg |= AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP;
 -- 
 1.7.10
