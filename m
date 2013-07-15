@@ -1,128 +1,66 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Mon, 15 Jul 2013 11:45:58 +0530
-Subject: v3.10 - big endian core support
-In-Reply-To: <51E3638A.3080103@gmail.com>
-References: <CALicx6u89THSiRa4FzGZrcoG8q+o_BD8qVEC4CYXEjPUVK_fJw@mail.gmail.com>
- <20130712134726.0a909165@skate>
- <CALicx6sr=OXYAdSS-RXPCjSp4f_yLQyw6jJsQ2KyhgQ9fRtXag@mail.gmail.com>
- <51DFEFD9.2060509@codethink.co.uk> <51E3638A.3080103@gmail.com>
-Message-ID: <CALicx6ujEvEVnHM8qT7ThKwg1kgtGsqjSrvmx1pZxk9zXJm0yQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 15 Jul 2013 08:36:44 +0200
+Subject: [PATCH 1/1] ARM: imx: clk-pllv3: move the timeout just before
+ the comparison
+In-Reply-To: <1373763528-20792-1-git-send-email-peter.chen@freescale.com>
+References: <1373763528-20792-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130715063644.GK14452@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes, It works now after using rev16
+On Sun, Jul 14, 2013 at 08:58:48AM +0800, Peter Chen wrote:
+> It can let the timeout value be more precise.
+> 
+> Suggested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  arch/arm/mach-imx/clk-pllv3.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
+> index a9fad5f..e2c026f 100644
+> --- a/arch/arm/mach-imx/clk-pllv3.c
+> +++ b/arch/arm/mach-imx/clk-pllv3.c
+> @@ -48,7 +48,7 @@ struct clk_pllv3 {
+>  static int clk_pllv3_prepare(struct clk_hw *hw)
+>  {
+>  	struct clk_pllv3 *pll = to_clk_pllv3(hw);
+> -	unsigned long timeout = jiffies + msecs_to_jiffies(10);
+> +	unsigned long timeout;
+>  	u32 val;
+>  
+>  	val = readl_relaxed(pll->base);
+> @@ -59,6 +59,7 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+>  		val &= ~BM_PLL_POWER;
+>  	writel_relaxed(val, pll->base);
+>  
+> +	timeout = jiffies + msecs_to_jiffies(10);
+>  	/* Wait for PLL to lock */
+>  	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK))
+>  		if (time_after(jiffies, timeout))
 
-Regards
-Vijay
+For a proper timeout loop you have to check the condition once after the
+timeout, like this:
 
-On Mon, Jul 15, 2013 at 8:20 AM,  <jgq516@gmail.com> wrote:
-> On 07/12/2013 08:00 PM, Ben Dooks wrote:
->>
->> On 12/07/13 12:56, Vijay Kilari wrote:
->>>
->>> On Fri, Jul 12, 2013 at 5:17 PM, Thomas Petazzoni
->>> <thomas.petazzoni@free-electrons.com>  wrote:
->>>>
->>>> Dear Vijay Kilari,
->>>>
->>>> On Fri, 12 Jul 2013 17:09:12 +0530, Vijay Kilari wrote:
->>>>
->>>>>> Ben Dooks has a separate branch on top of this base branch for
->>>>>> big-endian support, that adds atags compat code to convert the ATAGs
->>>>>> data from LE to BE. See the baserock/311/be/atags branch in
->>>>>> git://git.baserock.org/delta/linux. Or
->>>>>>
->>>>>> http://git.baserock.org/cgi-bin/cgit.cgi/delta/linux.git/log/?h=baserock/311/be/atags.
->>>>>
->>>>>
->>>>>   ARM VE TC2 board, enabling CONFIG_THUMB2_KERNEL failed to boot in BE
->>>>> mode
->>>>> It hangs at very early stage of boot
->>>>
->>>>
->>>> Yeah, the Thumb2 code is not supported by Ben Dooks patches, it's part
->>>> of the TODO-list. I think Ben said he would probably not have much time
->>>> to work on this. I might be able to spare some time on this, so just
->>>> let me know if I should start working on this. If I remember correctly,
->>>> it's mainly the fixup_pv_table code that needed some Thumb2/BE love.
->>>
->>>
->>> In fact, I tried with below changes.. still it fails
->>>
->>> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
->>> index 2de1114..7df64c7 100644
->>> --- a/arch/arm/kernel/head.S
->>> +++ b/arch/arm/kernel/head.S
->>> @@ -592,8 +592,14 @@ __fixup_a_pv_table:
->>>          b       2f
->>>   1:     add     r7, r3
->>>          ldrh    ip, [r7, #2]
->>> +#ifdef CONFIG_CPU_ENDIAN_BE8
->>> +       rev     ip, ip
->>> +#endif
->>
->>
->> Do you need a rev16 here? I think you may have tried
->> reversing the full 32 bits here instead of just the
->> 16bits of instruction that was loaded.
->>
-> Thanks Ben, 3.4 kernel booted ok with your suggested modifications.
->
-> gjiang at gjiang-desktop:~/work/be-a15$ git diff
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 0ad3af8..1a0196c 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -600,8 +600,10 @@ __fixup_a_pv_table:
->
->         b       2f
->  1:     add     r7, r3
->         ldrh    ip, [r7, #2]
-> +       rev16   ip, ip @be8
->
->         and     ip, 0x8f00
->         orr     ip, r6  @ mask in offset bits 31-24
-> +       rev16   ip, ip @be8
->
->         strh    ip, [r7, #2]
->  2:     cmp     r4, r5
->         ldrcc   r7, [r4], #4    @ use branch for delay slot
->
-> root at localhost:~# zcat /proc/config.gz |grep BE8
-> CONFIG_CPU_ENDIAN_BE8=y
-> CONFIG_CPU_BE8_BOOT_LE=y
-> root at localhost:~# zcat /proc/config.gz |grep THUMB
-> CONFIG_ARM_THUMB=y
-> # CONFIG_ARM_THUMBEE is not set
-> CONFIG_THUMB2_KERNEL=y
-> CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11=y
->
->
-> Regards,
-> Xiao
->
->>>          and     ip, 0x8f00
->>>          orr     ip, r6  @ mask in offset bits 31-24
->>> +#ifdef CONFIG_CPU_ENDIAN_BE8
->>> +       rev     ip, ip
->>> +#endif
->>>          strh    ip, [r7, #2]
->>>   2:     cmp     r4, r5
->>>          ldrcc   r7, [r4], #4    @ use branch for delay slot
->>>
->>>>
->>>> Will, is getting Thumb2 working a requirement to get the BE support
->>>> merged, or can we for now make the BE option depends on !THUMB2_KERNEL ?
->>>>
->>>> Thanks!
->>>>
->>>> Thomas
->>>> --
->>>> Thomas Petazzoni, Free Electrons
->>>> Kernel, drivers, real-time and embedded Linux
->>>> development, consulting, training and support.
->>>> http://free-electrons.com
->>
->>
->>
->
+	while (1) {
+		if (condition)
+			break;
+		if (time_after())
+			break;
+	}
+
+	if (condition)
+		res = OK;
+	else
+		res = -ETIMEDOUT;
+
+Otherwise you risk being scheduled away after checking the condition but
+before checking the timeout.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
