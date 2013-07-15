@@ -1,67 +1,35 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 15 Jul 2013 18:33:43 +0300
-Subject: [PATCH 4/4] arm: omap2plus_defconfig: enable dwc3 and dependencies
-In-Reply-To: <1373902423-28654-1-git-send-email-balbi@ti.com>
-References: <1373902423-28654-1-git-send-email-balbi@ti.com>
-Message-ID: <1373902423-28654-5-git-send-email-balbi@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Jul 2013 09:34:19 -0600
+Subject: [PATCHv5 00/11] MSI support for Marvell EBU PCIe driver
+In-Reply-To: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <51E4167B.4000208@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DWC3 enables USB3 functionality for OMAP5 boards,
-it's safe to enable those drivers in omap2plus_defconfig.
+On 07/15/2013 05:52 AM, Thomas Petazzoni wrote:
+> Hello,
+> 
+> This set of patches introduces Message Signaled Interrupt support in
+> the Marvell EBU PCIe driver. It has been successfully tested on the
+> Armada XP GP platform with an Intel e1000e PCIe network card that
+> supports MSI.
+> 
+> This patch set is intended for merging in 3.12, so the respective
+> maintainers of the different areas are invited to review/ack the
+> patches, see below for the details. This set of patches applies on top
+> of 3.11-rc1.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/configs/omap2plus_defconfig | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Thomas, who is going to merge this series?
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 5339e6a..aed3cce 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -81,6 +81,7 @@ CONFIG_CMA=y
- CONFIG_CONNECTOR=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_OMAP_OCP2SCP=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_CHAR=y
-@@ -167,9 +168,11 @@ CONFIG_THERMAL_GOV_USER_SPACE=y
- CONFIG_CPU_THERMAL=y
- CONFIG_OMAP_WATCHDOG=y
- CONFIG_TWL4030_WATCHDOG=y
-+CONFIG_MFD_PALMAS=y
- CONFIG_MFD_TPS65217=y
- CONFIG_MFD_TPS65910=y
- CONFIG_TWL6040_CORE=y
-+CONFIG_REGULATOR_PALMAS=y
- CONFIG_REGULATOR_TWL4030=y
- CONFIG_REGULATOR_TPS65023=y
- CONFIG_REGULATOR_TPS6507X=y
-@@ -222,10 +225,14 @@ CONFIG_USB_MON=y
- CONFIG_USB_WDM=y
- CONFIG_USB_STORAGE=y
- CONFIG_USB_LIBUSUAL=y
-+CONFIG_USB_DWC3=m
-+CONFIG_USB_DWC3_OMAP=m
- CONFIG_USB_TEST=y
- CONFIG_USB_PHY=y
- CONFIG_NOP_USB_XCEIV=y
- CONFIG_USB_GADGET=y
-+CONFIG_OMAP_USB2=y
-+CONFIG_OMAP_USB3=y
- CONFIG_USB_GADGET_DEBUG=y
- CONFIG_USB_GADGET_DEBUG_FILES=y
- CONFIG_USB_GADGET_DEBUG_FS=y
-@@ -258,6 +265,8 @@ CONFIG_TI_THERMAL=y
- CONFIG_OMAP4_THERMAL=y
- CONFIG_OMAP5_THERMAL=y
- CONFIG_DRA752_THERMAL=y
-+CONFIG_EXTCON=y
-+CONFIG_EXTCON_PALMAS=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- # CONFIG_EXT3_FS_XATTR is not set
--- 
-1.8.2.1
+I believe at least patches 1-8 (or perhaps just 1-5 plus 8; I /think/
+all the other patches are MVEBU-specific) are dependencies for the new
+Tegra PCIe driver which should be posted very soon for 3.12. As such,
+I'd like to see these dependencies merged into a standalone stable (100%
+non-rebasable) topic branch based on 3.11-rc1 so that the topic branch
+is available for merging into whichever tree takes the new Tegra PCIe
+driver (which I'm guessing will be the Tegra tree to reduce conflicts).
+So, whoever merges these patches is going to need to know to set up that
+topic branch.
+
+Thierry, please correct me if I'm wrong here.
