@@ -1,67 +1,37 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 15 Jul 2013 15:52:12 -0500
-Subject: [PATCH] ARM: footbridge: fix overlapping PCI mappings
-In-Reply-To: <1372387356-15341-1-git-send-email-vapier@gentoo.org>
-References: <1372387356-15341-1-git-send-email-vapier@gentoo.org>
-Message-ID: <CAL_JsqKaha08U0fN1FruEEfsH=jAGzsxeJATJqeDvburd6EDjw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 15 Jul 2013 13:59:24 -0700
+Subject: [PATCH] ARM: Add check for Cortex-A15 errata 798181 ECO
+In-Reply-To: <1373920943-18308-1-git-send-email-robherring2@gmail.com>
+References: <1373920943-18308-1-git-send-email-robherring2@gmail.com>
+Message-ID: <CAOesGMjATn9MCzazUGmbD44XR8HyJZU4cCvmOEoUZsmCgutPUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 27, 2013 at 9:42 PM, Mike Frysinger <vapier@gentoo.org> wrote:
-> Commit 8ef6e6201b26cb9fde79c1baa08145af6aca2815 (ARM: footbridge: use
-> fixed PCI i/o mapping) broke booting on my netwinder.  Before that,
-> everything boots fine.  Since then, it crashes on boot.
+On Mon, Jul 15, 2013 at 1:42 PM, Rob Herring <robherring2@gmail.com> wrote:
+> diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+> index 9a52a07..7fd64b7 100644
+> --- a/arch/arm/kernel/smp_tlb.c
+> +++ b/arch/arm/kernel/smp_tlb.c
+> @@ -74,10 +74,21 @@ static inline void ipi_flush_bp_all(void *ignored)
+>  static int erratum_a15_798181(void)
+>  {
+>         unsigned int midr = read_cpuid_id();
+> +       unsigned int revidr;
 >
-> With earlyprintk, I see it BUG-ing like so:
-> kernel BUG at lib/ioremap.c:27!
-> Internal error: Oops - BUG: 0 [#1] ARM
-> ...
-> [<c0139b54>] (ioremap_page_range+0x128/0x154) from [<c02e6a6c>] (dc21285_setup+0xd0/0x114)
-> [<c02e6a6c>] (dc21285_setup+0xd0/0x114) from [<c02e4874>] (pci_common_init+0xa0/0x298)
-> [<c02e4874>] (pci_common_init+0xa0/0x298) from [<c02e793c>] (netwinder_pci_init+0xc/0x18)
-> [<c02e793c>] (netwinder_pci_init+0xc/0x18) from [<c02e27d0>] (do_one_initcall+0xb4/0x180)
-> ...
->
-> Russell points out it's because of overlapping PCI mappings that was
-> added with the aforementioned commit.  Rob thought the code would re-use
-> the static mapping, but that turns out to not be the case and instead
-> hits the BUG further down.
->
-> After deleting this hunk as suggested by Russel, the system boots up fine
-> again and all my PCI devices work (IDE, ethernet, the DC21285).
->
-> Signed-off-by: Mike Frysinger <vapier@gentoo.org>
+>         /* Cortex-A15 r0p0..r3p2 affected */
+>         if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
+>                 return 0;
+> +
+> +       /* Check for Cortex A15 <= r3p2 with ECO fix */
+> +       revidr = read_cpuid(CPUID_REVIDR);
+> +       if ((revidr & 0x210) == 0x210)
+> +               return 0;
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Reading and evaluating all this on every invalidate seems suboptimal.
+It should be possible to read just once and cache the result.
 
-Olof, Kevin,
+I would have had the same comment about the original patch, but ARM
+pushes those to Russell in secret so it wasn't on the list. :-)
 
-Please apply and add stable.
 
-Rob
-
-> ---
->  arch/arm/mach-footbridge/dc21285.c | 2 --
->  1 file changed, 2 deletions(-)
->
-> diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
-> index a7cd2cf..3490a24 100644
-> --- a/arch/arm/mach-footbridge/dc21285.c
-> +++ b/arch/arm/mach-footbridge/dc21285.c
-> @@ -276,8 +276,6 @@ int __init dc21285_setup(int nr, struct pci_sys_data *sys)
->
->         sys->mem_offset  = DC21285_PCI_MEM;
->
-> -       pci_ioremap_io(0, DC21285_PCI_IO);
-> -
->         pci_add_resource_offset(&sys->resources, &res[0], sys->mem_offset);
->         pci_add_resource_offset(&sys->resources, &res[1], sys->mem_offset);
->
-> --
-> 1.8.2.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-Olof
