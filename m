@@ -1,26 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 15 Jul 2013 15:10:59 -0300
-Subject: [PATCH 20/22] arm/dts: Add support for the cpuimx51 board from
- Eukrea and its baseboard.
-In-Reply-To: <1373900227-341-21-git-send-email-denis@eukrea.com>
-References: <1373900227-341-1-git-send-email-denis@eukrea.com>
- <1373900227-341-21-git-send-email-denis@eukrea.com>
-Message-ID: <CAOMZO5AMA=0Qt_XBYmZXLpPn0ri=JvSV40Qt0CyDNps6GsvAfQ@mail.gmail.com>
+From: nfortino@nvidia.com (Nickolas Fortino)
+Date: Mon, 15 Jul 2013 11:19:23 -0700
+Subject: preempted dup_mm misses TLB invalidate
+Message-ID: <51E43D2B.9090709@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
+I?ve noticed an issue in simulation where the Linux kernel is executing 
+a user process when the page tables and TLBs have gotten out of sync. 
+The page tables have a page marked as user read only, but the TLB has 
+the page marked as user read/write.
 
-On Mon, Jul 15, 2013 at 11:57 AM, Denis Carikli <denis@eukrea.com> wrote:
+I?ve traced the issue back to the handling of copy on write pages 
+generated from the ?do_fork?, ?copy_process?, ?dup_mm?, ?dup_mmap? call 
+stack. If run without interruption, ?dup_mmap? calls 
+?flush_tlb_mm(oldmm)? on completion, avoiding any issues. In this case, 
+however, about 4 million instructions after ?dup_mm? is called, 
+?copy_pte_range? yields to another thread via __cond_resched. About 20 
+million instructions later, a user process with the ASID of the source 
+mm is scheduled. This process performs a store to a page modified from 
+read/write to read only in the copy on write logic of ?copy_one_pte?. 
+Because the TLB was not invalidated, the store hits on a TLB entry with 
+read/write permissions and succeeds without a fault.
 
-> +i.MX51 Eukrea CPUIMX51 Board
-> +Required root node properties:
-> +    - compatible = "fsl,eukrea_cpuimx51", "fsl,imx51";
-> +
+What invariant in the Linux kernel is supposed to prevent this from 
+happening? Note I have not observed user visible corruption, but it 
+seems very unlikely a successful store to a page marked as read only in 
+the kernel is safe.
 
-The fsl.txt file contains boards that are developed by Freescale.
-
-The compatible string "fsl,eukrea_cpuimx51" is not correct, as the
-cpuimx51 board is not manufactured by Freescale.
-
-You should have used "eukrea" as the manufacturer instead.
+For reference, this issue was found with the Linux 3.7 kernel coming 
+from the Linaro 12.12 release available at 
+http://releases.linaro.org/12.12/android/vexpress
