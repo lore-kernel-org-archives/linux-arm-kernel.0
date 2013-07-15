@@ -1,16 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Jul 2013 15:08:25 +0100
-Subject: [PATCH] ARM: a.out: remove partial a.out support
-In-Reply-To: <1373894897-30607-1-git-send-email-will.deacon@arm.com>
-References: <1373894897-30607-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20130715140825.GU24642@n2100.arm.linux.org.uk>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Mon, 15 Jul 2013 15:15:06 +0100
+Subject: [PATCH] arm: choose debug/uncompress.h include when uncompress debug
+ is disabled
+Message-ID: <1373897706-15331-1-git-send-email-julien.grall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 02:28:17PM +0100, Will Deacon wrote:
->  arch/arm/include/uapi/asm/Kbuild  |  1 -
->  arch/arm/include/uapi/asm/a.out.h | 34 -----------------------------
+Even if uncompress debug is disabled, some board will continue to print
+information during uncompress step.
+By using debug/uncompress.h include, all debug output will be disabled.
 
-I don't think we can remove this quite as easily as this - this is
-a user visible API change as it's part of the userland headers, and
-will break anything in userspace which includes <a.out.h>
+This is usefull in Xen environment for DOM0 because the UART is stolen by
+Xen.
+
+Signed-off-by: Julien Grall <julien.grall@linaro.org>
+---
+ arch/arm/Kconfig.debug |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 21cc8a7..86c023d 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -679,7 +679,7 @@ config DEBUG_UNCOMPRESS
+ 
+ config UNCOMPRESS_INCLUDE
+ 	string
+-	default "debug/uncompress.h" if ARCH_MULTIPLATFORM
++	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || !DEBUG_UNCOMPRESS
+ 	default "mach/uncompress.h"
+ 
+ config EARLY_PRINTK
+-- 
+1.7.10.4
