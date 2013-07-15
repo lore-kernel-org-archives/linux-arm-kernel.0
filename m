@@ -1,409 +1,511 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Mon, 15 Jul 2013 16:57:04 +0200
-Subject: [PATCH 19/22] Input: tsc2007: Add device tree support.
-In-Reply-To: <1373900227-341-1-git-send-email-denis@eukrea.com>
-References: <1373900227-341-1-git-send-email-denis@eukrea.com>
-Message-ID: <1373900227-341-20-git-send-email-denis@eukrea.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 15 Jul 2013 11:57:34 -0300
+Subject: [RESEND PATCH v7 05/22] ARM: orion5x: Move to ID based window creation
+In-Reply-To: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1373900271-4722-6-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the of_match_table for this driver so that devices can be described
-  in the device tree.
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
+With the introduction of the ID based MBus API, it's better
+to switch to use it instead of the current name based scheme.
+
+This will allow to deprecate the name based API, once every
+user is removed.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../bindings/input/touchscreen/tsc2007.txt         |   44 +++++
- drivers/input/touchscreen/tsc2007.c                |  205 ++++++++++++++++----
- 2 files changed, 206 insertions(+), 43 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
+ arch/arm/mach-orion5x/common.c                 | 36 ++++++++++++++------------
+ arch/arm/mach-orion5x/common.h                 | 17 ++++++++++++
+ arch/arm/mach-orion5x/d2net-setup.c            |  6 +++--
+ arch/arm/mach-orion5x/db88f5281-setup.c        | 24 +++++++++++------
+ arch/arm/mach-orion5x/dns323-setup.c           |  6 +++--
+ arch/arm/mach-orion5x/edmini_v2-setup.c        |  6 +++--
+ arch/arm/mach-orion5x/kurobox_pro-setup.c      | 12 ++++++---
+ arch/arm/mach-orion5x/ls-chl-setup.c           |  6 +++--
+ arch/arm/mach-orion5x/ls_hgl-setup.c           |  6 +++--
+ arch/arm/mach-orion5x/lsmini-setup.c           |  6 +++--
+ arch/arm/mach-orion5x/mss2-setup.c             |  6 +++--
+ arch/arm/mach-orion5x/mv2120-setup.c           |  6 +++--
+ arch/arm/mach-orion5x/net2big-setup.c          |  6 +++--
+ arch/arm/mach-orion5x/pci.c                    |  9 +++----
+ arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c   |  6 +++--
+ arch/arm/mach-orion5x/rd88f5181l-ge-setup.c    |  6 +++--
+ arch/arm/mach-orion5x/rd88f5182-setup.c        | 13 ++++++----
+ arch/arm/mach-orion5x/terastation_pro2-setup.c |  6 +++--
+ arch/arm/mach-orion5x/ts209-setup.c            |  6 +++--
+ arch/arm/mach-orion5x/ts409-setup.c            |  6 +++--
+ arch/arm/mach-orion5x/wnr854t-setup.c          |  6 +++--
+ arch/arm/mach-orion5x/wrt350n-v2-setup.c       |  6 +++--
+ 22 files changed, 137 insertions(+), 70 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
-new file mode 100644
-index 0000000..d67b33f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
-@@ -0,0 +1,44 @@
-+* Texas Instruments tsc2007 touchscreen controller
-+
-+Required properties:
-+- compatible: must be "ti,tsc2007".
-+- reg: I2C address of the chip.
-+- pinctrl-0: Should specify pin control groups used for this controller
-+  (see pinctrl bindings[0]).
-+- pinctrl-names: Should contain only one value - "default"
-+  (see pinctrl bindings[0]).
-+- interrupt-parent: the phandle for the interrupt controller
-+  (see interrupt binding[1]).
-+- interrupts: interrupt to which the chip is connected
-+  (see interrupt binding[1]).
-+- x-plate-ohms: X-plate resistance in ohms.
-+
-+Optional properties:
-+- gpios: the interrupt gpio the chip is connected to (trough the penirq pin)
-+  (see GPIO binding[2] for more details).
-+- max-rt: maximum pressure.
-+- fuzzy: specifies the fuzz value that is used to filter noise from the event
-+  stream.
-+- poll-period: how much time to wait(in millisecond) before reading again the
-+  values from the tsc2007.
-+
-+[0]: Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-+[1]: Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-+[2]: Documentation/devicetree/bindings/gpio/gpio.txt
-+
-+Example:
-+	&i2c1 {
-+		/* ... */
-+		tsc2007 at 49 {
-+			compatible = "ti,tsc2007";
-+			reg = <0x49>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_tsc2007_1>;
-+			interrupt-parent = <&gpio4>;
-+			interrupts = <0x0 0x8>;
-+			gpios = <&gpio4 0 0>;
-+			x-plate-ohms = <180>;
-+		};
-+
-+		/* ... */
-+	};
-diff --git a/drivers/input/touchscreen/tsc2007.c b/drivers/input/touchscreen/tsc2007.c
-index 0b67ba4..c0af04b 100644
---- a/drivers/input/touchscreen/tsc2007.c
-+++ b/drivers/input/touchscreen/tsc2007.c
-@@ -26,6 +26,9 @@
- #include <linux/interrupt.h>
- #include <linux/i2c.h>
- #include <linux/i2c/tsc2007.h>
-+#include <linux/of_device.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
- 
- #define TSC2007_MEASURE_TEMP0		(0x0 << 4)
- #define TSC2007_MEASURE_AUX		(0x2 << 4)
-@@ -74,7 +77,10 @@ struct tsc2007 {
- 	u16			max_rt;
- 	unsigned long		poll_delay;
- 	unsigned long		poll_period;
-+	int			fuzzy;
-+	char			of;
- 
-+	unsigned		gpio;
- 	int			irq;
- 
- 	wait_queue_head_t	wait;
-@@ -84,6 +90,14 @@ struct tsc2007 {
- 	void			(*clear_penirq)(void);
- };
- 
-+static int tsc2007_get_pendown_state_dt(struct tsc2007  *ts)
-+{
-+	if (ts->gpio >= 0)
-+		return !gpio_get_value(ts->gpio);
-+	else
-+		return true;
-+}
-+
- static inline int tsc2007_xfer(struct tsc2007 *tsc, u8 cmd)
+diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+index b41599f..91a5852 100644
+--- a/arch/arm/mach-orion5x/common.c
++++ b/arch/arm/mach-orion5x/common.c
+@@ -174,8 +174,10 @@ void __init orion5x_xor_init(void)
+  ****************************************************************************/
+ static void __init orion5x_crypto_init(void)
  {
- 	s32 data;
-@@ -158,6 +172,9 @@ static bool tsc2007_is_pen_down(struct tsc2007 *ts)
- 	 * to fall back on the pressure reading.
+-	mvebu_mbus_add_window("sram", ORION5X_SRAM_PHYS_BASE,
+-			      ORION5X_SRAM_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_SRAM_TARGET,
++				    ORION_MBUS_SRAM_ATTR,
++				    ORION5X_SRAM_PHYS_BASE,
++				    ORION5X_SRAM_SIZE);
+ 	orion_crypto_init(ORION5X_CRYPTO_PHYS_BASE, ORION5X_SRAM_PHYS_BASE,
+ 			  SZ_8K, IRQ_ORION5X_CESA);
+ }
+@@ -222,22 +224,24 @@ void orion5x_setup_wins(void)
+ 	 * The PCIe windows will no longer be statically allocated
+ 	 * here once Orion5x is migrated to the pci-mvebu driver.
  	 */
- 
-+	if (ts->of)
-+		return tsc2007_get_pendown_state_dt(ts);
-+
- 	if (!ts->get_pendown_state)
- 		return true;
- 
-@@ -175,10 +192,10 @@ static irqreturn_t tsc2007_soft_irq(int irq, void *handle)
- 
- 		/* pen is down, continue with the measurement */
- 		tsc2007_read_values(ts, &tc);
--
- 		rt = tsc2007_calculate_pressure(ts, &tc);
- 
--		if (rt == 0 && !ts->get_pendown_state) {
-+		if ((ts->of && rt == 0 && ts->gpio < 0) ||
-+			(!ts->of && rt == 0 && !ts->get_pendown_state)) {
- 			/*
- 			 * If pressure reported is 0 and we don't have
- 			 * callback to check pendown state, we have to
-@@ -198,7 +215,6 @@ static irqreturn_t tsc2007_soft_irq(int irq, void *handle)
- 			input_report_abs(input, ABS_PRESSURE, rt);
- 
- 			input_sync(input);
--
- 		} else {
- 			/*
- 			 * Sample found inconsistent by debouncing or pressure is
-@@ -217,7 +233,6 @@ static irqreturn_t tsc2007_soft_irq(int irq, void *handle)
- 	input_report_key(input, BTN_TOUCH, 0);
- 	input_report_abs(input, ABS_PRESSURE, 0);
- 	input_sync(input);
--
- 	if (ts->clear_penirq)
- 		ts->clear_penirq();
- 
-@@ -228,11 +243,16 @@ static irqreturn_t tsc2007_hard_irq(int irq, void *handle)
- {
- 	struct tsc2007 *ts = handle;
- 
--	if (!ts->get_pendown_state || likely(ts->get_pendown_state()))
--		return IRQ_WAKE_THREAD;
-+	if (!ts->of) {
-+		if (!ts->get_pendown_state || likely(ts->get_pendown_state()))
-+			return IRQ_WAKE_THREAD;
- 
--	if (ts->clear_penirq)
--		ts->clear_penirq();
-+		if (ts->clear_penirq)
-+			ts->clear_penirq();
-+	} else {
-+		if (ts->gpio < 0 || likely(tsc2007_get_pendown_state_dt(ts)))
-+			return IRQ_WAKE_THREAD;
-+	}
- 
- 	return IRQ_HANDLED;
- }
-@@ -273,34 +293,70 @@ static void tsc2007_close(struct input_dev *input_dev)
- 	tsc2007_stop(ts);
+-	mvebu_mbus_add_window_remap_flags("pcie0.0", ORION5X_PCIE_IO_PHYS_BASE,
++	mvebu_mbus_add_window_remap_by_id(ORION_MBUS_PCIE_IO_TARGET,
++					  ORION_MBUS_PCIE_IO_ATTR,
++					  ORION5X_PCIE_IO_PHYS_BASE,
+ 					  ORION5X_PCIE_IO_SIZE,
+-					  ORION5X_PCIE_IO_BUS_BASE,
+-					  MVEBU_MBUS_PCI_IO);
+-	mvebu_mbus_add_window_remap_flags("pcie0.0", ORION5X_PCIE_MEM_PHYS_BASE,
+-					  ORION5X_PCIE_MEM_SIZE,
+-					  MVEBU_MBUS_NO_REMAP,
+-					  MVEBU_MBUS_PCI_MEM);
+-	mvebu_mbus_add_window_remap_flags("pci0.0", ORION5X_PCI_IO_PHYS_BASE,
++					  ORION5X_PCIE_IO_BUS_BASE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_PCIE_MEM_TARGET,
++				    ORION_MBUS_PCIE_MEM_ATTR,
++				    ORION5X_PCIE_MEM_PHYS_BASE,
++				    ORION5X_PCIE_MEM_SIZE);
++	mvebu_mbus_add_window_remap_by_id(ORION_MBUS_PCI_IO_TARGET,
++					  ORION_MBUS_PCI_IO_ATTR,
++					  ORION5X_PCI_IO_PHYS_BASE,
+ 					  ORION5X_PCI_IO_SIZE,
+-					  ORION5X_PCI_IO_BUS_BASE,
+-					  MVEBU_MBUS_PCI_IO);
+-	mvebu_mbus_add_window_remap_flags("pci0.0", ORION5X_PCI_MEM_PHYS_BASE,
+-					  ORION5X_PCI_MEM_SIZE,
+-					  MVEBU_MBUS_NO_REMAP,
+-					  MVEBU_MBUS_PCI_MEM);
++					  ORION5X_PCI_IO_BUS_BASE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_PCI_MEM_TARGET,
++				    ORION_MBUS_PCI_MEM_ATTR,
++				    ORION5X_PCI_MEM_PHYS_BASE,
++				    ORION5X_PCI_MEM_SIZE);
  }
  
--static int tsc2007_probe(struct i2c_client *client,
--				   const struct i2c_device_id *id)
-+#ifdef CONFIG_OF
-+static int tsc2007_probe_dt(struct i2c_client *client, struct tsc2007 *ts,
-+			    struct device_node *np)
- {
--	struct tsc2007 *ts;
--	struct tsc2007_platform_data *pdata = client->dev.platform_data;
--	struct input_dev *input_dev;
--	int err;
--
--	if (!pdata) {
--		dev_err(&client->dev, "platform data is required!\n");
-+	int err = 0;
-+	struct pinctrl *pinctrl;
-+	u32 val32;
-+	u64 val64;
+ int orion5x_tclk;
+diff --git a/arch/arm/mach-orion5x/common.h b/arch/arm/mach-orion5x/common.h
+index a909afb..f565f99 100644
+--- a/arch/arm/mach-orion5x/common.h
++++ b/arch/arm/mach-orion5x/common.h
+@@ -7,6 +7,23 @@ struct dsa_platform_data;
+ struct mv643xx_eth_platform_data;
+ struct mv_sata_platform_data;
+ 
++#define ORION_MBUS_PCIE_MEM_TARGET    0x04
++#define ORION_MBUS_PCIE_MEM_ATTR      0x59
++#define ORION_MBUS_PCIE_IO_TARGET     0x04
++#define ORION_MBUS_PCIE_IO_ATTR       0x51
++#define ORION_MBUS_PCIE_WA_TARGET     0x04
++#define ORION_MBUS_PCIE_WA_ATTR       0x79
++#define ORION_MBUS_PCI_MEM_TARGET     0x03
++#define ORION_MBUS_PCI_MEM_ATTR       0x59
++#define ORION_MBUS_PCI_IO_TARGET      0x03
++#define ORION_MBUS_PCI_IO_ATTR        0x51
++#define ORION_MBUS_DEVBUS_BOOT_TARGET 0x01
++#define ORION_MBUS_DEVBUS_BOOT_ATTR   0x0f
++#define ORION_MBUS_DEVBUS_TARGET(cs)  0x01
++#define ORION_MBUS_DEVBUS_ATTR(cs)    (~(1 << cs))
++#define ORION_MBUS_SRAM_TARGET        0x00
++#define ORION_MBUS_SRAM_ATTR          0x00
 +
-+	if (!of_property_read_u32(np, "max-rt", &val32))
-+		ts->max_rt = val32;
-+	else
-+		ts->max_rt = MAX_12BIT;
-+
-+	if (!of_property_read_u32(np, "fuzzy", &val32))
-+		ts->fuzzy = val32;
-+
-+	if (!of_property_read_u64(np, "poll-period", &val64))
-+		ts->poll_period = val64;
-+	else
-+		ts->poll_period = 1;
-+
-+	if (!of_property_read_u32(np, "x-plate-ohms", &val32))
-+		ts->x_plate_ohms = val32;
-+	else {
-+		dev_err(&client->dev,
-+			"x-plate-ohms is not set up in the devicetree."
-+			" (err %d).", err);
- 		return -EINVAL;
+ /*
+  * Basic Orion init functions used early by machine-setup.
+  */
+diff --git a/arch/arm/mach-orion5x/d2net-setup.c b/arch/arm/mach-orion5x/d2net-setup.c
+index 16c88bb..8f68b74 100644
+--- a/arch/arm/mach-orion5x/d2net-setup.c
++++ b/arch/arm/mach-orion5x/d2net-setup.c
+@@ -317,8 +317,10 @@ static void __init d2net_init(void)
+ 	d2net_sata_power_init();
+ 	orion5x_sata_init(&d2net_sata_data);
+ 
+-	mvebu_mbus_add_window("devbus-boot", D2NET_NOR_BOOT_BASE,
+-			      D2NET_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    D2NET_NOR_BOOT_BASE,
++				    D2NET_NOR_BOOT_SIZE);
+ 	platform_device_register(&d2net_nor_flash);
+ 
+ 	platform_device_register(&d2net_gpio_buttons);
+diff --git a/arch/arm/mach-orion5x/db88f5281-setup.c b/arch/arm/mach-orion5x/db88f5281-setup.c
+index 4e1263d..4b2aefd 100644
+--- a/arch/arm/mach-orion5x/db88f5281-setup.c
++++ b/arch/arm/mach-orion5x/db88f5281-setup.c
+@@ -340,19 +340,27 @@ static void __init db88f5281_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_uart1_init();
+ 
+-	mvebu_mbus_add_window("devbus-boot", DB88F5281_NOR_BOOT_BASE,
+-			      DB88F5281_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    DB88F5281_NOR_BOOT_BASE,
++				    DB88F5281_NOR_BOOT_SIZE);
+ 	platform_device_register(&db88f5281_boot_flash);
+ 
+-	mvebu_mbus_add_window("devbus-cs0", DB88F5281_7SEG_BASE,
+-			      DB88F5281_7SEG_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_TARGET(0),
++				    ORION_MBUS_DEVBUS_ATTR(0),
++				    DB88F5281_7SEG_BASE,
++				    DB88F5281_7SEG_SIZE);
+ 
+-	mvebu_mbus_add_window("devbus-cs1", DB88F5281_NOR_BASE,
+-			      DB88F5281_NOR_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_TARGET(1),
++				    ORION_MBUS_DEVBUS_ATTR(1),
++				    DB88F5281_NOR_BASE,
++				    DB88F5281_NOR_SIZE);
+ 	platform_device_register(&db88f5281_nor_flash);
+ 
+-	mvebu_mbus_add_window("devbus-cs2", DB88F5281_NAND_BASE,
+-			      DB88F5281_NAND_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_TARGET(2),
++				    ORION_MBUS_DEVBUS_ATTR(2),
++				    DB88F5281_NAND_BASE,
++				    DB88F5281_NAND_SIZE);
+ 	platform_device_register(&db88f5281_nand_flash);
+ 
+ 	i2c_register_board_info(0, &db88f5281_i2c_rtc, 1);
+diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
+index 9e6baf5..7097473 100644
+--- a/arch/arm/mach-orion5x/dns323-setup.c
++++ b/arch/arm/mach-orion5x/dns323-setup.c
+@@ -611,8 +611,10 @@ static void __init dns323_init(void)
+ 	/* setup flash mapping
+ 	 * CS3 holds a 8 MB Spansion S29GL064M90TFIR4
+ 	 */
+-	mvebu_mbus_add_window("devbus-boot", DNS323_NOR_BOOT_BASE,
+-			      DNS323_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    DNS323_NOR_BOOT_BASE,
++				    DNS323_NOR_BOOT_SIZE);
+ 	platform_device_register(&dns323_nor_flash);
+ 
+ 	/* Sort out LEDs, Buttons and i2c devices */
+diff --git a/arch/arm/mach-orion5x/edmini_v2-setup.c b/arch/arm/mach-orion5x/edmini_v2-setup.c
+index 1476155..0fc33c5 100644
+--- a/arch/arm/mach-orion5x/edmini_v2-setup.c
++++ b/arch/arm/mach-orion5x/edmini_v2-setup.c
+@@ -154,8 +154,10 @@ void __init edmini_v2_init(void)
+ 	orion5x_ehci0_init();
+ 	orion5x_eth_init(&edmini_v2_eth_data);
+ 
+-	mvebu_mbus_add_window("devbus-boot", EDMINI_V2_NOR_BOOT_BASE,
+-			      EDMINI_V2_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    EDMINI_V2_NOR_BOOT_BASE,
++				    EDMINI_V2_NOR_BOOT_SIZE);
+ 	platform_device_register(&edmini_v2_nor_flash);
+ 
+ 	pr_notice("edmini_v2: USB device port, flash write and power-off "
+diff --git a/arch/arm/mach-orion5x/kurobox_pro-setup.c b/arch/arm/mach-orion5x/kurobox_pro-setup.c
+index aae10e4..fe6a48a 100644
+--- a/arch/arm/mach-orion5x/kurobox_pro-setup.c
++++ b/arch/arm/mach-orion5x/kurobox_pro-setup.c
+@@ -359,13 +359,17 @@ static void __init kurobox_pro_init(void)
+ 	orion5x_uart1_init();
+ 	orion5x_xor_init();
+ 
+-	mvebu_mbus_add_window("devbus-boot", KUROBOX_PRO_NOR_BOOT_BASE,
+-			      KUROBOX_PRO_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    KUROBOX_PRO_NOR_BOOT_BASE,
++				    KUROBOX_PRO_NOR_BOOT_SIZE);
+ 	platform_device_register(&kurobox_pro_nor_flash);
+ 
+ 	if (machine_is_kurobox_pro()) {
+-		mvebu_mbus_add_window("devbus-cs0", KUROBOX_PRO_NAND_BASE,
+-				      KUROBOX_PRO_NAND_SIZE);
++		mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_TARGET(0),
++					    ORION_MBUS_DEVBUS_ATTR(0),
++					    KUROBOX_PRO_NAND_BASE,
++					    KUROBOX_PRO_NAND_SIZE);
+ 		platform_device_register(&kurobox_pro_nand_flash);
  	}
  
--	if (!i2c_check_functionality(client->adapter,
--				     I2C_FUNC_SMBUS_READ_WORD_DATA))
--		return -EIO;
--
--	ts = kzalloc(sizeof(struct tsc2007), GFP_KERNEL);
--	input_dev = input_allocate_device();
--	if (!ts || !input_dev) {
--		err = -ENOMEM;
--		goto err_free_mem;
-+	pinctrl = devm_pinctrl_get_select_default(&client->dev);
-+	if (IS_ERR(pinctrl)) {
-+		err = PTR_ERR(pinctrl);
-+		return err;
+diff --git a/arch/arm/mach-orion5x/ls-chl-setup.c b/arch/arm/mach-orion5x/ls-chl-setup.c
+index 6234977..028ea03 100644
+--- a/arch/arm/mach-orion5x/ls-chl-setup.c
++++ b/arch/arm/mach-orion5x/ls-chl-setup.c
+@@ -294,8 +294,10 @@ static void __init lschl_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_xor_init();
+ 
+-	mvebu_mbus_add_window("devbus-boot", LSCHL_NOR_BOOT_BASE,
+-			      LSCHL_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    LSCHL_NOR_BOOT_BASE,
++				    LSCHL_NOR_BOOT_SIZE);
+ 	platform_device_register(&lschl_nor_flash);
+ 
+ 	platform_device_register(&lschl_leds);
+diff --git a/arch/arm/mach-orion5x/ls_hgl-setup.c b/arch/arm/mach-orion5x/ls_hgl-setup.c
+index fe04c4b..32b7129 100644
+--- a/arch/arm/mach-orion5x/ls_hgl-setup.c
++++ b/arch/arm/mach-orion5x/ls_hgl-setup.c
+@@ -243,8 +243,10 @@ static void __init ls_hgl_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_xor_init();
+ 
+-	mvebu_mbus_add_window("devbus-boot", LS_HGL_NOR_BOOT_BASE,
+-			      LS_HGL_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    LS_HGL_NOR_BOOT_BASE,
++				    LS_HGL_NOR_BOOT_SIZE);
+ 	platform_device_register(&ls_hgl_nor_flash);
+ 
+ 	platform_device_register(&ls_hgl_button_device);
+diff --git a/arch/arm/mach-orion5x/lsmini-setup.c b/arch/arm/mach-orion5x/lsmini-setup.c
+index ca4dbe9..a6493e7 100644
+--- a/arch/arm/mach-orion5x/lsmini-setup.c
++++ b/arch/arm/mach-orion5x/lsmini-setup.c
+@@ -244,8 +244,10 @@ static void __init lsmini_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_xor_init();
+ 
+-	mvebu_mbus_add_window("devbus-boot", LSMINI_NOR_BOOT_BASE,
+-			      LSMINI_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    LSMINI_NOR_BOOT_BASE,
++				    LSMINI_NOR_BOOT_SIZE);
+ 	platform_device_register(&lsmini_nor_flash);
+ 
+ 	platform_device_register(&lsmini_button_device);
+diff --git a/arch/arm/mach-orion5x/mss2-setup.c b/arch/arm/mach-orion5x/mss2-setup.c
+index 827acba..e105130 100644
+--- a/arch/arm/mach-orion5x/mss2-setup.c
++++ b/arch/arm/mach-orion5x/mss2-setup.c
+@@ -241,8 +241,10 @@ static void __init mss2_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_xor_init();
+ 
+-	mvebu_mbus_add_window("devbus-boot", MSS2_NOR_BOOT_BASE,
+-			      MSS2_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    MSS2_NOR_BOOT_BASE,
++				    MSS2_NOR_BOOT_SIZE);
+ 	platform_device_register(&mss2_nor_flash);
+ 
+ 	platform_device_register(&mss2_button_device);
+diff --git a/arch/arm/mach-orion5x/mv2120-setup.c b/arch/arm/mach-orion5x/mv2120-setup.c
+index 92600ae..e032f01 100644
+--- a/arch/arm/mach-orion5x/mv2120-setup.c
++++ b/arch/arm/mach-orion5x/mv2120-setup.c
+@@ -204,8 +204,10 @@ static void __init mv2120_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_xor_init();
+ 
+-	mvebu_mbus_add_window("devbus-boot", MV2120_NOR_BOOT_BASE,
+-			      MV2120_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    MV2120_NOR_BOOT_BASE,
++				    MV2120_NOR_BOOT_SIZE);
+ 	platform_device_register(&mv2120_nor_flash);
+ 
+ 	platform_device_register(&mv2120_button_device);
+diff --git a/arch/arm/mach-orion5x/net2big-setup.c b/arch/arm/mach-orion5x/net2big-setup.c
+index dd0641a..ba73dc7 100644
+--- a/arch/arm/mach-orion5x/net2big-setup.c
++++ b/arch/arm/mach-orion5x/net2big-setup.c
+@@ -397,8 +397,10 @@ static void __init net2big_init(void)
+ 	net2big_sata_power_init();
+ 	orion5x_sata_init(&net2big_sata_data);
+ 
+-	mvebu_mbus_add_window("devbus-boot", NET2BIG_NOR_BOOT_BASE,
+-			      NET2BIG_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    NET2BIG_NOR_BOOT_BASE,
++				    NET2BIG_NOR_BOOT_SIZE);
+ 	platform_device_register(&net2big_nor_flash);
+ 
+ 	platform_device_register(&net2big_gpio_buttons);
+diff --git a/arch/arm/mach-orion5x/pci.c b/arch/arm/mach-orion5x/pci.c
+index 5033680..7fab670 100644
+--- a/arch/arm/mach-orion5x/pci.c
++++ b/arch/arm/mach-orion5x/pci.c
+@@ -157,11 +157,10 @@ static int __init pcie_setup(struct pci_sys_data *sys)
+ 	if (dev == MV88F5181_DEV_ID || dev == MV88F5182_DEV_ID) {
+ 		printk(KERN_NOTICE "Applying Orion-1/Orion-NAS PCIe config "
+ 				   "read transaction workaround\n");
+-		mvebu_mbus_add_window_remap_flags("pcie0.0",
+-						  ORION5X_PCIE_WA_PHYS_BASE,
+-						  ORION5X_PCIE_WA_SIZE,
+-						  MVEBU_MBUS_NO_REMAP,
+-						  MVEBU_MBUS_PCI_WA);
++		mvebu_mbus_add_window_by_id(ORION_MBUS_PCIE_WA_TARGET,
++					    ORION_MBUS_PCIE_WA_ATTR,
++					    ORION5X_PCIE_WA_PHYS_BASE,
++					    ORION5X_PCIE_WA_SIZE);
+ 		pcie_ops.read = pcie_rd_conf_wa;
  	}
  
--	ts->client = client;
--	ts->irq = client->irq;
--	ts->input = input_dev;
--	init_waitqueue_head(&ts->wait);
-+	ts->gpio = of_get_gpio(np, 0);
-+	if (ts->gpio < 0)
-+		pr_err("GPIO not found (of_get_gpio returned %d)\n", ts->gpio);
-+
-+	/* Used to detect if it is probed trough the device tree,
-+	 * in order to be able to use that information in the IRQ handler.
-+	 */
-+	ts->of = 1;
-+
-+	return 0;
-+}
-+#else
-+static int tsc2007_probe_dt(struct i2c_client *client, struct tsc2007 *ts,
-+			    struct device_node *np)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
-+static int tsc2007_probe_pdev(struct i2c_client *client, struct tsc2007 *ts,
-+			      struct tsc2007_platform_data *pdata,
-+			      const struct i2c_device_id *id)
-+{
-+	if (!pdata) {
-+		dev_err(&client->dev, "platform data is required!\n");
-+		return -EINVAL;
-+	}
+diff --git a/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c b/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
+index 1c4498b..213b3e1 100644
+--- a/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
++++ b/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
+@@ -123,8 +123,10 @@ static void __init rd88f5181l_fxo_init(void)
+ 	orion5x_eth_switch_init(&rd88f5181l_fxo_switch_plat_data, NO_IRQ);
+ 	orion5x_uart0_init();
  
- 	ts->model             = pdata->model;
- 	ts->x_plate_ohms      = pdata->x_plate_ohms;
-@@ -309,13 +365,59 @@ static int tsc2007_probe(struct i2c_client *client,
- 	ts->poll_period       = pdata->poll_period ? : 1;
- 	ts->get_pendown_state = pdata->get_pendown_state;
- 	ts->clear_penirq      = pdata->clear_penirq;
-+	ts->fuzzy             = pdata->fuzzy;
- 
- 	if (pdata->x_plate_ohms == 0) {
- 		dev_err(&client->dev, "x_plate_ohms is not set up in platform data");
--		err = -EINVAL;
-+		return -EINVAL;
-+	}
-+
-+	/* Used to detect if it is probed trough the device tree,
-+	 * in order to be able to use that information in the IRQ handler.
-+	 */
-+	ts->of = 0;
-+
-+	return 0;
-+}
-+
-+static int tsc2007_probe(struct i2c_client *client,
-+			 const struct i2c_device_id *id)
-+{
-+	struct device_node *np = client->dev.of_node;
-+	struct tsc2007_platform_data *pdata = client->dev.platform_data;
-+	struct tsc2007 *ts;
-+	struct input_dev *input_dev;
-+	int err = 0;
-+
-+	ts = kzalloc(sizeof(struct tsc2007), GFP_KERNEL);
-+	if (!ts)
-+		return -ENOMEM;
-+
-+	if (np)
-+		err = tsc2007_probe_dt(client, ts, np);
-+	else
-+		err = tsc2007_probe_pdev(client, ts, pdata, id);
-+
-+	if (err)
-+		goto err_free_mem;
-+
-+	if (!i2c_check_functionality(client->adapter,
-+				     I2C_FUNC_SMBUS_READ_WORD_DATA)) {
-+		err = -EIO;
- 		goto err_free_mem;
- 	}
- 
-+	input_dev = input_allocate_device();
-+	if (!input_dev) {
-+		err = -ENOMEM;
-+		goto err_free_input;
-+	};
-+
-+	ts->client = client;
-+	ts->irq = client->irq;
-+	ts->input = input_dev;
-+	init_waitqueue_head(&ts->wait);
-+
- 	snprintf(ts->phys, sizeof(ts->phys),
- 		 "%s/input0", dev_name(&client->dev));
- 
-@@ -331,19 +433,21 @@ static int tsc2007_probe(struct i2c_client *client,
- 	input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
- 	input_dev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
- 
--	input_set_abs_params(input_dev, ABS_X, 0, MAX_12BIT, pdata->fuzzx, 0);
--	input_set_abs_params(input_dev, ABS_Y, 0, MAX_12BIT, pdata->fuzzy, 0);
-+	input_set_abs_params(input_dev, ABS_X, 0, MAX_12BIT, ts->fuzzy, 0);
-+	input_set_abs_params(input_dev, ABS_Y, 0, MAX_12BIT, ts->fuzzy, 0);
- 	input_set_abs_params(input_dev, ABS_PRESSURE, 0, MAX_12BIT,
--			pdata->fuzzz, 0);
-+			     ts->fuzzy, 0);
- 
--	if (pdata->init_platform_hw)
--		pdata->init_platform_hw();
-+	if (!np) {
-+		if (pdata->init_platform_hw)
-+			pdata->init_platform_hw();
-+	}
- 
- 	err = request_threaded_irq(ts->irq, tsc2007_hard_irq, tsc2007_soft_irq,
- 				   IRQF_ONESHOT, client->dev.driver->name, ts);
- 	if (err < 0) {
- 		dev_err(&client->dev, "irq %d busy?\n", ts->irq);
--		goto err_free_mem;
-+		goto err_free_input;
- 	}
- 
- 	tsc2007_stop(ts);
-@@ -358,23 +462,29 @@ static int tsc2007_probe(struct i2c_client *client,
- 
-  err_free_irq:
- 	free_irq(ts->irq, ts);
--	if (pdata->exit_platform_hw)
--		pdata->exit_platform_hw();
-- err_free_mem:
-+	if (!np) {
-+		if (pdata->exit_platform_hw)
-+			pdata->exit_platform_hw();
-+	}
-+ err_free_input:
- 	input_free_device(input_dev);
-+ err_free_mem:
- 	kfree(ts);
- 	return err;
+-	mvebu_mbus_add_window("devbus-boot", RD88F5181L_FXO_NOR_BOOT_BASE,
+-			      RD88F5181L_FXO_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    RD88F5181L_FXO_NOR_BOOT_BASE,
++				    RD88F5181L_FXO_NOR_BOOT_SIZE);
+ 	platform_device_register(&rd88f5181l_fxo_nor_boot_flash);
  }
  
- static int tsc2007_remove(struct i2c_client *client)
- {
-+	struct device_node *np = client->dev.of_node;
- 	struct tsc2007	*ts = i2c_get_clientdata(client);
- 	struct tsc2007_platform_data *pdata = client->dev.platform_data;
+diff --git a/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c b/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
+index adabe34..594800e 100644
+--- a/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
++++ b/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
+@@ -130,8 +130,10 @@ static void __init rd88f5181l_ge_init(void)
+ 	orion5x_i2c_init();
+ 	orion5x_uart0_init();
  
- 	free_irq(ts->irq, ts);
+-	mvebu_mbus_add_window("devbus-boot", RD88F5181L_GE_NOR_BOOT_BASE,
+-			      RD88F5181L_GE_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    RD88F5181L_GE_NOR_BOOT_BASE,
++				    RD88F5181L_GE_NOR_BOOT_SIZE);
+ 	platform_device_register(&rd88f5181l_ge_nor_boot_flash);
  
--	if (pdata->exit_platform_hw)
--		pdata->exit_platform_hw();
-+	if (!np) {
-+		if (pdata->exit_platform_hw)
-+			pdata->exit_platform_hw();
-+	}
+ 	i2c_register_board_info(0, &rd88f5181l_ge_i2c_rtc, 1);
+diff --git a/arch/arm/mach-orion5x/rd88f5182-setup.c b/arch/arm/mach-orion5x/rd88f5182-setup.c
+index 66e77ec..b1cf684 100644
+--- a/arch/arm/mach-orion5x/rd88f5182-setup.c
++++ b/arch/arm/mach-orion5x/rd88f5182-setup.c
+@@ -264,11 +264,14 @@ static void __init rd88f5182_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_xor_init();
  
- 	input_unregister_device(ts->input);
- 	kfree(ts);
-@@ -389,10 +499,19 @@ static const struct i2c_device_id tsc2007_idtable[] = {
+-	mvebu_mbus_add_window("devbus-boot", RD88F5182_NOR_BOOT_BASE,
+-			      RD88F5182_NOR_BOOT_SIZE);
+-
+-	mvebu_mbus_add_window("devbus-cs1", RD88F5182_NOR_BASE,
+-			      RD88F5182_NOR_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    RD88F5182_NOR_BOOT_BASE,
++				    RD88F5182_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_TARGET(1),
++				    ORION_MBUS_DEVBUS_ATTR(1),
++				    RD88F5182_NOR_BASE,
++				    RD88F5182_NOR_SIZE);
+ 	platform_device_register(&rd88f5182_nor_flash);
+ 	platform_device_register(&rd88f5182_gpio_leds);
  
- MODULE_DEVICE_TABLE(i2c, tsc2007_idtable);
+diff --git a/arch/arm/mach-orion5x/terastation_pro2-setup.c b/arch/arm/mach-orion5x/terastation_pro2-setup.c
+index a0bfa53..7e90648 100644
+--- a/arch/arm/mach-orion5x/terastation_pro2-setup.c
++++ b/arch/arm/mach-orion5x/terastation_pro2-setup.c
+@@ -329,8 +329,10 @@ static void __init tsp2_init(void)
+ 	/*
+ 	 * Configure peripherals.
+ 	 */
+-	mvebu_mbus_add_window("devbus-boot", TSP2_NOR_BOOT_BASE,
+-			      TSP2_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    TSP2_NOR_BOOT_BASE,
++				    TSP2_NOR_BOOT_SIZE);
+ 	platform_device_register(&tsp2_nor_flash);
  
-+#ifdef CONFIG_OF
-+static const struct of_device_id tsc2007_of_match[] = {
-+	{ .compatible = "ti,tsc2007" },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, tsc2007_of_match);
-+#endif
-+
- static struct i2c_driver tsc2007_driver = {
- 	.driver = {
- 		.owner	= THIS_MODULE,
--		.name	= "tsc2007"
-+		.name	= "tsc2007",
-+		.of_match_table = of_match_ptr(tsc2007_of_match),
- 	},
- 	.id_table	= tsc2007_idtable,
- 	.probe		= tsc2007_probe,
+ 	orion5x_ehci0_init();
+diff --git a/arch/arm/mach-orion5x/ts209-setup.c b/arch/arm/mach-orion5x/ts209-setup.c
+index 80174f0..e90c061 100644
+--- a/arch/arm/mach-orion5x/ts209-setup.c
++++ b/arch/arm/mach-orion5x/ts209-setup.c
+@@ -286,8 +286,10 @@ static void __init qnap_ts209_init(void)
+ 	/*
+ 	 * Configure peripherals.
+ 	 */
+-	mvebu_mbus_add_window("devbus-boot", QNAP_TS209_NOR_BOOT_BASE,
+-			      QNAP_TS209_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    QNAP_TS209_NOR_BOOT_BASE,
++				    QNAP_TS209_NOR_BOOT_SIZE);
+ 	platform_device_register(&qnap_ts209_nor_flash);
+ 
+ 	orion5x_ehci0_init();
+diff --git a/arch/arm/mach-orion5x/ts409-setup.c b/arch/arm/mach-orion5x/ts409-setup.c
+index 9259279..5c079d3 100644
+--- a/arch/arm/mach-orion5x/ts409-setup.c
++++ b/arch/arm/mach-orion5x/ts409-setup.c
+@@ -277,8 +277,10 @@ static void __init qnap_ts409_init(void)
+ 	/*
+ 	 * Configure peripherals.
+ 	 */
+-	mvebu_mbus_add_window("devbus-boot", QNAP_TS409_NOR_BOOT_BASE,
+-			      QNAP_TS409_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    QNAP_TS409_NOR_BOOT_BASE,
++				    QNAP_TS409_NOR_BOOT_SIZE);
+ 	platform_device_register(&qnap_ts409_nor_flash);
+ 
+ 	orion5x_ehci0_init();
+diff --git a/arch/arm/mach-orion5x/wnr854t-setup.c b/arch/arm/mach-orion5x/wnr854t-setup.c
+index 6b84863..80a56ee 100644
+--- a/arch/arm/mach-orion5x/wnr854t-setup.c
++++ b/arch/arm/mach-orion5x/wnr854t-setup.c
+@@ -127,8 +127,10 @@ static void __init wnr854t_init(void)
+ 	orion5x_eth_switch_init(&wnr854t_switch_plat_data, NO_IRQ);
+ 	orion5x_uart0_init();
+ 
+-	mvebu_mbus_add_window("devbus-boot", WNR854T_NOR_BOOT_BASE,
+-			      WNR854T_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    WNR854T_NOR_BOOT_BASE,
++				    WNR854T_NOR_BOOT_SIZE);
+ 	platform_device_register(&wnr854t_nor_flash);
+ }
+ 
+diff --git a/arch/arm/mach-orion5x/wrt350n-v2-setup.c b/arch/arm/mach-orion5x/wrt350n-v2-setup.c
+index fae684b..670e30d 100644
+--- a/arch/arm/mach-orion5x/wrt350n-v2-setup.c
++++ b/arch/arm/mach-orion5x/wrt350n-v2-setup.c
+@@ -213,8 +213,10 @@ static void __init wrt350n_v2_init(void)
+ 	orion5x_eth_switch_init(&wrt350n_v2_switch_plat_data, NO_IRQ);
+ 	orion5x_uart0_init();
+ 
+-	mvebu_mbus_add_window("devbus-boot", WRT350N_V2_NOR_BOOT_BASE,
+-			      WRT350N_V2_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
++				    ORION_MBUS_DEVBUS_BOOT_ATTR,
++				    WRT350N_V2_NOR_BOOT_BASE,
++				    WRT350N_V2_NOR_BOOT_SIZE);
+ 	platform_device_register(&wrt350n_v2_nor_flash);
+ 	platform_device_register(&wrt350n_v2_leds);
+ 	platform_device_register(&wrt350n_v2_button_device);
 -- 
-1.7.9.5
+1.8.1.5
