@@ -1,64 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 15 Jul 2013 10:20:44 +0200
-Subject: [PATCH 1/3] serial: mxs: remove the unused macro
-In-Reply-To: <1373857736-30108-1-git-send-email-b32955@freescale.com>
-References: <1373857736-30108-1-git-send-email-b32955@freescale.com>
-Message-ID: <20130715082044.GL12139@pengutronix.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 15 Jul 2013 11:23:58 +0300
+Subject: [PATCH 4/6] mfd: omap-usb-host: Put pins in IDLE state on suspend
+In-Reply-To: <51E2A603.1000805@linaro.org>
+References: <1373473081-27181-1-git-send-email-rogerq@ti.com>
+ <1373473380-27515-1-git-send-email-rogerq@ti.com>
+ <51E2A603.1000805@linaro.org>
+Message-ID: <51E3B19E.80906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, Jul 15, 2013 at 11:08:54AM +0800, Huang Shijie wrote:
-> The MXS_AUART_DMA_CONFIG is originally used to check if the DT node
-> is configured with the DMA property.
+On 07/14/2013 04:22 PM, Kevin Hilman wrote:
+> On 07/10/2013 05:23 PM, Roger Quadros wrote:
+>> In order to support wake up from suspend use the pinctrl
+>> framework to put the USB host pins in IDLE state during suspend.
+>>
+>> CC: Samuel Ortiz <sameo@linux.intel.com>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
 > 
-> But now, the MXS_AUART_DMA_CONFIG is not used any more.
-> Just remove it.
+> [...]
 > 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  drivers/tty/serial/mxs-auart.c |    5 +----
->  1 files changed, 1 insertions(+), 4 deletions(-)
+>> @@ -608,6 +618,14 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+>>  		return -ENOMEM;
+>>  	}
+>>  
+>> +	if (!dev->pins || !dev->pins->idle_state) {
+>> +		/* If IDLE pins are not available, we can't remote wakeup,
+>> +		 * so prevent idling in that case.
+>> +		 */
 > 
-> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-> index 4f5f161..465ef0b 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -134,7 +134,6 @@ enum mxs_auart_type {
->  struct mxs_auart_port {
->  	struct uart_port port;
->  
-> -#define MXS_AUART_DMA_CONFIG	0x1
->  #define MXS_AUART_DMA_ENABLED	0x2
->  #define MXS_AUART_DMA_TX_SYNC	2  /* bit 2 */
->  #define MXS_AUART_DMA_RX_READY	3  /* bit 3 */
-> @@ -640,7 +639,7 @@ static void mxs_auart_settermios(struct uart_port *u,
->  		 * we can only implement the DMA support for auart
->  		 * in mx28.
->  		 */
-> -		if (is_imx28_auart(s) && (s->flags & MXS_AUART_DMA_CONFIG)) {
-> +		if (is_imx28_auart(s)) {
->  			if (!mxs_auart_dma_init(s))
->  				/* enable DMA tranfer */
->  				ctrl2 |= AUART_CTRL2_TXDMAE | AUART_CTRL2_RXDMAE
-> @@ -1002,8 +1001,6 @@ static int serial_mxs_probe_dt(struct mxs_auart_port *s,
->  	}
->  	s->port.line = ret;
->  
-> -	s->flags |= MXS_AUART_DMA_CONFIG;
-> -
-You're suggesting that MXS_AUART_DMA_CONFIG was set here unconditionally
-before and so the check in the hunk above is not necessary anymore.
-(<pedantic>So your "not used any more" is technically wrong.</pedantic>)
+> nit: multi-line comment style
+> 
+> Also, if there are no pins, aren't the pinctrl ops nops anyways?  IOW,
+> not sure the need
+> for this is clear, and it's not mentioned in the changelog.
 
-However serial_mxs_probe_dt returns earlier if the device was not probed
-by dt (which I think we can assume to not apply, still it should be
-mentioned in the commit log).
+The pinctrl ops are nops but the runtime suspend isn't. So in this case,
+we'll never be able to wake up the USB controller.
 
-Best regards
-Uwe
+I'll update the changelog to reflect this.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+cheers,
+-roger
