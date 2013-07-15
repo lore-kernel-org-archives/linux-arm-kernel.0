@@ -1,59 +1,56 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 15 Jul 2013 16:59:21 +0200
-Subject: [PATCH v5 2/7] sound: sam9x5_wm8731: machine driver for
- at91sam9x5 wm8731 boards
-In-Reply-To: <20130712114926.GE24508@sirena.org.uk>
-References: <1373559359-31607-1-git-send-email-richard.genoud@gmail.com>
- <1373559359-31607-3-git-send-email-richard.genoud@gmail.com>
- <20130712114926.GE24508@sirena.org.uk>
-Message-ID: <CACQ1gAiJ8ww-gYfcUsux00DmpWUpfqyzzqfxZjWZSaObgsz29g@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 15 Jul 2013 11:57:44 -0300
+Subject: [RESEND PATCH v7 15/22] bus: mvebu-mbus: Factorize Armada 370/XP data
+ structures
+In-Reply-To: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1373900271-4722-16-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/7/12 Mark Brown <broonie@kernel.org>:
-> On Thu, Jul 11, 2013 at 06:15:54PM +0200, Richard Genoud wrote:
->> From: Nicolas Ferre <nicolas.ferre@atmel.com>
->>
->> Description of the Asoc machine driver for an at91sam9x5 based board
->
-> ASoC.
->
->> +sam9x5 pins:
->> + * LOUT
->> + * ROUT
->> + * LHPOUT
->> + * RHPOUT
->> + * LLINEIN
->> + * RLINEIN
->> + * MICIN
->
-> These aren't pins on the CPU, they're pins on the CODEC, and you should
-> be adding this to the binding document for the CODEC and referring to
-> that rather than having them in each individual binding document.  This
-> also helps if any new variants are added (not that this is likely for
-> the WM8731).
-ok, I'll move that
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
->
->> +static struct sam9x5_drvdata sam9x5_priv;
->
-> Why is this a global static?
->
->> +     ret = snd_soc_register_card(&snd_soc_sam9x5);
->> +     if (ret) {
->> +             dev_err(&pdev->dev,
->> +                     "ASoC: Platform device allocation failed\n");
->> +             goto out_put_audio;
->> +     }
->
->> +     platform_set_drvdata(pdev, &snd_soc_sam9x5);
->
-> It should be being dynamically allocated and retrieved as driver data
-> when needed.
-ok.
+These structures were only different in the mapping tables.
+Now that those tables have been removed, it doesn't make any sense
+to keep different structures.
 
-Thanks !
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/bus/mvebu-mbus.c | 14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
 
-
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index f6e9192..d0a61ce 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -536,15 +536,7 @@ mvebu_mbus_dove_setup_cpu_target(struct mvebu_mbus_state *mbus)
+ 	mvebu_mbus_dram_info.num_cs = cs;
+ }
+ 
+-static const struct mvebu_mbus_soc_data armada_370_mbus_data = {
+-	.num_wins            = 20,
+-	.num_remappable_wins = 8,
+-	.win_cfg_offset      = armada_370_xp_mbus_win_offset,
+-	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
+-	.show_cpu_target     = mvebu_sdram_debug_show_orion,
+-};
+-
+-static const struct mvebu_mbus_soc_data armada_xp_mbus_data = {
++static const struct mvebu_mbus_soc_data armada_370_xp_mbus_data = {
+ 	.num_wins            = 20,
+ 	.num_remappable_wins = 8,
+ 	.win_cfg_offset      = armada_370_xp_mbus_win_offset,
+@@ -604,9 +596,9 @@ static const struct mvebu_mbus_soc_data mv78xx0_mbus_data = {
+  */
+ static const struct of_device_id of_mvebu_mbus_ids[] = {
+ 	{ .compatible = "marvell,armada370-mbus",
+-	  .data = &armada_370_mbus_data, },
++	  .data = &armada_370_xp_mbus_data, },
+ 	{ .compatible = "marvell,armadaxp-mbus",
+-	  .data = &armada_xp_mbus_data, },
++	  .data = &armada_370_xp_mbus_data, },
+ 	{ .compatible = "marvell,kirkwood-mbus",
+ 	  .data = &kirkwood_mbus_data, },
+ 	{ .compatible = "marvell,dove-mbus",
 -- 
-for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
+1.8.1.5
