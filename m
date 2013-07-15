@@ -1,32 +1,26 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 Jul 2013 12:04:44 -0600
-Subject: [PATCH] ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag
-In-Reply-To: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
-References: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
-Message-ID: <51E439BC.9030608@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Jul 2013 19:08:46 +0100
+Subject: [PATCH] arm: align shared memory unconditionally to the SHMLBA
+ boundary
+In-Reply-To: <20130715173238.GJ1730@moon>
+References: <1361254269-3444-1-git-send-email-alekskartashov@parallels.com>
+ <20130715173238.GJ1730@moon>
+Message-ID: <20130715180846.GV24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2013 03:23 AM, Joseph Lo wrote:
-> Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
-> to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
-> this state.
+On Mon, Jul 15, 2013 at 09:32:38PM +0400, Cyrill Gorcunov wrote:
+> On Tue, Feb 19, 2013 at 10:11:09AM +0400, Alexander Kartashov wrote:
+> > Currently IPC SHM works in a strange way on ARM:
+> > the syscall sys_shmat() requires the argument shmaddr
+> > be SHMLBA-aligned (ARM has the macro __ARCH_FORCE_SHMLBA
+> > unconditionally defined) but allocates memory that
+> > isn't SHMLBA-aligned because the value of memory alignment
+> > depends on presense of certain cache aliases.
+> 
+> Hi guys, is there some conclusion on this patch? It has been sent
+> almost 5 months back ;)
 
-I tried applying this patch, your series "[PATCH V3 0/3] ARM: tegra114:
-cpuidle: add power down state", and your series "[PATCH V2 00/11] ARM:
-tegra114: add support for system suspend", all on top of v3.11-rc1.
-
-On Dalmore, the new cpuidle mode /appears/ to work (I see increasing
-values in the sysfs cpuidle "usage" file for all defined cpuidle
-states), but I don't see the "CPU VDD off" LED light up; I'm not
-convinced that the CPU is actually being powered off in the idle mode.
-
-With these patches applies, Harmony acts very strangely. After
-hot-unplug and re-plug of CPU1, the system is hung or almost hung. The
-patches appear to reduce the amount of time CPU VDD is off judging by
-the LEDs. The patches might cause issues with system suspend too, but
-I'm not 100% sure.
-
-As such, I haven't applied any of these. Can you please test boards for
-all of Tegra20/30/114, and validate that on Dalmore the CPU power is
-actually being turned off, and report back? Thanks.
+It's pointless.  The alignment is only required for CPUs which have
+aliasing caches.  What the code does in mmap() is correct.  However,
+we can't dynamically select this in the SHM code.
