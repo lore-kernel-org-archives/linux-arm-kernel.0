@@ -1,36 +1,115 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Mon, 15 Jul 2013 16:56:56 +0200
-Subject: [PATCH 11/22] arm/dts: imx51.dtsi: i2c1 : Add pinctrl configuration.
-In-Reply-To: <1373900227-341-1-git-send-email-denis@eukrea.com>
-References: <1373900227-341-1-git-send-email-denis@eukrea.com>
-Message-ID: <1373900227-341-12-git-send-email-denis@eukrea.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 15 Jul 2013 11:57:30 -0300
+Subject: [RESEND PATCH v7 01/22] memory: mvebu-devbus: Remove address decoding
+ window workaround
+In-Reply-To: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1373900271-4722-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
- arch/arm/boot/dts/imx51.dtsi |    9 +++++++++
- 1 file changed, 9 insertions(+)
+Now that mbus device tree binding has been introduced, remove the address
+decoding window management from this driver.
+A suitable 'ranges' entry should be added to the devbus-compatible node in
+the device tree, as described by the mbus binding documentation.
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index fb5c2c3..60b2a8e 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -410,6 +410,15 @@
- 					};
- 				};
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/memory/mvebu-devbus.c | 64 ++-----------------------------------------
+ 1 file changed, 2 insertions(+), 62 deletions(-)
+
+diff --git a/drivers/memory/mvebu-devbus.c b/drivers/memory/mvebu-devbus.c
+index 978e8e3..94c9248 100644
+--- a/drivers/memory/mvebu-devbus.c
++++ b/drivers/memory/mvebu-devbus.c
+@@ -208,16 +208,11 @@ static int mvebu_devbus_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *node = pdev->dev.of_node;
+-	struct device_node *parent;
+ 	struct devbus *devbus;
+ 	struct resource *res;
+ 	struct clk *clk;
+ 	unsigned long rate;
+-	const __be32 *ranges;
+-	int err, cs;
+-	int addr_cells, p_addr_cells, size_cells;
+-	int ranges_len, tuple_len;
+-	u32 base, size;
++	int err;
  
-+				i2c1 {
-+					pinctrl_i2c1_1: i2c1grp-1 {
-+						fsl,pins = <
-+							MX51_PAD_SD2_CMD__I2C1_SCL 0x400001ed
-+							MX51_PAD_SD2_CLK__I2C1_SDA 0x400001ed
-+						>;
-+					};
-+				};
-+
- 				i2c2 {
- 					pinctrl_i2c2_1: i2c2grp-1 {
- 						fsl,pins = <
+ 	devbus = devm_kzalloc(&pdev->dev, sizeof(struct devbus), GFP_KERNEL);
+ 	if (!devbus)
+@@ -248,68 +243,13 @@ static int mvebu_devbus_probe(struct platform_device *pdev)
+ 		return err;
+ 
+ 	/*
+-	 * Allocate an address window for this device.
+-	 * If the device probing fails, then we won't be able to
+-	 * remove the allocated address decoding window.
+-	 *
+-	 * FIXME: This is only a temporary hack! We need to do this here
+-	 * because we still don't have device tree bindings for mbus.
+-	 * Once that support is added, we will declare these address windows
+-	 * statically in the device tree, and remove the window configuration
+-	 * from here.
+-	 */
+-
+-	/*
+-	 * Get the CS to choose the window string.
+-	 * This is a bit hacky, but it will be removed once the
+-	 * address windows are declared in the device tree.
+-	 */
+-	cs = (((unsigned long)devbus->base) % 0x400) / 8;
+-
+-	/*
+-	 * Parse 'ranges' property to obtain a (base,size) window tuple.
+-	 * This will be removed once the address windows
+-	 * are declared in the device tree.
+-	 */
+-	parent = of_get_parent(node);
+-	if (!parent)
+-		return -EINVAL;
+-
+-	p_addr_cells = of_n_addr_cells(parent);
+-	of_node_put(parent);
+-
+-	addr_cells = of_n_addr_cells(node);
+-	size_cells = of_n_size_cells(node);
+-	tuple_len = (p_addr_cells + addr_cells + size_cells) * sizeof(__be32);
+-
+-	ranges = of_get_property(node, "ranges", &ranges_len);
+-	if (ranges == NULL || ranges_len != tuple_len)
+-		return -EINVAL;
+-
+-	base = of_translate_address(node, ranges + addr_cells);
+-	if (base == OF_BAD_ADDR)
+-		return -EINVAL;
+-	size = of_read_number(ranges + addr_cells + p_addr_cells, size_cells);
+-
+-	/*
+-	 * Create an mbus address windows.
+-	 * FIXME: Remove this, together with the above code, once the
+-	 * address windows are declared in the device tree.
+-	 */
+-	err = mvebu_mbus_add_window(devbus_wins[cs], base, size);
+-	if (err < 0)
+-		return err;
+-
+-	/*
+ 	 * We need to create a child device explicitly from here to
+ 	 * guarantee that the child will be probed after the timing
+ 	 * parameters for the bus are written.
+ 	 */
+ 	err = of_platform_populate(node, NULL, NULL, dev);
+-	if (err < 0) {
+-		mvebu_mbus_del_window(base, size);
++	if (err < 0)
+ 		return err;
+-	}
+ 
+ 	return 0;
+ }
 -- 
-1.7.9.5
+1.8.1.5
