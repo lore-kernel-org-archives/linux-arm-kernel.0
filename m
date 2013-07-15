@@ -1,101 +1,83 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Mon, 15 Jul 2013 21:09:40 +0900
-Subject: [PATCH v2 3/5] mmc: dw_mmc: Add exynos resume_noirq callback to
- clear WAKEUP_INT
-In-Reply-To: <CAD=FV=UtX0Z1ABdi5h270ks8Py2o1iPK4DonOHJH3N0Q1YShTQ@mail.gmail.com>
-References: <1373391071-6312-1-git-send-email-dianders@chromium.org>
- <1373411961-23812-1-git-send-email-dianders@chromium.org>
- <1373411961-23812-4-git-send-email-dianders@chromium.org>
- <002a01ce7d7d$6bd9e870$438db950$%jun@samsung.com>
- <CAD=FV=UtX0Z1ABdi5h270ks8Py2o1iPK4DonOHJH3N0Q1YShTQ@mail.gmail.com>
-Message-ID: <003f01ce8154$2f5ea1d0$8e1be570$%jun@samsung.com>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Mon, 15 Jul 2013 21:20:50 +0900
+Subject: [PATCH v7 00/12] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+References: <002801ce797b$3d2fbc80$b78f3580$@samsung.com>
+ <CANEJEGvajhgzUPG6ppbjwBb4-9TdU9em3T_SejBpz8NCjGHYTQ@mail.gmail.com>
+Message-ID: <00a701ce8155$be139240$3a3ab6c0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, July 11, 2013, Doug Anderson wrote:
-> Seungwon,
+> From: Cho KyongHo [mailto:pullip.cho at samsung.com]
+> Sent: Monday, July 15, 2013 8:24 PM
 > 
-> On Wed, Jul 10, 2013 at 7:54 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
-> > On Wed, July 10, 2013, Doug Anderson wrote:
-> >> If the WAKEUP_INT is asserted at wakeup and not cleared, we'll end up
-> >> looping around forever.  This has been seen to happen on exynos5420
-> >> silicon despite the fact that we haven't enabled any wakeup events.
-> >>
-> >> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> >> ---
-> >> Changes in v2:
-> >> - Use suspend_noirq as per James Hogan.
-> >>
-> >>  drivers/mmc/host/dw_mmc-exynos.c | 23 +++++++++++++++++++++++
-> >>  1 file changed, 23 insertions(+)
-> >>
-> >> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-> >> index f013e7e..36b9620 100644
-> >> --- a/drivers/mmc/host/dw_mmc-exynos.c
-> >> +++ b/drivers/mmc/host/dw_mmc-exynos.c
-> >> @@ -30,6 +30,7 @@
-> >>  #define SDMMC_CLKSEL_TIMING(x, y, z) (SDMMC_CLKSEL_CCLK_SAMPLE(x) |  \
-> >>                                       SDMMC_CLKSEL_CCLK_DRIVE(y) |    \
-> >>                                       SDMMC_CLKSEL_CCLK_DIVIDER(z))
-> >> +#define SDMMC_CLKSEL_WAKEUP_INT              BIT(11)
-> >>
-> >>  #define SDMMC_CMD_USE_HOLD_REG               BIT(29)
-> >>
-> >> @@ -102,6 +103,27 @@ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
-> >>       return 0;
-> >>  }
-> >>
-> >> +/**
-> >> + * dw_mci_exynos_resume_noirq - Exynos-specific resume code
-> >> + *
-> >> + * We have seen cases (at least on the exynos5420) where turning off the INT
-> >> + * power rail during suspend will leave the WAKEUP_INT bit in the CLKSEL
-> >> + * register asserted.  This bit is 1 to indicate that it fired and we can
-> >> + * clear it by writing a 1 back.  Clear it to prevent interrupts from going off
-> >> + * constantly.
-> >> + */
-> > As I know this bit is auto-cleared.
-> > Did you find the cause of this problem?
-> > How about your GPIO setting in sleep?
-> > Currently, we don't know why the problem is happened.
-> > At least, we should make it clear.
+> > From: grundler at google.com [mailto:grundler at google.com] On Behalf Of Grant Grundler
+> > Sent: Friday, July 12, 2013 2:23 AM
+> >
+> > On Fri, Jul 5, 2013 at 5:29 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
+> > > The current exynos-iommu(System MMU) driver does not work autonomously
+> > > since it is lack of support for power management of peripheral blocks.
+> > ...
+> > > Patch summary:
+> > > [PATCH v7 1/9] iommu/exynos: do not include removed header
+> > > [PATCH v7 2/9] iommu/exynos: add missing cache flush for removed page table entries
+> > > [PATCH v7 3/9] iommu/exynos: fix page table maintenance
+> > > [PATCH v7 4/9] iommu/exynos: allocate lv2 page table from own slab
+> > > [PATCH v7 5/9] iommu/exynos: change rwlock to spinlock
+> > > [PATCH v7 6/9] clk: exynos5250: add gate clock descriptions of System MMU
+> > > [PATCH v7 7/9] ARM: dts: Add description of System MMU of Exynos SoCs
+> > > [PATCH v7 8/9] iommu/exynos: support for device tree
+> > > [PATCH v7 9/9] iommu/exynos: add bus notifier for registering System MMU
+> >
+> > Cho,
+> > Of the above patches, nearly all have been applied to chromeos-3.8
+> > (kernel-next git tree) by Doug Anderson and others.
+> >
+> > AFAICT, the only ones not applied are:
+> >    [v7,3/9] iommu/exynos: fix page table maintenance
+> >    [v7,6/9] clk: exynos5250: add gate clock descriptions of System MMU
+> > (conflicts in this one)
+> >    [v7,7/9] ARM: dts: Add description of System MMU of Exynos SoCs
+> > (depends on 6/9)
+> >
+> > We also already have parts of:
+> >    [v7,9/9] iommu/exynos: add bus notifier for registering System MMU
+> >
+> > Some of those are being further discussed but I've lost track now
+> > exactly which ones.
+> >
+> > I'm telling you about chromeos-3.8 status since the adopted changes
+> > have been reviewed (by me and others) are being tested manually here
+> > on several different Samsung Exynos platforms (including 5250 which is
+> > our "snow" platform). Not sure how you should to mark those patches
+> > since they aren't identical to your changes (which apply to post 3.10
+> > kernels, not 3.8).  You might consider splitting those patches out
+> > from the 4 I've listed above to get that series accepted upstream
+> > since the additional review/testing should provide some confidence
+> > those patches are good.
+> >
 > 
-> Yes, the documentation that I have says that this bit is "auto
-> cleared" as well but doesn't indicate under what conditions it is auto
-> cleared.  From testing how this bit reacts I have found that writing a
-> 1 to it clears the bit--in other words it behaves like bits in
-> RINTSTS.  That's a terrible design for a bit in a register with shared
-> config but appears to be how it works.
+> I understand what you are concerning about.
+> Have you applied v6 patchset?
 > 
-> Note: in a sense it will be "auto cleared" because doing a
-> read-modify-write of any other bits in this register will clear the
-> interrupt.
+> I will try to split the patches and make the changes from v6
+> on top of the v6 patcheset.
 > 
-> I have asked for official confirmation.
-> 
-> We have found that on exynos5420 bits 8-10 of CLKSEL are marked as
-> RESERVED.  Those bits are documented to enable the WAKEUP_INT on
-> exynos5250.  My best guess is that these bits are not used on
-> exynos5420 and the WAKEUP_INT line is left floating, which means it
-> can fire randomly.  I have also asked for official confirmation about
-> this.
-Sorry for late response.
-Yes, it's not clear.
-If you get the confirmation, could you share this problem?
-Possibly, auto-clear may not be implemented.
-Then, manual should be correct.
 
-Thanks,
-Seungwon Jeon
+Actually, as you know, the previous patches include setting a System MMU
+as the parent device of its master device in probe() of System MMU.
+I asked Greg KH about changing device hierarchy in probe() and he answered
+that it is not a good idea because it modifies sysfs even though probe() of
+System MMU driver is called before sysfs is constructed.
+
+That's why I uses genpd_pm_ops.
+It results in big change in the patches after registering device tree.
+
+I want to ask your opinion about this change :)
+
+> > cheers,
+> > grant
 > 
+> Thank you.
 > 
-> I will likely merge this change locally in our kernel tree while
-> waiting for a response.  If you would like to wait before Acking
-> that's very reasonable.  Do you have any other problems with this
-> change assuming my understanding above is correct?
-> 
-> -Doug
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Cho KyonogHo.
