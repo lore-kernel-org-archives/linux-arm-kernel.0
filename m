@@ -1,26 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Jul 2013 11:02:43 +0100
-Subject: [PATCH] arm64: compat: fix compilation when using 64kB pages
-In-Reply-To: <1373553036-5418-1-git-send-email-marc.zyngier@arm.com>
-References: <1373553036-5418-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130715100243.GA10000@mudshark.cambridge.arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 15 Jul 2013 12:05:19 +0200
+Subject: [PATCH 1/1] ARM: at91: at91sam9260: add missing pinctrl-names on mmc
+Message-ID: <1373882719-9940-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 11, 2013 at 03:30:36PM +0100, Marc Zyngier wrote:
-> When compiling for 64kB pages, we end-up having conflicting
-> implementations for aarch32_break_handler().
-> 
-> Wrap the 4kB page implementation with a CONFIG_COMPAT guard and change
-> the !CONFIG_COMPAT implementation to be static inline instead of simply static.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91sam9260.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-I think there was a better fix kicking around for this from Chen Gang already.
-I asked for a new commit message, but a v3 didn't appear:
-
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/179418.html
-
-Will
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index c7ccbcb..56ee828 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -572,6 +572,7 @@
+ 				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
+-- 
+1.8.3.2
