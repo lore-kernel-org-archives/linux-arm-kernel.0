@@ -1,47 +1,43 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 15 Jul 2013 20:32:39 -0300
-Subject: [PATCH 06/10] watchdog: orion: Update device-tree binding
- documentation
+Date: Mon, 15 Jul 2013 20:32:40 -0300
+Subject: [PATCH 07/10] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
 In-Reply-To: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1373931163-12670-7-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1373931163-12670-8-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the 'reg' property meaning has been changed,
-this commit updates the deivce-tree binding documentation.
+With the introduction of the orion irqchip driver, now the BRIDGE_CAUSE
+bit is cleared by it. There's no longer a need to do it in the watchdog
+driver, so we can simply remove it.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- Documentation/devicetree/bindings/watchdog/orion-wdt.txt | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/watchdog/orion_wdt.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-index 5dc8d30..48a71fc 100644
---- a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-@@ -3,7 +3,8 @@
- Required Properties:
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index 3c9b3d2..4a0ab47 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -59,18 +59,11 @@ static int orion_wdt_ping(struct watchdog_device *wdt_dev)
  
- - Compatibility : "marvell,orion-wdt"
--- reg		: Address of the timer registers
-+- reg		: First cell contains the register for the watchdog counter.
-+		  Second cell contains the register for the RSTOUT mask.
+ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ {
+-	u32 reg;
+-
+ 	spin_lock(&wdt_lock);
  
- Optional properties:
+ 	/* Set watchdog duration */
+ 	writel(wdt_tclk * wdt_dev->timeout, wdt_reg);
  
-@@ -11,9 +12,10 @@ Optional properties:
+-	/* Clear watchdog timer interrupt */
+-	reg = readl(BRIDGE_CAUSE);
+-	reg &= ~WDT_INT_REQ;
+-	writel(reg, BRIDGE_CAUSE);
+-
+ 	/* Enable watchdog timer */
+ 	orion_timer_ctrl_clrset(0, WDT_EN);
  
- Example:
- 
--	wdt at 20300 {
-+	wdt at 20324 {
- 		compatible = "marvell,orion-wdt";
--		reg = <0x20300 0x28>;
-+		reg = <0x20324 0x4
-+		       0x20108 0x4>;
- 		timeout-sec = <10>;
- 		status = "okay";
- 	};
 -- 
 1.8.1.5
