@@ -1,16 +1,76 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 15 Jul 2013 10:21:30 +0800
-Subject: [PATCH] ARM: dts: imx27: Add core voltages
-In-Reply-To: <1373690084-26760-1-git-send-email-shc_work@mail.ru>
-References: <1373690084-26760-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20130715022129.GG2730@S2101-09.ap.freescale.net>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Mon, 15 Jul 2013 10:41:45 +0800
+Subject: [PATCH] video: nuc900fb: fix to pass correct device identity to
+ free_irq()
+In-Reply-To: <CAPgLHd_mMOOeMecVJbTQjiK+xJD+-8jvgH6oAFqTHK_uSpWOJw@mail.gmail.com>
+References: <CAPgLHd_mMOOeMecVJbTQjiK+xJD+-8jvgH6oAFqTHK_uSpWOJw@mail.gmail.com>
+Message-ID: <CAKT61h-yRxHk6uQqp7hXNQcnRv7WOUQsi21SnCANhSECCW4nYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 13, 2013 at 08:34:44AM +0400, Alexander Shiyan wrote:
-> This patch adds core voltages for i.MX27 CPUs. Only 266 and 400 MHz modes
-> is documented in the datasheet, so we add a 266 MHz frequency for conform this.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+2013/7/12 Wei Yongjun <weiyj.lk@gmail.com>:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+>
+> free_irq() expects the same device identity that was passed to
+> corresponding request_irq(), otherwise the IRQ is not freed.
+>
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Applied, thanks.
+Sorry, repost.
+
+Hi Yongjun,
+
+(1)  ret = request_irq(irq, nuc900fb_irqhandler, 0,
+              pdev->name, fbinfo);
+
+(2)  static irqreturn_t nuc900fb_irqhandler(int irq, void *dev_id)
+{
+    struct nuc900fb_info *fbi = dev_id;
+    void __iomem *regs = fbi->io;
+
+>From (1) and (2), we should consider the wrong with passing 'fbinfo'
+to 'nuc900fb_irqhandler', it should pass the 'fbi' instead as
+following codes:
+
+ret = request_irq(irq, nuc900fb_irqhandler, 0,
+              pdev->name, fbi);
+
+So if we fix this wrong,' free_irq(irq, fbi);' would be ok, right?
+
+Thanks!
+Vincent Wan.
+
+
+> ---
+>  drivers/video/nuc900fb.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
+> index 8c527e5..ebd5501 100644
+> --- a/drivers/video/nuc900fb.c
+> +++ b/drivers/video/nuc900fb.c
+> @@ -661,7 +661,7 @@ release_clock:
+>         clk_disable(fbi->clk);
+>         clk_put(fbi->clk);
+>  release_irq:
+> -       free_irq(irq, fbi);
+> +       free_irq(irq, fbinfo);
+>  release_regs:
+>         iounmap(fbi->io);
+>  release_mem_region:
+> @@ -702,7 +702,7 @@ static int nuc900fb_remove(struct platform_device *pdev)
+>         iounmap(fbi->io);
+>
+>         irq = platform_get_irq(pdev, 0);
+> -       free_irq(irq, fbi);
+> +       free_irq(irq, fbinfo);
+>
+>         release_resource(fbi->mem);
+>         kfree(fbi->mem);
+>
+
+
+
+--
+Wan ZongShun.
+www.mcuos.com
