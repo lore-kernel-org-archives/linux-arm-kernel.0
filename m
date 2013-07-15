@@ -1,32 +1,83 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Mon, 15 Jul 2013 15:08:20 -0700
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <20130715150342.35f7620ffe0835e3e2bc37d0@linux-foundation.org>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
- <20130712075602.GA4002@gmail.com>
- <20130715150342.35f7620ffe0835e3e2bc37d0@linux-foundation.org>
-Message-ID: <51E472D4.5060307@zytor.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 15 Jul 2013 15:16:12 -0700
+Subject: [PATCH, re-send] Always trap on BUG()
+In-Reply-To: <201307051738.35930.arnd@arndb.de>
+References: <201307051738.35930.arnd@arndb.de>
+Message-ID: <20130715151612.9499c2b2ad40e88d183a4600@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2013 03:03 PM, Andrew Morton wrote:
-> 
-> I don't know how to do this.  Any suggestions?
-> 
-> It has to be done at `make config' time.  We'd need to probe for the
-> presence of lz4c and then....  what?
-> 
-> Is there any precedent for this?
-> 
-> I don't think we can just ignore the absence of lz4c - the user has
-> selected a config which his system cannot build.  The problem lies
-> within randconfig itself.
-> 
+On Fri, 5 Jul 2013 17:38:35 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
 
-We keep running over the need to be able to have kconfig run tests on
-the build system (for toolchain support or for optional tools needed);
-running them in the Makefiles (i.e. at Kbuild time) is simply too late.
+> I've run some size analyis using the ARM 'multi_v7_defconfig'
+> and gcc-4.8, using various definitions for BUG() and BUG_ON(), to
+> see how big the size improvement actually gets
+> 
+> 1. Baseline: normal bug plus CONFIG_BUG_VERBOSE
+>    text    data     bss     dec     hex filename
+> 3743196  224396  206812 4174404  3fb244 vmlinux-bugverbose
+> 
+> 2. disabling CONFIG_BUG_VERBOSE, saving 0.6%
+> 3716920  224380  206812 4148112  3f4b90 vmlinux-nobugverbose
+> 
+> 3. #define BUG() panic(__func__), #define BUG_ON(c) if(c) BUG(), saving 1.0%
+> 3701076  224384  206812 4132272  3f0db0 vmlinux-bug-panicfunc
+> 
+> 3. #define BUG() panic(__func__), #define BUG_ON(c) if(c) BUG(), saving 1.5%
+> 3678884  224400  206812 4110096  3eb710 vmlinux-bug-panic
+> 
+> 4. #define BUG() unreachable(), saving 2.1%
+> 3652636  224384  206812 4083832  3e5078 vmlinux-bug-unreachable
+> 
+> 5. as 4, plus #define BUG_ON(c) if(c) unreachable(), saving 2.2%
+> 3651108  224380  206812 4082300  3e4a7c vmlinux-bugon-unreachable
+> 
+> 6. #define BUG() do{}while(0), saving 2.1%
+> 3654264  224380  206812 4085456  3e56d0 vmlinux-nobug
+> 
+> 7. as 6, plus #define BUG_ON if(0 && (c)) unreachable, saving 2.2%
+> 3648392  223996  206748 4079136  3e3e20 vmlinux-no-bugon
+> 
+> 8. my patch below, saving 1.8%
+> 3666532  224380  206812 4097724  3e86bc obj-tmp/vmlinux
+> 
+> The gain of doing unreachable and letting the code run off whereever
+> is minimal compared to the current state of doing nothing, but it
+> avoids the warnings.
+> 
+> Same test using x86_defconfig:
+> 
+> 1. CONFIG_BUG=y, CONFIG_BUGVERBOSE=n
+> 10797859        1395648 1175552 13369059         cbfee3 vmlinux-x86-bug
+> 
+> 2. CONFIG_BUG=n, saves 1.0%
+> 10658553        1395584 1175552 13229689         c9de79 vmlinux-x86-nobug
+> 
+> 3. with my patch, saves 0.8%
+> 10684186        1395584 1175552 13255322         ca429a vmlinux-x86-archbug
+> 
+> Getting 1-2% savings in kernel size seems absolutely worth keeping the
+> option, but 0.2-0.4% left for getting reproducible behavior also seems
+> worthwhile. The result in the patch below.
+> 
+> This basically loses any of the BUG() reporting, but leaves the
+> logic to trap and kill the task in place when CONFIG_BUG is disabled.
 
-	-hpa
+um, nice changelog, but it didn't tell us what the patch actually does.
+
+AFACIT it arranges for the kernel to execute the trap instruction even
+when CONFIG_BUG=n?  Can't be bothered fully working it out, really.
+
+It also makes mystery changes to WARN_ON() and WARN().  What are those?
+
+Also, you say "it avoids the warnings".  To what warnings do you refer?
+The ones which are already emitted by CONFIG_BUG=n, or new ones which
+would have been added had this patch been implemented differently?
+
+Finally, code-size decreases are nice, but what are the runtime effects
+of this patch?
+
+I've been thinking for a while that CONFIG_BUG=n is a pretty dumb thing
+to do, and that maintaining it (and trying to fix the warnings it
+produces) aren't worth the effort and that we should remove the whole
+thing.  Perhaps your patch changes that calculus, dunno.  Please discuss.
