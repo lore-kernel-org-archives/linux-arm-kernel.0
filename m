@@ -1,35 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 Jul 2013 09:34:19 -0600
-Subject: [PATCHv5 00/11] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <51E4167B.4000208@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 15 Jul 2013 17:34:09 +0200
+Subject: [RFC PATCH 2/3] net: phy: call mdiobus_scan() after adding a fixed PHY
+In-Reply-To: <1373902450-11857-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1373902450-11857-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1373902450-11857-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2013 05:52 AM, Thomas Petazzoni wrote:
-> Hello,
-> 
-> This set of patches introduces Message Signaled Interrupt support in
-> the Marvell EBU PCIe driver. It has been successfully tested on the
-> Armada XP GP platform with an Intel e1000e PCIe network card that
-> supports MSI.
-> 
-> This patch set is intended for merging in 3.12, so the respective
-> maintainers of the different areas are invited to review/ack the
-> patches, see below for the details. This set of patches applies on top
-> of 3.11-rc1.
+The fixed_phy_add() function allows to register a fixed PHY. However,
+when this function gets called *after* fixed_mdio_bus_init() (which
+gets called at the module_init stage), then the fixed PHY is not
+registered into the phylib.
 
-Thomas, who is going to merge this series?
+In order to address this, we add a call to mdiobus_scan() in
+fixed_phy_add() to ensure that the PHY indeed gets registered into the
+phylib, even if the fixed_phy_add() is called after
+fixed_mdio_bus_init().
 
-I believe at least patches 1-8 (or perhaps just 1-5 plus 8; I /think/
-all the other patches are MVEBU-specific) are dependencies for the new
-Tegra PCIe driver which should be posted very soon for 3.12. As such,
-I'd like to see these dependencies merged into a standalone stable (100%
-non-rebasable) topic branch based on 3.11-rc1 so that the topic branch
-is available for merging into whichever tree takes the new Tegra PCIe
-driver (which I'm guessing will be the Tegra tree to reduce conflicts).
-So, whoever merges these patches is going to need to know to set up that
-topic branch.
+This is needed because until now, the only code that was calling the
+fixed_add_phy() function was PowerPC-specific platform code, which
+could ensure that such fixed PHYs get registered before
+fixed_mdio_bus_init() is called.
 
-Thierry, please correct me if I'm wrong here.
+However, with the new of_phy_register_fixed_link() function, device
+drivers can parse their 'fixed-link' property and register a fixed PHY
+at ->probe() time, which may happen after fixed_mdio_bus_init() is
+called.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/net/phy/fixed.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/net/phy/fixed.c b/drivers/net/phy/fixed.c
+index ba55adf..bd1e67a 100644
+--- a/drivers/net/phy/fixed.c
++++ b/drivers/net/phy/fixed.c
+@@ -195,6 +195,8 @@ int fixed_phy_add(unsigned int irq, int phy_id,
+ 
+ 	list_add_tail(&fp->node, &fmb->phys);
+ 
++	mdiobus_scan(fmb->mii_bus, phy_id);
++
+ 	return 0;
+ 
+ err_regs:
+-- 
+1.8.1.2
