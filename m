@@ -1,121 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 15 Jul 2013 11:12:42 -0500
-Subject: [PATCHv5 05/11] of: pci: add registry of MSI chips
-In-Reply-To: <1373889167-27878-6-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373889167-27878-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <51E41F7A.4010502@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 15 Jul 2013 13:14:58 -0300
+Subject: [PATCH 13/22] lcd: Add GPIO LCD driver.
+In-Reply-To: <1373900227-341-14-git-send-email-denis@eukrea.com>
+References: <1373900227-341-1-git-send-email-denis@eukrea.com>
+ <1373900227-341-14-git-send-email-denis@eukrea.com>
+Message-ID: <CAOMZO5C6wKUmK25+7iBX+JGs00RR_hpKrCW3r0un610Z-BZn0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2013 06:52 AM, Thomas Petazzoni wrote:
-> This commit adds a very basic registry of msi_chip structures, so that
-> an IRQ controller driver can register an msi_chip, and a PCIe host
-> controller can find it, based on a 'struct device_node'.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Hi Denis,
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-
+On Mon, Jul 15, 2013 at 11:56 AM, Denis Carikli <denis@eukrea.com> wrote:
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
 > ---
->  drivers/of/of_pci.c    | 45 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/msi.h    |  2 ++
->  include/linux/of_pci.h | 12 ++++++++++++
->  3 files changed, 59 insertions(+)
-> 
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 42c687a..e5ca008 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -89,3 +89,48 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
->  	return 0;
->  }
->  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
+>  .../bindings/video/backlight/gpio-lcd.txt          |   15 ++
+>  drivers/video/backlight/Kconfig                    |    8 +
+>  drivers/video/backlight/Makefile                   |    1 +
+>  drivers/video/backlight/gpio_lcd.c                 |  178 ++++++++++++++++++++
+>  4 files changed, 202 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/backlight/gpio-lcd.txt
+>  create mode 100644 drivers/video/backlight/gpio_lcd.c
+>
+> diff --git a/Documentation/devicetree/bindings/video/backlight/gpio-lcd.txt b/Documentation/devicetree/bindings/video/backlight/gpio-lcd.txt
+> new file mode 100644
+> index 0000000..4ff409d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/backlight/gpio-lcd.txt
+> @@ -0,0 +1,15 @@
+> +gpio-lcd bindings
 > +
-> +#ifdef CONFIG_PCI_MSI
-> +
-> +static LIST_HEAD(of_pci_msi_chip_list);
-> +static DEFINE_MUTEX(of_pci_msi_chip_mutex);
-> +
-> +int of_pci_msi_chip_add(struct msi_chip *chip)
-> +{
-> +	if (!of_property_read_bool(chip->of_node, "msi-controller"))
-> +		return -EINVAL;
-> +
-> +	mutex_lock(&of_pci_msi_chip_mutex);
-> +	list_add(&chip->list, &of_pci_msi_chip_list);
-> +	mutex_unlock(&of_pci_msi_chip_mutex);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(of_pci_msi_chip_add);
-> +
-> +void of_pci_msi_chip_remove(struct msi_chip *chip)
-> +{
-> +	mutex_lock(&of_pci_msi_chip_mutex);
-> +	list_del(&chip->list);
-> +	mutex_unlock(&of_pci_msi_chip_mutex);
-> +}
-> +EXPORT_SYMBOL_GPL(of_pci_msi_chip_remove);
-> +
-> +struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node *of_node)
-> +{
-> +	struct msi_chip *c;
-> +
-> +	mutex_lock(&of_pci_msi_chip_mutex);
-> +	list_for_each_entry(c, &of_pci_msi_chip_list, list) {
-> +		if (c->of_node == of_node) {
-> +			mutex_unlock(&of_pci_msi_chip_mutex);
-> +			return c;
-> +		}
-> +	}
-> +	mutex_unlock(&of_pci_msi_chip_mutex);
-> +
-> +	return NULL;
-> +}
-> +EXPORT_SYMBOL_GPL(of_pci_find_msi_chip_by_node);
-> +
-> +#endif /* CONFIG_PCI_MSI */
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index cbf5d05..80900e0 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -67,6 +67,8 @@ void default_teardown_msi_irqs(struct pci_dev *dev);
->  struct msi_chip {
->  	struct module *owner;
->  	struct device *dev;
-> +	struct device_node *of_node;
-> +	struct list_head list;
->  
->  	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
->  			 struct msi_desc *desc);
-> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> index 7a04826..29631eb 100644
-> --- a/include/linux/of_pci.h
-> +++ b/include/linux/of_pci.h
-> @@ -2,6 +2,7 @@
->  #define __OF_PCI_H
->  
->  #include <linux/pci.h>
-> +#include <linux/msi.h>
->  
->  struct pci_dev;
->  struct of_irq;
-> @@ -13,4 +14,15 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
->  int of_pci_get_devfn(struct device_node *np);
->  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
->  
-> +#if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-> +int of_pci_msi_chip_add(struct msi_chip *chip);
-> +void of_pci_msi_chip_remove(struct msi_chip *chip);
-> +struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node *of_node);
-> +#else
-> +static inline int of_pci_msi_chip_add(struct msi_chip *chip) { return -EINVAL; }
-> +static inline void of_pci_msi_chip_remove(struct msi_chip *chip) { }
-> +static inline struct msi_chip *
-> +of_pci_find_msi_chip_by_node(struct device_node *of_node) { return NULL };
-> +#endif
-> +
->  #endif
-> 
+> +Required properties:
+> +  - compatible: "gpio-lcd"
+> +  - gpios: describes the gpio that is used for enabling/disabling the lcd
+> +     (see GPIO binding[0] for more details).
+
+Do we really need this?
+
+Why not just use the regulator framework instead?
+
+You can refer to an example here:
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/video/mxsfb.c?id=4344429d3d926d219671f607125cff51223a140a
+
+Regards,
+
+Fabio Estevam
