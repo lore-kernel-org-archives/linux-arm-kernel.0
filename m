@@ -1,82 +1,40 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 15 Jul 2013 18:53:13 +0800
-Subject: [PATCH 2/3] serial: mxs: enable the DMA only when the rts/cts
- is enabled
-In-Reply-To: <20130715090755.GN12139@pengutronix.de>
-References: <1373857736-30108-1-git-send-email-b32955@freescale.com>
- <1373857736-30108-2-git-send-email-b32955@freescale.com>
- <20130715082716.GM12139@pengutronix.de> <51E3B5B5.1030706@freescale.com>
- <20130715090755.GN12139@pengutronix.de>
-Message-ID: <51E3D499.3060902@freescale.com>
+From: oleksandr.kozaruk@ti.com (Kozaruk, Oleksandr)
+Date: Mon, 15 Jul 2013 11:09:40 +0000
+Subject: [PATCH v3 2/2] iio: twl6030-gpadc: TWL6030, TWL6032 GPADC driver
+In-Reply-To: <51E05F6C.1060506@metafoo.de>
+References: <1373613482-28390-1-git-send-email-oleksandr.kozaruk@ti.com>
+ <1373613482-28390-3-git-send-email-oleksandr.kozaruk@ti.com>,
+ <51E05F6C.1060506@metafoo.de>
+Message-ID: <2A7ABDFCE21540479A5AEB0244A684D5E3D067@DNCE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?07?15? 17:07, Uwe Kleine-K?nig ??:
-> Hello,
->
-> On Mon, Jul 15, 2013 at 04:41:25PM +0800, Huang Shijie wrote:
->> ? 2013?07?15? 16:27, Uwe Kleine-K?nig ??:
->>> do you want to say that the driver fails to only enable DMA when RTS/CTS
->>> are available; or that today the driver can handle DMA just fine even
->>> without RTS/CTS? I interpret your commit log as the latter, your patch
->>> implements the former however.
->> in the mxs-auart, if the RTS/CTS is not invalid, the DMA should be
->> not enabled.
->>
->> But current code lost the limit, a uart without the RTS/CTS may also
->> enables the DMA in which case the uart
->> may does not run or run in a abnormal way.
-> So this sounds like a fix that should go into stable and so preferably
-> should be the first patch in your series.
-This patch depends on the first patch. :)
-> Something like:
->
-> 	serial: mxs-auart: DMA unreliable without RTS/CTS
->
-> 	According to [add some document name here] DMA doesn't work
-> 	reliable without hardware handshaking. So make DMA dependant on
-> 	a newly introdused property "fsl,uart-has-rtscts".
->
-> 	Cc: stable at kernel.org # [first affected version]
->
-> The flag is only used to decide if dma should be enabled. So I think an
-> in-code comment would be nice, too. Is it still correct to set
-ok.
-> AUART_CTRL2_RTSEN and AUART_CTRL2_RTS and read AUART_STAT_CTS when
-> fsl,uart-has-rtscts is not provided?
-i think it's correct. (if i have a imx28-evk board, i can test it.)
+Hello Lars-Peter,
+Thank you for the review.
 
-If you enable the RTS/CTS from the application, the 
-tty_port_cts_enabled() will be true.
-we will set the AUART_CTRL2_RTSEN in the end when the 
-"fsl,uart-has-rtscts" is enabled.
+>> diff --git a/drivers/iio/adc/twl6030-gpadc.c b/drivers/iio/adc/twl6030-gpadc.c
+>> new file mode 100644
+>> index 0000000..6ceb789
+>> --- /dev/null
+>> +++ b/drivers/iio/adc/twl6030-gpadc.c
+>> @@ -0,0 +1,1019 @@
+>[...]
+>> +static u8 twl6032_channel_to_reg(int channel)
+>> +{
+>> +     return TWL6032_GPADC_GPCH0_LSB;
+>
+>There is more than one channel, isn't there?
+Yes. But for twl6032 channel of interest is chosen first. When the conversion
+is ready tre result is available in GPCH0_LSB/GPCH1_MSB for any cosen
+channel. For twl6030 there are as many result register pairs as many of
+channels.
 
-
-> (BTW, mxs_auart_set_mctrl has:
+>> +     ret = devm_request_threaded_irq(dev, irq, NULL,
+>> +                                     twl6030_gpadc_irq_handler,
+>> +                                     IRQF_ONESHOT, "twl6030_gpadc", gpadc);
 >
-> 	u32 ctrl = readl(u->membase + AUART_CTRL2);
->
-> 	ctrl&= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
->          if (mctrl&  TIOCM_RTS) {
->                  if (tty_port_cts_enabled(&u->state->port))
->                          ctrl |= AUART_CTRL2_RTSEN;
->                  else
->                          ctrl |= AUART_CTRL2_RTS;
->          }
->
-> 	s->ctrl = mctrl;
->
-> A comment for the diligent reader about the difference between RTSEN and
-> RTS would be nice. Also I wonder if shadowing mctrl is sensible and used
-Please see the spec about the RTSEN and RTS.
-
-RTSEN enable the flow control by the hardware;
-RTS enable the flow control by the software.
-
-thanks
-Huang Shijie
-> correctly here.)
->
-> Best regards
-> Uwe
->
+>You access memory in the interrupt handler which is freed before the interrupt
+>handler is freed.
+Thanks for pointing this. devm_* will free memory for irq after the driver
+is removed and memory for the device is freed. I took me awhile to understand
+this. Is there going to be something like devm_iio_device_alloc? whould it be helpfull?
