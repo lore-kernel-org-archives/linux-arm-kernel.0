@@ -1,29 +1,20 @@
-From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Mon, 15 Jul 2013 13:39:13 -0300
-Subject: [PATCH 1/5] ARM: dts: imx23-evk: enable USB PHY and controller
-In-Reply-To: <CAOMZO5C_7nJ9RVYvuKJHP2u0mYY6P2UyGVA6OpPzqTnd7YXN2Q@mail.gmail.com>
-References: <1373898160-8460-1-git-send-email-otavio@ossystems.com.br>
- <CAOMZO5C_7nJ9RVYvuKJHP2u0mYY6P2UyGVA6OpPzqTnd7YXN2Q@mail.gmail.com>
-Message-ID: <CAP9ODKpr82mMoxhiv=K70RKdn01b=ZM2J9E4vV-AM5nwXxUR+g@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Jul 2013 10:48:22 -0600
+Subject: [PATCH V2] ARM: tegra: enable palmas device for dalmore
+In-Reply-To: <1373441852-27176-1-git-send-email-ldewangan@nvidia.com>
+References: <1373441852-27176-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <51E427D6.7090702@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 12:39 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Otavio,
->
-> On Mon, Jul 15, 2013 at 11:22 AM, Otavio Salvador
-> <otavio@ossystems.com.br> wrote:
->> The i.MX23EVK board provides a USB port so the USB PHY and controller
->> need to be enabled for it to be usable.
->>
->> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
->> ---
->
-> You should have Cc'd Shawn Guo on this series.
+On 07/10/2013 01:37 AM, Laxman Dewangan wrote:
+> Make the entry of Dalmore Power Management Unit device TPS65913
+> in dalmore DTS file. The Palma driver support this device.
+> 
+> Enable following submodule of the TPS65913:
+> - GPIO driver
+> - RTC driver.
+> - Power regulator driver.
 
-Oh; thanks for fix my mistake. I am new to kernel development :-)
-
---
-Otavio Salvador                             O.S. Systems
-http://www.ossystems.com.br        http://projetos.ossystems.com.br
-Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
+If I apply this, (at least) the SD card no longer works. I assume the
+regulator for it is being turned off somehow.
