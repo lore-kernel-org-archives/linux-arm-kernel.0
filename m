@@ -1,58 +1,84 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep.KarkadaNagesha at arm.com)
-Date: Mon, 15 Jul 2013 11:22:09 +0100
-Subject: [RFC PATCH 08/11] cpufreq: highbank-cpufreq: remove device tree
- parsing for cpu nodes
+Date: Mon, 15 Jul 2013 11:22:03 +0100
+Subject: [RFC PATCH 02/11] ARM: DT/kernel: define ARM specific
+ arch_of_get_cpu_node
 In-Reply-To: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1373883732-26303-9-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1373883732-26303-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Now that the cpu device registration initialises the of_node(if available)
-appropriately for all the cpus, parsing here is redundant.
+CPU subsystem now provides architecture specific hook to retrieve the
+of_node. Most of the cpu DT node parsing and initialisation is contained
+in devtree.c. It's better to contain all CPU device node parsing there.
 
-This patch removes all DT parsing and uses cpu->of_node instead.
+arch_of_get_cpu_node is mainly used to assign cpu->of_node when CPUs get
+registered. This patch overrides the defination of the same. It can also
+act as the helper function in pre-SMP/early initialisation stages to
+retrieve CPU device node pointers in logical ordering.
+
+This mainly helps to avoid replication of the code doing CPU node parsing
+and physical(MPIDR) to logical mapping.
 
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- drivers/cpufreq/highbank-cpufreq.c | 18 ++++++------------
- 1 file changed, 6 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/prom.h |  1 +
+ arch/arm/kernel/devtree.c   | 29 +++++++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+)
 
-diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
-index b61b5a3..794123f 100644
---- a/drivers/cpufreq/highbank-cpufreq.c
-+++ b/drivers/cpufreq/highbank-cpufreq.c
-@@ -69,23 +69,17 @@ static int hb_cpufreq_driver_init(void)
- 	if (!of_machine_is_compatible("calxeda,highbank"))
- 		return -ENODEV;
+diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
+index a219227..96f1682 100644
+--- a/arch/arm/include/asm/prom.h
++++ b/arch/arm/include/asm/prom.h
+@@ -18,6 +18,7 @@
+ extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
+ extern void arm_dt_memblock_reserve(void);
+ extern void __init arm_dt_init_cpu_maps(void);
++extern struct device_node *arch_of_get_cpu_node(int cpu);
  
--	for_each_child_of_node(of_find_node_by_path("/cpus"), np)
--		if (of_get_property(np, "operating-points", NULL))
--			break;
--
--	if (!np) {
--		pr_err("failed to find highbank cpufreq node\n");
--		return -ENOENT;
--	}
--
- 	cpu_dev = get_cpu_device(0);
- 	if (!cpu_dev) {
- 		pr_err("failed to get highbank cpufreq device\n");
--		ret = -ENODEV;
--		goto out_put_node;
-+		return -ENODEV;
+ #else /* CONFIG_OF */
+ 
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 5859c8b..3431aa9 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -169,6 +169,35 @@ void __init arm_dt_init_cpu_maps(void)
  	}
+ }
  
--	cpu_dev->of_node = np;
-+	np = of_node_get(cpu_dev->of_node);
-+	if (!np) {
-+		pr_err("failed to find highbank cpufreq node\n");
-+		return -ENOENT;
++struct device_node * __init arch_of_get_cpu_node(int cpu)
++{
++	struct device_node *cpun, *cpus;
++	const u32 *cell;
++	u64 hwid;
++	int ac;
++
++	cpus = of_find_node_by_path("/cpus");
++	if (WARN(!cpus, "Missing cpus node, bailing out\n"))
++		return NULL;
++
++	if (WARN_ON(of_property_read_u32(cpus, "#address-cells", &ac)))
++		ac = of_n_addr_cells(cpus);
++
++	for_each_child_of_node(cpus, cpun) {
++		if (of_node_cmp(cpun->type, "cpu"))
++			continue;
++		cell = of_get_property(cpun, "reg", NULL);
++		if (WARN(!cell, "%s: missing reg property\n", cpun->full_name))
++			continue;
++
++		hwid = of_read_number(cell, ac);
++		if ((hwid & MPIDR_HWID_BITMASK) == cpu_logical_map(cpu))
++			return cpun;
 +	}
- 
- 	cpu_clk = clk_get(cpu_dev, NULL);
- 	if (IS_ERR(cpu_clk)) {
++
++	return NULL;
++}
++
+ /**
+  * setup_machine_fdt - Machine setup when an dtb was passed to the kernel
+  * @dt_phys: physical address of dt blob
 -- 
 1.8.1.2
