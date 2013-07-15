@@ -1,37 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 15 Jul 2013 21:51:43 +0200
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <51E41944.6030403@keymile.com>
-References: <51DD88A4.1030506@keymile.com> <20130710185706.72b124a4@skate>
- <51DD9A8C.10608@keymile.com> <51DE58DF.5010304@keymile.com>
- <20130712105903.6336e912@skate> <51E41944.6030403@keymile.com>
-Message-ID: <20130715215143.5167a987@skate>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 15 Jul 2013 21:17:34 +0100
+Subject: [PATCH v1 01/24] spi: mpc512x: prepare clocks before enabling them
+In-Reply-To: <1373914074-20889-2-git-send-email-gsi@denx.de>
+References: <1373914074-20889-1-git-send-email-gsi@denx.de>
+ <1373914074-20889-2-git-send-email-gsi@denx.de>
+Message-ID: <20130715201734.GF11538@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Valentin Longchamp,
+On Mon, Jul 15, 2013 at 08:47:30PM +0200, Gerhard Sittig wrote:
+> clocks need to get prepared before they can get enabled,
+> fix the MPC512x PSC SPI master's initialization
 
-On Mon, 15 Jul 2013 17:46:12 +0200, Valentin Longchamp wrote:
-
-> > I'm not sure to follow this story of a virtual PCIe controller sitting
-> > at 0xf4000000. Can you give a few more details?
-> > 
+> Signed-off-by: Gerhard Sittig <gsi@denx.de>
+> ---
+>  drivers/spi/spi-mpc512x-psc.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> I'm not sure I can give all the details here as the documentation that we have
-> for this is subject to an NDA. To keep it short, in the kirkwood SoC we use,
-> there is an Ethernet Switch that is accessed by the kirkwood through an internal
-> virtual PCIe controller. The switch management SW has some hard expectations
-> about the physical address for this "PCIe" memory mapped window which conflicts
-> with the ones defined in the current device trees.
+> diff --git a/drivers/spi/spi-mpc512x-psc.c b/drivers/spi/spi-mpc512x-psc.c
+> index 29fce6a..76b20ea 100644
+> --- a/drivers/spi/spi-mpc512x-psc.c
+> +++ b/drivers/spi/spi-mpc512x-psc.c
+> @@ -395,7 +395,7 @@ static int mpc512x_psc_spi_port_config(struct spi_master *master,
+>  
+>  	sprintf(name, "psc%d_mclk", master->bus_num);
+>  	spiclk = clk_get(&master->dev, name);
+> -	clk_enable(spiclk);
+> +	clk_prepare_enable(spiclk);
+>  	mps->mclk = clk_get_rate(spiclk);
+>  	clk_put(spiclk);
 
-Ok. Note that the addresses chosen in the Device Tree can easily be
-changed on a per-SoC or per-board basis, if needed.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+This code is *clearly* buggy and should be fixed rather than papered
+over.  Not only is there no matching put the driver is also dropping the
+reference to the clock rather than holding on to it while it's in use.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130715/a9b4d8ae/attachment.sig>
