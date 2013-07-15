@@ -1,83 +1,43 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 15 Jul 2013 15:16:12 -0700
-Subject: [PATCH, re-send] Always trap on BUG()
-In-Reply-To: <201307051738.35930.arnd@arndb.de>
-References: <201307051738.35930.arnd@arndb.de>
-Message-ID: <20130715151612.9499c2b2ad40e88d183a4600@linux-foundation.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Jul 2013 23:22:26 +0100
+Subject: [PATCH] ARM: Add check for Cortex-A15 errata 798181 ECO
+In-Reply-To: <CAOesGMjATn9MCzazUGmbD44XR8HyJZU4cCvmOEoUZsmCgutPUg@mail.gmail.com>
+References: <1373920943-18308-1-git-send-email-robherring2@gmail.com>
+ <CAOesGMjATn9MCzazUGmbD44XR8HyJZU4cCvmOEoUZsmCgutPUg@mail.gmail.com>
+Message-ID: <20130715222226.GX24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Jul 2013 17:38:35 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
+On Mon, Jul 15, 2013 at 01:59:24PM -0700, Olof Johansson wrote:
+> On Mon, Jul 15, 2013 at 1:42 PM, Rob Herring <robherring2@gmail.com> wrote:
+> > diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+> > index 9a52a07..7fd64b7 100644
+> > --- a/arch/arm/kernel/smp_tlb.c
+> > +++ b/arch/arm/kernel/smp_tlb.c
+> > @@ -74,10 +74,21 @@ static inline void ipi_flush_bp_all(void *ignored)
+> >  static int erratum_a15_798181(void)
+> >  {
+> >         unsigned int midr = read_cpuid_id();
+> > +       unsigned int revidr;
+> >
+> >         /* Cortex-A15 r0p0..r3p2 affected */
+> >         if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
+> >                 return 0;
+> > +
+> > +       /* Check for Cortex A15 <= r3p2 with ECO fix */
+> > +       revidr = read_cpuid(CPUID_REVIDR);
+> > +       if ((revidr & 0x210) == 0x210)
+> > +               return 0;
+> 
+> Reading and evaluating all this on every invalidate seems suboptimal.
+> It should be possible to read just once and cache the result.
+> 
+> I would have had the same comment about the original patch, but ARM
+> pushes those to Russell in secret so it wasn't on the list. :-)
 
-> I've run some size analyis using the ARM 'multi_v7_defconfig'
-> and gcc-4.8, using various definitions for BUG() and BUG_ON(), to
-> see how big the size improvement actually gets
-> 
-> 1. Baseline: normal bug plus CONFIG_BUG_VERBOSE
->    text    data     bss     dec     hex filename
-> 3743196  224396  206812 4174404  3fb244 vmlinux-bugverbose
-> 
-> 2. disabling CONFIG_BUG_VERBOSE, saving 0.6%
-> 3716920  224380  206812 4148112  3f4b90 vmlinux-nobugverbose
-> 
-> 3. #define BUG() panic(__func__), #define BUG_ON(c) if(c) BUG(), saving 1.0%
-> 3701076  224384  206812 4132272  3f0db0 vmlinux-bug-panicfunc
-> 
-> 3. #define BUG() panic(__func__), #define BUG_ON(c) if(c) BUG(), saving 1.5%
-> 3678884  224400  206812 4110096  3eb710 vmlinux-bug-panic
-> 
-> 4. #define BUG() unreachable(), saving 2.1%
-> 3652636  224384  206812 4083832  3e5078 vmlinux-bug-unreachable
-> 
-> 5. as 4, plus #define BUG_ON(c) if(c) unreachable(), saving 2.2%
-> 3651108  224380  206812 4082300  3e4a7c vmlinux-bugon-unreachable
-> 
-> 6. #define BUG() do{}while(0), saving 2.1%
-> 3654264  224380  206812 4085456  3e56d0 vmlinux-nobug
-> 
-> 7. as 6, plus #define BUG_ON if(0 && (c)) unreachable, saving 2.2%
-> 3648392  223996  206748 4079136  3e3e20 vmlinux-no-bugon
-> 
-> 8. my patch below, saving 1.8%
-> 3666532  224380  206812 4097724  3e86bc obj-tmp/vmlinux
-> 
-> The gain of doing unreachable and letting the code run off whereever
-> is minimal compared to the current state of doing nothing, but it
-> avoids the warnings.
-> 
-> Same test using x86_defconfig:
-> 
-> 1. CONFIG_BUG=y, CONFIG_BUGVERBOSE=n
-> 10797859        1395648 1175552 13369059         cbfee3 vmlinux-x86-bug
-> 
-> 2. CONFIG_BUG=n, saves 1.0%
-> 10658553        1395584 1175552 13229689         c9de79 vmlinux-x86-nobug
-> 
-> 3. with my patch, saves 0.8%
-> 10684186        1395584 1175552 13255322         ca429a vmlinux-x86-archbug
-> 
-> Getting 1-2% savings in kernel size seems absolutely worth keeping the
-> option, but 0.2-0.4% left for getting reproducible behavior also seems
-> worthwhile. The result in the patch below.
-> 
-> This basically loses any of the BUG() reporting, but leaves the
-> logic to trap and kill the task in place when CONFIG_BUG is disabled.
+For a single read, there's probably not much between reading the CP15
+register and doing the tests, vs reading a bool from memory to decide
+whether we need to do it.
 
-um, nice changelog, but it didn't tell us what the patch actually does.
-
-AFACIT it arranges for the kernel to execute the trap instruction even
-when CONFIG_BUG=n?  Can't be bothered fully working it out, really.
-
-It also makes mystery changes to WARN_ON() and WARN().  What are those?
-
-Also, you say "it avoids the warnings".  To what warnings do you refer?
-The ones which are already emitted by CONFIG_BUG=n, or new ones which
-would have been added had this patch been implemented differently?
-
-Finally, code-size decreases are nice, but what are the runtime effects
-of this patch?
-
-I've been thinking for a while that CONFIG_BUG=n is a pretty dumb thing
-to do, and that maintaining it (and trying to fix the warnings it
-produces) aren't worth the effort and that we should remove the whole
-thing.  Perhaps your patch changes that calculus, dunno.  Please discuss.
+For more than that (as the above patch is growing) it probably makes
+sense to think about using a bool in memory now.
