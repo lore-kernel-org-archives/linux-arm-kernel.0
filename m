@@ -1,106 +1,60 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep.KarkadaNagesha at arm.com)
-Date: Mon, 15 Jul 2013 11:22:05 +0100
-Subject: [RFC PATCH 04/11] ARM: mvebu: remove device tree parsing for cpu nodes
-In-Reply-To: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1373883732-26303-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Date: Mon, 15 Jul 2013 11:22:01 +0100
+Subject: [RFC PATCH 00/11] ARM: DT: update cpu device of_node
+Message-ID: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Currently set_secondary_cpus_clock assume the CPU logical ordering
-and the MPDIR in DT are same, which is incorrect.
+As more and more information is getting added into the cpu node, the number
+of drivers needing to parse the device tree for CPU nodes are increasing.
+Most of the time, the information needed from the cpu node is preferred
+in the logical CPU order. Hence many drivers first parse and search the
+CPU node, match them to logical index if needed and then search for the
+required property inside a particular cpu node. Some of them assume the
+logical and physical CPU ordering to be same which is incorrect.
 
-Since the CPU device nodes can be retrieved in the logical ordering
-using the helper, we can remove the devices tree parsing.
+This patch series initialises the of_node in all the cpu devices when
+registering the CPU device.
+1. This avoids different drivers having to parse the cpu nodes to obtain
+   different attributes like operating points, latency,...etc.
+2. This handles different physical and logical cpu ordering which is not
+   the case in current code.
+3. Also all the cpu nodes will have their of_node initialised correctly.
+   Currently different drivers assign them partially and incorrectly.
+4. Removes all the reduntant parsing in various drivers.
 
-This patch removes DT parsing by making use of arch_of_get_cpu_node.
+Regards,
+Sudeep
 
-Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
----
- arch/arm/mach-mvebu/platsmp.c | 52 ++++++++++++++++++++-----------------------
- 1 file changed, 24 insertions(+), 28 deletions(-)
+Sudeep KarkadaNagesha (11):
+  driver/core: cpu: initialize of_node in cpu's device struture
+  ARM: DT/kernel: define ARM specific arch_of_get_cpu_node
+  ARM: topology: remove hwid(MPIDR dependency) from cpu_capacity
+  ARM: mvebu: remove device tree parsing for cpu nodes
+  drivers/bus: arm-cci: avoid parsing DT for cpu device nodes
+  cpufreq: imx6q-cpufreq: remove device tree parsing for cpu nodes
+  cpufreq: cpufreq-cpu0: remove device tree parsing for cpu nodes
+  cpufreq: highbank-cpufreq: remove device tree parsing for cpu nodes
+  cpufreq: spear-cpufreq: remove device tree parsing for cpu nodes
+  cpufreq: kirkwood-cpufreq: remove device tree parsing for cpu nodes
+  cpufreq: arm_big_little: remove device tree parsing for cpu nodes
 
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index 93f2f3a..b57af6c 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -23,51 +23,47 @@
- #include <linux/of.h>
- #include <linux/mbus.h>
- #include <asm/cacheflush.h>
-+#include <asm/prom.h>
- #include <asm/smp_plat.h>
- #include "common.h"
- #include "armada-370-xp.h"
- #include "pmsu.h"
- #include "coherency.h"
- 
-+static struct clk *__init get_cpu_clk(int cpu)
-+{
-+	struct clk *cpu_clk;
-+	struct device_node *np = arch_of_get_cpu_node(cpu);
-+
-+	if (WARN(!np, "missing cpu node\n"))
-+		return NULL;
-+	cpu_clk = of_clk_get(np, 0);
-+	if (WARN_ON(IS_ERR(cpu_clk)))
-+		return NULL;
-+	return cpu_clk;
-+}
-+
- void __init set_secondary_cpus_clock(void)
- {
--	int thiscpu;
-+	int thiscpu, cpu;
- 	unsigned long rate;
--	struct clk *cpu_clk = NULL;
--	struct device_node *np = NULL;
-+	struct clk *cpu_clk;
- 
- 	thiscpu = smp_processor_id();
--	for_each_node_by_type(np, "cpu") {
--		int err;
--		int cpu;
--
--		err = of_property_read_u32(np, "reg", &cpu);
--		if (WARN_ON(err))
--			return;
--
--		if (cpu == thiscpu) {
--			cpu_clk = of_clk_get(np, 0);
--			break;
--		}
--	}
--	if (WARN_ON(IS_ERR(cpu_clk)))
-+	cpu_clk = get_cpu_clk(thiscpu);
-+	if (!cpu_clk)
- 		return;
- 	clk_prepare_enable(cpu_clk);
- 	rate = clk_get_rate(cpu_clk);
- 
- 	/* set all the other CPU clk to the same rate than the boot CPU */
--	for_each_node_by_type(np, "cpu") {
--		int err;
--		int cpu;
--
--		err = of_property_read_u32(np, "reg", &cpu);
--		if (WARN_ON(err))
-+	for_each_possible_cpu(cpu) {
-+		if (cpu == thiscpu)
-+			continue;
-+		cpu_clk = get_cpu_clk(cpu);
-+		if (!cpu_clk)
- 			return;
--
--		if (cpu != thiscpu) {
--			cpu_clk = of_clk_get(np, 0);
--			clk_set_rate(cpu_clk, rate);
--		}
-+		clk_set_rate(cpu_clk, rate);
- 	}
- }
- 
+ arch/arm/include/asm/prom.h         |  1 +
+ arch/arm/kernel/devtree.c           | 29 ++++++++++++++++++
+ arch/arm/kernel/topology.c          | 61 ++++++++++++-------------------------
+ arch/arm/mach-imx/mach-imx6q.c      |  3 +-
+ arch/arm/mach-mvebu/platsmp.c       | 52 +++++++++++++++----------------
+ drivers/base/cpu.c                  | 19 ++++++++++++
+ drivers/bus/arm-cci.c               | 28 +++++------------
+ drivers/cpufreq/arm_big_little_dt.c | 39 +++++++++++-------------
+ drivers/cpufreq/cpufreq-cpu0.c      | 23 +++-----------
+ drivers/cpufreq/highbank-cpufreq.c  | 18 ++++-------
+ drivers/cpufreq/imx6q-cpufreq.c     |  4 +--
+ drivers/cpufreq/kirkwood-cpufreq.c  | 14 +++++++--
+ drivers/cpufreq/spear-cpufreq.c     | 10 +++++-
+ 13 files changed, 149 insertions(+), 152 deletions(-)
+
 -- 
 1.8.1.2
