@@ -1,49 +1,70 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 15 Jul 2013 15:03:42 -0700
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <20130712075602.GA4002@gmail.com>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
- <20130712075602.GA4002@gmail.com>
-Message-ID: <20130715150342.35f7620ffe0835e3e2bc37d0@linux-foundation.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 15 Jul 2013 17:08:58 -0500
+Subject: [PATCH] ARM: Add check for Cortex-A15 errata 798181 ECO
+In-Reply-To: <CAOesGMjATn9MCzazUGmbD44XR8HyJZU4cCvmOEoUZsmCgutPUg@mail.gmail.com>
+References: <1373920943-18308-1-git-send-email-robherring2@gmail.com>
+ <CAOesGMjATn9MCzazUGmbD44XR8HyJZU4cCvmOEoUZsmCgutPUg@mail.gmail.com>
+Message-ID: <51E472FA.1080905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Jul 2013 09:56:02 +0200 Ingo Molnar <mingo@kernel.org> wrote:
+On 07/15/2013 03:59 PM, Olof Johansson wrote:
+> On Mon, Jul 15, 2013 at 1:42 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+>> index 9a52a07..7fd64b7 100644
+>> --- a/arch/arm/kernel/smp_tlb.c
+>> +++ b/arch/arm/kernel/smp_tlb.c
+>> @@ -74,10 +74,21 @@ static inline void ipi_flush_bp_all(void *ignored)
+>>  static int erratum_a15_798181(void)
+>>  {
+>>         unsigned int midr = read_cpuid_id();
+>> +       unsigned int revidr;
+>>
+>>         /* Cortex-A15 r0p0..r3p2 affected */
+>>         if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
+>>                 return 0;
+>> +
+>> +       /* Check for Cortex A15 <= r3p2 with ECO fix */
+>> +       revidr = read_cpuid(CPUID_REVIDR);
+>> +       if ((revidr & 0x210) == 0x210)
+>> +               return 0;
+> 
+> Reading and evaluating all this on every invalidate seems suboptimal.
+> It should be possible to read just once and cache the result.
 
-> 
-> * Kyungsik Lee <kyungsik.lee@lge.com> wrote:
-> >  quiet_cmd_lz4 = LZ4     $@
-> >  cmd_lz4 = (cat $(filter-out FORCE,$^) | \
-> > -	lz4demo -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
-> > +	lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
-> >  	(rm -f $@ ; false)
-> 
-> None of the major distros I tried has the lz4 or lz4c binary available, 
-> and this breaks randconfig builds:
-> 
->   /bin/sh: lz4c: command not found
-> 
-> If:
-> 
->  CONFIG_HAVE_KERNEL_LZ4=y
->  CONFIG_KERNEL_LZ4=y
->  CONFIG_RD_LZ4=y
->  CONFIG_LZ4_DECOMPRESS=y
->  CONFIG_DECOMPRESS_LZ4=y
-> 
-> If a utility is not widely available yet and if the utility is not in the 
-> kernel proper, could you please at least make sure that randconfig does 
-> not stumble over non-buildable kernels?
+Yes, but I'm not sure it is so clear. 2 coproc reads may be faster than
+a load potentially from memory. But then how much more code do we have
+to fetch. How about something like this:
 
-I don't know how to do this.  Any suggestions?
+static int erratum_a15_798181(void)
+{
+	static int errata_fix_needed = -1;
 
-It has to be done at `make config' time.  We'd need to probe for the
-presence of lz4c and then....  what?
+	if (unlikely(errata_fix_needed == -1)) {
+		unsigned int midr = read_cpuid_id();
+		unsigned int revidr = read_cpuid(CPUID_REVIDR);
 
-Is there any precedent for this?
+		/* Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
+		if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2 ||
+		    (revidr & 0x210) == 0x210) {
+			errata_fix_needed = 0;
+			return 0;
+		}
+		if (revidr & 0x10)
+			errata_fix_needed = 1;
 
-I don't think we can just ignore the absence of lz4c - the user has
-selected a config which his system cannot build.  The problem lies
-within randconfig itself.
+		errata_fix_needed = 2;
+	}
+
+	if (errata_fix_needed)
+		dummy_flush_tlb_a15_erratum();
+	return (errata_fix_needed == 2) ? 1: 0;
+}
+
+
+> I would have had the same comment about the original patch, but ARM
+> pushes those to Russell in secret so it wasn't on the list. :-)
+
+And I would have commented that we need to handle ECO fixes...
+
+Rob
