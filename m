@@ -1,51 +1,29 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 15 Jul 2013 09:27:10 -0700
-Subject: [PATCHv5 00/11] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <51E4167B.4000208@wwwdotorg.org>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <51E4167B.4000208@wwwdotorg.org>
-Message-ID: <20130715162709.GA24625@dhcp-172-17-186-34.nvidia.com>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Mon, 15 Jul 2013 13:39:13 -0300
+Subject: [PATCH 1/5] ARM: dts: imx23-evk: enable USB PHY and controller
+In-Reply-To: <CAOMZO5C_7nJ9RVYvuKJHP2u0mYY6P2UyGVA6OpPzqTnd7YXN2Q@mail.gmail.com>
+References: <1373898160-8460-1-git-send-email-otavio@ossystems.com.br>
+ <CAOMZO5C_7nJ9RVYvuKJHP2u0mYY6P2UyGVA6OpPzqTnd7YXN2Q@mail.gmail.com>
+Message-ID: <CAP9ODKpr82mMoxhiv=K70RKdn01b=ZM2J9E4vV-AM5nwXxUR+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 09:34:19AM -0600, Stephen Warren wrote:
-> On 07/15/2013 05:52 AM, Thomas Petazzoni wrote:
-> > Hello,
-> > 
-> > This set of patches introduces Message Signaled Interrupt support in
-> > the Marvell EBU PCIe driver. It has been successfully tested on the
-> > Armada XP GP platform with an Intel e1000e PCIe network card that
-> > supports MSI.
-> > 
-> > This patch set is intended for merging in 3.12, so the respective
-> > maintainers of the different areas are invited to review/ack the
-> > patches, see below for the details. This set of patches applies on top
-> > of 3.11-rc1.
-> 
-> Thomas, who is going to merge this series?
-> 
-> I believe at least patches 1-8 (or perhaps just 1-5 plus 8; I /think/
-> all the other patches are MVEBU-specific) are dependencies for the new
-> Tegra PCIe driver which should be posted very soon for 3.12. As such,
-> I'd like to see these dependencies merged into a standalone stable (100%
-> non-rebasable) topic branch based on 3.11-rc1 so that the topic branch
-> is available for merging into whichever tree takes the new Tegra PCIe
-> driver (which I'm guessing will be the Tegra tree to reduce conflicts).
-> So, whoever merges these patches is going to need to know to set up that
-> topic branch.
-> 
-> Thierry, please correct me if I'm wrong here.
+On Mon, Jul 15, 2013 at 12:39 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Otavio,
+>
+> On Mon, Jul 15, 2013 at 11:22 AM, Otavio Salvador
+> <otavio@ossystems.com.br> wrote:
+>> The i.MX23EVK board provides a USB port so the USB PHY and controller
+>> need to be enabled for it to be usable.
+>>
+>> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+>> ---
+>
+> You should have Cc'd Shawn Guo on this series.
 
-We need at least patches 2, 4 and 8 for Tegra. There's still the option
-of working around patch 8 by using the custom root bus scan function
-that we have to use anyway, so I guess we could even trim the
-requirement down to patches 2 and 4 if we really need.
+Oh; thanks for fix my mistake. I am new to kernel development :-)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130715/97e67ff4/attachment.sig>
+--
+Otavio Salvador                             O.S. Systems
+http://www.ossystems.com.br        http://projetos.ossystems.com.br
+Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
