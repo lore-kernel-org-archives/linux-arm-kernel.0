@@ -1,40 +1,40 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Mon, 15 Jul 2013 11:27:24 +0200
-Subject: [PATCH] Route kbd LEDs through the generic LEDs layer
-In-Reply-To: <20130707101028.GD5651@type.youpi.perso.aquilenet.fr> (Samuel
- Thibault's message of "Sun, 7 Jul 2013 12:10:28 +0200")
-References: <201011112205.oABM5KVJ005298@imap1.linux-foundation.org>
- <201011111440.07882.dmitry.torokhov@gmail.com>
- <20110102090935.GV32469@atrey.karlin.mff.cuni.cz>
- <20110102103210.GA25662@core.coreip.homeip.net>
- <20110102225741.GX5480@const.famille.thibault.fr>
- <20110112182702.GA9168@core.coreip.homeip.net>
- <20111114040613.GA4992@type.famille.thibault.fr>
- <20121221003449.GA6999@type.youpi.perso.aquilenet.fr>
- <20130707101028.GD5651@type.youpi.perso.aquilenet.fr>
-Message-ID: <87wqos9nr7.fsf@dell.be.48ers.dk>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 15 Jul 2013 15:01:42 +0530
+Subject: [PATCH] cpufreq: s3c24xx: fix typo "ARM_S3C24XX"
+In-Reply-To: <1373803339.1370.18.camel@x61.thuisdomein>
+References: <1373803339.1370.18.camel@x61.thuisdomein>
+Message-ID: <CAKohpok1xvsVrssYrNJJZ2GTLJZVnY8SrCzNx+VdXbiMjL6uLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Samuel" == Samuel Thibault <samuel.thibault@ens-lyon.org> writes:
+On 14 July 2013 17:32, Paul Bolle <pebolle@tiscali.nl> wrote:
+> Kconfig symbol S3C24XX_PLL depends on ARM_S3C24XX. But that symbol
+> doesn't exist. Commit f023f8dd59bf ("cpufreq: s3c24xx: move cpufreq
+> driver to drivers/cpufreq"), which added this typo, makes clear that
+> ARM_S3C24XX_CPUFREQ was intended here.
+>
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> Untested!
+>
+>  arch/arm/mach-s3c24xx/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+> index 6d9252e..7791ac7 100644
+> --- a/arch/arm/mach-s3c24xx/Kconfig
+> +++ b/arch/arm/mach-s3c24xx/Kconfig
+> @@ -208,7 +208,7 @@ config S3C24XX_GPIO_EXTRA128
+>
+>  config S3C24XX_PLL
+>         bool "Support CPUfreq changing of PLL frequency (EXPERIMENTAL)"
+> -       depends on ARM_S3C24XX
+> +       depends on ARM_S3C24XX_CPUFREQ
+>         help
+>           Compile in support for changing the PLL frequency from the
+>           S3C24XX series CPUfreq driver. The PLL takes time to settle
 
- Samuel> This permits to reassign keyboard LEDs to something else than keyboard "leds"
- Samuel> state, by adding keyboard led and modifier triggers connected to a series
- Samuel> of VT input LEDs, themselves connected to VT input triggers, which
- Samuel> per-input device LEDs use by default.  Userland can thus easily change the LED
- Samuel> behavior of (a priori) all input devices, or of particular input devices.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
- Samuel> This also permits to fix #7063 from userland by using a modifier to implement
- Samuel> proper CapsLock behavior and have the keyboard caps lock led show that modifier
- Samuel> state.
-
- Samuel> Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
- Samuel> [ebroder at mokafive.com: Rebased to 3.2-rc1 or so, cleaned up some includes, and fixed some constants]
- Samuel> Signed-off-by: Evan Broder <evan@ebroder.net>
-
-Looks good to me. Samuel, thanks for picking this up again.
-
-Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
-
--- 
-Bye, Peter Korsgaard
+@Rafael: I saw you taking other s3c patch directly. Mind taking this
+one too?
