@@ -1,44 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 15 Jul 2013 09:59:53 +0200
-Subject: [PATCH 0/4] A10S-OLinuXino-Micro I2C support
-In-Reply-To: <1373232719-13050-1-git-send-email-emilio@elopez.com.ar>
-References: <1373232719-13050-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20130715075953.GA2962@lukather>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 15 Jul 2013 09:03:28 +0100
+Subject: v3.10 - big endian core support
+In-Reply-To: <20130714215325.GB7382@mudshark.cambridge.arm.com>
+References: <CALicx6u89THSiRa4FzGZrcoG8q+o_BD8qVEC4CYXEjPUVK_fJw@mail.gmail.com>
+ <20130712134726.0a909165@skate> <51DFEF75.8080600@codethink.co.uk>
+ <20130714215325.GB7382@mudshark.cambridge.arm.com>
+Message-ID: <51E3ACD0.8040209@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emilio,
+On 14/07/13 22:53, Will Deacon wrote:
+> On Fri, Jul 12, 2013 at 12:58:45PM +0100, Ben Dooks wrote:
+>> On 12/07/13 12:47, Thomas Petazzoni wrote:
+>>> Dear Vijay Kilari,
+>>>
+>>> On Fri, 12 Jul 2013 17:09:12 +0530, Vijay Kilari wrote:
+>>>
+>>>>> Ben Dooks has a separate branch on top of this base branch for
+>>>>> big-endian support, that adds atags compat code to convert the ATAGs
+>>>>> data from LE to BE. See the baserock/311/be/atags branch in
+>>>>> git://git.baserock.org/delta/linux. Or
+>>>>> http://git.baserock.org/cgi-bin/cgit.cgi/delta/linux.git/log/?h=baserock/311/be/atags.
+>>>>
+>>>>    ARM VE TC2 board, enabling CONFIG_THUMB2_KERNEL failed to boot in BE mode
+>>>> It hangs at very early stage of boot
+>>>
+>>> Yeah, the Thumb2 code is not supported by Ben Dooks patches, it's part
+>>> of the TODO-list. I think Ben said he would probably not have much time
+>>> to work on this. I might be able to spare some time on this, so just
+>>> let me know if I should start working on this. If I remember correctly,
+>>> it's mainly the fixup_pv_table code that needed some Thumb2/BE love.
+>>>
+>>> Will, is getting Thumb2 working a requirement to get the BE support
+>>> merged, or can we for now make the BE option depends on !THUMB2_KERNEL ?
+>>
+>> I would like to sort out getting this code merged as it seems to have
+>> been tested by several people now outside Codethink.
+>>
+>> I could try doing the THUMB2 support, but I do not have a lot of
+>> experience with building THUMB2 kernels.
+>
+> I think we should try and get Thumb-2 supported before merging this as there
+> isn't any real reason why the instruction set should cause endianness
+> issues. We're also only almost at -rc1, so there's still time to fix this
+> properly for 3.12 instead of adding a fake Kconfig dependency.
+>
+> As for building a Thumb-2 kernel; just enable the option in menuconfig and
+> you're done. The compiler should "do the right thing".
 
-On Sun, Jul 07, 2013 at 06:31:55PM -0300, Emilio L?pez wrote:
-> Hi,
-> 
-> This patchset adds the required DT nodes to get I2C supported and 
-> working on the OLIMEX A10S-OLinuXino-Micro board.
-> 
-> Patch 1 adds the muxings as seen on the board's schematics. Patch 2 adds 
-> the DT nodes, based on other sunxi dts, as we don't have an A10S user 
-> manual so far. Patch 3 enables the controllers, and patch 4 adds a node 
-> for the AT24 EEPROM found on the board.
-> 
-> I have tested and can see the PMU on I2C-0 using i2cdetect, and can read 
-> the EEPROM contents on I2C-1. I have not tested I2C-2, but i2cdetect 
-> reports no devices so I suppose it's working okay too.
-> 
-> Any testing or review will be appreciated :)
-
-I just applied them to my sunxi/dt-for-3.12 branch.
-
-Thanks!
-Maxime
+I can build it, I just don't have the time and hardware to give it a
+test at the moment. However it seems that changing to using 'rev16'
+instead of 'rev'. I will make the necessary changes and get this ready
+to go.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130715/9a977471/attachment.sig>
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
