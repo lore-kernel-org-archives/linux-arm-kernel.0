@@ -1,34 +1,31 @@
-From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Mon, 15 Jul 2013 11:22:39 -0300
-Subject: [PATCH 4/5] ARM: dts: imx23-olinuxino: enable Low Resolution ADC
-In-Reply-To: <1373898160-8460-1-git-send-email-otavio@ossystems.com.br>
-References: <1373898160-8460-1-git-send-email-otavio@ossystems.com.br>
-Message-ID: <1373898160-8460-4-git-send-email-otavio@ossystems.com.br>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Mon, 15 Jul 2013 15:23:39 +0100
+Subject: [PATCH] xen/arm: enable PV control for ARM
+Message-ID: <1373898219-15713-1-git-send-email-julien.grall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.XM23 has a internal Low Resolution ADC; this enables the support
-for this device.
+Enable power management from the toolstack for ARM guest.
 
-Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+Signed-off-by: Julien Grall <julien.grall@linaro.org>
 ---
- arch/arm/boot/dts/imx23-olinuxino.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/xen/Makefile |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
-index d107c4a..fc766ae 100644
---- a/arch/arm/boot/dts/imx23-olinuxino.dts
-+++ b/arch/arm/boot/dts/imx23-olinuxino.dts
-@@ -69,6 +69,10 @@
- 		};
+diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+index 2bf461a..a5f12bd 100644
+--- a/drivers/xen/Makefile
++++ b/drivers/xen/Makefile
+@@ -1,9 +1,8 @@
+ ifneq ($(CONFIG_ARM),y)
+-obj-y	+= manage.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
+ endif
+ obj-$(CONFIG_X86)			+= fallback.o
+-obj-y	+= grant-table.o features.o events.o balloon.o time.o
++obj-y	+= grant-table.o features.o events.o balloon.o time.o manage.o
+ obj-y	+= xenbus/
  
- 		apbx at 80040000 {
-+			lradc at 80050000 {
-+				status = "okay";
-+			};
-+
- 			duart: serial at 80070000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&duart_pins_a>;
+ nostackp := $(call cc-option, -fno-stack-protector)
 -- 
-1.8.3.2
+1.7.10.4
