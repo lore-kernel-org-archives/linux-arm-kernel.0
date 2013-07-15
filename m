@@ -1,59 +1,374 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Mon, 15 Jul 2013 11:25:32 -0400
-Subject: [Xen-devel] [PATCH] xen/arm: disable cpuidle when linux is
- running as dom0
-In-Reply-To: <1373898101-15633-1-git-send-email-julien.grall@linaro.org>
-References: <1373898101-15633-1-git-send-email-julien.grall@linaro.org>
-Message-ID: <20130715152532.GC5774@phenom.dumpdata.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 15 Jul 2013 11:57:50 -0300
+Subject: [RESEND PATCH v7 21/22] ARM: mvebu: Relocate Armada 370/XP DeviceBus
+ device tree nodes
+In-Reply-To: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1373900271-4722-22-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 03:21:41PM +0100, Julien Grall wrote:
-> When linux is running as dom0, Xen doesn't show the physical cpu but a
-> virtual CPU.
-> On some ARM SOC (for instance the exynos 5250), linux registers callbacks
-> for cpuidle. When these callbacks are called, they will modify
-> directly the physical cpu not the virtual one. It can impact the whole board
-> instead of dom0.
+Now that mbus has been added to the device tree, it's possible to
+move the DeviceBus out of internal registers, placing it directly
+below the mbus. This is a more accurate representation of the hardware.
 
-Should you also call disable_cpufreq() ?
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370-xp.dtsi             | 94 +++++++++++++-----------
+ arch/arm/boot/dts/armada-xp-db.dts               | 59 +++++++--------
+ arch/arm/boot/dts/armada-xp-gp.dts               | 60 +++++++--------
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 65 ++++++++--------
+ 4 files changed, 140 insertions(+), 138 deletions(-)
 
-> 
-> Signed-off-by: Julien Grall <julien.grall@linaro.org>
-> ---
->  arch/arm/xen/enlighten.c |    7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 49839d8..a98999f 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -24,6 +24,8 @@
->  #include <linux/of.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_address.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/cpufreq.h>
->  
->  #include <linux/mm.h>
->  
-> @@ -292,6 +294,11 @@ static int __init xen_pm_init(void)
->  {
->  	pm_power_off = xen_power_off;
->  	arm_pm_restart = xen_restart;
-> +	/*
-> +	 * Making sure board specific code will not set up ops for
-> +	 * cpu idle.
-> +	 */
-> +	disable_cpuidle();
->  
->  	return 0;
->  }
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> Xen-devel mailing list
-> Xen-devel at lists.xen.org
-> http://lists.xen.org/xen-devel
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 62639b4..073dd20 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -45,6 +45,56 @@
+ 		controller = <&mbusc>;
+ 		interrupt-parent = <&mpic>;
+ 
++		devbus-bootcs {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10400 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs0 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10408 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x3e) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs1 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10410 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x3d) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs2 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10418 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x3b) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs3 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10420 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x37) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
+ 		internal-regs {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -200,50 +250,6 @@
+ 				status = "disabled";
+ 			};
+ 
+-			devbus-bootcs at 10400 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10400 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+-
+-			devbus-cs0 at 10408 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10408 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+-
+-			devbus-cs1 at 10410 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10410 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+-
+-			devbus-cs2 at 10418 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10418 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+-
+-			devbus-cs3 at 10420 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10420 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+ 		};
+ 	};
+  };
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index 857f272..76ae1a9 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -31,7 +31,36 @@
+ 
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
++
++		devbus-bootcs {
++			status = "okay";
++
++			/* Device Bus parameters are required */
++
++			/* Read parameters */
++			devbus,bus-width    = <8>;
++			devbus,turn-off-ps  = <60000>;
++			devbus,badr-skew-ps = <0>;
++			devbus,acc-first-ps = <124000>;
++			devbus,acc-next-ps  = <248000>;
++			devbus,rd-setup-ps  = <0>;
++			devbus,rd-hold-ps   = <0>;
++
++			/* Write parameters */
++			devbus,sync-enable = <0>;
++			devbus,wr-high-ps  = <60000>;
++			devbus,wr-low-ps   = <60000>;
++			devbus,ale-wr-ps   = <60000>;
++
++			/* NOR 16 MiB */
++			nor at 0 {
++				compatible = "cfi-flash";
++				reg = <0 0x1000000>;
++				bank-width = <2>;
++			};
++		};
+ 
+ 		internal-regs {
+ 			serial at 12000 {
+@@ -160,34 +189,6 @@
+ 				};
+ 			};
+ 
+-			devbus-bootcs at 10400 {
+-				status = "okay";
+-				ranges = <0 0xf0000000 0x1000000>;
+-
+-				/* Device Bus parameters are required */
+-
+-				/* Read parameters */
+-				devbus,bus-width    = <8>;
+-				devbus,turn-off-ps  = <60000>;
+-				devbus,badr-skew-ps = <0>;
+-				devbus,acc-first-ps = <124000>;
+-				devbus,acc-next-ps  = <248000>;
+-				devbus,rd-setup-ps  = <0>;
+-				devbus,rd-hold-ps   = <0>;
+-
+-				/* Write parameters */
+-				devbus,sync-enable = <0>;
+-				devbus,wr-high-ps  = <60000>;
+-				devbus,wr-low-ps   = <60000>;
+-				devbus,ale-wr-ps   = <60000>;
+-
+-				/* NOR 16 MiB */
+-				nor at 0 {
+-					compatible = "cfi-flash";
+-					reg = <0 0x1000000>;
+-					bank-width = <2>;
+-				};
+-			};
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 934dc46..8c0de20 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -40,7 +40,36 @@
+ 
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
++
++		devbus-bootcs {
++			status = "okay";
++
++			/* Device Bus parameters are required */
++
++			/* Read parameters */
++			devbus,bus-width    = <8>;
++			devbus,turn-off-ps  = <60000>;
++			devbus,badr-skew-ps = <0>;
++			devbus,acc-first-ps = <124000>;
++			devbus,acc-next-ps  = <248000>;
++			devbus,rd-setup-ps  = <0>;
++			devbus,rd-hold-ps   = <0>;
++
++			/* Write parameters */
++			devbus,sync-enable = <0>;
++			devbus,wr-high-ps  = <60000>;
++			devbus,wr-low-ps   = <60000>;
++			devbus,ale-wr-ps   = <60000>;
++
++			/* NOR 16 MiB */
++			nor at 0 {
++				compatible = "cfi-flash";
++				reg = <0 0x1000000>;
++				bank-width = <2>;
++			};
++		};
+ 
+ 		internal-regs {
+ 			serial at 12000 {
+@@ -126,35 +155,6 @@
+ 				};
+ 			};
+ 
+-			devbus-bootcs at 10400 {
+-				status = "okay";
+-				ranges = <0 0xf0000000 0x1000000>; /* @addr 0xf000000, size 0x1000000 */
+-
+-				/* Device Bus parameters are required */
+-
+-				/* Read parameters */
+-				devbus,bus-width    = <8>;
+-				devbus,turn-off-ps  = <60000>;
+-				devbus,badr-skew-ps = <0>;
+-				devbus,acc-first-ps = <124000>;
+-				devbus,acc-next-ps  = <248000>;
+-				devbus,rd-setup-ps  = <0>;
+-				devbus,rd-hold-ps   = <0>;
+-
+-				/* Write parameters */
+-				devbus,sync-enable = <0>;
+-				devbus,wr-high-ps  = <60000>;
+-				devbus,wr-low-ps   = <60000>;
+-				devbus,ale-wr-ps   = <60000>;
+-
+-				/* NOR 16 MiB */
+-				nor at 0 {
+-					compatible = "cfi-flash";
+-					reg = <0 0x1000000>;
+-					bank-width = <2>;
+-				};
+-			};
+-
+ 			pcie-controller {
+ 				status = "okay";
+ 
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index 1700f6f..2b60ee0 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -28,7 +28,36 @@
+ 
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
++
++		devbus-bootcs {
++			status = "okay";
++
++			/* Device Bus parameters are required */
++
++			/* Read parameters */
++			devbus,bus-width    = <8>;
++			devbus,turn-off-ps  = <60000>;
++			devbus,badr-skew-ps = <0>;
++			devbus,acc-first-ps = <124000>;
++			devbus,acc-next-ps  = <248000>;
++			devbus,rd-setup-ps  = <0>;
++			devbus,rd-hold-ps   = <0>;
++
++			/* Write parameters */
++			devbus,sync-enable = <0>;
++			devbus,wr-high-ps  = <60000>;
++			devbus,wr-low-ps   = <60000>;
++			devbus,ale-wr-ps   = <60000>;
++
++			/* NOR 128 MiB */
++			nor at 0 {
++				compatible = "cfi-flash";
++				reg = <0 0x8000000>;
++				bank-width = <2>;
++			};
++		};
+ 
+ 		internal-regs {
+ 			serial at 12000 {
+@@ -148,40 +177,6 @@
+ 				status = "okay";
+ 			};
+ 
+-			/* USB interface in the mini-PCIe connector */
+-			usb at 52000 {
+-				status = "okay";
+-			};
+-
+-			devbus-bootcs at 10400 {
+-				status = "okay";
+-				ranges = <0 0xf0000000 0x8000000>; /* @addr 0xf000000, size 0x8000000 */
+-
+-				/* Device Bus parameters are required */
+-
+-				/* Read parameters */
+-				devbus,bus-width    = <8>;
+-				devbus,turn-off-ps  = <60000>;
+-				devbus,badr-skew-ps = <0>;
+-				devbus,acc-first-ps = <124000>;
+-				devbus,acc-next-ps  = <248000>;
+-				devbus,rd-setup-ps  = <0>;
+-				devbus,rd-hold-ps   = <0>;
+-
+-				/* Write parameters */
+-				devbus,sync-enable = <0>;
+-				devbus,wr-high-ps  = <60000>;
+-				devbus,wr-low-ps   = <60000>;
+-				devbus,ale-wr-ps   = <60000>;
+-
+-				/* NOR 128 MiB */
+-				nor at 0 {
+-					compatible = "cfi-flash";
+-					reg = <0 0x8000000>;
+-					bank-width = <2>;
+-				};
+-			};
+-
+ 			pcie-controller {
+ 				status = "okay";
+ 				/* Internal mini-PCIe connector */
+-- 
+1.8.1.5
