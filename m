@@ -1,144 +1,59 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 15 Jul 2013 11:57:49 -0300
-Subject: [RESEND PATCH v7 20/22] ARM: mvebu: Add BootROM to Armada 370/XP
- device tree
-In-Reply-To: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1373900271-4722-21-git-send-email-ezequiel.garcia@free-electrons.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 15 Jul 2013 16:59:21 +0200
+Subject: [PATCH v5 2/7] sound: sam9x5_wm8731: machine driver for
+ at91sam9x5 wm8731 boards
+In-Reply-To: <20130712114926.GE24508@sirena.org.uk>
+References: <1373559359-31607-1-git-send-email-richard.genoud@gmail.com>
+ <1373559359-31607-3-git-send-email-richard.genoud@gmail.com>
+ <20130712114926.GE24508@sirena.org.uk>
+Message-ID: <CACQ1gAiJ8ww-gYfcUsux00DmpWUpfqyzzqfxZjWZSaObgsz29g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to access the SoC BootROM, we need to declare a mapping
-(through a ranges property). The mbus driver will use this property
-to allocate a suitable address decoding window.
+2013/7/12 Mark Brown <broonie@kernel.org>:
+> On Thu, Jul 11, 2013 at 06:15:54PM +0200, Richard Genoud wrote:
+>> From: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>
+>> Description of the Asoc machine driver for an at91sam9x5 based board
+>
+> ASoC.
+>
+>> +sam9x5 pins:
+>> + * LOUT
+>> + * ROUT
+>> + * LHPOUT
+>> + * RHPOUT
+>> + * LLINEIN
+>> + * RLINEIN
+>> + * MICIN
+>
+> These aren't pins on the CPU, they're pins on the CODEC, and you should
+> be adding this to the binding document for the CODEC and referring to
+> that rather than having them in each individual binding document.  This
+> also helps if any new variants are added (not that this is likely for
+> the WM8731).
+ok, I'll move that
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-db.dts              | 3 ++-
- arch/arm/boot/dts/armada-370-mirabox.dts         | 3 ++-
- arch/arm/boot/dts/armada-370-rd.dts              | 3 ++-
- arch/arm/boot/dts/armada-370.dtsi                | 5 +++++
- arch/arm/boot/dts/armada-xp-db.dts               | 3 ++-
- arch/arm/boot/dts/armada-xp-gp.dts               | 3 ++-
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 3 ++-
- arch/arm/boot/dts/armada-xp.dtsi                 | 5 +++++
- 8 files changed, 22 insertions(+), 6 deletions(-)
+>
+>> +static struct sam9x5_drvdata sam9x5_priv;
+>
+> Why is this a global static?
+>
+>> +     ret = snd_soc_register_card(&snd_soc_sam9x5);
+>> +     if (ret) {
+>> +             dev_err(&pdev->dev,
+>> +                     "ASoC: Platform device allocation failed\n");
+>> +             goto out_put_audio;
+>> +     }
+>
+>> +     platform_set_drvdata(pdev, &snd_soc_sam9x5);
+>
+> It should be being dynamically allocated and retrieved as driver data
+> when needed.
+ok.
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 5920b4e..90ce29d 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -30,7 +30,8 @@
- 	};
- 
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index a4202b6..19341d2 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -25,7 +25,8 @@
- 	};
- 
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-index dd0ba01..0b3acf3 100644
---- a/arch/arm/boot/dts/armada-370-rd.dts
-+++ b/arch/arm/boot/dts/armada-370-rd.dts
-@@ -28,7 +28,8 @@
- 	};
- 
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 4b54e51..bd21d49 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -31,6 +31,11 @@
- 	soc {
- 		compatible = "marvell,armada370-mbus", "simple-bus";
- 
-+		bootrom {
-+			compatible = "marvell,bootrom";
-+			reg = <MBUS_ID(0x01, 0xe0) 0 0x100000>;
-+		};
-+
- 		internal-regs {
- 			system-controller at 18200 {
- 				compatible = "marvell,armada-370-xp-system-controller";
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index 0d4ce54..857f272 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -30,7 +30,8 @@
- 	};
- 
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index 2fa9209..934dc46 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -39,7 +39,8 @@
- 	};
- 
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index a3e3a12..1700f6f 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -27,7 +27,8 @@
- 	};
- 
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 8033824..7ba99ce 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -29,6 +29,11 @@
- 	soc {
- 		compatible = "marvell,armadaxp-mbus", "simple-bus";
- 
-+		bootrom {
-+			compatible = "marvell,bootrom";
-+			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
-+		};
-+
- 		internal-regs {
- 			L2: l2-cache {
- 				compatible = "marvell,aurora-system-cache";
+Thanks !
+
+
 -- 
-1.8.1.5
+for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
