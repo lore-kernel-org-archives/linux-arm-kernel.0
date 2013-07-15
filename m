@@ -1,37 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 15 Jul 2013 13:33:30 -0400
-Subject: [PATCHv5 00/11] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <51E4167B.4000208@wwwdotorg.org>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <51E4167B.4000208@wwwdotorg.org>
-Message-ID: <20130715173329.GA12062@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Jul 2013 12:04:44 -0600
+Subject: [PATCH] ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag
+In-Reply-To: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
+References: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
+Message-ID: <51E439BC.9030608@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 09:34:19AM -0600, Stephen Warren wrote:
-> On 07/15/2013 05:52 AM, Thomas Petazzoni wrote:
-> > Hello,
-> > 
-> > This set of patches introduces Message Signaled Interrupt support in
-> > the Marvell EBU PCIe driver. It has been successfully tested on the
-> > Armada XP GP platform with an Intel e1000e PCIe network card that
-> > supports MSI.
-> > 
-> > This patch set is intended for merging in 3.12, so the respective
-> > maintainers of the different areas are invited to review/ack the
-> > patches, see below for the details. This set of patches applies on top
-> > of 3.11-rc1.
-> 
-> Thomas, who is going to merge this series?
+On 06/25/2013 03:23 AM, Joseph Lo wrote:
+> Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
+> to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
+> this state.
 
-In a previous version of this series, Thomas and I discussed the
-feasibility of sending the irq changes through tglx, the pci changes
-through Bjorn, and the mvebu stuff through us.  With that version,
-Thomas felt it would work out fine, without depending on each other.
+I tried applying this patch, your series "[PATCH V3 0/3] ARM: tegra114:
+cpuidle: add power down state", and your series "[PATCH V2 00/11] ARM:
+tegra114: add support for system suspend", all on top of v3.11-rc1.
 
-If this is still the case, we'll just ask Thomas and Bjorn (or, at least
-Bjorn) to make topic branches for us.
+On Dalmore, the new cpuidle mode /appears/ to work (I see increasing
+values in the sysfs cpuidle "usage" file for all defined cpuidle
+states), but I don't see the "CPU VDD off" LED light up; I'm not
+convinced that the CPU is actually being powered off in the idle mode.
 
-thx,
+With these patches applies, Harmony acts very strangely. After
+hot-unplug and re-plug of CPU1, the system is hung or almost hung. The
+patches appear to reduce the amount of time CPU VDD is off judging by
+the LEDs. The patches might cause issues with system suspend too, but
+I'm not 100% sure.
 
-Jason.
+As such, I haven't applied any of these. Can you please test boards for
+all of Tegra20/30/114, and validate that on Dalmore the CPU power is
+actually being turned off, and report back? Thanks.
