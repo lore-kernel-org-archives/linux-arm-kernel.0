@@ -1,112 +1,63 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 15 Jul 2013 18:33:41 +0300
-Subject: [PATCH 2/4] arm: omap5: hwmod: add missing ocp2scp hwmod data
+Date: Mon, 15 Jul 2013 18:33:42 +0300
+Subject: [PATCH 3/4] arm: omap5: dts: add palmas-usb node
 In-Reply-To: <1373902423-28654-1-git-send-email-balbi@ti.com>
 References: <1373902423-28654-1-git-send-email-balbi@ti.com>
-Message-ID: <1373902423-28654-3-git-send-email-balbi@ti.com>
+Message-ID: <1373902423-28654-4-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benoit Cousson <benoit.cousson@linaro.org>
+Without this node, there will be no palmas
+driver to notify dwc3 that a cable has
+been connected and, without that, dwc3
+will never initialize.
 
-without that hwmod data, USB3 will not in OMAP5 boards.
-
-While at that, also fix DTS data to pass reg property,
-otherwise driver won't probe.
-
-Signed-off-by: Benoit Cousson <benoit.cousson@linaro.org>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/boot/dts/omap5.dtsi               |  3 +-
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 45 ++++++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/omap5-uevm.dts | 10 ++++++++++
+ arch/arm/boot/dts/omap5.dtsi     |  2 +-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index 08b7267..badceb8 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -272,6 +272,11 @@
+ 		interrupt-controller;
+ 		#interrupt-cells = <2>;
+ 
++		extcon_usb3: palmas_usb {
++			compatible = "ti,palmas-usb";
++			ti,wakeup;
++		};
++
+ 		palmas_pmic {
+ 			compatible = "ti,palmas-pmic";
+ 			interrupt-parent = <&palmas>;
+@@ -450,6 +455,11 @@
+ 	phys = <0 &hsusb2_phy &hsusb3_phy>;
+ };
+ 
++&usb3 {
++	extcon = <&extcon_usb3>;
++	vbus-supply = <&smps10_reg>;
++};
++
+ &mcspi1 {
+ 
+ };
 diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 5c99f19..4e41409 100644
+index 4e41409..1659246 100644
 --- a/arch/arm/boot/dts/omap5.dtsi
 +++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -652,10 +652,11 @@
- 			};
+@@ -634,7 +634,7 @@
+ 			ti,type = <2>;
  		};
  
--		ocp2scp {
-+		ocp2scp at 4a080000 {
- 			compatible = "ti,omap-ocp2scp";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-+			reg = <0x4a080000 0x20>;
- 			ranges;
- 			ti,hwmods = "ocp2scp1";
- 			usb2_phy: usb2phy at 4a084000 {
-diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-index f37ae96..542eddd 100644
---- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-@@ -1114,6 +1114,42 @@ static struct omap_hwmod omap54xx_mpu_hwmod = {
- };
- 
- /*
-+ * 'ocp2scp' class
-+ * bridge to transform ocp interface protocol to scp (serial control port)
-+ * protocol
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap54xx_ocp2scp_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.syss_offs	= 0x0014,
-+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE |
-+			SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class omap54xx_ocp2scp_hwmod_class = {
-+	.name	= "ocp2scp",
-+	.sysc	= &omap54xx_ocp2scp_sysc,
-+};
-+
-+/* ocp2scp1 */
-+static struct omap_hwmod omap54xx_ocp2scp1_hwmod = {
-+	.name		= "ocp2scp1",
-+	.class		= &omap54xx_ocp2scp_hwmod_class,
-+	.clkdm_name	= "l3init_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP54XX_CM_L3INIT_OCP2SCP1_CLKCTRL_OFFSET,
-+			.context_offs = OMAP54XX_RM_L3INIT_OCP2SCP1_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_HWCTRL,
-+		},
-+	},
-+};
-+
-+/*
-  * 'timer' class
-  * general purpose timer module with accurate 1ms tick
-  * This class contains several variants: ['timer_1ms', 'timer']
-@@ -1919,6 +1955,14 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__mpu = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* l4_cfg -> ocp2scp1 */
-+static struct omap_hwmod_ocp_if omap54xx_l4_cfg__ocp2scp1 = {
-+	.master		= &omap54xx_l4_cfg_hwmod,
-+	.slave		= &omap54xx_ocp2scp1_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* l4_wkup -> timer1 */
- static struct omap_hwmod_ocp_if omap54xx_l4_wkup__timer1 = {
- 	.master		= &omap54xx_l4_wkup_hwmod,
-@@ -2121,6 +2165,7 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap54xx_l4_per__mmc4,
- 	&omap54xx_l4_per__mmc5,
- 	&omap54xx_l4_cfg__mpu,
-+	&omap54xx_l4_cfg__ocp2scp1,
- 	&omap54xx_l4_wkup__timer1,
- 	&omap54xx_l4_per__timer2,
- 	&omap54xx_l4_per__timer3,
+-		omap_dwc3 at 4a020000 {
++		usb3: omap_dwc3 at 4a020000 {
+ 			compatible = "ti,dwc3";
+ 			ti,hwmods = "usb_otg_ss";
+ 			reg = <0x4a020000 0x10000>;
 -- 
 1.8.2.1
