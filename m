@@ -1,88 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 15 Jul 2013 17:27:00 +0200
-Subject: [PATCH 1/3] video: mxsfb: fix color settings for 18bit data bus and
- 32bpp
-In-Reply-To: <1373902022-20439-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1373902022-20439-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1373902022-20439-2-git-send-email-maxime.ripard@free-electrons.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Mon, 15 Jul 2013 11:27:14 -0400
+Subject: [PATCH] xen/control: protect functions with
+ CONFIG_HIBERNATE_CALLBACKS to avoid warning
+In-Reply-To: <1373898275-15765-1-git-send-email-julien.grall@linaro.org>
+References: <1373898275-15765-1-git-send-email-julien.grall@linaro.org>
+Message-ID: <20130715152714.GD5774@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hector Palacios <hector.palacios@digi.com>
+On Mon, Jul 15, 2013 at 03:24:35PM +0100, Julien Grall wrote:
+> If CONFIG_HIBERNATE_CALLBACKS is not set gcc will issue warnings:
+> drivers/xen/manage.c:46:13: warning: 'xen_hvm_post_suspend' defined but not used [-Wunused-function]
+> drivers/xen/manage.c:52:13: warning: 'xen_pre_suspend' defined but not used [-Wunused-function]
+> drivers/xen/manage.c:59:13: warning: 'xen_post_suspend' defined but not used [-Wunused-function]
 
-For a combination of 18bit LCD data bus width and a color
-mode of 32bpp, the driver was setting the color mapping to
-rgb666, which is wrong, as the color in memory realy has an
-rgb888 layout.
+Have you checked the upstream kernel?
+I see this:
 
-This patch also removes the setting of flag CTRL_DF24 that
-makes the driver dimiss the upper 2 bits when handling 32/24bpp
-colors in a diplay with 18bit data bus width. This flag made
-true color images display wrong in such configurations.
+commit 65e053a7038c608f89272d4fb1f899890c579f0a
+Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Date:   Thu Jun 27 14:28:38 2013 +0100
 
-Finally, the color mapping rgb666 has also been removed as nobody
-is using it and high level applications like Qt5 cannot work
-with it either.
+    xen: ifdef CONFIG_HIBERNATE_CALLBACKS xen_*_suspend
+    
+    xen_hvm_post_suspend, xen_pre_suspend, xen_post_suspend are only used if
+    CONFIG_HIBERNATE_CALLBACKS is defined, resulting in:
+    
+    drivers/xen/manage.c:46:13: warning: ?xen_hvm_post_suspend? defined but not used [-Wunused-function]
+    drivers/xen/manage.c:52:13: warning: ?xen_pre_suspend? defined but not used [-Wunused-function]
+    drivers/xen/manage.c:59:13: warning: ?xen_post_suspend? defined but not used [-Wunused-function]
+    
+    If the kernel config is missing CONFIG_HIBERNATE_CALLBACKS.
+    
+    Simply ifdef CONFIG_HIBERNATE_CALLBACKS the three functions.
+    
+    Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+    Signed-off-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 
-Reference: https://lkml.org/lkml/2013/5/23/220
-Signed-off-by: Hector Palacios <hector.palacios@digi.com>
-Acked-by: Juergen Beisert <jbe@pengutronix.de>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/video/mxsfb.c | 26 --------------------------
- 1 file changed, 26 deletions(-)
 
-diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-index 3ba3771..dc09ebe 100644
---- a/drivers/video/mxsfb.c
-+++ b/drivers/video/mxsfb.c
-@@ -239,24 +239,6 @@ static const struct fb_bitfield def_rgb565[] = {
- 	}
- };
- 
--static const struct fb_bitfield def_rgb666[] = {
--	[RED] = {
--		.offset = 16,
--		.length = 6,
--	},
--	[GREEN] = {
--		.offset = 8,
--		.length = 6,
--	},
--	[BLUE] = {
--		.offset = 0,
--		.length = 6,
--	},
--	[TRANSP] = {	/* no support for transparency */
--		.length = 0,
--	}
--};
--
- static const struct fb_bitfield def_rgb888[] = {
- 	[RED] = {
- 		.offset = 16,
-@@ -309,9 +291,6 @@ static int mxsfb_check_var(struct fb_var_screeninfo *var,
- 			break;
- 		case STMLCDIF_16BIT:
- 		case STMLCDIF_18BIT:
--			/* 24 bit to 18 bit mapping */
--			rgb = def_rgb666;
--			break;
- 		case STMLCDIF_24BIT:
- 			/* real 24 bit */
- 			rgb = def_rgb888;
-@@ -453,11 +432,6 @@ static int mxsfb_set_par(struct fb_info *fb_info)
- 			return -EINVAL;
- 		case STMLCDIF_16BIT:
- 		case STMLCDIF_18BIT:
--			/* 24 bit to 18 bit mapping */
--			ctrl |= CTRL_DF24; /* ignore the upper 2 bits in
--					    *  each colour component
--					    */
--			break;
- 		case STMLCDIF_24BIT:
- 			/* real 24 bit */
- 			break;
--- 
-1.8.3.2
+> 
+> Signed-off-by: Julien Grall <julien.grall@linaro.org>
+> ---
+>  drivers/xen/manage.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/xen/manage.c b/drivers/xen/manage.c
+> index 412b96c..7680276 100644
+> --- a/drivers/xen/manage.c
+> +++ b/drivers/xen/manage.c
+> @@ -36,6 +36,7 @@ enum shutdown_state {
+>  /* Ignore multiple shutdown requests. */
+>  static enum shutdown_state shutting_down = SHUTDOWN_INVALID;
+>  
+> +#ifdef CONFIG_HIBERNATE_CALLBACKS
+>  struct suspend_info {
+>  	int cancelled;
+>  	unsigned long arg; /* extra hypercall argument */
+> @@ -63,7 +64,6 @@ static void xen_post_suspend(int cancelled)
+>  	xen_mm_unpin_all();
+>  }
+>  
+> -#ifdef CONFIG_HIBERNATE_CALLBACKS
+>  static int xen_suspend(void *data)
+>  {
+>  	struct suspend_info *si = data;
+> -- 
+> 1.7.10.4
+> 
