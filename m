@@ -1,46 +1,29 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 15 Jul 2013 13:14:58 -0300
-Subject: [PATCH 13/22] lcd: Add GPIO LCD driver.
-In-Reply-To: <1373900227-341-14-git-send-email-denis@eukrea.com>
-References: <1373900227-341-1-git-send-email-denis@eukrea.com>
- <1373900227-341-14-git-send-email-denis@eukrea.com>
-Message-ID: <CAOMZO5C6wKUmK25+7iBX+JGs00RR_hpKrCW3r0un610Z-BZn0w@mail.gmail.com>
+From: grundler@chromium.org (Grant Grundler)
+Date: Mon, 15 Jul 2013 09:18:41 -0700
+Subject: [PATCH v7 3/9] iommu/exynos: fix page table maintenance
+In-Reply-To: <009a01ce814d$840b48c0$8c21da40$@samsung.com>
+References: <002b01ce797b$44d4ad10$ce7e0730$@samsung.com>
+ <1933986.4vddYccClk@amdc1032>
+ <009a01ce814d$840b48c0$8c21da40$@samsung.com>
+Message-ID: <CANEJEGs_8a9dPCYtDT8u2NEv5HUUD5gcdmRmbsrKU-_aagztgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
-
-On Mon, Jul 15, 2013 at 11:56 AM, Denis Carikli <denis@eukrea.com> wrote:
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
->  .../bindings/video/backlight/gpio-lcd.txt          |   15 ++
->  drivers/video/backlight/Kconfig                    |    8 +
->  drivers/video/backlight/Makefile                   |    1 +
->  drivers/video/backlight/gpio_lcd.c                 |  178 ++++++++++++++++++++
->  4 files changed, 202 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/backlight/gpio-lcd.txt
->  create mode 100644 drivers/video/backlight/gpio_lcd.c
+On Mon, Jul 15, 2013 at 4:21 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
+...
+>> Maybe you could add LV1TABLE_SIZE define and use it here (there is
+>> already a LV2TABLE_SIZE define)?
 >
-> diff --git a/Documentation/devicetree/bindings/video/backlight/gpio-lcd.txt b/Documentation/devicetree/bindings/video/backlight/gpio-lcd.txt
-> new file mode 100644
-> index 0000000..4ff409d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/backlight/gpio-lcd.txt
-> @@ -0,0 +1,15 @@
-> +gpio-lcd bindings
-> +
-> +Required properties:
-> +  - compatible: "gpio-lcd"
-> +  - gpios: describes the gpio that is used for enabling/disabling the lcd
-> +     (see GPIO binding[0] for more details).
+> Yes. But, LV2TABLE_SIZE is used in more places than one.
+> I do not feel that it is needed to define LV1TABLE_SIZE for the single line.
 
-Do we really need this?
+Cho,
+#define's are part of the code "documentation". Doesn't really matter
+how often it's used. I think Bartlomiej's suggestion is a good one.
 
-Why not just use the regulator framework instead?
+Key is to use "consistent" names so they makes sense to someone not
+familiar with the code. In this case, we want to show this use is the
+same way LV2TABLE_SIZE is used and serves the same purpose.
 
-You can refer to an example here:
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/video/mxsfb.c?id=4344429d3d926d219671f607125cff51223a140a
-
-Regards,
-
-Fabio Estevam
+cheers.
+grant
