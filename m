@@ -1,25 +1,15 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 15 Jul 2013 15:27:01 -0300
-Subject: [PATCH 18/22] staging: video: imx: Add RGB666 support for
- parallel display
-In-Reply-To: <1373900227-341-19-git-send-email-denis@eukrea.com>
-References: <1373900227-341-1-git-send-email-denis@eukrea.com>
- <1373900227-341-19-git-send-email-denis@eukrea.com>
-Message-ID: <CAOMZO5B8CuBR8sjVkDZH6ObLGKUUT1+jHPBujmFAQVGNtA5mBw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Jul 2013 12:27:36 -0600
+Subject: [PATCH] ARM: tegra114: Enable Cortex-A15 errata 798181
+In-Reply-To: <1372845348-27089-1-git-send-email-josephl@nvidia.com>
+References: <1372845348-27089-1-git-send-email-josephl@nvidia.com>
+Message-ID: <51E43F18.4090508@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
+On 07/03/2013 03:55 AM, Joseph Lo wrote:
+> The commit 93dc688 (ARM: 7684/1: errata: Workaround for Cortex-A15
+> erratum 798181 (TLBI/DSB operations)) introduecd a workaround for
+> Cortex-A15 errata 798181. Enabling it for Tegra114.
 
-On Mon, Jul 15, 2013 at 11:57 AM, Denis Carikli <denis@eukrea.com> wrote:
-> Support the RGB666 format on the IPUv3 parallel display.
->
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
->  .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    2 +-
->  drivers/staging/imx-drm/ipu-v3/ipu-dc.c            |    9 +++++++++
->  drivers/staging/imx-drm/parallel-display.c         |    2 ++
->  3 files changed, 12 insertions(+), 1 deletion(-)
-
-Maybe you could split your series and send all the driver related
-patches to their appropriate mailing lists and maintainers.
+Applied to Tegra's for-3.12/soc branch.
