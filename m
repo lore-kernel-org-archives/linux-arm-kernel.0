@@ -1,126 +1,177 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Mon, 15 Jul 2013 19:34:50 +0530
-Subject: [PATCH] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene host
-In-Reply-To: <73A8FA0E-9F7F-4866-9544-57838F30BB91@suse.de>
-References: <1373888788-8055-1-git-send-email-anup.patel@linaro.org>
- <51E3ED7A.7050207@arm.com>
- <CAAhSdy25WVnynDyPcOMtqVNEepGGq9WFT3b1PV34P6iSBm-FUg@mail.gmail.com>
- <73A8FA0E-9F7F-4866-9544-57838F30BB91@suse.de>
-Message-ID: <CAAhSdy1tYsdm-2kJzoRfqb-FaPa0-t9x2+=jtMjgFqes+Pco6Q@mail.gmail.com>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Mon, 15 Jul 2013 15:05:05 +0100
+Subject: [PATCH v3 2/2] iio: twl6030-gpadc: TWL6030, TWL6032 GPADC driver
+In-Reply-To: <2A7ABDFCE21540479A5AEB0244A684D5E3D0E3@DNCE04.ent.ti.com>
+References: <1373613482-28390-1-git-send-email-oleksandr.kozaruk@ti.com>
+ <1373613482-28390-3-git-send-email-oleksandr.kozaruk@ti.com>,
+ <51E05C0B.5050009@kernel.org>
+ <2A7ABDFCE21540479A5AEB0244A684D5E3D0E3@DNCE04.ent.ti.com>
+Message-ID: <51E40191.8010708@slimlogic.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 6:32 PM, Alexander Graf <agraf@suse.de> wrote:
+On 15/07/13 14:30, Kozaruk, Oleksandr wrote:
+> Hello Jonathan,
+> Thanks for the review.
 >
-> On 15.07.2013, at 14:56, Anup Patel wrote:
->
->> Hi Marc,
+>> Couple of things:
 >>
->> On Mon, Jul 15, 2013 at 6:09 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> Hi Anup,
->>>
->>> On 15/07/13 12:46, Anup Patel wrote:
->>>> This patch allows us to have X-Gene guest VCPU when using
->>>> KVM arm64 on APM X-Gene host.
->>>>
->>>> We add KVM_ARM_TARGET_XGENE_V8 for X-Gene compatible guest VCPU
->>>> and we return KVM_ARM_TARGET_XGENE_V8 in kvm_target_cpu() when
->>>> running on X-Gene host.
->>>>
->>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>>> ---
->>>> arch/arm64/include/uapi/asm/kvm.h    |    3 ++-
->>>> arch/arm64/kvm/guest.c               |   34 ++++++++++++++++++++++------------
->>>> arch/arm64/kvm/sys_regs_generic_v8.c |    3 +++
->>>> 3 files changed, 27 insertions(+), 13 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->>>> index 5031f42..8194707 100644
->>>> --- a/arch/arm64/include/uapi/asm/kvm.h
->>>> +++ b/arch/arm64/include/uapi/asm/kvm.h
->>>> @@ -55,8 +55,9 @@ struct kvm_regs {
->>>> #define KVM_ARM_TARGET_AEM_V8                0
->>>> #define KVM_ARM_TARGET_FOUNDATION_V8 1
->>>> #define KVM_ARM_TARGET_CORTEX_A57    2
->>>> +#define KVM_ARM_TARGET_XGENE_V8              3
->>>>
->>>> -#define KVM_ARM_NUM_TARGETS          3
->>>> +#define KVM_ARM_NUM_TARGETS          4
->>>>
->>>> /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
->>>> #define KVM_ARM_DEVICE_TYPE_SHIFT    0
->>>> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
->>>> index 2c3ff67..e99b0a5 100644
->>>> --- a/arch/arm64/kvm/guest.c
->>>> +++ b/arch/arm64/kvm/guest.c
->>>> @@ -207,19 +207,29 @@ int __attribute_const__ kvm_target_cpu(void)
->>>>      unsigned long implementor = read_cpuid_implementor();
->>>>      unsigned long part_number = read_cpuid_part_number();
->>>>
->>>> -     if (implementor != ARM_CPU_IMP_ARM)
->>>> -             return -EINVAL;
->>>> -
->>>> -     switch (part_number) {
->>>> -     case ARM_CPU_PART_AEM_V8:
->>>> -             return KVM_ARM_TARGET_AEM_V8;
->>>> -     case ARM_CPU_PART_FOUNDATION:
->>>> -             return KVM_ARM_TARGET_FOUNDATION_V8;
->>>> -     case ARM_CPU_PART_CORTEX_A57:
->>>> -             /* Currently handled by the generic backend */
->>>> -             return KVM_ARM_TARGET_CORTEX_A57;
->>>> +     switch (implementor) {
->>>> +     case ARM_CPU_IMP_ARM:
->>>> +             switch (part_number) {
->>>> +             case ARM_CPU_PART_AEM_V8:
->>>> +                     return KVM_ARM_TARGET_AEM_V8;
->>>> +             case ARM_CPU_PART_FOUNDATION:
->>>> +                     return KVM_ARM_TARGET_FOUNDATION_V8;
->>>> +             case ARM_CPU_PART_CORTEX_A57:
->>>> +                     return KVM_ARM_TARGET_CORTEX_A57;
->>>> +             default:
->>>> +                     return -EINVAL;
->>>> +             }
->>>> +             break;
->>>> +     case ARM_CPU_IMP_APM:
->>>> +             switch (part_number) {
->>>> +             case APM_CPU_PART_POTENZA:
->>>> +                     return KVM_ARM_TARGET_XGENE_V8;
->>>
->>> Why don't we have KVM_ARM_TARGET_XGENE_POTENZA (or something similar)
->>> instead? I don't expect all the X-Gene CPUs to be the same forever...
+>> 1) It looks from the driver that a lot of the channels are not measuring
+>> voltages but rather temperature or currents etc.  If so then their
+>> types in the channel mask should be appropriately set.  Also if some
+>> of the channels are entirely internal test networks, what is the benefit
+>> of exposing them to userspace as readable channels?
+>> If channels are merely 'suggested' as being used for temperatures etc
+>> then it is fine to keep them as voltages.
+> There are two kinds of channel for measuring temperature: die temperature
+> and those that measure temperature indirectly measuring voltage on resistive
+> load(NTC sensor).
+> die temperature is calculated by some formulas which convert ADC code to
+> temperature. This is not implemented in the driver.
+> Channels intended to measure temperature with NTC sensor have inbuilt current
+> sources. Voltage measured by this channels and specific NTC could be converted
+> to temperature.
+> This is the reason they chosen to be voltage channels.
+> As for test network I'll remove them from exposing to userspace.
+> [...]
+>
+>>> +static int twl6030_gpadc_get_raw(struct twl6030_gpadc_data *gpadc,
+>>> +             int channel, int *res)
+>>> +{
+>>> +     u8 reg = gpadc->pdata->channel_to_reg(channel);
+>>> +     u8 val[2];
+>> le16 val;
+>>> +     int ret;
+>>> +
+>> ret = twl6030_gpadc_read(val, reg);
+>> (note that (reg, val) ordering of parameters would be a more common choice)
 >>
->> OK, I will rename it to KVM_ARM_TARGET_XGENE_POTENZA.
+>>> +     ret = twl6030_gpadc_read(val, reg);
+>>> +     if (ret) {
+>>> +             dev_dbg(gpadc->dev, "unable to read register 0x%X\n", reg);
+>>> +             return ret;
+>>> +     }
+>>> +
+>> res = le16_to_cpup(val);
 >>
->> Does this mean that with every new ARM64 CPU we will have to add a new
->> target for KVM ARM64 ?
+>>> +     *res = (val[1] << 8) | val[0];
+>>> +
+>>> +     return ret;
+>>> +}
+>>> +
+> You mean something like this:
+> static int twl6030_gpadc_get_raw(struct twl6030_gpadc_data *gpadc,                                                                                                                                                  
+> 						int channel, int *res)                                                                                                                                                                              
+> {                                                                                                                                                                                                                   
+> 	u8 reg = gpadc->pdata->channel_to_reg(channel);                                                                                                                                                             
+> 	__le16 val;                                                                                                                                                                                                 
+> 	int ret;                                                                                                                                                                                                    
 >
-> Only for different core types, no? Any Cortex-A57 should still behave the same.
+> 	ret = twl6030_gpadc_read(reg, (u8 *)&val);                                                                                                                                                                  
+> 	if (ret) {                                                                                                                                                                                                  
+> 		dev_dbg(gpadc->dev, "unable to read register 0x%X\n", reg);                                                                                                                                         
+> 		return ret;                                                                                                                                                                                         
+> 	}                                                                                                                                                                                                           
 >
->> If so then I think the list of targets will grow very fast.
+> 	*res = le16_to_cpup(&val);                                                                                                                                                                                  
+>
+> 	return ret;                                                                                                                                                                                                 
+> }
+> Note, that twl6030_gpadc_read() is just wrapper for twl_i2c_read() which takes
+> "an array of num_bytes containing data to be read"
+> I like the original implementation better then this(if I did it correctly)
+> Do you insist on this change?
+> [...]
+>
+>>> +static int twl6030_gpadc_get_processed(struct twl6030_gpadc_data *gpadc,
+>>> +             int channel, int *val)
+>>> +{
+>>> +     int raw_code;
+>>> +     int corrected_code;
+>>> +     int channel_value;
+>>> +     int ret;
+>>> +
+>>> +     ret = twl6030_gpadc_get_raw(gpadc, channel, &raw_code);
+>>> +     if (ret)
+>>> +             return ret;
+>>> +
+>> Might first thought on seeing this is that it would be better to return
+>> raw for all channels and provide the scale and offset info_mask elements
+>> where possible rather than doing the conversion in the kernel.  Note we
+> In our custom kernel branch battery driver needs battery voltage and
+> temperature.  Thus the conversion anyway is done in the kernel, either
+> in ADC driver or battery driver.
+>
+>> allow really quite a bit of precision on those values so I doubt it
+>> will be a problem.
 >>
->> I also realized that if we add a new target type in KVM ARM64 then we have
->> to also update KVMTOOL to use the new target else KVMTOOL fails to
->> recognize the target provided by KVM ARM64.
+>> If nothing else it would make everything rather more consistent.
+>>
+> [...]
 >
-> Right. It might make sense to have a fetch mechanism for the host cpu part. So you can ask KVM for the host cpu type and pass that back in here.
+>>> +static int twl6032_calibration(struct twl6030_gpadc_data *gpadc)
+>>> +{
+>>> +     int chn, d1 = 0, d2 = 0, temp;
+>>> +     u8 trim_regs[17];
+>>> +     int ret;
+>>> +
+>>> +     ret = twl_i2c_read(TWL6030_MODULE_ID2, trim_regs + 1,
+>>> +                     TWL6030_GPADC_TRIM1, 16);
+>>> +     if (ret < 0) {
+>>> +             dev_err(gpadc->dev, "calibration failed\n");
+>>> +             return ret;
+>>> +     }
+>>> +
+>> /*
+>> * Loop
+>> please for kernel code.
+>>> +     /* Loop to calculate the value needed for returning voltages from
+>>> +      * GPADC not values.
+>>> +      *
+>>> +      * gain is calculated to 3 decimal places fixed point.
+>>> +      */
+>>> +     for (chn = 0; chn < TWL6032_GPADC_MAX_CHANNELS; chn++) {
+>>> +
+>>> +             switch (chn) {
+>>> +             case 0:
+>>> +             case 1:
+>>> +             case 2:
+>>> +             case 3:
+>>> +             case 4:
+>>> +             case 5:
+>>> +             case 6:
+>>> +             case 11:
+>>> +             case 12:
+>>> +             case 13:
+>>> +             case 14:
+>>> +                     /* D1 */
+>>> +                     d1 = (trim_regs[3] & 0x1F) << 2;
+>>> +                     d1 |= (trim_regs[1] & 0x06) >> 1;
+>>> +                     if (trim_regs[1] & 0x01)
+>>> +                             d1 = -d1;
+>>> +
+>>> +                     /* D2 */
+>>> +                     d2 = (trim_regs[4] & 0x3F) << 2;
+>>> +                     d2 |= (trim_regs[2] & 0x06) >> 1;
+>>> +                     if (trim_regs[2] & 0x01)
+>>> +                             d2 = -d2;
+>>> +                     break;
+>>> +             case 8:
+>> No coment on your code, but this is an 'interesting' bit
+>> of bit packing...
+>> I did vaguely wonder if this could be mapped to a big lookup table,
+>> but having tried it I think I end up with something almost as tricky
+>> to read.. Oh well that was a fun 10 minute diversion ;)
+> This is inherited code from Graeme - original author of implementation
+> for twl6032.
+> [...]
 >
->> Do you think we can have KVM_ARM_TARGET_xxx to represent a common
->> target for a family of CPUs from given ARM64 vendor?
->
-> Anything that is compatible is compatible :). I don't know the product roadmaps for X-Gene cores, but you will want to make the field here as coarse grained as possible, while maintaining the guarantee that a guest still behaves the same.
+That bit is the bane of my life :-( I think the data sheet used to
+changed weekly as the hardware guys did not understand the difference
+between ones and twos complement!
 
-Actually, I don't see X-Gene cores changing in-terms of register interface
-available to EL1 and EL0 in near future. This is the reason why I had named
-the target as KVM_ARM_TARGET_XGENE_V8.
+The reason for the crazy packing is there was not enough space allocated
+in hardware for the change from 10 to 12 bits for the error values
+between 6030 and 6032.
 
-My only concern in having a more specific target type (such as
-KVM_ARM_TARGET_XGENE_POTENZA) is that we might unnecessarily
-add new target types without any difference on KVM-side.
-
->
->
-> Alex
->
-
---Anup
+Graeme
