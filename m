@@ -1,84 +1,64 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep.KarkadaNagesha at arm.com)
-Date: Mon, 15 Jul 2013 11:22:03 +0100
-Subject: [RFC PATCH 02/11] ARM: DT/kernel: define ARM specific
- arch_of_get_cpu_node
+Date: Mon, 15 Jul 2013 11:22:07 +0100
+Subject: [RFC PATCH 06/11] cpufreq: imx6q-cpufreq: remove device tree parsing
+ for cpu nodes
 In-Reply-To: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1373883732-26303-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1373883732-26303-7-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-CPU subsystem now provides architecture specific hook to retrieve the
-of_node. Most of the cpu DT node parsing and initialisation is contained
-in devtree.c. It's better to contain all CPU device node parsing there.
+Now that the cpu device registration initialises the of_node(if available)
+appropriately for all the cpus, parsing here is redundant.
 
-arch_of_get_cpu_node is mainly used to assign cpu->of_node when CPUs get
-registered. This patch overrides the defination of the same. It can also
-act as the helper function in pre-SMP/early initialisation stages to
-retrieve CPU device node pointers in logical ordering.
-
-This mainly helps to avoid replication of the code doing CPU node parsing
-and physical(MPIDR) to logical mapping.
+This patch removes all DT parsing and uses cpu->of_node instead.
 
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- arch/arm/include/asm/prom.h |  1 +
- arch/arm/kernel/devtree.c   | 29 +++++++++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
+ arch/arm/mach-imx/mach-imx6q.c  | 3 +--
+ drivers/cpufreq/imx6q-cpufreq.c | 4 +---
+ 2 files changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
-index a219227..96f1682 100644
---- a/arch/arm/include/asm/prom.h
-+++ b/arch/arm/include/asm/prom.h
-@@ -18,6 +18,7 @@
- extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
- extern void arm_dt_memblock_reserve(void);
- extern void __init arm_dt_init_cpu_maps(void);
-+extern struct device_node *arch_of_get_cpu_node(int cpu);
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 7be13f8..a02f275 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -254,13 +254,12 @@ static void __init imx6q_opp_init(struct device *cpu_dev)
+ {
+ 	struct device_node *np;
  
- #else /* CONFIG_OF */
- 
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 5859c8b..3431aa9 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -169,6 +169,35 @@ void __init arm_dt_init_cpu_maps(void)
+-	np = of_find_node_by_path("/cpus/cpu at 0");
++	np = of_node_get(cpu_dev->of_node);
+ 	if (!np) {
+ 		pr_warn("failed to find cpu0 node\n");
+ 		return;
  	}
- }
  
-+struct device_node * __init arch_of_get_cpu_node(int cpu)
-+{
-+	struct device_node *cpun, *cpus;
-+	const u32 *cell;
-+	u64 hwid;
-+	int ac;
-+
-+	cpus = of_find_node_by_path("/cpus");
-+	if (WARN(!cpus, "Missing cpus node, bailing out\n"))
-+		return NULL;
-+
-+	if (WARN_ON(of_property_read_u32(cpus, "#address-cells", &ac)))
-+		ac = of_n_addr_cells(cpus);
-+
-+	for_each_child_of_node(cpus, cpun) {
-+		if (of_node_cmp(cpun->type, "cpu"))
-+			continue;
-+		cell = of_get_property(cpun, "reg", NULL);
-+		if (WARN(!cell, "%s: missing reg property\n", cpun->full_name))
-+			continue;
-+
-+		hwid = of_read_number(cell, ac);
-+		if ((hwid & MPIDR_HWID_BITMASK) == cpu_logical_map(cpu))
-+			return cpun;
-+	}
-+
-+	return NULL;
-+}
-+
- /**
-  * setup_machine_fdt - Machine setup when an dtb was passed to the kernel
-  * @dt_phys: physical address of dt blob
+-	cpu_dev->of_node = np;
+ 	if (of_init_opp_table(cpu_dev)) {
+ 		pr_warn("failed to init OPP table\n");
+ 		goto put_node;
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index e37cdae..b16632b 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -221,14 +221,12 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 
+ 	cpu_dev = &pdev->dev;
+ 
+-	np = of_find_node_by_path("/cpus/cpu at 0");
++	np = of_node_get(cpu_dev->of_node);
+ 	if (!np) {
+ 		dev_err(cpu_dev, "failed to find cpu0 node\n");
+ 		return -ENOENT;
+ 	}
+ 
+-	cpu_dev->of_node = np;
+-
+ 	arm_clk = devm_clk_get(cpu_dev, "arm");
+ 	pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
+ 	pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
 -- 
 1.8.1.2
