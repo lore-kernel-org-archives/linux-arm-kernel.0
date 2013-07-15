@@ -1,88 +1,35 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 15 Jul 2013 20:47:37 +0200
-Subject: [PATCH v1 08/24] dts: mpc512x: add clock related device tree specs
+Date: Mon, 15 Jul 2013 20:47:40 +0200
+Subject: [PATCH v1 11/24] net: can: mscan: add a comment on reg to idx mapping
 In-Reply-To: <1373914074-20889-1-git-send-email-gsi@denx.de>
 References: <1373914074-20889-1-git-send-email-gsi@denx.de>
-Message-ID: <1373914074-20889-9-git-send-email-gsi@denx.de>
+Message-ID: <1373914074-20889-12-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this addresses the clock driver aka provider's side of clocks
-- prepare for future '<&clks ID>' phandle references for device tree
-  based clock lookup in client drivers
-- introduce a 'clocks' subtree with an 'osc' node for the crystal
-  or oscillator SoC input (fixed frequency)
-- provide default values with 33MHz oscillator frequency in the
-  common include (the 66MHz IPS bus already was there), add
-  override values for the ifm AC14xx board which deviates from
-  the reference design (25MHz xtal, 80MHz IPS bus)
+add a comment about the magic of deriving an MSCAN component index
+from the peripheral's physical address / register offset
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/boot/dts/ac14xx.dts   |    7 +++++++
- arch/powerpc/boot/dts/mpc5121.dtsi |   15 ++++++++++++++-
- 2 files changed, 21 insertions(+), 1 deletion(-)
+ drivers/net/can/mscan/mpc5xxx_can.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/powerpc/boot/dts/ac14xx.dts b/arch/powerpc/boot/dts/ac14xx.dts
-index a543c40..a1b8837 100644
---- a/arch/powerpc/boot/dts/ac14xx.dts
-+++ b/arch/powerpc/boot/dts/ac14xx.dts
-@@ -139,7 +139,14 @@
- 		};
- 	};
+diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
+index 5b0ee8e..bc422ba 100644
+--- a/drivers/net/can/mscan/mpc5xxx_can.c
++++ b/drivers/net/can/mscan/mpc5xxx_can.c
+@@ -148,7 +148,10 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+ 		goto exit_put;
+ 	}
  
-+	clocks {
-+		osc {
-+			clock-frequency = <25000000>;
-+		};
-+	};
-+
- 	soc at 80000000 {
-+		bus-frequency = <80000000>;	/* 80 MHz ips bus */
- 
- 		clock at f00 {
- 			compatible = "fsl,mpc5121rev2-clock", "fsl,mpc5121-clock";
-diff --git a/arch/powerpc/boot/dts/mpc5121.dtsi b/arch/powerpc/boot/dts/mpc5121.dtsi
-index bd14c00..8f4cba0 100644
---- a/arch/powerpc/boot/dts/mpc5121.dtsi
-+++ b/arch/powerpc/boot/dts/mpc5121.dtsi
-@@ -9,6 +9,8 @@
-  * option) any later version.
-  */
- 
-+#include <dt-bindings/clock/mpc512x-clock.h>
-+
- /dts-v1/;
- 
- / {
-@@ -73,6 +75,16 @@
- 		ranges = <0x0 0x0 0xfc000000 0x04000000>;
- 	};
- 
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		osc {
-+			compatible = "fsl,mpc512x-osc", "fixed-clock";
-+			clock-frequency = <33000000>;
-+		};
-+	};
-+
- 	soc at 80000000 {
- 		compatible = "fsl,mpc5121-immr";
- 		#address-cells = <1>;
-@@ -118,9 +130,10 @@
- 		};
- 
- 		/* Clock control */
--		clock at f00 {
-+		clks: clock at f00 {
- 			compatible = "fsl,mpc5121-clock";
- 			reg = <0xf00 0x100>;
-+			#clock-cells = <1>;
- 		};
- 
- 		/* Power Management Controller */
+-	/* Determine the MSCAN device index from the physical address */
++	/* Determine the MSCAN device index from the peripheral's
++	 * physical address. Register address offsets against the
++	 * IMMR base are:  0x1300, 0x1380, 0x2300, 0x2380
++	 */
+ 	pval = of_get_property(ofdev->dev.of_node, "reg", &plen);
+ 	BUG_ON(!pval || plen < sizeof(*pval));
+ 	clockidx = (*pval & 0x80) ? 1 : 0;
 -- 
 1.7.10.4
