@@ -1,64 +1,69 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep.KarkadaNagesha at arm.com)
-Date: Mon, 15 Jul 2013 11:22:07 +0100
-Subject: [RFC PATCH 06/11] cpufreq: imx6q-cpufreq: remove device tree parsing
- for cpu nodes
+Date: Mon, 15 Jul 2013 11:22:02 +0100
+Subject: [RFC PATCH 01/11] driver/core: cpu: initialize of_node in cpu's
+ device struture
 In-Reply-To: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1373883732-26303-7-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1373883732-26303-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Now that the cpu device registration initialises the of_node(if available)
-appropriately for all the cpus, parsing here is redundant.
+CPUs are also registered as devices but the of_node in these cpu
+devices are not initialized. Currently different drivers requiring
+to access cpu device node are parsing the nodes themselves and
+initialising the of_node in cpu device.
 
-This patch removes all DT parsing and uses cpu->of_node instead.
+The of_node in all the cpu devices properly needs to be initialized
+properly and at one place. The best place to update this is CPU
+subsystem driver when registering the cpu devices.
+
+This patch introduces a new function arch_of_get_cpu_node and uses it
+to assign of_node. The definition of this function can be overridden
+by architecture specific implementation.
 
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- arch/arm/mach-imx/mach-imx6q.c  | 3 +--
- drivers/cpufreq/imx6q-cpufreq.c | 4 +---
- 2 files changed, 2 insertions(+), 5 deletions(-)
+ drivers/base/cpu.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 7be13f8..a02f275 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -254,13 +254,12 @@ static void __init imx6q_opp_init(struct device *cpu_dev)
- {
- 	struct device_node *np;
+diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
+index a16d20e..4b3047a 100644
+--- a/drivers/base/cpu.c
++++ b/drivers/base/cpu.c
+@@ -28,6 +28,24 @@ static int cpu_subsys_match(struct device *dev, struct device_driver *drv)
+ 	return 0;
+ }
  
--	np = of_find_node_by_path("/cpus/cpu at 0");
-+	np = of_node_get(cpu_dev->of_node);
- 	if (!np) {
- 		pr_warn("failed to find cpu0 node\n");
- 		return;
- 	}
- 
--	cpu_dev->of_node = np;
- 	if (of_init_opp_table(cpu_dev)) {
- 		pr_warn("failed to init OPP table\n");
- 		goto put_node;
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index e37cdae..b16632b 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -221,14 +221,12 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 
- 	cpu_dev = &pdev->dev;
- 
--	np = of_find_node_by_path("/cpus/cpu at 0");
-+	np = of_node_get(cpu_dev->of_node);
- 	if (!np) {
- 		dev_err(cpu_dev, "failed to find cpu0 node\n");
- 		return -ENOENT;
- 	}
- 
--	cpu_dev->of_node = np;
--
- 	arm_clk = devm_clk_get(cpu_dev, "arm");
- 	pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
- 	pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
++/**
++ * arch_of_get_cpu_node - Get device node associated with the given logical CPU
++ * @cpu: CPU number(logical index) for which device node is required
++ *
++ * The only purpose of this function is to retrieve the device node for the
++ * given logical CPU index. It should be used to intialise the of_node in
++ * cpu device. Once of_node in cpu device is populated, all the further
++ * references can use that instead.
++ *
++ * CPU logical to physical index mapping is architecure specific and is built
++ * before booting secondary cores. Hence this function is marked __weak and
++ * can be overridden by architecture specific implementation.
++ */
++struct device_node * __weak arch_of_get_cpu_node(int cpu)
++{
++	return NULL;
++}
++
+ #ifdef CONFIG_HOTPLUG_CPU
+ static void change_cpu_under_node(struct cpu *cpu,
+ 			unsigned int from_nid, unsigned int to_nid)
+@@ -289,6 +307,7 @@ int __cpuinit register_cpu(struct cpu *cpu, int num)
+ 	cpu->dev.release = cpu_device_release;
+ 	cpu->dev.offline_disabled = !cpu->hotpluggable;
+ 	cpu->dev.offline = !cpu_online(num);
++	cpu->dev.of_node = arch_of_get_cpu_node(num);
+ #ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
+ 	cpu->dev.bus->uevent = arch_cpu_uevent;
+ #endif
 -- 
 1.8.1.2
