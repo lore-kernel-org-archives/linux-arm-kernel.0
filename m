@@ -1,57 +1,78 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon, 15 Jul 2013 17:22:09 +0530
-Subject: [PATCH 1/1] ARM: EXYNOS: Update CONFIG_ARCH_NR_GPIO for Exynos
-In-Reply-To: <1372054438-15693-1-git-send-email-sachin.kamat@linaro.org>
-References: <1372054438-15693-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <CAK9yfHyEaysTJ9QpWWxxOacQEP4wv1NX3sXKkvKFhMbBgbCYYg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 15 Jul 2013 13:52:37 +0200
+Subject: [PATCHv5 01/11] irqdomain: add irq_alloc_mapping() function
+In-Reply-To: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1373889167-27878-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 June 2013 11:43, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> With the recent cleanup in Exynos platform code notably commits
-> 17859bec ("ARM: EXYNOS: Do not select legacy Kconfig symbols any
-> more") and b9222210 ("ARM: EXYNOS: Remove mach/gpio.h"), the definition
-> of ARCH_NR_GPIOS got removed. This started causing problems on SoCs like
-> Exynos4412 which have more (285) than the default number of GPIOs (255).
-> Thus define this number in Kconfig file. Without this patch we get the
-> following errors during boot:
->
-> gpiochip_add: gpios 251..258 (gpv0) failed to register
-> samsung-pinctrl 106e0000.pinctrl: failed to register gpio_chip gpv0,
-> error code: -22
-> samsung-pinctrl: probe of 106e0000.pinctrl failed with error -22
->
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> ---
-> Based on Kukjin's for-next tree.
-> ---
->  arch/arm/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index ddf2667..380a53b 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1578,6 +1578,7 @@ config ARCH_NR_GPIO
->         default 512 if SOC_OMAP5
->         default 392 if ARCH_U8500
->         default 352 if ARCH_VT8500
-> +       default 288 if ARCH_EXYNOS
->         default 288 if ARCH_SUNXI
->         default 264 if MACH_H4700
->         default 0
-> --
-> 1.7.9.5
->
+This commit extends the irqdomain subsystem with an
+irq_alloc_mapping() function which allows to let the irqdomain code
+find an available hwirq number in the range [ 0 ; domain size ] for
+the given domain, and create a virq mapping for it.
 
-Kukjin,
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ include/linux/irqdomain.h |  2 ++
+ kernel/irq/irqdomain.c    | 32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+)
 
-Now that 3.11-rc1 is out, can you please queue this up for 3.11-rc2 as
-without this patch
-gpio support on 4412 boards is broken.
-
-
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index c983ed1..1ffa336 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -195,6 +195,8 @@ static inline unsigned int irq_linear_revmap(struct irq_domain *domain,
+ extern unsigned int irq_find_mapping(struct irq_domain *host,
+ 				     irq_hw_number_t hwirq);
+ extern unsigned int irq_create_direct_mapping(struct irq_domain *host);
++extern unsigned int irq_alloc_mapping(struct irq_domain *host,
++				      irq_hw_number_t *hwirq);
+ extern int irq_create_strict_mappings(struct irq_domain *domain,
+ 				      unsigned int irq_base,
+ 				      irq_hw_number_t hwirq_base, int count);
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 706724e..b9ddb94 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -375,6 +375,38 @@ unsigned int irq_create_direct_mapping(struct irq_domain *domain)
+ EXPORT_SYMBOL_GPL(irq_create_direct_mapping);
+ 
+ /**
++ * irq_alloc_mapping() - Allocate an irq for mapping
++ * @domain: domain to allocate the irq for or NULL for default domain
++ * @hwirq:  reference to the returned hwirq
++ *
++ * This routine are used for irq controllers which can choose the
++ * hardware interrupt number from a range [ 0 ; domain size ], such as
++ * is often the case with PCI MSI controllers. The function will
++ * returned the allocated hwirq number in the hwirq pointer, and the
++ * corresponding virq number as the return value.
++ */
++unsigned int irq_alloc_mapping(struct irq_domain *domain,
++			       irq_hw_number_t *out_hwirq)
++{
++	irq_hw_number_t hwirq;
++
++	pr_debug("irq_alloc_mapping(0x%p)\n", domain);
++
++	for (hwirq = 0; hwirq < domain->hwirq_max; hwirq++)
++		if (!irq_find_mapping(domain, hwirq))
++			break;
++
++	if (hwirq == domain->hwirq_max) {
++		pr_debug("-> no available hwirq found\n");
++		return 0;
++	}
++
++	*out_hwirq = hwirq;
++	return irq_create_mapping(domain, hwirq);
++}
++EXPORT_SYMBOL_GPL(irq_alloc_mapping);
++
++/**
+  * irq_create_mapping() - Map a hardware interrupt into linux irq space
+  * @domain: domain owning this hardware interrupt or NULL for default domain
+  * @hwirq: hardware irq number in that domain space
 -- 
-With warm regards,
-Sachin
+1.8.1.2
