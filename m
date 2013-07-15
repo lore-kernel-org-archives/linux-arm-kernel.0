@@ -1,241 +1,106 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 15 Jul 2013 20:47:43 +0200
-Subject: [PATCH v1 14/24] powerpc/mpc512x: improve DIU related clock setup
-In-Reply-To: <1373914074-20889-1-git-send-email-gsi@denx.de>
-References: <1373914074-20889-1-git-send-email-gsi@denx.de>
-Message-ID: <1373914074-20889-15-git-send-email-gsi@denx.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 15 Jul 2013 13:50:46 -0500
+Subject: [RFC PATCH v4 03/18] Documentation: devicetree: arm: cpus/cpu
+ nodes bindings updates
+In-Reply-To: <20130715093406.GC15904@e102568-lin.cambridge.arm.com>
+References: <1368804061-4421-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1368804061-4421-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAL_JsqLANi5UoVyRMsa6XoQ+_KnmTQDfTz++shEh-dZ3FQGZaQ@mail.gmail.com>
+ <20130715093406.GC15904@e102568-lin.cambridge.arm.com>
+Message-ID: <51E44486.7050806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-adapt the DIU clock initialization to the COMMON_CLK approach: device
-tree based clock lookup, prepare and unprepare for clocks, work with
-frequencies not dividers, call the appropriate clk_*() routines and
-don't access CCM registers, remove the pre-enable workaround in the
-platform's clock driver
+On 07/15/2013 04:34 AM, Lorenzo Pieralisi wrote:
+> On Fri, Jul 12, 2013 at 03:47:17PM +0100, Rob Herring wrote:
+>> On Fri, May 17, 2013 at 10:20 AM, Lorenzo Pieralisi
+>> <lorenzo.pieralisi@arm.com> wrote:
+>>> In order to extend the current cpu nodes bindings to newer CPUs
+>>> inclusive of AArch64 and to update support for older ARM CPUs this
+>>> patch updates device tree documentation for the cpu nodes bindings.
+>>
+>> Sorry for the long delay on this, but I'm still not happy with the binding here.
+> 
+> I had to ask Russell again to drop the bindings patches from the patch
+> system, and this is not acceptable since two months have passed and the
+> entire series was reviewed, acked and partially merged. I will review
+> these bindings again but I would like to understand who should give the final
+> go ahead to get these patches queued for upstreaming, I can't continue
+> updating this stuff forever.
 
-the "best clock" determination now completely relies on the platform's
-clock driver to pick a frequency close to what the caller requests, and
-merely checks whether the desired frequency was met (is acceptable since
-it meets the tolerance of the monitor) -- this approach shall succeed
-upon first try in the usual case, will test a few less desirable yet
-acceptable frequencies in edge cases, and will fallback to "best effort"
-if none of the previously tried frequencies pass the test
+Most of my comments are for 64-bit. So don't blame me that it had to be
+reverted. I said up front I was concerned about this change breaking
+things and it appears it did. New kernels must not require a new DT.
 
-Signed-off-by: Gerhard Sittig <gsi@denx.de>
----
- arch/powerpc/platforms/512x/clock-commonclk.c |    1 -
- arch/powerpc/platforms/512x/mpc512x_shared.c  |  165 +++++++++++++------------
- 2 files changed, 88 insertions(+), 78 deletions(-)
+But yes, this should have been reviewed more quickly. We're working on a
+plan to help address DT binding reviews. We have not enforced that Grant
+and I must ack all bindings, but in this case you certainly need mine
+since I have reviewed it and if you want to me to pull it.
 
-diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
-index 218f55b..f31f895 100644
---- a/arch/powerpc/platforms/512x/clock-commonclk.c
-+++ b/arch/powerpc/platforms/512x/clock-commonclk.c
-@@ -705,7 +705,6 @@ static void mpc512x_clk_setup_clock_tree(int busfreq)
- 	/* some are not yet acquired by their respective drivers */
- 	clk_prepare_enable(clks[MPC512x_CLK_PSC3_MCLK]);/* serial console */
- 	clk_prepare_enable(clks[MPC512x_CLK_FEC]);	/* network, NFS */
--	clk_prepare_enable(clks[MPC512x_CLK_DIU]);	/* display */
- 	clk_prepare_enable(clks[MPC512x_CLK_I2C]);
- 	/*
- 	 * some have their individual clock subtree with separate clock
-diff --git a/arch/powerpc/platforms/512x/mpc512x_shared.c b/arch/powerpc/platforms/512x/mpc512x_shared.c
-index a82a41b..3381eea 100644
---- a/arch/powerpc/platforms/512x/mpc512x_shared.c
-+++ b/arch/powerpc/platforms/512x/mpc512x_shared.c
-@@ -12,6 +12,7 @@
-  * (at your option) any later version.
-  */
- 
-+#include <linux/clk.h>
- #include <linux/kernel.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-@@ -70,98 +71,108 @@ struct fsl_diu_shared_fb {
- 	bool		in_use;
- };
- 
--#define DIU_DIV_MASK	0x000000ff
-+/* receives a pixel clock spec in pico seconds, adjusts the DIU clock rate */
- void mpc512x_set_pixel_clock(unsigned int pixclock)
- {
--	unsigned long bestval, bestfreq, speed, busfreq;
--	unsigned long minpixclock, maxpixclock, pixval;
--	struct mpc512x_ccm __iomem *ccm;
- 	struct device_node *np;
--	u32 temp;
--	long err;
--	int i;
-+	struct clk *clk_diu;
-+	unsigned long epsilon, minpixclock, maxpixclock;
-+	unsigned long offset, want, got, delta;
- 
--	np = of_find_compatible_node(NULL, NULL, "fsl,mpc5121-clock");
-+	/* lookup and enable the DIU clock */
-+	np = of_find_compatible_node(NULL, NULL, "fsl,mpc5121-diu");
- 	if (!np) {
--		pr_err("Can't find clock control module.\n");
-+		pr_err("Could not find DIU device tree node.\n");
- 		return;
- 	}
--
--	ccm = of_iomap(np, 0);
-+	clk_diu = of_clk_get_by_name(np, "per");
- 	of_node_put(np);
--	if (!ccm) {
--		pr_err("Can't map clock control module reg.\n");
-+	if (IS_ERR(clk_diu)) {
-+		pr_err("Could not lookup DIU clock.\n");
- 		return;
- 	}
--
--	np = of_find_node_by_type(NULL, "cpu");
--	if (np) {
--		const unsigned int *prop =
--			of_get_property(np, "bus-frequency", NULL);
--
--		of_node_put(np);
--		if (prop) {
--			busfreq = *prop;
--		} else {
--			pr_err("Can't get bus-frequency property\n");
--			return;
--		}
--	} else {
--		pr_err("Can't find 'cpu' node.\n");
-+	if (clk_prepare_enable(clk_diu)) {
-+		pr_err("Could not enable DIU clock.\n");
- 		return;
- 	}
- 
--	/* Pixel Clock configuration */
--	pr_debug("DIU: Bus Frequency = %lu\n", busfreq);
--	speed = busfreq * 4; /* DIU_DIV ratio is 4 * CSB_CLK / DIU_CLK */
--
--	/* Calculate the pixel clock with the smallest error */
--	/* calculate the following in steps to avoid overflow */
--	pr_debug("DIU pixclock in ps - %d\n", pixclock);
--	temp = (1000000000 / pixclock) * 1000;
--	pixclock = temp;
--	pr_debug("DIU pixclock freq - %u\n", pixclock);
--
--	temp = temp / 20; /* pixclock * 0.05 */
--	pr_debug("deviation = %d\n", temp);
--	minpixclock = pixclock - temp;
--	maxpixclock = pixclock + temp;
--	pr_debug("DIU minpixclock - %lu\n", minpixclock);
--	pr_debug("DIU maxpixclock - %lu\n", maxpixclock);
--	pixval = speed/pixclock;
--	pr_debug("DIU pixval = %lu\n", pixval);
--
--	err = LONG_MAX;
--	bestval = pixval;
--	pr_debug("DIU bestval = %lu\n", bestval);
--
--	bestfreq = 0;
--	for (i = -1; i <= 1; i++) {
--		temp = speed / (pixval+i);
--		pr_debug("DIU test pixval i=%d, pixval=%lu, temp freq. = %u\n",
--			i, pixval, temp);
--		if ((temp < minpixclock) || (temp > maxpixclock))
--			pr_debug("DIU exceeds monitor range (%lu to %lu)\n",
--				minpixclock, maxpixclock);
--		else if (abs(temp - pixclock) < err) {
--			pr_debug("Entered the else if block %d\n", i);
--			err = abs(temp - pixclock);
--			bestval = pixval + i;
--			bestfreq = temp;
--		}
-+	/*
-+	 * convert the picoseconds spec into the desired clock rate,
-+	 * determine the acceptable clock range for the monitor (+/- 5%),
-+	 * do the calculation in steps to avoid integer overflow
-+	 */
-+	pr_debug("DIU pixclock in ps - %u\n", pixclock);
-+	pixclock = (1000000000 / pixclock) * 1000;
-+	pr_debug("DIU pixclock freq  - %u\n", pixclock);
-+	epsilon = pixclock / 20; /* pixclock * 0.05 */
-+	pr_debug("DIU deviation      - %lu\n", epsilon);
-+	minpixclock = pixclock - epsilon;
-+	maxpixclock = pixclock + epsilon;
-+	pr_debug("DIU minpixclock    - %lu\n", minpixclock);
-+	pr_debug("DIU maxpixclock    - %lu\n", maxpixclock);
-+
-+	/*
-+	 * check whether the DIU supports the desired pixel clock
-+	 *
-+	 * - simply request the desired clock and see what the
-+	 *   platform's clock driver will make of it, assuming that it
-+	 *   will setup the best approximation of the requested value
-+	 * - try other candidate frequencies in the order of decreasing
-+	 *   preference (i.e. with increasing distance from the desired
-+	 *   pixel clock, and checking the lower frequency before the
-+	 *   higher frequency to not overload the hardware) until the
-+	 *   first match is found -- any potential subsequent match
-+	 *   would only be as good as the former match or typically
-+	 *   would be less preferrable
-+	 *
-+	 * the offset increment of pixelclock divided by 64 is an
-+	 * arbitrary choice -- it's simple to calculate, in the typical
-+	 * case we expect the first check to succeed already, in the
-+	 * worst case seven frequencies get tested (the exact center and
-+	 * three more values each to the left and to the right) before
-+	 * the 5% tolerance window is exceeded, resulting in fast enough
-+	 * execution yet high enough probability of finding a suitable
-+	 * value, while the error rate will be in the order of single
-+	 * percents
-+	 */
-+	for (offset = 0; offset <= epsilon; offset += pixclock / 64) {
-+		want = pixclock - offset;
-+		pr_debug("DIU checking clock - %lu\n", want);
-+		clk_set_rate(clk_diu, want);
-+		got = clk_get_rate(clk_diu);
-+		delta = abs(pixclock - got);
-+		if (delta < epsilon)
-+			break;
-+		if (!offset)
-+			continue;
-+		want = pixclock + offset;
-+		pr_debug("DIU checking clock - %lu\n", want);
-+		clk_set_rate(clk_diu, want);
-+		got = clk_get_rate(clk_diu);
-+		delta = abs(pixclock - got);
-+		if (delta < epsilon)
-+			break;
- 	}
-+	if (offset <= epsilon) {
-+		pr_debug("DIU clock accepted - %lu\n", want);
-+		pr_debug("DIU pixclock want %u, got %lu, delta %lu, eps %lu\n",
-+			 pixclock, got, delta, epsilon);
-+		return;
-+	}
-+	pr_warn("DIU pixclock auto search unsuccessful\n");
- 
--	pr_debug("DIU chose = %lx\n", bestval);
--	pr_debug("DIU error = %ld\n NomPixClk ", err);
--	pr_debug("DIU: Best Freq = %lx\n", bestfreq);
--	/* Modify DIU_DIV in CCM SCFR1 */
--	temp = in_be32(&ccm->scfr1);
--	pr_debug("DIU: Current value of SCFR1: 0x%08x\n", temp);
--	temp &= ~DIU_DIV_MASK;
--	temp |= (bestval & DIU_DIV_MASK);
--	out_be32(&ccm->scfr1, temp);
--	pr_debug("DIU: Modified value of SCFR1: 0x%08x\n", temp);
--	iounmap(ccm);
-+	/*
-+	 * what is the most appropriate action to take when the search
-+	 * for an available pixel clock which is acceptable to the
-+	 * monitor has failed?  disable the DIU (clock) or just provide
-+	 * a "best effort"?  we go with the latter
-+	 */
-+	pr_warn("DIU pixclock best effort fallback (backend's choice)\n");
-+	clk_set_rate(clk_diu, pixclock);
-+	got = clk_get_rate(clk_diu);
-+	delta = abs(pixclock - got);
-+	pr_debug("DIU pixclock want %u, got %lu, delta %lu, eps %lu\n",
-+		 pixclock, got, delta, epsilon);
- }
- 
- enum fsl_diu_monitor_port
--- 
-1.7.10.4
+>>> Main changes:
+>>>     - adds 64-bit bindings
+>>>     - define usage of #address-cells
+>>>     - define 32/64 dts compatibility settings
+>>>     - defines behaviour on pre and post v7 uniprocessor systems
+>>>     - adds ARM 11MPcore specific reg property definition
+>>>
+>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/arm/cpus.txt | 459 ++++++++++++++++++++++---
+>>>  1 file changed, 412 insertions(+), 47 deletions(-)
+>>
+>> [snip]
+>>
+>>> +                       # On ARM v8 64-bit systems, where the reg property
+>>> +                         size can be 1 or 2 cells (as defined by cpus node's
+>>> +                         #address-cells property), this property is
+>>> +                         required and matches:
+>>> +
+>>> +                         - On systems running the OS in AArch32:
+>>
+>> The DTS cannot change based on 32-bit or 64-bit OS.
+> 
+> "On systems running the OS in AArch32" implies a dependency on the
+> HW execution state. Since the DT is used to configure OSs I thought that
+> could be a valid sentence. Unfortunately this stuff is not C, so I
+> reiterate my point above, before changing it I would like to understand
+> who should say the wording is ok otherwise we could argue forever.
+
+It does configure the OS, but not for 32 vs. 64 bit. That is more of a
+problem for the bootloader to know which mode to boot in and covered
+under something like Documentation/arm/Booting. Booting ARM vs. Thumb
+mode would be similar situation.
+
+Think about how your PC boots and add to that having a DTB as part of
+the firmware shipped with your PC. Then the end user can install a
+32-bit or 64-bit OS on it. That is the usecase that needs to be
+supported and having different DTB for 32 and 64 bit is totally broken
+and doesn't even help solve that problem.
+
+>>> +
+>>> +       - cpu-release-addr
+>>> +               Usage: required for systems that have an "enable-method"
+>>> +                      property value of "spin-table".
+>>> +               Value type: <prop-encoded-array>
+>>> +               Definition:
+>>> +                       # On ARM v8 64-bit systems must be a two cell
+>>> +                         property identifying a 64-bit zero-initialised
+>>> +                         memory location.
+>>
+>> As I mentioned previously, isn't some wake-up method needed? Most
+>> systems will be in wfi or wfe rather than continuously spinning.
+> 
+> Mmm...this can become a minefield, wfe, wfi, CPU in reset..this needs some
+> thought.
+
+Yes, it is today and standardizing this is a good thing. Which is what
+PSCI does. So why are you adding the spintable at all? Are you trying to
+set this as the standard for non-PSCI enabled platforms? Why not just
+say v8 boot interface is PSCI. Sure, we'll probably have to deal with
+other methods, but documenting something else here is not going to
+prevent that problem. I don't think a simple spintable would even work
+for any/most current platforms. I'd think we'd want to define something
+that would work for existing platforms (chances are new platforms will
+work like vendors' existing 32-bit platforms).
+
+Rob
