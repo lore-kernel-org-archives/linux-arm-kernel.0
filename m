@@ -1,20 +1,18 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 Jul 2013 10:48:22 -0600
-Subject: [PATCH V2] ARM: tegra: enable palmas device for dalmore
-In-Reply-To: <1373441852-27176-1-git-send-email-ldewangan@nvidia.com>
-References: <1373441852-27176-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <51E427D6.7090702@wwwdotorg.org>
+Date: Mon, 15 Jul 2013 10:49:47 -0600
+Subject: [PATCH V3] ARM: tegra: enable gpio-keys on dalmore
+In-Reply-To: <1373439643-16633-1-git-send-email-ldewangan@nvidia.com>
+References: <1373439643-16633-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <51E4282B.5040905@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2013 01:37 AM, Laxman Dewangan wrote:
-> Make the entry of Dalmore Power Management Unit device TPS65913
-> in dalmore DTS file. The Palma driver support this device.
+On 07/10/2013 01:00 AM, Laxman Dewangan wrote:
+> Dalmore have the keys mounted on board which are connected
+> to different pins of Tegra.
 > 
-> Enable following submodule of the TPS65913:
-> - GPIO driver
-> - RTC driver.
-> - Power regulator driver.
+> Add the keys entry in DTS file to enable key functionality.
+> This will enable KEY_POWER, KEY_HOME, KEY_VOLUMEUP and
+> KEY_VOLUMEDOWN.
 
-If I apply this, (at least) the SD card no longer works. I assume the
-regulator for it is being turned off somehow.
+I have applied this to Tegra's for-3.12/dt branch.
