@@ -1,95 +1,36 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep.KarkadaNagesha at arm.com)
-Date: Mon, 15 Jul 2013 11:22:12 +0100
-Subject: [RFC PATCH 11/11] cpufreq: arm_big_little: remove device tree parsing
- for cpu nodes
-In-Reply-To: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1373883732-26303-12-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 15 Jul 2013 11:26:09 +0100
+Subject: v3.10 - big endian core support
+In-Reply-To: <20130715103658.068ac6b7@skate>
+References: <CALicx6u89THSiRa4FzGZrcoG8q+o_BD8qVEC4CYXEjPUVK_fJw@mail.gmail.com>
+ <20130712134726.0a909165@skate> <51DFEF75.8080600@codethink.co.uk>
+ <20130714215325.GB7382@mudshark.cambridge.arm.com>
+ <51E3ACD0.8040209@codethink.co.uk> <20130715103658.068ac6b7@skate>
+Message-ID: <51E3CE41.5010807@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+On 15/07/13 09:36, Thomas Petazzoni wrote:
+> Dear Ben Dooks,
+>
+> On Mon, 15 Jul 2013 09:03:28 +0100, Ben Dooks wrote:
+>
+>>> As for building a Thumb-2 kernel; just enable the option in menuconfig and
+>>> you're done. The compiler should "do the right thing".
+>>
+>> I can build it, I just don't have the time and hardware to give it a
+>> test at the moment. However it seems that changing to using 'rev16'
+>> instead of 'rev'. I will make the necessary changes and get this ready
+>> to go.
+>
+> I am willing to give some testing to early patches, if needed. Do not
+> hesitate to send me things to test.
 
-Now that the cpu device registration initialises the of_node(if available)
-appropriately for all the cpus, parsing here is redundant.
+I've pushed out two new branches on git.baserock.org/delta/linux.git
+as:
+	baserock/311/be/core-v2
+	baserock/311/be/atags-v2
 
-This patch removes all DT parsing and uses cpu->of_node instead.
-
-Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
----
- drivers/cpufreq/arm_big_little_dt.c | 39 ++++++++++++++++---------------------
- 1 file changed, 17 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/cpufreq/arm_big_little_dt.c b/drivers/cpufreq/arm_big_little_dt.c
-index fd9e3ea..d2648d1 100644
---- a/drivers/cpufreq/arm_big_little_dt.c
-+++ b/drivers/cpufreq/arm_big_little_dt.c
-@@ -34,27 +34,19 @@
- /* get cpu node with valid operating-points */
- static struct device_node *get_cpu_node_with_valid_op(int cpu)
- {
--	struct device_node *np = NULL, *parent;
--	int count = 0;
-+	struct device *cpu_dev = get_cpu_device(cpu);
-+	struct device_node *np;
- 
--	parent = of_find_node_by_path("/cpus");
--	if (!parent) {
--		pr_err("failed to find OF /cpus\n");
-+	if (!cpu_dev) {
-+		pr_err("failed to get cpu device\n");
- 		return NULL;
- 	}
--
--	for_each_child_of_node(parent, np) {
--		if (count++ != cpu)
--			continue;
--		if (!of_get_property(np, "operating-points", NULL)) {
--			of_node_put(np);
--			np = NULL;
--		}
--
--		break;
-+	np = of_node_get(cpu_dev->of_node);
-+	if (!of_get_property(np, "operating-points", NULL)) {
-+		of_node_put(np);
-+		np = NULL;
- 	}
- 
--	of_node_put(parent);
- 	return np;
- }
- 
-@@ -63,11 +55,12 @@ static int dt_init_opp_table(struct device *cpu_dev)
- 	struct device_node *np;
- 	int ret;
- 
--	np = get_cpu_node_with_valid_op(cpu_dev->id);
--	if (!np)
--		return -ENODATA;
-+	np = of_node_get(cpu_dev->of_node);
-+	if (!np) {
-+		pr_err("failed to find cpu%d node\n", cpu_dev->id);
-+		return -ENOENT;
-+	}
- 
--	cpu_dev->of_node = np;
- 	ret = of_init_opp_table(cpu_dev);
- 	of_node_put(np);
- 
-@@ -79,9 +72,11 @@ static int dt_get_transition_latency(struct device *cpu_dev)
- 	struct device_node *np;
- 	u32 transition_latency = CPUFREQ_ETERNAL;
- 
--	np = get_cpu_node_with_valid_op(cpu_dev->id);
--	if (!np)
-+	np = of_node_get(cpu_dev->of_node);
-+	if (!np) {
-+		pr_info("Failed to find cpu node. Use CPUFREQ_ETERNAL transition latency\n");
- 		return CPUFREQ_ETERNAL;
-+	}
- 
- 	of_property_read_u32(np, "clock-latency", &transition_latency);
- 	of_node_put(np);
 -- 
-1.8.1.2
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
