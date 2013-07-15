@@ -1,31 +1,40 @@
 From: julien.grall@linaro.org (Julien Grall)
-Date: Mon, 15 Jul 2013 15:23:39 +0100
-Subject: [PATCH] xen/arm: enable PV control for ARM
-Message-ID: <1373898219-15713-1-git-send-email-julien.grall@linaro.org>
+Date: Mon, 15 Jul 2013 15:24:35 +0100
+Subject: [PATCH] xen/control: protect functions with
+ CONFIG_HIBERNATE_CALLBACKS to avoid warning
+Message-ID: <1373898275-15765-1-git-send-email-julien.grall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable power management from the toolstack for ARM guest.
+If CONFIG_HIBERNATE_CALLBACKS is not set gcc will issue warnings:
+drivers/xen/manage.c:46:13: warning: 'xen_hvm_post_suspend' defined but not used [-Wunused-function]
+drivers/xen/manage.c:52:13: warning: 'xen_pre_suspend' defined but not used [-Wunused-function]
+drivers/xen/manage.c:59:13: warning: 'xen_post_suspend' defined but not used [-Wunused-function]
 
 Signed-off-by: Julien Grall <julien.grall@linaro.org>
 ---
- drivers/xen/Makefile |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/xen/manage.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-index 2bf461a..a5f12bd 100644
---- a/drivers/xen/Makefile
-+++ b/drivers/xen/Makefile
-@@ -1,9 +1,8 @@
- ifneq ($(CONFIG_ARM),y)
--obj-y	+= manage.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
- endif
- obj-$(CONFIG_X86)			+= fallback.o
--obj-y	+= grant-table.o features.o events.o balloon.o time.o
-+obj-y	+= grant-table.o features.o events.o balloon.o time.o manage.o
- obj-y	+= xenbus/
+diff --git a/drivers/xen/manage.c b/drivers/xen/manage.c
+index 412b96c..7680276 100644
+--- a/drivers/xen/manage.c
++++ b/drivers/xen/manage.c
+@@ -36,6 +36,7 @@ enum shutdown_state {
+ /* Ignore multiple shutdown requests. */
+ static enum shutdown_state shutting_down = SHUTDOWN_INVALID;
  
- nostackp := $(call cc-option, -fno-stack-protector)
++#ifdef CONFIG_HIBERNATE_CALLBACKS
+ struct suspend_info {
+ 	int cancelled;
+ 	unsigned long arg; /* extra hypercall argument */
+@@ -63,7 +64,6 @@ static void xen_post_suspend(int cancelled)
+ 	xen_mm_unpin_all();
+ }
+ 
+-#ifdef CONFIG_HIBERNATE_CALLBACKS
+ static int xen_suspend(void *data)
+ {
+ 	struct suspend_info *si = data;
 -- 
 1.7.10.4
