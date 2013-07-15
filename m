@@ -1,20 +1,43 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 15 Jul 2013 12:39:43 -0300
-Subject: [PATCH 1/5] ARM: dts: imx23-evk: enable USB PHY and controller
-In-Reply-To: <1373898160-8460-1-git-send-email-otavio@ossystems.com.br>
-References: <1373898160-8460-1-git-send-email-otavio@ossystems.com.br>
-Message-ID: <CAOMZO5C_7nJ9RVYvuKJHP2u0mYY6P2UyGVA6OpPzqTnd7YXN2Q@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 15 Jul 2013 21:13:32 +0530
+Subject: [PATCH 2/4] arm: omap5: hwmod: add missing ocp2scp hwmod data
+In-Reply-To: <1373902423-28654-3-git-send-email-balbi@ti.com>
+References: <1373902423-28654-1-git-send-email-balbi@ti.com>
+ <1373902423-28654-3-git-send-email-balbi@ti.com>
+Message-ID: <51E418A4.9000109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Otavio,
+Hi,
 
-On Mon, Jul 15, 2013 at 11:22 AM, Otavio Salvador
-<otavio@ossystems.com.br> wrote:
-> The i.MX23EVK board provides a USB port so the USB PHY and controller
-> need to be enabled for it to be usable.
->
-> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+On Monday 15 July 2013 09:03 PM, Felipe Balbi wrote:
+> From: Benoit Cousson <benoit.cousson@linaro.org>
+> 
+> without that hwmod data, USB3 will not in OMAP5 boards.
+> 
+> While at that, also fix DTS data to pass reg property,
+> otherwise driver won't probe.
+> 
+> Signed-off-by: Benoit Cousson <benoit.cousson@linaro.org>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 > ---
+>  arch/arm/boot/dts/omap5.dtsi               |  3 +-
+>  arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 45 ++++++++++++++++++++++++++++++
+>  2 files changed, 47 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+> index 5c99f19..4e41409 100644
+> --- a/arch/arm/boot/dts/omap5.dtsi
+> +++ b/arch/arm/boot/dts/omap5.dtsi
+> @@ -652,10 +652,11 @@
+>  			};
+>  		};
+>  
+> -		ocp2scp {
+> +		ocp2scp at 4a080000 {
 
-You should have Cc'd Shawn Guo on this series.
+While at that, can we also name it ocp2scp1 since we have 3 instances of
+ocp2scp and it'll conflict when we want to add it for SATA and PCIE.
+
+Thanks
+Kishon
