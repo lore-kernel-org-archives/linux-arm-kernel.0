@@ -1,206 +1,200 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 15 Jul 2013 10:34:06 +0100
-Subject: [RFC PATCH v4 03/18] Documentation: devicetree: arm: cpus/cpu
- nodes bindings updates
-In-Reply-To: <CAL_JsqLANi5UoVyRMsa6XoQ+_KnmTQDfTz++shEh-dZ3FQGZaQ@mail.gmail.com>
-References: <1368804061-4421-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1368804061-4421-4-git-send-email-lorenzo.pieralisi@arm.com>
- <CAL_JsqLANi5UoVyRMsa6XoQ+_KnmTQDfTz++shEh-dZ3FQGZaQ@mail.gmail.com>
-Message-ID: <20130715093406.GC15904@e102568-lin.cambridge.arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 15 Jul 2013 15:31:01 +0530
+Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
+In-Reply-To: <51E39A3F.6080106@ti.com>
+References: <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
+ <20130708112553.GU5523@atomide.com> <51DAB394.3050104@ti.com>
+ <20130708131033.GA5523@atomide.com> <51DABC81.3080409@ti.com>
+ <20130708133512.GD31221@arwen.pp.htv.fi> <87mwpuakod.fsf@linaro.org>
+ <20130710142633.GV5523@atomide.com> <20130710160704.GH18966@arwen.pp.htv.fi>
+ <20130710161158.GA19716@arwen.pp.htv.fi> <20130711063209.GZ5523@atomide.com>
+ <51DE8215.5060306@ti.com> <51DF508F.3050703@ti.com> <51E39A3F.6080106@ti.com>
+Message-ID: <51E3C85D.2010008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 12, 2013 at 03:47:17PM +0100, Rob Herring wrote:
-> On Fri, May 17, 2013 at 10:20 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > In order to extend the current cpu nodes bindings to newer CPUs
-> > inclusive of AArch64 and to update support for older ARM CPUs this
-> > patch updates device tree documentation for the cpu nodes bindings.
+On Monday 15 July 2013 12:14 PM, Rajendra Nayak wrote:
+> On Friday 12 July 2013 06:10 AM, Suman Anna wrote:
+>> On 07/11/2013 04:59 AM, Grygorii Strashko wrote:
+>>> Hi,
+>>>
+>>> On 07/11/2013 09:32 AM, Tony Lindgren wrote:
+>>>> * Felipe Balbi <balbi@ti.com> [130710 09:18]:
+>>>>>
+>>>>> On Wed, Jul 10, 2013 at 07:07:04PM +0300, Felipe Balbi wrote:
+>>>>>> how about something like below ? It makes omap_device/hwmod and
+>>>>>> pm_runtime agree on the initial state of the device and will prevent
+>>>>>> ->runtime_resume() from being called on first pm_runtime_get*() done
+>>>>>> during probe.
+>>>>>>
+>>>>>> This is similar to what PCI bus does (if you look at pci_pm_init()).
+>>>>>>
+>>>>>> commit 59108a500b4ab4b1a5102648a3360276dbf7df6f
+>>>>>> Author: Felipe Balbi <balbi@ti.com>
+>>>>>> Date:   Wed Jul 10 18:50:16 2013 +0300
+>>>>>>
+>>>>>>      arm: omap2plus: unidle devices which are about to probe
+>>>>>>
+>>>>>>      in order to make HWMOD and pm_runtime agree on the
+>>>>>>      initial state of the device, we will unidle the device
+>>>>>>      and call pm_runtime_set_active() to tell pm_runtime
+>>>>>>      that the device is really active.
+>>> Don't think that it's good idea (
+>>> I've checked some driver's and think this patch will enable some devices
+>>> unpredictably:
+>>> - hwspinlock
+>>> - mailbox
+>>> - iommu
+>>> - ipu
+>>> All above devices need to be enabled on demand only (no
+>>> pm_runtime_get*() calls in probe). More over, some of them have very
+>>> specific enabling sequence - like ipu).
+>>>
+>>> May be Summan can say more on that.
+>>
+>> Indeed, this is a problem for any of the slave processor devices.
+>> mailbox and iommu would be slaves to the remoteproc and the drivers have
+>> a specific sequence of bringing up a processor. The current
+>> hwmod/omap_device code is such that these devices will be left in reset
+>> and the driver code use the omap_device_(de)assert_hardreset API
+>> together with omap_device_enable code to bring up the devices. The
+>> remoteproc driver also needs to assert the resets (there are other
+>> problems associated with using omap_device_idle for remoteproc and
+>> iommu) for bringing up the devices after a suspend sequence. hwspinlock
+>> and mailbox may get away since they are in CORE domain, but definitely
+>> an issue for iommu and remoteproc. I would think that this would also
+>> affect other compute devices like IVAHD, ISS, SGX.
 > 
-> Sorry for the long delay on this, but I'm still not happy with the binding here.
-
-I had to ask Russell again to drop the bindings patches from the patch
-system, and this is not acceptable since two months have passed and the
-entire series was reviewed, acked and partially merged. I will review
-these bindings again but I would like to understand who should give the final
-go ahead to get these patches queued for upstreaming, I can't continue
-updating this stuff forever.
-
-> > Main changes:
-> >     - adds 64-bit bindings
-> >     - define usage of #address-cells
-> >     - define 32/64 dts compatibility settings
-> >     - defines behaviour on pre and post v7 uniprocessor systems
-> >     - adds ARM 11MPcore specific reg property definition
-> >
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/cpus.txt | 459 ++++++++++++++++++++++---
-> >  1 file changed, 412 insertions(+), 47 deletions(-)
+> Today, for these IPs I guess hwmod waits for the resets to be de-asserted, right?
 > 
-> [snip]
+>         /*
+>          * If an IP block contains HW reset lines and all of them are
+>          * asserted, we let integration code associated with that
+>          * block handle the enable.  We've received very little
+>          * information on what those driver authors need, and until
+>          * detailed information is provided and the driver code is
+>          * posted to the public lists, this is probably the best we
+>          * can do.
+>          */
+>         if (_are_all_hardreset_lines_asserted(oh))
+>                 return 0;
 > 
-> > +                       # On ARM v8 64-bit systems, where the reg property
-> > +                         size can be 1 or 2 cells (as defined by cpus node's
-> > +                         #address-cells property), this property is
-> > +                         required and matches:
-> > +
-> > +                         - On systems running the OS in AArch32:
-> 
-> The DTS cannot change based on 32-bit or 64-bit OS.
+> What if this information is send back to omap_device() through a return value
+> so omap_device() knows about this too, so it avoids marking the omap device as
+> enabled? Wouldn't that fix the issue?
 
-"On systems running the OS in AArch32" implies a dependency on the
-HW execution state. Since the DT is used to configure OSs I thought that
-could be a valid sentence. Unfortunately this stuff is not C, so I
-reiterate my point above, before changing it I would like to understand
-who should say the wording is ok otherwise we could argue forever.
+I meant something like this..
 
-> > +
-> > +                           * If the cpus node's #address-cells value is 2:
-> > +
-> > +                             The first reg cell must be set to 0.
-> > +
-> > +                             The second reg cell bits [23:0] must be set to
-> > +                             bits [23:0] of MPIDR_EL1.
-> > +
-> > +                             All other bits in the reg cells must be set to 0.
-> > +
-> > +                           * If the cpus node's #address-cells value is 1:
-> > +
-> > +                             Bits [23:0] in the reg cell must be set to
-> > +                             bits [23:0] in MPIDR_EL1.
-> > +
-> > +                             All other bits in the reg cell must be 0.
-> > +
-> > +                         - On systems running the OS in AArch64:
-> > +
-> > +                           * If the cpus node's #address-cells value is 2:
-> > +
-> > +                             The first reg cell bits [7:0] must be set to
-> > +                             bits [39:32] of MPIDR_EL1.
-> > +
-> > +                             The second reg cell bits [23:0] must be set to
-> > +                             bits [23:0] of MPIDR_EL1.
-> > +
-> > +                             All other bits in the reg cells must be set to 0.
-> > +
-> > +                           * If the cpus node's #address-cells value is 1:
-> > +
-> > +                             MPIDR_EL1[63:32] is 0 on all processors in the
-> > +                             system.
-> 
-> Your logic is backwards here. If the MPIDR_EL1[63:32] is 0, then
-> #address-cells can be 1. You could say the upper bits are ignored and
-> treated as 0. However, you should simplify all this and just mandate
-> that #address-cells must be 2 for ARMv8 or more generally must match
-> the size of the MPIDR. If we want to boot a 32-bit kernel, then the
-> kernel will have to adapt to support this.
+>From 2fbea0dde0f72897089ef2e8e441b5e5bd6ea967 Mon Sep 17 00:00:00 2001
+From: Rajendra Nayak <rnayak@ti.com>
+Date: Mon, 15 Jul 2013 15:23:07 +0530
+Subject: [PATCH] ARM: OMAP2+: Make omap_device aware of hwmod failing to
+ enable/idle/shutdown the hwmods
 
-Fair enough I will see how I can reword it.
+For IP blocks (mainly processors) which have hard reset lines, hwmod avoids
+enable/idle/shutdown operations as long as all the hard reset lines are
+kept asserted. However it does not return an error back to the caller (in some
+cases the omap_device layer) to communicate back the failure to operate on the
+hwmod.
 
-> > +
-> > +                             The reg cell bits [23:0] must be set to
-> > +                             bits [23:0] of MPIDR_EL1.
-> > +
-> > +                             All other bits in the reg cell must be set to 0.
-> > +
-> > +       - compatible:
-> > +               Usage: required
-> > +               Value type: <string>
-> > +               Definition: should be one of:
-> > +                           "arm,arm710t"
-> > +                           "arm,arm720t"
-> > +                           "arm,arm740t"
-> > +                           "arm,arm7ej-s"
-> > +                           "arm,arm7tdmi"
-> > +                           "arm,arm7tdmi-s"
-> > +                           "arm,arm9es"
-> > +                           "arm,arm9ej-s"
-> > +                           "arm,arm920t"
-> > +                           "arm,arm922t"
-> > +                           "arm,arm925"
-> > +                           "arm,arm926e-s"
-> > +                           "arm,arm926ej-s"
-> > +                           "arm,arm940t"
-> > +                           "arm,arm946e-s"
-> > +                           "arm,arm966e-s"
-> > +                           "arm,arm968e-s"
-> > +                           "arm,arm9tdmi"
-> > +                           "arm,arm1020e"
-> > +                           "arm,arm1020t"
-> > +                           "arm,arm1022e"
-> > +                           "arm,arm1026ej-s"
-> > +                           "arm,arm1136j-s"
-> > +                           "arm,arm1136jf-s"
-> > +                           "arm,arm1156t2-s"
-> > +                           "arm,arm1156t2f-s"
-> > +                           "arm,arm1176jzf"
-> > +                           "arm,arm1176jz-s"
-> > +                           "arm,arm1176jzf-s"
-> > +                           "arm,arm11mpcore"
-> > +                           "arm,cortex-a5"
-> > +                           "arm,cortex-a7"
-> > +                           "arm,cortex-a8"
-> > +                           "arm,cortex-a9"
-> > +                           "arm,cortex-a15"
-> > +                           "arm,cortex-a53"
-> > +                           "arm,cortex-a57"
-> > +                           "arm,cortex-m0"
-> > +                           "arm,cortex-m0+"
-> > +                           "arm,cortex-m1"
-> > +                           "arm,cortex-m3"
-> > +                           "arm,cortex-m4"
-> > +                           "arm,cortex-r4"
-> > +                           "arm,cortex-r5"
-> > +                           "arm,cortex-r7"
-> > +                           "faraday,fa526"
-> > +                           "intel,sa110"
-> > +                           "intel,sa1100"
-> > +                           "marvell,feroceon"
-> > +                           "marvell,mohawk"
-> > +                           "marvell,pj4"
-> > +                           "marvell,sheeva-v7"
-> > +                           "marvell,xsc3"
-> > +                           "marvell,xscale"
-> > +                           "qcom,krait"
-> > +                           "qcom,scorpion"
-> > +       - enable-method
-> > +               Value type: <stringlist>
-> > +               Usage and definition depend on ARM architecture version and
-> > +               configuration:
-> > +                       # On ARM v8 64-bit systems running the OS in AArch64,
-> 
-> Again, the DTS can't depend on the OS type.
+Fix this by making _enable()/_idle()/_shutdown() all return an error in such
+cases, and also fix the omap_device layer to look at the return values coming
+from hwmod operations before doing a omap_device level state transition.
 
-It was meant to make it dependent on the execution state.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/omap_device.c |   20 ++++++++++----------
+ arch/arm/mach-omap2/omap_hwmod.c  |    6 +++---
+ 2 files changed, 13 insertions(+), 13 deletions(-)
 
-> > +                         this property is required and must be one of:
-> > +                            "spin-table"
-> > +                            "psci"
-> > +                       # On ARM 32-bit systems or ARM v8 systems running
-> > +                         the OS in AArch32 this property is prohibited.
-> 
-> I still don't get the distinction between 32 and 64 bit here. On
-> 32-bit, you have 3 choices: psci, spin-table, or SoC specific. So make
-> this property optional for 32-bit and mandatory for 64-bit.
-
-Ok.
-
-> > +
-> > +       - cpu-release-addr
-> > +               Usage: required for systems that have an "enable-method"
-> > +                      property value of "spin-table".
-> > +               Value type: <prop-encoded-array>
-> > +               Definition:
-> > +                       # On ARM v8 64-bit systems must be a two cell
-> > +                         property identifying a 64-bit zero-initialised
-> > +                         memory location.
-> 
-> As I mentioned previously, isn't some wake-up method needed? Most
-> systems will be in wfi or wfe rather than continuously spinning.
-
-Mmm...this can become a minefield, wfe, wfi, CPU in reset..this needs some
-thought.
-
-Thanks,
-Lorenzo
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index 5cc9287..e89244b 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -210,13 +210,12 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
+  */
+ static int _omap_device_enable_hwmods(struct omap_device *od)
+ {
+-	int i;
++	int i, ret = 0;
+ 
+ 	for (i = 0; i < od->hwmods_cnt; i++)
+-		omap_hwmod_enable(od->hwmods[i]);
++		ret |= omap_hwmod_enable(od->hwmods[i]);
+ 
+-	/* XXX pass along return value here? */
+-	return 0;
++	return ret;
+ }
+ 
+ /**
+@@ -227,13 +226,12 @@ static int _omap_device_enable_hwmods(struct omap_device *od)
+  */
+ static int _omap_device_idle_hwmods(struct omap_device *od)
+ {
+-	int i;
++	int i, ret = 0;
+ 
+ 	for (i = 0; i < od->hwmods_cnt; i++)
+-		omap_hwmod_idle(od->hwmods[i]);
++		ret |= omap_hwmod_idle(od->hwmods[i]);
+ 
+-	/* XXX pass along return value here? */
+-	return 0;
++	return ret;
+ }
+ 
+ /* Public functions for use by core code */
+@@ -697,7 +695,8 @@ int omap_device_enable(struct platform_device *pdev)
+ 
+ 	ret = _omap_device_enable_hwmods(od);
+ 
+-	od->_state = OMAP_DEVICE_STATE_ENABLED;
++	if (!ret)
++		od->_state = OMAP_DEVICE_STATE_ENABLED;
+ 
+ 	return ret;
+ }
+@@ -727,7 +726,8 @@ int omap_device_idle(struct platform_device *pdev)
+ 
+ 	ret = _omap_device_idle_hwmods(od);
+ 
+-	od->_state = OMAP_DEVICE_STATE_IDLE;
++	if (!ret)
++		od->_state = OMAP_DEVICE_STATE_IDLE;
+ 
+ 	return ret;
+ }
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 7341eff..07fd2a8 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2133,7 +2133,7 @@ static int _enable(struct omap_hwmod *oh)
+ 	 * can do.
+ 	 */
+ 	if (_are_all_hardreset_lines_asserted(oh))
+-		return 0;
++		return -EPERM;
+ 
+ 	/* Mux pins for device runtime if populated */
+ 	if (oh->mux && (!oh->mux->enabled ||
+@@ -2222,7 +2222,7 @@ static int _idle(struct omap_hwmod *oh)
+ 	}
+ 
+ 	if (_are_all_hardreset_lines_asserted(oh))
+-		return 0;
++		return -EPERM;
+ 
+ 	if (oh->class->sysc)
+ 		_idle_sysc(oh);
+@@ -2276,7 +2276,7 @@ static int _shutdown(struct omap_hwmod *oh)
+ 	}
+ 
+ 	if (_are_all_hardreset_lines_asserted(oh))
+-		return 0;
++		return -EPERM;
+ 
+ 	pr_debug("omap_hwmod: %s: disabling\n", oh->name);
+ 
+-- 
+1.7.9.5
