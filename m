@@ -1,36 +1,35 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 15 Jul 2013 23:20:52 +0200
-Subject: [PATCH 06/22] arm/dts: i.MX25: Add ssi clocks and DMA events.
-In-Reply-To: <1373900227-341-7-git-send-email-denis@eukrea.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 15 Jul 2013 18:22:02 -0300
+Subject: [PATCH 01/22] ARM i.MX25: devicetree: add compatible property for
+ imxfb support.
+In-Reply-To: <20130715211621.GA10995@pengutronix.de>
 References: <1373900227-341-1-git-send-email-denis@eukrea.com>
- <1373900227-341-7-git-send-email-denis@eukrea.com>
-Message-ID: <20130715212052.GC10995@pengutronix.de>
+ <1373900227-341-2-git-send-email-denis@eukrea.com>
+ <20130715211621.GA10995@pengutronix.de>
+Message-ID: <CAOMZO5A0qS39GFf1PeFS7BBL7PFMbNjkNpD2yqKGg660ZyYxbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 04:56:51PM +0200, Denis Carikli wrote:
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
->  arch/arm/boot/dts/imx25.dtsi |    6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> index b318106..fb37111 100644
-> --- a/arch/arm/boot/dts/imx25.dtsi
-> +++ b/arch/arm/boot/dts/imx25.dtsi
-> @@ -293,6 +293,9 @@
->  				compatible = "fsl,imx25-ssi", "fsl,imx21-ssi";
->  				reg = <0x50014000 0x4000>;
->  				interrupts = <11>;
-> +				clocks = <&clks 118>;
-> +				clock-names = "ssi2_ipg";
+On Mon, Jul 15, 2013 at 6:16 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Mon, Jul 15, 2013 at 04:56:46PM +0200, Denis Carikli wrote:
+>> Signed-off-by: Denis Carikli <denis@eukrea.com>
+>> ---
+>>  arch/arm/boot/dts/imx25.dtsi |    1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+>> index bcd3171..6a1633d 100644
+>> --- a/arch/arm/boot/dts/imx25.dtsi
+>> +++ b/arch/arm/boot/dts/imx25.dtsi
+>> @@ -394,6 +394,7 @@
+>>                       };
+>>
+>>                       lcdc at 53fbc000 {
+>> +                             compatible = "fsl,imx21-lcdif";
+>
+> The driver matches "fsl,imx21-fb", not "fsl,imx21-lcdif". Also please
+> add a i.MX25 specific compatible so that we have the chance to match the
+> specific SoC version in the driver.
 
-ssi2_ipg is wrong. This should be "ipg".
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+A patch was already sent for this:
+http://www.spinics.net/lists/arm-kernel/msg258249.html
