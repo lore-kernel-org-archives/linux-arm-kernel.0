@@ -1,28 +1,27 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 15 Jul 2013 13:08:23 -0300
-Subject: [PATCH 19/22] Input: tsc2007: Add device tree support.
-In-Reply-To: <1373900227-341-20-git-send-email-denis@eukrea.com>
-References: <1373900227-341-1-git-send-email-denis@eukrea.com>
- <1373900227-341-20-git-send-email-denis@eukrea.com>
-Message-ID: <CAOMZO5B169k+6f0G388xne4dUTNiEAb9Zpx1_XJH8TMv5FTLLg@mail.gmail.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Mon, 15 Jul 2013 18:09:43 +0200
+Subject: [PATCH] ARM: dma: imx: Fix deadlock bug
+In-Reply-To: <20130715100131.GR16653@intel.com>
+References: <1370724988-16426-1-git-send-email-shc_work@mail.ru>
+ <20130608211557.GK18614@n2100.arm.linux.org.uk>
+ <20130612030321.GA4107@intel.com> <1373876039.3897.9.camel@mars>
+ <20130715100131.GR16653@intel.com>
+Message-ID: <1373904583.3897.12.camel@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 11:57 AM, Denis Carikli <denis@eukrea.com> wrote:
-> Set the of_match_table for this driver so that devices can be described
->   in the device tree.
->
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
->  .../bindings/input/touchscreen/tsc2007.txt         |   44 +++++
->  drivers/input/touchscreen/tsc2007.c                |  205 ++++++++++++++++----
+On Mon, 2013-07-15 at 15:31 +0530, Vinod Koul wrote:
+> On Mon, Jul 15, 2013 at 10:13:59AM +0200, Christoph Fritz wrote:
+> > Hi,
+> > 
+> >  I'm the initiator of the bug-report[1] ("ARM: imx27: dmaengine:
+> > imx-dma: SD-Card: copy hangs forever") which led to this thread.
+> > 
+> > Are there any updates yet?
+> I should have a fix for you pretty soon. Obviosuly it would be untested on my
+> part as I lack the hardware
 
-You should have Cc'ed linux-input list and its maintainer Dmitry
-Torokhov <dmitry.torokhov@gmail.com>
+No problem, I'll do that.
 
-> +static int tsc2007_get_pendown_state_dt(struct tsc2007  *ts)
-> +{
-> +       if (ts->gpio >= 0)
-
-What about
-if (gpio_is_valid(ts->gpio)) instead?
+ Thanks
+  -- Christoph
