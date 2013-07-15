@@ -1,43 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Jul 2013 23:22:26 +0100
-Subject: [PATCH] ARM: Add check for Cortex-A15 errata 798181 ECO
-In-Reply-To: <CAOesGMjATn9MCzazUGmbD44XR8HyJZU4cCvmOEoUZsmCgutPUg@mail.gmail.com>
-References: <1373920943-18308-1-git-send-email-robherring2@gmail.com>
- <CAOesGMjATn9MCzazUGmbD44XR8HyJZU4cCvmOEoUZsmCgutPUg@mail.gmail.com>
-Message-ID: <20130715222226.GX24642@n2100.arm.linux.org.uk>
+Date: Mon, 15 Jul 2013 23:27:55 +0100
+Subject: [PATCH, re-send] Always trap on BUG()
+In-Reply-To: <20130715151612.9499c2b2ad40e88d183a4600@linux-foundation.org>
+References: <201307051738.35930.arnd@arndb.de>
+ <20130715151612.9499c2b2ad40e88d183a4600@linux-foundation.org>
+Message-ID: <20130715222755.GY24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 01:59:24PM -0700, Olof Johansson wrote:
-> On Mon, Jul 15, 2013 at 1:42 PM, Rob Herring <robherring2@gmail.com> wrote:
-> > diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
-> > index 9a52a07..7fd64b7 100644
-> > --- a/arch/arm/kernel/smp_tlb.c
-> > +++ b/arch/arm/kernel/smp_tlb.c
-> > @@ -74,10 +74,21 @@ static inline void ipi_flush_bp_all(void *ignored)
-> >  static int erratum_a15_798181(void)
-> >  {
-> >         unsigned int midr = read_cpuid_id();
-> > +       unsigned int revidr;
-> >
-> >         /* Cortex-A15 r0p0..r3p2 affected */
-> >         if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
-> >                 return 0;
-> > +
-> > +       /* Check for Cortex A15 <= r3p2 with ECO fix */
-> > +       revidr = read_cpuid(CPUID_REVIDR);
-> > +       if ((revidr & 0x210) == 0x210)
-> > +               return 0;
-> 
-> Reading and evaluating all this on every invalidate seems suboptimal.
-> It should be possible to read just once and cache the result.
-> 
-> I would have had the same comment about the original patch, but ARM
-> pushes those to Russell in secret so it wasn't on the list. :-)
+On Mon, Jul 15, 2013 at 03:16:12PM -0700, Andrew Morton wrote:
+> I've been thinking for a while that CONFIG_BUG=n is a pretty dumb thing
+> to do, and that maintaining it (and trying to fix the warnings it
+> produces) aren't worth the effort and that we should remove the whole
+> thing.  Perhaps your patch changes that calculus, dunno.  Please discuss.
 
-For a single read, there's probably not much between reading the CP15
-register and doing the tests, vs reading a bool from memory to decide
-whether we need to do it.
+This isn't about introducing "CONFIG_BUG=n" - this is about making a
+kernel with CONFIG_BUG=n build without producing tonnes and tonnes of
+warnings, as it does today.  It makes building randconfig pretty
+useless to find what could be more important warnings.
 
-For more than that (as the above patch is growing) it probably makes
-sense to think about using a bool in memory now.
+For example, this is a small extract from one such build log that
+randconfig decided to set CONFIG_BUG to n:
+
+fs/ext4/extents.c: In function 'ext4_inode_journal_mode':
+fs/ext4/ext4_jbd2.h:415:1: warning: control reaches end of non-void function
+fs/ext4/ext4_jbd2.c: In function 'ext4_inode_journal_mode':
+fs/ext4/ext4_jbd2.h:415:1: warning: control reaches end of non-void function
+fs/ext4/mballoc.c: In function 'ext4_inode_journal_mode':
+fs/ext4/ext4_jbd2.h:415:1: warning: control reaches end of non-void function
+fs/ext4/move_extent.c: In function 'ext4_inode_journal_mode':
+fs/ext4/ext4_jbd2.h:415:1: warning: control reaches end of non-void function
+fs/ext4/indirect.c: In function 'ext4_inode_journal_mode':
+fs/ext4/ext4_jbd2.h:415:1: warning: control reaches end of non-void function
+fs/ext4/inline.c: In function 'ext4_inode_journal_mode':
+fs/ext4/ext4_jbd2.h:415:1: warning: control reaches end of non-void function
+fs/ext4/acl.c: In function 'acl_by_type':
+include/linux/posix_acl.h:108:1: warning: control reaches end of non-void function
+fs/ext4/acl.c: In function 'ext4_get_acl':
+fs/ext4/acl.c:150:6: warning: 'name_index' may be used uninitialized in this funtion
