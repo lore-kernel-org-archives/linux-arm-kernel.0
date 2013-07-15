@@ -1,43 +1,67 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 15 Jul 2013 11:23:58 +0300
-Subject: [PATCH 4/6] mfd: omap-usb-host: Put pins in IDLE state on suspend
-In-Reply-To: <51E2A603.1000805@linaro.org>
-References: <1373473081-27181-1-git-send-email-rogerq@ti.com>
- <1373473380-27515-1-git-send-email-rogerq@ti.com>
- <51E2A603.1000805@linaro.org>
-Message-ID: <51E3B19E.80906@ti.com>
+From: sr@denx.de (Stefan Roese)
+Date: Mon, 15 Jul 2013 10:24:17 +0200
+Subject: [PATCH] ARM: OMAP3: Beagle: Fix USB Host on beagle xM Ax/Bx
+In-Reply-To: <51E3AFF4.7060607@ti.com>
+References: <1366024808-4691-1-git-send-email-rogerq@ti.com>
+ <51DC09E7.1070302@denx.de> <51DC164B.5010608@ti.com>
+ <51DC1B47.7070504@denx.de> <51DE87D3.5030600@ti.com>
+ <51DEA7F1.1050902@denx.de> <51DEC2CE.70400@ti.com> <51DED076.3040000@denx.de>
+ <51DEF0DE.4050607@denx.de> <51DFC92F.1050701@ti.com>
+ <51DFDFD4.3040900@denx.de> <51E3AFF4.7060607@ti.com>
+Message-ID: <51E3B1B1.3060202@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2013 04:22 PM, Kevin Hilman wrote:
-> On 07/10/2013 05:23 PM, Roger Quadros wrote:
->> In order to support wake up from suspend use the pinctrl
->> framework to put the USB host pins in IDLE state during suspend.
+On 07/15/2013 10:16 AM, Roger Quadros wrote:
+>>> I can only test on beagle-xm (which is also rev. C2) with integrated SMSC ethernet chip
+>>> as I don't have an external USB-ethernet adapter.
 >>
->> CC: Samuel Ortiz <sameo@linux.intel.com>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> Too bad. This difference in boards makes the tests a bit less
+>> meaningful. Is there really no USB-ethernet adapter somewhere in your
+>> department (perhaps a non-SMSC95xx might serve as well?)? I might
+>> send/order you one if necessary. ;)
 > 
-> [...]
-> 
->> @@ -608,6 +618,14 @@ static int usbhs_omap_probe(struct platform_device *pdev)
->>  		return -ENOMEM;
->>  	}
->>  
->> +	if (!dev->pins || !dev->pins->idle_state) {
->> +		/* If IDLE pins are not available, we can't remote wakeup,
->> +		 * so prevent idling in that case.
->> +		 */
-> 
-> nit: multi-line comment style
-> 
-> Also, if there are no pins, aren't the pinctrl ops nops anyways?  IOW,
-> not sure the need
-> for this is clear, and it's not mentioned in the changelog.
+> Thanks for the offer :). I'll just get one for myself by today/tomorrow.
+> The one available here uses this driver "drivers/net/usb/asix.c"
 
-The pinctrl ops are nops but the runtime suspend isn't. So in this case,
-we'll never be able to wake up the USB controller.
+Great.
 
-I'll update the changelog to reflect this.
+>>
+>>> The above commit doesn't work well for beagle-xm,
+>>
+>> Why is this? What does happen? Does U-Boot not boot up to the prompt?
+>> Please send me a log.
+> 
+> The last time it had failed I remember seeing a lot of IO pad configuration errors.
+> But I'm no longer able to reproduce that problem. Maybe it was just a messed up
+> build. In case I observe it again I'll let you know.
 
-cheers,
--roger
+It might be related to a problem with the gd (global-data) pointer being
+overwritten in den SPL. This is still not finally resolved the upcoming
+release:
+
+http://patchwork.ozlabs.org/patch/251293/
+
+>>
+>>> so my u-boot is on tag v2013.04
+>>> and you don't need that additional patch.
+>>>
+>>> Can you please retest on it? Thanks.
+>>
+>> Done, please see below.
+>>
+>>> You will need to set "usbethaddr" before starting USB else SMSC will not work.
+>>> e.g.
+>>> 	setenv usbethaddr A6:66:4D:B0:69:04
+>>
+>> I don't have a beagle-xm, only my beable. And my U-Boot network setup is
+>> already working, thanks.
+> 
+> Right. you won't need that for beagle. It was only for beagle-xm or panda with on board
+> usb-ethernet.
+
+I'm using the (external) USB-ethernet adapter on the beagle in U-Boot as
+well. To tftp the kernel/dtb.
+
+Thanks,
+Stefan
