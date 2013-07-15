@@ -1,119 +1,107 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 15 Jul 2013 14:23:52 -0500
-Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
-In-Reply-To: <51E3C85D.2010008@ti.com>
-References: <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
- <20130708112553.GU5523@atomide.com> <51DAB394.3050104@ti.com>
- <20130708131033.GA5523@atomide.com> <51DABC81.3080409@ti.com>
- <20130708133512.GD31221@arwen.pp.htv.fi> <87mwpuakod.fsf@linaro.org>
- <20130710142633.GV5523@atomide.com> <20130710160704.GH18966@arwen.pp.htv.fi>
- <20130710161158.GA19716@arwen.pp.htv.fi> <20130711063209.GZ5523@atomide.com>
- <51DE8215.5060306@ti.com> <51DF508F.3050703@ti.com> <51E39A3F.6080106@ti.com>
- <51E3C85D.2010008@ti.com>
-Message-ID: <51E44C48.3090905@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 15 Jul 2013 14:34:49 -0500
+Subject: [PATCH V2 5/5] ARM: remove #gpio-ranges-cells property
+In-Reply-To: <1373913629-32179-5-git-send-email-swarren@wwwdotorg.org>
+References: <1373913629-32179-1-git-send-email-swarren@wwwdotorg.org>
+ <1373913629-32179-5-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <51E44ED9.9020807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2013 05:01 AM, Rajendra Nayak wrote:
-> On Monday 15 July 2013 12:14 PM, Rajendra Nayak wrote:
->> On Friday 12 July 2013 06:10 AM, Suman Anna wrote:
->>> On 07/11/2013 04:59 AM, Grygorii Strashko wrote:
->>>> Hi,
->>>>
->>>> On 07/11/2013 09:32 AM, Tony Lindgren wrote:
->>>>> * Felipe Balbi <balbi@ti.com> [130710 09:18]:
->>>>>>
->>>>>> On Wed, Jul 10, 2013 at 07:07:04PM +0300, Felipe Balbi wrote:
->>>>>>> how about something like below ? It makes omap_device/hwmod and
->>>>>>> pm_runtime agree on the initial state of the device and will prevent
->>>>>>> ->runtime_resume() from being called on first pm_runtime_get*() done
->>>>>>> during probe.
->>>>>>>
->>>>>>> This is similar to what PCI bus does (if you look at pci_pm_init()).
->>>>>>>
->>>>>>> commit 59108a500b4ab4b1a5102648a3360276dbf7df6f
->>>>>>> Author: Felipe Balbi <balbi@ti.com>
->>>>>>> Date:   Wed Jul 10 18:50:16 2013 +0300
->>>>>>>
->>>>>>>      arm: omap2plus: unidle devices which are about to probe
->>>>>>>
->>>>>>>      in order to make HWMOD and pm_runtime agree on the
->>>>>>>      initial state of the device, we will unidle the device
->>>>>>>      and call pm_runtime_set_active() to tell pm_runtime
->>>>>>>      that the device is really active.
->>>> Don't think that it's good idea (
->>>> I've checked some driver's and think this patch will enable some devices
->>>> unpredictably:
->>>> - hwspinlock
->>>> - mailbox
->>>> - iommu
->>>> - ipu
->>>> All above devices need to be enabled on demand only (no
->>>> pm_runtime_get*() calls in probe). More over, some of them have very
->>>> specific enabling sequence - like ipu).
->>>>
->>>> May be Summan can say more on that.
->>>
->>> Indeed, this is a problem for any of the slave processor devices.
->>> mailbox and iommu would be slaves to the remoteproc and the drivers have
->>> a specific sequence of bringing up a processor. The current
->>> hwmod/omap_device code is such that these devices will be left in reset
->>> and the driver code use the omap_device_(de)assert_hardreset API
->>> together with omap_device_enable code to bring up the devices. The
->>> remoteproc driver also needs to assert the resets (there are other
->>> problems associated with using omap_device_idle for remoteproc and
->>> iommu) for bringing up the devices after a suspend sequence. hwspinlock
->>> and mailbox may get away since they are in CORE domain, but definitely
->>> an issue for iommu and remoteproc. I would think that this would also
->>> affect other compute devices like IVAHD, ISS, SGX.
->>
->> Today, for these IPs I guess hwmod waits for the resets to be de-asserted, right?
+On 07/15/2013 01:40 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> This property is no longer required by the GPIO binding. Remove it.
 
-Yes, the omap_device_enable bails out if the reset lines are still
-asserted, and the driver code deals with the resets currently. This code
-essentially achieves the same as if a HWMOD_INIT_NO_RESET flag is
-added to the corresponding hwmods - we do not want the hwmod/omap_device
-code to enable the processor IPs and leave the enabling/device
-management to the driver.
+Won't this break compatibility with older kernel? It is one thing to
+deprecate, but removal is another. If the relevant maintainers don't
+care, then I guess it is fine.
 
->>
->>         /*
->>          * If an IP block contains HW reset lines and all of them are
->>          * asserted, we let integration code associated with that
->>          * block handle the enable.  We've received very little
->>          * information on what those driver authors need, and until
->>          * detailed information is provided and the driver code is
->>          * posted to the public lists, this is probably the best we
->>          * can do.
->>          */
->>         if (_are_all_hardreset_lines_asserted(oh))
->>                 return 0;
->>
->> What if this information is send back to omap_device() through a return value
->> so omap_device() knows about this too, so it avoids marking the omap device as
->> enabled? Wouldn't that fix the issue?
-> 
-> I meant something like this..
-> 
-> From 2fbea0dde0f72897089ef2e8e441b5e5bd6ea967 Mon Sep 17 00:00:00 2001
-> From: Rajendra Nayak <rnayak@ti.com>
-> Date: Mon, 15 Jul 2013 15:23:07 +0530
-> Subject: [PATCH] ARM: OMAP2+: Make omap_device aware of hwmod failing to
->  enable/idle/shutdown the hwmods
-> 
-> For IP blocks (mainly processors) which have hard reset lines, hwmod avoids
-> enable/idle/shutdown operations as long as all the hard reset lines are
-> kept asserted. However it does not return an error back to the caller (in some
-> cases the omap_device layer) to communicate back the failure to operate on the
-> hwmod.
-> 
-> Fix this by making _enable()/_idle()/_shutdown() all return an error in such
-> cases, and also fix the omap_device layer to look at the return values coming
-> from hwmod operations before doing a omap_device level state transition.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+> This should presumably be applied along with the previous changes
 
-Let me test this and get back to you if there are any issues.
+The rest looks fine to me. I can take this series, but would actually
+prefer that this patch go separately to arm-soc.
 
-regards
-Suman
+Rob
+
+> 
+> v2: Squash spear and mxc changes into a single patch; there's no
+> need to keep vf610.dtsi separate now that this series will go into
+> v3.12 or later, and that file is part of v3.11-rc1.
+> ---
+>  arch/arm/boot/dts/spear1310.dtsi | 1 -
+>  arch/arm/boot/dts/spear1340.dtsi | 1 -
+>  arch/arm/boot/dts/spear310.dtsi  | 1 -
+>  arch/arm/boot/dts/spear320.dtsi  | 2 --
+>  arch/arm/boot/dts/vf610.dtsi     | 1 -
+>  5 files changed, 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/spear1310.dtsi b/arch/arm/boot/dts/spear1310.dtsi
+> index 122ae94..90e99b5 100644
+> --- a/arch/arm/boot/dts/spear1310.dtsi
+> +++ b/arch/arm/boot/dts/spear1310.dtsi
+> @@ -89,7 +89,6 @@
+>  		pinmux: pinmux at e0700000 {
+>  			compatible = "st,spear1310-pinmux";
+>  			reg = <0xe0700000 0x1000>;
+> -			#gpio-range-cells = <3>;
+>  		};
+>  
+>  		apb {
+> diff --git a/arch/arm/boot/dts/spear1340.dtsi b/arch/arm/boot/dts/spear1340.dtsi
+> index 54d128d..5003013 100644
+> --- a/arch/arm/boot/dts/spear1340.dtsi
+> +++ b/arch/arm/boot/dts/spear1340.dtsi
+> @@ -63,7 +63,6 @@
+>  		pinmux: pinmux at e0700000 {
+>  			compatible = "st,spear1340-pinmux";
+>  			reg = <0xe0700000 0x1000>;
+> -			#gpio-range-cells = <3>;
+>  		};
+>  
+>  		pwm: pwm at e0180000 {
+> diff --git a/arch/arm/boot/dts/spear310.dtsi b/arch/arm/boot/dts/spear310.dtsi
+> index 9537208..1e1318e 100644
+> --- a/arch/arm/boot/dts/spear310.dtsi
+> +++ b/arch/arm/boot/dts/spear310.dtsi
+> @@ -25,7 +25,6 @@
+>  		pinmux: pinmux at b4000000 {
+>  			compatible = "st,spear310-pinmux";
+>  			reg = <0xb4000000 0x1000>;
+> -			#gpio-range-cells = <3>;
+>  		};
+>  
+>  		fsmc: flash at 44000000 {
+> diff --git a/arch/arm/boot/dts/spear320.dtsi b/arch/arm/boot/dts/spear320.dtsi
+> index ffea342..f630d0c 100644
+> --- a/arch/arm/boot/dts/spear320.dtsi
+> +++ b/arch/arm/boot/dts/spear320.dtsi
+> @@ -1,4 +1,3 @@
+> -/*
+>   * DTS file for SPEAr320 SoC
+>   *
+>   * Copyright 2012 Viresh Kumar <viresh.linux@gmail.com>
+> @@ -24,7 +23,6 @@
+>  		pinmux: pinmux at b3000000 {
+>  			compatible = "st,spear320-pinmux";
+>  			reg = <0xb3000000 0x1000>;
+> -			#gpio-range-cells = <3>;
+>  		};
+>  
+>  		clcd at 90000000 {
+> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+> index e1eb7da..8577780 100644
+> --- a/arch/arm/boot/dts/vf610.dtsi
+> +++ b/arch/arm/boot/dts/vf610.dtsi
+> @@ -162,7 +162,6 @@
+>  			iomuxc: iomuxc at 40048000 {
+>  				compatible = "fsl,vf610-iomuxc";
+>  				reg = <0x40048000 0x1000>;
+> -				#gpio-range-cells = <3>;
+>  
+>  				/* functions and groups pins */
+>  
+> 
