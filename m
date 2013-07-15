@@ -1,85 +1,121 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Jul 2013 16:24:37 +0200
-Subject: [PATCH 2/3] i2c-mv64xxx: Fix timing issue on Armada XP (errata
- FE-8471889)
+Date: Mon, 15 Jul 2013 16:24:38 +0200
+Subject: [PATCH 3/3] ARM: dts: mvebu: Introduce a new compatible string for
+ mv64xxx-i2c
 In-Reply-To: <1373898278-4805-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1373898278-4805-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1373898278-4805-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1373898278-4805-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the Armada XP (mv78230, mv78260 and mv78460) have a silicon issue
-in the I2C controller which violate the i2c repeated start
-timing. The I2C standard requires a minimum of 4.7us for the repeated
-start condition whereas the I2C controller of the Armada XP this time
-is 2.9us.
+The mv64xxx-i2c embedded in the Armada XP have a new feature to
+offload i2c transaction. This new version of the IP come also with
+some errata. This lead to the introduction to a another compatible
+string.
 
-So this patch adds a 5us delay for the start case only if the
-the compatible i2c-mv78230 is set.
+This commit split the i2c information into armada-370.dtsi and
+armada-xp.dtsi. Most of the data remains the same and stay in the
+common file Armada-370-xp.dtsi. With this new feature the size of the
+registers are bigger for Armada XP and the new compatible string is
+used.
 
-Based on the initals patches from Zbigniew Bodek
+The Device Tree binding documentation is updated accordingly.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Zbigniew Bodek <zbb@semihalf.com>
 ---
- drivers/i2c/busses/i2c-mv64xxx.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 13 ++++++++++++-
+ arch/arm/boot/dts/armada-370-xp.dtsi                  |  2 --
+ arch/arm/boot/dts/armada-370.dtsi                     |  8 ++++++++
+ arch/arm/boot/dts/armada-xp.dtsi                      | 10 ++++++++++
+ 4 files changed, 30 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-index 355ab64..75be30cce 100644
---- a/drivers/i2c/busses/i2c-mv64xxx.c
-+++ b/drivers/i2c/busses/i2c-mv64xxx.c
-@@ -24,6 +24,7 @@
- #include <linux/of_i2c.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-+#include <linux/delay.h>
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+index a1ee681..c5dd952 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+@@ -4,7 +4,8 @@
+ Required properties :
  
- #define MV64XXX_I2C_ADDR_ADDR(val)			((val & 0x7f) << 1)
- #define MV64XXX_I2C_BAUD_DIV_N(val)			(val & 0x7)
-@@ -147,6 +148,8 @@ struct mv64xxx_i2c_data {
- 	struct i2c_msg		*msg;
- 	struct i2c_adapter	adapter;
- 	bool			offload_enabled;
-+/* 5us delay in order to avoid repeated start timing violation */
-+	bool			errata_delay;
- };
+  - reg             : Offset and length of the register set for the device
+- - compatible      : Should be "marvell,mv64xxx-i2c"
++ - compatible      : Should be "marvell,mv64xxx-i2c" and "marvell,mv7230-i2c"
++for controller which support the I2C Transaction Generator
+  - interrupts      : The interrupt number
  
- static struct mv64xxx_i2c_regs mv64xxx_i2c_regs_mv64xxx = {
-@@ -450,6 +453,9 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
- 			/* Setup for the next message */
- 			mv64xxx_i2c_prepare_for_io(drv_data, drv_data->msgs);
- 		}
-+		if (drv_data->errata_delay)
-+			udelay(5);
+ Optional properties :
+@@ -20,3 +21,13 @@ Examples:
+ 		interrupts = <29>;
+ 		clock-frequency = <100000>;
+ 	};
 +
- 		/*
- 		 * We're never at the start of the message here, and by this
- 		 * time it's already too late to do any protocol mangling.
-@@ -509,6 +515,9 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
- 		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_STOP,
- 			drv_data->reg_base + drv_data->reg_offsets.control);
- 		drv_data->block = 0;
-+		if (drv_data->errata_delay)
-+			udelay(5);
++For a controller which support the I2C Transaction Generator:
 +
- 		wake_up(&drv_data->waitq);
- 		break;
++	i2c at 11000 {
++		compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
++		reg = <0x11000 0x100>;
++		compatible = "marvell,mv64xxx-i2c";
++		interrupts = <29>;
++		clock-frequency = <100000>;
++	};
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 90b1176..d8b24c9 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -121,7 +121,6 @@
  
-@@ -780,10 +789,12 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+ 			i2c0: i2c at 11000 {
+ 				compatible = "marvell,mv64xxx-i2c";
+-				reg = <0x11000 0x20>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				interrupts = <31>;
+@@ -132,7 +131,6 @@
  
- 	/*
- 	 * For controllers embedded in new SoCs activate the
--	 * Transaction Generator support.
-+	 * Transaction Generator support and the errata fix.
- 	 */
--	if (of_device_is_compatible(np, "marvell,mv78230-i2c"))
-+	if (of_device_is_compatible(np, "marvell,mv78230-i2c")) {
- 		drv_data->offload_enabled = true;
-+		drv_data->errata_delay = true;
-+	}
+ 			i2c1: i2c at 11100 {
+ 				compatible = "marvell,mv64xxx-i2c";
+-				reg = <0x11100 0x20>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				interrupts = <32>;
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index fa3dfc6..0e2eefa 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -155,6 +155,14 @@
+ 				};
+ 			};
  
- out:
- 	return rc;
++			i2c0: i2c at 11000 {
++				reg = <0x11000 0x20>;
++			};
++
++			i2c1: i2c at 11100 {
++				reg = <0x11100 0x20>;
++			};
++
+ 			usb at 50000 {
+ 				clocks = <&coreclk 0>;
+ 			};
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 416eb94..e1f2547 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -138,6 +138,16 @@
+ 				};
+ 			};
+ 
++			i2c0: i2c at 11000 {
++				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
++				reg = <0x11000 0x100>;
++			};
++
++			i2c1: i2c at 11100 {
++				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
++				reg = <0x11100 0x100>;
++			};
++
+ 			usb at 50000 {
+ 				clocks = <&gateclk 18>;
+ 			};
 -- 
 1.8.1.2
