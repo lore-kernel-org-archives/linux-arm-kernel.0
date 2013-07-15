@@ -1,58 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Jul 2013 23:47:59 +0100
-Subject: [PATCH, re-send] Always trap on BUG()
-In-Reply-To: <51E47924.9030005@zytor.com>
-References: <201307051738.35930.arnd@arndb.de>
- <20130715151612.9499c2b2ad40e88d183a4600@linux-foundation.org>
- <20130715222755.GY24642@n2100.arm.linux.org.uk> <51E47924.9030005@zytor.com>
-Message-ID: <20130715224759.GZ24642@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Jul 2013 17:02:29 -0600
+Subject: [PATCH V2 5/5] ARM: remove #gpio-ranges-cells property
+In-Reply-To: <51E44ED9.9020807@gmail.com>
+References: <1373913629-32179-1-git-send-email-swarren@wwwdotorg.org>
+ <1373913629-32179-5-git-send-email-swarren@wwwdotorg.org>
+ <51E44ED9.9020807@gmail.com>
+Message-ID: <51E47F85.4050905@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 03:35:16PM -0700, H. Peter Anvin wrote:
-> On 07/15/2013 03:27 PM, Russell King - ARM Linux wrote:
-> > On Mon, Jul 15, 2013 at 03:16:12PM -0700, Andrew Morton wrote:
-> >> I've been thinking for a while that CONFIG_BUG=n is a pretty dumb thing
-> >> to do, and that maintaining it (and trying to fix the warnings it
-> >> produces) aren't worth the effort and that we should remove the whole
-> >> thing.  Perhaps your patch changes that calculus, dunno.  Please discuss.
-> > 
-> > This isn't about introducing "CONFIG_BUG=n" - this is about making a
-> > kernel with CONFIG_BUG=n build without producing tonnes and tonnes of
-> > warnings, as it does today.  It makes building randconfig pretty
-> > useless to find what could be more important warnings.
-> > 
+On 07/15/2013 01:34 PM, Rob Herring wrote:
+> On 07/15/2013 01:40 PM, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> This property is no longer required by the GPIO binding. Remove it.
 > 
-> Well, there are three alternatives here, right:
+> Won't this break compatibility with older kernel? It is one thing to
+> deprecate, but removal is another. If the relevant maintainers don't
+> care, then I guess it is fine.
 
-There's many more than three alternatives - some of them may not pass
-your taste filter.
+Yes.
 
-> 1. We can use unreachable(), which means that the compiler can assume it
-> never happens.
+I had originally hoped this could sneak in late for 3.11, but I suppose
+it's too late now. vf610.dtsi is a new file in 3.11 so has no legacy to
+protect.
 
-Arnd tried that... see the commit message for the build results from
-that.  Arnd included a whole boat-load of other solutions to this
-problem and documented the build results there too.
-
-What this actually means in reality is that you're giving permission for
-the CPU to run off the end of a function and start executing whatever it
-finds there - which could be literal tables.  That might cause some
-memory to be corrupted but otherwise go by unnoticed until very much
-later.
-
-Infinite while loops on the other hand... probably a single instruction,
-but if we're using a single instruction why not make it trap with an
-exception anyway so that the system can panic() and maybe reboot without
-needing to wait for the watchdog?
-
-> 2. We can trap without metadata.
-> 
-> 3. We can trap with metadata (current CONFIG_BUG=y).
-> 
-> I am *guessing* this does 2, but it isn't clear.
-
-That is what this paragraph in Arnd's mail conveys to me:
-
-  This basically loses any of the BUG() reporting, but leaves the
-  logic to trap and kill the task in place when CONFIG_BUG is disabled.
+Admittedly, the #gpio-cells property was added into the SPEAr files in 3.10.
