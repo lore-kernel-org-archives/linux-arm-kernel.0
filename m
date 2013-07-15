@@ -1,174 +1,128 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Mon, 15 Jul 2013 16:50:15 +0100
-Subject: [RFC PATCH 1/3] of: provide a binding for the 'fixed-link'
- property
-In-Reply-To: <1373902450-11857-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1373902450-11857-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373902450-11857-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CAGVrzcZU-3VS87RgrCrcSuoQd+aU3XRX-QerToT1uvRemtcQDQ@mail.gmail.com>
+From: grundler@chromium.org (Grant Grundler)
+Date: Mon, 15 Jul 2013 08:56:02 -0700
+Subject: [PATCH v7 00/12] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <00a701ce8155$be139240$3a3ab6c0$@samsung.com>
+References: <002801ce797b$3d2fbc80$b78f3580$@samsung.com>
+ <CANEJEGvajhgzUPG6ppbjwBb4-9TdU9em3T_SejBpz8NCjGHYTQ@mail.gmail.com>
+ <00a701ce8155$be139240$3a3ab6c0$@samsung.com>
+Message-ID: <CANEJEGu0VJdFZmS800EKRSH0GXLGomC973BON7Vtr1qjjqi_nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas,
+On Mon, Jul 15, 2013 at 5:20 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
+...
+>> > Cho,
+>> > Of the above patches, nearly all have been applied to chromeos-3.8
+>> > (kernel-next git tree) by Doug Anderson and others.
+>> >
+>> > AFAICT, the only ones not applied are:
+>> >    [v7,3/9] iommu/exynos: fix page table maintenance
+>> >    [v7,6/9] clk: exynos5250: add gate clock descriptions of System MMU
+>> > (conflicts in this one)
+>> >    [v7,7/9] ARM: dts: Add description of System MMU of Exynos SoCs
+>> > (depends on 6/9)
+>> >
+>> > We also already have parts of:
+>> >    [v7,9/9] iommu/exynos: add bus notifier for registering System MMU
+>> >
+>> > Some of those are being further discussed but I've lost track now
+>> > exactly which ones.
+>> >
+>> > I'm telling you about chromeos-3.8 status since the adopted changes
+>> > have been reviewed (by me and others) are being tested manually here
+>> > on several different Samsung Exynos platforms (including 5250 which is
+>> > our "snow" platform). Not sure how you should to mark those patches
+>> > since they aren't identical to your changes (which apply to post 3.10
+>> > kernels, not 3.8).  You might consider splitting those patches out
+>> > from the 4 I've listed above to get that series accepted upstream
+>> > since the additional review/testing should provide some confidence
+>> > those patches are good.
+>> >
+>>
+>> I understand what you are concerning about.
+>> Have you applied v6 patchset?
 
-2013/7/15 Thomas Petazzoni <thomas.petazzoni@free-electrons.com>:
-> Some Ethernet MACs have a "fixed link", and are not connected to a
-> normal MDIO-managed PHY device. For those situations, a Device Tree
-> binding allows to describe a "fixed link", as a "fixed-link" property
-> of the Ethernet device Device Tree node.
+I did not though it's possible some of the code that was applied to
+chromeos-3.8 kernel came from v6 (or earlier) patches. I just compared
+with v7. Since it's a "backport", the code I found in chromeos-3.8 is
+the same if not identical to v7.
+
+>>
+>> I will try to split the patches and make the changes from v6
+>> on top of the v6 patcheset.
+
+Ok.
+
+> Actually, as you know, the previous patches include setting a System MMU
+> as the parent device of its master device in probe() of System MMU.
+> I asked Greg KH about changing device hierarchy in probe() and he answered
+> that it is not a good idea because it modifies sysfs even though probe() of
+> System MMU driver is called before sysfs is constructed.
+
+SysMMU primarily provides DMA API, right? Can sysfs be initialized
+before DMA is available?
+On some (many?) platforms the SysMMU is also responsible for "child"
+bus controllers and MMIO resource routing, and on ARM platforms,
+clocks for rest of the IO devices.
+
+SysMMU might be needed for early gfx support (or something). Maybe the
+right answer is to "discover" the SysMMU twice: once very early to get
+the SysMMU operational and then again later in a "normal" probe
+sequence to register with the sysfs. Any reason a driver couldn't
+register two different module_init() routines in different parts of
+the init call table?
+
+
+> That's why I uses genpd_pm_ops.
+> It results in big change in the patches after registering device tree.
 >
-> This patch adds:
->
->  * A documentation for the Device Tree property "fixed-link".
->
->  * A of_phy_register_fixed_link() OF helper, which provided an OF node
->    that contains a "fixed-link" property, registers the corresponding
->    fixed PHY.
->
->  * Removes the warning on the of_phy_connect_fixed_link() that says
->    new drivers should not use it, since Grant Likely indicated that
->    this "fixed-link" property is indeed the way to go.
+> I want to ask your opinion about this change :)
 
-Some minor nitpicks below. Other than that:
+I have no objection to large changes if they work well and are easy to
+understand.
 
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+<rant>
+I personally not happy with the direction the Linux IOMMU "subsystem"
+has taken. I think the generic IOMMU subsystem should be discarded.
+Strong words for someone who's not a key contributor but I'll explain.
 
-Reviewed-by: Florian Fainelli <florian@openwrt.org>
+I wrote the IOMMU support for PA-RISC (three different IOMMUs) 10+
+years ago. I rewrote the HPUX implementations in the 90's and then
+around 2000 wrote the implementation for PA-RISC (one of which Alex
+Williamson used for IA64 IOMMU support - sba_iommu.c).  It's pretty
+straight forward. There is "page allocation policy", code to do TLB
+shoot down, and code to manage the IO Pdir. This is the same as for
+CPU MMU.  The *efficiency* of the TLB depends on the page allocation
+(SW) to work together with the HW TLB replacement policy. In other
+words, the page allocation policy needs to avoid thrashing the IO TLB.
+A generic IOTLB allocation policy can't do that for every platform.
 
-> ---
->  .../devicetree/bindings/net/fixed-link.txt         | 26 ++++++++++++++++
->  drivers/of/of_mdio.c                               | 36 +++++++++++++++++++---
->  include/linux/of_mdio.h                            | 10 ++++++
->  3 files changed, 68 insertions(+), 4 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/net/fixed-link.txt
->
-> diff --git a/Documentation/devicetree/bindings/net/fixed-link.txt b/Documentation/devicetree/bindings/net/fixed-link.txt
-> new file mode 100644
-> index 0000000..25a009a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/fixed-link.txt
-> @@ -0,0 +1,26 @@
-> +Fixed link Device Tree binding
-> +------------------------------
-> +
-> +Some Ethernet MACs have a "fixed link", and are not connected to a
-> +normal MDIO-managed PHY device. For those situations, a Device Tree
-> +binding allows to describe a "fixed link".
+Exynos 5250 has an 8-way associative TLB. That's likely very different
+from the Intel and TI (omap) IOMMU the IOMMU subsystem code was
+originally implemented for. The "optimal" size of page to allocate
+will be different too.  Older Exynos products are likely different
 
-You could also add the following:
+The "2cd layer" of indirect function calls between the generic IOMMU
+support and the platform specific code makes it harder to understand
+the code.  While jump tables are good for some things, I don't think
+this is a good use. We should "flip" this design around. Let the
+platform specific code "own" the DMA ops API and it can decide which
+services it should or should not use.
 
-"this might be the case when using an Ethernet switch whose management
-interface is not accessible using the MDIO bus, or for specific PHYs
-where the control path of the PHY might be separated from its data
-path".
+E.g. The IOTLB shoot down can be divorced from the "unmap" call. The
+efficiency of shooting down one IOTLB entry at a time is horrible on
+most platforms. One answer is to add a new API to shoot down an array
+of IOVAs. But the tradeoffs in the size of the array and the events
+that might trigger a TLB shoot down should be left up to the
+platform/chipset specific code (e.g. "lazy TLB shootdown").
 
-> +
-> +Such a fixed link situation is described within an Ethernet device
-> +Device Tree node using a 'fixed-link' property, composed of 5
-> +elements:
-> +
-> + 1. A fake PHY ID, which must be unique accross all fixed-link PHYs in
-> +    the system.
+Sorry...this got rant got alot longer than it should have been. I hope
+this helps people understand the design tradeoffs that linux IOMMU
+subsystem never will be able to cleanly address. My hope is this rant
+will help developers like you justify small steps to move away from
+generic IOMMU code.
+</rant>
 
-You might want to detail that will be used to fake PHY identification
-registers 2 & 3.
-
-> + 2. The duplex (1 for full-duplex, 0 for half-duplex)
-> + 3. The speed (10, 100, 1000)
-> + 4. The pause setting (1 for enabled, 0 for disabled)
-> + 5. The asym pause setting (1 for enabled, 0 for disabled)
-> +
-> +Example:
-> +
-> +ethernet at 0 {
-> +       ...
-> +       fixed-link = <1 1 1000 0 0>;
-> +       ...
-> +};
-> +
-> diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
-> index d5a57a9..66d5591 100644
-> --- a/drivers/of/of_mdio.c
-> +++ b/drivers/of/of_mdio.c
-> @@ -14,6 +14,7 @@
->  #include <linux/netdevice.h>
->  #include <linux/err.h>
->  #include <linux/phy.h>
-> +#include <linux/phy_fixed.h>
->  #include <linux/of.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_mdio.h>
-> @@ -215,10 +216,6 @@ EXPORT_SYMBOL(of_phy_connect);
->   * @dev: pointer to net_device claiming the phy
->   * @hndlr: Link state callback for the network device
->   * @iface: PHY data interface type
-> - *
-> - * This function is a temporary stop-gap and will be removed soon.  It is
-> - * only to support the fs_enet, ucc_geth and gianfar Ethernet drivers.  Do
-> - * not call this function from new drivers.
->   */
->  struct phy_device *of_phy_connect_fixed_link(struct net_device *dev,
->                                              void (*hndlr)(struct net_device *),
-> @@ -247,3 +244,34 @@ struct phy_device *of_phy_connect_fixed_link(struct net_device *dev,
->         return IS_ERR(phy) ? NULL : phy;
->  }
->  EXPORT_SYMBOL(of_phy_connect_fixed_link);
-> +
-> +#if defined(CONFIG_FIXED_PHY)
-> +/**
-> + * of_phy_register_fixed_link - Parse fixed-link property and register a dummy phy
-> + * @np: pointer to the OF device node that contains the "fixed-link"
-> + * property for which a dummy phy should be registered.
-> + */
-> +#define FIXED_LINK_PROPERTIES_COUNT 5
-> +int of_phy_register_fixed_link(struct device_node *np)
-> +{
-> +       struct fixed_phy_status status = {};
-> +       u32 fixed_link_props[FIXED_LINK_PROPERTIES_COUNT];
-> +       int ret;
-> +
-> +       ret = of_property_read_u32_array(np, "fixed-link",
-> +                                        fixed_link_props,
-> +                                        FIXED_LINK_PROPERTIES_COUNT);
-> +       if (ret < 0)
-> +               return ret;
-> +
-> +       status.link       = 1;
-> +       status.duplex     = fixed_link_props[1];
-> +       status.speed      = fixed_link_props[2];
-> +       status.pause      = fixed_link_props[3];
-> +       status.asym_pause = fixed_link_props[4];
-> +
-> +       return fixed_phy_add(PHY_POLL, fixed_link_props[0],
-> +                            &status);
-> +}
-> +EXPORT_SYMBOL(of_phy_register_fixed_link);
-> +#endif
-> diff --git a/include/linux/of_mdio.h b/include/linux/of_mdio.h
-> index 8163107..bf6efea 100644
-> --- a/include/linux/of_mdio.h
-> +++ b/include/linux/of_mdio.h
-> @@ -57,4 +57,14 @@ static inline struct mii_bus *of_mdio_find_bus(struct device_node *mdio_np)
->  }
->  #endif /* CONFIG_OF */
->
-> +#if defined(CONFIG_OF) && defined(CONFIG_FIXED_PHY)
-> +extern int of_phy_register_fixed_link(struct device_node *np);
-> +#else
-> +static inline int of_phy_register_fixed_link(struct device_node *np)
-> +{
-> +       return -ENOSYS;
-> +}
-> +#endif
-> +
-> +
->  #endif /* __LINUX_OF_MDIO_H */
-> --
-> 1.8.1.2
->
-
-
-
---
-Florian
+cheers,
+grant
