@@ -1,68 +1,20 @@
-From: rklein@nvidia.com (Rhyland Klein)
-Date: Mon, 15 Jul 2013 13:29:45 -0400
-Subject: [PATCH V2] ARM: tegra: enable palmas device for dalmore
-In-Reply-To: <51E43129.7080602@nvidia.com>
-References: <1373441852-27176-1-git-send-email-ldewangan@nvidia.com>
- <51E427D6.7090702@wwwdotorg.org> <51E43129.7080602@nvidia.com>
-Message-ID: <51E43189.5050805@nvidia.com>
+From: gorcunov@gmail.com (Cyrill Gorcunov)
+Date: Mon, 15 Jul 2013 21:32:38 +0400
+Subject: [PATCH] arm: align shared memory unconditionally to the SHMLBA
+ boundary
+In-Reply-To: <1361254269-3444-1-git-send-email-alekskartashov@parallels.com>
+References: <1361254269-3444-1-git-send-email-alekskartashov@parallels.com>
+Message-ID: <20130715173238.GJ1730@moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/15/2013 1:28 PM, Laxman Dewangan wrote:
-> On Monday 15 July 2013 10:18 PM, Stephen Warren wrote:
->> On 07/10/2013 01:37 AM, Laxman Dewangan wrote:
->>> Make the entry of Dalmore Power Management Unit device TPS65913
->>> in dalmore DTS file. The Palma driver support this device.
->>>
->>> Enable following submodule of the TPS65913:
->>> - GPIO driver
->>> - RTC driver.
->>> - Power regulator driver.
->> If I apply this, (at least) the SD card no longer works. I assume the
->> regulator for it is being turned off somehow.
-> 
-> As per downstream power tree, smps9 is feeding power to sd slot and I 
-> make this rail as always ON. So there should not be any issue.
-> 
-> Rhyland,
-> Do you see any differences on this power tree with your power tree with 
-> DT? There was discussion sometime ago on the sdcard. Am I missing 
-> anything here?
-> 
-> Thanks,
-> Laxman
-> 
+On Tue, Feb 19, 2013 at 10:11:09AM +0400, Alexander Kartashov wrote:
+> Currently IPC SHM works in a strange way on ARM:
+> the syscall sys_shmat() requires the argument shmaddr
+> be SHMLBA-aligned (ARM has the macro __ARCH_FORCE_SHMLBA
+> unconditionally defined) but allocates memory that
+> isn't SHMLBA-aligned because the value of memory alignment
+> depends on presense of certain cache aliases.
 
-
-I noticed a couple differences between this and what we are using...
-
-Yours:
-+			    ldo8-in-supply = <&tps65090_dcdc3_reg>;
-+			    ldo9-in-supply = <&palmas_smps9_reg>;
-Ours:
-                            ldo8-in-supply = <&tps65090_dcdc2_reg>;
-                            ldo9-in-supply = <&tps65090_dcdc2_reg>;
-
-We also specify supplies (floating) for smps6 and smps10.  I don't think
-that matters though.
-
-Also we have the vmmc-supply and sd-slot-supply propeties set for the sd
-card slot, like so:
-
-                vmmc-supply = <&palmas_smps3_reg>;
-                sd-slot-supply = <&palmas_smps9_reg>;
-
-Also, we have the interrupt trigger mode different for the palmas:
-
-Yours:
-+			interrupts = <0 86 0x4>;
-Ours:
-                        interrupts = <0 86 0x8>;
-
-
-I think other than that they should be the same.
-
--Rhyland
-
--- 
-nvpublic
+Hi guys, is there some conclusion on this patch? It has been sent
+almost 5 months back ;)
