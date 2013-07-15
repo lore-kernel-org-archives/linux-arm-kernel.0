@@ -1,85 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Jul 2013 13:39:22 +0100
-Subject: [PATCH] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene host
-In-Reply-To: <1373888788-8055-1-git-send-email-anup.patel@linaro.org>
-References: <1373888788-8055-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <51E3ED7A.7050207@arm.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Mon, 15 Jul 2013 18:15:27 +0530
+Subject: [PATCH] remove vlan tags in CPSW dual emac mode
+In-Reply-To: <51E0582D.4090306@newflow.co.uk>
+References: <4699400.vD3TdgH1nR@localhost> <5176C4FE.4080305@ti.com>
+ <51E00B2F.6050406@newflow.co.uk> <51E04C89.8030202@ti.com>
+ <51E0582D.4090306@newflow.co.uk>
+Message-ID: <51E3EEE7.9030508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anup,
+On 7/13/2013 12:55 AM, Mark Jackson wrote:
+> On 12/07/13 19:35, Mugunthan V N wrote:
+>> On 7/12/2013 7:27 PM, Mark Jackson wrote:
+> [snip]
+>
+>>> Just to update this (old) thread ...
+>>>
+>>> I can still confirm that *without* the above patch, I am *unable* to use both network
+>>> ports on our AM335x board.
+>>>
+> [snip]
+>
+>>> So I'm not sure what's wrong, but it's *definitely* not correct.
+>>>
+>>>
+>> I am sure that current code in mainline works for Dual EMAC. I can test it
+>> again and share the images with you if are interested. But had tested with DHCP
+>> on both the interfaces.
+> Hmmm ... well it's not working for me.  What hardware are you testing it on ?
+>
+> I tried DHCP to start with, and switched to static IP when that failed.
+> Then I recalled this patch and re-applied it ... hey presto !!
+>
+> Markus, are you still using this patch ?
+>
+Today I have tested the Dual EMAC on my am335x-evmsk and its working fine with
+net/master branch.
+I had 3 patches additional to net/master in which two for basic boot of EVMsk
+and one for enabling Dual EMAC. I had pushed the branch in the below repo
+repo:
+git://git.ti.com/~mugunthanvnm/ti-linux-kernel/mugunth-connectivity-linux-feature-tree.git
+branch: dual-emac
 
-On 15/07/13 12:46, Anup Patel wrote:
-> This patch allows us to have X-Gene guest VCPU when using
-> KVM arm64 on APM X-Gene host.
-> 
-> We add KVM_ARM_TARGET_XGENE_V8 for X-Gene compatible guest VCPU
-> and we return KVM_ARM_TARGET_XGENE_V8 in kvm_target_cpu() when
-> running on X-Gene host.
-> 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  arch/arm64/include/uapi/asm/kvm.h    |    3 ++-
->  arch/arm64/kvm/guest.c               |   34 ++++++++++++++++++++++------------
->  arch/arm64/kvm/sys_regs_generic_v8.c |    3 +++
->  3 files changed, 27 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 5031f42..8194707 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -55,8 +55,9 @@ struct kvm_regs {
->  #define KVM_ARM_TARGET_AEM_V8		0
->  #define KVM_ARM_TARGET_FOUNDATION_V8	1
->  #define KVM_ARM_TARGET_CORTEX_A57	2
-> +#define KVM_ARM_TARGET_XGENE_V8		3
->  
-> -#define KVM_ARM_NUM_TARGETS		3
-> +#define KVM_ARM_NUM_TARGETS		4
->  
->  /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
->  #define KVM_ARM_DEVICE_TYPE_SHIFT	0
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> index 2c3ff67..e99b0a5 100644
-> --- a/arch/arm64/kvm/guest.c
-> +++ b/arch/arm64/kvm/guest.c
-> @@ -207,19 +207,29 @@ int __attribute_const__ kvm_target_cpu(void)
->  	unsigned long implementor = read_cpuid_implementor();
->  	unsigned long part_number = read_cpuid_part_number();
->  
-> -	if (implementor != ARM_CPU_IMP_ARM)
-> -		return -EINVAL;
-> -
-> -	switch (part_number) {
-> -	case ARM_CPU_PART_AEM_V8:
-> -		return KVM_ARM_TARGET_AEM_V8;
-> -	case ARM_CPU_PART_FOUNDATION:
-> -		return KVM_ARM_TARGET_FOUNDATION_V8;
-> -	case ARM_CPU_PART_CORTEX_A57:
-> -		/* Currently handled by the generic backend */
-> -		return KVM_ARM_TARGET_CORTEX_A57;
-> +	switch (implementor) {
-> +	case ARM_CPU_IMP_ARM:
-> +		switch (part_number) {
-> +		case ARM_CPU_PART_AEM_V8:
-> +			return KVM_ARM_TARGET_AEM_V8;
-> +		case ARM_CPU_PART_FOUNDATION:
-> +			return KVM_ARM_TARGET_FOUNDATION_V8;
-> +		case ARM_CPU_PART_CORTEX_A57:
-> +			return KVM_ARM_TARGET_CORTEX_A57;
-> +		default:
-> +			return -EINVAL;
-> +		}
-> +		break;
-> +	case ARM_CPU_IMP_APM:
-> +		switch (part_number) {
-> +		case APM_CPU_PART_POTENZA:
-> +			return KVM_ARM_TARGET_XGENE_V8;
-
-Why don't we have KVM_ARM_TARGET_XGENE_POTENZA (or something similar)
-instead? I don't expect all the X-Gene CPUs to be the same forever...
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Regards
+Mugunthan V N
