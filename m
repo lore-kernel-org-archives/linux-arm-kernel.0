@@ -1,238 +1,332 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 15 Jul 2013 20:47:29 +0200
-Subject: [PATCH v1 00/24] add COMMON_CLK support for PowerPC MPC512x
-Message-ID: <1373914074-20889-1-git-send-email-gsi@denx.de>
+Date: Mon, 15 Jul 2013 20:47:39 +0200
+Subject: [PATCH v1 10/24] dts: mpc512x: add clock specs for client lookups
+In-Reply-To: <1373914074-20889-1-git-send-email-gsi@denx.de>
+References: <1373914074-20889-1-git-send-email-gsi@denx.de>
+Message-ID: <1373914074-20889-11-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this series introduces support for the common clock framework (CCF,
-COMMON_CLK Kconfig option) in the PowerPC based MPC512x platform, a
-resulting debugfs clk_summary is at the end of the message after the
-stats
+this addresses the client side of device tree based clock lookups:
+add clock specifiers to the mbx, nfc, mscan, sdhc, i2c, axe, diu,
+viu, mdio, fec, usb, pata, psc, psc fifo, and pci nodes in the
+shared mpc5121.dtsi include
 
-although the series does touch several subsystems -- serial, spi, net
-(can, fs_enet), mtd (nfc), usb, i2c, media (viu), and dts -- all of the
-patches are strictly clock related, changes outside of the clock driver
-in the mpc512x platform are rather small and local to probe and setup
+these specs map 'clock-names' encoded in drivers to their respective
+'struct clk' items in the platform's clock driver; some drivers
+still need to learn how to lookup OF clocks, other drivers will
+transparently probe successfully on MPC512x as well (sdhc)
 
-the distribution was chosen such to not spam too many lists, yet reach
-all the relevant maintainers (there appears to be no clk related list,
-it's assumed that the clk API is ARM centric, which is why I send the
-PowerPC related changes to the ARM list as well), but I'd be happy to
-add more participants if necessary
+few 'clock-names' (nfc, viu) use strings that are encoded in their
+respective drivers to keep up compatibility, an alternative approach
+would be to register clkdev items in the platform's clock driver for
+the migration period
 
-it appears most appropriate to take this series through either the clk
-or the powerpc trees after it has passed review and other subsystem
-maintainers ACKed the clock setup related driver modifications --
-splitting the series and taking the parts through several trees might
-reorder the set (make drivers fail to see the device tree specs) or
-would create unnecessary dependencies which need to get tracked upon
-merges and might defer propagation (unless I missed something)
+Signed-off-by: Gerhard Sittig <gsi@denx.de>
+---
+ arch/powerpc/boot/dts/mpc5121.dtsi |   79 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 79 insertions(+)
 
-the series passes 'checkpatch.pl --strict' except for one warning which
-cannot get resolved, since that either breaks compilation (the data type
-is preset by the clk-provider.h API) or requires a cast which shadows
-real mismatches:
-
-  WARNING: static const char * array should probably be static const char * const
-  #413: FILE: arch/powerpc/platforms/512x/clock-commonclk.c:335:
-  +static const char *parent_names_mux0[] = {
-
-  total: 0 errors, 1 warnings, 0 checks, 836 lines checked
-
-
-Gerhard Sittig (24):
-  spi: mpc512x: prepare clocks before enabling them
-  serial: mpc512x: prepare clocks before enabling them
-  mtd: mpc5121_nfc: prepare clocks before enabling them
-  powerpc: mpc512x: array decl for MCLK registers in CCM
-  clk: wrap I/O access for improved portability
-  dts: mpc512x: prepare for preprocessor support
-  dts: mpc512x: introduce dt-bindings/clock/ header
-  dts: mpc512x: add clock related device tree specs
-  clk: mpc512x: introduce COMMON_CLK for MPC512x
-  dts: mpc512x: add clock specs for client lookups
-  net: can: mscan: add a comment on reg to idx mapping
-  net: can: mscan: make mpc512x code use common clock
-  spi: mpc512x: OF clock lookup, use the 'mclk' name
-  powerpc/mpc512x: improve DIU related clock setup
-  serial: mpc512x: OF clock lookup, use the 'mclk' name
-  clk: mpc512x: remove now obsolete clkdev registration
-  serial: mpc512x: setup the PSC FIFO clock as well
-  i2c: mpc: OF clock lookup for MPC512x
-  USB: fsl-mph-dr-of: OF clock lookup, prepare and enable
-  fs_enet: OF clock lookup (non-fatal), prepare and enable
-  [media] fsl-viu: OF clock lookup, prepare before enable
-  powerpc/fsl-pci: OF clock lookup, prepare before enable
-  clk: mpc512x: switch to COMMON_CLK, remove PPC_CLOCK
-  net: can: mscan: remove MPC512x non-COMMON_CLK code path
-
- arch/powerpc/boot/dts/ac14xx.dts                   |    9 +-
- arch/powerpc/boot/dts/include/dt-bindings          |    1 +
- arch/powerpc/boot/dts/mpc5121.dtsi                 |   94 ++-
- arch/powerpc/boot/dts/mpc5121ads.dts               |    2 +-
- arch/powerpc/boot/dts/pdm360ng.dts                 |    2 +-
- arch/powerpc/include/asm/mpc5121.h                 |   18 +-
- arch/powerpc/platforms/512x/Kconfig                |    2 +-
- arch/powerpc/platforms/512x/Makefile               |    3 +-
- arch/powerpc/platforms/512x/clock-commonclk.c      |  762 ++++++++++++++++++++
- arch/powerpc/platforms/512x/clock.c                |  753 -------------------
- arch/powerpc/platforms/512x/mpc512x_shared.c       |  165 +++--
- arch/powerpc/sysdev/fsl_pci.c                      |   15 +
- drivers/clk/clk-divider.c                          |    6 +-
- drivers/clk/clk-gate.c                             |    6 +-
- drivers/clk/clk-mux.c                              |    6 +-
- drivers/i2c/busses/i2c-mpc.c                       |    9 +
- drivers/media/platform/fsl-viu.c                   |   12 +-
- drivers/mtd/nand/mpc5121_nfc.c                     |    4 +-
- drivers/net/can/mscan/mpc5xxx_can.c                |  234 +++---
- .../net/ethernet/freescale/fs_enet/fs_enet-main.c  |   27 +-
- drivers/spi/spi-mpc512x-psc.c                      |    6 +-
- drivers/tty/serial/mpc52xx_uart.c                  |   59 +-
- drivers/usb/host/fsl-mph-dr-of.c                   |   24 +-
- include/dt-bindings/clock/mpc512x-clock.h          |   59 ++
- include/linux/clk-provider.h                       |   33 +
- include/linux/fs_enet_pd.h                         |    3 +
- 26 files changed, 1299 insertions(+), 1015 deletions(-)
- create mode 120000 arch/powerpc/boot/dts/include/dt-bindings
- create mode 100644 arch/powerpc/platforms/512x/clock-commonclk.c
- delete mode 100644 arch/powerpc/platforms/512x/clock.c
- create mode 100644 include/dt-bindings/clock/mpc512x-clock.h
-
-
-$ uname -srm
-Linux 3.11.0-rc1-00024-g25dc674 ppc
-$ cat /sys/kernel/debug/clk/clk_summary
-   clock                        enable_cnt  prepare_cnt  rate
----------------------------------------------------------------------
- ac97                           0           0            24567000
- spdif_rx_in                    0           0            0
- spdif_tx_in                    0           0            0
- psc_mclk_in                    0           0            25000000
- dummy                          1           1            0
- osc                            1           1            25000000
-    ref                         1           1            25000000
-       sys                      9           9            320000000
-          spdif-mux0            0           0            320000000
-             spdif-en0          0           0            320000000
-                spdif_mclk_div  0           0            80000000
-                   spdif_mclk_out 0           0            80000000
-                      spdif_mclk 0           0            80000000
-          mscan3-mux0           1           1            320000000
-             mscan3-en0         1           1            320000000
-                mscan3_mclk_div 1           1            80000000
-                   mscan3_mclk_out 1           1            80000000
-                      mscan3_mclk 1           1            80000000
-          mscan2-mux0           1           1            320000000
-             mscan2-en0         1           1            320000000
-                mscan2_mclk_div 1           1            80000000
-                   mscan2_mclk_out 1           1            80000000
-                      mscan2_mclk 1           1            80000000
-          mscan1-mux0           1           1            320000000
-             mscan1-en0         1           1            320000000
-                mscan1_mclk_div 1           1            16000000
-                   mscan1_mclk_out 1           1            16000000
-                      mscan1_mclk 2           2            16000000
-          mscan0-mux0           1           1            320000000
-             mscan0-en0         1           1            320000000
-                mscan0_mclk_div 1           1            16000000
-                   mscan0_mclk_out 1           1            16000000
-                      mscan0_mclk 2           2            16000000
-          psc11-mux0            0           0            320000000
-             psc11-en0          0           0            320000000
-                psc11_mclk_div  0           0            80000000
-                   psc11_mclk_out 0           0            80000000
-                      psc11_mclk 0           0            80000000
-          psc10-mux0            0           0            320000000
-             psc10-en0          0           0            320000000
-                psc10_mclk_div  0           0            80000000
-                   psc10_mclk_out 0           0            80000000
-                      psc10_mclk 0           0            80000000
-          psc9-mux0             0           0            320000000
-             psc9-en0           0           0            320000000
-                psc9_mclk_div   0           0            80000000
-                   psc9_mclk_out 0           0            80000000
-                      psc9_mclk 0           0            80000000
-          psc8-mux0             0           0            320000000
-             psc8-en0           0           0            320000000
-                psc8_mclk_div   0           0            80000000
-                   psc8_mclk_out 0           0            80000000
-                      psc8_mclk 0           0            80000000
-          psc7-mux0             0           0            320000000
-             psc7-en0           0           0            320000000
-                psc7_mclk_div   0           0            80000000
-                   psc7_mclk_out 0           0            80000000
-                      psc7_mclk 0           0            80000000
-          psc6-mux0             0           0            320000000
-             psc6-en0           0           0            320000000
-                psc6_mclk_div   0           0            80000000
-                   psc6_mclk_out 0           0            80000000
-                      psc6_mclk 0           0            80000000
-          psc5-mux0             1           1            320000000
-             psc5-en0           1           1            320000000
-                psc5_mclk_div   1           1            80000000
-                   psc5_mclk_out 1           1            80000000
-                      psc5_mclk 1           1            80000000
-          psc4-mux0             1           1            320000000
-             psc4-en0           1           1            320000000
-                psc4_mclk_div   1           1            80000000
-                   psc4_mclk_out 1           1            80000000
-                      psc4_mclk 1           1            80000000
-          psc3-mux0             1           1            320000000
-             psc3-en0           1           1            320000000
-                psc3_mclk_div   1           1            80000000
-                   psc3_mclk_out 1           1            80000000
-                      psc3_mclk 1           1            80000000
-          psc2-mux0             0           0            320000000
-             psc2-en0           0           0            320000000
-                psc2_mclk_div   0           0            80000000
-                   psc2_mclk_out 0           0            80000000
-                      psc2_mclk 0           0            80000000
-          psc1-mux0             0           0            320000000
-             psc1-en0           0           0            320000000
-                psc1_mclk_div   0           0            80000000
-                   psc1_mclk_out 0           0            80000000
-                      psc1_mclk 0           0            80000000
-          psc0-mux0             0           0            320000000
-             psc0-en0           0           0            320000000
-                psc0_mclk_div   0           0            80000000
-                   psc0_mclk_out 0           0            80000000
-                      psc0_mclk 0           0            80000000
-          ddr-ug                1           1            160000000
-             ddr                1           1            160000000
-          csb                   4           4            160000000
-             viu                0           0            160000000
-             iim                0           0            160000000
-             usb2               0           0            160000000
-             usb1               0           0            160000000
-             axe                0           0            160000000
-             pci-ug             0           0            26666666
-                pci             0           0            26666666
-             mbx-bus-ug         0           0            80000000
-                mbx-bus         0           0            80000000
-                mbx-ug          0           0            80000000
-                   mbx          0           0            80000000
-                   mbx-3d-ug    0           0            80000000
-                      mbx-3d    0           0            80000000
-             e300               1           1            400000000
-             diu-x4             1           1            640000000
-                diu-ug          1           1            2509803
-                   diu          2           2            2509803
-             sdhc-x4            1           1            640000000
-                sdhc-ug         1           1            53333333
-                   sdhc-2       0           0            53333333
-                   sdhc         1           1            53333333
-             ips                7           7            80000000
-                i2c             3           3            80000000
-                mem             1           1            80000000
-                fec             1           1            80000000
-                sata            0           0            80000000
-                psc-fifo        1           1            80000000
-                pata            0           0            80000000
-                lpc-ug          1           1            40000000
-                   lpc          1           1            40000000
-                nfc-ug          0           0            40000000
-                   nfc          0           0            40000000
-
+diff --git a/arch/powerpc/boot/dts/mpc5121.dtsi b/arch/powerpc/boot/dts/mpc5121.dtsi
+index 8f4cba0..983da9c 100644
+--- a/arch/powerpc/boot/dts/mpc5121.dtsi
++++ b/arch/powerpc/boot/dts/mpc5121.dtsi
+@@ -51,6 +51,10 @@
+ 		compatible = "fsl,mpc5121-mbx";
+ 		reg = <0x20000000 0x4000>;
+ 		interrupts = <66 0x8>;
++		clocks = <&clks MPC512x_CLK_MBX_BUS>,
++			 <&clks MPC512x_CLK_MBX_3D>,
++			 <&clks MPC512x_CLK_MBX>;
++		clock-names = "mbx-bus", "mbx-3d", "mbx";
+ 	};
+ 
+ 	sram at 30000000 {
+@@ -64,6 +68,8 @@
+ 		interrupts = <6 8>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
++		clocks = <&clks MPC512x_CLK_NFC>;
++		clock-names = "nfc_clk";	/* backwards compat */
+ 	};
+ 
+ 	localbus at 80000020 {
+@@ -153,12 +159,22 @@
+ 			compatible = "fsl,mpc5121-mscan";
+ 			reg = <0x1300 0x80>;
+ 			interrupts = <12 0x8>;
++			clocks = <&clks MPC512x_CLK_IPS>,
++				 <&clks MPC512x_CLK_SYS>,
++				 <&clks MPC512x_CLK_REF>,
++				 <&clks MPC512x_CLK_MSCAN0_MCLK>;
++			clock-names = "ips", "sys", "ref", "mclk";
+ 		};
+ 
+ 		can at 1380 {
+ 			compatible = "fsl,mpc5121-mscan";
+ 			reg = <0x1380 0x80>;
+ 			interrupts = <13 0x8>;
++			clocks = <&clks MPC512x_CLK_IPS>,
++				 <&clks MPC512x_CLK_SYS>,
++				 <&clks MPC512x_CLK_REF>,
++				 <&clks MPC512x_CLK_MSCAN1_MCLK>;
++			clock-names = "ips", "sys", "ref", "mclk";
+ 		};
+ 
+ 		sdhc at 1500 {
+@@ -167,6 +183,9 @@
+ 			interrupts = <8 0x8>;
+ 			dmas = <&dma0 30>;
+ 			dma-names = "rx-tx";
++			clocks = <&clks MPC512x_CLK_IPS>,
++				 <&clks MPC512x_CLK_SDHC>;
++			clock-names = "ipg", "per";
+ 		};
+ 
+ 		i2c at 1700 {
+@@ -175,6 +194,8 @@
+ 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
+ 			reg = <0x1700 0x20>;
+ 			interrupts = <9 0x8>;
++			clocks = <&clks MPC512x_CLK_I2C>;
++			clock-names = "per";
+ 		};
+ 
+ 		i2c at 1720 {
+@@ -183,6 +204,8 @@
+ 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
+ 			reg = <0x1720 0x20>;
+ 			interrupts = <10 0x8>;
++			clocks = <&clks MPC512x_CLK_I2C>;
++			clock-names = "per";
+ 		};
+ 
+ 		i2c at 1740 {
+@@ -191,6 +214,8 @@
+ 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
+ 			reg = <0x1740 0x20>;
+ 			interrupts = <11 0x8>;
++			clocks = <&clks MPC512x_CLK_I2C>;
++			clock-names = "per";
+ 		};
+ 
+ 		i2ccontrol at 1760 {
+@@ -202,30 +227,46 @@
+ 			compatible = "fsl,mpc5121-axe";
+ 			reg = <0x2000 0x100>;
+ 			interrupts = <42 0x8>;
++			clocks = <&clks MPC512x_CLK_AXE>;
++			clock-names = "per";
+ 		};
+ 
+ 		display at 2100 {
+ 			compatible = "fsl,mpc5121-diu";
+ 			reg = <0x2100 0x100>;
+ 			interrupts = <64 0x8>;
++			clocks = <&clks MPC512x_CLK_DIU>;
++			clock-names = "per";
+ 		};
+ 
+ 		can at 2300 {
+ 			compatible = "fsl,mpc5121-mscan";
+ 			reg = <0x2300 0x80>;
+ 			interrupts = <90 0x8>;
++			clocks = <&clks MPC512x_CLK_IPS>,
++				 <&clks MPC512x_CLK_SYS>,
++				 <&clks MPC512x_CLK_REF>,
++				 <&clks MPC512x_CLK_MSCAN2_MCLK>;
++			clock-names = "ips", "sys", "ref", "mclk";
+ 		};
+ 
+ 		can at 2380 {
+ 			compatible = "fsl,mpc5121-mscan";
+ 			reg = <0x2380 0x80>;
+ 			interrupts = <91 0x8>;
++			clocks = <&clks MPC512x_CLK_IPS>,
++				 <&clks MPC512x_CLK_SYS>,
++				 <&clks MPC512x_CLK_REF>,
++				 <&clks MPC512x_CLK_MSCAN3_MCLK>;
++			clock-names = "ips", "sys", "ref", "mclk";
+ 		};
+ 
+ 		viu at 2400 {
+ 			compatible = "fsl,mpc5121-viu";
+ 			reg = <0x2400 0x400>;
+ 			interrupts = <67 0x8>;
++			clocks = <&clks MPC512x_CLK_VIU>;
++			clock-names = "viu_clk";	/* backwards compat */
+ 		};
+ 
+ 		mdio at 2800 {
+@@ -233,6 +274,8 @@
+ 			reg = <0x2800 0x800>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			clocks = <&clks MPC512x_CLK_FEC>;
++			clock-names = "per";
+ 		};
+ 
+ 		eth0: ethernet at 2800 {
+@@ -241,6 +284,8 @@
+ 			reg = <0x2800 0x800>;
+ 			local-mac-address = [ 00 00 00 00 00 00 ];
+ 			interrupts = <4 0x8>;
++			clocks = <&clks MPC512x_CLK_FEC>;
++			clock-names = "per";
+ 		};
+ 
+ 		/* USB1 using external ULPI PHY */
+@@ -252,6 +297,8 @@
+ 			interrupts = <43 0x8>;
+ 			dr_mode = "otg";
+ 			phy_type = "ulpi";
++			clocks = <&clks MPC512x_CLK_USB1>;
++			clock-names = "per";
+ 		};
+ 
+ 		/* USB0 using internal UTMI PHY */
+@@ -263,6 +310,8 @@
+ 			interrupts = <44 0x8>;
+ 			dr_mode = "otg";
+ 			phy_type = "utmi_wide";
++			clocks = <&clks MPC512x_CLK_USB2>;
++			clock-names = "per";
+ 		};
+ 
+ 		/* IO control */
+@@ -281,6 +330,8 @@
+ 			compatible = "fsl,mpc5121-pata";
+ 			reg = <0x10200 0x100>;
+ 			interrupts = <5 0x8>;
++			clocks = <&clks MPC512x_CLK_PATA>;
++			clock-names = "per";
+ 		};
+ 
+ 		/* 512x PSCs are not 52xx PSC compatible */
+@@ -292,6 +343,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC0_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC1 */
+@@ -301,6 +354,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC1_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC2 */
+@@ -310,6 +365,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC2_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC3 */
+@@ -319,6 +376,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC3_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC4 */
+@@ -328,6 +387,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC4_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC5 */
+@@ -337,6 +398,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC5_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC6 */
+@@ -346,6 +409,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC6_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC7 */
+@@ -355,6 +420,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC7_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC8 */
+@@ -364,6 +431,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC8_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC9 */
+@@ -373,6 +442,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC9_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC10 */
+@@ -382,6 +453,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC10_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC11 */
+@@ -391,12 +464,16 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC11_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		pscfifo at 11f00 {
+ 			compatible = "fsl,mpc5121-psc-fifo";
+ 			reg = <0x11f00 0x100>;
+ 			interrupts = <40 0x8>;
++			clocks = <&clks MPC512x_CLK_PSC_FIFO>;
++			clock-names = "per";
+ 		};
+ 
+ 		dma0: dma at 14000 {
+@@ -414,6 +491,8 @@
+ 		#address-cells = <3>;
+ 		#size-cells = <2>;
+ 		#interrupt-cells = <1>;
++		clocks = <&clks MPC512x_CLK_PCI>;
++		clock-names = "per";
+ 
+ 		reg = <0x80008500 0x100	/* internal registers */
+ 		       0x80008300 0x8>;	/* config space access registers */
 -- 
 1.7.10.4
