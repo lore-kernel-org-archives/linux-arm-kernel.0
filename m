@@ -1,46 +1,55 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 15 Jul 2013 18:15:27 +0530
-Subject: [PATCH] remove vlan tags in CPSW dual emac mode
-In-Reply-To: <51E0582D.4090306@newflow.co.uk>
-References: <4699400.vD3TdgH1nR@localhost> <5176C4FE.4080305@ti.com>
- <51E00B2F.6050406@newflow.co.uk> <51E04C89.8030202@ti.com>
- <51E0582D.4090306@newflow.co.uk>
-Message-ID: <51E3EEE7.9030508@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 15 Jul 2013 14:52:13 +0200
+Subject: [PATCH 1/5] iio: at91: use adc_clk_khz to make the calculation
+ not easy to large than u32.
+In-Reply-To: <1373789069-11604-2-git-send-email-josh.wu@atmel.com>
+References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
+ <1373789069-11604-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <20130715125213.GB2962@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/13/2013 12:55 AM, Mark Jackson wrote:
-> On 12/07/13 19:35, Mugunthan V N wrote:
->> On 7/12/2013 7:27 PM, Mark Jackson wrote:
-> [snip]
->
->>> Just to update this (old) thread ...
->>>
->>> I can still confirm that *without* the above patch, I am *unable* to use both network
->>> ports on our AM335x board.
->>>
-> [snip]
->
->>> So I'm not sure what's wrong, but it's *definitely* not correct.
->>>
->>>
->> I am sure that current code in mainline works for Dual EMAC. I can test it
->> again and share the images with you if are interested. But had tested with DHCP
->> on both the interfaces.
-> Hmmm ... well it's not working for me.  What hardware are you testing it on ?
->
-> I tried DHCP to start with, and switched to static IP when that failed.
-> Then I recalled this patch and re-applied it ... hey presto !!
->
-> Markus, are you still using this patch ?
->
-Today I have tested the Dual EMAC on my am335x-evmsk and its working fine with
-net/master branch.
-I had 3 patches additional to net/master in which two for basic boot of EVMsk
-and one for enabling Dual EMAC. I had pushed the branch in the below repo
-repo:
-git://git.ti.com/~mugunthanvnm/ti-linux-kernel/mugunth-connectivity-linux-feature-tree.git
-branch: dual-emac
+Hi Josh,
 
-Regards
-Mugunthan V N
+On Sun, Jul 14, 2013 at 04:04:25PM +0800, Josh Wu wrote:
+> for example, if adc_clk is 20Mhz and start-up time set as larger than 215us.
+> then the calculation "st->startup_time * adc_clk_khz" will out of u32.
+> 
+> In this patch, it will use khz unit for adc_clk, that avoids above problem.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+
+Maybe we can have a slightly better commit log here, like:
+
+------8<-----------
+iio: at91: Fix adc_clk overflow
+
+The adc_clk variable is currently defined using a 32-bits unsigned
+integer, which will overflow under some very valid range of operations.
+
+Such overflow will occur if, for example, the parent clock is set to a
+20MHz frequency and the ADC startup time is larger than 215ns.
+
+To fix this, introduce an intermediate variable holding the clock rate
+in kHz.
+
+--------8<---------------
+
+Or something like that.
+
+For the patch itself, I'm happy about it. You can add my Acked-by.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130715/b37339f0/attachment.sig>
