@@ -1,99 +1,57 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Mon, 15 Jul 2013 17:16:27 +0530
-Subject: [PATCH] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene host
-Message-ID: <1373888788-8055-1-git-send-email-anup.patel@linaro.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 15 Jul 2013 17:22:09 +0530
+Subject: [PATCH 1/1] ARM: EXYNOS: Update CONFIG_ARCH_NR_GPIO for Exynos
+In-Reply-To: <1372054438-15693-1-git-send-email-sachin.kamat@linaro.org>
+References: <1372054438-15693-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <CAK9yfHyEaysTJ9QpWWxxOacQEP4wv1NX3sXKkvKFhMbBgbCYYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows us to have X-Gene guest VCPU when using
-KVM arm64 on APM X-Gene host.
+On 24 June 2013 11:43, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> With the recent cleanup in Exynos platform code notably commits
+> 17859bec ("ARM: EXYNOS: Do not select legacy Kconfig symbols any
+> more") and b9222210 ("ARM: EXYNOS: Remove mach/gpio.h"), the definition
+> of ARCH_NR_GPIOS got removed. This started causing problems on SoCs like
+> Exynos4412 which have more (285) than the default number of GPIOs (255).
+> Thus define this number in Kconfig file. Without this patch we get the
+> following errors during boot:
+>
+> gpiochip_add: gpios 251..258 (gpv0) failed to register
+> samsung-pinctrl 106e0000.pinctrl: failed to register gpio_chip gpv0,
+> error code: -22
+> samsung-pinctrl: probe of 106e0000.pinctrl failed with error -22
+>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> ---
+> Based on Kukjin's for-next tree.
+> ---
+>  arch/arm/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index ddf2667..380a53b 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1578,6 +1578,7 @@ config ARCH_NR_GPIO
+>         default 512 if SOC_OMAP5
+>         default 392 if ARCH_U8500
+>         default 352 if ARCH_VT8500
+> +       default 288 if ARCH_EXYNOS
+>         default 288 if ARCH_SUNXI
+>         default 264 if MACH_H4700
+>         default 0
+> --
+> 1.7.9.5
+>
 
-We add KVM_ARM_TARGET_XGENE_V8 for X-Gene compatible guest VCPU
-and we return KVM_ARM_TARGET_XGENE_V8 in kvm_target_cpu() when
-running on X-Gene host.
+Kukjin,
 
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
----
- arch/arm64/include/uapi/asm/kvm.h    |    3 ++-
- arch/arm64/kvm/guest.c               |   34 ++++++++++++++++++++++------------
- arch/arm64/kvm/sys_regs_generic_v8.c |    3 +++
- 3 files changed, 27 insertions(+), 13 deletions(-)
+Now that 3.11-rc1 is out, can you please queue this up for 3.11-rc2 as
+without this patch
+gpio support on 4412 boards is broken.
 
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 5031f42..8194707 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -55,8 +55,9 @@ struct kvm_regs {
- #define KVM_ARM_TARGET_AEM_V8		0
- #define KVM_ARM_TARGET_FOUNDATION_V8	1
- #define KVM_ARM_TARGET_CORTEX_A57	2
-+#define KVM_ARM_TARGET_XGENE_V8		3
- 
--#define KVM_ARM_NUM_TARGETS		3
-+#define KVM_ARM_NUM_TARGETS		4
- 
- /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
- #define KVM_ARM_DEVICE_TYPE_SHIFT	0
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 2c3ff67..e99b0a5 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -207,19 +207,29 @@ int __attribute_const__ kvm_target_cpu(void)
- 	unsigned long implementor = read_cpuid_implementor();
- 	unsigned long part_number = read_cpuid_part_number();
- 
--	if (implementor != ARM_CPU_IMP_ARM)
--		return -EINVAL;
--
--	switch (part_number) {
--	case ARM_CPU_PART_AEM_V8:
--		return KVM_ARM_TARGET_AEM_V8;
--	case ARM_CPU_PART_FOUNDATION:
--		return KVM_ARM_TARGET_FOUNDATION_V8;
--	case ARM_CPU_PART_CORTEX_A57:
--		/* Currently handled by the generic backend */
--		return KVM_ARM_TARGET_CORTEX_A57;
-+	switch (implementor) {
-+	case ARM_CPU_IMP_ARM:
-+		switch (part_number) {
-+		case ARM_CPU_PART_AEM_V8:
-+			return KVM_ARM_TARGET_AEM_V8;
-+		case ARM_CPU_PART_FOUNDATION:
-+			return KVM_ARM_TARGET_FOUNDATION_V8;
-+		case ARM_CPU_PART_CORTEX_A57:
-+			return KVM_ARM_TARGET_CORTEX_A57;
-+		default:
-+			return -EINVAL;
-+		}
-+		break;
-+	case ARM_CPU_IMP_APM:
-+		switch (part_number) {
-+		case APM_CPU_PART_POTENZA:
-+			return KVM_ARM_TARGET_XGENE_V8;
-+		default:
-+			return -EINVAL;
-+		}
-+		break;
- 	default:
--		return -EINVAL;
-+ 		return -EINVAL;
- 	}
- }
- 
-diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
-index 4268ab9..87f0b3f4 100644
---- a/arch/arm64/kvm/sys_regs_generic_v8.c
-+++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-@@ -90,6 +90,9 @@ static int __init sys_reg_genericv8_init(void)
- 					  &genericv8_target_table);
- 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
- 					  &genericv8_target_table);
-+	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_V8,
-+					  &genericv8_target_table);
-+
- 	return 0;
- }
- late_initcall(sys_reg_genericv8_init);
+
 -- 
-1.7.9.5
+With warm regards,
+Sachin
