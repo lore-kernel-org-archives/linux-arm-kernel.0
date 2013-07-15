@@ -1,79 +1,67 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 15 Jul 2013 15:42:23 -0500
-Subject: [PATCH] ARM: Add check for Cortex-A15 errata 798181 ECO
-Message-ID: <1373920943-18308-1-git-send-email-robherring2@gmail.com>
+Date: Mon, 15 Jul 2013 15:52:12 -0500
+Subject: [PATCH] ARM: footbridge: fix overlapping PCI mappings
+In-Reply-To: <1372387356-15341-1-git-send-email-vapier@gentoo.org>
+References: <1372387356-15341-1-git-send-email-vapier@gentoo.org>
+Message-ID: <CAL_JsqKaha08U0fN1FruEEfsH=jAGzsxeJATJqeDvburd6EDjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Thu, Jun 27, 2013 at 9:42 PM, Mike Frysinger <vapier@gentoo.org> wrote:
+> Commit 8ef6e6201b26cb9fde79c1baa08145af6aca2815 (ARM: footbridge: use
+> fixed PCI i/o mapping) broke booting on my netwinder.  Before that,
+> everything boots fine.  Since then, it crashes on boot.
+>
+> With earlyprintk, I see it BUG-ing like so:
+> kernel BUG at lib/ioremap.c:27!
+> Internal error: Oops - BUG: 0 [#1] ARM
+> ...
+> [<c0139b54>] (ioremap_page_range+0x128/0x154) from [<c02e6a6c>] (dc21285_setup+0xd0/0x114)
+> [<c02e6a6c>] (dc21285_setup+0xd0/0x114) from [<c02e4874>] (pci_common_init+0xa0/0x298)
+> [<c02e4874>] (pci_common_init+0xa0/0x298) from [<c02e793c>] (netwinder_pci_init+0xc/0x18)
+> [<c02e793c>] (netwinder_pci_init+0xc/0x18) from [<c02e27d0>] (do_one_initcall+0xb4/0x180)
+> ...
+>
+> Russell points out it's because of overlapping PCI mappings that was
+> added with the aforementioned commit.  Rob thought the code would re-use
+> the static mapping, but that turns out to not be the case and instead
+> hits the BUG further down.
+>
+> After deleting this hunk as suggested by Russel, the system boots up fine
+> again and all my PCI devices work (IDE, ethernet, the DC21285).
+>
+> Signed-off-by: Mike Frysinger <vapier@gentoo.org>
 
-The work-around for A15 errata 798181 is not needed if appropriate ECO
-fixes have been applied to r3p2 and earlier core revisions. This can be
-checked by reading REVIDR register bits 4 and 9. If only bit 4 is set,
-then the IPI broadcast can be skipped.
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
+Olof, Kevin,
 
-Compile tested only.
+Please apply and add stable.
 
- arch/arm/include/asm/cputype.h |  1 +
- arch/arm/kernel/smp_tlb.c      | 13 +++++++++++--
- 2 files changed, 12 insertions(+), 2 deletions(-)
+Rob
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index ec635ff..ac1c46a 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -9,6 +9,7 @@
- #define CPUID_TCM	2
- #define CPUID_TLBTYPE	3
- #define CPUID_MPIDR	5
-+#define CPUID_REVIDR	6
- 
- #ifdef CONFIG_CPU_V7M
- #define CPUID_EXT_PFR0	0x40
-diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
-index 9a52a07..7fd64b7 100644
---- a/arch/arm/kernel/smp_tlb.c
-+++ b/arch/arm/kernel/smp_tlb.c
-@@ -74,10 +74,21 @@ static inline void ipi_flush_bp_all(void *ignored)
- static int erratum_a15_798181(void)
- {
- 	unsigned int midr = read_cpuid_id();
-+	unsigned int revidr;
- 
- 	/* Cortex-A15 r0p0..r3p2 affected */
- 	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
- 		return 0;
-+
-+	/* Check for Cortex A15 <= r3p2 with ECO fix */
-+	revidr = read_cpuid(CPUID_REVIDR);
-+	if ((revidr & 0x210) == 0x210)
-+		return 0;
-+
-+	dummy_flush_tlb_a15_erratum();
-+	if (revidr & 0x10)
-+		return 0;
-+
- 	return 1;
- }
- #else
-@@ -97,7 +108,6 @@ static void broadcast_tlb_a15_erratum(void)
- 	if (!erratum_a15_798181())
- 		return;
- 
--	dummy_flush_tlb_a15_erratum();
- 	smp_call_function(ipi_flush_tlb_a15_erratum, NULL, 1);
- }
- 
-@@ -109,7 +119,6 @@ static void broadcast_tlb_mm_a15_erratum(struct mm_struct *mm)
- 	if (!erratum_a15_798181())
- 		return;
- 
--	dummy_flush_tlb_a15_erratum();
- 	this_cpu = get_cpu();
- 	for_each_online_cpu(cpu) {
- 		if (cpu == this_cpu)
--- 
-1.8.1.2
+> ---
+>  arch/arm/mach-footbridge/dc21285.c | 2 --
+>  1 file changed, 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
+> index a7cd2cf..3490a24 100644
+> --- a/arch/arm/mach-footbridge/dc21285.c
+> +++ b/arch/arm/mach-footbridge/dc21285.c
+> @@ -276,8 +276,6 @@ int __init dc21285_setup(int nr, struct pci_sys_data *sys)
+>
+>         sys->mem_offset  = DC21285_PCI_MEM;
+>
+> -       pci_ioremap_io(0, DC21285_PCI_IO);
+> -
+>         pci_add_resource_offset(&sys->resources, &res[0], sys->mem_offset);
+>         pci_add_resource_offset(&sys->resources, &res[1], sys->mem_offset);
+>
+> --
+> 1.8.2.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
