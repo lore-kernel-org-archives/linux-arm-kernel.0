@@ -1,86 +1,79 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 15 Jul 2013 22:35:34 +0200
-Subject: DT binding review for Armada display subsystem
-In-Reply-To: <20130713230955.GQ24642@n2100.arm.linux.org.uk>
-References: <20130712164428.AC3D2FAAE9@dev.laptop.org>
- <51E1D1DA.8080102@gmail.com> <20130713230955.GQ24642@n2100.arm.linux.org.uk>
-Message-ID: <1854596.j2AmPXyF76@flatron>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 15 Jul 2013 15:42:23 -0500
+Subject: [PATCH] ARM: Add check for Cortex-A15 errata 798181 ECO
+Message-ID: <1373920943-18308-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Rob Herring <rob.herring@calxeda.com>
 
-On Sunday 14 of July 2013 00:09:55 Russell King - ARM Linux wrote:
-> On Sun, Jul 14, 2013 at 12:16:58AM +0200, Sylwester Nawrocki wrote:
-> > On 07/13/2013 11:02 PM, Russell King - ARM Linux wrote:
-> >> On Sat, Jul 13, 2013 at 10:43:29PM +0200, Sylwester Nawrocki wrote:
-> >>> I wasn't aware of it, thanks. I've seen a patch from Jiada Wang, it
-> >>> seems they're working on v4 with clock object reference counting.
-> >>> Presumably we need both clk_get() to be taking reference on the
-> >>> module and reference counted clk free, e.g. in cases where clock
-> >>> provider is a hot-pluggable device. It might be too paranoid
-> >>> though, I haven't seen hardware configurations where a clock source
-> >>> could be unplugged safely when whole system is running.
-> >> 
-> >> I'm not going to accept refcounting being thrown into clk_get().  The
-> >> clkdev API already has refcounting, as much as it needs to.  It just
-> >> needs people to use the hooks that I provided back in 2008 when I
-> >> created the clkdev API for doing _precisely_ this job.
-> >> 
-> >> Have a read through these commits, which backup my statement above:
-> >> 
-> >> 0318e693d3a56836632bf1a2cfdafb7f34bcc703 - initial commit of the
-> >> clkdev API d72fbdf01fc77628c0b837d0dd2fd564fa26ede6 - converting
-> >> Integrator to clkdev API
-> >> 
-> >> and it will show you how to do refcounting.  The common clk API just
-> >> needs to stop defining __clk_get() and __clk_put() to be an empty
-> >> function and implement them appropriately for it's clk
-> >> implementation,
-> >> like they were always meant to be.
-> > 
-> > Sure, I've already seen the above commits. This is how I understood it
-> > as well - __clk_get(), __clk_put() need to be defined by the common
-> > clk
-> > API, since it is going to replace all the arch specific
-> > implementations.> 
-> >> __clk_get() and __clk_put() are the clk-implementation specific parts
-> >> of the clkdev API, because the clkdev API is utterly divorsed from
-> >> the
-> >> internals of what a 'struct clk' actually is.  clkdev just treats a
-> >> 'struct clk' as a completely opaque type and never bothers poking
-> >> about inside it.
-> > 
-> > OK, but at the clock's implementation side we may need, e.g. to use
-> > kref to keep track of the clock's state, and free it only when it is
-> > unprepared, all its children are unregistered, etc. ? Is it not what
-> > you stated in your comment to patch [1] ?
-> 
-> If you want to do refcounting on a clock (which you run into problems
-> as I highlighted earlier in this thread) then yes, you need to use a
-> kref, and take a reference in __clk_get() and drop it in __clk_put()
-> to make things safe.
-> 
-> Whether you also take a reference on the module supplying the clock or
-> not depends whether you need to keep the code around to manipulate that
-> clock while there are users of it.
-> 
-> As I've already said - consider the possibilities with this scenario.
-> Here's one:
-> 
->   A clock consumer is using a clock, but the clock supplier has been
->   removed.  The clock consumer wants to change the state of the clock
->   in some way - eg, system is suspending.  clk_disable() doesn't fail,
->   but on resume, clk_enable() does... (and how many people assume that
->   clk_enable() never fails?)  And who knows what rate the clock is now
->   producing or whether it's even producing anything...
-> 
-> I'm not saying don't do the refcounting thing I mentioned back in June.
-> I'm merely pointing out the issues that there are.  There isn't a one
-> right answer here because each has their own advantages and
-> disadvantages (and problems.)
+The work-around for A15 errata 798181 is not needed if appropriate ECO
+fixes have been applied to r3p2 and earlier core revisions. This can be
+checked by reading REVIDR register bits 4 and 9. If only bit 4 is set,
+then the IPI broadcast can be skipped.
 
-What about having Mike on CC for such clock-related discussion?
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
 
-Best regards,
-Tomasz
+Compile tested only.
+
+ arch/arm/include/asm/cputype.h |  1 +
+ arch/arm/kernel/smp_tlb.c      | 13 +++++++++++--
+ 2 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index ec635ff..ac1c46a 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -9,6 +9,7 @@
+ #define CPUID_TCM	2
+ #define CPUID_TLBTYPE	3
+ #define CPUID_MPIDR	5
++#define CPUID_REVIDR	6
+ 
+ #ifdef CONFIG_CPU_V7M
+ #define CPUID_EXT_PFR0	0x40
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index 9a52a07..7fd64b7 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -74,10 +74,21 @@ static inline void ipi_flush_bp_all(void *ignored)
+ static int erratum_a15_798181(void)
+ {
+ 	unsigned int midr = read_cpuid_id();
++	unsigned int revidr;
+ 
+ 	/* Cortex-A15 r0p0..r3p2 affected */
+ 	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
+ 		return 0;
++
++	/* Check for Cortex A15 <= r3p2 with ECO fix */
++	revidr = read_cpuid(CPUID_REVIDR);
++	if ((revidr & 0x210) == 0x210)
++		return 0;
++
++	dummy_flush_tlb_a15_erratum();
++	if (revidr & 0x10)
++		return 0;
++
+ 	return 1;
+ }
+ #else
+@@ -97,7 +108,6 @@ static void broadcast_tlb_a15_erratum(void)
+ 	if (!erratum_a15_798181())
+ 		return;
+ 
+-	dummy_flush_tlb_a15_erratum();
+ 	smp_call_function(ipi_flush_tlb_a15_erratum, NULL, 1);
+ }
+ 
+@@ -109,7 +119,6 @@ static void broadcast_tlb_mm_a15_erratum(struct mm_struct *mm)
+ 	if (!erratum_a15_798181())
+ 		return;
+ 
+-	dummy_flush_tlb_a15_erratum();
+ 	this_cpu = get_cpu();
+ 	for_each_online_cpu(cpu) {
+ 		if (cpu == this_cpu)
+-- 
+1.8.1.2
