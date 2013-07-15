@@ -1,34 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 15 Jul 2013 21:38:29 +0200
-Subject: [PATCH v1 05/24] clk: wrap I/O access for improved portability
-In-Reply-To: <1373914074-20889-6-git-send-email-gsi@denx.de>
-References: <1373914074-20889-1-git-send-email-gsi@denx.de>
- <1373914074-20889-6-git-send-email-gsi@denx.de>
-Message-ID: <20130715193829.GS14452@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 15 Jul 2013 21:51:43 +0200
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <51E41944.6030403@keymile.com>
+References: <51DD88A4.1030506@keymile.com> <20130710185706.72b124a4@skate>
+ <51DD9A8C.10608@keymile.com> <51DE58DF.5010304@keymile.com>
+ <20130712105903.6336e912@skate> <51E41944.6030403@keymile.com>
+Message-ID: <20130715215143.5167a987@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 08:47:34PM +0200, Gerhard Sittig wrote:
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index 6d55eb2..2c07061 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -104,7 +104,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
->  	struct clk_divider *divider = to_clk_divider(hw);
->  	unsigned int div, val;
->  
-> -	val = readl(divider->reg) >> divider->shift;
-> +	val = clk_readl(divider->reg) >> divider->shift;
->  	val &= div_mask(divider);
+Dear Valentin Longchamp,
 
-Would it be an option to use regmap for the generic dividers/muxes
-instead? This should be suitable for ppc and also for people who want to
-use the generic clocks on i2c devices.
+On Mon, 15 Jul 2013 17:46:12 +0200, Valentin Longchamp wrote:
 
-Sascha
+> > I'm not sure to follow this story of a virtual PCIe controller sitting
+> > at 0xf4000000. Can you give a few more details?
+> > 
+> 
+> I'm not sure I can give all the details here as the documentation that we have
+> for this is subject to an NDA. To keep it short, in the kirkwood SoC we use,
+> there is an Ethernet Switch that is accessed by the kirkwood through an internal
+> virtual PCIe controller. The switch management SW has some hard expectations
+> about the physical address for this "PCIe" memory mapped window which conflicts
+> with the ones defined in the current device trees.
 
+Ok. Note that the addresses chosen in the Device Tree can easily be
+changed on a per-SoC or per-board basis, if needed.
+
+Best regards,
+
+Thomas
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
