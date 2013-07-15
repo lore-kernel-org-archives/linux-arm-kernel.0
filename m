@@ -1,46 +1,28 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 15 Jul 2013 16:59:53 +0100
-Subject: [PATCH] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene host
-In-Reply-To: <03C760B4-A395-491C-B589-0689BC2C48BB@suse.de>
-References: <1373888788-8055-1-git-send-email-anup.patel@linaro.org>
- <51E3ED7A.7050207@arm.com>
- <CAAhSdy25WVnynDyPcOMtqVNEepGGq9WFT3b1PV34P6iSBm-FUg@mail.gmail.com>
- <73A8FA0E-9F7F-4866-9544-57838F30BB91@suse.de>
- <CAAhSdy1tYsdm-2kJzoRfqb-FaPa0-t9x2+=jtMjgFqes+Pco6Q@mail.gmail.com>
- <03C760B4-A395-491C-B589-0689BC2C48BB@suse.de>
-Message-ID: <CAFEAcA-0Csn9NuHGKjL1TuNVVnmA0woUvAhuwxTv3r5a+3nMGg@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 15 Jul 2013 13:08:23 -0300
+Subject: [PATCH 19/22] Input: tsc2007: Add device tree support.
+In-Reply-To: <1373900227-341-20-git-send-email-denis@eukrea.com>
+References: <1373900227-341-1-git-send-email-denis@eukrea.com>
+ <1373900227-341-20-git-send-email-denis@eukrea.com>
+Message-ID: <CAOMZO5B169k+6f0G388xne4dUTNiEAb9Zpx1_XJH8TMv5FTLLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 July 2013 15:21, Alexander Graf <agraf@suse.de> wrote:
-> On 15.07.2013, at 16:04, Anup Patel wrote:
->> On Mon, Jul 15, 2013 at 6:32 PM, Alexander Graf <agraf@suse.de> wrote:
->>> Anything that is compatible is compatible :). I don't know
->>> the product roadmaps for X-Gene cores, but you will want to
->>> make the field here as coarse grained as possible, while
->>> maintaining the guarantee that a guest still behaves the same.
->>
->> Actually, I don't see X-Gene cores changing in-terms of register
->> interface available to EL1 and EL0 in near future. This is the
->> reason why I had named the target as KVM_ARM_TARGET_XGENE_V8.
+On Mon, Jul 15, 2013 at 11:57 AM, Denis Carikli <denis@eukrea.com> wrote:
+> Set the of_match_table for this driver so that devices can be described
+>   in the device tree.
 >
-> So where does the v8 come from? Is there any non-ARMv8 XGene? If
-> not, this is v1 really, right? What if we just call it v1 instead?
-> Then when a new core comes up that needs different treatment, we
-> create a new target.
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+>  .../bindings/input/touchscreen/tsc2007.txt         |   44 +++++
+>  drivers/input/touchscreen/tsc2007.c                |  205 ++++++++++++++++----
 
-I think what we're actually seeing here is that we started with
-a design that specifically said (in the v7 space) "only A15
-on A15", and we're now trying to broaden that out, only we
-haven't actually set out anywhere how that broadening is
-supposed to work (ie what range of hosts will work with
-what range of guests, and how, and whether we want to have
-a "give me a guest CPU that looks like the host CPU" option).
+You should have Cc'ed linux-input list and its maintainer Dmitry
+Torokhov <dmitry.torokhov@gmail.com>
 
-I think the original idea was that userspace would say
-which CPU it wanted, and the kernel would know about that
-CPU (including details like ID and feature registers which
-are going to vary from core to core).
+> +static int tsc2007_get_pendown_state_dt(struct tsc2007  *ts)
+> +{
+> +       if (ts->gpio >= 0)
 
-thanks
--- PMM
+What about
+if (gpio_is_valid(ts->gpio)) instead?
