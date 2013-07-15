@@ -1,145 +1,100 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 15 Jul 2013 17:34:08 +0200
-Subject: [RFC PATCH 1/3] of: provide a binding for the 'fixed-link' property
+Date: Mon, 15 Jul 2013 17:34:10 +0200
+Subject: [RFC PATCH 3/3] net: mvneta: add support for fixed links
 In-Reply-To: <1373902450-11857-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1373902450-11857-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1373902450-11857-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1373902450-11857-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Ethernet MACs have a "fixed link", and are not connected to a
-normal MDIO-managed PHY device. For those situations, a Device Tree
-binding allows to describe a "fixed link", as a "fixed-link" property
-of the Ethernet device Device Tree node.
-
-This patch adds:
-
- * A documentation for the Device Tree property "fixed-link".
-
- * A of_phy_register_fixed_link() OF helper, which provided an OF node
-   that contains a "fixed-link" property, registers the corresponding
-   fixed PHY.
-
- * Removes the warning on the of_phy_connect_fixed_link() that says
-   new drivers should not use it, since Grant Likely indicated that
-   this "fixed-link" property is indeed the way to go.
+Following the introduction of of_phy_register_fixed_link(), this patch
+introduces fixed link support in the mvneta driver, for Marvell Armada
+370/XP SOCs.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../devicetree/bindings/net/fixed-link.txt         | 26 ++++++++++++++++
- drivers/of/of_mdio.c                               | 36 +++++++++++++++++++---
- include/linux/of_mdio.h                            | 10 ++++++
- 3 files changed, 68 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/fixed-link.txt
+ .../bindings/net/marvell-armada-370-neta.txt       | 24 +++++++++++++++++++---
+ drivers/net/ethernet/marvell/mvneta.c              | 18 +++++++++++-----
+ 2 files changed, 34 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/fixed-link.txt b/Documentation/devicetree/bindings/net/fixed-link.txt
-new file mode 100644
-index 0000000..25a009a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/fixed-link.txt
-@@ -0,0 +1,26 @@
-+Fixed link Device Tree binding
-+------------------------------
-+
-+Some Ethernet MACs have a "fixed link", and are not connected to a
-+normal MDIO-managed PHY device. For those situations, a Device Tree
-+binding allows to describe a "fixed link".
-+
-+Such a fixed link situation is described within an Ethernet device
-+Device Tree node using a 'fixed-link' property, composed of 5
-+elements:
-+
-+ 1. A fake PHY ID, which must be unique accross all fixed-link PHYs in
-+    the system.
-+ 2. The duplex (1 for full-duplex, 0 for half-duplex)
-+ 3. The speed (10, 100, 1000)
-+ 4. The pause setting (1 for enabled, 0 for disabled)
-+ 5. The asym pause setting (1 for enabled, 0 for disabled)
-+
-+Example:
-+
-+ethernet at 0 {
-+	...
-+	fixed-link = <1 1 1000 0 0>;
-+	...
-+};
-+
-diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
-index d5a57a9..66d5591 100644
---- a/drivers/of/of_mdio.c
-+++ b/drivers/of/of_mdio.c
-@@ -14,6 +14,7 @@
- #include <linux/netdevice.h>
- #include <linux/err.h>
- #include <linux/phy.h>
-+#include <linux/phy_fixed.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
- #include <linux/of_mdio.h>
-@@ -215,10 +216,6 @@ EXPORT_SYMBOL(of_phy_connect);
-  * @dev: pointer to net_device claiming the phy
-  * @hndlr: Link state callback for the network device
-  * @iface: PHY data interface type
-- *
-- * This function is a temporary stop-gap and will be removed soon.  It is
-- * only to support the fs_enet, ucc_geth and gianfar Ethernet drivers.  Do
-- * not call this function from new drivers.
-  */
- struct phy_device *of_phy_connect_fixed_link(struct net_device *dev,
- 					     void (*hndlr)(struct net_device *),
-@@ -247,3 +244,34 @@ struct phy_device *of_phy_connect_fixed_link(struct net_device *dev,
- 	return IS_ERR(phy) ? NULL : phy;
- }
- EXPORT_SYMBOL(of_phy_connect_fixed_link);
-+
-+#if defined(CONFIG_FIXED_PHY)
-+/**
-+ * of_phy_register_fixed_link - Parse fixed-link property and register a dummy phy
-+ * @np: pointer to the OF device node that contains the "fixed-link"
-+ * property for which a dummy phy should be registered.
-+ */
-+#define FIXED_LINK_PROPERTIES_COUNT 5
-+int of_phy_register_fixed_link(struct device_node *np)
-+{
-+	struct fixed_phy_status status = {};
-+	u32 fixed_link_props[FIXED_LINK_PROPERTIES_COUNT];
-+	int ret;
-+
-+	ret = of_property_read_u32_array(np, "fixed-link",
-+					 fixed_link_props,
-+					 FIXED_LINK_PROPERTIES_COUNT);
-+	if (ret < 0)
-+		return ret;
-+
-+	status.link       = 1;
-+	status.duplex     = fixed_link_props[1];
-+	status.speed      = fixed_link_props[2];
-+	status.pause      = fixed_link_props[3];
-+	status.asym_pause = fixed_link_props[4];
-+
-+	return fixed_phy_add(PHY_POLL, fixed_link_props[0],
-+			     &status);
-+}
-+EXPORT_SYMBOL(of_phy_register_fixed_link);
-+#endif
-diff --git a/include/linux/of_mdio.h b/include/linux/of_mdio.h
-index 8163107..bf6efea 100644
---- a/include/linux/of_mdio.h
-+++ b/include/linux/of_mdio.h
-@@ -57,4 +57,14 @@ static inline struct mii_bus *of_mdio_find_bus(struct device_node *mdio_np)
- }
- #endif /* CONFIG_OF */
+diff --git a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
+index 859a6fa..31e61c0 100644
+--- a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
++++ b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
+@@ -4,13 +4,21 @@ Required properties:
+ - compatible: should be "marvell,armada-370-neta".
+ - reg: address and length of the register set for the device.
+ - interrupts: interrupt for the device
+-- phy: A phandle to a phy node defining the PHY address (as the reg
+-  property, a single integer).
+ - phy-mode: The interface between the SoC and the PHY (a string that
+   of_get_phy_mode() can understand)
+ - clocks: a pointer to the reference clock for this device.
  
-+#if defined(CONFIG_OF) && defined(CONFIG_FIXED_PHY)
-+extern int of_phy_register_fixed_link(struct device_node *np);
-+#else
-+static inline int of_phy_register_fixed_link(struct device_node *np)
-+{
-+	return -ENOSYS;
-+}
-+#endif
+-Example:
++Optional properties:
 +
++- phy: A phandle to a phy node defining the PHY address (as the reg
++  property, a single integer). Note: if this property isn't present,
++  then fixed link is assumed, and the 'fixed-link' property is
++  mandatory.
++- fixed-link: A 5 elements array that describe a fixed link, see
++  fixed-link.txt for details. Note: if a 'phy' property is present,
++  this 'fixed-link' property is ignored.
 +
- #endif /* __LINUX_OF_MDIO_H */
++Examples:
+ 
+ ethernet at d0070000 {
+ 	compatible = "marvell,armada-370-neta";
+@@ -21,3 +29,13 @@ ethernet at d0070000 {
+ 	phy = <&phy0>;
+ 	phy-mode = "rgmii-id";
+ };
++
++ethernet at d0070000 {
++	compatible = "marvell,armada-370-neta";
++	reg = <0xd0070000 0x2500>;
++	interrupts = <8>;
++	clocks = <&gate_clk 4>;
++	status = "okay";
++	fixed-link = <1 1 1000 0 0>;
++	phy-mode = "rgmii-id";
++};
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 712779f..0bd1590 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -2349,8 +2349,12 @@ static int mvneta_mdio_probe(struct mvneta_port *pp)
+ {
+ 	struct phy_device *phy_dev;
+ 
+-	phy_dev = of_phy_connect(pp->dev, pp->phy_node, mvneta_adjust_link, 0,
+-				 pp->phy_interface);
++	if (pp->phy_node)
++		phy_dev = of_phy_connect(pp->dev, pp->phy_node, mvneta_adjust_link, 0,
++					 pp->phy_interface);
++	else
++		phy_dev = of_phy_connect_fixed_link(pp->dev, mvneta_adjust_link,
++						    pp->phy_interface);
+ 	if (!phy_dev) {
+ 		netdev_err(pp->dev, "could not find the PHY\n");
+ 		return -ENODEV;
+@@ -2708,9 +2712,13 @@ static int mvneta_probe(struct platform_device *pdev)
+ 
+ 	phy_node = of_parse_phandle(dn, "phy", 0);
+ 	if (!phy_node) {
+-		dev_err(&pdev->dev, "no associated PHY\n");
+-		err = -ENODEV;
+-		goto err_free_irq;
++		/* No 'phy' found, see if we have a 'fixed-link'
++		 * property */
++		err = of_phy_register_fixed_link(dn);
++		if (err < 0) {
++			dev_err(&pdev->dev, "no 'phy' or 'fixed-link' properties\n");
++			goto err_free_irq;
++		}
+ 	}
+ 
+ 	phy_mode = of_get_phy_mode(dn);
 -- 
 1.8.1.2
