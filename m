@@ -1,159 +1,64 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep.KarkadaNagesha at arm.com)
-Date: Mon, 15 Jul 2013 11:22:04 +0100
-Subject: [RFC PATCH 03/11] ARM: topology: remove hwid/MPIDR dependency from
- cpu_capacity
+Date: Mon, 15 Jul 2013 11:22:11 +0100
+Subject: [RFC PATCH 10/11] cpufreq: kirkwood-cpufreq: remove device tree
+ parsing for cpu nodes
 In-Reply-To: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1373883732-26303-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1373883732-26303-11-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Currently the topology code computes cpu capacity and stores it in
-the list along with hwid(which is MPIDR) as it parses the CPU nodes
-in the device tree. This is required as it needs to be mapped to the
-logical CPU later.
+Now that the cpu device registration initialises the of_node(if available)
+appropriately for all the cpus, parsing here is redundant.
 
-Since the CPU device nodes can be retrieved in the logical ordering
-using helpers, its possible to store cpu_capacity also in logical
-ordering and avoid storing hwid for each entry.
-
-This patch removes hwid by making use of arch_of_get_cpu_node.
+This patch removes all DT parsing and uses cpu->of_node instead.
 
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- arch/arm/kernel/topology.c | 61 +++++++++++++++-------------------------------
- 1 file changed, 19 insertions(+), 42 deletions(-)
+ drivers/cpufreq/kirkwood-cpufreq.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index c5a5954..c1a8f05 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -74,12 +74,8 @@ struct cpu_efficiency table_efficiency[] = {
- 	{NULL, },
- };
- 
--struct cpu_capacity {
--	unsigned long hwid;
--	unsigned long capacity;
--};
--
--struct cpu_capacity *cpu_capacity;
-+unsigned long *__cpu_capacity;
-+#define cpu_capacity(cpu)	__cpu_capacity[cpu]
- 
- unsigned long middle_capacity = 1;
- 
-@@ -100,15 +96,19 @@ static void __init parse_dt_topology(void)
- 	unsigned long capacity = 0;
- 	int alloc_size, cpu = 0;
- 
--	alloc_size = nr_cpu_ids * sizeof(struct cpu_capacity);
--	cpu_capacity = kzalloc(alloc_size, GFP_NOWAIT);
-+	alloc_size = nr_cpu_ids * sizeof(*__cpu_capacity);
-+	__cpu_capacity = kzalloc(alloc_size, GFP_NOWAIT);
- 
--	while ((cn = of_find_node_by_type(cn, "cpu"))) {
--		const u32 *rate, *reg;
-+	for_each_possible_cpu(cpu) {
-+		const u32 *rate;
- 		int len;
- 
--		if (cpu >= num_possible_cpus())
--			break;
-+		/* too early to use cpu->of_node */
-+		cn = arch_of_get_cpu_node(cpu);
-+		if (!cn) {
-+			pr_err("missing device node for CPU %d\n", cpu);
-+			continue;
-+		}
- 
- 		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
- 			if (of_device_is_compatible(cn, cpu_eff->compatible))
-@@ -124,12 +124,6 @@ static void __init parse_dt_topology(void)
- 			continue;
- 		}
- 
--		reg = of_get_property(cn, "reg", &len);
--		if (!reg || len != 4) {
--			pr_err("%s missing reg property\n", cn->full_name);
--			continue;
--		}
--
- 		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
- 
- 		/* Save min capacity of the system */
-@@ -140,13 +134,9 @@ static void __init parse_dt_topology(void)
- 		if (capacity > max_capacity)
- 			max_capacity = capacity;
- 
--		cpu_capacity[cpu].capacity = capacity;
--		cpu_capacity[cpu++].hwid = be32_to_cpup(reg);
-+		cpu_capacity(cpu) = capacity;
- 	}
- 
--	if (cpu < num_possible_cpus())
--		cpu_capacity[cpu].hwid = (unsigned long)(-1);
--
- 	/* If min and max capacities are equals, we bypass the update of the
- 	 * cpu_scale because all CPUs have the same capacity. Otherwise, we
- 	 * compute a middle_capacity factor that will ensure that the capacity
-@@ -154,9 +144,7 @@ static void __init parse_dt_topology(void)
- 	 * SCHED_POWER_SCALE, which is the default value, but with the
- 	 * constraint explained near table_efficiency[].
- 	 */
--	if (min_capacity == max_capacity)
--		cpu_capacity[0].hwid = (unsigned long)(-1);
--	else if (4*max_capacity < (3*(max_capacity + min_capacity)))
-+	if (4*max_capacity < (3*(max_capacity + min_capacity)))
- 		middle_capacity = (min_capacity + max_capacity)
- 				>> (SCHED_POWER_SHIFT+1);
- 	else
-@@ -170,23 +158,12 @@ static void __init parse_dt_topology(void)
-  * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
-  * function returns directly for SMP system.
-  */
--void update_cpu_power(unsigned int cpu, unsigned long hwid)
-+void update_cpu_power(unsigned int cpu)
+diff --git a/drivers/cpufreq/kirkwood-cpufreq.c b/drivers/cpufreq/kirkwood-cpufreq.c
+index c233ea6..18aa3eb 100644
+--- a/drivers/cpufreq/kirkwood-cpufreq.c
++++ b/drivers/cpufreq/kirkwood-cpufreq.c
+@@ -13,6 +13,7 @@
+ #include <linux/module.h>
+ #include <linux/clk.h>
+ #include <linux/clk-provider.h>
++#include <linux/cpu.h>
+ #include <linux/cpufreq.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+@@ -165,6 +166,7 @@ static struct cpufreq_driver kirkwood_cpufreq_driver = {
+ static int kirkwood_cpufreq_probe(struct platform_device *pdev)
  {
--	unsigned int idx = 0;
--
--	/* look for the cpu's hwid in the cpu capacity table */
--	for (idx = 0; idx < num_possible_cpus(); idx++) {
--		if (cpu_capacity[idx].hwid == hwid)
--			break;
--
--		if (cpu_capacity[idx].hwid == -1)
--			return;
--	}
--
--	if (idx == num_possible_cpus())
-+	if (!cpu_capacity(cpu))
- 		return;
+ 	struct device_node *np;
++	struct device *cpu_dev;
+ 	struct resource *res;
+ 	int err;
  
--	set_power_scale(cpu, cpu_capacity[idx].capacity / middle_capacity);
-+	set_power_scale(cpu, cpu_capacity(cpu) / middle_capacity);
+@@ -175,9 +177,17 @@ static int kirkwood_cpufreq_probe(struct platform_device *pdev)
+ 	if (IS_ERR(priv.base))
+ 		return PTR_ERR(priv.base);
  
- 	printk(KERN_INFO "CPU%u: update cpu_power %lu\n",
- 		cpu, arch_scale_freq_power(NULL, cpu));
-@@ -194,7 +171,7 @@ void update_cpu_power(unsigned int cpu, unsigned long hwid)
+-	np = of_find_node_by_path("/cpus/cpu at 0");
+-	if (!np)
++	cpu_dev = get_cpu_device(0);
++	if (!cpu_dev) {
++		dev_err(&pdev->dev, "failed to get cpu device\n");
+ 		return -ENODEV;
++	}
++
++	np = of_node_get(cpu_dev->of_node);
++	if (!np) {
++		dev_err(&pdev->dev, "failed to get cpu device node\n");
++		return -ENODEV;
++	}
  
- #else
- static inline void parse_dt_topology(void) {}
--static inline void update_cpu_power(unsigned int cpuid, unsigned int mpidr) {}
-+static inline void update_cpu_power(unsigned int cpuid) {}
- #endif
- 
-  /*
-@@ -281,7 +258,7 @@ void store_cpu_topology(unsigned int cpuid)
- 
- 	update_siblings_masks(cpuid);
- 
--	update_cpu_power(cpuid, mpidr & MPIDR_HWID_BITMASK);
-+	update_cpu_power(cpuid);
- 
- 	printk(KERN_INFO "CPU%u: thread %d, cpu %d, socket %d, mpidr %x\n",
- 		cpuid, cpu_topology[cpuid].thread_id,
+ 	priv.cpu_clk = of_clk_get_by_name(np, "cpu_clk");
+ 	if (IS_ERR(priv.cpu_clk)) {
 -- 
 1.8.1.2
