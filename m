@@ -1,63 +1,41 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 15 Jul 2013 19:30:00 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxMy8yMl0gbGNkOiBBZGQgR1BJTyBMQ0QgZHJpdmVyLg==?=
-In-Reply-To: <1373900227-341-14-git-send-email-denis@eukrea.com>
-References: <1373900227-341-1-git-send-email-denis@eukrea.com>
- <1373900227-341-14-git-send-email-denis@eukrea.com>
-Message-ID: <1373902200.734772008@f148.mail.ru>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 15 Jul 2013 18:33:39 +0300
+Subject: [PATCH 0/4] Enable USB3 for OMAP5
+Message-ID: <1373902423-28654-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
->  .../bindings/video/backlight/gpio-lcd.txt          |   15 ++
->  drivers/video/backlight/Kconfig                    |    8 +
->  drivers/video/backlight/Makefile                   |    1 +
->  drivers/video/backlight/gpio_lcd.c                 |  178 ++++++++++++++++++++
->  4 files changed, 202 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/backlight/gpio-lcd.txt
->  create mode 100644 drivers/video/backlight/gpio_lcd.c
-> 
-> diff --git a/Documentation/devicetree/bindings/video/backlight/gpio-lcd.txt b/Documentation/devicetree/bindings/video/backlight/gpio-lcd.txt
-> new file mode 100644
-> index 0000000..4ff409d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/backlight/gpio-lcd.txt
-> @@ -0,0 +1,15 @@
-> +gpio-lcd bindings
-> +
-> +Required properties:
-> +  - compatible: "gpio-lcd"
-> +  - gpios: describes the gpio that is used for enabling/disabling the lcd
-> +     (see GPIO binding[0] for more details).
-> +
-> +[0]: Documentation/devicetree/bindings/gpio/gpio.txt
-> +
-> +Example:
-> +
-> +	lcd {
-> +		compatible = "gpio-lcd";
-> +		gpios = <&gpio3 13 0>;
-> +	};
-> diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
-> index 70e7706..eaf0525 100644
-> --- a/drivers/video/backlight/Kconfig
-> +++ b/drivers/video/backlight/Kconfig
-> @@ -34,6 +34,14 @@ config LCD_CORGI
->  	  Say y here to support the LCD panels usually found on SHARP
->  	  corgi (C7x0) and spitz (Cxx00) models.
->  
-> +config LCD_GPIO
-> +	tristate "LCD GPIO Driver"
-> +	depends on OF && GPIOLIB
-> +	help
-> +	  If your LCD enbling/disabling is controlled by a GPIO
-> +	  and that you use the device tree for booting,
-> +	  say y to enable the LCD GPIO driver.
-> +
+Hi,
 
-Instead of using GPIO maybe it would be better to use a regulator here?
-That would be a universal solution.
-Thanks.
+I have just tested all these patches on OMAP5 uEVM and it's
+working fine.
 
----
+| [1141397.137900] usb 10-2: USB disconnect, device number 3
+| [1142023.549485] usb 10-2: new SuperSpeed USB device number 4 using xhci_hcd
+| [1142024.185535] usb 10-2: Parent hub missing LPM exit latency info.  Power management will be impacted.
+| [1142025.458738] usb 10-2: New USB device found, idVendor=0525, idProduct=a4a0
+| [1142025.458744] usb 10-2: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+| [1142025.458748] usb 10-2: Product: Gadget Zero
+| [1142025.458752] usb 10-2: Manufacturer: Linux 3.11.0-rc1-00068-g6df6cd3-dirty with dwc3-gadget
+| [1142025.458755] usb 10-2: SerialNumber: 0123456789.0123456789.0123456789
+| [1142025.866540] usbtest 10-2:3.0: Linux gadget zero
+| [1142025.866547] usbtest 10-2:3.0: super-speed {control in/out bulk-in bulk-out} tests (+alt)
+
+please consider applying them.
+
+Benoit Cousson (1):
+  arm: omap5: hwmod: add missing ocp2scp hwmod data
+
+Felipe Balbi (3):
+  arm: omap5: dts: fix reg property size
+  arm: omap5: dts: add palmas-usb node
+  arm: omap2plus_defconfig: enable dwc3 and dependencies
+
+ arch/arm/boot/dts/omap5-uevm.dts           | 10 +++++++
+ arch/arm/boot/dts/omap5.dtsi               |  9 +++---
+ arch/arm/configs/omap2plus_defconfig       |  9 ++++++
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 45 ++++++++++++++++++++++++++++++
+ 4 files changed, 69 insertions(+), 4 deletions(-)
+
+-- 
+1.8.2.1
