@@ -1,37 +1,67 @@
-From: gorcunov@gmail.com (Cyrill Gorcunov)
-Date: Mon, 15 Jul 2013 22:57:39 +0400
-Subject: [PATCH] arm: align shared memory unconditionally to the SHMLBA
- boundary
-In-Reply-To: <20130715180846.GV24642@n2100.arm.linux.org.uk>
-References: <1361254269-3444-1-git-send-email-alekskartashov@parallels.com>
- <20130715173238.GJ1730@moon>
- <20130715180846.GV24642@n2100.arm.linux.org.uk>
-Message-ID: <20130715185739.GK1730@moon>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 15 Jul 2013 22:59:20 +0400
+Subject: [PATCH V2 3/5] of: introduce of_parse_phandle_with_fixed_args
+In-Reply-To: <1373913629-32179-3-git-send-email-swarren@wwwdotorg.org>
+References: <1373913629-32179-1-git-send-email-swarren@wwwdotorg.org>
+ <1373913629-32179-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <51E44688.3050805@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 07:08:46PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 15, 2013 at 09:32:38PM +0400, Cyrill Gorcunov wrote:
-> > On Tue, Feb 19, 2013 at 10:11:09AM +0400, Alexander Kartashov wrote:
-> > > Currently IPC SHM works in a strange way on ARM:
-> > > the syscall sys_shmat() requires the argument shmaddr
-> > > be SHMLBA-aligned (ARM has the macro __ARCH_FORCE_SHMLBA
-> > > unconditionally defined) but allocates memory that
-> > > isn't SHMLBA-aligned because the value of memory alignment
-> > > depends on presense of certain cache aliases.
-> > 
-> > Hi guys, is there some conclusion on this patch? It has been sent
-> > almost 5 months back ;)
-> 
-> It's pointless.  The alignment is only required for CPUs which have
-> aliasing caches.  What the code does in mmap() is correct.  However,
-> we can't dynamically select this in the SHM code.
+On 07/15/2013 10:40 PM, Stephen Warren wrote:
 
-Hi Russell, thanks a lot for reply! I must admit I'm not that familiar
-with arm hw internals, but if the behaviour is correct than we've a
-problem with checkpoint/restore procedure on arm platform :( As far
-as I know Alexander pointed me that he find no other way of fixing
-the problem except patching the kernel. Alexander, mind to remind
-where exactly we're failing in c/r procedure, thus maybe arm guys
-would help us to find a way to pass it by with some user-space
-trick?
+> From: Stephen Warren <swarren@nvidia.com>
+
+> This is identical to of_parse_phandle_with_args(), except that the
+> number of argument cells is fixed, rather than being parsed out of the
+> node referenced by each phandle.
+
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>   drivers/of/base.c  | 67 ++++++++++++++++++++++++++++++++++++++++++++++--------
+>   include/linux/of.h | 10 ++++++++
+>   2 files changed, 68 insertions(+), 9 deletions(-)
+
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 23e7073..ad799d9 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -1106,7 +1106,8 @@ EXPORT_SYMBOL(of_parse_phandle);
+>
+>   static int __of_parse_phandle_with_args(const struct device_node *np,
+>   					const char *list_name,
+> -					const char *cells_name, int index,
+> +					const char *cells_name,
+> +					int cells_count, int index,
+
+    The correct grammar would be 'cell_name' and 'cell_count' I think.
+
+>   					struct of_phandle_args *out_args)
+>   {
+>   	const __be32 *list, *list_end;
+> @@ -1142,12 +1143,17 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
+>   					 np->full_name);
+>   				goto err;
+>   			}
+> -			if (of_property_read_u32(node, cells_name, &count)) {
+> -				pr_err("%s: could not get %s for %s\n",
+> -					 np->full_name, cells_name,
+> -					 node->full_name);
+> -				goto err;
+> -			}
+> +
+> +			if (cells_name) {
+> +				if (of_property_read_u32(node, cells_name,
+> +							 &count)) {
+> +					pr_err("%s: could not get %s for %s\n",
+> +						np->full_name, cells_name,
+> +						node->full_name);
+> +					goto err;
+> +				}
+> +			} else
+> +				count = cells_count;
+
+    According to Documentation/CodingStyle chapter 3, both arms of the 
+*if* statment should have {} if oe arm has it.
+
+WBR, Sergei
