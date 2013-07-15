@@ -1,15 +1,36 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 Jul 2013 12:27:36 -0600
-Subject: [PATCH] ARM: tegra114: Enable Cortex-A15 errata 798181
-In-Reply-To: <1372845348-27089-1-git-send-email-josephl@nvidia.com>
-References: <1372845348-27089-1-git-send-email-josephl@nvidia.com>
-Message-ID: <51E43F18.4090508@wwwdotorg.org>
+Date: Mon, 15 Jul 2013 12:40:28 -0600
+Subject: [PATCH V2 4/5] gpio: implement gpio-ranges binding document fix
+In-Reply-To: <1373913629-32179-1-git-send-email-swarren@wwwdotorg.org>
+References: <1373913629-32179-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1373913629-32179-4-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2013 03:55 AM, Joseph Lo wrote:
-> The commit 93dc688 (ARM: 7684/1: errata: Workaround for Cortex-A15
-> erratum 798181 (TLBI/DSB operations)) introduecd a workaround for
-> Cortex-A15 errata 798181. Enabling it for Tegra114.
+From: Stephen Warren <swarren@nvidia.com>
 
-Applied to Tegra's for-3.12/soc branch.
+Use the new of_parse_phandle_with_fixed_args() to implement the
+corrected gpio-ranges DT property definition.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ drivers/gpio/gpiolib-of.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+index 665f953..48cda3c 100644
+--- a/drivers/gpio/gpiolib-of.c
++++ b/drivers/gpio/gpiolib-of.c
+@@ -194,8 +194,8 @@ static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
+ 		return;
+ 
+ 	for (;; index++) {
+-		ret = of_parse_phandle_with_args(np, "gpio-ranges",
+-				"#gpio-range-cells", index, &pinspec);
++		ret = of_parse_phandle_with_fixed_args(np, "gpio-ranges", 3,
++				index, &pinspec);
+ 		if (ret)
+ 			break;
+ 
+-- 
+1.8.1.5
