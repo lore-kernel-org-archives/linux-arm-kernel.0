@@ -1,37 +1,57 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 15 Jul 2013 13:59:24 -0700
-Subject: [PATCH] ARM: Add check for Cortex-A15 errata 798181 ECO
-In-Reply-To: <1373920943-18308-1-git-send-email-robherring2@gmail.com>
-References: <1373920943-18308-1-git-send-email-robherring2@gmail.com>
-Message-ID: <CAOesGMjATn9MCzazUGmbD44XR8HyJZU4cCvmOEoUZsmCgutPUg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 15 Jul 2013 23:09:00 +0200
+Subject: DT binding review for Armada display subsystem
+In-Reply-To: <CAMLZHHRvWFrxxjr0sF0NRqvz+K1wB9Mb_OGG-8tx36A2rk-SNQ@mail.gmail.com>
+References: <20130712164428.AC3D2FAAE9@dev.laptop.org>
+ <CAMLZHHRvWFrxxjr0sF0NRqvz+K1wB9Mb_OGG-8tx36A2rk-SNQ@mail.gmail.com>
+Message-ID: <20130715210900.GT14452@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 1:42 PM, Rob Herring <robherring2@gmail.com> wrote:
-> diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
-> index 9a52a07..7fd64b7 100644
-> --- a/arch/arm/kernel/smp_tlb.c
-> +++ b/arch/arm/kernel/smp_tlb.c
-> @@ -74,10 +74,21 @@ static inline void ipi_flush_bp_all(void *ignored)
->  static int erratum_a15_798181(void)
->  {
->         unsigned int midr = read_cpuid_id();
-> +       unsigned int revidr;
->
->         /* Cortex-A15 r0p0..r3p2 affected */
->         if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
->                 return 0;
-> +
-> +       /* Check for Cortex A15 <= r3p2 with ECO fix */
-> +       revidr = read_cpuid(CPUID_REVIDR);
-> +       if ((revidr & 0x210) == 0x210)
-> +               return 0;
+On Mon, Jul 15, 2013 at 02:23:30PM -0600, Daniel Drake wrote:
+> On Fri, Jul 12, 2013 at 10:44 AM, Daniel Drake <dsd@laptop.org> wrote:
+> > Based on the outcomes of the "Best practice device tree design for display
+> > subsystems" discussion I have drafted a DT binding. Comments much appreciated.
+> >
+> > At a high level, it uses a "super node" as something for the driver to bind
+> > to, needed because there is no clear one device that controls all the
+> > others, and also to distinguish between the Armada 510 possible use cases
+> > of having one video card with two outputs, or two independent video cards.
+> > It uses node-to-node linking beyond that point, V4L2 style.
+> 
+> As this hasn't been shot down very far, I've started to implement the
+> driver side of this binding. I have already run into a couple of
+> little problems.
+> 
+> First, interrupts. In the dt binding, each "lcd controller" node
+> defines which interrupt it listens to, and in the armada 510 case
+> there are indeed 2 interrupts (47 and 46, one for each LCD
+> controller). And remember that the drm driver itself binds to the
+> super-node.
+> 
+> Looking at drm_irq_install(), it looks like DRM only supports 1
+> interrupt line per drm_device.
 
-Reading and evaluating all this on every invalidate seems suboptimal.
-It should be possible to read just once and cache the result.
+You don't have to call drm_irq_install(). Both the exynos and i.MX
+driver do without it and at least the i.MX driver uses multiple irqs per
+drm_device.
 
-I would have had the same comment about the original patch, but ARM
-pushes those to Russell in secret so it wasn't on the list. :-)
+> 
+> Secondly, devm. I understand from the "best practices" thread that we
+> want to have exactly one platform_device which corresponds to the
+> "super node", and all of the individual display controller components
+> will be represented by DT nodes but *without* their own
+> platform_device.
 
+A super node approach doesn't mean that there's only one platform
+device. You can still have a platform device for each component. The
+super node should rather be seen as a node which contains phandles
+to the different components..
 
--Olof
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
