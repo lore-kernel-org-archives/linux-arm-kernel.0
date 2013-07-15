@@ -1,69 +1,52 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Mon, 15 Jul 2013 20:24:29 +0900
-Subject: [PATCH v7 00/12] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-In-Reply-To: <CANEJEGvajhgzUPG6ppbjwBb4-9TdU9em3T_SejBpz8NCjGHYTQ@mail.gmail.com>
-References: <002801ce797b$3d2fbc80$b78f3580$@samsung.com>
- <CANEJEGvajhgzUPG6ppbjwBb4-9TdU9em3T_SejBpz8NCjGHYTQ@mail.gmail.com>
-Message-ID: <009b01ce814d$def7a6c0$9ce6f440$@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 15 Jul 2013 12:25:03 +0100
+Subject: [PATCH] ARM: EXYNOS: remove references to non-DT SoCs
+In-Reply-To: <1373807896.1370.43.camel@x61.thuisdomein>
+References: <1373804812.1370.23.camel@x61.thuisdomein>
+ <20130714124538.GA11538@sirena.org.uk>
+ <1373807896.1370.43.camel@x61.thuisdomein>
+Message-ID: <20130715112503.GB11538@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: grundler at google.com [mailto:grundler at google.com] On Behalf Of Grant Grundler
-> Sent: Friday, July 12, 2013 2:23 AM
-> 
-> On Fri, Jul 5, 2013 at 5:29 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> > The current exynos-iommu(System MMU) driver does not work autonomously
-> > since it is lack of support for power management of peripheral blocks.
-> ...
-> > Patch summary:
-> > [PATCH v7 1/9] iommu/exynos: do not include removed header
-> > [PATCH v7 2/9] iommu/exynos: add missing cache flush for removed page table entries
-> > [PATCH v7 3/9] iommu/exynos: fix page table maintenance
-> > [PATCH v7 4/9] iommu/exynos: allocate lv2 page table from own slab
-> > [PATCH v7 5/9] iommu/exynos: change rwlock to spinlock
-> > [PATCH v7 6/9] clk: exynos5250: add gate clock descriptions of System MMU
-> > [PATCH v7 7/9] ARM: dts: Add description of System MMU of Exynos SoCs
-> > [PATCH v7 8/9] iommu/exynos: support for device tree
-> > [PATCH v7 9/9] iommu/exynos: add bus notifier for registering System MMU
-> 
-> Cho,
-> Of the above patches, nearly all have been applied to chromeos-3.8
-> (kernel-next git tree) by Doug Anderson and others.
-> 
-> AFAICT, the only ones not applied are:
->    [v7,3/9] iommu/exynos: fix page table maintenance
->    [v7,6/9] clk: exynos5250: add gate clock descriptions of System MMU
-> (conflicts in this one)
->    [v7,7/9] ARM: dts: Add description of System MMU of Exynos SoCs
-> (depends on 6/9)
-> 
-> We also already have parts of:
->    [v7,9/9] iommu/exynos: add bus notifier for registering System MMU
-> 
-> Some of those are being further discussed but I've lost track now
-> exactly which ones.
-> 
-> I'm telling you about chromeos-3.8 status since the adopted changes
-> have been reviewed (by me and others) are being tested manually here
-> on several different Samsung Exynos platforms (including 5250 which is
-> our "snow" platform). Not sure how you should to mark those patches
-> since they aren't identical to your changes (which apply to post 3.10
-> kernels, not 3.8).  You might consider splitting those patches out
-> from the 4 I've listed above to get that series accepted upstream
-> since the additional review/testing should provide some confidence
-> those patches are good.
-> 
+On Sun, Jul 14, 2013 at 03:18:16PM +0200, Paul Bolle wrote:
+> On Sun, 2013-07-14 at 13:45 +0100, Mark Brown wrote:
 
-I understand what you are concerning about.
-Have you applied v6 patchset?
+> > Simply removing the dependencies is not going to give the clearly
+> > intended effect here.  The dependency on the DT only machine needs to be
+> > replaced with something, not just deleted, otherwise the driver can't be
+> > enabled in Kconfig.
 
-I will try to split the patches and make the changes from v6
-on top of the v6 patcheset.
+> I interpreted commit 383ffda2fa as a commit that just removed a lot of
 
-> cheers,
-> grant
+Always provide human readable descriptions of commits in email.
 
-Thank you.
+> stuff: see its commit explanation and its diffstat (it adds one line and
+> deletes over 900 lines). Moreover, after that commit the references to
+> MACH_SMDKV310 and MACH_SMDKC210 both are nops. Deleting them can't
+> possibly change anything.
 
-Cho KyonogHo.
+This still doesn't have much to do with your commit message or indicate
+much understanding of what the change is actually doing or why it might
+be a problem.
+
+> But, anyhow, what would be the symbols to use here?
+
+Well, let's think about this for a minute - what is going on when
+someone does a device tree conversion on a platform?  What is replacing
+the board files?  What would an equivalent change be for the audio
+driver?
+
+> Besides, this patch was intended as a follow up to commit 383ffda2fa, to
+> clean up two references it apparently forgot to remove, and therefor
+> basically copied the subject line used in that commit.
+
+That doesn't really help - putting in a completely irrelevant subject
+line is a really good way to get your patch ignored.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130715/1ec4cc47/attachment.sig>
