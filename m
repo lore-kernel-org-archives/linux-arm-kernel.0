@@ -1,69 +1,102 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Mon, 15 Jul 2013 11:27:14 -0400
-Subject: [PATCH] xen/control: protect functions with
- CONFIG_HIBERNATE_CALLBACKS to avoid warning
-In-Reply-To: <1373898275-15765-1-git-send-email-julien.grall@linaro.org>
-References: <1373898275-15765-1-git-send-email-julien.grall@linaro.org>
-Message-ID: <20130715152714.GD5774@phenom.dumpdata.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 15 Jul 2013 17:27:01 +0200
+Subject: [PATCH 2/3] video: hx8357: Make IM pins optional
+In-Reply-To: <1373902022-20439-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1373902022-20439-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1373902022-20439-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 03:24:35PM +0100, Julien Grall wrote:
-> If CONFIG_HIBERNATE_CALLBACKS is not set gcc will issue warnings:
-> drivers/xen/manage.c:46:13: warning: 'xen_hvm_post_suspend' defined but not used [-Wunused-function]
-> drivers/xen/manage.c:52:13: warning: 'xen_pre_suspend' defined but not used [-Wunused-function]
-> drivers/xen/manage.c:59:13: warning: 'xen_post_suspend' defined but not used [-Wunused-function]
+The IM pins of the HX8357 controller are used to define the interface
+used to feed pixel stream to the LCD panel.
 
-Have you checked the upstream kernel?
-I see this:
+Most of the time, these pins are directly routed to either the ground or
+the VCC to set their values.
 
-commit 65e053a7038c608f89272d4fb1f899890c579f0a
-Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Date:   Thu Jun 27 14:28:38 2013 +0100
+Remove the need to assign GPIOs to these pins when we are in such a case.
 
-    xen: ifdef CONFIG_HIBERNATE_CALLBACKS xen_*_suspend
-    
-    xen_hvm_post_suspend, xen_pre_suspend, xen_post_suspend are only used if
-    CONFIG_HIBERNATE_CALLBACKS is defined, resulting in:
-    
-    drivers/xen/manage.c:46:13: warning: ?xen_hvm_post_suspend? defined but not used [-Wunused-function]
-    drivers/xen/manage.c:52:13: warning: ?xen_pre_suspend? defined but not used [-Wunused-function]
-    drivers/xen/manage.c:59:13: warning: ?xen_post_suspend? defined but not used [-Wunused-function]
-    
-    If the kernel config is missing CONFIG_HIBERNATE_CALLBACKS.
-    
-    Simply ifdef CONFIG_HIBERNATE_CALLBACKS the three functions.
-    
-    Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-    Signed-off-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/video/backlight/hx8357.c | 52 +++++++++++++++++++++++-----------------
+ 1 file changed, 30 insertions(+), 22 deletions(-)
 
-
-> 
-> Signed-off-by: Julien Grall <julien.grall@linaro.org>
-> ---
->  drivers/xen/manage.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/xen/manage.c b/drivers/xen/manage.c
-> index 412b96c..7680276 100644
-> --- a/drivers/xen/manage.c
-> +++ b/drivers/xen/manage.c
-> @@ -36,6 +36,7 @@ enum shutdown_state {
->  /* Ignore multiple shutdown requests. */
->  static enum shutdown_state shutting_down = SHUTDOWN_INVALID;
->  
-> +#ifdef CONFIG_HIBERNATE_CALLBACKS
->  struct suspend_info {
->  	int cancelled;
->  	unsigned long arg; /* extra hypercall argument */
-> @@ -63,7 +64,6 @@ static void xen_post_suspend(int cancelled)
->  	xen_mm_unpin_all();
->  }
->  
-> -#ifdef CONFIG_HIBERNATE_CALLBACKS
->  static int xen_suspend(void *data)
->  {
->  	struct suspend_info *si = data;
-> -- 
-> 1.7.10.4
-> 
+diff --git a/drivers/video/backlight/hx8357.c b/drivers/video/backlight/hx8357.c
+index a0482b5..ed94796 100644
+--- a/drivers/video/backlight/hx8357.c
++++ b/drivers/video/backlight/hx8357.c
+@@ -76,6 +76,7 @@ struct hx8357_data {
+ 	unsigned		reset;
+ 	struct spi_device	*spi;
+ 	int			state;
++	bool			use_im_pins;
+ };
+ 
+ static u8 hx8357_seq_power[] = {
+@@ -250,9 +251,11 @@ static int hx8357_lcd_init(struct lcd_device *lcdev)
+ 	 * Set the interface selection pins to SPI mode, with three
+ 	 * wires
+ 	 */
+-	gpio_set_value_cansleep(lcd->im_pins[0], 1);
+-	gpio_set_value_cansleep(lcd->im_pins[1], 0);
+-	gpio_set_value_cansleep(lcd->im_pins[2], 1);
++	if (lcd->use_im_pins) {
++		gpio_set_value_cansleep(lcd->im_pins[0], 1);
++		gpio_set_value_cansleep(lcd->im_pins[1], 0);
++		gpio_set_value_cansleep(lcd->im_pins[2], 1);
++	}
+ 
+ 	/* Reset the screen */
+ 	gpio_set_value(lcd->reset, 1);
+@@ -424,26 +427,31 @@ static int hx8357_probe(struct spi_device *spi)
+ 		return -EINVAL;
+ 	}
+ 
+-	for (i = 0; i < HX8357_NUM_IM_PINS; i++) {
+-		lcd->im_pins[i] = of_get_named_gpio(spi->dev.of_node,
+-						"im-gpios", i);
+-		if (lcd->im_pins[i] == -EPROBE_DEFER) {
+-			dev_info(&spi->dev, "GPIO requested is not here yet, deferring the probe\n");
+-			return -EPROBE_DEFER;
+-		}
+-		if (!gpio_is_valid(lcd->im_pins[i])) {
+-			dev_err(&spi->dev, "Missing dt property: im-gpios\n");
+-			return -EINVAL;
++	if (of_find_property(spi->dev.of_node, "im-gpios", NULL)) {
++		lcd->use_im_pins = 1;
++
++		for (i = 0; i < HX8357_NUM_IM_PINS; i++) {
++			lcd->im_pins[i] = of_get_named_gpio(spi->dev.of_node,
++							    "im-gpios", i);
++			if (lcd->im_pins[i] == -EPROBE_DEFER) {
++				dev_info(&spi->dev, "GPIO requested is not here yet, deferring the probe\n");
++				return -EPROBE_DEFER;
++			}
++			if (!gpio_is_valid(lcd->im_pins[i])) {
++				dev_err(&spi->dev, "Missing dt property: im-gpios\n");
++				return -EINVAL;
++			}
++
++			ret = devm_gpio_request_one(&spi->dev, lcd->im_pins[i],
++						    GPIOF_OUT_INIT_LOW, "im_pins");
++			if (ret) {
++				dev_err(&spi->dev, "failed to request gpio %d: %d\n",
++					lcd->im_pins[i], ret);
++				return -EINVAL;
++			}
+ 		}
+-
+-		ret = devm_gpio_request_one(&spi->dev, lcd->im_pins[i],
+-					GPIOF_OUT_INIT_LOW, "im_pins");
+-		if (ret) {
+-			dev_err(&spi->dev, "failed to request gpio %d: %d\n",
+-				lcd->im_pins[i], ret);
+-			return -EINVAL;
+-		}
+-	}
++	} else
++		lcd->use_im_pins = 0;
+ 
+ 	lcdev = lcd_device_register("mxsfb", &spi->dev, lcd, &hx8357_ops);
+ 	if (IS_ERR(lcdev)) {
+-- 
+1.8.3.2
