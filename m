@@ -1,26 +1,32 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 15 Jul 2013 16:41:25 +0800
-Subject: [PATCH 2/3] serial: mxs: enable the DMA only when the rts/cts
- is enabled
-In-Reply-To: <20130715082716.GM12139@pengutronix.de>
-References: <1373857736-30108-1-git-send-email-b32955@freescale.com>
- <1373857736-30108-2-git-send-email-b32955@freescale.com>
- <20130715082716.GM12139@pengutronix.de>
-Message-ID: <51E3B5B5.1030706@freescale.com>
+From: jgq516@gmail.com (jgq516 at gmail.com)
+Date: Mon, 15 Jul 2013 17:02:52 +0800
+Subject: v3.10 - big endian core support
+In-Reply-To: <20130715103658.068ac6b7@skate>
+References: <CALicx6u89THSiRa4FzGZrcoG8q+o_BD8qVEC4CYXEjPUVK_fJw@mail.gmail.com>
+ <20130712134726.0a909165@skate> <51DFEF75.8080600@codethink.co.uk>
+ <20130714215325.GB7382@mudshark.cambridge.arm.com>
+ <51E3ACD0.8040209@codethink.co.uk> <20130715103658.068ac6b7@skate>
+Message-ID: <51E3BABC.9070204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?07?15? 16:27, Uwe Kleine-K?nig ??:
-> do you want to say that the driver fails to only enable DMA when RTS/CTS
-> are available; or that today the driver can handle DMA just fine even
-> without RTS/CTS? I interpret your commit log as the latter, your patch
-> implements the former however.
-in the mxs-auart, if the RTS/CTS is not invalid, the DMA should be not 
-enabled.
+On 07/15/2013 04:36 PM, Thomas Petazzoni wrote:
+> Dear Ben Dooks,
+>
+> On Mon, 15 Jul 2013 09:03:28 +0100, Ben Dooks wrote:
+>
+>>> As for building a Thumb-2 kernel; just enable the option in menuconfig and
+>>> you're done. The compiler should "do the right thing".
+>> I can build it, I just don't have the time and hardware to give it a
+>> test at the moment. However it seems that changing to using 'rev16'
+>> instead of 'rev'. I will make the necessary changes and get this ready
+>> to go.
+> I am willing to give some testing to early patches, if needed. Do not
+> hesitate to send me things to test.
+I can test it too if needed :).
 
-But current code lost the limit, a uart without the RTS/CTS may also 
-enables the DMA in which case the uart
-may does not run or run in a abnormal way.
-
-thanks
-Huang Shijie
+Thanks,
+Xiao
+> Thanks!
+>
+> Thomas
