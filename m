@@ -1,64 +1,81 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 15 Jul 2013 22:32:59 +0530
-Subject: [PATCH] remove vlan tags in CPSW dual emac mode
-In-Reply-To: <51E41A34.4030000@newflow.co.uk>
-References: <4699400.vD3TdgH1nR@localhost> <5176C4FE.4080305@ti.com>
- <51E00B2F.6050406@newflow.co.uk> <51E04C89.8030202@ti.com>
- <51E0582D.4090306@newflow.co.uk> <51E3EEE7.9030508@ti.com>
- <51E41A34.4030000@newflow.co.uk>
-Message-ID: <51E42B43.8060307@ti.com>
+From: nerv@dawncrow.de (=?ISO-8859-1?Q?Andr=E9_Hentschel?=)
+Date: Mon, 15 Jul 2013 19:14:57 +0200
+Subject: arm: Only load TLS values when needed
+Message-ID: <51E42E11.1010903@dawncrow.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/15/2013 9:20 PM, Mark Jackson wrote:
-> On 15/07/13 13:45, Mugunthan V N wrote:
->> On 7/13/2013 12:55 AM, Mark Jackson wrote:
->>> On 12/07/13 19:35, Mugunthan V N wrote:
->>>> On 7/12/2013 7:27 PM, Mark Jackson wrote:
->>> [snip]
->>>
->>>>> Just to update this (old) thread ...
->>>>>
->>>>> I can still confirm that *without* the above patch, I am *unable* to use both network
->>>>> ports on our AM335x board.
->>>>>
->>> [snip]
->>>
->>>>> So I'm not sure what's wrong, but it's *definitely* not correct.
->>>>>
->>>>>
->>>> I am sure that current code in mainline works for Dual EMAC. I can test it
->>>> again and share the images with you if are interested. But had tested with DHCP
->>>> on both the interfaces.
->>> Hmmm ... well it's not working for me.  What hardware are you testing it on ?
->>>
->>> I tried DHCP to start with, and switched to static IP when that failed.
->>> Then I recalled this patch and re-applied it ... hey presto !!
->>>
->>> Markus, are you still using this patch ?
->>>
->> Today I have tested the Dual EMAC on my am335x-evmsk and its working fine with
->> net/master branch.
->> I had 3 patches additional to net/master in which two for basic boot of EVMsk
->> and one for enabling Dual EMAC. I had pushed the branch in the below repo
->> repo:
->> git://git.ti.com/~mugunthanvnm/ti-linux-kernel/mugunth-connectivity-linux-feature-tree.git
->> branch: dual-emac
-> Okay ... I can't test that at the moment as I can only boot from MMC as there's
-> currently no support for MMC booting in the mainline kernel.
->
-> So ... the code works for you, but not for me.
->
-> I guess the other difference is that I'm not using the same PHY (we use a 10/100
-> SMSC 8710A, not the GbE Atheros part).
->
-> Could that make any difference ?
->
-> Markus, are you still seeing the same issue ?  What PHY are you using ?
->
-There is no relation between what you used vs vlan aware mode in CPSW. I don't
-have a board with SMSC phy. If I have I could have helped you to bring up Dual
-EMAC.
+From: Andr? Hentschel <nerv@dawncrow.de>
 
-Regards
-Mugunthan V N
+This patch intents to reduce loading instructions when the resulting value is not used.
+It's a follow up on a4780adeefd042482f624f5e0d577bf9cdcbb760
+
+Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+
+---
+This patch is against Linux 3.11-rc1 (ad81f0545ef01ea651886dddac4bef6cec930092)
+
+Thanks to everyone who helped me with a4780adeefd042482f624f5e0d577bf9cdcbb760
+
+diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
+index 83259b8..3742722 100644
+--- a/arch/arm/include/asm/tls.h
++++ b/arch/arm/include/asm/tls.h
+@@ -3,29 +3,32 @@
+ 
+ #ifdef __ASSEMBLY__
+ #include <asm/asm-offsets.h>
+-	.macro switch_tls_none, base, tp, tpuser, tmp1, tmp2
++	.macro switch_tls_none, prev, next, tp, tpuser, tmp1, tmp2
+ 	.endm
+ 
+-	.macro switch_tls_v6k, base, tp, tpuser, tmp1, tmp2
++	.macro switch_tls_v6k, prev, next, tp, tpuser, tmp1, tmp2
++	ldrd	\tp, \tpuser, [\next, #TI_TP_VALUE]	@ get the next TLS and user r/w register
+ 	mrc	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
+ 	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
+ 	mcr	p15, 0, \tpuser, c13, c0, 2	@ and the user r/w register
+-	str	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
++	str	\tmp2, [\prev, #TI_TP_VALUE + 4] @ save it
+ 	.endm
+ 
+-	.macro switch_tls_v6, base, tp, tpuser, tmp1, tmp2
++	.macro switch_tls_v6, prev, next, tp, tpuser, tmp1, tmp2
+ 	ldr	\tmp1, =elf_hwcap
+ 	ldr	\tmp1, [\tmp1, #0]
+ 	mov	\tmp2, #0xffff0fff
++	ldr	\tp, [\next, #TI_TP_VALUE]	@ get the next TLS register
+ 	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
+ 	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
+-	mrcne	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
++	mrcne	p15, 0, \tmp2, c13, c0, 2	@ get the previous user r/w register
++	ldrne	\tpuser, [\next, #TI_TP_VALUE + 4]	@ get the next user r/w register
+ 	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
+ 	mcrne	p15, 0, \tpuser, c13, c0, 2	@ set user r/w register
+-	strne	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
++	strne	\tmp2, [\prev, #TI_TP_VALUE + 4] @ save it
+ 	.endm
+ 
+-	.macro switch_tls_software, base, tp, tpuser, tmp1, tmp2
++	.macro switch_tls_software, prev, next, tp, tpuser, tmp1, tmp2
+ 	mov	\tmp1, #0xffff0fff
+ 	str	\tp, [\tmp1, #-15]		@ set TLS value at 0xffff0ff0
+ 	.endm
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index a39cfc2a1..1484b59 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -689,12 +689,10 @@ ENTRY(__switch_to)
+  THUMB(	stmia	ip!, {r4 - sl, fp}	   )	@ Store most regs on stack
+  THUMB(	str	sp, [ip], #4		   )
+  THUMB(	str	lr, [ip], #4		   )
+-	ldr	r4, [r2, #TI_TP_VALUE]
+-	ldr	r5, [r2, #TI_TP_VALUE + 4]
+ #ifdef CONFIG_CPU_USE_DOMAINS
+ 	ldr	r6, [r2, #TI_CPU_DOMAIN]
+ #endif
+-	switch_tls r1, r4, r5, r3, r7
++	switch_tls r1, r2, r4, r5, r3, r7
+ #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
+ 	ldr	r7, [r2, #TI_TASK]
+ 	ldr	r8, =__stack_chk_guard
