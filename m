@@ -1,67 +1,19 @@
-From: sr@denx.de (Stefan Roese)
-Date: Mon, 15 Jul 2013 10:24:17 +0200
-Subject: [PATCH] ARM: OMAP3: Beagle: Fix USB Host on beagle xM Ax/Bx
-In-Reply-To: <51E3AFF4.7060607@ti.com>
-References: <1366024808-4691-1-git-send-email-rogerq@ti.com>
- <51DC09E7.1070302@denx.de> <51DC164B.5010608@ti.com>
- <51DC1B47.7070504@denx.de> <51DE87D3.5030600@ti.com>
- <51DEA7F1.1050902@denx.de> <51DEC2CE.70400@ti.com> <51DED076.3040000@denx.de>
- <51DEF0DE.4050607@denx.de> <51DFC92F.1050701@ti.com>
- <51DFDFD4.3040900@denx.de> <51E3AFF4.7060607@ti.com>
-Message-ID: <51E3B1B1.3060202@denx.de>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 15 Jul 2013 16:30:27 +0800
+Subject: [PATCH 1/3] serial: mxs: remove the unused macro
+In-Reply-To: <20130715082044.GL12139@pengutronix.de>
+References: <1373857736-30108-1-git-send-email-b32955@freescale.com>
+ <20130715082044.GL12139@pengutronix.de>
+Message-ID: <51E3B323.1070606@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2013 10:16 AM, Roger Quadros wrote:
->>> I can only test on beagle-xm (which is also rev. C2) with integrated SMSC ethernet chip
->>> as I don't have an external USB-ethernet adapter.
->>
->> Too bad. This difference in boards makes the tests a bit less
->> meaningful. Is there really no USB-ethernet adapter somewhere in your
->> department (perhaps a non-SMSC95xx might serve as well?)? I might
->> send/order you one if necessary. ;)
-> 
-> Thanks for the offer :). I'll just get one for myself by today/tomorrow.
-> The one available here uses this driver "drivers/net/usb/asix.c"
+? 2013?07?15? 16:20, Uwe Kleine-K?nig ??:
+> You're suggesting that MXS_AUART_DMA_CONFIG was set here unconditionally
+> before and so the check in the hunk above is not necessary anymore.
+yes, that's what i want to say.
+> (<pedantic>So your "not used any more" is technically wrong.</pedantic>)
+ok, I will change this comment.
 
-Great.
-
->>
->>> The above commit doesn't work well for beagle-xm,
->>
->> Why is this? What does happen? Does U-Boot not boot up to the prompt?
->> Please send me a log.
-> 
-> The last time it had failed I remember seeing a lot of IO pad configuration errors.
-> But I'm no longer able to reproduce that problem. Maybe it was just a messed up
-> build. In case I observe it again I'll let you know.
-
-It might be related to a problem with the gd (global-data) pointer being
-overwritten in den SPL. This is still not finally resolved the upcoming
-release:
-
-http://patchwork.ozlabs.org/patch/251293/
-
->>
->>> so my u-boot is on tag v2013.04
->>> and you don't need that additional patch.
->>>
->>> Can you please retest on it? Thanks.
->>
->> Done, please see below.
->>
->>> You will need to set "usbethaddr" before starting USB else SMSC will not work.
->>> e.g.
->>> 	setenv usbethaddr A6:66:4D:B0:69:04
->>
->> I don't have a beagle-xm, only my beable. And my U-Boot network setup is
->> already working, thanks.
-> 
-> Right. you won't need that for beagle. It was only for beagle-xm or panda with on board
-> usb-ethernet.
-
-I'm using the (external) USB-ethernet adapter on the beagle in U-Boot as
-well. To tftp the kernel/dtb.
-
-Thanks,
-Stefan
+thanks
+Huang Shijie
