@@ -1,72 +1,101 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 15 Jul 2013 11:57:33 -0300
-Subject: [RESEND PATCH v7 04/22] ARM: mv78xx0: Move to ID based window creation
+Date: Mon, 15 Jul 2013 11:57:31 -0300
+Subject: [RESEND PATCH v7 02/22] bus: mvebu-mbus: Add new API for window
+ creation
 In-Reply-To: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1373900271-4722-5-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1373900271-4722-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-With the introduction of the ID based MBus API, it's better
-to switch to use it instead of the current name based scheme.
-
-This will allow to deprecate the name based API, once every
-user is removed.
+We add an API to create MBus address decoding windows from the target
+ID and attribute. This function will be used later and deprecate the
+current name based scheme.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mv78xx0/pcie.c | 23 +++++++++++------------
- 1 file changed, 11 insertions(+), 12 deletions(-)
+ drivers/bus/mvebu-mbus.c | 33 +++++++++++++++++++++++++--------
+ include/linux/mbus.h     |  6 ++++++
+ 2 files changed, 31 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
-index dc26a65..397afde 100644
---- a/arch/arm/mach-mv78xx0/pcie.c
-+++ b/arch/arm/mach-mv78xx0/pcie.c
-@@ -18,6 +18,11 @@
- #include <mach/mv78xx0.h>
- #include "common.h"
- 
-+#define MV78XX0_MBUS_PCIE_MEM_TARGET(port,lane) ((port) ? 8 : 4)
-+#define MV78XX0_MBUS_PCIE_MEM_ATTR(port,lane)   (0xf8 & ~(0x10 << (lane)))
-+#define MV78XX0_MBUS_PCIE_IO_TARGET(port,lane)  ((port) ? 8 : 4)
-+#define MV78XX0_MBUS_PCIE_IO_ATTR(port,lane)    (0xf0 & ~(0x10 << (lane)))
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index 33c6947..827468a 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -748,6 +748,22 @@ static const struct of_device_id of_mvebu_mbus_ids[] = {
+ /*
+  * Public API of the driver
+  */
++int mvebu_mbus_add_window_remap_by_id(unsigned int target,
++				      unsigned int attribute,
++				      phys_addr_t base, size_t size,
++				      phys_addr_t remap)
++{
++	struct mvebu_mbus_state *s = &mbus_state;
 +
- struct pcie_port {
- 	u8			maj;
- 	u8			min;
-@@ -71,7 +76,6 @@ static void __init mv78xx0_pcie_preinit(void)
- 	start = MV78XX0_PCIE_MEM_PHYS_BASE;
- 	for (i = 0; i < num_pcie_ports; i++) {
- 		struct pcie_port *pp = pcie_port + i;
--		char winname[MVEBU_MBUS_MAX_WINNAME_SZ];
++	if (!mvebu_mbus_window_conflicts(s, base, size, target, attribute)) {
++		pr_err("cannot add window '%x:%x', conflicts with another window\n",
++		       target, attribute);
++		return -EINVAL;
++	}
++
++	return mvebu_mbus_alloc_window(s, base, size, remap, target, attribute);
++}
++
+ int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
+ 				      size_t size, phys_addr_t remap,
+ 				      unsigned int flags)
+@@ -776,14 +792,8 @@ int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
+ 	else if (flags == MVEBU_MBUS_PCI_WA)
+ 		attr |= 0x28;
  
- 		snprintf(pp->mem_space_name, sizeof(pp->mem_space_name),
- 			"PCIe %d.%d MEM", pp->maj, pp->min);
-@@ -85,17 +89,12 @@ static void __init mv78xx0_pcie_preinit(void)
- 		if (request_resource(&iomem_resource, &pp->res))
- 			panic("can't allocate PCIe MEM sub-space");
- 
--		snprintf(winname, sizeof(winname), "pcie%d.%d",
--			 pp->maj, pp->min);
+-	if (!mvebu_mbus_window_conflicts(s, base, size, target, attr)) {
+-		pr_err("cannot add window '%s', conflicts with another window\n",
+-		       devname);
+-		return -EINVAL;
+-	}
 -
--		mvebu_mbus_add_window_remap_flags(winname,
--						  pp->res.start,
--						  resource_size(&pp->res),
--						  MVEBU_MBUS_NO_REMAP,
--						  MVEBU_MBUS_PCI_MEM);
--		mvebu_mbus_add_window_remap_flags(winname,
--						  i * SZ_64K, SZ_64K,
--						  0, MVEBU_MBUS_PCI_IO);
-+		mvebu_mbus_add_window_by_id(MV78XX0_MBUS_PCIE_MEM_TARGET(pp->maj, pp->min),
-+					    MV78XX0_MBUS_PCIE_MEM_ATTR(pp->maj, pp->min),
-+					    pp->res.start, resource_size(&pp->res));
-+		mvebu_mbus_add_window_remap_by_id(MV78XX0_MBUS_PCIE_IO_TARGET(pp->maj, pp->min),
-+						  MV78XX0_MBUS_PCIE_IO_ATTR(pp->maj, pp->min),
-+						  i * SZ_64K, SZ_64K, 0);
- 	}
+-	return mvebu_mbus_alloc_window(s, base, size, remap, target, attr);
+-
++	return mvebu_mbus_add_window_remap_by_id(target, attr, base,
++						 size, remap);
  }
  
+ int mvebu_mbus_add_window(const char *devname, phys_addr_t base, size_t size)
+@@ -792,6 +802,13 @@ int mvebu_mbus_add_window(const char *devname, phys_addr_t base, size_t size)
+ 						 MVEBU_MBUS_NO_REMAP, 0);
+ }
+ 
++int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
++				phys_addr_t base, size_t size)
++{
++	return mvebu_mbus_add_window_remap_by_id(target, attribute, base,
++						 size, MVEBU_MBUS_NO_REMAP);
++}
++
+ int mvebu_mbus_del_window(phys_addr_t base, size_t size)
+ {
+ 	int win;
+diff --git a/include/linux/mbus.h b/include/linux/mbus.h
+index dba482e..9245b66 100644
+--- a/include/linux/mbus.h
++++ b/include/linux/mbus.h
+@@ -62,8 +62,14 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
+ int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
+ 				      size_t size, phys_addr_t remap,
+ 				      unsigned int flags);
++int mvebu_mbus_add_window_remap_by_id(unsigned int target,
++				      unsigned int attribute,
++				      phys_addr_t base, size_t size,
++				      phys_addr_t remap);
+ int mvebu_mbus_add_window(const char *devname, phys_addr_t base,
+ 			  size_t size);
++int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
++				phys_addr_t base, size_t size);
+ int mvebu_mbus_del_window(phys_addr_t base, size_t size);
+ int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
+ 		    size_t mbus_size, phys_addr_t sdram_phys_base,
 -- 
 1.8.1.5
