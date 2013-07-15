@@ -1,92 +1,88 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 15 Jul 2013 11:57:41 -0300
-Subject: [RESEND PATCH v7 12/22] bus: mvebu-mbus: Remove the no longer used
- name-based API
+Date: Mon, 15 Jul 2013 11:57:36 -0300
+Subject: [RESEND PATCH v7 07/22] bus: mvebu-mbus: Factor out initialization
+ details
 In-Reply-To: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1373900271-4722-13-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1373900271-4722-8-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Now that every user of the deprecated name-based API has been
-converted to using the ID-based API, let's remove the former one.
+We introduce a common initialization function mvebu_mbus_common_init()
+that will be used by both legacy and device-tree initialization code.
+This patch is an intermediate step, which will allow to introduce the
+DT binding for this driver in a less intrusive way.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/bus/mvebu-mbus.c | 38 --------------------------------------
- include/linux/mbus.h     |  5 -----
- 2 files changed, 43 deletions(-)
+ drivers/bus/mvebu-mbus.c | 47 ++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 30 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 5f0bfa3..9aee344 100644
+index 827468a..1b17954 100644
 --- a/drivers/bus/mvebu-mbus.c
 +++ b/drivers/bus/mvebu-mbus.c
-@@ -766,44 +766,6 @@ int mvebu_mbus_add_window_remap_by_id(unsigned int target,
- 	return mvebu_mbus_alloc_window(s, base, size, remap, target, attribute);
+@@ -847,26 +847,14 @@ static __init int mvebu_mbus_debugfs_init(void)
  }
+ fs_initcall(mvebu_mbus_debugfs_init);
  
--int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
--				      size_t size, phys_addr_t remap,
--				      unsigned int flags)
--{
--	struct mvebu_mbus_state *s = &mbus_state;
--	u8 target, attr;
--	int i;
--
--	if (!s->soc->map)
--		return -ENODEV;
--
--	for (i = 0; s->soc->map[i].name; i++)
--		if (!strcmp(s->soc->map[i].name, devname))
+-int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+-			   size_t mbuswins_size,
+-			   phys_addr_t sdramwins_phys_base,
+-			   size_t sdramwins_size)
++static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
++					 phys_addr_t mbuswins_phys_base,
++					 size_t mbuswins_size,
++					 phys_addr_t sdramwins_phys_base,
++					 size_t sdramwins_size)
+ {
+-	struct mvebu_mbus_state *mbus = &mbus_state;
+-	const struct of_device_id *of_id;
+ 	int win;
+ 
+-	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
+-		if (!strcmp(of_id->compatible, soc))
 -			break;
 -
--	if (!s->soc->map[i].name) {
--		pr_err("unknown device '%s'\n", devname);
+-	if (!of_id->compatible) {
+-		pr_err("could not find a matching SoC family\n");
 -		return -ENODEV;
 -	}
 -
--	target = s->soc->map[i].target;
--	attr   = s->soc->map[i].attr;
+-	mbus->soc = of_id->data;
 -
--	if (flags == MVEBU_MBUS_PCI_MEM)
--		attr |= 0x8;
--	else if (flags == MVEBU_MBUS_PCI_WA)
--		attr |= 0x28;
--
--	return mvebu_mbus_add_window_remap_by_id(target, attr, base,
--						 size, remap);
--}
--
--int mvebu_mbus_add_window(const char *devname, phys_addr_t base, size_t size)
--{
--	return mvebu_mbus_add_window_remap_flags(devname, base, size,
--						 MVEBU_MBUS_NO_REMAP, 0);
--}
--
- int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
- 				phys_addr_t base, size_t size)
- {
-diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index 650bc15..345b8c5 100644
---- a/include/linux/mbus.h
-+++ b/include/linux/mbus.h
-@@ -63,15 +63,10 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
+ 	mbus->mbuswins_base = ioremap(mbuswins_phys_base, mbuswins_size);
+ 	if (!mbus->mbuswins_base)
+ 		return -ENOMEM;
+@@ -887,3 +875,28 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
  
- void mvebu_mbus_get_pcie_mem_aperture(struct resource *res);
- void mvebu_mbus_get_pcie_io_aperture(struct resource *res);
--int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
--				      size_t size, phys_addr_t remap,
--				      unsigned int flags);
- int mvebu_mbus_add_window_remap_by_id(unsigned int target,
- 				      unsigned int attribute,
- 				      phys_addr_t base, size_t size,
- 				      phys_addr_t remap);
--int mvebu_mbus_add_window(const char *devname, phys_addr_t base,
--			  size_t size);
- int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
- 				phys_addr_t base, size_t size);
- int mvebu_mbus_del_window(phys_addr_t base, size_t size);
+ 	return 0;
+ }
++
++int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
++			   size_t mbuswins_size,
++			   phys_addr_t sdramwins_phys_base,
++			   size_t sdramwins_size)
++{
++	const struct of_device_id *of_id;
++
++	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
++		if (!strcmp(of_id->compatible, soc))
++			break;
++
++	if (!of_id->compatible) {
++		pr_err("could not find a matching SoC family\n");
++		return -ENODEV;
++	}
++
++	mbus_state.soc = of_id->data;
++
++	return mvebu_mbus_common_init(&mbus_state,
++			mbuswins_phys_base,
++			mbuswins_size,
++			sdramwins_phys_base,
++			sdramwins_size);
++}
 -- 
 1.8.1.5
