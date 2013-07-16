@@ -1,52 +1,46 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 16 Jul 2013 12:38:43 +0900
-Subject: [PATCH] ARM: exynos: change the PHYSMEM_BITS and SECTION_SIZE
-In-Reply-To: <1370956861-18710-1-git-send-email-subash.rp@samsung.com>
-References: <1370956861-18710-1-git-send-email-subash.rp@samsung.com>
-Message-ID: <027601ce81d5$f87bc080$e9734180$%kim@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Jul 2013 21:39:31 -0600
+Subject: [PATCH 2/2] pwm: Add PWM polarity flag macros for DT
+In-Reply-To: <2883016.87pKJk9n0R@avalon>
+References: <1373553468-6564-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2172485.AZTjvkLGcM@avalon> <51E015E1.2090906@wwwdotorg.org>
+ <2883016.87pKJk9n0R@avalon>
+Message-ID: <51E4C073.4020407@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subash Patel wrote:
+On 07/15/2013 07:10 PM, Laurent Pinchart wrote:
+> On Friday 12 July 2013 08:42:41 Stephen Warren wrote:
+...
+>> I think the values for any common system-wide flags should be defined
+>> once in some system-wide place, and the values for any HW-specific
+>> values should be defined only in the documentation for that specific HW.
+>> You could try and avoid conflicts by either:
+>>
+>> a) Allocating system-wide flags from bit 0 up, and HW-specific flags
+>> from bit 31 down.
+>>
+>> or:
+>>
+>> b) Using 1 cell for standard flags, and a separate cell for any
+>> HW-specific flags. Drivers can quite easily adapt to adding extra cells
+>> to #pwm-cells, thus making adding a HW-specific cell later
+>> backwards-compatible.
 > 
-> On exynos5440 there is DRAM on the 36-bit address range. Hence
-> this patch converts the MAX_PHYSMEM_BITS macro to 36 if LPAE is
-> enabled for the ARM architecture.
-> 
-> The conventional section size on exynos is 256M due to sparsemem.
-> Since exynos5440 has memory in multiples of 1G in 32-bit and 36-bit
-> range, this has now been modified to 31.
-> 
-> Signed-off-by: Subash Patel <subash.rp@samsung.com>
-> ---
->  arch/arm/mach-exynos/include/mach/memory.h |    5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/mach-exynos/include/mach/memory.h
-b/arch/arm/mach-exynos/include/mach/memory.h
-> index 374ef2c..2a4cdb7 100644
-> --- a/arch/arm/mach-exynos/include/mach/memory.h
-> +++ b/arch/arm/mach-exynos/include/mach/memory.h
-> @@ -15,8 +15,13 @@
-> 
->  #define PLAT_PHYS_OFFSET		UL(0x40000000)
-> 
-> +#ifndef CONFIG_ARM_LPAE
->  /* Maximum of 256MiB in one bank */
->  #define MAX_PHYSMEM_BITS	32
->  #define SECTION_SIZE_BITS	28
-> +#else
-> +#define MAX_PHYSMEM_BITS	36
-> +#define SECTION_SIZE_BITS	31
-> +#endif
-> 
->  #endif /* __ASM_ARCH_MEMORY_H */
-> --
-> 1.7.10.4
+> I wasn't referring to HW-specific flags, but rather to system-wide flags that 
+> might not be supported by all drivers. If we later add new system-wide flags I 
+> think the individual DT bindings should explicitly document which flags they 
+> support.
 
-OK, current EXYNOS5440(SSDK5440 and SD5v1) cannot boot without this because
-of enabling LPAE and bootargs for over 4GiB memory. So let me sort this out
-for v3.11-rc.
+Shouldn't all system-wide flags be supported by all HW, perhaps being
+implemented by the core subsystem rather than individual drivers to
+ensure that? Consider the case of the GPIO active-low flag which is
+actually implemented in SW, hence can work with any GPIO controller.
 
-Thanks,
-- Kukjin
+Perhaps that's not possible in all cases, in which case, yes, it does
+make sense to define which of the common flags a particular HW module
+supports.
+
+But then there's a problem where people assume that the common flags are
+always available, and somewhere they aren't... Care is needed in the
+choice of which common flags to define and/or how they're used.
