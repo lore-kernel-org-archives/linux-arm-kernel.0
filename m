@@ -1,127 +1,40 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Tue, 16 Jul 2013 16:29:28 -0700
-Subject: [PATCH 2/2] ARM: dts: Add AES data and documentation for AM33XX
-In-Reply-To: <1374017368-5267-1-git-send-email-mgreer@animalcreek.com>
-References: <1374017368-5267-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1374017368-5267-3-git-send-email-mgreer@animalcreek.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 16 Jul 2013 17:30:23 -0600
+Subject: [PATCH V2 5/5] ARM: remove #gpio-ranges-cells property
+In-Reply-To: <51E47F85.4050905@wwwdotorg.org>
+References: <1373913629-32179-1-git-send-email-swarren@wwwdotorg.org>
+ <1373913629-32179-5-git-send-email-swarren@wwwdotorg.org>
+ <51E44ED9.9020807@gmail.com> <51E47F85.4050905@wwwdotorg.org>
+Message-ID: <51E5D78F.8060400@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Mark A. Greer" <mgreer@animalcreek.com>
+On 07/15/2013 05:02 PM, Stephen Warren wrote:
+> On 07/15/2013 01:34 PM, Rob Herring wrote:
+>> On 07/15/2013 01:40 PM, Stephen Warren wrote:
+>>> From: Stephen Warren <swarren@nvidia.com>
+>>>
+>>> This property is no longer required by the GPIO binding. Remove it.
+>>
+>> Won't this break compatibility with older kernel? It is one thing to
+>> deprecate, but removal is another. If the relevant maintainers don't
+>> care, then I guess it is fine.
+> 
+> Yes.
+> 
+> I had originally hoped this could sneak in late for 3.11, but I suppose
+> it's too late now. vf610.dtsi is a new file in 3.11 so has no legacy to
+> protect.
+> 
+> Admittedly, the #gpio-cells property was added into the SPEAr files in 3.10.
 
-Add the generic AM33XX AES module's device tree data and
-enable it for the am335x-evm, am335x-evmsk, and am335x-bone
-platforms.  Also add Documentation file describing the data
-for the AES module.
+One more thought here:
 
-CC: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
----
- .../devicetree/bindings/crypto/omap-aes.txt        | 35 ++++++++++++++++++++++
- arch/arm/boot/dts/am335x-bone.dts                  |  4 +++
- arch/arm/boot/dts/am335x-evm.dts                   |  4 +++
- arch/arm/boot/dts/am335x-evmsk.dts                 |  4 +++
- arch/arm/boot/dts/am33xx.dtsi                      | 11 +++++++
- 5 files changed, 58 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/omap-aes.txt
+I know DT bindings are supposed to evolve so that a new kernel will
+support arbitrary old DTs. I'll call that backwards-compatibility for
+the DT parsing code.
 
-diff --git a/Documentation/devicetree/bindings/crypto/omap-aes.txt b/Documentation/devicetree/bindings/crypto/omap-aes.txt
-new file mode 100644
-index 0000000..b51d12f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/omap-aes.txt
-@@ -0,0 +1,35 @@
-+OMAP SoC AES crypto Module
-+
-+Required properties:
-+
-+- compatible : Should contain entries for this and backward compatible
-+  AES versions:
-+  - "ti,omap2-aes" for OMAP2.
-+  - "ti,omap3-aes" for OMAP3.
-+  - "ti,omap4-aes" for OMAP4 and AM33XX.
-+  Note that the OMAP2 and 3 versions are compatible (OMAP3 supports
-+  more algorithms) but they are incompatible with OMAP4.
-+- ti,hwmods: Name of the hwmod associated with the AES odule
-+- reg : Offset and length of the register set for the module
-+- interrupt-parent : the phandle for the interrupt controller that
-+  services interrupts for this module.
-+- interrupts : the interrupt number for the AES odule.
-+
-+Optional properties:
-+- dmas: DMA controller phandle and DMA request ordered pairs.
-+- dma-names: DMA request names. This string corresponds 1:1 with
-+	the ordered pairs in dmas. The string naming is to be
-+	"tx" for TX request and "rx" for RX request.
-+
-+Example:
-+	/* AM335x */
-+	aes: aes at 53500000 {
-+		compatible = "ti,omap4-aes";
-+		ti,hwmods = "aes";
-+		reg = <0x53500000 0xa0>;
-+		interrupt-parent = <&intc>;
-+		interrupts = <102>;
-+		dmas = <&edma 6
-+			&edma 5>;
-+		dma-names = "tx", "rx";
-+	};
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index bc75b2c..0cb454e 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -238,3 +238,7 @@
- &sham {
- 	status = "okay";
- };
-+
-+&aes {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 9b8c56d..76ba004 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -492,3 +492,7 @@
- &sham {
- 	status = "okay";
- };
-+
-+&aes {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index b04aea1..483d263 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -405,3 +405,7 @@
- &sham {
- 	status = "okay";
- };
-+
-+&aes {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index eb0e719..b20265a 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -539,5 +539,16 @@
- 			dmas = <&edma 36>;
- 			dma-names = "rx";
- 		};
-+
-+		aes: aes at 53500000 {
-+			compatible = "ti,omap4-aes";
-+			ti,hwmods = "aes";
-+			reg = <0x53500000 0xa0>;
-+			interrupt-parent = <&intc>;
-+			interrupts = <102>;
-+			dmas = <&edma 6
-+				&edma 5>;
-+			dma-names = "tx", "rx";
-+		};
- 	};
- };
--- 
-1.7.12
+However, this situation is the reverse; this patch would prevent a new
+DT running on an older kernel. I'll call that forwards-compatibility.
+I'm not sure if the intent is to support this or not? It's certainly the
+first I explicitly thought about compatibility in this direction...
