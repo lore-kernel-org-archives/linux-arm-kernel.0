@@ -1,41 +1,68 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Tue, 16 Jul 2013 08:05:04 +0200
-Subject: [PATCH v1 16/24] clk: mpc512x: remove now obsolete clkdev registration
+Date: Tue, 16 Jul 2013 08:05:07 +0200
+Subject: [PATCH v1 19/24] USB: fsl-mph-dr-of: OF clock lookup,
+ prepare and enable
 In-Reply-To: <1373914074-20889-1-git-send-email-gsi@denx.de>
 References: <1373914074-20889-1-git-send-email-gsi@denx.de>
-Message-ID: <1373954707-23909-1-git-send-email-gsi@denx.de>
+Message-ID: <1373954707-23909-4-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-after the PSC drivers for UART and SPI mode got converted to device tree
-based clock lookup, the former MCLK name which depends on the PSC index
-isn't needed any longer -- remove the clk_register_clkdev() invocation
+device tree based clock lookup in the MPC512x initialization (lookup
+'per' for register access), add error check in the clock setup, must
+prepare clocks before they can get enabled, unprepare after disable
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/platforms/512x/clock-commonclk.c |   10 ----------
- 1 file changed, 10 deletions(-)
+ drivers/usb/host/fsl-mph-dr-of.c |   24 +++++++++---------------
+ 1 file changed, 9 insertions(+), 15 deletions(-)
 
-diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
-index f31f895..31707b5 100644
---- a/arch/powerpc/platforms/512x/clock-commonclk.c
-+++ b/arch/powerpc/platforms/512x/clock-commonclk.c
-@@ -529,16 +529,6 @@ static void mpc512x_clk_setup_mclk(struct mclk_setup_data *entry)
- 				entry->name_mclk,
- 				entry->name_mux1, 1, 1);
+diff --git a/drivers/usb/host/fsl-mph-dr-of.c b/drivers/usb/host/fsl-mph-dr-of.c
+index 11e0b79..eb564f3 100644
+--- a/drivers/usb/host/fsl-mph-dr-of.c
++++ b/drivers/usb/host/fsl-mph-dr-of.c
+@@ -260,25 +260,19 @@ int fsl_usb2_mpc5121_init(struct platform_device *pdev)
+ {
+ 	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
+ 	struct clk *clk;
+-	char clk_name[10];
+-	int base, clk_num;
+-
+-	base = pdev->resource->start & 0xf000;
+-	if (base == 0x3000)
+-		clk_num = 1;
+-	else if (base == 0x4000)
+-		clk_num = 2;
+-	else
+-		return -ENODEV;
++	int err;
+ 
+-	snprintf(clk_name, sizeof(clk_name), "usb%d_clk", clk_num);
+-	clk = clk_get(&pdev->dev, clk_name);
++	clk = clk_get(&pdev->dev, "per");
+ 	if (IS_ERR(clk)) {
+ 		dev_err(&pdev->dev, "failed to get clk\n");
+ 		return PTR_ERR(clk);
  	}
 -
--	/*
--	 * without this "clock device" registration, "simple" lookups in
--	 * the SPI master initialization and serial port setup will fail
--	 *
--	 * those drivers need to get adjusted to lookup their required
--	 * clocks from OF specs, before this clkdev registration becomes
--	 * obsolete
--	 */
--	clk_register_clkdev(clks[clks_idx_pub], entry->name_mclk, NULL);
- }
+-	clk_enable(clk);
++	err = clk_prepare_enable(clk);
++	if (err) {
++		dev_err(&pdev->dev, "failed to enable clk\n");
++		clk_put(clk);
++		return err;
++	}
+ 	pdata->clk = clk;
  
- static void mpc512x_clk_setup_mclks(struct mclk_setup_data *table, size_t count)
+ 	if (pdata->phy_mode == FSL_USB2_PHY_UTMI_WIDE) {
+@@ -303,7 +297,7 @@ static void fsl_usb2_mpc5121_exit(struct platform_device *pdev)
+ 	pdata->regs = NULL;
+ 
+ 	if (pdata->clk) {
+-		clk_disable(pdata->clk);
++		clk_disable_unprepare(pdata->clk);
+ 		clk_put(pdata->clk);
+ 	}
+ }
 -- 
 1.7.10.4
