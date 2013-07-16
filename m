@@ -1,249 +1,136 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 16 Jul 2013 16:09:24 +0900
-Subject: [PATCH v2 6/6] ARM: S3C24XX: Convert s3c2416 and s3c2443 to common
- clock framework
-In-Reply-To: <201307100100.28992.heiko@sntech.de>
-References: <201307100057.06061.heiko@sntech.de>
- <201307100100.28992.heiko@sntech.de>
-Message-ID: <02cf01ce81f3$6777e5f0$3667b1d0$%kim@samsung.com>
+From: hesham.mahmoud@gmail.com (Hesham Mahmoud)
+Date: Tue, 16 Jul 2013 07:11:39 +0000 (UTC)
+Subject: Problems with semaphores, mutexes, and atomic?
+References: <BANLkTikwGgrK0FFiee1a8PvDicJa-bUedg@mail.gmail.com>
+Message-ID: <loom.20130716T090824-983@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+
+Dave Hylands <dhylands <at> gmail.com> writes:
+
 > 
-> This converts the mentioned platforms to use the newly introduced driver
-> for the common clock framework for them.
+> Hi,
 > 
-> With this the whole legacy clock structure can go away too.
+> I wrote a small test module to test semaphores, mutexes and atomic
+> increments, and I've tested it with CONFIG_SMP=y with 1 and 2
+> processors and with CONFIG_SMP disabled.
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  arch/arm/boot/dts/s3c2416-smdk2416.dts  |    7 +
->  arch/arm/boot/dts/s3c2416.dtsi          |   42 ++
->  arch/arm/mach-s3c24xx/Kconfig           |   14 +-
->  arch/arm/mach-s3c24xx/Makefile          |    5 +-
->  arch/arm/mach-s3c24xx/clock-s3c2416.c   |  171 --------
->  arch/arm/mach-s3c24xx/clock-s3c2443.c   |  212 ----------
->  arch/arm/mach-s3c24xx/common-s3c2443.c  |  677 ---------------------------
-> ----
-
-In this case, to use '-D' in format-patch would be better :-)
-
->  arch/arm/mach-s3c24xx/common.c          |   18 +-
->  arch/arm/mach-s3c24xx/common.h          |    8 +
->  arch/arm/mach-s3c24xx/mach-s3c2416-dt.c |   45 +-
->  arch/arm/mach-s3c24xx/mach-smdk2416.c   |    9 +-
->  arch/arm/mach-s3c24xx/mach-smdk2443.c   |    9 +-
->  12 files changed, 102 insertions(+), 1115 deletions(-)
->  delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2416.c
->  delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2443.c
->  delete mode 100644 arch/arm/mach-s3c24xx/common-s3c2443.c
+> My test code can be found here:
+> http://svn.hylands.org/linux/test-mutex/test-mutex.c
+> (it's about 133 lines long).
 > 
-> diff --git a/arch/arm/boot/dts/s3c2416-smdk2416.dts
-> b/arch/arm/boot/dts/s3c2416-smdk2416.dts
-> index 59594cf..9caeb89 100644
-> --- a/arch/arm/boot/dts/s3c2416-smdk2416.dts
-> +++ b/arch/arm/boot/dts/s3c2416-smdk2416.dts
-> @@ -19,6 +19,13 @@
->  		reg =  <0x30000000 0x4000000>;
->  	};
+> For each test, I launch 100 threads, and then increment a counter,
+> either inside a mutex_lock/unlock, a down/up, or do an atomic_inc.
 > 
-> +	fixed-rate-clocks {
-> +		xti {
-> +			compatible = "samsung,clock-xti";
-> +			clock-frequency = <12000000>;
-> +		};
-> +	};
-> +
->  	serial at 50000000 {
->  		status = "okay";
->  		pinctrl-names = "default";
-> diff --git a/arch/arm/boot/dts/s3c2416.dtsi
-> b/arch/arm/boot/dts/s3c2416.dtsi
-> index e6555bd..c19d99c 100644
-> --- a/arch/arm/boot/dts/s3c2416.dtsi
-> +++ b/arch/arm/boot/dts/s3c2416.dtsi
-> @@ -8,6 +8,7 @@
->   * published by the Free Software Foundation.
->   */
+> Each thread performs the loop a number of times, and at the end the
+> count often doesn't have the expected value if the locks were in fact
+> atomic.
 > 
-> +#include <dt-bindings/clock/samsung,s3c2443-clock.h>
->  #include "s3c24xx.dtsi"
->  #include "s3c2416-pinctrl.dtsi"
+> Typical output looks like:
 > 
-> @@ -28,26 +29,53 @@
->  		compatible = "samsung,s3c2416-irq";
->  	};
+> 192.168.0.50  ~ # modprobe test-mutex
+> [   26.220000] Testing mutex...
+> [   26.230000]     Launching threads ..........
+> [   26.300000]     Waiting for threads to finish ..........
+> [   26.310000]   counter = 999888 FAIL
+> [   26.310000] Testing semaphore...
+> [   26.310000]     Launching threads ..........
+> [   26.440000]     Waiting for threads to finish ..........
+> [   27.810000]   counter = 999575 FAIL
+> [   27.810000] Testing atomic...
+> [   27.820000]     Launching threads ..........
+> [   28.030000]     Waiting for threads to finish ..........
+> [   28.040000]  counter = 9910929 FAIL
 > 
-> +	clocks: clock-controller at 0x4c000000 {
-
-+	clock: clock-controller at 0x4c000000 {
-
-for keeping same format for Samsung stuff...
-
-> +		compatible = "samsung,s3c2416-clock";
-> +		reg = <0x4c000000 0x40>;
-> +		#clock-cells = <1>;
-> +	};
-> +
->  	pinctrl at 56000000 {
->  		compatible = "samsung,s3c2416-pinctrl";
->  	};
+> My processor info from /proc/cpuinfo looks like:
 > 
-> +	timer at 51000000 {
-> +		clocks = <&clocks PCLK_PWM>;
-
-+		clocks = <&clock PCLK_PWM>;
-
-And I'm not sure using definition PCLK_PWM is better here...
-
-> +		clock-names = "timers";
-> +	};
-> +
->  	serial at 50000000 {
->  		compatible = "samsung,s3c2440-uart";
-> +		clock-names = "uart", "clk_uart_baud2",
-> +				"clk_uart_baud3";
-> +		clocks = <&clocks PCLK_UART0>, <&clocks PCLK_UART0>,
-> +				<&clocks SCLK_UART>;
-
-Please use same ordering...for 'clocks' and 'clock-names'.
-See above the timers...'clocks' then 'clock-names'...
-
->  	};
+> 192.168.0.50  ~ # cat /proc/cpuinfo
+> Processor       : ARMv7 Processor rev 5 (v7l)
+> processor       : 0
+> BogoMIPS        : 1893.99
 > 
->  	serial at 50004000 {
->  		compatible = "samsung,s3c2440-uart";
-> +		clock-names = "uart", "clk_uart_baud2",
-> +				"clk_uart_baud3";
-> +		clocks = <&clocks PCLK_UART1>, <&clocks PCLK_UART1>,
-> +				<&clocks SCLK_UART>;
-
-Same as above.
-
->  	};
+> processor       : 1
+> BogoMIPS        : 1893.99
 > 
->  	serial at 50008000 {
->  		compatible = "samsung,s3c2440-uart";
-> +		clock-names = "uart", "clk_uart_baud2",
-> +				"clk_uart_baud3";
-> +		clocks = <&clocks PCLK_UART2>, <&clocks PCLK_UART2>,
-> +				<&clocks SCLK_UART>;
-
-Same as above.
-
->  	};
+> Features        : swp half thumb fastmult vfp edsp neon vfpv3
+> CPU implementer : 0x41
+> CPU architecture: 7
+> CPU variant     : 0x2
+> CPU part        : 0xc09
+> CPU revision    : 5
 > 
->  	serial at 5000C000 {
->  		compatible = "samsung,s3c2440-uart";
->  		reg = <0x5000C000 0x4000>;
->  		interrupts = <1 18 24 4>, <1 18 25 4>;
-> +		clock-names = "uart", "clk_uart_baud2",
-> +				"clk_uart_baud3";
-> +		clocks = <&clocks PCLK_UART3>, <&clocks PCLK_UART3>,
-> +				<&clocks SCLK_UART>;
-
-Same as above.
-
->  		status = "disabled";
->  	};
+> I'm running 2.6.36.3, and some snippets from my boot log:
 > 
-> @@ -55,6 +83,10 @@
->  		compatible = "samsung,s3c6410-sdhci";
->  		reg = <0x4AC00000 0x100>;
->  		interrupts = <0 0 21 3>;
-> +		clock-names = "hsmmc", "mmc_busclk.0",
-> +				"mmc_busclk.2";
-> +		clocks = <&clocks HCLK_HSMMC0>, <&clocks HCLK_HSMMC0>,
-> +				<&clocks MUX_HSMMC0>;
-
-Same.
-
->  		status = "disabled";
->  	};
+> Uncompressing Linux... done, booting the kernel.
+> Linux version 2.6.36.3 (dhylands <at> dave-ubuntu) (gcc version 4.5.1 (GCC)
+> ) #40 SMP PREEMPT Sun Jun 19 13:41:47 PDT 2011
+> CPU: ARMv7 Processor [412fc095] revision 5 (ARMv7), cr=10c53c7f
+> CPU: VIPT nonaliasing data cache, VIPT aliasing instruction cache
 > 
-> @@ -62,18 +94,28 @@
->  		compatible = "samsung,s3c6410-sdhci";
->  		reg = <0x4A800000 0x100>;
->  		interrupts = <0 0 20 3>;
-> +		clock-names = "hsmmc", "mmc_busclk.0",
-> +				"mmc_busclk.2";
-> +		clocks = <&clocks HCLK_HSMMC1>, <&clocks HCLK_HSMMC1>,
-> +				<&clocks MUX_HSMMC1>;
-
-Same.
-
->  		status = "disabled";
->  	};
+> [    0.280000] CPU: Testing write buffer coherency: ok
+> [    0.280000] Calibrating local timer... 474.46MHz.
+> [    0.340000] L310 cache controller enabled
+> [    0.340000] l2x0: 16 ways, CACHE_ID 0x410000c7, AUX_CTRL 0x7a450000
 > 
->  	watchdog at 53000000 {
->  		interrupts = <1 9 27 3>;
-> +		clocks = <&clocks PCLK_WDT>;
-> +		clock-names = "watchdog";
->  	};
+> So given that I'm seeing failures even with CONFIG_SMP disabled, I
+> have to wonder whether my test is valid, or whether our SoC has issues
+> some where.
 > 
->  	rtc at 57000000 {
->  		compatible = "samsung,s3c2416-rtc";
-> +		clocks = <&clocks PCLK_RTC>;
-> +		clock-names = "rtc";
->  	};
+> I even tried adding:
 > 
->  	i2c at 54000000 {
->  		compatible = "samsung,s3c2440-i2c";
-> +		clocks = <&clocks PCLK_I2C0>;
-> +		clock-names = "i2c";
->  	};
->  };
-> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-> index b8ec0ec..37cbe5f 100644
-> --- a/arch/arm/mach-s3c24xx/Kconfig
-> +++ b/arch/arm/mach-s3c24xx/Kconfig
-> @@ -49,9 +49,9 @@ config CPU_S3C2416
->  	select CPU_ARM926T
->  	select CPU_LLSERIAL_S3C2440
->  	select S3C2416_PM if PM
-> -	select S3C2443_COMMON
->  	select S3C2443_DMA if S3C24XX_DMA
-> -	select SAMSUNG_CLKSRC
-> +	select COMMON_CLK
-> +	select COMMON_CLK_S3C2443
+>     smp_mb();
+>     dsb();
+> 
+> after acquiring the lock and before releasing the lock, but I still
+> see failures.
+> 
+> Any feedback would be appreciated, and I can provide more information,
+> if needed.
+> 
 
-Please put them in alphabetical ordering...
+I ran this test on a PC. It gave me a FAILED result. I fixed it by
+initializing the thread_Wait semaphore to locked state. It worked fine.
 
->  	help
->  	  Support for the S3C2416 SoC from the S3C24XX line
-> 
-> @@ -83,9 +83,9 @@ config CPU_S3C2443
->  	bool "SAMSUNG S3C2443"
->  	select CPU_ARM920T
->  	select CPU_LLSERIAL_S3C2440
-> -	select S3C2443_COMMON
->  	select S3C2443_DMA if S3C24XX_DMA
-> -	select SAMSUNG_CLKSRC
-> +	select COMMON_CLK
-> +	select COMMON_CLK_S3C2443
+Failed:
 
-Same as above.
+Jul 16 02:57:12 ubuntu kernel: [ 1837.858846] Testing mutex...
+Jul 16 02:57:12 ubuntu kernel: [ 1837.858868]     Launching threads .
+Jul 16 02:57:12 ubuntu kernel: [ 1837.876590]     Waiting for threads to
+finish .
+Jul 16 02:57:12 ubuntu kernel: [ 1837.876652]   counter = 90000 FAIL
+Jul 16 02:57:12 ubuntu kernel: [ 1837.876660] Testing semaphore...
+Jul 16 02:57:12 ubuntu kernel: [ 1837.876688]     Launching threads .
+Jul 16 02:57:12 ubuntu kernel: [ 1837.901929]     Waiting for threads to
+finish .
+Jul 16 02:57:12 ubuntu kernel: [ 1837.901956]   counter = 90000 FAIL
+Jul 16 02:57:12 ubuntu kernel: [ 1837.901966] Testing atomic...
+Jul 16 02:57:12 ubuntu kernel: [ 1837.901974]     Launching threads .
+Jul 16 02:57:12 ubuntu kernel: [ 1837.931911]     Waiting for threads to
+finish .
+Jul 16 02:57:12 ubuntu kernel: [ 1837.931938]  counter = 900000 FAIL
 
->  	help
->  	  Support for the S3C2443 SoC from the S3C24XX line
-> 
-> @@ -663,12 +663,6 @@ endif	# CPU_S3C2442
-> 
->  if CPU_S3C2443 || CPU_S3C2416
-> 
-> -config S3C2443_COMMON
-> -	bool
-> -	help
-> -	  Common code for the S3C2443 and similar processors, which
-> includes
-> -	  the S3C2416 and S3C2450.
-> -
->  config S3C2443_DMA
->  	bool
->  	help
 
-[...]
+Passed:
+Jul 16 03:08:22 ubuntu kernel: [ 2507.982633] test_mutex_exit: called
+Jul 16 03:11:06 ubuntu kernel: [ 2671.515674] Testing mutex...
+Jul 16 03:11:06 ubuntu kernel: [ 2671.515700]     Launching threads ..........
+Jul 16 03:11:06 ubuntu kernel: [ 2671.607958]     Waiting for threads to
+finish ..........
+Jul 16 03:11:06 ubuntu kernel: [ 2671.609115]   counter = 1000000 Pass
+Jul 16 03:11:06 ubuntu kernel: [ 2671.609125] Testing semaphore...
+Jul 16 03:11:06 ubuntu kernel: [ 2671.609153]     Launching threads ..........
+Jul 16 03:11:06 ubuntu kernel: [ 2671.743826]     Waiting for threads to
+finish ..........
+Jul 16 03:11:06 ubuntu kernel: [ 2671.745109]   counter = 1000000 Pass
+Jul 16 03:11:06 ubuntu kernel: [ 2671.745119] Testing atomic...
+Jul 16 03:11:06 ubuntu kernel: [ 2671.745127]     Launching threads ..........
+Jul 16 03:11:06 ubuntu kernel: [ 2671.950545]     Waiting for threads to
+finish ..........
+Jul 16 03:11:06 ubuntu kernel: [ 2671.952532]  counter = 10000000 Pass
+
+$ uname -r
+2.6.32-34-generic
 
 Thanks,
-- Kukjin
+-Hesham
