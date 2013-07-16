@@ -1,23 +1,95 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Jul 2013 09:58:23 -0600
-Subject: [PATCH v9] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <1373985202-16353-1-git-send-email-p.zabel@pengutronix.de>
-References: <1373985202-16353-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <51E56D9F.30801@wwwdotorg.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 16 Jul 2013 17:05:42 +0100
+Subject: [RFC PATCH v5 0/1] drivers: mfd: Versatile Express SPC support
+Message-ID: <1373990743-23106-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2013 08:33 AM, Philipp Zabel wrote:
-> This driver implements a reset controller device that toggle a gpio
-> connected to a reset pin of a peripheral IC. The delay between assertion
-> and de-assertion of the reset signal can be configured via device tree.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Changes since v8, as suggested by Shawn:
->  - added support for I2C gpios via gpio_set_value_cansleep
->  - switched from module_init to arch_initcall to avoid unnecessary
->    probe deferral of subsys_initcall drivers like gpio-pca953x.
+Hello,
 
-For the record, I'm not convinced that either of those changes is correct.
+version v5 of VExpress SPC driver, please read on the changelog for major
+changes and explanations.
+
+The probing scheme is unchanged, since after trying the early platform
+devices approach it appeared that the end result was no better than the
+current one. The only clean solution relies either on changing how
+secondaries are brought up in the kernel (later than now) or enable
+early platform device registration through DT. Please check this
+thread for the related discussion:
+
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/036542.html
+
+The interface was adapted to regmap and again reverted to old driver for
+the following reasons:
+
+- Power down registers locking is hairy and requires arch spinlocks in
+  the MCPM back end to work properly, normal spinlocks cannot be used
+- Regmap adds unnecessary code to manage SPC since it is just a bunch of
+  registers used to control power management flags, the overhead is just
+  not worth it (talking about power down registers, not the vexpress config
+  interface)
+- The locking scheme behind regmap requires all registers in the map
+  to be protected with the same lock, which is not exactly what we want
+  here
+- Given the reasons above, adding a regmap interface buys us nothing from
+  a driver readability and maintainability perspective (again just talking
+  about the power interface, a few registers) because for the SPC it would
+  simply not be used
+
+/drivers/mfd is probably not the right place for this code as it stands (but
+probably will be when the entire driver, with DVFS and config interface, is
+complete).
+
+Thank you for the review in advance,
+Lorenzo
+
+This patch is v5 of a previous posting:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/177150.html
+
+v5 changes:
+
+- Completely removed vexpress-config interface waiting for refactoring
+  based on regmap
+- Removed frequency scaling interface and operating points programming
+  retrieval
+- Trimmed the driver code and DT bindings
+
+v4 changes:
+- Applied review comments (trimmed function names, added comments, refactored
+  some APIs)
+- Added comments throughout the set
+- Fixed irq handler bug in checking the transaction status
+- Improved commit log to explain early init synchro scheme
+- Created a single static structure for variables dynamically allocated to
+  remove usage of static
+- Improved Kconfig entry
+
+v3 changes:
+
+- added __refdata to spc_check_loaded pointer
+- removed some exported symbols
+- added node pointer check in vexpress_spc_init()
+
+v2 changes:
+
+- Dropped timeout interface patch
+- Converted interfaces to non-timeout ones, integrated and retested
+- Removed mutex used at init
+- Refactored code to work around init sections warning
+- Fixed two minor bugs
+
+Lorenzo Pieralisi (1):
+  drivers: mfd: vexpress: add Serial Power Controller (SPC) support
+
+ Documentation/devicetree/bindings/mfd/vexpress-spc.txt |  36 ++
+ drivers/mfd/Kconfig                                    |  10 +
+ drivers/mfd/Makefile                                   |   1 +
+ drivers/mfd/vexpress-spc.c                             | 253 ++++++++++
+ include/linux/vexpress.h                               |  17 +
+ 5 files changed, 317 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/vexpress-spc.txt
+ create mode 100644 drivers/mfd/vexpress-spc.c
+
+-- 
+1.8.2.2
