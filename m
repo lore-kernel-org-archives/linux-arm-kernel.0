@@ -1,53 +1,147 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 16 Jul 2013 11:04:36 -0300
-Subject: [PATCH 00/10] Orion Watchdog fixes
-In-Reply-To: <20130716134422.GE12062@titan.lakedaemon.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 16 Jul 2013 16:04:15 +0200
+Subject: [PATCH 05/10] watchdog: orion: Add a memory resource for RSTOUT
+ register
+In-Reply-To: <1373931163-12670-6-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130716065952.GA25043@lunn.ch> <20130716092059.237ea729@skate>
- <20130716073101.GB25043@lunn.ch> <20130716121432.GA2317@localhost>
- <20130716134422.GE12062@titan.lakedaemon.net>
-Message-ID: <20130716140435.GA23904@localhost>
+ <1373931163-12670-6-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130716140415.GB19448@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 09:44:22AM -0400, Jason Cooper wrote:
-> On Tue, Jul 16, 2013 at 09:14:33AM -0300, Ezequiel Garcia wrote:
-> > On the other side, I'm much interested in knowing if you are OK with
-> > breaking the watchdog DT compatibility. If you NACK this, then I'll
-> > start preparing a different watchdog driver for 370/XP, since I don't
-> > want to extend a driver that is a bit dirty.
+On Mon, Jul 15, 2013 at 08:32:38PM -0300, Ezequiel Garcia wrote:
+> Instead of accessing the RSTOUT register directly, this commit
+> adds a platform memory resource to map this register into the driver.
+
+Hi Ezequiel
+
+Have you looked at:
+
+arch/arm/mach-mvebu/system-controller.c
+
+It is also using this register. Are we going to have a similar problem
+as the TIMER_CTRL register, which you refactered in an earlier patch?
+
+"marvell,orion-system-controller" is not actually used yet, but once
+kirkwood moves into mach-mvebu, it will start using it.
+
+Andrew
+
+
 > 
-> Apparently there is some agreement that the bindings are still in flux
-> and that they need to be for a bit longer in order to hammer out
-> problems such as this.
+> Note that by adding a required 2nd-cell for the reg property,
+> this change breaks the device-tree binding compatibility.
 > 
-> Arnd and Olof both mentioned that something (a doc, and email?) is
-> forthcoming about marking some bindings as stable.  Whatever form that
-> takes, this one wouldn't get the stable marking yet. ;-)
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  1 +
+>  arch/arm/mach-orion5x/include/mach/bridge-regs.h  |  1 +
+>  arch/arm/plat-orion/common.c                      | 10 ++++++----
+>  drivers/watchdog/orion_wdt.c                      | 18 ++++++++++--------
+>  4 files changed, 18 insertions(+), 12 deletions(-)
 > 
-
-Yup, that's my understanding as well. But on the other side, I don't
-want to break possible users out there.
-
-So, just to check, you say it's early enough to safely do such change?
-
-In that case, I'll extend this patchset to include Armada 370/XP support
-and post it as soon as Sebastian's clocksource stuff gets in.
-
-> Oh, and one more nit.  The work 'fix' triggers a whole bunch of "get on
-> this right away, does it need to go to stable?  Has anyone confirmed it?
-> Which commit caused the regression? etc."  Although I hate the word, I
-> think 'refactoring' is much more appropriate description for this series.
+> diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+> index c3f361d..dead75a 100644
+> --- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+> +++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+> @@ -21,6 +21,7 @@
+>  #define CPU_RESET		0x00000002
+>  
+>  #define RSTOUTn_MASK		(BRIDGE_VIRT_BASE + 0x0108)
+> +#define RSTOUT_PHYS_BASE	(BRIDGE_PHYS_BASE + 0x0108)
+>  #define WDT_RESET_OUT_EN	0x00000002
+>  #define SOFT_RESET_OUT_EN	0x00000004
+>  
+> diff --git a/arch/arm/mach-orion5x/include/mach/bridge-regs.h b/arch/arm/mach-orion5x/include/mach/bridge-regs.h
+> index aa35de3..ccd91c9 100644
+> --- a/arch/arm/mach-orion5x/include/mach/bridge-regs.h
+> +++ b/arch/arm/mach-orion5x/include/mach/bridge-regs.h
+> @@ -18,6 +18,7 @@
+>  #define CPU_CTRL		(ORION5X_BRIDGE_VIRT_BASE + 0x104)
+>  
+>  #define RSTOUTn_MASK		(ORION5X_BRIDGE_VIRT_BASE + 0x108)
+> +#define RSTOUT_PHYS_BASE	(ORION5X_BRIDGE_PHYS_BASE + 0x108)
+>  #define WDT_RESET_OUT_EN	0x0002
+>  
+>  #define CPU_SOFT_RESET		(ORION5X_BRIDGE_VIRT_BASE + 0x10c)
+> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+> index 77fac6c..37924f8 100644
+> --- a/arch/arm/plat-orion/common.c
+> +++ b/arch/arm/plat-orion/common.c
+> @@ -594,14 +594,16 @@ void __init orion_spi_1_init(unsigned long mapbase)
+>  /*****************************************************************************
+>   * Watchdog
+>   ****************************************************************************/
+> -static struct resource orion_wdt_resource =
+> -		DEFINE_RES_MEM(WDT_PHYS_BASE, 0x04);
+> +static struct resource orion_wdt_resource[] = {
+> +		DEFINE_RES_MEM(WDT_PHYS_BASE, 0x04),
+> +		DEFINE_RES_MEM(RSTOUT_PHYS_BASE, 0x04)
+> +};
+>  
+>  static struct platform_device orion_wdt_device = {
+>  	.name		= "orion_wdt",
+>  	.id		= -1,
+> -	.num_resources	= 1,
+> -	.resource	= &orion_wdt_resource,
+> +	.num_resources	= ARRAY_SIZE(orion_wdt_resource),
+> +	.resource	= orion_wdt_resource,
+>  };
+>  
+>  void __init orion_wdt_init(void)
+> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+> index 01bcf53..3c9b3d2 100644
+> --- a/drivers/watchdog/orion_wdt.c
+> +++ b/drivers/watchdog/orion_wdt.c
+> @@ -43,6 +43,7 @@ static unsigned int wdt_max_duration;	/* (seconds) */
+>  static struct clk *clk;
+>  static unsigned int wdt_tclk;
+>  static void __iomem *wdt_reg;
+> +static void __iomem *rstout_reg;
+>  static DEFINE_SPINLOCK(wdt_lock);
+>  
+>  static int orion_wdt_ping(struct watchdog_device *wdt_dev)
+> @@ -74,9 +75,7 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+>  	orion_timer_ctrl_clrset(0, WDT_EN);
+>  
+>  	/* Enable reset on watchdog */
+> -	reg = readl(RSTOUTn_MASK);
+> -	reg |= WDT_RESET_OUT_EN;
+> -	writel(reg, RSTOUTn_MASK);
+> +	writel(readl(rstout_reg) | WDT_RESET_OUT_EN, rstout_reg);
+>  
+>  	spin_unlock(&wdt_lock);
+>  	return 0;
+> @@ -84,14 +83,10 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+>  
+>  static int orion_wdt_stop(struct watchdog_device *wdt_dev)
+>  {
+> -	u32 reg;
+> -
+>  	spin_lock(&wdt_lock);
+>  
+>  	/* Disable reset on watchdog */
+> -	reg = readl(RSTOUTn_MASK);
+> -	reg &= ~WDT_RESET_OUT_EN;
+> -	writel(reg, RSTOUTn_MASK);
+> +	writel(readl(rstout_reg) & ~WDT_RESET_OUT_EN, rstout_reg);
+>  
+>  	/* Disable watchdog timer */
+>  	orion_timer_ctrl_clrset(WDT_EN, 0);
+> @@ -158,6 +153,13 @@ static int orion_wdt_probe(struct platform_device *pdev)
+>  	if (!wdt_reg)
+>  		return -ENOMEM;
+>  
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	if (!res)
+> +		return -ENODEV;
+> +	rstout_reg = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+> +	if (!rstout_reg)
+> +		return -ENOMEM;
+> +
+>  	wdt_max_duration = WDT_MAX_CYCLE_COUNT / wdt_tclk;
+>  
+>  	orion_wdt.timeout = wdt_max_duration;
+> -- 
+> 1.8.1.5
 > 
-
-Oh, good observation. I wrote the cover letter at 8 PM, after ten long
-hours (*) of hacking and smashing this into something easy to review,
-and that's the best title I could come up with. I'll change it on v2.
-
-Thanks,
-
-(*) yes, I have another pair of eyes, in case these wear out.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
