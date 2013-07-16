@@ -1,138 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Jul 2013 16:06:11 +0800
-Subject: [PATCH] ARM: dts: imx: use generic DMA bindings for SSI nodes
-Message-ID: <1373961971-5375-1-git-send-email-shawn.guo@linaro.org>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 16 Jul 2013 16:11:19 +0800
+Subject: [PATCH 2/3] serial: mxs: enable the DMA only when the rts/cts
+ is enabled
+In-Reply-To: <20130716073305.GP12139@pengutronix.de>
+References: <1373857736-30108-1-git-send-email-b32955@freescale.com>
+ <1373857736-30108-2-git-send-email-b32955@freescale.com>
+ <20130715082716.GM12139@pengutronix.de> <51E3B5B5.1030706@freescale.com>
+ <20130715090755.GN12139@pengutronix.de> <51E3D499.3060902@freescale.com>
+ <20130716073305.GP12139@pengutronix.de>
+Message-ID: <51E50027.4020701@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Updates SDMA and SSI nodes to adopt generic DMA bindings.
+? 2013?07?16? 15:33, Uwe Kleine-K?nig ??:
+>> This patch depends on the first patch. :)
+> But it's not a hard dependency.
+>
+do you mean i should merge the patch 1 and patch 2 into a single patch?
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx51.dtsi   |   12 +++++++++---
- arch/arm/boot/dts/imx53.dtsi   |   12 +++++++++---
- arch/arm/boot/dts/imx6qdl.dtsi |   12 +++++++++---
- 3 files changed, 27 insertions(+), 9 deletions(-)
+>>> Something like:
+>>>
+>>> 	serial: mxs-auart: DMA unreliable without RTS/CTS
+>>>
+>>> 	According to [add some document name here] DMA doesn't work
+>>> 	reliable without hardware handshaking. So make DMA dependant on
+>>>   
+>> Please see the spec about the RTSEN and RTS.
+> Right, it's not hard for me. Other might not have the manual handy, so
+> a comment telling:
+>
+>> RTSEN enable the flow control by the hardware;
+>> RTS enable the flow control by the software.
+> would be nice.
+i think we need another patch to add this comment.
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index d086e07..cca3ef9 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -154,8 +154,10 @@
- 					reg = <0x70014000 0x4000>;
- 					interrupts = <30>;
- 					clocks = <&clks 49>;
-+					dmas = <&sdma 24 1 0>,
-+					       <&sdma 25 1 0>;
-+					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
--					fsl,ssi-dma-events = <25 24 23 22>; /* TX0 RX0 TX1 RX1 */
- 					status = "disabled";
- 				};
- 
-@@ -735,8 +737,10 @@
- 				reg = <0x83fcc000 0x4000>;
- 				interrupts = <29>;
- 				clocks = <&clks 48>;
-+				dmas = <&sdma 28 0 0>,
-+				       <&sdma 29 0 0>;
-+				dma-names = "rx", "tx";
- 				fsl,fifo-depth = <15>;
--				fsl,ssi-dma-events = <29 28 27 26>; /* TX0 RX0 TX1 RX1 */
- 				status = "disabled";
- 			};
- 
-@@ -784,8 +788,10 @@
- 				reg = <0x83fe8000 0x4000>;
- 				interrupts = <96>;
- 				clocks = <&clks 50>;
-+				dmas = <&sdma 46 0 0>,
-+				       <&sdma 47 0 0>;
-+				dma-names = "rx", "tx";
- 				fsl,fifo-depth = <15>;
--				fsl,ssi-dma-events = <47 46 37 35>; /* TX0 RX0 TX1 RX1 */
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 51b93c9..a6b6d95 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -153,8 +153,10 @@
- 					reg = <0x50014000 0x4000>;
- 					interrupts = <30>;
- 					clocks = <&clks 49>;
-+					dmas = <&sdma 24 1 0>,
-+					       <&sdma 25 1 0>;
-+					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
--					fsl,ssi-dma-events = <25 24 23 22>; /* TX0 RX0 TX1 RX1 */
- 					status = "disabled";
- 				};
- 
-@@ -1050,8 +1052,10 @@
- 				reg = <0x63fcc000 0x4000>;
- 				interrupts = <29>;
- 				clocks = <&clks 48>;
-+				dmas = <&sdma 28 0 0>,
-+				       <&sdma 29 0 0>;
-+				dma-names = "rx", "tx";
- 				fsl,fifo-depth = <15>;
--				fsl,ssi-dma-events = <29 28 27 26>; /* TX0 RX0 TX1 RX1 */
- 				status = "disabled";
- 			};
- 
-@@ -1074,8 +1078,10 @@
- 				reg = <0x63fe8000 0x4000>;
- 				interrupts = <96>;
- 				clocks = <&clks 50>;
-+				dmas = <&sdma 46 0 0>,
-+				       <&sdma 47 0 0>;
-+				dma-names = "rx", "tx";
- 				fsl,fifo-depth = <15>;
--				fsl,ssi-dma-events = <47 46 45 44>; /* TX0 RX0 TX1 RX1 */
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 9c64d17..d08048b 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -212,8 +212,10 @@
- 					reg = <0x02028000 0x4000>;
- 					interrupts = <0 46 0x04>;
- 					clocks = <&clks 178>;
-+					dmas = <&sdma 37 1 0>,
-+					       <&sdma 38 1 0>;
-+					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
--					fsl,ssi-dma-events = <38 37>;
- 					status = "disabled";
- 				};
- 
-@@ -222,8 +224,10 @@
- 					reg = <0x0202c000 0x4000>;
- 					interrupts = <0 47 0x04>;
- 					clocks = <&clks 179>;
-+					dmas = <&sdma 41 1 0>,
-+					       <&sdma 42 1 0>;
-+					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
--					fsl,ssi-dma-events = <42 41>;
- 					status = "disabled";
- 				};
- 
-@@ -232,8 +236,10 @@
- 					reg = <0x02030000 0x4000>;
- 					interrupts = <0 48 0x04>;
- 					clocks = <&clks 180>;
-+					dmas = <&sdma 45 1 0>,
-+					       <&sdma 46 1 0>;
-+					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
--					fsl,ssi-dma-events = <46 45>;
- 					status = "disabled";
- 				};
- 
--- 
-1.7.9.5
+thanks
+Huang Shijie
