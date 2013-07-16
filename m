@@ -1,140 +1,403 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 16 Jul 2013 18:08:26 +0530
-Subject: [GIT PULL] PHY Framework for 3.12 merge window
-Message-ID: <51E53EC2.5080401@ti.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Tue, 16 Jul 2013 14:41:25 +0200
+Subject: [PATCH v3] rtc: Add MOXA ART RTC driver
+In-Reply-To: <1373550711-18828-1-git-send-email-jonas.jensen@gmail.com>
+References: <1373550711-18828-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1373978485-17496-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Add RTC driver for MOXA ART SoCs.
 
-Here's the pull request for the PHY Framework which I've been working on for a
-while.
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-I've applied these patches on the current linux mainline HEAD (which has one
-commit after 3.11-rc1 is tagged).
+Notes:
+    Thanks for the replies. This should fix the remaining issues mentioned by Mark and Arnd.
+    
+    Changes since v2:
+    
+    1. don't use hardcoded GPIO numbers, use of_get_named_gpio
+    2. make two functions static, moxart_rtc_write_byte and moxart_rtc_read_byte
+    3. use devm_gpio_request_one where appropriate
+    4. add gpio_is_valid check to all of_get_named_gpio
+    5. check devm_gpio_request return value
+    6. use devm_rtc_device_register instead of rtc_device_register
+    7. remove label "out" from moxart_rtc_probe
+    8. remove moxart_rtc_remove function
+    
+    Applies to next-20130716
 
-Even before this framework is merged, quite a few people started using it. I've
-queued those patches along with the PHY framework as well.
+ drivers/rtc/Kconfig      |   9 ++
+ drivers/rtc/Makefile     |   1 +
+ drivers/rtc/rtc-moxart.c | 330 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 340 insertions(+)
+ create mode 100644 drivers/rtc/rtc-moxart.c
 
-I'm also planning to maintain this framework henceforth and will be sending
-pull requests for anything related to this framework or users of this framework.
-
-Let me know if you want any changes on this pull request
-
-Thanks
-Kishon
-
-The following changes since commit 47188d39b5deeebf41f87a02af1b3935866364cf:
-
-  Merge tag 'ext4_for_linus' of
-git://git.kernel.org/pub/scm/linux/kernel/git/tytso/ext4 (2013-07-14 21:47:51
--0700)
-
-are available in the git repository at:
-
-
-  git://gitorious.org/linuxphy/linuxphy.git tags/phy-for-v3.12
-
-for you to fetch changes up to 827c292242da5723345e5649e38279c721125ca8:
-
-  video: exynos_dp: Use the generic PHY driver (2013-07-16 14:37:04 +0530)
-
-----------------------------------------------------------------
-PHY: patches for 3.12 merge window
-
-We're introducing a new kernel wide generic PHY framework.
-
-This framework provides a set of APIs for the PHY drivers to
-create/destroy a PHY and APIs for the PHY users to obtain a
-reference to the PHY with or without using phandle.
-
-This framework will be of use only to devices that uses external PHY (PHY
-functionality is not embedded within the controller).
-
-The intention of creating this framework is to bring the phy drivers spread
-all over the Linux kernel to drivers/phy to increase code re-use and for
-better code maintainability.
-
-There are already quite a few users for this framework.
-Samsung Exynos SoC Display Port PHY and MIPI PHY are some of the early users
-of this framework in addition to OMAP-USB2 PHY and TWL4030-USB.
-
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-
-----------------------------------------------------------------
-Jingoo Han (3):
-      phy: Add driver for Exynos DP PHY
-      video: exynos_dp: remove non-DT support for Exynos Display Port
-      video: exynos_dp: Use the generic PHY driver
-
-Kishon Vijay Abraham I (8):
-      drivers: phy: add generic PHY framework
-      usb: phy: omap-usb2: use the new generic PHY framework
-      usb: phy: twl4030: use the new generic PHY framework
-      ARM: OMAP: USB: Add phy binding information
-      ARM: dts: omap: update usb_otg_hs data
-      usb: musb: omap2430: use the new generic PHY framework
-      usb: phy: omap-usb2: remove *set_suspend* callback from omap-usb2
-      usb: phy: twl4030-usb: remove *set_suspend* and *phy_init* ops
-
-Sylwester Nawrocki (4):
-      phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
-      video: exynos_mipi_dsim: Use the generic PHY driver
-      exynos4-is: Use the generic MIPI CSIS PHY driver
-      ARM: Samsung: Remove the MIPI PHY setup code
-
- .../devicetree/bindings/phy/phy-bindings.txt       |   66 +++
- .../devicetree/bindings/phy/samsung-phy.txt        |   22 +
- Documentation/devicetree/bindings/usb/omap-usb.txt |    5 +
- Documentation/devicetree/bindings/usb/usb-phy.txt  |    6 +
- .../devicetree/bindings/video/exynos_dp.txt        |   12 +-
- Documentation/phy.txt                              |  129 +++++
- MAINTAINERS                                        |    7 +
- arch/arm/boot/dts/omap3-beagle-xm.dts              |    2 +
- arch/arm/boot/dts/omap3-evm.dts                    |    2 +
- arch/arm/boot/dts/omap3-overo.dtsi                 |    2 +
- arch/arm/boot/dts/omap4.dtsi                       |    3 +
- arch/arm/boot/dts/twl4030.dtsi                     |    1 +
- arch/arm/mach-exynos/include/mach/regs-pmu.h       |    5 -
- arch/arm/mach-omap2/usb-musb.c                     |    3 +
- arch/arm/mach-s5pv210/include/mach/regs-clock.h    |    4 -
- arch/arm/plat-samsung/Kconfig                      |    5 -
- arch/arm/plat-samsung/Makefile                     |    1 -
- arch/arm/plat-samsung/setup-mipiphy.c              |   60 ---
- drivers/Kconfig                                    |    2 +
- drivers/Makefile                                   |    2 +
- drivers/media/platform/exynos4-is/mipi-csis.c      |   16 +-
- drivers/phy/Kconfig                                |   28 +
- drivers/phy/Makefile                               |    7 +
- drivers/phy/phy-core.c                             |  544 ++++++++++++++++++++
- drivers/phy/phy-exynos-dp-video.c                  |  111 ++++
- drivers/phy/phy-exynos-mipi-video.c                |  169 ++++++
- drivers/usb/musb/Kconfig                           |    1 +
- drivers/usb/musb/musb_core.c                       |    1 +
- drivers/usb/musb/musb_core.h                       |    3 +
- drivers/usb/musb/omap2430.c                        |   26 +-
- drivers/usb/phy/Kconfig                            |    1 +
- drivers/usb/phy/phy-omap-usb2.c                    |   60 ++-
- drivers/usb/phy/phy-twl4030-usb.c                  |   63 ++-
- drivers/video/exynos/Kconfig                       |    2 +-
- drivers/video/exynos/exynos_dp_core.c              |  132 ++---
- drivers/video/exynos/exynos_dp_core.h              |  110 ++++
- drivers/video/exynos/exynos_dp_reg.c               |    2 -
- drivers/video/exynos/exynos_mipi_dsi.c             |   19 +-
- include/linux/phy/phy.h                            |  344 +++++++++++++
- include/linux/platform_data/mipi-csis.h            |   11 +-
- include/linux/usb/musb.h                           |    3 +
- include/video/exynos_dp.h                          |  131 -----
- include/video/exynos_mipi_dsim.h                   |    6 +-
- 43 files changed, 1746 insertions(+), 383 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-bindings.txt
- create mode 100644 Documentation/devicetree/bindings/phy/samsung-phy.txt
- create mode 100644 Documentation/phy.txt
- delete mode 100644 arch/arm/plat-samsung/setup-mipiphy.c
- create mode 100644 drivers/phy/Kconfig
- create mode 100644 drivers/phy/Makefile
- create mode 100644 drivers/phy/phy-core.c
- create mode 100644 drivers/phy/phy-exynos-dp-video.c
- create mode 100644 drivers/phy/phy-exynos-mipi-video.c
- create mode 100644 include/linux/phy/phy.h
- delete mode 100644 include/video/exynos_dp.h
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 9e3498b..9654aa3 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1249,6 +1249,15 @@ config RTC_DRV_SIRFSOC
+ 	  Say "yes" here to support the real time clock on SiRF SOC chips.
+ 	  This driver can also be built as a module called rtc-sirfsoc.
+ 
++config RTC_DRV_MOXART
++	tristate "MOXA ART RTC"
++	help
++	   If you say yes here you get support for the MOXA ART
++	   RTC module.
++
++	   This driver can also be built as a module. If so, the module
++	   will be called rtc-moxart
++
+ comment "HID Sensor RTC drivers"
+ 
+ config RTC_DRV_HID_SENSOR_TIME
+diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+index d3b4488..2dff3d2 100644
+--- a/drivers/rtc/Makefile
++++ b/drivers/rtc/Makefile
+@@ -130,3 +130,4 @@ obj-$(CONFIG_RTC_DRV_WM831X)	+= rtc-wm831x.o
+ obj-$(CONFIG_RTC_DRV_WM8350)	+= rtc-wm8350.o
+ obj-$(CONFIG_RTC_DRV_X1205)	+= rtc-x1205.o
+ obj-$(CONFIG_RTC_DRV_SIRFSOC)	+= rtc-sirfsoc.o
++obj-$(CONFIG_RTC_DRV_MOXART)	+= rtc-moxart.o
+diff --git a/drivers/rtc/rtc-moxart.c b/drivers/rtc/rtc-moxart.c
+new file mode 100644
+index 0000000..c29dee0
+--- /dev/null
++++ b/drivers/rtc/rtc-moxart.c
+@@ -0,0 +1,330 @@
++/*
++ * MOXA ART RTC driver.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * Based on code from
++ * Moxa Technology Co., Ltd. <www.moxa.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/delay.h>
++#include <linux/rtc.h>
++#include <linux/platform_device.h>
++#include <linux/module.h>
++#include <linux/gpio.h>
++#include <linux/of_gpio.h>
++
++#define GPIO_RTC_RESERVED			0x0C
++#define GPIO_RTC_DATA_SET			0x10
++#define GPIO_RTC_DATA_CLEAR			0x14
++#define GPIO_RTC_PIN_PULL_ENABLE		0x18
++#define GPIO_RTC_PIN_PULL_TYPE			0x1C
++#define GPIO_RTC_INT_ENABLE			0x20
++#define GPIO_RTC_INT_RAW_STATE			0x24
++#define GPIO_RTC_INT_MASKED_STATE		0x28
++#define GPIO_RTC_INT_MASK			0x2C
++#define GPIO_RTC_INT_CLEAR			0x30
++#define GPIO_RTC_INT_TRIGGER			0x34
++#define GPIO_RTC_INT_BOTH			0x38
++#define GPIO_RTC_INT_RISE_NEG			0x3C
++#define GPIO_RTC_BOUNCE_ENABLE			0x40
++#define GPIO_RTC_BOUNCE_PRE_SCALE		0x44
++#define GPIO_RTC_PROTECT_W			0x8E
++#define GPIO_RTC_PROTECT_R			0x8F
++#define GPIO_RTC_YEAR_W				0x8C
++#define GPIO_RTC_YEAR_R				0x8D
++#define GPIO_RTC_DAY_W				0x8A
++#define GPIO_RTC_DAY_R				0x8B
++#define GPIO_RTC_MONTH_W			0x88
++#define GPIO_RTC_MONTH_R			0x89
++#define GPIO_RTC_DATE_W				0x86
++#define GPIO_RTC_DATE_R				0x87
++#define GPIO_RTC_HOURS_W			0x84
++#define GPIO_RTC_HOURS_R			0x85
++#define GPIO_RTC_MINUTES_W			0x82
++#define GPIO_RTC_MINUTES_R			0x83
++#define GPIO_RTC_SECONDS_W			0x80
++#define GPIO_RTC_SECONDS_R			0x81
++#define GPIO_RTC_DELAY_TIME			8
++
++struct moxart_rtc {
++	struct rtc_device *rtc;
++	spinlock_t rtc_lock;
++	int gpio_data, gpio_sclk, gpio_reset;
++};
++
++static int day_of_year[12] =	{ 0, 31, 59, 90, 120, 151, 181,
++				  212, 243, 273, 304, 334 };
++
++static void moxart_rtc_write_byte(struct device *dev, u8 data)
++{
++	struct moxart_rtc *moxart_rtc = dev_get_drvdata(dev);
++	int i;
++
++	for (i = 0; i < 8; i++, data >>= 1) {
++		gpio_set_value(moxart_rtc->gpio_sclk, 0);
++		gpio_set_value(moxart_rtc->gpio_data, ((data & 1) == 1));
++		udelay(GPIO_RTC_DELAY_TIME);
++		gpio_set_value(moxart_rtc->gpio_sclk, 1);
++		udelay(GPIO_RTC_DELAY_TIME);
++	}
++}
++
++static u8 moxart_rtc_read_byte(struct device *dev)
++{
++	struct moxart_rtc *moxart_rtc = dev_get_drvdata(dev);
++	int i;
++	u8 data = 0;
++
++	for (i = 0; i < 8; i++) {
++		gpio_set_value(moxart_rtc->gpio_sclk, 0);
++		udelay(GPIO_RTC_DELAY_TIME);
++		gpio_set_value(moxart_rtc->gpio_sclk, 1);
++		udelay(GPIO_RTC_DELAY_TIME);
++		if (gpio_get_value(moxart_rtc->gpio_data))
++			data |= (1 << i);
++		udelay(GPIO_RTC_DELAY_TIME);
++	}
++	return data;
++}
++
++static u8 moxart_rtc_read_register(struct device *dev, u8 cmd)
++{
++	struct moxart_rtc *moxart_rtc = dev_get_drvdata(dev);
++	u8 data;
++	unsigned long flags;
++
++	local_irq_save(flags);
++
++	gpio_direction_output(moxart_rtc->gpio_data, 0);
++	gpio_set_value(moxart_rtc->gpio_reset, 1);
++	udelay(GPIO_RTC_DELAY_TIME);
++	moxart_rtc_write_byte(dev, cmd);
++	gpio_direction_input(moxart_rtc->gpio_data);
++	udelay(GPIO_RTC_DELAY_TIME);
++	data = moxart_rtc_read_byte(dev);
++	gpio_set_value(moxart_rtc->gpio_sclk, 0);
++	gpio_set_value(moxart_rtc->gpio_reset, 0);
++	udelay(GPIO_RTC_DELAY_TIME);
++
++	local_irq_restore(flags);
++
++	return data;
++}
++
++static void moxart_rtc_write_register(struct device *dev, u8 cmd, u8 data)
++{
++	struct moxart_rtc *moxart_rtc = dev_get_drvdata(dev);
++	unsigned long flags;
++
++	local_irq_save(flags);
++
++	gpio_direction_output(moxart_rtc->gpio_data, 0);
++	gpio_set_value(moxart_rtc->gpio_reset, 1);
++	udelay(GPIO_RTC_DELAY_TIME);
++	moxart_rtc_write_byte(dev, cmd);
++	moxart_rtc_write_byte(dev, data);
++	gpio_set_value(moxart_rtc->gpio_sclk, 0);
++	gpio_set_value(moxart_rtc->gpio_reset, 0);
++	udelay(GPIO_RTC_DELAY_TIME);
++
++	local_irq_restore(flags);
++}
++
++static int moxart_rtc_set_time(struct device *dev, struct rtc_time *tm)
++{
++	struct moxart_rtc *moxart_rtc = dev_get_drvdata(dev);
++
++	spin_lock_irq(&moxart_rtc->rtc_lock);
++
++	moxart_rtc_write_register(dev, GPIO_RTC_PROTECT_W, 0);
++	moxart_rtc_write_register(dev, GPIO_RTC_YEAR_W,
++				  (((tm->tm_year - 100) / 10) << 4) |
++				  ((tm->tm_year - 100) % 10));
++
++	moxart_rtc_write_register(dev, GPIO_RTC_MONTH_W,
++				  (((tm->tm_mon + 1) / 10) << 4) |
++				  ((tm->tm_mon + 1) % 10));
++
++	moxart_rtc_write_register(dev, GPIO_RTC_DATE_W,
++				  ((tm->tm_mday / 10) << 4) |
++				  (tm->tm_mday % 10));
++
++	moxart_rtc_write_register(dev, GPIO_RTC_HOURS_W,
++				  ((tm->tm_hour / 10) << 4) |
++				  (tm->tm_hour % 10));
++
++	moxart_rtc_write_register(dev, GPIO_RTC_MINUTES_W,
++				  ((tm->tm_min / 10) << 4) |
++				  (tm->tm_min % 10));
++
++	moxart_rtc_write_register(dev, GPIO_RTC_SECONDS_W,
++				  ((tm->tm_sec / 10) << 4) |
++				  (tm->tm_sec % 10));
++
++	moxart_rtc_write_register(dev, GPIO_RTC_PROTECT_W, 0x80);
++
++	spin_unlock_irq(&moxart_rtc->rtc_lock);
++
++	dev_dbg(dev, "%s: success tm_year=%d tm_mon=%d\n"
++		"tm_mday=%d tm_hour=%d tm_min=%d tm_sec=%d\n",
++		__func__, tm->tm_year, tm->tm_mon, tm->tm_mday,
++		tm->tm_hour, tm->tm_min, tm->tm_sec);
++
++	return 0;
++}
++
++static int moxart_rtc_read_time(struct device *dev, struct rtc_time *tm)
++{
++	struct moxart_rtc *moxart_rtc = dev_get_drvdata(dev);
++	unsigned char v;
++
++	spin_lock_irq(&moxart_rtc->rtc_lock);
++
++	v = moxart_rtc_read_register(dev, GPIO_RTC_SECONDS_R);
++	tm->tm_sec = (((v & 0x70) >> 4) * 10) + (v & 0x0F);
++
++	v = moxart_rtc_read_register(dev, GPIO_RTC_MINUTES_R);
++	tm->tm_min = (((v & 0x70) >> 4) * 10) + (v & 0x0F);
++
++	v = moxart_rtc_read_register(dev, GPIO_RTC_HOURS_R);
++	if (v & 0x80) { /* 12-hour mode */
++		tm->tm_hour = (((v & 0x10) >> 4) * 10) + (v & 0x0F);
++		if (v & 0x20) { /* PM mode */
++			tm->tm_hour += 12;
++			if (tm->tm_hour >= 24)
++				tm->tm_hour = 0;
++		}
++	} else { /* 24-hour mode */
++		tm->tm_hour = (((v & 0x30) >> 4) * 10) + (v & 0x0F);
++	}
++
++	v = moxart_rtc_read_register(dev, GPIO_RTC_DATE_R);
++	tm->tm_mday = (((v & 0x30) >> 4) * 10) + (v & 0x0F);
++
++	v = moxart_rtc_read_register(dev, GPIO_RTC_MONTH_R);
++	tm->tm_mon = (((v & 0x10) >> 4) * 10) + (v & 0x0F);
++	tm->tm_mon--;
++
++	v = moxart_rtc_read_register(dev, GPIO_RTC_YEAR_R);
++	tm->tm_year = (((v & 0xF0) >> 4) * 10) + (v & 0x0F);
++	tm->tm_year += 100;
++	if (tm->tm_year <= 69)
++		tm->tm_year += 100;
++
++	v = moxart_rtc_read_register(dev, GPIO_RTC_DAY_R);
++	tm->tm_wday = (v & 0x0f) - 1;
++	tm->tm_yday = day_of_year[tm->tm_mon];
++	tm->tm_yday += (tm->tm_mday - 1);
++	if (tm->tm_mon >= 2) {
++		if (!(tm->tm_year % 4) && (tm->tm_year % 100))
++			tm->tm_yday++;
++	}
++
++	tm->tm_isdst = 0;
++
++	spin_unlock_irq(&moxart_rtc->rtc_lock);
++
++	return 0;
++}
++
++static const struct rtc_class_ops moxart_rtc_ops = {
++	.read_time	= moxart_rtc_read_time,
++	.set_time	= moxart_rtc_set_time,
++};
++
++static int moxart_rtc_probe(struct platform_device *pdev)
++{
++	struct moxart_rtc *moxart_rtc;
++	int ret = 0;
++
++	moxart_rtc = devm_kzalloc(&pdev->dev, sizeof(*moxart_rtc), GFP_KERNEL);
++	if (!moxart_rtc) {
++		dev_err(&pdev->dev, "devm_kzalloc failed\n");
++		return -ENOMEM;
++	}
++
++	moxart_rtc->gpio_data = of_get_named_gpio(pdev->dev.of_node,
++						  "gpio-rtc-data", 0);
++	if (!gpio_is_valid(moxart_rtc->gpio_data)) {
++		dev_err(&pdev->dev, "invalid gpio (data): %d\n",
++			moxart_rtc->gpio_data);
++		return moxart_rtc->gpio_data;
++	}
++
++	moxart_rtc->gpio_sclk = of_get_named_gpio(pdev->dev.of_node,
++						  "gpio-rtc-sclk", 0);
++	if (!gpio_is_valid(moxart_rtc->gpio_sclk)) {
++		dev_err(&pdev->dev, "invalid gpio (sclk): %d\n",
++			moxart_rtc->gpio_sclk);
++		return moxart_rtc->gpio_sclk;
++	}
++
++	moxart_rtc->gpio_reset = of_get_named_gpio(pdev->dev.of_node,
++						   "gpio-rtc-reset", 0);
++	if (!gpio_is_valid(moxart_rtc->gpio_reset)) {
++		dev_err(&pdev->dev, "invalid gpio (reset): %d\n",
++			moxart_rtc->gpio_reset);
++		return moxart_rtc->gpio_reset;
++	}
++
++	spin_lock_init(&moxart_rtc->rtc_lock);
++	platform_set_drvdata(pdev, moxart_rtc);
++
++	ret = devm_gpio_request(&pdev->dev, moxart_rtc->gpio_data, "rtc_data");
++	if (ret) {
++		dev_err(&pdev->dev, "can't get rtc_data gpio\n");
++		return ret;
++	}
++
++	ret = devm_gpio_request_one(&pdev->dev, moxart_rtc->gpio_sclk,
++				    GPIOF_DIR_OUT, "rtc_sclk");
++	if (ret) {
++		dev_err(&pdev->dev, "can't get rtc_sclk gpio\n");
++		return ret;
++	}
++
++	ret = devm_gpio_request_one(&pdev->dev, moxart_rtc->gpio_reset,
++				    GPIOF_DIR_OUT, "rtc_reset");
++	if (ret) {
++		dev_err(&pdev->dev, "can't get rtc_reset gpio\n");
++		return ret;
++	}
++
++	moxart_rtc->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
++						   &moxart_rtc_ops,
++						   THIS_MODULE);
++	if (IS_ERR(moxart_rtc->rtc)) {
++		dev_err(&pdev->dev, "devm_rtc_device_register failed\n");
++		return PTR_ERR(moxart_rtc->rtc);
++	}
++
++	return 0;
++}
++
++static const struct of_device_id moxart_rtc_match[] = {
++	{ .compatible = "moxa,moxart-rtc" },
++	{ },
++};
++
++static struct platform_driver moxart_rtc_driver = {
++	.probe	= moxart_rtc_probe,
++	.driver	= {
++		.name		= "moxart-rtc",
++		.owner		= THIS_MODULE,
++		.of_match_table	= moxart_rtc_match,
++	},
++};
++module_platform_driver(moxart_rtc_driver);
++
++MODULE_DESCRIPTION("MOXART RTC driver");
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
+-- 
+1.8.2.1
