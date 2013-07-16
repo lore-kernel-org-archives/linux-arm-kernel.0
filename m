@@ -1,60 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Jul 2013 02:18:16 -0700
-Subject: [GIT PULL] pinctrl-single SoC specific support for v3.12
-Message-ID: <20130716091816.GU7656@atomide.com>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Tue, 16 Jul 2013 09:18:25 +0000
+Subject: [v7 2/3] ARM: imx6q: update the sata bits definitions of gpr13
+In-Reply-To: <20130716080521.GI28375@S2101-09.ap.freescale.net>
+References: <1373945328-20893-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1373945328-20893-3-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <20130716033951.GG28375@S2101-09.ap.freescale.net>
+ <0E83723C55F66F43A6041464FE31119D33D959@039-SN2MPN1-011.039d.mgd.msft.net>
+ <20130716080521.GI28375@S2101-09.ap.freescale.net>
+Message-ID: <0E83723C55F66F43A6041464FE31119D33DA0D@039-SN2MPN1-011.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Thanks.
+Yes, it is. Both #2 and #3 should be merged together.
 
-Here's a pull request for the pinctrl-single changes posted
-few weeks ago. Assuming this pull request and the patches
-are OK, I'd like to also merge this branch into omap tree so
-we can have the wake-up events working. So we'd have to
-establish keeping these commits immutable.
-
-Note that this series does not depend on the dynamic remuxing
-patches I just posted. These patches can be used without the
-dynamic remuxing support for devices that have dedicated
-wake-up path and don't need remuxing, such as UART on most
-omaps.
-
-Regards,
-
-Tony
+Best Regards
+Richard Zhu
 
 
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+-----Original Message-----
+From: Shawn Guo [mailto:shawn.guo at linaro.org] 
+Sent: Tuesday, July 16, 2013 4:05 PM
+To: Zhu Richard-R65037
+Cc: tj at kernel.org; linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; rob.herring at calxeda.com; s.hauer at pengutronix.de; linux-ide at vger.kernel.org
+Subject: Re: [v7 2/3] ARM: imx6q: update the sata bits definitions of gpr13
 
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+On Tue, Jul 16, 2013 at 07:56:52AM +0000, Zhu Richard-R65037 wrote:
+> Hi Shawn:
+> Thanks.
+> 
+> Hi Tejun:
+> Can you help to pick up the #3 of this patch-set?
 
-are available in the git repository at:
+#2 and #3, I think.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/pinctrl-single-for-linus
-
-for you to fetch changes up to 8f406c0772ace721f0350c92acd043732285ba9f:
-
-  pinctrl: single: omap: Add SoC specific module for wake-up events (2013-07-15 00:17:07 -0700)
-
-----------------------------------------------------------------
-Pinctrl single changes to add support for SoC specific features
-that were too late for v3.11. This branch is needed as a dependency
-also for the omap tree for off-idle and USB wake-up events, so
-posting it as a pull request.
-
-----------------------------------------------------------------
-Tony Lindgren (3):
-      pinctrl: single: Prepare for supporting SoC specific features
-      pinctrl: single: Add hardware specific hooks for IRQ and GPIO wake-up events
-      pinctrl: single: omap: Add SoC specific module for wake-up events
-
- .../devicetree/bindings/pinctrl/pinctrl-single.txt |   5 +
- drivers/pinctrl/Makefile                           |   3 +-
- drivers/pinctrl/pinctrl-single-omap.c              | 287 +++++++++++++++++++++
- drivers/pinctrl/pinctrl-single.c                   | 158 +++++++++---
- drivers/pinctrl/pinctrl-single.h                   |  43 +++
- include/linux/platform_data/pinctrl-single-omap.h  |   4 +
- 6 files changed, 468 insertions(+), 32 deletions(-)
- create mode 100644 drivers/pinctrl/pinctrl-single-omap.c
- create mode 100644 drivers/pinctrl/pinctrl-single.h
- create mode 100644 include/linux/platform_data/pinctrl-single-omap.h
+Shawn
