@@ -1,64 +1,79 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Jul 2013 16:12:17 -0600
-Subject: [PATCH V3] ARM: mm: restrict early_alloc to section-aligned memory
-In-Reply-To: <1373481831-31459-1-git-send-email-swarren@wwwdotorg.org>
-References: <1373481831-31459-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <51E5C541.4080800@wwwdotorg.org>
+Date: Tue, 16 Jul 2013 16:17:22 -0600
+Subject: [PATCH 3/4] ARM: tegra: sort Makefile and fix whitespace
+In-Reply-To: <1374013043-4693-1-git-send-email-swarren@wwwdotorg.org>
+References: <1374013043-4693-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1374013043-4693-3-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2013 12:43 PM, Stephen Warren wrote:
-> From: Russell King <rmk@arm.linux.org.uk>
-> 
-> When map_lowmem() runs, and processes a memory bank whose start or end
-> is not section-aligned, memory must be allocated to store the 2nd-level
-> page tables. Those allocations are made by calling memblock_alloc().
-> 
-> At this point, the only memory that is free *and* mapped is memory which
-> has already been mapped by map_lowmem() itself. For this reason, we must
-> calculate the first point at which map_lowmem() will need to allocate
-> memory, and set the memblock allocation limit to a lower address, so that
-> memblock_alloc() is guaranteed to return memory that is already mapped.
-> 
-> This patch enhances sanity_check_meminfo() to calculate that memory
-> address, and pass it to memblock_set_current_limit(), rather than just
-> assuming the limit is arm_lowmem_limit.
-> 
-> The algorithm applied is:
-> 
-> * Default memblock_limit to arm_lowmem_limit in the absence of any other
->   limit; arm_lowmem_limit is the highest memory that is mapped by
->   map_lowmem().
-> 
-> * While walking the list of memblocks, if the start of a block is not
->   aligned, 2nd-level page tables will need to be allocated to map the
->   first few pages of the block. Hence, the memblock_limit must be before
->   the start of the block.
-> 
-> * Similarly, if the end of any block is not aligned, 2nd-level page
->   tables will need to be allocated to map the last few pages of the
->   block. Hence, the memblock_limit must point at the end of the block,
->   rounded down to section-alignment.
-> 
-> * The memory blocks are assumed to be sorted in address order, so the
->   first unaligned block start or end is used to set the limit.
-> 
-> With this algorithm, the start or end of almost any bank can be non-
-> section-aligned. The only exception is that the start of bank 0 must
-> be section-aligned, since otherwise memory would need to be allocated
-> when mapping the start of bank 0, which occurs before any free memory
-> is mapped.
-> 
-> Not-yet-signed-off-by: Russell King <rmk@arm.linux.org.uk>
-> [swarren, wrote commit description, rewrote calculation of memblock_limit]
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> V3: completely new implementation based on Russell's suggestion.
-> 
-> Russell, since this is strongly based on your patch, I set you as the
-> author in git. I assume that's OK. If not, let me know and I'll change
-> the patch to my authorship and add a note to the commit description
-> that it's based on your original.
+From: Stephen Warren <swarren@nvidia.com>
 
-Russell, should I assume that no comment implies this is OK and I should
-send it to the ARM patch tracker?
+Sort Makefile alphabetically, and consistently use TABs not spaces for
+all indentation.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/Makefile | 41 +++++++++++++++++++----------------------
+ 1 file changed, 19 insertions(+), 22 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index efb1e01..6ac978b 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -1,34 +1,31 @@
+ asflags-y				+= -march=armv7-a
+ 
+-obj-y                                   += common.o
+-obj-y                                   += io.o
+-obj-y                                   += irq.o
++obj-y					+= apbio.o
++obj-y					+= board-harmony-pcie.o
++obj-y					+= board-paz00.o
++obj-y					+= common.o
++obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
++obj-$(CONFIG_CPU_IDLE)			+= cpuidle-tegra20.o
++obj-$(CONFIG_CPU_IDLE)			+= cpuidle-tegra30.o
++obj-$(CONFIG_CPU_IDLE)			+= cpuidle-tegra114.o
++obj-y					+= flowctrl.o
+ obj-y					+= fuse.o
++obj-$(CONFIG_SMP)			+= headsmp.o
++obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
++obj-y					+= io.o
++obj-y					+= irq.o
++obj-$(CONFIG_TEGRA_PCI)			+= pcie.o
++obj-$(CONFIG_SMP)			+= platsmp.o
++obj-y					+= pm.o
+ obj-y					+= pmc.o
+-obj-y					+= flowctrl.o
+ obj-y					+= powergate.o
+-obj-y					+= apbio.o
+-obj-y					+= pm.o
+ obj-y					+= reset.o
+ obj-y					+= reset-handler.o
+-obj-y					+= sleep.o
+ obj-y					+= tegra.o
+-obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+-obj-y					+= tegra20_speedo.o
+ obj-y					+= tegra2_emc.o
+-obj-y					+= sleep-tegra20.o
+-obj-$(CONFIG_CPU_IDLE)			+= cpuidle-tegra20.o
++obj-y					+= tegra20_speedo.o
+ obj-y					+= tegra30_speedo.o
+-obj-y					+= sleep-tegra30.o
+-obj-$(CONFIG_CPU_IDLE)			+= cpuidle-tegra30.o
+-obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
+-obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
+-obj-$(CONFIG_TEGRA_PCI)			+= pcie.o
+-
+ obj-y					+= tegra114_speedo.o
++obj-y					+= sleep.o
++obj-y					+= sleep-tegra20.o
+ obj-y					+= sleep-tegra30.o
+-obj-$(CONFIG_CPU_IDLE)			+= cpuidle-tegra114.o
+-
+-obj-y		+= board-harmony-pcie.o
+-
+-obj-y		+= board-paz00.o
+-- 
+1.8.1.5
