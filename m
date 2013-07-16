@@ -1,148 +1,147 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 16 Jul 2013 17:43:21 +0800
-Subject: [PATCH v12 00/13] Add tested id switch and vbus connect detect
- support for Chipidea
-In-Reply-To: <201307121518.31501.marex@denx.de>
-References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
- <201307120604.43642.marex@denx.de>
- <20130712082642.GB16202@nchen-desktop>
- <201307121518.31501.marex@denx.de>
-Message-ID: <20130716094320.GA29679@nchen-desktop>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 16 Jul 2013 10:45:08 +0100
+Subject: [RFC PATCH v4 03/18] Documentation: devicetree: arm: cpus/cpu
+ nodes bindings updates
+In-Reply-To: <51E44486.7050806@gmail.com>
+References: <1368804061-4421-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1368804061-4421-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAL_JsqLANi5UoVyRMsa6XoQ+_KnmTQDfTz++shEh-dZ3FQGZaQ@mail.gmail.com>
+ <20130715093406.GC15904@e102568-lin.cambridge.arm.com>
+ <51E44486.7050806@gmail.com>
+Message-ID: <20130716094508.GA28503@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 12, 2013 at 03:18:31PM +0200, Marek Vasut wrote:
-> Hi Peter,
-> 
-> > On Fri, Jul 12, 2013 at 06:04:43AM +0200, Marek Vasut wrote:
-> > > Hi Peter,
-> > > 
-> > > > On Thu, Jul 11, 2013 at 07:57:19PM +0200, Marek Vasut wrote:
-> > > > > Hi Peter,
-> > > > > 
-> > > > > > This patchset adds tested otg id switch function and
-> > > > > > vbus connect and disconnect detection for chipidea driver.
-> > > > > > And fix kinds of bugs found at chipidea drivers after enabling
-> > > > > > id and vbus detection.
-> > > > > > 
-> > > > > > This patch is fully tested at imx6 sabresd platform.
-> > > > > > My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
-> > > > > > 
-> > > > > > Changes for v12:
-> > > > > > - Rebased greg's usb-next tree (3.10.0-rc7+)
-> > > > > > - Split more small patches for single function and fix.
-> > > > > 
-> > > > > I tested the patchset. Here are the results:
-> > > > > 
-> > > > > - VBUS switching
-> > > > > 
-> > > > > I'm no longer getting any ID interrupts at all when I apply the patch
-> > > > > below. The board stays in HOST mode all the time. If I configure it
-> > > > > as peripheral, it works as peripheral. Note with [1], I was able to
-> > > > > switch from Peripheral->Host , not the other way around.
-> > > > 
-> > > > Thanks for your testing. But first, can you have me check
-> > > > if your ID wakeup is enabled?
-> > > 
-> > > ID wakeup? How do I check?
+On Mon, Jul 15, 2013 at 07:50:46PM +0100, Rob Herring wrote:
+> On 07/15/2013 04:34 AM, Lorenzo Pieralisi wrote:
+> > On Fri, Jul 12, 2013 at 03:47:17PM +0100, Rob Herring wrote:
+> >> On Fri, May 17, 2013 at 10:20 AM, Lorenzo Pieralisi
+> >> <lorenzo.pieralisi@arm.com> wrote:
+> >>> In order to extend the current cpu nodes bindings to newer CPUs
+> >>> inclusive of AArch64 and to update support for older ARM CPUs this
+> >>> patch updates device tree documentation for the cpu nodes bindings.
+> >>
+> >> Sorry for the long delay on this, but I'm still not happy with the binding here.
 > > 
-> > See otgsc at controller register, the ID wakeup enable is bit 24.
+> > I had to ask Russell again to drop the bindings patches from the patch
+> > system, and this is not acceptable since two months have passed and the
+> > entire series was reviewed, acked and partially merged. I will review
+> > these bindings again but I would like to understand who should give the final
+> > go ahead to get these patches queued for upstreaming, I can't continue
+> > updating this stuff forever.
 > 
-> Yes, ID interrupt (IDIE) is set.
+> Most of my comments are for 64-bit. So don't blame me that it had to be
+> reverted. I said up front I was concerned about this change breaking
+> things and it appears it did. New kernels must not require a new DT.
+
+The patches in Russell's tree do not break anything, I asked him to drop
+them since, if we change the bindings again, those patches change and have
+to be reworked. It was not meant to blame you at all, just saying that
+the process to get this stuff in the kernel should be defined properly
+and patches reviewed in a timely fashion.
+
+And for legacy reasons the situation related to cpu/cpus node bindings
+is a complicated one, there are bindings in the ePAPR, bindings in the
+kernel, people are confused and with this set we wanted to draw a
+line. For arm64 this is an absolute must.
+
+I disagree with you on the "new kernels must not require a new DT".
+That's true if bindings are well defined, not for a mix of legacy ePAPR and
+bindings-in-the-kernel.
+
+What's the DT standard for ARM cpu/cpus node ? ePAPR ? In kernel docs ?
+A combination thereof ? Things are not clear cut and I do not like that, it
+is confusing.
+
+> But yes, this should have been reviewed more quickly. We're working on a
+> plan to help address DT binding reviews. We have not enforced that Grant
+> and I must ack all bindings, but in this case you certainly need mine
+> since I have reviewed it and if you want to me to pull it.
+
+Good, that's all I wanted to know, thanks.
+
+> >>> Main changes:
+> >>>     - adds 64-bit bindings
+> >>>     - define usage of #address-cells
+> >>>     - define 32/64 dts compatibility settings
+> >>>     - defines behaviour on pre and post v7 uniprocessor systems
+> >>>     - adds ARM 11MPcore specific reg property definition
+> >>>
+> >>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>> ---
+> >>>  Documentation/devicetree/bindings/arm/cpus.txt | 459 ++++++++++++++++++++++---
+> >>>  1 file changed, 412 insertions(+), 47 deletions(-)
+> >>
+> >> [snip]
+> >>
+> >>> +                       # On ARM v8 64-bit systems, where the reg property
+> >>> +                         size can be 1 or 2 cells (as defined by cpus node's
+> >>> +                         #address-cells property), this property is
+> >>> +                         required and matches:
+> >>> +
+> >>> +                         - On systems running the OS in AArch32:
+> >>
+> >> The DTS cannot change based on 32-bit or 64-bit OS.
+> > 
+> > "On systems running the OS in AArch32" implies a dependency on the
+> > HW execution state. Since the DT is used to configure OSs I thought that
+> > could be a valid sentence. Unfortunately this stuff is not C, so I
+> > reiterate my point above, before changing it I would like to understand
+> > who should say the wording is ok otherwise we could argue forever.
 > 
-> I noticed this backtrace in the kernel bootlog, but this only happens if the 
-> dr_mode="otg" , it comes from the host-mode irq handler :
+> It does configure the OS, but not for 32 vs. 64 bit. That is more of a
+> problem for the bootloader to know which mode to boot in and covered
+> under something like Documentation/arm/Booting. Booting ARM vs. Thumb
+> mode would be similar situation.
 > 
-> [    2.757563] irq 238: nobody cared (try booting with the "irqpoll" option)
-> [    2.764398] CPU: 0 PID: 1 Comm: swapper Not tainted 3.10.0-
-> next-20130711-00013-g011c4b3-dirty #703
-> [    2.773445] [<80013878>] (unwind_backtrace+0x0/0xe8) from [<80011644>] 
-> (show_stack+0x10/0x14)
-> [    2.782027] [<80011644>] (show_stack+0x10/0x14) from [<800659f4>] 
-> (__report_bad_irq.isra.6+0x20/0xe0)
-> [    2.791286] [<800659f4>] (__report_bad_irq.isra.6+0x20/0xe0) from 
-> [<80065c98>] (note_interrupt+0x16c/0x230)
-> [    2.801063] [<80065c98>] (note_interrupt+0x16c/0x230) from [<80064000>] 
-> (handle_irq_event_percpu+0x10c/0x1a4)
-> [    2.811010] [<80064000>] (handle_irq_event_percpu+0x10c/0x1a4) from 
-> [<800640e8>] (handle_irq_event+0x50/0x78)
-> [    2.820958] [<800640e8>] (handle_irq_event+0x50/0x78) from [<8006652c>] 
-> (handle_level_irq+0x88/0x10c)
-> [    2.830210] [<8006652c>] (handle_level_irq+0x88/0x10c) from [<800638d0>] 
-> (generic_handle_irq+0x28/0x3c)
-> [    2.839637] [<800638d0>] (generic_handle_irq+0x28/0x3c) from [<8000f84c>] 
-> (handle_IRQ+0x30/0x84)
-> [    2.848461] [<8000f84c>] (handle_IRQ+0x30/0x84) from [<80012160>] 
-> (__irq_svc+0x40/0x6c)
-> [    2.856510] [<80012160>] (__irq_svc+0x40/0x6c) from [<80022a44>] 
-> (__do_softirq+0x90/0x1d8)
-> [    2.864812] [<80022a44>] (__do_softirq+0x90/0x1d8) from [<80022edc>] 
-> (irq_exit+0x98/0xd4)
-> [    2.873025] [<80022edc>] (irq_exit+0x98/0xd4) from [<8000f850>] 
-> (handle_IRQ+0x34/0x84)
-> [    2.880980] [<8000f850>] (handle_IRQ+0x34/0x84) from [<80012160>] 
-> (__irq_svc+0x40/0x6c)
-> [    2.889020] [<80012160>] (__irq_svc+0x40/0x6c) from [<8001d724>] 
-> (vprintk_emit+0x1bc/0x524)
-> [    2.897411] [<8001d724>] (vprintk_emit+0x1bc/0x524) from [<804da5a4>] 
-> (printk+0x30/0x40)
-> [    2.905551] [<804da5a4>] (printk+0x30/0x40) from [<80630138>] 
-> (mousedev_init+0x4c/0x60)
-> [    2.913617] [<80630138>] (mousedev_init+0x4c/0x60) from [<806178fc>] 
-> (do_one_initcall+0x94/0x14c)
-> [    2.922537] [<806178fc>] (do_one_initcall+0x94/0x14c) from [<80617b20>] 
-> (kernel_init_freeable+0x16c/0x22c)
-> [    2.932230] [<80617b20>] (kernel_init_freeable+0x16c/0x22c) from [<804d8cbc>] 
-> (kernel_init+0x8/0x150)
-> [    2.941486] [<804d8cbc>] (kernel_init+0x8/0x150) from [<8000ea70>] 
-> (ret_from_fork+0x14/0x24)
-> [    2.949932] handlers:
-> [    2.952227] [<8033fc58>] ci_irq
-> [    2.955388] Disabling IRQ #238
+> Think about how your PC boots and add to that having a DTB as part of
+> the firmware shipped with your PC. Then the end user can install a
+> 32-bit or 64-bit OS on it. That is the usecase that needs to be
+> supported and having different DTB for 32 and 64 bit is totally broken
+> and doesn't even help solve that problem.
+
+I will give it more thought, point taken.
+
+> >>> +
+> >>> +       - cpu-release-addr
+> >>> +               Usage: required for systems that have an "enable-method"
+> >>> +                      property value of "spin-table".
+> >>> +               Value type: <prop-encoded-array>
+> >>> +               Definition:
+> >>> +                       # On ARM v8 64-bit systems must be a two cell
+> >>> +                         property identifying a 64-bit zero-initialised
+> >>> +                         memory location.
+> >>
+> >> As I mentioned previously, isn't some wake-up method needed? Most
+> >> systems will be in wfi or wfe rather than continuously spinning.
+> > 
+> > Mmm...this can become a minefield, wfe, wfi, CPU in reset..this needs some
+> > thought.
 > 
+> Yes, it is today and standardizing this is a good thing. Which is what
+> PSCI does. So why are you adding the spintable at all? Are you trying to
+> set this as the standard for non-PSCI enabled platforms? Why not just
+> say v8 boot interface is PSCI. Sure, we'll probably have to deal with
+> other methods, but documenting something else here is not going to
+> prevent that problem. I don't think a simple spintable would even work
+> for any/most current platforms. I'd think we'd want to define something
+> that would work for existing platforms (chances are new platforms will
+> work like vendors' existing 32-bit platforms).
 
-Marek, I have a test at imx28evk (Freescale imx28evk) for this patchset,
-it works well for dual-role switch after adding below dts change.
-There is a kernel dump when works at udc mode(due to enable CONFIG_LOCKUP_DETECTOR),
-at the first connect, but it does not affect function, it should be a common
-chipidea problem, I will check later.
+"spin-table" is how the current v8 kernel boots, I am not adding
+anything. It is documented in Documentation/arm64/booting.txt.
+I have to add the possible wake-up method(s) to the definition of
+spin-table here.
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 3637bf3..e8e2f09 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -240,6 +240,8 @@
- 	ahb at 80080000 {
- 		usb0: usb at 80080000 {
- 			vbus-supply = <&reg_usb0_vbus>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&usbphy0_pins_c>;
- 			status = "okay";
- 		};
- 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 600f7cb..a11e015 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -657,6 +657,16 @@
- 					fsl,pull-up = <0>;
- 				};
- 
-+				usbphy0_pins_c: usbphy0 at 2 {
-+					reg = <2>;
-+					fsl,pinmux-ids = <
-+						0x3071 /* MX28_PAD_AUART1_RTS__USB0_ID */
-+					>;
-+					fsl,drive-strength = <2>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+
- 				usbphy1_pins_a: usbphy1 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
+Just adding PSCI is tempting but not viable, that would make people
+think that's the only allowed method and that's not acceptable.
 
--- 
+While defining the process for the introduction of new DT bindings
+please consider how we have to deal with legacy bindings designed for
+PowerPC that people tend to reuse for ARM ("status" property in cpu
+nodes is next, as James highlighted in another thread).
 
-Best Regards,
-Peter Chen
+We are doing that in a case by case fashion and that's becoming a nightmare.
+
+Thank you !
+Lorenzo
