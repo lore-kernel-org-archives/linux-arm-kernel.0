@@ -1,59 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Jul 2013 05:24:32 -0700
-Subject: [PATCH 2/4] arm: omap5: hwmod: add missing ocp2scp hwmod data
-In-Reply-To: <20130715154603.GC32035@arwen.pp.htv.fi>
-References: <1373902423-28654-1-git-send-email-balbi@ti.com>
- <1373902423-28654-3-git-send-email-balbi@ti.com>
- <51E418A4.9000109@ti.com> <20130715154603.GC32035@arwen.pp.htv.fi>
-Message-ID: <20130716122432.GX7656@atomide.com>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Tue, 16 Jul 2013 09:25:16 -0300
+Subject: [PATCH 1/5] ARM: dts: imx23-evk: enable USB PHY and controller
+In-Reply-To: <20130716013002.GC28375@S2101-09.ap.freescale.net>
+References: <1373898160-8460-1-git-send-email-otavio@ossystems.com.br>
+ <CAOMZO5C_7nJ9RVYvuKJHP2u0mYY6P2UyGVA6OpPzqTnd7YXN2Q@mail.gmail.com>
+ <CAP9ODKpr82mMoxhiv=K70RKdn01b=ZM2J9E4vV-AM5nwXxUR+g@mail.gmail.com>
+ <20130716013002.GC28375@S2101-09.ap.freescale.net>
+Message-ID: <CAP9ODKqrXBybj=Xk5NsXQRvyOWppCEgR+CgzB1C=d0v2NXj4AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [130715 08:52]:
-> On Mon, Jul 15, 2013 at 09:13:32PM +0530, Kishon Vijay Abraham I wrote:
-> > Hi,
-> > 
-> > On Monday 15 July 2013 09:03 PM, Felipe Balbi wrote:
-> > > From: Benoit Cousson <benoit.cousson@linaro.org>
-> > > 
-> > > without that hwmod data, USB3 will not in OMAP5 boards.
-> > > 
-> > > While at that, also fix DTS data to pass reg property,
-> > > otherwise driver won't probe.
-> > > 
-> > > Signed-off-by: Benoit Cousson <benoit.cousson@linaro.org>
-> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > ---
-> > >  arch/arm/boot/dts/omap5.dtsi               |  3 +-
-> > >  arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 45 ++++++++++++++++++++++++++++++
-> > >  2 files changed, 47 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> > > index 5c99f19..4e41409 100644
-> > > --- a/arch/arm/boot/dts/omap5.dtsi
-> > > +++ b/arch/arm/boot/dts/omap5.dtsi
-> > > @@ -652,10 +652,11 @@
-> > >  			};
-> > >  		};
-> > >  
-> > > -		ocp2scp {
-> > > +		ocp2scp at 4a080000 {
-> > 
-> > While at that, can we also name it ocp2scp1 since we have 3 instances of
-> > ocp2scp and it'll conflict when we want to add it for SATA and PCIE.
+On Mon, Jul 15, 2013 at 10:30 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Mon, Jul 15, 2013 at 01:39:13PM -0300, Otavio Salvador wrote:
+>> On Mon, Jul 15, 2013 at 12:39 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>> > Hi Otavio,
+>> >
+>> > On Mon, Jul 15, 2013 at 11:22 AM, Otavio Salvador
+>> > <otavio@ossystems.com.br> wrote:
+>> >> The i.MX23EVK board provides a USB port so the USB PHY and controller
+>> >> need to be enabled for it to be usable.
+>> >>
+>> >> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+>> >> ---
+>> >
+>> > You should have Cc'd Shawn Guo on this series.
+>>
+>> Oh; thanks for fix my mistake. I am new to kernel development :-)
+>
+> I'm on copy of patches 1, 3 and 4.  2 and 5 are missing?
 
-Hmm the differentiatior is the name, so ocp2scp at 4a800000 should
-be enough and actually follows the naming standars where the name
-should describe the type. I guess it could be just ocp at 4a080000
-or scp at 4a080000 but I think it translates both ways, so ocp2scp
-is probably pretty good.
- 
-> Tony/Benoit, you want that in same patch or as a separate patch
-> altogether ?
+I will prepare a v2, as per Jonathan feedback and will add you in all them.
 
-Please do the .dts changes in separate patches as they should
-get merged separately for most part.
-
-Regards,
-
-Tony
+--
+Otavio Salvador                             O.S. Systems
+http://www.ossystems.com.br        http://projetos.ossystems.com.br
+Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
