@@ -1,37 +1,33 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 16 Jul 2013 11:41:09 -0500
-Subject: [PATCH V2 1/2] regulator: palmas-pmic: doc: fix typo for sleep-mode
-In-Reply-To: <1373992870-20725-1-git-send-email-nm@ti.com>
+Date: Tue, 16 Jul 2013 11:41:08 -0500
+Subject: [PATCH V2 0/2] regulator: palmas-pmic: doc: update device tree
+ bindings
+In-Reply-To: <20130716161939.GR22506@sirena.org.uk>
 References: <20130716161939.GR22506@sirena.org.uk>
- <1373992870-20725-1-git-send-email-nm@ti.com>
-Message-ID: <1373992870-20725-2-git-send-email-nm@ti.com>
+Message-ID: <1373992870-20725-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 3c870e3f9d9d98f1ab98614b3b1fd5c79287d361
-(regulator: palmas: Change the DT node property names to follow the convention)
+We seem to have a few missing updates to device tree bindings with the
+latest set of changes getting merged in.
 
-Missed updating mode-sleep from sleep-mode. Fix the same.
+Changes since V1:
+	Apologies on the spam, looks like I got the wrong mail ID first time around :(
+	minor commit message cleanups
 
-Documentation example seems proper for this property.
+V1: http://marc.info/?l=linux-doc&m=137398467901450&w=2
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- .../devicetree/bindings/regulator/palmas-pmic.txt  |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Based on v3.11-rc1 tag
 
-diff --git a/Documentation/devicetree/bindings/regulator/palmas-pmic.txt b/Documentation/devicetree/bindings/regulator/palmas-pmic.txt
-index d5a3086..04d67f0 100644
---- a/Documentation/devicetree/bindings/regulator/palmas-pmic.txt
-+++ b/Documentation/devicetree/bindings/regulator/palmas-pmic.txt
-@@ -31,7 +31,7 @@ Optional nodes:
- 	       Optional sub-node properties:
- 	       ti,warm-reset - maintain voltage during warm reset(boolean)
- 	       ti,roof-floor - control voltage selection by pin(boolean)
--	       ti,sleep-mode - mode to adopt in pmic sleep 0 - off, 1 - auto,
-+	       ti,mode-sleep - mode to adopt in pmic sleep 0 - off, 1 - auto,
- 	       2 - eco, 3 - forced pwm
- 	       ti,tstep - slope control 0 - Jump, 1 10mV/us, 2 5mV/us, 3 2.5mV/us
- 	       ti,smps-range - OTP has the wrong range set for the hardware so override
+Nishanth Menon (2):
+  regulator: palmas-pmic: doc: fix typo for sleep-mode
+  regulator: palmas-pmic: doc: remove ti,tstep
+
+ .../devicetree/bindings/regulator/palmas-pmic.txt  |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
 -- 
 1.7.9.5
+
+Regards,
+Nishanth Menon
