@@ -1,35 +1,33 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 15 Jul 2013 20:32:43 -0300
-Subject: [PATCH 10/10] ARM: kirkwood: Fix the device-tree watchdog's node reg
- property
-In-Reply-To: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1373931163-12670-11-git-send-email-ezequiel.garcia@free-electrons.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Tue, 16 Jul 2013 08:07:14 +0800
+Subject: [PATCH] video: nuc900fb: fix to pass correct device identity to
+ request_irq()
+Message-ID: <CAPgLHd9CZ=VponJTbTGKTXVTdvMQM6_T+-RWuPMrk0WYZPbW1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog driver now needs two 'reg' property cells. The first one
-is for the register containing the watchdog counter, while the second
-one is for the RSTOUT register.
+The IRQ handler nuc900fb_irqhandler() use dev_id as a type of
+struct nuc900fb_info *, so we should pass fbi as the device
+identity to request_irq().
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- arch/arm/boot/dts/kirkwood.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Was 'video: nuc900fb: fix to pass correct device identity to free_irq()'
+---
+ drivers/video/nuc900fb.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index ca296c3..0d74ee9 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -116,7 +116,8 @@
+diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
+index 8c527e5..796e511 100644
+--- a/drivers/video/nuc900fb.c
++++ b/drivers/video/nuc900fb.c
+@@ -587,8 +587,7 @@ static int nuc900fb_probe(struct platform_device *pdev)
+ 	fbinfo->flags			= FBINFO_FLAG_DEFAULT;
+ 	fbinfo->pseudo_palette		= &fbi->pseudo_pal;
  
- 		wdt: watchdog-timer at 20300 {
- 			compatible = "marvell,orion-wdt";
--			reg = <0x20300 0x28>;
-+			reg = <0x20324 0x04
-+			       0x20108 0x04>;
- 			interrupt-parent = <&bridge_intc>;
- 			interrupts = <3>;
- 			clocks = <&gate_clk 7>;
--- 
-1.8.1.5
+-	ret = request_irq(irq, nuc900fb_irqhandler, 0,
+-			  pdev->name, fbinfo);
++	ret = request_irq(irq, nuc900fb_irqhandler, 0, pdev->name, fbi);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "cannot register irq handler %d -err %d\n",
+ 			irq, ret);
