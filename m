@@ -1,10 +1,10 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue, 16 Jul 2013 17:08:14 +0200
-Subject: [PATCH v3 3/7] at91/avr32/atmel_lcdfb: prepare clk before calling
+Date: Tue, 16 Jul 2013 17:10:26 +0200
+Subject: [PATCH v3 4/7] USB: gadget: atmel_usba: prepare clk before calling
  enable
 In-Reply-To: <1373986995-23899-1-git-send-email-b.brezillon@overkiz.com>
 References: <1373986995-23899-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1373987294-24227-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1373987426-24338-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,33 +12,87 @@ Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
 avoid common clk framework warnings.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/video/atmel_lcdfb.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/usb/gadget/atmel_usba_udc.c |   28 +++++++++++++++++++++-------
+ 1 file changed, 21 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-index ece49d5..bf9c5d0 100644
---- a/drivers/video/atmel_lcdfb.c
-+++ b/drivers/video/atmel_lcdfb.c
-@@ -954,14 +954,14 @@ static int __init atmel_lcdfb_init_fbinfo(struct atmel_lcdfb_info *sinfo)
- 
- static void atmel_lcdfb_start_clock(struct atmel_lcdfb_info *sinfo)
+diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+index 1d97222..f018017 100644
+--- a/drivers/usb/gadget/atmel_usba_udc.c
++++ b/drivers/usb/gadget/atmel_usba_udc.c
+@@ -1772,6 +1772,7 @@ out:
+ static int atmel_usba_start(struct usb_gadget *gadget,
+ 		struct usb_gadget_driver *driver)
  {
--	clk_enable(sinfo->bus_clk);
--	clk_enable(sinfo->lcdc_clk);
-+	clk_prepare_enable(sinfo->bus_clk);
-+	clk_prepare_enable(sinfo->lcdc_clk);
++	int ret = 0;
+ 	struct usba_udc *udc = container_of(gadget, struct usba_udc, gadget);
+ 	unsigned long flags;
+ 
+@@ -1781,8 +1782,14 @@ static int atmel_usba_start(struct usb_gadget *gadget,
+ 	udc->driver = driver;
+ 	spin_unlock_irqrestore(&udc->lock, flags);
+ 
+-	clk_enable(udc->pclk);
+-	clk_enable(udc->hclk);
++	ret = clk_prepare_enable(udc->pclk);
++	if (ret)
++		goto out;
++	ret = clk_prepare_enable(udc->hclk);
++	if (ret) {
++		clk_disable_unprepare(udc->pclk);
++		goto out;
++	}
+ 
+ 	DBG(DBG_GADGET, "registered driver `%s'\n", driver->driver.name);
+ 
+@@ -1797,9 +1804,11 @@ static int atmel_usba_start(struct usb_gadget *gadget,
+ 		usba_writel(udc, CTRL, USBA_ENABLE_MASK);
+ 		usba_writel(udc, INT_ENB, USBA_END_OF_RESET);
+ 	}
++
++out:
+ 	spin_unlock_irqrestore(&udc->lock, flags);
+ 
+-	return 0;
++	return ret;
  }
  
- static void atmel_lcdfb_stop_clock(struct atmel_lcdfb_info *sinfo)
- {
--	clk_disable(sinfo->bus_clk);
--	clk_disable(sinfo->lcdc_clk);
-+	clk_disable_unprepare(sinfo->bus_clk);
-+	clk_disable_unprepare(sinfo->lcdc_clk);
- }
+ static int atmel_usba_stop(struct usb_gadget *gadget,
+@@ -1822,8 +1831,8 @@ static int atmel_usba_stop(struct usb_gadget *gadget,
  
- #ifdef CONFIG_OF
+ 	udc->driver = NULL;
+ 
+-	clk_disable(udc->hclk);
+-	clk_disable(udc->pclk);
++	clk_disable_unprepare(udc->hclk);
++	clk_disable_unprepare(udc->pclk);
+ 
+ 	DBG(DBG_GADGET, "unregistered driver `%s'\n", driver->driver.name);
+ 
+@@ -2022,10 +2031,14 @@ static int __init usba_udc_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, udc);
+ 
+ 	/* Make sure we start from a clean slate */
+-	clk_enable(pclk);
++	ret = clk_prepare_enable(pclk);
++	if (ret) {
++		dev_err(&pdev->dev, "Unable to enable pclk, aborting.\n");
++		goto err_clk_enable;
++	}
+ 	toggle_bias(0);
+ 	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
+-	clk_disable(pclk);
++	clk_disable_unprepare(pclk);
+ 
+ 	if (pdev->dev.of_node)
+ 		udc->usba_ep = atmel_udc_of_init(pdev, udc);
+@@ -2081,6 +2094,7 @@ err_add_udc:
+ 	free_irq(irq, udc);
+ err_request_irq:
+ err_alloc_ep:
++err_clk_enable:
+ 	iounmap(udc->fifo);
+ err_map_fifo:
+ 	iounmap(udc->regs);
 -- 
 1.7.9.5
