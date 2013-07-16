@@ -1,46 +1,44 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 16 Jul 2013 11:18:51 -0300
-Subject: [PATCH 05/10] watchdog: orion: Add a memory resource for RSTOUT
- register
-In-Reply-To: <20130716140415.GB19448@lunn.ch>
-References: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1373931163-12670-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130716140415.GB19448@lunn.ch>
-Message-ID: <20130716141850.GB23904@localhost>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 16 Jul 2013 18:22:08 +0400
+Subject: [PATCH v4 1/2] ARM: dts: twl: Add GPADC data to device tree
+In-Reply-To: <1373974500-23609-1-git-send-email-oleksandr.kozaruk@ti.com>
+References: <1373974500-23609-1-git-send-email-oleksandr.kozaruk@ti.com>
+Message-ID: <51E55710.8060907@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
+Hello.
 
-On Tue, Jul 16, 2013 at 04:04:15PM +0200, Andrew Lunn wrote:
-> On Mon, Jul 15, 2013 at 08:32:38PM -0300, Ezequiel Garcia wrote:
-> > Instead of accessing the RSTOUT register directly, this commit
-> > adds a platform memory resource to map this register into the driver.
-> 
-> 
-> Have you looked at:
-> 
-> arch/arm/mach-mvebu/system-controller.c
-> 
+On 07/16/2013 03:34 PM, Oleksandr Kozaruk wrote:
 
-Mmm... I saw the use of the RSTOUT register in kirkwood_restart()
-but wasn't sure who should be the real 'owner' of this register.
+> GPADC is the general purpose ADC present on twl6030.
+> The dt data is interrupt used to trigger end of ADC
+> conversion.
 
-> It is also using this register. Are we going to have a similar problem
-> as the TIMER_CTRL register, which you refactered in an earlier patch?
-> 
+> Signed-off-by: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
+> ---
+>   arch/arm/boot/dts/twl6030.dtsi | 6 ++++++
+>   1 file changed, 6 insertions(+)
 
-Probably.
+> diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
+> index 2e3bd31..434842c 100644
+> --- a/arch/arm/boot/dts/twl6030.dtsi
+> +++ b/arch/arm/boot/dts/twl6030.dtsi
+> @@ -103,4 +103,10 @@
+>   		compatible = "ti,twl6030-pwmled";
+>   		#pwm-cells = <2>;
+>   	};
+> +
+> +	gpadc: twl6030_gpadc {
+> +		compatible = "ti,twl6030_gpadc";
+> +		interrupts = <3>;
+> +		#io-channel-cells = <1>;
+> +	};
 
-> "marvell,orion-system-controller" is not actually used yet, but once
-> kirkwood moves into mach-mvebu, it will start using it.
-> 
+    ePAPR [1] says: "The name of a node should be somewhat generic, 
+reflecting the function of the device and not its precise programming 
+model."
 
-I guess so. We should take that into account *now*. Let me think about
-it and see if I can have something sane for v2.
+[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
 
-Thanks!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+WBR, Sergei
