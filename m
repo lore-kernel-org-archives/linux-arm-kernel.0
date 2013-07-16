@@ -1,23 +1,62 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Jul 2013 17:18:29 -0600
-Subject: [PATCH v2 06/22] ARM: dt: tegra114: iommu: Fix IOMMU register
- address
-In-Reply-To: <1373021097-32420-7-git-send-email-hdoyu@nvidia.com>
-References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
- <1373021097-32420-7-git-send-email-hdoyu@nvidia.com>
-Message-ID: <51E5D4C5.4090109@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Jul 2013 00:19:34 +0100
+Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC
+ with ARM CPU
+In-Reply-To: <20130716172023.64337690@skate>
+References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
+ <20130716172023.64337690@skate>
+Message-ID: <20130716231934.GH24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
-> Fix IOMMU register address.
+On Tue, Jul 16, 2013 at 05:20:23PM +0200, Thomas Petazzoni wrote:
+> Dear Hauke Mehrtens,
+> 
+> On Tue, 16 Jul 2013 15:52:07 +0200, Hauke Mehrtens wrote:
+> > +static int bcm53xx_abort_handler(unsigned long addr, unsigned int fsr,
+> > +				 struct pt_regs *regs)
+> > +{
+> > +	/*
+> > +	 * These happen for no good reason
+> > +	 * possibly left over from CFE
+> 
+> CFE ?
+> 
+> > +	 */
+> > +	pr_warn("External imprecise Data abort at addr=%#lx, fsr=%#x ignored.\n",
+> > +		addr, fsr);
+> > +
+> > +	/* Returning non-zero causes fault display and panic */
+> > +	return 0;
+> > +}
+> > +
+> > +static void bcm53xx_aborts_enable(void)
+> > +{
+> > +	/* Install our hook */
+> > +	hook_fault_code(16 + 6, bcm53xx_abort_handler, SIGBUS, 0,
+> > +			"imprecise external abort");
+> > +}
+> > +
+> > +static void __init bcm53xx_timer_init(void)
+> > +{
+> > +	of_clk_init(NULL);
+> > +	clocksource_of_init();
+> > +}
+> > +
+> > +void __init bcm53xx_map_io(void)
+> > +{
+> > +	debug_ll_io_init();
+> > +	bcm53xx_aborts_enable();
+> > +}
+> 
+> That's a nitpick, but I personally tend to like when callbacks are
+> ordered as they are called, i.e ->map_io() first, and then
+> ->init_time().
 
-Oh dear, how serious is this?
+A more important nitpick is... it would be better to have the call to
+the aborts enable function in the init_early() callback, not the map_io()
+callback.  Too often people overload stuff into these specific callbacks
+which makes maintanence of non-platform code pain in the butt.
 
-That incorrect node got added in v3.9 - a long time ago. Does the SMMU
-driver touch registers during probe() or under any other condition right
-now? If so, can that hang the CPU or end up trashing some other HW
-module's registers?
-
-I'm trying to determine whether we need to urgently send this patch as a
-fix Cc: stable.
+The init_early() callback was specifically added by me to remove this
+kind of crappage of map_io().  Please use it.  Thanks.
