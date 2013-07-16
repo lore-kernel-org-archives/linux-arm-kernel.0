@@ -1,29 +1,59 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 16 Jul 2013 13:16:43 +0200
-Subject: [PATCH 4/5] iio: at91: add an optional dt property for for adc
- clock hz.
-In-Reply-To: <20130716103014.GB3125@lukather>
-References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
- <1373789069-11604-5-git-send-email-josh.wu@atmel.com>
- <20130715130610.GD2962@lukather> <51E4FC70.3050207@atmel.com>
- <20130716103014.GB3125@lukather>
-Message-ID: <51E52B9B.5030407@metafoo.de>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 16 Jul 2013 19:17:27 +0800
+Subject: [PATCH] ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag
+In-Reply-To: <51E439BC.9030608@wwwdotorg.org>
+References: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
+ <51E439BC.9030608@wwwdotorg.org>
+Message-ID: <1373973447.8538.80.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2013 12:30 PM, Maxime Ripard wrote:
-[...]
->> After a further thinking of this, maybe remove the adc_op_clk is
->> better since it is a fake clock, and only used to specify the clock
->> rate.
->> To specify the clock rate use a dt property or platform data
->> parameter is better.
+On Tue, 2013-07-16 at 02:04 +0800, Stephen Warren wrote:
+> On 06/25/2013 03:23 AM, Joseph Lo wrote:
+> > Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
+> > to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
+> > this state.
 > 
-> No, to specify *any* clock, the common clock framework is the better
-> solution.
+> I tried applying this patch, your series "[PATCH V3 0/3] ARM: tegra114:
+> cpuidle: add power down state", and your series "[PATCH V2 00/11] ARM:
+> tegra114: add support for system suspend", all on top of v3.11-rc1.
+> 
+> On Dalmore, the new cpuidle mode /appears/ to work (I see increasing
+> values in the sysfs cpuidle "usage" file for all defined cpuidle
+> states), but I don't see the "CPU VDD off" LED light up; I'm not
+> convinced that the CPU is actually being powered off in the idle mode.
+> 
+The LED of the CPU Vdd indicates the power of CPU cluster. But the
+series of CPU idle power down mode support for Tegra114 only supports
+per core power down. It did not support cluster power down yet in idle
+mode. That needs some extra work to support cluster power down in idle
+mode.
+There are some items that I plat to do:
+1. integrate the MCPM (multi cluster power management) code into Tegra
+CPU PM code
+2. integrate coupled CPUidle framework into Tegra CPU idle driver
+3. normalize the Tegra CPU idle driver to single one
 
-Yep, this patch is not the right approach. It's trying to work around the
-limitations of the platforms clock API implementation. Please fix the at91
-clock implementation instead (e.g. by switching to the common clock framework).
+> With these patches applies, Harmony acts very strangely. After
+> hot-unplug and re-plug of CPU1, the system is hung or almost hung. The
+> patches appear to reduce the amount of time CPU VDD is off judging by
+> the LEDs. The patches might cause issues with system suspend too, but
+> I'm not 100% sure.
+> 
+Actually I didn't add anything about hotplug or something can increase
+the loading or make regressions. But I think you are testing with USB
+device attached, right? That might cause some extra loading. You can
+give it a try after just removing USB device. And I double confirm that
+on Seaboard. Except that, the test result looks OK for me.
 
-- Lars
+> As such, I haven't applied any of these. Can you please test boards for
+> all of Tegra20/30/114, and validate that on Dalmore the CPU power is
+> actually being turned off, and report back? Thanks.
+
+I have tested all these patches based on next-20130716. And verified the
+functions on Seaboard, Cardhu and Dalmore. Looks good for me. And the
+per core power down in idle is OK too. The cluster power down only
+support when the system goes into suspend mode right now for Tegra114.
+
+Thanks,
+Joseph
