@@ -1,98 +1,75 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Jul 2013 17:28:46 +0800
-Subject: [PATCH] dma: mxs-dma: remove code left from generic DMA binding
- conversion
-Message-ID: <1373966926-13809-1-git-send-email-shawn.guo@linaro.org>
+From: yann.morin.1998@free.fr (Yann E. MORIN)
+Date: Tue, 16 Jul 2013 11:32:39 +0200
+Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
+ streaming format
+In-Reply-To: <20130716092242.GD4402@pd.tnic>
+References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+ <201307161112.17901.yann.morin.1998@free.fr> <20130716092242.GD4402@pd.tnic>
+Message-ID: <201307161132.39845.yann.morin.1998@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With all mxs-dma clients moved to use generic DMA helper, the code
-left from generic DMA binding conversion can be removed now.
+Borislav, All,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/dma/mxs-dma.c       |   23 -----------------------
- include/linux/fsl/mxs-dma.h |   20 --------------------
- 2 files changed, 43 deletions(-)
- delete mode 100644 include/linux/fsl/mxs-dma.h
+On Tuesday 16 July 2013 11:22:42 Borislav Petkov wrote:
+> On Tue, Jul 16, 2013 at 11:12:17AM +0200, Yann E. MORIN wrote:
+> > The goal is to avoid generating a non-buildable kernel in the first place.
+> 
+> I know, that's why I'm proposing to fail the build with the script run
+> as one of the first things by make.
 
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index 7195930..099be73 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -23,7 +23,6 @@
- #include <linux/dmaengine.h>
- #include <linux/delay.h>
- #include <linux/module.h>
--#include <linux/fsl/mxs-dma.h>
- #include <linux/stmp_device.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-@@ -197,24 +196,6 @@ static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
- 	return container_of(chan, struct mxs_dma_chan, chan);
- }
- 
--int mxs_dma_is_apbh(struct dma_chan *chan)
--{
--	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
--	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
--
--	return dma_is_apbh(mxs_dma);
--}
--EXPORT_SYMBOL_GPL(mxs_dma_is_apbh);
--
--int mxs_dma_is_apbx(struct dma_chan *chan)
--{
--	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
--	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
--
--	return !dma_is_apbh(mxs_dma);
--}
--EXPORT_SYMBOL_GPL(mxs_dma_is_apbx);
--
- static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
- {
- 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-@@ -349,13 +330,9 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
- static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
- {
- 	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
--	struct mxs_dma_data *data = chan->private;
- 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
- 	int ret;
- 
--	if (data)
--		mxs_chan->chan_irq = data->chan_irq;
--
- 	mxs_chan->ccw = dma_alloc_coherent(mxs_dma->dma_device.dev,
- 				CCW_BLOCK_SIZE, &mxs_chan->ccw_phys,
- 				GFP_KERNEL);
-diff --git a/include/linux/fsl/mxs-dma.h b/include/linux/fsl/mxs-dma.h
-deleted file mode 100644
-index 55d8702..0000000
---- a/include/linux/fsl/mxs-dma.h
-+++ /dev/null
-@@ -1,20 +0,0 @@
--/*
-- * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef __MACH_MXS_DMA_H__
--#define __MACH_MXS_DMA_H__
--
--#include <linux/dmaengine.h>
--
--struct mxs_dma_data {
--	int chan_irq;
--};
--
--extern int mxs_dma_is_apbh(struct dma_chan *chan);
--extern int mxs_dma_is_apbx(struct dma_chan *chan);
--#endif /* __MACH_MXS_DMA_H__ */
+No, this is already too late: the given .config *is* already broken and
+unbuildable.
+
+> > > I.e., those steps:
+> > > 1. make <whatever>config
+> > > 2. make => A prereq. target runs the shell script.
+> > 
+> > This is too late, since this will bail out, and will give a false-positive
+> > failure.
+> 
+> Huh? This will tell you: "you've selected X, but I don't have toolX
+> needed for the build".
+> 
+> You install the tool and run make again. Checks pass, the build
+> continues.
+
+That does not work in two cases:
+  - older distros that do not have the tool packaged
+  - automatic test-harness that run thousands of randconfig a day
+
+In the first case, this /could/ be overcome by the user compiling and
+installing the package manually, but is mostly undoable in enterprise
+environment with shared build machines, where each user would have to
+install the same tool(s) again and again.
+
+In the second case, this would yield a lot of false-positive in daily
+reports.
+
+Your solution mostly works with minimum overhead for a human user
+interactively building a kernel, not with automated test harnesses.
+
+> > While if we were to check for _known_ needed tools before calling into
+> > Kconfig,
+> 
+> How would you do that? How do you know what the user is going to select
+> *before* she even selects it?
+
+The idea is to *avoid* the user being able to select unavailable options.
+
+> You need to have a prepared .config to act upon.
+
+The idea is to be always have a .config that is buildable with the current
+toolset of the system, especially for esoteric and/or recent tools that are
+not packaged and/or installed by default by the distros.
+
+Regards,
+Yann E. MORIN.
+
 -- 
-1.7.9.5
+.-----------------.--------------------.------------------.--------------------.
+|  Yann E. MORIN  | Real-Time Embedded | /"\ ASCII RIBBON | Erics' conspiracy: |
+| +0/33 662376056 | Software  Designer | \ / CAMPAIGN     |   ^                |
+| --==< O_o >==-- '------------.-------:  X  AGAINST      |  /e\  There is no  |
+| http://ymorin.is-a-geek.org/ | (*_*) | / \ HTML MAIL    |  """  conspiracy.  |
+'------------------------------'-------'------------------'--------------------'
