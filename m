@@ -1,32 +1,105 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 16 Jul 2013 13:19:17 +0300
-Subject: [PATCH] ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag
-In-Reply-To: <51E439BC.9030608@wwwdotorg.org>
-References: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
- <51E439BC.9030608@wwwdotorg.org>
-Message-ID: <20130716101917.GZ21962@tbergstrom-lnx.Nvidia.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 16 Jul 2013 13:27:02 +0300
+Subject: Boot hang regression 3.10.0-rc4 -> 3.10.0
+In-Reply-To: <51DE780C.2070701@ti.com>
+References: <20130705115959.GQ5523@atomide.com>
+ <B5906170F1614E41A8A28DE3B8D121433EE94489@DBDE04.ent.ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EE94520@DBDE04.ent.ti.com>
+ <20130708112553.GU5523@atomide.com> <51DAB394.3050104@ti.com>
+ <20130708131033.GA5523@atomide.com> <51DABC81.3080409@ti.com>
+ <20130708133512.GD31221@arwen.pp.htv.fi> <87mwpuakod.fsf@linaro.org>
+ <20130710142633.GV5523@atomide.com> <20130710160704.GH18966@arwen.pp.htv.fi>
+ <51DE780C.2070701@ti.com>
+Message-ID: <51E51FF6.60608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 08:04:44PM +0200, Stephen Warren wrote:
-> On 06/25/2013 03:23 AM, Joseph Lo wrote:
-> > Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
-> > to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
-> > this state.
-> 
-> I tried applying this patch, your series "[PATCH V3 0/3] ARM: tegra114:
-> cpuidle: add power down state", and your series "[PATCH V2 00/11] ARM:
-> tegra114: add support for system suspend", all on top of v3.11-rc1.
-> 
-> On Dalmore, the new cpuidle mode /appears/ to work (I see increasing
-> values in the sysfs cpuidle "usage" file for all defined cpuidle
-> states), but I don't see the "CPU VDD off" LED light up; I'm not
-> convinced that the CPU is actually being powered off in the idle mode.
+Hi Rajendra,
 
-The current patchset only powergates the individual cores on Tegra114. The
-entire cluster (including L2 cache etc) isn't railgated as a CPUidle state.
-Hence the CPU VDD off LED will never be on.
+On 07/11/2013 12:17 PM, Rajendra Nayak wrote:
+> On Wednesday 10 July 2013 09:37 PM, Felipe Balbi wrote:
+>> how about something like below ? It makes omap_device/hwmod and
+>> pm_runtime agree on the initial state of the device and will prevent
+>> ->runtime_resume() from being called on first pm_runtime_get*() done
+>> during probe.
+>>
+>> This is similar to what PCI bus does (if you look at pci_pm_init()).
+>
+> I tried something similar [1] but what I found is that the serial
+> runtime resume was called despite it being marked as active using
+> pm_runtime_set_active().
+>
+> That seems to be because of the pm_runtime_set_autosuspend_delay()
+> because we have the autosuspend_delay = -1
+>
+> -----
+> static void update_autosuspend(struct device *dev, int old_delay, int old_use)
+> {
+>          int delay = dev->power.autosuspend_delay;
+>
+>          /* Should runtime suspend be prevented now? */
+>          if (dev->power.use_autosuspend && delay < 0) {
+>
+>                  /* If it used to be allowed then prevent it. */
+>                  if (!old_use || old_delay >= 0) {
+>                          atomic_inc(&dev->power.usage_count);
+>                          rpm_resume(dev, 0); <------------------------------- calls serial runtime resume.
+>                  }
+>          }
+> -----
+>
+> So we end up with the same issue with serial resume being called before set_termios()
+>
+> [1]
+>
+> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+> index 5cc9287..c71d47d 100644
+> --- a/arch/arm/mach-omap2/omap_device.c
+> +++ b/arch/arm/mach-omap2/omap_device.c
+> @@ -129,6 +129,7 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+>          struct device_node *node = pdev->dev.of_node;
+>          const char *oh_name;
+>          int oh_cnt, i, ret = 0;
+> +       bool device_active = false;
+>
+>          oh_cnt = of_property_count_strings(node, "ti,hwmods");
+>          if (oh_cnt <= 0) {
+> @@ -152,6 +153,9 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+>                          goto odbfd_exit1;
+>                  }
+>                  hwmods[i] = oh;
+> +               if (oh->flags & HWMOD_INIT_NO_IDLE)
+> +                       device_active = true;
+> +
+>          }
+>
+>          od = omap_device_alloc(pdev, hwmods, oh_cnt);
+> @@ -172,6 +176,11 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+>
+>          pdev->dev.pm_domain = &omap_device_pm_domain;
+>
+> +       if (device_active) {
+> +               omap_device_enable(pdev);
+> +               pm_runtime_set_active(&pdev->dev);
+> +       }
+> +
+>   odbfd_exit1:
+>          kfree(hwmods);
+>   odbfd_exit:
 
-Cheers,
+This solution works good for me in combination with
+"serial: omap: enable PM runtime only when its fully configured"
+http://www.spinics.net/lists/linux-serial/msg10317.html
+(earlyprintk use case)
 
-Peter.
+And I think the best way would be to move forward with yours solution.
+- it will affect only on needed IPs drivers - not on all, so no issues 
+with iommu and etc.
+
+But issue with *non console" UARTs will still be here and, I think,
+there are no way ti solve it from OMAP device/hwmod frameworks side,
+because only driver can know when his context is ready.
+To test do: #echo 0xDEAD > dev/ttyO3
+
+Regards,
+-grygorii
