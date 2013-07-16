@@ -1,42 +1,22 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 16 Jul 2013 12:39:42 +0900
-Subject: [PATCH] ARM: EXYNOS: Enable 64-bit DMA for EXYNOS5440 if LPAE is
- enabled
-In-Reply-To: <109701ce667b$179822e0$46c868a0$%kim@samsung.com>
-References: <109701ce667b$179822e0$46c868a0$%kim@samsung.com>
-Message-ID: <027701ce81d6$1b857a80$52906f80$%kim@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Jul 2013 11:39:54 +0800
+Subject: [v7 2/3] ARM: imx6q: update the sata bits definitions of gpr13
+In-Reply-To: <1373945328-20893-3-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1373945328-20893-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1373945328-20893-3-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <20130716033951.GG28375@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+On Tue, Jul 16, 2013 at 11:28:47AM +0800, Richard Zhu wrote:
+> From: Richard Zhu <r65037@freescale.com>
 > 
-> From: Thomas Abraham <thomas.ab@samsung.com>
+> Replace the SATA_PHY_# by the more readable definitons.
 > 
-> Allow 64-bit DMA addresses if LPAE is enabled on EXYNOS5440.
-> 
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index e101b14..0f7d308 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -81,6 +81,7 @@ config SOC_EXYNOS5440
->  	bool "SAMSUNG EXYNOS5440"
->  	default y
->  	depends on ARCH_EXYNOS5
-> +	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
->  	select ARCH_HAS_OPP
->  	select ARM_ARCH_TIMER
->  	select AUTO_ZRELADDR
-> --
-> 1.7.10.4
+> Signed-off-by: Richard Zhu <r65037@freescale.com>
 
-OK, applied into -fixes for 3.11-rc because current SSDK5440 cannot boot
-without this.
+Hi Tejun,
 
-Thanks,
-- Kukjin
+The patch needs to go through your tree to keep patch #3 compilable.  So
+
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
