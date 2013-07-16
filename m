@@ -1,67 +1,212 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 16 Jul 2013 17:37:34 +0300
-Subject: [PATCH] ARM: OMAP3: Beagle: Fix USB Host on beagle xM Ax/Bx
-In-Reply-To: <51E3B1B1.3060202@denx.de>
-References: <1366024808-4691-1-git-send-email-rogerq@ti.com>
- <51DC09E7.1070302@denx.de> <51DC164B.5010608@ti.com>
- <51DC1B47.7070504@denx.de> <51DE87D3.5030600@ti.com>
- <51DEA7F1.1050902@denx.de> <51DEC2CE.70400@ti.com> <51DED076.3040000@denx.de>
- <51DEF0DE.4050607@denx.de> <51DFC92F.1050701@ti.com>
- <51DFDFD4.3040900@denx.de> <51E3AFF4.7060607@ti.com>
- <51E3B1B1.3060202@denx.de>
-Message-ID: <51E55AAE.3000209@ti.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Tue, 16 Jul 2013 16:44:40 +0200
+Subject: [PATCH v8] ARM: clocksource: add support for MOXA ART SoCs
+In-Reply-To: <1373024773-24574-1-git-send-email-jonas.jensen@gmail.com>
+References: <1373024773-24574-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1373985880-23469-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Alan
+This patch adds an clocksource driver for the main timer(s)
+found on MOXA ART SoCs.
 
-On 07/15/2013 11:24 AM, Stefan Roese wrote:
-> On 07/15/2013 10:16 AM, Roger Quadros wrote:
->>>> I can only test on beagle-xm (which is also rev. C2) with integrated SMSC ethernet chip
->>>> as I don't have an external USB-ethernet adapter.
->>>
->>> Too bad. This difference in boards makes the tests a bit less
->>> meaningful. Is there really no USB-ethernet adapter somewhere in your
->>> department (perhaps a non-SMSC95xx might serve as well?)? I might
->>> send/order you one if necessary. ;)
->>
->> Thanks for the offer :). I'll just get one for myself by today/tomorrow.
->> The one available here uses this driver "drivers/net/usb/asix.c"
-> 
-> Great.
-> 
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-OK. Finally managed to reproduce the problem.
+Notes:
+    Changes since v7:
+    
+    1. use BIT macro
+    2. set moxart_clockevent.irq
+    
+    Applies to next-20130716
 
-Don't know the root cause yet. Will need to investigate.
+ drivers/clocksource/Makefile       |   1 +
+ drivers/clocksource/moxart_timer.c | 164 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 165 insertions(+)
+ create mode 100644 drivers/clocksource/moxart_timer.c
 
-[   92.054138] ------------[ cut here ]------------
-[   92.059082] WARNING: at net/sched/sch_generic.c:255 dev_watchdog+0x278/0x29c()
-[   92.066741] NETDEV WATCHDOG: eth0 (asix): transmit queue 0 timed out
-[   92.073425] Modules linked in:
-[   92.076721] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-06007-g83bebb4 #837
-[   92.084594] [<c001b868>] (unwind_backtrace+0x0/0xf0) from [<c0017bbc>] (show_stack+0x10/0x14)
-[   92.093597] [<c0017bbc>] (show_stack+0x10/0x14) from [<c04f7658>] (dump_stack+0x78/0x94)
-[   92.102172] [<c04f7658>] (dump_stack+0x78/0x94) from [<c00440b8>] (warn_slowpath_common+0x4c/0x6c)
-[   92.111694] [<c00440b8>] (warn_slowpath_common+0x4c/0x6c) from [<c004416c>] (warn_slowpath_fmt+0x30/0x40)
-[   92.121826] [<c004416c>] (warn_slowpath_fmt+0x30/0x40) from [<c045aa28>] (dev_watchdog+0x278/0x29c)
-[   92.131439] [<c045aa28>] (dev_watchdog+0x278/0x29c) from [<c0052d0c>] (call_timer_fn+0x80/0x168)
-[   92.140747] [<c0052d0c>] (call_timer_fn+0x80/0x168) from [<c0052f98>] (run_timer_softirq+0x1a4/0x290)
-[   92.150512] [<c0052f98>] (run_timer_softirq+0x1a4/0x290) from [<c004bddc>] (__do_softirq+0x100/0x27c)
-[   92.160308] [<c004bddc>] (__do_softirq+0x100/0x27c) from [<c004c2fc>] (irq_exit+0xa0/0xdc)
-[   92.169067] [<c004c2fc>] (irq_exit+0xa0/0xdc) from [<c0014ccc>] (handle_IRQ+0x50/0xb0)
-[   92.177490] [<c0014ccc>] (handle_IRQ+0x50/0xb0) from [<c000862c>] (omap3_intc_handle_irq+0x60/0x74)
-[   92.187072] [<c000862c>] (omap3_intc_handle_irq+0x60/0x74) from [<c04fd5a4>] (__irq_svc+0x44/0x5c)
-[   92.196563] Exception stack(0xc0775f58 to 0xc0775fa0)
-[   92.201873] 5f40:                                                       00000001 00000001
-[   92.210540] 5f60: 00000000 c077fd08 c0774000 00000000 c080acc0 c080a5ee c080acc0 c0509860
-[   92.219207] 5f80: c077c9a8 c0774000 ce0ce578 c0775fa0 c0097b18 c0015034 200f0013 ffffffff
-[   92.227874] [<c04fd5a4>] (__irq_svc+0x44/0x5c) from [<c0015034>] (arch_cpu_idle+0x20/0x3c)
-[   92.236663] [<c0015034>] (arch_cpu_idle+0x20/0x3c) from [<c0086268>] (cpu_startup_entry+0x80/0x21c)
-[   92.246276] [<c0086268>] (cpu_startup_entry+0x80/0x21c) from [<c0714820>] (start_kernel+0x2c4/0x320)
-[   92.255950] ---[ end trace 29c2af54cf6c8fa8 ]---
-[   92.272674] ehci-omap 48064800.ehci: IAA watchdog: status e008 cmd 10075
-[   92.291137] ehci-omap 48064800.ehci: IAA watchdog: status e008 cmd 10075
-
-cheers,
--roger
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 8b00c5c..704d6d3 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -18,6 +18,7 @@ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
+ obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
+ obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
+ obj-$(CONFIG_ARCH_MARCO)	+= timer-marco.o
++obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
+ obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
+ obj-$(CONFIG_ARCH_PRIMA2)	+= timer-prima2.o
+ obj-$(CONFIG_SUN4I_TIMER)	+= sun4i_timer.o
+diff --git a/drivers/clocksource/moxart_timer.c b/drivers/clocksource/moxart_timer.c
+new file mode 100644
+index 0000000..08a5943
+--- /dev/null
++++ b/drivers/clocksource/moxart_timer.c
+@@ -0,0 +1,164 @@
++/*
++ * MOXA ART SoCs timer handling.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk.h>
++#include <linux/clockchips.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/irqreturn.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/io.h>
++#include <linux/clocksource.h>
++
++#define TIMER1_BASE		0x00
++#define TIMER2_BASE		0x10
++#define TIMER3_BASE		0x20
++
++#define REG_COUNT		0x0 /* writable */
++#define REG_LOAD		0x4
++#define REG_MATCH1		0x8
++#define REG_MATCH2		0xC
++
++#define TIMER_CR		0x30
++#define TIMER_INTR_STATE	0x34
++#define TIMER_INTR_MASK		0x38
++
++/*
++ * TIMER_CR flags:
++ *
++ * TIMEREG_CR_*_CLOCK	0: PCLK, 1: EXT1CLK
++ * TIMEREG_CR_*_INT	overflow interrupt enable bit
++ */
++#define TIMEREG_CR_1_ENABLE	BIT(0)
++#define TIMEREG_CR_1_CLOCK	BIT(1)
++#define TIMEREG_CR_1_INT	BIT(2)
++#define TIMEREG_CR_2_ENABLE	BIT(3)
++#define TIMEREG_CR_2_CLOCK	BIT(4)
++#define TIMEREG_CR_2_INT	BIT(5)
++#define TIMEREG_CR_3_ENABLE	BIT(6)
++#define TIMEREG_CR_3_CLOCK	BIT(7)
++#define TIMEREG_CR_3_INT	BIT(8)
++#define TIMEREG_CR_COUNT_UP	BIT(9)
++
++#define TIMER1_ENABLE		(TIMEREG_CR_2_ENABLE | TIMEREG_CR_1_ENABLE)
++#define TIMER1_DISABLE		(TIMEREG_CR_2_ENABLE)
++
++static void __iomem *base;
++static unsigned int clock_count_per_tick;
++
++static void moxart_clkevt_mode(enum clock_event_mode mode,
++			       struct clock_event_device *clk)
++{
++	switch (mode) {
++	case CLOCK_EVT_MODE_RESUME:
++	case CLOCK_EVT_MODE_ONESHOT:
++		writel(TIMER1_DISABLE, base + TIMER_CR);
++		writel(~0, base + TIMER1_BASE + REG_LOAD);
++		break;
++	case CLOCK_EVT_MODE_PERIODIC:
++		writel(clock_count_per_tick, base + TIMER1_BASE + REG_LOAD);
++		writel(TIMER1_ENABLE, base + TIMER_CR);
++		break;
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	default:
++		writel(TIMER1_DISABLE, base + TIMER_CR);
++		break;
++	}
++}
++
++static int moxart_clkevt_next_event(unsigned long cycles,
++				    struct clock_event_device *unused)
++{
++	u32 u;
++
++	writel(TIMER1_DISABLE, base + TIMER_CR);
++
++	u = readl(base + TIMER1_BASE + REG_COUNT) - cycles;
++	writel(u, base + TIMER1_BASE + REG_MATCH1);
++
++	writel(TIMER1_ENABLE, base + TIMER_CR);
++
++	return 0;
++}
++
++static struct clock_event_device moxart_clockevent = {
++	.name		= "moxart_timer",
++	.rating		= 200,
++	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_mode	= moxart_clkevt_mode,
++	.set_next_event	= moxart_clkevt_next_event,
++};
++
++static irqreturn_t moxart_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++	evt->event_handler(evt);
++	return IRQ_HANDLED;
++}
++
++static struct irqaction moxart_timer_irq = {
++	.name		= "moxart-timer",
++	.flags		= IRQF_TIMER,
++	.handler	= moxart_timer_interrupt,
++	.dev_id		= &moxart_clockevent,
++};
++
++static void __init moxart_timer_init(struct device_node *node)
++{
++	int ret, irq;
++	unsigned long pclk;
++	struct clk *clk;
++
++	base = of_iomap(node, 0);
++	if (!base)
++		panic("%s: of_iomap failed\n", node->full_name);
++
++	irq = irq_of_parse_and_map(node, 0);
++	if (irq <= 0)
++		panic("%s: irq_of_parse_and_map failed\n", node->full_name);
++
++	ret = setup_irq(irq, &moxart_timer_irq);
++	if (ret)
++		panic("%s: setup_irq failed\n", node->full_name);
++
++	clk = of_clk_get(node, 0);
++	if (IS_ERR(clk))
++		panic("%s: of_clk_get failed\n", node->full_name);
++
++	pclk = clk_get_rate(clk);
++
++	if (clocksource_mmio_init(base + TIMER2_BASE + REG_COUNT,
++				  "moxart_timer", pclk, 200, 32,
++				  clocksource_mmio_readl_down))
++		panic("%s: clocksource_mmio_init failed\n", node->full_name);
++
++	clock_count_per_tick = DIV_ROUND_CLOSEST(pclk, HZ);
++
++	writel(~0, base + TIMER2_BASE + REG_LOAD);
++	writel(TIMEREG_CR_2_ENABLE, base + TIMER_CR);
++
++	moxart_clockevent.cpumask = cpumask_of(0);
++	moxart_clockevent.irq = irq;
++
++	/*
++	 * documentation is not publicly available:
++	 * min_delta / max_delta obtained by trial-and-error,
++	 * max_delta 0xfffffffe should be ok because count
++	 * register size is u32
++	 */
++	clockevents_config_and_register(&moxart_clockevent, pclk,
++					0x4, 0xfffffffe);
++}
++CLOCKSOURCE_OF_DECLARE(moxart, "moxa,moxart-timer", moxart_timer_init);
+-- 
+1.8.2.1
