@@ -1,35 +1,49 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 16 Jul 2013 09:27:10 -0500
-Subject: [PATCH 0/2] regulator: palmas-pmic: doc: update device tree
- bindings
-In-Reply-To: <1373984635-14958-1-git-send-email-nm@ti.com>
-References: <1373984635-14958-1-git-send-email-nm@ti.com>
-Message-ID: <20130716142710.GA15015@kahuna>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 16 Jul 2013 10:29:30 -0400
+Subject: [PATCH 00/10] Orion Watchdog fixes
+In-Reply-To: <20130716140435.GA23904@localhost>
+References: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130716065952.GA25043@lunn.ch> <20130716092059.237ea729@skate>
+ <20130716073101.GB25043@lunn.ch> <20130716121432.GA2317@localhost>
+ <20130716134422.GE12062@titan.lakedaemon.net>
+ <20130716140435.GA23904@localhost>
+Message-ID: <20130716142930.GF12062@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:23-20130716, Nishanth Menon wrote:
-> We seem to have a few missing updates to device tree bindings with the
-> latest set of changes getting merged in.
+On Tue, Jul 16, 2013 at 11:04:36AM -0300, Ezequiel Garcia wrote:
+> On Tue, Jul 16, 2013 at 09:44:22AM -0400, Jason Cooper wrote:
+> > On Tue, Jul 16, 2013 at 09:14:33AM -0300, Ezequiel Garcia wrote:
+> > > On the other side, I'm much interested in knowing if you are OK with
+> > > breaking the watchdog DT compatibility. If you NACK this, then I'll
+> > > start preparing a different watchdog driver for 370/XP, since I don't
+> > > want to extend a driver that is a bit dirty.
+> > 
+> > Apparently there is some agreement that the bindings are still in flux
+> > and that they need to be for a bit longer in order to hammer out
+> > problems such as this.
+> > 
+> > Arnd and Olof both mentioned that something (a doc, and email?) is
+> > forthcoming about marking some bindings as stable.  Whatever form that
+> > takes, this one wouldn't get the stable marking yet. ;-)
+> > 
+> 
+> Yup, that's my understanding as well. But on the other side, I don't
+> want to break possible users out there.
 
-Oops.. seems like I have an old mailID for Mark :(
+I agree, but living with a sub-standard binding is worse imho.
 
-> 
-> Based on v3.11-rc1 tag
-> 
-> Nishanth Menon (2):
->   regulator: palmas-pmic: doc: fix typo for sleep-mode
->   regulator: palmas-pmic: doc: remove ti,tstep
-> 
->  .../devicetree/bindings/regulator/palmas-pmic.txt  |    4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
-> 
-> -- 
-> 1.7.9.5
-> 
-> Regards,
-> Nishanth Menon
+> So, just to check, you say it's early enough to safely do such change?
 
--- 
-Regards,
-Nishanth Menon
+Well, it's not *safe*.  But most consumers on mainline kernels are
+currently developer/hackers/distro maintainers.  eg, folks who can
+handle it.  It's better to do it now.
+
+> In that case, I'll extend this patchset to include Armada 370/XP support
+> and post it as soon as Sebastian's clocksource stuff gets in.
+
+Cool.
+
+thx,
+
+Jason.
