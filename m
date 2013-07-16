@@ -1,62 +1,19 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Jul 2013 00:19:34 +0100
-Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC
- with ARM CPU
-In-Reply-To: <20130716172023.64337690@skate>
-References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
- <20130716172023.64337690@skate>
-Message-ID: <20130716231934.GH24642@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 16 Jul 2013 17:20:04 -0600
+Subject: [PATCH v2 09/22] amba: Move AHB to core_initcall
+In-Reply-To: <1373021097-32420-10-git-send-email-hdoyu@nvidia.com>
+References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
+ <1373021097-32420-10-git-send-email-hdoyu@nvidia.com>
+Message-ID: <51E5D524.1000903@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 05:20:23PM +0200, Thomas Petazzoni wrote:
-> Dear Hauke Mehrtens,
-> 
-> On Tue, 16 Jul 2013 15:52:07 +0200, Hauke Mehrtens wrote:
-> > +static int bcm53xx_abort_handler(unsigned long addr, unsigned int fsr,
-> > +				 struct pt_regs *regs)
-> > +{
-> > +	/*
-> > +	 * These happen for no good reason
-> > +	 * possibly left over from CFE
-> 
-> CFE ?
-> 
-> > +	 */
-> > +	pr_warn("External imprecise Data abort at addr=%#lx, fsr=%#x ignored.\n",
-> > +		addr, fsr);
-> > +
-> > +	/* Returning non-zero causes fault display and panic */
-> > +	return 0;
-> > +}
-> > +
-> > +static void bcm53xx_aborts_enable(void)
-> > +{
-> > +	/* Install our hook */
-> > +	hook_fault_code(16 + 6, bcm53xx_abort_handler, SIGBUS, 0,
-> > +			"imprecise external abort");
-> > +}
-> > +
-> > +static void __init bcm53xx_timer_init(void)
-> > +{
-> > +	of_clk_init(NULL);
-> > +	clocksource_of_init();
-> > +}
-> > +
-> > +void __init bcm53xx_map_io(void)
-> > +{
-> > +	debug_ll_io_init();
-> > +	bcm53xx_aborts_enable();
-> > +}
-> 
-> That's a nitpick, but I personally tend to like when callbacks are
-> ordered as they are called, i.e ->map_io() first, and then
-> ->init_time().
+On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
+> Move AHB to core_initcall in order to instanciate this device earlier
+> than others since IOMMU depends on AHB and then IOMMU driver needs to
+> reigster other platform devices as IOMMU'able.
 
-A more important nitpick is... it would be better to have the call to
-the aborts enable function in the init_early() callback, not the map_io()
-callback.  Too often people overload stuff into these specific callbacks
-which makes maintanence of non-platform code pain in the butt.
-
-The init_early() callback was specifically added by me to remove this
-kind of crappage of map_io().  Please use it.  Thanks.
+Oh dear, this really is looking like we shouldn't be playing games by
+attempting to force the initialization order. An explicit bus structure
+and/or having client devices go and attach to the SMMU, would mean we
+didn't have to play games like this:-(
