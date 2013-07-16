@@ -1,32 +1,69 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 16 Jul 2013 14:55:32 +0800
-Subject: [PATCH v2 3/3] ARM: dts: imx28-evk: add the RTS/CTS property for
- auart0
-In-Reply-To: <1373957732-16638-1-git-send-email-b32955@freescale.com>
-References: <1373957732-16638-1-git-send-email-b32955@freescale.com>
-Message-ID: <1373957732-16638-4-git-send-email-b32955@freescale.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 16 Jul 2013 16:30:19 +0900
+Subject: [PATCH 2/6] clk: exynos4: Remove unused function
+In-Reply-To: <1373533334-5169-3-git-send-email-sachin.kamat@linaro.org>
+References: <1373533334-5169-1-git-send-email-sachin.kamat@linaro.org>
+ <1373533334-5169-3-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <02d701ce81f6$532ab9d0$f9802d70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the RTS/CTS property for auart0 which means we enable the
-DMA support for it.
+Sachin Kamat wrote:
+> 
+> Subsequent to the cleanup in commit 3c70348c7c ("ARM: EXYNOS:
+> Remove legacy timer initialization code"), this function has no more
+> users. Hence remove it.
+> 
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> ---
+>  drivers/clk/samsung/clk-exynos4.c |   14 --------------
+>  1 file changed, 14 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-
+> exynos4.c
+> index 18eadc4..75635eb 100644
+> --- a/drivers/clk/samsung/clk-exynos4.c
+> +++ b/drivers/clk/samsung/clk-exynos4.c
+> @@ -969,20 +969,6 @@ static void __init
+> exynos4_clk_register_finpll(unsigned long xom)
+> 
+>  }
+> 
+> -/*
+> - * This function allows non-dt platforms to specify the clock speed of
+> the
+> - * xxti and xusbxti clocks. These clocks are then registered with the
+> specified
+> - * clock speed.
+> - */
+> -void __init exynos4_clk_register_fixed_ext(unsigned long xxti_f,
+> -						  unsigned long xusbxti_f)
+> -{
+> -	exynos4_fixed_rate_ext_clks[0].fixed_rate = xxti_f;
+> -	exynos4_fixed_rate_ext_clks[1].fixed_rate = xusbxti_f;
+> -	samsung_clk_register_fixed_rate(exynos4_fixed_rate_ext_clks,
+> -			ARRAY_SIZE(exynos4_fixed_rate_ext_clks));
+> -}
+> -
+>  static __initdata struct of_device_id ext_clk_match[] = {
+>  	{ .compatible = "samsung,clock-xxti", .data = (void *)0, },
+>  	{ .compatible = "samsung,clock-xusbxti", .data = (void *)1, },
+> --
+> 1.7.9.5
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/boot/dts/imx28-evk.dts |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+And need following?
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index e035f46..15715d9 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -220,6 +220,7 @@
- 			auart0: serial at 8006a000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&auart0_pins_a>;
-+				fsl,uart-has-rtscts;
- 				status = "okay";
- 			};
- 
--- 
-1.7.1
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 3e156bc..1037da0 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -27,7 +27,6 @@ void exynos_init_late(void);
+
+ /* ToDo: remove these after migrating legacy exynos4 platforms to dt */
+ void exynos4_clk_init(struct device_node *np, int is_exynos4210, void
+__iomem *reg_base, unsigned long xom);
+-void exynos4_clk_register_fixed_ext(unsigned long, unsigned long);
+
+ void exynos_firmware_init(void);
+
+- Kukjin
