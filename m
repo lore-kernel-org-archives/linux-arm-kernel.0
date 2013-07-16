@@ -1,92 +1,40 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 16 Jul 2013 15:55:28 +0800
-Subject: [PATCH 4/5] iio: at91: add an optional dt property for for adc
- clock hz.
-In-Reply-To: <20130715130610.GD2962@lukather>
-References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
- <1373789069-11604-5-git-send-email-josh.wu@atmel.com>
- <20130715130610.GD2962@lukather>
-Message-ID: <51E4FC70.3050207@atmel.com>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Tue, 16 Jul 2013 07:56:52 +0000
+Subject: [v7 2/3] ARM: imx6q: update the sata bits definitions of gpr13
+In-Reply-To: <20130716033951.GG28375@S2101-09.ap.freescale.net>
+References: <1373945328-20893-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1373945328-20893-3-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <20130716033951.GG28375@S2101-09.ap.freescale.net>
+Message-ID: <0E83723C55F66F43A6041464FE31119D33D959@039-SN2MPN1-011.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Maxime
+Hi Shawn:
+Thanks.
 
-On 7/15/2013 9:06 PM, Maxime Ripard wrote:
-> Hi Josh,
->
-> On Sun, Jul 14, 2013 at 04:04:28PM +0800, Josh Wu wrote:
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->>   Documentation/devicetree/bindings/arm/atmel-adc.txt |    2 ++
->>   drivers/iio/adc/at91_adc.c                          |    8 +++++++-
->>   2 files changed, 9 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
->> index 16769d9..0db2945 100644
->> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
->> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
->> @@ -27,6 +27,8 @@ Optional properties:
->>   		       resolution will be used.
->>     - atmel,adc-sleep-mode: Boolean to enable sleep mode when no conversion
->>     - atmel,adc-sample-hold-time: Sample and Hold Time in microseconds
->> +  - atmel,adc-clock-rate: ADC clock rate. If not specified, use the default
->> +			  adc_op_clk.
->>    
->>   Optional trigger Nodes:
->>     - Required properties:
->> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
->> index e93a075..8f1386f 100644
->> --- a/drivers/iio/adc/at91_adc.c
->> +++ b/drivers/iio/adc/at91_adc.c
->> @@ -47,6 +47,7 @@ struct at91_adc_caps {
->>   
->>   struct at91_adc_state {
->>   	struct clk		*adc_clk;
->> +	u32			adc_clk_rate;
->>   	u16			*buffer;
->>   	unsigned long		channels_mask;
->>   	struct clk		*clk;
->> @@ -448,6 +449,10 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
->>   	if (!node)
->>   		return -EINVAL;
->>   
->> +	prop = 0;
->> +	of_property_read_u32(node, "atmel,adc-clock-rate", &prop);
->> +	st->adc_clk_rate = prop;
->> +
->>   	st->use_external = of_property_read_bool(node, "atmel,adc-use-external-triggers");
->>   
->>   	if (of_property_read_u32(node, "atmel,adc-channels-used", &prop)) {
->> @@ -723,7 +728,8 @@ static int at91_adc_probe(struct platform_device *pdev)
->>   	 * specified by the electrical characteristics of the board.
->>   	 */
->>   	mstrclk = clk_get_rate(st->clk);
->> -	adc_clk = clk_get_rate(st->adc_clk);
->> +	adc_clk = st->adc_clk_rate ?
->> +		st->adc_clk_rate : clk_get_rate(st->adc_clk);
-> Why is that needed? Isn't it completely redundant with the clocks
-> property?
+Hi Tejun:
+Can you help to pick up the #3 of this patch-set?
+Thanks in advance.
 
-As st->adc_clk rate is specified in arch/arm/mach-at91/sama5d3.c (take 
-sama5d3 for example), changing the clock rate should recompile the 
-kernel binary.
-Use dt parameter will let us easily specify the clock rate instead of 
-recompile the code.
+Best Regards
+Richard Zhu
 
-And yes, it is redundant that we can define the adc_op_clk rate in two 
-places (clock property in .c and adc-clock-rate in dts). But this can be 
-compatible with the non-dt platform.
+-----Original Message-----
+From: Shawn Guo [mailto:shawn.guo at linaro.org] 
+Sent: Tuesday, July 16, 2013 11:40 AM
+To: Richard Zhu
+Cc: linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; tj at kernel.org; rob.herring at calxeda.com; s.hauer at pengutronix.de; linux-ide at vger.kernel.org; Zhu Richard-R65037
+Subject: Re: [v7 2/3] ARM: imx6q: update the sata bits definitions of gpr13
 
-After a further thinking of this, maybe remove the adc_op_clk is better 
-since it is a fake clock, and only used to specify the clock rate.
-To specify the clock rate use a dt property or platform data parameter 
-is better.
+On Tue, Jul 16, 2013 at 11:28:47AM +0800, Richard Zhu wrote:
+> From: Richard Zhu <r65037@freescale.com>
+> 
+> Replace the SATA_PHY_# by the more readable definitons.
+> 
+> Signed-off-by: Richard Zhu <r65037@freescale.com>
 
->
-> Maxime
->
->
+Hi Tejun,
 
-Best Regards,
-Josh Wu
+The patch needs to go through your tree to keep patch #3 compilable.  So
+
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
