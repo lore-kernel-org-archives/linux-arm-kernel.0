@@ -1,24 +1,132 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Jul 2013 08:11:22 +0800
-Subject: [PATCH] phy: micrel: Add definitions for common Micrel PHY
- registers
-In-Reply-To: <1373929730-28130-1-git-send-email-dinguyen@altera.com>
-References: <1373929730-28130-1-git-send-email-dinguyen@altera.com>
-Message-ID: <20130716001120.GE23589@S2101-09.ap.freescale.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 16 Jul 2013 09:49:12 +0900
+Subject: [PATCH 2/3] video: hx8357: Make IM pins optional
+In-Reply-To: <1373902022-20439-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1373902022-20439-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1373902022-20439-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <003501ce81be$4a945ed0$dfbd1c70$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 06:08:50PM -0500, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
+On Tuesday, July 16, 2013 12:27 AM, Maxime Ripard wrote:
 > 
-> Add defines for common Micrel PHY setups so that other platforms
-> can use them. Update imx61 and sama5 hardware to use the micrel_phy.h
-> PHY defines.
+> The IM pins of the HX8357 controller are used to define the interface
+> used to feed pixel stream to the LCD panel.
 > 
-> Also add support for the KSZ9021RLRN PHY.
+> Most of the time, these pins are directly routed to either the ground or
+> the VCC to set their values.
 > 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Remove the need to assign GPIOs to these pins when we are in such a case.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/video/backlight/hx8357.c | 52 +++++++++++++++++++++++-----------------
+>  1 file changed, 30 insertions(+), 22 deletions(-)
+> 
+> diff --git a/drivers/video/backlight/hx8357.c b/drivers/video/backlight/hx8357.c
+> index a0482b5..ed94796 100644
+> --- a/drivers/video/backlight/hx8357.c
+> +++ b/drivers/video/backlight/hx8357.c
+> @@ -76,6 +76,7 @@ struct hx8357_data {
+>  	unsigned		reset;
+>  	struct spi_device	*spi;
+>  	int			state;
+> +	bool			use_im_pins;
+>  };
+> 
+>  static u8 hx8357_seq_power[] = {
+> @@ -250,9 +251,11 @@ static int hx8357_lcd_init(struct lcd_device *lcdev)
+>  	 * Set the interface selection pins to SPI mode, with three
+>  	 * wires
+>  	 */
+> -	gpio_set_value_cansleep(lcd->im_pins[0], 1);
+> -	gpio_set_value_cansleep(lcd->im_pins[1], 0);
+> -	gpio_set_value_cansleep(lcd->im_pins[2], 1);
+> +	if (lcd->use_im_pins) {
+> +		gpio_set_value_cansleep(lcd->im_pins[0], 1);
+> +		gpio_set_value_cansleep(lcd->im_pins[1], 0);
+> +		gpio_set_value_cansleep(lcd->im_pins[2], 1);
+> +	}
+> 
+>  	/* Reset the screen */
+>  	gpio_set_value(lcd->reset, 1);
+> @@ -424,26 +427,31 @@ static int hx8357_probe(struct spi_device *spi)
+>  		return -EINVAL;
+>  	}
+> 
+> -	for (i = 0; i < HX8357_NUM_IM_PINS; i++) {
+> -		lcd->im_pins[i] = of_get_named_gpio(spi->dev.of_node,
+> -						"im-gpios", i);
+> -		if (lcd->im_pins[i] == -EPROBE_DEFER) {
+> -			dev_info(&spi->dev, "GPIO requested is not here yet, deferring the probe\n");
+> -			return -EPROBE_DEFER;
+> -		}
+> -		if (!gpio_is_valid(lcd->im_pins[i])) {
+> -			dev_err(&spi->dev, "Missing dt property: im-gpios\n");
+> -			return -EINVAL;
+> +	if (of_find_property(spi->dev.of_node, "im-gpios", NULL)) {
+> +		lcd->use_im_pins = 1;
+> +
+> +		for (i = 0; i < HX8357_NUM_IM_PINS; i++) {
+> +			lcd->im_pins[i] = of_get_named_gpio(spi->dev.of_node,
+> +							    "im-gpios", i);
+> +			if (lcd->im_pins[i] == -EPROBE_DEFER) {
+> +				dev_info(&spi->dev, "GPIO requested is not here yet, deferring the
+> probe\n");
+> +				return -EPROBE_DEFER;
+> +			}
+> +			if (!gpio_is_valid(lcd->im_pins[i])) {
+> +				dev_err(&spi->dev, "Missing dt property: im-gpios\n");
+> +				return -EINVAL;
+> +			}
+> +
+> +			ret = devm_gpio_request_one(&spi->dev, lcd->im_pins[i],
+> +						    GPIOF_OUT_INIT_LOW, "im_pins");
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+This makes a checkpatch warning such as 'WARNING: line over 80 characters'.
+How about the following?
+
+			ret = devm_gpio_request_one(&spi->dev, lcd->im_pins[i],
+						GPIOF_OUT_INIT_LOW, "im_pins");
+
+> +			if (ret) {
+> +				dev_err(&spi->dev, "failed to request gpio %d: %d\n",
+> +					lcd->im_pins[i], ret);
+> +				return -EINVAL;
+> +			}
+>  		}
+> -
+> -		ret = devm_gpio_request_one(&spi->dev, lcd->im_pins[i],
+> -					GPIOF_OUT_INIT_LOW, "im_pins");
+> -		if (ret) {
+> -			dev_err(&spi->dev, "failed to request gpio %d: %d\n",
+> -				lcd->im_pins[i], ret);
+> -			return -EINVAL;
+> -		}
+> -	}
+> +	} else
+> +		lcd->use_im_pins = 0;
+
+According to the 'Documentation/CodingStyle', braces are necessary as below.
+
+	} else {
+		lcd->use_im_pins = 0;
+	}
+
+
+Others look good.
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+
+Best regards,
+Jingoo Han
+
+> 
+>  	lcdev = lcd_device_register("mxsfb", &spi->dev, lcd, &hx8357_ops);
+>  	if (IS_ERR(lcdev)) {
+> --
+> 1.8.3.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
