@@ -1,32 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 16 Jul 2013 13:01:18 +0900
-Subject: Single zImage and A15/LPAE
-In-Reply-To: <201305292351.41096.arnd@arndb.de>
-References: <50735B75.8070109@wwwdotorg.org> <2274563.opVbLLPT1p@wuerfel>
- <20130529151555.GP17767@MacBook-Pro.local> <201305292351.41096.arnd@arndb.de>
-Message-ID: <028201ce81d9$200ecbd0$602c6370$%kim@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Jul 2013 12:10:58 +0800
+Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <51E4BF98.8030604@wwwdotorg.org>
+References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
+ <20130716015038.GD28375@S2101-09.ap.freescale.net>
+ <51E4BF98.8030604@wwwdotorg.org>
+Message-ID: <20130716041056.GA30067@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+On Mon, Jul 15, 2013 at 09:35:52PM -0600, Stephen Warren wrote:
+> > It's a little bit late to register gpio-reset driver at module_init
+> > time, because gpio-reset provides reset control via gpio for other
+> > devices which are mostly probed at module_init time too.  And it
+> > becomes even worse, when the gpio comes from IO expander on I2C bus,
+> > e.g. pca953x.  In that case, gpio-reset needs to be ready before I2C
+> > bus driver which is generally ready at subsys_initcall time.  Let's
+> > register gpio-reset driver in arch_initcall() to have it ready early
+> > enough.
 > 
-> On Wednesday 29 May 2013, Catalin Marinas wrote:
-> > > I think to do this right, we need to treat ARMv7+LPAE as a separate
-> > > architecture level, just like we treat ARMv6, ARMv7 as separate
-> > > compatible architectures. BTW, is there an official name for that
-> > > architecture?
-> >
-> > The official is Large Physical Address Extension which is an extension
-> > to ARMv7, so not a new architecture.
+> There's no need for the reset driver to be registered before its users;
+> the users of the reset GPIO will simply have their probe deferred until
+> the reset controller is available, and then everything will work out
+> just fine.
 > 
-> Ah, too bad. I had hoped there were still postfixes like v6K or v4T.
-> I guess there is no complete list of ARMv7 extensions anywhere, right?
+> > The defer probe mechanism is not used here, because a reset controller
+> > driver should be reasonably registered early than other devices.  More
+> > importantly, defer probe doe not help in some nasty cases, e.g. the
+> > gpio-pca953x device itself needs a reset from gpio-reset driver to start
+> > working.
 > 
-Just note, EXYNOS4 SoCs and EXYNOS5250 cannot boot when LPAE is enabled so I
-think, single zImage should be handled separately for non-LPAE and LPAE. I
-need to sort out EXYNOS SoCs for it and prepare registering
-exynos5440_defconfig. Of course, EXYNOS5440 can be supported without LPAE
-enabling but current bootargs in v3.11-rc1 break the kernel booting.
+> That should work fine with deferred probe.
 
-Thanks,
-- Kukjin
+I should probably rework the commit log.  But I do not see a problem
+to register gpio-reset driver a little bit earlier.  On the other hand,
+if we reply on deferred probe, many drivers probe could be deferred.
+For example, on my system, the gpio-pca953x on I2C bus works as a GPIO
+controller and provides resets to many board level components.
+Deferring probe of gpio-pca953x on I2C bus means every single probe of
+all these components gets deferred.  IMO, this situation should be
+reasonably avoided.
+
+Shawn
