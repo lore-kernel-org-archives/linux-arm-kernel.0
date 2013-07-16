@@ -1,32 +1,41 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 16 Jul 2013 11:22:38 +0530
-Subject: [PATCH v2 0/4] usb: musb: fix USB enumeration issue in OMAP3
- platform
-In-Reply-To: <1373282057-20181-1-git-send-email-kishon@ti.com>
-References: <1373282057-20181-1-git-send-email-kishon@ti.com>
-Message-ID: <51E4DFA6.2010501@ti.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Tue, 16 Jul 2013 08:05:04 +0200
+Subject: [PATCH v1 16/24] clk: mpc512x: remove now obsolete clkdev registration
+In-Reply-To: <1373914074-20889-1-git-send-email-gsi@denx.de>
+References: <1373914074-20889-1-git-send-email-gsi@denx.de>
+Message-ID: <1373954707-23909-1-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+after the PSC drivers for UART and SPI mode got converted to device tree
+based clock lookup, the former MCLK name which depends on the PSC index
+isn't needed any longer -- remove the clk_register_clkdev() invocation
 
-On Monday 08 July 2013 04:44 PM, Kishon Vijay Abraham I wrote:
-> This series fixes the USB enumeration issue caused because of the controller
-> not able to get a reference to the PHY because of incorrect binding in the
-> board file.
-> 
-> In the case of non-dt boot, the platform specific initialization file
-> (board file) will do usb_bind_phy that binds the usb controller with the
-> PHY using device names. After the device names are created using 
-> PLATFORM_DEVID_AUTO, our original method of binding by device names doesn't
-> work reliably (since the device name changes). Hence the usb controller
-> is made to use labels for getting the PHY.
-> 
-> Here the PHY name is added in the plat data of USB controller device which
-> should be used by the controller driver to get the PHY.
-> Two new APIs usb_get_phy_by_name and devm_usb_get_phy_by_name are added to
-> be used by the controller to get the PHY by name.
+Signed-off-by: Gerhard Sittig <gsi@denx.de>
+---
+ arch/powerpc/platforms/512x/clock-commonclk.c |   10 ----------
+ 1 file changed, 10 deletions(-)
 
-You haven't picked this patch series?
-
--Kishon
+diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
+index f31f895..31707b5 100644
+--- a/arch/powerpc/platforms/512x/clock-commonclk.c
++++ b/arch/powerpc/platforms/512x/clock-commonclk.c
+@@ -529,16 +529,6 @@ static void mpc512x_clk_setup_mclk(struct mclk_setup_data *entry)
+ 				entry->name_mclk,
+ 				entry->name_mux1, 1, 1);
+ 	}
+-
+-	/*
+-	 * without this "clock device" registration, "simple" lookups in
+-	 * the SPI master initialization and serial port setup will fail
+-	 *
+-	 * those drivers need to get adjusted to lookup their required
+-	 * clocks from OF specs, before this clkdev registration becomes
+-	 * obsolete
+-	 */
+-	clk_register_clkdev(clks[clks_idx_pub], entry->name_mclk, NULL);
+ }
+ 
+ static void mpc512x_clk_setup_mclks(struct mclk_setup_data *table, size_t count)
+-- 
+1.7.10.4
