@@ -1,30 +1,67 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Tue, 16 Jul 2013 20:10:46 +0800
-Subject: [PATCH] ARM: OMAP: dma: fix error return code in
- omap_system_dma_probe()
-Message-ID: <CAPgLHd-yE_qW1NeK5KkPSUtA1wGfQcnROywrcfa7cH+Dtwfezw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 16 Jul 2013 14:04:21 +0200
+Subject: [RESEND] cpuidle for ARM pull request
+Message-ID: <51E536C5.1020609@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Fix to return a negative error code from the error handling
-case instead of 0, as done elsewhere in this function.
+Hi,
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- arch/arm/plat-omap/dma.c | 1 +
- 1 file changed, 1 insertion(+)
+The first PR was against the linux-pm-next tree including the patch:
 
-diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index 4d463ca..0376606 100644
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -2083,6 +2083,7 @@ static int omap_system_dma_probe(struct platform_device *pdev)
- 		dma_irq = platform_get_irq_byname(pdev, irq_name);
- 		if (dma_irq < 0) {
- 			dev_err(&pdev->dev, "failed: request IRQ %d", dma_irq);
-+			ret = dma_irq;
- 			goto exit_dma_lch_fail;
- 		}
- 		ret = setup_irq(dma_irq, &omap24xx_dma_irq);
+"cpuidle: Add Kconfig.arm and move calxeda, kirkwood and zynq"
+
+This patch has been dropped in the meantime.
+
+Here is a new PR where my tree has been rebased against linux-pm-next
+and adding the patch mentioned above.
+
+As stated by Rafael, I will handle the ARM specific patches from now.
+
+The following changes since commit 48f99d5a97d32d70c0738d6e314d9f4dbefd89bf:
+
+  Merge branch 'pm-cpuidle-next' into linux-next (2013-07-16 02:41:06 +0200)
+
+are available in the git repository at:
+
+
+  git://git.linaro.org/people/dlezcano/linux.git cpuidle/arm-next
+
+for you to fetch changes up to 2b7e79f4a75e803184f483985a25cc751a990f06:
+
+  ARM: ux500: cpuidle: Move ux500 cpuidle driver to drivers/cpuidle
+(2013-07-16 13:57:24 +0200)
+
+----------------------------------------------------------------
+Daniel Lezcano (2):
+      ARM: davinci: cpuidle: Fix target residency
+      ARM: ux500: cpuidle: Move ux500 cpuidle driver to drivers/cpuidle
+
+Linus Walleij (2):
+      ARM: ux500: cpuidle: Instantiate the driver from platform device
+      ARM: ux500: cpuidle: Remove pointless include
+
+Sahara (1):
+      cpuidle: Add Kconfig.arm and move calxeda, kirkwood and zynq
+
+ arch/arm/mach-davinci/cpuidle.c                    |    2 +-
+ arch/arm/mach-ux500/Makefile                       |    1 -
+ drivers/cpuidle/Kconfig                            |   20 +++++---------
+ drivers/cpuidle/Kconfig.arm                        |   29
+++++++++++++++++++++
+ drivers/cpuidle/Makefile                           |    9 ++++--
+ .../cpuidle.c => drivers/cpuidle/cpuidle-ux500.c   |   19 +++++++------
+ drivers/mfd/db8500-prcmu.c                         |    4 +++
+ 7 files changed, 58 insertions(+), 26 deletions(-)
+ create mode 100644 drivers/cpuidle/Kconfig.arm
+ rename arch/arm/mach-ux500/cpuidle.c => drivers/cpuidle/cpuidle-ux500.c
+(90%)
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
