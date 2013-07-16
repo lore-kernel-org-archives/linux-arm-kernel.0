@@ -1,149 +1,80 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 16 Jul 2013 10:45:38 -0700
-Subject: Division by zero caused by CCF
-In-Reply-To: <51E5465F.3090801@ti.com>
-References: <20130716123709.GA15036@arwen.pp.htv.fi> <51E5465F.3090801@ti.com>
-Message-ID: <CAPtuhTiUsLffRaC+8Gd8me2OYeMUOuFM4CqW3vnXmkkp53P_yg@mail.gmail.com>
+From: dsd@laptop.org (Daniel Drake)
+Date: Tue, 16 Jul 2013 14:06:05 -0400 (EDT)
+Subject: [PATCH RESEND 1/2] ARM: mmp: Add compatible entries for OLPC XO
+ laptops
+Message-ID: <20130716180605.A63C7FAAF3@dev.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 6:10 AM, Eduardo Valentin
-<eduardo.valentin@ti.com> wrote:
-> -----BEGIN PGP SIGNED MESSAGE-----
-> Hash: SHA256
->
->
-> Hi,
->
-> Adding Mike's correct address.
->
-> On 16-07-2013 08:37, Felipe Balbi wrote:
->> Hi,
->>
->> trying to get USB host verified on OMAP5 uEVM with v3.11-rc1. The
->> clk_set_rate() call ends up in a division by zero, which is quite
->> interesting provided the driver will only call clk_set_rate() if the
->> clock is valid and clk_rate is != 0.
->>
->>
->> [   22.009238] Division by zero in kernel.
->> [   22.009250] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W    3.11.0-rc1-00081-g3310d44-dirty #118
->> [   22.009275] [<c001c83c>] (unwind_backtrace+0x0/0xf0) from [<c0018a1c>] (show_stack+0x10/0x14)
->> [   22.009289] [<c0018a1c>] (show_stack+0x10/0x14) from [<c057403c>] (dump_stack+0x70/0x8c)
->> [   22.009304] [<c057403c>] (dump_stack+0x70/0x8c) from [<c02e4154>] (Ldiv0+0x8/0x10)
->> [   22.009319] [<c02e4154>] (Ldiv0+0x8/0x10) from [<c048d460>] (clk_divider_set_rate+0x10/0xdc)
->> [   22.009331] [<c048d460>] (clk_divider_set_rate+0x10/0xdc) from [<c048c124>] (clk_change_rate+0x38/0xb0)
->> [   22.009341] [<c048c124>] (clk_change_rate+0x38/0xb0) from [<c048c20c>] (clk_set_rate+0x70/0xa8)
->> [   22.009354] [<c048c20c>] (clk_set_rate+0x70/0xa8) from [<c042b244>] (nop_usb_xceiv_probe+0x1fc/0x2f8)
->> [   22.009369] [<c042b244>] (nop_usb_xceiv_probe+0x1fc/0x2f8) from [<c036b47c>] (platform_drv_probe+0x18/0x1c)
->> [   22.009380] [<c036b47c>] (platform_drv_probe+0x18/0x1c) from [<c0369f44>] (really_probe+0x70/0x1f4)
->> [   22.009390] [<c0369f44>] (really_probe+0x70/0x1f4) from [<c036a1dc>] (driver_probe_device+0x30/0x48)
->> [   22.009401] [<c036a1dc>] (driver_probe_device+0x30/0x48) from [<c036a288>] (__driver_attach+0x94/0x98)
->> [   22.009411] [<c036a288>] (__driver_attach+0x94/0x98) from [<c0368748>] (bus_for_each_dev+0x54/0x88)
->> [   22.009420] [<c0368748>] (bus_for_each_dev+0x54/0x88) from [<c036972c>] (bus_add_driver+0xdc/0x29c)
->> [   22.009430] [<c036972c>] (bus_add_driver+0xdc/0x29c) from [<c036a760>] (driver_register+0x78/0x190)
->> [   22.009440] [<c036a760>] (driver_register+0x78/0x190) from [<c00087b0>] (do_one_initcall+0x34/0x164)
->> [   22.009453] [<c00087b0>] (do_one_initcall+0x34/0x164) from [<c07b18f4>] (do_basic_setup+0x90/0xc4)
->> [   22.009466] [<c07b18f4>] (do_basic_setup+0x90/0xc4) from [<c07b199c>] (kernel_init_freeable+0x74/0x110)
->> [   22.009478] [<c07b199c>] (kernel_init_freeable+0x74/0x110) from [<c05676c4>] (kernel_init+0x8/0xe4)
->> [   22.009491] [<c05676c4>] (kernel_init+0x8/0xe4) from [<c0014648>] (ret_from_fork+0x14/0x2c)
->>
->> I believe the problem is the actual division reaching
->> clk_divider_set_rate().
->>
->> drivers/clk/clk-divider.c::clk_divider_set_rate()
->>
->> | static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
->> |                                 unsigned long parent_rate)
->> | {
->> |         struct clk_divider *divider = to_clk_divider(hw);
->> |         unsigned int div, value;
->> |         unsigned long flags = 0;
->> |         u32 val;
->> |
->> |         div = parent_rate / rate;
->>
->> right here, but how come rate would zero provided driver checks for it
->> as below.
->>
->> drivers/usb/phy/phy-nop.c::nop_usb_xceiv_probe()
->>
->> |         if (!IS_ERR(nop->clk) && clk_rate) {
->> |                 err = clk_set_rate(nop->clk, clk_rate);
->> |                 if (err) {
->> |                         dev_err(&pdev->dev, "Error setting clock rate\n");
->> |                         return err;
->> |                 }
->> |         }
->>
->> I've added a few prints around CCF to try and track what's going on:
->>
->> [   21.592690] ====> nop_usb_xceiv_probe rate 19200000
->> [   21.592700] ====> clk_set_rate rate 19200000
->> [   21.592707] ====> clk_calc_new_rates rate 19200000
->> [   21.592713] ====> clk_divider_round_rate rate 19200000
->> [   21.592719] ====> clk_divider_bestdiv rate 19200000
->> [   21.592726] ====> clk_change_rate best_parent_rate 0
->
-> or because we reach:
->         if (clk->ops->set_rate)
->                 clk->ops->set_rate(clk->hw, clk->new_rate, best_parent_rate);
->
-> with clk->new_rate == 0.
+Add compatible entries to enable booting of OLPC XO-1.75 (MMP2) and
+OLPC XO-4 (MMP3).
 
-Hmm, I'll look into this. We used to have a check which would at least
-WARN on division by zero, but looks like that was replaced by some
-other code at some point.
+Signed-off-by: Chris Ball <cjb@laptop.org>
+Signed-off-by: Daniel Drake <dsd@laptop.org>
+---
+ Documentation/devicetree/bindings/arm/mrvl/intc.txt | 4 ++--
+ Documentation/devicetree/bindings/arm/mrvl/mrvl.txt | 8 ++++++++
+ arch/arm/mach-mmp/irq.c                             | 1 +
+ arch/arm/mach-mmp/mmp2-dt.c                         | 2 ++
+ 4 files changed, 13 insertions(+), 2 deletions(-)
 
-Also does your clock have the CLK_SET_RATE_PARENT flag set? If so then
-you could be propagating a rate request of zero up to the next parent,
-which would be a neat trick... however based on the dump that doesn't
-seem to be what is happening.
+Resending after 1 month with no response.
 
-Regards,
-Mike
-
->
->
->> [   21.592732] ====> clk_divider_set_rate rate 0
->> [   21.592737] Division by zero in kernel.
->> [   21.592747] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W    3.11.0-rc1-00081-g3310d44-dirty #121
->> [   21.592773] [<c001c83c>] (unwind_backtrace+0x0/0xf0) from [<c0018a1c>] (show_stack+0x10/0x14)
->> [   21.592787] [<c0018a1c>] (show_stack+0x10/0x14) from [<c057400c>] (dump_stack+0x70/0x8c)
->> [   21.592803] [<c057400c>] (dump_stack+0x70/0x8c) from [<c02e4154>] (Ldiv0+0x8/0x10)
->> [   21.592819] [<c02e4154>] (Ldiv0+0x8/0x10) from [<c048d3e0>] (clk_divider_set_rate+0x2c/0x100)
->> [   21.592831] [<c048d3e0>] (clk_divider_set_rate+0x2c/0x100) from [<c048c050>] (clk_change_rate+0x48/0xe0)
->> [   21.592841] [<c048c050>] (clk_change_rate+0x48/0xe0) from [<c048c174>] (clk_set_rate+0x8c/0xc0)
->> [   21.592855] [<c048c174>] (clk_set_rate+0x8c/0xc0) from [<c042b254>] (nop_usb_xceiv_probe+0x20c/0x304)
->> [   21.592869] [<c042b254>] (nop_usb_xceiv_probe+0x20c/0x304) from [<c036b47c>] (platform_drv_probe+0x18/0x1c)
->> [   21.592880] [<c036b47c>] (platform_drv_probe+0x18/0x1c) from [<c0369f44>] (really_probe+0x70/0x1f4)
->> [   21.592891] [<c0369f44>] (really_probe+0x70/0x1f4) from [<c036a1dc>] (driver_probe_device+0x30/0x48)
->> [   21.592901] [<c036a1dc>] (driver_probe_device+0x30/0x48) from [<c036a288>] (__driver_attach+0x94/0x98)
->> [   21.592911] [<c036a288>] (__driver_attach+0x94/0x98) from [<c0368748>] (bus_for_each_dev+0x54/0x88)
->> [   21.592921] [<c0368748>] (bus_for_each_dev+0x54/0x88) from [<c036972c>] (bus_add_driver+0xdc/0x29c)
->> [   21.592930] [<c036972c>] (bus_add_driver+0xdc/0x29c) from [<c036a760>] (driver_register+0x78/0x190)
->> [   21.592941] [<c036a760>] (driver_register+0x78/0x190) from [<c00087b0>] (do_one_initcall+0x34/0x164)
->> [   21.592954] [<c00087b0>] (do_one_initcall+0x34/0x164) from [<c07b18f4>] (do_basic_setup+0x90/0xc4)
->> [   21.592966] [<c07b18f4>] (do_basic_setup+0x90/0xc4) from [<c07b199c>] (kernel_init_freeable+0x74/0x110)
->> [   21.592980] [<c07b199c>] (kernel_init_freeable+0x74/0x110) from [<c0567694>] (kernel_init+0x8/0xe4)
->> [   21.592992] [<c0567694>] (kernel_init+0x8/0xe4) from [<c0014648>] (ret_from_fork+0x14/0x2c)
->>
->> even though driver passed 19.2MHz, best_parent_rate ends up being zero
->> which triggers the division by zero above.
->>
->> cheers
->>
->
->
-> - --
-> You have got to be excited about what you are doing. (L. Lamport)
->
-> Eduardo Valentin
-> -----BEGIN PGP SIGNATURE-----
-> Version: GnuPG v1.4.12 (GNU/Linux)
-> Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
->
-> iF4EAREIAAYFAlHlRl8ACgkQCXcVR3XQvP00XQEAtQgDEJLt8OFCJiIhUj46Zq1h
-> PvNq67RSFTRXcq/zHa8A/0IZSPitTXt1TqDfalTKof/DR6n9/W6md8/C2Ovqb59o
-> =AKnu
-> -----END PGP SIGNATURE-----
+diff --git a/Documentation/devicetree/bindings/arm/mrvl/intc.txt b/Documentation/devicetree/bindings/arm/mrvl/intc.txt
+index 8b53273..3554fb9 100644
+--- a/Documentation/devicetree/bindings/arm/mrvl/intc.txt
++++ b/Documentation/devicetree/bindings/arm/mrvl/intc.txt
+@@ -1,8 +1,8 @@
+ * Marvell MMP Interrupt controller
+ 
+ Required properties:
+-- compatible : Should be "mrvl,mmp-intc", "mrvl,mmp2-intc" or
+-  "mrvl,mmp2-mux-intc"
++- compatible : One of: mrvl,mmp-intc mrvl,mmp2-intc mrvl,mmp3-intc
++  mrvl,mmp2-mux-intc
+ - reg : Address and length of the register set of the interrupt controller.
+   If the interrupt controller is intc, address and length means the range
+   of the whold interrupt controller. If the interrupt controller is mux-intc,
+diff --git a/Documentation/devicetree/bindings/arm/mrvl/mrvl.txt b/Documentation/devicetree/bindings/arm/mrvl/mrvl.txt
+index 117d741..236e884 100644
+--- a/Documentation/devicetree/bindings/arm/mrvl/mrvl.txt
++++ b/Documentation/devicetree/bindings/arm/mrvl/mrvl.txt
+@@ -12,3 +12,11 @@ Required root node properties:
+ MMP2 Brownstone Board
+ Required root node properties:
+ 	- compatible = "mrvl,mmp2-brownstone";
++
++OLPC XO-1.75 (CL2) based on MMP2
++Required root node properties:
++	- compatible = "olpc,xo-1.75";
++
++OLPC XO-4 (CL4) based on MMP3
++Required root node properties:
++	- compatible = "olpc,xo-cl4";
+diff --git a/arch/arm/mach-mmp/irq.c b/arch/arm/mach-mmp/irq.c
+index 3c71246..d60b85a 100644
+--- a/arch/arm/mach-mmp/irq.c
++++ b/arch/arm/mach-mmp/irq.c
+@@ -329,6 +329,7 @@ void __init mmp2_init_icu(void)
+ static const struct of_device_id intc_ids[] __initconst = {
+ 	{ .compatible = "mrvl,mmp-intc", .data = &mmp_conf },
+ 	{ .compatible = "mrvl,mmp2-intc", .data = &mmp2_conf },
++	{ .compatible = "mrvl,mmp3-intc", .data = &mmp2_conf },
+ 	{}
+ };
+ 
+diff --git a/arch/arm/mach-mmp/mmp2-dt.c b/arch/arm/mach-mmp/mmp2-dt.c
+index 4ac2567..e67bd9f 100644
+--- a/arch/arm/mach-mmp/mmp2-dt.c
++++ b/arch/arm/mach-mmp/mmp2-dt.c
+@@ -44,6 +44,8 @@ static void __init mmp2_dt_init(void)
+ 
+ static const char *mmp2_dt_board_compat[] __initdata = {
+ 	"mrvl,mmp2-brownstone",
++	"olpc,xo-1.75",
++	"olpc,xo-cl4",
+ 	NULL,
+ };
+ 
+-- 
+1.8.1.4
