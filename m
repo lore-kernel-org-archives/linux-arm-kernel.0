@@ -1,112 +1,77 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 16 Jul 2013 12:22:14 +0900
-Subject: [PATCH] irqchip: exynos: cleanup non-DT stuff in exynos-combiner
-Message-ID: <027401ce81d3$ad706570$08513050$%kim@samsung.com>
+From: richard.zhuhongxing@gmail.com (Richard Zhu)
+Date: Tue, 16 Jul 2013 11:28:45 +0800
+Subject: [PATCH v7 0/3] ahci: enable ahci sata support on imx6q
+Message-ID: <1373945328-20893-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+v7: add imx6q specific ahci sata support
+  Thanks to Sergei Shtylyow and Shawn.
+  - According to ePAPR [1] section 2.2.2, re-name
+  the node from 'ahci' to 'sata'
+  - Move the initialization of the ahb clock of the private
+  data to the probe function.
+  - Remove the platform_set_drvdata(..., NULL), and devm_clk_put
+  (..., ...).
+  - 
 
-For EXYNOS SoCs, only can support for DT so removes non-DT stuff
-in exynos-combiner.
+v6: http://www.spinics.net/lists/linux-ide/msg45719.html
+  Thanks for Shawn's comments.
+  - Speicify the ahb clock in the sata related dts changes.
+  - Move the initialization of the sata PHY clock of the private
+  data to the probe function.
+  - Remove the empty device release function.
+  - In order to be more readable, rename the imx_dev/imx_ahci_pdev
+  to be ahci_dev/ahci_pdev, and do some other changes, such as typo
+  error, more readable name of the variable.
+  - 
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- drivers/irqchip/exynos-combiner.c |   44 +------------------------------------
- 1 file changed, 1 insertion(+), 43 deletions(-)
+v5: http://www.spinics.net/lists/linux-ide/msg45712.html
+  - Fix the wrong referrence usage of the private data.
+  - Use the private data to contain the poninter of the PHY
+  signals adjustment window(gpr)
+  - Tested on imx6q sd board.
+  - 
 
-diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
-index 4c68265..868ed40 100644
---- a/drivers/irqchip/exynos-combiner.c
-+++ b/drivers/irqchip/exynos-combiner.c
-@@ -19,10 +19,6 @@
- #include <linux/of_irq.h>
- #include <asm/mach/irq.h>
- 
--#ifdef CONFIG_EXYNOS_ATAGS
--#include <plat/cpu.h>
--#endif
--
- #include "irqchip.h"
- 
- #define COMBINER_ENABLE_SET	0x0
-@@ -138,7 +134,6 @@ static void __init combiner_init_one(struct combiner_chip_data *combiner_data,
- 	__raw_writel(combiner_data->irq_mask, base + COMBINER_ENABLE_CLEAR);
- }
- 
--#ifdef CONFIG_OF
- static int combiner_irq_domain_xlate(struct irq_domain *d,
- 				     struct device_node *controller,
- 				     const u32 *intspec, unsigned int intsize,
-@@ -156,16 +151,6 @@ static int combiner_irq_domain_xlate(struct irq_domain *d,
- 
- 	return 0;
- }
--#else
--static int combiner_irq_domain_xlate(struct irq_domain *d,
--				     struct device_node *controller,
--				     const u32 *intspec, unsigned int intsize,
--				     unsigned long *out_hwirq,
--				     unsigned int *out_type)
--{
--	return -EINVAL;
--}
--#endif
- 
- static int combiner_irq_domain_map(struct irq_domain *d, unsigned int irq,
- 				   irq_hw_number_t hw)
-@@ -184,26 +169,6 @@ static struct irq_domain_ops combiner_irq_domain_ops = {
- 	.map	= combiner_irq_domain_map,
- };
- 
--static unsigned int combiner_lookup_irq(int group)
--{
--#ifdef CONFIG_EXYNOS_ATAGS
--	if (group < EXYNOS4210_MAX_COMBINER_NR || soc_is_exynos5250())
--		return IRQ_SPI(group);
--
--	switch (group) {
--	case 16:
--		return IRQ_SPI(107);
--	case 17:
--		return IRQ_SPI(108);
--	case 18:
--		return IRQ_SPI(48);
--	case 19:
--		return IRQ_SPI(42);
--	}
--#endif
--	return 0;
--}
--
- static void __init combiner_init(void __iomem *combiner_base,
- 				 struct device_node *np,
- 				 unsigned int max_nr,
-@@ -229,12 +194,7 @@ static void __init combiner_init(void __iomem *combiner_base,
- 	}
- 
- 	for (i = 0; i < max_nr; i++) {
--#ifdef CONFIG_OF
--		if (np)
--			irq = irq_of_parse_and_map(np, i);
--		else
--#endif
--			irq = combiner_lookup_irq(i);
-+		irq = irq_of_parse_and_map(np, i);
- 
- 		combiner_init_one(&combiner_data[i], i,
- 				  combiner_base + (i >> 2) * 0x10, irq);
-@@ -242,7 +202,6 @@ static void __init combiner_init(void __iomem *combiner_base,
- 	}
- }
- 
--#ifdef CONFIG_OF
- static int __init combiner_of_init(struct device_node *np,
- 				   struct device_node *parent)
- {
-@@ -275,4 +234,3 @@ static int __init combiner_of_init(struct device_node *np,
- }
- IRQCHIP_DECLARE(exynos4210_combiner, "samsung,exynos4210-combiner",
- 		combiner_of_init);
--#endif
--- 
-1.7.10.4
+v4: http://www.spinics.net/lists/linux-ide/msg45699.html
+  Thanks for the review comments provided by Sascha, and Alexander.
+  - Use the private data and keep a pointer to the PHY clock.
+  - Don't use the global platform device variable, because that
+  it would make the driver broken for mutiple instances.
+  - Don't do the "writel" with assignment.
+  - Other minor changes, such as print the error code when printing
+  error message, use a u32 type to store readl results, and so on.
+
+v3: http://www.spinics.net/lists/linux-ide/msg45688.html
+  - Keep arch/arm and ahci_platform driver clean.
+  - Add the sata_imx standalone driver contained all the
+  specific setup
+  - Add the release function, support the loadable module
+  driver.
+  - Tested on imx6q sd board.
+
+v2: http://www.spinics.net/lists/linux-ide/msg45666.html 
+ - Setup standalone imx ahci sata driver, because of
+ the misalignments of the bits definition of the HBA register.
+ - Replace the node by the label in the board dts.
+ - 
+
+v1: http://www.spinics.net/lists/linux-ide/msg45581.html
+ - add imx6q specific ahci sata support to arch/arm/mach-imx/mach-imx6q.c
+
+These patches is based on imx/dt branch of
+"http://git.linaro.org/git-ro/people/shawnguo/linux-2.6.git"
+
+[v7 1/3] ARM: dtsi: enable ahci sata on imx6q platforms
+[v7 2/3] ARM: imx6q: update the sata bits definitions of gpr13
+[v7 3/3] sata: imx: add ahci sata support on imx platforms
+
+arch/arm/boot/dts/imx6q-sabreauto.dts       |    4 +
+arch/arm/boot/dts/imx6q-sabrelite.dts       |    4 +
+arch/arm/boot/dts/imx6q-sabresd.dts         |    4 +
+arch/arm/boot/dts/imx6q.dtsi                |    9 +
+drivers/ata/Kconfig                         |    9 +
+drivers/ata/Makefile                        |    1 +
+drivers/ata/sata_imx.c                      |  236 +++++++++++++++++++++++++++
+include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  121 ++++++++++----
+8 files changed, 351 insertions(+), 37 deletions(-)
