@@ -1,33 +1,63 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 16 Jul 2013 15:50:32 +0300
-Subject: [PATCH v2 0/5] ARM: OMAP: DTS/HWMOD/defconfig changes for USB3
-Message-ID: <1373979037-27587-1-git-send-email-balbi@ti.com>
+Date: Tue, 16 Jul 2013 15:50:35 +0300
+Subject: [PATCH v2 3/5] arm: omap5: dts: add palmas-usb node
+In-Reply-To: <1373979037-27587-1-git-send-email-balbi@ti.com>
+References: <1373979037-27587-1-git-send-email-balbi@ti.com>
+Message-ID: <1373979037-27587-4-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With these patches (plus a few others on the driver side which
-will be going upstream soon) I could get functional USB3 with my
-omap5-uevm platform.
+Without this node, there will be no palmas
+driver to notify dwc3 that a cable has
+been connected and, without that, dwc3
+will never initialize.
 
-Changes since v1:
-	- split ocp2scp dts and hwmod data into separate patches
-	- reorganize the series in order to group DTS, hwmod and defconfig
-	  changes
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/boot/dts/omap5-uevm.dts | 10 ++++++++++
+ arch/arm/boot/dts/omap5.dtsi     |  2 +-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-Benoit Cousson (1):
-  arm: omap5: hwmod: add missing ocp2scp hwmod data
-
-Felipe Balbi (4):
-  arm: omap5: dts: fix reg property size
-  arm: omap5: dts: fix ocp2scp DTS data
-  arm: omap5: dts: add palmas-usb node
-  arm: omap2plus_defconfig: enable dwc3 and dependencies
-
- arch/arm/boot/dts/omap5-uevm.dts           | 10 +++++++
- arch/arm/boot/dts/omap5.dtsi               |  9 +++---
- arch/arm/configs/omap2plus_defconfig       |  9 ++++++
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 45 ++++++++++++++++++++++++++++++
- 4 files changed, 69 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index 08b7267..badceb8 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -272,6 +272,11 @@
+ 		interrupt-controller;
+ 		#interrupt-cells = <2>;
+ 
++		extcon_usb3: palmas_usb {
++			compatible = "ti,palmas-usb";
++			ti,wakeup;
++		};
++
+ 		palmas_pmic {
+ 			compatible = "ti,palmas-pmic";
+ 			interrupt-parent = <&palmas>;
+@@ -450,6 +455,11 @@
+ 	phys = <0 &hsusb2_phy &hsusb3_phy>;
+ };
+ 
++&usb3 {
++	extcon = <&extcon_usb3>;
++	vbus-supply = <&smps10_reg>;
++};
++
+ &mcspi1 {
+ 
+ };
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 4e41409..1659246 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -634,7 +634,7 @@
+ 			ti,type = <2>;
+ 		};
+ 
+-		omap_dwc3 at 4a020000 {
++		usb3: omap_dwc3 at 4a020000 {
+ 			compatible = "ti,dwc3";
+ 			ti,hwmods = "usb_otg_ss";
+ 			reg = <0x4a020000 0x10000>;
 -- 
 1.8.3.3.754.g9c3c367
