@@ -1,111 +1,319 @@
-From: juha.lumme@gmail.com (Juha Lumme)
-Date: Tue, 16 Jul 2013 10:59:22 +0900
-Subject: Can't get FIQ interrupt to work on i.mx233
-Message-ID: <CAF-Ht3z3GQLwEWoB+UgOGepHfMFUD7pTRHfYWR9Ynk3rM4dD=Q@mail.gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 16 Jul 2013 11:04:09 +0900
+Subject: [PATCH 3/3] fb: backlight: HX8357: Add HX8369 support
+In-Reply-To: <1373902022-20439-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1373902022-20439-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1373902022-20439-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <003601ce81c8$c2573320$47059960$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday, July 16, 2013 12:27 AM, Maxime Ripard wrote:
+> 
+> From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> Add support for the Himax HX8369 controller as it is quite similar to the
+> hx8357.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-I'm trying to get my head around FIQ's on imx233, with Maxime Ripard's
-article at free electrons (
-http://free-electrons.com/blog/fiq-handlers-in-the-arm-linux-kernel/ )
-as my original inspiration.
+Hi Maxime Ripard,
 
-Unfortunately, for some reason I'm unable to get similar results on my
-board (Olimex olinuxino maxi), even though the cpu is very close to
-his (he was using imx28).
+I reviewed this patch with Himax HX8369 datasheet.
+I cannot find any problems. It looks good.
 
-Im working with 3.10 kernel (Freescales mainline), and I had to add
-some code to drivers/irqchip/irq-mxs.c for mxs_icoll_set_irq_fiq. This
-is the code I added:
-http://codetidy.com/6195/
+However, if possible, please add comment on huge delays such as
+msleep(120), msleep(100), etc.
 
-Maxime used timer 2 to trigger interrupts in his design, but it seems
-that in imx233, timer 0 and 2 are being used by the kernel, so I chose
-timer3 for my purpose.
-According to the reference manual, the mx233 timer3 uses interrupt 31.
 
-As a first step, I'm now just trying to trigger FIQ once, and in FIQ I
-want to acknowledge the interrupt, and set GPIO state high.
-My driver code looks like this:
-http://codetidy.com/6194/
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
-I have carried over a simple header file from 2.6 kernel, that has
-register addresses defined, it can be seen here:
-http://codetidy.com/6192/
+Best regards,
+Jingoo Han
 
-In the driver I:
-1. map memory areas for HW_PINCTRL_DOUT1 (to trigger GPIO)
-HW_TIMROT_TIMCTRL3 (to initalize timer3 settings) HW_TIMROT_TIMCOUNT3
-(setup the actual timer values) HW_ICOLL_INTERRUPT31 (directly access
-interrupt 31 register)
-2. Reserve and setup the GPIO 38 as output (the pin I want to
-trigger), and initialize the timer3 settings.
-3. Claim the FIQ, setup it's assembly handler, and pass mapped memory
-pointers of HW_PINCTRL_DOUT1 (to trigger gpio) and HW_TIMROT_TIMCTRL3
-(to acknowledge the interrupt bit) to the handler via pt_regs struct.
-4. Call mxs_icoll_set_irq_fiq(irq) and enable_fiq(irq) to enable the IRQ/FIQ.
-
-For now the assembly handler is only 6 instructions: http://codetidy.com/6193/
-I first want to just clear the interrupt bit in HW_ICOLL_INTERRUPT31,
-and then I write 0xFF to HW_PINCTRL_DOUT1
-
-Now when I compile this driver to the kernel, I see during the boot
-that driver is initialized, and from the register printouts I can see
-that timer3 is initialized as I request.
-When I cat /proc/interrupts, I can see that my FIQ handler appears installed:
-# cat /proc/interrupts
-           CPU0
- 16:       2082         -  MXS Timer Tick
- 17:          0         -  mxs-spi
- 18:       2147         -  mxs-dma
-118:          0         -  mxs-spi
-119:          0         -  mxs-dma
-120:          0         -  RTC alarm
-124:          0         -  8006c000.serial
-127:         76         -  uart-pl011
-128:        258         -  ci13xxx_imx
-FIQ:              beagle_fiq_handler
-Err:          0
-
-In user space, I made a simple register reading application, and when
-I read HW_TIMROT_TIMCOUNT3, I can see that as requested first 16 bits
-of the register (fixed count part), is set to 4096 (bit 12), and bits
-16-31(running count part) vary all the time, so the timer appears
-running.
-Also, when I read HW_TIMROT_TIMCTRL3 in userspace, I can see that IRQ
-bit (bit 15) is now set, implying that timer3 has decremented to 0.
-This bit was not set during the initial driver loading. Now because of
-this, I am assuming that my assembly handler is never called, since
-the first task is to clear this bit:
-lsl r11, r11, #15?
-str r11, [r9, #BIT_CLR]
-
-This is basically where I am now, I don't know why my FIQ handler is
-never called, even though the IRQ bit is triggered in interrupt 31,
-and my handler appears to be created.
-
-I did try to do a bit of debugging in the IRQ setup part, and it seems
-that when I call mxs_icoll_set_irq_fiq(31); in the function it calls
-__raw_writel(BM_ICOLL_INTERRUPTn_FIQ_ENABLE, icoll_base +
-HW_ICOLL_INTERRUPTn_SET(d->hwirq));
-Now this d->hwirq is actually a value "8", not "31" as I thought it
-should be ? Im not exactly sure though here.
-Also enable_fiq(31) will use same irq_desc in kernel/irq/manage.c that
-has incorrect (?) value for hwirq.. but, again, I'm not sure this is
-the cause.
-
-If in user-space I check the value in HW_ICOLL_INTERRUPT31 I do NOT
-see the bit 4 (ENFIQ) set, it actually seems to be 0.
-Should the HW_ICOLL_INTERRUPT31 have bits 2 (enable) and 4 (enfiq) set ?
-
-Another difference with Maxime's code is that currently I do not have
-definition for my "HW" (gpio pin) and driver in dts file, I have
-hardcoded the values for now to the driver.
-
-I wonder what I might be doing wrong now, and where I should look more
-closer with this ? I'm a newbie with IRQ's and FIQ's, so please don't
-hesitate to confirm even some simple stuff I might have overlooked..
-Thank you for any advice,
-Juha Lumme
+> ---
+>  drivers/video/backlight/hx8357.c | 203 ++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 188 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/video/backlight/hx8357.c b/drivers/video/backlight/hx8357.c
+> index ed94796..b035fab 100644
+> --- a/drivers/video/backlight/hx8357.c
+> +++ b/drivers/video/backlight/hx8357.c
+> @@ -71,6 +71,18 @@
+>  #define HX8357_SET_POWER_NORMAL		0xd2
+>  #define HX8357_SET_PANEL_RELATED	0xe9
+> 
+> +#define HX8369_SET_DISPLAY_BRIGHTNESS		0x51
+> +#define HX8369_WRITE_CABC_DISPLAY_VALUE		0x53
+> +#define HX8369_WRITE_CABC_BRIGHT_CTRL		0x55
+> +#define HX8369_WRITE_CABC_MIN_BRIGHTNESS	0x5e
+> +#define HX8369_SET_POWER			0xb1
+> +#define HX8369_SET_DISPLAY_MODE			0xb2
+> +#define HX8369_SET_DISPLAY_WAVEFORM_CYC		0xb4
+> +#define HX8369_SET_VCOM				0xb6
+> +#define HX8369_SET_EXTENSION_COMMAND		0xb9
+> +#define HX8369_SET_GIP				0xd5
+> +#define HX8369_SET_GAMMA_CURVE_RELATED		0xe0
+> +
+>  struct hx8357_data {
+>  	unsigned		im_pins[HX8357_NUM_IM_PINS];
+>  	unsigned		reset;
+> @@ -144,6 +156,61 @@ static u8 hx8357_seq_display_mode[] = {
+>  	HX8357_SET_DISPLAY_MODE_RGB_INTERFACE,
+>  };
+> 
+> +static u8 hx8369_seq_write_CABC_min_brightness[] = {
+> +	HX8369_WRITE_CABC_MIN_BRIGHTNESS, 0x00,
+> +};
+> +
+> +static u8 hx8369_seq_write_CABC_control[] = {
+> +	HX8369_WRITE_CABC_DISPLAY_VALUE, 0x24,
+> +};
+> +
+> +static u8 hx8369_seq_set_display_brightness[] = {
+> +	HX8369_SET_DISPLAY_BRIGHTNESS, 0xFF,
+> +};
+> +
+> +static u8 hx8369_seq_write_CABC_control_setting[] = {
+> +	HX8369_WRITE_CABC_BRIGHT_CTRL, 0x02,
+> +};
+> +
+> +static u8 hx8369_seq_extension_command[] = {
+> +	HX8369_SET_EXTENSION_COMMAND, 0xff, 0x83, 0x69,
+> +};
+> +
+> +static u8 hx8369_seq_display_related[] = {
+> +	HX8369_SET_DISPLAY_MODE, 0x00, 0x2b, 0x03, 0x03, 0x70, 0x00,
+> +	0xff, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x00,	0x01,
+> +};
+> +
+> +static u8 hx8369_seq_panel_waveform_cycle[] = {
+> +	HX8369_SET_DISPLAY_WAVEFORM_CYC, 0x0a, 0x1d, 0x80, 0x06, 0x02,
+> +};
+> +
+> +static u8 hx8369_seq_set_address_mode[] = {
+> +	HX8357_SET_ADDRESS_MODE, 0x00,
+> +};
+> +
+> +static u8 hx8369_seq_vcom[] = {
+> +	HX8369_SET_VCOM, 0x3e, 0x3e,
+> +};
+> +
+> +static u8 hx8369_seq_gip[] = {
+> +	HX8369_SET_GIP, 0x00, 0x01, 0x03, 0x25, 0x01, 0x02, 0x28, 0x70,
+> +	0x11, 0x13, 0x00, 0x00, 0x40, 0x26, 0x51, 0x37, 0x00, 0x00, 0x71,
+> +	0x35, 0x60, 0x24, 0x07, 0x0f, 0x04, 0x04,
+> +};
+> +
+> +static u8 hx8369_seq_power[] = {
+> +	HX8369_SET_POWER, 0x01, 0x00, 0x34, 0x03, 0x00, 0x11, 0x11, 0x32,
+> +	0x2f, 0x3f, 0x3f, 0x01, 0x3a, 0x01, 0xe6, 0xe6, 0xe6, 0xe6, 0xe6,
+> +};
+> +
+> +static u8 hx8369_seq_gamma_curve_related[] = {
+> +	HX8369_SET_GAMMA_CURVE_RELATED, 0x00, 0x0d, 0x19, 0x2f, 0x3b, 0x3d,
+> +	0x2e, 0x4a, 0x08, 0x0e, 0x0f, 0x14, 0x16, 0x14, 0x14, 0x14, 0x1e,
+> +	0x00, 0x0d, 0x19, 0x2f, 0x3b, 0x3d, 0x2e, 0x4a, 0x08, 0x0e, 0x0f,
+> +	0x14, 0x16, 0x14, 0x14, 0x14, 0x1e,
+> +};
+> +
+>  static int hx8357_spi_write_then_read(struct lcd_device *lcdev,
+>  				u8 *txbuf, u16 txlen,
+>  				u8 *rxbuf, u16 rxlen)
+> @@ -242,6 +309,18 @@ static int hx8357_exit_standby(struct lcd_device *lcdev)
+>  	return 0;
+>  }
+> 
+> +static void hx8357_lcd_reset(struct lcd_device *lcdev)
+> +{
+> +	struct hx8357_data *lcd = lcd_get_data(lcdev);
+> +
+> +	gpio_set_value(lcd->reset, 1);
+> +	usleep_range(10000, 12000);
+> +	gpio_set_value(lcd->reset, 0);
+> +	usleep_range(10000, 12000);
+> +	gpio_set_value(lcd->reset, 1);
+> +	msleep(120);
+> +}
+> +
+>  static int hx8357_lcd_init(struct lcd_device *lcdev)
+>  {
+>  	struct hx8357_data *lcd = lcd_get_data(lcdev);
+> @@ -257,14 +336,6 @@ static int hx8357_lcd_init(struct lcd_device *lcdev)
+>  		gpio_set_value_cansleep(lcd->im_pins[2], 1);
+>  	}
+> 
+> -	/* Reset the screen */
+> -	gpio_set_value(lcd->reset, 1);
+> -	usleep_range(10000, 12000);
+> -	gpio_set_value(lcd->reset, 0);
+> -	usleep_range(10000, 12000);
+> -	gpio_set_value(lcd->reset, 1);
+> -	msleep(120);
+> -
+>  	ret = hx8357_spi_write_array(lcdev, hx8357_seq_power,
+>  				ARRAY_SIZE(hx8357_seq_power));
+>  	if (ret < 0)
+> @@ -359,6 +430,94 @@ static int hx8357_lcd_init(struct lcd_device *lcdev)
+>  	return 0;
+>  }
+> 
+> +static int hx8369_lcd_init(struct lcd_device *lcdev)
+> +{
+> +	int ret;
+> +
+> +	ret = hx8357_spi_write_array(lcdev, hx8369_seq_extension_command,
+> +				ARRAY_SIZE(hx8369_seq_extension_command));
+> +	if (ret < 0)
+> +		return ret;
+> +	usleep_range(10000, 12000);
+> +
+> +	ret = hx8357_spi_write_array(lcdev, hx8369_seq_display_related,
+> +				ARRAY_SIZE(hx8369_seq_display_related));
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = hx8357_spi_write_array(lcdev, hx8369_seq_panel_waveform_cycle,
+> +				ARRAY_SIZE(hx8369_seq_panel_waveform_cycle));
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = hx8357_spi_write_array(lcdev, hx8369_seq_set_address_mode,
+> +				ARRAY_SIZE(hx8369_seq_set_address_mode));
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = hx8357_spi_write_array(lcdev, hx8369_seq_vcom,
+> +				ARRAY_SIZE(hx8369_seq_vcom));
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = hx8357_spi_write_array(lcdev, hx8369_seq_gip,
+> +				ARRAY_SIZE(hx8369_seq_gip));
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = hx8357_spi_write_array(lcdev, hx8369_seq_power,
+> +				ARRAY_SIZE(hx8369_seq_power));
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = hx8357_spi_write_byte(lcdev, HX8357_EXIT_SLEEP_MODE);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	msleep(120);
+> +
+> +	ret = hx8357_spi_write_array(lcdev, hx8369_seq_gamma_curve_related,
+> +				ARRAY_SIZE(hx8369_seq_gamma_curve_related));
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = hx8357_spi_write_byte(lcdev, HX8357_EXIT_SLEEP_MODE);
+> +	if (ret < 0)
+> +		return ret;
+> +	usleep_range(1000, 1200);
+> +
+> +	ret = hx8357_spi_write_array(lcdev, hx8369_seq_write_CABC_control,
+> +				ARRAY_SIZE(hx8369_seq_write_CABC_control));
+> +	if (ret < 0)
+> +		return ret;
+> +	usleep_range(10000, 12000);
+> +
+> +	ret = hx8357_spi_write_array(lcdev,
+> +			hx8369_seq_write_CABC_control_setting,
+> +			ARRAY_SIZE(hx8369_seq_write_CABC_control_setting));
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = hx8357_spi_write_array(lcdev,
+> +			hx8369_seq_write_CABC_min_brightness,
+> +			ARRAY_SIZE(hx8369_seq_write_CABC_min_brightness));
+> +	if (ret < 0)
+> +		return ret;
+> +	usleep_range(10000, 12000);
+> +
+> +	ret = hx8357_spi_write_array(lcdev, hx8369_seq_set_display_brightness,
+> +				ARRAY_SIZE(hx8369_seq_set_display_brightness));
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = hx8357_spi_write_byte(lcdev, HX8357_SET_DISPLAY_ON);
+> +	if (ret < 0)
+> +		return ret;
+> +	msleep(100);
+> +
+> +	return 0;
+> +}
+> +
+>  #define POWER_IS_ON(pwr)	((pwr) <= FB_BLANK_NORMAL)
+> 
+>  static int hx8357_set_power(struct lcd_device *lcdev, int power)
+> @@ -391,10 +550,24 @@ static struct lcd_ops hx8357_ops = {
+>  	.get_power	= hx8357_get_power,
+>  };
+> 
+> +static const struct of_device_id hx8357_dt_ids[] = {
+> +	{
+> +		.compatible = "himax,hx8357",
+> +		.data = hx8357_lcd_init,
+> +	},
+> +	{
+> +		.compatible = "himax,hx8369",
+> +		.data = hx8369_lcd_init,
+> +	},
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, hx8357_dt_ids);
+> +
+>  static int hx8357_probe(struct spi_device *spi)
+>  {
+>  	struct lcd_device *lcdev;
+>  	struct hx8357_data *lcd;
+> +	const struct of_device_id *match;
+>  	int i, ret;
+> 
+>  	lcd = devm_kzalloc(&spi->dev, sizeof(*lcd), GFP_KERNEL);
+> @@ -411,6 +584,10 @@ static int hx8357_probe(struct spi_device *spi)
+> 
+>  	lcd->spi = spi;
+> 
+> +	match = of_match_device(hx8357_dt_ids, &spi->dev);
+> +	if (!match || !match->data)
+> +		return -EINVAL;
+> +
+>  	lcd->reset = of_get_named_gpio(spi->dev.of_node, "gpios-reset", 0);
+>  	if (!gpio_is_valid(lcd->reset)) {
+>  		dev_err(&spi->dev, "Missing dt property: gpios-reset\n");
+> @@ -460,7 +637,9 @@ static int hx8357_probe(struct spi_device *spi)
+>  	}
+>  	spi_set_drvdata(spi, lcdev);
+> 
+> -	ret = hx8357_lcd_init(lcdev);
+> +	hx8357_lcd_reset(lcdev);
+> +
+> +	ret = ((int (*)(struct lcd_device *))match->data)(lcdev);
+>  	if (ret) {
+>  		dev_err(&spi->dev, "Couldn't initialize panel\n");
+>  		goto init_error;
+> @@ -483,12 +662,6 @@ static int hx8357_remove(struct spi_device *spi)
+>  	return 0;
+>  }
+> 
+> -static const struct of_device_id hx8357_dt_ids[] = {
+> -	{ .compatible = "himax,hx8357" },
+> -	{},
+> -};
+> -MODULE_DEVICE_TABLE(of, hx8357_dt_ids);
+> -
+>  static struct spi_driver hx8357_driver = {
+>  	.probe  = hx8357_probe,
+>  	.remove = hx8357_remove,
+> --
+> 1.8.3.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
