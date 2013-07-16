@@ -1,38 +1,23 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Tue, 16 Jul 2013 15:12:50 +0200
-Subject: [PATCH v2 4/4] ARM: OMAP2+: Provide alias to USB PHY clock
-In-Reply-To: <51E40199.9070906@ti.com>
-References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
- <1371571487-14389-5-git-send-email-rogerq@ti.com>
- <51E40199.9070906@ti.com>
-Message-ID: <51E546D2.6000100@broadcom.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 16 Jul 2013 14:13:32 +0100
+Subject: [PATCH v3] rtc: Add MOXA ART RTC driver
+In-Reply-To: <1373978485-17496-1-git-send-email-jonas.jensen@gmail.com>
+References: <1373550711-18828-1-git-send-email-jonas.jensen@gmail.com>
+ <1373978485-17496-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <20130716131332.GL22506@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2013 04:05 PM, Roger Quadros wrote:
-> Hi Tony,
->
-> On 06/18/2013 07:04 PM, Roger Quadros wrote:
->> Till the OMAP clocks are correctly defined in device tree, use
->> this temporary hack to provide clock alias to the USB PHY clocks.
->>
->> Without this, USB Host & Ethernet will not be functional with
->> device tree boots on Panda and uEVM.
->
-> Looks like this one got missed out.
+On Tue, Jul 16, 2013 at 02:41:25PM +0200, Jonas Jensen wrote:
 
-Could it be because you promised to resend it (see [1]). I was upgrading 
-our test stuff to 3.11-rc1 and made a DT appended image. Boot went fine, 
-but no USB/ethernet. Should I pickup all four patches?
+>     1. don't use hardcoded GPIO numbers, use of_get_named_gpio
 
-Regards,
-Arend
-
-[1] http://mid.gmane.org/51C2EC5F.8050703 at ti.com
-
-> USB host no longer works on Panda with DT boot.
-> Could you please queue this for next 3.11-rc? Thanks.
->
-> cheers,
-> -roger
->
+Since you're now using OF you should also be including a binding
+document.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130716/e65a6be3/attachment-0001.sig>
