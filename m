@@ -1,32 +1,40 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 16 Jul 2013 09:17:44 -0300
-Subject: [PATCH 00/10] Orion Watchdog fixes
-In-Reply-To: <13fe673f255.2784.107cef0f820c2f5d7b7f41463071c310@gmail.com>
-References: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130716065952.GA25043@lunn.ch> <20130716092059.237ea729@skate>
- <20130716073101.GB25043@lunn.ch>
- <13fe673f255.2784.107cef0f820c2f5d7b7f41463071c310@gmail.com>
-Message-ID: <20130716121743.GB2317@localhost>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Tue, 16 Jul 2013 20:17:45 +0800
+Subject: [PATCH -next] clk: sunxi: fix return value check
+Message-ID: <CAPgLHd_RTeUgZtsLd=GqW7tG0q-ccDcd8gBNgDxo3E8qLE141g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-On Tue, Jul 16, 2013 at 09:48:56AM +0200, Sebastian Hesselbarth wrote:
-> 
-> In the discussion about orion clocksource Russell was proposing a generic 
-> thread-safe write. That puts a single lock around all those writes. Of 
-> course, it will also blocked by totally unrelated thread-safe register 
-> accesses but should prevent us from having dozens of locks and solves the 
-> symbol issue.
-> 
+In case of error, the function clk_register_composite() and
+clk_register_factors() returns ERR_PTR() not NULL. The NULL test
+in the return value check should be replaced with IS_ERR().
 
-Thanks for the insight! I'll try to dig this suggestion in the clocksource
-discussion. Do you have any plans for posting the clocksource soon?
-This way I can base this series on something that's in Jason's trees...
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/clk/sunxi/clk-sunxi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 412912b..02e440b 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -64,7 +64,7 @@ static void __init sunxi_osc_clk_setup(struct device_node *node)
+ 			&gate->hw, &clk_gate_ops,
+ 			CLK_IS_ROOT);
+ 
+-	if (clk) {
++	if (!IS_ERR(clk)) {
+ 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+ 		clk_register_clkdev(clk, clk_name, NULL);
+ 	}
+@@ -221,7 +221,7 @@ static void __init sunxi_factors_clk_setup(struct device_node *node,
+ 	clk = clk_register_factors(NULL, clk_name, parent, 0, reg,
+ 				   data->table, data->getter, &clk_lock);
+ 
+-	if (clk) {
++	if (!IS_ERR(clk)) {
+ 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+ 		clk_register_clkdev(clk, clk_name, NULL);
+ 	}
