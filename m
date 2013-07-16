@@ -1,36 +1,45 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 16 Jul 2013 15:50:34 +0300
-Subject: [PATCH v2 2/5] arm: omap5: dts: fix ocp2scp DTS data
+Date: Tue, 16 Jul 2013 15:50:33 +0300
+Subject: [PATCH v2 1/5] arm: omap5: dts: fix reg property size
 In-Reply-To: <1373979037-27587-1-git-send-email-balbi@ti.com>
 References: <1373979037-27587-1-git-send-email-balbi@ti.com>
-Message-ID: <1373979037-27587-3-git-send-email-balbi@ti.com>
+Message-ID: <1373979037-27587-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch fixes the DTS data for ocp2scp
-node by adding the missing reg property.
+USB3 block has a 64KiB space, another 64KiB is
+used for the wrapper.
+
+Without this change, resource_size() will get
+confused and driver won't probe because size
+will be negative.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/boot/dts/omap5.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/omap5.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 5c99f19..4e41409 100644
+index e643620..5c99f19 100644
 --- a/arch/arm/boot/dts/omap5.dtsi
 +++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -652,10 +652,11 @@
- 			};
- 		};
- 
--		ocp2scp {
-+		ocp2scp at 4a080000 {
- 			compatible = "ti,omap-ocp2scp";
+@@ -637,7 +637,7 @@
+ 		omap_dwc3 at 4a020000 {
+ 			compatible = "ti,dwc3";
+ 			ti,hwmods = "usb_otg_ss";
+-			reg = <0x4a020000 0x1000>;
++			reg = <0x4a020000 0x10000>;
+ 			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
  			#address-cells = <1>;
  			#size-cells = <1>;
-+			reg = <0x4a080000 0x20>;
+@@ -645,7 +645,7 @@
  			ranges;
- 			ti,hwmods = "ocp2scp1";
- 			usb2_phy: usb2phy at 4a084000 {
+ 			dwc3 at 4a030000 {
+ 				compatible = "synopsys,dwc3";
+-				reg = <0x4a030000 0x1000>;
++				reg = <0x4a030000 0x10000>;
+ 				interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
+ 				usb-phy = <&usb2_phy>, <&usb3_phy>;
+ 				tx-fifo-resize;
 -- 
 1.8.3.3.754.g9c3c367
