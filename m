@@ -1,46 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 Jul 2013 21:39:31 -0600
-Subject: [PATCH 2/2] pwm: Add PWM polarity flag macros for DT
-In-Reply-To: <2883016.87pKJk9n0R@avalon>
-References: <1373553468-6564-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2172485.AZTjvkLGcM@avalon> <51E015E1.2090906@wwwdotorg.org>
- <2883016.87pKJk9n0R@avalon>
-Message-ID: <51E4C073.4020407@wwwdotorg.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 16 Jul 2013 12:39:42 +0900
+Subject: [PATCH] ARM: EXYNOS: Enable 64-bit DMA for EXYNOS5440 if LPAE is
+ enabled
+In-Reply-To: <109701ce667b$179822e0$46c868a0$%kim@samsung.com>
+References: <109701ce667b$179822e0$46c868a0$%kim@samsung.com>
+Message-ID: <027701ce81d6$1b857a80$52906f80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2013 07:10 PM, Laurent Pinchart wrote:
-> On Friday 12 July 2013 08:42:41 Stephen Warren wrote:
-...
->> I think the values for any common system-wide flags should be defined
->> once in some system-wide place, and the values for any HW-specific
->> values should be defined only in the documentation for that specific HW.
->> You could try and avoid conflicts by either:
->>
->> a) Allocating system-wide flags from bit 0 up, and HW-specific flags
->> from bit 31 down.
->>
->> or:
->>
->> b) Using 1 cell for standard flags, and a separate cell for any
->> HW-specific flags. Drivers can quite easily adapt to adding extra cells
->> to #pwm-cells, thus making adding a HW-specific cell later
->> backwards-compatible.
+Kukjin Kim wrote:
 > 
-> I wasn't referring to HW-specific flags, but rather to system-wide flags that 
-> might not be supported by all drivers. If we later add new system-wide flags I 
-> think the individual DT bindings should explicitly document which flags they 
-> support.
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> Allow 64-bit DMA addresses if LPAE is enabled on EXYNOS5440.
+> 
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index e101b14..0f7d308 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -81,6 +81,7 @@ config SOC_EXYNOS5440
+>  	bool "SAMSUNG EXYNOS5440"
+>  	default y
+>  	depends on ARCH_EXYNOS5
+> +	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+>  	select ARCH_HAS_OPP
+>  	select ARM_ARCH_TIMER
+>  	select AUTO_ZRELADDR
+> --
+> 1.7.10.4
 
-Shouldn't all system-wide flags be supported by all HW, perhaps being
-implemented by the core subsystem rather than individual drivers to
-ensure that? Consider the case of the GPIO active-low flag which is
-actually implemented in SW, hence can work with any GPIO controller.
+OK, applied into -fixes for 3.11-rc because current SSDK5440 cannot boot
+without this.
 
-Perhaps that's not possible in all cases, in which case, yes, it does
-make sense to define which of the common flags a particular HW module
-supports.
-
-But then there's a problem where people assume that the common flags are
-always available, and somewhere they aren't... Care is needed in the
-choice of which common flags to define and/or how they're used.
+Thanks,
+- Kukjin
