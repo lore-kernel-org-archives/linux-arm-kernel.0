@@ -1,102 +1,125 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Jul 2013 02:14:14 -0700
-Subject: [PATCH 0/4] improved support for runtime muxing for pinctrl
-In-Reply-To: <20130716090310.5541.36777.stgit@localhost>
-References: <20130716090310.5541.36777.stgit@localhost>
-Message-ID: <20130716091413.GT7656@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 16 Jul 2013 10:14:17 +0100
+Subject: [PATCH V2] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene
+ host
+In-Reply-To: <1373957734-21482-1-git-send-email-anup.patel@linaro.org>
+References: <1373957734-21482-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <20130716091417.GC14486@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130716 02:12]:
+On Tue, Jul 16, 2013 at 07:55:34AM +0100, Anup Patel wrote:
+> This patch allows us to have X-Gene guest VCPU when using KVM arm64
+> on APM X-Gene host.
 > 
-> As discussed earlier, the pinctrl support for changing some of the
-> consumer device pins during runtime needs some improvment.
+> We add KVM_ARM_TARGET_XGENE_POTENZA for X-Gene Potenza compatible
+> guest VCPU and we return KVM_ARM_TARGET_XGENE_POTENZA in kvm_target_cpu()
+> when running on X-Gene host with Potenza core.
 > 
-> Here are the patches to do that, I'll also post a minimal sample
-> patch as a reply to this thread on how to do the muxing for
-> runtime PM.
+> V2:
+>  - Renamed KVM_ARM_TARGET_XGENE_V8 to KVM_ARM_TARGET_XGENE_POTENZA
+> 
+> V1:
+>  - Initial patch with target named as KVM_ARM_TARGET_XGENE_V8
+> 
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> ---
+>  arch/arm64/include/uapi/asm/kvm.h    |    3 ++-
+>  arch/arm64/kvm/guest.c               |   34 ++++++++++++++++++++++------------
+>  arch/arm64/kvm/sys_regs_generic_v8.c |    3 +++
+>  3 files changed, 27 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 5031f42..d9f026b 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -55,8 +55,9 @@ struct kvm_regs {
+>  #define KVM_ARM_TARGET_AEM_V8		0
+>  #define KVM_ARM_TARGET_FOUNDATION_V8	1
+>  #define KVM_ARM_TARGET_CORTEX_A57	2
+> +#define KVM_ARM_TARGET_XGENE_POTENZA	3
+>  
+> -#define KVM_ARM_NUM_TARGETS		3
+> +#define KVM_ARM_NUM_TARGETS		4
+>  
+>  /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
+>  #define KVM_ARM_DEVICE_TYPE_SHIFT	0
+> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> index 2c3ff67..a466244 100644
+> --- a/arch/arm64/kvm/guest.c
+> +++ b/arch/arm64/kvm/guest.c
+> @@ -207,19 +207,29 @@ int __attribute_const__ kvm_target_cpu(void)
+>  	unsigned long implementor = read_cpuid_implementor();
+>  	unsigned long part_number = read_cpuid_part_number();
+>  
+> -	if (implementor != ARM_CPU_IMP_ARM)
+> -		return -EINVAL;
+> -
+> -	switch (part_number) {
+> -	case ARM_CPU_PART_AEM_V8:
+> -		return KVM_ARM_TARGET_AEM_V8;
+> -	case ARM_CPU_PART_FOUNDATION:
+> -		return KVM_ARM_TARGET_FOUNDATION_V8;
+> -	case ARM_CPU_PART_CORTEX_A57:
+> -		/* Currently handled by the generic backend */
+> -		return KVM_ARM_TARGET_CORTEX_A57;
+> +	switch (implementor) {
+> +	case ARM_CPU_IMP_ARM:
+> +		switch (part_number) {
+> +		case ARM_CPU_PART_AEM_V8:
+> +			return KVM_ARM_TARGET_AEM_V8;
+> +		case ARM_CPU_PART_FOUNDATION:
+> +			return KVM_ARM_TARGET_FOUNDATION_V8;
+> +		case ARM_CPU_PART_CORTEX_A57:
+> +			return KVM_ARM_TARGET_CORTEX_A57;
+> +		default:
+> +			return -EINVAL;
+> +		}
+> +		break;
+> +	case ARM_CPU_IMP_APM:
+> +		switch (part_number) {
+> +		case APM_CPU_PART_POTENZA:
+> +			return KVM_ARM_TARGET_XGENE_POTENZA;
+> +		default:
+> +			return -EINVAL;
+> +		}
+> +		break;
+>  	default:
+> -		return -EINVAL;
+> + 		return -EINVAL;
+>  	}
 
-Here's a patch showing the suggested usage remuxing SDIO IRQ
-to GPIO mode for runtime PM. Note that this patch depends on
-three other patches for the hsmmc driver, I'll post that series
-separately.
+Why not place a return -EINVAL here, outside of the outer switch
+statement? That way you don't need to duplicate it for an unknown
+implementor or a known implementor's unknown CPU, as long as you keep
+the break at the end of each implementor's case.
 
-Regards,
+Thanks,
+Mark.
 
-Tony
-
-
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 15 Jul 2013 07:39:39 -0700
-Subject: [PATCH] mmc: omap_hsmmc: Remux pins to support SDIO interrupt and PM runtime
-
-On some omaps we need to remux MMC pins for PM, and for some omaps
-we need to remux the SDIO IRQ pin.
-
-Based on an earlier patch by Andreas Fenkart <afenkart@gmail.com>.
-
-Cc: Andreas Fenkart <afenkart@gmail.com>
-Cc: Balaji T K <balajitk@ti.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1869,7 +1869,6 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 	const struct of_device_id *match;
- 	dma_cap_mask_t mask;
- 	unsigned tx_req, rx_req;
--	struct pinctrl *pinctrl;
- 
- 	match = of_match_device(of_match_ptr(omap_mmc_of_match), &pdev->dev);
- 	if (match) {
-@@ -2114,21 +2113,19 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 
- 	omap_hsmmc_disable_irq(host);
- 
--	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
--	if (IS_ERR(pinctrl))
--		dev_warn(&pdev->dev,
--			"pins are not configured from the driver\n");
--
- 	/*
--	 * For now, only support SDIO interrupt if we are doing
--	 * muxing of dat1 when booted with DT. This is because the
-+	 * For now, only support SDIO interrupt if we are doing dynamic
-+	 * remuxing of dat1 when booted with DT. This is because the
- 	 * supposedly the wake-up events for CTPL don't work from deeper
- 	 * idle states. And we don't want to add new legacy mux platform
- 	 * init code callbacks any longer as we are moving to DT based
- 	 * booting anyways.
- 	 */
- 	if (match) {
--		if (!IS_ERR(pinctrl) && mmc_slot(host).sdio_irq)
-+		struct device *dev = &pdev->dev;
-+
-+		if (!pinctrl_pm_check_idle_state(dev) &&
-+		    mmc_slot(host).sdio_irq)
- 			mmc->caps |= MMC_CAP_SDIO_IRQ;
- 	}
- 
-@@ -2348,6 +2345,10 @@ static int omap_hsmmc_runtime_suspend(struct device *dev)
- 		OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
- 		spin_unlock_irqrestore(&host->irq_lock, flags);
- 
-+		ret = pinctrl_pm_select_idle_state(dev);
-+		if (ret < 0)
-+			dev_err(dev, "Unable to select idle pinmux\n");
-+
- 		if (mmc_slot(host).sdio_irq)
- 			enable_irq(mmc_slot(host).sdio_irq);
- 	}
-@@ -2371,6 +2372,10 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
- 		if (mmc_slot(host).sdio_irq)
- 			disable_irq(mmc_slot(host).sdio_irq);
- 
-+		ret = pinctrl_pm_select_active_state(dev);
-+		if (ret < 0)
-+			dev_err(dev, "Unable to select active pinmux\n");
-+
- 		spin_lock_irqsave(&host->irq_lock, flags);
- 		host->active_pinmux = true;
- 
+>  }
+>  
+> diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+> index 4268ab9..8fe6f76 100644
+> --- a/arch/arm64/kvm/sys_regs_generic_v8.c
+> +++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+> @@ -90,6 +90,9 @@ static int __init sys_reg_genericv8_init(void)
+>  					  &genericv8_target_table);
+>  	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
+>  					  &genericv8_target_table);
+> +	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
+> +					  &genericv8_target_table);
+> +
+>  	return 0;
+>  }
+>  late_initcall(sys_reg_genericv8_init);
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
