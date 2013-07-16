@@ -1,224 +1,54 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 16 Jul 2013 17:09:32 +0800
-Subject: [PATCH 5/5] iio: at91: introduce touch screen support in iio
- adc driver
-In-Reply-To: <20130715131507.GE2962@lukather>
-References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
- <1373789069-11604-6-git-send-email-josh.wu@atmel.com>
- <20130715131507.GE2962@lukather>
-Message-ID: <51E50DCC.4010107@atmel.com>
+From: yann.morin.1998@free.fr (Yann E. MORIN)
+Date: Tue, 16 Jul 2013 11:12:17 +0200
+Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
+ streaming format
+In-Reply-To: <20130716090546.GB4402@pd.tnic>
+References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+ <20130716012756.31936d8d.akpm@linux-foundation.org>
+ <20130716090546.GB4402@pd.tnic>
+Message-ID: <201307161112.17901.yann.morin.1998@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Maxime
+Borislav, All,
 
-On 7/15/2013 9:15 PM, Maxime Ripard wrote:
-> Hi Josh,
->
-> On Sun, Jul 14, 2013 at 04:04:29PM +0800, Josh Wu wrote:
->> AT91 ADC hardware integrate touch screen support. So this patch add touch
->> screen support for at91 adc iio driver.
->> To enable touch screen support in adc, you need to add the dt parameters:
->>    which type of touch are used? (4 or 5 wires), sample period time,
->>    pen detect debounce time, average samples and pen detect resistor.
->>
->> In the meantime, since touch screen will use a interal period trigger of adc,
->> so it is conflict to other hardware triggers. Driver will disable the hardware
->> trigger support if touch screen is enabled.
->>
->> This driver has been tested in AT91SAM9X5-EK and SAMA5D3x-EK.
->>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->> ---
->>   .../devicetree/bindings/arm/atmel-adc.txt          |   13 +
->>   arch/arm/mach-at91/include/mach/at91_adc.h         |   34 ++
->>   drivers/iio/adc/at91_adc.c                         |  389 ++++++++++++++++++--
->>   3 files changed, 412 insertions(+), 24 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
->> index 0db2945..925d656 100644
->> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
->> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
->> @@ -29,6 +29,19 @@ Optional properties:
->>     - atmel,adc-sample-hold-time: Sample and Hold Time in microseconds
->>     - atmel,adc-clock-rate: ADC clock rate. If not specified, use the default
->>   			  adc_op_clk.
->> +  - atmel,adc-touchscreen-wires: Number of touch screen wires. Only support
->> +				 4 and 5 wires touch screen.
->> +    NOTE: when adc touch screen enabled, the adc hardware trigger will be
->> +          disabled. Since touch screen will occupied the trigger register.
->> +  - atmel,adc-ts-pendet-debounce: Debounce time in microsecond for touch pen
->> +				  detect.
->> +  - atmel,adc-ts-sample-period-time: Sample Period Time in microsecond for
->> +				     touch screen
->> +  - atmel,adc-ts-filter-average: Numbers of sampling data will be averaged.
->> +    0 means no average. 1 means average two samples. 2 means average four
->> +    samples. 3 means average eight samples.
->> +  - atmel,adc-ts-pendet-sensitivity: Pen Detection input pull-up resistor.
->> +    It can be 0, 1, 2, 3.
-> Could you expand a bit on what are these properties for? Are they
-> board-specific? IP-specific?
+On Tuesday 16 July 2013 11:05:46 Borislav Petkov wrote:
+> On Tue, Jul 16, 2013 at 01:27:56AM -0700, Andrew Morton wrote:
+> > What I'm angling at is, rather than a single global front-end script,
+> > can we embed the scripts in some fashion within the various Kconfig
+> > files?  Say,
+> > 
+> > 	script ./some-script.sh
+> > 
+> > and the config system will only evaluate that command if it is working
+> > on that Kconfig file.  Obviously that requires a multiple-pass thing.
+> 
+> What's wrong with simply grepping the .config we've just created for
+> *enabled* symbols which require userspace support, check for the
+> presence of said support and bail out if none?
 
-+  - atmel,adc-touchscreen-wires: Number of touch screen wires. Only support
-+                 4 and 5 wires touch screen.
-+    NOTE: when adc touch screen enabled, the adc hardware trigger will be
-+          disabled. Since touch screen will occupied the trigger register.
+The goal is to avoid generating a non-buildable kernel in the first place.
+This is very usefull for automatic check harness that run randconfig, for
+example (but may have more use-cases).
 
-It is board specific. Currently in AT91SAM9M10G45EK, AT91SAM9X5-EK, 
-SAMA5D3x-EK all use 4 wire touch.
-Now the driver not support 5 wire yet.
+> I.e., those steps:
+> 1. make <whatever>config
+> 2. make => A prereq. target runs the shell script.
 
-+  - atmel,adc-ts-pendet-debounce: Debounce time in microsecond for 
-touch pen
-+                  detect.
+This is too late, since this will bail out, and will give a false-positive
+failure.
 
-de-glitch time for pen detect. Board specific.
+While if we were to check for _known_ needed tools before calling into
+Kconfig, we can simply hide non-available config options, and even inform
+the user *why* the option is not available.
 
-+  - atmel,adc-ts-sample-period-time: Sample Period Time in microsecond for
-+                     touch screen
+Regards,
+Yann E. MORIN.
 
-The period to sample a touch data after pen is touched. Board specific.
-
-+  - atmel,adc-ts-filter-average: Numbers of sampling data will be averaged.
-+    0 means no average. 1 means average two samples. 2 means average four
-+    samples. 3 means average eight samples.
-+  - atmel,adc-ts-pendet-sensitivity: Pen Detection input pull-up resistor.
-+    It can be 0, 1, 2, 3.
-
-Above two properties only supported in SAM9X5, SAMA5D3 IP.
-
->
-> [...]
->
->> +#define DRIVER_NAME		"at91_adc"
-> This looks like this part doesn't belong to another cleanup patch.
-
-it is part of this patch. As it's a little cleanup, I integrate it as 
-add touch feature.
-
->
->> +#define MAX_POS_BITS		12
->> +
->> +#define ZTHRESHOLD		9000
->> +
->>   struct at91_adc_caps {
->> +	bool	has_12bits_xy;	/* true means use 12 bits. Otherwise 10 bits */
-> Isn't that redundant with the low_res boolean?
-
-yes, right. I will remove it.
-
->
->>   	bool	has_tsmr;	/* only at91sam9x5, sama5d3 have TSMR reg */
->>   	u32	mr_prescal_mask;
->>   	u32	mr_startup_mask;
->>   };
->>   
->> +enum atmel_adc_ts_type {
->> +	ATMEL_ADC_TOUCHSCREEN_NONE = 0,
->> +	ATMEL_ADC_TOUCHSCREEN_4WIRE,
->> +	ATMEL_ADC_TOUCHSCREEN_5WIRE,
->> +};
->> +
->>   struct at91_adc_state {
->>   	struct clk		*adc_clk;
->>   	u32			adc_clk_rate;
->> @@ -70,6 +83,29 @@ struct at91_adc_state {
->>   	bool			low_res;	/* the resolution corresponds to the lowest one */
->>   	wait_queue_head_t	wq_data_avail;
->>   	struct at91_adc_caps	caps;
->> +
->> +	/*
->> +	 * Following ADC channels are shared by touchscreen:
->> +	 *
->> +	 * CH0 -- Touch screen XP/UL
->> +	 * CH1 -- Touch screen XM/UR
->> +	 * CH2 -- Touch screen YP/LL
->> +	 * CH3 -- Touch screen YM/Sense
->> +	 * CH4 -- Touch screen LR(5-wire only)
->> +	 *
->> +	 * The bitfields below represents the reserved channel in the
->> +	 * touchscreen mode.
->> +	 */
->> +#define CHAN_MASK_TOUCHSCREEN_4WIRE	(0xf << 0)
->> +#define CHAN_MASK_TOUCHSCREEN_5WIRE	(0x1f << 0)
->> +	enum atmel_adc_ts_type	touchscreen_type;
->> +	struct input_dev		*ts_input;
->> +
->> +	u8			ts_filter_average;
->> +	u16			ts_pen_detect_debounce;
->> +	u8			ts_pen_detect_sensitivity;
->> +	u16			ts_sample_period_time;
->> +	u16			ts_sample_period_val;
->>   };
->>   
->>   static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
->> @@ -104,14 +140,10 @@ static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
->>   	return IRQ_HANDLED;
->>   }
->>   
->> -static irqreturn_t at91_adc_eoc_trigger(int irq, void *private)
->> +/* Handler for classic adc channel eoc trigger */
->> +void handle_adc_eoc_trigger(int irq, struct iio_dev *idev)
->>   {
->> -	struct iio_dev *idev = private;
->>   	struct at91_adc_state *st = iio_priv(idev);
->> -	u32 status = at91_adc_readl(st, st->registers->status_register);
->> -
->> -	if (!(status & st->registers->drdy_mask))
->> -		return IRQ_HANDLED;
-> Why are you changing the prototype and remove most of the useful part
-> out of the handler?
-
-I change the protype because I make it as a sub interrupt handler.
-Since I just add a new interrupt handler which will check the interrupt 
-type, if DRDY interrupt is coming, it will call your original handler.
-Otherwise use touch screen interrupt handler code.
-
-Following is the new interrupt handler code in this patch:
-
-+static irqreturn_t at91_adc_interrupt(int irq, void *private)
-+{
-+	struct iio_dev *idev = private;
-+	struct at91_adc_state *st = iio_priv(idev);
-+	u32 status = at91_adc_readl(st, st->registers->status_register);
-+	const uint32_t ts_data_irq_mask =
-+		AT91_ADC_IER_XRDY |
-+		AT91_ADC_IER_YRDY |
-+		AT91_ADC_IER_PRDY;
-+
-+	if (status & st->registers->drdy_mask)
-+		handle_adc_eoc_trigger(irq, idev);
-
-                              ^
-                              |
-here we call original trigger handler.
-
-+
-+	if (status & AT91_ADC_IER_PEN) {
-+		at91_adc_writel(st, AT91_ADC_IDR, AT91_ADC_IER_PEN);
-+		at91_adc_writel(st, AT91_ADC_IER, AT91_ADC_IER_NOPEN |
-+			ts_data_irq_mask);
-+		/* Set up period trigger for sampling */
-+		at91_adc_writel(st, st->registers->trigger_register,
-+			AT91_ADC_TRGR_MOD_PERIOD_TRIG |
-+			AT91_ADC_TRGR_TRGPER_(st->ts_sample_period_val));
-+	} else if (status & AT91_ADC_IER_NOPEN) {
-+		at91_adc_writel(st, st->registers->trigger_register, 0);
-+		at91_adc_writel(st, AT91_ADC_IDR, AT91_ADC_IER_NOPEN |
-+			ts_data_irq_mask);
-+		at91_adc_writel(st, AT91_ADC_IER, AT91_ADC_IER_PEN);
-+
-+		input_report_key(st->ts_input, BTN_TOUCH, 0);
-+		input_sync(st->ts_input);
-+	} else if ((status & ts_data_irq_mask) == ts_data_irq_mask) {
-
-Those code will handle for the Touch screen interrupt.
-
->
-> Maxime
->
-
-Thanks.
-Best Regards,
-Josh Wu
+-- 
+.-----------------.--------------------.------------------.--------------------.
+|  Yann E. MORIN  | Real-Time Embedded | /"\ ASCII RIBBON | Erics' conspiracy: |
+| +0/33 662376056 | Software  Designer | \ / CAMPAIGN     |   ^                |
+| --==< O_o >==-- '------------.-------:  X  AGAINST      |  /e\  There is no  |
+| http://ymorin.is-a-geek.org/ | (*_*) | / \ HTML MAIL    |  """  conspiracy.  |
+'------------------------------'-------'------------------'--------------------'
