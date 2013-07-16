@@ -1,136 +1,75 @@
-From: oliver@schinagl.nl (Oliver Schinagl)
-Date: Tue, 16 Jul 2013 23:02:22 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/2] Initial support for Allwinner's
- Security ID fuses
-In-Reply-To: <20130716064107.GA10868@kroah.com>
-References: <20130624160440.GA15201@kroah.com> <51C87DC7.50005@schinagl.nl>
- <20130624181509.GA8847@kroah.com> <51C8B84C.3020200@schinagl.nl>
- <20130624214615.GA17604@kroah.com> <51CAA709.4060801@schinagl.nl>
- <20130626175144.GC2222@kroah.com> <51D674BF.9030207@schinagl.nl>
- <20130706193646.GB9778@kroah.com> <51E466A3.4010503@schinagl.nl>
- <20130716064107.GA10868@kroah.com>
-Message-ID: <51E5B4DE.5060002@schinagl.nl>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 16 Jul 2013 14:05:10 -0700
+Subject: [PATCHv5 00/11] MSI support for Marvell EBU PCIe driver
+In-Reply-To: <20130716103351.15b0fb50@skate>
+References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <51E4167B.4000208@wwwdotorg.org>
+ <20130715162709.GA24625@dhcp-172-17-186-34.nvidia.com>
+ <20130716103351.15b0fb50@skate>
+Message-ID: <20130716210509.GA29318@dhcp-172-17-186-34.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/13 08:41, Greg KH wrote:
-> On Mon, Jul 15, 2013 at 11:16:19PM +0200, Oliver Schinagl wrote:
->> With your latest patches for binary attributes and your blog post, I
->> thought that you want to create your binary attributes before the probe
->> function, to avoid the userspace race. To do that, we have two options,
->> create them in init (ugly?) or fill the .group member if available so it
->> gets automatically created from the register function.
-> Yes, the .group thing should be what is needed here.
-That's what I thought (and used).
->
->> Well in my case, I'm using the module_platform_driver() macro which
->> expects the struct platform_driver. Platform_driver has a device_driver
->> member .driver where the .groups is located. Great, using that works and
->> we should have the sysfs entry race-free. However I don't know hot to
->> exchange data between that and the rest of my driver.
->>
->> Before I used to_platform_device(kobj_to_dev(kobj)) as passed via the
->> .read function to obtain a platform_device where i could use
->> platform_get_drvdata on. All was good, but that doesn't fly now and my
->> knowledge is a bit short as to why.
-> I don't understand, why not use the platform device that was passed to
-> the binary attribute write function?
-Because the pointers don't match and I get a null pointer from 
-platform_get_data
->
->> The second method is finding some other shared structure given that we
->> get a platform_device in the probe function, yet I couldn't find
->> anything and this platform_device isn't the same as the one from the .read.
-> It should be, why isn't it?
-I think that's a little above my grasp :p
->
->> Of course using a global var bypasses this issue, but I'm sure it won't
->> pass review ;)
-> The platform device structure should have what you need, right?
-Should, but doesn't :(
->
->> So using these new patches for binary attributes, how can I pass data
->> between my driver and the sysfs files using a platform_driver? Or are
->> other 'hacks' needed and using the .groups attribute from
->> platform_driver->device_driver->groups is really the wrong approach.
->>
->> I did ask around and still haven't figured it out so far, so I do
->> apologize if you feel I'm wasting your precious time.
-> How is the platform device not the same thing that was passed to your
-> probe function?
-I don't know :( But i'll add the relevant sections with printk results 
-below, which I should have done before, then again those printk's were 
-not supposed to be in that e-mail to begin with ;)
+On Tue, Jul 16, 2013 at 10:33:51AM +0200, Thomas Petazzoni wrote:
+> Dear Thierry Reding,
+> 
+> On Mon, 15 Jul 2013 09:27:10 -0700, Thierry Reding wrote:
+> 
+> > We need at least patches 2, 4 and 8 for Tegra.
+> 
+> Are you sure you don't want patch 1 ? It allows to replace the
+> allocation of MSI interrupt numbers for the MSI driver by a generic
+> facility based on irq domains.
 
-So if I'm not seeing something stupidly obvious, feel free to shout at me :)
+Yes, I could use it to replace some of the functionality. I was just
+saying that we don't absolutely need it. If it makes things easier for
+the merge, it would be trivial to convert the Tegra driver to using the
+new generic facility in a follow-up patch.
 
-static ssize_t sid_read(struct file *fd, struct kobject *kobj,
-             struct bin_attribute *attr, char *buf,
-             loff_t pos, size_t size)
-{
-     struct platform_device *pdev;
-     void __iomem *sid_reg_base;
-     int i;
+> > There's still the option
+> > of working around patch 8 by using the custom root bus scan function
+> > that we have to use anyway, so I guess we could even trim the
+> > requirement down to patches 2 and 4 if we really need.
+> 
+> Bjorn said he didn't like having the msi chip assignment in the middle
+> of the root bus scan function, because he was hoping someday to
+> refactor this function. Quoting Bjorn:
+> 
+> """
+> > +	bus->msi = pcie->msi;  
+> 
+> Ideally, arches could use pci_scan_root_bus(), which does the
+> pci_scan_child_bus() itself, so I never like to add arch-specific code
+> between pci_create_root_bus() and pci_scan_child_bus().
+> 
+> But you should be able to accomplish this by setting bus->msi in a
+> pcibios_add_bus() hook.  There is a corresponding pcibios_remove_bus()
+> hook that might be useful for deallocating the msi_chip.  I'm not too
+> clear on how you manage the msi_chip lifetime -- I see the alloc in
+> armada_370_xp_msi_init(), but I'm not sure whether you ever deallocate
+> it or how you know when it would be safe to do so.
+> """
+> 
+> This is from:
+> 
+> Subject: Re: [PATCH v2 6/8] pci: mvebu: add support for MSI
+> Date: Tue, 18 Jun 2013 16:57:11 -0600
 
-     pdev = to_platform_device(kobj_to_dev(kobj));
-     sid_reg_base = (void __iomem *)platform_get_drvdata(pdev);
-     printk("0x%p, 0x%p, 0x%p, 0x%p\n", kobj, kobj_to_dev(kobj), pdev, 
-sid_reg_base);
+Yes, I'm aware of that discussion. However we currently need to have the
+custom root bus scan implementation anyway because pci_scan_root_bus()
+just doesn't work on ARM. So again, since we'll have to rework the
+driver anyway in order to use pci_scan_root_bus() once the issues have
+been resolved, it wouldn't hurt to postpone the transition to the new
+ARM pcibios_add_bus() support until that point.
 
-0xef1e7c80, 0xef1e7c78, 0xef1e7c68, 0x  (null)
+All I was trying to do was reduce the list of common dependencies in an
+attempt to make merging it easier.
 
-     if (pos < 0 || pos >= SID_SIZE)
-         return 0;
-     if (size > SID_SIZE - pos)
-         size = SID_SIZE - pos;
-
-     for (i = 0; i < size; i++)
-         buf[i] = sunxi_sid_read_byte(sid_reg_base, pos + i);
-
-     return i;
-}
-
-
-static struct bin_attribute sid_bin_attr = {
-     .attr = { .name = "eeprom", .mode = S_IRUGO, },
-     .size = SID_SIZE,
-     .read = sid_read,
-};
-
-static struct bin_attribute *sunxi_sid_attrs[] = {
-     &sid_bin_attr,
-     NULL,
-};
-
-static const struct attribute_group sunxi_sid_group = {
-     .bin_attrs = sunxi_sid_attrs,
-};
-
-static const struct attribute_group *sunxi_sid_groups[] = {
-     &sunxi_sid_group,
-     NULL,
-};
-
-static int __init sunxi_sid_probe(struct platform_device *pdev)
-{
-     struct resource *res;
-     void __iomem *sid_reg_base;
-     u8 entropy[SID_SIZE];
-     unsigned int i;
-
-     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-     sid_reg_base = devm_ioremap_resource(&pdev->dev, res);
-     if (IS_ERR(sid_reg_base))
-         return PTR_ERR(sid_reg_base);
-     platform_set_drvdata(pdev, sid_reg_base);
-
-     for (i = 0; i < SID_SIZE; i++)
-         entropy[i] = sunxi_sid_read_byte(sid_reg_base, i);
-     add_device_randomness(entropy, SID_SIZE);
-     dev_dbg(&pdev->dev, "%s loaded\n", DRV_NAME);
-     printk("0x%p, 0x%p\n", pdev, sid_reg_base);
-
-0xef02b000, 0xf1c23800
-
-     return 0;
-}
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130716/917057ff/attachment.sig>
