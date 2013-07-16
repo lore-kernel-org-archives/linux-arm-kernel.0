@@ -1,22 +1,15 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Jul 2013 11:39:54 +0800
-Subject: [v7 2/3] ARM: imx6q: update the sata bits definitions of gpr13
-In-Reply-To: <1373945328-20893-3-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1373945328-20893-1-git-send-email-Hong-Xing.Zhu@freescale.com>
- <1373945328-20893-3-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20130716033951.GG28375@S2101-09.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 16 Jul 2013 00:42:15 -0300
+Subject: [PATCH 1/5] ARM: dts: imx23-evk: enable USB PHY and controller
+In-Reply-To: <1373898160-8460-1-git-send-email-otavio@ossystems.com.br>
+References: <1373898160-8460-1-git-send-email-otavio@ossystems.com.br>
+Message-ID: <CAOMZO5D+szAgY6+CHjwFRw2qwvusv2_Ach0hv=hj4X1cmMnHfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 11:28:47AM +0800, Richard Zhu wrote:
-> From: Richard Zhu <r65037@freescale.com>
-> 
-> Replace the SATA_PHY_# by the more readable definitons.
-> 
-> Signed-off-by: Richard Zhu <r65037@freescale.com>
+On Mon, Jul 15, 2013 at 11:22 AM, Otavio Salvador
+<otavio@ossystems.com.br> wrote:
+> The i.MX23EVK board provides a USB port so the USB PHY and controller
+> need to be enabled for it to be usable.
 
-Hi Tejun,
-
-The patch needs to go through your tree to keep patch #3 compilable.  So
-
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Has this been tested? I don't see in this patch any code to enable USB power.
