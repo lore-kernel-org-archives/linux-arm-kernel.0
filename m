@@ -1,37 +1,46 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Tue, 16 Jul 2013 09:18:25 +0000
-Subject: [v7 2/3] ARM: imx6q: update the sata bits definitions of gpr13
-In-Reply-To: <20130716080521.GI28375@S2101-09.ap.freescale.net>
-References: <1373945328-20893-1-git-send-email-Hong-Xing.Zhu@freescale.com>
- <1373945328-20893-3-git-send-email-Hong-Xing.Zhu@freescale.com>
- <20130716033951.GG28375@S2101-09.ap.freescale.net>
- <0E83723C55F66F43A6041464FE31119D33D959@039-SN2MPN1-011.039d.mgd.msft.net>
- <20130716080521.GI28375@S2101-09.ap.freescale.net>
-Message-ID: <0E83723C55F66F43A6041464FE31119D33DA0D@039-SN2MPN1-011.039d.mgd.msft.net>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 16 Jul 2013 11:22:42 +0200
+Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
+ streaming format
+In-Reply-To: <201307161112.17901.yann.morin.1998@free.fr>
+References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+ <20130716012756.31936d8d.akpm@linux-foundation.org>
+ <20130716090546.GB4402@pd.tnic>
+ <201307161112.17901.yann.morin.1998@free.fr>
+Message-ID: <20130716092242.GD4402@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks.
-Yes, it is. Both #2 and #3 should be merged together.
+On Tue, Jul 16, 2013 at 11:12:17AM +0200, Yann E. MORIN wrote:
+> The goal is to avoid generating a non-buildable kernel in the first place.
 
-Best Regards
-Richard Zhu
+I know, that's why I'm proposing to fail the build with the script run
+as one of the first things by make.
 
-
------Original Message-----
-From: Shawn Guo [mailto:shawn.guo at linaro.org] 
-Sent: Tuesday, July 16, 2013 4:05 PM
-To: Zhu Richard-R65037
-Cc: tj at kernel.org; linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; rob.herring at calxeda.com; s.hauer at pengutronix.de; linux-ide at vger.kernel.org
-Subject: Re: [v7 2/3] ARM: imx6q: update the sata bits definitions of gpr13
-
-On Tue, Jul 16, 2013 at 07:56:52AM +0000, Zhu Richard-R65037 wrote:
-> Hi Shawn:
-> Thanks.
+> > I.e., those steps:
+> > 1. make <whatever>config
+> > 2. make => A prereq. target runs the shell script.
 > 
-> Hi Tejun:
-> Can you help to pick up the #3 of this patch-set?
+> This is too late, since this will bail out, and will give a false-positive
+> failure.
 
-#2 and #3, I think.
+Huh? This will tell you: "you've selected X, but I don't have toolX
+needed for the build".
 
-Shawn
+You install the tool and run make again. Checks pass, the build
+continues.
+
+> While if we were to check for _known_ needed tools before calling into
+> Kconfig,
+
+How would you do that? How do you know what the user is going to select
+*before* she even selects it?
+
+You need to have a prepared .config to act upon.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
