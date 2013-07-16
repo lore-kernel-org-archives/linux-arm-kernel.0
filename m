@@ -1,70 +1,114 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Jul 2013 18:13:24 +0100
-Subject: [PATCH v3 2/7] mmc: atmel-mci: prepare clk before calling enable
-In-Reply-To: <1373987208-24120-1-git-send-email-b.brezillon@overkiz.com>
-References: <1373986995-23899-1-git-send-email-b.brezillon@overkiz.com>
- <1373987208-24120-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20130716171324.GF24642@n2100.arm.linux.org.uk>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Tue, 16 Jul 2013 18:31:23 +0100
+Subject: arm: Only load TLS values when needed
+In-Reply-To: <51E42E11.1010903@dawncrow.de>
+References: <51E42E11.1010903@dawncrow.de>
+Message-ID: <51E5836B.1010904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 05:06:48PM +0200, Boris BREZILLON wrote:
-> @@ -389,9 +391,13 @@ static int atmci_regs_show(struct seq_file *s, void *v)
->  	 * consistent.
->  	 */
->  	spin_lock_bh(&host->lock);
-> -	clk_enable(host->mck);
-> +	ret = clk_prepare_enable(host->mck);
-> +	if (ret) {
-> +		spin_unlock_bh(&host->lock);
-> +		goto out;
-> +	}
+Hi Andr?,
 
-NAK.  This is buggy.  clk_prepare() can sleep.  Calling clk_prepare()
-even via clk_prepare_enable() is a blatent bug.
+On 15/07/13 18:14, Andr? Hentschel wrote:
+> From: Andr? Hentschel <nerv@dawncrow.de>
+>
+> This patch intents to reduce loading instructions when the resulting value is not used.
+> It's a follow up on a4780adeefd042482f624f5e0d577bf9cdcbb760
+>
 
->  	memcpy_fromio(buf, host->regs, ATMCI_REGS_SIZE);
-> -	clk_disable(host->mck);
-> +	clk_disable_unprepare(host->mck);
->  	spin_unlock_bh(&host->lock);
+Have you done any benchmarking to see that this has any real impact? Or 
+tested on a !Vv6k system? It looks possible that the only case where 
+this will perform better is where we're using switch_tls_none or 
+switch_tls_software (both rare cases, I think) and there's some change 
+it will make things worse in other cases?
 
-Now, given that the CLK API counts enables/disables, having the spin lock
-around the clk API calls is utterly pointless.  This should be:
+One of the reasons for Russell's suggestion of placing the ldrd (which 
+became the two ldr instructions you've removed from __switch_to, in 
+order to maintain building for older cores) where it is was in order to 
+reduce the chance of pipeline stalls.
 
-	ret = clk_prepare_enable(host->mck);
-	if (ret)
-		goto out;
+As I've pointed out below, there is some risk that changing that has 
+implications for the v6 only case below (and the v6k case is now more 
+prone to stalls with !CONFIG_CPU_USE_DOMAINS, but newer cores should 
+have more advanced scheduling to avoid such issues anyway...)
 
-	spin_lock_bh(&host->lock);
-	memcpy_fromio(buf, host->regs, ATMCI_REGS_SIZE);
-	spin_unlock_bh(&host->lock);
+> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+>
+> ---
+> This patch is against Linux 3.11-rc1 (ad81f0545ef01ea651886dddac4bef6cec930092)
+>
+> Thanks to everyone who helped me with a4780adeefd042482f624f5e0d577bf9cdcbb760
+>
+> diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
+> index 83259b8..3742722 100644
+> --- a/arch/arm/include/asm/tls.h
+> +++ b/arch/arm/include/asm/tls.h
+> @@ -3,29 +3,32 @@
+>
+>   #ifdef __ASSEMBLY__
+>   #include <asm/asm-offsets.h>
+> -	.macro switch_tls_none, base, tp, tpuser, tmp1, tmp2
+> +	.macro switch_tls_none, prev, next, tp, tpuser, tmp1, tmp2
+>   	.endm
+>
+> -	.macro switch_tls_v6k, base, tp, tpuser, tmp1, tmp2
+> +	.macro switch_tls_v6k, prev, next, tp, tpuser, tmp1, tmp2
+> +	ldrd	\tp, \tpuser, [\next, #TI_TP_VALUE]	@ get the next TLS and user r/w register
+>   	mrc	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
+>   	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
+>   	mcr	p15, 0, \tpuser, c13, c0, 2	@ and the user r/w register
+> -	str	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
+> +	str	\tmp2, [\prev, #TI_TP_VALUE + 4] @ save it
+>   	.endm
+>
+> -	.macro switch_tls_v6, base, tp, tpuser, tmp1, tmp2
+> +	.macro switch_tls_v6, prev, next, tp, tpuser, tmp1, tmp2
+>   	ldr	\tmp1, =elf_hwcap
+>   	ldr	\tmp1, [\tmp1, #0]
+>   	mov	\tmp2, #0xffff0fff
+> +	ldr	\tp, [\next, #TI_TP_VALUE]	@ get the next TLS register
+>   	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
+>   	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
+> -	mrcne	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
+> +	mrcne	p15, 0, \tmp2, c13, c0, 2	@ get the previous user r/w register
+> +	ldrne	\tpuser, [\next, #TI_TP_VALUE + 4]	@ get the next user r/w register
+>   	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
+>   	mcrne	p15, 0, \tpuser, c13, c0, 2	@ set user r/w register
 
-	clk_disable_unprepare(host->mclk);
+Now we've only got one instruction between the store and the load and 
+risk stalling the pipeline...
 
-or, if you really need to have the clock enabled/disabled within the
-spinlock (very very very unlikely):
+Dave M cautiously says "The ancient advice was that one instruction was 
+enough" but this is very core dependent... I wonder if anyone has a good 
+idea about whether this is an issue here...?
 
-	ret = clk_prepare(host->mck);
-	if (ret)
-		goto out;
+> -	strne	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
+> +	strne	\tmp2, [\prev, #TI_TP_VALUE + 4] @ save it
+>   	.endm
+>
+> -	.macro switch_tls_software, base, tp, tpuser, tmp1, tmp2
+> +	.macro switch_tls_software, prev, next, tp, tpuser, tmp1, tmp2
+>   	mov	\tmp1, #0xffff0fff
+>   	str	\tp, [\tmp1, #-15]		@ set TLS value at 0xffff0ff0
+>   	.endm
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index a39cfc2a1..1484b59 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -689,12 +689,10 @@ ENTRY(__switch_to)
+>    THUMB(	stmia	ip!, {r4 - sl, fp}	   )	@ Store most regs on stack
+>    THUMB(	str	sp, [ip], #4		   )
+>    THUMB(	str	lr, [ip], #4		   )
+> -	ldr	r4, [r2, #TI_TP_VALUE]
+> -	ldr	r5, [r2, #TI_TP_VALUE + 4]
+>   #ifdef CONFIG_CPU_USE_DOMAINS
+>   	ldr	r6, [r2, #TI_CPU_DOMAIN]
+>   #endif
+> -	switch_tls r1, r4, r5, r3, r7
+> +	switch_tls r1, r2, r4, r5, r3, r7
+>   #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
+>   	ldr	r7, [r2, #TI_TASK]
+>   	ldr	r8, =__stack_chk_guard
+>
 
-	spin_lock_bh(&host->lock);
-	ret = clk_enable(host->mck);
-	if (ret == 0) {
-		memcpy_fromio(buf, host->regs, ATMCI_REGS_SIZE);
-		clk_disable(host->mck);
-	}
-	spin_unlock_bh(&host->lock);
-
-	clk_unprepare(host->mclk);
-	if (ret)
-		goto out;
-
-> @@ -1279,7 +1286,7 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->  
->  		spin_lock_bh(&host->lock);
->  		if (!host->mode_reg) {
-> -			clk_enable(host->mck);
-> +			clk_prepare_enable(host->mck);
-
-Again, buggy - calling clk_prepare beneath a spinlock is illegal.
+Jonny
