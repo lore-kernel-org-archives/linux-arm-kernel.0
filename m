@@ -1,28 +1,19 @@
-From: bitbucket@online.de (Mike Galbraith)
-Date: Tue, 16 Jul 2013 05:29:40 +0200
-Subject: [PATCH 2/3] video: hx8357: Make IM pins optional
-In-Reply-To: <003501ce81be$4a945ed0$dfbd1c70$@samsung.com>
-References: <1373902022-20439-1-git-send-email-maxime.ripard@free-electrons.com>
- <1373902022-20439-3-git-send-email-maxime.ripard@free-electrons.com>
- <003501ce81be$4a945ed0$dfbd1c70$@samsung.com>
-Message-ID: <1373945380.7549.26.camel@marge.simpson.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Jul 2013 11:36:43 +0800
+Subject: [v7 1/3] ARM: dtsi: enable ahci sata on imx6q platforms
+In-Reply-To: <1373945328-20893-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1373945328-20893-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1373945328-20893-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <20130716033639.GE28375@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-07-16 at 09:49 +0900, Jingoo Han wrote: 
-> On Tuesday, July 16, 2013 12:27 AM, Maxime Ripard wrote:
-
-> > +
-> > +			ret = devm_gpio_request_one(&spi->dev, lcd->im_pins[i],
-> > +						    GPIOF_OUT_INIT_LOW, "im_pins");
+On Tue, Jul 16, 2013 at 11:28:46AM +0800, Richard Zhu wrote:
+> From: Richard Zhu <r65037@freescale.com>
 > 
-> This makes a checkpatch warning such as 'WARNING: line over 80 characters'.
-> How about the following?
+> Only imx6q has the ahci sata controller, enable
+> it on imx6q platforms.
 > 
-> 			ret = devm_gpio_request_one(&spi->dev, lcd->im_pins[i],
-> 						GPIOF_OUT_INIT_LOW, "im_pins");
+> Signed-off-by: Richard Zhu <r65037@freescale.com>
 
-IIRC, some maintainers gripe (davem?) when they see such alignment,
-preferring the original arg below arg alignment vs strict 80 column.
-
--Mike
+Applied, thanks.
