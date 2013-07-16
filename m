@@ -1,70 +1,76 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Jul 2013 21:17:06 +0200
-Subject: [PATCH 2/5] iio: at91: Use different prescal, startup mask in
- MR for different IP
-In-Reply-To: <51E5990A.4050709@kernel.org>
-References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
- <1373789069-11604-3-git-send-email-josh.wu@atmel.com>
- <20130715125815.GC2962@lukather> <51E505EA.4060502@atmel.com>
- <51E50864.6020904@atmel.com> <20130716133003.7c208cdf@skate>
- <51E5990A.4050709@kernel.org>
-Message-ID: <20130716211706.39665234@skate>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Jul 2013 20:16:58 +0100
+Subject: [PATCH RFC v2 04/14] ARM: debug: provide 8250 debug uart
+ register shift configuration option
+In-Reply-To: <51E59338.6020102@ti.com>
+References: <20130716163243.GY21614@n2100.arm.linux.org.uk>
+ <E1Uz8FU-00047a-AB@rmk-PC.arm.linux.org.uk> <51E59338.6020102@ti.com>
+Message-ID: <20130716191658.GG24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jonathan Cameron,
+On Tue, Jul 16, 2013 at 02:38:48PM -0400, Santosh Shilimkar wrote:
+> Just a question. Exposing selection choice for UART port
+> and probably flow control is just fine, but do we need to
+> really need config entries for SHIFT, PA, VA etc ?
 
-On Tue, 16 Jul 2013 20:03:38 +0100, Jonathan Cameron wrote:
+Let's look at the original problem.  We have lots of files in
+arch/arm/include/debug who's sole purpose is to define a pair of base
+addresses.  Maybe around 500 lines of code doing just that - though
+much of it is copyright notices (can someone explain to me the point
+of claiming copyright on four lines of code defining a base address of
+a UART which is, apart from the addresses themselves, identical with
+every other damned file?)
 
-> On 07/16/2013 12:30 PM, Thomas Petazzoni wrote:
-> > I've asked exactly this question last week at Linaro Connect during the
-> > ARM SoC consolidation panel/discussion, where Grant Likely, Arnd
-> > Bergmann, Olof and others were answering Device Tree related questions.
-> > 
-> > My question, which precisely had the at91-adc DT binding in mind was
-> > precisely whether we should use different compatible properties to
-> > identify different revisions of an IP block and let the driver handle
-> > those differences, or whether the DT binding should provide sufficient
-> > properties (register offsets, bit numbers, etc.) to make the driver
-> > independent of the IP revisions. And clearly, the answer was that
-> > different compatible properties should be used to identify the
-> > different versions of the IP block, and the driver should abstract out
-> > the differences. I.e, was has been done for at91-adc is completely the
-> > opposite of the best practices for Device Tree on ARM.
-> > 
-> > See
-> > http://www.youtube.com/watch?v=zF_AXLgkFy4&feature=player_detailpage#t=1581s
-> > where I ask exactly this question, and get answers from Olof Johansson
-> > and Grant Likely. They clearly say that the solution of having separate
-> > compatible properties and a driver that handles the differences is the
-> > way to go. So the way at91-adc (and possibly other at91 drivers) is
-> > using the Device Tree is wrong, there should have been multiple
-> > compatible properties. It's a shame because this is something we did say
-> > when we submitted at91-adc and during the reviews, but the maintainer
-> > wasn't listening to our comments...
-> > 
-> 
-> Thanks for getting some clarity on this Thomas.  So I'll ask the somewhat obvious
-> question - how do we unwind from where we are to where we want to be wrt to the
-> bindings?
+What this series does is remove many of those files by consolidating
+much of them into a much denser way to represent all this variability.
+However, this doesn't really address the root problem, which is that
+we have all this information in the kernel, which needs to be added
+to every single time we have a new platform come along no matter what
+it is.
 
-During Linaro Connect last week, there was some discussion about
-marking DT bindings as unstable for a little while, once they get
-reviewed by a group of DT "experts" that mark them as stable. Until
-they are stable, the kernel does not offer any ABI guarantees, and we
-are free to change the DT bindings as needed.
+We need to stop that from happening - we need a way for people to tell
+the kernel where their UART is without having to load the kernel up
+with lots of platform specific information [*].
 
-Now, since this unstable/stable thing is not in place at the moment,
-deciding whether to break or not existing bindings is something to be
-decided by the maintainer of this platform, judging what is the best
-option depending on whether there are already many users of the DT for
-this platform or not, for example.
+Also, even without this, the debug menu has become something of a
+sprawling mess, with various people re-implementing what's already
+there presumably because they don't look/don't bother to research what
+support is already there - and is another source of constant additions.
 
-Best regards,
+So, the idea that every platform gets to somehow put its UART addresses
+into the kernel image isn't scalable.  Either we end up with lots of
+defaults in a Kconfig wihch are also prone to merge conflicts, or we
+end up with lots of files in arch/arm/include/debug defining the base
+addresses.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+We need to stop all of these problems from happening before they
+become a big headache for us - imagine Linus' reaction when our debug
+menu grows to be the largest Kconfig file in the kernel tree!  Do you
+want to be there when that happens?  We're the 22nd biggest Kconfig
+file already at 25K - there's only one debug Kconfig larger and that's
+the main lib/Kconfig.debug one which has recently been through a cleanup.
+
+Therefore, the idea is to provide _generic_ options which people can
+set according to their platforms needs.  Remember, this is *supposed*
+to be a developer tool, not a user tool, so asking for addresses and
+other parameters is perfectly acceptable - just make sure that they're
+documented in a reasonable place.
+
+
+Lastly, if you want to moan at someone about this, you only have to look
+at the hardware guys who have made ARM hardware be soo diverse that we
+have ended up with all these different implementations in the first place.
+It is *their* problem that we have every platform doing this basic stuff
+differently, and it is they who need to realise that this mentality
+doesn't scale and hurts.  The "oh it's just software, they can deal
+with it" attitude needs to be fought.
+
+
+* - We've been around all the discussions before about getting this
+information from DT, and quite frankly I'm *really* not in the mood for
+a rehash of those arguments yet again - we'll only end up at the same
+point.  (If anyone feels that they need to state their opinion on that,
+please *first* go back and read the previous discussions about what the
+LL debug infrastructure is about, it's purpose, etc.  If you don't do
+your homework before piping up, I'm not going to bother replying to you.)
