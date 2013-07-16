@@ -1,53 +1,77 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 16 Jul 2013 09:24:30 -0400
-Subject: [PATCH 06/10] watchdog: orion: Update device-tree binding
- documentation
-In-Reply-To: <1373931163-12670-7-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1373931163-12670-7-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130716132430.GD12062@titan.lakedaemon.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Jul 2013 21:31:02 +0800
+Subject: [PATCH] ARM: imx: add low-level debug for vybrid
+Message-ID: <1373981462-22670-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 08:32:39PM -0300, Ezequiel Garcia wrote:
-> Now that the 'reg' property meaning has been changed,
-> this commit updates the deivce-tree binding documentation.
+Add low-level debug support for vybrid, so that earlyprintk can be
+enabled for debugging early boot issue.
 
-nit. s/deivce/device/
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/Kconfig.debug      |    8 ++++++++
+ arch/arm/include/debug/vf.S |   26 ++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+)
+ create mode 100644 arch/arm/include/debug/vf.S
 
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/watchdog/orion-wdt.txt | 8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-> index 5dc8d30..48a71fc 100644
-> --- a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-> @@ -3,7 +3,8 @@
->  Required Properties:
->  
->  - Compatibility : "marvell,orion-wdt"
-> -- reg		: Address of the timer registers
-> +- reg		: First cell contains the register for the watchdog counter.
-> +		  Second cell contains the register for the RSTOUT mask.
->  
->  Optional properties:
->  
-> @@ -11,9 +12,10 @@ Optional properties:
->  
->  Example:
->  
-> -	wdt at 20300 {
-> +	wdt at 20324 {
->  		compatible = "marvell,orion-wdt";
-> -		reg = <0x20300 0x28>;
-> +		reg = <0x20324 0x4
-> +		       0x20108 0x4>;
->  		timeout-sec = <10>;
->  		status = "okay";
->  	};
-> -- 
-> 1.8.1.5
-> 
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index e401a76..0aa5b9d 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -355,6 +355,13 @@ choice
+ 		  when u-boot hands over to the kernel, the system
+ 		  silently crashes, with no serial output at all.
+ 
++	config DEBUG_VF_UART
++		bool "Vybrid UART"
++		depends on SOC_VF610
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Vybrid based platforms.
++
+ 	config DEBUG_NOMADIK_UART
+ 		bool "Kernel low-level debugging messages via NOMADIK UART"
+ 		depends on ARCH_NOMADIK
+@@ -798,6 +805,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
+ 		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1 || \
+ 		DEBUG_VEXPRESS_UART0_CRX
++	default "debug/vf.S" if DEBUG_VF_UART
+ 	default "debug/vt8500.S" if DEBUG_VT8500_UART0
+ 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
+ 	default "mach/debug-macro.S"
+diff --git a/arch/arm/include/debug/vf.S b/arch/arm/include/debug/vf.S
+new file mode 100644
+index 0000000..ba12cc4
+--- /dev/null
++++ b/arch/arm/include/debug/vf.S
+@@ -0,0 +1,26 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++	.macro	addruart, rp, rv, tmp
++	ldr	\rp, =0x40028000	@ physical
++	ldr	\rv, =0xfe028000	@ virtual
++	.endm
++
++	.macro	senduart, rd, rx
++	strb	\rd, [\rx, #0x7]	@ Data Register
++	.endm
++
++	.macro	busyuart, rd, rx
++1001:	ldrb	\rd, [\rx, #0x4]	@ Status Register 1
++	tst	\rd, #1 << 6		@ TC
++	beq	1001b			@ wait until transmit done
++	.endm
++
++	.macro	waituart,rd,rx
++	.endm
+-- 
+1.7.9.5
