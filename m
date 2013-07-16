@@ -1,50 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Jul 2013 05:47:22 -0700
-Subject: [PATCH v2 0/4] usb: musb: fix USB enumeration issue in OMAP3
- platform
-In-Reply-To: <20130716124227.GC15036@arwen.pp.htv.fi>
-References: <1373282057-20181-1-git-send-email-kishon@ti.com>
- <51E4DFA6.2010501@ti.com> <20130716124227.GC15036@arwen.pp.htv.fi>
-Message-ID: <20130716124721.GB7656@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 16 Jul 2013 15:50:34 +0300
+Subject: [PATCH v2 2/5] arm: omap5: dts: fix ocp2scp DTS data
+In-Reply-To: <1373979037-27587-1-git-send-email-balbi@ti.com>
+References: <1373979037-27587-1-git-send-email-balbi@ti.com>
+Message-ID: <1373979037-27587-3-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [130716 05:49]:
-> Hi,
-> 
-> On Tue, Jul 16, 2013 at 11:22:38AM +0530, Kishon Vijay Abraham I wrote:
-> > Tony,
-> > 
-> > On Monday 08 July 2013 04:44 PM, Kishon Vijay Abraham I wrote:
-> > > This series fixes the USB enumeration issue caused because of the controller
-> > > not able to get a reference to the PHY because of incorrect binding in the
-> > > board file.
-> > > 
-> > > In the case of non-dt boot, the platform specific initialization file
-> > > (board file) will do usb_bind_phy that binds the usb controller with the
-> > > PHY using device names. After the device names are created using 
-> > > PLATFORM_DEVID_AUTO, our original method of binding by device names doesn't
-> > > work reliably (since the device name changes). Hence the usb controller
-> > > is made to use labels for getting the PHY.
-> > > 
-> > > Here the PHY name is added in the plat data of USB controller device which
-> > > should be used by the controller driver to get the PHY.
-> > > Two new APIs usb_get_phy_by_name and devm_usb_get_phy_by_name are added to
-> > > be used by the controller to get the PHY by name.
-> > 
-> > You haven't picked this patch series?
-> 
-> yeah and now it's too much to send during the -rc series. Here's what we
-> can do, we can to minimum fix for -rc series (patching the names again)
-> and I'll queue everything else for mailine if tony gives me his Ack for
-> all arch/arm/*omap* parts.
-> 
-> Sounds good ?
+this patch fixes the DTS data for ocp2scp
+node by adding the missing reg property.
 
-Sounds good to me, except let's queue the last patch separately as cleanup
-after the others are merged. I've acked the first patch, that should not
-cause merge conflicts.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/boot/dts/omap5.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 5c99f19..4e41409 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -652,10 +652,11 @@
+ 			};
+ 		};
+ 
+-		ocp2scp {
++		ocp2scp at 4a080000 {
+ 			compatible = "ti,omap-ocp2scp";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
++			reg = <0x4a080000 0x20>;
+ 			ranges;
+ 			ti,hwmods = "ocp2scp1";
+ 			usb2_phy: usb2phy at 4a084000 {
+-- 
+1.8.3.3.754.g9c3c367
