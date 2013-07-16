@@ -1,33 +1,23 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 16 Jul 2013 16:57:40 +0100
-Subject: [PATCH v3] rtc: Add MOXA ART RTC driver
-In-Reply-To: <CACmBeS3jU2csACZCqXfRvCYAEHaK7S3AcJ++Yd=L-mgfeqg68A@mail.gmail.com>
-References: <1373550711-18828-1-git-send-email-jonas.jensen@gmail.com>
- <1373978485-17496-1-git-send-email-jonas.jensen@gmail.com>
- <20130716131332.GL22506@sirena.org.uk>
- <CACmBeS3jU2csACZCqXfRvCYAEHaK7S3AcJ++Yd=L-mgfeqg68A@mail.gmail.com>
-Message-ID: <20130716155740.GO22506@sirena.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 16 Jul 2013 09:58:23 -0600
+Subject: [PATCH v9] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <1373985202-16353-1-git-send-email-p.zabel@pengutronix.de>
+References: <1373985202-16353-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <51E56D9F.30801@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 04:04:07PM +0200, Jonas Jensen wrote:
-> On 16 July 2013 15:13, Mark Brown <broonie@kernel.org> wrote:
-> > Since you're now using OF you should also be including a binding
-> > document.
+On 07/16/2013 08:33 AM, Philipp Zabel wrote:
+> This driver implements a reset controller device that toggle a gpio
+> connected to a reset pin of a peripheral IC. The delay between assertion
+> and de-assertion of the reset signal can be configured via device tree.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Changes since v8, as suggested by Shawn:
+>  - added support for I2C gpios via gpio_set_value_cansleep
+>  - switched from module_init to arch_initcall to avoid unnecessary
+>    probe deferral of subsys_initcall drivers like gpio-pca953x.
 
-> The binding document already exist in set of patches adding MOXA ART
-> SoC support ( I intend to mail out v4 once I know how to proceed ):
-
-If that's the case then you need to point people at the binding document
-when posting the driver but...
-
-> Or should it be moved here to a new v4 patch?
-
-...it's more normal to push the binding along with the driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130716/7e5b010a/attachment.sig>
+For the record, I'm not convinced that either of those changes is correct.
