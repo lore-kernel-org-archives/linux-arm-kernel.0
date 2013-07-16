@@ -1,70 +1,135 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue, 16 Jul 2013 17:16:22 +0200
-Subject: [PATCH v3 5/7] spi: atmel: prepare clk before calling enable
-In-Reply-To: <1373986995-23899-1-git-send-email-b.brezillon@overkiz.com>
-References: <1373986995-23899-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1373987782-24463-1-git-send-email-b.brezillon@overkiz.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 16 Jul 2013 17:20:23 +0200
+Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC
+ with ARM CPU
+In-Reply-To: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
+References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <20130716172023.64337690@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
-avoid common clk framework warnings.
+Dear Hauke Mehrtens,
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/spi/spi-atmel.c |   12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+On Tue, 16 Jul 2013 15:52:07 +0200, Hauke Mehrtens wrote:
+> +/include/ "bcm5301x.dtsi"
+> +
+> +/ {
+> +	model = "Netgear R6250 V1 (BCM4708)";
+> +	compatible = "netgear,r6250v1", "brcm,bcm5301x";
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index ea1ec00..4c6c455 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -1579,7 +1579,9 @@ static int atmel_spi_probe(struct platform_device *pdev)
- 		goto out_unmap_regs;
- 
- 	/* Initialize the hardware */
--	clk_enable(clk);
-+	ret = clk_prepare_enable(clk);
-+	if (ret)
-+		goto out_unmap_regs;
- 	spi_writel(as, CR, SPI_BIT(SWRST));
- 	spi_writel(as, CR, SPI_BIT(SWRST)); /* AT91SAM9263 Rev B workaround */
- 	if (as->caps.has_wdrbt) {
-@@ -1609,7 +1611,7 @@ out_free_dma:
- 
- 	spi_writel(as, CR, SPI_BIT(SWRST));
- 	spi_writel(as, CR, SPI_BIT(SWRST)); /* AT91SAM9263 Rev B workaround */
--	clk_disable(clk);
-+	clk_disable_unprepare(clk);
- 	free_irq(irq, master);
- out_unmap_regs:
- 	iounmap(as->regs);
-@@ -1661,7 +1663,7 @@ static int atmel_spi_remove(struct platform_device *pdev)
- 	dma_free_coherent(&pdev->dev, BUFFER_SIZE, as->buffer,
- 			as->buffer_dma);
- 
--	clk_disable(as->clk);
-+	clk_disable_unprepare(as->clk);
- 	clk_put(as->clk);
- 	free_irq(as->irq, master);
- 	iounmap(as->regs);
-@@ -1678,7 +1680,7 @@ static int atmel_spi_suspend(struct platform_device *pdev, pm_message_t mesg)
- 	struct spi_master	*master = platform_get_drvdata(pdev);
- 	struct atmel_spi	*as = spi_master_get_devdata(master);
- 
--	clk_disable(as->clk);
-+	clk_disable_unprepare(as->clk);
- 	return 0;
- }
- 
-@@ -1687,7 +1689,7 @@ static int atmel_spi_resume(struct platform_device *pdev)
- 	struct spi_master	*master = platform_get_drvdata(pdev);
- 	struct atmel_spi	*as = spi_master_get_devdata(master);
- 
--	clk_enable(as->clk);
-+	return clk_prepare_enable(as->clk);
- 	return 0;
- }
- 
+I don't think using "brcm,bcm5301x" has a compatible string is very
+appropriate. It should really reflect which particular SoC this board
+is using.
+
+> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+> new file mode 100644
+> index 0000000..638350d
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
+> @@ -0,0 +1,72 @@
+> +/*
+> + * Broadcom BCM47XX / BCM53XX ARM platform code.
+> + *
+> + * Copyright 2013 Hauke Mehrtens <hauke@hauke-m.de>
+> + *
+> + * Licensed under the GNU/GPL. See COPYING for details.
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	compatible = "brcm,bcm5301x";
+> +	model = "BCM5301X/BCM4707/BCM4708/BCM4709 SoC";
+
+Same here. Most likely, there will be difference between those SoCs, so
+a compatible string of bcm5301x doesn't seem right, and also the model
+that says this will handle all those platforms.
+
+> diff --git a/arch/arm/mach-bcm53xx/Kconfig b/arch/arm/mach-bcm53xx/Kconfig
+> new file mode 100644
+> index 0000000..1e16e87
+> --- /dev/null
+> +++ b/arch/arm/mach-bcm53xx/Kconfig
+> @@ -0,0 +1,10 @@
+> +config ARCH_BCM53XX
+> +	bool "Broadcom BCM47XX / BCM53XX ARM SoC"
+
+So the directory is named mach-bcm53xx, but you also handle BCM47xx
+SoCs. This doesn't sound really easy to follow.
+
+> +static int bcm53xx_abort_handler(unsigned long addr, unsigned int fsr,
+> +				 struct pt_regs *regs)
+> +{
+> +	/*
+> +	 * These happen for no good reason
+> +	 * possibly left over from CFE
+
+CFE ?
+
+> +	 */
+> +	pr_warn("External imprecise Data abort at addr=%#lx, fsr=%#x ignored.\n",
+> +		addr, fsr);
+> +
+> +	/* Returning non-zero causes fault display and panic */
+> +	return 0;
+> +}
+> +
+> +static void bcm53xx_aborts_enable(void)
+> +{
+> +	/* Install our hook */
+> +	hook_fault_code(16 + 6, bcm53xx_abort_handler, SIGBUS, 0,
+> +			"imprecise external abort");
+> +}
+> +
+> +static void __init bcm53xx_timer_init(void)
+> +{
+> +	of_clk_init(NULL);
+> +	clocksource_of_init();
+> +}
+> +
+> +void __init bcm53xx_map_io(void)
+> +{
+> +	debug_ll_io_init();
+> +	bcm53xx_aborts_enable();
+> +}
+
+That's a nitpick, but I personally tend to like when callbacks are
+ordered as they are called, i.e ->map_io() first, and then
+->init_time().
+
+> +static void __init bcm53xx_dt_init(void)
+> +{
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +}
+
+Not needed, this is the default. When ->init_machine() is NULL, the ARM
+core already calls automatically of_platform_populate().
+
+> +
+> +static const char const *bcm53xx_dt_compat[] = {
+> +	"brcm,bcm5301x",
+> +	"netgear,r6250v1",
+> +	NULL,
+
+Don't list the boards here, only the SoCs. Otherwise, this place is
+going to become a nightmare of conflicts.
+
+> +DT_MACHINE_START(BCM53XX, "BCM53XX")
+> +	.init_machine = bcm53xx_dt_init,
+> +	.map_io = bcm53xx_map_io,
+> +	.init_irq = irqchip_init,
+> +	.init_time = bcm53xx_timer_init,
+> +	.dt_compat = bcm53xx_dt_compat,
+> +MACHINE_END
+
+You also probably want to add this new platform to the
+multi_v7_defconfig.
+
+Best regards,
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
