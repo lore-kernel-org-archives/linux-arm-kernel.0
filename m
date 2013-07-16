@@ -1,40 +1,37 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Tue, 16 Jul 2013 20:17:45 +0800
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 16 Jul 2013 14:22:37 +0200
 Subject: [PATCH -next] clk: sunxi: fix return value check
-Message-ID: <CAPgLHd_RTeUgZtsLd=GqW7tG0q-ccDcd8gBNgDxo3E8qLE141g@mail.gmail.com>
+In-Reply-To: <CAPgLHd_RTeUgZtsLd=GqW7tG0q-ccDcd8gBNgDxo3E8qLE141g@mail.gmail.com>
+References: <CAPgLHd_RTeUgZtsLd=GqW7tG0q-ccDcd8gBNgDxo3E8qLE141g@mail.gmail.com>
+Message-ID: <20130716122237.GF3125@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Hi Wei,
 
-In case of error, the function clk_register_composite() and
-clk_register_factors() returns ERR_PTR() not NULL. The NULL test
-in the return value check should be replaced with IS_ERR().
+On Tue, Jul 16, 2013 at 08:17:45PM +0800, Wei Yongjun wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> In case of error, the function clk_register_composite() and
+> clk_register_factors() returns ERR_PTR() not NULL. The NULL test
+> in the return value check should be replaced with IS_ERR().
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/clk/sunxi/clk-sunxi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks for this patch, but Axel Lin already sent a equivalent patch for
+this issue last week:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/183138.html
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 412912b..02e440b 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -64,7 +64,7 @@ static void __init sunxi_osc_clk_setup(struct device_node *node)
- 			&gate->hw, &clk_gate_ops,
- 			CLK_IS_ROOT);
- 
--	if (clk) {
-+	if (!IS_ERR(clk)) {
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
- 		clk_register_clkdev(clk, clk_name, NULL);
- 	}
-@@ -221,7 +221,7 @@ static void __init sunxi_factors_clk_setup(struct device_node *node,
- 	clk = clk_register_factors(NULL, clk_name, parent, 0, reg,
- 				   data->table, data->getter, &clk_lock);
- 
--	if (clk) {
-+	if (!IS_ERR(clk)) {
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
- 		clk_register_clkdev(clk, clk_name, NULL);
- 	}
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130716/db544376/attachment.sig>
