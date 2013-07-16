@@ -1,115 +1,72 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 16 Jul 2013 12:25:26 +0100
-Subject: [RFC PATCH v4 03/18] Documentation: devicetree: arm: cpus/cpu
- nodes bindings updates
-In-Reply-To: <CAL_JsqLANi5UoVyRMsa6XoQ+_KnmTQDfTz++shEh-dZ3FQGZaQ@mail.gmail.com>
-References: <1368804061-4421-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1368804061-4421-4-git-send-email-lorenzo.pieralisi@arm.com>
- <CAL_JsqLANi5UoVyRMsa6XoQ+_KnmTQDfTz++shEh-dZ3FQGZaQ@mail.gmail.com>
-Message-ID: <20130716112520.GA3428@localhost.localdomain>
+From: oleksandr.kozaruk@ti.com (Oleksandr Kozaruk)
+Date: Tue, 16 Jul 2013 14:27:01 +0300
+Subject: [PATCH v4 0/2] TWL6030, TWL6032 GPADC driver
+Message-ID: <1373974023-23521-1-git-send-email-oleksandr.kozaruk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 12, 2013 at 09:47:17AM -0500, Rob Herring wrote:
-> On Fri, May 17, 2013 at 10:20 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > In order to extend the current cpu nodes bindings to newer CPUs
-> > inclusive of AArch64 and to update support for older ARM CPUs this
-> > patch updates device tree documentation for the cpu nodes bindings.
-> 
-> Sorry for the long delay on this, but I'm still not happy with the binding here.
-> 
-> > Main changes:
-> >     - adds 64-bit bindings
-> >     - define usage of #address-cells
-> >     - define 32/64 dts compatibility settings
-> >     - defines behaviour on pre and post v7 uniprocessor systems
-> >     - adds ARM 11MPcore specific reg property definition
-> >
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/cpus.txt | 459 ++++++++++++++++++++++---
-> >  1 file changed, 412 insertions(+), 47 deletions(-)
-> 
-> [snip]
-> 
-> > +                       # On ARM v8 64-bit systems, where the reg property
-> > +                         size can be 1 or 2 cells (as defined by cpus node's
-> > +                         #address-cells property), this property is
-> > +                         required and matches:
-> > +
-> > +                         - On systems running the OS in AArch32:
-> 
-> The DTS cannot change based on 32-bit or 64-bit OS.
-> 
-> > +
-> > +                           * If the cpus node's #address-cells value is 2:
-> > +
-> > +                             The first reg cell must be set to 0.
-> > +
-> > +                             The second reg cell bits [23:0] must be set to
-> > +                             bits [23:0] of MPIDR_EL1.
-> > +
-> > +                             All other bits in the reg cells must be set to 0.
-> > +
-> > +                           * If the cpus node's #address-cells value is 1:
-> > +
-> > +                             Bits [23:0] in the reg cell must be set to
-> > +                             bits [23:0] in MPIDR_EL1.
-> > +
-> > +                             All other bits in the reg cell must be 0.
-> > +
-> > +                         - On systems running the OS in AArch64:
-> > +
-> > +                           * If the cpus node's #address-cells value is 2:
-> > +
-> > +                             The first reg cell bits [7:0] must be set to
-> > +                             bits [39:32] of MPIDR_EL1.
-> > +
-> > +                             The second reg cell bits [23:0] must be set to
-> > +                             bits [23:0] of MPIDR_EL1.
-> > +
-> > +                             All other bits in the reg cells must be set to 0.
-> > +
-> > +                           * If the cpus node's #address-cells value is 1:
-> > +
-> > +                             MPIDR_EL1[63:32] is 0 on all processors in the
-> > +                             system.
-> 
-> Your logic is backwards here. If the MPIDR_EL1[63:32] is 0, then
-> #address-cells can be 1. You could say the upper bits are ignored and
-> treated as 0. However, you should simplify all this and just mandate
-> that #address-cells must be 2 for ARMv8 or more generally must match
-> the size of the MPIDR. If we want to boot a 32-bit kernel, then the
-> kernel will have to adapt to support this.
+Hello,
 
-I'd support this, opting for a clean split.
+v4 - addressed comments: fixed style violation, bug in freeing memory,
+     added comments explaining calibration method, removed test network
+     channels from exposing to userspace, error handling for 
+     wait_for_complition
+v3 - fixed compiler warning
+v2 - the driver put in drivers/iio, and
+converted using iio facilities as suggested by Graeme.
 
-Strictly speaking, it should be this:
+TWL603[02] GPADC is used to measure battery voltage,
+battery temperature, battery presence ID, and could
+be used to measure twl603[02] die temperature.
+This is used on TI blaze, blaze tablet platforms.
 
-AArch64-capable hardware: #address-cells = 2
-non-AArch64-capable hardware: #address-cells = 1
+The TWL6030/TWL6032 is a PMIC that has a GPADC with 17/19
+channels respectively. Some channels have current
+source and are used for measuring voltage drop
+on resistive load for detecting battery ID resistance,
+or measuring voltage drop on NTC resistors for external
+temperature measurements, other channels measure voltage,
+(i.e. battery voltage), and have inbuilt voltage dividers,
+thus, capable to scale voltage. Some channels are dedicated
+for measuring die temperature.
 
-The only time it is valid to have #address-cells = 1 on AArch64-capable
-hardware is in an AArch32 virtual machine (in which case, the DT anyway
-describes the VM and not the real hardware).
+Some channels could be calibrated in 2 points, having
+offsets from ideal values in trim registers.
 
+The difference between GPADC in TWL6030 and TWL6032:
+- 10 bit vs 12 bit ADC;
+- 17 vs 19 channels;
+- channels have different purpose(i. e. battery voltage
+  channel 8 vs channel 18);
+- trim values are interpreted differently.
 
-However, due to the awkwardness of defining precisely what "AArch64-
-capable hardware" means in a world containing firmware and hypervisors,
-it might be better (if slightly less correct) to go with:
+The driver is derived from git://git.omapzoom.org/kernel/omap.git
+The original driver's authors and contributors are Balaji T K,
+Graeme Gregory, Ambresh K, Girish S Ghongdemath.
 
-v8 hardware: #address-cells must be 2
-<=v7 hardware: #address-cells must be 1
+The changes to the original driver:
+- device tree adaptation;
+- drop ioctl support - never been used;
+- unified measurement method for both devices;
+- get rid of "if (device == X)" code style to data driven;
+- drop polling end of conversion and use interrupt instead;
+- iio framework is used
 
+Tested with on blaze tablet 2 with OMAP4430(twl6030), and
+OMAP4470(twl6032) SOMs.
 
-If the firmware boots an AArch32 payload natively on AArch64-capable
-v8 hardware, it's the firmware's job to ensure that non-addressable
-CPUs are properly quiesced and shut down, otherwise the setup is
-pretty broken -- DT can't solve that one, nor can Linux, so we shouldn't
-try.  Linux just needs to discard the non-addressable CPUs and maybe
-print out a warning.
+The patches were tested against 3.10-rc7
 
+Oleksandr Kozaruk (2):
+  ARM: dts: twl: Add GPADC data to device tree
+  iio: twl6030-gpadc: TWL6030, TWL6032 GPADC driver
 
-Cheers
----Dave
+ arch/arm/boot/dts/twl6030.dtsi  |    6 +
+ drivers/iio/adc/Kconfig         |   14 +
+ drivers/iio/adc/Makefile        |    1 +
+ drivers/iio/adc/twl6030-gpadc.c | 1008 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 1029 insertions(+)
+ create mode 100644 drivers/iio/adc/twl6030-gpadc.c
+
+-- 
+1.8.1.2
