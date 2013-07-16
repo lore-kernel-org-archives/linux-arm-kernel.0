@@ -1,57 +1,55 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Tue, 16 Jul 2013 20:52:57 +0200
-Subject: [PATCH] ARM: omap2: fix musb usage for n8x0
-Message-ID: <1374000777-5626-1-git-send-email-zonque@gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Tue, 16 Jul 2013 20:03:38 +0100
+Subject: [PATCH 2/5] iio: at91: Use different prescal, startup mask in
+ MR for different IP
+In-Reply-To: <20130716133003.7c208cdf@skate>
+References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
+ <1373789069-11604-3-git-send-email-josh.wu@atmel.com>
+ <20130715125815.GC2962@lukather> <51E505EA.4060502@atmel.com>
+ <51E50864.6020904@atmel.com> <20130716133003.7c208cdf@skate>
+Message-ID: <51E5990A.4050709@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b7e2e75a8c ("usb: gadget: drop unused USB_GADGET_MUSB_HDRC")
-dropped a config symbol that was unused by the musb core, but it turns
-out that board support code had references to it.
+On 07/16/2013 12:30 PM, Thomas Petazzoni wrote:
+> Dear Nicolas Ferre,
+> 
+> On Tue, 16 Jul 2013 10:46:28 +0200, Nicolas Ferre wrote:
+> 
+>>> Ok, that make sense. I will use compatible names for the capabilities in
+>>> next version. Thanks.
+>>
+>> Hold on a little bit Josh, I know that Jean-Christophe is not in favor 
+>> of the use of multiple compatible strings. So, as the code is already 
+>> there, let's wait and see if we find another argument...
+> 
+> I've asked exactly this question last week at Linaro Connect during the
+> ARM SoC consolidation panel/discussion, where Grant Likely, Arnd
+> Bergmann, Olof and others were answering Device Tree related questions.
+> 
+> My question, which precisely had the at91-adc DT binding in mind was
+> precisely whether we should use different compatible properties to
+> identify different revisions of an IP block and let the driver handle
+> those differences, or whether the DT binding should provide sufficient
+> properties (register offsets, bit numbers, etc.) to make the driver
+> independent of the IP revisions. And clearly, the answer was that
+> different compatible properties should be used to identify the
+> different versions of the IP block, and the driver should abstract out
+> the differences. I.e, was has been done for at91-adc is completely the
+> opposite of the best practices for Device Tree on ARM.
+> 
+> See
+> http://www.youtube.com/watch?v=zF_AXLgkFy4&feature=player_detailpage#t=1581s
+> where I ask exactly this question, and get answers from Olof Johansson
+> and Grant Likely. They clearly say that the solution of having separate
+> compatible properties and a driver that handles the differences is the
+> way to go. So the way at91-adc (and possibly other at91 drivers) is
+> using the Device Tree is wrong, there should have been multiple
+> compatible properties. It's a shame because this is something we did say
+> when we submitted at91-adc and during the reviews, but the maintainer
+> wasn't listening to our comments...
+> 
 
-As the core now has a fall-back to host-only mode if support for
-dual-role is not compiled in, so we can just pass MUSB_OTG as
-mode from board files.
-
-Signed-off-by: Daniel Mack <zonque@gmail.com>
-Reported-and-tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- arch/arm/mach-omap2/board-n8x0.c | 4 ----
- arch/arm/mach-omap2/usb-musb.c   | 5 +----
- 2 files changed, 1 insertion(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
-index f6eeb87..827d150 100644
---- a/arch/arm/mach-omap2/board-n8x0.c
-+++ b/arch/arm/mach-omap2/board-n8x0.c
-@@ -122,11 +122,7 @@ static struct musb_hdrc_config musb_config = {
- };
- 
- static struct musb_hdrc_platform_data tusb_data = {
--#ifdef CONFIG_USB_GADGET_MUSB_HDRC
- 	.mode		= MUSB_OTG,
--#else
--	.mode		= MUSB_HOST,
--#endif
- 	.set_power	= tusb_set_power,
- 	.min_power	= 25,	/* x2 = 50 mA drawn from VBUS as peripheral */
- 	.power		= 100,	/* Max 100 mA VBUS for host mode */
-diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-index 8c4de27..bc89723 100644
---- a/arch/arm/mach-omap2/usb-musb.c
-+++ b/arch/arm/mach-omap2/usb-musb.c
-@@ -38,11 +38,8 @@ static struct musb_hdrc_config musb_config = {
- };
- 
- static struct musb_hdrc_platform_data musb_plat = {
--#ifdef CONFIG_USB_GADGET_MUSB_HDRC
- 	.mode		= MUSB_OTG,
--#else
--	.mode		= MUSB_HOST,
--#endif
-+
- 	/* .clock is set dynamically */
- 	.config		= &musb_config,
- 
--- 
-1.8.1.4
+Thanks for getting some clarity on this Thomas.  So I'll ask the somewhat obvious
+question - how do we unwind from where we are to where we want to be wrt to the
+bindings?
