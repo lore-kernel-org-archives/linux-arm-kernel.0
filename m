@@ -1,38 +1,52 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Jul 2013 11:37:15 +0800
-Subject: [v7 3/3] sata: imx: add ahci sata support on imx platforms
-In-Reply-To: <1373945328-20893-4-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1373945328-20893-1-git-send-email-Hong-Xing.Zhu@freescale.com>
- <1373945328-20893-4-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20130716033711.GF28375@S2101-09.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 16 Jul 2013 12:38:43 +0900
+Subject: [PATCH] ARM: exynos: change the PHYSMEM_BITS and SECTION_SIZE
+In-Reply-To: <1370956861-18710-1-git-send-email-subash.rp@samsung.com>
+References: <1370956861-18710-1-git-send-email-subash.rp@samsung.com>
+Message-ID: <027601ce81d5$f87bc080$e9734180$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 11:28:48AM +0800, Richard Zhu wrote:
-> From: Richard Zhu <r65037@freescale.com>
+Subash Patel wrote:
 > 
-> imx6q contains one Synopsys AHCI SATA controller,
-> But it can't share ahci_platform driver with other
-> controllers.
-> Because there are some misalignments of the generic
-> AHCI controller.
-> The bits definitions of the HBA registers, the Vendor
-> Specific registers, the AHCI PHY clock and the AHCI
-> signals adjustment window(GPR13 register).
->  - CAP_SSS(bit20) of the HOST_CAP is writable, default
->  value is '0', should be configured to be '1'
->  - bit0 (only one AHCI SATA port on imx6q) of the
->  HOST_PORTS_IMPL should be set to be '1'.(default 0)
->  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)
->  should be configured regarding to the frequency of AHB
->  bus clock.
->  - Configurations of the AHCI PHY clock, and the signal
->  parameters of the GPR13
+> On exynos5440 there is DRAM on the 36-bit address range. Hence
+> this patch converts the MAX_PHYSMEM_BITS macro to 36 if LPAE is
+> enabled for the ARM architecture.
 > 
-> Setup its own ahci sata driver, contained the imx6q specific
-> initialized codes, re-use the generic ahci_platform driver, and
-> keep the generic ahci_platform driver clean as much as possible.
+> The conventional section size on exynos is 256M due to sparsemem.
+> Since exynos5440 has memory in multiples of 1G in 32-bit and 36-bit
+> range, this has now been modified to 31.
 > 
-> Signed-off-by: Richard Zhu <r65037@freescale.com>
+> Signed-off-by: Subash Patel <subash.rp@samsung.com>
+> ---
+>  arch/arm/mach-exynos/include/mach/memory.h |    5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/mach-exynos/include/mach/memory.h
+b/arch/arm/mach-exynos/include/mach/memory.h
+> index 374ef2c..2a4cdb7 100644
+> --- a/arch/arm/mach-exynos/include/mach/memory.h
+> +++ b/arch/arm/mach-exynos/include/mach/memory.h
+> @@ -15,8 +15,13 @@
+> 
+>  #define PLAT_PHYS_OFFSET		UL(0x40000000)
+> 
+> +#ifndef CONFIG_ARM_LPAE
+>  /* Maximum of 256MiB in one bank */
+>  #define MAX_PHYSMEM_BITS	32
+>  #define SECTION_SIZE_BITS	28
+> +#else
+> +#define MAX_PHYSMEM_BITS	36
+> +#define SECTION_SIZE_BITS	31
+> +#endif
+> 
+>  #endif /* __ASM_ARCH_MEMORY_H */
+> --
+> 1.7.10.4
 
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+OK, current EXYNOS5440(SSDK5440 and SD5v1) cannot boot without this because
+of enabling LPAE and bootargs for over 4GiB memory. So let me sort this out
+for v3.11-rc.
+
+Thanks,
+- Kukjin
