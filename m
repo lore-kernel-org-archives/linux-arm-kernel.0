@@ -1,22 +1,50 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Jul 2013 09:26:01 +0800
-Subject: [RFC PATCH 07/11] cpufreq: cpufreq-cpu0: remove device tree
- parsing for cpu nodes
-In-Reply-To: <1373883732-26303-8-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1373883732-26303-8-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <20130716012559.GB28375@S2101-09.ap.freescale.net>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Tue, 16 Jul 2013 09:25:45 +0800
+Subject: [PATCH] video: nuc900fb: fix to pass correct device identity to
+ request_irq()
+In-Reply-To: <CAPgLHd9CZ=VponJTbTGKTXVTdvMQM6_T+-RWuPMrk0WYZPbW1Q@mail.gmail.com>
+References: <CAPgLHd9CZ=VponJTbTGKTXVTdvMQM6_T+-RWuPMrk0WYZPbW1Q@mail.gmail.com>
+Message-ID: <CAKT61h8v2mSHqdREgpvtuQAKC-4j3sKHtJ=c=6-YQdj=JUDyFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 11:22:08AM +0100, Sudeep.KarkadaNagesha at arm.com wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> 
-> Now that the cpu device registration initialises the of_node(if available)
-> appropriately for all the cpus, parsing here is redundant.
-> 
-> This patch removes all DT parsing and uses cpu->of_node instead.
-> 
-> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+2013/7/16 Wei Yongjun <weiyj.lk@gmail.com>:
+> The IRQ handler nuc900fb_irqhandler() use dev_id as a type of
+> struct nuc900fb_info *, so we should pass fbi as the device
+> identity to request_irq().
+>
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Wan Zongshun <mcuos.com@gmail.com>
+
+Thanks!
+Vincent Wan.
+
+> ---
+> Was 'video: nuc900fb: fix to pass correct device identity to free_irq()'
+> ---
+>  drivers/video/nuc900fb.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
+> index 8c527e5..796e511 100644
+> --- a/drivers/video/nuc900fb.c
+> +++ b/drivers/video/nuc900fb.c
+> @@ -587,8 +587,7 @@ static int nuc900fb_probe(struct platform_device *pdev)
+>         fbinfo->flags                   = FBINFO_FLAG_DEFAULT;
+>         fbinfo->pseudo_palette          = &fbi->pseudo_pal;
+>
+> -       ret = request_irq(irq, nuc900fb_irqhandler, 0,
+> -                         pdev->name, fbinfo);
+> +       ret = request_irq(irq, nuc900fb_irqhandler, 0, pdev->name, fbi);
+>         if (ret) {
+>                 dev_err(&pdev->dev, "cannot register irq handler %d -err %d\n",
+>                         irq, ret);
+>
+>
+
+
+
+--
+Wan ZongShun.
+www.mcuos.com
