@@ -1,56 +1,53 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Jul 2013 16:34:37 -0600
-Subject: [PATCH] pinctrl: tegra: expose config options for individual SoCs
-Message-ID: <1374014077-22536-1-git-send-email-swarren@wwwdotorg.org>
+Date: Tue, 16 Jul 2013 16:36:20 -0600
+Subject: [PATCH 1/2] ARM: tegra: remove CONFIG_ARCH_TEGRA_*_SOC
+Message-ID: <1374014181-22605-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-I'm planning to remove CONFIG_ARCH_TEGRA_*_SOC, leaving just ARCH_TEGRA.
-This will reduce the number of configurations that need to be supported
-by core Tegra code, e.g. CPU idle, hotplug. As a precursor, we need to
-update Kconfig for all Tegra drivers not to reference ARCH_TEGRA_*_SOC.
-
-The Tegra pinctrl driver contains a fairly large amount of SoC-specific
-code and data. Introduce explicit config options so that the user can
-trim the set of supported SoCs if they wish. Default these to on, since
-most people will probably want to enable support for all SoCs. This also
-avoids the need to change any defconfig files.
+These kconfig symbols are no longer used, so delete them.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/pinctrl/Kconfig | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+These will need to be applied after all the various subsystems have
+merged the other patches I sent related to ARCH_TEGRA_*_SOC, and those
+subsystem trees have all been merged together. So, after v3.12-rc1 some
+time.
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index 5a8ad51..25a56b5 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -207,15 +207,21 @@ config PINCTRL_TEGRA
- 	select PINCONF
+ arch/arm/mach-tegra/Kconfig | 12 ------------
+ 1 file changed, 12 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 94713e4..b1fabe6 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -3,9 +3,6 @@ config ARCH_TEGRA
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select ARCH_TEGRA_2x_SOC
+-	select ARCH_TEGRA_3x_SOC
+-	select ARCH_TEGRA_114_SOC
+ 	select ARM_ERRATA_720789
+ 	select ARM_ERRATA_754322
+ 	select ARM_ERRATA_754327 if SMP
+@@ -43,15 +40,6 @@ config ARCH_TEGRA
+ menu "NVIDIA Tegra options"
+ 	depends on ARCH_TEGRA
  
- config PINCTRL_TEGRA20
+-config ARCH_TEGRA_2x_SOC
 -	bool
-+	bool "NVIDIA Tegra20 pin control driver"
-+	depends on ARCH_TEGRA
-+	default y
- 	select PINCTRL_TEGRA
- 
- config PINCTRL_TEGRA30
+-
+-config ARCH_TEGRA_3x_SOC
 -	bool
-+	bool "NVIDIA Tegra30 pin control driver"
-+	depends on ARCH_TEGRA
-+	default y
- 	select PINCTRL_TEGRA
- 
- config PINCTRL_TEGRA114
+-
+-config ARCH_TEGRA_114_SOC
 -	bool
-+	bool "NVIDIA Tegra114 pin control driver"
-+	depends on ARCH_TEGRA
-+	default y
- 	select PINCTRL_TEGRA
- 
- config PINCTRL_TZ1090
+-
+ config TEGRA_PCI
+ 	bool "PCI Express support"
+ 	depends on ARCH_TEGRA
 -- 
 1.8.1.5
