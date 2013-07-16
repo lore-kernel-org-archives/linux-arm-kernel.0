@@ -1,37 +1,66 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Jul 2013 16:36:21 -0600
-Subject: [PATCH 2/2] ARM: tegra: don't select all pinctrl drivers
-In-Reply-To: <1374014181-22605-1-git-send-email-swarren@wwwdotorg.org>
-References: <1374014181-22605-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1374014181-22605-2-git-send-email-swarren@wwwdotorg.org>
+Date: Tue, 16 Jul 2013 16:57:03 -0600
+Subject: [PATCH v2 01/22] [HACK] of: dev_node has struct device pointer
+In-Reply-To: <1373021097-32420-2-git-send-email-hdoyu@nvidia.com>
+References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
+ <1373021097-32420-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <51E5CFBF.5080407@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
+> To prevent of_platform_populate() from trying to populate duplicate
+> devices if a device has been already populated.
 
-The Tegra pinctrl drivers now have their own user-visible config options.
-Don't select all of these when ARCH_TEGRA is enabled; that prevents the
-user from selectively disabling pinctrl drivers for SoCs that they don't
-care about.
+You need to send drivers/of patches to the DT maintainer and
+devicetree-discuss mailing list.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/Kconfig | 3 ---
- 1 file changed, 3 deletions(-)
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+> Need to take care of early_platform_devices, or alternative solution.
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index b1fabe6..6715621 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -23,9 +23,6 @@ config ARCH_TEGRA
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select PINCTRL
--	select PINCTRL_TEGRA114
--	select PINCTRL_TEGRA20
--	select PINCTRL_TEGRA30
- 	select PL310_ERRATA_727915 if CACHE_L2X0
- 	select PL310_ERRATA_769419 if CACHE_L2X0
- 	select SOC_BUS
--- 
-1.8.1.5
+I assume that's a TODO item... Are you planning on fleshing out this
+patch to address that issue?
+
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+
+> +struct device *of_get_device(const struct device_node *node)
+> +{
+> +	struct device *dev;
+> +	unsigned long flags;
+> +
+> +	raw_spin_lock_irqsave(&devtree_lock, flags);
+> +	dev = node->dev;
+> +	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+
+The read (and write in of_set_device()) aren't atomic already? I guess
+perhaps they aren't necessarily. It sure seems like some higher-level
+locking is needed in of_platform_create_pdata() though, since there's
+quite a window there between the get() and set() calls. Or, is there
+already some locking in place above that, in which case, I 'm not sure
+why there's a need for this level of locking here...
+
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+
+> +	tmp = of_get_device(np);
+> +	if (tmp) {
+> +		dev_info(tmp, "Already populated\n");
+> +		return to_platform_device(tmp);
+> +	}
+
+Did you check all callers of this function to make sure that they also
+don't do any kind of double-processing?
+
+
+> diff --git a/include/linux/of.h b/include/linux/of.h
+
+> @@ -60,6 +60,9 @@ struct device_node {
+>  	struct	kref kref;
+>  	unsigned long _flags;
+>  	void	*data;
+> +
+> +	struct device *dev;		/* Set only after populated */
+> +
+>  #if defined(CONFIG_SPARC)
+
+Are the extra blank lines needed?
