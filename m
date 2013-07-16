@@ -1,75 +1,90 @@
-From: yann.morin.1998@free.fr (Yann E. MORIN)
-Date: Tue, 16 Jul 2013 11:32:39 +0200
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <20130716092242.GD4402@pd.tnic>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <201307161112.17901.yann.morin.1998@free.fr> <20130716092242.GD4402@pd.tnic>
-Message-ID: <201307161132.39845.yann.morin.1998@free.fr>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 16 Jul 2013 12:35:41 +0300
+Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
+In-Reply-To: <20130716090536.5541.36289.stgit@localhost>
+References: <20130716090310.5541.36777.stgit@localhost>
+ <20130716090536.5541.36289.stgit@localhost>
+Message-ID: <20130716093541.GK8880@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Borislav, All,
+Hi,
 
-On Tuesday 16 July 2013 11:22:42 Borislav Petkov wrote:
-> On Tue, Jul 16, 2013 at 11:12:17AM +0200, Yann E. MORIN wrote:
-> > The goal is to avoid generating a non-buildable kernel in the first place.
-> 
-> I know, that's why I'm proposing to fail the build with the script run
-> as one of the first things by make.
+On Tue, Jul 16, 2013 at 02:05:36AM -0700, Tony Lindgren wrote:
+> +int pinctrl_check_dynamic(struct device *dev, struct pinctrl_state *st1,
+> +			  struct pinctrl_state *st2)
+> +{
+> +	struct pinctrl_setting *s1, *s2;
+> +
+> +	list_for_each_entry(s1, &st1->settings, node) {
+> +		struct pinctrl_dev *pctldev1;
+> +		const struct pinctrl_ops *pctlops1;
+> +		const unsigned *pins1;
+> +		unsigned num_pins1;
+> +		int res;
+> +
+> +		if (s1->type != PIN_MAP_TYPE_MUX_GROUP)
+> +			continue;
+> +
+> +		pctldev1 = s1->pctldev;
+> +		pctlops1 = pctldev1->desc->pctlops;
+> +		res = pctlops1->get_group_pins(pctldev1, s1->data.mux.group,
+> +					       &pins1, &num_pins1);
+> +		if (res) {
+> +			dev_dbg(dev, "could not get state1 group pins\n");
+> +			return -EINVAL;
+> +		}
+> +
+> +		list_for_each_entry(s2, &st2->settings, node) {
+> +			struct pinctrl_dev *pctldev2;
+> +			const struct pinctrl_ops *pctlops2;
+> +			const unsigned *pins2;
+> +			unsigned num_pins2;
+> +			int i, j, found = 0;
+> +
+> +			if (s2->type != PIN_MAP_TYPE_MUX_GROUP)
+> +				continue;
+> +
+> +			pctldev2 = s2->pctldev;
+> +			if (pctldev1 != pctldev2) {
+> +				dev_dbg(dev, "pctldev must be the same for states\n");
+> +				return -EINVAL;
+> +			}
+> +			pctlops2 = pctldev2->desc->pctlops;
+> +			res = pctlops2->get_group_pins(pctldev2,
+> +						       s2->data.mux.group,
+> +						       &pins2, &num_pins2);
+> +			if (res) {
+> +				dev_dbg(dev, "could not get state2 group pins\n");
+> +				return -EINVAL;
+> +			}
+> +
+> +			for (i = 0; i < num_pins1; i++) {
+> +				int pin1 = pins1[i];
+> +
+> +				for (j = 0; j < num_pins2; j++) {
+> +					int pin2 = pins2[j];
+> +
+> +					if (pin1 == pin2) {
+> +						found++;
+> +						break;
+> +					}
+> +				}
+> +			}
 
-No, this is already too late: the given .config *is* already broken and
-unbuildable.
+4 levels of nested loops ? Isn't this way too much ? OTOH, it points to
+the fact that, perhaps, a list isn't the best data structure for
+pinctrl ??
 
-> > > I.e., those steps:
-> > > 1. make <whatever>config
-> > > 2. make => A prereq. target runs the shell script.
-> > 
-> > This is too late, since this will bail out, and will give a false-positive
-> > failure.
-> 
-> Huh? This will tell you: "you've selected X, but I don't have toolX
-> needed for the build".
-> 
-> You install the tool and run make again. Checks pass, the build
-> continues.
-
-That does not work in two cases:
-  - older distros that do not have the tool packaged
-  - automatic test-harness that run thousands of randconfig a day
-
-In the first case, this /could/ be overcome by the user compiling and
-installing the package manually, but is mostly undoable in enterprise
-environment with shared build machines, where each user would have to
-install the same tool(s) again and again.
-
-In the second case, this would yield a lot of false-positive in daily
-reports.
-
-Your solution mostly works with minimum overhead for a human user
-interactively building a kernel, not with automated test harnesses.
-
-> > While if we were to check for _known_ needed tools before calling into
-> > Kconfig,
-> 
-> How would you do that? How do you know what the user is going to select
-> *before* she even selects it?
-
-The idea is to *avoid* the user being able to select unavailable options.
-
-> You need to have a prepared .config to act upon.
-
-The idea is to be always have a .config that is buildable with the current
-toolset of the system, especially for esoteric and/or recent tools that are
-not packaged and/or installed by default by the distros.
-
-Regards,
-Yann E. MORIN.
+Or perhaps you could just assume that if num_pins1 == num_pins2 it's
+enough ? But that will, likely, leave some uncovered corners...
 
 -- 
-.-----------------.--------------------.------------------.--------------------.
-|  Yann E. MORIN  | Real-Time Embedded | /"\ ASCII RIBBON | Erics' conspiracy: |
-| +0/33 662376056 | Software  Designer | \ / CAMPAIGN     |   ^                |
-| --==< O_o >==-- '------------.-------:  X  AGAINST      |  /e\  There is no  |
-| http://ymorin.is-a-geek.org/ | (*_*) | / \ HTML MAIL    |  """  conspiracy.  |
-'------------------------------'-------'------------------'--------------------'
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130716/bb3331b7/attachment.sig>
