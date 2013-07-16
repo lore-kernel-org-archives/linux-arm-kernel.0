@@ -1,42 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Jul 2013 17:07:12 -0600
-Subject: [PATCH v2 03/22] ARM: tegra: Create a DT header defining swgroups
- ID
-In-Reply-To: <1373021097-32420-4-git-send-email-hdoyu@nvidia.com>
-References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
- <1373021097-32420-4-git-send-email-hdoyu@nvidia.com>
-Message-ID: <51E5D220.1070708@wwwdotorg.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 17 Jul 2013 00:08:30 +0100
+Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC with
+ ARM CPU
+In-Reply-To: <20130716151435.GB3871@linaro.org>
+References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
+ <20130716151435.GB3871@linaro.org>
+Message-ID: <2043662.BcW19XTTMG@lenovo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
-> Create a header file to define the swgroup IDs used by the IOMMU(SMMU)
-> binding. "swgroup" is a group of H/W clients in Tegra SoC from S/W POV.
+Hello,
+
+Le mardi 16 juillet 2013 11:14:36 Matt Porter a ?crit :
+> > +	compatible = "brcm,bcm5301x";
 > 
-> This will allow the same header to be used by both device tree files,
-> and drivers implementing this binding, which guarantees that the two
-> stay in sync. This also makes device trees more readable by using names
-> instead of magic numbers.
+> Ok, this was nagging at me before I went on my very long vacation. I see
+> the "brcm" vendor prefix as a real consistency problem. I noticed on the
+> bcm281xx/kona family, we have been using "bcm" which is not logged in
+> vendor-prefixes.txt as a legitimate prefix. I see that bcm2835 had
+> already established use of "brcm" before any of the bcm281xx support
+> came in. Ideally, the vendor prefix should change to "bcm" since every
+> reference in the family names is BCM. However, if others want the least
+> amount of churn in making this consistent, we might have to go with
+> "brcm" across the board.
 
-Why does the driver need these constants; shouldn't it simply support
-0..n SW group IDs that all work the same way? Or, is there some reason
-for it to know the identities?
+I would like to keep "brcm" here because that is what has been defined as a 
+vendor prefix, and is used beyond the scope of the ARM Linux kernel support 
+even within Broadcom. Maybe it was an oversight, or rather a mistake to let 
+the bcm281x/kona family support code be merged and use "bcm" there, without 
+registering it. Besides, a simple rule of number here wins:
 
-> diff --git a/include/dt-bindings/memory/tegra-swgroup.h b/include/dt-bindings/memory/tegra-swgroup.h
+git grep "brcm," * | wc -l
+63
+git grep "bcm," * | wc -l
+25
 
-s/memory/iommu/?
+(as of Linux 3.11-rc1)
 
-s/tegra-swgroup.h/tegra-smmu.h/?
-
-> +#define TEGRA_SWGROUP_AFI 0
-
-Should this file document which values are valid for which SoCs? Should
-there be separate files for each SoC; I don't know if it's guaranteed
-that IDs won't be re-assigned between different SoCs.
-
-> +#define TEGRA_SWGROUP_BIT(x)	(1ULL << TEGRA_SWGROUP_##x)
-> +
-> +#define TEGRA30_SWGROUP_ALL	<0x00000000 0x000779ff>
-> +#define TEGRA114_SWGROUP_ALL	<0x00000000 0x01b659fe>
-
-Are those 3 values needed by DT files, or just the driver?
+So consistency we should get the bcm281x/kona DT bindings to rename their 
+vendor prefix as well.
+-- 
+Florian
