@@ -1,57 +1,112 @@
-From: elen.song@atmel.com (Elen Song)
-Date: Tue, 16 Jul 2013 10:43:47 +0800
-Subject: [PATCH V2 8/8] serial: at91: modify UART to use software timer to
- trigger rx
-In-Reply-To: <1373942627-7121-1-git-send-email-elen.song@atmel.com>
-References: <1373942627-7121-1-git-send-email-elen.song@atmel.com>
-Message-ID: <1373942627-7121-9-git-send-email-elen.song@atmel.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 16 Jul 2013 12:22:14 +0900
+Subject: [PATCH] irqchip: exynos: cleanup non-DT stuff in exynos-combiner
+Message-ID: <027401ce81d3$ad706570$08513050$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Elen Song <elen.song@atmel.com>
----
- drivers/tty/serial/atmel_serial.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 769b90b..67617a8 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -826,7 +826,7 @@ static void atmel_release_rx_dma(struct uart_port *port)
- 	atmel_port->chan_rx = NULL;
- 	atmel_port->cookie_rx = -EINVAL;
+For EXYNOS SoCs, only can support for DT so removes non-DT stuff
+in exynos-combiner.
+
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ drivers/irqchip/exynos-combiner.c |   44 +------------------------------------
+ 1 file changed, 1 insertion(+), 43 deletions(-)
+
+diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+index 4c68265..868ed40 100644
+--- a/drivers/irqchip/exynos-combiner.c
++++ b/drivers/irqchip/exynos-combiner.c
+@@ -19,10 +19,6 @@
+ #include <linux/of_irq.h>
+ #include <asm/mach/irq.h>
  
--	if (port->line == 0)
-+	if (!atmel_port->is_usart)
- 		del_timer_sync(&atmel_port->uart_timer);
+-#ifdef CONFIG_EXYNOS_ATAGS
+-#include <plat/cpu.h>
+-#endif
+-
+ #include "irqchip.h"
+ 
+ #define COMBINER_ENABLE_SET	0x0
+@@ -138,7 +134,6 @@ static void __init combiner_init_one(struct combiner_chip_data *combiner_data,
+ 	__raw_writel(combiner_data->irq_mask, base + COMBINER_ENABLE_CLEAR);
  }
  
-@@ -1230,7 +1230,7 @@ static void atmel_release_rx_pdc(struct uart_port *port)
- 		kfree(pdc->buf);
+-#ifdef CONFIG_OF
+ static int combiner_irq_domain_xlate(struct irq_domain *d,
+ 				     struct device_node *controller,
+ 				     const u32 *intspec, unsigned int intsize,
+@@ -156,16 +151,6 @@ static int combiner_irq_domain_xlate(struct irq_domain *d,
+ 
+ 	return 0;
+ }
+-#else
+-static int combiner_irq_domain_xlate(struct irq_domain *d,
+-				     struct device_node *controller,
+-				     const u32 *intspec, unsigned int intsize,
+-				     unsigned long *out_hwirq,
+-				     unsigned int *out_type)
+-{
+-	return -EINVAL;
+-}
+-#endif
+ 
+ static int combiner_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 				   irq_hw_number_t hw)
+@@ -184,26 +169,6 @@ static struct irq_domain_ops combiner_irq_domain_ops = {
+ 	.map	= combiner_irq_domain_map,
+ };
+ 
+-static unsigned int combiner_lookup_irq(int group)
+-{
+-#ifdef CONFIG_EXYNOS_ATAGS
+-	if (group < EXYNOS4210_MAX_COMBINER_NR || soc_is_exynos5250())
+-		return IRQ_SPI(group);
+-
+-	switch (group) {
+-	case 16:
+-		return IRQ_SPI(107);
+-	case 17:
+-		return IRQ_SPI(108);
+-	case 18:
+-		return IRQ_SPI(48);
+-	case 19:
+-		return IRQ_SPI(42);
+-	}
+-#endif
+-	return 0;
+-}
+-
+ static void __init combiner_init(void __iomem *combiner_base,
+ 				 struct device_node *np,
+ 				 unsigned int max_nr,
+@@ -229,12 +194,7 @@ static void __init combiner_init(void __iomem *combiner_base,
  	}
  
--	if (port->line == 0)
-+	if (!atmel_port->is_usart)
- 		del_timer_sync(&atmel_port->uart_timer);
+ 	for (i = 0; i < max_nr; i++) {
+-#ifdef CONFIG_OF
+-		if (np)
+-			irq = irq_of_parse_and_map(np, i);
+-		else
+-#endif
+-			irq = combiner_lookup_irq(i);
++		irq = irq_of_parse_and_map(np, i);
+ 
+ 		combiner_init_one(&combiner_data[i], i,
+ 				  combiner_base + (i >> 2) * 0x10, irq);
+@@ -242,7 +202,6 @@ static void __init combiner_init(void __iomem *combiner_base,
+ 	}
  }
  
-@@ -1593,7 +1593,7 @@ static int atmel_startup(struct uart_port *port)
- 
- 	if (atmel_use_pdc_rx(port)) {
- 		/* set UART timeout */
--		if (port->line == 0) {
-+		if (!atmel_port->is_usart) {
- 			setup_timer(&atmel_port->uart_timer,
- 					atmel_uart_timer_callback,
- 					(unsigned long)port);
-@@ -1610,7 +1610,7 @@ static int atmel_startup(struct uart_port *port)
- 		UART_PUT_PTCR(port, ATMEL_PDC_RXTEN);
- 	} else if (atmel_use_dma_rx(port)) {
- 		/* set UART timeout */
--		if (port->line == 0) {
-+		if (!atmel_port->is_usart) {
- 			setup_timer(&atmel_port->uart_timer,
- 					atmel_uart_timer_callback,
- 					(unsigned long)port);
+-#ifdef CONFIG_OF
+ static int __init combiner_of_init(struct device_node *np,
+ 				   struct device_node *parent)
+ {
+@@ -275,4 +234,3 @@ static int __init combiner_of_init(struct device_node *np,
+ }
+ IRQCHIP_DECLARE(exynos4210_combiner, "samsung,exynos4210-combiner",
+ 		combiner_of_init);
+-#endif
 -- 
-1.7.9.5
+1.7.10.4
