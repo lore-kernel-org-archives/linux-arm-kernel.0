@@ -1,40 +1,45 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Tue, 16 Jul 2013 07:56:52 +0000
-Subject: [v7 2/3] ARM: imx6q: update the sata bits definitions of gpr13
-In-Reply-To: <20130716033951.GG28375@S2101-09.ap.freescale.net>
-References: <1373945328-20893-1-git-send-email-Hong-Xing.Zhu@freescale.com>
- <1373945328-20893-3-git-send-email-Hong-Xing.Zhu@freescale.com>
- <20130716033951.GG28375@S2101-09.ap.freescale.net>
-Message-ID: <0E83723C55F66F43A6041464FE31119D33D959@039-SN2MPN1-011.039d.mgd.msft.net>
+From: jgq516@gmail.com (jgq516 at gmail.com)
+Date: Tue, 16 Jul 2013 16:00:40 +0800
+Subject: v3.10 - big endian core support
+In-Reply-To: <51E3CE41.5010807@codethink.co.uk>
+References: <CALicx6u89THSiRa4FzGZrcoG8q+o_BD8qVEC4CYXEjPUVK_fJw@mail.gmail.com>
+ <20130712134726.0a909165@skate> <51DFEF75.8080600@codethink.co.uk>
+ <20130714215325.GB7382@mudshark.cambridge.arm.com>
+ <51E3ACD0.8040209@codethink.co.uk> <20130715103658.068ac6b7@skate>
+ <51E3CE41.5010807@codethink.co.uk>
+Message-ID: <51E4FDA8.9030306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn:
-Thanks.
+On 07/15/2013 06:26 PM, Ben Dooks wrote:
+> On 15/07/13 09:36, Thomas Petazzoni wrote:
+>> Dear Ben Dooks,
+>>
+>> On Mon, 15 Jul 2013 09:03:28 +0100, Ben Dooks wrote:
+>>
+>>>> As for building a Thumb-2 kernel; just enable the option in 
+>>>> menuconfig and
+>>>> you're done. The compiler should "do the right thing".
+>>>
+>>> I can build it, I just don't have the time and hardware to give it a
+>>> test at the moment. However it seems that changing to using 'rev16'
+>>> instead of 'rev'. I will make the necessary changes and get this ready
+>>> to go.
+>>
+>> I am willing to give some testing to early patches, if needed. Do not
+>> hesitate to send me things to test.
+>
+> I've pushed out two new branches on git.baserock.org/delta/linux.git
+> as:
+>     baserock/311/be/core-v2
+I have tested the 10 patches on this branch with latest mainline kernel 
+(commit 47188d).
+Vexpress a15 tc2 boards works with the combos: BE+LPAE on/off, 
+BE+THUMB2+LPAE on and LE.
 
-Hi Tejun:
-Can you help to pick up the #3 of this patch-set?
-Thanks in advance.
+There are some conflicts existed between your patch set and latest kernel.
 
-Best Regards
-Richard Zhu
-
------Original Message-----
-From: Shawn Guo [mailto:shawn.guo at linaro.org] 
-Sent: Tuesday, July 16, 2013 11:40 AM
-To: Richard Zhu
-Cc: linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; tj at kernel.org; rob.herring at calxeda.com; s.hauer at pengutronix.de; linux-ide at vger.kernel.org; Zhu Richard-R65037
-Subject: Re: [v7 2/3] ARM: imx6q: update the sata bits definitions of gpr13
-
-On Tue, Jul 16, 2013 at 11:28:47AM +0800, Richard Zhu wrote:
-> From: Richard Zhu <r65037@freescale.com>
-> 
-> Replace the SATA_PHY_# by the more readable definitons.
-> 
-> Signed-off-by: Richard Zhu <r65037@freescale.com>
-
-Hi Tejun,
-
-The patch needs to go through your tree to keep patch #3 compilable.  So
-
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Thanks,
+Xiao
+>     baserock/311/be/atags-v2
+>
