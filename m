@@ -1,51 +1,58 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 16 Jul 2013 15:42:27 +0300
-Subject: [PATCH v2 0/4] usb: musb: fix USB enumeration issue in OMAP3
- platform
-In-Reply-To: <51E4DFA6.2010501@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 16 Jul 2013 05:44:43 -0700
+Subject: [PATCH v2 1/4] arm: omap: Add phy binding info for musb in
+ plat data
+In-Reply-To: <1373282057-20181-2-git-send-email-kishon@ti.com>
 References: <1373282057-20181-1-git-send-email-kishon@ti.com>
- <51E4DFA6.2010501@ti.com>
-Message-ID: <20130716124227.GC15036@arwen.pp.htv.fi>
+ <1373282057-20181-2-git-send-email-kishon@ti.com>
+Message-ID: <20130716124442.GZ7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jul 16, 2013 at 11:22:38AM +0530, Kishon Vijay Abraham I wrote:
-> Tony,
+* Kishon Vijay Abraham I <kishon@ti.com> [130708 04:20]:
+> In order for controllers to get PHY in case of non dt boot, the phy
+> binding information (phy label) should be added in the platform
+> data of the controller.
 > 
-> On Monday 08 July 2013 04:44 PM, Kishon Vijay Abraham I wrote:
-> > This series fixes the USB enumeration issue caused because of the controller
-> > not able to get a reference to the PHY because of incorrect binding in the
-> > board file.
-> > 
-> > In the case of non-dt boot, the platform specific initialization file
-> > (board file) will do usb_bind_phy that binds the usb controller with the
-> > PHY using device names. After the device names are created using 
-> > PLATFORM_DEVID_AUTO, our original method of binding by device names doesn't
-> > work reliably (since the device name changes). Hence the usb controller
-> > is made to use labels for getting the PHY.
-> > 
-> > Here the PHY name is added in the plat data of USB controller device which
-> > should be used by the controller driver to get the PHY.
-> > Two new APIs usb_get_phy_by_name and devm_usb_get_phy_by_name are added to
-> > be used by the controller to get the PHY by name.
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> Tested-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+
+> ---
+>  arch/arm/mach-omap2/usb-musb.c |    3 +++
+>  include/linux/usb/musb.h       |    3 +++
+>  2 files changed, 6 insertions(+)
 > 
-> You haven't picked this patch series?
-
-yeah and now it's too much to send during the -rc series. Here's what we
-can do, we can to minimum fix for -rc series (patching the names again)
-and I'll queue everything else for mailine if tony gives me his Ack for
-all arch/arm/*omap* parts.
-
-Sounds good ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130716/376cd3a8/attachment.sig>
+> diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
+> index 8c4de27..20b42de 100644
+> --- a/arch/arm/mach-omap2/usb-musb.c
+> +++ b/arch/arm/mach-omap2/usb-musb.c
+> @@ -85,6 +85,9 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
+>  	musb_plat.mode = board_data->mode;
+>  	musb_plat.extvbus = board_data->extvbus;
+>  
+> +	if (cpu_is_omap34xx())
+> +		musb_plat.phy_name = "twl4030";
+> +
+>  	if (soc_is_am35xx()) {
+>  		oh_name = "am35x_otg_hs";
+>  		name = "musb-am35x";
+> diff --git a/include/linux/usb/musb.h b/include/linux/usb/musb.h
+> index 053c268..c05d46d 100644
+> --- a/include/linux/usb/musb.h
+> +++ b/include/linux/usb/musb.h
+> @@ -104,6 +104,9 @@ struct musb_hdrc_platform_data {
+>  	/* for clk_get() */
+>  	const char	*clock;
+>  
+> +	/* phy device label */
+> +	const char	*phy_name;
+> +
+>  	/* (HOST or OTG) switch VBUS on/off */
+>  	int		(*set_vbus)(struct device *dev, int is_on);
+>  
+> -- 
+> 1.7.10.4
+> 
