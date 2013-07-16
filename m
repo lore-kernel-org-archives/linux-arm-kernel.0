@@ -1,37 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 16 Jul 2013 14:22:37 +0200
-Subject: [PATCH -next] clk: sunxi: fix return value check
-In-Reply-To: <CAPgLHd_RTeUgZtsLd=GqW7tG0q-ccDcd8gBNgDxo3E8qLE141g@mail.gmail.com>
-References: <CAPgLHd_RTeUgZtsLd=GqW7tG0q-ccDcd8gBNgDxo3E8qLE141g@mail.gmail.com>
-Message-ID: <20130716122237.GF3125@lukather>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Tue, 16 Jul 2013 09:24:10 -0300
+Subject: [PATCH 1/5] ARM: dts: imx23-evk: enable USB PHY and controller
+In-Reply-To: <CAOMZO5D+szAgY6+CHjwFRw2qwvusv2_Ach0hv=hj4X1cmMnHfA@mail.gmail.com>
+References: <1373898160-8460-1-git-send-email-otavio@ossystems.com.br>
+ <CAOMZO5D+szAgY6+CHjwFRw2qwvusv2_Ach0hv=hj4X1cmMnHfA@mail.gmail.com>
+Message-ID: <CAP9ODKpByXLm1xkbfxJoktYr2ZNSD1cwNmtV95pfnjQ0jgeWYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+On Tue, Jul 16, 2013 at 12:42 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Mon, Jul 15, 2013 at 11:22 AM, Otavio Salvador
+> <otavio@ossystems.com.br> wrote:
+>> The i.MX23EVK board provides a USB port so the USB PHY and controller
+>> need to be enabled for it to be usable.
+>
+> Has this been tested? I don't see in this patch any code to enable USB power.
 
-On Tue, Jul 16, 2013 at 08:17:45PM +0800, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> In case of error, the function clk_register_composite() and
-> clk_register_factors() returns ERR_PTR() not NULL. The NULL test
-> in the return value check should be replaced with IS_ERR().
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+It does, I am using it.
 
-Thanks for this patch, but Axel Lin already sent a equivalent patch for
-this issue last week:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/183138.html
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130716/db544376/attachment.sig>
+--
+Otavio Salvador                             O.S. Systems
+http://www.ossystems.com.br        http://projetos.ossystems.com.br
+Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
