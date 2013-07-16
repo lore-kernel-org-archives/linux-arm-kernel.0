@@ -1,97 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Jul 2013 02:05:39 -0700
-Subject: [PATCH 4/4] drivers: Add pinctrl handling for dynamic pin states
-In-Reply-To: <20130716090310.5541.36777.stgit@localhost>
-References: <20130716090310.5541.36777.stgit@localhost>
-Message-ID: <20130716090539.5541.980.stgit@localhost>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 16 Jul 2013 11:05:46 +0200
+Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
+ streaming format
+In-Reply-To: <20130716012756.31936d8d.akpm@linux-foundation.org>
+References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+ <20130716004727.b60b2c96.akpm@linux-foundation.org>
+ <20130716005611.e4ccab02.akpm@linux-foundation.org>
+ <201307161008.07643.yann.morin.1998@free.fr>
+ <20130716012756.31936d8d.akpm@linux-foundation.org>
+Message-ID: <20130716090546.GB4402@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to have static pin states handled separately from
-dynamic pin states, so let's add optional state_active.
+On Tue, Jul 16, 2013 at 01:27:56AM -0700, Andrew Morton wrote:
+> What I'm angling at is, rather than a single global front-end script,
+> can we embed the scripts in some fashion within the various Kconfig
+> files?  Say,
+> 
+> 	script ./some-script.sh
+> 
+> and the config system will only evaluate that command if it is working
+> on that Kconfig file.  Obviously that requires a multiple-pass thing.
 
-Then if state_active is defined, let's check and make sure
-state_idle and state_sleep match state_active for the
-pin groups to avoid checking them during runtime as the
-active and idle pins may need to be toggled for many
-devices every time we enter and exit idle.
+What's wrong with simply grepping the .config we've just created for
+*enabled* symbols which require userspace support, check for the
+presence of said support and bail out if none?
 
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- drivers/base/pinctrl.c |   39 +++++++++++++++++++++++++++++++++++++--
- 1 file changed, 37 insertions(+), 2 deletions(-)
+I.e., those steps:
 
-diff --git a/drivers/base/pinctrl.c b/drivers/base/pinctrl.c
-index 5fb74b4..49644ed 100644
---- a/drivers/base/pinctrl.c
-+++ b/drivers/base/pinctrl.c
-@@ -34,6 +34,7 @@ int pinctrl_bind_pins(struct device *dev)
- 		goto cleanup_alloc;
- 	}
- 
-+	/* Default static pins that don't need to change */
- 	dev->pins->default_state = pinctrl_lookup_state(dev->pins->p,
- 					PINCTRL_STATE_DEFAULT);
- 	if (IS_ERR(dev->pins->default_state)) {
-@@ -48,23 +49,57 @@ int pinctrl_bind_pins(struct device *dev)
- 		goto cleanup_get;
- 	}
- 
-+	/* Optional runtime dynamic pins in addition to the static pins */
-+	dev->pins->active_state = pinctrl_lookup_state(dev->pins->p,
-+					PINCTRL_STATE_ACTIVE);
-+	if (IS_ERR(dev->pins->active_state)) {
-+		/* Not supplying this state is perfectly legal */
-+		dev_dbg(dev, "no active pinctrl state\n");
-+	} else {
-+		ret = pinctrl_select_dynamic(dev->pins->p,
-+				dev->pins->active_state);
-+		if (ret) {
-+			dev_dbg(dev, "failed to select active pinctrl state\n");
-+			goto cleanup_get;
-+		}
-+	}
-+
- #ifdef CONFIG_PM
- 	/*
- 	 * If power management is enabled, we also look for the optional
- 	 * sleep and idle pin states, with semantics as defined in
- 	 * <linux/pinctrl/pinctrl-state.h>
-+	 *
-+	 * Note that if active state is defined, sleep and idle states must
-+	 * cover the same pin groups as active state.
- 	 */
- 	dev->pins->sleep_state = pinctrl_lookup_state(dev->pins->p,
- 					PINCTRL_STATE_SLEEP);
--	if (IS_ERR(dev->pins->sleep_state))
-+	if (IS_ERR(dev->pins->sleep_state)) {
- 		/* Not supplying this state is perfectly legal */
- 		dev_dbg(dev, "no sleep pinctrl state\n");
-+	} else if (!IS_ERR(dev->pins->active_state)) {
-+		ret = pinctrl_check_dynamic(dev, dev->pins->active_state,
-+					    dev->pins->sleep_state);
-+		if (ret) {
-+			dev_err(dev, "sleep state groups do not match active state\n");
-+			dev->pins->sleep_state = ERR_PTR(-EINVAL);
-+		}
-+	}
- 
- 	dev->pins->idle_state = pinctrl_lookup_state(dev->pins->p,
- 					PINCTRL_STATE_IDLE);
--	if (IS_ERR(dev->pins->idle_state))
-+	if (IS_ERR(dev->pins->idle_state)) {
- 		/* Not supplying this state is perfectly legal */
- 		dev_dbg(dev, "no idle pinctrl state\n");
-+	} else if (!IS_ERR(dev->pins->active_state)) {
-+		ret = pinctrl_check_dynamic(dev, dev->pins->active_state,
-+					    dev->pins->idle_state);
-+		if (ret) {
-+			dev_err(dev, "idle state groups do not match active state\n");
-+			dev->pins->idle_state = ERR_PTR(-EINVAL);
-+		}
-+	}
- #endif
- 
- 	return 0;
+1. make <whatever>config
+2. make => A prereq. target runs the shell script.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
