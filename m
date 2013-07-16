@@ -1,45 +1,62 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 16 Jul 2013 17:01:23 +0200
-Subject: [PATCH v8] ARM: clocksource: add support for MOXA ART SoCs
-In-Reply-To: <1373985880-23469-1-git-send-email-jonas.jensen@gmail.com>
-References: <1373024773-24574-1-git-send-email-jonas.jensen@gmail.com>
- <1373985880-23469-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <51E56043.1010509@linaro.org>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue, 16 Jul 2013 17:03:15 +0200
+Subject: [PATCH v3 0/7] ARM: at91: prepare transition to common clk framework
+Message-ID: <1373986995-23899-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2013 04:44 PM, Jonas Jensen wrote:
-> This patch adds an clocksource driver for the main timer(s)
-> found on MOXA ART SoCs.
-> 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> ---
+Hello,
 
-Ok, I will ask you two more things before taking your patch. I missed
-them at the previous review, sorry for asking a new version.
+This patch series prepares the transition to common clk framework by
+1) replacing all the clk_enable and clk_disable calls by clk_prepare_unable and
+   clk_disable_unprepare to avoid common clock framework warnings.
+2) adding explicit configuration of clk (set_rate) within drivers instead of
+   default configuration done in arch/arm/mach-at91/clock.c (udc and ohci
+   drivers)
 
-1. could you elaborate the patch log: as it is a new driver, a nice
-description of the timer hardware would be valuable for people willing
-to understand the code (eg. some specificities of the driver).
+If the second part of this patch series (the last 2 patches) does not belong
+here, please tell me and I'll move it into the "move to common clk framework"
+series.
 
-2. fix the alignment below
+Best Regards,
+Boris
 
-Thanks
-  -- Daniel
+Changes since v2:
+ - add configuraton of usb clock in ohci and udc drivers
+ - add clk_prepare patch for usba udc driver
+ - add clk_prepare patch for spi driver
+ - remove already applied udc clk_prepare patch
 
-[ ... ]
+Changes since v1:
+ - remove unneeded clk_unprepare in mci driver
+ - remove already applied patches (ehci, ohci, dma and serial)
 
-> +
-> +#define TIMER_CR		0x30
-> +#define TIMER_INTR_STATE	0x34
-> +#define TIMER_INTR_MASK		0x38
+Changes since common clk patch series:
+ - add clk_prepare_enable return check
+ - fix a deadlock in atmel-mci (missing spin_unlock)
+ - remove already applied patches (atmel-ssc and pwm-atmel-tcb)
 
 
-[ ... ]
+Boris BREZILLON (7):
+  ARM: at91/tc/clocksource: replace clk_enable/disable with
+    clk_prepare_enable/disable_unprepare.
+  mmc: atmel-mci: prepare clk before calling enable
+  at91/avr32/atmel_lcdfb: prepare clk before calling enable
+  USB: gadget: atmel_usba: prepare clk before calling enable
+  spi: atmel: prepare clk before calling enable
+  USB: ohci-at91: add usb_clk for transition to common clk framework
+  usb: gadget: at91_udc: add usb_clk for transition to common clk
+    framework
+
+ drivers/clocksource/tcb_clksrc.c    |   10 +++++-----
+ drivers/mmc/host/atmel-mci.c        |   27 ++++++++++++++++++---------
+ drivers/spi/spi-atmel.c             |   12 +++++++-----
+ drivers/usb/gadget/at91_udc.c       |   12 ++++++++++++
+ drivers/usb/gadget/at91_udc.h       |    2 +-
+ drivers/usb/gadget/atmel_usba_udc.c |   28 +++++++++++++++++++++-------
+ drivers/usb/host/ohci-at91.c        |   18 +++++++++++++++---
+ drivers/video/atmel_lcdfb.c         |    8 ++++----
+ 8 files changed, 83 insertions(+), 34 deletions(-)
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.9.5
