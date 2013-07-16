@@ -1,140 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Jul 2013 17:32:43 +0100
-Subject: [PATCH RFC v2 0/14] Clean up debugging support
-Message-ID: <20130716163243.GY21614@n2100.arm.linux.org.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 16 Jul 2013 17:35:28 +0100
+Subject: [PATCH] ARM: locks: remove opencoded #16 for ticket shift
+In-Reply-To: <1373894879-30559-1-git-send-email-will.deacon@arm.com>
+References: <1373894879-30559-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20130716163528.GC3428@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the second posting of this series, with a few additional patches
-on top to go a little further.  Changes since the last posting:
+On Mon, Jul 15, 2013 at 02:27:59PM +0100, Will Deacon wrote:
+> The ticket width of our spinlocks is defined by TICKET_SHIFT, so remove
+> the opencoded #16 from the trylock implementation.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/spinlock.h | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+> index f8b8965..fa3ccce 100644
+> --- a/arch/arm/include/asm/spinlock.h
+> +++ b/arch/arm/include/asm/spinlock.h
+> @@ -104,11 +104,11 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
+>  		__asm__ __volatile__(
+>  		"	ldrex	%0, [%3]\n"
+>  		"	mov	%2, #0\n"
+> -		"	subs	%1, %0, %0, ror #16\n"
+> -		"	addeq	%0, %0, %4\n"
+> +		"	subs	%1, %0, %0, ror %4\n"
+> +		"	addeq	%0, %0, %5\n"
 
-- we now provide a couple of generic options to allow the 8250 and PL01x
-  ports to be configured via Kconfig manually.  What this means is that
-  I do not expect to see further entries to the debug menu for platforms
-  which have PL01x or 8250 debug ports - use the generic options instead.
+%5!  Argh.
 
-- I've converted a bunch of the dependencies to select statements here
-  to clean things up a little more.
+>  		"	strexeq	%2, %0, [%3]"
+>  		: "=&r" (slock), "=&r" (contended), "=r" (res)
+> -		: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
+> +		: "r" (&lock->slock), "I" (TICKET_SHIFT), "I" (1 << TICKET_SHIFT)
 
-- Made the '8250 32-bit access size" option depend on a shift >= 2
-  (it would be silly to do 32-bit accesses to byte offsets.)
+I guess that should work.
 
-- Made all 8250 options available to the user when 8250 support is
-  selected, allowing full configuration of 8250 options.
+Strictly speaking, "M" is the right constraint to use for explicit shift
+counts, though it won't make much difference in practice.
 
-- Removed DEBUG_ROCKCHIP_UART which wasn't doing anything after this
-  cleanup.
+(Unless it ICEs the compiler for you ... seems to work on the 4.6.3
+GCC I have here.)
 
-- Converted Keystone, Davinci, and Spear to also use the generic 8250/PL01x
-  code; these had their own private implementations of the same without
-  using the generic versions for no reason that I could see.
+Cheers
+---Dave
 
-The rest is the same boilerplate from last time with the exception of
-the diffstat.
-
-This patch series cleans up some aspects of the LL debug support by:
-- Removing the multi-level choice madness
-- Consolidating the 8250 debug UART support
-- Consolidating the PL01x debug UART support
-
-The differences between the various 8250 debug UART implementations are:
-- Physical/Virtual addresses
-- Register offset shift
-- Access size
-- Flow control
-
-These are now parameterised in the Kconfig.  I've left OMAP because
-that's a complex case, but it looks like it can be adapted to it if
-some of the unnecessary complexity is eliminated.
-
-Similar is done with the PL01x implementation, except a few complex
-cases are left - automatic detection on Versatile Express, and the
-Ux500 support which looks like it'll take some picking through header
-files to work out what the base addresses are.
-
-The approach I've taken is to consolidate without losing any information
-- what that means it that the Kconfig parameters have rather a lot of
-dependencies/defaults associated with them, and the main choice
-statement keeps all its options.
-
-Nevertheless, even avoiding the loss of information, I think the diffstat
-is quite impressive:
-
- arch/arm/Kconfig.debug                             |  553 ++++++++++++++------
- arch/arm/include/asm/hardware/debug-8250.S         |   29 -
- arch/arm/include/debug/8250.S                      |   54 ++
- arch/arm/include/debug/8250_32.S                   |   27 -
- arch/arm/include/debug/bcm2835.S                   |   22 -
- arch/arm/include/debug/cns3xxx.S                   |   19 -
- arch/arm/include/debug/highbank.S                  |   17 -
- arch/arm/include/debug/keystone.S                  |   43 --
- arch/arm/include/debug/mvebu.S                     |   30 -
- arch/arm/include/debug/mxs.S                       |   27 -
- arch/arm/include/debug/nomadik.S                   |   20 -
- arch/arm/include/debug/nspire.S                    |   28 -
- arch/arm/include/debug/picoxcell.S                 |   19 -
- .../{asm/hardware/debug-pl01x.S => debug/pl01x.S}  |    9 +-
- arch/arm/include/debug/pxa.S                       |   33 --
- arch/arm/include/debug/rockchip.S                  |   42 --
- arch/arm/include/debug/socfpga.S                   |   21 -
- arch/arm/include/debug/sunxi.S                     |   27 -
- arch/arm/include/debug/u300.S                      |   18 -
- arch/arm/include/debug/ux500.S                     |    2 +-
- arch/arm/include/debug/vexpress.S                  |   48 +--
- arch/arm/mach-davinci/include/mach/debug-macro.S   |   65 ---
- arch/arm/mach-dove/include/mach/debug-macro.S      |   19 -
- arch/arm/mach-ebsa110/include/mach/debug-macro.S   |   22 -
- arch/arm/mach-ep93xx/include/mach/debug-macro.S    |   21 -
- .../arm/mach-footbridge/include/mach/debug-macro.S |   15 -
- arch/arm/mach-gemini/include/mach/debug-macro.S    |   21 -
- .../arm/mach-integrator/include/mach/debug-macro.S |   20 -
- arch/arm/mach-iop13xx/include/mach/debug-macro.S   |   24 -
- arch/arm/mach-iop32x/include/mach/debug-macro.S    |   21 -
- arch/arm/mach-iop33x/include/mach/debug-macro.S    |   22 -
- arch/arm/mach-ixp4xx/include/mach/debug-macro.S    |   26 -
- arch/arm/mach-kirkwood/include/mach/debug-macro.S  |   19 -
- arch/arm/mach-lpc32xx/include/mach/debug-macro.S   |   29 -
- arch/arm/mach-mv78xx0/include/mach/debug-macro.S   |   19 -
- arch/arm/mach-orion5x/include/mach/debug-macro.S   |   21 -
- arch/arm/mach-realview/include/mach/debug-macro.S  |   29 -
- arch/arm/mach-rpc/include/mach/debug-macro.S       |   23 -
- arch/arm/mach-spear/include/mach/debug-macro.S     |   36 --
- arch/arm/mach-spear/include/mach/spear.h           |    2 -
- arch/arm/mach-versatile/include/mach/debug-macro.S |   21 -
- 41 files changed, 457 insertions(+), 1106 deletions(-)
- delete mode 100644 arch/arm/include/asm/hardware/debug-8250.S
- create mode 100644 arch/arm/include/debug/8250.S
- delete mode 100644 arch/arm/include/debug/8250_32.S
- delete mode 100644 arch/arm/include/debug/bcm2835.S
- delete mode 100644 arch/arm/include/debug/cns3xxx.S
- delete mode 100644 arch/arm/include/debug/highbank.S
- delete mode 100644 arch/arm/include/debug/keystone.S
- delete mode 100644 arch/arm/include/debug/mvebu.S
- delete mode 100644 arch/arm/include/debug/mxs.S
- delete mode 100644 arch/arm/include/debug/nomadik.S
- delete mode 100644 arch/arm/include/debug/nspire.S
- delete mode 100644 arch/arm/include/debug/picoxcell.S
- rename arch/arm/include/{asm/hardware/debug-pl01x.S => debug/pl01x.S} (78%)
- delete mode 100644 arch/arm/include/debug/pxa.S
- delete mode 100644 arch/arm/include/debug/rockchip.S
- delete mode 100644 arch/arm/include/debug/socfpga.S
- delete mode 100644 arch/arm/include/debug/sunxi.S
- delete mode 100644 arch/arm/include/debug/u300.S
- delete mode 100644 arch/arm/mach-davinci/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-dove/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-ebsa110/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-ep93xx/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-gemini/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-integrator/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-iop13xx/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-iop32x/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-iop33x/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-kirkwood/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-lpc32xx/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-mv78xx0/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-orion5x/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-realview/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-rpc/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-spear/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-versatile/include/mach/debug-macro.S
+>  		: "cc");
+>  	} while (res);
+>  
+> -- 
+> 1.8.2.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
