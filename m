@@ -1,53 +1,52 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 16 Jul 2013 16:39:25 +0300
-Subject: [PATCH v2 4/4] ARM: OMAP2+: Provide alias to USB PHY clock
-In-Reply-To: <20130716123256.GY7656@atomide.com>
-References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
- <1371571487-14389-5-git-send-email-rogerq@ti.com> <51E40199.9070906@ti.com>
- <20130716123256.GY7656@atomide.com>
-Message-ID: <51E54D0D.3030200@ti.com>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Tue, 16 Jul 2013 19:10:34 +0530
+Subject: [PATCH v7 00/11] Add generic set_rate clk_ops for PLL35xx and
+ PLL36xx for samsung SoCs
+In-Reply-To: <007001ce7149$1f683f40$5e38bdc0$%kim@samsung.com>
+References: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
+ <CAKew6eUOy4=D08v_iq7CTRY5gvt37VAN7Z7WOr2Yt25znDJb2g@mail.gmail.com>
+ <CAGm_ybiVZOPBJJ0bYX33wafn1So6aqSAnk7myXZ+Z+RfLBeBQw@mail.gmail.com>
+ <1524664.UCV47tfIRU@flatron> <20130621163143.9136.28807@quantum>
+ <51C85F8F.9050501@samsung.com> <20130624190227.20448.68120@quantum>
+ <007001ce7149$1f683f40$5e38bdc0$%kim@samsung.com>
+Message-ID: <CAKew6eVW6dOzLRN2CG8jT3Oo1uzKrXqi1aRYkAHmUu61dBSDpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2013 03:32 PM, Tony Lindgren wrote:
-> * Roger Quadros <rogerq@ti.com> [130715 07:11]:
->> Hi Tony,
+Hi Kukjin / Mike,
+
+On Tue, Jun 25, 2013 at 7:40 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Mike Turquette wrote:
 >>
->> On 06/18/2013 07:04 PM, Roger Quadros wrote:
->>> Till the OMAP clocks are correctly defined in device tree, use
->>> this temporary hack to provide clock alias to the USB PHY clocks.
->>>
->>> Without this, USB Host & Ethernet will not be functional with
->>> device tree boots on Panda and uEVM.
+>> Quoting Kukjin Kim (2013-06-24 08:02:39)
+>> > On 06/22/13 01:31, Mike Turquette wrote:
+>> > >
+>> > > Acked-by: Mike Turquette<mturquette@linaro.org>
+>> > >
+>> > > Or I can take this through the clk tree. Either way is fine.
+>> > >
+>> > Mike, please go ahead taking this series into the clk tree for 3.11.
 >>
->> Looks like this one got missed out.
+>> Actually it might be better for you to take it. Patch #5 relies on
+>> drivers/clk/samsung/clk-exynos5420.c which only exists in the samsung
+>> tree.  It was introduced by commit 1609027f, "clk: exynos5420: register
+>> clocks using common clock framework".
 >>
->> USB host no longer works on Panda with DT boot.
->> Could you please queue this for next 3.11-rc? Thanks.
-> 
-> OK thanks for checking, applying into omap-for-v3.11/fixes.
+> Yes, you're right. It depends on soc-exynos5420 stuff in samsung tree.
+>
+>> And these patches need to be applied with some fuzz to the clk tree due
+>> to other changes which are not in my tree and only present in yours.
+>>
+>> The best two options are either for you to take this series or it can be
+>> rebased on top of clk-next, after which I'll apply it.
+>>
+> Let me try to send this series via samsung tree for v3.11 but I'm not sure because it's a little bit late for arm-soc tree.
+>
+> Thanks for your ack, just note I will send to arm-soc tonight in my time.
+>
 
-Thanks.
+Can we get this series merge now in any of trees.
+Please let me if its required to rebase it.
 
-> 
-> Looks like I also have some pending the .dts changes in
-> omap-for-v3.11/dt branch:
-> 
-> 4cf2198b1e3cee47a1cccbb500b67782c36615d5 ARM: dts: omap3-beagle-xm: Add USB host supprot for Rev. Ax/Bx
-> 9bc44515819a00c0ffaf751ad497ddf275089ede ARM: dts: omap3-beagle-xm: Add USB Host support
-> fd65d7df4598c1d2ad27d664c719611a1a070edc ARM: dts: omap3-beagle: Make USB host pin naming consistent
-
-Please disregard those. They are old versions.
-
-Benoit had agreed to take the newer version of those for 3.12.
-
-Please pick this one to get usb host working on 3.11 with DT.
-
-http://www.spinics.net/lists/arm-kernel/msg253612.html
-
-> 39ea891d9da6ae1824bc9f689db3f306f5ce0724 ARM: dts: omap4-panda: Add USB Host support
-
-This one is already in through Benoit.
-
-cheers,
--roger
+Regards,
+Yadwinder
