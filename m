@@ -1,49 +1,158 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 16 Jul 2013 21:49:53 +0530
-Subject: [GIT PULL] DaVinci fixes for v3.11-rc2
-Message-ID: <51E572A9.2080201@ti.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 15 Jul 2013 23:41:07 -0700
+Subject: [linux-sunxi] Re: [PATCH 1/2] Initial support for Allwinner's
+ Security ID fuses
+In-Reply-To: <51E466A3.4010503@schinagl.nl>
+References: <20130624160440.GA15201@kroah.com> <51C87DC7.50005@schinagl.nl>
+ <20130624181509.GA8847@kroah.com> <51C8B84C.3020200@schinagl.nl>
+ <20130624214615.GA17604@kroah.com> <51CAA709.4060801@schinagl.nl>
+ <20130626175144.GC2222@kroah.com> <51D674BF.9030207@schinagl.nl>
+ <20130706193646.GB9778@kroah.com> <51E466A3.4010503@schinagl.nl>
+Message-ID: <20130716064107.GA10868@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Mon, Jul 15, 2013 at 11:16:19PM +0200, Oliver Schinagl wrote:
+> 
+> With your latest patches for binary attributes and your blog post, I 
+> thought that you want to create your binary attributes before the probe 
+> function, to avoid the userspace race. To do that, we have two options, 
+> create them in init (ugly?) or fill the .group member if available so it 
+> gets automatically created from the register function.
 
-Can you please pull the following fixes for v3.11-rc2?
+Yes, the .group thing should be what is needed here.
 
-Thanks,
-Sekhar
+> Well in my case, I'm using the module_platform_driver() macro which 
+> expects the struct platform_driver. Platform_driver has a device_driver 
+> member .driver where the .groups is located. Great, using that works and 
+> we should have the sysfs entry race-free. However I don't know hot to 
+> exchange data between that and the rest of my driver.
+> 
+> Before I used to_platform_device(kobj_to_dev(kobj)) as passed via the 
+> .read function to obtain a platform_device where i could use 
+> platform_get_drvdata on. All was good, but that doesn't fly now and my 
+> knowledge is a bit short as to why.
 
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+I don't understand, why not use the platform device that was passed to
+the binary attribute write function?
 
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> The second method is finding some other shared structure given that we 
+> get a platform_device in the probe function, yet I couldn't find 
+> anything and this platform_device isn't the same as the one from the .read.
 
-are available in the git repository at:
+It should be, why isn't it?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.11-rc2
+> Of course using a global var bypasses this issue, but I'm sure it won't 
+> pass review ;)
 
-for you to fetch changes up to cf690331642010a837c026088588761f61528ddf:
+The platform device structure should have what you need, right?
 
-  ARM: davinci: defconfig: enable EDMA driver (2013-07-16 20:39:39 +0530)
+> So using these new patches for binary attributes, how can I pass data 
+> between my driver and the sysfs files using a platform_driver? Or are 
+> other 'hacks' needed and using the .groups attribute from 
+> platform_driver->device_driver->groups is really the wrong approach.
+> 
+> I did ask around and still haven't figured it out so far, so I do 
+> apologize if you feel I'm wasting your precious time.
 
-----------------------------------------------------------------
-DaVinci fixes for v3.11-rc2
+How is the platform device not the same thing that was passed to your
+probe function?
 
-The pull request includes fixes for sparse
-warnings, defconfig changes to enable DMA
-usage on peripherals and removal of a duplicated
-include file.
+> 
+> Oliver
 
-----------------------------------------------------------------
-Sekhar Nori (2):
-      ARM: davinci: make file local variables static
-      ARM: davinci: defconfig: enable EDMA driver
+> /*
+>  * Copyright (c) 2013 Oliver Schinagl
+>  * http://www.linux-sunxi.org
+>  *
+>  * Oliver Schinagl <oliver@schinagl.nl>
+>  *
+>  * This program is free software; you can redistribute it and/or modify
+>  * it under the terms of the GNU General Public License as published by
+>  * the Free Software Foundation; either version 2 of the License, or
+>  * (at your option) any later version.
+>  *
+>  * This program is distributed in the hope that it will be useful,
+>  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+>  * GNU General Public License for more details.
+>  *
+>  * This driver exposes the Allwinner security ID, a 128 bit eeprom, in byte
+>  * sized chunks.
+>  */
+> 
+> #include <linux/compiler.h>
+> #include <linux/device.h>
+> #include <linux/err.h>
+> #include <linux/export.h>
+> #include <linux/fs.h>
+> #include <linux/init.h>
+> #include <linux/io.h>
+> #include <linux/kernel.h>
+> #include <linux/kobject.h>
+> #include <linux/module.h>
+> #include <linux/platform_device.h>
+> #include <linux/random.h>
+> #include <linux/sysfs.h>
+> #include <linux/types.h>
+> 
+> #define DRV_NAME "sunxi-sid"
+> 
+> /* There are 4 32-bit keys */
+> #define SID_KEYS 4
+> /* Each key is 4 bytes long */
+> #define SID_SIZE (SID_KEYS * 4)
+> 
+> /* We read the entire key, due to a 32 bit read alignment requirement. Since we
+>  * want to return the requested byte, this resuls in somewhat slower code and
+>  * uses 4 times more reads as needed but keeps code simpler. Since the SID is
+>  * only very rarly probed, this is not really an issue.
+>  */
+> static u8 sunxi_sid_read_byte(const void __iomem *sid_reg_base,
+> 			      const unsigned int offset)
+> {
+> 	u32 sid_key;
+> 
+> 	if (offset >= SID_SIZE)
+> 		return 0;
+> 
+> 	sid_key = ioread32be(sid_reg_base + round_down(offset, 4));
+> 	sid_key >>= (offset % 4) * 8;
+> 
+> 	return sid_key; /* Only return the last byte */
+> }
+> 
+> static ssize_t eeprom_read(struct file *fd, struct kobject *kobj,
+> 			struct bin_attribute *attr, char *buf,
+> 			loff_t pos, size_t size)
+> {
+> 	struct platform_device *pdev;
+> 	void __iomem *sid_reg_base;
+> 	int i;
+> 
+> 	pdev = to_platform_device(kobj_to_dev(kobj));
+> 	sid_reg_base = (void __iomem *)platform_get_drvdata(pdev);
 
-Wei Yongjun (1):
-      ARM: edma: remove duplicated include from edma.c
+Great, isn't that what you need?
 
- arch/arm/common/edma.c                  |    1 -
- arch/arm/configs/da8xx_omapl_defconfig  |    2 ++
- arch/arm/configs/davinci_all_defconfig  |    2 ++
- arch/arm/mach-davinci/board-dm365-evm.c |    2 +-
- arch/arm/mach-davinci/dm355.c           |    2 +-
- arch/arm/mach-davinci/dm365.c           |    2 +-
- 6 files changed, 7 insertions(+), 4 deletions(-)
+> 	printk("0x%x, 0x%x 0x%x 0x%x\n", kobj, kobj_to_dev(kobj), pdev, sid_reg_base);
+> 
+> 	if (pos < 0 || pos >= SID_SIZE)
+> 		return 0;
+> 	if (size > SID_SIZE - pos)
+> 		size = SID_SIZE - pos;
+> 
+> 	for (i = 0; i < size; i++)
+> 		buf[i] = sunxi_sid_read_byte(sid_reg_base, pos + i);
+> 
+> 	return i;
+> }
+
+What are you missing in this function that you have in your probe
+function?
+
+This driver looks fine, what is not working properly?
+
+totally confused,
+
+greg k-h
