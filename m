@@ -1,256 +1,97 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Tue, 16 Jul 2013 14:00:52 +0200
-Subject: [PATCH v2] gpio: Add MOXA ART GPIO driver
-In-Reply-To: <1373464158-27881-1-git-send-email-jonas.jensen@gmail.com>
-References: <1373464158-27881-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1373976052-16779-1-git-send-email-jonas.jensen@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 16 Jul 2013 05:06:50 -0700
+Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
+In-Reply-To: <20130716093541.GK8880@arwen.pp.htv.fi>
+References: <20130716090310.5541.36777.stgit@localhost>
+ <20130716090536.5541.36289.stgit@localhost>
+ <20130716093541.GK8880@arwen.pp.htv.fi>
+Message-ID: <20130716120650.GW7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add GPIO driver for MOXA ART SoCs.
+* Felipe Balbi <balbi@ti.com> [130716 02:42]:
+> Hi,
+> 
+> On Tue, Jul 16, 2013 at 02:05:36AM -0700, Tony Lindgren wrote:
+> > +int pinctrl_check_dynamic(struct device *dev, struct pinctrl_state *st1,
+> > +			  struct pinctrl_state *st2)
+> > +{
+> > +	struct pinctrl_setting *s1, *s2;
+> > +
+> > +	list_for_each_entry(s1, &st1->settings, node) {
+> > +		struct pinctrl_dev *pctldev1;
+> > +		const struct pinctrl_ops *pctlops1;
+> > +		const unsigned *pins1;
+> > +		unsigned num_pins1;
+> > +		int res;
+> > +
+> > +		if (s1->type != PIN_MAP_TYPE_MUX_GROUP)
+> > +			continue;
+> > +
+> > +		pctldev1 = s1->pctldev;
+> > +		pctlops1 = pctldev1->desc->pctlops;
+> > +		res = pctlops1->get_group_pins(pctldev1, s1->data.mux.group,
+> > +					       &pins1, &num_pins1);
+> > +		if (res) {
+> > +			dev_dbg(dev, "could not get state1 group pins\n");
+> > +			return -EINVAL;
+> > +		}
+> > +
+> > +		list_for_each_entry(s2, &st2->settings, node) {
+> > +			struct pinctrl_dev *pctldev2;
+> > +			const struct pinctrl_ops *pctlops2;
+> > +			const unsigned *pins2;
+> > +			unsigned num_pins2;
+> > +			int i, j, found = 0;
+> > +
+> > +			if (s2->type != PIN_MAP_TYPE_MUX_GROUP)
+> > +				continue;
+> > +
+> > +			pctldev2 = s2->pctldev;
+> > +			if (pctldev1 != pctldev2) {
+> > +				dev_dbg(dev, "pctldev must be the same for states\n");
+> > +				return -EINVAL;
+> > +			}
+> > +			pctlops2 = pctldev2->desc->pctlops;
+> > +			res = pctlops2->get_group_pins(pctldev2,
+> > +						       s2->data.mux.group,
+> > +						       &pins2, &num_pins2);
+> > +			if (res) {
+> > +				dev_dbg(dev, "could not get state2 group pins\n");
+> > +				return -EINVAL;
+> > +			}
+> > +
+> > +			for (i = 0; i < num_pins1; i++) {
+> > +				int pin1 = pins1[i];
+> > +
+> > +				for (j = 0; j < num_pins2; j++) {
+> > +					int pin2 = pins2[j];
+> > +
+> > +					if (pin1 == pin2) {
+> > +						found++;
+> > +						break;
+> > +					}
+> > +				}
+> > +			}
+> 
+> 4 levels of nested loops ? Isn't this way too much ? OTOH, it points to
+> the fact that, perhaps, a list isn't the best data structure for
+> pinctrl ??
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+This check is only done during init to avoid constantly diffing the
+pins during runtime like we currently do. And it's only done for the
+pins that need to change during runtime for wake-up events etc. So
+that's typically few to ten pins per device that need to be checked.
 
-Notes:
-    Changes since v1:
-    
-    1. don't use hardcoded GPIO numbers, use of_get_named_gpio
-    2. check gpiochip_add return value
-    3. set gpio_chip .dev member to platform device
-    
-    Applies to next-20130703
-
- drivers/gpio/Kconfig       |   7 ++
- drivers/gpio/Makefile      |   1 +
- drivers/gpio/gpio-moxart.c | 189 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 197 insertions(+)
- create mode 100644 drivers/gpio/gpio-moxart.c
-
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index b2450ba..521fd97 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -714,6 +714,13 @@ config GPIO_MSIC
- 	  Enable support for GPIO on intel MSIC controllers found in
- 	  intel MID devices
+I agree there are things to improve for the data structures,
+but that's a different patch set.
  
-+config GPIO_MOXART
-+	bool "MOXART GPIO support"
-+	depends on ARCH_MOXART
-+	help
-+	  Select this option to enable GPIO driver for
-+	  MOXA ART SoC devices.
-+
- comment "USB GPIO expanders:"
- 
- config GPIO_VIPERBOARD
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index ef3e983..44b0de4 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -42,6 +42,7 @@ obj-$(CONFIG_GPIO_MC9S08DZ60)	+= gpio-mc9s08dz60.o
- obj-$(CONFIG_GPIO_MCP23S08)	+= gpio-mcp23s08.o
- obj-$(CONFIG_GPIO_ML_IOH)	+= gpio-ml-ioh.o
- obj-$(CONFIG_GPIO_MM_LANTIQ)	+= gpio-mm-lantiq.o
-+obj-$(CONFIG_GPIO_MOXART)	+= gpio-moxart.o
- obj-$(CONFIG_GPIO_MPC5200)	+= gpio-mpc5200.o
- obj-$(CONFIG_GPIO_MPC8XXX)	+= gpio-mpc8xxx.o
- obj-$(CONFIG_GPIO_MSIC)		+= gpio-msic.o
-diff --git a/drivers/gpio/gpio-moxart.c b/drivers/gpio/gpio-moxart.c
-new file mode 100644
-index 0000000..19d4e3b
---- /dev/null
-+++ b/drivers/gpio/gpio-moxart.c
-@@ -0,0 +1,189 @@
-+/*
-+ * MOXA ART SoCs GPIO driver.
-+ *
-+ * Copyright (C) 2013 Jonas Jensen
-+ *
-+ * Jonas Jensen <jonas.jensen@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/irq.h>
-+#include <linux/io.h>
-+#include <linux/gpio.h>
-+#include <linux/platform_device.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_gpio.h>
-+#include <linux/pinctrl/consumer.h>
-+#include <linux/delay.h>
-+#include <linux/timer.h>
-+
-+#define GPIO_DATA_OUT		0x00
-+#define GPIO_DATA_IN		0x04
-+#define GPIO_PIN_DIRECTION	0x08
-+
-+static void __iomem *moxart_pincontrol_base;
-+static void __iomem *moxart_gpio_base;
-+
-+void moxart_gpio_enable(u32 gpio)
-+{
-+	writel(readl(moxart_pincontrol_base) | gpio, moxart_pincontrol_base);
-+}
-+
-+void moxart_gpio_disable(u32 gpio)
-+{
-+	writel(readl(moxart_pincontrol_base) & ~gpio, moxart_pincontrol_base);
-+}
-+
-+static int moxart_gpio_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	moxart_gpio_enable(1 << offset);
-+	return pinctrl_request_gpio(offset);
-+}
-+
-+static void moxart_gpio_free(struct gpio_chip *chip, unsigned offset)
-+{
-+	pinctrl_free_gpio(offset);
-+	moxart_gpio_disable(1 << offset);
-+}
-+
-+static int moxart_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	void __iomem *ioaddr = moxart_gpio_base + GPIO_PIN_DIRECTION;
-+
-+	writel(readl(ioaddr) & ~(1 << offset), ioaddr);
-+	return 0;
-+}
-+
-+static int moxart_gpio_direction_output(struct gpio_chip *chip,
-+					unsigned offset, int value)
-+{
-+	void __iomem *ioaddr = moxart_gpio_base + GPIO_PIN_DIRECTION;
-+
-+	writel(readl(ioaddr) | (1 << offset), ioaddr);
-+	return 0;
-+}
-+
-+static void moxart_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	void __iomem *ioaddr = moxart_gpio_base + GPIO_DATA_OUT;
-+	u32 reg = readl(ioaddr);
-+
-+	(value) ?	writel(reg | (1 << offset), ioaddr) :
-+			writel(reg & ~(1 << offset), ioaddr);
-+}
-+
-+static int moxart_gpio_get(struct gpio_chip *chip, unsigned offset)
-+{
-+	u32 ret = readl(moxart_gpio_base + GPIO_PIN_DIRECTION);
-+
-+	if (ret & (1 << offset))
-+		ret = readl(moxart_gpio_base + GPIO_DATA_OUT) & (1 << offset);
-+	else
-+		ret = readl(moxart_gpio_base + GPIO_DATA_IN) & (1 << offset);
-+
-+	return ret;
-+}
-+
-+static struct gpio_chip moxart_gpio_chip = {
-+	.label			= "moxart-gpio",
-+	.request		= moxart_gpio_request,
-+	.free			= moxart_gpio_free,
-+	.direction_input	= moxart_gpio_direction_input,
-+	.direction_output	= moxart_gpio_direction_output,
-+	.set			= moxart_gpio_set,
-+	.get			= moxart_gpio_get,
-+	.base			= 0,
-+	.ngpio			= 32,
-+	.can_sleep		= 0,
-+};
-+
-+static int moxart_gpio_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	int ret, gpio_ready_led, gpio_reset_switch;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	moxart_gpio_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(moxart_gpio_base)) {
-+		dev_err(dev, "%s: devm_ioremap_resource res_gpio failed\n",
-+			dev->of_node->full_name);
-+		return PTR_ERR(moxart_gpio_base);
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	moxart_pincontrol_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(moxart_pincontrol_base)) {
-+		dev_err(dev, "%s: devm_ioremap_resource res_pmu failed\n",
-+			dev->of_node->full_name);
-+		return PTR_ERR(moxart_pincontrol_base);
-+	}
-+
-+	moxart_gpio_chip.dev = dev;
-+
-+	ret = gpiochip_add(&moxart_gpio_chip);
-+	if (ret)
-+		dev_err(dev, "%s: gpiochip_add failed\n",
-+			dev->of_node->full_name);
-+
-+
-+	gpio_ready_led = of_get_named_gpio(pdev->dev.of_node,
-+					   "gpio-ready-led", 0);
-+	if (!gpio_is_valid(gpio_ready_led)) {
-+		dev_err(&pdev->dev, "invalid gpio (gpio-ready-led): %d\n",
-+			gpio_ready_led);
-+		return gpio_ready_led;
-+	}
-+
-+	gpio_reset_switch = of_get_named_gpio(pdev->dev.of_node,
-+					      "gpio-reset-switch", 0);
-+	if (!gpio_is_valid(gpio_reset_switch)) {
-+		dev_err(&pdev->dev, "invalid gpio (gpio-reset-switch): %d\n",
-+			gpio_reset_switch);
-+		return gpio_reset_switch;
-+	}
-+
-+	moxart_gpio_enable(gpio_ready_led | gpio_reset_switch);
-+
-+	moxart_gpio_direction_input(&moxart_gpio_chip, gpio_reset_switch);
-+
-+	/*
-+	 * gpio_ready_led=0 ready LED on
-+	 * gpio_ready_led=1 ready LED off
-+	 */
-+	moxart_gpio_direction_output(&moxart_gpio_chip, gpio_ready_led, 0);
-+	moxart_gpio_set(&moxart_gpio_chip, gpio_ready_led, 0);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id moxart_gpio_match[] = {
-+	{ .compatible = "moxa,moxart-gpio" },
-+	{ }
-+};
-+
-+static struct platform_driver moxart_gpio_driver = {
-+	.driver	= {
-+		.name		= "moxart-gpio",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= moxart_gpio_match,
-+	},
-+	.probe	= moxart_gpio_probe,
-+};
-+
-+static int __init moxart_gpio_init(void)
-+{
-+	return platform_driver_register(&moxart_gpio_driver);
-+}
-+
-+postcore_initcall(moxart_gpio_init);
-+
-+MODULE_DESCRIPTION("MOXART GPIO chip driver");
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
--- 
-1.8.2.1
+> Or perhaps you could just assume that if num_pins1 == num_pins2 it's
+> enough ? But that will, likely, leave some uncovered corners...
+
+Yes I considered that, but checking for the number of pins is not
+enough. It's best to check them properly during init.
+
+Regards,
+
+Tony
