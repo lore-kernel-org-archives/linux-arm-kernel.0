@@ -1,53 +1,46 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Jul 2013 22:18:35 +0800
-Subject: [PATCH] ARM: dts: imx: add LVDS panel for imx6qdl-sabresd
-Message-ID: <1373984315-28189-1-git-send-email-shawn.guo@linaro.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 16 Jul 2013 11:18:51 -0300
+Subject: [PATCH 05/10] watchdog: orion: Add a memory resource for RSTOUT
+ register
+In-Reply-To: <20130716140415.GB19448@lunn.ch>
+References: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1373931163-12670-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130716140415.GB19448@lunn.ch>
+Message-ID: <20130716141850.GB23904@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HannStar HSD100PXN1 XGA panel support on LVDS1 port of
-imx6qdl-sabresd board.
+Andrew,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+On Tue, Jul 16, 2013 at 04:04:15PM +0200, Andrew Lunn wrote:
+> On Mon, Jul 15, 2013 at 08:32:38PM -0300, Ezequiel Garcia wrote:
+> > Instead of accessing the RSTOUT register directly, this commit
+> > adds a platform memory resource to map this register into the driver.
+> 
+> 
+> Have you looked at:
+> 
+> arch/arm/mach-mvebu/system-controller.c
+> 
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 0408472..166b9ae 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -148,6 +148,31 @@
- 	};
- };
- 
-+&ldb {
-+	status = "okay";
-+
-+	lvds-channel at 1 {
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <18>;
-+		status = "okay";
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: hsd100pxn1 {
-+				clock-frequency = <65000000>;
-+				hactive = <1024>;
-+				vactive = <768>;
-+				hback-porch = <220>;
-+				hfront-porch = <40>;
-+				vback-porch = <21>;
-+				vfront-porch = <7>;
-+				hsync-len = <60>;
-+				vsync-len = <10>;
-+			};
-+		};
-+	};
-+};
-+
- &ssi2 {
- 	fsl,mode = "i2s-slave";
- 	status = "okay";
+Mmm... I saw the use of the RSTOUT register in kirkwood_restart()
+but wasn't sure who should be the real 'owner' of this register.
+
+> It is also using this register. Are we going to have a similar problem
+> as the TIMER_CTRL register, which you refactered in an earlier patch?
+> 
+
+Probably.
+
+> "marvell,orion-system-controller" is not actually used yet, but once
+> kirkwood moves into mach-mvebu, it will start using it.
+> 
+
+I guess so. We should take that into account *now*. Let me think about
+it and see if I can have something sane for v2.
+
+Thanks!
 -- 
-1.7.9.5
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
