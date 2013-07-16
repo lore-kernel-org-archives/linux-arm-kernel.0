@@ -1,84 +1,127 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 16 Jul 2013 16:47:57 +0200
-Subject: [PATCHv5 00/10] clocksource: sunxi: Timer fixes and cleanup
-In-Reply-To: <1373560282-15184-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1373560282-15184-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <51E55D1D.6080809@linaro.org>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 16 Jul 2013 09:54:37 -0500
+Subject: [PATCH] phy: micrel: Add definitions for common Micrel PHY
+ registers
+In-Reply-To: <51E5046C.60101@atmel.com>
+References: <1373929730-28130-1-git-send-email-dinguyen@altera.com>
+ <51E5046C.60101@atmel.com>
+Message-ID: <1373986477.3164.1.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2013 06:31 PM, Maxime Ripard wrote:
+On Tue, 2013-07-16 at 10:29 +0200, Nicolas Ferre wrote:
+> On 16/07/2013 01:08, dinguyen at altera.com :
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> >
+> > Add defines for common Micrel PHY setups so that other platforms
+> > can use them. Update imx61 and sama5 hardware to use the micrel_phy.h
+> > PHY defines.
+> >
+> > Also add support for the KSZ9021RLRN PHY.
+> >
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > Cc: David S. Miller <davem@davemloft.net>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > CC: Andrew Victor <linux@maxim.org.za>
+> > CC: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> BTW, which way do you plan to use to merge it upstream?
 
-Applied to my tree for 3.12.
+Thanks Nicolas, I was hoping to have either Shawn or you pick it up?
 
-Thanks
-  -- Daniel
-
-
-> Hi everyone,
+Dinh
 > 
-> The first timer code we merged when adding support for the A13 some
-> time back was mostly a clean up from the source drop we had, without
-> any documentation.  This happened to work, but the code merged in
-> turned out to be far from perfect, and had several flaws.
+> Thanks a lot, bye,
 > 
-> This patchset hopefully fixes these flaws, and cleanup most of the
-> driver as well, to end up in an almost complete rewrite of it (even
-> though it's not that long).
+> > CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> > CC: Pavel Machek <pavel@denx.de>
+> > ---
+> >   arch/arm/mach-at91/board-dt-sama5.c |   17 ++++++-----------
+> >   arch/arm/mach-imx/mach-imx6q.c      |   13 ++++++++-----
+> >   include/linux/micrel_phy.h          |    6 ++++++
+> >   3 files changed, 20 insertions(+), 16 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+> > index ad95f6a..bf00d15 100644
+> > --- a/arch/arm/mach-at91/board-dt-sama5.c
+> > +++ b/arch/arm/mach-at91/board-dt-sama5.c
+> > @@ -42,20 +42,15 @@ static int ksz9021rn_phy_fixup(struct phy_device *phy)
+> >   {
+> >   	int value;
+> >
+> > -#define GMII_RCCPSR	260
+> > -#define GMII_RRDPSR	261
+> > -#define GMII_ERCR	11
+> > -#define GMII_ERDWR	12
+> > -
+> >   	/* Set delay values */
+> > -	value = GMII_RCCPSR | 0x8000;
+> > -	phy_write(phy, GMII_ERCR, value);
+> > +	value = MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW | 0x8000;
+> > +	phy_write(phy, MICREL_KSZ9021_EXTREG_CTRL, value);
+> >   	value = 0xF2F4;
+> > -	phy_write(phy, GMII_ERDWR, value);
+> > -	value = GMII_RRDPSR | 0x8000;
+> > -	phy_write(phy, GMII_ERCR, value);
+> > +	phy_write(phy, MICREL_KSZ9021_EXTREG_DATA_WRITE, value);
+> > +	value = MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW | 0x8000;
+> > +	phy_write(phy, MICREL_KSZ9021_EXTREG_CTRL, value);
+> >   	value = 0x2222;
+> > -	phy_write(phy, GMII_ERDWR, value);
+> > +	phy_write(phy, MICREL_KSZ9021_EXTREG_DATA_WRITE, value);
+> >
+> >   	return 0;
+> >   }
+> > diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> > index 7be13f8..c8d7814 100644
+> > --- a/arch/arm/mach-imx/mach-imx6q.c
+> > +++ b/arch/arm/mach-imx/mach-imx6q.c
+> > @@ -103,13 +103,16 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
+> >   {
+> >   	if (IS_BUILTIN(CONFIG_PHYLIB)) {
+> >   		/* min rx data delay */
+> > -		phy_write(phydev, 0x0b, 0x8105);
+> > -		phy_write(phydev, 0x0c, 0x0000);
+> > +		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
+> > +			0x8000 | MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW);
+> > +		phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0x0000);
+> >
+> >   		/* max rx/tx clock delay, min rx/tx control delay */
+> > -		phy_write(phydev, 0x0b, 0x8104);
+> > -		phy_write(phydev, 0x0c, 0xf0f0);
+> > -		phy_write(phydev, 0x0b, 0x104);
+> > +		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
+> > +			0x8000 | MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW);
+> > +		phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0xf0f0);
+> > +		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
+> > +			MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW);
+> >   	}
+> >
+> >   	return 0;
+> > diff --git a/include/linux/micrel_phy.h b/include/linux/micrel_phy.h
+> > index 8752dbb..ad05ce6 100644
+> > --- a/include/linux/micrel_phy.h
+> > +++ b/include/linux/micrel_phy.h
+> > @@ -17,6 +17,7 @@
+> >
+> >   #define PHY_ID_KSZ8873MLL	0x000e7237
+> >   #define PHY_ID_KSZ9021		0x00221610
+> > +#define PHY_ID_KSZ9021RLRN	0x00221611
+> >   #define PHY_ID_KS8737		0x00221720
+> >   #define PHY_ID_KSZ8021		0x00221555
+> >   #define PHY_ID_KSZ8031		0x00221556
+> > @@ -35,4 +36,9 @@
+> >   /* struct phy_device dev_flags definitions */
+> >   #define MICREL_PHY_50MHZ_CLK	0x00000001
+> >
+> > +#define MICREL_KSZ9021_EXTREG_CTRL	0xB
+> > +#define MICREL_KSZ9021_EXTREG_DATA_WRITE	0xC
+> > +#define MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW	0x104
+> > +#define MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW	0x105
+> > +
+> >   #endif /* _MICREL_PHY_H */
+> >
 > 
-> It also finally adds a clocksource driver using the second timer as
-> our monotonic clock source.
 > 
-> These flaws have all been spotted when trying to add the A31 support,
-> work that is still ongoing, but will hopefully benefit from this
-> patchset as well.
-> 
-> Thanks,
-> Maxime
-> 
-> Changes from v4:
->   - Removed the last clk_get_rate() user
->   - Got a few beers
-> 
-> Changes from v3:
->   - Reintroduce the rate variable to cache the parent clock rate
->   - Remove the interval programming at probe time that was
->     reintroduced in the v3 due to a poor rebase.
-> 
-> Changes from v2:
->   - Use the clocksource timer to get the amount of time we have to
->     wait for when disabling and enabling back a timer
->   - Added patch to add parenthesis around the macros arguments
->   - Renamed the AUTORELOAD register define to the more meaningful
->     RELOAD name
-> 
-> Changes from v1:
->   - Rebased on top of linux-next to benefit from the move to all
->     architectures of the sched_clock functions
->   - Moved the clock source to the second timer instead of the 64 bits
->     free-running counter like suggested by Thomas.
-> 
-> Maxime Ripard (10):
->   clocksource: sun4i: Use the BIT macros where possible
->   clocksource: sun4i: Wrap macros arguments in parenthesis
->   clocksource: sun4i: rename AUTORELOAD define to RELOAD
->   clocksource: sun4i: Add clocksource and sched clock drivers
->   clocksource: sun4i: Don't forget to enable the clock we use
->   clocksource: sun4i: Fix the next event code
->   clocksource: sun4i: Factor out some timer code
->   clocksource: sun4i: Remove TIMER_SCAL variable
->   clocksource: sun4i: Cleanup parent clock setup
->   clocksource: sun4i: Fix bug when switching from periodic to oneshot
->     modes
-> 
->  drivers/clocksource/sun4i_timer.c | 110 +++++++++++++++++++++++++++-----------
->  1 file changed, 78 insertions(+), 32 deletions(-)
-> 
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
