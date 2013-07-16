@@ -1,60 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Jul 2013 06:43:50 -0700
-Subject: [PATCH v2 4/4] ARM: OMAP2+: Provide alias to USB PHY clock
-In-Reply-To: <51E54D0D.3030200@ti.com>
-References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
- <1371571487-14389-5-git-send-email-rogerq@ti.com>
- <51E40199.9070906@ti.com> <20130716123256.GY7656@atomide.com>
- <51E54D0D.3030200@ti.com>
-Message-ID: <20130716134350.GD7656@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 16 Jul 2013 09:44:22 -0400
+Subject: [PATCH 00/10] Orion Watchdog fixes
+In-Reply-To: <20130716121432.GA2317@localhost>
+References: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130716065952.GA25043@lunn.ch> <20130716092059.237ea729@skate>
+ <20130716073101.GB25043@lunn.ch> <20130716121432.GA2317@localhost>
+Message-ID: <20130716134422.GE12062@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [130716 06:45]:
-> On 07/16/2013 03:32 PM, Tony Lindgren wrote:
-> > * Roger Quadros <rogerq@ti.com> [130715 07:11]:
-> >> Hi Tony,
-> >>
-> >> On 06/18/2013 07:04 PM, Roger Quadros wrote:
-> >>> Till the OMAP clocks are correctly defined in device tree, use
-> >>> this temporary hack to provide clock alias to the USB PHY clocks.
-> >>>
-> >>> Without this, USB Host & Ethernet will not be functional with
-> >>> device tree boots on Panda and uEVM.
-> >>
-> >> Looks like this one got missed out.
-> >>
-> >> USB host no longer works on Panda with DT boot.
-> >> Could you please queue this for next 3.11-rc? Thanks.
-> > 
-> > OK thanks for checking, applying into omap-for-v3.11/fixes.
-> 
-> Thanks.
-> 
-> > 
-> > Looks like I also have some pending the .dts changes in
-> > omap-for-v3.11/dt branch:
-> > 
-> > 4cf2198b1e3cee47a1cccbb500b67782c36615d5 ARM: dts: omap3-beagle-xm: Add USB host supprot for Rev. Ax/Bx
-> > 9bc44515819a00c0ffaf751ad497ddf275089ede ARM: dts: omap3-beagle-xm: Add USB Host support
-> > fd65d7df4598c1d2ad27d664c719611a1a070edc ARM: dts: omap3-beagle: Make USB host pin naming consistent
-> 
-> Please disregard those. They are old versions.
+On Tue, Jul 16, 2013 at 09:14:33AM -0300, Ezequiel Garcia wrote:
+> On the other side, I'm much interested in knowing if you are OK with
+> breaking the watchdog DT compatibility. If you NACK this, then I'll
+> start preparing a different watchdog driver for 370/XP, since I don't
+> want to extend a driver that is a bit dirty.
 
-OK, poof that branch is now gone.
- 
-> Benoit had agreed to take the newer version of those for 3.12.
-> 
-> Please pick this one to get usb host working on 3.11 with DT.
-> 
-> http://www.spinics.net/lists/arm-kernel/msg253612.html
-> 
-> > 39ea891d9da6ae1824bc9f689db3f306f5ce0724 ARM: dts: omap4-panda: Add USB Host support
-> 
-> This one is already in through Benoit.
+Apparently there is some agreement that the bindings are still in flux
+and that they need to be for a bit longer in order to hammer out
+problems such as this.
 
-It's best that Benoit queue all those to avoid more confusion :)
+Arnd and Olof both mentioned that something (a doc, and email?) is
+forthcoming about marking some bindings as stable.  Whatever form that
+takes, this one wouldn't get the stable marking yet. ;-)
 
-Regards,
+Oh, and one more nit.  The work 'fix' triggers a whole bunch of "get on
+this right away, does it need to go to stable?  Has anyone confirmed it?
+Which commit caused the regression? etc."  Although I hate the word, I
+think 'refactoring' is much more appropriate description for this series.
 
-Tony
+thx,
+
+Jason.
