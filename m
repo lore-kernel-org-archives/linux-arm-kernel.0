@@ -1,45 +1,33 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 16 Jul 2013 15:50:33 +0300
-Subject: [PATCH v2 1/5] arm: omap5: dts: fix reg property size
-In-Reply-To: <1373979037-27587-1-git-send-email-balbi@ti.com>
-References: <1373979037-27587-1-git-send-email-balbi@ti.com>
-Message-ID: <1373979037-27587-2-git-send-email-balbi@ti.com>
+Date: Tue, 16 Jul 2013 15:50:32 +0300
+Subject: [PATCH v2 0/5] ARM: OMAP: DTS/HWMOD/defconfig changes for USB3
+Message-ID: <1373979037-27587-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB3 block has a 64KiB space, another 64KiB is
-used for the wrapper.
+With these patches (plus a few others on the driver side which
+will be going upstream soon) I could get functional USB3 with my
+omap5-uevm platform.
 
-Without this change, resource_size() will get
-confused and driver won't probe because size
-will be negative.
+Changes since v1:
+	- split ocp2scp dts and hwmod data into separate patches
+	- reorganize the series in order to group DTS, hwmod and defconfig
+	  changes
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/boot/dts/omap5.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Benoit Cousson (1):
+  arm: omap5: hwmod: add missing ocp2scp hwmod data
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index e643620..5c99f19 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -637,7 +637,7 @@
- 		omap_dwc3 at 4a020000 {
- 			compatible = "ti,dwc3";
- 			ti,hwmods = "usb_otg_ss";
--			reg = <0x4a020000 0x1000>;
-+			reg = <0x4a020000 0x10000>;
- 			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-@@ -645,7 +645,7 @@
- 			ranges;
- 			dwc3 at 4a030000 {
- 				compatible = "synopsys,dwc3";
--				reg = <0x4a030000 0x1000>;
-+				reg = <0x4a030000 0x10000>;
- 				interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
- 				usb-phy = <&usb2_phy>, <&usb3_phy>;
- 				tx-fifo-resize;
+Felipe Balbi (4):
+  arm: omap5: dts: fix reg property size
+  arm: omap5: dts: fix ocp2scp DTS data
+  arm: omap5: dts: add palmas-usb node
+  arm: omap2plus_defconfig: enable dwc3 and dependencies
+
+ arch/arm/boot/dts/omap5-uevm.dts           | 10 +++++++
+ arch/arm/boot/dts/omap5.dtsi               |  9 +++---
+ arch/arm/configs/omap2plus_defconfig       |  9 ++++++
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 45 ++++++++++++++++++++++++++++++
+ 4 files changed, 69 insertions(+), 4 deletions(-)
+
 -- 
 1.8.3.3.754.g9c3c367
