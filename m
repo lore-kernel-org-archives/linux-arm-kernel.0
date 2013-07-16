@@ -1,69 +1,146 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Jul 2013 16:17:23 -0600
-Subject: [PATCH 4/4] ARM: tegra: move config TEGRA_AHB
-In-Reply-To: <1374013043-4693-1-git-send-email-swarren@wwwdotorg.org>
-References: <1374013043-4693-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1374013043-4693-4-git-send-email-swarren@wwwdotorg.org>
+Date: Tue, 16 Jul 2013 16:17:20 -0600
+Subject: [PATCH 1/4] ARM: tegra: hide CONFIG_ARCH_TEGRA_*_SOC
+Message-ID: <1374013043-4693-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-The Tegra AHB driver is located in drivers/amba. Move the Kconfig option
-that enables it to the Kconfig file in that directory. This completely
-decouples it from arch/arm/mach-tegra.
+Enable all or none of Tegra support, rather than using separate Kconfig
+options for individual SoCs. This will allow various conditional logic
+to be simplified, as well as presenting fewer Kconfig options to the
+user.
+
+Once all use of ARCH_TEGRA_*_SOC has been replaced with ARCH_TEGRA, the
+SoC-specific options will be removed.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/Kconfig | 8 --------
- drivers/Kconfig             | 2 ++
- drivers/amba/Kconfig        | 8 ++++++++
- 3 files changed, 10 insertions(+), 8 deletions(-)
- create mode 100644 drivers/amba/Kconfig
+I'll follow this up with patches for driver/memory, iommu, clk, pinctrl
+and sound/soc which remove use of ARCH_TEGRA_*_SOC, and finally with a
+series to remove those config options from the Tegra tree; that can be
+applied once everything else is merged together.
 
+ arch/arm/configs/tegra_defconfig |  3 --
+ arch/arm/mach-tegra/Kconfig      | 67 +++++++++++++++-------------------------
+ 2 files changed, 25 insertions(+), 45 deletions(-)
+
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index efb03b3..9760a0f 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -24,9 +24,6 @@ CONFIG_PARTITION_ADVANCED=y
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_GPIO_PCA953X=y
+ CONFIG_ARCH_TEGRA=y
+-CONFIG_ARCH_TEGRA_2x_SOC=y
+-CONFIG_ARCH_TEGRA_3x_SOC=y
+-CONFIG_ARCH_TEGRA_114_SOC=y
+ CONFIG_TEGRA_PCI=y
+ CONFIG_TEGRA_EMC_SCALING_ENABLE=y
+ CONFIG_SMP=y
 diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 9a4ec62..94713e4 100644
+index add345e..44cb28c 100644
 --- a/arch/arm/mach-tegra/Kconfig
 +++ b/arch/arm/mach-tegra/Kconfig
-@@ -57,14 +57,6 @@ config TEGRA_PCI
+@@ -1,19 +1,41 @@
+ config ARCH_TEGRA
+ 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
+ 	select ARCH_HAS_CPUFREQ
++	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARCH_TEGRA_2x_SOC
++	select ARCH_TEGRA_3x_SOC
++	select ARCH_TEGRA_114_SOC
++	select ARM_ERRATA_720789
++	select ARM_ERRATA_754322
++	select ARM_ERRATA_754327 if SMP
++	select ARM_ERRATA_764369 if SMP
++	select ARM_ERRATA_798181
++	select ARM_GIC
++	select ARM_L1_CACHE_SHIFT_6
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+ 	select CLKSRC_OF
+ 	select COMMON_CLK
++	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_ARM_ARCH_TIMER
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_CLK
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
++	select PINCTRL
++	select PINCTRL_TEGRA114
++	select PINCTRL_TEGRA20
++	select PINCTRL_TEGRA30
++	select PL310_ERRATA_727915 if CACHE_L2X0
++	select PL310_ERRATA_769419 if CACHE_L2X0
+ 	select SOC_BUS
+ 	select SPARSE_IRQ
++	select USB_ARCH_HAS_EHCI if USB_SUPPORT
++	select USB_ULPI if USB_PHY
++	select USB_ULPI_VIEWPORT if USB_PHY
+ 	select USE_OF
+ 	help
+ 	  This enables support for NVIDIA Tegra based systems.
+@@ -22,52 +44,13 @@ menu "NVIDIA Tegra options"
  	depends on ARCH_TEGRA
- 	select PCI
  
--config TEGRA_AHB
--	bool "Enable AHB driver for NVIDIA Tegra SoCs"
--	default y
+ config ARCH_TEGRA_2x_SOC
+-	bool "Enable support for Tegra20 family"
+-	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
+-	select ARM_ERRATA_720789
+-	select ARM_ERRATA_754327 if SMP
+-	select ARM_ERRATA_764369 if SMP
+-	select ARM_GIC
+-	select CPU_V7
+-	select PINCTRL
+-	select PINCTRL_TEGRA20
+-	select PL310_ERRATA_727915 if CACHE_L2X0
+-	select PL310_ERRATA_769419 if CACHE_L2X0
+-	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+-	select USB_ULPI if USB_PHY
+-	select USB_ULPI_VIEWPORT if USB_PHY
 -	help
--	  Adds AHB configuration functionality for NVIDIA Tegra SoCs,
--	  which controls AHB bus master arbitration and some
--	  performance parameters(priority, prefech size).
--
- config TEGRA_EMC_SCALING_ENABLE
- 	bool "Enable scaling the memory frequency"
+-	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
+-	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
++	bool
  
-diff --git a/drivers/Kconfig b/drivers/Kconfig
-index aa43b91..5603bc3 100644
---- a/drivers/Kconfig
-+++ b/drivers/Kconfig
-@@ -166,4 +166,6 @@ source "drivers/reset/Kconfig"
+ config ARCH_TEGRA_3x_SOC
+-	bool "Enable support for Tegra30 family"
+-	select ARM_ERRATA_754322
+-	select ARM_ERRATA_764369 if SMP
+-	select ARM_GIC
+-	select CPU_V7
+-	select PINCTRL
+-	select PINCTRL_TEGRA30
+-	select PL310_ERRATA_769419 if CACHE_L2X0
+-	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+-	select USB_ULPI if USB_PHY
+-	select USB_ULPI_VIEWPORT if USB_PHY
+-	help
+-	  Support for NVIDIA Tegra T30 processor family, based on the
+-	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
++	bool
  
- source "drivers/fmc/Kconfig"
+ config ARCH_TEGRA_114_SOC
+-	bool "Enable support for Tegra114 family"
+-	select HAVE_ARM_ARCH_TIMER
+-	select ARM_ERRATA_798181
+-	select ARM_GIC
+-	select ARM_L1_CACHE_SHIFT_6
+-	select CPU_V7
+-	select PINCTRL
+-	select PINCTRL_TEGRA114
+-	help
+-	  Support for NVIDIA Tegra T114 processor family, based on the
+-	  ARM CortexA15MP CPU
++	bool
  
-+source "drivers/amba/Kconfig"
-+
- endmenu
-diff --git a/drivers/amba/Kconfig b/drivers/amba/Kconfig
-new file mode 100644
-index 0000000..9244e48
---- /dev/null
-+++ b/drivers/amba/Kconfig
-@@ -0,0 +1,8 @@
-+config TEGRA_AHB
-+	bool "AHB driver for NVIDIA Tegra SoCs"
-+	depends on ARCH_TEGRA
-+	default y
-+	help
-+	  Adds AHB configuration functionality for NVIDIA Tegra SoCs,
-+	  which controls AHB bus master arbitration and some
-+	  performance parameters (priority, prefetch size).
+ config TEGRA_PCI
+ 	bool "PCI Express support"
 -- 
 1.8.1.5
