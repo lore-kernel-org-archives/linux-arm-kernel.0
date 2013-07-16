@@ -1,98 +1,44 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue, 16 Jul 2013 17:10:26 +0200
-Subject: [PATCH v3 4/7] USB: gadget: atmel_usba: prepare clk before calling
- enable
-In-Reply-To: <1373986995-23899-1-git-send-email-b.brezillon@overkiz.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 16 Jul 2013 17:13:24 +0200
+Subject: [PATCH v3 2/7] mmc: atmel-mci: prepare clk before calling enable
+In-Reply-To: <1373987208-24120-1-git-send-email-b.brezillon@overkiz.com>
 References: <1373986995-23899-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1373987426-24338-1-git-send-email-b.brezillon@overkiz.com>
+ <1373987208-24120-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20130716171324.7d483ada@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
-avoid common clk framework warnings.
+Dear Boris BREZILLON,
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/usb/gadget/atmel_usba_udc.c |   28 +++++++++++++++++++++-------
- 1 file changed, 21 insertions(+), 7 deletions(-)
+On Tue, 16 Jul 2013 17:06:48 +0200, Boris BREZILLON wrote:
 
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index 1d97222..f018017 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -1772,6 +1772,7 @@ out:
- static int atmel_usba_start(struct usb_gadget *gadget,
- 		struct usb_gadget_driver *driver)
- {
-+	int ret = 0;
- 	struct usba_udc *udc = container_of(gadget, struct usba_udc, gadget);
- 	unsigned long flags;
- 
-@@ -1781,8 +1782,14 @@ static int atmel_usba_start(struct usb_gadget *gadget,
- 	udc->driver = driver;
- 	spin_unlock_irqrestore(&udc->lock, flags);
- 
--	clk_enable(udc->pclk);
--	clk_enable(udc->hclk);
-+	ret = clk_prepare_enable(udc->pclk);
-+	if (ret)
-+		goto out;
-+	ret = clk_prepare_enable(udc->hclk);
-+	if (ret) {
-+		clk_disable_unprepare(udc->pclk);
-+		goto out;
-+	}
- 
- 	DBG(DBG_GADGET, "registered driver `%s'\n", driver->driver.name);
- 
-@@ -1797,9 +1804,11 @@ static int atmel_usba_start(struct usb_gadget *gadget,
- 		usba_writel(udc, CTRL, USBA_ENABLE_MASK);
- 		usba_writel(udc, INT_ENB, USBA_END_OF_RESET);
- 	}
-+
-+out:
- 	spin_unlock_irqrestore(&udc->lock, flags);
- 
--	return 0;
-+	return ret;
- }
- 
- static int atmel_usba_stop(struct usb_gadget *gadget,
-@@ -1822,8 +1831,8 @@ static int atmel_usba_stop(struct usb_gadget *gadget,
- 
- 	udc->driver = NULL;
- 
--	clk_disable(udc->hclk);
--	clk_disable(udc->pclk);
-+	clk_disable_unprepare(udc->hclk);
-+	clk_disable_unprepare(udc->pclk);
- 
- 	DBG(DBG_GADGET, "unregistered driver `%s'\n", driver->driver.name);
- 
-@@ -2022,10 +2031,14 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, udc);
- 
- 	/* Make sure we start from a clean slate */
--	clk_enable(pclk);
-+	ret = clk_prepare_enable(pclk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Unable to enable pclk, aborting.\n");
-+		goto err_clk_enable;
-+	}
- 	toggle_bias(0);
- 	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
--	clk_disable(pclk);
-+	clk_disable_unprepare(pclk);
- 
- 	if (pdev->dev.of_node)
- 		udc->usba_ep = atmel_udc_of_init(pdev, udc);
-@@ -2081,6 +2094,7 @@ err_add_udc:
- 	free_irq(irq, udc);
- err_request_irq:
- err_alloc_ep:
-+err_clk_enable:
- 	iounmap(udc->fifo);
- err_map_fifo:
- 	iounmap(udc->regs);
+>  	buf = kmalloc(ATMCI_REGS_SIZE, GFP_KERNEL);
+>  	if (!buf)
+> @@ -389,9 +391,13 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+>  	 * consistent.
+>  	 */
+>  	spin_lock_bh(&host->lock);
+> -	clk_enable(host->mck);
+> +	ret = clk_prepare_enable(host->mck);
+
+I am not very familiar with the spin_lock_bh() variant, but are you
+sure we are allowed to sleep within a spin_lock_bh()-protected critical
+section?
+
+Remember that clk_prepare_enable() calls both ->prepare() and
+->enable() for the clock, and ->prepare() is allowed to sleep, while
+->enable() is guaranteed not to sleep.
+
+Therefore, clk_prepare() is usually called at probe time, while
+clk_enable() is called whenever enabling/disabling the clock is really
+needed. So not all clk_enable() can transparently be converted into a
+clk_prepare_enable().
+
+Best regards,
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
