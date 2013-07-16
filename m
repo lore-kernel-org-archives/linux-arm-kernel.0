@@ -1,77 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Jul 2013 21:31:02 +0800
-Subject: [PATCH] ARM: imx: add low-level debug for vybrid
-Message-ID: <1373981462-22670-1-git-send-email-shawn.guo@linaro.org>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 16 Jul 2013 10:32:39 -0300
+Subject: [PATCH] ARM: mxs: pm: Include "pm.h"
+Message-ID: <1373981559-23743-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add low-level debug support for vybrid, so that earlyprintk can be
-enabled for debugging early boot issue.
+Fix the following sparse warning:
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+arch/arm/mach-mxs/pm.c:37:13: warning: symbol 'mxs_pm_init' was not declared. Should it be static?
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/Kconfig.debug      |    8 ++++++++
- arch/arm/include/debug/vf.S |   26 ++++++++++++++++++++++++++
- 2 files changed, 34 insertions(+)
- create mode 100644 arch/arm/include/debug/vf.S
+ arch/arm/mach-mxs/pm.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index e401a76..0aa5b9d 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -355,6 +355,13 @@ choice
- 		  when u-boot hands over to the kernel, the system
- 		  silently crashes, with no serial output at all.
+diff --git a/arch/arm/mach-mxs/pm.c b/arch/arm/mach-mxs/pm.c
+index b2494d2..0170e99 100644
+--- a/arch/arm/mach-mxs/pm.c
++++ b/arch/arm/mach-mxs/pm.c
+@@ -15,6 +15,7 @@
+ #include <linux/kernel.h>
+ #include <linux/suspend.h>
+ #include <linux/io.h>
++#include "pm.h"
  
-+	config DEBUG_VF_UART
-+		bool "Vybrid UART"
-+		depends on SOC_VF610
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Vybrid based platforms.
-+
- 	config DEBUG_NOMADIK_UART
- 		bool "Kernel low-level debugging messages via NOMADIK UART"
- 		depends on ARCH_NOMADIK
-@@ -798,6 +805,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
- 		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1 || \
- 		DEBUG_VEXPRESS_UART0_CRX
-+	default "debug/vf.S" if DEBUG_VF_UART
- 	default "debug/vt8500.S" if DEBUG_VT8500_UART0
- 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
- 	default "mach/debug-macro.S"
-diff --git a/arch/arm/include/debug/vf.S b/arch/arm/include/debug/vf.S
-new file mode 100644
-index 0000000..ba12cc4
---- /dev/null
-+++ b/arch/arm/include/debug/vf.S
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+	.macro	addruart, rp, rv, tmp
-+	ldr	\rp, =0x40028000	@ physical
-+	ldr	\rv, =0xfe028000	@ virtual
-+	.endm
-+
-+	.macro	senduart, rd, rx
-+	strb	\rd, [\rx, #0x7]	@ Data Register
-+	.endm
-+
-+	.macro	busyuart, rd, rx
-+1001:	ldrb	\rd, [\rx, #0x4]	@ Status Register 1
-+	tst	\rd, #1 << 6		@ TC
-+	beq	1001b			@ wait until transmit done
-+	.endm
-+
-+	.macro	waituart,rd,rx
-+	.endm
+ static int mxs_suspend_enter(suspend_state_t state)
+ {
 -- 
-1.7.9.5
+1.8.1.2
