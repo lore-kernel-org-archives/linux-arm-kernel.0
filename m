@@ -1,7 +1,7 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Jul 2013 16:19:07 -0600
-Subject: [PATCH] memory: tegra: depend on ARCH_TEGRA, not ARCH_TEGRA_*
-Message-ID: <1374013147-4775-1-git-send-email-swarren@wwwdotorg.org>
+Date: Tue, 16 Jul 2013 16:20:22 -0600
+Subject: [PATCH] iommu: tegra: depend on ARCH_TEGRA, not ARCH_TEGRA_*
+Message-ID: <1374013222-4856-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,30 +14,21 @@ update Kconfig for all Tegra drivers not to reference ARCH_TEGRA_*_SOC.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/memory/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/iommu/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
-index 29a11db..0ed76f7 100644
---- a/drivers/memory/Kconfig
-+++ b/drivers/memory/Kconfig
-@@ -33,7 +33,7 @@ config MVEBU_DEVBUS
- config TEGRA20_MC
- 	bool "Tegra20 Memory Controller(MC) driver"
- 	default y
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index 820d85c..0da7938 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -148,7 +148,7 @@ config OMAP_IOMMU_DEBUG
+ 
+ config TEGRA_IOMMU_GART
+ 	bool "Tegra GART IOMMU Support"
 -	depends on ARCH_TEGRA_2x_SOC
 +	depends on ARCH_TEGRA
+ 	select IOMMU_API
  	help
- 	  This driver is for the Memory Controller(MC) module available
- 	  in Tegra20 SoCs, mainly for a address translation fault
-@@ -43,7 +43,7 @@ config TEGRA20_MC
- config TEGRA30_MC
- 	bool "Tegra30 Memory Controller(MC) driver"
- 	default y
--	depends on ARCH_TEGRA_3x_SOC
-+	depends on ARCH_TEGRA
- 	help
- 	  This driver is for the Memory Controller(MC) module available
- 	  in Tegra30 SoCs, mainly for a address translation fault
+ 	  Enables support for remapping discontiguous physical memory
 -- 
 1.8.1.5
