@@ -1,30 +1,83 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Jul 2013 09:30:04 +0800
-Subject: [PATCH 1/5] ARM: dts: imx23-evk: enable USB PHY and controller
-In-Reply-To: <CAP9ODKpr82mMoxhiv=K70RKdn01b=ZM2J9E4vV-AM5nwXxUR+g@mail.gmail.com>
-References: <1373898160-8460-1-git-send-email-otavio@ossystems.com.br>
- <CAOMZO5C_7nJ9RVYvuKJHP2u0mYY6P2UyGVA6OpPzqTnd7YXN2Q@mail.gmail.com>
- <CAP9ODKpr82mMoxhiv=K70RKdn01b=ZM2J9E4vV-AM5nwXxUR+g@mail.gmail.com>
-Message-ID: <20130716013002.GC28375@S2101-09.ap.freescale.net>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Tue, 16 Jul 2013 10:36:22 +0900
+Subject: [PATCH v3 3/5] mmc: dw_mmc: Add exynos resume_noirq callback to
+ clear WAKEUP_INT
+In-Reply-To: <1373470926-19314-4-git-send-email-dianders@chromium.org>
+References: <1373411961-23812-1-git-send-email-dianders@chromium.org>
+ <1373470926-19314-1-git-send-email-dianders@chromium.org>
+ <1373470926-19314-4-git-send-email-dianders@chromium.org>
+Message-ID: <51E4A396.7010202@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 01:39:13PM -0300, Otavio Salvador wrote:
-> On Mon, Jul 15, 2013 at 12:39 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > Hi Otavio,
-> >
-> > On Mon, Jul 15, 2013 at 11:22 AM, Otavio Salvador
-> > <otavio@ossystems.com.br> wrote:
-> >> The i.MX23EVK board provides a USB port so the USB PHY and controller
-> >> need to be enabled for it to be usable.
-> >>
-> >> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
-> >> ---
-> >
-> > You should have Cc'd Shawn Guo on this series.
+Hi Doug,
+
+I think these patch-set didn't base on latest mmc-next.
+If you can rebase on latest mmc-next, it's helpful to me for testing.
+
+Best Regards,
+Jaehoon Chung
+
+On 07/11/2013 12:42 AM, Doug Anderson wrote:
+> If the WAKEUP_INT is asserted at wakeup and not cleared, we'll end up
+> looping around forever.  This has been seen to happen on exynos5420
+> silicon despite the fact that we haven't enabled any wakeup events.
 > 
-> Oh; thanks for fix my mistake. I am new to kernel development :-)
-
-I'm on copy of patches 1, 3 and 4.  2 and 5 are missing?
-
-Shawn
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> Changes in v3: None
+> Changes in v2:
+> - Use suspend_noirq as per James Hogan.
+> 
+>  drivers/mmc/host/dw_mmc-exynos.c | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+> index f013e7e..36b9620 100644
+> --- a/drivers/mmc/host/dw_mmc-exynos.c
+> +++ b/drivers/mmc/host/dw_mmc-exynos.c
+> @@ -30,6 +30,7 @@
+>  #define SDMMC_CLKSEL_TIMING(x, y, z)	(SDMMC_CLKSEL_CCLK_SAMPLE(x) |	\
+>  					SDMMC_CLKSEL_CCLK_DRIVE(y) |	\
+>  					SDMMC_CLKSEL_CCLK_DIVIDER(z))
+> +#define SDMMC_CLKSEL_WAKEUP_INT		BIT(11)
+>  
+>  #define SDMMC_CMD_USE_HOLD_REG		BIT(29)
+>  
+> @@ -102,6 +103,27 @@ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
+>  	return 0;
+>  }
+>  
+> +/**
+> + * dw_mci_exynos_resume_noirq - Exynos-specific resume code
+> + *
+> + * We have seen cases (at least on the exynos5420) where turning off the INT
+> + * power rail during suspend will leave the WAKEUP_INT bit in the CLKSEL
+> + * register asserted.  This bit is 1 to indicate that it fired and we can
+> + * clear it by writing a 1 back.  Clear it to prevent interrupts from going off
+> + * constantly.
+> + */
+> +
+> +static int dw_mci_exynos_resume_noirq(struct dw_mci *host)
+> +{
+> +	u32 clksel;
+> +
+> +	clksel = mci_readl(host, CLKSEL);
+> +	if (clksel & SDMMC_CLKSEL_WAKEUP_INT)
+> +		mci_writel(host, CLKSEL, clksel);
+> +
+> +	return 0;
+> +}
+> +
+>  static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
+>  {
+>  	/*
+> @@ -165,6 +187,7 @@ static const struct dw_mci_drv_data exynos_drv_data = {
+>  	.caps			= exynos_dwmmc_caps,
+>  	.init			= dw_mci_exynos_priv_init,
+>  	.setup_clock		= dw_mci_exynos_setup_clock,
+> +	.resume_noirq		= dw_mci_exynos_resume_noirq,
+>  	.prepare_command	= dw_mci_exynos_prepare_command,
+>  	.set_ios		= dw_mci_exynos_set_ios,
+>  	.parse_dt		= dw_mci_exynos_parse_dt,
+> 
