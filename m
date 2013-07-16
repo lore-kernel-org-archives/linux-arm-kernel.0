@@ -1,68 +1,105 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Jul 2013 14:51:33 +0800
-Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <20130716015038.GD28375@S2101-09.ap.freescale.net>
-References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
- <20130716015038.GD28375@S2101-09.ap.freescale.net>
-Message-ID: <20130716065130.GB30067@S2101-09.ap.freescale.net>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Tue, 16 Jul 2013 12:25:34 +0530
+Subject: [PATCH V2] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene host
+Message-ID: <1373957734-21482-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 09:50:42AM +0800, Shawn Guo wrote:
-> Hi Philipp,
-> 
-> On Thu, May 30, 2013 at 11:09:00AM +0200, Philipp Zabel wrote:
-> > This driver implements a reset controller device that toggle a gpio
-> > connected to a reset pin of a peripheral IC. The delay between assertion
-> > and de-assertion of the reset signal can be configured via device tree.
-> > 
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > Reviewed-by: Stephen Warren <swarren@nvidia.com>
-> 
-> I see this patch is very useful, as GPIOs are widely used to reset
-> components/devices on board.  But I do not find the patch in v3.11-rc1.
-> What's your plan about it?
-> 
-> Also, I'm wondering if we should register the driver a little bit
-> early.  Please see the following patch.  If it makes sense to you,
-> I can send the patch to you, or you can just quash it into yours.
+This patch allows us to have X-Gene guest VCPU when using KVM arm64
+on APM X-Gene host.
 
-And here is another change request.
+We add KVM_ARM_TARGET_XGENE_POTENZA for X-Gene Potenza compatible
+guest VCPU and we return KVM_ARM_TARGET_XGENE_POTENZA in kvm_target_cpu()
+when running on X-Gene host with Potenza core.
 
-Shawn
+V2:
+ - Renamed KVM_ARM_TARGET_XGENE_V8 to KVM_ARM_TARGET_XGENE_POTENZA
 
-----8<---------------
+V1:
+ - Initial patch with target named as KVM_ARM_TARGET_XGENE_V8
 
->From 822a0c4fb7c99b371844ba7e957affcaa8cb1cfe Mon Sep 17 00:00:00 2001
-From: Shawn Guo <shawn.guo@linaro.org>
-Date: Sun, 14 Jul 2013 20:28:05 +0800
-Subject: [PATCH] ENGR00269945: reset: handle cansleep case in gpio-reset
-
-Some gpio reset may be backed by a gpio that can sleep, e.g. pca953x
-gpio output.  For such gpio, gpio_set_value_cansleep() should be
-called.  Otherwise, the WARN_ON(chip->can_sleep) in gpiod_set_value()
-will be hit.  Add a gpio_cansleep() check to handle cansleep gpio.
-
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 ---
- drivers/reset/gpio-reset.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm64/include/uapi/asm/kvm.h    |    3 ++-
+ arch/arm64/kvm/guest.c               |   34 ++++++++++++++++++++++------------
+ arch/arm64/kvm/sys_regs_generic_v8.c |    3 +++
+ 3 files changed, 27 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/reset/gpio-reset.c b/drivers/reset/gpio-reset.c
-index 5d2515a..4f372f9 100644
---- a/drivers/reset/gpio-reset.c
-+++ b/drivers/reset/gpio-reset.c
-@@ -32,7 +32,10 @@ static void gpio_reset_set(struct reset_controller_dev *rcdev, int asserted)
- 	if (drvdata->active_low)
- 		value = !value;
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 5031f42..d9f026b 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -55,8 +55,9 @@ struct kvm_regs {
+ #define KVM_ARM_TARGET_AEM_V8		0
+ #define KVM_ARM_TARGET_FOUNDATION_V8	1
+ #define KVM_ARM_TARGET_CORTEX_A57	2
++#define KVM_ARM_TARGET_XGENE_POTENZA	3
  
--	gpio_set_value(drvdata->gpio, value);
-+	if (gpio_cansleep(drvdata->gpio))
-+		gpio_set_value_cansleep(drvdata->gpio, value);
-+	else
-+		gpio_set_value(drvdata->gpio, value);
+-#define KVM_ARM_NUM_TARGETS		3
++#define KVM_ARM_NUM_TARGETS		4
+ 
+ /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
+ #define KVM_ARM_DEVICE_TYPE_SHIFT	0
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 2c3ff67..a466244 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -207,19 +207,29 @@ int __attribute_const__ kvm_target_cpu(void)
+ 	unsigned long implementor = read_cpuid_implementor();
+ 	unsigned long part_number = read_cpuid_part_number();
+ 
+-	if (implementor != ARM_CPU_IMP_ARM)
+-		return -EINVAL;
+-
+-	switch (part_number) {
+-	case ARM_CPU_PART_AEM_V8:
+-		return KVM_ARM_TARGET_AEM_V8;
+-	case ARM_CPU_PART_FOUNDATION:
+-		return KVM_ARM_TARGET_FOUNDATION_V8;
+-	case ARM_CPU_PART_CORTEX_A57:
+-		/* Currently handled by the generic backend */
+-		return KVM_ARM_TARGET_CORTEX_A57;
++	switch (implementor) {
++	case ARM_CPU_IMP_ARM:
++		switch (part_number) {
++		case ARM_CPU_PART_AEM_V8:
++			return KVM_ARM_TARGET_AEM_V8;
++		case ARM_CPU_PART_FOUNDATION:
++			return KVM_ARM_TARGET_FOUNDATION_V8;
++		case ARM_CPU_PART_CORTEX_A57:
++			return KVM_ARM_TARGET_CORTEX_A57;
++		default:
++			return -EINVAL;
++		}
++		break;
++	case ARM_CPU_IMP_APM:
++		switch (part_number) {
++		case APM_CPU_PART_POTENZA:
++			return KVM_ARM_TARGET_XGENE_POTENZA;
++		default:
++			return -EINVAL;
++		}
++		break;
+ 	default:
+-		return -EINVAL;
++ 		return -EINVAL;
+ 	}
  }
  
- static int gpio_reset(struct reset_controller_dev *rcdev, unsigned long id)
+diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+index 4268ab9..8fe6f76 100644
+--- a/arch/arm64/kvm/sys_regs_generic_v8.c
++++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+@@ -90,6 +90,9 @@ static int __init sys_reg_genericv8_init(void)
+ 					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
+ 					  &genericv8_target_table);
++	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
++					  &genericv8_target_table);
++
+ 	return 0;
+ }
+ late_initcall(sys_reg_genericv8_init);
 -- 
 1.7.9.5
