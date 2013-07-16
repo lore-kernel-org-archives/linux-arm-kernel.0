@@ -1,55 +1,92 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 16 Jul 2013 00:56:11 -0700
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <20130716004727.b60b2c96.akpm@linux-foundation.org>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
- <20130712075602.GA4002@gmail.com>
- <20130715150342.35f7620ffe0835e3e2bc37d0@linux-foundation.org>
- <51E472D4.5060307@zytor.com>
- <20130716004727.b60b2c96.akpm@linux-foundation.org>
-Message-ID: <20130716005611.e4ccab02.akpm@linux-foundation.org>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 16 Jul 2013 15:55:28 +0800
+Subject: [PATCH 4/5] iio: at91: add an optional dt property for for adc
+ clock hz.
+In-Reply-To: <20130715130610.GD2962@lukather>
+References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
+ <1373789069-11604-5-git-send-email-josh.wu@atmel.com>
+ <20130715130610.GD2962@lukather>
+Message-ID: <51E4FC70.3050207@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Jul 2013 00:47:27 -0700 Andrew Morton <akpm@linux-foundation.org> wrote:
+Hi, Maxime
 
-> On Mon, 15 Jul 2013 15:08:20 -0700 "H. Peter Anvin" <hpa@zytor.com> wrote:
-> 
-> > On 07/15/2013 03:03 PM, Andrew Morton wrote:
-> > > 
-> > > I don't know how to do this.  Any suggestions?
-> > > 
-> > > It has to be done at `make config' time.  We'd need to probe for the
-> > > presence of lz4c and then....  what?
-> > > 
-> > > Is there any precedent for this?
-> > > 
-> > > I don't think we can just ignore the absence of lz4c - the user has
-> > > selected a config which his system cannot build.  The problem lies
-> > > within randconfig itself.
-> > > 
-> > 
-> > We keep running over the need to be able to have kconfig run tests on
-> > the build system (for toolchain support or for optional tools needed);
-> > running them in the Makefiles (i.e. at Kbuild time) is simply too late.
-> > 
-> 
-> Would it make sense to extend Kconfig's `depends'?
-> 
-> 	depends on $(shell-command)
-> 
-> I don't know how practical that would be to implement...
+On 7/15/2013 9:06 PM, Maxime Ripard wrote:
+> Hi Josh,
+>
+> On Sun, Jul 14, 2013 at 04:04:28PM +0800, Josh Wu wrote:
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>>   Documentation/devicetree/bindings/arm/atmel-adc.txt |    2 ++
+>>   drivers/iio/adc/at91_adc.c                          |    8 +++++++-
+>>   2 files changed, 9 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>> index 16769d9..0db2945 100644
+>> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>> @@ -27,6 +27,8 @@ Optional properties:
+>>   		       resolution will be used.
+>>     - atmel,adc-sleep-mode: Boolean to enable sleep mode when no conversion
+>>     - atmel,adc-sample-hold-time: Sample and Hold Time in microseconds
+>> +  - atmel,adc-clock-rate: ADC clock rate. If not specified, use the default
+>> +			  adc_op_clk.
+>>    
+>>   Optional trigger Nodes:
+>>     - Required properties:
+>> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+>> index e93a075..8f1386f 100644
+>> --- a/drivers/iio/adc/at91_adc.c
+>> +++ b/drivers/iio/adc/at91_adc.c
+>> @@ -47,6 +47,7 @@ struct at91_adc_caps {
+>>   
+>>   struct at91_adc_state {
+>>   	struct clk		*adc_clk;
+>> +	u32			adc_clk_rate;
+>>   	u16			*buffer;
+>>   	unsigned long		channels_mask;
+>>   	struct clk		*clk;
+>> @@ -448,6 +449,10 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
+>>   	if (!node)
+>>   		return -EINVAL;
+>>   
+>> +	prop = 0;
+>> +	of_property_read_u32(node, "atmel,adc-clock-rate", &prop);
+>> +	st->adc_clk_rate = prop;
+>> +
+>>   	st->use_external = of_property_read_bool(node, "atmel,adc-use-external-triggers");
+>>   
+>>   	if (of_property_read_u32(node, "atmel,adc-channels-used", &prop)) {
+>> @@ -723,7 +728,8 @@ static int at91_adc_probe(struct platform_device *pdev)
+>>   	 * specified by the electrical characteristics of the board.
+>>   	 */
+>>   	mstrclk = clk_get_rate(st->clk);
+>> -	adc_clk = clk_get_rate(st->adc_clk);
+>> +	adc_clk = st->adc_clk_rate ?
+>> +		st->adc_clk_rate : clk_get_rate(st->adc_clk);
+> Why is that needed? Isn't it completely redundant with the clocks
+> property?
 
-Or, easier and faster, run some front-end script which generates
-once-off Kconfig symbols.
+As st->adc_clk rate is specified in arch/arm/mach-at91/sama5d3.c (take 
+sama5d3 for example), changing the clock rate should recompile the 
+kernel binary.
+Use dt parameter will let us easily specify the clock rate instead of 
+recompile the code.
 
-	if [ -x /bin/lz4c ]
-	then
-		echo CONFIG_HAVE_LZ4C
-	fi
+And yes, it is redundant that we can define the adc_op_clk rate in two 
+places (clock property in .c and adc-clock-rate in dts). But this can be 
+compatible with the non-dt platform.
 
-then munge the output of that script into the Kconfig run and do
+After a further thinking of this, maybe remove the adc_op_clk is better 
+since it is a fake clock, and only used to specify the clock rate.
+To specify the clock rate use a dt property or platform data parameter 
+is better.
 
-	depends on HAVE_LZ4C
+>
+> Maxime
+>
+>
+
+Best Regards,
+Josh Wu
