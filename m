@@ -1,138 +1,128 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Tue, 16 Jul 2013 22:12:25 +0530
-Subject: [PATCH V2] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene
- host
-In-Reply-To: <20130716091417.GC14486@e106331-lin.cambridge.arm.com>
-References: <1373957734-21482-1-git-send-email-anup.patel@linaro.org>
- <20130716091417.GC14486@e106331-lin.cambridge.arm.com>
-Message-ID: <CAAhSdy3B8HVAixeLt2rRnFFvGLepkxfW86gnbr6CMw+LfJw_Sw@mail.gmail.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 16 Jul 2013 17:43:13 +0100
+Subject: [PATCH RFC v2 10/14] ARM: debug: provide generic option choices for
+ 8250 and PL01x ports
+In-Reply-To: <20130716163243.GY21614@n2100.arm.linux.org.uk>
+References: <20130716163243.GY21614@n2100.arm.linux.org.uk>
+Message-ID: <E1Uz8LJ-000485-0g@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 2:44 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Jul 16, 2013 at 07:55:34AM +0100, Anup Patel wrote:
->> This patch allows us to have X-Gene guest VCPU when using KVM arm64
->> on APM X-Gene host.
->>
->> We add KVM_ARM_TARGET_XGENE_POTENZA for X-Gene Potenza compatible
->> guest VCPU and we return KVM_ARM_TARGET_XGENE_POTENZA in kvm_target_cpu()
->> when running on X-Gene host with Potenza core.
->>
->> V2:
->>  - Renamed KVM_ARM_TARGET_XGENE_V8 to KVM_ARM_TARGET_XGENE_POTENZA
->>
->> V1:
->>  - Initial patch with target named as KVM_ARM_TARGET_XGENE_V8
->>
->> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->> ---
->>  arch/arm64/include/uapi/asm/kvm.h    |    3 ++-
->>  arch/arm64/kvm/guest.c               |   34 ++++++++++++++++++++++------------
->>  arch/arm64/kvm/sys_regs_generic_v8.c |    3 +++
->>  3 files changed, 27 insertions(+), 13 deletions(-)
->>
->> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->> index 5031f42..d9f026b 100644
->> --- a/arch/arm64/include/uapi/asm/kvm.h
->> +++ b/arch/arm64/include/uapi/asm/kvm.h
->> @@ -55,8 +55,9 @@ struct kvm_regs {
->>  #define KVM_ARM_TARGET_AEM_V8                0
->>  #define KVM_ARM_TARGET_FOUNDATION_V8 1
->>  #define KVM_ARM_TARGET_CORTEX_A57    2
->> +#define KVM_ARM_TARGET_XGENE_POTENZA 3
->>
->> -#define KVM_ARM_NUM_TARGETS          3
->> +#define KVM_ARM_NUM_TARGETS          4
->>
->>  /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
->>  #define KVM_ARM_DEVICE_TYPE_SHIFT    0
->> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
->> index 2c3ff67..a466244 100644
->> --- a/arch/arm64/kvm/guest.c
->> +++ b/arch/arm64/kvm/guest.c
->> @@ -207,19 +207,29 @@ int __attribute_const__ kvm_target_cpu(void)
->>       unsigned long implementor = read_cpuid_implementor();
->>       unsigned long part_number = read_cpuid_part_number();
->>
->> -     if (implementor != ARM_CPU_IMP_ARM)
->> -             return -EINVAL;
->> -
->> -     switch (part_number) {
->> -     case ARM_CPU_PART_AEM_V8:
->> -             return KVM_ARM_TARGET_AEM_V8;
->> -     case ARM_CPU_PART_FOUNDATION:
->> -             return KVM_ARM_TARGET_FOUNDATION_V8;
->> -     case ARM_CPU_PART_CORTEX_A57:
->> -             /* Currently handled by the generic backend */
->> -             return KVM_ARM_TARGET_CORTEX_A57;
->> +     switch (implementor) {
->> +     case ARM_CPU_IMP_ARM:
->> +             switch (part_number) {
->> +             case ARM_CPU_PART_AEM_V8:
->> +                     return KVM_ARM_TARGET_AEM_V8;
->> +             case ARM_CPU_PART_FOUNDATION:
->> +                     return KVM_ARM_TARGET_FOUNDATION_V8;
->> +             case ARM_CPU_PART_CORTEX_A57:
->> +                     return KVM_ARM_TARGET_CORTEX_A57;
->> +             default:
->> +                     return -EINVAL;
->> +             }
->> +             break;
->> +     case ARM_CPU_IMP_APM:
->> +             switch (part_number) {
->> +             case APM_CPU_PART_POTENZA:
->> +                     return KVM_ARM_TARGET_XGENE_POTENZA;
->> +             default:
->> +                     return -EINVAL;
->> +             }
->> +             break;
->>       default:
->> -             return -EINVAL;
->> +             return -EINVAL;
->>       }
->
-> Why not place a return -EINVAL here, outside of the outer switch
-> statement? That way you don't need to duplicate it for an unknown
-> implementor or a known implementor's unknown CPU, as long as you keep
-> the break at the end of each implementor's case.
+Provide generic option choices for 8250 and PL01x UART ports; these can
+now be selected by UART type rather than asking about the platform.
+This means that a kernel configuration user can manually choose the
+various parameters of the debug UART without resorting to the platform
+having to encode the possible settings.
 
-Sure, I will update the switch statement accordingly.
+These two generic options are preferred over further debug entries for
+these ports; the existing options which refer back to the 8250 and PL01x
+ports are now considered deprecated.
 
->
-> Thanks,
-> Mark.
->
->>  }
->>
->> diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
->> index 4268ab9..8fe6f76 100644
->> --- a/arch/arm64/kvm/sys_regs_generic_v8.c
->> +++ b/arch/arm64/kvm/sys_regs_generic_v8.c
->> @@ -90,6 +90,9 @@ static int __init sys_reg_genericv8_init(void)
->>                                         &genericv8_target_table);
->>       kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
->>                                         &genericv8_target_table);
->> +     kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
->> +                                       &genericv8_target_table);
->> +
->>       return 0;
->>  }
->>  late_initcall(sys_reg_genericv8_init);
->> --
->> 1.7.9.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/Kconfig.debug |   44 +++++++++++++++++++++++++++++++++++++-------
+ 1 files changed, 37 insertions(+), 7 deletions(-)
 
-Regards,
-Anup
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 6bab4b0..ecb3b32 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -770,6 +770,32 @@ choice
+ 		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
+ 		  devices, including VT8500, WM8505, WM8650 and WM8850.
+ 
++	config DEBUG_LL_UART_8250
++		bool "Kernel low-level debugging via 8250 UART"
++		help
++		  Say Y here if you wish the debug print routes to direct
++		  their output to an 8250 UART.  You can use this option
++		  to provide the parameters for the 8250 UART rather than
++		  selecting one of the platform specific options above if
++		  you know the parameters for the port.
++
++		  This option is preferred over the platform specific
++		  options; the platform specific options are deprecated
++		  and will be soon removed.
++
++	config DEBUG_LL_UART_PL01X
++		bool "Kernel low-level debugging via ARM Ltd PL01x Primecell UART"
++		help
++		  Say Y here if you wish the debug print routes to direct
++		  their output to a PL01x Primecell UART.  You can use
++		  this option to provide the parameters for the UART
++		  rather than selecting one of the platform specific
++		  options above if you know the parameters for the port.
++
++		  This option is preferred over the platform specific
++		  options; the platform specific options are deprecated
++		  and will be soon removed.
++
+ 	config DEBUG_LL_UART_NONE
+ 		bool "No low-level debugging UART"
+ 		depends on !ARCH_MULTIPLATFORM
+@@ -845,8 +871,8 @@ config DEBUG_STI_UART
+ 
+ config DEBUG_LL_INCLUDE
+ 	string
+-	default "debug/8250.S" if DEBUG_UART_8250
+-	default "debug/pl01x.S" if DEBUG_UART_PL01X
++	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
++	default "debug/pl01x.S" if DEBUG_LL_UART_PL01X || DEBUG_UART_PL01X
+ 	default "debug/exynos.S" if DEBUG_EXYNOS_UART
+ 	default "debug/icedcc.S" if DEBUG_ICEDCC
+ 	default "debug/imx.S" if DEBUG_IMX1_UART || \
+@@ -870,11 +896,13 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
+ 	default "mach/debug-macro.S"
+ 
++# Compatibility options for PL01x
+ config DEBUG_UART_PL01X
+ 	def_bool ARCH_EP93XX || \
+ 		ARCH_INTEGRATOR || \
+ 		ARCH_VERSATILE
+ 
++# Compatibility options for 8250
+ config DEBUG_UART_8250
+ 	def_bool ARCH_DOVE || ARCH_EBSA110 || \
+ 		(FOOTBRIDGE && !DEBUG_DC21285_PORT) || \
+@@ -925,7 +953,8 @@ config DEBUG_UART_PHYS
+ 	default 0xffd82340 if ARCH_IOP13XX
+ 	default 0xfff36000 if DEBUG_HIGHBANK_UART
+ 	default 0xfffff700 if ARCH_IOP33X
+-	depends on DEBUG_UART_8250 || DEBUG_UART_PL01X
++	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
++		DEBUG_UART_8250 || DEBUG_UART_PL01X
+ 
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
+@@ -971,23 +1000,24 @@ config DEBUG_UART_VIRT
+ 	default 0xfefff700 if ARCH_IOP33X
+ 	default 0xff003000 if DEBUG_U300_UART
+ 	default DEBUG_UART_PHYS if !MMU
+-	depends on DEBUG_UART_8250 || DEBUG_UART_PL01X
++	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
++		DEBUG_UART_8250 || DEBUG_UART_PL01X
+ 
+ config DEBUG_UART_8250_SHIFT
+ 	int "Register offset shift for the 8250 debug UART"
+-	depends on DEBUG_UART_8250
++	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
+ 	default 0 if FOOTBRIDGE || ARCH_IOP32X
+ 	default 2
+ 
+ config DEBUG_UART_8250_WORD
+ 	bool "Use 32-bit accesses for 8250 UART"
+-	depends on DEBUG_UART_8250
++	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
+ 	depends on DEBUG_UART_8250_SHIFT >= 2
+ 	default y if DEBUG_PICOXCELL_UART || DEBUG_SOCFPGA_UART
+ 
+ config DEBUG_UART_8250_FLOW_CONTROL
+ 	bool "Enable flow control for 8250 UART"
+-	depends on DEBUG_UART_8250
++	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
+ 	default y if ARCH_EBSA110 || FOOTBRIDGE || ARCH_GEMINI || ARCH_RPC
+ 
+ config DEBUG_UNCOMPRESS
+-- 
+1.7.4.4
