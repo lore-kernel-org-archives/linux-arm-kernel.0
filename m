@@ -1,44 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Jul 2013 12:10:58 +0800
-Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <51E4BF98.8030604@wwwdotorg.org>
-References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
- <20130716015038.GD28375@S2101-09.ap.freescale.net>
- <51E4BF98.8030604@wwwdotorg.org>
-Message-ID: <20130716041056.GA30067@S2101-09.ap.freescale.net>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Tue, 16 Jul 2013 10:51:44 +0530
+Subject: [PATCH 8/8] ARM: DRA7: Kconfig: Increase the default gpio count
+In-Reply-To: <51E29482.7060208@linaro.org>
+References: <1373354873-12359-1-git-send-email-rnayak@ti.com>
+ <1373354873-12359-9-git-send-email-rnayak@ti.com>
+ <51E29482.7060208@linaro.org>
+Message-ID: <51E4D868.8010609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 09:35:52PM -0600, Stephen Warren wrote:
-> > It's a little bit late to register gpio-reset driver at module_init
-> > time, because gpio-reset provides reset control via gpio for other
-> > devices which are mostly probed at module_init time too.  And it
-> > becomes even worse, when the gpio comes from IO expander on I2C bus,
-> > e.g. pca953x.  In that case, gpio-reset needs to be ready before I2C
-> > bus driver which is generally ready at subsys_initcall time.  Let's
-> > register gpio-reset driver in arch_initcall() to have it ready early
-> > enough.
-> 
-> There's no need for the reset driver to be registered before its users;
-> the users of the reset GPIO will simply have their probe deferred until
-> the reset controller is available, and then everything will work out
-> just fine.
-> 
-> > The defer probe mechanism is not used here, because a reset controller
-> > driver should be reasonably registered early than other devices.  More
-> > importantly, defer probe doe not help in some nasty cases, e.g. the
-> > gpio-pca953x device itself needs a reset from gpio-reset driver to start
-> > working.
-> 
-> That should work fine with deferred probe.
+On Sunday 14 July 2013 05:37 PM, Kevin Hilman wrote:
+> On 07/09/2013 08:27 AM, Rajendra Nayak wrote:
+>> From: R Sricharan <r.sricharan@ti.com>
+>>
+>> DRA7xx has 8 GPIO banks so that there are 32x8 = 256 GPIOs.
+>> In order for the gpiolib to detect and initialize these
+>> additional GPIOs and other TWL GPIOs, ARCH_NR_GPIO is set
+>> to 512 instead of present 256.
+> nit: the patch itself doesn't change 256 to 512, but just adds another
+> Kconfig default.
+>
+> Kevin
+ hmm, ok. Will reword the $subject and commit accordingly
 
-I should probably rework the commit log.  But I do not see a problem
-to register gpio-reset driver a little bit earlier.  On the other hand,
-if we reply on deferred probe, many drivers probe could be deferred.
-For example, on my system, the gpio-pca953x on I2C bus works as a GPIO
-controller and provides resets to many board level components.
-Deferring probe of gpio-pca953x on I2C bus means every single probe of
-all these components gets deferred.  IMO, this situation should be
-reasonably avoided.
-
-Shawn
+Regards,
+ Sricharan
+>> Signed-off-by: R Sricharan <r.sricharan@ti.com>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> ---
+>>  arch/arm/Kconfig |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 5ef7af0..9faed52 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -1599,7 +1599,7 @@ config LOCAL_TIMERS
+>>  config ARCH_NR_GPIO
+>>  	int
+>>  	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+>> -	default 512 if SOC_OMAP5
+>> +	default 512 if SOC_OMAP5 || SOC_DRA7XX
+>>  	default 512 if ARCH_KEYSTONE
+>>  	default 392 if ARCH_U8500
+>>  	default 352 if ARCH_VT8500
+>>
