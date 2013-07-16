@@ -1,80 +1,98 @@
-From: yann.morin.1998@free.fr (Yann E. MORIN)
-Date: Tue, 16 Jul 2013 11:25:14 +0200
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <CAGVrzcaTMckMKUObknT8abPyOzetuHzWtNPkF=Ae4zz7huShkQ@mail.gmail.com>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <20130716005611.e4ccab02.akpm@linux-foundation.org>
- <CAGVrzcaTMckMKUObknT8abPyOzetuHzWtNPkF=Ae4zz7huShkQ@mail.gmail.com>
-Message-ID: <201307161125.14491.yann.morin.1998@free.fr>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Jul 2013 17:28:46 +0800
+Subject: [PATCH] dma: mxs-dma: remove code left from generic DMA binding
+ conversion
+Message-ID: <1373966926-13809-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian, All,
+With all mxs-dma clients moved to use generic DMA helper, the code
+left from generic DMA binding conversion can be removed now.
 
-On Tuesday 16 July 2013 11:13:24 Florian Fainelli wrote:
-> 2013/7/16 Andrew Morton <akpm@linux-foundation.org>:
-> > On Tue, 16 Jul 2013 00:47:27 -0700 Andrew Morton <akpm@linux-foundation.org> wrote:
-> >
-> >> On Mon, 15 Jul 2013 15:08:20 -0700 "H. Peter Anvin" <hpa@zytor.com> wrote:
-> >>
-> >> > On 07/15/2013 03:03 PM, Andrew Morton wrote:
-> >> > >
-> >> > > I don't know how to do this.  Any suggestions?
-> >> > >
-> >> > > It has to be done at `make config' time.  We'd need to probe for the
-> >> > > presence of lz4c and then....  what?
-> >> > >
-> >> > > Is there any precedent for this?
-> >> > >
-> >> > > I don't think we can just ignore the absence of lz4c - the user has
-> >> > > selected a config which his system cannot build.  The problem lies
-> >> > > within randconfig itself.
-> >> > >
-> >> >
-> >> > We keep running over the need to be able to have kconfig run tests on
-> >> > the build system (for toolchain support or for optional tools needed);
-> >> > running them in the Makefiles (i.e. at Kbuild time) is simply too late.
-> >> >
-> >>
-> >> Would it make sense to extend Kconfig's `depends'?
-> >>
-> >>       depends on $(shell-command)
-> >>
-> >> I don't know how practical that would be to implement...
-> >
-> > Or, easier and faster, run some front-end script which generates
-> > once-off Kconfig symbols.
-> >
-> >         if [ -x /bin/lz4c ]
-> >         then
-> >                 echo CONFIG_HAVE_LZ4C
-> >         fi
-> >
-> > then munge the output of that script into the Kconfig run and do
-> >
-> >         depends on HAVE_LZ4C
-> 
-> That does sound nice to avoid the build error, but will eventually
-> make it harder to diagnose why the kernel has not been compressed with
-> the specific compression tool, some kind of warning should also be
-> emitted maybe?
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/dma/mxs-dma.c       |   23 -----------------------
+ include/linux/fsl/mxs-dma.h |   20 --------------------
+ 2 files changed, 43 deletions(-)
+ delete mode 100644 include/linux/fsl/mxs-dma.h
 
-Either a warning at check-time, or a comment in Kconfig, such as:
-    config COMPRESS_LZ4
-        depends on HAVE_LZ4
-    comment "'lz4' missing, LZ4 compression not available"
-        depends on !HAVE_LZ4
-
-Either way is fine with me. ;-)
-
-Regards,
-Yann E. MORIN.
-
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index 7195930..099be73 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -23,7 +23,6 @@
+ #include <linux/dmaengine.h>
+ #include <linux/delay.h>
+ #include <linux/module.h>
+-#include <linux/fsl/mxs-dma.h>
+ #include <linux/stmp_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -197,24 +196,6 @@ static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
+ 	return container_of(chan, struct mxs_dma_chan, chan);
+ }
+ 
+-int mxs_dma_is_apbh(struct dma_chan *chan)
+-{
+-	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+-	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+-
+-	return dma_is_apbh(mxs_dma);
+-}
+-EXPORT_SYMBOL_GPL(mxs_dma_is_apbh);
+-
+-int mxs_dma_is_apbx(struct dma_chan *chan)
+-{
+-	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+-	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+-
+-	return !dma_is_apbh(mxs_dma);
+-}
+-EXPORT_SYMBOL_GPL(mxs_dma_is_apbx);
+-
+ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+ {
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+@@ -349,13 +330,9 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
+ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
+ {
+ 	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+-	struct mxs_dma_data *data = chan->private;
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 	int ret;
+ 
+-	if (data)
+-		mxs_chan->chan_irq = data->chan_irq;
+-
+ 	mxs_chan->ccw = dma_alloc_coherent(mxs_dma->dma_device.dev,
+ 				CCW_BLOCK_SIZE, &mxs_chan->ccw_phys,
+ 				GFP_KERNEL);
+diff --git a/include/linux/fsl/mxs-dma.h b/include/linux/fsl/mxs-dma.h
+deleted file mode 100644
+index 55d8702..0000000
+--- a/include/linux/fsl/mxs-dma.h
++++ /dev/null
+@@ -1,20 +0,0 @@
+-/*
+- * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#ifndef __MACH_MXS_DMA_H__
+-#define __MACH_MXS_DMA_H__
+-
+-#include <linux/dmaengine.h>
+-
+-struct mxs_dma_data {
+-	int chan_irq;
+-};
+-
+-extern int mxs_dma_is_apbh(struct dma_chan *chan);
+-extern int mxs_dma_is_apbx(struct dma_chan *chan);
+-#endif /* __MACH_MXS_DMA_H__ */
 -- 
-.-----------------.--------------------.------------------.--------------------.
-|  Yann E. MORIN  | Real-Time Embedded | /"\ ASCII RIBBON | Erics' conspiracy: |
-| +0/33 662376056 | Software  Designer | \ / CAMPAIGN     |   ^                |
-| --==< O_o >==-- '------------.-------:  X  AGAINST      |  /e\  There is no  |
-| http://ymorin.is-a-geek.org/ | (*_*) | / \ HTML MAIL    |  """  conspiracy.  |
-'------------------------------'-------'------------------'--------------------'
+1.7.9.5
