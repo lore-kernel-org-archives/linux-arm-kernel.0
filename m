@@ -1,7 +1,7 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Jul 2013 16:27:47 -0600
-Subject: [PATCH] ASoC: tegra: depend on ARCH_TEGRA, not ARCH_TEGRA_*
-Message-ID: <1374013667-21435-1-git-send-email-swarren@wwwdotorg.org>
+Date: Tue, 16 Jul 2013 16:33:59 -0600
+Subject: [PATCH] clk: tegra: depend on ARCH_TEGRA, not ARCH_TEGRA_*
+Message-ID: <1374014039-22469-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,138 +12,113 @@ This will reduce the number of configurations that need to be supported
 by core Tegra code, e.g. CPU idle, hotplug. As a precursor, we need to
 update Kconfig for all Tegra drivers not to reference ARCH_TEGRA_*_SOC.
 
-Stop selecting I2S/AC97/SPDIF controller drivers from the machine driver
-config options; this doesn't really work if we don't know which specific
-SoC(s) we're building for. However, set their default values based on
-SND_SOC_TEGRA, since most people will probably want to enable support for
-all SoCs. This also avoids the need to change any defconfig files.
+The Tegra clock driver contains a fairly large amount of SoC-specific
+code and data. Introduce explicit config options so that the user can
+trim the set of supported SoCs if they wish. Default these to on, since
+most people will probably want to enable support for all SoCs. This also
+avoids the need to change any defconfig files.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- sound/soc/tegra/Kconfig | 36 +++++++++++++++---------------------
- 1 file changed, 15 insertions(+), 21 deletions(-)
+ drivers/clk/Kconfig         |  2 ++
+ drivers/clk/Makefile        |  2 +-
+ drivers/clk/tegra/Kconfig   | 24 ++++++++++++++++++++++++
+ drivers/clk/tegra/Makefile  |  6 +++---
+ drivers/clk/tegra/clk-pll.c |  4 ++--
+ 5 files changed, 32 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/clk/tegra/Kconfig
 
-diff --git a/sound/soc/tegra/Kconfig b/sound/soc/tegra/Kconfig
-index 68fd6d0..321a6c9 100644
---- a/sound/soc/tegra/Kconfig
-+++ b/sound/soc/tegra/Kconfig
-@@ -7,8 +7,9 @@ config SND_SOC_TEGRA
- 	  Say Y or M here if you want support for SoC audio on Tegra.
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 51380d6..8efaf3e 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -87,6 +87,8 @@ config CLK_PPC_CORENET
+ 	  This adds the clock driver support for Freescale PowerPC corenet
+ 	  platforms using common clock framework.
  
- config SND_SOC_TEGRA20_AC97
--	tristate
--	depends on SND_SOC_TEGRA && ARCH_TEGRA_2x_SOC
-+	tristate "Tegra20 AC97 controller"
-+	depends on SND_SOC_TEGRA
-+	default SND_SOC_TEGRA
- 	select SND_SOC_AC97_BUS
- 	select SND_SOC_TEGRA20_DAS
- 	help
-@@ -18,15 +19,16 @@ config SND_SOC_TEGRA20_AC97
++source "drivers/clk/tegra/Kconfig"
++
+ endmenu
  
- config SND_SOC_TEGRA20_DAS
- 	tristate
--	depends on SND_SOC_TEGRA && ARCH_TEGRA_2x_SOC
-+	depends on SND_SOC_TEGRA
- 	help
- 	  Say Y or M if you want to add support for the Tegra20 DAS module.
- 	  You will also need to select the individual machine drivers to
- 	  support below.
+ source "drivers/clk/mvebu/Kconfig"
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 4038c2b..3368f03 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -30,7 +30,7 @@ obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
+ obj-$(CONFIG_ARCH_U8500)	+= ux500/
+ obj-$(CONFIG_ARCH_VT8500)	+= clk-vt8500.o
+ obj-$(CONFIG_ARCH_ZYNQ)		+= zynq/
+-obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
++obj-$(CONFIG_CLK_TEGRA)		+= tegra/
+ obj-$(CONFIG_PLAT_SAMSUNG)	+= samsung/
  
- config SND_SOC_TEGRA20_I2S
--	tristate
--	depends on SND_SOC_TEGRA && ARCH_TEGRA_2x_SOC
-+	tristate "Tegra20 I2C controller"
-+	depends on SND_SOC_TEGRA
-+	default SND_SOC_TEGRA
- 	select SND_SOC_TEGRA20_DAS
- 	help
- 	  Say Y or M if you want to add support for codecs attached to the
-@@ -34,9 +36,9 @@ config SND_SOC_TEGRA20_I2S
- 	  machine drivers to support below.
+ obj-$(CONFIG_X86)		+= x86/
+diff --git a/drivers/clk/tegra/Kconfig b/drivers/clk/tegra/Kconfig
+new file mode 100644
+index 0000000..abe609b
+--- /dev/null
++++ b/drivers/clk/tegra/Kconfig
+@@ -0,0 +1,24 @@
++config CLK_TEGRA
++	bool "Clock driver for NVIDIA Tegra SoCs"
++	depends on ARCH_TEGRA
++	default y
++	help
++	  Say y here to enable clock driver support for NVIDIA Tegra SoCs.
++
++	  This option provides core functionality; enable support for specific
++	  individual SoCs using the options below.
++
++config CLK_TEGRA20
++	bool "Tegra20 clock support"
++	depends on CLK_TEGRA
++	default y
++
++config CLK_TEGRA30
++	bool "Tegra30 clock support"
++	depends on CLK_TEGRA
++	default y
++
++config CLK_TEGRA114
++	bool "Tegra114 clock support"
++	depends on CLK_TEGRA
++	default y
+diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
+index f49fac2..7b1a929 100644
+--- a/drivers/clk/tegra/Makefile
++++ b/drivers/clk/tegra/Makefile
+@@ -7,6 +7,6 @@ obj-y					+= clk-pll.o
+ obj-y					+= clk-pll-out.o
+ obj-y					+= clk-super.o
  
- config SND_SOC_TEGRA20_SPDIF
--	tristate
--	depends on SND_SOC_TEGRA && ARCH_TEGRA_2x_SOC
--	default m
-+	tristate "Tegra20 SPDIF controller"
-+	default SND_SOC_TEGRA
-+	depends on SND_SOC_TEGRA
- 	help
- 	  Say Y or M if you want to add support for the Tegra20 SPDIF interface.
- 	  You will also need to select the individual machine drivers to support
-@@ -44,15 +46,16 @@ config SND_SOC_TEGRA20_SPDIF
+-obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clk-tegra20.o
+-obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += clk-tegra30.o
+-obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= clk-tegra114.o
++obj-$(CONFIG_CLK_TEGRA20)		+= clk-tegra20.o
++obj-$(CONFIG_CLK_TEGRA30)		+= clk-tegra30.o
++obj-$(CONFIG_CLK_TEGRA114)		+= clk-tegra114.o
+diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+index 197074a..87520c6 100644
+--- a/drivers/clk/tegra/clk-pll.c
++++ b/drivers/clk/tegra/clk-pll.c
+@@ -744,7 +744,7 @@ const struct clk_ops tegra_clk_plle_ops = {
+ 	.enable = clk_plle_enable,
+ };
  
- config SND_SOC_TEGRA30_AHUB
- 	tristate
--	depends on SND_SOC_TEGRA && ARCH_TEGRA_3x_SOC
-+	depends on SND_SOC_TEGRA
- 	help
- 	  Say Y or M if you want to add support for the Tegra20 AHUB module.
- 	  You will also need to select the individual machine drivers to
- 	  support below.
+-#ifdef CONFIG_ARCH_TEGRA_114_SOC
++#ifdef CONFIG_CLK_TEGRA114
  
- config SND_SOC_TEGRA30_I2S
--	tristate
--	depends on SND_SOC_TEGRA && ARCH_TEGRA_3x_SOC
-+	tristate "Tegra30 I2S controller"
-+	depends on SND_SOC_TEGRA
-+	default SND_SOC_TEGRA
- 	select SND_SOC_TEGRA30_AHUB
- 	help
- 	  Say Y or M if you want to add support for codecs attached to the
-@@ -62,8 +65,6 @@ config SND_SOC_TEGRA30_I2S
- config SND_SOC_TEGRA_RT5640
- 	tristate "SoC Audio support for Tegra boards using an RT5640 codec"
- 	depends on SND_SOC_TEGRA && I2C && GPIOLIB
--	select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC
--	select SND_SOC_TEGRA30_I2S if ARCH_TEGRA_3x_SOC
- 	select SND_SOC_RT5640
- 	help
- 	  Say Y or M here if you want to add support for SoC audio on Tegra
-@@ -72,8 +73,6 @@ config SND_SOC_TEGRA_RT5640
- config SND_SOC_TEGRA_WM8753
- 	tristate "SoC Audio support for Tegra boards using a WM8753 codec"
- 	depends on SND_SOC_TEGRA && I2C && GPIOLIB
--	select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC
--	select SND_SOC_TEGRA30_I2S if ARCH_TEGRA_3x_SOC
- 	select SND_SOC_WM8753
- 	help
- 	  Say Y or M here if you want to add support for SoC audio on Tegra
-@@ -82,8 +81,6 @@ config SND_SOC_TEGRA_WM8753
- config SND_SOC_TEGRA_WM8903
- 	tristate "SoC Audio support for Tegra boards using a WM8903 codec"
- 	depends on SND_SOC_TEGRA && I2C && GPIOLIB
--	select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC
--	select SND_SOC_TEGRA30_I2S if ARCH_TEGRA_3x_SOC
- 	select SND_SOC_WM8903
- 	help
- 	  Say Y or M here if you want to add support for SoC audio on Tegra
-@@ -92,8 +89,7 @@ config SND_SOC_TEGRA_WM8903
+ static int _pll_fixed_mdiv(struct tegra_clk_pll_params *pll_params,
+ 			   unsigned long parent_rate)
+@@ -1339,7 +1339,7 @@ struct clk *tegra_clk_register_plle(const char *name, const char *parent_name,
+ 	return clk;
+ }
  
- config SND_SOC_TEGRA_WM9712
- 	tristate "SoC Audio support for Tegra boards using a WM9712 codec"
--	depends on SND_SOC_TEGRA && ARCH_TEGRA_2x_SOC && GPIOLIB
--	select SND_SOC_TEGRA20_AC97
-+	depends on SND_SOC_TEGRA && GPIOLIB
- 	select SND_SOC_WM9712
- 	help
- 	  Say Y or M here if you want to add support for SoC audio on Tegra
-@@ -102,7 +98,6 @@ config SND_SOC_TEGRA_WM9712
- config SND_SOC_TEGRA_TRIMSLICE
- 	tristate "SoC Audio support for TrimSlice board"
- 	depends on SND_SOC_TEGRA && I2C
--	select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC
- 	select SND_SOC_TLV320AIC23
- 	help
- 	  Say Y or M here if you want to add support for SoC audio on the
-@@ -111,7 +106,6 @@ config SND_SOC_TEGRA_TRIMSLICE
- config SND_SOC_TEGRA_ALC5632
- 	tristate "SoC Audio support for Tegra boards using an ALC5632 codec"
- 	depends on SND_SOC_TEGRA && I2C && GPIOLIB
--	select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC
- 	select SND_SOC_ALC5632
- 	help
- 	  Say Y or M here if you want to add support for SoC audio on the
+-#ifdef CONFIG_ARCH_TEGRA_114_SOC
++#ifdef CONFIG_CLK_TEGRA114
+ const struct clk_ops tegra_clk_pllxc_ops = {
+ 	.is_enabled = clk_pll_is_enabled,
+ 	.enable = clk_pll_iddq_enable,
 -- 
 1.8.1.5
