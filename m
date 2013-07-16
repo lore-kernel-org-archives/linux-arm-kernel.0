@@ -1,69 +1,34 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 16 Jul 2013 16:30:19 +0900
-Subject: [PATCH 2/6] clk: exynos4: Remove unused function
-In-Reply-To: <1373533334-5169-3-git-send-email-sachin.kamat@linaro.org>
-References: <1373533334-5169-1-git-send-email-sachin.kamat@linaro.org>
- <1373533334-5169-3-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <02d701ce81f6$532ab9d0$f9802d70$%kim@samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 16 Jul 2013 09:31:01 +0200
+Subject: [PATCH 00/10] Orion Watchdog fixes
+In-Reply-To: <20130716092059.237ea729@skate>
+References: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130716065952.GA25043@lunn.ch> <20130716092059.237ea729@skate>
+Message-ID: <20130716073101.GB25043@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sachin Kamat wrote:
+On Tue, Jul 16, 2013 at 09:20:59AM +0200, Thomas Petazzoni wrote:
+> Dear Andrew Lunn,
 > 
-> Subsequent to the cleanup in commit 3c70348c7c ("ARM: EXYNOS:
-> Remove legacy timer initialization code"), this function has no more
-> users. Hence remove it.
+> On Tue, 16 Jul 2013 08:59:52 +0200, Andrew Lunn wrote:
 > 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> ---
->  drivers/clk/samsung/clk-exynos4.c |   14 --------------
->  1 file changed, 14 deletions(-)
+> > Maybe i'm missing something here. You are making use of
+> > orion_timer_ctrl_clrset() from time-orion.c. How will this work on
+> > 370/XP which has a different clocksource driver?
 > 
-> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-
-> exynos4.c
-> index 18eadc4..75635eb 100644
-> --- a/drivers/clk/samsung/clk-exynos4.c
-> +++ b/drivers/clk/samsung/clk-exynos4.c
-> @@ -969,20 +969,6 @@ static void __init
-> exynos4_clk_register_finpll(unsigned long xom)
-> 
->  }
-> 
-> -/*
-> - * This function allows non-dt platforms to specify the clock speed of
-> the
-> - * xxti and xusbxti clocks. These clocks are then registered with the
-> specified
-> - * clock speed.
-> - */
-> -void __init exynos4_clk_register_fixed_ext(unsigned long xxti_f,
-> -						  unsigned long xusbxti_f)
-> -{
-> -	exynos4_fixed_rate_ext_clks[0].fixed_rate = xxti_f;
-> -	exynos4_fixed_rate_ext_clks[1].fixed_rate = xusbxti_f;
-> -	samsung_clk_register_fixed_rate(exynos4_fixed_rate_ext_clks,
-> -			ARRAY_SIZE(exynos4_fixed_rate_ext_clks));
-> -}
-> -
->  static __initdata struct of_device_id ext_clk_match[] = {
->  	{ .compatible = "samsung,clock-xxti", .data = (void *)0, },
->  	{ .compatible = "samsung,clock-xusbxti", .data = (void *)1, },
-> --
-> 1.7.9.5
+> I *think* the idea is that the Armada 370/XP driver will expose the
+> same function, so from the point of view of the watchdog driver, it
+> will just work.
 
-And need following?
+Hi Thomas
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 3e156bc..1037da0 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -27,7 +27,6 @@ void exynos_init_late(void);
+That was what i was thinking would happen. And then i started to
+wonder how well the kernel linker deals with multiple definitions of
+the same symbol. Dove and 370/XP can end up in the same kernel. So we
+need to have both orion-timer and the 370/XP timer in the same kernel,
+so we end up with the same symbol in the kernel twice...
 
- /* ToDo: remove these after migrating legacy exynos4 platforms to dt */
- void exynos4_clk_init(struct device_node *np, int is_exynos4210, void
-__iomem *reg_base, unsigned long xom);
--void exynos4_clk_register_fixed_ext(unsigned long, unsigned long);
+Lets wait for Ezequiel to answer.
 
- void exynos_firmware_init(void);
-
-- Kukjin
+   Andrew
