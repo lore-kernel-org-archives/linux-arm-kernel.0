@@ -1,75 +1,44 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 16 Jul 2013 16:34:23 +0900
-Subject: [PATCH 1/6] clk: exynos4: Staticize local symbols
-In-Reply-To: <1373533334-5169-2-git-send-email-sachin.kamat@linaro.org>
+Date: Tue, 16 Jul 2013 16:36:26 +0900
+Subject: [PATCH 0/6] clk: exynos: Some fixes and cleanup
+In-Reply-To: <1373533334-5169-1-git-send-email-sachin.kamat@linaro.org>
 References: <1373533334-5169-1-git-send-email-sachin.kamat@linaro.org>
- <1373533334-5169-2-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <02d801ce81f6$e480fe80$ad82fb80$%kim@samsung.com>
+Message-ID: <02dc01ce81f7$2d9fb6b0$88df2410$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Sachin Kamat wrote:
 > 
-> Symbols referenced only in this file are made static.
+> Resending some of patches (1, 3 and 5) as per discussion in thread [1].
+> Other patches in the series are new.
 > 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> [1] http://comments.gmane.org/gmane.linux.kernel.samsung-soc/19933
+> 
+> Sachin Kamat (6):
+>   clk: exynos4: Staticize local symbols
+>   clk: exynos4: Remove unused function
+>   clk: exynos5250: Staticize local symbols
+>   clk: exynos5420: Staticize local symbols
+>   clk: exynos5440: Staticize local symbols
+>   clk: exynos-audss: Staticize exynos_audss_clk_init
+> 
+>  drivers/clk/samsung/clk-exynos-audss.c |    2 +-
+>  drivers/clk/samsung/clk-exynos4.c      |   42
+++++++++++++-----------------
 > ---
->  drivers/clk/samsung/clk-exynos4.c |   30 ++++++++++++++++--------------
->  1 file changed, 16 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-
-> exynos4.c
-> index 1bdb882..18eadc4 100644
-> --- a/drivers/clk/samsung/clk-exynos4.c
-> +++ b/drivers/clk/samsung/clk-exynos4.c
-
-[...]
-
-> @@ -975,7 +975,7 @@ static void __init
-> exynos4_clk_register_finpll(unsigned long xom)
->   * clock speed.
->   */
->  void __init exynos4_clk_register_fixed_ext(unsigned long xxti_f,
-> -						unsigned long xusbxti_f)
-> +						  unsigned long xusbxti_f)
-
-Why?
-
->  {
->  	exynos4_fixed_rate_ext_clks[0].fixed_rate = xxti_f;
->  	exynos4_fixed_rate_ext_clks[1].fixed_rate = xusbxti_f;
-> @@ -990,7 +990,9 @@ static __initdata struct of_device_id ext_clk_match[]
-> = {
->  };
-> 
->  /* register exynos4 clocks */
-> -void __init exynos4_clk_init(struct device_node *np, enum exynos4_soc
-> exynos4_soc, void __iomem *reg_base, unsigned long xom)
-> +static void __init exynos4_clk_init(struct device_node *np,
-> +				    enum exynos4_soc exynos4_soc,
-> +				    void __iomem *reg_base, unsigned long
-xom)
->  {
->  	struct clk *apll, *mpll, *epll, *vpll;
+>  drivers/clk/samsung/clk-exynos5250.c   |   14 +++++------
+>  drivers/clk/samsung/clk-exynos5420.c   |   14 +++++------
+>  drivers/clk/samsung/clk-exynos5440.c   |   14 +++++------
+>  5 files changed, 37 insertions(+), 49 deletions(-)
 > 
 > --
 > 1.7.9.5
 
-And don't we need following?
+There are small comments on 1st and 2nd patches.
+Others look good to me.
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 3e156bc..3a34f1e 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -26,7 +26,6 @@ void exynos5_restart(enum reboot_mode mode, const char
-*cmd);
- void exynos_init_late(void);
+For 3rd~6th patches:
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
- /* ToDo: remove these after migrating legacy exynos4 platforms to dt */
--void exynos4_clk_init(struct device_node *np, int is_exynos4210, void
-__iomem *reg_base, unsigned long xom);
- void exynos4_clk_register_fixed_ext(unsigned long, unsigned long);
-
- void exynos_firmware_init(void);
-
+Thanks,
 - Kukjin
