@@ -1,99 +1,32 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 16 Jul 2013 15:52:26 +0200
-Subject: [PATCH v7] ARM: clocksource: add support for MOXA ART SoCs
-In-Reply-To: <1373024773-24574-1-git-send-email-jonas.jensen@gmail.com>
-References: <1373018653-18421-1-git-send-email-jonas.jensen@gmail.com>
- <1373024773-24574-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <51E5501A.6070403@linaro.org>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Tue, 16 Jul 2013 16:04:07 +0200
+Subject: [PATCH v3] rtc: Add MOXA ART RTC driver
+In-Reply-To: <20130716131332.GL22506@sirena.org.uk>
+References: <1373550711-18828-1-git-send-email-jonas.jensen@gmail.com>
+ <1373978485-17496-1-git-send-email-jonas.jensen@gmail.com>
+ <20130716131332.GL22506@sirena.org.uk>
+Message-ID: <CACmBeS3jU2csACZCqXfRvCYAEHaK7S3AcJ++Yd=L-mgfeqg68A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2013 01:46 PM, Jonas Jensen wrote:
-> This patch adds an clocksource driver for the main timer(s)
-> found on MOXA ART SoCs.
-> 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> ---
-> 
-> Notes:
->     Applies to next-20130703
->     
->     Changes since v6:
->     
->     1. remove TIMER_CR read back
->     2. set TIMER_CR from constants
-> 
+On 16 July 2013 15:13, Mark Brown <broonie@kernel.org> wrote:
+> Since you're now using OF you should also be including a binding
+> document.
 
-Except for the few comments below, it looks ok for me.
+The binding document already exist in set of patches adding MOXA ART
+SoC support ( I intend to mail out v4 once I know how to proceed ):
 
-[ ... ]
+"[PATCH v3 2/4] ARM: mach-moxart: add MOXA ART device tree files" -
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/181757.html
 
-> + */
-> +#define TIMEREG_CR_1_ENABLE	(1 << 0)
-> +#define TIMEREG_CR_1_CLOCK	(1 << 1)
-> +#define TIMEREG_CR_1_INT	(1 << 2)
-> +#define TIMEREG_CR_2_ENABLE	(1 << 3)
-> +#define TIMEREG_CR_2_CLOCK	(1 << 4)
-> +#define TIMEREG_CR_2_INT	(1 << 5)
-> +#define TIMEREG_CR_3_ENABLE	(1 << 6)
-> +#define TIMEREG_CR_3_CLOCK	(1 << 7)
-> +#define TIMEREG_CR_3_INT	(1 << 8)
-> +#define TIMEREG_CR_COUNT_UP	(1 << 9)
-> +#define TIMEREG_CR_COUNT_DOWN	(0 << 9)
+Can it remain as a part of that set?
 
-Could you replace this by the BIT macro ?
+Or should it be moved here to a new v4 patch?
 
-[ ... ]
+Changes are available in my public git repository, see
+Documentation/devicetree/bindings/rtc/moxa,moxart-rtc.txt:
 
-> +
-> +	irq = irq_of_parse_and_map(node, 0);
-> +	if (irq <= 0)
-> +		panic("%s: irq_of_parse_and_map failed\n", node->full_name);
-> +
-> +	ret = setup_irq(irq, &moxart_timer_irq);
-> +	if (ret)
-> +		panic("%s: setup_irq failed\n", node->full_name);
-> +
-> +	clk = of_clk_get(node, 0);
-> +	if (IS_ERR(clk))
-> +		panic("%s: of_clk_get failed\n", node->full_name);
-> +
-> +	pclk = clk_get_rate(clk);
-> +
-> +	if (clocksource_mmio_init(base + TIMER2_BASE + REG_COUNT,
-> +				  "moxart_timer", pclk, 200, 32,
-> +				  clocksource_mmio_readl_down))
-> +		panic("%s: clocksource_mmio_init failed\n", node->full_name);
-> +
-> +	clock_count_per_tick = DIV_ROUND_CLOSEST(pclk, HZ);
-> +
-> +	writel(~0, base + TIMER2_BASE + REG_LOAD);
-> +	writel(TIMEREG_CR_2_ENABLE, base + TIMER_CR);
-> +
-> +	moxart_clockevent.cpumask = cpumask_of(0);
+http://code.google.com/p/linux-next-20130703-moxart/source/detail?r=55b2a92724f36ecc852208bb1f8e1b7bd7c7904b
 
-	moxart_clockevent.irq = irq;
-
-> +
-> +	/*
-> +	 * documentation is not publicly available:
-> +	 * min_delta / max_delta obtained by trial-and-error,
-> +	 * max_delta 0xfffffffe should be ok because count
-> +	 * register size is u32
-> +	 */
-> +	clockevents_config_and_register(&moxart_clockevent, pclk,
-> +					0x4, 0xfffffffe);
-> +}
-> +CLOCKSOURCE_OF_DECLARE(moxart, "moxa,moxart-timer", moxart_timer_init);
-
-
-Thanks
-  -- Daniel
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Best regards,
+Jonas
