@@ -1,146 +1,186 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 16 Jul 2013 10:46:28 +0200
-Subject: [PATCH 2/5] iio: at91: Use different prescal, startup mask in
- MR for different IP
-In-Reply-To: <51E505EA.4060502@atmel.com>
-References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
- <1373789069-11604-3-git-send-email-josh.wu@atmel.com>
- <20130715125815.GC2962@lukather> <51E505EA.4060502@atmel.com>
-Message-ID: <51E50864.6020904@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Jul 2013 16:47:36 +0800
+Subject: [PATCH 10/22] arm/dts: Add support for the cpuimx25 board from
+ Eukrea and its baseboard.
+In-Reply-To: <1373900227-341-11-git-send-email-denis@eukrea.com>
+References: <1373900227-341-1-git-send-email-denis@eukrea.com>
+ <1373900227-341-11-git-send-email-denis@eukrea.com>
+Message-ID: <20130716084733.GI30067@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/07/2013 10:35, Josh Wu :
-> Hi, Maxime
->
-> On 7/15/2013 8:58 PM, Maxime Ripard wrote:
->> Hi Josh,
->>
->> On Sun, Jul 14, 2013 at 04:04:26PM +0800, Josh Wu wrote:
->>> For at91 boards, there are different IPs for adc. Different IPs has
->>> different
->>> STARTUP & PRESCAL mask in ADC_MR.
->>>
->>> This patch can change the masks according to the different IP version.
->>>
->>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->>> ---
->>>   arch/arm/mach-at91/include/mach/at91_adc.h |    9 ++++--
->>>   drivers/iio/adc/at91_adc.c                 |   48
->>> ++++++++++++++++++++++++++--
->>>   2 files changed, 53 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-at91/include/mach/at91_adc.h
->>> b/arch/arm/mach-at91/include/mach/at91_adc.h
->>> index 8e7ed5c..ab273ee 100644
->>> --- a/arch/arm/mach-at91/include/mach/at91_adc.h
->>> +++ b/arch/arm/mach-at91/include/mach/at91_adc.h
->>> @@ -28,9 +28,12 @@
->>>   #define            AT91_ADC_TRGSEL_EXTERNAL    (6 << 1)
->>>   #define        AT91_ADC_LOWRES        (1 << 4)    /* Low Resolution */
->>>   #define        AT91_ADC_SLEEP        (1 << 5)    /* Sleep Mode */
->>> -#define        AT91_ADC_PRESCAL    (0x3f << 8)    /* Prescalar Rate
->>> Selection */
->>> +#define        AT91_ADC_PRESCAL    (0xff << 8)    /* Prescalar Rate
->>> Selection */
->>> +#define        AT91_ADC_PRESCAL_9260    (0x3f << 8)
->>>   #define            AT91_ADC_PRESCAL_(x)    ((x) << 8)
->>> -#define        AT91_ADC_STARTUP    (0x1f << 16)    /* Startup Up
->>> Time */
->>> +#define        AT91_ADC_STARTUP    (0xf << 16)    /* Startup Up Time */
->>> +#define        AT91_ADC_STARTUP_9260    (0x1f << 16)
->>> +#define        AT91_ADC_STARTUP_9G45    (0x7f << 16)
->>>   #define            AT91_ADC_STARTUP_(x)    ((x) << 16)
->>>   #define        AT91_ADC_SHTIM        (0xf  << 24)    /* Sample &
->>> Hold Time */
->>>   #define            AT91_ADC_SHTIM_(x)    ((x) << 24)
->>> @@ -58,4 +61,6 @@
->>>   #define AT91_ADC_CHR(n)        (0x30 + ((n) * 4))    /* Channel
->>> Data Register N */
->>>   #define        AT91_ADC_DATA        (0x3ff)
->>> +#define AT91_ADC_VERSION    0xFC
->>> +
->>>   #endif
->>> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
->>> index 18bd54f..14e99ba 100644
->>> --- a/drivers/iio/adc/at91_adc.c
->>> +++ b/drivers/iio/adc/at91_adc.c
->>> @@ -39,6 +39,12 @@
->>>   #define at91_adc_writel(st, reg, val) \
->>>       (writel_relaxed(val, st->reg_base + reg))
->>> +struct at91_adc_caps {
->>> +    bool    has_tsmr;    /* only at91sam9x5, sama5d3 have TSMR reg */
->>> +    u32    mr_prescal_mask;
->>> +    u32    mr_startup_mask;
->>> +};
->>> +
->>>   struct at91_adc_state {
->>>       struct clk        *adc_clk;
->>>       u16            *buffer;
->>> @@ -62,6 +68,7 @@ struct at91_adc_state {
->>>       u32            res;        /* resolution used for convertions */
->>>       bool            low_res;    /* the resolution corresponds to
->>> the lowest one */
->>>       wait_queue_head_t    wq_data_avail;
->>> +    struct at91_adc_caps    caps;
->>>   };
->>>   static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
->>> @@ -580,6 +587,41 @@ static const struct iio_info at91_adc_info = {
->>>       .read_raw = &at91_adc_read_raw,
->>>   };
->>> +/*
->>> + * Since atmel adc support different ip for touchscreen mode.
->>> Through the
->>> + * IP check, we will know the touchscreen capbilities.
->>> + */
->>> +static void atmel_adc_get_cap(struct at91_adc_state *st)
->>> +{
->>> +    unsigned int version;
->>> +    struct iio_dev *idev = iio_priv_to_dev(st);
->>> +
->>> +    version = at91_adc_readl(st, AT91_ADC_VERSION);
->>> +    dev_dbg(&idev->dev, "version: 0x%x\n", version);
->>> +
->>> +    st->caps.mr_prescal_mask = AT91_ADC_PRESCAL_9260;
->>> +    st->caps.mr_startup_mask = AT91_ADC_STARTUP_9260;
->>> +
->>> +    /* keep only major version number */
->>> +    switch (version & 0xf00) {
->>> +    case 0x500:    /* SAMA5D3 */
->>> +    case 0x400:    /* AT91SAM9X5/9N12 */
->>> +        st->caps.has_tsmr = 1;
->>> +        st->caps.mr_startup_mask = AT91_ADC_STARTUP;
->>> +    case 0x200:    /* AT91SAM9M10/9G45 */
->>> +        st->caps.mr_prescal_mask = AT91_ADC_PRESCAL;
->>> +
->>> +        if ((version & 0xf00) == 0x200)
->>> +            st->caps.mr_startup_mask = AT91_ADC_STARTUP_9G45;
->>> +    case 0x100:    /* AT91SAM9260/9G20 */
->>> +        break;
->>> +    default:
->>> +        dev_warn(&idev->dev,
->>> +                "Unmanaged adc version, use minimal capabilities\n");
->>> +        break;
->>> +    };
->>> +}
->> Why don't you use different compatible names and derive your
->> capabilities from which compatible is declared.
->>
->> It seems safer.
+On Mon, Jul 15, 2013 at 04:56:55PM +0200, Denis Carikli wrote:
+> Only the following devices/functionalities were added:
+>  * Main UART
+>  * Memory node
+>  * NAND
+>  * i2c and its pcf8563
+>  * Ethernet
+>  * LCD controller
+>  * Sound
+>  * ESDHC
+> 
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.txt     |    4 ++
+>  arch/arm/boot/dts/eukrea_cpuimx25.dts             |   48 +++++++++++++++++
+>  arch/arm/boot/dts/eukrea_mbimxsd25-baseboard.dtsi |   59 +++++++++++++++++++++
+>  3 files changed, 111 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/eukrea_cpuimx25.dts
+>  create mode 100644 arch/arm/boot/dts/eukrea_mbimxsd25-baseboard.dtsi
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+> index e935d7d..2c19348 100644
+> --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> @@ -9,6 +9,10 @@ i.MX25 Product Development Kit
+>  Required root node properties:
+>      - compatible = "fsl,imx25-pdk", "fsl,imx25";
+>  
+> +i.MX25 Eukrea CPUIMX25 Board.
+> +Required root node properties:
+> +    - compatible = "fsl,eukrea_cpuimx25", "fsl,imx25";
+> +
 
-I see it as handier in the sense that a different IP version can be 
-compatible with an older IP version: so we do not need to modify the 
-driver just to use another SoC.
+This is not a board produced by Freescale, and shouldn't be added here.
+Also recently, it seems that documenting custom board compatible is not
+required as hard as before.
 
-On your side Maxime, what makes you say that it is "safer"?
+>  i.MX27 Product Development Kit
+>  Required root node properties:
+>      - compatible = "fsl,imx27-pdk", "fsl,imx27";
+> diff --git a/arch/arm/boot/dts/eukrea_cpuimx25.dts b/arch/arm/boot/dts/eukrea_cpuimx25.dts
+> new file mode 100644
+> index 0000000..a65243c
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/eukrea_cpuimx25.dts
+> @@ -0,0 +1,48 @@
+> +/*
+> + * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +#include "imx25.dtsi"
+> +#include "eukrea_mbimxsd25-baseboard.dtsi"
+> +
+> +/ {
+> +	model = "Eukrea CPUIMX25";
+> +	compatible = "fsl,eukrea_cpuimx25", "fsl,imx25";
+> +
+> +	memory {
+> +		reg = <0x80000000 0x4000000>; /* 64M */
+> +	};
+> +};
+> +
+> +&fec {
+> +	phy-mode = "rmii";
+> +	status = "okay";
 
-> Ok, that make sense. I will use compatible names for the capabilities in
-> next version. Thanks.
+Please consistently put "status" at the end of property list.
 
-Hold on a little bit Josh, I know that Jean-Christophe is not in favor 
-of the use of multiple compatible strings. So, as the code is already 
-there, let's wait and see if we find another argument...
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_fec_1>;
+> +};
+> +
+> +&nfc {
+> +	nand-bus-width = <8>;
+> +	nand-ecc-mode = "hw";
+> +	nand-on-flash-bbt;
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
 
-Bye,
--- 
-Nicolas Ferre
+Please sort the nodes in alphabet order.
+
+Shawn
+
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c1_1>;
+> +
+> +	pcf8563 at 51 {
+> +		compatible = "nxp,pcf8563";
+> +		reg = <0x51>;
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/eukrea_mbimxsd25-baseboard.dtsi b/arch/arm/boot/dts/eukrea_mbimxsd25-baseboard.dtsi
+> new file mode 100644
+> index 0000000..ffaf657
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/eukrea_mbimxsd25-baseboard.dtsi
+> @@ -0,0 +1,59 @@
+> +/*
+> + * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include "skeleton.dtsi"
+> +
+> +/ {
+> +	sound {
+> +		compatible = "fsl,eukrea-tlv320";
+> +		model = "imx25-eukrea-tlv320aic23";
+> +		ssi-controller = <&ssi1>;
+> +		fsl,audio-codec = <&tlv320aic23>;
+> +		mux-int-port = <1>;
+> +		mux-ext-port = <5>;
+> +	};
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1_1>;
+> +	fsl,uart-has-rtscts;
+> +	status = "okay";
+> +};
+> +
+> +&lcdc {
+> +	status = "okay";
+> +};
+> +
+> +&audmux {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_audmux_1>;
+> +};
+> +
+> +&ssi1 {
+> +	fsl,mode = "i2s-slave";
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	tlv320aic23: codec at 1a {
+> +		compatible = "ti,tlv320aic23";
+> +		reg = <0x1a>;
+> +	};
+> +};
+> +
+> +&esdhc1 {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_esdhc1_1>;
+> +	cd-gpios = <&gpio1 20>;
+> +};
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
