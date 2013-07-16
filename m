@@ -1,18 +1,63 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 16 Jul 2013 08:51:13 -0700
-Subject: [PATCH v2 2/2] clocksource/cadence_ttc: Reuse clocksource as
- sched_clock
-In-Reply-To: <51E56799.2090601@linaro.org>
-References: <1373302298-27957-1-git-send-email-soren.brinkmann@xilinx.com>
- <1373302298-27957-3-git-send-email-soren.brinkmann@xilinx.com>
- <51DFF1AA.8080407@monstr.eu> <51E56799.2090601@linaro.org>
-Message-ID: <9616f33f-9b1b-4f0c-9b2c-51806fc1c4c6@CO1EHSMHS007.ehs.local>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 16 Jul 2013 17:55:41 +0200
+Subject: [GIT PULL] clockevents/clocksource: Add Marvell Orion SoC timer
+In-Reply-To: <alpine.DEB.2.02.1307081041290.32106@ionos.tec.linutronix.de>
+References: <51B8D310.4050404@linaro.org> <51D9548B.9040907@gmail.com>
+ <alpine.DEB.2.02.1307071508030.32106@ionos.tec.linutronix.de>
+ <20130707144645.GA11908@titan.lakedaemon.net>
+ <alpine.DEB.2.02.1307071723220.32106@ionos.tec.linutronix.de>
+ <20130707235819.GB11908@titan.lakedaemon.net>
+ <alpine.DEB.2.02.1307081041290.32106@ionos.tec.linutronix.de>
+Message-ID: <51E56CFD.9050508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 05:32:41PM +0200, Daniel Lezcano wrote:
-> On 07/12/2013 02:08 PM, Michal Simek wrote:
-> > Acked-by: Michal Simek <monstr@monstr.eu>
+On 07/08/2013 10:45 AM, Thomas Gleixner wrote:
+> On Sun, 7 Jul 2013, Jason Cooper wrote:
+>> On Sun, Jul 07, 2013 at 05:30:31PM +0200, Thomas Gleixner wrote:
+>> I don't mind delaying half of a series so the drivers/ portion can land
+>> in mainline, and the rest can land in the next cycle.  But when things
+>> don't go according to that plan, I'd like a little consideration /
+>> flexibility about solving the problem.  Especially considering I'm
+>> *trying* to do the right thing by pushing to appropriate maintainers
+>> first.
+>>
+>> Of course, this is a moot point since, as you clarified above, this
+>> dependency doesn't have the hazards typically associated with
+>> out-of-tree dependencies.
 > 
-> Applied to my tree for 3.12
-thanks
+> There is a very simple procedure for stuff like this.
+> 
+> Series has parts which go through tree A and B and another larger part
+> for tree C which depends on the A and B parts.
+> 
+> So ask the maintainers of A and B to apply this to separate branches,
+> which are based on some commit in Linus tree. These branches can be
+> pulled into C and C can apply the depending stuff on top.
+> 
+> Now the maintainers of A and B merge these branches into their main
+> devel branch, can do further fixups and stuff on top. And the whole
+> thing just works without glitches during the merge window.
+> 
+> We do this all the time.
+
+Ok, I was about to send to both of you a PR with a common ancestor [1]
+for this patch but finally this patch has been taken for timers/urgent.
+
+I don't have to send the PR, right ?
+
+timers/urgent will be merged into timers/core, correct ?
+
+Thanks
+  -- Daniel
+
+[1]
+https://git.linaro.org/gitweb?p=people/dlezcano/clockevents.git;a=shortlog;h=refs/heads/timers/mvebu-deps-3.12
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
