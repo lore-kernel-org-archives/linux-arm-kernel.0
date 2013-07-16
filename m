@@ -1,66 +1,57 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Jul 2013 10:43:47 +0200
-Subject: [PATCHv5 00/11] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <51E4167B.4000208@wwwdotorg.org>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <51E4167B.4000208@wwwdotorg.org>
-Message-ID: <20130716104347.045a612a@skate>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Tue, 16 Jul 2013 10:45:37 +0200
+Subject: [PATCH v1 21/24] [media] fsl-viu: OF clock lookup,
+ prepare before enable
+In-Reply-To: <1373914074-20889-1-git-send-email-gsi@denx.de>
+References: <1373914074-20889-1-git-send-email-gsi@denx.de>
+Message-ID: <1373964341-25228-1-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Stephen Warren,
+device tree based clock lookup, must prepare clocks before enabling
+them, unprepare after disable, error check in the clock setup
 
-On Mon, 15 Jul 2013 09:34:19 -0600, Stephen Warren wrote:
+Signed-off-by: Gerhard Sittig <gsi@denx.de>
+---
+ drivers/media/platform/fsl-viu.c |   12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-> > This patch set is intended for merging in 3.12, so the respective
-> > maintainers of the different areas are invited to review/ack the
-> > patches, see below for the details. This set of patches applies on top
-> > of 3.11-rc1.
-> 
-> Thomas, who is going to merge this series?
-
-I don't know. There are quite a few build dependencies in there:
-
- * PATCH 7 build depends on PATCH 1 and PATCH 5, and obviously depends
-   on PATCH 6.
-
- * PATCH 2 to 5 really are one thing, they depend on each other.
-
- * PATCH 10 build depends on PATCH 5 and PATCH 8.
-
-A quick diagram of the dependencies, best viewed with a fixed-size font
-mailer.
-
-kernel/irq/irqdomain    drivers/pci        arch/arm/kernel
-     patch 1           patch 2, 3, 4           patch 8
-        ||                  ||                   ||
-        ||                  \/                   \/
-        ||               drivers/of   ==> drivers/pci/host
-        ||                patch 5           patch 10
-        ||                  ||
-        \\__________________//
-                  ||
-                  \/
-            drivers/irqchip
-              patch 6, 7
-
-Patches 9 and 11 are DT patches, so they are not mentioned in this
-diagram.
-
-Normally tegra would require 1, 2, 3, 4, 5 and 8, so ideally, with
-the respective maintainers ACKs, Jason Cooper could take them in a
-specific topic stable branch that would not be rebased, on top of which
-both the Marvell work and Tegra work could be done.
-
-I really would like to see those patches very soon in linux-next, in
-order to get some build coverage, especially for the 2, 3 and 4 patches
-that touch a number of architectures.
-
-Thanks,
-
-Thomas
+diff --git a/drivers/media/platform/fsl-viu.c b/drivers/media/platform/fsl-viu.c
+index 221ec42..b95aa43 100644
+--- a/drivers/media/platform/fsl-viu.c
++++ b/drivers/media/platform/fsl-viu.c
+@@ -1582,8 +1582,11 @@ static int viu_of_probe(struct platform_device *op)
+ 		dev_err(&op->dev, "failed to find the clock module!\n");
+ 		ret = -ENODEV;
+ 		goto err_clk;
+-	} else {
+-		clk_enable(viu_dev->clk);
++	}
++	ret = clk_prepare_enable(viu_dev->clk);
++	if (ret) {
++		dev_err(&op->dev, "failed to enable the clock!\n");
++		goto err_clk_put;
+ 	}
+ 
+ 	/* reset VIU module */
+@@ -1602,7 +1605,8 @@ static int viu_of_probe(struct platform_device *op)
+ 	return ret;
+ 
+ err_irq:
+-	clk_disable(viu_dev->clk);
++	clk_disable_unprepare(viu_dev->clk);
++err_clk_put:
+ 	clk_put(viu_dev->clk);
+ err_clk:
+ 	video_unregister_device(viu_dev->vdev);
+@@ -1626,7 +1630,7 @@ static int viu_of_remove(struct platform_device *op)
+ 	free_irq(dev->irq, (void *)dev);
+ 	irq_dispose_mapping(dev->irq);
+ 
+-	clk_disable(dev->clk);
++	clk_disable_unprepare(dev->clk);
+ 	clk_put(dev->clk);
+ 
+ 	video_unregister_device(dev->vdev);
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10.4
