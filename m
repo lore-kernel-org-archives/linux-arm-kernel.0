@@ -1,59 +1,18 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 16 Jul 2013 19:32:48 -0400 (EDT)
-Subject: [RFC PATCH v5 1/1] drivers: mfd: vexpress: add Serial Power
- Controller (SPC) support
-In-Reply-To: <51E5A785.1040805@gmail.com>
-References: <1373990743-23106-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1373990743-23106-2-git-send-email-lorenzo.pieralisi@arm.com>
- <51E5A785.1040805@gmail.com>
-Message-ID: <alpine.LFD.2.03.1307161917580.14924@syhkavp.arg>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 16 Jul 2013 18:36:19 -0500
+Subject: [PATCH RFC v2 0/14] Clean up debugging support
+In-Reply-To: <20130716163243.GY21614@n2100.arm.linux.org.uk>
+References: <20130716163243.GY21614@n2100.arm.linux.org.uk>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0021DAC4AB4FC@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Jul 2013, Rob Herring wrote:
+On Tuesday, July 16, 2013 9:33 AM, Russell King wrote:
+> This is the second posting of this series, with a few additional patches
+> on top to go a little further.  Changes since the last posting:
 
-> On 07/16/2013 11:05 AM, Lorenzo Pieralisi wrote:
-> > The TC2 versatile express core tile integrates a logic block that provides the
-> > interface between the dual cluster test-chip and the M3 microcontroller that
-> > carries out power management. The logic block, called Serial Power Controller
-> > (SPC), contains several memory mapped registers to control among other things
-> > low-power states, wake-up irqs and per-CPU jump addresses registers.
-> > 
-> > This patch provides a driver that enables run-time control of features
-> > implemented by the SPC power management control logic.
-> > 
-> > The SPC control logic is required to be programmed very early in the boot
-> > process to reset secondary CPUs on the TC2 testchip, set-up jump addresses and
-> > wake-up IRQs for power management. Hence, waiting for core changes to be
-> > made in the device core code to enable early registration of platform
-> > devices, the driver puts in place an early init scheme that allows kernel
-> > drivers to initialize the SPC driver directly from the components requiring
-> > it, if their initialization routine is called before the driver init
-> > function by the boot process.
-> > 
-> > Device tree bindings documentation for the SPC component is provided with
-> > the patchset.
-> 
-> Just curious, wouldn't a TC2 PSCI implementation eliminate the need for
-> most/all of this code?
+<snip>
 
-There is a PSCI equivalent for the above already, in the sense that 
-there is a simple MCPM backend that bypass most of the MCPM race 
-avoidance code paths and simply calls into PSCI instead.  But not all 
-the world is going to be PSCI, and therefore we need to ensure good 
-support for non-PSCI platforms as well.
+Boot tested on ep93xx. For the ep93xx parts:
 
-This is why TC2 supports both, and this also ensure that the PSCI 
-implementation, which won't be part of the kernel and therefore unlikely 
-to get the same level of scrutiny, is properly implemented and doesn't 
-introduce any regression when compared to the non PSCI case.
-
-Remember that TC2 is multi-cluster which means that the PSCI 
-implementation has to carry the same amount of complexity as the whole 
-in-kernel MCPM layer and that doesn't make me overly confident it is 
-going to always be right.
-
-All this to say that we do need this code despite PSCI availability.
-
-
-Nicolas
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
