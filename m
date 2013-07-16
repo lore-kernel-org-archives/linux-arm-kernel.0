@@ -1,31 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 16 Jul 2013 14:42:55 -0400
-Subject: [PATCH 0/8] ARM: mm: Extend the runtime patch stub for PAE systems
-In-Reply-To: <alpine.LFD.2.03.1306212149130.18597@syhkavp.arg>
-References: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
- <alpine.LFD.2.03.1306212149130.18597@syhkavp.arg>
-Message-ID: <51E5942F.9020701@ti.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 16 Jul 2013 14:47:02 -0400 (EDT)
+Subject: [PATCH v3 6/7] USB: ohci-at91: add usb_clk for transition to
+ common clk framework
+In-Reply-To: <51E57DFC.5030302@overkiz.com>
+Message-ID: <Pine.LNX.4.44L0.1307161441350.1032-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, Nico,
+On Tue, 16 Jul 2013, boris brezillon wrote:
 
-Ping.
+> >> +	uclk = clk_get(&pdev->dev, "usb_clk");
+> >> +	if (IS_ERR(uclk)) {
+> >> +		uclk = NULL;
+> >> +		dev_warn(&pdev->dev, "failed to get usb_clk\n");
+> >> +	}
+> > Is this really what you want for backward compatibility?
+> Here are some proposition to remove the warning message:
+> 
+> 1) replace it with a dev_info and change the message:
+>      dev_info(&pdev->dev, "failed to get usb_clk (most likely using old 
+> at91 clk implementation)\n");
+> 2) drop the log and silently ignore the missing clk (I'm not a big fan 
+> of this solution
+>      as it may lead to some errors if we're using new clk implem and the 
+> clock is really missing)
+> 3) rework the current clk_set_rate function to accept clk_set_rate on 
+> usb clk and add clk_lookup entries
+>      for the usb clk (I'm not a big fan of this solution neither as this 
+> modifications will only be used for a short time
+>      until the transition to common clk framework is completed).
 
-On Friday 21 June 2013 09:51 PM, Nicolas Pitre wrote:
-> On Fri, 21 Jun 2013, Santosh Shilimkar wrote:
-> 
->> Based on discussion/debate on Cyril's generic code patching framework,
->> we cooked up this series which basically trying to extend the existing
->> v2p runtime patching for LPAE machines which can have physical memory
->> beyond 4 GB. Keystone is one such ARM machine.
->>
->> We think the 64 bit patching can be still made better than the proposed
->> patch in the series and hence seeking expert comments from RMK, Nico and
->> others. Last patch in the series added to just give perspective on how
->> machine code will make use of the available bits from the series.
-> 
-> FYI I'm currently on vacation and only handling quick emails.
-> 
-> I'll review your series in a week or so.
-> 
+Another possibility is to combine this change with the clock 
+implementation update, and do them in a single patch.  Then backward 
+compatibility would not be an issue.
+
+Alan Stern
