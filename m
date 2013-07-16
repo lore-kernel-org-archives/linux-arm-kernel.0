@@ -1,83 +1,82 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Tue, 16 Jul 2013 10:36:22 +0900
-Subject: [PATCH v3 3/5] mmc: dw_mmc: Add exynos resume_noirq callback to
- clear WAKEUP_INT
-In-Reply-To: <1373470926-19314-4-git-send-email-dianders@chromium.org>
-References: <1373411961-23812-1-git-send-email-dianders@chromium.org>
- <1373470926-19314-1-git-send-email-dianders@chromium.org>
- <1373470926-19314-4-git-send-email-dianders@chromium.org>
-Message-ID: <51E4A396.7010202@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Jul 2013 09:50:42 +0800
+Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
+References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130716015038.GD28375@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+Hi Philipp,
 
-I think these patch-set didn't base on latest mmc-next.
-If you can rebase on latest mmc-next, it's helpful to me for testing.
+On Thu, May 30, 2013 at 11:09:00AM +0200, Philipp Zabel wrote:
+> This driver implements a reset controller device that toggle a gpio
+> connected to a reset pin of a peripheral IC. The delay between assertion
+> and de-assertion of the reset signal can be configured via device tree.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
 
-Best Regards,
-Jaehoon Chung
+I see this patch is very useful, as GPIOs are widely used to reset
+components/devices on board.  But I do not find the patch in v3.11-rc1.
+What's your plan about it?
 
-On 07/11/2013 12:42 AM, Doug Anderson wrote:
-> If the WAKEUP_INT is asserted at wakeup and not cleared, we'll end up
-> looping around forever.  This has been seen to happen on exynos5420
-> silicon despite the fact that we haven't enabled any wakeup events.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
-> Changes in v3: None
-> Changes in v2:
-> - Use suspend_noirq as per James Hogan.
-> 
->  drivers/mmc/host/dw_mmc-exynos.c | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-> index f013e7e..36b9620 100644
-> --- a/drivers/mmc/host/dw_mmc-exynos.c
-> +++ b/drivers/mmc/host/dw_mmc-exynos.c
-> @@ -30,6 +30,7 @@
->  #define SDMMC_CLKSEL_TIMING(x, y, z)	(SDMMC_CLKSEL_CCLK_SAMPLE(x) |	\
->  					SDMMC_CLKSEL_CCLK_DRIVE(y) |	\
->  					SDMMC_CLKSEL_CCLK_DIVIDER(z))
-> +#define SDMMC_CLKSEL_WAKEUP_INT		BIT(11)
->  
->  #define SDMMC_CMD_USE_HOLD_REG		BIT(29)
->  
-> @@ -102,6 +103,27 @@ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
->  	return 0;
->  }
->  
-> +/**
-> + * dw_mci_exynos_resume_noirq - Exynos-specific resume code
-> + *
-> + * We have seen cases (at least on the exynos5420) where turning off the INT
-> + * power rail during suspend will leave the WAKEUP_INT bit in the CLKSEL
-> + * register asserted.  This bit is 1 to indicate that it fired and we can
-> + * clear it by writing a 1 back.  Clear it to prevent interrupts from going off
-> + * constantly.
-> + */
-> +
-> +static int dw_mci_exynos_resume_noirq(struct dw_mci *host)
-> +{
-> +	u32 clksel;
-> +
-> +	clksel = mci_readl(host, CLKSEL);
-> +	if (clksel & SDMMC_CLKSEL_WAKEUP_INT)
-> +		mci_writel(host, CLKSEL, clksel);
-> +
-> +	return 0;
-> +}
-> +
->  static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
->  {
->  	/*
-> @@ -165,6 +187,7 @@ static const struct dw_mci_drv_data exynos_drv_data = {
->  	.caps			= exynos_dwmmc_caps,
->  	.init			= dw_mci_exynos_priv_init,
->  	.setup_clock		= dw_mci_exynos_setup_clock,
-> +	.resume_noirq		= dw_mci_exynos_resume_noirq,
->  	.prepare_command	= dw_mci_exynos_prepare_command,
->  	.set_ios		= dw_mci_exynos_set_ios,
->  	.parse_dt		= dw_mci_exynos_parse_dt,
-> 
+Also, I'm wondering if we should register the driver a little bit
+early.  Please see the following patch.  If it makes sense to you,
+I can send the patch to you, or you can just quash it into yours.
+
+Shawn
+
+---8<--------
+
+>From 2f8ce9e5d6525b98f3828b707458e83fabb39d50 Mon Sep 17 00:00:00 2001
+From: Shawn Guo <shawn.guo@linaro.org>
+Date: Sun, 14 Jul 2013 20:41:00 +0800
+Subject: [PATCH] ENGR00269945: reset: register gpio-reset driver in
+ arch_initcall
+
+It's a little bit late to register gpio-reset driver at module_init
+time, because gpio-reset provides reset control via gpio for other
+devices which are mostly probed at module_init time too.  And it
+becomes even worse, when the gpio comes from IO expander on I2C bus,
+e.g. pca953x.  In that case, gpio-reset needs to be ready before I2C
+bus driver which is generally ready at subsys_initcall time.  Let's
+register gpio-reset driver in arch_initcall() to have it ready early
+enough.
+
+The defer probe mechanism is not used here, because a reset controller
+driver should be reasonably registered early than other devices.  More
+importantly, defer probe doe not help in some nasty cases, e.g. the
+gpio-pca953x device itself needs a reset from gpio-reset driver to start
+working.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/reset/gpio-reset.c |   12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/reset/gpio-reset.c b/drivers/reset/gpio-reset.c
+index 4f372f9..a7f214f 100644
+--- a/drivers/reset/gpio-reset.c
++++ b/drivers/reset/gpio-reset.c
+@@ -168,7 +168,17 @@ static struct platform_driver gpio_reset_driver = {
+ 	},
+ };
+ 
+-module_platform_driver(gpio_reset_driver);
++static int __init gpio_reset_init(void)
++{
++	return platform_driver_register(&gpio_reset_driver);
++}
++arch_initcall(gpio_reset_init);
++
++static void __exit gpio_reset_exit(void)
++{
++	platform_driver_unregister(&gpio_reset_driver);
++}
++module_exit(gpio_reset_exit);
+ 
+ MODULE_AUTHOR("Philipp Zabel <p.zabel@pengutronix.de>");
+ MODULE_DESCRIPTION("gpio reset controller");
+-- 
+1.7.9.5
