@@ -1,91 +1,40 @@
-From: alekskartashov@parallels.com (Alexander Kartashov)
-Date: Tue, 16 Jul 2013 17:12:06 +0400
-Subject: [PATCH] arm: align shared memory unconditionally to the SHMLBA
- boundary
-In-Reply-To: <20130716110721.GD24642@n2100.arm.linux.org.uk>
-References: <1361254269-3444-1-git-send-email-alekskartashov@parallels.com>
- <20130715173238.GJ1730@moon> <20130715180846.GV24642@n2100.arm.linux.org.uk>
- <20130715185739.GK1730@moon> <51E4DC0B.8040908@parallels.com>
- <20130716095349.GB16370@moon> <51E51EF1.3010104@parallels.com>
- <20130716103649.GC24642@n2100.arm.linux.org.uk>
- <51E524D1.2090504@parallels.com>
- <20130716110721.GD24642@n2100.arm.linux.org.uk>
-Message-ID: <51E546A6.7010606@parallels.com>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Tue, 16 Jul 2013 22:07:46 +0900
+Subject: [PATCH v7 3/9] iommu/exynos: fix page table maintenance
+In-Reply-To: <CANEJEGs_8a9dPCYtDT8u2NEv5HUUD5gcdmRmbsrKU-_aagztgg@mail.gmail.com>
+References: <002b01ce797b$44d4ad10$ce7e0730$@samsung.com>
+ <1933986.4vddYccClk@amdc1032> <009a01ce814d$840b48c0$8c21da40$@samsung.com>
+ <CANEJEGs_8a9dPCYtDT8u2NEv5HUUD5gcdmRmbsrKU-_aagztgg@mail.gmail.com>
+Message-ID: <002101ce8225$775a71e0$660f55a0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2013 03:07 PM, Russell King - ARM Linux wrote:
-> On Tue, Jul 16, 2013 at 02:47:45PM +0400, Alexander Kartashov wrote:
->> On 07/16/2013 02:36 PM, Russell King - ARM Linux wrote:
->>> shmget() doesn't allocate space in the process for the SHM region.  It
->>> merely creates the shm memory and returns an identifier for it which can
->>> later be used by shmat() to map it.
->> Thank you for the correction, I meant shmat() in that comment indeed.
->> I'm sorry for the inconvenience.
-> Right, so it appears that there's a difference between shmat() with an
-> address and with a NULL address, because the enforcement is done by two
-> completely different bits of code in unrelated parts of the kernel.
->
-> I notice Sparc32 seems to have a fix for this along the lines of the
-> (untested) patch below, so let's do the same on ARM.  Please test this
-> and let me know if this solves your problem.
->
-> Thanks.
->
->   arch/arm/include/asm/shmparam.h |    8 ++++----
->   1 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/include/asm/shmparam.h b/arch/arm/include/asm/shmparam.h
-> index a5223b3..843db59 100644
-> --- a/arch/arm/include/asm/shmparam.h
-> +++ b/arch/arm/include/asm/shmparam.h
-> @@ -1,16 +1,16 @@
->   #ifndef _ASMARM_SHMPARAM_H
->   #define _ASMARM_SHMPARAM_H
->   
-> +#include <asm/cachetype.h>
-> +
->   /*
->    * This should be the size of the virtually indexed cache/ways,
->    * or page size, whichever is greater since the cache aliases
->    * every size/ways bytes.
->    */
-> -#define	SHMLBA	(4 * PAGE_SIZE)		 /* attach addr a multiple of this */
-> +#define	SHMLBA	(cache_is_vipt_aliasing() ? (4 * PAGE_SIZE) : PAGE_SIZE)
-This change breaks compilation:
+> From: grundler at google.com [mailto:grundler at google.com] On Behalf Of Grant Grundler
+> Sent: Tuesday, July 16, 2013 1:19 AM
+> 
+> On Mon, Jul 15, 2013 at 4:21 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
+> ...
+> >> Maybe you could add LV1TABLE_SIZE define and use it here (there is
+> >> already a LV2TABLE_SIZE define)?
+> >
+> > Yes. But, LV2TABLE_SIZE is used in more places than one.
+> > I do not feel that it is needed to define LV1TABLE_SIZE for the single line.
+> 
+> Cho,
+> #define's are part of the code "documentation". Doesn't really matter
+> how often it's used. I think Bartlomiej's suggestion is a good one.
+> 
+> Key is to use "consistent" names so they makes sense to someone not
+> familiar with the code. In this case, we want to show this use is the
+> same way LV2TABLE_SIZE is used and serves the same purpose.
+> 
+Ok.
+I agree the error handling code is not pretty to understand.
+I will change it in the next patch.
 
-arch/arm/mm/copypage-v6.c:23:5: warning: "cacheid_is" is not defined 
-[-Wundef]
-arch/arm/mm/copypage-v6.c:23:5: error: missing binary operator before 
-token "("
-make[1]: *** [arch/arm/mm/copypage-v6.o] Error 1
-make: *** [arch/arm/mm] Error 2
+> cheers.
+> grant
 
-The lines in trouble is
+Thank you.
 
-#if SHMLBA > 16384
-#error FIX ME
-#endif
-
-
->   
-> -/*
-> - * Enforce SHMLBA in shmat
-> - */
-> +/* Enforce SHMLBA in shmat */
->   #define __ARCH_FORCE_SHMLBA
->   
->   #endif /* _ASMARM_SHMPARAM_H */
-
-
--- 
-Sincerely yours,
-Alexander Kartashov
-
-Intern
-Core team
-
-www.parallels.com
-
-Skype: aleksandr.kartashov
-Email: alekskartashov at parallels.com
+Cho KyongHo.
