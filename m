@@ -1,42 +1,42 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 16 Jul 2013 11:38:20 +0200
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <201307161132.39845.yann.morin.1998@free.fr>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <201307161112.17901.yann.morin.1998@free.fr>
- <20130716092242.GD4402@pd.tnic>
- <201307161132.39845.yann.morin.1998@free.fr>
-Message-ID: <20130716093820.GE4402@pd.tnic>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 16 Jul 2013 11:42:12 +0200
+Subject: [PATCH v4 0/3]  ARM: shmobile: lager: enable Ether
+In-Reply-To: <1372663234-13486-1-git-send-email-horms+renesas@verge.net.au>
+References: <1372663234-13486-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <7990652.CKWzcoj3FL@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 11:32:39AM +0200, Yann E. MORIN wrote:
-> No, this is already too late: the given .config *is* already broken and
-> unbuildable.
+Hi Simon,
 
-Yes, and we don't build it because we fail the build.
+On Monday 01 July 2013 16:20:31 Simon Horman wrote:
+> Hi,
+> 
+> this short series enables the on-board ethernet
+> of the r8a7790 SoC for on lager board.
+> 
+> It has a run-time dependency on
+> "sh_eth: add support for r8a7790 SoC"
+> 
+> It has been built on top of renesas-next-20130701.
 
-> That does not work in two cases:
->   - older distros that do not have the tool packaged
+Do you plan to respin this series on top of your latest devel branch ? I've 
+quickly rebased it and now get receive FIFO overflows when booting over NFS, 
+followed by the kernel disabling the sh-eth IRQ.
 
-This point is moot - distro kernels are built by the distro people.
-
->   - automatic test-harness that run thousands of randconfig a day
-
-randconfigs are not guaranteed to build successfully.
-
-> The idea is to be always have a .config that is buildable with the
-> current toolset of the system, especially for esoteric and/or recent
-> tools that are not packaged and/or installed by default by the
-> distros.
-
-How are you going to tell the user running make <something>config to
-install the missing tools?
+> Simon Horman (3):
+>   ARM: shmobile: r8a7790: add Ether support
+>   ARM: shmobile: lager: enable Ether
+>   ARM: shmobile: lager: enable nfsroot in DTS
+> 
+>  arch/arm/boot/dts/r8a7790-lager.dts           |  2 +-
+>  arch/arm/mach-shmobile/board-lager.c          | 24 ++++++++++++++++++++++++
+> arch/arm/mach-shmobile/clock-r8a7790.c        |  4 ++++
+>  arch/arm/mach-shmobile/include/mach/r8a7790.h |  3 +++
+>  arch/arm/mach-shmobile/setup-r8a7790.c        | 14 ++++++++++++++
+>  5 files changed, 46 insertions(+), 1 deletion(-)
 
 -- 
-Regards/Gruss,
-    Boris.
+Regards,
 
-Sent from a fat crate under my desk. Formatting is fine.
---
+Laurent Pinchart
