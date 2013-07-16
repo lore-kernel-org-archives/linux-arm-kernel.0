@@ -1,25 +1,25 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 16 Jul 2013 08:59:52 +0200
-Subject: [PATCH 00/10] Orion Watchdog fixes
-In-Reply-To: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130716065952.GA25043@lunn.ch>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Jul 2013 15:04:22 +0800
+Subject: [PATCH v2 1/1] ARM: imx: clk-pllv3: improve the timeout waiting
+ method
+In-Reply-To: <1373941400-32274-1-git-send-email-peter.chen@freescale.com>
+References: <1373941400-32274-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130716070419.GC30067@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 08:32:33PM -0300, Ezequiel Garcia wrote:
-> This patchset introduces a bunch of fixes that removes the direct use of
-> the shared timer control register, and also removes the need to include
-> a mach-specific header.
+On Tue, Jul 16, 2013 at 10:23:20AM +0800, Peter Chen wrote:
+> There are two improvements for this commit:
 > 
-> With this changes the driver can be included in multiplatforms builds,
-> and in particular be used for the Armada 370/XP SoC.
+> - Add comparing pll lock condition after while loop. It can
+> fix potential fake timeout problem caused by the code is just
+> scheduled out before compare the timeout, and the time of
+> scheduling out are more than one jiffies.
+> 
+> - Move timeout assignment more close to compare the timeout.
+> It can reduce the possibility the code is scheduled out, and
+> the timeout can be more precise.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 
-Hi Ezequiel
-
-Maybe i'm missing something here. You are making use of
-orion_timer_ctrl_clrset() from time-orion.c. How will this work on
-370/XP which has a different clocksource driver?
-
-Thanks
-	Andrew
+Applied, thanks.
