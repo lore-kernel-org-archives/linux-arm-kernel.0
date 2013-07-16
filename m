@@ -1,101 +1,94 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Jul 2013 10:29:50 +0200
-Subject: [PATCHv5 08/11] ARM: pci: add ->add_bus() and ->remove_bus()
- hooks to hw_pci
-In-Reply-To: <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 16 Jul 2013 10:31:15 +0200
+Subject: [PATCHv5 01/11] irqdomain: add irq_alloc_mapping() function
+In-Reply-To: <1373889167-27878-2-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130716102950.6a7023ae@skate>
+ <1373889167-27878-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130716103115.552dcbd6@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Grant,
 
-Would it be possible to have your opinion on the below patch? It has
-already been sent on June, 19th and July, 1st, and I'd really like to
-see it merged for 3.12, as part of this series enabling MSI support for
-the Marvell PCIe driver.
+Would it be possible to get your opinion on the below patch? We have
+already discussed it in the past, and it was implemented according to
+your suggestions, so I guess it should be fine, but I'd like to have
+your formal Acked-by if possible, or additional comments. It is needed
+for the MSI support on Marvell PCIe, but now the Tegra people are also
+interested by it, and we hope to get this merged in 3.12.
 
 Thanks!
 
 Thomas
 
-On Mon, 15 Jul 2013 13:52:44 +0200, Thomas Petazzoni wrote:
-> Some PCI drivers may need to adjust the pci_bus structure after it has
-> been allocated by the Linux PCI core. The PCI core allows
-> architectures to implement the pcibios_add_bus() and
-> pcibios_remove_bus() for this purpose. This commit therefore extends
-> the hw_pci and pci_sys_data structures of the ARM PCI core to allow
-> PCI drivers to register ->add_bus() and ->remove_bus() in hw_pci,
-> which will get called when a bus is added or removed from the system.
-> 
-> This will be used for example by the Marvell PCIe driver to connect a
-> particular PCI bus with its corresponding MSI chip to handle Message
-> Signaled Interrupts.
+On Mon, 15 Jul 2013 13:52:37 +0200, Thomas Petazzoni wrote:
+> This commit extends the irqdomain subsystem with an
+> irq_alloc_mapping() function which allows to let the irqdomain code
+> find an available hwirq number in the range [ 0 ; domain size ] for
+> the given domain, and create a virq mapping for it.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
 > ---
->  arch/arm/include/asm/mach/pci.h |  4 ++++
->  arch/arm/kernel/bios32.c        | 16 ++++++++++++++++
->  2 files changed, 20 insertions(+)
+>  include/linux/irqdomain.h |  2 ++
+>  kernel/irq/irqdomain.c    | 32 ++++++++++++++++++++++++++++++++
+>  2 files changed, 34 insertions(+)
 > 
-> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> index a1c90d7..487155c 100644
-> --- a/arch/arm/include/asm/mach/pci.h
-> +++ b/arch/arm/include/asm/mach/pci.h
-> @@ -36,6 +36,8 @@ struct hw_pci {
->  					  resource_size_t start,
->  					  resource_size_t size,
->  					  resource_size_t align);
-> +	void            (*add_bus)(struct pci_bus *bus);
-> +	void            (*remove_bus)(struct pci_bus *bus);
->  };
+> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> index c983ed1..1ffa336 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -195,6 +195,8 @@ static inline unsigned int irq_linear_revmap(struct irq_domain *domain,
+>  extern unsigned int irq_find_mapping(struct irq_domain *host,
+>  				     irq_hw_number_t hwirq);
+>  extern unsigned int irq_create_direct_mapping(struct irq_domain *host);
+> +extern unsigned int irq_alloc_mapping(struct irq_domain *host,
+> +				      irq_hw_number_t *hwirq);
+>  extern int irq_create_strict_mappings(struct irq_domain *domain,
+>  				      unsigned int irq_base,
+>  				      irq_hw_number_t hwirq_base, int count);
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index 706724e..b9ddb94 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -375,6 +375,38 @@ unsigned int irq_create_direct_mapping(struct irq_domain *domain)
+>  EXPORT_SYMBOL_GPL(irq_create_direct_mapping);
 >  
->  /*
-> @@ -63,6 +65,8 @@ struct pci_sys_data {
->  					  resource_size_t start,
->  					  resource_size_t size,
->  					  resource_size_t align);
-> +	void            (*add_bus)(struct pci_bus *bus);
-> +	void            (*remove_bus)(struct pci_bus *bus);
->  	void		*private_data;	/* platform controller private data	*/
->  };
->  
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 261fcc8..530e59d 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -363,6 +363,20 @@ void pcibios_fixup_bus(struct pci_bus *bus)
->  }
->  EXPORT_SYMBOL(pcibios_fixup_bus);
->  
-> +void pcibios_add_bus(struct pci_bus *bus)
+>  /**
+> + * irq_alloc_mapping() - Allocate an irq for mapping
+> + * @domain: domain to allocate the irq for or NULL for default domain
+> + * @hwirq:  reference to the returned hwirq
+> + *
+> + * This routine are used for irq controllers which can choose the
+> + * hardware interrupt number from a range [ 0 ; domain size ], such as
+> + * is often the case with PCI MSI controllers. The function will
+> + * returned the allocated hwirq number in the hwirq pointer, and the
+> + * corresponding virq number as the return value.
+> + */
+> +unsigned int irq_alloc_mapping(struct irq_domain *domain,
+> +			       irq_hw_number_t *out_hwirq)
 > +{
-> +	struct pci_sys_data *sys = bus->sysdata;
-> +	if (sys->add_bus)
-> +		sys->add_bus(bus);
-> +}
+> +	irq_hw_number_t hwirq;
 > +
-> +void pcibios_remove_bus(struct pci_bus *bus)
-> +{
-> +	struct pci_sys_data *sys = bus->sysdata;
-> +	if (sys->remove_bus)
-> +		sys->remove_bus(bus);
-> +}
+> +	pr_debug("irq_alloc_mapping(0x%p)\n", domain);
 > +
->  /*
->   * Swizzle the device pin each time we cross a bridge.  If a platform does
->   * not provide a swizzle function, we perform the standard PCI swizzling.
-> @@ -464,6 +478,8 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
->  		sys->swizzle = hw->swizzle;
->  		sys->map_irq = hw->map_irq;
->  		sys->align_resource = hw->align_resource;
-> +		sys->add_bus        = hw->add_bus;
-> +		sys->remove_bus     = hw->remove_bus;
->  		INIT_LIST_HEAD(&sys->resources);
->  
->  		if (hw->private_data)
+> +	for (hwirq = 0; hwirq < domain->hwirq_max; hwirq++)
+> +		if (!irq_find_mapping(domain, hwirq))
+> +			break;
+> +
+> +	if (hwirq == domain->hwirq_max) {
+> +		pr_debug("-> no available hwirq found\n");
+> +		return 0;
+> +	}
+> +
+> +	*out_hwirq = hwirq;
+> +	return irq_create_mapping(domain, hwirq);
+> +}
+> +EXPORT_SYMBOL_GPL(irq_alloc_mapping);
+> +
+> +/**
+>   * irq_create_mapping() - Map a hardware interrupt into linux irq space
+>   * @domain: domain owning this hardware interrupt or NULL for default domain
+>   * @hwirq: hardware irq number in that domain space
 
 
 
