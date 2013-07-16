@@ -1,114 +1,339 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 16 Jul 2013 18:31:23 +0100
-Subject: arm: Only load TLS values when needed
-In-Reply-To: <51E42E11.1010903@dawncrow.de>
-References: <51E42E11.1010903@dawncrow.de>
-Message-ID: <51E5836B.1010904@arm.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 16 Jul 2013 14:40:29 -0300
+Subject: [PATCH 1/2] ARM: dts: imx6: Add support for imx6q wandboard
+Message-ID: <1373996430-19854-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andr?,
+Add support for the imx6q wanboard variant.
 
-On 15/07/13 18:14, Andr? Hentschel wrote:
-> From: Andr? Hentschel <nerv@dawncrow.de>
->
-> This patch intents to reduce loading instructions when the resulting value is not used.
-> It's a follow up on a4780adeefd042482f624f5e0d577bf9cdcbb760
->
+Since imx6q/dl are pin to pin compatible, introduce the imx6qdl-wandboard.dtsi 
+file that contains the common peripheral nodes.
 
-Have you done any benchmarking to see that this has any real impact? Or 
-tested on a !Vv6k system? It looks possible that the only case where 
-this will perform better is where we're using switch_tls_none or 
-switch_tls_software (both rare cases, I think) and there's some change 
-it will make things worse in other cases?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/imx6dl-wandboard.dts   | 121 +---------------------------
+ arch/arm/boot/dts/imx6q-wandboard.dts    |  22 ++++++
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 132 +++++++++++++++++++++++++++++++
+ 4 files changed, 156 insertions(+), 120 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6q-wandboard.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-wandboard.dtsi
 
-One of the reasons for Russell's suggestion of placing the ldrd (which 
-became the two ldr instructions you've removed from __switch_to, in 
-order to maintain building for older cores) where it is was in order to 
-reduce the chance of pipeline stalls.
-
-As I've pointed out below, there is some risk that changing that has 
-implications for the v6 only case below (and the v6k case is now more 
-prone to stalls with !CONFIG_CPU_USE_DOMAINS, but newer cores should 
-have more advanced scheduling to avoid such issues anyway...)
-
-> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
->
-> ---
-> This patch is against Linux 3.11-rc1 (ad81f0545ef01ea651886dddac4bef6cec930092)
->
-> Thanks to everyone who helped me with a4780adeefd042482f624f5e0d577bf9cdcbb760
->
-> diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
-> index 83259b8..3742722 100644
-> --- a/arch/arm/include/asm/tls.h
-> +++ b/arch/arm/include/asm/tls.h
-> @@ -3,29 +3,32 @@
->
->   #ifdef __ASSEMBLY__
->   #include <asm/asm-offsets.h>
-> -	.macro switch_tls_none, base, tp, tpuser, tmp1, tmp2
-> +	.macro switch_tls_none, prev, next, tp, tpuser, tmp1, tmp2
->   	.endm
->
-> -	.macro switch_tls_v6k, base, tp, tpuser, tmp1, tmp2
-> +	.macro switch_tls_v6k, prev, next, tp, tpuser, tmp1, tmp2
-> +	ldrd	\tp, \tpuser, [\next, #TI_TP_VALUE]	@ get the next TLS and user r/w register
->   	mrc	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
->   	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
->   	mcr	p15, 0, \tpuser, c13, c0, 2	@ and the user r/w register
-> -	str	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
-> +	str	\tmp2, [\prev, #TI_TP_VALUE + 4] @ save it
->   	.endm
->
-> -	.macro switch_tls_v6, base, tp, tpuser, tmp1, tmp2
-> +	.macro switch_tls_v6, prev, next, tp, tpuser, tmp1, tmp2
->   	ldr	\tmp1, =elf_hwcap
->   	ldr	\tmp1, [\tmp1, #0]
->   	mov	\tmp2, #0xffff0fff
-> +	ldr	\tp, [\next, #TI_TP_VALUE]	@ get the next TLS register
->   	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
->   	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
-> -	mrcne	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
-> +	mrcne	p15, 0, \tmp2, c13, c0, 2	@ get the previous user r/w register
-> +	ldrne	\tpuser, [\next, #TI_TP_VALUE + 4]	@ get the next user r/w register
->   	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
->   	mcrne	p15, 0, \tpuser, c13, c0, 2	@ set user r/w register
-
-Now we've only got one instruction between the store and the load and 
-risk stalling the pipeline...
-
-Dave M cautiously says "The ancient advice was that one instruction was 
-enough" but this is very core dependent... I wonder if anyone has a good 
-idea about whether this is an issue here...?
-
-> -	strne	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
-> +	strne	\tmp2, [\prev, #TI_TP_VALUE + 4] @ save it
->   	.endm
->
-> -	.macro switch_tls_software, base, tp, tpuser, tmp1, tmp2
-> +	.macro switch_tls_software, prev, next, tp, tpuser, tmp1, tmp2
->   	mov	\tmp1, #0xffff0fff
->   	str	\tp, [\tmp1, #-15]		@ set TLS value at 0xffff0ff0
->   	.endm
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index a39cfc2a1..1484b59 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -689,12 +689,10 @@ ENTRY(__switch_to)
->    THUMB(	stmia	ip!, {r4 - sl, fp}	   )	@ Store most regs on stack
->    THUMB(	str	sp, [ip], #4		   )
->    THUMB(	str	lr, [ip], #4		   )
-> -	ldr	r4, [r2, #TI_TP_VALUE]
-> -	ldr	r5, [r2, #TI_TP_VALUE + 4]
->   #ifdef CONFIG_CPU_USE_DOMAINS
->   	ldr	r6, [r2, #TI_CPU_DOMAIN]
->   #endif
-> -	switch_tls r1, r4, r5, r3, r7
-> +	switch_tls r1, r2, r4, r5, r3, r7
->   #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
->   	ldr	r7, [r2, #TI_TASK]
->   	ldr	r8, =__stack_chk_guard
->
-
-Jonny
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 2cec2ff..ce1b3a3 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -133,6 +133,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6q-sabrelite.dtb \
+ 	imx6q-sabresd.dtb \
+ 	imx6q-sbc6x.dtb \
++	imx6q-wandboard.dtb \
+ 	imx6sl-evk.dtb \
+ 	vf610-twr.dtb
+ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dts b/arch/arm/boot/dts/imx6dl-wandboard.dts
+index 15014bb..e672891 100644
+--- a/arch/arm/boot/dts/imx6dl-wandboard.dts
++++ b/arch/arm/boot/dts/imx6dl-wandboard.dts
+@@ -10,6 +10,7 @@
+  */
+ /dts-v1/;
+ #include "imx6dl.dtsi"
++#include "imx6qdl-wandboard.dtsi"
+ 
+ / {
+ 	model = "Wandboard i.MX6 Dual Lite Board";
+@@ -18,124 +19,4 @@
+ 	memory {
+ 		reg = <0x10000000 0x40000000>;
+ 	};
+-
+-	regulators {
+-		compatible = "simple-bus";
+-
+-		reg_2p5v: 2p5v {
+-			compatible = "regulator-fixed";
+-			regulator-name = "2P5V";
+-			regulator-min-microvolt = <2500000>;
+-			regulator-max-microvolt = <2500000>;
+-			regulator-always-on;
+-		};
+-
+-		reg_3p3v: 3p3v {
+-			compatible = "regulator-fixed";
+-			regulator-name = "3P3V";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			regulator-always-on;
+-		};
+-	};
+-
+-	sound {
+-		compatible = "fsl,imx6dl-wandboard-sgtl5000",
+-			     "fsl,imx-audio-sgtl5000";
+-		model = "imx6dl-wandboard-sgtl5000";
+-		ssi-controller = <&ssi1>;
+-		audio-codec = <&codec>;
+-		audio-routing =
+-			"MIC_IN", "Mic Jack",
+-			"Mic Jack", "Mic Bias",
+-			"Headphone Jack", "HP_OUT";
+-		mux-int-port = <1>;
+-		mux-ext-port = <3>;
+-	};
+-};
+-
+-&audmux {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_audmux_2>;
+-	status = "okay";
+-};
+-
+-&i2c2 {
+-	clock-frequency = <100000>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c2_2>;
+-	status = "okay";
+-
+-	codec: sgtl5000 at 0a {
+-		compatible = "fsl,sgtl5000";
+-		reg = <0x0a>;
+-		clocks = <&clks 169>;
+-		VDDA-supply = <&reg_2p5v>;
+-		VDDIO-supply = <&reg_3p3v>;
+-	};
+-};
+-
+-&iomuxc {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_hog>;
+-
+-	hog {
+-		pinctrl_hog: hoggrp {
+-			fsl,pins = <
+-				MX6QDL_PAD_GPIO_0__CCM_CLKO1 	0x130b0
+-				MX6QDL_PAD_GPIO_2__GPIO1_IO02	0x80000000
+-				MX6QDL_PAD_EIM_DA9__GPIO3_IO09	0x80000000
+-			>;
+-		};
+-	};
+-};
+-
+-&fec {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_enet_1>;
+-	phy-mode = "rgmii";
+-	status = "okay";
+-};
+-
+-&ssi1 {
+-	fsl,mode = "i2s-slave";
+-	status = "okay";
+-};
+-
+-&uart1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_uart1_1>;
+-	status = "okay";
+-};
+-
+-&uart3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_uart3_2>;
+-	fsl,uart-has-rtscts;
+-	status = "okay";
+-};
+-
+-&usbh1 {
+-	status = "okay";
+-};
+-
+-&usdhc1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usdhc1_2>;
+-	cd-gpios = <&gpio1 2 0>;
+-	status = "okay";
+-};
+-
+-&usdhc2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usdhc2_2>;
+-	non-removable;
+-	status = "okay";
+-};
+-
+-&usdhc3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usdhc3_2>;
+-	cd-gpios = <&gpio3 9 0>;
+-	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx6q-wandboard.dts b/arch/arm/boot/dts/imx6q-wandboard.dts
+new file mode 100644
+index 0000000..5dd6342
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-wandboard.dts
+@@ -0,0 +1,22 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * Author: Fabio Estevam <fabio.estevam@freescale.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++/dts-v1/;
++#include "imx6q.dtsi"
++#include "imx6qdl-wandboard.dtsi"
++
++/ {
++	model = "Wandboard i.MX6 Quad Board";
++	compatible = "wand,imx6q-wandboard", "fsl,imx6q";
++
++	memory {
++		reg = <0x10000000 0x80000000>;
++	};
++};
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+new file mode 100644
+index 0000000..7a46f64
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -0,0 +1,132 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * Author: Fabio Estevam <fabio.estevam@freescale.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++/ {
++	regulators {
++		compatible = "simple-bus";
++
++		reg_2p5v: 2p5v {
++			compatible = "regulator-fixed";
++			regulator-name = "2P5V";
++			regulator-min-microvolt = <2500000>;
++			regulator-max-microvolt = <2500000>;
++			regulator-always-on;
++		};
++
++		reg_3p3v: 3p3v {
++			compatible = "regulator-fixed";
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++	};
++
++	sound {
++		compatible = "fsl,imx6-wandboard-sgtl5000",
++			     "fsl,imx-audio-sgtl5000";
++		model = "imx6-wandboard-sgtl5000";
++		ssi-controller = <&ssi1>;
++		audio-codec = <&codec>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++		mux-int-port = <1>;
++		mux-ext-port = <3>;
++	};
++};
++
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux_2>;
++	status = "okay";
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2_2>;
++	status = "okay";
++
++	codec: sgtl5000 at 0a {
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		clocks = <&clks 169>;
++		VDDA-supply = <&reg_2p5v>;
++		VDDIO-supply = <&reg_3p3v>;
++	};
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog>;
++
++	hog {
++		pinctrl_hog: hoggrp {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_0__CCM_CLKO1 	0x130b0
++				MX6QDL_PAD_GPIO_2__GPIO1_IO02	0x80000000
++				MX6QDL_PAD_EIM_DA9__GPIO3_IO09	0x80000000
++			>;
++		};
++	};
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet_1>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
++&ssi1 {
++	fsl,mode = "i2s-slave";
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_1>;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3_2>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
++
++&usbh1 {
++	status = "okay";
++};
++
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1_2>;
++	cd-gpios = <&gpio1 2 0>;
++	status = "okay";
++};
++
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2_2>;
++	non-removable;
++	status = "okay";
++};
++
++&usdhc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3_2>;
++	cd-gpios = <&gpio3 9 0>;
++	status = "okay";
++};
+-- 
+1.8.1.2
