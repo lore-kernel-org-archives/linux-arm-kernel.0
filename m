@@ -1,45 +1,54 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 16 Jul 2013 09:48:56 +0200
-Subject: [PATCH 00/10] Orion Watchdog fixes
-In-Reply-To: <20130716073101.GB25043@lunn.ch>
-References: <1373931163-12670-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130716065952.GA25043@lunn.ch> <20130716092059.237ea729@skate>
- <20130716073101.GB25043@lunn.ch>
-Message-ID: <13fe673f255.2784.107cef0f820c2f5d7b7f41463071c310@gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 16 Jul 2013 15:54:54 +0800
+Subject: [PATCH 1/5] iio: at91: use adc_clk_khz to make the calculation
+ not easy to large than u32.
+In-Reply-To: <20130715125213.GB2962@lukather>
+References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
+ <1373789069-11604-2-git-send-email-josh.wu@atmel.com>
+ <20130715125213.GB2962@lukather>
+Message-ID: <51E4FC4E.2010203@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew, Thomas,
+Hi, Maxime
 
-In the discussion about orion clocksource Russell was proposing a generic 
-thread-safe write. That puts a single lock around all those writes. Of 
-course, it will also blocked by totally unrelated thread-safe register 
-accesses but should prevent us from having dozens of locks and solves the 
-symbol issue.
-
-Sebastian
-
-
-
-On July 16, 2013 9:31:01 AM Andrew Lunn <andrew@lunn.ch> wrote:
-> On Tue, Jul 16, 2013 at 09:20:59AM +0200, Thomas Petazzoni wrote:
-> > Dear Andrew Lunn,
-> > On Tue, 16 Jul 2013 08:59:52 +0200, Andrew Lunn wrote:
-> > > Maybe i'm missing something here. You are making use of
-> > > orion_timer_ctrl_clrset() from time-orion.c. How will this work on
-> > > 370/XP which has a different clocksource driver?
-> > I *think* the idea is that the Armada 370/XP driver will expose the
-> > same function, so from the point of view of the watchdog driver, it
-> > will just work.
+On 7/15/2013 8:52 PM, Maxime Ripard wrote:
+> Hi Josh,
 >
-> Hi Thomas
+> On Sun, Jul 14, 2013 at 04:04:25PM +0800, Josh Wu wrote:
+>> for example, if adc_clk is 20Mhz and start-up time set as larger than 215us.
+>> then the calculation "st->startup_time * adc_clk_khz" will out of u32.
+>>
+>> In this patch, it will use khz unit for adc_clk, that avoids above problem.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> Maybe we can have a slightly better commit log here, like:
 >
-> That was what i was thinking would happen. And then i started to
-> wonder how well the kernel linker deals with multiple definitions of
-> the same symbol. Dove and 370/XP can end up in the same kernel. So we
-> need to have both orion-timer and the 370/XP timer in the same kernel,
-> so we end up with the same symbol in the kernel twice...
+> ------8<-----------
+> iio: at91: Fix adc_clk overflow
 >
-> Lets wait for Ezequiel to answer.
+> The adc_clk variable is currently defined using a 32-bits unsigned
+> integer, which will overflow under some very valid range of operations.
 >
->    Andrew
+> Such overflow will occur if, for example, the parent clock is set to a
+> 20MHz frequency and the ADC startup time is larger than 215ns.
+>
+> To fix this, introduce an intermediate variable holding the clock rate
+> in kHz.
+>
+> --------8<---------------
+>
+> Or something like that.
+>
+> For the patch itself, I'm happy about it. You can add my Acked-by.
+
+Thank you. Your commit log is better. I will fix the commit log base on 
+your commit in next version.
+
+>
+> Thanks!
+> Maxime
+>
+
+Best Regards,
+Josh Wu
