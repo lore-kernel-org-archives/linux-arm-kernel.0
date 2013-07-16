@@ -1,43 +1,30 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 17 Jul 2013 00:08:30 +0100
-Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC with
- ARM CPU
-In-Reply-To: <20130716151435.GB3871@linaro.org>
-References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
- <20130716151435.GB3871@linaro.org>
-Message-ID: <2043662.BcW19XTTMG@lenovo>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 16 Jul 2013 17:10:32 -0600
+Subject: [PATCH v2 04/22] ARM: dt: tegra30: iommu: Add "nvidia,swgroup"
+In-Reply-To: <1373021097-32420-5-git-send-email-hdoyu@nvidia.com>
+References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
+ <1373021097-32420-5-git-send-email-hdoyu@nvidia.com>
+Message-ID: <51E5D2E8.5060200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
+> This is a bitmap that indicates which HardWare Accelerators(HWA) are
+> supported on Tegra30 SoC.
 
-Le mardi 16 juillet 2013 11:14:36 Matt Porter a ?crit :
-> > +	compatible = "brcm,bcm5301x";
-> 
-> Ok, this was nagging at me before I went on my very long vacation. I see
-> the "brcm" vendor prefix as a real consistency problem. I noticed on the
-> bcm281xx/kona family, we have been using "bcm" which is not logged in
-> vendor-prefixes.txt as a legitimate prefix. I see that bcm2835 had
-> already established use of "brcm" before any of the bcm281xx support
-> came in. Ideally, the vendor prefix should change to "bcm" since every
-> reference in the family names is BCM. However, if others want the least
-> amount of churn in making this consistent, we might have to go with
-> "brcm" across the board.
+> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
 
-I would like to keep "brcm" here because that is what has been defined as a 
-vendor prefix, and is used beyond the scope of the ARM Linux kernel support 
-even within Broadcom. Maybe it was an oversight, or rather a mistake to let 
-the bcm281x/kona family support code be merged and use "bcm" there, without 
-registering it. Besides, a simple rule of number here wins:
+> +		nvidia,swgroup = TEGRA30_SWGROUP_ALL;
 
-git grep "brcm," * | wc -l
-63
-git grep "bcm," * | wc -l
-25
+That property isn't in the binding document. We can't add properties
+that aren't documented.
 
-(as of Linux 3.11-rc1)
+Macros should not include structural syntax; the < > around the cell
+value is part of the macro the way you've written it, but shouldn't be.
+It'd be simpler to just write:
 
-So consistency we should get the bcm281x/kona DT bindings to rename their 
-vendor prefix as well.
--- 
-Florian
+	nvidia,swgroup = <0x00000000 0x000779ff>;
+
+We should only extend the binding in a backwards-compatible fashion, so
+we can't require that DTs contain this value. At least, there should be
+a default value defined for when the property doesn't exist.
