@@ -1,91 +1,68 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 16 Jul 2013 08:45:19 +0200
-Subject: [PATCH v2 1/1] ARM: imx: clk-pllv3: improve the timeout waiting
- method
-In-Reply-To: <1373941400-32274-1-git-send-email-peter.chen@freescale.com>
-References: <1373941400-32274-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <20130716064519.GH10995@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Jul 2013 14:51:33 +0800
+Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <20130716015038.GD28375@S2101-09.ap.freescale.net>
+References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
+ <20130716015038.GD28375@S2101-09.ap.freescale.net>
+Message-ID: <20130716065130.GB30067@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 10:23:20AM +0800, Peter Chen wrote:
-> There are two improvements for this commit:
+On Tue, Jul 16, 2013 at 09:50:42AM +0800, Shawn Guo wrote:
+> Hi Philipp,
 > 
-> - Add comparing pll lock condition after while loop. It can
-> fix potential fake timeout problem caused by the code is just
-> scheduled out before compare the timeout, and the time of
-> scheduling out are more than one jiffies.
+> On Thu, May 30, 2013 at 11:09:00AM +0200, Philipp Zabel wrote:
+> > This driver implements a reset controller device that toggle a gpio
+> > connected to a reset pin of a peripheral IC. The delay between assertion
+> > and de-assertion of the reset signal can be configured via device tree.
+> > 
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > Reviewed-by: Stephen Warren <swarren@nvidia.com>
 > 
-> - Move timeout assignment more close to compare the timeout.
-> It can reduce the possibility the code is scheduled out, and
-> the timeout can be more precise.
+> I see this patch is very useful, as GPIOs are widely used to reset
+> components/devices on board.  But I do not find the patch in v3.11-rc1.
+> What's your plan about it?
 > 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> Also, I'm wondering if we should register the driver a little bit
+> early.  Please see the following patch.  If it makes sense to you,
+> I can send the patch to you, or you can just quash it into yours.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+And here is another change request.
 
-Sascha
+Shawn
 
-> ---
-> 
-> Changes for v2:
-> - Add more description for this improvement according to
-> Fabio's suggstion.
-> - Add comparsion after while loop according to Sascha's
-> suggestion.
-> 
->  arch/arm/mach-imx/clk-pllv3.c |   15 +++++++++++----
->  1 files changed, 11 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
-> index 36aac94..4499db5 100644
-> --- a/arch/arm/mach-imx/clk-pllv3.c
-> +++ b/arch/arm/mach-imx/clk-pllv3.c
-> @@ -50,7 +50,7 @@ struct clk_pllv3 {
->  static int clk_pllv3_prepare(struct clk_hw *hw)
->  {
->  	struct clk_pllv3 *pll = to_clk_pllv3(hw);
-> -	unsigned long timeout = jiffies + msecs_to_jiffies(10);
-> +	unsigned long timeout;
->  	u32 val;
->  
->  	val = readl_relaxed(pll->base);
-> @@ -61,12 +61,19 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
->  		val &= ~BM_PLL_POWER;
->  	writel_relaxed(val, pll->base);
->  
-> +	timeout = jiffies + msecs_to_jiffies(10);
->  	/* Wait for PLL to lock */
-> -	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK))
-> +	do {
-> +		if (readl_relaxed(pll->base) & BM_PLL_LOCK)
-> +			break;
->  		if (time_after(jiffies, timeout))
-> -			return -ETIMEDOUT;
-> +			break;
-> +	} while (1);
->  
-> -	return 0;
-> +	if (readl_relaxed(pll->base) & BM_PLL_LOCK)
-> +		return 0;
-> +	else
-> +		return -ETIMEDOUT;
->  }
->  
->  static void clk_pllv3_unprepare(struct clk_hw *hw)
-> -- 
-> 1.7.0.4
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+----8<---------------
 
+>From 822a0c4fb7c99b371844ba7e957affcaa8cb1cfe Mon Sep 17 00:00:00 2001
+From: Shawn Guo <shawn.guo@linaro.org>
+Date: Sun, 14 Jul 2013 20:28:05 +0800
+Subject: [PATCH] ENGR00269945: reset: handle cansleep case in gpio-reset
+
+Some gpio reset may be backed by a gpio that can sleep, e.g. pca953x
+gpio output.  For such gpio, gpio_set_value_cansleep() should be
+called.  Otherwise, the WARN_ON(chip->can_sleep) in gpiod_set_value()
+will be hit.  Add a gpio_cansleep() check to handle cansleep gpio.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/reset/gpio-reset.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/reset/gpio-reset.c b/drivers/reset/gpio-reset.c
+index 5d2515a..4f372f9 100644
+--- a/drivers/reset/gpio-reset.c
++++ b/drivers/reset/gpio-reset.c
+@@ -32,7 +32,10 @@ static void gpio_reset_set(struct reset_controller_dev *rcdev, int asserted)
+ 	if (drvdata->active_low)
+ 		value = !value;
+ 
+-	gpio_set_value(drvdata->gpio, value);
++	if (gpio_cansleep(drvdata->gpio))
++		gpio_set_value_cansleep(drvdata->gpio, value);
++	else
++		gpio_set_value(drvdata->gpio, value);
+ }
+ 
+ static int gpio_reset(struct reset_controller_dev *rcdev, unsigned long id)
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
