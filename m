@@ -1,44 +1,24 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 16 Jul 2013 18:22:08 +0400
-Subject: [PATCH v4 1/2] ARM: dts: twl: Add GPADC data to device tree
-In-Reply-To: <1373974500-23609-1-git-send-email-oleksandr.kozaruk@ti.com>
-References: <1373974500-23609-1-git-send-email-oleksandr.kozaruk@ti.com>
-Message-ID: <51E55710.8060907@cogentembedded.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 16 Jul 2013 09:23:52 -0500
+Subject: [PATCH 0/2] regulator: palmas-pmic: doc: update device tree bindings
+Message-ID: <1373984635-14958-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+We seem to have a few missing updates to device tree bindings with the
+latest set of changes getting merged in.
 
-On 07/16/2013 03:34 PM, Oleksandr Kozaruk wrote:
+Based on v3.11-rc1 tag
 
-> GPADC is the general purpose ADC present on twl6030.
-> The dt data is interrupt used to trigger end of ADC
-> conversion.
+Nishanth Menon (2):
+  regulator: palmas-pmic: doc: fix typo for sleep-mode
+  regulator: palmas-pmic: doc: remove ti,tstep
 
-> Signed-off-by: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
-> ---
->   arch/arm/boot/dts/twl6030.dtsi | 6 ++++++
->   1 file changed, 6 insertions(+)
+ .../devicetree/bindings/regulator/palmas-pmic.txt  |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-> diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
-> index 2e3bd31..434842c 100644
-> --- a/arch/arm/boot/dts/twl6030.dtsi
-> +++ b/arch/arm/boot/dts/twl6030.dtsi
-> @@ -103,4 +103,10 @@
->   		compatible = "ti,twl6030-pwmled";
->   		#pwm-cells = <2>;
->   	};
-> +
-> +	gpadc: twl6030_gpadc {
-> +		compatible = "ti,twl6030_gpadc";
-> +		interrupts = <3>;
-> +		#io-channel-cells = <1>;
-> +	};
+-- 
+1.7.9.5
 
-    ePAPR [1] says: "The name of a node should be somewhat generic, 
-reflecting the function of the device and not its precise programming 
-model."
-
-[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
-
-WBR, Sergei
+Regards,
+Nishanth Menon
