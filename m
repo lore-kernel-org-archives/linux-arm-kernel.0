@@ -1,34 +1,72 @@
-From: juha.lumme@gmail.com (Juha Lumme)
-Date: Tue, 16 Jul 2013 20:44:43 +0900
-Subject: Can't get FIQ interrupt to work on i.mx233
-In-Reply-To: <20130716081132.GB24642@n2100.arm.linux.org.uk>
-References: <CAF-Ht3z3GQLwEWoB+UgOGepHfMFUD7pTRHfYWR9Ynk3rM4dD=Q@mail.gmail.com>
- <20130716081132.GB24642@n2100.arm.linux.org.uk>
-Message-ID: <51E5322B.8080602@gmail.com>
+From: oleksandr.kozaruk@ti.com (Oleksandr Kozaruk)
+Date: Tue, 16 Jul 2013 14:47:32 +0300
+Subject: [PATCH v4 0/2] TWL6030, TWL6032 GPADC driver
+Message-ID: <1373975254-23764-1-git-send-email-oleksandr.kozaruk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+Hello,
 
-Thanks for your reply.
-And thanks for pointing out the wrong instruction there with the ldr 
-instruction.
+v4 - addressed comments: fixed style violation, bug in freeing memory,
+     added comments explaining calibration method, removed test network
+     channels from exposing to userspace, error handling for 
+     wait_for_complition
+v3 - fixed compiler warning
+v2 - the driver put in drivers/iio, and
+converted using iio facilities as suggested by Graeme.
 
-However, unfortunately the code still doesn't seem to trigger anything 
-(neither to clear the IRQ bit in the timer, nor the GPIO output).. It 
-seems to me as if the handler never gets called. Is there a good way to 
-confirm that any activity is actually triggered when timer3 reaches 0, 
-and the IRQ bit is set to 1 ?
+TWL603[02] GPADC is used to measure battery voltage,
+battery temperature, battery presence ID, and could
+be used to measure twl603[02] die temperature.
+This is used on TI blaze, blaze tablet platforms.
 
-Best regards,
-Juha
+The TWL6030/TWL6032 is a PMIC that has a GPADC with 17/19
+channels respectively. Some channels have current
+source and are used for measuring voltage drop
+on resistive load for detecting battery ID resistance,
+or measuring voltage drop on NTC resistors for external
+temperature measurements, other channels measure voltage,
+(i.e. battery voltage), and have inbuilt voltage dividers,
+thus, capable to scale voltage. Some channels are dedicated
+for measuring die temperature.
 
-On 07/16/2013 05:11 PM, Russell King - ARM Linux wrote:
-> On Tue, Jul 16, 2013 at 10:59:22AM +0900, Juha Lumme wrote:
->> For now the assembly handler is only 6 instructions: http://codetidy.com/6193/
->> I first want to just clear the interrupt bit in HW_ICOLL_INTERRUPT31,
->> and then I write 0xFF to HW_PINCTRL_DOUT1
-> Unfortunately, the code doesn't match your description.  You set r10 to
-> 0xff, and then _load_ the value from the address at r8 into r10.
->
-> Maybe that ldr r10, [r8] should be str r10, [r8] ?
+Some channels could be calibrated in 2 points, having
+offsets from ideal values in trim registers.
+
+The difference between GPADC in TWL6030 and TWL6032:
+- 10 bit vs 12 bit ADC;
+- 17 vs 19 channels;
+- channels have different purpose(i. e. battery voltage
+  channel 8 vs channel 18);
+- trim values are interpreted differently.
+
+The driver is derived from git://git.omapzoom.org/kernel/omap.git
+The original driver's authors and contributors are Balaji T K,
+Graeme Gregory, Ambresh K, Girish S Ghongdemath.
+
+The changes to the original driver:
+- device tree adaptation;
+- drop ioctl support - never been used;
+- unified measurement method for both devices;
+- get rid of "if (device == X)" code style to data driven;
+- drop polling end of conversion and use interrupt instead;
+- iio framework is used
+
+Tested with on blaze tablet 2 with OMAP4430(twl6030), and
+OMAP4470(twl6032) SOMs.
+
+The patches were tested against 3.10-rc7
+
+Oleksandr Kozaruk (2):
+  ARM: dts: twl: Add GPADC data to device tree
+  iio: twl6030-gpadc: TWL6030, TWL6032 GPADC driver
+
+ arch/arm/boot/dts/twl6030.dtsi  |    6 +
+ drivers/iio/adc/Kconfig         |   14 +
+ drivers/iio/adc/Makefile        |    1 +
+ drivers/iio/adc/twl6030-gpadc.c | 1008 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 1029 insertions(+)
+ create mode 100644 drivers/iio/adc/twl6030-gpadc.c
+
+-- 
+1.8.1.2
