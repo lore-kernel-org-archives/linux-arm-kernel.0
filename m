@@ -1,36 +1,24 @@
-From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Tue, 16 Jul 2013 09:56:14 -0300
-Subject: [PATCH v2 3/4] ARM: dts: imx23-olinuxino: enable Low Resolution ADC
-In-Reply-To: <1373979376-31583-1-git-send-email-otavio@ossystems.com.br>
-References: <1373979376-31583-1-git-send-email-otavio@ossystems.com.br>
-Message-ID: <1373979376-31583-3-git-send-email-otavio@ossystems.com.br>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Jul 2013 20:56:48 +0800
+Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <1373968166.4327.11.camel@pizza.hi.pengutronix.de>
+References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
+ <20130716015038.GD28375@S2101-09.ap.freescale.net>
+ <51E4BF98.8030604@wwwdotorg.org>
+ <20130716041056.GA30067@S2101-09.ap.freescale.net>
+ <1373968166.4327.11.camel@pizza.hi.pengutronix.de>
+Message-ID: <20130716125646.GM28375@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.XM23 has a internal Low Resolution ADC; this enables the support
-for this device.
+On Tue, Jul 16, 2013 at 11:49:26AM +0200, Philipp Zabel wrote:
+> so you want to have gpio-reset probed at arch_initcall time and you have
+> gpio-pca953x probed at subsys_initcall time. Won't then all gpio-reset
+> devices that use gpios on pca953x to reset other peripherals need to be
+> deferred?
 
-Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
----
-Changes in v2: None
+Yes, they will be deferred, but they will be probed and ready at
+subsys_initcall time when gpio-pca953x probes.  This is still good since
+most of component device drivers probes at module_init time.
 
- arch/arm/boot/dts/imx23-olinuxino.dts | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
-index d107c4a..fc766ae 100644
---- a/arch/arm/boot/dts/imx23-olinuxino.dts
-+++ b/arch/arm/boot/dts/imx23-olinuxino.dts
-@@ -69,6 +69,10 @@
- 		};
- 
- 		apbx at 80040000 {
-+			lradc at 80050000 {
-+				status = "okay";
-+			};
-+
- 			duart: serial at 80070000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&duart_pins_a>;
--- 
-1.8.3.2
+Shawn
