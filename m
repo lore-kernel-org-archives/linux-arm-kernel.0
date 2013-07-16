@@ -1,85 +1,70 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 16 Jul 2013 11:54:49 +0200
-Subject: [PATCH v2 2/3] serial: mxs: enable the DMA only when the RTS/CTS
- is valid
-In-Reply-To: <1373957732-16638-3-git-send-email-b32955@freescale.com>
-References: <1373957732-16638-1-git-send-email-b32955@freescale.com>
- <1373957732-16638-3-git-send-email-b32955@freescale.com>
-Message-ID: <20130716095449.GS12139@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 16 Jul 2013 11:59:18 +0200
+Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <51E4BF98.8030604@wwwdotorg.org>
+References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
+ <20130716015038.GD28375@S2101-09.ap.freescale.net>
+ <51E4BF98.8030604@wwwdotorg.org>
+Message-ID: <1373968758.4327.17.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 02:55:31PM +0800, Huang Shijie wrote:
-> The original DMA support works only when RTS/CTS is enabled.
-What is original here?
+Hi Stephen,
 
-> But after several patches, DMA support has lost this limit.
-This is still misleading.
-
-> This patch adds an optional property for the UART DT node
-> which indicates the UART has RTS and CTS lines.
+Am Montag, den 15.07.2013, 21:35 -0600 schrieb Stephen Warren:
+> On 07/15/2013 07:50 PM, Shawn Guo wrote:
+> > Hi Philipp,
+> > 
+> > On Thu, May 30, 2013 at 11:09:00AM +0200, Philipp Zabel wrote:
+> >> This driver implements a reset controller device that toggle a gpio
+> >> connected to a reset pin of a peripheral IC. The delay between assertion
+> >> and de-assertion of the reset signal can be configured via device tree.
+> >>
+> >> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> >> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> > 
+> > I see this patch is very useful, as GPIOs are widely used to reset
+> > components/devices on board.  But I do not find the patch in v3.11-rc1.
+> > What's your plan about it?
+> > 
+> > Also, I'm wondering if we should register the driver a little bit
+> > early.  Please see the following patch.  If it makes sense to you,
+> > I can send the patch to you, or you can just quash it into yours.
+> > 
+> > Shawn
+> > 
+> > ---8<--------
+> > 
+> > From 2f8ce9e5d6525b98f3828b707458e83fabb39d50 Mon Sep 17 00:00:00 2001
+> > From: Shawn Guo <shawn.guo@linaro.org>
+> > Date: Sun, 14 Jul 2013 20:41:00 +0800
+> > Subject: [PATCH] ENGR00269945: reset: register gpio-reset driver in
+> >  arch_initcall
+> > 
+> > It's a little bit late to register gpio-reset driver at module_init
+> > time, because gpio-reset provides reset control via gpio for other
+> > devices which are mostly probed at module_init time too.  And it
+> > becomes even worse, when the gpio comes from IO expander on I2C bus,
+> > e.g. pca953x.  In that case, gpio-reset needs to be ready before I2C
+> > bus driver which is generally ready at subsys_initcall time.  Let's
+> > register gpio-reset driver in arch_initcall() to have it ready early
+> > enough.
 > 
-> This patch also adds a macro MXS_AUART_RTSCTS, and uses it to check
-> RTS/CTS before we enable the DMA for the UART.
-
-I still think this should go to stable. The options are:
-
-	a) also take patch 1 into stable
-	b) apply this patch without patch 1
-
-I don't know if option a) is OK, b) is probably preferable. And as Greg
-has much to do anyhow, better move this patch first. (Otherwise he will
-probably only say: That patch doesn't apply, please help.)
-
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  .../bindings/tty/serial/fsl-mxs-auart.txt          |    4 ++++
->  drivers/tty/serial/mxs-auart.c                     |    5 ++++-
->  2 files changed, 8 insertions(+), 1 deletions(-)
+> There's no need for the reset driver to be registered before its users;
+> the users of the reset GPIO will simply have their probe deferred until
+> the reset controller is available, and then everything will work out
+> just fine.
 > 
-> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> index 2c00ec6..59a40f1 100644
-> --- a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> @@ -10,6 +10,10 @@ Required properties:
->    Refer to dma.txt and fsl-mxs-dma.txt for details.
->  - dma-names: "rx" for RX channel, "tx" for TX channel.
->  
-> +Optional properties:
-> +- fsl,uart-has-rtscts : Indicate the UART has RTS and CTS lines,
-> +	it also means you enable the DMA support for this UART.
-> +
->  Example:
->  auart0: serial at 8006a000 {
->  	compatible = "fsl,imx28-auart", "fsl,imx23-auart";
-> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-> index 465ef0b..27532fd 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -134,6 +134,7 @@ enum mxs_auart_type {
->  struct mxs_auart_port {
->  	struct uart_port port;
->  
-> +#define MXS_AUART_RTSCTS	1
->  #define MXS_AUART_DMA_ENABLED	0x2
->  #define MXS_AUART_DMA_TX_SYNC	2  /* bit 2 */
->  #define MXS_AUART_DMA_RX_READY	3  /* bit 3 */
-> @@ -639,7 +640,7 @@ static void mxs_auart_settermios(struct uart_port *u,
->  		 * we can only implement the DMA support for auart
->  		 * in mx28.
->  		 */
-> -		if (is_imx28_auart(s)) {
-> +		if (is_imx28_auart(s) && (s->flags & MXS_AUART_RTSCTS)) {
-I thought you wanted to add a comment here. Without knowing the details
+> > The defer probe mechanism is not used here, because a reset controller
+> > driver should be reasonably registered early than other devices.  More
+> > importantly, defer probe doe not help in some nasty cases, e.g. the
+> > gpio-pca953x device itself needs a reset from gpio-reset driver to start
+> > working.
+> 
+> That should work fine with deferred probe.
 
-	if (RTSCTS)
-		enable_dma();
+Deferred probing is fine, but it'd be nice to keep the probe deferral
+loops to a minimum where possible and/or reasonable.
 
-looks strange.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+regards
+Philipp
