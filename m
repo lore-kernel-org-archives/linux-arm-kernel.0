@@ -1,29 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 16 Jul 2013 16:28:37 +0400
-Subject: [PATCH v4 0/3]  ARM: shmobile: lager: enable Ether
-In-Reply-To: <7990652.CKWzcoj3FL@avalon>
-References: <1372663234-13486-1-git-send-email-horms+renesas@verge.net.au>
- <7990652.CKWzcoj3FL@avalon>
-Message-ID: <51E53C75.10904@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 16 Jul 2013 05:32:56 -0700
+Subject: [PATCH v2 4/4] ARM: OMAP2+: Provide alias to USB PHY clock
+In-Reply-To: <51E40199.9070906@ti.com>
+References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
+ <1371571487-14389-5-git-send-email-rogerq@ti.com>
+ <51E40199.9070906@ti.com>
+Message-ID: <20130716123256.GY7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+* Roger Quadros <rogerq@ti.com> [130715 07:11]:
+> Hi Tony,
+> 
+> On 06/18/2013 07:04 PM, Roger Quadros wrote:
+> > Till the OMAP clocks are correctly defined in device tree, use
+> > this temporary hack to provide clock alias to the USB PHY clocks.
+> > 
+> > Without this, USB Host & Ethernet will not be functional with
+> > device tree boots on Panda and uEVM.
+> 
+> Looks like this one got missed out.
+> 
+> USB host no longer works on Panda with DT boot.
+> Could you please queue this for next 3.11-rc? Thanks.
 
-On 16-07-2013 13:42, Laurent Pinchart wrote:
+OK thanks for checking, applying into omap-for-v3.11/fixes.
 
->> this short series enables the on-board ethernet
->> of the r8a7790 SoC for on lager board.
+Looks like I also have some pending the .dts changes in
+omap-for-v3.11/dt branch:
 
->> It has a run-time dependency on
->> "sh_eth: add support for r8a7790 SoC"
+4cf2198b1e3cee47a1cccbb500b67782c36615d5 ARM: dts: omap3-beagle-xm: Add USB host supprot for Rev. Ax/Bx
+9bc44515819a00c0ffaf751ad497ddf275089ede ARM: dts: omap3-beagle-xm: Add USB Host support
+fd65d7df4598c1d2ad27d664c719611a1a070edc ARM: dts: omap3-beagle: Make USB host pin naming consistent
+39ea891d9da6ae1824bc9f689db3f306f5ce0724 ARM: dts: omap4-panda: Add USB Host support
 
->> It has been built on top of renesas-next-20130701.
+Those should get merged as fixes, right? Can you please
+check and see if they're still OK or if we also need
+something else?
 
-> Do you plan to respin this series on top of your latest devel branch ? I've
-> quickly rebased it and now get receive FIFO overflows when booting over NFS,
-> followed by the kernel disabling the sh-eth IRQ.
+Regards,
 
-    That disabling of IRQ should have been fixed in 3.10.
-
-WBR, Sergei
+Tony
