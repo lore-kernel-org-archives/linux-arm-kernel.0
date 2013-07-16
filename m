@@ -1,588 +1,285 @@
 From: dsd@laptop.org (Daniel Drake)
-Date: Tue, 16 Jul 2013 14:10:29 -0400 (EDT)
-Subject: [PATCH RESEND 1/2] clk: mmp: use global clock lock
-Message-ID: <20130716181029.C08D8FAAF3@dev.laptop.org>
+Date: Tue, 16 Jul 2013 14:11:19 -0400 (EDT)
+Subject: [PATCH RESEND 2/2] clk: mmp: add support for DT-defined clocks
+Message-ID: <20130716181119.46C08FAAF3@dev.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mmp platform shares a lock between different clock types, and all
-clocks are currently initialized by static bindings.
+Add support to the existing mmp clock drivers for clocks to be defined
+in the device tree. This will be used on OLPC MMP2/MMP3-based laptops.
 
-Move this static/private lock into global context so that it can
-easily be shared by clocks that will be defined by the device tree in
-followup patches.
+If clock info cannot be found in the device tree, we fall back to the
+static clock initialization already present.
 
 Signed-off-by: Daniel Drake <dsd@laptop.org>
 ---
- drivers/clk/mmp/Makefile   |   2 +-
- drivers/clk/mmp/clk-apbc.c |  38 +++++----------
- drivers/clk/mmp/clk-apmu.c |  20 ++------
- drivers/clk/mmp/clk-mmp2.c | 116 ++++++++++++++++++++++-----------------------
- drivers/clk/mmp/clk.h      |   8 ++--
- drivers/clk/mmp/common.c   |  13 +++++
- 6 files changed, 92 insertions(+), 105 deletions(-)
- create mode 100644 drivers/clk/mmp/common.c
+ .../devicetree/bindings/clock/mmp-apbc.txt         | 30 ++++++++++
+ .../devicetree/bindings/clock/mmp-apmu.txt         | 30 ++++++++++
+ drivers/clk/mmp/clk-apbc.c                         | 66 +++++++++++++++++++++-
+ drivers/clk/mmp/clk-apmu.c                         | 37 +++++++++++-
+ drivers/clk/mmp/clk-mmp2.c                         | 19 ++++++-
+ 5 files changed, 179 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/mmp-apbc.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/mmp-apmu.txt
 
 Resending after a month without review.
 
-diff --git a/drivers/clk/mmp/Makefile b/drivers/clk/mmp/Makefile
-index 392d780..31aacb5 100644
---- a/drivers/clk/mmp/Makefile
-+++ b/drivers/clk/mmp/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for mmp specific clk
- #
- 
--obj-y += clk-apbc.o clk-apmu.o clk-frac.o
-+obj-y += common.o clk-apbc.o clk-apmu.o clk-frac.o
- 
- obj-$(CONFIG_CPU_PXA168) += clk-pxa168.o
- obj-$(CONFIG_CPU_PXA910) += clk-pxa910.o
+diff --git a/Documentation/devicetree/bindings/clock/mmp-apbc.txt b/Documentation/devicetree/bindings/clock/mmp-apbc.txt
+new file mode 100644
+index 0000000..88e1253
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/mmp-apbc.txt
+@@ -0,0 +1,30 @@
++* Clock bindings for Marvell MMP Advanced Peripheral Bus clock
++
++Parent apb-clock node
++=====================
++Required properties:
++- reg: Address and length of the APB clock unit registers
++
++
++Child peripheral clock nodes
++============================
++Required properties:
++- compatible : shall be "marvell,mmp-apb-clock"
++- #clock-cells : from common clock binding; shall be set to 1
++- clocks : parent clock, from common clock binding
++- clock-output-names : Array of clock names, from common clock binding
++- reg : Array of control register offsets into APB clock unit register space
++
++
++Example:
++apbc: apb-clock {
++	reg = <0xd4015000 0x1000>;
++
++	twsi-clocks {
++		compatible = "marvell,mmp-apb-clock";
++		#clock-cells = <1>;
++		clocks = <&vctvxo-clock>;
++		clock-output-names = "TWSI0", "TWSI1";
++		reg = <0x04 0x08>;
++	};
++};
+diff --git a/Documentation/devicetree/bindings/clock/mmp-apmu.txt b/Documentation/devicetree/bindings/clock/mmp-apmu.txt
+new file mode 100644
+index 0000000..18bb0f9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/mmp-apmu.txt
+@@ -0,0 +1,30 @@
++* Clock bindings for Marvell MMP Application Subsystem Power Management Unit
++
++Parent apmu-clock node
++=====================
++Required properties:
++- reg: Address and length of the CPU Subsystem PMU registers
++
++
++Child peripheral clock nodes
++============================
++Required properties:
++- compatible : shall be "marvell,mmp-apmu-clock"
++- #clock-cells : from common clock binding; shall be set to 0
++- clocks : parent clock, from common clock binding
++- reg : Control register offsets into parent register space
++- enable-mask : The bits to be set in the register to enable the clock, or
++                cleared to disable.
++
++Example:
++apmu-clock {
++	reg = <0xd4282800 0x1000>;
++
++	usb-clock {
++		compatible = "marvell,mmp-apmu-clock";
++		#clock-cells = <0>;
++		clocks = <&usb_pll>;
++		reg = <0x5c>;
++		enable-mask = <0x09>;
++	};
++};
 diff --git a/drivers/clk/mmp/clk-apbc.c b/drivers/clk/mmp/clk-apbc.c
-index d14120e..89a146a 100644
+index 89a146a..d53bc79 100644
 --- a/drivers/clk/mmp/clk-apbc.c
 +++ b/drivers/clk/mmp/clk-apbc.c
-@@ -30,7 +30,6 @@ struct clk_apbc {
- 	void __iomem		*base;
- 	unsigned int		delay;
- 	unsigned int		flags;
--	spinlock_t		*lock;
- };
+@@ -15,6 +15,8 @@
+ #include <linux/err.h>
+ #include <linux/delay.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
  
- static int clk_apbc_prepare(struct clk_hw *hw)
-@@ -43,8 +42,7 @@ static int clk_apbc_prepare(struct clk_hw *hw)
- 	 * It may share same register as MUX clock,
- 	 * and it will impact FNCLK enable. Spinlock is needed
- 	 */
--	if (apbc->lock)
--		spin_lock_irqsave(apbc->lock, flags);
-+	spin_lock_irqsave(&mmp_clk_lock, flags);
+ #include "clk.h"
  
- 	data = readl_relaxed(apbc->base);
- 	if (apbc->flags & APBC_POWER_CTRL)
-@@ -52,33 +50,26 @@ static int clk_apbc_prepare(struct clk_hw *hw)
- 	data |= APBC_FNCLK;
- 	writel_relaxed(data, apbc->base);
- 
--	if (apbc->lock)
--		spin_unlock_irqrestore(apbc->lock, flags);
--
-+	spin_unlock_irqrestore(&mmp_clk_lock, flags);
- 	udelay(apbc->delay);
--
--	if (apbc->lock)
--		spin_lock_irqsave(apbc->lock, flags);
-+	spin_lock_irqsave(&mmp_clk_lock, flags);
- 
- 	data = readl_relaxed(apbc->base);
- 	data |= APBC_APBCLK;
- 	writel_relaxed(data, apbc->base);
- 
--	if (apbc->lock)
--		spin_unlock_irqrestore(apbc->lock, flags);
-+	spin_unlock_irqrestore(&mmp_clk_lock, flags);
- 
- 	udelay(apbc->delay);
- 
- 	if (!(apbc->flags & APBC_NO_BUS_CTRL)) {
--		if (apbc->lock)
--			spin_lock_irqsave(apbc->lock, flags);
-+		spin_lock_irqsave(&mmp_clk_lock, flags);
- 
- 		data = readl_relaxed(apbc->base);
- 		data &= ~APBC_RST;
- 		writel_relaxed(data, apbc->base);
- 
--		if (apbc->lock)
--			spin_unlock_irqrestore(apbc->lock, flags);
-+		spin_unlock_irqrestore(&mmp_clk_lock, flags);
- 	}
- 
- 	return 0;
-@@ -90,8 +81,7 @@ static void clk_apbc_unprepare(struct clk_hw *hw)
- 	unsigned long data;
- 	unsigned long flags = 0;
- 
--	if (apbc->lock)
--		spin_lock_irqsave(apbc->lock, flags);
-+	spin_lock_irqsave(&mmp_clk_lock, flags);
- 
- 	data = readl_relaxed(apbc->base);
- 	if (apbc->flags & APBC_POWER_CTRL)
-@@ -99,20 +89,15 @@ static void clk_apbc_unprepare(struct clk_hw *hw)
- 	data &= ~APBC_FNCLK;
- 	writel_relaxed(data, apbc->base);
- 
--	if (apbc->lock)
--		spin_unlock_irqrestore(apbc->lock, flags);
--
-+	spin_unlock_irqrestore(&mmp_clk_lock, flags);
- 	udelay(10);
--
--	if (apbc->lock)
--		spin_lock_irqsave(apbc->lock, flags);
-+	spin_lock_irqsave(&mmp_clk_lock, flags);
- 
- 	data = readl_relaxed(apbc->base);
- 	data &= ~APBC_APBCLK;
- 	writel_relaxed(data, apbc->base);
- 
--	if (apbc->lock)
--		spin_unlock_irqrestore(apbc->lock, flags);
-+	spin_unlock_irqrestore(&mmp_clk_lock, flags);
- }
- 
- struct clk_ops clk_apbc_ops = {
-@@ -122,7 +107,7 @@ struct clk_ops clk_apbc_ops = {
- 
- struct clk *mmp_clk_register_apbc(const char *name, const char *parent_name,
- 		void __iomem *base, unsigned int delay,
--		unsigned int apbc_flags, spinlock_t *lock)
-+		unsigned int apbc_flags)
- {
- 	struct clk_apbc *apbc;
- 	struct clk *clk;
-@@ -141,7 +126,6 @@ struct clk *mmp_clk_register_apbc(const char *name, const char *parent_name,
- 	apbc->base = base;
- 	apbc->delay = delay;
- 	apbc->flags = apbc_flags;
--	apbc->lock = lock;
+@@ -129,8 +131,70 @@ struct clk *mmp_clk_register_apbc(const char *name, const char *parent_name,
  	apbc->hw.init = &init;
  
  	clk = clk_register(NULL, &apbc->hw);
+-	if (IS_ERR(clk))
++	if (WARN_ON(IS_ERR(clk)))
+ 		kfree(apbc);
+ 
+ 	return clk;
+ }
++
++static void __init mmp_apbc_dt_init(struct device_node *node)
++{
++	struct device_node *parent = of_get_parent(node);
++	const __be32 *regs;
++	struct clk *clk;
++	int rc;
++	int len;
++	int num_clocks;
++	int clock_num;
++	void __iomem *baseaddr;
++	const char *clock_name;
++	const char *parent_name;
++	struct clk **clks;
++	struct clk_onecell_data *clk_data;
++
++	regs = of_get_property(node, "reg", &len);
++	if (WARN_ON(!regs || (len % sizeof(__be32) != 0)))
++		return;
++	num_clocks = len / sizeof(__be32);
++
++	baseaddr = of_iomap(parent, 0);
++	of_node_put(parent);
++	if (WARN_ON(!baseaddr))
++		return;
++
++	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
++	if (WARN_ON(!clk_data))
++		goto err_clk_data;
++
++	clks = kzalloc(num_clocks * sizeof(*clks), GFP_KERNEL);
++	if (WARN_ON(!clks))
++		goto err_clks;
++
++	clock_name = of_get_property(node, "clock-output-names", NULL);
++	parent_name = of_clk_get_parent_name(node, 0);
++
++	for (clock_num = 0; clock_num < num_clocks; clock_num++) {
++		void __iomem *clock_addr;
++		clock_addr = baseaddr + be32_to_cpup(regs + clock_num);
++
++		clk = mmp_clk_register_apbc(clock_name, parent_name,
++					    clock_addr, 10, 0);
++		if (IS_ERR(clk))
++			return;
++		clock_name += strlen(clock_name) + 1;
++		clks[clock_num] = clk;
++	}
++
++	clk_data->clk_num = num_clocks;
++	clk_data->clks = clks;
++	rc = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++	WARN_ON(rc);
++	return;
++
++err_clks:
++	kfree(clk_data);
++err_clk_data:
++	iounmap(baseaddr);
++
++}
++CLK_OF_DECLARE(mmp2_apbc, "marvell,mmp-apb-clock", mmp_apbc_dt_init);
 diff --git a/drivers/clk/mmp/clk-apmu.c b/drivers/clk/mmp/clk-apmu.c
-index abe182b..4f4d8c5 100644
+index 4f4d8c5..dfcecc9 100644
 --- a/drivers/clk/mmp/clk-apmu.c
 +++ b/drivers/clk/mmp/clk-apmu.c
-@@ -24,7 +24,6 @@ struct clk_apmu {
+@@ -15,6 +15,8 @@
+ #include <linux/err.h>
+ #include <linux/delay.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
+ 
+ #include "clk.h"
+ 
+@@ -22,7 +24,6 @@
+ struct clk_apmu {
+ 	struct clk_hw   hw;
  	void __iomem    *base;
- 	u32		rst_mask;
+-	u32		rst_mask;
  	u32		enable_mask;
--	spinlock_t	*lock;
  };
  
- static int clk_apmu_enable(struct clk_hw *hw)
-@@ -33,14 +32,10 @@ static int clk_apmu_enable(struct clk_hw *hw)
- 	unsigned long data;
- 	unsigned long flags = 0;
+@@ -85,3 +86,37 @@ struct clk *mmp_clk_register_apmu(const char *name, const char *parent_name,
  
--	if (apmu->lock)
--		spin_lock_irqsave(apmu->lock, flags);
--
-+	spin_lock_irqsave(&mmp_clk_lock, flags);
- 	data = readl_relaxed(apmu->base) | apmu->enable_mask;
- 	writel_relaxed(data, apmu->base);
--
--	if (apmu->lock)
--		spin_unlock_irqrestore(apmu->lock, flags);
-+	spin_unlock_irqrestore(&mmp_clk_lock, flags);
- 
- 	return 0;
+ 	return clk;
  }
-@@ -51,14 +46,10 @@ static void clk_apmu_disable(struct clk_hw *hw)
- 	unsigned long data;
- 	unsigned long flags = 0;
- 
--	if (apmu->lock)
--		spin_lock_irqsave(apmu->lock, flags);
--
-+	spin_lock_irqsave(&mmp_clk_lock, flags);
- 	data = readl_relaxed(apmu->base) & ~apmu->enable_mask;
- 	writel_relaxed(data, apmu->base);
--
--	if (apmu->lock)
--		spin_unlock_irqrestore(apmu->lock, flags);
-+	spin_unlock_irqrestore(&mmp_clk_lock, flags);
- }
- 
- struct clk_ops clk_apmu_ops = {
-@@ -67,7 +58,7 @@ struct clk_ops clk_apmu_ops = {
- };
- 
- struct clk *mmp_clk_register_apmu(const char *name, const char *parent_name,
--		void __iomem *base, u32 enable_mask, spinlock_t *lock)
-+		void __iomem *base, u32 enable_mask)
- {
- 	struct clk_apmu *apmu;
- 	struct clk *clk;
-@@ -85,7 +76,6 @@ struct clk *mmp_clk_register_apmu(const char *name, const char *parent_name,
- 
- 	apmu->base = base;
- 	apmu->enable_mask = enable_mask;
--	apmu->lock = lock;
- 	apmu->hw.init = &init;
- 
- 	clk = clk_register(NULL, &apmu->hw);
++
++static void __init mmp_apmu_dt_init(struct device_node *node)
++{
++	struct device_node *parent = of_get_parent(node);
++	const char *clk_name = node->name;
++	void __iomem *baseaddr;
++	struct clk *clk;
++	u32 reg;
++	u32 enable_mask;
++	int rc;
++
++	rc = of_property_read_u32(node, "reg", &reg);
++	if (WARN_ON(rc))
++		return;
++
++	rc = of_property_read_u32(node, "enable-mask", &enable_mask);
++	if (WARN_ON(rc))
++		return;
++
++	baseaddr = of_iomap(parent, 0);
++	of_node_put(parent);
++	if (WARN_ON(!baseaddr))
++		return;
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++	clk = mmp_clk_register_apmu(clk_name, of_clk_get_parent_name(node, 0),
++				    baseaddr + reg, enable_mask);
++	if (WARN_ON(IS_ERR(clk)))
++		return;
++
++	rc = of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	WARN_ON(rc);
++}
++CLK_OF_DECLARE(mmp2_apmu, "marvell,mmp-apmu-clock", mmp_apmu_dt_init);
 diff --git a/drivers/clk/mmp/clk-mmp2.c b/drivers/clk/mmp/clk-mmp2.c
-index d1f1a19..cb1b0b6 100644
+index cb1b0b6..774193b 100644
 --- a/drivers/clk/mmp/clk-mmp2.c
 +++ b/drivers/clk/mmp/clk-mmp2.c
-@@ -52,8 +52,6 @@
- #define APMU_CCIC1	0xf4
- #define MPMU_UART_PLL	0x14
+@@ -15,6 +15,7 @@
+ #include <linux/io.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
++#include <linux/of.h>
  
--static DEFINE_SPINLOCK(clk_lock);
--
- static struct clk_factor_masks uart_factor_masks = {
- 	.factor = 2,
- 	.num_mask = 0x1fff,
-@@ -196,254 +194,254 @@ void __init mmp2_clk_init(void)
- 	clk_register_clkdev(clk, "uart_pll", NULL);
+ #include <mach/addr-map.h>
  
- 	clk = mmp_clk_register_apbc("twsi0", "vctcxo",
--				apbc_base + APBC_TWSI0, 10, 0, &clk_lock);
-+				apbc_base + APBC_TWSI0, 10, 0);
- 	clk_register_clkdev(clk, NULL, "pxa2xx-i2c.0");
+@@ -73,7 +74,7 @@ static const char *sdh_parent[] = {"pll1_4", "pll2", "usb_pll", "pll1"};
+ static const char *disp_parent[] = {"pll1", "pll1_16", "pll2", "vctcxo"};
+ static const char *ccic_parent[] = {"pll1_2", "pll1_16", "vctcxo"};
  
- 	clk = mmp_clk_register_apbc("twsi1", "vctcxo",
--				apbc_base + APBC_TWSI1, 10, 0, &clk_lock);
-+				apbc_base + APBC_TWSI1, 10, 0);
- 	clk_register_clkdev(clk, NULL, "pxa2xx-i2c.1");
- 
- 	clk = mmp_clk_register_apbc("twsi2", "vctcxo",
--				apbc_base + APBC_TWSI2, 10, 0, &clk_lock);
-+				apbc_base + APBC_TWSI2, 10, 0);
- 	clk_register_clkdev(clk, NULL, "pxa2xx-i2c.2");
- 
- 	clk = mmp_clk_register_apbc("twsi3", "vctcxo",
--				apbc_base + APBC_TWSI3, 10, 0, &clk_lock);
-+				apbc_base + APBC_TWSI3, 10, 0);
- 	clk_register_clkdev(clk, NULL, "pxa2xx-i2c.3");
- 
- 	clk = mmp_clk_register_apbc("twsi4", "vctcxo",
--				apbc_base + APBC_TWSI4, 10, 0, &clk_lock);
-+				apbc_base + APBC_TWSI4, 10, 0);
- 	clk_register_clkdev(clk, NULL, "pxa2xx-i2c.4");
- 
- 	clk = mmp_clk_register_apbc("twsi5", "vctcxo",
--				apbc_base + APBC_TWSI5, 10, 0, &clk_lock);
-+				apbc_base + APBC_TWSI5, 10, 0);
- 	clk_register_clkdev(clk, NULL, "pxa2xx-i2c.5");
- 
- 	clk = mmp_clk_register_apbc("gpio", "vctcxo",
--				apbc_base + APBC_GPIO, 10, 0, &clk_lock);
-+				apbc_base + APBC_GPIO, 10, 0);
- 	clk_register_clkdev(clk, NULL, "mmp2-gpio");
- 
- 	clk = mmp_clk_register_apbc("kpc", "clk32",
--				apbc_base + APBC_KPC, 10, 0, &clk_lock);
-+				apbc_base + APBC_KPC, 10, 0);
- 	clk_register_clkdev(clk, NULL, "pxa27x-keypad");
- 
- 	clk = mmp_clk_register_apbc("rtc", "clk32",
--				apbc_base + APBC_RTC, 10, 0, &clk_lock);
-+				apbc_base + APBC_RTC, 10, 0);
- 	clk_register_clkdev(clk, NULL, "mmp-rtc");
- 
- 	clk = mmp_clk_register_apbc("pwm0", "vctcxo",
--				apbc_base + APBC_PWM0, 10, 0, &clk_lock);
-+				apbc_base + APBC_PWM0, 10, 0);
- 	clk_register_clkdev(clk, NULL, "mmp2-pwm.0");
- 
- 	clk = mmp_clk_register_apbc("pwm1", "vctcxo",
--				apbc_base + APBC_PWM1, 10, 0, &clk_lock);
-+				apbc_base + APBC_PWM1, 10, 0);
- 	clk_register_clkdev(clk, NULL, "mmp2-pwm.1");
- 
- 	clk = mmp_clk_register_apbc("pwm2", "vctcxo",
--				apbc_base + APBC_PWM2, 10, 0, &clk_lock);
-+				apbc_base + APBC_PWM2, 10, 0);
- 	clk_register_clkdev(clk, NULL, "mmp2-pwm.2");
- 
- 	clk = mmp_clk_register_apbc("pwm3", "vctcxo",
--				apbc_base + APBC_PWM3, 10, 0, &clk_lock);
-+				apbc_base + APBC_PWM3, 10, 0);
- 	clk_register_clkdev(clk, NULL, "mmp2-pwm.3");
- 
- 	clk = clk_register_mux(NULL, "uart0_mux", uart_parent,
- 				ARRAY_SIZE(uart_parent), CLK_SET_RATE_PARENT,
--				apbc_base + APBC_UART0, 4, 3, 0, &clk_lock);
-+				apbc_base + APBC_UART0, 4, 3, 0, &mmp_clk_lock);
- 	clk_set_parent(clk, vctcxo);
- 	clk_register_clkdev(clk, "uart_mux.0", NULL);
- 
- 	clk = mmp_clk_register_apbc("uart0", "uart0_mux",
--				apbc_base + APBC_UART0, 10, 0, &clk_lock);
-+				apbc_base + APBC_UART0, 10, 0);
- 	clk_register_clkdev(clk, NULL, "pxa2xx-uart.0");
- 
- 	clk = clk_register_mux(NULL, "uart1_mux", uart_parent,
- 				ARRAY_SIZE(uart_parent), CLK_SET_RATE_PARENT,
--				apbc_base + APBC_UART1, 4, 3, 0, &clk_lock);
-+				apbc_base + APBC_UART1, 4, 3, 0, &mmp_clk_lock);
- 	clk_set_parent(clk, vctcxo);
- 	clk_register_clkdev(clk, "uart_mux.1", NULL);
- 
- 	clk = mmp_clk_register_apbc("uart1", "uart1_mux",
--				apbc_base + APBC_UART1, 10, 0, &clk_lock);
-+				apbc_base + APBC_UART1, 10, 0);
- 	clk_register_clkdev(clk, NULL, "pxa2xx-uart.1");
- 
- 	clk = clk_register_mux(NULL, "uart2_mux", uart_parent,
- 				ARRAY_SIZE(uart_parent), CLK_SET_RATE_PARENT,
--				apbc_base + APBC_UART2, 4, 3, 0, &clk_lock);
-+				apbc_base + APBC_UART2, 4, 3, 0, &mmp_clk_lock);
- 	clk_set_parent(clk, vctcxo);
- 	clk_register_clkdev(clk, "uart_mux.2", NULL);
- 
- 	clk = mmp_clk_register_apbc("uart2", "uart2_mux",
--				apbc_base + APBC_UART2, 10, 0, &clk_lock);
-+				apbc_base + APBC_UART2, 10, 0);
- 	clk_register_clkdev(clk, NULL, "pxa2xx-uart.2");
- 
- 	clk = clk_register_mux(NULL, "uart3_mux", uart_parent,
- 				ARRAY_SIZE(uart_parent), CLK_SET_RATE_PARENT,
--				apbc_base + APBC_UART3, 4, 3, 0, &clk_lock);
-+				apbc_base + APBC_UART3, 4, 3, 0, &mmp_clk_lock);
- 	clk_set_parent(clk, vctcxo);
- 	clk_register_clkdev(clk, "uart_mux.3", NULL);
- 
- 	clk = mmp_clk_register_apbc("uart3", "uart3_mux",
--				apbc_base + APBC_UART3, 10, 0, &clk_lock);
-+				apbc_base + APBC_UART3, 10, 0);
- 	clk_register_clkdev(clk, NULL, "pxa2xx-uart.3");
- 
- 	clk = clk_register_mux(NULL, "ssp0_mux", ssp_parent,
- 				ARRAY_SIZE(ssp_parent), CLK_SET_RATE_PARENT,
--				apbc_base + APBC_SSP0, 4, 3, 0, &clk_lock);
-+				apbc_base + APBC_SSP0, 4, 3, 0, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "uart_mux.0", NULL);
- 
- 	clk = mmp_clk_register_apbc("ssp0", "ssp0_mux",
--				apbc_base + APBC_SSP0, 10, 0, &clk_lock);
-+				apbc_base + APBC_SSP0, 10, 0);
- 	clk_register_clkdev(clk, NULL, "mmp-ssp.0");
- 
- 	clk = clk_register_mux(NULL, "ssp1_mux", ssp_parent,
- 				ARRAY_SIZE(ssp_parent), CLK_SET_RATE_PARENT,
--				apbc_base + APBC_SSP1, 4, 3, 0, &clk_lock);
-+				apbc_base + APBC_SSP1, 4, 3, 0, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "ssp_mux.1", NULL);
- 
- 	clk = mmp_clk_register_apbc("ssp1", "ssp1_mux",
--				apbc_base + APBC_SSP1, 10, 0, &clk_lock);
-+				apbc_base + APBC_SSP1, 10, 0);
- 	clk_register_clkdev(clk, NULL, "mmp-ssp.1");
- 
- 	clk = clk_register_mux(NULL, "ssp2_mux", ssp_parent,
- 				ARRAY_SIZE(ssp_parent), CLK_SET_RATE_PARENT,
--				apbc_base + APBC_SSP2, 4, 3, 0, &clk_lock);
-+				apbc_base + APBC_SSP2, 4, 3, 0, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "ssp_mux.2", NULL);
- 
- 	clk = mmp_clk_register_apbc("ssp2", "ssp2_mux",
--				apbc_base + APBC_SSP2, 10, 0, &clk_lock);
-+				apbc_base + APBC_SSP2, 10, 0);
- 	clk_register_clkdev(clk, NULL, "mmp-ssp.2");
- 
- 	clk = clk_register_mux(NULL, "ssp3_mux", ssp_parent,
- 				ARRAY_SIZE(ssp_parent), CLK_SET_RATE_PARENT,
--				apbc_base + APBC_SSP3, 4, 3, 0, &clk_lock);
-+				apbc_base + APBC_SSP3, 4, 3, 0, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "ssp_mux.3", NULL);
- 
- 	clk = mmp_clk_register_apbc("ssp3", "ssp3_mux",
--				apbc_base + APBC_SSP3, 10, 0, &clk_lock);
-+				apbc_base + APBC_SSP3, 10, 0);
- 	clk_register_clkdev(clk, NULL, "mmp-ssp.3");
- 
- 	clk = clk_register_mux(NULL, "sdh_mux", sdh_parent,
- 				ARRAY_SIZE(sdh_parent), CLK_SET_RATE_PARENT,
--				apmu_base + APMU_SDH0, 8, 2, 0, &clk_lock);
-+				apmu_base + APMU_SDH0, 8, 2, 0, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "sdh_mux", NULL);
- 
- 	clk = clk_register_divider(NULL, "sdh_div", "sdh_mux",
- 				CLK_SET_RATE_PARENT, apmu_base + APMU_SDH0,
--				10, 4, CLK_DIVIDER_ONE_BASED, &clk_lock);
-+				10, 4, CLK_DIVIDER_ONE_BASED, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "sdh_div", NULL);
- 
- 	clk = mmp_clk_register_apmu("sdh0", "sdh_div", apmu_base + APMU_SDH0,
--				0x1b, &clk_lock);
-+				0x1b);
- 	clk_register_clkdev(clk, NULL, "sdhci-pxav3.0");
- 
- 	clk = mmp_clk_register_apmu("sdh1", "sdh_div", apmu_base + APMU_SDH1,
--				0x1b, &clk_lock);
-+				0x1b);
- 	clk_register_clkdev(clk, NULL, "sdhci-pxav3.1");
- 
- 	clk = mmp_clk_register_apmu("sdh2", "sdh_div", apmu_base + APMU_SDH2,
--				0x1b, &clk_lock);
-+				0x1b);
- 	clk_register_clkdev(clk, NULL, "sdhci-pxav3.2");
- 
- 	clk = mmp_clk_register_apmu("sdh3", "sdh_div", apmu_base + APMU_SDH3,
--				0x1b, &clk_lock);
-+				0x1b);
- 	clk_register_clkdev(clk, NULL, "sdhci-pxav3.3");
- 
- 	clk = mmp_clk_register_apmu("usb", "usb_pll", apmu_base + APMU_USB,
--				0x9, &clk_lock);
-+				0x9);
- 	clk_register_clkdev(clk, "usb_clk", NULL);
- 
- 	clk = clk_register_mux(NULL, "disp0_mux", disp_parent,
- 				ARRAY_SIZE(disp_parent), CLK_SET_RATE_PARENT,
--				apmu_base + APMU_DISP0, 6, 2, 0, &clk_lock);
-+				apmu_base + APMU_DISP0, 6, 2, 0, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "disp_mux.0", NULL);
- 
- 	clk = clk_register_divider(NULL, "disp0_div", "disp0_mux",
- 				CLK_SET_RATE_PARENT, apmu_base + APMU_DISP0,
--				8, 4, CLK_DIVIDER_ONE_BASED, &clk_lock);
-+				8, 4, CLK_DIVIDER_ONE_BASED, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "disp_div.0", NULL);
- 
- 	clk = mmp_clk_register_apmu("disp0", "disp0_div",
--				apmu_base + APMU_DISP0, 0x1b, &clk_lock);
-+				apmu_base + APMU_DISP0, 0x1b);
- 	clk_register_clkdev(clk, NULL, "mmp-disp.0");
- 
- 	clk = clk_register_divider(NULL, "disp0_sphy_div", "disp0_mux", 0,
--				apmu_base + APMU_DISP0, 15, 5, 0, &clk_lock);
-+				apmu_base + APMU_DISP0, 15, 5, 0, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "disp_sphy_div.0", NULL);
- 
- 	clk = mmp_clk_register_apmu("disp0_sphy", "disp0_sphy_div",
--				apmu_base + APMU_DISP0, 0x1024, &clk_lock);
-+				apmu_base + APMU_DISP0, 0x1024);
- 	clk_register_clkdev(clk, "disp_sphy.0", NULL);
- 
- 	clk = clk_register_mux(NULL, "disp1_mux", disp_parent,
- 				ARRAY_SIZE(disp_parent), CLK_SET_RATE_PARENT,
--				apmu_base + APMU_DISP1, 6, 2, 0, &clk_lock);
-+				apmu_base + APMU_DISP1, 6, 2, 0, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "disp_mux.1", NULL);
- 
- 	clk = clk_register_divider(NULL, "disp1_div", "disp1_mux",
- 				CLK_SET_RATE_PARENT, apmu_base + APMU_DISP1,
--				8, 4, CLK_DIVIDER_ONE_BASED, &clk_lock);
-+				8, 4, CLK_DIVIDER_ONE_BASED, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "disp_div.1", NULL);
- 
- 	clk = mmp_clk_register_apmu("disp1", "disp1_div",
--				apmu_base + APMU_DISP1, 0x1b, &clk_lock);
-+				apmu_base + APMU_DISP1, 0x1b);
- 	clk_register_clkdev(clk, NULL, "mmp-disp.1");
- 
- 	clk = mmp_clk_register_apmu("ccic_arbiter", "vctcxo",
--				apmu_base + APMU_CCIC0, 0x1800, &clk_lock);
-+				apmu_base + APMU_CCIC0, 0x1800);
- 	clk_register_clkdev(clk, "ccic_arbiter", NULL);
- 
- 	clk = clk_register_mux(NULL, "ccic0_mux", ccic_parent,
- 				ARRAY_SIZE(ccic_parent), CLK_SET_RATE_PARENT,
--				apmu_base + APMU_CCIC0, 6, 2, 0, &clk_lock);
-+				apmu_base + APMU_CCIC0, 6, 2, 0, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "ccic_mux.0", NULL);
- 
- 	clk = clk_register_divider(NULL, "ccic0_div", "ccic0_mux",
- 				CLK_SET_RATE_PARENT, apmu_base + APMU_CCIC0,
--				17, 4, CLK_DIVIDER_ONE_BASED, &clk_lock);
-+				17, 4, CLK_DIVIDER_ONE_BASED, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "ccic_div.0", NULL);
- 
- 	clk = mmp_clk_register_apmu("ccic0", "ccic0_div",
--				apmu_base + APMU_CCIC0, 0x1b, &clk_lock);
-+				apmu_base + APMU_CCIC0, 0x1b);
- 	clk_register_clkdev(clk, "fnclk", "mmp-ccic.0");
- 
- 	clk = mmp_clk_register_apmu("ccic0_phy", "ccic0_div",
--				apmu_base + APMU_CCIC0, 0x24, &clk_lock);
-+				apmu_base + APMU_CCIC0, 0x24);
- 	clk_register_clkdev(clk, "phyclk", "mmp-ccic.0");
- 
- 	clk = clk_register_divider(NULL, "ccic0_sphy_div", "ccic0_div",
- 				CLK_SET_RATE_PARENT, apmu_base + APMU_CCIC0,
--				10, 5, 0, &clk_lock);
-+				10, 5, 0, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "sphyclk_div", "mmp-ccic.0");
- 
- 	clk = mmp_clk_register_apmu("ccic0_sphy", "ccic0_sphy_div",
--				apmu_base + APMU_CCIC0, 0x300, &clk_lock);
-+				apmu_base + APMU_CCIC0, 0x300);
- 	clk_register_clkdev(clk, "sphyclk", "mmp-ccic.0");
- 
- 	clk = clk_register_mux(NULL, "ccic1_mux", ccic_parent,
- 				ARRAY_SIZE(ccic_parent), CLK_SET_RATE_PARENT,
--				apmu_base + APMU_CCIC1, 6, 2, 0, &clk_lock);
-+				apmu_base + APMU_CCIC1, 6, 2, 0, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "ccic_mux.1", NULL);
- 
- 	clk = clk_register_divider(NULL, "ccic1_div", "ccic1_mux",
- 				CLK_SET_RATE_PARENT, apmu_base + APMU_CCIC1,
--				16, 4, CLK_DIVIDER_ONE_BASED, &clk_lock);
-+				16, 4, CLK_DIVIDER_ONE_BASED, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "ccic_div.1", NULL);
- 
- 	clk = mmp_clk_register_apmu("ccic1", "ccic1_div",
--				apmu_base + APMU_CCIC1, 0x1b, &clk_lock);
-+				apmu_base + APMU_CCIC1, 0x1b);
- 	clk_register_clkdev(clk, "fnclk", "mmp-ccic.1");
- 
- 	clk = mmp_clk_register_apmu("ccic1_phy", "ccic1_div",
--				apmu_base + APMU_CCIC1, 0x24, &clk_lock);
-+				apmu_base + APMU_CCIC1, 0x24);
- 	clk_register_clkdev(clk, "phyclk", "mmp-ccic.1");
- 
- 	clk = clk_register_divider(NULL, "ccic1_sphy_div", "ccic1_div",
- 				CLK_SET_RATE_PARENT, apmu_base + APMU_CCIC1,
--				10, 5, 0, &clk_lock);
-+				10, 5, 0, &mmp_clk_lock);
- 	clk_register_clkdev(clk, "sphyclk_div", "mmp-ccic.1");
- 
- 	clk = mmp_clk_register_apmu("ccic1_sphy", "ccic1_sphy_div",
--				apmu_base + APMU_CCIC1, 0x300, &clk_lock);
-+				apmu_base + APMU_CCIC1, 0x300);
+-void __init mmp2_clk_init(void)
++static void __init mmp2_clk_init_static(void)
+ {
+ 	struct clk *clk;
+ 	struct clk *vctcxo;
+@@ -445,3 +446,19 @@ void __init mmp2_clk_init(void)
+ 				apmu_base + APMU_CCIC1, 0x300);
  	clk_register_clkdev(clk, "sphyclk", "mmp-ccic.1");
  }
-diff --git a/drivers/clk/mmp/clk.h b/drivers/clk/mmp/clk.h
-index ab86dd4..d697d9b 100644
---- a/drivers/clk/mmp/clk.h
-+++ b/drivers/clk/mmp/clk.h
-@@ -3,6 +3,9 @@
- 
- #include <linux/clk-provider.h>
- #include <linux/clkdev.h>
-+#include <linux/spinlock.h>
 +
-+extern spinlock_t mmp_clk_lock;
- 
- #define APBC_NO_BUS_CTRL	BIT(0)
- #define APBC_POWER_CTRL		BIT(1)
-@@ -24,10 +27,9 @@ extern struct clk *mmp_clk_register_pll2(const char *name,
- 		const char *parent_name, unsigned long flags);
- extern struct clk *mmp_clk_register_apbc(const char *name,
- 		const char *parent_name, void __iomem *base,
--		unsigned int delay, unsigned int apbc_flags, spinlock_t *lock);
-+		unsigned int delay, unsigned int apbc_flags);
- extern struct clk *mmp_clk_register_apmu(const char *name,
--		const char *parent_name, void __iomem *base, u32 enable_mask,
--		spinlock_t *lock);
-+		const char *parent_name, void __iomem *base, u32 enable_mask);
- extern struct clk *mmp_clk_register_factor(const char *name,
- 		const char *parent_name, unsigned long flags,
- 		void __iomem *base, struct clk_factor_masks *masks,
-diff --git a/drivers/clk/mmp/common.c b/drivers/clk/mmp/common.c
-new file mode 100644
-index 0000000..dadce5f
---- /dev/null
-+++ b/drivers/clk/mmp/common.c
-@@ -0,0 +1,13 @@
-+/*
-+ * mmp clock common elements
-+ *
-+ * Copyright (C) 2013 One Laptop per Child
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
++void __init mmp2_clk_init(void)
++{
++	struct device_node *node;
 +
-+#include <linux/spinlock.h>
-+
-+DEFINE_SPINLOCK(mmp_clk_lock);
++	/* The presence of the ABP clock node in the device tree indicates
++	 * that we should use the DT for clock setup. */
++	node = of_find_compatible_node(NULL, NULL, "marvell,mmp-apb-clock");
++	if (node) {
++		of_node_put(node);
++		of_clk_init(NULL);
++	} else {
++		/* Fallback to static setup */
++		mmp2_clk_init_static();
++	}
++}
 -- 
 1.8.1.4
