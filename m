@@ -1,58 +1,132 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Jul 2013 10:33:51 +0200
-Subject: [PATCHv5 00/11] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <20130715162709.GA24625@dhcp-172-17-186-34.nvidia.com>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <51E4167B.4000208@wwwdotorg.org>
- <20130715162709.GA24625@dhcp-172-17-186-34.nvidia.com>
-Message-ID: <20130716103351.15b0fb50@skate>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 16 Jul 2013 16:35:54 +0800
+Subject: [PATCH 2/5] iio: at91: Use different prescal, startup mask in
+ MR for different IP
+In-Reply-To: <20130715125815.GC2962@lukather>
+References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
+ <1373789069-11604-3-git-send-email-josh.wu@atmel.com>
+ <20130715125815.GC2962@lukather>
+Message-ID: <51E505EA.4060502@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thierry Reding,
+Hi, Maxime
 
-On Mon, 15 Jul 2013 09:27:10 -0700, Thierry Reding wrote:
+On 7/15/2013 8:58 PM, Maxime Ripard wrote:
+> Hi Josh,
+>
+> On Sun, Jul 14, 2013 at 04:04:26PM +0800, Josh Wu wrote:
+>> For at91 boards, there are different IPs for adc. Different IPs has different
+>> STARTUP & PRESCAL mask in ADC_MR.
+>>
+>> This patch can change the masks according to the different IP version.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>>   arch/arm/mach-at91/include/mach/at91_adc.h |    9 ++++--
+>>   drivers/iio/adc/at91_adc.c                 |   48 ++++++++++++++++++++++++++--
+>>   2 files changed, 53 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/include/mach/at91_adc.h b/arch/arm/mach-at91/include/mach/at91_adc.h
+>> index 8e7ed5c..ab273ee 100644
+>> --- a/arch/arm/mach-at91/include/mach/at91_adc.h
+>> +++ b/arch/arm/mach-at91/include/mach/at91_adc.h
+>> @@ -28,9 +28,12 @@
+>>   #define			AT91_ADC_TRGSEL_EXTERNAL	(6 << 1)
+>>   #define		AT91_ADC_LOWRES		(1 << 4)	/* Low Resolution */
+>>   #define		AT91_ADC_SLEEP		(1 << 5)	/* Sleep Mode */
+>> -#define		AT91_ADC_PRESCAL	(0x3f << 8)	/* Prescalar Rate Selection */
+>> +#define		AT91_ADC_PRESCAL	(0xff << 8)	/* Prescalar Rate Selection */
+>> +#define		AT91_ADC_PRESCAL_9260	(0x3f << 8)
+>>   #define			AT91_ADC_PRESCAL_(x)	((x) << 8)
+>> -#define		AT91_ADC_STARTUP	(0x1f << 16)	/* Startup Up Time */
+>> +#define		AT91_ADC_STARTUP	(0xf << 16)	/* Startup Up Time */
+>> +#define		AT91_ADC_STARTUP_9260	(0x1f << 16)
+>> +#define		AT91_ADC_STARTUP_9G45	(0x7f << 16)
+>>   #define			AT91_ADC_STARTUP_(x)	((x) << 16)
+>>   #define		AT91_ADC_SHTIM		(0xf  << 24)	/* Sample & Hold Time */
+>>   #define			AT91_ADC_SHTIM_(x)	((x) << 24)
+>> @@ -58,4 +61,6 @@
+>>   #define AT91_ADC_CHR(n)		(0x30 + ((n) * 4))	/* Channel Data Register N */
+>>   #define		AT91_ADC_DATA		(0x3ff)
+>>   
+>> +#define AT91_ADC_VERSION	0xFC
+>> +
+>>   #endif
+>> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+>> index 18bd54f..14e99ba 100644
+>> --- a/drivers/iio/adc/at91_adc.c
+>> +++ b/drivers/iio/adc/at91_adc.c
+>> @@ -39,6 +39,12 @@
+>>   #define at91_adc_writel(st, reg, val) \
+>>   	(writel_relaxed(val, st->reg_base + reg))
+>>   
+>> +struct at91_adc_caps {
+>> +	bool	has_tsmr;	/* only at91sam9x5, sama5d3 have TSMR reg */
+>> +	u32	mr_prescal_mask;
+>> +	u32	mr_startup_mask;
+>> +};
+>> +
+>>   struct at91_adc_state {
+>>   	struct clk		*adc_clk;
+>>   	u16			*buffer;
+>> @@ -62,6 +68,7 @@ struct at91_adc_state {
+>>   	u32			res;		/* resolution used for convertions */
+>>   	bool			low_res;	/* the resolution corresponds to the lowest one */
+>>   	wait_queue_head_t	wq_data_avail;
+>> +	struct at91_adc_caps	caps;
+>>   };
+>>   
+>>   static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
+>> @@ -580,6 +587,41 @@ static const struct iio_info at91_adc_info = {
+>>   	.read_raw = &at91_adc_read_raw,
+>>   };
+>>   
+>> +/*
+>> + * Since atmel adc support different ip for touchscreen mode. Through the
+>> + * IP check, we will know the touchscreen capbilities.
+>> + */
+>> +static void atmel_adc_get_cap(struct at91_adc_state *st)
+>> +{
+>> +	unsigned int version;
+>> +	struct iio_dev *idev = iio_priv_to_dev(st);
+>> +
+>> +	version = at91_adc_readl(st, AT91_ADC_VERSION);
+>> +	dev_dbg(&idev->dev, "version: 0x%x\n", version);
+>> +
+>> +	st->caps.mr_prescal_mask = AT91_ADC_PRESCAL_9260;
+>> +	st->caps.mr_startup_mask = AT91_ADC_STARTUP_9260;
+>> +
+>> +	/* keep only major version number */
+>> +	switch (version & 0xf00) {
+>> +	case 0x500:	/* SAMA5D3 */
+>> +	case 0x400:	/* AT91SAM9X5/9N12 */
+>> +		st->caps.has_tsmr = 1;
+>> +		st->caps.mr_startup_mask = AT91_ADC_STARTUP;
+>> +	case 0x200:	/* AT91SAM9M10/9G45 */
+>> +		st->caps.mr_prescal_mask = AT91_ADC_PRESCAL;
+>> +
+>> +		if ((version & 0xf00) == 0x200)
+>> +			st->caps.mr_startup_mask = AT91_ADC_STARTUP_9G45;
+>> +	case 0x100:	/* AT91SAM9260/9G20 */
+>> +		break;
+>> +	default:
+>> +		dev_warn(&idev->dev,
+>> +				"Unmanaged adc version, use minimal capabilities\n");
+>> +		break;
+>> +	};
+>> +}
+> Why don't you use different compatible names and derive your
+> capabilities from which compatible is declared.
+>
+> It seems safer.
 
-> We need at least patches 2, 4 and 8 for Tegra.
+Ok, that make sense. I will use compatible names for the capabilities in 
+next version. Thanks.
 
-Are you sure you don't want patch 1 ? It allows to replace the
-allocation of MSI interrupt numbers for the MSI driver by a generic
-facility based on irq domains.
+>
+> Maxime
+>
 
-> There's still the option
-> of working around patch 8 by using the custom root bus scan function
-> that we have to use anyway, so I guess we could even trim the
-> requirement down to patches 2 and 4 if we really need.
-
-Bjorn said he didn't like having the msi chip assignment in the middle
-of the root bus scan function, because he was hoping someday to
-refactor this function. Quoting Bjorn:
-
-"""
-> +	bus->msi = pcie->msi;  
-
-Ideally, arches could use pci_scan_root_bus(), which does the
-pci_scan_child_bus() itself, so I never like to add arch-specific code
-between pci_create_root_bus() and pci_scan_child_bus().
-
-But you should be able to accomplish this by setting bus->msi in a
-pcibios_add_bus() hook.  There is a corresponding pcibios_remove_bus()
-hook that might be useful for deallocating the msi_chip.  I'm not too
-clear on how you manage the msi_chip lifetime -- I see the alloc in
-armada_370_xp_msi_init(), but I'm not sure whether you ever deallocate
-it or how you know when it would be safe to do so.
-"""
-
-This is from:
-
-Subject: Re: [PATCH v2 6/8] pci: mvebu: add support for MSI
-Date: Tue, 18 Jun 2013 16:57:11 -0600
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best Regards,
+Josh Wu
