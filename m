@@ -1,27 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 16 Jul 2013 17:19:40 +0100
-Subject: [PATCH 0/2] regulator: palmas-pmic: doc: update device tree
- bindings
-In-Reply-To: <20130716142710.GA15015@kahuna>
-References: <1373984635-14958-1-git-send-email-nm@ti.com>
- <20130716142710.GA15015@kahuna>
-Message-ID: <20130716161939.GR22506@sirena.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 16 Jul 2013 21:49:53 +0530
+Subject: [GIT PULL] DaVinci fixes for v3.11-rc2
+Message-ID: <51E572A9.2080201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 09:27:10AM -0500, Nishanth Menon wrote:
-> On 09:23-20130716, Nishanth Menon wrote:
+Hi Arnd, Olof,
 
-> > We seem to have a few missing updates to device tree bindings with the
-> > latest set of changes getting merged in.
+Can you please pull the following fixes for v3.11-rc2?
 
-> Oops.. seems like I have an old mailID for Mark :(
+Thanks,
+Sekhar
 
-I'll need the actual patches as well...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130716/36acce69/attachment-0001.sig>
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.11-rc2
+
+for you to fetch changes up to cf690331642010a837c026088588761f61528ddf:
+
+  ARM: davinci: defconfig: enable EDMA driver (2013-07-16 20:39:39 +0530)
+
+----------------------------------------------------------------
+DaVinci fixes for v3.11-rc2
+
+The pull request includes fixes for sparse
+warnings, defconfig changes to enable DMA
+usage on peripherals and removal of a duplicated
+include file.
+
+----------------------------------------------------------------
+Sekhar Nori (2):
+      ARM: davinci: make file local variables static
+      ARM: davinci: defconfig: enable EDMA driver
+
+Wei Yongjun (1):
+      ARM: edma: remove duplicated include from edma.c
+
+ arch/arm/common/edma.c                  |    1 -
+ arch/arm/configs/da8xx_omapl_defconfig  |    2 ++
+ arch/arm/configs/davinci_all_defconfig  |    2 ++
+ arch/arm/mach-davinci/board-dm365-evm.c |    2 +-
+ arch/arm/mach-davinci/dm355.c           |    2 +-
+ arch/arm/mach-davinci/dm365.c           |    2 +-
+ 6 files changed, 7 insertions(+), 4 deletions(-)
