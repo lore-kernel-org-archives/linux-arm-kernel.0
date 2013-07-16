@@ -1,119 +1,76 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Tue, 16 Jul 2013 08:05:55 +0200
-Subject: [PATCH v1 20/24] fs_enet: OF clock lookup (non-fatal),
- prepare and enable
-In-Reply-To: <1373914074-20889-1-git-send-email-gsi@denx.de>
-References: <1373914074-20889-1-git-send-email-gsi@denx.de>
-Message-ID: <1373954759-23947-1-git-send-email-gsi@denx.de>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 16 Jul 2013 11:57:02 +0530
+Subject: [RFC PATCH 01/11] driver/core: cpu: initialize of_node in cpu's
+ device struture
+In-Reply-To: <1373883732-26303-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1373883732-26303-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <CAKohpom-u3hCZrxWi-oaneXY_7ewLn06C8Wn78nE28mn9=TOHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-device tree based clock lookup, must prepare clocks before enabling
-them, unprepare after disable, error check in the clock setup, remove
-the pre-enable workaround in the MPC512x platform's clock driver
+On 15 July 2013 15:52,  <Sudeep.KarkadaNagesha@arm.com> wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>
+> CPUs are also registered as devices but the of_node in these cpu
+> devices are not initialized. Currently different drivers requiring
+> to access cpu device node are parsing the nodes themselves and
+> initialising the of_node in cpu device.
+>
+> The of_node in all the cpu devices properly needs to be initialized
 
-this change implements non-fatal clock lookup since not all platforms
-provide device tree specs for clocks, but failure to enable a specified
-clock is considered fatal
+s/properly /
 
-Signed-off-by: Gerhard Sittig <gsi@denx.de>
----
- arch/powerpc/platforms/512x/clock-commonclk.c      |    1 -
- .../net/ethernet/freescale/fs_enet/fs_enet-main.c  |   27 +++++++++++++++++++-
- include/linux/fs_enet_pd.h                         |    3 +++
- 3 files changed, 29 insertions(+), 2 deletions(-)
-
-diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
-index 29c51a5..31d0cf3 100644
---- a/arch/powerpc/platforms/512x/clock-commonclk.c
-+++ b/arch/powerpc/platforms/512x/clock-commonclk.c
-@@ -692,7 +692,6 @@ static void mpc512x_clk_setup_clock_tree(int busfreq)
- 	clk_prepare_enable(clks[MPC512x_CLK_LPC]);	/* boot media */
- 	/* some are not yet acquired by their respective drivers */
- 	clk_prepare_enable(clks[MPC512x_CLK_PSC3_MCLK]);/* serial console */
--	clk_prepare_enable(clks[MPC512x_CLK_FEC]);	/* network, NFS */
- 	/*
- 	 * some have their individual clock subtree with separate clock
- 	 * items and their individual enable counters, yet share a
-diff --git a/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c b/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-index 8de53a1..df92e12 100644
---- a/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-+++ b/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-@@ -1020,6 +1020,21 @@ static int fs_enet_probe(struct platform_device *ofdev)
- 		fpi->cp_command = *data;
- 	}
- 
-+	/* make clock lookup non-fatal (the driver is shared among platforms),
-+	 * but require enable to succeed when a clock was specified/found
-+	 */
-+	fpi->clk_per = clk_get(&ofdev->dev, "per");
-+	if (IS_ERR(fpi->clk_per))
-+		fpi->clk_per = NULL;
-+	if (fpi->clk_per) {
-+		int err;
-+		err = clk_prepare_enable(fpi->clk_per);
-+		if (err) {
-+			ret = err;
-+			goto out_clk_put;
-+		}
-+	}
-+
- 	fpi->rx_ring = 32;
- 	fpi->tx_ring = 32;
- 	fpi->rx_copybreak = 240;
-@@ -1028,7 +1043,7 @@ static int fs_enet_probe(struct platform_device *ofdev)
- 	fpi->phy_node = of_parse_phandle(ofdev->dev.of_node, "phy-handle", 0);
- 	if ((!fpi->phy_node) && (!of_get_property(ofdev->dev.of_node, "fixed-link",
- 						  NULL)))
--		goto out_free_fpi;
-+		goto out_clk_dis;
- 
- 	if (of_device_is_compatible(ofdev->dev.of_node, "fsl,mpc5125-fec")) {
- 		phy_connection_type = of_get_property(ofdev->dev.of_node,
-@@ -1108,6 +1123,12 @@ out_free_dev:
- 	free_netdev(ndev);
- out_put:
- 	of_node_put(fpi->phy_node);
-+out_clk_dis:
-+	if (fpi->clk_per)
-+		clk_disable_unprepare(fpi->clk_per);
-+out_clk_put:
-+	if (fpi->clk_per)
-+		clk_put(fpi->clk_per);
- out_free_fpi:
- 	kfree(fpi);
- 	return ret;
-@@ -1124,6 +1145,10 @@ static int fs_enet_remove(struct platform_device *ofdev)
- 	fep->ops->cleanup_data(ndev);
- 	dev_set_drvdata(fep->dev, NULL);
- 	of_node_put(fep->fpi->phy_node);
-+	if (fep->fpi->clk_per) {
-+		clk_disable_unprepare(fep->fpi->clk_per);
-+		clk_put(fep->fpi->clk_per);
-+	}
- 	free_netdev(ndev);
- 	return 0;
- }
-diff --git a/include/linux/fs_enet_pd.h b/include/linux/fs_enet_pd.h
-index 51b7934..a978d0d 100644
---- a/include/linux/fs_enet_pd.h
-+++ b/include/linux/fs_enet_pd.h
-@@ -16,6 +16,7 @@
- #ifndef FS_ENET_PD_H
- #define FS_ENET_PD_H
- 
-+#include <linux/clk.h>
- #include <linux/string.h>
- #include <linux/of_mdio.h>
- #include <asm/types.h>
-@@ -142,6 +143,8 @@ struct fs_platform_info {
- 
- 	int use_rmii;		/* use RMII mode 	       */
- 	int has_phy;            /* if the network is phy container as well...*/
-+
-+	struct clk *clk_per;	/* 'per' clock for register access */
- };
- struct fs_mii_fec_platform_info {
- 	u32 irq[32];
--- 
-1.7.10.4
+> properly and at one place. The best place to update this is CPU
+> subsystem driver when registering the cpu devices.
+>
+> This patch introduces a new function arch_of_get_cpu_node and uses it
+> to assign of_node. The definition of this function can be overridden
+> by architecture specific implementation.
+>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> ---
+>  drivers/base/cpu.c | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>
+> diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
+> index a16d20e..4b3047a 100644
+> --- a/drivers/base/cpu.c
+> +++ b/drivers/base/cpu.c
+> @@ -28,6 +28,24 @@ static int cpu_subsys_match(struct device *dev, struct device_driver *drv)
+>         return 0;
+>  }
+>
+> +/**
+> + * arch_of_get_cpu_node - Get device node associated with the given logical CPU
+> + * @cpu: CPU number(logical index) for which device node is required
+> + *
+> + * The only purpose of this function is to retrieve the device node for the
+> + * given logical CPU index. It should be used to intialise the of_node in
+> + * cpu device. Once of_node in cpu device is populated, all the further
+> + * references can use that instead.
+> + *
+> + * CPU logical to physical index mapping is architecure specific and is built
+> + * before booting secondary cores. Hence this function is marked __weak and
+> + * can be overridden by architecture specific implementation.
+> + */
+> +struct device_node * __weak arch_of_get_cpu_node(int cpu)
+> +{
+> +       return NULL;
+> +}
+> +
+>  #ifdef CONFIG_HOTPLUG_CPU
+>  static void change_cpu_under_node(struct cpu *cpu,
+>                         unsigned int from_nid, unsigned int to_nid)
+> @@ -289,6 +307,7 @@ int __cpuinit register_cpu(struct cpu *cpu, int num)
+>         cpu->dev.release = cpu_device_release;
+>         cpu->dev.offline_disabled = !cpu->hotpluggable;
+>         cpu->dev.offline = !cpu_online(num);
+> +       cpu->dev.of_node = arch_of_get_cpu_node(num);
+>  #ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
+>         cpu->dev.bus->uevent = arch_cpu_uevent;
+>  #endif
+> --
+> 1.8.1.2
+>
+>
