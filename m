@@ -1,45 +1,37 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 16 Jul 2013 11:41:10 -0500
-Subject: [PATCH V2 2/2] regulator: palmas-pmic: doc: remove ti,tstep
+Date: Tue, 16 Jul 2013 11:41:09 -0500
+Subject: [PATCH V2 1/2] regulator: palmas-pmic: doc: fix typo for sleep-mode
 In-Reply-To: <1373992870-20725-1-git-send-email-nm@ti.com>
 References: <20130716161939.GR22506@sirena.org.uk>
  <1373992870-20725-1-git-send-email-nm@ti.com>
-Message-ID: <1373992870-20725-3-git-send-email-nm@ti.com>
+Message-ID: <1373992870-20725-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 28d1e8cd671a53d6b4f967abbbc2a55f7bd333f6
-(regulator: palma: add ramp delay support through regulator constraints)
+commit 3c870e3f9d9d98f1ab98614b3b1fd5c79287d361
+(regulator: palmas: Change the DT node property names to follow the convention)
 
-Removed the regulator's ti,step option from driver without updating the
-documentation.
+Missed updating mode-sleep from sleep-mode. Fix the same.
 
-So, remove from documentation and example as well.
+Documentation example seems proper for this property.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- .../devicetree/bindings/regulator/palmas-pmic.txt  |    2 --
- 1 file changed, 2 deletions(-)
+ .../devicetree/bindings/regulator/palmas-pmic.txt  |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/Documentation/devicetree/bindings/regulator/palmas-pmic.txt b/Documentation/devicetree/bindings/regulator/palmas-pmic.txt
-index 04d67f0..30b0581 100644
+index d5a3086..04d67f0 100644
 --- a/Documentation/devicetree/bindings/regulator/palmas-pmic.txt
 +++ b/Documentation/devicetree/bindings/regulator/palmas-pmic.txt
-@@ -33,7 +33,6 @@ Optional nodes:
+@@ -31,7 +31,7 @@ Optional nodes:
+ 	       Optional sub-node properties:
+ 	       ti,warm-reset - maintain voltage during warm reset(boolean)
  	       ti,roof-floor - control voltage selection by pin(boolean)
- 	       ti,mode-sleep - mode to adopt in pmic sleep 0 - off, 1 - auto,
+-	       ti,sleep-mode - mode to adopt in pmic sleep 0 - off, 1 - auto,
++	       ti,mode-sleep - mode to adopt in pmic sleep 0 - off, 1 - auto,
  	       2 - eco, 3 - forced pwm
--	       ti,tstep - slope control 0 - Jump, 1 10mV/us, 2 5mV/us, 3 2.5mV/us
+ 	       ti,tstep - slope control 0 - Jump, 1 10mV/us, 2 5mV/us, 3 2.5mV/us
  	       ti,smps-range - OTP has the wrong range set for the hardware so override
- 	       0 - low range, 1 - high range.
- 
-@@ -59,7 +58,6 @@ pmic {
- 			ti,warm-reset;
- 			ti,roof-floor;
- 			ti,mode-sleep = <0>;
--			ti,tstep = <0>;
- 			ti,smps-range = <1>;
- 		};
- 
 -- 
 1.7.9.5
