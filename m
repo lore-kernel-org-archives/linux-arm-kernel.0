@@ -1,63 +1,33 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 16 Jul 2013 17:55:41 +0200
-Subject: [GIT PULL] clockevents/clocksource: Add Marvell Orion SoC timer
-In-Reply-To: <alpine.DEB.2.02.1307081041290.32106@ionos.tec.linutronix.de>
-References: <51B8D310.4050404@linaro.org> <51D9548B.9040907@gmail.com>
- <alpine.DEB.2.02.1307071508030.32106@ionos.tec.linutronix.de>
- <20130707144645.GA11908@titan.lakedaemon.net>
- <alpine.DEB.2.02.1307071723220.32106@ionos.tec.linutronix.de>
- <20130707235819.GB11908@titan.lakedaemon.net>
- <alpine.DEB.2.02.1307081041290.32106@ionos.tec.linutronix.de>
-Message-ID: <51E56CFD.9050508@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 16 Jul 2013 16:57:40 +0100
+Subject: [PATCH v3] rtc: Add MOXA ART RTC driver
+In-Reply-To: <CACmBeS3jU2csACZCqXfRvCYAEHaK7S3AcJ++Yd=L-mgfeqg68A@mail.gmail.com>
+References: <1373550711-18828-1-git-send-email-jonas.jensen@gmail.com>
+ <1373978485-17496-1-git-send-email-jonas.jensen@gmail.com>
+ <20130716131332.GL22506@sirena.org.uk>
+ <CACmBeS3jU2csACZCqXfRvCYAEHaK7S3AcJ++Yd=L-mgfeqg68A@mail.gmail.com>
+Message-ID: <20130716155740.GO22506@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2013 10:45 AM, Thomas Gleixner wrote:
-> On Sun, 7 Jul 2013, Jason Cooper wrote:
->> On Sun, Jul 07, 2013 at 05:30:31PM +0200, Thomas Gleixner wrote:
->> I don't mind delaying half of a series so the drivers/ portion can land
->> in mainline, and the rest can land in the next cycle.  But when things
->> don't go according to that plan, I'd like a little consideration /
->> flexibility about solving the problem.  Especially considering I'm
->> *trying* to do the right thing by pushing to appropriate maintainers
->> first.
->>
->> Of course, this is a moot point since, as you clarified above, this
->> dependency doesn't have the hazards typically associated with
->> out-of-tree dependencies.
-> 
-> There is a very simple procedure for stuff like this.
-> 
-> Series has parts which go through tree A and B and another larger part
-> for tree C which depends on the A and B parts.
-> 
-> So ask the maintainers of A and B to apply this to separate branches,
-> which are based on some commit in Linus tree. These branches can be
-> pulled into C and C can apply the depending stuff on top.
-> 
-> Now the maintainers of A and B merge these branches into their main
-> devel branch, can do further fixups and stuff on top. And the whole
-> thing just works without glitches during the merge window.
-> 
-> We do this all the time.
+On Tue, Jul 16, 2013 at 04:04:07PM +0200, Jonas Jensen wrote:
+> On 16 July 2013 15:13, Mark Brown <broonie@kernel.org> wrote:
+> > Since you're now using OF you should also be including a binding
+> > document.
 
-Ok, I was about to send to both of you a PR with a common ancestor [1]
-for this patch but finally this patch has been taken for timers/urgent.
+> The binding document already exist in set of patches adding MOXA ART
+> SoC support ( I intend to mail out v4 once I know how to proceed ):
 
-I don't have to send the PR, right ?
+If that's the case then you need to point people at the binding document
+when posting the driver but...
 
-timers/urgent will be merged into timers/core, correct ?
+> Or should it be moved here to a new v4 patch?
 
-Thanks
-  -- Daniel
-
-[1]
-https://git.linaro.org/gitweb?p=people/dlezcano/clockevents.git;a=shortlog;h=refs/heads/timers/mvebu-deps-3.12
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+...it's more normal to push the binding along with the driver.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130716/7e5b010a/attachment.sig>
