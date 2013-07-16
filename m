@@ -1,76 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Jul 2013 20:24:04 +0100
-Subject: [PATCH RFC v2 04/14] ARM: debug: provide 8250 debug uart
- register shift configuration option
-In-Reply-To: <20130716191658.GG24642@n2100.arm.linux.org.uk>
-References: <20130716163243.GY21614@n2100.arm.linux.org.uk>
- <E1Uz8FU-00047a-AB@rmk-PC.arm.linux.org.uk> <51E59338.6020102@ti.com>
- <20130716191658.GG24642@n2100.arm.linux.org.uk>
-Message-ID: <20130716192403.GA13150@n2100.arm.linux.org.uk>
+From: nerv@dawncrow.de (=?UTF-8?B?QW5kcsOpIEhlbnRzY2hlbA==?=)
+Date: Tue, 16 Jul 2013 21:27:11 +0200
+Subject: arm: Only load TLS values when needed
+In-Reply-To: <51E5836B.1010904@arm.com>
+References: <51E42E11.1010903@dawncrow.de> <51E5836B.1010904@arm.com>
+Message-ID: <51E59E8F.1060501@dawncrow.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 08:16:58PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jul 16, 2013 at 02:38:48PM -0400, Santosh Shilimkar wrote:
-> > Just a question. Exposing selection choice for UART port
-> > and probably flow control is just fine, but do we need to
-> > really need config entries for SHIFT, PA, VA etc ?
-> 
-> Let's look at the original problem.  We have lots of files in
-> arch/arm/include/debug who's sole purpose is to define a pair of base
-> addresses.  Maybe around 500 lines of code doing just that - though
-> much of it is copyright notices (can someone explain to me the point
-> of claiming copyright on four lines of code defining a base address of
-> a UART which is, apart from the addresses themselves, identical with
-> every other damned file?)
-> 
-> What this series does is remove many of those files by consolidating
-> much of them into a much denser way to represent all this variability.
-> However, this doesn't really address the root problem, which is that
-> we have all this information in the kernel, which needs to be added
-> to every single time we have a new platform come along no matter what
-> it is.
-> 
-> We need to stop that from happening - we need a way for people to tell
-> the kernel where their UART is without having to load the kernel up
-> with lots of platform specific information [*].
-> 
-> Also, even without this, the debug menu has become something of a
-> sprawling mess, with various people re-implementing what's already
-> there presumably because they don't look/don't bother to research what
-> support is already there - and is another source of constant additions.
-> 
-> So, the idea that every platform gets to somehow put its UART addresses
-> into the kernel image isn't scalable.  Either we end up with lots of
-> defaults in a Kconfig wihch are also prone to merge conflicts, or we
-> end up with lots of files in arch/arm/include/debug defining the base
-> addresses.
-> 
-> We need to stop all of these problems from happening before they
-> become a big headache for us - imagine Linus' reaction when our debug
-> menu grows to be the largest Kconfig file in the kernel tree!  Do you
-> want to be there when that happens?  We're the 22nd biggest Kconfig
-> file already at 25K - there's only one debug Kconfig larger and that's
-> the main lib/Kconfig.debug one which has recently been through a cleanup.
-> 
-> Therefore, the idea is to provide _generic_ options which people can
-> set according to their platforms needs.  Remember, this is *supposed*
-> to be a developer tool, not a user tool, so asking for addresses and
-> other parameters is perfectly acceptable - just make sure that they're
-> documented in a reasonable place.
+Hi Jonathan,
+First, thank you for your review.
 
-And as if to prove the point, while writing that email, a patch dropped
-into my mailbox:
+Am 16.07.2013 19:31, schrieb Jonathan Austin:
+> Hi Andr?,
+> 
+> On 15/07/13 18:14, Andr? Hentschel wrote:
+>> From: Andr? Hentschel <nerv@dawncrow.de>
+>>
+>> This patch intents to reduce loading instructions when the resulting value is not used.
+>> It's a follow up on a4780adeefd042482f624f5e0d577bf9cdcbb760
+>>
+> 
+> Have you done any benchmarking to see that this has any real impact? Or tested on a !Vv6k system? It looks possible that the only case where this will perform better is where we're using switch_tls_none or switch_tls_software (both rare cases, I think) and there's some change it will make things worse in other cases?
 
-"ARM: BCM53XX: initial support for the BCM5301/BCM470X"
+I have to admit that i only tested it on v6k and did no benchmark.
 
-which adds yet another 8250 debug UART where the only difference between
-it and the others are its two base addresses, and in order to do that
-it needs to add 25 or so more lines - 19 lines in a header file and six
-in arch/arm/Kconfig.debug.
+> One of the reasons for Russell's suggestion of placing the ldrd (which became the two ldr instructions you've removed from __switch_to, in order to maintain building for older cores) where it is was in order to reduce the chance of pipeline stalls.
+> 
+> As I've pointed out below, there is some risk that changing that has implications for the v6 only case below (and the v6k case is now more prone to stalls with !CONFIG_CPU_USE_DOMAINS, but newer cores should have more advanced scheduling to avoid such issues anyway...)
 
-With the solution I'm proposing above, that could be:
+I'm not sure how this could make things worse on v6k, could you elaborate please?
+Besides of the ldr and str being too close to each other i thought this patch is a good idea, because it removes two ldr which are always executed.
+(Continuing below...)
 
-- zero lines if you just set the options via Kconfig
-- one, two or maybe at most three lines if you include it with some
-  documentation file already in the kernel
+>> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+>>
+>> ---
+>> This patch is against Linux 3.11-rc1 (ad81f0545ef01ea651886dddac4bef6cec930092)
+>>
+>> Thanks to everyone who helped me with a4780adeefd042482f624f5e0d577bf9cdcbb760
+>>
+>> diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
+>> index 83259b8..3742722 100644
+>> --- a/arch/arm/include/asm/tls.h
+>> +++ b/arch/arm/include/asm/tls.h
+>> @@ -3,29 +3,32 @@
+>>
+>>   #ifdef __ASSEMBLY__
+>>   #include <asm/asm-offsets.h>
+>> -    .macro switch_tls_none, base, tp, tpuser, tmp1, tmp2
+>> +    .macro switch_tls_none, prev, next, tp, tpuser, tmp1, tmp2
+>>       .endm
+>>
+>> -    .macro switch_tls_v6k, base, tp, tpuser, tmp1, tmp2
+>> +    .macro switch_tls_v6k, prev, next, tp, tpuser, tmp1, tmp2
+>> +    ldrd    \tp, \tpuser, [\next, #TI_TP_VALUE]    @ get the next TLS and user r/w register
+>>       mrc    p15, 0, \tmp2, c13, c0, 2    @ get the user r/w register
+>>       mcr    p15, 0, \tp, c13, c0, 3        @ set TLS register
+>>       mcr    p15, 0, \tpuser, c13, c0, 2    @ and the user r/w register
+>> -    str    \tmp2, [\base, #TI_TP_VALUE + 4] @ save it
+>> +    str    \tmp2, [\prev, #TI_TP_VALUE + 4] @ save it
+>>       .endm
+>>
+>> -    .macro switch_tls_v6, base, tp, tpuser, tmp1, tmp2
+>> +    .macro switch_tls_v6, prev, next, tp, tpuser, tmp1, tmp2
+>>       ldr    \tmp1, =elf_hwcap
+>>       ldr    \tmp1, [\tmp1, #0]
+>>       mov    \tmp2, #0xffff0fff
+>> +    ldr    \tp, [\next, #TI_TP_VALUE]    @ get the next TLS register
+>>       tst    \tmp1, #HWCAP_TLS        @ hardware TLS available?
+>>       streq    \tp, [\tmp2, #-15]        @ set TLS value at 0xffff0ff0
+>> -    mrcne    p15, 0, \tmp2, c13, c0, 2    @ get the user r/w register
+>> +    mrcne    p15, 0, \tmp2, c13, c0, 2    @ get the previous user r/w register
+>> +    ldrne    \tpuser, [\next, #TI_TP_VALUE + 4]    @ get the next user r/w register
+>>       mcrne    p15, 0, \tp, c13, c0, 3        @ yes, set TLS register
+>>       mcrne    p15, 0, \tpuser, c13, c0, 2    @ set user r/w register
+> 
+> Now we've only got one instruction between the store and the load and risk stalling the pipeline...
+> 
+> Dave M cautiously says "The ancient advice was that one instruction was enough" but this is very core dependent... I wonder if anyone has a good idea about whether this is an issue here...?
+
+We could use a ldrd at the top, that'd be nearly what we have right now, don't we?
