@@ -1,87 +1,136 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 16 Jul 2013 16:09:54 -0400
-Subject: [PATCH RFC v2 04/14] ARM: debug: provide 8250 debug uart register
- shift configuration option
-In-Reply-To: <20130716192403.GA13150@n2100.arm.linux.org.uk>
-References: <20130716163243.GY21614@n2100.arm.linux.org.uk>
- <E1Uz8FU-00047a-AB@rmk-PC.arm.linux.org.uk> <51E59338.6020102@ti.com>
- <20130716191658.GG24642@n2100.arm.linux.org.uk>
- <20130716192403.GA13150@n2100.arm.linux.org.uk>
-Message-ID: <51E5A892.7060309@ti.com>
+From: oliver@schinagl.nl (Oliver Schinagl)
+Date: Tue, 16 Jul 2013 23:02:22 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/2] Initial support for Allwinner's
+ Security ID fuses
+In-Reply-To: <20130716064107.GA10868@kroah.com>
+References: <20130624160440.GA15201@kroah.com> <51C87DC7.50005@schinagl.nl>
+ <20130624181509.GA8847@kroah.com> <51C8B84C.3020200@schinagl.nl>
+ <20130624214615.GA17604@kroah.com> <51CAA709.4060801@schinagl.nl>
+ <20130626175144.GC2222@kroah.com> <51D674BF.9030207@schinagl.nl>
+ <20130706193646.GB9778@kroah.com> <51E466A3.4010503@schinagl.nl>
+ <20130716064107.GA10868@kroah.com>
+Message-ID: <51E5B4DE.5060002@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 July 2013 03:24 PM, Russell King - ARM Linux wrote:
-> On Tue, Jul 16, 2013 at 08:16:58PM +0100, Russell King - ARM Linux wrote:
->> On Tue, Jul 16, 2013 at 02:38:48PM -0400, Santosh Shilimkar wrote:
->>> Just a question. Exposing selection choice for UART port
->>> and probably flow control is just fine, but do we need to
->>> really need config entries for SHIFT, PA, VA etc ?
+On 07/16/13 08:41, Greg KH wrote:
+> On Mon, Jul 15, 2013 at 11:16:19PM +0200, Oliver Schinagl wrote:
+>> With your latest patches for binary attributes and your blog post, I
+>> thought that you want to create your binary attributes before the probe
+>> function, to avoid the userspace race. To do that, we have two options,
+>> create them in init (ugly?) or fill the .group member if available so it
+>> gets automatically created from the register function.
+> Yes, the .group thing should be what is needed here.
+That's what I thought (and used).
+>
+>> Well in my case, I'm using the module_platform_driver() macro which
+>> expects the struct platform_driver. Platform_driver has a device_driver
+>> member .driver where the .groups is located. Great, using that works and
+>> we should have the sysfs entry race-free. However I don't know hot to
+>> exchange data between that and the rest of my driver.
 >>
->> Let's look at the original problem.  We have lots of files in
->> arch/arm/include/debug who's sole purpose is to define a pair of base
->> addresses.  Maybe around 500 lines of code doing just that - though
->> much of it is copyright notices (can someone explain to me the point
->> of claiming copyright on four lines of code defining a base address of
->> a UART which is, apart from the addresses themselves, identical with
->> every other damned file?)
+>> Before I used to_platform_device(kobj_to_dev(kobj)) as passed via the
+>> .read function to obtain a platform_device where i could use
+>> platform_get_drvdata on. All was good, but that doesn't fly now and my
+>> knowledge is a bit short as to why.
+> I don't understand, why not use the platform device that was passed to
+> the binary attribute write function?
+Because the pointers don't match and I get a null pointer from 
+platform_get_data
+>
+>> The second method is finding some other shared structure given that we
+>> get a platform_device in the probe function, yet I couldn't find
+>> anything and this platform_device isn't the same as the one from the .read.
+> It should be, why isn't it?
+I think that's a little above my grasp :p
+>
+>> Of course using a global var bypasses this issue, but I'm sure it won't
+>> pass review ;)
+> The platform device structure should have what you need, right?
+Should, but doesn't :(
+>
+>> So using these new patches for binary attributes, how can I pass data
+>> between my driver and the sysfs files using a platform_driver? Or are
+>> other 'hacks' needed and using the .groups attribute from
+>> platform_driver->device_driver->groups is really the wrong approach.
 >>
->> What this series does is remove many of those files by consolidating
->> much of them into a much denser way to represent all this variability.
->> However, this doesn't really address the root problem, which is that
->> we have all this information in the kernel, which needs to be added
->> to every single time we have a new platform come along no matter what
->> it is.
->>
->> We need to stop that from happening - we need a way for people to tell
->> the kernel where their UART is without having to load the kernel up
->> with lots of platform specific information [*].
->>
->> Also, even without this, the debug menu has become something of a
->> sprawling mess, with various people re-implementing what's already
->> there presumably because they don't look/don't bother to research what
->> support is already there - and is another source of constant additions.
->>
->> So, the idea that every platform gets to somehow put its UART addresses
->> into the kernel image isn't scalable.  Either we end up with lots of
->> defaults in a Kconfig wihch are also prone to merge conflicts, or we
->> end up with lots of files in arch/arm/include/debug defining the base
->> addresses.
->>
->> We need to stop all of these problems from happening before they
->> become a big headache for us - imagine Linus' reaction when our debug
->> menu grows to be the largest Kconfig file in the kernel tree!  Do you
->> want to be there when that happens?  We're the 22nd biggest Kconfig
->> file already at 25K - there's only one debug Kconfig larger and that's
->> the main lib/Kconfig.debug one which has recently been through a cleanup.
->>
->> Therefore, the idea is to provide _generic_ options which people can
->> set according to their platforms needs.  Remember, this is *supposed*
->> to be a developer tool, not a user tool, so asking for addresses and
->> other parameters is perfectly acceptable - just make sure that they're
->> documented in a reasonable place.
-> 
-> And as if to prove the point, while writing that email, a patch dropped
-> into my mailbox:
-> 
-> "ARM: BCM53XX: initial support for the BCM5301/BCM470X"
-> 
-> which adds yet another 8250 debug UART where the only difference between
-> it and the others are its two base addresses, and in order to do that
-> it needs to add 25 or so more lines - 19 lines in a header file and six
-> in arch/arm/Kconfig.debug.
-> 
-> With the solution I'm proposing above, that could be:
-> 
-> - zero lines if you just set the options via Kconfig
-> - one, two or maybe at most three lines if you include it with some
->   documentation file already in the kernel
-> 
-Fair enough. Sorry I missed the point about providing the LL debug
-information with config entries than adding the code. It indeed
-doable as long as the information is documented as you said.
+>> I did ask around and still haven't figured it out so far, so I do
+>> apologize if you feel I'm wasting your precious time.
+> How is the platform device not the same thing that was passed to your
+> probe function?
+I don't know :( But i'll add the relevant sections with printk results 
+below, which I should have done before, then again those printk's were 
+not supposed to be in that e-mail to begin with ;)
 
-Thanks for explaining the goal of the series again.
+So if I'm not seeing something stupidly obvious, feel free to shout at me :)
 
-Regards,
-Santosh 
+static ssize_t sid_read(struct file *fd, struct kobject *kobj,
+             struct bin_attribute *attr, char *buf,
+             loff_t pos, size_t size)
+{
+     struct platform_device *pdev;
+     void __iomem *sid_reg_base;
+     int i;
+
+     pdev = to_platform_device(kobj_to_dev(kobj));
+     sid_reg_base = (void __iomem *)platform_get_drvdata(pdev);
+     printk("0x%p, 0x%p, 0x%p, 0x%p\n", kobj, kobj_to_dev(kobj), pdev, 
+sid_reg_base);
+
+0xef1e7c80, 0xef1e7c78, 0xef1e7c68, 0x  (null)
+
+     if (pos < 0 || pos >= SID_SIZE)
+         return 0;
+     if (size > SID_SIZE - pos)
+         size = SID_SIZE - pos;
+
+     for (i = 0; i < size; i++)
+         buf[i] = sunxi_sid_read_byte(sid_reg_base, pos + i);
+
+     return i;
+}
+
+
+static struct bin_attribute sid_bin_attr = {
+     .attr = { .name = "eeprom", .mode = S_IRUGO, },
+     .size = SID_SIZE,
+     .read = sid_read,
+};
+
+static struct bin_attribute *sunxi_sid_attrs[] = {
+     &sid_bin_attr,
+     NULL,
+};
+
+static const struct attribute_group sunxi_sid_group = {
+     .bin_attrs = sunxi_sid_attrs,
+};
+
+static const struct attribute_group *sunxi_sid_groups[] = {
+     &sunxi_sid_group,
+     NULL,
+};
+
+static int __init sunxi_sid_probe(struct platform_device *pdev)
+{
+     struct resource *res;
+     void __iomem *sid_reg_base;
+     u8 entropy[SID_SIZE];
+     unsigned int i;
+
+     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+     sid_reg_base = devm_ioremap_resource(&pdev->dev, res);
+     if (IS_ERR(sid_reg_base))
+         return PTR_ERR(sid_reg_base);
+     platform_set_drvdata(pdev, sid_reg_base);
+
+     for (i = 0; i < SID_SIZE; i++)
+         entropy[i] = sunxi_sid_read_byte(sid_reg_base, i);
+     add_device_randomness(entropy, SID_SIZE);
+     dev_dbg(&pdev->dev, "%s loaded\n", DRV_NAME);
+     printk("0x%p, 0x%p\n", pdev, sid_reg_base);
+
+0xef02b000, 0xf1c23800
+
+     return 0;
+}
