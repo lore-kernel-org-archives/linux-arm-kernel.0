@@ -1,44 +1,29 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 16 Jul 2013 16:36:26 +0900
-Subject: [PATCH 0/6] clk: exynos: Some fixes and cleanup
-In-Reply-To: <1373533334-5169-1-git-send-email-sachin.kamat@linaro.org>
-References: <1373533334-5169-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <02dc01ce81f7$2d9fb6b0$88df2410$%kim@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Jul 2013 15:46:54 +0800
+Subject: [PATCH 03/22] pinctrl: pinctrl-imx: add imx25 pinctrl driver
+In-Reply-To: <1373900227-341-4-git-send-email-denis@eukrea.com>
+References: <1373900227-341-1-git-send-email-denis@eukrea.com>
+ <1373900227-341-4-git-send-email-denis@eukrea.com>
+Message-ID: <20130716074650.GD30067@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sachin Kamat wrote:
+On Mon, Jul 15, 2013 at 04:56:48PM +0200, Denis Carikli wrote:
+> This is mostly cut and paste from the imx35 pinctrl driver.
+> The data was generated using sed and awk on
+>   arch/arm/plat-mxc/include/mach/iomux-mx25.h.
 > 
-> Resending some of patches (1, 3 and 5) as per discussion in thread [1].
-> Other patches in the series are new.
-> 
-> [1] http://comments.gmane.org/gmane.linux.kernel.samsung-soc/19933
-> 
-> Sachin Kamat (6):
->   clk: exynos4: Staticize local symbols
->   clk: exynos4: Remove unused function
->   clk: exynos5250: Staticize local symbols
->   clk: exynos5420: Staticize local symbols
->   clk: exynos5440: Staticize local symbols
->   clk: exynos-audss: Staticize exynos_audss_clk_init
-> 
->  drivers/clk/samsung/clk-exynos-audss.c |    2 +-
->  drivers/clk/samsung/clk-exynos4.c      |   42
-++++++++++++-----------------
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
 > ---
->  drivers/clk/samsung/clk-exynos5250.c   |   14 +++++------
->  drivers/clk/samsung/clk-exynos5420.c   |   14 +++++------
->  drivers/clk/samsung/clk-exynos5440.c   |   14 +++++------
->  5 files changed, 37 insertions(+), 49 deletions(-)
-> 
-> --
-> 1.7.9.5
+>  .../bindings/pinctrl/fsl,imx25-pinctrl.txt         |   33 ++
+>  arch/arm/boot/dts/imx25-pinfunc.h                  |  513 ++++++++++++++++++++
+>  arch/arm/boot/dts/imx25.dtsi                       |    1 +
+>  arch/arm/mach-imx/Kconfig                          |    2 +
+>  drivers/pinctrl/Kconfig                            |    8 +
+>  drivers/pinctrl/Makefile                           |    1 +
+>  drivers/pinctrl/pinctrl-imx25.c                    |  351 ++++++++++++++
 
-There are small comments on 1st and 2nd patches.
-Others look good to me.
+Either we split it into driver part and mach part, or I need an ACK from
+pinctrl maintainer to take the patch via IMX tree.
 
-For 3rd~6th patches:
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Thanks,
-- Kukjin
+Shawn
