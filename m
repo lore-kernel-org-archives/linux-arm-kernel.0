@@ -1,28 +1,76 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 17 Jul 2013 09:30:03 +0100
-Subject: [PATCH] ASoC: tegra: depend on ARCH_TEGRA, not ARCH_TEGRA_*
-In-Reply-To: <1374013667-21435-1-git-send-email-swarren@wwwdotorg.org>
-References: <1374013667-21435-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130717083003.GA22506@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 17 Jul 2013 09:40:39 +0100
+Subject: [PATCH 1/3] ASoC: bt-sco: enable OF support
+In-Reply-To: <1374041536-27643-1-git-send-email-Baohua.Song@csr.com>
+References: <1374041536-27643-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <20130717084039.GA15981@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 04:27:47PM -0600, Stephen Warren wrote:
+On Wed, Jul 17, 2013 at 07:12:14AM +0100, Barry Song wrote:
+> From: Rongjun Ying <Rongjun.Ying@csr.com>
+> 
+> this makes users be able to add a bt-sco node in dts instead of
+> hardcoding a platform device in mach.
 
-> Stop selecting I2S/AC97/SPDIF controller drivers from the machine driver
-> config options; this doesn't really work if we don't know which specific
-> SoC(s) we're building for. However, set their default values based on
-> SND_SOC_TEGRA, since most people will probably want to enable support for
-> all SoCs. This also avoids the need to change any defconfig files.
+I'm slightly confused by this. The driver doesn't seem to pick up any
+information out of the dts, and the binding doesn't even describe any
+linkage to a piece of hardware. I'm not familiar with bluetooth or ASoC,
+could you give an explanation as to why this is needed?
 
-This doesn't seem terribly clever and is definitely not idiomatic for
-ASoC.  If you want to just select all CPUs that'd be fine but forcing
-the user to select the individual components isn't the style anything
-else uses.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/400e5d30/attachment-0001.sig>
+I don't think this should be in the dt as is. Could this not be
+registered based on the presence of a bluetooth controller that supports
+this?
+
+Thanks,
+Mark.
+
+> 
+> Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  sound/soc/codecs/bt-sco.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/sound/soc/codecs/bt-sco.c b/sound/soc/codecs/bt-sco.c
+> index a081d9f..39e7ebe 100644
+> --- a/sound/soc/codecs/bt-sco.c
+> +++ b/sound/soc/codecs/bt-sco.c
+> @@ -46,6 +46,14 @@ static int bt_sco_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id bt_sco_of_match[] = {
+> +	{ .compatible = "bt-sco-codec", },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, bt_sco_of_match);
+> +#endif
+> +
+>  static struct platform_device_id bt_sco_driver_ids[] = {
+>  	{
+>  		.name		= "dfbmcs320",
+> @@ -58,6 +66,9 @@ static struct platform_driver bt_sco_driver = {
+>  	.driver = {
+>  		.name = "bt-sco",
+>  		.owner = THIS_MODULE,
+> +#ifdef CONFIG_OF
+> +		.of_match_table = bt_sco_of_match,
+> +#endif
+>  	},
+>  	.probe = bt_sco_probe,
+>  	.remove = bt_sco_remove,
+> -- 
+> 1.8.2.3
+> 
+> 
+> 
+> Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+> More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
