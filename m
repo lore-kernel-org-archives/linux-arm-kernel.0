@@ -1,76 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 17 Jul 2013 09:40:39 +0100
-Subject: [PATCH 1/3] ASoC: bt-sco: enable OF support
-In-Reply-To: <1374041536-27643-1-git-send-email-Baohua.Song@csr.com>
-References: <1374041536-27643-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <20130717084039.GA15981@e106331-lin.cambridge.arm.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 17 Jul 2013 10:41:19 +0200
+Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
+ pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
+In-Reply-To: <20130621135219.GC4099@arm.com>
+References: <51C2C0B5.8020802@pengutronix.de> <20130620095705.GA18536@arm.com>
+ <51C2D5EF.3040803@pengutronix.de> <20130620102856.GC18536@arm.com>
+ <20130620111255.GD18536@arm.com> <51C2E917.9000708@pengutronix.de>
+ <51C2EA04.4060701@pengutronix.de> <51C2EBCD.4070206@pengutronix.de>
+ <51C42AE0.9070506@pengutronix.de> <20130621135219.GC4099@arm.com>
+Message-ID: <51E658AF.1090009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 07:12:14AM +0100, Barry Song wrote:
-> From: Rongjun Ying <Rongjun.Ying@csr.com>
+On 06/21/2013 03:52 PM, Catalin Marinas wrote:
+> On Fri, Jun 21, 2013 at 11:28:48AM +0100, Marc Kleine-Budde wrote:
+>> On 06/20/2013 01:47 PM, Marc Kleine-Budde wrote:
+>>> From 306d84d5f0645a86e86d539be0546c4ac758d3d4 Mon Sep 17 00:00:00 2001
+>>> From: Catalin Marinas <catalin.marinas@arm.com>
+>>> Date: Thu, 20 Jun 2013 12:12:55 +0100
+>>> Subject: [PATCH] arm: Fix deferred mm switch on VIVT processors
+>>>
+>>> As of commit b9d4d42ad9 (ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
+>>> pre-ARMv6 CPUs), the mm switching on VIVT processors is done in the
+>>> finish_arch_post_lock_switch() function to avoid whole cache flushing
+>>> with interrupts disabled. The need for deferred mm switch is stored as a
+>>> thread flag (TIF_SWITCH_MM). However, with preemption enabled, we can
+>>> have another thread switch before finish_arch_post_lock_switch(). If the
+>>> new thread has the same mm as the previous 'next' thread, the scheduler
+>>> will not call switch_mm() and the TIF_SWITCH_MM flag won't be set for
+>>> the new thread.
+>>>
+>>> This patch moves the switch pending flag to the mm_context_t structure
+>>> since this is specific to the mm rather than thread.
+>>>
+>>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+>>> Reported-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>>> [mkl: add check for mm]
+>>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>>
+>> Works on $CUSTOMERS's hardware.
+>>
+>> Tested-by: Marc Kleine-Budde <mkl@pengutronix.de>
 > 
-> this makes users be able to add a bt-sco node in dts instead of
-> hardcoding a platform device in mach.
+> Thanks.
+> 
+>> Catalin, do you take care of the patch? Please add stable on Cc. The fix
+>> is needed on kernels >= v3.5.
+> 
+> I'll send it to Russell, if possible it should go in for 3.10. I already
+> added CC stable in my copy (3.5+).
 
-I'm slightly confused by this. The driver doesn't seem to pick up any
-information out of the dts, and the binding doesn't even describe any
-linkage to a piece of hardware. I'm not familiar with bluetooth or ASoC,
-could you give an explanation as to why this is needed?
+What happend to that patch? I cannot find it in v3.10.x nor in linus/master.
 
-I don't think this should be in the dt as is. Could this not be
-registered based on the presence of a bluetooth controller that supports
-this?
+Marc
 
-Thanks,
-Mark.
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-> 
-> Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  sound/soc/codecs/bt-sco.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/sound/soc/codecs/bt-sco.c b/sound/soc/codecs/bt-sco.c
-> index a081d9f..39e7ebe 100644
-> --- a/sound/soc/codecs/bt-sco.c
-> +++ b/sound/soc/codecs/bt-sco.c
-> @@ -46,6 +46,14 @@ static int bt_sco_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id bt_sco_of_match[] = {
-> +	{ .compatible = "bt-sco-codec", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, bt_sco_of_match);
-> +#endif
-> +
->  static struct platform_device_id bt_sco_driver_ids[] = {
->  	{
->  		.name		= "dfbmcs320",
-> @@ -58,6 +66,9 @@ static struct platform_driver bt_sco_driver = {
->  	.driver = {
->  		.name = "bt-sco",
->  		.owner = THIS_MODULE,
-> +#ifdef CONFIG_OF
-> +		.of_match_table = bt_sco_of_match,
-> +#endif
->  	},
->  	.probe = bt_sco_probe,
->  	.remove = bt_sco_remove,
-> -- 
-> 1.8.2.3
-> 
-> 
-> 
-> Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-> More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/dcf37d41/attachment.sig>
