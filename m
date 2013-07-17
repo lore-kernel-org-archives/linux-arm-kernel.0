@@ -1,44 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 17 Jul 2013 15:23:41 -0600
-Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
-In-Reply-To: <20130716090536.5541.36289.stgit@localhost>
-References: <20130716090310.5541.36777.stgit@localhost>
- <20130716090536.5541.36289.stgit@localhost>
-Message-ID: <51E70B5D.6030802@wwwdotorg.org>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Wed, 17 Jul 2013 23:23:43 +0200
+Subject: [RFC PATCH v5 0/1] drivers: mfd: Versatile Express SPC support
+In-Reply-To: <alpine.LFD.2.03.1307171416490.14924@syhkavp.arg>
+References: <1373990743-23106-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1374052705.3146.86.camel@hornet>
+ <alpine.LFD.2.03.1307170825240.14924@syhkavp.arg>
+ <1374067786.3146.123.camel@hornet>
+ <alpine.LFD.2.03.1307171014510.14924@syhkavp.arg>
+ <1374070811.3146.124.camel@hornet>
+ <alpine.LFD.2.03.1307171148160.14924@syhkavp.arg>
+ <20130717170038.GP24642@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.03.1307171416490.14924@syhkavp.arg>
+Message-ID: <20130717212343.GC19864@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2013 03:05 AM, Tony Lindgren wrote:
-> To toggle dynamic states, let's add the optional active state in
-> addition to the static default state. Then if the optional active
-> state is defined, we can require that idle and sleep states cover
-> the same pingroups as the active state.
-> 
-> Then let's add pinctrl_check_dynamic() and pinctrl_select_dynamic()
-> to use instead of pinctrl_select() to avoid breaking existing users.
-> 
-> With pinctrl_check_dynamic() we can check that idle and sleep states
-> match the active state for pingroups during init, and don't need to
-> do it during runtime.
-> 
-> Then with the states pre-validated, pinctrl_select_dynamic() can
-> just toggle between the dynamic states without extra checks.
-> 
-> Note that pinctr_select_state() still has valid use cases, such as
-> changing states when the pins can be shared between two drivers
-> and don't necessarily cover the same pingroups. For dynamic runtime
-> toggling of pin states, we should eventually always use just
-> pinctrl_select_dynamic().
+Hi Nicolas,
 
-Something in this series should edit Documentation/pinctrl.txt to
-explain the philosophy behind the static/dynamic state split. That
-philosophy and/or semantics are more important to review than the code...
+On Wed, Jul 17, 2013 at 02:29:02PM -0400, Nicolas Pitre wrote:
+> On Wed, 17 Jul 2013, Russell King - ARM Linux wrote:
+> 
+> > On Wed, Jul 17, 2013 at 11:57:55AM -0400, Nicolas Pitre wrote:
+> > > The sanest location at this point might simply be 
+> > > drivers/platform/vexpress_spc.c or drivers/platform/vexpress/spc.c 
+> > > depending on whether or not more such driver glue is expected in the 
+> > > vexpress future.  No point putting "arm" in the path, especially if this 
+> > > is later reused on arm64.
+> > 
+> > You wouldn't be making that argument if it were arch/arm64 and arch/arm32 -
+> > you'd probably be arguing that "arm" made perfect sense.
+> 
+> Well... in a sense: yes.  But in the end, having per arch directories 
+> under drivers/ is silly.  We already have per arch directories under 
+> arch/already.
+> 
+> > Don't get too hung up on names please, it's really not worth the time
+> > and effort being soo pedantic, and being soo pedantic leads to "pointless
+> > churn" when someone comes along and wants to pedantically change the
+> > names because it no longer matches the users.
+> 
+> At this point I don't really care about the name.  I just want the damn 
+> thing merged upstream.  But after several iterations to either fit one 
+> or another maintainers taste, each rework ends up in that maintainer 
+> saying: "Now that you've reworked the code, I still don't like it since 
+> this no longer fits in my subsystem tree."
+FWIW, we asked Pawel to rework the sysreg and config parts of the
+vexpress driver, make it an actual MFD driver, and spread the remaining
+bits of the code into their respective subsystems. I don't think
+this is an eccentric requirement.
 
-Related to that, I'm worried that using pinctrl_select_state() and
-pinctrl_select_dynamic() appear to be mutually-exclusive options here.
-Why shouldn't e.g. a pinctrl-based I2C mux also be able to do runtime
-PM? Does the mux setting select which states are used for runtime PM, or
-does runtime PM override the basic mux setting, or must the pincrl-I2C
-mux manually implement custom runtime-PM/pinctrl interaction since
-there's no generic answer to those questions? How many more custom
-exceptions will there be?
+
+> In fact what we'd need at this point is 
+> drivers/code_that_no_subsystem_maintainers_wants/.  
+Which is what some people think drivers/mfd/ is...
+I don't mind merging Lorenzo's SPC driver as it is if he can explain to
+me how it will eventually evolve into an actual MFD driver. If that's
+not the case, I don't see how I could justify merging it through the
+MFD tree.
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
