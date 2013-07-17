@@ -1,61 +1,64 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 18 Jul 2013 00:54:24 +0200
-Subject: [PATCH v2 4/4] ARM: dts: Use the PWM polarity flags
-In-Reply-To: <1374101664-21112-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1374101664-21112-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1374101664-21112-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 17 Jul 2013 16:06:21 -0700
+Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if
+ UP system
+In-Reply-To: <alpine.LFD.2.03.1307171849180.14924@syhkavp.arg>
+References: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
+ <20130712111322.GC3213@e102654-lin.cambridge.arm.com>
+ <20130712121023.GB27430@codeaurora.org> <51E71249.4050200@codeaurora.org>
+ <alpine.LFD.2.03.1307171830170.14924@syhkavp.arg>
+ <51E71C78.6080604@codeaurora.org>
+ <alpine.LFD.2.03.1307171849180.14924@syhkavp.arg>
+Message-ID: <51E7236D.3010700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the numerical polarity flags with the PWM_POLARITY_INVERTED
-symbolic constant.
+On 07/17/13 15:53, Nicolas Pitre wrote:
+> On Wed, 17 Jul 2013, Stephen Boyd wrote:
+>
+>> On 07/17/13 15:34, Nicolas Pitre wrote:
+>>> On Wed, 17 Jul 2013, Stephen Boyd wrote:
+>>>
+>>>> On 07/12/13 05:10, Stephen Boyd wrote:
+>>>>> On 07/12, Javi Merino wrote:
+>>>>>> I agree, we should drop the check.  It's annoying in uniprocessors and
+>>>>>> unlikely to be found in the real world unless your gic entry in the dt
+>>>>>> is wrong.
+>>> And that's a likely outcome in the real world.
+>>>
+>>>>> Ok. How about this?
+>>>> Any comments?
+>>> What about this instead:
+>> Unfortunately arm64 doesn't have SMP_ON_UP. 
+> And why does that matter?
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- arch/arm/boot/dts/am335x-evmsk.dts | 3 ++-
- arch/arm/boot/dts/wm8850-w70v2.dts | 3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+Because the gic driver is compiled on both arm and arm64? I suppose we
+could define is_smp() to 1 on arm64 but its probably better to rely on
+generic kernel things instead of arch specific functions.
 
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 0c8ad17..62124c7 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -14,6 +14,7 @@
- /dts-v1/;
+>
+>> It sounds like you preferred the first patch using num_possible_cpus()
+> Probably, yes.  I didn't follow the early conversation though.
+
+This was the first patch:
+
+---8<----
+
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 19ceaa6..589c760 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -368,7 +368,7 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
+ 			break;
+ 	}
  
- #include "am33xx.dtsi"
-+#include <dt-bindings/pwm/pwm.h>
+-	if (!mask)
++	if (!mask && num_possible_cpus() > 1)
+ 		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
  
- / {
- 	model = "TI AM335x EVM-SK";
-@@ -298,7 +299,7 @@
- 
- 	backlight {
- 		compatible = "pwm-backlight";
--		pwms = <&ecap2 0 50000 1>;
-+		pwms = <&ecap2 0 50000 PWM_POLARITY_INVERTED>;
- 		brightness-levels = <0 58 61 66 75 90 125 170 255>;
- 		default-brightness-level = <8>;
- 	};
-diff --git a/arch/arm/boot/dts/wm8850-w70v2.dts b/arch/arm/boot/dts/wm8850-w70v2.dts
-index 90e913f..7a563d2 100644
---- a/arch/arm/boot/dts/wm8850-w70v2.dts
-+++ b/arch/arm/boot/dts/wm8850-w70v2.dts
-@@ -11,13 +11,14 @@
- 
- /dts-v1/;
- /include/ "wm8850.dtsi"
-+#include <dt-bindings/pwm/pwm.h>
- 
- / {
- 	model = "Wondermedia WM8850-W70v2 Tablet";
- 
- 	backlight {
- 		compatible = "pwm-backlight";
--		pwms = <&pwm 0 50000 1>;	/* duty inverted */
-+		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
- 
- 		brightness-levels = <0 40 60 80 100 130 190 255>;
- 		default-brightness-level = <5>;
+ 	return mask;
+
+
 -- 
-1.8.1.5
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
