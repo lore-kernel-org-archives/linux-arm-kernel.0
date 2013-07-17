@@ -1,90 +1,56 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 17 Jul 2013 14:41:52 +0300
-Subject: [PATCH 3/3] ARM: dts: omap4-sdp: add dynamic pin states for uart3/4
-In-Reply-To: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
-References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1374061312-25469-4-git-send-email-grygorii.strashko@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 17 Jul 2013 13:46:50 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/2] Initial support for Allwinner's
+ Security ID fuses
+In-Reply-To: <20130716064107.GA10868@kroah.com>
+References: <51C87DC7.50005@schinagl.nl> <20130624181509.GA8847@kroah.com>
+ <51C8B84C.3020200@schinagl.nl> <20130624214615.GA17604@kroah.com>
+ <51CAA709.4060801@schinagl.nl> <20130626175144.GC2222@kroah.com>
+ <51D674BF.9030207@schinagl.nl> <20130706193646.GB9778@kroah.com>
+ <51E466A3.4010503@schinagl.nl> <20130716064107.GA10868@kroah.com>
+Message-ID: <20130717114650.GN3125@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dynamic "active"/"idle" pin states for uart3/4 which will be applied
-when uart3/4 state is switched from active to idle and back by Runtime
-PM or during system suspend.
+On Mon, Jul 15, 2013 at 11:41:07PM -0700, Greg KH wrote:
+> On Mon, Jul 15, 2013 at 11:16:19PM +0200, Oliver Schinagl wrote:
+> > So using these new patches for binary attributes, how can I pass data 
+> > between my driver and the sysfs files using a platform_driver? Or are 
+> > other 'hacks' needed and using the .groups attribute from 
+> > platform_driver->device_driver->groups is really the wrong approach.
+> > 
+> > I did ask around and still haven't figured it out so far, so I do 
+> > apologize if you feel I'm wasting your precious time.
+> 
+> How is the platform device not the same thing that was passed to your
+> probe function?
 
-CC: Benoit Cousson <benoit.cousson@linaro.org>
-CC: Linus Walleij <linus.walleij@linaro.org>
-CC: Stephen Warren <swarren@wwwdotorg.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- arch/arm/boot/dts/omap4-sdp.dts |   34 ++++++++++++++++++++++++++++++----
- 1 file changed, 30 insertions(+), 4 deletions(-)
+One thing I don't get here is why it should be set in the
+platform_driver structure. From my understanding of the device model,
+and since what Oliver is trying to do is exposing a few bytes of memory
+to sysfs, shouldn't the sysfs file be attached to the device instead?
 
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 7951b4e..2624504 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -181,18 +181,40 @@
- 		pinctrl-single,pins = <
- 			0x100 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart3_cts_rctx.uart3_cts_rctx */
- 			0x102 (PIN_OUTPUT | MUX_MODE0)		/* uart3_rts_sd.uart3_rts_sd */
--			0x104 (PIN_INPUT | MUX_MODE0)		/* uart3_rx_irrx.uart3_rx_irrx */
- 			0x106 (PIN_OUTPUT | MUX_MODE0)		/* uart3_tx_irtx.uart3_tx_irtx */
- 		>;
- 	};
- 
-+	uart3_pins_active: pinmux_uart3_pins_active {
-+		pinctrl-single,pins = <
-+			0x104 (PIN_INPUT | MUX_MODE0)		/* uart3_rx_irrx.uart3_rx_irrx */
-+		>;
-+	};
-+
-+	uart3_pins_idle: pinmux_uart3_pins_idle {
-+		pinctrl-single,pins = <
-+			0x104 (WAKEUP_EN | PIN_INPUT | MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
-+		>;
-+	};
-+
- 	uart4_pins: pinmux_uart4_pins {
- 		pinctrl-single,pins = <
--			0x11c (PIN_INPUT | MUX_MODE0)		/* uart4_rx.uart4_rx */
- 			0x11e (PIN_OUTPUT | MUX_MODE0)		/* uart4_tx.uart4_tx */
- 		>;
- 	};
- 
-+	uart4_pins_active: pinmux_uart4_pins_active {
-+		pinctrl-single,pins = <
-+			0x11c (PIN_INPUT | MUX_MODE0)		/* uart3_rx_irrx.uart3_rx_irrx */
-+		>;
-+	};
-+
-+	uart4_pins_idle: pinmux_uart4_pins_idle {
-+		pinctrl-single,pins = <
-+			0x11c (WAKEUP_EN | PIN_INPUT | MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
-+		>;
-+	};
-+
- 	twl6030_pins: pinmux_twl6030_pins {
- 		pinctrl-single,pins = <
- 			0x15e (WAKEUP_EN | PIN_INPUT_PULLUP | MUX_MODE0)	/* sys_nirq1.sys_nirq1 */
-@@ -510,13 +532,17 @@
- };
- 
- &uart3 {
--	pinctrl-names = "default";
-+	pinctrl-names = "default", "active", "idle";
- 	pinctrl-0 = <&uart3_pins>;
-+	pinctrl-1 = <&uart3_pins_active>;
-+	pinctrl-2 = <&uart3_pins_idle>;
- };
- 
- &uart4 {
--	pinctrl-names = "default";
-+	pinctrl-names = "default", "active", "idle";
- 	pinctrl-0 = <&uart4_pins>;
-+	pinctrl-1 = <&uart4_pins_active>;
-+	pinctrl-2 = <&uart4_pins_idle>;
- };
- 
- &mcbsp3 {
+I mean, here, the sysfs file will be created under something like
+.../drivers/sunxi-sid/eeprom. What happens when you have several
+instances of that driver loaded? I'd expect it to have several sysfs
+files created, one for each instance. So to me, it should be in the
+device structure, not the driver one.
+
+Couldn't that be also the reason of Oliver's NULL pointer? If the kobj
+is attached to the platform_driver and not to the platform_device, it
+should definitely get nasty when we try to cast it and retrieve data
+from it (and that would match the different pointers stuff as well.)
+
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/bc403ec4/attachment-0001.sig>
