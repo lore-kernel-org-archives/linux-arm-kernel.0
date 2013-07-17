@@ -1,69 +1,25 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 17 Jul 2013 10:41:19 +0200
-Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
- pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
-In-Reply-To: <20130621135219.GC4099@arm.com>
-References: <51C2C0B5.8020802@pengutronix.de> <20130620095705.GA18536@arm.com>
- <51C2D5EF.3040803@pengutronix.de> <20130620102856.GC18536@arm.com>
- <20130620111255.GD18536@arm.com> <51C2E917.9000708@pengutronix.de>
- <51C2EA04.4060701@pengutronix.de> <51C2EBCD.4070206@pengutronix.de>
- <51C42AE0.9070506@pengutronix.de> <20130621135219.GC4099@arm.com>
-Message-ID: <51E658AF.1090009@pengutronix.de>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 17 Jul 2013 14:27:24 +0530
+Subject: [PATCH V2] ARM: tegra: enable palmas device for dalmore
+In-Reply-To: <51E54FD1.1010404@nvidia.com>
+References: <1373441852-27176-1-git-send-email-ldewangan@nvidia.com>
+ <51E54FD1.1010404@nvidia.com>
+Message-ID: <51E65C74.8060405@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2013 03:52 PM, Catalin Marinas wrote:
-> On Fri, Jun 21, 2013 at 11:28:48AM +0100, Marc Kleine-Budde wrote:
->> On 06/20/2013 01:47 PM, Marc Kleine-Budde wrote:
->>> From 306d84d5f0645a86e86d539be0546c4ac758d3d4 Mon Sep 17 00:00:00 2001
->>> From: Catalin Marinas <catalin.marinas@arm.com>
->>> Date: Thu, 20 Jun 2013 12:12:55 +0100
->>> Subject: [PATCH] arm: Fix deferred mm switch on VIVT processors
->>>
->>> As of commit b9d4d42ad9 (ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
->>> pre-ARMv6 CPUs), the mm switching on VIVT processors is done in the
->>> finish_arch_post_lock_switch() function to avoid whole cache flushing
->>> with interrupts disabled. The need for deferred mm switch is stored as a
->>> thread flag (TIF_SWITCH_MM). However, with preemption enabled, we can
->>> have another thread switch before finish_arch_post_lock_switch(). If the
->>> new thread has the same mm as the previous 'next' thread, the scheduler
->>> will not call switch_mm() and the TIF_SWITCH_MM flag won't be set for
->>> the new thread.
->>>
->>> This patch moves the switch pending flag to the mm_context_t structure
->>> since this is specific to the mm rather than thread.
->>>
->>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->>> Reported-by: Marc Kleine-Budde <mkl@pengutronix.de>
->>> [mkl: add check for mm]
->>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->>
->> Works on $CUSTOMERS's hardware.
->>
->> Tested-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> 
-> Thanks.
-> 
->> Catalin, do you take care of the patch? Please add stable on Cc. The fix
->> is needed on kernels >= v3.5.
-> 
-> I'll send it to Russell, if possible it should go in for 3.10. I already
-> added CC stable in my copy (3.5+).
+On Tuesday 16 July 2013 07:21 PM, Mikko Perttunen wrote:
+> On 07/10/2013 10:37 AM, Laxman Dewangan wrote:
+>> +
+>> +			palmas_gpio: gpio {
+>> +				compatible = "ti,palmas-gpio";
+>> +				gpio-controller;
+>> +				#gpio-cells = <2>;
+>> +			};
+> I don't think the palmas-gpio driver ever gets probed since it doesn't
+> have device tree compability strings?
+>
+You will need the patch
+[PATCH V3] gpio: palmas: add dt support
 
-What happend to that patch? I cannot find it in v3.10.x nor in linus/master.
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/dcf37d41/attachment.sig>
+which is under review from last few days.
