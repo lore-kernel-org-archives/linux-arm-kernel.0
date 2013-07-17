@@ -1,75 +1,91 @@
-From: oleksandr.kozaruk@ti.com (Oleksandr Kozaruk)
-Date: Wed, 17 Jul 2013 14:12:42 +0300
-Subject: [PATCH v5 0/2] TWL6030, TWL6032 GPADC driver
-Message-ID: <1374059564-6872-1-git-send-email-oleksandr.kozaruk@ti.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Wed, 17 Jul 2013 13:22:29 +0200
+Subject: [PATCH v1 01/24] spi: mpc512x: prepare clocks before enabling them
+In-Reply-To: <20130715201734.GF11538@sirena.org.uk>
+References: <1373914074-20889-1-git-send-email-gsi@denx.de>
+ <1373914074-20889-2-git-send-email-gsi@denx.de>
+ <20130715201734.GF11538@sirena.org.uk>
+Message-ID: <20130717112229.GK7080@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Jul 15, 2013 at 21:17 +0100, Mark Brown wrote:
+> 
+> On Mon, Jul 15, 2013 at 08:47:30PM +0200, Gerhard Sittig wrote:
+> > clocks need to get prepared before they can get enabled,
+> > fix the MPC512x PSC SPI master's initialization
+> 
+> > Signed-off-by: Gerhard Sittig <gsi@denx.de>
+> > ---
+> >  drivers/spi/spi-mpc512x-psc.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/spi/spi-mpc512x-psc.c b/drivers/spi/spi-mpc512x-psc.c
+> > index 29fce6a..76b20ea 100644
+> > --- a/drivers/spi/spi-mpc512x-psc.c
+> > +++ b/drivers/spi/spi-mpc512x-psc.c
+> > @@ -395,7 +395,7 @@ static int mpc512x_psc_spi_port_config(struct spi_master *master,
+> >  
+> >  	sprintf(name, "psc%d_mclk", master->bus_num);
+> >  	spiclk = clk_get(&master->dev, name);
+> > -	clk_enable(spiclk);
+> > +	clk_prepare_enable(spiclk);
+> >  	mps->mclk = clk_get_rate(spiclk);
+> >  	clk_put(spiclk);
+> 
+> This code is *clearly* buggy and should be fixed rather than papered
+> over.  Not only is there no matching put the driver is also dropping the
+> reference to the clock rather than holding on to it while it's in use.
 
-v5 - gpadc DT node renamed from "gpadc" to generic "adc", added
-     temperature channels; raw code is corracted with calibration
-     data.
-v4 - addressed comments: fixed style violation, bug in freeing memory,
-     added comments explaining calibration method, removed test network
-     channels from exposing to userspace, error handling for 
-     wait_for_complition
-v3 - fixed compiler warning
-v2 - the driver put in drivers/iio, and
-converted using iio facilities as suggested by Graeme.
+"This code" refers to the driver's original condition, right?  I
+agree that the driver has been suffering from incomplete clock
+handling since it was born three years ago.  And that this issue
+shall get addressed.  The question is just whether it needs to be
+part of this series which has a different focus.
 
-TWL603[02] GPADC is used to measure battery voltage,
-battery temperature, battery presence ID, and could
-be used to measure twl603[02] die temperature.
-This is used on TI blaze, blaze tablet platforms.
+What the above patch addresses is prevention of an immediate and
+fatal breakage, when common clock gets used but clocks aren't
+prepared before getting enabled.  So I consider it appropriate as
+a step in preparation before introducing support for common clock
+on the platform.  (It's funny that I had a comment in this spirit
+in the commit message, but trimmed it to not be overly verbose.)
 
-The TWL6030/TWL6032 is a PMIC that has a GPADC with 17/19
-channels respectively. Some channels have current
-source and are used for measuring voltage drop
-on resistive load for detecting battery ID resistance,
-or measuring voltage drop on NTC resistors for external
-temperature measurements, other channels measure voltage,
-(i.e. battery voltage), and have inbuilt voltage dividers,
-thus, capable to scale voltage. Some channels are dedicated
-for measuring die temperature.
+What the patch does not address is to fix any other deficiencies
+in the driver which might have been lurking there for ages.  This
+would be the scope of a different patch or series, as addressing
+it here as well would mix orthogonal issues within one series,
+and would complicate review and test (and would delay or even
+potentially kill the introduction of desirable support for common
+infrastructure just because other legacy non-fatal issues aren't
+addressed as well in bypassing).
 
-Some channels could be calibrated in 2 points, having
-offsets from ideal values in trim registers.
+I will look into what I can do to address your concerns about
+proper general clock handling in this specific driver.  But I'm
+unable to do this for all other drivers as well which I happen to
+pass by as I work on platform code (partially due to lack of
+knowledge).  In any case I won't be able to test all of these
+changes in all subsystems (mostly due to lack of hardware and
+test setups).
 
-The difference between GPADC in TWL6030 and TWL6032:
-- 10 bit vs 12 bit ADC;
-- 17 vs 19 channels;
-- channels have different purpose(i. e. battery voltage
-  channel 8 vs channel 18);
-- trim values are interpreted differently.
+So I suggest to leave these general cleanup activities for a
+separate series.  The current series certainly improves general
+platform code, transparently brings new drivers into successful
+operation, and keeps the quality of existing code (doesn't break
+anything, does even actively prevent breakage).  So it shall be
+acceptable despite its not being perfect (like addressing each
+and every other aspect which may arise elsewhere).  Where would I
+stop then?
 
-The driver is derived from git://git.omapzoom.org/kernel/omap.git
-The original driver's authors and contributors are Balaji T K,
-Graeme Gregory, Ambresh K, Girish S Ghongdemath.
+Sorry for the lengthy reply, but I guess it's about just one
+general aspect which equally applies to other parts of the
+series, not just the specific SPI driver which the feedback was
+provided for.  And I do appreciate your looking at the
+submission.
 
-The changes to the original driver:
-- device tree adaptation;
-- drop ioctl support - never been used;
-- unified measurement method for both devices;
-- get rid of "if (device == X)" code style to data driven;
-- drop polling end of conversion and use interrupt instead;
-- iio framework is used
 
-Tested with on blaze tablet 2 with OMAP4430(twl6030), and
-OMAP4470(twl6032) SOMs.
-
-The patches were tested against 3.10-rc7
-
-Oleksandr Kozaruk (2):
-  ARM: dts: twl: Add GPADC data to device tree
-  iio: twl6030-gpadc: TWL6030, TWL6032 GPADC driver
-
- arch/arm/boot/dts/twl6030.dtsi  |    6 +
- drivers/iio/adc/Kconfig         |   14 +
- drivers/iio/adc/Makefile        |    1 +
- drivers/iio/adc/twl6030-gpadc.c | 1026 +++++++++++++++++++++++++++++++++++++++
- 4 files changed, 1047 insertions(+)
- create mode 100644 drivers/iio/adc/twl6030-gpadc.c
-
+virtually yours
+Gerhard Sittig
 -- 
-1.8.1.2
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
