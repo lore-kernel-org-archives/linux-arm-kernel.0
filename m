@@ -1,32 +1,28 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 17 Jul 2013 02:11:09 -0300
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Drop the chip variant suffix
-Message-ID: <1374037869-17443-1-git-send-email-festevam@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 17 Jul 2013 10:48:57 +0530
+Subject: [PATCH RFC v2 14/14] ARM: debug: move Spear debug to generic
+ PL01x code
+In-Reply-To: <E1Uz8PB-00048R-F3@rmk-PC.arm.linux.org.uk>
+References: <20130716163243.GY21614@n2100.arm.linux.org.uk>
+ <E1Uz8PB-00048R-F3@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAOh2x==PCWa_eOK1S5oy+B-tbwin2ceeb92-ihJ6J_XmC2irUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Tue, Jul 16, 2013 at 10:17 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> The Spear debug code is a copy of the PL01x debugging code, so rather
+> than have this pointless code duplication, lets just use the standard
+> implementation instead.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/Kconfig.debug                         |    7 ++++
+>  arch/arm/mach-spear/include/mach/debug-macro.S |   36 ------------------------
+>  arch/arm/mach-spear/include/mach/spear.h       |    2 -
+>  3 files changed, 7 insertions(+), 38 deletions(-)
+>  delete mode 100644 arch/arm/mach-spear/include/mach/debug-macro.S
 
-imx6qdl-sabresd.dtsi is a common file for mx6q and mx6dl versions of sabresd
-board, so let's get rid of the 'quad' reference in the compatible string.
+s/Spear/SPEAr
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 4dec80c..f70db40 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -52,7 +52,7 @@
- 	};
- 
- 	sound {
--		compatible = "fsl,imx6q-sabresd-wm8962",
-+		compatible = "fsl,imx6-sabresd-wm8962",
- 			   "fsl,imx-audio-wm8962";
- 		model = "wm8962-audio";
- 		ssi-controller = <&ssi2>;
--- 
-1.8.1.2
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
