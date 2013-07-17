@@ -1,53 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Jul 2013 23:31:44 -0700
-Subject: [PATCH 1/4] pinctrl: Remove duplicate code in
- pinctrl_pm_select_state functions
-In-Reply-To: <51E557D1.4000707@ti.com>
-References: <20130716090310.5541.36777.stgit@localhost>
- <20130716090529.5541.54331.stgit@localhost>
- <51E5475B.1050900@ti.com> <20130716134118.GC7656@atomide.com>
- <51E557D1.4000707@ti.com>
-Message-ID: <20130717063144.GE7656@atomide.com>
+From: gerlando.falauto@keymile.com (Gerlando Falauto)
+Date: Wed, 17 Jul 2013 08:35:38 +0200
+Subject: [PATCH] ARM: Kirkwood: Fix the internal register ranges
+ translation
+In-Reply-To: <20130716125531.GD2317@localhost>
+References: <1371569479-31498-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <51E5145A.90404@keymile.com> <20130716125531.GD2317@localhost>
+Message-ID: <51E63B3A.2010807@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [130716 07:32]:
-> Hi Tony,
-> 
-> On 07/16/2013 04:41 PM, Tony Lindgren wrote:
-> >* Grygorii Strashko <grygorii.strashko@ti.com> [130716 06:22]:
-> >>Hi Tony,
-> >>
-> >>This patch causes boot failure when I've applied my patch
-> >>"[RFC] ARM: OMAP2+: omap_device: add pinctrl handling"
-> >>https://lkml.org/lkml/2013/6/21/309
-> >>
-> >>on top of it:
-> >
-> >Hmm this patch alone removes duplicate code and if it causes
-> >issues I must have made a typo somewhere.
-> 
-> No typo :) You've removed the check for !dev-pins.
+Hi Ezequiel,
 
-Oh OK, sorry that was not intentional.
+On 07/16/2013 02:56 PM, Ezequiel Garcia wrote:
+[...]
+> Also, speaking of "device bus" this nand node should be behind a devicebus node.
+>
+> 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000   /* internal-regs */
+> 			  MBUS_ID(0x01, 0x2f) 0 0 0xf4000000 0x400>;
+>
+> 		devbus {
+> 			status = "okay";
+> 			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0x400>;
+>
+> 			/* nand */
+> 			nand {
+> 				compatible = "marvell,orion-nand";
+> 				reg = <0 0x400>;
+> 			};
+> 		};
+>
+> (notice this will allow you to relocate the base address of the NAND windows
+> easily if it conflicts with your PCIe needs).
 
-> And the failure place is:
-> int pinctrl_pm_select_active_state(struct device *dev)
-> {
->    return pinctrl_pm_select_state(dev, dev->pins->active_state);
->                                                 ^^^^ here
-> }
-> 
-> If I understand everything right, the pinctrl support in Device core
-> assumed to be optional - so, It's valid case, when there are no
-> definition for device's pinctrl in DT at all.
-> 
-> And in this case dev->pins == NULL and  pinctrl_pm_select_*() API
-> should return 0 always.
+I am MAYBE slowly starting to understand this whole mbus rework.
+Just one remark though: don't you think it would make sense to add 
+something like:
 
-Care to post your patch as it sounds like you have it fixed
-and tested?
+#define MBUS_ID_INTERNAL_REGS	MBUS_ID(0xf0, 0x01)
+#define MBUS_ID_NAND		MBUS_ID(0x01, 0x2f)
 
-Regards,
+I personally have a hard time reading numeric values for 
+GPIO_ACTIVE_LOW/GPIO_ACTIVE_HIGH.
 
-Tony
+Thanks,
+Gerlando
+
+>
+>> avoid a later incosistency between the "unit-address" and the first
+>> "reg" address:
+>>
+>>>    		#address-cells = <1>;
+>>>    		#size-cells = <1>;
+>>> @@ -171,7 +172,7 @@
+>>   >   		nand at 3000000 {
+>> 		     ^^^^^^^
+>
+> Oh, this should be fixed. I just missed it, and nobody noticed either.
+>
