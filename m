@@ -1,51 +1,84 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Wed, 17 Jul 2013 17:45:39 +0200
-Subject: [PATCH v3 6/7] USB: ohci-at91: add usb_clk for transition to
- common clk framework
-In-Reply-To: <Pine.LNX.4.44L0.1307171131580.1555-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1307171131580.1555-100000@iolanthe.rowland.org>
-Message-ID: <51E6BC23.6020700@overkiz.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Wed, 17 Jul 2013 17:46:11 +0200
+Subject: [PATCH v2 25/42] ARM: at91: move pit timer to common clk framework
+In-Reply-To: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1374075971-20254-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/2013 17:33, Alan Stern wrote:
-> On Tue, 16 Jul 2013, Boris BREZILLON wrote:
->
->> The AT91 PMC (Power Management Controller) provides an USB clock used by
->> USB Full Speed host (ohci) and USB Full Speed device (udc).
->> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
->> This configuration was formely done in mach-at91/clock.c, but this
->> implementation will be removed when moving to common clk framework.
->>
->> This patch add support for usb clock retrieval and configuration, and is
->> backward compatible with the current at91 clk implementation (if usb clk
->> is not found, it does not configure/enable the usb clk).
-> This does not take into account any of the changes you discussed with
-> Russell King and me -- it is exactly the same as the previous version.
-Sorry, I don't understand. I didn't send any new version since yesterday.
+Use device tree to get the source clock of the PIT (Periodic Interval Timer).
+If the clock is not found in device tree (or dt is not enabled) we'll try to
+get it using clk_lookup definitions.
 
-I'm sending it right now and it's part of the
-"ARM: at91: move to common clk framework" series (as discussed with you).
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/mach-at91/at91sam926x_time.c |   21 +++++++++++++++++++--
+ 1 file changed, 19 insertions(+), 2 deletions(-)
 
-
->> @@ -144,6 +150,11 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->>   		goto err2;
->>   	}
->>   
->> +	uclk = clk_get(&pdev->dev, "usb_clk");
->> +	if (IS_ERR(uclk)) {
->> +		uclk = NULL;
->> +		dev_warn(&pdev->dev, "failed to get usb_clk\n");
->> +	}
->>   	iclk = clk_get(&pdev->dev, "ohci_clk");
->>   	if (IS_ERR(iclk)) {
->>   		dev_err(&pdev->dev, "failed to get ohci_clk\n");
->> @@ -212,10 +223,11 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
->>   	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
->>   	usb_put_hcd(hcd);
->>   
->> +	clk_put(uclk);
-> What will clk_put() do when uclk is NULL?
->
-> Alan Stern
->
+diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+index 3a4bc2e..fba7bd6 100644
+--- a/arch/arm/mach-at91/at91sam926x_time.c
++++ b/arch/arm/mach-at91/at91sam926x_time.c
+@@ -39,6 +39,7 @@
+ static u32 pit_cycle;		/* write-once */
+ static u32 pit_cnt;		/* access only w/system irq blocked */
+ static void __iomem *pit_base_addr __read_mostly;
++static struct clk *mck;
+ 
+ static inline unsigned int pit_read(unsigned int reg_offset)
+ {
+@@ -186,6 +187,7 @@ static int __init of_at91sam926x_pit_init(void)
+ {
+ 	struct device_node	*np;
+ 	int			ret;
++	int			err = -EINVAL;
+ 
+ 	np = of_find_matching_node(NULL, pit_timer_ids);
+ 	if (!np)
+@@ -195,10 +197,19 @@ static int __init of_at91sam926x_pit_init(void)
+ 	if (!pit_base_addr)
+ 		goto node_err;
+ 
++	mck = of_clk_get(np, 0);
++	if (IS_ERR(mck)) {
++		err = PTR_RET(mck);
++		mck = NULL;
++		pr_crit("AT91: PIT: Unable to get mck clk from DT\n");
++		goto ioremap_err;
++	}
++
+ 	/* Get the interrupts property */
+ 	ret = irq_of_parse_and_map(np, 0);
+ 	if (!ret) {
+ 		pr_crit("AT91: PIT: Unable to get IRQ from DT\n");
++		clk_put(mck);
+ 		goto ioremap_err;
+ 	}
+ 	at91sam926x_pit_irq.irq = ret;
+@@ -212,7 +223,7 @@ ioremap_err:
+ node_err:
+ 	of_node_put(np);
+ err:
+-	return -EINVAL;
++	return err;
+ }
+ #else
+ static int __init of_at91sam926x_pit_init(void)
+@@ -237,7 +248,13 @@ void __init at91sam926x_pit_init(void)
+ 	 * Use our actual MCK to figure out how many MCK/16 ticks per
+ 	 * 1/HZ period (instead of a compile-time constant LATCH).
+ 	 */
+-	pit_rate = clk_get_rate(clk_get(NULL, "mck")) / 16;
++	if (!mck)
++		mck = clk_get(NULL, "mck");
++
++	if (IS_ERR(mck))
++		panic("AT91: PIT: Unable to get mck clk\n");
++	pit_rate = clk_get_rate(mck) / 16;
++	pr_notice("AT91: PIT: mck rate = %lu\n", pit_rate);
+ 	pit_cycle = (pit_rate + HZ/2) / HZ;
+ 	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
+ 
+-- 
+1.7.9.5
