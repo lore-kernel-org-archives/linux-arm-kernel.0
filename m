@@ -1,68 +1,83 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 17 Jul 2013 18:45:53 +0200
-Subject: [PATCH v2 34/42] ARM: at91/dt: move at91sam9g20 SoC to new at91 clk
- implem
-In-Reply-To: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
-References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1374079553-20942-1-git-send-email-b.brezillon@overkiz.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 17 Jul 2013 17:48:48 +0100
+Subject: [PATCH] arm: choose debug/uncompress.h include when uncompress
+ debug is disabled
+In-Reply-To: <20130717151816.GN24642@n2100.arm.linux.org.uk>
+References: <1373897706-15331-1-git-send-email-julien.grall@linaro.org>
+ <alpine.DEB.2.02.1307171420350.8258@kaball.uk.xensource.com>
+ <20130717151148.GM24642@n2100.arm.linux.org.uk>
+ <20130717151816.GN24642@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1307171748310.8258@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define at91sam9g20 clocks in at91sam9g20 device tree.
-Add references to the appropriate clocks in each peripheral.
+On Wed, 17 Jul 2013, Russell King - ARM Linux wrote:
+> On Wed, Jul 17, 2013 at 04:11:48PM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Jul 17, 2013 at 02:25:38PM +0100, Stefano Stabellini wrote:
+> > > On Mon, 15 Jul 2013, Julien Grall wrote:
+> > > > Even if uncompress debug is disabled, some board will continue to print
+> > > > information during uncompress step.
+> > > 
+> > > Are you talking about DEBUG_UNCOMPRESS?
+> > > Should I read the sentence as "even if DEBUG_UNCOMPRESS is not selected,
+> > > some board will continue to print information during the uncompress step"?
+> > > 
+> > > Isn't this a bug in the platform specific code that should be fixed anyway?
+> > 
+> > Hang on, let's be clear what's going on here.
+> > 
+> > 1. The normal output from the decompressor is *not* debugging.  By that
+> >    I mean the "Uncompressing kernel... done" message.  That is part of
+> >    user output.
+> > 
+> > 2. In non-multiplatform environments, the decompressor will normally use
+> >    the putc/flush functions found in arch/arm/mach-*/include/mach/uncompress.h
+> >    to implement its output, irrespective of the DEBUG_UNCOMPRESS setting.
+> >    (An interesting point is that DEBUG_UNCOMPRESS really should depend on
+> >    MULTIPLATFORM so that this point is explicit - the option requires
+> >    MULTIPLATFORM to be set.)
+> > 
+> > 3. DEBUG_UNCOMPRESS allows the functions which we've implemented for LL
+> >    debug to be re-used for decompressor output.
+> > 
+> > 4. When DEBUG_UNCOMPRESS is not set in a multiplatform kernel, the
+> >    decompressors putc() and flush() functions are stubbed out.
+> > 
+> > So, it's quite right that you get output from the decompressor even when
+> > DEBUG_UNCOMPRESS is not set.  There's no problem with that.
+> 
+> Does this patch help to explain this?
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/boot/dts/at91sam9g20.dtsi |   37 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+Yes it does, thanks.
 
-diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-index b8e7946..60a20ec 100644
---- a/arch/arm/boot/dts/at91sam9g20.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -25,6 +25,43 @@
- 			adc0: adc at fffe0000 {
- 				atmel,adc-startup-time = <40>;
- 			};
-+
-+			pmc: pmc at fffffc00 {
-+				plla: pllack {
-+					compatible = "atmel,at91sam9g45-clk-pll";
-+					#clock-cells = <0>;
-+					clocks = <&main>;
-+					id = <0>;
-+					input = <2000000 32000000>;
-+					output = <74500000 800000000
-+							  69500000 750000000
-+							  64500000 700000000
-+							  59500000 650000000
-+							  54500000 600000000
-+							  49500000 550000000
-+							  44500000 500000000
-+							  40000000 450000000>;
-+					out = <0 1 2 3 0 1 2 3>;
-+					icpll = <0 0 0 0 1 1 1 1>;
-+				};
-+
-+				pllb: pllbck {
-+					compatible = "atmel,at91sam9g20-clk-pllb";
-+					#clock-cells = <0>;
-+					clocks = <&main>;
-+					id = <1>;
-+					input = <2000000 32000000>;
-+					output = <30000000 100000000>;
-+					out = <0>;
-+				};
-+
-+				mck: masterck {
-+					#clock-cells = <0>;
-+					clocks = <&clk32k>, <&main>, <&plla>, <&pllb>;
-+					output = <0 133000000>;
-+					divisors = <1 2 4 6>;
-+				};
-+			};
- 		};
- 	};
- };
--- 
-1.7.9.5
+
+>  arch/arm/Kconfig.debug |   14 ++++++++++++--
+>  1 files changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index e401a76..583f4a0 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -804,9 +804,19 @@ config DEBUG_LL_INCLUDE
+>  
+>  config DEBUG_UNCOMPRESS
+>  	bool
+> -	default y if ARCH_MULTIPLATFORM && DEBUG_LL && \
+> -		     !DEBUG_OMAP2PLUS_UART && \
+> +	depends on ARCH_MULTIPLATFORM
+> +	default y if DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
+>  		     !DEBUG_TEGRA_UART
+> +	help
+> +	  This option influences the normal decompressor output only for
+> +	  multiplatform kernels.  Normally, multiplatform kernels disable
+> +	  decompressor output because it is not possible to know where to
+> +	  send the decompressor output.
+> +
+> +	  When this option is set, the selected DEBUG_LL output method
+> +	  will be re-used for normal decompressor output on multiplatform
+> +	  kernels.
+> +	  
+>  
+>  config UNCOMPRESS_INCLUDE
+>  	string
+> 
