@@ -1,394 +1,518 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 17 Jul 2013 16:59:30 +0200
-Subject: [PATCH v2 22/42] ARM: at91: move sama5d3 SoCs to new at91 clk implem
+Date: Wed, 17 Jul 2013 17:00:17 +0200
+Subject: [PATCH v2 23/42] ARM: at91: move at91rm9200 boards to new at91 clk
+ implem
 In-Reply-To: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
 References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1374073170-19972-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1374073217-20011-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes all references to the old at91 clks for sama5d3 SoCs.
-These SoCs only supports dt boards: we can remove register_clocks
-(all clocks are defined in dt).
+Move at91 clk init from early_init to timer_init for all at91rm9200 non dt
+boards.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- arch/arm/mach-at91/Kconfig   |    1 +
- arch/arm/mach-at91/sama5d3.c |  342 ------------------------------------------
- 2 files changed, 1 insertion(+), 342 deletions(-)
+ arch/arm/mach-at91/board-1arm.c       |   12 ++++++++++--
+ arch/arm/mach-at91/board-carmeva.c    |   13 ++++++++-----
+ arch/arm/mach-at91/board-cpuat91.c    |   12 ++++++++++--
+ arch/arm/mach-at91/board-csb337.c     |   11 +++++++----
+ arch/arm/mach-at91/board-csb637.c     |   11 +++++++----
+ arch/arm/mach-at91/board-dt-rm9200.c  |    9 ++++++++-
+ arch/arm/mach-at91/board-eb9200.c     |   11 +++++++----
+ arch/arm/mach-at91/board-ecbat91.c    |   12 ++++++++++--
+ arch/arm/mach-at91/board-eco920.c     |   13 +++++++++++--
+ arch/arm/mach-at91/board-kafa.c       |   12 ++++++++++--
+ arch/arm/mach-at91/board-kb9202.c     |   12 ++++++++++--
+ arch/arm/mach-at91/board-picotux200.c |   11 +++++++----
+ arch/arm/mach-at91/board-rm9200ek.c   |   11 +++++++----
+ arch/arm/mach-at91/board-rsi-ews.c    |   12 ++++++++----
+ arch/arm/mach-at91/board-yl-9200.c    |   12 ++++++++++--
+ 15 files changed, 130 insertions(+), 44 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 9901316..5a51254 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -41,6 +41,7 @@ config SOC_AT91SAM9
+diff --git a/arch/arm/mach-at91/board-1arm.c b/arch/arm/mach-at91/board-1arm.c
+index 35ab632..1ccfa2d 100644
+--- a/arch/arm/mach-at91/board-1arm.c
++++ b/arch/arm/mach-at91/board-1arm.c
+@@ -46,8 +46,16 @@ static void __init onearm_init_early(void)
+ 	/* Set cpu type: PQFP */
+ 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
  
- config SOC_SAMA5
- 	bool
-+	select COMMON_CLK
- 	select AT91_SAM9_TIME
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/mach-at91/sama5d3.c b/arch/arm/mach-at91/sama5d3.c
-index 32e0522..5e53be8 100644
---- a/arch/arm/mach-at91/sama5d3.c
-+++ b/arch/arm/mach-at91/sama5d3.c
-@@ -19,350 +19,9 @@
++	at91_initialize();
++}
++
++static void __init onearm_timer_init(void)
++{
+ 	/* Initialize processor: 18.432 MHz crystal */
+-	at91_initialize(18432000);
++	at91_clk_init(18432000);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
  
- #include "soc.h"
+ static struct macb_platform_data __initdata onearm_eth_data = {
+@@ -90,7 +98,7 @@ static void __init onearm_board_init(void)
+ 
+ MACHINE_START(ONEARM, "Ajeco 1ARM single board computer")
+ 	/* Maintainer: Lennert Buytenhek <buytenh@wantstofly.org> */
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= onearm_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= onearm_init_early,
+diff --git a/arch/arm/mach-at91/board-carmeva.c b/arch/arm/mach-at91/board-carmeva.c
+index 9298305..591ff4c 100644
+--- a/arch/arm/mach-at91/board-carmeva.c
++++ b/arch/arm/mach-at91/board-carmeva.c
+@@ -41,10 +41,13 @@
  #include "generic.h"
--#include "clock.h"
- #include "sam9_smc.h"
  
- /* --------------------------------------------------------------------
-- *  Clocks
-- * -------------------------------------------------------------------- */
--
--/*
-- * The peripheral clocks.
-- */
--
--static struct clk pioA_clk = {
--	.name		= "pioA_clk",
--	.pid		= SAMA5D3_ID_PIOA,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk pioB_clk = {
--	.name		= "pioB_clk",
--	.pid		= SAMA5D3_ID_PIOB,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk pioC_clk = {
--	.name		= "pioC_clk",
--	.pid		= SAMA5D3_ID_PIOC,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk pioD_clk = {
--	.name		= "pioD_clk",
--	.pid		= SAMA5D3_ID_PIOD,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk pioE_clk = {
--	.name		= "pioE_clk",
--	.pid		= SAMA5D3_ID_PIOE,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk usart0_clk = {
--	.name		= "usart0_clk",
--	.pid		= SAMA5D3_ID_USART0,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk usart1_clk = {
--	.name		= "usart1_clk",
--	.pid		= SAMA5D3_ID_USART1,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk usart2_clk = {
--	.name		= "usart2_clk",
--	.pid		= SAMA5D3_ID_USART2,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk usart3_clk = {
--	.name		= "usart3_clk",
--	.pid		= SAMA5D3_ID_USART3,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk uart0_clk = {
--	.name		= "uart0_clk",
--	.pid		= SAMA5D3_ID_UART0,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk uart1_clk = {
--	.name		= "uart1_clk",
--	.pid		= SAMA5D3_ID_UART1,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk twi0_clk = {
--	.name		= "twi0_clk",
--	.pid		= SAMA5D3_ID_TWI0,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk twi1_clk = {
--	.name		= "twi1_clk",
--	.pid		= SAMA5D3_ID_TWI1,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk twi2_clk = {
--	.name		= "twi2_clk",
--	.pid		= SAMA5D3_ID_TWI2,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk mmc0_clk = {
--	.name		= "mci0_clk",
--	.pid		= SAMA5D3_ID_HSMCI0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk mmc1_clk = {
--	.name		= "mci1_clk",
--	.pid		= SAMA5D3_ID_HSMCI1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk mmc2_clk = {
--	.name		= "mci2_clk",
--	.pid		= SAMA5D3_ID_HSMCI2,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk spi0_clk = {
--	.name		= "spi0_clk",
--	.pid		= SAMA5D3_ID_SPI0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk spi1_clk = {
--	.name		= "spi1_clk",
--	.pid		= SAMA5D3_ID_SPI1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk tcb0_clk = {
--	.name		= "tcb0_clk",
--	.pid		= SAMA5D3_ID_TC0,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk tcb1_clk = {
--	.name		= "tcb1_clk",
--	.pid		= SAMA5D3_ID_TC1,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk adc_clk = {
--	.name		= "adc_clk",
--	.pid		= SAMA5D3_ID_ADC,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk adc_op_clk = {
--	.name		= "adc_op_clk",
--	.type		= CLK_TYPE_PERIPHERAL,
--	.rate_hz	= 5000000,
--};
--static struct clk dma0_clk = {
--	.name		= "dma0_clk",
--	.pid		= SAMA5D3_ID_DMA0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk dma1_clk = {
--	.name		= "dma1_clk",
--	.pid		= SAMA5D3_ID_DMA1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk uhphs_clk = {
--	.name		= "uhphs",
--	.pid		= SAMA5D3_ID_UHPHS,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk udphs_clk = {
--	.name		= "udphs_clk",
--	.pid		= SAMA5D3_ID_UDPHS,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* gmac only for sama5d33, sama5d34, sama5d35 */
--static struct clk macb0_clk = {
--	.name		= "macb0_clk",
--	.pid		= SAMA5D3_ID_GMAC,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* emac only for sama5d31, sama5d35 */
--static struct clk macb1_clk = {
--	.name		= "macb1_clk",
--	.pid		= SAMA5D3_ID_EMAC,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* lcd only for sama5d31, sama5d33, sama5d34 */
--static struct clk lcdc_clk = {
--	.name		= "lcdc_clk",
--	.pid		= SAMA5D3_ID_LCDC,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* isi only for sama5d33, sama5d35 */
--static struct clk isi_clk = {
--	.name		= "isi_clk",
--	.pid		= SAMA5D3_ID_ISI,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk can0_clk = {
--	.name		= "can0_clk",
--	.pid		= SAMA5D3_ID_CAN0,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk can1_clk = {
--	.name		= "can1_clk",
--	.pid		= SAMA5D3_ID_CAN1,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk ssc0_clk = {
--	.name		= "ssc0_clk",
--	.pid		= SAMA5D3_ID_SSC0,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk ssc1_clk = {
--	.name		= "ssc1_clk",
--	.pid		= SAMA5D3_ID_SSC1,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk sha_clk = {
--	.name		= "sha_clk",
--	.pid		= SAMA5D3_ID_SHA,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV8,
--};
--static struct clk aes_clk = {
--	.name		= "aes_clk",
--	.pid		= SAMA5D3_ID_AES,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk tdes_clk = {
--	.name		= "tdes_clk",
--	.pid		= SAMA5D3_ID_TDES,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--
--static struct clk *periph_clocks[] __initdata = {
--	&pioA_clk,
--	&pioB_clk,
--	&pioC_clk,
--	&pioD_clk,
--	&pioE_clk,
--	&usart0_clk,
--	&usart1_clk,
--	&usart2_clk,
--	&usart3_clk,
--	&uart0_clk,
--	&uart1_clk,
--	&twi0_clk,
--	&twi1_clk,
--	&twi2_clk,
--	&mmc0_clk,
--	&mmc1_clk,
--	&mmc2_clk,
--	&spi0_clk,
--	&spi1_clk,
--	&tcb0_clk,
--	&tcb1_clk,
--	&adc_clk,
--	&adc_op_clk,
--	&dma0_clk,
--	&dma1_clk,
--	&uhphs_clk,
--	&udphs_clk,
--	&macb0_clk,
--	&macb1_clk,
--	&lcdc_clk,
--	&isi_clk,
--	&can0_clk,
--	&can1_clk,
--	&ssc0_clk,
--	&ssc1_clk,
--	&sha_clk,
--	&aes_clk,
--	&tdes_clk,
--};
--
--static struct clk pck0 = {
--	.name		= "pck0",
--	.pmc_mask	= AT91_PMC_PCK0,
--	.type		= CLK_TYPE_PROGRAMMABLE,
--	.id		= 0,
--};
--
--static struct clk pck1 = {
--	.name		= "pck1",
--	.pmc_mask	= AT91_PMC_PCK1,
--	.type		= CLK_TYPE_PROGRAMMABLE,
--	.id		= 1,
--};
--
--static struct clk pck2 = {
--	.name		= "pck2",
--	.pmc_mask	= AT91_PMC_PCK2,
--	.type		= CLK_TYPE_PROGRAMMABLE,
--	.id		= 2,
--};
--
--static struct clk_lookup periph_clocks_lookups[] = {
--	/* lookup table for DT entries */
--	CLKDEV_CON_DEV_ID("usart", "ffffee00.serial", &mck),
--	CLKDEV_CON_DEV_ID(NULL, "fffff200.gpio", &pioA_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioB_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioC_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioD_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioE_clk),
--	CLKDEV_CON_DEV_ID("usart", "f001c000.serial", &usart0_clk),
--	CLKDEV_CON_DEV_ID("usart", "f0020000.serial", &usart1_clk),
--	CLKDEV_CON_DEV_ID("usart", "f8020000.serial", &usart2_clk),
--	CLKDEV_CON_DEV_ID("usart", "f8024000.serial", &usart3_clk),
--	CLKDEV_CON_DEV_ID(NULL, "f0014000.i2c", &twi0_clk),
--	CLKDEV_CON_DEV_ID(NULL, "f0018000.i2c", &twi1_clk),
--	CLKDEV_CON_DEV_ID(NULL, "f801c000.i2c", &twi2_clk),
--	CLKDEV_CON_DEV_ID("mci_clk", "f0000000.mmc", &mmc0_clk),
--	CLKDEV_CON_DEV_ID("mci_clk", "f8000000.mmc", &mmc1_clk),
--	CLKDEV_CON_DEV_ID("mci_clk", "f8004000.mmc", &mmc2_clk),
--	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi0_clk),
--	CLKDEV_CON_DEV_ID("spi_clk", "f8008000.spi", &spi1_clk),
--	CLKDEV_CON_DEV_ID("t0_clk", "f0010000.timer", &tcb0_clk),
--	CLKDEV_CON_DEV_ID("t0_clk", "f8014000.timer", &tcb1_clk),
--	CLKDEV_CON_DEV_ID("tsc_clk", "f8018000.tsadcc", &adc_clk),
--	CLKDEV_CON_DEV_ID("dma_clk", "ffffe600.dma-controller", &dma0_clk),
--	CLKDEV_CON_DEV_ID("dma_clk", "ffffe800.dma-controller", &dma1_clk),
--	CLKDEV_CON_DEV_ID("hclk", "600000.ohci", &uhphs_clk),
--	CLKDEV_CON_DEV_ID("ohci_clk", "600000.ohci", &uhphs_clk),
--	CLKDEV_CON_DEV_ID("ehci_clk", "700000.ehci", &uhphs_clk),
--	CLKDEV_CON_DEV_ID("pclk", "500000.gadget", &udphs_clk),
--	CLKDEV_CON_DEV_ID("hclk", "500000.gadget", &utmi_clk),
--	CLKDEV_CON_DEV_ID("hclk", "f0028000.ethernet", &macb0_clk),
--	CLKDEV_CON_DEV_ID("pclk", "f0028000.ethernet", &macb0_clk),
--	CLKDEV_CON_DEV_ID("hclk", "f802c000.ethernet", &macb1_clk),
--	CLKDEV_CON_DEV_ID("pclk", "f802c000.ethernet", &macb1_clk),
--	CLKDEV_CON_DEV_ID("pclk", "f0008000.ssc", &ssc0_clk),
--	CLKDEV_CON_DEV_ID("pclk", "f000c000.ssc", &ssc1_clk),
--	CLKDEV_CON_DEV_ID("can_clk", "f000c000.can", &can0_clk),
--	CLKDEV_CON_DEV_ID("can_clk", "f8010000.can", &can1_clk),
--	CLKDEV_CON_DEV_ID("sha_clk", "f8034000.sha", &sha_clk),
--	CLKDEV_CON_DEV_ID("aes_clk", "f8038000.aes", &aes_clk),
--	CLKDEV_CON_DEV_ID("tdes_clk", "f803c000.tdes", &tdes_clk),
--};
--
--static void __init sama5d3_register_clocks(void)
--{
--	int i;
--
--	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
--		clk_register(periph_clocks[i]);
--
--	clkdev_add_table(periph_clocks_lookups,
--			 ARRAY_SIZE(periph_clocks_lookups));
--
--	clk_register(&pck0);
--	clk_register(&pck1);
--	clk_register(&pck2);
--}
--
--/* --------------------------------------------------------------------
-  *  AT91SAM9x5 processor initialization
-  * -------------------------------------------------------------------- */
  
-@@ -373,5 +32,4 @@ static void __init sama5d3_map_io(void)
+-static void __init carmeva_init_early(void)
++static void __init carmeva_timer_init(void)
+ {
+-	/* Initialize processor: 20.000 MHz crystal */
+-	at91_initialize(20000000);
++	/* Initialize processor: 18.432 MHz crystal */
++	at91_clk_init(20000000);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
  
- AT91_SOC_START(sama5d3)
- 	.map_io = sama5d3_map_io,
--	.register_clocks = sama5d3_register_clocks,
- AT91_SOC_END
+ static struct macb_platform_data __initdata carmeva_eth_data = {
+@@ -157,10 +160,10 @@ static void __init carmeva_board_init(void)
+ 
+ MACHINE_START(CARMEVA, "Carmeva")
+ 	/* Maintainer: Conitec Datasystems */
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= carmeva_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+-	.init_early	= carmeva_init_early,
++	.init_early	= at91_initialize,
+ 	.init_irq	= at91_init_irq_default,
+ 	.init_machine	= carmeva_board_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/board-cpuat91.c b/arch/arm/mach-at91/board-cpuat91.c
+index 42f1353..42b51d9 100644
+--- a/arch/arm/mach-at91/board-cpuat91.c
++++ b/arch/arm/mach-at91/board-cpuat91.c
+@@ -58,8 +58,16 @@ static void __init cpuat91_init_early(void)
+ 	/* Set cpu type: PQFP */
+ 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
+ 
++	at91_initialize();
++}
++
++static void __init cpuat91_timer_init(void)
++{
+ 	/* Initialize processor: 18.432 MHz crystal */
+-	at91_initialize(18432000);
++	at91_clk_init(18432000);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
+ 
+ static struct macb_platform_data __initdata cpuat91_eth_data = {
+@@ -178,7 +186,7 @@ static void __init cpuat91_board_init(void)
+ 
+ MACHINE_START(CPUAT91, "Eukrea")
+ 	/* Maintainer: Eric Benard - EUKREA Electromatique */
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= cpuat91_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= cpuat91_init_early,
+diff --git a/arch/arm/mach-at91/board-csb337.c b/arch/arm/mach-at91/board-csb337.c
+index e5fde215..b772ec2 100644
+--- a/arch/arm/mach-at91/board-csb337.c
++++ b/arch/arm/mach-at91/board-csb337.c
+@@ -44,10 +44,13 @@
+ #include "generic.h"
+ 
+ 
+-static void __init csb337_init_early(void)
++static void __init csb337_timer_init(void)
+ {
+ 	/* Initialize processor: 3.6864 MHz crystal */
+-	at91_initialize(3686400);
++	at91_clk_init(3686400);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
+ 
+ static struct macb_platform_data __initdata csb337_eth_data = {
+@@ -251,10 +254,10 @@ static void __init csb337_board_init(void)
+ 
+ MACHINE_START(CSB337, "Cogent CSB337")
+ 	/* Maintainer: Bill Gatliff */
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= csb337_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+-	.init_early	= csb337_init_early,
++	.init_early	= at91_initialize,
+ 	.init_irq	= at91_init_irq_default,
+ 	.init_machine	= csb337_board_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/board-csb637.c b/arch/arm/mach-at91/board-csb637.c
+index fdf1106..4815dbe 100644
+--- a/arch/arm/mach-at91/board-csb637.c
++++ b/arch/arm/mach-at91/board-csb637.c
+@@ -41,10 +41,13 @@
+ #include "generic.h"
+ 
+ 
+-static void __init csb637_init_early(void)
++static void __init csb637_timer_init(void)
+ {
+ 	/* Initialize processor: 3.6864 MHz crystal */
+-	at91_initialize(3686400);
++	at91_clk_init(3686400);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
+ 
+ static struct macb_platform_data __initdata csb637_eth_data = {
+@@ -132,10 +135,10 @@ static void __init csb637_board_init(void)
+ 
+ MACHINE_START(CSB637, "Cogent CSB637")
+ 	/* Maintainer: Bill Gatliff */
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= csb637_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+-	.init_early	= csb637_init_early,
++	.init_early	= at91_initialize,
+ 	.init_irq	= at91_init_irq_default,
+ 	.init_machine	= csb637_board_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/board-dt-rm9200.c b/arch/arm/mach-at91/board-dt-rm9200.c
+index 3fcb662..4f3882e 100644
+--- a/arch/arm/mach-at91/board-dt-rm9200.c
++++ b/arch/arm/mach-at91/board-dt-rm9200.c
+@@ -15,6 +15,7 @@
+ #include <linux/of.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
++#include <linux/clk-provider.h>
+ 
+ #include <asm/setup.h>
+ #include <asm/irq.h>
+@@ -26,6 +27,12 @@
+ #include "generic.h"
+ 
+ 
++static void __init at91rm9200_dt_timer_init(void)
++{
++	of_clk_init(NULL);
++	at91rm9200_timer_init();
++}
++
+ static const struct of_device_id irq_of_match[] __initconst = {
+ 	{ .compatible = "atmel,at91rm9200-aic", .data = at91_aic_of_init },
+ 	{ /*sentinel*/ }
+@@ -47,7 +54,7 @@ static const char *at91rm9200_dt_board_compat[] __initdata = {
+ };
+ 
+ DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
+-	.init_time      = at91rm9200_timer_init,
++	.init_time      = at91rm9200_dt_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= at91rm9200_dt_initialize,
+diff --git a/arch/arm/mach-at91/board-eb9200.c b/arch/arm/mach-at91/board-eb9200.c
+index f9be816..84cc538 100644
+--- a/arch/arm/mach-at91/board-eb9200.c
++++ b/arch/arm/mach-at91/board-eb9200.c
+@@ -40,10 +40,13 @@
+ #include "generic.h"
+ 
+ 
+-static void __init eb9200_init_early(void)
++static void __init eb9200_timer_init(void)
+ {
+ 	/* Initialize processor: 18.432 MHz crystal */
+-	at91_initialize(18432000);
++	at91_clk_init(18432000);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
+ 
+ static struct macb_platform_data __initdata eb9200_eth_data = {
+@@ -116,10 +119,10 @@ static void __init eb9200_board_init(void)
+ }
+ 
+ MACHINE_START(ATEB9200, "Embest ATEB9200")
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= eb9200_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+-	.init_early	= eb9200_init_early,
++	.init_early	= at91_initialize,
+ 	.init_irq	= at91_init_irq_default,
+ 	.init_machine	= eb9200_board_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/board-ecbat91.c b/arch/arm/mach-at91/board-ecbat91.c
+index b2fcd71..fc767bd 100644
+--- a/arch/arm/mach-at91/board-ecbat91.c
++++ b/arch/arm/mach-at91/board-ecbat91.c
+@@ -49,8 +49,16 @@ static void __init ecb_at91init_early(void)
+ 	/* Set cpu type: PQFP */
+ 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
+ 
++	at91_initialize();
++}
++
++static void __init ecbat91_timer_init(void)
++{
+ 	/* Initialize processor: 18.432 MHz crystal */
+-	at91_initialize(18432000);
++	at91_clk_init(18432000);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
+ 
+ static struct macb_platform_data __initdata ecb_at91eth_data = {
+@@ -181,7 +189,7 @@ static void __init ecb_at91board_init(void)
+ 
+ MACHINE_START(ECBAT91, "emQbit's ECB_AT91")
+ 	/* Maintainer: emQbit.com */
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= ecbat91_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= ecb_at91init_early,
+diff --git a/arch/arm/mach-at91/board-eco920.c b/arch/arm/mach-at91/board-eco920.c
+index 77de410..b910c41 100644
+--- a/arch/arm/mach-at91/board-eco920.c
++++ b/arch/arm/mach-at91/board-eco920.c
+@@ -37,7 +37,16 @@ static void __init eco920_init_early(void)
+ 	/* Set cpu type: PQFP */
+ 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
+ 
+-	at91_initialize(18432000);
++	at91_initialize();
++}
++
++static void __init eco920_timer_init(void)
++{
++	/* Initialize processor: 18.432 MHz crystal */
++	at91_clk_init(18432000);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
+ 
+ static struct macb_platform_data __initdata eco920_eth_data = {
+@@ -149,7 +158,7 @@ static void __init eco920_board_init(void)
+ 
+ MACHINE_START(ECO920, "eco920")
+ 	/* Maintainer: Sascha Hauer */
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= eco920_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= eco920_init_early,
+diff --git a/arch/arm/mach-at91/board-kafa.c b/arch/arm/mach-at91/board-kafa.c
+index 88e2f5d..e7378c4 100644
+--- a/arch/arm/mach-at91/board-kafa.c
++++ b/arch/arm/mach-at91/board-kafa.c
+@@ -46,8 +46,16 @@ static void __init kafa_init_early(void)
+ 	/* Set cpu type: PQFP */
+ 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
+ 
++	at91_initialize();
++}
++
++static void __init kafa_timer_init(void)
++{
+ 	/* Initialize processor: 18.432 MHz crystal */
+-	at91_initialize(18432000);
++	at91_clk_init(18432000);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
+ 
+ static struct macb_platform_data __initdata kafa_eth_data = {
+@@ -103,7 +111,7 @@ static void __init kafa_board_init(void)
+ 
+ MACHINE_START(KAFA, "Sperry-Sun KAFA")
+ 	/* Maintainer: Sergei Sharonov */
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= kafa_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= kafa_init_early,
+diff --git a/arch/arm/mach-at91/board-kb9202.c b/arch/arm/mach-at91/board-kb9202.c
+index 0c519d9..58f2069 100644
+--- a/arch/arm/mach-at91/board-kb9202.c
++++ b/arch/arm/mach-at91/board-kb9202.c
+@@ -49,8 +49,16 @@ static void __init kb9202_init_early(void)
+ 	/* Set cpu type: PQFP */
+ 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
+ 
++	at91_initialize();
++}
++
++static void __init kafa_timer_init(void)
++{
+ 	/* Initialize processor: 10 MHz crystal */
+-	at91_initialize(10000000);
++	at91_clk_init(10000000);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
+ 
+ static struct macb_platform_data __initdata kb9202_eth_data = {
+@@ -149,7 +157,7 @@ static void __init kb9202_board_init(void)
+ 
+ MACHINE_START(KB9200, "KB920x")
+ 	/* Maintainer: KwikByte, Inc. */
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= kafa_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= kb9202_init_early,
+diff --git a/arch/arm/mach-at91/board-picotux200.c b/arch/arm/mach-at91/board-picotux200.c
+index ab2b2ec..8855fad 100644
+--- a/arch/arm/mach-at91/board-picotux200.c
++++ b/arch/arm/mach-at91/board-picotux200.c
+@@ -45,10 +45,13 @@
+ #include "generic.h"
+ 
+ 
+-static void __init picotux200_init_early(void)
++static void __init picotux200_timer_init(void)
+ {
+ 	/* Initialize processor: 18.432 MHz crystal */
+-	at91_initialize(18432000);
++	at91_clk_init(18432000);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
+ 
+ static struct macb_platform_data __initdata picotux200_eth_data = {
+@@ -119,10 +122,10 @@ static void __init picotux200_board_init(void)
+ 
+ MACHINE_START(PICOTUX2XX, "picotux 200")
+ 	/* Maintainer: Kleinhenz Elektronik GmbH */
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= picotux200_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+-	.init_early	= picotux200_init_early,
++	.init_early	= at91_initialize,
+ 	.init_irq	= at91_init_irq_default,
+ 	.init_machine	= picotux200_board_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
+index 8b17dad..5d3abac 100644
+--- a/arch/arm/mach-at91/board-rm9200ek.c
++++ b/arch/arm/mach-at91/board-rm9200ek.c
+@@ -47,10 +47,13 @@
+ #include "generic.h"
+ 
+ 
+-static void __init ek_init_early(void)
++static void __init ek_timer_init(void)
+ {
+ 	/* Initialize processor: 18.432 MHz crystal */
+-	at91_initialize(18432000);
++	at91_clk_init(18432000);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
+ 
+ static struct macb_platform_data __initdata ek_eth_data = {
+@@ -186,10 +189,10 @@ static void __init ek_board_init(void)
+ 
+ MACHINE_START(AT91RM9200EK, "Atmel AT91RM9200-EK")
+ 	/* Maintainer: SAN People/Atmel */
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= ek_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+-	.init_early	= ek_init_early,
++	.init_early	= at91_initialize,
+ 	.init_irq	= at91_init_irq_default,
+ 	.init_machine	= ek_board_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/board-rsi-ews.c b/arch/arm/mach-at91/board-rsi-ews.c
+index f6d7f19..31738f9 100644
+--- a/arch/arm/mach-at91/board-rsi-ews.c
++++ b/arch/arm/mach-at91/board-rsi-ews.c
+@@ -32,10 +32,14 @@
+ #include "board.h"
+ #include "generic.h"
+ 
+-static void __init rsi_ews_init_early(void)
++
++static void __init rsi_ews_timer_init(void)
+ {
+ 	/* Initialize processor: 18.432 MHz crystal */
+-	at91_initialize(18432000);
++	at91_clk_init(18432000);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
+ 
+ /*
+@@ -222,10 +226,10 @@ static void __init rsi_ews_board_init(void)
+ 
+ MACHINE_START(RSI_EWS, "RSI EWS")
+ 	/* Maintainer: Josef Holzmayr <holzmayr@rsi-elektrotechnik.de> */
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= rsi_ews_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+-	.init_early	= rsi_ews_init_early,
++	.init_early	= at91_initialize,
+ 	.init_irq	= at91_init_irq_default,
+ 	.init_machine	= rsi_ews_board_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
+index be08377..78a0780 100644
+--- a/arch/arm/mach-at91/board-yl-9200.c
++++ b/arch/arm/mach-at91/board-yl-9200.c
+@@ -57,8 +57,16 @@ static void __init yl9200_init_early(void)
+ 	/* Set cpu type: PQFP */
+ 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
+ 
++	at91_initialize();
++}
++
++static void __init yl9200_timer_init(void)
++{
+ 	/* Initialize processor: 18.432 MHz crystal */
+-	at91_initialize(18432000);
++	at91_clk_init(18432000);
++
++	/* Init rm9200 timer */
++	at91rm9200_timer_init();
+ }
+ 
+ /*
+@@ -587,7 +595,7 @@ static void __init yl9200_board_init(void)
+ 
+ MACHINE_START(YL9200, "uCdragon YL-9200")
+ 	/* Maintainer: S.Birtles */
+-	.init_time	= at91rm9200_timer_init,
++	.init_time	= yl9200_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= yl9200_init_early,
 -- 
 1.7.9.5
