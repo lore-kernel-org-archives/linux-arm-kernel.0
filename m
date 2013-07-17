@@ -1,41 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Jul 2013 22:21:48 +0100
-Subject: preempted dup_mm misses TLB invalidate
-In-Reply-To: <51E706A6.4040309@nvidia.com>
-References: <51E43D2B.9090709@nvidia.com>
- <20130717192746.GE16496@MacBook-Pro.local> <51E6F60D.6060804@wwwdotorg.org>
- <51E6FA10.5070504@nvidia.com> <20130717203409.GU24642@n2100.arm.linux.org.uk>
- <51E706A6.4040309@nvidia.com>
-Message-ID: <20130717212148.GV24642@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 17 Jul 2013 15:23:41 -0600
+Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
+In-Reply-To: <20130716090536.5541.36289.stgit@localhost>
+References: <20130716090310.5541.36777.stgit@localhost>
+ <20130716090536.5541.36289.stgit@localhost>
+Message-ID: <51E70B5D.6030802@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 02:03:34PM -0700, Nickolas Fortino wrote:
-> On 7/17/2013 1:34 PM, Russell King - ARM Linux wrote:
->> Even if you stopped all threads on entry to a fork, the same problem
->> exists - at the point that you stopped the other threads, how do you know
->> what data they've written to memory?
->>
->> What I'm pointing out here is that in this situation, the data visible to
->> the child process is unpredictable.
->
-> I agree the data visible to the child process is inherently  
-> unpredictable. If you stop all process threads on a fork, however, you  
-> do preserve the invariant that memory accesses are not seen out of  
-> order. In your memcopy case, it is indeterminate how much of the memcopy  
-> has completed, but it is known that later pages in the memcopy will only  
-> have been written if prior pages have been updated.
->
-> With the current kernel configuration, you can have holes. Any page  
-> which hits in the TLB has the memcopy data appear in the forked process.  
-> Any page which misses in the TLB will not appear in the forked process.  
-> The choice of which pages get memcopy data in the forked process will  
-> appear random based on TLB contents, a behavior you cannot have if you  
-> freeze threads on a fork.
+On 07/16/2013 03:05 AM, Tony Lindgren wrote:
+> To toggle dynamic states, let's add the optional active state in
+> addition to the static default state. Then if the optional active
+> state is defined, we can require that idle and sleep states cover
+> the same pingroups as the active state.
+> 
+> Then let's add pinctrl_check_dynamic() and pinctrl_select_dynamic()
+> to use instead of pinctrl_select() to avoid breaking existing users.
+> 
+> With pinctrl_check_dynamic() we can check that idle and sleep states
+> match the active state for pingroups during init, and don't need to
+> do it during runtime.
+> 
+> Then with the states pre-validated, pinctrl_select_dynamic() can
+> just toggle between the dynamic states without extra checks.
+> 
+> Note that pinctr_select_state() still has valid use cases, such as
+> changing states when the pins can be shared between two drivers
+> and don't necessarily cover the same pingroups. For dynamic runtime
+> toggling of pin states, we should eventually always use just
+> pinctrl_select_dynamic().
 
-So... how is this handled on x86 or any of the other architectures?  I'm
-willing to bet that the behaviour you observe on ARM is inherently visible
-on many of the other Linux architectures.
+Something in this series should edit Documentation/pinctrl.txt to
+explain the philosophy behind the static/dynamic state split. That
+philosophy and/or semantics are more important to review than the code...
 
-Short of modifying the generic kernel to halt all threads, this can not be
-fixed.
+Related to that, I'm worried that using pinctrl_select_state() and
+pinctrl_select_dynamic() appear to be mutually-exclusive options here.
+Why shouldn't e.g. a pinctrl-based I2C mux also be able to do runtime
+PM? Does the mux setting select which states are used for runtime PM, or
+does runtime PM override the basic mux setting, or must the pincrl-I2C
+mux manually implement custom runtime-PM/pinctrl interaction since
+there's no generic answer to those questions? How many more custom
+exceptions will there be?
