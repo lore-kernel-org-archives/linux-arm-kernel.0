@@ -1,159 +1,132 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 17 Jul 2013 17:07:54 +0800
-Subject: [PATCH 2/5] iio: at91: Use different prescal, startup mask in
- MR for different IP
-In-Reply-To: <51E651D5.7050906@atmel.com>
-References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
- <1373789069-11604-3-git-send-email-josh.wu@atmel.com>
- <20130715125815.GC2962@lukather> <51E651D5.7050906@atmel.com>
-Message-ID: <51E65EEA.2050306@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 17 Jul 2013 10:11:03 +0100
+Subject: [PATCH v4 1/3] ARM: shmobile: r8a7790: add Ether support
+In-Reply-To: <1372663234-13486-2-git-send-email-horms+renesas@verge.net.au>
+References: <1372663234-13486-1-git-send-email-horms+renesas@verge.net.au>
+ <1372663234-13486-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130717091103.GD15981@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Nicolas
+On Mon, Jul 01, 2013 at 08:20:32AM +0100, Simon Horman wrote:
+> Add Ether clock and platform device for R8A7779 SoC; add a function to
+> register this device with board-specific platform data.
+> 
+> Based on a similar change for the r8a7779 by Sergei Shtylyov.
+> 
+> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> ---
+> 
+> This patch has a run-time dependency on "sh_eth: add support for r8a7790 SoC".
+> 
+> v3
+> * Use newly added "r8a7790-ether" instead of "sh-eth"
+> 
+> v2
+> * Do not add MSTP812, EtherAVB. It is not used.
+> * As suggested by Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>   - Move Ethernet element of MSTP enum to a separate line
+>   - Move declaration of r8a7790_add_ether_device() to immediately
+>     after that of r8a7790_add_standard_devices()
+>   - Add __initdata annotation to ether_resource.
+> ---
+>  arch/arm/mach-shmobile/clock-r8a7790.c        |  4 ++++
+>  arch/arm/mach-shmobile/include/mach/r8a7790.h |  3 +++
+>  arch/arm/mach-shmobile/setup-r8a7790.c        | 14 ++++++++++++++
+>  3 files changed, 21 insertions(+)
+> 
+> diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+> index 62d8162..2f52c0f 100644
+> --- a/arch/arm/mach-shmobile/clock-r8a7790.c
+> +++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+> @@ -52,6 +52,7 @@
+>  #define SMSTPCR3 0xe615013c
+>  #define SMSTPCR5 0xe6150144
+>  #define SMSTPCR7 0xe615014c
+> +#define SMSTPCR8 0xe6150990
+>  
+>  #define MODEMR		0xE6160060
+>  #define SDCKCR		0xE6150074
+> @@ -182,6 +183,7 @@ static struct clk div6_clks[DIV6_NR] = {
+>  
+>  /* MSTP */
+>  enum {
+> +	MSTP813,
+>  	MSTP721, MSTP720,
+>  	MSTP717, MSTP716,
+>  	MSTP522,
+> @@ -192,6 +194,7 @@ enum {
+>  };
+>  
+>  static struct clk mstp_clks[MSTP_NR] = {
+> +	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
+>  	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
+>  	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
+>  	[MSTP717] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 17, 0), /* HSCIF0 */
+> @@ -260,6 +263,7 @@ static struct clk_lookup lookups[] = {
+>  	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
+>  	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP717]),
+>  	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP716]),
+> +	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
+>  	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
+>  	CLKDEV_DEV_ID("ee200000.mmcif", &mstp_clks[MSTP315]),
+>  	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
+> diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> index 7851cc1..b827b49 100644
+> --- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> +++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> @@ -1,7 +1,10 @@
+>  #ifndef __ASM_R8A7790_H__
+>  #define __ASM_R8A7790_H__
+>  
+> +#include <linux/sh_eth.h>
+> +
+>  void r8a7790_add_standard_devices(void);
+> +void r8a7790_add_ether_device(struct sh_eth_plat_data *pdata);
+>  void r8a7790_clock_init(void);
+>  void r8a7790_pinmux_init(void);
+>  void r8a7790_init_delay(void);
+> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+> index d89cd83..fad4251 100644
+> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
+> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+> @@ -31,6 +31,20 @@
+>  #include <mach/r8a7790.h>
+>  #include <asm/mach/arch.h>
+>  
+> +/* Ether */
+> +static struct resource ether_resources[] __initdata = {
+> +	DEFINE_RES_MEM(0xee700000, 0x400),
+> +	DEFINE_RES_IRQ(gic_spi(162)), /* IRQ0 */
+> +};
+> +
+> +void __init r8a7790_add_ether_device(struct sh_eth_plat_data *pdata)
+> +{
+> +	platform_device_register_resndata(&platform_bus, "r8a7790-ether", -1,
+> +					  ether_resources,
+> +					  ARRAY_SIZE(ether_resources),
+> +					  pdata, sizeof(*pdata));
+> +}
 
-On 7/17/2013 4:12 PM, Nicolas Ferre wrote:
-> On 15/07/2013 14:58, Maxime Ripard :
->> Hi Josh,
->>
->> On Sun, Jul 14, 2013 at 04:04:26PM +0800, Josh Wu wrote:
->>> For at91 boards, there are different IPs for adc. Different IPs has 
->>> different
->>> STARTUP & PRESCAL mask in ADC_MR.
->>>
->>> This patch can change the masks according to the different IP version.
->>>
->>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->>> ---
->>>   arch/arm/mach-at91/include/mach/at91_adc.h |    9 ++++--
->>>   drivers/iio/adc/at91_adc.c                 |   48 
->>> ++++++++++++++++++++++++++--
->>>   2 files changed, 53 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-at91/include/mach/at91_adc.h 
->>> b/arch/arm/mach-at91/include/mach/at91_adc.h
->>> index 8e7ed5c..ab273ee 100644
->>> --- a/arch/arm/mach-at91/include/mach/at91_adc.h
->>> +++ b/arch/arm/mach-at91/include/mach/at91_adc.h
->>> @@ -28,9 +28,12 @@
->>>   #define            AT91_ADC_TRGSEL_EXTERNAL    (6 << 1)
->>>   #define        AT91_ADC_LOWRES        (1 << 4)    /* Low 
->>> Resolution */
->>>   #define        AT91_ADC_SLEEP        (1 << 5)    /* Sleep Mode */
->>> -#define        AT91_ADC_PRESCAL    (0x3f << 8)    /* Prescalar Rate 
->>> Selection */
->>> +#define        AT91_ADC_PRESCAL    (0xff << 8)    /* Prescalar Rate 
->>> Selection */
->>> +#define        AT91_ADC_PRESCAL_9260    (0x3f << 8)
->>>   #define            AT91_ADC_PRESCAL_(x)    ((x) << 8)
->>> -#define        AT91_ADC_STARTUP    (0x1f << 16)    /* Startup Up 
->>> Time */
->>> +#define        AT91_ADC_STARTUP    (0xf << 16)    /* Startup Up 
->>> Time */
->>> +#define        AT91_ADC_STARTUP_9260    (0x1f << 16)
->>> +#define        AT91_ADC_STARTUP_9G45    (0x7f << 16)
->>>   #define            AT91_ADC_STARTUP_(x)    ((x) << 16)
->>>   #define        AT91_ADC_SHTIM        (0xf  << 24) /* Sample & Hold 
->>> Time */
->>>   #define            AT91_ADC_SHTIM_(x)    ((x) << 24)
->>> @@ -58,4 +61,6 @@
->>>   #define AT91_ADC_CHR(n)        (0x30 + ((n) * 4))    /* Channel 
->>> Data Register N */
->>>   #define        AT91_ADC_DATA        (0x3ff)
->>>
->>> +#define AT91_ADC_VERSION    0xFC
->>> +
->>>   #endif
->>> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
->>> index 18bd54f..14e99ba 100644
->>> --- a/drivers/iio/adc/at91_adc.c
->>> +++ b/drivers/iio/adc/at91_adc.c
->>> @@ -39,6 +39,12 @@
->>>   #define at91_adc_writel(st, reg, val) \
->>>       (writel_relaxed(val, st->reg_base + reg))
->>>
->>> +struct at91_adc_caps {
->>> +    bool    has_tsmr;    /* only at91sam9x5, sama5d3 have TSMR reg */
->>> +    u32    mr_prescal_mask;
->>> +    u32    mr_startup_mask;
->>> +};
->>> +
->>>   struct at91_adc_state {
->>>       struct clk        *adc_clk;
->>>       u16            *buffer;
->>> @@ -62,6 +68,7 @@ struct at91_adc_state {
->>>       u32            res;        /* resolution used for convertions */
->>>       bool            low_res;    /* the resolution corresponds to 
->>> the lowest one */
->>>       wait_queue_head_t    wq_data_avail;
->>> +    struct at91_adc_caps    caps;
->>>   };
->>>
->>>   static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
->>> @@ -580,6 +587,41 @@ static const struct iio_info at91_adc_info = {
->>>       .read_raw = &at91_adc_read_raw,
->>>   };
->>>
->>> +/*
->>> + * Since atmel adc support different ip for touchscreen mode. 
->>> Through the
->>> + * IP check, we will know the touchscreen capbilities.
->>> + */
->>> +static void atmel_adc_get_cap(struct at91_adc_state *st)
->>> +{
->>> +    unsigned int version;
->>> +    struct iio_dev *idev = iio_priv_to_dev(st);
->>> +
->>> +    version = at91_adc_readl(st, AT91_ADC_VERSION);
->>> +    dev_dbg(&idev->dev, "version: 0x%x\n", version);
->>> +
->>> +    st->caps.mr_prescal_mask = AT91_ADC_PRESCAL_9260;
->>> +    st->caps.mr_startup_mask = AT91_ADC_STARTUP_9260;
->>> +
->>> +    /* keep only major version number */
->>> +    switch (version & 0xf00) {
->>> +    case 0x500:    /* SAMA5D3 */
->>> +    case 0x400:    /* AT91SAM9X5/9N12 */
->>> +        st->caps.has_tsmr = 1;
->>> +        st->caps.mr_startup_mask = AT91_ADC_STARTUP;
->>> +    case 0x200:    /* AT91SAM9M10/9G45 */
->>> +        st->caps.mr_prescal_mask = AT91_ADC_PRESCAL;
->>> +
->>> +        if ((version & 0xf00) == 0x200)
->>> +            st->caps.mr_startup_mask = AT91_ADC_STARTUP_9G45;
->>> +    case 0x100:    /* AT91SAM9260/9G20 */
->>> +        break;
->>> +    default:
->>> +        dev_warn(&idev->dev,
->>> +                "Unmanaged adc version, use minimal capabilities\n");
->>> +        break;
->>> +    };
->>> +}
->>
->> Why don't you use different compatible names and derive your
->> capabilities from which compatible is declared.
->
-> Do not forget that we still have a handful of platforms that do not 
-> support DT (and never will).
->
-> Josh, do you think that we can deal with this with different 
-> compatible string instead of checking the IP revision?
+Why are we hardcoding the address and interrupt of a device rather than
+describing it in the devicetree? This is the most trivial case to
+describe.
 
-yes, the simplest way is define additional adc_cap structure for 
-different compatible string.
-like following:
+Thanks,
+Mark.
 
-static const struct of_device_id at91_adc_dt_ids[] = {
-     { .compatible = "atmel,at91sam9260-adc", .data 
-=&at91sam9260-adc-caps },
-     { .compatible = "atmel,at91sam9x5-adc", .data =&at91sam9x5-adc-caps },
-     {},
-};
-
-Then we can define the capability for different chip very easy.
-
->
-> Bye,
-
-Best Regards,
-Josh Wu
+> +
+>  static struct resource pfc_resources[] __initdata = {
+>  	DEFINE_RES_MEM(0xe6060000, 0x250),
+>  };
+> -- 
+> 1.8.2.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
