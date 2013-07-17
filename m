@@ -1,39 +1,33 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Wed, 17 Jul 2013 09:10:23 -0700
-Subject: [PATCH 1/2] ARM: dts: Add SHAM data and documentation for AM33XX
-In-Reply-To: <51E620AE.8090602@ti.com>
-References: <1374017368-5267-1-git-send-email-mgreer@animalcreek.com>
- <1374017368-5267-2-git-send-email-mgreer@animalcreek.com>
- <51E620AE.8090602@ti.com>
-Message-ID: <20130717161023.GA12124@animalcreek.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 17 Jul 2013 12:17:24 -0400 (EDT)
+Subject: [PATCH v3 6/7] USB: ohci-at91: add usb_clk for transition to
+ common clk framework
+In-Reply-To: <51E6BC23.6020700@overkiz.com>
+Message-ID: <Pine.LNX.4.44L0.1307171215000.1555-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 10:12:22AM +0530, Lokesh Vutla wrote:
-> Hi Mark,
+On Wed, 17 Jul 2013, boris brezillon wrote:
 
-Hi Lokesh.
+> On 17/07/2013 17:33, Alan Stern wrote:
+> > On Tue, 16 Jul 2013, Boris BREZILLON wrote:
+> >
+> >> The AT91 PMC (Power Management Controller) provides an USB clock used by
+> >> USB Full Speed host (ohci) and USB Full Speed device (udc).
+> >> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
+> >> This configuration was formely done in mach-at91/clock.c, but this
+> >> implementation will be removed when moving to common clk framework.
+> >>
+> >> This patch add support for usb clock retrieval and configuration, and is
+> >> backward compatible with the current at91 clk implementation (if usb clk
+> >> is not found, it does not configure/enable the usb clk).
+> > This does not take into account any of the changes you discussed with
+> > Russell King and me -- it is exactly the same as the previous version.
+> Sorry, I don't understand. I didn't send any new version since yesterday.
 
-> On Wednesday 17 July 2013 04:59 AM, Mark A. Greer wrote:
-> > From: "Mark A. Greer" <mgreer@animalcreek.com>
+Oh.  Never mind.  That message was the _same_ one that I replied to
+yesterday.  I got two copies of it, because you sent it both to me
+directly and to linux-usb.  For some reason one of the copies was
+delayed for many hours, so I thought it was a new message.
 
-> > diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-> > index 0c8ad17..b04aea1 100644
-> > --- a/arch/arm/boot/dts/am335x-evmsk.dts
-> > +++ b/arch/arm/boot/dts/am335x-evmsk.dts
-> > @@ -401,4 +401,7 @@
-> >  &cpsw_emac1 {
-> >  	phy_id = <&davinci_mdio>, <1>;
-> >  	phy-mode = "rgmii-txid";
-> > +
-> > +&sham {
-> > +	status = "okay";
->  "};" is missing here.
-> >  };
-
-Ugh, yeah, I somehow mess that out.
-
-Thanks for pointing that out.
-
-Mark
---
+Alan Stern
