@@ -1,72 +1,101 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 17 Jul 2013 14:41:49 +0300
-Subject: [PATCH 0/3] ARM: OMAP2+: omap_device: add dynamic pinctrl handling
-Message-ID: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
+Date: Wed, 17 Jul 2013 14:41:51 +0300
+Subject: [PATCH 2/3] ARM: OMAP2+: omap_device: add pinctrl handling
+In-Reply-To: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
+References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1374061312-25469-3-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony, Kevin
+Before switching to DT pinctrl states of OMAP IPs have been handled by hwmod
+framework. After switching to DT-boot the pinctrl handling was dropped from
+hwmod framework and, as it was recommended, OMAP IP's drivers have to be updated
+to handle pinctrl states by itself using pinctrl_pm_select_xx() helpers
+(see http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173514.html)
 
-This patch series introduces dynamic pinctrl handling in OMAP device framework
-in the same way as it was before switching to DT. 
-This allow OMAP devices driver's developers to simply add dynamic pinctrl
-handling for "default", "active", "idle", "sleep" PIN states in their drivers
-by modifying DT definitions only - no modifications in drivers code are not needed.
+But this is not right for OMAP2+ SoC where real IPs state is controlled
+by omap_device core which enables/disables modules & clocks actually.
 
-Tested on OMAP4 SDP(Tablet2) board using omap4-sdp.dts
-- UART3/4 autoidle
-- suspend, by adding some fake "sleep" pin state
-- wake up (PRCM) IRQ generation by ading call to omap44xx_prm_reconfigure_io_chain()
-  right after each call to pinctrl_pm_select_xx() API.
+For example, if OMAP I2C driver will handle pinctrl state during system wide
+suspend the following issue may occure:
+- suspend_noirq - I2C device can be still active because of PM auto-suspend
+  |-_od_suspend_noirq
+     |- omap_i2c_suspend_noirq
+        |- PINs state set to SLEEP
+  |- pm_generic_runtime_suspend
+     |- omap_i2c_runtime_suspend()
+        |- PINs state set to IDLE  <--- *oops* PINs state is IDLE and not SLEEP
+  |- omap_device_idle()
+     |- omap_hwmod_idle()
+        |- _idle()
+           |- disbale module (sysc&clocks)
 
-UART3(console) reg dumps:
-- active 
- 0x4A100140(RTS/CTS) - 0x00000118
- 0x4A100140(TX/RX) - 0x00000100
-- idle
- 0x4A100140(RTS/CTS) - 0x00000118
- 0x4A100144(TX/RX) - 0x00004100
+- resume_noirq - I2C was active before suspend
+  |-_od_resume_noirq
+     |- omap_hwmod_enable()
+        |- _enable()
+           |- enable module (sysc&clocks)
+     |- pm_generic_runtime_resume
+        |- omap_i2c_runtime_resume()
+           |- PINs state set to DEFAULT  <--- !!!!
+     |- omap_i2c_resume_noirq
+        |- PINs state set to DEFAULT
+        |- PINs state set to IDLE  <--- *big oops* we have active module and its
+                                         PINs state is IDLE
+(see https://patchwork.kernel.org/patch/2642101/)
 
-UART4 reg dumps:
-- active 
- 0x4A10015C(TX/RX) - 0x00000100
-- idle
- 0x4A10015C(TX/RX) - 0x00004100
+Of course, everything can be handled by adding a tons of code in ecah driver to
+check PM state of device and override default behavior of omap_device core, but
+this not good.
 
-Debugfs:
-# cat sys/kernel/debug/pinctrl/4a100040.pinmux/pinmux-pins
-[snip]
-pin 128 (4a100140.0): 48020000.serial (GPIO UNCLAIMED) function pinmux_uart3_pins group pinmux_uart3_pins
-pin 129 (4a100142.0): 48020000.serial (GPIO UNCLAIMED) function pinmux_uart3_pins group pinmux_uart3_pins
-pin 130 (4a100144.0): 48020000.serial (GPIO UNCLAIMED) function pinmux_uart3_pins_active group pinmux_uart3_pins_active
-pin 131 (4a100146.0): 48020000.serial (GPIO UNCLAIMED) function pinmux_uart3_pins group pinmux_uart3_pins
-[snip]
-pin 142 (4a10015c.0): 4806e000.serial (GPIO UNCLAIMED) function pinmux_uart4_pins_idle group pinmux_uart4_pins_idle
-pin 143 (4a10015e.0): 4806e000.serial (GPIO UNCLAIMED) function pinmux_uart4_pins group pinmux_uart4_pins
+Hence, add pinctrl handling in omap_device core as shown below:
+                                         +
+                                         |
+                                         |  .probe()
+                                         |
+                                   +-----v--------+
+                                   |              |
+                                   |  default     |
+                                   |              |
+                                   +----+--+------+
+                                        |  |
+                        pm_runtime_get()|  | pm_runtime_put()
+                       +----------------+  +------------+
+                       |                                |
+                +------v------+ pm_runtime_put()+-------v-----+
+                |             +----------------->             |
+    +----------->  Active     |pm_runtime_get() |   Idle      <----------+
+    |           |             <-----------------+             |          |
+    |           +-------+-----+                 +-------+-----+          |
+    |                   |.suspend_noirq()               |.suspend_noirq()|
+    |                   |                               |                |
+    |                   |                               |                |
+    |                   |                               |                |
+    |                   |                               |                |
+    |           +-------v-----+                 +-------v-----+          |
+    |           |             |                 |             |          |
+    +-----------+  Sleep      ------+           |  Sleep      +----------+
+.resume_noirq() |             |     |           |             |.resume_noirq()
+                +-------|-----+     |           +-------------+
+                        |  Idle     |
+                        +-----------+
+1) on PM runtime resume
+- switch pinctrl state to "active"
+2) on PM runtime suspend
+- switch pinctrl state to "idle"
+3) during system wide suspend
+- switch pinctrl state to "sleep" or "idle" if omap_device core disables device
+- switch pinctrl state to "sleep" if device has been disabled already
+4) during system wide resume
+- switch pinctrl state to "active" if omap_device core has
+  disabled device during suspend
+- switch pinctrl state to "idle" if device was already disabled before suspend
 
-Changes since RFC:
-- _od_resume_noirq() fixed - "idle" state was not selected on resume
-- description updated
-
-RFC: https://lkml.org/lkml/2013/6/21/309
-
-Based on v3.11-rc1 plus patch series from Tony Lindgren
-"[PATCH 0/4] improved support for runtime muxing for pinctrl"
-http://www.spinics.net/lists/arm-kernel/msg258827.html:
-
-fd7937b drivers: Add pinctrl handling for dynamic pin states
-479246b pinctrl: Add support for additional dynamic states
-c9f37e8 pinctrl: Allow pinctrl to have multiple active states
-756f10b pinctrl: Remove duplicate code in pinctrl_pm_select_state functions
-ad81f05 Linux 3.11-rc1
+This will enable pinctrl for all OMAP2+ IP's drivers by default -
+no changes in code is needed and only DT data will need to be updated
+(add "default", "active", "idle", "sleep" states).
 
 Related discussions:
-- drivers: pinctrl sleep and idle states in the core
- http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173514.html
-- [PATCH] drivers: pinctrl: add active state to core
- http://marc.info/?l=linux-kernel&m=137094012703340&w=2
-- [PATCH] pinctrl: document the pinctrl PM states
- https://lkml.org/lkml/2013/6/11/501
 - [3/3] i2c: nomadik: use pinctrl PM helpers
  https://patchwork.kernel.org/patch/2670291/
 - mmc: omap_hsmmc: Remux pins to support SDIO interrupt and PM runtime
@@ -74,22 +103,99 @@ Related discussions:
 - [PATCH 00/11] drivers: Add Pinctrl PM support
  https://lkml.org/lkml/2013/5/31/210
 
-
-Grygorii Strashko (3):
-  pinctrl: rollback check for !dev->pins in pinctrl_pm_select*() APIs
-  ARM: OMAP2+: omap_device: add pinctrl handling
-  ARM: dts: omap4-sdp: add dynamic pin states for uart3/4
-
- arch/arm/boot/dts/omap4-sdp.dts   |   34 +++++++++++++++++++++++++++----
- arch/arm/mach-omap2/omap_device.c |   40 +++++++++++++++++++++++++++++++------
- drivers/pinctrl/core.c            |   12 +++++++++++
- 3 files changed, 76 insertions(+), 10 deletions(-)
-
-Regards,
--grygorii
-
 CC: Linus Walleij <linus.walleij@linaro.org>
-CC: Stephen Warren <swarren@wwwdotorg.org>
-CC: Roger Quadros <rogerq@ti.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ arch/arm/mach-omap2/omap_device.c |   40 +++++++++++++++++++++++++++++++------
+ 1 file changed, 34 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index 5cc9287..4ebdbd7 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -39,6 +39,7 @@
+ #include "soc.h"
+ #include "omap_device.h"
+ #include "omap_hwmod.h"
++#include "iomap.h"
+ 
+ /* Private functions */
+ 
+@@ -582,8 +583,10 @@ static int _od_runtime_suspend(struct device *dev)
+ 
+ 	ret = pm_generic_runtime_suspend(dev);
+ 
+-	if (!ret)
++	if (!ret) {
+ 		omap_device_idle(pdev);
++		pinctrl_pm_select_idle_state(dev);
++	}
+ 
+ 	return ret;
+ }
+@@ -592,12 +595,25 @@ static int _od_runtime_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 
++	pinctrl_pm_select_active_state(dev);
++
+ 	omap_device_enable(pdev);
+ 
+ 	return pm_generic_runtime_resume(dev);
+ }
+ #endif
+ 
++void _od_suspend_sel_pinctrl_state(struct device *dev)
++{
++	if (!dev->pins)
++		return;
++	/* try to select *deepest* pinctrl state */
++	if (IS_ERR(dev->pins->sleep_state))
++		pinctrl_pm_select_idle_state(dev);
++	else
++		pinctrl_pm_select_sleep_state(dev);
++}
++
+ #ifdef CONFIG_SUSPEND
+ static int _od_suspend_noirq(struct device *dev)
+ {
+@@ -610,11 +626,19 @@ static int _od_suspend_noirq(struct device *dev)
+ 		return 0;
+ 
+ 	ret = pm_generic_suspend_noirq(dev);
+-
+-	if (!ret && !pm_runtime_status_suspended(dev)) {
+-		if (pm_generic_runtime_suspend(dev) == 0) {
+-			omap_device_idle(pdev);
+-			od->flags |= OMAP_DEVICE_SUSPENDED;
++	if (!ret) {
++		if (!pm_runtime_status_suspended(dev)) {
++			if (pm_generic_runtime_suspend(dev) == 0) {
++				omap_device_idle(pdev);
++				od->flags |= OMAP_DEVICE_SUSPENDED;
++				_od_suspend_sel_pinctrl_state(dev);
++			}
++		} else {
++			/*
++			 * "idle" pinctrl state already applied -
++			 * try to set "sleep" state
++			 */
++			pinctrl_pm_select_sleep_state(dev);
+ 		}
+ 	}
+ 
+@@ -630,7 +654,11 @@ static int _od_resume_noirq(struct device *dev)
+ 	    !pm_runtime_status_suspended(dev)) {
+ 		od->flags &= ~OMAP_DEVICE_SUSPENDED;
+ 		omap_device_enable(pdev);
++		pinctrl_pm_select_active_state(dev);
+ 		pm_generic_runtime_resume(dev);
++	} else if (pm_runtime_status_suspended(dev)) {
++		/* switch back to "idle" pinctrl state */
++		pinctrl_pm_select_idle_state(dev);
+ 	}
+ 
+ 	return pm_generic_resume_noirq(dev);
 -- 
 1.7.9.5
