@@ -1,17 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 17 Jul 2013 11:53:23 +0800
-Subject: [PATCH] ARM: mxs: pm: Include "pm.h"
-In-Reply-To: <1373981559-23743-1-git-send-email-fabio.estevam@freescale.com>
-References: <1373981559-23743-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20130717035321.GE4541@S2101-09.ap.freescale.net>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 16 Jul 2013 21:13:27 -0700
+Subject: [GIT PULL] PHY Framework for 3.12 merge window
+In-Reply-To: <51E53EC2.5080401@ti.com>
+References: <51E53EC2.5080401@ti.com>
+Message-ID: <20130717041327.GA20201@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 10:32:39AM -0300, Fabio Estevam wrote:
-> Fix the following sparse warning:
+On Tue, Jul 16, 2013 at 06:08:26PM +0530, Kishon Vijay Abraham I wrote:
+> Hi Greg,
 > 
-> arch/arm/mach-mxs/pm.c:37:13: warning: symbol 'mxs_pm_init' was not declared. Should it be static?
+> Here's the pull request for the PHY Framework which I've been working on for a
+> while.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> I've applied these patches on the current linux mainline HEAD (which has one
+> commit after 3.11-rc1 is tagged).
+> 
+> Even before this framework is merged, quite a few people started using it. I've
+> queued those patches along with the PHY framework as well.
+> 
+> I'm also planning to maintain this framework henceforth and will be sending
+> pull requests for anything related to this framework or users of this framework.
+> 
+> Let me know if you want any changes on this pull request
+> 
+> Thanks
+> Kishon
+> 
+> The following changes since commit 47188d39b5deeebf41f87a02af1b3935866364cf:
+> 
+>   Merge tag 'ext4_for_linus' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/tytso/ext4 (2013-07-14 21:47:51
+> -0700)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://gitorious.org/linuxphy/linuxphy.git tags/phy-for-v3.12
 
-Applied, thanks.
+I'm sorry, but I can't pull from a non-kernel.org account.  And, why is
+this a pull request at all?   There aren't many patches in this series,
+I can take them just fine through email.  I only do pull requests from a
+_very_ limited number of people whom I have been working with for a long
+time, everyone else I handle just fine with email.
+
+Also, why me for this?   Should it go through my "char/misc" tree?  Do
+you have sign-offs for the subsystems that you touch?  Will you be
+moving more phy code from the different subsystems (like all the USB phy
+code), into here as well?  Or is this just for new devices?
+
+thanks,
+
+greg k-h
