@@ -1,39 +1,55 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 17 Jul 2013 10:14:06 +0300
-Subject: [Linux-Xtensa] Re: sched_clock always 0 and no process time
- accounting with 3.11-rc1
-In-Reply-To: <51E64172.9050808@zankel.net>
-References: <CAMo8BfLO31GgMMA_hENr0xm=qaUz3EVLtaQ8hewiQHdbV+s6sA@mail.gmail.com>
- <20130717061925.GC6950@tarshish>
- <CAMo8Bf+UY2Lj=7=Y2AxeUfM3LqJkbQqPviH81PEjwo8irtiGJg@mail.gmail.com>
- <20130717064709.GD6950@tarshish> <51E64172.9050808@zankel.net>
-Message-ID: <20130717071406.GE6950@tarshish>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 17 Jul 2013 09:17:04 +0200
+Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <51E56AF6.30506@wwwdotorg.org>
+References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
+ <20130716015038.GD28375@S2101-09.ap.freescale.net>
+ <20130716065130.GB30067@S2101-09.ap.freescale.net>
+ <51E56AF6.30506@wwwdotorg.org>
+Message-ID: <1374045424.4350.5.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
-
-On Wed, Jul 17, 2013 at 12:02:10AM -0700, Chris Zankel wrote:
-> On 07/16/2013 11:47 PM, Baruch Siach wrote:
-> >> According to C99 the behaviour of (1 << 32) is undefined on platforms with
-> >> 32 bit int, so it could yield any value.
-> > But so is ARM, isn't it?
+Am Dienstag, den 16.07.2013, 09:47 -0600 schrieb Stephen Warren:
+> On 07/16/2013 12:51 AM, Shawn Guo wrote:
+> > On Tue, Jul 16, 2013 at 09:50:42AM +0800, Shawn Guo wrote:
+> >> Hi Philipp,
+> >>
+> >> On Thu, May 30, 2013 at 11:09:00AM +0200, Philipp Zabel wrote:
+> >>> This driver implements a reset controller device that toggle a gpio
+> >>> connected to a reset pin of a peripheral IC. The delay between assertion
+> >>> and de-assertion of the reset signal can be configured via device tree.
+> >>>
+> >>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> >>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> >>
+> >> I see this patch is very useful, as GPIOs are widely used to reset
+> >> components/devices on board.  But I do not find the patch in v3.11-rc1.
+> >> What's your plan about it?
+> >>
+> >> Also, I'm wondering if we should register the driver a little bit
+> >> early.  Please see the following patch.  If it makes sense to you,
+> >> I can send the patch to you, or you can just quash it into yours.
+> > 
+> > And here is another change request.
 > 
-> The handling of constants might be target-architecture dependent.
+> > diff --git a/drivers/reset/gpio-reset.c b/drivers/reset/gpio-reset.c
 > 
-> On a somewhat related issue, are you using a 32-bit host or 64-bit host?
-> Note that 64-bit cross compilation is known to be broken for Xtensa, I
-> had a problem running glibc when compiled with cross compiler on a
-> 64-bit host.
+> > -	gpio_set_value(drvdata->gpio, value);
+> > +	if (gpio_cansleep(drvdata->gpio))
+> > +		gpio_set_value_cansleep(drvdata->gpio, value);
+> > +	else
+> > +		gpio_set_value(drvdata->gpio, value);
+> 
+> That's not right. Calling gpio_set_value() v.s.
+> gpio_set_value_cansleep() should be based on the properties of the
+> calling context, not the GPIO being controlled. In other words, if it's
+> permissible to call gpio_set_value_cansleep() at this point in the code,
+> simply always call that, and remove the conditional logic.
 
-Yes, my host is x86_64. I haven't encountered any problem yet. But thanks for 
-the warning, I'll keep that in mind. I think it's worth a mention in the 
-linux-xtensa wiki. It surly worth a fix as well, I guess. Are there any 
-samples of code that are known to be break with 64 bit host?
+In which case I'd say let's just call the _cansleep variant here
+unconditionally and declare that reset_control_assert/deassert() may
+sleep, just as reset_control_reset() has to anyway.
 
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+regards
+Philipp
