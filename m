@@ -1,59 +1,52 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Wed, 17 Jul 2013 08:35:38 +0200
-Subject: [PATCH] ARM: Kirkwood: Fix the internal register ranges
- translation
-In-Reply-To: <20130716125531.GD2317@localhost>
-References: <1371569479-31498-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <51E5145A.90404@keymile.com> <20130716125531.GD2317@localhost>
-Message-ID: <51E63B3A.2010807@keymile.com>
+From: jcmvbkbc@gmail.com (Max Filippov)
+Date: Wed, 17 Jul 2013 10:39:51 +0400
+Subject: sched_clock always 0 and no process time accounting with 3.11-rc1
+In-Reply-To: <20130717061925.GC6950@tarshish>
+References: <CAMo8BfLO31GgMMA_hENr0xm=qaUz3EVLtaQ8hewiQHdbV+s6sA@mail.gmail.com>
+ <20130717061925.GC6950@tarshish>
+Message-ID: <CAMo8Bf+UY2Lj=7=Y2AxeUfM3LqJkbQqPviH81PEjwo8irtiGJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+On Wed, Jul 17, 2013 at 10:19 AM, Baruch Siach <baruch@tkos.co.il> wrote:
+> Hi Max,
+>
+> On Mon, Jul 15, 2013 at 06:18:33PM +0400, Max Filippov wrote:
+>> with 3.11-rc1 printk timestamps are always zero (which means that
+>> sched_clock is always 0) and process time accounting always shows
+>> 0 for system/user time. I see it regardless of HZ_PERIODIC/NO_HZ_IDLE
+>> and HIGH_RES_TIMERS settings. Am I missing any necessary config
+>> options? Can you see the same issue?
+>
+> The following patch fixes the issue for me:
+>
+> diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+> index a326f27..0b479a6 100644
+> --- a/kernel/time/sched_clock.c
+> +++ b/kernel/time/sched_clock.c
+> @@ -121,7 +121,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+>         BUG_ON(bits > 32);
+>         WARN_ON(!irqs_disabled());
+>         read_sched_clock = read;
+> -       sched_clock_mask = (1 << bits) - 1;
+> +       sched_clock_mask = (1ULL << bits) - 1;
+>         cd.rate = rate;
+>
+>         /* calculate the mult/shift to convert counter ticks to ns. */
+>
+> Apparently the expression '(1 << 32)' evaluates to 1 on xtensa cross gcc, and
+> x86_84 native gcc. According to my limited understanding, the C compiler is
+> allowed to do so. This caused sched_clock_32() to return constant 0. I wonder
+> how it didn't bite the ARM people who are using this code from quite some time
+> (added LAKL to CC).
 
-On 07/16/2013 02:56 PM, Ezequiel Garcia wrote:
-[...]
-> Also, speaking of "device bus" this nand node should be behind a devicebus node.
->
-> 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000   /* internal-regs */
-> 			  MBUS_ID(0x01, 0x2f) 0 0 0xf4000000 0x400>;
->
-> 		devbus {
-> 			status = "okay";
-> 			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0x400>;
->
-> 			/* nand */
-> 			nand {
-> 				compatible = "marvell,orion-nand";
-> 				reg = <0 0x400>;
-> 			};
-> 		};
->
-> (notice this will allow you to relocate the base address of the NAND windows
-> easily if it conflicts with your PCIe needs).
+Cool, it works now, thanks Baruch.
+According to C99 the behaviour of (1 << 32) is undefined on platforms with
+32 bit int, so it could yield any value.
 
-I am MAYBE slowly starting to understand this whole mbus rework.
-Just one remark though: don't you think it would make sense to add 
-something like:
+> If this patch proves correct I'll send a formal patch to the timekeeping
+> maintainers.
 
-#define MBUS_ID_INTERNAL_REGS	MBUS_ID(0xf0, 0x01)
-#define MBUS_ID_NAND		MBUS_ID(0x01, 0x2f)
-
-I personally have a hard time reading numeric values for 
-GPIO_ACTIVE_LOW/GPIO_ACTIVE_HIGH.
-
-Thanks,
-Gerlando
-
->
->> avoid a later incosistency between the "unit-address" and the first
->> "reg" address:
->>
->>>    		#address-cells = <1>;
->>>    		#size-cells = <1>;
->>> @@ -171,7 +172,7 @@
->>   >   		nand at 3000000 {
->> 		     ^^^^^^^
->
-> Oh, this should be fixed. I just missed it, and nobody noticed either.
->
+-- 
+Thanks.
+-- Max
