@@ -1,10 +1,10 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep.KarkadaNagesha at arm.com)
-Date: Wed, 17 Jul 2013 15:06:24 +0100
-Subject: [RFC PATCH v2 15/15] cpufreq: pmac32-cpufreq: remove device tree
+Date: Wed, 17 Jul 2013 15:06:22 +0100
+Subject: [RFC PATCH v2 13/15] cpufreq: maple-cpufreq: remove device tree
  parsing for cpu nodes
 In-Reply-To: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1374069984-20567-16-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1374069984-20567-14-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,50 +13,80 @@ From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 Now that the cpu device registration initialises the of_node(if available)
 appropriately for all the cpus, parsing here is redundant.
 
-This patch removes DT parsing and uses cpu->of_node instead.
+This patch removes all DT parsing and uses cpu->of_node instead.
 
 Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- drivers/cpufreq/pmac32-cpufreq.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ drivers/cpufreq/maple-cpufreq.c | 23 +++++++----------------
+ 1 file changed, 7 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/cpufreq/pmac32-cpufreq.c b/drivers/cpufreq/pmac32-cpufreq.c
-index 3104fad..b6822ee 100644
---- a/drivers/cpufreq/pmac32-cpufreq.c
-+++ b/drivers/cpufreq/pmac32-cpufreq.c
-@@ -21,6 +21,7 @@
+diff --git a/drivers/cpufreq/maple-cpufreq.c b/drivers/cpufreq/maple-cpufreq.c
+index cdd6291..bc7233b 100644
+--- a/drivers/cpufreq/maple-cpufreq.c
++++ b/drivers/cpufreq/maple-cpufreq.c
+@@ -19,6 +19,7 @@
+ #include <linux/kernel.h>
+ #include <linux/delay.h>
  #include <linux/sched.h>
- #include <linux/adb.h>
- #include <linux/pmu.h>
 +#include <linux/cpu.h>
  #include <linux/cpufreq.h>
  #include <linux/init.h>
- #include <linux/device.h>
-@@ -643,6 +644,7 @@ static int pmac_cpufreq_init_750FX(struct device_node *cpunode)
-  */
- static int __init pmac_cpufreq_setup(void)
- {
-+	struct device *cpu_dev;
- 	struct device_node	*cpunode;
- 	const u32		*value;
+ #include <linux/completion.h>
+@@ -201,7 +202,7 @@ static struct cpufreq_driver maple_cpufreq_driver = {
  
-@@ -650,7 +652,14 @@ static int __init pmac_cpufreq_setup(void)
+ static int __init maple_cpufreq_init(void)
+ {
+-	struct device_node *cpus;
++	struct device *cpu_dev;
+ 	struct device_node *cpunode;
+ 	unsigned int psize;
+ 	unsigned long max_freq;
+@@ -217,24 +218,17 @@ static int __init maple_cpufreq_init(void)
+ 	    !of_machine_is_compatible("Momentum,Apache"))
  		return 0;
  
- 	/* Assume only one CPU */
--	cpunode = of_find_node_by_type(NULL, "cpu");
+-	cpus = of_find_node_by_path("/cpus");
+-	if (cpus == NULL) {
+-		DBG("No /cpus node !\n");
 +	cpu_dev = get_cpu_device(0);
 +	if (!cpu_dev) {
 +		pr_err("failed to get cpu device\n");
-+		return -ENODEV;
-+	}
-+
-+	/* Get first CPU node */
-+	cpunode = of_node_get(cpu_dev->of_node);
- 	if (!cpunode)
- 		goto out;
+ 		return -ENODEV;
+ 	}
  
+ 	/* Get first CPU node */
+-	for (cpunode = NULL;
+-	     (cpunode = of_get_next_child(cpus, cpunode)) != NULL;) {
+-		const u32 *reg = of_get_property(cpunode, "reg", NULL);
+-		if (reg == NULL || (*reg) != 0)
+-			continue;
+-		if (!strcmp(cpunode->type, "cpu"))
+-			break;
+-	}
++	cpunode = of_node_get(cpu_dev->of_node);
+ 	if (cpunode == NULL) {
+ 		printk(KERN_ERR "cpufreq: Can't find any CPU 0 node\n");
+-		goto bail_cpus;
++		goto bail_noprops;
+ 	}
+ 
+ 	/* Check 970FX for now */
+@@ -290,14 +284,11 @@ static int __init maple_cpufreq_init(void)
+ 	rc = cpufreq_register_driver(&maple_cpufreq_driver);
+ 
+ 	of_node_put(cpunode);
+-	of_node_put(cpus);
+ 
+ 	return rc;
+ 
+ bail_noprops:
+ 	of_node_put(cpunode);
+-bail_cpus:
+-	of_node_put(cpus);
+ 
+ 	return rc;
+ }
 -- 
 1.8.1.2
