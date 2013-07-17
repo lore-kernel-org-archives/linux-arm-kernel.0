@@ -1,31 +1,21 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Jul 2013 08:40:39 -0700
-Subject: [PATCH 1/3] pinctrl: rollback check for !dev->pins in
- pinctrl_pm_select*() APIs
-In-Reply-To: <1374061312-25469-2-git-send-email-grygorii.strashko@ti.com>
-References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
- <1374061312-25469-2-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20130717154038.GK7656@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 17 Jul 2013 16:43:38 +0100
+Subject: [PATCH 1/2] ARM: mm: Remove general hugetlb code from ARM.
+In-Reply-To: <1374067574-32034-2-git-send-email-steve.capper@linaro.org>
+References: <1374067574-32034-1-git-send-email-steve.capper@linaro.org>
+ <1374067574-32034-2-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130717154338.GI27948@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [130717 04:49]:
-> The pinctrl support in Device core assumed to be optional - so, It's
-> valid case, when there are no definition for default device's pinctrl
-> states in DT at all ("default", "active", "idle", "sleep").
-> And in this case dev->pins == NULL and pinctrl_pm_select*() API
-> should return 0 always.
+On Wed, Jul 17, 2013 at 02:26:13PM +0100, Steve Capper wrote:
+> General forms of huge_pte_alloc, huge_pte_offset and follow_huge_pmd
+> are now available in mm/hugetlb.c.
 > 
-> Now the checks for !dev->pins have been removed from
-> pinctrl_pm_select*() API mistakenly by the patch
-> pinctrl: Remove duplicate code in pinctrl_pm_select_state functions
-> http://www.spinics.net/lists/arm-kernel/msg258829.html
+> This patch removes the ARM copies of these functions and activates
+> the general ones by enabling:
+> CONFIG_ARCH_WANT_GENERAL_HUGETLB
 > 
-> Hence, rollback these checks in in pinctrl_pm_select*() APIs.
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
 
-Thanks, it's best that I fold this fix into my patch as it has not
-been committed yet.
-
-Regards,
-
-Tony
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
