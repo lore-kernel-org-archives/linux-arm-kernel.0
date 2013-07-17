@@ -1,77 +1,33 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Wed, 17 Jul 2013 11:17:26 -0400
-Subject: [RESEND PATCH V1 7/9] arm: dts: add omap4430 thermal data
-In-Reply-To: <1374074248-31690-1-git-send-email-eduardo.valentin@ti.com>
-References: <1374074248-31690-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1374074248-31690-8-git-send-email-eduardo.valentin@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Jul 2013 16:24:44 +0100
+Subject: [Linux-Xtensa] Re: sched_clock always 0 and no process time
+ accounting with 3.11-rc1
+In-Reply-To: <8572CFB6-0D88-46F4-B055-7834F8B9BDA5@tensilica.com>
+References: <CAMo8BfLO31GgMMA_hENr0xm=qaUz3EVLtaQ8hewiQHdbV+s6sA@mail.gmail.com>
+ <20130717061925.GC6950@tarshish>
+ <8572CFB6-0D88-46F4-B055-7834F8B9BDA5@tensilica.com>
+Message-ID: <20130717152443.GO24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the dtsi entry on omap4430 to contain
-the thermal data. This data will enable the passive
-cooling with CPUfreq cooling device at 100C and the
-system will do a thermal shutdown at 125C.
+On Wed, Jul 17, 2013 at 08:15:08AM -0700, Marc Gauthier wrote:
+> Hi Baruch,
+> 
+> On 2013-07-16, at 11:19 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+> > -    sched_clock_mask = (1 << bits) - 1;
+> > +    sched_clock_mask = (1ULL << bits) - 1;
+> 
+> Might it be more efficient to use:
+> 
+>    sched_clock_mask = 0xffffffff >> (32 - bits);
+> 
+> to avoid using 64 bit ints?
+> (assuming bits > 0, didn't check)
 
-Cc: "Beno?t Cousson" <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-omap at vger.kernel.org
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
----
- arch/arm/boot/dts/omap443x.dtsi | 31 +++++++++++++++++++++++++++++--
- 1 file changed, 29 insertions(+), 2 deletions(-)
+bits being 0 would be rather silly (it implies a mask of zero, and therefore
+no bits available for the clock.)  We could modify the BUG_ON() above to
+make that point, or add it as commentry against the function.
 
-diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
-index 4a4dcc3..27f0e0f 100644
---- a/arch/arm/boot/dts/omap443x.dtsi
-+++ b/arch/arm/boot/dts/omap443x.dtsi
-@@ -8,6 +8,7 @@
-  * kind, whether express or implied.
-  */
- 
-+#include <dt-bindings/thermal/thermal.h>
- #include "omap4.dtsi"
- 
- / {
-@@ -27,8 +28,34 @@
- 	};
- 
- 	bandgap {
--		reg = <0x4a002260 0x4
--		       0x4a00232C 0x4>;
-+		reg = <0x4a002260 0x4 0x4a00232C 0x4>;
- 		compatible = "ti,omap4430-bandgap";
-+		thermal_zone {
-+			type = "CPU";
-+			mask = <0x03>; /* trips writability */
-+			passive_delay = <250>; /* milliseconds */
-+			polling_delay = <1000>; /* milliseconds */
-+			governor = "step_wise";
-+			trips {
-+				alert at 100000{
-+					temperature = <100000>; /* milliCelsius */
-+					hysteresis = <2000>; /* milliCelsius */
-+					type = <THERMAL_TRIP_PASSIVE>;
-+				};
-+				crit at 125000{
-+					temperature = <125000>; /* milliCelsius */
-+					hysteresis = <2000>; /* milliCelsius */
-+					type = <THERMAL_TRIP_CRITICAL>;
-+				};
-+			};
-+			bind_params {
-+				action at 0{
-+					cooling_device = "thermal-cpufreq";
-+					weight = <100>; /* percentage */
-+					mask = <0x01>;
-+					/* no limits, using defaults */
-+				};
-+			};
-+		};
- 	};
- };
--- 
-1.8.2.1.342.gfa7285d
+Given that, and that sched_clock_mask is a u32, then I agree with you - the
+above would be a better way to do this.  Personally, I'd suggest ~0u rather
+than 0xffffffff because its less typing.
