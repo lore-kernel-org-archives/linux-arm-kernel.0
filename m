@@ -1,34 +1,23 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 17 Jul 2013 10:57:08 +0100
-Subject: [PATCH 2/3] ASoC: hdmi-codec: enable OF support
-In-Reply-To: <20130717084910.GB15981@e106331-lin.cambridge.arm.com>
-References: <1374041536-27643-1-git-send-email-Baohua.Song@csr.com>
- <1374041536-27643-2-git-send-email-Baohua.Song@csr.com>
- <20130717084910.GB15981@e106331-lin.cambridge.arm.com>
-Message-ID: <20130717095708.GG22506@sirena.org.uk>
+Date: Wed, 17 Jul 2013 11:06:24 +0100
+Subject: [PATCH V2 0/2] regulator: palmas-pmic: doc: update device tree
+ bindings
+In-Reply-To: <1373992870-20725-1-git-send-email-nm@ti.com>
+References: <20130716161939.GR22506@sirena.org.uk>
+ <1373992870-20725-1-git-send-email-nm@ti.com>
+Message-ID: <20130717100624.GJ22506@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 09:49:10AM +0100, Mark Rutland wrote:
-> On Wed, Jul 17, 2013 at 07:12:15AM +0100, Barry Song wrote:
+On Tue, Jul 16, 2013 at 11:41:08AM -0500, Nishanth Menon wrote:
+> We seem to have a few missing updates to device tree bindings with the
+> latest set of changes getting merged in.
 
-> > this makes users be able to add a hdmi-codec node in dts instead of
-> > hardcoding a platform device in mach.
-
-> Similarly to my comment on the first patch, I'm not sure this is the
-> best way to wire this up to devicetree. Can this not be hung off of hdmi
-> controller drivers?
-
-This one is different to the BT case - as you say it's hanging off the
-HDMI controller so the HDMI controller ought to enumerate it either as a
-stub or by actually seeing a device.  The platform device is fine but
-it's not something that should appear in the DT unless it's conveying
-some information about what's connected there (eg, power supplies for
-something soldered down on the board).
+Applied both, thanks.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/2dca995c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/443b43b4/attachment.sig>
