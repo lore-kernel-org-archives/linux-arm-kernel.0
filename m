@@ -1,61 +1,34 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 18 Jul 2013 05:31:27 +0900
-Subject: [PATCH 04/04] ARM: shmobile: Allow ARCH_SHMOBILE_MULTI timer
- configuration
-In-Reply-To: <20130717203049.27542.78385.sendpatchset@w520>
-References: <20130717203049.27542.78385.sendpatchset@w520>
-Message-ID: <20130717203127.27542.41663.sendpatchset@w520>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Wed, 17 Jul 2013 22:32:35 +0200
+Subject: [PATCH v2 24/42] ARM: at91: move at91sam9 boards to new at91
+ clk implem
+In-Reply-To: <20130717171343.GS24642@n2100.arm.linux.org.uk>
+References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+ <1374075433-20170-1-git-send-email-b.brezillon@overkiz.com>
+ <20130717171343.GS24642@n2100.arm.linux.org.uk>
+Message-ID: <51E6FF63.6050805@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On 17/07/2013 19:13, Russell King - ARM Linux wrote:
+> On Wed, Jul 17, 2013 at 05:37:13PM +0200, Boris BREZILLON wrote:
+>> Move at91 clk init from early_init to timer_init for all at91sam9 non dt
+>> boards.
+> Using black ball point pen, please complete the following sentence using
+> as many words as you desire.  Additional underscores are available on
+> request.
+>
+> The reason for this change is ______________________________________.
+>
+> Thanks. :)
+Indeed, this commit message is a bit useless as it only describe what is 
+done not why...
 
-Move the timer configuration bits to allow use in
-case of ARCH_SHMOBILE or ARCH_SHMOBILE_MULTI.
+The reason for this is that dynamic allocator is not ready yet when 
+early_init callback is called,
+and new at91 clk implementation calls kzalloc functions.
+It is moved in timer_init (before timer init) because at91sam9 init 
+timer (pit timer) request the
+mck clk which is registered by at91 clk init function.
 
-The timers all make use of the regular driver model
-so they are safe to enable for ARCH_MULTIPLATFORM.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- arch/arm/mach-shmobile/Kconfig |   16 +++++++++++-----
- 1 file changed, 11 insertions(+), 5 deletions(-)
-
---- 0005/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2013-07-09 12:07:23.000000000 +0900
-@@ -30,6 +30,8 @@ config MACH_KZM9D_REFERENCE
- 	   of not supporting a number of devices.
- 
- 	   This is intended to aid developers
-+
-+comment "SH-Mobile System Configuration"
- endif
- 
- if ARCH_SHMOBILE
-@@ -243,6 +245,15 @@ config CPU_HAS_INTEVT
-         bool
- 	default y
- 
-+config SH_CLK_CPG
-+	bool
-+
-+source "drivers/sh/Kconfig"
-+
-+endif
-+
-+if ARCH_SHMOBILE || ARCH_SHMOBILE_MULTI
-+
- menu "Timer and clock configuration"
- 
- config SHMOBILE_TIMER_HZ
-@@ -277,9 +288,4 @@ config EM_TIMER_STI
- 
- endmenu
- 
--config SH_CLK_CPG
--	bool
--
--source "drivers/sh/Kconfig"
--
- endif
+I'll change this commit message in the next version.
