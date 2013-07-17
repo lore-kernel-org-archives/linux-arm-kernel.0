@@ -1,69 +1,50 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 18 Jul 2013 00:47:29 +0200
-Subject: [RFC PATCH v5 0/1] drivers: mfd: Versatile Express SPC support
-In-Reply-To: <alpine.LFD.2.03.1307171758591.14924@syhkavp.arg>
-References: <1374052705.3146.86.camel@hornet>
- <alpine.LFD.2.03.1307170825240.14924@syhkavp.arg>
- <1374067786.3146.123.camel@hornet>
- <alpine.LFD.2.03.1307171014510.14924@syhkavp.arg>
- <1374070811.3146.124.camel@hornet>
- <alpine.LFD.2.03.1307171148160.14924@syhkavp.arg>
- <20130717170038.GP24642@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1307171416490.14924@syhkavp.arg>
- <20130717212343.GC19864@zurbaran>
- <alpine.LFD.2.03.1307171758591.14924@syhkavp.arg>
-Message-ID: <20130717224729.GA20652@zurbaran>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 17 Jul 2013 16:52:42 -0600
+Subject: [PATCH] ASoC: tegra: depend on ARCH_TEGRA, not ARCH_TEGRA_*
+In-Reply-To: <20130717223309.GZ22506@sirena.org.uk>
+References: <1374013667-21435-1-git-send-email-swarren@wwwdotorg.org>
+ <20130717083003.GA22506@sirena.org.uk> <51E6CDEA.7060003@wwwdotorg.org>
+ <20130717175701.GY22506@sirena.org.uk> <51E6E107.8020300@wwwdotorg.org>
+ <20130717223309.GZ22506@sirena.org.uk>
+Message-ID: <51E7203A.2020007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 06:22:46PM -0400, Nicolas Pitre wrote:
-> On Wed, 17 Jul 2013, Samuel Ortiz wrote:
+On 07/17/2013 04:33 PM, Mark Brown wrote:
+> On Wed, Jul 17, 2013 at 12:23:03PM -0600, Stephen Warren wrote:
+>> On 07/17/2013 11:57 AM, Mark Brown wrote:
 > 
-> > On Wed, Jul 17, 2013 at 02:29:02PM -0400, Nicolas Pitre wrote:
-> > > At this point I don't really care about the name.  I just want the damn 
-> > > thing merged upstream.  But after several iterations to either fit one 
-> > > or another maintainers taste, each rework ends up in that maintainer 
-> > > saying: "Now that you've reworked the code, I still don't like it since 
-> > > this no longer fits in my subsystem tree."
-> > FWIW, we asked Pawel to rework the sysreg and config parts of the
-> > vexpress driver, make it an actual MFD driver, and spread the remaining
-> > bits of the code into their respective subsystems. I don't think
-> > this is an eccentric requirement.
+>>> So how do they disable the core support for the older SoCs with
+>>> the new model?
 > 
-> I agree.  However the code that Lorenzo just posted can't be deprived 
-> of any more sysreg/config parts.  
-Yes, and I appreciate Lorenzo's effort here.
-
-
-> Even the larger code you reviewed before is completely useless without 
-> _additional_ drivers to go on top which are indeed waiting after this 
-> code to be merged before they are submitted to their respective 
-> subsystems.
-Right. And merging this code in the right place is exactly what we're
-doing here.
-
- 
-> And those additional drivers are way more interesting than this dumb 
-> register access arbitrator.  
-Yes, they're a lot smarter hence the requirement to have them live into
-their respective subsystems where the right maintainer can provide
-relevant reviews on them.
-
-> > I don't mind merging Lorenzo's SPC driver as it is if he can explain to
-> > me how it will eventually evolve into an actual MFD driver. If that's
-> > not the case, I don't see how I could justify merging it through the
-> > MFD tree.
+>> They don't; the core support is so small it's not worth having
+>> the ifdefs in it; just a few K. As such, it seems simpler to just
+>> always compile in the core support, and remove the need for all
+>> the ifdef nests in mach-tegra/. The bulk of the differences are
+>> different drivers for different chips.
 > 
-> Maybe the misunderstanding is about what actually is a MFD driver.
-That's possible. I agree it should be documented properly.
+> So my take on that is that it seems like it's simpler to just have
+> the core selection since that's just one option for the user to
+> choose and save all the space for whatever device they're not
+> interested in rather than having to go through individual drivers
+> disabling the boring SoCs. It seems more straightfoward from a UI
+> point of view but perhaps I'm not thinking about it from the right
+> angle?
 
-> So I'll follow existing precedents in the kernel and move Lorenzo's code 
-> to drivers/platform/vexpress/.
-Thanks for that.
+Ah, so you mean keep the options in mach-tegra/Kconfig so that there's
+a single place to configure per-SoC support, but just ignore those
+options in code (like the Tegra CPU reset vector) where it's not worth
+it. That sounds reasonable.
 
-Cheers,
-Samuel.
-
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+The one remaining issue is that we have plenty of HW module whose
+driver works across multiple HW generations. For example,
+tegra20_i2s.c supports only Tegra20, yet tegra30_i2s.c supports both
+Tegra30 and Tegra114, and likely will support other generations too.
+The key to enable tegra30_i2s.c should really be ARCH_TEGRA_3x_SOC ||
+ARCH_TEGRA_114_SOC, which gets a bit unwieldy once you have, say, 4
+different SoCs in that list and a similar list starts to apply to a
+lot of different HW-modules/drivers. Even creating an
+ARCH_TEGRA_30_OR_LATER_SOC will get problematic, since defining "or
+later" will likely become progressively more complex over time, as we
+start putting our more SoCs. What are your thoughts on the best way to
+solve that?
