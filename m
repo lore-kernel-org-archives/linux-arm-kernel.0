@@ -1,50 +1,63 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 17 Jul 2013 16:52:42 -0600
-Subject: [PATCH] ASoC: tegra: depend on ARCH_TEGRA, not ARCH_TEGRA_*
-In-Reply-To: <20130717223309.GZ22506@sirena.org.uk>
-References: <1374013667-21435-1-git-send-email-swarren@wwwdotorg.org>
- <20130717083003.GA22506@sirena.org.uk> <51E6CDEA.7060003@wwwdotorg.org>
- <20130717175701.GY22506@sirena.org.uk> <51E6E107.8020300@wwwdotorg.org>
- <20130717223309.GZ22506@sirena.org.uk>
-Message-ID: <51E7203A.2020007@wwwdotorg.org>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 Jul 2013 00:54:21 +0200
+Subject: [PATCH v2 1/4] pwm: Add PWM polarity flag macro for DT
+In-Reply-To: <1374101664-21112-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1374101664-21112-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1374101664-21112-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2013 04:33 PM, Mark Brown wrote:
-> On Wed, Jul 17, 2013 at 12:23:03PM -0600, Stephen Warren wrote:
->> On 07/17/2013 11:57 AM, Mark Brown wrote:
-> 
->>> So how do they disable the core support for the older SoCs with
->>> the new model?
-> 
->> They don't; the core support is so small it's not worth having
->> the ifdefs in it; just a few K. As such, it seems simpler to just
->> always compile in the core support, and remove the need for all
->> the ifdef nests in mach-tegra/. The bulk of the differences are
->> different drivers for different chips.
-> 
-> So my take on that is that it seems like it's simpler to just have
-> the core selection since that's just one option for the user to
-> choose and save all the space for whatever device they're not
-> interested in rather than having to go through individual drivers
-> disabling the boring SoCs. It seems more straightfoward from a UI
-> point of view but perhaps I'm not thinking about it from the right
-> angle?
+Define a PWM_POLARITY_INVERTED macro in include/dt-bindings/pwm/pwm.h to
+be used by device tree sources.
 
-Ah, so you mean keep the options in mach-tegra/Kconfig so that there's
-a single place to configure per-SoC support, but just ignore those
-options in code (like the Tegra CPU reset vector) where it's not worth
-it. That sounds reasonable.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ Documentation/devicetree/bindings/pwm/pwm.txt |  7 ++++---
+ include/dt-bindings/pwm/pwm.h                 | 14 ++++++++++++++
+ 2 files changed, 18 insertions(+), 3 deletions(-)
+ create mode 100644 include/dt-bindings/pwm/pwm.h
 
-The one remaining issue is that we have plenty of HW module whose
-driver works across multiple HW generations. For example,
-tegra20_i2s.c supports only Tegra20, yet tegra30_i2s.c supports both
-Tegra30 and Tegra114, and likely will support other generations too.
-The key to enable tegra30_i2s.c should really be ARCH_TEGRA_3x_SOC ||
-ARCH_TEGRA_114_SOC, which gets a bit unwieldy once you have, say, 4
-different SoCs in that list and a similar list starts to apply to a
-lot of different HW-modules/drivers. Even creating an
-ARCH_TEGRA_30_OR_LATER_SOC will get problematic, since defining "or
-later" will likely become progressively more complex over time, as we
-start putting our more SoCs. What are your thoughts on the best way to
-solve that?
+diff --git a/Documentation/devicetree/bindings/pwm/pwm.txt b/Documentation/devicetree/bindings/pwm/pwm.txt
+index 06e6724..8556263 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm.txt
+@@ -43,13 +43,14 @@ because the name "backlight" would be used as fallback anyway.
+ pwm-specifier typically encodes the chip-relative PWM number and the PWM
+ period in nanoseconds.
+ 
+-Optionally, the pwm-specifier can encode a number of flags in a third cell:
+-- bit 0: PWM signal polarity (0: normal polarity, 1: inverse polarity)
++Optionally, the pwm-specifier can encode a number of flags (defined in
++<dt-bindings/pwm/pwm.h>) in a third cell:
++- PWM_POLARITY_INVERTED: invert the PWM signal polarity
+ 
+ Example with optional PWM specifier for inverse polarity
+ 
+ 	bl: backlight {
+-		pwms = <&pwm 0 5000000 1>;
++		pwms = <&pwm 0 5000000 PWM_POLARITY_INVERTED>;
+ 		pwm-names = "backlight";
+ 	};
+ 
+diff --git a/include/dt-bindings/pwm/pwm.h b/include/dt-bindings/pwm/pwm.h
+new file mode 100644
+index 0000000..96f49e8
+--- /dev/null
++++ b/include/dt-bindings/pwm/pwm.h
+@@ -0,0 +1,14 @@
++/*
++ * This header provides constants for most PWM bindings.
++ *
++ * Most PWM bindings can include a flags cell as part of the PWM specifier.
++ * In most cases, the format of the flags cell uses the standard values
++ * defined in this header.
++ */
++
++#ifndef _DT_BINDINGS_PWM_PWM_H
++#define _DT_BINDINGS_PWM_PWM_H
++
++#define PWM_POLARITY_INVERTED			(1 << 0)
++
++#endif
+-- 
+1.8.1.5
