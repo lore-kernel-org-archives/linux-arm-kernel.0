@@ -1,68 +1,32 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 17 Jul 2013 19:56:22 +0300
-Subject: [PATCH 2/3] ARM: OMAP2+: omap_device: add pinctrl handling
-In-Reply-To: <20130717153838.GJ7656@atomide.com>
-References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
- <1374061312-25469-3-git-send-email-grygorii.strashko@ti.com>
- <20130717153838.GJ7656@atomide.com>
-Message-ID: <51E6CCB6.2000907@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 17 Jul 2013 19:05:30 +0200
+Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
+In-Reply-To: <201305221219.43558.jbe@pengutronix.de>
+References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
+ <CAOMZO5AKKVeTMsXpG9wa-eeLocBStUwPjQEe3n6fRVY2aSc7Nw@mail.gmail.com>
+ <201305221219.43558.jbe@pengutronix.de>
+Message-ID: <201307171905.30981.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2013 06:38 PM, Tony Lindgren wrote:
-> * Grygorii Strashko <grygorii.strashko@ti.com> [130717 04:49]:
->> Before switching to DT pinctrl states of OMAP IPs have been handled by hwmod
->> framework. After switching to DT-boot the pinctrl handling was dropped from
->> hwmod framework and, as it was recommended, OMAP IP's drivers have to be updated
->> to handle pinctrl states by itself using pinctrl_pm_select_xx() helpers
->> (see http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173514.html)
->>
->> But this is not right for OMAP2+ SoC where real IPs state is controlled
->> by omap_device core which enables/disables modules & clocks actually.
->
-> I'm not convinced we should try to handle this in a generic way
-> as only some devices need dynamic remuxing of some pins.
->
->> For example, if OMAP I2C driver will handle pinctrl state during system wide
->> suspend the following issue may occure:
->> - suspend_noirq - I2C device can be still active because of PM auto-suspend
->>    |-_od_suspend_noirq
->>       |- omap_i2c_suspend_noirq
->>          |- PINs state set to SLEEP
->>    |- pm_generic_runtime_suspend
->>       |- omap_i2c_runtime_suspend()
->>          |- PINs state set to IDLE  <--- *oops* PINs state is IDLE and not SLEEP
->>    |- omap_device_idle()
->>       |- omap_hwmod_idle()
->>          |- _idle()
->>             |- disbale module (sysc&clocks)
->
-> And in this example you are assuming that you need separate idle and
-> sleep states, which is not true at least for most cases I've seen.
+Dear Juergen Beisert,
 
-I don't need both states (at least right now) :), but
-- if any OMAP2+ driver will have two states defined: "idle" and "sleep"
-- and if it will try to manage them from drivers callbacks only using
-   pure calls to pinctrl_pm_select_xx() helpers
+> Hi Fabio,
+> 
+> > i2c slowness is a different issue.
+> 
+> Same happens here for my i.M23 based platform. It seems the PIO mode does
+> not work, or at least not like it works on a i.MX28. Each short transfer
+> needs about one second (without an error message) but does not send
+> anything on the I2C lines.
+> 
+> I need the following patches to make I2C master work within a 3.10-rc2
+> kernel:
+> 
+> Subject: [PATCH] I2C/MXS: distinguish i.MX23 and i.MX28 based I2C
+> controller Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
 
-the "idle" state will be selected during suspend and *not* "sleep".
+Can you please properly submit this patch ?
 
->
-> It is possible that am33xx needs separate idle and sleep states, but
-> most likely only for some pins. For omap[345] we can get away with
-> just the default state for most cases.
->
-
-
-In case, if only "default" state is defined for device - nothing will
-  be done by OMAP device framework for it (I mean any call to
-pinctrl_pm_select_xx() will do nothing - it just checks that there is
-no state and returns 0).
-
-> Regards,
->
-> Tony
->
-
-Regards,
-- grygorii
+Best regards,
+Marek Vasut
