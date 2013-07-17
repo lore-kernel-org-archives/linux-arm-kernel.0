@@ -1,56 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 17 Jul 2013 13:46:50 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/2] Initial support for Allwinner's
- Security ID fuses
-In-Reply-To: <20130716064107.GA10868@kroah.com>
-References: <51C87DC7.50005@schinagl.nl> <20130624181509.GA8847@kroah.com>
- <51C8B84C.3020200@schinagl.nl> <20130624214615.GA17604@kroah.com>
- <51CAA709.4060801@schinagl.nl> <20130626175144.GC2222@kroah.com>
- <51D674BF.9030207@schinagl.nl> <20130706193646.GB9778@kroah.com>
- <51E466A3.4010503@schinagl.nl> <20130716064107.GA10868@kroah.com>
-Message-ID: <20130717114650.GN3125@lukather>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 17 Jul 2013 13:48:45 +0200
+Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
+ pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
+In-Reply-To: <20130717085139.GJ24642@n2100.arm.linux.org.uk>
+References: <20130620095705.GA18536@arm.com> <51C2D5EF.3040803@pengutronix.de>
+ <20130620102856.GC18536@arm.com> <20130620111255.GD18536@arm.com>
+ <51C2E917.9000708@pengutronix.de> <51C2EA04.4060701@pengutronix.de>
+ <51C2EBCD.4070206@pengutronix.de> <51C42AE0.9070506@pengutronix.de>
+ <20130621135219.GC4099@arm.com> <51E658AF.1090009@pengutronix.de>
+ <20130717085139.GJ24642@n2100.arm.linux.org.uk>
+Message-ID: <51E6849D.7080505@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 11:41:07PM -0700, Greg KH wrote:
-> On Mon, Jul 15, 2013 at 11:16:19PM +0200, Oliver Schinagl wrote:
-> > So using these new patches for binary attributes, how can I pass data 
-> > between my driver and the sysfs files using a platform_driver? Or are 
-> > other 'hacks' needed and using the .groups attribute from 
-> > platform_driver->device_driver->groups is really the wrong approach.
-> > 
-> > I did ask around and still haven't figured it out so far, so I do 
-> > apologize if you feel I'm wasting your precious time.
+On 07/17/2013 10:51 AM, Russell King - ARM Linux wrote:
+> On Wed, Jul 17, 2013 at 10:41:19AM +0200, Marc Kleine-Budde wrote:
+>> What happend to that patch? I cannot find it in v3.10.x nor in linus/master.
 > 
-> How is the platform device not the same thing that was passed to your
-> probe function?
+> Catalin sent it to me, and I didn't apply it because it's still racy.
+> 
+> We have stateful context switches (due to cache clearing) and this does
+> nothing to solve the problem there.  If we get preempted during the
+> cache clearing, things will still go wrong.
 
-One thing I don't get here is why it should be set in the
-platform_driver structure. From my understanding of the device model,
-and since what Oliver is trying to do is exposing a few bytes of memory
-to sysfs, shouldn't the sysfs file be attached to the device instead?
+Thanks for the update.
 
-I mean, here, the sysfs file will be created under something like
-.../drivers/sunxi-sid/eeprom. What happens when you have several
-instances of that driver loaded? I'd expect it to have several sysfs
-files created, one for each instance. So to me, it should be in the
-device structure, not the driver one.
+> See:
+> 
+> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7771/1
+> 
+> I've no idea what's happening about this.  It looks to me like nothing
+> happened after Catalin's last comment there.
 
-Couldn't that be also the reason of Oliver's NULL pointer? If the kobj
-is attached to the platform_driver and not to the platform_device, it
-should definitely get nasty when we try to cast it and retrieve data
-from it (and that would match the different pointers stuff as well.)
+Catalin, what's next?
 
-Maxime
+Marc
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/bc403ec4/attachment-0001.sig>
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/e01fe949/attachment.sig>
