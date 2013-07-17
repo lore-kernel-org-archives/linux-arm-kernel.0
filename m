@@ -1,163 +1,30 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 17 Jul 2013 10:30:10 -0400 (EDT)
-Subject: [RFC PATCH v2 01/15] of: add support for retrieving cpu node
- for a given logical cpu index
-In-Reply-To: <1374069984-20567-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374069984-20567-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <alpine.LFD.2.03.1307171023410.14924@syhkavp.arg>
+From: shuahkhan@gmail.com (Shuah Khan)
+Date: Wed, 17 Jul 2013 08:31:55 -0600
+Subject: Linux Plumbers ACPI/PM, PCI Microconference
+In-Reply-To: <CAL-B5D03ki8NHsM6EuESTH2K-Eh+XyFHNXPDYwgDq+oagDjtMQ@mail.gmail.com>
+References: <CAL-B5D03ki8NHsM6EuESTH2K-Eh+XyFHNXPDYwgDq+oagDjtMQ@mail.gmail.com>
+Message-ID: <CAKocOOOgEb5h1dZWP_2UqBKhSK9U-kxKUbvTdzHfds=RiDzNJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Jul 2013, Sudeep.KarkadaNagesha at arm.com wrote:
+Myron,
 
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> 
-> Currently different drivers requiring to access cpu device node are
-> parsing the device tree themselves. Since the ordering in the DT need
-> not match the logical cpu ordering, the parsing logic needs to consider
-> that. However, this has resulted in lots of code duplication and in some
-> cases even incorrect logic.
-> 
-> It's better to consolidate them by adding support for getting cpu
-> device node for a given logical cpu index in DT core library. However
-> logical to physical index mapping can be architecture specific.
-> 
-> This patch adds of_get_cpu_node to retrieve a cpu device node for a
-> given logical cpu index. The default matching of the physical id to the
-> logical cpu index can be overridden by architecture specific code.
-> 
-> It is recommended to use these helper function only in pre-SMP/early
-> initialisation stages to retrieve CPU device node pointers in logical
-> ordering. Once the cpu devices are registered, it can be retrieved easily
-> from cpu device of_node which avoids unnecessary parsing and matching.
-> 
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> ---
->  drivers/of/base.c  | 66 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of.h |  5 +++++
->  2 files changed, 71 insertions(+)
-> 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 5c54279..363b8f9 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -230,6 +230,72 @@ const void *of_get_property(const struct device_node *np, const char *name,
->  }
->  EXPORT_SYMBOL(of_get_property);
->  
-> +/*
-> + * arch_match_cpu_phys_id - Match the given logical CPU and physical id
-> + *
-> + * @cpu: logical index of a cpu
-> + * @phys_id: physical identifier of a cpu
-> + *
-> + * CPU logical to physical index mapping is architecure specific.
+On Tue, Jul 16, 2013 at 8:21 PM, Myron Stowe <myron.stowe@gmail.com> wrote:
 
-Typo.
+>
+> Shuah - You brought up the idea about "Converting drivers from Legacy
+> PM ops to dev_pm_ops"; would you like to present what you have
+> done/encountered so far?
+>
 
-> + * However this __weak function provides a default match of physical
-> + * id to logical cpu index.
-> + *
-> + * Returns 1 if the physical identifier and the logical index correspond
-> + * to the same cpu, 0 otherwise.
-> + */
-> +int __weak arch_match_cpu_phys_id(int cpu, u64 phys_id)
+Awesome. Yes, I would like to present what I have done so far and I do
+have a couple of things that could benefit from a face to face
+discussion which would help me make progress on the rest of the work
+that needs to get done.
 
-Please use a bool return type, and use true/false rather than 1/0 in the 
-comment.
+Thanks for putting this item on the agenda.
 
-> +{
-> +	return (u32)phys_id == cpu;
-> +}
-> +
-> +/**
-> + * of_get_cpu_node - Get device node associated with the given logical CPU
-> + *
-> + * @cpu: CPU number(logical index) for which device node is required
-> + *
-> + * The main purpose of this function is to retrieve the device node for the
-> + * given logical CPU index. It should be used to intialise the of_node in
+-- Shuah
 
-Typo.
-
-> + * cpu device. Once of_node in cpu device is populated, all the further
-> + * references can use that instead.
-> + *
-> + * CPU logical to physical index mapping is architecure specific and is built
-
-Typo.
-
-> + * before booting secondary cores. This function uses arch_match_cpu_phys_id
-> + * which can be overridden by architecture specific implementation.
-> + *
-> + * Returns a node pointer for the logical cpu if found, else NULL.
-> + */
-> +struct device_node *of_get_cpu_node(int cpu)
-> +{
-> +	struct device_node *cpun, *cpus;
-> +	const u32 *cell;
-> +	u64 hwid;
-> +	int ac, prop_len;
-> +
-> +	cpus = of_find_node_by_path("/cpus");
-> +	if (WARN(!cpus, "Missing cpus node, bailing out\n"))
-> +		return NULL;
-> +
-> +	if (WARN_ON(of_property_read_u32(cpus, "#address-cells", &ac)))
-> +		ac = of_n_addr_cells(cpus);
-> +
-> +	for_each_child_of_node(cpus, cpun) {
-> +		if (of_node_cmp(cpun->type, "cpu"))
-> +			continue;
-> +		cell = of_get_property(cpun, "reg", &prop_len);
-> +		if (WARN(!cell, "%s: missing reg property\n", cpun->full_name))
-> +			continue;
-> +
-> +		while (prop_len) {
-> +			hwid = of_read_number(cell, ac);
-> +			prop_len -= ac;
-> +			if (arch_match_cpu_phys_id(cpu, hwid))
-> +				return cpun;
-> +		}
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
->  /** Checks if the given "compat" string matches one of the strings in
->   * the device's "compatible" property
->   */
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 1fd08ca..150b48e 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -266,6 +266,7 @@ extern int of_device_is_available(const struct device_node *device);
->  extern const void *of_get_property(const struct device_node *node,
->  				const char *name,
->  				int *lenp);
-> +extern struct device_node *of_get_cpu_node(int cpu);
->  #define for_each_property_of_node(dn, pp) \
->  	for (pp = dn->properties; pp != NULL; pp = pp->next)
->  
-> @@ -458,6 +459,10 @@ static inline const void *of_get_property(const struct device_node *node,
->  {
->  	return NULL;
->  }
-> +static inline struct device_node *of_get_cpu_node(int cpu)
-> +{
-> +	return NULL;
-> +}
->  
->  static inline int of_property_read_u64(const struct device_node *np,
->  				       const char *propname, u64 *out_value)
-> -- 
-> 1.8.1.2
-> 
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
+Shuah Khan, Linux Kernel Developer - Open Source Group Samsung Research
+America (Silicon Valley) shuah.kh at samsung.com | (970) 672-0658
