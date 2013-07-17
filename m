@@ -1,52 +1,69 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 17 Jul 2013 15:36:40 -0700
-Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if
- UP system
-In-Reply-To: <alpine.LFD.2.03.1307171830170.14924@syhkavp.arg>
-References: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
- <20130712111322.GC3213@e102654-lin.cambridge.arm.com>
- <20130712121023.GB27430@codeaurora.org> <51E71249.4050200@codeaurora.org>
- <alpine.LFD.2.03.1307171830170.14924@syhkavp.arg>
-Message-ID: <51E71C78.6080604@codeaurora.org>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Thu, 18 Jul 2013 00:47:29 +0200
+Subject: [RFC PATCH v5 0/1] drivers: mfd: Versatile Express SPC support
+In-Reply-To: <alpine.LFD.2.03.1307171758591.14924@syhkavp.arg>
+References: <1374052705.3146.86.camel@hornet>
+ <alpine.LFD.2.03.1307170825240.14924@syhkavp.arg>
+ <1374067786.3146.123.camel@hornet>
+ <alpine.LFD.2.03.1307171014510.14924@syhkavp.arg>
+ <1374070811.3146.124.camel@hornet>
+ <alpine.LFD.2.03.1307171148160.14924@syhkavp.arg>
+ <20130717170038.GP24642@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.03.1307171416490.14924@syhkavp.arg>
+ <20130717212343.GC19864@zurbaran>
+ <alpine.LFD.2.03.1307171758591.14924@syhkavp.arg>
+Message-ID: <20130717224729.GA20652@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/13 15:34, Nicolas Pitre wrote:
-> On Wed, 17 Jul 2013, Stephen Boyd wrote:
->
->> On 07/12/13 05:10, Stephen Boyd wrote:
->>> On 07/12, Javi Merino wrote:
->>>> I agree, we should drop the check.  It's annoying in uniprocessors and
->>>> unlikely to be found in the real world unless your gic entry in the dt
->>>> is wrong.
-> And that's a likely outcome in the real world.
->
->>> Ok. How about this?
->> Any comments?
-> What about this instead:
+On Wed, Jul 17, 2013 at 06:22:46PM -0400, Nicolas Pitre wrote:
+> On Wed, 17 Jul 2013, Samuel Ortiz wrote:
+> 
+> > On Wed, Jul 17, 2013 at 02:29:02PM -0400, Nicolas Pitre wrote:
+> > > At this point I don't really care about the name.  I just want the damn 
+> > > thing merged upstream.  But after several iterations to either fit one 
+> > > or another maintainers taste, each rework ends up in that maintainer 
+> > > saying: "Now that you've reworked the code, I still don't like it since 
+> > > this no longer fits in my subsystem tree."
+> > FWIW, we asked Pawel to rework the sysreg and config parts of the
+> > vexpress driver, make it an actual MFD driver, and spread the remaining
+> > bits of the code into their respective subsystems. I don't think
+> > this is an eccentric requirement.
+> 
+> I agree.  However the code that Lorenzo just posted can't be deprived 
+> of any more sysreg/config parts.  
+Yes, and I appreciate Lorenzo's effort here.
 
-Unfortunately arm64 doesn't have SMP_ON_UP. It sounds like you preferred
-the first patch using num_possible_cpus()
 
->
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 19ceaa60e0..86d21bc6cb 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -368,7 +368,7 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
->  			break;
->  	}
->  
-> -	if (!mask)
-> +	if (is_smp() && !mask)
->  		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
->  
->  	return mask;
->
->
-> Nicolas
+> Even the larger code you reviewed before is completely useless without 
+> _additional_ drivers to go on top which are indeed waiting after this 
+> code to be merged before they are submitted to their respective 
+> subsystems.
+Right. And merging this code in the right place is exactly what we're
+doing here.
 
+ 
+> And those additional drivers are way more interesting than this dumb 
+> register access arbitrator.  
+Yes, they're a lot smarter hence the requirement to have them live into
+their respective subsystems where the right maintainer can provide
+relevant reviews on them.
+
+> > I don't mind merging Lorenzo's SPC driver as it is if he can explain to
+> > me how it will eventually evolve into an actual MFD driver. If that's
+> > not the case, I don't see how I could justify merging it through the
+> > MFD tree.
+> 
+> Maybe the misunderstanding is about what actually is a MFD driver.
+That's possible. I agree it should be documented properly.
+
+> So I'll follow existing precedents in the kernel and move Lorenzo's code 
+> to drivers/platform/vexpress/.
+Thanks for that.
+
+Cheers,
+Samuel.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Intel Open Source Technology Centre
+http://oss.intel.com/
