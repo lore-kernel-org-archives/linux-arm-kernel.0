@@ -1,101 +1,89 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 17 Jul 2013 10:25:10 -0700
-Subject: [PATCH v9 1/8] drivers: phy: add generic PHY framework
-In-Reply-To: <51E664CB.8050906@ti.com>
-References: <1372247257-30186-1-git-send-email-kishon@ti.com>
- <1372247257-30186-2-git-send-email-kishon@ti.com>
- <20130717062944.GA24968@kroah.com> <51E664CB.8050906@ti.com>
-Message-ID: <20130717172510.GB17093@kroah.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 17 Jul 2013 10:48:16 -0700
+Subject: [PATCH] ARM: debug: use generic option for ep93xx PL10x debug port
+Message-ID: <201307171048.17430.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 03:02:59PM +0530, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Wednesday 17 July 2013 11:59 AM, Greg KH wrote:
-> > On Wed, Jun 26, 2013 at 05:17:29PM +0530, Kishon Vijay Abraham I wrote:
-> >> +menuconfig GENERIC_PHY
-> >> +	tristate "PHY Subsystem"
-> >> +	help
-> >> +	  Generic PHY support.
-> >> +
-> >> +	  This framework is designed to provide a generic interface for PHY
-> >> +	  devices present in the kernel. This layer will have the generic
-> >> +	  API by which phy drivers can create PHY using the phy framework and
-> >> +	  phy users can obtain reference to the PHY.
-> > 
-> > Shouldn't this be something that other drivers select?  How will anyone
-> > know if they need this or not?
-> 
-> All the PHY drivers should go here. So only if *GENERIC_PHY* is enabled those
-> PHY drivers can be selected like in [1].
-> The PHY consumer driver should ideally use *depends on* in their Kconfig.
-> 
-> [1] ->
-> http://archive.arm.linux.org.uk/lurker/message/20130628.134308.4a8f7668.ca.html
+The generic option DEBUG_LL_UART_PL01X is now used to select the UART
+type for the kernel low-level debugging on the ep93xx platform. This
+enables two config options to provide the physical and virtual base
+address of the debug UART.
 
-No, switch it around the other way.  How would I even _know_ that I need
-to enable the generic PHY subsystem in the first place?  How can I
-determine that I need this for my hardware?  You need to give hints to
-someone who doesn't even know what a PHY is, otherwise they will always
-disable it and move on.
+Use the generic options instead of providing platform specific options
+to select the debug UART.
 
-> >> --- /dev/null
-> >> +++ b/drivers/phy/phy-core.c
-> >> @@ -0,0 +1,544 @@
-> >> +/*
-> >> + * phy-core.c  --  Generic Phy framework.
-> >> + *
-> >> + * Copyright (C) 2013 Texas Instruments
-> >> + *
-> >> + * Author: Kishon Vijay Abraham I <kishon@ti.com>
-> >> + *
-> >> + * This program is free software; you can redistribute  it and/or modify it
-> >> + * under  the terms of  the GNU General  Public License as published by the
-> >> + * Free Software Foundation;  either version 2 of the  License, or (at your
-> >> + * option) any later version.
-> > 
-> > You really mean "any later version" (I have to ask)?
-> 
-> That was copied from somewhere :-s
+UART1 is selected with:  DEBUG_UART_PHYS = 0x808c0000
+                         DEBUG_UART_VIRT = 0xfedc0000
 
-So, is that what you really mean to have for this code?
+UART2 is selected with:  DEBUG_UART_PHYS = 0x808d0000
+                         DEBUG_UART_VIRT = 0xfedd0000
 
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + *
-> >> + * You should have received a copy of the GNU General Public License
-> >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > 
-> > Are these two paragraphs needed?  This isn't a "program", and they got a
-> > copy of the GPL already with the kernel.
-> 
-> hmm.. I can remove that.
-> > 
-> >> +static struct class *phy_class;
-> > 
-> > Why do you need a class?
-> 
-> Wanted to group all the PHY drivers to be used by different subsystems
-> (SATA/USB/PCIE/HDMI/VIDEO) into a single entity. There were some comments in my
-> initial version [3] on using a bus_type instead of class but then it was
-> decided to go with class itself.
-> 
-> [3] -> http://lkml.indiana.edu/hypermail/linux/kernel/1302.2/01389.html
+UART3 is selected with:  DEBUG_UART_PHYS = 0x808e0000
+                         DEBUG_UART_VIRT = 0xfede0000
 
-Ok, but what does the class usage get you?
+The selected UART must already be initialized by the bootloader. If it
+isn't setup nothing will appear (which might be desired).
 
-> > When modifying/adding new sysfs stuff, you need a Documentation/ABI/
-> > entry as well.
-> 
-> I'm not actually adding any new sysfs entry other than what a *class_create*
-> must have created. Do I need to add one for that?
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Ryan Mallon <rmallon@gmail.com>
+---
+This applies on top of Russell King's "Clean up the debugging support".
 
-If you are not creating anything in sysfs at all, why use the driver
-model?  (hint, I think you need to do something here to justify it...)
+ arch/arm/mach-ep93xx/Kconfig                   | 14 --------------
+ arch/arm/mach-ep93xx/include/mach/uncompress.h | 14 ++------------
+ 2 files changed, 2 insertions(+), 26 deletions(-)
 
-thanks,
-
-greg k-h
+diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
+index fe3c1fa..93e54fd 100644
+--- a/arch/arm/mach-ep93xx/Kconfig
++++ b/arch/arm/mach-ep93xx/Kconfig
+@@ -194,20 +194,6 @@ config MACH_VISION_EP9307
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Vision Engraving Systems EP9307 SoM.
+ 
+-choice
+-	prompt "Select a UART for early kernel messages"
+-
+-config EP93XX_EARLY_UART1
+-	bool "UART1"
+-
+-config EP93XX_EARLY_UART2
+-	bool "UART2"
+-
+-config EP93XX_EARLY_UART3
+-	bool "UART3"
+-
+-endchoice
+-
+ endmenu
+ 
+ endif
+diff --git a/arch/arm/mach-ep93xx/include/mach/uncompress.h b/arch/arm/mach-ep93xx/include/mach/uncompress.h
+index b5cc77d..03c42e5 100644
+--- a/arch/arm/mach-ep93xx/include/mach/uncompress.h
++++ b/arch/arm/mach-ep93xx/include/mach/uncompress.h
+@@ -31,18 +31,8 @@ static void __raw_writel(unsigned int value, unsigned int ptr)
+ 	*((volatile unsigned int *)ptr) = value;
+ }
+ 
+-#if defined(CONFIG_EP93XX_EARLY_UART1)
+-#define UART_BASE		EP93XX_UART1_PHYS_BASE
+-#elif defined(CONFIG_EP93XX_EARLY_UART2)
+-#define UART_BASE		EP93XX_UART2_PHYS_BASE
+-#elif defined(CONFIG_EP93XX_EARLY_UART3)
+-#define UART_BASE		EP93XX_UART3_PHYS_BASE
+-#else
+-#define UART_BASE		EP93XX_UART1_PHYS_BASE
+-#endif
+-
+-#define PHYS_UART_DATA		(UART_BASE + 0x00)
+-#define PHYS_UART_FLAG		(UART_BASE + 0x18)
++#define PHYS_UART_DATA		(CONFIG_DEBUG_UART_PHYS + 0x00)
++#define PHYS_UART_FLAG		(CONFIG_DEBUG_UART_PHYS + 0x18)
+ #define UART_FLAG_TXFF		0x20
+ 
+ static inline void putc(int c)
+-- 
+1.8.3.2
