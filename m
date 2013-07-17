@@ -1,214 +1,639 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 17 Jul 2013 16:36:26 +0200
-Subject: [PATCH 1/3] ARM: EXYNOS: remove non-working AFTR mode support
-In-Reply-To: <51E694BA.3030906@linaro.org>
-References: <1372241627-22695-1-git-send-email-b.zolnierkie@samsung.com>
- <5509794.32CckI9OQ8@amdc1032> <51E694BA.3030906@linaro.org>
-Message-ID: <8703473.ctkuh2YRQb@amdc1032>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Wed, 17 Jul 2013 16:41:04 +0200
+Subject: [PATCH v2 13/42] ARM: at91: move at91rm9200 SoC to new at91 clk implem
+In-Reply-To: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1374072064-19461-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 17, 2013 02:57:30 PM Daniel Lezcano wrote:
-> On 07/11/2013 03:14 PM, Bartlomiej Zolnierkiewicz wrote:
-> > 
-> > Hi,
-> > 
-> > On Friday, June 28, 2013 11:47:49 PM Daniel Lezcano wrote:
-> >> On 06/28/2013 06:27 PM, Bartlomiej Zolnierkiewicz wrote:
-> >>> On Friday, June 28, 2013 01:20:09 PM Daniel Lezcano wrote:
-> >>>> On 06/28/2013 12:11 PM, Tomasz Figa wrote:
-> >>>>> Hi Daniel,
-> >>>>>
-> >>>>> I've been fighting with this whole AFTR state as well, before Bartlomiej. 
-> >>>>> Let me share my thoughts on this.
-> >>>>>
-> >>
-> >> [ ... ]
-> >>
-> >>>>>
-> >>>>> If you don't unplug all the CPUs >0 the state is obviously never reached. 
-> >>>>> Otherwise the whole system hangs after it tries to enter this mode without 
-> >>>>> any reaction for external events, other than reset.
-> >>>>
-> >>>> Need investigation.
-> >>>>
-> >>>> What is the exynos board version where that occurs ?
-> >>>
-> >>> Could you please tell me what exactly do you mean by that?
-> >>>
-> >>> I already wrote that we can reproduce the problem on EXYNOS4210 rev0
-> >>> and rev1.1 (we don't have rev1.0). Tomek has also reproduced the problem
-> >>> on some later SoCs (I hope that he can give you exact revisions).
-> >>>
-> >>> In our testing we didn't encounter the board on which the problem
-> >>> doesn't occur. Our current working theory is that the problem may be
-> >>> u-boot (or first stage bootloader) related.
-> >>
-> >> Ok, the status for what I know:
-> >>
-> >> Origen Exynos4210, board ver A: works for me
-> >> Arndale Exynos5250: works for me but only if u-boot does not enable the
-> >> hypervisor mode.
-> >> Chromebook Exynos5250: works for me
-> > 
-> > I've also done some more testing. First I tested on some Exynos4412 devices
-> > (M0 and SLP_PQ) and AFTR was not working on them. Then I got my hands on
-> > Origen Exynos4210 (thanks to Tomek Figa for providing it) and AFTR is working
-> > just fine on it. Finally I tried Trats board again but with the upstream
-> > u-boot instead of our custom modified version (thanks to help from Lukasz
-> > Majewski) and I found out that after this change AFTR works fine on it! It
-> > also gives quite nice power savings (~80mA less current drawn in AFTR mode
-> > compared to just WFI one).
-> 
-> Is the 80mA power saving comparing with:
-> 
->  * (cpu0/cpu1 online) vs (cpu0 AFTR and cpu1 offline)
-> or
->  * (cpu0 AFTR and cpu1 offline) vs (cpu0 WFI and cpu1 offline)
-> ?
+This patch removes all references to the old at91 clks implementation and
+make use of the new at91 clk implem for at91rm9200 SoC.
 
-The latter one and the following scenario:
+All dt specific lookups are removed (handled in clk device tree binding).
 
- * (cpu0/cpu1 online) vs (cpu0 WFI and cpu1 offline)
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/mach-at91/Kconfig      |    1 +
+ arch/arm/mach-at91/at91rm9200.c |  566 +++++++++++++++++++++++----------------
+ 2 files changed, 341 insertions(+), 226 deletions(-)
 
-gives only ~10mA saving. Maybe something is not working as it should be in
-the hotplug support and the code is not doing as much as it could but these
-are the actual results (using vanilla v3.10).
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> > With the above findings it now seems that the issue is on our side and is
-> > outside the kernel. Thanks for help with narrowing down the problem and
-> > sorry for wasting your time.
-> 
-> May be we were not working on the same tree.
-> 
-> I am on the linux-pm-next tree.
-> 
-> Now the merge window occurred, the AFTR is no longer working on my board.
-> 
-> After git bisecting:
-> 
-> commit 87107d89052bcec1fe91b309631de4ed294a5171
-> Author: Arnd Bergmann <arnd@arndb.de>
-> Date:   Wed Jun 19 01:36:52 2013 +0900
-> 
->     ARM: EXYNOS: Remove legacy L2X0 initialization
-> 
->     Since Exynos is now supporting only DT-based boot, the old L2X0
->     initialization code is not needed anymore, so exynos4_l2x0_cache_init()
->     can be greatly simplified.
-> 
->     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->     Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->     Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->     Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> :040000 040000 79e1adfd6386256ba71b3f609592d5acf9c08222
-> 9cb0026563b3b8657d906767493d26c501963269 M	arch
-> 
-> Reverting the patch solves the problem.
-> 
-> Any ideas ?
-> 
-> Thanks
->   -- Daniel
-> 
-> 
-> > 
-> > Best regards,
-> > --
-> > Bartlomiej Zolnierkiewicz
-> > Samsung R&D Institute Poland
-> > Samsung Electronics
-> > 
-> >> I found the following drivers:
-> >>
-> >> https://github.com/AndreiLux/Perseus-UNIVERSAL5410/blob/samsung/arch/arm/mach-exynos/cpuidle.c
-> >>
-> >> https://github.com/CyanogenMod/hardkernel-kernel-4412/blob/cm-10.1/arch/arm/mach-exynos/cpuidle-exynos4.c
-> >>
-> >> Sounds like the num cpus > 1 is still there.
-> >>
-> >> [ ... ]
-> >>
-> >>>> The kernel is not a playground where you can upstream code and then
-> >>>> remove it because a feature seems broken and you don't have an idea of why.
-> >>>
-> >>> Neither me or Tomek did upstream this code and we couldn't react in
-> >>> time because we haven't noticed that it is completely unusable for us
-> >>> as EXYNOS cpuidle driver is not even used by default on EXYNOS (it is
-> >>> not enabled either in defconfig or Kconfig).
-> >>>
-> >>> Moreover the feature we are talking about (AFTR mode) is also not used
-> >>> by default (except EXYNOS4210 rev0 on which it lockups system for us)
-> >>> even with EXYNOS cpuidle driver being enabled (because this specific
-> >>> feature depends on CPU hot-unplug which is not done automatically right
-> >>> now).
-> >>>
-> >>> Such things like unused/broken code removal is not something very
-> >>> unusual in the upstream kernel (I'm speaking from the experience here
-> >>> having maintained large subsystem for a couple of years). In this
-> >>> particular case we are talking about ~130 lines of code which can
-> >>> be trivially brought back later when/if needed.
-> >>>
-> >>> Anyway if the code removal is controversial for you we can just disable
-> >>> AFTR mode by default and enable it only when special command line option
-> >>> is given (i.e. "aftr"). This would fix all the broken configuration
-> >>> while still allowing the feature to be enabled on systems that had it
-> >>> working previously (since you claim that it works on some chipset/u-boot
-> >>> configurations).
-> >>
-> >> Actually, there are several reasons I am not in favor for the moment to
-> >> remove this code:
-> >>
-> >> 1) code can't be pushed upstream and then removed so easily
-> >> 2) I asked several times what was this cpu1 hack, I had no answer
-> >> 3) I tried to make both cpus entering the AFTR state, but the cpu1 never
-> >> wakes up, I asked but no answer.
-> >>
-> >> I would like to have some answers :)
-> >>
-> >> Before taking the decision to remove this state (btw you can remove the
-> >> driver directly, no ? the default idle function is WFI), IMO it is worth
-> >> to investigate and to spend some time to clarify what is happening. Then
-> >> we can take a decision.
-> >>
-> >> I am willing to help.
-> >>
-> >>>> I asked several times the reasons of why the AFTR state couldn't work
-> >>>> with multiple CPUs and I had no answer.
-> >>>
-> >>> Unfortunately I don't know the answer for your question.
-> >>>
-> >>> The AFTR mode doesn't work for us *at*all* (even with *one* CPU).
-> >>>
-> >>>> Frankly speaking I have a couple of hypothesis:
-> >>>>
-> >>>> 1. something is not correctly setup and the PMU does not wake up the CPU1
-> >>>> 2. there is a silicon bug and no one wants to tell it is the case
-> >>>>
-> >>>> In any case, this must be investigated and identified. And then we can
-> >>>> take a decision about this state.
-> >>>
-> >>> I don't have good idea currently how to investigate it further.
-> >>>
-> >>> I also don't have any prove that the actual work is worth it
-> >>> (and this work can easily take some weeks).
-> >>>
-> >>> One of main responsibilities of the maintainer it to make sure that
-> >>> the code does indeed work and that regressions (like these caused by
-> >>> AFTR mode feature) are fixed in the timely manner, not let the code
-> >>> sit in the limbo state for large periods of time.  It is already very
-> >>> bad situation that the regression we are hitting was present since
-> >>> v3.4 and we are in v3.10 now, I would like to have it fixed ASAP so
-> >>> we may actually consider enabling cpuidle in our exynos_defconfig.
-> >>
-> >> I agree.
-> >>
-> >> Thanks
-> >>   -- Daniel
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index c8e02ca..3253373 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -85,6 +85,7 @@ endif
+ if SOC_SAM_V4_V5
+ config SOC_AT91RM9200
+ 	bool "AT91RM9200"
++	select COMMON_CLK
+ 	select CPU_ARM920T
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_DBGU0
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index 8de5b02..3454c8b 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -13,6 +13,7 @@
+ #include <linux/module.h>
+ #include <linux/reboot.h>
+ #include <linux/clk/at91.h>
++#include <linux/clkdev.h>
+ 
+ #include <asm/irq.h>
+ #include <asm/mach/arch.h>
+@@ -25,7 +26,6 @@
+ #include "at91_aic.h"
+ #include "soc.h"
+ #include "generic.h"
+-#include "clock.h"
+ #include "sam9_smc.h"
+ 
+ /* --------------------------------------------------------------------
+@@ -35,245 +35,359 @@
+ /*
+  * The peripheral clocks.
+  */
+-static struct clk udc_clk = {
+-	.name		= "udc_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_UDP,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk ohci_clk = {
+-	.name		= "ohci_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_UHP,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk ether_clk = {
+-	.name		= "ether_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_EMAC,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk mmc_clk = {
+-	.name		= "mci_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_MCI,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk twi_clk = {
+-	.name		= "twi_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_TWI,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk usart0_clk = {
+-	.name		= "usart0_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_US0,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk usart1_clk = {
+-	.name		= "usart1_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_US1,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk usart2_clk = {
+-	.name		= "usart2_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_US2,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk usart3_clk = {
+-	.name		= "usart3_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_US3,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk spi_clk = {
+-	.name		= "spi_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_SPI,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk pioA_clk = {
+-	.name		= "pioA_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_PIOA,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk pioB_clk = {
+-	.name		= "pioB_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_PIOB,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk pioC_clk = {
+-	.name		= "pioC_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_PIOC,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk pioD_clk = {
+-	.name		= "pioD_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_PIOD,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk ssc0_clk = {
+-	.name		= "ssc0_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_SSC0,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk ssc1_clk = {
+-	.name		= "ssc1_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_SSC1,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk ssc2_clk = {
+-	.name		= "ssc2_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_SSC2,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk tc0_clk = {
+-	.name		= "tc0_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_TC0,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk tc1_clk = {
+-	.name		= "tc1_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_TC1,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk tc2_clk = {
+-	.name		= "tc2_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_TC2,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk tc3_clk = {
+-	.name		= "tc3_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_TC3,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk tc4_clk = {
+-	.name		= "tc4_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_TC4,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk tc5_clk = {
+-	.name		= "tc5_clk",
+-	.pmc_mask	= 1 << AT91RM9200_ID_TC5,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-
+-static struct clk *periph_clocks[] __initdata = {
+-	&pioA_clk,
+-	&pioB_clk,
+-	&pioC_clk,
+-	&pioD_clk,
+-	&usart0_clk,
+-	&usart1_clk,
+-	&usart2_clk,
+-	&usart3_clk,
+-	&mmc_clk,
+-	&udc_clk,
+-	&twi_clk,
+-	&spi_clk,
+-	&ssc0_clk,
+-	&ssc1_clk,
+-	&ssc2_clk,
+-	&tc0_clk,
+-	&tc1_clk,
+-	&tc2_clk,
+-	&tc3_clk,
+-	&tc4_clk,
+-	&tc5_clk,
+-	&ohci_clk,
+-	&ether_clk,
+-	// irq0 .. irq6
+-};
+-
+-static struct clk_lookup periph_clocks_lookups[] = {
+-	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
+-	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.0", &tc1_clk),
+-	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc2_clk),
+-	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.1", &tc3_clk),
+-	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.1", &tc4_clk),
+-	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.1", &tc5_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.0", &ssc0_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.1", &ssc1_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.2", &ssc2_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "fffd0000.ssc", &ssc0_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "fffd4000.ssc", &ssc1_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "fffd8000.ssc", &ssc2_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "i2c-at91rm9200.0", &twi_clk),
+-	/* fake hclk clock */
+-	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+-	CLKDEV_CON_ID("pioA", &pioA_clk),
+-	CLKDEV_CON_ID("pioB", &pioB_clk),
+-	CLKDEV_CON_ID("pioC", &pioC_clk),
+-	CLKDEV_CON_ID("pioD", &pioD_clk),
+-	/* usart lookup table for DT entries */
+-	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
+-	CLKDEV_CON_DEV_ID("usart", "fffc0000.serial", &usart0_clk),
+-	CLKDEV_CON_DEV_ID("usart", "fffc4000.serial", &usart1_clk),
+-	CLKDEV_CON_DEV_ID("usart", "fffc8000.serial", &usart2_clk),
+-	CLKDEV_CON_DEV_ID("usart", "fffcc000.serial", &usart3_clk),
+-	/* tc lookup table for DT entries */
+-	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
+-	CLKDEV_CON_DEV_ID("t1_clk", "fffa0000.timer", &tc1_clk),
+-	CLKDEV_CON_DEV_ID("t2_clk", "fffa0000.timer", &tc2_clk),
+-	CLKDEV_CON_DEV_ID("t0_clk", "fffa4000.timer", &tc3_clk),
+-	CLKDEV_CON_DEV_ID("t1_clk", "fffa4000.timer", &tc4_clk),
+-	CLKDEV_CON_DEV_ID("t2_clk", "fffa4000.timer", &tc5_clk),
+-	CLKDEV_CON_DEV_ID("mci_clk", "fffb4000.mmc", &mmc_clk),
+-	CLKDEV_CON_DEV_ID("emac_clk", "fffbc000.ethernet", &ether_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "fffb8000.i2c", &twi_clk),
+-	CLKDEV_CON_DEV_ID("hclk", "300000.ohci", &ohci_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioA_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioD_clk),
+-};
+-
+-static struct clk_lookup usart_clocks_lookups[] = {
+-	CLKDEV_CON_DEV_ID("usart", "atmel_usart.0", &mck),
+-	CLKDEV_CON_DEV_ID("usart", "atmel_usart.1", &usart0_clk),
+-	CLKDEV_CON_DEV_ID("usart", "atmel_usart.2", &usart1_clk),
+-	CLKDEV_CON_DEV_ID("usart", "atmel_usart.3", &usart2_clk),
+-	CLKDEV_CON_DEV_ID("usart", "atmel_usart.4", &usart3_clk),
++static struct clk_lookup pioA_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pioA_clk", NULL),
++	CLKDEV_INIT(NULL, "pioA", NULL),
++};
++
++static struct clk_lookup pioB_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pioB_clk", NULL),
++	CLKDEV_INIT(NULL, "pioB", NULL),
++};
++
++static struct clk_lookup pioC_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pioC_clk", NULL),
++	CLKDEV_INIT(NULL, "pioC", NULL),
++};
++
++static struct clk_lookup pioD_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pioD_clk", NULL),
++	CLKDEV_INIT(NULL, "pioD", NULL),
++};
++
++static struct clk_lookup usart0_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "usart0_clk", NULL),
++	CLKDEV_INIT("atmel_usart.1", "usart", NULL),
++};
++
++static struct clk_lookup usart1_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "usart1_clk", NULL),
++	CLKDEV_INIT("atmel_usart.2", "usart", NULL),
++};
++
++static struct clk_lookup usart2_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "usart2_clk", NULL),
++	CLKDEV_INIT("atmel_usart.3", "usart", NULL),
++};
++
++static struct clk_lookup usart3_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "usart3_clk", NULL),
++	CLKDEV_INIT("atmel_usart.4", "usart", NULL),
++};
++
++static struct clk_lookup mci_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "mci_clk", NULL),
++};
++
++static struct clk_lookup udc_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "udc_clk", NULL),
++};
++
++static struct clk_lookup twi_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "twi_clk", NULL),
++	CLKDEV_INIT("i2c-at91rm9200.0", NULL, NULL),
++};
++
++static struct clk_lookup ssc0_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "ssc0_clk", NULL),
++	CLKDEV_INIT("at91rm9200_ssc.0", "pclk", NULL),
++};
++
++static struct clk_lookup ssc1_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "ssc1_clk", NULL),
++	CLKDEV_INIT("at91rm9200_ssc.1", "pclk", NULL),
++};
++
++static struct clk_lookup ssc2_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "ssc2_clk", NULL),
++	CLKDEV_INIT("at91rm9200_ssc.2", "pclk", NULL),
++};
++
++static struct clk_lookup tc0_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "tc0_clk", NULL),
++	CLKDEV_INIT("atmel_tcb.0", "t0_clk", NULL),
++};
++
++static struct clk_lookup tc1_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "tc1_clk", NULL),
++	CLKDEV_INIT("atmel_tcb.0", "t1_clk", NULL),
++};
++
++static struct clk_lookup tc2_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "tc2_clk", NULL),
++	CLKDEV_INIT("atmel_tcb.0", "t2_clk", NULL),
++};
++
++static struct clk_lookup tc3_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "tc3_clk", NULL),
++	CLKDEV_INIT("atmel_tcb.1", "t0_clk", NULL),
++};
++
++static struct clk_lookup tc4_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "tc4_clk", NULL),
++	CLKDEV_INIT("atmel_tcb.1", "t1_clk", NULL),
++};
++
++static struct clk_lookup tc5_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "tc5_clk", NULL),
++	CLKDEV_INIT("atmel_tcb.1", "t2_clk", NULL),
++};
++
++static struct clk_lookup ohci_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "ohci_clk", NULL),
++	CLKDEV_INIT("at91_ohci", "hclk", NULL),
++};
++
++static struct clk_lookup ether_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "ether_clk", NULL),
++	CLKDEV_INIT("emac_clk", "fffbc000.ethernet", NULL),
++};
++
++static size_t periph_clock_lookup_sizes[] __initdata = {
++	0,
++	0,
++	ARRAY_SIZE(pioA_clk_lookup),
++	ARRAY_SIZE(pioB_clk_lookup),
++	ARRAY_SIZE(pioC_clk_lookup),
++	ARRAY_SIZE(pioD_clk_lookup),
++	ARRAY_SIZE(usart0_clk_lookup),
++	ARRAY_SIZE(usart1_clk_lookup),
++	ARRAY_SIZE(usart2_clk_lookup),
++	ARRAY_SIZE(usart3_clk_lookup),
++	ARRAY_SIZE(mci_clk_lookup),
++	ARRAY_SIZE(udc_clk_lookup),
++	ARRAY_SIZE(twi_clk_lookup),
++	0,
++	ARRAY_SIZE(ssc0_clk_lookup),
++	ARRAY_SIZE(ssc1_clk_lookup),
++	ARRAY_SIZE(ssc2_clk_lookup),
++	ARRAY_SIZE(tc0_clk_lookup),
++	ARRAY_SIZE(tc1_clk_lookup),
++	ARRAY_SIZE(tc2_clk_lookup),
++	ARRAY_SIZE(tc3_clk_lookup),
++	ARRAY_SIZE(tc4_clk_lookup),
++	ARRAY_SIZE(tc5_clk_lookup),
++	ARRAY_SIZE(ohci_clk_lookup),
++	ARRAY_SIZE(ether_clk_lookup),
++};
++
++static struct clk_lookup *periph_clock_lookups[] __initdata = {
++	NULL,
++	NULL,
++	pioA_clk_lookup,
++	pioB_clk_lookup,
++	pioC_clk_lookup,
++	pioD_clk_lookup,
++	usart0_clk_lookup,
++	usart1_clk_lookup,
++	usart2_clk_lookup,
++	usart3_clk_lookup,
++	mci_clk_lookup,
++	udc_clk_lookup,
++	twi_clk_lookup,
++	NULL,
++	ssc0_clk_lookup,
++	ssc1_clk_lookup,
++	ssc2_clk_lookup,
++	tc0_clk_lookup,
++	tc1_clk_lookup,
++	tc2_clk_lookup,
++	tc3_clk_lookup,
++	tc4_clk_lookup,
++	tc5_clk_lookup,
++	ohci_clk_lookup,
++	ether_clk_lookup,
++};
++
++/*
++ * The system clocks.
++ */
++static struct clk_lookup udp_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "udpck", NULL),
++};
++
++static struct clk_lookup uhp_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "uhpck", NULL),
++};
++
++static struct clk_lookup pck0_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pck0", NULL),
++};
++
++static struct clk_lookup pck1_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pck1", NULL),
++};
++
++static struct clk_lookup pck2_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pck2", NULL),
++};
++
++static struct clk_lookup pck3_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pck3", NULL),
++};
++
++static size_t system_clock_lookup_sizes[] __initdata = {
++	0,
++	ARRAY_SIZE(udp_clk_lookup),
++	0,
++	0,
++	ARRAY_SIZE(uhp_clk_lookup),
++	0,
++	0,
++	0,
++	ARRAY_SIZE(pck0_clk_lookup),
++	ARRAY_SIZE(pck1_clk_lookup),
++	ARRAY_SIZE(pck2_clk_lookup),
++	ARRAY_SIZE(pck3_clk_lookup),
++};
++
++static struct clk_lookup *system_clock_lookups[] __initdata = {
++	NULL,
++	udp_clk_lookup,
++	NULL,
++	NULL,
++	uhp_clk_lookup,
++	NULL,
++	NULL,
++	NULL,
++	pck0_clk_lookup,
++	pck1_clk_lookup,
++	pck2_clk_lookup,
++	pck3_clk_lookup,
+ };
+ 
+ /*
+  * The four programmable clocks.
+  * You must configure pin multiplexing to bring these signals out.
+  */
+-static struct clk pck0 = {
+-	.name		= "pck0",
+-	.pmc_mask	= AT91_PMC_PCK0,
+-	.type		= CLK_TYPE_PROGRAMMABLE,
+-	.id		= 0,
+-};
+-static struct clk pck1 = {
+-	.name		= "pck1",
+-	.pmc_mask	= AT91_PMC_PCK1,
+-	.type		= CLK_TYPE_PROGRAMMABLE,
+-	.id		= 1,
+-};
+-static struct clk pck2 = {
+-	.name		= "pck2",
+-	.pmc_mask	= AT91_PMC_PCK2,
+-	.type		= CLK_TYPE_PROGRAMMABLE,
+-	.id		= 2,
+-};
+-static struct clk pck3 = {
+-	.name		= "pck3",
+-	.pmc_mask	= AT91_PMC_PCK3,
+-	.type		= CLK_TYPE_PROGRAMMABLE,
+-	.id		= 3,
++static const char *prog_clock_parent_names[] __initdata = {
++	"clk32k",
++	"main",
++	"plla",
++	"pllb",
++};
++
++static const char *prog_clock_names[] __initdata = {
++	"prog0",
++	"prog1",
++	"prog2",
++	"prog3",
++};
++
++/*
++ * The pll clocks.
++ */
++static struct clk_lookup pll_clk_lookup[] __initdata = {
++	CLKDEV_INIT(NULL, "plla", NULL),
++	CLKDEV_INIT(NULL, "pllb", NULL),
++};
++
++static struct clk_range at91rm9200_pll_output[] = {
++	CLK_RANGE(80000000, 160000000),
++	CLK_RANGE(150000000, 180000000),
+ };
++static u8 at91rm9200_pll_out[] = {0, 2};
++
++struct clk_pll_characteristics at91rm9200_pll_characteristics = {
++	.input = CLK_RANGE(1000000, 32000000),
++	.num_output = ARRAY_SIZE(at91rm9200_pll_output),
++	.output = at91rm9200_pll_output,
++	.out = at91rm9200_pll_out,
++};
++
++
++/*
++ * The master clock.
++ */
++static struct clk_lookup mck_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "mck", NULL),
++	CLKDEV_INIT("atmel_usart.0", "usart", NULL),
++};
++
++struct clk_master_characteristics at91rm9200_master_characteristics = {
++	.output = CLK_RANGE(0, 80000000),
++	.have_div3_pres = 0,
++	.divisors = {1, 2, 3, 4},
++};
++
++static const char *master_clock_parent_names[] __initdata = {
++	"clk32k",
++	"main",
++	"plla",
++	"pllb",
++};
++
++/*
++ * The USB clock.
++ */
++static u32 usb_divisors[] = {1, 2, 0, 0};
+ 
+ static void __init at91rm9200_register_clocks(void)
+ {
+ 	int i;
++	int k;
++	size_t size;
++	struct clk *clk;
++	const char *name;
++	struct clk_lookup *lookup;
++
++	for (i = 0; i < ARRAY_SIZE(pll_clk_lookup); i++) {
++		name = pll_clk_lookup[i].con_id;
++		clk = at91_clk_register_pll(name, "main", i,
++					    &at91rm9200_pll_layout,
++					    &at91rm9200_pll_characteristics);
++		pll_clk_lookup[i].clk = clk;
++	}
++	clkdev_add_table(pll_clk_lookup, ARRAY_SIZE(pll_clk_lookup));
++
++	clk = at91_clk_register_master("mck",
++				       ARRAY_SIZE(master_clock_parent_names),
++				       master_clock_parent_names,
++				       &at91rm9200_master_layout,
++				       &at91rm9200_master_characteristics);
+ 
+-	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+-		clk_register(periph_clocks[i]);
++	for (i = 0; i < ARRAY_SIZE(mck_clk_lookup); i++)
++		mck_clk_lookup[i].clk = clk;
++	clkdev_add_table(mck_clk_lookup, ARRAY_SIZE(mck_clk_lookup));
+ 
+-	clkdev_add_table(periph_clocks_lookups,
+-			 ARRAY_SIZE(periph_clocks_lookups));
+-	clkdev_add_table(usart_clocks_lookups,
+-			 ARRAY_SIZE(usart_clocks_lookups));
++	for (i = 0; i < ARRAY_SIZE(periph_clock_lookup_sizes); i++) {
++		size = periph_clock_lookup_sizes[i];
++		lookup = periph_clock_lookups[i];
++		if (!size || !lookup)
++			continue;
++		name = periph_clock_lookups[i][0].con_id;
++		if (!name)
++			continue;
++		clk = at91_clk_register_peripheral(name, "mck", i);
+ 
+-	clk_register(&pck0);
+-	clk_register(&pck1);
+-	clk_register(&pck2);
+-	clk_register(&pck3);
++		for (k = 0; k < size; k++)
++			lookup[k].clk = clk;
++		clkdev_add_table(lookup, size);
++	}
++
++	for (i = 0; i < ARRAY_SIZE(prog_clock_names); i++) {
++		name = prog_clock_names[i];
++		clk = at91_clk_register_programmable(name,
++					prog_clock_parent_names,
++					ARRAY_SIZE(prog_clock_parent_names),
++					i, &at91rm9200_programmable_layout);
++	}
++
++	clk = at91rm9200_clk_register_usb("usbck", "pllb", usb_divisors);
++
++	for (i = 0; i < ARRAY_SIZE(system_clock_lookup_sizes); i++) {
++		size = system_clock_lookup_sizes[i];
++		lookup = system_clock_lookups[i];
++		if (!size || !lookup)
++			continue;
++		name = system_clock_lookups[i][0].con_id;
++		if (!name)
++			continue;
++		clk = at91_clk_register_system(name, i);
++		for (k = 0; k < size; k++)
++			lookup[k].clk = clk;
++		clkdev_add_table(lookup, size);
++	}
+ }
+ 
+ /* --------------------------------------------------------------------
+-- 
+1.7.9.5
