@@ -1,75 +1,96 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep.KarkadaNagesha at arm.com)
-Date: Wed, 17 Jul 2013 15:06:09 +0100
-Subject: [RFC PATCH v2 00/15] DT/core: update cpu device of_node
-Message-ID: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Date: Wed, 17 Jul 2013 15:06:21 +0100
+Subject: [RFC PATCH v2 12/15] cpufreq: arm_big_little: remove device tree
+ parsing for cpu nodes
+In-Reply-To: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1374069984-20567-13-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-As more and more information is getting added into the cpu node, the number
-of drivers needing to parse the device tree for CPU nodes are increasing.
-Most of the time, the information needed from the cpu node is preferred
-in the logical CPU order. Hence many drivers first parse and search the
-CPU node, match them to logical index if needed and then search for the
-required property inside a particular cpu node. Some of them assume the
-logical and physical CPU ordering to be same which is incorrect.
+Now that the cpu device registration initialises the of_node(if available)
+appropriately for all the cpus, parsing here is redundant.
 
-This patch series initialises the of_node in all the cpu devices when
-registering the CPU device.
-1. This avoids different drivers having to parse the cpu nodes to obtain
-   different attributes like operating points, latency,...etc.
-2. This handles different physical and logical cpu ordering which is not
-   the case in current code.
-3. Also all the cpu nodes will have their of_node initialised correctly.
-   Currently different drivers assign them partially and incorrectly.
-4. Removes all the reduntant parsing in various drivers.
+This patch removes all DT parsing and uses cpu->of_node instead.
 
-Changes v1->v2:
-1. Moved most of arch_of_get_cpu_node to OF/DT core as of_get_cpu_node
-   adding a provision for architecture specific hooks for matching
-   logical and physical ids.
-2. Extended removal of DT cpu node parsing to PPC cpufreq drivers
-3. Added Acks from Viresh and Shawn
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+---
+ drivers/cpufreq/arm_big_little_dt.c | 39 ++++++++++++++++---------------------
+ 1 file changed, 17 insertions(+), 22 deletions(-)
 
-Regards,
-Sudeep
-
-Sudeep KarkadaNagesha (15):
-  of: add support for retrieving cpu node for a given logical cpu index
-  driver/core: cpu: initialize of_node in cpu's device struture
-  ARM: DT/kernel: define ARM specific arch_match_cpu_phys_id
-  ARM: topology: remove hwid/MPIDR dependency from cpu_capacity
-  ARM: mvebu: remove device tree parsing for cpu nodes
-  drivers/bus: arm-cci: avoid parsing DT for cpu device nodes
-  cpufreq: imx6q-cpufreq: remove device tree parsing for cpu nodes
-  cpufreq: cpufreq-cpu0: remove device tree parsing for cpu nodes
-  cpufreq: highbank-cpufreq: remove device tree parsing for cpu nodes
-  cpufreq: spear-cpufreq: remove device tree parsing for cpu nodes
-  cpufreq: kirkwood-cpufreq: remove device tree parsing for cpu nodes
-  cpufreq: arm_big_little: remove device tree parsing for cpu nodes
-  cpufreq: maple-cpufreq: remove device tree parsing for cpu nodes
-  cpufreq: pmac64-cpufreq: remove device tree parsing for cpu nodes
-  cpufreq: pmac32-cpufreq: remove device tree parsing for cpu nodes
-
- arch/arm/kernel/devtree.c           |  5 +++
- arch/arm/kernel/topology.c          | 61 +++++++++++-----------------------
- arch/arm/mach-imx/mach-imx6q.c      |  3 +-
- arch/arm/mach-mvebu/platsmp.c       | 52 ++++++++++++++---------------
- drivers/base/cpu.c                  |  2 ++
- drivers/bus/arm-cci.c               | 28 ++++------------
- drivers/cpufreq/arm_big_little_dt.c | 39 ++++++++++------------
- drivers/cpufreq/cpufreq-cpu0.c      | 23 +++----------
- drivers/cpufreq/highbank-cpufreq.c  | 18 ++++------
- drivers/cpufreq/imx6q-cpufreq.c     |  4 +--
- drivers/cpufreq/kirkwood-cpufreq.c  | 14 ++++++--
- drivers/cpufreq/maple-cpufreq.c     | 23 ++++---------
- drivers/cpufreq/pmac32-cpufreq.c    | 11 ++++++-
- drivers/cpufreq/pmac64-cpufreq.c    | 54 ++++++++++--------------------
- drivers/cpufreq/spear-cpufreq.c     | 10 +++++-
- drivers/of/base.c                   | 66 +++++++++++++++++++++++++++++++++++++
- include/linux/of.h                  |  5 +++
- 17 files changed, 213 insertions(+), 205 deletions(-)
-
+diff --git a/drivers/cpufreq/arm_big_little_dt.c b/drivers/cpufreq/arm_big_little_dt.c
+index fd9e3ea..d2648d1 100644
+--- a/drivers/cpufreq/arm_big_little_dt.c
++++ b/drivers/cpufreq/arm_big_little_dt.c
+@@ -34,27 +34,19 @@
+ /* get cpu node with valid operating-points */
+ static struct device_node *get_cpu_node_with_valid_op(int cpu)
+ {
+-	struct device_node *np = NULL, *parent;
+-	int count = 0;
++	struct device *cpu_dev = get_cpu_device(cpu);
++	struct device_node *np;
+ 
+-	parent = of_find_node_by_path("/cpus");
+-	if (!parent) {
+-		pr_err("failed to find OF /cpus\n");
++	if (!cpu_dev) {
++		pr_err("failed to get cpu device\n");
+ 		return NULL;
+ 	}
+-
+-	for_each_child_of_node(parent, np) {
+-		if (count++ != cpu)
+-			continue;
+-		if (!of_get_property(np, "operating-points", NULL)) {
+-			of_node_put(np);
+-			np = NULL;
+-		}
+-
+-		break;
++	np = of_node_get(cpu_dev->of_node);
++	if (!of_get_property(np, "operating-points", NULL)) {
++		of_node_put(np);
++		np = NULL;
+ 	}
+ 
+-	of_node_put(parent);
+ 	return np;
+ }
+ 
+@@ -63,11 +55,12 @@ static int dt_init_opp_table(struct device *cpu_dev)
+ 	struct device_node *np;
+ 	int ret;
+ 
+-	np = get_cpu_node_with_valid_op(cpu_dev->id);
+-	if (!np)
+-		return -ENODATA;
++	np = of_node_get(cpu_dev->of_node);
++	if (!np) {
++		pr_err("failed to find cpu%d node\n", cpu_dev->id);
++		return -ENOENT;
++	}
+ 
+-	cpu_dev->of_node = np;
+ 	ret = of_init_opp_table(cpu_dev);
+ 	of_node_put(np);
+ 
+@@ -79,9 +72,11 @@ static int dt_get_transition_latency(struct device *cpu_dev)
+ 	struct device_node *np;
+ 	u32 transition_latency = CPUFREQ_ETERNAL;
+ 
+-	np = get_cpu_node_with_valid_op(cpu_dev->id);
+-	if (!np)
++	np = of_node_get(cpu_dev->of_node);
++	if (!np) {
++		pr_info("Failed to find cpu node. Use CPUFREQ_ETERNAL transition latency\n");
+ 		return CPUFREQ_ETERNAL;
++	}
+ 
+ 	of_property_read_u32(np, "clock-latency", &transition_latency);
+ 	of_node_put(np);
 -- 
 1.8.1.2
