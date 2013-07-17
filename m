@@ -1,27 +1,84 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Wed, 17 Jul 2013 10:14:56 +0200
-Subject: [PATCH v8] ARM: clocksource: add support for MOXA ART SoCs
-In-Reply-To: <51E56043.1010509@linaro.org>
-References: <1373024773-24574-1-git-send-email-jonas.jensen@gmail.com>
- <1373985880-23469-1-git-send-email-jonas.jensen@gmail.com>
- <51E56043.1010509@linaro.org>
-Message-ID: <CACmBeS129VOmFjnF+-iRH1viS+zpoaNMYMaWZ_UiPVxa6ncYeQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 17 Jul 2013 10:23:17 +0200
+Subject: [PATCH 2/5] iio: at91: Use different prescal, startup mask in
+ MR for different IP
+In-Reply-To: <20130716211706.39665234@skate>
+References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
+ <1373789069-11604-3-git-send-email-josh.wu@atmel.com>
+ <20130715125815.GC2962@lukather> <51E505EA.4060502@atmel.com>
+ <51E50864.6020904@atmel.com> <20130716133003.7c208cdf@skate>
+ <51E5990A.4050709@kernel.org> <20130716211706.39665234@skate>
+Message-ID: <51E65475.4010109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 July 2013 17:01, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> 1. could you elaborate the patch log: as it is a new driver, a nice
-> description of the timer hardware would be valuable for people willing
-> to understand the code (eg. some specificities of the driver).
+On 16/07/2013 21:17, Thomas Petazzoni :
+> Dear Jonathan Cameron,
+>
+> On Tue, 16 Jul 2013 20:03:38 +0100, Jonathan Cameron wrote:
+>
+>> On 07/16/2013 12:30 PM, Thomas Petazzoni wrote:
+>>> I've asked exactly this question last week at Linaro Connect during the
+>>> ARM SoC consolidation panel/discussion, where Grant Likely, Arnd
+>>> Bergmann, Olof and others were answering Device Tree related questions.
+>>>
+>>> My question, which precisely had the at91-adc DT binding in mind was
+>>> precisely whether we should use different compatible properties to
+>>> identify different revisions of an IP block and let the driver handle
+>>> those differences, or whether the DT binding should provide sufficient
+>>> properties (register offsets, bit numbers, etc.) to make the driver
+>>> independent of the IP revisions. And clearly, the answer was that
+>>> different compatible properties should be used to identify the
+>>> different versions of the IP block, and the driver should abstract out
+>>> the differences. I.e, was has been done for at91-adc is completely the
+>>> opposite of the best practices for Device Tree on ARM.
+>>>
+>>> See
+>>> http://www.youtube.com/watch?v=zF_AXLgkFy4&feature=player_detailpage#t=1581s
+>>> where I ask exactly this question, and get answers from Olof Johansson
+>>> and Grant Likely. They clearly say that the solution of having separate
+>>> compatible properties and a driver that handles the differences is the
+>>> way to go. So the way at91-adc (and possibly other at91 drivers) is
+>>> using the Device Tree is wrong, there should have been multiple
+>>> compatible properties. It's a shame because this is something we did say
+>>> when we submitted at91-adc and during the reviews, but the maintainer
+>>> wasn't listening to our comments...
+>>>
+>>
+>> Thanks for getting some clarity on this Thomas.  So I'll ask the somewhat obvious
+>> question - how do we unwind from where we are to where we want to be wrt to the
+>> bindings?
+>
+> During Linaro Connect last week, there was some discussion about
+> marking DT bindings as unstable for a little while, once they get
+> reviewed by a group of DT "experts" that mark them as stable. Until
+> they are stable, the kernel does not offer any ABI guarantees, and we
+> are free to change the DT bindings as needed.
+>
+> Now, since this unstable/stable thing is not in place at the moment,
+> deciding whether to break or not existing bindings is something to be
+> decided by the maintainer of this platform, judging what is the best
+> option depending on whether there are already many users of the DT for
+> this platform or not, for example.
 
-A short description is now added to the commit message, I hope this is
-what you wanted, I can reformat the text if needed.
+I didn't had in mind that the current discussion about the addition of 
+some properties could cast doubt on the entire at91-adc binding!
 
-> 2. fix the alignment below
+The binding itself has several drawbacks and is kind of over engineered, 
+I agree with that. Some register offsets in particular have nothing to 
+do in a DT binding.
+On the other hand, some values are highly dependent on the SoC process 
+itself and can't be stored in the driver because it would require to 
+change the driver for each new SoC, depending on the electrical 
+characteristics.
+In conclusion, we have to be cautious with this binding and make sure 
+that we don't throw the baby out with the bath water.
 
-I don't see the alignment error, I think this is because git adds the
-one '+' character, it should be correct once applied?
+Moreover, at the time we are just beginning to be comfortable with DT on 
+AT91 and beginning to overcome the difficulty of converting our 
+platforms, I see this new step on the path to "mainline + DT stable" as 
+another slowdown.
 
-
-Best regards,
-Jonas
+Bye,
+-- 
+Nicolas Ferre
