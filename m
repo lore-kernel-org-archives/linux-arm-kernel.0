@@ -1,43 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 17 Jul 2013 10:47:18 +0100
-Subject: [PATCH 1/3] ASoC: bt-sco: enable OF support
-In-Reply-To: <20130717084039.GA15981@e106331-lin.cambridge.arm.com>
-References: <1374041536-27643-1-git-send-email-Baohua.Song@csr.com>
- <20130717084039.GA15981@e106331-lin.cambridge.arm.com>
-Message-ID: <20130717094718.GE22506@sirena.org.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 17 Jul 2013 12:46:53 +0300
+Subject: [PATCH] time: sched_clock: fix integer overflow
+Message-ID: <232c026d1b8d2556679aea56cf77a6811f9a96c5.1374054369.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 09:40:39AM +0100, Mark Rutland wrote:
-> On Wed, Jul 17, 2013 at 07:12:14AM +0100, Barry Song wrote:
+The expression '(1 << 32)' happens to evaluate as 0 on ARM, but it evaluates as
+1 on xtensa and x86_64. This zeros sched_clock_mask, and breaks sched_clock().
+Set the type of 1 to 'unsigned long long' to get the value we need.
 
-> > this makes users be able to add a bt-sco node in dts instead of
-> > hardcoding a platform device in mach.
+Reported-by: Max Filippov <jcmvbkbc@gmail.com>
+Tested-by: Max Filippov <jcmvbkbc@gmail.com>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ kernel/time/sched_clock.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> I'm slightly confused by this. The driver doesn't seem to pick up any
-> information out of the dts, and the binding doesn't even describe any
-> linkage to a piece of hardware. I'm not familiar with bluetooth or ASoC,
-> could you give an explanation as to why this is needed?
-
-> I don't think this should be in the dt as is. Could this not be
-> registered based on the presence of a bluetooth controller that supports
-> this?
-
-Audio devices are linked together by a separate board binding which
-specifies how all the different components in the audio subsystem on the
-board are wired together.  Even where things have no meanignful software
-control (as is the case here and for a lot of simple DACs or ADCs) the
-rest of the system needs information on their capabilites and ideally
-the ability to interchange them with more substantial devices.  If there
-were meaningful control there'd be a control bus here.
-
-There is likely to be a control interface for the BT device hanging off
-a UART but it's not clear there's much more meaningful data for those
-than there is here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/419fecfc/attachment.sig>
+diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+index a326f27..0b479a6 100644
+--- a/kernel/time/sched_clock.c
++++ b/kernel/time/sched_clock.c
+@@ -121,7 +121,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+ 	BUG_ON(bits > 32);
+ 	WARN_ON(!irqs_disabled());
+ 	read_sched_clock = read;
+-	sched_clock_mask = (1 << bits) - 1;
++	sched_clock_mask = (1ULL << bits) - 1;
+ 	cd.rate = rate;
+ 
+ 	/* calculate the mult/shift to convert counter ticks to ns. */
+-- 
+1.8.3.2
