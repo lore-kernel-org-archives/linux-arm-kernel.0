@@ -1,55 +1,124 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 17 Jul 2013 09:17:58 -0700
-Subject: [linux-sunxi] Re: [PATCH 1/2] Initial support for Allwinner's
- Security ID fuses
-In-Reply-To: <20130717114650.GN3125@lukather>
-References: <20130624181509.GA8847@kroah.com> <51C8B84C.3020200@schinagl.nl>
- <20130624214615.GA17604@kroah.com> <51CAA709.4060801@schinagl.nl>
- <20130626175144.GC2222@kroah.com> <51D674BF.9030207@schinagl.nl>
- <20130706193646.GB9778@kroah.com> <51E466A3.4010503@schinagl.nl>
- <20130716064107.GA10868@kroah.com> <20130717114650.GN3125@lukather>
-Message-ID: <20130717161758.GA9822@kroah.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Wed, 17 Jul 2013 09:23:41 -0700
+Subject: [PATCH v2 1/2] ARM: dts: Add SHAM data and documentation for AM33XX
+In-Reply-To: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
+References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1374078222-12883-2-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 01:46:50PM +0200, Maxime Ripard wrote:
-> On Mon, Jul 15, 2013 at 11:41:07PM -0700, Greg KH wrote:
-> > On Mon, Jul 15, 2013 at 11:16:19PM +0200, Oliver Schinagl wrote:
-> > > So using these new patches for binary attributes, how can I pass data 
-> > > between my driver and the sysfs files using a platform_driver? Or are 
-> > > other 'hacks' needed and using the .groups attribute from 
-> > > platform_driver->device_driver->groups is really the wrong approach.
-> > > 
-> > > I did ask around and still haven't figured it out so far, so I do 
-> > > apologize if you feel I'm wasting your precious time.
-> > 
-> > How is the platform device not the same thing that was passed to your
-> > probe function?
-> 
-> One thing I don't get here is why it should be set in the
-> platform_driver structure. From my understanding of the device model,
-> and since what Oliver is trying to do is exposing a few bytes of memory
-> to sysfs, shouldn't the sysfs file be attached to the device instead?
+From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-It will be created by the driver core for any device attached to the
-driver automatically.
+Add the generic AM33XX SHAM module's device tree data and
+enable it for the am335x-evm, am335x-evmsk, and am335x-bone
+platforms.  Also add Documentation file describing the data
+for the SHAM module.
 
-> I mean, here, the sysfs file will be created under something like
-> .../drivers/sunxi-sid/eeprom. What happens when you have several
-> instances of that driver loaded? I'd expect it to have several sysfs
-> files created, one for each instance. So to me, it should be in the
-> device structure, not the driver one.
+CC: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+---
+ .../devicetree/bindings/crypto/omap-sham.txt       | 33 ++++++++++++++++++++++
+ arch/arm/boot/dts/am335x-bone.dts                  |  4 +++
+ arch/arm/boot/dts/am335x-evm.dts                   |  4 +++
+ arch/arm/boot/dts/am335x-evmsk.dts                 |  4 +++
+ arch/arm/boot/dts/am33xx.dtsi                      | 10 +++++++
+ 5 files changed, 55 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/omap-sham.txt
 
-You can't have multiple drivers with the same name loaded (or the same
-module loaded multiple times.)  You can have multiple devices for a
-single driver, which is what we do all the time.
-
-> Couldn't that be also the reason of Oliver's NULL pointer? If the kobj
-> is attached to the platform_driver and not to the platform_device, it
-> should definitely get nasty when we try to cast it and retrieve data
-> from it (and that would match the different pointers stuff as well.)
-
-No, he's getting a kobject that looks quite different at probe that is
-different from when the file callback happens, something is odd here...
-
-greg k-h
+diff --git a/Documentation/devicetree/bindings/crypto/omap-sham.txt b/Documentation/devicetree/bindings/crypto/omap-sham.txt
+new file mode 100644
+index 0000000..c6d1202
+--- /dev/null
++++ b/Documentation/devicetree/bindings/crypto/omap-sham.txt
+@@ -0,0 +1,33 @@
++OMAP SoC SHA crypto Module
++
++Required properties:
++
++- compatible : Should contain entries for this and backward compatible
++  SHAM versions:
++  - "ti,omap2-sham" for OMAP2 & OMAP3.
++  - "ti,omap4-sham" for OMAP4 and AM33XX.
++  Note that these two versions are incompatible.
++- ti,hwmods: Name of the hwmod associated with the SHAM module
++- reg : Offset and length of the register set for the module
++- interrupt-parent : the phandle for the interrupt controller that
++  services interrupts for this module.
++- interrupts : the interrupt number for the SHAM module.
++
++Optional properties:
++- dmas: DMA controller phandle and DMA request ordered pair.
++	Only one rx pair is valid per SHAM module.
++- dma-names: DMA request name. This string corresponds 1:1 with
++	the ordered pair in dmas. The string naming is to be
++	"rx" for RX request.
++
++Example:
++	/* AM335x */
++	sham: sham at 53100000 {
++		compatible = "ti,omap4-sham";
++		ti,hwmods = "sham";
++		reg = <0x53100000 0x200>;
++		interrupt-parent = <&intc>;
++		interrupts = <109>;
++		dmas = <&edma 36>;
++		dma-names = "rx";
++	};
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index 444b4ed..bc75b2c 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -234,3 +234,7 @@
+ 	pinctrl-0 = <&davinci_mdio_default>;
+ 	pinctrl-1 = <&davinci_mdio_sleep>;
+ };
++
++&sham {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index 3aee1a4..9b8c56d 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -488,3 +488,7 @@
+ 		ti,adc-channels = <4 5 6 7>;
+ 	};
+ };
++
++&sham {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index 0c8ad17..61dc5d4 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -402,3 +402,7 @@
+ 	phy_id = <&davinci_mdio>, <1>;
+ 	phy-mode = "rgmii-txid";
+ };
++
++&sham {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 38b446b..63a5e95 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -530,5 +530,15 @@
+ 			#size-cells = <1>;
+ 			status = "disabled";
+ 		};
++
++		sham: sham at 53100000 {
++			compatible = "ti,omap4-sham";
++			ti,hwmods = "sham";
++			reg = <0x53100000 0x200>;
++			interrupt-parent = <&intc>;
++			interrupts = <109>;
++			dmas = <&edma 36>;
++			dma-names = "rx";
++		};
+ 	};
+ };
+-- 
+1.7.12
