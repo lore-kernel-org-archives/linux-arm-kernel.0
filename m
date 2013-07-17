@@ -1,56 +1,35 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 16 Jul 2013 23:26:49 -0400 (EDT)
-Subject: [RFC PATCH v5 0/1] drivers: mfd: Versatile Express SPC support
-In-Reply-To: <1373990743-23106-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1373990743-23106-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <alpine.LFD.2.03.1307162323530.14924@syhkavp.arg>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 17 Jul 2013 11:43:15 +0800
+Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <51E56AF6.30506@wwwdotorg.org>
+References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
+ <20130716015038.GD28375@S2101-09.ap.freescale.net>
+ <20130716065130.GB30067@S2101-09.ap.freescale.net>
+ <51E56AF6.30506@wwwdotorg.org>
+Message-ID: <20130717034314.GB4541@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Jul 2013, Lorenzo Pieralisi wrote:
+On Tue, Jul 16, 2013 at 09:47:02AM -0600, Stephen Warren wrote:
+> > diff --git a/drivers/reset/gpio-reset.c b/drivers/reset/gpio-reset.c
+> 
+> > -	gpio_set_value(drvdata->gpio, value);
+> > +	if (gpio_cansleep(drvdata->gpio))
+> > +		gpio_set_value_cansleep(drvdata->gpio, value);
+> > +	else
+> > +		gpio_set_value(drvdata->gpio, value);
+> 
+> That's not right. Calling gpio_set_value() v.s.
+> gpio_set_value_cansleep() should be based on the properties of the
+> calling context, not the GPIO being controlled. In other words, if it's
+> permissible to call gpio_set_value_cansleep() at this point in the code,
+> simply always call that, and remove the conditional logic.
 
-> Hello,
-> 
-> version v5 of VExpress SPC driver, please read on the changelog for major
-> changes and explanations.
-> 
-> The probing scheme is unchanged, since after trying the early platform
-> devices approach it appeared that the end result was no better than the
-> current one. The only clean solution relies either on changing how
-> secondaries are brought up in the kernel (later than now) or enable
-> early platform device registration through DT. Please check this
-> thread for the related discussion:
-> 
-> https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/036542.html
-> 
-> The interface was adapted to regmap and again reverted to old driver for
-> the following reasons:
-> 
-> - Power down registers locking is hairy and requires arch spinlocks in
->   the MCPM back end to work properly, normal spinlocks cannot be used
-> - Regmap adds unnecessary code to manage SPC since it is just a bunch of
->   registers used to control power management flags, the overhead is just
->   not worth it (talking about power down registers, not the vexpress config
->   interface)
-> - The locking scheme behind regmap requires all registers in the map
->   to be protected with the same lock, which is not exactly what we want
->   here
-> - Given the reasons above, adding a regmap interface buys us nothing from
->   a driver readability and maintainability perspective (again just talking
->   about the power interface, a few registers) because for the SPC it would
->   simply not be used
-> 
-> /drivers/mfd is probably not the right place for this code as it stands (but
-> probably will be when the entire driver, with DVFS and config interface, is
-> complete).
-> 
-> Thank you for the review in advance,
-> Lorenzo
+Ah, yes.  I was confused by the API gpio_cansleep().  Which API we
+should call depends on the calling context.  And the context should
+come from the gpio-reset client device driver.  IOW, we have no idea
+what the context is in gpio-reset driver.  To start with something
+simple, we may want to define the gpio-reset as a sleepable interface
+and always call gpio_set_value_cansleep() in there.
 
-I've integrated this patch in my MCPM backend for TC2 patch series.
-
-ACKs from concerned/interested people would be appreciated so I could 
-send this for ARM-SOC inclusion right away.
-
-
-Nicolas
+Shawn
