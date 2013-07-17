@@ -1,33 +1,47 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 17 Jul 2013 12:17:24 -0400 (EDT)
-Subject: [PATCH v3 6/7] USB: ohci-at91: add usb_clk for transition to
- common clk framework
-In-Reply-To: <51E6BC23.6020700@overkiz.com>
-Message-ID: <Pine.LNX.4.44L0.1307171215000.1555-100000@iolanthe.rowland.org>
+From: Marc.Gauthier@tensilica.com (Marc Gauthier)
+Date: Wed, 17 Jul 2013 09:17:19 -0700
+Subject: [Linux-Xtensa] Re: sched_clock always 0 and no process time
+ accounting with 3.11-rc1
+In-Reply-To: <20130717152443.GO24642@n2100.arm.linux.org.uk>
+References: <CAMo8BfLO31GgMMA_hENr0xm=qaUz3EVLtaQ8hewiQHdbV+s6sA@mail.gmail.com>
+ <20130717061925.GC6950@tarshish>
+ <8572CFB6-0D88-46F4-B055-7834F8B9BDA5@tensilica.com>
+ <20130717152443.GO24642@n2100.arm.linux.org.uk>
+Message-ID: <522C1DF17AF50042AD8AE87F7887BD3D0B789F2A53@exch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Jul 2013, boris brezillon wrote:
-
-> On 17/07/2013 17:33, Alan Stern wrote:
-> > On Tue, 16 Jul 2013, Boris BREZILLON wrote:
+Russell King - ARM Linux wrote:
+> On Wed, Jul 17, 2013 at 08:15:08AM -0700, Marc Gauthier wrote:
+> > Hi Baruch,
 > >
-> >> The AT91 PMC (Power Management Controller) provides an USB clock used by
-> >> USB Full Speed host (ohci) and USB Full Speed device (udc).
-> >> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
-> >> This configuration was formely done in mach-at91/clock.c, but this
-> >> implementation will be removed when moving to common clk framework.
-> >>
-> >> This patch add support for usb clock retrieval and configuration, and is
-> >> backward compatible with the current at91 clk implementation (if usb clk
-> >> is not found, it does not configure/enable the usb clk).
-> > This does not take into account any of the changes you discussed with
-> > Russell King and me -- it is exactly the same as the previous version.
-> Sorry, I don't understand. I didn't send any new version since yesterday.
+> > On 2013-07-16, at 11:19 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+> > > -    sched_clock_mask = (1 << bits) - 1;
+> > > +    sched_clock_mask = (1ULL << bits) - 1;
+> >
+> > Might it be more efficient to use:
+> >
+> >    sched_clock_mask = 0xffffffff >> (32 - bits);
+> >
+> > to avoid using 64 bit ints?
+> > (assuming bits > 0, didn't check)
+>
+> bits being 0 would be rather silly (it implies a mask of
+> zero, and therefore
+> no bits available for the clock.)  We could modify the
+> BUG_ON() above to
+> make that point, or add it as commentry against the function.
 
-Oh.  Never mind.  That message was the _same_ one that I replied to
-yesterday.  I got two copies of it, because you sent it both to me
-directly and to linux-usb.  For some reason one of the copies was
-delayed for many hours, so I thought it was a new message.
+Sounds good.
 
-Alan Stern
+
+> Given that, and that sched_clock_mask is a u32, then I agree
+> with you - the above would be a better way to do this.
+
+> Personally, I'd suggest ~0u rather
+> than 0xffffffff because its less typing.
+
+Am not sure though, on machines with 64-bit int, ~0u might
+end up being 0xffffffffffffffff which is unintended.
+
+-Marc
