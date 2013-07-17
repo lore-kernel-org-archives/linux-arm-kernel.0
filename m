@@ -1,89 +1,161 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 17 Jul 2013 15:33:22 +0800
-Subject: [PATCH v2 2/3] serial: mxs: enable the DMA only when the RTS/CTS
- is valid
-In-Reply-To: <20130716095449.GS12139@pengutronix.de>
-References: <1373957732-16638-1-git-send-email-b32955@freescale.com>
- <1373957732-16638-3-git-send-email-b32955@freescale.com>
- <20130716095449.GS12139@pengutronix.de>
-Message-ID: <51E648C2.3010304@freescale.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 17 Jul 2013 09:58:51 +0200
+Subject: [PATCH 2/5] iio: at91: Use different prescal, startup mask in
+ MR for different IP
+In-Reply-To: <1373789069-11604-3-git-send-email-josh.wu@atmel.com>
+References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
+ <1373789069-11604-3-git-send-email-josh.wu@atmel.com>
+Message-ID: <51E64EBB.30700@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?07?16? 17:54, Uwe Kleine-K?nig ??:
-> On Tue, Jul 16, 2013 at 02:55:31PM +0800, Huang Shijie wrote:
->> The original DMA support works only when RTS/CTS is enabled.
-> What is original here?
+On 14/07/2013 10:04, Josh Wu :
+> For at91 boards, there are different IPs for adc. Different IPs has different
+> STARTUP & PRESCAL mask in ADC_MR.
 >
-i will add more information for this in the next version.
->> But after several patches, DMA support has lost this limit.
-> This is still misleading.
+> This patch can change the masks according to the different IP version.
 >
->> This patch adds an optional property for the UART DT node
->> which indicates the UART has RTS and CTS lines.
->>
->> This patch also adds a macro MXS_AUART_RTSCTS, and uses it to check
->> RTS/CTS before we enable the DMA for the UART.
-> I still think this should go to stable. The options are:
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+>   arch/arm/mach-at91/include/mach/at91_adc.h |    9 ++++--
+>   drivers/iio/adc/at91_adc.c                 |   48 ++++++++++++++++++++++++++--
+>   2 files changed, 53 insertions(+), 4 deletions(-)
 >
-> 	a) also take patch 1 into stable
-> 	b) apply this patch without patch 1
->
-> I don't know if option a) is OK, b) is probably preferable. And as Greg
-to Greg:
+> diff --git a/arch/arm/mach-at91/include/mach/at91_adc.h b/arch/arm/mach-at91/include/mach/at91_adc.h
+> index 8e7ed5c..ab273ee 100644
+> --- a/arch/arm/mach-at91/include/mach/at91_adc.h
+> +++ b/arch/arm/mach-at91/include/mach/at91_adc.h
+> @@ -28,9 +28,12 @@
+>   #define			AT91_ADC_TRGSEL_EXTERNAL	(6 << 1)
+>   #define		AT91_ADC_LOWRES		(1 << 4)	/* Low Resolution */
+>   #define		AT91_ADC_SLEEP		(1 << 5)	/* Sleep Mode */
+> -#define		AT91_ADC_PRESCAL	(0x3f << 8)	/* Prescalar Rate Selection */
+> +#define		AT91_ADC_PRESCAL	(0xff << 8)	/* Prescalar Rate Selection */
+> +#define		AT91_ADC_PRESCAL_9260	(0x3f << 8)
+>   #define			AT91_ADC_PRESCAL_(x)	((x) << 8)
+> -#define		AT91_ADC_STARTUP	(0x1f << 16)	/* Startup Up Time */
+> +#define		AT91_ADC_STARTUP	(0xf << 16)	/* Startup Up Time */
 
-I think a) is ok to me. what's your opinion?
-
-
-> has much to do anyhow, better move this patch first. (Otherwise he will
-> probably only say: That patch doesn't apply, please help.)
->
->> Signed-off-by: Huang Shijie<b32955@freescale.com>
->> ---
->>   .../bindings/tty/serial/fsl-mxs-auart.txt          |    4 ++++
->>   drivers/tty/serial/mxs-auart.c                     |    5 ++++-
->>   2 files changed, 8 insertions(+), 1 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
->> index 2c00ec6..59a40f1 100644
->> --- a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
->> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
->> @@ -10,6 +10,10 @@ Required properties:
->>     Refer to dma.txt and fsl-mxs-dma.txt for details.
->>   - dma-names: "rx" for RX channel, "tx" for TX channel.
->>
->> +Optional properties:
->> +- fsl,uart-has-rtscts : Indicate the UART has RTS and CTS lines,
->> +	it also means you enable the DMA support for this UART.
->> +
->>   Example:
->>   auart0: serial at 8006a000 {
->>   	compatible = "fsl,imx28-auart", "fsl,imx23-auart";
->> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
->> index 465ef0b..27532fd 100644
->> --- a/drivers/tty/serial/mxs-auart.c
->> +++ b/drivers/tty/serial/mxs-auart.c
->> @@ -134,6 +134,7 @@ enum mxs_auart_type {
->>   struct mxs_auart_port {
->>   	struct uart_port port;
->>
->> +#define MXS_AUART_RTSCTS	1
->>   #define MXS_AUART_DMA_ENABLED	0x2
->>   #define MXS_AUART_DMA_TX_SYNC	2  /* bit 2 */
->>   #define MXS_AUART_DMA_RX_READY	3  /* bit 3 */
->> @@ -639,7 +640,7 @@ static void mxs_auart_settermios(struct uart_port *u,
->>   		 * we can only implement the DMA support for auart
->>   		 * in mx28.
->>   		 */
->> -		if (is_imx28_auart(s)) {
->> +		if (is_imx28_auart(s)&&  (s->flags&  MXS_AUART_RTSCTS)) {
-> I thought you wanted to add a comment here. Without knowing the details
->
-> 	if (RTSCTS)
-> 		enable_dma();
->
-ok, no problem.
+Which product has this kind of startup mask: 0xf? Compared with 9260 and 
+9g45 values, it seems strange to me: maybe a little comment should be added.
 
 
-thanks
-Huang Shijie
+> +#define		AT91_ADC_STARTUP_9260	(0x1f << 16)
+> +#define		AT91_ADC_STARTUP_9G45	(0x7f << 16)
+>   #define			AT91_ADC_STARTUP_(x)	((x) << 16)
+>   #define		AT91_ADC_SHTIM		(0xf  << 24)	/* Sample & Hold Time */
+>   #define			AT91_ADC_SHTIM_(x)	((x) << 24)
+> @@ -58,4 +61,6 @@
+>   #define AT91_ADC_CHR(n)		(0x30 + ((n) * 4))	/* Channel Data Register N */
+>   #define		AT91_ADC_DATA		(0x3ff)
+>
+> +#define AT91_ADC_VERSION	0xFC
+> +
+>   #endif
+> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+> index 18bd54f..14e99ba 100644
+> --- a/drivers/iio/adc/at91_adc.c
+> +++ b/drivers/iio/adc/at91_adc.c
+> @@ -39,6 +39,12 @@
+>   #define at91_adc_writel(st, reg, val) \
+>   	(writel_relaxed(val, st->reg_base + reg))
+>
+> +struct at91_adc_caps {
+> +	bool	has_tsmr;	/* only at91sam9x5, sama5d3 have TSMR reg */
+> +	u32	mr_prescal_mask;
+> +	u32	mr_startup_mask;
+> +};
+> +
+
+If we move to DT and compatible string for these values, maybe a 
+separate structure won't be needed....
+
+
+>   struct at91_adc_state {
+>   	struct clk		*adc_clk;
+>   	u16			*buffer;
+> @@ -62,6 +68,7 @@ struct at91_adc_state {
+>   	u32			res;		/* resolution used for convertions */
+>   	bool			low_res;	/* the resolution corresponds to the lowest one */
+>   	wait_queue_head_t	wq_data_avail;
+> +	struct at91_adc_caps	caps;
+>   };
+>
+>   static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
+> @@ -580,6 +587,41 @@ static const struct iio_info at91_adc_info = {
+>   	.read_raw = &at91_adc_read_raw,
+>   };
+>
+> +/*
+> + * Since atmel adc support different ip for touchscreen mode. Through the
+> + * IP check, we will know the touchscreen capbilities.
+> + */
+> +static void atmel_adc_get_cap(struct at91_adc_state *st)
+> +{
+> +	unsigned int version;
+> +	struct iio_dev *idev = iio_priv_to_dev(st);
+> +
+> +	version = at91_adc_readl(st, AT91_ADC_VERSION);
+> +	dev_dbg(&idev->dev, "version: 0x%x\n", version);
+> +
+> +	st->caps.mr_prescal_mask = AT91_ADC_PRESCAL_9260;
+> +	st->caps.mr_startup_mask = AT91_ADC_STARTUP_9260;
+> +
+> +	/* keep only major version number */
+> +	switch (version & 0xf00) {
+> +	case 0x500:	/* SAMA5D3 */
+> +	case 0x400:	/* AT91SAM9X5/9N12 */
+> +		st->caps.has_tsmr = 1;
+> +		st->caps.mr_startup_mask = AT91_ADC_STARTUP;
+
+Here is where AT91_ADC_STARTUP may need another name: what about 
+AT91_ADC_STARTUP_9x5 to match the "compatibility" of this value?
+
+
+> +	case 0x200:	/* AT91SAM9M10/9G45 */
+> +		st->caps.mr_prescal_mask = AT91_ADC_PRESCAL;
+> +
+> +		if ((version & 0xf00) == 0x200)
+
+Sorry but I do not understand this test in a switch/case entry where it 
+should always be true...
+
+
+> +			st->caps.mr_startup_mask = AT91_ADC_STARTUP_9G45;
+> +	case 0x100:	/* AT91SAM9260/9G20 */
+> +		break;
+> +	default:
+> +		dev_warn(&idev->dev,
+> +				"Unmanaged adc version, use minimal capabilities\n");
+> +		break;
+> +	};
+> +}
+> +
+>   static int at91_adc_probe(struct platform_device *pdev)
+>   {
+>   	unsigned int prsc, mstrclk, ticks, adc_clk, adc_clk_khz, shtim;
+> @@ -645,6 +687,8 @@ static int at91_adc_probe(struct platform_device *pdev)
+>   		goto error_free_device;
+>   	}
+>
+> +	atmel_adc_get_cap(st);
+> +
+>   	st->clk = devm_clk_get(&pdev->dev, "adc_clk");
+>   	if (IS_ERR(st->clk)) {
+>   		dev_err(&pdev->dev, "Failed to get the clock.\n");
+> @@ -704,8 +748,8 @@ static int at91_adc_probe(struct platform_device *pdev)
+>   	shtim = round_up((st->sample_hold_time * adc_clk_khz /
+>   			  1000) - 1, 1);
+>
+> -	reg = AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL;
+> -	reg |= AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP;
+> +	reg = AT91_ADC_PRESCAL_(prsc) & st->caps.mr_prescal_mask;
+> +	reg |= AT91_ADC_STARTUP_(ticks) & st->caps.mr_startup_mask;
+>   	if (st->low_res)
+>   		reg |= AT91_ADC_LOWRES;
+>   	if (st->sleep_mode)
+>
+
+
+-- 
+Nicolas Ferre
