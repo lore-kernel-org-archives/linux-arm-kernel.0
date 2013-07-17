@@ -1,41 +1,32 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 17 Jul 2013 11:20:23 -0700
-Subject: [PATCH 2/2] pwm: Add PWM polarity flag macros for DT
-In-Reply-To: <51E6D037.3020706@wwwdotorg.org>
-References: <1373553468-6564-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2883016.87pKJk9n0R@avalon> <51E4C073.4020407@wwwdotorg.org>
- <2989497.8E7gzkcamn@avalon> <51E6D037.3020706@wwwdotorg.org>
-Message-ID: <20130717182021.GA24079@dhcp-172-17-186-34.nvidia.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 17 Jul 2013 12:23:03 -0600
+Subject: [PATCH] ASoC: tegra: depend on ARCH_TEGRA, not ARCH_TEGRA_*
+In-Reply-To: <20130717175701.GY22506@sirena.org.uk>
+References: <1374013667-21435-1-git-send-email-swarren@wwwdotorg.org>
+ <20130717083003.GA22506@sirena.org.uk> <51E6CDEA.7060003@wwwdotorg.org>
+ <20130717175701.GY22506@sirena.org.uk>
+Message-ID: <51E6E107.8020300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 11:11:19AM -0600, Stephen Warren wrote:
-> On 07/17/2013 05:00 AM, Laurent Pinchart wrote:
-> > On Monday 15 July 2013 21:39:31 Stephen Warren wrote:
-> ...
-> >> But then there's a problem where people assume that the common flags are
-> >> always available, and somewhere they aren't... Care is needed in the
-> >> choice of which common flags to define and/or how they're used.
-> > 
-> > Exactly. That's why I think listing the supported common flags in individual 
-> > bindings makes sense when some of the flags are not supported by all devices. 
-> > As the only PWM flags currently used are common to all PWM devices I can leave 
-> > this out now. I have no strong preference, I'll follow your opinion on this.
+On 07/17/2013 11:57 AM, Mark Brown wrote:
+> On Wed, Jul 17, 2013 at 11:01:30AM -0600, Stephen Warren wrote:
+>> On 07/17/2013 02:30 AM, Mark Brown wrote:
 > 
-> Yes, I guess separating the concept of defining common flags and which
-> devices use them is good. And then indeed individual devices need to
-> define which of the common flags they support. I'd still like to see the
-> *definition* of those common flags in some central place (i.e. pwm.txt
-> or a header that defines constants for it), and the other device
-> bindings simply reference that for the actual definitions.
+>> -       select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC -
+>> select SND_SOC_TEGRA30_I2S if ARCH_TEGRA_3x_SOC +       select
+>> SND_SOC_TEGRA20_I2S +       select SND_SOC_TEGRA30_I2S
+> 
+>> But then, it won't be possible to disable support for older
+>> SoCs, since simply enabling a machine driver that might support
+>> Tegra20 would force ASoC support for Tegra20 to be enabled, even
+>> if the user only cares about Tegra30.
+> 
+> So how do they disable the core support for the older SoCs with the
+> new model?
 
-That sounds reasonable to me.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/18cb3b2b/attachment.sig>
+They don't; the core support is so small it's not worth having the
+ifdefs in it; just a few K. As such, it seems simpler to just always
+compile in the core support, and remove the need for all the ifdef
+nests in mach-tegra/. The bulk of the differences are different
+drivers for different chips.
