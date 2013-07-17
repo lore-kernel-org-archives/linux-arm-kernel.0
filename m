@@ -1,61 +1,40 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 18 Jul 2013 00:54:20 +0200
-Subject: [PATCH v2 0/4] Add PWM polarity flag macro for DT
-Message-ID: <1374101664-21112-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 17 Jul 2013 18:53:51 -0400 (EDT)
+Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if UP
+ system
+In-Reply-To: <51E71C78.6080604@codeaurora.org>
+References: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
+ <20130712111322.GC3213@e102654-lin.cambridge.arm.com>
+ <20130712121023.GB27430@codeaurora.org> <51E71249.4050200@codeaurora.org>
+ <alpine.LFD.2.03.1307171830170.14924@syhkavp.arg>
+ <51E71C78.6080604@codeaurora.org>
+Message-ID: <alpine.LFD.2.03.1307171849180.14924@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, 17 Jul 2013, Stephen Boyd wrote:
 
-Here's a small patch set that replaces PWM polarity numerical constants with
-macros in DT.
+> On 07/17/13 15:34, Nicolas Pitre wrote:
+> > On Wed, 17 Jul 2013, Stephen Boyd wrote:
+> >
+> >> On 07/12/13 05:10, Stephen Boyd wrote:
+> >>> On 07/12, Javi Merino wrote:
+> >>>> I agree, we should drop the check.  It's annoying in uniprocessors and
+> >>>> unlikely to be found in the real world unless your gic entry in the dt
+> >>>> is wrong.
+> > And that's a likely outcome in the real world.
+> >
+> >>> Ok. How about this?
+> >> Any comments?
+> > What about this instead:
+> 
+> Unfortunately arm64 doesn't have SMP_ON_UP. 
 
-The series is the result of splitting the original patch into four patches
-that
+And why does that matter?
 
-- add the flag macro (both in a header file and in the PWM DT binding core
-  documentation)
-- use the macro in the PWM core code
-- update existing DT bindings to refer to the PWM DT bindings core
-  documentation
-- update existing DT sources to use the new macro
+> It sounds like you preferred the first patch using num_possible_cpus()
 
-I believe I've taken all comments received so far into account. Most notable
-changes include
+Probably, yes.  I didn't follow the early conversation though.
 
-- splitting the original patch
-- removing the PWM_POLARITY_NORMAL flag, which wasn't a flag but was defined
-  as 0
-- renaming the PWM_POLARITY_INVERSED DT flag to PWM_POLARITY_INVERTED
-- not relying on DT flags and PWM C flags having identical names and values
 
-Laurent Pinchart (4):
-  pwm: Add PWM polarity flag macro for DT
-  pwm: Use the DT macro directly when parsing PWM DT flags
-  pwm: Update DT bindings to reference pwm.txt for cells documentation
-  ARM: dts: Use the PWM polarity flags
-
- Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt    |  8 +++-----
- Documentation/devicetree/bindings/pwm/imx-pwm.txt          |  4 ++--
- Documentation/devicetree/bindings/pwm/mxs-pwm.txt          |  4 ++--
- .../devicetree/bindings/pwm/nvidia,tegra20-pwm.txt         |  5 ++---
- Documentation/devicetree/bindings/pwm/nxp,pca9685-pwm.txt  |  4 ++--
- Documentation/devicetree/bindings/pwm/pwm-samsung.txt      | 10 +++-------
- Documentation/devicetree/bindings/pwm/pwm-tiecap.txt       |  8 +++-----
- Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt     |  8 +++-----
- Documentation/devicetree/bindings/pwm/pwm.txt              |  7 ++++---
- Documentation/devicetree/bindings/pwm/spear-pwm.txt        |  5 ++---
- Documentation/devicetree/bindings/pwm/ti,twl-pwm.txt       |  4 ++--
- Documentation/devicetree/bindings/pwm/ti,twl-pwmled.txt    |  4 ++--
- Documentation/devicetree/bindings/pwm/vt8500-pwm.txt       |  8 +++-----
- arch/arm/boot/dts/am335x-evmsk.dts                         |  3 ++-
- arch/arm/boot/dts/wm8850-w70v2.dts                         |  3 ++-
- drivers/pwm/core.c                                         |  7 +++----
- include/dt-bindings/pwm/pwm.h                              | 14 ++++++++++++++
- 17 files changed, 54 insertions(+), 52 deletions(-)
- create mode 100644 include/dt-bindings/pwm/pwm.h
-
--- 
-Regards,
-
-Laurent Pinchart
+Nicolas
