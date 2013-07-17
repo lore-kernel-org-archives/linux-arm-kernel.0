@@ -1,30 +1,37 @@
-From: shuahkhan@gmail.com (Shuah Khan)
-Date: Wed, 17 Jul 2013 08:31:55 -0600
-Subject: Linux Plumbers ACPI/PM, PCI Microconference
-In-Reply-To: <CAL-B5D03ki8NHsM6EuESTH2K-Eh+XyFHNXPDYwgDq+oagDjtMQ@mail.gmail.com>
-References: <CAL-B5D03ki8NHsM6EuESTH2K-Eh+XyFHNXPDYwgDq+oagDjtMQ@mail.gmail.com>
-Message-ID: <CAKocOOOgEb5h1dZWP_2UqBKhSK9U-kxKUbvTdzHfds=RiDzNJg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 17 Jul 2013 18:33:56 +0400
+Subject: [PATCH v5 1/2] ARM: dts: twl: Add GPADC data to device tree
+In-Reply-To: <1374059564-6872-2-git-send-email-oleksandr.kozaruk@ti.com>
+References: <1374059564-6872-1-git-send-email-oleksandr.kozaruk@ti.com>
+ <1374059564-6872-2-git-send-email-oleksandr.kozaruk@ti.com>
+Message-ID: <51E6AB54.103@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Myron,
+Hello.
 
-On Tue, Jul 16, 2013 at 8:21 PM, Myron Stowe <myron.stowe@gmail.com> wrote:
+On 17-07-2013 15:12, Oleksandr Kozaruk wrote:
 
->
-> Shuah - You brought up the idea about "Converting drivers from Legacy
-> PM ops to dev_pm_ops"; would you like to present what you have
-> done/encountered so far?
->
+> GPADC is the general purpose ADC present on twl6030.
+> The dt data is interrupt used to trigger end of ADC
+> conversion.
 
-Awesome. Yes, I would like to present what I have done so far and I do
-have a couple of things that could benefit from a face to face
-discussion which would help me make progress on the rest of the work
-that needs to get done.
+> Signed-off-by: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
+> ---
+>   arch/arm/boot/dts/twl6030.dtsi | 6 ++++++
+>   1 file changed, 6 insertions(+)
 
-Thanks for putting this item on the agenda.
+> diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
+> index 2e3bd31..322aa8e 100644
+> --- a/arch/arm/boot/dts/twl6030.dtsi
+> +++ b/arch/arm/boot/dts/twl6030.dtsi
+> @@ -103,4 +103,10 @@
+>   		compatible = "ti,twl6030-pwmled";
+>   		#pwm-cells = <2>;
+>   	};
+> +
+> +	adc: twl6030_gpadc {
 
--- Shuah
+    I was talking about the device name, not label. The "twl6030_gpadc" part.
 
-Shuah Khan, Linux Kernel Developer - Open Source Group Samsung Research
-America (Silicon Valley) shuah.kh at samsung.com | (970) 672-0658
+WBR, Sergei
