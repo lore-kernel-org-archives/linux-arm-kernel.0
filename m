@@ -1,55 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 18 Jul 2013 08:31:51 +0900
-Subject: [PATCH 12/22] ARM: shmobile: Remove unused r8a7740 auxdata table
+Date: Thu, 18 Jul 2013 08:32:09 +0900
+Subject: [PATCH 08/22] ARM: shmobile: lager: Remove init_irq declaration in
+ machine description
 In-Reply-To: <cover.1374103272.git.horms+renesas@verge.net.au>
 References: <cover.1374103272.git.horms+renesas@verge.net.au>
-Message-ID: <88378837780166d67a11142cd6f76596c0a2d8c3.1374103272.git.horms+renesas@verge.net.au>
+Message-ID: <5f85052c606e38c98de28170a2df72f78931aa30.1374103272.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Pass NULL to of_platform_populate instead of passing
-an empty list. This cleans up the code and reduces the
-number of lines.
+Remove redundant irqchip_init() callback. The default case
+of NULL will result in invoking irqchip_init() anyway.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
+[ horms+renesas at verge.net.au: Trimmed patch to remove portion
+  that updates the r8a7790 SoC and altered the subject to
+  use the same format as the patch that updates the r8a7790. ]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7740.c |   16 +++++++++++-----
- 1 file changed, 11 insertions(+), 5 deletions(-)
+ arch/arm/mach-shmobile/board-lager.c |    2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 00c5a70..ac29c2e 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -986,16 +986,22 @@ void __init r8a7740_add_early_devices(void)
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index d73e21d..1e99b17 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -22,7 +22,6 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/interrupt.h>
+-#include <linux/irqchip.h>
+ #include <linux/kernel.h>
+ #include <linux/leds.h>
+ #include <linux/pinctrl/machine.h>
+@@ -103,7 +102,6 @@ static const char *lager_boards_compat_dt[] __initdata = {
+ };
  
- #ifdef CONFIG_USE_OF
- 
--static const struct of_dev_auxdata r8a7740_auxdata_lookup[] __initconst = {
--	{ }
--};
-+void __init r8a7740_add_early_devices_dt(void)
-+{
-+	shmobile_setup_delay(800, 1, 3); /* Cortex-A9 @ 800MHz */
-+
-+	early_platform_add_devices(r8a7740_early_devices,
-+				   ARRAY_SIZE(r8a7740_early_devices));
-+
-+	/* setup early console here as well */
-+	shmobile_setup_console();
-+}
- 
- void __init r8a7740_add_standard_devices_dt(void)
- {
- 	platform_add_devices(r8a7740_devices_dt,
- 			    ARRAY_SIZE(r8a7740_devices_dt));
--	of_platform_populate(NULL, of_default_bus_match_table,
--			     r8a7740_auxdata_lookup, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
- void __init r8a7740_init_delay(void)
+ DT_MACHINE_START(LAGER_DT, "lager")
+-	.init_irq	= irqchip_init,
+ 	.init_time	= r8a7790_timer_init,
+ 	.init_machine	= lager_add_standard_devices,
+ 	.dt_compat	= lager_boards_compat_dt,
 -- 
 1.7.10.4
