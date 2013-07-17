@@ -1,34 +1,25 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 17 Jul 2013 10:03:20 -0700
-Subject: [PATCH] arm, kbuild: make "make install" not depend on vmlinux
-In-Reply-To: <20130717165743.GK8731@rric.localhost>
-References: <20130710133742.GA29368@emu.suse.cz>
- <CA+55aFxtvT3Yvbxe5JGBThZS13payymFJ7jCLyEiE2iNDvsZtQ@mail.gmail.com>
- <20130711135445.GA21500@sepie.suse.cz>
- <CA+55aFyVjugxM7cUDWi0ASWttYthCxa6e7X3CADknBcSFxWgew@mail.gmail.com>
- <20130712105721.GF8731@rric.localhost>
- <20130717160506.GI8731@rric.localhost>
- <CA+55aFx4G5gME3ByqE0Wr-_t2x_6WkP3Ta4k1z4jfW+PrcK0og@mail.gmail.com>
- <20130717165743.GK8731@rric.localhost>
-Message-ID: <CA+55aFzhmV7iq+Pv37trMCmdNzk53ORAoj0a6rV14fzKta3Dhw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Jul 2013 18:02:33 +0100
+Subject: [PATCH RFC v2 13/14] ARM: debug: move davinci debug to generic
+ 8250 code
+In-Reply-To: <51E6887F.3090808@ti.com>
+References: <20130716163243.GY21614@n2100.arm.linux.org.uk>
+ <E1Uz8OD-00048N-Be@rmk-PC.arm.linux.org.uk> <51E6887F.3090808@ti.com>
+Message-ID: <20130717170233.GQ24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 9:57 AM, Robert Richter <rric@kernel.org> wrote:
->
-> If kernel.release doen't exist KERNEL_RELEASE is empty, thus all args
-> for install.sh shift one arg left.
+On Wed, Jul 17, 2013 at 05:35:19PM +0530, Sekhar Nori wrote:
+> On 7/16/2013 10:16 PM, Russell King wrote:
+> > Davinci's debugging is just a copy of the old 8250_32 code with a
+> > different base address.  Incorporate this into the generic 8250
+> > debug code.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Tested on DA850 EVM
+> 
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-You know what? I read the patch, but I didn't read your changelog well
-enough. You already explained that in the commit log, and I just
-missed it like some blind monkey. My bad.
-
-> Will splitt the patches and resend.
-
-No need to split, I was wrong, it wasn't some unrelated cleanup, and
-you were right the first time.
-
-So Michal (or ARM people - whoever wants to take the patch), just take
-my ack. No objections.
-
-                 Linus
+You may wish to consider whether a Tested-by tag would be a more accurate
+attributation if you actually tested the patch.
