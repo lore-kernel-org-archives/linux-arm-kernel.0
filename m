@@ -1,55 +1,212 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Jul 2013 21:01:38 +0100
-Subject: preempted dup_mm misses TLB invalidate
-In-Reply-To: <51E6F60D.6060804@wwwdotorg.org>
-References: <51E43D2B.9090709@nvidia.com>
- <20130717192746.GE16496@MacBook-Pro.local> <51E6F60D.6060804@wwwdotorg.org>
-Message-ID: <20130717200137.GT24642@n2100.arm.linux.org.uk>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Wed, 17 Jul 2013 22:06:11 +0200
+Subject: [PATCH v2 36/42] ARM: at91/dt: move sam9260/sam9g20 to new at91 clk
+ implem
+In-Reply-To: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1374091571-21935-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 01:52:45PM -0600, Stephen Warren wrote:
-> Hmmm. That sounds like a plausible explanation, but I'm not convinced
-> it's true.
-> 
-> I would guess that the only way to prevent threads of an application
-> from writing to its memory while a fork() happens in another thread is
-> to prevent those threads from running at all; almost any code is going
-> to do some writes e.g. to the stack at least. That would imply the
-> kernel must prevent the scheduling of the other threads, not the
-> user-space application.
-> 
-> I quickly searched and couldn't see anything that agreed with your
-> statement about this being a user-space bug. There are plenty of
-> articles pointing out potential problems if a threaded app forks, but I
-> didn't see anything that said it's no legal. I also note that pthreads
-> explicitly specifies what happens if a threaded app forks (just the
-> thread calling fork is duplicated into the child process), what
-> functions can be called after a fork ("async-safe" functions), and the
-> function pthread_at_fork() exists, all of which tend to imply that
-> forking-and-threading can be legally used together.
+Define the main clock frequency in every sam9260/sam9g20 boards.
+Remove the old main clock definition.
 
-Yes, everything which you've said above is true, but if you read the
-discussions on pthread_atfork(), you'll see that the whole notion that
-you can somehow synchronize state for a fork() is a complete dead loss -
-and pthread_atfork() is a pile of trash.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/boot/dts/animeo_ip.dts             |   17 ++++++-----------
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   17 ++++++-----------
+ arch/arm/boot/dts/ge863-pro3.dtsi           |   16 ++++++----------
+ arch/arm/boot/dts/kizbox.dts                |    5 +++++
+ arch/arm/boot/dts/tny_a9260_common.dtsi     |   17 ++++++-----------
+ arch/arm/boot/dts/usb_a9260_common.dtsi     |   17 ++++++-----------
+ 6 files changed, 35 insertions(+), 54 deletions(-)
 
-Semaphores must be released in the same thread as the thread which
-acquired them.  If you take a semaphore in the pre-fork handler, and
-release it in the parent post-fork handler, you can't legally release
-it in the child post-fork handler because the child didn't acquire it!
-
-What that means is that you can't be holding any semaphores when a
-thread forks.  Remember that a thread ends up with a complete copy of
-the VM space, semaphores and all in whatever state they were in _all_
-the threads the moment when the fork happened.
-
-Really, the only legal thing for a threaded process to do with fork()
-is to immediately follow it with exec*() without doing anything else
-with any pthread state (or any function which touches any pthread
-state).  That much must work correctly - and if it doesn't, then we
-definitely have a bug.
-
-However, fork()ing a threaded app and trying to use pthread in the
-child is not something I (or anyone) should really care about; it's
-not a legal thing to do with all the requirements of the pthread APIs.
+diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
+index 3a1de9e..1843f15 100644
+--- a/arch/arm/boot/dts/animeo_ip.dts
++++ b/arch/arm/boot/dts/animeo_ip.dts
+@@ -31,17 +31,6 @@
+ 		reg = <0x20000000 0x4000000>;
+ 	};
+ 
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <18432000>;
+-		};
+-	};
+-
+ 	ahb {
+ 		apb {
+ 			usart0: serial at fffb0000 {
+@@ -82,6 +71,12 @@
+ 			watchdog at fffffd40 {
+ 				status = "okay";
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <18432000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+index 1373546..b8c823d 100644
+--- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+@@ -17,17 +17,6 @@
+ 		reg = <0x20000000 0x4000000>;
+ 	};
+ 
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <18432000>;
+-		};
+-	};
+-
+ 	ahb {
+ 		apb {
+ 			pinctrl at fffff400 {
+@@ -108,6 +97,12 @@
+ 			watchdog at fffffd40 {
+ 				status = "okay";
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <18432000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/ge863-pro3.dtsi b/arch/arm/boot/dts/ge863-pro3.dtsi
+index 230099b..b0b6aae 100644
+--- a/arch/arm/boot/dts/ge863-pro3.dtsi
++++ b/arch/arm/boot/dts/ge863-pro3.dtsi
+@@ -10,22 +10,18 @@
+ #include "at91sam9260.dtsi"
+ 
+ / {
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <6000000>;
+-		};
+-	};
+ 
+ 	ahb {
+ 		apb {
+ 			dbgu: serial at fffff200 {
+ 				status = "okay";
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <6000000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/kizbox.dts b/arch/arm/boot/dts/kizbox.dts
+index 02df191..091da2e 100644
+--- a/arch/arm/boot/dts/kizbox.dts
++++ b/arch/arm/boot/dts/kizbox.dts
+@@ -53,6 +53,11 @@
+ 				status = "okay";
+ 			};
+ 
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <18432000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/tny_a9260_common.dtsi b/arch/arm/boot/dts/tny_a9260_common.dtsi
+index 0e6d3de..1cecb7a 100644
+--- a/arch/arm/boot/dts/tny_a9260_common.dtsi
++++ b/arch/arm/boot/dts/tny_a9260_common.dtsi
+@@ -15,22 +15,17 @@
+ 		reg = <0x20000000 0x4000000>;
+ 	};
+ 
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <12000000>;
+-		};
+-	};
+-
+ 	ahb {
+ 		apb {
+ 			dbgu: serial at fffff200 {
+ 				status = "okay";
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <12000000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/usb_a9260_common.dtsi b/arch/arm/boot/dts/usb_a9260_common.dtsi
+index 2859776..3ed4db8 100644
+--- a/arch/arm/boot/dts/usb_a9260_common.dtsi
++++ b/arch/arm/boot/dts/usb_a9260_common.dtsi
+@@ -7,17 +7,6 @@
+  */
+ 
+ / {
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <12000000>;
+-		};
+-	};
+-
+ 	ahb {
+ 		apb {
+ 			dbgu: serial at fffff200 {
+@@ -33,6 +22,12 @@
+ 				atmel,vbus-gpio = <&pioC 5 GPIO_ACTIVE_HIGH>;
+ 				status = "okay";
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <12000000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+-- 
+1.7.9.5
