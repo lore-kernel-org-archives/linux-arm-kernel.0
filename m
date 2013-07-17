@@ -1,53 +1,26 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 17 Jul 2013 14:49:55 +0300
-Subject: [PATCH 0/4] improved support for runtime muxing for pinctrl
-In-Reply-To: <20130716090310.5541.36777.stgit@localhost>
-References: <20130716090310.5541.36777.stgit@localhost>
-Message-ID: <51E684E3.2040104@ti.com>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Wed, 17 Jul 2013 08:56:18 -0300
+Subject: [PATCH v2 1/4] ARM: dts: imx23-evk: enable USB PHY and controller
+In-Reply-To: <20130717035010.GC4541@S2101-09.ap.freescale.net>
+References: <1373979376-31583-1-git-send-email-otavio@ossystems.com.br>
+ <20130717035010.GC4541@S2101-09.ap.freescale.net>
+Message-ID: <CAP9ODKruGc+mOs3uvNzfCgPqnXgxqTJbaPXVRDFt9TwtnwumYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Wed, Jul 17, 2013 at 12:50 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Jul 16, 2013 at 09:56:12AM -0300, Otavio Salvador wrote:
+>> The i.MX23EVK board provides a USB port so the USB PHY and controller
+>> need to be enabled for it to be usable.
+>>
+>> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+>
+> There is a typo i.XM23 in commit log of patch #2 and #3.  I fixed them
+> up and applied all 3.
 
-On 07/16/2013 12:05 PM, Tony Lindgren wrote:
-> Hi all,
->
-> As discussed earlier, the pinctrl support for changing some of the
-> consumer device pins during runtime needs some improvment.
->
-> Here are the patches to do that, I'll also post a minimal sample
-> patch as a reply to this thread on how to do the muxing for
-> runtime PM.
+Thanks Shawn :)
 
-I've posted my patch and tested this patch series.
-Seems everything is ok (except patch "pinctrl: Remove duplicate code in 
-pinctrl_pm_select_state functions").
-See http://www.spinics.net/lists/arm-kernel/msg259180.html
-
-So,  Tested-By: Grygorii Strashko <grygorii.strashko@ti.com>
-
->
-> Regards,
->
-> Tony
->
-> ---
->
-> Tony Lindgren (4):
->        pinctrl: Remove duplicate code in pinctrl_pm_select_state functions
->        pinctrl: Allow pinctrl to have multiple active states
->        pinctrl: Add support for additional dynamic states
->        drivers: Add pinctrl handling for dynamic pin states
->
->
->   drivers/base/pinctrl.c                |   39 +++++
->   drivers/pinctrl/core.c                |  250 ++++++++++++++++++++++++++++-----
->   drivers/pinctrl/core.h                |   10 +
->   include/linux/pinctrl/consumer.h      |   46 ++++++
->   include/linux/pinctrl/devinfo.h       |    4 +
->   include/linux/pinctrl/pinctrl-state.h |   15 ++
->   6 files changed, 321 insertions(+), 43 deletions(-)
->
-
-Regards,
--grygorii
+--
+Otavio Salvador                             O.S. Systems
+http://www.ossystems.com.br        http://projetos.ossystems.com.br
+Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
