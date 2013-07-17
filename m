@@ -1,84 +1,25 @@
-From: dh.herrmann@gmail.com (David Herrmann)
-Date: Wed, 17 Jul 2013 17:14:13 +0200
-Subject: [PATCH] Route kbd LEDs through the generic LEDs layer
-In-Reply-To: <20130715190803.GG11600@type.youpi.perso.aquilenet.fr>
-References: <201011112205.oABM5KVJ005298@imap1.linux-foundation.org>
- <201011111440.07882.dmitry.torokhov@gmail.com>
- <20110102090935.GV32469@atrey.karlin.mff.cuni.cz>
- <20110102103210.GA25662@core.coreip.homeip.net>
- <20110102225741.GX5480@const.famille.thibault.fr>
- <20110112182702.GA9168@core.coreip.homeip.net>
- <20111114040613.GA4992@type.famille.thibault.fr>
- <20121221003449.GA6999@type.youpi.perso.aquilenet.fr>
- <20130707101028.GD5651@type.youpi.perso.aquilenet.fr>
- <CANq1E4TRAOp+=w4oqPt4sjV7iLyDygxxpwrZy7dSB8UK288aNA@mail.gmail.com>
- <20130715190803.GG11600@type.youpi.perso.aquilenet.fr>
-Message-ID: <CANq1E4QicuuD6iSkR-TUp99QTaxq_FZGwing2w30=nN0cw5hpw@mail.gmail.com>
+From: marc@tensilica.com (Marc Gauthier)
+Date: Wed, 17 Jul 2013 08:15:08 -0700
+Subject: [Linux-Xtensa] Re: sched_clock always 0 and no process time
+ accounting with 3.11-rc1
+In-Reply-To: <20130717061925.GC6950@tarshish>
+References: <CAMo8BfLO31GgMMA_hENr0xm=qaUz3EVLtaQ8hewiQHdbV+s6sA@mail.gmail.com>
+ <20130717061925.GC6950@tarshish>
+Message-ID: <8572CFB6-0D88-46F4-B055-7834F8B9BDA5@tensilica.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Baruch,
 
-On Mon, Jul 15, 2013 at 9:08 PM, Samuel Thibault
-<samuel.thibault@ens-lyon.org> wrote:
-> Hello,
->
-> David Herrmann, le Mon 15 Jul 2013 17:03:08 +0200, a ?crit :
->> > @@ -13,6 +13,10 @@
->> >         bool "Virtual terminal" if EXPERT
->> >         depends on !S390 && !UML
->> >         select INPUT
->> > +       select NEW_LEDS
->> > +       select LEDS_CLASS
->> > +       select LEDS_TRIGGERS
->> > +       select INPUT_LEDS
->>
->> This looks odd. Any dependency changes in the input-layer will break
->> this. But I guess that's what we get for a non-recursive "select". Hmm
->
-> Yes, that's the issue.
->
->> I also think that the macros don't really simplify this. So:
->>   [VC_SHIFTLOCK] = { .name = "shiftlock", .activate =
->> kbd_lockstate_trigger_activate },
->> isn't much longer than:
->>   DEFINE_LOCKSTATE_TRIGGER(VC_SHIFTLOCK,  "shiftlock"),
->
-> That makes it more than 80 columns, at least.
+On 2013-07-16, at 11:19 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+> -    sched_clock_mask = (1 << bits) - 1;
+> +    sched_clock_mask = (1ULL << bits) - 1;
 
-Indeed, I missed that.
+Might it be more efficient to use:
 
->> > +       for (i = 0; i < ARRAY_SIZE(ledtrig_ledstate); i++)
->> > +               led_trigger_register(&ledtrig_ledstate[i]);
->> > +       for (i = 0; i < ARRAY_SIZE(ledtrig_lockstate); i++)
->> > +               led_trigger_register(&ledtrig_lockstate[i]);
->> > +
->>
->> This returns "int", are you sure no error-handling is needed?
->
-> ATM only registering the same name several times can happen, and
-> shouldn't ever happen. But better warn than be sorry, indeed.
+   sched_clock_mask = 0xffffffff >> (32 - bits);
 
-Yepp, it also avoids ignoring any future errors that we might
-introduce in led_trigger_register().
+to avoid using 64 bit ints?
+(assuming bits > 0, didn't check)
 
->> > + * Keyboard LEDs are propagated by default like the following example:
->> > + *
->> > + * VT keyboard numlock trigger
->> > + * -> vt::numl VT LED
->> > + * -> vt-numl VT trigger
->>
->> Nitpick: What's the reason for the syntax difference? "vt-numl" vs. "vt::numl"
->
-> vt::numl is a clear LED classification convention. For triggers, I don't
-> see a clear convention, but at least I have never seen "::", only "-".
-> That makes me realize that for keyboard triggers I haven't introduced a
-> prefix, and only used "scrollock", "numlock", etc. Perhaps
-> "kbd-scrollock" etc. or (in phase with LEDs), "kbd::scrollock" etc.?
-
-I understand. Due to lack of insight, I cannot really comment on that,
-sorry. Just wanted to go sure you're aware of that. So feel free to
-pick any of them.
-
-Thanks
-David
+-Marc
