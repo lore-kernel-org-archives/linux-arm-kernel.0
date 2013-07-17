@@ -1,79 +1,39 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Wed, 17 Jul 2013 15:16:54 +0100
-Subject: [RFC PATCH 02/11] ARM: DT/kernel: define ARM specific
- arch_of_get_cpu_node
-In-Reply-To: <51E50C59.50900@arm.com>
-References: <1373883732-26303-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1373883732-26303-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <51E44943.7000600@gmail.com> <51E50C59.50900@arm.com>
-Message-ID: <51E6A756.1000300@arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 17 Jul 2013 15:20:11 +0100
+Subject: [RFC PATCH v5 0/1] drivers: mfd: Versatile Express SPC support
+In-Reply-To: <alpine.LFD.2.03.1307171014510.14924@syhkavp.arg>
+References: <1373990743-23106-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1374052705.3146.86.camel@hornet>
+ <alpine.LFD.2.03.1307170825240.14924@syhkavp.arg>
+ <1374067786.3146.123.camel@hornet>
+ <alpine.LFD.2.03.1307171014510.14924@syhkavp.arg>
+Message-ID: <1374070811.3146.124.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/07/13 10:03, Sudeep KarkadaNagesha wrote:
-> On 15/07/13 20:10, Rob Herring wrote:
->> On 07/15/2013 05:22 AM, Sudeep.KarkadaNagesha at arm.com wrote:
->>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>>
->>> CPU subsystem now provides architecture specific hook to retrieve the
->>> of_node. Most of the cpu DT node parsing and initialisation is contained
->>> in devtree.c. It's better to contain all CPU device node parsing there.
->>>
->>> arch_of_get_cpu_node is mainly used to assign cpu->of_node when CPUs get
->>> registered. This patch overrides the defination of the same. It can also
->>> act as the helper function in pre-SMP/early initialisation stages to
->>> retrieve CPU device node pointers in logical ordering.
->>>
->>> This mainly helps to avoid replication of the code doing CPU node parsing
->>> and physical(MPIDR) to logical mapping.
->>>
->>> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> [snip]
->>
->>> +struct device_node * __init arch_of_get_cpu_node(int cpu)
->>> +{
->>> +	struct device_node *cpun, *cpus;
->>> +	const u32 *cell;
->>> +	u64 hwid;
->>> +	int ac;
->>> +
->>> +	cpus = of_find_node_by_path("/cpus");
->>> +	if (WARN(!cpus, "Missing cpus node, bailing out\n"))
->>> +		return NULL;
->>> +
->>> +	if (WARN_ON(of_property_read_u32(cpus, "#address-cells", &ac)))
->>> +		ac = of_n_addr_cells(cpus);
->>> +
->>> +	for_each_child_of_node(cpus, cpun) {
->>> +		if (of_node_cmp(cpun->type, "cpu"))
->>> +			continue;
->>> +		cell = of_get_property(cpun, "reg", NULL);
->>> +		if (WARN(!cell, "%s: missing reg property\n", cpun->full_name))
->>> +			continue;
->>> +
->>> +		hwid = of_read_number(cell, ac);
->>> +		if ((hwid & MPIDR_HWID_BITMASK) == cpu_logical_map(cpu))
->>
->> Most of this function is not ARM specific, so it would be nice if we
->> could shrink the arch specific part down to just this match. A default
->> match of reg == logical cpu number might be useful.
->>
-> I completely agree, in fact that was my initial idea too.
+On Wed, 2013-07-17 at 15:16 +0100, Nicolas Pitre wrote:
+> On Wed, 17 Jul 2013, Pawel Moll wrote:
 > 
-> But when I had a look at powerpc implementation of "of_get_cpu_node" in
-> arch/powerpc/kernel/prom.c, it looked like PPC is using some
-> compatibles(e.g. ibm,ppc-interrupt-server#s) which are not specified in
-> ePAPR. I am not sure is that's allowed or not, if allowed then we can't
-> have generic of_get_cpu_node with just arch specific hwid matching function.
+> > On Wed, 2013-07-17 at 13:33 +0100, Nicolas Pitre wrote:
+> > > If this is really miscelaneous code that really doesn't fit 
+> > > anywhere else, it should rather go into drivers/misc/ as a last resort.
+> > 
+> > Interestingly enough drivers/misc was my first choice for all the
+> > vexpress stuff, but it wasn't received well...
+> > 
+> > Anyway, the SPC driver as it is now seem to be a "power management
+> > system driver". Maybe a relevant directory would be in place? Wouldn't
+> > PSCI belong there as well? (there are two psci.c files in arch/arm and
+> > arch/arm64, surprisingly similar ones ;-)
+> > 
+> > The bottom line is: today it is not an MFD driver.
+> 
+> But we know it will, right?  So better  save some churn by storing the 
+> initial code where it would end up anyway once complete.
 
-I meant property names not compatibles. Looks like PPC and SPARC seem to
-use non-standard property names like "cpuid",
-"ibm,ppc-interrupt-server#s" instead of single "reg" property for all
-cpus/threads
+Not in that form, no. The code living in mfd will just register
+mfd_cells while "functional" parts are going to live elsewhere. This is
+how I understand what Samuel asked me to do and that's what is happening
+to vexpress-sysreg now.
 
-Since the cpufreq driver doesn't depend on those properties, I moved
-arch_of_get_cpu_node to OF/DT core in v2.
-
-Regards,
-Sudeep
+Pawe?
