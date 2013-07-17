@@ -1,181 +1,76 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Wed, 17 Jul 2013 18:39:29 +0200
-Subject: [PATCH v2 02/42] ARM: at91: add PMC main clock
-In-Reply-To: <1374068404-13654-1-git-send-email-b.brezillon@overkiz.com>
-References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
- <1374068404-13654-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <51E6C8C1.4050401@overkiz.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 17 Jul 2013 19:41:29 +0300
+Subject: [PATCH 3/3] ARM: dts: omap4-sdp: add dynamic pin states for
+ uart3/4
+In-Reply-To: <20130717153248.GI7656@atomide.com>
+References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
+ <1374061312-25469-4-git-send-email-grygorii.strashko@ti.com>
+ <20130717153248.GI7656@atomide.com>
+Message-ID: <51E6C939.40208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/2013 15:40, Boris BREZILLON wrote:
-> This is the at91 main oscillator clock implementation using common
-> clk framework.
->
-> If rate is not provided during clock registraction it is computed using
-> the slow clock (main clk parent in this case) rate and the MCFR register.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
->   drivers/clk/at91/Makefile   |    5 ++
->   drivers/clk/at91/clk-main.c |  106 +++++++++++++++++++++++++++++++++++++++++++
->   include/linux/clk/at91.h    |   10 ++++
->   3 files changed, 121 insertions(+)
->   create mode 100644 drivers/clk/at91/Makefile
->   create mode 100644 drivers/clk/at91/clk-main.c
->
-> diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
-> new file mode 100644
-> index 0000000..42c084e
-> --- /dev/null
-> +++ b/drivers/clk/at91/Makefile
-> @@ -0,0 +1,5 @@
-> +#
-> +# Makefile for at91 specific clk
-> +#
-> +
-> +obj-y += clk-main.o
-> diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
-> new file mode 100644
-> index 0000000..738fa39
-> --- /dev/null
-> +++ b/drivers/clk/at91/clk-main.c
-> @@ -0,0 +1,106 @@
-> +/*
-> + * drivers/clk/at91/clk-main.c
-> + *
-> + *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-> + *
-> + * This mainram is free software; you can redistribute it and/or modify
-                  ^program not mainram
+Hi,
 
-This typo error is still present in pll, main and master clock 
-implementations.
-I will fix it for the next version.
+On 07/17/2013 06:32 PM, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [130717 04:49]:
+>> Add dynamic "active"/"idle" pin states for uart3/4 which will be applied
+>> when uart3/4 state is switched from active to idle and back by Runtime
+>> PM or during system suspend.
+>
+> This is good for testing code, but should not be merged because
+> omap4 has the iopad wake-ups available for uarts. So those can
+> be always enabled.
 
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/clk/at91.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/io.h>
-> +
-> +#define to_clk_main(hw) container_of(hw, struct clk_main, hw)
-> +struct clk_main {
-> +	struct clk_hw hw;
-> +	unsigned long rate;
-> +};
-> +
-> +static unsigned long clk_main_recalc_rate(struct clk_hw *hw,
-> +					  unsigned long parent_rate)
-> +{
-> +	u32 tmp;
-> +	struct clk_main *clkmain = to_clk_main(hw);
-> +	if (clkmain->rate)
-> +		return clkmain->rate;
-> +	while ((tmp = at91_pmc_read(AT91_CKGR_MCFR)) & AT91_PMC_MAINRDY)
-> +		;
-> +	tmp &= AT91_PMC_MAINF;
-> +	clkmain->rate = (tmp * parent_rate) / 16;
-> +	return clkmain->rate;
-> +}
-> +
-> +static const struct clk_ops main_ops = {
-> +	.recalc_rate = clk_main_recalc_rate,
-> +};
-> +
-> +struct clk * __init
-> +at91_clk_register_main(const char *name,
-> +		       const char *parent_name,
-> +		       unsigned long rate)
-> +{
-> +	struct clk_main *clkmain;
-> +	struct clk *clk = NULL;
-> +	struct clk_init_data init;
-> +
-> +	if (!rate && !parent_name)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	clkmain = kzalloc(sizeof(*clkmain), GFP_KERNEL);
-> +	if (!clkmain)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	init.name = name;
-> +	init.ops = &main_ops;
-> +	init.parent_names = parent_name ? &parent_name : NULL;
-> +	init.num_parents = parent_name ? 1 : 0;
-> +	init.flags = parent_name ? 0 : CLK_IS_ROOT;
-> +
-> +	clkmain->hw.init = &init;
-> +	clkmain->rate = rate;
-> +
-> +	clk = clk_register(NULL, &clkmain->hw);
-> +
-> +	if (IS_ERR(clk))
-> +		kfree(clkmain);
-> +
-> +	return clk;
-> +}
-> +
-> +
-> +
-> +#if defined(CONFIG_OF)
-> +static void __init
-> +of_at91_clk_main_setup(struct device_node *np)
-> +{
-> +	struct clk *clk;
-> +	const char *parent_name;
-> +	const char *name = np->name;
-> +	u32 rate = 0;
-> +
-> +	parent_name = of_clk_get_parent_name(np, 0);
-> +	of_property_read_string(np, "clock-output-names", &name);
-> +	of_property_read_u32(np, "clock-frequency", &rate);
-> +
-> +	clk = at91_clk_register_main(name, parent_name, rate);
-> +
-> +	if (!IS_ERR(clk))
-> +		return;
-> +
-> +	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-> +}
-> +
-> +static void __init of_at91rm9200_clk_main_setup(struct device_node *np)
-> +{
-> +	of_at91_clk_main_setup(np);
-> +}
-> +CLK_OF_DECLARE(at91rm9200_clk_main, "atmel,at91rm9200-clk-main",
-> +	       of_at91rm9200_clk_main_setup);
-> +#endif
-> diff --git a/include/linux/clk/at91.h b/include/linux/clk/at91.h
-> index 0ce9586..8e83942 100644
-> --- a/include/linux/clk/at91.h
-> +++ b/include/linux/clk/at91.h
-> @@ -16,6 +16,8 @@
->   #ifndef AT91_PMC_H
->   #define AT91_PMC_H
+In this case, 2 IRQ will be received per each UART RX event - one from
+PRCM and from UART - and that's not good from PM perspective (It will
+affect on CPUIdle and CPUFreq at least).
+
+-- log when wake-up enabled always
+106:        729          0       GIC 106  OMAP UART2
+115:         13          0       GIC 115  mmc0
+118:         68          0       GIC 118  mmc1
+151:          0          0       GIC 151  twl6040
+361:        322          0      PRCM  hwmod_io
+             ^^^^
+-- log when wake-up enabled only when UART3 (console) is active
+106:       1104          0       GIC 106  OMAP UART2
+115:         13          0       GIC 115  mmc0
+118:         68          0       GIC 118  mmc1
+151:          0          0       GIC 151  twl6040
+361:          7          0      PRCM  hwmod_io
+
+The same is valid for all devices which will leave WAKEUP_EN set
+all the time (
+
 >
-> +#include <linux/clk-provider.h>
-> +
->   #ifndef __ASSEMBLY__
->   extern void __iomem *at91_pmc_base;
+>> --- a/arch/arm/boot/dts/omap4-sdp.dts
+>> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+>> @@ -181,18 +181,40 @@
+>>   		pinctrl-single,pins = <
+>>   			0x100 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart3_cts_rctx.uart3_cts_rctx */
+>>   			0x102 (PIN_OUTPUT | MUX_MODE0)		/* uart3_rts_sd.uart3_rts_sd */
+>> -			0x104 (PIN_INPUT | MUX_MODE0)		/* uart3_rx_irrx.uart3_rx_irrx */
+>>   			0x106 (PIN_OUTPUT | MUX_MODE0)		/* uart3_tx_irtx.uart3_tx_irtx */
+>>   		>;
+>>   	};
 >
-> @@ -187,4 +189,12 @@ extern void __iomem *at91_pmc_base;
->   #define			AT91_PMC_PCR_DIV8	0x3			/* Peripheral clock is MCK/8 */
->   #define		AT91_PMC_PCR_EN		(0x1  <<  28)		/* Enable */
+> This just need to become:
+> 		pinctrl-single,pins = <
+> 			...
+> 			0x104 (WAKEUP_EN | PIN_INPUT_MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
+> 			...
+> 		>;
+> 		interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
+> 	};
 >
-> +
-> +
-> +
-> +struct clk * __init
-> +at91_clk_register_main(const char *name,
-> +		       const char *parent_name,
-> +		       unsigned long rate);
-> +
->   #endif
+> And so on. For am33xx you need to remux things to GPIO for the wake-up
+> events, so you should maybe test on that instead.
+>
+> Regards,
+>
+> Tony
+>
+
+Regards,
+- grygorii
