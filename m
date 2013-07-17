@@ -1,79 +1,109 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep.KarkadaNagesha at arm.com)
-Date: Wed, 17 Jul 2013 15:06:17 +0100
-Subject: [RFC PATCH v2 08/15] cpufreq: cpufreq-cpu0: remove device tree
- parsing for cpu nodes
+Date: Wed, 17 Jul 2013 15:06:14 +0100
+Subject: [RFC PATCH v2 05/15] ARM: mvebu: remove device tree parsing for cpu
+ nodes
 In-Reply-To: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1374069984-20567-9-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1374069984-20567-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Now that the cpu device registration initialises the of_node(if available)
-appropriately for all the cpus, parsing here is redundant.
+Currently set_secondary_cpus_clock assume the CPU logical ordering
+and the MPDIR in DT are same, which is incorrect.
 
-This patch removes all DT parsing and uses cpu->of_node instead.
+Since the CPU device nodes can be retrieved in the logical ordering
+using the DT helper, we can remove the devices tree parsing.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+This patch removes DT parsing by making use of of_get_cpu_node.
+
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Jason Cooper <jason@lakedaemon.net>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- drivers/cpufreq/cpufreq-cpu0.c | 23 ++++-------------------
- 1 file changed, 4 insertions(+), 19 deletions(-)
+ arch/arm/mach-mvebu/platsmp.c | 52 ++++++++++++++++++++-----------------------
+ 1 file changed, 24 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-index ad1fde2..5b05c26 100644
---- a/drivers/cpufreq/cpufreq-cpu0.c
-+++ b/drivers/cpufreq/cpufreq-cpu0.c
-@@ -174,29 +174,17 @@ static struct cpufreq_driver cpu0_cpufreq_driver = {
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index 93f2f3a..12585ad 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -23,51 +23,47 @@
+ #include <linux/of.h>
+ #include <linux/mbus.h>
+ #include <asm/cacheflush.h>
++#include <asm/prom.h>
+ #include <asm/smp_plat.h>
+ #include "common.h"
+ #include "armada-370-xp.h"
+ #include "pmsu.h"
+ #include "coherency.h"
  
- static int cpu0_cpufreq_probe(struct platform_device *pdev)
++static struct clk *__init get_cpu_clk(int cpu)
++{
++	struct clk *cpu_clk;
++	struct device_node *np = of_get_cpu_node(cpu);
++
++	if (WARN(!np, "missing cpu node\n"))
++		return NULL;
++	cpu_clk = of_clk_get(np, 0);
++	if (WARN_ON(IS_ERR(cpu_clk)))
++		return NULL;
++	return cpu_clk;
++}
++
+ void __init set_secondary_cpus_clock(void)
  {
--	struct device_node *np, *parent;
-+	struct device_node *np;
- 	int ret;
+-	int thiscpu;
++	int thiscpu, cpu;
+ 	unsigned long rate;
+-	struct clk *cpu_clk = NULL;
+-	struct device_node *np = NULL;
++	struct clk *cpu_clk;
  
--	parent = of_find_node_by_path("/cpus");
--	if (!parent) {
--		pr_err("failed to find OF /cpus\n");
--		return -ENOENT;
--	}
+ 	thiscpu = smp_processor_id();
+-	for_each_node_by_type(np, "cpu") {
+-		int err;
+-		int cpu;
 -
--	for_each_child_of_node(parent, np) {
--		if (of_get_property(np, "operating-points", NULL))
+-		err = of_property_read_u32(np, "reg", &cpu);
+-		if (WARN_ON(err))
+-			return;
+-
+-		if (cpu == thiscpu) {
+-			cpu_clk = of_clk_get(np, 0);
 -			break;
+-		}
 -	}
-+	cpu_dev = &pdev->dev;
+-	if (WARN_ON(IS_ERR(cpu_clk)))
++	cpu_clk = get_cpu_clk(thiscpu);
++	if (!cpu_clk)
+ 		return;
+ 	clk_prepare_enable(cpu_clk);
+ 	rate = clk_get_rate(cpu_clk);
  
-+	np = of_node_get(cpu_dev->of_node);
- 	if (!np) {
- 		pr_err("failed to find cpu0 node\n");
--		ret = -ENOENT;
--		goto out_put_parent;
-+		return -ENOENT;
- 	}
- 
--	cpu_dev = &pdev->dev;
--	cpu_dev->of_node = np;
+ 	/* set all the other CPU clk to the same rate than the boot CPU */
+-	for_each_node_by_type(np, "cpu") {
+-		int err;
+-		int cpu;
 -
- 	cpu_reg = devm_regulator_get(cpu_dev, "cpu0");
- 	if (IS_ERR(cpu_reg)) {
- 		/*
-@@ -269,15 +257,12 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
+-		err = of_property_read_u32(np, "reg", &cpu);
+-		if (WARN_ON(err))
++	for_each_possible_cpu(cpu) {
++		if (cpu == thiscpu)
++			continue;
++		cpu_clk = get_cpu_clk(cpu);
++		if (!cpu_clk)
+ 			return;
+-
+-		if (cpu != thiscpu) {
+-			cpu_clk = of_clk_get(np, 0);
+-			clk_set_rate(cpu_clk, rate);
+-		}
++		clk_set_rate(cpu_clk, rate);
  	}
- 
- 	of_node_put(np);
--	of_node_put(parent);
- 	return 0;
- 
- out_free_table:
- 	opp_free_cpufreq_table(cpu_dev, &freq_table);
- out_put_node:
- 	of_node_put(np);
--out_put_parent:
--	of_node_put(parent);
- 	return ret;
  }
  
 -- 
