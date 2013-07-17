@@ -1,56 +1,66 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep.KarkadaNagesha at arm.com)
-Date: Wed, 17 Jul 2013 15:06:11 +0100
-Subject: [RFC PATCH v2 02/15] driver/core: cpu: initialize of_node in cpu's
- device struture
+Date: Wed, 17 Jul 2013 15:06:16 +0100
+Subject: [RFC PATCH v2 07/15] cpufreq: imx6q-cpufreq: remove device tree
+ parsing for cpu nodes
 In-Reply-To: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1374069984-20567-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1374069984-20567-8-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-CPUs are also registered as devices but the of_node in these cpu
-devices are not initialized. Currently different drivers requiring
-to access cpu device node are parsing the nodes themselves and
-initialising the of_node in cpu device.
+Now that the cpu device registration initialises the of_node(if available)
+appropriately for all the cpus, parsing here is redundant.
 
-The of_node in all the cpu devices needs to be initialized properly
-and at one place. The best place to update this is CPU subsystem
-driver when registering the cpu devices.
+This patch removes all DT parsing and uses cpu->of_node instead.
 
-The OF/DT core library now provides of_get_cpu_node to retrieve a cpu
-device node for a given logical index by abstracting the architecture
-specific details.
-
-This patch uses of_get_cpu_node to assign of_node when registering the
-cpu devices.
-
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- drivers/base/cpu.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-imx/mach-imx6q.c  | 3 +--
+ drivers/cpufreq/imx6q-cpufreq.c | 4 +---
+ 2 files changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
-index a16d20e..c0f7a08 100644
---- a/drivers/base/cpu.c
-+++ b/drivers/base/cpu.c
-@@ -14,6 +14,7 @@
- #include <linux/slab.h>
- #include <linux/percpu.h>
- #include <linux/acpi.h>
-+#include <linux/of.h>
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 7be13f8..a02f275 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -254,13 +254,12 @@ static void __init imx6q_opp_init(struct device *cpu_dev)
+ {
+ 	struct device_node *np;
  
- #include "base.h"
+-	np = of_find_node_by_path("/cpus/cpu at 0");
++	np = of_node_get(cpu_dev->of_node);
+ 	if (!np) {
+ 		pr_warn("failed to find cpu0 node\n");
+ 		return;
+ 	}
  
-@@ -289,6 +290,7 @@ int __cpuinit register_cpu(struct cpu *cpu, int num)
- 	cpu->dev.release = cpu_device_release;
- 	cpu->dev.offline_disabled = !cpu->hotpluggable;
- 	cpu->dev.offline = !cpu_online(num);
-+	cpu->dev.of_node = of_get_cpu_node(num);
- #ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
- 	cpu->dev.bus->uevent = arch_cpu_uevent;
- #endif
+-	cpu_dev->of_node = np;
+ 	if (of_init_opp_table(cpu_dev)) {
+ 		pr_warn("failed to init OPP table\n");
+ 		goto put_node;
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index e37cdae..b16632b 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -221,14 +221,12 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 
+ 	cpu_dev = &pdev->dev;
+ 
+-	np = of_find_node_by_path("/cpus/cpu at 0");
++	np = of_node_get(cpu_dev->of_node);
+ 	if (!np) {
+ 		dev_err(cpu_dev, "failed to find cpu0 node\n");
+ 		return -ENOENT;
+ 	}
+ 
+-	cpu_dev->of_node = np;
+-
+ 	arm_clk = devm_clk_get(cpu_dev, "arm");
+ 	pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
+ 	pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
 -- 
 1.8.1.2
