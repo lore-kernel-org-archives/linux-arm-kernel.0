@@ -1,31 +1,24 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 17 Jul 2013 14:57:53 +0300
-Subject: [PATCH 0/3] ARM: OMAP2+: omap_device: add dynamic pinctrl handling
-In-Reply-To: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
-References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <51E686C1.8020801@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 17 Jul 2013 17:35:19 +0530
+Subject: [PATCH RFC v2 13/14] ARM: debug: move davinci debug to generic
+ 8250 code
+In-Reply-To: <E1Uz8OD-00048N-Be@rmk-PC.arm.linux.org.uk>
+References: <20130716163243.GY21614@n2100.arm.linux.org.uk>
+ <E1Uz8OD-00048N-Be@rmk-PC.arm.linux.org.uk>
+Message-ID: <51E6887F.3090808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
-
-On 07/17/2013 02:41 PM, Grygorii Strashko wrote:
-> Hi Tony, Kevin
+On 7/16/2013 10:16 PM, Russell King wrote:
+> Davinci's debugging is just a copy of the old 8250_32 code with a
+> different base address.  Incorporate this into the generic 8250
+> debug code.
 > 
-> This patch series introduces dynamic pinctrl handling in OMAP device framework
-> in the same way as it was before switching to DT. 
-> This allow OMAP devices driver's developers to simply add dynamic pinctrl
-> handling for "default", "active", "idle", "sleep" PIN states in their drivers
-> by modifying DT definitions only - no modifications in drivers code are not needed.
-> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Overall I like the idea but can we make a provision for device drivers to override
-this default pin state handling?
+Tested on DA850 EVM
 
-The OMAP EHCI driver is one such special case where the wakeup mechanism is tied to pinctrl states
-as it uses IO daisy chaining to implement wakeup.
-So depending on whether wakeup needs to be enabled or not I must be able to chose whether
-I put the pin in just "sleep" state or "sleep with wakeup" state.
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-cheers,
--roger
+Thanks,
+Sekhar
