@@ -1,63 +1,58 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 17 Jul 2013 09:47:09 +0300
-Subject: [Linux-Xtensa] Re: sched_clock always 0 and no process time
- accounting with 3.11-rc1
-In-Reply-To: <CAMo8Bf+UY2Lj=7=Y2AxeUfM3LqJkbQqPviH81PEjwo8irtiGJg@mail.gmail.com>
-References: <CAMo8BfLO31GgMMA_hENr0xm=qaUz3EVLtaQ8hewiQHdbV+s6sA@mail.gmail.com>
- <20130717061925.GC6950@tarshish>
- <CAMo8Bf+UY2Lj=7=Y2AxeUfM3LqJkbQqPviH81PEjwo8irtiGJg@mail.gmail.com>
-Message-ID: <20130717064709.GD6950@tarshish>
+From: koba@kmckk.co.jp (Tetsuyuki Kobayashi)
+Date: Wed, 17 Jul 2013 15:48:29 +0900
+Subject: [PATCH] ARM: bugfix: Features of /proc/cpuinfo is wrong
+Message-ID: <1374043709-24770-1-git-send-email-koba@kmckk.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Max,
+Array hwcap_str[19] should be "vfpd32" and hwcap_str[20] should be "lpae".
+But actually "vfpd32" was missing and "lpae" was at wrong place.
 
-On Wed, Jul 17, 2013 at 10:39:51AM +0400, Max Filippov wrote:
-> On Wed, Jul 17, 2013 at 10:19 AM, Baruch Siach <baruch@tkos.co.il> wrote:
-> > On Mon, Jul 15, 2013 at 06:18:33PM +0400, Max Filippov wrote:
-> >> with 3.11-rc1 printk timestamps are always zero (which means that
-> >> sched_clock is always 0) and process time accounting always shows
-> >> 0 for system/user time. I see it regardless of HZ_PERIODIC/NO_HZ_IDLE
-> >> and HIGH_RES_TIMERS settings. Am I missing any necessary config
-> >> options? Can you see the same issue?
-> >
-> > The following patch fixes the issue for me:
-> >
-> > diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
-> > index a326f27..0b479a6 100644
-> > --- a/kernel/time/sched_clock.c
-> > +++ b/kernel/time/sched_clock.c
-> > @@ -121,7 +121,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
-> >         BUG_ON(bits > 32);
-> >         WARN_ON(!irqs_disabled());
-> >         read_sched_clock = read;
-> > -       sched_clock_mask = (1 << bits) - 1;
-> > +       sched_clock_mask = (1ULL << bits) - 1;
-> >         cd.rate = rate;
-> >
-> >         /* calculate the mult/shift to convert counter ticks to ns. */
-> >
-> > Apparently the expression '(1 << 32)' evaluates to 1 on xtensa cross gcc, and
-> > x86_64 native gcc. According to my limited understanding, the C compiler is
-> > allowed to do so. This caused sched_clock_32() to return constant 0. I wonder
-> > how it didn't bite the ARM people who are using this code from quite some time
-> > (added LAKL to CC).
-> 
-> Cool, it works now, thanks Baruch.
+Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+---
+Hello, 
 
-Thanks for testing.
+The output of features string of /proc/cpuinfo is changed at v3.11-rc1.
+In case of KZM-A9-GT board, which cpu is ARM Corex-A9
+$ grep Features /proc/cpuinfo
 
-> According to C99 the behaviour of (1 << 32) is undefined on platforms with
-> 32 bit int, so it could yield any value.
+Features	: swp half thumb fastmult vfp edsp neon vfpv3 tls lpae 
 
-But so is ARM, isn't it?
+This is wrong. Cortex-A9 does not have lpae (Large Physical Address Extension).
 
-> > If this patch proves correct I'll send a formal patch to the timekeeping
-> > maintainers.
+I tried git bisect and found this commit is related.
 
-baruch
+a469abd0f868c902b75532579bf87553dcf1b360
+ ARM: elf: add new hwcap for identifying atomic ldrd/strd instructions
 
+Variable elf_hwcap = 0x0008b0d7. This seems good.
+HWCAP_LPAE (1 << 20) is not set in elf_hwcap.
+Finally I found "lpae" string was wrong place in the array hwcap_str[].
+hwcap_str[19] should be "vfpd32" and hwcap_str[20] should be "lpae".
+But actually "vfpd32" was missing and "lpae" was@wrong place.
+
+After this patch, features of /proc/cpuinfo of the same board is
+
+Features	: swp half thumb fastmult vfp edsp neon vfpv3 tls vfpd32 
+
+I tested only in Cortex-A9.
+Someone, please test on Cortex-A15 or A7. "lpae" should be appeared.
+
+
+ arch/arm/kernel/setup.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 63af9a7..96286cb 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -971,6 +971,7 @@ static const char *hwcap_str[] = {
+ 	"vfpv4",
+ 	"idiva",
+ 	"idivt",
++	"vfpd32",
+ 	"lpae",
+ 	NULL
+ };
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+1.7.9.5
