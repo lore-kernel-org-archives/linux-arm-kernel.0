@@ -1,44 +1,32 @@
-From: cb@sgoc.de (Christoph G. Baumann)
-Date: Wed, 17 Jul 2013 18:27:38 +0200
-Subject: [PATCH v2 1/3] mxs: enable ocotp in device tree
-In-Reply-To: <1374078460-4126-1-git-send-email-cb@sgoc.de>
-References: <1372855154-8422-1-git-send-email-cb@sgoc.de>
- <1374078460-4126-1-git-send-email-cb@sgoc.de>
-Message-ID: <1374078460-4126-2-git-send-email-cb@sgoc.de>
+From: mpfj-list@newflow.co.uk (Mark Jackson)
+Date: Wed, 17 Jul 2013 17:28:37 +0100
+Subject: ARM: AM335x: Kernel oops when using EDMA and MMC
+In-Reply-To: <51E6BE84.6080905@newflow.co.uk>
+References: <51E6BE84.6080905@newflow.co.uk>
+Message-ID: <51E6C635.5020506@newflow.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Christoph G. Baumann" <cb@sgoc.de>
+On 17/07/13 16:55, Mark Jackson wrote:
+> I'm trying to get the MMC port working on our custom AM3352 CPU board.
+> 
+> I have added MMC entries to out dts file (similar to [1]), and I've
+> enabled CONFIG_TI_EDMA.
+> 
+> Our board boots fine without an SD card inserted ...
+> 
+> [    0.000000] Booting Linux on physical CPU 0x0
+> [    0.000000] Linux version 3.11.0-rc1-00025-g95b9b72 (mpfj at mpfj-nanobone) (gcc version 4.6.3 (Buildroot 2013.02-dirty) ) #309 Wed Jul 17 16:37:28 BST 2013
+> ...
+> [    2.789028] VFS: Mounted root (ubifs filesystem) on device 0:12.
+> [    2.797268] devtmpfs: mounted
+> [    2.801032] Freeing unused kernel memory: 200K (c0551000 - c0583000)
+> ...
+> Welcome to Buildroot
+> nanobone login:
 
-Signed-off-by: "Christoph G. Baumann" <cb@sgoc.de>
----
- arch/arm/boot/dts/imx23.dtsi |    1 -
- arch/arm/boot/dts/imx28.dtsi |    1 -
- 2 files changed, 2 deletions(-)
+I have just noticed the following in the boot log:-
 
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index 587ceef..dc70ea9 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -348,7 +348,6 @@
- 			ocotp at 8002c000 {
- 				compatible = "fsl,ocotp";
- 				reg = <0x8002c000 0x2000>;
--				status = "disabled";
- 			};
- 
- 			axi-ahb at 8002e000 {
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 6a8acb0..968244a 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -748,7 +748,6 @@
- 			ocotp at 8002c000 {
- 				compatible = "fsl,ocotp";
- 				reg = <0x8002c000 0x2000>;
--				status = "disabled";
- 			};
- 
- 			axi-ahb at 8002e000 {
--- 
-1.7.9.5
+...
+[    1.225698] omap_hsmmc 48060000.mmc: unable to obtain RX DMA engine channel 3227000204
+...
