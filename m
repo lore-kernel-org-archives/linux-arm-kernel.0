@@ -1,73 +1,26 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 17 Jul 2013 14:28:43 +0100
-Subject: [Xen-devel] [PATCH] xen/arm: disable cpuidle when linux is
- running as dom0
-In-Reply-To: <20130715152532.GC5774@phenom.dumpdata.com>
-References: <1373898101-15633-1-git-send-email-julien.grall@linaro.org>
- <20130715152532.GC5774@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1307171426300.8258@kaball.uk.xensource.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 17 Jul 2013 14:29:46 +0100
+Subject: [RFC PATCH v5 0/1] drivers: mfd: Versatile Express SPC support
+In-Reply-To: <alpine.LFD.2.03.1307170825240.14924@syhkavp.arg>
+References: <1373990743-23106-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1374052705.3146.86.camel@hornet>
+ <alpine.LFD.2.03.1307170825240.14924@syhkavp.arg>
+Message-ID: <1374067786.3146.123.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Jul 2013, Konrad Rzeszutek Wilk wrote:
-> On Mon, Jul 15, 2013 at 03:21:41PM +0100, Julien Grall wrote:
-> > When linux is running as dom0, Xen doesn't show the physical cpu but a
-> > virtual CPU.
-> > On some ARM SOC (for instance the exynos 5250), linux registers callbacks
-> > for cpuidle. When these callbacks are called, they will modify
-> > directly the physical cpu not the virtual one.
-> It can impact the whole board
-> > instead of dom0.
+On Wed, 2013-07-17 at 13:33 +0100, Nicolas Pitre wrote:
+> If this is really miscelaneous code that really doesn't fit 
+> anywhere else, it should rather go into drivers/misc/ as a last resort.
 
-Certainly this is something that should be fixed at the hypervisor level
-too. However I agree that Linux should try to avoid doing that when
-running on Xen.
+Interestingly enough drivers/misc was my first choice for all the
+vexpress stuff, but it wasn't received well...
 
+Anyway, the SPC driver as it is now seem to be a "power management
+system driver". Maybe a relevant directory would be in place? Wouldn't
+PSCI belong there as well? (there are two psci.c files in arch/arm and
+arch/arm64, surprisingly similar ones ;-)
 
+The bottom line is: today it is not an MFD driver.
 
-> Should you also call disable_cpufreq() ?
-
-Sounds like a good idea.
-Julien, could you add that to this patch?
-
-
-> > 
-> > Signed-off-by: Julien Grall <julien.grall@linaro.org>
-> > ---
-> >  arch/arm/xen/enlighten.c |    7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > index 49839d8..a98999f 100644
-> > --- a/arch/arm/xen/enlighten.c
-> > +++ b/arch/arm/xen/enlighten.c
-> > @@ -24,6 +24,8 @@
-> >  #include <linux/of.h>
-> >  #include <linux/of_irq.h>
-> >  #include <linux/of_address.h>
-> > +#include <linux/cpuidle.h>
-> > +#include <linux/cpufreq.h>
-> >  
-> >  #include <linux/mm.h>
-> >  
-> > @@ -292,6 +294,11 @@ static int __init xen_pm_init(void)
-> >  {
-> >  	pm_power_off = xen_power_off;
-> >  	arm_pm_restart = xen_restart;
-> > +	/*
-> > +	 * Making sure board specific code will not set up ops for
-> > +	 * cpu idle.
-> > +	 */
-> > +	disable_cpuidle();
-> >  
-> >  	return 0;
-> >  }
-> > -- 
-> > 1.7.10.4
-> > 
-> > 
-> > _______________________________________________
-> > Xen-devel mailing list
-> > Xen-devel at lists.xen.org
-> > http://lists.xen.org/xen-devel
-> 
+Pawe?
