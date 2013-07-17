@@ -1,10 +1,10 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 17 Jul 2013 17:47:42 +0200
-Subject: [PATCH v2 26/42] USB: ohci-at91: add usb_clk for transition to common
- clk framework
+Date: Wed, 17 Jul 2013 17:49:23 +0200
+Subject: [PATCH v2 27/42] usb: gadget: at91_udc: add usb_clk for transition to
+ common clk framework
 In-Reply-To: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
 References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1374076062-20293-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1374076163-20332-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,70 +18,99 @@ This patch add support for usb clock retrieval and configuration.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- drivers/usb/host/ohci-at91.c |   16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ drivers/usb/gadget/at91_udc.c |   31 ++++++++++++++++++++++++++-----
+ drivers/usb/gadget/at91_udc.h |    2 +-
+ 2 files changed, 27 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index 9677f68..ca1cdd6 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -31,8 +31,8 @@
- #define at91_for_each_port(index)	\
- 		for ((index) = 0; (index) < AT91_MAX_USBH_PORTS; (index)++)
- 
--/* interface and function clocks; sometimes also an AHB clock */
--static struct clk *iclk, *fclk, *hclk;
-+/* interface, function and usb clocks; sometimes also an AHB clock */
-+static struct clk *iclk, *fclk, *uclk, *hclk;
- static int clocked;
- 
- extern int usb_disabled(void);
-@@ -41,6 +41,8 @@ extern int usb_disabled(void);
- 
- static void at91_start_clock(void)
- {
-+	clk_set_rate(uclk, 48000000);
-+	clk_prepare_enable(uclk);
- 	clk_prepare_enable(hclk);
- 	clk_prepare_enable(iclk);
- 	clk_prepare_enable(fclk);
-@@ -52,6 +54,7 @@ static void at91_stop_clock(void)
- 	clk_disable_unprepare(fclk);
- 	clk_disable_unprepare(iclk);
- 	clk_disable_unprepare(hclk);
-+	clk_disable_unprepare(uclk);
- 	clocked = 0;
+diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+index fce8e4e..05aac04 100644
+--- a/drivers/usb/gadget/at91_udc.c
++++ b/drivers/usb/gadget/at91_udc.c
+@@ -870,6 +870,8 @@ static void clk_on(struct at91_udc *udc)
+ 	if (udc->clocked)
+ 		return;
+ 	udc->clocked = 1;
++	clk_set_rate(udc->uclk, 48000000);
++	clk_prepare_enable(udc->uclk);
+ 	clk_prepare_enable(udc->iclk);
+ 	clk_prepare_enable(udc->fclk);
+ }
+@@ -882,6 +884,7 @@ static void clk_off(struct at91_udc *udc)
+ 	udc->gadget.speed = USB_SPEED_UNKNOWN;
+ 	clk_disable_unprepare(udc->fclk);
+ 	clk_disable_unprepare(udc->iclk);
++	clk_disable_unprepare(udc->uclk);
  }
  
-@@ -162,6 +165,12 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 		retval = PTR_ERR(hclk);
- 		goto err5;
+ /*
+@@ -1773,18 +1776,28 @@ static int at91udc_probe(struct platform_device *pdev)
+ 
+ 	/* get interface and function clocks */
+ 	udc->iclk = clk_get(dev, "udc_clk");
+-	udc->fclk = clk_get(dev, "udpck");
+-	if (IS_ERR(udc->iclk) || IS_ERR(udc->fclk)) {
+-		DBG("clocks missing\n");
++	if (IS_ERR(udc->iclk)) {
++		DBG("interface clock missing\n");
+ 		retval = -ENODEV;
+-		/* NOTE: we "know" here that refcounts on these are NOPs */
+ 		goto fail1;
  	}
-+	uclk = clk_get(&pdev->dev, "usb_clk");
-+	if (IS_ERR(uclk)) {
-+		dev_err(&pdev->dev, "failed to get usb_clk\n");
-+		retval = PTR_ERR(uclk);
-+		goto err6;
++	udc->fclk = clk_get(dev, "udpck");
++	if (IS_ERR(udc->fclk)) {
++		DBG("function clock missing\n");
++		retval = -ENODEV;
++		goto fail1a;
++	}
++	udc->uclk = clk_get(dev, "usb_clk");
++	if (IS_ERR(udc->uclk)) {
++		DBG("usb clock missing\n");
++		retval = -ENODEV;
++		goto fail1b;
 +	}
  
- 	at91_start_hc(pdev);
- 	ohci_hcd_init(hcd_to_ohci(hcd));
-@@ -173,6 +182,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 	/* Error handling */
- 	at91_stop_hc(pdev);
+ 	/* don't do anything until we have both gadget driver and VBUS */
+ 	retval = clk_prepare_enable(udc->iclk);
+ 	if (retval)
+-		goto fail1;
++		goto fail1c;
+ 	at91_udp_write(udc, AT91_UDP_TXVC, AT91_UDP_TXVC_TXVDIS);
+ 	at91_udp_write(udc, AT91_UDP_IDR, 0xffffffff);
+ 	/* Clear all pending interrupts - UDP may be used by bootloader. */
+@@ -1850,6 +1863,13 @@ fail3:
+ 		gpio_free(udc->board.vbus_pin);
+ fail2:
+ 	free_irq(udc->udp_irq, udc);
++
++fail1c:
++	clk_put(udc->uclk);
++fail1b:
++	clk_put(udc->fclk);
++fail1a:
++	clk_put(udc->iclk);
+ fail1:
+ 	iounmap(udc->udp_baseaddr);
+ fail0a:
+@@ -1894,6 +1914,7 @@ static int __exit at91udc_remove(struct platform_device *pdev)
  
-+	clk_put(uclk);
-+ err6:
- 	clk_put(hclk);
-  err5:
- 	clk_put(fclk);
-@@ -212,6 +223,7 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
- 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
- 	usb_put_hcd(hcd);
+ 	clk_put(udc->iclk);
+ 	clk_put(udc->fclk);
++	clk_put(udc->uclk);
  
-+	clk_put(uclk);
- 	clk_put(hclk);
- 	clk_put(fclk);
- 	clk_put(iclk);
+ 	return 0;
+ }
+diff --git a/drivers/usb/gadget/at91_udc.h b/drivers/usb/gadget/at91_udc.h
+index e647d1c..0175246 100644
+--- a/drivers/usb/gadget/at91_udc.h
++++ b/drivers/usb/gadget/at91_udc.h
+@@ -126,7 +126,7 @@ struct at91_udc {
+ 	unsigned			active_suspend:1;
+ 	u8				addr;
+ 	struct at91_udc_data		board;
+-	struct clk			*iclk, *fclk;
++	struct clk			*iclk, *fclk, *uclk;
+ 	struct platform_device		*pdev;
+ 	struct proc_dir_entry		*pde;
+ 	void __iomem			*udp_baseaddr;
 -- 
 1.7.9.5
