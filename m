@@ -1,51 +1,53 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 17 Jul 2013 13:48:45 +0200
-Subject: BUG: commit "ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
- pre-ARMv6 CPUs" breaks armv5 with CONFIG_PREEMPT
-In-Reply-To: <20130717085139.GJ24642@n2100.arm.linux.org.uk>
-References: <20130620095705.GA18536@arm.com> <51C2D5EF.3040803@pengutronix.de>
- <20130620102856.GC18536@arm.com> <20130620111255.GD18536@arm.com>
- <51C2E917.9000708@pengutronix.de> <51C2EA04.4060701@pengutronix.de>
- <51C2EBCD.4070206@pengutronix.de> <51C42AE0.9070506@pengutronix.de>
- <20130621135219.GC4099@arm.com> <51E658AF.1090009@pengutronix.de>
- <20130717085139.GJ24642@n2100.arm.linux.org.uk>
-Message-ID: <51E6849D.7080505@pengutronix.de>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 17 Jul 2013 14:49:55 +0300
+Subject: [PATCH 0/4] improved support for runtime muxing for pinctrl
+In-Reply-To: <20130716090310.5541.36777.stgit@localhost>
+References: <20130716090310.5541.36777.stgit@localhost>
+Message-ID: <51E684E3.2040104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2013 10:51 AM, Russell King - ARM Linux wrote:
-> On Wed, Jul 17, 2013 at 10:41:19AM +0200, Marc Kleine-Budde wrote:
->> What happend to that patch? I cannot find it in v3.10.x nor in linus/master.
-> 
-> Catalin sent it to me, and I didn't apply it because it's still racy.
-> 
-> We have stateful context switches (due to cache clearing) and this does
-> nothing to solve the problem there.  If we get preempted during the
-> cache clearing, things will still go wrong.
+Hi Tony,
 
-Thanks for the update.
+On 07/16/2013 12:05 PM, Tony Lindgren wrote:
+> Hi all,
+>
+> As discussed earlier, the pinctrl support for changing some of the
+> consumer device pins during runtime needs some improvment.
+>
+> Here are the patches to do that, I'll also post a minimal sample
+> patch as a reply to this thread on how to do the muxing for
+> runtime PM.
 
-> See:
-> 
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7771/1
-> 
-> I've no idea what's happening about this.  It looks to me like nothing
-> happened after Catalin's last comment there.
+I've posted my patch and tested this patch series.
+Seems everything is ok (except patch "pinctrl: Remove duplicate code in 
+pinctrl_pm_select_state functions").
+See http://www.spinics.net/lists/arm-kernel/msg259180.html
 
-Catalin, what's next?
+So,  Tested-By: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Marc
+>
+> Regards,
+>
+> Tony
+>
+> ---
+>
+> Tony Lindgren (4):
+>        pinctrl: Remove duplicate code in pinctrl_pm_select_state functions
+>        pinctrl: Allow pinctrl to have multiple active states
+>        pinctrl: Add support for additional dynamic states
+>        drivers: Add pinctrl handling for dynamic pin states
+>
+>
+>   drivers/base/pinctrl.c                |   39 +++++
+>   drivers/pinctrl/core.c                |  250 ++++++++++++++++++++++++++++-----
+>   drivers/pinctrl/core.h                |   10 +
+>   include/linux/pinctrl/consumer.h      |   46 ++++++
+>   include/linux/pinctrl/devinfo.h       |    4 +
+>   include/linux/pinctrl/pinctrl-state.h |   15 ++
+>   6 files changed, 321 insertions(+), 43 deletions(-)
+>
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/e01fe949/attachment.sig>
+Regards,
+-grygorii
