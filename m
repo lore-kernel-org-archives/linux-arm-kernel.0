@@ -1,53 +1,123 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 17 Jul 2013 23:10:21 +0200
-Subject: [RFC PATCH v5 0/1] drivers: mfd: Versatile Express SPC support
-In-Reply-To: <1374070811.3146.124.camel@hornet>
-References: <1373990743-23106-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1374052705.3146.86.camel@hornet>
- <alpine.LFD.2.03.1307170825240.14924@syhkavp.arg>
- <1374067786.3146.123.camel@hornet>
- <alpine.LFD.2.03.1307171014510.14924@syhkavp.arg>
- <1374070811.3146.124.camel@hornet>
-Message-ID: <20130717211021.GB19864@zurbaran>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 17 Jul 2013 15:14:59 -0600
+Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
+In-Reply-To: <20130716090536.5541.36289.stgit@localhost>
+References: <20130716090310.5541.36777.stgit@localhost>
+ <20130716090536.5541.36289.stgit@localhost>
+Message-ID: <51E70953.1000601@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
-
-On Wed, Jul 17, 2013 at 03:20:11PM +0100, Pawel Moll wrote:
-> On Wed, 2013-07-17 at 15:16 +0100, Nicolas Pitre wrote:
-> > On Wed, 17 Jul 2013, Pawel Moll wrote:
-> > 
-> > > On Wed, 2013-07-17 at 13:33 +0100, Nicolas Pitre wrote:
-> > > > If this is really miscelaneous code that really doesn't fit 
-> > > > anywhere else, it should rather go into drivers/misc/ as a last resort.
-> > > 
-> > > Interestingly enough drivers/misc was my first choice for all the
-> > > vexpress stuff, but it wasn't received well...
-> > > 
-> > > Anyway, the SPC driver as it is now seem to be a "power management
-> > > system driver". Maybe a relevant directory would be in place? Wouldn't
-> > > PSCI belong there as well? (there are two psci.c files in arch/arm and
-> > > arch/arm64, surprisingly similar ones ;-)
-> > > 
-> > > The bottom line is: today it is not an MFD driver.
-> > 
-> > But we know it will, right?  So better  save some churn by storing the 
-> > initial code where it would end up anyway once complete.
+On 07/16/2013 03:05 AM, Tony Lindgren wrote:
+> To toggle dynamic states, let's add the optional active state in
+> addition to the static default state. Then if the optional active
+> state is defined, we can require that idle and sleep states cover
+> the same pingroups as the active state.
 > 
-> Not in that form, no. The code living in mfd will just register
-> mfd_cells while "functional" parts are going to live elsewhere. This is
-> how I understand what Samuel asked me to do and that's what is happening
-> to vexpress-sysreg now.
-Very good, I'll happily apply such changes.
-If I understand the IP correctly, the SPC driver will stay as a set of
-runtime APIs for controlling the SPC features. If that's the case, then
-misc sounds like a more appropriate place for this driver.
-drivers/power/ really is for power supplies and charging drivers.
+> Then let's add pinctrl_check_dynamic() and pinctrl_select_dynamic()
+> to use instead of pinctrl_select() to avoid breaking existing users.
+> 
+> With pinctrl_check_dynamic() we can check that idle and sleep states
+> match the active state for pingroups during init, and don't need to
+> do it during runtime.
+> 
+> Then with the states pre-validated, pinctrl_select_dynamic() can
+> just toggle between the dynamic states without extra checks.
+> 
+> Note that pinctr_select_state() still has valid use cases, such as
+> changing states when the pins can be shared between two drivers
+> and don't necessarily cover the same pingroups. For dynamic runtime
+> toggling of pin states, we should eventually always use just
+> pinctrl_select_dynamic().
 
-Cheers,
-Samuel. 
+> diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+> @@ -887,6 +887,8 @@ static void pinctrl_free(struct pinctrl *p, bool inlist)
+>  		list_for_each_entry_safe(setting, n2, &state->settings, node) {
+>  			pinctrl_free_setting(state == p->state[PINCTRL_STATIC],
+>  					     setting);
+> +			pinctrl_free_setting(state == p->state[PINCTRL_DYNAMIC],
+> +					     setting);
+
+This will cause pinmux_free_setting() or pinconf_free_setting() to be
+called twice on the setting object. Right now they don't do anything,
+but if they start to kfree() some dynamically-allocated data that's
+stored within the setting, that'll cause problems. I would suggest a
+loop body something more like:
+
+bool disable_setting = state == XXX || state == YYY;
+pinctrl_free_setting(disable_setting, setting);
+
+> +int pinctrl_check_dynamic(struct device *dev, struct pinctrl_state *st1,
+> +			  struct pinctrl_state *st2)
+> +{
+> +	struct pinctrl_setting *s1, *s2;
+> +
+> +	list_for_each_entry(s1, &st1->settings, node) {
+...
+> +		list_for_each_entry(s2, &st2->settings, node) {
+...
+> +			if (pctldev1 != pctldev2) {
+> +				dev_dbg(dev, "pctldev must be the same for states\n");
+> +				return -EINVAL;
+> +			}
+
+I don't think we should require that; it's perfectly legal at the moment
+for some device's pinctrl configuration to include settings from
+multiple different pin controllers.
+
+> +			for (i = 0; i < num_pins1; i++) {
+> +				int pin1 = pins1[i];
+> +
+> +				for (j = 0; j < num_pins2; j++) {
+> +					int pin2 = pins2[j];
+> +
+> +					if (pin1 == pin2) {
+> +						found++;
+> +						break;
+> +					}
+> +				}
+> +			}
+> +
+> +			if (found != num_pins1) {
+
+I guess this make sure that every entry in the dynamic state is in the
+state state, but not vice-versa; the static state can affect more stuff
+than the dynamic state?
+
+If so, shouldn't that check be if (found != num_pins2)?
+
+> +int pinctrl_select_dynamic(struct pinctrl *p, struct pinctrl_state *state)
+
+The body of this function is rather duplicated with pinctrl_select().
+
+> @@ -1241,7 +1371,13 @@ static int pinctrl_pm_select_state(struct device *dev, struct pinctrl_state *sta
+>  		return 0;
+>  	if (IS_ERR(state))
+>  		return 0; /* No such state */
+> -	ret = pinctrl_select_state(pins->p, state);
+> +
+> +	/* Configured for proper dynamic muxing? */
+
+I don't think "proper" is correct here; it's just fine not to have any
+dynamic configuration.
+
+> +	if (!IS_ERR(dev->pins->active_state))
+> +		ret = pinctrl_select_dynamic(pins->p, state);
+> +	else
+> +		ret = pinctrl_select_state(pins->p, state);
+
+Hmmm. I'm not quite sure this is right... Surely this function should
+just do nothing if the dynamic states aren't defined? The system should
+just, and only, be in the "default" state and never do anything else.
+
+Looking back at patch 1, I see the are
+pinctrl_pm_select_{default,sleep,idle}_state(). Shouldn't that list be
+active/sleep/idle, since I assume default is that "static" state, and
+the other three are the "dynamic" states?
+
+> +static int pinctrl_pm_check_state(struct device *dev,
+> +				  struct pinctrl_state *state)
+
+Naming this pinctrl_pm_is_state_error() or pinctrl_pm_is_state_ok()
+might give more clue what its return value is expected to be.
