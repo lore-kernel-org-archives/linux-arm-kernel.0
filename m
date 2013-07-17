@@ -1,65 +1,116 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 17 Jul 2013 14:53:13 -0700
-Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if
- UP system
-In-Reply-To: <20130712121023.GB27430@codeaurora.org>
-References: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
- <20130712111322.GC3213@e102654-lin.cambridge.arm.com>
- <20130712121023.GB27430@codeaurora.org>
-Message-ID: <51E71249.4050200@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 17 Jul 2013 16:01:41 -0600
+Subject: [PATCH] ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag
+In-Reply-To: <51E7108B.5030504@linaro.org>
+References: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
+ <51E439BC.9030608@wwwdotorg.org>
+ <1373973447.8538.80.camel@jlo-ubuntu-64.nvidia.com>
+ <51E5A438.10004@wwwdotorg.org>
+ <1374056130.10997.16.camel@jlo-ubuntu-64.nvidia.com>
+ <51E6FF0B.5000708@wwwdotorg.org> <51E7108B.5030504@linaro.org>
+Message-ID: <51E71445.4070306@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/13 05:10, Stephen Boyd wrote:
-> On 07/12, Javi Merino wrote:
->> I agree, we should drop the check.  It's annoying in uniprocessors and
->> unlikely to be found in the real world unless your gic entry in the dt
->> is wrong.
+On 07/17/2013 03:45 PM, Daniel Lezcano wrote:
+> On 07/17/2013 10:31 PM, Stephen Warren wrote:
+>> On 07/17/2013 04:15 AM, Joseph Lo wrote:
+>>> On Wed, 2013-07-17 at 03:51 +0800, Stephen Warren wrote:
+>>>> On 07/16/2013 05:17 AM, Joseph Lo wrote:
+>>>>> On Tue, 2013-07-16 at 02:04 +0800, Stephen Warren wrote:
+>>>>>> On 06/25/2013 03:23 AM, Joseph Lo wrote:
+>>>>>>> Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
+>>>>>>> to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
+>>>>>>> this state.
+>> ... [ discussion of issues with Joesph's patches applied]
+>>>
+>>> OK. I did more stress tests last night and today. I found it cause by
+>>> the patch "ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag" and
+>>> only impact the Tegra20 platform. The hot plug regression seems due to
+>>> this patch. After dropping this patch on top of v3.11-rc1, the Tegra20
+>>> can back to normal.
+>>>
+>>> And the hop plug and suspend stress test can pass on Tegra30/114 too.
+>>>
+>>> Can the other two patch series for Tegra114 to support CPU idle power
+>>> down mode and system suspend still moving forward, not be blocked by
+>>> this patch?
+>>>
+>>> Looks the CPUIDLE_FLAG_TIMER_STOP flag still cause some other issue for
+>>> hot plug on Tegra20, I will continue to check this. You can just drop
+>>> this patch.
 >>
-> Ok. How about this?
+>> OK, if I drop that patch, then everything on Tegra20 and Tegra30 seems
+>> fine again.
+>>
+>> However, I've found some new and exciting issue on Tegra114!
+>>
+>> With unmodified v3.11-rc1, I can do the following without issue:
+>>
+>> * Unplug/replug CPUs, so that I had all combinations of CPU 1, 2, 3
+>> plugged/unpplugged (with CPU 0 always plugged).
+>>
+>> * Unplug/replug CPUs, so that I had all combinations of CPU 0, 1, 2, 3
+>> plugged/unpplugged (with the obvious exception of never having all CPUs
+>> unplugged).
+>>
+>> However, if I try this with your Tegra114 cpuidle and suspend patches
+>> applied, I see the following issues:
+>>
+>> 1) If I boot, unplug CPU 0, then replug CPU 0, the system immediately
+>> hard-hangs.
+>>
+>> 2) If I run the hotplug test script, leaving CPU 0 always present, I
+>> sometimes see:
+>>
+>>> root at localhost:~# for i in `seq 1 50`; do echo ITERATION $i; ./cpuonline.py; done
+>>> ITERATION 1
+>>> echo 0 > /sys/devices/system/cpu/cpu2/online
+>>> [  458.910054] CPU2: shutdown
+>>> echo 0 > /sys/devices/system/cpu/cpu1/online
+>>> [  461.004371] CPU1: shutdown
+>>> echo 0 > /sys/devices/system/cpu/cpu3/online
+>>> [  463.027341] CPU3: shutdown
+>>> echo 1 > /sys/devices/system/cpu/cpu1/online
+>>> [  465.061412] CPU1: Booted secondary processor
+>>> echo 1 > /sys/devices/system/cpu/cpu2/online
+>>> [  467.095313] CPU2: Booted secondary processor
+>>> [  467.113243] ------------[ cut here ]------------
+>>> [  467.117948] WARNING: CPU: 2 PID: 0 at kernel/time/tick-broadcast.c:667 tick_broadcast_oneshot_control+0x19c/0x1c4()
+>>> [  467.128352] Modules linked in:
+>>> [  467.131455] CPU: 2 PID: 0 Comm: swapper/2 Not tainted 3.11.0-rc1-00022-g7487363-dirty #49
+>>> [  467.139678] [<c0015620>] (unwind_backtrace+0x0/0xf8) from [<c001154c>] (show_stack+0x10/0x14)
+>>> [  467.148228] [<c001154c>] (show_stack+0x10/0x14) from [<c05135a8>] (dump_stack+0x80/0xc4)
+>>> [  467.156336] [<c05135a8>] (dump_stack+0x80/0xc4) from [<c0024590>] (warn_slowpath_common+0x64/0x88)
+>>> [  467.165300] [<c0024590>] (warn_slowpath_common+0x64/0x88) from [<c00245d0>] (warn_slowpath_null+0x1c/0x24)
+>>> [  467.174959] [<c00245d0>] (warn_slowpath_null+0x1c/0x24) from [<c00695e4>] (tick_broadcast_oneshot_control+0x19c/0x1c4)
+>>> [  467.185659] [<c00695e4>] (tick_broadcast_oneshot_control+0x19c/0x1c4) from [<c0067cdc>] (clockevents_notify+0x1b0/0x1dc)
+>>> [  467.196538] [<c0067cdc>] (clockevents_notify+0x1b0/0x1dc) from [<c034f348>] (cpuidle_idle_call+0x11c/0x168)
+>>> [  467.206292] [<c034f348>] (cpuidle_idle_call+0x11c/0x168) from [<c000f134>] (arch_cpu_idle+0x8/0x38)
+>>> [  467.215359] [<c000f134>] (arch_cpu_idle+0x8/0x38) from [<c0061038>] (cpu_startup_entry+0x60/0x134)
+>>> [  467.224325] [<c0061038>] (cpu_startup_entry+0x60/0x134) from [<800083d8>] (0x800083d8)
+>>> [  467.232227] ---[ end trace ea579be22a00e7fb ]---
+>>> echo 0 > /sys/devices/system/cpu/cpu1/online
+>>> [  469.126682] CPU1: shutdown
+>>
+>> I have found no solution for (1) (although I didn't look hard!).
+>>
+>> (2) can be solved with the following (at least 50 iterations of my test
+>> script worked with this patch applied):
+> 
+> Actually this warning is resulting from a bug in the tick broadcast code
+> and has been solved with commit:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?h=timers/urgent&id=ea8deb8dfa6b0e8d1b3d1051585706739b46656c
+> 
+> This patch has been merged in timers/urgent branch but still need to
+> merged with timers/core.
+> 
+> The patch below does not fix the warning but prevents the tick warning
+> to occur. Applying the patch above will fix your problem.
 
-Any comments?
+Yes, I was imprecise when I said solve; I simply meant that making that
+change prevented me from seeing that issue any more.
 
->
-> ----8<-----
-> Subject: [PATCH v2] irqchip: gic: Don't complain in gic_get_cpumask()
->
-> In a uniprocessor implementation the interrupt processor targets
-> registers are read-as-zero/write-ignored (RAZ/WI). Unfortunately
-> gic_get_cpumask() will print a critical message saying
->
->  GIC CPU mask not found - kernel will fail to boot.
->
-> if these registers all read as zero, but there won't actually be
-> a problem on uniprocessor systems and the kernel will boot just
-> fine. Remove this check because if you're on a multiprocessor
-> system it's unlikely to be printed unless your DT is wrong or
-> your hardware is broken.
->
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Javi Merino <javi.merino@arm.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/irqchip/irq-gic.c | 3 ---
->  1 file changed, 3 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 19ceaa60..4fbcea9 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -368,9 +368,6 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
->  			break;
->  	}
->  
-> -	if (!mask)
-> -		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
-> -
->  	return mask;
->  }
->  
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+That patch is already in v3.11-rc1, and I was using that as a base when
+I applied Joseph's patches. So, it doesn't solve this issue.
