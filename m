@@ -1,73 +1,43 @@
-From: damien.riegel.ext@parrot.com (Damien Riegel)
-Date: Wed, 17 Jul 2013 11:45:32 +0200
-Subject: Issue with gpio and pinmux
-Message-ID: <51E667BC.3070804@parrot.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 17 Jul 2013 10:47:18 +0100
+Subject: [PATCH 1/3] ASoC: bt-sco: enable OF support
+In-Reply-To: <20130717084039.GA15981@e106331-lin.cambridge.arm.com>
+References: <1374041536-27643-1-git-send-email-Baohua.Song@csr.com>
+ <20130717084039.GA15981@e106331-lin.cambridge.arm.com>
+Message-ID: <20130717094718.GE22506@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 17, 2013 at 09:40:39AM +0100, Mark Rutland wrote:
+> On Wed, Jul 17, 2013 at 07:12:14AM +0100, Barry Song wrote:
 
+> > this makes users be able to add a bt-sco node in dts instead of
+> > hardcoding a platform device in mach.
 
-In our ARM-based SoC, we can multiplex up to 4 functions on each pin,
-but we have an issue when using a pin as a gpio: it can still be muxed
-as another function.
+> I'm slightly confused by this. The driver doesn't seem to pick up any
+> information out of the dts, and the binding doesn't even describe any
+> linkage to a piece of hardware. I'm not familiar with bluetooth or ASoC,
+> could you give an explanation as to why this is needed?
 
-In the gpio driver, we delegate calls to "request" to
-"pinctrl_request_gpio":
+> I don't think this should be in the dt as is. Could this not be
+> registered based on the presence of a bluetooth controller that supports
+> this?
 
-	static int p7gpio_request(struct gpio_chip *chip, unsigned int offset)
-	{
-		return pinctrl_request_gpio(chip->base + offset);
-	}
+Audio devices are linked together by a separate board binding which
+specifies how all the different components in the audio subsystem on the
+board are wired together.  Even where things have no meanignful software
+control (as is the case here and for a lot of simple DACs or ADCs) the
+rest of the system needs information on their capabilites and ideally
+the ability to interchange them with more substantial devices.  If there
+were meaningful control there'd be a control bus here.
 
-	static const struct gpio_chip p7gpio_chip_defaults = {
-		.request            = p7gpio_request,
-		[...]
-	};
-
-pinctrl_request_gpio will result in a call to pin_request, which behaves
-differently if we request a gpio or another function, so at kernel
-level they are not exclusive, but at hardware level they must be.
-
-To avoid conflicts, the workaround I use is to implement "request" and
-"gpio_request_enable" as below in a pinctrl driver to make mux and gpio
-exclusive. But I really feel like I should not do so and let the kernel
-do this for me.
-
-	static int p7ctl_enable_gpio(struct pinctrl_dev* pctl,
-					struct pinctrl_gpio_range* range,
-					unsigned int gpio)
-	{
-		struct pin_desc *desc;
-		desc = pin_desc_get(pctl, gpio);
-		if (desc->mux_owner)
-			return -EBUSY;
-		
-		[...]
-	}
-
-	static int p7ctl_request(struct pinctrl_dev* pctl, unsigned int pin)
-	{
-		struct pin_desc *desc;
-		desc = pin_desc_get(pctl, pin);
-		if (desc->gpio_owner)
-			return -EBUSY;
-
-		return 0;
-	}
-
-	static struct pinmux_ops p7ctl_mux_ops = {
-		.request                = p7ctl_request,
-		.gpio_request_enable    = p7ctl_enable_gpio,
-		[...]
-	};
-
-Is this solution correct or is there a better way to claim the mux when
-using a pin as a gpio ?
-
-Note: we are using a kernel based on 3.4.11, but as far as I can tell,
-pinctrl_request_gpio have the same behavior in the upstream kernel.
-
-
-Thanks,
-Damien
+There is likely to be a control interface for the BT device hanging off
+a UART but it's not clear there's much more meaningful data for those
+than there is here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/419fecfc/attachment.sig>
