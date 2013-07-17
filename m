@@ -1,84 +1,28 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 17 Jul 2013 10:23:17 +0200
-Subject: [PATCH 2/5] iio: at91: Use different prescal, startup mask in
- MR for different IP
-In-Reply-To: <20130716211706.39665234@skate>
-References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
- <1373789069-11604-3-git-send-email-josh.wu@atmel.com>
- <20130715125815.GC2962@lukather> <51E505EA.4060502@atmel.com>
- <51E50864.6020904@atmel.com> <20130716133003.7c208cdf@skate>
- <51E5990A.4050709@kernel.org> <20130716211706.39665234@skate>
-Message-ID: <51E65475.4010109@atmel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 17 Jul 2013 09:30:03 +0100
+Subject: [PATCH] ASoC: tegra: depend on ARCH_TEGRA, not ARCH_TEGRA_*
+In-Reply-To: <1374013667-21435-1-git-send-email-swarren@wwwdotorg.org>
+References: <1374013667-21435-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130717083003.GA22506@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/07/2013 21:17, Thomas Petazzoni :
-> Dear Jonathan Cameron,
->
-> On Tue, 16 Jul 2013 20:03:38 +0100, Jonathan Cameron wrote:
->
->> On 07/16/2013 12:30 PM, Thomas Petazzoni wrote:
->>> I've asked exactly this question last week at Linaro Connect during the
->>> ARM SoC consolidation panel/discussion, where Grant Likely, Arnd
->>> Bergmann, Olof and others were answering Device Tree related questions.
->>>
->>> My question, which precisely had the at91-adc DT binding in mind was
->>> precisely whether we should use different compatible properties to
->>> identify different revisions of an IP block and let the driver handle
->>> those differences, or whether the DT binding should provide sufficient
->>> properties (register offsets, bit numbers, etc.) to make the driver
->>> independent of the IP revisions. And clearly, the answer was that
->>> different compatible properties should be used to identify the
->>> different versions of the IP block, and the driver should abstract out
->>> the differences. I.e, was has been done for at91-adc is completely the
->>> opposite of the best practices for Device Tree on ARM.
->>>
->>> See
->>> http://www.youtube.com/watch?v=zF_AXLgkFy4&feature=player_detailpage#t=1581s
->>> where I ask exactly this question, and get answers from Olof Johansson
->>> and Grant Likely. They clearly say that the solution of having separate
->>> compatible properties and a driver that handles the differences is the
->>> way to go. So the way at91-adc (and possibly other at91 drivers) is
->>> using the Device Tree is wrong, there should have been multiple
->>> compatible properties. It's a shame because this is something we did say
->>> when we submitted at91-adc and during the reviews, but the maintainer
->>> wasn't listening to our comments...
->>>
->>
->> Thanks for getting some clarity on this Thomas.  So I'll ask the somewhat obvious
->> question - how do we unwind from where we are to where we want to be wrt to the
->> bindings?
->
-> During Linaro Connect last week, there was some discussion about
-> marking DT bindings as unstable for a little while, once they get
-> reviewed by a group of DT "experts" that mark them as stable. Until
-> they are stable, the kernel does not offer any ABI guarantees, and we
-> are free to change the DT bindings as needed.
->
-> Now, since this unstable/stable thing is not in place at the moment,
-> deciding whether to break or not existing bindings is something to be
-> decided by the maintainer of this platform, judging what is the best
-> option depending on whether there are already many users of the DT for
-> this platform or not, for example.
+On Tue, Jul 16, 2013 at 04:27:47PM -0600, Stephen Warren wrote:
 
-I didn't had in mind that the current discussion about the addition of 
-some properties could cast doubt on the entire at91-adc binding!
+> Stop selecting I2S/AC97/SPDIF controller drivers from the machine driver
+> config options; this doesn't really work if we don't know which specific
+> SoC(s) we're building for. However, set their default values based on
+> SND_SOC_TEGRA, since most people will probably want to enable support for
+> all SoCs. This also avoids the need to change any defconfig files.
 
-The binding itself has several drawbacks and is kind of over engineered, 
-I agree with that. Some register offsets in particular have nothing to 
-do in a DT binding.
-On the other hand, some values are highly dependent on the SoC process 
-itself and can't be stored in the driver because it would require to 
-change the driver for each new SoC, depending on the electrical 
-characteristics.
-In conclusion, we have to be cautious with this binding and make sure 
-that we don't throw the baby out with the bath water.
-
-Moreover, at the time we are just beginning to be comfortable with DT on 
-AT91 and beginning to overcome the difficulty of converting our 
-platforms, I see this new step on the path to "mainline + DT stable" as 
-another slowdown.
-
-Bye,
--- 
-Nicolas Ferre
+This doesn't seem terribly clever and is definitely not idiomatic for
+ASoC.  If you want to just select all CPUs that'd be fine but forcing
+the user to select the individual components isn't the style anything
+else uses.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/400e5d30/attachment-0001.sig>
