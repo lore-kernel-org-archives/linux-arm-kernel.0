@@ -1,64 +1,68 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 17 Jul 2013 11:45:32 -0500
-Subject: [PATCH 3/9] ARM: dts: omap5-uevm: update and disable unused
- regulators LDO[28]
-In-Reply-To: <1374079538-19548-1-git-send-email-nm@ti.com>
-References: <1374079538-19548-1-git-send-email-nm@ti.com>
-Message-ID: <1374079538-19548-4-git-send-email-nm@ti.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Wed, 17 Jul 2013 18:45:53 +0200
+Subject: [PATCH v2 34/42] ARM: at91/dt: move at91sam9g20 SoC to new at91 clk
+ implem
+In-Reply-To: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1374079553-20942-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit e00c27ef3b4c23e39d0a77b7c8e5be44c28001c7
-(ARM: dts: OMAP5: Add Palmas MFD node and regulator nodes)
-introduced regulator entries for OMAP5uEVM.
+Define at91sam9g20 clocks in at91sam9g20 device tree.
+Add references to the appropriate clocks in each peripheral.
 
-However, The regulator information is based on an older temporary
-pre-production board variant and does not reflect production board
-750-2628-XXX boards - On production boards, LDO2 and 8 are unused.
-
-LDO2 and LDO8 do not go to any peripheral or connector on the board.
-Further, these unused regulators should have been 2.8V for LDO2 and
-3.0V for LDO8. Mark these LDOs as disabled in the dts until needed.
-
-Reported-by: Marc J?ttner <m-juettner@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- arch/arm/boot/dts/omap5-uevm.dts |   15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/at91sam9g20.dtsi |   37 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-index 6709f1e..87b3e9e 100644
---- a/arch/arm/boot/dts/omap5-uevm.dts
-+++ b/arch/arm/boot/dts/omap5-uevm.dts
-@@ -355,10 +355,10 @@
- 				ldo2_reg: ldo2 {
- 					/* VCC_2V8_DISP: Does not go anywhere */
- 					regulator-name = "ldo2";
--					regulator-min-microvolt = <2900000>;
--					regulator-max-microvolt = <2900000>;
--					regulator-always-on;
--					regulator-boot-on;
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+					/* Unused */
-+					status = "disabled";
- 				};
- 
- 				ldo3_reg: ldo3 {
-@@ -409,10 +409,11 @@
- 				ldo8_reg: ldo8 {
- 					/* VDD_3v0: Does not go anywhere */
- 					regulator-name = "ldo8";
--					regulator-min-microvolt = <1500000>;
--					regulator-max-microvolt = <1500000>;
--					regulator-always-on;
-+					regulator-min-microvolt = <3000000>;
-+					regulator-max-microvolt = <3000000>;
- 					regulator-boot-on;
-+					/* Unused */
-+					status = "disabled";
- 				};
- 
- 				ldo9_reg: ldo9 {
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index b8e7946..60a20ec 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -25,6 +25,43 @@
+ 			adc0: adc at fffe0000 {
+ 				atmel,adc-startup-time = <40>;
+ 			};
++
++			pmc: pmc at fffffc00 {
++				plla: pllack {
++					compatible = "atmel,at91sam9g45-clk-pll";
++					#clock-cells = <0>;
++					clocks = <&main>;
++					id = <0>;
++					input = <2000000 32000000>;
++					output = <74500000 800000000
++							  69500000 750000000
++							  64500000 700000000
++							  59500000 650000000
++							  54500000 600000000
++							  49500000 550000000
++							  44500000 500000000
++							  40000000 450000000>;
++					out = <0 1 2 3 0 1 2 3>;
++					icpll = <0 0 0 0 1 1 1 1>;
++				};
++
++				pllb: pllbck {
++					compatible = "atmel,at91sam9g20-clk-pllb";
++					#clock-cells = <0>;
++					clocks = <&main>;
++					id = <1>;
++					input = <2000000 32000000>;
++					output = <30000000 100000000>;
++					out = <0>;
++				};
++
++				mck: masterck {
++					#clock-cells = <0>;
++					clocks = <&clk32k>, <&main>, <&plla>, <&pllb>;
++					output = <0 133000000>;
++					divisors = <1 2 4 6>;
++				};
++			};
+ 		};
+ 	};
+ };
 -- 
 1.7.9.5
