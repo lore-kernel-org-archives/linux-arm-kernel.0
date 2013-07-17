@@ -1,41 +1,159 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 17 Jul 2013 13:23:36 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Drop the chip variant suffix
-In-Reply-To: <1374037869-17443-1-git-send-email-festevam@gmail.com>
-References: <1374037869-17443-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130717052334.GF4541@S2101-09.ap.freescale.net>
+Date: Wed, 17 Jul 2013 13:57:48 +0800
+Subject: [PATCH v3] ARM: dts: imx: use generic DMA bindings for SSI nodes
+Message-ID: <1374040668-14325-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 02:11:09AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> imx6qdl-sabresd.dtsi is a common file for mx6q and mx6dl versions of sabresd
-> board, so let's get rid of the 'quad' reference in the compatible string.
-> 
-The change makes no sense.  Look at it in this way: imx6dl sabresd
-wm8962 is compatible to imx6q one.
+Updates SSI nodes to adopt generic DMA bindings.
 
-Shawn
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Changes since v2:
+ * Keep custom fsl,ssi-dma-events property until fsl_ssi driver moves
+   to use generic DMA bindings.
 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> index 4dec80c..f70db40 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> @@ -52,7 +52,7 @@
->  	};
->  
->  	sound {
-> -		compatible = "fsl,imx6q-sabresd-wm8962",
-> +		compatible = "fsl,imx6-sabresd-wm8962",
->  			   "fsl,imx-audio-wm8962";
->  		model = "wm8962-audio";
->  		ssi-controller = <&ssi2>;
-> -- 
-> 1.8.1.2
-> 
+ arch/arm/boot/dts/imx51.dtsi   |    9 +++++++++
+ arch/arm/boot/dts/imx53.dtsi   |    9 +++++++++
+ arch/arm/boot/dts/imx6qdl.dtsi |    9 +++++++++
+ arch/arm/boot/dts/imx6sl.dtsi  |    9 +++++++++
+ 4 files changed, 36 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index d086e07..d7b0646 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -154,6 +154,9 @@
+ 					reg = <0x70014000 0x4000>;
+ 					interrupts = <30>;
+ 					clocks = <&clks 49>;
++					dmas = <&sdma 24 1 0>,
++					       <&sdma 25 1 0>;
++					dma-names = "rx", "tx";
+ 					fsl,fifo-depth = <15>;
+ 					fsl,ssi-dma-events = <25 24 23 22>; /* TX0 RX0 TX1 RX1 */
+ 					status = "disabled";
+@@ -735,6 +738,9 @@
+ 				reg = <0x83fcc000 0x4000>;
+ 				interrupts = <29>;
+ 				clocks = <&clks 48>;
++				dmas = <&sdma 28 0 0>,
++				       <&sdma 29 0 0>;
++				dma-names = "rx", "tx";
+ 				fsl,fifo-depth = <15>;
+ 				fsl,ssi-dma-events = <29 28 27 26>; /* TX0 RX0 TX1 RX1 */
+ 				status = "disabled";
+@@ -784,6 +790,9 @@
+ 				reg = <0x83fe8000 0x4000>;
+ 				interrupts = <96>;
+ 				clocks = <&clks 50>;
++				dmas = <&sdma 46 0 0>,
++				       <&sdma 47 0 0>;
++				dma-names = "rx", "tx";
+ 				fsl,fifo-depth = <15>;
+ 				fsl,ssi-dma-events = <47 46 37 35>; /* TX0 RX0 TX1 RX1 */
+ 				status = "disabled";
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 51b93c9..fb26830 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -153,6 +153,9 @@
+ 					reg = <0x50014000 0x4000>;
+ 					interrupts = <30>;
+ 					clocks = <&clks 49>;
++					dmas = <&sdma 24 1 0>,
++					       <&sdma 25 1 0>;
++					dma-names = "rx", "tx";
+ 					fsl,fifo-depth = <15>;
+ 					fsl,ssi-dma-events = <25 24 23 22>; /* TX0 RX0 TX1 RX1 */
+ 					status = "disabled";
+@@ -1050,6 +1053,9 @@
+ 				reg = <0x63fcc000 0x4000>;
+ 				interrupts = <29>;
+ 				clocks = <&clks 48>;
++				dmas = <&sdma 28 0 0>,
++				       <&sdma 29 0 0>;
++				dma-names = "rx", "tx";
+ 				fsl,fifo-depth = <15>;
+ 				fsl,ssi-dma-events = <29 28 27 26>; /* TX0 RX0 TX1 RX1 */
+ 				status = "disabled";
+@@ -1074,6 +1080,9 @@
+ 				reg = <0x63fe8000 0x4000>;
+ 				interrupts = <96>;
+ 				clocks = <&clks 50>;
++				dmas = <&sdma 46 0 0>,
++				       <&sdma 47 0 0>;
++				dma-names = "rx", "tx";
+ 				fsl,fifo-depth = <15>;
+ 				fsl,ssi-dma-events = <47 46 45 44>; /* TX0 RX0 TX1 RX1 */
+ 				status = "disabled";
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 7c18fa0..bc4ca03 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -211,6 +211,9 @@
+ 					reg = <0x02028000 0x4000>;
+ 					interrupts = <0 46 0x04>;
+ 					clocks = <&clks 178>;
++					dmas = <&sdma 37 1 0>,
++					       <&sdma 38 1 0>;
++					dma-names = "rx", "tx";
+ 					fsl,fifo-depth = <15>;
+ 					fsl,ssi-dma-events = <38 37>;
+ 					status = "disabled";
+@@ -221,6 +224,9 @@
+ 					reg = <0x0202c000 0x4000>;
+ 					interrupts = <0 47 0x04>;
+ 					clocks = <&clks 179>;
++					dmas = <&sdma 41 1 0>,
++					       <&sdma 42 1 0>;
++					dma-names = "rx", "tx";
+ 					fsl,fifo-depth = <15>;
+ 					fsl,ssi-dma-events = <42 41>;
+ 					status = "disabled";
+@@ -231,6 +237,9 @@
+ 					reg = <0x02030000 0x4000>;
+ 					interrupts = <0 48 0x04>;
+ 					clocks = <&clks 180>;
++					dmas = <&sdma 45 1 0>,
++					       <&sdma 46 1 0>;
++					dma-names = "rx", "tx";
+ 					fsl,fifo-depth = <15>;
+ 					fsl,ssi-dma-events = <46 45>;
+ 					status = "disabled";
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index d048a78..c46651e 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -195,6 +195,9 @@
+ 					reg = <0x02028000 0x4000>;
+ 					interrupts = <0 46 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_SSI1>;
++					dmas = <&sdma 37 1 0>,
++					       <&sdma 38 1 0>;
++					dma-names = "rx", "tx";
+ 					fsl,fifo-depth = <15>;
+ 					status = "disabled";
+ 				};
+@@ -204,6 +207,9 @@
+ 					reg = <0x0202c000 0x4000>;
+ 					interrupts = <0 47 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_SSI2>;
++					dmas = <&sdma 41 1 0>,
++					       <&sdma 42 1 0>;
++					dma-names = "rx", "tx";
+ 					fsl,fifo-depth = <15>;
+ 					status = "disabled";
+ 				};
+@@ -213,6 +219,9 @@
+ 					reg = <0x02030000 0x4000>;
+ 					interrupts = <0 48 0x04>;
+ 					clocks = <&clks IMX6SL_CLK_SSI3>;
++					dmas = <&sdma 45 1 0>,
++					       <&sdma 46 1 0>;
++					dma-names = "rx", "tx";
+ 					fsl,fifo-depth = <15>;
+ 					status = "disabled";
+ 				};
+-- 
+1.7.9.5
