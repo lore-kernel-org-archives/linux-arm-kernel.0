@@ -1,150 +1,135 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 16 Jul 2013 21:20:37 -0700
-Subject: [linux-sunxi] Re: [PATCH 1/2] Initial support for Allwinner's
- Security ID fuses
-In-Reply-To: <51E5B4DE.5060002@schinagl.nl>
-References: <20130624181509.GA8847@kroah.com> <51C8B84C.3020200@schinagl.nl>
- <20130624214615.GA17604@kroah.com> <51CAA709.4060801@schinagl.nl>
- <20130626175144.GC2222@kroah.com> <51D674BF.9030207@schinagl.nl>
- <20130706193646.GB9778@kroah.com> <51E466A3.4010503@schinagl.nl>
- <20130716064107.GA10868@kroah.com> <51E5B4DE.5060002@schinagl.nl>
-Message-ID: <20130717042037.GB20312@kroah.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 17 Jul 2013 10:12:22 +0530
+Subject: [PATCH 1/2] ARM: dts: Add SHAM data and documentation for AM33XX
+In-Reply-To: <1374017368-5267-2-git-send-email-mgreer@animalcreek.com>
+References: <1374017368-5267-1-git-send-email-mgreer@animalcreek.com>
+ <1374017368-5267-2-git-send-email-mgreer@animalcreek.com>
+Message-ID: <51E620AE.8090602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 11:02:22PM +0200, Oliver Schinagl wrote:
-> On 07/16/13 08:41, Greg KH wrote:
-> > On Mon, Jul 15, 2013 at 11:16:19PM +0200, Oliver Schinagl wrote:
-> >> With your latest patches for binary attributes and your blog post, I
-> >> thought that you want to create your binary attributes before the probe
-> >> function, to avoid the userspace race. To do that, we have two options,
-> >> create them in init (ugly?) or fill the .group member if available so it
-> >> gets automatically created from the register function.
-> > Yes, the .group thing should be what is needed here.
-> That's what I thought (and used).
-> >
-> >> Well in my case, I'm using the module_platform_driver() macro which
-> >> expects the struct platform_driver. Platform_driver has a device_driver
-> >> member .driver where the .groups is located. Great, using that works and
-> >> we should have the sysfs entry race-free. However I don't know hot to
-> >> exchange data between that and the rest of my driver.
-> >>
-> >> Before I used to_platform_device(kobj_to_dev(kobj)) as passed via the
-> >> .read function to obtain a platform_device where i could use
-> >> platform_get_drvdata on. All was good, but that doesn't fly now and my
-> >> knowledge is a bit short as to why.
-> > I don't understand, why not use the platform device that was passed to
-> > the binary attribute write function?
-> Because the pointers don't match and I get a null pointer from 
-> platform_get_data
+Hi Mark,
 
-That's not good, that shouldn't happen.
+On Wednesday 17 July 2013 04:59 AM, Mark A. Greer wrote:
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
+> 
+> Add the generic AM33XX SHAM module's device tree data and
+> enable it for the am335x-evm, am335x-evmsk, and am335x-bone
+> platforms.  Also add Documentation file describing the data
+> for the SHAM module.
+> 
+> CC: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> ---
+>  .../devicetree/bindings/crypto/omap-sham.txt       | 33 ++++++++++++++++++++++
+>  arch/arm/boot/dts/am335x-bone.dts                  |  4 +++
+>  arch/arm/boot/dts/am335x-evm.dts                   |  4 +++
+>  arch/arm/boot/dts/am335x-evmsk.dts                 |  3 ++
+>  arch/arm/boot/dts/am33xx.dtsi                      |  9 ++++++
+>  5 files changed, 53 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/crypto/omap-sham.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/crypto/omap-sham.txt b/Documentation/devicetree/bindings/crypto/omap-sham.txt
+> new file mode 100644
+> index 0000000..c6d1202
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/crypto/omap-sham.txt
+> @@ -0,0 +1,33 @@
+> +OMAP SoC SHA crypto Module
+> +
+> +Required properties:
+> +
+> +- compatible : Should contain entries for this and backward compatible
+> +  SHAM versions:
+> +  - "ti,omap2-sham" for OMAP2 & OMAP3.
+> +  - "ti,omap4-sham" for OMAP4 and AM33XX.
+> +  Note that these two versions are incompatible.
+> +- ti,hwmods: Name of the hwmod associated with the SHAM module
+> +- reg : Offset and length of the register set for the module
+> +- interrupt-parent : the phandle for the interrupt controller that
+> +  services interrupts for this module.
+> +- interrupts : the interrupt number for the SHAM module.
+> +
+> +Optional properties:
+> +- dmas: DMA controller phandle and DMA request ordered pair.
+> +	Only one rx pair is valid per SHAM module.
+> +- dma-names: DMA request name. This string corresponds 1:1 with
+> +	the ordered pair in dmas. The string naming is to be
+> +	"rx" for RX request.
+> +
+> +Example:
+> +	/* AM335x */
+> +	sham: sham at 53100000 {
+> +		compatible = "ti,omap4-sham";
+> +		ti,hwmods = "sham";
+> +		reg = <0x53100000 0x200>;
+> +		interrupt-parent = <&intc>;
+> +		interrupts = <109>;
+> +		dmas = <&edma 36>;
+> +		dma-names = "rx";
+> +	};
+> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+> index 444b4ed..bc75b2c 100644
+> --- a/arch/arm/boot/dts/am335x-bone.dts
+> +++ b/arch/arm/boot/dts/am335x-bone.dts
+> @@ -234,3 +234,7 @@
+>  	pinctrl-0 = <&davinci_mdio_default>;
+>  	pinctrl-1 = <&davinci_mdio_sleep>;
+>  };
+> +
+> +&sham {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+> index 3aee1a4..9b8c56d 100644
+> --- a/arch/arm/boot/dts/am335x-evm.dts
+> +++ b/arch/arm/boot/dts/am335x-evm.dts
+> @@ -488,3 +488,7 @@
+>  		ti,adc-channels = <4 5 6 7>;
+>  	};
+>  };
+> +
+> +&sham {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+> index 0c8ad17..b04aea1 100644
+> --- a/arch/arm/boot/dts/am335x-evmsk.dts
+> +++ b/arch/arm/boot/dts/am335x-evmsk.dts
+> @@ -401,4 +401,7 @@
+>  &cpsw_emac1 {
+>  	phy_id = <&davinci_mdio>, <1>;
+>  	phy-mode = "rgmii-txid";
+> +
+> +&sham {
+> +	status = "okay";
+ "};" is missing here.
+>  };
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 38b446b..eb0e719 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -529,6 +529,15 @@
+>  			#address-cells = <2>;
+>  			#size-cells = <1>;
+>  			status = "disabled";
+> +
+> +		sham: sham at 53100000 {
+> +			compatible = "ti,omap4-sham";
+> +			ti,hwmods = "sham";
+> +			reg = <0x53100000 0x200>;
+> +			interrupt-parent = <&intc>;
+> +			interrupts = <109>;
+> +			dmas = <&edma 36>;
+> +			dma-names = "rx";
+ditto...
 
-> >> The second method is finding some other shared structure given that we
-> >> get a platform_device in the probe function, yet I couldn't find
-> >> anything and this platform_device isn't the same as the one from the .read.
-> > It should be, why isn't it?
-> I think that's a little above my grasp :p
-> >
-> >> Of course using a global var bypasses this issue, but I'm sure it won't
-> >> pass review ;)
-> > The platform device structure should have what you need, right?
-> Should, but doesn't :(
-> >
-> >> So using these new patches for binary attributes, how can I pass data
-> >> between my driver and the sysfs files using a platform_driver? Or are
-> >> other 'hacks' needed and using the .groups attribute from
-> >> platform_driver->device_driver->groups is really the wrong approach.
-> >>
-> >> I did ask around and still haven't figured it out so far, so I do
-> >> apologize if you feel I'm wasting your precious time.
-> > How is the platform device not the same thing that was passed to your
-> > probe function?
-> I don't know :( But i'll add the relevant sections with printk results 
-> below, which I should have done before, then again those printk's were 
-> not supposed to be in that e-mail to begin with ;)
-> 
-> So if I'm not seeing something stupidly obvious, feel free to shout at me :)
+And please specify in commit log that this series is dependent on
+Joel's "[PATCH 1/2] ARM: dts: add AM33XX EDMA support" series.
 
-Your code looks good, and correct, to me, I don't see anything obviously
-wrong.  What creates your platform device in the first place?
-
+Thanks,
+Lokesh 
+>  		};
+>  	};
+>  };
 > 
-> static ssize_t sid_read(struct file *fd, struct kobject *kobj,
->              struct bin_attribute *attr, char *buf,
->              loff_t pos, size_t size)
-> {
->      struct platform_device *pdev;
->      void __iomem *sid_reg_base;
->      int i;
-> 
->      pdev = to_platform_device(kobj_to_dev(kobj));
->      sid_reg_base = (void __iomem *)platform_get_drvdata(pdev);
->      printk("0x%p, 0x%p, 0x%p, 0x%p\n", kobj, kobj_to_dev(kobj), pdev, 
-> sid_reg_base);
-> 
-> 0xef1e7c80, 0xef1e7c78, 0xef1e7c68, 0x  (null)
-> 
->      if (pos < 0 || pos >= SID_SIZE)
->          return 0;
->      if (size > SID_SIZE - pos)
->          size = SID_SIZE - pos;
-> 
->      for (i = 0; i < size; i++)
->          buf[i] = sunxi_sid_read_byte(sid_reg_base, pos + i);
-> 
->      return i;
-> }
-> 
-> 
-> static struct bin_attribute sid_bin_attr = {
->      .attr = { .name = "eeprom", .mode = S_IRUGO, },
->      .size = SID_SIZE,
->      .read = sid_read,
-> };
-> 
-> static struct bin_attribute *sunxi_sid_attrs[] = {
->      &sid_bin_attr,
->      NULL,
-> };
-> 
-> static const struct attribute_group sunxi_sid_group = {
->      .bin_attrs = sunxi_sid_attrs,
-> };
-
-If you create a "normal" attribute here as well, does that work
-properly?
-
-> 
-> static const struct attribute_group *sunxi_sid_groups[] = {
->      &sunxi_sid_group,
->      NULL,
-> };
-> 
-> static int __init sunxi_sid_probe(struct platform_device *pdev)
-> {
->      struct resource *res;
->      void __iomem *sid_reg_base;
->      u8 entropy[SID_SIZE];
->      unsigned int i;
-> 
->      res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->      sid_reg_base = devm_ioremap_resource(&pdev->dev, res);
->      if (IS_ERR(sid_reg_base))
->          return PTR_ERR(sid_reg_base);
->      platform_set_drvdata(pdev, sid_reg_base);
-> 
->      for (i = 0; i < SID_SIZE; i++)
->          entropy[i] = sunxi_sid_read_byte(sid_reg_base, i);
->      add_device_randomness(entropy, SID_SIZE);
->      dev_dbg(&pdev->dev, "%s loaded\n", DRV_NAME);
->      printk("0x%p, 0x%p\n", pdev, sid_reg_base);
-> 
-> 0xef02b000, 0xf1c23800
-
-The memory locations are really different here, that's strange, I don't
-know what is going on, sorry.
-
-Try a text attribute to ensure that works properly.
-
-greg k-h
