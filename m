@@ -1,75 +1,83 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 17 Jul 2013 13:00:21 +0200
-Subject: [PATCH 2/2] pwm: Add PWM polarity flag macros for DT
-In-Reply-To: <51E4C073.4020407@wwwdotorg.org>
-References: <1373553468-6564-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2883016.87pKJk9n0R@avalon> <51E4C073.4020407@wwwdotorg.org>
-Message-ID: <2989497.8E7gzkcamn@avalon>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Wed, 17 Jul 2013 12:10:16 +0100
+Subject: arm: Only load TLS values when needed
+In-Reply-To: <51E59E8F.1060501@dawncrow.de>
+References: <51E42E11.1010903@dawncrow.de> <51E5836B.1010904@arm.com>
+ <51E59E8F.1060501@dawncrow.de>
+Message-ID: <51E67B98.9040101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Andr?,
 
-On Monday 15 July 2013 21:39:31 Stephen Warren wrote:
-> On 07/15/2013 07:10 PM, Laurent Pinchart wrote:
-> > On Friday 12 July 2013 08:42:41 Stephen Warren wrote:
-> ...
-> 
-> >> I think the values for any common system-wide flags should be defined
-> >> once in some system-wide place, and the values for any HW-specific
-> >> values should be defined only in the documentation for that specific HW.
-> >> You could try and avoid conflicts by either:
-> >> 
-> >> a) Allocating system-wide flags from bit 0 up, and HW-specific flags
-> >> from bit 31 down.
-> >> 
-> >> or:
-> >> 
-> >> b) Using 1 cell for standard flags, and a separate cell for any
-> >> HW-specific flags. Drivers can quite easily adapt to adding extra cells
-> >> to #pwm-cells, thus making adding a HW-specific cell later
-> >> backwards-compatible.
-> > 
-> > I wasn't referring to HW-specific flags, but rather to system-wide flags
-> > that might not be supported by all drivers. If we later add new
-> > system-wide flags I think the individual DT bindings should explicitly
-> > document which flags they support.
-> 
-> Shouldn't all system-wide flags be supported by all HW, perhaps being
-> implemented by the core subsystem rather than individual drivers to
-> ensure that? Consider the case of the GPIO active-low flag which is
-> actually implemented in SW, hence can work with any GPIO controller.
-> 
-> Perhaps that's not possible in all cases, in which case, yes, it does
-> make sense to define which of the common flags a particular HW module
-> supports.
+On 16/07/13 20:27, Andr? Hentschel wrote:
+> Hi Jonathan, First, thank you for your review.
+>
+> Am 16.07.2013 19:31, schrieb Jonathan Austin:
+>> Hi Andr?,
+>>
+>> On 15/07/13 18:14, Andr? Hentschel wrote:
+>>> From: Andr? Hentschel <nerv@dawncrow.de>
+>>>
+>>> This patch intents to reduce loading instructions when the
+>>> resulting value is not used. It's a follow up on
+>>> a4780adeefd042482f624f5e0d577bf9cdcbb760
+>>>
+>>
+>> Have you done any benchmarking to see that this has any real
+>> impact? Or tested on a !Vv6k system? It looks possible that the
+>> only case where this will perform better is where we're using
+>> switch_tls_none or switch_tls_software (both rare cases, I think)
+>> and there's some change it will make things worse in other cases?
+>
+> I have to admit that i only tested it on v6k and did no benchmark.
+>
+Do you have access to anything v6-NOT-k-ish? If not I can try and test 
+this on something appropriate. How does your test-case access tpidrurw? 
+If it uses inline asm then it won't work on v6-not-k, as those 
+instructions aren't defined...
 
-It largely depends on what we consider as system flags. We should probably be 
-talking about common flags instead of system flags. I usually try to 
-standardize DT properties that are common to multiple devices. Some of those 
-properties can apply to all devices of the same class (possibly 
-implemented/emulated in software when the hardware doesn't support them), but 
-others are just commonly seen properties that don't make sense for all the 
-devices.
+>> One of the reasons for Russell's suggestion of placing the ldrd
+>> (which became the two ldr instructions you've removed from
+>> __switch_to, in order to maintain building for older cores) where
+>> it is was in order to reduce the chance of pipeline stalls.
+>>
+>> As I've pointed out below, there is some risk that changing that
+>> has implications for the v6 only case below (and the v6k case is
+>> now more prone to stalls with !CONFIG_CPU_USE_DOMAINS, but newer
+>> cores should have more advanced scheduling to avoid such issues
+>> anyway...)
+>
+> I'm not sure how this could make things worse on v6k, could you
+> elaborate please? Besides of the ldr and str being too close to each
+> other
 
-One example I'm familiar with can be found in V4L2 DT bindings. We've 
-standardized properties to specify what kind of video synchronization signals 
-devices support/use. Not all synchronization signals are supported by a given 
-video transmitter, so DT bindings for such chips list (or at least should 
-list) the common properties supported by a given device. The definitions of 
-the properties should of course not be duplicated to all individual DT 
-bindings.
+Yea, that's the only issue, and in the !CONFIG_CPU_USE_DOMAINS case 
+things are slightly worse than they were before
 
-> But then there's a problem where people assume that the common flags are
-> always available, and somewhere they aren't... Care is needed in the
-> choice of which common flags to define and/or how they're used.
+> i thought this patch is a good idea, because it removes two ldr
+> which are always executed. (Continuing below...)
 
-Exactly. That's why I think listing the supported common flags in individual 
-bindings makes sense when some of the flags are not supported by all devices. 
-As the only PWM flags currently used are common to all PWM devices I can leave 
-this out now. I have no strong preference, I'll follow your opinion on this.
+Indeed, as long as it doesn't cause pipeline stalls then that's a gain 
+for some cases :)
 
--- 
-Regards,
+[...]
+>> Now we've only got one instruction between the store and the load
+>> and risk stalling the pipeline...
+>>
+>> Dave M cautiously says "The ancient advice was that one instruction
+>> was enough" but this is very core dependent... I wonder if anyone
+>> has a good idea about whether this is an issue here...?
+>
+> We could use a ldrd at the top, that'd be nearly what we have right
+> now, don't we?
 
-Laurent Pinchart
+Yea, that'd be good - as far as I can see from an 1136 TRM, the ldrd 
+*may* be two cycles (depending on alignment of the words) but the ldr 
+and ldrne will always be two cycles. Ahhh, the joys of modifying the 
+fast path ;)
+
+Jonny
+>
+>
+>
