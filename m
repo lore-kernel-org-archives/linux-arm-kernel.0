@@ -1,29 +1,23 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 17 Jul 2013 11:53:32 +0300
-Subject: [PATCH V2] ARM: tegra: enable palmas device for dalmore
-In-Reply-To: <51E65C74.8060405@nvidia.com>
-References: <1373441852-27176-1-git-send-email-ldewangan@nvidia.com>
- <51E54FD1.1010404@nvidia.com> <51E65C74.8060405@nvidia.com>
-Message-ID: <51E65B8C.1000405@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Jul 2013 10:03:55 +0100
+Subject: sched_clock always 0 and no process time accounting with 3.11-rc1
+In-Reply-To: <20130717061925.GC6950@tarshish>
+References: <CAMo8BfLO31GgMMA_hENr0xm=qaUz3EVLtaQ8hewiQHdbV+s6sA@mail.gmail.com>
+ <20130717061925.GC6950@tarshish>
+Message-ID: <20130717090354.GK24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2013 11:57 AM, Laxman Dewangan wrote:
-> On Tuesday 16 July 2013 07:21 PM, Mikko Perttunen wrote:
->> On 07/10/2013 10:37 AM, Laxman Dewangan wrote:
->>> +
->>> +			palmas_gpio: gpio {
->>> +				compatible = "ti,palmas-gpio";
->>> +				gpio-controller;
->>> +				#gpio-cells = <2>;
->>> +			};
->> I don't think the palmas-gpio driver ever gets probed since it doesn't
->> have device tree compability strings?
->>
-> You will need the patch
-> [PATCH V3] gpio: palmas: add dt support
->
-> which is under review from last few days.
->
+On Wed, Jul 17, 2013 at 09:19:25AM +0300, Baruch Siach wrote:
+> Apparently the expression '(1 << 32)' evaluates to 1 on xtensa cross gcc, and 
+> x86_84 native gcc. According to my limited understanding, the C compiler is 
+> allowed to do so. This caused sched_clock_32() to return constant 0. I wonder 
+> how it didn't bite the ARM people who are using this code from quite some time 
+> (added LAKL to CC).
 
-Ah, ok. I guess I'm not on the proper ML for that one.
+It (a) used to be only 32-bit, and (b) <<32 on ARM evaluates to zero in
+a 32-bit context (it's not a rotate).
+
+Patch looks fine.  I wonder who takes it... after all, I used to look
+after that code (after all, I'm the author of it), but now I guess as
+it's been moved under kernel/time, it's someone elses responsibility.
