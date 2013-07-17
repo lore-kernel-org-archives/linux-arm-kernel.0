@@ -1,40 +1,51 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 17 Jul 2013 10:57:08 -0600
-Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <20130717030246.GA4541@S2101-09.ap.freescale.net>
-References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
- <20130716015038.GD28375@S2101-09.ap.freescale.net>
- <51E4BF98.8030604@wwwdotorg.org>
- <20130716041056.GA30067@S2101-09.ap.freescale.net>
- <51E56AA7.7020103@wwwdotorg.org>
- <20130717030246.GA4541@S2101-09.ap.freescale.net>
-Message-ID: <51E6CCE4.20705@wwwdotorg.org>
+From: rric@kernel.org (Robert Richter)
+Date: Wed, 17 Jul 2013 18:57:43 +0200
+Subject: [PATCH] arm, kbuild: make "make install" not depend on vmlinux
+In-Reply-To: <CA+55aFx4G5gME3ByqE0Wr-_t2x_6WkP3Ta4k1z4jfW+PrcK0og@mail.gmail.com>
+References: <20130710133742.GA29368@emu.suse.cz>
+ <CA+55aFxtvT3Yvbxe5JGBThZS13payymFJ7jCLyEiE2iNDvsZtQ@mail.gmail.com>
+ <20130711135445.GA21500@sepie.suse.cz>
+ <CA+55aFyVjugxM7cUDWi0ASWttYthCxa6e7X3CADknBcSFxWgew@mail.gmail.com>
+ <20130712105721.GF8731@rric.localhost>
+ <20130717160506.GI8731@rric.localhost>
+ <CA+55aFx4G5gME3ByqE0Wr-_t2x_6WkP3Ta4k1z4jfW+PrcK0og@mail.gmail.com>
+Message-ID: <20130717165743.GK8731@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2013 09:02 PM, Shawn Guo wrote:
-> On Tue, Jul 16, 2013 at 09:45:43AM -0600, Stephen Warren wrote:
->> Registering the driver earlier won't cause any bugs. However, it's not
->> the correct approach.
->>
->> Deferred probe /is/ the approach for assuring correct dependencies
->> between drivers. It works and should be used. There are not enough
->> initcall levels to play games using initcalls and solve all the issues,
->> and the ordering requirements vary board-to-board. Deferred probe at
->> runtime handles this without having to manually place all the drivers
->> into specific initcall levels, and dynamically adjusts to board
->> differences, since it all happens automatically at run-time.
+On 17.07.13 09:36:57, Linus Torvalds wrote:
+> On Wed, Jul 17, 2013 at 9:05 AM, Robert Richter <rric@kernel.org> wrote:
+> >
+> > I narrowed this down. The problem is that zinstall on ARCH=arm has a
+> > dependency to vmlinux which does a prepare/prepare3 and finally does a
+> > forced rebuild of kernel.release even if it exists already.
+> >
+> > Rebuilding it removes kernel.release first and then recreates it. This
+> > might race with another parallel make job running depmod.
+> >
+> > So on arm and maybe other archs we need the same as for x86:
+> >
+> >  1648e4f8 x86, kbuild: make "make install" not depend on vmlinux
+> >
+> > The patch below fixes this for arm. It is build-tested in my
+> > environment, but please test it in others too if possible.
 > 
-> I do not quite follow the argument here.  I agree with you that
-> deferred probe is the approach to solve dependencies.  But it does not
-> necessarily mean that initcall can not be used to help it save some
-> nasty or nested deferring.  Deferred probe and initcalls are not two
-> mutually exclusive mechanisms but two which can help each other.
+> Ack. This looks like the right thing to do.
 
-My understanding is that deferred probe was implemented specifically to
-avoid having to, or allowing, the use of initcall levels to determine
-probe order.
+Thanks for looking at this.
 
-However, if someone closely associated with the implementation of
-deferred probe (e.g. Grant, or a device core maintainer) is willing to
-step up and say I'm wrong, I'll drop my objection.
+> That said, I think for clarity you might perhaps want to make the
+> unrelated change of adding double quotes around $(KERNELRELEASE) a
+> separate patch. Not a big deal, but it took me a moment to say "why
+> did he do that" (in fact, I'm not sure KERNEL_RELEASE can actually
+> validly have spaces in it, but quoting it is certainly not wrong
+> either - but it might be unnecessary.
+
+If kernel.release doen't exist KERNEL_RELEASE is empty, thus all args
+for install.sh shift one arg left. Putting it in quotes avoids this.
+Noticed this since the first verified file in install.sh ($2) should
+be the image file but was already System.map ($3).
+
+Will splitt the patches and resend.
+
+-Robert
