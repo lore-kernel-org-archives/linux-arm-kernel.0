@@ -1,137 +1,163 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Wed, 17 Jul 2013 16:26:28 +0200
-Subject: [PATCH v1 01/24] spi: mpc512x: prepare clocks before enabling them
-In-Reply-To: <20130717120758.GR22506@sirena.org.uk>
-References: <1373914074-20889-1-git-send-email-gsi@denx.de>
- <1373914074-20889-2-git-send-email-gsi@denx.de>
- <20130715201734.GF11538@sirena.org.uk>
- <20130717112229.GK7080@book.gsilab.sittig.org>
- <20130717120758.GR22506@sirena.org.uk>
-Message-ID: <20130717142628.GN7080@book.gsilab.sittig.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 17 Jul 2013 10:30:10 -0400 (EDT)
+Subject: [RFC PATCH v2 01/15] of: add support for retrieving cpu node
+ for a given logical cpu index
+In-Reply-To: <1374069984-20567-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374069984-20567-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <alpine.LFD.2.03.1307171023410.14924@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 13:07 +0100, Mark Brown wrote:
+On Wed, 17 Jul 2013, Sudeep.KarkadaNagesha at arm.com wrote:
+
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 > 
-> On Wed, Jul 17, 2013 at 01:22:29PM +0200, Gerhard Sittig wrote:
-> > On Mon, Jul 15, 2013 at 21:17 +0100, Mark Brown wrote:
-> > > On Mon, Jul 15, 2013 at 08:47:30PM +0200, Gerhard Sittig wrote:
+> Currently different drivers requiring to access cpu device node are
+> parsing the device tree themselves. Since the ordering in the DT need
+> not match the logical cpu ordering, the parsing logic needs to consider
+> that. However, this has resulted in lots of code duplication and in some
+> cases even incorrect logic.
 > 
-> > > >   sprintf(name, "psc%d_mclk", master->bus_num);
-> > > >  	spiclk = clk_get(&master->dev, name);
-> > > > -	clk_enable(spiclk);
-> > > > +	clk_prepare_enable(spiclk);
-> > > >  	mps->mclk = clk_get_rate(spiclk);
-> > > >  	clk_put(spiclk);
+> It's better to consolidate them by adding support for getting cpu
+> device node for a given logical cpu index in DT core library. However
+> logical to physical index mapping can be architecture specific.
 > 
-> > > This code is *clearly* buggy and should be fixed rather than papered
-> > > over.  Not only is there no matching put the driver is also dropping the
-> > > reference to the clock rather than holding on to it while it's in use.
+> This patch adds of_get_cpu_node to retrieve a cpu device node for a
+> given logical cpu index. The default matching of the physical id to the
+> logical cpu index can be overridden by architecture specific code.
 > 
-> > "This code" refers to the driver's original condition, right?  I
-> > agree that the driver has been suffering from incomplete clock
-> > handling since it was born three years ago.  And that this issue
-> > shall get addressed.  The question is just whether it needs to be
-> > part of this series which has a different focus.
+> It is recommended to use these helper function only in pre-SMP/early
+> initialisation stages to retrieve CPU device node pointers in logical
+> ordering. Once the cpu devices are registered, it can be retrieved easily
+> from cpu device of_node which avoids unnecessary parsing and matching.
 > 
-> This is a pretty long e-mail.  It'd probably have taken less time to
-> fix the issues than to reply to the e-mail...  but anyway.
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> ---
+>  drivers/of/base.c  | 66 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of.h |  5 +++++
+>  2 files changed, 71 insertions(+)
+> 
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 5c54279..363b8f9 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -230,6 +230,72 @@ const void *of_get_property(const struct device_node *np, const char *name,
+>  }
+>  EXPORT_SYMBOL(of_get_property);
+>  
+> +/*
+> + * arch_match_cpu_phys_id - Match the given logical CPU and physical id
+> + *
+> + * @cpu: logical index of a cpu
+> + * @phys_id: physical identifier of a cpu
+> + *
+> + * CPU logical to physical index mapping is architecure specific.
 
-[ this is meta stuff, technical details are after the next quotation ]
+Typo.
 
-Not quite.  Please consider that careful submission is as
-expensive as thorough review is, and that a lot of work is done
-before v1 gets submitted, which you may not always notice from
-looking at a concentrated series that may no longer suggest how
-much it took to get there (especially when prepared carefully).
+> + * However this __weak function provides a default match of physical
+> + * id to logical cpu index.
+> + *
+> + * Returns 1 if the physical identifier and the logical index correspond
+> + * to the same cpu, 0 otherwise.
+> + */
+> +int __weak arch_match_cpu_phys_id(int cpu, u64 phys_id)
 
-As mentioned before I did not question the need to fix issues as
-they get identified.  I just asked whether reworking the serial
-driver is in the scope of this series which provides a different
-clock driver implementation for the platform.  To me these two
-things are orthogonal, while I did promise to see how I can
-address your concerns.
+Please use a bool return type, and use true/false rather than 1/0 in the 
+comment.
 
-Let's provide the technical information you need to judge the
-quality of the submission and see why it shall be acceptable:
+> +{
+> +	return (u32)phys_id == cpu;
+> +}
+> +
+> +/**
+> + * of_get_cpu_node - Get device node associated with the given logical CPU
+> + *
+> + * @cpu: CPU number(logical index) for which device node is required
+> + *
+> + * The main purpose of this function is to retrieve the device node for the
+> + * given logical CPU index. It should be used to intialise the of_node in
 
+Typo.
 
-> A big part of the issue with the state of the driver is that there's
-> obvious clock API abuse going on that isn't corrected here - the main
-> one is that the sprintf() for the clock name is a fairly clear warning
-> sign, the driver should be using a fixed value there.  This raises a
-> warning flag for me about the quality of the common clock API
-> implementation that's being sent and/or the potential for bugs to be
-> noticed with the common clock framework.  I'd not expect this code to
-> actually work, and looking at the rest of the series I don't see how it
-> does since I can't see what forces the name.
+> + * cpu device. Once of_node in cpu device is populated, all the further
+> + * references can use that instead.
+> + *
+> + * CPU logical to physical index mapping is architecure specific and is built
 
-Why the code does work:
+Typo.
 
-OK, here is why the driver keeps its state throughout the set and
-is operational as good or as bad as it was before:
-
-The sprintf() in the SPI driver used to construct a name which
-includes the PSC index.  This applies to the UART driver as well,
-as they both use the PSC controller hardware to implement their
-serial communication.
-
-The corresponding clock name was found in the previous PPC_CLOCK
-implementation since the clock driver provided those names which
-include the PSC index (fixed strings in a table).
-
-The initial COMMON_CLK implementation in part 09/24 registers
-clkdev items for compatibility during migration.  The string
-isn't greppable since it's constructed by the preprocessor in the
-MCLK data setup, see the MCLK_SETUP_DATA_PSC() macro.
-
-Part 13/24 adjusts the SPI driver to no longer construct a name,
-but instead use a fixed string after OF based clock lookup became
-available.  This shall meet your expectation and simplifies the
-client side.  Part 15/24 does the same for the UART driver.
-
-Part 16/24 removes the clkdev registration in the clock driver
-after both the UART and SPI clients switched to OF clock lookups.
-
-At this stage things are the way you would expect:  The client
-uses a fixed string in the lookup, while lookup occurs via device
-tree, and instances are supported without the clients'
-constructing something based on a component index.
-
-Remaining issues are not with the common clock support of the
-platform, but in the serial driver and are identical to the
-previous (actually: the initial) status.  While we agree on the
-existance of the remaining issue and the desire to address it.
-Just not on which context that fix shall be done in.
-
-
-The series' status and perspective:
-
-The UART and SPI drivers did work before, while it's true that
-clock handling wasn't complete (in non-fatal ways).  This has
-been the case in the past, and has been identified just now.
-
-The serial drivers are kept operational during migration, and
-still are operational after the series.  But now they use common
-clock and OF lookups, which is an improvement for the platform in
-my eyes.
-
-It's true that the status of the serial driver isn't improved
-with the series -- but it isn't degraded either, while
-(additional) breakage actively gets prevented.
-
-Now let me see how I can improve the SPI driver with regard to
-overall clock handling and beyond mere operation by coincidence
-in the absence of errors.  But please understand that I don't
-want to stall the common clock support for a whole platform just
-because some of the drivers it needs to touch to keep them
-operational have other issues that weren't addressed yet, while
-these issues aren't introduced with the series but preceed it.
-
-
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+> + * before booting secondary cores. This function uses arch_match_cpu_phys_id
+> + * which can be overridden by architecture specific implementation.
+> + *
+> + * Returns a node pointer for the logical cpu if found, else NULL.
+> + */
+> +struct device_node *of_get_cpu_node(int cpu)
+> +{
+> +	struct device_node *cpun, *cpus;
+> +	const u32 *cell;
+> +	u64 hwid;
+> +	int ac, prop_len;
+> +
+> +	cpus = of_find_node_by_path("/cpus");
+> +	if (WARN(!cpus, "Missing cpus node, bailing out\n"))
+> +		return NULL;
+> +
+> +	if (WARN_ON(of_property_read_u32(cpus, "#address-cells", &ac)))
+> +		ac = of_n_addr_cells(cpus);
+> +
+> +	for_each_child_of_node(cpus, cpun) {
+> +		if (of_node_cmp(cpun->type, "cpu"))
+> +			continue;
+> +		cell = of_get_property(cpun, "reg", &prop_len);
+> +		if (WARN(!cell, "%s: missing reg property\n", cpun->full_name))
+> +			continue;
+> +
+> +		while (prop_len) {
+> +			hwid = of_read_number(cell, ac);
+> +			prop_len -= ac;
+> +			if (arch_match_cpu_phys_id(cpu, hwid))
+> +				return cpun;
+> +		}
+> +	}
+> +
+> +	return NULL;
+> +}
+> +
+>  /** Checks if the given "compat" string matches one of the strings in
+>   * the device's "compatible" property
+>   */
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index 1fd08ca..150b48e 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -266,6 +266,7 @@ extern int of_device_is_available(const struct device_node *device);
+>  extern const void *of_get_property(const struct device_node *node,
+>  				const char *name,
+>  				int *lenp);
+> +extern struct device_node *of_get_cpu_node(int cpu);
+>  #define for_each_property_of_node(dn, pp) \
+>  	for (pp = dn->properties; pp != NULL; pp = pp->next)
+>  
+> @@ -458,6 +459,10 @@ static inline const void *of_get_property(const struct device_node *node,
+>  {
+>  	return NULL;
+>  }
+> +static inline struct device_node *of_get_cpu_node(int cpu)
+> +{
+> +	return NULL;
+> +}
+>  
+>  static inline int of_property_read_u64(const struct device_node *np,
+>  				       const char *propname, u64 *out_value)
+> -- 
+> 1.8.1.2
+> 
+> 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> 
