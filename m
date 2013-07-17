@@ -1,234 +1,130 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 17 Jul 2013 16:49:53 +0200
-Subject: [PATCH v2 18/42] ARM: at91: move at91sam9n12 SoC to new at91 clk
- implem
-In-Reply-To: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
-References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1374072593-19740-1-git-send-email-b.brezillon@overkiz.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 17 Jul 2013 09:50:49 -0500
+Subject: [RFC PATCH v2 01/15] of: add support for retrieving cpu node
+ for a given logical cpu index
+In-Reply-To: <1374069984-20567-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374069984-20567-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <51E6AF49.20403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes all references to the old at91 clks for at91sam9n12 SoC.
-This SoC only supports dt boards: we can remove register_clocks
-(all clocks are defined in dt).
+On 07/17/2013 09:06 AM, Sudeep.KarkadaNagesha at arm.com wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> Currently different drivers requiring to access cpu device node are
+> parsing the device tree themselves. Since the ordering in the DT need
+> not match the logical cpu ordering, the parsing logic needs to consider
+> that. However, this has resulted in lots of code duplication and in some
+> cases even incorrect logic.
+> 
+> It's better to consolidate them by adding support for getting cpu
+> device node for a given logical cpu index in DT core library. However
+> logical to physical index mapping can be architecture specific.
+> 
+> This patch adds of_get_cpu_node to retrieve a cpu device node for a
+> given logical cpu index. The default matching of the physical id to the
+> logical cpu index can be overridden by architecture specific code.
+> 
+> It is recommended to use these helper function only in pre-SMP/early
+> initialisation stages to retrieve CPU device node pointers in logical
+> ordering. Once the cpu devices are registered, it can be retrieved easily
+> from cpu device of_node which avoids unnecessary parsing and matching.
+> 
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/mach-at91/at91sam9n12.c |  194 --------------------------------------
- 1 file changed, 194 deletions(-)
+One comment below, but otherwise for patches 1-4, 8 and 9:
 
-diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-index c270503..e4863fc 100644
---- a/arch/arm/mach-at91/at91sam9n12.c
-+++ b/arch/arm/mach-at91/at91sam9n12.c
-@@ -19,202 +19,9 @@
- #include "board.h"
- #include "soc.h"
- #include "generic.h"
--#include "clock.h"
- #include "sam9_smc.h"
- 
- /* --------------------------------------------------------------------
-- *  Clocks
-- * -------------------------------------------------------------------- */
--
--/*
-- * The peripheral clocks.
-- */
--static struct clk pioAB_clk = {
--	.name		= "pioAB_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_PIOAB,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk pioCD_clk = {
--	.name		= "pioCD_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_PIOCD,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk usart0_clk = {
--	.name		= "usart0_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_USART0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk usart1_clk = {
--	.name		= "usart1_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_USART1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk usart2_clk = {
--	.name		= "usart2_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_USART2,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk usart3_clk = {
--	.name		= "usart3_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_USART3,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk twi0_clk = {
--	.name		= "twi0_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_TWI0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk twi1_clk = {
--	.name		= "twi1_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_TWI1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk mmc_clk = {
--	.name		= "mci_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_MCI,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk spi0_clk = {
--	.name		= "spi0_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_SPI0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk spi1_clk = {
--	.name		= "spi1_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_SPI1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk uart0_clk = {
--	.name		= "uart0_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_UART0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk uart1_clk = {
--	.name		= "uart1_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_UART1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk tcb_clk = {
--	.name		= "tcb_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_TCB,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk pwm_clk = {
--	.name		= "pwm_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_PWM,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk adc_clk = {
--	.name		= "adc_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_ADC,
--	.type	= CLK_TYPE_PERIPHERAL,
--};
--static struct clk dma_clk = {
--	.name		= "dma_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_DMA,
--	.type	= CLK_TYPE_PERIPHERAL,
--};
--static struct clk uhp_clk = {
--	.name		= "uhp",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_UHP,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk udp_clk = {
--	.name		= "udp_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_UDP,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk lcdc_clk = {
--	.name		= "lcdc_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_LCDC,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk ssc_clk = {
--	.name		= "ssc_clk",
--	.pmc_mask	= 1 << AT91SAM9N12_ID_SSC,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--
--static struct clk *periph_clocks[] __initdata = {
--	&pioAB_clk,
--	&pioCD_clk,
--	&usart0_clk,
--	&usart1_clk,
--	&usart2_clk,
--	&usart3_clk,
--	&twi0_clk,
--	&twi1_clk,
--	&mmc_clk,
--	&spi0_clk,
--	&spi1_clk,
--	&lcdc_clk,
--	&uart0_clk,
--	&uart1_clk,
--	&tcb_clk,
--	&pwm_clk,
--	&adc_clk,
--	&dma_clk,
--	&uhp_clk,
--	&udp_clk,
--	&ssc_clk,
--};
--
--static struct clk_lookup periph_clocks_lookups[] = {
--	/* lookup table for DT entries */
--	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
--	CLKDEV_CON_DEV_ID("usart", "f801c000.serial", &usart0_clk),
--	CLKDEV_CON_DEV_ID("usart", "f8020000.serial", &usart1_clk),
--	CLKDEV_CON_DEV_ID("usart", "f8024000.serial", &usart2_clk),
--	CLKDEV_CON_DEV_ID("usart", "f8028000.serial", &usart3_clk),
--	CLKDEV_CON_DEV_ID("t0_clk", "f8008000.timer", &tcb_clk),
--	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb_clk),
--	CLKDEV_CON_DEV_ID("mci_clk", "f0008000.mmc", &mmc_clk),
--	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma_clk),
--	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
--	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
--	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
--	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioAB_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioAB_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCD_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioCD_clk),
--	/* additional fake clock for macb_hclk */
--	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &uhp_clk),
--	CLKDEV_CON_DEV_ID("ohci_clk", "500000.ohci", &uhp_clk),
--};
--
--/*
-- * The two programmable clocks.
-- * You must configure pin multiplexing to bring these signals out.
-- */
--static struct clk pck0 = {
--	.name		= "pck0",
--	.pmc_mask	= AT91_PMC_PCK0,
--	.type		= CLK_TYPE_PROGRAMMABLE,
--	.id		= 0,
--};
--static struct clk pck1 = {
--	.name		= "pck1",
--	.pmc_mask	= AT91_PMC_PCK1,
--	.type		= CLK_TYPE_PROGRAMMABLE,
--	.id		= 1,
--};
--
--static void __init at91sam9n12_register_clocks(void)
--{
--	int i;
--
--	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
--		clk_register(periph_clocks[i]);
--	clk_register(&pck0);
--	clk_register(&pck1);
--
--	clkdev_add_table(periph_clocks_lookups,
--			 ARRAY_SIZE(periph_clocks_lookups));
--
--}
--
--/* --------------------------------------------------------------------
-  *  AT91SAM9N12 processor initialization
-  * -------------------------------------------------------------------- */
- 
-@@ -225,5 +32,4 @@ static void __init at91sam9n12_map_io(void)
- 
- AT91_SOC_START(at91sam9n12)
- 	.map_io = at91sam9n12_map_io,
--	.register_clocks = at91sam9n12_register_clocks,
- AT91_SOC_END
--- 
-1.7.9.5
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+Also, patch 3 needs to come before patch 2 or the matching will be wrong
+if patch 3 is not applied.
+
+> ---
+>  drivers/of/base.c  | 66 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of.h |  5 +++++
+>  2 files changed, 71 insertions(+)
+> 
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 5c54279..363b8f9 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -230,6 +230,72 @@ const void *of_get_property(const struct device_node *np, const char *name,
+>  }
+>  EXPORT_SYMBOL(of_get_property);
+>  
+> +/*
+> + * arch_match_cpu_phys_id - Match the given logical CPU and physical id
+> + *
+> + * @cpu: logical index of a cpu
+> + * @phys_id: physical identifier of a cpu
+> + *
+> + * CPU logical to physical index mapping is architecure specific.
+> + * However this __weak function provides a default match of physical
+> + * id to logical cpu index.
+> + *
+> + * Returns 1 if the physical identifier and the logical index correspond
+> + * to the same cpu, 0 otherwise.
+> + */
+> +int __weak arch_match_cpu_phys_id(int cpu, u64 phys_id)
+> +{
+> +	return (u32)phys_id == cpu;
+> +}
+> +
+> +/**
+> + * of_get_cpu_node - Get device node associated with the given logical CPU
+> + *
+> + * @cpu: CPU number(logical index) for which device node is required
+> + *
+> + * The main purpose of this function is to retrieve the device node for the
+> + * given logical CPU index. It should be used to intialise the of_node in
+> + * cpu device. Once of_node in cpu device is populated, all the further
+> + * references can use that instead.
+> + *
+> + * CPU logical to physical index mapping is architecure specific and is built
+> + * before booting secondary cores. This function uses arch_match_cpu_phys_id
+> + * which can be overridden by architecture specific implementation.
+> + *
+> + * Returns a node pointer for the logical cpu if found, else NULL.
+> + */
+> +struct device_node *of_get_cpu_node(int cpu)
+> +{
+> +	struct device_node *cpun, *cpus;
+> +	const u32 *cell;
+> +	u64 hwid;
+> +	int ac, prop_len;
+> +
+> +	cpus = of_find_node_by_path("/cpus");
+> +	if (WARN(!cpus, "Missing cpus node, bailing out\n"))
+
+What happens on a system with no /cpus nodes? Seems like this is another
+case of adding new warnings to existing working systems.
+
+I'd replace all the WARN's with a single pr_warn on any errors below.
+For missing /cpus, I would just silently return.
+
+Rob
+
+> +		return NULL;
+> +
+> +	if (WARN_ON(of_property_read_u32(cpus, "#address-cells", &ac)))
+> +		ac = of_n_addr_cells(cpus);
+> +
+> +	for_each_child_of_node(cpus, cpun) {
+> +		if (of_node_cmp(cpun->type, "cpu"))
+> +			continue;
+> +		cell = of_get_property(cpun, "reg", &prop_len);
+> +		if (WARN(!cell, "%s: missing reg property\n", cpun->full_name))
+> +			continue;
+> +
+> +		while (prop_len) {
+> +			hwid = of_read_number(cell, ac);
+> +			prop_len -= ac;
+> +			if (arch_match_cpu_phys_id(cpu, hwid))
+> +				return cpun;
+> +		}
+> +	}
+> +
+> +	return NULL;
+> +}
