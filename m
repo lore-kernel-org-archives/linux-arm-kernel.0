@@ -1,88 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 18 Jul 2013 08:30:15 +0900
-Subject: [GIT 00/22] Renesas ARM based SoC cleanups for v3.12
-Message-ID: <cover.1374103272.git.horms+renesas@verge.net.au>
+Date: Thu, 18 Jul 2013 08:32:06 +0900
+Subject: [PATCH 05/22] ARM: shmobile: r8a73a4: Remove init_irq declaration in
+ machine description
+In-Reply-To: <cover.1374103272.git.horms+renesas@verge.net.au>
+References: <cover.1374103272.git.horms+renesas@verge.net.au>
+Message-ID: <0bdbe04db005e025d3522ad3ae9797a4954528e9.1374103272.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-please consider the following cleanups for v3.12.
+Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
+specified") removed the need to explictly setup the init_irq field in
+the machine description when using only irqchip_init. Remove that
+declaration for shmobile as well.
 
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a73a4.c |    2 --
+ 1 file changed, 2 deletions(-)
 
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-for-v3.12
-
-for you to fetch changes up to ebd9616f439a8a46b9dca9a272b342f34c5f3614:
-
-  ARM: shmobile: Remove unused mach/dma.h (2013-07-17 10:02:30 +0900)
-
-----------------------------------------------------------------
-renesas-cleanup-for-v3.12 Renesas ARM based SoC cleanups for v3.12
-
-* remove mach/dma.h, it is not used
-* r8a7778 SoC: Removed unused r8a7778_init_irq
-* emev2 SoC: Use less verbose resource declarations
-* emev2 SoC: Correct typo in comment
-* r8a7790 SoC: Remove redundant init_machine callback
-* emev2, r8a7740, r8a7778, r8a7779, sh7372 and sh73a0 SoCs: Remove auxdata
-* emev2, r8a73a4, ape6evm, r8a7790 and sh73a0 SoCs, and
-  lager and kzm9g boards: remove init_irq declaration in machine description
-* sh73a0 SoC: pinmux platform device cleanup
-* r8a7778 SoC: add __initdata on resource and device data
-* armadillo800eva board: Remove unused commend and define
-
-----------------------------------------------------------------
-Guennadi Liakhovetski (1):
-      ARM: shmobile: armadillo800eva: remove left-overs
-
-Kuninori Morimoto (2):
-      ARM: shmobile: r8a7778: add __initdata on resource and device data
-      ARM: shmobile: r8a7778: remove r8a7778_init_irq()
-
-Magnus Damm (15):
-      ARM: shmobile: sh73a0 pinmux platform device cleanup
-      ARM: shmobile: ape6evm: Remove init_irq declaration in machine description
-      ARM: shmobile: lager: Remove init_irq declaration in machine description
-      ARM: shmobile: kzm9g: Remove init_irq declaration in machine description
-      ARM: shmobile: Remove unused EMEV2 auxdata and callback
-      ARM: shmobile: Remove unused r8a7740 auxdata table
-      ARM: shmobile: Remove unused r8a7778 auxdata and callback
-      ARM: shmobile: Remove unused r8a7779 auxdata table
-      ARM: shmobile: Remove unused sh7372 auxdata table
-      ARM: shmobile: Remove unused sh73a0 auxdata table
-      ARM: shmobile: Remove redundant r8a7790 callback
-      ARM: shmobile: Remove unused EMEV2/KZM9D early console
-      ARM: shmobile: Make EMEV2 platform devices more compact
-      ARM: shmobile: Fix EMEV2 clock comment typo
-      ARM: shmobile: Remove unused mach/dma.h
-
-Maxime Ripard (4):
-      ARM: shmobile: emev2: Remove init_irq declaration in machine description
-      ARM: shmobile: r8a73a4: Remove init_irq declaration in machine description
-      ARM: shmobile: r8a7790: Remove init_irq declaration in machine description
-      ARM: shmobile: sh73a0: Remove init_irq declaration in machine description
-
- arch/arm/mach-shmobile/board-ape6evm.c         |    2 -
- arch/arm/mach-shmobile/board-armadillo800eva.c |    9 -
- arch/arm/mach-shmobile/board-kzm9d.c           |    2 +-
- arch/arm/mach-shmobile/board-kzm9g-reference.c |    2 -
- arch/arm/mach-shmobile/board-lager.c           |    2 -
- arch/arm/mach-shmobile/clock-emev2.c           |    2 +-
- arch/arm/mach-shmobile/include/mach/dma.h      |    1 -
- arch/arm/mach-shmobile/include/mach/emev2.h    |    2 +-
- arch/arm/mach-shmobile/include/mach/r8a7778.h  |    1 -
- arch/arm/mach-shmobile/setup-emev2.c           |  353 +++++-------------------
- arch/arm/mach-shmobile/setup-r8a73a4.c         |    2 -
- arch/arm/mach-shmobile/setup-r8a7740.c         |   16 +-
- arch/arm/mach-shmobile/setup-r8a7778.c         |   72 ++---
- arch/arm/mach-shmobile/setup-r8a7779.c         |    7 +-
- arch/arm/mach-shmobile/setup-r8a7790.c         |    7 -
- arch/arm/mach-shmobile/setup-sh7372.c          |    7 +-
- arch/arm/mach-shmobile/setup-sh73a0.c          |   34 +--
- 17 files changed, 106 insertions(+), 415 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/include/mach/dma.h
+diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
+index 7f45c2e..a8c4e41 100644
+--- a/arch/arm/mach-shmobile/setup-r8a73a4.c
++++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+@@ -18,7 +18,6 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ #include <linux/irq.h>
+-#include <linux/irqchip.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_data/irq-renesas-irqc.h>
+@@ -194,7 +193,6 @@ static const char *r8a73a4_boards_compat_dt[] __initdata = {
+ };
+ 
+ DT_MACHINE_START(R8A73A4_DT, "Generic R8A73A4 (Flattened Device Tree)")
+-	.init_irq	= irqchip_init,
+ 	.init_machine	= r8a73a4_add_standard_devices_dt,
+ 	.init_time	= shmobile_timer_init,
+ 	.dt_compat	= r8a73a4_boards_compat_dt,
+-- 
+1.7.10.4
