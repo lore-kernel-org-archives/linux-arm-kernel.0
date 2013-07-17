@@ -1,77 +1,43 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Wed, 17 Jul 2013 11:02:50 -0400
-Subject: [PATCH 7/9] arm: dts: add omap4430 thermal data
-In-Reply-To: <1374073374-30946-1-git-send-email-eduardo.valentin@ti.com>
-References: <1374073374-30946-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1374073374-30946-15-git-send-email-eduardo.valentin@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Jul 2013 16:11:48 +0100
+Subject: [PATCH] arm: choose debug/uncompress.h include when uncompress
+ debug is disabled
+In-Reply-To: <alpine.DEB.2.02.1307171420350.8258@kaball.uk.xensource.com>
+References: <1373897706-15331-1-git-send-email-julien.grall@linaro.org>
+ <alpine.DEB.2.02.1307171420350.8258@kaball.uk.xensource.com>
+Message-ID: <20130717151148.GM24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the dtsi entry on omap4430 to contain
-the thermal data. This data will enable the passive
-cooling with CPUfreq cooling device at 100C and the
-system will do a thermal shutdown at 125C.
+On Wed, Jul 17, 2013 at 02:25:38PM +0100, Stefano Stabellini wrote:
+> On Mon, 15 Jul 2013, Julien Grall wrote:
+> > Even if uncompress debug is disabled, some board will continue to print
+> > information during uncompress step.
+> 
+> Are you talking about DEBUG_UNCOMPRESS?
+> Should I read the sentence as "even if DEBUG_UNCOMPRESS is not selected,
+> some board will continue to print information during the uncompress step"?
+> 
+> Isn't this a bug in the platform specific code that should be fixed anyway?
 
-Cc: "Beno?t Cousson" <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-omap at vger.kernel.org
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
----
- arch/arm/boot/dts/omap443x.dtsi | 31 +++++++++++++++++++++++++++++--
- 1 file changed, 29 insertions(+), 2 deletions(-)
+Hang on, let's be clear what's going on here.
 
-diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
-index 4a4dcc3..27f0e0f 100644
---- a/arch/arm/boot/dts/omap443x.dtsi
-+++ b/arch/arm/boot/dts/omap443x.dtsi
-@@ -8,6 +8,7 @@
-  * kind, whether express or implied.
-  */
- 
-+#include <dt-bindings/thermal/thermal.h>
- #include "omap4.dtsi"
- 
- / {
-@@ -27,8 +28,34 @@
- 	};
- 
- 	bandgap {
--		reg = <0x4a002260 0x4
--		       0x4a00232C 0x4>;
-+		reg = <0x4a002260 0x4 0x4a00232C 0x4>;
- 		compatible = "ti,omap4430-bandgap";
-+		thermal_zone {
-+			type = "CPU";
-+			mask = <0x03>; /* trips writability */
-+			passive_delay = <250>; /* milliseconds */
-+			polling_delay = <1000>; /* milliseconds */
-+			governor = "step_wise";
-+			trips {
-+				alert at 100000{
-+					temperature = <100000>; /* milliCelsius */
-+					hysteresis = <2000>; /* milliCelsius */
-+					type = <THERMAL_TRIP_PASSIVE>;
-+				};
-+				crit at 125000{
-+					temperature = <125000>; /* milliCelsius */
-+					hysteresis = <2000>; /* milliCelsius */
-+					type = <THERMAL_TRIP_CRITICAL>;
-+				};
-+			};
-+			bind_params {
-+				action at 0{
-+					cooling_device = "thermal-cpufreq";
-+					weight = <100>; /* percentage */
-+					mask = <0x01>;
-+					/* no limits, using defaults */
-+				};
-+			};
-+		};
- 	};
- };
--- 
-1.8.2.1.342.gfa7285d
+1. The normal output from the decompressor is *not* debugging.  By that
+   I mean the "Uncompressing kernel... done" message.  That is part of
+   user output.
+
+2. In non-multiplatform environments, the decompressor will normally use
+   the putc/flush functions found in arch/arm/mach-*/include/mach/uncompress.h
+   to implement its output, irrespective of the DEBUG_UNCOMPRESS setting.
+   (An interesting point is that DEBUG_UNCOMPRESS really should depend on
+   MULTIPLATFORM so that this point is explicit - the option requires
+   MULTIPLATFORM to be set.)
+
+3. DEBUG_UNCOMPRESS allows the functions which we've implemented for LL
+   debug to be re-used for decompressor output.
+
+4. When DEBUG_UNCOMPRESS is not set in a multiplatform kernel, the
+   decompressors putc() and flush() functions are stubbed out.
+
+So, it's quite right that you get output from the decompressor even when
+DEBUG_UNCOMPRESS is not set.  There's no problem with that.
