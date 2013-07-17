@@ -1,34 +1,36 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 17 Jul 2013 08:33:02 -0400 (EDT)
-Subject: [RFC PATCH v5 0/1] drivers: mfd: Versatile Express SPC support
-In-Reply-To: <1374052705.3146.86.camel@hornet>
-References: <1373990743-23106-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1374052705.3146.86.camel@hornet>
-Message-ID: <alpine.LFD.2.03.1307170825240.14924@syhkavp.arg>
+From: mpfj-list@newflow.co.uk (Mark Jackson)
+Date: Wed, 17 Jul 2013 13:08:02 +0100
+Subject: [PATCH v2] ARM: dts: add AM33XX MMC support
+In-Reply-To: <1372303956-30208-1-git-send-email-joelf@ti.com>
+References: <1372303956-30208-1-git-send-email-joelf@ti.com>
+Message-ID: <51E68922.5020503@newflow.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Jul 2013, Pawel Moll wrote:
-
-> On Tue, 2013-07-16 at 17:05 +0100, Lorenzo Pieralisi wrote:
-> > /drivers/mfd is probably not the right place for this code as it stands (but
-> > probably will be when the entire driver, with DVFS and config interface, is
-> > complete).
+On 27/06/13 04:32, Joel Fernandes wrote:
+> From: Matt Porter <mporter@ti.com>
 > 
-> Not that it really matters now, but my vexpress-sysreg rework will -
-> most likely - leave only skeleton in the MFD (registering mfd_cells) and
-> other stuff is going to be spread all around. Then I'm planning to move
-> the remaining of the vexpress-specific initialization to
-> drivers/platform/arm/vexpress.c, so maybe sticking vexpress-spc.c to
-> this (non-existing yet) directory would be the right thing to do?
+> Adds AM33XX MMC support for am335x-bone, am335x-evm, and am335x-evmsk.
+> Also added is the DMA binding definitions based on the generic DMA
+> request binding.
+> 
+> The HWMOD data removal was breaking MMC so some new properties like reg,
+> interrupt etc were added.
+> 
+> Changes to DTS:
+> Interrupt and reg added by: Joel Fernandes <joelf@ti.com>
+> Compatible added by Balaji TK <balajitk@ti.com>
+> ti,needs-special-hs-handling added by Gururaja Hebbar <gururaja.hebbar@ti.com>
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> ---
+>  .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   26 +++++++++++++-
+>  arch/arm/boot/dts/am335x-bone.dts                  |    7 ++++
+>  arch/arm/boot/dts/am335x-evm.dts                   |    7 ++++
+>  arch/arm/boot/dts/am335x-evmsk.dts                 |    7 ++++
+>  arch/arm/boot/dts/am33xx.dtsi                      |   38 ++++++++++++++++++++
+>  5 files changed, 84 insertions(+), 1 deletion(-)
 
-I don't like this idea.  We worked hard to shrink platform specific 
-directories such as arch/arm/mach-*/ as much as possible.  Simply moving 
-stuff to drivers/platform/arm/* doesn't make the situation any much 
-better.
-
-If this is really miscelaneous code that really doesn't fit 
-anywhere else, it should rather go into drivers/misc/ as a last resort.
-
-
-Nicolas
+Excuse my ignorance, but which git repository is this against ?
