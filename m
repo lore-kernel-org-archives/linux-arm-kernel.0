@@ -1,127 +1,35 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Wed, 17 Jul 2013 09:23:42 -0700
-Subject: [PATCH v2 2/2] ARM: dts: Add AES data and documentation for AM33XX
-In-Reply-To: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
-References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1374078222-12883-3-git-send-email-mgreer@animalcreek.com>
+From: cb@sgoc.de (Christoph G. Baumann)
+Date: Wed, 17 Jul 2013 18:27:37 +0200
+Subject: [PATCH v2 0/3] mxs: add driver for On Chip OTP
+In-Reply-To: <1372855154-8422-1-git-send-email-cb@sgoc.de>
+References: <1372855154-8422-1-git-send-email-cb@sgoc.de>
+Message-ID: <1374078460-4126-1-git-send-email-cb@sgoc.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Mark A. Greer" <mgreer@animalcreek.com>
+From: "Christoph G. Baumann" <cb@sgoc.de>
 
-Add the generic AM33XX AES module's device tree data and
-enable it for the am335x-evm, am335x-evmsk, and am335x-bone
-platforms.  Also add Documentation file describing the data
-for the AES module.
+This patch brings read/write support for the On Chip OTP cells in the i.MX23
+and i.MX28 processor. The driver uses files (one for each cell) in /sys/fsl_otp
+as interface. The original code from Freescale was stripped down to the
+required minimum and ported to 3.x kernels.
 
-CC: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
----
- .../devicetree/bindings/crypto/omap-aes.txt        | 35 ++++++++++++++++++++++
- arch/arm/boot/dts/am335x-bone.dts                  |  4 +++
- arch/arm/boot/dts/am335x-evm.dts                   |  4 +++
- arch/arm/boot/dts/am335x-evmsk.dts                 |  4 +++
- arch/arm/boot/dts/am33xx.dtsi                      | 11 +++++++
- 5 files changed, 58 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/omap-aes.txt
+Christoph G. Baumann (3):
+  mxs: enable ocotp in device tree
+  mxs: register clkdev "hbus" as it is required by OCOTP driver
+  mxs: added driver for OCOTP in i.MX23 and i.MX28
 
-diff --git a/Documentation/devicetree/bindings/crypto/omap-aes.txt b/Documentation/devicetree/bindings/crypto/omap-aes.txt
-new file mode 100644
-index 0000000..b51d12f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/omap-aes.txt
-@@ -0,0 +1,35 @@
-+OMAP SoC AES crypto Module
-+
-+Required properties:
-+
-+- compatible : Should contain entries for this and backward compatible
-+  AES versions:
-+  - "ti,omap2-aes" for OMAP2.
-+  - "ti,omap3-aes" for OMAP3.
-+  - "ti,omap4-aes" for OMAP4 and AM33XX.
-+  Note that the OMAP2 and 3 versions are compatible (OMAP3 supports
-+  more algorithms) but they are incompatible with OMAP4.
-+- ti,hwmods: Name of the hwmod associated with the AES odule
-+- reg : Offset and length of the register set for the module
-+- interrupt-parent : the phandle for the interrupt controller that
-+  services interrupts for this module.
-+- interrupts : the interrupt number for the AES odule.
-+
-+Optional properties:
-+- dmas: DMA controller phandle and DMA request ordered pairs.
-+- dma-names: DMA request names. This string corresponds 1:1 with
-+	the ordered pairs in dmas. The string naming is to be
-+	"tx" for TX request and "rx" for RX request.
-+
-+Example:
-+	/* AM335x */
-+	aes: aes at 53500000 {
-+		compatible = "ti,omap4-aes";
-+		ti,hwmods = "aes";
-+		reg = <0x53500000 0xa0>;
-+		interrupt-parent = <&intc>;
-+		interrupts = <102>;
-+		dmas = <&edma 6
-+			&edma 5>;
-+		dma-names = "tx", "rx";
-+	};
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index bc75b2c..0cb454e 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -238,3 +238,7 @@
- &sham {
- 	status = "okay";
- };
-+
-+&aes {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 9b8c56d..76ba004 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -492,3 +492,7 @@
- &sham {
- 	status = "okay";
- };
-+
-+&aes {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 61dc5d4..025a47e 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -406,3 +406,7 @@
- &sham {
- 	status = "okay";
- };
-+
-+&aes {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 63a5e95..2a7ff0f 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -540,5 +540,16 @@
- 			dmas = <&edma 36>;
- 			dma-names = "rx";
- 		};
-+
-+		aes: aes at 53500000 {
-+			compatible = "ti,omap4-aes";
-+			ti,hwmods = "aes";
-+			reg = <0x53500000 0xa0>;
-+			interrupt-parent = <&intc>;
-+			interrupts = <102>;
-+			dmas = <&edma 6
-+				&edma 5>;
-+			dma-names = "tx", "rx";
-+		};
- 	};
- };
+ arch/arm/boot/dts/imx23.dtsi |    1 -
+ arch/arm/boot/dts/imx28.dtsi |    1 -
+ drivers/clk/mxs/clk-imx23.c  |    2 +
+ drivers/clk/mxs/clk-imx28.c  |    1 +
+ drivers/misc/Kconfig         |   14 ++
+ drivers/misc/Makefile        |    1 +
+ drivers/misc/fsl_otp.c       |  363 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/misc/fsl_otp.h       |  126 +++++++++++++++
+ 8 files changed, 507 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/misc/fsl_otp.c
+ create mode 100644 drivers/misc/fsl_otp.h
+
 -- 
-1.7.12
+1.7.9.5
