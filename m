@@ -1,40 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 17 Jul 2013 13:52:45 -0600
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Jul 2013 21:01:38 +0100
 Subject: preempted dup_mm misses TLB invalidate
-In-Reply-To: <20130717192746.GE16496@MacBook-Pro.local>
+In-Reply-To: <51E6F60D.6060804@wwwdotorg.org>
 References: <51E43D2B.9090709@nvidia.com>
- <20130717192746.GE16496@MacBook-Pro.local>
-Message-ID: <51E6F60D.6060804@wwwdotorg.org>
+ <20130717192746.GE16496@MacBook-Pro.local> <51E6F60D.6060804@wwwdotorg.org>
+Message-ID: <20130717200137.GT24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2013 01:27 PM, Catalin Marinas wrote:
-> On Mon, Jul 15, 2013 at 07:19:23PM +0100, Nickolas Fortino wrote:
->> I?ve noticed an issue in simulation where the Linux kernel is executing 
->> a user process when the page tables and TLBs have gotten out of sync. 
->> The page tables have a page marked as user read only, but the TLB has 
->> the page marked as user read/write.
+On Wed, Jul 17, 2013 at 01:52:45PM -0600, Stephen Warren wrote:
+> Hmmm. That sounds like a plausible explanation, but I'm not convinced
+> it's true.
 > 
-> This happens during fork() for the current process. I think mprotect()
-> as well. The caller is supposed not to have threads that write its
-> memory while another thread does a fork().
+> I would guess that the only way to prevent threads of an application
+> from writing to its memory while a fork() happens in another thread is
+> to prevent those threads from running at all; almost any code is going
+> to do some writes e.g. to the stack at least. That would imply the
+> kernel must prevent the scheduling of the other threads, not the
+> user-space application.
+> 
+> I quickly searched and couldn't see anything that agreed with your
+> statement about this being a user-space bug. There are plenty of
+> articles pointing out potential problems if a threaded app forks, but I
+> didn't see anything that said it's no legal. I also note that pthreads
+> explicitly specifies what happens if a threaded app forks (just the
+> thread calling fork is duplicated into the child process), what
+> functions can be called after a fork ("async-safe" functions), and the
+> function pthread_at_fork() exists, all of which tend to imply that
+> forking-and-threading can be legally used together.
 
-Hmmm. That sounds like a plausible explanation, but I'm not convinced
-it's true.
+Yes, everything which you've said above is true, but if you read the
+discussions on pthread_atfork(), you'll see that the whole notion that
+you can somehow synchronize state for a fork() is a complete dead loss -
+and pthread_atfork() is a pile of trash.
 
-I would guess that the only way to prevent threads of an application
-from writing to its memory while a fork() happens in another thread is
-to prevent those threads from running at all; almost any code is going
-to do some writes e.g. to the stack at least. That would imply the
-kernel must prevent the scheduling of the other threads, not the
-user-space application.
+Semaphores must be released in the same thread as the thread which
+acquired them.  If you take a semaphore in the pre-fork handler, and
+release it in the parent post-fork handler, you can't legally release
+it in the child post-fork handler because the child didn't acquire it!
 
-I quickly searched and couldn't see anything that agreed with your
-statement about this being a user-space bug. There are plenty of
-articles pointing out potential problems if a threaded app forks, but I
-didn't see anything that said it's no legal. I also note that pthreads
-explicitly specifies what happens if a threaded app forks (just the
-thread calling fork is duplicated into the child process), what
-functions can be called after a fork ("async-safe" functions), and the
-function pthread_at_fork() exists, all of which tend to imply that
-forking-and-threading can be legally used together.
+What that means is that you can't be holding any semaphores when a
+thread forks.  Remember that a thread ends up with a complete copy of
+the VM space, semaphores and all in whatever state they were in _all_
+the threads the moment when the fork happened.
+
+Really, the only legal thing for a threaded process to do with fork()
+is to immediately follow it with exec*() without doing anything else
+with any pthread state (or any function which touches any pthread
+state).  That much must work correctly - and if it doesn't, then we
+definitely have a bug.
+
+However, fork()ing a threaded app and trying to use pthread in the
+child is not something I (or anyone) should really care about; it's
+not a legal thing to do with all the requirements of the pthread APIs.
