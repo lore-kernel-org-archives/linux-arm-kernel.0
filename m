@@ -1,38 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 17 Jul 2013 23:33:09 +0100
-Subject: [PATCH] ASoC: tegra: depend on ARCH_TEGRA, not ARCH_TEGRA_*
-In-Reply-To: <51E6E107.8020300@wwwdotorg.org>
-References: <1374013667-21435-1-git-send-email-swarren@wwwdotorg.org>
- <20130717083003.GA22506@sirena.org.uk>
- <51E6CDEA.7060003@wwwdotorg.org>
- <20130717175701.GY22506@sirena.org.uk>
- <51E6E107.8020300@wwwdotorg.org>
-Message-ID: <20130717223309.GZ22506@sirena.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 17 Jul 2013 18:34:11 -0400 (EDT)
+Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if UP
+ system
+In-Reply-To: <51E71249.4050200@codeaurora.org>
+References: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
+ <20130712111322.GC3213@e102654-lin.cambridge.arm.com>
+ <20130712121023.GB27430@codeaurora.org> <51E71249.4050200@codeaurora.org>
+Message-ID: <alpine.LFD.2.03.1307171830170.14924@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 12:23:03PM -0600, Stephen Warren wrote:
-> On 07/17/2013 11:57 AM, Mark Brown wrote:
+On Wed, 17 Jul 2013, Stephen Boyd wrote:
 
-> > So how do they disable the core support for the older SoCs with the
-> > new model?
+> On 07/12/13 05:10, Stephen Boyd wrote:
+> > On 07/12, Javi Merino wrote:
+> >> I agree, we should drop the check.  It's annoying in uniprocessors and
+> >> unlikely to be found in the real world unless your gic entry in the dt
+> >> is wrong.
 
-> They don't; the core support is so small it's not worth having the
-> ifdefs in it; just a few K. As such, it seems simpler to just always
-> compile in the core support, and remove the need for all the ifdef
-> nests in mach-tegra/. The bulk of the differences are different
-> drivers for different chips.
+And that's a likely outcome in the real world.
 
-So my take on that is that it seems like it's simpler to just have the
-core selection since that's just one option for the user to choose and
-save all the space for whatever device they're not interested in rather
-than having to go through individual drivers disabling the boring SoCs.
-It seems more straightfoward from a UI point of view but perhaps I'm not
-thinking about it from the right angle?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/ff0e814b/attachment.sig>
+> >>
+> > Ok. How about this?
+> 
+> Any comments?
+
+What about this instead:
+
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 19ceaa60e0..86d21bc6cb 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -368,7 +368,7 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
+ 			break;
+ 	}
+ 
+-	if (!mask)
++	if (is_smp() && !mask)
+ 		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
+ 
+ 	return mask;
+
+
+Nicolas
