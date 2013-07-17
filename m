@@ -1,48 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 18 Jul 2013 08:31:53 +0900
-Subject: [PATCH 14/22] ARM: shmobile: Remove unused r8a7779 auxdata table
+Date: Thu, 18 Jul 2013 08:32:02 +0900
+Subject: [PATCH 01/22] ARM: shmobile: armadillo800eva: remove left-overs
 In-Reply-To: <cover.1374103272.git.horms+renesas@verge.net.au>
 References: <cover.1374103272.git.horms+renesas@verge.net.au>
-Message-ID: <41b0156ca5a1460f8f6dde7e57baf1b80d6a7030.1374103272.git.horms+renesas@verge.net.au>
+Message-ID: <bcfed2a8a61a0f6ee7769f5093a8279a9e50c526.1374103272.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Pass NULL to of_platform_populate instead of passing
-an empty list. This cleans up the code and reduces the
-number of lines.
+A comment and a #define in board-armadillo800eva.c have been left over
+after recent changes and are no longer relevant or needed, remove them.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7779.c |    7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    9 ---------
+ 1 file changed, 9 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 3986877..66d3826 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -665,10 +665,6 @@ void __init r8a7779_init_delay(void)
- 	shmobile_setup_delay(1000, 2, 4); /* Cortex-A9 @ 1000MHz */
- }
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index e115f67..66cfd56 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -679,15 +679,6 @@ static struct platform_device vcc_sdhi1 = {
+ };
  
--static const struct of_dev_auxdata r8a7779_auxdata_lookup[] __initconst = {
--	{},
--};
--
- void __init r8a7779_add_standard_devices_dt(void)
- {
- 	/* clocks are setup late during boot in the case of DT */
-@@ -676,8 +672,7 @@ void __init r8a7779_add_standard_devices_dt(void)
- 
- 	platform_add_devices(r8a7779_devices_dt,
- 			     ARRAY_SIZE(r8a7779_devices_dt));
--	of_platform_populate(NULL, of_default_bus_match_table,
--			     r8a7779_auxdata_lookup, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
- static const char *r8a7779_compat_dt[] __initdata = {
+ /* SDHI0 */
+-/*
+- * FIXME
+- *
+- * It use polling mode here, since
+- * CD (= Card Detect) pin is not connected to SDHI0_CD.
+- * We can use IRQ31 as card detect irq,
+- * but it needs chattering removal operation
+- */
+-#define IRQ31	irq_pin(31)
+ static struct sh_mobile_sdhi_info sdhi0_info = {
+ 	.dma_slave_tx	= SHDMA_SLAVE_SDHI0_TX,
+ 	.dma_slave_rx	= SHDMA_SLAVE_SDHI0_RX,
 -- 
 1.7.10.4
