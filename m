@@ -1,54 +1,124 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 17 Jul 2013 12:27:59 +0100
-Subject: [PATCH 3/3] mfd: s2mps11: Remove clocks from regulators list
-In-Reply-To: <1373197462-4033-4-git-send-email-yadi.brar@samsung.com>
-References: <1373197462-4033-1-git-send-email-yadi.brar@samsung.com>
- <1373197462-4033-4-git-send-email-yadi.brar@samsung.com>
-Message-ID: <20130717112759.GD3336@laptop>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 17 Jul 2013 13:28:30 +0200
+Subject: [PATCH v3] clk: implement clk_unregister
+In-Reply-To: <1370248626-3760-1-git-send-email-jiada_wang@mentor.com>
+References: <1370248626-3760-1-git-send-email-jiada_wang@mentor.com>
+Message-ID: <51E67FDE.7000301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 07 Jul 2013, Yadwinder Singh Brar wrote:
+Hello,
 
-> Since these are fixed rate clocks which are registered with common clock
-> framework so remove these from list of regulators which were unnecessarily
-> incrementing the count(S2MPS11_REGULATOR_MAX) of regulators.
+On 06/03/2013 10:37 AM, Jiada Wang wrote:
+> Currently clk_unregister is unimplemented, it is required in case
+> sub modules want actually remove clk device registered by clk_register.
+> This patch adds the implementation of clk_unregister.
 > 
-> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
 > ---
->  include/linux/mfd/samsung/s2mps11.h |    6 +-----
->  1 files changed, 1 insertions(+), 5 deletions(-)
+>  drivers/clk/clk.c | 59 +++++++++++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 57 insertions(+), 2 deletions(-)
 > 
-> diff --git a/include/linux/mfd/samsung/s2mps11.h b/include/linux/mfd/samsung/s2mps11.h
-> index d0d52ea..b3ddf98 100644
-> --- a/include/linux/mfd/samsung/s2mps11.h
-> +++ b/include/linux/mfd/samsung/s2mps11.h
-> @@ -167,11 +167,8 @@ enum s2mps11_regulators {
->  	S2MPS11_BUCK8,
->  	S2MPS11_BUCK9,
->  	S2MPS11_BUCK10,
-> -	S2MPS11_AP_EN32KHZ,
-> -	S2MPS11_CP_EN32KHZ,
-> -	S2MPS11_BT_EN32KHZ,
-
-These aren't mentioned anywhere else in the kernel, so I'll just apply
-the patch.
-
-> -	S2MPS11_REG_MAX,
-> +	S2MPS11_REGULATOR_MAX,
->  };
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 934cfd1..0b9e13c 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -342,6 +342,25 @@ out:
+>  	return ret;
+>  }
 >  
->  #define S2MPS11_BUCK_MIN1	600000
-> @@ -203,6 +200,5 @@ enum s2mps11_regulators {
->  #define S2MPS11_BUCK4_RAMP_EN_SHIFT	1
->  #define S2MPS11_BUCK6_RAMP_EN_SHIFT	0
->  #define S2MPS11_PMIC_EN_SHIFT	6
-> -#define S2MPS11_REGULATOR_MAX (S2MPS11_REG_MAX - 3)
+> + /**
+> + * clk_debug_unregister - remove a clk node from the debugfs clk tree
+> + * @clk: the clk being removed from the debugfs clk tree
+> + *
+> + * Dynamically removes a clk and all it's children clk nodes from the
+> + * debugfs clk tree if clk->dentry points to debugfs created by
+> + * clk_debug_register in __clk_init.
+> + *
+> + * Caller must hold prepare_lock.
+> + *
+> + */
+> +static void clk_debug_unregister(struct clk *clk)
+> +{
+> +	if (!clk || !clk->dentry)
+> +		return;
+> +
+> +	debugfs_remove_recursive(clk->dentry);
+> +}
+> +
+>  /**
+>   * clk_debug_reparent - reparent clk node in the debugfs clk tree
+>   * @clk: the clk being reparented
+> @@ -432,6 +451,9 @@ static inline int clk_debug_register(struct clk *clk) { return 0; }
+>  static inline void clk_debug_reparent(struct clk *clk, struct clk *new_parent)
+>  {
+>  }
+> +static inline void clk_debug_unregister(struct clk *clk)
+> +{
+> +}
+>  #endif
 >  
->  #endif /*  __LINUX_MFD_S2MPS11_H */
+>  /* caller must hold prepare_lock */
+> @@ -1790,9 +1812,42 @@ EXPORT_SYMBOL_GPL(clk_register);
+>   * clk_unregister - unregister a currently registered clock
+>   * @clk: clock to unregister
+>   *
+> - * Currently unimplemented.
+>   */
+> -void clk_unregister(struct clk *clk) {}
+> +void clk_unregister(struct clk *clk)
+> +{
+> +	int i;
+> +
+> +	if (!clk)
+> +		return;
+> +
+> +	mutex_lock(&prepare_lock);
+> +	if (clk->prepare_count) {
+> +		pr_debug("%s: can't unregister clk %s, it is prepared\n",
+> +				__func__, clk->name);
+> +		goto out;
+> +	}
+> +
+> +	if (!hlist_empty(&clk->children)) {
+> +		pr_debug("%s: clk %s has registered children\n",
+> +				__func__, clk->name);
+> +		goto out;
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+How about moving the clock to the orphan list instead, as Mike
+suggested [1] ?
+
+> +	}
+> +
+> +	clk_debug_unregister(clk);
+> +
+> +	hlist_del_init(&clk->child_node);
+> +
+> +	kfree(clk->parents);
+> +	i = clk->num_parents;
+> +	while (--i >= 0)
+> +		kfree(clk->parent_names[i]);
+> +	kfree(clk->parent_names);
+> +	kfree(clk->name);
+> +	kfree(clk);
+> +out:
+> +	mutex_unlock(&prepare_lock);
+> +	return;
+
+Redundant return statement.
+
+> +}
+
+Shouldn't we also free the clock supplier specific data structure
+for the clock, i.e. the structure struct clk_hw is embedded in ?
+
+One possible way to solve this could be to provide, e.g. destroy()
+operation in struct clk_ops ? Alternatively clock providers would
+need to store a list of their clock specific data structures
+associated with each struct clk they have registered.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg250613.html
+
+
+Thanks,
+Sylwester
