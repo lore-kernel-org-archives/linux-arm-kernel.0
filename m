@@ -1,26 +1,31 @@
-From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Wed, 17 Jul 2013 08:56:18 -0300
-Subject: [PATCH v2 1/4] ARM: dts: imx23-evk: enable USB PHY and controller
-In-Reply-To: <20130717035010.GC4541@S2101-09.ap.freescale.net>
-References: <1373979376-31583-1-git-send-email-otavio@ossystems.com.br>
- <20130717035010.GC4541@S2101-09.ap.freescale.net>
-Message-ID: <CAP9ODKruGc+mOs3uvNzfCgPqnXgxqTJbaPXVRDFt9TwtnwumYQ@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 17 Jul 2013 14:57:53 +0300
+Subject: [PATCH 0/3] ARM: OMAP2+: omap_device: add dynamic pinctrl handling
+In-Reply-To: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
+References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <51E686C1.8020801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 12:50 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Jul 16, 2013 at 09:56:12AM -0300, Otavio Salvador wrote:
->> The i.MX23EVK board provides a USB port so the USB PHY and controller
->> need to be enabled for it to be usable.
->>
->> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
->
-> There is a typo i.XM23 in commit log of patch #2 and #3.  I fixed them
-> up and applied all 3.
+Hi Grygorii,
 
-Thanks Shawn :)
+On 07/17/2013 02:41 PM, Grygorii Strashko wrote:
+> Hi Tony, Kevin
+> 
+> This patch series introduces dynamic pinctrl handling in OMAP device framework
+> in the same way as it was before switching to DT. 
+> This allow OMAP devices driver's developers to simply add dynamic pinctrl
+> handling for "default", "active", "idle", "sleep" PIN states in their drivers
+> by modifying DT definitions only - no modifications in drivers code are not needed.
+> 
 
---
-Otavio Salvador                             O.S. Systems
-http://www.ossystems.com.br        http://projetos.ossystems.com.br
-Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
+Overall I like the idea but can we make a provision for device drivers to override
+this default pin state handling?
+
+The OMAP EHCI driver is one such special case where the wakeup mechanism is tied to pinctrl states
+as it uses IO daisy chaining to implement wakeup.
+So depending on whether wakeup needs to be enabled or not I must be able to chose whether
+I put the pin in just "sleep" state or "sleep with wakeup" state.
+
+cheers,
+-roger
