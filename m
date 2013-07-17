@@ -1,19 +1,38 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 17 Jul 2013 11:50:11 +0800
-Subject: [PATCH v2 1/4] ARM: dts: imx23-evk: enable USB PHY and controller
-In-Reply-To: <1373979376-31583-1-git-send-email-otavio@ossystems.com.br>
-References: <1373979376-31583-1-git-send-email-otavio@ossystems.com.br>
-Message-ID: <20130717035010.GC4541@S2101-09.ap.freescale.net>
+Date: Wed, 17 Jul 2013 11:51:27 +0800
+Subject: [PATCH] clk: mxs: clk-imx23: Include <linux/clk/mxs.h>
+In-Reply-To: <1373981623-23800-1-git-send-email-fabio.estevam@freescale.com>
+References: <1373981623-23800-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130717035125.GD4541@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 09:56:12AM -0300, Otavio Salvador wrote:
-> The i.MX23EVK board provides a USB port so the USB PHY and controller
-> need to be enabled for it to be usable.
+On Tue, Jul 16, 2013 at 10:33:43AM -0300, Fabio Estevam wrote:
+> Fix the following sparse warning:
 > 
-> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+> drivers/clk/mxs/clk-imx23.c:102:12: warning: symbol 'mx23_clocks_init' was not declared. Should it be static?
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-There is a typo i.XM23 in commit log of patch #2 and #3.  I fixed them
-up and applied all 3.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Shawn
+> ---
+>  drivers/clk/mxs/clk-imx23.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
+> index f6a7487..c396fe3 100644
+> --- a/drivers/clk/mxs/clk-imx23.c
+> +++ b/drivers/clk/mxs/clk-imx23.c
+> @@ -10,6 +10,7 @@
+>   */
+>  
+>  #include <linux/clk.h>
+> +#include <linux/clk/mxs.h>
+>  #include <linux/clkdev.h>
+>  #include <linux/err.h>
+>  #include <linux/init.h>
+> -- 
+> 1.8.1.2
+> 
+> 
