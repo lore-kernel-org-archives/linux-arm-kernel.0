@@ -1,40 +1,46 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 17 Jul 2013 18:53:51 -0400 (EDT)
-Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if UP
- system
-In-Reply-To: <51E71C78.6080604@codeaurora.org>
-References: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
- <20130712111322.GC3213@e102654-lin.cambridge.arm.com>
- <20130712121023.GB27430@codeaurora.org> <51E71249.4050200@codeaurora.org>
- <alpine.LFD.2.03.1307171830170.14924@syhkavp.arg>
- <51E71C78.6080604@codeaurora.org>
-Message-ID: <alpine.LFD.2.03.1307171849180.14924@syhkavp.arg>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 Jul 2013 00:54:22 +0200
+Subject: [PATCH v2 2/4] pwm: Use the DT macro directly when parsing PWM DT
+ flags
+In-Reply-To: <1374101664-21112-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1374101664-21112-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1374101664-21112-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Jul 2013, Stephen Boyd wrote:
+Don't redefine a PWM_SPEC_POLARITY macro with a value identical to
+PWM_POLARITY_INVERTED, use the PWM DT macro directly.
 
-> On 07/17/13 15:34, Nicolas Pitre wrote:
-> > On Wed, 17 Jul 2013, Stephen Boyd wrote:
-> >
-> >> On 07/12/13 05:10, Stephen Boyd wrote:
-> >>> On 07/12, Javi Merino wrote:
-> >>>> I agree, we should drop the check.  It's annoying in uniprocessors and
-> >>>> unlikely to be found in the real world unless your gic entry in the dt
-> >>>> is wrong.
-> > And that's a likely outcome in the real world.
-> >
-> >>> Ok. How about this?
-> >> Any comments?
-> > What about this instead:
-> 
-> Unfortunately arm64 doesn't have SMP_ON_UP. 
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/pwm/core.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-And why does that matter?
-
-> It sounds like you preferred the first patch using num_possible_cpus()
-
-Probably, yes.  I didn't follow the early conversation though.
-
-
-Nicolas
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index dfbfbc5..2ca9504 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -30,10 +30,9 @@
+ #include <linux/debugfs.h>
+ #include <linux/seq_file.h>
+ 
+-#define MAX_PWMS 1024
++#include <dt-bindings/pwm/pwm.h>
+ 
+-/* flags in the third cell of the DT PWM specifier */
+-#define PWM_SPEC_POLARITY	(1 << 0)
++#define MAX_PWMS 1024
+ 
+ static DEFINE_MUTEX(pwm_lookup_lock);
+ static LIST_HEAD(pwm_lookup_list);
+@@ -149,7 +148,7 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
+ 
+ 	pwm_set_period(pwm, args->args[1]);
+ 
+-	if (args->args[2] & PWM_SPEC_POLARITY)
++	if (args->args[2] & PWM_POLARITY_INVERTED)
+ 		pwm_set_polarity(pwm, PWM_POLARITY_INVERSED);
+ 	else
+ 		pwm_set_polarity(pwm, PWM_POLARITY_NORMAL);
+-- 
+1.8.1.5
