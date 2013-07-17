@@ -1,161 +1,246 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 17 Jul 2013 09:58:51 +0200
-Subject: [PATCH 2/5] iio: at91: Use different prescal, startup mask in
- MR for different IP
-In-Reply-To: <1373789069-11604-3-git-send-email-josh.wu@atmel.com>
-References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
- <1373789069-11604-3-git-send-email-josh.wu@atmel.com>
-Message-ID: <51E64EBB.30700@atmel.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Wed, 17 Jul 2013 10:04:57 +0200
+Subject: [PATCH v9] ARM: clocksource: add support for MOXA ART SoCs
+In-Reply-To: <1373985880-23469-1-git-send-email-jonas.jensen@gmail.com>
+References: <1373985880-23469-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1374048297-4321-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/2013 10:04, Josh Wu :
-> For at91 boards, there are different IPs for adc. Different IPs has different
-> STARTUP & PRESCAL mask in ADC_MR.
->
-> This patch can change the masks according to the different IP version.
->
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->   arch/arm/mach-at91/include/mach/at91_adc.h |    9 ++++--
->   drivers/iio/adc/at91_adc.c                 |   48 ++++++++++++++++++++++++++--
->   2 files changed, 53 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/include/mach/at91_adc.h b/arch/arm/mach-at91/include/mach/at91_adc.h
-> index 8e7ed5c..ab273ee 100644
-> --- a/arch/arm/mach-at91/include/mach/at91_adc.h
-> +++ b/arch/arm/mach-at91/include/mach/at91_adc.h
-> @@ -28,9 +28,12 @@
->   #define			AT91_ADC_TRGSEL_EXTERNAL	(6 << 1)
->   #define		AT91_ADC_LOWRES		(1 << 4)	/* Low Resolution */
->   #define		AT91_ADC_SLEEP		(1 << 5)	/* Sleep Mode */
-> -#define		AT91_ADC_PRESCAL	(0x3f << 8)	/* Prescalar Rate Selection */
-> +#define		AT91_ADC_PRESCAL	(0xff << 8)	/* Prescalar Rate Selection */
-> +#define		AT91_ADC_PRESCAL_9260	(0x3f << 8)
->   #define			AT91_ADC_PRESCAL_(x)	((x) << 8)
-> -#define		AT91_ADC_STARTUP	(0x1f << 16)	/* Startup Up Time */
-> +#define		AT91_ADC_STARTUP	(0xf << 16)	/* Startup Up Time */
+This patch adds an clocksource driver for the main timer(s)
+found on MOXA ART SoCs.
 
-Which product has this kind of startup mask: 0xf? Compared with 9260 and 
-9g45 values, it seems strange to me: maybe a little comment should be added.
+The MOXA ART SoC provides three separate timers with individual
+count/load/match registers, two are used here:
 
+TIMER1: clockevents, used to support oneshot and periodic events
+TIMER2: set up as a free running counter, used as clocksource
 
-> +#define		AT91_ADC_STARTUP_9260	(0x1f << 16)
-> +#define		AT91_ADC_STARTUP_9G45	(0x7f << 16)
->   #define			AT91_ADC_STARTUP_(x)	((x) << 16)
->   #define		AT91_ADC_SHTIM		(0xf  << 24)	/* Sample & Hold Time */
->   #define			AT91_ADC_SHTIM_(x)	((x) << 24)
-> @@ -58,4 +61,6 @@
->   #define AT91_ADC_CHR(n)		(0x30 + ((n) * 4))	/* Channel Data Register N */
->   #define		AT91_ADC_DATA		(0x3ff)
->
-> +#define AT91_ADC_VERSION	0xFC
-> +
->   #endif
-> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index 18bd54f..14e99ba 100644
-> --- a/drivers/iio/adc/at91_adc.c
-> +++ b/drivers/iio/adc/at91_adc.c
-> @@ -39,6 +39,12 @@
->   #define at91_adc_writel(st, reg, val) \
->   	(writel_relaxed(val, st->reg_base + reg))
->
-> +struct at91_adc_caps {
-> +	bool	has_tsmr;	/* only at91sam9x5, sama5d3 have TSMR reg */
-> +	u32	mr_prescal_mask;
-> +	u32	mr_startup_mask;
-> +};
-> +
+Timers are preconfigured by bootloader to count down and interrupt
+on match or zero. Count increments every APB clock cycle and is
+automatically reloaded when it reaches zero.
 
-If we move to DT and compatible string for these values, maybe a 
-separate structure won't be needed....
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
+Notes:
+    Changes since v8:
+    
+    1. add devicetree bindings document
+    
+    Applies to next-20130716
 
->   struct at91_adc_state {
->   	struct clk		*adc_clk;
->   	u16			*buffer;
-> @@ -62,6 +68,7 @@ struct at91_adc_state {
->   	u32			res;		/* resolution used for convertions */
->   	bool			low_res;	/* the resolution corresponds to the lowest one */
->   	wait_queue_head_t	wq_data_avail;
-> +	struct at91_adc_caps	caps;
->   };
->
->   static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
-> @@ -580,6 +587,41 @@ static const struct iio_info at91_adc_info = {
->   	.read_raw = &at91_adc_read_raw,
->   };
->
-> +/*
-> + * Since atmel adc support different ip for touchscreen mode. Through the
-> + * IP check, we will know the touchscreen capbilities.
-> + */
-> +static void atmel_adc_get_cap(struct at91_adc_state *st)
-> +{
-> +	unsigned int version;
-> +	struct iio_dev *idev = iio_priv_to_dev(st);
-> +
-> +	version = at91_adc_readl(st, AT91_ADC_VERSION);
-> +	dev_dbg(&idev->dev, "version: 0x%x\n", version);
-> +
-> +	st->caps.mr_prescal_mask = AT91_ADC_PRESCAL_9260;
-> +	st->caps.mr_startup_mask = AT91_ADC_STARTUP_9260;
-> +
-> +	/* keep only major version number */
-> +	switch (version & 0xf00) {
-> +	case 0x500:	/* SAMA5D3 */
-> +	case 0x400:	/* AT91SAM9X5/9N12 */
-> +		st->caps.has_tsmr = 1;
-> +		st->caps.mr_startup_mask = AT91_ADC_STARTUP;
+ .../bindings/timer/moxa,moxart-timer.txt           |  17 +++
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/moxart_timer.c                 | 164 +++++++++++++++++++++
+ 3 files changed, 182 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
+ create mode 100644 drivers/clocksource/moxart_timer.c
 
-Here is where AT91_ADC_STARTUP may need another name: what about 
-AT91_ADC_STARTUP_9x5 to match the "compatibility" of this value?
-
-
-> +	case 0x200:	/* AT91SAM9M10/9G45 */
-> +		st->caps.mr_prescal_mask = AT91_ADC_PRESCAL;
-> +
-> +		if ((version & 0xf00) == 0x200)
-
-Sorry but I do not understand this test in a switch/case entry where it 
-should always be true...
-
-
-> +			st->caps.mr_startup_mask = AT91_ADC_STARTUP_9G45;
-> +	case 0x100:	/* AT91SAM9260/9G20 */
-> +		break;
-> +	default:
-> +		dev_warn(&idev->dev,
-> +				"Unmanaged adc version, use minimal capabilities\n");
-> +		break;
-> +	};
-> +}
-> +
->   static int at91_adc_probe(struct platform_device *pdev)
->   {
->   	unsigned int prsc, mstrclk, ticks, adc_clk, adc_clk_khz, shtim;
-> @@ -645,6 +687,8 @@ static int at91_adc_probe(struct platform_device *pdev)
->   		goto error_free_device;
->   	}
->
-> +	atmel_adc_get_cap(st);
-> +
->   	st->clk = devm_clk_get(&pdev->dev, "adc_clk");
->   	if (IS_ERR(st->clk)) {
->   		dev_err(&pdev->dev, "Failed to get the clock.\n");
-> @@ -704,8 +748,8 @@ static int at91_adc_probe(struct platform_device *pdev)
->   	shtim = round_up((st->sample_hold_time * adc_clk_khz /
->   			  1000) - 1, 1);
->
-> -	reg = AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL;
-> -	reg |= AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP;
-> +	reg = AT91_ADC_PRESCAL_(prsc) & st->caps.mr_prescal_mask;
-> +	reg |= AT91_ADC_STARTUP_(ticks) & st->caps.mr_startup_mask;
->   	if (st->low_res)
->   		reg |= AT91_ADC_LOWRES;
->   	if (st->sleep_mode)
->
-
-
+diff --git a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
+new file mode 100644
+index 0000000..77c4cfa
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
+@@ -0,0 +1,17 @@
++MOXA ART timer
++
++Required properties:
++
++- compatible : Should be "moxa,moxart-timer"
++- reg : Should contain registers location and length
++- interrupts : Should contain the timer interrupt number
++- clocks : Should contain phandle for APB clock "clkapb"
++
++Example:
++
++	timer: timer at 98400000 {
++		compatible = "moxa,moxart-timer";
++		reg = <0x98400000 0x42>;
++		interrupts = <19 1>;
++		clocks = <&clkapb>;
++	};
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 8b00c5c..704d6d3 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -18,6 +18,7 @@ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
+ obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
+ obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
+ obj-$(CONFIG_ARCH_MARCO)	+= timer-marco.o
++obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
+ obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
+ obj-$(CONFIG_ARCH_PRIMA2)	+= timer-prima2.o
+ obj-$(CONFIG_SUN4I_TIMER)	+= sun4i_timer.o
+diff --git a/drivers/clocksource/moxart_timer.c b/drivers/clocksource/moxart_timer.c
+new file mode 100644
+index 0000000..08a5943
+--- /dev/null
++++ b/drivers/clocksource/moxart_timer.c
+@@ -0,0 +1,164 @@
++/*
++ * MOXA ART SoCs timer handling.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk.h>
++#include <linux/clockchips.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/irqreturn.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/io.h>
++#include <linux/clocksource.h>
++
++#define TIMER1_BASE		0x00
++#define TIMER2_BASE		0x10
++#define TIMER3_BASE		0x20
++
++#define REG_COUNT		0x0 /* writable */
++#define REG_LOAD		0x4
++#define REG_MATCH1		0x8
++#define REG_MATCH2		0xC
++
++#define TIMER_CR		0x30
++#define TIMER_INTR_STATE	0x34
++#define TIMER_INTR_MASK		0x38
++
++/*
++ * TIMER_CR flags:
++ *
++ * TIMEREG_CR_*_CLOCK	0: PCLK, 1: EXT1CLK
++ * TIMEREG_CR_*_INT	overflow interrupt enable bit
++ */
++#define TIMEREG_CR_1_ENABLE	BIT(0)
++#define TIMEREG_CR_1_CLOCK	BIT(1)
++#define TIMEREG_CR_1_INT	BIT(2)
++#define TIMEREG_CR_2_ENABLE	BIT(3)
++#define TIMEREG_CR_2_CLOCK	BIT(4)
++#define TIMEREG_CR_2_INT	BIT(5)
++#define TIMEREG_CR_3_ENABLE	BIT(6)
++#define TIMEREG_CR_3_CLOCK	BIT(7)
++#define TIMEREG_CR_3_INT	BIT(8)
++#define TIMEREG_CR_COUNT_UP	BIT(9)
++
++#define TIMER1_ENABLE		(TIMEREG_CR_2_ENABLE | TIMEREG_CR_1_ENABLE)
++#define TIMER1_DISABLE		(TIMEREG_CR_2_ENABLE)
++
++static void __iomem *base;
++static unsigned int clock_count_per_tick;
++
++static void moxart_clkevt_mode(enum clock_event_mode mode,
++			       struct clock_event_device *clk)
++{
++	switch (mode) {
++	case CLOCK_EVT_MODE_RESUME:
++	case CLOCK_EVT_MODE_ONESHOT:
++		writel(TIMER1_DISABLE, base + TIMER_CR);
++		writel(~0, base + TIMER1_BASE + REG_LOAD);
++		break;
++	case CLOCK_EVT_MODE_PERIODIC:
++		writel(clock_count_per_tick, base + TIMER1_BASE + REG_LOAD);
++		writel(TIMER1_ENABLE, base + TIMER_CR);
++		break;
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	default:
++		writel(TIMER1_DISABLE, base + TIMER_CR);
++		break;
++	}
++}
++
++static int moxart_clkevt_next_event(unsigned long cycles,
++				    struct clock_event_device *unused)
++{
++	u32 u;
++
++	writel(TIMER1_DISABLE, base + TIMER_CR);
++
++	u = readl(base + TIMER1_BASE + REG_COUNT) - cycles;
++	writel(u, base + TIMER1_BASE + REG_MATCH1);
++
++	writel(TIMER1_ENABLE, base + TIMER_CR);
++
++	return 0;
++}
++
++static struct clock_event_device moxart_clockevent = {
++	.name		= "moxart_timer",
++	.rating		= 200,
++	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_mode	= moxart_clkevt_mode,
++	.set_next_event	= moxart_clkevt_next_event,
++};
++
++static irqreturn_t moxart_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++	evt->event_handler(evt);
++	return IRQ_HANDLED;
++}
++
++static struct irqaction moxart_timer_irq = {
++	.name		= "moxart-timer",
++	.flags		= IRQF_TIMER,
++	.handler	= moxart_timer_interrupt,
++	.dev_id		= &moxart_clockevent,
++};
++
++static void __init moxart_timer_init(struct device_node *node)
++{
++	int ret, irq;
++	unsigned long pclk;
++	struct clk *clk;
++
++	base = of_iomap(node, 0);
++	if (!base)
++		panic("%s: of_iomap failed\n", node->full_name);
++
++	irq = irq_of_parse_and_map(node, 0);
++	if (irq <= 0)
++		panic("%s: irq_of_parse_and_map failed\n", node->full_name);
++
++	ret = setup_irq(irq, &moxart_timer_irq);
++	if (ret)
++		panic("%s: setup_irq failed\n", node->full_name);
++
++	clk = of_clk_get(node, 0);
++	if (IS_ERR(clk))
++		panic("%s: of_clk_get failed\n", node->full_name);
++
++	pclk = clk_get_rate(clk);
++
++	if (clocksource_mmio_init(base + TIMER2_BASE + REG_COUNT,
++				  "moxart_timer", pclk, 200, 32,
++				  clocksource_mmio_readl_down))
++		panic("%s: clocksource_mmio_init failed\n", node->full_name);
++
++	clock_count_per_tick = DIV_ROUND_CLOSEST(pclk, HZ);
++
++	writel(~0, base + TIMER2_BASE + REG_LOAD);
++	writel(TIMEREG_CR_2_ENABLE, base + TIMER_CR);
++
++	moxart_clockevent.cpumask = cpumask_of(0);
++	moxart_clockevent.irq = irq;
++
++	/*
++	 * documentation is not publicly available:
++	 * min_delta / max_delta obtained by trial-and-error,
++	 * max_delta 0xfffffffe should be ok because count
++	 * register size is u32
++	 */
++	clockevents_config_and_register(&moxart_clockevent, pclk,
++					0x4, 0xfffffffe);
++}
++CLOCKSOURCE_OF_DECLARE(moxart, "moxa,moxart-timer", moxart_timer_init);
 -- 
-Nicolas Ferre
+1.8.2.1
