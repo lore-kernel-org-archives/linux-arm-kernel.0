@@ -1,46 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Jul 2013 08:32:49 -0700
-Subject: [PATCH 3/3] ARM: dts: omap4-sdp: add dynamic pin states for
- uart3/4
-In-Reply-To: <1374061312-25469-4-git-send-email-grygorii.strashko@ti.com>
-References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
- <1374061312-25469-4-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20130717153248.GI7656@atomide.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 17 Jul 2013 11:33:54 -0400 (EDT)
+Subject: [PATCH v3 6/7] USB: ohci-at91: add usb_clk for transition to
+ common clk framework
+In-Reply-To: <1373988136-24622-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <Pine.LNX.4.44L0.1307171131580.1555-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [130717 04:49]:
-> Add dynamic "active"/"idle" pin states for uart3/4 which will be applied
-> when uart3/4 state is switched from active to idle and back by Runtime
-> PM or during system suspend.
+On Tue, 16 Jul 2013, Boris BREZILLON wrote:
 
-This is good for testing code, but should not be merged because
-omap4 has the iopad wake-ups available for uarts. So those can
-be always enabled.
- 
-> --- a/arch/arm/boot/dts/omap4-sdp.dts
-> +++ b/arch/arm/boot/dts/omap4-sdp.dts
-> @@ -181,18 +181,40 @@
->  		pinctrl-single,pins = <
->  			0x100 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart3_cts_rctx.uart3_cts_rctx */
->  			0x102 (PIN_OUTPUT | MUX_MODE0)		/* uart3_rts_sd.uart3_rts_sd */
-> -			0x104 (PIN_INPUT | MUX_MODE0)		/* uart3_rx_irrx.uart3_rx_irrx */
->  			0x106 (PIN_OUTPUT | MUX_MODE0)		/* uart3_tx_irtx.uart3_tx_irtx */
->  		>;
->  	};
+> The AT91 PMC (Power Management Controller) provides an USB clock used by
+> USB Full Speed host (ohci) and USB Full Speed device (udc).
+> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
+> This configuration was formely done in mach-at91/clock.c, but this
+> implementation will be removed when moving to common clk framework.
+> 
+> This patch add support for usb clock retrieval and configuration, and is
+> backward compatible with the current at91 clk implementation (if usb clk
+> is not found, it does not configure/enable the usb clk).
 
-This just need to become:
-		pinctrl-single,pins = <
-			...
-			0x104 (WAKEUP_EN | PIN_INPUT_MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
-			...
-		>;
-		interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-	};
+This does not take into account any of the changes you discussed with 
+Russell King and me -- it is exactly the same as the previous version.
 
-And so on. For am33xx you need to remux things to GPIO for the wake-up
-events, so you should maybe test on that instead.
+> @@ -144,6 +150,11 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>  		goto err2;
+>  	}
+>  
+> +	uclk = clk_get(&pdev->dev, "usb_clk");
+> +	if (IS_ERR(uclk)) {
+> +		uclk = NULL;
+> +		dev_warn(&pdev->dev, "failed to get usb_clk\n");
+> +	}
+>  	iclk = clk_get(&pdev->dev, "ohci_clk");
+>  	if (IS_ERR(iclk)) {
+>  		dev_err(&pdev->dev, "failed to get ohci_clk\n");
+> @@ -212,10 +223,11 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
+>  	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+>  	usb_put_hcd(hcd);
+>  
+> +	clk_put(uclk);
 
-Regards,
+What will clk_put() do when uclk is NULL?
 
-Tony
+Alan Stern
