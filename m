@@ -1,159 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 17 Jul 2013 13:57:48 +0800
-Subject: [PATCH v3] ARM: dts: imx: use generic DMA bindings for SSI nodes
-Message-ID: <1374040668-14325-1-git-send-email-shawn.guo@linaro.org>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Wed, 17 Jul 2013 14:12:14 +0800
+Subject: [PATCH 1/3] ASoC: bt-sco: enable OF support
+Message-ID: <1374041536-27643-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Updates SSI nodes to adopt generic DMA bindings.
+From: Rongjun Ying <Rongjun.Ying@csr.com>
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+this makes users be able to add a bt-sco node in dts instead of
+hardcoding a platform device in mach.
+
+Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
-Changes since v2:
- * Keep custom fsl,ssi-dma-events property until fsl_ssi driver moves
-   to use generic DMA bindings.
+ sound/soc/codecs/bt-sco.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
- arch/arm/boot/dts/imx51.dtsi   |    9 +++++++++
- arch/arm/boot/dts/imx53.dtsi   |    9 +++++++++
- arch/arm/boot/dts/imx6qdl.dtsi |    9 +++++++++
- arch/arm/boot/dts/imx6sl.dtsi  |    9 +++++++++
- 4 files changed, 36 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index d086e07..d7b0646 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -154,6 +154,9 @@
- 					reg = <0x70014000 0x4000>;
- 					interrupts = <30>;
- 					clocks = <&clks 49>;
-+					dmas = <&sdma 24 1 0>,
-+					       <&sdma 25 1 0>;
-+					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					fsl,ssi-dma-events = <25 24 23 22>; /* TX0 RX0 TX1 RX1 */
- 					status = "disabled";
-@@ -735,6 +738,9 @@
- 				reg = <0x83fcc000 0x4000>;
- 				interrupts = <29>;
- 				clocks = <&clks 48>;
-+				dmas = <&sdma 28 0 0>,
-+				       <&sdma 29 0 0>;
-+				dma-names = "rx", "tx";
- 				fsl,fifo-depth = <15>;
- 				fsl,ssi-dma-events = <29 28 27 26>; /* TX0 RX0 TX1 RX1 */
- 				status = "disabled";
-@@ -784,6 +790,9 @@
- 				reg = <0x83fe8000 0x4000>;
- 				interrupts = <96>;
- 				clocks = <&clks 50>;
-+				dmas = <&sdma 46 0 0>,
-+				       <&sdma 47 0 0>;
-+				dma-names = "rx", "tx";
- 				fsl,fifo-depth = <15>;
- 				fsl,ssi-dma-events = <47 46 37 35>; /* TX0 RX0 TX1 RX1 */
- 				status = "disabled";
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 51b93c9..fb26830 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -153,6 +153,9 @@
- 					reg = <0x50014000 0x4000>;
- 					interrupts = <30>;
- 					clocks = <&clks 49>;
-+					dmas = <&sdma 24 1 0>,
-+					       <&sdma 25 1 0>;
-+					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					fsl,ssi-dma-events = <25 24 23 22>; /* TX0 RX0 TX1 RX1 */
- 					status = "disabled";
-@@ -1050,6 +1053,9 @@
- 				reg = <0x63fcc000 0x4000>;
- 				interrupts = <29>;
- 				clocks = <&clks 48>;
-+				dmas = <&sdma 28 0 0>,
-+				       <&sdma 29 0 0>;
-+				dma-names = "rx", "tx";
- 				fsl,fifo-depth = <15>;
- 				fsl,ssi-dma-events = <29 28 27 26>; /* TX0 RX0 TX1 RX1 */
- 				status = "disabled";
-@@ -1074,6 +1080,9 @@
- 				reg = <0x63fe8000 0x4000>;
- 				interrupts = <96>;
- 				clocks = <&clks 50>;
-+				dmas = <&sdma 46 0 0>,
-+				       <&sdma 47 0 0>;
-+				dma-names = "rx", "tx";
- 				fsl,fifo-depth = <15>;
- 				fsl,ssi-dma-events = <47 46 45 44>; /* TX0 RX0 TX1 RX1 */
- 				status = "disabled";
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 7c18fa0..bc4ca03 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -211,6 +211,9 @@
- 					reg = <0x02028000 0x4000>;
- 					interrupts = <0 46 0x04>;
- 					clocks = <&clks 178>;
-+					dmas = <&sdma 37 1 0>,
-+					       <&sdma 38 1 0>;
-+					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					fsl,ssi-dma-events = <38 37>;
- 					status = "disabled";
-@@ -221,6 +224,9 @@
- 					reg = <0x0202c000 0x4000>;
- 					interrupts = <0 47 0x04>;
- 					clocks = <&clks 179>;
-+					dmas = <&sdma 41 1 0>,
-+					       <&sdma 42 1 0>;
-+					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					fsl,ssi-dma-events = <42 41>;
- 					status = "disabled";
-@@ -231,6 +237,9 @@
- 					reg = <0x02030000 0x4000>;
- 					interrupts = <0 48 0x04>;
- 					clocks = <&clks 180>;
-+					dmas = <&sdma 45 1 0>,
-+					       <&sdma 46 1 0>;
-+					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					fsl,ssi-dma-events = <46 45>;
- 					status = "disabled";
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index d048a78..c46651e 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -195,6 +195,9 @@
- 					reg = <0x02028000 0x4000>;
- 					interrupts = <0 46 0x04>;
- 					clocks = <&clks IMX6SL_CLK_SSI1>;
-+					dmas = <&sdma 37 1 0>,
-+					       <&sdma 38 1 0>;
-+					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					status = "disabled";
- 				};
-@@ -204,6 +207,9 @@
- 					reg = <0x0202c000 0x4000>;
- 					interrupts = <0 47 0x04>;
- 					clocks = <&clks IMX6SL_CLK_SSI2>;
-+					dmas = <&sdma 41 1 0>,
-+					       <&sdma 42 1 0>;
-+					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					status = "disabled";
- 				};
-@@ -213,6 +219,9 @@
- 					reg = <0x02030000 0x4000>;
- 					interrupts = <0 48 0x04>;
- 					clocks = <&clks IMX6SL_CLK_SSI3>;
-+					dmas = <&sdma 45 1 0>,
-+					       <&sdma 46 1 0>;
-+					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					status = "disabled";
- 				};
+diff --git a/sound/soc/codecs/bt-sco.c b/sound/soc/codecs/bt-sco.c
+index a081d9f..39e7ebe 100644
+--- a/sound/soc/codecs/bt-sco.c
++++ b/sound/soc/codecs/bt-sco.c
+@@ -46,6 +46,14 @@ static int bt_sco_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id bt_sco_of_match[] = {
++	{ .compatible = "bt-sco-codec", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, bt_sco_of_match);
++#endif
++
+ static struct platform_device_id bt_sco_driver_ids[] = {
+ 	{
+ 		.name		= "dfbmcs320",
+@@ -58,6 +66,9 @@ static struct platform_driver bt_sco_driver = {
+ 	.driver = {
+ 		.name = "bt-sco",
+ 		.owner = THIS_MODULE,
++#ifdef CONFIG_OF
++		.of_match_table = bt_sco_of_match,
++#endif
+ 	},
+ 	.probe = bt_sco_probe,
+ 	.remove = bt_sco_remove,
 -- 
-1.7.9.5
+1.8.2.3
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
