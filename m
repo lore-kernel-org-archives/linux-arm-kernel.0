@@ -1,16 +1,17 @@
 From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Wed, 17 Jul 2013 11:02:46 -0400
-Subject: [PATCH 5/8] arm: dts: add omap4430 thermal data
+Date: Wed, 17 Jul 2013 11:02:48 -0400
+Subject: [PATCH 6/8] arm: dts: flag omap4430 with needs-cooling for cpu node
 In-Reply-To: <1374073374-30946-1-git-send-email-eduardo.valentin@ti.com>
 References: <1374073374-30946-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1374073374-30946-11-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <1374073374-30946-13-git-send-email-eduardo.valentin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the dtsi entry on omap4430 to contain
-the thermal data. This data will enable the passive
-cooling with CPUfreq cooling device at 100C and the
-system will do a thermal shutdown at 125C.
+OMAP4430 devices can reach high temperatures and thus
+needs to have cpufreq-cooling on systems running on it.
+
+This patch adds the flag so that cpufreq-cpu0 driver
+loads the cooling device to use cpufreq on OMAP4430.
 
 Cc: "Beno?t Cousson" <b-cousson@ti.com>
 Cc: Tony Lindgren <tony@atomide.com>
@@ -21,57 +22,20 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
 ---
- arch/arm/boot/dts/omap443x.dtsi | 31 +++++++++++++++++++++++++++++--
- 1 file changed, 29 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/omap443x.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
-index bcf455e..c9a1c89 100644
+index c9a1c89..27f0e0f 100644
 --- a/arch/arm/boot/dts/omap443x.dtsi
 +++ b/arch/arm/boot/dts/omap443x.dtsi
-@@ -8,6 +8,7 @@
-  * kind, whether express or implied.
-  */
- 
-+#include <dt-bindings/thermal/thermal.h>
- #include "omap4.dtsi"
- 
- / {
-@@ -26,8 +27,34 @@
+@@ -23,6 +23,7 @@
+ 				1008000 1375000
+ 			>;
+ 			clock-latency = <300000>; /* From legacy driver */
++			needs-cooling; /* make sure we have cpufreq-cooling */
+ 		};
  	};
  
- 	bandgap {
--		reg = <0x4a002260 0x4
--		       0x4a00232C 0x4>;
-+		reg = <0x4a002260 0x4 0x4a00232C 0x4>;
- 		compatible = "ti,omap4430-bandgap";
-+		thermal_zone {
-+			type = "CPU";
-+			mask = <0x03>; /* trips writability */
-+			passive_delay = <250>; /* milliseconds */
-+			polling_delay = <1000>; /* milliseconds */
-+			governor = "step_wise";
-+			trips {
-+				alert at 100000{
-+					temperature = <100000>; /* milliCelsius */
-+					hysteresis = <2000>; /* milliCelsius */
-+					type = <THERMAL_TRIP_PASSIVE>;
-+				};
-+				crit at 125000{
-+					temperature = <125000>; /* milliCelsius */
-+					hysteresis = <2000>; /* milliCelsius */
-+					type = <THERMAL_TRIP_CRITICAL>;
-+				};
-+			};
-+			bind_params {
-+				action at 0{
-+					cooling_device = "thermal-cpufreq";
-+					weight = <100>; /* percentage */
-+					mask = <0x01>;
-+					/* no limits, using defaults */
-+				};
-+			};
-+		};
- 	};
- };
 -- 
 1.8.2.1.342.gfa7285d
