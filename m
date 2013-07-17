@@ -1,49 +1,57 @@
-From: myron.stowe@gmail.com (Myron Stowe)
-Date: Tue, 16 Jul 2013 20:21:26 -0600
-Subject: Linux Plumbers ACPI/PM, PCI Microconference
-Message-ID: <CAL-B5D03ki8NHsM6EuESTH2K-Eh+XyFHNXPDYwgDq+oagDjtMQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 16 Jul 2013 20:58:19 -0600
+Subject: [PATCH V2 5/5] ARM: remove #gpio-ranges-cells property
+In-Reply-To: <CAL_JsqJ7CYUieGbvAZtQDEYsUKdM3yYBHSu871jUqOLeASc08g@mail.gmail.com>
+References: <1373913629-32179-1-git-send-email-swarren@wwwdotorg.org>
+ <1373913629-32179-5-git-send-email-swarren@wwwdotorg.org>
+ <51E44ED9.9020807@gmail.com> <51E47F85.4050905@wwwdotorg.org>
+ <51E5D78F.8060400@wwwdotorg.org>
+ <CAL_JsqJ7CYUieGbvAZtQDEYsUKdM3yYBHSu871jUqOLeASc08g@mail.gmail.com>
+Message-ID: <51E6084B.30500@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linux Plumbers has approved an ACPI/PM, PCI microconference. The
-overview page is here:
+On 07/16/2013 07:50 PM, Rob Herring wrote:
+> On Tue, Jul 16, 2013 at 6:30 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 07/15/2013 05:02 PM, Stephen Warren wrote:
+>>> On 07/15/2013 01:34 PM, Rob Herring wrote:
+>>>> On 07/15/2013 01:40 PM, Stephen Warren wrote:
+>>>>> From: Stephen Warren <swarren@nvidia.com>
+>>>>>
+>>>>> This property is no longer required by the GPIO binding. Remove it.
+>>>>
+>>>> Won't this break compatibility with older kernel? It is one thing to
+>>>> deprecate, but removal is another. If the relevant maintainers don't
+>>>> care, then I guess it is fine.
+>>>
+>>> Yes.
+>>>
+>>> I had originally hoped this could sneak in late for 3.11, but I suppose
+>>> it's too late now. vf610.dtsi is a new file in 3.11 so has no legacy to
+>>> protect.
+>>>
+>>> Admittedly, the #gpio-cells property was added into the SPEAr files in 3.10.
+>>
+>> One more thought here:
+>>
+>> I know DT bindings are supposed to evolve so that a new kernel will
+>> support arbitrary old DTs. I'll call that backwards-compatibility for
+>> the DT parsing code.
+> 
+> That is the more common case.
+> 
+>> However, this situation is the reverse; this patch would prevent a new
+>> DT running on an older kernel. I'll call that forwards-compatibility.
+>> I'm not sure if the intent is to support this or not? It's certainly the
+>> first I explicitly thought about compatibility in this direction...
+> 
+> So you would be okay if your computer stopped booting a kernel after a
+> BIOS update? It's the same deal. It's both forwards and backwards
+> compatibility that is needed.
 
-http://wiki.linuxplumbersconf.org/2013:pci_subsystem
-
-We would like to start receiving volunteers for presenting topics of
-interest.  There is a lot of activity in these subsystems so please
-respond by submitting presentation or discussion proposals that you
-would be willing to cover for consideration.  You should also feel
-free to submit ideas as proposals that others could cover.  The
-instructions for submitting ideas should be at:
-
-http://www.linuxplumbersconf.org/2013/submitting-topic/
-
-This is the "Plumbers" conference so topics concerning userspace
-interaction with the kernel and not just topics concerning pure kernel
-subsystem internals would be greatly welcomed.  As a possible aid
-towards promoting topics for submissions we have listed a few
-candidates that seem to meet the criteria in the microconference
-proposals wiki located at
-http://wiki.linuxplumbersconf.org/2013:pci_subsystem
-
-Last year, we had a good discussion on general issues in PCI space -
-that also might be worth giving updates on.
-
-If you have topics that you would like to add, wait until the
-instructions get posted at the link above. If you are impatient, feel
-free to email me directly (but probably best to drop the broad mailing
-lists from the reply).
-
-Thanks!
-
-Len, Bjorn, Myron, Rafael
-
-
-
-Yinghai - An update on host bridge hot-add capabilities, what is in
-place and what still remains to be done, would seem like a good topic.
-
-Shuah - You brought up the idea about "Converting drivers from Legacy
-PM ops to dev_pm_ops"; would you like to present what you have
-done/encountered so far?
+I would strongly hope the BIOS/bootloader/... would have nothing to do
+with the DT content. There's a reason that Grant asserted early on that
+DTBs shouldn't be part of the BIOS/bootloader, but rather stored
+separately, so the DTB could be updated without updating firmware, just
+like the kernel. And I see no real problem with a new DTB requiring a
+new kernel or even vice-versa to be honest.
