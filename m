@@ -1,129 +1,111 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 17 Jul 2013 10:12:05 +0200
-Subject: [PATCH 2/5] iio: at91: Use different prescal, startup mask in
- MR for different IP
-In-Reply-To: <20130715125815.GC2962@lukather>
-References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
- <1373789069-11604-3-git-send-email-josh.wu@atmel.com>
- <20130715125815.GC2962@lukather>
-Message-ID: <51E651D5.7050906@atmel.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Wed, 17 Jul 2013 13:41:58 +0530
+Subject: [PATCH V3] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene host
+Message-ID: <1374048718-9455-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/07/2013 14:58, Maxime Ripard :
-> Hi Josh,
->
-> On Sun, Jul 14, 2013 at 04:04:26PM +0800, Josh Wu wrote:
->> For at91 boards, there are different IPs for adc. Different IPs has different
->> STARTUP & PRESCAL mask in ADC_MR.
->>
->> This patch can change the masks according to the different IP version.
->>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->>   arch/arm/mach-at91/include/mach/at91_adc.h |    9 ++++--
->>   drivers/iio/adc/at91_adc.c                 |   48 ++++++++++++++++++++++++++--
->>   2 files changed, 53 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/mach-at91/include/mach/at91_adc.h b/arch/arm/mach-at91/include/mach/at91_adc.h
->> index 8e7ed5c..ab273ee 100644
->> --- a/arch/arm/mach-at91/include/mach/at91_adc.h
->> +++ b/arch/arm/mach-at91/include/mach/at91_adc.h
->> @@ -28,9 +28,12 @@
->>   #define			AT91_ADC_TRGSEL_EXTERNAL	(6 << 1)
->>   #define		AT91_ADC_LOWRES		(1 << 4)	/* Low Resolution */
->>   #define		AT91_ADC_SLEEP		(1 << 5)	/* Sleep Mode */
->> -#define		AT91_ADC_PRESCAL	(0x3f << 8)	/* Prescalar Rate Selection */
->> +#define		AT91_ADC_PRESCAL	(0xff << 8)	/* Prescalar Rate Selection */
->> +#define		AT91_ADC_PRESCAL_9260	(0x3f << 8)
->>   #define			AT91_ADC_PRESCAL_(x)	((x) << 8)
->> -#define		AT91_ADC_STARTUP	(0x1f << 16)	/* Startup Up Time */
->> +#define		AT91_ADC_STARTUP	(0xf << 16)	/* Startup Up Time */
->> +#define		AT91_ADC_STARTUP_9260	(0x1f << 16)
->> +#define		AT91_ADC_STARTUP_9G45	(0x7f << 16)
->>   #define			AT91_ADC_STARTUP_(x)	((x) << 16)
->>   #define		AT91_ADC_SHTIM		(0xf  << 24)	/* Sample & Hold Time */
->>   #define			AT91_ADC_SHTIM_(x)	((x) << 24)
->> @@ -58,4 +61,6 @@
->>   #define AT91_ADC_CHR(n)		(0x30 + ((n) * 4))	/* Channel Data Register N */
->>   #define		AT91_ADC_DATA		(0x3ff)
->>
->> +#define AT91_ADC_VERSION	0xFC
->> +
->>   #endif
->> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
->> index 18bd54f..14e99ba 100644
->> --- a/drivers/iio/adc/at91_adc.c
->> +++ b/drivers/iio/adc/at91_adc.c
->> @@ -39,6 +39,12 @@
->>   #define at91_adc_writel(st, reg, val) \
->>   	(writel_relaxed(val, st->reg_base + reg))
->>
->> +struct at91_adc_caps {
->> +	bool	has_tsmr;	/* only at91sam9x5, sama5d3 have TSMR reg */
->> +	u32	mr_prescal_mask;
->> +	u32	mr_startup_mask;
->> +};
->> +
->>   struct at91_adc_state {
->>   	struct clk		*adc_clk;
->>   	u16			*buffer;
->> @@ -62,6 +68,7 @@ struct at91_adc_state {
->>   	u32			res;		/* resolution used for convertions */
->>   	bool			low_res;	/* the resolution corresponds to the lowest one */
->>   	wait_queue_head_t	wq_data_avail;
->> +	struct at91_adc_caps	caps;
->>   };
->>
->>   static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
->> @@ -580,6 +587,41 @@ static const struct iio_info at91_adc_info = {
->>   	.read_raw = &at91_adc_read_raw,
->>   };
->>
->> +/*
->> + * Since atmel adc support different ip for touchscreen mode. Through the
->> + * IP check, we will know the touchscreen capbilities.
->> + */
->> +static void atmel_adc_get_cap(struct at91_adc_state *st)
->> +{
->> +	unsigned int version;
->> +	struct iio_dev *idev = iio_priv_to_dev(st);
->> +
->> +	version = at91_adc_readl(st, AT91_ADC_VERSION);
->> +	dev_dbg(&idev->dev, "version: 0x%x\n", version);
->> +
->> +	st->caps.mr_prescal_mask = AT91_ADC_PRESCAL_9260;
->> +	st->caps.mr_startup_mask = AT91_ADC_STARTUP_9260;
->> +
->> +	/* keep only major version number */
->> +	switch (version & 0xf00) {
->> +	case 0x500:	/* SAMA5D3 */
->> +	case 0x400:	/* AT91SAM9X5/9N12 */
->> +		st->caps.has_tsmr = 1;
->> +		st->caps.mr_startup_mask = AT91_ADC_STARTUP;
->> +	case 0x200:	/* AT91SAM9M10/9G45 */
->> +		st->caps.mr_prescal_mask = AT91_ADC_PRESCAL;
->> +
->> +		if ((version & 0xf00) == 0x200)
->> +			st->caps.mr_startup_mask = AT91_ADC_STARTUP_9G45;
->> +	case 0x100:	/* AT91SAM9260/9G20 */
->> +		break;
->> +	default:
->> +		dev_warn(&idev->dev,
->> +				"Unmanaged adc version, use minimal capabilities\n");
->> +		break;
->> +	};
->> +}
->
-> Why don't you use different compatible names and derive your
-> capabilities from which compatible is declared.
+This patch allows us to have X-Gene guest VCPU when using KVM arm64
+on APM X-Gene host.
 
-Do not forget that we still have a handful of platforms that do not 
-support DT (and never will).
+We add KVM_ARM_TARGET_XGENE_POTENZA for X-Gene Potenza compatible
+guest VCPU and we return KVM_ARM_TARGET_XGENE_POTENZA in kvm_target_cpu()
+when running on X-Gene host with Potenza core.
 
-Josh, do you think that we can deal with this with different compatible 
-string instead of checking the IP revision?
+V3:
+ - Reduce multiple "return -EINVAL" in kvm_target_cpu()
 
-Bye,
+V2:
+ - Renamed KVM_ARM_TARGET_XGENE_V8 to KVM_ARM_TARGET_XGENE_POTENZA
+
+V1:
+ - Initial patch with target named as KVM_ARM_TARGET_XGENE_V8
+
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+---
+ arch/arm64/include/uapi/asm/kvm.h    |    3 ++-
+ arch/arm64/kvm/guest.c               |   36 ++++++++++++++++++++++------------
+ arch/arm64/kvm/sys_regs_generic_v8.c |    3 +++
+ 3 files changed, 29 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 5031f42..d9f026b 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -55,8 +55,9 @@ struct kvm_regs {
+ #define KVM_ARM_TARGET_AEM_V8		0
+ #define KVM_ARM_TARGET_FOUNDATION_V8	1
+ #define KVM_ARM_TARGET_CORTEX_A57	2
++#define KVM_ARM_TARGET_XGENE_POTENZA	3
+ 
+-#define KVM_ARM_NUM_TARGETS		3
++#define KVM_ARM_NUM_TARGETS		4
+ 
+ /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
+ #define KVM_ARM_DEVICE_TYPE_SHIFT	0
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 2c3ff67..143d179 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -207,20 +207,32 @@ int __attribute_const__ kvm_target_cpu(void)
+ 	unsigned long implementor = read_cpuid_implementor();
+ 	unsigned long part_number = read_cpuid_part_number();
+ 
+-	if (implementor != ARM_CPU_IMP_ARM)
+-		return -EINVAL;
+-
+-	switch (part_number) {
+-	case ARM_CPU_PART_AEM_V8:
+-		return KVM_ARM_TARGET_AEM_V8;
+-	case ARM_CPU_PART_FOUNDATION:
+-		return KVM_ARM_TARGET_FOUNDATION_V8;
+-	case ARM_CPU_PART_CORTEX_A57:
+-		/* Currently handled by the generic backend */
+-		return KVM_ARM_TARGET_CORTEX_A57;
++	switch (implementor) {
++	case ARM_CPU_IMP_ARM:
++		switch (part_number) {
++		case ARM_CPU_PART_AEM_V8:
++			return KVM_ARM_TARGET_AEM_V8;
++		case ARM_CPU_PART_FOUNDATION:
++			return KVM_ARM_TARGET_FOUNDATION_V8;
++		case ARM_CPU_PART_CORTEX_A57:
++			return KVM_ARM_TARGET_CORTEX_A57;
++		default:
++	 		break;
++		}
++		break;
++	case ARM_CPU_IMP_APM:
++		switch (part_number) {
++		case APM_CPU_PART_POTENZA:
++			return KVM_ARM_TARGET_XGENE_POTENZA;
++		default:
++	 		break;
++		}
++		break;
+ 	default:
+-		return -EINVAL;
++ 		break;
+ 	}
++
++	return -EINVAL;
+ }
+ 
+ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+index 4268ab9..8fe6f76 100644
+--- a/arch/arm64/kvm/sys_regs_generic_v8.c
++++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+@@ -90,6 +90,9 @@ static int __init sys_reg_genericv8_init(void)
+ 					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
+ 					  &genericv8_target_table);
++	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
++					  &genericv8_target_table);
++
+ 	return 0;
+ }
+ late_initcall(sys_reg_genericv8_init);
 -- 
-Nicolas Ferre
+1.7.9.5
