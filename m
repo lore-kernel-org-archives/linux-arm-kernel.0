@@ -1,47 +1,78 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Jul 2013 08:38:38 -0700
-Subject: [PATCH 2/3] ARM: OMAP2+: omap_device: add pinctrl handling
-In-Reply-To: <1374061312-25469-3-git-send-email-grygorii.strashko@ti.com>
-References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
- <1374061312-25469-3-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20130717153838.GJ7656@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 17 Jul 2013 17:40:10 +0200
+Subject: [PATCH 2/5] iio: at91: Use different prescal, startup mask in MR
+ for different IP
+In-Reply-To: <51E651D5.7050906@atmel.com>
+References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
+ <1373789069-11604-3-git-send-email-josh.wu@atmel.com>
+ <20130715125815.GC2962@lukather> <51E651D5.7050906@atmel.com>
+Message-ID: <20130717154010.GB21549@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [130717 04:49]:
-> Before switching to DT pinctrl states of OMAP IPs have been handled by hwmod
-> framework. After switching to DT-boot the pinctrl handling was dropped from
-> hwmod framework and, as it was recommended, OMAP IP's drivers have to be updated
-> to handle pinctrl states by itself using pinctrl_pm_select_xx() helpers
-> (see http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173514.html)
+Hi Nicolas,
+
+On Wed, Jul 17, 2013 at 10:12:05AM +0200, Nicolas Ferre wrote:
+> On 15/07/2013 14:58, Maxime Ripard :
+> >On Sun, Jul 14, 2013 at 04:04:26PM +0800, Josh Wu wrote:
+> >>+/*
+> >>+ * Since atmel adc support different ip for touchscreen mode. Through the
+> >>+ * IP check, we will know the touchscreen capbilities.
+> >>+ */
+> >>+static void atmel_adc_get_cap(struct at91_adc_state *st)
+> >>+{
+> >>+	unsigned int version;
+> >>+	struct iio_dev *idev = iio_priv_to_dev(st);
+> >>+
+> >>+	version = at91_adc_readl(st, AT91_ADC_VERSION);
+> >>+	dev_dbg(&idev->dev, "version: 0x%x\n", version);
+> >>+
+> >>+	st->caps.mr_prescal_mask = AT91_ADC_PRESCAL_9260;
+> >>+	st->caps.mr_startup_mask = AT91_ADC_STARTUP_9260;
+> >>+
+> >>+	/* keep only major version number */
+> >>+	switch (version & 0xf00) {
+> >>+	case 0x500:	/* SAMA5D3 */
+> >>+	case 0x400:	/* AT91SAM9X5/9N12 */
+> >>+		st->caps.has_tsmr = 1;
+> >>+		st->caps.mr_startup_mask = AT91_ADC_STARTUP;
+> >>+	case 0x200:	/* AT91SAM9M10/9G45 */
+> >>+		st->caps.mr_prescal_mask = AT91_ADC_PRESCAL;
+> >>+
+> >>+		if ((version & 0xf00) == 0x200)
+> >>+			st->caps.mr_startup_mask = AT91_ADC_STARTUP_9G45;
+> >>+	case 0x100:	/* AT91SAM9260/9G20 */
+> >>+		break;
+> >>+	default:
+> >>+		dev_warn(&idev->dev,
+> >>+				"Unmanaged adc version, use minimal capabilities\n");
+> >>+		break;
+> >>+	};
+> >>+}
+> >
+> >Why don't you use different compatible names and derive your
+> >capabilities from which compatible is declared.
 > 
-> But this is not right for OMAP2+ SoC where real IPs state is controlled
-> by omap_device core which enables/disables modules & clocks actually.
+> Do not forget that we still have a handful of platforms that do not
+> support DT (and never will).
 
-I'm not convinced we should try to handle this in a generic way
-as only some devices need dynamic remuxing of some pins.
+You can do pretty much the same thing with board-file-probed device
+drivers, using the id_table field of the platform_driver structure and
+use the driver_data field of the associated platform_device_id array to
+store the needed values.
 
-> For example, if OMAP I2C driver will handle pinctrl state during system wide
-> suspend the following issue may occure:
-> - suspend_noirq - I2C device can be still active because of PM auto-suspend
->   |-_od_suspend_noirq
->      |- omap_i2c_suspend_noirq
->         |- PINs state set to SLEEP
->   |- pm_generic_runtime_suspend
->      |- omap_i2c_runtime_suspend()
->         |- PINs state set to IDLE  <--- *oops* PINs state is IDLE and not SLEEP
->   |- omap_device_idle()
->      |- omap_hwmod_idle()
->         |- _idle()
->            |- disbale module (sysc&clocks)
+(see for example drivers/gpio/gpio-mxs.c)
 
-And in this example you are assuming that you need separate idle and
-sleep states, which is not true at least for most cases I've seen.
+Maxime
 
-It is possible that am33xx needs separate idle and sleep states, but
-most likely only for some pins. For omap[345] we can get away with
-just the default state for most cases.
-
-Regards,
-
-Tony
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/71912aca/attachment-0001.sig>
