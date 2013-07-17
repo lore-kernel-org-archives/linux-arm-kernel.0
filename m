@@ -1,49 +1,58 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 17 Jul 2013 23:38:36 +0200
-Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <51E6CCE4.20705@wwwdotorg.org>
-References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
- <20130716015038.GD28375@S2101-09.ap.freescale.net>
- <51E4BF98.8030604@wwwdotorg.org>
- <20130716041056.GA30067@S2101-09.ap.freescale.net>
- <51E56AA7.7020103@wwwdotorg.org>
- <20130717030246.GA4541@S2101-09.ap.freescale.net>
- <51E6CCE4.20705@wwwdotorg.org>
-Message-ID: <20130717213836.GA13324@amd.pavel.ucw.cz>
+From: cb@sgoc.de (Christoph G. Baumann)
+Date: Wed, 17 Jul 2013 23:43:12 +0200 (CEST)
+Subject: [PATCH v2 3/3] mxs: added driver for OCOTP in i.MX23 and i.MX28
+In-Reply-To: <20130717192627.GA12533@pengutronix.de>
+References: <1372855154-8422-1-git-send-email-cb@sgoc.de>
+ <1374078460-4126-1-git-send-email-cb@sgoc.de>
+ <1374078460-4126-4-git-send-email-cb@sgoc.de>
+ <20130717192627.GA12533@pengutronix.de>
+Message-ID: <1068003072.1131668.1374097392210.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2013-07-17 10:57:08, Stephen Warren wrote:
-> On 07/16/2013 09:02 PM, Shawn Guo wrote:
-> > On Tue, Jul 16, 2013 at 09:45:43AM -0600, Stephen Warren wrote:
-> >> Registering the driver earlier won't cause any bugs. However, it's not
-> >> the correct approach.
-> >>
-> >> Deferred probe /is/ the approach for assuring correct dependencies
-> >> between drivers. It works and should be used. There are not enough
-> >> initcall levels to play games using initcalls and solve all the issues,
-> >> and the ordering requirements vary board-to-board. Deferred probe at
-> >> runtime handles this without having to manually place all the drivers
-> >> into specific initcall levels, and dynamically adjusts to board
-> >> differences, since it all happens automatically at run-time.
-> > 
-> > I do not quite follow the argument here.  I agree with you that
-> > deferred probe is the approach to solve dependencies.  But it does not
-> > necessarily mean that initcall can not be used to help it save some
-> > nasty or nested deferring.  Deferred probe and initcalls are not two
-> > mutually exclusive mechanisms but two which can help each other.
-> 
-> My understanding is that deferred probe was implemented specifically to
-> avoid having to, or allowing, the use of initcall levels to determine
-> probe order.
-> 
-> However, if someone closely associated with the implementation of
-> deferred probe (e.g. Grant, or a device core maintainer) is willing to
-> step up and say I'm wrong, I'll drop my objection.
+Hello Sascha,
 
-AFAIR, defered probing is known to be a "hack" by its authors. We
-should still try to get initcall levels right...
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+thanks for your input. I must admit that I didn't do a thorough review of the
+FSL code...
+
+
+> Sascha Hauer <s.hauer@pengutronix.de> hat am 17. Juli 2013 um 21:26
+> geschrieben:
+> [...]
+> > +static DEFINE_MUTEX(otp_mutex);
+> > +static struct kobject *otp_kobj;
+> > +static struct attribute **attrs;
+> > +static struct kobj_attribute *kattr;
+> > +static struct attribute_group attr_group;
+> > +static unsigned long otp_hclk_saved;
+> > +static u32 otp_voltage_saved;
+> > +static resource_size_t otp_base_address;
+> > +struct regulator *regu;
+>
+> Collect your driver data in a struct and pass it around in functions
+> calls. No need to limit this driver to a single instance.
+
+The OTP device is unique in the CPU and several instances i.e. potential
+concurrent access is considered harmful. So I kept this construction
+from FSL.
+
+
+> > +static int otp_write_prepare(void)
+> > +{
+> > +? ? ?struct clk *hclk;
+> > +? ? ?int err = 0;
+> > +
+> > +? ? ?/* [1] HCLK to 24MHz. */
+> > +? ? ?hclk = clk_get_sys("hbus", NULL);
+>
+> This is a driver, so you should use regular clk_get, not clk_get_sys.
+> Besides, this has to be done during probe. clk_get takes a reference to
+> the clock which has to be released.
+
+As far as I remember testing clk_get didn't work in this place.
+In the API doc I only found the warning:
+"clk_get_sys should not be called from within interrupt context.".
+
+
+Regards,
+Christoph
