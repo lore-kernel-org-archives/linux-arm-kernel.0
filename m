@@ -1,49 +1,80 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 17 Jul 2013 14:29:02 -0400 (EDT)
-Subject: [RFC PATCH v5 0/1] drivers: mfd: Versatile Express SPC support
-In-Reply-To: <20130717170038.GP24642@n2100.arm.linux.org.uk>
-References: <1373990743-23106-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1374052705.3146.86.camel@hornet>
- <alpine.LFD.2.03.1307170825240.14924@syhkavp.arg>
- <1374067786.3146.123.camel@hornet>
- <alpine.LFD.2.03.1307171014510.14924@syhkavp.arg>
- <1374070811.3146.124.camel@hornet>
- <alpine.LFD.2.03.1307171148160.14924@syhkavp.arg>
- <20130717170038.GP24642@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.03.1307171416490.14924@syhkavp.arg>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Wed, 17 Jul 2013 20:30:14 +0200
+Subject: DT binding review for Armada display subsystem
+In-Reply-To: <CAMLZHHSFW9o280yTURrBnvrEGWFi-a7Q2yQWsCh7X5kEWbZNyw@mail.gmail.com>
+References: <20130712164428.AC3D2FAAE9@dev.laptop.org>
+ <CAMLZHHRvWFrxxjr0sF0NRqvz+K1wB9Mb_OGG-8tx36A2rk-SNQ@mail.gmail.com>
+ <20130715210900.GT14452@pengutronix.de>
+ <CAMLZHHSFW9o280yTURrBnvrEGWFi-a7Q2yQWsCh7X5kEWbZNyw@mail.gmail.com>
+Message-ID: <20130717203014.339cd37c@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Jul 2013, Russell King - ARM Linux wrote:
+On Wed, 17 Jul 2013 11:50:11 -0600
+Daniel Drake <dsd@laptop.org> wrote:
 
-> On Wed, Jul 17, 2013 at 11:57:55AM -0400, Nicolas Pitre wrote:
-> > The sanest location at this point might simply be 
-> > drivers/platform/vexpress_spc.c or drivers/platform/vexpress/spc.c 
-> > depending on whether or not more such driver glue is expected in the 
-> > vexpress future.  No point putting "arm" in the path, especially if this 
-> > is later reused on arm64.
+> I am now facing a problem with i2c/TDA998x which Russell already noted:
 > 
-> You wouldn't be making that argument if it were arch/arm64 and arch/arm32 -
-> you'd probably be arguing that "arm" made perfect sense.
+> http://lists.freedesktop.org/archives/dri-devel/2013-June/039632.html
+>    What *can't* be done without a rewrite of the DRM slave encoder backend
+>    is to have the TDA998x I2C device provided by DT.  There are mumblings
+>    about redoing the slave encoder API, hopefully this will be fixed there.
+> 
+> This is because the existing DRM/encoder system works something like this:
+> 1. i2c driver (e.g. tda998x_drv) registers as an i2c_driver via
+> drm_i2c_encoder_register()
+> 2. The drm driver (i.e. armada) later has to know that it is expecting
+> a tda998x instance. It calls drm_i2c_encoder_init() to set this up.
+> 
+> drm_i2c_encoder init requires:
+>  1. The i2c_adapter in question. In a DT world, we could get this from
+> finding the parent node of the tda998x node (this is the i2c bus
+> master), and then using i2c_for_each_dev to find the first i2c adapter
+> instance that has the same of_node.
+>  2. i2c_board_info - basically the address of the device on the i2c
+> bus. This is basically the way of instantiating i2c devices from
+> platform data. Not the DT way :(
+> 
+> In a DT world the i2c driver would be instantiated from a node in the
+> DT, which already includes the info that would come in i2c_board_info.
+> Then later it would have to be linked to a DRM slave/encoder, perhaps
+> when the DRM device finds the of_node corresponding to it.
+> 
+> So I think the next step is fixing up DRM, as Russell hinted. Unless
+> someone sees another acceptable option that doesn't break our DT
+> design.
 
-Well... in a sense: yes.  But in the end, having per arch directories 
-under drivers/ is silly.  We already have per arch directories under 
-arch/already.
+Hi Daniel,
 
-> Don't get too hung up on names please, it's really not worth the time
-> and effort being soo pedantic, and being soo pedantic leads to "pointless
-> churn" when someone comes along and wants to pedantically change the
-> names because it no longer matches the users.
+I don't see the problem with the TDA998x.
 
-At this point I don't really care about the name.  I just want the damn 
-thing merged upstream.  But after several iterations to either fit one 
-or another maintainers taste, each rework ends up in that maintainer 
-saying: "Now that you've reworked the code, I still don't like it since 
-this no longer fits in my subsystem tree."
+Indeed, it needs some enhancement to handle the DT, but also, the
+function drm_i2c_encoder_init() is not usable in the DT case (this
+function loads the module, while the module must be loaded by the DT
+for it gets all parameters - i2c address and irq).
 
-In fact what we'd need at this point is 
-drivers/code_that_no_subsystem_maintainers_wants/.  This is becoming 
-overly ridiculous.
+Here is the simple solution I use:
 
+- the tda998x is declared in the DT, so the module is loaded at system
+  startup time.
 
-Nicolas
+- its probe function is void.
+
+- when the connector of the drm driver scans the DT, it finds the
+  phandle to the tda998x.
+
+- if / after the tda998x is loaded, the connector calls the function
+  encoder_init() of the tda998x (and also increment the reference
+  counter of the tda998x module to avoid this last one to be unloaded).
+
+- the function encoder_init() of the tda998x scans the DT and it has all
+  elements to run.
+
+This working is compatible with the ticlcd driver: calling
+drm_i2c_encoder_init() just prevents the tda998x to use the irq (the
+i2c address is hard coded, the display connect/disconnect event is
+detected by polling and reading the EDID is synchronous).
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
