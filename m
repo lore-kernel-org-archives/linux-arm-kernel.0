@@ -1,58 +1,27 @@
-From: koba@kmckk.co.jp (Tetsuyuki Kobayashi)
-Date: Wed, 17 Jul 2013 15:48:29 +0900
-Subject: [PATCH] ARM: bugfix: Features of /proc/cpuinfo is wrong
-Message-ID: <1374043709-24770-1-git-send-email-koba@kmckk.co.jp>
+From: chris@zankel.net (Chris Zankel)
+Date: Wed, 17 Jul 2013 00:02:10 -0700
+Subject: [Linux-Xtensa] Re: sched_clock always 0 and no process time
+ accounting with 3.11-rc1
+In-Reply-To: <20130717064709.GD6950@tarshish>
+References: <CAMo8BfLO31GgMMA_hENr0xm=qaUz3EVLtaQ8hewiQHdbV+s6sA@mail.gmail.com>
+ <20130717061925.GC6950@tarshish>
+ <CAMo8Bf+UY2Lj=7=Y2AxeUfM3LqJkbQqPviH81PEjwo8irtiGJg@mail.gmail.com>
+ <20130717064709.GD6950@tarshish>
+Message-ID: <51E64172.9050808@zankel.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Array hwcap_str[19] should be "vfpd32" and hwcap_str[20] should be "lpae".
-But actually "vfpd32" was missing and "lpae" was at wrong place.
+On 07/16/2013 11:47 PM, Baruch Siach wrote:
+>> According to C99 the behaviour of (1 << 32) is undefined on platforms with
+>> 32 bit int, so it could yield any value.
+> But so is ARM, isn't it?
 
-Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
----
-Hello, 
+The handling of constants might be target-architecture dependent.
 
-The output of features string of /proc/cpuinfo is changed at v3.11-rc1.
-In case of KZM-A9-GT board, which cpu is ARM Corex-A9
-$ grep Features /proc/cpuinfo
+On a somewhat related issue, are you using a 32-bit host or 64-bit host?
+Note that 64-bit cross compilation is known to be broken for Xtensa, I
+had a problem running glibc when compiled with cross compiler on a
+64-bit host.
 
-Features	: swp half thumb fastmult vfp edsp neon vfpv3 tls lpae 
-
-This is wrong. Cortex-A9 does not have lpae (Large Physical Address Extension).
-
-I tried git bisect and found this commit is related.
-
-a469abd0f868c902b75532579bf87553dcf1b360
- ARM: elf: add new hwcap for identifying atomic ldrd/strd instructions
-
-Variable elf_hwcap = 0x0008b0d7. This seems good.
-HWCAP_LPAE (1 << 20) is not set in elf_hwcap.
-Finally I found "lpae" string was wrong place in the array hwcap_str[].
-hwcap_str[19] should be "vfpd32" and hwcap_str[20] should be "lpae".
-But actually "vfpd32" was missing and "lpae" was@wrong place.
-
-After this patch, features of /proc/cpuinfo of the same board is
-
-Features	: swp half thumb fastmult vfp edsp neon vfpv3 tls vfpd32 
-
-I tested only in Cortex-A9.
-Someone, please test on Cortex-A15 or A7. "lpae" should be appeared.
-
-
- arch/arm/kernel/setup.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 63af9a7..96286cb 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -971,6 +971,7 @@ static const char *hwcap_str[] = {
- 	"vfpv4",
- 	"idiva",
- 	"idivt",
-+	"vfpd32",
- 	"lpae",
- 	NULL
- };
--- 
-1.7.9.5
+Cheers!
+-Chris
