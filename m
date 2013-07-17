@@ -1,23 +1,18 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Jul 2013 10:03:55 +0100
-Subject: sched_clock always 0 and no process time accounting with 3.11-rc1
-In-Reply-To: <20130717061925.GC6950@tarshish>
-References: <CAMo8BfLO31GgMMA_hENr0xm=qaUz3EVLtaQ8hewiQHdbV+s6sA@mail.gmail.com>
- <20130717061925.GC6950@tarshish>
-Message-ID: <20130717090354.GK24642@n2100.arm.linux.org.uk>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Wed, 17 Jul 2013 11:04:10 +0200
+Subject: [PATCH v3 2/4] ARM: mach-moxart: add MOXA ART device tree files
+In-Reply-To: <1372949115-8190-1-git-send-email-jonas.jensen@gmail.com>
+References: <1371040448-28742-3-git-send-email-jonas.jensen@gmail.com>
+ <1372949115-8190-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <CACmBeS0LHqm8=4hM4VaDCBZZEP9-er7rP+SfJ7GnpgiGvJm+2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 09:19:25AM +0300, Baruch Siach wrote:
-> Apparently the expression '(1 << 32)' evaluates to 1 on xtensa cross gcc, and 
-> x86_84 native gcc. According to my limited understanding, the C compiler is 
-> allowed to do so. This caused sched_clock_32() to return constant 0. I wonder 
-> how it didn't bite the ARM people who are using this code from quite some time 
-> (added LAKL to CC).
+Just as a reminder, I intend to update this set with some minor changes:
 
-It (a) used to be only 32-bit, and (b) <<32 on ARM evaluates to zero in
-a 32-bit context (it's not a rotate).
+1. remove devicetree bindings for drivers, I will mail those out separately
+2. a devicetree node for DMA was added
+3. GPIO numbers are now in DT aswell
 
-Patch looks fine.  I wonder who takes it... after all, I used to look
-after that code (after all, I'm the author of it), but now I guess as
-it's been moved under kernel/time, it's someone elses responsibility.
+Best regards,
+Jonas
