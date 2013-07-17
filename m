@@ -1,32 +1,50 @@
-From: mpfj-list@newflow.co.uk (Mark Jackson)
-Date: Wed, 17 Jul 2013 17:28:37 +0100
-Subject: ARM: AM335x: Kernel oops when using EDMA and MMC
-In-Reply-To: <51E6BE84.6080905@newflow.co.uk>
-References: <51E6BE84.6080905@newflow.co.uk>
-Message-ID: <51E6C635.5020506@newflow.co.uk>
+From: cb@sgoc.de (Christoph G. Baumann)
+Date: Wed, 17 Jul 2013 18:27:39 +0200
+Subject: [PATCH v2 2/3] mxs: register clkdev "hbus" as it is required by OCOTP
+In-Reply-To: <1374078460-4126-1-git-send-email-cb@sgoc.de>
+References: <1372855154-8422-1-git-send-email-cb@sgoc.de>
+ <1374078460-4126-1-git-send-email-cb@sgoc.de>
+Message-ID: <1374078460-4126-3-git-send-email-cb@sgoc.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/13 16:55, Mark Jackson wrote:
-> I'm trying to get the MMC port working on our custom AM3352 CPU board.
-> 
-> I have added MMC entries to out dts file (similar to [1]), and I've
-> enabled CONFIG_TI_EDMA.
-> 
-> Our board boots fine without an SD card inserted ...
-> 
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Linux version 3.11.0-rc1-00025-g95b9b72 (mpfj at mpfj-nanobone) (gcc version 4.6.3 (Buildroot 2013.02-dirty) ) #309 Wed Jul 17 16:37:28 BST 2013
-> ...
-> [    2.789028] VFS: Mounted root (ubifs filesystem) on device 0:12.
-> [    2.797268] devtmpfs: mounted
-> [    2.801032] Freeing unused kernel memory: 200K (c0551000 - c0583000)
-> ...
-> Welcome to Buildroot
-> nanobone login:
+From: "Christoph G. Baumann" <cb@sgoc.de>
 
-I have just noticed the following in the boot log:-
+The OCOTP driver needs to switch the HBUS clock when burning OTP bits.
+For this purpose it uses the CLK-API and requests a handler for "hbus".
+Trying to burn bits without registered "hbus" CLK results in a blocked user
+process.
 
-...
-[    1.225698] omap_hsmmc 48060000.mmc: unable to obtain RX DMA engine channel 3227000204
-...
+Signed-off-by: "Christoph G. Baumann" <cb@sgoc.de>
+---
+ drivers/clk/mxs/clk-imx23.c |    2 ++
+ drivers/clk/mxs/clk-imx28.c |    1 +
+ 2 files changed, 3 insertions(+)
+
+diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
+index f6a7487..ec76d00 100644
+--- a/drivers/clk/mxs/clk-imx23.c
++++ b/drivers/clk/mxs/clk-imx23.c
+@@ -168,6 +168,8 @@ int __init mx23_clocks_init(void)
+ 	clk_data.clk_num = ARRAY_SIZE(clks);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
++	clk_register_clkdev(clks[hbus], NULL, "hbus");
++
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+ 		clk_prepare_enable(clks[clks_init_on[i]]);
+ 
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index 4faf0af..792fcaf 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -247,6 +247,7 @@ int __init mx28_clocks_init(void)
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+ 	clk_register_clkdev(clks[enet_out], NULL, "enet_out");
++	clk_register_clkdev(clks[hbus], NULL, "hbus");
+ 
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+ 		clk_prepare_enable(clks[clks_init_on[i]]);
+-- 
+1.7.9.5
