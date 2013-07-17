@@ -1,52 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 17 Jul 2013 13:07:58 +0100
-Subject: [PATCH v1 01/24] spi: mpc512x: prepare clocks before enabling them
-In-Reply-To: <20130717112229.GK7080@book.gsilab.sittig.org>
-References: <1373914074-20889-1-git-send-email-gsi@denx.de>
- <1373914074-20889-2-git-send-email-gsi@denx.de>
- <20130715201734.GF11538@sirena.org.uk>
- <20130717112229.GK7080@book.gsilab.sittig.org>
-Message-ID: <20130717120758.GR22506@sirena.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 17 Jul 2013 14:13:58 +0200
+Subject: [PATCH v8] ARM: clocksource: add support for MOXA ART SoCs
+In-Reply-To: <CACmBeS129VOmFjnF+-iRH1viS+zpoaNMYMaWZ_UiPVxa6ncYeQ@mail.gmail.com>
+References: <1373024773-24574-1-git-send-email-jonas.jensen@gmail.com>
+ <1373985880-23469-1-git-send-email-jonas.jensen@gmail.com>
+ <51E56043.1010509@linaro.org>
+ <CACmBeS129VOmFjnF+-iRH1viS+zpoaNMYMaWZ_UiPVxa6ncYeQ@mail.gmail.com>
+Message-ID: <51E68A86.3020703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 01:22:29PM +0200, Gerhard Sittig wrote:
-> On Mon, Jul 15, 2013 at 21:17 +0100, Mark Brown wrote:
-> > On Mon, Jul 15, 2013 at 08:47:30PM +0200, Gerhard Sittig wrote:
+On 07/17/2013 10:14 AM, Jonas Jensen wrote:
+> On 16 July 2013 17:01, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+>> 1. could you elaborate the patch log: as it is a new driver, a nice
+>> description of the timer hardware would be valuable for people willing
+>> to understand the code (eg. some specificities of the driver).
+> 
+> A short description is now added to the commit message, I hope this is
+> what you wanted, I can reformat the text if needed.
 
-> > >   sprintf(name, "psc%d_mclk", master->bus_num);
-> > >  	spiclk = clk_get(&master->dev, name);
-> > > -	clk_enable(spiclk);
-> > > +	clk_prepare_enable(spiclk);
-> > >  	mps->mclk = clk_get_rate(spiclk);
-> > >  	clk_put(spiclk);
+It is ok. Thanks for the update.
 
-> > This code is *clearly* buggy and should be fixed rather than papered
-> > over.  Not only is there no matching put the driver is also dropping the
-> > reference to the clock rather than holding on to it while it's in use.
 
-> "This code" refers to the driver's original condition, right?  I
-> agree that the driver has been suffering from incomplete clock
-> handling since it was born three years ago.  And that this issue
-> shall get addressed.  The question is just whether it needs to be
-> part of this series which has a different focus.
+>> 2. fix the alignment below
+> 
+> I don't see the alignment error, I think this is because git adds the
+> one '+' character, it should be correct once applied?
 
-This is a pretty long e-mail.  It'd probably have taken less time to
-fix the issues than to reply to the e-mail...  but anyway.
+Ok. I will check it.
 
-A big part of the issue with the state of the driver is that there's
-obvious clock API abuse going on that isn't corrected here - the main
-one is that the sprintf() for the clock name is a fairly clear warning
-sign, the driver should be using a fixed value there.  This raises a
-warning flag for me about the quality of the common clock API
-implementation that's being sent and/or the potential for bugs to be
-noticed with the common clock framework.  I'd not expect this code to
-actually work, and looking at the rest of the series I don't see how it
-does since I can't see what forces the name.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/245057e2/attachment-0001.sig>
+Thanks
+  -- Daniel
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
