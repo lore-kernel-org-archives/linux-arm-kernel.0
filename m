@@ -1,57 +1,48 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 17 Jul 2013 11:45:37 -0500
-Subject: [PATCH 8/9] ARM: dts: omap5-uevm: update LDO7 voltage to 2V and
- settings
-In-Reply-To: <1374079538-19548-1-git-send-email-nm@ti.com>
-References: <1374079538-19548-1-git-send-email-nm@ti.com>
-Message-ID: <1374079538-19548-9-git-send-email-nm@ti.com>
+Date: Wed, 17 Jul 2013 11:45:29 -0500
+Subject: [PATCH 0/9] ARM: dts: omap5-uevm: fixup wrong regulator configuration
+Message-ID: <1374079538-19548-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit e00c27ef3b4c23e39d0a77b7c8e5be44c28001c7
-(ARM: dts: OMAP5: Add Palmas MFD node and regulator nodes)
-introduced regulator entries for OMAP5uEVM.
+Due to wrong older revision of documentation used as reference, we
+seem to have a bunch of LDOs wrongly configured on OMAP5 uEVM. This
+series is based power tree on production board 750-2628-XXX platform.
+Unfortunately, the wrong voltages may be detrimental to OMAP5 as they
+supply hardware blocks at voltages that are out of specification.
 
-However, The regulator information is based on an older temporary
-pre-production board variant and does not reflect production board
-750-2628-XXX boards.
+Also available at:
+based on v3.11-rc1 tag
+http link: https://github.com/nmenon/linux-2.6-playground/commits/push/omap5-palmas-fixes
+git link: git://github.com/nmenon/linux-2.6-playground.git
+branch: push/omap5-palmas-fixes
 
-LDO4 supplies VDD_VPP which is vpp1. This is currently configured for
-1.5V which as per data manual "A pulse width of 1000 ns and an amplitude
-of 2V is required to program each eFuse bit. Otherwise, VPP1 must not
-be supplied".
+Tested with https://patchwork.kernel.org/patch/2545061/
+ + https://git.kernel.org/cgit/linux/kernel/git/ssantosh/linux.git/log/?h=for_3.11/out_of_tree/omap5_clk_data
+Test result: http://pastebin.com/YqASYkXG
 
-So, fix the voltage to 2V. and disable the supply since we have no plans
-of programming efuse bits - it can only be done once - in factory.
+Relevant documentation:
+- OMAP5 uEVM documentation: https://www.svtronics.com/omap/omap54xx?product_id=33
+- OMAP5432 Data Manual: http://www.ti.com/product/OMAP5432
+- TWL6037 / OTP information: Currently available only under NDA
 
-Further it is not enabled by default by PMIC so, 'boot-on' must be
-removed, and the 'always-on' needs to be removed to achieve pulsing
-if efuse needs to be programmed.
+Nishanth Menon (9):
+  ARM: dts: omap5-uevm: document regulator signals used on the actual
+    board
+  ARM: dts: omap5-uevm: update SMPS9 settings
+  ARM: dts: omap5-uevm: update and disable unused regulators LDO[28]
+  ARM: dts: omap5-uevm: update LDO1 voltage to 1.5V and settings
+  ARM: dts: omap5-uevm: update LDO3 voltage to 1.5V and settings
+  ARM: dts: omap5-uevm: update LDO4 voltage to 1.5V and settings
+  ARM: dts: omap5-uevm: update LDO6 voltage to 1.2V
+  ARM: dts: omap5-uevm: update LDO7 voltage to 2V and settings
+  ARM: dts: omap5-uevm: update SDCARD LDO9 and resource REGEN3
 
-Reported-by: Marc J?ttner <m-juettner@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/boot/dts/omap5-uevm.dts |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/omap5-uevm.dts |   78 ++++++++++++++++++++++++--------------
+ 1 file changed, 49 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-index 3ff5874..ef05676 100644
---- a/arch/arm/boot/dts/omap5-uevm.dts
-+++ b/arch/arm/boot/dts/omap5-uevm.dts
-@@ -397,10 +397,10 @@
- 				ldo7_reg: ldo7 {
- 					/* VDD_VPP: vpp1 */
- 					regulator-name = "ldo7";
--					regulator-min-microvolt = <1500000>;
--					regulator-max-microvolt = <1500000>;
--					regulator-always-on;
--					regulator-boot-on;
-+					regulator-min-microvolt = <2000000>;
-+					regulator-max-microvolt = <2000000>;
-+					/* Only for efuse reprograming! */
-+					status = "disabled";
- 				};
- 
- 				ldo8_reg: ldo8 {
 -- 
 1.7.9.5
+
+Regards,
+Nishanth Menon
