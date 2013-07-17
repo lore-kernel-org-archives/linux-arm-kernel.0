@@ -1,51 +1,37 @@
-From: rric@kernel.org (Robert Richter)
-Date: Wed, 17 Jul 2013 18:57:43 +0200
-Subject: [PATCH] arm, kbuild: make "make install" not depend on vmlinux
-In-Reply-To: <CA+55aFx4G5gME3ByqE0Wr-_t2x_6WkP3Ta4k1z4jfW+PrcK0og@mail.gmail.com>
-References: <20130710133742.GA29368@emu.suse.cz>
- <CA+55aFxtvT3Yvbxe5JGBThZS13payymFJ7jCLyEiE2iNDvsZtQ@mail.gmail.com>
- <20130711135445.GA21500@sepie.suse.cz>
- <CA+55aFyVjugxM7cUDWi0ASWttYthCxa6e7X3CADknBcSFxWgew@mail.gmail.com>
- <20130712105721.GF8731@rric.localhost>
- <20130717160506.GI8731@rric.localhost>
- <CA+55aFx4G5gME3ByqE0Wr-_t2x_6WkP3Ta4k1z4jfW+PrcK0og@mail.gmail.com>
-Message-ID: <20130717165743.GK8731@rric.localhost>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 17 Jul 2013 11:01:30 -0600
+Subject: [PATCH] ASoC: tegra: depend on ARCH_TEGRA, not ARCH_TEGRA_*
+In-Reply-To: <20130717083003.GA22506@sirena.org.uk>
+References: <1374013667-21435-1-git-send-email-swarren@wwwdotorg.org>
+ <20130717083003.GA22506@sirena.org.uk>
+Message-ID: <51E6CDEA.7060003@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.07.13 09:36:57, Linus Torvalds wrote:
-> On Wed, Jul 17, 2013 at 9:05 AM, Robert Richter <rric@kernel.org> wrote:
-> >
-> > I narrowed this down. The problem is that zinstall on ARCH=arm has a
-> > dependency to vmlinux which does a prepare/prepare3 and finally does a
-> > forced rebuild of kernel.release even if it exists already.
-> >
-> > Rebuilding it removes kernel.release first and then recreates it. This
-> > might race with another parallel make job running depmod.
-> >
-> > So on arm and maybe other archs we need the same as for x86:
-> >
-> >  1648e4f8 x86, kbuild: make "make install" not depend on vmlinux
-> >
-> > The patch below fixes this for arm. It is build-tested in my
-> > environment, but please test it in others too if possible.
+On 07/17/2013 02:30 AM, Mark Brown wrote:
+> On Tue, Jul 16, 2013 at 04:27:47PM -0600, Stephen Warren wrote:
 > 
-> Ack. This looks like the right thing to do.
+>> Stop selecting I2S/AC97/SPDIF controller drivers from the machine
+>> driver config options; this doesn't really work if we don't know
+>> which specific SoC(s) we're building for. However, set their
+>> default values based on SND_SOC_TEGRA, since most people will
+>> probably want to enable support for all SoCs. This also avoids
+>> the need to change any defconfig files.
+> 
+> This doesn't seem terribly clever and is definitely not idiomatic
+> for ASoC.  If you want to just select all CPUs that'd be fine but
+> forcing the user to select the individual components isn't the
+> style anything else uses.
 
-Thanks for looking at this.
+So I think what you're saying is that machine drivers should be
+changed like:
 
-> That said, I think for clarity you might perhaps want to make the
-> unrelated change of adding double quotes around $(KERNELRELEASE) a
-> separate patch. Not a big deal, but it took me a moment to say "why
-> did he do that" (in fact, I'm not sure KERNEL_RELEASE can actually
-> validly have spaces in it, but quoting it is certainly not wrong
-> either - but it might be unnecessary.
+-       select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC
+-       select SND_SOC_TEGRA30_I2S if ARCH_TEGRA_3x_SOC
++       select SND_SOC_TEGRA20_I2S
++       select SND_SOC_TEGRA30_I2S
 
-If kernel.release doen't exist KERNEL_RELEASE is empty, thus all args
-for install.sh shift one arg left. Putting it in quotes avoids this.
-Noticed this since the first verified file in install.sh ($2) should
-be the image file but was already System.map ($3).
-
-Will splitt the patches and resend.
-
--Robert
+But then, it won't be possible to disable support for older SoCs,
+since simply enabling a machine driver that might support Tegra20
+would force ASoC support for Tegra20 to be enabled, even if the user
+only cares about Tegra30.
