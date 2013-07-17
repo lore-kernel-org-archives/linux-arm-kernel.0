@@ -1,63 +1,50 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 17 Jul 2013 18:22:46 -0400 (EDT)
-Subject: [RFC PATCH v5 0/1] drivers: mfd: Versatile Express SPC support
-In-Reply-To: <20130717212343.GC19864@zurbaran>
-References: <1373990743-23106-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1374052705.3146.86.camel@hornet>
- <alpine.LFD.2.03.1307170825240.14924@syhkavp.arg>
- <1374067786.3146.123.camel@hornet>
- <alpine.LFD.2.03.1307171014510.14924@syhkavp.arg>
- <1374070811.3146.124.camel@hornet>
- <alpine.LFD.2.03.1307171148160.14924@syhkavp.arg>
- <20130717170038.GP24642@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1307171416490.14924@syhkavp.arg>
- <20130717212343.GC19864@zurbaran>
-Message-ID: <alpine.LFD.2.03.1307171758591.14924@syhkavp.arg>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 17 Jul 2013 16:24:38 -0600
+Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <20130717213836.GA13324@amd.pavel.ucw.cz>
+References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
+ <20130716015038.GD28375@S2101-09.ap.freescale.net>
+ <51E4BF98.8030604@wwwdotorg.org>
+ <20130716041056.GA30067@S2101-09.ap.freescale.net>
+ <51E56AA7.7020103@wwwdotorg.org>
+ <20130717030246.GA4541@S2101-09.ap.freescale.net>
+ <51E6CCE4.20705@wwwdotorg.org> <20130717213836.GA13324@amd.pavel.ucw.cz>
+Message-ID: <51E719A6.6070105@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Jul 2013, Samuel Ortiz wrote:
+On 07/17/2013 03:38 PM, Pavel Machek wrote:
+> On Wed 2013-07-17 10:57:08, Stephen Warren wrote:
+>> On 07/16/2013 09:02 PM, Shawn Guo wrote:
+>>> On Tue, Jul 16, 2013 at 09:45:43AM -0600, Stephen Warren wrote:
+>>>> Registering the driver earlier won't cause any bugs. However, it's not
+>>>> the correct approach.
+>>>>
+>>>> Deferred probe /is/ the approach for assuring correct dependencies
+>>>> between drivers. It works and should be used. There are not enough
+>>>> initcall levels to play games using initcalls and solve all the issues,
+>>>> and the ordering requirements vary board-to-board. Deferred probe at
+>>>> runtime handles this without having to manually place all the drivers
+>>>> into specific initcall levels, and dynamically adjusts to board
+>>>> differences, since it all happens automatically at run-time.
+>>>
+>>> I do not quite follow the argument here.  I agree with you that
+>>> deferred probe is the approach to solve dependencies.  But it does not
+>>> necessarily mean that initcall can not be used to help it save some
+>>> nasty or nested deferring.  Deferred probe and initcalls are not two
+>>> mutually exclusive mechanisms but two which can help each other.
+>>
+>> My understanding is that deferred probe was implemented specifically to
+>> avoid having to, or allowing, the use of initcall levels to determine
+>> probe order.
+>>
+>> However, if someone closely associated with the implementation of
+>> deferred probe (e.g. Grant, or a device core maintainer) is willing to
+>> step up and say I'm wrong, I'll drop my objection.
+> 
+> AFAIR, defered probing is known to be a "hack" by its authors. We
+> should still try to get initcall levels right...
 
-> On Wed, Jul 17, 2013 at 02:29:02PM -0400, Nicolas Pitre wrote:
-> > At this point I don't really care about the name.  I just want the damn 
-> > thing merged upstream.  But after several iterations to either fit one 
-> > or another maintainers taste, each rework ends up in that maintainer 
-> > saying: "Now that you've reworked the code, I still don't like it since 
-> > this no longer fits in my subsystem tree."
-> FWIW, we asked Pawel to rework the sysreg and config parts of the
-> vexpress driver, make it an actual MFD driver, and spread the remaining
-> bits of the code into their respective subsystems. I don't think
-> this is an eccentric requirement.
-
-I agree.  However the code that Lorenzo just posted can't be deprived 
-of any more sysreg/config parts.  They are simply nonexistent.
-
-Even the larger code you reviewed before is completely useless without 
-_additional_ drivers to go on top which are indeed waiting after this 
-code to be merged before they are submitted to their respective 
-subsystems.
-
-And those additional drivers are way more interesting than this dumb 
-register access arbitrator.  Because this is fundamentally the only 
-thing it does.
-
-> > In fact what we'd need at this point is 
-> > drivers/code_that_no_subsystem_maintainers_wants/.  
-> Which is what some people think drivers/mfd/ is...
-
-Does mfd still stand for "Multi Function Device"?
-
-> I don't mind merging Lorenzo's SPC driver as it is if he can explain to
-> me how it will eventually evolve into an actual MFD driver. If that's
-> not the case, I don't see how I could justify merging it through the
-> MFD tree.
-
-Maybe the misunderstanding is about what actually is a MFD driver.
-Given your persisting reluctance, I may only conclude that this is 
-indeed not a MFD driver after all.
-
-So I'll follow existing precedents in the kernel and move Lorenzo's code 
-to drivers/platform/vexpress/.
-
-
-Nicolas
+I don't /think/ it was the concept of deferred probe that was considered
+hacky, but perhaps just the first proof-of-concept implementation, and
+any hackiness was presumably solved before the feature was merged.
