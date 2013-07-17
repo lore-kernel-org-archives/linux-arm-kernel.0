@@ -1,40 +1,43 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 17 Jul 2013 14:13:58 +0200
-Subject: [PATCH v8] ARM: clocksource: add support for MOXA ART SoCs
-In-Reply-To: <CACmBeS129VOmFjnF+-iRH1viS+zpoaNMYMaWZ_UiPVxa6ncYeQ@mail.gmail.com>
-References: <1373024773-24574-1-git-send-email-jonas.jensen@gmail.com>
- <1373985880-23469-1-git-send-email-jonas.jensen@gmail.com>
- <51E56043.1010509@linaro.org>
- <CACmBeS129VOmFjnF+-iRH1viS+zpoaNMYMaWZ_UiPVxa6ncYeQ@mail.gmail.com>
-Message-ID: <51E68A86.3020703@linaro.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 17 Jul 2013 15:30:36 +0300
+Subject: [PATCH 0/3] ARM: OMAP2+: omap_device: add dynamic pinctrl handling
+In-Reply-To: <51E686C1.8020801@ti.com>
+References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
+ <51E686C1.8020801@ti.com>
+Message-ID: <51E68E6C.60100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2013 10:14 AM, Jonas Jensen wrote:
-> On 16 July 2013 17:01, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
->> 1. could you elaborate the patch log: as it is a new driver, a nice
->> description of the timer hardware would be valuable for people willing
->> to understand the code (eg. some specificities of the driver).
-> 
-> A short description is now added to the commit message, I hope this is
-> what you wanted, I can reformat the text if needed.
+On 07/17/2013 02:57 PM, Roger Quadros wrote:
+> Hi Grygorii,
+>
+> On 07/17/2013 02:41 PM, Grygorii Strashko wrote:
+>> Hi Tony, Kevin
+>>
+>> This patch series introduces dynamic pinctrl handling in OMAP device framework
+>> in the same way as it was before switching to DT.
+>> This allow OMAP devices driver's developers to simply add dynamic pinctrl
+>> handling for "default", "active", "idle", "sleep" PIN states in their drivers
+>> by modifying DT definitions only - no modifications in drivers code are not needed.
+>>
+>
+> Overall I like the idea but can we make a provision for device drivers to override
+> this default pin state handling?
+>
+> The OMAP EHCI driver is one such special case where the wakeup mechanism is tied to pinctrl states
+> as it uses IO daisy chaining to implement wakeup.
+> So depending on whether wakeup needs to be enabled or not I must be able to chose whether
+> I put the pin in just "sleep" state or "sleep with wakeup" state.
 
-It is ok. Thanks for the update.
+I think, in this case you can't use default behavior and need to define
+custom pins states like "sleep_wakeup"/"sleep_no_wakeup" and do not
+define pins state with name "sleep', so Device core and OMAP device
+framework will not touch your pins.
 
+>
+> cheers,
+> -roger
+>
 
->> 2. fix the alignment below
-> 
-> I don't see the alignment error, I think this is because git adds the
-> one '+' character, it should be correct once applied?
-
-Ok. I will check it.
-
-Thanks
-  -- Daniel
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards,
+-grygorii
