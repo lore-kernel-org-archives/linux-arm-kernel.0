@@ -1,43 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 17 Jul 2013 15:21:35 -0600
-Subject: [PATCH 4/4] drivers: Add pinctrl handling for dynamic pin states
-In-Reply-To: <20130716090539.5541.980.stgit@localhost>
-References: <20130716090310.5541.36777.stgit@localhost>
- <20130716090539.5541.980.stgit@localhost>
-Message-ID: <51E70ADF.8090805@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Jul 2013 22:21:48 +0100
+Subject: preempted dup_mm misses TLB invalidate
+In-Reply-To: <51E706A6.4040309@nvidia.com>
+References: <51E43D2B.9090709@nvidia.com>
+ <20130717192746.GE16496@MacBook-Pro.local> <51E6F60D.6060804@wwwdotorg.org>
+ <51E6FA10.5070504@nvidia.com> <20130717203409.GU24642@n2100.arm.linux.org.uk>
+ <51E706A6.4040309@nvidia.com>
+Message-ID: <20130717212148.GV24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2013 03:05 AM, Tony Lindgren wrote:
-> We want to have static pin states handled separately from
-> dynamic pin states, so let's add optional state_active.
-> 
-> Then if state_active is defined, let's check and make sure
-> state_idle and state_sleep match state_active for the
-> pin groups to avoid checking them during runtime as the
-> active and idle pins may need to be toggled for many
-> devices every time we enter and exit idle.
+On Wed, Jul 17, 2013 at 02:03:34PM -0700, Nickolas Fortino wrote:
+> On 7/17/2013 1:34 PM, Russell King - ARM Linux wrote:
+>> Even if you stopped all threads on entry to a fork, the same problem
+>> exists - at the point that you stopped the other threads, how do you know
+>> what data they've written to memory?
+>>
+>> What I'm pointing out here is that in this situation, the data visible to
+>> the child process is unpredictable.
+>
+> I agree the data visible to the child process is inherently  
+> unpredictable. If you stop all process threads on a fork, however, you  
+> do preserve the invariant that memory accesses are not seen out of  
+> order. In your memcopy case, it is indeterminate how much of the memcopy  
+> has completed, but it is known that later pages in the memcopy will only  
+> have been written if prior pages have been updated.
+>
+> With the current kernel configuration, you can have holes. Any page  
+> which hits in the TLB has the memcopy data appear in the forked process.  
+> Any page which misses in the TLB will not appear in the forked process.  
+> The choice of which pages get memcopy data in the forked process will  
+> appear random based on TLB contents, a behavior you cannot have if you  
+> freeze threads on a fork.
 
-> +	 * Note that if active state is defined, sleep and idle states must
-> +	 * cover the same pin groups as active state.
->  	 */
->  	dev->pins->sleep_state = pinctrl_lookup_state(dev->pins->p,
->  					PINCTRL_STATE_SLEEP);
-> -	if (IS_ERR(dev->pins->sleep_state))
-> +	if (IS_ERR(dev->pins->sleep_state)) {
->  		/* Not supplying this state is perfectly legal */
->  		dev_dbg(dev, "no sleep pinctrl state\n");
-> +	} else if (!IS_ERR(dev->pins->active_state)) {
-> +		ret = pinctrl_check_dynamic(dev, dev->pins->active_state,
-> +					    dev->pins->sleep_state);
+So... how is this handled on x86 or any of the other architectures?  I'm
+willing to bet that the behaviour you observe on ARM is inherently visible
+on many of the other Linux architectures.
 
-Oh, I see you're trying to check that the set of pins in the active,
-sleep, and idle states are identical.
-
-But I think that pinctrl_check_dynamic() only checks that one state is a
-subset of the other, not that the two states are equal. Instead, I think
-you want to comparison coded in pinctrl_check_dynamic() to be:
-
-gen_group_list_of_pinctrl_state(s1, array1);
-gen_group_list_of_pinctrl_state(s2, array2);
-mismatch = memcmp(array1, array2, length);
+Short of modifying the generic kernel to halt all threads, this can not be
+fixed.
