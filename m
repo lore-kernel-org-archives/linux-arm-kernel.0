@@ -1,135 +1,46 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 17 Jul 2013 10:12:22 +0530
-Subject: [PATCH 1/2] ARM: dts: Add SHAM data and documentation for AM33XX
-In-Reply-To: <1374017368-5267-2-git-send-email-mgreer@animalcreek.com>
-References: <1374017368-5267-1-git-send-email-mgreer@animalcreek.com>
- <1374017368-5267-2-git-send-email-mgreer@animalcreek.com>
-Message-ID: <51E620AE.8090602@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 17 Jul 2013 06:56:08 +0200
+Subject: [PATCH V3 3/4] ARM: dts: tegra: Correct PCIe entry
+In-Reply-To: <20130611073048.GR3847@tbergstrom-lnx.Nvidia.com>
+References: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
+ <1370372252-4332-3-git-send-email-jagarwal@nvidia.com>
+ <20130610195511.GC25859@mithrandir>
+ <20130611073048.GR3847@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20130717045607.GC11359@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Tue, Jun 11, 2013 at 10:30:48AM +0300, Peter De Schrijver wrote:
+> On Mon, Jun 10, 2013 at 09:55:12PM +0200, Thierry Reding wrote:
+> > * PGP Signed by an unknown key
+> > 
+> > On Wed, Jun 05, 2013 at 12:27:31AM +0530, Jay Agarwal wrote:
+> > [...]
+> > > @@ -29,7 +29,7 @@
+> > >  		ranges = <0x82000000 0 0x00000000 0x00000000 0 0x00001000   /* port 0 configuration space */
+> > >  			  0x82000000 0 0x00001000 0x00001000 0 0x00001000   /* port 1 configuration space */
+> > >  			  0x82000000 0 0x00004000 0x00004000 0 0x00001000   /* port 2 configuration space */
+> > > -			  0x81000000 0 0          0x02000000 0 0x00010000   /* downstream I/O */
+> > > +			  0x81000000 0 0          0x02000000 0 0x00100000   /* downstream I/O */
+> > >  			  0x82000000 0 0x20000000 0x20000000 0 0x10000000   /* non-prefetchable memory */
+> > >  			  0xc2000000 0 0x30000000 0x30000000 0 0x10000000>; /* prefetchable memory */
+> > 
+> > That increases the I/O region size from 64 KiB to 1 MiB. Why is that
+> > necessary? I/O operations can only address 64 KiB, so I don't think
+> > adding more makes any sense.
+> 
+> At least PCI allows 32bit I/O addresses. No idea if anyone uses them though.
 
-On Wednesday 17 July 2013 04:59 AM, Mark A. Greer wrote:
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
-> 
-> Add the generic AM33XX SHAM module's device tree data and
-> enable it for the am335x-evm, am335x-evmsk, and am335x-bone
-> platforms.  Also add Documentation file describing the data
-> for the SHAM module.
-> 
-> CC: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> ---
->  .../devicetree/bindings/crypto/omap-sham.txt       | 33 ++++++++++++++++++++++
->  arch/arm/boot/dts/am335x-bone.dts                  |  4 +++
->  arch/arm/boot/dts/am335x-evm.dts                   |  4 +++
->  arch/arm/boot/dts/am335x-evmsk.dts                 |  3 ++
->  arch/arm/boot/dts/am33xx.dtsi                      |  9 ++++++
->  5 files changed, 53 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/crypto/omap-sham.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/crypto/omap-sham.txt b/Documentation/devicetree/bindings/crypto/omap-sham.txt
-> new file mode 100644
-> index 0000000..c6d1202
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/crypto/omap-sham.txt
-> @@ -0,0 +1,33 @@
-> +OMAP SoC SHA crypto Module
-> +
-> +Required properties:
-> +
-> +- compatible : Should contain entries for this and backward compatible
-> +  SHAM versions:
-> +  - "ti,omap2-sham" for OMAP2 & OMAP3.
-> +  - "ti,omap4-sham" for OMAP4 and AM33XX.
-> +  Note that these two versions are incompatible.
-> +- ti,hwmods: Name of the hwmod associated with the SHAM module
-> +- reg : Offset and length of the register set for the module
-> +- interrupt-parent : the phandle for the interrupt controller that
-> +  services interrupts for this module.
-> +- interrupts : the interrupt number for the SHAM module.
-> +
-> +Optional properties:
-> +- dmas: DMA controller phandle and DMA request ordered pair.
-> +	Only one rx pair is valid per SHAM module.
-> +- dma-names: DMA request name. This string corresponds 1:1 with
-> +	the ordered pair in dmas. The string naming is to be
-> +	"rx" for RX request.
-> +
-> +Example:
-> +	/* AM335x */
-> +	sham: sham at 53100000 {
-> +		compatible = "ti,omap4-sham";
-> +		ti,hwmods = "sham";
-> +		reg = <0x53100000 0x200>;
-> +		interrupt-parent = <&intc>;
-> +		interrupts = <109>;
-> +		dmas = <&edma 36>;
-> +		dma-names = "rx";
-> +	};
-> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> index 444b4ed..bc75b2c 100644
-> --- a/arch/arm/boot/dts/am335x-bone.dts
-> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> @@ -234,3 +234,7 @@
->  	pinctrl-0 = <&davinci_mdio_default>;
->  	pinctrl-1 = <&davinci_mdio_sleep>;
->  };
-> +
-> +&sham {
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-> index 3aee1a4..9b8c56d 100644
-> --- a/arch/arm/boot/dts/am335x-evm.dts
-> +++ b/arch/arm/boot/dts/am335x-evm.dts
-> @@ -488,3 +488,7 @@
->  		ti,adc-channels = <4 5 6 7>;
->  	};
->  };
-> +
-> +&sham {
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-> index 0c8ad17..b04aea1 100644
-> --- a/arch/arm/boot/dts/am335x-evmsk.dts
-> +++ b/arch/arm/boot/dts/am335x-evmsk.dts
-> @@ -401,4 +401,7 @@
->  &cpsw_emac1 {
->  	phy_id = <&davinci_mdio>, <1>;
->  	phy-mode = "rgmii-txid";
-> +
-> +&sham {
-> +	status = "okay";
- "};" is missing here.
->  };
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 38b446b..eb0e719 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -529,6 +529,15 @@
->  			#address-cells = <2>;
->  			#size-cells = <1>;
->  			status = "disabled";
-> +
-> +		sham: sham at 53100000 {
-> +			compatible = "ti,omap4-sham";
-> +			ti,hwmods = "sham";
-> +			reg = <0x53100000 0x200>;
-> +			interrupt-parent = <&intc>;
-> +			interrupts = <109>;
-> +			dmas = <&edma 36>;
-> +			dma-names = "rx";
-ditto...
+I just realized that we are constrained to 64 KiB by the implementation
+of pci_ioremap_io(), which assumes each mapping is 64 KiB. Not that it
+couldn't be changed, but unless there actually is a use-case where more
+than 64 KiB are required I don't think we should worry about it.
 
-And please specify in commit log that this series is dependent on
-Joel's "[PATCH 1/2] ARM: dts: add AM33XX EDMA support" series.
-
-Thanks,
-Lokesh 
->  		};
->  	};
->  };
-> 
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130717/db9411c6/attachment.sig>
