@@ -1,45 +1,119 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 18 Jul 2013 08:32:06 +0900
-Subject: [PATCH 05/22] ARM: shmobile: r8a73a4: Remove init_irq declaration in
- machine description
+Date: Thu, 18 Jul 2013 08:32:03 +0900
+Subject: [PATCH 02/22] ARM: shmobile: r8a7778: add __initdata on resource and
+ device data
 In-Reply-To: <cover.1374103272.git.horms+renesas@verge.net.au>
 References: <cover.1374103272.git.horms+renesas@verge.net.au>
-Message-ID: <0bdbe04db005e025d3522ad3ae9797a4954528e9.1374103272.git.horms+renesas@verge.net.au>
+Message-ID: <c9031fbb35bd44d99c5cfe7d3c97ec238d63643a.1374103272.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
-specified") removed the need to explictly setup the init_irq field in
-the machine description when using only irqchip_init. Remove that
-declaration for shmobile as well.
+These data will be kmemdup()'ed on
+platform_device_add_resources() and platform_device_add_data()
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a73a4.c |    2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7778.c |   24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
-index 7f45c2e..a8c4e41 100644
---- a/arch/arm/mach-shmobile/setup-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
-@@ -18,7 +18,6 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  */
- #include <linux/irq.h>
--#include <linux/irqchip.h>
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/platform_data/irq-renesas-irqc.h>
-@@ -194,7 +193,6 @@ static const char *r8a73a4_boards_compat_dt[] __initdata = {
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index 80c2039..b70bfee 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -53,7 +53,7 @@
+ 	.irqs		= SCIx_IRQ_MUXED(irq),			\
+ }
+ 
+-static struct plat_sci_port scif_platform_data[] = {
++static struct plat_sci_port scif_platform_data[] __initdata = {
+ 	SCIF_INFO(0xffe40000, gic_iid(0x66)),
+ 	SCIF_INFO(0xffe41000, gic_iid(0x67)),
+ 	SCIF_INFO(0xffe42000, gic_iid(0x68)),
+@@ -63,24 +63,24 @@ static struct plat_sci_port scif_platform_data[] = {
  };
  
- DT_MACHINE_START(R8A73A4_DT, "Generic R8A73A4 (Flattened Device Tree)")
--	.init_irq	= irqchip_init,
- 	.init_machine	= r8a73a4_add_standard_devices_dt,
- 	.init_time	= shmobile_timer_init,
- 	.dt_compat	= r8a73a4_boards_compat_dt,
+ /* TMU */
+-static struct resource sh_tmu0_resources[] = {
++static struct resource sh_tmu0_resources[] __initdata = {
+ 	DEFINE_RES_MEM(0xffd80008, 12),
+ 	DEFINE_RES_IRQ(gic_iid(0x40)),
+ };
+ 
+-static struct sh_timer_config sh_tmu0_platform_data = {
++static struct sh_timer_config sh_tmu0_platform_data __initdata = {
+ 	.name			= "TMU00",
+ 	.channel_offset		= 0x4,
+ 	.timer_bit		= 0,
+ 	.clockevent_rating	= 200,
+ };
+ 
+-static struct resource sh_tmu1_resources[] = {
++static struct resource sh_tmu1_resources[] __initdata = {
+ 	DEFINE_RES_MEM(0xffd80014, 12),
+ 	DEFINE_RES_IRQ(gic_iid(0x41)),
+ };
+ 
+-static struct sh_timer_config sh_tmu1_platform_data = {
++static struct sh_timer_config sh_tmu1_platform_data __initdata = {
+ 	.name			= "TMU01",
+ 	.channel_offset		= 0x10,
+ 	.timer_bit		= 1,
+@@ -189,7 +189,7 @@ USB_PLATFORM_INFO(ehci);
+ USB_PLATFORM_INFO(ohci);
+ 
+ /* Ether */
+-static struct resource ether_resources[] = {
++static struct resource ether_resources[] __initdata = {
+ 	DEFINE_RES_MEM(0xfde00000, 0x400),
+ 	DEFINE_RES_IRQ(gic_iid(0x89)),
+ };
+@@ -203,17 +203,17 @@ void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
+ }
+ 
+ /* PFC/GPIO */
+-static struct resource pfc_resources[] = {
++static struct resource pfc_resources[] __initdata = {
+ 	DEFINE_RES_MEM(0xfffc0000, 0x118),
+ };
+ 
+ #define R8A7778_GPIO(idx)						\
+-static struct resource r8a7778_gpio##idx##_resources[] = {		\
++static struct resource r8a7778_gpio##idx##_resources[] __initdata = {	\
+ 	DEFINE_RES_MEM(0xffc40000 + 0x1000 * (idx), 0x30),		\
+ 	DEFINE_RES_IRQ(gic_iid(0x87)),					\
+ };									\
+ 									\
+-static struct gpio_rcar_config r8a7778_gpio##idx##_platform_data = {	\
++static struct gpio_rcar_config r8a7778_gpio##idx##_platform_data __initdata = { \
+ 	.gpio_base	= 32 * (idx),					\
+ 	.irq_base	= GPIO_IRQ_BASE(idx),				\
+ 	.number_of_pins	= 32,						\
+@@ -249,7 +249,7 @@ void __init r8a7778_pinmux_init(void)
+ };
+ 
+ /* SDHI */
+-static struct resource sdhi_resources[] = {
++static struct resource sdhi_resources[] __initdata = {
+ 	/* SDHI0 */
+ 	DEFINE_RES_MEM(0xFFE4C000, 0x100),
+ 	DEFINE_RES_IRQ(gic_iid(0x77)),
+@@ -365,12 +365,12 @@ void __init r8a7778_init_late(void)
+ 	platform_device_register_full(&ohci_info);
+ }
+ 
+-static struct renesas_intc_irqpin_config irqpin_platform_data = {
++static struct renesas_intc_irqpin_config irqpin_platform_data __initdata = {
+ 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
+ 	.sense_bitfield_width = 2,
+ };
+ 
+-static struct resource irqpin_resources[] = {
++static struct resource irqpin_resources[] __initdata = {
+ 	DEFINE_RES_MEM(0xfe78001c, 4), /* ICR1 */
+ 	DEFINE_RES_MEM(0xfe780010, 4), /* INTPRI */
+ 	DEFINE_RES_MEM(0xfe780024, 4), /* INTREQ */
 -- 
 1.7.10.4
