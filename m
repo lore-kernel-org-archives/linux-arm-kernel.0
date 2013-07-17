@@ -1,43 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Jul 2013 16:11:48 +0100
-Subject: [PATCH] arm: choose debug/uncompress.h include when uncompress
- debug is disabled
-In-Reply-To: <alpine.DEB.2.02.1307171420350.8258@kaball.uk.xensource.com>
-References: <1373897706-15331-1-git-send-email-julien.grall@linaro.org>
- <alpine.DEB.2.02.1307171420350.8258@kaball.uk.xensource.com>
-Message-ID: <20130717151148.GM24642@n2100.arm.linux.org.uk>
+From: dh.herrmann@gmail.com (David Herrmann)
+Date: Wed, 17 Jul 2013 17:14:13 +0200
+Subject: [PATCH] Route kbd LEDs through the generic LEDs layer
+In-Reply-To: <20130715190803.GG11600@type.youpi.perso.aquilenet.fr>
+References: <201011112205.oABM5KVJ005298@imap1.linux-foundation.org>
+ <201011111440.07882.dmitry.torokhov@gmail.com>
+ <20110102090935.GV32469@atrey.karlin.mff.cuni.cz>
+ <20110102103210.GA25662@core.coreip.homeip.net>
+ <20110102225741.GX5480@const.famille.thibault.fr>
+ <20110112182702.GA9168@core.coreip.homeip.net>
+ <20111114040613.GA4992@type.famille.thibault.fr>
+ <20121221003449.GA6999@type.youpi.perso.aquilenet.fr>
+ <20130707101028.GD5651@type.youpi.perso.aquilenet.fr>
+ <CANq1E4TRAOp+=w4oqPt4sjV7iLyDygxxpwrZy7dSB8UK288aNA@mail.gmail.com>
+ <20130715190803.GG11600@type.youpi.perso.aquilenet.fr>
+Message-ID: <CANq1E4QicuuD6iSkR-TUp99QTaxq_FZGwing2w30=nN0cw5hpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 02:25:38PM +0100, Stefano Stabellini wrote:
-> On Mon, 15 Jul 2013, Julien Grall wrote:
-> > Even if uncompress debug is disabled, some board will continue to print
-> > information during uncompress step.
-> 
-> Are you talking about DEBUG_UNCOMPRESS?
-> Should I read the sentence as "even if DEBUG_UNCOMPRESS is not selected,
-> some board will continue to print information during the uncompress step"?
-> 
-> Isn't this a bug in the platform specific code that should be fixed anyway?
+Hi
 
-Hang on, let's be clear what's going on here.
+On Mon, Jul 15, 2013 at 9:08 PM, Samuel Thibault
+<samuel.thibault@ens-lyon.org> wrote:
+> Hello,
+>
+> David Herrmann, le Mon 15 Jul 2013 17:03:08 +0200, a ?crit :
+>> > @@ -13,6 +13,10 @@
+>> >         bool "Virtual terminal" if EXPERT
+>> >         depends on !S390 && !UML
+>> >         select INPUT
+>> > +       select NEW_LEDS
+>> > +       select LEDS_CLASS
+>> > +       select LEDS_TRIGGERS
+>> > +       select INPUT_LEDS
+>>
+>> This looks odd. Any dependency changes in the input-layer will break
+>> this. But I guess that's what we get for a non-recursive "select". Hmm
+>
+> Yes, that's the issue.
+>
+>> I also think that the macros don't really simplify this. So:
+>>   [VC_SHIFTLOCK] = { .name = "shiftlock", .activate =
+>> kbd_lockstate_trigger_activate },
+>> isn't much longer than:
+>>   DEFINE_LOCKSTATE_TRIGGER(VC_SHIFTLOCK,  "shiftlock"),
+>
+> That makes it more than 80 columns, at least.
 
-1. The normal output from the decompressor is *not* debugging.  By that
-   I mean the "Uncompressing kernel... done" message.  That is part of
-   user output.
+Indeed, I missed that.
 
-2. In non-multiplatform environments, the decompressor will normally use
-   the putc/flush functions found in arch/arm/mach-*/include/mach/uncompress.h
-   to implement its output, irrespective of the DEBUG_UNCOMPRESS setting.
-   (An interesting point is that DEBUG_UNCOMPRESS really should depend on
-   MULTIPLATFORM so that this point is explicit - the option requires
-   MULTIPLATFORM to be set.)
+>> > +       for (i = 0; i < ARRAY_SIZE(ledtrig_ledstate); i++)
+>> > +               led_trigger_register(&ledtrig_ledstate[i]);
+>> > +       for (i = 0; i < ARRAY_SIZE(ledtrig_lockstate); i++)
+>> > +               led_trigger_register(&ledtrig_lockstate[i]);
+>> > +
+>>
+>> This returns "int", are you sure no error-handling is needed?
+>
+> ATM only registering the same name several times can happen, and
+> shouldn't ever happen. But better warn than be sorry, indeed.
 
-3. DEBUG_UNCOMPRESS allows the functions which we've implemented for LL
-   debug to be re-used for decompressor output.
+Yepp, it also avoids ignoring any future errors that we might
+introduce in led_trigger_register().
 
-4. When DEBUG_UNCOMPRESS is not set in a multiplatform kernel, the
-   decompressors putc() and flush() functions are stubbed out.
+>> > + * Keyboard LEDs are propagated by default like the following example:
+>> > + *
+>> > + * VT keyboard numlock trigger
+>> > + * -> vt::numl VT LED
+>> > + * -> vt-numl VT trigger
+>>
+>> Nitpick: What's the reason for the syntax difference? "vt-numl" vs. "vt::numl"
+>
+> vt::numl is a clear LED classification convention. For triggers, I don't
+> see a clear convention, but at least I have never seen "::", only "-".
+> That makes me realize that for keyboard triggers I haven't introduced a
+> prefix, and only used "scrollock", "numlock", etc. Perhaps
+> "kbd-scrollock" etc. or (in phase with LEDs), "kbd::scrollock" etc.?
 
-So, it's quite right that you get output from the decompressor even when
-DEBUG_UNCOMPRESS is not set.  There's no problem with that.
+I understand. Due to lack of insight, I cannot really comment on that,
+sorry. Just wanted to go sure you're aware of that. So feel free to
+pick any of them.
+
+Thanks
+David
