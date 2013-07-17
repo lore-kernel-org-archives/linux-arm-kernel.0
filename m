@@ -1,49 +1,62 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 17 Jul 2013 09:19:25 +0300
-Subject: sched_clock always 0 and no process time accounting with 3.11-rc1
-In-Reply-To: <CAMo8BfLO31GgMMA_hENr0xm=qaUz3EVLtaQ8hewiQHdbV+s6sA@mail.gmail.com>
-References: <CAMo8BfLO31GgMMA_hENr0xm=qaUz3EVLtaQ8hewiQHdbV+s6sA@mail.gmail.com>
-Message-ID: <20130717061925.GC6950@tarshish>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 16 Jul 2013 23:29:44 -0700
+Subject: [PATCH v9 1/8] drivers: phy: add generic PHY framework
+In-Reply-To: <1372247257-30186-2-git-send-email-kishon@ti.com>
+References: <1372247257-30186-1-git-send-email-kishon@ti.com>
+ <1372247257-30186-2-git-send-email-kishon@ti.com>
+Message-ID: <20130717062944.GA24968@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Max,
+On Wed, Jun 26, 2013 at 05:17:29PM +0530, Kishon Vijay Abraham I wrote:
+> +menuconfig GENERIC_PHY
+> +	tristate "PHY Subsystem"
+> +	help
+> +	  Generic PHY support.
+> +
+> +	  This framework is designed to provide a generic interface for PHY
+> +	  devices present in the kernel. This layer will have the generic
+> +	  API by which phy drivers can create PHY using the phy framework and
+> +	  phy users can obtain reference to the PHY.
 
-On Mon, Jul 15, 2013 at 06:18:33PM +0400, Max Filippov wrote:
-> with 3.11-rc1 printk timestamps are always zero (which means that
-> sched_clock is always 0) and process time accounting always shows
-> 0 for system/user time. I see it regardless of HZ_PERIODIC/NO_HZ_IDLE
-> and HIGH_RES_TIMERS settings. Am I missing any necessary config
-> options? Can you see the same issue?
+Shouldn't this be something that other drivers select?  How will anyone
+know if they need this or not?
 
-The following patch fixes the issue for me:
+> --- /dev/null
+> +++ b/drivers/phy/phy-core.c
+> @@ -0,0 +1,544 @@
+> +/*
+> + * phy-core.c  --  Generic Phy framework.
+> + *
+> + * Copyright (C) 2013 Texas Instruments
+> + *
+> + * Author: Kishon Vijay Abraham I <kishon@ti.com>
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
 
-diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
-index a326f27..0b479a6 100644
---- a/kernel/time/sched_clock.c
-+++ b/kernel/time/sched_clock.c
-@@ -121,7 +121,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
- 	BUG_ON(bits > 32);
- 	WARN_ON(!irqs_disabled());
- 	read_sched_clock = read;
--	sched_clock_mask = (1 << bits) - 1;
-+	sched_clock_mask = (1ULL << bits) - 1;
- 	cd.rate = rate;
- 
- 	/* calculate the mult/shift to convert counter ticks to ns. */
+You really mean "any later version" (I have to ask)?
 
-Apparently the expression '(1 << 32)' evaluates to 1 on xtensa cross gcc, and 
-x86_84 native gcc. According to my limited understanding, the C compiler is 
-allowed to do so. This caused sched_clock_32() to return constant 0. I wonder 
-how it didn't bite the ARM people who are using this code from quite some time 
-(added LAKL to CC).
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-If this patch proves correct I'll send a formal patch to the timekeeping 
-maintainers.
+Are these two paragraphs needed?  This isn't a "program", and they got a
+copy of the GPL already with the kernel.
 
-baruch
+> +static struct class *phy_class;
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch@tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Why do you need a class?
+
+When modifying/adding new sysfs stuff, you need a Documentation/ABI/
+entry as well.
+
+thanks,
+
+greg k-h
