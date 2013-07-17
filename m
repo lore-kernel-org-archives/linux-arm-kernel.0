@@ -1,76 +1,44 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 17 Jul 2013 19:41:29 +0300
-Subject: [PATCH 3/3] ARM: dts: omap4-sdp: add dynamic pin states for
- uart3/4
-In-Reply-To: <20130717153248.GI7656@atomide.com>
-References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
- <1374061312-25469-4-git-send-email-grygorii.strashko@ti.com>
- <20130717153248.GI7656@atomide.com>
-Message-ID: <51E6C939.40208@ti.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 17 Jul 2013 11:45:36 -0500
+Subject: [PATCH 7/9] ARM: dts: omap5-uevm: update LDO6 voltage to 1.2V
+In-Reply-To: <1374079538-19548-1-git-send-email-nm@ti.com>
+References: <1374079538-19548-1-git-send-email-nm@ti.com>
+Message-ID: <1374079538-19548-8-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+commit e00c27ef3b4c23e39d0a77b7c8e5be44c28001c7
+(ARM: dts: OMAP5: Add Palmas MFD node and regulator nodes)
+introduced regulator entries for OMAP5uEVM.
 
-On 07/17/2013 06:32 PM, Tony Lindgren wrote:
-> * Grygorii Strashko <grygorii.strashko@ti.com> [130717 04:49]:
->> Add dynamic "active"/"idle" pin states for uart3/4 which will be applied
->> when uart3/4 state is switched from active to idle and back by Runtime
->> PM or during system suspend.
->
-> This is good for testing code, but should not be merged because
-> omap4 has the iopad wake-ups available for uarts. So those can
-> be always enabled.
+However, The regulator information is based on an older temporary
+pre-production board variant and does not reflect production board
+750-2628-XXX boards.
 
-In this case, 2 IRQ will be received per each UART RX event - one from
-PRCM and from UART - and that's not good from PM perspective (It will
-affect on CPUIdle and CPUFreq at least).
+LDO6 supplies the board specified VDDS_1V2_WKUP supply going to
+ldo_emu_wkup/vdds_hsic. To stay within the SoC specification supply
+1.2V instead of 1.5V.
 
--- log when wake-up enabled always
-106:        729          0       GIC 106  OMAP UART2
-115:         13          0       GIC 115  mmc0
-118:         68          0       GIC 118  mmc1
-151:          0          0       GIC 151  twl6040
-361:        322          0      PRCM  hwmod_io
-             ^^^^
--- log when wake-up enabled only when UART3 (console) is active
-106:       1104          0       GIC 106  OMAP UART2
-115:         13          0       GIC 115  mmc0
-118:         68          0       GIC 118  mmc1
-151:          0          0       GIC 151  twl6040
-361:          7          0      PRCM  hwmod_io
+Reported-by: Marc J?ttner <m-juettner@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/boot/dts/omap5-uevm.dts |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-The same is valid for all devices which will leave WAKEUP_EN set
-all the time (
-
->
->> --- a/arch/arm/boot/dts/omap4-sdp.dts
->> +++ b/arch/arm/boot/dts/omap4-sdp.dts
->> @@ -181,18 +181,40 @@
->>   		pinctrl-single,pins = <
->>   			0x100 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart3_cts_rctx.uart3_cts_rctx */
->>   			0x102 (PIN_OUTPUT | MUX_MODE0)		/* uart3_rts_sd.uart3_rts_sd */
->> -			0x104 (PIN_INPUT | MUX_MODE0)		/* uart3_rx_irrx.uart3_rx_irrx */
->>   			0x106 (PIN_OUTPUT | MUX_MODE0)		/* uart3_tx_irtx.uart3_tx_irtx */
->>   		>;
->>   	};
->
-> This just need to become:
-> 		pinctrl-single,pins = <
-> 			...
-> 			0x104 (WAKEUP_EN | PIN_INPUT_MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
-> 			...
-> 		>;
-> 		interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-> 	};
->
-> And so on. For am33xx you need to remux things to GPIO for the wake-up
-> events, so you should maybe test on that instead.
->
-> Regards,
->
-> Tony
->
-
-Regards,
-- grygorii
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index 1550d6a..3ff5874 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -388,8 +388,8 @@
+ 				ldo6_reg: ldo6 {
+ 					/* VDDS_1V2_WKUP: hsic/ldo_emu_wkup */
+ 					regulator-name = "ldo6";
+-					regulator-min-microvolt = <1500000>;
+-					regulator-max-microvolt = <1500000>;
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
+ 					regulator-always-on;
+ 					regulator-boot-on;
+ 				};
+-- 
+1.7.9.5
