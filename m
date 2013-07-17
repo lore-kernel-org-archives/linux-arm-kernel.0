@@ -1,63 +1,54 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Wed, 17 Jul 2013 13:27:50 +0200
-Subject: [PATCH v1 15/24] serial: mpc512x: OF clock lookup, use the
- 'mclk' name
-In-Reply-To: <20130715215423.GU14452@pengutronix.de>
-References: <1373914074-20889-1-git-send-email-gsi@denx.de>
- <1373924770-22599-1-git-send-email-gsi@denx.de>
- <20130715215423.GU14452@pengutronix.de>
-Message-ID: <20130717112750.GL7080@book.gsilab.sittig.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 17 Jul 2013 12:27:59 +0100
+Subject: [PATCH 3/3] mfd: s2mps11: Remove clocks from regulators list
+In-Reply-To: <1373197462-4033-4-git-send-email-yadi.brar@samsung.com>
+References: <1373197462-4033-1-git-send-email-yadi.brar@samsung.com>
+ <1373197462-4033-4-git-send-email-yadi.brar@samsung.com>
+Message-ID: <20130717112759.GD3336@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 23:54 +0200, Sascha Hauer wrote:
+On Sun, 07 Jul 2013, Yadwinder Singh Brar wrote:
+
+> Since these are fixed rate clocks which are registered with common clock
+> framework so remove these from list of regulators which were unnecessarily
+> incrementing the count(S2MPS11_REGULATOR_MAX) of regulators.
 > 
-> On Mon, Jul 15, 2013 at 11:46:01PM +0200, Gerhard Sittig wrote:
-> > with device tree based clock lookup, the MCLK name no longer
-> > depends on the PSC index
-> > 
-> > Signed-off-by: Gerhard Sittig <gsi@denx.de>
-> > ---
-> >  drivers/tty/serial/mpc52xx_uart.c |    8 ++------
-> >  1 file changed, 2 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/tty/serial/mpc52xx_uart.c b/drivers/tty/serial/mpc52xx_uart.c
-> > index 53c1093..221fb89 100644
-> > --- a/drivers/tty/serial/mpc52xx_uart.c
-> > +++ b/drivers/tty/serial/mpc52xx_uart.c
-> > @@ -619,21 +619,17 @@ static irqreturn_t mpc512x_psc_handle_irq(struct uart_port *port)
-> >  static int mpc512x_psc_clock(struct uart_port *port, int enable)
-> >  {
-> >  	struct clk *psc_clk;
-> > -	int psc_num;
-> > -	char clk_name[10];
-> >  
-> >  	if (uart_console(port))
-> >  		return 0;
-> >  
-> > -	psc_num = (port->mapbase & 0xf00) >> 8;
-> > -	snprintf(clk_name, sizeof(clk_name), "psc%d_mclk", psc_num);
-> > -	psc_clk = clk_get(port->dev, clk_name);
-> > +	psc_clk = clk_get(port->dev, "mclk");
+> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> ---
+>  include/linux/mfd/samsung/s2mps11.h |    6 +-----
+>  1 files changed, 1 insertions(+), 5 deletions(-)
 > 
-> Same comment applies here as Mark made to the spi driver.
+> diff --git a/include/linux/mfd/samsung/s2mps11.h b/include/linux/mfd/samsung/s2mps11.h
+> index d0d52ea..b3ddf98 100644
+> --- a/include/linux/mfd/samsung/s2mps11.h
+> +++ b/include/linux/mfd/samsung/s2mps11.h
+> @@ -167,11 +167,8 @@ enum s2mps11_regulators {
+>  	S2MPS11_BUCK8,
+>  	S2MPS11_BUCK9,
+>  	S2MPS11_BUCK10,
+> -	S2MPS11_AP_EN32KHZ,
+> -	S2MPS11_CP_EN32KHZ,
+> -	S2MPS11_BT_EN32KHZ,
 
-So I'd like to respond in the same way as I did for the SPI
-driver. :)
+These aren't mentioned anywhere else in the kernel, so I'll just apply
+the patch.
 
-The scope of this series is the introduction of support for the
-common clock framework.  Addressing other (legacy non-fatal and
-previously accepted) issues as they get identified in bypassing
-would be the scope of a separate patch or series.
+> -	S2MPS11_REG_MAX,
+> +	S2MPS11_REGULATOR_MAX,
+>  };
+>  
+>  #define S2MPS11_BUCK_MIN1	600000
+> @@ -203,6 +200,5 @@ enum s2mps11_regulators {
+>  #define S2MPS11_BUCK4_RAMP_EN_SHIFT	1
+>  #define S2MPS11_BUCK6_RAMP_EN_SHIFT	0
+>  #define S2MPS11_PMIC_EN_SHIFT	6
+> -#define S2MPS11_REGULATOR_MAX (S2MPS11_REG_MAX - 3)
+>  
+>  #endif /*  __LINUX_MFD_S2MPS11_H */
 
-I'm not questioning the need to fix other additionally identified
-issues.  I'm just asking whether they shall be in the scope of
-this very series.
-
-
-virtually yours
-Gerhard Sittig
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
