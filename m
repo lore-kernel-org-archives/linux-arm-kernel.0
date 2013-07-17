@@ -1,42 +1,73 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 17 Jul 2013 14:26:14 +0100
-Subject: [PATCH 2/2] ARM: mm: Remove HugeTLB warning from dma-mapping.c
-In-Reply-To: <1374067574-32034-1-git-send-email-steve.capper@linaro.org>
-References: <1374067574-32034-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1374067574-32034-3-git-send-email-steve.capper@linaro.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 17 Jul 2013 14:28:43 +0100
+Subject: [Xen-devel] [PATCH] xen/arm: disable cpuidle when linux is
+ running as dom0
+In-Reply-To: <20130715152532.GC5774@phenom.dumpdata.com>
+References: <1373898101-15633-1-git-send-email-julien.grall@linaro.org>
+ <20130715152532.GC5774@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1307171426300.8258@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The coherant DMA allocator code contained a compile time warning
-when HugeTLB support was enabled. It stated that huge pages were
-not supported by the DMA allocator.
+On Mon, 15 Jul 2013, Konrad Rzeszutek Wilk wrote:
+> On Mon, Jul 15, 2013 at 03:21:41PM +0100, Julien Grall wrote:
+> > When linux is running as dom0, Xen doesn't show the physical cpu but a
+> > virtual CPU.
+> > On some ARM SOC (for instance the exynos 5250), linux registers callbacks
+> > for cpuidle. When these callbacks are called, they will modify
+> > directly the physical cpu not the virtual one.
+> It can impact the whole board
+> > instead of dom0.
 
-Apart from memory pressure, HugeTLB should not affect (or be
-affected by) the higher order pages operated on by the DMA
-allocator. Also, the user space mappings returned by arm_dma_mmap
-are done via remap_pfn_range, so the Transparent Huge Page daemon
-will leave them alone too.
+Certainly this is something that should be fixed at the hypervisor level
+too. However I agree that Linux should try to avoid doing that when
+running on Xen.
 
-This patch removes the huge page warning from dma-mapping.c.
 
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
----
- arch/arm/mm/dma-mapping.c | 3 ---
- 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 7f9b179..9486048 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -249,9 +249,6 @@ static void __dma_free_buffer(struct page *page, size_t size)
- }
- 
- #ifdef CONFIG_MMU
--#ifdef CONFIG_HUGETLB_PAGE
--#warning ARM Coherent DMA allocator does not (yet) support huge TLB
--#endif
- 
- static void *__alloc_from_contiguous(struct device *dev, size_t size,
- 				     pgprot_t prot, struct page **ret_page,
--- 
-1.8.1.4
+> Should you also call disable_cpufreq() ?
+
+Sounds like a good idea.
+Julien, could you add that to this patch?
+
+
+> > 
+> > Signed-off-by: Julien Grall <julien.grall@linaro.org>
+> > ---
+> >  arch/arm/xen/enlighten.c |    7 +++++++
+> >  1 file changed, 7 insertions(+)
+> > 
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > index 49839d8..a98999f 100644
+> > --- a/arch/arm/xen/enlighten.c
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -24,6 +24,8 @@
+> >  #include <linux/of.h>
+> >  #include <linux/of_irq.h>
+> >  #include <linux/of_address.h>
+> > +#include <linux/cpuidle.h>
+> > +#include <linux/cpufreq.h>
+> >  
+> >  #include <linux/mm.h>
+> >  
+> > @@ -292,6 +294,11 @@ static int __init xen_pm_init(void)
+> >  {
+> >  	pm_power_off = xen_power_off;
+> >  	arm_pm_restart = xen_restart;
+> > +	/*
+> > +	 * Making sure board specific code will not set up ops for
+> > +	 * cpu idle.
+> > +	 */
+> > +	disable_cpuidle();
+> >  
+> >  	return 0;
+> >  }
+> > -- 
+> > 1.7.10.4
+> > 
+> > 
+> > _______________________________________________
+> > Xen-devel mailing list
+> > Xen-devel at lists.xen.org
+> > http://lists.xen.org/xen-devel
+> 
