@@ -1,88 +1,54 @@
-From: ml@communistcode.co.uk (Jack Mitchell)
-Date: Thu, 18 Jul 2013 14:38:51 +0100
-Subject: [PATCH 0/4] Enable ethernet support for SOCFPGA
-In-Reply-To: <1374153173.9004.4.camel@linux-builds1>
-References: <1374102623-4154-1-git-send-email-dinguyen@altera.com>
- <51E7B27F.2000304@communistcode.co.uk>
- <20130718115951.GA2706@amd.pavel.ucw.cz>
- <1374153173.9004.4.camel@linux-builds1>
-Message-ID: <51E7EFEB.6080605@communistcode.co.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 Jul 2013 06:48:07 -0700
+Subject: [PATCH 4/4] drivers: Add pinctrl handling for dynamic pin states
+In-Reply-To: <20130718074508.GQ7656@atomide.com>
+References: <20130716090310.5541.36777.stgit@localhost>
+ <20130716090539.5541.980.stgit@localhost>
+ <51E70ADF.8090805@wwwdotorg.org>
+ <20130718074508.GQ7656@atomide.com>
+Message-ID: <20130718134806.GW7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/13 14:12, Dinh Nguyen wrote:
-> Hi Jack,
+* Tony Lindgren <tony@atomide.com> [130718 00:57]:
+> * Stephen Warren <swarren@wwwdotorg.org> [130717 14:28]:
+> > 
+> > Oh, I see you're trying to check that the set of pins in the active,
+> > sleep, and idle states are identical.
 > 
-> On Thu, 2013-07-18 at 13:59 +0200, ZY - pavel wrote:
->> Hi!
->>
->>>> These 4 patches are meant to enable ethernet and SD/MMC for the SOCFPGA
->>>> platform.
->>>>
->>>> patch (1/4): Adds select ARM_TWD for the platform
->>>> patch (2/4): Add platform specific initialization for the ethernet controller.
->>>> patch (3/4): Commit 25c83b5c2 added "snps,phy-addr" for getting the PHY addr.
->>>>         Set the ethernet clocks to be emac_0_clk and emac_1_clk so it be gated.
->>>> patch (4/4): Update defconfig to support SD/MMC, ethernet, EXT3 and NFS.
->>
->>> What tree is this based against, or what patches are a pre-requisite
->>> to this series? I applied the patches to linux-arm/master but the
->>> compile failed.
->>>
->>> arch/arm/mach-socfpga/socfpga.c: In function 'ksz9021rlrn_phy_fixup':
->>> arch/arm/mach-socfpga/socfpga.c:85:21: error:
->>> 'MICREL_KSZ9021_EXTREG_CTRL' undeclared (first use in this function)
->>>    phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
->>>                      ^
->>
->> It seems it depends on:
->>
->> Date: Mon, 15 Jul 2013 18:08:50 -0500
->> From: dinguyen at altera.com
->> To: dinh.linux at gmail.com, netdev at vger.kernel.org
->> Cc: Pavel Machek <pavel@denx.de>, Nicolas Ferre
->> <nicolas.ferre@atmel.com>,
->>         "David S. Miller" <davem@davemloft.net>,
->>         linux-arm-kernel at lists.infradead.org,
->>         Shawn Guo <shawn.guo@linaro.org>,
->>         Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>,
->>         Andrew Victor <linux@maxim.org.za>,
->>         Dinh Nguyen <dinguyen@altera.com>
->> Subject: [PATCH] phy: micrel: Add definitions for common Micrel PHY
->> registers
->> X-Mailer: git-send-email 1.7.9.5
->>
->> From: Dinh Nguyen <dinguyen@altera.com>
->>
->> Add defines for common Micrel PHY setups so that other platforms
->> can use them. Update imx61 and sama5 hardware to use the micrel_phy.h
->> PHY defines.
->>
->> Also add support for the KSZ9021RLRN PHY.
->>
->> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Right, that's to avoid any further checking during runtime for runtime PM.
+>  
+> > But I think that pinctrl_check_dynamic() only checks that one state is a
+> > subset of the other, not that the two states are equal. Instead, I think
+> > you want to comparison coded in pinctrl_check_dynamic() to be:
 > 
-> Yes, the above patch is necessary. I was hoping that patch can go into
-> either Shawn's or Nicolas' tree. I have received ACKs from both. There
-> is also the SD/MMC bindings patch that has not been applied to the
-> arm-soc tree yet. I have started collecting the patches at github in the
-> meantime:
+> In pinctrl_check_dynamic() we check that the pins match between the
+> states, and the number of found pins matches the first set. I'll
+> take a look if we check the total pins between the two sets.
+
+That that is a bit painful right now to check properly as we don't
+have any sorting, and we could use that elsewhere too for checks
+probably..
+  
+> > gen_group_list_of_pinctrl_state(s1, array1);
+> > gen_group_list_of_pinctrl_state(s2, array2);
+> > mismatch = memcmp(array1, array2, length);
 > 
-> git at github.com:dinh-linux/linux-socfpga.git for-next
-> 
-> Dinh
+> Well we could allocate and sort the pins, but the number of pins
+> for runtime PM is typically very small for each pin consumer device.
+> Typically you just need to toggle RX pin to GPIO mode for idle. And
+> this check is only done during consumer driver probe time. So
+> optimizing it for larger sets could be done at any point later on
+> as needed.
 
-Dinh,
+..so for now, let's just check the total number of pins for the sets
+like Felipe suggested. I think we're better off improving the pinctrl
+data first to make various checks easier.
 
-Perfect, that boots from the mmc! For what it's worth, for the whole
-series + pre-requisite patches on an Arrow SoCkit devkit:
+What you're suggesting with the mepcmp() can be done easily if we add
+something like device_get_pins() and have the pins sorted for the
+various states for a device at the device probe time.
 
-Tested-by: Jack Mitchell <jack.mitchell@dbbroadcast.co.uk>
+Regards,
 
--- 
-
-  Jack Mitchell (jack at embed.me.uk)
-  Embedded Systems Engineer
-  http://www.embed.me.uk
-
---
+Tony
