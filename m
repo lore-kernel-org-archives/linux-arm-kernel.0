@@ -1,53 +1,88 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 18 Jul 2013 15:31:07 +0800
-Subject: [PATCH 1/4] ARM: imx6q: add spdif gate clock
+Date: Thu, 18 Jul 2013 15:31:08 +0800
+Subject: [PATCH 2/4] ARM: imx6q: add cko2 clocks
 In-Reply-To: <1374132670-791-1-git-send-email-shawn.guo@linaro.org>
 References: <1374132670-791-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1374132670-791-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1374132670-791-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds the missing spdif gate clock into imx6q clock driver.
+It adds the missing cko2 clocks, including multiplexer, divider and
+gate.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- .../devicetree/bindings/clock/imx6q-clock.txt      |    1 +
- arch/arm/mach-imx/clk-imx6q.c                      |    4 +++-
- 2 files changed, 4 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/clock/imx6q-clock.txt      |    3 +++
+ arch/arm/mach-imx/clk-imx6q.c                      |   15 ++++++++++++++-
+ 2 files changed, 17 insertions(+), 1 deletion(-)
 
 diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-index a0e104f..794d089 100644
+index 794d089..c6d7e16 100644
 --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
 +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-@@ -209,6 +209,7 @@ clocks and IDs.
- 	pll5_post_div		194
+@@ -210,6 +210,9 @@ clocks and IDs.
  	pll5_video_div		195
  	eim_slow      		196
-+	spdif      		197
+ 	spdif      		197
++	cko2_sel      		198
++	cko2_podf      		199
++	cko2      		200
  
  Examples:
  
 diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index db9f8f5..d739df1 100644
+index d739df1..924ed84 100644
 --- a/arch/arm/mach-imx/clk-imx6q.c
 +++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -239,7 +239,8 @@ enum mx6q_clks {
- 	pll4_audio, pll5_video, pll8_mlb, pll7_usb_host, pll6_enet, ssi1_ipg,
+@@ -206,6 +206,16 @@ static const char *vpu_axi_sels[]	= { "axi", "pll2_pfd2_396m", "pll2_pfd0_352m",
+ static const char *cko1_sels[]	= { "pll3_usb_otg", "pll2_bus", "pll1_sys", "pll5_video_div",
+ 				    "dummy", "axi", "enfc", "ipu1_di0", "ipu1_di1", "ipu2_di0",
+ 				    "ipu2_di1", "ahb", "ipg", "ipg_per", "ckil", "pll4_post_div", };
++static const char *cko2_sels[] = {
++	"mmdc_ch0_axi", "mmdc_ch1_axi", "usdhc4", "usdhc1",
++	"gpu2d_axi", "dummy", "ecspi_root", "gpu3d_axi",
++	"usdhc3", "dummy", "arm", "ipu1",
++	"ipu2", "vdo_axi", "osc", "gpu2d_core",
++	"gpu3d_core", "usdhc2", "ssi1", "ssi2",
++	"ssi3", "gpu3d_shader", "vpu_axi", "can_root",
++	"ldb_di0", "ldb_di1", "esai", "eim_slow",
++	"uart_serial", "spdif", "asrc", "hsi_tx",
++};
+ 
+ enum mx6q_clks {
+ 	dummy, ckil, ckih, osc, pll2_pfd0_352m, pll2_pfd1_594m, pll2_pfd2_396m,
+@@ -240,7 +250,7 @@ enum mx6q_clks {
  	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
  	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
--	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow, clk_max
-+	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow,
-+	spdif, clk_max
+ 	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow,
+-	spdif, clk_max
++	spdif, cko2_sel, cko2_podf, cko2, clk_max
  };
  
  static struct clk *clk[clk_max];
-@@ -521,6 +522,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[sata]         = imx_clk_gate2("sata",          "ipg",               base + 0x7c, 4);
- 	clk[sdma]         = imx_clk_gate2("sdma",          "ahb",               base + 0x7c, 6);
- 	clk[spba]         = imx_clk_gate2("spba",          "ipg",               base + 0x7c, 12);
-+	clk[spdif]        = imx_clk_gate2("spdif",         "spdif_podf",    	base + 0x7c, 14);
- 	clk[ssi1_ipg]     = imx_clk_gate2("ssi1_ipg",      "ipg",               base + 0x7c, 18);
- 	clk[ssi2_ipg]     = imx_clk_gate2("ssi2_ipg",      "ipg",               base + 0x7c, 20);
- 	clk[ssi3_ipg]     = imx_clk_gate2("ssi3_ipg",      "ipg",               base + 0x7c, 22);
+@@ -398,6 +408,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[vdo_axi_sel]      = imx_clk_mux("vdo_axi_sel",      base + 0x18, 11, 1, vdo_axi_sels,      ARRAY_SIZE(vdo_axi_sels));
+ 	clk[vpu_axi_sel]      = imx_clk_mux("vpu_axi_sel",      base + 0x18, 14, 2, vpu_axi_sels,      ARRAY_SIZE(vpu_axi_sels));
+ 	clk[cko1_sel]         = imx_clk_mux("cko1_sel",         base + 0x60, 0,  4, cko1_sels,         ARRAY_SIZE(cko1_sels));
++	clk[cko2_sel]         = imx_clk_mux("cko2_sel",         base + 0x60, 16, 5, cko2_sels,         ARRAY_SIZE(cko2_sels));
+ 
+ 	/*                              name         reg      shift width busy: reg, shift parent_names  num_parents */
+ 	clk[periph]  = imx_clk_busy_mux("periph",  base + 0x14, 25,  1,   base + 0x48, 5,  periph_sels,  ARRAY_SIZE(periph_sels));
+@@ -447,6 +458,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[emi_slow_podf]    = imx_clk_fixup_divider("emi_slow_podf", "emi_slow_sel",   base + 0x1c, 23, 3, imx_cscmr1_fixup);
+ 	clk[vpu_axi_podf]     = imx_clk_divider("vpu_axi_podf",     "vpu_axi_sel",       base + 0x24, 25, 3);
+ 	clk[cko1_podf]        = imx_clk_divider("cko1_podf",        "cko1_sel",          base + 0x60, 4,  3);
++	clk[cko2_podf]        = imx_clk_divider("cko2_podf",        "cko2_sel",          base + 0x60, 21, 3);
+ 
+ 	/*                                            name                 parent_name    reg        shift width busy: reg, shift */
+ 	clk[axi]               = imx_clk_busy_divider("axi",               "axi_sel",     base + 0x14, 16,  3,   base + 0x48, 0);
+@@ -537,6 +549,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[vdo_axi]      = imx_clk_gate2("vdo_axi",       "vdo_axi_sel",       base + 0x80, 12);
+ 	clk[vpu_axi]      = imx_clk_gate2("vpu_axi",       "vpu_axi_podf",      base + 0x80, 14);
+ 	clk[cko1]         = imx_clk_gate("cko1",           "cko1_podf",         base + 0x60, 7);
++	clk[cko2]         = imx_clk_gate("cko2",           "cko2_podf",         base + 0x60, 24);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(clk); i++)
+ 		if (IS_ERR(clk[i]))
 -- 
 1.7.9.5
