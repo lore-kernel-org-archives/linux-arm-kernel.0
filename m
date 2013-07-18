@@ -1,75 +1,42 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 18 Jul 2013 10:28:09 +0100
-Subject: [RFC PATCH v5 0/1] drivers: mfd: Versatile Express SPC support
-In-Reply-To: <20130717210700.GA19864@zurbaran>
-References: <1373990743-23106-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130717210700.GA19864@zurbaran>
-Message-ID: <20130718092809.GA29977@e102568-lin.cambridge.arm.com>
+From: sr@denx.de (Stefan Roese)
+Date: Thu, 18 Jul 2013 11:40:42 +0200
+Subject: [PATCH] ARM: omap2: fix musb usage for n8x0
+In-Reply-To: <51E7B2FA.7020206@ti.com>
+References: <1374000777-5626-1-git-send-email-zonque@gmail.com>
+ <51E7B1FF.6000301@denx.de> <51E7B2FA.7020206@ti.com>
+Message-ID: <51E7B81A.70103@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
-
-On Wed, Jul 17, 2013 at 10:07:00PM +0100, Samuel Ortiz wrote:
-> Hi Lorenzo,
+On 07/18/2013 11:18 AM, Kishon Vijay Abraham I wrote:
+>> I'm testing musb as OTG on beagleboard (old one, not Beagle-xm). And
+>> using the latest kernel.org version with this patch applied I see the
+>> following messages while booting (repeatedly):
+>>
+>> [    4.998168] usb usb1: bus auto-suspend, wakeup 1
+>> [    5.003112] musb_bus_suspend 2457: trying to suspend as b_idle while active
+>> [    5.010498] usb usb1: bus suspend fail, err -16
+>> [    5.015289] hub 1-0:1.0: hub_resume
+>> [    5.019073] hub 1-0:1.0: state 7 ports 1 chg 0000 evt 0000
+>> [    5.024963] hub 1-0:1.0: hub_suspend
+>> [    5.028778] usb usb1: bus auto-suspend, wakeup 1
+>> ...
+>>
+>> This is without a cable connected to the OTG port.
+>>
+>> Any ideas what might be missing here?
 > 
-> On Tue, Jul 16, 2013 at 05:05:42PM +0100, Lorenzo Pieralisi wrote:
-> > Hello,
-> > 
-> > version v5 of VExpress SPC driver, please read on the changelog for major
-> > changes and explanations.
-> > 
-> > The probing scheme is unchanged, since after trying the early platform
-> > devices approach it appeared that the end result was no better than the
-> > current one. The only clean solution relies either on changing how
-> > secondaries are brought up in the kernel (later than now) or enable
-> > early platform device registration through DT. Please check this
-> > thread for the related discussion:
-> > 
-> > https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/036542.html
-> > 
-> > The interface was adapted to regmap and again reverted to old driver for
-> > the following reasons:
-> > 
-> > - Power down registers locking is hairy and requires arch spinlocks in
-> >   the MCPM back end to work properly, normal spinlocks cannot be used
-> > - Regmap adds unnecessary code to manage SPC since it is just a bunch of
-> >   registers used to control power management flags, the overhead is just
-> >   not worth it (talking about power down registers, not the vexpress config
-> >   interface)
-> > - The locking scheme behind regmap requires all registers in the map
-> >   to be protected with the same lock, which is not exactly what we want
-> >   here
-> > - Given the reasons above, adding a regmap interface buys us nothing from
-> >   a driver readability and maintainability perspective (again just talking
-> >   about the power interface, a few registers) because for the SPC it would
-> >   simply not be used
-> > 
-> > /drivers/mfd is probably not the right place for this code as it stands (but
-> > probably will be when the entire driver, with DVFS and config interface, is
-> > complete).
-> Could you please elaborate on how will the SPC driver extend into an MFD
-> driver?
+> Even I observed these prints when I have dual mode enabled. When kept as gadget
+> only mode I dint see these prints.
 
-Reading through the thread I noticed Nico explained details properly, I
-was about to mention a possible solution to the directory issue but I am
-pretty sure that what he did will turn out for the best.
+Yes. With gadget-only I don't see those messages. Thanks for the hint.
 
-Usually, or better, historically, these pieces of code that program
-PMICs lived in arch/arm/mach-* directories and that's something we could
-have done as well (create a static mapping and write some functions to
-peek and poke a few registers), but we thought that it was not the proper
-way to go.
+> However if you connect a cable, you should still see that enumeration should
+> succeed.
+> Not sure why those prints come though :-s
 
-On top of that, the SPC is part of a component whose register space maps
-disparate functions (config interface for voltage, clocks, energy probes,
-frequency scaling and power states management) and basically that's the
-reason we struggled to partition it properly (with further complexity
-implied by the way requests - config and frequency scaling - have to be
-serialized).
+No. When configured as dual-role these endless messages are still there
+with a cable connected to the PC USB host port (musb gadget mode).
 
-I hope the end result is reasonable, and overall I think it was a debate
-that was worth having.
-
-Thank you,
-Lorenzo
+Thanks,
+Stefan
