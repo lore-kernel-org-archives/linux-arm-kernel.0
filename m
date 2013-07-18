@@ -1,40 +1,36 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 18 Jul 2013 13:07:14 -0700
-Subject: [PATCH 2/3] drivers: gpio: msm: Fix the error condition for reading
- ngpio
-In-Reply-To: <1374178035-19943-1-git-send-email-davidb@codeaurora.org>
-References: <1374178035-19943-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1374178035-19943-3-git-send-email-davidb@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 18 Jul 2013 14:10:29 -0600
+Subject: [PATCH v2 13/22] iommu/tegra: smmu: Create default IOVA maps
+In-Reply-To: <1373021097-32420-14-git-send-email-hdoyu@nvidia.com>
+References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
+ <1373021097-32420-14-git-send-email-hdoyu@nvidia.com>
+Message-ID: <51E84BB5.9010303@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rohit Vaswani <rvaswani@codeaurora.org>
+On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
+> Create default IOVA maps at boot-up which can be attached to devices.
 
-of_property_read_u32 return 0 on success. The check was using a ! to
-return error. Fix the if condition.
+> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
 
-Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Reviewed-by: Pankaj Jangra  <jangra.pankaj9@gmail.com>
-Cc: "Bird, Tim" <Tim.Bird@sonymobile.com>
-Signed-off-by: David Brown <davidb@codeaurora.org>
----
- drivers/gpio/gpio-msm-v2.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>  static int tegra_smmu_probe(struct platform_device *pdev)
+>  {
+>  	struct smmu_device *smmu;
 
-diff --git a/drivers/gpio/gpio-msm-v2.c b/drivers/gpio/gpio-msm-v2.c
-index f4491a4..c2fa770 100644
---- a/drivers/gpio/gpio-msm-v2.c
-+++ b/drivers/gpio/gpio-msm-v2.c
-@@ -378,7 +378,7 @@ static int msm_gpio_probe(struct platform_device *pdev)
- 	int ret, ngpio;
- 	struct resource *res;
- 
--	if (!of_property_read_u32(pdev->dev.of_node, "ngpio", &ngpio)) {
-+	if (of_property_read_u32(pdev->dev.of_node, "ngpio", &ngpio)) {
- 		dev_err(&pdev->dev, "%s: ngpio property missing\n", __func__);
- 		return -EINVAL;
- 	}
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> @@ -1160,13 +1182,15 @@ static int tegra_smmu_probe(struct platform_device *pdev)
+>  	if (of_property_read_u32(dev->of_node, "nvidia,#asids", &asids))
+>  		return -ENODEV;
+>  
+> -	bytes = sizeof(*smmu) + asids * sizeof(*smmu->as);
+> +	bytes = sizeof(*smmu) + asids * (sizeof(*smmu->as) +
+> +					 sizeof(struct dma_iommu_mapping *));
+>  	smmu = devm_kzalloc(dev, bytes, GFP_KERNEL);
+>  	if (!smmu) {
+>  		dev_err(dev, "failed to allocate smmu_device\n");
+>  		return -ENOMEM;
+>  	}
+>  
+> +	smmu->map = (struct dma_iommu_mapping **)(smmu->as + asids);
+
+Shouldn't "+ asids" be "+ asids * sizeof(*smmu->as)" to match the
+calculation of "bytes" above?
