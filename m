@@ -1,47 +1,64 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 18 Jul 2013 22:52:32 +0100
-Subject: Audio issue on Kirkwood t5325: no sound
-In-Reply-To: <20130718212350.GC24642@n2100.arm.linux.org.uk>
-References: <20130718134330.5aea00c5@skate>
- <20130718142009.GX24642@n2100.arm.linux.org.uk>
- <20130718173727.2cfa38d3@skate>
- <20130718210637.GW22506@sirena.org.uk>
- <20130718211521.GX22506@sirena.org.uk>
- <20130718212350.GC24642@n2100.arm.linux.org.uk>
-Message-ID: <20130718215231.GY22506@sirena.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 19 Jul 2013 01:56:36 +0400
+Subject: [PATCH 1/3] ARM: shmobile: use common platform header for HPB-DMAC
+In-Reply-To: <51D171E4.3080108@cogentembedded.com>
+References: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
+ <201306300245.58486.sergei.shtylyov@cogentembedded.com>
+ <87ehbij4wc.wl%kuninori.morimoto.gx@renesas.com>
+ <51D171E4.3080108@cogentembedded.com>
+Message-ID: <51E86494.5050906@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 10:23:50PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 18, 2013 at 10:15:21PM +0100, Mark Brown wrote:
+Hello.
 
-> > This means that for uda134x (which I think is what you're using here, I
+On 07/01/2013 04:11 PM, Sergei Shtylyov wrote:
 
-> No, this report is against ALC5623, which does appear to have widgets.
-> I was remarking that this looks like the same kind of issue I had with
-> UDA134x.
+>>> From: Max Filippov <max.filippov@cogentembedded.com>
 
-Ah, OK.  In that case the issue is likely to be that no connection has
-been made between the audio interface and the outputs desired - probably
-some routing control needs to be enabled by userspace.  If there's no
-visible path between a source of audio (like playback from the CPU) and
-a sink (such as an output) then the framework will think there's nothing
-to do.
+>>> Use previously empty <mach/dma.h> to declare HPB-DMA slave IDs.
 
-> So if everything on the codec is powered down, it's not surprising that
-> there is no audio output.
+>>> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
+>>> [Sergei: changed the guard macro name, fixed comment, extended copyright.]
+>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Indeed, and if the routing isn't set up to connect an audio path the
-core will not bother powering it on at all.  The issue with the UDA134x
-is that we need to give the framework the information that the playback
-interfaces are connected to an output (or restore the code to do this in
-the core but at this point since it's all data driven now in the drivers
-it's easier and more robust to just plumb them in and avoid having to
-deal with special cases which keep tripping us up).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130718/72605e9e/attachment.sig>
+>>> ---
+>>>   arch/arm/mach-shmobile/include/mach/dma.h |   25 ++++++++++++++++++++++++-
+>>>   1 file changed, 24 insertions(+), 1 deletion(-)
+
+>>> Index: renesas/arch/arm/mach-shmobile/include/mach/dma.h
+>>> ===================================================================
+>>> --- renesas.orig/arch/arm/mach-shmobile/include/mach/dma.h
+>>> +++ renesas/arch/arm/mach-shmobile/include/mach/dma.h
+>>> @@ -1 +1,24 @@
+>>> -/* empty */
+>>> +/*
+>>> + * Copyright (C) 2011-2013 Renesas Electronics Corporation
+>>> + * Copyright (C) 2013 Cogent Embedded, Inc.
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2
+>>> + * as published by the Free Software Foundation.
+>>> + */
+>>> +
+>>> +#ifndef __MACH_DMA_H
+>>> +#define __MACH_DMA_H
+>>> +
+>>> +/* HPB-DMA slave IDs */
+>>> +enum {
+>>> +    HPBDMA_SLAVE_DUMMY,
+>>> +    HPBDMA_SLAVE_SDHI0_TX,
+>>> +    HPBDMA_SLAVE_SDHI0_RX,
+>>> +    HPBDMA_SLAVE_SSI0_TX_ST,
+>>> +    HPBDMA_SLAVE_SSI0_TX_MN,
+>>> +    HPBDMA_SLAVE_SSI1_RX_ST,
+>>> +    HPBDMA_SLAVE_SSI1_RX_MN,
+>>> +};
+
+>> it should be in r8a7778.h
+
+>     It will be shared with R8A7779.
+
+    Apparently not anymore as this file is gone now.
+
+WBR, Sergei
