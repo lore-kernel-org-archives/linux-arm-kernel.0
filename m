@@ -1,88 +1,189 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 18 Jul 2013 15:31:08 +0800
-Subject: [PATCH 2/4] ARM: imx6q: add cko2 clocks
+Date: Thu, 18 Jul 2013 15:31:10 +0800
+Subject: [PATCH 4/4] ARM: imx6q: remove board specific CLKO setup
 In-Reply-To: <1374132670-791-1-git-send-email-shawn.guo@linaro.org>
 References: <1374132670-791-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1374132670-791-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1374132670-791-5-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds the missing cko2 clocks, including multiplexer, divider and
-gate.
+The CLKO is widely used by imx6q board designs to clock audio codec.
+Since most codecs accept 24 MHz frequency, let's initially set up CLKO
+with OSC24M (cko <-- cko2 <-- osc).  Then those board specific CLKO
+setup for audio codec can be removed.
+
+The board dts files also need an update on cko reference in codec node.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- .../devicetree/bindings/clock/imx6q-clock.txt      |    3 +++
- arch/arm/mach-imx/clk-imx6q.c                      |   15 ++++++++++++++-
- 2 files changed, 17 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6q-sabrelite.dts    |    2 +-
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi   |    2 +-
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi |    2 +-
+ arch/arm/mach-imx/clk-imx6q.c            |   11 +++++
+ arch/arm/mach-imx/mach-imx6q.c           |   69 ------------------------------
+ 5 files changed, 14 insertions(+), 72 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-index 794d089..c6d7e16 100644
---- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-@@ -210,6 +210,9 @@ clocks and IDs.
- 	pll5_video_div		195
- 	eim_slow      		196
- 	spdif      		197
-+	cko2_sel      		198
-+	cko2_podf      		199
-+	cko2      		200
- 
- Examples:
- 
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index e0f4cd0..3530280 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -167,7 +167,7 @@
+ 	codec: sgtl5000 at 0a {
+ 		compatible = "fsl,sgtl5000";
+ 		reg = <0x0a>;
+-		clocks = <&clks 169>;
++		clocks = <&clks 201>;
+ 		VDDA-supply = <&reg_2p5v>;
+ 		VDDIO-supply = <&reg_3p3v>;
+ 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 166b9ae..75b36b2 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -109,7 +109,7 @@
+ 	codec: wm8962 at 1a {
+ 		compatible = "wlf,wm8962";
+ 		reg = <0x1a>;
+-		clocks = <&clks 169>;
++		clocks = <&clks 201>;
+ 		DCVDD-supply = <&reg_audio>;
+ 		DBVDD-supply = <&reg_audio>;
+ 		AVDD-supply = <&reg_audio>;
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index 7a46f64..77188cb 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -60,7 +60,7 @@
+ 	codec: sgtl5000 at 0a {
+ 		compatible = "fsl,sgtl5000";
+ 		reg = <0x0a>;
+-		clocks = <&clks 169>;
++		clocks = <&clks 201>;
+ 		VDDA-supply = <&reg_2p5v>;
+ 		VDDIO-supply = <&reg_3p3v>;
+ 	};
 diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index d739df1..924ed84 100644
+index ed19b33..97f2702 100644
 --- a/arch/arm/mach-imx/clk-imx6q.c
 +++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -206,6 +206,16 @@ static const char *vpu_axi_sels[]	= { "axi", "pll2_pfd2_396m", "pll2_pfd0_352m",
- static const char *cko1_sels[]	= { "pll3_usb_otg", "pll2_bus", "pll1_sys", "pll5_video_div",
- 				    "dummy", "axi", "enfc", "ipu1_di0", "ipu1_di1", "ipu2_di0",
- 				    "ipu2_di1", "ahb", "ipg", "ipg_per", "ckil", "pll4_post_div", };
-+static const char *cko2_sels[] = {
-+	"mmdc_ch0_axi", "mmdc_ch1_axi", "usdhc4", "usdhc1",
-+	"gpu2d_axi", "dummy", "ecspi_root", "gpu3d_axi",
-+	"usdhc3", "dummy", "arm", "ipu1",
-+	"ipu2", "vdo_axi", "osc", "gpu2d_core",
-+	"gpu3d_core", "usdhc2", "ssi1", "ssi2",
-+	"ssi3", "gpu3d_shader", "vpu_axi", "can_root",
-+	"ldb_di0", "ldb_di1", "esai", "eim_slow",
-+	"uart_serial", "spdif", "asrc", "hsi_tx",
-+};
+@@ -288,6 +288,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	struct device_node *np;
+ 	void __iomem *base;
+ 	int i, irq;
++	int ret;
  
- enum mx6q_clks {
- 	dummy, ckil, ckih, osc, pll2_pfd0_352m, pll2_pfd1_594m, pll2_pfd2_396m,
-@@ -240,7 +250,7 @@ enum mx6q_clks {
- 	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
- 	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
- 	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow,
--	spdif, clk_max
-+	spdif, cko2_sel, cko2_podf, cko2, clk_max
- };
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+ 	clk[ckil] = imx_obtain_fixed_clock("ckil", 0);
+@@ -591,6 +592,16 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 		clk_prepare_enable(clk[usbphy2_gate]);
+ 	}
  
- static struct clk *clk[clk_max];
-@@ -398,6 +408,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[vdo_axi_sel]      = imx_clk_mux("vdo_axi_sel",      base + 0x18, 11, 1, vdo_axi_sels,      ARRAY_SIZE(vdo_axi_sels));
- 	clk[vpu_axi_sel]      = imx_clk_mux("vpu_axi_sel",      base + 0x18, 14, 2, vpu_axi_sels,      ARRAY_SIZE(vpu_axi_sels));
- 	clk[cko1_sel]         = imx_clk_mux("cko1_sel",         base + 0x60, 0,  4, cko1_sels,         ARRAY_SIZE(cko1_sels));
-+	clk[cko2_sel]         = imx_clk_mux("cko2_sel",         base + 0x60, 16, 5, cko2_sels,         ARRAY_SIZE(cko2_sels));
++	/*
++	 * Let's initially set up CLKO with OSC24M, since this configuration
++	 * is widely used by imx6q board designs to clock audio codec.
++	 */
++	ret = clk_set_parent(clk[cko2_sel], clk[osc]);
++	if (!ret)
++		ret = clk_set_parent(clk[cko], clk[cko2]);
++	if (ret)
++		pr_warn("failed to set up CLKO: %d\n", ret);
++
+ 	/* Set initial power mode */
+ 	imx6q_set_lpm(WAIT_CLOCKED);
  
- 	/*                              name         reg      shift width busy: reg, shift parent_names  num_parents */
- 	clk[periph]  = imx_clk_busy_mux("periph",  base + 0x14, 25,  1,   base + 0x48, 5,  periph_sels,  ARRAY_SIZE(periph_sels));
-@@ -447,6 +458,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[emi_slow_podf]    = imx_clk_fixup_divider("emi_slow_podf", "emi_slow_sel",   base + 0x1c, 23, 3, imx_cscmr1_fixup);
- 	clk[vpu_axi_podf]     = imx_clk_divider("vpu_axi_podf",     "vpu_axi_sel",       base + 0x24, 25, 3);
- 	clk[cko1_podf]        = imx_clk_divider("cko1_podf",        "cko1_sel",          base + 0x60, 4,  3);
-+	clk[cko2_podf]        = imx_clk_divider("cko2_podf",        "cko2_sel",          base + 0x60, 21, 3);
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 9f06cc8..2460d49 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -159,30 +159,6 @@ static int ar8031_phy_fixup(struct phy_device *dev)
+ 	return 0;
+ }
  
- 	/*                                            name                 parent_name    reg        shift width busy: reg, shift */
- 	clk[axi]               = imx_clk_busy_divider("axi",               "axi_sel",     base + 0x14, 16,  3,   base + 0x48, 0);
-@@ -537,6 +549,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[vdo_axi]      = imx_clk_gate2("vdo_axi",       "vdo_axi_sel",       base + 0x80, 12);
- 	clk[vpu_axi]      = imx_clk_gate2("vpu_axi",       "vpu_axi_podf",      base + 0x80, 14);
- 	clk[cko1]         = imx_clk_gate("cko1",           "cko1_podf",         base + 0x60, 7);
-+	clk[cko2]         = imx_clk_gate("cko2",           "cko2_podf",         base + 0x60, 24);
+-static void __init imx6q_sabrelite_cko1_setup(void)
+-{
+-	struct clk *cko1_sel, *ahb, *cko1;
+-	unsigned long rate;
+-
+-	cko1_sel = clk_get_sys(NULL, "cko1_sel");
+-	ahb = clk_get_sys(NULL, "ahb");
+-	cko1 = clk_get_sys(NULL, "cko1");
+-	if (IS_ERR(cko1_sel) || IS_ERR(ahb) || IS_ERR(cko1)) {
+-		pr_err("cko1 setup failed!\n");
+-		goto put_clk;
+-	}
+-	clk_set_parent(cko1_sel, ahb);
+-	rate = clk_round_rate(cko1, 16000000);
+-	clk_set_rate(cko1, rate);
+-put_clk:
+-	if (!IS_ERR(cko1_sel))
+-		clk_put(cko1_sel);
+-	if (!IS_ERR(ahb))
+-		clk_put(ahb);
+-	if (!IS_ERR(cko1))
+-		clk_put(cko1);
+-}
+-
+ #define PHY_ID_AR8031	0x004dd074
  
- 	for (i = 0; i < ARRAY_SIZE(clk); i++)
- 		if (IS_ERR(clk[i]))
+ static void __init imx6q_enet_phy_init(void)
+@@ -197,45 +173,6 @@ static void __init imx6q_enet_phy_init(void)
+ 	}
+ }
+ 
+-static void __init imx6q_sabresd_cko1_setup(void)
+-{
+-	struct clk *cko1_sel, *pll4, *pll4_post, *cko1;
+-	unsigned long rate;
+-
+-	cko1_sel = clk_get_sys(NULL, "cko1_sel");
+-	pll4 = clk_get_sys(NULL, "pll4_audio");
+-	pll4_post = clk_get_sys(NULL, "pll4_post_div");
+-	cko1 = clk_get_sys(NULL, "cko1");
+-	if (IS_ERR(cko1_sel) || IS_ERR(pll4)
+-			|| IS_ERR(pll4_post) || IS_ERR(cko1)) {
+-		pr_err("cko1 setup failed!\n");
+-		goto put_clk;
+-	}
+-	/*
+-	 * Setting pll4 at 768MHz (24MHz * 32)
+-	 * So its child clock can get 24MHz easily
+-	 */
+-	clk_set_rate(pll4, 768000000);
+-
+-	clk_set_parent(cko1_sel, pll4_post);
+-	rate = clk_round_rate(cko1, 24000000);
+-	clk_set_rate(cko1, rate);
+-put_clk:
+-	if (!IS_ERR(cko1_sel))
+-		clk_put(cko1_sel);
+-	if (!IS_ERR(pll4_post))
+-		clk_put(pll4_post);
+-	if (!IS_ERR(pll4))
+-		clk_put(pll4);
+-	if (!IS_ERR(cko1))
+-		clk_put(cko1);
+-}
+-
+-static void __init imx6q_sabresd_init(void)
+-{
+-	imx6q_sabresd_cko1_setup();
+-}
+-
+ static void __init imx6q_1588_init(void)
+ {
+ 	struct regmap *gpr;
+@@ -256,12 +193,6 @@ static void __init imx6q_usb_init(void)
+ 
+ static void __init imx6q_init_machine(void)
+ {
+-	if (of_machine_is_compatible("fsl,imx6q-sabrelite"))
+-		imx6q_sabrelite_cko1_setup();
+-	else if (of_machine_is_compatible("fsl,imx6q-sabresd") ||
+-			of_machine_is_compatible("fsl,imx6dl-sabresd"))
+-		imx6q_sabresd_init();
+-
+ 	imx6q_enet_phy_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 -- 
 1.7.9.5
