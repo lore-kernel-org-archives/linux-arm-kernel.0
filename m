@@ -1,54 +1,261 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 18 Jul 2013 22:34:55 +0400
-Subject: [PATCH 04/10] ARM: clps711x: edb7211: Remove extra iotable_init() call
+Date: Thu, 18 Jul 2013 22:34:56 +0400
+Subject: [PATCH 05/10] ARM: clps711x: Add CLPS711X clk driver
 In-Reply-To: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
 References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1374172501-26796-5-git-send-email-shc_work@mail.ru>
+Message-ID: <1374172501-26796-6-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The keyboard driver for the CLPS711X platform is missing, so there
-is no need to call iotable_init() for this memory region.
+This adds the clock driver for Cirrus Logic CLPS711X series SoCs
+using common clock infrastructure.
+Designed primarily for migration CLPS711X subarch for multiplatform & DT,
+for this as the "OF" and "not-OF" calls implemented.
+Additionally, patch removes unnecessary symbol CLKDEV_LOOKUP for CLPS711X
+from main ARM Kconfig since this symbol is selected automatically by COMMON_CLK.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/board-edb7211.c | 17 +----------------
- 1 file changed, 1 insertion(+), 16 deletions(-)
+ .../devicetree/bindings/clock/clps711x-clock.txt   |  47 +++++++
+ arch/arm/Kconfig                                   |   1 -
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-clps711x.c                         | 150 +++++++++++++++++++++
+ 4 files changed, 198 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/clps711x-clock.txt
+ create mode 100644 drivers/clk/clk-clps711x.c
 
-diff --git a/arch/arm/mach-clps711x/board-edb7211.c b/arch/arm/mach-clps711x/board-edb7211.c
-index 9dfb990..fe6184e 100644
---- a/arch/arm/mach-clps711x/board-edb7211.c
-+++ b/arch/arm/mach-clps711x/board-edb7211.c
-@@ -126,21 +126,6 @@ static struct gpio edb7211_gpios[] __initconst = {
- 	{ EDB7211_LCDBL,	GPIOF_OUT_INIT_LOW,	"LCD BACKLIGHT" },
- };
+diff --git a/Documentation/devicetree/bindings/clock/clps711x-clock.txt b/Documentation/devicetree/bindings/clock/clps711x-clock.txt
+new file mode 100644
+index 0000000..0fb9fff
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/clps711x-clock.txt
+@@ -0,0 +1,47 @@
++Device Tree Clock bindings for the Cirrus Logic CLPS711X CPUs
++
++=== Clock subsystem ===
++Required properties:
++- compatible: Should be "cirrus,clps711x-clk"
++- reg: Address of the internal register set
++- #clock-cells: Should be <1>
++
++The clock consumer should specify the desired clock by having the clock
++ID in its "clocks" phandle cell. The following table is a full list of
++CLPS711X clocks and IDs.
++
++	Clock		ID
++	------------------
++	dummy		0
++	cpu		1
++	pll		2
++	bus		3
++	timer_hf	4
++	timer_lf	5
++	tc1		6
++	tc2		7
++	spi		8
++	uart		9
++
++=== Clocksource subsystem ===
++Required properties:
++- compatible: Should be "cirrus,clps711x-clocksource"
++- reg: Address of the internal register set
++- clocks: phandle to the source clocks TC1 and TC2
++- interrupts: The interrupt of the TC2 timer
++
++Example:
++
++clks: clks at 80000000 {
++	compatible = "cirrus,clps711x-clk";
++	reg = <0x80000000 0>;
++	#clock-cells = <1>;
++};
++
++timer {
++	compatible = "cirrus,clps711x-clocksource";
++	reg = <0x80000000 0>;
++	clocks = <&clks 6>, <&clks 7>;
++	clock-names = "tc1", "tc2";
++	interrupts = <9>;
++};
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ba412e0..dfb1e7f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -370,7 +370,6 @@ config ARCH_CLPS711X
+ 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select AUTO_ZRELADDR
+-	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+ 	select COMMON_CLK
+ 	select CPU_ARM720T
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 4038c2b..a7e9b73 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -11,6 +11,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
  
--static struct map_desc edb7211_io_desc[] __initdata = {
--	{	/* Memory-mapped extra keyboard row */
--		.virtual	= IO_ADDRESS(EDB7211_EXTKBD_BASE),
--		.pfn		= __phys_to_pfn(EDB7211_EXTKBD_BASE),
--		.length		= SZ_1M,
--		.type		= MT_DEVICE,
--	},
--};
--
--void __init edb7211_map_io(void)
--{
--	clps711x_map_io();
--	iotable_init(edb7211_io_desc, ARRAY_SIZE(edb7211_io_desc));
--}
--
- /* Reserve screen memory region at the start of main system memory. */
- static void __init edb7211_reserve(void)
- {
-@@ -195,7 +180,7 @@ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
- 	.nr_irqs	= CLPS711X_NR_IRQS,
- 	.fixup		= fixup_edb7211,
- 	.reserve	= edb7211_reserve,
--	.map_io		= edb7211_map_io,
-+	.map_io		= clps711x_map_io,
- 	.init_early	= clps711x_init_early,
- 	.init_irq	= clps711x_init_irq,
- 	.init_time	= clps711x_timer_init,
+ # SoCs specific
+ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
++obj-$(CONFIG_ARCH_CLPS711X)	+= clk-clps711x.o
+ obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+ obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+ obj-$(CONFIG_ARCH_NSPIRE)	+= clk-nspire.o
+diff --git a/drivers/clk/clk-clps711x.c b/drivers/clk/clk-clps711x.c
+new file mode 100644
+index 0000000..662908c
+--- /dev/null
++++ b/drivers/clk/clk-clps711x.c
+@@ -0,0 +1,150 @@
++/*
++ *  CLPS711X clk driver
++ *
++ *  Copyright (C) 2013 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#define pr_fmt(fmt)	"clk-clps711x: " fmt
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/io.h>
++#include <linux/ioport.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++
++#include <linux/mfd/syscon/clps711x.h>
++
++#define CLPS711X_SYSCON1	(0x0100)
++#define CLPS711X_SYSCON2	(0x1100)
++#define CLPS711X_PLLR		(0xa5a8)
++
++#define CLPS711X_EXT_FREQ	(13000000)
++#define CLPS711X_OSC_FREQ	(3686400)
++
++enum clps711x_clks {
++	dummy, cpu, pll, bus, timer_hf, timer_lf, tc1, tc2, spi, uart, clk_max
++};
++
++static struct {
++	struct clk_onecell_data	clk_data;
++	struct clk		*clks[clk_max];
++} *clps711x_clk;
++
++static void __init _clps711x_clk_init(phys_addr_t phys_base)
++{
++	const char *tc_parents[] = { "timer_lf", "timer_hf" };
++	u32 tmp, f_cpu, f_pll, f_bus, f_timh, f_spi;
++	void __iomem *pllr, *syscon1, *syscon2;
++
++	BUG_ON(!request_mem_region(phys_base + CLPS711X_PLLR, SZ_4, NULL));
++	BUG_ON(!request_mem_region(phys_base + CLPS711X_SYSCON1, SZ_128, NULL));
++	BUG_ON(!request_mem_region(phys_base + CLPS711X_SYSCON2, SZ_128, NULL));
++
++	clps711x_clk = kzalloc(sizeof(*clps711x_clk), GFP_KERNEL);
++	BUG_ON(!clps711x_clk);
++
++	pllr = ioremap(phys_base + CLPS711X_PLLR, SZ_4);
++	BUG_ON(!pllr);
++
++	syscon1 = ioremap(phys_base + CLPS711X_SYSCON1, SZ_128);
++	BUG_ON(!syscon1);
++
++	syscon2 = ioremap(phys_base + CLPS711X_SYSCON2, SZ_128);
++	BUG_ON(!syscon2);
++
++	tmp = readl(pllr) >> 24;
++	if (tmp)
++		f_pll = DIV_ROUND_UP(CLPS711X_OSC_FREQ * tmp, 2);
++	else
++		f_pll = 73728000; /* Old CPUs default value */
++
++	tmp = readl(syscon2 + SYSFLG_OFFSET);
++	if (tmp & SYSFLG2_CKMODE) {
++		f_cpu = CLPS711X_EXT_FREQ;
++		f_bus = CLPS711X_EXT_FREQ;
++		f_spi = 135400;
++		f_pll = 0;
++	} else {
++		f_cpu = f_pll;
++		if (f_cpu >= 36864000)
++			f_bus = DIV_ROUND_UP(f_cpu, 2);
++		else
++			f_bus = 36864000 / 2;
++		f_spi = DIV_ROUND_CLOSEST(f_cpu, 576);
++	}
++
++	if (tmp & SYSFLG2_CKMODE) {
++		if (readl(syscon2 + SYSCON_OFFSET) & SYSCON2_OSTB)
++			f_timh = DIV_ROUND_CLOSEST(CLPS711X_EXT_FREQ, 26);
++		else
++			f_timh = DIV_ROUND_CLOSEST(CLPS711X_EXT_FREQ, 24);
++	} else
++		f_timh = DIV_ROUND_CLOSEST(f_cpu, 144);
++
++	clps711x_clk->clks[dummy] =
++		clk_register_fixed_rate(NULL, "dummy", NULL, CLK_IS_ROOT, 0);
++	clps711x_clk->clks[cpu] =
++		clk_register_fixed_rate(NULL, "cpu", NULL, CLK_IS_ROOT, f_cpu);
++	clps711x_clk->clks[pll] =
++		clk_register_fixed_rate(NULL, "pll", NULL, CLK_IS_ROOT, f_pll);
++	clps711x_clk->clks[bus] =
++		clk_register_fixed_rate(NULL, "bus", NULL, CLK_IS_ROOT, f_bus);
++	clps711x_clk->clks[timer_hf] =
++		clk_register_fixed_rate(NULL, "timer_hf", NULL, CLK_IS_ROOT,
++					f_timh);
++	clps711x_clk->clks[timer_lf] =
++		clk_register_fixed_factor(NULL, "timer_lf", "timer_hf",
++					  0, 1, 256);
++	clps711x_clk->clks[tc1] =
++		clk_register_mux(NULL, "tc1", tc_parents, 2,
++				 CLK_GET_RATE_NOCACHE, syscon1, 5, 1, 0, NULL);
++	clps711x_clk->clks[tc2] =
++		clk_register_mux(NULL, "tc2", tc_parents, 2,
++				 CLK_GET_RATE_NOCACHE, syscon1, 7, 1, 0, NULL);
++	clps711x_clk->clks[spi] =
++		clk_register_fixed_rate(NULL, "spi", NULL, CLK_IS_ROOT, f_spi);
++	clps711x_clk->clks[uart] =
++		clk_register_fixed_factor(NULL, "uart", "bus", 0, 1, 10);
++
++	clk_set_parent(clps711x_clk->clks[tc1], clps711x_clk->clks[timer_lf]);
++	clk_set_parent(clps711x_clk->clks[tc2], clps711x_clk->clks[timer_hf]);
++
++	/* Temporary export clocks for non-DT capable drivers */
++	clk_register_clkdev(clps711x_clk->clks[pll], "pll", NULL);
++	clk_register_clkdev(clps711x_clk->clks[spi], "spi", NULL);
++	clk_register_clkdev(clps711x_clk->clks[uart], "uart", NULL);
++
++	pr_debug("CPU: %u Hz, Timer: %u Hz\n", f_cpu, f_timh);
++}
++
++void __init clps711x_clk_init(phys_addr_t phys_base)
++{
++	_clps711x_clk_init(phys_base);
++
++	clk_register_clkdev(clps711x_clk->clks[tc1], "tc1", NULL);
++	clk_register_clkdev(clps711x_clk->clks[tc2], "tc2", NULL);
++}
++
++#ifdef CONFIG_OF
++static void __init clps711x_clk_init_dt(struct device_node *np)
++{
++	struct resource res;
++
++	BUG_ON(!of_address_to_resource(np, 0, &res));
++
++	_clps711x_clk_init(res.start);
++
++	clps711x_clk->clk_data.clks = clps711x_clk->clks;
++	clps711x_clk->clk_data.clk_num = clk_max;
++	of_clk_add_provider(np, of_clk_src_onecell_get,
++			    &clps711x_clk->clk_data);
++}
++CLK_OF_DECLARE(clps711x, "cirrus,clps711x-clk", clps711x_clk_init_dt);
++#endif
 -- 
 1.8.1.5
