@@ -1,22 +1,38 @@
-From: cb@sgoc.de (Christoph G. Baumann)
-Date: Thu, 18 Jul 2013 17:14:37 +0200 (CEST)
-Subject: [PATCH v2 3/3] mxs: added driver for OCOTP in i.MX23 and i.MX28
-In-Reply-To: <20130718063655.GH10380@pengutronix.de>
-References: <1372855154-8422-1-git-send-email-cb@sgoc.de>
- <1374078460-4126-1-git-send-email-cb@sgoc.de>
- <1374078460-4126-4-git-send-email-cb@sgoc.de>
- <20130717192627.GA12533@pengutronix.de>
- <1068003072.1131668.1374097392210.open-xchange@email.1und1.de>
- <20130718063655.GH10380@pengutronix.de>
-Message-ID: <1421016029.122488.1374160477415.open-xchange@email.1und1.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 Jul 2013 08:15:01 -0700
+Subject: [PATCHv2 0/4] improved support for runtime muxing for pinctrl
+Message-ID: <20130718151213.30990.45828.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sascha,
+Hi all,
 
-unfortunately I don't have the time at the moment to further fix the FSL code.
-Maybe someone else feels inclined?
+Here's this series again with hopefully all the comments addressed.
+
+As discussed earlier, the pinctrl support for changing some of the
+consumer device pins during runtime needs some improvment.
+                                                                                                                
+Regards,
+
+Tony
+
+---
+
+Tony Lindgren (4):
+      pinctrl: Remove duplicate code in pinctrl_pm_select_state functions
+      pinctrl: Allow pinctrl to have multiple active states
+      pinctrl: Add support for additional dynamic states
+      drivers: Add pinctrl handling for dynamic pin states
 
 
-Regards
-Christoph
+ Documentation/pinctrl.txt             |   77 ++++++++-
+ drivers/base/pinctrl.c                |   39 ++++
+ drivers/pinctrl/core.c                |  291 +++++++++++++++++++++++++++------
+ drivers/pinctrl/core.h                |   10 +
+ include/linux/pinctrl/consumer.h      |   46 +++++
+ include/linux/pinctrl/devinfo.h       |    4 
+ include/linux/pinctrl/pinctrl-state.h |   15 +-
+ 7 files changed, 420 insertions(+), 62 deletions(-)
+
+-- 
+Signature
