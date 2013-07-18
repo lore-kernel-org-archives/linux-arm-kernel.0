@@ -1,52 +1,54 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Thu, 18 Jul 2013 13:55:26 +0200
-Subject: [PATCH v3] clk: add MOXA ART SoCs clock driver
-In-Reply-To: <20130718110201.GB29153@e106331-lin.cambridge.arm.com>
-References: <1372943292-6960-1-git-send-email-jonas.jensen@gmail.com>
- <1374067396-30155-1-git-send-email-jonas.jensen@gmail.com>
- <20130718095035.GA29153@e106331-lin.cambridge.arm.com>
- <CACmBeS2SnpiUtiQD6j9qyaXZ5-chHSHVeo4c5=UhitVonvkKtw@mail.gmail.com>
- <20130718110201.GB29153@e106331-lin.cambridge.arm.com>
-Message-ID: <CACmBeS24smrJ4SLY7snv1_6SRcuXRkZ8t0PGMvBupUpKMMb43w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 18 Jul 2013 19:55:45 +0800
+Subject: [PATCH 4/4] ARM: imx6q: remove board specific CLKO setup
+In-Reply-To: <20130718083603.GK10380@pengutronix.de>
+References: <1374132670-791-1-git-send-email-shawn.guo@linaro.org>
+ <1374132670-791-5-git-send-email-shawn.guo@linaro.org>
+ <20130718083603.GK10380@pengutronix.de>
+Message-ID: <20130718115541.GA16328@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 July 2013 13:02, Mark Rutland <mark.rutland@arm.com> wrote:
-> Ok. I'm just concerned that the linkage isn't explicit or obvious.
+On Thu, Jul 18, 2013 at 10:36:03AM +0200, Sascha Hauer wrote:
+> On Thu, Jul 18, 2013 at 03:31:10PM +0800, Shawn Guo wrote:
+> > The CLKO is widely used by imx6q board designs to clock audio codec.
+> > Since most codecs accept 24 MHz frequency, let's initially set up CLKO
+> > with OSC24M (cko <-- cko2 <-- osc).  Then those board specific CLKO
+> > setup for audio codec can be removed.
+> > 
+> > The board dts files also need an update on cko reference in codec node.
+> > 
+> > +	/*
+> > +	 * Let's initially set up CLKO with OSC24M, since this configuration
+> > +	 * is widely used by imx6q board designs to clock audio codec.
+> > +	 */
+> > +	ret = clk_set_parent(clk[cko2_sel], clk[osc]);
+> > +	if (!ret)
+> > +		ret = clk_set_parent(clk[cko], clk[cko2]);
+> > +	if (ret)
+> > +		pr_warn("failed to set up CLKO: %d\n", ret);
+> 
+> 
+> I don't really like that the clock setup code fiddles with clocks it has
+> no knowledge about just because it happens to be correct for several
+> boards.
 
-> This does leave apb-clock completely dependent on core-clock, and unless
-> I've missed something there's no linkage between the two described in
-> the dt.
+I have to admit it's not the best way to handle it, and I can understand
+your concern.  What I like about it is we can remove those board
+specific hooks from mach-imx6q.c at least for now.
 
-I can add a description in the core-clock binding and also for
-apb-clock pointing
-out that it's set from core-clock.
+> 
+> I currently have no example where this bites me, so I think I can live
+> with it for now. I just wonder what I should do when this clock is used
+> for something vital to the system (clocking an FPGA for example?).
 
-> How does core-clock physically relate to apb-clock? Does it feed or is
-> it fed by apb-clock?
+Go back to set up CLKO in mach-imx6q.c with board specific hook for the
+system?
 
-apb-clock is entirely a DT construct used by drivers to get the fixed
-rate 48MHz.
-It's not fed by core-clock more than what happens in probe.
+I think I chose to change the default CLKO setup for audio use case, as
+all the users we've seen so far is audio codec.  I can still have this
+setup done in mach-imx6q.c with of_machine_is_compatible() check on all
+those board.  But that also means we need to register lookups for those
+CLKO clocks and call clk_get_sys() to get them.
 
-For UC-7112-LX, drivers using apb-clock are: clocksource, MMC, watchdog
-
-Because clocksource relies on apb-clock, a successful probe of
-core-clock is critical.
-
-Commonly, drivers look up the apb-clock node and call clk_get_rate.
-
-> Are we always guaranteed to have core-clock if we have apb-clock, and is
-> it part of the same block in hardware? If so we could describe the
-> amalgamation as a provider with two clock outputs, with core-clock's
-> registers for configuration at probe-time.
-
-Yes, as described above, there can not be a apb-clock without core-clock.
-
-
-I think drivers could find and use core-clock instead. Maybe the abstraction
-of apb-clock is unnecessary?
-
-
-Best regards,
-Jonas
+Shawn
