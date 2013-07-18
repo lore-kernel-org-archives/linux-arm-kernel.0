@@ -1,163 +1,59 @@
-From: oleksandr.kozaruk@ti.com (Oleksandr Kozaruk)
-Date: Thu, 18 Jul 2013 11:36:42 +0300
-Subject: [PATCH v5 2/2] iio: twl6030-gpadc: TWL6030, TWL6032 GPADC driver
-In-Reply-To: <51E6DCB5.3070302@metafoo.de>
-References: <1374059564-6872-1-git-send-email-oleksandr.kozaruk@ti.com>
- <1374059564-6872-3-git-send-email-oleksandr.kozaruk@ti.com>
- <51E6DCB5.3070302@metafoo.de>
-Message-ID: <CAPb7_muAzO-jRqgcm89fcKT-hTLq38Aj2p0WAWjGjN9DoQUwPg@mail.gmail.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Thu, 18 Jul 2013 10:50:26 +0200
+Subject: [PATCH] Documentation: Add device tree binding file for MOXA ART SoCs
+ interrupt controller
+Message-ID: <1374137426-6763-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lars,
+Add binding document for MOXA ART SoCs interrupt controller.
 
-On Wed, Jul 17, 2013 at 9:04 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
->> +static int twl6032_calibration(struct twl6030_gpadc_data *gpadc)
->> +{
->> +     int chn, d1 = 0, d2 = 0, temp;
->> +     u8 trim_regs[17];
->> +     int ret;
->> +
->> +     ret = twl_i2c_read(TWL6030_MODULE_ID2, trim_regs + 1,
->> +                     TWL6030_GPADC_TRIM1, 16);
->> +     if (ret < 0) {
->> +             dev_err(gpadc->dev, "calibration failed\n");
->> +             return ret;
->> +     }
->> +
->> +     /*
->> +      * Loop to calculate the value needed for returning voltages from
->> +      * GPADC not values.
->> +      *
->> +      * gain is calculated to 3 decimal places fixed point.
->> +      */
->> +     for (chn = 0; chn < TWL6032_GPADC_MAX_CHANNELS; chn++) {
->> +
->> +             switch (chn) {
->> +             case 0:
->> +             case 1:
->> +             case 2:
->> +             case 3:
->> +             case 4:
->> +             case 5:
->> +             case 6:
->> +             case 11:
->> +             case 12:
->> +             case 13:
->> +             case 14:
->> +                     /* D1 */
->> +                     d1 = (trim_regs[3] & 0x1F) << 2;
->> +                     d1 |= (trim_regs[1] & 0x06) >> 1;
->> +                     if (trim_regs[1] & 0x01)
->> +                             d1 = -d1;
->> +
->> +                     /* D2 */
->> +                     d2 = (trim_regs[4] & 0x3F) << 2;
->> +                     d2 |= (trim_regs[2] & 0x06) >> 1;
->> +                     if (trim_regs[2] & 0x01)
->> +                             d2 = -d2;
->> +                     break;
->> +             case 8:
->> +                     /* D1 */
->> +                     temp = (trim_regs[3] & 0x1F) << 2;
->> +                     temp |= (trim_regs[1] & 0x06) >> 1;
->> +                     if (trim_regs[1] & 0x01)
->> +                             temp = -temp;
->> +
->> +                     d1 = (trim_regs[8] & 0x18) << 1;
->> +                     d1 |= (trim_regs[7] & 0x1E) >> 1;
->> +                     if (trim_regs[7] & 0x01)
->> +                             d1 = -d1;
->> +
->> +                     d1 += temp;
->> +
->> +                     /* D2 */
->> +                     temp = (trim_regs[4] & 0x3F) << 2;
->> +                     temp |= (trim_regs[2] & 0x06) >> 1;
->> +                     if (trim_regs[2] & 0x01)
->> +                             temp = -temp;
->> +
->> +                     d2 = (trim_regs[10] & 0x1F) << 2;
->> +                     d2 |= (trim_regs[8] & 0x06) >> 1;
->> +                     if (trim_regs[8] & 0x01)
->> +                             d2 = -d2;
->> +
->> +                     d2 += temp;
->> +                     break;
->> +             case 9:
->> +                     /* D1 */
->> +                     temp = (trim_regs[3] & 0x1F) << 2;
->> +                     temp |= (trim_regs[1] & 0x06) >> 1;
->> +                     if (trim_regs[1] & 0x01)
->> +                             temp = -temp;
->> +
->> +                     d1 = (trim_regs[14] & 0x18) << 1;
->> +                     d1 |= (trim_regs[12] & 0x1E) >> 1;
->> +                     if (trim_regs[12] & 0x01)
->> +                             d1 = -d1;
->> +
->> +                     d1 += temp;
->> +
->> +                     /* D2 */
->> +                     temp = (trim_regs[4] & 0x3F) << 2;
->> +                     temp |= (trim_regs[2] & 0x06) >> 1;
->> +                     if (trim_regs[2] & 0x01)
->> +                             temp = -temp;
->> +
->> +                     d2 = (trim_regs[16] & 0x1F) << 2;
->> +                     d2 |= (trim_regs[14] & 0x06) >> 1;
->> +                     if (trim_regs[14] & 0x01)
->> +                             d2 = -d2;
->> +
->> +                     d2 += temp;
->> +             case 10:
->> +                     /* D1 */
->> +                     d1 = (trim_regs[11] & 0x0F) << 3;
->> +                     d1 |= (trim_regs[9] & 0x0E) >> 1;
->> +                     if (trim_regs[9] & 0x01)
->> +                             d1 = -d1;
->> +
->> +                     /* D2 */
->> +                     d2 = (trim_regs[15] & 0x0F) << 3;
->> +                     d2 |= (trim_regs[13] & 0x0E) >> 1;
->> +                     if (trim_regs[13] & 0x01)
->> +                             d2 = -d2;
->> +                     break;
->> +             case 7:
->> +             case 18:
->> +                     /* D1 */
->> +                     temp = (trim_regs[3] & 0x1F) << 2;
->> +                     temp |= (trim_regs[1] & 0x06) >> 1;
->> +                     if (trim_regs[1] & 0x01)
->> +                             temp = -temp;
->> +
->> +                     d1 = (trim_regs[5] & 0x7E) >> 1;
->> +                     if (trim_regs[5] & 0x01)
->> +                             d1 = -d1;
->> +.
->> +                     d1 += temp;
->> +
->> +                     /* D2 */
->> +                     temp = (trim_regs[4] & 0x3F) << 2;
->> +                     temp |= (trim_regs[2] & 0x06) >> 1;
->> +                     if (trim_regs[2] & 0x01)
->> +                             temp = -temp;
->> +
->> +                     d2 = (trim_regs[6] & 0xFE) >> 1;
->> +                     if (trim_regs[6] & 0x01)
->> +                             d2 = -d2;
->> +
->> +                     d2 += temp;
->> +                     break;
->
->
-> There is quite a bit of copy paste in here. Putting the bit swizziling into
-> a helper function should also improbe legibility.
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-Trimming bits are scattered randomly between registers and in
-different bit positions.
-I don't see any commonalities, that could be generalized. as Graeme
-said about it "it's a bane of my life".
+Notes:
+    The MOXA ART irqchip driver was added without accompanying devicetree document.
+    ( in next-20130716   drivers/irqchip/irq-moxart.c )
+    
+    Applies to next-20130716
 
-Regards,
-OK.
+ .../interrupt-controller/moxa,moxart-ic.txt        | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/moxa,moxart-ic.txt
+
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/moxa,moxart-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/moxa,moxart-ic.txt
+new file mode 100644
+index 0000000..58f1fe1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/moxa,moxart-ic.txt
+@@ -0,0 +1,28 @@
++* MOXA ART Interrupt Controller
++
++MOXA ART Interrupt Controller (moxart-ic) is used on MOXA ART SoCs
++and supports 32 non-configurable number of interrupts
++
++Main node required properties:
++
++- compatible : "moxa,moxart-ic"
++- interrupt-controller : Identifies the node as an interrupt controller
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The type shall be a <u32> and the value shall be 2.
++
++  The first cell contains the interrupt number in the range [0-31].
++  The second cell contains the interrupt type
++
++- reg: physical base address and size of the intc registers map.
++- interrupt-mask: Specifies if the interrupt is edge or level-triggered
++  each bit represent an interrupt 0-31 where 1 signify edge
++
++Example:
++
++	intc: interrupt-controller at 98800000 {
++		compatible = "moxa,moxart-ic";
++		reg = <0x98800000 0x38>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		interrupt-mask = <0x00080000>;
++	};
+-- 
+1.8.2.1
