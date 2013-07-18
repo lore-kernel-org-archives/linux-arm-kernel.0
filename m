@@ -1,54 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Jul 2013 06:48:07 -0700
-Subject: [PATCH 4/4] drivers: Add pinctrl handling for dynamic pin states
-In-Reply-To: <20130718074508.GQ7656@atomide.com>
-References: <20130716090310.5541.36777.stgit@localhost>
- <20130716090539.5541.980.stgit@localhost>
- <51E70ADF.8090805@wwwdotorg.org>
- <20130718074508.GQ7656@atomide.com>
-Message-ID: <20130718134806.GW7656@atomide.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 18 Jul 2013 10:55:06 -0300
+Subject: [PATCH] ARM: Kirkwood: Fix the internal register ranges
+ translation
+In-Reply-To: <51E63B3A.2010807@keymile.com>
+References: <1371569479-31498-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <51E5145A.90404@keymile.com> <20130716125531.GD2317@localhost>
+ <51E63B3A.2010807@keymile.com>
+Message-ID: <20130718135505.GA3264@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130718 00:57]:
-> * Stephen Warren <swarren@wwwdotorg.org> [130717 14:28]:
-> > 
-> > Oh, I see you're trying to check that the set of pins in the active,
-> > sleep, and idle states are identical.
+Hi Gerlando,
+
+On Wed, Jul 17, 2013 at 08:35:38AM +0200, Gerlando Falauto wrote:
+> On 07/16/2013 02:56 PM, Ezequiel Garcia wrote:
+> [...]
+> > Also, speaking of "device bus" this nand node should be behind a devicebus node.
+> >
+> > 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000   /* internal-regs */
+> > 			  MBUS_ID(0x01, 0x2f) 0 0 0xf4000000 0x400>;
+> >
+> > 		devbus {
+> > 			status = "okay";
+> > 			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0x400>;
+> >
+> > 			/* nand */
+> > 			nand {
+> > 				compatible = "marvell,orion-nand";
+> > 				reg = <0 0x400>;
+> > 			};
+> > 		};
+> >
+> > (notice this will allow you to relocate the base address of the NAND windows
+> > easily if it conflicts with your PCIe needs).
 > 
-> Right, that's to avoid any further checking during runtime for runtime PM.
->  
-> > But I think that pinctrl_check_dynamic() only checks that one state is a
-> > subset of the other, not that the two states are equal. Instead, I think
-> > you want to comparison coded in pinctrl_check_dynamic() to be:
+> I am MAYBE slowly starting to understand this whole mbus rework.
+> Just one remark though: don't you think it would make sense to add 
+> something like:
 > 
-> In pinctrl_check_dynamic() we check that the pins match between the
-> states, and the number of found pins matches the first set. I'll
-> take a look if we check the total pins between the two sets.
-
-That that is a bit painful right now to check properly as we don't
-have any sorting, and we could use that elsewhere too for checks
-probably..
-  
-> > gen_group_list_of_pinctrl_state(s1, array1);
-> > gen_group_list_of_pinctrl_state(s2, array2);
-> > mismatch = memcmp(array1, array2, length);
+> #define MBUS_ID_INTERNAL_REGS	MBUS_ID(0xf0, 0x01)
+> #define MBUS_ID_NAND		MBUS_ID(0x01, 0x2f)
 > 
-> Well we could allocate and sort the pins, but the number of pins
-> for runtime PM is typically very small for each pin consumer device.
-> Typically you just need to toggle RX pin to GPIO mode for idle. And
-> this check is only done during consumer driver probe time. So
-> optimizing it for larger sets could be done at any point later on
-> as needed.
 
-..so for now, let's just check the total number of pins for the sets
-like Felipe suggested. I think we're better off improving the pinctrl
-data first to make various checks easier.
+Yeah, maybe it would make sense. This has been discussed in the past
+and others were against, so that's the reason it's not included in
+the series I submitted.
 
-What you're suggesting with the mepcmp() can be done easily if we add
-something like device_get_pins() and have the pins sorted for the
-various states for a device at the device probe time.
+But feel free to send a patch proposing it once the MBus is merged!
 
-Regards,
-
-Tony
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
