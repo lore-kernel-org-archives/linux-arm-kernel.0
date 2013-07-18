@@ -1,34 +1,40 @@
-From: andi@etezian.org (Andi Shyti)
-Date: Thu, 18 Jul 2013 21:35:30 +0200
-Subject: [PATCH] u8500_defconfig: allow creation and mounting of devtmpfs
-Message-ID: <1374176130-21209-1-git-send-email-andi@etezian.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 18 Jul 2013 14:01:36 -0600
+Subject: [PATCH v2 11/22] iommu/tegra: smmu: Add Tegra 114 support
+In-Reply-To: <1373021097-32420-12-git-send-email-hdoyu@nvidia.com>
+References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
+ <1373021097-32420-12-git-send-email-hdoyu@nvidia.com>
+Message-ID: <51E849A0.6040508@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables CONFIG_DETTMPFS and CONFIG_DEVTMPFS_MOUNT
-flags for u8500 based devices.
+On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
+> Tegra 114 SMMU uses the almost same logic as one in Tegra 30 except
+> that they have different HaredWare Accelerators(HWA). Those difference
+> is provided from DT.
 
-In this way it's possible to create a tmpfs/ramfs already in the
-early stages of the boot, allowing programs like udev/mdev to
-populate the /dev directory.
+> diff --git a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
 
-Signed-off-by: Andi Shyti <andi@etezian.org>
----
- arch/arm/configs/u8500_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+>  Required properties:
+> -- compatible : "nvidia,tegra30-smmu"
+> +- compatible : "nvidia,tegra114-smmu", "nvidia,tegra30-smmu"
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index a0025dc..0675d6a 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -109,6 +109,8 @@ CONFIG_EXT2_FS_SECURITY=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT4_FS=y
- CONFIG_VFAT_FS=y
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
- # CONFIG_MISC_FILESYSTEMS is not set
--- 
-1.8.3.2
+So that we don't have to list every single chip in that list, we've
+often written that as:
+
+compatible : "nvidia,tegra<chip>-smmu".
+
+> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+
+>  static struct of_device_id tegra_smmu_of_match[] = {
+> +	{ .compatible = "nvidia,tegra114-smmu", },
+>  	{ .compatible = "nvidia,tegra30-smmu", },
+
+So, there are no HW differences, and hence no driver changes required?
+In that case, there's no point making the driver explicitly support
+nvidia,tegra114-smmu, since the DT will always be:
+
+compatible = "nvidia,tegra114-smmu", "nvidia,tegra30-smmu";
+
+... and hence always match on the existing nvidia,tegra30-smmu entry in
+that table.
