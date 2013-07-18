@@ -1,399 +1,548 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 18 Jul 2013 22:34:58 +0400
-Subject: [PATCH 07/10] ARM: clps711x: Add CLPS711X irqchip driver
+Date: Thu, 18 Jul 2013 22:35:00 +0400
+Subject: [PATCH 09/10] ARM: clps711x: Migrate CLPS711X subarch to the new
+ basic drivers
 In-Reply-To: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
 References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1374172501-26796-8-git-send-email-shc_work@mail.ru>
+Message-ID: <1374172501-26796-10-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the irqchip driver for Cirrus Logic CLPS711X series SoCs.
-Designed primarily for migration CLPS711X subarch for multiplatform & DT,
-for this as the "OF" and "not-OF" calls implemented.
+This patch remove old code and migrate Cirrus Logic CLPS711X subarch
+to the new basic drivers: clk, clocksource, irqchip and cpuidle.
+This change brings this subarch for use in multiplatform build.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- .../interrupt-controller/cirrus,clps711x-intc.txt  |  42 ++++
- arch/arm/Kconfig                                   |   2 -
- drivers/irqchip/Kconfig                            |   6 +
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-clps711x.c                     | 277 +++++++++++++++++++++
- 5 files changed, 326 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
- create mode 100644 drivers/irqchip/irq-clps711x.c
+ arch/arm/mach-clps711x/board-autcpu12.c |   3 -
+ arch/arm/mach-clps711x/board-cdb89712.c |   3 -
+ arch/arm/mach-clps711x/board-clep7312.c |   3 -
+ arch/arm/mach-clps711x/board-edb7211.c  |   3 -
+ arch/arm/mach-clps711x/board-p720t.c    |   3 -
+ arch/arm/mach-clps711x/common.c         | 345 +-------------------------------
+ arch/arm/mach-clps711x/common.h         |   3 -
+ arch/arm/mach-clps711x/devices.c        |  10 +
+ 8 files changed, 16 insertions(+), 357 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
-new file mode 100644
-index 0000000..26f8983
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
-@@ -0,0 +1,42 @@
-+Cirrus Logic CLPS711X Interrupt Controller
-+
-+Required properties:
-+
-+- compatible: Should be "cirrus,clps711x-intc"
-+- reg: Specifies base physical address of the registers set
-+- interrupt-controller: Identifies the node as an interrupt controller
-+- #interrupt-cells: Specifies the number of cells needed to encode an
-+  interrupt source. The value shall be 1.
-+
-+The interrupt sources are as follows:
-+ID	Name	Description
-+---------------------------
-+1:	BLINT	Battery low (FIQ)
-+3:	MCINT	Media changed (FIQ)
-+4:	CSINT	CODEC sound
-+5:	EINT1	External 1
-+6:	EINT2	External 2
-+7:	EINT3	External 3
-+8:	TC1OI	TC1 under flow
-+9:	TC2OI	TC2 under flow
-+10:	RTCMI	RTC compare match
-+11:	TINT	64Hz tick
-+12:	UTXINT1	UART1 transmit FIFO half empty
-+13:	URXINT1	UART1 receive FIFO half full
-+14:	UMSINT	UART1 modem status changed
-+15:	SSEOTI	SSI1 end of transfer
-+16:	KBDINT	Keyboard
-+17:	SS2RX	SSI2 receive FIFO half or greater full
-+18:	SS2TX	SSI2 transmit FIFO less than half empty
-+28:	UTXINT2	UART2 transmit FIFO half empty
-+29:	URXINT2	UART2 receive FIFO half full
-+32:	DAIINT	DAI interface (FIQ)
-+
-+Example:
-+
-+intc: interrupt-controller {
-+	compatible = "cirrus,clps711x-intc";
-+	reg = <0x80000000 0>;
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
-+};
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5c60cb7..6f0d238 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -373,8 +373,6 @@ config ARCH_CLPS711X
- 	select COMMON_CLK
- 	select CPU_ARM720T
- 	select MFD_SYSCON
--	select MULTI_IRQ_HANDLER
--	select SPARSE_IRQ
- 	help
- 	  Support for Cirrus Logic 711x/721x/731x based boards.
+diff --git a/arch/arm/mach-clps711x/board-autcpu12.c b/arch/arm/mach-clps711x/board-autcpu12.c
+index f8d71a8..b1c77ad 100644
+--- a/arch/arm/mach-clps711x/board-autcpu12.c
++++ b/arch/arm/mach-clps711x/board-autcpu12.c
+@@ -265,14 +265,11 @@ static void __init autcpu12_init_late(void)
+ MACHINE_START(AUTCPU12, "autronix autcpu12")
+ 	/* Maintainer: Thomas Gleixner */
+ 	.atag_offset	= 0x20000,
+-	.nr_irqs	= CLPS711X_NR_IRQS,
+ 	.map_io		= clps711x_map_io,
+-	.init_early	= clps711x_init_early,
+ 	.init_irq	= clps711x_init_irq,
+ 	.init_time	= clps711x_timer_init,
+ 	.init_machine	= autcpu12_init,
+ 	.init_late	= autcpu12_init_late,
+-	.handle_irq	= clps711x_handle_irq,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
  
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 1fea003..c94d00a 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -30,6 +30,12 @@ config ARM_VIC_NR
- 	  The maximum number of VICs available in the system, for
- 	  power management.
+diff --git a/arch/arm/mach-clps711x/board-cdb89712.c b/arch/arm/mach-clps711x/board-cdb89712.c
+index a9e38c6..1ec378c 100644
+--- a/arch/arm/mach-clps711x/board-cdb89712.c
++++ b/arch/arm/mach-clps711x/board-cdb89712.c
+@@ -139,12 +139,9 @@ static void __init cdb89712_init(void)
+ MACHINE_START(CDB89712, "Cirrus-CDB89712")
+ 	/* Maintainer: Ray Lehtiniemi */
+ 	.atag_offset	= 0x100,
+-	.nr_irqs	= CLPS711X_NR_IRQS,
+ 	.map_io		= clps711x_map_io,
+-	.init_early	= clps711x_init_early,
+ 	.init_irq	= clps711x_init_irq,
+ 	.init_time	= clps711x_timer_init,
+ 	.init_machine	= cdb89712_init,
+-	.handle_irq	= clps711x_handle_irq,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/board-clep7312.c b/arch/arm/mach-clps711x/board-clep7312.c
+index b476424..1f3b403 100644
+--- a/arch/arm/mach-clps711x/board-clep7312.c
++++ b/arch/arm/mach-clps711x/board-clep7312.c
+@@ -36,12 +36,9 @@ fixup_clep7312(struct tag *tags, char **cmdline, struct meminfo *mi)
+ MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
+ 	/* Maintainer: Nobody */
+ 	.atag_offset	= 0x0100,
+-	.nr_irqs	= CLPS711X_NR_IRQS,
+ 	.fixup		= fixup_clep7312,
+ 	.map_io		= clps711x_map_io,
+-	.init_early	= clps711x_init_early,
+ 	.init_irq	= clps711x_init_irq,
+ 	.init_time	= clps711x_timer_init,
+-	.handle_irq	= clps711x_handle_irq,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/board-edb7211.c b/arch/arm/mach-clps711x/board-edb7211.c
+index fe6184e..fa4580f 100644
+--- a/arch/arm/mach-clps711x/board-edb7211.c
++++ b/arch/arm/mach-clps711x/board-edb7211.c
+@@ -177,15 +177,12 @@ static void __init edb7211_init_late(void)
+ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
+ 	/* Maintainer: Jon McClintock */
+ 	.atag_offset	= VIDEORAM_SIZE + 0x100,
+-	.nr_irqs	= CLPS711X_NR_IRQS,
+ 	.fixup		= fixup_edb7211,
+ 	.reserve	= edb7211_reserve,
+ 	.map_io		= clps711x_map_io,
+-	.init_early	= clps711x_init_early,
+ 	.init_irq	= clps711x_init_irq,
+ 	.init_time	= clps711x_timer_init,
+ 	.init_machine	= edb7211_init,
+ 	.init_late	= edb7211_init_late,
+-	.handle_irq	= clps711x_handle_irq,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/board-p720t.c b/arch/arm/mach-clps711x/board-p720t.c
+index dd81b06..4a2ec28 100644
+--- a/arch/arm/mach-clps711x/board-p720t.c
++++ b/arch/arm/mach-clps711x/board-p720t.c
+@@ -363,14 +363,11 @@ static void __init p720t_init_late(void)
+ MACHINE_START(P720T, "ARM-Prospector720T")
+ 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
+ 	.atag_offset	= 0x100,
+-	.nr_irqs	= CLPS711X_NR_IRQS,
+ 	.fixup		= fixup_p720t,
+ 	.map_io		= clps711x_map_io,
+-	.init_early	= clps711x_init_early,
+ 	.init_irq	= clps711x_init_irq,
+ 	.init_time	= clps711x_timer_init,
+ 	.init_machine	= p720t_init,
+ 	.init_late	= p720t_init_late,
+-	.handle_irq	= clps711x_handle_irq,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
+index 4ca2f3c..d226609 100644
+--- a/arch/arm/mach-clps711x/common.c
++++ b/arch/arm/mach-clps711x/common.c
+@@ -22,26 +22,14 @@
+ #include <linux/io.h>
+ #include <linux/init.h>
+ #include <linux/sizes.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/clk.h>
+-#include <linux/clkdev.h>
+-#include <linux/clockchips.h>
+ #include <linux/clocksource.h>
+ #include <linux/clk-provider.h>
  
-+config CLPS711X_IRQCHIP
-+	def_bool y if ARCH_CLPS711X
-+	select IRQ_DOMAIN
-+	select MULTI_IRQ_HANDLER
-+	select SPARSE_IRQ
+-#include <asm/exception.h>
+-#include <asm/mach/irq.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/time.h>
+-#include <asm/sched_clock.h>
+ #include <asm/system_misc.h>
+ 
+ #include <mach/hardware.h>
+ 
+-static struct clk *clk_pll, *clk_bus, *clk_uart, *clk_timerl, *clk_timerh,
+-		  *clk_tint, *clk_spi;
+-
+ /*
+  * This maps the generic CLPS711x registers
+  */
+@@ -59,344 +47,23 @@ void __init clps711x_map_io(void)
+ 	iotable_init(clps711x_io_desc, ARRAY_SIZE(clps711x_io_desc));
+ }
+ 
+-static void int1_mask(struct irq_data *d)
+-{
+-	u32 intmr1;
+-
+-	intmr1 = clps_readl(INTMR1);
+-	intmr1 &= ~(1 << d->irq);
+-	clps_writel(intmr1, INTMR1);
+-}
+-
+-static void int1_eoi(struct irq_data *d)
+-{
+-	switch (d->irq) {
+-	case IRQ_CSINT:  clps_writel(0, COEOI);  break;
+-	case IRQ_TC1OI:  clps_writel(0, TC1EOI); break;
+-	case IRQ_TC2OI:  clps_writel(0, TC2EOI); break;
+-	case IRQ_RTCMI:  clps_writel(0, RTCEOI); break;
+-	case IRQ_TINT:   clps_writel(0, TEOI);   break;
+-	case IRQ_UMSINT: clps_writel(0, UMSEOI); break;
+-	}
+-}
+-
+-static void int1_unmask(struct irq_data *d)
+-{
+-	u32 intmr1;
+-
+-	intmr1 = clps_readl(INTMR1);
+-	intmr1 |= 1 << d->irq;
+-	clps_writel(intmr1, INTMR1);
+-}
+-
+-static struct irq_chip int1_chip = {
+-	.name		= "Interrupt Vector 1",
+-	.irq_eoi	= int1_eoi,
+-	.irq_mask	= int1_mask,
+-	.irq_unmask	= int1_unmask,
+-};
+-
+-static void int2_mask(struct irq_data *d)
+-{
+-	u32 intmr2;
+-
+-	intmr2 = clps_readl(INTMR2);
+-	intmr2 &= ~(1 << (d->irq - 16));
+-	clps_writel(intmr2, INTMR2);
+-}
+-
+-static void int2_eoi(struct irq_data *d)
+-{
+-	switch (d->irq) {
+-	case IRQ_KBDINT: clps_writel(0, KBDEOI); break;
+-	}
+-}
+-
+-static void int2_unmask(struct irq_data *d)
+-{
+-	u32 intmr2;
+-
+-	intmr2 = clps_readl(INTMR2);
+-	intmr2 |= 1 << (d->irq - 16);
+-	clps_writel(intmr2, INTMR2);
+-}
+-
+-static struct irq_chip int2_chip = {
+-	.name		= "Interrupt Vector 2",
+-	.irq_eoi	= int2_eoi,
+-	.irq_mask	= int2_mask,
+-	.irq_unmask	= int2_unmask,
+-};
+-
+-static void int3_mask(struct irq_data *d)
+-{
+-	u32 intmr3;
+-
+-	intmr3 = clps_readl(INTMR3);
+-	intmr3 &= ~(1 << (d->irq - 32));
+-	clps_writel(intmr3, INTMR3);
+-}
+-
+-static void int3_unmask(struct irq_data *d)
+-{
+-	u32 intmr3;
+-
+-	intmr3 = clps_readl(INTMR3);
+-	intmr3 |= 1 << (d->irq - 32);
+-	clps_writel(intmr3, INTMR3);
+-}
+-
+-static struct irq_chip int3_chip = {
+-	.name		= "Interrupt Vector 3",
+-	.irq_mask	= int3_mask,
+-	.irq_unmask	= int3_unmask,
+-};
+-
+-static struct {
+-	int			nr;
+-	struct irq_chip		*chip;
+-	irq_flow_handler_t	handle;
+-} clps711x_irqdescs[] __initdata = {
+-	{ IRQ_CSINT,	&int1_chip,	handle_fasteoi_irq,	},
+-	{ IRQ_EINT1,	&int1_chip,	handle_level_irq,	},
+-	{ IRQ_EINT2,	&int1_chip,	handle_level_irq,	},
+-	{ IRQ_EINT3,	&int1_chip,	handle_level_irq,	},
+-	{ IRQ_TC1OI,	&int1_chip,	handle_fasteoi_irq,	},
+-	{ IRQ_TC2OI,	&int1_chip,	handle_fasteoi_irq,	},
+-	{ IRQ_RTCMI,	&int1_chip,	handle_fasteoi_irq,	},
+-	{ IRQ_TINT,	&int1_chip,	handle_fasteoi_irq,	},
+-	{ IRQ_UTXINT1,	&int1_chip,	handle_level_irq,	},
+-	{ IRQ_URXINT1,	&int1_chip,	handle_level_irq,	},
+-	{ IRQ_UMSINT,	&int1_chip,	handle_fasteoi_irq,	},
+-	{ IRQ_SSEOTI,	&int1_chip,	handle_level_irq,	},
+-	{ IRQ_KBDINT,	&int2_chip,	handle_fasteoi_irq,	},
+-	{ IRQ_SS2RX,	&int2_chip,	handle_level_irq,	},
+-	{ IRQ_SS2TX,	&int2_chip,	handle_level_irq,	},
+-	{ IRQ_UTXINT2,	&int2_chip,	handle_level_irq,	},
+-	{ IRQ_URXINT2,	&int2_chip,	handle_level_irq,	},
+-};
+-
+ void __init clps711x_init_irq(void)
+ {
+-	unsigned int i;
+-
+-	/* Disable interrupts */
+-	clps_writel(0, INTMR1);
+-	clps_writel(0, INTMR2);
+-	clps_writel(0, INTMR3);
+-
+-	/* Clear down any pending interrupts */
+-	clps_writel(0, BLEOI);
+-	clps_writel(0, MCEOI);
+-	clps_writel(0, COEOI);
+-	clps_writel(0, TC1EOI);
+-	clps_writel(0, TC2EOI);
+-	clps_writel(0, RTCEOI);
+-	clps_writel(0, TEOI);
+-	clps_writel(0, UMSEOI);
+-	clps_writel(0, KBDEOI);
+-	clps_writel(0, SRXEOF);
+-	clps_writel(0xffffffff, DAISR);
+-
+-	for (i = 0; i < ARRAY_SIZE(clps711x_irqdescs); i++) {
+-		irq_set_chip_and_handler(clps711x_irqdescs[i].nr,
+-					 clps711x_irqdescs[i].chip,
+-					 clps711x_irqdescs[i].handle);
+-		set_irq_flags(clps711x_irqdescs[i].nr,
+-			      IRQF_VALID | IRQF_PROBE);
+-	}
+-
+-	if (IS_ENABLED(CONFIG_FIQ)) {
+-		init_FIQ(0);
+-		irq_set_chip_and_handler(IRQ_DAIINT, &int3_chip,
+-					 handle_bad_irq);
+-		set_irq_flags(IRQ_DAIINT,
+-			      IRQF_VALID | IRQF_PROBE | IRQF_NOAUTOEN);
+-	}
+-}
+-
+-static inline u32 fls16(u32 x)
+-{
+-	u32 r = 15;
++	extern void clps711x_intc_init(phys_addr_t);
+ 
+-	if (!(x & 0xff00)) {
+-		x <<= 8;
+-		r -= 8;
+-	}
+-	if (!(x & 0xf000)) {
+-		x <<= 4;
+-		r -= 4;
+-	}
+-	if (!(x & 0xc000)) {
+-		x <<= 2;
+-		r -= 2;
+-	}
+-	if (!(x & 0x8000))
+-		r--;
+-
+-	return r;
+-}
+-
+-asmlinkage void __exception_irq_entry clps711x_handle_irq(struct pt_regs *regs)
+-{
+-	do {
+-		u32 irqstat;
+-		void __iomem *base = CLPS711X_VIRT_BASE;
+-
+-		irqstat = readw_relaxed(base + INTSR1) &
+-			  readw_relaxed(base + INTMR1);
+-		if (irqstat)
+-			handle_IRQ(fls16(irqstat), regs);
+-
+-		irqstat = readw_relaxed(base + INTSR2) &
+-			  readw_relaxed(base + INTMR2);
+-		if (irqstat) {
+-			handle_IRQ(fls16(irqstat) + 16, regs);
+-			continue;
+-		}
+-
+-		break;
+-	} while (1);
+-}
+-
+-static u32 notrace clps711x_sched_clock_read(void)
+-{
+-	return ~readw_relaxed(CLPS711X_VIRT_BASE + TC1D);
+-}
+-
+-static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
+-					 struct clock_event_device *evt)
+-{
+-	disable_irq(IRQ_TC2OI);
+-
+-	switch (mode) {
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		enable_irq(IRQ_TC2OI);
+-		break;
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		/* Not supported */
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-	case CLOCK_EVT_MODE_UNUSED:
+-	case CLOCK_EVT_MODE_RESUME:
+-		/* Left event sources disabled, no more interrupts appear */
+-		break;
+-	}
+-}
+-
+-static struct clock_event_device clockevent_clps711x = {
+-	.name		= "clps711x-clockevent",
+-	.rating		= 300,
+-	.features	= CLOCK_EVT_FEAT_PERIODIC,
+-	.set_mode	= clps711x_clockevent_set_mode,
+-};
+-
+-static irqreturn_t clps711x_timer_interrupt(int irq, void *dev_id)
+-{
+-	clockevent_clps711x.event_handler(&clockevent_clps711x);
+-
+-	return IRQ_HANDLED;
+-}
+-
+-static struct irqaction clps711x_timer_irq = {
+-	.name		= "clps711x-timer",
+-	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+-	.handler	= clps711x_timer_interrupt,
+-};
+-
+-static void add_fixed_clk(struct clk *clk, const char *name, int rate)
+-{
+-	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
+-	clk_register_clkdev(clk, name, NULL);
++	clps711x_intc_init(CLPS711X_PHYS_BASE);
+ }
+ 
+ void __init clps711x_timer_init(void)
+ {
+-	int osc, ext, pll, cpu, bus, timl, timh, uart, spi;
+-	u32 tmp;
+-
+-	osc = 3686400;
+-	ext = 13000000;
+-
+-	tmp = clps_readl(PLLR) >> 24;
+-	if (tmp)
+-		pll = (osc * tmp) / 2;
+-	else
+-		pll = 73728000; /* Default value */
+-
+-	tmp = clps_readl(SYSFLG2);
+-	if (tmp & SYSFLG2_CKMODE) {
+-		cpu = ext;
+-		bus = cpu;
+-		spi = 135400;
+-		pll = 0;
+-	} else {
+-		cpu = pll;
+-		if (cpu >= 36864000)
+-			bus = cpu / 2;
+-		else
+-			bus = 36864000 / 2;
+-		spi = cpu / 576;
+-	}
+-
+-	uart = bus / 10;
+-
+-	if (tmp & SYSFLG2_CKMODE) {
+-		tmp = clps_readl(SYSCON2);
+-		if (tmp & SYSCON2_OSTB)
+-			timh = ext / 26;
+-		else
+-			timh = 541440;
+-	} else
+-		timh = DIV_ROUND_CLOSEST(cpu, 144);
+-
+-	timl = DIV_ROUND_CLOSEST(timh, 256);
+-
+-	/* All clocks are fixed */
+-	add_fixed_clk(clk_pll, "pll", pll);
+-	add_fixed_clk(clk_bus, "bus", bus);
+-	add_fixed_clk(clk_uart, "uart", uart);
+-	add_fixed_clk(clk_timerl, "timer_lf", timl);
+-	add_fixed_clk(clk_timerh, "timer_hf", timh);
+-	add_fixed_clk(clk_tint, "tint", 64);
+-	add_fixed_clk(clk_spi, "spi", spi);
+-
+-	pr_info("CPU frequency set at %i Hz.\n", cpu);
++	extern void clps711x_clk_init(phys_addr_t);
++	extern void clps711x_clksrc_init(phys_addr_t, int);
+ 
+-	/* Start Timer1 in free running mode (Low frequency) */
+-	tmp = clps_readl(SYSCON1) & ~(SYSCON1_TC1S | SYSCON1_TC1M);
+-	clps_writel(tmp, SYSCON1);
+-
+-	setup_sched_clock(clps711x_sched_clock_read, 16, timl);
+-
+-	clocksource_mmio_init(CLPS711X_VIRT_BASE + TC1D,
+-			      "clps711x_clocksource", timl, 300, 16,
+-			      clocksource_mmio_readw_down);
+-
+-	/* Set Timer2 prescaler */
+-	clps_writew(DIV_ROUND_CLOSEST(timh, HZ), TC2D);
+-
+-	/* Start Timer2 in prescale mode (High frequency)*/
+-	tmp = clps_readl(SYSCON1) | SYSCON1_TC2M | SYSCON1_TC2S;
+-	clps_writel(tmp, SYSCON1);
+-
+-	clockevents_config_and_register(&clockevent_clps711x, timh, 0, 0);
+-
+-	setup_irq(IRQ_TC2OI, &clps711x_timer_irq);
++	clps711x_clk_init(CLPS711X_PHYS_BASE);
++	clps711x_clksrc_init(CLPS711X_PHYS_BASE, IRQ_TC2OI);
+ }
+ 
+ void clps711x_restart(enum reboot_mode mode, const char *cmd)
+ {
+ 	soft_restart(0);
+ }
+-
+-static void clps711x_idle(void)
+-{
+-	clps_writel(1, HALT);
+-	asm("mov r0, r0");
+-	asm("mov r0, r0");
+-}
+-
+-void __init clps711x_init_early(void)
+-{
+-	arm_pm_idle = clps711x_idle;
+-}
+diff --git a/arch/arm/mach-clps711x/common.h b/arch/arm/mach-clps711x/common.h
+index 9a6767b..77f3130 100644
+--- a/arch/arm/mach-clps711x/common.h
++++ b/arch/arm/mach-clps711x/common.h
+@@ -6,13 +6,10 @@
+ 
+ #include <linux/reboot.h>
+ 
+-#define CLPS711X_NR_IRQS	(33)
+ #define CLPS711X_NR_GPIO	(4 * 8 + 3)
+ #define CLPS711X_GPIO(prt, bit)	((prt) * 8 + (bit))
+ 
+ extern void clps711x_map_io(void);
+ extern void clps711x_init_irq(void);
+ extern void clps711x_timer_init(void);
+-extern void clps711x_handle_irq(struct pt_regs *regs);
+ extern void clps711x_restart(enum reboot_mode mode, const char *cmd);
+-extern void clps711x_init_early(void);
+diff --git a/arch/arm/mach-clps711x/devices.c b/arch/arm/mach-clps711x/devices.c
+index fb77d14..aa24dc4 100644
+--- a/arch/arm/mach-clps711x/devices.c
++++ b/arch/arm/mach-clps711x/devices.c
+@@ -14,6 +14,15 @@
+ 
+ #include <mach/hardware.h>
+ 
++static const struct resource clps711x_cpuidle_res __initconst =
++	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + HALT, SZ_4);
 +
- config ORION_IRQCHIP
- 	bool
- 	select IRQ_DOMAIN
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index e65c41a..a80ff5b 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -8,6 +8,7 @@ obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
- obj-$(CONFIG_METAG)			+= irq-metag-ext.o
- obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)	+= irq-metag.o
- obj-$(CONFIG_ARCH_MOXART)		+= irq-moxart.o
-+obj-$(CONFIG_CLPS711X_IRQCHIP)		+= irq-clps711x.o
- obj-$(CONFIG_ORION_IRQCHIP)		+= irq-orion.o
- obj-$(CONFIG_ARCH_SUNXI)		+= irq-sun4i.o
- obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
-diff --git a/drivers/irqchip/irq-clps711x.c b/drivers/irqchip/irq-clps711x.c
-new file mode 100644
-index 0000000..819baa9
---- /dev/null
-+++ b/drivers/irqchip/irq-clps711x.c
-@@ -0,0 +1,277 @@
-+/*
-+ *  CLPS711X IRQ driver
-+ *
-+ *  Copyright (C) 2013 Alexander Shiyan <shc_work@mail.ru>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/slab.h>
-+
-+#include <asm/exception.h>
-+#include <asm/mach/irq.h>
-+
-+#include "irqchip.h"
-+
-+#define CLPS711X_INTSR1	(0x0240)
-+#define CLPS711X_INTMR1	(0x0280)
-+#define CLPS711X_BLEOI	(0x0600)
-+#define CLPS711X_MCEOI	(0x0640)
-+#define CLPS711X_TEOI	(0x0680)
-+#define CLPS711X_TC1EOI	(0x06c0)
-+#define CLPS711X_TC2EOI	(0x0700)
-+#define CLPS711X_RTCEOI	(0x0740)
-+#define CLPS711X_UMSEOI	(0x0780)
-+#define CLPS711X_COEOI	(0x07c0)
-+#define CLPS711X_INTSR2	(0x1240)
-+#define CLPS711X_INTMR2	(0x1280)
-+#define CLPS711X_SRXEOF	(0x1600)
-+#define CLPS711X_KBDEOI	(0x1700)
-+#define CLPS711X_INTSR3	(0x2240)
-+#define CLPS711X_INTMR3	(0x2280)
-+
-+static const struct {
-+#define CLPS711X_FLAG_EN	(1 << 0)
-+#define CLPS711X_FLAG_FIQ	(1 << 1)
-+	unsigned int	flags;
-+	phys_addr_t	phys_eoi;
-+} clps711x_irqs[] __initconst = {
-+	[1]	= { CLPS711X_FLAG_FIQ, CLPS711X_BLEOI, },
-+	[3]	= { CLPS711X_FLAG_FIQ, CLPS711X_MCEOI, },
-+	[4]	= { CLPS711X_FLAG_EN, CLPS711X_COEOI, },
-+	[5]	= { CLPS711X_FLAG_EN, },
-+	[6]	= { CLPS711X_FLAG_EN, },
-+	[7]	= { CLPS711X_FLAG_EN, },
-+	[8]	= { CLPS711X_FLAG_EN, CLPS711X_TC1EOI, },
-+	[9]	= { CLPS711X_FLAG_EN, CLPS711X_TC2EOI, },
-+	[10]	= { CLPS711X_FLAG_EN, CLPS711X_RTCEOI, },
-+	[11]	= { CLPS711X_FLAG_EN, CLPS711X_TEOI, },
-+	[12]	= { CLPS711X_FLAG_EN, },
-+	[13]	= { CLPS711X_FLAG_EN, },
-+	[14]	= { CLPS711X_FLAG_EN, CLPS711X_UMSEOI, },
-+	[15]	= { CLPS711X_FLAG_EN, CLPS711X_SRXEOF, },
-+	[16]	= { CLPS711X_FLAG_EN, CLPS711X_KBDEOI, },
-+	[17]	= { CLPS711X_FLAG_EN, },
-+	[18]	= { CLPS711X_FLAG_EN, },
-+	[28]	= { CLPS711X_FLAG_EN, },
-+	[29]	= { CLPS711X_FLAG_EN, },
-+	[32]	= { CLPS711X_FLAG_FIQ, },
-+};
-+
-+static struct {
-+	struct irq_domain	*domain;
-+	phys_addr_t		phys_base;
-+	void __iomem		*intmr[3];
-+	void __iomem		*intsr[3];
-+	void __iomem		*eoi[ARRAY_SIZE(clps711x_irqs)];
-+} *clps711x_intc;
-+
-+
-+static inline u32 fls16(u32 x)
++static void __init clps711x_add_cpuidle(void)
 +{
-+	u32 r = 15;
-+
-+	if (!(x & 0xff00)) {
-+		x <<= 8;
-+		r -= 8;
-+	}
-+	if (!(x & 0xf000)) {
-+		x <<= 4;
-+		r -= 4;
-+	}
-+	if (!(x & 0xc000)) {
-+		x <<= 2;
-+		r -= 2;
-+	}
-+	if (!(x & 0x8000))
-+		r--;
-+
-+	return r;
++	platform_device_register_simple("clps711x-cpuidle", PLATFORM_DEVID_NONE,
++					&clps711x_cpuidle_res, 1);
 +}
 +
-+static asmlinkage void __exception_irq_entry
-+clps711x_handle_irq(struct pt_regs *regs)
-+{
-+	do {
-+		u32 irqnr, irqstat;
-+
-+		irqstat = readw(clps711x_intc->intmr[0]) &
-+			  readw(clps711x_intc->intsr[0]);
-+		if (irqstat) {
-+			irqnr =	irq_find_mapping(clps711x_intc->domain,
-+						 fls16(irqstat));
-+			handle_IRQ(irqnr, regs);
-+		}
-+
-+		irqstat = readw(clps711x_intc->intmr[1]) &
-+			  readw(clps711x_intc->intsr[1]);
-+		if (irqstat) {
-+			irqnr =	irq_find_mapping(clps711x_intc->domain,
-+						 fls16(irqstat) + 16);
-+			handle_IRQ(irqnr, regs);
-+			continue;
-+		}
-+
-+		break;
-+	} while (1);
-+}
-+
-+static void clps711x_intc_eoi(struct irq_data *d)
-+{
-+	irq_hw_number_t hwirq = irqd_to_hwirq(d);
-+
-+	writel(0, clps711x_intc->eoi[hwirq]);
-+}
-+
-+static void clps711x_intc_mask(struct irq_data *d)
-+{
-+	irq_hw_number_t hwirq = irqd_to_hwirq(d);
-+	void __iomem *intmr = clps711x_intc->intmr[hwirq / 16];
-+	u32 tmp;
-+
-+	tmp = readl(intmr);
-+	tmp &= ~(1 << (hwirq % 16));
-+	writel(tmp, intmr);
-+}
-+
-+static void clps711x_intc_unmask(struct irq_data *d)
-+{
-+	irq_hw_number_t hwirq = irqd_to_hwirq(d);
-+	void __iomem *intmr = clps711x_intc->intmr[hwirq / 16];
-+	u32 tmp;
-+
-+	tmp = readl(intmr);
-+	tmp |= 1 << (hwirq % 16);
-+	writel(tmp, intmr);
-+}
-+
-+static struct irq_chip clps711x_intc_chip = {
-+	.name		= "clps711x-intc",
-+	.irq_eoi	= clps711x_intc_eoi,
-+	.irq_mask	= clps711x_intc_mask,
-+	.irq_unmask	= clps711x_intc_unmask,
-+};
-+
-+static void __iomem __init *clps711x_ioremap_one(phys_addr_t reg)
-+{
-+	void __iomem *ret;
-+
-+	if (!request_mem_region(clps711x_intc->phys_base + reg, SZ_4, NULL))
-+		return ERR_PTR(-EBUSY);
-+
-+	ret = ioremap(clps711x_intc->phys_base + reg, SZ_4);
-+	if (!ret)
-+		return ERR_PTR(-ENOMEM);
-+
-+	return ret;
-+}
-+
-+static int __init clps711x_intc_irq_map(struct irq_domain *h, unsigned int virq,
-+					irq_hw_number_t hw)
-+{
-+	irq_flow_handler_t handler = handle_level_irq;
-+	unsigned int flags = IRQF_VALID | IRQF_PROBE;
-+
-+	if (!clps711x_irqs[hw].flags)
-+		return 0;
-+
-+	if (clps711x_irqs[hw].flags & CLPS711X_FLAG_FIQ) {
-+		handler = handle_bad_irq;
-+		flags |= IRQF_NOAUTOEN;
-+	} else if (clps711x_irqs[hw].phys_eoi) {
-+		handler = handle_fasteoi_irq;
-+
-+		clps711x_intc->eoi[hw] =
-+			clps711x_ioremap_one(clps711x_irqs[hw].phys_eoi);
-+		if (IS_ERR_OR_NULL(clps711x_intc->eoi[hw]))
-+			return PTR_ERR(clps711x_intc->eoi[hw]);
-+
-+		/* Clear down pending interrupt */
-+		writel(0, clps711x_intc->eoi[hw]);
-+	}
-+
-+	irq_set_chip_and_handler(virq, &clps711x_intc_chip, handler);
-+	set_irq_flags(virq, flags);
-+
-+	return 0;
-+}
-+
-+static struct irq_domain_ops clps711x_intc_ops = {
-+	.map	= clps711x_intc_irq_map,
-+	.xlate	= irq_domain_xlate_onecell,
-+};
-+
-+static void __init _clps711x_intc_init(phys_addr_t phys_base,
-+				       struct device_node *np)
-+{
-+	clps711x_intc = kzalloc(sizeof(*clps711x_intc), GFP_KERNEL);
-+	BUG_ON(!clps711x_intc);
-+
-+	clps711x_intc->phys_base = phys_base;
-+
-+	clps711x_intc->intsr[0] = clps711x_ioremap_one(CLPS711X_INTSR1);
-+	BUG_ON(IS_ERR_OR_NULL(clps711x_intc->intsr[0]));
-+
-+	clps711x_intc->intmr[0] = clps711x_ioremap_one(CLPS711X_INTMR1);
-+	BUG_ON(IS_ERR_OR_NULL(clps711x_intc->intmr[0]));
-+
-+	clps711x_intc->intsr[1] = clps711x_ioremap_one(CLPS711X_INTSR2);
-+	BUG_ON(IS_ERR_OR_NULL(clps711x_intc->intsr[1]));
-+
-+	clps711x_intc->intmr[1] = clps711x_ioremap_one(CLPS711X_INTMR2);
-+	BUG_ON(IS_ERR_OR_NULL(clps711x_intc->intmr[1]));
-+
-+	clps711x_intc->intsr[2] = clps711x_ioremap_one(CLPS711X_INTSR3);
-+	BUG_ON(IS_ERR_OR_NULL(clps711x_intc->intsr[2]));
-+
-+	clps711x_intc->intmr[2] = clps711x_ioremap_one(CLPS711X_INTMR3);
-+	BUG_ON(IS_ERR_OR_NULL(clps711x_intc->intmr[2]));
-+
-+	/* Disable interrupts */
-+	writel(0, clps711x_intc->intmr[0]);
-+	writel(0, clps711x_intc->intmr[1]);
-+	writel(0, clps711x_intc->intmr[2]);
-+
-+	BUG_ON(IS_ERR_VALUE(irq_alloc_descs(-1, 0, ARRAY_SIZE(clps711x_irqs),
-+					    numa_node_id())));
-+
-+	clps711x_intc->domain =
-+		irq_domain_add_legacy(np, ARRAY_SIZE(clps711x_irqs),
-+				      0, 0, &clps711x_intc_ops, NULL);
-+	BUG_ON(!clps711x_intc->domain);
-+
-+	irq_set_default_host(clps711x_intc->domain);
-+	set_handle_irq(clps711x_handle_irq);
-+
-+#ifdef CONFIG_FIQ
-+	init_FIQ(0);
-+#endif
-+}
-+
-+void __init clps711x_intc_init(phys_addr_t phys_base)
-+{
-+	_clps711x_intc_init(phys_base, NULL);
-+}
-+
-+#ifdef CONFIG_IRQCHIP
-+static int __init clps711x_intc_init_dt(struct device_node *np,
-+					struct device_node *parent)
-+{
-+	struct resource res;
-+
-+	BUG_ON(of_address_to_resource(np, 0, &res));
-+
-+	_clps711x_intc_init(res.start, np);
-+
-+	return 0;
-+}
-+IRQCHIP_DECLARE(clps711x, "cirrus,clps711x-intc", clps711x_intc_init_dt);
-+#endif
+ static const phys_addr_t clps711x_gpios[][2] __initconst = {
+ 	{ PADR, PADDR },
+ 	{ PBDR, PBDDR },
+@@ -63,6 +72,7 @@ static void __init clps711x_add_syscon(void)
+ 
+ void __init clps711x_devices_init(void)
+ {
++	clps711x_add_cpuidle();
+ 	clps711x_add_gpio();
+ 	clps711x_add_syscon();
+ }
 -- 
 1.8.1.5
