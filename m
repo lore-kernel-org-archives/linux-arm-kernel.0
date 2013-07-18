@@ -1,66 +1,82 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 18 Jul 2013 10:19:47 +0200
-Subject: [PATCH V2 0/8] serial: at91: make usart and uart support dma
- transfer
-In-Reply-To: <1373942627-7121-1-git-send-email-elen.song@atmel.com>
-References: <1373942627-7121-1-git-send-email-elen.song@atmel.com>
-Message-ID: <20130718081947.GE16015@ns203013.ovh.net>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Thu, 18 Jul 2013 09:24:31 +0100
+Subject: [RFC PATCH v2 11/15] cpufreq: kirkwood-cpufreq: remove device
+ tree parsing for cpu nodes
+In-Reply-To: <20130717144355.GE1026@lunn.ch>
+References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374069984-20567-12-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <20130717144355.GE1026@lunn.ch>
+Message-ID: <51E7A63F.7020207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 17/07/13 15:43, Andrew Lunn wrote:
+> On Wed, Jul 17, 2013 at 03:06:20PM +0100, Sudeep.KarkadaNagesha at arm.com wrote:
+>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>>
+>> Now that the cpu device registration initialises the of_node(if available)
+>> appropriately for all the cpus, parsing here is redundant.
+>>
+>> This patch removes all DT parsing and uses cpu->of_node instead.
+>>
+>> Cc: Andrew Lunn <andrew@lunn.ch>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>> ---
+>>  drivers/cpufreq/kirkwood-cpufreq.c | 14 ++++++++++++--
+>>  1 file changed, 12 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/cpufreq/kirkwood-cpufreq.c b/drivers/cpufreq/kirkwood-cpufreq.c
+>> index c233ea6..18aa3eb 100644
+>> --- a/drivers/cpufreq/kirkwood-cpufreq.c
+>> +++ b/drivers/cpufreq/kirkwood-cpufreq.c
+>> @@ -13,6 +13,7 @@
+>>  #include <linux/module.h>
+>>  #include <linux/clk.h>
+>>  #include <linux/clk-provider.h>
+>> +#include <linux/cpu.h>
+>>  #include <linux/cpufreq.h>
+>>  #include <linux/of.h>
+>>  #include <linux/platform_device.h>
+>> @@ -165,6 +166,7 @@ static struct cpufreq_driver kirkwood_cpufreq_driver = {
+>>  static int kirkwood_cpufreq_probe(struct platform_device *pdev)
+>>  {
+>>  	struct device_node *np;
+>> +	struct device *cpu_dev;
+>>  	struct resource *res;
+>>  	int err;
+>>  
+>> @@ -175,9 +177,17 @@ static int kirkwood_cpufreq_probe(struct platform_device *pdev)
+>>  	if (IS_ERR(priv.base))
+>>  		return PTR_ERR(priv.base);
+>>  
+>> -	np = of_find_node_by_path("/cpus/cpu at 0");
+>> -	if (!np)
+>> +	cpu_dev = get_cpu_device(0);
+>> +	if (!cpu_dev) {
+>> +		dev_err(&pdev->dev, "failed to get cpu device\n");
+>>  		return -ENODEV;
+>> +	}
+>> +
+>> +	np = of_node_get(cpu_dev->of_node);
+>> +	if (!np) {
+>> +		dev_err(&pdev->dev, "failed to get cpu device node\n");
+>> +		return -ENODEV;
+>> +	}
+> 
+> Hi Sudeep
+> 
+> Are we not going a bit backwards here? You are replacing two lines
+> with 10 lines.
+> 
+> How about putting these 10 lines into some helper,
+> of_get_cpu_device()?  It would be useful for spear, kirkwood and
+> imx6q, and maybe others.
+> 
+Yes I realised that after making changes to this and pmac32 drivers. I
+have already made those changes in v3. I am waiting for more response
+before posting them.
 
-	except the comment this looks good
-
-Best Regards,
-J.
-On 10:43 Tue 16 Jul     , Elen Song wrote:
-> After at91sam9g45 socs, the usart only support dma transfer.
-> This patch serial focus on:
-> 1) distinguish pdc and dma transfer
-> 2) support usart dma rx and tx transfer
-> 3) distinguish usart and uart
-> 4) support uart dma rx and tx transfer
-> 
-> For those only support PDC transfer socs, we use "atmel,use-dma-rx/tx" to establish a PDC transfer.
-> For those only support DMA transfer socs, we not only use "atmel,use-dma-rx/tx", but also describe dma binding to establish a DMA transfer. 
-> We switch the name from "use-dma" to "use-pdc" in serial driver to state more clearly.
-> We also distinguish usart and uart by read ip name, the dbgu is regard as a uart.
-> Because uart lack timeout function, we use software timer to trigger rx.
-> 
-> Compare to v1, this patch serials improve:
-> 1) use function pointer instead of if/else
-> 2) "atmel,use-dma-rx/tx" represent a PDC transfer,
->    but when add the dma bindings, it is a dma transfer
-> 3) do not use strncmp in get ip name
-> 4) remove modification in documentation part
-> 
-> Elen Song (7):
->   serial: at91: correct definition from DMA to PDC
->   serial: at91: add tx dma support
->   serial: at91: add rx dma support
->   serial: at91: make DBGU support dma and pdc transfers
->   serial: at91: distinguish usart and uart
->   serial: at91: modify UART to use software timer to trigger rx
->   serial: at91: add dma support in usart binding descriptions
-> 
->  Documentation/devicetree/bindings/serial/rs485.txt |    4 +-
->  .../devicetree/bindings/tty/serial/atmel-usart.txt |   29 +-
->  arch/arm/boot/dts/at91rm9200.dtsi                  |   16 +-
->  arch/arm/boot/dts/at91sam9260.dtsi                 |   24 +-
->  arch/arm/boot/dts/at91sam9263.dtsi                 |   12 +-
->  arch/arm/boot/dts/at91sam9g45.dtsi                 |   16 +-
->  arch/arm/mach-at91/at91rm9200_devices.c            |   20 +-
->  arch/arm/mach-at91/at91sam9260_devices.c           |   28 +-
->  arch/arm/mach-at91/at91sam9261_devices.c           |   16 +-
->  arch/arm/mach-at91/at91sam9263_devices.c           |   16 +-
->  arch/arm/mach-at91/at91sam9g45_devices.c           |   20 +-
->  arch/arm/mach-at91/at91sam9rl_devices.c            |   20 +-
->  drivers/tty/serial/atmel_serial.c                  |  582 ++++++++++++++++++--
->  include/linux/atmel_serial.h                       |    2 +
->  include/linux/platform_data/atmel.h                |    2 +
->  15 files changed, 665 insertions(+), 142 deletions(-)
-> 
-> -- 
-> 1.7.9.5
-> 
+Regards,
+Sudeep
