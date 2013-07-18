@@ -1,89 +1,46 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 19 Jul 2013 02:04:20 +0400
-Subject: [PATCH 2/3] ARM: shmobile: r8a7778: add HPB-DMAC support
-In-Reply-To: <87d2r2j4uy.wl%kuninori.morimoto.gx@renesas.com>
-References: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
- <201306300248.57898.sergei.shtylyov@cogentembedded.com>
- <87d2r2j4uy.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <51E86664.1060509@cogentembedded.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 18 Jul 2013 15:50:09 -0700
+Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <51E6CCE4.20705@wwwdotorg.org>
+References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
+ <20130716015038.GD28375@S2101-09.ap.freescale.net>
+ <51E4BF98.8030604@wwwdotorg.org>
+ <20130716041056.GA30067@S2101-09.ap.freescale.net>
+ <51E56AA7.7020103@wwwdotorg.org>
+ <20130717030246.GA4541@S2101-09.ap.freescale.net>
+ <51E6CCE4.20705@wwwdotorg.org>
+Message-ID: <CACxGe6usaesdKTb8eVtB3SxdOUzJVbE+4X4J5mfKDmD6oiyQsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Jul 17, 2013 at 9:57 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 07/16/2013 09:02 PM, Shawn Guo wrote:
+>> On Tue, Jul 16, 2013 at 09:45:43AM -0600, Stephen Warren wrote:
+>>> Registering the driver earlier won't cause any bugs. However, it's not
+>>> the correct approach.
+>>>
+>>> Deferred probe /is/ the approach for assuring correct dependencies
+>>> between drivers. It works and should be used. There are not enough
+>>> initcall levels to play games using initcalls and solve all the issues,
+>>> and the ordering requirements vary board-to-board. Deferred probe at
+>>> runtime handles this without having to manually place all the drivers
+>>> into specific initcall levels, and dynamically adjusts to board
+>>> differences, since it all happens automatically at run-time.
+>>
+>> I do not quite follow the argument here.  I agree with you that
+>> deferred probe is the approach to solve dependencies.  But it does not
+>> necessarily mean that initcall can not be used to help it save some
+>> nasty or nested deferring.  Deferred probe and initcalls are not two
+>> mutually exclusive mechanisms but two which can help each other.
+>
+> My understanding is that deferred probe was implemented specifically to
+> avoid having to, or allowing, the use of initcall levels to determine
+> probe order.
 
-On 07/01/2013 08:12 AM, Kuninori Morimoto wrote:
+Correct. Futzing around with initcalls may optimize particular use
+cases, but it isn't complete. I've been pushing for all drivers to use
+module_initcall() unless there is a very strong reason to do
+otherwise. Premature optimization (without measuring time consumed) is
+not a strong justification.
 
->> From: Max Filippov <max.filippov@cogentembedded.com>
-
->> Add HPB-DMAC platform device on R8A7778 SoC along with its slave and channel
->> configurations.
-
->> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
->> ---
-> (snip)
->> +static const struct hpb_dmae_slave_config hpb_dmae_slaves[] = {
->> +	{
->> +		.id	= HPBDMA_SLAVE_SDHI0_TX,
->> +		.addr	= 0xffe4c000 + 0x30,
->> +		.dcr	= DCR_SPDS_16BIT | DCR_DMDL | DCR_DPDS_16BIT,
->> +		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
->> +			  ASYNCRSTR_ASRST23,
->> +		.mdr	= ASYNCMDR_ASMD21_SINGLE,
->> +		.mdm	= ASYNCMDR_ASMD21_MASK,
->> +		.port	= 0x0D0C,
->> +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
->> +		.dma_ch	= 21,
->> +	}, {
->> +		.id	= HPBDMA_SLAVE_SDHI0_RX,
->> +		.addr	= 0xffe4c000 + 0x30,
->> +		.dcr	= DCR_SMDL | DCR_SPDS_16BIT | DCR_DPDS_16BIT,
->> +		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
->> +			  ASYNCRSTR_ASRST23,
->> +		.mdr	= ASYNCMDR_ASMD22_SINGLE,
->> +		.mdm	= ASYNCMDR_ASMD22_MASK,
->> +		.port	= 0x0D0C,
->> +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
->> +		.dma_ch	= 22,
->> +	}, {
->> +		.id	= HPBDMA_SLAVE_SSI0_TX_ST,
->> +		.addr	= 0xffd90000 + 0x1008,
->> +		.dcr	= DCR_CT | DCR_DIP | DCR_SPDS_32BIT | DCR_DMDL |
->> +			  DCR_DPDS_32BIT,
->> +		.port	= 0x0000,
->> +		.dma_ch	= 28,
->> +	}, {
->> +		.id	= HPBDMA_SLAVE_SSI0_TX_MN,
->> +		.addr	= 0xffd90000 + 0x1008,
->> +		.dcr	= DCR_CT | DCR_DIP | DCR_SPDS_16BIT | DCR_DMDL |
->> +			  DCR_DPDS_16BIT,
->> +		.port	= 0x0000,
->> +		.dma_ch	= 28,
->> +	}, {
->> +		.id	= HPBDMA_SLAVE_SSI1_RX_ST,
->> +		.addr	= 0xffd90000 + 0x104c,
->> +		.dcr	= DCR_CT | DCR_DIP | DCR_SMDL | DCR_SPDS_32BIT |
->> +			  DCR_DPDAM | DCR_DPDS_32BIT,
->> +		.port	= 0x0101,
->> +		.dma_ch	= 29,
->> +	}, {
->> +		.id	= HPBDMA_SLAVE_SSI1_RX_MN,
->> +		.addr	= 0xffd90000 + 0x104c,
->> +		.dcr	= DCR_CT | DCR_DIP | DCR_SMDL | DCR_SPDS_16BIT |
->> +			  DCR_DPDAM | DCR_DPDS_16BIT,
->> +		.port	= 0x0101,
->> +		.dma_ch	= 29,
->> +	},
->> +};
-
-> How did you test SSI ?
-> remove these
-
-    OK. The SSI stuff came from the original patch.
-
-> Best regards
-> ---
-> Kuninori Morimoto
-
-WBR, Sergei
+g.
