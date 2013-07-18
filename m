@@ -1,71 +1,210 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Jul 2013 01:14:06 -0700
-Subject: [PATCH 2/3] ARM: OMAP2+: omap_device: add pinctrl handling
-In-Reply-To: <51E6CCB6.2000907@ti.com>
-References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
- <1374061312-25469-3-git-send-email-grygorii.strashko@ti.com>
- <20130717153838.GJ7656@atomide.com> <51E6CCB6.2000907@ti.com>
-Message-ID: <20130718081405.GS7656@atomide.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 18 Jul 2013 10:15:20 +0200
+Subject: [PATCH V2 5/8] serial: at91: support run time switch transfer mode
+In-Reply-To: <1373942627-7121-6-git-send-email-elen.song@atmel.com>
+References: <1373942627-7121-1-git-send-email-elen.song@atmel.com>
+ <1373942627-7121-6-git-send-email-elen.song@atmel.com>
+Message-ID: <20130718081520.GC16015@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [130717 10:11]:
-> On 07/17/2013 06:38 PM, Tony Lindgren wrote:
-> >* Grygorii Strashko <grygorii.strashko@ti.com> [130717 04:49]:
-> >>Before switching to DT pinctrl states of OMAP IPs have been handled by hwmod
-> >>framework. After switching to DT-boot the pinctrl handling was dropped from
-> >>hwmod framework and, as it was recommended, OMAP IP's drivers have to be updated
-> >>to handle pinctrl states by itself using pinctrl_pm_select_xx() helpers
-> >>(see http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173514.html)
-> >>
-> >>But this is not right for OMAP2+ SoC where real IPs state is controlled
-> >>by omap_device core which enables/disables modules & clocks actually.
-> >
-> >I'm not convinced we should try to handle this in a generic way
-> >as only some devices need dynamic remuxing of some pins.
-> >
-> >>For example, if OMAP I2C driver will handle pinctrl state during system wide
-> >>suspend the following issue may occure:
-> >>- suspend_noirq - I2C device can be still active because of PM auto-suspend
-> >>   |-_od_suspend_noirq
-> >>      |- omap_i2c_suspend_noirq
-> >>         |- PINs state set to SLEEP
-> >>   |- pm_generic_runtime_suspend
-> >>      |- omap_i2c_runtime_suspend()
-> >>         |- PINs state set to IDLE  <--- *oops* PINs state is IDLE and not SLEEP
-> >>   |- omap_device_idle()
-> >>      |- omap_hwmod_idle()
-> >>         |- _idle()
-> >>            |- disbale module (sysc&clocks)
-> >
-> >And in this example you are assuming that you need separate idle and
-> >sleep states, which is not true at least for most cases I've seen.
+On 10:43 Tue 16 Jul     , Elen Song wrote:
+> We will switch to pio mode when request of dma or pdc fail.
+> But soon or later, when the request is success, the transfer mode can switch to them at
+> next open serial port action.
+> So in startup stage, we should get original transfer mode.
+
+You need to update the Documentation of the binding to said the driver support
+dmas bindings for the new IP
+
+and please use true/false for boolean
+
+and check the white space
 > 
-> I don't need both states (at least right now) :), but
-> - if any OMAP2+ driver will have two states defined: "idle" and "sleep"
-> - and if it will try to manage them from drivers callbacks only using
->   pure calls to pinctrl_pm_select_xx() helpers
+> Signed-off-by: Elen Song <elen.song@atmel.com>
+> ---
+>  drivers/tty/serial/atmel_serial.c |  139 +++++++++++++++++++++----------------
+>  1 file changed, 80 insertions(+), 59 deletions(-)
 > 
-> the "idle" state will be selected during suspend and *not* "sleep".
-
-But the drivers have separate calls for runtime PM and suspend/resume?
-
-> >It is possible that am33xx needs separate idle and sleep states, but
-> >most likely only for some pins. For omap[345] we can get away with
-> >just the default state for most cases.
-> >
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 298b58c..ad787fd1 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -1371,6 +1371,80 @@ static void atmel_tasklet_func(unsigned long data)
+>  	spin_unlock(&port->lock);
+>  }
+>  
+> +static int atmel_init_property(struct atmel_uart_port *atmel_port,
+> +				struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct atmel_uart_data *pdata = pdev->dev.platform_data;
+> +
+> +	if (np) {
+> +		/* DMA/PDC usage specification */
+> +		if (of_get_property(np, "atmel,use-dma-rx", NULL)) {
+> +			if (of_get_property(np, "dmas", NULL)) {
+> +				atmel_port->use_dma_rx  = 1;
+> +				atmel_port->use_pdc_rx  = 0;
+> +			} else {
+> +				atmel_port->use_dma_rx  = 0;
+> +				atmel_port->use_pdc_rx  = 1;
+> +			}
+> +		} else {
+> +			atmel_port->use_dma_rx  = 0;
+> +			atmel_port->use_pdc_rx  = 0;
+> +		}
+> +
+> +		if (of_get_property(np, "atmel,use-dma-tx", NULL)) {
+> +			if (of_get_property(np, "dmas", NULL)) {
+> +				atmel_port->use_dma_tx  = 1;
+> +				atmel_port->use_pdc_tx  = 0;
+> +			} else {
+> +				atmel_port->use_dma_tx  = 0;
+> +				atmel_port->use_pdc_tx  = 1;
+> +			}
+> +		} else {
+> +			atmel_port->use_dma_tx  = 0;
+> +			atmel_port->use_pdc_tx  = 0;
+> +		}
+> +
+> +	} else {
+> +		atmel_port->use_pdc_rx  = pdata->use_dma_rx;
+> +		atmel_port->use_pdc_tx  = pdata->use_dma_tx;
+> +		atmel_port->use_dma_rx  = 0;
+> +		atmel_port->use_dma_tx  = 0;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void atmel_init_rs485(struct atmel_uart_port *atmel_port,
+> +				struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct atmel_uart_data *pdata = pdev->dev.platform_data;
+> +
+> +	if (np) {
+> +		u32 rs485_delay[2];
+> +		/* rs485 properties */
+> +		if (of_property_read_u32_array(np, "rs485-rts-delay",
+> +					rs485_delay, 2) == 0) {
+> +			struct serial_rs485 *rs485conf = &atmel_port->rs485;
+> +
+> +			rs485conf->delay_rts_before_send = rs485_delay[0];
+> +			rs485conf->delay_rts_after_send = rs485_delay[1];
+> +			rs485conf->flags = 0;
+> +
+> +		if (of_get_property(np, "rs485-rx-during-tx", NULL))
+> +			rs485conf->flags |= SER_RS485_RX_DURING_TX;
+> +
+> +		if (of_get_property(np, "linux,rs485-enabled-at-boot-time",
+> +								NULL))
+> +			rs485conf->flags |= SER_RS485_ENABLED;
+> +		}
+> +	} else {
+> +		atmel_port->rs485       = pdata->rs485;
+> +	}
+> +
+> +}
+> +
+>  static void atmel_set_ops(struct uart_port *port)
+>  {
+>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+> @@ -1409,6 +1483,7 @@ static void atmel_set_ops(struct uart_port *port)
+>   */
+>  static int atmel_startup(struct uart_port *port)
+>  {
+> +	struct platform_device *pdev = to_platform_device(port->dev);
+>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>  	struct tty_struct *tty = port->state->port.tty;
+>  	int retval;
+> @@ -1433,6 +1508,8 @@ static int atmel_startup(struct uart_port *port)
+>  	/*
+>  	 * Initialize DMA (if necessary)
+>  	 */
+> +	atmel_init_property(atmel_port, pdev);
+> +
+>  	if (atmel_port->prepare_rx) {
+>  		retval = atmel_port->prepare_rx(port);
+>  		if (retval < 0)
+> @@ -1878,55 +1955,6 @@ static struct uart_ops atmel_pops = {
+>  #endif
+>  };
+>  
+> -static void atmel_of_init_port(struct atmel_uart_port *atmel_port,
+> -					 struct device_node *np)
+> -{
+> -	u32 rs485_delay[2];
+> -
+> -	/* DMA/PDC usage specification */
+> -	if (of_get_property(np, "atmel,use-dma-rx", NULL)) {
+> -		if (of_get_property(np, "dmas", NULL)) {
+> -			atmel_port->use_dma_rx	= 1;
+> -			atmel_port->use_pdc_rx	= 0;
+> -		} else {
+> -			atmel_port->use_dma_rx	= 0;
+> -			atmel_port->use_pdc_rx	= 1;
+> -		}
+> -	} else {
+> -		atmel_port->use_dma_rx	= 0;
+> -		atmel_port->use_pdc_rx	= 0;
+> -	}
+> -
+> -	if (of_get_property(np, "atmel,use-dma-tx", NULL)) {
+> -		if (of_get_property(np, "dmas", NULL)) {
+> -			atmel_port->use_dma_tx	= 1;
+> -			atmel_port->use_pdc_tx	= 0;
+> -		} else {
+> -			atmel_port->use_dma_tx	= 0;
+> -			atmel_port->use_pdc_tx	= 1;
+> -		}
+> -	} else {
+> -		atmel_port->use_dma_tx	= 0;
+> -		atmel_port->use_pdc_tx	= 0;
+> -	}
+> -
+> -	/* rs485 properties */
+> -	if (of_property_read_u32_array(np, "rs485-rts-delay",
+> -					    rs485_delay, 2) == 0) {
+> -		struct serial_rs485 *rs485conf = &atmel_port->rs485;
+> -
+> -		rs485conf->delay_rts_before_send = rs485_delay[0];
+> -		rs485conf->delay_rts_after_send = rs485_delay[1];
+> -		rs485conf->flags = 0;
+> -
+> -		if (of_get_property(np, "rs485-rx-during-tx", NULL))
+> -			rs485conf->flags |= SER_RS485_RX_DURING_TX;
+> -
+> -		if (of_get_property(np, "linux,rs485-enabled-at-boot-time", NULL))
+> -			rs485conf->flags |= SER_RS485_ENABLED;
+> -	}
+> -}
+> -
+>  /*
+>   * Configure the port from the platform device resource info.
+>   */
+> @@ -1936,17 +1964,10 @@ static void atmel_init_port(struct atmel_uart_port *atmel_port,
+>  	struct uart_port *port = &atmel_port->uart;
+>  	struct atmel_uart_data *pdata = pdev->dev.platform_data;
+>  
+> -	if (pdev->dev.of_node) {
+> -		atmel_of_init_port(atmel_port, pdev->dev.of_node);
+> -	} else {
+> -		atmel_port->use_pdc_rx	= pdata->use_dma_rx;
+> -		atmel_port->use_pdc_tx	= pdata->use_dma_tx;
+> -		atmel_port->use_dma_rx	= 0;
+> -		atmel_port->use_dma_tx	= 0;
+> -		atmel_port->rs485	= pdata->rs485;
+> -	}
+> +	if (!atmel_init_property(atmel_port, pdev))
+> +		atmel_set_ops(port);
+>  
+> -	atmel_set_ops(port);
+> +	atmel_init_rs485(atmel_port, pdev);
+>  
+>  	port->iotype		= UPIO_MEM;
+>  	port->flags		= UPF_BOOT_AUTOCONF;
+> -- 
+> 1.7.9.5
 > 
-> 
-> In case, if only "default" state is defined for device - nothing will
->  be done by OMAP device framework for it (I mean any call to
-> pinctrl_pm_select_xx() will do nothing - it just checks that there is
-> no state and returns 0).
-
-If we want to automate something, it should be done at Linux generic
-level rather than at omap "bus" level. That sort of relates to drivers
-needing to know when they've lost context too, which should be
-implemented in Linux generic way.
-
-Regards,
-
-Tony
