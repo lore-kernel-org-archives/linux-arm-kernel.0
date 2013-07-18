@@ -1,10 +1,10 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 18 Jul 2013 11:53:08 +0300
-Subject: [PATCH 4/6] ARM: dts: omap5-uevm: Use reset-gpio driver for
- hsusb2_reset
+Date: Thu, 18 Jul 2013 11:53:07 +0300
+Subject: [PATCH 3/6] ARM: dts: omap4-panda: Use reset-gpio driver for
+ hsusb1_reset
 In-Reply-To: <1374137590-17865-1-git-send-email-rogerq@ti.com>
 References: <1374137590-17865-1-git-send-email-rogerq@ti.com>
-Message-ID: <1374137590-17865-5-git-send-email-rogerq@ti.com>
+Message-ID: <1374137590-17865-4-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,41 +13,49 @@ we have the reset-gpio driver available.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap5-uevm.dts |   17 ++++++++---------
- 1 files changed, 8 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   22 ++++++++--------------
+ 1 files changed, 8 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-index 08b7267..08650f9 100644
---- a/arch/arm/boot/dts/omap5-uevm.dts
-+++ b/arch/arm/boot/dts/omap5-uevm.dts
-@@ -28,20 +28,19 @@
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index faa95b5..e9b0a91 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -60,20 +60,13 @@
+ 			"AFMR", "Line In";
  	};
  
- 	/* HS USB Port 2 RESET */
--	hsusb2_reset: hsusb2_reset_reg {
+-	/*
+-	 * Temp hack: Need to be replaced with the proper gpio-controlled
+-	 * reset driver as soon it will be merged.
+-	 * http://thread.gmane.org/gmane.linux.drivers.devicetree/36830
+-	 */
+ 	/* HS USB Port 1 RESET */
+-	hsusb1_reset: hsusb1_reset_reg {
 -		compatible = "regulator-fixed";
--		regulator-name = "hsusb2_reset";
+-		regulator-name = "hsusb1_reset";
 -		regulator-min-microvolt = <3300000>;
 -		regulator-max-microvolt = <3300000>;
--		gpio = <&gpio3 16 GPIO_ACTIVE_HIGH>; /* gpio3_80 HUB_NRESET */
+-		gpio = <&gpio2 30 0>;	/* gpio_62 */
 -		startup-delay-us = <70000>;
 -		enable-active-high;
-+	hsusb2_reset: hsusb2_reset {
++	hsusb1_reset: hsusb1_reset {
 +		compatible = "gpio-reset";
-+		reset-gpios = <&gpio2 30 GPIO_ACTIVE_LOW>; /* gpio3_80 HUB_NRESET */
++		reset-gpios = <&gpio2 30 GPIO_ACTIVE_LOW>; /* gpio_62 */
 +		reset-delay-us = <70000>;
 +		initially-in-reset;
 +		#reset-cells = <0>;
  	};
  
- 	/* HS USB Host PHY on PORT 2 */
- 	hsusb2_phy: hsusb2_phy {
+ 	/* HS USB Port 1 Power */
+@@ -97,7 +90,8 @@
+ 	/* HS USB Host PHY on PORT 1 */
+ 	hsusb1_phy: hsusb1_phy {
  		compatible = "usb-nop-xceiv";
--		reset-supply = <&hsusb2_reset>;
-+		resets = <&hsusb2_reset>;
-+		reset_names = "reset";
+-		reset-supply = <&hsusb1_reset>;
++		resets = <&hsusb1_reset>;
++		reset-names = "reset";
+ 		vcc-supply = <&hsusb1_power>;
  	/**
- 	  * FIXME
- 	  * Put the right clock phandle here when available
+ 	 * FIXME:
 -- 
 1.7.4.1
