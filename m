@@ -1,27 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 18 Jul 2013 21:49:56 +0100
-Subject: [PATCH v2 01/24] spi: mpc512x: cleanup clock API use
-In-Reply-To: <1374166855-7280-2-git-send-email-gsi@denx.de>
-References: <1373914074-20889-1-git-send-email-gsi@denx.de>
- <1374166855-7280-1-git-send-email-gsi@denx.de>
- <1374166855-7280-2-git-send-email-gsi@denx.de>
-Message-ID: <20130718204956.GU22506@sirena.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 18 Jul 2013 16:51:17 -0400 (EDT)
+Subject: [PATCH V3 5/6] USB: OHCI: make ohci-at91 a separate driver
+In-Reply-To: <1372141408-9894-6-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1307181647240.1245-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 07:00:32PM +0200, Gerhard Sittig wrote:
+On Tue, 25 Jun 2013, Manjunath Goudar wrote:
 
-> +	psc_num = master->bus_num;
-> +	snprintf(clk_name, sizeof(clk_name), "psc%d_mclk", psc_num);
-> +	mps->clk_mclk = clk_get(dev, clk_name);
-> +	if (IS_ERR(mps->clk_mclk))
-> +		goto free_irq;
+> Separate the  TI OHCI Atmel host controller driver from ohci-hcd
+> host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM;
+> it would be nice to have in 3.11.
 
-Should be using devm_clk_get().
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130718/5428dd8f/attachment.sig>
+This looks okay except for some very minor issues.
+
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index 46c2f42..e4dc9ab 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -390,6 +390,14 @@ config USB_OHCI_HCD_SPEAR
+>            Enables support for the on-chip OHCI controller on
+>            ST SPEAr chips.
+>  
+> +config USB_OHCI_HCD_AT91
+> +        tristate  "Support for Atmel on-chip OHCI USB controller"
+> +        depends on USB_OHCI_HCD && ARCH_AT91
+> +        default y
+> +        ---help---
+> +          Enables support for the on-chip OHCI controller on
+> +          Atmel chips.
+
+Get rid of the extra space after "tristate".
+
+> @@ -686,7 +630,11 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
+>  	 * REVISIT: some boards will be able to turn VBUS off...
+>  	 */
+>  	if (at91_suspend_entering_slow_clock()) {
+> -		ohci_usb_reset (ohci);
+> +		ohci->hc_control = ohci_readl (ohci, &ohci->regs->control);
+> +		ohci->hc_control &= OHCI_CTRL_RWC;
+> +		ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
+> +		ohci->rh_state = OHCI_RH_HALTED;
+
+Even though you're just copying the code, don't also copy its mistakes.
+Get rid of the extra spaces before the '(' characters.
+
+> +static void __exit ohci_at91_cleanup(void)
+> +{
+> +	platform_driver_unregister(&ohci_hcd_at91_driver);
+> +}
+> +module_exit(ohci_at91_cleanup);
+> +
+> +MODULE_DESCRIPTION(DRIVER_DESC);
+> +MODULE_LICENSE("GPL");
+
+Please move the existing MODULE_ALIAS line down here with these lines.
+
+Alan Stern
