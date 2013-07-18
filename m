@@ -1,38 +1,75 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 18 Jul 2013 10:02:27 +0200
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <51E72752.9020206@zytor.com>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <20130716004727.b60b2c96.akpm@linux-foundation.org>
- <20130716005611.e4ccab02.akpm@linux-foundation.org>
- <201307161008.07643.yann.morin.1998@free.fr>
- <20130716180408.GA19863@merkur.ravnborg.org>
- <20130717211649.GA5619@merkur.ravnborg.org>
- <20130717223033.GF3385@free.fr> <51E72752.9020206@zytor.com>
-Message-ID: <CAMuHMdVo3rnTtXUZOZavdjJ4uHv4KYPA5g1Py6GTdZD3dPwFzQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 18 Jul 2013 10:06:57 +0200
+Subject: [PATCH v1 05/24] clk: wrap I/O access for improved portability
+In-Reply-To: <20130718070402.GO7080@book.gsilab.sittig.org>
+References: <1373914074-20889-1-git-send-email-gsi@denx.de>
+ <1373914074-20889-6-git-send-email-gsi@denx.de>
+ <20130715193829.GS14452@pengutronix.de>
+ <20130718070402.GO7080@book.gsilab.sittig.org>
+Message-ID: <20130718080657.GI10380@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 1:22 AM, H. Peter Anvin <hpa@zytor.com> wrote:
-> It is worth noting that one of the things that keep getting brought up
-> as something that need this is gcc/binutils support for a specific feature.
+On Thu, Jul 18, 2013 at 09:04:02AM +0200, Gerhard Sittig wrote:
+> On Mon, Jul 15, 2013 at 21:38 +0200, Sascha Hauer wrote:
+> > 
+> > On Mon, Jul 15, 2013 at 08:47:34PM +0200, Gerhard Sittig wrote:
+> > > diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> > > index 6d55eb2..2c07061 100644
+> > > --- a/drivers/clk/clk-divider.c
+> > > +++ b/drivers/clk/clk-divider.c
+> > > @@ -104,7 +104,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+> > >  	struct clk_divider *divider = to_clk_divider(hw);
+> > >  	unsigned int div, val;
+> > >  
+> > > -	val = readl(divider->reg) >> divider->shift;
+> > > +	val = clk_readl(divider->reg) >> divider->shift;
+> > >  	val &= div_mask(divider);
+> > 
+> > Would it be an option to use regmap for the generic dividers/muxes
+> > instead? This should be suitable for ppc and also for people who want to
+> > use the generic clocks on i2c devices.
+> 
+> Some other thought crossed my mind regarding access to clock
+> control registers that reside behind some communication channel
+> like I2C:
+> 
+> The common clock API assumes (it's part of the contract) that
+> there are potentially expensive operations like get, put, prepare
+> and unprepare, as well as swift and non-blocking operations like
+> enable and disable.
+> 
+> Would the regmap abstraction hide the potentially blocking nature
+> of a register access (I understand that you can implement "local"
+> as well as "remote" register sets by this mechanism)?  Or could
+> you still meet the assumptions or requirements of the common
+> clock API?
+> 
+> It might as well be the responsibility of the clock driver's
+> implementor to arrange for the availability of non-blocking
+> enable/disable operations, just as it is today.  Such that
+> expensive register access need not be forbidden in general.
 
-Yeah, then those tests would be run only once, at kconfig time. I guess we
-still run some of them many times, due to the use of recursive make?
+regmap for mmio uses a spinlock for read/modify/write operations, just
+like you have to use a spinlock in the common clk dividers/gates. This
+part wouldn't change with regmap.
 
-Note that these will end up in your .config --- which is not necesarily a bad
-thing --- but it does mean that if e.g. you sent me your .config,
-several options
-may change when I try to use it.
+For i2c connected clocks where a spinlock doesn't work due to the
+nonatomic nature of i2c devices we would have to move the enable/disble
+stuff to prepare/unprepare in the common gate code. This can be left
+for someone who works on i2c clocks though.
 
-Gr{oetje,eeting}s,
+I think regmap has the potential to solve a number of issues like the
+hardcoded readl/writel in the common clock blocks, issues with i2c
+clocks and your endianess issue. The biggest question probably is how
+to get there without putting too much of a burden on you. It's probably
+not an option to convert all users to regmap, so it seems additional
+functions like clk_register_gate_regmap are better to handle.
 
-                        Geert
+Sascha
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
