@@ -1,89 +1,45 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Thu, 18 Jul 2013 19:00:39 +0200
-Subject: [PATCH v2 08/24] dts: mpc512x: add clock related device tree specs
+Date: Thu, 18 Jul 2013 19:00:42 +0200
+Subject: [PATCH v2 11/24] spi: mpc512x: remove now obsolete clock lookup name
 In-Reply-To: <1374166855-7280-1-git-send-email-gsi@denx.de>
 References: <1373914074-20889-1-git-send-email-gsi@denx.de>
  <1374166855-7280-1-git-send-email-gsi@denx.de>
-Message-ID: <1374166855-7280-9-git-send-email-gsi@denx.de>
+Message-ID: <1374166855-7280-12-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this addresses the clock driver aka provider's side of clocks
-- prepare for future '<&clks ID>' phandle references for device tree
-  based clock lookup in client drivers
-- introduce a 'clocks' subtree with an 'osc' node for the crystal
-  or oscillator SoC input (fixed frequency)
-- provide default values with 33MHz oscillator frequency in the
-  common include (the 66MHz IPS bus already was there), add
-  override values for the ifm AC14xx board which deviates from
-  the reference design (25MHz xtal, 80MHz IPS bus)
+after device tree based clock lookup became available, the peripheral
+driver need no longer construct clock names which include the PSC index,
+remove the "psc%d_mclk" template and unconditionally use "mclk"
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/boot/dts/ac14xx.dts   |    7 +++++++
- arch/powerpc/boot/dts/mpc5121.dtsi |   15 ++++++++++++++-
- 2 files changed, 21 insertions(+), 1 deletion(-)
+ drivers/spi/spi-mpc512x-psc.c |    6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/arch/powerpc/boot/dts/ac14xx.dts b/arch/powerpc/boot/dts/ac14xx.dts
-index a543c40..a1b8837 100644
---- a/arch/powerpc/boot/dts/ac14xx.dts
-+++ b/arch/powerpc/boot/dts/ac14xx.dts
-@@ -139,7 +139,14 @@
- 		};
- 	};
+diff --git a/drivers/spi/spi-mpc512x-psc.c b/drivers/spi/spi-mpc512x-psc.c
+index 7a32373..b04f094 100644
+--- a/drivers/spi/spi-mpc512x-psc.c
++++ b/drivers/spi/spi-mpc512x-psc.c
+@@ -474,8 +474,6 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
+ 	struct spi_master *master;
+ 	int ret;
+ 	void *tempp;
+-	int psc_num;
+-	char clk_name[16];
  
-+	clocks {
-+		osc {
-+			clock-frequency = <25000000>;
-+		};
-+	};
-+
- 	soc at 80000000 {
-+		bus-frequency = <80000000>;	/* 80 MHz ips bus */
+ 	master = spi_alloc_master(dev, sizeof *mps);
+ 	if (master == NULL)
+@@ -518,9 +516,7 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
+ 		goto free_master;
+ 	init_completion(&mps->txisrdone);
  
- 		clock at f00 {
- 			compatible = "fsl,mpc5121rev2-clock", "fsl,mpc5121-clock";
-diff --git a/arch/powerpc/boot/dts/mpc5121.dtsi b/arch/powerpc/boot/dts/mpc5121.dtsi
-index bd14c00..8f4cba0 100644
---- a/arch/powerpc/boot/dts/mpc5121.dtsi
-+++ b/arch/powerpc/boot/dts/mpc5121.dtsi
-@@ -9,6 +9,8 @@
-  * option) any later version.
-  */
- 
-+#include <dt-bindings/clock/mpc512x-clock.h>
-+
- /dts-v1/;
- 
- / {
-@@ -73,6 +75,16 @@
- 		ranges = <0x0 0x0 0xfc000000 0x04000000>;
- 	};
- 
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		osc {
-+			compatible = "fsl,mpc512x-osc", "fixed-clock";
-+			clock-frequency = <33000000>;
-+		};
-+	};
-+
- 	soc at 80000000 {
- 		compatible = "fsl,mpc5121-immr";
- 		#address-cells = <1>;
-@@ -118,9 +130,10 @@
- 		};
- 
- 		/* Clock control */
--		clock at f00 {
-+		clks: clock at f00 {
- 			compatible = "fsl,mpc5121-clock";
- 			reg = <0xf00 0x100>;
-+			#clock-cells = <1>;
- 		};
- 
- 		/* Power Management Controller */
+-	psc_num = master->bus_num;
+-	snprintf(clk_name, sizeof(clk_name), "psc%d_mclk", psc_num);
+-	mps->clk_mclk = clk_get(dev, clk_name);
++	mps->clk_mclk = clk_get(dev, "mclk");
+ 	if (IS_ERR(mps->clk_mclk))
+ 		goto free_irq;
+ 	ret = clk_prepare_enable(mps->clk_mclk);
 -- 
 1.7.10.4
