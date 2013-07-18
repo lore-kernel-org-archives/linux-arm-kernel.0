@@ -1,32 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 17 Jul 2013 19:39:21 -0700
-Subject: [PATCH 3/3] ARM: Remove temporary sched_clock.h header
-In-Reply-To: <1374115161-675-1-git-send-email-sboyd@codeaurora.org>
-References: <1374115161-675-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1374115161-675-4-git-send-email-sboyd@codeaurora.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 17 Jul 2013 23:28:32 -0400
+Subject: [PATCH 0/4] MCPM backends updates
+Message-ID: <1374118116-16836-1-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This header file is no longer needed now that the ARM sched_clock
-framework is generic and all users have moved to linux/sched_clock.h
-instead of asm/sched_clock.h. Remove it.
+Patch 1:
+Fixes to the existing Vexpress DCSCB backend.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/include/asm/sched_clock.h | 4 ----
- 1 file changed, 4 deletions(-)
- delete mode 100644 arch/arm/include/asm/sched_clock.h
+Patch 2:
+Lorenzo's minimal SPC driver required by the TC2 MCPM backend.
+As discussed on the list, this is not considered to be a MFD driver.
+This hardly qualify as a bus driver either.  Conceptually, this is
+a very platform specific register multiplex driver allowing subsystem
+drivers to hook into.  I therefore moved it to drivers/platform/vexpress/.
 
-diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
-deleted file mode 100644
-index 2389b71..0000000
---- a/arch/arm/include/asm/sched_clock.h
-+++ /dev/null
-@@ -1,4 +0,0 @@
--/* You shouldn't include this file. Use linux/sched_clock.h instead.
-- * Temporary file until all asm/sched_clock.h users are gone
-- */
--#include <linux/sched_clock.h>
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Patch 3:
+This is the MCPM backend enabling SMP secondary boot and CPU hotplug
+on the VExpress TC2 big.LITTLE platform.
+
+Patch 4:
+Add MCPM suspend method to the TC2 backend allowing basic CPU idle/suspend.
+The cpuidle driver that hooks into this will be submitted separately.
+
+The TC2 MCPM patches have been reviewed here:
+http://news.gmane.org/group/gmane.linux.ports.arm.kernel/thread=242408
+
+The latest SPC driver discussion is here:
+http://news.gmane.org/group/gmane.linux.kernel/thread=1525836
+
+
+Nicolas
