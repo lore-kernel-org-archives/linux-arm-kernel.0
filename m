@@ -1,70 +1,20 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Jul 2013 03:53:46 -0700
-Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
-In-Reply-To: <20130718072034.GO7656@atomide.com>
-References: <20130716090310.5541.36777.stgit@localhost>
- <20130716090536.5541.36289.stgit@localhost>
- <51E70953.1000601@wwwdotorg.org>
- <20130718072034.GO7656@atomide.com>
-Message-ID: <20130718105345.GV7656@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 18 Jul 2013 11:55:40 +0100
+Subject: [PATCH] ASoC: wm8904: fix the typo error for LINER Mux
+In-Reply-To: <1374129500-5270-1-git-send-email-voice.shen@atmel.com>
+References: <1374129500-5270-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <20130718105540.GI22506@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130718 00:31]:
-> * Stephen Warren <swarren@wwwdotorg.org> [130717 14:21]:
-> > On 07/16/2013 03:05 AM, Tony Lindgren wrote:
-> > > +int pinctrl_check_dynamic(struct device *dev, struct pinctrl_state *st1,
-> > > +			  struct pinctrl_state *st2)
-> > > +{
-> > > +	struct pinctrl_setting *s1, *s2;
-> > > +
-> > > +	list_for_each_entry(s1, &st1->settings, node) {
-> > ...
-> > > +		list_for_each_entry(s2, &st2->settings, node) {
-> > ...
-> > > +			if (pctldev1 != pctldev2) {
-> > > +				dev_dbg(dev, "pctldev must be the same for states\n");
-> > > +				return -EINVAL;
-> > > +			}
-> > 
-> > I don't think we should require that; it's perfectly legal at the moment
-> > for some device's pinctrl configuration to include settings from
-> > multiple different pin controllers.
-> 
-> Yes that's fine for pinctrl_select(), but let's not do that for
-> runtime muxing.
+On Thu, Jul 18, 2013 at 02:38:20PM +0800, Bo Shen wrote:
+> fix the typo error, from "LINEL Mux" to "LINER Mux"
 
-Hmm reading this again, you're right, there should not be anything
-preventing mixing multiple controllers as long as the states match.
- 
-> > > +			for (i = 0; i < num_pins1; i++) {
-> > > +				int pin1 = pins1[i];
-> > > +
-> > > +				for (j = 0; j < num_pins2; j++) {
-> > > +					int pin2 = pins2[j];
-> > > +
-> > > +					if (pin1 == pin2) {
-> > > +						found++;
-> > > +						break;
-> > > +					}
-> > > +				}
-> > > +			}
-> > > +
-> > > +			if (found != num_pins1) {
-> > 
-> > I guess this make sure that every entry in the dynamic state is in the
-> > state state, but not vice-versa; the static state can affect more stuff
-> > than the dynamic state?
-> > 
-> > If so, shouldn't that check be if (found != num_pins2)?
-> 
-> The check is that idle_state and sleep_state pins must match the
-> active_state pins. This is intentionally different from the current
-> pinctrl_select() logic.
-
-And here things will get messed up if the order of settings is diffrent..
-So yes, pinctrl_check_dynamic() needs more work.
-
-Regards,
-
-Tony
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130718/46091b67/attachment.sig>
