@@ -1,48 +1,49 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 18 Jul 2013 14:54:30 +0200
-Subject: [PATCH 4/4] ARM: exynos: cpuidle: Remove useless headers
-In-Reply-To: <1374152070-21008-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1374152070-21008-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1374152070-21008-4-git-send-email-daniel.lezcano@linaro.org>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 18 Jul 2013 14:58:06 +0200
+Subject: [PATCH] gpio/mxc: add chained_irq_enter/exit() to mx2_gpio_irq_handler
+Message-ID: <1374152286-12955-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The headers:
+Similar to commit
 
-#include <linux/kernel.h>
-#include <linux/export.h>
-#include <linux/time.h>
-#include <asm/unified.h>
+	0e44b6e (gpio/mxc: add chained_irq_enter/exit() to mx3_gpio_irq_handler())
 
-are not needed. Removed them.
+. It doesn't seem to be critical to make the irqs work, but still it is
+more correct.
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-exynos/cpuidle.c |    4 ----
- 1 file changed, 4 deletions(-)
+Hello,
 
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index 8d06128..027f5e7 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -8,18 +8,14 @@
-  * published by the Free Software Foundation.
- */
+note this is completely untested.
+
+Uwe
+
+ drivers/gpio/gpio-mxc.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+index 7176743..832881c 100644
+--- a/drivers/gpio/gpio-mxc.c
++++ b/drivers/gpio/gpio-mxc.c
+@@ -291,6 +291,9 @@ static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ {
+ 	u32 irq_msk, irq_stat;
+ 	struct mxc_gpio_port *port;
++	struct irq_chip *chip = irq_get_chip(irq);
++
++	chained_irq_enter(chip, desc);
  
--#include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/cpuidle.h>
- #include <linux/cpu_pm.h>
- #include <linux/io.h>
--#include <linux/export.h>
--#include <linux/time.h>
+ 	/* walk through all interrupt status registers */
+ 	list_for_each_entry(port, &mxc_gpio_ports, node) {
+@@ -302,6 +305,7 @@ static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ 		if (irq_stat)
+ 			mxc_gpio_irq_handler(port, irq_stat);
+ 	}
++	chained_irq_exit(chip, desc);
+ }
  
- #include <asm/proc-fns.h>
- #include <asm/smp_scu.h>
- #include <asm/suspend.h>
--#include <asm/unified.h>
- #include <asm/cpuidle.h>
- #include <mach/regs-clock.h>
- #include <mach/regs-pmu.h>
+ /*
 -- 
-1.7.9.5
+1.8.3.2
