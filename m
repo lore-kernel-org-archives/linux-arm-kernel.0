@@ -1,69 +1,68 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu, 18 Jul 2013 09:58:11 +0200
-Subject: [PATCH v4 1/5] ARM: at91/tc/clocksource: replace clk_enable/disable
- with clk_prepare_enable/disable_unprepare.
-In-Reply-To: <1374132753-15206-1-git-send-email-b.brezillon@overkiz.com>
-References: <1374132753-15206-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1374134291-27704-1-git-send-email-b.brezillon@overkiz.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 18 Jul 2013 09:48:39 +0200
+Subject: [PATCH V2 0/8] serial: at91: make usart and uart support dma
+ transfer
+In-Reply-To: <1373942627-7121-1-git-send-email-elen.song@atmel.com>
+References: <1373942627-7121-1-git-send-email-elen.song@atmel.com>
+Message-ID: <20130718074839.GA16015@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
-avoid common clk framework warnings.
+On 10:43 Tue 16 Jul     , Elen Song wrote:
+> After at91sam9g45 socs, the usart only support dma transfer.
+> This patch serial focus on:
+> 1) distinguish pdc and dma transfer
+> 2) support usart dma rx and tx transfer
+> 3) distinguish usart and uart
+> 4) support uart dma rx and tx transfer
+> 
+> For those only support PDC transfer socs, we use "atmel,use-dma-rx/tx" to establish a PDC transfer.
+> For those only support DMA transfer socs, we not only use "atmel,use-dma-rx/tx", but also describe dma binding to establish a DMA transfer. 
+> We switch the name from "use-dma" to "use-pdc" in serial driver to state more clearly.
+> We also distinguish usart and uart by read ip name, the dbgu is regard as a uart.
+> Because uart lack timeout function, we use software timer to trigger rx.
+> 
+> Compare to v1, this patch serials improve:
+> 1) use function pointer instead of if/else
+> 2) "atmel,use-dma-rx/tx" represent a PDC transfer,
+>    but when add the dma bindings, it is a dma transfer
+> 3) do not use strncmp in get ip name
+> 4) remove modification in documentation part
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/clocksource/tcb_clksrc.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+please next time update this too when sending a new verison as I was nearly
+NACKing it as I thought it was the same version
 
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index 8a61872..229c019 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -100,7 +100,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
- 			|| tcd->clkevt.mode == CLOCK_EVT_MODE_ONESHOT) {
- 		__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
- 		__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
--		clk_disable(tcd->clk);
-+		clk_disable_unprepare(tcd->clk);
- 	}
- 
- 	switch (m) {
-@@ -109,7 +109,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
- 	 * of oneshot, we get lower overhead and improved accuracy.
- 	 */
- 	case CLOCK_EVT_MODE_PERIODIC:
--		clk_enable(tcd->clk);
-+		clk_prepare_enable(tcd->clk);
- 
- 		/* slow clock, count up to RC, then irq and restart */
- 		__raw_writel(timer_clock
-@@ -126,7 +126,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
- 		break;
- 
- 	case CLOCK_EVT_MODE_ONESHOT:
--		clk_enable(tcd->clk);
-+		clk_prepare_enable(tcd->clk);
- 
- 		/* slow clock, count up to RC, then irq and stop */
- 		__raw_writel(timer_clock | ATMEL_TC_CPCSTOP
-@@ -275,7 +275,7 @@ static int __init tcb_clksrc_init(void)
- 	pdev = tc->pdev;
- 
- 	t0_clk = tc->clk[0];
--	clk_enable(t0_clk);
-+	clk_prepare_enable(t0_clk);
- 
- 	/* How fast will we be counting?  Pick something over 5 MHz.  */
- 	rate = (u32) clk_get_rate(t0_clk);
-@@ -313,7 +313,7 @@ static int __init tcb_clksrc_init(void)
- 		/* tclib will give us three clocks no matter what the
- 		 * underlying platform supports.
- 		 */
--		clk_enable(tc->clk[1]);
-+		clk_prepare_enable(tc->clk[1]);
- 		/* setup both channel 0 & 1 */
- 		tcb_setup_dual_chan(tc, best_divisor_idx);
- 	}
--- 
-1.7.9.5
+Please be carefull next time
+
+Best Regards,
+J.
+> 
+> Elen Song (7):
+>   serial: at91: correct definition from DMA to PDC
+>   serial: at91: add tx dma support
+>   serial: at91: add rx dma support
+>   serial: at91: make DBGU support dma and pdc transfers
+>   serial: at91: distinguish usart and uart
+>   serial: at91: modify UART to use software timer to trigger rx
+>   serial: at91: add dma support in usart binding descriptions
+> 
+>  Documentation/devicetree/bindings/serial/rs485.txt |    4 +-
+>  .../devicetree/bindings/tty/serial/atmel-usart.txt |   29 +-
+>  arch/arm/boot/dts/at91rm9200.dtsi                  |   16 +-
+>  arch/arm/boot/dts/at91sam9260.dtsi                 |   24 +-
+>  arch/arm/boot/dts/at91sam9263.dtsi                 |   12 +-
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 |   16 +-
+>  arch/arm/mach-at91/at91rm9200_devices.c            |   20 +-
+>  arch/arm/mach-at91/at91sam9260_devices.c           |   28 +-
+>  arch/arm/mach-at91/at91sam9261_devices.c           |   16 +-
+>  arch/arm/mach-at91/at91sam9263_devices.c           |   16 +-
+>  arch/arm/mach-at91/at91sam9g45_devices.c           |   20 +-
+>  arch/arm/mach-at91/at91sam9rl_devices.c            |   20 +-
+>  drivers/tty/serial/atmel_serial.c                  |  582 ++++++++++++++++++--
+>  include/linux/atmel_serial.h                       |    2 +
+>  include/linux/platform_data/atmel.h                |    2 +
+>  15 files changed, 665 insertions(+), 142 deletions(-)
+> 
+> -- 
+> 1.7.9.5
+> 
