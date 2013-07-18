@@ -1,98 +1,108 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu, 18 Jul 2013 09:43:08 +0200
-Subject: [PATCH v4 4/5] USB: gadget: atmel_usba: prepare clk before calling
- enable
-In-Reply-To: <1374132753-15206-1-git-send-email-b.brezillon@overkiz.com>
-References: <1374132753-15206-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1374133388-22669-1-git-send-email-b.brezillon@overkiz.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 18 Jul 2013 09:46:11 +0200
+Subject: [PATCH 4/4] ARM: dts: i.MX53: split esdhc3 pins into base and 8bit
+ groups
+In-Reply-To: <1374133571-7660-1-git-send-email-s.hauer@pengutronix.de>
+References: <1374133571-7660-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1374133571-7660-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
-avoid common clk framework warnings.
+This splits the esdhc3 groups into a base group and an 8bit extension
+which results in smaller devicetrees and more obvious pinctrl group
+names.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/usb/gadget/atmel_usba_udc.c |   28 +++++++++++++++++++++-------
- 1 file changed, 21 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/imx53-evk.dts     |  2 +-
+ arch/arm/boot/dts/imx53-qsb.dts     |  2 +-
+ arch/arm/boot/dts/imx53-smd.dts     |  2 +-
+ arch/arm/boot/dts/imx53-tqma53.dtsi |  2 +-
+ arch/arm/boot/dts/imx53.dtsi        | 11 ++++++++---
+ 5 files changed, 12 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index 1d97222..f018017 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -1772,6 +1772,7 @@ out:
- static int atmel_usba_start(struct usb_gadget *gadget,
- 		struct usb_gadget_driver *driver)
- {
-+	int ret = 0;
- 	struct usba_udc *udc = container_of(gadget, struct usba_udc, gadget);
- 	unsigned long flags;
+diff --git a/arch/arm/boot/dts/imx53-evk.dts b/arch/arm/boot/dts/imx53-evk.dts
+index 2d093b5..ed5a41a 100644
+--- a/arch/arm/boot/dts/imx53-evk.dts
++++ b/arch/arm/boot/dts/imx53-evk.dts
+@@ -69,7 +69,7 @@
  
-@@ -1781,8 +1782,14 @@ static int atmel_usba_start(struct usb_gadget *gadget,
- 	udc->driver = driver;
- 	spin_unlock_irqrestore(&udc->lock, flags);
+ &esdhc3 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_esdhc3_1>;
++	pinctrl-0 = <&pinctrl_esdhc3_base_1 &pinctrl_esdhc3_8bit_1>;
+ 	cd-gpios = <&gpio3 11 0>;
+ 	wp-gpios = <&gpio3 12 0>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+index 508390f..dbdd807 100644
+--- a/arch/arm/boot/dts/imx53-qsb.dts
++++ b/arch/arm/boot/dts/imx53-qsb.dts
+@@ -124,7 +124,7 @@
  
--	clk_enable(udc->pclk);
--	clk_enable(udc->hclk);
-+	ret = clk_prepare_enable(udc->pclk);
-+	if (ret)
-+		goto out;
-+	ret = clk_prepare_enable(udc->hclk);
-+	if (ret) {
-+		clk_disable_unprepare(udc->pclk);
-+		goto out;
-+	}
+ &esdhc3 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_esdhc3_1>;
++	pinctrl-0 = <&pinctrl_esdhc3_base_1 &pinctrl_esdhc3_8bit_1>;
+ 	cd-gpios = <&gpio3 11 0>;
+ 	wp-gpios = <&gpio3 12 0>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
+index 74d34872..668c518 100644
+--- a/arch/arm/boot/dts/imx53-smd.dts
++++ b/arch/arm/boot/dts/imx53-smd.dts
+@@ -95,7 +95,7 @@
  
- 	DBG(DBG_GADGET, "registered driver `%s'\n", driver->driver.name);
+ &esdhc3 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_esdhc3_1>;
++	pinctrl-0 = <&pinctrl_esdhc3_base_1 &pinctrl_esdhc3_8bit_1>;
+ 	non-removable;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx53-tqma53.dtsi b/arch/arm/boot/dts/imx53-tqma53.dtsi
+index 82b0bd8..4c95c93 100644
+--- a/arch/arm/boot/dts/imx53-tqma53.dtsi
++++ b/arch/arm/boot/dts/imx53-tqma53.dtsi
+@@ -60,7 +60,7 @@
  
-@@ -1797,9 +1804,11 @@ static int atmel_usba_start(struct usb_gadget *gadget,
- 		usba_writel(udc, CTRL, USBA_ENABLE_MASK);
- 		usba_writel(udc, INT_ENB, USBA_END_OF_RESET);
- 	}
+ &esdhc3 { /* EMMC */
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_esdhc3_1>;
++	pinctrl-0 = <&pinctrl_esdhc3_base_1 &pinctrl_esdhc3_8bit_1>;
+ 	vmmc-supply = <&reg_3p3v>;
+ 	non-removable;
+ 	bus-width = <8>;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index bfbeaef..a3e1eee 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -490,18 +490,23 @@
+ 				};
+ 
+ 				esdhc3 {
+-					pinctrl_esdhc3_1: esdhc3grp-1 {
++					pinctrl_esdhc3_base_1: esdhc3-basegrp-1 {
+ 						fsl,pins = <
+ 							MX53_PAD_PATA_DATA8__ESDHC3_DAT0  0x1d5
+ 							MX53_PAD_PATA_DATA9__ESDHC3_DAT1  0x1d5
+ 							MX53_PAD_PATA_DATA10__ESDHC3_DAT2 0x1d5
+ 							MX53_PAD_PATA_DATA11__ESDHC3_DAT3 0x1d5
++							MX53_PAD_PATA_RESET_B__ESDHC3_CMD 0x1d5
++							MX53_PAD_PATA_IORDY__ESDHC3_CLK   0x1d5
++						>;
++					};
 +
-+out:
- 	spin_unlock_irqrestore(&udc->lock, flags);
- 
--	return 0;
-+	return ret;
- }
- 
- static int atmel_usba_stop(struct usb_gadget *gadget,
-@@ -1822,8 +1831,8 @@ static int atmel_usba_stop(struct usb_gadget *gadget,
- 
- 	udc->driver = NULL;
- 
--	clk_disable(udc->hclk);
--	clk_disable(udc->pclk);
-+	clk_disable_unprepare(udc->hclk);
-+	clk_disable_unprepare(udc->pclk);
- 
- 	DBG(DBG_GADGET, "unregistered driver `%s'\n", driver->driver.name);
- 
-@@ -2022,10 +2031,14 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, udc);
- 
- 	/* Make sure we start from a clean slate */
--	clk_enable(pclk);
-+	ret = clk_prepare_enable(pclk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Unable to enable pclk, aborting.\n");
-+		goto err_clk_enable;
-+	}
- 	toggle_bias(0);
- 	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
--	clk_disable(pclk);
-+	clk_disable_unprepare(pclk);
- 
- 	if (pdev->dev.of_node)
- 		udc->usba_ep = atmel_udc_of_init(pdev, udc);
-@@ -2081,6 +2094,7 @@ err_add_udc:
- 	free_irq(irq, udc);
- err_request_irq:
- err_alloc_ep:
-+err_clk_enable:
- 	iounmap(udc->fifo);
- err_map_fifo:
- 	iounmap(udc->regs);
++					pinctrl_esdhc3_8bit_1: esdhc3-8bitgrp-1 {
++						fsl,pins = <
+ 							MX53_PAD_PATA_DATA0__ESDHC3_DAT4  0x1d5
+ 							MX53_PAD_PATA_DATA1__ESDHC3_DAT5  0x1d5
+ 							MX53_PAD_PATA_DATA2__ESDHC3_DAT6  0x1d5
+ 							MX53_PAD_PATA_DATA3__ESDHC3_DAT7  0x1d5
+-							MX53_PAD_PATA_RESET_B__ESDHC3_CMD 0x1d5
+-							MX53_PAD_PATA_IORDY__ESDHC3_CLK   0x1d5
+ 						>;
+ 					};
+ 				};
 -- 
-1.7.9.5
+1.8.3.2
