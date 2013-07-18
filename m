@@ -1,61 +1,127 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 18 Jul 2013 11:53:07 +0300
-Subject: [PATCH 3/6] ARM: dts: omap4-panda: Use reset-gpio driver for
- hsusb1_reset
+Date: Thu, 18 Jul 2013 11:53:09 +0300
+Subject: [PATCH 5/6] ARM: dts: omap3-beagle-xm: Add USB Host support
 In-Reply-To: <1374137590-17865-1-git-send-email-rogerq@ti.com>
 References: <1374137590-17865-1-git-send-email-rogerq@ti.com>
-Message-ID: <1374137590-17865-4-git-send-email-rogerq@ti.com>
+Message-ID: <1374137590-17865-6-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We no longer need to model a RESET line as a regulator since
-we have the reset-gpio driver available.
+Provide RESET controller and Power regulator for the USB PHY,
+the USB Host port mode and the PHY device. Provide
+pin multiplexer information for USB host pins.
+
+We also relocate omap3_pmx_core pin definations so that they
+are close to omap3_pmx_wkup pin definations.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap4-panda-common.dtsi |   22 ++++++++--------------
- 1 files changed, 8 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/omap3-beagle-xm.dts |   75 +++++++++++++++++++++++++++++----
+ 1 files changed, 66 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index faa95b5..e9b0a91 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -60,20 +60,13 @@
- 			"AFMR", "Line In";
- 	};
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index afdb164..2273c24 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -69,6 +69,33 @@
+ 		};
  
--	/*
--	 * Temp hack: Need to be replaced with the proper gpio-controlled
--	 * reset driver as soon it will be merged.
--	 * http://thread.gmane.org/gmane.linux.drivers.devicetree/36830
--	 */
- 	/* HS USB Port 1 RESET */
--	hsusb1_reset: hsusb1_reset_reg {
--		compatible = "regulator-fixed";
--		regulator-name = "hsusb1_reset";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		gpio = <&gpio2 30 0>;	/* gpio_62 */
--		startup-delay-us = <70000>;
--		enable-active-high;
-+	hsusb1_reset: hsusb1_reset {
+ 	};
++
++	/* HS USB Port 2 RESET */
++	hsusb2_reset: hsusb2_reset {
 +		compatible = "gpio-reset";
-+		reset-gpios = <&gpio2 30 GPIO_ACTIVE_LOW>; /* gpio_62 */
++		reset-gpios = <&gpio5 19 GPIO_ACTIVE_LOW>; /* gpio_147 */
 +		reset-delay-us = <70000>;
 +		initially-in-reset;
 +		#reset-cells = <0>;
- 	};
- 
- 	/* HS USB Port 1 Power */
-@@ -97,7 +90,8 @@
- 	/* HS USB Host PHY on PORT 1 */
- 	hsusb1_phy: hsusb1_phy {
- 		compatible = "usb-nop-xceiv";
--		reset-supply = <&hsusb1_reset>;
-+		resets = <&hsusb1_reset>;
++	};
++
++	/* HS USB Port 2 Power */
++	hsusb2_power: hsusb2_power_reg {
++		compatible = "regulator-fixed";
++		regulator-name = "hsusb2_vbus";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
++		startup-delay-us = <70000>;
++	};
++
++	/* HS USB Host PHY on PORT 2 */
++	hsusb2_phy: hsusb2_phy {
++		compatible = "usb-nop-xceiv";
++		resets = <&hsusb2_reset>;
 +		reset-names = "reset";
- 		vcc-supply = <&hsusb1_power>;
- 	/**
- 	 * FIXME:
++		vcc-supply = <&hsusb2_power>;
++	};
+ };
+ 
+ &omap3_pmx_wkup {
+@@ -79,6 +106,37 @@
+ 	};
+ };
+ 
++&omap3_pmx_core {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++			&hsusbb2_pins
++	>;
++
++	uart3_pins: pinmux_uart3_pins {
++		pinctrl-single,pins = <
++			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
++			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx OUTPUT | MODE0 */
++		>;
++	};
++
++	hsusbb2_pins: pinmux_hsusbb2_pins {
++		pinctrl-single,pins = <
++			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
++			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
++			0x5c4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
++			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
++			0x5c8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
++			0x5cA (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
++			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
++			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
++			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
++			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
++			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
++			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
++		>;
++	};
++};
++
+ &i2c1 {
+ 	clock-frequency = <2600000>;
+ 
+@@ -148,15 +206,6 @@
+ 	power = <50>;
+ };
+ 
+-&omap3_pmx_core {
+-	uart3_pins: pinmux_uart3_pins {
+-		pinctrl-single,pins = <
+-			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
+-			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx OUTPUT | MODE0 */
+-		>;
+-	};
+-};
+-
+ &uart3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_pins>;
+@@ -166,3 +215,11 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&gpio1_pins>;
+ };
++
++&usbhshost {
++	port2-mode = "ehci-phy";
++};
++
++&usbhsehci {
++	phys = <0 &hsusb2_phy>;
++};
 -- 
 1.7.4.1
