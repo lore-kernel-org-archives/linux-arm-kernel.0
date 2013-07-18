@@ -1,30 +1,34 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 18 Jul 2013 21:46:58 +0530
-Subject: [PATCH 1/3] dmaengine: add dma_get_slave_sg_limits()
-In-Reply-To: <1374166001-31340-2-git-send-email-joelf@ti.com>
-References: <1374166001-31340-1-git-send-email-joelf@ti.com>
- <1374166001-31340-2-git-send-email-joelf@ti.com>
-Message-ID: <20130718161658.GW16653@intel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 18 Jul 2013 10:58:46 -0600
+Subject: [PATCH] ASoC: tegra: depend on ARCH_TEGRA, not ARCH_TEGRA_*
+In-Reply-To: <20130718095815.GE22506@sirena.org.uk>
+References: <1374013667-21435-1-git-send-email-swarren@wwwdotorg.org>
+ <20130717083003.GA22506@sirena.org.uk> <51E6CDEA.7060003@wwwdotorg.org>
+ <20130717175701.GY22506@sirena.org.uk> <51E6E107.8020300@wwwdotorg.org>
+ <20130717223309.GZ22506@sirena.org.uk> <51E7203A.2020007@wwwdotorg.org>
+ <20130718095815.GE22506@sirena.org.uk>
+Message-ID: <51E81EC6.2040802@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 11:46:39AM -0500, Joel Fernandes wrote:
-> From: Matt Porter <mporter@ti.com>
+On 07/18/2013 03:58 AM, Mark Brown wrote:
+> On Wed, Jul 17, 2013 at 04:52:42PM -0600, Stephen Warren wrote:
 > 
-> Add a dmaengine API to retrieve slave SG transfer limits.
+>> The key to enable tegra30_i2s.c should really be
+>> ARCH_TEGRA_3x_SOC || ARCH_TEGRA_114_SOC, which gets a bit
+>> unwieldy once you have, say, 4 different SoCs in that list and a
+>> similar list starts to apply to a lot of different
+>> HW-modules/drivers. Even creating an ARCH_TEGRA_30_OR_LATER_SOC
+>> will get problematic, since defining "or later" will likely
+>> become progressively more complex over time, as we start putting
+>> our more SoCs. What are your thoughts on the best way to solve
+>> that?
 > 
-> The API is optionally implemented by dmaengine drivers and when
-> unimplemented will return a NULL pointer. A client driver using
-> this API provides the required dma channel, address width, and
-> burst size of the transfer. dma_get_slave_sg_limits() returns an
-> SG limits structure with the maximum number and size of SG segments
-> that the given channel can handle.
-Hi Joel,
+> Can't you just say Tegra 20 or later is Tegra 20 plus Tegra 30 or
+> later and so on?
 
-I have already resurrected this and generalized the API to get the slave
-capablities. 
-https://lkml.org/lkml/2013/7/15/147
-
-Please start using this API
-
-~Vinod
+For the chips that are supported upstream right now, that would work.
+However, I'm not sure that life will be quite so linear in the future.
+In other words, what is "or later" for, say, the SDHCI controller may
+not be the same as what is "or later" for, say, the I2C controller.
+(feel free to substitute arbitrary HW modules into that statement).
