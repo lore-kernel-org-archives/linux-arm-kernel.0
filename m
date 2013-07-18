@@ -1,61 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Jul 2013 00:02:20 -0700
-Subject: [PATCH 04/15] ARM: OMAP: USB: Add phy binding information
-In-Reply-To: <1374129984-765-5-git-send-email-kishon@ti.com>
-References: <1374129984-765-1-git-send-email-kishon@ti.com>
- <1374129984-765-5-git-send-email-kishon@ti.com>
-Message-ID: <20130718070219.GM7656@atomide.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Thu, 18 Jul 2013 09:04:02 +0200
+Subject: [PATCH v1 05/24] clk: wrap I/O access for improved portability
+In-Reply-To: <20130715193829.GS14452@pengutronix.de>
+References: <1373914074-20889-1-git-send-email-gsi@denx.de>
+ <1373914074-20889-6-git-send-email-gsi@denx.de>
+ <20130715193829.GS14452@pengutronix.de>
+Message-ID: <20130718070402.GO7080@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [130717 23:53]:
-> In order for controllers to get PHY in case of non dt boot, the phy
-> binding information (phy device name) should be added in the platform
-> data of the controller.
+On Mon, Jul 15, 2013 at 21:38 +0200, Sascha Hauer wrote:
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> ---
->  arch/arm/mach-omap2/usb-musb.c |    3 +++
->  include/linux/usb/musb.h       |    3 +++
->  2 files changed, 6 insertions(+)
+> On Mon, Jul 15, 2013 at 08:47:34PM +0200, Gerhard Sittig wrote:
+> > diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> > index 6d55eb2..2c07061 100644
+> > --- a/drivers/clk/clk-divider.c
+> > +++ b/drivers/clk/clk-divider.c
+> > @@ -104,7 +104,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+> >  	struct clk_divider *divider = to_clk_divider(hw);
+> >  	unsigned int div, val;
+> >  
+> > -	val = readl(divider->reg) >> divider->shift;
+> > +	val = clk_readl(divider->reg) >> divider->shift;
+> >  	val &= div_mask(divider);
 > 
-> diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-> index 8c4de27..6aa7cbf 100644
-> --- a/arch/arm/mach-omap2/usb-musb.c
-> +++ b/arch/arm/mach-omap2/usb-musb.c
-> @@ -85,6 +85,9 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
->  	musb_plat.mode = board_data->mode;
->  	musb_plat.extvbus = board_data->extvbus;
->  
-> +	if (cpu_is_omap34xx())
-> +		musb_plat.phy_label = "twl4030";
-> +
->  	if (soc_is_am35xx()) {
->  		oh_name = "am35x_otg_hs";
->  		name = "musb-am35x";
+> Would it be an option to use regmap for the generic dividers/muxes
+> instead? This should be suitable for ppc and also for people who want to
+> use the generic clocks on i2c devices.
 
-I don't think there's a USB PHY on non-twl4030 chips, so this should
-be OK:
+Some other thought crossed my mind regarding access to clock
+control registers that reside behind some communication channel
+like I2C:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+The common clock API assumes (it's part of the contract) that
+there are potentially expensive operations like get, put, prepare
+and unprepare, as well as swift and non-blocking operations like
+enable and disable.
+
+Would the regmap abstraction hide the potentially blocking nature
+of a register access (I understand that you can implement "local"
+as well as "remote" register sets by this mechanism)?  Or could
+you still meet the assumptions or requirements of the common
+clock API?
+
+It might as well be the responsibility of the clock driver's
+implementor to arrange for the availability of non-blocking
+enable/disable operations, just as it is today.  Such that
+expensive register access need not be forbidden in general.
 
 
-> diff --git a/include/linux/usb/musb.h b/include/linux/usb/musb.h
-> index 053c268..596f8c8 100644
-> --- a/include/linux/usb/musb.h
-> +++ b/include/linux/usb/musb.h
-> @@ -104,6 +104,9 @@ struct musb_hdrc_platform_data {
->  	/* for clk_get() */
->  	const char	*clock;
->  
-> +	/* phy label */
-> +	const char	*phy_label;
-> +
->  	/* (HOST or OTG) switch VBUS on/off */
->  	int		(*set_vbus)(struct device *dev, int is_on);
->  
-> -- 
-> 1.7.10.4
-> 
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
