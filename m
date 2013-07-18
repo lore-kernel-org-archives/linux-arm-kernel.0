@@ -1,27 +1,33 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 17 Jul 2013 19:39:18 -0700
-Subject: [PATCH 0/3] Cleanup sched_clock.h users
-Message-ID: <1374115161-675-1-git-send-email-sboyd@codeaurora.org>
+Date: Wed, 17 Jul 2013 19:39:19 -0700
+Subject: [PATCH 1/3] clocksource: orion: Use linux/sched_clock.h
+In-Reply-To: <1374115161-675-1-git-send-email-sboyd@codeaurora.org>
+References: <1374115161-675-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1374115161-675-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset cleans up the last few stragglers using the sched_clock.h
-header file in asm and removes the asm header.
+The sched_clock.h include is under include/linux now.
 
-A new one appeared in drivers/clocksource so I'm not sure who
-wants to take that one.
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clocksource/time-orion.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Stephen Boyd (3):
-  clocksource: orion: Use linux/sched_clock.h
-  ARM: clps711x: Use linux/sched_clock.h
-  ARM: Remove temporary sched_clock.h header
-
- arch/arm/include/asm/sched_clock.h | 4 ----
- arch/arm/mach-clps711x/common.c    | 2 +-
- drivers/clocksource/time-orion.c   | 2 +-
- 3 files changed, 2 insertions(+), 6 deletions(-)
- delete mode 100644 arch/arm/include/asm/sched_clock.h
-
+diff --git a/drivers/clocksource/time-orion.c b/drivers/clocksource/time-orion.c
+index ecbeb68..9c7f018 100644
+--- a/drivers/clocksource/time-orion.c
++++ b/drivers/clocksource/time-orion.c
+@@ -19,7 +19,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/spinlock.h>
+-#include <asm/sched_clock.h>
++#include <linux/sched_clock.h>
+ 
+ #define TIMER_CTRL		0x00
+ #define  TIMER0_EN		BIT(0)
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
