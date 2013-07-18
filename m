@@ -1,42 +1,57 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 18 Jul 2013 14:02:24 +0200
-Subject: [PATCH] ARM: omap2: fix musb usage for n8x0
-In-Reply-To: <51E7B81A.70103@denx.de>
-References: <1374000777-5626-1-git-send-email-zonque@gmail.com>
- <51E7B1FF.6000301@denx.de> <51E7B2FA.7020206@ti.com> <51E7B81A.70103@denx.de>
-Message-ID: <51E7D950.60900@gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 18 Jul 2013 15:01:17 +0300
+Subject: [PATCH 3/3] ARM: dts: omap4-sdp: add dynamic pin states for
+ uart3/4
+In-Reply-To: <20130718090408.GU7656@atomide.com>
+References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
+ <1374061312-25469-4-git-send-email-grygorii.strashko@ti.com>
+ <20130717153248.GI7656@atomide.com> <51E6C939.40208@ti.com>
+ <20130718080953.GR7656@atomide.com> <51E7AD38.6010108@ti.com>
+ <20130718090408.GU7656@atomide.com>
+Message-ID: <51E7D90D.6070101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.07.2013 11:40, Stefan Roese wrote:
-> On 07/18/2013 11:18 AM, Kishon Vijay Abraham I wrote:
->>> I'm testing musb as OTG on beagleboard (old one, not Beagle-xm). And
->>> using the latest kernel.org version with this patch applied I see the
->>> following messages while booting (repeatedly):
->>>
->>> [    4.998168] usb usb1: bus auto-suspend, wakeup 1
->>> [    5.003112] musb_bus_suspend 2457: trying to suspend as b_idle while active
->>> [    5.010498] usb usb1: bus suspend fail, err -16
->>> [    5.015289] hub 1-0:1.0: hub_resume
->>> [    5.019073] hub 1-0:1.0: state 7 ports 1 chg 0000 evt 0000
->>> [    5.024963] hub 1-0:1.0: hub_suspend
->>> [    5.028778] usb usb1: bus auto-suspend, wakeup 1
->>> ...
->>>
->>> This is without a cable connected to the OTG port.
->>>
->>> Any ideas what might be missing here?
+Hi Tony,
+
+On 07/18/2013 12:04 PM, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [130718 02:01]:
+>> On 07/18/2013 11:09 AM, Tony Lindgren wrote:
 >>
->> Even I observed these prints when I have dual mode enabled. When kept as gadget
->> only mode I dint see these prints.
-> 
-> Yes. With gadget-only I don't see those messages. Thanks for the hint.
+>> Don't think it's debug code - IO chain need to be rearmed after each
+>> PRCM IO IRQ - otherwise IO wakeup events may be lost (at least on
+>> OMAP4, OMAP5 requires more complex handling(( ).
+>
+> Nope, only after the mux register changes. I've verified it on
+> am3730 with off-idle for both serial and wl12xx.
 
-So in which mode does your port operate then? Gadget or dual-role? And I
-take it this does not happen with 3.10?
+Unfortunately, there is a possibility to lose wake up events in case if
+IO daisy chain will be rearmed (this will clean up all WAKEUPEVENT bits)
+while there is some pending  WAKEUP event present. In this case, 
+pcs_omap_handle_irq() will not call generic_handle_irq(wakeirq).
 
-Unfortunately, I have no board here anymore with such a port in
-dual-role mode ...
+The below patch contains explanation of such kind of issue we've solved
+in K3.4
+http://git.omapzoom.org/?p=kernel/omap.git;a=commit;h=5ff316db224a2c3c23bfe44261275d520b4f78bb
+
+Currently, in Mainline the same is possible on OMAP4 (which is SMP) if
+some Device will be switched to idle and rearm IO chain while there is
+pending WAKEUP event form USB for example. So, IO rearming need to be 
+delayed until PRCM irq will be served served and PRCM irq handler should 
+finally rearm IO daisy chain.
 
 
-Daniel
+>
+>> I didn't pick up your padconf patches yet -seems i need to be in sync :)
+>
+> Well you need those for proper wake-up event support..
+>
+>> Below the diff I used to verify IO wake up (It follows old IO daisy
+>> chain hanlding models in hwmod before DT):
+>
+> ..then these changes not needed with the pinctrl-single changes.
+>
+> Regards,
+>
+> Tony
+>
