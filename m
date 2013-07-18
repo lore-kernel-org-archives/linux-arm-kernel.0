@@ -1,106 +1,26 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 18 Jul 2013 03:35:16 +0200
-Subject: [PATCH V2 5/5] ARM: remove #gpio-ranges-cells property
-In-Reply-To: <1373913629-32179-5-git-send-email-swarren@wwwdotorg.org>
-References: <1373913629-32179-1-git-send-email-swarren@wwwdotorg.org>
- <1373913629-32179-5-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1425430.efevqzjIZK@avalon>
+From: nfortino@nvidia.com (Nickolas Fortino)
+Date: Wed, 17 Jul 2013 18:48:37 -0700
+Subject: preempted dup_mm misses TLB invalidate
+In-Reply-To: <20130717212148.GV24642@n2100.arm.linux.org.uk>
+References: <51E43D2B.9090709@nvidia.com>
+ <20130717192746.GE16496@MacBook-Pro.local> <51E6F60D.6060804@wwwdotorg.org>
+ <51E6FA10.5070504@nvidia.com> <20130717203409.GU24642@n2100.arm.linux.org.uk>
+ <51E706A6.4040309@nvidia.com> <20130717212148.GV24642@n2100.arm.linux.org.uk>
+Message-ID: <51E74975.9040105@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On 7/17/2013 2:21 PM, Russell King - ARM Linux wrote:
+> I'm
+> willing to bet that the behaviour you observe on ARM is inherently visible
+> on many of the other Linux architectures.
 
-On Monday 15 July 2013 12:40:29 Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> This property is no longer required by the GPIO binding. Remove it.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
-> This should presumably be applied along with the previous changes
+Based on the discussion from this thread, I agree there is nothing 
+architecture specific here. This behavior also appears legal, so long as 
+any page with write permissions in the TLB is considered dirty in the 
+linux PTE structure.
 
-The mach-shmobile tree includes patches for v3.12 that will add the #gpio-
-ranges-cells to several .dtsi files. I can get that fixed locally (most 
-probably through a rebase), could you please ping me when this series will be 
-accepted for upstream merge ?
-
-> v2: Squash spear and mxc changes into a single patch; there's no
-> need to keep vf610.dtsi separate now that this series will go into
-> v3.12 or later, and that file is part of v3.11-rc1.
-> ---
->  arch/arm/boot/dts/spear1310.dtsi | 1 -
->  arch/arm/boot/dts/spear1340.dtsi | 1 -
->  arch/arm/boot/dts/spear310.dtsi  | 1 -
->  arch/arm/boot/dts/spear320.dtsi  | 2 --
->  arch/arm/boot/dts/vf610.dtsi     | 1 -
->  5 files changed, 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/spear1310.dtsi
-> b/arch/arm/boot/dts/spear1310.dtsi index 122ae94..90e99b5 100644
-> --- a/arch/arm/boot/dts/spear1310.dtsi
-> +++ b/arch/arm/boot/dts/spear1310.dtsi
-> @@ -89,7 +89,6 @@
->  		pinmux: pinmux at e0700000 {
->  			compatible = "st,spear1310-pinmux";
->  			reg = <0xe0700000 0x1000>;
-> -			#gpio-range-cells = <3>;
->  		};
-> 
->  		apb {
-> diff --git a/arch/arm/boot/dts/spear1340.dtsi
-> b/arch/arm/boot/dts/spear1340.dtsi index 54d128d..5003013 100644
-> --- a/arch/arm/boot/dts/spear1340.dtsi
-> +++ b/arch/arm/boot/dts/spear1340.dtsi
-> @@ -63,7 +63,6 @@
->  		pinmux: pinmux at e0700000 {
->  			compatible = "st,spear1340-pinmux";
->  			reg = <0xe0700000 0x1000>;
-> -			#gpio-range-cells = <3>;
->  		};
-> 
->  		pwm: pwm at e0180000 {
-> diff --git a/arch/arm/boot/dts/spear310.dtsi
-> b/arch/arm/boot/dts/spear310.dtsi index 9537208..1e1318e 100644
-> --- a/arch/arm/boot/dts/spear310.dtsi
-> +++ b/arch/arm/boot/dts/spear310.dtsi
-> @@ -25,7 +25,6 @@
->  		pinmux: pinmux at b4000000 {
->  			compatible = "st,spear310-pinmux";
->  			reg = <0xb4000000 0x1000>;
-> -			#gpio-range-cells = <3>;
->  		};
-> 
->  		fsmc: flash at 44000000 {
-> diff --git a/arch/arm/boot/dts/spear320.dtsi
-> b/arch/arm/boot/dts/spear320.dtsi index ffea342..f630d0c 100644
-> --- a/arch/arm/boot/dts/spear320.dtsi
-> +++ b/arch/arm/boot/dts/spear320.dtsi
-> @@ -1,4 +1,3 @@
-> -/*
->   * DTS file for SPEAr320 SoC
->   *
->   * Copyright 2012 Viresh Kumar <viresh.linux@gmail.com>
-> @@ -24,7 +23,6 @@
->  		pinmux: pinmux at b3000000 {
->  			compatible = "st,spear320-pinmux";
->  			reg = <0xb3000000 0x1000>;
-> -			#gpio-range-cells = <3>;
->  		};
-> 
->  		clcd at 90000000 {
-> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-> index e1eb7da..8577780 100644
-> --- a/arch/arm/boot/dts/vf610.dtsi
-> +++ b/arch/arm/boot/dts/vf610.dtsi
-> @@ -162,7 +162,6 @@
->  			iomuxc: iomuxc at 40048000 {
->  				compatible = "fsl,vf610-iomuxc";
->  				reg = <0x40048000 0x1000>;
-> -				#gpio-range-cells = <3>;
-> 
->  				/* functions and groups pins */
--- 
-Regards,
-
-Laurent Pinchart
+I had missed the specification for fork() is silent on what happens to 
+MAP_PRIVATE memory modifications which occur during the execution of 
+fork(); it merely specifies what happens to writes which occur prior to 
+fork being called and after fork returns.
