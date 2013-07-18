@@ -1,130 +1,66 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 18 Jul 2013 10:18:49 +0200
-Subject: [PATCH V2 6/8] serial: at91: make DBGU support dma and pdc
- transfers
-In-Reply-To: <1373942627-7121-7-git-send-email-elen.song@atmel.com>
+Date: Thu, 18 Jul 2013 10:19:47 +0200
+Subject: [PATCH V2 0/8] serial: at91: make usart and uart support dma
+ transfer
+In-Reply-To: <1373942627-7121-1-git-send-email-elen.song@atmel.com>
 References: <1373942627-7121-1-git-send-email-elen.song@atmel.com>
- <1373942627-7121-7-git-send-email-elen.song@atmel.com>
-Message-ID: <20130718081849.GD16015@ns203013.ovh.net>
+Message-ID: <20130718081947.GE16015@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:43 Tue 16 Jul     , Elen Song wrote:
-> Because the DBGU lack of receive timeout register, so we use a timer to trigger
-> data receive.
+Hi,
 
-please re-order the patch put patch 7 before 6
-so we can distinguish the uart type not by line = 0 which is wrong as if you
-can have no dbgu registered and line == 0 can be a normal usart
+	except the comment this looks good
 
 Best Regards,
 J.
+On 10:43 Tue 16 Jul     , Elen Song wrote:
+> After at91sam9g45 socs, the usart only support dma transfer.
+> This patch serial focus on:
+> 1) distinguish pdc and dma transfer
+> 2) support usart dma rx and tx transfer
+> 3) distinguish usart and uart
+> 4) support uart dma rx and tx transfer
 > 
-> Signed-off-by: Elen Song <elen.song@atmel.com>
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  drivers/tty/serial/atmel_serial.c |   48 ++++++++++++++++++++++++++++++++-----
->  1 file changed, 42 insertions(+), 6 deletions(-)
+> For those only support PDC transfer socs, we use "atmel,use-dma-rx/tx" to establish a PDC transfer.
+> For those only support DMA transfer socs, we not only use "atmel,use-dma-rx/tx", but also describe dma binding to establish a DMA transfer. 
+> We switch the name from "use-dma" to "use-pdc" in serial driver to state more clearly.
+> We also distinguish usart and uart by read ip name, the dbgu is regard as a uart.
+> Because uart lack timeout function, we use software timer to trigger rx.
 > 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index ad787fd1..afecdfa 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -41,6 +41,7 @@
->  #include <linux/uaccess.h>
->  #include <linux/pinctrl/consumer.h>
->  #include <linux/platform_data/atmel.h>
-> +#include <linux/timer.h>
->  
->  #include <asm/io.h>
->  #include <asm/ioctls.h>
-> @@ -167,6 +168,7 @@ struct atmel_uart_port {
->  
->  	struct serial_rs485	rs485;		/* rs485 settings */
->  	unsigned int		tx_done_mask;
-> +	struct timer_list       uart_timer;     /* dbgu timer */
->  	int (*prepare_rx)(struct uart_port *port);
->  	int (*prepare_tx)(struct uart_port *port);
->  	void (*schedule_rx)(struct uart_port *port);
-> @@ -821,6 +823,9 @@ static void atmel_release_rx_dma(struct uart_port *port)
->  	atmel_port->desc_rx = NULL;
->  	atmel_port->chan_rx = NULL;
->  	atmel_port->cookie_rx = -EINVAL;
-> +
-> +	if (port->line == 0)
-> +		del_timer_sync(&atmel_port->uart_timer);
->  }
->  
->  static void atmel_rx_from_dma(struct uart_port *port)
-> @@ -950,6 +955,15 @@ chan_err:
->  	return -EINVAL;
->  }
->  
-> +static void atmel_uart_timer_callback(unsigned long data)
-> +{
-> +	struct uart_port *port = (void *)data;
-> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-> +
-> +	tasklet_schedule(&atmel_port->tasklet);
-> +	mod_timer(&atmel_port->uart_timer, jiffies + uart_poll_timeout(port));
-> +}
-> +
->  /*
->   * receive interrupt handler.
->   */
-> @@ -1213,6 +1227,9 @@ static void atmel_release_rx_pdc(struct uart_port *port)
->  				 DMA_FROM_DEVICE);
->  		kfree(pdc->buf);
->  	}
-> +
-> +	if (port->line == 0)
-> +		del_timer_sync(&atmel_port->uart_timer);
->  }
->  
->  static void atmel_rx_from_pdc(struct uart_port *port)
-> @@ -1546,17 +1563,36 @@ static int atmel_startup(struct uart_port *port)
->  
->  	if (atmel_use_pdc_rx(port)) {
->  		/* set UART timeout */
-> -		UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
-> -		UART_PUT_CR(port, ATMEL_US_STTTO);
-> +		if (port->line == 0) {
-> +			setup_timer(&atmel_port->uart_timer,
-> +					atmel_uart_timer_callback,
-> +					(unsigned long)port);
-> +			mod_timer(&atmel_port->uart_timer,
-> +					jiffies + uart_poll_timeout(port));
-> +		/* set USART timeout */
-> +		} else {
-> +			UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
-> +			UART_PUT_CR(port, ATMEL_US_STTTO);
->  
-> -		UART_PUT_IER(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT);
-> +			UART_PUT_IER(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT);
-> +		}
->  		/* enable PDC controller */
->  		UART_PUT_PTCR(port, ATMEL_PDC_RXTEN);
->  	} else if (atmel_use_dma_rx(port)) {
-> -		UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
-> -		UART_PUT_CR(port, ATMEL_US_STTTO);
-> +		/* set UART timeout */
-> +		if (port->line == 0) {
-> +			setup_timer(&atmel_port->uart_timer,
-> +					atmel_uart_timer_callback,
-> +					(unsigned long)port);
-> +			mod_timer(&atmel_port->uart_timer,
-> +					jiffies + uart_poll_timeout(port));
-> +		/* set USART timeout */
-> +		} else {
-> +			UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
-> +			UART_PUT_CR(port, ATMEL_US_STTTO);
->  
-> -		UART_PUT_IER(port, ATMEL_US_TIMEOUT);
-> +			UART_PUT_IER(port, ATMEL_US_TIMEOUT);
-> +		}
->  	} else {
->  		/* enable receive only */
->  		UART_PUT_IER(port, ATMEL_US_RXRDY);
+> Compare to v1, this patch serials improve:
+> 1) use function pointer instead of if/else
+> 2) "atmel,use-dma-rx/tx" represent a PDC transfer,
+>    but when add the dma bindings, it is a dma transfer
+> 3) do not use strncmp in get ip name
+> 4) remove modification in documentation part
+> 
+> Elen Song (7):
+>   serial: at91: correct definition from DMA to PDC
+>   serial: at91: add tx dma support
+>   serial: at91: add rx dma support
+>   serial: at91: make DBGU support dma and pdc transfers
+>   serial: at91: distinguish usart and uart
+>   serial: at91: modify UART to use software timer to trigger rx
+>   serial: at91: add dma support in usart binding descriptions
+> 
+>  Documentation/devicetree/bindings/serial/rs485.txt |    4 +-
+>  .../devicetree/bindings/tty/serial/atmel-usart.txt |   29 +-
+>  arch/arm/boot/dts/at91rm9200.dtsi                  |   16 +-
+>  arch/arm/boot/dts/at91sam9260.dtsi                 |   24 +-
+>  arch/arm/boot/dts/at91sam9263.dtsi                 |   12 +-
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 |   16 +-
+>  arch/arm/mach-at91/at91rm9200_devices.c            |   20 +-
+>  arch/arm/mach-at91/at91sam9260_devices.c           |   28 +-
+>  arch/arm/mach-at91/at91sam9261_devices.c           |   16 +-
+>  arch/arm/mach-at91/at91sam9263_devices.c           |   16 +-
+>  arch/arm/mach-at91/at91sam9g45_devices.c           |   20 +-
+>  arch/arm/mach-at91/at91sam9rl_devices.c            |   20 +-
+>  drivers/tty/serial/atmel_serial.c                  |  582 ++++++++++++++++++--
+>  include/linux/atmel_serial.h                       |    2 +
+>  include/linux/platform_data/atmel.h                |    2 +
+>  15 files changed, 665 insertions(+), 142 deletions(-)
+> 
 > -- 
 > 1.7.9.5
 > 
