@@ -1,89 +1,70 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 18 Jul 2013 19:03:23 +0100
-Subject: [PATCH 1/4] ARM: vexpress/dcscb: fix cache disabling sequences
-In-Reply-To: <alpine.LFD.2.03.1307181231510.14924@syhkavp.arg>
-References: <1374118116-16836-1-git-send-email-nicolas.pitre@linaro.org>
- <1374118116-16836-2-git-send-email-nicolas.pitre@linaro.org>
- <20130718150408.GB2655@localhost.localdomain>
- <alpine.LFD.2.03.1307181231510.14924@syhkavp.arg>
-Message-ID: <20130718180323.GC2655@localhost.localdomain>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 18 Jul 2013 12:11:07 -0600
+Subject: Issue with gpio and pinmux
+In-Reply-To: <51E667BC.3070804@parrot.com>
+References: <51E667BC.3070804@parrot.com>
+Message-ID: <51E82FBB.1080905@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 01:24:48PM -0400, Nicolas Pitre wrote:
-> [ added Russell for his opinion on the patch below ]
-
-[...]
-
-> commit 390cf8b9b83eeeebdfef51912f5003a6a9b84115
-> Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Date:   Thu Jul 18 13:12:48 2013 -0400
+On 07/17/2013 03:45 AM, Damien Riegel wrote:
+> Hi,
 > 
->     ARM: cacheflush: consolidate single-CPU ARMv7 cache disabling code
->     
->     This code is becoming duplicated in many places.  So let's consolidate
->     it into a handy macro that is known to be right and available for reuse.
->     
->     Signed-off-by: Nicolas Pitre <nico@linaro.org>
 > 
-> diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-> index 17d0ae8672..8a76933e80 100644
-> --- a/arch/arm/include/asm/cacheflush.h
-> +++ b/arch/arm/include/asm/cacheflush.h
-> @@ -436,4 +436,33 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
->  #define sync_cache_w(ptr) __sync_cache_range_w(ptr, sizeof *(ptr))
->  #define sync_cache_r(ptr) __sync_cache_range_r(ptr, sizeof *(ptr))
->  
-> +/*
-> + * Disabling cache access for one CPU in an ARMv7 SMP system is tricky.
-> + * To do so we must:
-> + *
-> + * - Clear the SCTLR.C bit to prevent further cache allocations
-> + * - Flush the desired level of cache
-> + * - Clear the ACTLR "SMP" bit to disable local coherency
-> + *
-> + * ... and so without any intervening memory access in between those steps,
-> + * not even to the stack.
-> + *
-> + * The clobber list is dictated by the call to v7_flush_dcache_*.
-> + */
-> +#define v7_disable_flush_cache(level) \
-> +	asm volatile( \
-> +	"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t" \
-> +	"bic	r0, r0, #"__stringify(CR_C)" \n\t" \
-> +	"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t" \
-> +	"isb	\n\t" \
-> +	"bl	v7_flush_dcache_"__stringify(level)" \n\t" \
-> +	"clrex	\n\t" \
-> +	"mrc	p15, 0, r0, c1, c0, 1	@ get AUXCR \n\t" \
-> +	"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t" \
-> +	"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t" \
-> +	"isb	\n\t" \
-> +	"dsb	" \
-> +	: : : "r0","r1","r2","r3","r4","r5","r6","r7", \
-> +	      "r9","r10","r11","lr","memory" )
-> +
->  #endif
+> In our ARM-based SoC, we can multiplex up to 4 functions on each pin,
+> but we have an issue when using a pin as a gpio: it can still be muxed
+> as another function.
 
-That's roughly what I had in mind, though it might belong somewhere more
-obscure than cacheflush.h(?)
+It's a good idea to Cc the maintainers of the subsystem you're asking
+questions about. See the MAINTAINERS file in the kernel source tree for
+clues who that is. I've CC'd LinusW here.
 
-"disable_flush_cache" sounds a too general-purpose for my liking.
+When you say "it can still be muxed as another function", I assume you
+mean that SW is allowing someone to do that; it's not that your HW
+allows this somehow?
 
-"v7" isn't really right because we touch the ACTLR.  This only works
-on certain CPUs and when Linux is running Secure.  Maybe saying "a15"
-instead of "a7" is reasonable, since a7 is supposed to be an a15
-workalike in most places.
+> In the gpio driver, we delegate calls to "request" to
+> "pinctrl_request_gpio":
+> 
+> 	static int p7gpio_request(struct gpio_chip *chip, unsigned int offset)
+> 	{
+> 		return pinctrl_request_gpio(chip->base + offset);
+> 	}
+> 
+> 	static const struct gpio_chip p7gpio_chip_defaults = {
+> 		.request            = p7gpio_request,
+> 		[...]
+> 	};
+> 
+> pinctrl_request_gpio will result in a call to pin_request, which behaves
+> differently if we request a gpio or another function, so at kernel
+> level they are not exclusive, but at hardware level they must be.
 
-I had other names in mind, like "coherency_exit" or "cache_exit".
-Those are not very intelligible, but that might at least make people
-pause and think before blindly using it.
+Yes, that's how pinctrl is implemented right now.
 
-Really, it's for the very specific purpose of doing native low-level
-powerdown of an individual CPU in a multiprocessor system, when the
-platform as a whole is not being shut down, on A15 or A7 (+ possibly
-other future v7 CPUs)... it's not suitable for any other situation.
-Even kexec probably shouldn't be disabling the SMP bit.
+The issue is that some HW muxes groups of pins at a time, so simply
+because that group of pins is "claimed" by a mux function, implies
+nothing about which specific pins in that group are actually used; some
+may actually still be free for usage as a GPIO.
 
-Cheers
----Dave
+Now obviously that doesn't make a huge amount of sense if your HW muxes
+each pin individually, so there are no groups.
+
+The solution here may be one of:
+
+a) Modify pinctrl /not/ to allow both a GPIO and a mux function to claim
+a pin *if* the group that contains the pin only contains a single pin.
+This is a bit of a hacky special case though; there are other situations
+where "dual claiming" shouldn't be allowed, and this doesn't solve those.
+
+b) Ignore the issue; if the system configuration is correct, the issue
+won't cause problems in practice, since nothing will be configured to
+"dual claim" any pin.
+
+c) Enhance pinctrl with extra information, so it knows which pins in a
+group are usable as GPIO even when the group is claimed by a mux
+function. The list of pins could theoretically vary per mux function, so
+you'd need a table with lookup key (pin group, mux function) and output
+data (list of pins that can be "dual claimed"). This would be a complete
+solution. If a list wasn't provided, the pinctrl core could assume that
+mean no dual claim was allowed.
