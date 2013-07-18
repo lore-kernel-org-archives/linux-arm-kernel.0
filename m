@@ -1,75 +1,51 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 18 Jul 2013 16:38:57 -0400 (EDT)
-Subject: [PATCH V3 6/6] USB: OHCI: make ohci-s3c2410 a separate driver
-In-Reply-To: <1372141408-9894-7-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1307181634380.1245-100000@iolanthe.rowland.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 18 Jul 2013 14:40:55 -0600
+Subject: [PATCH v2 20/22] iommu/tegra: smmu: Get "nvidia,memory-client"
+ from DT
+In-Reply-To: <1373021097-32420-21-git-send-email-hdoyu@nvidia.com>
+References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
+ <1373021097-32420-21-git-send-email-hdoyu@nvidia.com>
+Message-ID: <51E852D7.4070302@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Jun 2013, Manjunath Goudar wrote:
+On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
+> This provides the info about which swgroups a device belongs to. This
+> info is passed from DT. This is necessary for the unified SMMU driver
+> among Tegra SoCs since each has different H/W accelerators.
 
-> Separate the Samsung OHCI S3CXXXX host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> it would be nice to have in 3.11.
+> diff --git a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
 
-This patch looks very good.  I have only two very small nits:
+> @@ -11,6 +11,7 @@ Required properties:
+>  - nvidia,swgroups: A bitmap of supported HardWare Accelerators(HWA).
+>    Each bit represents one swgroup. The assignments may be found in header
+>    file <dt-bindings/memory/tegra-swgroup.h>.
+> +- nvidia,memory-client: Indicates which swgroups a device belongs to.
 
-> diff --git a/drivers/usb/host/ohci-s3c2410.c b/drivers/usb/host/ohci-s3c2410.c
-> index e125770..b0f6644 100644
-> --- a/drivers/usb/host/ohci-s3c2410.c
-> +++ b/drivers/usb/host/ohci-s3c2410.c
-> @@ -19,17 +19,34 @@
->   * This file is licenced under the GPL.
->  */
->  
-> -#include <linux/platform_device.h>
->  #include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
->  #include <linux/platform_data/usb-ohci-s3c2410.h>
-> +#include <linux/usb.h>
-> +#include <linux/usb/hcd.h>
-> +
-> +#include "ohci.h"
-> +
->  
->  #define valid_port(idx) ((idx) == 1 || (idx) == 2)
->  
->  /* clock device associated with the hcd */
->  
-> +
-> +#define DRIVER_DESC "OHCI S3CXXXX driver"
-> +
-> +static const char hcd_name[] = "ohci-s3cxxxx";
-> +
->  static struct clk *clk;
->  static struct clk *usb_clk;
->  
-> +static int (*orig_ohci_hub_control)(struct usb_hcd  *hcd, u16 typeReq,
-> +			u16 wValue, u16 wIndex, char *buf, u16 wLength);
-> +static int (*orig_ohci_hub_status_data)(struct usb_hcd *hcd, char *buf);
-> +
->  /* forward definitions */
+The list of properties you're adding to is for the SMMU node itself. If
+specific properties need to exist in SMMU client nodes, you need to
+create a separate section/list in the document for that. For example,
+see the clear distinction between sections (1) and (2) in
+Documentation/devicetree/bindings/gpio/gpio.txt.
 
-Do you understand what "forward definitions" means?  It refers to 
-declarations of functions whose actual code is given later.  In other 
-words, your declarations of orig_ohci_hub_control and 
-orig_ohci_hub_status_data belong just after this comment, not just 
-before it.
+What is the format/size of data in this property?
 
-> @@ -93,7 +110,7 @@ ohci_s3c2410_hub_status_data(struct usb_hcd *hcd, char *buf)
->  	int orig;
->  	int portno;
->  
-> -	orig  = ohci_hub_status_data(hcd, buf);
-> +	orig  = orig_ohci_hub_status_data(hcd, buf);
+>From the example below:
 
-Since you're changing the line anyway, you should get rid of the extra
-space before the '='.
+> +			nvidia,memory-client = <TEGRA_SWGROUP_NV
+> +						TEGRA_SWGROUP_NV2>;
 
-After you make those two changes, you can add my Acked-by.
+... it seems like multiple entries are allowed. Should the property be
+named "nvidia,memory-clients" instead (a plural)? "memory-clients" seems
+like new terminology that exists just for this property. Is "swgroups"
+the correct term here?
 
-Alan Stern
+> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+
+> +static u64 smmu_of_get_memory_client(struct device *dev)
+
+> +	for (i = 0; i < bytes / sizeof(u32); i++, prop++)
+> +		swgroup |= 1ULL << be32_to_cpup(prop);
+
+Oh, so it's a list of bit numbers instead of a list of masks. Definitely
+good to specify in the binding doc!
