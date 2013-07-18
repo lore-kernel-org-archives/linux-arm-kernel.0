@@ -1,62 +1,42 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Thu, 18 Jul 2013 13:59:51 +0200
-Subject: [PATCH 0/4] Enable ethernet support for SOCFPGA
-In-Reply-To: <51E7B27F.2000304@communistcode.co.uk>
-References: <1374102623-4154-1-git-send-email-dinguyen@altera.com>
- <51E7B27F.2000304@communistcode.co.uk>
-Message-ID: <20130718115951.GA2706@amd.pavel.ucw.cz>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 18 Jul 2013 14:02:24 +0200
+Subject: [PATCH] ARM: omap2: fix musb usage for n8x0
+In-Reply-To: <51E7B81A.70103@denx.de>
+References: <1374000777-5626-1-git-send-email-zonque@gmail.com>
+ <51E7B1FF.6000301@denx.de> <51E7B2FA.7020206@ti.com> <51E7B81A.70103@denx.de>
+Message-ID: <51E7D950.60900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> >These 4 patches are meant to enable ethernet and SD/MMC for the SOCFPGA
-> >platform.
-> >
-> >patch (1/4): Adds select ARM_TWD for the platform
-> >patch (2/4): Add platform specific initialization for the ethernet controller.
-> >patch (3/4): Commit 25c83b5c2 added "snps,phy-addr" for getting the PHY addr.
-> >         Set the ethernet clocks to be emac_0_clk and emac_1_clk so it be gated.
-> >patch (4/4): Update defconfig to support SD/MMC, ethernet, EXT3 and NFS.
-
-> What tree is this based against, or what patches are a pre-requisite
-> to this series? I applied the patches to linux-arm/master but the
-> compile failed.
+On 18.07.2013 11:40, Stefan Roese wrote:
+> On 07/18/2013 11:18 AM, Kishon Vijay Abraham I wrote:
+>>> I'm testing musb as OTG on beagleboard (old one, not Beagle-xm). And
+>>> using the latest kernel.org version with this patch applied I see the
+>>> following messages while booting (repeatedly):
+>>>
+>>> [    4.998168] usb usb1: bus auto-suspend, wakeup 1
+>>> [    5.003112] musb_bus_suspend 2457: trying to suspend as b_idle while active
+>>> [    5.010498] usb usb1: bus suspend fail, err -16
+>>> [    5.015289] hub 1-0:1.0: hub_resume
+>>> [    5.019073] hub 1-0:1.0: state 7 ports 1 chg 0000 evt 0000
+>>> [    5.024963] hub 1-0:1.0: hub_suspend
+>>> [    5.028778] usb usb1: bus auto-suspend, wakeup 1
+>>> ...
+>>>
+>>> This is without a cable connected to the OTG port.
+>>>
+>>> Any ideas what might be missing here?
+>>
+>> Even I observed these prints when I have dual mode enabled. When kept as gadget
+>> only mode I dint see these prints.
 > 
-> arch/arm/mach-socfpga/socfpga.c: In function 'ksz9021rlrn_phy_fixup':
-> arch/arm/mach-socfpga/socfpga.c:85:21: error:
-> 'MICREL_KSZ9021_EXTREG_CTRL' undeclared (first use in this function)
->    phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
->                      ^
+> Yes. With gadget-only I don't see those messages. Thanks for the hint.
 
-It seems it depends on:
+So in which mode does your port operate then? Gadget or dual-role? And I
+take it this does not happen with 3.10?
 
-Date: Mon, 15 Jul 2013 18:08:50 -0500
-From: dinguyen@altera.com
-To: dinh.linux at gmail.com, netdev at vger.kernel.org
-Cc: Pavel Machek <pavel@denx.de>, Nicolas Ferre
-<nicolas.ferre@atmel.com>,
-        "David S. Miller" <davem@davemloft.net>,
-        linux-arm-kernel at lists.infradead.org,
-        Shawn Guo <shawn.guo@linaro.org>,
-        Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>,
-        Andrew Victor <linux@maxim.org.za>,
-        Dinh Nguyen <dinguyen@altera.com>
-Subject: [PATCH] phy: micrel: Add definitions for common Micrel PHY
-registers
-X-Mailer: git-send-email 1.7.9.5
+Unfortunately, I have no board here anymore with such a port in
+dual-role mode ...
 
-From: Dinh Nguyen <dinguyen@altera.com>
 
-Add defines for common Micrel PHY setups so that other platforms
-can use them. Update imx61 and sama5 hardware to use the micrel_phy.h
-PHY defines.
-
-Also add support for the KSZ9021RLRN PHY.
-
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Daniel
