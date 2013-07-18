@@ -1,40 +1,41 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Thu, 18 Jul 2013 18:20:52 +0100
-Subject: [Xen-devel] [PATCH] xen/arm: disable cpuidle when linux is
- running as dom0
-In-Reply-To: <alpine.DEB.2.02.1307171426300.8258@kaball.uk.xensource.com>
-References: <1373898101-15633-1-git-send-email-julien.grall@linaro.org>
- <20130715152532.GC5774@phenom.dumpdata.com>
- <alpine.DEB.2.02.1307171426300.8258@kaball.uk.xensource.com>
-Message-ID: <CAPnVf8xuQJpXv+D8QNqhdz=Pm8rvbWA-U0T-ZdC3Mye-KeLdGA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 18 Jul 2013 18:21:59 +0100
+Subject: [PATCH] ARM: locks: remove opencoded #16 for ticket shift
+In-Reply-To: <alpine.LFD.2.03.1307170952580.14924@syhkavp.arg>
+References: <1373894879-30559-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1307170952580.14924@syhkavp.arg>
+Message-ID: <20130718172159.GC9837@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 July 2013 14:28, Stefano Stabellini
-<stefano.stabellini@eu.citrix.com> wrote:
-> On Mon, 15 Jul 2013, Konrad Rzeszutek Wilk wrote:
->> On Mon, Jul 15, 2013 at 03:21:41PM +0100, Julien Grall wrote:
->> > When linux is running as dom0, Xen doesn't show the physical cpu but a
->> > virtual CPU.
->> > On some ARM SOC (for instance the exynos 5250), linux registers callbacks
->> > for cpuidle. When these callbacks are called, they will modify
->> > directly the physical cpu not the virtual one.
->> It can impact the whole board
->> > instead of dom0.
->
-> Certainly this is something that should be fixed at the hypervisor level
-> too. However I agree that Linux should try to avoid doing that when
-> running on Xen.
->
->
->
->> Should you also call disable_cpufreq() ?
->
-> Sounds like a good idea.
-> Julien, could you add that to this patch?
+On Wed, Jul 17, 2013 at 02:56:59PM +0100, Nicolas Pitre wrote:
+> On Mon, 15 Jul 2013, Will Deacon wrote:
+> 
+> > The ticket width of our spinlocks is defined by TICKET_SHIFT, so remove
+> > the opencoded #16 from the trylock implementation.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> This is pointless.
 
-I have checked with both the Arndale and Versatile Express without any issue.
-I will resend this patch with disable_cpufreq().
+I disagree (see below).
 
--- 
-Julien Grall
+> >  		"	ldrex	%0, [%3]\n"
+> >  		"	mov	%2, #0\n"
+> > -		"	subs	%1, %0, %0, ror #16\n"
+> 
+> Any value other than 16 would break that code.  You'd rather ensure it 
+> never gets defined to anything else.
+
+There are two aspects to the ticket lock:
+
+  1. The size of each ticket
+  2. The location of the next ticket within the 32-bit lock word
+
+TICKET_SHIFT actually defines (2) and could be 0 or 16, hence why I was
+making this small cosmetic change. I admit that the naming isn't very good
+and I should change the commit message to reflect what's actually going on.
+
+Cheers,
+
+Will
