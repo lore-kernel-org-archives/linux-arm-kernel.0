@@ -1,32 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 18 Jul 2013 14:04:44 -0700
-Subject: [PATCH v3 0/5] clk: dt: bindings for mux, divider & gate clocks
-In-Reply-To: <1371795256-16703-1-git-send-email-mturquette@linaro.org>
-References: <1371795256-16703-1-git-send-email-mturquette@linaro.org>
-Message-ID: <51E8586C.7040808@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 18 Jul 2013 22:06:37 +0100
+Subject: Audio issue on Kirkwood t5325: no sound
+In-Reply-To: <20130718173727.2cfa38d3@skate>
+References: <20130718134330.5aea00c5@skate>
+ <20130718142009.GX24642@n2100.arm.linux.org.uk>
+ <20130718173727.2cfa38d3@skate>
+Message-ID: <20130718210637.GW22506@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/13 23:14, Mike Turquette wrote:
-> This series introduces binding definitions for common register-mapped
-> clock multiplexer, divider and gate IP blocks along with the
-> corresponding setup functions for matching DT data.  The bindings are
-> similar to the struct definitions but please don't hold that against the
-> binding: the struct definitions closely model the hardware register
-> layout.
+On Thu, Jul 18, 2013 at 05:37:27PM +0200, Thomas Petazzoni wrote:
 
-I know there was some discussion about clock bindings and how they
-should and should not be done at Linaro Connect Europe last week. Can
-someone in that discussion reply to the mailing list with what came out
-of that? I only have second hand knowledge about the discussion so it
-would be good for me and others to know what was discussed. I'm
-especially curious because the arm soc update etherpad[1] says "DT
-describes what HW is (location, type, attributes), not how HW works
-(register descriptions, bitmasks, etc)." but these proposed generic
-clock bindings are describing registers and bitmasks.
+> # for i in /sys/kernel/debug/asoc/t5325/dapm/* ; do echo $i ; cat "$i" ; done
+> /sys/kernel/debug/asoc/t5325/dapm/Headphone Jack
+> Headphone Jack: Off  in 2 out 1
+>  in  "static" "HPR"
+>  in  "static" "HPL"
+> /sys/kernel/debug/asoc/t5325/dapm/Mic Jack
+> Mic Jack: Off  in 1 out 0
+>  out "static" "MIC2"
+>  out "static" "MIC1"
+> /sys/kernel/debug/asoc/t5325/dapm/Speaker
+> Speaker: Off  in 2 out 1
+>  in  "static" "SPKOUTN"
+>  in  "static" "SPKOUT"
+> /sys/kernel/debug/asoc/t5325/dapm/bias_level
+> Off
 
-[1] http://pad.linaro.org/p/LCE13_ARM_SOC_Tree_Consolidation_Update
+> I don't see anything that looks unreasonable in there, but I've never
+> played with DAPM and related things, so it is very possible that my
+> reasonable-guesser might be wrong on this.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+All those "Off" things mean that things are powered off which tends not
+to involve them making any noise...  Russell mentioned that he thought
+this was a lack of DAPM stuff however looking here it seems there are
+some DAPM widgets on your board?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130718/56ddfdb1/attachment.sig>
