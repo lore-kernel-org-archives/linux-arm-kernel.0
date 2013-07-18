@@ -1,64 +1,128 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 18 Jul 2013 22:34:51 +0400
-Subject: [PATCH 00/10] ARM: clps711x: Initial DT support / Fixes
-Message-ID: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 18 Jul 2013 13:56:15 -0500
+Subject: [PATCH 1/3] misc: Add crossbar driver
+In-Reply-To: <1374165830-6367-2-git-send-email-r.sricharan@ti.com>
+References: <1374165830-6367-1-git-send-email-r.sricharan@ti.com>
+ <1374165830-6367-2-git-send-email-r.sricharan@ti.com>
+Message-ID: <51E83A4F.5080904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is next patchset for the Cirrus Logic CLPS711X target CPUs.
-The first four patches is a small fixes. The rest is a attempt
-to add DT support for this subarch.
-As long as DT support is incomplete (no peripherals), I did not
-add DTS yet. This is the next step.
+On 07/18/2013 11:43 AM, Sricharan R wrote:
+> Some socs have a large number of interrupts/dma requests to service
+> the needs of its many peripherals and subsystems. All of the
+> requests lines from the subsystems are not needed at the same
+> time, so they have to be muxed to the controllers appropriately.
+> In such places a interrupt/dma controllers are preceded by an
+> IRQ/DMA CROSSBAR that provides flexibility in muxing the device
+> requests to the controller inputs.
+>
+> The Peripheral irq/dma requests are connected to one crossbar's input
+> and the output of the crossbar is connected to controller's input
+> line. On POR, there are some mappings which are done by default.
+> Those peripherals which do not have a mapping on POR, should be configured
+> to route its requests using the crossbar.
+>
+> The drivers identifies every controller's crossbar as individual devices.
+> The mappings can be specified from the DT crossbar nodes and those gets mapped
+> during the crossbar device's probe. The mappings can also be specified by adding
+> the crossbar lines to the peripheral device nodes and map it with
+> crossbar_map/unmap apis.
+>
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> ---
+>   .../devicetree/bindings/arm/omap/crossbar.txt      |   24 ++
+>   drivers/misc/Kconfig                               |    8 +
+>   drivers/misc/Makefile                              |    1 +
+>   drivers/misc/crossbar.c                            |  258 ++++++++++++++++++++
+>   include/linux/crossbar.h                           |   71 ++++++
+>   5 files changed, 362 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>   create mode 100644 drivers/misc/crossbar.c
+>   create mode 100644 include/linux/crossbar.h
+>
+> diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+> new file mode 100644
+> index 0000000..02a8a28
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+> @@ -0,0 +1,24 @@
+> +* TI - IRQ/DMA Crossbar
+> +
+> +This version is an implementation of the Crossbar IRQ/DMA IP
+> +
+> +Required properties:
+> +- compatible : Should be "ti,dra-crossbar"
+> +- crossbar-name: Name of the controller to which crossbar output is routed
+> +- reg:	Contains crossbar register address range
+> +- reg-width: Represents the width of the individual registers
+> +- crossbar-lines:  Default mappings.Should contain the crossbar-name
+> +		   device name, int/dma request number, crossbar number,
+> +		   register offset in the same order.
+> +
+> +Examples:
+> +		crossbar_mpu: mpuirq at 4a002a48 {
+> +			compatible = "crossbar";
+> +			crossbar-name = "mpu-irq";
+> +			reg = <0x4a002a48 0x0130>;
+> +			reg-width = <16>;
+> +			crossbar-lines = "mpu-irq", "rtc-ss-alarm", <0x9f 0xd9 0x12c>,
+> +					 "mpu-irq", "mcasp3-arevt", <0x9e 0x96 0x12a>,
+> +					 "mpu-irq", "mcasp3-axevt", <0x9d 0x97 0x128>;
+> +		};
 
-Alexander Shiyan (10):
-  ARM: clps711x: Remove the special name for the syscon driver
-  ARM: clps711x: Drop fortunet board support
-  ARM: clps711x: autcpu12: Remove incorrect config checking
-  ARM: clps711x: edb7211: Remove extra iotable_init() call
-  ARM: clps711x: Add CLPS711X clk driver
-  ARM: clps711x: Add CLPS711X clocksource driver
-  ARM: clps711x: Add CLPS711X irqchip driver
-  ARM: clps711x: Add CLPS711X cpuidle driver
-  ARM: clps711x: Migrate CLPS711X subarch to the new basic drivers
-  ARM: clps711x: Add initial DT support
+I carry forward my TI internal objection to this approach:
 
- .../devicetree/bindings/clock/clps711x-clock.txt   |  47 +++
- .../interrupt-controller/cirrus,clps711x-intc.txt  |  42 +++
- arch/arm/Kconfig                                   |   5 -
- arch/arm/mach-clps711x/Kconfig                     |   8 +-
- arch/arm/mach-clps711x/Makefile                    |   2 +-
- arch/arm/mach-clps711x/board-autcpu12.c            |   9 +-
- arch/arm/mach-clps711x/board-cdb89712.c            |   3 -
- arch/arm/mach-clps711x/board-clep7312.c            |   3 -
- arch/arm/mach-clps711x/board-dt.c                  |  56 ++++
- arch/arm/mach-clps711x/board-edb7211.c             |  20 +-
- arch/arm/mach-clps711x/board-fortunet.c            |  85 -----
- arch/arm/mach-clps711x/board-p720t.c               |   3 -
- arch/arm/mach-clps711x/common.c                    | 345 +--------------------
- arch/arm/mach-clps711x/common.h                    |   3 -
- arch/arm/mach-clps711x/devices.c                   |  12 +-
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk-clps711x.c                         | 150 +++++++++
- drivers/clocksource/Kconfig                        |   6 +
- drivers/clocksource/Makefile                       |   1 +
- drivers/clocksource/clps711x-clksrc.c              | 151 +++++++++
- drivers/cpuidle/Kconfig                            |   6 +
- drivers/cpuidle/Makefile                           |   1 +
- drivers/cpuidle/cpuidle-clps711x.c                 |  80 +++++
- drivers/irqchip/Kconfig                            |   6 +
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-clps711x.c                     | 277 +++++++++++++++++
- drivers/mfd/syscon.c                               |   3 -
- 27 files changed, 851 insertions(+), 475 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/clps711x-clock.txt
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
- create mode 100644 arch/arm/mach-clps711x/board-dt.c
- delete mode 100644 arch/arm/mach-clps711x/board-fortunet.c
- create mode 100644 drivers/clk/clk-clps711x.c
- create mode 100644 drivers/clocksource/clps711x-clksrc.c
- create mode 100644 drivers/cpuidle/cpuidle-clps711x.c
- create mode 100644 drivers/irqchip/irq-clps711x.c
+NAK.
+
+DRA7 uses a cross bar to map a line to GIC interrupt. Flow of interrupt 
+is as follows:
+hardware IP block -interrupt line-> IRQ Cross bar -> GIC IRQ line --> 
+MPU IRQ.
+
+
+What we have done today for DRA is to provide IRQ numbers as direct maps 
+from hardware IP block to GIC based on default IRQ cross bar mapping.
+
+Lets see what happens as a result of this:
+
+https://patchwork.kernel.org/patch/2825148/ (introducing DTS for DRA7)
+uart1 to uart6 is defined. while in fact 10 uarts exist on IP block.
+uart1: serial at 4806a000 {
+<snip>
++			interrupts = <0 72 0x4>;
+Assumes that GIC interrupt by default mapping used.
+
+Now, think of a product that wants to use UART10 instead of UART1, SoC 
+design allows you do that by doing a remapping of GIC interrupt to 
+UART10 - which is awesome.
+
+Option 1: u-boot/bootloader
+mw.l IRQ_CROSSBAR_address with value to map uart10 to GIC IRQ for UART1,
+
+Option 2: in kernel do a raw_writel version of option 1.
+This patch does option 1 in kernel in a "fancy way" - why the heck would 
+I want to do that when u-boot allows me to do the same thing in uEnv.txt
+
+Option 3: map GIC interrupt to IRQ CROSS bar dynamically.
+a) Allows us to define every single IP available on DRA7 SoC.
+b) GIC allocation happens dynamically
+c) allow products use IPs as needed.
+
+Sorry, Conceptually option 3 is the right approach in my view.
+instead of doing
+uart1: serial at 4806a000 {
+<snip>
++			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+
+we should be able to do the following:
+uart1: serial at 4806a000 {
+<snip>
++			interrupts = <TI_IRQ_CROSSBAR 192 IRQ_TYPE_LEVEL_HIGH>;
+
+and not worry about the GIC interrupt number used
+
 
 -- 
-1.8.1.5
+Regards,
+Nishanth Menon
