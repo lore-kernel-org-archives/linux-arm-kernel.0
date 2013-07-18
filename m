@@ -1,159 +1,57 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Thu, 18 Jul 2013 19:00:32 +0200
-Subject: [PATCH v2 01/24] spi: mpc512x: cleanup clock API use
+Date: Thu, 18 Jul 2013 19:00:35 +0200
+Subject: [PATCH v2 04/24] powerpc: mpc512x: array decl for MCLK registers in
+ CCM
 In-Reply-To: <1374166855-7280-1-git-send-email-gsi@denx.de>
 References: <1373914074-20889-1-git-send-email-gsi@denx.de>
  <1374166855-7280-1-git-send-email-gsi@denx.de>
-Message-ID: <1374166855-7280-2-git-send-email-gsi@denx.de>
+Message-ID: <1374166855-7280-5-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cleanup the MPC512x SoC's SPI master's use of the clock API
-- get, prepare, and enable the MCLK during probe; disable, unprepare and
-  put the MCLK upon remove; hold a reference to the clock over the
-  period of use
-- fetch MCLK rate (reference) once during probe and slightly reword BCLK
-  (bitrate) determination to reduce redundancy as well as to not exceed
-  the maximum text line length
-- stick with the PPC_CLOCK 'psc%d_mclk' name for clock lookup, only
-  switch to a fixed string later after device tree based clock lookup
-  will have become available
+reword the clock control module's registers declaration such that the
+MCLK related registers form an array and get indexed by PSC number
 
-the omission in the clock handling previously went unnoticed, but will
-become fatal in the common clock scenario
+this change is in preparation to COMMON_CLK support for the MPC512x
+platform, the changed declaration remains neutral to existing code since
+the PSC and MSCAN CCR fields declared here aren't referenced anywhere
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- drivers/spi/spi-mpc512x-psc.c |   49 ++++++++++++++++++++++++++---------------
- 1 file changed, 31 insertions(+), 18 deletions(-)
+ arch/powerpc/include/asm/mpc5121.h |   18 ++----------------
+ 1 file changed, 2 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/spi/spi-mpc512x-psc.c b/drivers/spi/spi-mpc512x-psc.c
-index 29fce6a..7a32373 100644
---- a/drivers/spi/spi-mpc512x-psc.c
-+++ b/drivers/spi/spi-mpc512x-psc.c
-@@ -38,7 +38,8 @@ struct mpc512x_psc_spi {
- 	struct mpc512x_psc_fifo __iomem *fifo;
- 	unsigned int irq;
- 	u8 bits_per_word;
--	u32 mclk;
-+	struct clk *clk_mclk;
-+	u32 mclk_rate;
- 
- 	struct completion txisrdone;
+diff --git a/arch/powerpc/include/asm/mpc5121.h b/arch/powerpc/include/asm/mpc5121.h
+index 8ae133e..887d3d6 100644
+--- a/arch/powerpc/include/asm/mpc5121.h
++++ b/arch/powerpc/include/asm/mpc5121.h
+@@ -32,25 +32,11 @@ struct mpc512x_ccm {
+ 	u32	scfr2;	/* System Clock Frequency Register 2 */
+ 	u32	scfr2s;	/* System Clock Frequency Shadow Register 2 */
+ 	u32	bcr;	/* Bread Crumb Register */
+-	u32	p0ccr;	/* PSC0 Clock Control Register */
+-	u32	p1ccr;	/* PSC1 CCR */
+-	u32	p2ccr;	/* PSC2 CCR */
+-	u32	p3ccr;	/* PSC3 CCR */
+-	u32	p4ccr;	/* PSC4 CCR */
+-	u32	p5ccr;	/* PSC5 CCR */
+-	u32	p6ccr;	/* PSC6 CCR */
+-	u32	p7ccr;	/* PSC7 CCR */
+-	u32	p8ccr;	/* PSC8 CCR */
+-	u32	p9ccr;	/* PSC9 CCR */
+-	u32	p10ccr;	/* PSC10 CCR */
+-	u32	p11ccr;	/* PSC11 CCR */
++	u32	psc_ccr[12];	/* PSC Clock Control Registers */
+ 	u32	spccr;	/* SPDIF Clock Control Register */
+ 	u32	cccr;	/* CFM Clock Control Register */
+ 	u32	dccr;	/* DIU Clock Control Register */
+-	u32	m1ccr;	/* MSCAN1 CCR */
+-	u32	m2ccr;	/* MSCAN2 CCR */
+-	u32	m3ccr;	/* MSCAN3 CCR */
+-	u32	m4ccr;	/* MSCAN4 CCR */
++	u32	mscan_ccr[4];	/* MSCAN Clock Control Registers */
+ 	u8	res[0x98]; /* Reserved */
  };
-@@ -72,6 +73,7 @@ static void mpc512x_psc_spi_activate_cs(struct spi_device *spi)
- 	struct mpc52xx_psc __iomem *psc = mps->psc;
- 	u32 sicr;
- 	u32 ccr;
-+	int speed;
- 	u16 bclkdiv;
  
- 	sicr = in_be32(&psc->sicr);
-@@ -95,10 +97,10 @@ static void mpc512x_psc_spi_activate_cs(struct spi_device *spi)
- 
- 	ccr = in_be32(&psc->ccr);
- 	ccr &= 0xFF000000;
--	if (cs->speed_hz)
--		bclkdiv = (mps->mclk / cs->speed_hz) - 1;
--	else
--		bclkdiv = (mps->mclk / 1000000) - 1;	/* default 1MHz */
-+	speed = cs->speed_hz;
-+	if (!speed)
-+		speed = 1000000;	/* default 1MHz */
-+	bclkdiv = (mps->mclk_rate / speed) - 1;
- 
- 	ccr |= (((bclkdiv & 0xff) << 16) | (((bclkdiv >> 8) & 0xff) << 8));
- 	out_be32(&psc->ccr, ccr);
-@@ -386,19 +388,11 @@ static int mpc512x_psc_spi_port_config(struct spi_master *master,
- {
- 	struct mpc52xx_psc __iomem *psc = mps->psc;
- 	struct mpc512x_psc_fifo __iomem *fifo = mps->fifo;
--	struct clk *spiclk;
--	int ret = 0;
--	char name[32];
- 	u32 sicr;
- 	u32 ccr;
-+	int speed;
- 	u16 bclkdiv;
- 
--	sprintf(name, "psc%d_mclk", master->bus_num);
--	spiclk = clk_get(&master->dev, name);
--	clk_enable(spiclk);
--	mps->mclk = clk_get_rate(spiclk);
--	clk_put(spiclk);
--
- 	/* Reset the PSC into a known state */
- 	out_8(&psc->command, MPC52xx_PSC_RST_RX);
- 	out_8(&psc->command, MPC52xx_PSC_RST_TX);
-@@ -425,7 +419,8 @@ static int mpc512x_psc_spi_port_config(struct spi_master *master,
- 
- 	ccr = in_be32(&psc->ccr);
- 	ccr &= 0xFF000000;
--	bclkdiv = (mps->mclk / 1000000) - 1;	/* default 1MHz */
-+	speed = 1000000;	/* default 1MHz */
-+	bclkdiv = (mps->mclk_rate / speed) - 1;
- 	ccr |= (((bclkdiv & 0xff) << 16) | (((bclkdiv >> 8) & 0xff) << 8));
- 	out_be32(&psc->ccr, ccr);
- 
-@@ -445,7 +440,7 @@ static int mpc512x_psc_spi_port_config(struct spi_master *master,
- 
- 	mps->bits_per_word = 8;
- 
--	return ret;
-+	return 0;
- }
- 
- static irqreturn_t mpc512x_psc_spi_isr(int irq, void *dev_id)
-@@ -479,6 +474,8 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
- 	struct spi_master *master;
- 	int ret;
- 	void *tempp;
-+	int psc_num;
-+	char clk_name[16];
- 
- 	master = spi_alloc_master(dev, sizeof *mps);
- 	if (master == NULL)
-@@ -521,16 +518,30 @@ static int mpc512x_psc_spi_do_probe(struct device *dev, u32 regaddr,
- 		goto free_master;
- 	init_completion(&mps->txisrdone);
- 
-+	psc_num = master->bus_num;
-+	snprintf(clk_name, sizeof(clk_name), "psc%d_mclk", psc_num);
-+	mps->clk_mclk = clk_get(dev, clk_name);
-+	if (IS_ERR(mps->clk_mclk))
-+		goto free_irq;
-+	ret = clk_prepare_enable(mps->clk_mclk);
-+	if (ret)
-+		goto free_putclk;
-+	mps->mclk_rate = clk_get_rate(mps->clk_mclk);
-+
- 	ret = mpc512x_psc_spi_port_config(master, mps);
- 	if (ret < 0)
--		goto free_irq;
-+		goto free_disclk;
- 
- 	ret = spi_register_master(master);
- 	if (ret < 0)
--		goto free_irq;
-+		goto free_disclk;
- 
- 	return ret;
- 
-+free_disclk:
-+	clk_disable_unprepare(mps->clk_mclk);
-+free_putclk:
-+	clk_put(mps->clk_mclk);
- free_irq:
- 	free_irq(mps->irq, mps);
- free_master:
-@@ -547,6 +558,8 @@ static int mpc512x_psc_spi_do_remove(struct device *dev)
- 	struct mpc512x_psc_spi *mps = spi_master_get_devdata(master);
- 
- 	spi_unregister_master(master);
-+	clk_disable_unprepare(mps->clk_mclk);
-+	clk_put(mps->clk_mclk);
- 	free_irq(mps->irq, mps);
- 	if (mps->psc)
- 		iounmap(mps->psc);
 -- 
 1.7.10.4
