@@ -1,333 +1,145 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Thu, 18 Jul 2013 19:00:41 +0200
-Subject: [PATCH v2 10/24] dts: mpc512x: add clock specs for client lookups
+Date: Thu, 18 Jul 2013 19:00:36 +0200
+Subject: [PATCH v2 05/24] clk: wrap I/O access for improved portability
 In-Reply-To: <1374166855-7280-1-git-send-email-gsi@denx.de>
 References: <1373914074-20889-1-git-send-email-gsi@denx.de>
  <1374166855-7280-1-git-send-email-gsi@denx.de>
-Message-ID: <1374166855-7280-11-git-send-email-gsi@denx.de>
+Message-ID: <1374166855-7280-6-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this addresses the client side of device tree based clock lookups:
-add clock specifiers to the mbx, nfc, mscan, sdhc, i2c, axe, diu,
-viu, mdio, fec, usb, pata, psc, psc fifo, and pci nodes in the
-shared mpc5121.dtsi include
+the common clock drivers were motivated/initiated by ARM development
+and apparently assume little endian peripherals
 
-these specs map 'clock-names' encoded in drivers to their respective
-'struct clk' items in the platform's clock driver; some drivers
-still need to learn how to lookup OF clocks, other drivers will
-transparently probe successfully on MPC512x as well (sdhc)
-
-few 'clock-names' (nfc, viu) use strings that are encoded in their
-respective drivers to keep up compatibility, an alternative approach
-would be to register clkdev items in the platform's clock driver for
-the migration period
+wrap register/peripherals access in the common code (div, gate, mux)
+in preparation of adding COMMON_CLK support for other platforms
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/boot/dts/mpc5121.dtsi |   79 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 79 insertions(+)
+ drivers/clk/clk-divider.c    |    6 +++---
+ drivers/clk/clk-gate.c       |    6 +++---
+ drivers/clk/clk-mux.c        |    6 +++---
+ include/linux/clk-provider.h |   17 +++++++++++++++++
+ 4 files changed, 26 insertions(+), 9 deletions(-)
 
-diff --git a/arch/powerpc/boot/dts/mpc5121.dtsi b/arch/powerpc/boot/dts/mpc5121.dtsi
-index 8f4cba0..983da9c 100644
---- a/arch/powerpc/boot/dts/mpc5121.dtsi
-+++ b/arch/powerpc/boot/dts/mpc5121.dtsi
-@@ -51,6 +51,10 @@
- 		compatible = "fsl,mpc5121-mbx";
- 		reg = <0x20000000 0x4000>;
- 		interrupts = <66 0x8>;
-+		clocks = <&clks MPC512x_CLK_MBX_BUS>,
-+			 <&clks MPC512x_CLK_MBX_3D>,
-+			 <&clks MPC512x_CLK_MBX>;
-+		clock-names = "mbx-bus", "mbx-3d", "mbx";
- 	};
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 6d55eb2..2c07061 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -104,7 +104,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+ 	struct clk_divider *divider = to_clk_divider(hw);
+ 	unsigned int div, val;
  
- 	sram at 30000000 {
-@@ -64,6 +68,8 @@
- 		interrupts = <6 8>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-+		clocks = <&clks MPC512x_CLK_NFC>;
-+		clock-names = "nfc_clk";	/* backwards compat */
- 	};
+-	val = readl(divider->reg) >> divider->shift;
++	val = clk_readl(divider->reg) >> divider->shift;
+ 	val &= div_mask(divider);
  
- 	localbus at 80000020 {
-@@ -153,12 +159,22 @@
- 			compatible = "fsl,mpc5121-mscan";
- 			reg = <0x1300 0x80>;
- 			interrupts = <12 0x8>;
-+			clocks = <&clks MPC512x_CLK_IPS>,
-+				 <&clks MPC512x_CLK_SYS>,
-+				 <&clks MPC512x_CLK_REF>,
-+				 <&clks MPC512x_CLK_MSCAN0_MCLK>;
-+			clock-names = "ips", "sys", "ref", "mclk";
- 		};
+ 	div = _get_div(divider, val);
+@@ -230,11 +230,11 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
+ 		val = div_mask(divider) << (divider->shift + 16);
+ 	} else {
+-		val = readl(divider->reg);
++		val = clk_readl(divider->reg);
+ 		val &= ~(div_mask(divider) << divider->shift);
+ 	}
+ 	val |= value << divider->shift;
+-	writel(val, divider->reg);
++	clk_writel(val, divider->reg);
  
- 		can at 1380 {
- 			compatible = "fsl,mpc5121-mscan";
- 			reg = <0x1380 0x80>;
- 			interrupts = <13 0x8>;
-+			clocks = <&clks MPC512x_CLK_IPS>,
-+				 <&clks MPC512x_CLK_SYS>,
-+				 <&clks MPC512x_CLK_REF>,
-+				 <&clks MPC512x_CLK_MSCAN1_MCLK>;
-+			clock-names = "ips", "sys", "ref", "mclk";
- 		};
+ 	if (divider->lock)
+ 		spin_unlock_irqrestore(divider->lock, flags);
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index 790306e..b7fbd96 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -58,7 +58,7 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
+ 		if (set)
+ 			reg |= BIT(gate->bit_idx);
+ 	} else {
+-		reg = readl(gate->reg);
++		reg = clk_readl(gate->reg);
  
- 		sdhc at 1500 {
-@@ -167,6 +183,9 @@
- 			interrupts = <8 0x8>;
- 			dmas = <&dma0 30>;
- 			dma-names = "rx-tx";
-+			clocks = <&clks MPC512x_CLK_IPS>,
-+				 <&clks MPC512x_CLK_SDHC>;
-+			clock-names = "ipg", "per";
- 		};
+ 		if (set)
+ 			reg |= BIT(gate->bit_idx);
+@@ -66,7 +66,7 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
+ 			reg &= ~BIT(gate->bit_idx);
+ 	}
  
- 		i2c at 1700 {
-@@ -175,6 +194,8 @@
- 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
- 			reg = <0x1700 0x20>;
- 			interrupts = <9 0x8>;
-+			clocks = <&clks MPC512x_CLK_I2C>;
-+			clock-names = "per";
- 		};
+-	writel(reg, gate->reg);
++	clk_writel(reg, gate->reg);
  
- 		i2c at 1720 {
-@@ -183,6 +204,8 @@
- 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
- 			reg = <0x1720 0x20>;
- 			interrupts = <10 0x8>;
-+			clocks = <&clks MPC512x_CLK_I2C>;
-+			clock-names = "per";
- 		};
+ 	if (gate->lock)
+ 		spin_unlock_irqrestore(gate->lock, flags);
+@@ -89,7 +89,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
+ 	u32 reg;
+ 	struct clk_gate *gate = to_clk_gate(hw);
  
- 		i2c at 1740 {
-@@ -191,6 +214,8 @@
- 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
- 			reg = <0x1740 0x20>;
- 			interrupts = <11 0x8>;
-+			clocks = <&clks MPC512x_CLK_I2C>;
-+			clock-names = "per";
- 		};
+-	reg = readl(gate->reg);
++	reg = clk_readl(gate->reg);
  
- 		i2ccontrol at 1760 {
-@@ -202,30 +227,46 @@
- 			compatible = "fsl,mpc5121-axe";
- 			reg = <0x2000 0x100>;
- 			interrupts = <42 0x8>;
-+			clocks = <&clks MPC512x_CLK_AXE>;
-+			clock-names = "per";
- 		};
+ 	/* if a set bit disables this clk, flip it before masking */
+ 	if (gate->flags & CLK_GATE_SET_TO_DISABLE)
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 614444c..02ef506 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -42,7 +42,7 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
+ 	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
+ 	 * val = 0x4 really means "bit 2, index starts at bit 0"
+ 	 */
+-	val = readl(mux->reg) >> mux->shift;
++	val = clk_readl(mux->reg) >> mux->shift;
+ 	val &= mux->mask;
  
- 		display at 2100 {
- 			compatible = "fsl,mpc5121-diu";
- 			reg = <0x2100 0x100>;
- 			interrupts = <64 0x8>;
-+			clocks = <&clks MPC512x_CLK_DIU>;
-+			clock-names = "per";
- 		};
+ 	if (mux->table) {
+@@ -89,11 +89,11 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+ 	if (mux->flags & CLK_MUX_HIWORD_MASK) {
+ 		val = mux->mask << (mux->shift + 16);
+ 	} else {
+-		val = readl(mux->reg);
++		val = clk_readl(mux->reg);
+ 		val &= ~(mux->mask << mux->shift);
+ 	}
+ 	val |= index << mux->shift;
+-	writel(val, mux->reg);
++	clk_writel(val, mux->reg);
  
- 		can at 2300 {
- 			compatible = "fsl,mpc5121-mscan";
- 			reg = <0x2300 0x80>;
- 			interrupts = <90 0x8>;
-+			clocks = <&clks MPC512x_CLK_IPS>,
-+				 <&clks MPC512x_CLK_SYS>,
-+				 <&clks MPC512x_CLK_REF>,
-+				 <&clks MPC512x_CLK_MSCAN2_MCLK>;
-+			clock-names = "ips", "sys", "ref", "mclk";
- 		};
+ 	if (mux->lock)
+ 		spin_unlock_irqrestore(mux->lock, flags);
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 1ec14a7..c4f7799 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -12,6 +12,7 @@
+ #define __LINUX_CLK_PROVIDER_H
  
- 		can at 2380 {
- 			compatible = "fsl,mpc5121-mscan";
- 			reg = <0x2380 0x80>;
- 			interrupts = <91 0x8>;
-+			clocks = <&clks MPC512x_CLK_IPS>,
-+				 <&clks MPC512x_CLK_SYS>,
-+				 <&clks MPC512x_CLK_REF>,
-+				 <&clks MPC512x_CLK_MSCAN3_MCLK>;
-+			clock-names = "ips", "sys", "ref", "mclk";
- 		};
+ #include <linux/clk.h>
++#include <linux/io.h>
  
- 		viu at 2400 {
- 			compatible = "fsl,mpc5121-viu";
- 			reg = <0x2400 0x400>;
- 			interrupts = <67 0x8>;
-+			clocks = <&clks MPC512x_CLK_VIU>;
-+			clock-names = "viu_clk";	/* backwards compat */
- 		};
+ #ifdef CONFIG_COMMON_CLK
  
- 		mdio at 2800 {
-@@ -233,6 +274,8 @@
- 			reg = <0x2800 0x800>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			clocks = <&clks MPC512x_CLK_FEC>;
-+			clock-names = "per";
- 		};
- 
- 		eth0: ethernet at 2800 {
-@@ -241,6 +284,8 @@
- 			reg = <0x2800 0x800>;
- 			local-mac-address = [ 00 00 00 00 00 00 ];
- 			interrupts = <4 0x8>;
-+			clocks = <&clks MPC512x_CLK_FEC>;
-+			clock-names = "per";
- 		};
- 
- 		/* USB1 using external ULPI PHY */
-@@ -252,6 +297,8 @@
- 			interrupts = <43 0x8>;
- 			dr_mode = "otg";
- 			phy_type = "ulpi";
-+			clocks = <&clks MPC512x_CLK_USB1>;
-+			clock-names = "per";
- 		};
- 
- 		/* USB0 using internal UTMI PHY */
-@@ -263,6 +310,8 @@
- 			interrupts = <44 0x8>;
- 			dr_mode = "otg";
- 			phy_type = "utmi_wide";
-+			clocks = <&clks MPC512x_CLK_USB2>;
-+			clock-names = "per";
- 		};
- 
- 		/* IO control */
-@@ -281,6 +330,8 @@
- 			compatible = "fsl,mpc5121-pata";
- 			reg = <0x10200 0x100>;
- 			interrupts = <5 0x8>;
-+			clocks = <&clks MPC512x_CLK_PATA>;
-+			clock-names = "per";
- 		};
- 
- 		/* 512x PSCs are not 52xx PSC compatible */
-@@ -292,6 +343,8 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC0_MCLK>;
-+			clock-names = "mclk";
- 		};
- 
- 		/* PSC1 */
-@@ -301,6 +354,8 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC1_MCLK>;
-+			clock-names = "mclk";
- 		};
- 
- 		/* PSC2 */
-@@ -310,6 +365,8 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC2_MCLK>;
-+			clock-names = "mclk";
- 		};
- 
- 		/* PSC3 */
-@@ -319,6 +376,8 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC3_MCLK>;
-+			clock-names = "mclk";
- 		};
- 
- 		/* PSC4 */
-@@ -328,6 +387,8 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC4_MCLK>;
-+			clock-names = "mclk";
- 		};
- 
- 		/* PSC5 */
-@@ -337,6 +398,8 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC5_MCLK>;
-+			clock-names = "mclk";
- 		};
- 
- 		/* PSC6 */
-@@ -346,6 +409,8 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC6_MCLK>;
-+			clock-names = "mclk";
- 		};
- 
- 		/* PSC7 */
-@@ -355,6 +420,8 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC7_MCLK>;
-+			clock-names = "mclk";
- 		};
- 
- 		/* PSC8 */
-@@ -364,6 +431,8 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC8_MCLK>;
-+			clock-names = "mclk";
- 		};
- 
- 		/* PSC9 */
-@@ -373,6 +442,8 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC9_MCLK>;
-+			clock-names = "mclk";
- 		};
- 
- 		/* PSC10 */
-@@ -382,6 +453,8 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC10_MCLK>;
-+			clock-names = "mclk";
- 		};
- 
- 		/* PSC11 */
-@@ -391,12 +464,16 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC11_MCLK>;
-+			clock-names = "mclk";
- 		};
- 
- 		pscfifo at 11f00 {
- 			compatible = "fsl,mpc5121-psc-fifo";
- 			reg = <0x11f00 0x100>;
- 			interrupts = <40 0x8>;
-+			clocks = <&clks MPC512x_CLK_PSC_FIFO>;
-+			clock-names = "per";
- 		};
- 
- 		dma0: dma at 14000 {
-@@ -414,6 +491,8 @@
- 		#address-cells = <3>;
- 		#size-cells = <2>;
- 		#interrupt-cells = <1>;
-+		clocks = <&clks MPC512x_CLK_PCI>;
-+		clock-names = "per";
- 
- 		reg = <0x80008500 0x100	/* internal registers */
- 		       0x80008300 0x8>;	/* config space access registers */
+@@ -490,5 +491,21 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
+ #define of_clk_init(matches) \
+ 	{ while (0); }
+ #endif /* CONFIG_OF */
++
++/*
++ * wrap access to peripherals in accessor routines
++ * for improved portability across platforms
++ */
++
++static inline u32 clk_readl(u32 __iomem *reg)
++{
++	return readl(reg);
++}
++
++static inline void clk_writel(u32 val, u32 __iomem *reg)
++{
++	writel(val, reg);
++}
++
+ #endif /* CONFIG_COMMON_CLK */
+ #endif /* CLK_PROVIDER_H */
 -- 
 1.7.10.4
