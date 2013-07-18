@@ -1,106 +1,29 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 17 Jul 2013 23:28:33 -0400
-Subject: [PATCH 1/4] ARM: vexpress/dcscb: fix cache disabling sequences
-In-Reply-To: <1374118116-16836-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1374118116-16836-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1374118116-16836-2-git-send-email-nicolas.pitre@linaro.org>
+From: john.stultz@linaro.org (John Stultz)
+Date: Wed, 17 Jul 2013 20:41:07 -0700
+Subject: [PATCH 0/3] Cleanup sched_clock.h users
+In-Reply-To: <1374115161-675-1-git-send-email-sboyd@codeaurora.org>
+References: <1374115161-675-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <51E763D3.4000308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike real A15/A7's, the RTSM simulation doesn't appear to hit the
-cache when the CTRL.C bit is cleared.  Let's ensure there is no memory
-access within the disable and flush cache sequence, including to the
-stack.
+On 07/17/2013 07:39 PM, Stephen Boyd wrote:
+> This patchset cleans up the last few stragglers using the sched_clock.h
+> header file in asm and removes the asm header.
+>
+> A new one appeared in drivers/clocksource so I'm not sure who
+> wants to take that one.
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
----
- arch/arm/mach-vexpress/dcscb.c | 58 +++++++++++++++++++++++++++---------------
- 1 file changed, 37 insertions(+), 21 deletions(-)
+Thanks for doing this!
 
-diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-index 16d57a8a9d..9f01c04d58 100644
---- a/arch/arm/mach-vexpress/dcscb.c
-+++ b/arch/arm/mach-vexpress/dcscb.c
-@@ -136,14 +136,29 @@ static void dcscb_power_down(void)
- 		/*
- 		 * Flush all cache levels for this cluster.
- 		 *
--		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
--		 * a preliminary flush here for those CPUs.  At least, that's
--		 * the theory -- without the extra flush, Linux explodes on
--		 * RTSM (to be investigated).
-+		 * To do so we do:
-+		 * - Clear the CTLR.C bit to prevent further cache allocations
-+		 * - Flush the whole cache
-+		 * - Disable local coherency by clearing the ACTLR "SMP" bit
-+		 *
-+		 * Let's do it in the safest possible way i.e. with
-+		 * no memory access within the following sequence
-+		 * including the stack.
- 		 */
--		flush_cache_all();
--		set_cr(get_cr() & ~CR_C);
--		flush_cache_all();
-+		asm volatile(
-+		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
-+		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
-+		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-+		"isb	\n\t"
-+		"bl	v7_flush_dcache_all \n\t"
-+		"clrex	\n\t"
-+		"mrc	p15, 0, r0, c1, c0, 1	@ get AUXCR \n\t"
-+		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
-+		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
-+		"isb	\n\t"
-+		"dsb	"
-+		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-+		      "r9","r10","r11","lr","memory");
- 
- 		/*
- 		 * This is a harmless no-op.  On platforms with a real
-@@ -152,9 +167,6 @@ static void dcscb_power_down(void)
- 		 */
- 		outer_flush_all();
- 
--		/* Disable local coherency by clearing the ACTLR "SMP" bit: */
--		set_auxcr(get_auxcr() & ~(1 << 6));
--
- 		/*
- 		 * Disable cluster-level coherency by masking
- 		 * incoming snoops and DVM messages:
-@@ -167,18 +179,22 @@ static void dcscb_power_down(void)
- 
- 		/*
- 		 * Flush the local CPU cache.
--		 *
--		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
--		 * a preliminary flush here for those CPUs.  At least, that's
--		 * the theory -- without the extra flush, Linux explodes on
--		 * RTSM (to be investigated).
-+		 * Let's do it in the safest possible way as above.
- 		 */
--		flush_cache_louis();
--		set_cr(get_cr() & ~CR_C);
--		flush_cache_louis();
--
--		/* Disable local coherency by clearing the ACTLR "SMP" bit: */
--		set_auxcr(get_auxcr() & ~(1 << 6));
-+		asm volatile(
-+		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
-+		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
-+		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-+		"isb	\n\t"
-+		"bl	v7_flush_dcache_louis \n\t"
-+		"clrex	\n\t"
-+		"mrc	p15, 0, r0, c1, c0, 1	@ get AUXCR \n\t"
-+		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
-+		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
-+		"isb	\n\t"
-+		"dsb	"
-+		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-+		      "r9","r10","r11","lr","memory");
- 	}
- 
- 	__mcpm_cpu_down(cpu, cluster);
--- 
-1.8.1.2
+I'll queue the drivers/clocksource one on its own in a separate branch, 
+that way I'll merge it into my own 3.12 queue, and Arnd/Olof can also 
+merge just that change it in before they drop the asm/sched_clock.h header.
+
+I just pushed it out here:
+
+git://git.linaro.org/people/jstultz/linux.git fortglx/3.12/sched-clock-cleanups
+
+
+thanks
+-john
