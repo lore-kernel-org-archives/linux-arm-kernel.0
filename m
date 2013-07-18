@@ -1,33 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Jul 2013 15:20:09 +0100
-Subject: Audio issue on Kirkwood t5325: no sound
-In-Reply-To: <20130718134330.5aea00c5@skate>
-References: <20130718134330.5aea00c5@skate>
-Message-ID: <20130718142009.GX24642@n2100.arm.linux.org.uk>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Thu, 18 Jul 2013 16:25:27 +0200
+Subject: [PATCH v3] clk: add MOXA ART SoCs clock driver
+In-Reply-To: <20130718135650.GD29153@e106331-lin.cambridge.arm.com>
+References: <1372943292-6960-1-git-send-email-jonas.jensen@gmail.com>
+ <1374067396-30155-1-git-send-email-jonas.jensen@gmail.com>
+ <20130718095035.GA29153@e106331-lin.cambridge.arm.com>
+ <CACmBeS2SnpiUtiQD6j9qyaXZ5-chHSHVeo4c5=UhitVonvkKtw@mail.gmail.com>
+ <20130718110201.GB29153@e106331-lin.cambridge.arm.com>
+ <CACmBeS24smrJ4SLY7snv1_6SRcuXRkZ8t0PGMvBupUpKMMb43w@mail.gmail.com>
+ <20130718135650.GD29153@e106331-lin.cambridge.arm.com>
+Message-ID: <CACmBeS2rBTtyfzUgB41zXkDC5-DRcvArgeyjbqHQHXO5+QLvmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 01:43:30PM +0200, Thomas Petazzoni wrote:
-> As part of some work around audio support on Marvell platforms, I've
-> taken the Kirkwood-based HP t5325 thin client device that Martin
-> Michlmayr kindly gave me and tried to use the audio part of it, with
-> kernel 3.11-rc1. (My plan is to write the Device Tree binding for this
-> audio driver, and then use it for Armada 370 based platforms).
+On 18 July 2013 15:56, Mark Rutland <mark.rutland@arm.com> wrote:
+> When you say look up the apb-clock node, I assume they find it via their
+> clocks property with of_clk_get or similar, rather than scanning the
+> tree for a "moxart,moxa-apb-clock" node specifically?
 
-A couple of basic things to check:
+Yes, all use of_clk_get(node, 0), which is fortunate because e.g.
+clocksource is already merged with linaro's clockevent drivers tree.
 
-1. /proc/asound/card0/pcm0p/sub0/status
+That should mean I can get away with only changing the DT files :)
 
-Does this indicate that the hw_ptr and appl_ptr are updating ?
+> Given the above, I think it would make more sense to have core-clock
+> registered, and have it passed to the devices currently passed
+> apb-clock.
 
-2. /proc/interrupts
+OK, I'll return with an updated version.
 
-Are you getting interrupts for kirkwood-i2s ?
 
-That will confirm whether the I2S unit is reading data from the ring
-buffer.  I suspect these will be a positive yes, given that aplay
-appears to work normally except being muted.
-
-Another thing to check is the DAPM status, which you can find buried
-in /sys/kernel/debug/asoc - check all the DAPM status you can find
-below there, and check whether you think it's reasonable.
+Best regards,
+Jonas
