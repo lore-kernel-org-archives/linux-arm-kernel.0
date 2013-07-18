@@ -1,110 +1,81 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Thu, 18 Jul 2013 19:00:45 +0200
-Subject: [PATCH v2 14/24] serial: mpc512x: setup the PSC FIFO clock as well
-In-Reply-To: <1374166855-7280-1-git-send-email-gsi@denx.de>
-References: <1373914074-20889-1-git-send-email-gsi@denx.de>
- <1374166855-7280-1-git-send-email-gsi@denx.de>
-Message-ID: <1374166855-7280-15-git-send-email-gsi@denx.de>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 18 Jul 2013 12:02:12 -0500
+Subject: ARM: AM335x: Kernel oops when using EDMA and MMC
+In-Reply-To: <51E81C0E.6070709@gmail.com>
+References: <51E6BE84.6080905@newflow.co.uk> <51E6C88B.8090608@ti.com>
+ <51E81A7E.9030805@ti.com> <51E81C0E.6070709@gmail.com>
+Message-ID: <51E81F94.7090804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-prepare and enable the FIFO clock upon PSC FIFO initialization,
-disable and unprepare the FIFO clock upon PSC FIFO uninitialization,
-remove the pre-enable workaround from the platform's clock driver
+On 07/18/2013 11:47 AM, Daniel Mack wrote:
+> Hi Balaji,
+> 
+> On 18.07.2013 18:40, Balaji T K wrote:
+>> With DMA channel info retrieved from dt binding on 3.11rc1,
+>> unused_chan_list is broken after hwmod cleanup removing mmc sdma
+>> resource info, hence pdev resource wont have DMA resource populated.
+>>
+>> arch/arm/common/edma.c
+>> static int prepare_unused_channel_list(struct device *dev, void *data)
+>> {
+>> 	struct platform_device *pdev = to_platform_device(dev);
+>> 	int i, ctlr;
+>>
+>> 	for (i = 0; i < pdev->num_resources; i++) {
+>> 		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
+>> 				(int)pdev->resource[i].start >= 0) {
+>> 			ctlr = EDMA_CTLR(pdev->resource[i].start);
+>> 			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
+>> 					edma_cc[ctlr]->edma_unused);
+>> 		}
+>> 	}
+>>
+>> 	return 0;
+>> }
+>>
+>> int edma_alloc_channel(int channel,
+>> 	if (!unused_chan_list_done) {
+>> 		/*
+>> 		 * Scan all the platform devices to find out the EDMA channels
+>> 		 * used and clear them in the unused list, making the rest
+>> 		 * available for ARM usage.
+>> 		 */
+>> 		ret = bus_for_each_dev(&platform_bus_type, NULL, NULL,
+>> 				prepare_unused_channel_list);
+>> 		if (ret < 0)
+>> 			return ret;
+>>
+>> 		unused_chan_list_done = true;
+>> 	}
+>>
+>> ===========
+>>
+>> with the below hack patch, edma is working fine with mmc on your 3.11rc1+ branch
+>>
+>> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+>> index a432e6c..5a19164 100644
+>> --- a/arch/arm/common/edma.c
+>> +++ b/arch/arm/common/edma.c
+>> @@ -1262,8 +1262,8 @@ int edma_start(unsigned channel)
+>>   		if (test_bit(channel, edma_cc[ctlr]->edma_unused)) {
+>>   			pr_debug("EDMA: ESR%d %08x\n", j,
+>>   				edma_shadow0_read_array(ctlr, SH_ESR, j));
+>> -			edma_shadow0_write_array(ctlr, SH_ESR, j, mask);
+>> -			return 0;
+>> +//			edma_shadow0_write_array(ctlr, SH_ESR, j, mask);
+>> +//			return 0;
+>>   		}
+>>
+>>   		/* EDMA channel with event association */
+>>
+> 
+> Yes, this in fact works for me as well. Thanks for the quick reply! What
+> would be the proper fix for this?
 
-Signed-off-by: Gerhard Sittig <gsi@denx.de>
----
- arch/powerpc/platforms/512x/clock-commonclk.c |    2 --
- drivers/tty/serial/mpc52xx_uart.c             |   39 +++++++++++++++++++++----
- 2 files changed, 33 insertions(+), 8 deletions(-)
+Correct fix would be in the common EDMA driver to populate the unused
+channel list correctly as found by Balaji.
 
-diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
-index b822469..99d197d 100644
---- a/arch/powerpc/platforms/512x/clock-commonclk.c
-+++ b/arch/powerpc/platforms/512x/clock-commonclk.c
-@@ -689,8 +689,6 @@ static void mpc512x_clk_setup_clock_tree(int busfreq)
- 	clk_prepare_enable(clks[MPC512x_CLK_MEM]);	/* SRAM */
- 	clk_prepare_enable(clks[MPC512x_CLK_IPS]);	/* SoC periph */
- 	clk_prepare_enable(clks[MPC512x_CLK_LPC]);	/* boot media */
--	/* some are required yet no dependencies were declared */
--	clk_prepare_enable(clks[MPC512x_CLK_PSC_FIFO]);
- 	/* some are not yet acquired by their respective drivers */
- 	clk_prepare_enable(clks[MPC512x_CLK_PSC3_MCLK]);/* serial console */
- 	clk_prepare_enable(clks[MPC512x_CLK_FEC]);	/* network, NFS */
-diff --git a/drivers/tty/serial/mpc52xx_uart.c b/drivers/tty/serial/mpc52xx_uart.c
-index 8643dcf..3fdadf9 100644
---- a/drivers/tty/serial/mpc52xx_uart.c
-+++ b/drivers/tty/serial/mpc52xx_uart.c
-@@ -421,6 +421,7 @@ struct psc_fifoc {
- 
- static struct psc_fifoc __iomem *psc_fifoc;
- static unsigned int psc_fifoc_irq;
-+static struct clk *psc_fifoc_clk;
- 
- static void mpc512x_psc_fifo_init(struct uart_port *port)
- {
-@@ -574,30 +575,56 @@ static int __init mpc512x_psc_fifoc_init(void)
- 				     "fsl,mpc5121-psc-fifo");
- 	if (!np) {
- 		pr_err("%s: Can't find FIFOC node\n", __func__);
--		return -ENODEV;
-+		goto out_err;
-+	}
-+
-+	psc_fifoc_clk = of_clk_get_by_name(np, "per");
-+	if (IS_ERR(psc_fifoc_clk)) {
-+		pr_err("%s: Can't lookup FIFO clock\n", __func__);
-+		goto out_ofnode_put;
-+	}
-+	if (clk_prepare_enable(psc_fifoc_clk)) {
-+		pr_err("%s: Can't enable FIFO clock\n", __func__);
-+		goto out_clk_put;
- 	}
- 
- 	psc_fifoc = of_iomap(np, 0);
- 	if (!psc_fifoc) {
- 		pr_err("%s: Can't map FIFOC\n", __func__);
--		of_node_put(np);
--		return -ENODEV;
-+		goto out_clk_disable;
- 	}
- 
- 	psc_fifoc_irq = irq_of_parse_and_map(np, 0);
--	of_node_put(np);
- 	if (psc_fifoc_irq == 0) {
- 		pr_err("%s: Can't get FIFOC irq\n", __func__);
--		iounmap(psc_fifoc);
--		return -ENODEV;
-+		goto out_unmap;
- 	}
- 
-+	of_node_put(np);
- 	return 0;
-+
-+out_unmap:
-+	iounmap(psc_fifoc);
-+out_clk_disable:
-+	clk_disable_unprepare(psc_fifoc_clk);
-+out_clk_put:
-+	clk_put(psc_fifoc_clk);
-+out_ofnode_put:
-+	of_node_put(np);
-+out_err:
-+	return -ENODEV;
- }
- 
- static void __exit mpc512x_psc_fifoc_uninit(void)
- {
- 	iounmap(psc_fifoc);
-+
-+	/* disable the clock, errors are not fatal */
-+	if (psc_fifoc_clk && !IS_ERR(psc_fifoc_clk)) {
-+		clk_disable_unprepare(psc_fifoc_clk);
-+		clk_put(psc_fifoc_clk);
-+		psc_fifoc_clk = NULL;
-+	}
- }
- 
- /* 512x specific interrupt handler. The caller holds the port lock */
--- 
-1.7.10.4
+Thanks,
+
+-Joel
