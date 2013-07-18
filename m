@@ -1,57 +1,136 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 18 Jul 2013 13:30:55 -0500
-Subject: [RFC PATCH v2 11/15] cpufreq: kirkwood-cpufreq: remove device
- tree parsing for cpu nodes
-In-Reply-To: <51E7BFFA.8010101@arm.com>
-References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374069984-20567-12-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <20130717144355.GE1026@lunn.ch> <51E7A63F.7020207@arm.com>
- <51E7BFFA.8010101@arm.com>
-Message-ID: <51E8345F.30608@gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Thu, 18 Jul 2013 22:34:59 +0400
+Subject: [PATCH 08/10] ARM: clps711x: Add CLPS711X cpuidle driver
+In-Reply-To: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
+References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1374172501-26796-9-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2013 05:14 AM, Sudeep KarkadaNagesha wrote:
-> On 18/07/13 09:24, Sudeep KarkadaNagesha wrote:
->> On 17/07/13 15:43, Andrew Lunn wrote:
->>> On Wed, Jul 17, 2013 at 03:06:20PM +0100, Sudeep.KarkadaNagesha at arm.com wrote:
->>>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>>>
-> [...]
+This adds the cpuidle driver for Cirrus Logic CLPS711X series SoCs.
+Designed primarily for migration CLPS711X subarch for multiplatform & DT.
 
->>> Are we not going a bit backwards here? You are replacing two lines
->>> with 10 lines.
->>>
->>> How about putting these 10 lines into some helper,
->>> of_get_cpu_device()?  It would be useful for spear, kirkwood and
->>> imx6q, and maybe others.
->>>
->> Yes I realised that after making changes to this and pmac32 drivers. I
->> have already made those changes in v3. I am waiting for more response
->> before posting them.
->>
-> I thought of placing this helper in include/linux/of_device.h but I see:
-> #include <linux/of_platform.h> /* temporary until merge */
-> 
-> Does this mean of_platform.h and of_device.h will be merged ?
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ drivers/cpuidle/Kconfig            |  6 +++
+ drivers/cpuidle/Makefile           |  1 +
+ drivers/cpuidle/cpuidle-clps711x.c | 80 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 87 insertions(+)
+ create mode 100644 drivers/cpuidle/cpuidle-clps711x.c
 
-No, I think that was probably to avoid adding includes of of_platform.h
-for 100's of files. Maybe things are cleaned up enough to remove this line.
-
-> If so, which will be the final merged one ? I would like to avoid
-> changing all the header file inclusions later in users of this new helper.
-
-of_device.h is the right place.
-
-Rob
-
-> 
-> Regards,
-> Sudeep
-> 
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
+diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+index 0e2cd5c..c68a0cf 100644
+--- a/drivers/cpuidle/Kconfig
++++ b/drivers/cpuidle/Kconfig
+@@ -36,6 +36,12 @@ config CPU_IDLE_CALXEDA
+ 	help
+ 	  Select this to enable cpuidle on Calxeda processors.
+ 
++config CPU_IDLE_CLPS711X
++	bool "CPU Idle Driver for CLPS711X processors"
++	depends on ARCH_CLPS711X
++	help
++	  Select this to enable cpuidle on Cirrus Logic CLPS711X processors.
++
+ config CPU_IDLE_ZYNQ
+ 	bool "CPU Idle Driver for Xilinx Zynq processors"
+ 	depends on ARCH_ZYNQ
+diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+index 8767a7b..d07d2cb 100644
+--- a/drivers/cpuidle/Makefile
++++ b/drivers/cpuidle/Makefile
+@@ -6,5 +6,6 @@ obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
+ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+ 
+ obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
++obj-$(CONFIG_CPU_IDLE_CLPS711X)	+= cpuidle-clps711x.o
+ obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
+ obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
+diff --git a/drivers/cpuidle/cpuidle-clps711x.c b/drivers/cpuidle/cpuidle-clps711x.c
+new file mode 100644
+index 0000000..9f0129f
+--- /dev/null
++++ b/drivers/cpuidle/cpuidle-clps711x.c
+@@ -0,0 +1,80 @@
++/*
++ *  CLPS711X CPU idle driver
++ *
++ *  Copyright (C) 2013 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/cpuidle.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++static void __iomem *clps711x_halt;
++
++static int clps711x_cpuidle_halt(struct cpuidle_device *dev,
++				 struct cpuidle_driver *drv, int index)
++{
++	writel(1, clps711x_halt);
++	asm volatile ("mov r0, r0");
++	asm volatile ("mov r0, r0");
++
++	return index;
++}
++
++static struct cpuidle_driver clps711x_idle_driver = {
++	.name			= "clps711x_idle",
++	.owner			= THIS_MODULE,
++	.state_count		= 1,
++	.states[0]	= {
++		.name		= "HALT",
++		.desc		= "CLPS711X WFI",
++		.enter		= clps711x_cpuidle_halt,
++		.exit_latency	= 1,
++	},
++};
++
++static int __init clps711x_cpuidle_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	clps711x_halt = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(clps711x_halt))
++		return PTR_ERR(clps711x_halt);
++
++	return cpuidle_register(&clps711x_idle_driver, NULL);
++}
++
++static int clps711x_cpuidle_remove(struct platform_device *pdev)
++{
++	cpuidle_unregister(&clps711x_idle_driver);
++
++	return 0;
++}
++
++static const struct of_device_id clps711x_cpuidle_dt_ids[] = {
++	{ .compatible = "cirrus,clps711x-cpuidle", },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, clps711x_cpuidle_dt_ids);
++
++static struct platform_driver clps711x_cpuidle_driver = {
++	.driver	= {
++		.name		= "clps711x-cpuidle",
++		.owner		= THIS_MODULE,
++		.of_match_table	= clps711x_cpuidle_dt_ids,
++	},
++	.remove	= clps711x_cpuidle_remove,
++};
++module_platform_driver_probe(clps711x_cpuidle_driver, clps711x_cpuidle_probe);
++
++MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
++MODULE_DESCRIPTION("CLPS711X CPU idle driver");
++MODULE_LICENSE("GPL");
+-- 
+1.8.1.5
