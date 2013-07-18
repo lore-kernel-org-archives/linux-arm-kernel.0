@@ -1,65 +1,78 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 18 Jul 2013 14:54:28 +0200
-Subject: [PATCH 2/4] ARM: exynos: cpuidle: Use the common cpuidle register
- routine
+Date: Thu, 18 Jul 2013 14:54:29 +0200
+Subject: [PATCH 3/4] ARM: exynos: cpuidle: Move exynos4_idle_driver
+ declaration below in the code
 In-Reply-To: <1374152070-21008-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1374152070-21008-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1374152070-21008-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1374152070-21008-3-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we have the same routine than the one handled by the cpuidle framework.
-
-Let's use it.
+In order to prevent a pointless forward declaration, move the driver declation
+after the idle function callback, right before the init function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-exynos/cpuidle.c |   24 +-----------------------
- 1 file changed, 1 insertion(+), 23 deletions(-)
+ arch/arm/mach-exynos/cpuidle.c |   40 ++++++++++++++++++----------------------
+ 1 file changed, 18 insertions(+), 22 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index cc4b097..d8fc1a2 100644
+index d8fc1a2..8d06128 100644
 --- a/arch/arm/mach-exynos/cpuidle.c
 +++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -41,8 +41,6 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
- 				struct cpuidle_driver *drv,
- 				int index);
+@@ -37,28 +37,6 @@
  
--static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+ #define S5P_CHECK_AFTR		0xFCBA0D10
+ 
+-static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+-				struct cpuidle_driver *drv,
+-				int index);
 -
- static struct cpuidle_driver exynos4_idle_driver = {
- 	.name			= "exynos4_idle",
- 	.owner			= THIS_MODULE,
-@@ -188,29 +186,9 @@ static void __init exynos5_core_down_clk(void)
+-static struct cpuidle_driver exynos4_idle_driver = {
+-	.name			= "exynos4_idle",
+-	.owner			= THIS_MODULE,
+-	.states = {
+-		[0] = ARM_CPUIDLE_WFI_STATE,
+-		[1] = {
+-			.enter			= exynos4_enter_lowpower,
+-			.exit_latency		= 300,
+-			.target_residency	= 100000,
+-			.flags			= CPUIDLE_FLAG_TIME_VALID,
+-			.name			= "C1",
+-			.desc			= "ARM power down",
+-		},
+-	},
+-	.state_count = 2,
+-	.safe_state_index = 0,
+-};
+-
+ /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+ static void exynos4_set_wakeupmask(void)
+ {
+@@ -184,6 +162,24 @@ static void __init exynos5_core_down_clk(void)
+ 	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+ }
  
++static struct cpuidle_driver exynos4_idle_driver = {
++	.name			= "exynos4_idle",
++	.owner			= THIS_MODULE,
++	.states = {
++		[0] = ARM_CPUIDLE_WFI_STATE,
++		[1] = {
++			.enter			= exynos4_enter_lowpower,
++			.exit_latency		= 300,
++			.target_residency	= 100000,
++			.flags			= CPUIDLE_FLAG_TIME_VALID,
++			.name			= "C1",
++			.desc			= "ARM power down",
++		},
++	},
++	.state_count = 2,
++	.safe_state_index = 0,
++};
++
  static int __init exynos4_init_cpuidle(void)
  {
--	int cpu_id, ret;
--	struct cpuidle_device *device;
--
  	if (soc_is_exynos5250())
- 		exynos5_core_down_clk();
- 
--	ret = cpuidle_register_driver(&exynos4_idle_driver);
--	if (ret) {
--		printk(KERN_ERR "CPUidle failed to register driver\n");
--		return ret;
--	}
--
--	for_each_online_cpu(cpu_id) {
--		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
--		device->cpu = cpu_id;
--
--		ret = cpuidle_register_device(device);
--		if (ret) {
--			printk(KERN_ERR "CPUidle register device failed\n");
--			return ret;
--		}
--	}
--
--	return 0;
-+	return cpuidle_register(&exynos4_idle_driver, NULL);
- }
- device_initcall(exynos4_init_cpuidle);
 -- 
 1.7.9.5
