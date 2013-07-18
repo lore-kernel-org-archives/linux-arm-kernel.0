@@ -1,225 +1,38 @@
-From: elen.song@atmel.com (elen.song)
-Date: Thu, 18 Jul 2013 17:21:00 +0800
-Subject: [PATCH V2 5/8] serial: at91: support run time switch transfer mode
-In-Reply-To: <20130718081520.GC16015@ns203013.ovh.net>
-References: <1373942627-7121-1-git-send-email-elen.song@atmel.com>
- <1373942627-7121-6-git-send-email-elen.song@atmel.com>
- <20130718081520.GC16015@ns203013.ovh.net>
-Message-ID: <51E7B37C.5090105@atmel.com>
+From: mmarek@suse.cz (Michal Marek)
+Date: Thu, 18 Jul 2013 11:22:24 +0200
+Subject: [PATCH] arm, kbuild: make "make install" not depend on vmlinux
+In-Reply-To: <CA+55aFzhmV7iq+Pv37trMCmdNzk53ORAoj0a6rV14fzKta3Dhw@mail.gmail.com>
+References: <20130710133742.GA29368@emu.suse.cz>
+ <CA+55aFxtvT3Yvbxe5JGBThZS13payymFJ7jCLyEiE2iNDvsZtQ@mail.gmail.com>
+ <20130711135445.GA21500@sepie.suse.cz>
+ <CA+55aFyVjugxM7cUDWi0ASWttYthCxa6e7X3CADknBcSFxWgew@mail.gmail.com>
+ <20130712105721.GF8731@rric.localhost> <20130717160506.GI8731@rric.localhost>
+ <CA+55aFx4G5gME3ByqE0Wr-_t2x_6WkP3Ta4k1z4jfW+PrcK0og@mail.gmail.com>
+ <20130717165743.GK8731@rric.localhost>
+ <CA+55aFzhmV7iq+Pv37trMCmdNzk53ORAoj0a6rV14fzKta3Dhw@mail.gmail.com>
+Message-ID: <51E7B3D0.4060609@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi JC:
-On 7/18/2013 4:15 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 10:43 Tue 16 Jul     , Elen Song wrote:
->> We will switch to pio mode when request of dma or pdc fail.
->> But soon or later, when the request is success, the transfer mode can switch to them at
->> next open serial port action.
->> So in startup stage, we should get original transfer mode.
-> You need to update the Documentation of the binding to said the driver support
-> dmas bindings for the new IP
-
-one question, it seems the document should write like:
-
-use DMA:
-     usart0: serial at f001c000{
-         compatible = "atmel,at91sam9260-usart";
-         dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(3)>,
-                      <&dma0 2 
-(AT91_DMA_CFG_PER_ID(3)|AT91_DMA_CFG_FIFOCFG_ASAP)>;
-         dma-names = "tx","rx";
-};
-
-Should I replace macros with typical values?
-
-Best regards
-> and please use true/false for boolean
->
-> and check the white space
->> Signed-off-by: Elen Song <elen.song@atmel.com>
->> ---
->>   drivers/tty/serial/atmel_serial.c |  139 +++++++++++++++++++++----------------
->>   1 file changed, 80 insertions(+), 59 deletions(-)
+On 17.7.2013 19:03, Linus Torvalds wrote:
+> On Wed, Jul 17, 2013 at 9:57 AM, Robert Richter <rric@kernel.org> wrote:
 >>
->> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
->> index 298b58c..ad787fd1 100644
->> --- a/drivers/tty/serial/atmel_serial.c
->> +++ b/drivers/tty/serial/atmel_serial.c
->> @@ -1371,6 +1371,80 @@ static void atmel_tasklet_func(unsigned long data)
->>   	spin_unlock(&port->lock);
->>   }
->>   
->> +static int atmel_init_property(struct atmel_uart_port *atmel_port,
->> +				struct platform_device *pdev)
->> +{
->> +	struct device_node *np = pdev->dev.of_node;
->> +	struct atmel_uart_data *pdata = pdev->dev.platform_data;
->> +
->> +	if (np) {
->> +		/* DMA/PDC usage specification */
->> +		if (of_get_property(np, "atmel,use-dma-rx", NULL)) {
->> +			if (of_get_property(np, "dmas", NULL)) {
->> +				atmel_port->use_dma_rx  = 1;
->> +				atmel_port->use_pdc_rx  = 0;
->> +			} else {
->> +				atmel_port->use_dma_rx  = 0;
->> +				atmel_port->use_pdc_rx  = 1;
->> +			}
->> +		} else {
->> +			atmel_port->use_dma_rx  = 0;
->> +			atmel_port->use_pdc_rx  = 0;
->> +		}
->> +
->> +		if (of_get_property(np, "atmel,use-dma-tx", NULL)) {
->> +			if (of_get_property(np, "dmas", NULL)) {
->> +				atmel_port->use_dma_tx  = 1;
->> +				atmel_port->use_pdc_tx  = 0;
->> +			} else {
->> +				atmel_port->use_dma_tx  = 0;
->> +				atmel_port->use_pdc_tx  = 1;
->> +			}
->> +		} else {
->> +			atmel_port->use_dma_tx  = 0;
->> +			atmel_port->use_pdc_tx  = 0;
->> +		}
->> +
->> +	} else {
->> +		atmel_port->use_pdc_rx  = pdata->use_dma_rx;
->> +		atmel_port->use_pdc_tx  = pdata->use_dma_tx;
->> +		atmel_port->use_dma_rx  = 0;
->> +		atmel_port->use_dma_tx  = 0;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static void atmel_init_rs485(struct atmel_uart_port *atmel_port,
->> +				struct platform_device *pdev)
->> +{
->> +	struct device_node *np = pdev->dev.of_node;
->> +	struct atmel_uart_data *pdata = pdev->dev.platform_data;
->> +
->> +	if (np) {
->> +		u32 rs485_delay[2];
->> +		/* rs485 properties */
->> +		if (of_property_read_u32_array(np, "rs485-rts-delay",
->> +					rs485_delay, 2) == 0) {
->> +			struct serial_rs485 *rs485conf = &atmel_port->rs485;
->> +
->> +			rs485conf->delay_rts_before_send = rs485_delay[0];
->> +			rs485conf->delay_rts_after_send = rs485_delay[1];
->> +			rs485conf->flags = 0;
->> +
->> +		if (of_get_property(np, "rs485-rx-during-tx", NULL))
->> +			rs485conf->flags |= SER_RS485_RX_DURING_TX;
->> +
->> +		if (of_get_property(np, "linux,rs485-enabled-at-boot-time",
->> +								NULL))
->> +			rs485conf->flags |= SER_RS485_ENABLED;
->> +		}
->> +	} else {
->> +		atmel_port->rs485       = pdata->rs485;
->> +	}
->> +
->> +}
->> +
->>   static void atmel_set_ops(struct uart_port *port)
->>   {
->>   	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->> @@ -1409,6 +1483,7 @@ static void atmel_set_ops(struct uart_port *port)
->>    */
->>   static int atmel_startup(struct uart_port *port)
->>   {
->> +	struct platform_device *pdev = to_platform_device(port->dev);
->>   	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->>   	struct tty_struct *tty = port->state->port.tty;
->>   	int retval;
->> @@ -1433,6 +1508,8 @@ static int atmel_startup(struct uart_port *port)
->>   	/*
->>   	 * Initialize DMA (if necessary)
->>   	 */
->> +	atmel_init_property(atmel_port, pdev);
->> +
->>   	if (atmel_port->prepare_rx) {
->>   		retval = atmel_port->prepare_rx(port);
->>   		if (retval < 0)
->> @@ -1878,55 +1955,6 @@ static struct uart_ops atmel_pops = {
->>   #endif
->>   };
->>   
->> -static void atmel_of_init_port(struct atmel_uart_port *atmel_port,
->> -					 struct device_node *np)
->> -{
->> -	u32 rs485_delay[2];
->> -
->> -	/* DMA/PDC usage specification */
->> -	if (of_get_property(np, "atmel,use-dma-rx", NULL)) {
->> -		if (of_get_property(np, "dmas", NULL)) {
->> -			atmel_port->use_dma_rx	= 1;
->> -			atmel_port->use_pdc_rx	= 0;
->> -		} else {
->> -			atmel_port->use_dma_rx	= 0;
->> -			atmel_port->use_pdc_rx	= 1;
->> -		}
->> -	} else {
->> -		atmel_port->use_dma_rx	= 0;
->> -		atmel_port->use_pdc_rx	= 0;
->> -	}
->> -
->> -	if (of_get_property(np, "atmel,use-dma-tx", NULL)) {
->> -		if (of_get_property(np, "dmas", NULL)) {
->> -			atmel_port->use_dma_tx	= 1;
->> -			atmel_port->use_pdc_tx	= 0;
->> -		} else {
->> -			atmel_port->use_dma_tx	= 0;
->> -			atmel_port->use_pdc_tx	= 1;
->> -		}
->> -	} else {
->> -		atmel_port->use_dma_tx	= 0;
->> -		atmel_port->use_pdc_tx	= 0;
->> -	}
->> -
->> -	/* rs485 properties */
->> -	if (of_property_read_u32_array(np, "rs485-rts-delay",
->> -					    rs485_delay, 2) == 0) {
->> -		struct serial_rs485 *rs485conf = &atmel_port->rs485;
->> -
->> -		rs485conf->delay_rts_before_send = rs485_delay[0];
->> -		rs485conf->delay_rts_after_send = rs485_delay[1];
->> -		rs485conf->flags = 0;
->> -
->> -		if (of_get_property(np, "rs485-rx-during-tx", NULL))
->> -			rs485conf->flags |= SER_RS485_RX_DURING_TX;
->> -
->> -		if (of_get_property(np, "linux,rs485-enabled-at-boot-time", NULL))
->> -			rs485conf->flags |= SER_RS485_ENABLED;
->> -	}
->> -}
->> -
->>   /*
->>    * Configure the port from the platform device resource info.
->>    */
->> @@ -1936,17 +1964,10 @@ static void atmel_init_port(struct atmel_uart_port *atmel_port,
->>   	struct uart_port *port = &atmel_port->uart;
->>   	struct atmel_uart_data *pdata = pdev->dev.platform_data;
->>   
->> -	if (pdev->dev.of_node) {
->> -		atmel_of_init_port(atmel_port, pdev->dev.of_node);
->> -	} else {
->> -		atmel_port->use_pdc_rx	= pdata->use_dma_rx;
->> -		atmel_port->use_pdc_tx	= pdata->use_dma_tx;
->> -		atmel_port->use_dma_rx	= 0;
->> -		atmel_port->use_dma_tx	= 0;
->> -		atmel_port->rs485	= pdata->rs485;
->> -	}
->> +	if (!atmel_init_property(atmel_port, pdev))
->> +		atmel_set_ops(port);
->>   
->> -	atmel_set_ops(port);
->> +	atmel_init_rs485(atmel_port, pdev);
->>   
->>   	port->iotype		= UPIO_MEM;
->>   	port->flags		= UPF_BOOT_AUTOCONF;
->> -- 
->> 1.7.9.5
->>
+>> If kernel.release doen't exist KERNEL_RELEASE is empty, thus all args
+>> for install.sh shift one arg left.
+> 
+> You know what? I read the patch, but I didn't read your changelog well
+> enough. You already explained that in the commit log, and I just
+> missed it like some blind monkey. My bad.
+> 
+>> Will splitt the patches and resend.
+> 
+> No need to split, I was wrong, it wasn't some unrelated cleanup, and
+> you were right the first time.
+> 
+> So Michal (or ARM people - whoever wants to take the patch), just take
+> my ack. No objections.
+
+I can add it to the kbuild tree if needed. Otherwise you can add
+Acked-by: Michal Marek <mmarek@suse.cz>.
+
+Michal
