@@ -1,71 +1,141 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Jul 2013 00:36:39 -0700
-Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
-In-Reply-To: <51E70B5D.6030802@wwwdotorg.org>
-References: <20130716090310.5541.36777.stgit@localhost>
- <20130716090536.5541.36289.stgit@localhost>
- <51E70B5D.6030802@wwwdotorg.org>
-Message-ID: <20130718073638.GP7656@atomide.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu, 18 Jul 2013 09:38:52 +0200
+Subject: [PATCH v4 2/5] mmc: atmel-mci: prepare clk before calling enable
+In-Reply-To: <1374132753-15206-1-git-send-email-b.brezillon@overkiz.com>
+References: <1374132753-15206-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1374133132-17556-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [130717 14:30]:
-> On 07/16/2013 03:05 AM, Tony Lindgren wrote:
-> > To toggle dynamic states, let's add the optional active state in
-> > addition to the static default state. Then if the optional active
-> > state is defined, we can require that idle and sleep states cover
-> > the same pingroups as the active state.
-> > 
-> > Then let's add pinctrl_check_dynamic() and pinctrl_select_dynamic()
-> > to use instead of pinctrl_select() to avoid breaking existing users.
-> > 
-> > With pinctrl_check_dynamic() we can check that idle and sleep states
-> > match the active state for pingroups during init, and don't need to
-> > do it during runtime.
-> > 
-> > Then with the states pre-validated, pinctrl_select_dynamic() can
-> > just toggle between the dynamic states without extra checks.
-> > 
-> > Note that pinctr_select_state() still has valid use cases, such as
-> > changing states when the pins can be shared between two drivers
-> > and don't necessarily cover the same pingroups. For dynamic runtime
-> > toggling of pin states, we should eventually always use just
-> > pinctrl_select_dynamic().
-> 
-> Something in this series should edit Documentation/pinctrl.txt to
-> explain the philosophy behind the static/dynamic state split. That
-> philosophy and/or semantics are more important to review than the code...
+Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+avoid common clk framework warnings.
 
-Sure, I'll write up something on that.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/mmc/host/atmel-mci.c |   34 +++++++++++++++++++++++++++-------
+ 1 file changed, 27 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index bdb84da..69e438e 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -378,6 +378,8 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+ {
+ 	struct atmel_mci	*host = s->private;
+ 	u32			*buf;
++	int			ret = 0;
++
  
-> Related to that, I'm worried that using pinctrl_select_state() and
-> pinctrl_select_dynamic() appear to be mutually-exclusive options here.
-
-Not currently, but eventually I think that's a good idea. We should
-use pinctrl_select_state() only during init time eventually because
-of the diffing of states it does.
-
-> Why shouldn't e.g. a pinctrl-based I2C mux also be able to do runtime
-> PM? Does the mux setting select which states are used for runtime PM, or
-> does runtime PM override the basic mux setting, or must the pincrl-I2C
-> mux manually implement custom runtime-PM/pinctrl interaction since
-> there's no generic answer to those questions? How many more custom
-> exceptions will there be?
-
-The idea is that runtime PM will never touch the basic mux settings
-at all. The "default" state should be considered a static state
-that is claimed during driver probe, and released when the driver
-is unloaded. This is typically let's say 90% of the pins for any
-device.
-
-For runtime PM, we can just toggle the PM related pinctrl states as
-they have been verified to match the active state during init.
-
-So I don't see why pinctrl-I2C would have to do anything specific.
-All that is required is that the pins are grouped for the consumer
-driver, and we can provide some automated checks on the states for
-runtime PM.
-
-Regards,
-
-Tony
+ 	buf = kmalloc(ATMCI_REGS_SIZE, GFP_KERNEL);
+ 	if (!buf)
+@@ -388,12 +390,16 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+ 	 * not disabling interrupts, so IMR and SR may not be
+ 	 * consistent.
+ 	 */
++	ret = clk_prepare_enable(host->mck);
++	if (ret)
++		goto out;
++
+ 	spin_lock_bh(&host->lock);
+-	clk_enable(host->mck);
+ 	memcpy_fromio(buf, host->regs, ATMCI_REGS_SIZE);
+-	clk_disable(host->mck);
+ 	spin_unlock_bh(&host->lock);
+ 
++	clk_disable_unprepare(host->mck);
++
+ 	seq_printf(s, "MR:\t0x%08x%s%s ",
+ 			buf[ATMCI_MR / 4],
+ 			buf[ATMCI_MR / 4] & ATMCI_MR_RDPROOF ? " RDPROOF" : "",
+@@ -442,9 +448,10 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+ 				val & ATMCI_CFG_LSYNC ? " LSYNC" : "");
+ 	}
+ 
++out:
+ 	kfree(buf);
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ static int atmci_regs_open(struct inode *inode, struct file *file)
+@@ -1262,6 +1269,7 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	struct atmel_mci_slot	*slot = mmc_priv(mmc);
+ 	struct atmel_mci	*host = slot->host;
+ 	unsigned int		i;
++	bool			unprepare_clk;
+ 
+ 	slot->sdc_reg &= ~ATMCI_SDCBUS_MASK;
+ 	switch (ios->bus_width) {
+@@ -1277,9 +1285,13 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		unsigned int clock_min = ~0U;
+ 		u32 clkdiv;
+ 
++		clk_prepare(host->mck);
++		unprepare_clk = true;
++
+ 		spin_lock_bh(&host->lock);
+ 		if (!host->mode_reg) {
+ 			clk_enable(host->mck);
++			unprepare_clk = false;
+ 			atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+ 			atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIEN);
+ 			if (host->caps.has_cfg_reg)
+@@ -1347,6 +1359,8 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	} else {
+ 		bool any_slot_active = false;
+ 
++		unprepare_clk = false;
++
+ 		spin_lock_bh(&host->lock);
+ 		slot->clock = 0;
+ 		for (i = 0; i < ATMCI_MAX_NR_SLOTS; i++) {
+@@ -1360,12 +1374,16 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 			if (host->mode_reg) {
+ 				atmci_readl(host, ATMCI_MR);
+ 				clk_disable(host->mck);
++				unprepare_clk = true;
+ 			}
+ 			host->mode_reg = 0;
+ 		}
+ 		spin_unlock_bh(&host->lock);
+ 	}
+ 
++	if (unprepare_clk)
++		clk_unprepare(host->mck);
++
+ 	switch (ios->power_mode) {
+ 	case MMC_POWER_UP:
+ 		set_bit(ATMCI_CARD_NEED_INIT, &slot->flags);
+@@ -2376,10 +2394,12 @@ static int __init atmci_probe(struct platform_device *pdev)
+ 	if (!host->regs)
+ 		goto err_ioremap;
+ 
+-	clk_enable(host->mck);
++	ret = clk_prepare_enable(host->mck);
++	if (ret)
++		goto err_request_irq;
+ 	atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+ 	host->bus_hz = clk_get_rate(host->mck);
+-	clk_disable(host->mck);
++	clk_disable_unprepare(host->mck);
+ 
+ 	host->mapbase = regs->start;
+ 
+@@ -2482,11 +2502,11 @@ static int __exit atmci_remove(struct platform_device *pdev)
+ 			atmci_cleanup_slot(host->slot[i], i);
+ 	}
+ 
+-	clk_enable(host->mck);
++	clk_prepare_enable(host->mck);
+ 	atmci_writel(host, ATMCI_IDR, ~0UL);
+ 	atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
+ 	atmci_readl(host, ATMCI_SR);
+-	clk_disable(host->mck);
++	clk_disable_unprepare(host->mck);
+ 
+ 	if (host->dma.chan)
+ 		dma_release_channel(host->dma.chan);
+-- 
+1.7.9.5
