@@ -1,55 +1,68 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 18 Jul 2013 10:55:06 -0300
-Subject: [PATCH] ARM: Kirkwood: Fix the internal register ranges
- translation
-In-Reply-To: <51E63B3A.2010807@keymile.com>
-References: <1371569479-31498-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <51E5145A.90404@keymile.com> <20130716125531.GD2317@localhost>
- <51E63B3A.2010807@keymile.com>
-Message-ID: <20130718135505.GA3264@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 18 Jul 2013 14:56:50 +0100
+Subject: [PATCH v3] clk: add MOXA ART SoCs clock driver
+In-Reply-To: <CACmBeS24smrJ4SLY7snv1_6SRcuXRkZ8t0PGMvBupUpKMMb43w@mail.gmail.com>
+References: <1372943292-6960-1-git-send-email-jonas.jensen@gmail.com>
+ <1374067396-30155-1-git-send-email-jonas.jensen@gmail.com>
+ <20130718095035.GA29153@e106331-lin.cambridge.arm.com>
+ <CACmBeS2SnpiUtiQD6j9qyaXZ5-chHSHVeo4c5=UhitVonvkKtw@mail.gmail.com>
+ <20130718110201.GB29153@e106331-lin.cambridge.arm.com>
+ <CACmBeS24smrJ4SLY7snv1_6SRcuXRkZ8t0PGMvBupUpKMMb43w@mail.gmail.com>
+Message-ID: <20130718135650.GD29153@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gerlando,
-
-On Wed, Jul 17, 2013 at 08:35:38AM +0200, Gerlando Falauto wrote:
-> On 07/16/2013 02:56 PM, Ezequiel Garcia wrote:
-> [...]
-> > Also, speaking of "device bus" this nand node should be behind a devicebus node.
-> >
-> > 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000   /* internal-regs */
-> > 			  MBUS_ID(0x01, 0x2f) 0 0 0xf4000000 0x400>;
-> >
-> > 		devbus {
-> > 			status = "okay";
-> > 			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0x400>;
-> >
-> > 			/* nand */
-> > 			nand {
-> > 				compatible = "marvell,orion-nand";
-> > 				reg = <0 0x400>;
-> > 			};
-> > 		};
-> >
-> > (notice this will allow you to relocate the base address of the NAND windows
-> > easily if it conflicts with your PCIe needs).
+On Thu, Jul 18, 2013 at 12:55:26PM +0100, Jonas Jensen wrote:
+> On 18 July 2013 13:02, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Ok. I'm just concerned that the linkage isn't explicit or obvious.
 > 
-> I am MAYBE slowly starting to understand this whole mbus rework.
-> Just one remark though: don't you think it would make sense to add 
-> something like:
+> > This does leave apb-clock completely dependent on core-clock, and unless
+> > I've missed something there's no linkage between the two described in
+> > the dt.
 > 
-> #define MBUS_ID_INTERNAL_REGS	MBUS_ID(0xf0, 0x01)
-> #define MBUS_ID_NAND		MBUS_ID(0x01, 0x2f)
+> I can add a description in the core-clock binding and also for
+> apb-clock pointing
+> out that it's set from core-clock.
 > 
+> > How does core-clock physically relate to apb-clock? Does it feed or is
+> > it fed by apb-clock?
+> 
+> apb-clock is entirely a DT construct used by drivers to get the fixed
+> rate 48MHz.
+> It's not fed by core-clock more than what happens in probe.
+> 
+> For UC-7112-LX, drivers using apb-clock are: clocksource, MMC, watchdog
+> 
+> Because clocksource relies on apb-clock, a successful probe of
+> core-clock is critical.
+> 
+> Commonly, drivers look up the apb-clock node and call clk_get_rate.
 
-Yeah, maybe it would make sense. This has been discussed in the past
-and others were against, so that's the reason it's not included in
-the series I submitted.
+When you say look up the apb-clock node, I assume they find it via their
+clocks property with of_clk_get or similar, rather than scanning the
+tree for a "moxart,moxa-apb-clock" node specifically?
 
-But feel free to send a patch proposing it once the MBus is merged!
+> 
+> > Are we always guaranteed to have core-clock if we have apb-clock, and is
+> > it part of the same block in hardware? If so we could describe the
+> > amalgamation as a provider with two clock outputs, with core-clock's
+> > registers for configuration at probe-time.
+> 
+> Yes, as described above, there can not be a apb-clock without core-clock.
+> 
+> 
+> I think drivers could find and use core-clock instead. Maybe the abstraction
+> of apb-clock is unnecessary?
+
+Given the above, I think it would make more sense to have core-clock
+registered, and have it passed to the devices currently passed
+apb-clock.
 
 Thanks,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Mark.
+
+> 
+> 
+> Best regards,
+> Jonas
+> 
